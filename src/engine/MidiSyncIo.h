@@ -92,6 +92,7 @@ private:
         midisync::Generator generator;       // audio thread
         SpscQueue<Timed, 2048> queue;        // audio → sender
         std::string name;                    // message thread
+        std::string id;                      // message thread: the opened device's identifier (round 190gh, hot-plug)
         bool notesOff = false, sync = false; // message thread
         std::unique_ptr<juce::MidiOutput> device; // under outputLock
     };

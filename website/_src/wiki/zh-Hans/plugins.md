@@ -1,5 +1,5 @@
 ---
-source: be0fc22373
+source: 1c440a7810
 ---
 ![插件管理器的下半部分，带有一条说明：每个插件文件都在独立进程中检查](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -89,6 +89,19 @@ macOS 上不承载 VST2。在 Linux 上，Windows 插件可通过 [yabridge](htt
 ## 把乐器的输出送到不同的插入轨
 
 有多个输出的乐器插件可以让每个输出在各自的混音台插入轨上播放。在插件窗口中，单击 `封装器设置`，再单击 `处理` 选项卡。在 `连接` 下，每个输出都有一个用来开关它的指示灯和一个数字：表示它在通道自己的插入轨之后的第几个插入轨上播放。`自动映射输出` 会给每个输出分配下一个插入轨，`重置` 则恢复默认值。
+
+## FL Studio 自带的插件
+
+FL Studio 的原生插件，例如 Sytrus、Harmor 和 Patcher，只能在 FL Studio 内部运行。要在 LYNX SHARE 中使用它们，请使用随 FL Studio 附带的插件版本。在 Windows 上，它安装为 `C:\Program Files\Common Files\VST2` 中的 `FL Studio VSTi` 和 `FL Studio VSTi (Multi)`。在 macOS 上是 Audio Unit。
+
+1. 扫描插件。两者都会作为乐器出现，厂商是 Image-Line。第一次扫描可能要一些时间，因为整个 FL Studio 都会在插件内启动。
+2. 把 `FL Studio VSTi` 添加到一个通道并打开它的窗口。点击 FL Studio 标志可打开 FL Studio 自己的窗口，里面有它的通道机架、混音台和浏览器。
+3. 在 FL Studio 的通道机架中添加一个乐器。新的 FL Studio 插件开始时只有一个空的采样器，在你添加乐器之前不会发声。来自 LYNX SHARE 的音符会播放 FL Studio 通道机架中选中的通道。
+4. LYNX SHARE 播放时，FL Studio 自己的样式也会播放，速度跟随 LYNX SHARE 的速度。
+
+你在 FL Studio 内部搭建的内容会随 LYNX SHARE 工程一起保存。`FL Studio VSTi (Multi)` 有 16 路立体声输出，可以在各自独立的插入轨上播放（见上一节）。你的 FL Studio 许可证决定哪些 FL 插件能在其中使用。LYNX SHARE 自己不会加载 FL Studio 的插件文件。
+
+如果 FL Studio 插件被列为 `加载失败`，请在 `选项 › 插件管理器...` 中右键点击它，选择 `重试（立即扫描此文件）`。
 
 ## 插件数据库文件夹
 

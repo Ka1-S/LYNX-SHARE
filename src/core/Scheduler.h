@@ -52,6 +52,10 @@ struct NoteEvent
     float clipPitch = 0.0f;
     // audio clips: FL 2026's clip stretch (the audio plays that many times longer; round 167l)
     float clipStretch = 1.0f;
+    // audio clips, round 190gi (core/ClipEnvelope.h): the clip's envelope (an index into Song::clipEnvelopes; −1 = none
+    // or flat) and the clip time (ticks) where the note starts in it
+    std::int32_t clipEnvelope = -1;
+    double clipEnvTick = 0.0;
     // the note's Mod X / Y (0..1, 0.5 = none) and, on its "off", its release velocity (0..1) — REA round 151
     float modX = 0.5f, modY = 0.5f, release = 0.5f;
     // the note's level factor (a Layer's VOL and crossfade, round 164): the instrument scales the voice when it can,
@@ -216,6 +220,14 @@ struct ScheduleIndex
     // per Playlist clip: the next clip of the same pattern by start (the same start: later in the list), -1 = none or
     // not a pattern clip (Song::patternClipTakeover, issue #158)
     std::vector<int> nextOfPattern;
+    // Round 190gp: the Playlist's clips by time, so a block visits only the clips it can reach instead of every clip.
+    // Bucket b holds, in Playlist order, the clips whose [start, end + 1] meets [b · bucketTicks, (b + 1) · bucketTicks)
+    // (the first bucket also every clip that starts before 0, the last every clip that reaches past it).
+    // bucketTicks 0 = none (every clip is visited, as before). `clipCount`: the Playlist it was built for.
+    std::int64_t bucketTicks = 0;
+    std::size_t clipCount = 0;
+    std::vector<std::uint32_t> bucketFirst; // bucket b's clips: bucketClips[bucketFirst[b] … bucketFirst[b + 1])
+    std::vector<std::uint32_t> bucketClips;
 };
 
 // FL's pattern clip takeover (Song::patternClipTakeover, issue #158): the song tick from which Playlist clip `clipIndex`

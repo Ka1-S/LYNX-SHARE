@@ -114,6 +114,25 @@ inline std::vector<WarpPoint> playedMarkers (const SamplerSettings& s, double fi
     return out;
 }
 
+// Round 190gi: the markers to show and edit on a Playlist clip — playedMarkers, or, for a warped channel whose markers
+// keep one tempo (playedMarkers is then empty), the same normalisation of its own markers (the end marker, and markers
+// added on the beat they play on, show as flags and can be dragged). Empty when the channel is not warped.
+inline std::vector<WarpPoint> editableMarkers (const SamplerSettings& s, double fileSeconds)
+{
+    if (auto played = playedMarkers (s, fileSeconds); ! played.empty())
+        return played;
+    if (! s.keepPitch || s.stretchBeats <= 0.0f || s.warp.size() < 2 || ! (fileSeconds > 0.0))
+        return {};
+    const auto b0 = beatAt (s.warp, 0.0), b1 = beatAt (s.warp, fileSeconds);
+    if (! (b1 > b0))
+        return {};
+    const auto scale = (double) s.stretchBeats / (b1 - b0);
+    std::vector<WarpPoint> out;
+    for (const auto& p : s.warp)
+        out.push_back ({ p.seconds, (p.beats - b0) * scale });
+    return out;
+}
+
 // The file time played at content beat `beats` (the inverse of beatAt, straight beyond the end markers)
 inline double secondsAt (const std::vector<WarpPoint>& w, double beats)
 {

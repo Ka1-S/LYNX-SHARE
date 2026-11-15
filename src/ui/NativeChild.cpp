@@ -1,6 +1,7 @@
 #include "ui/NativeChild.h"
 #include "ui/WindowOwner.h"
 #include "core/DockStack.h"
+#include "core/DockingPolicy.h"
 
 #include <algorithm>
 #include <cmath>
@@ -57,6 +58,9 @@ RECT physicalRect (const juce::Component& c, const juce::ComponentPeer& peer, ju
     return { juce::roundToInt (b.getX()), juce::roundToInt (b.getY()), juce::roundToInt (b.getRight()), juce::roundToInt (b.getBottom()) };
 }
 
+// LYNX's own exact placement is under way (placePhysically): the window procedure leaves its position alone
+bool placingExactly = false;
+
 // the native window's place in its parent's client area, physical pixels
 RECT rectInParent (HWND hwnd, HWND parent)
 {
@@ -83,6 +87,7 @@ void placePhysically (juce::Component& c, juce::Rectangle<int> bounds)
     const auto now = rectInParent (hwnd, parent);
     if (now.left == want.left && now.top == want.top && now.right == want.right && now.bottom == want.bottom)
         return;
+    const juce::ScopedValueSetter<bool> exact (placingExactly, true); // (this place stands: placeAtOnce leaves it)
     SetWindowPos (hwnd, nullptr, want.left, want.top, want.right - want.left, want.bottom - want.top, SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
    #else
     juce::ignoreUnused (c, bounds);
@@ -278,6 +283,40 @@ bool rootIsForeground (HWND hwnd)
     return root != nullptr && GetForegroundWindow() == root;
 }
 
+bool isButtonDownNotice (WORD event) noexcept
+{
+    return event == WM_LBUTTONDOWN || event == WM_RBUTTONDOWN || event == WM_MBUTTONDOWN || event == WM_XBUTTONDOWN || event == WM_POINTERDOWN;
+}
+
+void raiseForForeignClick (HWND frame, LPARAM pointInFrame);
+
+// Round 190he (issue #152, "the windows still flicker"): JUCE moves a child window to a place it works out with the
+// scale of the display at that point taken as a SCREEN point, and with SWP_FRAMECHANGED (the whole window redrawn) on
+// every move; LYNX then put it at its real place in the parent (placePhysically). With a display scale other than 100 %
+// every move or resize of a panel or docked window showed it first at the wrong place, then at the right one: a flash
+// on each step of a drag. The window now goes straight to its place in the parent's own pixels (the component's bounds
+// are already the new ones when JUCE asks), without the frame change (a child window has no frame to recalculate).
+void placeAtOnce (juce::Component& c, WINDOWPOS& pos)
+{
+    if (placingExactly || ((pos.flags & SWP_NOMOVE) != 0 && (pos.flags & SWP_NOSIZE) != 0))
+        return;
+    auto* peer = c.getPeer();
+    if (peer == nullptr || ! isAttached (c) || GetParent (pos.hwnd) == nullptr || (GetWindowLongPtr (pos.hwnd, GWL_STYLE) & WS_CHILD) == 0)
+        return;
+    const auto want = physicalRect (c, *peer, c.getBounds());
+    if ((pos.flags & SWP_NOMOVE) == 0)
+    {
+        pos.x = want.left;
+        pos.y = want.top;
+    }
+    if ((pos.flags & SWP_NOSIZE) == 0)
+    {
+        pos.cx = want.right - want.left;
+        pos.cy = want.bottom - want.top;
+    }
+    pos.flags &= ~(UINT) SWP_FRAMECHANGED;
+}
+
 LRESULT CALLBACK childProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     auto& windows = subclassedWindows();
@@ -315,6 +354,10 @@ LRESULT CALLBACK childProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
                 if (auto* focus = GetFocus(); focus == nullptr || GetAncestor (focus, GA_ROOT) != root)
                     SetFocus (root);
     }
+    else if (message == WM_WINDOWPOSCHANGING && c != nullptr && lParam != 0)
+        placeAtOnce (*c, *reinterpret_cast<WINDOWPOS*> (lParam));
+    else if (message == WM_PARENTNOTIFY && c != nullptr && isButtonDownNotice (LOWORD (wParam)))
+        raiseForForeignClick (hwnd, lParam);
     else if (message == WM_NCDESTROY)
     {
         SetWindowLongPtr (hwnd, GWLP_WNDPROC, (LONG_PTR) original);
@@ -432,6 +475,30 @@ LRESULT CALLBACK clickHookProc (int code, WPARAM wParam, LPARAM lParam)
     return CallNextHookEx (nullptr, code, wParam, lParam);
 }
 
+// Round 190he (issue #152 again, 0.1.27: "no window can be put over the Channel rack"): the hook above sees only the
+// windows of LYNX's UI thread. A plugin view made by another thread, or in another process (a bridged 32-bit plugin, a
+// plugin run in its own process), gets its clicks from the system directly, so a click inside it never raised its
+// docked window: the Channel rack (or any panel) clicked before stayed over it. Windows tells every ancestor of the
+// clicked child window about a button press (WM_PARENTNOTIFY), whatever thread or process made the child: the docked
+// window raises itself for those. Clicks in this thread's own windows stay with the hook (no second raise).
+void raiseForForeignClick (HWND frame, LPARAM pointInFrame)
+{
+    POINT p { (int) (short) LOWORD (pointInFrame), (int) (short) HIWORD (pointInFrame) };
+    ClientToScreen (frame, &p);
+    auto* clicked = WindowFromPoint (p);
+    if (clicked == nullptr || clicked == frame || ! IsChild (frame, clicked))
+        return;
+    if (! dockstack::clickNeedsParentNotice (GetWindowThreadProcessId (clicked, nullptr), GetCurrentThreadId()))
+        return;
+    auto& list = clickRaises();
+    for (const auto& r : list)
+        if (r.component != nullptr && r.component->getWindowHandle() == (void*) frame)
+        {
+            juce::MessageManager::callAsync ([safe = r.component] { raiseClicked (safe); });
+            return;
+        }
+}
+
 void installClickHook()
 {
     static HHOOK hook = nullptr;
@@ -470,7 +537,20 @@ KeyForwarder& keyForwarder()
 
 bool dockingEnabled()
 {
-    static const bool on = juce::SystemStats::getEnvironmentVariable ("LYNX_DOCKED_PLUGINS", {}).trim() != "0";
+    // Issue #165 (Linux, Wayland desktop through XWayland, and LYNX's own private X server): an X11 child window in the
+    // main window takes no keyboard focus for its text fields (the SoundFont's preset search box typed nothing), a
+    // closed or moved one leaves its picture behind until something else repaints there, and it has no frame of its
+    // own. The docking glue (click raise, placement, stacking checks) is written for Win32 only, so on Linux and macOS
+    // plugin and channel windows are the system's own windows ("Detached", as before issue #116) unless
+    // LYNX_DOCKED_PLUGINS=1 (core/DockingPolicy.h).
+    static const bool on = [] {
+        const auto value = juce::SystemStats::getEnvironmentVariable ("LYNX_DOCKED_PLUGINS", {}).trim().toStdString();
+       #if JUCE_WINDOWS
+        return dockpolicy::dockingOn (value, true);
+       #else
+        return dockpolicy::dockingOn (value, false);
+       #endif
+    }();
     return on;
 }
 

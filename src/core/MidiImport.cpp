@@ -294,8 +294,12 @@ bool importInto (Song& song, const ParsedMidi& midi, const Options& o, const std
         song.bpm = midi.bpm;
         song.mixer = Song::defaultMixer();
         song.patterns.clear();
-        if (o.timeSignatures && midi.numerator > 0 && midi.denominator == 4)
+        // (round 190fg: any denominator the song meter has; before, only n/4 was taken)
+        if (o.timeSignatures && midi.numerator > 0 && meterUnit (midi.denominator) == midi.denominator)
+        {
             song.beatsPerBar = std::clamp (midi.numerator, 1, 16);
+            song.beatUnit = midi.denominator;
+        }
     }
     const auto shift = realignShift (gs, o.realign);
 

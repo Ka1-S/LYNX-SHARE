@@ -149,10 +149,10 @@ std::string readme (const Song& song, const Plan& plan, double seconds, const st
     line (plan.name + " - exported for other apps by LYNX SHARE");
     line();
     line ("Tempo:          " + tempoText (song));
-    line ("Time signature: " + std::to_string (std::max (1, song.beatsPerBar)) + "/4");
+    line ("Time signature: " + std::to_string (std::max (1, song.beatsPerBar)) + "/" + std::to_string (meterUnit (song.beatUnit)));
     line ("Key:            " + keyText (song));
     line ("Length:         " + exportopts::formatDuration (seconds) + " ("
-          + std::to_string ((int) std::ceil (exportopts::lengthInBars (seconds, song.bpm, song.beatsPerBar) - 1e-9)) + " bars)");
+          + std::to_string ((int) std::ceil (exportopts::lengthInBars (seconds, song.bpm, song.meter()) - 1e-9)) + " bars)");
     line();
     line ("Files:");
     for (const auto& w : written)

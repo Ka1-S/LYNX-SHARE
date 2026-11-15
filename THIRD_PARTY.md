@@ -17,6 +17,7 @@ LYNX is distributed under the [GNU AGPL-3.0](LICENSE). It uses the components be
 | [Monocypher 4.0.2](https://monocypher.org) (`third_party/monocypher/monocypher.c` / `.h`, unmodified) | the end-to-end encryption of live sessions: Argon2id (the invite code's keys), BLAKE2b, XChaCha20-Poly1305 | 2-clause BSD or CC0 1.0, at the user's choice (`third_party/monocypher/LICENCE.md`) |
 | [Faust Libraries](https://github.com/grame-cncm/faustlibraries) `reverbs.lib` 1.6.2: the function `re.valhallaSupermassive` by David Braun, ported to C++ in `src/core/NebulaCloud.h` / `.cpp` (no Faust code or runtime is shipped; LYNX's changes: block processing, glided controls, single-precision signal path) | the six "cloud" networks of the Nebula effect (its Measured model) | MIT (declared for that function in the file; notice below) |
 | [PipeWire 1.6.2](https://gitlab.freedesktop.org/pipewire/pipewire) headers (the `pipewire-0.3` / `spa-0.2` headers LYNX includes, in `third_party/pipewire/include`, unmodified) | LYNX's native PipeWire audio driver on Linux; `libpipewire-0.3.so.0` itself is loaded from the system at run time, never shipped | MIT (`third_party/pipewire/LICENSE`) |
+| [Ableton Link 4.1.1](https://github.com/Ableton/link) by Ableton AG (headers in `third_party/link/include`, unmodified) with the standalone [Asio 1.38.2](https://think-async.com/Asio/) it bundles (`third_party/link/asio/include`, unmodified) | Ableton Link: tempo, beat and phase shared with other apps and devices on the network (`src/engine/AbletonLink.cpp`) | Link: GPL-2.0-or-later (`third_party/link/LICENSE.md`, `GNU-GPL-v2.0.md`), used under the GPLv3 terms its "or any later version" allows, which are compatible with the AGPL-3.0; Asio: Boost Software License 1.0 (`third_party/link/asio/LICENSE_1_0.txt`) |
 | [VST 3 SDK](https://github.com/steinbergmedia/vst3sdk) (the copy bundled with JUCE 8.0.4) | VST3 plugin hosting | GPLv3 option of Steinberg's dual licence (`VST3_SDK/LICENSE.txt` in JUCE) |
 | [ASIO SDK 2.3.4](https://www.steinberg.net/developers/) (interface headers in `third_party/asiosdk`) | ASIO audio drivers on Windows | GPLv3 option of Steinberg's dual licence (`third_party/asiosdk/LICENSE.txt`) |
 | [ONNX Runtime 1.23.2](https://github.com/microsoft/onnxruntime) (C API headers in `third_party/onnxruntime`, unmodified; Microsoft's release library ships next to LYNX and is loaded at run time) | running the stem separation model of "Extract stems from sample" and the Basic Pitch model of "Convert to MIDI" | MIT (`third_party/onnxruntime/LICENSE`) |
@@ -36,7 +37,8 @@ the AGPL-3.0. The release binaries are built from this repository by
 [`.github/workflows/release.yml`](.github/workflows/release.yml); the build downloads JUCE 8.0.4 and Zig 0.14.1
 from their official sources and checks their SHA-256.
 
-VST and ASIO are trademarks of Steinberg Media Technologies GmbH. FL Studio is a registered trademark of
+VST and ASIO are trademarks of Steinberg Media Technologies GmbH. Ableton and Ableton Link are trademarks of Ableton AG;
+LYNX is not affiliated with Ableton. FL Studio is a registered trademark of
 Image-Line Software; LYNX is not affiliated with Image-Line.
 
 ## Basic Pitch (Apache-2.0)

@@ -84,6 +84,11 @@ In the clip grid (Clip-launch workflow):
   mixer tracks, or none, shows no controls but its Arm button.
 - **Devices to another track**: drag a device's title bar out of the Device View onto another track's column in the
   grid: it moves to the end of that track's chain, with its automation. Hold Ctrl when you drop to put a copy there.
+- **Instruments and effects from the Browser** (its Plugin database, or the Plugin picker) onto a track's column in the
+  grid or onto an Arrangement track: an instrument replaces the track's instrument (its effects stay), an effect goes to
+  the end of the track's chain. On an empty column the track becomes a MIDI track (an instrument) or an audio track
+  (an effect) holding it. An instrument can't go on an audio track: the status bar says so. In the Device View, drop an
+  instrument on the track's instrument to replace it, an effect between two devices to put it there.
 - **Audio clips** in the Clip View: the **Warp** switch (on: the sample follows the song's tempo; off: it plays at its
   own speed; it belongs to the sample's channel), the warp mode, gain, pitch and Reverse, the sample's name, rate, depth
   and channels over its editor, and **Set** beside Start and End (for every clip): while the clip plays, Set puts that
@@ -125,6 +130,15 @@ controller, mapping formula, smoothing and FL's Mode list, also for note and but
 mixer slot (mixer menu › Open audio editor / ...and record) and records with its window closed. The **Sampler page**
 follows FL's layout (Content, Playback with loop points, Time stretching, Precomputed effects); LYNX's own controls are
 in its last box, LYNX extras.
+
+## Drag samples into plugins
+
+Drag a sample from the Browser (or Edison's drag button, or an audio clip from the Playlist) onto a plugin's own
+window, such as Serum, a sampler or a drum machine that takes dropped files, and let go there: the plugin gets the
+file, as when you drop it from your file manager. This works for plugins inside LYNX SHARE's windows, for plugins
+running in a separate process or in the 32-bit bridge, and on Windows, Linux and macOS. While the mouse is over LYNX
+SHARE's own panels the drag stays LYNX SHARE's, so the Channel rack, the Playlist and the Mixer take it as before. You
+can also drag a sample out to another program.
 
 ## Online sessions: make a song with a friend (phase 1, packages)
 
@@ -273,3 +287,23 @@ Renders are made in the background a moment after the last change, never while y
 - When the session ends the guest keeps the audio renders of their part (what the host chose under "guests keep");
   the plugin and its settings stay with the host, whose project keeps the plugin as it sounded.
 - Use these sounds for the song you are making together; don't redistribute them as samples.
+
+## Ableton Link: play in time with other apps
+
+Ableton Link shares the tempo, the beat and the bar with other apps and devices on the same network (phone apps,
+other DAWs, hardware with Link). Nothing to set up: switch it on and the apps find each other.
+
+- **Switch it on**: Options › Ableton Link, Settings › Ableton Link, or the **Link** toggle in the toolbar. The
+  toggle is shown in the Clip-launch layout; in the Pattern layout show it with Settings › Ableton Link › Show Link
+  Toggle (or the toolbar's edit mode). Once on, it shows how many other apps are in the session ("1 Link", "2 Links").
+- **Tempo**: the first app in a session sets its tempo. Anyone may change it and everyone follows; the tempo display
+  shows the session's tempo. Changing LYNX's tempo changes it for everyone.
+- **Beat and bar**: the bars line up over the clip grid's launch quantisation (1 Bar by default). With another app
+  in the session, Play waits until the session reaches the beat the song starts on; the position display fills
+  up while it waits. Press Space again to cancel.
+- **Start Stop Sync** (Settings › Ableton Link, off by default): Play and Stop are shared with the apps that have it on.
+- **Tempo automation**: while Link is on, LYNX's tempo automation goes to the other apps as it plays. A tempo change
+  made in another app wins over LYNX's automation until playback starts again.
+- An external MIDI clock LYNX follows (Settings › MIDI) wins: its tempo goes to the session.
+- There is no count-in while Link is on: the start waits for the session instead.
+- When you leave the session after another app changed the tempo, the project keeps that tempo.

@@ -23,7 +23,7 @@ TEST (rea146b_shift_and_gate_schedule)
     song.channels[0].misc.gateBeats = 0.125f; // at most half a step
     EventBuffer ev;
     const auto tps = ticksPerSample (120.0, 48000.0);
-    schedulePatternLoop (song.patterns[0], song.patterns[0].effectiveLength (4), 0.0, 48000, tps, ev, 0.0f, &song.channels);
+    schedulePatternLoop (song.patterns[0], song.patterns[0].effectiveLength (lynx::Meter (4, 4)), 0.0, 48000, tps, ev, 0.0f, &song.channels);
     double on = -1, off = -1;
     for (const auto& e : ev)
         (e.type == NoteEvent::Type::on ? on : off) = e.sampleOffset * tps;
@@ -32,7 +32,7 @@ TEST (rea146b_shift_and_gate_schedule)
     // a porta note with Full porta keeps its length
     song.patterns[0].notes[0].porta = true;
     ev.clear();
-    schedulePatternLoop (song.patterns[0], song.patterns[0].effectiveLength (4), 0.0, 48000, tps, ev, 0.0f, &song.channels);
+    schedulePatternLoop (song.patterns[0], song.patterns[0].effectiveLength (lynx::Meter (4, 4)), 0.0, 48000, tps, ev, 0.0f, &song.channels);
     for (const auto& e : ev)
         if (e.type == NoteEvent::Type::off)
             CHECK (std::abs (e.sampleOffset * tps - (ticksPerStep + ppq)) < 2.0);

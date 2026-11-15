@@ -226,7 +226,7 @@ void Player::apply (const Song& song, const std::vector<int>& zone, const Comman
             return;
         c.clipStart = clips[(std::size_t) c.column];
     }
-    const auto barTicks = c.barSync ? (double) ppq * 4.0 * song.beatsPerBar / 4.0 : 0.0;
+    const auto barTicks = c.barSync ? (double) song.barTicks() : 0.0;
     if (c.type == Command::Type::press && c.scope != Command::Scope::track)
     {
         // a controller's column launch: every track's zone clip that starts within the pressed clip's span

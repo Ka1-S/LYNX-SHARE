@@ -2,6 +2,7 @@
 
 #include "core/Python.h"
 #include "core/VfxScript.h"
+#include <ctime>
 
 namespace vfxs165
 {
@@ -274,22 +275,72 @@ vfx.addOutputController('n', 0)
     CHECK (worst < 50.0);
 }
 
+extern "C" size_t py_lynx_heap_limit; // (third_party/pocketpy/pocketpy.c: LYNX's heap limit, 768 MB)
+
 TEST (vfx_script_memory_runaway_is_stopped)
 {
     using namespace lynx::vfx;
-    // a script that keeps allocating is stopped at LYNX's heap limit (768 MB), with a message; the memory comes back
-    auto p = makeProcessor (Kind::script, vfxs165::state ("import flvfx as vfx\nkeep = []\ndef onTick():\n    while True:\n        try:\n            keep.append([0] * 4000000)\n        except:\n            pass\n"));
+    // a script that keeps allocating is stopped at LYNX's heap limit, with a message; the memory comes back.
+    // (round 190fg: the test runs with the limit lowered to 64 MB. Filling the real 768 MB costs the Python thread
+    // ~0.5 s of page faults on an idle machine; under six parallel test shards plus builds it once took past the
+    // call's time limit (3 s of CPU, 12 s wall), and the script was stopped as "took too long" before the memory
+    // stop: the test failed though the product did what it should. The heap counter and the stop are the same at any
+    // limit; the shipped limit is checked on its own.)
+    CHECK (py_lynx_heap_limit == ((size_t) 768 << 20));
+    const auto shipped = py_lynx_heap_limit;
+    py_lynx_heap_limit = (size_t) 64 << 20;
+    auto p = makeProcessor (Kind::script, vfxs165::state ("import flvfx as vfx\nkeep = []\ndef onTick():\n    while True:\n        try:\n            keep.append([0] * 400000)\n        except:\n            pass\n"));
     p->setTag (0x165d0005);
+    const auto cpuBefore = std::clock();
+    const auto wallBefore = std::chrono::steady_clock::now();
     vfxs165::play (*p, {}, 1024);
     auto m = script::monitorOf (0x165d0005);
-    CHECK (m != nullptr && m->status().find ("more than 768 MB") != std::string::npos);
+    CHECK (m != nullptr && m->status().find ("Stopped: the script used more than 64 MB of memory") != std::string::npos);
     if (m != nullptr)
-        std::printf ("  %s\n", m->status().c_str());
+        std::printf ("  %s\n  (process CPU %.0f ms, wall %.0f ms)\n", m->status().c_str(), 1000.0 * (double) (std::clock() - cpuBefore) / CLOCKS_PER_SEC,
+                     std::chrono::duration<double, std::milli> (std::chrono::steady_clock::now() - wallBefore).count());
     m.reset();
     p.reset(); // (its VM is released: the next script starts with a small heap)
-    auto q = makeProcessor (Kind::script, vfxs165::state ("import flvfx as vfx\nbig = [0] * 1000000\ndef onTick():\n    vfx.setOutputController('ok', 1)\nvfx.addOutputController('ok', 0)\n"));
+    // the memory came back: a list of 1.5 million items (its storage grows to 32 MB) fits under the same 64 MB limit
+    auto q = makeProcessor (Kind::script, vfxs165::state ("import flvfx as vfx\nbig = [0] * 1500000\ndef onTick():\n    vfx.setOutputController('ok', 1)\nvfx.addOutputController('ok', 0)\n"));
     vfxs165::play (*q, {}, 512);
     CHECK (q->controlOutput (0) == 1.0f);
+    q.reset();
+    py_lynx_heap_limit = shipped;
+}
+
+// Round 190fg: one operation that asks for more than the heap has room for, in a single allocation, stops the script
+// with the same memory message before anything is allocated (list() of a long iterator: as soon as it passes the limit). Before, an allocation past twice the limit failed and
+// pocketpy aborted the process ('[0] * 300_000_000': c11_vector__reserve "out of memory") or wrote through a null
+// pointer ('x' * 2_000_000_000): one line of a script took LYNX down.
+TEST (vfx_script_one_huge_allocation_is_stopped_not_fatal)
+{
+    using namespace lynx::vfx;
+    // (at a 64 MB limit, as the test above: list(range(...)) fills the heap up to the limit first)
+    const auto shipped = py_lynx_heap_limit;
+    py_lynx_heap_limit = (size_t) 64 << 20;
+    const char* lines[] = { "big = [0] * 300000000", "big = 'x' * 2000000000", "big = 'xy' * 1500000000", "big = [1, 2] * 2000000000",
+                            "big = list(range(200000000))" };
+    int tag = 0x165d0100;
+    for (const auto* line : lines)
+    {
+        const auto src = std::string ("import flvfx as vfx\ndef onTick():\n    try:\n        ") + line + "\n    except:\n        pass\n";
+        auto p = makeProcessor (Kind::script, vfxs165::state (src));
+        p->setTag (++tag);
+        vfxs165::play (*p, {}, 1024);
+        auto m = script::monitorOf (tag);
+        CHECK (m != nullptr && m->status().find ("more than 64 MB") != std::string::npos);
+        if (m != nullptr && m->status().find ("more than 64 MB") == std::string::npos)
+            std::printf ("  %s: %s\n", line, m->status().c_str());
+    }
+    // a repeat that fits is untouched
+    auto ok = makeProcessor (Kind::script, vfxs165::state ("import flvfx as vfx\ns = 'ab' * 1000\nl = [0, 1] * 1000\nr = list(range(5000))\n"
+                                                           "def onTick():\n    vfx.setOutputController('ok', 1 if len(s) == 2000 and len(l) == 2000 and len(r) == 5000 else 0)\n"
+                                                           "vfx.addOutputController('ok', 0)\n"));
+    vfxs165::play (*ok, {}, 512);
+    CHECK (ok->controlOutput (0) == 1.0f);
+    ok.reset();
+    py_lynx_heap_limit = shipped;
 }
 
 TEST (vfx_script_voice_changes_reach_the_sounding_note)

@@ -29,10 +29,11 @@ struct GeneralOptions
     bool rackPlayheadColumn = true; // the Channel Rack's playhead column + bar marks (LYNX, round 170a)
     bool rackStepsChannelColour = true; // lit Channel Rack steps in their channel's colour (LYNX, round 170a2)
     bool splash = true, startupSound = true, scanAtStart = true;
+    bool supportNote = true; // round 190fq: "Show the support note" (ui/SupportLynx.h; the note's own file)
     int startupProject = 1;       // issue #123: FL's "Startup project" (StartupProject: 0 empty, 1 default template, 2 last)
     juce::String defaultTemplate; // issue #123: TemplateChoice::toText of FL's "Default template" ("" = LYNX's default)
     bool menuEntry = false;     // Linux AppImage: LYNX in the applications menu + the .lynx file type (round 161)
-    bool typingPiano = true, keepEditorsOpen = false, rememberSeek = false;
+    bool typingPiano = true, keepEditorsOpen = false, rememberSeek = true;
     int layoutStyle = 0; // Settings › General › Workflow (rounds 181a, 184a): layoutstyle::Style, 0 = Pattern workflow, the default
     bool alsSessionOnPlaylist = false; // Settings › General › Workflow (round 181c): a Live set's Session clips → the clip grid (default) or the Playlist
     bool stretchedClipsLoop = true; // LYNX extra (issue #25): a stretched pattern clip loops its pattern; off = FL (once)
@@ -57,11 +58,13 @@ struct GeneralOptions
     bool backupWaitsForQuiet = true; // round 177d: a backup waits while playing and right after MIDI input too
     int backupLongestWaitMinutes = prefs::defaultBackupLongestWaitMinutes; // ...and is written anyway after this long
     bool crossfadesInNewProjects = true; // FL's "Enable automatic crossfades in new projects" (Settings › Project; round 166e)
+    bool linkTracksInNewProjects = false; // LYNX: "Link Playlist tracks to mixer tracks in new projects" (round 190gz, issue #170)
     bool pluginSandbox = false;
     bool pluginSubstitutes = true; // missing plugins play a LYNX equivalent (core/PluginSubstitutes.h)
     bool limitEditors = true; // FL's "Limit the number of open plugin editors" (round 189o, core/EditorLimit.h; on as FL)
     int crashReports = 0;          // crashreport::Consent: 0 ask, 1 always send, 2 never (round 159)
     bool checkUpdates = true;      // "Check for updates automatically" (ui/Updater.h, round 166b)
+    bool remoteControl = false;   // opt-in local control API
     bool reducedEffects = false;
     bool uiAnimations = true;      // round 179a: panel fades, hover fades, wheel glide (ui/Motion.h)
     bool artMotion = true;         // round 170j: the Themed plugins' art moves (falling petals, glows...)
@@ -83,6 +86,9 @@ struct SettingsHooks
     // runs one of the main window's actions by id ("playlist.automationLanes"): the LYNX extras page switches a view
     // option exactly as its menu item does (round 190am)
     std::function<bool (const std::string&)> runAction;
+    // Settings › Link's "Show Link Toggle" (round 190gl): the main toolbar's Link toggle shown, and showing / hiding it
+    std::function<bool()> linkToggleShown;
+    std::function<void (bool)> showLinkToggle;
 };
 
 // Settings pages (Settings window, ui/SettingsDialog.cpp)
@@ -93,6 +99,10 @@ std::unique_ptr<juce::Component> makeMidiPage (AudioEngine& engine, const Settin
 // switch and one line of explanation (core/LynxExtras.h). The switches mirror the preferences the features already
 // have: nothing is stored by the page itself.
 std::unique_ptr<juce::Component> makeExtrasPage (AudioEngine& engine, const SettingsHooks& hooks, bool persistent);
+// Settings › Ableton Link (round 190gl): Ableton Link Enabled / Disabled (Ableton's integration guidelines), then the
+// reference DAW's Link page — "Show Link Toggle" (Show / Hide) and "Start Stop Sync" (On / Off). Its Link Audio section
+// is left out: LYNX has no Link Audio.
+std::unique_ptr<juce::Component> makeLinkPage (AudioEngine& engine, const SettingsHooks& hooks);
 // Whether the extra `id` (core/LynxExtras.h) is on now, and switching it: the same variables and the same code paths
 // as each feature's own menu item or check box.
 bool lynxExtraOn (AudioEngine& engine, const SettingsHooks& hooks, std::string_view id);

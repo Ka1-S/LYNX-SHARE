@@ -8,6 +8,8 @@
 #include "core/MidiControls.h"
 #include "core/SessionIds.h"
 #include "core/FlCurve.h"
+#include "core/SynthParams.h"
+#include "core/SoundFont.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -24,12 +26,12 @@ void Pattern::sortNotes()
     std::stable_sort (notes.begin(), notes.end(), [] (const Note& a, const Note& b) { return a.start < b.start; });
 }
 
-std::int64_t Pattern::effectiveLength (int beatsPerBar) const noexcept
+std::int64_t Pattern::effectiveLength (Meter meter) const noexcept
 {
     if (lengthTicks > 0)
         return lengthTicks;
 
-    const std::int64_t bar = (std::int64_t) ppq * std::max (1, beatsPerBar);
+    const std::int64_t bar = meter.bar();
     std::int64_t end = 0;
 
     for (auto& n : notes)
@@ -80,7 +82,7 @@ void Pattern::toggleStep (int channel, int step, bool muteRemoved)
 
 std::int64_t Song::songLength() const noexcept
 {
-    const std::int64_t bar = (std::int64_t) ppq * std::max (1, beatsPerBar);
+    const std::int64_t bar = barTicks();
     std::int64_t end = 0;
 
     for (const auto& c : playlist)
@@ -97,7 +99,7 @@ std::int64_t Song::songLength() const noexcept
 
     // an empty Playlist (e.g. recording the first take in Song mode) loops the current pattern's length, not one bar
     if (! arranged && currentPattern >= 0 && currentPattern < (int) patterns.size())
-        end = patterns[(std::size_t) currentPattern].effectiveLength (beatsPerBar);
+        end = patterns[(std::size_t) currentPattern].effectiveLength (meter());
 
     // FL: Song mode loops at the exact end of the last clip (a clip ending at 3:05 loops at 3:05), not at the bar end
     if (arranged && end > 0)
@@ -122,7 +124,7 @@ void followPatternLengths (const std::vector<std::int64_t>& before, Song& song)
 
     for (std::size_t i = 0; i < before.size(); ++i)
     {
-        const auto now = song.patterns[i].effectiveLength (song.beatsPerBar);
+        const auto now = song.patterns[i].effectiveLength (song.meter());
         if (now == before[i] || before[i] <= 0)
             continue;
 
@@ -210,7 +212,7 @@ std::vector<std::int64_t> patternLengths (const Song& song)
     std::vector<std::int64_t> lengths;
     lengths.reserve (song.patterns.size());
     for (const auto& p : song.patterns)
-        lengths.push_back (p.effectiveLength (song.beatsPerBar));
+        lengths.push_back (p.effectiveLength (song.meter()));
     return lengths;
 }
 
@@ -1060,7 +1062,7 @@ std::vector<Bar> Song::barsBetween (std::int64_t from, std::int64_t to) const
         return std::max<std::int64_t> (1, (std::int64_t) ppq * 4 * std::max (1, numerator) / std::max (1, denominator));
     };
 
-    Bar bar { 0, barLength (beatsPerBar, 4), 1 };
+    Bar bar { 0, barLength (beatsPerBar, beatUnit), 1 };
     const auto& list = markers();
     std::size_t next = 0;
 
@@ -1097,7 +1099,7 @@ std::vector<Bar> Song::barsBetween (std::int64_t from, std::int64_t to) const
 Bar Song::barAt (std::int64_t tick) const
 {
     const auto bars = barsBetween (std::max<std::int64_t> (0, tick), std::max<std::int64_t> (0, tick) + 1);
-    return bars.empty() ? Bar { 0, (std::int64_t) ppq * std::max (1, beatsPerBar), 1 } : bars.front();
+    return bars.empty() ? Bar { 0, barTicks(), 1 } : bars.front();
 }
 
 void Song::selectArrangement (int index)
@@ -1313,6 +1315,12 @@ float Song::targetValue (const AutomationTarget& t) const noexcept
             // the Sampler's knobs (issue #12)
             if (channels[(std::size_t) t.index].instrument == InstrumentKind::sampler && t.param >= 0 && t.param < samplerparam::count)
                 return samplerparam::get (channels[(std::size_t) t.index].sampler, t.param);
+            // LYNX Soundfont's knobs (issue #152, round 190he: a linked controller moved nothing)
+            if (channels[(std::size_t) t.index].instrument == InstrumentKind::soundfont && sf::automatable (t.param))
+                return sf::normalise (t.param, sf::readParams (channels[(std::size_t) t.index].modelParams)[(std::size_t) t.param]);
+            // LYNX Synth's knobs (issue #152, round 190he; core/SynthParams.h)
+            if (channels[(std::size_t) t.index].instrument == InstrumentKind::synth && synthparam::valid (t.param))
+                return synthparam::get (channels[(std::size_t) t.index].synth, synthparam::indexOf (t.param));
             // a MIDI Out's patch and knobs (round 167i)
             if (channels[(std::size_t) t.index].instrument == InstrumentKind::midiOut && t.param >= 0 && t.param <= midiout::controlCount)
                 return midiout::paramValue (midiout::stateOf (channels[(std::size_t) t.index].pluginState), t.param);
@@ -1333,6 +1341,14 @@ float Song::targetValue (const AutomationTarget& t) const noexcept
     }
 
     return -1.0f;
+}
+
+float Song::modulationBase (const AutomationTarget& t) const noexcept
+{
+    if (! soundfontModBaseReal && t.kind == AutomationTargetKind::channelParam && t.index >= 0 && t.index < (int) channels.size()
+        && channels[(std::size_t) t.index].instrument == InstrumentKind::soundfont)
+        return 0.5f; // (a project saved before round 190he: every Soundfont knob's value read 0.5 then)
+    return targetValue (t);
 }
 
 bool Song::setTargetValue (const AutomationTarget& t, float v) noexcept
@@ -1406,6 +1422,19 @@ bool Song::setTargetValue (const AutomationTarget& t, float v) noexcept
                 && t.param < samplerparam::count)
             {
                 samplerparam::set (channels[(std::size_t) t.index].sampler, t.param, v);
+                return true;
+            }
+            if (validChannel && channels[(std::size_t) t.index].instrument == InstrumentKind::soundfont && sf::automatable (t.param))
+            {
+                auto& c = channels[(std::size_t) t.index]; // (issue #152, round 190he)
+                auto params = sf::readParams (c.modelParams);
+                params[(std::size_t) t.param] = sf::denormalise (t.param, v);
+                c.modelParams.assign (params.begin(), params.end());
+                return true;
+            }
+            if (validChannel && channels[(std::size_t) t.index].instrument == InstrumentKind::synth && synthparam::valid (t.param))
+            {
+                synthparam::set (channels[(std::size_t) t.index].synth, synthparam::indexOf (t.param), v); // (issue #152, round 190he)
                 return true;
             }
             if (validChannel && channels[(std::size_t) t.index].instrument == InstrumentKind::midiOut && t.param >= 0
@@ -1905,7 +1934,7 @@ Song makeExportSong (const Song& song, bool wholeSong, std::int64_t tailTicks, s
         const auto index = std::clamp (out.currentPattern, 0, (int) out.patterns.size() - 1);
         Clip clip;
         clip.pattern = index;
-        clip.length = out.patterns[(std::size_t) index].effectiveLength (out.beatsPerBar);
+        clip.length = out.patterns[(std::size_t) index].effectiveLength (out.meter());
         out.playlist = { clip };
         musicLength = clip.length;
     }
@@ -1921,7 +1950,7 @@ Song makeExportSong (const Song& song, bool wholeSong, std::int64_t tailTicks, s
     // because the last rendered block goes slightly past the end and must not wrap to the start.
     if (tailTicks > 0)
     {
-        tailTicks += (std::int64_t) ppq * std::max (1, out.beatsPerBar);
+        tailTicks += out.barTicks();
         out.patterns.emplace_back().name = "(tail)";
         Clip tail;
         tail.pattern = (int) out.patterns.size() - 1;
@@ -1952,6 +1981,100 @@ Song makeBounceSong (const Song& song, int track)
                                // route on the new insert; rendering it too played a route at 50 % at 25 %, round 186b)
     insert.muted = false;
     insert.solo = true; // it and whatever feeds it are audible
+
+    // Round 190gj (owner decision 2026-11-14, FL's split render): what the insert's effects listen to (a side-chain key,
+    // a hosted effect's Connections) plays as it does in the mix, unheard — so a ducked bass stays ducked in its stem and
+    // the stems add up to the mix. Those inserts (with their own sources and keys) are soloed too, and their routes out
+    // of that set are cut, so nothing of them reaches the Master. (Until 0.1.27 they were silenced: no ducking.)
+    {
+        const auto n = (int) out.mixer.size();
+        auto feedersOf = [&out, n] (int u) {
+            std::vector<int> f;
+            for (int src = 1; src < n; ++src)
+            {
+                if (src == u)
+                    continue;
+                auto feeds = out.routes (src, u);
+                for (const auto& fx : out.mixer[(std::size_t) src].effects)
+                    for (int o = 0; o < maxSlotSends && ! feeds; ++o)
+                        feeds = slotSendTarget (fx, o) == u;
+                for (const auto& tap : fruitySendsOf (out, src))
+                    feeds = feeds || tap.target == u;
+                if (feeds)
+                    f.push_back (src);
+            }
+            return f;
+        };
+        auto keysOf = [&out, n] (int u) {
+            std::vector<int> k;
+            for (const auto& fx : out.mixer[(std::size_t) u].effects)
+            {
+                const auto c = slotConnections (out, u, fx);
+                for (const auto source : { fx.sidechain, fx.sidechain2, c.routed ? c.mainSource : -1, c.routed ? c.sideSource : -1 })
+                    if (source > 0 && source < n && source != u)
+                        k.push_back (source);
+            }
+            return k;
+        };
+        const auto heard = out.soloAudible();
+        // the keys of whatever the stem hears that feeds the insert, then everything that reaches those keys
+        std::vector<char> inSet ((std::size_t) n, 0);
+        std::vector<int> stack;
+        for (int u = 1; u < n; ++u)
+            if (heard[(std::size_t) u])
+                for (const auto k : keysOf (u))
+                    if (! heard[(std::size_t) k] && ! inSet[(std::size_t) k])
+                    {
+                        inSet[(std::size_t) k] = 1;
+                        stack.push_back (k);
+                    }
+        while (! stack.empty())
+        {
+            const auto u = stack.back();
+            stack.pop_back();
+            auto more = feedersOf (u);
+            const auto k = keysOf (u);
+            more.insert (more.end(), k.begin(), k.end());
+            for (const auto src : more)
+                if (! inSet[(std::size_t) src] && ! heard[(std::size_t) src])
+                {
+                    inSet[(std::size_t) src] = 1;
+                    stack.push_back (src);
+                }
+        }
+        if (std::any_of (inSet.begin(), inSet.end(), [] (char c) { return c != 0; }))
+        {
+            for (int u = 1; u < n; ++u)
+                if (inSet[(std::size_t) u])
+                {
+                    auto& m = out.mixer[(std::size_t) u];
+                    m.solo = true;
+                    m.soloSources = true;
+                }
+            // the newly heard inserts send nowhere outside the keys' set (not to the Master, not into the stem's own
+            // path: the insert and its sources stay as they were)
+            for (int pass = 0; pass < 4; ++pass)
+            {
+                const auto now = out.soloAudible();
+                auto changed = false;
+                for (int u = 1; u < n; ++u)
+                {
+                    if (! now[(std::size_t) u] || heard[(std::size_t) u])
+                        continue;
+                    auto& m = out.mixer[(std::size_t) u];
+                    changed = changed || m.toMaster;
+                    m.toMaster = false;
+                    const auto before = m.sends.size();
+                    m.sends.erase (std::remove_if (m.sends.begin(), m.sends.end(),
+                                                   [&inSet, n] (const MixerSend& s) { return s.target <= 0 || s.target >= n || ! inSet[(std::size_t) s.target]; }),
+                                   m.sends.end());
+                    changed = changed || m.sends.size() != before;
+                }
+                if (! changed)
+                    break;
+            }
+        }
+    }
 
     // the Master neutral: the render plays through the song's Master again (Render to audio), so nothing of it may be in
     // the file — effects, fader, pan, separation, phase / swap, EQ and its automation (round 186b, as StandIns' stems)

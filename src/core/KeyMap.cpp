@@ -216,6 +216,9 @@ std::vector<Action> makeActions()
         { "pianoRoll.quantizeStarts", TR_NOOP ("Quantize starts"), Context::pianoRoll, { chord ('Q', shift) }, true },
         { "pianoRoll.quantizeHalf", TR_NOOP ("Quantize starts 50% (halfway to the grid)"), Context::pianoRoll, {} },
         { "pianoRoll.follow", TR_NOOP ("Follow the playhead (auto scrolling) on/off"), Context::pianoRoll, {} },
+        // FL's piano roll splitter (round 190fz, its hint "Right-click / shift+enter for alternate size"): the event
+        // editor swaps with its alternate size (folded away by default) and back
+        { "pianoRoll.eventPaneAlternate", TR_NOOP ("Event editor: alternate size"), Context::pianoRoll, { chord (enter, shift) } },
         // FL's Piano roll menu (round 168g, REA_rodada168g.md: the ShortcutsModule / EEMenu keys): View, Select, Stamp,
         // Edit and File items
         { "pianoRoll.gridHighlights", TR_NOOP ("Note grid highlights on/off"), Context::pianoRoll, { chord ('B', alt) } },
@@ -275,9 +278,13 @@ std::vector<Action> makeActions()
         { "playlist.ripple", TR_NOOP ("Ripple editing on/off"), Context::playlist, { chord ('S', shift) } },
         // FL's Playlist › Edit › "Automatic crossfades (current project)" (round 166e)
         { "playlist.autoCrossfades", TR_NOOP ("Automatic crossfades (current project) on/off"), Context::playlist, {} },
+        // LYNX extra (round 190gz, issue #170): Playlist tracks linked to mixer tracks
+        { "playlist.linkTracks", TR_NOOP ("Link Playlist tracks to mixer tracks (current project) on/off"), Context::playlist, {} },
         // FL's legacy Pattern Blocks (round 170f, issue #60)
         { "playlist.patternBlocks", TR_NOOP ("Pattern blocks (current project) on/off"), Context::playlist, {} },
         { "playlist.automationLanes", TR_NOOP ("Automation lanes on/off"), Context::playlist, {} },
+        // FL's Playlist menu › Picker panel › Enable (EEPatternsShowMenu; FL's shortcut page: Alt+P, issue #175)
+        { "playlist.pickerPanel", TR_NOOP ("Picker panel on / off"), Context::playlist, { chord ('P', alt) } },
         { "playlist.blocksToClips", TR_NOOP ("Turn pattern blocks into clips"), Context::playlist, {} },
         // FL's Select › time (round 167k: EESelAroundSelAction, EESelPrevAction / EESelNextAction, Playlist focused)
         { "playlist.selectTimeAround", TR_NOOP ("Select time around selection"), Context::playlist, { chord (enter, ctrl) } },

@@ -85,6 +85,17 @@ public:
     static std::unique_ptr<juce::Component> makeSampleBrowserContent (AudioEngine& engine, const std::function<void (BrowserComponent&)>& wire);
     // Whether the Sample browser was open when LYNX last closed (its view file).
     static bool sampleBrowserWasOpen();
+    // Round 190hd: the Browser's search index kept up to date by a low-priority child process (LYNX --browser-indexer
+    // <parent pid> <roots file>) woken by file-system changes, as Live's Indexer. Main allows it for the normal window
+    // only (command-line modes and tests index in-process, as before); LYNX_INDEXER_PROCESS=0 turns it off.
+    static inline bool allowIndexerProcess = false;
+    static int runIndexerProcess (const juce::StringArray& args); // the child: never returns while its parent lives
+
+private:
+    bool constructing = true; // (round 190hd: the start-up trace's lines of the main Browser's construction)
+    void browserStartupMark (const char* step) const;
+
+public:
     static juce::Rectangle<int> sampleBrowserBounds(); // its last window bounds (empty: default)
 
     std::function<void (const juce::File&)> onOpenProject;
@@ -153,6 +164,8 @@ public:
     // FL's "Locate sample in browser" (the sampler's File row, round 190df): the ALL tab with the folders opened down to
     // the file, its row selected; false (and a note) when no folder the Browser shows holds it
     bool locateFile (const juce::File& file);
+    // --plugwintest's drop check (issue #174): the selected row of the tree on screen (empty: none shown)
+    juce::Rectangle<int> selectedRowScreenBounds() const;
     void showScores (const juce::String& subfolder = {});         // the Piano roll's File › Browse scores: FL's "Scores" (the user's Presets/Scores and Data/Patches/Scores)
     // FL's Shift+F8: the All tab with the Plugin database opened and scrolled into view; with a folder (the Plugin
     // picker's tab, round 171c; `generators` 1 / 0, -1 = none) that folder of the Generators / Effects opened

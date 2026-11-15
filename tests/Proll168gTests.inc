@@ -229,11 +229,11 @@ TEST (proll168g_pattern_markers_add_auto_signature_and_follow_the_space)
     CHECK (p.markers.size() == 2 && p.markers[0].tick == 0 && p.markers[0].name == "Auto #2");
 
     // a 3/4 change over [bar, 2 bars): the old 4/4 comes back at its end; names are FL's "%d/%d"
-    addPatternSignatureChange (p, bar + 10, 2 * bar, 3, 4, 4);
+    addPatternSignatureChange (p, bar + 10, 2 * bar, 3, 4, lynx::Meter (4, 4));
     REA167K_REQUIRE (p.markers.size() == 4);
-    CHECK (patternSignatureAt (p, bar + lynx::ppq, 4) == std::make_pair (3, 4));
-    CHECK (patternSignatureAt (p, 2 * bar, 4) == std::make_pair (4, 4));
-    CHECK (patternSignatureAt (p, 0, 4) == std::make_pair (4, 4));
+    CHECK (patternSignatureAt (p, bar + lynx::ppq, lynx::Meter (4, 4)) == std::make_pair (3, 4));
+    CHECK (patternSignatureAt (p, 2 * bar, lynx::Meter (4, 4)) == std::make_pair (4, 4));
+    CHECK (patternSignatureAt (p, 0, lynx::Meter (4, 4)) == std::make_pair (4, 4));
     const auto sig = std::find_if (p.markers.begin(), p.markers.end(), [] (const lynx::Marker& m) { return m.isSignature() && m.numerator == 3; });
     CHECK (sig != p.markers.end() && sig->tick == bar && sig->name == "3/4");
 

@@ -181,4 +181,31 @@ private:
     double outputRate = 44100.0, position = 0.0, step = 1.0;
     float gain = beatGain;
 };
+// Round 190fg: where the clicks fall. A meter span starts a bar at `tick` and has bars of `bar` ticks and beats of
+// `beat` ticks (the song's meter from 0, each signature marker from its tick: a 6/8 bar is 3 quarters clicked in six
+// eighths, as Live's metronome follows the denominator). The beat a position falls in: its first tick, and whether a
+// bar starts there (the downbeat). Before the first span (a count-in) the first span's grid runs backwards.
+struct Span
+{
+    std::int64_t tick = 0, bar = 4, beat = 1;
+};
+struct Beat
+{
+    std::int64_t start = 0;
+    bool downbeat = false;
+};
+inline Beat beatAt (double position, const Span* spans, int count, Span base) noexcept
+{
+    const auto t = (std::int64_t) std::floor (position);
+    auto s = base;
+    for (int i = 0; i < count; ++i)
+        if (spans[i].tick <= t || i == 0)
+            s = spans[i];
+    const auto beat = std::max<std::int64_t> (1, s.beat), bar = std::max<std::int64_t> (1, s.bar);
+    const auto floorDiv = [] (std::int64_t a, std::int64_t b) { return a / b - ((a % b != 0) && ((a < 0) != (b < 0)) ? 1 : 0); };
+    const auto k = floorDiv (t - s.tick, beat);
+    const auto start = s.tick + k * beat;
+    const auto intoBar = (start - s.tick) - floorDiv (start - s.tick, bar) * bar;
+    return { start, intoBar == 0 };
+}
 } // namespace lynx::metronome

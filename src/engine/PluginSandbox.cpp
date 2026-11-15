@@ -54,6 +54,11 @@ bool pluginAlwaysSeparate (const juce::String& name)
     return name.isNotEmpty() && separateList().contains (name.trim(), true);
 }
 
+juce::StringArray pluginsAlwaysSeparate()
+{
+    return separateList();
+}
+
 void setPluginAlwaysSeparate (const juce::String& name, bool on)
 {
     if (name.trim().isEmpty())

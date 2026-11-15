@@ -1,5 +1,5 @@
 ---
-source: 358890815a
+source: c4e89e7e72
 ---
 `File › Apri...` (`Ctrl+O`) apre i progetti `.lynx` di LYNX SHARE e anche i file `.flp`, `.als`, `.flm` e `.mid`. Un progetto di un altro programma è un'importazione: diventa un nuovo progetto LYNX SHARE non salvato, e il file originale non viene mai scritto.
 
@@ -27,6 +27,12 @@ I plugin di terze parti VST2, VST3 e CLAP in un `.flp`, e i plugin VST2 e VST3 i
 I generatori e gli effetti di FL Studio non vengono caricati. LYNX SHARE ne legge le impostazioni salvate e le suona su motori che ha ricreato. Ogni motore ha un livello di qualità, da `Exact` (identico bit per bit all'originale in ogni stato provato) fino a `Placeholder` (le impostazioni vengono conservate, ma il plugin è muto o lascia passare l'audio). I livelli sono spiegati in [Se vieni da FL Studio](/wiki/coming-from-fl-studio/).
 
 Aprire un `.flp` funziona senza FL Studio installato. Alcuni motori hanno bisogno di onde, sample o impulsi che vengono letti dalla tua installazione di FL Studio durante l'esecuzione.
+
+Un `.flp` che usa il "FL Studio Mobile Rack" di FL Studio (il "Save as FLP" di FL Studio Mobile ne scrive uno per ogni traccia di strumento) suona il suo strumento e i suoi effetti sugli stessi motori di un `.flm`, e così anche l'effetto "FL Studio Mobile Rack FX". Un rack con un drum kit o più strumenti suona ancora con il synth integrato.
+
+## Suoni di fabbrica di FL Studio Mobile
+
+I suoni di fabbrica che usa un `.flm` (drum kit, programmi DirectWave, SoundFont, le onde di GMSynth) appartengono a FL Studio Mobile e non vengono mai distribuiti con LYNX SHARE. LYNX SHARE li cerca nella tua copia della cartella `Resources` dell'app: aggiungila in `Impostazioni › File › Risorse di FL Studio Mobile` (funziona anche scegliendo la cartella sopra di essa, o la cartella di un'installazione di FL Studio). L'installazione di FL Studio ne contiene solo una parte, e viene cercata dopo le tue cartelle. I file ancora mancanti sono elencati nella finestra File mancanti.
 
 ## Sample mancanti
 

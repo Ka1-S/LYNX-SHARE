@@ -50,11 +50,13 @@ struct NewProjectDefaults
     int playlistTracks = 16;                    // tracks the Playlist shows at least (1..500)
     // FL's Options › Project settings › "Enable automatic crossfades in new projects" (round 166e; on by default)
     bool autoCrossfades = true;
+    // LYNX extra (round 190gz, issue #170): "Link Playlist tracks to mixer tracks in new projects" (off: FL's tracks)
+    bool linkTracks = false;
 
     bool operator== (const NewProjectDefaults&) const = default;
 
     // "key=value" lines for ui-options.txt (keys newInserts, newMasterChain, newCleanMixer, playlistTracks,
-    // newAutoCrossfades) and back;
+    // newAutoCrossfades, newLinkTracks) and back;
     // unknown or missing keys keep the defaults, values are clamped.
     std::string toText() const;
     void readKey (const std::string& key, const std::string& value);

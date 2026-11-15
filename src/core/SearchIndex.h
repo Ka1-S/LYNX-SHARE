@@ -112,6 +112,11 @@ public:
 
     static bool isUnder (const std::string& path, const std::string& root);
 
+    // The index another process wrote (round 190hd: the Browser's indexer process): its folder trees replace these
+    // where it walked them to the end (folders it found gone are dropped), the rest of its folders come in where
+    // this index has no complete tree of its own; trees only this index walked to the end stay as they are.
+    void adopt (const Index& newer);
+
     // Text form for the index file: one "D\t<time>\t<folder>" line per folder followed by "F\t<name>" / "S\t<name>";
     // "R\t<folder>" lines name the complete trees.
     std::string toText() const;

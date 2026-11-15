@@ -1,5 +1,9 @@
 #include "engine/AudioEngine.h"
 #include "core/VideoPlayer.h"
+#include "engine/ProjectFile.h"
+#include "engine/RemoteError.h"
+#include "engine/RemoteHistory.h"
+#include "core/Sha256.h"
 
 #include "core/Comping.h"
 #include "core/CountIn.h"
@@ -12,6 +16,7 @@
 #include "engine/SessionPack.h"
 
 #include "core/ClipOps.h"
+#include "core/PlaylistOps.h"
 #include "core/DetailChain.h"
 #include "core/SessionOps.h"
 #include "core/MarkerPlan.h"
@@ -37,6 +42,7 @@
 #include "core/Instruments.h"
 #include "core/Denormals.h"
 #include "core/Dither.h"
+#include "core/GrossBeat.h"
 #include "core/ProjectSafety.h"
 #include "core/SoftClip.h"
 #include "core/Scheduler.h"
@@ -44,11 +50,14 @@
 #include "engine/DllAsioDevice.h"
 #include "engine/PipeWireDevice.h"
 #include "platform/LinuxRealtime.h"
+#include "engine/PowerHints.h"
+#include "platform/PowerThrottling.h"
 #include "engine/Metronome.h"
 #include "core/NoteTools.h"
 #include "core/VfxScript.h"
 #include "core/SamplePrecompute.h"
 #include "engine/PreviewPlayer.h"
+#include "engine/RenderStream.h"
 #include "engine/PluginSandbox.h"
 #include "core/PluginPresets.h"
 #include "flp/Flp.h"
@@ -56,8 +65,12 @@
 #if JUCE_WINDOWS
  #include <windows.h>
 #elif JUCE_MAC
+ #include <mach/mach.h>
+ #include <mach/mach_time.h>
+ #include <mach/thread_policy.h>
  #include <pthread.h>
  #include <sys/qos.h>
+ #include <sys/sysctl.h>
 #elif JUCE_LINUX || JUCE_BSD
  #include <pthread.h>
  #include <sched.h>
@@ -65,6 +78,32 @@
 
 namespace lynx
 {
+namespace
+{
+std::unordered_set<std::uint64_t> remoteFreshTargets (const Song& before, const Song& after)
+{
+    std::unordered_set<std::uint64_t> existing, fresh;
+    for (const auto& channel : before.channels) existing.insert (channel.instance.id);
+    for (const auto& track : before.mixer)
+        for (const auto& effect : track.effects) existing.insert (effect.instance.id);
+    for (const auto& channel : after.channels)
+        if (! existing.contains (channel.instance.id)) fresh.insert (channel.instance.id);
+    for (const auto& track : after.mixer)
+        for (const auto& effect : track.effects)
+            if (! existing.contains (effect.instance.id)) fresh.insert (effect.instance.id);
+    return fresh;
+}
+
+void adoptCapturedRemoteDevices (Song& model, RackState& published, Song&& captured)
+{
+    // Capturing changes only saved hosted-state bytes. Keep the model and reuse baseline equal to the verified
+    // running devices without publishing, changing history or capturing a vendor a second time.
+    remote_history::mirrorCapturedHostedStates (captured, published.song);
+    model.channels = std::move (captured.channels);
+    model.mixer = std::move (captured.mixer);
+}
+}
+
 using IONode = juce::AudioProcessorGraph::AudioGraphIOProcessor;
 
 // The FL Studio installation (registry, else the usual folders) to resolve %FLStudio...%.
@@ -105,6 +144,22 @@ const natives::FlAccess& flStudioAccess()
             return std::vector<std::uint8_t> (bytes, bytes + data.getSize());
         };
         access.listPresets = [] (const std::string& folder) {
+            // round 190gd: a folder's listing is kept for a few seconds. Listing the generators' engines walked FL's whole
+            // Plugin database\Generators tree once per engine (~40 walks, ~0.5 s of every start and of every Browser /
+            // Add menu refresh); FL's own preset folders change when FL or the user saves a preset, seconds apart at most
+            struct Listing
+            {
+                std::vector<std::string> files;
+                juce::uint32 madeMs = 0;
+            };
+            static std::mutex lock;
+            static std::map<std::string, Listing> listings;
+            const auto now = juce::Time::getMillisecondCounter();
+            {
+                const std::scoped_lock l (lock);
+                if (const auto it = listings.find (folder); it != listings.end() && now - it->second.madeMs < 5000)
+                    return it->second.files;
+            }
             std::vector<std::string> out;
             auto files = platform::localFile (folder).findChildFiles (juce::File::findFiles, true, "*.fst;*.tbio;*.gmsynth;*.mrp");
             std::sort (files.begin(), files.end(), [] (const juce::File& a, const juce::File& b) {
@@ -112,6 +167,8 @@ const natives::FlAccess& flStudioAccess()
             });
             for (const auto& f : files)
                 out.push_back (f.getFullPathName().toStdString());
+            const std::scoped_lock l (lock);
+            listings[folder] = { out, juce::Time::getMillisecondCounter() };
             return out;
         };
         // (FL Keys' raw wavetables become WAV files of LYNX's settings folder, like an .flp's embedded samples)
@@ -131,8 +188,106 @@ const natives::FlAccess& flStudioAccess()
     return cached;
 }
 
+// --- engine/PowerHints.h (rollup 0.1.28, REA round 190hb actions 3 and 4) -------------------------------------------
+namespace powerhints
+{
+std::uint32_t keepAwakeBegin() noexcept
+{
+   #if JUCE_WINDOWS
+    return (std::uint32_t) SetThreadExecutionState (ES_CONTINUOUS | ES_SYSTEM_REQUIRED);
+   #else
+    return 0;
+   #endif
+}
+
+void keepAwakeEnd (std::uint32_t previous) noexcept
+{
+   #if JUCE_WINDOWS
+    // (the state before, or plain ES_CONTINUOUS when there was none: the system may sleep again)
+    SetThreadExecutionState (previous != 0 ? (EXECUTION_STATE) previous : ES_CONTINUOUS);
+   #else
+    (void) previous;
+   #endif
+}
+
+int lowerCurrentThread() noexcept
+{
+   #if JUCE_WINDOWS
+    const auto before = GetThreadPriority (GetCurrentThread());
+    SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
+    return before == THREAD_PRIORITY_ERROR_RETURN ? THREAD_PRIORITY_NORMAL : before;
+   #else
+    return 0;
+   #endif
+}
+
+void restoreCurrentThread (int previous) noexcept
+{
+   #if JUCE_WINDOWS
+    SetThreadPriority (GetCurrentThread(), previous);
+   #else
+    (void) previous;
+   #endif
+}
+
+void lowerWorkerThread()
+{
+    (void) lowerCurrentThread();
+}
+
+void enableCompositorMmcss() noexcept
+{
+   #if JUCE_WINDOWS
+    if (juce::SystemStats::getEnvironmentVariable ("LYNX_DWM_MMCSS", {}) == "0")
+        return;
+    using EnableMmcss = HRESULT (WINAPI*) (BOOL);
+    if (auto* dwm = LoadLibraryW (L"dwmapi.dll"))
+        if (auto enable = (EnableMmcss) (void*) GetProcAddress (dwm, "DwmEnableMMCSS"))
+            enable (TRUE);
+   #endif
+}
+} // namespace powerhints
+
 namespace
 {
+#if JUCE_WINDOWS
+// what the audio threads reached (round toolchain190gt, REA 190hc: LYNX's were seen at dynamic priority 15 in some runs
+// and 24-25 in others, Live's always at 26): threads raised, how many joined MMCSS at CRITICAL, their thread priority
+std::atomic<int> rtThreadsRaised { 0 }, rtThreadsMmcss { 0 }, rtThreadsCritical { 0 };
+std::atomic<int> rtPriorityMin { 1000 }, rtPriorityMax { -1000 };
+
+// The process priority class (round toolchain190gt, REA 190hb): Windows' WinMM driver (wdmaud2.drv) raises a process
+// that opens a WinMM device to HIGH (and asks REALTIME), FL's and LYNX's alike, so the UI, decoders, prefetch and plugin
+// scans ran above every normal program; FL itself asks ABOVE_NORMAL. LYNX_PRIORITY_CLASS=above asks ABOVE_NORMAL when a
+// device starts (and again 2 s later, after the MIDI ports), relying on MMCSS for the audio threads. Default: left as
+// Windows sets it — measured with --rtstress (Exoplanet, 10 ms buffer, 3 x 3000 callbacks each, loaded PC): HIGH 0
+// callbacks over the deadline, ABOVE_NORMAL 1, the same average load; a 64-sample run was not possible on this PC.
+std::atomic<unsigned long> priorityClassFound { 0 }, priorityClassNow { 0 };
+void choosePriorityClass() noexcept
+{
+    static const auto keep = juce::SystemStats::getEnvironmentVariable ("LYNX_PRIORITY_CLASS", {}) != "above";
+    const auto found = GetPriorityClass (GetCurrentProcess());
+    if (priorityClassFound.load (std::memory_order_relaxed) == 0 || found != ABOVE_NORMAL_PRIORITY_CLASS)
+        priorityClassFound.store (found, std::memory_order_relaxed);
+    if (! keep && found != ABOVE_NORMAL_PRIORITY_CLASS)
+        SetPriorityClass (GetCurrentProcess(), ABOVE_NORMAL_PRIORITY_CLASS);
+    priorityClassNow.store (GetPriorityClass (GetCurrentProcess()), std::memory_order_relaxed);
+}
+juce::String priorityClassName (unsigned long c)
+{
+    switch (c)
+    {
+        case IDLE_PRIORITY_CLASS: return "idle";
+        case BELOW_NORMAL_PRIORITY_CLASS: return "below normal";
+        case NORMAL_PRIORITY_CLASS: return "normal";
+        case ABOVE_NORMAL_PRIORITY_CLASS: return "above normal";
+        case HIGH_PRIORITY_CLASS: return "high";
+        case REALTIME_PRIORITY_CLASS: return "realtime";
+        default: return c == 0 ? juce::String ("not seen") : juce::String::toHexString ((juce::int64) c);
+    }
+}
+#endif
+
 // Audio workers with real-time priority (MMCSS "Pro Audio" on Windows, like the driver; QoS class on macOS; SCHED_FIFO
 // on Linux when allowed).
 void raiseAudioThreadPriority()
@@ -144,7 +299,9 @@ void raiseAudioThreadPriority()
             return reinterpret_cast<AvSet> (reinterpret_cast<void*> (GetProcAddress (avrt, "AvSetMmThreadCharacteristicsW")));
         return nullptr;
     }();
-    // FL's audio worker threads also raise their MMCSS priority to "high" (FLEngine_x64.dll, REA round 87)
+    // FL's audio worker threads raise their MMCSS priority to "high" (FLEngine_x64.dll, REA round 87); Live's to "critical"
+    // (REA round 190hc: its 22 audio threads sat at dynamic priority 26 in every snapshot), which LYNX uses since round
+    // toolchain190gt
     using AvPriority = int (__stdcall*) (void*, int);
     static const auto avPriority = [] () -> AvPriority {
         if (auto* avrt = LoadLibraryW (L"avrt.dll"))
@@ -155,11 +312,20 @@ void raiseAudioThreadPriority()
 
     if (auto* handle = avSet != nullptr ? avSet (L"Pro Audio", &task) : nullptr)
     {
-        if (avPriority != nullptr)
+        rtThreadsMmcss.fetch_add (1, std::memory_order_relaxed);
+        if (avPriority != nullptr && avPriority (handle, 2 /* AVRT_PRIORITY_CRITICAL */) != 0)
+            rtThreadsCritical.fetch_add (1, std::memory_order_relaxed);
+        else if (avPriority != nullptr)
             avPriority (handle, 1 /* AVRT_PRIORITY_HIGH */);
     }
     else
         SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
+    // and full speed while LYNX is in the background (no EcoQoS: platform/PowerThrottling.h, round toolchain190gt)
+    power::optOutOfPowerThrottling();
+    const auto reached = GetThreadPriority (GetCurrentThread());
+    rtThreadsRaised.fetch_add (1, std::memory_order_relaxed);
+    for (auto low = rtPriorityMin.load(); reached < low && ! rtPriorityMin.compare_exchange_weak (low, reached);) {}
+    for (auto high = rtPriorityMax.load(); reached > high && ! rtPriorityMax.compare_exchange_weak (high, reached);) {}
    #elif JUCE_MAC
     // the highest quality-of-service class: scheduled like the UI's own interactive work, on the performance cores
     pthread_set_qos_class_self_np (QOS_CLASS_USER_INTERACTIVE, 0);
@@ -173,13 +339,122 @@ void raiseAudioThreadPriority()
    #endif
 }
 
+#if JUCE_MAC
+// The calling thread becomes a time-constraint (real-time) thread with the device's buffer as its period: about half of
+// it to compute, the whole of it as the deadline. Apple's audio workgroups take only such threads (os_workgroup_join
+// fails with EINVAL before; research round 190gs B1).
+void becomeTimeConstraintThread (double blockMs) noexcept
+{
+    mach_timebase_info_data_t timebase {};
+    if (mach_timebase_info (&timebase) != KERN_SUCCESS || timebase.numer == 0)
+        return;
+    const auto ticks = [&] (double ms) { return (uint32_t) (ms * 1.0e6 * (double) timebase.denom / (double) timebase.numer); };
+    const auto period = juce::jlimit (0.5, 50.0, blockMs); // (above 50 ms the kernel refuses the policy)
+    thread_time_constraint_policy_data_t policy { ticks (period), ticks (0.5 * period), ticks (period), 1 };
+    thread_policy_set (pthread_mach_thread_np (pthread_self()), THREAD_TIME_CONSTRAINT_POLICY, (thread_policy_t) &policy,
+                       THREAD_TIME_CONSTRAINT_POLICY_COUNT);
+}
+#endif
+
+// The render-ahead thread (round 190gq, core/RenderAhead.h): the workers' priority, except on macOS, where it is not
+// deadline work and must never join the device's Audio Workgroup (round 190gt joins the real-time workers): the
+// interactive QoS class only.
+void raiseRenderAheadThreadPriority()
+{
+   #if JUCE_MAC
+    pthread_set_qos_class_self_np (QOS_CLASS_USER_INTERACTIVE, 0);
+   #else
+    raiseAudioThreadPriority();
+   #endif
+}
+
+// Round 190gq (190gs Q7): the cores that give a block its full speed — physical cores (SMT siblings share one core's
+// units), and on hybrid CPUs only the performance class (a block waits for its slowest worker). 0 = unknown.
+int performanceCores()
+{
+   #if JUCE_WINDOWS
+    DWORD bytes = 0;
+    GetLogicalProcessorInformationEx (RelationProcessorCore, nullptr, &bytes);
+    if (bytes == 0)
+        return 0;
+    std::vector<std::uint8_t> buffer (bytes);
+    if (! GetLogicalProcessorInformationEx (RelationProcessorCore, reinterpret_cast<PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX> (buffer.data()), &bytes))
+        return 0;
+    int best = -1, count = 0;
+    for (DWORD at = 0; at < bytes;)
+    {
+        const auto* info = reinterpret_cast<const SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*> (buffer.data() + at);
+        if (info->Relationship == RelationProcessorCore)
+        {
+            const auto cls = (int) info->Processor.EfficiencyClass; // (higher = faster; all 0 on a non-hybrid CPU)
+            if (cls > best)
+            {
+                best = cls;
+                count = 0;
+            }
+            if (cls == best)
+                ++count;
+        }
+        if (info->Size == 0)
+            break;
+        at += info->Size;
+    }
+    return count;
+   #elif JUCE_MAC
+    int perf = 0;
+    auto size = sizeof (perf);
+    if (sysctlbyname ("hw.perflevel0.physicalcpu", &perf, &size, nullptr, 0) == 0 && perf > 0)
+        return perf;
+    int physical = 0;
+    size = sizeof (physical);
+    return sysctlbyname ("hw.physicalcpu", &physical, &size, nullptr, 0) == 0 ? physical : 0;
+   #elif JUCE_LINUX || JUCE_BSD
+    // sysfs: one (package, core) pair per physical core; on an Intel hybrid CPU only the cpu_core PMU's CPUs
+    std::vector<std::pair<int, int>> cores;
+    const juce::File root ("/sys/devices/system/cpu");
+    juce::String hybrid = juce::File ("/sys/devices/cpu_core/cpus").loadFileAsString().trim(); // e.g. "0-15"
+    auto inHybridSet = [&hybrid] (int cpu) {
+        if (hybrid.isEmpty())
+            return true;
+        for (const auto& range : juce::StringArray::fromTokens (hybrid, ",", {}))
+        {
+            const auto from = range.upToFirstOccurrenceOf ("-", false, false).getIntValue();
+            const auto to = range.contains ("-") ? range.fromFirstOccurrenceOf ("-", false, false).getIntValue() : from;
+            if (cpu >= from && cpu <= to)
+                return true;
+        }
+        return false;
+    };
+    for (int cpu = 0; cpu < 1024; ++cpu)
+    {
+        const auto dir = root.getChildFile ("cpu" + juce::String (cpu));
+        if (! dir.isDirectory())
+            break;
+        const auto core = dir.getChildFile ("topology/core_id").loadFileAsString().trim();
+        const auto package = dir.getChildFile ("topology/physical_package_id").loadFileAsString().trim();
+        if (core.isEmpty() || ! inHybridSet (cpu))
+            continue;
+        const std::pair<int, int> id { package.getIntValue(), core.getIntValue() };
+        if (std::find (cores.begin(), cores.end(), id) == cores.end())
+            cores.push_back (id);
+    }
+    return (int) cores.size();
+   #else
+    return 0;
+   #endif
+}
+
 int workerCount()
 {
     // diagnostics: LYNX_WORKERS=n fixes the number of extra threads
     if (const auto forced = juce::SystemStats::getEnvironmentVariable ("LYNX_WORKERS", {}); forced.isNotEmpty())
         return juce::jlimit (0, 31, forced.getIntValue());
 
-    // the audio thread works too; leave one core free for the UI
+    // round 190gq (190gs Q7): the audio thread and the workers on the performance cores, one per physical core, the
+    // audio thread's own included (the SMT siblings and the slower cores are left to the UI and the rest). Before:
+    // logical CPUs − 2 (7 workers on 6 cores / 12 threads). Unknown topology: as before.
+    if (const auto cores = performanceCores(); cores > 0)
+        return juce::jlimit (0, 7, cores - 1);
     const auto cores = (int) std::thread::hardware_concurrency();
     return juce::jlimit (0, 7, cores - 2);
 }
@@ -249,8 +524,12 @@ namespace
 std::atomic<const AudioEngine*> pluginHoldOwner { nullptr };
 } // namespace
 
-AudioEngine::AudioEngine (bool openAudioDevice, int workerThreads, bool userPluginList)
-    : workers (std::make_unique<WorkerPool> (workerThreads >= 0 ? workerThreads : workerCount(), raiseAudioThreadPriority)),
+AudioEngine::AudioEngine (bool openAudioDevice, int workerThreads, bool userPluginList, bool deferDeviceOpen)
+    // (an engine without an audio device renders offline — exports, bounces, freezes: its workers run below normal
+    // priority as FL's export threads do, rollup 0.1.28 / REA 190hb; the live engine's workers get the audio priority)
+    : workers (std::make_unique<WorkerPool> (workerThreads >= 0 ? workerThreads : workerCount(),
+                                             openAudioDevice ? std::function<void()> (raiseAudioThreadPriority)
+                                                             : std::function<void()> (powerhints::lowerWorkerThread))),
       plugins (userPluginList),
       song (Song::makeDefault())
 {
@@ -270,57 +549,109 @@ AudioEngine::AudioEngine (bool openAudioDevice, int workerThreads, bool userPlug
     if (openAudioDevice)
     {
         player.setProcessor (&graph);
-
-        // LYNX ASIO without installation: lynx-asio.dll next to LYNX.exe, when it is not registered (REA round 106)
-        if (auto lynxAsio = makeBuiltInLynxAsioType())
-        {
-            deviceManager.getAvailableDeviceTypes(); // the standard types first
-            deviceManager.addAudioDeviceType (std::move (lynxAsio));
-        }
-        // LYNX's own PipeWire client on Linux (round 161), listed when a PipeWire daemon answers
-        if (auto pipeWire = makePipeWireDeviceType())
-        {
-            deviceManager.getAvailableDeviceTypes();
-            deviceManager.addAudioDeviceType (std::move (pipeWire));
-        }
-        mark ("  engine: device types");
-
-        // 0 inputs, 2 outputs; the device of the last session (Settings › Audio) if it is still there, else the default.
-        const auto saved = juce::XmlDocument::parse (audioDeviceFile());
-        auto fresh = saved == nullptr;
-        if (deviceManager.initialise (0, 2, saved.get(), true).isNotEmpty() && saved != nullptr)
-        {
-            deviceManager.initialise (0, 2, nullptr, true);
-            fresh = true;
-        }
-        if (fresh)
-        {
-            choosePreferredDriver(); // Linux: PipeWire, then JACK, then ALSA
-            chooseSafeBufferSize(); // no saved setup: a buffer with room for heavy projects (Settings › Audio changes it)
-        }
-        mark ("  engine: device opened");
-        deviceManager.addAudioCallback (this);
+        // the settings that do not need the device (the window reads them; round 190go: built before the device opens)
         if (rackProcessor != nullptr)
-            rackProcessor->getRenderer().setProfiling (true); // per-unit CPU for the CPU meter and the glitch log
-        deviceStateSaver = std::make_unique<DeviceStateSaver> (*this);
+            rackProcessor->setProfiling (true); // per-unit CPU for the CPU meter and the glitch log (both renderers: 190gq)
         midiPrefs = midiPrefsShared = prefs::MidiPrefs::fromText (midiSettingsFile().loadFileAsString().toStdString());
         performanceMidiChannel.store (midiPrefs.performanceChannel);
         controllerIo.loadProfiles (controllerProfilesFolder());
         recordingSettings = loadRecordingSettings();
         saveGlobalLinks = true;
-
-        mark ("  engine: callback + settings");
-        prefetcher = std::make_unique<StreamPrefetcher> (transport);
-        prefetcher->update (song, samples);
-        enableAllMidiInputs();
-        midiSync.configure (midiPrefs);
-        midiSync.sendAllNotesOff(); // FL's "Send all notes off": on init and after a render
-        deviceManager.addMidiInputDeviceCallback ({}, this); // {} = all inputs enabled
-        midiDevicesChanged = juce::MidiDeviceListConnection::make ([this] { enableAllMidiInputs(); });
-        mark ("  engine: MIDI inputs");
+        devicePending = midiPending = true;
+        if (! deferDeviceOpen)
+        {
+            this->openAudioDevice();
+            openMidiDevices();
+        }
     }
 
     startTimerHz (30); // recording and collection of retired snapshots
+}
+
+void AudioEngine::openAudioDevice()
+{
+    if (! std::exchange (devicePending, false))
+        return;
+    const auto mark = [] (const char* step) { if (startupMark != nullptr) startupMark (step); };
+
+    // LYNX ASIO without installation: lynx-asio.dll next to LYNX.exe, when it is not registered (REA round 106)
+    deviceManager.getAvailableDeviceTypes(); // the standard types first (round 190hd: its own trace line)
+    mark ("  engine: standard device types (the prewarmed ASIO device handed over)");
+    if (auto lynxAsio = makeBuiltInLynxAsioType())
+        deviceManager.addAudioDeviceType (std::move (lynxAsio));
+    // LYNX's own PipeWire client on Linux (round 161), listed when a PipeWire daemon answers
+    if (auto pipeWire = makePipeWireDeviceType())
+    {
+        deviceManager.getAvailableDeviceTypes();
+        deviceManager.addAudioDeviceType (std::move (pipeWire));
+    }
+    mark ("  engine: device types");
+
+    // 0 inputs, 2 outputs; the device of the last session (Settings › Audio) if it is still there, else the default.
+    const auto saved = juce::XmlDocument::parse (audioDeviceFile());
+    // (round 190go) the MIDI ports the saved setup names open with the MIDI devices (openMidiDevices: LYNX's MIDI
+    // settings decide which inputs are open anyway), not on the audio device's way: JUCE opened them here (~0.1-0.2 s)
+    if (saved != nullptr)
+    {
+        savedMidiOutput = { saved->getStringAttribute ("defaultMidiOutput"), saved->getStringAttribute ("defaultMidiOutputDevice") };
+        saved->removeAttribute ("defaultMidiOutput");
+        saved->removeAttribute ("defaultMidiOutputDevice");
+        saved->deleteAllChildElementsWithTagName ("MIDIINPUT");
+    }
+    auto fresh = saved == nullptr;
+    auto failed = deviceManager.initialise (0, 2, saved.get(), true).isNotEmpty();
+    // (round 190hd) a device made ahead without JUCE's start / stop at init that then failed: once more the usual way
+    if (failed && saved != nullptr && asioPrewarmQuickInit())
+        failed = deviceManager.initialise (0, 2, saved.get(), true).isNotEmpty();
+    if (failed && saved != nullptr)
+    {
+        deviceManager.initialise (0, 2, nullptr, true);
+        fresh = true;
+    }
+    if (fresh)
+    {
+        choosePreferredDriver(); // Linux: PipeWire, then JACK, then ALSA
+        chooseSafeBufferSize(); // no saved setup: a buffer with room for heavy projects (Settings › Audio changes it)
+    }
+    mark ("  engine: device opened");
+    deviceManager.addAudioCallback (this);
+    deviceStateSaver = std::make_unique<DeviceStateSaver> (*this);
+    prefetcher = std::make_unique<StreamPrefetcher> (transport);
+    prefetcher->update (song, samples);
+    // a project set while the device was not open yet (round 190go: the start-up song, built with the window): its
+    // inputs, FL insert inputs, hardware outputs and inserts open now, as they do when a project is opened
+    if (followProjectOnDevice())
+        publishSong();
+    mark ("  engine: callback + settings");
+}
+
+void AudioEngine::prewarmAudioDevice()
+{
+    prewarmAsioDevice (audioDeviceFile());
+}
+
+void AudioEngine::openMidiDevices()
+{
+    if (! std::exchange (midiPending, false))
+        return;
+    midiOpen = true;
+    // the default MIDI output of the last session (see openAudioDevice), by its id, else by its name (as JUCE does)
+    if (savedMidiOutput.name.isNotEmpty() || savedMidiOutput.identifier.isNotEmpty())
+        for (const auto& out : juce::MidiOutput::getAvailableDevices())
+            if (out.identifier == savedMidiOutput.identifier || (savedMidiOutput.identifier.isEmpty() && out.name == savedMidiOutput.name))
+            {
+                deviceManager.setDefaultMidiOutputDevice (out.identifier);
+                break;
+            }
+    enableAllMidiInputs();
+    midiSync.configure (midiPrefs);
+    midiSync.sendAllNotesOff(); // FL's "Send all notes off": on init and after a render
+    if (! platform::testMode()) // (round 190gl: Link on as it was left; never in a test run, which must not join a session)
+        applyLinkPrefs();
+    deviceManager.addMidiInputDeviceCallback ({}, this); // {} = all inputs enabled
+    midiDevicesChanged = juce::MidiDeviceListConnection::make ([this] { enableAllMidiInputs(); });
+    if (startupMark != nullptr)
+        startupMark ("  engine: MIDI inputs");
 }
 
 AudioLogger& AudioEngine::getAudioLogger()
@@ -332,6 +663,8 @@ AudioLogger& AudioEngine::getAudioLogger()
 
 AudioEngine::~AudioEngine()
 {
+    if (rackProcessor != nullptr) // (round 190gq: the render-ahead thread stops before the snapshots are freed)
+        rackProcessor->haltRenderAhead();
     if (pluginHoldOwner.load() == this) // (round 190ap: the hold goes with its project's engine)
     {
         pluginHoldOwner.store (nullptr);
@@ -383,13 +716,16 @@ void AudioEngine::buildInitialGraph()
     graph.setPlayConfigDetails (0, 2, transport.sampleRate.load(), 512);
 
     auto output = graph.addNode (std::make_unique<IONode> (IONode::audioOutputNode));
-    auto rack = graph.addNode (std::make_unique<ChannelRackProcessor> (transport, rackExchange, liveEvents, midiEvents, meters, workers.get()));
+    auto rack = graph.addNode (std::make_unique<ChannelRackProcessor> (transport, rackExchange, liveEvents, midiEvents, meters, workers.get(),
+                                                                       raiseRenderAheadThreadPriority));
     rackProcessor = dynamic_cast<ChannelRackProcessor*> (rack->getProcessor());
     if (rackProcessor != nullptr)
     {
+        rackProcessor->setRenderAheadTargets (&renderAheadTargets); // (round 190gq)
         rackProcessor->setLiveInput (&liveInput);
         rackProcessor->setHardwareOutput (&hwOutput);
         rackProcessor->setPerformance (performanceLive.get());
+        rackProcessor->getRenderer().reserveFor (lastPublishedShape); // (round 190gn: a song published before the graph)
         // FL's own metronome sounds from its install (Data\System), LYNX's stand-ins without it (round 165z-a2)
         const auto& flData = flStudioAccess().roots.data;
         rackProcessor->setMetronome (std::make_unique<Metronome> (transport, flData.empty() ? juce::File() : platform::localFile (flData)));
@@ -416,23 +752,33 @@ std::atomic<int>& AudioEngine::offlineRendersRunning() noexcept
     return count;
 }
 
+RenderStream::Setup AudioEngine::streamSetup (const RenderOptions& options, int latency)
+{
+    RenderStream::Setup setup;
+    setup.trim = (std::int64_t) juce::jmax (0, options.trimSamples + (options.trimPdc ? latency : 0));
+    setup.musicSamples = (std::int64_t) (options.seconds * options.sampleRate) + setup.trim;
+    // (round 190gh: an exact length renders that much after the trim, the tail's silence does not end it)
+    setup.totalSamples = options.exactSamples > 0 ? setup.trim + options.exactSamples
+                                                  : setup.musicSamples + (std::int64_t) (juce::jmax (0.0, options.tailSeconds) * options.sampleRate);
+    setup.exact = options.exactSamples > 0;
+    setup.sampleRate = options.sampleRate;
+    setup.keepOvers = options.keepOvers;
+    setup.ditherBits = options.ditherBits;
+    setup.ditherShaping = options.ditherShaping;
+    setup.output = options.output;
+    setup.capture = options.capture;
+    return setup;
+}
+
 float AudioEngine::renderOffline (const RenderOptions& options)
 {
     offlineRendersRunning().fetch_add (1, std::memory_order_acq_rel);
     const juce::ScopeGuard rendered { [] { offlineRendersRunning().fetch_sub (1, std::memory_order_acq_rel); } };
-    const auto seconds = options.seconds;
     const auto sampleRate = options.sampleRate;
-    auto* output = options.output;
     const auto& progress = options.progress;
-    const auto tailSeconds = options.tailSeconds;
-    const auto trimSamples = options.trimSamples;
-    std::optional<Dither> dither;
+    auto* shared = options.shared;
 
-    if (options.ditherBits > 0)
-        dither.emplace (options.ditherBits, options.ditherShaping);
-
-    constexpr int blockSize = 512;
-    constexpr float silence = 3.0e-5f; // ~ -90 dB
+    constexpr int blockSize = renderBlockSize;
     // "HQ for all plugins" (REA round 134): engines with FL render-quality settings use them (Sytrus) and HQ switches
     // are forced on; without it the export keeps the playback quality
     setOfflineRendering (options.hqAllPlugins);
@@ -490,19 +836,28 @@ float AudioEngine::renderOffline (const RenderOptions& options)
 
     juce::AudioBuffer<float> buffer (2, blockSize);
     juce::MidiBuffer midi;
-    float peak = 0.0f;
-    // PDC trim with the latency the plugins report once they have settled
-    const auto trim = (std::int64_t) juce::jmax (0, trimSamples + (options.trimPdc ? latency : 0));
-    lastRenderStats.trimmedSamples = (int) trim;
-    const auto musicSamples = (std::int64_t) (seconds * sampleRate) + trim;
-    const auto totalSamples = musicSamples + (std::int64_t) (juce::jmax (0.0, tailSeconds) * sampleRate);
-    std::int64_t quietSamples = 0;
+    // what is done after the graph (round 190gj: RenderStream, the same code as the single-pass stems' files), with the
+    // PDC trim of the latency the plugins report once they have settled
+    auto setup = streamSetup (options, latency);
+    lastRenderStats.trimmedSamples = (int) setup.trim;
+    const auto musicSamples = setup.musicSamples;
+    const auto totalSamples = setup.totalSamples;
+    if (shared != nullptr)
+    {
+        setup.output = nullptr;
+        setup.capture = nullptr;
+    }
+    RenderStream stream (std::move (setup));
     bool cancelled = lastRenderStats.warmUp.cancelled;
+    if (shared != nullptr && ! cancelled)
+        shared->start (latency);
 
     vfx::script::setSongEnded (false);
-    for (std::int64_t done = 0; done < totalSamples && ! cancelled; done += blockSize)
+    for (std::int64_t done = 0; ! cancelled;)
     {
-        const auto n = (int) juce::jmin<std::int64_t> (blockSize, totalSamples - done);
+        const auto n = shared != nullptr ? juce::jmin (blockSize, shared->nextBlock (done)) : stream.blockAt (done, blockSize);
+        if (n <= 0)
+            break;
         // the tail: the song has ended (VFX Script sees the transport stopped, like FL's render; round 167e)
         if (done >= musicSamples)
             vfx::script::setSongEnded (true);
@@ -513,46 +868,30 @@ float AudioEngine::renderOffline (const RenderOptions& options)
         const auto afterGraph = juce::Time::getMillisecondCounterHiRes();
         lastRenderStats.graphMs += afterGraph - before;
 
-        if (! options.keepOvers) // float WAV and the buffered export (normalize) keep what goes above 0 dBFS, like FL
-            for (int ch = 0; ch < view.getNumChannels(); ++ch)
-                clipOvers (view.getWritePointer (ch), n);
-
-        const auto blockPeak = view.getMagnitude (0, n);
-        peak = juce::jmax (peak, blockPeak);
-
-        if (dither)
-            for (int ch = 0; ch < view.getNumChannels(); ++ch)
-                dither->process (view.getWritePointer (ch), n, ch);
-
-        // PDC: the start is the latency's silence; the song's end arrives `trim` samples later
-        if ((output != nullptr || options.capture) && done + n > trim)
-        {
-            const auto skip = (int) juce::jmax<std::int64_t> (0, trim - done);
-            const auto beforeWrite = juce::Time::getMillisecondCounterHiRes();
-            if (output != nullptr)
-                output->writeFromAudioSampleBuffer (view, skip, n - skip);
-            if (options.capture)
-                options.capture (view.getReadPointer (0, skip), view.getReadPointer (1, skip), n - skip);
-            lastRenderStats.writeMs += juce::Time::getMillisecondCounterHiRes() - beforeWrite;
-        }
+        if (shared != nullptr)
+            shared->block (view, done, n);
+        else
+            stream.block (view, done, n);
 
         transport.positionTicks.store (transport.positionTicks.load() + n * transport.ticksPerSample());
 
         // in the tail: half a second of silence ends it
-        if (done + n > musicSamples)
-        {
-            quietSamples = blockPeak < silence ? quietSamples + n : 0;
+        if (stream.endedBySilence())
+            break;
 
-            if (quietSamples > (std::int64_t) (sampleRate * 0.5))
-                break;
-        }
-
-        if (progress && (done / blockSize) % 32 == 0 && ! progress ((double) done / (double) juce::jmax<std::int64_t> (1, totalSamples)))
+        // (a shared render reports its own progress, and is cancelled by ending its blocks)
+        if (shared == nullptr && progress && (done / blockSize) % 32 == 0
+            && ! progress ((double) done / (double) juce::jmax<std::int64_t> (1, totalSamples)))
         {
             cancelled = true;
             break;
         }
+        done += n;
+        if (stream.hasEnded())
+            break;
     }
+    lastRenderStats.writeMs = stream.getWriteMs();
+    const auto peak = stream.getPeak();
 
     stop();
     vfx::script::setSongEnded (false);
@@ -689,6 +1028,26 @@ void AudioEngine::forEachHostedPlugin (const std::function<void (juce::AudioPlug
             inGraph (patcher::graphOf (getEffect ((int) t, (int) s).get()));
 }
 
+void AudioEngine::getPublishedLatencies (std::vector<int>& channels, std::vector<std::vector<int>>& slots) const
+{
+    // RackState::latencies: the instruments, then the slots of every insert in order (buildPdc's layout)
+    const auto& shape = lastPublishedShape;
+    channels.clear();
+    slots.assign (shape.effects.size(), {});
+    auto next = shape.latencies.begin();
+    for (std::size_t c = 0; c < shape.instruments.size() && next != shape.latencies.end(); ++c)
+        channels.push_back (*next++);
+    for (std::size_t t = 0; t < shape.effects.size(); ++t)
+        for (std::size_t s = 0; s < shape.effects[t].size() && next != shape.latencies.end(); ++s)
+            slots[t].push_back (*next++);
+}
+
+void AudioEngine::setRenderTaps (RackRenderer::RenderTaps* taps) noexcept
+{
+    if (rackProcessor != nullptr)
+        rackProcessor->getRenderer().setRenderTaps (taps);
+}
+
 ProcessTimes* AudioEngine::getProcessTimes() noexcept
 {
     if (externalTimes != nullptr)
@@ -792,6 +1151,7 @@ void AudioEngine::stop() noexcept
     stopClipPreview(); // (live check 190ew PL-3: and transport stop)
     waitingForInput.store (false);
     transport.countIn.store (0.0);
+    transport.linkWaiting.store (false); // (round 190gl: a start waiting for the Link session's phase is cancelled)
     transport.playing.store (false);
 }
 
@@ -884,7 +1244,8 @@ void AudioEngine::startPlayback()
         return;
     }
 
-    if (recordOptions.countInBars > 0)
+    // (round 190gl: as the reference DAW, no count-in while Link is on: the start waits for the session's phase instead)
+    if (recordOptions.countInBars > 0 && ! abletonLink.isEnabled())
     {
         // the notes played during the count-in belong to this take (round 170d)
         const auto length = countInLength (song, recordOptions.countInBars, startAt);
@@ -894,7 +1255,7 @@ void AudioEngine::startPlayback()
         takeCatch.songMode = song.mode == PlayMode::song;
         if (! song.patterns.empty())
             takeCatch.wrap = countInWrap (length, song.patterns[(std::size_t) juce::jlimit (0, (int) song.patterns.size() - 1, song.currentPattern)]
-                                                      .effectiveLength (song.beatsPerBar));
+                                                      .effectiveLength (song.meter()));
         transport.countIn.store ((double) length);
         sendChangeMessage();
         return;
@@ -1033,7 +1394,7 @@ void AudioEngine::previewFile (const juce::File& file)
     // here), else from LYNX's tempo detection (on the worker); a file that can have none plays as it always did
     const auto path = file.getFullPathName();
     const auto name = file.getFileName().toStdString();
-    const auto external = transport.externalBpm.load (std::memory_order_relaxed);
+    const auto external = transport.overrideBpm(); // (an external clock's or the Link session's tempo)
     const auto projectBpm = external > 0.0 ? external : transport.bpm.load (std::memory_order_relaxed);
     auto found = previewtempo::quick (*sample, name);
     auto known = found.bpm > 0.0;
@@ -1289,7 +1650,7 @@ void AudioEngine::clearScoreLog()
 
 NoteMask AudioEngine::soundingKeys (int channel) const noexcept
 {
-    return rackProcessor != nullptr ? rackProcessor->getRenderer().soundingKeys (channel) : NoteMask {};
+    return rackProcessor != nullptr ? rackProcessor->soundingKeys (channel) : NoteMask {};
 }
 
 std::vector<int> AudioEngine::heldInputKeys() const
@@ -1417,7 +1778,7 @@ CaptureResult AudioEngine::captureMidi()
     CaptureOptions o;
     o.afterMs = lastCaptureMs;
     o.nowMs = juce::Time::getMillisecondCounterHiRes();
-    o.gapMs = 2.0 * juce::jmax (1, song.beatsPerBar) * 60000.0 / juce::jmax (1.0, song.bpm); // two bars of silence end a phrase
+    o.gapMs = 2.0 * (double) song.barTicks() / ppq * 60000.0 / juce::jmax (1.0, song.bpm); // two bars of silence end a phrase
     o.playhead = (std::int64_t) std::llround (songPlayheadTicks());
     o.mode = recordOptions.mode;
     o.quantize.grid = recordOptions.quantise;
@@ -1442,7 +1803,7 @@ CaptureResult AudioEngine::captureMidiToSlot (int track, int scene, int& placed,
     CaptureOptions o;
     o.afterMs = lastCaptureMs;
     o.nowMs = juce::Time::getMillisecondCounterHiRes();
-    o.gapMs = 2.0 * juce::jmax (1, song.beatsPerBar) * 60000.0 / juce::jmax (1.0, song.bpm);
+    o.gapMs = 2.0 * (double) song.barTicks() / ppq * 60000.0 / juce::jmax (1.0, song.bpm);
     const auto log = scoreLogSnapshot();
     const auto phrase = capturePhrase (song, log, o);
     if (phrase.empty() || track < 0 || track >= launcher::maxTracks)
@@ -1479,7 +1840,7 @@ CaptureResult AudioEngine::captureMidiToSlot (int track, int scene, int& placed,
     // a new clip; played while stopped, the tempo comes from the phrase
     const auto bpm = running ? song.bpm : session::phraseTempo (phrase, song.bpm);
     std::int64_t length = 0;
-    auto notes = session::phraseNotes (phrase, o.nowMs, bpm, song.beatsPerBar, length);
+    auto notes = session::phraseNotes (phrase, o.nowMs, bpm, song.meter(), length);
     session::setNotesChannel (notes, channel);
     result.notes = (int) notes.size();
     const auto row = session::captureSlot (song, track, scene);
@@ -2694,21 +3055,37 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
     }
 }
 
+std::function<juce::Array<juce::MidiDeviceInfo> (bool inputs)>& AudioEngine::midiDeviceListOverride()
+{
+    static std::function<juce::Array<juce::MidiDeviceInfo> (bool)> lists;
+    return lists;
+}
+
 void AudioEngine::enableAllMidiInputs()
 {
+    const auto& stand = midiDeviceListOverride();
+    const auto inputs = stand ? stand (true) : juce::MidiInput::getAvailableDevices();
+    const auto outputs = stand ? stand (false) : juce::MidiOutput::getAvailableDevices();
+
     // (a device turned off in the MIDI settings is closed, so other programs can use it)
     std::vector<prefs::MidiPort> available;
     std::vector<std::string> open;
-    for (const auto& device : juce::MidiInput::getAvailableDevices())
+    for (const auto& device : inputs)
     {
         available.push_back ({ device.identifier.toStdString(), device.name.toStdString() });
         if (deviceManager.isMidiInputDeviceEnabled (device.identifier))
             open.push_back (device.identifier.toStdString());
     }
+    // round 190gh (B8): an input that was open and is no longer listed (unplugged) is closed at once
+    for (const auto& id : lastMidiInputIds)
+        if (std::none_of (available.begin(), available.end(), [&id] (const prefs::MidiPort& p) { return p.id == id; })
+            && deviceManager.isMidiInputDeviceEnabled (juce::String (id)))
+            open.push_back (id);
 
     const auto plan = prefs::planMidiInputs (midiPrefs, available, lastMidiInputIds, open);
-    for (const auto& id : plan.close)
-        deviceManager.setMidiInputDeviceEnabled (juce::String (id), false);
+    for (const auto* list : { &plan.close, &plan.gone })
+        for (const auto& id : *list)
+            deviceManager.setMidiInputDeviceEnabled (juce::String (id), false);
     for (const auto& id : plan.reopen) // it went away and came back: the old handle may be dead
         deviceManager.setMidiInputDeviceEnabled (juce::String (id), false);
     for (const auto* list : { &plan.reopen, &plan.open })
@@ -2719,11 +3096,36 @@ void AudioEngine::enableAllMidiInputs()
     for (const auto& port : available)
         lastMidiInputIds.push_back (port.id);
 
+    // round 190gh (B8): what was plugged in or out since the last check (inputs and outputs)
+    std::vector<prefs::MidiPort> ports;
+    for (const auto& port : available)
+        ports.push_back ({ "in:" + port.id, port.name });
+    for (const auto& device : outputs)
+        ports.push_back ({ "out:" + device.identifier.toStdString(), device.name.toStdString() });
+    const auto change = prefs::diffMidiDevices (lastMidiPorts, ports);
+    const auto firstList = ! std::exchange (midiPortsKnown, true);
+    lastMidiPorts = std::move (ports);
+
     // the devices that run a controller profile (round 190aw)
     std::vector<std::string> names;
     for (const auto& port : available)
         names.push_back (port.name);
     controllerIo.configure (midiPrefs, names, true);
+
+    if (change.changed && ! firstList)
+    {
+        ++midiDeviceListVersion;
+        controllerIo.devicesChanged(); // (feedback ports: an output that came back under another identifier)
+        midiSync.configure (midiPrefs); // (sync / notes-off outputs: closed when gone, opened again by name)
+        juce::StringArray added, removed;
+        for (const auto& n : change.added)
+            added.add (juce::String::fromUTF8 (n.c_str()));
+        for (const auto& n : change.removed)
+            removed.add (juce::String::fromUTF8 (n.c_str()));
+        if (onMidiDevicesChanged && (! added.isEmpty() || ! removed.isEmpty()))
+            onMidiDevicesChanged (added, removed);
+        sendChangeMessage();
+    }
 }
 
 void AudioEngine::setControllerSurface (controller::Surface* surface) { controllerIo.setSurface (surface); }
@@ -2733,14 +3135,14 @@ juce::File AudioEngine::controllerProfilesFolder() { return PluginHost::settings
 void AudioEngine::reloadControllerProfiles()
 {
     controllerIo.loadProfiles (controllerProfilesFolder());
-    if (prefetcher != nullptr)
+    if (midiOpen)
         enableAllMidiInputs();
     sendChangeMessage();
 }
 
 void AudioEngine::reconnectMidiInputs()
 {
-    if (prefetcher == nullptr) // (only with an audio device: the real app)
+    if (! midiOpen) // (only with an audio device: the real app, once its MIDI devices are open)
         return;
     for (const auto& device : juce::MidiInput::getAvailableDevices())
         if (deviceManager.isMidiInputDeviceEnabled (device.identifier))
@@ -2755,18 +3157,62 @@ void AudioEngine::setMidiPrefs (const prefs::MidiPrefs& p, bool save)
         const juce::SpinLock::ScopedLockType lock (midiPrefsLock);
         midiPrefsShared = p;
     }
+    publishRenderAheadTargets(); // (round 190gq: a MIDI input's own target channel is played live)
     performanceMidiChannel.store (p.performanceChannel);
     footPedalNoteOff.store (p.footPedalNoteOff);
     if (! p.pickup)
         pickups.clear();
-    if (prefetcher != nullptr) // (only with an audio device: the real app)
+    if (midiOpen) // (only with an audio device: the real app, once its MIDI devices are open; they open with these)
     {
         enableAllMidiInputs();
         midiSync.configure (p);
+        applyLinkPrefs();
     }
     if (save)
         midiSettingsFile().replaceWithText (juce::String (p.toText()));
     sendChangeMessage();
+}
+
+// --- Ableton Link (round 190gl) -----------------------------------------------------------------------------------
+
+void AudioEngine::applyLinkPrefs()
+{
+    abletonLink.setStartStopSync (midiPrefs.linkStartStopSync);
+    if (midiPrefs.link == abletonLink.isEnabled())
+        return;
+    if (! midiPrefs.link && abletonLink.tempoChangedByPeer())
+    {
+        // the reference DAW has one tempo: leaving the session, the project keeps the tempo a peer set last (not over
+        // tempo automation, which sets it anyway)
+        const auto session = abletonLink.sessionTempo();
+        if (session > 0.0 && std::abs (session - song.bpm) > 1.0e-6 && ! transport.songTempoMap.load())
+            editSong ([session] (Song& s) { s.bpm = session; });
+    }
+    abletonLink.setEnabled (midiPrefs.link, song.bpm);
+}
+
+void AudioEngine::setLinkEnabled (bool on)
+{
+    if (midiPrefs.link == on && abletonLink.isEnabled() == on)
+        return;
+    auto p = midiPrefs;
+    p.link = on;
+    setMidiPrefs (p);
+}
+
+void AudioEngine::setLinkStartStopSync (bool on)
+{
+    if (midiPrefs.linkStartStopSync == on)
+        return;
+    auto p = midiPrefs;
+    p.linkStartStopSync = on;
+    setMidiPrefs (p);
+}
+
+double AudioEngine::shownTempo() const noexcept
+{
+    const auto session = abletonLink.isEnabled() ? abletonLink.sessionTempo() : 0.0;
+    return session > 0.0 ? session : song.bpm;
 }
 
 void AudioEngine::setUndoLevels (int levels)
@@ -2873,6 +3319,11 @@ void AudioEngine::updateRecording()
         recordPassTrimmed = 0;
     }
     recordPassActive = active;
+    // (rollup 0.1.28, REA 190hb action 3: no sleep in the middle of a take; this timer runs on the message thread)
+    if (active && ! awakeForRecording)
+        awakeForRecording = powerhints::keepAwakeBegin();
+    else if (! active && awakeForRecording)
+        powerhints::keepAwakeEnd (*std::exchange (awakeForRecording, std::nullopt));
 
     if (playing)
         lastPlayingTick = estimatedPositionNow();
@@ -2886,12 +3337,12 @@ void AudioEngine::updateRecording()
             return;
 
         const auto& pattern = std::as_const (song).activePattern();
-        recorder.begin (pattern.effectiveLength (song.beatsPerBar));
+        recorder.begin (pattern.effectiveLength (song.meter()));
         // Pattern mode with Loop record off (round 170e5, FL's "never" play end [DECOMP 0x11d4800]): the pattern plays
         // once from the start of this pass and on past its end; the notes stay where they were played, so it grows
         if (recordloop::patternLinear (song.mode, recordOptions.loopRecord))
         {
-            const auto origin = recordloop::patternOrigin (at, pattern.effectiveLength (song.beatsPerBar));
+            const auto origin = recordloop::patternOrigin (at, pattern.effectiveLength (song.meter()));
             recorder.setPatternOrigin (origin);
             liveInput.patternOrigin.store (origin);
         }
@@ -2998,12 +3449,16 @@ void AudioEngine::launcherCommand (const launcher::Command& command)
                 if (tempo > 0.0)
                     s.bpm = tempo;
                 if (bar > 0)
-                    s.beatsPerBar = session::sceneBarBeats (bar, unit); // (round 190em: n/d as the same bar in quarter notes)
+                {
+                    // round 190fg: the song takes the scene's meter as it is (6 / 8: six eighths a bar; it was 3/4)
+                    s.beatsPerBar = bar;
+                    s.beatUnit = session::sceneBeatUnit (unit);
+                }
             }, false);
     if (starts && ! transport.playing.load() && ! isCountingIn())
     {
         // a recording into a slot counts in first, as the record options say (round 190bv)
-        if (command.type == T::record && recordOptions.countInBars > 0)
+        if (command.type == T::record && recordOptions.countInBars > 0 && ! abletonLink.isEnabled())
             transport.countIn.store ((double) countInLength (song, recordOptions.countInBars, (std::int64_t) transport.positionTicks.load()));
         else
             play();
@@ -3080,16 +3535,26 @@ void AudioEngine::setSong (Song newSong)
     // arming isn't saved: a new project starts disarmed; its inserts' audio inputs open the device input
     for (const auto t : std::vector<int> (armedInserts))
         setInsertArmed (t, false);
-    if (prefetcher != nullptr && ! hasAudioInput()
-        && std::any_of (song.mixer.begin(), song.mixer.end(), [] (const MixerTrack& t) { return t.inputChannel >= 0 || t.flInput >= 0; }))
+    followProjectOnDevice();
+
+    publishSong();
+}
+
+bool AudioEngine::followProjectOnDevice()
+{
+    if (prefetcher == nullptr) // (only with an audio device: the real app; see openAudioDevice)
+        return false;
+    if (! hasAudioInput() && std::any_of (song.mixer.begin(), song.mixer.end(), [] (const MixerTrack& t) { return t.inputChannel >= 0 || t.flInput >= 0; }))
         openAudioInput();
     // an FL project's insert inputs (REA round 157c): FL's list index on the device open now
-    if (prefetcher != nullptr && hasAudioInput())
+    auto changed = false;
+    if (hasAudioInput())
     {
         auto* device = deviceManager.getCurrentAudioDevice();
         const auto channels = device != nullptr ? device->getInputChannelNames().size() : 0;
         for (auto& t : song.mixer)
         {
+            changed = changed || t.flInput >= 0;
             if (t.flInput >= 0 && t.inputChannel < 0)
             {
                 const auto source = flInputSource (t.flInput, channels);
@@ -3100,14 +3565,14 @@ void AudioEngine::setSong (Song newSong)
         }
     }
     // hardware output targets and hardware inserts: their channels open with the project (the ones the device has)
-    if (prefetcher != nullptr)
-        openHardwareInsertIo();
-
-    publishSong();
+    openHardwareInsertIo();
+    return changed;
 }
 
 void AudioEngine::saveUndoStep()
 {
+    const auto remote = nextRemoteHistoryStep;
+    nextRemoteHistoryStep = false;
     // Dozens of edits arrive during a drag; only the first one of the click saves the state.
     bool samePress = false;
 
@@ -3124,7 +3589,7 @@ void AudioEngine::saveUndoStep()
 
     if (! samePress)
     {
-        undoStack.push_back (song);
+        undoStack.push_back ({ song, remote });
         redoStack.clear();
 
         if (undoStack.size() > maxUndoSteps)
@@ -3136,7 +3601,7 @@ void AudioEngine::saveUndoStep()
         if (sessionHistory)
         {
             closeSessionStep();
-            sessionUndo.push_back ({ song, song });
+            sessionUndo.push_back ({ song, song, remote });
             sessionRedo.clear();
             if (sessionUndo.size() > maxUndoSteps)
                 sessionUndo.pop_front();
@@ -3157,8 +3622,12 @@ void AudioEngine::editSong (const std::function<void (Song&)>& edit, bool undoab
     const auto lengthsBefore = patternLengths (song);
     const auto auditioned = comp::auditionedTrack (song);
     const auto pluginsBefore = detachNewPluginsOn ? freshPluginCounts (song) : std::map<std::string, int>();
+    // LYNX's "Link Playlist tracks to mixer tracks" (round 190gz): what each track's clips called for before the edit
+    const auto contentBefore = song.linkTracksToMixer ? autolink::contentKinds (song) : std::vector<autolink::Plan::Kind>();
     edit (song);
     song.keepOnePattern(); // (round 190ea: what follows, and every listener, may read the current pattern)
+    if (song.linkTracksToMixer && ! contentBefore.empty()) // a track that just got its first clip (or notes) is linked
+        autolink::followNewContent (song, contentBefore);
     if (detachNewPluginsOn)
         detachNewPlugins (pluginsBefore, song);
     comp::checkAudition (song, auditioned);
@@ -3182,6 +3651,7 @@ void AudioEngine::editLevels (const std::function<void (Song&)>& edit, bool undo
     // snapshot rebuild per move. While the song played that stalled the message thread and the fader (and the sound)
     // moved in steps of ~0.2 s. Here the edit changes only levels, so the snapshot in use takes the new values through
     // its live levels; the full publish follows once the mouse is released (timerCallback).
+    renderAheadTargets.tweaked(); // (round 190gq: the part rendered ahead hears a drag within about a block)
     if (publishedLevels == nullptr || ! publishedLevels->matches (song))
     {
         editSong (edit, undoable);
@@ -3235,24 +3705,69 @@ void AudioEngine::sessionStep (bool redo)
     closeSessionStep();
     auto& from = redo ? sessionRedo : sessionUndo;
     auto& to = redo ? sessionUndo : sessionRedo;
-    if (from.empty())
-        return;
-    auto step = std::move (from.back());
-    from.pop_back();
-    std::vector<live::Key> skipped;
-    // undo: the step's entities back to "before" (where they still are as "after" left them); redo the other way
-    auto next = redo ? live::selectiveRevert (song, step.second, step.first, &skipped) : live::selectiveRevert (song, step.first, step.second, &skipped);
-    juce::StringArray names;
-    for (const auto& k : skipped)
-        names.addIfNotAlreadyThere (juce::String::fromUTF8 (live::describe (k, song, [] (const char* s) { return tr (s).toStdString(); }).c_str()));
-    to.push_back (std::move (step));
-    song = std::move (next);
-    modified = true;
-    lastUndoPress = {};
-    clipops::updateCrossfades (song);
-    publishSong();
-    if (! names.isEmpty() && onSessionUndoSkipped)
-        onSessionUndoSkipped (names);
+    if (from.empty()) return;
+    const auto remote = from.back().remote;
+    bool movementMayHaveBegun = false;
+    try
+    {
+        std::optional<Song> before;
+        if (remote)
+        {
+            before = song;
+            capturePluginStatesInto (*before, false);
+            if (remoteHistoryApiStep && ! checkRemoteHistory (from.back().deviceHash, *before)) return;
+        }
+        // Prepare the pending after-state, selective result and all conflict labels before touching either stack.
+        auto step = from.back();
+        if (remote)
+        {
+            // API calls passed the device fence; native history intentionally restores without that refusal.
+            // Capture this endpoint while keeping metadata for selective conflicts in the remaining entities.
+            auto& outgoing = redo ? step.first : step.second;
+            outgoing.channels = before->channels;
+            outgoing.mixer = before->mixer;
+        }
+        const auto& current = before ? *before : song;
+        std::vector<live::Key> skipped;
+        auto next = redo ? live::selectiveRevert (current, step.second, step.first, &skipped)
+                         : live::selectiveRevert (current, step.first, step.second, &skipped);
+        const auto savedTargetHash = remote ? remoteDeviceStateHashOf (next) : juce::String();
+        juce::StringArray names;
+        for (const auto& key : skipped)
+            names.addIfNotAlreadyThere (juce::String::fromUTF8 (live::describe (key, song, [] (const char* s) { return tr (s).toStdString(); }).c_str()));
+        const auto fresh = remote ? remoteFreshTargets (*before, next) : std::unordered_set<std::uint64_t>();
+        const juce::ScopedValueSetter<std::unordered_set<std::uint64_t>> freshPolicy (remoteFreshInstances, fresh);
+        if (remoteHistoryApiStep && remoteHistoryCancelled && remoteHistoryCancelled())
+        {
+            failRemoteHistory (false);
+            remoteHistoryError = tr ("Remote history operation cancelled before changing history.");
+            return;
+        }
+        movementMayHaveBegun = true;
+        to.push_back (std::move (step));
+        from.pop_back();
+        sessionAfterOpen = false;
+        song = std::move (next);
+        modified = true;
+        lastUndoPress = {};
+        clipops::updateCrossfades (song);
+        levelsPending = false;
+        publishSong();
+        const auto fence = finishRemoteHistory (before);
+        if (remote && ! remoteHistoryFailed)
+        {
+            auto& incoming = redo ? to.back().second : to.back().first;
+            incoming.channels = song.channels;
+            incoming.mixer = song.mixer;
+            remote_history::acceptRestoredState (to.back(), from.empty() ? nullptr : &from.back(), savedTargetHash, fence);
+        }
+        if (! names.isEmpty() && onSessionUndoSkipped) onSessionUndoSkipped (names);
+    }
+    catch (...)
+    {
+        if (! remote) throw;
+        failRemoteHistory (movementMayHaveBegun);
+    }
 }
 
 void AudioEngine::setSessionHistory (bool on)
@@ -3272,47 +3787,86 @@ void AudioEngine::applyRemote (Song remote)
     publishSong();
 }
 
+void AudioEngine::historyStep (bool redo)
+{
+    auto& from = redo ? redoStack : undoStack;
+    auto& to = redo ? undoStack : redoStack;
+    if (from.empty()) return;
+    const auto remote = from.back().remote;
+    bool movementMayHaveBegun = false;
+    try
+    {
+        std::optional<Song> before;
+        if (remote)
+        {
+            before = song;
+            capturePluginStatesInto (*before, false);
+            if (remoteHistoryApiStep && ! checkRemoteHistory (from.back().deviceHash, *before)) return;
+        }
+        const auto savedTargetHash = remote ? remoteDeviceStateHashOf (from.back().song) : juce::String();
+        // The model's saved blob can differ from the running vendor's normalized blob. Redo must restore the
+        // actual state we are leaving, captured before any history movement, rather than the stale model bytes.
+        std::optional<HistoryEntry> inverse;
+        if (remote) inverse.emplace (HistoryEntry { *before, true });
+        const auto fresh = remote ? remoteFreshTargets (*before, from.back().song) : std::unordered_set<std::uint64_t>();
+        const juce::ScopedValueSetter<std::unordered_set<std::uint64_t>> freshPolicy (remoteFreshInstances, fresh);
+        if (remoteHistoryApiStep && remoteHistoryCancelled && remoteHistoryCancelled())
+        {
+            failRemoteHistory (false);
+            remoteHistoryError = tr ("Remote history operation cancelled before changing history.");
+            return;
+        }
+        // Moving song into a temporary may already change the live model even if push_back throws.
+        movementMayHaveBegun = true;
+        if (remote) to.push_back (std::move (*inverse));
+        else to.push_back ({ std::move (song), false });
+        song = std::move (from.back().song);
+        from.pop_back();
+        comp::setAudition (song, -1); // an old history state must not resume a comp audition
+        modified = true;
+        levelsPending = false;
+        lastUndoPress = {};
+        publishSong();
+        const auto fence = finishRemoteHistory (before);
+        if (remote && ! remoteHistoryFailed)
+            remote_history::acceptRestoredState (to.back(), from.empty() ? nullptr : &from.back(),
+                                                 savedTargetHash, fence);
+    }
+    catch (...)
+    {
+        if (! remote) throw;
+        failRemoteHistory (movementMayHaveBegun);
+    }
+}
+
 void AudioEngine::undo()
 {
-    if (sessionHistory)
-        return sessionStep (false);
-    if (undoStack.empty())
-        return;
-
-    redoStack.push_back (std::move (song));
-    song = std::move (undoStack.back());
-    undoStack.pop_back();
-    comp::setAudition (song, -1); // (not an edit: whatever an old state had auditioned stays out of it)
-    modified = true;
-    lastUndoPress = {};
-    publishSong();
+    remoteHistoryFailed = false;
+    remoteHistoryUncertain = false;
+    remoteHistoryError.clear();
+    remoteHistoryCode = "changed";
+    if (sessionHistory) sessionStep (false); else historyStep (false);
 }
 
 void AudioEngine::redo()
 {
-    if (sessionHistory)
-        return sessionStep (true);
-    if (redoStack.empty())
-        return;
-
-    undoStack.push_back (std::move (song));
-    song = std::move (redoStack.back());
-    redoStack.pop_back();
-    comp::setAudition (song, -1);
-    modified = true;
-    lastUndoPress = {};
-    publishSong();
+    remoteHistoryFailed = false;
+    remoteHistoryUncertain = false;
+    remoteHistoryError.clear();
+    remoteHistoryCode = "changed";
+    if (sessionHistory) sessionStep (true); else historyStep (true);
 }
 
 namespace
 {
-const Song& historyState (const std::deque<Song>& undo, const Song& current, const std::deque<Song>& redo, int index)
+template <typename Entries>
+const Song& historyState (const Entries& undo, const Song& current, const Entries& redo, int index)
 {
     if (index < (int) undo.size())
-        return undo[(std::size_t) index];
+        return undo[(std::size_t) index].song;
     if (index == (int) undo.size())
         return current;
-    return redo[redo.size() - 1 - (std::size_t) (index - (int) undo.size() - 1)];
+    return redo[redo.size() - 1 - (std::size_t) (index - (int) undo.size() - 1)].song;
 }
 } // namespace
 
@@ -3338,30 +3892,55 @@ void AudioEngine::jumpToHistory (int index)
         return;
     if (sessionHistory)
     {
-        while (getHistoryPosition() > index && ! sessionUndo.empty())
-            sessionStep (false);
-        while (getHistoryPosition() < index && ! sessionRedo.empty())
-            sessionStep (true);
+        while (getHistoryPosition() != index)
+        {
+            const auto previous = getHistoryPosition();
+            if (previous > index) undo(); else redo();
+            if (remoteHistoryFailed || getHistoryPosition() == previous) return;
+        }
         return;
     }
 
+    bool remote = false;
+    const auto position = getHistoryPosition();
+    if (index < position)
+        for (int i = index; i < position; ++i) remote = remote || undoStack[(std::size_t) i].remote;
+    else
+        for (int i = 0; i < index - position; ++i) remote = remote || redoStack[redoStack.size() - 1 - (std::size_t) i].remote;
+    if (remote)
+    {
+        while (getHistoryPosition() > index)
+        {
+            const auto previous = getHistoryPosition();
+            undo();
+            if (remoteHistoryFailed || getHistoryPosition() == previous) return;
+        }
+        while (getHistoryPosition() < index)
+        {
+            const auto previous = getHistoryPosition();
+            redo();
+            if (remoteHistoryFailed || getHistoryPosition() == previous) return;
+        }
+        return;
+    }
     // move through the stacks, then publish once
     while (getHistoryPosition() > index && ! undoStack.empty())
     {
-        redoStack.push_back (std::move (song));
-        song = std::move (undoStack.back());
+        redoStack.push_back ({ std::move (song), undoStack.back().remote });
+        song = std::move (undoStack.back().song);
         undoStack.pop_back();
     }
 
     while (getHistoryPosition() < index && ! redoStack.empty())
     {
-        undoStack.push_back (std::move (song));
-        song = std::move (redoStack.back());
+        undoStack.push_back ({ std::move (song), redoStack.back().remote });
+        song = std::move (redoStack.back().song);
         redoStack.pop_back();
     }
 
     modified = true;
     lastUndoPress = {};
+    levelsPending = false;
     publishSong();
 }
 
@@ -3404,6 +3983,44 @@ void AudioEngine::publishSelection()
             extraLiveChannels[(std::size_t) extra++].store (c);
 
     extraLiveCount.store (extra);
+    publishRenderAheadTargets();
+}
+
+// Render-ahead (round 190gq, core/RenderAhead.h): the channels notes are played into live stay real-time — the selected
+// channels (the typing keyboard, a MIDI input on "the selected channels"), each MIDI input's own target channel, the
+// channels locked to a MIDI input ("Receive notes from")
+void AudioEngine::publishRenderAheadTargets()
+{
+    std::array<int, renderahead::Targets::maxChannels> channels {};
+    int count = 0;
+    auto add = [&] (int c) {
+        if (c < 0 || count >= (int) channels.size() || std::find (channels.begin(), channels.begin() + count, c) != channels.begin() + count)
+            return;
+        channels[(std::size_t) count++] = c;
+    };
+    add (selectedChannel);
+    for (const auto c : selectedChannels)
+        add (c);
+    for (const auto& input : midiPrefs.inputs)
+        if (input.enabled)
+            add (input.target);
+    for (std::size_t c = 0; c < song.channels.size(); ++c)
+        if (! song.channels[c].receiveFrom.empty())
+            add ((int) c);
+    // hosted plugin editors on screen: their channel or insert
+    std::array<int, renderahead::Targets::maxTracks> tracks {};
+    int trackCount = 0;
+    for (const auto& e : openEditors)
+    {
+        if (e.track >= 0 && trackCount < (int) tracks.size())
+            tracks[(std::size_t) trackCount++] = e.track;
+        if (e.find)
+            if (const auto* ref = e.find (song))
+                for (std::size_t c = 0; c < song.channels.size(); ++c)
+                    if (&song.channels[c].plugin == ref)
+                        add ((int) c);
+    }
+    renderAheadTargets.publish (channels.data(), count, tracks.data(), trackCount);
 }
 
 namespace
@@ -3430,6 +4047,27 @@ std::string userOf (const Song& song, std::size_t track)
 
 namespace
 {
+// Round 190fn (O1): the FL Studio Mobile resources folders of Settings › Files (flm-resources.txt, one per line), each
+// taken down to the folder "@R@" paths start from; only folders that exist.
+std::vector<std::string> flmResourceFolders()
+{
+    std::vector<std::string> out;
+    const auto file = PluginHost::settingsFolder().getChildFile ("flm-resources.txt");
+    if (! file.existsAsFile())
+        return out;
+    juce::StringArray lines;
+    lines.addLines (file.loadFileAsString());
+    const auto exists = [] (const std::string& p) { return platform::localFile (p).exists(); };
+    for (auto line : lines)
+    {
+        line = line.trim();
+        if (line.isEmpty() || ! platform::localFile (line.toStdString()).isDirectory())
+            continue;
+        out.push_back (flmResourceRootFrom (line.toStdString(), exists));
+    }
+    return out;
+}
+
 // Where a Live set's library-relative samples live (Core Library, packs, User Library), newest install first; only
 // folders that exist. Read-only: nothing is ever written there.
 std::vector<std::string> liveLibraryRoots()
@@ -3496,6 +4134,7 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
         FlpImportOptions options;
         options.roots = findFlStudioRoots();
         options.projectFolder = file.getParentDirectory().getFullPathName().toStdString();
+        options.flmResourceRoots = flmResourceFolders(); // round 190fn (O1): FL Studio Mobile Rack generators in an .flp
         // samples on a drive that is not there (unplugged external drive, dead network share): one probe per root
         auto roots = std::make_shared<loadtrace::RootProbe> ([] (const std::string& root) {
             const auto t = std::chrono::steady_clock::now();
@@ -3562,6 +4201,8 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
                 if (! options.roots.factoryData.empty())
                     if (const auto root = flmResourceRootIn (options.roots.factoryData); platform::localFile (root).isDirectory())
                         flmOptions.resourceRoot = root;
+                // round 190fn (O1): the user's own FL Studio Mobile "Resources" folders (Settings › Files), searched first
+                flmOptions.userResourceRoots = options.flmResourceRoots;
                 std::string flmError;
                 auto song = importFlm (std::vector<std::uint8_t> (fileBytes, fileBytes + data.getSize()), flmOptions, &flmError);
                 if (! song)
@@ -3685,6 +4326,7 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
             StretchMap map;
             std::string variant; // non-empty: the precomputed span is stretched (RackRenderer, round 180d)
             std::shared_ptr<const SampleData> span;
+            StretchOptions options; // (round 190fm)
         };
         std::vector<Stretch> stretches;
         for (const auto& c : out.song.channels)
@@ -3695,6 +4337,7 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
                     const auto target = c.sampler.stretchBeats * 60.0 / std::max (1.0, out.song.bpm);
                     const auto method = c.sampler.stretchMethod;
                     const auto semitones = (double) c.sampler.stretchPitch;
+                    const auto options = stretchOptionsOf (c.sampler);
                     // the same stretch as RackRenderer: the precomputed span when there is one (round 180d), else the file
                     const auto clip = c.instrument == InstrumentKind::audioClip;
                     auto settings = c.sampler;
@@ -3708,8 +4351,8 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
                             const auto ratio = target / ((double) span->frames() / span->sampleRate);
                             auto variant = precompute::variantKey (settings, clip);
                             if (std::none_of (stretches.begin(), stretches.end(), [&] (const Stretch& x) {
-                                    return x.path == c.samplePath && x.variant == variant && x.ratio == ratio && x.method == method && x.semitones == semitones; }))
-                                stretches.push_back ({ c.samplePath, ratio, method, semitones, {}, std::move (variant), std::move (span) });
+                                    return x.path == c.samplePath && x.variant == variant && x.ratio == ratio && x.method == method && x.semitones == semitones && x.options == options; }))
+                                stretches.push_back ({ c.samplePath, ratio, method, semitones, {}, std::move (variant), std::move (span), options });
                         }
                         continue;
                     }
@@ -3717,8 +4360,8 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
                     // (the same map the rack asks for: RackState::build)
                     auto map = warpStretchMap (c.sampler.warp, (double) data->frames(), data->sampleRate, (double) std::llround ((double) data->frames() * ratio));
                     if (std::none_of (stretches.begin(), stretches.end(), [&] (const Stretch& x) {
-                            return x.path == c.samplePath && x.variant.empty() && x.ratio == ratio && x.method == method && x.semitones == semitones && x.map == map; }))
-                        stretches.push_back ({ c.samplePath, ratio, method, semitones, std::move (map), {}, {} });
+                            return x.path == c.samplePath && x.variant.empty() && x.ratio == ratio && x.method == method && x.semitones == semitones && x.map == map && x.options == options; }))
+                        stretches.push_back ({ c.samplePath, ratio, method, semitones, std::move (map), {}, {}, options });
                 }
         if (! stretches.empty())
         {
@@ -3728,8 +4371,10 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
                 for (auto i = nextStretch++; i < stretches.size(); i = nextStretch++)
                     if (auto stretched = ! stretches[i].variant.empty()
                                              ? library.loadStretchedSpan (juce::String::fromUTF8 (stretches[i].path.c_str()), stretches[i].variant,
-                                                                          stretches[i].span, stretches[i].ratio, stretches[i].method, stretches[i].semitones)
-                                             : library.loadStretched (juce::String::fromUTF8 (stretches[i].path.c_str()), stretches[i].ratio, stretches[i].method, stretches[i].semitones, stretches[i].map))
+                                                                          stretches[i].span, stretches[i].ratio, stretches[i].method, stretches[i].semitones,
+                                                                          stretches[i].options)
+                                             : library.loadStretched (juce::String::fromUTF8 (stretches[i].path.c_str()), stretches[i].ratio, stretches[i].method, stretches[i].semitones, stretches[i].map,
+                                                                      stretches[i].options))
                     {
                         const std::scoped_lock l (keep); // held until the rack is built (the cache drops unused lengths)
                         out.decoded.push_back (std::move (stretched));
@@ -3934,14 +4579,15 @@ RackState::Factories AudioEngine::rackFactories()
         const loadtrace::Scope timing ("rack_samples");
         return samples.load (juce::String::fromUTF8 (path.c_str()));
     };
-    factories.stretchedSamples = [this] (const std::string& path, double ratio, StretchMethod method, double semitones, const StretchMap& map) {
+    factories.stretchedSamples = [this] (const std::string& path, double ratio, StretchMethod method, double semitones, const StretchMap& map,
+                                         const StretchOptions& options) {
         const loadtrace::Scope timing ("rack_stretch");
-        return samples.loadStretched (juce::String::fromUTF8 (path.c_str()), ratio, method, semitones, map);
+        return samples.loadStretched (juce::String::fromUTF8 (path.c_str()), ratio, method, semitones, map, options);
     };
     factories.stretchedSpans = [this] (const std::string& path, const std::string& variant, const std::shared_ptr<const SampleData>& span,
-                                       double ratio, StretchMethod method, double semitones) {
+                                       double ratio, StretchMethod method, double semitones, const StretchOptions& options) {
         const loadtrace::Scope timing ("rack_stretch");
-        return samples.loadStretchedSpan (juce::String::fromUTF8 (path.c_str()), variant, span, ratio, method, semitones);
+        return samples.loadStretchedSpan (juce::String::fromUTF8 (path.c_str()), variant, span, ratio, method, semitones, options);
     };
     factories.pluginInstruments = [this] (const PluginRef& ref, double sr) { return plugins.makeInstrument (ref, sr); };
     factories.pluginEffects = [this] (const PluginRef& ref, double sr) { return plugins.makeEffect (ref, sr); };
@@ -4041,22 +4687,28 @@ void AudioEngine::publishSong()
     }
     transport.bpm.store (song.bpm);
     transport.beatsPerBar.store (song.beatsPerBar);
+    transport.beatUnit.store (meterUnit (song.beatUnit));
+    transport.projectBpm.store (song.bpm); // (round 190gl: what the Link session sees as the project's own tempo)
+    transport.linkQuantum.store (linksync::quantumBeats (song.clipGrid.has_value() ? song.clipGrid->globalQuant : LaunchQuant::bar, song.meter()));
 
     {
-        // time-signature table for the metronome: the start (beatsPerBar/4) and each signature change
+        // time-signature table for the metronome: the start (the song's meter) and each signature change
         transport.signatureVersion.fetch_add (1, std::memory_order_acq_rel); // odd: writing
         int count = 0;
         transport.signatureTick[0].store (0, std::memory_order_relaxed);
-        transport.signatureLength[0].store ((std::int64_t) ppq * juce::jmax (1, song.beatsPerBar), std::memory_order_relaxed);
+        transport.signatureLength[0].store (song.barTicks(), std::memory_order_relaxed);
+        transport.signatureBeat[0].store (song.beatTicks(), std::memory_order_relaxed);
         ++count;
 
         for (const auto& m : song.markers())
             if (m.isSignature() && count < Transport::maxSignatures)
             {
                 const auto length = juce::jmax<std::int64_t> (1, (std::int64_t) ppq * 4 * m.numerator / juce::jmax (1, m.denominator));
+                const auto beat = juce::jmax<std::int64_t> (1, length / juce::jmax (1, m.numerator)); // (round 190fg: its own beats)
                 const auto slot = m.tick <= 0 ? 0 : count++; // at position 0 it replaces the default
                 transport.signatureTick[(std::size_t) slot].store (juce::jmax<std::int64_t> (0, m.tick), std::memory_order_relaxed);
                 transport.signatureLength[(std::size_t) slot].store (length, std::memory_order_relaxed);
+                transport.signatureBeat[(std::size_t) slot].store (beat, std::memory_order_relaxed);
             }
 
         transport.signatureCount.store (count, std::memory_order_relaxed);
@@ -4082,6 +4734,7 @@ void AudioEngine::publishSong()
             duringPluginCreation();
         return plugins.makeEffect (ref, sr);
     };
+    factories.freshInstances = std::exchange (remoteFreshInstances, {});
     if (rebuildPlugins) // round 190ap: a plugin switched back on (switchPluginOn)
         factories.rebuildPlugin = [this] (const PluginRef& ref) { return rebuildPluginId.empty() || ref.id == rebuildPluginId; };
 
@@ -4153,6 +4806,7 @@ void AudioEngine::publishSong()
     lastPublishedShape.pdc = state->pdc;
     lastPublishedShape.channelDelays = state->channelDelays;
     lastPublishedShape.sendDelays = state->sendDelays;
+    lastPublishedShape.shifterStock = state->shifterStock; // (round 190gn: the next build keeps the rack's shifter stock)
 
     const auto mark = [&] (const char* what) {
         if (traceEdits)
@@ -4161,6 +4815,9 @@ void AudioEngine::publishSong()
     mark ("built");
     levelsPending = false;
     publishedLevels = projectedSong ? nullptr : state->live; // (stand-ins: their projection, edits rebuild)
+    // round 190gn (A6): the renderer's channel / insert buffers hold this song before it can play it
+    if (rackProcessor != nullptr)
+        rackProcessor->getRenderer().reserveFor (*state);
     rackExchange.publish (std::move (state));
     mark ("exchanged");
 
@@ -4350,7 +5007,7 @@ void AudioEngine::publishReleasedTargets()
             if (a >= (int) song.automations.size() || ! song.automations[(std::size_t) a].isLive())
                 slots.push_back (a);
     }
-    rackProcessor->getRenderer().setReleasedSlots (slots);
+    rackProcessor->setReleasedSlots (slots);
 }
 
 void AudioEngine::tweakReleased (const AutomationTarget& target)
@@ -4494,7 +5151,7 @@ void AudioEngine::updateAutomationRecording (bool active)
         }
         if (slots.empty() && ! automationOverrideActive)
             return;
-        rackProcessor->getRenderer().setOverriddenSlots (slots);
+        rackProcessor->setOverriddenSlots (slots);
         automationOverrideActive = ! slots.empty();
     };
 
@@ -4542,7 +5199,7 @@ void AudioEngine::updateAutomationRecording (bool active)
         automationPattern = song.currentPattern;
         automationLoopLength = song.patterns.empty() ? ppq * 4
                                                      : song.patterns[(std::size_t) juce::jlimit (0, (int) song.patterns.size() - 1, song.currentPattern)]
-                                                           .effectiveLength (song.beatsPerBar);
+                                                           .effectiveLength (song.meter());
     }
 
     const auto tick = estimatedPositionNow();
@@ -4860,13 +5517,16 @@ void AudioEngine::applyTargetValues (const std::vector<std::pair<AutomationTarge
 void AudioEngine::timerCallback()
 {
     // MIDI inputs: open the enabled devices that appeared (or were not ready) and reopen the ones that came back
-    if (prefetcher != nullptr && ++midiCheckTicks >= 60) // every 2 s
+    if (midiOpen && ++midiCheckTicks >= 60) // every 2 s
     {
         midiCheckTicks = 0;
         enableAllMidiInputs();
     }
 
     updateRealtimeStats();
+    // round 190gn (A1): the racks' pitch-shifter stocks back to their reserve (a voice took one: a live keyboard on a
+    // keep-pitch channel); nothing to do, and no allocation, when none was taken
+    shifterstock::topUpAll();
     if (++hwTicks >= 5) // (6 times a second)
     {
         hwTicks = 0;
@@ -4876,6 +5536,7 @@ void AudioEngine::timerCallback()
     rt::promotePending(); // Linux: real-time priority for the audio threads seen since the last tick (round 161)
     updateAudition(); // (round 190ao: the preset audition's note starts and ends here)
     applyControllers();
+    pumpGrossBeatPicks();
     controllerIo.pump (controllerLearnTick); // (controller profiles, round 190aw)
     // playback started: the moved controls follow their automation again (the renderer cleared its own mask)
     if (const auto playing = transport.playing.load(); playing != std::exchange (releasedWasPlaying, playing) && playing)
@@ -5256,12 +5917,26 @@ void AudioEngine::updateRealtimeStats()
             heaviestUnits = std::move (loads);
     }
 
-    // a line in the glitch log when callbacks ran over their deadline or the device called late
+    // round 190gg (B5): the dropout log (how many, the last one's time and cause)
     const auto stats = rtStats.snapshot();
+    {
+        dropouts::Poll poll;
+        poll.nowMs = juce::Time::getMillisecondCounterHiRes();
+        poll.overBudget = stats.overBudget;
+        poll.lateCalls = stats.lateCalls;
+        auto* device = deviceManager.getCurrentAudioDevice();
+        poll.deviceXruns = device != nullptr ? device->getXRunCount() : -1;
+        poll.windowMaxLoad = rtStats.takeDropoutWindowMaxLoad();
+        poll.lastOverSlowest = stats.lastOverSlowest;
+        poll.lastOverLoad = stats.lastOverLoad;
+        dropoutLog.update (poll);
+    }
+
+    // a line in the glitch log when callbacks ran over their deadline or the device called late
     if ((stats.overBudget > loggedOver || stats.lateCalls > loggedLate) && juce::Time::getMillisecondCounterHiRes() - lastLogMs > 2000.0)
     {
         // (appended by fileJobs: this runs on the message thread, and at a small buffer glitches come every 2 s)
-        const auto bar = transport.positionTicks.load() / (double) (ppq * juce::jmax (1, song.beatsPerBar)) + 1.0;
+        const auto bar = transport.positionTicks.load() / (double) song.barTicks() + 1.0;
         auto line = juce::Time::getCurrentTime().formatted ("%Y-%m-%d %H:%M:%S") + "  over deadline +" + juce::String ((juce::int64) (stats.overBudget - loggedOver))
                     + ", late calls +" + juce::String ((juce::int64) (stats.lateCalls - loggedLate)) + ", at bar " + juce::String (bar, 2)
                     + (transport.playing.load() ? "" : " (stopped)") + "\n" + describeRealtime() + "\n";
@@ -5276,10 +5951,71 @@ void AudioEngine::updateRealtimeStats()
     }
 }
 
+juce::String AudioEngine::unitDisplayName (std::uint32_t unit) const
+{
+    if (unit == 0)
+        return {};
+    if (dropouts::isChannel (unit))
+    {
+        const auto c = (std::size_t) dropouts::channelOf (unit);
+        return c < song.channels.size() ? juce::String::fromUTF8 (song.channels[c].name.c_str()) : "Channel " + juce::String ((int) c + 1);
+    }
+    const auto k = dropouts::effectKeyOf (unit);
+    const auto t = k / (std::size_t) maxEffectSlots, slot = k % (std::size_t) maxEffectSlots;
+    juce::String effect;
+    if (t < song.mixer.size() && slot < song.mixer[t].effects.size())
+    {
+        const auto& fx = song.mixer[t].effects[slot];
+        effect = juce::String::fromUTF8 (fx.plugin.name.empty() ? effectInfo (fx.kind).name : fx.plugin.name.c_str());
+    }
+    const auto track = t == 0 ? juce::String ("Master") : (t < song.mixer.size() && ! song.mixer[t].name.empty() ? juce::String::fromUTF8 (song.mixer[t].name.c_str())
+                                                                                                               : "Insert " + juce::String ((int) t));
+    return track + " / " + juce::String ((int) slot + 1) + " " + effect;
+}
+
+AudioEngine::DropoutInfo AudioEngine::dropoutInfo() const
+{
+    DropoutInfo d;
+    d.count = dropoutLog.count();
+    d.processing = dropoutLog.processing();
+    d.system = dropoutLog.system();
+    d.secondsAgo = dropoutLog.secondsSince (juce::Time::getMillisecondCounterHiRes());
+    d.cause = dropoutLog.cause();
+    d.load = dropoutLog.load();
+    if (const auto slowest = dropoutLog.slowest(); slowest != 0)
+    {
+        d.slowest = unitDisplayName (dropouts::unitOf (slowest));
+        d.slowestMs = (double) dropouts::nanosecondsOf (slowest) * 1.0e-6;
+    }
+    if (auto* device = const_cast<LynxDeviceManager&> (deviceManager).getCurrentAudioDevice())
+        if (device->getCurrentSampleRate() > 0.0)
+            d.bufferMs = 1000.0 * device->getCurrentBufferSizeSamples() / device->getCurrentSampleRate();
+    return d;
+}
+
+const renderahead::Stats* AudioEngine::renderAheadStats() const noexcept
+{
+    return rackProcessor != nullptr ? &rackProcessor->renderAheadStats() : nullptr;
+}
+
+void AudioEngine::setEditorOpen (const void* key, std::function<PluginRef* (Song&)> find, int track, bool open)
+{
+    openEditors.erase (std::remove_if (openEditors.begin(), openEditors.end(), [key] (const OpenEditor& e) { return e.key == key; }), openEditors.end());
+    if (open)
+        openEditors.push_back ({ key, std::move (find), track });
+    publishRenderAheadTargets();
+}
+
+void AudioEngine::setRenderAheadAlways (bool always) noexcept
+{
+    if (rackProcessor != nullptr)
+        rackProcessor->setRenderAheadAlways (always);
+}
+
 juce::String AudioEngine::describeRealtime (bool withUnits) const
 {
     juce::String text;
-    if (auto* device = const_cast<juce::AudioDeviceManager&> (deviceManager).getCurrentAudioDevice())
+    if (auto* device = const_cast<LynxDeviceManager&> (deviceManager).getCurrentAudioDevice())
     {
         const auto rate = device->getCurrentSampleRate();
         const auto buffer = device->getCurrentBufferSizeSamples();
@@ -5294,6 +6030,12 @@ juce::String AudioEngine::describeRealtime (bool withUnits) const
             text << "  device thread priority " << before << (deviceThreadPriorityAfter.load (std::memory_order_relaxed) != before
                                                                 ? " -> " + juce::String (deviceThreadPriorityAfter.load (std::memory_order_relaxed)) + " (raised to MMCSS Pro Audio)"
                                                                 : juce::String (boostDeviceThread ? " (kept)" : " (kept: LYNX_DEVICE_BOOST=0)")) << "\n";
+        if (const auto raised = rtThreadsRaised.load (std::memory_order_relaxed); raised > 0)
+            text << "  audio threads raised " << raised << ": MMCSS Pro Audio " << rtThreadsMmcss.load (std::memory_order_relaxed)
+                 << " (critical " << rtThreadsCritical.load (std::memory_order_relaxed) << "), thread priority "
+                 << rtPriorityMin.load (std::memory_order_relaxed) << ".." << rtPriorityMax.load (std::memory_order_relaxed) << "\n";
+        text << "  process priority class " << priorityClassName (priorityClassNow.load (std::memory_order_relaxed)) << " (found "
+             << priorityClassName (priorityClassFound.load (std::memory_order_relaxed)) << ")\n";
        #endif
     }
     else
@@ -5302,8 +6044,24 @@ juce::String AudioEngine::describeRealtime (bool withUnits) const
     text << "  callbacks " << (juce::int64) s.callbacks << ": over deadline " << (juce::int64) s.overBudget << ", 80-100% " << (juce::int64) s.nearBudget
          << ", late device calls " << (juce::int64) s.lateCalls << ", average load " << juce::String (s.averageLoad * 100.0, 1) << "%, max "
          << juce::String (s.maxLoad * 100.0, 0) << "%, workers " << (workers != nullptr ? workers->workers() : 0) << "\n";
+    if (const auto d = dropoutInfo(); d.count > 0) // (round 190gg)
+        text << "  dropouts " << (juce::int64) d.count << " (processing " << (juce::int64) d.processing << ", driver / system " << (juce::int64) d.system
+             << "), the last " << d.secondsAgo << " s ago: " << (d.cause == dropouts::Cause::system ? "driver / system late" : "processing")
+             << ", load " << juce::String (d.load * 100.0, 0) << "%"
+             << (d.slowest.isNotEmpty() ? ", slowest " + d.slowest + " " + juce::String (d.slowestMs, 2) + " ms" : juce::String()) << "\n";
     if (latencyRepublishes > 0)
         text << "  latency changes re-planned PDC " << latencyRepublishes << " times (last: unit " << lastLatencyChange << ")\n";
+    if (rackProcessor != nullptr) // (round 190gq: Options › Audio settings › "Render ahead")
+    {
+        const auto& r = rackProcessor->renderAheadStats();
+        auto n = [] (const std::atomic<std::uint64_t>& v) { return juce::String ((juce::int64) v.load (std::memory_order_relaxed)); };
+        text << "  render ahead: " << (renderAheadOption().load() ? "on" : "off") << ", " << (r.engaged.load() ? "running" : "not running")
+             << ", window " << r.window.load() << " samples; blocks " << n (r.blocks) << ": from the ring " << n (r.fromRing) << ", waited "
+             << n (r.waited) << ", rendered in the callback " << n (r.inline_) << "; dropped " << n (r.flushes) << ", drained " << n (r.drains)
+             << ", started " << n (r.engagements) << ", states taken at once " << n (r.statesSwapped) << ", channels joined live " << n (r.promoted)
+             << ", partition changes " << n (r.partitionChanges) << ", boundary mismatches " << n (r.splitMismatches) << "; ahead "
+             << r.aheadChannels.load() << " channels / " << r.aheadTracks.load() << " inserts, boundary " << r.boundary.load() << "\n";
+    }
     if (withUnits && heaviestUnits.empty())
         text << "  heaviest: not measured yet\n";
     if (withUnits && ! heaviestUnits.empty())
@@ -5433,6 +6191,37 @@ void AudioEngine::markCreatedNow()
         song.info.created = (double) juce::Time::currentTimeMillis() / 1000.0;
 }
 
+void AudioEngine::pumpGrossBeatPicks()
+{
+    std::vector<std::pair<AutomationTarget, float>> changes;
+    const auto& effects = lastPublishedShape.effects;
+    for (std::size_t t = 0; t < song.mixer.size() && t < effects.size(); ++t)
+        for (std::size_t s = 0; s < song.mixer[t].effects.size() && s < effects[t].size(); ++s)
+        {
+            const auto& fx = song.mixer[t].effects[s];
+            if (fx.kind != EffectKind::grossBeat)
+                continue;
+            auto* picks = grossbeat::midiPicksOf (effects[t][s].get());
+            if (picks == nullptr)
+                continue;
+            const auto serial = picks->serial.load (std::memory_order_acquire);
+            if (serial == picks->taken.load (std::memory_order_relaxed))
+                continue;
+            picks->taken.store (serial, std::memory_order_relaxed);
+            for (const auto& [param, value] : grossbeat::paramsForPicks (*picks, fx.params))
+            {
+                AutomationTarget target;
+                target.kind = AutomationTargetKind::effectParam;
+                target.index = (int) t;
+                target.slot = (int) s;
+                target.param = param;
+                changes.push_back ({ target, value });
+            }
+        }
+    if (! changes.empty())
+        applyTargetValues (changes);
+}
+
 void AudioEngine::pumpEdisonRecordings()
 {
     bool finished = false;
@@ -5512,23 +6301,26 @@ void AudioEngine::flushEdisonAudio()
         editSong (apply, false);
 }
 
-void AudioEngine::capturePluginStates()
+void AudioEngine::capturePluginStatesInto (Song& target, bool requireAll)
 {
-    stampWorkTime();
-    flushEdisonAudio(); // (round 190cd: an Edison slot's audio is a file of the project)
+    const auto capture = [requireAll] (auto* plugin) {
+        auto state = plugin->captureState();
+        if (! state && requireAll) throw RemoteError ("failed", "Cannot capture a live device; no project changes were made");
+        return state;
+    };
     // Changes only the saved state (recreates nothing and doesn't enter the undo history).
-    for (std::size_t i = 0; i < song.channels.size(); ++i)
+    for (std::size_t i = 0; i < target.channels.size(); ++i)
         if (auto* p = dynamic_cast<PluginInstrument*> (getChannelInstrument ((int) i).get()))
-            if (song.channels[i].plugin.playedBy == 0) // (P5-A1: a plugin shared in a live session keeps no state, only values)
-                if (auto state = p->captureState()) // (a plugin that crashed keeps the state saved before)
-                    song.channels[i].plugin.state = std::move (*state);
+            if (target.channels[i].plugin.playedBy == 0) // (P5-A1: a plugin shared in a live session keeps no state, only values)
+                if (auto state = capture (p)) // (a plugin that crashed keeps the state saved before)
+                    target.channels[i].plugin.state = std::move (*state);
 
-    for (std::size_t t = 0; t < song.mixer.size(); ++t)
-        for (std::size_t s = 0; s < song.mixer[t].effects.size(); ++s)
+    for (std::size_t t = 0; t < target.mixer.size(); ++t)
+        for (std::size_t s = 0; s < target.mixer[t].effects.size(); ++s)
             if (auto* p = dynamic_cast<PluginEffect*> (getEffect ((int) t, (int) s).get()))
-                if (song.mixer[t].effects[s].plugin.playedBy == 0)
-                    if (auto state = p->captureState())
-                        song.mixer[t].effects[s].plugin.state = std::move (*state);
+                if (target.mixer[t].effects[s].plugin.playedBy == 0)
+                    if (auto state = capture (p))
+                        target.mixer[t].effects[s].plugin.state = std::move (*state);
 
     // the plugins inside Patchers (REA_rodada141), nested ones too
     std::function<void (PatcherDoc&, patcher::Graph*)> captureGraph = [&] (PatcherDoc& doc, patcher::Graph* graph) {
@@ -5541,7 +6333,7 @@ void AudioEngine::capturePluginStates()
             {
                 auto instrument = graph->instrumentAt (n);
                 if (auto* p = dynamic_cast<PluginInstrument*> (instrument.get()))
-                    if (auto state = p->captureState())
+                    if (auto state = capture (p))
                         node.channel.plugin.state = std::move (*state);
                 if (node.channel.instrument == InstrumentKind::patcher)
                     captureGraph (node.channel.patcher, patcher::graphOf (instrument.get()));
@@ -5550,23 +6342,55 @@ void AudioEngine::capturePluginStates()
             {
                 auto effect = graph->effectAt (n);
                 if (auto* p = dynamic_cast<PluginEffect*> (effect.get()))
-                    if (auto state = p->captureState())
+                    if (auto state = capture (p))
                         node.effect.plugin.state = std::move (*state);
                 if (node.effect.kind == EffectKind::patcher)
                     captureGraph (node.effect.patcher, patcher::graphOf (effect.get()));
             }
         }
     };
-    for (std::size_t i = 0; i < song.channels.size(); ++i)
-        if (song.channels[i].instrument == InstrumentKind::patcher)
-            captureGraph (song.channels[i].patcher, patcher::graphOf (getChannelInstrument ((int) i).get()));
-    for (std::size_t t = 0; t < song.mixer.size(); ++t)
-        for (std::size_t s = 0; s < song.mixer[t].effects.size(); ++s)
-            if (song.mixer[t].effects[s].kind == EffectKind::patcher)
-                captureGraph (song.mixer[t].effects[s].patcher, patcher::graphOf (getEffect ((int) t, (int) s).get()));
+    for (std::size_t i = 0; i < target.channels.size(); ++i)
+        if (target.channels[i].instrument == InstrumentKind::patcher)
+            captureGraph (target.channels[i].patcher, patcher::graphOf (getChannelInstrument ((int) i).get()));
+    for (std::size_t t = 0; t < target.mixer.size(); ++t)
+        for (std::size_t s = 0; s < target.mixer[t].effects.size(); ++s)
+            if (target.mixer[t].effects[s].kind == EffectKind::patcher)
+                captureGraph (target.mixer[t].effects[s].patcher, patcher::graphOf (getEffect ((int) t, (int) s).get()));
 
+}
+
+void AudioEngine::capturePluginStates()
+{
+    stampWorkTime();
+    flushEdisonAudio(); // (round 190cd: an Edison slot's audio is a file of the project)
+    capturePluginStatesInto (song, false);
     lastPublishedShape.song.channels = song.channels;
     lastPublishedShape.song.mixer = song.mixer;
+}
+
+Song AudioEngine::snapshotForRemoteControl()
+{
+    if (getTransport().playing.load() || isRecording())
+        throw RemoteError ("busy", "Stop playback and recording before capturing opaque device state");
+    // The model belongs to the message thread. Live state capture runs beside processing (no lock, as on JUCE's own
+    // hosts); only a restore holds a hosted plugin's callback lock. Do not stop the audio callback while copying.
+    auto snapshot = song;
+    capturePluginStatesInto (snapshot, false);
+    return snapshot;
+}
+
+juce::String AudioEngine::remoteDeviceStateHash()
+{
+    return remoteDeviceStateHashOf (snapshotForRemoteControl());
+}
+
+juce::String AudioEngine::remoteDeviceStateHashOf (const Song& snapshot)
+{
+    Song devices;
+    devices.channels = snapshot.channels;
+    devices.mixer = snapshot.mixer;
+    const auto json = ProjectFile::toJsonExact (devices).toStdString();
+    return juce::String (sha256Hex (reinterpret_cast<const std::uint8_t*> (json.data()), json.size()));
 }
 
 bool AudioEngine::auditionPreset (const juce::AudioPluginInstance& plugin)
@@ -5618,6 +6442,283 @@ void AudioEngine::updateAudition()
     sendLiveNote (auditionChannel, pluginpresets::auditionKey, pluginpresets::auditionVelocity, true);
     auditionSounding = true;
     auditionAtMs = juce::Time::getMillisecondCounterHiRes() + pluginpresets::auditionLengthMs;
+}
+
+namespace
+{
+void preserveRemoteTags (const Song& before, Song& after)
+{
+    std::function<void (const PatcherDoc&, PatcherDoc&)> graph;
+    graph = [&] (const PatcherDoc& old, PatcherDoc& next) {
+        for (std::size_t i = 0; i < std::min (old.nodes.size(), next.nodes.size()); ++i)
+        {
+            const auto& prior = old.nodes[i];
+            auto& node = next.nodes[i];
+            if (node.generator != prior.generator) continue;
+            if (node.generator)
+            {
+                node.channel.instance = prior.channel.instance;
+                graph (prior.channel.patcher, node.channel.patcher);
+            }
+            else
+            {
+                node.effect.instance = prior.effect.instance;
+                graph (prior.effect.patcher, node.effect.patcher);
+            }
+        }
+    };
+    for (auto& channel : after.channels)
+        if (channel.uid != 0)
+            for (const auto& prior : before.channels)
+                if (channel.uid == prior.uid && channel.instrument == prior.instrument && channel.plugin.id == prior.plugin.id
+                    && ! (channel.plugin.state.empty() && ! prior.plugin.state.empty()))
+                {
+                    channel.instance = prior.instance;
+                    graph (prior.patcher, channel.patcher);
+                    break;
+                }
+    for (std::size_t t = 0; t < std::min (before.mixer.size(), after.mixer.size()); ++t)
+    {
+        const auto& old = before.mixer[t].effects;
+        auto& next = after.mixer[t].effects;
+        std::vector<bool> used (old.size(), false);
+        std::vector<int> match (next.size(), -1);
+        // Keep tags already carried through an edit; parsed project documents need value matching.
+        for (std::size_t i = 0; i < next.size(); ++i)
+            for (std::size_t j = 0; j < old.size(); ++j)
+                if (! used[j] && next[i].instance.id == old[j].instance.id)
+                { match[i] = (int) j; used[j] = true; break; }
+        for (std::size_t i = 0; i < next.size(); ++i)
+            if (match[i] < 0)
+                for (std::size_t j = 0; j < old.size(); ++j)
+                    if (! used[j] && next[i] == old[j])
+                    { match[i] = (int) j; used[j] = true; break; }
+        for (std::size_t i = 0; i < next.size(); ++i)
+            if (match[i] < 0 && i < old.size() && ! used[i] && next[i].kind == old[i].kind && next[i].plugin.id == old[i].plugin.id
+                && ! (next[i].plugin.state.empty() && ! old[i].plugin.state.empty()))
+            { match[i] = (int) i; used[i] = true; }
+        for (std::size_t i = 0; i < next.size(); ++i)
+            if (match[i] >= 0)
+            {
+                const auto& prior = old[(std::size_t) match[i]];
+                next[i].instance = prior.instance;
+                graph (prior.patcher, next[i].patcher);
+            }
+    }
+}
+
+void validateRemoteStates (const Song& song)
+{
+    const auto check = [] (const PluginRef& ref) {
+        if (ref.state.empty()) return;
+        juce::MemoryBlock bytes;
+        if (! bytes.fromBase64Encoding (juce::String::fromUTF8 (ref.state.c_str())))
+            throw RemoteError ("invalid", "Hosted device state must use the native base64 encoding");
+    };
+    std::function<void (const PatcherDoc&)> graph;
+    graph = [&] (const PatcherDoc& doc) {
+        for (const auto& node : doc.nodes)
+            if (node.generator)
+            {
+                if (node.channel.instrument == InstrumentKind::plugin) check (node.channel.plugin);
+                graph (node.channel.patcher);
+            }
+            else
+            {
+                if (node.effect.kind == EffectKind::plugin) check (node.effect.plugin);
+                graph (node.effect.patcher);
+            }
+    };
+    for (const auto& channel : song.channels)
+    {
+        if (channel.instrument == InstrumentKind::plugin) check (channel.plugin);
+        graph (channel.patcher);
+    }
+    for (const auto& track : song.mixer)
+        for (const auto& effect : track.effects)
+        {
+            if (effect.kind == EffectKind::plugin) check (effect.plugin);
+            graph (effect.patcher);
+        }
+}
+}
+
+void AudioEngine::syncRemotePluginStates (const Song& before)
+{
+    std::map<std::uint64_t, std::string> previous;
+    std::function<void (const PatcherDoc&)> collectGraph;
+    collectGraph = [&] (const PatcherDoc& doc) {
+        for (const auto& node : doc.nodes)
+            if (node.generator)
+            {
+                previous[node.channel.instance.id] = node.channel.plugin.state;
+                collectGraph (node.channel.patcher);
+            }
+            else
+            {
+                previous[node.effect.instance.id] = node.effect.plugin.state;
+                collectGraph (node.effect.patcher);
+            }
+    };
+    for (const auto& channel : before.channels)
+    {
+        previous[channel.instance.id] = channel.plugin.state;
+        collectGraph (channel.patcher);
+    }
+    for (const auto& track : before.mixer)
+        for (const auto& effect : track.effects)
+        {
+            previous[effect.instance.id] = effect.plugin.state;
+            collectGraph (effect.patcher);
+        }
+    const auto apply = [&] (auto* plugin, std::uint64_t identity, const std::string& desired) {
+        const auto old = previous.find (identity);
+        // A new instance was loaded with its target state by the normal factory. An unchanged
+        // instance needs no state call: saving bytes must never reset unrelated GUI state.
+        if (old == previous.end() || old->second == desired) return;
+        const auto current = plugin->captureState();
+        if (! current || (*current != desired && ! plugin->restoreState (desired)))
+            throw RemoteError ("uncertain", "The project changed but a running device could not restore its state; inspect it before further history actions", true);
+    };
+    std::function<void (const PatcherDoc&, patcher::Graph*)> graph;
+    graph = [&] (const PatcherDoc& doc, patcher::Graph* live) {
+        if (live == nullptr) return;
+        for (int i = 0; i < (int) doc.nodes.size() && i < live->nodeCount(); ++i)
+        {
+            const auto& node = doc.nodes[(std::size_t) i];
+            if (node.generator)
+            {
+                auto instance = live->instrumentAt (i);
+                if (auto* p = dynamic_cast<PluginInstrument*> (instance.get())) apply (p, node.channel.instance.id, node.channel.plugin.state);
+                if (node.channel.instrument == InstrumentKind::patcher) graph (node.channel.patcher, patcher::graphOf (instance.get()));
+            }
+            else
+            {
+                auto instance = live->effectAt (i);
+                if (auto* p = dynamic_cast<PluginEffect*> (instance.get())) apply (p, node.effect.instance.id, node.effect.plugin.state);
+                if (node.effect.kind == EffectKind::patcher) graph (node.effect.patcher, patcher::graphOf (instance.get()));
+            }
+        }
+    };
+    for (std::size_t i = 0; i < song.channels.size(); ++i)
+    {
+        auto instance = getChannelInstrument ((int) i);
+        if (auto* p = dynamic_cast<PluginInstrument*> (instance.get())) apply (p, song.channels[i].instance.id, song.channels[i].plugin.state);
+        if (song.channels[i].instrument == InstrumentKind::patcher) graph (song.channels[i].patcher, patcher::graphOf (instance.get()));
+    }
+    for (std::size_t t = 0; t < song.mixer.size(); ++t)
+        for (std::size_t i = 0; i < song.mixer[t].effects.size(); ++i)
+        {
+            auto instance = getEffect ((int) t, (int) i);
+            if (auto* p = dynamic_cast<PluginEffect*> (instance.get())) apply (p, song.mixer[t].effects[i].instance.id, song.mixer[t].effects[i].plugin.state);
+            if (song.mixer[t].effects[i].kind == EffectKind::patcher) graph (song.mixer[t].effects[i].patcher, patcher::graphOf (instance.get()));
+        }
+}
+
+void AudioEngine::failRemoteHistory (bool uncertain)
+{
+    remoteHistoryFailed = true;
+    remoteHistoryUncertain = uncertain;
+    remoteHistoryCode = uncertain ? "uncertain" : "failed";
+    remoteHistoryError = uncertain
+        ? tr ("The history operation did not finish; the project or its history may have changed. Inspect before further undo/redo.")
+        : tr ("The history operation could not be prepared. No history step was moved; inspect the device before retrying.");
+    try { juce::Logger::writeToLog (remoteHistoryError); } catch (...) {}
+}
+
+bool AudioEngine::checkRemoteHistory (const juce::String& expected, const Song& current)
+{
+    if (expected.isNotEmpty() && expected == remoteDeviceStateHashOf (current)) return true;
+    remoteHistoryFailed = true;
+    remoteHistoryUncertain = false;
+    remoteHistoryCode = "changed";
+    remoteHistoryError = tr ("A device changed after this remote edit. Undo/redo was refused to preserve those changes.");
+    juce::Logger::writeToLog (remoteHistoryError);
+    return false;
+}
+
+juce::String AudioEngine::finishRemoteHistory (const std::optional<Song>& before)
+{
+    if (! before) return {};
+    try
+    {
+        syncRemotePluginStates (*before);
+        auto current = song;
+        capturePluginStatesInto (current, false);
+        const auto fence = remoteDeviceStateHashOf (current);
+        adoptCapturedRemoteDevices (song, lastPublishedShape, std::move (current));
+        return fence;
+    }
+    catch (...)
+    {
+        failRemoteHistory (true);
+        return {};
+    }
+}
+
+bool AudioEngine::editSongRemoteTransaction (const std::function<void (Song&)>& stage, const std::function<bool()>& cancelled, bool preserveRuntimeIdentity)
+{
+    if (getTransport().playing.load() || isRecording() || juce::ModifierKeys::getCurrentModifiersRealtime().isAnyMouseButtonDown())
+        throw RemoteError ("busy", "Stop playback/recording and finish the current gesture before remote edits");
+    // Staging, serialization and publication stay off the audio-device lock. A hosted state restore holds only that
+    // plugin's callback lock (the audio side skips the block meanwhile); capture takes no lock.
+    auto before = snapshotForRemoteControl();
+    auto next = before;
+    if (cancelled && cancelled()) throw RemoteError ("failed", "Remote operation cancelled before committing changes");
+    stage (next); // all parsing, validation and allocations happen before history is changed
+    if (cancelled && cancelled()) throw RemoteError ("failed", "Remote operation cancelled before committing changes");
+    if (ProjectFile::toJsonExact (before) == ProjectFile::toJsonExact (next)) return false;
+    validateRemoteStates (next);
+    if (preserveRuntimeIdentity) preserveRemoteTags (before, next);
+    const auto capturedBefore = before;
+    const auto fresh = remoteFreshTargets (capturedBefore, next);
+    try
+    {
+        song = std::move (before); // capture live state in the owned undo step, without adding a separate step
+        remote_history::mirrorCapturedHostedStates (song, lastPublishedShape.song);
+        lastUndoPress = {};
+        levelsPending = false;
+        const juce::ScopedValueSetter<bool> remoteStep (nextRemoteHistoryStep, true);
+        const juce::ScopedValueSetter<std::unordered_set<std::uint64_t>> freshPolicy (remoteFreshInstances, fresh);
+        editSong ([&] (Song& current) { current = std::move (next); });
+        syncRemotePluginStates (capturedBefore);
+        auto committed = song;
+        capturePluginStatesInto (committed, false);
+        const auto fence = remoteDeviceStateHashOf (committed);
+        adoptCapturedRemoteDevices (song, lastPublishedShape, std::move (committed));
+        if (! undoStack.empty()) undoStack.back().deviceHash = fence;
+        if (sessionHistory && ! sessionUndo.empty()) sessionUndo.back().deviceHash = fence;
+        remoteHistoryError.clear();
+    }
+    catch (...)
+    {
+        throw RemoteError ("uncertain", "The project edit ran but its device state could not be verified; inspect before retrying", true);
+    }
+    return true;
+}
+
+void AudioEngine::undoRemoteControl (const std::function<bool()>& cancelled)
+{
+    if (getTransport().playing.load() || isRecording() || juce::ModifierKeys::getCurrentModifiersRealtime().isAnyMouseButtonDown())
+        throw RemoteError ("busy", "Stop playback/recording and finish the current gesture before remote undo");
+    if (cancelled && cancelled()) throw RemoteError ("failed", "Remote undo cancelled before changing history");
+    const juce::ScopedValueSetter<bool> apiStep (remoteHistoryApiStep, true);
+    const juce::ScopedValueSetter<std::function<bool()>> cancellation (remoteHistoryCancelled, cancelled);
+    try { undo(); }
+    catch (...) { throw RemoteError ("uncertain", "Native undo did not finish; its history or project may have changed. Inspect before retrying", true); }
+    if (remoteHistoryFailed) throw RemoteError (remoteHistoryCode, remoteHistoryError.toStdString(), remoteHistoryUncertain);
+}
+
+void AudioEngine::redoRemoteControl (const std::function<bool()>& cancelled)
+{
+    if (getTransport().playing.load() || isRecording() || juce::ModifierKeys::getCurrentModifiersRealtime().isAnyMouseButtonDown())
+        throw RemoteError ("busy", "Stop playback/recording and finish the current gesture before remote redo");
+    if (cancelled && cancelled()) throw RemoteError ("failed", "Remote redo cancelled before changing history");
+    const juce::ScopedValueSetter<bool> apiStep (remoteHistoryApiStep, true);
+    const juce::ScopedValueSetter<std::function<bool()>> cancellation (remoteHistoryCancelled, cancelled);
+    try { redo(); }
+    catch (...) { throw RemoteError ("uncertain", "Native redo did not finish; its history or project may have changed. Inspect before retrying", true); }
+    if (remoteHistoryFailed) throw RemoteError (remoteHistoryCode, remoteHistoryError.toStdString(), remoteHistoryUncertain);
 }
 
 namespace
@@ -5699,6 +6800,8 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
         deviceThreadPriorityBefore.store (before, std::memory_order_relaxed);
         if (boostDeviceThread && before < THREAD_PRIORITY_TIME_CRITICAL)
             raiseAudioThreadPriority();
+        else
+            power::optOutOfPowerThrottling(); // (a driver's own time-critical thread too: no EcoQoS, round toolchain190gt)
         deviceThreadPriorityAfter.store (GetThreadPriority (GetCurrentThread()), std::memory_order_relaxed);
     }
    #endif
@@ -5709,8 +6812,10 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
         ~Measure()
         {
             const auto rate = engine.transport.sampleRate.load (std::memory_order_relaxed);
+            // round 190gg: with the block's slowest channel / effect call (named if the block missed its deadline)
+            const auto slowest = engine.rackProcessor != nullptr ? engine.rackProcessor->getRenderer().takeBlockSlowest() : 0;
             if (rate > 0.0)
-                engine.rtStats.record (start, juce::Time::getMillisecondCounterHiRes() - start, 1000.0 * samples / rate);
+                engine.rtStats.record (start, juce::Time::getMillisecondCounterHiRes() - start, 1000.0 * samples / rate, slowest);
         }
         AudioEngine& engine;
         double start;
@@ -5747,6 +6852,9 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
     transport.readMarkers (rtMarkers, rtMarkerVersion); // FL's marker actions (a new table when the song changed)
     // an external MIDI clock moves the transport (round 165f)
     midiSync.beginBlock (transport, callbackStart, numSamples);
+    // Ableton Link (round 190gl): the session's tempo and phase move the transport; a Play waiting for the session's
+    // phase starts at `linkStart` (a sample of this block; -1 = none), to the sample like the count-in's end
+    const auto linkStart = abletonLink.beginBlock (transport, numSamples, outputCompensationMs.load (std::memory_order_relaxed));
 
     // With the loop region on, the block is split at the loop end and the position jumps back to
     // its start (the nodes see a jump and release their notes, as in FL).
@@ -5775,6 +6883,10 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
         auto n = numSamples - done;
         if (countInSamples > done)
             n = juce::jmin (n, countInSamples - done);
+        if (linkStart > done) // (the part before the Link start plays stopped)
+            n = juce::jmin (n, linkStart - done);
+        else if (linkStart >= 0 && done == linkStart)
+            transport.playing.store (true, std::memory_order_relaxed);
         const auto playing = transport.playing.load (std::memory_order_relaxed);
         const auto tps = transport.ticksPerSample();
         // Song mode: the loop region, or else the whole song (back to the start at its end, like FL)
@@ -5890,7 +7002,12 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
         // master sync out (round 165f): this part's clock / MTC messages, time-stamped for the sender thread
         midiSync.subBlock (transport.positionTicks.load (std::memory_order_relaxed), tps, n, done, playing);
 
+        // (round 190gq: render-ahead follows the device callback's blocks while the rack runs inside it)
+        transport.callbackSamples.store (numSamples, std::memory_order_relaxed);
+        transport.callbackOffset.store (done, std::memory_order_relaxed);
+        transport.inDeviceCallback.store (true, std::memory_order_relaxed);
         player.audioDeviceIOCallbackWithContext (inputs.data(), numInputChannels, outputs.data(), numOutputChannels, n, context);
+        transport.inDeviceCallback.store (false, std::memory_order_relaxed);
         routeOutputs (outputs.data(), numOutputChannels, n);
 
         if (takesLocked) // the tapped takes' part of this block, now rendered (round 168x)
@@ -6007,8 +7124,9 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
         ping.process (in, clickOut.data(), 2, numSamples);
     }
 
-    // the block is done: the workers sleep until the next one instead of spinning (REA round 116)
-    if (workers != nullptr)
+    // the block is done: the workers sleep until the next one instead of spinning (REA round 116) — unless render-ahead
+    // runs: its thread hands them blocks between the callbacks and parks them itself (round 190gq)
+    if (workers != nullptr && (rackProcessor == nullptr || ! rackProcessor->renderAheadOwnsWorkers()))
         workers->park();
 
     // the live clock (round 170d): the next block's musical position — during the count-in the metronome's count before
@@ -6035,6 +7153,7 @@ void AudioEngine::audioDeviceAboutToStart (juce::AudioIODevice* device)
     transport.sampleRate.store (device->getCurrentSampleRate());
     meters.rollingLog.setSampleRate (device->getCurrentSampleRate()); // (the audio thread isn't running yet: it may allocate)
     midiSync.deviceStarted (device->getCurrentSampleRate(), device->getCurrentBufferSizeSamples(), device->getOutputLatencyInSamples());
+    abletonLink.deviceStarted (device->getCurrentSampleRate()); // (round 190gl: the Link session's sample clock starts over)
     // what is heard comes out one output buffer + the driver's output latency after it was rendered (round 170d, as
     // the MIDI clock output counts it)
     outputCompensationMs.store (1000.0 * (device->getCurrentBufferSizeSamples() + juce::jmax (0, device->getOutputLatencyInSamples()))
@@ -6055,12 +7174,87 @@ void AudioEngine::audioDeviceAboutToStart (juce::AudioIODevice* device)
     hwOutput.clear();
     hwOutput.active.store (true);
     player.audioDeviceAboutToStart (device);
+    joinDeviceWorkgroup (device);
+    if (! processFullSpeed) // (Windows: the process stays out of EcoQoS while a device is open, round toolchain190gt)
+    {
+        processFullSpeed = true;
+        power::holdProcessFullSpeed (true);
+    }
+   #if JUCE_WINDOWS
+    choosePriorityClass();
+    juce::Timer::callAfterDelay (2000, [] { choosePriorityClass(); }); // (after the MIDI ports: WinMM raises it again)
+   #endif
 }
 
 void AudioEngine::audioDeviceStopped()
 {
     hwOutput.active.store (false);
     player.audioDeviceStopped();
+    joinDeviceWorkgroup (nullptr);
+    if (processFullSpeed)
+    {
+        processFullSpeed = false;
+        power::holdProcessFullSpeed (false);
+    }
+}
+
+// macOS (round toolchain190gt): the render workers join the device's audio workgroup (os_workgroup, macOS 11+), so the
+// scheduler runs them with the device's I/O thread as one real-time job with the buffer's deadline: on Apple silicon,
+// on the performance cores. Each worker joins on its own thread (WorkerPool::setThreadRefresh) the next time it wakes,
+// first becoming a time-constraint thread. A stopped device: the workers leave. LYNX_WORKGROUP=0 turns it off.
+// Elsewhere this does nothing (Windows: MMCSS "Pro Audio" and no EcoQoS; Linux: SCHED_FIFO / RealtimeKit, round 161).
+struct AudioEngine::DeviceWorkgroup
+{
+    juce::SpinLock lock;
+    juce::AudioWorkgroup workgroup; // (empty: no device, or one without a workgroup)
+    double blockMs = 0.0;
+};
+
+void AudioEngine::joinDeviceWorkgroup ([[maybe_unused]] juce::AudioIODevice* device)
+{
+   #if JUCE_MAC
+    static const auto off = juce::SystemStats::getEnvironmentVariable ("LYNX_WORKGROUP", {}) == "0";
+    if (off || workers == nullptr || workers->workers() == 0)
+        return;
+    auto wanted = device != nullptr ? device->getWorkgroup() : juce::AudioWorkgroup {};
+    if (deviceWorkgroup == nullptr)
+    {
+        if (! wanted)
+            return;
+        deviceWorkgroup = std::make_shared<DeviceWorkgroup>();
+        // (the pool keeps the holder alive as long as its workers can run the refresh)
+        workers->setThreadRefresh ([holder = deviceWorkgroup] {
+            struct Joined
+            {
+                juce::AudioWorkgroup workgroup; // (retained while joined: the token leaves it before it is released)
+                juce::WorkgroupToken token;
+            };
+            thread_local Joined joined;
+            juce::AudioWorkgroup next;
+            double blockMs = 0.0;
+            {
+                const juce::SpinLock::ScopedLockType sl (holder->lock);
+                next = holder->workgroup;
+                blockMs = holder->blockMs;
+            }
+            if (next == joined.workgroup && (! next || static_cast<bool> (joined.token)))
+                return;
+            joined.token.reset();
+            joined.workgroup = next;
+            if (! next)
+                return;
+            becomeTimeConstraintThread (blockMs);
+            next.join (joined.token);
+        });
+    }
+    {
+        const juce::SpinLock::ScopedLockType sl (deviceWorkgroup->lock);
+        deviceWorkgroup->workgroup = std::move (wanted);
+        deviceWorkgroup->blockMs = device != nullptr ? 1000.0 * device->getCurrentBufferSizeSamples() / juce::jmax (1.0, device->getCurrentSampleRate())
+                                                     : 0.0;
+    }
+    workers->requestThreadRefresh();
+   #endif
 }
 
 // The Master's own target (its default: the graph's output as it is, on the first open pair) and the inserts'

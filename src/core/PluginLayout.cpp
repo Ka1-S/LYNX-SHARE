@@ -2037,13 +2037,17 @@ Layout glowLeveler()
     // round 123: the voicing — Glow's own engine, or the measured classic opto leveler (substitutes start there);
     // round 152 / 165w: the classic voicing's opto law and release (Old = a project saved before that round)
     // (review: one compact group of small muted keys where the original has only its badge)
-    v.push_back (tabs (14, 18, 112, 14, "Voicing", TR_NOOP ("Modern|Opto classic"), {}, compactKeys));
-    v.push_back (when (tabs (14, 36, 112, 14, "Opto law", TR_NOOP ("Old|Measured"), {}, compactKeys), "Voicing", 0.5f, 1.0f));
-    v.push_back (when (label (14, 54, 112, 9, TR_NOOP ("Attack / release"), dim), "Voicing", 0.5f, 1.0f)); // round 165x: both measured
-    v.push_back (when (tabs (14, 64, 112, 14, "Opto release", TR_NOOP ("Old|Measured"), {}, compactKeys), "Voicing", 0.5f, 1.0f));
+    v.push_back (tabs (14, 14, 112, 12, "Voicing", TR_NOOP ("Modern|Opto classic"), {}, compactKeys));
+    v.push_back (when (tabs (14, 29, 112, 12, "Opto law", TR_NOOP ("Old|Measured"), {}, compactKeys), "Voicing", 0.5f, 1.0f));
+    v.push_back (when (label (14, 44, 112, 9, TR_NOOP ("Attack / release"), dim), "Voicing", 0.5f, 1.0f)); // round 165x: both measured
+    v.push_back (when (tabs (14, 53, 112, 12, "Opto release", TR_NOOP ("Old|Measured"), {}, compactKeys), "Voicing", 0.5f, 1.0f));
     // round 190dm: the cell's memory (release slower after long exposure; Compress)
-    v.push_back (when (label (14, 82, 112, 9, TR_NOOP ("Cell memory"), dim), "Voicing", 0.5f, 1.0f));
-    v.push_back (when (tabs (14, 92, 112, 14, "Opto memory", TR_NOOP ("Off|On"), {}, compactKeys), "Voicing", 0.5f, 1.0f));
+    v.push_back (when (label (14, 68, 112, 9, TR_NOOP ("Cell memory"), dim), "Voicing", 0.5f, 1.0f));
+    v.push_back (when (tabs (14, 77, 112, 12, "Opto memory", TR_NOOP ("Off|On"), {}, compactKeys), "Voicing", 0.5f, 1.0f));
+    // round 190fx: the side chain's weighting (Old = the voicing's treble emphasis; Measured = the even weighting); the four
+    // key groups 12 px high so the column ends above the COMPRESS caption
+    v.push_back (when (label (14, 92, 112, 9, TR_NOOP ("Side chain"), dim), "Voicing", 0.5f, 1.0f));
+    v.push_back (when (tabs (14, 101, 112, 12, "SC weighting", TR_NOOP ("Old|Measured"), {}, compactKeys), "Voicing", 0.5f, 1.0f));
     // COMPRESS / LIMIT: a bat toggle (up = compress), its two words above and under it
     v.push_back (tabs (40, 136, 52, 84, "Limit", TR_NOOP ("Compress|Limit"), {}, batToggle));
     // the two big knobs, their printed 0 … 100 round them; no value text (the drag tip shows it)
@@ -2332,6 +2336,36 @@ Layout strikeLayout()
     return l;
 }
 
+// round 190fk: Anvil Bus, LYNX's drum-bus processor (the editor draws the forged-steel look, ui/PluginArtEffects.inc).
+// Round 190gx: the controls in the reference's four columns, top to bottom [Live 12.4 Drum Buss panel shot,
+// /mnt/e/lynx-work/live190gu/drumbus/live-drumbuss-panel-type0-drive25.png]: Drive, the three types stacked, Trim, Comp |
+// Crunch, Damp, Transients | Boom, Freq., Decay | the Output fader and Dry/Wet (the reference's Bass meter, Force to note
+// and Boom audition are left out: LYNX has no such outputs)
+Layout anvilLayout()
+{
+    Layout l;
+    l.width = 600;
+    l.height = 330;
+    auto& v = l.items;
+    v.push_back (section (4, 4, 146, 322, TR_NOOP ("Drive")));
+    v.push_back (dial (77, 68, 52, "Drive", TR_NOOP ("Drive"), big));
+    v.push_back (radio (30, 124, 94, 72, "Drive type", TR_NOOP ("Soft|Medium|Hard"), { 0.0f, 0.5f, 1.0f }));
+    v.push_back (dial (77, 226, 30, "Trim", TR_NOOP ("Trim")));
+    v.push_back (toggle (22, 286, 110, 26, "Comp", TR_NOOP ("Comp")));
+    v.push_back (section (154, 4, 146, 322, "", boxed));
+    v.push_back (dial (227, 58, 40, "Crunch", TR_NOOP ("Crunch")));
+    v.push_back (dial (227, 150, 40, "Damp", TR_NOOP ("Damp")));
+    v.push_back (dial (227, 246, 48, "Transients", TR_NOOP ("Transients"), bipolar | big));
+    v.push_back (section (304, 4, 146, 322, TR_NOOP ("Boom")));
+    v.push_back (dial (377, 68, 52, "Boom", TR_NOOP ("Boom"), big));
+    v.push_back (dial (377, 162, 40, "Boom freq.", TR_NOOP ("Freq.")));
+    v.push_back (dial (377, 250, 40, "Boom decay", TR_NOOP ("Decay")));
+    v.push_back (section (454, 4, 142, 322, "", boxed));
+    v.push_back (slider (Item::vslider, 505, 24, 40, 200, "Output", TR_NOOP ("Output")));
+    v.push_back (dial (525, 276, 30, "Dry/Wet", TR_NOOP ("Dry/Wet")));
+    return l;
+}
+
 // round tp172c8: Shell Channel, LYNX's drum channel strip (its role: the drum channel strip measured on the SSL Native
 // Drumstrip trial). The generic layout: input column, GATE and TRANSIENT SHAPER on top, the LOW / HIGH FREQ ENHANCERS and
 // the LISTEN MIC COMPRESSOR below, the process order under them, output column
@@ -2395,7 +2429,13 @@ Layout emberLayout()
     l.height = 230;
     auto& v = l.items;
     v.push_back (section (4, 4, 200, 222, TR_NOOP ("Style")));
-    v.push_back (display (12, 26, 184, 110, "embercurve"));
+    v.push_back (display (12, 26, 184, 96, "embercurve"));
+    // round 190fj: Tape's speed on the measured core; projects saved before it keep the Classic tape until switched
+    // (their own third condition: hidden on the Classic voicing's page like the rest of this page)
+    v.push_back (when (when (when (tabs (12, 124, 184, 16, "Tape speed", TR_NOOP ("30 ips|15|7.5|3.75|1.875"), {}, compactKeys),
+                                   "Style", 0.17f, 0.5f), "Law", 0.5f, 1.0f), "Voicing", 0.0f, 0.5f));
+    v.push_back (when (when (when (tabs (12, 124, 184, 16, "Law", TR_NOOP ("Classic|Measured"), {}, compactKeys), "Style", 0.17f, 0.5f),
+                             "Law", 0.0f, 0.5f), "Voicing", 0.0f, 0.5f));
     auto styles = radio (12, 144, 184, 76, "Style", TR_NOOP ("Tube|Tape|Transistor|Fuzz"));
     styles.columns = 2;
     v.push_back (styles);
@@ -4017,7 +4057,7 @@ const std::vector<EffectKind>& flLayoutKinds()
 const std::vector<EffectKind>& ownLayoutKinds()
 {
     static const std::vector<EffectKind> kinds { EffectKind::ridgeStrip, EffectKind::glowLeveler, EffectKind::hushDeEsser,
-                                                 EffectKind::aether, EffectKind::ember, EffectKind::kilnChannel, EffectKind::fretChannel, EffectKind::shellChannel, EffectKind::strikeShaper, EffectKind::epochVerb, EffectKind::atrium,
+                                                 EffectKind::aether, EffectKind::ember, EffectKind::kilnChannel, EffectKind::fretChannel, EffectKind::shellChannel, EffectKind::strikeShaper, EffectKind::anvilBus, EffectKind::epochVerb, EffectKind::atrium,
                                                  EffectKind::foilPlate, EffectKind::nebula, EffectKind::halo, EffectKind::horizon,
                                                  EffectKind::echoform, EffectKind::spiralEcho, EffectKind::orbit, EffectKind::latticeMod,
                                                  EffectKind::crestCompressor, EffectKind::prismMultiband, EffectKind::sentryGate,
@@ -4105,6 +4145,7 @@ const Layout& layoutFor (EffectKind kind)
         case EffectKind::fretChannel: l = fretLayout(); break;
         case EffectKind::shellChannel: l = shellLayout(); break;
         case EffectKind::strikeShaper: l = strikeLayout(); break;
+        case EffectKind::anvilBus: l = anvilLayout(); break;
         case EffectKind::epochVerb: l = captionsAbove (epochVerbLayout()); break;
         case EffectKind::atrium: l = captionsAbove (atriumLayout()); break;
         case EffectKind::foilPlate: l = captionsAbove (foilPlateLayout()); break;

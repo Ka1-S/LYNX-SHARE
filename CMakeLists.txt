@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.22)
 # macOS: Big Sur or newer (universal builds pass -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"); set before project()
 set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Minimum macOS version")
 
-project(LYNX VERSION 0.1.27 LANGUAGES C CXX)
+project(LYNX VERSION 0.1.28 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -46,6 +46,7 @@ add_library(lynx_core STATIC
     src/core/Patcherize.cpp
     src/core/Instruments.cpp
     src/core/RackRenderer.cpp
+    src/core/RenderAhead.cpp
     src/core/RollingAudioLog.cpp
     src/core/ChordReadout.cpp
     src/core/LoadTrace.cpp
@@ -58,6 +59,7 @@ add_library(lynx_core STATIC
     src/core/AlsDevices.cpp
     src/core/AlsDevicesLot2.cpp
     src/core/AlsDevicesLot3.cpp
+    src/core/AlsDevicesLot4.cpp
     src/core/FlmFormat.cpp
     src/core/FlmImport.cpp
     src/core/FlmEffects.cpp
@@ -98,6 +100,7 @@ add_library(lynx_core STATIC
     src/core/ThemePalette.cpp
     src/core/LoopStarter.cpp
     src/core/SimpleTracks.cpp
+    src/core/SimplePads.cpp
     src/core/KeyFollow.cpp
     src/core/GoalKnobs.cpp
     src/core/ChainPresets.cpp
@@ -281,6 +284,7 @@ target_sources(lynx_core PRIVATE
 target_sources(lynx_core PRIVATE
     src/core/NoteTools.cpp
     src/core/MidiTools.cpp
+    src/core/MidiGenerate.cpp
     src/core/PianoRollTools.cpp
     src/core/EventEdit.cpp
     src/core/AudioEdit.cpp
@@ -290,12 +294,14 @@ target_sources(lynx_core PRIVATE
     src/core/History.cpp
     src/core/EffectPresets.cpp
     src/core/PluginPresets.cpp
+    src/core/GeneratorPresets.cpp
     src/core/ParamHelp.cpp
     src/core/SearchQuery.cpp src/core/SearchIndex.cpp src/core/SearchService.cpp src/core/BrowserView.cpp)
 
 # spectral waveforms: band analysis and multi-resolution peak cache
 target_sources(lynx_core PRIVATE
-    src/core/WaveAnalysis.cpp)
+    src/core/WaveAnalysis.cpp
+    src/core/Spectrogram.cpp)
 
 # export options + MP3, plugin performance monitor, clip properties / arrangements (round 84)
 target_sources(lynx_core PRIVATE
@@ -321,6 +327,9 @@ target_sources(lynx_core PRIVATE
 # in-app update check: versions, release list, build flavours, checksums, release notes (round 166b)
 target_sources(lynx_core PRIVATE
     src/core/UpdateCheck.cpp)
+# the first-start audio check: verdict and the devices to try (round 190gh, B23)
+target_sources(lynx_core PRIVATE
+    src/core/AudioCheck.cpp)
 # the Browser's "Find similar samples" (round 190as)
 target_sources(lynx_core PRIVATE
     src/core/SampleSimilarity.cpp)
@@ -377,6 +386,12 @@ target_link_libraries(lynx_core PUBLIC vorbis_decoder)
 
 add_executable(lynx_tests tests/tests.cpp)
 target_link_libraries(lynx_tests PRIVATE lynx_core)
+add_executable(lynx_remote_playlist_tests tests/RemotePlaylistEditsTests.cpp)
+target_link_libraries(lynx_remote_playlist_tests PRIVATE lynx_core)
+add_executable(lynx_remote_instrument_tests tests/RemoteInstrumentEditsTests.cpp)
+target_link_libraries(lynx_remote_instrument_tests PRIVATE lynx_core)
+add_executable(lynx_remote_pattern_tests tests/RemotePatternEditsTests.cpp)
+target_link_libraries(lynx_remote_pattern_tests PRIVATE lynx_core)
 
 add_executable(flpdump tools/flpdump.cpp)
 target_link_libraries(flpdump PRIVATE lynx_core)
@@ -384,8 +399,16 @@ target_link_libraries(flpdump PRIVATE lynx_core)
 add_executable(renderwav tools/renderwav.cpp)
 target_link_libraries(renderwav PRIVATE lynx_core)
 
+# the audio engine's CPU per block, headless (round 190ge): perfbench <scenario> [--block N] [--threads N] ...
+add_executable(perfbench tools/perfbench.cpp)
+target_link_libraries(perfbench PRIVATE lynx_core)
+target_include_directories(perfbench PRIVATE tools)
+
 enable_testing()
 add_test(NAME lynx_tests COMMAND lynx_tests)
+add_test(NAME lynx_remote_playlist_tests COMMAND lynx_remote_playlist_tests)
+add_test(NAME lynx_remote_instrument_tests COMMAND lynx_remote_instrument_tests)
+add_test(NAME lynx_remote_pattern_tests COMMAND lynx_remote_pattern_tests)
 
 # ---------------------------------------------------------------------------
 # App (JUCE)
@@ -432,6 +455,15 @@ if(LYNX_BUILD_APP)
         src/platform/Package.cpp
         src/platform/NativeEmbed.cpp
         src/engine/AudioEngine.cpp
+        src/engine/RemoteControl.cpp
+        src/engine/RemoteProjectControl.cpp
+        src/engine/RemoteProjectDocument.cpp
+        src/ui/RemoteControlSettings.cpp
+        src/engine/RemotePluginControl.cpp
+        src/engine/RemoteInstrumentControl.cpp
+        src/engine/RemotePatternControl.cpp
+        src/engine/GeneratorCatalog.cpp
+        src/engine/RemotePlaylistControl.cpp
         src/engine/AudioEngineSession.cpp
         src/engine/ChannelRackProcessor.cpp
         src/engine/Metronome.cpp
@@ -448,6 +480,8 @@ if(LYNX_BUILD_APP)
         src/engine/LiveTest.cpp
         src/engine/DeviceChangeTest.cpp
         src/engine/ShortExportTest.cpp
+        src/engine/ExportParityTest.cpp
+        src/engine/MidiHotplugTest.cpp
         src/ui/LiveSessionUi.cpp
         src/ui/LiveChat.cpp
         src/engine/LiveRemotePlugins.cpp
@@ -469,6 +503,7 @@ if(LYNX_BUILD_APP)
         src/engine/MidiFileIo.cpp
         src/engine/AudioLogger.cpp
         src/engine/MidiSyncIo.cpp
+        src/engine/AbletonLink.cpp
         src/engine/ControllerIo.cpp
         src/engine/PreviewPlayer.cpp
         src/ui/MainComponent.cpp
@@ -480,6 +515,7 @@ if(LYNX_BUILD_APP)
         src/ui/QuickPick.cpp
         src/ui/PluginWindow.cpp
         src/ui/PluginPresetMenu.cpp
+        src/ui/GeneratorPresetMenu.cpp
         src/ui/ProjectLoading.cpp
         src/ui/WindowOwner.cpp
         src/ui/PluginKeysTest.cpp
@@ -538,6 +574,8 @@ if(LYNX_BUILD_APP)
     list(APPEND LYNX_APP_SOURCES
         src/ui/Workspace.cpp
         src/ui/NativeChild.cpp
+        src/ui/ExternalDrag.cpp
+        src/ui/ExternalDragX11.cpp
         src/ui/ValueControl.cpp
         src/ui/Dialogs.cpp
         src/ui/SetupWizard.cpp
@@ -575,6 +613,7 @@ if(LYNX_BUILD_APP)
         src/ui/ReferenceMatchPanel.cpp
         src/ui/StartFromPanel.cpp
         src/ui/FirstSongTour.cpp
+        src/ui/SupportLynx.cpp
         src/ui/PluginsOffPanel.cpp
         src/ui/MissingFilesDialog.cpp
         src/ui/SettingsDialog.cpp
@@ -598,9 +637,14 @@ if(LYNX_BUILD_APP)
         src/ui/PluginPicker.cpp
         src/ui/CrashReporter.cpp
         src/ui/Updater.cpp
+        src/ui/AudioCheck.cpp
         src/ui/StemExtract.cpp
         src/ui/AudioToMidi.cpp)
     target_sources(LYNX PRIVATE src/Main.cpp ${LYNX_APP_SOURCES})
+    # Ableton Link 4.1.1 (GPL-2.0-or-later, used under the GPLv3; third_party/link, round 190gl) with its bundled Asio
+    # (Boost licence): header-only, used by src/engine/AbletonLink.cpp alone (it sets Link's and Asio's macros itself)
+    set_source_files_properties(src/engine/AbletonLink.cpp PROPERTIES COMPILE_OPTIONS
+        "$<IF:$<CXX_COMPILER_ID:MSVC>,/external:I${CMAKE_CURRENT_SOURCE_DIR}/third_party/link/include;/external:I${CMAKE_CURRENT_SOURCE_DIR}/third_party/link/asio/include;/external:W0,-isystem;${CMAKE_CURRENT_SOURCE_DIR}/third_party/link/include;-isystem;${CMAKE_CURRENT_SOURCE_DIR}/third_party/link/asio/include>")
     target_include_directories(LYNX PRIVATE third_party/onnxruntime) # loaded at run time, never linked
 
     target_include_directories(LYNX PRIVATE third_party/clap/include)
@@ -623,7 +667,8 @@ if(LYNX_BUILD_APP)
     if(WIN32)
         target_include_directories(LYNX PRIVATE third_party/asiosdk/common)
         target_compile_definitions(LYNX PRIVATE JUCE_ASIO=1) # ASIO SDK headers in third_party/asiosdk (GPLv3 option)
-        target_link_libraries(LYNX PRIVATE winhttp) # live sessions' WebSocket (engine/LiveLink.cpp)
+        target_link_libraries(LYNX PRIVATE winhttp bcrypt advapi32) # live sessions' WebSocket (engine/LiveLink.cpp)
+        target_link_libraries(LYNX PRIVATE ws2_32 iphlpapi) # Ableton Link's sockets and network interfaces (round 190gl)
         target_link_libraries(LYNX PRIVATE mfplat mfreadwrite mfuuid propsys) # the system's video decoder (round 174d)
     elseif(APPLE)
         target_compile_definitions(LYNX PRIVATE JUCE_PLUGINHOST_AU=1)
@@ -665,6 +710,18 @@ if(LYNX_BUILD_APP)
     if(LYNX_LTO)
         target_link_libraries(LYNX PUBLIC juce::juce_recommended_lto_flags)
     endif()
+    add_executable(lynx_remote_project_tests
+        tests/RemoteProjectControlTests.cpp
+        src/engine/RemoteProjectDocument.cpp
+        src/engine/ProjectFile.cpp)
+    target_include_directories(lynx_remote_project_tests PRIVATE src)
+    target_compile_definitions(lynx_remote_project_tests PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0
+        JUCE_APPLICATION_VERSION_STRING="${PROJECT_VERSION}")
+    target_link_libraries(lynx_remote_project_tests PRIVATE lynx_core juce::juce_core)
+    if(WIN32)
+        target_link_libraries(lynx_remote_project_tests PRIVATE bcrypt advapi32)
+    endif()
+    add_test(NAME lynx_remote_project_tests COMMAND lynx_remote_project_tests)
 endif()
 
 # LYNX's own effects and instruments as VST3 / CLAP plugins for other hosts (round 180b, docs/PLUGIN_EXPORT.md). Off by

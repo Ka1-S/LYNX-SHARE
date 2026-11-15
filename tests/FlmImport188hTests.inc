@@ -227,10 +227,16 @@ TEST (flm188h_post_gain_and_new_modules)
     if (mapped.slots.size() == 2)
         CHECK (mapped.slots[0].kind == EffectKind::pocketLimiter && mapped.slots[0].params[3] == 0.8f
                && mapped.slots[1].kind == EffectKind::utility && std::abs ((mapped.slots[1].params[0] - 0.5f) * 48.0f - 10.0f) < 1e-4f);
-    // with Mix below 100 % it is listed instead
+    // with Mix below 100 % (round 190fe): FLM's blend itself, a parallel container — the dry signal at 1 − Mix, the module
+    // at Mix × Post Gain (an automated module keeps its plain slot, the Post Gain listed)
     m.reserved = { 0.75f, 0.5f, 0.5f };
     const auto half = flmfx::map (m);
-    CHECK (half.slots.size() == 1 && half.slots[0].mix == 0.5f && half.partial.size() == 1);
+    CHECK (half.slots.size() == 1 && half.slots[0].kind == EffectKind::parallel && half.partial.empty());
+    if (half.slots.size() == 1 && half.slots[0].branches.size() == 2)
+        CHECK (half.slots[0].branches[0].chain.empty() && half.slots[0].branches[0].gain == 0.5f && half.slots[0].branches[1].chain.size() == 1
+               && half.slots[0].branches[1].chain[0].kind == EffectKind::pocketLimiter && std::abs (half.slots[0].branches[1].gain - 0.5f * std::pow (10.0f, 0.5f)) < 1e-5f);
+    const auto live = flmfx::map (m, true);
+    CHECK (live.slots.size() == 1 && live.slots[0].kind == EffectKind::pocketLimiter && live.slots[0].mix == 0.5f && live.partial.size() == 1);
     // Trance Delay: FLM's saved dry-pan byte; a module without one loads with it on
     auto t = flm188f::moduleOf (16, { 1.0f, 0.775f, 0.845f, 1.0f, 0.71f, 0.5f, 0.703f });
     CHECK (flmfx::map (t).slots[0].params[6] == 1.0f && flmfx::map (t).slots[0].params[5] == 0.703f);

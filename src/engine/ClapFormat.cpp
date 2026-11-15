@@ -14,6 +14,8 @@
 #include <clap/clap.h>
 
 #include "core/Mpe.h"
+#include "engine/PluginHost.h"
+#include "platform/CrashGuard.h"
 #include "platform/NativeEmbed.h"
 #include "platform/Paths.h"
 
@@ -1127,11 +1129,11 @@ public:
     {
         stopTimer();
 
-        if (created)
-        {
-            owner.gui->hide (owner.plugin);
-            owner.gui->destroy (owner.plugin);
-        }
+        if (created && ! faulted) // (round 190gg: under the crash guard; after a fault in it, never called again)
+            crashguard::run ([this] {
+                owner.gui->hide (owner.plugin);
+                owner.gui->destroy (owner.plugin);
+            });
     }
 
     void resized() override { embed.setBounds (getLocalBounds()); }
@@ -1166,13 +1168,18 @@ private:
        #else
         window.ptr = embed.nativeHandle();
        #endif
-        owner.gui->set_parent (owner.plugin, &window);
-        owner.gui->show (owner.plugin);
+        // round 190gg (B4): this runs from the message loop, outside every other guard: a plugin that crashes building
+        // its view in its new window is switched off (its window shows the crash notice) instead of ending LYNX
+        if (! callPluginFromUi (owner, "opening its editor", [this, &window] {
+                owner.gui->set_parent (owner.plugin, &window);
+                owner.gui->show (owner.plugin);
+            }))
+            faulted = true;
     }
 
     ClapInstance& owner;
     platform::NativeEmbed embed;
-    bool created = false;
+    bool created = false, faulted = false;
 };
 
 juce::AudioProcessorEditor* ClapInstance::createEditor()

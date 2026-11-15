@@ -248,7 +248,7 @@ public:
         // the biggest monospaced size that fits the box (the digits never jump while they change)
         const auto chars = (float) juce::jmax (8, shown.length());
         const auto size = juce::jmin (digits.getHeight() * 0.92f, digits.getWidth() / (chars * 0.62f));
-        g.setFont (theme::monoFont (size).withStyle ("Bold"));
+        g.setFont (theme::monoFont (size).boldened());
         g.setColour (theme::colour::textPrimary);
         g.drawText (shown, digits, juce::Justification::centred, false);
 
@@ -296,7 +296,7 @@ private:
             const auto length = (double) juce::jmax<std::int64_t> (1, song.mode == PlayMode::song ? song.songLength() : (std::int64_t) ppq * 4 * 1000);
             ticks = std::fmod (juce::jmax (0.0, target.engine->getTransport().positionTicks.load()), length);
         }
-        const auto text = juce::String (fx::bigclock::clockText (song, ticks, target.engine->getTransport().beatsPerBar.load(), display()));
+        const auto text = juce::String (fx::bigclock::clockText (song, ticks, song.meter(), display()));
         if (text != shown || display() != shownDisplay)
         {
             shown = text;

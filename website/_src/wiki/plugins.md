@@ -92,6 +92,19 @@ On Windows, 32-bit VST2 and VST3 plugins run through a bridge (`LYNX-bridge32.ex
 
 An instrument plugin with several outputs can play each one on its own Mixer insert. In the plugin's window, click `Wrapper settings`, then the `Processing` tab. Under `Connections`, each output has a light that turns it on or off and a number: how many inserts after the channel's own insert it plays on. `Auto map outputs` gives each output the next insert, and `Reset` goes back to the defaults.
 
+## FL Studio's own plugins
+
+FL Studio's native plugins, such as Sytrus, Harmor and Patcher, run only inside FL Studio. To use them in LYNX SHARE, use the plugin version of FL Studio that comes with it. On Windows it is installed as `FL Studio VSTi` and `FL Studio VSTi (Multi)` in `C:\Program Files\Common Files\VST2`. On macOS it is an Audio Unit.
+
+1. Scan for plugins. Both appear as instruments with the vendor Image-Line. The first scan can take a while, because the whole of FL Studio starts inside the plugin.
+2. Add `FL Studio VSTi` to a channel and open its window. Click the FL Studio logo to open FL Studio's own window, with its Channel rack, Mixer and browser.
+3. In FL Studio's Channel rack, add an instrument. A new FL Studio plugin starts with one empty Sampler and makes no sound until you add one. Notes from LYNX SHARE play the channel selected in FL Studio's Channel rack.
+4. FL Studio's own patterns play when LYNX SHARE plays, at LYNX SHARE's tempo.
+
+What you build inside FL Studio is saved with the LYNX SHARE project. `FL Studio VSTi (Multi)` has 16 stereo outputs, which can play on separate inserts (see the section above). Your FL Studio licence decides which FL plugins work inside it. LYNX SHARE does not load FL Studio's plugin files by itself.
+
+If the FL Studio plugin is listed as `Failed to load`, right-click it in `Options › Plugin manager...` and choose `Try again (scan this file now)`.
+
 ## The Plugin database folder
 
 The folders of the [Browser](/wiki/browser/)'s Plugin database, the plugin picker and the plugin menus are a folder on disk: `LYNX/Plugin database` in your Documents folder. To open it, right-click `Plugin database` in the Browser and choose `Open`.

@@ -40,6 +40,18 @@ void setHost (Host host);
 
 void startAutomaticCheck(); // start-up (normal UI runs only)
 void checkNow();            // Help › Check for updates...
+
+// Round 190gh (B2, complaint #2 "regressions after an update; users downgrade by hand"): going back to the version
+// before. The updater records the version an update replaced (core/UpdateCheck.h Settings::previous);
+// Help › "Go back to <version>..." and Settings › General › Updates install that release the way an update installs
+// a new one (the same flavour's file from GitHub, checked against its SHA256SUMS.txt, the project saved and
+// reopened), and skip the version left so the bar does not offer it again at once. The Store build never does.
+// The version it would install as far as known without the network (the recorded one, else from the cached release
+// list); empty when none is known yet.
+juce::String previousVersion();
+// Asks first, then fetches the release list, downloads, checks and installs the older version. LYNX_UPDATE_URL /
+// LYNX_UPDATE_VERSION / LYNX_UPDATE_FLAVOUR apply as for an update (test fixtures).
+void goBack();
 void shutdown();            // stops a check or download in flight (app shutdown)
 
 // After an update by the installer: the helper's result (a notice when it failed) and the temporary files go.
@@ -61,7 +73,7 @@ public:
     static constexpr int height = 30;
     void paint (juce::Graphics&) override;
     void resized() override;
-    void showForSnapshot (int state); // --snapshot: 0 available, 1 downloading, 2 failed, 3 ready
+    void showForSnapshot (int state); // --snapshot: 0 available, 1 downloading, 2 failed, 3 ready, 4 going back, 5 went back
 
 private:
     void changeListenerCallback (juce::ChangeBroadcaster*) override;

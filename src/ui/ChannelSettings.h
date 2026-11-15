@@ -30,6 +30,12 @@ bool samplerFileRowPress (juce::Component& root, int button);
 // "scroll"). False / empty: no sampler page.
 bool samplerPageTurn (juce::Component& root, const juce::String& what, double value, bool shift = false);
 juce::String samplerPageQuery (juce::Component& root, const juce::String& what);
+// Round 190fs (shots, tests): the preset box of the channel window `root` (the ◀ name ▶ bar of an FL engine or a LYNX
+// bank, LYNX's synth's "Presets..." box): its menu (nullopt: no box), "Save preset..." with `name` (no name box), and
+// the preset it shows ("" = none).
+std::optional<juce::PopupMenu> channelPresetMenu (juce::Component& root);
+bool channelPresetSave (juce::Component& root, const juce::String& name);
+juce::String channelPresetName (juce::Component& root);
 void closeChannelSettings();
 // FL's View › Align all channel editors (Shift+F12): every open channel editor moves to the focused one's place (else the
 // selected channel's), and channel editors opened later come up there too (round 169k).

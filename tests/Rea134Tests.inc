@@ -233,7 +233,7 @@ TEST (rea134_export_window_length_and_disk_space)
 {
     // FL's render window: "Length: 144 bars  Total time: 3'57''  Disk space: 38.76 MB" (Thief, 150 BPM, 16-bit WAV)
     using namespace lynx::exportopts;
-    CHECK (std::abs (lengthInBars (230.4, 150.0, 4) - 144.0) < 1e-9);
+    CHECK (std::abs (lengthInBars (230.4, 150.0, lynx::Meter (4, 4)) - 144.0) < 1e-9);
     Options o;
     o.format = Format::wav;
     o.wavBits = 16;

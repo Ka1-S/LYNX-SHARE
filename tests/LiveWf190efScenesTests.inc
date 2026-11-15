@@ -188,7 +188,7 @@ TEST (live190ef_scene_captured_phrase_as_clip_notes)
     played[1].endMs = 3500.0;
     played[1].key = 64;
     std::int64_t length = 0;
-    auto notes = session::phraseNotes (played, 4000.0, 120.0, 4, length);
+    auto notes = session::phraseNotes (played, 4000.0, 120.0, lynx::Meter (4, 4), length);
     CHECK (notes.size() == 2 && notes[0].start == ppq && notes[0].length == ppq / 2 && notes[0].key == 60);
     CHECK (notes[1].start == bar + 2 * ppq && notes[1].length == ppq);
     CHECK (length == 2 * bar);
@@ -199,12 +199,12 @@ TEST (live190ef_scene_captured_phrase_as_clip_notes)
     stopped[1].startMs = 1500.0; // held
     stopped[1].key = 67;
     stopped[1].velocity = 0.5f;
-    notes = session::phraseNotes (stopped, 2500.0, 120.0, 3, length);
+    notes = session::phraseNotes (stopped, 2500.0, 120.0, lynx::Meter (3, 4), length);
     CHECK (notes.size() == 2 && notes[0].start == 0 && notes[0].length == ppq);
     CHECK (notes[1].start == ppq && notes[1].length == 2 * ppq && notes[1].velocity == 0.5f);
     CHECK (length == 3 * ppq); // one bar of 3/4
     // nothing: one empty bar
-    notes = session::phraseNotes ({}, 0.0, 120.0, 4, length);
+    notes = session::phraseNotes ({}, 0.0, 120.0, lynx::Meter (4, 4), length);
     CHECK (notes.empty() && length == bar);
 }
 

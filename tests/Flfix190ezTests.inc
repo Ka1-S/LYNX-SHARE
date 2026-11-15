@@ -114,7 +114,7 @@ TEST (edison190ez_trigger_notes_are_written_as_fls_tlst)
     doc.markers.push_back ({ 1000, 2000, "b", "", 0.0, -1 });
     doc.markers.push_back ({ 2000, 3000, "c", "", 0.0, 127 });
     const auto two = flfix190ez::chunk (encodeWav (doc, WavFormat::int16), "tlst");
-    CHECK (two.size() == 4 + 2 * 24 && two[0] == 2 && two[4 + 24 + 8] == 3 && two[4 + 24 + 13] == 127 && two[4 + 13] == 38);
+    CHECK (two.size() == 4 + 2 * 24 && two[0] == 2 && two[4 + 24 + 4] == 2 && two[4 + 24 + 8] == 1 && two[4 + 24 + 13] == 127 && two[4 + 13] == 38); // cue id 3 − 1 (round 190gk)
 }
 
 TEST (edison190ez_reads_fls_tlst_and_027s_lxkn)

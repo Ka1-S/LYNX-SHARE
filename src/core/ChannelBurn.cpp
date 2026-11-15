@@ -78,8 +78,8 @@ Baked whatBurns (const Song& song, int pattern, int channel)
     b.echo = c.misc.echo.enabled();
     b.swing = song.swing > 0.0f && c.swingMix > 0.0f;
     b.time = c.misc.shiftBeats > 0.0f || c.misc.gateBeats > 0.0f;
-    const auto length = p.effectiveLength (song.beatsPerBar);
-    const auto loop = channelloops::loopLength (p, channel, channelloops::effectiveSetting (p, channel), length, song.beatsPerBar);
+    const auto length = p.effectiveLength (song.meter());
+    const auto loop = channelloops::loopLength (p, channel, channelloops::effectiveSetting (p, channel), length, song.meter());
     b.loop = loop > 0 && loop < length;
     return b;
 }
@@ -91,8 +91,8 @@ std::vector<Note> playedNotes (const Song& song, int patternIndex, int channel)
         return out;
     const auto& c = song.channels[(std::size_t) channel];
     auto pattern = song.patterns[(std::size_t) patternIndex];
-    const auto patternLength = pattern.effectiveLength (song.beatsPerBar);
-    channelloops::expandPattern (pattern, song.beatsPerBar); // the loop repeats, as the engine plays them
+    const auto patternLength = pattern.effectiveLength (song.meter());
+    channelloops::expandPattern (pattern, song.meter()); // the loop repeats, as the engine plays them
 
     std::vector<Note> source;
     for (const auto& n : pattern.notes)
@@ -244,7 +244,7 @@ bool burnMidi (Song& song, int channel, bool toNewPattern, const Reset& reset)
     if (notes.empty())
         return false;
     const auto baked = whatBurns (song, current, channel);
-    const auto sourceLength = song.patterns[(std::size_t) current].effectiveLength (song.beatsPerBar);
+    const auto sourceLength = song.patterns[(std::size_t) current].effectiveLength (song.meter());
 
     if (toNewPattern)
     {
@@ -265,7 +265,7 @@ bool burnMidi (Song& song, int channel, bool toNewPattern, const Reset& reset)
         // the channel's loop is written out: its loop point becomes "Don't loop" (FL: FUN_012cf150)
         if (baked.loop || channelloops::hasStoredSetting (p, channel))
             channelloops::setSetting (p, channel, ChannelLoop::dontLoop);
-        if (autoLength && p.effectiveLength (song.beatsPerBar) != sourceLength)
+        if (autoLength && p.effectiveLength (song.meter()) != sourceLength)
             p.lengthTicks = sourceLength; // (a long echo never makes the pattern longer)
     }
 

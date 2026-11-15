@@ -1,5 +1,5 @@
 ---
-source: 358890815a
+source: c4e89e7e72
 ---
 `Arquivo › Abrir...` (`Ctrl+O`) abre os projetos `.lynx` do próprio LYNX SHARE e também arquivos `.flp`, `.als`, `.flm` e `.mid`. Um projeto de outro programa é uma importação: ele vira um projeto novo do LYNX SHARE, ainda não salvo, e o arquivo original nunca é gravado.
 
@@ -27,6 +27,12 @@ Plugins VST2, VST3 e CLAP de terceiros em um `.flp`, e plugins VST2 e VST3 em um
 Os geradores e efeitos do FL Studio não são carregados. O LYNX SHARE lê as configurações salvas deles e as toca em motores que recriou. Cada motor tem um nível de qualidade, de `Exact` (idêntico bit a bit ao original em todos os estados testados) até `Placeholder` (as configurações são mantidas, mas o plugin fica mudo ou deixa o áudio passar direto). Os níveis são explicados em [Vindo do FL Studio](/wiki/coming-from-fl-studio/).
 
 Abrir um `.flp` funciona sem o FL Studio instalado. Alguns motores precisam de ondas, samples ou impulsos que são lidos da sua própria instalação do FL Studio durante a execução.
+
+Um `.flp` que usa o "FL Studio Mobile Rack" do FL Studio (o "Save as FLP" do próprio FL Studio Mobile grava um por faixa de instrumento) toca o instrumento e os efeitos nos mesmos motores de um `.flm`, e o efeito "FL Studio Mobile Rack FX" também. Um rack com um kit de bateria ou vários instrumentos ainda toca o sintetizador embutido.
+
+## Sons de fábrica do FL Studio Mobile
+
+Os sons de fábrica que um `.flm` usa (kits de bateria, programas do DirectWave, SoundFonts, as ondas do GMSynth) pertencem ao FL Studio Mobile e nunca são distribuídos com o LYNX SHARE. O LYNX SHARE os procura na sua própria cópia da pasta `Resources` do app: adicione-a em `Configurações › Arquivos › Recursos do FL Studio Mobile` (escolher a pasta acima dela, ou uma pasta de instalação do FL Studio, também funciona). A instalação do FL Studio guarda só uma parte deles e é pesquisada depois das suas pastas. Os arquivos que ainda faltarem aparecem na janela Arquivos ausentes.
 
 ## Samples ausentes
 

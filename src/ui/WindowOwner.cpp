@@ -189,6 +189,11 @@ juce::Image logoImage()
     return juce::ImageCache::getFromMemory (logo::png512, (int) sizeof (logo::png512));
 }
 
+juce::Image decodeLogoImage()
+{
+    return juce::ImageFileFormat::loadFrom (logo::png512, sizeof (logo::png512));
+}
+
 juce::Image logoSmallImage()
 {
     return juce::ImageCache::getFromMemory (logo::pngSmall, (int) sizeof (logo::pngSmall));

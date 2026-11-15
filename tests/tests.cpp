@@ -146,6 +146,7 @@
 #include "core/PinOnTop.h"
 #include "core/MetronomeVoice.h"
 #include "engine/Transport.h"
+#include "engine/RemoteHistory.h"
 #include "core/Patcherize.h"
 #include "core/Performance.h"
 #include "core/Scheduler.h"
@@ -168,6 +169,7 @@
 #include "core/LiveRecordView.h"
 #include "core/Recorder.h"
 #include "core/KeyMap.h"
+#include "core/EventPaneSplit.h" // round 190fz
 #include "core/UndoKeys.h"
 #include "core/SortOnce.h"
 #include "core/RackOps.h"
@@ -184,6 +186,7 @@
 #include "core/PluginSubstitutes.h"
 #include "core/ClipOps.h"
 #include "core/PlaylistOps.h"
+#include "core/PluginDrop.h"
 #include "core/QuickRender.h"
 #include "core/TouchKeyboard.h"
 #include "core/HeldNotes.h"
@@ -192,6 +195,8 @@
 #include "ui/I18nData.h"
 #include "ui/I18nLocale.h"
 #include "core/CrashReport.h"
+#include "core/RenderAhead.h"
+#include "core/WorkerPool.h"
 
 namespace
 {
@@ -2419,9 +2424,9 @@ TEST (pattern_toggle_step_and_length)
     p.toggleStep (0, 4);
     CHECK (p.hasStep (0, 4));
     CHECK (p.notes.size() == 1 && p.notes[0].start == 4 * lynx::ticksPerStep);
-    CHECK (p.effectiveLength (4) == 4 * lynx::ppq); // one bar
+    CHECK (p.effectiveLength (lynx::Meter (4, 4)) == 4 * lynx::ppq); // one bar
     p.toggleStep (1, 20);                            // second bar
-    CHECK (p.effectiveLength (4) == 8 * lynx::ppq);
+    CHECK (p.effectiveLength (lynx::Meter (4, 4)) == 8 * lynx::ppq);
     p.toggleStep (0, 4);
     CHECK (! p.hasStep (0, 4) && p.notes.size() == 1);
 }
@@ -2465,7 +2470,7 @@ TEST (scheduler_places_events_at_exact_samples)
     const auto tps = lynx::ticksPerSample (bpm, sr);
     lynx::EventBuffer ev;
 
-    lynx::schedulePatternLoop (p, p.effectiveLength (4), 23900.0 * tps, 512, tps, ev);
+    lynx::schedulePatternLoop (p, p.effectiveLength (lynx::Meter (4, 4)), 23900.0 * tps, 512, tps, ev);
     // the beat-2 note starts at sample 24000 -> offset 100 in this block
     int ons = 0;
     for (auto& e : ev)
@@ -2481,7 +2486,7 @@ TEST (scheduler_wraps_the_loop)
 {
     lynx::Pattern p;
     p.toggleStep (2, 0);
-    const auto len = p.effectiveLength (4); // 3840 ticks
+    const auto len = p.effectiveLength (lynx::Meter (4, 4)); // 3840 ticks
     const double sr = 48000.0;
     const auto tps = lynx::ticksPerSample (120.0, sr);
     lynx::EventBuffer ev;
@@ -2510,7 +2515,7 @@ TEST (scheduler_off_before_on_at_same_sample)
     p.notes = { a, b };
     const auto tps = lynx::ticksPerSample (120.0, 48000.0);
     lynx::EventBuffer ev;
-    lynx::schedulePatternLoop (p, p.effectiveLength (4), 200.0, 4000, tps, ev);
+    lynx::schedulePatternLoop (p, p.effectiveLength (lynx::Meter (4, 4)), 200.0, 4000, tps, ev);
 
     CHECK (ev.size() >= 2);
     CHECK (ev[0].type == lynx::NoteEvent::Type::off);
@@ -4815,12 +4820,36 @@ TEST (plugin_factories_create_reuse_and_fallback)
     CHECK (instrumentsMade == 1 && effectsMade == 1);
     CHECK (a->instruments.size() == 2 && a->instruments[1] != nullptr); // missing: muted, but it exists
 
-    // changing the saved state doesn't recreate; swapping the plugin does
+    // Default startup keeps the established reuse contract: saving/capturing
+    // different serialized bytes by itself must not recreate hosted instances.
+    auto storedOnly = s;
+    storedOnly.channels[0].plugin.state = "captured instrument without opt-in";
+    storedOnly.mixer[1].effects[0].plugin.state = "captured effect without opt-in";
+    auto ordinary = lynx::RackState::build (storedOnly, a.get(), 48000.0, f);
+    CHECK (instrumentsMade == 1 && effectsMade == 1);
+    CHECK (ordinary->instruments[0] == a->instruments[0] && ordinary->effects[1][0] == a->effects[1][0]);
+
+    // Serialized state changes and undo preserve running instances. Remote control
+    // applies deliberate state edits in place through the engine, outside this factory.
     s.channels[0].plugin.state = "abc";
     auto b = lynx::RackState::build (s, a.get(), 48000.0, f);
     CHECK (instrumentsMade == 1 && b->instruments[0] == a->instruments[0] && b->effects[1][0] == a->effects[1][0]);
+    s.mixer[1].effects[0].plugin.state = "new effect state";
+    auto changed = lynx::RackState::build (s, b.get(), 48000.0, f);
+    CHECK (instrumentsMade == 1 && effectsMade == 1 && changed->effects[1][0] == b->effects[1][0]);
+    s.channels[0].plugin.state.clear();
+    s.mixer[1].effects[0].plugin.state.clear();
+    auto undone = lynx::RackState::build (s, changed.get(), 48000.0, f);
+    CHECK (instrumentsMade == 1 && effectsMade == 1);
+    CHECK (undone->instruments[0] == changed->instruments[0] && undone->effects[1][0] == changed->effects[1][0]);
+    auto capturedShape = *undone;
+    capturedShape.song.channels[0].plugin.state = s.channels[0].plugin.state = "captured instrument";
+    capturedShape.song.mixer[1].effects[0].plugin.state = s.mixer[1].effects[0].plugin.state = "captured effect";
+    auto captured = lynx::RackState::build (s, &capturedShape, 48000.0, f);
+    CHECK (instrumentsMade == 1 && effectsMade == 1);
+    CHECK (captured->instruments[0] == undone->instruments[0] && captured->effects[1][0] == undone->effects[1][0]);
     s.mixer[1].effects[0].plugin.id = "VST3-Outro-1";
-    auto c2 = lynx::RackState::build (s, b.get(), 48000.0, f);
+    auto c2 = lynx::RackState::build (s, captured.get(), 48000.0, f);
     CHECK (effectsMade == 2);
 
     // rendering with a missing plugin and a plugin slot breaks nothing
@@ -4842,6 +4871,164 @@ TEST (plugin_factories_create_reuse_and_fallback)
         peak = std::max (peak, std::abs (v));
     }
     CHECK (peak > 0.0f);
+}
+
+TEST (remote_reset_replaces_only_requested_instances_and_default_reuse_stays_unchanged)
+{
+    lynx::Song source;
+    source.mixer = lynx::Song::defaultMixer (2);
+    for (const auto* id : { "Synth A", "Synth B" })
+    {
+        lynx::ChannelDef channel;
+        channel.instrument = lynx::InstrumentKind::plugin;
+        channel.plugin.id = id;
+        channel.plugin.state = std::string ("saved ") + id;
+        source.channels.push_back (std::move (channel));
+    }
+    for (const auto* id : { "Effect A", "Effect B" })
+    {
+        lynx::EffectSlot effect;
+        effect.kind = lynx::EffectKind::plugin;
+        effect.plugin.id = id;
+        effect.plugin.state = std::string ("saved ") + id;
+        source.mixer[1].effects.push_back (std::move (effect));
+    }
+    int instrumentsMade = 0, effectsMade = 0;
+    std::string lastInstrumentState, lastEffectState;
+    lynx::RackState::Factories normal;
+    normal.pluginInstruments = [&] (const lynx::PluginRef& ref, double) -> std::shared_ptr<lynx::Instrument> {
+        ++instrumentsMade;
+        lastInstrumentState = ref.state;
+        return lynx::makeInstrument (lynx::InstrumentKind::synth);
+    };
+    normal.pluginEffects = [&] (const lynx::PluginRef& ref, double) -> std::shared_ptr<lynx::Effect> {
+        ++effectsMade;
+        lastEffectState = ref.state;
+        return lynx::makeEffect (lynx::EffectKind::eq);
+    };
+    const auto before = lynx::RackState::build (source, nullptr, 48000.0, normal);
+    CHECK (instrumentsMade == 2 && effectsMade == 2);
+    // Round 190az (24047e7a0): an ordinary build keeps a running instance for its own channel / slot (the instance
+    // tag) or for one saved with the same settings. A renewed tag with a cleared state is another device: it is
+    // created anew, with the default state, as a remote reset asks.
+    auto reset = source;
+    reset.channels[0].instance.renew();
+    reset.channels[0].plugin.state.clear();
+    reset.mixer[1].effects[0].instance.renew();
+    reset.mixer[1].effects[0].plugin.state.clear();
+    const auto ordinary = lynx::RackState::build (reset, before.get(), 48000.0, normal);
+    CHECK (instrumentsMade == 3 && effectsMade == 3);
+    CHECK (lastInstrumentState.empty() && lastEffectState.empty()); // factories received actual default-state requests
+    CHECK (ordinary->instruments[0] != before->instruments[0] && ordinary->effects[1][0] != before->effects[1][0]);
+    CHECK (ordinary->instruments[1] == before->instruments[1] && ordinary->effects[1][1] == before->effects[1][1]);
+
+    // With the same saved bytes the positional instance stays in an ordinary build; freshInstances replaces exactly
+    // the devices it names.
+    auto renewed = source;
+    renewed.channels[0].instance.renew();
+    renewed.mixer[1].effects[0].instance.renew();
+    const auto kept = lynx::RackState::build (renewed, before.get(), 48000.0, normal);
+    CHECK (instrumentsMade == 3 && effectsMade == 3);
+    CHECK (kept->instruments[0] == before->instruments[0] && kept->effects[1][0] == before->effects[1][0]);
+    auto requested = normal;
+    requested.freshInstances = { renewed.channels[0].instance.id, renewed.mixer[1].effects[0].instance.id };
+    const auto replaced = lynx::RackState::build (renewed, before.get(), 48000.0, requested);
+    CHECK (instrumentsMade == 4 && effectsMade == 4);
+    CHECK (lastInstrumentState == "saved Synth A" && lastEffectState == "saved Effect A");
+    CHECK (replaced->instruments[0] != before->instruments[0] && replaced->effects[1][0] != before->effects[1][0]);
+    CHECK (replaced->instruments[1] == before->instruments[1] && replaced->effects[1][1] == before->effects[1][1]);
+
+    // The policy belongs to that build only: later ordinary edits reuse the newly created instances.
+    const auto later = lynx::RackState::build (renewed, replaced.get(), 48000.0, normal);
+    CHECK (instrumentsMade == 4 && effectsMade == 4);
+    CHECK (later->instruments[0] == replaced->instruments[0] && later->effects[1][0] == replaced->effects[1][0]);
+}
+
+TEST (remote_history_normalized_restores_preserve_lineage_without_crossing_producer_edits)
+{
+    struct Entry { std::string song; bool remote = false; std::string deviceHash; };
+    std::vector<Entry> undo { { "A", true, "B" }, { "B", true, "C" } }, redo;
+    std::string live = "C";
+    const auto restore = [&] (auto& from, auto& to, const std::string& normalized) {
+        CHECK (! from.empty() && from.back().deviceHash == live);
+        const auto savedTarget = from.back().song;
+        // A real engine inverse stores captured live bytes, even when its raw model blob was older.
+        to.push_back ({ live, true, {} });
+        from.pop_back();
+        live = normalized;
+        lynx::remote_history::acceptRestoredState (to.back(), from.empty() ? nullptr : &from.back(), savedTarget, live);
+    };
+
+    restore (undo, redo, "B-normalized");
+    CHECK (undo.back().deviceHash == live && redo.back().deviceHash == live);
+    CHECK (redo.back().song == "C");
+    restore (undo, redo, "A-normalized");
+    CHECK (undo.empty() && redo.back().song == "B-normalized");
+    restore (redo, undo, "B-normalized-again");
+    CHECK (redo.back().deviceHash == live); // the next redo adopts normalization through the same proven lineage
+    restore (redo, undo, "C-normalized");
+    CHECK (redo.empty() && undo.size() == 2);
+
+    // A producer changed B to D before the following remote edit. Undoing that edit may normalize D, but cannot
+    // promote the older B fence: doing so would silently authorize undo across the producer's opaque edit.
+    undo = { { "A", true, "B" }, { "D", true, "E" } };
+    redo.clear();
+    live = "E";
+    restore (undo, redo, "D-normalized");
+    CHECK (redo.back().deviceHash == live && undo.back().deviceHash == "B");
+    CHECK (undo.back().deviceHash != live); // the next remote-owned undo remains refused
+
+    // An ordinary producer entry never acquires a remote fence even if its bytes happen to match the target.
+    Entry ordinary { "A", false, "B" }, inverse { "C", true, {} };
+    lynx::remote_history::acceptRestoredState (inverse, &ordinary, std::string ("B"), std::string ("B-normalized"));
+    CHECK (ordinary.deviceHash == "B" && inverse.deviceHash == "B-normalized");
+}
+
+TEST (remote_capture_mirror_preserves_projected_shape_and_updates_only_matching_hosted_bytes)
+{
+    lynx::Song captured;
+    lynx::ChannelDef hosted;
+    hosted.instrument = lynx::InstrumentKind::plugin;
+    hosted.plugin.id = "Synth";
+    hosted.plugin.state = "saved";
+    captured.channels = { hosted, hosted };
+    captured.channels[1].instance.renew();
+    lynx::ChannelDef patcher;
+    patcher.instrument = lynx::InstrumentKind::patcher;
+    lynx::PatchNode nested;
+    nested.generator = true;
+    nested.channel = hosted;
+    patcher.patcher.nodes.push_back (nested);
+    captured.channels.push_back (patcher);
+    captured.mixer = lynx::Song::defaultMixer (2);
+    lynx::EffectSlot effect;
+    effect.kind = lynx::EffectKind::plugin;
+    effect.plugin.id = "Effect";
+    effect.plugin.state = "saved";
+    captured.mixer[1].effects.push_back (effect);
+    auto published = captured;
+    published.channels[0].muted = true; // an insert stand-in changes routing/muting in the published projection
+    published.channels[1].instrument = lynx::InstrumentKind::sampler;
+    published.channels[1].samplePath = "stem.wav";
+    published.channels.push_back (lynx::ChannelDef()); // generated stem helper channels must survive
+    published.mixer[1].effects[0].enabled = false;
+
+    captured.channels[0].plugin.state = "captured synth";
+    captured.channels[1].plugin.state = "unavailable synth";
+    captured.channels[2].patcher.nodes[0].channel.plugin.state = "captured nested synth";
+    captured.mixer[1].effects[0].plugin.state = "captured effect";
+    lynx::remote_history::mirrorCapturedHostedStates (captured, published);
+    CHECK (published.channels.size() == 4 && published.channels[0].muted);
+    CHECK (published.channels[0].plugin.state == "captured synth");
+    CHECK (published.channels[1].instrument == lynx::InstrumentKind::sampler && published.channels[1].samplePath == "stem.wav");
+    CHECK (published.channels[1].plugin.state == "saved"); // a projected replacement is not the captured hosted device
+    CHECK (published.channels[2].patcher.nodes[0].channel.plugin.state == "captured nested synth");
+    CHECK (! published.mixer[1].effects[0].enabled && published.mixer[1].effects[0].plugin.state == "captured effect");
+
+    published.channels[0].instance.renew();
+    captured.channels[0].plugin.state = "different device";
+    lynx::remote_history::mirrorCapturedHostedStates (captured, published);
+    CHECK (published.channels[0].plugin.state == "captured synth");
 }
 
 TEST (export_song_adds_silent_tail_and_never_restarts)
@@ -4988,15 +5175,15 @@ TEST (note_edit_grid_and_time_text)
     CHECK (ne::screenStep (8.0 / bar, bar) == 2 * bar);
     CHECK (ne::screenStep (200.0 / step, bar) == step / 4);
 
-    CHECK (ne::formatTime (0, 4) == "1:1:0" && ne::formatTime (bar + 5 * step + 7, 4) == "2:6:7");
-    CHECK (ne::formatTime (step * 2, 4, true) == "0:2:0");
+    CHECK (ne::formatTime (0, lynx::Meter (4, 4)) == "1:1:0" && ne::formatTime (bar + 5 * step + 7, lynx::Meter (4, 4)) == "2:6:7");
+    CHECK (ne::formatTime (step * 2, lynx::Meter (4, 4), true) == "0:2:0");
     std::int64_t t = 0;
-    CHECK (ne::parseTime ("2:6:7", 4, t) && t == bar + 5 * step + 7);
-    CHECK (ne::parseTime ("3", 4, t) && t == 2 * bar);
-    CHECK (ne::parseTime ("0:2:0", 4, t, true) && t == 2 * step);
-    CHECK (! ne::parseTime ("0:1:0", 4, t) && ! ne::parseTime ("1:17:0", 4, t) && ! ne::parseTime ("1:1:240", 4, t)
-           && ! ne::parseTime ("a", 4, t) && ! ne::parseTime ("", 4, t));
-    CHECK (ne::parseTime ("1:12:0", 3, t) && ! ne::parseTime ("1:13:0", 3, t)); // 3/4: 12 steps per bar
+    CHECK (ne::parseTime ("2:6:7", lynx::Meter (4, 4), t) && t == bar + 5 * step + 7);
+    CHECK (ne::parseTime ("3", lynx::Meter (4, 4), t) && t == 2 * bar);
+    CHECK (ne::parseTime ("0:2:0", lynx::Meter (4, 4), t, true) && t == 2 * step);
+    CHECK (! ne::parseTime ("0:1:0", lynx::Meter (4, 4), t) && ! ne::parseTime ("1:17:0", lynx::Meter (4, 4), t) && ! ne::parseTime ("1:1:240", lynx::Meter (4, 4), t)
+           && ! ne::parseTime ("a", lynx::Meter (4, 4), t) && ! ne::parseTime ("", lynx::Meter (4, 4), t));
+    CHECK (ne::parseTime ("1:12:0", lynx::Meter (3, 4), t) && ! ne::parseTime ("1:13:0", lynx::Meter (3, 4), t)); // 3/4: 12 steps per bar
 }
 
 TEST (playlist_clip_edges_and_time_selection)
@@ -5053,7 +5240,7 @@ TEST (playlist_clip_edges_and_time_selection)
 TEST (recorder_builds_notes_in_pattern_and_song_mode)
 {
     auto song = lynx::Song::makeDefault();
-    const auto loop = song.patterns[0].effectiveLength (4); // 1 bar = 3840
+    const auto loop = song.patterns[0].effectiveLength (lynx::Meter (4, 4)); // 1 bar = 3840
     lynx::NoteRecorder r;
     r.add (song, { 100.0, 4, 60, 0.5f, true }); // no take: ignored
     CHECK (r.takeFinished().empty());
@@ -5769,7 +5956,7 @@ TEST (swing_delays_offbeat_sixteenths)
     p.notes = { { 0, 100, 0, 60 }, { lynx::ticksPerStep, 100, 0, 62 } };
     lynx::EventBuffer ev;
     const auto tps = lynx::ticksPerSample (120.0, 48000.0);
-    lynx::schedulePatternLoop (p, p.effectiveLength (4), 0.0, 12000, tps, ev, 1.0f);
+    lynx::schedulePatternLoop (p, p.effectiveLength (lynx::Meter (4, 4)), 0.0, 12000, tps, ev, 1.0f);
     int onOffset = -1;
     for (auto& e : ev)
         if (e.type == lynx::NoteEvent::Type::on && e.key == 62)
@@ -5870,7 +6057,7 @@ TEST (note_pan_pitch_and_mute)
     p.notes = { a, b };
     lynx::EventBuffer ev;
     const auto tps = lynx::ticksPerSample (120.0, 48000.0);
-    lynx::schedulePatternLoop (p, p.effectiveLength (4), 0.0, 48000, tps, ev);
+    lynx::schedulePatternLoop (p, p.effectiveLength (lynx::Meter (4, 4)), 0.0, 48000, tps, ev);
     int ons = 0;
     for (auto& e : ev)
         if (e.type == lynx::NoteEvent::Type::on)
@@ -6089,7 +6276,7 @@ TEST (slide_notes_glide_without_retrigger)
     p.notes = { base, glide };
     lynx::EventBuffer ev;
     const auto tps = lynx::ticksPerSample (120.0, 48000.0);
-    lynx::schedulePatternLoop (p, p.effectiveLength (4), 0.0, 30000, tps, ev);
+    lynx::schedulePatternLoop (p, p.effectiveLength (lynx::Meter (4, 4)), 0.0, 30000, tps, ev);
     int ons = 0, offs = 0, slides = 0;
     for (auto& e : ev)
     {
@@ -6361,7 +6548,7 @@ TEST (arpeggiator_plays_held_chord_in_steps)
     for (double tick = 0.0; tick < lynx::ppq * 2.0; tick += 512 * tps)
     {
         ev.clear();
-        lynx::schedulePatternLoop (song.patterns[0], song.patterns[0].effectiveLength (4), tick, 512, tps, ev);
+        lynx::schedulePatternLoop (song.patterns[0], song.patterns[0].effectiveLength (lynx::Meter (4, 4)), tick, 512, tps, ev);
         int in = 0, out = 0;
         for (auto& e : ev)
             if (e.channel == 4)
@@ -16083,22 +16270,22 @@ TEST (prtools_articulate)
     using namespace lynx::prtools;
     Pattern p;
     p.notes = { prNote (0, 100), prNote (480, 100), prNote (960, 100) };
-    articulate (p, allOf (p), articulatePreset (ArticulatePreset::legato), 4);
+    articulate (p, allOf (p), articulatePreset (ArticulatePreset::legato), lynx::Meter (4, 4));
     CHECK (p.notes[0].length == 480 && p.notes[1].length == 480 && p.notes[2].length == 3840 - 960); // to the bar line
 
     p.notes = { prNote (0, 100), prNote (480, 100), prNote (960, 2880) };
-    articulate (p, allOf (p), articulatePreset (ArticulatePreset::staccato), 4);
+    articulate (p, allOf (p), articulatePreset (ArticulatePreset::staccato), lynx::Meter (4, 4));
     CHECK (p.notes[0].length == 96 && p.notes[1].length == 96 && p.notes[2].length == 576); // ends on a bar: own length
 
     auto o = articulatePreset (ArticulatePreset::legato);
     o.gap = 20;
     p.notes = { prNote (0, 100), prNote (480, 100) };
-    articulate (p, allOf (p), o, 4);
+    articulate (p, allOf (p), o, lynx::Meter (4, 4));
     CHECK (p.notes[0].length == 460);
 
     // chop chords: a held note is cut where the next one starts
     p.notes = { prNote (0, 960, 48), prNote (480, 480, 60) };
-    articulate (p, allOf (p), articulatePreset (ArticulatePreset::chopChordsOnly), 4);
+    articulate (p, allOf (p), articulatePreset (ArticulatePreset::chopChordsOnly), lynx::Meter (4, 4));
     CHECK (p.notes.size() == 3 && p.notes[0].length == 480 && p.notes[1].start == 480 && p.notes[2].start == 480);
 
     // variation is seeded (MT19937): same seed, same result; lengths only get shorter
@@ -16107,8 +16294,8 @@ TEST (prtools_articulate)
     o.seed = 7;
     Pattern a, b2;
     a.notes = b2.notes = { prNote (0, 100), prNote (480, 100), prNote (960, 100) };
-    articulate (a, allOf (a), o, 4);
-    articulate (b2, allOf (b2), o, 4);
+    articulate (a, allOf (a), o, lynx::Meter (4, 4));
+    articulate (b2, allOf (b2), o, lynx::Meter (4, 4));
     CHECK (a.notes[0].length == b2.notes[0].length && a.notes[0].length <= 480 && a.notes[0].length >= 240);
 }
 
@@ -16176,7 +16363,7 @@ TEST (prtools_riff_machine)
     RiffOptions o;
     o.channel = 1;
     o.bars = 2;
-    const auto notes = riffMachine (p, { 0 }, o, 4);
+    const auto notes = riffMachine (p, { 0 }, o, lynx::Meter (4, 4));
     CHECK (! notes.empty() && notes.size() == p.notes.size());
     CHECK (std::all_of (p.notes.begin(), p.notes.end(), [] (auto& n) {
         return n.channel == 1 && n.start >= 0 && n.start < 2 * 3840 && n.key >= 36 && n.key <= 84;
@@ -16185,7 +16372,7 @@ TEST (prtools_riff_machine)
     // only the first step: the progression shape, chopped from one note at key 48
     o.stepsUpTo = 0;
     Pattern q;
-    const auto first = riffMachine (q, {}, o, 4);
+    const auto first = riffMachine (q, {}, o, lynx::Meter (4, 4));
     CHECK (first.size() == builtInRiffProgression (0).notes.size() * 2 && q.notes[0].key == 48);
 }
 
@@ -17402,6 +17589,8 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "PocketReverb190dwTests.inc" // round 190dw
 #include "FlmEffects190dwTests.inc" // round 190dw: the .flm effect laws against FLM's renders
 #include "FlmImport190dwInstTests.inc" // round 190dw item 4
+#include "FlmImport190feTests.inc" // round 190fe: cut groups, 3x Osc lanes, effect Mix, rack parts
+#include "FlmImport190fnTests.inc" // round 190fn: FLM resources folders (O1), FL Studio Mobile Rack in an .flp, META, short SEND
 #include "Bridge176aTests.inc"
 #include "Issues178aTests.inc"
 #include "Mixer177aTests.inc"
@@ -17409,15 +17598,19 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Session190bvTests.inc"
 #include "DetailView183aTests.inc"
 #include "Als181cTests.inc"
+#include "Groove190fmTests.inc"
 #include "AlsDevices190bqTests.inc"
 #include "AlsDevices190cfTests.inc"
 #include "AlsDevices190edTests.inc"
 #include "AlsDevices190ekTests.inc"
+#include "AlsDevices190fmTests.inc"
 #include "Merge180cTests.inc"
 #include "Slicer180cTests.inc"
 #include "Slicer190fTests.inc"
 #include "Issue160Tests.inc"
 #include "Issue159Tests.inc"
+#include "Issue165Tests.inc"
+#include "Bugs190gyTests.inc"
 #include "Fpc190mTests.inc"
 #include "Fpc190qTests.inc"
 #include "Fpc190zTests.inc"
@@ -17475,6 +17668,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "MidiTools190sTests.inc"
 #include "MidiTools190aaTests.inc"
 #include "MidiTools190aa2Tests.inc"
+#include "MidiGenerate190fmTests.inc"
 #include "Notes188gTests.inc"
 #include "Layer190bTests.inc"
 #include "PlugLevel190adTests.inc"
@@ -17495,6 +17689,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Slicex190rTests.inc"
 #include "Slicex190acTests.inc"
 #include "Slicex190ajTests.inc"
+#include "Slicex190hgTests.inc"
 #include "ScaleSnap190anTests.inc"
 #include "TruePeak190amTests.inc"
 #include "Loudness190amTests.inc"
@@ -17520,7 +17715,12 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Mpe190bbTests.inc"
 #include "Mpe190bbLiveTests.inc"
 #include "PluginDb190baTests.inc"
+#include "PerfWin190gdTests.inc"
+#include "Ram190gnTests.inc"
+#include "Startup190goTests.inc"
+#include "Startup190hdTests.inc"
 #include "Freeze190ayTests.inc"
+#include "LiveFreeze190ffTests.inc"
 #include "QaFix190bjTests.inc"
 #include "Fl190bfTests.inc"
 #include "ShotScale190biTests.inc"
@@ -17534,6 +17734,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "SimpleGate190dgTests.inc"
 #include "SimpleNext190dsTests.inc"
 #include "FirstSongTour190dvTests.inc"
+#include "SimplePads190foTests.inc"
 #include "Rollup027Tests.inc"
 #include "Edison190cdTests.inc"
 #include "Fled190eeTests.inc"
@@ -17547,22 +17748,57 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "DanceFix190cjTests.inc"
 #include "Reverb190bzTests.inc"
 #include "Dyn190dmTests.inc"
+#include "ParityDyn190fxTests.inc"
 #include "Echo190dlTests.inc"
 #include "Vqe190dpTests.inc"
+#include "Ember190fjTests.inc"
 #include "ApexFix190coTests.inc"
 #include "Link190csTests.inc"
 #include "TrackLinkTests.inc"
+#include "TrackAuto190gzTests.inc"
 #include "Warp190dbTests.inc"
+#include "WarpModes190fmTests.inc" // round 190fm
+#include "WarpLive190gxTests.inc" // round 190gx
+#include "ClipEnv190giTests.inc" // round 190gi
+#include "LiveFacts190gxTests.inc" // round 190gx
+#include "BeatsLaw190gxTests.inc" // round 190gx
 #include "FlCtl190dfTests.inc"
 #include "FlFix190eyTests.inc"
 #include "FlPl190dxTests.inc"
 #include "FlClip190dzTests.inc"
 #include "Iss152Tests.inc"
 #include "Win190evTests.inc"
+#include "U190heTests.inc"
 #include "Mod190doTests.inc"
+#include "Parity190fyTests.inc"
 #include "Sampler190dhTests.inc"
 #include "Fix190eaTests.inc"
 #include "Iss158Tests.inc"
 #include "Voices190ejTests.inc"
 #include "Flfix190ezTests.inc"
+#include "Reafl190flTests.inc"
+#include "FlTails190gkTests.inc"
 #include "Rcfix190fcTests.inc"
+#include "Follow190fgTests.inc"
+#include "Relfix190fpTests.inc"
+#include "Anvil190fkTests.inc"
+#include "AnvilBus190gxTests.inc"
+#include "Donate190fqTests.inc"
+#include "GenPreset190fsTests.inc"
+#include "Issues190ftTests.inc"
+#include "FlFacts190gwTests.inc"
+#include "Flvsti190fwTests.inc"
+#include "Stability190ggTests.inc"
+#include "StemPass190gjTests.inc"
+#include "Small190ghTests.inc"
+#include "Link190glTests.inc"
+#include "SynthLanes190gpTests.inc"
+#include "SchedIndex190gpTests.inc"
+#include "SmartTails190gpTests.inc"
+#include "ApexMeter190gpTests.inc"
+#include "Toolchain190gtTests.inc"
+#include "RenderAhead190gqTests.inc"
+#include "EvPane190fzTests.inc"
+#include "U190heLinkTests.inc" // round 190he (issue #152 item 2: linkable LYNX instruments, knobs that follow links)
+#include "PluginDrop190hfTests.inc" // issue #152 point 6: plugins dropped on the tracks (FL and Live layouts)
+#include "Rollup028Tests.inc" // round 190fv: semantic interactions of the 0.1.28 rollup

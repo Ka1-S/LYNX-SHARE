@@ -37,13 +37,29 @@ struct Transport
     // External clock sync (round 165f): > 0 = the tempo LYNX follows from an incoming MIDI clock, over the song's
     // (written by the audio thread only)
     std::atomic<double> externalBpm { 0.0 };
+    // Ableton Link (round 190gl, engine/AbletonLink.h): > 0 = the tempo LYNX plays at in a Link session (the session's,
+    // nudged onto its phase), over the song's; an external clock still wins (written by the audio thread only)
+    std::atomic<double> linkBpm { 0.0 };
+    // Play was pressed in a Link session with other peers: playback waits for the session's phase (core/LinkSync.h); the
+    // audio thread starts it, a Stop cancels it
+    std::atomic<bool> linkWaiting { false };
+    // the tempo the song plays at without an override (its automation and tempo events) and whether it has any:
+    // written by the rack's processor each block, read by the Link session (which proposes it to the peers)
+    std::atomic<double> songTempoNow { 0.0 };
+    std::atomic<bool> songTempoMap { false };
+    // the project's tempo (Song::bpm) and the Link quantum in beats (the clip grid's global launch quantisation,
+    // core/LinkSync.h), published with the song
+    std::atomic<double> projectBpm { 130.0 };
+    std::atomic<double> linkQuantum { 4.0 };
     std::atomic<int> beatsPerBar { 4 };
+    std::atomic<int> beatUnit { 4 }; // (round 190fg: the meter's denominator: the metronome clicks its beats)
 
     // Playlist time-signature changes for the metronome (song mode): the bar restarts at each
-    // `signatureTick[i]` with `signatureLength[i]` ticks. The UI writes under a "seqlock": odd version
-    // while writing; readers check the version before and after.
+    // `signatureTick[i]` with `signatureLength[i]` ticks, clicked in beats of `signatureBeat[i]` ticks (round 190fg:
+    // a 6/8 bar clicks six eighths). The UI writes under a "seqlock": odd version while writing; readers check the
+    // version before and after.
     static constexpr int maxSignatures = 64;
-    std::array<std::atomic<std::int64_t>, maxSignatures> signatureTick {}, signatureLength {};
+    std::array<std::atomic<std::int64_t>, maxSignatures> signatureTick {}, signatureLength {}, signatureBeat {};
     std::atomic<int> signatureCount { 0 };
     std::atomic<std::uint32_t> signatureVersion { 0 };
     std::atomic<double> sampleRate { 44100.0 };
@@ -111,10 +127,27 @@ struct Transport
     // makes it when the position reaches `pendingJumpAt` (FL's "Quantize song jumps"; < 0 = none).
     std::atomic<double> pendingJumpAt { -1.0 }, pendingJumpTo { -1.0 };
 
-    double ticksPerSample() const noexcept
+    // The tempo that replaces the song's now: an external MIDI clock's, else the Link session's (0 = none).
+    double overrideBpm() const noexcept
     {
         const auto external = externalBpm.load (std::memory_order_relaxed);
-        return (external > 0.0 ? external : bpm.load (std::memory_order_relaxed)) * ppq / (60.0 * sampleRate.load (std::memory_order_relaxed));
+        return external > 0.0 ? external : linkBpm.load (std::memory_order_relaxed);
+    }
+
+    // Render-ahead (round 190gq, core/RenderAhead.h): while part of the rack renders ahead, the tempo the position moves
+    // with is the one both parts render with (> 0); a tempo edit takes over when it reaches both. Audio thread only.
+    std::atomic<double> pinnedBpm { 0.0 };
+    // The device callback's block (samples) and where its current sub-block starts, while the callback runs the rack
+    // (inDeviceCallback); an offline render through the graph leaves them unset. Audio thread only.
+    std::atomic<int> callbackSamples { 0 }, callbackOffset { 0 };
+    std::atomic<bool> inDeviceCallback { false };
+
+    double ticksPerSample() const noexcept
+    {
+        // (rollup 0.1.28: an external clock or Link first, then 190gq's pinned tempo, then the song's)
+        const auto over = overrideBpm();
+        const auto pinned = pinnedBpm.load (std::memory_order_relaxed);
+        return (over > 0.0 ? over : pinned > 0.0 ? pinned : bpm.load (std::memory_order_relaxed)) * ppq / (60.0 * sampleRate.load (std::memory_order_relaxed));
     }
 
     double positionInBeats() const noexcept

@@ -425,8 +425,8 @@ TEST (als190cf_filter_saturation_eq_chorus_pan_redux)
         const auto* cutoff = als190cf::linkOf (*filter, "Cutoff");
         CHECK (cutoff != nullptr && cutoff->param == 1 && formatEffectParam (EffectKind::filter, 1, cutoff->value (69.0), 120.0) == "440 Hz");
     }
-    // a notch / morph filter has no LYNX Filter type: not translated (dropped and listed as before)
-    CHECK (! als190cf::translate ("<AutoFilter Id=\"1\">" + als190cf::on() + par ("FilterType", 3) + par ("Cutoff", 81.0) + par ("Resonance", 0.0) + "</AutoFilter>").has_value());
+    // a notch has no LYNX Filter type: since round 190fm it becomes a Facet EQ notch band (AlsDevices190fmTests.inc)
+    CHECK (als190cf::translate ("<AutoFilter Id=\"1\">" + als190cf::on() + par ("FilterType", 3) + par ("Cutoff", 81.0) + par ("Resonance", 0.0) + "</AutoFilter>")->slot.kind == EffectKind::facetEq);
     const auto filter2 = als190cf::translate ("<AutoFilter2 Id=\"1\">" + als190cf::on() + par ("Filter_Type", 0) + par ("Filter_Frequency", 8000.0) + par ("Filter_Resonance", 0.0) +
                                               par ("Lfo_Amount", 0.0) + par ("Envelope_Amount", 0.0) + par ("DryWet", 0.5) + "</AutoFilter2>");
     CHECK (filter2 && shown (filter2->slot, 0) == "Low-pass" && shown (filter2->slot, 1) == "8000 Hz" && filter2->slot.params[3] == 0.5f && filter2->notes.dropped.empty() &&

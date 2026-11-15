@@ -1,5 +1,5 @@
 ---
-source: a3748d4a2a
+source: e5206a071d
 ---
 Ogni titolo qui sotto è un problema. Se il tuo non c'è, segnalalo come descritto alla fine.
 
@@ -71,11 +71,32 @@ Il thread audio dovrebbe girare con priorità real-time.
 
 I dettagli sono in [LINUX.md](https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/LINUX.md).
 
+### Il suono crepita o si interrompe
+
+LYNX SHARE conta ogni dropout (buffer underrun) e dice perché è successo. Punta il misuratore `CPU` nella barra degli strumenti, oppure apri `Strumenti › Monitor delle prestazioni dei plugin...`. Un numero rosso accanto alla percentuale della CPU è il conteggio.
+
+Il suggerimento indica la causa dell'ultimo dropout:
+
+| Causa | Cosa significa | Cosa provare |
+|---|---|---|
+| L'elaborazione ha richiesto più del buffer | Un blocco di audio ha richiesto più tempo per essere calcolato della sua durata. Il suggerimento indica il canale o l'effetto più lento in quel blocco | Aumenta la dimensione del buffer in `Opzioni › Impostazioni audio...`, blocca quel canale, o abbassa la qualità del plugin |
+| L'elaborazione si è avvicinata al limite del buffer | Il carico era vicino al 100 % intorno al dropout | Aumenta la dimensione del buffer, o blocca i canali più pesanti |
+| Latenza del driver o del sistema | Il driver o il sistema era in ritardo mentre il carico restava basso. Nessun plugin l'ha causata | Aumenta la dimensione del buffer, prova un altro driver (su Windows il driver ASIO dell'interfaccia), e su Linux controlla la priorità real-time (sopra) |
+
+Ogni dropout viene scritto anche in `audio-glitches.log` nella cartella delle impostazioni, con il dispositivo, il buffer e i canali più pesanti.
+
 ## Plugin
 
 ### Un plugin va in crash
 
-Eseguilo nel suo processo, così si ferma solo il plugin.
+La maggior parte dei crash dei plugin disattiva solo quel plugin: un effetto viene bypassato, uno strumento resta muto, e LYNX SHARE e il progetto continuano a funzionare. Il messaggio `Il plugin è andato in crash` propone allora:
+
+- `Ricarica`, che riavvia il plugin con le impostazioni dell'ultimo salvataggio o backup.
+- `Esegui sempre <plugin> in un processo separato`, che lo riavvia in un processo a sé, ora e in ogni progetto. Un crash lì non può abbattere LYNX SHARE. Un plugin in un processo separato apre la sua finestra per conto suo (non può essere agganciato).
+
+La finestra del plugin mostra gli stessi due pulsanti al posto del suo editor. `Opzioni › Gestione plugin...` elenca i plugin che vengono sempre eseguiti in un processo separato nella colonna `Processo separato`; fai clic sulla casella per attivarne o disattivarne uno.
+
+Per eseguire ogni plugin nel suo processo:
 
 1. Apri `Opzioni › Impostazioni generali...`.
 2. Attiva `Esegui i plugin in un processo separato (protegge LYNX SHARE dai crash)`.

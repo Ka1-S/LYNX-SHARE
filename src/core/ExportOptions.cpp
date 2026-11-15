@@ -11,8 +11,14 @@
 #include <set>
 #include <sstream>
 
+#include "core/MixerOps.h"
+#include "core/Patcher.h"
+#include "core/Fpc.h"
 #include "core/PatternBlocks.h"
+#include "core/Pdc.h"
 #include "core/Preferences.h"
+#include "core/SessionIds.h"
+#include "core/StandIns.h"
 
 namespace lynx::exportopts
 {
@@ -140,9 +146,9 @@ Options clamped (Options o)
     return o;
 }
 
-double lengthInBars (double seconds, double bpm, int beatsPerBar) noexcept
+double lengthInBars (double seconds, double bpm, Meter meter) noexcept
 {
-    return seconds <= 0.0 || bpm <= 0.0 ? 0.0 : seconds * bpm / 60.0 / (double) std::max (1, beatsPerBar);
+    return seconds <= 0.0 || bpm <= 0.0 ? 0.0 : seconds * bpm / 60.0 / ((double) meter.bar() / ppq);
 }
 
 std::int64_t estimatedBytes (const Options& o, double seconds) noexcept
@@ -225,7 +231,7 @@ std::vector<Note> midiExportNotes (const Song& original)
         {
             // the pattern repeats along a clip longer than it (LYNX extra stretchedClipsLoop, issue #25)
             const auto& pattern = song.patterns[(std::size_t) c.pattern];
-            const auto period = std::max<std::int64_t> (1, pattern.effectiveLength (song.beatsPerBar));
+            const auto period = std::max<std::int64_t> (1, pattern.effectiveLength (song.meter()));
             const auto repeats = stretchedClipsLoop() && c.offset + c.length > period;
             // FL's pattern clip takeover (issue #158): what plays is what is written
             const auto stopsAt = patternClipStopsAt (song, clipIndex);
@@ -410,7 +416,7 @@ Song makeRenderSong (const Song& original, const Options& o, std::int64_t tailTi
         Clip tail;
         tail.pattern = (int) base.patterns.size() - 1;
         tail.start = musicTicks;
-        tail.length = tailTicks + (std::int64_t) ppq * std::max (1, base.beatsPerBar);
+        tail.length = tailTicks + base.barTicks();
         base.playlist.push_back (tail);
     }
 
@@ -439,11 +445,33 @@ Song makeRenderSong (const Song& original, const Options& o, std::int64_t tailTi
 
 std::vector<int> stemTracks (const Song& song)
 {
-    std::vector<int> out;
-    for (int t = 1; t < (int) song.mixer.size(); ++t)
+    const auto n = (int) song.mixer.size();
+    // round 190gh (B7): the inserts extra outputs feed (a multi-output instrument's, a Patcher's, an effect's sends)
+    std::set<int> fed;
+    for (const auto& c : song.channels)
     {
-        auto used = std::any_of (song.channels.begin(), song.channels.end(), [t] (const ChannelDef& c) { return c.mixerTrack == t; });
-        for (int src = 1; src < (int) song.mixer.size() && ! used; ++src)
+        if (c.instrument == InstrumentKind::plugin)
+            for (const auto& route : c.plugin.outputs)
+                if (route.offset != 0 && (route.active != 0 || c.plugin.processInactive))
+                    fed.insert (c.mixerTrack + route.offset);
+        if (c.instrument == InstrumentKind::fpc)
+            if (const auto kit = fpc::read (c.pluginState))
+                for (const auto& pad : kit->pads)
+                    if (pad.output != 0)
+                        fed.insert (c.mixerTrack + pad.output);
+        if (c.instrument == InstrumentKind::patcher)
+            for (std::size_t k = 0; k < c.patcher.outputTracks.size(); ++k)
+                fed.insert (c.patcher.outputTracks[k] >= 0 ? c.patcher.outputTracks[k] : c.mixerTrack + (int) k + 1);
+    }
+    for (int src = 1; src < n; ++src)
+        for (const auto& tap : fruitySendsOf (song, src))
+            fed.insert (tap.target);
+
+    std::vector<int> out;
+    for (int t = 1; t < n; ++t)
+    {
+        auto used = fed.count (t) > 0 || std::any_of (song.channels.begin(), song.channels.end(), [t] (const ChannelDef& c) { return c.mixerTrack == t; });
+        for (int src = 1; src < n && ! used; ++src)
             used = src != t && song.routes (src, t);
         if (used)
             out.push_back (t);
@@ -529,6 +557,261 @@ std::string stemFileName (const std::string& base, int number, const std::string
     while (! clean.empty() && (clean.back() == ' ' || clean.back() == '.'))
         clean.pop_back();
     return base + " - " + std::to_string (number) + (clean.empty() ? "" : " " + clean) + ext;
+}
+
+// --- "Split mixer tracks" in one render (round 190gj) ----------------------------------------------------------------
+namespace
+{
+// a slot that acts outside its insert (moves other controls, plays through hardware): when its insert is heard in one
+// render and silenced in the other, what it does differs (RackRenderer's canMeterSilenced list)
+bool actsOutside (const EffectSlot& slot) noexcept
+{
+    switch (slot.kind)
+    {
+        case EffectKind::hardwareInsert:
+        case EffectKind::formulaController:
+        case EffectKind::xyController:
+        case EffectKind::xyzController:
+        case EffectKind::controlSurface:
+        case EffectKind::peakController:
+            return true;
+        case EffectKind::patcher:
+            return patcher::usesHardwareIo (slot.patcher);
+        default:
+            return false;
+    }
+}
+
+// whoever's audio reaches insert `t`: routes and sends, slot sends (Fruity Send, Transmitter, a hosted effect's routed
+// outputs), and the side inputs of its effects (side-chains, Connections)
+std::vector<int> sourcesOf (const Song& song, int t)
+{
+    const auto n = (int) song.mixer.size();
+    std::vector<int> out;
+    for (int src = 1; src < n; ++src)
+    {
+        if (src == t)
+            continue;
+        auto feeds = song.routes (src, t);
+        for (const auto& fx : song.mixer[(std::size_t) src].effects)
+            for (int o = 0; o < maxSlotSends && ! feeds; ++o)
+                feeds = slotSendTarget (fx, o) == t;
+        if (! feeds)
+            for (const auto& tap : fruitySendsOf (song, src))
+                feeds = feeds || tap.target == t;
+        if (feeds)
+            out.push_back (src);
+    }
+    for (const auto& fx : song.mixer[(std::size_t) t].effects)
+    {
+        const auto c = slotConnections (song, t, fx);
+        for (const auto source : { fx.sidechain, fx.sidechain2, c.routed ? c.mainSource : -1, c.routed ? c.sideSource : -1 })
+            if (source > 0 && source < n && source != t)
+                out.push_back (source);
+    }
+    return out;
+}
+
+// every insert whose audio can reach `t` (t itself not included unless a loop brings it back)
+std::vector<char> closureOf (const Song& song, int t)
+{
+    std::vector<char> seen (song.mixer.size(), 0);
+    std::vector<int> stack { t };
+    while (! stack.empty())
+    {
+        const auto u = stack.back();
+        stack.pop_back();
+        for (const auto src : sourcesOf (song, u))
+            if (! seen[(std::size_t) src])
+            {
+                seen[(std::size_t) src] = 1;
+                stack.push_back (src);
+            }
+    }
+    return seen;
+}
+
+// audible in a render of `song`: its solo state and its VCAs (RackState::mixerAudible)
+std::vector<char> audibleIn (const Song& song)
+{
+    const auto solo = song.soloAudible();
+    std::vector<char> out (song.mixer.size(), 1);
+    for (std::size_t t = 0; t < out.size() && t < solo.size(); ++t)
+        out[t] = solo[t] && (t == 0 || ! mixerops::vcaMuted (song, (int) t)) ? 1 : 0;
+    return out;
+}
+
+bool onMaster (const AutomationTarget& t) noexcept
+{
+    return refs::targetsInsert (t) && t.index == 0;
+}
+
+bool isRouteToMaster (const AutomationTarget& t, int from) noexcept
+{
+    return t.kind == AutomationTargetKind::mixerSend && t.index == from && t.slot == 0;
+}
+} // namespace
+
+StemTap planStemTap (const Song& shared, int track, const std::vector<int>& channelLatency,
+                     const std::vector<std::vector<int>>& slotLatency, double sampleRate)
+{
+    StemTap out;
+    auto fail = [&out] (const char* why) {
+        out.ok = false;
+        out.why = why;
+        out.inputs.clear();
+        return out;
+    };
+    const auto n = (int) shared.mixer.size();
+    if (track <= 0 || track >= n)
+        return fail ("not an insert");
+    if (std::any_of (shared.mixer.begin(), shared.mixer.end(), [] (const MixerTrack& m) { return m.solo; }))
+        return fail ("a solo in the shared render");
+    // the engine plays stand-ins / frozen audio as a projection of the song, made per render
+    if (standins::hasAny (shared))
+        return fail ("stand-ins or frozen channels");
+    if (shared.mixer[(std::size_t) track].muted)
+        return fail ("the insert is muted (its own render plays it)");
+
+    // the stem render takes the Master's automation, events and effects out: its blocks would be cut differently, and
+    // what the Master's effects control is not in it
+    // (the Master's automation clips only move the Master, which the stem render leaves out; they matter when they are
+    // the song's only automation: without them that render takes its blocks in pieces of another size)
+    const auto otherAutomation = std::any_of (shared.automations.begin(), shared.automations.end(), [&] (const Automation& a) {
+        const auto& t = a.target;
+        return (t.kind == AutomationTargetKind::channelVolume || t.kind == AutomationTargetKind::channelPan)
+                   ? t.index >= 0 && t.index < (int) shared.channels.size()
+                   : (t.kind == AutomationTargetKind::mixerVolume || t.kind == AutomationTargetKind::mixerPan) && t.index > 0 && t.index < n;
+    });
+    for (const auto& a : shared.automations)
+        if (onMaster (a.target) && ! otherAutomation)
+            return fail ("the Master is automated (the song's only automation)");
+    for (const auto& p : shared.patterns)
+        for (const auto& lane : p.events)
+            if (onMaster (lane.target))
+                return fail ("the Master has pattern events");
+    for (const auto& m : shared.modulators)
+        for (const auto& r : m.routes)
+            if (onMaster (r.target))
+                return fail ("the Master is modulated");
+    for (const auto& fx : shared.mixer[0].effects)
+        if (actsOutside (fx))
+            return fail ("a controller on the Master");
+    for (int u = 0; u < n; ++u)
+        for (const auto& tap : fruitySendsOf (shared, u))
+            if (tap.target == 0)
+                return fail ("a slot sends to the Master");
+    if (! fruitySendsOf (shared, 0).empty())
+        return fail ("the Master sends");
+
+    const auto stem = makeBounceSong (shared, track);
+    const auto heardShared = audibleIn (shared);
+    const auto heardStem = audibleIn (stem);
+
+    // controllers on inserts heard in one render and not in the other move their targets differently
+    for (int u = 1; u < n; ++u)
+        if (heardShared[(std::size_t) u] != heardStem[(std::size_t) u])
+            for (const auto& fx : shared.mixer[(std::size_t) u].effects)
+                if (actsOutside (fx))
+                    return fail ("a controller on an insert the stem render silences");
+
+    // the routes that carry sound into the stem render's Master: each must put out the same as in the shared render —
+    // everything that reaches it heard (or silenced) alike, and not the insert's sends (the stem render has none)
+    std::vector<char> feedsMaster ((std::size_t) n, 0);
+    for (int u = 1; u < n; ++u)
+    {
+        const auto& m = stem.mixer[(std::size_t) u];
+        if (! m.toMaster || m.muted || ! heardStem[(std::size_t) u])
+            continue;
+        feedsMaster[(std::size_t) u] = 1;
+        const auto reach = closureOf (shared, u);
+        if (reach[(std::size_t) u])
+            return fail ("a loop in the routing");
+        if (u != track && reach[(std::size_t) track])
+            return fail ("an insert fed by this one also goes to the Master");
+        for (int m2 = 1; m2 < n; ++m2)
+            if (reach[(std::size_t) m2] && heardShared[(std::size_t) m2] != heardStem[(std::size_t) m2])
+            {
+                // (typically a side-chain: the stem render solos the insert with what routes into it, not its keys)
+                fail ("");
+                out.why = "insert " + std::to_string (m2) + " (" + shared.mixer[(std::size_t) m2].name + ") reaches insert " + std::to_string (u)
+                          + " (a side-chain or a connection), and the stem's own render silences it";
+                return out;
+            }
+        if (! heardShared[(std::size_t) u])
+            return fail ("an input silenced in the shared render");
+        for (const auto& a : shared.automations)
+            if (isRouteToMaster (a.target, u))
+                return fail ("an automated route to the Master");
+        for (const auto& p : shared.patterns)
+            for (const auto& lane : p.events)
+                if (isRouteToMaster (lane.target, u))
+                    return fail ("an automated route to the Master");
+        for (const auto& m3 : shared.modulators)
+            for (const auto& r : m3.routes)
+                if (isRouteToMaster (r.target, u))
+                    return fail ("a modulated route to the Master");
+    }
+
+    const auto planShared = computePdc (shared, channelLatency, slotLatency, sampleRate);
+    const auto planStem = computePdc (stem, channelLatency, slotLatency, sampleRate);
+    // the Master's own channels: delayed to the Master's alignment, which the stem render may have elsewhere
+    for (std::size_t c = 0; c < shared.channels.size(); ++c)
+        if (std::clamp (shared.channels[c].mixerTrack, 0, std::max (0, n - 1)) == 0 && c < planShared.channelDelay.size()
+            && c < planStem.channelDelay.size() && planShared.channelDelay[c] != planStem.channelDelay[c])
+            return fail ("the Master's own channels are compensated differently");
+    // VFX Script sees the song end at the render's trimmed music end: the same block in both renders, or not at all
+    if (planStem.total != planShared.total
+        && std::any_of (shared.channels.begin(), shared.channels.end(), [] (const ChannelDef& c) {
+               return c.instrument == InstrumentKind::vfx || c.instrument == InstrumentKind::patcher;
+           }))
+        return fail ("a VFX channel and another latency");
+
+    for (const auto u : stem.mixerOrder())
+        if (u > 0 && u < n && feedsMaster[(std::size_t) u])
+        {
+            const auto& delays = planStem.sendDelay[(std::size_t) u];
+            out.inputs.push_back ({ u, stem.mixer[(std::size_t) u].masterLevel, delays.empty() ? 0 : delays[0] });
+        }
+    out.latency = planStem.total;
+    out.ok = true;
+    return out;
+}
+
+StemMixer::StemMixer (const StemTap& p) : plan (p)
+{
+    for (const auto& in : plan.inputs)
+        lines.push_back (in.delay > 0 ? std::make_unique<DelayLine> (in.delay) : nullptr);
+}
+
+StemMixer::StemMixer (StemMixer&&) noexcept = default;
+StemMixer::~StemMixer() = default;
+
+void StemMixer::mix (const float* masterL, const float* masterR, const float* const* tapLeft, const float* const* tapRight, float* outL,
+                     float* outR, int n) noexcept
+{
+    // the stem render's Master input: its channels first (cleared, then summed), then its routes (pullInputs)
+    for (int i = 0; i < n; ++i)
+    {
+        outL[i] = masterL != nullptr ? masterL[i] : 0.0f;
+        outR[i] = masterR != nullptr ? masterR[i] : 0.0f;
+    }
+    for (std::size_t k = 0; k < plan.inputs.size(); ++k)
+    {
+        const auto level = plan.inputs[k].level;
+        const auto* sl = tapLeft[k];
+        const auto* sr = tapRight[k];
+        if (lines[k] != nullptr)
+        {
+            lines[k]->mixInto (sl, sr, level, outL, outR, n);
+            continue;
+        }
+        for (int i = 0; i < n; ++i)
+        {
+            outL[i] += sl[i] * level;
+            outR[i] += sr[i] * level;
+        }
+    }
 }
 
 // --- one file per marker section (round 190ap) ----------------------------------------------------------------------
@@ -866,7 +1149,7 @@ WavExtras wavExtras (const Song& song, const Options& o, double sampleRate)
     x.acid = o.saveTempo;
     x.tempo = (float) song.bpm;
     x.numerator = std::max (1, song.beatsPerBar);
-    x.denominator = std::max (1, 16 / stepsPerBeat); // FL: 16 / steps per beat
+    x.denominator = meterUnit (song.beatUnit); // FL: 16 / steps per beat (round 190fg: the song meter's denominator)
     if (o.playlistMarkers)
     {
         // the range: the selection starts at the loop region (as makeRenderSong cuts it), one pass

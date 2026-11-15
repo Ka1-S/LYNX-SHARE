@@ -1,4 +1,7 @@
 #include "ui/SlicexEditor.h"
+
+#include <optional>
+#include <utility>
 #include "ui/FileChoosers.h"
 
 #include <algorithm>
@@ -162,7 +165,7 @@ public:
 class IconButton final : public juce::Button
 {
 public:
-    enum Icon { loop, play, stop, file, flag, dual, arrow, keys, zoom, select };
+    enum Icon { loop, play, stop, file, flag, dual, arrow, keys, zoom, select, freeze, slide, magnet };
     explicit IconButton (Icon i) : juce::Button ({}), icon (i) {}
 
     void paintButton (juce::Graphics& g, bool over, bool down) override
@@ -217,6 +220,26 @@ public:
             case zoom:
                 g.drawEllipse (c.x - u * 1.1f, c.y - u * 1.1f, u * 1.6f, u * 1.6f, 1.5f);
                 g.drawLine (c.x + u * 0.3f, c.y + u * 0.3f, c.x + u * 1.1f, c.y + u * 1.1f, 1.8f);
+                break;
+            case freeze: // a six-armed star (FL's snowflake glyph, drawn by LYNX)
+                for (int k = 0; k < 3; ++k)
+                {
+                    const auto a = juce::MathConstants<float>::pi * (float) k / 3.0f;
+                    g.drawLine (c.x - std::cos (a) * u * 1.3f, c.y - std::sin (a) * u * 1.3f, c.x + std::cos (a) * u * 1.3f, c.y + std::sin (a) * u * 1.3f, 1.4f);
+                }
+                break;
+            case slide: // a double arrow, left and right
+                g.drawLine (c.x - u * 1.3f, c.y, c.x + u * 1.3f, c.y, 1.5f);
+                p.addTriangle (c.x - u * 1.5f, c.y, c.x - u * 0.7f, c.y - u * 0.7f, c.x - u * 0.7f, c.y + u * 0.7f);
+                p.addTriangle (c.x + u * 1.5f, c.y, c.x + u * 0.7f, c.y - u * 0.7f, c.x + u * 0.7f, c.y + u * 0.7f);
+                g.fillPath (p);
+                break;
+            case magnet: // a horseshoe magnet with its poles down
+                p.addCentredArc (c.x, c.y - u * 0.1f, u * 1.1f, u * 1.1f, 0.0f, -juce::MathConstants<float>::halfPi, juce::MathConstants<float>::halfPi, true);
+                p.lineTo (c.x + u * 1.1f, c.y + u * 1.2f);
+                p.startNewSubPath (c.x - u * 1.1f, c.y - u * 0.1f);
+                p.lineTo (c.x - u * 1.1f, c.y + u * 1.2f);
+                g.strokePath (p, juce::PathStrokeType (1.8f));
                 break;
             case select: // a selection frame: the four corners
                 for (int sx = -1; sx <= 1; sx += 2)
@@ -331,6 +354,10 @@ public:
     std::function<const slicex::Articulator*()> articulator;
     std::function<int()> part; // 0 envelope, 1 LFO, 2…5 maps
     std::function<void (const std::function<void (slicex::Curve&)>&, bool)> change; // (…, undoable)
+    // FL's TMEnvEditor buttons under the graph (round 190hg, REA_rodada190hg §3): "Freeze editing / hide points" (off
+    // by default) and "Slide succeeding points" (on by default: a dragged point takes the later points with it; off:
+    // it stays between its neighbours and they keep their times)
+    bool frozen = false, slide = true;
 
     void paint (juce::Graphics& g) override
     {
@@ -381,7 +408,9 @@ public:
         g.fillPath (fill);
         g.setColour (colour);
         g.strokePath (line, juce::PathStrokeType (1.5f));
-        // the points; decay, loop start and sustain marked with their letter
+        // the points; decay, loop start and sustain marked with their letter (frozen: FL hides the points)
+        if (frozen)
+            return;
         double t = 0.0;
         g.setFont (theme::font (theme::type::caption));
         for (int i = 0; i < (int) c->points.size(); ++i)
@@ -406,7 +435,7 @@ public:
 
     void mouseMove (const juce::MouseEvent& e) override
     {
-        const auto h = pointAt (e.position);
+        const auto h = frozen ? -1 : pointAt (e.position);
         if (h != hot)
         {
             hot = h;
@@ -423,7 +452,7 @@ public:
     void mouseDown (const juce::MouseEvent& e) override
     {
         const auto* c = curve ? curve() : nullptr;
-        if (c == nullptr || ! change)
+        if (c == nullptr || ! change || frozen)
             return;
         dragging = pointAt (e.position);
         moved = false;
@@ -446,17 +475,25 @@ public:
         const auto length = span (*c);
         const auto i = dragging;
         const auto y = std::clamp ((double) (r.getBottom() - e.position.y) / (double) r.getHeight(), 0.0, 1.0);
-        // the time since the previous point; the points after it keep their own distances (FL's default, "slide")
+        // the time since the previous point. Slide on (FL's default): the points after it keep their own distances, so
+        // they move with it; slide off: it stays between its neighbours, the next one keeps its time (FL's point drag
+        // clamps to the next point only then)
         double before = 0.0;
         for (int k = 1; k < i; ++k)
             before += c->points[(std::size_t) k].dt;
         const auto t = (double) (e.position.x - r.getX()) / (double) r.getWidth() * (length > 0.0 ? length : 1.0);
-        const auto dt = i == 0 ? 0.0 : std::max (0.0, t - before);
-        change ([i, y, dt] (slicex::Curve& k) {
+        auto dt = i == 0 ? 0.0 : std::max (0.0, t - before);
+        const auto hasNext = i > 0 && i + 1 < (int) c->points.size();
+        const auto gap = hasNext ? c->points[(std::size_t) i].dt + c->points[(std::size_t) i + 1].dt : 0.0;
+        if (! slide && hasNext)
+            dt = std::min (dt, gap);
+        change ([i, y, dt, gap, keepNext = ! slide && hasNext] (slicex::Curve& k) {
             if (i < (int) k.points.size())
             {
                 k.points[(std::size_t) i].y = y;
                 k.points[(std::size_t) i].dt = dt;
+                if (keepNext && i + 1 < (int) k.points.size())
+                    k.points[(std::size_t) i + 1].dt = gap - dt;
             }
         }, ! moved);
         moved = true;
@@ -525,6 +562,9 @@ private:
         }, true);
     }
 
+    // FL's PointMenu (TMEnvEditor form, round 190hg): Delete; "Mode" (its 13 curve modes in the form's order); "ADSR
+    // section" (decay, loop start, sustain: envelopes); Copy value / Paste value (the point's level as text on the
+    // clipboard; FL's paste sets the selected points, LYNX's the clicked one)
     void pointMenu (int i)
     {
         const auto* c = curve ? curve() : nullptr;
@@ -533,25 +573,35 @@ private:
         const auto map = (part ? part() : 0) >= 2;
         juce::PopupMenu m;
         m.addItem (1, tr ("Delete"), i > 0 && c->points.size() > 2);
+        m.addSectionHeader (tr ("Mode"));
+        static const int order[] = { 2, 10, 0, 7, 11, 1, 8, 12, 9, 3, 4, 5, 6 };
+        static const char* const modes[] = { "Single curve", "Double curve", "Hold", "Stairs", "Smooth stairs", "Pulse", "Wave",
+                                             "Single curve 2", "Double curve 2", "Half sine", "Smooth", "Single curve 3", "Double curve 3" };
+        for (const auto k : order)
+            m.addItem (100 + k, tr (modes[k]), true, c->points[(std::size_t) i].mode == k);
         if (! map)
         {
-            m.addSeparator();
+            m.addSectionHeader (tr ("ADSR section"));
             if ((part ? part() : 0) == 0)
                 m.addItem (2, tr ("Decay"), true, c->decay == i);
             m.addItem (3, tr ("Loop start"), true, c->loop == i);
             m.addItem (4, tr ("Sustain / loop end"), true, c->sustain == i);
         }
         m.addSeparator();
-        // FL's curve modes, in its order
-        static const char* const modes[] = { "Single curve", "Double curve", "Hold", "Stairs", "Smooth stairs", "Pulse", "Wave",
-                                             "Single curve 2", "Double curve 2", "Half sine", "Smooth", "Single curve 3", "Double curve 3" };
-        for (int k = 0; k < 13; ++k)
-            m.addItem (100 + k, tr (modes[k]), true, c->points[(std::size_t) i].mode == k);
+        m.addItem (5, tr ("Copy value"));
+        const auto pasted = juce::SystemClipboard::getTextFromClipboard().trim();
+        m.addItem (6, tr ("Paste value"), pasted.containsOnly ("0123456789.-+eE") && pasted.isNotEmpty());
         juce::Component::SafePointer<CurveView> self (this);
-        m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this), [self, i] (int r) {
+        m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this), [self, i, pasted] (int r) {
             if (self == nullptr || r == 0 || ! self->change)
                 return;
-            self->change ([i, r] (slicex::Curve& k) {
+            if (r == 5)
+            {
+                if (const auto* k = self->curve ? self->curve() : nullptr; k != nullptr && i < (int) k->points.size())
+                    juce::SystemClipboard::copyTextToClipboard (juce::String ((float) k->points[(std::size_t) i].y));
+                return;
+            }
+            self->change ([i, r, v = std::clamp (pasted.getDoubleValue(), 0.0, 1.0)] (slicex::Curve& k) {
                 if (i >= (int) k.points.size())
                     return;
                 if (r == 1 && i > 0)
@@ -568,6 +618,8 @@ private:
                     k.loop = k.loop == i ? -1 : i;
                 else if (r == 4)
                     k.sustain = k.sustain == i ? -1 : i;
+                else if (r == 6)
+                    k.points[(std::size_t) i].y = (double) (float) v; // (FL keeps a point's level as a float)
                 else if (r >= 100)
                     k.points[(std::size_t) i].mode = (std::uint8_t) (r - 100);
             }, true);
@@ -608,6 +660,7 @@ public:
     std::int64_t cursor = -1; // the last frame clicked in the wave (where "Add marker" puts one without a selection)
     // the selection in frames, [selFrom, selTo); none when selTo <= selFrom (FL keeps it in beats: the editor converts)
     double selFrom = -1.0, selTo = -1.0;
+    bool collapsed = false; // (round 190hg: FL's 37 / 53 / 85 px strips)
 
     DeckView() { setWantsKeyboardFocus (true); }
 
@@ -694,14 +747,21 @@ public:
         const auto v0 = shownStart(), length = shownLength();
         const auto bar = barArea(), tabs = tabArea(), wave = waveArea();
 
-        // the zoom / scroll bar: the whole sample small, the part shown lit
+        // the zoom / scroll bar: the whole sample small, the part shown lit (none on a collapsed deck)
+        if (! collapsed)
+            paintBar (g, *data, bar, total);
+        paintRest (g, data, list, total, v0, length, tabs, wave);
+    }
+
+    void paintBar (juce::Graphics& g, const SampleData& data, juce::Rectangle<float> bar, double total)
+    {
         g.setColour (theme::colour::bg2);
         g.fillRect (bar);
         const auto thumb = thumbArea();
         g.setColour (theme::colour::bg5);
         g.fillRect (thumb);
         g.setColour (deckColour (deck).withMultipliedSaturation (0.6f).withAlpha (0.8f));
-        drawWave (g, *data, bar.reduced (0.0f, 1.0f), 0.0, total);
+        drawWave (g, data, bar.reduced (0.0f, 1.0f), 0.0, total);
         if (hasSelection()) // (FL tints the selected stretch in the scroller too)
         {
             g.setColour (theme::colour::textPrimary.withAlpha (0.28f));
@@ -710,6 +770,11 @@ public:
         }
         g.setColour (theme::colour::borderStrong);
         g.drawRect (thumb, 1.0f);
+    }
+
+    void paintRest (juce::Graphics& g, const std::shared_ptr<const SampleData>& data, const std::vector<slicex::WavRegion>* list, double total,
+                    double v0, double length, juce::Rectangle<float> tabs, juce::Rectangle<float> wave)
+    {
 
         g.setColour (theme::colour::bg1);
         g.fillRect (tabs);
@@ -1035,7 +1100,8 @@ private:
             viewChanged();
     }
 
-    juce::Rectangle<float> barArea() const { return getLocalBounds().toFloat().removeFromTop (std::round (14.0f * scale)); }
+    // (a collapsed deck, FL's editor that is not the expanded one, shows no scroller: its tags and wave only)
+    juce::Rectangle<float> barArea() const { return getLocalBounds().toFloat().removeFromTop (collapsed ? 0.0f : std::round (14.0f * scale)); }
     juce::Rectangle<float> tabArea() const { return getLocalBounds().toFloat().withTrimmedTop (barArea().getHeight()).removeFromTop (std::round (12.0f * scale)); }
     juce::Rectangle<float> waveArea() const { return getLocalBounds().toFloat().withTrimmedTop (barArea().getHeight() + tabArea().getHeight()); }
     juce::Rectangle<float> thumbArea() const
@@ -1458,6 +1524,39 @@ public:
             edit ([this, &f] (State& s) { f (curveOf (s)); }, undoable);
         };
         addAndMakeVisible (curveView);
+        // (round 190hg: FL's Freeze and Slide buttons under the graph; they belong to the editor, not to the state)
+        ui::setHint (curveFreeze, tr ("Freeze editing / hide points"));
+        curveFreeze.setClickingTogglesState (true);
+        curveFreeze.onClick = [this] { curveView.frozen = curveFreeze.getToggleState(); curveView.repaint(); };
+        addAndMakeVisible (curveFreeze);
+        ui::setHint (curveSlide, tr ("Slide succeeding points / regions"));
+        curveSlide.setClickingTogglesState (true);
+        curveSlide.setToggleState (true, juce::dontSendNotification);
+        curveSlide.onClick = [this] { curveView.slide = curveSlide.getToggleState(); };
+        addAndMakeVisible (curveSlide);
+        // FL's envelope options menu, its "Flags" (LFOBipolarTensionMenuClick 0x84d510, LFOFrozenMenuClick 0x850fd0):
+        // "Bipolar LFO tension" is the LFO curve's flag bit 2 cleared, "Frozen LFO" sets bit 3 and the global phase
+        ui::setHint (curveOptions, tr ("LFO options"), true);
+        curveOptions.onClick = [this] {
+            const auto flags = art().lfo.flags;
+            juce::PopupMenu m;
+            m.addSectionHeader (tr ("Flags"));
+            m.addItem (1, tr ("Bipolar LFO tension"), true, (flags & 4) == 0);
+            m.addItem (2, tr ("Frozen LFO"), true, (flags & 8) != 0);
+            juce::Component::SafePointer<SlicexEditor> self (this);
+            m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&curveOptions), [self] (int r) {
+                if (self == nullptr || r == 0)
+                    return;
+                self->edit ([r, g = self->groupIndex(), t = self->targetIndex()] (State& s) {
+                    auto& c = s.groups[(std::size_t) g].art[(std::size_t) t].lfo;
+                    if (r == 1)
+                        c.flags ^= 4;
+                    else
+                        c.flags = (c.flags & 8) != 0 ? (c.flags & ~8) : (c.flags | 8 | 2);
+                });
+            });
+        };
+        addAndMakeVisible (curveOptions);
         ui::setHint (curveOn, tr ("Enable envelope / LFO"));
         curveOn.onClick = [this] {
             edit ([this, on = curveOn.getToggleState()] (State& s) { curveOf (s).enabled = on ? -1 : 0; });
@@ -1551,7 +1650,7 @@ public:
             };
             v.key = [this, d] (const juce::KeyPress& k) { return deckKey (d, k); };
             v.viewChanged = [this] { startTimer (300); }; // (the zoom goes into the state once it rests, as FL saves it)
-            v.frozen = [this, d] { return frozen (d); };
+            v.frozen = [this, d] { return frozen (d) || displayMode() > 0; }; // (FL freezes the decks' editing outside full mode)
             v.menu = [this, d] (int i) {
                 if (i >= 0)
                     selectRegion (d, i, false);
@@ -1577,9 +1676,46 @@ public:
         ui::setHint (octave, tr ("Keyboard base octave"));
         addAndMakeVisible (octave);
 
+        // ---- FL's View keyboard button and display mode selector (KbBtn, DispModeSelect; round 190hg)
+        ui::setHint (kbButton, tr ("View keyboard"));
+        kbButton.setClickingTogglesState (true);
+        kbButton.onClick = [this] { edit ([on = kbButton.getToggleState()] (State& s) { s.setOptionByte (slicex::oKeyboard, on ? 1 : 0); }, false); };
+        addAndMakeVisible (kbButton);
+        dispMode.items = { "1", "2", "3", "4" };
+        dispMode.drawCell = [] (juce::Graphics& g, int i, juce::Rectangle<float> r) { drawDisplayMode (g, i, r); };
+        dispMode.onChange = [this] (int v) { edit ([v] (State& s) { s.setOptionInt (slicex::oDisplayMode, v); }, false); };
+        ui::setHint (dispMode, tr ("Display mode") + ": " + tr ("Full") + " / " + tr ("No audio editor") + " / " + tr ("No region settings") + " / "
+                                   + tr ("Compact"));
+        addAndMakeVisible (dispMode);
+        // the panels' members (FL: ArtPanel, y 99…297, and DeckPanel, y 296…362); a part-dependent one says when it shows
+        for (auto* c : std::initializer_list<juce::Component*> { &regionMenuButton, &regionHeader, &regionSel, &output, &cutGroup, &outLabel, &cutLabel,
+                                                                 &artGroupLabel, &artGroup, &filterLabel, &filterType, &filterOrder, &filterEnv, &filterCut,
+                                                                 &filterRes, &filterEnvLabel, &filterCutLabel, &filterResLabel, &target, &partSel, &curveView,
+                                                                 &curveFreeze, &curveSlide })
+            artMembers.push_back ({ c, nullptr });
+        for (int i = 0; i < 4; ++i)
+        {
+            const auto k = (std::size_t) i;
+            for (auto* c : std::initializer_list<juce::Component*> { &rowB[k], &rowLabel[k], &artLabel[k], &rowGroup[k], &rowAmount[k] })
+                artMembers.push_back ({ c, nullptr });
+            if (i != 2) // (the speed row has no first wheel)
+                artMembers.push_back ({ &rowA[k], nullptr });
+            artMembers.push_back ({ &envKnob[k], [this] { return part() == 0; } });
+            artMembers.push_back ({ &envKnobLabel[k], [this] { return part() == 0; } });
+            artMembers.push_back ({ &lfoKnob[k], [this] { return part() == 1; } });
+            artMembers.push_back ({ &lfoKnobLabel[k], [this] { return part() == 1; } });
+        }
+        artMembers.push_back ({ &curveOn, [this] { return part() < 2; } });
+        artMembers.push_back ({ &curveTempo, [this] { return part() < 2; } });
+        artMembers.push_back ({ &curveGlobal, [this] { return part() == 1; } });
+        artMembers.push_back ({ &curveOptions, [this] { return part() == 1; } });
+        for (auto* c : std::initializer_list<juce::Component*> { &loopButton, &playButton, &stopButton, &fileButton, &regionsButton, &selectButton,
+                                                                 &zoomButton, &dualButton, &deckSel, &rateLabel, &tempoLabel, &nameLabel, &selLabel })
+            deckMembers.push_back ({ c, nullptr });
+
         engine.addChangeListener (this);
         reload();
-        setSize ((int) std::lround (714.0f * scale), (int) std::lround (625.0f * scale));
+        setSize ((int) std::lround (714.0f * scale), (int) std::lround ((float) formHeight() * scale));
     }
 
     ~SlicexEditor() override
@@ -1660,6 +1796,11 @@ public:
             if (! view.keyPressed (juce::KeyPress (code, juce::ModifierKeys (mods), 0)))
                 return "key not taken";
         }
+        else if (cmd == "mode") dispMode.onChange (std::clamp (w[1].getIntValue(), 0, 3));      // (round 190hg)
+        else if (cmd == "kb") { kbButton.setToggleState (w[1] != "0", juce::dontSendNotification); kbButton.onClick(); }
+        else if (cmd == "dual") { dualButton.setToggleState (w[1] != "0", juce::dontSendNotification); dualButton.onClick(); }
+        else if (cmd == "deck") deckSel.onChange (std::clamp (w[1].getIntValue(), 0, 1));
+        else if (cmd == "size") return juce::String (getWidth()) + " x " + juce::String (getHeight());
         else if (cmd == "rest") { stopTimer(); storeViews(); }
         else if (cmd == "load") loadSample (deck, w[1]);
         else if (cmd == "regions")
@@ -1690,6 +1831,10 @@ public:
 
     bool isInterestedInFileDrag (const juce::StringArray&) override { return true; }
 
+    // round 190gk: the Sampler waveform menu's "Open in new Slicex channel" (FL's SBONewMenuClick 0x11f8330: the
+    // plugin's template channel, then the sample loaded into it): deck A, as the deck's Load sample does
+    void loadSampleNow (const juce::String& path) { loadSample (0, path); }
+
     void filesDropped (const juce::StringArray& files, int, int y) override
     {
         if (files.isEmpty())
@@ -1707,14 +1852,19 @@ public:
         g.fillAll (theme::colour::bg2);
         g.setColour (theme::colour::bg1);
         g.fillRect (fl (0, 0, 714, 99));           // the top panel
-        g.fillRect (fl (0, 296, 714, 66));         // DeckPanel
+        if (deckPanelShown())
+            g.fillRect (fl (0, 296, 714, 66));     // DeckPanel
         g.setColour (theme::colour::bg3);
-        g.fillRoundedRectangle (fl (10, 106, 158, 189).toFloat(), 3.0f);  // the region settings
-        g.fillRoundedRectangle (fl (173, 106, 160, 189).toFloat(), 3.0f); // the articulator group and its filter
+        if (artShown())
+        {
+            g.fillRoundedRectangle (fl (10, 106, 158, 189).toFloat(), 3.0f);  // the region settings
+            g.fillRoundedRectangle (fl (173, 106, 160, 189).toFloat(), 3.0f); // the articulator group and its filter
+        }
         g.fillRoundedRectangle (fl (341, 6, 222, 50).toFloat(), 3.0f);    // layering
         g.setColour (theme::colour::border);
         g.drawHorizontalLine (fl (0, 99, 1, 1).getY(), 0.0f, (float) getWidth());
-        g.drawHorizontalLine (fl (0, 296, 1, 1).getY(), 0.0f, (float) getWidth());
+        if (deckPanelShown())
+            g.drawHorizontalLine (fl (0, 296, 1, 1).getY(), 0.0f, (float) getWidth());
 
         // the masters' icons under their sliders: level, randomness, LFO, pitch
         g.setColour (theme::colour::accent);
@@ -1748,6 +1898,8 @@ public:
         }
 
         // the deck row's small titles
+        if (! deckPanelShown())
+            return;
         g.setColour (theme::colour::textDisabled);
         g.setFont (theme::font (8.5f));
         g.drawText ("SAMPLERATE", fl (5, 336, 64, 9), juce::Justification::centredLeft, false);
@@ -1781,6 +1933,8 @@ public:
         crossfade.setBounds (fl (477, 35, 80, 16));
         autoDump.setBounds (fl (480, 71, 83, 15));
         brand.setBounds (fl (589, 12, 118, 45));
+        kbButton.setBounds (fl (574, 61, 25, 30));
+        dispMode.setBounds (fl (604, 61, 108, 30));
 
         // the region settings (ArtPanel is at y 99)
         regionMenuButton.setBounds (fl (13, 110, 18, 19));
@@ -1818,6 +1972,9 @@ public:
         target.setBounds (fl (338, 107, 367, 15));
         partSel.setBounds (fl (338, 123, 367, 15));
         curveView.setBounds (fl (339, 139, 365, 116));
+        curveOptions.setBounds (fl (491, 275, 17, 17));
+        curveFreeze.setBounds (fl (612, 275, 17, 17)); // (FL: alRight in the editor's GlobalPanel, y 99 + 40 + 136)
+        curveSlide.setBounds (fl (684, 275, 18, 17));
         curveOn.setBounds (fl (340, 264, 15, 15));
         for (int i = 0; i < 4; ++i)
         {
@@ -1848,8 +2005,6 @@ public:
         selLabel.setBounds (fl (475, 345, 160, 15));
 
         layoutDecks();
-        octave.setBounds (fl (3, 574, 26, 48));
-        keyboard.setBounds (fl (32, 574, 679, 48));
     }
 
     void mouseDown (const juce::MouseEvent& e) override
@@ -2115,6 +2270,8 @@ private:
             lfoKnobLabel[(std::size_t) i].setVisible (p == 1);
         }
 
+        kbButton.setToggleState (state.optionByte (slicex::oKeyboard) != 0, juce::dontSendNotification);
+        dispMode.value = displayMode();
         loopButton.setToggleState (state.optionByte (slicex::oLoop) != 0, juce::dontSendNotification);
         dualButton.setToggleState (state.optionByte (slicex::oDualDeck) != 0, juce::dontSendNotification);
         deckSel.value = currentDeck();
@@ -2313,19 +2470,97 @@ private:
             zoomOnRegion (deck, regionIndex());
     }
 
+    // ---- FL's layout for the display mode, the dual deck button and the keyboard button (round 190hg, REA_rodada190hg §2:
+    // the relayout 0x898b50 and the deck layout 0x897c60). Rows in FL's form pixels: the top panel 0…99; ArtPanel 99…297
+    // while the mode is full or "no audio editor"; DeckPanel 296…362 in full mode only. The decks follow, 9 px apart:
+    // in full mode the current deck at 163 px and, with the dual deck on, the other one at 37 px; in the other modes
+    // every deck with a sample at 53 px (85 px when the other deck is empty), none in compact mode. KbPanel (54 px)
+    // starts at the last row's bottom; the window ends with it.
+    // compact mode: KbPanel starts this far above ArtPanel's top (FL subtracts a metric of its skin there; FL's own
+    // window in compact mode puts KbPanel at 99, measured in round 190hg's live check)
+    static constexpr int compactLift = 0;
+    int displayMode() const { return std::clamp ((int) state.optionInt (slicex::oDisplayMode), 0, 3); }
+    bool artShown() const { return displayMode() < 2; }
+    bool deckPanelShown() const { return displayMode() < 1; }
+    bool keyboardShown() const { return state.optionByte (slicex::oKeyboard) != 0; }
+    bool deckHasSample (int d) const { return samples[(std::size_t) d] != nullptr && samples[(std::size_t) d]->frames() > 0; }
+
+    struct Rows
+    {
+        std::array<juce::Rectangle<int>, 2> deck;
+        std::array<bool, 2> deckShown { false, false };
+        int keyboardTop = 0, height = 0;
+    };
+
+    Rows rows() const
+    {
+        Rows r;
+        const auto mode = displayMode();
+        int y = deckPanelShown() ? 362 : (artShown() ? 297 : 99);
+        int bottom = deckPanelShown() ? 362 : (artShown() ? 296 : 99 - compactLift); // (FL: ArtPanel.top − a skin metric, REA_rodada190hg §2)
+        for (int d = 0; d < 2; ++d)
+        {
+            int h = 0;
+            bool shown = false;
+            if (mode == 0)
+            {
+                const auto expanded = d == currentDeck();
+                shown = expanded || state.optionByte (slicex::oDualDeck) != 0;
+                h = expanded ? 163 : 37;
+            }
+            else
+            {
+                shown = mode < 3 && deckHasSample (d);
+                h = deckHasSample (1 - d) ? 53 : 85;
+            }
+            r.deck[(std::size_t) d] = { 0, y, 714, h };
+            r.deckShown[(std::size_t) d] = shown;
+            if (shown)
+            {
+                bottom = y + h;
+                y += h + 9;
+            }
+        }
+        r.keyboardTop = bottom;
+        r.height = bottom + (keyboardShown() ? 54 : 0);
+        return r;
+    }
+
+    int formHeight() const { return rows().height; }
+
     void layoutDecks()
     {
-        const auto dual = state.optionByte (slicex::oDualDeck) != 0;
-        const auto deck = currentDeck();
-        deckView[0].setVisible (dual || deck == 0);
-        deckView[1].setVisible (dual || deck == 1);
-        if (dual)
+        const auto r = rows();
+        for (auto& m : artMembers)
+            m.c->setVisible (artShown() && (m.shown == nullptr || m.shown()));
+        for (auto& m : deckMembers)
+            m.c->setVisible (deckPanelShown() && (m.shown == nullptr || m.shown()));
+        for (int d = 0; d < 2; ++d)
         {
-            deckView[0].setBounds (fl (0, 362, 714, 144));
-            deckView[1].setBounds (fl (0, 507, 714, 62));
+            auto& v = deckView[(std::size_t) d];
+            v.setVisible (r.deckShown[(std::size_t) d]);
+            v.collapsed = ! (displayMode() == 0 && d == currentDeck());
+            v.setBounds (fl (0, r.deck[(std::size_t) d].getY(), 714, r.deck[(std::size_t) d].getHeight()));
         }
-        else
-            deckView[(std::size_t) deck].setBounds (fl (0, 362, 714, 207));
+        octave.setVisible (keyboardShown());
+        keyboard.setVisible (keyboardShown());
+        octave.setBounds (fl (3, r.keyboardTop + 3, 26, 48));
+        keyboard.setBounds (fl (32, r.keyboardTop + 3, 679, 48));
+        const auto h = (int) std::lround ((float) r.height * scale);
+        if (getHeight() != h && getWidth() > 0)
+            setSize (getWidth(), h); // (the channel window follows, ChannelFrame::childBoundsChanged)
+    }
+
+    // the display mode selector's cells (FL's DispModeSelectPaintCell 0x895c30 draws a window outline with the rows the
+    // mode keeps: full = everything, then fewer rows down to the compact strip; LYNX's own drawing)
+    static void drawDisplayMode (juce::Graphics& g, int mode, juce::Rectangle<float> r)
+    {
+        const auto box = r.withSizeKeepingCentre (std::min (r.getWidth(), r.getHeight() * 1.2f), r.getHeight());
+        g.drawRoundedRectangle (box, 1.5f, 1.0f);
+        const auto inner = box.reduced (2.0f);
+        const auto rowsShown = 3 - mode; // full 3 rows, no audio editor 2, no region settings 1, compact 0
+        for (int i = 0; i < rowsShown; ++i)
+            g.fillRect (inner.getX(), inner.getY() + inner.getHeight() * (float) i / 3.0f + 0.5f, inner.getWidth(), inner.getHeight() / 3.0f - 1.0f);
     }
 
     void edit (const std::function<void (State&)>& change, bool undoable = true)
@@ -3066,6 +3301,17 @@ private:
     std::array<std::pair<std::int64_t, std::int64_t>, 2> loops {}; // each deck's loop points (first, last frame)
     std::array<bool, 2> loopShown { false, false };          // … and whether they are drawn (FL's View ▸ Loop)
     Keyboard keyboard;
+    // FL's View keyboard button and display mode selector (round 190hg): which panels the window shows
+    IconButton kbButton { IconButton::keys };
+    IconButton curveFreeze { IconButton::freeze }, curveSlide { IconButton::slide }; // (the articulator editor's own)
+    IconButton curveOptions { IconButton::arrow }; // (FL's EnvOptionsMenu; LYNX: its LFO flags)
+    Selector dispMode;
+    struct Member
+    {
+        juce::Component* c;
+        std::function<bool()> shown; // (null: always, while its panel is shown)
+    };
+    std::vector<Member> artMembers, deckMembers;
     std::unique_ptr<juce::FileChooser> chooser;
 };
 } // namespace
@@ -3084,8 +3330,29 @@ juce::String slicexEditorTest (juce::Component& root, const juce::String& comman
     return editor != nullptr ? editor->test (juce::StringArray::fromTokens (command, " ", "\"")) : juce::String ("no Slicex editor");
 }
 
+static std::optional<std::pair<int, juce::String>>& pendingSample()
+{
+    static std::optional<std::pair<int, juce::String>> pending;
+    return pending;
+}
+
+void loadSlicexSampleWhenOpened (int channel, const juce::String& path)
+{
+    if (channel >= 0)
+        pendingSample() = std::make_pair (channel, path);
+    else
+        pendingSample().reset();
+}
+
 std::unique_ptr<juce::Component> makeSlicexEditor (AudioEngine& engine, std::function<ChannelDef* (Song&)> locate, int channel)
 {
-    return std::make_unique<SlicexEditor> (engine, std::move (locate), channel);
+    auto editor = std::make_unique<SlicexEditor> (engine, std::move (locate), channel);
+    if (auto& p = pendingSample(); p.has_value() && channel >= 0 && p->first == channel)
+    {
+        const auto path = p->second;
+        p.reset();
+        editor->loadSampleNow (path);
+    }
+    return editor;
 }
 } // namespace lynx

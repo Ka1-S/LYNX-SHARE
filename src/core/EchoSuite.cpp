@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdlib>
 #include <complex>
 #include <cstdint>
 #include <cstdio>
@@ -2442,13 +2443,17 @@ private:
     void processMeasured (float* l, float* r, int n, const EffectParams& p, double ms, float g, double hz, bool stereoMode,
                           float wet, float dry) noexcept
     {
-        static constexpr double lowCutScale = 0.8, allpassHz = 2875.0, allpassQ = 0.3375;
+        static constexpr double lowCutScale = 0.8;
         static constexpr float limitAt = 0.25625f;
-        const auto target = std::clamp (ms * 0.001 * sr - 0.125 * sr / 48000.0, 2.0, ch[0].line.maxDelay() - 4.0);
+        // round 190fy (revision 1): the loop's timing as measured pass by pass (see Rev1 below)
+        const bool rev1 = p[revision] >= 0.5f;
+        const auto& k = rev1 ? rev1Law() : Rev1 { 1.0, -0.125, 2875.0, 0.3375 };
+        const auto allpassHz = k.allpassHz, allpassQ = k.allpassQ;
+        const auto target = std::clamp (k.scale * ms * 0.001 * sr + k.offset * sr / 48000.0, rev1 ? 1.0 : 2.0, ch[0].line.maxDelay() - 4.0);
         const auto hpHz = lowCutHz (p[lowCut]) * lowCutScale, lpHz = highCutHz (p[highCut]);
-        if (hpHz != designedHp || lpHz != designedLp || sr != designedSr)
+        if (hpHz != designedHp || lpHz != designedLp || sr != designedSr || allpassHz != designedAp || allpassQ != designedApQ)
         {
-            designedHp = hpHz, designedLp = lpHz, designedSr = sr;
+            designedHp = hpHz, designedLp = lpHz, designedSr = sr, designedAp = allpassHz, designedApQ = allpassQ;
             // the two first-order cuts as one second-order section: c (1 − z⁻²) / ((1 + a z⁻¹)(1 + b z⁻¹))
             Biquad hpS, lpS;
             bilinearFirst (hpS, hpHz, sr, true);
@@ -2477,7 +2482,10 @@ private:
                 auto& s = ch[(std::size_t) c];
                 const auto x = *io[c];
                 float re = 0.0f, im = 0.0f;
-                s.shifter.h.analytic (s.ap.process (s.band.process (s.line.at (d), 0), 0), re, im);
+                // (revision 1 reads under two samples: a linear read between the last two written samples)
+                const auto tapped = d >= 2.0 ? s.line.at (d) : s.line.tap (1) + (float) (d - 1.0) * (s.line.tap (2) - s.line.tap (1));
+                const auto banded = s.band.process (tapped, 0);
+                s.shifter.h.analytic (allpassHz > 0.0 ? s.ap.process (banded, 0) : banded, re, im);
                 const auto up = re * oc + im * os, down = re * oc - im * os;
                 s.line.push (x + g * (limitAt * std::tanh (up / limitAt)));
                 *io[c] = dry * x + wet * (c == 1 && stereoMode ? down : up);
@@ -2500,8 +2508,34 @@ private:
     double sr = 48000.0;
     std::array<Channel, 2> ch;
     Glide time;
-    double designedHp = -1.0, designedLp = -1.0, designedSr = -1.0;
+    double designedHp = -1.0, designedLp = -1.0, designedSr = -1.0, designedAp = -1.0, designedApQ = -1.0;
     double rotC = 1.0, rotS = 0.0; // the measured loop's shifter phasor
+
+    // round 190fy [EXEC] (black-box: the tp172d reference renders, checked on refcap0124's 36 one-parameter captures;
+    // /mnt/e/lynx-work/parityfx190fy): revision 1 of the measured loop. Echo by echo, revision 0 was late against the
+    // reference above 1 kHz and early under 200 Hz (its low-mid all-pass delayed the mids, not the lows). Revision 1 reads
+    // the line 1.8 samples (at 48 kHz) sooner, at least one sample after the input (a linear read under two samples: the
+    // dial's 0.01 ms floor answers two samples after the input, the reference one, revision 0 three), and
+    // swaps the 2875 Hz (Q 0.34) all-pass for a broad one at 7080 Hz (Q 0.101): 3.7 samples more delay under 300 Hz
+    // against the top, 2.4 less at 2 kHz. Fitted on the error of the 16 bank renders (mean ESR -6.8 -> -10.2 dB)
+    struct Rev1
+    {
+        double scale, offset, allpassHz, allpassQ;
+    };
+    static const Rev1& rev1Law() noexcept
+    {
+        static const Rev1 law = [] {
+            Rev1 r { 1.0, -1.8, 7080.0, 0.101 };
+           #ifdef LYNX_SPIRAL_FIT
+            if (const char* v = std::getenv ("SP_SCALE")) r.scale = std::atof (v);
+            if (const char* v = std::getenv ("SP_OFFSET")) r.offset = std::atof (v);
+            if (const char* v = std::getenv ("SP_APHZ")) r.allpassHz = std::atof (v);
+            if (const char* v = std::getenv ("SP_APQ")) r.allpassQ = std::atof (v);
+           #endif
+            return r;
+        }();
+        return law;
+    }
 };
 } // namespace
 } // namespace spiral

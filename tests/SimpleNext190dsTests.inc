@@ -115,7 +115,7 @@ inline Render renderClip (std::shared_ptr<SampleData> data, float clipPitch, boo
     s.mode = PlayMode::song;
     RackState::Factories f;
     f.samples = [data] (const std::string&) { return std::shared_ptr<const SampleData> (data); };
-    f.stretchedSamples = [data] (const std::string&, double ratio, StretchMethod m, double semis, const StretchMap&) {
+    f.stretchedSamples = [data] (const std::string&, double ratio, StretchMethod m, double semis, const StretchMap&, const lynx::StretchOptions&) {
         return std::shared_ptr<const SampleData> (timeStretch (*data, ratio, m, semis));
     };
     auto state = RackState::build (s, nullptr, rate, f);
@@ -639,7 +639,7 @@ TEST (simple190ds_simple_tracks_patterns_and_keyed_loops)
     if (! r.ok() || r.pattern < 0)
         return;
     CHECK (s.patterns[(std::size_t) r.pattern].notes.empty());
-    CHECK (s.patterns[(std::size_t) r.pattern].effectiveLength (s.beatsPerBar) == 4 * s.beatsPerBar * ppq);
+    CHECK (s.patterns[(std::size_t) r.pattern].effectiveLength (s.meter()) == 4 * s.beatsPerBar * ppq);
     CHECK (st::patternOf (s, r.track) == r.pattern);
     bool made = true;
     CHECK (st::ensurePattern (s, r.track, 4, &made) == r.pattern && ! made); // (it has one)

@@ -8,7 +8,7 @@
 <meta property="og:title" content="Troubleshooting · LYNX SHARE">
 <meta property="og:description" content="First-launch warnings, no sound, plugin problems, crash reports and where to report bugs.">
 <meta property="og:site_name" content="LYNX SHARE">
-<meta property="og:image" content="https://lynx-share.com/assets/img/hero.webp?v=0.1.27">
+<meta property="og:image" content="https://lynx-share.com/assets/img/hero.webp?v=0.1.28">
 <meta property="og:url" content="https://lynx-share.com/wiki/troubleshooting/">
 <meta property="og:locale" content="en_US">
 <meta property="og:locale:alternate" content="zh_CN">
@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="57f5f169";
+window.LYNX_LANG=lang;window.LYNX_V="b57b2774";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=57f5f169">
+<link rel="stylesheet" href="/assets/site.css?v=b57b2774">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -116,9 +116,17 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <p>The audio thread should run with real-time priority.</p>
 <ol><li>Open <code>Options › Audio settings...</code> and read <code>Status</code>. It shows whether the thread got real-time priority.</li><li>If it did not, install rtkit (<code>sudo apt install rtkit</code>, <code>sudo dnf install rtkit</code> or <code>sudo pacman -S rtkit</code>), or add yourself to the <code>audio</code> group with a real-time limit, as JACK set-ups have.</li><li>Log out and in again.</li></ol>
 <p>The details are in <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/LINUX.md">LINUX.md</a>.</p>
+<h3 id="the-sound-crackles-or-drops-out">The sound crackles or drops out</h3>
+<p>LYNX SHARE counts every dropout (buffer underrun) and says why it happened. Point at the <code>CPU</code> meter in the toolbar, or open <code>Tools › Plugin performance monitor...</code>. A red number next to the CPU percentage is the count.</p>
+<p>The hint names the cause of the last dropout:</p>
+<div class="tablewrap"><table><thead><tr><th>Cause</th><th>What it means</th><th>What to try</th></tr></thead><tbody><tr><td>The processing took longer than the buffer</td><td>A block of audio took longer to compute than the time it lasts. The hint names the slowest channel or effect in that block</td><td>Raise the buffer size in <code>Options › Audio settings...</code>, freeze that channel, or turn the plugin's quality down</td></tr><tr><td>The processing came near the buffer's limit</td><td>The load was close to 100 % around the dropout</td><td>Raise the buffer size, or freeze the heaviest channels</td></tr><tr><td>Driver or system latency</td><td>The driver or the system was late while the load stayed low. No plugin caused it</td><td>Raise the buffer size, try another driver (on Windows the interface's ASIO driver), and on Linux check real-time priority (above)</td></tr></tbody></table></div>
+<p>Each dropout is also written to <code>audio-glitches.log</code> in the settings folder, with the device, the buffer and the heaviest channels.</p>
 <h2 id="plugins">Plugins</h2>
 <h3 id="a-plugin-crashes">A plugin crashes</h3>
-<p>Run it in its own process, so that only the plugin stops.</p>
+<p>Most plugin crashes switch only that plugin off: an effect is bypassed, an instrument goes silent, and LYNX SHARE and the project keep running. The <code>Plugin crashed</code> message then offers:</p>
+<ul><li><code>Reload</code>, which starts the plugin again with the settings from the last save or backup.</li><li><code>Always run &lt;plugin&gt; in a separate process</code>, which starts it again in a process of its own, now and in every project. A crash there cannot take LYNX SHARE down. A plugin in a separate process opens its window on its own (it cannot be docked).</li></ul>
+<p>The plugin's window shows the same two buttons in place of its editor. <code>Options › Plugin manager...</code> lists the plugins that always run in a separate process in its <code>Separate process</code> column; click the box to switch one on or off.</p>
+<p>To run every plugin in its own process:</p>
 <ol><li>Open <code>Options › General settings...</code>.</li><li>Turn on <code>Run plugins in a separate process (protects LYNX SHARE from crashes)</code>.</li><li>Reopen the project.</li></ol>
 <p>A plugin that crashed or stopped responding in its own process is muted. Save the project and reopen it to load the plugin again. See <a href="/wiki/plugins/">Third-party plugins</a>.</p>
 <h3 id="a-plugin-is-not-in-the-list">A plugin is not in the list</h3>
@@ -147,12 +155,12 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <a href="/" class="brand" style="font-size:16px"><img src="/assets/img/logo.png?v=0.1.26-logo2" srcset="/assets/img/favicon-32.png?v=0.1.26-logo2 1x, /assets/img/favicon.png?v=0.1.26-logo2 2x, /assets/img/logo.png?v=0.1.26-logo2 4x" alt="" width="26" height="26" style="width:26px;height:26px">LYNX SHARE</a>
   <span>© 2026 · AGPL-3.0</span>
   <span data-i18n="f.logo">Logo by w3teal</span>
-  <div class="links2"><a href="https://github.com/Ka1-S/LYNX-SHARE">GitHub</a><a href="https://github.com/Ka1-S/LYNX-SHARE/releases">Releases</a><a href="https://github.com/Ka1-S/LYNX-SHARE/issues">Issues</a><a href="https://discord.gg/XHKkbtbkY">Discord</a><a href="/#signing" data-i18n="f.sign">Code signing &amp; privacy</a></div>
+  <div class="links2"><a href="https://github.com/Ka1-S/LYNX-SHARE">GitHub</a><a href="https://github.com/Ka1-S/LYNX-SHARE/releases">Releases</a><a href="https://github.com/Ka1-S/LYNX-SHARE/issues">Issues</a><a href="https://discord.gg/XHKkbtbkY">Discord</a><a href="/#support" data-i18n="f.support">Support</a><a href="/#signing" data-i18n="f.sign">Code signing &amp; privacy</a></div>
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=57f5f169" defer></script>
-<script src="/assets/wiki.js?v=57f5f169" defer></script>
-<script src="/assets/motion.js?v=57f5f169" defer></script>
+<script src="/assets/site.js?v=b57b2774" defer></script>
+<script src="/assets/wiki.js?v=b57b2774" defer></script>
+<script src="/assets/motion.js?v=b57b2774" defer></script>
 </body>
 </html>

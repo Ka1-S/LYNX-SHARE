@@ -286,7 +286,7 @@ Import (the default, the user's choice of 2026-11-08; `AlsImportOptions::session
 - A looping clip → one pass of its loop region `[LoopStart, LoopEnd)` with the slot's Loop on; a start marker inside the loop (`StartRelative` ≠ 0) is reported as approximated. A one-shot → `[LoopStart + StartRelative, OutMarker)` with Loop off. MIDI clips get their own pattern, audio clips the same channel and warp handling as arrangement clips.
 - `LaunchMode`, `LaunchQuantisation`, `Legato`, `Name`, `Color`, and `FollowAction{FollowActionEnabled, FollowActionA/B, FollowChanceA/B, JumpIndexA/B, IsLinked, LoopIterations, FollowTime}` → the slot's settings.
 - An empty slot with `HasStop` false → no stop button.
-- Scenes: `Name`, `Color`, `Tempo` when `IsTempoEnabled`, the numerator of `TimeSignatureId` when `IsTimeSignatureEnabled` (n/4 only; other denominators reported). Scene follow actions are reported (not built).
+- Scenes: `Name`, `Color`, `Tempo` when `IsTempoEnabled`, `TimeSignatureId` when `IsTimeSignatureEnabled` (n / d; round 190fg: a launch gives the song that meter). Scene follow actions are reported (not built).
 - A set whose slots are all empty adds no grid.
 
 Export:
@@ -393,7 +393,7 @@ exists yet: every law that is not plain unit maths is [ASSUMED] and listed in th
 | Live device (tag) | LYNX | Translated | Listed in the report |
 |---|---|---|---|
 | EQ Three (`FilterEQ3`) | Prism Multiband, 3 bands, minimum-phase (the crossover sum), no dynamics | FreqLo / FreqHi → crossovers, Slope → 24 / 48 dB/oct, GainLo / Mid / Hi (linear) → band levels (dB), kill switches and −inf gains → the bands that still sound are soloed | the pair (fitted), gains under −30 dB, all bands off (Prism's lowest output) |
-| Drum Buss (`DrumBuss`) | an Audio Effect Rack "Drum Buss": Ember Saturator → Facet EQ → Crest Compressor (with Comp on) → Shell Channel, plus a "Dry" chain when Dry/Wet is under 100 % or can move (refit to Live's renders in round 190ek, §19) | Drive and its type → Ember's Pentode voicing at the measured small-signal gain per type and amount (+ the type's own EQ: Medium a bell, Hard a low shelf, in proportion to the drive); the device's own colour → three Facet bells and the output; Damping → Ember's 6 dB/oct high cut; Input Trim → Ember's input; Crunch → its mid band (two Facet shelves under the output's lift); Boom → a Facet bell at the Boom frequency and a resonant 12 dB/oct high pass (decay sets their gain / Q / place); Comp → Crest at 4 : 1, −19 dB, 1 / 200 ms, +11 dB; Transients → Shell's transient shaper (Amount, Invert below 0); Output → Shell's output; Dry/Wet → the chains' volumes. The rack's macros (Drive, Crunch, Damping, Transients, Boom, Boom Freq, Trim, Output, Dry/Wet) run through the imported values: Live's envelopes and macros reach them | every fitted part, the type's EQ at other drives, Boom's tail, Crunch's distortion, the transient shaper's tail lift, Soft's wave folding, negative transients under automation |
+| Drum Buss (`DrumBuss`) | **Anvil Bus**, LYNX's own drum-bus engine (round 190fk, §24; until then a rack "Drum Buss": Ember Saturator → Facet EQ → Crest Compressor → Shell Channel, which projects that already hold it keep) | every control one to one: Drive / Drive type / Crunch / Damping / Transients / Boom amount, frequency, decay / Comp / Input Trim / Output / Dry/Wet → the engine's own; Live's envelopes and macros on them reach the engine through `links` | Boom audition (listed); drive amounts between 0 / 25 / 50 / 100 %, the type EQ below 100 %, Boom and Crunch away from 0.5 are interpolated / scaled (reported) |
 | Auto Filter's LFO / envelope follower / side chain | a Peak Controller (FL's internal-controller link) in front of the Filter — or at the end of the side-chain source track's insert — whose output 0 (peak + LFO) drives the Filter's cutoff through a 33-point curve | LFO rate (Hz at the set's tempo, or synced), shape, phase offset, amount; the follower's amount and release (a straight fall); the cutoff's base | amounts (law assumed), the follower's attack, stereo LFO offset, falling saw, inside a rack (no link possible) |
 | Operator (`Operator`) | the built-in synth, only when no FM is in use: operator A alone (B … D off or at −inf), or algorithm 11's carriers (≤ 3) | waveforms Sine (0), White noise (21), User (22 → the synth's harmonic table), coarse / fine ratio → pitch, volume, A's envelope (ms → s), filter, glide, global volume / pan | the pair (fitted), envelope levels / slopes / loop, LFO, pitch envelope, spread, tone; with FM the device stays unsupported ("FM synthesis: no LYNX engine for it yet") |
 | Drift (`Drift`) | the built-in synth | oscillator 1 / 2 types → nearest waves, transposes, detune, levels, noise; filter I / II (12 dB / 24 dB ladder), frequency, resonance, key tracking; envelope 1 (amp ADSR); voice mode mono; glide; volume | the pair (fitted), shape, high pass, envelope 2 / LFO / cycling envelope / matrix, drift, stereo / unison voices |
@@ -468,3 +468,165 @@ envelope; volume, pan, transpose, reverse; one sample part per zone or the sampl
 `AlsExportOptions::sampleFormat`). Live's Slicing defaults (Defaults/Slicing) hold one `DrumBranchPreset` each: "Default"
 is a Classic Simpler with a 50 ms release, one voice, `ChokeGroup` 1; the drum ones are One-Shot, polyphonic, no choke;
 LYNX's Slice to Drum Rack templates follow those facts with its own names.
+
+## 21. The warp modes' own settings (round 190fm, 2026-11-13)
+
+Evidence (round 190fm, `/mnt/e/lynx-work/realive190fm/LIVE-FACTS.md` §1): Live 12.4's own schema
+(`Resources/Schema/12.0_12402.txt`), the 642 audio clips of the 19 shipped sets, the strings of Live's binaries and REA's
+read of Live's Push "Simpler decoration" script (`ableton/v2/control_surface/simpler_decoration.pyc`, Python 3.11 byte
+code, constants only, evidence `ev_59c086ca…`).
+
+- `AudioClip` (and `SampleWarpProperties` of Simpler / Sampler parts) carry after `WarpMode`: `GranularityTones`,
+  `GranularityTexture`, `FluctuationTexture`, `TransientResolution`, `TransientLoopMode`, `TransientEnvelope`,
+  `ComplexProFormants`, `ComplexProEnvelope` [SCHEMA]. Defaults in every shipped clip: 30, 65, 25, 6, 2, 100, 100, 128 [DATA].
+- `TransientResolution` = Beats › Preserve: 0 … 6 = 1 Bar, 1/2, 1/4, 1/8, 1/16, 1/32, Transients [REA: the decoration's
+  7-item resolution list in that order]. `TransientLoopMode` 0 / 1 / 2 = Loop Off, Loop Forward, Loop Back-and-Forth
+  [STR + 175a's measured default]. `TransientEnvelope` 0 … 100 [REA].
+- Ranges [REA, the decoration's parameter table]: Tones Grain Size 12 … 100, Texture Grain Size 2 … 263, Flux 0 … 100,
+  Formants 0 … 100, Complex Pro Envelope 8 … 256.
+
+LYNX (`SamplerSettings::warpModes`, `core/WarpModes.h`, `core/TimeStretch` `StretchOptions`):
+- Import reads all eight into the audio channel (clips with other settings get channels of their own); export writes them
+  back, and WarpMode 6 (Complex Pro) is kept as a flag so it is written back as 6. .lynx keeps them as `warpModes` (nine
+  numbers, only when not the defaults).
+- Rendered offline: Beats Preserve on a note grid (cuts where the output reaches each multiple of the division; 1 bar is
+  taken as 4 beats), Transient Loop Mode and Transient Envelope, Tones / Texture Grain Size (the spectral block scaled by
+  size / Live's default, 10 … 250 ms).
+- Round 190gx re-measured Beats on Live 12.4's W1 renders (`/mnt/e/lynx-work/livefacts190gx/warp/REPORT.md`, black box):
+  transient cuts sit on the attack itself (LYNX's were 10 ms early) and a transient piece starts within 2 ms (grid pieces
+  keep the 16 ms crossfade); Loop Off = a linear 10 ms fade ending at the next transient, then silence; Back-and-Forth
+  mirrors 20 ms before a transient piece's end (Live: 21.5–30 ms; grid pieces at their end) and Forward loops the piece's
+  second half from there (5 ms crossfade); Transient Envelope = unity up to the piece's own end, then an exponential decay
+  of the fill, τ = 15.5 ms at 0 and 98 ms at 50 (geometric between, assumed; 100 = none). These change Beats renders
+  that have a fill or transient cuts (measured fixes; the other modes render as before).
+- Not matched yet (reported there): Live's transient detection on sustained voice (it cuts at pitch changes), Texture
+  Flux, Complex Pro Formants, the grain-size law at the extremes.
+- Kept but not rendered (import report lines): Texture's Flux, Complex Pro's Formants and Envelope (Complex Pro plays as
+  Complex).
+- The Clip View shows the mode's settings under the mode chooser; an edit from a grid clip whose channel other clips play
+  gives that clip its own copy of the channel first (owner decision O16), so only that clip changes, as in Live.
+
+## 22. Grooves in and out (round 190fm, 2026-11-13) [SCHEMA, DATA]
+
+Live 12.4's schema (`Resources/Schema/12.0_12402.txt`, lines 2742-2760) and the shipped sets (7 of 19 hold a groove; a
+Live 11.0.12 public set saves the same members) give:
+
+- `LiveSet/GroovePool {LomId, Grooves, DefaultGrooveId, GroovesListWrapper}`. Live 11's pool has no `DefaultGrooveId`.
+- `Grooves/Groove Id="n" {LomId, Name, Clip/Value/MidiClip (the template), Grid, QuantizationAmount, TimingAmount,
+  RandomAmount, VelocityAmount, Annotation, Selection, SourceContext}`. `Grid` 0…5 = 1/4, 1/8, 1/8T, 1/16, 1/16T, 1/32
+  (LYNX's `GrooveBase` numbers). The amounts are percent (Velocity −100…100). `SourceContext` is empty for a groove
+  that came from no file, else it names the library file it was loaded from.
+- A clip (MIDI or audio, Arrangement or Session) refers to a groove by `GrooveSettings/GrooveId` = the `Id` attribute
+  of a pool `Groove` (sets with `<Groove Id="0">` use 0; −1 = none, 492 clips in the shipped sets).
+- `DefaultGrooveId` is a pool groove's id or −1 (Live's default set: 4, its one groove "Swing 16ths 66").
+- The global amount is the main track's `Mixer/GlobalGrooveAmount` (`Manual` in percent; `MidiControllerRange` 0…131.25).
+
+Import (`AlsImport.cpp readGroovePool`, `grooveOfClip`): every pool groove → LYNX's pool (`groove::fromGrooveElement`,
+the same reader as a user's `.agr`: the template's notes inside its loop, the loudest per Base slot, become the points);
+`GlobalGrooveAmount` → the pool's amount (above 130 % kept at 130 %, reported); an Arrangement MIDI clip's `GrooveId` →
+the Playlist clip's groove (`Clip::groove`), a Session MIDI clip's → its slot's groove. Reported: a groove on an audio
+clip (LYNX's grooves play on MIDI clips), a `GrooveId` that is not in the pool, a `DefaultGrooveId` (LYNX has no
+default groove for new clips), an `Annotation`, and the groove law itself as approximate (LYNX's arithmetic of
+REA_rodada190bv.md §3; Live's is not measured: needs a live check).
+
+Export (`AlsExport.cpp groovePool`, `grooveNode`): the skeleton's pool gets one `Groove` per pool groove, written member by
+member in the schema's order by the exporter's own code (no skeleton of a groove; its template is the exporter's own
+`MidiClip` with one note per point, key 60, a 64th long, `Velocity` = the accent, `LoopOn` true); `Id` = the groove's
+index in LYNX's pool; `SourceContext` empty, `Annotation` empty, `Selection` false; `DefaultGrooveId` −1 (Live 12
+only); `GlobalGrooveAmount` = the pool's amount × 100 (100 % for a project without grooves; the Live 12 skeleton held
+0). A Playlist pattern clip's and a grid slot's groove → `GrooveSettings/GrooveId`. Needs a live check: that Live 12.4
+opens such a pool (the members and order are the schema's and the shipped sets'), and whether Live measures a groove
+from the clip's start (LYNX: the pattern's own ticks) for a clip whose start is not on the groove's length.
+
+## 23. Live's own devices → LYNX's own, lot 4 (round 190fm, 2026-11-13)
+`src/core/AlsDevicesLot4.cpp` (laws and evidence tags in `core/AlsDevices.h`). No render of these devices exists yet: what
+is not plain unit maths is [ASSUMED] and listed with the Live settings to render in the round's report
+(`/mnt/e/lynx-work/realive190fm/sub-dev.md`). Menu orders were settled from Live's own Core Library presets on this
+machine, read-only: a preset's name against the value it stores (nothing of them is in LYNX).
+
+- **Hybrid Reverb** (`Hybrid`) → an Audio Effect Rack "Hybrid Reverb". `Algorithm_Type` 0 Dark Hall, 1 Quartz, 2 Shimmer,
+  3 Tides, 4 Prism [DATA: the type-specific parameters the 256 Core Library devices move per type]. `Routing` 0 Serial,
+  1 Parallel, 2 Algorithm, 3 Convolution [ASSUMED order; DATA: the four presets on 3 leave the blend at 0, the ones on 2
+  hold algorithm-sized decays]. Dark Hall / Quartz / Tides / Prism → Atrium (Decay = its RT, Size, Damping → high
+  multiplier, Diffusion, Modulation → late modulation depth, Dark Hall's bass multiplier / crossover, Prism's two
+  multipliers at its crossover); Shimmer → Halo (PitchShift ±12 = Halo's Shift, Shimmer = the shifted feedback, Decay
+  through Halo's Size law). The convolution half: the set's `ImpulseResponseHandler/SampleSlot/Value/SampleRef` (and the
+  `SampleSlotTrueStereo` right file) is looked up on this machine (the set's folder, the library roots, and the
+  `Builtin` folder beside a `Core Library` root: Live's own install, `RelativePathType` 7); found → decoded (WAV / AIFF /
+  AIFC), shaped (`Convolution_IrAttackTime`, `IrDecayTime`, `IrSize`) and embedded in a Fruity Convolver slot (the project
+  keeps it; LYNX ships none); not found → the algorithm alone, the file named in the report (Routing 3 alone: the device
+  stays listed). Serial: Convolver → an inner rack {Convolution | Send → Algorithm}; Parallel: an inner rack {Convolver |
+  Algorithm}; the inner rack's "Blend" crossfades (`ConvoAlgoBlend` 0 = convolution only [DATA: the vocal-IR presets sit
+  at 0]). EQ section → Facet EQ (band type 0 a cut with `Slope` 6 dB per step, 1 a shelf; peaks as bells; `Eq_PreAlgo` in
+  front of the algorithm, else after the wet sum), `StereoWidth` → Utility, Dry/Wet → a dry chain. Macros: Dry/Wet, Decay,
+  Size, Diffusion, Modulation, Damping, Blend, Width (Live's envelopes and macro mappings reach them). Listed: Vintage,
+  Bass Mono, Freeze, Shape, Quartz low damping / distance, Tides, pre-delay feedback, the algorithm's own delay.
+- **Roar** (`Roar`) → an Audio Effect Rack "Roar". `Input_RoutingMode` (a plain value) 0 Single, 1 Serial, 2 Parallel,
+  3 Multi Band, 4 Mid Side, 5 Feedback [DATA: "Basic Parallel" 2 … "Basic Feedback" 5]; stage 3 is used only by Multi
+  Band [DATA]. Per stage: its filter (`Filter_PreOn` before the shaper) — low / band / high pass → Filter, notch / peak →
+  Facet EQ, Morph at its nearest corner, Comb / Resampling listed — and its shaper: `Shaper_Type` 0 … 11 [ASSUMED order,
+  DATA for 2 Bit Crusher, 3 Diode Clipper, 10 Noise Injection] → Ember (Saturator's Soft Sine / Digital Clip fits, the
+  Soft clip, Octave rectifier and Wavefold characters, tube / tape styles) or Lo-fi (bit crusher); Half Wave Rectifier,
+  Noise Injection, Shards listed. Amount → Ember's drive (0 … 36 dB), Trim → its output. Parallel / Multi Band / Mid
+  Side → an inner rack: two chains crossfaded by Blend, three chains behind LYNX's crossover bands (LR 24 dB/oct at
+  `Input_LowMidCrossover` / `MidHighCrossover`), mid / side Utility matrices. Tone → a Facet tilt, compression → Crest
+  Compressor, output gain → Utility, Dry/Wet → a dry chain; macros Drive 1 … 3, Output, Dry/Wet. Listed: modulation (2
+  LFOs, envelope, noise, the matrix), feedback, Color, bias, the compressor's side-chain high pass.
+- **Grain Delay** (`GrainDelay`) → Echoform in Pitch mode (one time for both sides): `MsDelay` 1 … 128 ms or
+  `SyncMode` + `BeatDelayEnum` (the Delay's 1, 2, 3, 4, 5, 6, 8, 16 sixteenths [ASSUMED]) + `BarDelayOffset`; Feedback
+  0 … 0.95 → the loop gain; Pitch −36 … 12 → ±24 st; `NewDryWet` (linear [ASSUMED]) → Echoform's equal-power mix. Listed:
+  Spray, Random Pitch, the grain frequency (Echoform's window is fixed), each repeat shifted once (not again per pass).
+- **Auto Filter** types: `AutoFilter2/Filter_Type` 0 low, 1 high, 2 band pass, 3 notch, 4 Morph, 5 DJ, 6 Comb,
+  7 Resampling, 8 Notch + LP, 9 Vowel [DATA: Core Library names "Cut-O-Move LPF / HPF", "Band-pass Spinner", "Notch Slide
+  Crunch", "DJ Filter Soft Clip", "Comb Envelope", "Resampling Filter S&H", "Vocal Quivver"; 4 and 8 by the STR names
+  left]; the older `AutoFilter/FilterType` 0 … 4 low, high, band, notch, Morph. Morph [DATA: the older device stores the
+  classic type its Morph stands for in `LegacyFilterType`: 0 → low (0), 0.25 → band (2), 0.5 → high (1), 0.75 → notch
+  (3)] → the nearest corner. Notch → a Facet EQ notch band (its Q the low pass's law; LFO / envelope modulation moved onto
+  Facet's frequency scale); DJ (`Filter_DjControl` −1 … 1) → a low pass below 0, a high pass above, cutoff on a log sweep
+  [ASSUMED]. Drive (older `Drive` 0 … 24 dB, newer `Filter_Drive` 0 … 1 × 24 dB [ASSUMED]) → a rack: Ember (transistor
+  curve) in front of the filter, every linked parameter and the Peak Controller's target moved onto a macro; `Circuit`
+  listed. Comb, Resampling, Notch + LP, Vowel stay listed.
+- **Device presets** (gzip XML; `.adg` = `GroupDevicePreset{…, Device, PresetRef, BranchPresets, ReturnBranchPresets}`
+  [SCHEMA, DATA]; `.adv` = the device element right under `<Ableton>` in Live 12.4's Core Library [DATA], the schema's
+  `AbletonDevicePreset{OverwriteProtectionNumber, Device, PresetRef}` wrapper also read): `importLiveDevicePreset`
+  (core/AlsImport.h) opens one the user owns as an insert effect (an audio effect through the translators, an Audio
+  Effect Rack as a LYNX rack, a plugin as a foreign plugin); instrument / MIDI presets are refused with the reason.
+
+## 24. Drum Buss on its own engine: Anvil Bus (round 190fk, 2026-11-13)
+Owner decision O20: Live's Drum Buss colours even at its all-zero setting, which the rack of §18 / §19 could not hold, so
+it now imports onto **Anvil Bus** (`core/AnvilBus.h`, LYNX's own name, look and code), a built-in effect like the others
+(mixer menu, presets, editor art, 14 languages). Laws from round 190ei's renders of Live 12.4.16 (§19), re-fitted on
+the engine (`/mnt/e/lynx-work/drumbus190fk/`: `p/dbrun.cpp` renders the engine on the same stimuli, `ana/fit.py` fits a
+constant against Live's renders with the round-190ek metrics, never letting a case get worse than the rack):
+- **Signal flow:** Trim → colour pre-emphasis (a +2.5 dB bell at 100 Hz) → Drive gain → the type's curve, 4×
+  oversampled → Damp → colour EQ (three bells), the type's EQ, Crunch's band, Boom's bell and resonant high pass →
+  Comp → Transients → Output → Dry/Wet against the raw input. Latency 55 samples (Live 188, the rack 254).
+- **Curve:** y = s (u) + (sin (k·u) / k − s (u))·m with s (u) = u / √(1 + u²) and u = the driven input: a soft
+  saturation blended with a sine folder, m and k per type at 0 / 25 / 50 / 100 % (fitted on the 1 kHz staircases:
+  level rms 0.04 … 0.46 dB). Soft at 100 % folds a 0 dBFS sine's fundamental away (Live −130 dBFS, the engine
+  −40 dBFS); Medium and Hard clip with their own EQ under the drive (Soft: −4.2 dB at 37 Hz, Medium −16.4 dB at 181 Hz,
+  Hard a +14 dB low shelf at 120 Hz, at 100 % and in proportion below; normalised at 1 kHz).
+- **Damp:** a one-pole low pass (no zero at Nyquist: the top flattens like Live's) at the set frequency.
+- **Comp:** feed-forward, stereo-linked peak detector, 4 : 1 above −18.3 dB, knee 1.2 dB, attack 0.45 ms, release
+  145 ms, +11.1 dB make-up.
+- **Transients:** the band above 330 Hz (a one-pole split) through Strike Shaper's level-independent detector; attack
+  min (15, 22.6·t) dB and sustain 19.0·t dB for t > 0, attack 14.6·|t| and sustain −22.5·|t| dB for t < 0.
+- **Boom / Crunch / colour:** §19's fits, unchanged (Boom's high pass stays at 10 Hz with Boom at 0).
+Before → after per case (the rack against the engine, same stimuli, same metrics) and what still needs a live render:
+`/mnt/e/lynx-work/drumbus190fk/HANDOFF.md`.
+
+## 25. Audio clip envelopes (round 190gi)
+
+- An audio clip's clip envelopes: `AudioClip/Envelopes/Envelopes/ClipEnvelope{EnvelopeTarget/PointeeId, Automation/Events/FloatEvent{Time, Value}, LoopSlot, ScrollerTimePreserver}` **[SCHEMA, DATA]**, times in clip beats (the clip's `LoopStart` coordinates), the first event "before the song" (−63072000).
+- Clip Gain → the track's `DeviceChain/MainSequencer/VolumeModulationTarget`; Track Panning modulation → `DeviceChain/Mixer/Pan/ModulationTarget` **[SCHEMA, DATA: the 12 Suite demo set's vocal clips]**. Values −1…1 (−1 where those clips are silent) **[DATA]**.
+- LYNX: the clip's own `ClipEnvelope` volume / pan lanes (core/ClipEnvelope.h), 0…1 ↔ −1…1 linear (the ends are certain; the law between them needs a live check). Export: the PointeeId is a placeholder until the ids are renumbered, then the track's own target ids; a curved LYNX segment is written as 8 straight ones. Import: other clip envelopes (devices, track volume modulation, transposition, sample offset) are listed; Live 11+ curve controls become straight segments (listed).
+- **Round 190gx (Live 12.4 renders of round 190gu, 1 kHz sine, the same in Re-Pitch and Complex):** Live plays clip
+  envelopes **only on warped clips** (an unwarped clip renders at unity and its Clip View has no Envelopes tab) — the
+  import leaves an unwarped clip's envelopes out (listed); the export always writes warped clips. **Clip Gain law**
+  (value L → dB): 20·(L − 1) from 1 down to −0.2; below it the larger of −50·L² + L − 21.8 and the line through
+  (−0.98, −69.4 dB) and (−0.96, −68.37 dB) (it takes over near −0.95); −1 silent; never above 0 dB. All 28 measured
+  values within 0.01 dB (`clipenv::liveGainDb`). LYNX's volume lane keeps its own gain law (FL's Levels adjustment), so
+  the values are converted through the gain both ways (`clipenv::toLive / fromLive`), and because the two programs'
+  ramps are straight in different units a volume ramp is cut into pieces both ways until the gain agrees within 0.05 dB
+  (above −60 dB). **Track Panning law:** constant power with +3 dB at the sides, L = √2·cos((p+1)·π/4),
+  R = √2·sin((p+1)·π/4) — the same as LYNX's voice pan, so the pan lane maps one to one.

@@ -21,7 +21,7 @@ TEST (extras190am_extras_list)
         CHECK (item.note.back() == '.'); // one line of explanation, a sentence
         CHECK (item.note.find ("Also ") != std::string_view::npos); // ... that names the switch's own place
     }
-    CHECK (count == 11);
+    CHECK (count == 12); // (round 190gz: project.linkTracks)
     for (const auto* id : { "mixer.loudness", "mixer.usedOnly", "mixer.keepLostLinks", "mixer.followPlaylist", "playlist.automationLanes",
                             "pianoRoll.songBarsRuler", "general.hoverValues" })
         CHECK (ids.count (id) == 1);

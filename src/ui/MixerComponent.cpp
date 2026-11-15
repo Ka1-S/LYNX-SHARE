@@ -7,6 +7,7 @@
 #include "ui/MixerComponent.h"
 #include "ui/PluginOffTag.h"
 #include "ui/SlotWatch.h"
+#include "core/AlsImport.h"
 #include "core/ValueMath.h"
 #include "ui/UiTrace.h"
 #include "ui/TextCache.h"
@@ -43,6 +44,7 @@
 #include "ui/PluginEditors.h"
 #include "ui/PluginWindow.h"
 #include "ui/HintBar.h"
+#include "core/StandIns.h"
 #include "ui/I18n.h"
 #include "ui/LiveRemoteUi.h"
 #include "core/LynxTune.h"
@@ -1805,7 +1807,12 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
             updateSize();
             selectTrack (juce::jmax (1, count));
         });
-        menu.addItem (tr ("Add multiple..."), room, false, [this, count] { askInsertMultiple (juce::jmax (1, count)); });
+        menu.addItem (tr ("Add multiple..."), room, false, [this, count] { askInsertMultiple (juce::jmax (1, count), true); });
+        // FL's third item (Tag -1, round 190fl): the number of inserts to have, the new ones at the end. Round 190gw: FL 2026
+        // shows it only on THIS "+" (the one after the last strip): AddMixerTracksMenuBeforePopup 0x12a87d0 sets the
+        // item's Visible (TQuickMenuItem.Visible's setter 0x840720) to "the menu was not opened from the toolbar's
+        // AddTrackAfterSelectedBtn" — LYNX has no such toolbar button, and FL's track / options menus never had the item
+        menu.addItem (tr ("Increase number of tracks to..."), room, false, [this] { askInsertCount(); });
         // FL's "Add from state" (REA round 167q: AddMixerTracksMenu, FUN_012a87d0 / FUN_012a83b0)
         juce::PopupMenu fromState;
         for (const auto& f : mixerpresets::all())
@@ -1966,7 +1973,11 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
         selectBase.clear();
         if (e.mods.isShiftDown())
             selectBase = selection;
-        dragSelectTo (t);
+        // LYNX extra (issue #163, owner 2026-11-14; FL has no Ctrl+click toggle): with Ctrl alone the press waits; a drag
+        // onto another strip does FL's range from here, a release on this strip adds / removes it
+        ctrlClickPending = ! e.mods.isShiftDown();
+        if (! ctrlClickPending)
+            dragSelectTo (t);
         return;
     }
 
@@ -2168,8 +2179,11 @@ void MixerStrips::mouseDrag (const juce::MouseEvent& e)
 
     if (selectAnchor > 0)
     {
-        if (const auto t = trackAt (juce::jlimit (0, getWidth() - 1, e.x)); t >= 0)
+        if (const auto t = trackAt (juce::jlimit (0, getWidth() - 1, e.x)); t >= 0 && ! (ctrlClickPending && t == selectAnchor))
+        {
+            ctrlClickPending = false;
             dragSelectTo (t);
+        }
         return;
     }
 
@@ -2609,7 +2623,7 @@ ui::Hint MixerStrips::hintAt (juce::Point<int> p)
             h.text = tr ("Folded group: {0} ({1} inserts)  [LMB] unfold", { name, juce::String ((int) mixerops::groupOf (song, t).size()) });
             break;
         case Part::header:
-            h.text = name + " - " + tr ("[LMB] selects  [Ctrl]+[LMB] or drag across: range  [Ctrl]+[Shift]+[LMB] adds or removes  [LMB] drag sideways reorders  [RMB] insert menu") + feeds() + latency();
+            h.text = name + " - " + tr ("[LMB] selects  [Ctrl]+[LMB] or [Ctrl]+[Shift]+[LMB] adds or removes  [Ctrl] drag across: range  [LMB] drag sideways reorders  [RMB] insert menu") + feeds() + latency();
             h.hasMenu = true;
             if (engine.insertPlaysStandIn (t))
                 h.text = name + " - " + tr ("Stand-in: a plugin of this insert is not installed on this PC, a render of its sound plays (the plugins' settings are kept)");
@@ -2618,7 +2632,7 @@ ui::Hint MixerStrips::hintAt (juce::Point<int> p)
             break;
         case Part::body:
         case Part::none:
-            h.text = name + " - " + tr ("Click selects the insert (Ctrl+click or drag across: range, Ctrl+Shift: add or remove), right-click opens its menu; Alt+Left/Right moves the selection") + feeds() + latency();
+            h.text = name + " - " + tr ("Click selects the insert (Ctrl+click or Ctrl+Shift+click: add or remove, Ctrl+drag across: range), right-click opens its menu; Alt+Left/Right moves the selection") + feeds() + latency();
             h.hasMenu = true;
             break;
     }
@@ -2638,6 +2652,22 @@ void MixerStrips::mouseUp (const juce::MouseEvent&)
         repaint();
     dragVca = -1;
 
+    if (ctrlClickPending && selectAnchor > 0)
+    {
+        // the LYNX Ctrl+click toggle (the last selected track stays: the mixer always has one)
+        auto s = selection;
+        const auto t = selectAnchor;
+        if (const auto it = std::lower_bound (s.begin(), s.end(), t); it != s.end() && *it == t)
+        {
+            if (s.size() > 1)
+                s.erase (it);
+        }
+        else
+            s.insert (std::lower_bound (s.begin(), s.end(), t), t);
+        const auto primary = std::binary_search (s.begin(), s.end(), t) ? t : (std::binary_search (s.begin(), s.end(), selected) ? selected : s.back());
+        setSelection (s, primary);
+    }
+    ctrlClickPending = false;
     headerDragTrack = -1;
     headerDragged = false;
     selectAnchor = -1;
@@ -3048,36 +3078,96 @@ static void placeRenderedFiles (AudioEngine& engine, const std::vector<juce::Fil
         engine.editSong ([list] (Song& s) { mixerops::placeRenderedFiles (s, list); });
 }
 
-void MixerStrips::askInsertMultiple (int at)
+std::unique_ptr<juce::AlertWindow> MixerStrips::makeInsertMultipleBox (bool adding)
 {
-    auto* window = new juce::AlertWindow (tr ("Insert multiple"), tr ("How many blank inserts?"), juce::MessageBoxIconType::NoIcon);
-    // FL 2026's box starts at 10, already selected; Ctrl+A selects it again (round 167a [SHOT s13–s15])
-    window->addTextEditor ("count", "10");
+    auto window = std::make_unique<juce::AlertWindow> (adding ? tr ("Add multiple") : tr ("Insert multiple"),
+                                                      adding ? tr ("Enter the number of mixer tracks to add") : tr ("Number of tracks to add"),
+                                                      juce::MessageBoxIconType::NoIcon);
+    window->addTextEditor ("count", adding ? "10" : "1");
+    if (auto* field = window->getTextEditor ("count"))
+        field->setInputRestrictions (4, "0123456789");
+    window->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+    window->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+    return window;
+}
+
+void MixerStrips::askInsertMultiple (int at, bool adding)
+{
+    // FL 2026 (round 190gw; live check 190gu B4, shots reafl/fl-mixer-insert-multiple-*.png; FLEngine
+    // InsertMixerTrackMenuItemClick 0x129c990 and AddOneMixerTrackMenuClick 0x12a8bb0 Tag -2): the track menu's
+    // "Insert multiple..." asks "Number of tracks to add" (1, selected) and refuses anything outside 1 to the room left
+    // ("Please enter a number between 1 and N.", N = 500 - inserts: 377 on a 123-insert project); the new tracks go before
+    // the track and are all selected. The "+" menu's "Add multiple..." asks "Enter the number of mixer tracks to add" (10)
+    // and refuses more than the room ("You can add a maximum of N tracks."). Nothing is added after an error.
+    auto* window = makeInsertMultipleBox (adding).release();
+    juce::Component::SafePointer<MixerStrips> safe (this);
+    window->enterModalState (true, juce::ModalCallbackFunction::create ([safe, at, adding, window] (int result) {
+                                 if (safe == nullptr || result != 1)
+                                     return;
+                                 const auto n = window->getTextEditorContents ("count").getIntValue();
+                                 const auto& song = safe->engine.getSong();
+                                 const auto room = mixerops::roomForInserts (song);
+                                 if (const auto check = mixerops::checkInsertMultiple (song, n, adding); check != mixerops::InsertCheck::ok)
+                                 {
+                                     juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Error"),
+                                                                             check == mixerops::InsertCheck::outOfRange
+                                                                                 ? tr ("Please enter a number between 1 and {0}.", { juce::String (room) })
+                                                                                 : tr ("You can add a maximum of {0} tracks.", { juce::String (room) }));
+                                     return;
+                                 }
+                                 if (n <= 0)
+                                     return;
+                                 const auto first = juce::jlimit (1, (int) song.mixer.size(), at);
+                                 int added = 0;
+                                 safe->engine.editSong ([first, n, &added] (Song& s) { added = mixerops::insertTracks (s, first, n); });
+                                 std::vector<int> made;
+                                 for (int i = 0; i < added; ++i)
+                                 {
+                                     safe->revealed.insert (first + i); // shown even while unused
+                                     made.push_back (first + i);
+                                 }
+                                 safe->updateSize();
+                                 if (! made.empty())
+                                     safe->setSelection (made, first); // (FL: the new tracks, all selected)
+                             }),
+                             true);
+    if (auto* field = window->getTextEditor ("count"))
+    {
+        field->grabKeyboardFocus();
+        field->selectAll();
+    }
+}
+
+// FL's "Increase number of tracks to..." (AddOneMixerTrackMenuClick 0x12a8bb0, Tag -1; round 190fl): the box starts at
+// the number of inserts; FL refuses a number below it or above 500 with "Track count must be between N and 500."
+void MixerStrips::askInsertCount()
+{
+    const auto now = mixerops::insertCount (engine.getSong());
+    auto* window = new juce::AlertWindow (tr ("Increase number of tracks to..."), tr ("Enter the number of mixer tracks"), juce::MessageBoxIconType::NoIcon);
+    window->addTextEditor ("count", juce::String (now));
     if (auto* field = window->getTextEditor ("count"))
         field->setInputRestrictions (4, "0123456789");
     window->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
     window->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
     juce::Component::SafePointer<MixerStrips> safe (this);
-    window->enterModalState (true, juce::ModalCallbackFunction::create ([safe, at, window] (int result) {
+    window->enterModalState (true, juce::ModalCallbackFunction::create ([safe, window] (int result) {
                                  if (safe == nullptr || result != 1)
                                      return;
-                                 const auto n = window->getTextEditorContents ("count").getIntValue();
-                                 const auto room = mixerops::roomForInserts (safe->engine.getSong());
-                                 if (n > room) // FL 2026 shows "You can add a maximum of 375 tracks." (round 166d [SHOT]); nothing is added then
+                                 const auto wanted = window->getTextEditorContents ("count").getIntValue();
+                                 const auto& song = safe->engine.getSong();
+                                 if (! mixerops::validInsertCount (song, wanted))
                                  {
-                                     juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Insert multiple"),
-                                                                             tr ("You can add a maximum of {0} inserts.", { juce::String (room) }));
+                                     juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Error"),
+                                                                             tr ("Track count must be between {0} and {1}.",
+                                                                                 { juce::String (mixerops::insertCount (song)), juce::String (maxMixerTracks - 1) }));
                                      return;
                                  }
-                                 if (n > 0)
-                                 {
-                                     const auto first = juce::jlimit (1, (int) safe->engine.getSong().mixer.size(), at);
-                                     safe->engine.editSong ([first, n] (Song& s) { mixerops::insertTracks (s, first, n); });
-                                     for (int i = 0; i < n; ++i)
-                                         safe->revealed.insert (first + i); // shown even while unused
-                                     safe->updateSize();
-                                     safe->selectTrack (first);
-                                 }
+                                 const auto first = (int) song.mixer.size();
+                                 int added = 0;
+                                 safe->engine.editSong ([wanted, &added] (Song& s) { added = mixerops::increaseInsertsTo (s, wanted); });
+                                 for (int i = 0; i < added; ++i)
+                                     safe->revealed.insert (first + i); // shown even while unused
+                                 safe->updateSize();
                              }),
                              true);
     if (auto* field = window->getTextEditor ("count"))
@@ -3352,6 +3442,19 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
             setSelection (selection, t);
             selectLinkedChannels();
         });
+        // FL's second item (SelectLinkedMenuClick 0x129d110, round 190fl): every selected insert's channels and Playlist
+        // tracks (audio tracks linked to it, instrument tracks whose channel plays into it); the Playlist shows the first
+        {
+            const auto channels = mixerops::channelsOn (song, targets);
+            const auto tracks = mixerops::playlistTracksOn (song, targets);
+            select.addItem (tr ("Channels and playlist tracks routed to this track"), ! channels.empty() || ! tracks.empty(), false,
+                            [this, channels, tracks] {
+                                if (! channels.empty())
+                                    engine.setChannelSelection (channels, channels.front());
+                                if (! tracks.empty() && mixeroptions::selectPlaylistTracks)
+                                    mixeroptions::selectPlaylistTracks (tracks);
+                            });
+        }
         select.addSeparator();
         const auto destinations = mixerops::destinationsOf (song, t);
         const auto sources = mixerops::sourcesOf (song, t);
@@ -3612,6 +3715,9 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
         menu.addSubMenu (tr ("Disk recording"), disk);
         juce::PopupMenu pdc;
         const auto manual = std::count_if (song.mixer.begin(), song.mixer.end(), [] (const MixerTrack& m) { return m.latencyMs != 0.0f; });
+        // FL's first item (SetupPDCMenuClick → FUN_012a3880(1, 1), round 190fl): every track's manual latency back to
+        // 0 without the warning box; the compensation then comes from the plugins again
+        pdc.addItem (tr ("Set for all tracks"), [this] { engine.editSong ([] (Song& s) { mixerops::setPdcForAllTracks (s); }); });
         pdc.addItem (tr ("Reset manual latency on all tracks"), manual > 0, false, [this] {
             juce::AlertWindow::showOkCancelBox (juce::MessageBoxIconType::WarningIcon, tr ("Warning"),
                                                 tr ("This will reset manual latency values on all mixer tracks."), tr ("OK"), tr ("Cancel"), nullptr,
@@ -4214,7 +4320,7 @@ const EffectKind allEffects[] = { EffectKind::eq,     EffectKind::parametricEq, 
                                       EffectKind::delay,  EffectKind::reverb,       EffectKind::chorus,     EffectKind::filter,
                                       EffectKind::distortion, EffectKind::utility, EffectKind::volumeGate,
                                       EffectKind::pitchShift, EffectKind::freqShift, EffectKind::lofi, EffectKind::effector, EffectKind::crossover, EffectKind::frequencySplitter, EffectKind::autoPan, EffectKind::vocoder, EffectKind::pitchCorrect,
-                                      EffectKind::ridgeStrip, EffectKind::glowLeveler, EffectKind::hushDeEsser, EffectKind::aether, EffectKind::ember, EffectKind::kilnChannel, EffectKind::fretChannel, EffectKind::shellChannel, EffectKind::strikeShaper, // LYNX's mixing suite
+                                      EffectKind::ridgeStrip, EffectKind::glowLeveler, EffectKind::hushDeEsser, EffectKind::aether, EffectKind::ember, EffectKind::kilnChannel, EffectKind::fretChannel, EffectKind::shellChannel, EffectKind::strikeShaper, EffectKind::anvilBus, // LYNX's mixing suite
                                       EffectKind::lynxTune, // LYNX's own pitch corrector
                                       EffectKind::epochVerb, EffectKind::atrium, EffectKind::foilPlate, EffectKind::nebula, EffectKind::halo, EffectKind::horizon, // LYNX's reverbs
                                       EffectKind::echoform, EffectKind::spiralEcho, EffectKind::orbit, EffectKind::latticeMod, // LYNX's delay / modulation suite
@@ -4775,6 +4881,7 @@ std::function<void()> changed;
 std::function<void (bool)> setShowUsedOnly;
 std::function<void (bool)> setShowLoudness;
 std::function<void (std::vector<int>, std::function<void (const std::vector<juce::File>&)>)> renderTracks;
+std::function<void (std::vector<int>)> selectPlaylistTracks;
 
 namespace
 {
@@ -5725,7 +5832,8 @@ void EffectsPanel::paint (juce::Graphics& g)
 
         g.setColour (colour::textSecondary);
         g.setFont (font (type::caption));
-        textcache::drawFittedText (g, juce::String::fromUTF8 (info.params[(std::size_t) p].name), r.getX(), r.getY() + knobHeight + 2, r.getWidth(), 14,
+        // (round 190fg: through the translation table, as the generated editor page and the Pocket panels show it)
+        textcache::drawFittedText (g, tr (info.params[(std::size_t) p].name), r.getX(), r.getY() + knobHeight + 2, r.getWidth(), 14,
                           juce::Justification::centred, 1, 0.8f);
         g.setColour (colour::textPrimary);
         textcache::drawText (g, juce::String::fromUTF8 (formatEffectParam (slot.kind, p, value, song.bpm, slot.params).c_str()), r.getX(), r.getY() + knobHeight + 16,
@@ -5733,11 +5841,29 @@ void EffectsPanel::paint (juce::Graphics& g)
     }
 }
 
+bool EffectsPanel::refuseFrozenSlots (juce::Point<int> p)
+{
+    const auto& song = engine.getSong();
+    const auto channel = freeze::frozenByInsert (song, track);
+    if (channel < 0)
+        return false;
+    bool inSlots = fxSwitchBounds().contains (p) || sidechainButtonBounds().contains (p) || knobAt (p) >= 0;
+    for (int row = 0; row < maxEffectSlots && ! inSlots; ++row)
+        inSlots = slotBounds (row).contains (p);
+    if (! inSlots)
+        return false;
+    ui::postNotice ({ tr ("{0} is frozen with its effects: Unfreeze the track to edit them", { juce::String::fromUTF8 (song.channels[(std::size_t) channel].name.c_str()) }), {} },
+                    3000);
+    return true;
+}
+
 void EffectsPanel::mouseDown (const juce::MouseEvent& e)
 {
     const auto* s = slots();
 
     if (s == nullptr)
+        return;
+    if (refuseFrozenSlots (e.getPosition()))
         return;
 
     if (const auto sc = sidechainButtonBounds(); ! sc.isEmpty() && sc.contains (e.getPosition()))
@@ -6017,7 +6143,7 @@ ui::ValueSpec EffectsPanel::specFor (int param, int slot) const
     if (param < 0 || param >= (int) info.params.size())
         return spec;
 
-    spec.name = trackName + " - " + utf8 (info.name) + " - " + utf8 (info.params[(std::size_t) param].name);
+    spec.name = trackName + " - " + utf8 (info.name) + " - " + tr (info.params[(std::size_t) param].name); // (as "Mix" above)
     spec.defaultValue = info.params[(std::size_t) param].defaultValue;
     spec.toText = [kind = fx.kind, param, bpm = song.bpm, context = fx.params] (double v) { return utf8 (formatEffectParam (kind, param, (float) v, bpm, context).c_str()); };
     spec.fromText = ui::inverseOf (spec.toText, 0.0, 1.0);
@@ -6084,6 +6210,8 @@ void EffectsPanel::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseW
         return;
     }
 
+    if (freeze::frozenByInsert (engine.getSong(), track) >= 0 && refuseFrozenSlots (e.getPosition()))
+        return;
     if (auto eqControl = eqControlAt (e.getPosition()); eqControl != 0)
     {
         if (isEqPoint (eqControl)) // the wheel over a handle changes the band's width
@@ -6430,6 +6558,8 @@ void EffectsPanel::mouseUp (const juce::MouseEvent& e)
 
 void EffectsPanel::mouseDoubleClick (const juce::MouseEvent& e)
 {
+    if (refuseFrozenSlots (e.getPosition()))
+        return;
     if (const auto eqControl = eqControlAt (e.getPosition()); eqControl != 0)
     {
         if (isEqPoint (eqControl)) // the band back to 0 dB
@@ -6465,7 +6595,7 @@ void EffectsPanel::mouseDoubleClick (const juce::MouseEvent& e)
 
 bool EffectsPanel::isInterestedInDragSource (const SourceDetails& details)
 {
-    return (BrowserComponent::isBrowserDrag (details) && BrowserComponent::draggedFile (details).hasFileExtension ("fst"))
+    return (BrowserComponent::isBrowserDrag (details) && BrowserComponent::draggedFile (details).hasFileExtension ("fst;adv;adg"))
            || BrowserComponent::isEffectDrag (details) || BrowserComponent::isGeneratorDrag (details);
 }
 
@@ -6489,7 +6619,8 @@ void EffectsPanel::itemDropped (const SourceDetails& details)
 
 bool EffectsPanel::isInterestedInFileDrag (const juce::StringArray& files)
 {
-    return files.size() == 1 && juce::File (files[0]).hasFileExtension ("fst");
+    // FL presets (.fst) and, round 190fm, Live's device / rack presets the user owns (.adv / .adg, core/AlsImport.h)
+    return files.size() == 1 && juce::File (files[0]).hasFileExtension ("fst;adv;adg");
 }
 
 void EffectsPanel::filesDropped (const juce::StringArray& files, int x, int y)
@@ -6500,12 +6631,23 @@ void EffectsPanel::filesDropped (const juce::StringArray& files, int x, int y)
 
 bool EffectsPanel::dropPreset (const juce::File& file, juce::Point<int> position)
 {
+    if (freeze::frozenByInsert (engine.getSong(), track) >= 0 && refuseFrozenSlots (position))
+        return false;
     juce::MemoryBlock data;
 
     if (slots() == nullptr || ! file.loadFileAsData (data))
         return false;
 
     const auto* bytes = static_cast<const std::uint8_t*> (data.getData());
+    if (file.hasFileExtension ("adv;adg")) // round 190fm: a Live device or Audio Effect Rack preset → LYNX's own engines
+    {
+        std::string error;
+        if (auto live = importLiveDevicePreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), {}, &error))
+            return dropEffect (std::move (live->slot), position);
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Preset"),
+                                                tr ("LYNX SHARE can't build an effect from this preset."));
+        return false;
+    }
     const auto fx = effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), engine.getSong().bpm, natives::flDataReader (flStudioAccess()));
 
     if (! fx)
@@ -6520,6 +6662,8 @@ bool EffectsPanel::dropPreset (const juce::File& file, juce::Point<int> position
 
 bool EffectsPanel::dropEffect (EffectSlot fx, juce::Point<int> position)
 {
+    if (freeze::frozenByInsert (engine.getSong(), track) >= 0 && refuseFrozenSlots (position))
+        return false;
     if (slots() == nullptr)
         return false;
 
@@ -6592,6 +6736,8 @@ juce::Rectangle<int> EffectsPanel::pluginButtonBounds() const
 
 void EffectsPanel::openEditor (int slot)
 {
+    if (freeze::frozenByInsert (engine.getSong(), track) >= 0) // (round 190ff: its effects are not loaded)
+        return;
     const auto* s = slots();
     if (s == nullptr || slot < 0 || slot >= (int) s->size())
         return;
@@ -6606,6 +6752,8 @@ void EffectsPanel::openEditor (int slot)
 
 void EffectsPanel::toggleEditor (int slot)
 {
+    if (freeze::frozenByInsert (engine.getSong(), track) >= 0) // (round 190ff: its effects are not loaded)
+        return;
     const auto* s = slots();
     if (s == nullptr || slot < 0 || slot >= (int) s->size())
         return;

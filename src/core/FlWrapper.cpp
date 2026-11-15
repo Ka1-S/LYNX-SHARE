@@ -1,5 +1,7 @@
 #include "core/FlWrapper.h"
 
+#include "flp/Flp.h"
+
 #include <algorithm>
 #include <cstring>
 #include <string>
@@ -442,5 +444,21 @@ void resetOutputOffsets (std::vector<PluginOutputRoute>& routes, int count)
 int outputTargetTrack (int channelTrack, const PluginOutputRoute& route, bool pluginDefault) noexcept
 {
     return route.isActive (pluginDefault) ? channelTrack + route.offset : -1;
+}
+
+bool foreignFromFlPreset (const std::vector<std::uint8_t>& fileBytes, ForeignPlugin& out)
+{
+    try
+    {
+        // a channel or effect preset holds one plugin record: its name (0xC9) and state (0xD5), as a channel
+        const auto project = flp::parseProject (fileBytes, true);
+        if (project.channels.empty() || project.channels.front().pluginName != "Fruity Wrapper")
+            return false;
+        return parseFlWrapper (project.channels.front().pluginState, out) && ! out.name.empty();
+    }
+    catch (const std::exception&)
+    {
+        return false;
+    }
 }
 } // namespace lynx

@@ -1,4 +1,5 @@
 #include "core/AlsExport.h"
+#include "core/ClipEnvelope.h"
 
 #include <algorithm>
 #include <charconv>
@@ -18,6 +19,7 @@
 #include "core/ClipLauncher.h"
 #include "core/Effects.h"
 #include "core/FlWrapper.h"
+#include "core/Groove.h"
 #include "core/Gzip.h"
 #include "core/Inflate.h"
 #include "core/LiveScales.h"
@@ -247,7 +249,7 @@ int warpModeOf (const SamplerSettings& s)
         case StretchMethod::mono:
         case StretchMethod::tones: return 1;      // Tones
         case StretchMethod::texture: return 2;    // Texture
-        default: return 4;                        // Complex
+        default: return s.warpModes.complexPro ? 6 : 4; // Complex (Complex Pro when it came from one, round 190fm)
     }
 }
 
@@ -879,6 +881,96 @@ struct Exporter
         }
     }
 
+    // ---- grooves (round 190fm) [SCHEMA 2742-2759: GroovePool{LomId, Grooves, DefaultGrooveId (Live 12)}, Groove Id=…
+    // {LomId, Name, Clip, Grid, QuantizationAmount, TimingAmount, RandomAmount, VelocityAmount, Annotation, Selection,
+    // SourceContext}; DATA: the shipped Live 12 sets and a Live 11.0.12 set save the same members, SourceContext empty
+    // for a groove that came from no file]. Live's Groove Id = the groove's index in LYNX's pool.
+    std::string liveGrooveId (std::uint32_t id) const
+    {
+        const auto& list = song.grooves.grooves;
+        for (std::size_t i = 0; i < list.size(); ++i)
+            if (id != 0 && list[i].id == id)
+                return num ((int) i);
+        return "-1";
+    }
+    void setClipGroove (Node& clip, std::uint32_t id) { clip.value ("GrooveSettings/GrooveId", liveGrooveId (id)); }
+
+    static Node member (const char* name, std::string value)
+    {
+        Node n;
+        n.name = name;
+        n.set ("Value", std::move (value));
+        return n;
+    }
+
+    // One groove: its template as a looping MIDI clip (one note per point, Velocity = the accent), Grid = the base
+    Node grooveNode (const Groove& g, int index)
+    {
+        Pattern p;
+        p.name = g.name;
+        for (const auto& point : g.points)
+        {
+            Note n;
+            n.channel = 0;
+            n.key = 60;
+            n.start = point.tick;
+            n.length = ppq / 16;
+            n.velocity = point.velocity;
+            n.release = 64.0f / 127.0f;
+            p.notes.push_back (n);
+        }
+        Node clip = midiClip (p, 0, 0, g.length, 0, false, 0);
+        clip.value ("Loop/LoopOn", "true");
+        Node value;
+        value.name = "Value";
+        value.add (std::move (clip));
+        Node holder;
+        holder.name = "Clip";
+        holder.add (std::move (value));
+
+        Node out;
+        out.name = "Groove";
+        out.set ("Id", num (index));
+        out.add (member ("LomId", "0"));
+        out.add (member ("Name", g.name));
+        out.add (std::move (holder));
+        out.add (member ("Grid", num ((int) g.base)));
+        const auto percent = [] (float v) { return num (std::round ((double) v * 1.0e6) / 1.0e4); };
+        out.add (member ("QuantizationAmount", percent (g.quantize)));
+        out.add (member ("TimingAmount", percent (g.timing)));
+        out.add (member ("RandomAmount", percent (g.random)));
+        out.add (member ("VelocityAmount", percent (g.velocity)));
+        out.add (member ("Annotation", ""));
+        out.add (member ("Selection", "false"));
+        Node source;
+        source.name = "SourceContext";
+        out.add (std::move (source));
+        return out;
+    }
+
+    // The set's pool and the main track's GlobalGrooveAmount (percent; LYNX's pool amount 0…1.3)
+    void groovePool (Node& set, Node* main)
+    {
+        if (main != nullptr)
+            main->value ("DeviceChain/Mixer/GlobalGrooveAmount/Manual", num (std::round ((double) song.grooves.amount * 1.0e6) / 1.0e4));
+        auto* pool = set.child ("GroovePool");
+        if (pool == nullptr)
+        {
+            if (! song.grooves.grooves.empty())
+                note ("Groove Pool not exported (no pool in this Live version's set)");
+            return;
+        }
+        if (auto* list = pool->child ("Grooves"))
+        {
+            list->kids.clear();
+            for (std::size_t i = 0; i < song.grooves.grooves.size(); ++i)
+                list->add (grooveNode (song.grooves.grooves[i], (int) i));
+        }
+        pool->value ("DefaultGrooveId", "-1"); // (Live 12 only; LYNX has no default groove for new clips)
+        if (! song.grooves.grooves.empty())
+            note ("Grooves: Live plays them by its own groove law, which may sound slightly different from LYNX's");
+    }
+
     // ---- clips
     Node midiClip (const Pattern& p, int channel, std::int64_t start, std::int64_t length, std::int64_t offset, bool muted, int id)
     {
@@ -1012,6 +1104,17 @@ struct Exporter
         const auto mode = warpModeOf (ch.sampler);
         c.value ("IsWarped", "true");
         c.value ("WarpMode", num (mode));
+        { // the warp mode's own settings (round 190fm; ALS_FORMAT §21): the skeleton holds Live's defaults
+            const auto& w = ch.sampler.warpModes;
+            c.value ("GranularityTones", num ((double) w.tonesGrain));
+            c.value ("GranularityTexture", num ((double) w.textureGrain));
+            c.value ("FluctuationTexture", num ((double) w.textureFlux));
+            c.value ("TransientResolution", num ((int) w.beatsPreserve));
+            c.value ("TransientLoopMode", num ((int) w.beatsLoop));
+            c.value ("TransientEnvelope", num ((double) w.beatsEnvelope));
+            c.value ("ComplexProFormants", num ((double) w.proFormants));
+            c.value ("ComplexProEnvelope", num ((double) w.proEnvelope));
+        }
         // a Beats channel's offline transposition (stretchPitch) is the clip's transpose in Live
         const auto baked = mode == 0 && ch.sampler.keepPitch && ch.sampler.stretchBeats > 0.0f ? (double) ch.sampler.stretchPitch : 0.0;
         const auto pitch = mode == 3 ? 0.0 : std::clamp ((double) clip.pitch + baked, -48.0, 48.0);
@@ -1092,7 +1195,151 @@ struct Exporter
         }
         if (clip.reversed)
             note ("Reversed audio clips are exported forwards");
+        clipEnvelopes (c, clip);
         return c;
+    }
+
+    // Round 190gi: the clip's own envelopes → Live's clip envelopes, in clip beats: volume → the track's Clip Gain
+    // (MainSequencer/VolumeModulationTarget), pan → the Mixer's Track Panning modulation (Mixer/Pan/ModulationTarget),
+    // values on Live's measured laws (clipenv::toLive; an exported audio clip is always warped, so Live plays them, round
+    // 190gx). The targets' ids exist only after the renumbering: the PointeeId holds a
+    // placeholder that run() replaces per track (clipEnvelopeTargets).
+    void clipEnvelopes (Node& c, const Clip& clip)
+    {
+        const auto* e = clipenv::activeOf (song, clip);
+        auto* list = c.at ("Envelopes/Envelopes");
+        if (e == nullptr)
+            return;
+        if (list == nullptr)
+        {
+            auto* envelopes = c.child ("Envelopes");
+            if (envelopes == nullptr)
+                return;
+            Node inner;
+            inner.name = "Envelopes";
+            envelopes->add (std::move (inner));
+            list = envelopes->child ("Envelopes");
+        }
+        int id = (int) list->kids.size();
+        bool curved = false;
+        for (const auto lane : { clipenv::volumeLane, clipenv::panLane })
+        {
+            const auto& points = clipenv::laneOf (*e, lane);
+            if (clipenv::flat (points, clipenv::neutralOf (lane)))
+                continue;
+            // the events: each point, and a curved segment (FL's curve modes, a tension) sampled at 8 steps; round 190gx:
+            // a volume segment is also cut until Live's straight line in its own value (its Clip Gain law, measured in
+            // 190gu) keeps LYNX's gain curve within 0.05 dB
+            std::vector<std::pair<double, double>> events;
+            for (std::size_t k = 0; k < points.size(); ++k)
+            {
+                events.push_back ({ beats (points[k].tick), clipenv::toLive (lane, points[k].value) });
+                if (k + 1 >= points.size() || points[k + 1].tick <= points[k].tick)
+                    continue;
+                const auto curvedSegment = points[k].mode != 0 || points[k].tension != 0.0f;
+                if (! curvedSegment && (lane != clipenv::volumeLane || points[k + 1].value == points[k].value))
+                    continue;
+                curved = curved || curvedSegment;
+                const auto t0 = (double) points[k].tick, t1 = (double) points[k + 1].tick;
+                const auto v0 = points[k].value, v1 = points[k + 1].value;
+                const auto valueAt = [&] (double t) { return t <= t0 ? v0 : t >= t1 ? v1 : automationCurveAt (points, t); };
+                const int pieces = curvedSegment ? 8 : 1;
+                for (int j = 0; j < pieces; ++j)
+                {
+                    const auto a = t0 + (t1 - t0) * j / pieces, b = t0 + (t1 - t0) * (j + 1) / pieces;
+                    const auto add = [&] (double t, double live) {
+                        if (t < t1)
+                            events.push_back ({ t / (double) ppq, live });
+                    };
+                    if (lane == clipenv::volumeLane)
+                        clipenv::subdivide (
+                            a, b, valueAt, [] (float v) { return clipenv::volumeToLive (v); }, [] (double l) { return clipenv::liveDb (l); },
+                            [] (float v) { return clipenv::laneDb (v); }, add);
+                    else
+                        add (b, clipenv::toLive (lane, valueAt (b)));
+                }
+            }
+            Node env;
+            env.name = "ClipEnvelope";
+            env.set ("Id", num (id++));
+            Node target;
+            target.name = "EnvelopeTarget";
+            Node pointee;
+            pointee.name = "PointeeId";
+            pointee.set ("Value", lane == clipenv::volumeLane ? clipVolumePlaceholder : clipPanPlaceholder);
+            target.add (std::move (pointee));
+            env.add (std::move (target));
+            Node automation;
+            automation.name = "Automation";
+            Node list2;
+            list2.name = "Events";
+            int eventId = 0;
+            auto add = [&] (double t, double v) {
+                Node ev;
+                ev.name = "FloatEvent";
+                ev.set ("Id", num (eventId++));
+                ev.set ("Time", num (t));
+                ev.set ("Value", num (v));
+                list2.add (std::move (ev));
+            };
+            add (beforeSong, events.front().second); // (Live's envelopes open with the "before the song" event [DATA])
+            for (const auto& [t, v] : events)
+                add (t, v);
+            automation.add (std::move (list2));
+            Node view;
+            view.name = "AutomationTransformViewState";
+            Node pending;
+            pending.name = "IsTransformPending";
+            pending.set ("Value", "false");
+            view.add (std::move (pending));
+            Node transforms;
+            transforms.name = "TimeAndValueTransforms";
+            view.add (std::move (transforms));
+            automation.add (std::move (view));
+            env.add (std::move (automation));
+            Node loopSlot;
+            loopSlot.name = "LoopSlot";
+            Node value;
+            value.name = "Value";
+            loopSlot.add (std::move (value));
+            env.add (std::move (loopSlot));
+            Node scroller;
+            scroller.name = "ScrollerTimePreserver";
+            for (const auto* edge : { "LeftTime", "RightTime" })
+            {
+                Node t;
+                t.name = edge;
+                t.set ("Value", "0");
+                scroller.add (std::move (t));
+            }
+            env.add (std::move (scroller));
+            list->add (std::move (env));
+        }
+        if (curved)
+            note ("Clip envelope curves are written as straight segments (8 per curved segment)");
+    }
+    static constexpr const char* clipVolumePlaceholder = "@lynx-clip-volume";
+    static constexpr const char* clipPanPlaceholder = "@lynx-clip-pan";
+
+    // after the renumbering: each track's clip envelope placeholders → its own targets' ids
+    void clipEnvelopeTargets (Node& track)
+    {
+        const auto* vol = track.at ("DeviceChain/MainSequencer/VolumeModulationTarget");
+        const auto* pan = track.at ("DeviceChain/Mixer/Pan/ModulationTarget");
+        const auto volId = vol != nullptr ? vol->get ("Id") : std::string(), panId = pan != nullptr ? pan->get ("Id") : std::string();
+        std::function<void (Node&)> walk = [&] (Node& n) {
+            if (n.name == "PointeeId")
+            {
+                const auto v = n.get ("Value");
+                if (v == clipVolumePlaceholder)
+                    n.set ("Value", volId);
+                else if (v == clipPanPlaceholder)
+                    n.set ("Value", panId);
+            }
+            for (auto& k : n.kids)
+                walk (k);
+        };
+        walk (track);
     }
 
     // ---- the clip grid → Session view (round 181c). Launch numbers as read in Live 12's Clip View [LIVE: REA_rodada181a.md]
@@ -1219,7 +1466,7 @@ struct Exporter
         {
             const auto cur = std::clamp (song.currentPattern, 0, (int) song.patterns.size() - 1);
             patternModeClip.pattern = cur;
-            patternModeClip.length = std::max<std::int64_t> (song.patterns[(std::size_t) cur].lengthTicks, (std::int64_t) song.beatsPerBar * ppq);
+            patternModeClip.length = std::max<std::int64_t> (song.patterns[(std::size_t) cur].lengthTicks, song.barTicks());
             patternClips.push_back (&patternModeClip);
             note ("The song had no Playlist clips: the current pattern is exported at the start");
         }
@@ -1461,7 +1708,10 @@ struct Exporter
                             return x.channel == t.channel && x.start >= c->offset && x.start < c->offset + c->length;
                         });
                         if (has)
+                        {
                             events->add (midiClip (p, t.channel, c->start, c->length, c->offset, c->muted, clipId++));
+                            setClipGroove (events->kids.back(), c->groove); // (round 190fm)
+                        }
                     }
                 for (const auto* c : gridPatternClips)
                 {
@@ -1474,6 +1724,7 @@ struct Exporter
                     const auto& slot = grid->slots[(std::size_t) c->gridSlot];
                     Node clip = midiClip (p, t.channel, 0, c->length, c->offset, c->muted, clipId++);
                     sessionSettings (clip, slot, 0.0, beats (c->length));
+                    setClipGroove (clip, slot.groove); // (round 190fm)
                     if (! putSessionClip (n, slot.scene, std::move (clip)))
                         note ("Grid clips of one channel in the same scene: only the first is exported (" + ch.name + ")");
                 }
@@ -1529,7 +1780,7 @@ struct Exporter
         {
             main->value ("DeviceChain/Mixer/Tempo/Manual", num (song.bpm));
             // the signature at the song start: a signature marker there, else the project's n/4 (round 190cg)
-            int startNum = song.beatsPerBar, startDen = 4;
+            int startNum = song.beatsPerBar, startDen = meterUnit (song.beatUnit); // (round 190fg: the song meter's own denominator)
             for (const auto& m : song.markers())
                 if (m.isSignature() && m.tick <= 0)
                 {
@@ -1559,6 +1810,7 @@ struct Exporter
             for (auto& n : nodes)
                 list->add (std::move (n));
         }
+        groovePool (set, main); // (round 190fm)
         if (auto* pre = set.child ("SendsPre"))
         {
             pre->kids.clear();
@@ -1650,6 +1902,9 @@ struct Exporter
                 renumber (k);
         };
         renumber (set);
+        if (auto* tracks = set.child ("Tracks")) // (round 190gi)
+            for (auto& t : tracks->kids)
+                clipEnvelopeTargets (t);
 
         // automation: mixer volume / pan of a track's insert, the Master, tempo
         int envelopeId = 0;
@@ -1711,7 +1966,7 @@ struct Exporter
         if (main != nullptr)
             if (const auto* target = main->at ("DeviceChain/Mixer/TimeSignature/AutomationTarget"); target != nullptr && target->has ("Id"))
             {
-                int num = song.beatsPerBar, den = 4;
+                int num = song.beatsPerBar, den = meterUnit (song.beatUnit);
                 std::vector<std::pair<double, double>> changes;
                 for (const auto& m : song.markers())
                 {

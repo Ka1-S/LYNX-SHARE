@@ -40,14 +40,14 @@ LYNX SHARE est en version alpha : attendez-vous à quelques imperfections, et me
 
 ## What's new
 
-LYNX SHARE 0.1.27 : effets réajustés pour sonner plus proche des plugins dont ils s'inspirent, tandis que les projets
-enregistrés gardent leur son ; plafond de true peak d'Apex Limiter corrigé ; plus d'outils de FL Studio (Réglages de
-la télécommande, courbes d'automation, Edison sur un emplacement du mixer, page Sampler avec points de boucle et fondu
-enchaîné, menu du clip audio) ; une Table de mixage de session, un Drum Rack, des scènes et des modes d'assignation
-pour la grille de clips, et beaucoup d'appareils propres à Ableton Live ouverts depuis des sets .als ; DW Sampler,
-Slicer et plus d'effets depuis les projets FL Studio Mobile ; un onglet Effets, un Pad d'accords et une visite du
-premier morceau dans le Flux simple ; une protection contre les plantages de plugins sous Linux et macOS ; un nouveau
-logo ; et de nombreuses corrections.
+LYNX SHARE 0.1.28 : plus rapide et plus léger, avec la fenêtre prête en environ une seconde, des gros projets qui
+s'ouvrent plus vite et utilisent moins de mémoire, une lecture plus fluide, des stems exportés en une passe et un
+rendu anticipé pour les projets lourds avec de petits tampons ; Ableton Link ; Freeze et Bounce dans le Flux par
+lancement de clips ; enveloppes de clip ; samples glissés sur les plugins ; davantage de devices propres à Ableton
+Live ouverts depuis des sets .als ; sons d'usine de FL Studio Mobile depuis votre propre copie de l'application ; un
+Sampler à 16 pads dans le Flux simple ; Enregistrer le preset pour les instruments intégrés ; une API de contrôle à
+distance expérimentale ; des pistes de la Playlist redimensionnables par leur bord, Ctrl+clic pour sélectionner
+plusieurs pistes, et des pistes de la Playlist reliées aux pistes du mixer ; et de nombreuses corrections.
 
 ## Features
 

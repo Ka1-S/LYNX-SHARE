@@ -65,7 +65,7 @@ std::vector<int> duplicate (Pattern& pattern, const std::vector<int>& indices, s
 // The Piano roll's Ctrl+B / Duplicate (round 170h, FL 2026 driven with the snap on Step): the copy goes whole bars
 // later, the selection's span rounded up to bars (notes over steps 1-8 -> bar 2, over 1-24 -> bar 3), so a riff
 // repeats in time even when its last note ends before the bar line.
-std::vector<int> duplicateBars (Pattern& pattern, const std::vector<int>& indices, int beatsPerBar);
+std::vector<int> duplicateBars (Pattern& pattern, const std::vector<int>& indices, Meter meter);
 
 // Rounds the notes' start to the nearest multiple of `grid` (length kept).
 void quantize (Pattern& pattern, const std::vector<int>& indices, std::int64_t grid);
@@ -133,8 +133,8 @@ std::int64_t screenStep (double pixelsPerTick, std::int64_t bar, double minPixel
 std::int64_t flLineStep (double pixelsPerTick, int numerator, int denominator = 4, double minPixels = 10.0);
 
 // "bar:step:tick" (bar and step from 1, tick from 0; 16 steps per 4/4 bar) <-> ticks.
-std::string formatTime (std::int64_t ticks, int beatsPerBar, bool isLength = false); // lengths count bars and steps from 0
-bool parseTime (const std::string& text, int beatsPerBar, std::int64_t& ticks, bool isLength = false);
+std::string formatTime (std::int64_t ticks, Meter meter, bool isLength = false); // lengths count bars and steps from 0
+bool parseTime (const std::string& text, Meter meter, std::int64_t& ticks, bool isLength = false);
 
 // --- Playlist clips ------------------------------------------------------------------
 
@@ -331,9 +331,9 @@ int addPatternMarker (Pattern& pattern, const Marker& marker);
 int addPatternAutoMarker (Pattern& pattern, std::int64_t tick);
 // Shift+Alt+T (FUN_0122b0d0 Tag 2): a num/den change at `from` (floored to a beat) named "num/den" (FL's "%d/%d"); with a
 // time selection ending at `to`, the signature in force before comes back there (unless a change is already there)
-void addPatternSignatureChange (Pattern& pattern, std::int64_t from, std::int64_t to, int numerator, int denominator, int beatsPerBar);
-// the pattern's signature at `tick`: its last signature marker at or before it, else beatsPerBar / 4
-std::pair<int, int> patternSignatureAt (const Pattern& pattern, std::int64_t tick, int beatsPerBar);
+void addPatternSignatureChange (Pattern& pattern, std::int64_t from, std::int64_t to, int numerator, int denominator, Meter meter);
+// the pattern's signature at `tick`: its last signature marker at or before it, else the song's meter
+std::pair<int, int> patternSignatureAt (const Pattern& pattern, std::int64_t tick, Meter meter);
 // FL's Paint tool in the Piano roll (round 189o; FLEngine 2026 [DECOMP] FUN_00e5cd20: mode 0x11 "mono paint" when
 // Shift != General › "Monophonic painting in piano roll", PRPaintMode, off by default): with the option on, a plain
 // stroke paints monophonically and Shift paints chords / layers as before.

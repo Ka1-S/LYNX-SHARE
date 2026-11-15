@@ -1,10 +1,12 @@
 #include "ui/RemoteControl.h"
 #include "ui/NumBox.h"
 #include "ui/SettingsPages.h"
+#include "ui/RemoteControlSettings.h"
 #include "platform/Paths.h"
 #include "platform/FileTypes.h"
 #include "platform/Package.h"
 
+#include "core/RenderAhead.h"
 #include "core/FlSettings.h"
 #include "core/LayoutStyle.h"
 #include "core/LynxExtras.h"
@@ -119,7 +121,7 @@ struct Rows
 // ================================================================================================================
 // General
 // ================================================================================================================
-class GeneralPage final : public ScrollingPage
+class GeneralPage final : public ScrollingPage, private juce::Timer
 {
 public:
     GeneralPage (AudioEngine& e, SettingsHooks h, bool keep) : engine (e), hooks (std::move (h)), persistent (keep)
@@ -131,12 +133,12 @@ public:
 
         for (auto* c : std::initializer_list<juce::Component*> { &workflowTitle, &layoutStyleLabel, &layoutStyleBox, &layoutStyleNote, &alsSessionLabel, &alsSessionBox, &languageTitle, &displayTitle, &startupTitle, &editingTitle, &backupTitle,
                                                                  &pluginsTitle, &languageLabel, &languageBox, &languageNote, &scaleLabel, &scaleBox, &menuLabel, &menuBox,
-                                                                 &wavesLabel, &wavesBox, &stereoWaves, &noteNamesLabel, &noteNamesBox, &blackNotesLabel, &blackNotesBox, &everyKeyNames, &rackColumn, &rackStepColour, &pluginStyleLabel, &pluginStyleBox, &artMotion, &reducedEffects, &uiAnimations, &animationLabel, &animationBox, &animationNote, &gpuRendering, &templateLabel, &templateBox, &templateNote, &startupProjectLabel, &startupProjectBox, &splash, &startupSound, &scanAtStart, &menuEntry,
+                                                                 &wavesLabel, &wavesBox, &stereoWaves, &noteNamesLabel, &noteNamesBox, &blackNotesLabel, &blackNotesBox, &everyKeyNames, &rackColumn, &rackStepColour, &pluginStyleLabel, &pluginStyleBox, &artMotion, &reducedEffects, &uiAnimations, &animationLabel, &animationBox, &animationNote, &gpuRendering, &templateLabel, &templateBox, &templateNote, &startupProjectLabel, &startupProjectBox, &splash, &startupSound, &scanAtStart, &supportNoteBox, &menuEntry,
                                                                  &typingPiano, &keepEditors, &rememberSeek, &clipsLoop, &autoClipsAtPlayback, &firstChannel, &monoPaint, &autoSelectLinked, &noTypingPriority, &hoverValues, &editInLabel, &editInBox, &undoLabel,
                                                                  &undoBox, &alternateUndo, &hintsTitle, &manageMessages, &messagesNote, &autosaveLabel, &autosaveBox, &keepLabel, &keepBox, &openBackups, &backupQuiet, &longestWaitLabel, &longestWaitBox, &unusedTakes, &detachNew,
                                                                  &sandbox, &sandboxNote, &substitutes, &substitutesNote, &limitEditors, &managePlugins, &manageShortcuts, &shortcutsNote,
                                                                  &reportsTitle, &crashLabel, &crashBox, &crashNote, &updatesTitle, &checkUpdates, &checkNow, &updatesNote,
-                                                                 &autoNameChannels, &restoreAfterSolo, &readSampleTempo, &historyNewestFirst })
+                                                                 &previousLabel, &goBack, &autoNameChannels, &restoreAfterSolo, &readSampleTempo, &historyNewestFirst })
             add (*c);
 
         setupFontRow();
@@ -163,6 +165,16 @@ public:
             if (hooks.setGeneral)
                 hooks.setGeneral (options);
         };
+        add (remoteTitle);
+        add (remoteControl);
+        add (remoteStatus);
+        toggle (remoteControl, tr ("Enable local remote control"), options.remoteControl,
+                [this] (bool on) { options.remoteControl = on; });
+        remoteControl.setEnabled (hooks.setGeneral != nullptr);
+        remoteControl.setTooltip (tr ("Allows authenticated local applications to read and edit this project."));
+        styleNote (remoteStatus, tr (remoteui::status()));
+        startTimerHz (2);
+
         styleLabel (languageLabel, tr ("Language"));
         styleNote (languageNote, tr ("A new language is applied when LYNX SHARE restarts."));
         int id = 1;
@@ -288,6 +300,10 @@ public:
         toggle (startupSound, tr ("Play the startup sound"), options.startupSound, [this] (bool on) { options.startupSound = on; });
         toggle (scanAtStart, tr ("Look for new plugins in the background at every start"), options.scanAtStart,
                 [this] (bool on) { options.scanAtStart = on; });
+        // round 190fq (LYNX's own): the start-up note about supporting LYNX SHARE on Ko-fi (ui/SupportLynx.h)
+        toggle (supportNoteBox, tr ("Show the support note"), options.supportNote, [this] (bool on) { options.supportNote = on; });
+        supportNoteBox.setTooltip (tr ("Now and then at start-up, a small note in a corner about supporting LYNX SHARE on Ko-fi. "
+                                       "Donating is optional and never unlocks anything."));
         // the AppImage on Linux (round 161): its menu entry and the .lynx file type, in the user's ~/.local/share
         toggle (menuEntry, tr ("Show LYNX SHARE in the applications menu and open .lynx files with it"), options.menuEntry,
                 [this] (bool on) { options.menuEntry = on; });
@@ -451,7 +467,15 @@ public:
         checkNow.onClick = [] { updater::checkNow(); };
         styleNote (updatesNote, tr ("At start-up LYNX SHARE asks GitHub for the newest version number (nothing about you is sent) and shows a bar "
                                     "when a new version is out. Help > Check for updates... asks at any time."));
-        for (auto* c : std::initializer_list<juce::Component*> { &updatesTitle, &checkUpdates, &checkNow, &updatesNote })
+        // round 190gh (B2): the version before the last update, and the way back to it (Help › Go back to... too)
+        {
+            const auto previous = persistent ? updater::previousVersion() : juce::String ("0.1.27");
+            styleLabel (previousLabel, previous.isNotEmpty() ? tr ("Previous version: {0}", { previous }) : tr ("Previous version: none known yet"));
+            goBack.setButtonText (previous.isNotEmpty() ? tr ("Go back to {0}...", { previous }) : tr ("Go back..."));
+            goBack.setTooltip (tr ("Installs the earlier version again, checked like an update. Your projects stay as they are."));
+            goBack.onClick = [] { updater::goBack(); };
+        }
+        for (auto* c : std::initializer_list<juce::Component*> { &updatesTitle, &checkUpdates, &checkNow, &updatesNote, &previousLabel, &goBack })
             c->setVisible (updater::offered());
 
         for (auto* b : { &templateBox, &startupProjectBox, &longestWaitBox, &languageBox, &fontBox, &scaleBox, &menuBox, &wavesBox, &noteNamesBox, &blackNotesBox, &pluginStyleBox, &animationBox, &editInBox, &undoBox, &longestWaitBox, &autosaveBox, &keepBox, &crashBox })
@@ -505,7 +529,7 @@ private:
         templateBox.setBounds (r.row (templateLabel, 260));
         startupProjectBox.setBounds (r.row (startupProjectLabel, 260));
         templateNote.setBounds (r.indented (32).translated (0, -3));
-        for (auto* t : { &splash, &startupSound, &scanAtStart })
+        for (auto* t : { &splash, &startupSound, &scanAtStart, &supportNoteBox })
             t->setBounds (r.full (24));
         if (menuEntry.isVisible())
             menuEntry.setBounds (r.full (24));
@@ -557,6 +581,9 @@ private:
         r.section (reportsTitle);
         crashBox.setBounds (r.row (crashLabel, 260));
         crashNote.setBounds (r.full (46).translated (0, -3));
+        r.section (remoteTitle);
+        remoteControl.setBounds (r.full (24));
+        remoteStatus.setBounds (r.full (36));
         if (updatesTitle.isVisible())
         {
             r.section (updatesTitle);
@@ -564,9 +591,20 @@ private:
             checkNow.setBounds (row.removeFromRight (juce::jmin (row.getWidth() / 3, 150)));
             checkUpdates.setBounds (row.withTrimmedRight (8));
             updatesNote.setBounds (r.full (32).translated (0, -1));
+            row = r.full (24);
+            goBack.setBounds (row.removeFromRight (juce::jmin (row.getWidth() / 3, 150)));
+            previousLabel.setBounds (row.withTrimmedRight (8));
         }
         displayTitle.setVisible (false);
         return r.bottom();
+    }
+
+    void timerCallback() override
+    {
+        remoteControl.setToggleState (remoteui::enabled(), juce::dontSendNotification);
+        const auto historyError = engine.getRemoteHistoryError();
+        remoteStatus.setText (historyError.isNotEmpty() ? historyError : tr (remoteui::status()), juce::dontSendNotification);
+        remoteStatus.setColour (juce::Label::textColourId, remoteui::active() ? theme::colour::accent : theme::colour::textSecondary);
     }
 
     void toggle (juce::ToggleButton& t, const juce::String& text, bool value, std::function<void (bool)> set)
@@ -668,8 +706,8 @@ private:
     juce::Label alsSessionLabel;
     juce::ComboBox alsSessionBox;
     SectionTitle languageTitle { tr ("Language and display") }, displayTitle, startupTitle { tr ("Startup") }, editingTitle { tr ("Editing") },
-        backupTitle { tr ("Backup") }, hintsTitle { tr ("Hints and warnings") }, pluginsTitle { tr ("Plugins and shortcuts") }, reportsTitle { tr ("Crash reports") }, updatesTitle { tr ("Updates") };
-    juce::Label longestWaitLabel, animationLabel, animationNote, languageLabel, languageNote, scaleLabel, menuLabel, wavesLabel, noteNamesLabel, blackNotesLabel, pluginStyleLabel, editInLabel, undoLabel, autosaveLabel, keepLabel, sandboxNote, substitutesNote, shortcutsNote, crashLabel, crashNote, updatesNote;
+        backupTitle { tr ("Backup") }, hintsTitle { tr ("Hints and warnings") }, pluginsTitle { tr ("Plugins and shortcuts") }, reportsTitle { tr ("Crash reports") }, updatesTitle { tr ("Updates") }, remoteTitle { tr ("Remote control") };
+    juce::Label longestWaitLabel, animationLabel, animationNote, languageLabel, languageNote, scaleLabel, menuLabel, wavesLabel, noteNamesLabel, blackNotesLabel, pluginStyleLabel, editInLabel, undoLabel, autosaveLabel, keepLabel, sandboxNote, substitutesNote, shortcutsNote, crashLabel, crashNote, updatesNote, previousLabel;
     juce::Label fontLabel, fontPreview, fontNote;
     juce::ComboBox fontBox;
     juce::Label templateLabel, templateNote, startupProjectLabel;
@@ -677,12 +715,14 @@ private:
     std::vector<TemplateChoice> templateChoices; // templateBox's item id - 1
     juce::TextButton fontReset { tr ("Reset to default") };
     juce::StringArray fontNames;
+    juce::ToggleButton remoteControl;
+    juce::Label remoteStatus;
     juce::HyperlinkButton translationLink;
     juce::ComboBox animationBox, crashBox, languageBox, scaleBox, menuBox, wavesBox, noteNamesBox, blackNotesBox, pluginStyleBox, editInBox, undoBox, autosaveBox, keepBox, longestWaitBox;
-    juce::ToggleButton detachNew, stereoWaves, everyKeyNames, rackColumn, rackStepColour, artMotion, reducedEffects, uiAnimations, gpuRendering, splash, startupSound, scanAtStart, menuEntry, typingPiano, keepEditors, rememberSeek, clipsLoop, autoClipsAtPlayback, firstChannel, monoPaint, hoverValues, alternateUndo, sandbox, substitutes, limitEditors, backupQuiet, unusedTakes, checkUpdates, noTypingPriority, autoSelectLinked;
+    juce::ToggleButton detachNew, stereoWaves, everyKeyNames, rackColumn, rackStepColour, artMotion, reducedEffects, uiAnimations, gpuRendering, splash, startupSound, scanAtStart, supportNoteBox, menuEntry, typingPiano, keepEditors, rememberSeek, clipsLoop, autoClipsAtPlayback, firstChannel, monoPaint, hoverValues, alternateUndo, sandbox, substitutes, limitEditors, backupQuiet, unusedTakes, checkUpdates, noTypingPriority, autoSelectLinked;
     juce::ToggleButton autoNameChannels, restoreAfterSolo, readSampleTempo, historyNewestFirst; // FL's options of round 190bx (core/FlSettings.h)
     juce::TextButton openBackups { tr ("Open backup folder") }, managePlugins { tr ("Plugin manager...") }, manageShortcuts { tr ("Manage shortcuts...") },
-        checkNow { tr ("Check now") }, manageMessages { tr ("Manage messages") };
+        checkNow { tr ("Check now") }, manageMessages { tr ("Manage messages") }, goBack;
     juce::Label messagesNote;
 };
 
@@ -702,7 +742,7 @@ public:
                                                                  &formatLabel, &formatBox, &takeNames, &latencyTitle, &latencyText, &pingOutLabel, &pingOutBox,
                                                                  &pingInLabel, &pingInBox, &measureButton, &pingNote, &useMeasured, &offsetLabel, &offsetSlider, &offsetNote,
                                                                  &mixerTitle, &metronomeTrackLabel, &metronomeTrackBox, &metronomeTrackNote, &playTruncated, &resetPlugins,
-                                                                 &autoClose, &cpuTitle, &threadGenerators, &threadMixer, &smartDisableAll, &resamplingLabel, &resamplingBox, &resamplingNote })
+                                                                 &autoClose, &cpuTitle, &threadGenerators, &threadMixer, &smartDisableAll, &renderAhead, &resamplingLabel, &resamplingBox, &resamplingNote })
             add (*c);
         setupRecordingControls();
         setupMixerControls();
@@ -825,7 +865,7 @@ private:
         offsetSlider.setBounds (r.row (offsetLabel, 200));
         offsetNote.setBounds (r.full (32).translated (0, -3));
         r.section (cpuTitle); // (FL's order: Input / output, CPU, Mixer)
-        for (auto* t : { &threadGenerators, &threadMixer, &smartDisableAll })
+        for (auto* t : { &threadGenerators, &threadMixer, &smartDisableAll, &renderAhead })
             t->setBounds (r.full (24));
         r.section (mixerTitle);
         resamplingBox.setBounds (r.row (resamplingLabel, 260)); // (FL: the Mixer panel's first row)
@@ -900,6 +940,11 @@ private:
         flag (threadMixer, tr ("Multithreaded mixer processing"), tr ("May increase CPU performance"), o.multithreadMixer);
         flag (smartDisableAll, tr ("Smart disable"),
               tr ("May increase CPU performance. Off: every effect is processed all the time, whatever its own Smart disable switch says"), o.smartDisable);
+        // LYNX extra (round 190gq, core/RenderAhead.h; owner decision O22: on by default)
+        flag (renderAhead, tr ("Render ahead (lower CPU at small buffers)"),
+              tr ("Tracks nobody plays live are rendered a little ahead on another thread, so heavy projects hold small buffers. Inputs, the "
+                  "channels being played and everything they feed stay real-time; edits on the other tracks can be heard up to about 25 ms late."),
+              renderAheadOption());
 
         styleLabel (resamplingLabel, tr ("Resampling quality"));
         styleCombo (resamplingBox);
@@ -1326,7 +1371,7 @@ private:
     // FL's Settings › Audio options of round 190bx (core/FlSettings.h)
     juce::ToggleButton autoClose;
     SectionTitle cpuTitle { tr ("CPU") };
-    juce::ToggleButton threadGenerators, threadMixer, smartDisableAll;
+    juce::ToggleButton threadGenerators, threadMixer, smartDisableAll, renderAhead;
     juce::Label resamplingLabel, resamplingNote;
     juce::ComboBox resamplingBox;
     juce::Label metronomeTrackLabel, metronomeTrackNote;
@@ -2116,9 +2161,12 @@ private:
 
     void changeListenerCallback (juce::ChangeBroadcaster*) override
     {
-        if (engine.getSong().channels.size() != channelCount)
+        // round 190gh (B8): a device plugged in or out refreshes the lists by itself (FL: "MIDI devices have changed...
+        // refreshing..."); Refresh device list stays for a device that stopped sending
+        if (engine.getSong().channels.size() != channelCount || engine.getMidiDeviceListVersion() != deviceListVersion)
         {
             channelCount = engine.getSong().channels.size();
+            deviceListVersion = engine.getMidiDeviceListVersion();
             rebuildInputs();
         }
         load();
@@ -2129,6 +2177,7 @@ private:
     bool persistent;
     bool loading = false;
     std::size_t channelCount = 0;
+    int deviceListVersion = 0;
     juce::StringArray sampleDevices;
     static constexpr const char* sampleMpeDevice = "MPE keyboard";
     std::vector<std::unique_ptr<MidiInputRow>> rows;
@@ -2243,7 +2292,115 @@ private:
     std::vector<std::unique_ptr<SectionTitle>> titles;
     std::vector<std::unique_ptr<Row>> rows;
 };
+// ================================================================================================================
+// Link (round 190gl): the reference DAW's Settings › Link, its Link section (manual: "The Link Tab in Live's Settings")
+// ================================================================================================================
+class LinkPage final : public ScrollingPage,
+                       private juce::Timer
+{
+public:
+    LinkPage (AudioEngine& e, SettingsHooks h) : engine (e), hooks (std::move (h))
+    {
+        add (linkTitle);
+        styleNote (intro, tr ("Ableton Link shares the tempo and the beat with other apps and devices on the same network "
+                              "(phones, other DAWs, hardware). Switch it on with the Link toggle in the toolbar or in Options."));
+        intro.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+        add (intro);
+        for (auto* l : { &enableLabel, &showLabel, &syncLabel, &statusLabel })
+        {
+            l->setColour (juce::Label::textColourId, theme::colour::textPrimary);
+            add (*l);
+        }
+        enableLabel.setText (tr ("Ableton Link"), juce::dontSendNotification);
+        showLabel.setText (tr ("Show Link Toggle"), juce::dontSendNotification);
+        syncLabel.setText (tr ("Start Stop Sync"), juce::dontSendNotification);
+        statusLabel.setText (tr ("Status"), juce::dontSendNotification);
+        for (auto* b : { &enableButton, &showButton, &syncButton })
+        {
+            b->setClickingTogglesState (true);
+            b->setColour (juce::TextButton::buttonOnColourId, theme::colour::accent);
+            b->setColour (juce::TextButton::textColourOnId, theme::colour::bg0);
+            add (*b);
+        }
+        enableButton.setComponentID ("link.enabled");
+        enableButton.onClick = [this] {
+            engine.setLinkEnabled (enableButton.getToggleState());
+            refresh();
+        };
+        showButton.setComponentID ("link.showToggle");
+        syncButton.setComponentID ("link.startStopSync");
+        showButton.onClick = [this] {
+            if (hooks.showLinkToggle)
+                hooks.showLinkToggle (showButton.getToggleState());
+            refresh();
+        };
+        syncButton.onClick = [this] {
+            engine.setLinkStartStopSync (syncButton.getToggleState());
+            refresh();
+        };
+        styleNote (syncNote, tr ("Play and Stop are shared with the peers that also have Start Stop Sync on."));
+        syncNote.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+        add (syncNote);
+        status.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+        add (status);
+        refresh();
+        startTimerHz (4);
+    }
+
+    int layout (int width) override
+    {
+        Rows r (width);
+        r.section (linkTitle, true);
+        intro.setBounds (r.note (intro, 34));
+        enableButton.setBounds (r.row (enableLabel, 110));
+        showButton.setBounds (r.row (showLabel, 110));
+        syncButton.setBounds (r.row (syncLabel, 110));
+        syncNote.setBounds (r.note (syncNote, 18));
+        status.setBounds (r.row (statusLabel, 0));
+        return r.bottom();
+    }
+
+private:
+    void timerCallback() override { refresh(); }
+
+    void refresh()
+    {
+        // (Ableton's Link integration guidelines: the state in the settings list, "Enabled" / "Disabled")
+        const auto linkOn = engine.getLink().isEnabled();
+        enableButton.setToggleState (linkOn, juce::dontSendNotification);
+        enableButton.setButtonText (linkOn ? tr ("Enabled") : tr ("Disabled"));
+        const auto shown = hooks.linkToggleShown ? hooks.linkToggleShown() : false;
+        showButton.setToggleState (shown, juce::dontSendNotification);
+        showButton.setButtonText (shown ? tr ("Show") : tr ("Hide"));
+        const auto sync = engine.getLink().startStopSync();
+        syncButton.setToggleState (sync, juce::dontSendNotification);
+        syncButton.setButtonText (sync ? tr ("On") : tr ("Off"));
+        const auto& link = engine.getLink();
+        juce::String text;
+        if (! link.isEnabled())
+            text = tr ("Link is off");
+        else
+        {
+            const auto peers = link.peers();
+            text = (peers == 1 ? tr ("On: 1 other peer") : tr ("On: {0} other peers").replace ("{0}", juce::String (peers)));
+            if (const auto tempo = link.sessionTempo(); tempo > 0.0)
+                text += ", " + tr ("session tempo {0} BPM").replace ("{0}", juce::String (tempo, 2));
+        }
+        status.setText (text, juce::dontSendNotification);
+    }
+
+    AudioEngine& engine;
+    SettingsHooks hooks;
+    SectionTitle linkTitle { tr ("Ableton Link") };
+    juce::Label intro, enableLabel, showLabel, syncLabel, statusLabel, syncNote, status;
+    juce::TextButton enableButton, showButton, syncButton;
+};
 } // namespace
+
+std::unique_ptr<juce::Component> makeLinkPage (AudioEngine& engine, const SettingsHooks& hooks)
+{
+    return std::make_unique<LinkPage> (engine, hooks);
+}
 
 bool lynxExtraOn (AudioEngine& engine, const SettingsHooks& hooks, std::string_view id)
 {
@@ -2254,6 +2411,7 @@ bool lynxExtraOn (AudioEngine& engine, const SettingsHooks& hooks, std::string_v
     if (id == "playlist.automationLanes") return autolanes::shown();
     if (id == "pianoRoll.songBarsRuler") return PianoRollComponent::songBarsRuler;
     if (id == "general.hoverValues") return hooks.getGeneral && hooks.getGeneral().hoverValues;
+    if (id == "project.linkTracks") return hooks.getGeneral && hooks.getGeneral().linkTracksInNewProjects;
     if (id == "record.lastLoopPassPlays") return engine.getRecordOptions().lastLoopPassPlays;
     if (id == "detail.windowKey") return DetailView::extraWindowKey;
     if (id == "detail.selectInMixer") return DetailView::extraSelectInMixer;
@@ -2322,6 +2480,15 @@ void setLynxExtra (AudioEngine& engine, const SettingsHooks& hooks, std::string_
         {
             auto options = hooks.getGeneral();
             options.hoverValues = on;
+            hooks.setGeneral (options);
+        }
+    }
+    else if (id == "project.linkTracks") // round 190gz: the new projects' default (the open project: Settings › Project)
+    {
+        if (hooks.getGeneral && hooks.setGeneral)
+        {
+            auto options = hooks.getGeneral();
+            options.linkTracksInNewProjects = on;
             hooks.setGeneral (options);
         }
     }

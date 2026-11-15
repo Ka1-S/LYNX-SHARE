@@ -1,3 +1,4 @@
+#include "core/ClipEnvelope.h"
 #include "core/FlCurve.h"
 #include "core/PlaylistOps.h"
 #include "core/FlpExport.h"
@@ -11,6 +12,7 @@
 #include <numeric>
 #include <set>
 
+#include "core/EditorPolish.h"
 #include "core/Effects.h"
 #include "core/FlEffects.h"
 #include "core/FlStateWrite.h"
@@ -782,6 +784,7 @@ struct Converter
         out.flagsA9 = 15;
         out.tempo = song.bpm;
         out.beatsPerBar = song.beatsPerBar;
+        out.beatUnit = meterUnit (song.beatUnit);
         out.swing = std::clamp (iround (song.swing * 128.0), 0, 128);
         out.mainPitch = iround (song.masterPitch);
         out.currentPattern = std::clamp (song.currentPattern, 0, std::max (0, (int) song.patterns.size() - 1)) + 1;
@@ -1466,7 +1469,7 @@ struct Converter
                     a.items.push_back (*item);
             std::stable_sort (a.items.begin(), a.items.end(), [] (const flp::PlaylistItem& x, const flp::PlaylistItem& y) { return x.position < y.position; });
             for (int t = 0; t < (int) song.playlistTracks.size() && t < 500; ++t)
-                a.tracks.push_back (trackInfo (song.playlistTracks[(std::size_t) t], t));
+                a.tracks.push_back (trackInfo (song.playlistTracks[(std::size_t) t], t, song.playlistRowHeight));
             out.arrangements.push_back (std::move (a));
         }
         report.exact.push_back ("Playlist: " + std::to_string (song.arrangements.size()) + " arrangement(s), tracks, markers");
@@ -1555,7 +1558,7 @@ struct Converter
         return std::nullopt;
     }
 
-    static flp::PlaylistTrackInfo trackInfo (const PlaylistTrack& t, int index)
+    static flp::PlaylistTrackInfo trackInfo (const PlaylistTrack& t, int index, int rowHeight)
     {
         flp::PlaylistTrackInfo info;
         info.index = index;
@@ -1566,6 +1569,7 @@ struct Converter
         info.expanded = ! t.collapsed;
         info.lockedToContent = t.lockedToContent;
         info.lockedHeight = t.lockedHeight;
+        info.heightScale = t.height > 0 ? polish::flSizeForHeight (t.height, rowHeight) : 1.0f; // (round 190ft: FL's size factor; 190gw: on the song's default row)
         info.mode = t.mode == PlaylistTrackMode::audio ? 1 : t.mode == PlaylistTrackMode::instrument ? 3 : 0;
         info.mixerTrack = t.mixerTrack;
         info.channel = t.channel;
@@ -1842,6 +1846,10 @@ flp::Project toProject (const Song& input, const Options& options, Report& repor
         if (n > 0)
             report.notes.push_back ("Pattern Blocks: " + std::to_string (n) + " block(s) written as pattern clips (FL 2026 has no blocks)");
     }
+    // audio clip envelopes (round 190gi): FL has none on a clip; FL's own way is the clip menu's Automate › Volume /
+    // Panning, an automation clip of the clip channel's Levels adjustment over the clip — written that way, same curve
+    if (const auto n = clipenv::bakeToAutomation (song); n > 0)
+        report.notes.push_back ("Clip envelopes: " + std::to_string (n) + " envelope(s) written as automation clips of the clip's channel Levels adjustment (FL's Automate > Volume / Panning)");
     // automation lanes (round 177b): FL has none; each becomes an automation clip on a free track
     if (const auto n = autolanes::lanesToClips (song); n > 0)
         report.notes.push_back ("Automation lanes: " + std::to_string (n) + " lane(s) written as automation clips (FL has no lanes)");

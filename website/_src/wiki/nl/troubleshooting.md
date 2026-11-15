@@ -1,5 +1,5 @@
 ---
-source: a3748d4a2a
+source: e5206a071d
 ---
 Elke kop hieronder is één probleem. Staat het jouwe er niet bij, meld het dan zoals aan het einde beschreven.
 
@@ -71,11 +71,32 @@ De audiothread hoort met realtimeprioriteit te draaien.
 
 De details staan in [LINUX.md](https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/LINUX.md).
 
+### Het geluid knettert of valt weg
+
+LYNX SHARE telt elke uitvaller (buffer underrun) en zegt waarom die gebeurde. Wijs naar de `CPU`-meter in de werkbalk, of open `Extra › Prestatiemonitor voor plugins...`. Een rood getal naast het CPU-percentage is het aantal.
+
+De hint noemt de oorzaak van de laatste uitvaller:
+
+| Oorzaak | Wat het betekent | Wat je kunt proberen |
+|---|---|---|
+| De verwerking duurde langer dan de buffer | Een blok audio kostte meer tijd om te berekenen dan het duurt. De hint noemt het traagste kanaal of effect in dat blok | Verhoog de buffergrootte in `Opties › Audio-instellingen...`, bevries dat kanaal, of zet de kwaliteit van de plugin lager |
+| De verwerking kwam dicht bij de limiet van de buffer | De belasting was rond de uitvaller bijna 100 % | Verhoog de buffergrootte, of bevries de zwaarste kanalen |
+| Latentie van het stuurprogramma of systeem | Het stuurprogramma of systeem was te laat terwijl de belasting laag bleef. Geen plugin veroorzaakte het | Verhoog de buffergrootte, probeer een ander stuurprogramma (op Windows het ASIO-stuurprogramma van de interface), en controleer op Linux de realtimeprioriteit (hierboven) |
+
+Elke uitvaller wordt ook naar `audio-glitches.log` in de instellingenmap geschreven, met het apparaat, de buffer en de zwaarste kanalen.
+
 ## Plugins
 
 ### Een plugin crasht
 
-Draai hem in een eigen proces, zodat alleen de plugin stopt.
+De meeste plugincrashes schakelen alleen die plugin uit: een effect wordt gebypasst, een instrument valt stil, en LYNX SHARE en het project blijven draaien. De melding `Plugin gecrasht` biedt dan aan:
+
+- `Herladen`, dat de plugin opnieuw start met de instellingen van de laatste keer opslaan of de laatste back-up.
+- `<plugin> altijd in een apart proces draaien`, dat hem opnieuw start in een eigen proces, nu en in elk project. Een crash daar kan LYNX SHARE niet neerhalen. Een plugin in een apart proces opent zijn venster op zichzelf (hij kan niet worden gedockt).
+
+Het venster van de plugin toont dezelfde twee knoppen in plaats van zijn editor. `Opties › Pluginbeheer...` toont de plugins die altijd in een apart proces draaien in de kolom `Apart proces`; klik op het vakje om er een in of uit te schakelen.
+
+Om elke plugin in een eigen proces te draaien:
 
 1. Open `Opties › Algemene instellingen...`.
 2. Zet `Plugins in een apart proces draaien (beschermt LYNX SHARE tegen crashes)` aan.

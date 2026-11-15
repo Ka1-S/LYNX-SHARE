@@ -138,7 +138,7 @@ std::string paramText (int param, float value)
     return param == display ? displayName (displayOf (value)) : std::string();
 }
 
-std::string clockText (const Song& song, double ticks, int beatsPerBar, Display d)
+std::string clockText (const Song& song, double ticks, Meter meter, Display d)
 {
     ticks = std::max (0.0, ticks);
     char text[64] {};
@@ -161,7 +161,7 @@ std::string clockText (const Song& song, double ticks, int beatsPerBar, Display 
     }
     else
     {
-        const auto perBar = (double) ppq * std::max (1, beatsPerBar);
+        const auto perBar = (double) meter.bar();
         bar = (long) (ticks / perBar) + 1;
         intoBar = std::fmod (ticks, perBar);
     }

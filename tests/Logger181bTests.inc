@@ -345,12 +345,12 @@ TEST (toolbar181b_chord_panel_is_on_the_default_toolbar)
     // a customised toolbar keeps its order and what it hides, and doesn't gain the panel (it is in the edit mode)
     Layout custom;
     custom.orderFromString ("transport,-master,snap,record,file,windows,output,meters");
-    CHECK (custom.orderToString() == "transport,-master,snap,record,file,-key,-chord,windows,-multilink,output,meters"); // (177b-4: Multilink, hidden)
+    CHECK (custom.orderToString() == "-link,transport,-master,snap,record,file,-key,-chord,windows,-multilink,output,meters"); // (177b-4: Multilink, hidden)
     CHECK (! custom.isShown (Group::chord));
     custom.setShown (Group::chord, true); // and it stays once shown
     Layout again;
     again.orderFromString (custom.orderToString());
-    CHECK (again.isShown (Group::chord) && again.orderToString() == "transport,-master,snap,record,file,-key,chord,windows,-multilink,output,meters");
+    CHECK (again.isShown (Group::chord) && again.orderToString() == "-link,transport,-master,snap,record,file,-key,chord,windows,-multilink,output,meters");
     // the default order with one panel hidden is customised too
     Layout hidden;
     hidden.orderFromString ("transport,master,record,snap,windows,file,-meters,output");

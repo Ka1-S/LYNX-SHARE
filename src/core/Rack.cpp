@@ -1804,11 +1804,11 @@ const char* slicePerName (SlicePer per) noexcept
     return "";
 }
 
-double slicePerBeats (SlicePer per, int beatsPerBar) noexcept
+double slicePerBeats (SlicePer per, Meter meter) noexcept
 {
     switch (per)
     {
-        case SlicePer::bar: return (double) std::max (1, beatsPerBar);
+        case SlicePer::bar: return (double) meter.bar() / ppq;
         case SlicePer::half: return 2.0;
         case SlicePer::quarter: return 1.0;
         case SlicePer::eighth: return 0.5;

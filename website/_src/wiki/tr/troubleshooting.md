@@ -1,5 +1,5 @@
 ---
-source: a3748d4a2a
+source: e5206a071d
 ---
 Aşağıdaki her başlık bir sorundur. Sizinki burada yoksa sondaki anlatıma göre bildirin.
 
@@ -71,11 +71,32 @@ Ses thread'inin gerçek zamanlı öncelikle çalışması gerekir.
 
 Ayrıntılar [LINUX.md](https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/LINUX.md) içindedir.
 
+### Ses çıtırdıyor veya kesiliyor
+
+LYNX SHARE her kesintiyi (arabellek boşalması) sayar ve nedenini söyler. Araç çubuğundaki `CPU` ölçerine gelin ya da `Araçlar › Plugin performans monitörü...` seçeneğini açın. CPU yüzdesinin yanındaki kırmızı sayı, kesinti sayısıdır.
+
+İpucu, son kesintinin nedenini söyler:
+
+| Neden | Ne anlama gelir | Ne denenir |
+|---|---|---|
+| İşleme arabellekten uzun sürdü | Bir ses bloğunun hesaplanması, sürdüğü süreden uzun sürdü. İpucu, o blokta en yavaş kanalı veya efekti adlandırır | `Seçenekler › Ses ayarları...` içinde arabellek boyutunu artırın, o kanalı dondurun veya plugin'in kalitesini düşürün |
+| İşleme arabelleğin sınırına yaklaştı | Yük, kesintinin çevresinde %100'e yakındı | Arabellek boyutunu artırın veya en ağır kanalları dondurun |
+| Sürücü veya sistem gecikmesi | Yük düşük kalırken sürücü veya sistem geç kaldı. Hiçbir plugin buna neden olmadı | Arabellek boyutunu artırın, başka bir sürücü deneyin (Windows'ta arayüzün ASIO sürücüsü) ve Linux'ta gerçek zamanlı önceliği denetleyin (yukarıda) |
+
+Her kesinti ayrıca ayarlar klasöründeki `audio-glitches.log` dosyasına, aygıt, arabellek ve en ağır kanallarla birlikte yazılır.
+
 ## Plugin'ler
 
 ### Bir plugin çöküyor
 
-Yalnızca plugin durması için onu kendi sürecinde çalıştırın.
+Çoğu plugin çökmesi yalnızca o plugin'i kapatır: bir efekt bypass edilir, bir enstrüman susar ve LYNX SHARE ile proje çalışmaya devam eder. `Plugin çöktü` iletisi o zaman şunları sunar:
+
+- `Yeniden yükle`, plugin'i son kayıttaki veya yedekteki ayarlarla yeniden başlatır.
+- `Her zaman ayrı süreçte çalıştır: <plugin>`, onu şimdi ve her projede kendi sürecinde yeniden başlatır. Orada bir çökme LYNX SHARE'i düşüremez. Ayrı süreçteki bir plugin penceresini kendi başına açar (yerleştirilemez).
+
+Plugin'in penceresi, editörünün yerine aynı iki düğmeyi gösterir. `Seçenekler › Plugin yöneticisi...`, her zaman ayrı süreçte çalışan plugin'leri `Ayrı süreç` sütununda listeler; birini açıp kapatmak için kutuya tıklayın.
+
+Her plugin'i kendi sürecinde çalıştırmak için:
 
 1. `Seçenekler › Genel ayarlar...` seçeneğini açın.
 2. `Plugin'leri ayrı süreçte çalıştır (LYNX SHARE'i çökmelere karşı korur)` seçeneğini açın.

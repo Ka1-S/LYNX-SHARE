@@ -69,7 +69,7 @@ there.
 | Sentry Gate | Pro-G | 9 | 8 | 7 | 8 | trial187b | tp172b: sound 3 → 7 (first programme comparison: 7.2; upward law, hysteresis); trial187b: 12 more settings 7.3 → 7.6 (wet / dry are Expert-only); round 190v: the Vocal style's noise reduction (noise probes 3.7 → 4.9) |
 | Ember Saturator | Saturn 2 | 9 | 8 | 5 | 6 | 152b |  |
 | Aether | Fresh Air | 9 | 8 | 8 | 9 | tp172c | issue #77: the measured dynamic air model is the default (a new Aether ran the round-114 shelf + exciter: Mid air nearly inaudible, High air ~1.5 dB short of loudness); fxparity on Mid / High air 0–100 % sweeps 5.0 → 8.3; look: frosted plate, white disc knobs |
-| Glow Leveler | CLA-2A (Waves) | 10 | 8 | 6 (ref expired) | 8 | 165x | 9 → 9 → 10 / 8 → 8 (165w: the measured release; 165x: the measured attack, Auto Makeup's reference, the VU display saved and translated) |
+| Glow Leveler | CLA-2A (Waves) | 10 | 8 | 6 (ref expired) | 8 | 165x | 9 → 9 → 10 / 8 → 8 (165w: the measured release; 165x: the measured attack, Auto Makeup's reference, the VU display saved and translated); 190fx: SC weighting Old \| Measured for the other optical references — FG-2A 3.75 → 4.08, SD-3A 4.64 → 4.84, Custom Opto 4.96 → 5.16 — this pair unchanged |
 | Hush De-esser | DeEsser (Waves) | 10 | 8 | 7 (ref expired) | 6 | 165 | 9 → 10 / 8 → 8 |
 | Echoform | H-Delay (Waves) | 9 | 8 | 7 (ref expired) | 6 | 137 |  |
 | Echoform | ValhallaDelay | 9 | 8 | 5 | 6 | 137 | 183b: sound 4 → 5 (fxparity 3.75 → 4.06, verb 5.12 → 7.39; bank 2.88 → 3.44 / 5.18 → 6.77): tape repeats without −1.9 dB per pass, one tape transport in the Single style |
@@ -80,13 +80,13 @@ there.
 | Apex Limiter | Pro-L 2 | 9 | 9 | 7 | 6 | tp172b | tp172b: sound 2 → 7 (first programme comparison: 5.7 → 6.9; two-stage release); trial187b: 16 more settings measured (6.8), no change |
 | Epoch Verb | ValhallaVintageVerb | 9 | 9 | 5 | 8 | 135 |  |
 | Nebula | Valhalla Supermassive | 9 | 9 | 4 | 8 | 135 | 183b: sound 3 → 4 (fxparity 3.20 → 3.33, verb 6.05 → 7.19 on the matched settings; bank 3.11 → 3.33 / 6.16 → 7.30; stereo part 1.8 → 9.3): the tail is stereo as the reference's, the modulation law of its level |
-| Spiral Echo | ValhallaFreqEcho | 9 | 9 | 7 | 8 | 129 |  |
+| Spiral Echo | ValhallaFreqEcho | 9 | 9 | 7 | 8 | 190fy | 190do: measured loop (fxparity 3.38 → 3.88); 190fy: the loop's read and all-pass refitted, revision 1 (fxparity 3.88 → 4.50, 7 up / 9 same / 0 down, tail 6.79 → 6.98; refcap0124 36 captures 3.69 → 3.75) |
 | Lattice Mod | ValhallaUberMod | 9 | 9 | 4 | 8 | 144 |  |
 | Quell Denoiser | NS1 (Waves) | 9 | 9 | 4 (ref expired) | 6 | 137 |  |
 | Hush De-esser | Pro-DS | 10 | 9 | 6 | 6 | tp172b | 8 → 9 → 10 / 8 → 8 → 9 (165w: pans, state levels; 165x: ranges, the 0 … 200 % link knob) |
 | Foil Plate | ValhallaPlate | 9 | 10 | 4 | 8 | 135 | 183b: sound 3 → 4 (fxparity 3.13 → 3.73, verb 8.15 → 8.49; bank 3.03 → 3.64 / 8.13 → 8.48): EQ laws, Width keeps the level, the reference's tone |
 | Gemini Doubler | Doubler2 / Doubler4 (Waves) | 10 | 8 | 6 (ref expired) | 8 | 165w | 9 → 10 / 8 → 8 (defaults; 165w: shelf range −88 … +12 and law) |
-| Compressor (stand-in) | Renaissance Compressor (Waves) | 10 | 8 | 6 (ref expired) | 8 | 152 |  |
+| Compressor (stand-in) | Renaissance Compressor (Waves) | 10 | 8 | 6 (ref expired) | 8 | 152 | 190fx: the FET references' maps and translators refitted on the pink stairs — FG-116 4.80 → 5.80, Modern 4.08 → 4.76, Vintage 5.00 → 5.56, all-buttons 4.28 → 4.48 — this pair unchanged |
 | LYNX Tune | Waves Tune Real-Time | 10 | 8 | 6 (ref expired) | 8 | 152b | 165j: sound only (measured; scores unchanged) |
 | Echoform | EchoBoy / PrimalTap | 10 | 8 | 6 | 6 | 150 |  |
 | Voice Shift | Little AlterBoy | 10 | 8 | 4 | 8 | trial187b | trial187b: dual mono like the original, the input itself at no shift, level laws: 2.8 → 3.1 |
@@ -2341,6 +2341,7 @@ compressor role (no captured state) still load the stand-in at its defaults.
 | Sidechain from an effect | route arrow › "Sidechain to this track" (/ only), then the plugin's own input selector | the same route menu, plus a "SC: … ▾" picker in every side-input effect's window header, the plugin wrapper header, the mixer's selected-effect panel and the slot menu (makes FL's level-0 link) | LYNX extra |
 | Automation lanes under Playlist tracks | — (automation clips only) | Playlist ruler menu › "Automation lanes", off by default | LYNX extra (Ableton-style, optional) |
 | Modulators (LFO / random moving a knob around its value) | — | Tools › "Modulators…" and every control's "Modulate" submenu; no cost until the first one exists | LYNX extra |
+| Playlist tracks linked to mixer tracks (round 190gz, issue #170) | tracks and inserts apart; Track mode links one track at a time | Playlist › Edit, Track mode and Settings › Project › "Link Playlist tracks to mixer tracks", off by default (Settings also has the new-projects default). Each track with clips becomes FL's audio / instrument track of an insert (Track N with insert N when the sound stays the same; content already routed keeps its insert; mixed tracks stay unassigned), new content follows, insert N's recording lands on Track N; linked headers get M, S, volume and pan (152 px headers). The links are FL track modes, so .flp keeps them | LYNX extra (optional) |
 
 ## Host workflow: LYNX extras over FL (round 177d)
 
@@ -3192,6 +3193,81 @@ drum gate's Debleed is not modelled (its release sweep changes nothing on the pr
 note onsets the reference ignores). No state translators were added for these references (their saved states were never
 captured); the missing-plugin table uses the measured defaults instead.
 
+## Round 190fx: dynamics parity — Glow's side-chain weighting, the FET maps refitted on the pink stairs
+
+Round 190fx of the 0.1.28 parity work: the dynamics rows with the lowest Sound numbers, highest gain per hour first. Black-box
+only: the references' recorded probe captures (trial190k: `stairs` — 1 kHz up and down, then 100 Hz and 8 kHz — `tc`,
+`pinkst`), never their code; the programme banks (tp172c, refcap182) were only scored, never fitted. No third-party code.
+Tooling, logs and every render score: `/mnt/e/lynx-work/paritydyn190fx/` (`tools/probeerr.py`, `lab/`, `fit/`, `bank.py`,
+`runs/`, `SCOREBOARD-190fx.md`).
+
+**What the probes showed.** The dynamics maps were fitted on the 1 kHz stairs and tone bursts only. Read on the pink stairs and
+on the 100 Hz / 8 kHz parts of the stairs, two kinds of error were left:
+
+- the optical references (FG-2A, SD-3A and Custom Opto types) hear treble much less and bass a little more than Glow's Opto
+  classic voicing, whose side chain carries the treble emphasis measured on another leveler: at 8 kHz LYNX reduced 4 … 8 dB
+  more, at 100 Hz 1 … 3 dB less, and pink noise came out 2 … 4 dB too low (the programme rows' S2 / X1 files the same way);
+- the FET references (FG-116 family, all-buttons type) compress much harder above their knee than their maps had them (on the
+  1 kHz stairs about 14 : 1 where the maps ran 3 … 4 : 1 with a lower threshold): pink noise and the top steps came out 2 …
+  3.5 dB too loud. A side-chain filter for the FET law was tried in the lab (a low-pass and a low shelf, `lab/fetfit.py`): it
+  trades the 8 kHz steps against the pink steps and made the pink stairs worse, so it was dropped: the gap was in the maps.
+
+**Glow Leveler — SC weighting: Old | Measured** (appended parameter 14, Opto classic voicing; default Old = every project and
+new instance as before, sample for sample). Measured: two peaking filters in place of the emphasis — 4.56 kHz, Q 0.38,
++1.5 dB and 225 Hz, Q 0.59, +2.5 dB — with the chain's 1 kHz gain kept where the emphasis had it (a level shift computed from
+both filters' responses), so every 1 kHz law fitted before (rounds 123 … 190dm) holds. Fitted by a grid and a coordinate
+search on the three references' stair and pink-stair step levels at all their probe settings (`lab/scwfit.py`,
+`lab/refine.py`): rms step-level error 2.01 → 1.23 dB (FG-2A type 2.15 → 1.16, SD-3A type 1.84 → 1.25, Custom Opto type
+1.89 → 1.16). The measured Limit law and Glow's own engine ignore the switch. The editor shows `Side chain` `Old | Measured`
+under the cell-memory keys (existing strings, 14 languages; the four key groups are 12 px high now so the column ends above
+the COMPRESS caption). CPU: one biquad per sample and channel more than the emphasis (35 s stereo programme, user time, best of
+five, `logs/cpu2.txt`): Glow 0.356 → 0.352 s with the switch off, 0.356 s (base, emphasis) → 0.360 s with it on, with the cell
+memory 0.408 → 0.398 s — inside the timing noise; the Compressor 0.127 → 0.128 s (same code); no latency.
+
+**Setting maps refitted with the pink stairs in the loss** (round 190ar's fitter, `fit/fitfx.py`, specs `fit/specs190fx*.py`):
+- FET references → Compressor (FET law, no code change): stairs, tone bursts and pink stairs; pass 1 restarts the ratio at
+  14 : 1 with attack / release / mix kept, pass 2 frees every link; two cycles each, the same procedure for all four. On the
+  probe loss pass 2 beats round 190ar's maps for three of them (FG-116 −9.30 → −10.05, Modern −7.97 → −9.57, all-buttons
+  −5.03 → −6.10); for the Vintage revision it does not (−7.86 → −6.54) although the programme bank improves — a sign the
+  probes under-weight what that revision's programme rows depend on (noted, shipped by the same rule as the others);
+- optical references → Glow with SC weighting on: Peak Reduction and Gain searched again (the switches keep round 190dm's
+  choices: Opto law, release, cell memory). Custom Opto's search moved nothing (its map is round 190dm's plus the switch).
+
+The missing-plugin translators of the four FET references (`core/FittedMaps.inc`, regenerated with round 190ar's
+`tr/gentr.py`; test data with `tr/gentest.py`) load such projects at the refitted settings: rendered from the translator's own
+output they score exactly the map rows below (5.80 / 4.76 / 5.56 / 4.48). The optical references have no translator (their
+stand-in stays at Glow's defaults).
+
+Scores (same banks and score as SCOREBOARD-v3 / round 190dm; before = origin/main fdfe73139 with round 190dm's maps, which
+reproduces round 190dm's after-numbers exactly; per-file up / same / down):
+
+| reference | LYNX plugin | bank | files | before → after | null | level error | up / same / down | went down | change |
+|---|---|---|---|---|---|---|---|---|---|
+| VM FG-116 | Compressor | prog182 | 25 | 4.80 → **5.80** | −15.8 → −21.1 dB | 1.5 → 0.6 dB | 15 / 10 / 0 | – | map refit (pink stairs) + translator |
+| VM FG-116 Modern | Compressor | prog182 | 25 | 4.08 → **4.76** | −12.5 → −15.7 dB | 1.9 → 1.3 dB | 13 / 10 / 2 | D_bass 8→5, X2_drums 4→2 | map refit + translator |
+| VM FG-116 Vintage | Compressor | prog182 | 25 | 5.00 → **5.56** | −16.4 → −19.4 dB | 1.3 → 0.7 dB | 11 / 13 / 1 | X3_guitar 8→7 | map refit + translator |
+| VM The Monster | Compressor | prog182 | 25 | 4.28 → **4.48** | −13.2 → −13.7 dB | 1.2 → 1.0 dB | 4 / 20 / 1 | X3_drums 4→3 | map refit + translator |
+| VM FG-2A | Glow Leveler | tp172c | 12 | 3.75 → **4.08** | −10.9 → −11.4 dB | 1.8 → 1.3 dB | 4 / 8 / 0 | – | SC weighting + refit |
+| VM FG-2A (programme) | Glow Leveler | prog182 | 25 | 4.80 → **4.84** | −15.8 → −16.5 dB | 1.0 → 1.0 dB | 3 / 20 / 2 | X2_bass 7→5, X2_mix 8→6 | |
+| VM SD-3A | Glow Leveler | prog182 | 25 | 4.64 → **4.84** | −14.8 → −16.8 dB | 1.2 → 1.1 dB | 11 / 9 / 5 | X1_bass 5→2, X1_guitar 5→2, X1_mix 3→2, X1_vocal 3→2, X2_bass 6→5 | SC weighting + refit |
+| VM Custom Opto | Glow Leveler | prog182 | 25 | 4.96 → **5.16** | −17.3 → −18.5 dB | 1.0 → 0.8 dB | 4 / 21 / 0 | – | SC weighting |
+
+Per plugin (the SCOREBOARD-v3 rows of `bank.py`, same rows before and after): Compressor 4.88 → **5.12** (10 rows),
+Glow Leveler 4.64 → **4.82** (4 rows; the FG-2A programme column is an extra row, as in round 190dm). The other rows of both
+plugins score exactly as before: the Compressor's code did not change, and with SC weighting Old every render of the Glow
+rows is byte-identical to the base binary's (87 of 87 files on the programme and tp172c banks, the CLA-2A row's 16 of 16 on
+tp172d, `ident.py`); `tests/Dyn190dmTests.inc` keeps its goldens (the defaults). Gate as in round 190dm: no row went down;
+the files that did are listed (SD-3A's X1 setting was already 2 … 3 dB over-compressed by its map and the extra bass weight
+deepens it; a refit that fixes X1 alone was not searched).
+
+Sound column (0–10, table above): the pairs it lists (CLA-2A, Renaissance Compressor) did not change and keep their numbers;
+the rows here are the stand-in pairs of the SCOREBOARD, whose fxparity means above are their scores.
+
+Not done, and why: the Harrison MPC-type compressor on Crest (3.88: its Depth control caps the reduction in a way Crest's
+range does not — a law of its own), the vari-mu row (4.32: below the threshold the reference's 100 Hz is 2 dB lower than its
+1 kHz, a fixed tone Crest has no control for), X-Limit on Apex (4.94: LYNX limits pink noise 2 … 3 dB harder while the
+programme comes out louder — a time-constant question, not a map). Hush, Sentry and the non-dynamics rows were not touched.
+
 ## Round 190dl: Echoform — H-Delay's clocked modulation, the measured tape stage (Law: Classic | Measured)
 
 Roadmap item 3 of the 0.1.27 parity plan (Echoform, 10 reference rows). Black-box only: every number below comes from
@@ -3313,3 +3389,204 @@ at Drive 15 / fast tape a hard ceiling (−0.6 / −5.3 / −10.5 dB at −15 / 
 loses 2.7 dB flat at default and stays almost linear at Drive 15: Ember's own Tape curve cannot be fitted to that
 law. A tape style with a level-dependent ceiling (hysteresis core) is the next step there.
 Tools and tables: `/mnt/e/lynx-work/vqe190dp` (`bank.sh`, `gate.py`, `vsx/`, `qfit/`, `qv/`, `ember/`, `golden/`).
+
+## Round 190ff: Live's Freeze Track with the insert effects, Bounce Track in Place (Flatten), Bounce to New Track, Consolidate (Clip-launch workflow)
+
+Evidence: Live 12.4.16's own command list (`ableton/live-exe-strings.txt`: `Edit>Freeze Track(s)`, `Edit>Bounce
+Track(s) in Place`, `Edit>Bounce to New Track(s)`, `Edit>Paste Bounced Audio`, menu keys `sMenuFreeze` / `sMenuUnfreeze`
+/ `sMenuBounceTrackInPlace` / `sMenuBounceToNewTrack`; no `sMenuFlatten` — Flatten survives only as the scripting API's
+`NTrackApi::Flatten`), the arrangement clip menu of 12.4.16 [SHOT live190ei/shots/live-audioclip-context-menu.png:
+Freeze Track Ctrl+Shift+Alt+F, Bounce Track in Place, Bounce to New Track Ctrl+B, Paste Bounced Audio Ctrl+Alt+V],
+its errors (`sErrorRouteInFreeze`, `sErrorMonitoringStateFreeze`, `sErrorGroupExternalFreeze`) and the folders
+`Samples/Processed/Freeze|Bounce|Consolidate`.
+
+| Live | LYNX (Clip-launch workflow) | Status |
+|---|---|---|
+| Freeze Track: the track with all its devices; the mixer stays live | Column title menu / Playlist clip menu › Freeze Track (Ctrl+Shift+Alt+F in the grid): the channel with its volume and pan through its insert's effects, before the insert's EQ, fader, pan and sends; the instrument and the effects are not loaded | ✅ null −139 dB (core), real export: `--trackfreezetest` |
+| Unfreeze Track | the same item | ✅ project byte for byte as before |
+| A routing into the track / an input refuses the freeze | refused with the reason: another channel or insert into the insert, a side-chain or send out of it, an audio input, a live controller link | ✅ (a freeze that stops holding plays live) |
+| Frozen devices locked | Mixer slots and knobs refuse with a notice; the Device view dims them with the freeze tag | ✅ |
+| Flatten (12.2+: Bounce Track in Place on a frozen track) | Bounce Track in Place on a frozen track: the channel becomes an audio clip channel of its stem, one clip per clip at its place and length plus tail clips, devices removed | ✅ bit-identical to the frozen playback |
+| Freeze and Flatten / Bounce Track in Place | Bounce Track in Place on a live track: rendered and flattened, one undo step | ✅ |
+| Bounce to New Track | the selected clips of one track through its devices, onto a new track below (the clips stay) | ✅ −135 dB vs the track's devices |
+| Consolidate (Ctrl+J) | pattern clips: one pattern, no render; audio clips of one channel: rendered into one clip | ✅ bit-identical / −134 dB |
+| Session clips of a frozen track, group tracks, Paste Bounced Audio, Consolidate Time to New Scene, files in the project's Samples/Processed | — | open (see the round's HANDOFF) |
+
+Also: `Song::automationChunks` (runtime only): stand-in / freeze render songs and projections keep the chunking of the
+song they stand for (the renderer works in 128-sample chunks while any automation plays; some instruments sound about
+−66 dB different at 512): frozen audio now nulls where the freeze took the song's automation away.
+
+## Round 190gx: Anvil Bus refitted on Live's second Drum Buss render set
+
+Round 190gu rendered Live 12.4's Drum Buss again: the settings 190fk could not measure (types at 25 / 50 %, Soft 75 %,
+Boom amount / decay / frequency, Crunch 0.25 / 1.0, Transients on a sustained pad, Comp with Drive and with Trim, Dry/Wet
+with Comp, every type at +6 dBFS, Damping 500 Hz / 2 kHz), 46 cases, each at 44.1, 48 and 96 kHz. Anvil Bus was
+refitted on them with the plugin quality gate: the 31 cases of 190ei and the 46 new ones, every case at or under its
+error before (to 0.001 dB), at all three rates. Anvil Bus is in no release yet (only the 0.1.28 rollup), so the new laws
+need no engine-version switch.
+
+| Item | Live (190gu) | Anvil Bus now | |
+|---|---|---|---|
+| Comp's place | before the curve (Comp + Drive 50 %: staircase THD and level follow) | moved before the curve, refitted: 8 Comp cases all closer (Drive 50 % stair 1.63 → 0.17 dB, drums 2.65 → 0.65) | ✅ |
+| Dry/Wet with Comp | dry = the raw input (0.003 dB) | the same (test: sample for sample) | ✅ |
+| Type EQ below 100 % | Soft / Medium keep the neutral shape until near 100 % | depth = amount⁸ for Soft and Medium (Medium 50 % noise 2.95 → 0.41 dB) | ✅ |
+| Soft 75 % | folds 0 dBFS to −12.1 dBFS | its own knot (stair 1.07 → 0.33 dB) | ✅ |
+| Boom amount | lift and ring grow fast (1.0 rings ≈ −20 dB/s at 50 Hz) | lift and Q per amount (0.25: drums 4.98 → 0.43; 1.0: 7.82 → 3.32 dB) | ⚠️ |
+| Boom decay 0 / 0.5 | | refitted knots (drums 3.22 → 3.08, 1.87 → 1.75) | ⚠️ |
+| Damping | one-pole | corner 6 % above the set value (0.38 → 0.24 dB) | ✅ |
+| Transients on steady sound | a pad: −1.0 → −3.9 dB, +0.25 → +1.15 | a broadband level term joins the shaper (pad 3.53 → 3.05, 0.98 → 0.80 dB); the full depth would move the drum loop | ⚠️ |
+| Crunch's grit | THD 1 → 2.3 / 4.4 / 12 % at 0.25 / 0.5 / 1.0 | not carried (tried: lift before the curve; failed the gate) | ❌ |
+| Output never above 0 dBFS | yes (+6 dBFS in → ≤ 0.0) | not limited (tried an output ceiling; failed the gate) | ❌ |
+| Rates 44.1 / 48 / 96 kHz | agree within 0.25 dB | errors against Live the same at the three rates (mean 0.77 / 0.77 / 0.79 dB) | ✅ |
+| Panel | Drive, types, Trim, Comp \| Crunch, Damp, Transients \| Boom, Freq, Decay \| Out, Dry/Wet | the generic panel in those four columns | ✅ |
+
+Mean headline error: 190ei bank 1.216 → 1.198 dB, 190gu bank 1.261 → 0.766 dB (48 kHz); details and CPU in
+`/mnt/e/lynx-work/livefacts190gx/db/REPORT.md`.
+
+## Round 190fk: Anvil Bus — LYNX's drum-bus engine in the role of Ableton Live's Drum Buss
+
+Owner decision O20: Live's Drum Buss colours even at its all-zero setting, so it imports onto a dedicated engine
+instead of the round-190ek rack (Ember → Facet → Crest → Shell; projects that hold the rack keep it). Anvil Bus is a
+built-in effect (mixer menu, eight factory presets, generic editor in its own forged-gunmetal theme, 14 languages).
+Laws from LYNX's own analysis of Live 12.4.16's renders (round 190ei); nothing of Live's is used.
+
+| Item | Live's Drum Buss | Anvil Bus | |
+|---|---|---|---|
+| Controls | Drive, type (3), Crunch, Damp, Transients, Boom amount / freq / decay, Comp, Trim, Output, Dry/Wet | the same twelve, Live's ranges (Output to +12 dB) | ✅ |
+| Boom audition / Force to note | yes | not built (the import lists audition) | ❌ |
+| Colour at zero | EQ "smile" + soft saturation | the same (fitted, noise TF rms 0.22 dB) | ✅ |
+| Drive curves | Soft folds, Medium / Hard clip with their EQ | fitted per type and amount (staircase level rms 0.04 … 0.46 dB; Soft's fold null −40 vs −130 dBFS) | ⚠️ |
+| Comp | fixed ≈ 4 : 1, +11 dB | the same (staircase 0.09 dB, drums 0.73 dB) | ✅ |
+| Transients | attack + sustain above the lows | Strike's detector above 330 Hz (drums 1.1 … 2.4 dB) | ⚠️ |
+| Latency | 188 samples | 55 samples (rack: 254) | ✅ |
+
+Before → after on Live's 31 Drum Buss renders (headline error, rack → engine): mean 2.13 → 1.19 dB, no case worse;
+per case in `/mnt/e/lynx-work/drumbus190fk/HANDOFF.md`.
+
+## Round 190fj: Ember's Tape on a measured magnetic core (Law: Classic | Measured), tape speed
+
+**Finding (black-box, the tape reference's recorded renders).** At small level the reference is a pure 147-sample
+delay (impulse: one tap of 0.962, response flat to 0.2 dB from 20 Hz to 20 kHz), odd harmonics only (H2 below −150 dB,
+H3 rising 12 dB per 6 dB), its drive compensated (the quiet stair steps read 0.00 dB at every drive). On the 1 kHz
+staircase the fundamental lags the input as the level rises: 0° up to −24 dBFS, −1.9° / −8.7° at −12 / 0 dBFS with
+Drive +10 dB, −26.6° at Drive +15 dB and 1⅞ ips. A static curve fitted per step leaves −16 dB (Drive +10, 0 dBFS) and
+−9 dB (Drive +15) of residual, while any memoryless curve — with any EQ around it — keeps the fundamental's phase
+exactly. At Drive +15 / 1⅞ ips the three loudest steps come out identical (−127 dB apart): the field is clamped ahead
+of the core. Its tails are exactly zero (no remanent offset). Ember's Classic tape curve (round 190dp: "cannot follow
+that level law") lost 2.7 dB flat at the default and stayed almost linear at Drive +15.
+
+**Engine (`core/EmberTape.h`, LYNX's own).** Record EQ (a low and a high first-order shelf) → record level → field
+clamp (`clip · tanh`) → Jiles–Atherton loop (D. C. Jiles, D. L. Atherton, J. Magn. Magn. Mater. 61, 1986; for tape
+J. Chowdhury, DAFx-19 — literature only, no code of any tape model) solved per oversampled sample with midpoint
+Runge–Kutta on the field step, the Langevin function from a 4096-point table, and a 5 ms creep back to the
+anhysteretic curve (without it the loop keeps a remanent offset after loud passages: −12 dB of the peak at Drive +15;
+a DC blocker instead cost the default's sweep 19 dB of ESR) → small-signal make-up (Auto gain on: 0 dB at quiet
+levels, as the reference) → playback EQ (the record EQ's exact inverse) → playback loss (one-pole low-pass per speed)
+→ trim. Ember's half-band oversampler around the core as for every style; a switch onto the measured Tape on a running
+signal starts its filters and loop at the signal's state (no click; FxAudit clean). Auto gain off: the small-signal
+gain is Ember's drive gain, as for every other style.
+Constants fitted with `fit/tapefit` (Nelder–Mead on mean ESR + level error, the model compiled from the same header):
+the loop, record EQ and drive law at 15 ips on the default and Drive +10 takes (tp172c stairs, sweeps, drums, music);
+1⅞ ips on Drive +15 (tp172c + refcap182 programme); 30 ips on refcap182's X1; 7½ ips on X2 (a take with "Average"
+tape and flutter on: its level law only); 3¾ ips interpolated. Ember's drive 18 dB = the reference's 0 dB (record
+level = gain0 + 1.384 × (drive − 18) dB). The fit keeps the loop narrow: the Langevin saturation, the level law, the
+clamp and the losses carry the match. The reference's lag (which grows as it saturates, where a JA loop's shrinks) is
+not reproduced yet.
+
+**Parameters.** `Law` (appended; Measured for new instances, Classic for projects saved before:
+`upgradeLoadedEffectParams`) and `Tape speed` (30, 15, 7.5, 3.75, 1.875 ips; 15 by default). The measured core runs
+only where the Classic tape curve ran: single band, Style Tape, no voice / band character / Classic voicing / band
+feedback; every other path is untouched. Panel: the speed tabs under the curve while Tape runs measured; the Law tabs
+in the same place while a project's Classic tape is set (both hidden on the Classic voicing's page).
+
+**Gate** (base b0cb90aec objects vs branch, same banks, same harness: `/mnt/e/lynx-work/ember190fj`, `gate.py`):
+
+| Reference row | Bank | Files | Before → after | Up / same / down |
+|---|---|---|---|---|
+| Harrison Tape Saturator → Ember (measured Tape) | tp172c | 12 | 2.67 → **5.75** | 12 / 0 / 0 |
+| Harrison Tape Saturator → Ember (measured Tape) | refcap182 programme | 25 | 2.76 → **5.56** | 23 / 2 / 0 |
+| Saturn 2 | tp172b / refcap182 | 20 / 25 | 5.10 / 6.16 → same | 0 / 45 / 0 |
+| Decapitator | tp172d / trial187b / refcap182 | 24 / 100 / 30 | 5.00 / 3.91 / 4.70 → same | 0 / 154 / 0 |
+| X-Saturator v6, VM Revival, Fusion Vintage Drive, Fusion Transformer | tp172c / refcap182 | 40 / 100 | 5.00, 5.75, 4.58, 5.12 / 5.60, 6.08, 5.04, 6.24 → same | 0 / 140 / 0 |
+| Heatwave (its map keeps the Classic tape: Law Classic) | tp172c / refcap182 | 12 / 25 | 3.08 / 3.04 → same | 0 / 37 / 0 |
+
+Total 35 up / 376 same / 0 down; the 376 unchanged renders are byte-identical to the base's. Per file (tp172c):
+default ESR −5.8 … −14.9 → −19.5 … −41.3 dB (level error up to 5.8 → 0.2 dB); Drive +10 −10.3 … −10.7 → −12.7 …
+−20.0 dB; Drive +15 / 1⅞ ips +2.7 … −2.1 → −12.8 … −20.9 dB (level +3.9 … +6.7 → −0.6 … 0.0 dB). refcap182 X1
+(30 ips) 2 … 5 → 7 … 8; X2 (flutter on, not modelled) 2 … 3 → 3 … 4.
+Classic law / old projects / every non-tape path: bit for bit the base (8 hash goldens, `tests/Ember190fjTests.inc`). The
+Classic voicing's golden is kept for both compilers (g++ 15 and zig c++ 0.13 round the base's own Classic voicing
+differently; each build of the branch matches its build of the base). Imported Live Saturators (Bass Shaper, Hard
+Curve map to the Tape style) keep the Classic tape: their fits (round 190da) were made on it.
+
+**CPU** (one instance, 30 s stereo at 48 kHz, best of 5, -O2 no-LTO objects at machine load ~20): Tape at 4×
+(Ember's default) Classic 1.8 % of a core → Measured 4.0 % (4.2 % at 1⅞ ips with the clamp); 2× 1.2 → 2.3 %; 8× 3.1 →
+6.9 … 7.7 %. Paid only by the measured Tape (other styles and old projects unchanged). **Latency** unchanged (the
+oversampler's 55 samples, reported to the host as before).
+
+**Not shipped.** Transformer: the same core with a low-frequency record emphasis and an output shelf per Shine was
+fitted on the transformer reference (tp172c D / S1, refcap182 D / S1 / X1 / X2): better on the default's stair /
+drums / music (−24.5 → −36.6, −8.2 → −10.1, −17.1 → −18.5 dB ESR) but worse on Amount 200 %'s stair and sweep
+(−38.4 → −20.1, −7.4 → −6.2 dB) — no clear win; its distortion falls ~50 dB from 400 Hz to 1 kHz (a split low band,
+not a first-order emphasis) and Shine / LF Extend would need their own controls. Heatwave is no tape: its harmonics
+are level-independent (Drive 50: H2 −49, H3 −35 dB at every level from −48 to −12 dBFS) and its default is flat in
+magnitude but dispersive in phase (group delay ~370 samples at 60 Hz → ~96 at 15 kHz); its map keeps the Classic law.
+
+## Round 190fy: Spiral Echo's measured loop, revision 1 (non-dynamics parity round, 0.1.28)
+
+Scope: the lowest non-dynamics rows where the recorded reference renders allow a real gain (Ember, LYNX Tune and the
+dynamics plugins belong to other rounds). Black-box only: the tp172d bank renders and refcap0124's one-parameter
+captures of the reference; no plugin was run again, nothing of its binary was opened, no third-party code.
+
+**What changed.** Spiral Echo's measured loop (round 190do, the default of new instances since 0.1.27) gets a
+revision. Echo by echo (echo 2 over echo 1 of the bank's 0.5 impulse, S1 = 10 ms, S3 = 18 ms on the dial), revision 0
+was late against the reference above 1 kHz and early under 200 Hz: its 2875 Hz (Q 0.34) all-pass delayed the mids more
+than the reference's loop does. Revision 1 reads the line 1.8 samples sooner (at 48 kHz; at least one sample, a linear
+read under two samples: the 0.01 ms floor answers two samples after the input, the reference one, revision 0 three) and replaces that all-pass with a broad one at 7080 Hz (Q 0.101): 3.7 samples more delay under 300 Hz
+against the top, 2.4 fewer at 2 kHz. The constants were fitted on the error of the 16 bank renders (Nelder-Mead over
+read offset, all-pass frequency and Q and a time scale; mean ESR −6.8 → −10.2 dB; the scale came back at 1.000) and
+checked on the 36 refcap0124 renders, which the fit never saw.
+
+**Old projects.** The revision is a hidden parameter (index 9, not in the info: no control, no string): a new instance
+starts at 1 (`makeEffectSlot`), a project or preset saved by 0.1.27 (nine values, Law = Measured) loads at 0 and renders
+bit for bit as before (4 of 4 fingerprints from the base commit's objects in `tests/Parity190fyTests.inc`; 16 of 16 bank
+renders byte-identical), one saved before 0.1.27 keeps the classic loop (Law = 0). Law = Classic ignores the revision.
+
+| Bank | Files | Before → after | Up / same / down | Mean ESR |
+|---|---|---|---|---|
+| tp172d ValhallaFreqEcho (the scoreboard row) | 16 | **3.88 → 4.50** | 7 / 9 / 0 | −6.8 → −10.2 dB |
+| refcap0124 ValhallaFreqEcho (default + every one-parameter render) | 36 | 3.69 → 3.75 | 2 / 33 / 1 | |
+
+Per setting (tp172d): D 3.00 → 3.00, S1 4.00 → 5.00, S2 4.00 → 5.50, S3 4.50 → 4.50. Tail score (`scripts/taillab.py`,
+delay kind): 6.79 → 6.98, every setting up (D 6.26 → 6.67, S1 6.98 → 7.15, S2 6.49 → 6.53, S3 7.43 → 7.56). The one refcap file down is the −1000 Hz shift
+(`p001_0.000`, 6 → 4): its spectrum error crosses the 0.6 dB step (0.56 → 0.62 dB) while its ESR improves (−10.5 → −11.2
+dB) and its level stays (+0.1 dB); its mirror, +1000 Hz (`p001_1.000`), goes 4 → 6. Every candidate of the fit that
+moved the bank moved that file across the same step; the coordinator decides whether a 0.06 dB spectrum step counts.
+
+**CPU** (thread time, 20 s of noise bursts at 48 kHz, blocks of 512, best of 5; base, revision 0 and revision 1
+binaries interleaved four times, machine load ~30): % of one core, default 0.564 / 0.596 / 0.590, S1 0.580 / 0.590 /
+0.608, S3 0.564 / 0.581 / 0.587, +100 Hz shift 0.590 / 0.588 / 0.558 — the same within noise (two constants and one
+branch, no new filter). Latency 0, memory unchanged.
+
+**Looked at, nothing shipped (the gate or the evidence said no):**
+- *Voice Shift ← Little AlterBoy* (3.17 / 3.27 / 3.80): the shifted files' spectrum error comes from the reference's
+  own low-level output under 130 Hz — a DC offset that changes per note (−32 dB at 0 Hz in a held note) and a floor
+  45 … 55 dB down — where LYNX is clean. LYNX also thumps at each voiced onset under 130 Hz (Formant −6: −26 … −29 dB
+  with Law Measured, −35 … −37 dB with Classic, the reference −41 … −45 dB): round 190dp's shifted unvoiced grains
+  meeting the first voiced grain (Voice Shift does not normalise the window sum as LYNX Tune does). Removing the thump
+  is a quality fix the score cannot see (one file 3 → 2), copying the DC is not one; left open for the owner.
+- *Halo ← ValhallaShimmer*: the top two bands are 3.5 / 8 dB under the reference on every wet file (the output high
+  cut is first order at 8 kHz at the bank's setting); opening it moved one file down and none up (the tone corrector of
+  round 190bz is fitted with that cut). The level error has opposite signs on the impulse and programme files of one
+  setting, so a level law cannot fix it either.
+- *Orbit ← ValhallaSpaceModulator* S1: the music file sits 1.0 dB low, all of it under 110 Hz; a stronger feedback
+  (0.45 instead of 0.377) did not lift it (another mechanism), so nothing shipped.
+- *Ridge Strip ← SSL 4K G, Pink EQ*: the translator plays Pink as Black. The 206 Pink impulse renders of tp172c's
+  K4G_ir grid show a different EQ (larger gain range, other centre frequencies, a high shelf that tilts the lows down
+  by up to 11 dB, LF Bell = LF Shelf): a new curve family to fit, a round of its own; data and tools listed in the
+  handoff. Lattice Mod: every file is at step 4 with an ESR near 0 (random modulation) and envelope correlation
+  0.49 … 0.97, under step 6's 0.98: no statistic within reach.
+
+Tools: `/mnt/e/lynx-work/parityfx190fy` (`lab/spiral.py`, `lab/refcap_sp.py`, `lab/sp_search.py`, `lab/cands.sh`,
+`lab/echoes.py`, `lab/loopid.py`, `lab/bands.py`, `lab/lf.py`, `gold/`, `cpu/`).
+

@@ -2179,6 +2179,16 @@ public:
             if (v != raw[(std::size_t) i])
             {
                 raw[(std::size_t) i] = v;
+                // round 190gk: a slot MIDI picked comes back as the parameter (the message thread writes it, as FL's
+                // click sets it). The slot already playing is not selected again; a pick that a later note replaced
+                // within the last half second is that note's out-of-date echo, not a click.
+                if (i < 2 && v >= 0 && v < slotsPerKind)
+                {
+                    if (v == current[(std::size_t) i])
+                        continue;
+                    if (samplesDone - pickedAt[(std::size_t) i][(std::size_t) v] < (std::int64_t) sampleRate / 2)
+                        continue;
+                }
                 engine.setParam (i, v);
                 if (i < 2)
                     current[(std::size_t) i] = v;
@@ -2197,6 +2207,10 @@ public:
             {
                 current[(std::size_t) kind] = slot;
                 engine.setParam (kind, slot);
+                // round 190gk: published so the parameter (and the editor's grid) follows, as a click would
+                pickedAt[(std::size_t) kind][(std::size_t) slot] = samplesDone;
+                (kind == 0 ? picks.timeSlot : picks.volumeSlot).store (slot, std::memory_order_relaxed);
+                picks.serial.fetch_add (1, std::memory_order_release);
             }
         }
         queued = 0;
@@ -2214,6 +2228,7 @@ public:
         lastTicks = songTicks;
         expected = songTicks + (double) n * bpm / 60.0 * (double) ppq / (double) sampleRate;
         engine.process (l, r, n, flTicks);
+        samplesDone += n;
     }
 
 private:
@@ -2234,6 +2249,19 @@ private:
     bool midiTrigger = true;
     std::array<bool, 2 * slotsPerKind> keyHeld {};
     std::array<int, 2> current {};
+    // per kind and slot: when MIDI last picked it (in samples processed; far in the past = never)
+    std::array<std::array<std::int64_t, slotsPerKind>, 2> pickedAt = [] {
+        std::array<std::array<std::int64_t, slotsPerKind>, 2> a {};
+        for (auto& k : a)
+            k.fill (std::numeric_limits<std::int64_t>::min() / 2);
+        return a;
+    }();
+    std::int64_t samplesDone = 0;
+
+public:
+    MidiPicks picks;
+
+private:
 
     State state, incoming;
     std::atomic<bool> incomingFull { false };
@@ -2246,4 +2274,20 @@ private:
 } // namespace
 
 std::unique_ptr<Effect> make (const std::vector<std::uint8_t>& container) { return std::make_unique<GrossBeatEffect> (container); }
+
+MidiPicks* midiPicksOf (Effect* effect)
+{
+    if (auto* g = dynamic_cast<GrossBeatEffect*> (effect))
+        return &g->picks;
+    return nullptr;
+}
+
+std::vector<std::pair<int, float>> paramsForPicks (const MidiPicks& picks, const EffectParams& params)
+{
+    std::vector<std::pair<int, float>> out;
+    for (int kind = 0; kind < 2; ++kind)
+        if (const auto slot = picks.slotOf (kind); slot >= 0 && slot < slotsPerKind && rawFromParam (kind, params[(std::size_t) kind]) != slot)
+            out.push_back ({ kind, paramFromRaw (kind, slot) });
+    return out;
+}
 } // namespace lynx::grossbeat

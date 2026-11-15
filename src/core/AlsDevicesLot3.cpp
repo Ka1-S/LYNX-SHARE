@@ -11,6 +11,7 @@
 #include <complex>
 #include <cstdio>
 
+#include "core/AnvilBus.h"
 #include "core/DynamicsSuite.h"
 #include "core/Effects.h"
 #include "core/FacetEq.h"
@@ -206,6 +207,7 @@ bool drumBussToRack (const Element& device, Translated& out)
     const auto stageAt = [type] (double d) { return drumBussDriveStage (type, d); };
     e[em::voice] = (float) stage.voice / (float) em::voices;
     e[em::autoGain] = 0.0f;
+    e[(std::size_t) em::law] = 0.0f; // (rollup 0.1.28, 190fk x 190fj: round 190ek's rack was fitted on the Classic tape)
     e[em::drive] = linValue (stage.driveDb, 0.0, 36.0);
     e[em::output] = linValue (stage.outputDb, -18.0, 18.0);
     const auto trimDb = dbOfGain (manual (device, "InputTrim", 1.0));
@@ -433,6 +435,69 @@ bool drumBussToRack (const Element& device, Translated& out)
         out.notes.approximated.push_back (text ("output %.1f dB (Shell Channel's output: +/-20 dB)", outDb));
     if (transients < 0.0)
         out.notes.approximated.push_back ("negative transients: automation / macros of Transients are not carried");
+    return true;
+}
+
+// Round 190fk (owner decision O20): Drum Buss onto LYNX's own drum-bus engine, Anvil Bus (core/AnvilBus.h), whose laws
+// were fitted to the same renders of Live 12.4 (rounds 190ei / 190fk). Every control maps one to one; Live's parameters
+// reach the engine's through `links`, so envelopes and rack macros on them are carried. The rack above stays for the
+// A/B harness and its tests (Context::drumBussRack); projects that already hold the rack keep it as it is.
+bool drumBussToEngine (const Element& device, Translated& out)
+{
+    namespace an = anvil;
+    if (! has (device, "DriveAmount") || ! has (device, "TransientShaping") || ! has (device, "BoomAmount"))
+        return false;
+    out.slot = makeEffectSlot (EffectKind::anvilBus);
+    auto& p = out.slot.params;
+    const auto type = std::clamp ((int) manual (device, "DriveType", 0), 0, 2);
+    p[an::drive] = unit (manual (device, "DriveAmount", 0.2));
+    p[an::driveType] = an::typeValue ((an::Type) type);
+    p[an::crunch] = unit (manual (device, "CrunchAmount", 0.0));
+    const auto dampHz = std::clamp (manual (device, "DampingFrequency", 20000.0), 500.0, 20000.0);
+    const auto dampOf = [] (double hz) { return hz >= 19999.0 ? 1.0f : an::dampValue (hz); };
+    p[an::damp] = dampOf (dampHz);
+    p[an::transients] = an::transientsValue (manual (device, "TransientShaping", 0.0));
+    p[an::boom] = unit (manual (device, "BoomAmount", 0.0));
+    p[an::boomFreq] = an::boomHzValue (manual (device, "BoomFrequency", 50.0));
+    p[an::boomDecay] = unit (manual (device, "BoomDecay", 0.5));
+    p[an::comp] = device.boolean ("EnableCompression/Manual", device.boolean ("EnableCompression", false)) ? 1.0f : 0.0f;
+    const auto trimDb = dbOfGain (manual (device, "InputTrim", 1.0));
+    const auto outDb = dbOfGain (manual (device, "OutputGain", 1.0));
+    p[an::trim] = an::trimValue (trimDb);
+    p[an::output] = an::outputValue (outDb);
+    p[an::dryWet] = unit (manual (device, "DryWet", 1.0));
+
+    out.links.push_back ({ "DriveAmount", an::drive, [] (double v) { return unit (v); } });
+    out.links.push_back ({ "DriveType", an::driveType, [] (double v) { return an::typeValue ((an::Type) std::clamp ((int) std::lround (v), 0, 2)); } });
+    out.links.push_back ({ "CrunchAmount", an::crunch, [] (double v) { return unit (v); } });
+    out.links.push_back ({ "DampingFrequency", an::damp, dampOf });
+    out.links.push_back ({ "TransientShaping", an::transients, [] (double t) { return an::transientsValue (t); } });
+    out.links.push_back ({ "BoomAmount", an::boom, [] (double v) { return unit (v); } });
+    out.links.push_back ({ "BoomFrequency", an::boomFreq, [] (double hz) { return an::boomHzValue (hz); } });
+    out.links.push_back ({ "BoomDecay", an::boomDecay, [] (double v) { return unit (v); } });
+    out.links.push_back ({ "EnableCompression", an::comp, [] (double v) { return v >= 0.5 ? 1.0f : 0.0f; } });
+    out.links.push_back ({ "InputTrim", an::trim, [] (double g) { return an::trimValue (dbOfGain (g)); } });
+    out.links.push_back ({ "OutputGain", an::output, [] (double g) { return an::outputValue (dbOfGain (g)); } });
+    out.links.push_back ({ "DryWet", an::dryWet, [] (double v) { return unit (v); } });
+
+    // the report: what the engine holds as a fit rather than a measurement at that very setting
+    // (round 190gx: the measured settings are Live's 190ei and 190gu renders)
+    const auto drive = (double) p[an::drive];
+    const auto measured = [] (double v, std::initializer_list<double> at) {
+        return std::any_of (at.begin(), at.end(), [v] (double a) { return std::abs (v - a) < 1.0e-3; });
+    };
+    if (drive > 0.0 && ! measured (drive, { 0.25, 0.5, 1.0 }) && ! (type == 0 && measured (drive, { 0.75 })))
+        out.notes.approximated.push_back ("drive between the measured amounts (0, 25, 50, 100 %; Soft also 75 %): curve and gain interpolated");
+    if (drive > 0.0 && ! measured (drive, { 0.25, 0.5, 1.0 }))
+        out.notes.approximated.push_back ("the drive type's EQ fitted at 25, 50 and 100 % and interpolated between");
+    if (p[an::boom] > 0.0f && ! measured ((double) p[an::boom], { 0.25, 0.5, 1.0 }))
+        out.notes.approximated.push_back ("Boom fitted at amounts 0.25, 0.5 and 1.0; amounts between interpolate its lift and resonance");
+    if (p[an::crunch] > 0.0f)
+        out.notes.approximated.push_back ("Crunch as its mid-band level (fitted at 0.25, 0.5 and 1.0; its grit is not carried)");
+    if (outDb > 12.0)
+        out.notes.approximated.push_back (text ("output %.1f dB (Anvil Bus: up to +12 dB)", outDb));
+    if (device.boolean ("BoomAudition/Manual", false))
+        out.notes.dropped.push_back ("Boom audition (the boom heard alone): Anvil Bus plays the whole device");
     return true;
 }
 

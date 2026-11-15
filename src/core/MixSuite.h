@@ -46,11 +46,36 @@ public:
     static int latency() noexcept;        // base-rate samples (the same for every factor)
 
     // Runs `f` (float → float) at the oversampled rate on each sample of `x` (in place).
+    // Round 190ge: stage by stage over blocks of samples instead of one base sample through every stage at a time. Each
+    // half-band output still sums its taps one by one in the same order (four outputs side by side), every stage sees
+    // the same samples in the same order, and `f` is called on the same values in the same order: the same output, bit
+    // for bit, at about a third of the cost (the per-sample chain of float additions was most of Ember's CPU).
     template <typename F>
     void process (float* x, int n, F&& f) noexcept
     {
-        for (int i = 0; i < n; ++i)
-            x[i] = padOut (run<0> (x[i], f));
+        std::array<float, blockBase << maxStages> bufA, bufB;
+        for (int start = 0; start < n; start += blockBase)
+        {
+            const int m = std::min (blockBase, n - start);
+            float* cur = bufA.data();
+            float* other = bufB.data();
+            upBlock (st[0], x + start, m, cur);
+            int len = 2 * m;
+            for (int level = 1; level < stages; ++level, len *= 2)
+            {
+                upBlock (st[(std::size_t) level], cur, len, other);
+                std::swap (cur, other);
+            }
+            for (int i = 0; i < len; ++i)
+                cur[i] = f (padIn (cur[i]));
+            for (int level = stages - 1; level >= 0; --level, len /= 2)
+            {
+                downBlock (st[(std::size_t) level], cur, len / 2, other);
+                std::swap (cur, other);
+            }
+            for (int i = 0; i < m; ++i)
+                x[start + i] = padOut (cur[i]);
+        }
     }
 
 private:
@@ -63,25 +88,13 @@ private:
         int upPos = 0, downPos = 0;
     };
 
-    template <int level, typename F>
-    float run (float x, F& f) noexcept
-    {
-        if constexpr (level == maxStages)
-            return f (padIn (x));
-        else
-        {
-            if (level == stages)
-                return f (padIn (x));
-            float a, b;
-            up (st[(std::size_t) level], x, a, b);
-            const auto ya = run<level + 1> (a, f);
-            const auto yb = run<level + 1> (b, f);
-            return down (st[(std::size_t) level], ya, yb);
-        }
-    }
-
-    static void up (Stage& s, float x, float& a, float& b) noexcept;
-    static float down (Stage& s, float a, float b) noexcept;
+    // One stage over a block (round 190ge; before, one sample at a time). up: `m` samples in, 2m out (y[2m] = 2 · the
+    // half-band of the input, y[2m + 1] = the input (c − 1) / 2 samples back). down: m (even, odd) pairs in, m out
+    // (the half-band of the even samples + half the odd one c samples back). The history is left as m single steps
+    // left it, so blocks of any size give the same samples.
+    static constexpr int blockBase = 64; // base-rate samples per block (the highest rate holds blockBase << maxStages)
+    static void upBlock (Stage& s, const float* in, int m, float* out) noexcept;
+    static void downBlock (Stage& s, const float* in, int m, float* out) noexcept;
     float padIn (float x) noexcept;  // a short delay at the highest rate (makes the latency whole)
     float padOut (float x) noexcept; // base-rate delay up to the common latency
 
@@ -234,7 +247,8 @@ namespace glow
 // are unchanged); the opto release now also selects the measured attack; and the VU display (gain reduction / input /
 // output: the reference saves its VU DISPLAY knob with the state, so LYNX keeps the editor's selector with the project)
 // round 190dm (appended): the Opto classic voicing's cell memory (VoiceMatch.h opto::Settings::memory; off = as before)
-enum Param { peakReduction, gain, mode, emphasis, mix, trim, autoMakeup, voicing, optoLaw, analog, releaseLaw, makeupRef, vuDisplay, optoMemory, count };
+// round 190fx (appended): the Opto classic voicing's side-chain weighting (opto::Settings::scWeighting; off = as before)
+enum Param { peakReduction, gain, mode, emphasis, mix, trim, autoMakeup, voicing, optoLaw, analog, releaseLaw, makeupRef, vuDisplay, optoMemory, scWeighting, count };
 // round 165x: an editor edit with the reference's AUTO MAKEUP behaviour (switching it on takes the dial as the
 // reference; switching it off leaves the make-up in the Gain dial, as the trial turns its own Gain knob)
 std::vector<std::pair<int, float>> linkedEdit (const EffectParams& p, int param, float value);
@@ -479,8 +493,18 @@ enum Param
     // the curve (core/EmberClassic.h: styles driven hard hold the reference's uneven square wave). Off = round
     // trial187b's tables: what a project saved before loads with (upgradeLoadedEffectParams). Drives up to 5 ignore it.
     classicHot,
+    // round 190fj (appended; Measured for new instances, Classic for projects saved before): the Style menu's Tape on a
+    // measured magnetic core (core/EmberTape.h: hysteresis between a record and a playback EQ, the level law and the
+    // speed losses fitted black-box on the reference tape saturator's renders) in the single-band mode, and the tape
+    // speed it runs at (30, 15, 7½, 3¾, 1⅞ ips; 15 by default). Classic = the tape curve of round 108 … 190, bit for bit.
+    law, tapeSpeed,
     count
 };
+constexpr int tapeSpeeds = 5;
+int tapeSpeedIndex (float v) noexcept;          // 0 … 4 = 30, 15, 7½, 3¾, 1⅞ ips
+const char* tapeSpeedName (int k) noexcept;
+// round 190fj: the single-band Tape runs the measured core (Law = Measured, no voice / character on band 1)
+bool measuredTape (const EffectParams& p) noexcept;
 // round 165: an editor edit of `param` with the Classic voicing's Auto on also moves Output (the reference's link);
 // returns every (parameter, value) to set — just the edit itself when nothing is linked
 std::vector<std::pair<int, float>> linkedEdit (const EffectParams& p, int param, float value);
@@ -615,6 +639,7 @@ const EffectInfo& kilnInfo();
 const EffectInfo& fretInfo();
 const EffectInfo& shellInfo();
 const EffectInfo& strikeInfo(); // round trans189d: Strike Shaper (core/StrikeShaper.h)
+const EffectInfo& anvilInfo();  // round 190fk: Anvil Bus (core/AnvilBus.h)
 
 std::string paramText (EffectKind kind, int param, float v);
 std::unique_ptr<Effect> make (EffectKind kind);

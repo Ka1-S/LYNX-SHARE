@@ -122,6 +122,8 @@ juce::TextEditor* firstTextField (juce::Component& dialog);
 // small-size form (thicker lines, the mark larger in the tile: tools/make_logo.py) with the pepper stem for 21-32
 // physical pixels and without it for 20 px and less. All three are square with the tile filling them.
 juce::Image logoImage();
+// The app icon decoded now, on the calling thread, outside the image cache (round 190hd: the splash's own thread)
+juce::Image decodeLogoImage();
 juce::Image logoSmallImage();
 juce::Image logoTinyImage();
 // The mark alone (w3teal's lynx in the red ring with the stem, no tile; 512 px) and its small-size form (128 px).

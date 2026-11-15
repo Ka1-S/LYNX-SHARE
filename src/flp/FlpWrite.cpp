@@ -754,7 +754,7 @@ std::vector<std::uint8_t> writeProject (const Project& p, const WriteOptions& op
     out.u8 (evSwing, (std::uint32_t) std::clamp (p.swing, 0, 128));
     out.u16 (evMainPitch, (std::uint32_t) (std::uint16_t) (std::int16_t) std::clamp (p.mainPitch, -1200, 1200));
     out.u8 (evTimeSigNumerator, (std::uint32_t) std::clamp (p.beatsPerBar, 1, 32));
-    out.u8 (evTimeSigDenominator, 4);
+    out.u8 (evTimeSigDenominator, (std::uint32_t) p.beatUnit); // (round 190fg: the song meter's denominator)
     out.u8 (evTimeSetting, p.timeSignatureMode ? 1 : 0);
     out.u8 (evPanLaw, (std::uint32_t) p.panLaw);
     out.u8 (evAutoCrossfades, p.autoCrossfades ? 1 : 0);

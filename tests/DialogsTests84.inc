@@ -93,7 +93,7 @@ TEST (export_render_song_ranges_loops_and_tail)
     o = {};
     o.range = Range::pattern;
     auto pat = makeRenderSong (song, o, 0, music, loop);
-    CHECK (pat.playlist.size() == 1 && music == song.patterns[0].effectiveLength (song.beatsPerBar));
+    CHECK (pat.playlist.size() == 1 && music == song.patterns[0].effectiveLength (song.meter()));
 
     // an empty selection still renders its length (silence)
     song.playlist.clear();
@@ -488,12 +488,12 @@ TEST (clipprops_bar_beat_tick_text)
     using namespace lynx;
     using namespace lynx::clipprops;
     const auto beat = (std::int64_t) ppq, bar = beat * 4;
-    CHECK (formatPosition (0, 4) == "1:1:000" && formatLength (0, 4) == "0:0:000");
-    CHECK (formatPosition (2 * bar + beat + 5, 4) == "3:2:005" && formatLength (2 * bar + beat + 5, 4) == "2:1:005");
-    CHECK (parsePosition ("3:2:005", 4) == 2 * bar + beat + 5 && parseLength ("2:1:005", 4) == 2 * bar + beat + 5);
-    CHECK (parsePosition ("5", 4) == 4 * bar && parsePosition ("5:3", 4) == 4 * bar + 2 * beat && parseLength ("2", 4) == 2 * bar);
-    CHECK (parsePosition ("0:1:000", 4) == -1 && parsePosition ("1:5:000", 4) == -1 && parsePosition ("1:1:x", 4) == -1 && parsePosition ("", 4) == -1);
-    CHECK (parsePosition ("1:4", 3) == -1 && parsePosition ("2:3", 3) == 3 * beat + 2 * beat);
+    CHECK (formatPosition (0, lynx::Meter (4, 4)) == "1:1:000" && formatLength (0, lynx::Meter (4, 4)) == "0:0:000");
+    CHECK (formatPosition (2 * bar + beat + 5, lynx::Meter (4, 4)) == "3:2:005" && formatLength (2 * bar + beat + 5, lynx::Meter (4, 4)) == "2:1:005");
+    CHECK (parsePosition ("3:2:005", lynx::Meter (4, 4)) == 2 * bar + beat + 5 && parseLength ("2:1:005", lynx::Meter (4, 4)) == 2 * bar + beat + 5);
+    CHECK (parsePosition ("5", lynx::Meter (4, 4)) == 4 * bar && parsePosition ("5:3", lynx::Meter (4, 4)) == 4 * bar + 2 * beat && parseLength ("2", lynx::Meter (4, 4)) == 2 * bar);
+    CHECK (parsePosition ("0:1:000", lynx::Meter (4, 4)) == -1 && parsePosition ("1:5:000", lynx::Meter (4, 4)) == -1 && parsePosition ("1:1:x", lynx::Meter (4, 4)) == -1 && parsePosition ("", lynx::Meter (4, 4)) == -1);
+    CHECK (parsePosition ("1:4", lynx::Meter (3, 4)) == -1 && parsePosition ("2:3", lynx::Meter (3, 4)) == 3 * beat + 2 * beat);
     for (std::int64_t t : { (std::int64_t) 0, beat * 7 + 33, bar * 100 + 1 })
-        CHECK (parsePosition (formatPosition (t, 4), 4) == t && parseLength (formatLength (t, 7), 7) == t);
+        CHECK (parsePosition (formatPosition (t, lynx::Meter (4, 4)), lynx::Meter (4, 4)) == t && parseLength (formatLength (t, lynx::Meter (7, 4)), lynx::Meter (7, 4)) == t);
 }

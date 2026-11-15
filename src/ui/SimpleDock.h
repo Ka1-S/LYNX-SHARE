@@ -11,6 +11,8 @@
 //   Editor      (round 190ds) the Piano roll docked here on the track's pattern; a track without one gets an empty
 //               4-bar pattern the first time (core/SimpleTracks.h ensurePattern), so the first click writes a note.
 //               "Only notes in key" folds the rows to the project key.
+//   Pads        (round 190fo) a Sampler track's 16 pads (core/SimplePads.h): play, drop sounds on them, their region,
+//               mode, envelope, tone, pitch, pan, volume, group and colour; kits of the user's own.
 //   Effects     the track's insert as cards: one-knob effects (core/GoalKnobs.h) show one big knob, any other effect
 //               its Mix; on / off, move, remove, "Editor" opens the effect's own window. On the left the chain's
 //               preset (core/ChainPresets.h, the user's own in Documents/LYNX/Chain presets) and Blend, the dry/wet
@@ -51,7 +53,7 @@ public:
         std::function<void()> openPianoRollPanel;
     };
 
-    enum class Tab { instrument, keyboard, editor, effects };
+    enum class Tab { instrument, keyboard, editor, effects, pads };
 
     SimpleDock (AudioEngine& engine, Hooks hooks);
     ~SimpleDock() override;
@@ -112,6 +114,7 @@ public:
     void removeCardForCheck (int card);
     void addOneKnobForCheck (int goal);
     void setBlendForCheck (float value);
+    void setReverbForCheck (float value); // round 190fo: the track's send to the shared reverb
     // round 190dg (--simple190dgshot): where card `card` is in the dock, and a search typed into the sound list
     juce::Rectangle<int> cardBoundsForSnapshot (int card) const;
     void setSearchForSnapshot (const juce::String& text);
@@ -121,6 +124,26 @@ public:
     void clickFollowForCheck();
     juce::Component* keyboardPanelForSnapshot();
     void clickFoldForCheck (bool on); // the Editor tab's "Only notes in key"
+    // round 190fo (--reabl190foshot)
+    class PadsPage;
+    bool hasPadsTabForCheck() const noexcept { return padsTab; }
+    void padsLoadForCheck (int pad, const juce::File& file);
+    void padsSelectForCheck (int pad);
+    void padsModeForCheck (int mode);       // the selected pad's mode button (0 Gate, 1 One-shot, 2 Loop)
+    void padsKnobForCheck (int knob, float v); // 0 Attack, 1 Release, 2 Tone, 3 Pitch, 4 Pan, 5 Volume
+    void padsRegionForCheck (float start, float end);
+    void padsNormalizeForCheck();
+    void padsHitForCheck (int pad);
+    void padsDragForCheck (int from, int to, bool copy);
+    void padsUpdateForCheck();
+    juce::PopupMenu padMenuForSnapshot (int pad);
+    juce::PopupMenu kitMenuForSnapshot();
+    bool saveKitForCheck (const juce::String& name);
+    bool openKitForCheck (const juce::File& file);
+    static bool renameKitForCheck (const juce::File& file, const juce::String& name);
+    void lightPad (int pad); // a pad played by its typing key
+    bool recordHintShown() const; // the strip's "wear headphones" line (an armed Voice / Guitar / Bass track with an input)
+    std::function<void()> onBrowseSounds; // the Pads tab's "Browse sounds"
 
     void paint (juce::Graphics& g) override;
     void resized() override;
@@ -143,14 +166,16 @@ private:
     std::unique_ptr<EffectsPage> effectsPage;
     std::unique_ptr<InstrumentPage> instrumentPage;
     std::unique_ptr<EditorPage> editorPage;
+    std::unique_ptr<PadsPage> padsPage;
     std::unique_ptr<juce::Component> keyboardPage; // (made the first time the Keyboard tab shows)
-    juce::TextButton instrumentButton, keyboardButton, editorButton, effectsButton, hideButton;
+    juce::TextButton instrumentButton, keyboardButton, editorButton, effectsButton, padsButton, hideButton;
     juce::ToggleButton followButton;
     juce::String followText;
     Tab tab = Tab::effects;
     bool tabChosen = false;     // the user picked a tab for this track: a refresh keeps it
     bool instrumentTab = false; // the track has an instrument whose sound can be picked
     bool playTabs = false;      // the track plays notes (Instrument / Sampler): Keyboard and Editor
+    bool padsTab = false;       // round 190fo: a Sampler track's pads
     int track = -1, insert = -1, channel = -1;
     int dragStartHeight = 0;
     bool resizing = false;

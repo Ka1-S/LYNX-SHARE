@@ -1,4 +1,5 @@
 #include "ui/DetailView.h"
+#include "core/StandIns.h"
 #include "ui/MapMode.h"
 
 #include <algorithm>
@@ -10,6 +11,7 @@
 #include "core/ClipLauncher.h"
 #include "core/ClipSample.h"
 #include "core/DetailChain.h"
+#include "core/RackOps.h"
 #include "core/Groove.h"
 #include "core/Effects.h"
 #include "core/FlEffects.h"
@@ -224,7 +226,17 @@ public:
             juce::Graphics::ScopedSaveState save (g);
             g.reduceClipRegion (area);
             for (int i = 0; i < (int) cards.size(); ++i)
+            {
                 paintCard (g, i);
+                if (const auto& card = cards[(std::size_t) i]; card.kind != Card::add && cardLocked (card))
+                {
+                    // (round 190ff) a frozen device: dimmed, with the freeze tag on its title
+                    g.setColour (colour::bg1.withAlpha (0.45f));
+                    g.fillRect (card.bounds.reduced (1));
+                    theme::drawFrozenTag (g, juce::Rectangle<float> ((float) card.bounds.getRight() - 22.0f, (float) card.bounds.getY() + 4.0f, 14.0f, 13.0f),
+                                          colour::info.withAlpha (0.85f), colour::bg1);
+                }
+            }
             if (insert < 0 && channel < 0)
             {
                 g.setColour (colour::textDisabled);
@@ -274,10 +286,13 @@ public:
         const auto& card = cards[(std::size_t) hit.card];
         if (card.kind == Card::add)
         {
-            slotActions.showAddMenuFor (nextFreeRow());
+            if (! refuseLocked (card))
+                slotActions.showAddMenuFor (nextFreeRow());
             return;
         }
         select (hit.card);
+        if (hit.part != Part::title && hit.part != Part::folded && refuseLocked (card, hit.part == Part::knob ? hit.knob : -2))
+            return;
 
         if (hit.part == Part::knob)
         {
@@ -384,7 +399,8 @@ public:
         const auto& card = cards[(std::size_t) hit.card];
         if (hit.part == Part::knob)
         {
-            setKnob (card, hit.knob, knobSpec (card, hit.knob).defaultValue);
+            if (! refuseLocked (card, hit.knob))
+                setKnob (card, hit.knob, knobSpec (card, hit.knob).defaultValue);
             return;
         }
         if (hit.part == Part::title || hit.part == Part::folded) // fold / unfold (the reference: double-click the title bar)
@@ -394,7 +410,7 @@ public:
     void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override
     {
         const auto hit = hitAt (e.getPosition());
-        if (hit.part == Part::knob)
+        if (hit.part == Part::knob && ! cardLocked (cards[(std::size_t) hit.card], hit.knob))
         {
             const auto& card = cards[(std::size_t) hit.card];
             const auto spec = knobSpec (card, hit.knob);
@@ -567,6 +583,11 @@ public:
         const auto position = effectPositionFor (positionAt (details.localPosition.x));
         dropBefore = -1;
         repaint();
+        if (freeze::frozenByInsert (engine.getSong(), insert) >= 0) // (round 190ff: a frozen track's devices stay as they are)
+        {
+            ui::postNotice ({ tr ("This track is frozen: Unfreeze the track to edit its devices"), {} }, 3000);
+            return;
+        }
         // round 190dr: a card that left the chain and came back: a move inside the chain (Ctrl: a copy), as a plain drag
         if (int from = -1, slot = -1; detailDeviceDrag (details.description, from, slot))
         {
@@ -585,7 +606,23 @@ public:
         }
         if (BrowserComponent::isGeneratorDrag (details))
         {
-            if (auto c = BrowserComponent::draggedGenerator (details); c && hooks.instrumentDropped != nullptr)
+            auto c = BrowserComponent::draggedGenerator (details);
+            if (! c)
+                return;
+            // issue #152 point 6 (Live: an instrument dropped onto the track's instrument in the Device View replaces
+            // only it; its effects stay): the instrument card under the mouse takes the plugin
+            if (const auto hit = hitAt (details.localPosition); juce::isPositiveAndBelow (hit.card, (int) cards.size())
+                                                                 && cards[(std::size_t) hit.card].kind == Card::instrument)
+            {
+                const auto channel = cards[(std::size_t) hit.card].index;
+                if (c->instrument != InstrumentKind::audioClip && c->instrument != InstrumentKind::controller)
+                {
+                    engine.editSong ([channel, gen = std::move (*c)] (Song& song) mutable { replaceGenerator (song, channel, std::move (gen)); });
+                    refresh();
+                }
+                return;
+            }
+            if (hooks.instrumentDropped != nullptr)
                 hooks.instrumentDropped (insert, std::move (*c));
             return;
         }
@@ -694,6 +731,29 @@ private:
         repaint();
     }
 
+    // Freeze (round 190ff): a frozen track's devices are not loaded and cannot be edited, as in the reference (its frozen
+    // devices are greyed out). The instrument card of a frozen channel (its body; with a track freeze its volume and pan
+    // too) and every card of an insert whose effects a track freeze holds.
+    bool cardLocked (const Card& c, int knob = -2) const
+    {
+        const auto& song = engine.getSong();
+        if (c.kind == Card::instrument)
+        {
+            if (c.index < 0 || c.index >= (int) song.channels.size() || ! song.channels[(std::size_t) c.index].freeze.on())
+                return false;
+            const auto levelsLive = song.channels[(std::size_t) c.index].freeze.insert == 0; // (a channel freeze: they apply live)
+            return ! (levelsLive && knob >= 0);
+        }
+        return freeze::frozenByInsert (song, insert) >= 0;
+    }
+    bool refuseLocked (const Card& c, int knob = -2)
+    {
+        if (! cardLocked (c, knob))
+            return false;
+        ui::postNotice ({ tr ("This track is frozen: Unfreeze the track to edit its devices"), {} }, 3000);
+        return true;
+    }
+
     void layoutCards()
     {
         cards.clear();
@@ -755,6 +815,9 @@ private:
             cards.push_back (std::move (c));
         }
         placeCustomCards();
+        for (const auto& c : cards) // (round 190ff: a frozen device's own body takes no clicks)
+            if (c.custom != nullptr)
+                c.custom->setEnabled (! cardLocked (c));
         contentWidth = x + scroll - area.getX();
         const auto overflow = contentWidth > area.getWidth();
         scrollBar.setVisible (overflow);
@@ -1710,7 +1773,7 @@ public:
                 notetools::humanize (p, all, o);
             });
         };
-        duplicate.onClick = [this] { notes ([] (Pattern& p, const std::vector<int>& all, const Song& song) { noteedit::duplicateBars (p, all, song.beatsPerBar); }); };
+        duplicate.onClick = [this] { notes ([] (Pattern& p, const std::vector<int>& all, const Song& song) { noteedit::duplicateBars (p, all, song.meter()); }); };
         quantize.onClick = [this] { notes ([] (Pattern& p, const std::vector<int>& all, const Song&) { noteedit::quantize (p, all, ppq / 4); }); };
         randomize.onClick = [this] {
             notes ([seed = (std::uint32_t) juce::Random::getSystemRandom().nextInt()] (Pattern& p, const std::vector<int>& all, const Song&) {
@@ -1951,13 +2014,13 @@ private:
     juce::String fieldText (std::int64_t ticks, bool asLength, bool seconds) const
     {
         const auto& song = engine.getSong();
-        return juce::String (seconds ? clipsample::secondsText (ticks, song.bpm) : clipsample::positionText (ticks, song.beatsPerBar, asLength));
+        return juce::String (seconds ? clipsample::secondsText (ticks, song.bpm) : clipsample::positionText (ticks, song.meter(), asLength));
     }
     std::int64_t fieldTicks (const juce::TextEditor& ed, bool asLength, bool seconds) const
     {
         const auto& song = engine.getSong();
         const auto text = ed.getText().trim().toStdString();
-        return seconds ? clipsample::parseSeconds (text, song.bpm) : clipsample::parsePosition (text, song.beatsPerBar, asLength);
+        return seconds ? clipsample::parseSeconds (text, song.bpm) : clipsample::parsePosition (text, song.meter(), asLength);
     }
 
     // the grid clip of the slot (const) and its settings
@@ -1988,7 +2051,7 @@ private:
             position.setText (fieldText (c->offset, false, secs), false);
         if (! length.hasKeyboardFocus (false))
             length.setText (fieldText (c->length, true, secs), false);
-        signature.setText (juce::String (bpb) + " / 4", n);
+        signature.setText (juce::String (bpb) + " / " + juce::String (meterUnit (song.beatUnit)), n);
         {
             // the Groove chooser: None + the pool's grooves; MIDI clips only
             const juce::ScopedValueSetter<bool> guard (loading, true);
@@ -2160,6 +2223,13 @@ private:
         {
             t.indices = roll->midiToolNotes (t.selected);
             t.grid = roll->midiToolGrid();
+            t.from = roll->timeSelectionFrom(); // round 190fm: Generate writes into the time selection…
+            t.to = roll->timeSelectionTo();
+        }
+        if (t.to <= t.from && c->length > 0) // …else the part of the pattern the clip plays (Live: the clip's loop)
+        {
+            t.from = std::max<std::int64_t> (0, c->offset);
+            t.to = t.from + c->length;
         }
         else
         {

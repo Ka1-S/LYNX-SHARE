@@ -34,6 +34,11 @@ juce::String saveWildcard (juce::AudioPluginInstance& plugin);
 // (the last one used first), then the selected channel's plugin; a .lynxpreset of an instrument nobody has open
 // becomes a new channel with that plugin. `message` receives what happened when nothing could take it.
 bool applyFromBrowser (AudioEngine& engine, const juce::File& file, juce::String& message);
+// Round 190fs: an FL preset (.fst) of a third-party plugin (FL's wrapper record). `load` reads it too (the plugin's
+// state carried over as from an .flp). From the Browser: into an open window of that plugin (or the selected channel's
+// plugin), else a new channel when the plugin is an instrument LYNX SHARE found; `message` says what to do otherwise.
+bool isFlPresetOfPlugin (const juce::File& file);
+bool applyFlPresetFromBrowser (AudioEngine& engine, const juce::File& file, juce::String& message);
 
 // Round 190ao (pain point 13; LYNX's own): the preset menu's "Play a note when a preset loads" — a short C5 on the
 // instrument after a preset is loaded while the song is stopped. A user setting (preset-audition.txt in the settings

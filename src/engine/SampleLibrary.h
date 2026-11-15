@@ -30,14 +30,15 @@ public:
     // `map` (round 175a, warp markers): stretched along that warp map instead of at one ratio (its own cache entries).
     std::shared_ptr<const SampleData> loadStretched (const juce::String& path, double ratio, StretchMethod method = StretchMethod::general,
                                                     double semitones = 0.0, // semitones: Beats only (core/TimeStretch)
-                                                    const StretchMap& map = {});
+                                                    const StretchMap& map = {}, const StretchOptions& options = {});
 
     // A channel's precomputed span (its region after its precomputed effects and Trim, core/SamplePrecompute.h) stretched
     // by `ratio` (core/TimeStretch timeStretchSpan), cached in memory by (path, variantKey, ratio, method): FL stretches
     // that span to TIME, not the whole file (round 180d). Dropped with the file's other unused lengths.
     std::shared_ptr<const SampleData> loadStretchedSpan (const juce::String& path, const std::string& variantKey,
                                                         const std::shared_ptr<const SampleData>& span, double ratio,
-                                                        StretchMethod method = StretchMethod::general, double semitones = 0.0);
+                                                        StretchMethod method = StretchMethod::general, double semitones = 0.0,
+                                                        const StretchOptions& options = {});
 
     // Above this, audio goes to a memory-mapped disk cache instead of staying entirely
     // in RAM ("disk streaming"). The cache is reused across sessions.
@@ -46,6 +47,21 @@ public:
     // The decoded copies (*.pcm) above `limitBytes`: the least recently used are deleted down to 3/4 of it (round 167e;
     // done once per session in the background). Returns the bytes left.
     static juce::int64 prunePcmCache (juce::int64 limitBytes);
+
+    // What the decoded samples of the process hold now (round 190gd: the load log says where a project's megabytes go):
+    // samples in RAM (float, both channels) and mapped from the disk cache, and the time-stretched copies kept
+    struct MemoryUse
+    {
+        int samples = 0, mappedSamples = 0, stretched = 0;
+        std::int64_t sampleBytes = 0, mappedBytes = 0, stretchedBytes = 0;
+        // round 190gn (A2): the stretched copies mapped from the disk cache (locked in RAM: not the process's memory)
+        int stretchedMapped = 0;
+        std::int64_t stretchedMappedBytes = 0;
+    };
+    static MemoryUse memoryUse();
+    // the bytes of the mapped stretched copies that are resident and locked right now (-1: can't tell); the load log
+    // shows it next to stretchedMappedBytes: equal = no page of them can fault on the audio thread
+    static std::int64_t lockedStretchedBytes();
 
     // Filter for FileChooser ("*.wav;*.flac;...")
     juce::String wildcard() const;

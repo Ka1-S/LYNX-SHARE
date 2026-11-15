@@ -68,15 +68,21 @@ inline std::vector<Entry> fl()
         { K::header, TR_NOOP ("Sample") },
         { K::item, TR_NOOP ("Make unique as sample"), H::yes, 'u' },
         { K::item, TR_NOOP ("Edit sample"), H::yes, 'E' },
-        { K::item, TR_NOOP ("Pitch-correct sample"), H::missing, 'P' }, // (FL: the clip's sample into Newtone)
-        { K::item, TR_NOOP ("Time-warp sample"), H::missing, 'T' },     // (FL: the clip's sample into Newtime)
+        // round 190gw (live check 190gu B3): FL opens Newtone / Newtime on the Master with the clip's sample; LYNX's own
+        // Newtone / Newtime (mixerops::openSampleInMasterEditor)
+        { K::item, TR_NOOP ("Pitch-correct sample"), H::yes, 'P' },
+        { K::item, TR_NOOP ("Time-warp sample"), H::yes, 'T' },
         { K::item, TR_NOOP ("Extract stems from sample") },
-        { K::item, TR_NOOP ("Deverb"), H::missing }, // (FL: its Deverb dialog on the clip's part, the result saved as <name>_Deverb.wav)
+        // (FL 2026 only offers to download the module here, live check 190gu B3: "This feature needs to be downloaded before it
+        // can be used"; LYNX's Deverb is the audio editor's tool, so the item stays out)
+        { K::item, TR_NOOP ("Deverb"), H::missing },
         { K::item, TR_NOOP ("Detect tempo"), H::yes, 'D' },
         { K::item, TR_NOOP ("Fit to tempo"), H::yes, 'F' },
         { K::header, TR_NOOP ("Automation") },
         { K::submenu, TR_NOOP ("Automate"), H::yes, 'A' },
-        { K::submenu, TR_NOOP ("Crossfade with"), H::greyedOnly, 'f' }, // (greyed while no other channel's audio clip overlaps it)
+        // the other channels' audio clips overlapping it in time; one picked makes "<A> to <B> crossfade" (round 190gw,
+        // crossfadeWith below); greyed while there is none
+        { K::submenu, TR_NOOP ("Crossfade with"), H::yes, 'f' },
         { K::header, TR_NOOP ("Fades") },
         { K::item, TR_NOOP ("Reset fades") },
         { K::item, TR_NOOP ("Crossfade selected"), H::yes, 0, true },
@@ -109,11 +115,12 @@ inline std::vector<Entry> fadeCurve()
 }
 
 // LYNX's own audio clip items with no FL counterpart (kept: add, never remove), after FL's Fades below a line, in this
-// order. Comping's "Promote this take..." comes first when the clip is on a take lane (core/Comping, round 163).
+// order. Round 190gi: Clip envelope ›, Auto-warp, Quantize audio (core/ClipEnvelope.h, core/ClipWarp.h). Comping's "Promote this take..." comes first when the clip is on a take lane (core/Comping, round 163).
 inline std::vector<std::string> lynxExtras()
 {
     return { TR_NOOP ("Color palette"), TR_NOOP ("Split here"), TR_NOOP ("Merge clips"), TR_NOOP ("Reverse"), TR_NOOP ("Convert to MIDI"), TR_NOOP ("Slice to New MIDI Track..."), TR_NOOP ("Pitch... (semitones, cents, keep length)"),
-             TR_NOOP ("Normalize"), TR_NOOP ("Clip volume"), TR_NOOP ("Open in a new Sampler channel"), TR_NOOP ("Show the file in Explorer"), TR_NOOP ("Cut"), TR_NOOP ("Copy"), TR_NOOP ("Paste here") };
+             TR_NOOP ("Normalize"), TR_NOOP ("Clip volume"), TR_NOOP ("Clip envelope"), TR_NOOP ("Auto-warp"), TR_NOOP ("Quantize audio"),
+             TR_NOOP ("Open in a new Sampler channel"), TR_NOOP ("Show the file in Explorer"), TR_NOOP ("Cut"), TR_NOOP ("Copy"), TR_NOOP ("Paste here") };
 }
 
 // What LYNX shows of FL's list: FL's entries without the missing ones, Crossfade with only while it is greyed in FL

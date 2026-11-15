@@ -79,12 +79,21 @@ void apply (Song& song, const std::vector<Rendered>& rendered);
 // Freeze (round 190ay; core/StandIns.h, lynx::freeze): renders `channel` alone, before its volume, pan and insert, with
 // a private engine holding only that channel's instrument — the whole song (the Song-mode stem) and one loop pass per
 // pattern it plays in (the Pattern-mode stems) — into 32-bit float WAVs in `folder`. Same threads as render().
+// insert > 0 (round 190ff, track freeze): the channel with its volume and pan through that insert's effects
+// (standins::channelTimelineRender withInsert). timelineOnly: the whole-song stem alone (Bounce Track in Place, which
+// keeps no Pattern-mode stems).
 bool renderFreeze (const Song& song, int channel, double sampleRate, const juce::File& folder, std::vector<StandIn>& stems,
-                   const std::function<bool (double)>& progress, juce::String& error);
+                   const std::function<bool (double)>& progress, juce::String& error, int insert = 0, bool timelineOnly = false);
+// Round 190ff (Bounce to New Track, Consolidate): renders `song`'s time selection (loopStart..loopEnd, the tail cut) into a
+// 32-bit float WAV at playback quality, with a private engine. Same threads as render().
+bool renderSelection (const Song& song, double sampleRate, const juce::File& file, const std::function<bool (double)>& progress, juce::String& error);
 // What a channel's freeze depends on (its instrument and settings, its notes, where its patterns play, the tempo, the
 // sample rate): a FreezeState::source with another value is out of date. The plugin's saved state counts by its size only
 // (a frozen plugin is not loaded: nothing can change it).
-std::string freezeSource (const Song& song, int channel, double sampleRate);
+// insert: −1 = as the channel is frozen (FreezeState::insert), 0 = a channel freeze, > 0 = a track freeze through that
+// insert (round 190ff: then the channel's volume / pan, the insert's effects, what drives them and whether the freeze
+// still holds count too).
+std::string freezeSource (const Song& song, int channel, double sampleRate, int insert = -1);
 // What an export renders (ExportJob): the song with the frozen channels whose audio cannot stand for them playing
 // their instruments instead. A bounce never carries audio that does not match: a channel that is out of date renders
 // live, and so does every frozen channel when the export does not play the song's own timeline once (timelineKept =

@@ -41,6 +41,13 @@ EffectSlot makeEffectSlot (EffectKind kind);
 // 0.5 + x / (1 + x) for the first stage's Q = 0.5 + 2x / (1 − x) — the pair Ableton Live 12.4's Auto Filter runs
 // (measured in round 190cz: both stages cookbook biquads, 0.003 dB); at Q 0.5 both are 0.5
 double filterSecondStageQ (double q) noexcept;
+// Round 190gp: smart disable takes each built-in effect's declared tail (Effect::tailSamples) instead of the fixed 1 s
+// hold; false = the fixed hold for all (A/B runs and tests).
+void setDeclaredTails (bool on) noexcept;
+bool declaredTails() noexcept;
+// Samples for a biquad's free response to fall by `db` (from its poles; the polynomial factor of near-double poles
+// and a few samples of margin added). Infinite for an unstable section.
+double biquadTailSamples (double a1, double a2, double db) noexcept;
 // A slot loaded from a project that stored `savedCount` parameters: parameters added later that switch an engine
 // to a newer construction get the value that keeps the old sound (round 147: Prism's measured Dynamic phase).
 void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexcept;
@@ -114,6 +121,10 @@ public:
     virtual float parameterValue (int /*index*/) const noexcept { return -1.0f; }
     // Control output ("controller" effects such as the Peak Controller), 0..1. Read every block.
     virtual float controlOutput (int /*output*/) const noexcept { return 0.0f; }
+    // Whether an editor shows this slot's live meters now (round 190gp; the renderer tells a slot with live meters before
+    // each block, ProcessTimes::metersWanted). A meter that costs CPU and is only shown (Apex Limiter's loudness and
+    // true-peak meter) may stop while none does. Never called: shown.
+    virtual void setMetersShown (bool /*shown*/) noexcept {}
     // Song position at the start of the block, in ticks (for tempo-synced effects).
     virtual void setSongPosition (double /*ticks*/) noexcept {}
     // Whether the song is playing during the next process() (effects that follow the host transport, like Newtone).
@@ -157,6 +168,12 @@ public:
     }
     // Latency the effect introduces (plugins), in samples. Used by PDC.
     virtual int latencySamples() const noexcept { return 0; }
+    // Round 190gp (smart disable from a declared tail): after this many samples of silent input the effect's output,
+    // and every state that shapes what it does next, have settled (from its settings in the last block: its filters'
+    // decay, its look-ahead, its gain's recovery), so the renderer may stop running it — sooner than the fixed hold
+    // (1 s for built-ins), never later. −1 = not declared: the fixed hold. Audio thread; cheap (worked out when the
+    // settings change).
+    virtual int tailSamples() const noexcept { return -1; }
     // The hardware insert (round 164d): the device's input of the current callback piece and the device-output buses,
     // with where the next process() starts within that piece. `out` is null when no device plays live (an export).
     virtual void setHardwareIo (const LiveInput* /*in*/, HardwareOutput* /*out*/, int /*offset*/) noexcept {}

@@ -5,6 +5,7 @@
 
 #include "core/ClipOps.h"
 #include "core/MissingFiles.h"
+#include "core/PlaylistOps.h"
 #include "engine/PluginHost.h"
 #include "ui/I18n.h"
 #include "ui/MissingFilesDialog.h"
@@ -98,6 +99,21 @@ public:
         crossfadesNew.setEnabled (hooks.getGeneral != nullptr);
         crossfadesNew.setToggleState (hooks.getGeneral != nullptr ? hooks.getGeneral().crossfadesInNewProjects : true, juce::dontSendNotification);
         add (crossfadesNew);
+        // LYNX extra (round 190gz, issue #170): Playlist tracks linked to mixer tracks, for this project and new ones
+        linkTracks.setButtonText (tr ("Link Playlist tracks to mixer tracks (Track N with insert N; mute, solo, volume and pan on linked track headers)"));
+        linkTracks.onClick = [this] { edit ([on = linkTracks.getToggleState()] (Song& s) { autolink::setOn (s, on); }); };
+        add (linkTracks);
+        linkTracksNew.setButtonText (tr ("Link Playlist tracks to mixer tracks in new projects"));
+        linkTracksNew.onClick = [this] {
+            if (hooks.getGeneral == nullptr || hooks.setGeneral == nullptr)
+                return;
+            auto o = hooks.getGeneral();
+            o.linkTracksInNewProjects = linkTracksNew.getToggleState();
+            hooks.setGeneral (o);
+        };
+        linkTracksNew.setEnabled (hooks.getGeneral != nullptr);
+        linkTracksNew.setToggleState (hooks.getGeneral != nullptr && hooks.getGeneral().linkTracksInNewProjects, juce::dontSendNotification);
+        add (linkTracksNew);
         // Comping (round 177c): the crossfade at a comp's switches, re-applied to every comp when it changes
         styleLabel (compFadeLabel, tr ("Comp crossfade"));
         add (compFadeLabel);
@@ -166,6 +182,8 @@ private:
         area.removeFromTop (6);
         crossfades.setBounds (area.removeFromTop (26));
         crossfadesNew.setBounds (area.removeFromTop (26));
+        linkTracks.setBounds (area.removeFromTop (26));
+        linkTracksNew.setBounds (area.removeFromTop (26));
         auto compRow = area.removeFromTop (26);
         compFadeLabel.setBounds (compRow.removeFromLeft (150));
         compFade.setBounds (compRow.removeFromLeft (180));
@@ -191,9 +209,11 @@ private:
         const auto& s = engine.getSong();
         tempo.setValue (s.bpm, juce::dontSendNotification);
         beats.setValue (s.beatsPerBar, juce::dontSendNotification);
+        shownUnit = meterUnit (s.beatUnit);
         swing.setValue (s.swing * 100.0, juce::dontSendNotification);
         pitch.setValue (s.masterPitch, juce::dontSendNotification);
         crossfades.setToggleState (s.autoCrossfades, juce::dontSendNotification);
+        linkTracks.setToggleState (s.linkTracksToMixer, juce::dontSendNotification);
         compFade.setValue (s.compCrossfadeMs, juce::dontSendNotification);
         truncated.setToggleState (s.playTruncatedNotes, juce::dontSendNotification);
         fastDeclick.setToggleState (s.fastDeclick, juce::dontSendNotification);
@@ -203,11 +223,13 @@ private:
     }
 
     // FL's time signature mode (FUN_00eccbd0): the numerator is the beats per bar, the denominator sets the steps per
-    // beat (16 / denominator); LYNX's step grid is 4 per beat, so the denominator is 4
+    // beat (16 / denominator). Round 190fg: the song meter's own denominator (4 unless a scene, an .als, .flp or MIDI
+    // file set another); the step grid stays sixteenths, so a beat of 6/8 is 2 steps
+    int shownUnit = 4;
     void showTimeMode (bool signature)
     {
         beatsLabel.setText (signature ? tr ("Numerator") : tr ("Beats per bar"), juce::dontSendNotification);
-        stepsText.setText (signature ? tr ("Denominator: {0} (the Channel Rack's step grid is {1} steps per beat).", { juce::String (16 / stepsPerBeat), juce::String (stepsPerBeat) })
+        stepsText.setText (signature ? tr ("Denominator: {0} (the Channel Rack's step grid is {1} steps per beat).", { juce::String (shownUnit), juce::String (juce::jmax (1, 16 / shownUnit)) })
                                      : tr ("Steps per beat: {0} (the Channel Rack's step grid).", { juce::String (stepsPerBeat) }),
                            juce::dontSendNotification);
     }
@@ -225,7 +247,7 @@ private:
         playlistTitle { tr ("Playlist") };
     juce::Label tempoLabel, beatsLabel, swingLabel, pitchLabel, ppqText, stepsText, signatureText, panLawLabel, timeModeLabel;
     juce::Slider tempo, beats, swing, pitch;
-    juce::ToggleButton crossfades, crossfadesNew, truncated, fastDeclick;
+    juce::ToggleButton crossfades, crossfadesNew, linkTracks, linkTracksNew, truncated, fastDeclick;
     juce::Label compFadeLabel;
     juce::Slider compFade;
     juce::ComboBox panLaw, timeMode;
@@ -480,6 +502,9 @@ public:
         }
     }
 
+    // the least height that shows the heading, the note, two rows and every button
+    int minimumHeight() const { return 28 + 4 + 20 + 4 + juce::jmax (2 * 24 + 2, extraButton != nullptr ? 26 + 6 + 26 + 6 + 26 : 26 + 6 + 26); }
+
     // A third button under Add / Remove (the plugin folders' "Plugin manager...", as FL's File page has it).
     void addExtraButton (const juce::String& text, std::function<void()> onClick)
     {
@@ -558,7 +583,9 @@ private:
     std::unique_ptr<juce::FileChooser> chooser;
 };
 
-class FilesPage final : public juce::Component
+// (rollup 0.1.28: a ScrollingPage since round 190fn added the fourth list: at a short window every list keeps its
+// Add / Remove buttons and two rows, and the page scrolls)
+class FilesPage final : public ScrollingPage
 {
 public:
     FilesPage (AudioEngine& engine, bool persistent, std::function<void()> browserChanged, std::function<void()> managePlugins = {})
@@ -623,28 +650,53 @@ public:
                 host.setPluginFolders (path);
             }, persistent);
 
+        // Round 190fn (decision O1, LYNX's own): FL Studio Mobile's factory content for .flm projects, from the user's own
+        // copy of the app's "Resources" folder (FL's copy, when FL is installed, is searched after these)
+        flmResources = std::make_unique<FolderList> (
+            tr ("FL Studio Mobile resources"), tr ("Factory sounds for .flm projects: the app's own Resources folder. LYNX SHARE ships none."),
+            [persistent, sample] {
+                juce::StringArray list;
+                if (persistent)
+                    list.addLines (PluginHost::settingsFolder().getChildFile ("flm-resources.txt").loadFileAsString());
+                list.removeEmptyStrings();
+                return sample (list, { "D:\\FL Studio Mobile\\Resources" });
+            },
+            [persistent] (const juce::StringArray& list) {
+                if (persistent)
+                    PluginHost::settingsFolder().getChildFile ("flm-resources.txt").replaceWithText (list.joinIntoString ("\n"));
+            }, persistent);
+
         // FL's File page has "Manage plugins" next to the plugin settings (REA round 143b)
         if (managePlugins)
             pluginFolders->addExtraButton (tr ("Plugin manager..."), managePlugins);
 
-        addAndMakeVisible (*searchFolders);
-        addAndMakeVisible (*browserFolders);
-        addAndMakeVisible (*pluginFolders);
+        add (*searchFolders);
+        add (*browserFolders);
+        add (*pluginFolders);
+        add (*flmResources);
     }
 
-    void resized() override
+protected:
+    // The four lists share the window's height; none gets less than its heading, two rows and its buttons (below that
+    // the page scrolls)
+    int layout (int width) override
     {
-        auto area = getLocalBounds().reduced (20, 14);
-        const auto h = (area.getHeight() - 24) / 3;
-        searchFolders->setBounds (area.removeFromTop (h));
-        area.removeFromTop (12);
-        browserFolders->setBounds (area.removeFromTop (h));
-        area.removeFromTop (12);
-        pluginFolders->setBounds (area);
+        constexpr int padX = 20, padY = 14, gap = 12;
+        FolderList* lists[] = { searchFolders.get(), browserFolders.get(), pluginFolders.get(), flmResources.get() };
+        const auto share = (getHeight() - 2 * padY - 3 * gap) / 4;
+        auto y = padY;
+        for (auto* list : lists)
+        {
+            const auto h = juce::jmax (list->minimumHeight(), share);
+            list->setBounds (padX, y, juce::jmax (0, width - 2 * padX), h);
+            y += h + gap;
+        }
+        return y - gap + padY;
     }
+    int minimumWidth() const override { return 300; }
 
 private:
-    std::unique_ptr<FolderList> searchFolders, browserFolders, pluginFolders;
+    std::unique_ptr<FolderList> searchFolders, browserFolders, pluginFolders, flmResources;
 };
 
 class SettingsPanel final : public juce::Component
@@ -655,7 +707,10 @@ public:
         tabs.setTabBarDepth (34);
         tabs.setOutline (0);
         // FL's order: device pages first, then the app, then the project
+        // (round 190gl: Link after MIDI, as the reference DAW's Settings put Link beside Tempo & MIDI; named in full, as
+        // Ableton's Link integration guidelines ask of other apps)
         const std::pair<SettingsPage, juce::String> order[] = { { SettingsPage::audio, tr ("Audio") },     { SettingsPage::midi, tr ("MIDI") },
+                                                                { SettingsPage::link, tr ("Ableton Link") },
                                                                 { SettingsPage::general, tr ("General") }, { SettingsPage::theme, tr ("Theme") },
                                                                 { SettingsPage::files, tr ("Files") },     { SettingsPage::extras, tr ("LYNX extras") },
                                                                 { SettingsPage::project, tr ("Project") }, { SettingsPage::info, tr ("Info") } };
@@ -672,6 +727,7 @@ public:
                 case SettingsPage::project: content = new ProjectPage (engine, hooks); break;
                 case SettingsPage::info: content = new InfoPage (engine); break;
                 case SettingsPage::extras: content = makeExtrasPage (engine, hooks, persistent).release(); break;
+                case SettingsPage::link: content = makeLinkPage (engine, hooks).release(); break;
             }
             tabs.addTab (name, theme::colour::bg2, content, true);
             pages.push_back (p);

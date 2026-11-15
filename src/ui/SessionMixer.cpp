@@ -1,4 +1,5 @@
 #include "ui/SessionMixer.h"
+#include "ui/PaintAB.h"
 
 #include <algorithm>
 #include <cmath>
@@ -161,22 +162,56 @@ void SessionMixerComponent::layoutSections()
 
 void SessionMixerComponent::resized() { layoutSections(); }
 
-void SessionMixerComponent::tick()
+bool SessionMixerComponent::tick()
 {
     auto& meterBank = engine.getMeters();
-    std::vector<bool> seen ((std::size_t) maxMixerTracks, false);
+    std::vector<bool> seen ((std::size_t) maxMixerTracks, false), movedInsert ((std::size_t) maxMixerTracks, false);
+    auto moved = false;
     const auto take = [&] (int insert) {
         if (insert < 0 || insert >= maxMixerTracks || seen[(std::size_t) insert])
             return;
         seen[(std::size_t) insert] = true;
         for (int ch = 0; ch < 2; ++ch)
-            levels[(std::size_t) insert * 2 + (std::size_t) ch].tick (meterBank.takeSessionPeak (insert, ch));
+        {
+            auto& meter = levels[(std::size_t) insert * 2 + (std::size_t) ch];
+            const auto before = meter;
+            meter.tick (meterBank.takeSessionPeak (insert, ch));
+            if (meter.level != before.level || meter.peak != before.peak || meter.clipped != before.clipped)
+                moved = true, movedInsert[(std::size_t) insert] = true;
+        }
     };
     if (sections.volume > 0)
     {
         take (0);
         for (int t = std::max (0, scroll / std::max (1, columnWidth)); t < columns && stripX (t) < tracksWidth; ++t)
             take (insertFor (t));
+        // round 190ge: only the meters that moved are repainted (their fader part: bars, scale and handle), not the
+        // whole mixer — it was repainted whole 30 times a second while the song played (most of the message thread)
+        if (moved && ui::paintSavings())
+        {
+            juce::Rectangle<int> dirty;
+            const auto add = [&] (int column) {
+                if (const auto insert = insertFor (column); insert >= 0 && insert < maxMixerTracks && movedInsert[(std::size_t) insert])
+                    dirty = dirty.getUnion (partBounds (column, Part::fader).expanded (1));
+            };
+            add (mainColumn);
+            for (int t = std::max (0, scroll / std::max (1, columnWidth)); t < columns && stripX (t) < tracksWidth; ++t)
+                add (t);
+            if (! dirty.isEmpty())
+                repaint (dirty);
+        }
+    }
+    // (the arm buttons follow the grid's arms, which can change without a song edit: the mixer is repainted then)
+    if (ui::paintSavings())
+    {
+        std::uint64_t arms = 1469598103934665603ull;
+        for (int t = std::max (0, scroll / std::max (1, columnWidth)); t < columns && stripX (t) < tracksWidth; ++t)
+            arms = (arms ^ (engine.isGridTrackArmed (t) ? 2u : 1u)) * 1099511628211ull;
+        if (arms != armsShownState)
+        {
+            armsShownState = arms;
+            repaint();
+        }
     }
     // the song may have changed (a send, a routing): the rows follow
     const auto before = rows;
@@ -185,6 +220,7 @@ void SessionMixerComponent::tick()
     if (rows != before || sections.total() != sectionsBefore)
         if (auto* parent = getParentComponent())
             parent->resized();
+    return moved;
 }
 
 void SessionMixerComponent::addViewItems (juce::PopupMenu& menu)

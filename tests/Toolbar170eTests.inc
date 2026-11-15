@@ -117,7 +117,7 @@ TEST (toolbar170e3_loop_record_off_keeps_a_second_pass_where_it_was_played)
     s.patterns[0].notes.clear();
     s.playlist.clear();
     lynx::NoteRecorder recorder;
-    recorder.begin (s.patterns[0].effectiveLength (s.beatsPerBar));
+    recorder.begin (s.patterns[0].effectiveLength (s.meter()));
     if (lynx::recordloop::notesLinear (s.mode, s.hasLoop(), false))
         recorder.setLinear (true);
     std::vector<int> cleared;
@@ -220,7 +220,7 @@ TEST (toolbar170e5_pattern_plays_once_from_the_take_origin)
 {
     lynx::Pattern p;
     p.toggleStep (0, 0); // a note on the pattern's first step (1 bar = 3840 ticks)
-    const auto len = p.effectiveLength (4);
+    const auto len = p.effectiveLength (lynx::Meter (4, 4));
     const double sr = 48000.0, bpm = 120.0;
     const auto tps = lynx::ticksPerSample (bpm, sr);
     auto ons = [&] (double start, int samples, double origin) {
@@ -264,10 +264,10 @@ TEST (toolbar170e5_pattern_take_with_loop_record_off_grows_the_pattern)
     s.patterns[0].notes.clear();
     s.patterns[0].lengthTicks = 0;
     const std::int64_t bar = (std::int64_t) lynx::ppq * s.beatsPerBar;
-    CHECK (s.patterns[0].effectiveLength (s.beatsPerBar) == bar);
+    CHECK (s.patterns[0].effectiveLength (s.meter()) == bar);
 
     lynx::NoteRecorder recorder;
-    recorder.begin (s.patterns[0].effectiveLength (s.beatsPerBar));
+    recorder.begin (s.patterns[0].effectiveLength (s.meter()));
     recorder.setPatternOrigin (lynx::recordloop::patternOrigin (0.0, bar));
     // one note in bar 1, one in bar 3: the take ran on past the 1-bar pattern's end
     recorder.add (s, { (double) lynx::ppq, 0, 60, 0.8f, true });
@@ -284,7 +284,7 @@ TEST (toolbar170e5_pattern_take_with_loop_record_off_grows_the_pattern)
     lynx::commitNoteBatch (s, recorder, std::move (notes), lynx::RecordMode::overdub, q, cleared, false, first);
     // the pattern is now 3 bars long (its length follows its notes)
     CHECK (s.patterns[0].notes.size() == 2);
-    CHECK (s.patterns[0].effectiveLength (s.beatsPerBar) == 3 * bar);
+    CHECK (s.patterns[0].effectiveLength (s.meter()) == 3 * bar);
 
     // Loop record on (the default): the same notes fold into the 1-bar loop
     lynx::NoteRecorder folded;

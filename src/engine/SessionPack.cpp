@@ -332,6 +332,7 @@ std::string sourceHash (const Song& song, bool insert, int index, int pattern, d
         // a pattern stem: the channel (without what applies live), its notes in that pattern, the tempo and swing
         mini.bpm = song.bpm;
         mini.beatsPerBar = song.beatsPerBar;
+        mini.beatUnit = song.beatUnit;
         mini.swing = song.swing;
         mini.masterPitch = song.masterPitch;
         auto c = song.channels[(std::size_t) index];
@@ -347,7 +348,7 @@ std::string sourceHash (const Song& song, bool insert, int index, int pattern, d
         mini.channels = { c };
         const auto& source = song.patterns[(std::size_t) pattern];
         Pattern p;
-        p.lengthTicks = source.effectiveLength (song.beatsPerBar);
+        p.lengthTicks = source.effectiveLength (song.meter());
         p.loopOn = source.loopOn;
         p.loopMode = source.loopMode;
         for (auto n : source.notes)
@@ -531,13 +532,31 @@ void apply (Song& song, const std::vector<Rendered>& rendered)
     }
 }
 
-std::string freezeSource (const Song& song, int channel, double sampleRate)
+std::string freezeSource (const Song& song, int channel, double sampleRate, int insert)
 {
     if (channel < 0 || channel >= (int) song.channels.size())
         return {};
+    if (insert < 0)
+        insert = song.channels[(std::size_t) channel].freeze.insert;
+    // a track freeze (round 190ff): the volume / pan and the insert's effects are in the stems, and so is what drives them
+    const bool track = insert > 0 && insert < (int) song.mixer.size();
+    auto drivesTrack = [&] (const AutomationTarget& t) {
+        if (! track)
+            return false;
+        const bool level = (t.kind == AutomationTargetKind::channelVolume || t.kind == AutomationTargetKind::channelPan
+                            || (t.kind == AutomationTargetKind::channelAdjust && (t.param == leveladjust::pan || t.param == leveladjust::volume)))
+                           && t.index == channel;
+        const bool effects = (t.kind == AutomationTargetKind::effectParam || t.kind == AutomationTargetKind::effectMix) && t.index == insert;
+        return level || effects;
+    };
+    auto remapped = [&] (AutomationTarget t) {
+        t.index = t.index == insert && (t.kind == AutomationTargetKind::effectParam || t.kind == AutomationTargetKind::effectMix) ? 1 : 0;
+        return t;
+    };
     Song mini;
     mini.bpm = song.bpm;
     mini.beatsPerBar = song.beatsPerBar;
+    mini.beatUnit = song.beatUnit;
     mini.swing = song.swing;
     mini.masterPitch = song.masterPitch;
     auto c = song.channels[(std::size_t) channel];
@@ -547,9 +566,12 @@ std::string freezeSource (const Song& song, int channel, double sampleRate)
     c.name.clear();
     c.colour = 0;
     c.icon = 0;
-    c.volume = 1.0f; // (volume, pan, mute and the insert apply live)
-    c.pan = 0.0f;
-    c.mixerTrack = 0;
+    if (! track)
+    {
+        c.volume = 1.0f; // (volume, pan, mute and the insert apply live)
+        c.pan = 0.0f;
+    }
+    c.mixerTrack = track ? 1 : 0;
     c.muted = false;
     c.group = -1;
     const auto stateBytes = c.plugin.state.size();
@@ -567,7 +589,7 @@ std::string freezeSource (const Song& song, int channel, double sampleRate)
         plays[p] = ! q.notes.empty();
         if (plays[p])
         {
-            q.lengthTicks = source.effectiveLength (song.beatsPerBar);
+            q.lengthTicks = source.effectiveLength (song.meter());
             q.loopOn = source.loopOn;
             q.loopMode = source.loopMode;
             for (auto l : source.channelLoops)
@@ -575,9 +597,9 @@ std::string freezeSource (const Song& song, int channel, double sampleRate)
                     l.channel = 0, q.channelLoops.push_back (l);
             for (auto lane : source.events)
                 if (lane.target.kind == AutomationTargetKind::tempo
-                    || (lane.target.kind == AutomationTargetKind::channelParam && lane.target.index == channel))
+                    || (lane.target.kind == AutomationTargetKind::channelParam && lane.target.index == channel) || drivesTrack (lane.target))
                 {
-                    lane.target.index = 0;
+                    lane.target = remapped (lane.target);
                     q.events.push_back (lane);
                 }
         }
@@ -588,11 +610,11 @@ std::string freezeSource (const Song& song, int channel, double sampleRate)
     for (std::size_t a = 0; a < song.automations.size(); ++a)
     {
         const auto& t = song.automations[a].target;
-        if (t.kind != AutomationTargetKind::tempo && ! (t.kind == AutomationTargetKind::channelParam && t.index == channel))
+        if (t.kind != AutomationTargetKind::tempo && ! (t.kind == AutomationTargetKind::channelParam && t.index == channel) && ! drivesTrack (t))
             continue;
         auto copy = song.automations[a];
         copy.uid = 0;
-        copy.target.index = 0;
+        copy.target = remapped (copy.target);
         kept[a] = (int) mini.automations.size();
         mini.automations.push_back (std::move (copy));
     }
@@ -621,9 +643,32 @@ std::string freezeSource (const Song& song, int channel, double sampleRate)
         mini.playlist.push_back (clip);
     }
     std::stable_sort (mini.playlist.begin(), mini.playlist.end(), [] (const Clip& a, const Clip& b) { return a.start < b.start; });
+    // rollup 0.1.28 (190ay / 190ff x 190fm): a Playlist clip may play through a groove of the pool; then the pool (its
+    // grooves and amount) is part of what the stems were rendered from, so editing it makes the audio out of date
+    if (std::any_of (mini.playlist.begin(), mini.playlist.end(), [] (const Clip& c) { return c.kind == ClipKind::pattern && c.groove != 0; }))
+        mini.grooves = song.grooves;
     mini.mixer = Song::defaultMixer (0);
+    juce::String extra;
+    if (track)
+    {
+        // the insert's effects (plugin states by their size, as the channel's: an unloaded plugin cannot change), and
+        // whether the freeze still holds (the channel on that insert, nothing else playing into it)
+        MixerTrack t;
+        t.effects = song.mixer[(std::size_t) insert].effects;
+        for (auto& e : t.effects)
+            if (e.kind == EffectKind::plugin)
+            {
+                extra << (juce::int64) e.plugin.state.size() << ",";
+                e.plugin.state.clear();
+            }
+        t.chainBlend = song.mixer[(std::size_t) insert].chainBlend;
+        mini.mixer.resize (2);
+        mini.mixer[1] = t;
+        const auto* taken = song.channels[(std::size_t) channel].mixerTrack != insert ? "moved" : freeze::whyNotTrack (song, channel);
+        extra << "|track " << insert << "|" << (taken != nullptr ? taken : "holds");
+    }
     const auto json = ProjectFile::toJson (mini, false) + "|freeze|" + juce::String ((juce::int64) stateBytes) + "|" + juce::String (song.songLength())
-                      + "|" + juce::String (sampleRate, 1);
+                      + "|" + juce::String (sampleRate, 1) + extra;
     const auto bytes = json.toStdString();
     return sha256Hex ((const std::uint8_t*) bytes.data(), bytes.size());
 }
@@ -664,8 +709,21 @@ Song freshForExport (const Song& song, bool timelineKept, std::vector<int>* thaw
     return copy;
 }
 
+bool renderSelection (const Song& song, double sampleRate, const juce::File& file, const std::function<bool (double)>& progress, juce::String& error)
+{
+    if (! file.getParentDirectory().createDirectory())
+    {
+        error = "could not create " + file.getParentDirectory().getFullPathName();
+        return false;
+    }
+    auto o = stemOptions (sampleRate, 0.0);
+    o.range = exportopts::Range::selection;
+    o.tail = exportopts::TailMode::cut;
+    return renderSong (song, o, file, progress, error);
+}
+
 bool renderFreeze (const Song& song, int channel, double sampleRate, const juce::File& folder, std::vector<StandIn>& stems,
-                   const std::function<bool (double)>& progress, juce::String& error)
+                   const std::function<bool (double)>& progress, juce::String& error, int insert, bool timelineOnly)
 {
     stems.clear();
     if (channel < 0 || channel >= (int) song.channels.size())
@@ -683,11 +741,14 @@ bool renderFreeze (const Song& song, int channel, double sampleRate, const juce:
     const auto tailSeconds = ticksToSeconds (song, tail);
     const auto stamp = juce::String (uids::newProjectId()).substring (0, 8);
     const auto base = juce::File::createLegalFileName ((def.name.empty() ? juce::String ("Channel ") + juce::String (channel + 1) : str (def.name)) + " (frozen " + stamp + ")");
+    const bool track = insert > 0 && insert < (int) song.mixer.size();
     std::vector<const PluginRef*> refs;
     standins::pluginsOf (def, refs);
+    if (track)
+        standins::pluginsOf (song.mixer[(std::size_t) insert], refs);
     const auto plugins = pluginNames (refs);
     // the pattern stems share one render: it is the shorter part unless the song is very short
-    const auto plan = standins::channelPatternRender (song, channel);
+    auto plan = timelineOnly ? standins::ChannelRender() : standins::channelPatternRender (song, channel, track);
     const auto songTicks = (double) std::max<std::int64_t> (1, song.songLength()), loopTicks = (double) plan.end;
     const auto share = songTicks / (songTicks + loopTicks);
     auto fail = [&] {
@@ -699,8 +760,8 @@ bool renderFreeze (const Song& song, int channel, double sampleRate, const juce:
 
     // Song mode: the whole song
     {
-        auto renderSongCopy = standins::channelTimelineRender (song, channel);
-        freeze::lighten (renderSongCopy, channel);
+        auto renderSongCopy = standins::channelTimelineRender (song, channel, track);
+        freeze::lighten (renderSongCopy, channel, track ? insert : -1);
         const auto file = folder.getChildFile (base + ".wav");
         if (! renderSong (renderSongCopy, stemOptions (sampleRate, tailSeconds), file, [&] (double p) { return ! progress || progress (share * p); }, error))
             return fail();
@@ -715,7 +776,7 @@ bool renderFreeze (const Song& song, int channel, double sampleRate, const juce:
     if (! plan.segments.empty())
     {
         auto renderSongCopy = plan.song;
-        freeze::lighten (renderSongCopy, channel);
+        freeze::lighten (renderSongCopy, channel, track ? insert : -1);
         const auto whole = folder.getChildFile (base + " (render).wav");
         if (! renderSong (renderSongCopy, stemOptions (sampleRate, tailSeconds), whole, [&] (double p) { return ! progress || progress (share + (1.0 - share) * p); }, error))
             return fail();

@@ -99,10 +99,47 @@ struct SentKeys
         for (auto& t : sent)
             t.tuned = 0;
     }
+
+    // Round 190fg: which LYNX note (NoteEvent::noteId, 0 = none) each note on and note off that went out on MIDI
+    // channel 1 belongs to, per key sent, in the order they went out. The patched VST3 host (cmake/LynxPatchJuce.cmake
+    // fix 26) converts the block's MIDI in the same order and takes one tag per note on / off, so a note off ends the
+    // VST3 note id of its own note on: of a long note with a short one of the same key inside it, the short note's end
+    // ends the short note (fix 14 alone gave it the long note's id). Every note on / off written on channel 1 queues
+    // one (0 when it has no note: a live key, a held key's release), so the order cannot slip.
+    struct Tags
+    {
+        std::array<std::uint32_t, 8> ids {};
+        int count = 0;
+    };
+    std::array<Tags, 128> onTags {}, offTags {};
+
+    void tag (bool noteOn, int sentKey, std::uint32_t id) noexcept
+    {
+        auto& t = (noteOn ? onTags : offTags)[(std::size_t) (sentKey & 127)];
+        if (t.count == (int) t.ids.size()) // (never taken: no VST3 host read the block)
+            drop (t.ids, t.count);
+        t.ids[(std::size_t) t.count++] = id;
+    }
+    std::uint32_t takeTag (bool noteOn, int sentKey) noexcept
+    {
+        auto& t = (noteOn ? onTags : offTags)[(std::size_t) (sentKey & 127)];
+        if (t.count == 0)
+            return 0;
+        const auto id = t.ids[0];
+        drop (t.ids, t.count);
+        return id;
+    }
+    void clearTags() noexcept
+    {
+        onTags = {};
+        offTags = {};
+    }
+
     void clear() noexcept
     {
         played = {};
         sent = {};
+        clearTags();
     }
 
 private:

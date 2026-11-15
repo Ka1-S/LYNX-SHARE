@@ -6,6 +6,7 @@
 #include <map>
 #include <tuple>
 
+#include "core/ClipEnvelope.h"
 #include "core/EventEdit.h"
 #include "core/NoteEdit.h"
 #include "core/PlaylistOps.h"
@@ -332,7 +333,7 @@ MergeResult mergePatternClips (Song& song, const std::vector<int>& clips, int* n
         if (c.pattern < 0 || c.pattern >= (int) song.patterns.size())
             continue;
         const auto& p = song.patterns[(std::size_t) c.pattern];
-        const auto period = std::max<std::int64_t> (1, p.effectiveLength (song.beatsPerBar));
+        const auto period = std::max<std::int64_t> (1, p.effectiveLength (song.meter()));
         const auto from = c.offset, to = c.offset + c.length;
         const auto shift = c.start - first.start - c.offset;
         for (std::int64_t base = (from / period) * period; base < to; base += period)
@@ -852,8 +853,10 @@ void stretchAudioClip (Song& song, const std::vector<Clip>& before, int index, s
     const auto& original = before[(std::size_t) index];
     newLength = std::max<std::int64_t> (1, newLength);
     const auto ratio = (double) newLength / (double) std::max<std::int64_t> (1, original.length);
-    auto scale = [ratio] (Clip& c, const Clip& from) {
+    auto scale = [ratio, &song] (Clip& c, const Clip& from) {
         c.stretch = std::clamp (from.stretch * ratio, 0.01, 100.0);
+        if (from.envelope >= 0) // its envelopes follow their audio (round 190gi)
+            clipenv::scaleFrom (song, c, from.envelope, ratio);
         const auto offset = ((double) from.offset + (double) from.offsetFraction) * ratio;
         c.offset = (std::int64_t) std::floor (offset);
         c.offsetFraction = (float) (offset - (double) c.offset);

@@ -82,7 +82,9 @@ std::vector<Part> loopPasses (const Placement& p, std::int64_t loopStart, std::i
 
 // The Playlist track a take recorded through mixer insert `insert` goes to: the first audio track linked to that insert
 // (Playlist track mode "audio", REA round 146a) that is free over [start, end); else a new track after the last one
-// used. Then linkTakeTrack() links a fresh track to the insert, so the next take of that insert lands there too.
+// used. Then linkTakeTrack() links a fresh track to the insert, so the next take of that insert lands there too. With
+// LYNX's "Link Playlist tracks to mixer tracks" on (round 190gz), insert N's take goes to Track N while that track is
+// unassigned and empty (autolink::pairedTakeTrack), before the new track after the last one.
 int takeTrack (const Song& song, int insert, std::int64_t start, std::int64_t end);
 void linkTakeTrack (Song& song, int track, int insert);
 
@@ -92,6 +94,8 @@ void linkTakeTrack (Song& song, int track, int insert);
 // insert's own processing (Post EQ, FL's default, and every other position after the input), so the clip goes where the
 // insert goes: the lowest-numbered insert it is routed to (Master, 0, first), Master when it goes nowhere. Never a new
 // insert. -1 (a new free insert) only for a take of no insert (Settings' "Record input audio" without armed inserts).
+// LYNX's link switch (round 190gz): an insert whose own track will take the take (autolink::pairedTakeTrack) counts as
+// linked: the recording insert.
 int playbackInsert (const Song& song, int recordedOn, RecordSource point);
 
 // Puts recorded takes on the Playlist: one audio channel per file (through its insert; -1 = a new free insert) and a

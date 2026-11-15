@@ -53,10 +53,16 @@ public:
     // Returns false at the end of the data. Throws flp::Error if the file is truncated.
     bool next (Event& out);
 
+    // True once the file has turned out to be saved by an unregistered (trial) FL Studio 21 or newer: from event 0x1C
+    // = 0 on, FL XORs every u8/u16/u32 value with a key that depends on the value's file offset; next() undoes it
+    bool isScrambled() const noexcept { return scrambled; }
+
 private:
     std::span<const std::uint8_t> bytes;
     std::size_t pos = 0;
     Header hdr;
+    std::uint32_t versionNumber = 0; // of the 0xC7 version text, as parseVersionNumber gives it
+    bool scrambled = false;
 };
 
 // ---------------------------------------------------------------------------
@@ -438,6 +444,9 @@ struct Project
     std::uint32_t versionNumber = 0; // major*1e6 + minor*1e3 + patch
     double tempo = 140.0;
     int beatsPerBar = 4; // event 0x11 (the first one, the project's)
+    // event 0x12 right after it: the denominator (REA_rodada167g-gaps #11, the saver [DECOMP]; FL's time signature
+    // with "Set as time signature" sets the steps per beat to 16 / it, REA_rodada168j E14c). Round 190fg: read.
+    int beatUnit = 4;
     int swing = 0;       // event 0x0B: 0..128
     int currentPattern = 0;     // event 0x43: FL's pattern number selected when saved (1…999; 0 = not in the file)
     int songMode = -1;          // event 0x09: 1 = SONG, 0 = PAT (−1 = not in the file)

@@ -9,14 +9,23 @@
 // they are now. Auto off: nothing happens until Transform. Each change is an undo step (one per mouse press).
 // The maths is core/MidiTools.h. Own design and art; shown in the Clip View's column of the Clip-launch workflow and
 // from the Piano roll's Tools menu.
+//
+// Round 190fm: a Generate tab beside Transform (Live 12's Generate panel, LIVE-FACTS §4): Rhythm, Seed, Shape, Stacks
+// and a one-voice Euclidean (core/MidiGenerate.h). A generator writes new notes into the editor's time selection, else
+// the clip / pattern, replacing the notes of the edited channel that start there. Generate (the button) draws new random
+// choices and writes; Auto on (Live's default in the panels' picture): every control change writes again with the same
+// choices. Each write is an undo step; the settings are the project's (Song::midiGenerate), saved with it.
 
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
+#include <string>
 #include <vector>
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include "core/MidiGenerate.h"
 #include "core/MidiTools.h"
 #include "engine/AudioEngine.h"
 
@@ -37,6 +46,10 @@ public:
         std::vector<int> indices;
         bool selected = false;
         std::int64_t grid = ppq / 4;
+        // round 190fm, for Generate: the editor's time selection (ticks; to <= from = none), else 0…`length` (0 = the
+        // pattern's own length); the channel the new notes get (-1 = the engine's selected channel)
+        std::int64_t from = -1, to = -1, length = 0;
+        int channel = -1;
     };
 
     MidiToolsPanel (AudioEngine& engine, std::function<Target()> target, std::function<void (const std::vector<int>&)> select = {});
@@ -46,6 +59,14 @@ public:
 
     void setTool (int tool);
     int getTool() const noexcept { return tool; }
+    // round 190fm: the Transform / Generate tabs; the generator (midigen::Settings::Tool); the Generate button
+    enum Section { transformSection, generateSection };
+    void setSection (int section);
+    int getSection() const noexcept { return section; }
+    void setGenerator (int generator);
+    void generateNow();
+    // --mtshot190fm: the generators' settings as in Live's picture (Stacks: two chords)
+    void setGenerateShotSettingsForSnapshot();
     void transformNow(); // the Transform button
     void setAuto (bool on);
     // --detailshot: the settings of round 190aa's Live shots (Chop part 1 emphasised, Quantize 1/8 + 1/8T, Time Warp
@@ -96,7 +117,27 @@ private:
         std::int64_t grid = ppq / 4;
     } session;
 
-    juce::Label title;
+    // round 190fm: Generate
+    int section = transformSection;
+    bool autoGenerate = true;
+    midigen::Settings gen;             // a copy of the project's Song::midiGenerate (stored back on every change)
+    std::uint32_t genSeed = 1;         // the random choices of the last Generate press
+    struct LoadedBank
+    {
+        std::string path;
+        std::optional<midigen::ChordBank> bank;
+    } loadedBank;
+    const midigen::ChordBank& chordBank();
+    midigen::ScaleRef projectScale() const;
+    midigen::Context generateContext (const Target& t) const;
+    void runGenerate();
+    void storeSettings();
+    void loadSettings();
+    void chooseChordBank();
+    void fillChooser();
+    std::unique_ptr<juce::FileChooser> bankChooser;
+
+    juce::TextButton transformTab, generateTab;
     juce::ComboBox chooser;
     juce::TextButton resetButton, autoButton, transformButton;
     std::unique_ptr<Body> body;

@@ -70,7 +70,7 @@ std::vector<Note> dump (const std::vector<Entry>& log, const DumpOptions& option
     std::stable_sort (notes.begin(), notes.end(), [] (const Note& a, const Note& b) { return a.start < b.start; });
 
     // the first note at the pattern start, silences longer than two bars shortened to two bars
-    const auto maxGap = 2 * (std::int64_t) std::max (1, options.beatsPerBar) * ppq;
+    const auto maxGap = 2 * Meter (options.beatsPerBar, options.beatUnit).bar();
     std::int64_t shift = 0, coveredUntil = 0;
     for (std::size_t i = 0; i < notes.size(); ++i)
     {

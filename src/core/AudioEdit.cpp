@@ -992,15 +992,20 @@ bool parseMarkers (const std::uint8_t* data, std::size_t size, Document& out, st
             }
             else if (pass == 1 && std::memcmp (tag, "tlst", 4) == 0 && len >= 4) // round 190ez: FL Edison's trigger notes
             {
-                // u32 count, then 24-byte entries: fourcc "cue ", u32 0, u32 cue id, u8 0xFF, u8 note, u8 0x90, u8 0,
-                // u32 0, u32 0 (live FL check 190ew, EDI-2: a WAV Edison saved with a region on D3 = note 38)
+                // u32 count, then 24-byte entries: fourcc "cue ", u32 cue id - 1, u32 1, u8 0xFF, u8 note, u8 0x90, u8 0,
+                // u32 0, u32 0. Round 190gk: FL's own multi-entry files settle the first two words (an FL /R render with
+                // three markers, r167l: cue ids 0x10000..0x10002, entries 0xffff / 0x10000 / 0x10001 then 1 each;
+                // Edison's writer 0x613f00, REA 190h; Slicex 190r). LYNX 0.1.27 wrote {0, cue id} instead, which only
+                // matches FL for cue id 1: an entry whose second word is not FL's constant 1 is read that old way.
                 const auto count = (std::size_t) get32 (data + body);
                 for (std::size_t i = 0; i < count && 4 + (i + 1) * 24 <= len; ++i)
                 {
                     const auto* t = data + body + 4 + i * 24;
                     if (std::memcmp (t, "cue ", 4) != 0)
                         continue;
-                    if (auto* c = findCue (get32 (t + 8)))
+                    const auto second = get32 (t + 8);
+                    const auto id = second == 1 ? get32 (t + 4) + 1 : second;
+                    if (auto* c = findCue (id))
                         c->key = t[13] < 128 ? (int) t[13] : -1;
                 }
             }
@@ -1177,8 +1182,8 @@ std::vector<std::uint8_t> encodeWav (const Document& doc, WavFormat format)
                 if (doc.markers[i].keyNum >= 0)
                 {
                     putTag (o, "cue ");
-                    put32 (o, 0);
-                    put32 (o, (std::uint32_t) i + 1); // the cue id
+                    put32 (o, (std::uint32_t) i); // the cue id (i + 1) minus one, as FL writes it (round 190gk)
+                    put32 (o, 1);
                     o.push_back (0xff);
                     o.push_back ((std::uint8_t) std::min (doc.markers[i].keyNum, 127));
                     o.push_back (0x90);

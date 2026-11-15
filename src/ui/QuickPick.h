@@ -8,6 +8,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "engine/AudioEngine.h"
+#include "engine/GeneratorCatalog.h"
 
 namespace lynx::quickpick
 {
@@ -22,18 +23,7 @@ namespace lynx::quickpick
 // generatorEntries() is THE list of generators (issue #18): the Channel Rack's Insert ›, Replace › and "+" menus
 // (addGeneratorMenu), the Browser's Plugin database, the user's plugin folders and the renamed picks all read it, so
 // they never differ.
-struct GeneratorEntry
-{
-    std::string key;
-    juce::String label, detail;
-    int folder = 0; // 0 LYNX, 1 FL engines, 2 VFX, 3 installed
-    std::function<std::optional<ChannelDef>()> make;
-    // where addGeneratorMenu puts a LYNX one (folder 0): 0 the first block (Kick … Synth), 1 the tools block (Envelope
-    // Controller … Fruity Video Player), 2 after the FL engines / VFX submenus (Patcher, LYNX Soundfont)
-    int section = 1;
-    InstrumentKind kind = InstrumentKind::synth; // what make() gives (the Replace menu ticks the channel's own)
-    bool available = true; // false: an FL engine without the user's FL installation (shown disabled in the menu only)
-};
+using GeneratorEntry = generators::Entry;
 
 struct EffectEntry
 {

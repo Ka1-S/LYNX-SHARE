@@ -2,9 +2,12 @@
 #include "ui/WindowOwner.h"
 #include "core/NoteNames.h"
 #include "ui/ChannelSettings.h"
+#include "core/EditorScale.h"
 #include "core/FlControlMenus.h"
 #include "core/FlmDwSampler.h"
 #include "core/SamplerPage.h"
+#include "ui/NewtoneEditor.h"
+#include "ui/EditorTools.h"
 #include "ui/FileChoosers.h"
 #include "ui/Icons.h"
 #include "ui/LayerEditor.h"
@@ -45,6 +48,7 @@
 #include "core/PoiZone.h"
 #include "core/LynxBanks.h"
 #include "core/ModelParams.h"
+#include "core/SynthParams.h"
 #include "core/BassDrum.h"
 #include "core/FruitKick.h"
 #include "core/Toxic.h"
@@ -61,6 +65,8 @@
 #include "core/RackOps.h"
 #include "core/NativeEngines.h"
 #include "core/PresetCycle.h"
+#include "core/GeneratorPresets.h"
+#include "ui/GeneratorPresetMenu.h"
 #include "ui/ControllerEditors.h"
 #include "ui/HintBar.h"
 #include "ui/ValueControl.h"
@@ -77,6 +83,7 @@
 #include "ui/FlVoicePanel.h"
 #include "core/FruitySlicer.h"
 #include "ui/SlicexEditor.h"
+#include "platform/FileTypes.h"
 #include "ui/BrowserComponent.h"
 #include "engine/SampleLibrary.h"
 #include "core/SampleFiles.h"
@@ -422,7 +429,11 @@ private:
 
         // only its own window: as a tab of the channel's window it left that window titled "Modulation - ..." while the
         // Sampler page showed (issue #12)
-        if (auto* w = findParentComponentOfClass<juce::DocumentWindow>(); w != nullptr && w->getContentComponent() == this)
+        // (round 190he: the window's content is the scaled holder around this page)
+        if (auto* w = findParentComponentOfClass<juce::DocumentWindow>();
+            w != nullptr && (w->getContentComponent() == this
+                             || (getParentComponent() == w->getContentComponent() && getParentComponent() != nullptr
+                                 && (bool) getParentComponent()->getProperties().getWithDefault ("lynxScaledContent", false))))
             w->setName (tr ("Modulation - {0}", { juce::String::fromUTF8 (c->name.c_str()) }));
     }
 
@@ -496,6 +507,7 @@ class ModelPanel final : public juce::Component,
                          public juce::TooltipClient,
                          public juce::DragAndDropTarget,
                          public juce::FileDragAndDropTarget,
+                         private juce::ChangeListener,
                          private juce::Timer
 {
 public:
@@ -1201,14 +1213,123 @@ public:
             const auto f = juce::jmin (layoutScale, 1200.0f / (float) layout->width, 720.0f / (float) layout->height);
             setSize ((int) std::ceil (f * (float) layout->width) + 16, (int) std::ceil (f * (float) layout->height) + layoutTop + 8);
         }
-        if (transistorBass && ref.index >= 0)
-            startTimerHz (10); // the page follows the program a note selects (round 169g2)
+        // issue #152 (round 190he): the knobs follow the channel's state (a MIDI link, Init song values, undo) and play
+        // their automation, as FL's editors do; the timer also follows Transistor Bass's program (round 169g2)
+        rememberState();
+        engine.addChangeListener (this);
+        if (ref.index >= 0 && (! modelKnobs.empty() || ! partKnobs.empty() || transistorBass))
+            startTimerHz (30);
+    }
+
+    ~ModelPanel() override
+    {
+        stopTimer();
+        engine.removeChangeListener (this);
+    }
+
+    // issue #152: a change of the channel's state that this page did not make (a linked controller, an Init song value,
+    // undo / redo, a preset loaded elsewhere) moves the knobs; nothing is redrawn when the state is the same
+    void changeListenerCallback (juce::ChangeBroadcaster*) override
+    {
+        const auto* c = channelNow();
+        if (c == nullptr || (c->pluginState == seenState && c->modelParams == seenParams))
+            return;
+        rememberState();
+        auto moved = false;
+        for (const auto& [k, index] : modelKnobs)
+            if (! k->isMouseButtonDown() && ! isAutomatedShown (k))
+                if (const auto v = modelparams::rawValue (*c, index); v && std::abs (*v - (float) k->getValue()) > 1.0e-6f)
+                {
+                    k->setValue (*v, juce::dontSendNotification);
+                    moved = true;
+                }
+        for (const auto& [k, control] : partKnobs)
+            if (! k->isMouseButtonDown() && ! isAutomatedShown (k))
+                if (const auto v = drumcontrols::value (*c, *control, drumPart); v && std::abs (*v - (float) k->getValue()) > 1.0e-6f)
+                {
+                    k->setValue (*v, juce::dontSendNotification);
+                    moved = true;
+                }
+        if (moved && layout != nullptr)
+            updateConditional();
+        if (moved)
+            repaint();
+    }
+
+    void rememberState()
+    {
+        if (const auto* c = channelNow())
+        {
+            seenState = c->pluginState;
+            seenParams = c->modelParams;
+        }
+    }
+
+    bool isAutomatedShown (const juce::Slider* k) const
+    {
+        return std::find (automatedShown.begin(), automatedShown.end(), k) != automatedShown.end();
+    }
+
+    // issue #152: while the song plays, an automated knob shows its automation's value (AutomationDisplay, as the
+    // Sampler's and the effects' knobs); when the automation stops driving it, it shows the channel's value again
+    void showAutomation()
+    {
+        if (ref.index < 0 || (modelKnobs.empty() && partKnobs.empty()))
+            return;
+        const auto& shown = engine.getAutomationDisplay();
+        if (shown.getGeneration() == shownGeneration)
+            return;
+        shownGeneration = shown.getGeneration();
+        if (automatedShown.empty() && ! shown.any())
+            return;
+        const auto* c = channelNow();
+        if (c == nullptr)
+            return;
+        std::vector<const juce::Slider*> now;
+        auto moved = false;
+        const auto show = [&] (juce::Slider* k, int index, std::optional<float> songRaw) {
+            if (k->isMouseButtonDown())
+                return;
+            const auto* p = modelparams::find (instrumentKind, index);
+            const auto v = shown.valueOf ({ AutomationTargetKind::channelParam, ref.index, 0, index });
+            if (v && p != nullptr)
+            {
+                k->setValue (p->raw (*v), juce::dontSendNotification);
+                now.push_back (k);
+                moved = true;
+            }
+            else if (isAutomatedShown (k) && songRaw)
+            {
+                k->setValue (*songRaw, juce::dontSendNotification);
+                moved = true;
+            }
+        };
+        for (const auto& [k, index] : modelKnobs)
+            show (k, index, modelparams::rawValue (*c, index));
+        for (const auto& [k, control] : partKnobs)
+            show (k, drumcontrols::absoluteIndex (instrumentKind, *control, drumPart), drumcontrols::value (*c, *control, drumPart));
+        automatedShown = std::move (now);
+        if (moved && layout != nullptr)
+            updateConditional();
+        if (moved)
+            repaint();
+    }
+
+    void timerCallback() override
+    {
+        if (isShowing())
+            showAutomation();
+        if (transistorBass && ref.index >= 0 && ++programTicks >= 3) // (10 times a second, as before)
+        {
+            programTicks = 0;
+            followTransistorBassProgram();
+        }
     }
 
     // Transistor Bass with its sequencer on: a note selects program = key (REA_rodada57 §2.10) and FL's editor shows
     // that program, so its knobs edit what plays. The channel's state takes the playing program (not an undo step)
     // and every knob reads it again (round 169g2)
-    void timerCallback() override
+    void followTransistorBassProgram()
     {
         const auto* c = channelNow();
         const auto instrument = engine.getChannelInstrument (ref.index);
@@ -1258,6 +1379,7 @@ public:
             knob->onDragStart = [this, target] { engine.noteTweaked (target(), true); };
             knob->onDragEnd = [this, target] { engine.tweakReleased (target()); };
         }
+        modelKnobs.push_back ({ knob.get(), index });
         addAndMakeVisible (*knob);
         knobs.push_back (std::move (knob));
     }
@@ -2667,6 +2789,12 @@ private:
     int editorKey = 60;
     int drumPart = 0; // round 168p: the Drumaxx pad / DrumSynth Live key the per-part knobs edit
     std::vector<std::pair<juce::Slider*, const drumcontrols::Control*>> partKnobs;
+    std::vector<std::pair<juce::Slider*, int>> modelKnobs; // a listed parameter's knob -> its index (issue #152)
+    std::vector<const juce::Slider*> automatedShown;      // the knobs showing their automation now
+    std::uint32_t shownGeneration = 0;
+    std::vector<std::uint8_t> seenState;                   // the channel's state the knobs show (issue #152)
+    std::vector<float> seenParams;
+    int programTicks = 0;
     std::vector<std::unique_ptr<juce::Slider>> knobs;
     const plugui::Layout* layout = nullptr;
     plugui::Layout hostedLayout;
@@ -3129,6 +3257,7 @@ public:
         wave.setWatermark (tr ("Sampler"));
         wave.setCaptionVisible (false);
         wave.setZoomable (true);
+        wave.setFollowsSamplerViews (true); // (round 190gw: the waveform menu's Spectrum / Multichannel views)
         wave.onViewChanged = [this] { waveScroll.setCurrentRange (wave.getViewStart(), wave.getViewEnd() - wave.getViewStart(), juce::dontSendNotification); };
         // round 190w: FL 2026 previews the sample when its display is clicked (from the start offset, to its end) and shows
         // the playback locator over it (What's New 21138; [SHOT] flgap190w burst n2 / o3)
@@ -3680,13 +3809,40 @@ private:
                     if (safe != nullptr)
                         openAudioEditorForChannel (safe->engine, safe->ref.index);
                 });
-            else if (key == "Open in new sampler channel" || key == "Open in new Fruity Granulizer channel")
+            else if (key == "Open in new sampler channel" || key == "Open in new Fruity Granulizer channel" || key == "Open in new Fruity Slicer channel"
+                     || key == "Open in new Slicex channel")
             {
-                const auto kind = key == "Open in new sampler channel" ? InstrumentKind::sampler : InstrumentKind::granulizer;
+                const auto kind = key == "Open in new sampler channel"            ? InstrumentKind::sampler
+                                  : key == "Open in new Fruity Granulizer channel" ? InstrumentKind::granulizer
+                                  : key == "Open in new Fruity Slicer channel"     ? InstrumentKind::fruityslicer
+                                                                                   : InstrumentKind::slicex;
                 menu.addItem (text, file.existsAsFile() && openInNewChannelHandler() != nullptr, false, [file, kind] {
                     if (openInNewChannelHandler())
                         openInNewChannelHandler() (file, kind);
                 });
+            }
+            else if (key == "Edit in pitch corrector" || key == "Edit in time warper") // (round 190gw)
+                menu.addItem (text, has && file.existsAsFile(), false, [safe, file, kind = key == "Edit in pitch corrector" ? EffectKind::newtone : EffectKind::newtime] {
+                    if (safe != nullptr)
+                        openSampleInMasterEditor (safe->engine, kind, file.getFullPathName().toStdString());
+                });
+            else if (key == "Spectrum view" || key == "Multichannel waveform view") // (round 190gw: FL's global view switches)
+            {
+                const auto spectrum = key == "Spectrum view";
+                auto& views = samplerpage::waveViews();
+                menu.addItem (text, true, spectrum ? views.spectrum : views.multichannel, [safe, spectrum] {
+                    auto& v = samplerpage::waveViews();
+                    (spectrum ? v.spectrum : v.multichannel) = ! (spectrum ? v.spectrum : v.multichannel);
+                    if (safe != nullptr)
+                        safe->wave.repaint();
+                    if (EditorGlobals::get().onOptionsChanged) // (kept in the UI settings)
+                        EditorGlobals::get().onOptionsChanged();
+                });
+            }
+            else if (key == "Get properties")
+            {
+                if (fileProperties) // (FL: Explorer's Properties of the sample's file; no such window on the other systems)
+                    menu.addItem (text, file.existsAsFile(), false, [file] { showFileProperties (file); });
             }
             else if (key == "Detect tempo")
                 menu.addItem (text, has, false, [safe, sample] {
@@ -4115,9 +4271,10 @@ private:
         m.addItem (tr ("Autodetect"), sample != nullptr, false, [set, sample, bpm = song.bpm] { set (tempodetect::fitBeatsOf (sample.get(), bpm)); });
         const auto atTempo = sample != nullptr && sample->sampleRate > 0.0 ? (float) ((double) sample->frames() / sample->sampleRate * song.bpm / 60.0) : 0.0f;
         m.addItem (tr ("Project tempo"), atTempo > 0.0f, false, [set, atTempo] { set (atTempo); });
-        for (const auto preset : clipops::timePresetBeats (song.beatsPerBar))
+        const auto barBeats = (float) song.barTicks() / (float) ppq; // (round 190fg: a bar in quarter notes)
+        for (const auto preset : clipops::timePresetBeats (song.meter()))
         {
-            const auto bars = song.beatsPerBar > 0 && preset >= (float) song.beatsPerBar ? preset / (float) song.beatsPerBar : 0.0f;
+            const auto bars = preset >= barBeats - 1.0e-4f ? preset / barBeats : 0.0f;
             const auto label = bars > 0.0f ? (bars == 1.0f ? tr ("1 bar") : tr ("{0} bars", { juce::String (bars, 0) }))
                                            : (preset == 1.0f ? tr ("1 beat") : tr ("{0} beats", { juce::String (preset, 0) }));
             m.addItem (label, true, now == preset, [set, preset] { set (preset); });
@@ -4172,7 +4329,8 @@ private:
 
 // Built-in synth page: 3 oscillators, envelope and filter.
 class SynthPanel final : public juce::Component,
-                         private juce::ChangeListener
+                         private juce::ChangeListener,
+                         private juce::Timer
 {
 public:
     SynthPanel (AudioEngine& e, ChannelRef c)
@@ -4245,17 +4403,27 @@ public:
         }
 
         presetBox.setTextWhenNothingSelected (tr ("Presets..."));
-        const auto presets = synthPresets();
-        for (int i = 0; i < (int) presets.size(); ++i)
-            presetBox.addItem (juce::String::fromUTF8 (presets[(std::size_t) i].first.c_str()), i + 1);
+        fillPresetBox();
+        presetBox.beforePopup = [this] { fillPresetBox(); }; // (round 190fs: the user's presets as they are on disk now)
         presetBox.onChange = [this] {
             const auto presets = synthPresets();
-            const auto index = presetBox.getSelectedId() - 1;
+            const auto id = presetBox.getSelectedId();
+            const auto index = id - 1;
+            presetBox.setSelectedId (0, juce::dontSendNotification);
 
             if (juce::isPositiveAndBelow (index, (int) presets.size()) && current() != nullptr)
                 ref.edit (engine, [s = presets[(std::size_t) index].second] (ChannelDef& channelDef) { channelDef.synth = s; });
-
-            presetBox.setSelectedId (0, juce::dontSendNotification);
+            else if (id >= userPresetId && id - userPresetId < userFiles.size())
+                loadUserPreset (userFiles[id - userPresetId]);
+            else if (id == savePresetId)
+                saveUserPreset();
+            else if (id == deletePresetId && lastUserPreset.existsAsFile())
+            {
+                lastUserPreset.deleteFile();
+                lastUserPreset = juce::File();
+            }
+            else if (id == showFolderId)
+                genpresetui::reveal (genpresetui::folderFor (InstrumentKind::synth));
         };
         addAndMakeVisible (presetBox);
 
@@ -4287,12 +4455,42 @@ public:
         mono.onClick = [this] { apply(); };
         addAndMakeVisible (mono);
 
+        // issue #152 (round 190he): every knob is one of the synth's parameters (core/SynthParams.h), as FL's plugin
+        // parameters are: right-click = FL's parameter menu (Link to controller, automation clip, Init song value); a
+        // move is a tweak; the knobs follow MIDI links (refresh) and play their automation (timer)
+        if (ref.index >= 0) // (a Patcher node: no automation target)
+        {
+            for (int o = 0; o < 3; ++o)
+            {
+                auto& row = rows[(std::size_t) o];
+                wire (row.octave, synthparam::oscParam (o, synthparam::octave));
+                wire (row.semitones, synthparam::oscParam (o, synthparam::semitones));
+                wire (row.detune, synthparam::oscParam (o, synthparam::detune));
+                wire (row.pan, synthparam::oscParam (o, synthparam::pan));
+                wire (row.level, synthparam::oscParam (o, synthparam::level));
+            }
+            for (auto [slider, k] : { std::pair { &attack, (int) synthparam::attack }, { &decay, (int) synthparam::decay },
+                                      { &sustain, (int) synthparam::sustain }, { &release, (int) synthparam::release },
+                                      { &cutoff, (int) synthparam::cutoff }, { &resonance, (int) synthparam::resonance },
+                                      { &porta, (int) synthparam::porta }, { &fm, (int) synthparam::fm }, { &fmDecay, (int) synthparam::fmDecay },
+                                      { &keyTrack, (int) synthparam::keyTrack }, { &sweep, (int) synthparam::sweep },
+                                      { &sweepTime, (int) synthparam::sweepTime }, { &bandLow, (int) synthparam::bandLow },
+                                      { &bandMid, (int) synthparam::bandMid }, { &bandHigh, (int) synthparam::bandHigh } })
+                wire (*slider, k);
+        }
+
         refresh();
         engine.addChangeListener (this);
         setSize (720, 510);
+        if (ref.index >= 0)
+            startTimerHz (30); // the knobs follow their automation while the song plays (cheap while nothing moves)
     }
 
-    ~SynthPanel() override { engine.removeChangeListener (this); }
+    ~SynthPanel() override
+    {
+        stopTimer();
+        engine.removeChangeListener (this);
+    }
 
     int getChannel() const noexcept { return ref.index; }
 
@@ -4357,7 +4555,7 @@ private:
     {
         juce::Label title;
         juce::ComboBox wave;
-        juce::Slider octave, semitones, detune, pan, level;
+        MenuSlider octave, semitones, detune, pan, level;
     };
 
     static constexpr int oscKnobs = 5; // oscillator knob labels come first
@@ -4445,8 +4643,63 @@ private:
             juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("FL presets"),
                                                     tr ("This preset is not for a synth LYNX SHARE converts, or it could not be read."));
     }
-    juce::Slider porta;
+    MenuSlider porta;
     juce::ComboBox filterTypeBox;
+
+    // a knob as the synth parameter k (issue #152)
+    AutomationTarget targetOf (int k) const { return { AutomationTargetKind::channelParam, ref.index, 0, synthparam::target (k) }; }
+    void wire (MenuSlider& slider, int k)
+    {
+        ui::setOwnMenu (slider);
+        slider.onMenu = [this, &slider, k] { ui::showSliderMenu (slider, &engine, targetOf (k)); };
+        slider.onDragStart = [this, k] { engine.noteTweaked (targetOf (k), true); };
+        slider.onDragEnd = [this, k] { engine.tweakReleased (targetOf (k)); };
+        wired.push_back ({ &slider, k });
+    }
+
+    // the knobs an automation drives show its value while the song plays; when it stops they show the Song's again
+    void timerCallback() override
+    {
+        if (isShowing())
+            showAutomation (false);
+    }
+
+    // `force`: after refresh() put the Song's values back (the automated ones go on the automation's value again)
+    void showAutomation (bool force)
+    {
+        if (wired.empty())
+            return;
+        const auto& shown = engine.getAutomationDisplay();
+        if (! force && shown.getGeneration() == shownGeneration)
+            return;
+        shownGeneration = shown.getGeneration();
+        if (automatedShown.empty() && ! shown.any())
+            return;
+        const auto* c = current();
+        if (c == nullptr)
+            return;
+        const juce::ScopedValueSetter<bool> guard (updating, true);
+        std::vector<juce::Slider*> now;
+        for (const auto& [slider, k] : wired)
+        {
+            if (slider->isMouseButtonDown())
+                continue;
+            const auto v = shown.valueOf (targetOf (k));
+            const auto was = std::find (automatedShown.begin(), automatedShown.end(), slider) != automatedShown.end();
+            if (v)
+            {
+                slider->setValue (synthparam::toNatural (k, *v), juce::dontSendNotification);
+                now.push_back (slider);
+            }
+            else if (was && ! force)
+                slider->setValue (synthparam::natural (c->synth, k), juce::dontSendNotification);
+        }
+        automatedShown = std::move (now);
+    }
+
+    std::vector<std::pair<MenuSlider*, int>> wired; // knob -> synth parameter
+    std::vector<juce::Slider*> automatedShown;
+    std::uint32_t shownGeneration = 0;
 
     void knob (juce::Slider& s, double lo, double hi, double step, const char* suffix)
     {
@@ -4508,6 +4761,7 @@ private:
         ring.setToggleState (s.ring, juce::dontSendNotification);
 
         updating = false;
+        showAutomation (true); // (issue #152: an automated knob keeps showing its automation)
 
         if (auto* w = findParentComponentOfClass<juce::DocumentWindow>())
             w->setName (tr ("Synth settings - {0}", { juce::String::fromUTF8 (c->name.c_str()) }));
@@ -4571,10 +4825,100 @@ private:
     ChannelRef ref;
     bool updating = false;
     std::array<Row, 3> rows;
-    juce::Slider attack, decay, sustain, release, cutoff, resonance, fm, fmDecay, keyTrack, sweep, sweepTime, bandLow, bandMid, bandHigh;
+    MenuSlider attack, decay, sustain, release, cutoff, resonance, fm, fmDecay, keyTrack, sweep, sweepTime, bandLow, bandMid, bandHigh;
     juce::ToggleButton ring;
     std::array<juce::Label, 20> labels;
-    juce::ComboBox presetBox;
+    // round 190fs: the box lists LYNX's synth presets, then the user's own ("Your presets") and the preset items of
+    // LYNX's other preset menus (Save preset..., Delete preset, Show the presets folder)
+    struct PresetBox final : public juce::ComboBox
+    {
+        std::function<void()> beforePopup;
+        void showPopup() override
+        {
+            if (beforePopup)
+                beforePopup();
+            juce::ComboBox::showPopup();
+        }
+    };
+    static constexpr int userPresetId = 1001, savePresetId = 3001, deletePresetId = 3002, showFolderId = 3003;
+    PresetBox presetBox;
+    juce::Array<juce::File> userFiles;
+    juce::File lastUserPreset; // the user's preset loaded or saved last (Delete preset)
+
+    void fillPresetBox()
+    {
+        presetBox.clear (juce::dontSendNotification);
+        const auto presets = synthPresets();
+        for (int i = 0; i < (int) presets.size(); ++i)
+            presetBox.addItem (juce::String::fromUTF8 (presets[(std::size_t) i].first.c_str()), i + 1);
+        userFiles = genpresetui::userPresets (InstrumentKind::synth);
+        if (! userFiles.isEmpty())
+        {
+            presetBox.addSectionHeading (tr ("Your presets"));
+            for (int i = 0; i < userFiles.size(); ++i)
+                presetBox.addItem (userFiles[i].getFileNameWithoutExtension(), userPresetId + i);
+        }
+        presetBox.addSeparator();
+        presetBox.addItem (tr ("Save preset..."), savePresetId);
+        if (lastUserPreset.existsAsFile())
+            presetBox.addItem (tr ("Delete preset \"{0}\"", { lastUserPreset.getFileNameWithoutExtension() }), deletePresetId);
+        presetBox.addItem (tr ("Show the presets folder"), showFolderId);
+    }
+
+    void loadUserPreset (const juce::File& file)
+    {
+        const auto preset = genpresetui::read (file);
+        const auto* d = current();
+        if (! preset || d == nullptr)
+            return;
+        if (auto changed = genpresets::withPreset (*d, *preset))
+        {
+            ref.edit (engine, [c = std::move (*changed)] (ChannelDef& channelDef) {
+                if (channelDef.instrument == c.instrument)
+                    channelDef = c;
+            });
+            lastUserPreset = file;
+        }
+        else
+            ui::postHint ({ tr ("This preset is for {0}.", { juce::String::fromUTF8 (genpresets::engineName (preset->kind).c_str()) }), {} }, 2500);
+    }
+
+    void saveUserPreset()
+    {
+        const auto* d = current();
+        if (d == nullptr)
+            return;
+        genpresetui::askName (*this, juce::String::fromUTF8 (d->name.c_str()), [safe = juce::Component::SafePointer<SynthPanel> (this)] (const juce::String& name) {
+            if (safe != nullptr)
+                safe->saveNamed (name);
+        });
+    }
+
+public:
+    bool saveNamed (const juce::String& name)
+    {
+        const auto* now = current();
+        if (now == nullptr)
+            return false;
+        juce::File written;
+        juce::String error;
+        if (! genpresetui::save (*now, name, written, error))
+        {
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Save preset"), error);
+            return false;
+        }
+        lastUserPreset = written;
+        return true;
+    }
+
+    // the box's list as it opens (shots)
+    juce::PopupMenu presetBoxMenu()
+    {
+        fillPresetBox();
+        return *presetBox.getRootMenu();
+    }
+
+private:
 };
 
 // --- FL's channel window frame (REA round 143b) --------------------------------------------------------------
@@ -5577,6 +5921,10 @@ private:
             const auto& bank = banks::bankOf (kind);
             for (int i = 0; i < (int) bank.size(); ++i)
                 presets.push_back ({ banks::pathOf (i), banks::relativeOf (bank[(std::size_t) i]), bank[(std::size_t) i].name });
+            // the user's own presets last (round 190fs): "Your presets" in the menu, the arrows go through them too
+            userFrom = (int) presets.size();
+            for (const auto& f : genpresetui::userPresets (kind))
+                presets.push_back ({ f.getFullPathName().toStdString(), {}, f.getFileNameWithoutExtension().toStdString() });
             listedKind = kind;
             loaded = true;
             current = d != nullptr ? presetcycle::indexOfName (presets, d->name) : -1; // (a channel named after its preset)
@@ -5608,7 +5956,14 @@ private:
             return false;
         const auto& preset = all[(std::size_t) index];
         const auto bankIndex = banks::indexOfPath (preset.path);
-        auto changed = bankIndex >= 0 ? banks::withPreset (*d, bankIndex) : natives::withPreset (*d, preset.path, preset.name, flStudioAccess());
+        std::optional<ChannelDef> changed;
+        if (index >= userFrom) // one of the user's own presets (round 190fs)
+        {
+            if (const auto own = genpresetui::read (juce::File (juce::String::fromUTF8 (preset.path.c_str()))))
+                changed = genpresets::withPreset (*d, *own);
+        }
+        else
+            changed = bankIndex >= 0 ? banks::withPreset (*d, bankIndex) : natives::withPreset (*d, preset.path, preset.name, flStudioAccess());
         if (! changed)
         {
             if (reportFailure)
@@ -5633,11 +5988,18 @@ private:
 
     void showMenu()
     {
+        buildMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this));
+    }
+
+public:
+    juce::PopupMenu buildMenu()
+    {
+        refreshUserPresets(); // (another channel's window may have saved or deleted one)
         const auto& all = list();
         juce::PopupMenu menu;
         std::map<std::string, juce::PopupMenu> folders;
         std::vector<std::string> order;
-        for (int i = 0; i < (int) all.size(); ++i)
+        for (int i = 0; i < juce::jmin (userFrom, (int) all.size()); ++i)
         {
             const auto& rel = all[(std::size_t) i].relative;
             const auto slash = rel.find_last_of ('/');
@@ -5652,9 +6014,117 @@ private:
                     menu.addItem (it.getItem());
             else
                 menu.addSubMenu (juce::String::fromUTF8 (folder.c_str()), folders[folder]);
-        if (menu.getNumItems() == 0)
+        if (menu.getNumItems() == 0 && userFrom >= (int) all.size())
             menu.addItem (tr ("No presets found (they come with FL Studio)"), false, false, [] {});
-        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this));
+        addUserItems (menu);
+        return menu;
+    }
+
+    // Round 190fs: the user's own presets of this generator, with the items the hosted plugins' and the mixer effects'
+    // preset menus have (Save preset..., Your presets, Delete preset, Show the presets folder). FL's wrapper saves a
+    // generator's settings with "Save preset as..." (PluginMenu SaveStateMenu); LYNX's channel window has no wrapper
+    // menu, so the item is in the preset box, as in the other LYNX preset menus.
+    void addUserItems (juce::PopupMenu& menu)
+    {
+        const auto& all = list();
+        const auto* d = def();
+        if (d == nullptr || ! genpresets::canSave (d->instrument))
+            return;
+        if (userFrom < (int) all.size())
+        {
+            menu.addSectionHeader (tr ("Your presets"));
+            for (int i = userFrom; i < (int) all.size(); ++i)
+                menu.addItem (juce::String::fromUTF8 (all[(std::size_t) i].name.c_str()), true, i == current, [this, i] { load (i); });
+        }
+        menu.addSeparator();
+        menu.addItem (tr ("Save preset..."), [safe = juce::Component::SafePointer<ChannelPresetBar> (this)] {
+            if (safe != nullptr)
+                safe->saveAs();
+        });
+        if (current >= userFrom && current < (int) all.size())
+        {
+            const juce::File file (juce::String::fromUTF8 (all[(std::size_t) current].path.c_str()));
+            menu.addItem (tr ("Delete preset \"{0}\"", { file.getFileNameWithoutExtension() }),
+                          [safe = juce::Component::SafePointer<ChannelPresetBar> (this), file] {
+                              file.deleteFile();
+                              if (safe != nullptr)
+                                  safe->relist ({});
+                          });
+        }
+        const auto kind = d->instrument;
+        menu.addItem (tr ("Show the presets folder"), [kind] { genpresetui::reveal (genpresetui::folderFor (kind)); });
+    }
+
+    // "Save preset...": the name box, then the file; the box shows the new preset (the channel keeps its name)
+    void saveAs()
+    {
+        const auto* d = def();
+        if (d == nullptr)
+            return;
+        genpresetui::askName (*this, current >= 0 ? currentName : juce::String::fromUTF8 (d->name.c_str()),
+                              [safe = juce::Component::SafePointer<ChannelPresetBar> (this)] (const juce::String& name) {
+                                  if (safe != nullptr)
+                                      safe->saveNamed (name);
+                              });
+    }
+
+    bool saveNamed (const juce::String& name)
+    {
+        const auto* d = def();
+        if (d == nullptr)
+            return false;
+        juce::File written;
+        juce::String error;
+        if (! genpresetui::save (*d, name, written, error))
+        {
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Save preset"), error);
+            return false;
+        }
+        relist (written.getFullPathName());
+        return true;
+    }
+
+    juce::String shownName() const { return current >= 0 ? currentName : juce::String(); }
+    int presetCount() { return (int) list().size(); }
+    int userPresetCount() { return (int) list().size() - userFrom; }
+    bool loadAt (int index) { return load (index, false); }
+
+private:
+    // the user's presets as they are on disk now, the rest of the list kept; the current preset stays selected
+    void refreshUserPresets()
+    {
+        const auto* d = def();
+        if (! loaded || d == nullptr || d->instrument != listedKind)
+            return;
+        const auto was = current >= userFrom && current < (int) presets.size() ? presets[(std::size_t) current].path : std::string();
+        presets.resize ((std::size_t) userFrom);
+        for (const auto& f : genpresetui::userPresets (listedKind))
+            presets.push_back ({ f.getFullPathName().toStdString(), {}, f.getFileNameWithoutExtension().toStdString() });
+        if (! was.empty())
+        {
+            current = -1;
+            for (int i = userFrom; i < (int) presets.size(); ++i)
+                if (presets[(std::size_t) i].path == was)
+                    current = i;
+            if (current < 0)
+                currentName = {};
+        }
+    }
+
+    // the list again (a preset was saved or deleted); `select` (a file path) becomes the current preset
+    void relist (const juce::String& select)
+    {
+        loaded = false;
+        const auto& all = list();
+        current = -1;
+        currentName = {};
+        for (int i = userFrom; i < (int) all.size() && select.isNotEmpty(); ++i)
+            if (juce::File (juce::String::fromUTF8 (all[(std::size_t) i].path.c_str())) == juce::File (select))
+            {
+                current = i;
+                currentName = juce::String::fromUTF8 (all[(std::size_t) i].name.c_str());
+            }
+        repaint();
     }
 
     AudioEngine& engine;
@@ -5665,6 +6135,7 @@ private:
     InstrumentKind listedKind = InstrumentKind::synth;
     bool loaded = false;
     int current = -1;
+    int userFrom = 0; // the first of the user's own presets in `presets`
     juce::String currentName;
 };
 
@@ -5894,11 +6365,39 @@ public:
         on.setBounds (right.removeFromRight (52).withSizeKeepingCentre (52, 24));
         // each page keeps its own size (some scale their drawing with it), centred under the header
         const auto body = getLocalBounds().withTrimmedTop (headerHeight);
+        const juce::ScopedValueSetter<bool> placing (laying, true);
         for (std::size_t i = 0; i < pages.size(); ++i)
         {
             const auto w = juce::jmin (body.getWidth(), sizes[i].x), h = juce::jmin (body.getHeight(), sizes[i].y);
             pages[i]->setBounds (body.getX() + (body.getWidth() - w) / 2, body.getY(), w, h);
         }
+    }
+
+    // A page that sizes itself (Slicex's display modes and keyboard button, round 190hg): the frame takes the new
+    // size and its window follows, as FL's plugin window does. Sizes set by resized() itself are not news.
+    void childBoundsChanged (juce::Component* child) override
+    {
+        if (laying)
+            return;
+        for (std::size_t i = 0; i < pages.size(); ++i)
+            if (pages[i].get() == child)
+            {
+                const juce::Point<int> now { juce::jmax (1, child->getWidth()), juce::jmax (1, child->getHeight()) };
+                if (now == sizes[i])
+                    return;
+                sizes[i] = now;
+                int width = node ? 1 : MiscPanel::preferredWidth, height = node ? 1 : MiscPanel::preferredHeight;
+                for (const auto& size : sizes)
+                {
+                    width = juce::jmax (width, size.x);
+                    height = juce::jmax (height, size.y);
+                }
+                if (width != getWidth() || headerHeight + height != getHeight())
+                    setSize (width, headerHeight + height);
+                else
+                    resized();
+                return;
+            }
     }
 
 private:
@@ -5919,6 +6418,7 @@ private:
     std::vector<std::unique_ptr<juce::TextButton>> tabs;
     std::vector<std::unique_ptr<juce::Component>> pages;
     std::vector<juce::Point<int>> sizes;
+    bool laying = false; // (resized() is placing the pages)
     std::vector<std::unique_ptr<FrameKnob>> header;
     juce::ToggleButton on;
     std::unique_ptr<ChannelPresetBar> presetBar;
@@ -6033,13 +6533,126 @@ std::optional<juce::Point<int>>& alignedChannelEditorPosition()
     return at;
 }
 
+// Round 190he (issue #152: "the FL-engine plugins can't be made smaller"): a settings window's content at a scale of
+// its own (FL's plugin menu › Scaling, core/EditorScale.h). The page keeps its own size and layout and is drawn through a
+// transform; this holder is the page's size times the factor, and follows the page when it changes its size (a tab
+// with another size). When the window is sized by its edge, the holder takes the new size and the factor follows.
+class ScaledContent final : public juce::Component
+{
+public:
+    ScaledContent (std::unique_ptr<juce::Component> page, int storedScale)
+        : inner (std::move (page)),
+          stored (storedScale)
+    {
+        getProperties().set ("lynxScaledContent", true);
+        addAndMakeVisible (*inner);
+        fitToPage();
+    }
+
+    juce::Component& page() noexcept { return *inner; }
+    int storedScale() const noexcept { return stored; }
+    juce::Point<int> pageSize() const { return { juce::jmax (1, inner->getWidth()), juce::jmax (1, inner->getHeight()) }; }
+
+    void setStoredScale (int newStored)
+    {
+        stored = newStored <= 0 ? 0 : editorscale::storedFor (newStored);
+        fitToPage();
+    }
+
+    void resized() override
+    {
+        if (fitting)
+            return;
+        const auto size = pageSize();
+        const auto factor = juce::jmax (0.05, juce::jmin ((double) getWidth() / size.x, (double) getHeight() / size.y));
+        inner->setTransform (juce::AffineTransform::scale ((float) factor));
+        // (a pixel of rounding is not a new size: the window fitted to the page lands here too)
+        if (const auto percent = editorscale::percentForWidth (getWidth(), size.x); std::abs (percent - editorscale::percentOf (stored)) > 1)
+            stored = editorscale::storedFor (percent);
+    }
+
+    void childBoundsChanged (juce::Component* child) override
+    {
+        if (child == inner.get() && ! fitting)
+            fitToPage();
+    }
+
+private:
+    void fitToPage()
+    {
+        const juce::ScopedValueSetter<bool> busy (fitting, true);
+        const auto factor = editorscale::factorOf (stored);
+        inner->setTopLeftPosition (0, 0);
+        inner->setTransform (juce::AffineTransform::scale ((float) factor));
+        const auto size = pageSize();
+        setSize (juce::roundToInt (size.x * factor), juce::roundToInt (size.y * factor));
+    }
+
+    std::unique_ptr<juce::Component> inner;
+    int stored = 0;
+    bool fitting = false;
+};
+
+// Sizing a settings window by its edge keeps the page's proportions (the content area is the page times one factor),
+// between editorscale::minPercent and maxPercent.
+class PageAspectConstrainer final : public juce::ComponentBoundsConstrainer
+{
+public:
+    explicit PageAspectConstrainer (juce::ResizableWindow& w) : window (w)
+    {
+        setMinimumOnscreenAmounts (0x10000, 16, 24, 16); // (as ResizableWindow's own constrainer: the title stays reachable)
+    }
+    std::function<juce::Point<int>()> pageSize;
+    std::function<void()> onResizeEnd; // (the size is remembered once, when the drag ends)
+
+    void resizeEnd() override
+    {
+        if (onResizeEnd != nullptr)
+            onResizeEnd();
+    }
+
+    void checkBounds (juce::Rectangle<int>& bounds, const juce::Rectangle<int>& previous, const juce::Rectangle<int>& limits, bool top,
+                      bool left, bool bottom, bool right) override
+    {
+        const auto page = pageSize != nullptr ? pageSize() : juce::Point<int>();
+        // (only a drag of an edge keeps the proportions: a move, or the system placing the window, keeps its size)
+        if (page.x <= 0 || page.y <= 0 || ! (top || left || bottom || right))
+        {
+            juce::ComponentBoundsConstrainer::checkBounds (bounds, previous, limits, top, left, bottom, right);
+            return;
+        }
+        const auto border = window.getContentComponentBorder();
+        const auto w = (double) (bounds.getWidth() - border.getLeftAndRight()), h = (double) (bounds.getHeight() - border.getTopAndBottom());
+        const auto sideways = left || right, upDown = top || bottom;
+        auto factor = sideways && ! upDown ? w / page.x : upDown && ! sideways ? h / page.y : juce::jmax (w / page.x, h / page.y);
+        factor = juce::jlimit ((double) editorscale::minPercent / editorscale::defaultPercent,
+                               (double) editorscale::maxPercent / editorscale::defaultPercent, factor);
+        const auto newW = juce::roundToInt (page.x * factor) + border.getLeftAndRight();
+        const auto newH = juce::roundToInt (page.y * factor) + border.getTopAndBottom();
+        if (left)
+            bounds.setLeft (bounds.getRight() - newW);
+        else
+            bounds.setWidth (newW);
+        if (top)
+            bounds.setTop (bounds.getBottom() - newH);
+        else
+            bounds.setHeight (newH);
+        juce::ComponentBoundsConstrainer::checkBounds (bounds, previous, limits, top, left, bottom, right); // (on screen)
+    }
+
+private:
+    juce::ResizableWindow& window;
+};
+
 class SettingsWindow final : public juce::DocumentWindow
 {
 public:
     SettingsWindow (AudioEngine& engine, int c, bool modulationWindow)
         : juce::DocumentWindow (tr ("Channel settings"), theme::colour::bg2, DocumentWindow::closeButton),
           channel (c),
-          modulation (modulationWindow)
+          modulation (modulationWindow),
+          engineRef (engine),
+          aspect (*this)
     {
         setUsingNativeTitleBar (true);
         // FL names the window after the channel and its mixer track (REA round 149 [EXEC]: "FL Studio VSTi (Master)",
@@ -6055,12 +6668,21 @@ public:
                      + (modulation ? " - " + tr ("Envelope / instrument") : juce::String()));
         }
 
+        std::unique_ptr<juce::Component> page;
         if (modulation)
-            setContentOwned (new ModulationPanel (engine, ChannelRef::rack (channel)), true);
+            page = std::make_unique<ModulationPanel> (engine, ChannelRef::rack (channel));
         else if (! hasChannelSettings (engine.getSong().channels[(std::size_t) channel].instrument))
-            setContentOwned (new ChannelFrame (engine, ChannelRef::rack (channel), nullptr, nullptr), true); // the Misc tab alone
+            page = std::make_unique<ChannelFrame> (engine, ChannelRef::rack (channel), nullptr, nullptr); // the Misc tab alone
         else
-            setContentOwned (makeChannelFrame (engine, channel).release(), true);
+            page = makeChannelFrame (engine, channel);
+        // FL's Scaling (round 190he): the channel's own size, remembered with the project (the modulation window too)
+        const auto& song = engine.getSong();
+        scaled = new ScaledContent (std::move (page), song.channels[(std::size_t) channel].editorScale);
+        setContentOwned (scaled, true);
+        aspect.pageSize = [this] { return scaled->pageSize(); };
+        aspect.onResizeEnd = [this] { remember (scaled->storedScale()); };
+        setConstrainer (&aspect);
+        setResizable (true, false);
 
         centreWithSize (getWidth(), getHeight());
         if (! modulation)
@@ -6073,11 +6695,66 @@ public:
 
     int getChannel() const { return channel; }
     bool isModulation() const { return modulation; }
+    juce::Component* page() const { return scaled != nullptr ? &scaled->page() : nullptr; }
     void closeButtonPressed() override;
 
+    // FL's plugin menu › Scaling (PluginScalingMenu: 100 % … 400 % of the plugin's size). LYNX's window has no wrapper
+    // menu, so a right-click on its title bar (docked: LYNX's own bar) shows it.
+    void mouseDown (const juce::MouseEvent& e) override
+    {
+        if (e.mods.isPopupMenu() && e.eventComponent == this && ! isUsingNativeTitleBar() && e.y < getTitleBarHeight())
+        {
+            showScalingMenu();
+            return;
+        }
+        juce::DocumentWindow::mouseDown (e);
+    }
+
+    void showScalingMenu()
+    {
+        juce::PopupMenu sizes;
+        const auto stored = scaled->storedScale();
+        const juce::Component::SafePointer<SettingsWindow> safe (this);
+        // FL's items (System is left out: LYNX's whole interface already follows the display's scale)
+        sizes.addItem (tr ("Host"), true, stored == 0, [safe] {
+            if (safe != nullptr)
+                safe->setStoredScale (0);
+        });
+        for (const auto percent : editorscale::menuPercents)
+            sizes.addItem (juce::String (percent) + "%", true, stored == percent, [safe, percent] {
+                if (safe != nullptr)
+                    safe->setStoredScale (editorscale::storedFor (percent));
+            });
+        juce::PopupMenu menu;
+        menu.addSubMenu (tr ("Scaling"), sizes);
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+    }
+
+    void setStoredScale (int stored)
+    {
+        scaled->setStoredScale (stored);
+        setContentComponentSize (scaled->getWidth(), scaled->getHeight());
+        remember (stored);
+    }
+
 private:
+    void remember (int stored)
+    {
+        const auto& song = engineRef.getSong();
+        if (channel < 0 || channel >= (int) song.channels.size() || song.channels[(std::size_t) channel].editorScale == stored)
+            return;
+        engineRef.editSong ([ch = channel, stored] (Song& s) {
+            if (ch < (int) s.channels.size())
+                s.channels[(std::size_t) ch].editorScale = stored;
+        }, false);
+        engineRef.markModified();
+    }
+
     int channel;
     bool modulation;
+    AudioEngine& engineRef;
+    PageAspectConstrainer aspect;
+    ScaledContent* scaled = nullptr; // (owned by the window: its content)
 };
 
 std::vector<std::unique_ptr<SettingsWindow>>& windows()
@@ -6147,7 +6824,7 @@ void openChannelMisc (AudioEngine& engine, int channel)
     openWindow (engine, channel, false);
     for (auto& w : windows())
         if (w->getChannel() == channel && ! w->isModulation())
-            if (auto* frame = dynamic_cast<ChannelFrame*> (w->getContentComponent()))
+            if (auto* frame = dynamic_cast<ChannelFrame*> (w->page()))
                 frame->showTab (frame->tabCount() - 1);
 }
 
@@ -6401,6 +7078,45 @@ juce::String samplerPageQuery (juce::Component& root, const juce::String& what)
     if (what == "mulText" || what == "corner" || what == "waveHint")
         return p->shotText (what);
     return p->shotEnabled (what) ? "1" : "0";
+}
+
+namespace
+{
+template <typename T>
+T* findChild (juce::Component& c)
+{
+    if (auto* p = dynamic_cast<T*> (&c))
+        return p;
+    for (auto* child : c.getChildren())
+        if (auto* p = findChild<T> (*child))
+            return p;
+    return nullptr;
+}
+} // namespace
+
+std::optional<juce::PopupMenu> channelPresetMenu (juce::Component& root)
+{
+    if (auto* bar = findChild<ChannelPresetBar> (root))
+        return bar->buildMenu();
+    if (auto* synth = findChild<SynthPanel> (root))
+        return synth->presetBoxMenu();
+    return std::nullopt;
+}
+
+bool channelPresetSave (juce::Component& root, const juce::String& name)
+{
+    if (auto* bar = findChild<ChannelPresetBar> (root))
+        return bar->saveNamed (name);
+    if (auto* synth = findChild<SynthPanel> (root))
+        return synth->saveNamed (name);
+    return false;
+}
+
+juce::String channelPresetName (juce::Component& root)
+{
+    if (auto* bar = findChild<ChannelPresetBar> (root))
+        return bar->shownName();
+    return {};
 }
 
 std::optional<juce::PopupMenu> samplerWaveMenu (juce::Component& root)

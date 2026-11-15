@@ -4,8 +4,10 @@
 
 #include <juce_audio_utils/juce_audio_utils.h>
 
+#include "core/AutoScanPolicy.h"
 #include "core/LayoutStyle.h"
 #include "engine/AudioEngine.h"
+#include "ui/AudioCheck.h"
 #include "engine/FlStudio.h"
 #include "ui/FileChoosers.h"
 #include "ui/I18n.h"
@@ -105,6 +107,9 @@ public:
         addAndMakeVisible (skip);
         addAndMakeVisible (finish);
         devices.addComponentListener (this);
+        // round 190gh (B23): the test tone with a meter, and other devices to try when nothing is heard
+        audioCheck = makeAudioCheckPanel (engine, persistentDevices, [this] { triggerAsyncUpdate(); });
+        body.addAndMakeVisible (*audioCheck);
         // language
         int id = 1;
         for (const auto& l : i18n::languages())
@@ -286,6 +291,12 @@ private:
         devices.setBounds (r.getX(), r.getY(), w, 200); // its resized() sets its own height
         r.removeFromTop (juce::jmax (0, devices.getHeight() - 18)); // it ends with an empty row of its own
         r.removeFromTop (6);
+        if (audioCheck != nullptr) // (round 190gh)
+        {
+            const auto h = audioCheckHeight (*audioCheck, w);
+            audioCheck->setBounds (r.getX(), r.getY(), w, h);
+            r.removeFromTop (h + 6);
+        }
 
         flLabel.setBounds (r.removeFromTop (24));
         flStatus.setBounds (r.removeFromTop (textHeight (flStatus, w, 22)));
@@ -380,8 +391,10 @@ private:
         markSetupWizardDone();
         if (runningAsAppImage())
             setAppImageMenuEntry (menuEntry.getToggleState());
-        if (! scanStarted)
-            engine.getPluginHost().startBackgroundScan(); // keeps going after the window closes
+        // (keeps going after the window closes) only when asked for: with "every start" unticked, nothing scans here
+        // (round 190fp: a scan can bring up one licence box per expired plugin)
+        if (autoscan::onWizardFinish (scanAtStart.getToggleState(), scanStarted))
+            engine.getPluginHost().startBackgroundScan();
         const auto chosen = languageBox.getSelectedId() - 1;
         const auto& languages = i18n::languages();
         const auto language = chosen >= 0 && chosen < (int) languages.size() ? juce::String (languages[(std::size_t) chosen].id) : i18n::saved();
@@ -434,6 +447,8 @@ private:
         foldersLabel { tr ("Plugin folders ({0})", { platform::pluginFormatNames() }) };
     juce::ComboBox languageBox;
     juce::AudioDeviceSelectorComponent devices;
+    std::unique_ptr<juce::Component> audioCheck; // (round 190gh, B23)
+    bool persistentDevices = true;
     juce::StringArray folderList;
     juce::ListBox folders;
     juce::TextButton addFolder { tr ("Add folder...") }, removeFolder { tr ("Remove") }, resetFolders { tr ("Suggested folders") };

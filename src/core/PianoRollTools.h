@@ -157,7 +157,7 @@ struct ArticulateOptions
 enum class ArticulatePreset { legato, portato, staccato, smallGaps, chopChordsOnly };
 ArticulateOptions articulatePreset (ArticulatePreset preset) noexcept;
 // Returns the indices of the processed notes after the change (chop chords adds notes).
-void articulate (Pattern& pattern, const std::vector<int>& indices, const ArticulateOptions& options, int beatsPerBar);
+void articulate (Pattern& pattern, const std::vector<int>& indices, const ArticulateOptions& options, Meter meter);
 
 // --- chord progression (LYNX's own generator) ------------------------------------------------
 struct Chord
@@ -254,5 +254,5 @@ int builtInRiffChordCount() noexcept;
 
 // Runs the chain. Without `onExistingNotes`, the channel's notes in `indices` are replaced by one note of `bars`
 // bars at key 48 before the steps run. Returns the indices of the riff's notes.
-std::vector<int> riffMachine (Pattern& pattern, const std::vector<int>& indices, const RiffOptions& options, int beatsPerBar);
+std::vector<int> riffMachine (Pattern& pattern, const std::vector<int>& indices, const RiffOptions& options, Meter meter);
 } // namespace lynx::prtools

@@ -241,7 +241,7 @@ TEST (issues178a_tempo_events_in_pattern_mode)
     CHECK (song.tempoAt (ppq) == 130.0);
 
     p.events.push_back (issues178a::tempoLane ({ { ppq, 140.0 }, { 3 * ppq, 90.0 } }));
-    const auto length = (double) p.effectiveLength (song.beatsPerBar);
+    const auto length = (double) p.effectiveLength (song.meter());
     CHECK (tempomap::active (song));
     CHECK (song.tempoAt (0.0) == 130.0);                                // before the first event
     CHECK (issues178a::near (song.tempoAt (ppq), 140.0));

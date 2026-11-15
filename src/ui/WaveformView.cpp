@@ -1,4 +1,7 @@
 #include "ui/WaveformView.h"
+
+#include "core/SamplerPage.h"
+#include "core/Spectrogram.h"
 #include "platform/Paths.h"
 
 #include <algorithm>
@@ -638,6 +641,47 @@ void WaveformDisplay::setEmptyText (const juce::String& text)
     repaint();
 }
 
+void WaveformDisplay::setFollowsSamplerViews (bool follows)
+{
+    samplerViews = follows;
+    repaint();
+}
+
+void WaveformDisplay::paintSpectrum (juce::Graphics& g, juce::Rectangle<float> inner, const SampleData& data)
+{
+    // one analysis column per pixel of the view (display order: a reversed sample reads backwards), kept until the
+    // file, the view or the size changes
+    const auto width = juce::jmax (1, juce::roundToInt (inner.getWidth())), height = juce::jmax (1, juce::roundToInt (inner.getHeight()));
+    const auto frames = (double) data.frames();
+    const auto key = path + "|" + juce::String (data.frames()) + "|" + juce::String (viewStart, 6) + "|" + juce::String (viewEnd, 6) + "|"
+                     + juce::String (width) + "x" + juce::String (height) + (reversed ? "|r" : "");
+    if (key != spectrumKey || ! spectrumImage.isValid())
+    {
+        const auto from = reversed ? frames * (1.0 - viewEnd) : frames * viewStart;
+        const auto to = reversed ? frames * (1.0 - viewStart) : frames * viewEnd;
+        const auto cells = spectrogram::compute (data.leftData(), data.isStereo() ? data.rightData() : nullptr, (std::int64_t) data.frames(), from, to, width);
+        spectrumImage = juce::Image (juce::Image::RGB, width, height, true);
+        if (cells.columns == width && cells.bins > 0)
+        {
+            juce::Image::BitmapData pixels (spectrumImage, juce::Image::BitmapData::writeOnly);
+            for (int x = 0; x < width; ++x)
+            {
+                const auto column = reversed ? width - 1 - x : x;
+                for (int y = 0; y < height; ++y)
+                {
+                    // frequency up, linear: the bottom row is 0 Hz, the top one the highest bin
+                    const auto bin = juce::jlimit (0, cells.bins - 1, (int) ((double) (height - 1 - y) / (double) height * cells.bins));
+                    const auto level = cells.level[(std::size_t) column * (std::size_t) cells.bins + (std::size_t) bin];
+                    pixels.setPixelColour (x, y, juce::Colour (spectrogram::colourOf (level)));
+                }
+            }
+        }
+        spectrumKey = key;
+    }
+    g.setOpacity (1.0f); // (drawImage takes the current colour's alpha: the centre line's is faint)
+    g.drawImage (spectrumImage, inner);
+}
+
 void WaveformDisplay::paint (juce::Graphics& g)
 {
     using namespace theme;
@@ -677,8 +721,28 @@ void WaveformDisplay::paint (juce::Graphics& g)
                     juce::Justification::centredRight, false);
         g.setFont (font (type::small));
     }
-    paintWaveform (g, inner, *summary, reversed ? frames * (1.0 - viewStart) : frames * viewStart, reversed ? -perPixel : perPixel,
-                   currentWaveStyle (colour::audioClip.brighter (0.3f), normalisingGain (*summary)));
+    // round 190gw: FL's Sampler view switches (the spectrogram wins when both are on)
+    const auto& views = samplerpage::waveViews();
+    const auto data = samplerViews && views.spectrum && source != nullptr ? source() : nullptr;
+    if (data != nullptr && data->frames() > 0)
+    {
+        paintSpectrum (g, inner, *data);
+        if (watermark.isNotEmpty()) // (FL's faded name shows over the spectrogram too)
+        {
+            g.setColour (colour::textSecondary.withAlpha (0.22f));
+            g.setFont (font (juce::jlimit (14.0f, 34.0f, inner.getHeight() * 0.24f)));
+            g.drawText (watermark, inner.reduced (10.0f, 4.0f).removeFromTop (juce::jlimit (18.0f, 44.0f, inner.getHeight() * 0.32f)),
+                        juce::Justification::centredRight, false);
+            g.setFont (font (type::small));
+        }
+    }
+    else
+    {
+        auto style = currentWaveStyle (colour::audioClip.brighter (0.3f), normalisingGain (*summary));
+        if (samplerViews && views.multichannel)
+            style.stereo = true;
+        paintWaveform (g, inner, *summary, reversed ? frames * (1.0 - viewStart) : frames * viewStart, reversed ? -perPixel : perPixel, style);
+    }
 
     // the part outside the region is dimmed; its edges are marked in the accent colour
     if (regionStart > 0.0f || regionEnd < 1.0f)

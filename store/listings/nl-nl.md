@@ -39,13 +39,14 @@ LYNX SHARE is in alfa: verwacht nog wat ruwe randjes en meld problemen alsjeblie
 
 ## What's new
 
-LYNX SHARE 0.1.27: effecten bijgesteld om dichter bij de plugins te klinken waarop ze zijn gebaseerd, terwijl
-opgeslagen projecten hun geluid behouden; het true-peakplafond van Apex Limiter hersteld; meer tools van FL Studio
-(Instellingen voor afstandsbediening, automatiseringscurves, Edison op een mixerslot, de Sampler-pagina met
-loop-punten en crossfade, het audioclipmenu); een Sessiemixer, een Drum Rack, scènes en toewijzingsmodi voor het
-clipraster, en veel eigen devices van Ableton Live geopend vanuit .als-sets; DW Sampler, Slicer en meer effecten uit
-FL Studio Mobile-projecten; een tabblad Effecten, een Akkoordpad en een rondleiding voor het eerste nummer in de
-Eenvoudige werkwijze; een crashbeveiliging voor plugins op Linux en macOS; een nieuw logo; en veel fixes.
+LYNX SHARE 0.1.28: sneller en lichter, met het venster in ongeveer een seconde klaar, grote projecten die sneller
+openen en minder geheugen gebruiken, soepeler afspelen, stems die in één keer worden geëxporteerd en vooruit renderen
+voor zware projecten bij kleine buffers; Ableton Link; Freeze en Bounce in de Clipstart-werkwijze; clip-envelopes;
+samples die op plugins worden gesleept; meer eigen devices van Ableton Live die uit .als-sets worden geopend;
+fabrieksgeluiden van FL Studio Mobile uit je eigen kopie van de app; een Sampler met 16 pads in de Eenvoudige
+werkwijze; Preset opslaan voor de ingebouwde instrumenten; een experimentele Remote Control API; Playlist-tracks die
+aan hun rand van grootte veranderen, Ctrl+klik om meerdere tracks te selecteren, en Playlist-tracks gekoppeld aan
+mixertracks; en veel fixes.
 
 ## Features
 

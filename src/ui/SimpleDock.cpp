@@ -1,6 +1,7 @@
 #include "ui/SimpleDock.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <set>
 
@@ -9,6 +10,7 @@
 #include "core/GoalKnobs.h"
 #include "core/KeyFollow.h"
 #include "core/MixerOps.h"
+#include "core/SimplePads.h"
 #include "core/SimpleTracks.h"
 #include "core/SoundLibrary.h"
 #include "engine/AudioEngine.h"
@@ -16,6 +18,7 @@
 #include "engine/ProjectFile.h"
 #include "platform/Paths.h"
 #include "ui/FileChoosers.h"
+#include "ui/BrowserComponent.h"
 #include "ui/I18n.h"
 #include "ui/MixerComponent.h"
 #include "ui/QuickPick.h"
@@ -256,6 +259,18 @@ public:
                 });
         };
         addAndMakeVisible (blend);
+        // round 190fo: the track's send into the shared "Reverb" insert (the original's per-track Reverb knob)
+        styleCaption (reverbCaption, tr ("Reverb"));
+        addAndMakeVisible (reverbCaption);
+        reverb.resetValue = 0.0f;
+        reverb.setTooltip (tr ("How much of the track goes to the shared reverb (one Reverb insert for every track)"));
+        reverb.setTitle (tr ("Reverb"));
+        reverb.onChange = [this] (float v) {
+            const auto t = insert;
+            if (t > 0)
+                engine.editSong ([t, v] (Song& s) { simpletracks::setReverbSend (s, t, v < 0.005f ? 0.0f : v); });
+        };
+        addAndMakeVisible (reverb);
 
         view.setViewedComponent (&strip, false);
         view.setScrollBarsShown (false, true);
@@ -291,6 +306,8 @@ public:
         const bool has = insert >= 0 && insert < (int) song.mixer.size();
         presetButton.setEnabled (has);
         blend.setEnabled (has);
+        reverb.setEnabled (has && insert > 0 && insert != simpletracks::sharedReverb (song));
+        reverb.setValue (has ? simpletracks::reverbSend (song, insert) : 0.0f);
         addCard.setEnabled (has);
         if (! has)
         {
@@ -342,8 +359,12 @@ public:
         row.removeFromRight (6);
         presetButton.setBounds (row);
         side.removeFromTop (10);
-        blendCaption.setBounds (side.removeFromTop (16));
-        blend.setBounds (side.removeFromTop (juce::jmin (84, side.getHeight())).withWidth (72));
+        auto captions = side.removeFromTop (16);
+        auto knobs = side.removeFromTop (juce::jmin (84, side.getHeight()));
+        blendCaption.setBounds (captions.removeFromLeft (90));
+        blend.setBounds (knobs.removeFromLeft (90).withWidth (72));
+        reverbCaption.setBounds (captions);
+        reverb.setBounds (knobs.withWidth (72));
         r.removeFromLeft (pad);
         view.setBounds (r);
         layoutStrip();
@@ -555,6 +576,7 @@ public:
             cards[(std::size_t) card]->knob.turnTo (v);
     }
     void blendForCheck (float v) { blend.turnTo (v); }
+    void reverbForCheck (float v) { reverb.turnTo (v); }
     const juce::Component* cardForSnapshot (int card) const
     {
         return card >= 0 && card < (int) cards.size() ? cards[(std::size_t) card].get() : nullptr;
@@ -753,10 +775,10 @@ private:
     }
 
     EffectsPanel slotActions;
-    juce::Label presetCaption, blendCaption, emptyHint;
+    juce::Label presetCaption, blendCaption, reverbCaption, emptyHint;
     juce::TextButton presetButton, saveButton;
     AddCardButton addCard;
-    DockKnob blend;
+    DockKnob blend, reverb;
     juce::Viewport view;
     Strip strip { *this };
     std::vector<std::unique_ptr<Card>> cards;
@@ -1474,6 +1496,926 @@ private:
     std::set<int> made; // channels whose pattern this page made once (an undo then asks, it doesn't make it again)
 };
 
+// =====================================================================================================================
+// Pads (round 190fo): the Sampler track's 16 pads (core/SimplePads.h)
+// =====================================================================================================================
+namespace
+{
+// LYNX's own pad colours (index 1…8; 0 = the track's colour)
+juce::Colour padColour (int index, juce::Colour track)
+{
+    static const juce::uint32 palette[simplepads::colourCount] { 0xffe5383b, 0xffe8833a, 0xffe2c044, 0xff5fbf6a,
+                                                                0xff3fb6b0, 0xff4f8ee0, 0xff9a6fe0, 0xffe06aa8 };
+    return index >= 1 && index <= simplepads::colourCount ? juce::Colour (palette[index - 1]) : track;
+}
+
+juce::String padColourName (int index)
+{
+    switch (index)
+    {
+        case 1: return trc ("@colour: Red");
+        case 2: return trc ("@colour: Orange");
+        case 3: return trc ("@colour: Yellow");
+        case 4: return trc ("@colour: Green");
+        case 5: return trc ("@colour: Teal");
+        case 6: return trc ("@colour: Blue");
+        case 7: return trc ("@colour: Violet");
+        case 8: return trc ("@colour: Pink");
+        default: break;
+    }
+    return tr ("Track colour");
+}
+
+// the pad knobs' names
+juce::String padKnobName (int k)
+{
+    switch (k)
+    {
+        case 0: return tr ("Attack");
+        case 1: return tr ("Release");
+        case 2: return tr ("Tone");
+        case 3: return tr ("Pitch");
+        case 4: return trc ("@mixer: Pan");
+        default: break;
+    }
+    return trc ("@mixer: Volume");
+}
+
+juce::String modeText (simplepads::Mode m)
+{
+    return m == simplepads::Mode::gate ? trc ("@pad mode: Gate") : m == simplepads::Mode::oneShot ? tr ("One-shot") : trc ("@pad mode: Loop");
+}
+
+juce::String toneLabel (float tone)
+{
+    const auto t = simplepads::toneFilter (tone);
+    if (! t.on)
+        return tr ("Off");
+    const auto hz = t.cutoff >= 1000.0f ? juce::String (t.cutoff / 1000.0f, 1) + " kHz" : juce::String (juce::roundToInt (t.cutoff)) + " Hz";
+    return (t.filterType == 0 ? tr ("Low-pass") : tr ("High-pass")) + " " + hz;
+}
+
+// the knobs' laws: the dock's knob is 0…1
+float attackFrom (float v) { return v * v * simplepads::maxAttack; }
+float attackTo (float s) { return std::sqrt (juce::jlimit (0.0f, 1.0f, s / simplepads::maxAttack)); }
+float releaseFrom (float v) { return v * v * simplepads::maxRelease; }
+float releaseTo (float s) { return std::sqrt (juce::jlimit (0.0f, 1.0f, s / simplepads::maxRelease)); }
+juce::String secondsText (float s) { return s < 1.0f ? juce::String (juce::roundToInt (s * 1000.0f)) + " ms" : juce::String (s, 2) + " s"; }
+juce::String panText (float pan)
+{
+    const auto p = juce::roundToInt (pan * 100.0f);
+    return p == 0 ? tr ("Centre") : p < 0 ? "L " + juce::String (-p) : "R " + juce::String (p);
+}
+juce::String pitchText (float semis)
+{
+    const auto cents = juce::roundToInt (semis * 100.0f);
+    if (cents % 100 == 0)
+        return (cents > 0 ? "+" : "") + juce::String (cents / 100) + " st";
+    return (semis > 0.0f ? "+" : "") + juce::String (semis, 2) + " st";
+}
+} // namespace
+
+class SimpleDock::PadsPage final : public juce::Component,
+                                   public juce::FileDragAndDropTarget,
+                                   public juce::DragAndDropTarget,
+                                   private juce::Timer
+{
+public:
+    explicit PadsPage (AudioEngine& e) : engine (e)
+    {
+        load.setButtonText (tr ("Import..."));
+        load.setTooltip (tr ("Put an audio file on the selected pad"));
+        load.onClick = [this] { chooseFile (selected); };
+        browse.setButtonText (tr ("Browse sounds"));
+        browse.setTooltip (tr ("The sample browser: drag a sound onto a pad"));
+        browse.onClick = [this] {
+            if (onBrowse)
+                onBrowse();
+        };
+        kit.setButtonText (tr ("Kit"));
+        kit.setTooltip (tr ("Save the pads as a kit, open one of your kits, or fill the pads from a folder"));
+        kit.onClick = [this] { showKitMenu(); };
+        reverse.setButtonText (tr ("Reverse"));
+        reverse.onClick = [this] { edit ([on = reverse.getToggleState()] (ChannelDef& c) { c.sampler.reverse = on; }); };
+        normalize.setButtonText (tr ("Normalize"));
+        normalize.setTooltip (tr ("Brings the pad's loudest point to full level"));
+        normalize.onClick = [this] { normalizePad(); };
+        group.setTooltip (tr ("Pads of the same group cut each other off (an open and a closed hi-hat)"));
+        group.onClick = [this] { showGroupMenu(); };
+        for (int m = 0; m < 3; ++m)
+        {
+            auto& b = modes[(std::size_t) m];
+            b.setButtonText (modeText ((simplepads::Mode) m));
+            b.setClickingTogglesState (true);
+            b.setRadioGroupId (1902);
+            b.onClick = [this, m, &b] {
+                if (b.getToggleState())
+                    edit ([m] (ChannelDef& c) { c.simplePad.mode = (std::uint8_t) m; });
+            };
+            addAndMakeVisible (b);
+        }
+        modes[0].setTooltip (tr ("Plays while the key is held"));
+        modes[1].setTooltip (tr ("Plays to its end, however short the hit"));
+        modes[2].setTooltip (tr ("Repeats while the key is held"));
+
+        for (int k = 0; k < knobCount; ++k)
+        {
+            auto& knob = knobs[(std::size_t) k];
+            styleCaption (captions[(std::size_t) k], padKnobName (k));
+            captions[(std::size_t) k].setJustificationType (juce::Justification::centred);
+            addAndMakeVisible (captions[(std::size_t) k]);
+            knob.onChange = [this, k] (float v) { turn (k, v); };
+            addAndMakeVisible (knob);
+        }
+        knobs[0].resetValue = 0.0f;
+        knobs[0].valueText = [] (float v) { return secondsText (attackFrom (v)); };
+        knobs[1].resetValue = 0.0f;
+        knobs[1].valueText = [] (float v) { return secondsText (releaseFrom (v)); };
+        knobs[2].valueText = [] (float v) { return toneLabel (v * 2.0f - 1.0f); };
+        knobs[3].valueText = [] (float v) { return pitchText ((v * 2.0f - 1.0f) * simplepads::maxPitch); };
+        knobs[4].valueText = [] (float v) { return panText (v * 2.0f - 1.0f); };
+        knobs[5].resetValue = 0.78f;
+        knobs[2].setTooltip (tr ("Left: darker (low-pass). Right: thinner (high-pass). Middle: off"));
+        knobs[3].setTooltip (tr ("In semitones; Shift + drag for cents"));
+        for (auto* c : std::initializer_list<juce::Component*> { &load, &browse, &kit, &reverse, &normalize, &group })
+            addAndMakeVisible (c);
+        setWantsKeyboardFocus (false);
+    }
+
+    std::function<void()> onBrowse;
+
+    void show (int newTrack)
+    {
+        track = newTrack;
+        update();
+    }
+
+    void update()
+    {
+        const auto& song = engine.getSong();
+        channels = simplepads::padChannels (song, track);
+        const auto c = channelOf (selected);
+        const bool has = c != nullptr && ! c->samplePath.empty();
+        if (c != nullptr)
+        {
+            const auto mode = simplepads::modeOf (*c);
+            modes[(std::size_t) mode].setToggleState (true, juce::dontSendNotification);
+            knobs[0].setValue (attackTo (c->sampler.attack));
+            knobs[1].setValue (releaseTo (c->simplePad.release));
+            knobs[2].setValue ((c->simplePad.tone + 1.0f) * 0.5f);
+            knobs[3].setValue ((c->sampler.pitch / simplepads::maxPitch + 1.0f) * 0.5f);
+            knobs[4].setValue ((c->pan + 1.0f) * 0.5f);
+            knobs[5].setValue (c->volume);
+            reverse.setToggleState (c->sampler.reverse, juce::dontSendNotification);
+            group.setButtonText (tr ("Group: {0}", { c->simplePad.group > 0 ? juce::String (c->simplePad.group) : tr ("None") }));
+            knobs[1].setDimmed (mode == simplepads::Mode::oneShot);
+        }
+        for (auto* comp : std::initializer_list<juce::Component*> { &reverse, &normalize, &group, &modes[0], &modes[1], &modes[2] })
+            comp->setEnabled (has);
+        for (auto& k : knobs)
+            k.setEnabled (has);
+        waveFor = {};
+        resized();
+        repaint();
+    }
+
+    int selectedPad() const noexcept { return selected; }
+    void select (int pad)
+    {
+        selected = juce::jlimit (0, simplepads::padCount - 1, pad);
+        update();
+    }
+    // a click on pad `pad`, as the mouse does (tests, --reabl190foshot)
+    void hit (int pad)
+    {
+        select (pad);
+        lightPad (selected);
+        if (const auto ch = channelIndex (selected); ch >= 0 && hasSound (selected))
+        {
+            engine.sendLiveNote (ch, simplepads::padKey, 0.8f, true, true);
+            engine.sendLiveNote (ch, simplepads::padKey, 0.0f, false, true);
+        }
+        repaint();
+    }
+    // tests / shots: the same edits the controls make
+    void loadFileForCheck (int pad, const juce::File& file) { loadFile (pad, file); }
+    void turnForCheck (int knob, float v) { knobs[(std::size_t) knob].turnTo (v); }
+    void setModeForCheck (int mode) // (the button's own edit, at once: triggerClick would post it)
+    {
+        modes[(std::size_t) mode].setToggleState (true, juce::dontSendNotification);
+        edit ([mode] (ChannelDef& c) { c.simplePad.mode = (std::uint8_t) mode; });
+    }
+    void dragPadForCheck (int from, int to, bool copy) { dropPad (from, to, copy); }
+    void setRegionForCheck (float start, float end)
+    {
+        edit ([start, end] (ChannelDef& c) {
+            c.sampler.regionStart = start;
+            c.sampler.regionEnd = end;
+        });
+    }
+    void normalizeForCheck() { normalizePad(); }
+    juce::PopupMenu kitMenuForSnapshot() { return kitMenu(); }
+    juce::PopupMenu padMenuForSnapshot (int pad) { return padMenu (pad); }
+
+    void paint (juce::Graphics& g) override
+    {
+        const auto& song = engine.getSong();
+        const auto trackColour = juce::Colour (track >= 0 && track < (int) song.playlistTracks.size() && song.playlistTracks[(std::size_t) track].colour != 0
+                                                   ? song.playlistTracks[(std::size_t) track].colour
+                                                   : simpletracks::defaultColour (simpletracks::Kind::pads));
+        for (int p = 0; p < simplepads::padCount; ++p)
+        {
+            const auto r = padBounds (p).toFloat();
+            const auto* c = channelOf (p);
+            const bool has = c != nullptr && ! c->samplePath.empty();
+            const auto tint = padColour (c != nullptr ? c->simplePad.colour : 0, trackColour);
+            const bool lit = flash[(std::size_t) p] > 0;
+            if (has)
+            {
+                fillRoundRect (g, r, radius::md, tint.withMultipliedBrightness (lit ? 1.0f : 0.55f).withMultipliedSaturation (lit ? 1.0f : 0.8f));
+                g.setColour (lit ? colour::onAccent : colour::textPrimary);
+                g.setFont (font (type::small, true));
+                g.drawFittedText (utf8 (c->name), r.reduced (6.0f, 4.0f).withTrimmedTop (12.0f).toNearestInt(), juce::Justification::centredLeft, 2, 0.8f);
+            }
+            else
+            {
+                fillRoundRect (g, r, radius::md, p == dropTarget ? colour::bg4 : colour::bg2);
+                juce::Path frame, dashed;
+                frame.addRoundedRectangle (r.reduced (0.5f), radius::md);
+                const float dashes[] { 3.0f, 3.0f };
+                juce::PathStrokeType (1.0f).createDashedStroke (dashed, frame, dashes, 2);
+                g.setColour (colour::borderStrong);
+                g.fillPath (dashed);
+                g.setColour (colour::textDisabled);
+                g.fillRect (juce::Rectangle<float> (10.0f, 1.5f).withCentre (r.getCentre()));
+                g.fillRect (juce::Rectangle<float> (1.5f, 10.0f).withCentre (r.getCentre()));
+            }
+            // the typing key that plays it, top left
+            g.setColour (has ? colour::onAccent.withAlpha (0.75f) : colour::textSecondary);
+            g.setFont (font (type::caption, true));
+            g.drawText (juce::String::charToString ((juce::juce_wchar) simplepads::typingKey (p)), r.reduced (6.0f, 3.0f).toNearestInt(),
+                        juce::Justification::topLeft, false);
+            if (p == selected)
+            {
+                g.setColour (colour::accent);
+                g.drawRoundedRectangle (r.reduced (1.0f), radius::md, 2.0f);
+            }
+            if (p == dropTarget)
+            {
+                g.setColour (colour::textPrimary);
+                g.drawRoundedRectangle (r.reduced (2.5f), radius::md, 1.0f);
+            }
+        }
+
+        // the selected pad: its title and its waveform with the played region
+        const auto* c = channelOf (selected);
+        const bool has = c != nullptr && ! c->samplePath.empty();
+        g.setColour (colour::textPrimary);
+        g.setFont (font (type::body, true));
+        const auto title = tr ("Pad {0}", { juce::String (selected + 1) })
+                           + (has ? juce::String::fromUTF8 (" \xc2\xb7 ") + utf8 (c->name) : juce::String())
+                           + juce::String::fromUTF8 ("  \xc2\xb7  ") + tr ("key {0}", { juce::String::charToString ((juce::juce_wchar) simplepads::typingKey (selected)) });
+        g.drawFittedText (title, titleArea, juce::Justification::centredLeft, 1, 0.8f);
+        const auto w = waveArea.toFloat();
+        fillRoundRect (g, w, radius::md, colour::bg0);
+        if (! has)
+        {
+            g.setColour (colour::textSecondary);
+            g.setFont (font (type::small));
+            g.drawFittedText (tr ("Drop a sound on a pad, import a file or browse the sounds. Click a pad or press its key to play it."),
+                              waveArea.reduced (10, 4), juce::Justification::centred, 2, 0.9f);
+            return;
+        }
+        drawWave (g, *c, w);
+    }
+
+    void resized() override
+    {
+        auto r = getLocalBounds().reduced (pad, 6);
+        const auto side = juce::jlimit (34, 64, (r.getHeight() - 3 * 4) / 4);
+        gridArea = r.removeFromLeft (side * 4 + 3 * 4).withHeight (side * 4 + 3 * 4);
+        r.removeFromLeft (14);
+        auto top = r.removeFromTop (26);
+        kit.setBounds (top.removeFromRight (64));
+        top.removeFromRight (6);
+        browse.setBounds (top.removeFromRight (124));
+        top.removeFromRight (6);
+        load.setBounds (top.removeFromRight (84));
+        titleArea = top;
+        r.removeFromTop (4);
+        auto controls = r.removeFromBottom (juce::jmin (84, r.getHeight() / 2 + 8));
+        waveArea = r.reduced (0, 2);
+        auto row = controls.removeFromTop (24);
+        for (auto& b : modes)
+            b.setBounds (row.removeFromLeft (84)), row.removeFromLeft (2);
+        row.removeFromLeft (10);
+        reverse.setBounds (row.removeFromLeft (84));
+        row.removeFromLeft (6);
+        normalize.setBounds (row.removeFromLeft (92));
+        row.removeFromLeft (6);
+        group.setBounds (row.removeFromLeft (110));
+        controls.removeFromTop (4);
+        const auto kw = juce::jmin (78, controls.getWidth() / knobCount);
+        for (int k = 0; k < knobCount; ++k)
+        {
+            auto cell = controls.removeFromLeft (kw);
+            captions[(std::size_t) k].setBounds (cell.removeFromTop (13));
+            knobs[(std::size_t) k].setBounds (cell);
+        }
+    }
+
+    void mouseDown (const juce::MouseEvent& e) override
+    {
+        dragFrom = -1;
+        regionDrag = 0;
+        if (const auto p = padAt (e.getPosition()); p >= 0)
+        {
+            if (e.mods.isPopupMenu())
+            {
+                select (p);
+                padMenu (p).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+                return;
+            }
+            dragFrom = p;
+            // a click plays the pad while the button is held (a Gate pad stops when it is let go)
+            select (p);
+            lightPad (p);
+            if (const auto ch = channelIndex (p); ch >= 0 && hasSound (p))
+            {
+                engine.sendLiveNote (ch, simplepads::padKey, 0.8f, true, true);
+                heldChannel = ch;
+            }
+            return;
+        }
+        if (waveArea.contains (e.getPosition()))
+        {
+            const auto* c = channelOf (selected);
+            if (c == nullptr || c->samplePath.empty())
+                return;
+            const auto x = (float) (e.x - waveArea.getX()) / (float) juce::jmax (1, waveArea.getWidth());
+            regionDrag = std::abs (x - c->sampler.regionStart) <= std::abs (x - c->sampler.regionEnd) ? 1 : 2;
+            mouseDrag (e);
+        }
+    }
+    void mouseDrag (const juce::MouseEvent& e) override
+    {
+        if (regionDrag != 0)
+        {
+            const auto x = juce::jlimit (0.0f, 1.0f, (float) (e.x - waveArea.getX()) / (float) juce::jmax (1, waveArea.getWidth()));
+            const bool start = regionDrag == 1;
+            edit ([x, start] (ChannelDef& c) {
+                if (start)
+                    c.sampler.regionStart = juce::jmin (x, c.sampler.regionEnd - 0.01f);
+                else
+                    c.sampler.regionEnd = juce::jmax (x, c.sampler.regionStart + 0.01f);
+            });
+            return;
+        }
+        if (dragFrom >= 0 && e.getDistanceFromDragStart() > 6)
+        {
+            const auto over = padAt (e.getPosition());
+            if (over != dropTarget)
+            {
+                dropTarget = over == dragFrom ? -1 : over;
+                repaint();
+            }
+        }
+    }
+    void mouseUp (const juce::MouseEvent& e) override
+    {
+        if (heldChannel >= 0)
+        {
+            engine.sendLiveNote (heldChannel, simplepads::padKey, 0.0f, false, true);
+            heldChannel = -1;
+        }
+        if (dragFrom >= 0 && dropTarget >= 0)
+            dropPad (dragFrom, dropTarget, e.mods.isAltDown());
+        dragFrom = dropTarget = -1;
+        regionDrag = 0;
+        repaint();
+    }
+
+    // files from the system and sounds from LYNX's browser land on the pad under the pointer
+    bool isInterestedInFileDrag (const juce::StringArray& files) override { return track >= 0 && ! files.isEmpty(); }
+    void fileDragMove (const juce::StringArray&, int x, int y) override { setDropTarget (padAt ({ x, y })); }
+    void fileDragExit (const juce::StringArray&) override { setDropTarget (-1); }
+    void filesDropped (const juce::StringArray& files, int x, int y) override
+    {
+        auto at = padAt ({ x, y });
+        setDropTarget (-1);
+        if (at < 0)
+            at = selected;
+        // several files fill the pads from there on
+        for (const auto& f : files)
+            if (SampleLibrary::isSampleFile (juce::File (f)) && at < simplepads::padCount)
+                loadFile (at++, juce::File (f));
+    }
+    bool isInterestedInDragSource (const SourceDetails& d) override
+    {
+        return track >= 0 && BrowserComponent::isBrowserDrag (d) && SampleLibrary::isSampleFile (BrowserComponent::draggedFile (d));
+    }
+    void itemDragMove (const SourceDetails& d) override { setDropTarget (padAt (d.localPosition)); }
+    void itemDragExit (const SourceDetails&) override { setDropTarget (-1); }
+    void itemDropped (const SourceDetails& d) override
+    {
+        const auto at = padAt (d.localPosition);
+        setDropTarget (-1);
+        loadFile (at >= 0 ? at : selected, BrowserComponent::draggedFile (d));
+    }
+
+    // a short light on a pad played by a key or a click (a timer runs only while a pad is lit)
+    void timerCallback() override
+    {
+        bool any = false;
+        for (auto& f : flash)
+            if (f > 0)
+                --f, any = true;
+        repaint();
+        if (! any)
+            stopTimer();
+    }
+    void lightPad (int pad)
+    {
+        if (pad >= 0 && pad < simplepads::padCount)
+        {
+            flash[(std::size_t) pad] = 5;
+            repaint();
+            if (! isTimerRunning())
+                startTimerHz (30);
+        }
+    }
+
+private:
+    static constexpr int knobCount = 6;
+
+    const ChannelDef* channelOf (int p) const
+    {
+        const auto& song = engine.getSong();
+        const auto i = p >= 0 && p < (int) channels.size() ? channels[(std::size_t) p] : -1;
+        return i >= 0 && i < (int) song.channels.size() ? &song.channels[(std::size_t) i] : nullptr;
+    }
+    int channelIndex (int p) const { return p >= 0 && p < (int) channels.size() ? channels[(std::size_t) p] : -1; }
+    bool hasSound (int p) const
+    {
+        const auto* c = channelOf (p);
+        return c != nullptr && ! c->samplePath.empty();
+    }
+
+    // the grid: pad 0 bottom left, pad 15 top right (the keys' shape)
+    juce::Rectangle<int> padBounds (int p) const
+    {
+        const auto side = (gridArea.getWidth() - 3 * 4) / 4;
+        const auto col = p % 4, row = 3 - p / 4;
+        return { gridArea.getX() + col * (side + 4), gridArea.getY() + row * (side + 4), side, side };
+    }
+    int padAt (juce::Point<int> pos) const
+    {
+        for (int p = 0; p < simplepads::padCount; ++p)
+            if (padBounds (p).contains (pos))
+                return p;
+        return -1;
+    }
+    void setDropTarget (int p)
+    {
+        if (p != dropTarget)
+        {
+            dropTarget = p;
+            repaint();
+        }
+    }
+
+    std::int64_t framesOf (const ChannelDef& c)
+    {
+        if (c.samplePath.empty())
+            return 0;
+        const auto data = engine.getSampleLibrary().load (utf8 (c.samplePath));
+        return data != nullptr ? (std::int64_t) data->frames() : 0;
+    }
+
+    // one undoable edit of the selected pad's channel; the pad's own settings are applied to the channel after it
+    void edit (const std::function<void (ChannelDef&)>& change, int pad = -1)
+    {
+        const auto p = pad >= 0 ? pad : selected;
+        const auto ch = channelIndex (p);
+        if (ch < 0)
+            return;
+        const auto frames = framesOf (engine.getSong().channels[(std::size_t) ch]);
+        engine.editSong ([ch, change, frames] (Song& s) {
+            if (ch < (int) s.channels.size())
+            {
+                change (s.channels[(std::size_t) ch]);
+                simplepads::apply (s.channels[(std::size_t) ch], frames);
+            }
+        });
+        update();
+    }
+
+    void turn (int k, float v)
+    {
+        switch (k)
+        {
+            case 0: edit ([s = attackFrom (v)] (ChannelDef& c) { c.sampler.attack = s; }); break;
+            case 1: edit ([s = releaseFrom (v)] (ChannelDef& c) { c.simplePad.release = s; }); break;
+            case 2: edit ([t = v * 2.0f - 1.0f] (ChannelDef& c) { c.simplePad.tone = std::abs (t) < 0.02f ? 0.0f : t; }); break;
+            case 3: edit ([p = (v * 2.0f - 1.0f) * simplepads::maxPitch] (ChannelDef& c) { c.sampler.pitch = p; }); break;
+            case 4: edit ([p = v * 2.0f - 1.0f] (ChannelDef& c) { c.pan = std::abs (p) < 0.01f ? 0.0f : p; }); break;
+            default: edit ([v] (ChannelDef& c) { c.volume = v; }); break;
+        }
+    }
+
+    // the same value on every pad (the knob's menu): what the original's "copy value to other pads" does
+    void copyKnobToAll (int k)
+    {
+        const auto* src = channelOf (selected);
+        if (src == nullptr)
+            return;
+        const auto from = *src;
+        const auto chans = channels;
+        std::vector<std::int64_t> frames;
+        for (auto ch : chans)
+            frames.push_back (ch >= 0 ? framesOf (engine.getSong().channels[(std::size_t) ch]) : 0);
+        engine.editSong ([k, from, chans, frames] (Song& s) {
+            for (std::size_t i = 0; i < chans.size(); ++i)
+            {
+                if (chans[i] < 0 || chans[i] >= (int) s.channels.size())
+                    continue;
+                auto& c = s.channels[(std::size_t) chans[i]];
+                switch (k)
+                {
+                    case 0: c.sampler.attack = from.sampler.attack; break;
+                    case 1: c.simplePad.release = from.simplePad.release; break;
+                    case 2: c.simplePad.tone = from.simplePad.tone; break;
+                    case 3: c.sampler.pitch = from.sampler.pitch; break;
+                    case 4: c.pan = from.pan; break;
+                    default: c.volume = from.volume; break;
+                }
+                simplepads::apply (c, frames[i]);
+            }
+        });
+        update();
+    }
+
+    void loadFile (int p, const juce::File& file)
+    {
+        if (p < 0 || ! file.existsAsFile())
+            return;
+        const auto data = engine.getSampleLibrary().load (file.getFullPathName());
+        if (data == nullptr)
+        {
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not import"),
+                                                    tr ("Could not read {0}", { file.getFileName() }));
+            return;
+        }
+        const auto t = track;
+        const auto path = file.getFullPathName().toStdString(), name = file.getFileNameWithoutExtension().toStdString();
+        const auto frames = (std::int64_t) data->frames();
+        const auto seconds = data->sampleRate > 0.0 ? (double) frames / data->sampleRate : 0.0;
+        engine.editSong ([t, p, path, name, frames, seconds] (Song& s) { simplepads::loadSample (s, t, p, path, name, frames, seconds); });
+        folder = file.getParentDirectory();
+        select (p);
+    }
+
+    void chooseFile (int p)
+    {
+        chooser = ui::makeFileChooser (tr ("Choose sample"), folder, engine.getSampleLibrary().wildcard());
+        ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                           [safe = juce::Component::SafePointer<PadsPage> (this), p] (const juce::FileChooser& fc) {
+                               if (safe != nullptr)
+                                   safe->loadFile (p, fc.getResult());
+                           });
+    }
+
+    void dropPad (int from, int to, bool copy)
+    {
+        if (from < 0 || to < 0 || from == to || ! hasSound (from))
+            return;
+        const auto t = track;
+        const auto ch = channelIndex (from);
+        const auto frames = ch >= 0 ? framesOf (engine.getSong().channels[(std::size_t) ch]) : 0;
+        // onto an empty pad it moves, onto a pad with a sound the two swap; with Alt it is copied
+        engine.editSong ([t, from, to, copy, frames] (Song& s) {
+            if (copy)
+                simplepads::copyPad (s, t, from, to, frames);
+            else
+                simplepads::swapPads (s, t, from, to);
+        });
+        select (to);
+    }
+
+    void normalizePad()
+    {
+        const auto* c = channelOf (selected);
+        if (c == nullptr || c->samplePath.empty())
+            return;
+        const auto data = engine.getSampleLibrary().load (utf8 (c->samplePath));
+        if (data == nullptr || data->frames() == 0)
+            return;
+        const auto n = (std::int64_t) data->frames();
+        const auto a = (std::int64_t) (c->sampler.regionStart * (float) n), b = juce::jmax (a + 1, (std::int64_t) (c->sampler.regionEnd * (float) n));
+        float peak = 0.0f;
+        for (auto i = a; i < b && i < n; ++i)
+            peak = juce::jmax (peak, std::abs (data->leftData()[i]), std::abs (data->rightData()[i]));
+        edit ([g = simplepads::normalizeGainDb (peak)] (ChannelDef& ch) { ch.sampler.gainDb = g; });
+    }
+
+    void showGroupMenu()
+    {
+        juce::PopupMenu m;
+        const auto* c = channelOf (selected);
+        const auto now = c != nullptr ? c->simplePad.group : 0;
+        m.addItem (tr ("None"), true, now == 0, [this] { edit ([] (ChannelDef& ch) { ch.simplePad.group = 0; }); });
+        for (int g = 1; g <= simplepads::groupCount; ++g)
+            m.addItem (tr ("Group {0}", { juce::String (g) }), true, now == g, [this, g] { edit ([g] (ChannelDef& ch) { ch.simplePad.group = g; }); });
+        m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&group));
+    }
+
+    juce::PopupMenu padMenu (int p)
+    {
+        juce::PopupMenu m;
+        const bool has = hasSound (p);
+        m.addItem (tr ("Import..."), [this, p] { chooseFile (p); });
+        m.addSeparator();
+        m.addItem (tr ("Copy"), has, false, [this, p] { clipboard = p; });
+        m.addItem (tr ("Paste"), clipboard >= 0 && clipboard != p && hasSound (clipboard), false, [this, p] { dropPad (clipboard, p, true); });
+        m.addItem (tr ("Clear the pad"), has, false, [this, p] {
+            const auto t = track;
+            engine.editSong ([t, p] (Song& s) { simplepads::clearPad (s, t, p); });
+            update();
+        });
+        juce::PopupMenu colours;
+        const auto* c = channelOf (p);
+        const auto now = c != nullptr ? c->simplePad.colour : 0;
+        for (int i = 0; i <= simplepads::colourCount; ++i)
+            colours.addItem (padColourName (i), true, now == i, [this, p, i] { edit ([i] (ChannelDef& ch) { ch.simplePad.colour = i; }, p); });
+        m.addSubMenu (tr ("Colour"), colours);
+        juce::PopupMenu copyTo;
+        for (int k = 0; k < knobCount; ++k)
+            copyTo.addItem (padKnobName (k), has, false, [this, p, k] {
+                select (p);
+                copyKnobToAll (k);
+            });
+        m.addSubMenu (tr ("Copy a value to every pad"), copyTo, has);
+        return m;
+    }
+
+    // kits: the pads' sounds and settings in a file of the user's (Documents/LYNX/Sampler kits/<name>.lynxkit)
+    static juce::File kitFolder() { return platform::documentsFolder().getChildFile ("LYNX/Sampler kits"); }
+
+    juce::PopupMenu kitMenu()
+    {
+        juce::PopupMenu m;
+        m.addItem (tr ("Save the pads as a kit..."), track >= 0, false, [this] { askKitName(); });
+        juce::PopupMenu mine, rename, remove;
+        const auto files = kitFolder().findChildFiles (juce::File::findFiles, false, "*.lynxkit");
+        auto sorted = files;
+        std::sort (sorted.begin(), sorted.end(), [] (const juce::File& a, const juce::File& b) { return a.getFileName().compareNatural (b.getFileName()) < 0; });
+        for (const auto& f : sorted)
+        {
+            mine.addItem (f.getFileNameWithoutExtension(), [this, f] { openKit (f); });
+            rename.addItem (f.getFileNameWithoutExtension(), [this, f] { askRename (f); });
+            remove.addItem (f.getFileNameWithoutExtension(), [f] { f.moveToTrash(); });
+        }
+        m.addSubMenu (tr ("My kits"), mine, ! sorted.isEmpty());
+        m.addItem (tr ("Fill the pads from a folder..."), track >= 0, false, [this] { chooseKitFolder(); });
+        m.addSeparator();
+        m.addSubMenu (tr ("Rename a kit"), rename, ! sorted.isEmpty());
+        m.addSubMenu (tr ("Delete a kit"), remove, ! sorted.isEmpty());
+        return m;
+    }
+    void showKitMenu() { kitMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&kit)); }
+
+    void askKitName()
+    {
+        auto* w = new juce::AlertWindow (tr ("Save the pads as a kit"), tr ("Name of the kit:"), juce::MessageBoxIconType::NoIcon);
+        w->addTextEditor ("name", utf8 (track >= 0 && track < (int) engine.getSong().playlistTracks.size() ? engine.getSong().playlistTracks[(std::size_t) track].name : std::string()));
+        w->addButton (tr ("Save"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+        w->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+        w->enterModalState (true, juce::ModalCallbackFunction::create ([this, w, safe = juce::Component::SafePointer<PadsPage> (this)] (int r) {
+                                if (r == 1 && safe != nullptr)
+                                    saveKit (w->getTextEditorContents ("name").trim());
+                            }),
+                            true);
+    }
+
+    void askRename (const juce::File& kitFile)
+    {
+        auto* w = new juce::AlertWindow (tr ("Rename the kit"), tr ("New name of the kit:"), juce::MessageBoxIconType::NoIcon);
+        w->addTextEditor ("name", kitFile.getFileNameWithoutExtension());
+        w->addButton (tr ("Rename"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+        w->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+        w->enterModalState (true, juce::ModalCallbackFunction::create ([w, kitFile] (int r) {
+                                if (r == 1)
+                                    renameKit (kitFile, w->getTextEditorContents ("name"));
+                            }),
+                            true);
+    }
+
+public:
+    // a kit file gets another name (2 to 50 characters, not taken); false when it can't
+    static bool renameKit (const juce::File& kitFile, const juce::String& rawName)
+    {
+        const auto name = juce::File::createLegalFileName (rawName).trim();
+        const auto target = kitFile.getSiblingFile (name + ".lynxkit");
+        if (name.length() < 2 || name.length() > 50 || target.exists() || ! kitFile.existsAsFile())
+            return false;
+        auto json = juce::JSON::parse (kitFile.loadFileAsString());
+        if (auto* o = json.getDynamicObject())
+            o->setProperty ("name", name);
+        return target.replaceWithText (juce::JSON::toString (json)) && kitFile.deleteFile();
+    }
+
+    bool saveKit (const juce::String& rawName)
+    {
+        const auto name = juce::File::createLegalFileName (rawName).trim();
+        if (name.length() < 2 || name.length() > 50) // (the original's rule for a kit's name)
+            return false;
+        auto pads = juce::Array<juce::var>();
+        for (int p = 0; p < simplepads::padCount; ++p)
+        {
+            const auto* c = channelOf (p);
+            if (c == nullptr || c->samplePath.empty())
+                continue;
+            auto o = std::make_unique<juce::DynamicObject>();
+            o->setProperty ("pad", p);
+            o->setProperty ("file", utf8 (c->samplePath));
+            o->setProperty ("name", utf8 (c->name));
+            o->setProperty ("mode", (int) c->simplePad.mode);
+            o->setProperty ("tone", c->simplePad.tone);
+            o->setProperty ("release", c->simplePad.release);
+            o->setProperty ("group", c->simplePad.group);
+            o->setProperty ("colour", c->simplePad.colour);
+            o->setProperty ("attack", c->sampler.attack);
+            o->setProperty ("pitch", c->sampler.pitch);
+            o->setProperty ("start", c->sampler.regionStart);
+            o->setProperty ("end", c->sampler.regionEnd);
+            o->setProperty ("reverse", c->sampler.reverse);
+            o->setProperty ("gainDb", c->sampler.gainDb);
+            o->setProperty ("volume", c->volume);
+            o->setProperty ("pan", c->pan);
+            pads.add (juce::var (o.release()));
+        }
+        auto root = std::make_unique<juce::DynamicObject>();
+        root->setProperty ("lynxSamplerKit", 1);
+        root->setProperty ("name", name);
+        root->setProperty ("pads", pads);
+        kitFolder().createDirectory();
+        return kitFolder().getChildFile (name + ".lynxkit").replaceWithText (juce::JSON::toString (juce::var (root.release())));
+    }
+
+    bool openKit (const juce::File& file)
+    {
+        const auto json = juce::JSON::parse (file.loadFileAsString());
+        if ((int) json.getProperty ("lynxSamplerKit", 0) != 1)
+            return false;
+        struct Loaded
+        {
+            int pad;
+            ChannelDef def;
+            std::int64_t frames;
+        };
+        std::vector<Loaded> loaded;
+        if (const auto* list = json.getProperty ("pads", {}).getArray())
+            for (const auto& v : *list)
+            {
+                const auto p = (int) v.getProperty ("pad", -1);
+                const juce::File f (v.getProperty ("file", "").toString());
+                const auto data = f.existsAsFile() ? engine.getSampleLibrary().load (f.getFullPathName()) : nullptr;
+                if (p < 0 || p >= simplepads::padCount || data == nullptr)
+                    continue;
+                ChannelDef d;
+                d.samplePath = f.getFullPathName().toStdString();
+                d.name = v.getProperty ("name", f.getFileNameWithoutExtension()).toString().toStdString();
+                d.simplePad.mode = (std::uint8_t) juce::jlimit (0, 2, (int) v.getProperty ("mode", 0));
+                d.simplePad.tone = (float) v.getProperty ("tone", 0.0);
+                d.simplePad.release = (float) v.getProperty ("release", 0.0);
+                d.simplePad.group = (int) v.getProperty ("group", 0);
+                d.simplePad.colour = (int) v.getProperty ("colour", 0);
+                d.sampler.attack = (float) v.getProperty ("attack", 0.0);
+                d.sampler.pitch = (float) v.getProperty ("pitch", 0.0);
+                d.sampler.regionStart = (float) v.getProperty ("start", 0.0);
+                d.sampler.regionEnd = (float) v.getProperty ("end", 1.0);
+                d.sampler.reverse = (bool) v.getProperty ("reverse", false);
+                d.sampler.gainDb = (float) v.getProperty ("gainDb", 0.0);
+                d.volume = (float) v.getProperty ("volume", 0.78);
+                d.pan = (float) v.getProperty ("pan", 0.0);
+                loaded.push_back ({ p, std::move (d), (std::int64_t) data->frames() });
+            }
+        const auto t = track;
+        engine.editSong ([t, loaded] (Song& s) {
+            for (int p = 0; p < simplepads::padCount; ++p)
+                simplepads::clearPad (s, t, p);
+            for (const auto& l : loaded)
+            {
+                const auto ch = simplepads::padChannel (s, t, l.pad);
+                if (ch < 0)
+                    continue;
+                auto& c = s.channels[(std::size_t) ch];
+                c.samplePath = l.def.samplePath;
+                c.name = l.def.name;
+                c.sampler.attack = l.def.sampler.attack;
+                c.sampler.pitch = l.def.sampler.pitch;
+                c.sampler.regionStart = l.def.sampler.regionStart;
+                c.sampler.regionEnd = l.def.sampler.regionEnd;
+                c.sampler.reverse = l.def.sampler.reverse;
+                c.sampler.gainDb = l.def.sampler.gainDb;
+                c.volume = l.def.volume;
+                c.pan = l.def.pan;
+                const auto index = c.simplePad.index;
+                c.simplePad = l.def.simplePad;
+                c.simplePad.index = index;
+                simplepads::apply (c, l.frames);
+            }
+        });
+        update();
+        return true;
+    }
+
+    // the first 16 sounds of a folder (by name), pad by pad
+    int fillFromFolder (const juce::File& dir)
+    {
+        auto files = dir.findChildFiles (juce::File::findFiles, false);
+        std::sort (files.begin(), files.end(), [] (const juce::File& a, const juce::File& b) { return a.getFileName().compareNatural (b.getFileName()) < 0; });
+        int p = 0;
+        for (const auto& f : files)
+            if (p < simplepads::padCount && SampleLibrary::isSampleFile (f))
+                loadFile (p++, f);
+        select (0);
+        return p;
+    }
+
+private:
+    void chooseKitFolder()
+    {
+        chooser = ui::makeFileChooser (tr ("Choose a folder of sounds"), folder, {});
+        ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
+                           [safe = juce::Component::SafePointer<PadsPage> (this)] (const juce::FileChooser& fc) {
+                               if (safe != nullptr && fc.getResult().isDirectory())
+                                   safe->fillFromFolder (fc.getResult());
+                           });
+    }
+
+    void drawWave (juce::Graphics& g, const ChannelDef& c, juce::Rectangle<float> w)
+    {
+        const auto width = juce::jmax (1, (int) w.getWidth());
+        if (waveFor != c.samplePath || (int) wave.size() != width)
+        {
+            wave.assign ((std::size_t) width, 0.0f);
+            if (const auto data = engine.getSampleLibrary().load (utf8 (c.samplePath)); data != nullptr && data->frames() > 0)
+            {
+                const auto n = (std::int64_t) data->frames();
+                for (int x = 0; x < width; ++x)
+                {
+                    const auto a = n * x / width, b = juce::jmax (a + 1, n * (x + 1) / width);
+                    float peak = 0.0f;
+                    for (auto i = a; i < b; ++i) // (every sample: a stride aliases a low tone into a moiré; done once per sample)
+                        peak = juce::jmax (peak, std::abs (data->leftData()[i]), std::abs (data->rightData()[i]));
+                    wave[(std::size_t) x] = peak;
+                }
+            }
+            waveFor = c.samplePath;
+        }
+        const auto mid = w.getCentreY(), half = w.getHeight() * 0.45f;
+        const auto s = w.getX() + c.sampler.regionStart * w.getWidth(), e = w.getX() + c.sampler.regionEnd * w.getWidth();
+        for (int x = 0; x < width; ++x)
+        {
+            const auto px = w.getX() + (float) x;
+            const auto inside = px >= s && px <= e;
+            const auto idx = c.sampler.reverse ? width - 1 - x : x;
+            const auto h = juce::jmax (0.5f, wave[(std::size_t) idx] * half);
+            g.setColour (inside ? colour::accent.withAlpha (0.9f) : colour::textDisabled.withAlpha (0.6f));
+            g.fillRect (px, mid - h, 1.0f, h * 2.0f);
+        }
+        // the region's handles
+        g.setColour (colour::textPrimary);
+        for (auto x : { s, e })
+        {
+            g.fillRect (x - 1.0f, w.getY(), 2.0f, w.getHeight());
+            g.fillRect (x - 4.0f, w.getY(), 8.0f, 4.0f);
+        }
+        if (simplepads::modeOf (c) == simplepads::Mode::loop)
+        {
+            g.setFont (font (type::caption, true));
+            g.setColour (colour::textSecondary);
+            g.drawText (juce::String::fromUTF8 ("\xe2\x9f\xb3 ") + trc ("@pad mode: Loop"), w.reduced (6.0f, 3.0f).toNearestInt(), juce::Justification::topRight, false);
+        }
+    }
+
+    AudioEngine& engine;
+    int track = -1, selected = 0, dragFrom = -1, dropTarget = -1, regionDrag = 0, clipboard = -1, heldChannel = -1;
+    std::vector<int> channels;
+    std::array<int, simplepads::padCount> flash {};
+    juce::Rectangle<int> gridArea, titleArea, waveArea;
+    juce::TextButton load, browse, kit, normalize, group;
+    juce::ToggleButton reverse;
+    std::array<juce::TextButton, 3> modes;
+    std::array<DockKnob, knobCount> knobs;
+    std::array<juce::Label, knobCount> captions;
+    std::vector<float> wave;
+    std::string waveFor;
+    juce::File folder;
+    std::unique_ptr<juce::FileChooser> chooser;
+};
+
 SimpleDock::SimpleDock (AudioEngine& e, Hooks h) : engine (e), hooks (std::move (h))
 {
     // the Instrument tab's "Keyboard" button shows the dock's own Keyboard tab (round 190ds)
@@ -1481,6 +2423,12 @@ SimpleDock::SimpleDock (AudioEngine& e, Hooks h) : engine (e), hooks (std::move 
     effectsPage = std::make_unique<EffectsPage> (engine);
     instrumentPage = std::make_unique<InstrumentPage> (engine, hooks);
     editorPage = std::make_unique<EditorPage> (engine, hooks);
+    padsPage = std::make_unique<PadsPage> (engine);
+    padsPage->onBrowse = [this] {
+        if (onBrowseSounds)
+            onBrowseSounds();
+    };
+    addChildComponent (*padsPage);
     addChildComponent (*effectsPage);
     addChildComponent (*instrumentPage);
     addChildComponent (*editorPage);
@@ -1491,12 +2439,15 @@ SimpleDock::SimpleDock (AudioEngine& e, Hooks h) : engine (e), hooks (std::move 
     editorButton.setButtonText (tr ("Editor"));
     editorButton.setTooltip (tr ("Write the track's notes"));
     effectsButton.setButtonText (tr ("Effects"));
+    padsButton.setButtonText (tr ("Pads"));
+    padsButton.setTooltip (tr ("The Sampler track's 16 pads: their sounds and how they play"));
+    padsButton.setComponentID ("simple.dock.pads");
     // round 190dv: what the first-song tour's ring finds
     keyboardButton.setComponentID ("simple.dock.keyboard");
     editorButton.setComponentID ("simple.dock.editor");
     effectsButton.setComponentID ("simple.dock.effects");
     const std::pair<juce::TextButton*, Tab> tabs[] { { &instrumentButton, Tab::instrument }, { &keyboardButton, Tab::keyboard },
-                                                     { &editorButton, Tab::editor }, { &effectsButton, Tab::effects } };
+                                                     { &editorButton, Tab::editor }, { &padsButton, Tab::pads }, { &effectsButton, Tab::effects } };
     for (auto [b, t] : tabs)
     {
         b->setClickingTogglesState (true);
@@ -1541,6 +2492,7 @@ void SimpleDock::refresh()
     insert = channel = -1;
     instrumentTab = false;
     playTabs = false;
+    padsTab = track >= 0 && simpletracks::kindOf (song, track) == simpletracks::Kind::pads;
     if (track >= 0)
     {
         const auto chain = detailchain::forTrack (song, track);
@@ -1560,16 +2512,20 @@ void SimpleDock::refresh()
     instrumentButton.setVisible (instrumentTab);
     keyboardButton.setVisible (playTabs);
     editorButton.setVisible (playTabs);
-    if ((tab == Tab::instrument && ! instrumentTab) || ((tab == Tab::keyboard || tab == Tab::editor) && ! playTabs))
+    padsButton.setVisible (padsTab);
+    if ((tab == Tab::instrument && ! instrumentTab) || ((tab == Tab::keyboard || tab == Tab::editor) && ! playTabs) || (tab == Tab::pads && ! padsTab))
         tab = Tab::effects;
     if (! tabChosen && (instrumentTab || playTabs))
         tab = instrumentTab ? Tab::instrument : Tab::keyboard; // (an instrument track opens on its sound; an audio track on its effects)
+    else if (! tabChosen && padsTab)
+        tab = Tab::pads; // (round 190fo: a Sampler track opens on its pads)
     else if (! tabChosen)
         tab = Tab::effects;
     effectsPage->show (insert);
     instrumentPage->show (instrumentTab ? channel : -1);
     showPage();
     editorPage->show (playTabs ? track : -1, channel);
+    padsPage->show (padsTab ? track : -1);
     updateFollow();
     resized();
     repaint();
@@ -1578,7 +2534,7 @@ void SimpleDock::refresh()
 void SimpleDock::setTab (Tab t)
 {
     tabChosen = true; // (a refresh keeps a tab that was asked for)
-    if ((t == Tab::instrument && ! instrumentTab) || ((t == Tab::keyboard || t == Tab::editor) && ! playTabs))
+    if ((t == Tab::instrument && ! instrumentTab) || ((t == Tab::keyboard || t == Tab::editor) && ! playTabs) || (t == Tab::pads && ! padsTab))
         t = Tab::effects;
     tab = t;
     showPage();
@@ -1592,6 +2548,8 @@ void SimpleDock::cycleTab()
         shown.push_back (Tab::instrument);
     if (playTabs)
         shown.push_back (Tab::keyboard), shown.push_back (Tab::editor);
+    if (padsTab)
+        shown.push_back (Tab::pads);
     shown.push_back (Tab::effects);
     const auto at = std::find (shown.begin(), shown.end(), tab);
     setTab (at == shown.end() || at + 1 == shown.end() ? shown.front() : *(at + 1));
@@ -1599,7 +2557,9 @@ void SimpleDock::cycleTab()
 
 void SimpleDock::showPage()
 {
-    auto& button = tab == Tab::instrument ? instrumentButton : tab == Tab::keyboard ? keyboardButton : tab == Tab::editor ? editorButton : effectsButton;
+    auto& button = tab == Tab::instrument ? instrumentButton : tab == Tab::keyboard ? keyboardButton : tab == Tab::editor ? editorButton
+                 : tab == Tab::pads                                         ? padsButton
+                                                                            : effectsButton;
     button.setToggleState (true, juce::dontSendNotification);
     if (tab == Tab::keyboard && keyboardPage == nullptr)
     {
@@ -1612,6 +2572,7 @@ void SimpleDock::showPage()
     instrumentPage->setVisible (tab == Tab::instrument);
     effectsPage->setVisible (tab == Tab::effects);
     editorPage->setVisible (tab == Tab::editor);
+    padsPage->setVisible (tab == Tab::pads);
     if (keyboardPage != nullptr)
         keyboardPage->setVisible (tab == Tab::keyboard);
 }
@@ -1623,6 +2584,34 @@ void SimpleDock::showKeyboard()
 }
 
 void SimpleDock::editorTakenBack() { editorPage->takenBackByPanel(); }
+void SimpleDock::padsLoadForCheck (int pad, const juce::File& file) { padsPage->loadFileForCheck (pad, file); }
+void SimpleDock::padsSelectForCheck (int pad) { padsPage->select (pad); }
+void SimpleDock::padsModeForCheck (int mode) { padsPage->setModeForCheck (mode); }
+void SimpleDock::padsKnobForCheck (int knob, float v) { padsPage->turnForCheck (knob, v); }
+void SimpleDock::padsRegionForCheck (float start, float end) { padsPage->setRegionForCheck (start, end); }
+void SimpleDock::padsNormalizeForCheck() { padsPage->normalizeForCheck(); }
+void SimpleDock::padsHitForCheck (int pad) { padsPage->hit (pad); }
+void SimpleDock::padsDragForCheck (int from, int to, bool copy) { padsPage->dragPadForCheck (from, to, copy); }
+void SimpleDock::padsUpdateForCheck() { padsPage->update(); }
+juce::PopupMenu SimpleDock::padMenuForSnapshot (int pad) { return padsPage->padMenuForSnapshot (pad); }
+juce::PopupMenu SimpleDock::kitMenuForSnapshot() { return padsPage->kitMenuForSnapshot(); }
+bool SimpleDock::saveKitForCheck (const juce::String& name) { return padsPage->saveKit (name); }
+bool SimpleDock::openKitForCheck (const juce::File& file) { return padsPage->openKit (file); }
+bool SimpleDock::renameKitForCheck (const juce::File& file, const juce::String& name) { return PadsPage::renameKit (file, name); }
+bool SimpleDock::recordHintShown() const
+{
+    const auto& song = engine.getSong();
+    if (track < 0 || insert <= 0 || insert >= (int) song.mixer.size() || ! engine.isInsertArmed (insert) || song.mixer[(std::size_t) insert].inputChannel < 0)
+        return false;
+    const auto kind = simpletracks::kindOf (song, track);
+    return kind && simpletracks::isAudioKind (*kind) && *kind != simpletracks::Kind::audio;
+}
+
+void SimpleDock::lightPad (int pad)
+{
+    if (padsTab && tab == Tab::pads)
+        padsPage->lightPad (pad);
+}
 void SimpleDock::releaseEditor() { editorPage->release(); }
 bool SimpleDock::isEditorDocked() const noexcept { return editorPage->docked(); }
 
@@ -1715,6 +2704,14 @@ void SimpleDock::paint (juce::Graphics& g)
         const auto area = strip.withLeft (effectsButton.getRight() + 16).withRight (rightEdge);
         g.drawText (followText, area, juce::Justification::centredRight, true);
     }
+    else if (recordHintShown())
+    {
+        // round 190fo: a track armed to record from an input (the original's mobile app warns the same way)
+        const auto area = strip.withLeft (effectsButton.getRight() + 16).withRight (rightEdge);
+        g.setColour (colour::warning);
+        g.setFont (font (type::small));
+        g.drawFittedText (tr ("Recording: wear headphones, so the microphone does not pick up the playback"), area, juce::Justification::centredRight, 1, 0.8f);
+    }
     else if (insert > 0 && insert < (int) song.mixer.size() && ! song.mixer[(std::size_t) insert].chainPreset.empty())
     {
         auto name = utf8 (song.mixer[(std::size_t) insert].chainPreset);
@@ -1726,7 +2723,9 @@ void SimpleDock::paint (juce::Graphics& g)
         g.drawText (tr ("Preset") + glyph (": ") + name, area, juce::Justification::centredRight, true);
     }
     auto text = strip.withTrimmedLeft (12).withRight (instrumentButton.isVisible() ? instrumentButton.getX() - 12
-                                                      : keyboardButton.isVisible() ? keyboardButton.getX() - 12 : effectsButton.getX() - 12);
+                                                      : keyboardButton.isVisible() ? keyboardButton.getX() - 12
+                                                      : padsButton.isVisible()     ? padsButton.getX() - 12
+                                                                                   : effectsButton.getX() - 12);
     if (track < 0)
     {
         g.setColour (colour::textSecondary);
@@ -1758,13 +2757,15 @@ void SimpleDock::resized()
     hideButton.setBounds (strip.removeFromRight (34).withTrimmedRight (8));
     followButton.setBounds (strip.removeFromRight (190).withTrimmedRight (10));
     // the tabs sit after the track's name, left of the middle
-    const auto count = 1 + (instrumentTab ? 1 : 0) + (playTabs ? 2 : 0);
+    const auto count = 1 + (instrumentTab ? 1 : 0) + (playTabs ? 2 : 0) + (padsTab ? 1 : 0);
     auto tabs = strip.withLeft (juce::jmin (300, getWidth() / 3)).withWidth (100 * count);
     std::vector<juce::TextButton*> shown;
     if (instrumentTab)
         shown.push_back (&instrumentButton);
     if (playTabs)
         shown.push_back (&keyboardButton), shown.push_back (&editorButton);
+    if (padsTab)
+        shown.push_back (&padsButton);
     shown.push_back (&effectsButton);
     for (std::size_t i = 0; i < shown.size(); ++i)
     {
@@ -1775,6 +2776,7 @@ void SimpleDock::resized()
     effectsPage->setBounds (body);
     instrumentPage->setBounds (body);
     editorPage->setBounds (body);
+    padsPage->setBounds (body);
     if (keyboardPage != nullptr)
         keyboardPage->setBounds (body);
 }
@@ -1890,6 +2892,7 @@ void SimpleDock::moveCardForCheck (int card, int delta) { effectsPage->move (car
 void SimpleDock::removeCardForCheck (int card) { effectsPage->remove (card); }
 void SimpleDock::addOneKnobForCheck (int goal) { effectsPage->addOneKnob (goal); }
 void SimpleDock::setBlendForCheck (float value) { effectsPage->blendForCheck (value); }
+void SimpleDock::setReverbForCheck (float value) { effectsPage->reverbForCheck (value); }
 juce::Rectangle<int> SimpleDock::cardBoundsForSnapshot (int card) const
 {
     const auto* c = effectsPage->cardForSnapshot (card);

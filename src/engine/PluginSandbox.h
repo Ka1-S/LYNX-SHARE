@@ -24,6 +24,8 @@ void setPluginSandboxEnabled (bool enabled);
 // goes). File separate-process.txt in the settings folder, one name per line.
 bool pluginAlwaysSeparate (const juce::String& name);
 void setPluginAlwaysSeparate (const juce::String& name, bool on);
+// The whole list (round 190gg: the Plugin manager's "Separate process" column reads it once per refresh)
+juce::StringArray pluginsAlwaysSeparate();
 
 // 32-bit plugins (round 176a, Windows x64 only): LYNX is 64-bit and can't load a 32-bit module, so a 32-bit VST2 / VST3
 // always runs in the 32-bit bridge LYNX-bridge32.exe (next to LYNX.exe) — the same separate-process protocol as "Make

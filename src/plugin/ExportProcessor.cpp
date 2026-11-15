@@ -366,6 +366,8 @@ private:
         shape.pdc = state->pdc;
         shape.channelDelays = state->channelDelays;
         shape.sendDelays = state->sendDelays;
+        shape.shifterStock = state->shifterStock;
+        renderer->reserveFor (*state); // (round 190gn: its buffers hold this song before the audio thread plays it)
         exchange.publish (std::move (state));
     }
 

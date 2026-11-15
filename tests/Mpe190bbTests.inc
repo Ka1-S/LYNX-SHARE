@@ -182,7 +182,7 @@ TEST (mpe190bb_member_channel_messages_as_note_expressions)
 TEST (mpe190bb_recorded_notes_keep_their_expression)
 {
     auto song = lynx::Song::makeDefault();
-    const auto loop = song.patterns[0].effectiveLength (4);
+    const auto loop = song.patterns[0].effectiveLength (lynx::Meter (4, 4));
     lynx::NoteRecorder r;
     r.begin (loop);
     // an MPE note: the "on" brings its bend and timbre, the "off" its peak pressure

@@ -29,9 +29,9 @@ std::int64_t lastTick (const Pattern& pattern, int channel) noexcept;
 
 // The loop length in ticks for `setting` (0: none): the next step / beat / bar after the channel's last note, or N steps;
 // at most the pattern's length (`patternLength`), and the whole pattern when it would be 0.
-std::int64_t loopLength (const Pattern& pattern, int channel, int setting, std::int64_t patternLength, int beatsPerBar) noexcept;
+std::int64_t loopLength (const Pattern& pattern, int channel, int setting, std::int64_t patternLength, Meter meter) noexcept;
 // FL's "Set to next beat" / "Set to next bar": the fixed setting (in steps) of the next beat / bar after the last note.
-int nextBoundarySteps (const Pattern& pattern, int channel, int boundary, int beatsPerBar) noexcept; // boundary = nextBeat / nextBar
+int nextBoundarySteps (const Pattern& pattern, int channel, int boundary, Meter meter) noexcept; // boundary = nextBeat / nextBar
 
 // The notes the channel plays in one pass of the pattern with loop length `length` (> 0, < patternLength): its own
 // notes before the loop point, then repeated every `length` ticks while they start before the pattern's end (the
@@ -40,15 +40,15 @@ void expandChannel (Pattern& pattern, int channel, std::int64_t length, std::int
 
 // What the engine plays: every looping channel of a pattern with looping on written out as notes (the pattern keeps
 // its length). Run on the snapshot the audio thread gets, never on the edited song.
-void expandPattern (Pattern& pattern, int beatsPerBar);
+void expandPattern (Pattern& pattern, Meter meter);
 void expandSong (Song& song);
 
 // "Burn to pattern": the channel's repeats become real notes and its loop point is "Don't loop". Returns false when the
 // channel did not loop (nothing changed).
-bool burnChannel (Pattern& pattern, int channel, int beatsPerBar);
+bool burnChannel (Pattern& pattern, int channel, Meter meter);
 // "Burn all looping channels" (selectedOnly empty) / "Burn selected channels": how many channels were burnt.
-int burnChannels (Pattern& pattern, const std::vector<int>& channels, int beatsPerBar);
-std::vector<int> loopingChannels (const Pattern& pattern, int beatsPerBar);
+int burnChannels (Pattern& pattern, const std::vector<int>& channels, Meter meter);
+std::vector<int> loopingChannels (const Pattern& pattern, Meter meter);
 
 // The text FL's loop control shows: "..." none, "Step", "Beat", "Bar", or the steps ("12").
 std::string settingText (int setting);

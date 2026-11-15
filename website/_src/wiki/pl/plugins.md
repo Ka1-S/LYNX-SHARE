@@ -1,5 +1,5 @@
 ---
-source: be0fc22373
+source: 1c440a7810
 ---
 ![Dolna część Menedżera pluginów z uwagą, że każdy plik pluginu jest badany w osobnym procesie](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -89,6 +89,19 @@ W Windows 32-bitowe pluginy VST2 i VST3 działają przez most (`LYNX-bridge32.ex
 ## Wyślij wyjścia instrumentu na osobne inserty
 
 Plugin instrumentu z kilkoma wyjściami może grać każde z nich na własnym insercie Mixera. W oknie pluginu kliknij `Ustawienia wrappera`, a potem kartę `Przetwarzanie`. W `Połączenia` każde wyjście ma lampkę, która je włącza lub wyłącza, oraz numer: na którym insercie po własnym insercie kanału gra. `Automatycznie przypisz wyjścia` daje każdemu wyjściu następny insert, a `Resetuj` wraca do ustawień domyślnych.
+
+## Własne pluginy FL Studio
+
+Własne pluginy FL Studio, takie jak Sytrus, Harmor i Patcher, działają tylko w FL Studio. Aby użyć ich w LYNX SHARE, użyj wersji pluginowej FL Studio, która jest z nim dołączona. W Windows instaluje się jako `FL Studio VSTi` i `FL Studio VSTi (Multi)` w `C:\Program Files\Common Files\VST2`. W macOS to Audio Unit.
+
+1. Zeskanuj pluginy. Oba pojawiają się jako instrumenty z producentem Image-Line. Pierwszy skan może trwać dłuższą chwilę, bo całe FL Studio startuje wewnątrz pluginu.
+2. Dodaj `FL Studio VSTi` do kanału i otwórz jego okno. Kliknij logo FL Studio, aby otworzyć własne okno FL Studio z jego Channel Rack, Mixerem i browserem.
+3. W Channel Rack FL Studio dodaj instrument. Nowy plugin FL Studio startuje z jednym pustym Samplerem i nie wydaje dźwięku, dopóki jakiegoś nie dodasz. Nuty z LYNX SHARE grają kanał zaznaczony w Channel Rack FL Studio.
+4. Własne patterny FL Studio grają, gdy gra LYNX SHARE, w tempie LYNX SHARE.
+
+To, co zbudujesz w FL Studio, jest zapisywane razem z projektem LYNX SHARE. `FL Studio VSTi (Multi)` ma 16 wyjść stereo, które mogą grać na osobnych insertach (zob. sekcję powyżej). Twoja licencja FL Studio decyduje, które pluginy FL działają w jego wnętrzu. LYNX SHARE nie ładuje plików pluginów FL Studio samodzielnie.
+
+Jeśli plugin FL Studio jest wymieniony jako `Błąd wczytania`, kliknij go prawym przyciskiem w `Opcje › Menedżer pluginów...` i wybierz `Spróbuj ponownie (skanuj ten plik teraz)`.
 
 ## Folder Plugin database
 

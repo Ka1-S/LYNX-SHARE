@@ -35,7 +35,7 @@ std::vector<float> renderTransposed (int channels)
     s.patterns[0].sortNotes();
     lynx::RackState::Factories f;
     f.samples = [sample] (const std::string&) { return std::shared_ptr<const lynx::SampleData> (sample); };
-    f.stretchedSamples = [sample] (const std::string&, double ratio, lynx::StretchMethod m, double, const lynx::StretchMap&) {
+    f.stretchedSamples = [sample] (const std::string&, double ratio, lynx::StretchMethod m, double, const lynx::StretchMap&, const lynx::StretchOptions&) {
         return std::shared_ptr<const lynx::SampleData> (lynx::timeStretch (*sample, ratio, m));
     };
     auto state = lynx::RackState::build (s, nullptr, 44100.0, f);

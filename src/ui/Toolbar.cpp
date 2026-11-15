@@ -2,36 +2,44 @@
 
 #include <juce_dsp/juce_dsp.h>
 
+#include "core/MarkerPlan.h"
 #include "core/Timecode.h"
+#include "core/TempoMap.h"
 #include "ui/FrameTicker.h"
 #include "ui/HintBar.h"
 #include "ui/I18n.h"
 #include "ui/Icons.h"
+#include "ui/PaintAB.h"
 #include "ui/Theme.h"
 
 namespace lynx::toolbar
 {
 namespace
 {
-juce::String barBeatStep (const Song& song, double ticks, int beatsPerBar)
+juce::String barBeatStep (const Song& song, double ticks, Meter meter)
 {
-    const auto beats = ticks / ppq;
-    int bar = 0, beat = 0;
+    // (round 190fg: beats of the meter in force, eighths in 6/8; the steps are sixteenths into the beat)
+    int bar = 0;
+    double intoBar = 0.0;
+    auto beatLength = (double) meter.beat();
 
     if (song.mode == PlayMode::song) // the Playlist ruler applies (with time signature changes)
     {
         const auto current = song.barAt ((std::int64_t) ticks);
         bar = current.number;
-        beat = (int) ((ticks - (double) current.tick) / ppq) + 1;
+        intoBar = ticks - (double) current.tick;
+        const auto sig = markers::signatureAt (song, (std::int64_t) ticks);
+        beatLength = (double) ppq * 4.0 / (double) juce::jmax (1, sig.second);
     }
     else
     {
-        const auto perBar = juce::jmax (1, beatsPerBar);
-        bar = (int) (beats / perBar) + 1;
-        beat = (int) std::fmod (beats, (double) perBar) + 1;
+        const auto perBar = (double) meter.bar();
+        bar = (int) (ticks / perBar) + 1;
+        intoBar = std::fmod (ticks, perBar);
     }
 
-    const auto step = (int) (std::fmod (beats, 1.0) * stepsPerBeat) + 1;
+    const auto beat = (int) (intoBar / beatLength) + 1;
+    const auto step = (int) (std::fmod (intoBar, beatLength) / ticksPerStep) + 1;
     return juce::String::formatted ("%d : %d : %d", bar, beat, step);
 }
 
@@ -42,7 +50,7 @@ double loopLength (const Song& song)
 
     const auto length = song.mode == PlayMode::song
                             ? song.songLength()
-                            : song.patterns[(std::size_t) juce::jlimit (0, (int) song.patterns.size() - 1, song.currentPattern)].effectiveLength (song.beatsPerBar);
+                            : song.patterns[(std::size_t) juce::jlimit (0, (int) song.patterns.size() - 1, song.currentPattern)].effectiveLength (song.meter());
     return (double) juce::jmax<std::int64_t> (1, length);
 }
 
@@ -157,7 +165,7 @@ void SongPositionBar::mouseWheelMove (const juce::MouseEvent&, const juce::Mouse
     if (delta == 0.0f)
         return;
 
-    const auto bar = (double) ppq * juce::jmax (1, engine.getSong().beatsPerBar);
+    const auto bar = (double) engine.getSong().barTicks();
     const auto current = std::round (position() / bar) * bar;
     engine.seek (juce::jlimit (0.0, juce::jmax (0.0, length() - bar), current + (delta > 0.0f ? -bar : bar) * (wheel.isReversed ? -1.0 : 1.0)));
     update();
@@ -169,12 +177,43 @@ ui::Hint SongPositionBar::hintAt (juce::Point<int>)
     ui::Hint h;
     h.text = (song.mode == PlayMode::song ? tr ("Song position") : tr ("Pattern position"))
              + ": " + tr ("[LMB] click or drag to move the playhead  [Wheel] one bar  [Alt] no snap");
-    const auto bars = juce::jmax (1, juce::roundToInt (length() / ((double) ppq * juce::jmax (1, song.beatsPerBar))));
-    h.value = tr ("Bar {0} of {1}", { barBeatStep (song, position(), song.beatsPerBar).upToFirstOccurrenceOf (" ", false, false), juce::String (bars) });
+    const auto bars = juce::jmax (1, juce::roundToInt (length() / ((double) song.barTicks())));
+    h.value = tr ("Bar {0} of {1}", { barBeatStep (song, position(), song.meter()).upToFirstOccurrenceOf (" ", false, false), juce::String (bars) });
     return h;
 }
 
 // --- time display --------------------------------------------------------------------------------
+
+namespace
+{
+// Round 190gr: Song::secondsForTicks sums the song's tempo from tick 0 at every call (with a tempo automation: one tempo
+// lookup, a walk over the clips, per 16th), and the time display asks for it at every timer tick and paint while the song
+// plays. The sum of the whole 16ths is kept and continued from where it stopped: the same additions in the same order,
+// so the same seconds to the last bit. Message thread.
+double secondsForTicksCached (const Song& song, std::uint64_t stamp, std::int64_t ticks)
+{
+    if (! tempomap::active (song) || ! ui::paintCache())
+        return song.secondsForTicks (ticks);
+    struct Sum
+    {
+        std::uint64_t stamp = 0;
+        double bpm = 0.0;
+        int mode = -1, pattern = -1;
+        std::int64_t whole = 0; // ticks summed (whole 16ths)
+        double seconds = 0.0;
+    };
+    static Sum sum;
+    if (sum.stamp != stamp || sum.bpm != song.bpm || sum.mode != (int) song.mode || sum.pattern != song.currentPattern || ticks < sum.whole)
+        sum = { stamp, song.bpm, (int) song.mode, song.currentPattern, 0, 0.0 };
+    constexpr std::int64_t step = ticksPerStep;
+    for (; sum.whole + step <= ticks; sum.whole += step)
+        sum.seconds += (double) step * 60.0 / (std::max (1.0, song.tempoAt ((double) sum.whole)) * ppq);
+    auto seconds = sum.seconds;
+    if (const auto rest = ticks - sum.whole; rest > 0)
+        seconds += (double) rest * 60.0 / (std::max (1.0, song.tempoAt ((double) sum.whole)) * ppq);
+    return seconds;
+}
+} // namespace
 
 juce::String TimeDisplay::text() const
 {
@@ -182,9 +221,9 @@ juce::String TimeDisplay::text() const
     const auto ticks = playheadTicks (engine);
 
     if (mode == Mode::bars)
-        return barBeatStep (song, ticks, engine.getTransport().beatsPerBar.load());
+        return barBeatStep (song, ticks, song.meter());
 
-    const auto seconds = song.secondsForTicks ((std::int64_t) ticks);
+    const auto seconds = secondsForTicksCached (song, engine.getSongStamp(), (std::int64_t) ticks);
     if (mode == Mode::smpte)
         return juce::String (timecode::format (seconds, smpteRate));
     const auto whole = (int) seconds;
@@ -198,6 +237,15 @@ void TimeDisplay::update()
         shown = t;
         repaint();
     }
+    // (round 190gl) the reference DAW's position display with Link: a progress bar of the session through the quantum
+    // while the transport is stopped or waits to start (another peer connected); Play starts when it is full
+    const auto& link = engine.getLink();
+    const auto progress = link.isEnabled() ? link.startProgress() : -1.0;
+    if (std::abs (progress - linkProgress) > 0.004 || (progress < 0.0) != (linkProgress < 0.0))
+    {
+        linkProgress = progress;
+        repaint();
+    }
 }
 
 void TimeDisplay::paint (juce::Graphics& g)
@@ -206,6 +254,14 @@ void TimeDisplay::paint (juce::Graphics& g)
     const auto area = getLocalBounds();
     g.setColour (colour::bg1);
     g.fillRoundedRectangle (area.toFloat(), radius::md);
+    if (linkProgress >= 0.0) // (round 190gl) the Link session's progress bar, filled from the left
+    {
+        g.saveState();
+        g.reduceClipRegion (area.withWidth (juce::roundToInt (area.getWidth() * juce::jlimit (0.0, 1.0, linkProgress))));
+        g.setColour (colour::accent.withAlpha (0.42f));
+        g.fillRoundedRectangle (area.toFloat(), radius::md);
+        g.restoreState();
+    }
 
     if (isMouseOver())
     {
@@ -604,6 +660,121 @@ ui::Hint ChordPanel::hintAt (juce::Point<int>)
     return { tr ("Detected chord"), {}, false, false };
 }
 
+// --- Ableton Link toggle (round 190gl) ---------------------------------------------------------------------------
+
+juce::String LinkToggle::text() const
+{
+    if (! on)
+        return trc ("@Ableton Link: Link");
+    return (peers == 1 ? trc ("@Ableton Link: {0} Link") : trc ("@Ableton Link: {0} Links")).replace ("{0}", juce::String (peers));
+}
+
+int LinkToggle::idealWidth (int)
+{
+    // (rollup 0.1.28, coordinator: a small switch like the reference's control-bar toggle and the toolbar's own
+    // switches — the small type, a short box, a narrow arrow)
+    const auto f = theme::font (theme::type::small, true);
+    auto widest = 0.0f;
+    for (const auto* t : { "@Ableton Link: Link", "@Ableton Link: {0} Links" })
+        widest = juce::jmax (widest, juce::GlyphArrangement::getStringWidth (f, trc (t).replace ("{0}", "88")));
+    return juce::roundToInt (widest) + 12 + arrowWidth + 2;
+}
+
+void LinkToggle::update()
+{
+    const auto& link = engine.getLink();
+    const auto nowOn = link.isEnabled();
+    const auto nowPeers = nowOn ? link.peers() : 0;
+    if (nowOn != on || nowPeers != peers)
+    {
+        on = nowOn;
+        peers = nowPeers;
+        repaint();
+    }
+}
+
+void LinkToggle::paint (juce::Graphics& g)
+{
+    using namespace theme;
+    const auto arrow = arrowArea();
+    const auto main = boxArea().withTrimmedRight (arrow.getWidth() + 2);
+    const auto over = isMouseOver (true);
+    // the switch, small like the reference's control-bar toggle and lit like the toolbar's other switches (metronome,
+    // count-in: the raised surface with the theme's accent on it; rollup 0.1.28, coordinator)
+    g.setColour (on ? colour::bg6 : (over ? colour::bg5 : colour::bg4));
+    g.fillRoundedRectangle (main.toFloat(), radius::sm);
+    if (on)
+    {
+        g.setColour (colour::accent.withAlpha (0.55f));
+        g.drawRoundedRectangle (main.toFloat().reduced (0.5f), radius::sm, 1.0f);
+    }
+    g.setColour (on ? colour::accent : (over ? colour::textPrimary : colour::textSecondary));
+    auto f = font (type::small, true);
+    const auto label = text();
+    for (int i = 0; i < 8 && juce::GlyphArrangement::getStringWidth (f, label) > (float) main.getWidth() - 6.0f; ++i)
+        f = f.withHeight (f.getHeight() * 0.92f);
+    g.setFont (f);
+    g.drawText (label, main, juce::Justification::centred, false);
+    // the drop-down arrow beside it
+    if (over)
+    {
+        g.setColour (colour::bg5);
+        g.fillRoundedRectangle (arrow.toFloat(), radius::sm);
+    }
+    const auto a = arrow.toFloat().withSizeKeepingCentre (7.0f, 4.0f);
+    juce::Path tri;
+    tri.addTriangle (a.getX(), a.getY(), a.getRight(), a.getY(), a.getCentreX(), a.getBottom());
+    g.setColour (colour::textSecondary);
+    g.fillPath (tri);
+}
+
+void LinkToggle::mouseDown (const juce::MouseEvent& e)
+{
+    if (e.mods.isPopupMenu() || arrowArea().contains (e.getPosition()))
+    {
+        showMenu();
+        return;
+    }
+    if (e.mods.isLeftButtonDown())
+    {
+        engine.setLinkEnabled (! engine.getLink().isEnabled());
+        update();
+    }
+}
+
+void LinkToggle::showMenu()
+{
+    makeMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this));
+}
+
+juce::PopupMenu LinkToggle::makeMenu()
+{
+    // the reference DAW's drop-down: Link on / off and "Configure Link..." (its Link Audio items: LYNX has no Link Audio)
+    juce::PopupMenu menu;
+    const auto linkOn = engine.getLink().isEnabled();
+    menu.addItem (trc ("@Ableton Link: Link"), true, linkOn, [this, linkOn] {
+        engine.setLinkEnabled (! linkOn);
+        update();
+    });
+    menu.addSeparator();
+    menu.addItem (tr ("Configure Link..."), [this] {
+        if (onConfigure)
+            onConfigure();
+    });
+    return menu;
+}
+
+ui::Hint LinkToggle::hintAt (juce::Point<int> position)
+{
+    ui::Hint h;
+    if (arrowArea().contains (position))
+        h.text = tr ("Ableton Link options");
+    else
+        h.text = on ? tr ("Ableton Link is on: the tempo and the beat are shared with the other apps and devices in the session. Click to leave it")
+                    : tr ("Ableton Link: share the tempo and the beat with other apps and devices on the network. Click to join");
+    return h;
+}
+
 void KeyPanel::setText (const juce::String& keyName)
 {
     if (keyName != text)
@@ -719,6 +890,8 @@ ui::Hint PerformanceMeter::hintAt (juce::Point<int> p)
                                   { juce::String ((juce::int64) overDeadline), juce::String ((juce::int64) lateCalls) });
         if (! heaviest.isEmpty())
             h.text << "  " << tr ("Heaviest: {0}", { heaviest.joinIntoString (", ") });
+        if (dropoutText.isNotEmpty())
+            h.text << "  " << dropoutText;
         if (underruns > 0 && driverTip.isNotEmpty())
             h.text << "  " << tr ("Tip: Windows Audio (shared) drops out more easily; choose the ASIO driver \"{0}\" in Options > Audio settings.",
                                   { driverTip });

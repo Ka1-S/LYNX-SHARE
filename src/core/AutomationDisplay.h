@@ -214,7 +214,7 @@ private:
         {
             if (s.pattern != song.currentPattern)
                 return none;
-            const auto length = (double) std::max<std::int64_t> (1, pattern.effectiveLength (song.beatsPerBar));
+            const auto length = (double) std::max<std::int64_t> (1, pattern.effectiveLength (song.meter()));
             return events.valueAt (std::fmod (std::max (0.0, tick), length));
         }
 

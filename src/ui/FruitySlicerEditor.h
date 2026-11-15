@@ -18,4 +18,7 @@ struct Song;
 
 // `channel`: the Channel Rack channel (−1 in a Patcher: `locate` finds the node)
 std::unique_ptr<juce::Component> makeFruitySlicerEditor (AudioEngine& engine, std::function<ChannelDef* (Song&)> locate, int channel);
+// Round 190gk ("Open in new Fruity Slicer channel" of the Sampler's waveform menu): the next editor made for Channel
+// Rack channel `channel` loads `path` as its own Load does (auto slices, FL's beats); `channel` −1 forgets it.
+void loadSampleWhenOpened (int channel, const juce::String& path);
 } // namespace lynx

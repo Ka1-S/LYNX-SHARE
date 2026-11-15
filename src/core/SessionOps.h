@@ -50,7 +50,7 @@ void mergeNotes (Pattern& pattern, const std::vector<Note>& notes);
 std::string recordedClipName (const Song& song, const std::string& trackName);
 // The length counter of a slot that records (round 190cy, Live 12.4.16): `ticks` recorded so far as
 // "bars.beats.sixteenths", each counted from 0 ("0.1.0" one beat in).
-std::string lengthCounter (double ticks, int beatsPerBar);
+std::string lengthCounter (double ticks, Meter meter);
 // A recorded MIDI clip in (track, scene): a new pattern of `length` ticks with `notes`, named `name` (empty: as a new
 // pattern is), and a clip of it in the slot, in the track's colour. Returns the pattern's index (−1: the slot cannot
 // take it).
@@ -115,7 +115,7 @@ bool setSceneBeats (Song& song, int scene, int beats);
 bool setSceneSignature (Song& song, int scene, int beats, int unit);
 int sceneBeatUnit (int unit) noexcept;                    // the nearest of 1, 2, 4, 8, 16
 int sceneBeatUnitStep (int unit, int steps) noexcept;     // `steps` denominators up (+) or down (−) from `unit`
-int sceneBarBeats (int beats, int unit) noexcept;         // n/d as LYNX's n/4 meter: the bar's length in quarter notes
+int sceneBarBeats (int beats, int unit) noexcept;         // the bar's length in quarter notes (whole: 7 / 8 gives 4)
 std::string sceneTempoText (double bpm);                  // "120.00"
 std::string sceneSignatureText (int beats, int unit = 4); // "3 / 4" (the reference's spacing)
 // The reference's drag rates on the fields (live check 190ei: 5 px +14 BPM, 10 px +29, 20 px +58, 40 px +112, whole
@@ -131,7 +131,7 @@ int captureSlot (const Song& song, int track, int scene);
 // The captured phrase as the notes of a new clip and its `length` (whole bars, at least one): played while the transport
 // ran, the notes keep their place in the bar of the first one; played while stopped, the first starts the clip, the
 // timing kept at `bpm`. `nowMs`: notes still held end there.
-std::vector<Note> phraseNotes (const std::vector<scorelog::Entry>& phrase, double nowMs, double bpm, int beatsPerBar, std::int64_t& length);
+std::vector<Note> phraseNotes (const std::vector<scorelog::Entry>& phrase, double nowMs, double bpm, Meter meter, std::int64_t& length);
 
 // --- Capture MIDI in the Clip-launch layout (round 190em; Live 12.4.16, live check 190ei) ---------------------------
 // Played with the transport stopped, the reference sets the song tempo from the phrase (a s d f a s d f played evenly:
@@ -143,7 +143,7 @@ double phraseTempo (const std::vector<scorelog::Entry>& phrase, double fallback)
 std::vector<Note> clipTimeNotes (const std::vector<scorelog::Entry>& phrase, double nowMs, double bpm, double shift);
 // Capture into the clip playing in (track, scene) (the reference writes into it, no new clip): its loop content is
 // unrolled up to the bars just played, the notes are added there, and the clip's start and loop move to those bars (whole
-// bars of `song.beatsPerBar`, from the bar of the first note to the end of the last). A pattern another clip also uses
+// bars of the song's meter, from the bar of the first note to the end of the last). A pattern another clip also uses
 // is copied first. False: no pattern clip there, or no notes.
 bool captureIntoClip (Song& song, int track, int scene, const std::vector<Note>& notes);
 // The notes' channel becomes the track's instrument channel (`channel` ≥ 0).

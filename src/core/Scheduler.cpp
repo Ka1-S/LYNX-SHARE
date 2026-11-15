@@ -1,4 +1,5 @@
 #include "core/Scheduler.h"
+#include "core/ClipEnvelope.h"
 
 #include "core/ClipOps.h"
 #include "core/Groove.h"
@@ -20,13 +21,16 @@ void EventBuffer::add (const NoteEvent& e) noexcept
 
 void EventBuffer::sortByOffset() noexcept
 {
-    // "off" before "on" on the same sample, so a repeated note isn't cut. A stable insertion sort in place: this runs
-    // on the audio thread for every block with events, and std::stable_sort allocates a temporary buffer (round 160);
-    // the events arrive nearly in order, so it is close to linear.
-    const auto before = [] (const NoteEvent& a, const NoteEvent& b) {
+    // "off" before "on" on the same sample, so a repeated note isn't cut; a slide after the "on"s of its sample, so a
+    // slide note that starts with a note bends that note (issue #165: FL 2026 glides a note whose slide note starts on
+    // the same step; sorted before it, the slide found no sounding voice and the note played flat). A stable insertion
+    // sort in place: this runs on the audio thread for every block with events, and std::stable_sort allocates a
+    // temporary buffer (round 160); the events arrive nearly in order, so it is close to linear.
+    const auto rank = [] (NoteEvent::Type t) { return t == NoteEvent::Type::on ? 1 : t == NoteEvent::Type::slide ? 2 : 0; };
+    const auto before = [rank] (const NoteEvent& a, const NoteEvent& b) {
         if (a.sampleOffset != b.sampleOffset)
             return a.sampleOffset < b.sampleOffset;
-        return a.type != NoteEvent::Type::on && b.type == NoteEvent::Type::on;
+        return rank (a.type) < rank (b.type);
     };
     for (int i = 1; i < count; ++i)
     {
@@ -330,7 +334,7 @@ ScheduleIndex makeScheduleIndex (const Song& song)
         for (const auto& n : p.notes)
             longest = std::max (longest, n.length);
         index.maxNoteLength.push_back (longest);
-        index.patternLength.push_back (std::max<std::int64_t> (1, p.effectiveLength (song.beatsPerBar)));
+        index.patternLength.push_back (std::max<std::int64_t> (1, p.effectiveLength (song.meter())));
     }
 
     // FL's pattern clip takeover (issue #158): each pattern's clips chained by start, the list order kept on the same start
@@ -348,6 +352,40 @@ ScheduleIndex makeScheduleIndex (const Song& song)
     for (std::size_t k = 0; k + 1 < order.size(); ++k)
         if (song.playlist[(std::size_t) order[k]].pattern == song.playlist[(std::size_t) order[k + 1]].pattern)
             index.nextOfPattern[(std::size_t) order[k]] = order[k + 1];
+
+    // round 190gp: the clips by time (one bar per bucket; wider when the song is long or the clips are many bars long, so
+    // the table stays small)
+    if (! song.playlist.empty())
+    {
+        std::int64_t last = 0, span = 0;
+        for (const auto& c : song.playlist)
+        {
+            last = std::max (last, c.end() + 1);
+            span += std::max<std::int64_t> (0, c.length);
+        }
+        auto bucket = std::max<std::int64_t> (1, (std::int64_t) std::max (1, song.beatsPerBar) * ppq);
+        constexpr std::int64_t maxBuckets = 1 << 16, maxEntries = 1 << 21;
+        while (last / bucket + 1 > maxBuckets || span / bucket + 2 * (std::int64_t) song.playlist.size() > maxEntries)
+            bucket *= 2;
+        const auto buckets = (std::size_t) (last / bucket + 1);
+        auto of = [&] (std::int64_t tick) { return (std::size_t) std::clamp<std::int64_t> (tick < 0 ? 0 : tick / bucket, 0, (std::int64_t) buckets - 1); };
+        index.bucketFirst.assign (buckets + 1, 0);
+        for (const auto& c : song.playlist)
+            for (auto b = of (c.start); b <= of (c.end() + 1); ++b)
+                ++index.bucketFirst[b + 1];
+        for (std::size_t b = 0; b < buckets; ++b)
+            index.bucketFirst[b + 1] += index.bucketFirst[b];
+        index.bucketClips.assign (index.bucketFirst.back(), 0);
+        auto fill = index.bucketFirst;
+        for (std::size_t i = 0; i < song.playlist.size(); ++i)
+        {
+            const auto& c = song.playlist[i];
+            for (auto b = of (c.start); b <= of (c.end() + 1); ++b)
+                index.bucketClips[fill[b]++] = (std::uint32_t) i;
+        }
+        index.bucketTicks = bucket;
+        index.clipCount = song.playlist.size();
+    }
 
     return index;
 }
@@ -423,7 +461,7 @@ double hostPositionTick (const Song& song, double tick, std::int64_t songLength)
     if (song.patterns.empty())
         return tick;
     const auto& pattern = song.patterns[(std::size_t) std::clamp (song.currentPattern, 0, (int) song.patterns.size() - 1)];
-    return std::fmod (tick, (double) std::max<std::int64_t> (1, pattern.effectiveLength (song.beatsPerBar)));
+    return std::fmod (tick, (double) std::max<std::int64_t> (1, pattern.effectiveLength (song.meter())));
 }
 
 // An audio clip's note (round 190ey: out of scheduleClip, so a Playlist preview plays the clip through its channel the
@@ -448,6 +486,9 @@ NoteEvent audioClipNote (const Song& song, const Clip& clip, std::size_t clipInd
     e.fadeOutTension = clip.crossfadeOut > 0 || (clip.fadeCurve & 2) != 0 ? 0.0f : clip.fadeOutTension;
     e.clipPitch = clip.pitch; // FL 2026's clip pitch (round 167k): shifted, the clip's length stays
     e.clipStretch = (float) clip.stretch; // FL 2026's clip stretch (round 167l)
+    // the clip's own envelopes (round 190gi): only an active one reaches the voice (a flat or missing one costs nothing)
+    e.clipEnvelope = clipenv::activeOf (song, clip) != nullptr ? clip.envelope : -1;
+    e.clipEnvTick = (double) clip.offset + (double) clip.offsetFraction;
 
     // FL's per-clip edge declicker (round 189i, clipops::declickChoice): a Disabled side plays without the channel's
     // declicker, a manual side neither. FL /R renders (round 189l): a side FL marks as joined seamlessly (choice 1)
@@ -472,12 +513,69 @@ NoteEvent audioClipNote (const Song& song, const Clip& clip, std::size_t clipInd
 
 namespace
 {
+// Round 190gp: calls `visit (clipIndex)` in Playlist order for every clip that can play in the block [loopStart,
+// loopEnd) of the song loop of length `loop` (and, when the block crosses the loop's end, in [0, loopEnd − loop)): the
+// clips of the index's buckets that cover those ticks, each once. Without an index for this Playlist, or for a block
+// that spans many buckets, every clip (the old walk). scheduleClip itself decides what a visited clip plays, so the
+// events, and their order, are the same either way.
+template <typename Visit>
+void forClipsInBlock (const Song& song, const ScheduleIndex* index, std::int64_t loop, double loopStart, double loopEnd, Visit&& visit) noexcept
+{
+    constexpr int maxRanges = 8;
+    std::array<std::uint32_t, maxRanges> at {}, stop {};
+    int ranges = 0;
+    auto add = [&] (double from, double to) {
+        const auto bucket = (double) index->bucketTicks;
+        const auto buckets = (std::int64_t) index->bucketFirst.size() - 1;
+        const auto b0 = std::max<std::int64_t> (0, (std::int64_t) std::floor (from / bucket));
+        const auto b1 = std::min<std::int64_t> (buckets - 1, (std::int64_t) std::floor (to / bucket));
+        for (auto b = b0; b <= b1; ++b)
+        {
+            if (ranges == maxRanges)
+                return false;
+            at[(std::size_t) ranges] = index->bucketFirst[(std::size_t) b];
+            stop[(std::size_t) ranges] = index->bucketFirst[(std::size_t) b + 1];
+            ++ranges;
+        }
+        return true;
+    };
+    const auto usable = index != nullptr && index->bucketTicks > 0 && index->clipCount == song.playlist.size()
+                        && std::isfinite (loopStart) && std::isfinite (loopEnd) && add (loopStart, loopEnd)
+                        && (loopEnd <= (double) loop || add (0.0, loopEnd - (double) loop));
+    if (! usable)
+    {
+        for (std::size_t clipIndex = 0; clipIndex < song.playlist.size(); ++clipIndex)
+            visit (clipIndex);
+        return;
+    }
+    // the buckets' lists merged in Playlist order (a clip in several of them, once)
+    auto previous = std::numeric_limits<std::uint32_t>::max();
+    for (;;)
+    {
+        auto best = std::numeric_limits<std::uint32_t>::max();
+        for (int r = 0; r < ranges; ++r)
+            if (at[(std::size_t) r] < stop[(std::size_t) r])
+                best = std::min (best, index->bucketClips[at[(std::size_t) r]]);
+        if (best == std::numeric_limits<std::uint32_t>::max())
+            return;
+        for (int r = 0; r < ranges; ++r)
+            if (at[(std::size_t) r] < stop[(std::size_t) r] && index->bucketClips[at[(std::size_t) r]] == best)
+                ++at[(std::size_t) r];
+        if (best != previous)
+            visit ((std::size_t) best);
+        previous = best;
+    }
+}
+
 // One clip of the Playlist (or a performance-mode launch, played as a clip of its own), its events in the block.
 // [loopStart, loopEnd) = the block within the song loop of length `loop`.
 void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, double startTick, double endTick, int numSamples,
                    double tps, std::int64_t loop, double loopStart, double loopEnd, bool resume, const ScheduleIndex* index,
-                   EventBuffer& out, bool chase = false, std::int64_t stopsAt = std::numeric_limits<std::int64_t>::max()) noexcept
+                   EventBuffer& out, bool chase = false, const std::int64_t* takeoverZoneEnd = nullptr) noexcept
 {
+    // takeoverZoneEnd: FL's pattern clip takeover applies (stopsAtFor with that zone end), else never. Round 190ge: worked
+    // out only for a pattern clip the block reaches (it was found for every clip of the Playlist at every block: the
+    // walk along the pattern's later clips was the scheduler's largest cost in big projects)
     auto overlaps = [&] (double from, double to) {
         return (from < loopEnd && to > loopStart) || (loopEnd > (double) loop && from < loopEnd - (double) loop);
     };
@@ -488,25 +586,34 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
         if (clip.channel < 0 || clip.channel >= (int) song.channels.size() || clip.length <= 0)
             return;
 
+        // (round 190ge: a clip the block does not reach is left before its note is made — it was made for every audio
+        // clip of the Playlist at every block)
+        const auto resumes = resume && loopStart > (double) clip.start && loopStart < (double) clip.end();
+        const auto reached = overlaps ((double) clip.start, (double) clip.end() + 1.0);
+        if (! resumes && ! reached)
+            return;
+
         auto e = audioClipNote (song, clip, clipIndex, tps);
 
-        if (resume && loopStart > (double) clip.start && loopStart < (double) clip.end())
+        if (resumes)
         {
             e.type = NoteEvent::Type::on;
             e.sampleOffset = 0;
             e.startSeconds = ((double) clip.offset + (double) clip.offsetFraction + loopStart - (double) clip.start) * secondsPerTick;
             e.clipElapsed = (float) ((loopStart - (double) clip.start) / tps);
             e.clipRemaining = (float) (((double) clip.end() - loopStart) / tps);
+            e.clipEnvTick = clipenv::clipTick (clip, loopStart);
             out.add (e);
         }
 
-        if (! overlaps ((double) clip.start, (double) clip.end() + 1.0))
+        if (! reached)
             return;
 
         e.type = NoteEvent::Type::on;
         e.startSeconds = std::max (0.0, ((double) clip.offset + (double) clip.offsetFraction) * secondsPerTick);
         e.clipElapsed = 0.0f;
         e.clipRemaining = (float) ((double) clip.length / tps);
+        e.clipEnvTick = (double) clip.offset + (double) clip.offsetFraction;
         emitOccurrences ((double) clip.start, loop, startTick, endTick, tps, numSamples, e, out);
 
         e.type = NoteEvent::Type::off;
@@ -522,6 +629,7 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
     if (! overlaps ((double) clip.start, (double) clip.end() + 1.0))
         return;
 
+    const auto stopsAt = takeoverZoneEnd != nullptr ? stopsAtFor (song, clipIndex, index, *takeoverZoneEnd) : std::numeric_limits<std::int64_t>::max();
     const auto& pattern = song.patterns[(std::size_t) clip.pattern];
     const auto& notes = pattern.notes;
     // LYNX extra (stretchedClipsLoop(), default on; issue #25): a pattern clip longer than its pattern loops it (FL
@@ -529,12 +637,13 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
     // pattern's length. A clip within its pattern, or the option off, is one pass of the notes in [offset, offset + length).
     const auto period = index != nullptr && (std::size_t) clip.pattern < index->patternLength.size()
                             ? index->patternLength[(std::size_t) clip.pattern]
-                            : std::max<std::int64_t> (1, pattern.effectiveLength (song.beatsPerBar));
+                            : std::max<std::int64_t> (1, pattern.effectiveLength (song.meter()));
     const auto repeats = stretchedClipsLoop() && clip.offset + clip.length > period;
     const auto firstPass = repeats ? clip.offset / period : 0, lastPass = repeats ? (clip.offset + clip.length - 1) / period : 0;
-    // a clip of the grid may play through a groove of the pool (round 190bv, core/Groove.h): its notes sound moved and
-    // accented, the pattern stays as written. No groove (every Playlist clip, every project without a pool): nothing here.
-    const auto* clipGroove = clip.gridSlot >= 0 ? groove::ofClip (song, clip) : nullptr;
+    // a clip may play through a groove of the pool (round 190bv, core/Groove.h; Playlist clips too since round 190fm):
+    // its notes sound moved and accented, the pattern stays as written. No groove (every clip saved before, every project
+    // without a pool): nothing here. (ofClip only reads: no allocation on the audio thread)
+    const auto* clipGroove = groove::ofClip (song, clip);
     const auto grooveReach = clipGroove != nullptr ? (double) groove::maxShift (*clipGroove, song.grooves.amount) : 0.0;
 
     // one pass: the notes `shift` ticks later (pass ticks = pattern ticks + shift)
@@ -684,18 +793,16 @@ void scheduleSong (const Song& song, double startTick, int numSamples, double tp
 
     const auto zoneEnd = song.performanceZoneEnd();
 
-    for (std::size_t clipIndex = 0; clipIndex < song.playlist.size(); ++clipIndex)
-    {
+    forClipsInBlock (song, index, loop, loopStart, loopEnd, [&] (std::size_t clipIndex) {
         const auto& clip = song.playlist[clipIndex];
 
         // muted clips and tracks, comping auditions; Performance mode: the zone's clips play only when launched
         // (schedulePerformance)
         if (! clipPlaysInSong (song, clip, zoneEnd))
-            continue;
+            return;
 
-        scheduleClip (song, clip, clipIndex, startTick, endTick, numSamples, tps, loop, loopStart, loopEnd, resume, index, out, chase,
-                      stopsAtFor (song, clipIndex, index, zoneEnd));
-    }
+        scheduleClip (song, clip, clipIndex, startTick, endTick, numSamples, tps, loop, loopStart, loopEnd, resume, index, out, chase, &zoneEnd);
+    });
 
     out.sortByOffset();
 }
@@ -715,29 +822,27 @@ void scheduleSongAround (const Song& song, const TrackMask& taken, const TrackMa
     const auto loopEnd = loopStart + (endTick - startTick);
     const auto zoneEnd = song.performanceZoneEnd();
 
-    for (std::size_t clipIndex = 0; clipIndex < song.playlist.size(); ++clipIndex)
-    {
+    forClipsInBlock (song, index, loop, loopStart, loopEnd, [&] (std::size_t clipIndex) {
         const auto& clip = song.playlist[clipIndex];
         if (clip.muted || song.isTrackMuted (clip.track) || clip.start < zoneEnd)
-            continue;
+            return;
         const auto inMask = clip.track >= 0 && clip.track < scheduleMaskTracks;
         if (inMask && taken[(std::size_t) clip.track])
         {
             // only the ends: what the track was sounding still stops
             const auto first = out.size();
-            scheduleClip (song, clip, clipIndex, startTick, endTick, numSamples, tps, loop, loopStart, loopEnd, false, index, out, false,
-                          stopsAtFor (song, clipIndex, index, zoneEnd));
+            scheduleClip (song, clip, clipIndex, startTick, endTick, numSamples, tps, loop, loopStart, loopEnd, false, index, out, false, &zoneEnd);
             auto kept = first;
             for (int i = first; i < out.size(); ++i)
                 if (out[i].type == NoteEvent::Type::off)
                     out.at (kept++) = out[i];
             out.resize (kept);
-            continue;
+            return;
         }
         const auto back = inMask && givenBack[(std::size_t) clip.track];
         scheduleClip (song, clip, clipIndex, startTick, endTick, numSamples, tps, loop, loopStart, loopEnd, resume || back, index, out, chase || back,
-                      stopsAtFor (song, clipIndex, index, zoneEnd));
-    }
+                      &zoneEnd);
+    });
     out.sortByOffset();
 }
 } // namespace lynx

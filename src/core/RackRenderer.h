@@ -9,11 +9,14 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <utility>
+#include <unordered_set>
 #include <vector>
 
 #include "core/Arpeggiator.h"
+#include "core/LinkFormula.h"
 #include "core/ChannelMiscFx.h"
 #include "core/ChannelPoly.h"
 #include "core/VoiceLimit.h"
@@ -23,6 +26,7 @@
 #include "core/Instruments.h"
 #include "core/TimeStretch.h"
 #include "core/LiveEventQueue.h"
+#include "core/SnapshotExchange.h"
 #include "core/LiveInput.h"
 #include "core/LowLatency.h"
 #include "core/Meters.h"
@@ -60,6 +64,8 @@ struct RackState
     std::vector<std::shared_ptr<Instrument>> instruments; // one per channel
     std::vector<std::vector<std::shared_ptr<Effect>>> effects; // [mixer track][slot]
     double sampleRate = 44100.0; // rate the new instruments were prepared with
+    // Round 190gn (A1): the keep-pitch samplers' stock of fresh pitch shifters (shared with the racks built from this one)
+    std::shared_ptr<ShifterStock> shifterStock;
     // Round 168s (issue #32): this snapshot's number, the one it was built from, and for each channel the channel of
     // that snapshot it is (−1 = new): the renderer moves its per-channel note state along when channels moved
     std::uint64_t serial = 0, builtFrom = 0;
@@ -115,6 +121,14 @@ struct RackState
         int pattern = 0, lane = 0, slot = 0;
     };
     std::vector<EventLane> eventLanes;
+    // round 190gw: automation clips with several target links (FL's "Target links", Automation::links): each link takes
+    // a slot after the event lanes whose value is the clip's own through the link's mapping formula
+    struct LinkSlot
+    {
+        int automation = 0, slot = 0;
+        linkformula::Formula formula;
+    };
+    std::vector<LinkSlot> linkSlots;
     std::vector<std::vector<int>> patternClips; // per pattern: its clips in the Playlist, by start
 
     struct PluginParamBinding
@@ -255,6 +269,11 @@ struct RackState
     std::vector<int> graphIndegree;                   // [task] tasks that must finish first
     std::vector<int> graphNextStart, graphNext;       // [task] → successors (CSR)
     std::vector<int> graphRoots;                      // tasks with nothing before them, heaviest kind first
+    // Round 190gq (REA 190hb, FL's mixer threading runs each serial chain of tracks as one unit): [task] the task run
+    // right after it on the same thread (its only successor, which nothing else feeds), −1 none; those tasks are not
+    // handed out on their own (graphFusedCount of them), so a chain costs no hand-off per link
+    std::vector<int> graphFused;
+    int graphFusedCount = 0;
     std::vector<std::vector<int>> trackChannels;      // [track] the channels playing into it, in channel order
     void buildMixerGraph();
     void applyVcas(); // VCA mutes into mixerAudible, the VCA chains (round 177a)
@@ -313,15 +332,16 @@ struct RackState
 
     // Sample stretched without changing pitch (ratio = new / original duration); cached in the app.
     // `map`: the channel's warp map (core/TimeStretch warpStretchMap; empty = one ratio)
+    // `options` (round 190fm): the warp mode's own settings (core/TimeStretch StretchOptions)
     using StretchedSampleProvider = std::function<std::shared_ptr<const SampleData> (const std::string& path, double ratio, StretchMethod method,
-                                                                                     double semitones, const StretchMap& map)>;
+                                                                                     double semitones, const StretchMap& map, const StretchOptions& options)>;
 
     // A channel's precomputed span (its region after its precomputed effects and Trim) stretched by `ratio`, cached in the
     // app by (path, variantKey, ratio, method): FL stretches that span, not the whole file (round 180d). Unset: stretched
     // here, uncached (tests).
     using StretchedSpanProvider = std::function<std::shared_ptr<const SampleData> (const std::string& path, const std::string& variantKey,
                                                                                   const std::shared_ptr<const SampleData>& span, double ratio,
-                                                                                  StretchMethod method, double semitones)>;
+                                                                                  StretchMethod method, double semitones, const StretchOptions& options)>;
 
     struct Factories
     {
@@ -335,9 +355,36 @@ struct RackState
         // when it was off). A Patcher that holds such a plugin is built anew as a whole. Unset: nothing is forced.
         std::function<bool (const PluginRef&)> rebuildPlugin;
         launcher::Runtime* clipLauncher = nullptr; // (round 181a) only the engine's own state, and only with a grid
+        // One publish may deliberately replace selected runtime identities (remote reset/replacement).
+        // An empty set preserves the established positional fallback for ordinary project/UI edits.
+        std::unordered_set<std::uint64_t> freshInstances;
         // round 190aq: the inserts whose latency-adding slots are bypassed (lowlatency::bypassTracks); empty = none
         std::vector<char> lowLatencyTracks;
     };
+
+    // Round 190gp: what the renderer's effect loop needs of each slot, worked out once per snapshot ([track][slot], one
+    // per slot with an effect): a few bytes in a row instead of each EffectSlot (about 1 KB) and its automation table
+    // (768 bytes) read at every block, most of the effect loop's own cost in a big project (cache misses).
+    struct SlotPlan
+    {
+        EffectKind kind {};
+        bool active = false;        // Song::slotActive
+        bool smartEligible = false; // smart disable may skip it (everything but FL's global switch, which is read live)
+        bool longHold = false;      // a plugin or a Patcher: 4 s of silence before smart disable, else 1 s
+        bool liveMeters = false;    // an editor shows its controlOutput()
+        bool isPlugin = false;
+        bool routed = false;        // a hosted effect with routed Connections (slotConnections)
+        bool sends = false;         // it sends into its own buffers (Fruity Send, Patcher, Transmitter, Transporter, Equo, routed)
+        bool hasMixAuto = false;    // effectMixAuto has its entry (mixAuto)
+        bool tailHold = false;      // smart disable may take the effect's declared tail (a built-in with no side input)
+        int mixAuto = -1;
+        float mix = 1.0f;
+        int used = 0;               // the parameters its kind has (and the slot holds)
+        int firstAutomated = 0;     // its first automated parameter (used = none)
+    };
+    std::vector<std::vector<SlotPlan>> slotPlans;
+    static SlotPlan planSlot (const RackState& state, int track, std::size_t slot) noexcept;
+    void buildSlotPlans();
 
     // Builds the next state reusing the instruments from `previous` when the
     // channel changed neither instrument nor sample, and the effects when the slot has the
@@ -401,6 +448,9 @@ struct ProcessTimes
     // itself in `levelWanted[key]`; while it is above 0 the audio thread raises slotLevels[key * 2 + 0 / 1] to the
     // block's peak (linear), and the editor takes them with exchange (0) (the highest peak since its last frame).
     std::array<std::atomic<std::uint16_t>, (std::size_t) maxMixerTracks * maxEffectSlots> levelWanted {};
+    // Round 190gp: the editors showing a slot's live meters (effectMeters) count themselves here; the renderer tells the
+    // slot's effect before each block (Effect::setMetersShown), so a costly meter runs only while one is open.
+    std::array<std::atomic<std::uint16_t>, (std::size_t) maxMixerTracks * maxEffectSlots> metersWanted {};
     std::array<std::atomic<float>, (std::size_t) maxMixerTracks * maxEffectSlots * 2> slotLevels {};
 
     // Audio of one effect slot for an editor's spectrum analyser (Facet EQ, round 103): the editor sets `key`
@@ -495,9 +545,35 @@ public:
         sideTrack = track;
     }
 
+    // Round 190gj (P9, FL's "Split mixer tracks" in one render): while set, every process() block copies the post-fader
+    // output of each `wanted` insert, and the Master's own input before its routes arrive (its channels: index 0), into
+    // `taps` at its place in the block. A part where an insert stays inactive (silent, idle) is left as it was: the
+    // export clears the taps before each block. Same thread as process(); set off playback (an offline render).
+    struct RenderTaps
+    {
+        int capacity = 0;                     // samples per block
+        std::vector<char> wanted;             // [track]
+        std::vector<std::vector<float>> data; // [track]: left (capacity samples) then right
+        bool wants (int t) const noexcept { return t >= 0 && (std::size_t) t < wanted.size() && wanted[(std::size_t) t] != 0; }
+        float* left (int t) noexcept { return data[(std::size_t) t].data(); }
+        float* right (int t) noexcept { return data[(std::size_t) t].data() + capacity; }
+    };
+    void setRenderTaps (RenderTaps* taps) noexcept { renderTaps = taps; }
+
     // Allocates the mixer buffers: call off the audio thread.
     // Blocks larger than maxBlockSize are processed in pieces.
     void prepare (double sampleRate, int maxBlockSize = 2048);
+
+    // Round 190gn (A6, memory): the channel and mixer buffers are sized by the songs played, not for 1 024 channels and
+    // 501 inserts (~8 MB, all touched). Off the audio thread, before `state` reaches process(): grows them (in steps of
+    // 32) when the state has more channels or inserts than they hold; the audio thread swaps to the new ones at its
+    // next block (never smaller than the state it plays). A renderer nobody calls this on (tools, tests, offline
+    // renders) grows them on the rendering thread instead.
+    void reserveFor (const RackState& state);
+    // the channels / inserts the buffers hold now (as last reserved or prepared)
+    int bufferChannels() const noexcept { return reservedChannels.load (std::memory_order_relaxed); }
+    int bufferTracks() const noexcept { return reservedTracks.load (std::memory_order_relaxed); }
+    static constexpr int minBufferChannels = 64, minBufferTracks = 128;
 
     // Audio thread. left/right are overwritten. `live` (optional) carries notes
     // played live, applied at the start of the block.
@@ -522,6 +598,8 @@ public:
         std::array<std::atomic<std::uint64_t>, maxChannels> channelMaxNs {}; // longest single call (spikes)
         std::array<std::atomic<std::uint64_t>, (std::size_t) maxMixerTracks * maxEffectSlots> effectMaxNs {};
         std::atomic<std::uint64_t> processNs { 0 }, processedSamples { 0 };
+        // round 190gg: the slowest channel / effect call since the audio callback last took it (core/Dropouts.h pack())
+        std::atomic<std::uint64_t> blockSlowest { 0 };
     };
     // The keys sounding on a channel (played by the song / pattern, the keyboard, MIDI inputs), for the Piano roll's
     // keyboard (issue #14: FL lights them); published after each block, safe to read from any thread.
@@ -534,6 +612,74 @@ public:
     void setProfiling (bool on) noexcept { profiling.store (on, std::memory_order_relaxed); }
     bool isProfiling() const noexcept { return profiling.load (std::memory_order_relaxed); }
     const UnitTimes& unitTimes() const noexcept { return *units; }
+    // Round 190gg: the slowest channel / effect call since the last take (core/Dropouts.h pack(); 0 = none). Audio thread,
+    // once per device callback.
+    std::uint64_t takeBlockSlowest() noexcept { return units->blockSlowest.exchange (0, std::memory_order_relaxed); }
+
+    // ---- Render-ahead (round 190gq, core/RenderAhead.h) ----------------------------------------------------------
+    // Two renderers can share one rack, each channel and insert rendered by exactly one of them: the live one at the
+    // device block, the other a few blocks ahead on its own thread. A Split names the other renderer's units and the
+    // boundary: the units of the part rendered ahead that a live insert takes (a channel or an insert routed into it,
+    // a send tap, a side-chain or Connections source). The renderer that renders ahead writes them into a SplitBlock
+    // chunk by chunk; the live one reads them where the unit would have run. The same samples either way.
+    struct Split
+    {
+        static constexpr int maxSlots = 256;
+        enum class Kind : std::uint8_t { channel, track, tap };
+        std::array<char, maxChannels> foreignChannel {};       // 1 = the other renderer renders this channel
+        std::array<char, maxMixerTracks> foreignTrack {};      // ... this insert (0 = the Master)
+        std::array<std::int16_t, maxChannels> channelSlot {};  // its boundary slot, −1 = none
+        std::array<std::int16_t, maxMixerTracks> trackSlot {};
+        std::array<std::int16_t, RackState::maxSendTaps> tapSlot {};
+        std::array<Kind, maxSlots> slotKind {};
+        std::array<std::int16_t, maxSlots> slotUnit {};
+        int slots = 0;
+        bool exports = false; // true: this renderer writes the boundary (it renders ahead); false: it reads it
+        void clear() noexcept
+        {
+            foreignChannel.fill (0);
+            foreignTrack.fill (0);
+            channelSlot.fill (-1);
+            trackSlot.fill (-1);
+            tapSlot.fill (-1);
+            slots = 0;
+            exports = false;
+        }
+    };
+    struct SplitBlock
+    {
+        static constexpr int maxChunks = 64;
+        float* audio = nullptr;        // slot s, side d: audio + (s * 2 + d) * stride, each chunk at its offset in the block
+        int stride = 0;
+        std::uint8_t* flags = nullptr; // [chunk * Split::maxSlots + slot]: the channel's channelSilent, the insert's or tap's activity
+        int chunks = 0;
+        std::array<int, maxChunks> chunkOffset {};
+    };
+    // Same thread as process(); nullptr = this renderer renders everything (the default)
+    void setSplit (const Split* s) noexcept { split = s; }
+    void setSplitBlock (SplitBlock* block) noexcept { splitBlock = block; }
+    // the play head this renderer's hosted plugins see (core/Instruments.h), nullptr = the shared one (the song position)
+    void setHostTimeline (HostTimeline* timeline) noexcept { ownTimeline = timeline; }
+    // the Plugin performance monitor's and the profiler's counters are `other`'s: both renderers of one rack add their
+    // units into them, and only `other` counts the audio's duration
+    void shareTimesWith (RackRenderer& other) noexcept;
+    // Moving units between the two renderers (at a block boundary, both idle): the global state — transport, the
+    // started notes, automation values, the live clocks — and each flagged unit's own state (fader ramps, the built-in
+    // EQ, smart disable, one-knob glides, held keys, voice order, Mono layers, Layer picks). Any per-unit state added to
+    // the renderer must be copied in adoptUnits too.
+    void adoptGlobals (const RackRenderer& from) noexcept;
+    void adoptUnits (const RackRenderer& from, const char* channels, const char* tracks) noexcept;
+    // these automations' values (controllers: their value comes from a unit's output), or all of them (nullptr)
+    void adoptAutomationValues (const RackRenderer& from, const int* automations, int count) noexcept;
+    // the flagged channels' voices end now and their note state is cleared (what render-ahead played for them was dropped)
+    void silenceChannels (const RackState& state, const char* channels) noexcept;
+    // the snapshot it last rendered is gone: not looked at again (prepare)
+    void forgetState() noexcept { lastState = nullptr; }
+    // chunks whose boundary did not line up with the part rendered ahead (the live renderer; diagnostics)
+    std::uint64_t splitMismatchCount() const noexcept { return splitMismatches; }
+    // A7's measure of the last chunk: its units' summed work as a share of the chunk's real time (0 when not measured,
+    // e.g. without workers). Render-ahead skips its probe when one thread could not carry the ahead part anyway.
+    double lastWorkShare() const noexcept { return lastWorkShareValue; }
     // Blocks in which an insert effect output NaN / inf and was muted and reset (all renderers, since start; round 111)
     static std::uint64_t nonFiniteEffectBlocks() noexcept;
     void resetUnitTimes() noexcept;
@@ -556,6 +702,9 @@ public:
 
     // Tempo used in the last block (changes with tempo automation). The transport advances with it.
     double currentBpm() const noexcept { return bpm; }
+    // The song's own tempo in the last block (its tempo, automation and tempo events), with or without an override
+    // (round 190gl: the Link session proposes it to its peers)
+    double songBpm() const noexcept { return ownBpm; }
     // > 0: the tempo of an external MIDI clock LYNX follows (round 165f), over the song's tempo and its automation
     void setTempoOverride (double b) noexcept { tempoOverride = b; }
 
@@ -570,7 +719,31 @@ public:
 
 private:
     void processChunk (const RackState& state, bool playing, double startTick, int numSamples,
-                       float* left, float* right, MeterBank* meters) noexcept;
+                       float* left, float* right, MeterBank* meters, bool continuing = false) noexcept;
+    // render-ahead (round 190gq): this renderer's part of the rack, the boundary in and out
+    const Split* split = nullptr;
+    SplitBlock* splitBlock = nullptr;
+    int splitChunk = 0; // the chunk of the current process() call
+    std::uint64_t splitMismatches = 0;
+    HostTimeline* ownTimeline = nullptr;
+    bool countsAudio = true; // (false: a renderer that shares another's times)
+    bool foreignChannel (int c) const noexcept { return split != nullptr && c >= 0 && c < maxChannels && split->foreignChannel[(std::size_t) c] != 0; }
+    bool foreignTrack (int t) const noexcept { return split != nullptr && t >= 0 && t < maxMixerTracks && split->foreignTrack[(std::size_t) t] != 0; }
+    void importChannel (int channel, int n) noexcept;
+    void importTrack (const RackState& state, int track, int n) noexcept;
+    void exportSplit (int n) noexcept;
+    // A7 (round 190gq): each unit's time in the last chunk it ran in, measured while workers are available (the
+    // channel and insert tasks; nanoseconds, saturated), and what the chunk's work comes to from them
+    std::array<std::uint32_t, maxChannels> channelCostNs {};
+    std::array<std::uint32_t, maxMixerTracks> trackCostNs {};
+    bool measureUnits = false;
+    bool parallelChunk = false; // this chunk may go to the workers (the snapshot's guess, or its units' measured work)
+    double lastWorkShareValue = 0.0;
+    // the channel pass in clusters of neighbouring channels worth one hand-off each: [k] first channel of cluster k
+    std::array<std::int16_t, maxChannels + 1> clusterStart {};
+    // the boundary row of the current chunk (−1: the chunks do not line up: the slow path)
+    int splitRow() noexcept;
+    void resetNoteTools (const RackState& state) noexcept;
     void renderChannel (const RackState& state, int channel, int n) noexcept;
     void processTrack (const RackState& state, int track, int n, MeterBank* meters) noexcept;
     void runSilencedTrack (const RackState& state, int track, int n, const MixerMatrix& level, MeterBank* meters, bool cutEffectSends) noexcept;
@@ -596,9 +769,20 @@ private:
     double compensateTicksPerSample = 0.0; // > 0: compensation on in this block
     float automated (int automation, float base) const noexcept;
     float* trackBuffer (int track, int channel) noexcept;
+    // Round 190gp (lazy-zero track buffers): an insert's buffer nobody has written in this chunk holds zeros without
+    // storing them (trackUnwritten). trackBuffer — for the insert's own work and what is added into it — stores the
+    // zeros on first use; trackInput — another insert reading it (a sidechain, a route, a hardware output) — reads
+    // `zeroBlock` instead, so nothing is written by a reader. rawTrackBuffer: the memory, as it is.
+    const float* trackInput (int track, int channel) noexcept;
+    float* rawTrackBuffer (int track, int channel) noexcept;
+    bool trackZeros (int track) const noexcept { return (std::size_t) track < trackUnwritten.size() && trackUnwritten[(std::size_t) track] != 0; }
+    std::vector<std::uint8_t> trackUnwritten;
+    std::vector<float> zeroBlock;
+    int trackSamples = 0; // the chunk's samples (what trackBuffer zeroes)
 
     double sampleRate = 44100.0;
     double bpm = 120.0;
+    double ownBpm = 120.0;
     double tempoOverride = 0.0;
     bool wasPlaying = false;
     double expectedTick = -1.0; // where the next block should start, to detect jumps
@@ -611,7 +795,22 @@ private:
     std::vector<VoiceOrder> voiceOrderScratch;   // (round 168s: moving the note state with moved channels)
     std::vector<NoteMask> heldScratch;
     EventBuffer events;
-    std::vector<float> mixBuffers; // maxMixerTracks * 2 * blockCapacity
+    // round 190gn (A6): the per-chunk channel and insert buffers, sized by the songs (reserveFor) and handed to the
+    // audio thread like the snapshots; `buffers` is the one process() uses (audio thread)
+    struct Buffers
+    {
+        int channels = 0, tracks = 0, frames = 0;  // frames: of each mixer buffer, min (blockCapacity, chunkCapacity)
+        mutable std::vector<float> channel;      // channels * 2 * chunkCapacity
+        mutable std::vector<float> scratch;      // tracks * 2 * chunkCapacity
+        mutable std::vector<float> mix;          // tracks * 2 * frames
+    };
+    static std::unique_ptr<const Buffers> makeBuffers (int channels, int tracks, int frames);
+    bool buffersFor (const RackState& state) noexcept; // (audio thread) false: no buffers for it (the block is silent)
+    SnapshotExchange<Buffers> bufferExchange;
+    const Buffers* buffers = nullptr;
+    std::mutex bufferLock; // the producers of bufferExchange: reserveFor (message thread) and prepare
+    std::atomic<int> reservedChannels { 0 }, reservedTracks { 0 }, preparedFrames { 0 };
+    std::atomic<bool> reserving { false }; // reserveFor is used: the audio thread never grows them itself
     std::array<float, RackState::maxAutomations> automationValues {}; // NaN = not evaluated yet
     // the pitch bend an automation / event lane last gave each LYNX instrument (0..1; NaN = none yet; issue #12)
     std::array<float, maxChannels> automatedBend {};
@@ -661,9 +860,8 @@ private:
     channelpoly::Mode polyMode (const ChannelDef& c, const Instrument& instrument) const noexcept;
     void clearPolyLayers() noexcept;
     static constexpr int chunkCapacity = 512;               // chunks processed at once
-    std::vector<float> channelBuffers;                      // maxChannels * 2 * chunkCapacity
-    std::vector<float> trackScratchBuffers;                 // maxMixerTracks * 2 * chunkCapacity
     double chunkStartTick = 0.0, chunkTps = 1.0;            // of the chunk being rendered (for the arpeggiator)
+    bool clipEnvTableShown = false, clipEnvTableWas = false; // round 190gi: the last chunk's song had clip envelopes
     // live-played notes of channels with an arpeggiator, echo delay or key / velocity tracking go through the
     // channel's note path like the scheduled ones (FL, round 149); while stopped the arpeggiator runs on its own clock
     std::array<NoteEvent, 256> liveRouted {};
@@ -672,6 +870,12 @@ private:
     std::unique_ptr<vfx::EventList> vfxIn = std::make_unique<vfx::EventList>(), vfxOut = std::make_unique<vfx::EventList>();
     int liveRoutedCount = 0;
     double liveTick = 0.0;
+    // round 190gh (B7, render = playback): while playing, the automation's pieces end on a grid counted in samples from
+    // where playback started (or jumped: a seek, the loop), not from each block's start, so the values change at the
+    // same samples whatever the audio device's block size; an export (blocks of 512 from its start) is unchanged
+    std::int64_t gridSample = 0;   // (audio thread) samples played since the start or the last jump
+    std::int64_t pieceStart = 0;   // where the current piece began (on that count): a block's end may cut it
+    double gridNextTick = -1.0;    // the tick the next block starts at when nothing jumps; < 0: not playing
     bool routesLiveNotes (const RackState& state, int channel) const noexcept;
     // Layer channels (round 164): each note event of a Layer is copied to the children it plays (core/Layer.h). The
     // child a Random / Sequential note picked is kept per Layer and key so its "off" reaches the same child.
@@ -683,6 +887,8 @@ private:
     WorkerPool* workers = nullptr;
     LiveInput* liveInput = nullptr;
     HardwareOutput* hwOut = nullptr;
+    RenderTaps* renderTaps = nullptr; // round 190gj (single-pass stems)
+    void copyToRenderTap (int t, const float* l, const float* r, int n) noexcept;
     perf::Live* perfLive = nullptr;
     perf::Player perfPlayer;
     double perfClock = 0.0;      // the Player's steady clock (ticks): the transport's position, never wrapping
@@ -715,8 +921,10 @@ private:
     bool runTaskGraph (const RackState& state, bool playing, int channels, int numSamples, MeterBank* meters) noexcept;
     void sumChannelsInto (const RackState& state, int track, int channels, int n) noexcept;
     std::atomic<bool> profiling { false };
-    std::unique_ptr<UnitTimes> units = std::make_unique<UnitTimes>();
-    std::unique_ptr<ProcessTimes> times = std::make_unique<ProcessTimes>();
+    std::unique_ptr<UnitTimes> ownUnits = std::make_unique<UnitTimes>();
+    std::unique_ptr<ProcessTimes> ownTimes = std::make_unique<ProcessTimes>();
+    UnitTimes* units = ownUnits.get();
+    ProcessTimes* times = ownTimes.get();
 
     struct SmartDisableState
     {

@@ -24,6 +24,22 @@ juce::Colour loadColour (double v)
     return v < 25.0 ? theme::colour::meterLow : v < 60.0 ? theme::colour::meterMid : theme::colour::meterClip;
 }
 
+juce::String describeDropoutInfo (const AudioEngine::DropoutInfo& d)
+{
+    if (d.count == 0)
+        return {};
+    auto text = tr ("Dropouts since the start: {0} (the last {1} s ago).", { juce::String ((juce::int64) d.count), juce::String (d.secondsAgo) });
+    const auto load = juce::String (juce::roundToInt (d.load * 100.0));
+    if (d.cause == dropouts::Cause::system)
+        text << " " << tr ("Cause: driver or system latency (the load was only {0}%). Try a larger buffer or another driver.", { load });
+    else if (d.slowest.isNotEmpty())
+        text << " " << tr ("Cause: the processing took longer than the buffer ({0} ms). Slowest in that block: {1} ({2} ms).",
+                           { juce::String (d.bufferMs, 1), d.slowest, juce::String (d.slowestMs, 1) });
+    else
+        text << " " << tr ("Cause: the processing came near the buffer's limit ({0}%). Try a larger buffer, or freeze the heaviest channels.", { load });
+    return text;
+}
+
 class MonitorTable final : public juce::Component
 {
 public:
@@ -165,6 +181,11 @@ public:
         note.setColour (juce::Label::textColourId, theme::colour::textDisabled);
         note.setText (tr ("100% = one processor core busy for the whole time the audio lasts"), juce::dontSendNotification);
         addAndMakeVisible (note);
+        // round 190gg (B5): the dropouts and their cause, over the table's foot
+        dropoutLine.setFont (theme::font (theme::type::small));
+        dropoutLine.setColour (juce::Label::textColourId, theme::colour::warning);
+        dropoutLine.setMinimumHorizontalScale (0.85f);
+        addChildComponent (dropoutLine);
 
         table.describe = [this] (const perfmon::Source& s) { return describe (s); };
         table.onSort = [this] { refreshRows(); };
@@ -211,6 +232,15 @@ public:
             wall += sum + 4'000'000;
             monitor.update (list, busy, audio, wall);
         }
+        // (a sample dropout of the second kind: the driver late while the load was low)
+        AudioEngine::DropoutInfo sample;
+        sample.count = 2;
+        sample.system = 2;
+        sample.secondsAgo = 14;
+        sample.cause = dropouts::Cause::system;
+        sample.load = 0.23;
+        sample.bufferMs = 10.7;
+        setDropoutText (describeDropoutInfo (sample));
         refreshRows();
     }
 
@@ -233,6 +263,11 @@ public:
         auto bottom = area.removeFromBottom (20);
         total.setBounds (bottom.removeFromLeft (bottom.getWidth() / 2));
         note.setBounds (bottom);
+        if (dropoutLine.isVisible())
+        {
+            area.removeFromBottom (2);
+            dropoutLine.setBounds (area.removeFromBottom (34));
+        }
         area.removeFromBottom (6);
         viewport.setBounds (area);
         table.setSize (area.getWidth() - (table.idealHeight() > area.getHeight() ? viewport.getScrollBarThickness() : 0), juce::jmax (area.getHeight(), table.idealHeight()));
@@ -271,7 +306,19 @@ private:
         for (std::size_t k = 0; k < times->effectNs.size(); ++k)
             busy[(std::size_t) perfmon::channelKeys + k] = times->effectNs[k].load (std::memory_order_relaxed);
         monitor.update (perfmon::sources (engine.getSong()), busy, times->audioNs.load(), times->wallNs.load());
+        setDropoutText (describeDropouts (engine));
         refreshRows();
+    }
+
+    void setDropoutText (const juce::String& text)
+    {
+        dropoutLine.setText (text, juce::dontSendNotification);
+        dropoutLine.setTooltip (text);
+        if (dropoutLine.isVisible() != text.isNotEmpty())
+        {
+            dropoutLine.setVisible (text.isNotEmpty());
+            resized();
+        }
     }
 
     void refreshRows()
@@ -288,7 +335,7 @@ private:
     AudioEngine& engine;
     bool measuring = true, wasPlaying = false;
     perfmon::Monitor monitor;
-    juce::Label findLabel, total, note;
+    juce::Label findLabel, total, note, dropoutLine;
     juce::TextEditor find;
     juce::ToggleButton pluginsOnly, freeze, resetOnPlay;
     juce::TextButton reset { tr ("Reset") };
@@ -300,6 +347,11 @@ private:
 void showPluginMonitor (AudioEngine& engine)
 {
     openToolWindow (std::make_unique<PluginMonitorPanel> (engine, true), tr ("Plugin performance monitor"), "plugin-monitor");
+}
+
+juce::String describeDropouts (AudioEngine& engine)
+{
+    return describeDropoutInfo (engine.dropoutInfo());
 }
 
 std::unique_ptr<juce::Component> makePluginMonitorPanel (AudioEngine& engine)

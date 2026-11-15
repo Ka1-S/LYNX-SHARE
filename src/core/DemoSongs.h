@@ -91,7 +91,7 @@ inline Note note (int channel, double beat, double beats, int key, float velocit
 // addTrack at bar 0, is moved to `fromBar`)
 inline void repeatClip (Song& song, int track, int pattern, int fromBar, int toBar, int every)
 {
-    const auto bar = (std::int64_t) ppq * song.beatsPerBar;
+    const auto bar = song.barTicks();
     Clip proto;
     bool found = false;
     for (auto it = song.playlist.begin(); it != song.playlist.end();)
@@ -133,7 +133,7 @@ inline simpletracks::Result drums (Song& song, const char* genreId, std::uint64_
     auto r = simpletracks::addTrack (song, q);
     if (r.ok() && r.pattern >= 0)
     {
-        const auto bars = std::max (1, (int) (song.patterns[(std::size_t) r.pattern].effectiveLength (song.beatsPerBar) / ((std::int64_t) ppq * song.beatsPerBar)));
+        const auto bars = std::max (1, (int) (song.patterns[(std::size_t) r.pattern].effectiveLength (song.meter()) / (song.barTicks())));
         repeatClip (song, r.track, r.pattern, fromBar, toBar, bars);
     }
     return r;
@@ -147,7 +147,7 @@ inline simpletracks::Result instrument (Song& song, const char* trackName, Chann
     q.channel = std::move (channel);
     Pattern p;
     p.notes = std::move (notes);
-    p.lengthTicks = (std::int64_t) bars * song.beatsPerBar * ppq;
+    p.lengthTicks = (std::int64_t) bars * song.barTicks();
     q.pattern = std::move (p);
     return simpletracks::addTrack (song, q);
 }

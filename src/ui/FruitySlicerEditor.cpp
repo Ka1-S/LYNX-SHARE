@@ -1,4 +1,7 @@
 #include "ui/FruitySlicerEditor.h"
+
+#include <optional>
+#include <utility>
 #include "ui/FileChoosers.h"
 
 #include <algorithm>
@@ -449,6 +452,10 @@ public:
             loadSample (files[0]);
     }
 
+    // round 190gk: the Sampler waveform menu's "Open in new Fruity Slicer channel" (FL's SBONewMenuClick 0x11f8330:
+    // the plugin's template channel, then the sample loaded into it as the plugin's own Load does)
+    void loadSampleNow (const juce::String& path) { loadSample (path); }
+
 private:
     const ChannelDef* def() const { return locate ? locate (const_cast<Song&> (engine.getSong())) : nullptr; }
 
@@ -889,8 +896,29 @@ private:
 };
 } // namespace
 
+static std::optional<std::pair<int, juce::String>>& pendingSample()
+{
+    static std::optional<std::pair<int, juce::String>> pending;
+    return pending;
+}
+
+void loadSampleWhenOpened (int channel, const juce::String& path)
+{
+    if (channel >= 0)
+        pendingSample() = std::make_pair (channel, path);
+    else
+        pendingSample().reset();
+}
+
 std::unique_ptr<juce::Component> makeFruitySlicerEditor (AudioEngine& engine, std::function<ChannelDef* (Song&)> locate, int channel)
 {
-    return std::make_unique<FruitySlicerEditor> (engine, std::move (locate), channel);
+    auto editor = std::make_unique<FruitySlicerEditor> (engine, std::move (locate), channel);
+    if (auto& p = pendingSample(); p.has_value() && channel >= 0 && p->first == channel)
+    {
+        const auto path = p->second;
+        p.reset();
+        editor->loadSampleNow (path);
+    }
+    return editor;
 }
 } // namespace lynx

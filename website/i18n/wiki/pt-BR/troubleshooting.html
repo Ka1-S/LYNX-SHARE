@@ -25,9 +25,17 @@
 <p>A thread de áudio deve rodar com prioridade de tempo real.</p>
 <ol><li>Abra <code>Opções › Configurações de áudio...</code> e leia <code>Estado</code>. Ele mostra se a thread obteve prioridade de tempo real.</li><li>Se não obteve, instale o rtkit (<code>sudo apt install rtkit</code>, <code>sudo dnf install rtkit</code> ou <code>sudo pacman -S rtkit</code>), ou entre no grupo <code>áudio</code> com um limite de tempo real, como nas configurações de JACK.</li><li>Saia da sessão e entre de novo.</li></ol>
 <p>Os detalhes estão em <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/LINUX.md">LINUX.md</a>.</p>
+<h3 id="the-sound-crackles-or-drops-out">O som estala ou falha</h3>
+<p>O LYNX SHARE conta cada falha (buffer underrun) e diz por que ela aconteceu. Aponte para o medidor <code>CPU</code> na barra de ferramentas, ou abra <code>Ferramentas › Monitor de desempenho dos plugins...</code>. Um número vermelho ao lado da porcentagem de CPU é a contagem.</p>
+<p>A dica diz a causa da última falha:</p>
+<div class="tablewrap"><table><thead><tr><th>Causa</th><th>O que significa</th><th>O que tentar</th></tr></thead><tbody><tr><td>O processamento levou mais tempo que o buffer</td><td>Um bloco de áudio levou mais tempo para ser calculado do que o tempo que ele dura. A dica diz o canal ou efeito mais lento daquele bloco</td><td>Aumente o tamanho do buffer em <code>Opções › Configurações de áudio...</code>, congele esse canal ou baixe a qualidade do plugin</td></tr><tr><td>O processamento chegou perto do limite do buffer</td><td>A carga estava perto de 100 % na hora da falha</td><td>Aumente o tamanho do buffer ou congele os canais mais pesados</td></tr><tr><td>Latência do driver ou do sistema</td><td>O driver ou o sistema atrasou enquanto a carga estava baixa. Nenhum plugin causou a falha</td><td>Aumente o tamanho do buffer, tente outro driver (no Windows, o driver ASIO da interface) e, no Linux, verifique a prioridade de tempo real (acima)</td></tr></tbody></table></div>
+<p>Cada falha também é registrada em <code>audio-glitches.log</code> na pasta de configurações, com o dispositivo, o buffer e os canais mais pesados.</p>
 <h2 id="plugins">Plugins</h2>
 <h3 id="a-plugin-crashes">Um plugin trava</h3>
-<p>Rode-o no próprio processo, para que só o plugin pare.</p>
+<p>A maioria dos travamentos de plugin desliga só aquele plugin: um efeito fica em bypass, um instrumento fica mudo, e o LYNX SHARE e o projeto continuam rodando. A mensagem <code>O plugin travou</code> então oferece:</p>
+<ul><li><code>Recarregar</code>, que inicia o plugin de novo com as configurações do último salvamento ou backup.</li><li><code>Sempre rodar &lt;plugin&gt; em um processo separado</code>, que o inicia de novo em um processo próprio, agora e em todo projeto. Um travamento lá não derruba o LYNX SHARE. Um plugin em processo separado abre a janela dele sozinha (ela não pode ser encaixada).</li></ul>
+<p>A janela do plugin mostra os mesmos dois botões no lugar do editor. <code>Opções › Gerenciador de plugins...</code> lista na coluna <code>Processo separado</code> os plugins que sempre rodam em processo separado; clique na caixa para ligar ou desligar um deles.</p>
+<p>Para rodar todos os plugins no próprio processo:</p>
 <ol><li>Abra <code>Opções › Configurações gerais...</code>.</li><li>Ative <code>Rodar plugins em processo separado (protege o LYNX SHARE de travamentos)</code>.</li><li>Reabra o projeto.</li></ol>
 <p>Um plugin que travou ou parou de responder no próprio processo é silenciado. Salve o projeto e reabra-o para carregar o plugin de novo. Veja <a href="/wiki/plugins/">Plugins de terceiros</a>.</p>
 <h3 id="a-plugin-is-not-in-the-list">Um plugin não está na lista</h3>

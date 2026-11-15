@@ -4,6 +4,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -12,6 +13,7 @@
 #include "core/ArrangeOps.h"
 #include "core/MagicLasso.h"
 #include "core/MeterBallistics.h"
+#include "core/TrackHeaderGestures.h"
 #include "core/PickerSelection.h"
 #include "core/PlaylistOps.h"
 #include "engine/AudioEngine.h"
@@ -68,6 +70,9 @@ public:
     {
         ClipKind kind = ClipKind::pattern;
         int index = -1; // audio or automation channel; for patterns the current pattern is used
+        // issue #175 (FL's rule): the clip last clicked with the Pencil or the Brush, as it is (core/PaintTemplate.h); a
+        // choice in the Picker (a new Brush) paints the plain item again
+        std::optional<Clip> picked;
     };
     Brush brush;
     int knownCurrentPattern = -1;
@@ -165,6 +170,10 @@ public:
     // files dragged from the LYNX browser
     bool isInterestedInDragSource (const SourceDetails& details) override;
     void itemDropped (const SourceDetails& details) override;
+    // issue #152 point 6: a generator / effect from the Browser's Plugin database (or the Plugin picker). Pattern
+    // workflow, FL-exact: on a track header only (core/PluginDrop.h); Clip-launch workflow: on a track, as Live
+    void pluginDropped (const SourceDetails& details);
+    void applyGeneratorDrop (ChannelDef generator, std::vector<int> tracks, bool shift);
     // The Browser's "Send to the Playlist as an audio clip": at the playhead (song mode) or the start, on the
     // first track that is free there; an audio-clip channel of the same file is reused.
     void addAudioClipAtPlayhead (const juce::File& file);
@@ -182,23 +191,34 @@ public:
     // round 190ef (--drawshot190ef): where a lane's curve is drawn, and the x of a tick
     juce::Rectangle<float> laneBodyForSnapshot (int track, int lane) const { return laneBody (track, lane); }
     juce::Rectangle<int> trackRowForSnapshot (int track) const { return { 0, trackToY (track), getWidth(), heightOf (track) }; } // (round 190fc)
+    std::vector<int> selectedTracksForSnapshot() const { return sortedTrackSelection(); } // (round 190ft)
+    int numTracksForSnapshot() const { return numTracks(); } // (round 190gw)
+    int headerWidthForSnapshot() const noexcept { return headerWidth; }
     double xOfTickForSnapshot (double tick) const { return tickToX (tick); }
+    juce::Rectangle<int> clipBoundsForSnapshot (int clip) const { return clipBounds (clip); } // (round 190gi)
+    juce::Rectangle<float> curveBodyForSnapshot (int clip) const; // (round 190gi: where an envelope / automation curve is drawn)
+    double warpStripSecondsForSnapshot (int clip, juce::Point<int> p) const { return warpStripSeconds (clip, p); }
+    std::size_t warpMarkerCountForSnapshot (int clip) const { return clipWarpMarkers (clip).size(); }
+    double clipFileSecondsForSnapshot (int clip) const { return clipFileSeconds (clip); }
     juce::PopupMenu getClipMenuForSnapshot (int index); // --snapshot: the clip menu of that clip
     juce::PopupMenu getAutomationPointMenuForSnapshot (int clip, int point); // FL's point menu of an automation clip's point (round 190bw)
     juce::PopupMenu getTrackMenuForSnapshot (int track) { return buildTrackMenu (track); }
     // hovers the right edge of the first clip in view (grip, outline, menu button); returns its hint
     ui::Hint hoverForSnapshot();
 
-    // The track headers' width: FL's 96 px, or the Simple workflow's wider headers (round 184a). setSimpleHeaders sets
-    // it; everything else only reads it.
-    static constexpr int flHeaderWidth = 96, simpleHeaderWidth = 232;
+    // The track headers' width: FL's 96 px, the Simple workflow's wider headers (round 184a), or the linked headers
+    // (round 190gz). updateHeaderWidth sets it; everything else only reads it.
+    static constexpr int flHeaderWidth = 96, simpleHeaderWidth = 232, linkedHeaderWidth = 152;
     int headerWidth = flHeaderWidth;
     static constexpr int toolbarHeight = 32; // the panel title row (Workspace::titleHeight)
     static constexpr int overviewHeight = 16; // the overview strip under the toolbar (round 90)
     static constexpr int timelineHeight = 24;
     static constexpr int rulerTop = toolbarHeight + overviewHeight;
     static constexpr int headerHeight = rulerTop + timelineHeight;
-    static constexpr int trackHeight = 38; // the default row height (each track can be resized: P18)
+    // the default row (each track can be resized: P18): the song's (FL's 48 px since round 190gw; 38 in older projects);
+    // the Clip-launch layout keeps LYNX's 38, the Simple layout its own
+    static constexpr int liveTrackHeight = 38;
+    int baseRowHeight() const;
     static constexpr int foldedHeight = 7; // a member of a collapsed group: a thin row of clip bars (as FL)
     static constexpr int groupIndent = 8;  // grouped tracks' headers are indented under their group header
     static constexpr int scrollBarSize = 12;
@@ -224,8 +244,13 @@ public:
     bool hasSimpleHeaders() const noexcept { return simpleHeaders; }
     std::function<void (int insert)> onTrackEffects; // "+FX" on a Simple header: the insert's effects
     std::function<void (int track)> onSimpleTrackSelected; // the Simple workflow: a track was selected (its dock follows)
+    // round 190ft (FL FUN_012e3aa0): a header click made an audio / instrument track the only selected one: its mixer
+    // track (the main window makes it the mixer's current track when the mixer is showing)
+    std::function<void (int insert)> onLinkedMixerTrack;
     // Files dropped below the tracks (or MIDI files anywhere) while the Simple headers are on: new tracks from `tick`
     std::function<void (const juce::StringArray& files, std::int64_t tick)> onSimpleFilesDropped;
+    // round 190fo: the Simple workflow's track menu "Export this track" › As audio / As MIDI (nullptr: not offered)
+    std::function<void (int track, bool asMidi)> onExportTrack;
 
     // FL's legacy Pattern Blocks (round 170f, issue #60): the section under the clip tracks while the project's option is
     // on (ui/PatternBlocksView.h). `height` = the section's height in px (the divider drag); clamped to the window.
@@ -252,10 +277,14 @@ public:
     // the game controller's D-pad).
     int getCurrentTrack() const noexcept { return currentTrack; }
     void selectTrack (int track);
+    // Several tracks selected, the first current and scrolled into view (round 190fl: the mixer's "Select › Channels and
+    // playlist tracks routed to this track")
+    void selectTracks (const std::vector<int>& tracks);
+    const std::vector<int>& getSelectedTracks() const noexcept { return selectedTracks; }
 
 private:
     enum class Drag { none, move, resize, trimLeft, slip, erase, seek, loop, select, fadeIn, fadeOut, paint, muting, knife, zoomRange, listen, pan, timeMove, timeShift, autoPoint, autoTension,
-                      lanePoint, laneTension, laneDraw, trackResize, preview, trackZoom, heightZoom, timeZoom, perfLaunch, clipGain, swipe, warpMarker };
+                      lanePoint, laneTension, laneDraw, trackResize, headerSelect, preview, trackZoom, heightZoom, timeZoom, perfLaunch, clipGain, swipe, warpMarker };
     void swipeTimeSelectionToComp (int lane);
     // a swipe on a take lane (round 177c): the lane and the range so far
     int swipeLane = -1;
@@ -341,7 +370,7 @@ private:
     // vertical scroll bar (up = taller), double-click it: back to 100%
     double trackZoom = 1.0;
     int scaledHeight (int storedHeight) const { return juce::jlimit (8, 640, (int) std::lround (storedHeight * trackZoom)); }
-    int defaultRowHeight() const { return scaledHeight (trackHeight); }
+    int defaultRowHeight() const { return scaledHeight (baseRowHeight()); }
     juce::Rectangle<int> trackZoomHandle() const;
     void setTrackZoom (double zoom, int anchorY);
     double trackZoomStart = 1.0;
@@ -356,6 +385,17 @@ private:
     void setTrackHeights (std::vector<int> tracks, int height);
     int resizeTrack = -1, resizeStartHeight = 0;
     bool resizeAll = false;
+    // round 190ft (FL AUTracksPanelMouseDown / MouseMove): the band press, a drag across the headers after a Ctrl /
+    // Ctrl+Shift press (adds or removes the tracks crossed; with Ctrl the clips of the tracks crossed are selected)
+    std::vector<int> bandTargets (int track) const; // the track, and the other selected tracks when it is one of them
+    void bandToggleLock (int track);
+    void bandReset (int track);
+    std::vector<int> sortedTrackSelection() const;
+    void selectClipsOnTracks (int fromTrack, int toTrack, bool add);
+    void followLinkedTrack (int track); // FL's select-only side effects (instrument channel, mixer track)
+    int headerDragAnchor = -1;
+    bool headerDragAdding = true, headerDragClips = false, headerCtrlPending = false;
+    std::vector<int> headerClipBase;
     // Alt+right-click on a clip: hear it while the button is held (pattern clips play their pattern)
     void startPreview (int clip, int x);
     // FL's audio clip menu › Preview (EEAUPreviewMenuClick, round 190dx): the clip's own audio, alone, once
@@ -397,6 +437,8 @@ private:
     std::vector<WarpPoint> clipWarpMarkers (int clip) const; // as played (warpedit::playedMarkers); empty: none
     double clipFileSeconds (int clip) const;
     int warpMarkerAt (int clip, juce::Point<int> p) const; // the marker's index, or -1
+    int warpMarkerNear (int clip, juce::Point<int> p) const;      // round 190gi: Alt + drag, anywhere on the body
+    double warpStripSeconds (int clip, juce::Point<int> p) const; // round 190gi: a double-click on the flag strip
     int warpClip = -1, warpIndex = -1;
     double warpBeat = 0.0; // the dragged marker's beat (shown while dragging, applied on release)
     void updateScrollBars();
@@ -438,6 +480,7 @@ private:
     void normalizeClips (const std::vector<int>& targets, bool asGroup = false);
     juce::PopupMenu buildClipMenu (int index, int mouseX);
     void addKeyFollowItems (juce::PopupMenu& menu, int index, const std::vector<int>& targets); // round 190ds
+    void addGrooveItems (juce::PopupMenu& menu, int index, const std::vector<int>& targets); // round 190fm: Playlist clip grooves
 
     // FL's audio clip menu (round 190dz, core/FlClipMenu.h): FL's two columns and sections, LYNX's own items after them
     juce::PopupMenu buildAudioClipMenu (int index, int mouseX);
@@ -456,6 +499,7 @@ private:
     void arrangementChosen();
     void renameArrangement();
     void renameTrack (int track);
+    void freezeTrackChannels (std::vector<std::uint64_t> uids); // round 190fo: the Simple track menu's Freeze
     void showTrackMenu (int track);
     juce::PopupMenu buildTrackMenu (int track);
     void openClipSource (int clip, bool other); // double click: the clip's pattern / automation (Alt: the other editor)
@@ -470,12 +514,19 @@ private:
     juce::Rectangle<int> trackVolume (int track) const;
     juce::Rectangle<int> trackPan (int track) const;
     juce::Rectangle<int> trackFx (int track) const;
-    int simpleInsert (int track) const; // the insert a Simple header's controls act on, -1 none
+    int simpleInsert (int track) const; // the insert a Simple (or linked) header's controls act on, -1 none
+    // LYNX's "Link Playlist tracks to mixer tracks" (round 190gz, issue #170): with FL's headers, the project's switch is
+    // on. The headers are then wider and a linked track's header carries its mixer track's M, S, volume and pan (the
+    // Simple headers' controls, laid out for FL's row heights: one row of buttons, the volume bar and pan from 34 px).
+    bool linkedHeaders() const;
+    void updateHeaderWidth(); // FL's, the Simple or the linked width, as the layout and the project ask
+    static constexpr int linkedTwoRows = 34;
     void selectTrackChannel (int track); // the Simple workflow: a header click selects the track's channel
     int dropLaneTrack() const;          // the row the "drop files here" lane is drawn on, -1 none
     // a level drag on a Simple header: 1 volume, 2 pan (0 none)
     int levelDrag = 0, levelInsert = -1;
     float levelStart = 0.0f;
+    int levelWidth = 1; // the volume bar's width at the press
     juce::Rectangle<int> trackArrow (int track) const; // a group header's fold arrow (empty for other tracks)
     // An audio track's buttons (FL 2026, issue #11), acting on its linked mixer track: "Arm/disarm recording" (left of
     // the LED / arrow) and, on rows tall enough, "Audio input source" (with the monitoring choices). Empty for others.
@@ -562,6 +613,20 @@ private:
     bool rulerDoubleDrag = false;
     bool rulerMenuOnClick = false; // a right press on the ruler: the ruler menu if released in place (round 168t)
     juce::Rectangle<float> automationBody (const Clip& clip) const;
+    // round 190gi: the curve a clip edits in place — an automation clip's points, or an audio clip's envelope lane shown
+    // on it (core/ClipEnvelope.h); the point and handle helpers below work on either. editCurve: one undoable edit (the
+    // audio clip gets its own envelope first).
+    struct CurveRef
+    {
+        const std::vector<AutomationPoint>* points = nullptr;
+        int automation = -1;   // an automation clip's automation
+        std::uint8_t lane = 0; // an audio clip's envelope lane (clipenv::volumeLane / panLane)
+    };
+    CurveRef curveOf (int clip) const;
+    void editCurve (int clip, const std::function<void (std::vector<AutomationPoint>&)>& fn);
+    float curveValueAt (int clip, double clipTick) const;
+    juce::String curveValueText (int clip, float value) const;
+    void paintClipEnvelope (juce::Graphics& g, const Clip& c, const ClipEnvelope& envelope);
     int automationPointAt (int clip, juce::Point<int> p) const;
     bool isOnAutomationCurve (int clip, juce::Point<int> p) const;
     // round 165: FL's in-Playlist automation editing — clips tall and wide enough to edit, the tension handles between
@@ -635,13 +700,16 @@ private:
     // `immediate`: a trackpad's smooth scroll moves the view at once (the fingers carry it; round 170e)
     void glideBy (double ticks, double pixels, bool immediate = false);
     void glideFrame();
-    juce::VBlankAttachment vblank { this, [this] { glideFrame(); } };
+    ui::OnDemandVBlank vblank { *this, [this] { glideFrame(); return gliding; } }; // (attached only while gliding)
     ui::FrameTicker frames { *this, [this] (double ms) { return liveFrame (ms); } };
     // round 190w: the track headers' level meters (FL's "Show levels on audio / instrument tracks")
     int meteredInsertOf (int track) const;
     bool updateMeterColumn();        // true when the column appeared or went away
     bool stepHeaderMeters (double nowMs);
     int meterColumn = 0;             // px at the right of the headers for the meters (0 = no track shows one)
+    // the column at the headers' right edge: FL's selection strip (9 px, live check 190gu B1; the meters sit in it), or
+    // in the Simple headers the meters' column alone
+    int rightColumn() const noexcept { return simpleHeaders ? meterColumn : trackhdr::selectionStripWidth; }
     std::map<int, std::array<meters::PeakHold, 2>> headerLevels; // per mixer track shown
     double headerMeterMs = -1.0;
 

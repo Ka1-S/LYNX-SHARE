@@ -25,6 +25,23 @@
 
 namespace lynx
 {
+// An OS semaphore (a Win32 semaphore on Windows, a libdispatch one on macOS, a futex-backed POSIX one on Linux): the
+// workers sleep on one, so does the render-ahead thread (round 190gq, core/RenderAhead.h). release() never blocks.
+class OsSemaphore
+{
+public:
+    OsSemaphore();
+    ~OsSemaphore();
+    OsSemaphore (const OsSemaphore&) = delete;
+    OsSemaphore& operator= (const OsSemaphore&) = delete;
+    void release (int n = 1) noexcept;
+    void acquire() noexcept;
+
+private:
+    struct Impl;
+    std::unique_ptr<Impl> impl;
+};
+
 class WorkerPool
 {
 public:
@@ -38,8 +55,19 @@ public:
 
     int workers() const noexcept { return (int) threads.size(); }
 
+    // Per-thread set-up that can change while the pool lives (round toolchain190gt: on macOS the workers join the audio
+    // device's workgroup, which changes with the device). `fn` runs on every worker thread, on that thread, the next time
+    // it looks for work after requestThreadRefresh(). Set it once, before the first request; it runs outside the work,
+    // so it may take a short lock. requestThreadRefresh() may be called from any thread and is wait-free.
+    void setThreadRefresh (std::function<void()> fn);
+    void requestThreadRefresh() noexcept { refreshGeneration.fetch_add (1, std::memory_order_acq_rel); }
+
     // a spin-wait pause (x86 PAUSE / ARM YIELD), for callers waiting on each other inside a parallelFor
     static void relax() noexcept;
+    // the calling thread's CPU time (nanoseconds; Windows: the scheduler's per-thread times, coarse but fine over seconds)
+    static std::uint64_t threadCpuNs() noexcept;
+    // round 190gq: the CPU time the workers have spent (working and spinning), for render-ahead's on / off comparison
+    std::uint64_t cpuNs() const noexcept { return workersCpu.load (std::memory_order_relaxed); }
 
     // Calls fn(i) for i in [0, count), in parallel. Returns when all have finished.
     template <typename Fn>
@@ -71,12 +99,15 @@ private:
     bool hasWork() const noexcept;
     bool isParked() const noexcept;
     void workerLoop (std::function<void()> onStart);
+    void refreshIfAsked (std::uint32_t& seen) const;
 
-    struct Semaphore; // OS semaphore (WorkerPool.cpp)
-    std::unique_ptr<Semaphore> wake;
+    // Round 190gq (190gs Q5): what the hot path shares sits on cache lines of its own — the read-mostly work, the
+    // ticket every index takes, the count the caller spins on, the sleep / park state — and the counters are added once
+    // per batch, not per index: on a two-CCX Ryzen each line hand-off cost ~70-100 ns, three per index.
+    std::unique_ptr<OsSemaphore> wake;
     std::vector<std::thread> threads;
     std::atomic<bool> quit { false };
-    std::atomic<int> sleeping { 0 }; // workers blocked (or about to block) on `wake`
+    alignas (64) std::atomic<int> sleeping { 0 }; // workers blocked (or about to block) on `wake`
     // the generation (see `ticket`) of the last parallelFor before park(); while the ticket still carries it,
     // the pool is parked and a worker without work sleeps instead of spinning
     std::atomic<std::uint64_t> parkedGeneration { ~std::uint64_t (0) };
@@ -84,12 +115,23 @@ private:
     // current work (published before `ticket`). The ticket packs generation (bits 40+), count (bits 20…39) and the
     // next index (bits 0…19), so an index taken by a late worker always carries its own round's count: a worker
     // that stalls between taking an index and running it can never run an index of a later round (no ABA)
-    void* context = nullptr;
+    alignas (64) void* context = nullptr;
     Call call = nullptr;
     static constexpr int indexBits = 20;
-    std::atomic<std::uint64_t> ticket { 0 };
-    std::uint64_t generation = 0; // caller thread only
-    std::atomic<int> done { 0 };
+    alignas (64) std::atomic<std::uint64_t> ticket { 0 };
+    alignas (64) std::atomic<int> done { 0 };
+    // Round 190gq (REA 190hb: FL's caller never spins): the caller spins callerSpinMicros for the last index, then sleeps
+    // on `finished`; the index that completes the round wakes it (callerWaiting: one wake per wait, never a stale one)
+    std::atomic<bool> callerWaiting { false };
+    int target = 0; // the round's count (written before the ticket)
+    std::unique_ptr<OsSemaphore> finished = std::make_unique<OsSemaphore>();
+    static constexpr int callerSpinMicros = 20;
+    alignas (64) std::uint64_t generation = 0; // caller thread only
     std::atomic<std::uint64_t> byWorkers { 0 }, wokenUp { 0 };
+    // round toolchain190gt's thread refresh: read by every worker loop, written once per request: a line of its own
+    // (rollup 0.1.28, with 190gq's layout)
+    alignas (64) std::atomic<std::uint32_t> refreshGeneration { 0 };
+    std::function<void()> threadRefresh; // (published by refreshGeneration)
+    alignas (64) std::atomic<std::uint64_t> workersCpu { 0 };
 };
 } // namespace lynx

@@ -1,5 +1,6 @@
 #include "core/FlCurve.h"
 #include "core/FlpImport.h"
+#include "core/FlmImport.h" // round 190fn: the FL Studio Mobile Rack generator
 #include "core/FruityDance.h"
 #include "core/FlpExport.h"
 
@@ -953,6 +954,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
     song.performanceMode = project.performanceMode; // (round 165m)
     song.autoCrossfades = project.autoCrossfades;   // FL's Playlist "Automatic crossfades" (round 167a)
     song.beatsPerBar = std::clamp (project.beatsPerBar, 1, 32);
+    song.beatUnit = meterUnit (project.beatUnit); // (round 190fg; 4 in every demo project)
     song.swing = std::clamp (project.swing / 128.0f, 0.0f, 1.0f);
     song.playTruncatedNotes = project.playTruncatedNotes; // 0x1E (REA round 167g)
     song.muteRunsEffects = true;                          // FL's muted insert (round 190y)
@@ -1020,6 +1022,9 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
         auto inData = resolveFlPath ("%FLStudioFactoryData%\\Data" + path, options.roots);
         return inData.empty() ? path : inData;
     };
+
+    // round 190fn: the FL Studio Mobile Racks' own inserts (LYNX channel → the rack's level, pan and effects)
+    std::vector<std::pair<int, MixerTrack>> flmRackInserts;
 
     for (const auto& c : project.channels)
     {
@@ -2225,8 +2230,73 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
             applyFlStretchPanel (def.sampler, c.stretchMode, c.stretchPitch, c.stretchMul, c.stretchTime,
                                  needsLength ? options.sampleSeconds (def.samplePath) : 0.0, song.bpm);
         }
+        // Round 190fn (FLM coverage instruments-0022): the "FL Studio Mobile Rack" generator (FLM's own FLP export writes
+        // every instrument track as one) on the .flm importer's engines: the rack's instrument on this channel, the
+        // rack's level, pan and effects on an insert of their own in front of the channel's FL insert (placed below,
+        // once the mixer exists). FL's channel settings stay FL's. What LYNX cannot rebuild keeps the stand-in (listed).
+        const auto flmRack = c.type == flp::ChannelType::instrument && c.pluginName == "FL Studio Mobile Rack" && ! c.pluginState.empty();
+        if (flmRack)
+        {
+            FlmImportOptions flmOptions;
+            flmOptions.common = options;
+            flmOptions.resourceRoot = flmResourceRootIn (options.roots.factoryData);
+            flmOptions.userResourceRoots = options.flmResourceRoots;
+            std::string why;
+            if (auto rack = importFlmRackState (c.pluginState, flmOptions, song.bpm, def.name, &why))
+            {
+                const auto& r = rack->channel;
+                def.instrument = r.instrument;
+                def.pluginState = r.pluginState;
+                def.modelParams = r.modelParams;
+                def.samplePath = r.samplePath;
+                def.zones = r.zones;
+                {
+                    // the engine's sampler settings, with FL's channel pitch and porta on top
+                    const auto porta = def.sampler.porta;
+                    const auto portaBeats = def.sampler.portaBeats;
+                    const auto pitch = def.sampler.pitch;
+                    def.sampler = r.sampler;
+                    def.sampler.porta = def.sampler.porta || porta;
+                    def.sampler.portaBeats = portaBeats;
+                    def.sampler.pitch = std::clamp (def.sampler.pitch + pitch, -24.0f, 24.0f);
+                }
+                def.synth.porta = def.synth.porta || r.synth.porta;
+                if (r.synth.porta)
+                    def.synth.portaBeats = r.synth.portaBeats;
+                def.misc.pitchRange = r.misc.pitchRange;
+                // round 190gw (live check 190gu B6): the module's own Gate (3x Osc MISC › Poly › Gate, a .flm import's
+                // Time › Gate) shortens the notes it plays inside FL as well: the shorter of it and FL's channel gate.
+                // (FL's render of 190fe's all-0.5 rack: notes ~70 ms long; without this LYNX held the whole beat, ~10 dB louder)
+                if (r.misc.gateBeats > 0.0f)
+                    def.misc.gateBeats = def.misc.gateBeats > 0.0f ? std::min (def.misc.gateBeats, r.misc.gateBeats) : r.misc.gateBeats;
+                if (r.maxPolyphony > 0 && (def.maxPolyphony == 0 || r.maxPolyphony < def.maxPolyphony))
+                    def.maxPolyphony = r.maxPolyphony;
+                // the module's key range inside FL's key region
+                def.keyLow = std::max (def.keyLow, r.keyLow);
+                def.keyHigh = std::max (def.keyLow, std::min (def.keyHigh, r.keyHigh));
+                // the instrument's wrapper (Enable, Post Gain, Mix, Wet Pan; FLM_FORMAT §7.4): on FL's channel knobs
+                def.muted = def.muted || r.muted;
+                if (std::abs (r.volume - 1.0f) > 1.0e-4f)
+                {
+                    // (LYNX's channel curve gain = (11^v − 1) / 10; its inverse)
+                    const auto gain = (double) channelGain (def.volume) * channelGain (r.volume) / channelGain (1.0f);
+                    def.volume = (float) std::clamp (std::log (10.0 * std::max (0.0, gain) + 1.0) / std::log (11.0), 0.0, 1.0);
+                }
+                def.pan = std::clamp (def.pan + r.pan, -1.0f, 1.0f);
+                if (rack->insertUsed)
+                {
+                    rack->insert.name = def.name + " (FL Studio Mobile Rack)";
+                    flmRackInserts.push_back ({ (int) song.channels.size(), std::move (rack->insert) });
+                }
+                if (options.report != nullptr)
+                    ++options.report->converted["FL Studio Mobile Rack"];
+            }
+            else if (options.report != nullptr)
+                ++options.report->unsupported[why + "; played with a LYNX SHARE synth preset"];
+        }
+
         // report: what happened to this channel's generator/sample
-        if (options.report != nullptr)
+        if (options.report != nullptr && ! flmRack)
         {
             auto& r = *options.report;
             const auto plugin = lowercase (c.pluginName);
@@ -3037,6 +3107,13 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                     made->plugin.foreign = std::move (foreign);
                     made->plugin.detached = flDetached (slot.wrapperFlags); // (0xD4 flag 0x4, issue #116)
                 }
+                else if (slot.plugin == "FL Studio Mobile Rack FX")
+                {
+                    // round 190fn (FLM coverage effects-0048): the rack's effect modules on the .flm importer's engines
+                    made = flmRackFxSlot (slot.state, options.report);
+                    if (! made)
+                        continue; // (an empty rack, or nothing that maps: listed by flmRackFxSlot)
+                }
                 else
                 {
                     made = effectFromFl (slot.plugin, slot.state, song.bpm, flData); // native effect with the saved settings (REA_rodada7)
@@ -3296,6 +3373,37 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
             for (auto& send : track.sends)
                 if (send.target == p - flp::ControlId::mixerSendBase)
                     send.level = faderGain (control.value / 16000.0f);
+    }
+
+    // round 190fn: each FL Studio Mobile Rack's level, pan and effects on an insert of their own after FL's (FLM's rack
+    // applies them inside the generator, before FL's channel and insert), sending into the channel's FL insert. When the
+    // mixer has no room, the effects go on the channel's FL insert if nothing else uses it; else they are listed.
+    for (auto& [index, insert] : flmRackInserts)
+    {
+        auto& channel = song.channels[(std::size_t) index];
+        const auto target = channel.mixerTrack;
+        if ((int) song.mixer.size() < maxMixerTracks)
+        {
+            insert.toMaster = target == 0;
+            song.mixer.push_back (std::move (insert));
+            const auto added = (int) song.mixer.size() - 1;
+            if (target > 0)
+                song.setRoute (added, target, true, 1.0f);
+            channel.mixerTrack = added;
+            continue;
+        }
+        const auto shared = std::any_of (song.channels.begin(), song.channels.end(), [&] (const ChannelDef& other) {
+            return &other != &channel && other.mixerTrack == target;
+        });
+        auto& own = song.mixer[(std::size_t) target];
+        if (target > 0 && ! shared && own.effects.empty())
+        {
+            own.effects = std::move (insert.effects);
+            own.volume = faderPosition (std::min (faderGain (insert.volume) * faderGain (own.volume), maxFaderGain));
+            own.pan = std::clamp (own.pan + insert.pan, -1.0f, 1.0f);
+        }
+        else if (options.report != nullptr)
+            ++options.report->droppedEffects["FL Studio Mobile Rack: the rack's effects and level (the mixer is full)"];
     }
 
     // the FL template routes every insert to the send tracks at level 0; that makes no sound, only wastes CPU
@@ -3993,9 +4101,10 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
 
                     auto& track = song.playlistTracks[(std::size_t) t.index];
                     track = { t.name, ! t.enabled, 0, coloured ? 0xFF000000u | t.colour : 0u };
-                    // FL's size is relative to its default row; LYNX keeps the same proportion of its own default
+                    // FL's size factor: a row is 16 px + size × (default − 16) (FUN_00ea0b30, round 190ft) on FL's
+                    // 48 px default row (live check 190gu B1, round 190gw)
                     if (sized)
-                        track.height = polish::clampTrackHeight ((int) std::lround (polish::defaultTrackHeight * t.heightScale));
+                        track.height = polish::heightForFlSize (t.heightScale, song.playlistRowHeight);
                     track.grouped = t.index > 0 && t.grouped;
                     track.performance = performance; // Performance mode's track settings (round 165m)
                     track.collapsed = ! t.expanded;

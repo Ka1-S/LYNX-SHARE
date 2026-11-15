@@ -109,3 +109,4 @@ LYNX_ART (luxeSpace, 225) // round tp172b4: LuxeVerb on its Space page (the Pro-
 LYNX_ART (fret, 226)      // round tp172c8: Fret Channel (a grey guitar channel strip with dark side columns)
 LYNX_ART (shell, 227)     // round tp172c8: Shell Channel (a charcoal drum channel strip)
 LYNX_ART (strike, 228)    // round trans189d: Strike Shaper (brushed silver rack modules round black capsules)
+LYNX_ART (anvil, 229)     // round 190fk: Anvil Bus (hammered gunmetal, a forge glow along the bottom)

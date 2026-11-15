@@ -2,6 +2,7 @@
 
 #include "engine/Metronome.h"
 
+#include "core/Song.h"
 #include "core/ValueMath.h"
 
 namespace lynx
@@ -50,6 +51,7 @@ void Metronome::prepare (double sampleRate, int maximumBlockSize)
     voice.setOutputRate (sampleRate);
     voice.stop();
     lastBeat = -1;
+    hasLastBeat = false;
     const auto size = (std::size_t) juce::jmax (maximumBlockSize, 8192);
     left.assign (size, 0.0f);
     right.assign (size, 0.0f);
@@ -66,11 +68,13 @@ bool Metronome::render (float* outLeft, float* outRight, int numSamples) noexcep
     if (! counting && (! transport.playing.load (std::memory_order_relaxed) || ! transport.metronome.load (std::memory_order_relaxed)))
     {
         lastBeat = -1;
+        hasLastBeat = false;
         voice.stop();
         return false;
     }
 
     const auto beatsPerBar = juce::jmax (1, transport.beatsPerBar.load (std::memory_order_relaxed));
+    const Meter meter (beatsPerBar, meterUnit (transport.beatUnit.load (std::memory_order_relaxed)));
     const auto songMode = transport.songMode.load (std::memory_order_relaxed);
 
     // in song mode, bars follow the Playlist time-signature changes (consistent copy
@@ -86,7 +90,8 @@ bool Metronome::render (float* outLeft, float* outRight, int numSamples) noexcep
 
             for (int s = 0; s < count; ++s)
                 copy[(std::size_t) s] = { transport.signatureTick[(std::size_t) s].load (std::memory_order_relaxed),
-                                          transport.signatureLength[(std::size_t) s].load (std::memory_order_relaxed) };
+                                          transport.signatureLength[(std::size_t) s].load (std::memory_order_relaxed),
+                                          transport.signatureBeat[(std::size_t) s].load (std::memory_order_relaxed) };
 
             if (transport.signatureVersion.load (std::memory_order_acquire) == before)
             {
@@ -97,19 +102,9 @@ bool Metronome::render (float* outLeft, float* outRight, int numSamples) noexcep
         }
     }
 
-    auto isDownbeat = [&] (std::int64_t beat) {
-        if (beat < 0 || ! songMode || signatureCount == 0)
-            return ((beat % beatsPerBar) + beatsPerBar) % beatsPerBar == 0;
-
-        const auto tick = beat * ppq;
-        auto index = 0;
-        for (int s = 1; s < signatureCount; ++s)
-            if (signatures[(std::size_t) s].first <= tick)
-                index = s;
-
-        const auto [start, length] = signatures[(std::size_t) index];
-        return (tick - start) % juce::jmax<std::int64_t> (1, length) == 0;
-    };
+    // the song's meter from 0; in song mode the Playlist's signatures (their own beats); a count-in's ticks are
+    // negative and run on the grid of the first one
+    const metronome::Span base { 0, meter.bar(), meter.beat() };
     // during the count-in the clicks run on a position before the start (whole bars, so the beats line up)
     const auto startTick = transport.positionTicks.load (std::memory_order_relaxed) - (counting ? countIn : 0.0);
     const auto tps = transport.ticksPerSample();
@@ -118,12 +113,13 @@ bool Metronome::render (float* outLeft, float* outRight, int numSamples) noexcep
 
     for (int i = 0; i < numSamples; ++i)
     {
-        const auto beat = (std::int64_t) std::floor ((startTick + i * tps) / ppq);
+        const auto beat = metronome::beatAt (startTick + i * tps, signatures.data(), songMode ? signatureCount : 0, base);
 
-        if (beat != lastBeat)
+        if (! hasLastBeat || beat.start != lastBeat)
         {
-            lastBeat = beat;
-            voice.trigger (&sound (transport.metronomeSound.load (std::memory_order_relaxed)), isDownbeat (beat));
+            lastBeat = beat.start;
+            hasLastBeat = true;
+            voice.trigger (&sound (transport.metronomeSound.load (std::memory_order_relaxed)), beat.downbeat);
         }
 
         if (voice.next (level, outLeft[i], outRight[i]))

@@ -55,7 +55,7 @@ juce::Colour accentFor (EffectKind kind)
             return colour::teal;
         case EffectKind::compressor: case EffectKind::limiter: case EffectKind::fruityLimiter: case EffectKind::fruityCompressor:
         case EffectKind::fruityMultiband: case EffectKind::crestCompressor: case EffectKind::prismMultiband: case EffectKind::sentryGate:
-        case EffectKind::apexLimiter: case EffectKind::glowLeveler: case EffectKind::hushDeEsser: case EffectKind::transientProcessor: case EffectKind::shellChannel: case EffectKind::strikeShaper:
+        case EffectKind::apexLimiter: case EffectKind::glowLeveler: case EffectKind::hushDeEsser: case EffectKind::transientProcessor: case EffectKind::shellChannel: case EffectKind::strikeShaper: case EffectKind::anvilBus:
         case EffectKind::maximus: case EffectKind::peakController: case EffectKind::pocketLimiterClassic: case EffectKind::pocketLimiter: case EffectKind::pocketLeveller: case EffectKind::pocketGate:
         case EffectKind::pocketAutoduck:
         case EffectKind::pocketCompressor: case EffectKind::pocketMultiband:
@@ -287,7 +287,7 @@ Style plainStyleFor (int key)
             return G;
         // analogue / vintage-modelled roles: Hardware
         case K::glowLeveler: case K::ridgeStrip: case K::foilPlate: case K::echoform: case K::vintageChorus: case K::vintagePhaser: case K::maximus:
-        case K::fruityBloodOverdrive: case K::fruityCompressor: case K::fruityLimiter: case K::reeverb2: case K::aether: case K::vocoder: case K::kilnChannel: case K::fretChannel: case K::shellChannel: case K::strikeShaper:
+        case K::fruityBloodOverdrive: case K::fruityCompressor: case K::fruityLimiter: case K::reeverb2: case K::aether: case K::vocoder: case K::kilnChannel: case K::fretChannel: case K::shellChannel: case K::strikeShaper: case K::anvilBus:
             return H;
         // creative, pitch and fun: Vivid
         case K::geminiDoubler: case K::voiceShift: case K::ember: case K::grossBeat: case K::flPitchShifter: case K::fruityFastDist: case K::effector:

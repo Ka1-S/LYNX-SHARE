@@ -50,7 +50,7 @@ int eraseSpan (Song& song, int pattern, std::int64_t fromTick, std::int64_t toTi
 
 std::int64_t lengthOf (const Song& song, int pattern) noexcept
 {
-    return validPattern (song, pattern) ? song.patterns[(std::size_t) pattern].effectiveLength (song.beatsPerBar) : 0;
+    return validPattern (song, pattern) ? song.patterns[(std::size_t) pattern].effectiveLength (song.meter()) : 0;
 }
 
 bool active (const Song& song) noexcept { return song.patternBlocksOn && ! song.blocks.empty(); }

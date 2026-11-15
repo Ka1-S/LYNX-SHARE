@@ -271,8 +271,8 @@ TEST (als190ek_drum_buss_rack_is_fitted_to_live)
     CHECK (near (drumBussCrunchDb (0.5), 6.32, 0.01) && drumBussCrunchDb (0.0) == 0.0);
 
     // the chain: Ember → Facet EQ → (Crest with Comp on) → Shell Channel
-    const auto plain = als190ed::translate (als190ek::drumBuss (0.0, 0));
-    const auto comp = als190ed::translate (als190ek::drumBuss (0.0, 0, {}, als190ek::flag ("EnableCompression", true)));
+    const auto plain = als190ed::translateRack (als190ek::drumBuss (0.0, 0));
+    const auto comp = als190ed::translateRack (als190ek::drumBuss (0.0, 0, {}, als190ek::flag ("EnableCompression", true)));
     CHECK (plain && rack::isRack (plain->slot) && comp && rack::isRack (comp->slot));
     if (! plain || ! comp || ! rack::isRack (plain->slot) || ! rack::isRack (comp->slot))
         return;
@@ -302,23 +302,23 @@ TEST (als190ek_drum_buss_rack_is_fitted_to_live)
     static constexpr double full[3] { 11.52, 16.98, 14.23 };
     for (int type = 0; type < 3; ++type)
     {
-        const auto t = als190ed::translate (als190ek::drumBuss (1.0, type));
+        const auto t = als190ed::translateRack (als190ek::drumBuss (1.0, type));
         CHECK (t && near (als190ek::sineThrough (t->slot.patcher, 1000.0, -60.0) + 60.0, full[type], 0.5));
     }
     // Boom 0.5 at 50 Hz, decay 1 [MEASURED +14.1 dB at 50 Hz over the all-zero device]; damping 1 kHz [MEASURED −3 dB at
     // 1020 Hz, −12.1 dB at 4 kHz over it]; Crunch 0.5 [MEASURED +6.3 dB at 1 kHz over it]
     const auto ref50 = als190ek::sineThrough (plain->slot.patcher, 50.0, -40.0), ref1k = als190ek::sineThrough (plain->slot.patcher, 1000.0, -40.0),
                ref4k = als190ek::sineThrough (plain->slot.patcher, 4000.0, -40.0);
-    const auto boom = als190ed::translate (als190ek::drumBuss (0.0, 0, { { "BoomAmount", 0.5 }, { "BoomDecay", 1.0 } }));
+    const auto boom = als190ed::translateRack (als190ek::drumBuss (0.0, 0, { { "BoomAmount", 0.5 }, { "BoomDecay", 1.0 } }));
     CHECK (boom && near (als190ek::sineThrough (boom->slot.patcher, 50.0, -40.0) - ref50, 14.1, 2.0));
-    const auto damp = als190ed::translate (als190ek::drumBuss (0.0, 0, { { "DampingFrequency", 1000.0 } }));
+    const auto damp = als190ed::translateRack (als190ek::drumBuss (0.0, 0, { { "DampingFrequency", 1000.0 } }));
     CHECK (damp && near (als190ek::sineThrough (damp->slot.patcher, 1000.0, -40.0) - ref1k, -3.0, 0.7) &&
            near (als190ek::sineThrough (damp->slot.patcher, 4000.0, -40.0) - ref4k, -12.1, 1.0));
-    const auto crunch = als190ed::translate (als190ek::drumBuss (0.0, 0, { { "CrunchAmount", 0.5 } }));
+    const auto crunch = als190ed::translateRack (als190ek::drumBuss (0.0, 0, { { "CrunchAmount", 0.5 } }));
     CHECK (crunch && near (als190ek::sineThrough (crunch->slot.patcher, 1000.0, -40.0) - ref1k, 6.3, 0.5));
 
     // the macros: each sits where Live's control is, and setting it there changes nothing; Drive at 127 gives the 100 % drive
-    const auto mid = als190ed::translate (als190ek::drumBuss (0.5, 1, { { "CrunchAmount", 0.3 }, { "BoomAmount", 0.25 }, { "BoomFrequency", 70.0 } }));
+    const auto mid = als190ed::translateRack (als190ek::drumBuss (0.5, 1, { { "CrunchAmount", 0.3 }, { "BoomAmount", 0.25 }, { "BoomFrequency", 70.0 } }));
     CHECK (mid && rack::isRack (mid->slot));
     if (mid && rack::isRack (mid->slot))
     {

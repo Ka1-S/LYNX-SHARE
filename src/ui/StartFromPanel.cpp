@@ -20,7 +20,7 @@ void describe (Entry& entry, const Song& song)
     std::int64_t length = 0;
     const auto exported = makeExportSong (song, true, 0, length);
     juce::ignoreUnused (exported);
-    const auto bar = (std::int64_t) ppq * juce::jmax (1, song.beatsPerBar);
+    const auto bar = song.barTicks();
     entry.bars = (int) ((length + bar - 1) / bar);
     auto notes = false;
     for (const auto& p : song.patterns)
@@ -77,7 +77,7 @@ bool renderPreview (const Song& source, const juce::File& file, int bars)
     {
         std::int64_t length = 0;
         juce::ignoreUnused (makeExportSong (song, true, 0, length));
-        const auto bar = (std::int64_t) ppq * juce::jmax (1, song.beatsPerBar);
+        const auto bar = song.barTicks();
         song.loopStart = 0;
         song.loopEnd = juce::jmax<std::int64_t> (bar, juce::jmin (length, bar * juce::jmax (1, bars)));
         o.range = exportopts::Range::selection;

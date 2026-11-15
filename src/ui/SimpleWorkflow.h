@@ -119,6 +119,14 @@ public:
     FirstSongTour* tourForSnapshot() noexcept { return tour.get(); }
     void doTourStep (int step); // the tour's "Do it for me", with the code the controls run
 
+    // round 190fo: the Sampler track's 16 pads (core/SimplePads.h). The chooser's Sampler tile adds one (`addPads`); while
+    // the dock shows a Sampler track's Pads tab the typing keys V B N M / F G H J / R T Y U / 4 5 6 7 play its pads:
+    // `padChannelForKey` gives the pad channel a key plays (−1: not a pad key now).
+    bool addPads();
+    int padChannelForKey (int keyCode);
+    // round 190fo: files and folders as the Import tile and a drop bring them in (tests, --reabl190foshot)
+    void addFilesForCheck (const juce::Array<juce::File>& files) { addFiles (files, 0); }
+
     // --simpleshot: the chooser's two pages, as drawn
     juce::Component* chooserForSnapshot();
     void showStarterPageForSnapshot();
@@ -138,6 +146,7 @@ private:
     void chooseInstrument (juce::Component& tile);
     void chooseSample();
     void importFiles();
+    void importFolder(); // round 190fo
     void addFiles (const juce::Array<juce::File>& files, std::int64_t start);
     void addDrums (const std::string& genre, bool steps, bool useTempo);
     void addAudio (simpletracks::Kind kind);

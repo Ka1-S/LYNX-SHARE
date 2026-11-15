@@ -927,6 +927,8 @@ Settings parseSettings (const std::string& text)
             s.skipped = parseVersion (value).valid ? value : std::string();
         else if (key == "lastCheck")
             s.lastCheckMs = allDigits (value) ? std::strtoll (value.c_str(), nullptr, 10) : 0;
+        else if (key == "previous")
+            s.previous = parseVersion (value).valid ? value : std::string();
     }
     return s;
 }
@@ -938,6 +940,8 @@ std::string formatSettings (const Settings& s)
         out += "skipped=" + s.skipped + "\n";
     if (s.lastCheckMs > 0)
         out += "lastCheck=" + std::to_string (s.lastCheckMs) + "\n";
+    if (! s.previous.empty())
+        out += "previous=" + s.previous + "\n";
     return out;
 }
 
@@ -947,6 +951,39 @@ bool shouldShow (const Release& release, const Settings& settings, bool manual)
         return true;
     const auto skipped = parseVersion (settings.skipped);
     return ! (skipped.valid && compare (release.version, skipped) <= 0);
+}
+
+int rollbackIndex (const std::vector<Release>& releases, const Version& running, const std::string& previous)
+{
+    const auto wanted = parseVersion (previous);
+    int newestOlder = -1;
+    for (int i = 0; i < (int) releases.size(); ++i)
+    {
+        const auto& r = releases[(std::size_t) i];
+        if (r.draft || ! r.version.valid || ! running.valid || compare (r.version, running) >= 0)
+            continue;
+        if (wanted.valid && compare (r.version, wanted) == 0)
+            return i;
+        if (newestOlder < 0 || compare (r.version, releases[(std::size_t) newestOlder].version) > 0)
+            newestOlder = i;
+    }
+    return newestOlder;
+}
+
+Settings afterUpdate (Settings settings, const Version& from)
+{
+    if (from.valid)
+        settings.previous = from.text();
+    return settings;
+}
+
+Settings afterRollback (Settings settings, const Version& left)
+{
+    const auto skipped = parseVersion (settings.skipped);
+    if (left.valid && (! skipped.valid || compare (left, skipped) > 0))
+        settings.skipped = left.text();
+    settings.previous.clear();
+    return settings;
 }
 
 bool cacheFresh (std::int64_t lastCheckMs, std::int64_t nowMs)

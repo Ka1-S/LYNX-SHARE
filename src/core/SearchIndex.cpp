@@ -274,6 +274,33 @@ bool Index::isComplete (const std::string& folder) const
     return std::any_of (complete.begin(), complete.end(), [this, &folder] (const std::string& r) { return isUnder (folder, r) && folders.count (r) > 0; });
 }
 
+void Index::adopt (const Index& newer)
+{
+    const auto completeInNewer = [&newer] (const std::string& folder) { return newer.isComplete (folder); };
+    for (auto f = folders.begin(); f != folders.end();)
+    {
+        if (completeInNewer (f->first) && newer.folders.count (f->first) == 0)
+            f = folders.erase (f); // (the other process found it gone)
+        else
+            ++f;
+    }
+    std::vector<const std::pair<const std::string, Folder>*> taken; // (decided before anything changes here)
+    for (const auto& entry : newer.folders)
+        if (completeInNewer (entry.first) || ! isComplete (entry.first))
+            taken.push_back (&entry);
+    for (const auto* entry : taken)
+    {
+        auto& mine = folders[entry->first];
+        const auto listedIn = mine.listedIn, seenIn = mine.seenIn; // (this index's own rebuild marks)
+        mine = entry->second;
+        mine.listedIn = listedIn;
+        mine.seenIn = seenIn;
+    }
+    for (const auto& r : newer.complete)
+        complete.insert (r);
+    ++gen;
+}
+
 std::size_t Index::fileCount() const noexcept
 {
     std::size_t n = 0;

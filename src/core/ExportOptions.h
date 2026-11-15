@@ -7,10 +7,16 @@
 
 #include <cstdint>
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
 #include "core/Song.h"
+
+namespace lynx
+{
+class DelayLine;
+}
 
 namespace lynx::exportopts
 {
@@ -151,7 +157,7 @@ double mp3SampleRate (double rate) noexcept;
 // What the render window shows before the export (FL: "Length: 144 bars  Total time: 3'57''  Disk space: 38.76 MB"):
 // the music's length in bars and the file size the options give for `seconds` (one file; the tail not counted;
 // FLAC and the lossy formats are estimates).
-double lengthInBars (double seconds, double bpm, int beatsPerBar) noexcept;
+double lengthInBars (double seconds, double bpm, Meter meter) noexcept;
 std::int64_t estimatedBytes (const Options& o, double seconds) noexcept;
 
 // The notes FL's File › Export › "MIDI file..." writes (REA round 139): in song mode, each pattern clip's part of its
@@ -176,7 +182,10 @@ Song makeRenderSong (const Song& song, const Options& o, std::int64_t tailTicks,
 // The selection exists (loop region set and inside the song).
 bool hasSelection (const Song& song) noexcept;
 
-// Inserts that get sound: a channel goes to them or another insert sends to them (Master excluded).
+// Inserts that get sound: a channel goes to them or another insert sends to them (Master excluded). Round 190gh (B7):
+// also the inserts fed only by extra outputs — a hosted multi-output instrument's Connections (as the engine plays
+// them, "Process inactive inputs and outputs" included), FPC pads with their own mixer offset, a generator Patcher's
+// "To LYNX" outputs, and an effect slot's sends (Fruity Send, Transmitter, a hosted effect's Connections).
 std::vector<int> stemTracks (const Song& song);
 // FL's Mixer › Disk recording › "Render armed / selected tracks to wave file(s)" (REA round 165f-mixer): the inserts
 // of `only` (each once, in mixer order, the Master excluded) whether or not they get sound; empty = stemTracks (song).
@@ -193,6 +202,51 @@ Song makeChannelStemSong (const Song& song, int channel, bool dry = false);
 
 // "<base> - <number> <name><ext>" with characters that are illegal in file names replaced.
 std::string stemFileName (const std::string& base, int number, const std::string& name, const char* ext);
+
+// --- "Split mixer tracks" in one render (round 190gj, P9) -----------------------------------------------------------
+// FL renders the split mixer tracks in one pass (TRENDERFORM, REA_rodada84 §1). LYNX's stem of an insert is the render
+// of makeBounceSong (song, insert): that insert alone (soloed with its sources), straight to a neutral Master. The same
+// samples come out of one render of the whole song when that render's insert outputs are tapped: the stem render's
+// Master adds up its own channels and the routes that carry sound into it — the insert, and whatever feeds it that
+// also goes to the Master — each delayed by that render's delay compensation, and its neutral Master passes the sum
+// as it is. planStemTap says how (or why not: then the stem is rendered alone, as before).
+struct StemTap
+{
+    bool ok = false;
+    std::string why; // when not ok: what the stem's own render does differently
+    struct Input
+    {
+        int track = 0;      // an insert whose output is tapped
+        float level = 1.0f; // its route level into the Master (the stem render's)
+        int delay = 0;      // the stem render's delay on that route (samples)
+    };
+    std::vector<Input> inputs; // in the order the stem render's Master adds them (after its own channels)
+    int latency = 0;           // the stem render's delay compensation total (its export trims that much)
+};
+
+// The stem of insert `track` from a render of `shared` (the song that render plays: solos cleared), whose instruments
+// and effects report these latencies (the layout of computePdc; an engine's after its plugin warm-up).
+StemTap planStemTap (const Song& shared, int track, const std::vector<int>& channelLatency,
+                     const std::vector<std::vector<int>>& slotLatency, double sampleRate);
+
+// What a stem render's Master adds up, made from the taps of the shared render, one block after another (the blocks in
+// order, the same sizes as that render's): its own channels' sum (`masterL/R`, the shared render's Master input before
+// its routes; nullptr = silence) then each input of the plan through its delay line, exactly as the stem render's Master
+// (RackRenderer::pullInputs) does.
+class StemMixer
+{
+public:
+    explicit StemMixer (const StemTap& plan);
+    StemMixer (StemMixer&&) noexcept;
+    ~StemMixer();
+    // `tapLeft / tapRight (input index)`: that input's tap for this block (n samples)
+    void mix (const float* masterL, const float* masterR, const float* const* tapLeft, const float* const* tapRight, float* outL,
+              float* outR, int n) noexcept;
+
+private:
+    StemTap plan;
+    std::vector<std::unique_ptr<DelayLine>> lines; // per input (nullptr = no delay)
+};
 
 // --- one file per marker section (round 190ap) ----------------------------------------------------------------------
 // A stretch of the song between two Playlist markers.

@@ -17,7 +17,7 @@ struct Take
     explicit Take (lynx::Song& s) : song (s)
     {
         q.grid = 0;
-        recorder.begin (song.patterns[(std::size_t) song.currentPattern].effectiveLength (song.beatsPerBar));
+        recorder.begin (song.patterns[(std::size_t) song.currentPattern].effectiveLength (song.meter()));
         if (song.mode == lynx::PlayMode::song && ! song.hasLoop())
             recorder.setLinear (true); // AudioEngine: noteTakeLinear for the whole take
     }
@@ -109,7 +109,7 @@ TEST (rec168k_song_take_of_8_bars_into_an_empty_pattern_keeps_8_bars)
 
     const auto& p = s.patterns[1];
     CHECK (p.notes.size() == 32);
-    CHECK (p.effectiveLength (s.beatsPerBar) == 8 * bar);
+    CHECK (p.effectiveLength (s.meter()) == 8 * bar);
     for (const auto& n : p.notes)
         CHECK (n.start / bar == n.key - 60); // every note in the bar it was played in
     const auto clips = rec168k::clipsOf (s, 1);
@@ -301,7 +301,7 @@ TEST (rec168k_take_inside_a_stretched_clip_grows_the_pattern)
     const auto& p = s.patterns[0];
     CHECK (p.notes.size() == 4);
     CHECK (p.notes[1].start == bar && p.notes[2].start == 2 * bar + 2 * lynx::ppq && p.notes[3].start == 3 * bar + lynx::ppq);
-    CHECK (p.effectiveLength (s.beatsPerBar) == 4 * bar);
+    CHECK (p.effectiveLength (s.meter()) == 4 * bar);
     CHECK (s.playlist.size() == 1 && s.playlist[0].length == 4 * bar); // no clip added
 }
 
@@ -326,7 +326,7 @@ TEST (rec168k_probe_case_b_set_length_pattern_in_an_8_bar_clip)
             take.note ((double) (b * bar + beat * lynx::ppq), lynx::ppq * 0.9, 60 + b);
     take.stop ((double) (8 * bar));
     const auto& p = s.patterns[1];
-    CHECK (p.notes.size() == 32 && p.lengthTicks == 8 * bar && p.effectiveLength (s.beatsPerBar) == 8 * bar);
+    CHECK (p.notes.size() == 32 && p.lengthTicks == 8 * bar && p.effectiveLength (s.meter()) == 8 * bar);
     for (const auto& n : p.notes)
         CHECK (n.start / bar == n.key - 60);
     const auto clips = rec168k::clipsOf (s, 1);
@@ -354,7 +354,7 @@ TEST (rec168k_auto_length_pattern_stretched_clip_8_bars)
     for (int b = 2; b < 8; ++b)
         take.note ((double) (b * bar), lynx::ppq, 60 + b);
     take.stop ((double) (8 * bar));
-    CHECK (s.patterns[1].notes.size() == 7 && s.patterns[1].effectiveLength (s.beatsPerBar) == 8 * bar);
+    CHECK (s.patterns[1].notes.size() == 7 && s.patterns[1].effectiveLength (s.meter()) == 8 * bar);
     CHECK (s.patterns[1].notes.back().start == 7 * bar);
     CHECK (rec168k::clipsOf (s, 1).size() == 1);
 }
@@ -387,7 +387,7 @@ TEST (rec168k_take_inside_a_long_clip_keeps_the_clip)
         take.note ((double) (3 * bar), lynx::ppq, 60);
         take.stop ((double) (4 * bar));
     }
-    CHECK (s.playlist[0].length == 8 * bar && s.patterns[0].effectiveLength (s.beatsPerBar) == bar);
+    CHECK (s.playlist[0].length == 8 * bar && s.patterns[0].effectiveLength (s.meter()) == bar);
 
     // a take inside the long clip, in its second bar: the pattern becomes 2 bars, the clip stays 8 bars
     s.currentPattern = 0;
@@ -398,7 +398,7 @@ TEST (rec168k_take_inside_a_long_clip_keeps_the_clip)
     }
     const auto clips = rec168k::clipsOf (s, 0);
     CHECK (clips.size() == 1 && clips[0]->length == 8 * bar && clips[0]->offset == 0);
-    CHECK (s.patterns[0].effectiveLength (s.beatsPerBar) == 2 * bar);
+    CHECK (s.patterns[0].effectiveLength (s.meter()) == 2 * bar);
     CHECK (s.patterns[0].notes.size() == 2 && s.patterns[0].notes.back().start == bar + lynx::ppq);
 }
 

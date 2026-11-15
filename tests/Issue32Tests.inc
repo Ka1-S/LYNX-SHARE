@@ -266,7 +266,7 @@ TEST (issue32_fit_to_tempo_keeps_a_loop_in_time)
     CHECK (fitBeats (withTail, 100.0, 6.0f, 90.0) == 6.0f); // a WAV's ACID beats win ("embedded")
     CHECK (std::abs (fitBeats (16.0 * 60.0 / 90.0, 140.0, 0.0f, 90.0) - 32.0f) < 1e-3f); // the octave nearest 140: 180 BPM
     CHECK (fitBeats (2.4, 128.0) == 4.0f); // nothing known: a power of two, as before
-    const auto presets = lynx::clipops::timePresetBeats (4);
+    const auto presets = lynx::clipops::timePresetBeats (lynx::Meter (4, 4));
     CHECK (presets == (std::vector<float> { 1.0f, 2.0f, 4.0f, 8.0f, 12.0f, 16.0f }));
 
     // the whole path: a click loop of 3 bars at 100 BPM with a tail, detected (no ACID chunk)

@@ -1,5 +1,5 @@
 ---
-source: be0fc22373
+source: 1c440a7810
 ---
 ![각 플러그인 파일을 별도 프로세스에서 검사한다는 안내가 있는 플러그인 관리자 아래쪽](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -89,6 +89,19 @@ Windows에서 32비트 VST2와 VST3 플러그인은 브리지(`LYNX-bridge32.exe
 ## 악기의 출력을 별도의 인서트로 보내기
 
 출력이 여러 개인 악기 플러그인은 출력마다 자기 믹서 인서트로 재생할 수 있습니다. 플러그인 창에서 `래퍼 설정`를 클릭한 다음 `처리` 탭을 엽니다. `연결` 아래에서 각 출력에는 켜고 끄는 표시등과 숫자가 있습니다. 숫자는 채널 자신의 인서트에서 몇 칸 뒤의 인서트로 재생하는지를 뜻합니다. `출력 자동 매핑`는 각 출력에 바로 다음 인서트를 하나씩 배정하고, `초기화`은 기본값으로 되돌립니다.
+
+## FL Studio 자체 플러그인
+
+Sytrus, Harmor, Patcher 같은 FL Studio의 네이티브 플러그인은 FL Studio 안에서만 실행됩니다. LYNX SHARE에서 쓰려면 FL Studio에 함께 들어 있는 플러그인 버전의 FL Studio를 사용하세요. Windows에서는 `C:\Program Files\Common Files\VST2`에 `FL Studio VSTi`와 `FL Studio VSTi (Multi)`로 설치됩니다. macOS에서는 Audio Unit입니다.
+
+1. 플러그인을 스캔합니다. 둘 다 제조사가 Image-Line인 악기로 나타납니다. 플러그인 안에서 FL Studio 전체가 시작되므로 첫 스캔은 시간이 걸릴 수 있습니다.
+2. `FL Studio VSTi`를 채널에 추가하고 그 창을 엽니다. FL Studio 로고를 클릭하면 채널 랙, 믹서, 브라우저가 있는 FL Studio 자체 창이 열립니다.
+3. FL Studio의 채널 랙에서 악기를 추가합니다. 새 FL Studio 플러그인은 비어 있는 샘플러 하나로 시작하며, 악기를 추가하기 전까지는 소리가 나지 않습니다. LYNX SHARE의 노트는 FL Studio의 채널 랙에서 선택한 채널을 연주합니다.
+4. FL Studio 자체 패턴은 LYNX SHARE가 재생될 때 LYNX SHARE의 템포로 재생됩니다.
+
+FL Studio 안에서 만든 내용은 LYNX SHARE 프로젝트와 함께 저장됩니다. `FL Studio VSTi (Multi)`에는 스테레오 출력이 16개 있으며, 각각 다른 인서트에서 재생할 수 있습니다(앞 섹션 참고). FL Studio 안에서 어떤 FL 플러그인이 작동하는지는 사용 중인 FL Studio 라이선스가 정합니다. LYNX SHARE가 FL Studio의 플러그인 파일을 단독으로 불러오지는 않습니다.
+
+FL Studio 플러그인이 `불러오기 실패`로 표시되면 `옵션 › 플러그인 관리자...`에서 마우스 오른쪽 버튼으로 눌러 `다시 시도(지금 이 파일 스캔)`를 선택하세요.
 
 ## Plugin database 폴더
 

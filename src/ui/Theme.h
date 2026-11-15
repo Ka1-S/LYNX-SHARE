@@ -88,10 +88,13 @@ inline constexpr float title = 15.0f;    // panel titles
 inline constexpr float display = 20.0f;  // the transport position
 } // namespace type
 
-inline juce::FontOptions font (float size, bool bold = false)
-{
-    return juce::FontOptions (size, bold ? juce::Font::bold : juce::Font::plain);
-}
+// The UI font at `size` (plain or bold). Round 190gr (U1): the fonts come from a small cache, so a paint no longer makes a
+// new juce::Font whose typeface JUCE then looks up by name (its typeface cache compares the family and style strings),
+// and the fonts a paint sets share one JUCE font object, so JUCE's glyph and context checks see the same font at once.
+// The cache empties when the interface font changes (clearFontCache) and with the image caches (ui/ImageCaches.h).
+// LYNX_PAINT_CACHE=0 (diagnostics) makes a new font on every call, as before.
+juce::Font font (float size, bool bold = false);
+void clearFontCache();
 
 // The width a column of labels needs: `minWidth` when every text fits in it (the English layout), else the widest
 // text (+ the label borders), up to `maxWidth` (round 165o: translated labels are often longer).
@@ -127,10 +130,7 @@ int headerHeight();  // a section header (the "DOCUMENTS" titles)
 int separatorHeight();
 } // namespace menus
 
-inline juce::FontOptions monoFont (float size)
-{
-    return juce::FontOptions (juce::Font::getDefaultMonospacedFontName(), size, juce::Font::plain);
-}
+juce::Font monoFont (float size); // (cached as font() is)
 
 // --- spacing and radii ---------------------------------------------------------------------------
 namespace space
@@ -202,6 +202,10 @@ inline juce::String caps (const juce::String& text)
 // g.setColour (colour) + g.fillRoundedRectangle, faster where the frame is drawn on the CPU (Linux): nothing outside the
 // clip, a plain rectangle when the clip misses the corners, the shape (or a big one's corners) from a cached sprite.
 void fillRoundRect (juce::Graphics& g, juce::Rectangle<float> r, float corner, juce::Colour colour);
+// The launch triangle of a clip slot (a triangle pointing right, filling `a`, in `colour`; g's colour is `colour` after),
+// from cached tiles (round 190gr, U2): Linux's software renderer within one level per channel of drawing it straight
+// (--selftest paint_caches); Direct2D (where each triangle drawn straight is a new path geometry) see paintCacheSelfTest.
+void fillLaunchTriangle (juce::Graphics& g, juce::Rectangle<float> a, juce::Colour colour);
 // The frozen mark (round 190ay, Freeze): a small tag with a six-armed snowflake, in the shape of the stand-in tag. `tag`
 // is the tag's fill (the info colour while the frozen audio is up to date, the warning colour when it needs attention).
 void drawFrozenTag (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour tag, juce::Colour flake);
@@ -236,6 +240,8 @@ inline juce::Colour text { 0xffeceef2 }; // = colour::textPrimary
 juce::StringArray fontFoldersToScan (const juce::StringArray& fontconfigFolders, const std::function<bool (const juce::String&)>& exists);
 // --selftest "fonts=": every font LYNX draws with has a typeface and glyphs, and a font without one does not crash.
 juce::String fontSelfTest();
+// --selftest "paint_caches=" (round 190gr): the font cache and the shape tiles against shapes drawn straight.
+juce::String paintCacheSelfTest();
 
 // --- LookAndFeel ---------------------------------------------------------------------------------
 class LookAndFeel final : public juce::LookAndFeel_V4

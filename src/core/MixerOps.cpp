@@ -1,4 +1,5 @@
 #include "core/MixerOps.h"
+#include "core/Effects.h"
 #include "core/ClipOps.h"
 #include "core/FlpExport.h"
 #include "core/RackOps.h"
@@ -204,6 +205,8 @@ void remapTrackReferences (Song& song, const std::function<int (int)>& map)
         if (c.instrument == InstrumentKind::patcher)
             remapPatcherOutputs (c, c.mixerTrack, map);
         c.mixerTrack = std::max (0, map (c.mixerTrack));
+        if (c.freeze.insert > 0) // (round 190ff: a track freeze follows its insert; deleted, it plays live — -1)
+            c.freeze.insert = map (c.freeze.insert) > 0 ? map (c.freeze.insert) : -1;
 
         if (c.instrument == InstrumentKind::soundfont)
             for (const auto p : { sf::pReverbTrack, sf::pChorusTrack })
@@ -1166,6 +1169,36 @@ int roomForInserts (const Song& song) noexcept
     return std::max (0, maxMixerTracks - std::max (1, (int) song.mixer.size()));
 }
 
+int openSampleInMasterEditor (Song& song, EffectKind kind, const std::string& path)
+{
+    if ((kind != EffectKind::newtone && kind != EffectKind::newtime) || path.empty())
+        return -1;
+    if (song.mixer.empty())
+        song.mixer.resize (1);
+    auto& effects = song.mixer[0].effects;
+    auto slot = -1;
+    for (int i = 0; i < (int) effects.size() && slot < 0; ++i)
+        if (effects[(std::size_t) i].kind == kind)
+            slot = i;
+    for (int row = 0; slot < 0 && row < maxEffectSlots; ++row)
+        if (effectAtRow (effects, row) < 0)
+            slot = insertEffectAtRow (song, 0, makeEffectSlot (kind), row);
+    if (slot < 0)
+        return -1;
+    auto& fx = song.mixer[0].effects[(std::size_t) slot];
+    fx.samplePath = path;
+    fx.state.clear(); // (a new sample: its own notes / no markers, as the editor's own Load does)
+    return slot;
+}
+
+InsertCheck checkInsertMultiple (const Song& song, int count, bool adding) noexcept
+{
+    const auto room = roomForInserts (song);
+    if (adding)
+        return count > room ? InsertCheck::tooMany : InsertCheck::ok;
+    return count < 1 || count > room ? InsertCheck::outOfRange : InsertCheck::ok;
+}
+
 std::vector<int> displayOrder (const Song& song)
 {
     std::vector<int> order;
@@ -1771,5 +1804,55 @@ int placeRenderedFiles (Song& song, const std::vector<RenderedFile>& files)
     if (placed > 0 && song.autoCrossfades)
         clipops::updateCrossfades (song);
     return placed;
+}
+
+// --- round 190fl: FL's mixer menu tail ----------------------------------------------------------------------------
+int insertCount (const Song& song) noexcept
+{
+    return std::max (0, (int) song.mixer.size() - 1);
+}
+
+bool validInsertCount (const Song& song, int wanted) noexcept
+{
+    return wanted >= insertCount (song) && wanted <= maxMixerTracks - 1;
+}
+
+int increaseInsertsTo (Song& song, int wanted)
+{
+    if (! validInsertCount (song, wanted) || wanted <= insertCount (song))
+        return 0;
+    return insertTracks (song, std::max (1, (int) song.mixer.size()), wanted - insertCount (song));
+}
+
+int setPdcForAllTracks (Song& song)
+{
+    return resetManualLatency (song);
+}
+
+std::vector<int> playlistTracksOn (const Song& song, const std::vector<int>& inserts)
+{
+    const auto on = [&inserts] (int t) { return t > 0 && std::find (inserts.begin(), inserts.end(), t) != inserts.end(); };
+    std::vector<int> out;
+    for (int i = 0; i < (int) song.playlistTracks.size(); ++i)
+    {
+        const auto& track = song.playlistTracks[(std::size_t) i];
+        auto insert = -1;
+        if (track.mode == PlaylistTrackMode::audio)
+            insert = track.mixerTrack;
+        else if (track.mode == PlaylistTrackMode::instrument && track.channel >= 0 && track.channel < (int) song.channels.size())
+            insert = song.channels[(std::size_t) track.channel].mixerTrack;
+        if (on (insert))
+            out.push_back (i);
+    }
+    return out;
+}
+
+std::vector<int> channelsOn (const Song& song, const std::vector<int>& inserts)
+{
+    std::vector<int> out;
+    for (int c = 0; c < (int) song.channels.size(); ++c)
+        if (const auto t = song.channels[(std::size_t) c].mixerTrack; t > 0 && std::find (inserts.begin(), inserts.end(), t) != inserts.end())
+            out.push_back (c);
+    return out;
 }
 } // namespace lynx::mixerops

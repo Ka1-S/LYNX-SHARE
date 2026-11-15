@@ -26,5 +26,12 @@ fi
 if objdump -T "$BIN" | grep -qE '(GLIBCXX|CXXABI)_[0-9]'; then
     echo "ERROR: imports GLIBCXX/CXXABI symbols from the system's libstdc++"; fail=1
 fi
+# A library (a plugin a host loads with dlopen; not the executable, which has an interpreter) must not ask for static
+# TLS: glibc keeps only a small reserve for modules loaded later, and the host then fails to load it with "cannot
+# allocate memory in static TLS block" (the 0.1.27 Linux plugins on glibc 2.35, round 190fp). One initial-exec
+# thread_local makes the module's whole TLS block static.
+if ! readelf -lW "$BIN" | grep -q 'INTERP' && readelf -dW "$BIN" | grep -E '\((FLAGS)\)' | grep -q 'STATIC_TLS'; then
+    echo "ERROR: a library that asks for static TLS (DF_STATIC_TLS: an initial-exec thread_local); hosts can fail to load it"; fail=1
+fi
 [[ $fail == 0 ]] && echo "OK: runs with glibc $MAX and no system C++ runtime"
 exit $fail

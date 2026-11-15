@@ -1,5 +1,5 @@
 ---
-source: a3748d4a2a
+source: e5206a071d
 ---
 Każdy nagłówek poniżej to jeden problem. Jeśli Twojego tu nie ma, zgłoś go tak, jak opisano na końcu.
 
@@ -71,11 +71,32 @@ Wątek audio powinien działać z priorytetem czasu rzeczywistego.
 
 Szczegóły są w [LINUX.md](https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/LINUX.md).
 
+### Dźwięk trzeszczy lub się urywa
+
+LYNX SHARE zlicza każdy zanik (buffer underrun) i mówi, dlaczego do niego doszło. Wskaż wskaźnik `CPU` na pasku narzędzi albo otwórz `Narzędzia › Monitor wydajności pluginów...`. Czerwona liczba obok procentu CPU to licznik.
+
+Podpowiedź podaje przyczynę ostatniego zaniku:
+
+| Przyczyna | Co to znaczy | Co spróbować |
+|---|---|---|
+| Przetwarzanie trwało dłużej niż bufor | Blok audio liczył się dłużej, niż trwa. Podpowiedź podaje najwolniejszy kanał lub efekt w tym bloku | Zwiększ rozmiar bufora w `Opcje › Ustawienia audio...`, zamroź ten kanał albo obniż jakość pluginu |
+| Przetwarzanie zbliżyło się do granicy bufora | Obciążenie było bliskie 100 % w okolicy zaniku | Zwiększ rozmiar bufora albo zamroź najcięższe kanały |
+| Opóźnienie sterownika lub systemu | Sterownik lub system się spóźnił, choć obciążenie było niskie. Żaden plugin tego nie spowodował | Zwiększ rozmiar bufora, spróbuj innego sterownika (w Windows sterownika ASIO interfejsu), a w Linuksie sprawdź priorytet czasu rzeczywistego (wyżej) |
+
+Każdy zanik jest też zapisywany w `audio-glitches.log` w folderze ustawień, razem z urządzeniem, buforem i najcięższymi kanałami.
+
 ## Pluginy
 
 ### Plugin się wywala
 
-Uruchom go we własnym procesie, aby zatrzymał się tylko plugin.
+Większość awarii pluginów wyłącza tylko ten plugin: efekt jest pomijany (bypass), instrument milknie, a LYNX SHARE i projekt działają dalej. Komunikat `Plugin uległ awarii` proponuje wtedy:
+
+- `Odśwież`, co uruchamia plugin od nowa z ustawieniami z ostatniego zapisu lub kopii zapasowej.
+- `Zawsze uruchamiaj <plugin> w osobnym procesie`, co uruchamia go od nowa w jego własnym procesie, teraz i w każdym projekcie. Awaria tam nie może zatrzymać LYNX SHARE. Plugin w osobnym procesie otwiera swoje okno samodzielnie (nie można go zadokować).
+
+Okno pluginu pokazuje te same dwa przyciski zamiast swojego edytora. `Opcje › Menedżer pluginów...` wymienia pluginy, które zawsze działają w osobnym procesie, w kolumnie `Osobny proces`; kliknij pole, aby włączyć lub wyłączyć jeden z nich.
+
+Aby uruchamiać każdy plugin w jego własnym procesie:
 
 1. Otwórz `Opcje › Ustawienia ogólne...`.
 2. Włącz `Uruchamiaj pluginy w osobnym procesie (chroni LYNX SHARE przed awariami)`.

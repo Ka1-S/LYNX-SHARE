@@ -1,4 +1,6 @@
 #include "core/RackRenderer.h"
+#include "core/Dropouts.h"
+#include "core/HostTimelineScope.h"
 #include "core/Rack.h"
 #include "core/MixerOps.h"
 #include "core/FlSettings.h"
@@ -8,9 +10,11 @@
 #include "core/SlicexInstrument.h"
 #include "core/TempoMap.h"
 #include "core/ModelParams.h"
+#include "core/SynthParams.h"
 #include "core/FlmDwSampler.h"
 #include "core/FlmSlicer.h"
 #include "core/SamplePrecompute.h"
+#include "core/ThreeOsc.h" // round 190fe
 #include "core/TimeStretch.h"
 #include "core/MetronomeVoice.h"
 
@@ -340,9 +344,9 @@ std::shared_ptr<Instrument> buildInstrument (const ChannelDef& channel, double s
                 const auto ratio = target / ((double) span->frames() / span->sampleRate);
                 auto stretched = factories.stretchedSpans
                                      ? factories.stretchedSpans (channel.samplePath, precompute::variantKey (spanSettings, clip), span, ratio,
-                                                                 channel.sampler.stretchMethod, channel.sampler.stretchPitch)
+                                                                 channel.sampler.stretchMethod, channel.sampler.stretchPitch, stretchOptionsOf (channel.sampler))
                                      : std::shared_ptr<const SampleData> (timeStretchSpan (*span, ratio, channel.sampler.stretchMethod,
-                                                                                           channel.sampler.stretchPitch));
+                                                                                           channel.sampler.stretchPitch, stretchOptionsOf (channel.sampler)));
                 sample = stretched != nullptr ? std::move (stretched) : std::move (span);
                 precomputed = true;
             }
@@ -353,7 +357,8 @@ std::shared_ptr<Instrument> buildInstrument (const ChannelDef& channel, double s
             const auto ratio = target / ((double) precompute::stretchedFrames (sample, channel.sampler, clip) / sample->sampleRate);
             const auto map = warpStretchMap (channel.sampler.warp, (double) sample->frames(), sample->sampleRate,
                                              (double) std::llround ((double) sample->frames() * ratio));
-            if (auto stretched = factories.stretchedSamples (channel.samplePath, ratio, channel.sampler.stretchMethod, channel.sampler.stretchPitch, map))
+            if (auto stretched = factories.stretchedSamples (channel.samplePath, ratio, channel.sampler.stretchMethod, channel.sampler.stretchPitch, map,
+                                                         stretchOptionsOf (channel.sampler)))
                 sample = std::move (stretched);
         }
     }
@@ -499,6 +504,148 @@ bool clipShiftWanted (const Song& song, std::size_t channel)
         if (c.kind == ClipKind::audio && c.channel == (int) channel && c.pitch != 0.0f)
             return true;
     return false;
+}
+
+// Round 190gn (A1, memory): how many voices of channel `c` can sound at once — a bound for the pitch shifters it can
+// use (at most 8, ShifterStock). Every note of the channel the song can play (each pattern clip's notes along the clip,
+// repeated or not; muted clips, tracks and notes too, as they can be switched on while playing; each pattern looped on
+// its own, as in pattern mode; the notes of a Layer that has the channel as a child; the channel's echo repeats; with a
+// VFX note processor in the song, all 8) lasts
+// at most `voiceSeconds` (the instrument's longestVoiceSeconds: its sample played once to the end), an audio clip of
+// the channel at most its length and the end declick; counted with a quarter beat of slack each side (time shift,
+// swing; plus the channel's Time › Shift) at the fastest tempo of the song. The most of these intervals that overlap is the bound; a channel whose notes
+// can come from elsewhere (an arpeggiator) or whose voices have no end (loops, zones: +inf) keeps all 8. What a live
+// keyboard adds comes from the stock's live reserve.
+// The song as the analysis reads it (once per build): Pattern Blocks expanded to their clips, and the fastest tempo
+struct VoicePlan
+{
+    std::optional<Song> expanded; // (empty: the song itself)
+    double ticksPerSecond = 0.0; // at the fastest tempo; 0 = unknown (a pattern's own tempo lane)
+};
+
+VoicePlan voicePlan (const Song& song)
+{
+    VoicePlan plan;
+    if (patternblocks::active (song))
+        patternblocks::expandSong (plan.expanded.emplace (song));
+    auto bpm = std::max (1.0, song.bpm);
+    if (tempomap::active (song))
+    {
+        if (song.mode != PlayMode::song)
+            return plan;
+        const auto length = (double) std::max<std::int64_t> (ppq, song.songLength());
+        for (double t = 0.0; t <= length; t += ppq / 16.0)
+            bpm = std::max (bpm, tempomap::tempoAt (song, t));
+        bpm *= 1.01;
+    }
+    plan.ticksPerSecond = bpm * ppq / 60.0;
+    return plan;
+}
+
+int voicesAtOnce (const Song& song, const VoicePlan& plan, std::size_t c, double voiceSeconds)
+{
+    constexpr int all = 8;
+    if (c >= song.channels.size() || ! std::isfinite (voiceSeconds) || song.channels[c].arp.enabled() || plan.ticksPerSecond <= 0.0)
+        return all;
+    const auto& channel = song.channels[c];
+    const auto ticksPerSecond = plan.ticksPerSecond;
+    // (+ the channel's Time › Shift, which moves every note later)
+    const auto slack = (double) ppq / 4.0 + std::max (0.0, (double) song.channels[c].misc.shiftBeats * ppq);
+    const auto voiceTicks = voiceSeconds * ticksPerSecond;
+
+    // VFX note processors send notes to other channels by port (core/Vfx.h): not followed here, 8
+    for (const auto& other : song.channels)
+        if (other.instrument == InstrumentKind::vfx)
+            return all;
+
+    // the channels whose notes play this one: itself, and every Layer (in turn) that has it as a child
+    std::vector<char> plays (song.channels.size(), 0);
+    plays[c] = 1;
+    for (bool grew = true; grew;)
+    {
+        grew = false;
+        for (std::size_t l = 0; l < song.channels.size(); ++l)
+            if (! plays[l] && song.channels[l].instrument == InstrumentKind::layer)
+                for (const auto child : song.channels[l].layer.children)
+                    if (child >= 0 && (std::size_t) child < plays.size() && plays[(std::size_t) child])
+                    {
+                        if (song.channels[l].arp.enabled())
+                            return all;
+                        plays[l] = 1, grew = true;
+                        break;
+                    }
+    }
+    const auto ofChannel = [&plays] (const Note& n) { return n.channel >= 0 && (std::size_t) n.channel < plays.size() && plays[(std::size_t) n.channel] && ! n.slide; };
+    const auto echo = channel.misc.echo.enabled() ? std::clamp (channel.misc.echo.echoes, 0, 64) * (channel.misc.echo.fat ? 2 : 1) : 0;
+    const auto echoTicks = (double) channel.misc.echo.timeBeats * ppq;
+
+    std::vector<std::pair<double, int>> edges; // (tick, +1 start / −1 end) of one timeline
+    auto best = 0;
+    const auto addVoice = [&] (double start, double ticks) {
+        edges.push_back ({ start - slack, +1 });
+        edges.push_back ({ start + ticks + slack, -1 });
+    };
+    const auto addNote = [&] (double start) {
+        addVoice (start, voiceTicks);
+        for (int k = 1; k <= echo; ++k)
+            addVoice (start + (double) (channel.misc.echo.fat ? (k + 1) / 2 : k) * echoTicks, voiceTicks);
+    };
+    const auto count = [&] {
+        std::sort (edges.begin(), edges.end()); // (an end at the same tick as a start comes first)
+        auto now = 0;
+        for (const auto& e : edges)
+            best = std::max (best, now += e.second);
+        edges.clear();
+    };
+
+    // the song: pattern clips (with their repeats), audio clips of the channel
+    const Song& played = plan.expanded ? *plan.expanded : song;
+    for (const auto& clip : played.playlist)
+    {
+        if (clip.kind == ClipKind::audio && clip.channel >= 0 && (std::size_t) clip.channel < plays.size() && plays[(std::size_t) clip.channel])
+            addVoice ((double) clip.start, (double) clip.length + 0.3 * ticksPerSecond);
+        if (clip.kind != ClipKind::pattern || clip.pattern < 0 || clip.pattern >= (int) played.patterns.size() || clip.length <= 0)
+            continue;
+        const auto& pattern = played.patterns[(std::size_t) clip.pattern];
+        const auto period = std::max<std::int64_t> (1, pattern.effectiveLength (played.meter()));
+        const auto lastPass = (clip.offset + clip.length - 1) / period;
+        for (const auto& n : pattern.notes)
+        {
+            if (! ofChannel (n))
+                continue;
+            for (std::int64_t pass = 0; pass <= lastPass; ++pass)
+            {
+                const auto at = n.start + pass * period;
+                if (pass > 0 && n.start >= period)
+                    break;
+                if (at >= clip.offset && at < clip.offset + clip.length)
+                    addNote ((double) (clip.start + at - clip.offset));
+            }
+        }
+    }
+    count();
+
+    // pattern mode: each pattern on its own, looping
+    for (const auto& pattern : song.patterns)
+    {
+        const auto period = (double) std::max<std::int64_t> (1, pattern.effectiveLength (song.meter()));
+        const auto loops = std::max (2.0, std::ceil ((voiceTicks + 2.0 * slack) / period) + 1.0);
+        auto any = false;
+        for (const auto& n : pattern.notes)
+            if (ofChannel (n))
+            {
+                any = true;
+                for (double k = 0.0; k < loops; ++k)
+                    addNote ((double) n.start + k * period);
+            }
+        if (any)
+            count();
+        if (best >= all)
+            break;
+    }
+
+    // (not capped by the channel's Max polyphony: a note past it releases the oldest one, which still sounds)
+    return std::clamp (best, 0, all);
 }
 
 // The keep-pitch samplers' shifters, in parallel: each instrument only touches its own pool, and each shifter's
@@ -738,8 +885,10 @@ std::unique_ptr<const RackState> RackState::build (Song song,
     // which previous channel each channel was (round 168s, issue #32): by its instance tag, so inserting, removing or
     // moving channels keeps every other channel's running instrument (voices, loops, a plugin's live state); by position
     // only when the channel there is gone from the song (another project loaded over it, the old behaviour)
-    const auto channelOrigin = matchByInstance (song.channels, previous != nullptr ? &previous->song.channels : nullptr,
-                                                previous != nullptr ? previous->instruments.size() : 0);
+    auto channelOrigin = matchByInstance (song.channels, previous != nullptr ? &previous->song.channels : nullptr,
+                                         previous != nullptr ? previous->instruments.size() : 0);
+    for (std::size_t i = 0; i < channelOrigin.size(); ++i)
+        if (factories.freshInstances.contains (song.channels[i].instance.id)) channelOrigin[i] = -1;
     {
         static std::atomic<std::uint64_t> serials { 1 };
         state->serial = serials.fetch_add (1, std::memory_order_relaxed);
@@ -792,6 +941,7 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                             && previous->song.channels[p].sampler.stretchMethod == channel.sampler.stretchMethod
                             && previous->song.channels[p].sampler.stretchPitch == channel.sampler.stretchPitch
                             && previous->song.channels[p].sampler.warp == channel.sampler.warp
+                            && previous->song.channels[p].sampler.warpModes == channel.sampler.warpModes
                             && previous->song.bpm == song.bpm))))
             && (kind != InstrumentKind::plugin
                 || (previous->song.channels[p].plugin.id == channel.plugin.id && previous->sampleRate == sampleRate
@@ -841,7 +991,45 @@ std::unique_ptr<const RackState> RackState::build (Song song,
             instrument->setPanTriangular (song.panTriangular);
             instrument->setFlWrapperVelocity (song.flPluginLevels);
         }
+    // round 190gn (A1): the shifters each keep-pitch channel's voices can use at once are made now; any further one (a
+    // live keyboard, an edit) comes from the rack's stock, refilled off the audio thread
+    {
+        const loadtrace::Scope timing ("rack_shifter_plan");
+        const auto offline = offlineRendering() || renderInProgress();
+        state->shifterStock = previous != nullptr && previous->shifterStock != nullptr && previous->sampleRate == sampleRate
+                                      && previous->shifterStock->offline() == (offline && ! shifterstock::strict())
+                                  ? previous->shifterStock
+                                  : std::make_shared<ShifterStock> (sampleRate, offline);
+        auto& stock = *state->shifterStock;
+        std::array<int, ShifterStock::kinds> reserve {};
+        std::array<bool, ShifterStock::kinds> used {};
+        std::optional<VoicePlan> plan; // (made for the first keep-pitch channel)
+        for (std::size_t i = 0; i < song.channels.size() && i < state->instruments.size(); ++i)
+        {
+            auto* instrument = state->instruments[i].get();
+            const auto& channel = song.channels[i];
+            const auto fresh = std::find (keyShiftLater.begin(), keyShiftLater.end(), instrument) != keyShiftLater.end();
+            const auto shifts = (channel.instrument == InstrumentKind::sampler || channel.instrument == InstrumentKind::audioClip)
+                                && (channel.sampler.keepPitch || clipShiftWanted (song, i));
+            if (instrument == nullptr || ! shifts || ! shifterstock::planned())
+                continue;
+            const auto kind = ShifterStock::kindOf (channel.sampler.stretchMethod);
+            if (! plan)
+                plan = voicePlan (song);
+            const auto need = voicesAtOnce (song, *plan, i, instrument->longestVoiceSeconds());
+            if (fresh)
+                instrument->useShifterStock (state->shifterStock, need);
+            else // (a running instrument: what the song now wants beyond what it holds waits in the stock)
+                reserve[(std::size_t) kind] += std::max (0, need - instrument->pitchShiftersHeld());
+            used[(std::size_t) kind] = true;
+        }
+        // + a live reserve (a chord) for each kind in use: a keyboard played into a keep-pitch channel
+        for (int k = 0; k < ShifterStock::kinds; ++k)
+            stock.setReserve (k, used[(std::size_t) k] ? ShifterStock::liveReserve + reserve[(std::size_t) k] : 0);
+    }
     prepareKeyShifts (keyShiftLater, sampleRate);
+    state->shifterStock->topUp();
+    shifterstock::enlist (state->shifterStock);
 
     state->effects.resize (song.mixer.size());
 
@@ -891,6 +1079,7 @@ std::unique_ptr<const RackState> RackState::build (Song song,
 
         for (std::size_t i = 0; i < slots.size() && i < (std::size_t) maxEffectSlots; ++i)
         {
+            if (factories.freshInstances.contains (slots[i].instance.id)) slotOrigin[t][i] = { -1, -1 };
             const auto kind = slots[i].kind;
             const auto none = std::numeric_limits<std::size_t>::max();
             const auto pt = slotOrigin[t][i].first >= 0 ? (std::size_t) slotOrigin[t][i].first : none;
@@ -1038,7 +1227,8 @@ std::unique_ptr<const RackState> RackState::build (Song song,
     for (std::size_t c = 0; c < channels.size(); ++c)
         if (channels[c].cutGroup > 0)
             for (std::size_t d = 0; d < channels.size(); ++d)
-                if (channels[d].cutBy == channels[c].cutGroup && flCutsIt (channels[d].instrument))
+                if (channels[d].cutBy == channels[c].cutGroup && flCutsIt (channels[d].instrument)
+                    && ! (d == c && channels[c].cutOthersOnly)) // (round 190fe: FLM's groups spare the pad that plays)
                 {
                     state->cutTargets[c].push_back ((int) d);
                     state->hasCutGroups = true;
@@ -1049,6 +1239,7 @@ std::unique_ptr<const RackState> RackState::build (Song song,
     const auto audible = state->song.soloAudible();
     state->mixerAudible.assign (audible.begin(), audible.end());
     state->applyVcas();
+    state->buildSlotPlans(); // (round 190gp: last, from the song as it now is)
     loadtrace::add ("rack_schedule_graph", loadtrace::msSince (tailStarted));
     return state;
 }
@@ -1292,6 +1483,19 @@ void RackState::buildTaskGraph (const std::vector<int>& depth)
     for (int i = 0; i < tasks; ++i)
         if (graphIndegree[(std::size_t) i] == 0)
             graphRoots.push_back (i);
+    // serial chains (round 190gq): an insert whose only successor is an insert fed by nothing else runs that insert
+    // itself. Only insert → insert links: a channel fused with its insert made the graph run depth-first, so the other
+    // channels (the roots, most of the work) started later (measured: Exoplanet's overruns doubled)
+    graphFused.assign ((std::size_t) tasks, -1);
+    graphFusedCount = 0;
+    if (std::getenv ("LYNX_CHAINS") == nullptr || std::atoi (std::getenv ("LYNX_CHAINS")) != 0)
+        for (int i = graphChannels; i < tasks; ++i)
+            if (graphNextStart[(std::size_t) i + 1] - graphNextStart[(std::size_t) i] == 1)
+                if (const auto j = graphNext[(std::size_t) graphNextStart[(std::size_t) i]]; graphIndegree[(std::size_t) j] == 1)
+                {
+                    graphFused[(std::size_t) i] = j;
+                    ++graphFusedCount;
+                }
     graphOk = true;
 }
 
@@ -1729,11 +1933,16 @@ void RackState::buildAutomationTables()
                                       && t.param < samplerparam::count)
                                   // the knobs of an FL engine kept in the channel's state (round 168n)
                                   || modelparams::find (song.channels[(std::size_t) t.index].instrument, t.param) != nullptr
+                                  // LYNX Synth's knobs (issue #152, round 190he)
+                                  || (song.channels[(std::size_t) t.index].instrument == InstrumentKind::synth && synthparam::valid (t.param))
                                   // FL Studio Mobile's DW Sampler: its own 34 values (round 190de)
                                   || (flmdw::isChannel (song.channels[(std::size_t) t.index]) && t.param >= flmdw::automationBase
                                       && t.param < flmdw::automationBase + flmdw::paramCount)
                                   || (flmslicer::isChannel (song.channels[(std::size_t) t.index]) && t.param >= flmslicer::automationBase
                                       && t.param < flmslicer::automationBase + flmslicer::paramCount)
+                                  // FL Studio Mobile's 3x Osc: FLM's own values of its parameters (an imported .flm's lanes, round 190fe)
+                                  || (threeOscIsFlm (song.channels[(std::size_t) t.index]) && t.param > threeosc::flmParamBase
+                                      && threeosc::isFlmTarget (t.param - threeosc::flmParamBase))
                                   // FL Studio Mobile's GMSynth: its own 75 values P[k] (an imported .flm's lanes, round 190de)
                                   || (song.channels[(std::size_t) t.index].instrument == InstrumentKind::gms
                                       && song.channels[(std::size_t) t.index].modelParams.size() == 1
@@ -1793,6 +2002,7 @@ void RackState::buildAutomationTables()
 
         hasAutomation = hasAutomation || used;
     };
+    hasAutomation = song.automationChunks; // (round 190ff: a render song standing in for one with automation)
 
     // issue #97: the automations with clips on one target share a slot, the clip that plays decides (automationValueAt)
     automationGroups.assign ((std::size_t) count, {});
@@ -1800,7 +2010,7 @@ void RackState::buildAutomationTables()
     const auto playsClips = [&] (int a) {
         const auto& automation = automations[(std::size_t) a];
         return ! automationClips[(std::size_t) a].empty() && ! automation.isLive() && zoneAutomations[(std::size_t) a] == 0
-               && automation.target.kind != AutomationTargetKind::none;
+               && automation.target.kind != AutomationTargetKind::none && automation.links.empty(); // (190gw: links bind below)
     };
     for (int a = count - 1; a > 0; --a)
     {
@@ -1832,7 +2042,8 @@ void RackState::buildAutomationTables()
     for (int a = 0; a < count; ++a)
     {
         if (automationFollowers[(std::size_t) a] != 0
-            || (automationClips[(std::size_t) a].empty() && ! automations[(std::size_t) a].isLive() && zoneAutomations[(std::size_t) a] == 0))
+            || (automationClips[(std::size_t) a].empty() && ! automations[(std::size_t) a].isLive() && zoneAutomations[(std::size_t) a] == 0)
+            || ! automations[(std::size_t) a].links.empty()) // (round 190gw: through its link slots, below)
             continue;
 
         bind (a, automations[(std::size_t) a].target);
@@ -1871,6 +2082,18 @@ void RackState::buildAutomationTables()
             eventLanes.push_back ({ p, l, slot });
             bind (slot++, lane.target);
         }
+
+    // round 190gw: the target links of an automation clip with several (FL's "Crossfade with" clip): one slot each
+    linkSlots.clear();
+    for (int a = 0; a < count; ++a)
+        if (const auto& automation = automations[(std::size_t) a]; ! automation.links.empty() && ! automation.isLive())
+            for (const auto& link : automation.links)
+            {
+                if (slot >= maxAutomations)
+                    break;
+                linkSlots.push_back ({ a, slot, linkformula::Formula::compile (link.formula) });
+                bind (slot++, link.target);
+            }
 
     // round 177b: modulators, after everything else (a modulated target follows its automation or its own value)
     modRoutes.clear();
@@ -1917,7 +2140,7 @@ void RackState::buildAutomationTables()
             if (slot >= maxAutomations || route.depth == 0.0f || ! Modulator::canModulate (song, route.target))
                 continue;
             const auto source = boundSlot (route.target);
-            modRoutes.push_back ({ slot, source, std::clamp (song.targetValue (route.target), 0.0f, 1.0f), m, route.depth });
+            modRoutes.push_back ({ slot, source, std::clamp (song.modulationBase (route.target), 0.0f, 1.0f), m, route.depth });
             bind (slot++, route.target);
         }
 
@@ -2096,8 +2319,27 @@ void flWrapperGains (float pan, float gain, bool triangular, float& left, float&
 float peakOf (const float* data, int n) noexcept
 {
     float peak = 0.0f;
-
-    for (int i = 0; i < n; ++i)
+    int i = 0;
+#if defined(LYNX_X86)
+    // round 190ge: four lanes at a time. The scalar form below stayed one serial chain of maxss on every compiler (it
+    // runs for each insert and meter, every block). The same peak: a maximum is exact in any order, and a NaN is
+    // skipped in both forms (max (NaN, m) keeps m, as `a > peak` is false for a NaN)
+    if (n >= 8)
+    {
+        const auto mask = _mm_castsi128_ps (_mm_set1_epi32 (0x7fffffff));
+        auto m0 = _mm_setzero_ps(), m1 = _mm_setzero_ps();
+        for (; i + 8 <= n; i += 8)
+        {
+            m0 = _mm_max_ps (_mm_and_ps (_mm_loadu_ps (data + i), mask), m0);
+            m1 = _mm_max_ps (_mm_and_ps (_mm_loadu_ps (data + i + 4), mask), m1);
+        }
+        alignas (16) float lanes[4];
+        _mm_store_ps (lanes, _mm_max_ps (m0, m1));
+        for (const auto a : lanes)
+            peak = a > peak ? a : peak;
+    }
+#endif
+    for (; i < n; ++i)
     {
         const auto a = std::abs (data[i]);
         peak = a > peak ? a : peak; // form the compiler vectorizes
@@ -2106,13 +2348,29 @@ float peakOf (const float* data, int n) noexcept
     return peak;
 }
 
-// No NaN / inf in the block? (x · 0 is 0 for every finite x: one vectorized pass)
+// No NaN / inf in the block? Round 190ge: by the exponent bits (all ones only for an inf or a NaN), four lanes at a
+// time. (The form before, x · 0 summed — 0 for every finite x — was one serial chain of float additions on every
+// compiler: the order of a float sum may not change. It ran after every effect slot, every block.)
 bool finiteBlock (const float* l, const float* r, int n) noexcept
 {
-    float acc = 0.0f;
-    for (int k = 0; k < n; ++k)
-        acc += l[k] * 0.0f + r[k] * 0.0f;
-    return acc == 0.0f;
+    int k = 0;
+    auto bad = false;
+#if defined(LYNX_X86)
+    {
+        const auto exponent = _mm_set1_epi32 (0x7f800000);
+        auto acc = _mm_setzero_si128();
+        for (; k + 4 <= n; k += 4)
+        {
+            const auto a = _mm_and_si128 (_mm_castps_si128 (_mm_loadu_ps (l + k)), exponent);
+            const auto b = _mm_and_si128 (_mm_castps_si128 (_mm_loadu_ps (r + k)), exponent);
+            acc = _mm_or_si128 (acc, _mm_or_si128 (_mm_cmpeq_epi32 (a, exponent), _mm_cmpeq_epi32 (b, exponent)));
+        }
+        bad = _mm_movemask_epi8 (acc) != 0;
+    }
+#endif
+    for (; k < n; ++k)
+        bad = bad || ! std::isfinite (l[k]) || ! std::isfinite (r[k]);
+    return ! bad;
 }
 
 std::atomic<std::uint64_t> nonFiniteBlocks { 0 };
@@ -2123,6 +2381,22 @@ bool anyAbove (const float* l, const float* r, int n, float level) noexcept
     // in blocks of 32: the inner loop vectorizes; silent chunks (the ones that scan everything) stay cheap
     int i = 0;
 
+#if defined(LYNX_X86)
+    // round 190ge: explicitly four lanes at a time (the loop below stayed scalar on every compiler); the same answer:
+    // true as soon as a 32-sample chunk holds a sample above `level` (a NaN is never above it, in both forms)
+    {
+        const auto mask = _mm_castsi128_ps (_mm_set1_epi32 (0x7fffffff));
+        const auto threshold = _mm_set1_ps (level);
+        for (; i + 32 <= n; i += 32)
+        {
+            auto m = _mm_setzero_ps();
+            for (int k = i; k < i + 32; k += 4)
+                m = _mm_max_ps (_mm_max_ps (_mm_and_ps (_mm_loadu_ps (l + k), mask), _mm_and_ps (_mm_loadu_ps (r + k), mask)), m);
+            if (_mm_movemask_ps (_mm_cmpgt_ps (m, threshold)) != 0)
+                return true;
+        }
+    }
+#endif
     for (; i + 32 <= n; i += 32)
     {
         float m = 0.0f;
@@ -2208,8 +2482,12 @@ std::uint64_t nowNs() noexcept
 // Adds the time since `start` to `slot` when profiling (start = 0: profiling was off when the unit began)
 struct UnitTimer
 {
-    UnitTimer (bool on, std::atomic<std::uint64_t>& s, std::atomic<std::uint64_t>* m = nullptr) noexcept
-        : slot (s), longest (m), start (on ? nowNs() : 0) {}
+    // `blockSlowest` / `unit` (round 190gg): the block's slowest call, for the dropout log (core/Dropouts.h)
+    // (rollup 0.1.28: only the live renderer reports it; the part rendered ahead (190gq) runs outside the callback, so
+    // its calls are no cause of a late callback)
+    UnitTimer (bool on, std::atomic<std::uint64_t>& s, std::atomic<std::uint64_t>* m = nullptr, std::atomic<std::uint64_t>* blockSlowest = nullptr,
+               std::uint32_t unitId = 0) noexcept
+        : slot (s), longest (m), slowest (blockSlowest), unit (unitId), start (on ? nowNs() : 0) {}
     ~UnitTimer()
     {
         if (start == 0)
@@ -2223,9 +2501,13 @@ struct UnitTimer
             {
             }
         }
+        if (slowest != nullptr)
+            dropouts::raiseSlowest (*slowest, used, unit);
     }
     std::atomic<std::uint64_t>& slot;
     std::atomic<std::uint64_t>* longest;
+    std::atomic<std::uint64_t>* slowest;
+    std::uint32_t unit;
     std::uint64_t start;
 };
 } // namespace
@@ -2254,14 +2536,32 @@ void RackRenderer::prepare (double sr, int maxBlockSize)
     lastTrackGain.fill ({ std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f, 0.0f });
     lastTapGain.fill ({ std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f, 0.0f });
     lastMeterGain.fill ({ std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f, 0.0f });
-    channelBuffers.assign ((std::size_t) maxChannels * 2 * chunkCapacity, 0.0f);
     smartDisable.assign ((std::size_t) maxMixerTracks * maxEffectSlots, {});
     trackEqs.assign ((std::size_t) maxMixerTracks, {});
-    trackScratchBuffers.assign ((std::size_t) maxMixerTracks * 2 * chunkCapacity, 0.0f);
     tapBuffers.assign ((std::size_t) RackState::maxSendTaps * 2 * chunkCapacity, 0.0f);
     sampleRate = sr;
     blockCapacity = std::max (64, maxBlockSize);
-    mixBuffers.assign ((std::size_t) maxMixerTracks * 2 * (std::size_t) blockCapacity, 0.0f);
+    {
+        // (round 190gn: as many channels / inserts as reserved, the state last played or the minimum; a mixer buffer
+        // holds one chunk, the most process() mixes at once)
+        const std::scoped_lock l (bufferLock);
+        auto channels = std::max (reservedChannels.load(), minBufferChannels);
+        auto tracks = std::max (reservedTracks.load(), minBufferTracks);
+        if (lastState != nullptr)
+        {
+            channels = std::max (channels, (int) std::min<std::size_t> (lastState->instruments.size(), (std::size_t) maxChannels));
+            tracks = std::max (tracks, (int) std::min<std::size_t> (lastState->song.mixer.size(), (std::size_t) maxMixerTracks));
+        }
+        const auto frames = std::min (blockCapacity, chunkCapacity);
+        reservedChannels.store (channels);
+        reservedTracks.store (tracks);
+        preparedFrames.store (frames);
+        bufferExchange.collectGarbage();
+        bufferExchange.publish (makeBuffers (channels, tracks, frames));
+    }
+    // (round 190gp: the lazy-zero flags of the inserts and the shared silent block a reader of an unwritten insert gets)
+    trackUnwritten.assign ((std::size_t) maxMixerTracks, 0);
+    zeroBlock.assign ((std::size_t) blockCapacity, 0.0f);
     hwScratch.assign (2 * (std::size_t) blockCapacity, 0.0f);
     layerPick.assign ((std::size_t) maxChannels * 128, (std::int16_t) -1);
     voiceOrderScratch.assign ((std::size_t) maxChannels, {});
@@ -2271,18 +2571,101 @@ void RackRenderer::prepare (double sr, int maxBlockSize)
 
     if (lastState != nullptr)
     {
-        for (auto& instrument : lastState->instruments)
-            instrument->prepare (sr);
+        for (std::size_t c = 0; c < lastState->instruments.size(); ++c)
+            if (! foreignChannel ((int) c))
+                lastState->instruments[c]->prepare (sr);
 
-        for (auto& track : lastState->effects)
-            for (auto& effect : track)
-                effect->prepare (sr);
+        for (std::size_t t = 0; t < lastState->effects.size(); ++t)
+            if (! foreignTrack ((int) t))
+                for (auto& effect : lastState->effects[t])
+                    effect->prepare (sr);
     }
+}
+
+float* RackRenderer::rawTrackBuffer (int track, int channel) noexcept
+{
+    return buffers->mix.data() + ((std::size_t) track * 2 + (std::size_t) channel) * (std::size_t) buffers->frames;
+}
+
+std::unique_ptr<const RackRenderer::Buffers> RackRenderer::makeBuffers (int channels, int tracks, int frames)
+{
+    auto b = std::make_unique<Buffers>();
+    b->channels = std::clamp (channels, 1, maxChannels);
+    b->tracks = std::clamp (tracks, 1, maxMixerTracks);
+    b->frames = std::clamp (frames, 1, chunkCapacity);
+    b->channel.assign ((std::size_t) b->channels * 2 * chunkCapacity, 0.0f);
+    b->scratch.assign ((std::size_t) b->tracks * 2 * chunkCapacity, 0.0f);
+    b->mix.assign ((std::size_t) b->tracks * 2 * (std::size_t) b->frames, 0.0f);
+    return b;
+}
+
+namespace
+{
+// what a state's blocks index the buffers by (process: channels < min (instruments, channels, maxChannels); inserts
+// < max (1, mixer size), at most maxMixerTracks)
+std::pair<int, int> bufferNeeds (const RackState& state) noexcept
+{
+    const auto channels = (int) std::min ({ state.instruments.size(), state.song.channels.size(), (std::size_t) RackRenderer::maxChannels });
+    const auto tracks = std::clamp ((int) state.song.mixer.size(), 1, maxMixerTracks);
+    return { std::max (1, channels), tracks };
+}
+} // namespace
+
+void RackRenderer::reserveFor (const RackState& state)
+{
+    const auto [channels, tracks] = bufferNeeds (state);
+    const std::scoped_lock l (bufferLock);
+    reserving.store (true);
+    bufferExchange.collectGarbage();
+    if (channels <= reservedChannels.load() && tracks <= reservedTracks.load())
+        return;
+    const auto up = [] (int n, int limit) { return std::min (limit, (n + 31) / 32 * 32); };
+    reservedChannels.store (std::max (reservedChannels.load(), up (channels, maxChannels)));
+    reservedTracks.store (std::max (reservedTracks.load(), up (tracks, maxMixerTracks)));
+    if (preparedFrames.load() > 0) // (not prepared yet: prepare() makes them at this size)
+        bufferExchange.publish (makeBuffers (reservedChannels.load(), reservedTracks.load(), preparedFrames.load()));
+}
+
+bool RackRenderer::buffersFor (const RackState& state) noexcept
+{
+    const auto [channels, tracks] = bufferNeeds (state);
+    buffers = bufferExchange.acquire();
+    const auto fits = [&] { return buffers != nullptr && buffers->channels >= channels && buffers->tracks >= tracks; };
+    if (fits())
+        return true;
+    if (reserving.load (std::memory_order_relaxed)) // (never: reserveFor ran before the state was published)
+        return false;
+    // a renderer without reserveFor (offline, tools, tests): grown here, on the rendering thread
+    try
+    {
+        const std::scoped_lock l (bufferLock);
+        reservedChannels.store (std::max (reservedChannels.load(), channels));
+        reservedTracks.store (std::max (reservedTracks.load(), tracks));
+        bufferExchange.collectGarbage();
+        bufferExchange.publish (makeBuffers (reservedChannels.load(), reservedTracks.load(), std::max (1, preparedFrames.load())));
+    }
+    catch (...)
+    {
+        return false;
+    }
+    buffers = bufferExchange.acquire();
+    return fits();
 }
 
 float* RackRenderer::trackBuffer (int track, int channel) noexcept
 {
-    return mixBuffers.data() + ((std::size_t) track * 2 + (std::size_t) channel) * (std::size_t) blockCapacity;
+    if (trackZeros (track)) // (round 190gp: the zeros of a buffer nobody wrote this chunk, stored now)
+    {
+        trackUnwritten[(std::size_t) track] = 0;
+        std::memset (rawTrackBuffer (track, 0), 0, sizeof (float) * (std::size_t) trackSamples);
+        std::memset (rawTrackBuffer (track, 1), 0, sizeof (float) * (std::size_t) trackSamples);
+    }
+    return rawTrackBuffer (track, channel);
+}
+
+const float* RackRenderer::trackInput (int track, int channel) noexcept
+{
+    return trackZeros (track) ? zeroBlock.data() : rawTrackBuffer (track, channel);
 }
 
 float* RackRenderer::tapBuffer (int tap, int side) noexcept
@@ -2377,6 +2760,19 @@ void RackRenderer::clearOverriddenValues() noexcept
                     automationValues[w * 32 + b] = std::numeric_limits<float>::quiet_NaN(); // the control's own value
 }
 
+// Round 190gh (B7): where the song is for its automation and tempo: within the song (the transport wraps at its end),
+// except while it plays on past its end (a real-time bounce, a linear recording: liveInput's linearSong), where the
+// values hold as the song ended them — as an export's tail does — instead of starting over from the song's start.
+namespace
+{
+double linearSongTick (const LiveInput* liveInput, double startTick, double length) noexcept
+{
+    if (liveInput != nullptr && liveInput->linearSong.load (std::memory_order_relaxed))
+        return std::max (0.0, startTick);
+    return std::fmod (std::max (0.0, startTick), length);
+}
+} // namespace
+
 void RackRenderer::updateAutomation (const RackState& state, double startTick) noexcept
 {
     const auto& song = state.song;
@@ -2386,6 +2782,8 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
     {
         const auto& automation = song.automations[(std::size_t) a];
         const auto& src = automation.source;
+        if (src.channel >= 0 ? foreignChannel (src.channel) : foreignTrack (src.track))
+            continue; // (render-ahead: that unit's renderer works it out; what it drives is that renderer's too)
         if (src.channel >= 0)
         {
             if (src.channel < (int) state.instruments.size() && state.instruments[(std::size_t) src.channel] != nullptr)
@@ -2407,7 +2805,7 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
             if (current >= 0 && current < (int) song.patterns.size())
             {
                 const auto& pattern = song.patterns[(std::size_t) current];
-                const auto length = (double) std::max<std::int64_t> (1, pattern.effectiveLength (song.beatsPerBar));
+                const auto length = (double) std::max<std::int64_t> (1, pattern.effectiveLength (song.meter()));
                 const auto t = std::fmod (std::max (0.0, startTick), length);
 
                 for (const auto& lane : state.eventLanes)
@@ -2418,7 +2816,7 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
         else
         {
             const auto length = (double) std::max<std::int64_t> (1, state.schedule.songLength);
-            const auto tick = std::fmod (std::max (0.0, startTick), length);
+            const auto tick = linearSongTick (liveInput, startTick, length);
 
             // inside a clip of the pattern: its events; after one: the value it ended with; before the first:
             // no value (the target's own). Depends only on the position, like automation clips.
@@ -2457,11 +2855,17 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
     }
 
     const auto length = (double) std::max<std::int64_t> (1, state.schedule.songLength);
-    const auto tick = std::fmod (std::max (0.0, startTick), length);
+    const auto tick = linearSongTick (liveInput, startTick, length);
 
     for (std::size_t a = 0; a < state.automationClips.size(); ++a)
         if (! state.automationClips[a].empty() && state.automationFollowers[a] == 0)
             automationValues[a] = automationValueAt (state, (int) a, tick);
+    // round 190gw: an automation's target links take its value through their formulas (NaN: the targets' own values)
+    for (const auto& link : state.linkSlots)
+    {
+        const auto v = automationValues[(std::size_t) link.automation];
+        automationValues[(std::size_t) link.slot] = std::isnan (v) ? v : link.formula.map (v);
+    }
 
     // automation lanes (round 177b): the lane's curve in song time, except where a clip of the same target plays
     for (const auto& lane : state.laneAutomations)
@@ -2543,7 +2947,7 @@ void RackRenderer::applyPluginParams (const RackState& state, int firstSlot, boo
 
         const auto v = automationValues[(std::size_t) b.automation];
 
-        if (std::isnan (v))
+        if (std::isnan (v) || (b.channel >= 0 ? foreignChannel (b.channel) : foreignTrack (b.track)))
             continue;
 
         if (b.channel >= 0)
@@ -2596,7 +3000,8 @@ void RackRenderer::deliverToEffects (const RackState& state, const NoteEvent& e)
         return;
     for (const auto& route : state.effectMidiRoutes[(std::size_t) e.channel])
     {
-        if ((std::size_t) route.track >= state.effects.size() || (std::size_t) route.slot >= state.effects[(std::size_t) route.track].size())
+        if ((std::size_t) route.track >= state.effects.size() || (std::size_t) route.slot >= state.effects[(std::size_t) route.track].size()
+            || foreignTrack (route.track))
             continue;
         if ((e.port >= 0 && route.port != e.port) || (e.port < 0 && route.portOnly))
             continue;
@@ -2640,12 +3045,12 @@ void RackRenderer::deliverToEffects (const RackState& state, const NoteEvent& e)
 
 float* RackRenderer::channelBuffer (int channel, int side) noexcept
 {
-    return channelBuffers.data() + ((std::size_t) channel * 2 + (std::size_t) side) * chunkCapacity;
+    return buffers->channel.data() + ((std::size_t) channel * 2 + (std::size_t) side) * chunkCapacity;
 }
 
 float* RackRenderer::trackScratch (int track, int side) noexcept
 {
-    return trackScratchBuffers.data() + ((std::size_t) track * 2 + (std::size_t) side) * chunkCapacity;
+    return buffers->scratch.data() + ((std::size_t) track * 2 + (std::size_t) side) * chunkCapacity;
 }
 
 // A whole channel over the chunk: notes at the exact sample (only its own events), volume/pan and the
@@ -2672,6 +3077,11 @@ void RackRenderer::clearPolyLayers() noexcept
 
 void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
 {
+    if (foreignChannel (i)) // (render-ahead: the other renderer renders it; the boundary brings it here)
+    {
+        importChannel (i, n);
+        return;
+    }
     const auto& c = state.song.channels[(std::size_t) i];
     const auto automation = state.hasAutomation;
     const auto knobVolume = liveLevel (state, &LiveLevels::channelVolume, i, c.volume);
@@ -2706,6 +3116,10 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
     auto& instrument = *state.instruments[(std::size_t) i];
     instrument.beginChunk (n); // (extra outputs: a generator Patcher's, REA_rodada141)
     instrument.setChannelLevels (pan, volume); // (FPC's pads pan around the channel's pan, round 190q)
+    // audio clip envelopes (round 190gi): this snapshot's table, every block while the song has one (and once more when it
+    // has none left, so no instrument keeps a table that is going away); a song without any skips the call
+    if (! state.song.clipEnvelopes.empty() || clipEnvTableShown)
+        instrument.setClipEnvelopes (state.song.clipEnvelopes.empty() ? nullptr : &state.song.clipEnvelopes, chunkTps);
     // issue #14: the channel's pitch as it is now (a hosted plugin bends to it; native engines took it at note on)
     // (round 167a: the native generators move their sounding notes with it, as FL's do)
     // (round 173d: + the controller's pitch wheel, which FL's generators follow through the channel's pitch)
@@ -2729,7 +3143,8 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
         return;
     }
     channelSilent[(std::size_t) i] = 0;
-    const UnitTimer timer (profiling.load (std::memory_order_relaxed), units->channelNs[(std::size_t) i], &units->channelMaxNs[(std::size_t) i]);
+    const UnitTimer timer (profiling.load (std::memory_order_relaxed), units->channelNs[(std::size_t) i], &units->channelMaxNs[(std::size_t) i],
+                           (countsAudio ? &units->blockSlowest : nullptr), dropouts::channelUnit (i));
     std::memset (l, 0, sizeof (float) * (std::size_t) n);
     std::memset (r, 0, sizeof (float) * (std::size_t) n);
     int position = 0;
@@ -2899,6 +3314,8 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
                     instrument.setNextClipStretch (e.clipStretch);
                 if (e.fadeIn > 0.0f || e.fadeOut > 0.0f || e.fadeShape != 0)
                     instrument.setNextClipFades (e.clipElapsed, e.clipRemaining, e.fadeIn, e.fadeOut, e.fadeShape, e.fadeInTension, e.fadeOutTension);
+                if (e.clipEnvelope >= 0) // (round 190gi)
+                    instrument.setNextClipEnvelope (e.clipEnvelope, e.clipEnvTick);
 
                 // an echo's volume: the instrument scales the voice, else (engines without it) the velocity
                 auto velocity = e.velocity;
@@ -3005,6 +3422,72 @@ static bool hasLiveMeters (EffectKind kind) noexcept
            || kind == EffectKind::peakController; // issue #66: its display's Peak + LFO, Peak and LFO lines
 }
 
+RackState::SlotPlan RackState::planSlot (const RackState& state, int track, std::size_t i) noexcept
+{
+    SlotPlan p;
+    const auto& slot = state.song.mixer[(std::size_t) track].effects[i];
+    p.kind = slot.kind;
+    p.active = state.song.slotActive (slot);
+    p.mix = slot.mix;
+    p.hasMixAuto = (std::size_t) track < state.effectMixAuto.size() && i < state.effectMixAuto[(std::size_t) track].size();
+    p.mixAuto = p.hasMixAuto ? state.effectMixAuto[(std::size_t) track][i] : -1;
+    p.isPlugin = slot.kind == EffectKind::plugin;
+    p.routed = p.isPlugin && (std::size_t) track < state.slotConnections.size() && i < state.slotConnections[(std::size_t) track].size()
+               && state.slotConnections[(std::size_t) track][i].routed;
+    p.longHold = p.isPlugin || slot.kind == EffectKind::patcher;
+    p.liveMeters = hasLiveMeters (slot.kind);
+    p.sends = slot.kind == EffectKind::fruitySend || slot.kind == EffectKind::patcher || slot.kind == EffectKind::transmitter
+              || slot.kind == EffectKind::flTransporter || slot.kind == EffectKind::equo || p.routed;
+    // smart disable (runEffects; FL's global switch is read there, live):
+    // (not Gross Beat: its buffer must keep recording the silence it may play back later, as in FL)
+    // (nor Newtone / Newtime: in slave mode they play their sample whatever the input)
+    // (nor a slot whose "Smart disable" is off, or a plugin that does not allow it — FL's per-plugin options, REA round 139)
+    // (nor a hosted effect whose input 1 comes from another insert: its own input says nothing; round 189j)
+    p.smartEligible = slot.smartDisable && ! (p.isPlugin && ! slot.plugin.allowSmartDisable)
+                      && ! (p.routed && state.slotConnections[(std::size_t) track][i].mainSource > 0)
+                      && slot.kind != EffectKind::grossBeat && slot.kind != EffectKind::newtone
+                      && slot.kind != EffectKind::newtime
+                      && slot.kind != EffectKind::scratcher // (nor the Scratcher: its turntable plays whatever the input)
+                      && slot.kind != EffectKind::edison // (nor Edison: it records silence and plays whatever the input, round 190cd)
+                      && slot.kind != EffectKind::hardwareInsert // (nor the hardware insert: outboard gear has its own tails and noise)
+                      && ! (slot.kind == EffectKind::patcher && patcher::usesHardwareIo (slot.patcher)) // (nor a Patcher holding one, round 165c)
+                      // (nor a controller: its outputs move whatever the sound — a silent insert is their usual place; round 164)
+                      && slot.kind != EffectKind::formulaController
+                      && slot.kind != EffectKind::xyController && slot.kind != EffectKind::xyzController
+                      && slot.kind != EffectKind::controlSurface
+                      && slot.kind != EffectKind::peakController // (issue #66: its LFO runs and its peak falls in silence, as FL's)
+                      // round 164c: a visual plugin keeps recording silence (its display falls, the video export stays in time)
+                      && slot.kind != EffectKind::waveCandy && slot.kind != EffectKind::visualizer
+                      && slot.kind != EffectKind::tuner // (round 165g: the tuner's display follows the signal into silence)
+                      // (round 166f: nor Facet EQ playing its comparative target — the sidechain plays while this track is silent)
+                      && ! (slot.kind == EffectKind::facetEq && facet::listensToTarget (slot.params));
+    // round 190gp: a built-in's declared tail (Effect::tailSamples) may end its smart-disable hold early; not with a
+    // side input (what it hears there moves its state while its own input is silent)
+    p.tailHold = ! p.longHold && slot.sidechain < 0 && slot.sidechain2 < 0;
+    p.used = (int) std::min (slot.params.size(), effectInfo (slot.kind).params.size());
+    p.firstAutomated = p.used;
+    if ((std::size_t) track < state.effectParamAuto.size() && i < state.effectParamAuto[(std::size_t) track].size())
+    {
+        const auto& autos = state.effectParamAuto[(std::size_t) track][i];
+        p.firstAutomated = 0;
+        while (p.firstAutomated < p.used && autos[(std::size_t) p.firstAutomated] < 0)
+            ++p.firstAutomated;
+    }
+    return p;
+}
+
+void RackState::buildSlotPlans()
+{
+    slotPlans.assign (effects.size(), {});
+    for (std::size_t t = 0; t < effects.size() && t < song.mixer.size(); ++t)
+    {
+        const auto count = std::min (effects[t].size(), song.mixer[t].effects.size());
+        slotPlans[t].reserve (count);
+        for (std::size_t i = 0; i < count; ++i)
+            slotPlans[t].push_back (planSlot (*this, (int) t, i));
+    }
+}
+
 void RackRenderer::setSidechain (const RackState& state, const EffectSlot& slot, Effect& effect, int track) noexcept
 {
     // the source was already processed in this pass (earlier layer); silent = no signal in the detector
@@ -3014,8 +3497,8 @@ void RackRenderer::setSidechain (const RackState& state, const EffectSlot& slot,
         if (source < 0 || source == track || source >= (int) state.song.mixer.size())
             continue;
         const auto active = (std::size_t) source < trackActive.size() && trackActive[(std::size_t) source] != 0;
-        const auto* left = active ? trackBuffer (source, 0) : nullptr;
-        const auto* right = active ? trackBuffer (source, 1) : nullptr;
+        const auto* left = active ? trackInput (source, 0) : nullptr;
+        const auto* right = active ? trackInput (source, 1) : nullptr;
         if (second)
             effect.setSidechain2 (left, right);
         else
@@ -3034,13 +3517,13 @@ void RackRenderer::connect (const RackState& state, const SlotConnections& c, Ef
     if (c.mainSource == -2)
         effect.setMainInput (nullptr, nullptr);
     else if (c.mainSource > 0)
-        effect.setMainInput (sounding (c.mainSource) ? trackBuffer (c.mainSource, 0) : nullptr, sounding (c.mainSource) ? trackBuffer (c.mainSource, 1) : nullptr);
+        effect.setMainInput (sounding (c.mainSource) ? trackInput (c.mainSource, 0) : nullptr, sounding (c.mainSource) ? trackInput (c.mainSource, 1) : nullptr);
     if (c.sideSource == -1)
         effect.setSidechain (l, r);
     else if (c.sideSource == -2)
         effect.setSidechain (nullptr, nullptr);
     else // (its index, when no side input source is picked: setSidechain fed the slot's own one, if any)
-        effect.setSidechain (sounding (c.sideSource) ? trackBuffer (c.sideSource, 0) : nullptr, sounding (c.sideSource) ? trackBuffer (c.sideSource, 1) : nullptr);
+        effect.setSidechain (sounding (c.sideSource) ? trackInput (c.sideSource, 0) : nullptr, sounding (c.sideSource) ? trackInput (c.sideSource, 1) : nullptr);
 }
 
 void RackRenderer::runGoalSlot (const EffectSlot& slot, Effect& effect, std::size_t key, float* l, float* r, int n, const EffectParams& params,
@@ -3084,14 +3567,16 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
     const auto& slots = state.song.mixer[(std::size_t) track].effects;
     const auto& effects = state.effects[(std::size_t) track];
 
-    auto* l = trackBuffer (track, 0);
-    auto* r = trackBuffer (track, 1);
+    // (round 190gp: the insert's zeros, when nothing came in, are stored only once a slot runs: trackBuffer)
+    auto* l = rawTrackBuffer (track, 0);
+    auto* r = rawTrackBuffer (track, 1);
     int audible = -1; // -1 = not measured yet; an effect's output is the next one's input
     // round 190bu: the chain's Blend (nullptr at 100 %): the insert's input is kept before the first slot
     static_assert (chunkCapacity <= RackState::ChainBlendStage::capacity);
     auto* blend = (std::size_t) track < state.chainBlends.size() ? state.chainBlends[(std::size_t) track].get() : nullptr;
     if (blend != nullptr)
     {
+        (void) trackBuffer (track, 0);
         std::memcpy (blend->dry.data(), l, sizeof (float) * (std::size_t) n);
         std::memcpy (blend->dry.data() + RackState::ChainBlendStage::capacity, r, sizeof (float) * (std::size_t) n);
     }
@@ -3107,12 +3592,14 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
         times->effectNs[key].fetch_add (ProcessTimes::now() - before, std::memory_order_relaxed);
     };
 
+    // round 190gp: the slots' plan (RackState::SlotPlan), made with the snapshot; worked out here only for a state that
+    // has none
+    const auto* plans = (std::size_t) track < state.slotPlans.size() ? &state.slotPlans[(std::size_t) track] : nullptr;
     for (std::size_t i = 0; i < effects.size() && i < slots.size(); ++i)
     {
+        const auto plan = plans != nullptr && i < plans->size() ? (*plans)[i] : RackState::planSlot (state, track, i);
         // slot dry/wet (automatable)
-        const auto wet = state.hasAutomation && i < state.effectMixAuto[(std::size_t) track].size()
-                             ? std::clamp (automated (state.effectMixAuto[(std::size_t) track][i], slots[i].mix), 0.0f, 1.0f)
-                             : slots[i].mix;
+        const auto wet = state.hasAutomation && plan.hasMixAuto ? std::clamp (automated (plan.mixAuto, plan.mix), 0.0f, 1.0f) : plan.mix;
 
         auto clearMeters = [this, track, i] {
             const auto at = ((std::size_t) track * maxEffectSlots + i) * ProcessTimes::meterOutputs;
@@ -3121,9 +3608,9 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
                     times->effectMeters[at + (std::size_t) o].store (0.0f, std::memory_order_relaxed);
         };
 
-        if (! state.song.slotActive (slots[i]) || wet <= 0.0f)
+        if (! plan.active || wet <= 0.0f)
         {
-            if (hasLiveMeters (slots[i].kind))
+            if (plan.liveMeters)
                 clearMeters();
             continue;
         }
@@ -3135,7 +3622,7 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
             if (lowlatency::bypassed (state.lowLatencySlots, track, (int) i))
             {
                 lowLatencySkipped[at] = 1;
-                if (hasLiveMeters (slots[i].kind))
+                if (plan.liveMeters)
                     clearMeters();
                 continue;
             }
@@ -3149,37 +3636,13 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
         // smart disable (like FL): an effect with silent input and output is skipped (plugins
         // after 4 s; built-ins after 1 s, which is well beyond their tail)
         const auto key = (std::size_t) track * maxEffectSlots + i;
-        const auto isPlugin = slots[i].kind == EffectKind::plugin;
-        const auto* connections = isPlugin && (std::size_t) track < state.slotConnections.size() && i < state.slotConnections[(std::size_t) track].size()
-                                      && state.slotConnections[(std::size_t) track][i].routed
-                                      ? &state.slotConnections[(std::size_t) track][i]
-                                      : nullptr; // (round 189j: a hosted effect's routed Connections)
-        const auto hold = (int) (sampleRate * (isPlugin || slots[i].kind == EffectKind::patcher ? 4.0 : 1.0)); // (a Patcher may hold plugins)
+        const auto isPlugin = plan.isPlugin;
+        const auto* connections = plan.routed ? &state.slotConnections[(std::size_t) track][i] : nullptr; // (round 189j: a hosted effect's routed Connections)
+        const auto hold = (int) (sampleRate * (plan.longHold ? 4.0 : 1.0)); // (a Patcher may hold plugins)
 
-        // (not Gross Beat: its buffer must keep recording the silence it may play back later, as in FL)
-        // (nor Newtone / Newtime: in slave mode they play their sample whatever the input)
-        // (nor a slot whose "Smart disable" is off, or a plugin that does not allow it — FL's per-plugin options, REA round 139)
-        // (nor a hosted effect whose input 1 comes from another insert: its own input says nothing; round 189j)
-        // (nor anything while FL's Settings › Audio › CPU › "Smart disable" is off: the global switch, round 190bx)
-        if (key < smartDisable.size() && slots[i].smartDisable && ! (isPlugin && ! slots[i].plugin.allowSmartDisable)
-            && flsettings::options().smartDisable.load (std::memory_order_relaxed)
-            && ! (connections != nullptr && connections->mainSource > 0)
-            && slots[i].kind != EffectKind::grossBeat && slots[i].kind != EffectKind::newtone
-            && slots[i].kind != EffectKind::newtime
-            && slots[i].kind != EffectKind::scratcher // (nor the Scratcher: its turntable plays whatever the input)
-            && slots[i].kind != EffectKind::edison // (nor Edison: it records silence and plays whatever the input, round 190cd)
-            && slots[i].kind != EffectKind::hardwareInsert // (nor the hardware insert: outboard gear has its own tails and noise)
-            && ! (slots[i].kind == EffectKind::patcher && patcher::usesHardwareIo (slots[i].patcher)) // (nor a Patcher holding one, round 165c)
-            // (nor a controller: its outputs move whatever the sound — a silent insert is their usual place; round 164)
-            && slots[i].kind != EffectKind::formulaController
-            && slots[i].kind != EffectKind::xyController && slots[i].kind != EffectKind::xyzController
-            && slots[i].kind != EffectKind::controlSurface
-            && slots[i].kind != EffectKind::peakController // (issue #66: its LFO runs and its peak falls in silence, as FL's)
-            // round 164c: a visual plugin keeps recording silence (its display falls, the video export stays in time)
-            && slots[i].kind != EffectKind::waveCandy && slots[i].kind != EffectKind::visualizer
-            && slots[i].kind != EffectKind::tuner // (round 165g: the tuner's display follows the signal into silence)
-            // (round 166f: nor Facet EQ playing its comparative target — the sidechain plays while this track is silent)
-            && ! (slots[i].kind == EffectKind::facetEq && facet::listensToTarget (slots[i].params)))
+        // (not the slots RackState::planSlot lists, made with the snapshot; round 190gp — nor anything while FL's
+        // Settings › Audio › CPU › "Smart disable" is off: the global switch, round 190bx)
+        if (key < smartDisable.size() && plan.smartEligible && flsettings::options().smartDisable.load (std::memory_order_relaxed))
         {
             auto& sd = smartDisable[key];
 
@@ -3187,19 +3650,24 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
                 sd = { effects[i].get(), 0 };
 
             if (audible < 0)
-                audible = anyAbove (l, r, n, silenceLevel) ? 1 : 0;
+                audible = ! trackZeros (track) && anyAbove (l, r, n, silenceLevel) ? 1 : 0;
 
+            // round 190gp: a built-in whose declared tail is shorter than the hold is taken out once it has settled
+            const auto tail = plan.tailHold && declaredTails() ? effects[i]->tailSamples() : -1;
             if (audible == 1)
                 sd.silentSamples = 0;
-            else if (sd.silentSamples >= hold)
+            // (at least one silent block runs: its output is measured, and one the effect makes audible keeps it on)
+            else if (sd.silentSamples >= (tail >= 0 ? std::min (hold, std::max (tail, 1)) : hold))
             {
-                if (hasLiveMeters (slots[i].kind))
+                if (plan.liveMeters)
                     clearMeters();
                 continue;
             }
             else
                 sd.silentSamples += n;
         }
+
+        (void) trackBuffer (track, 0); // (round 190gp: this slot runs: the insert's zeros are stored, if it has only those)
 
         // the editor's spectrum analyser listens to this slot: its input
         const auto tapped = times->analyzer.key.load (std::memory_order_relaxed) == (int) key;
@@ -3213,8 +3681,8 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
             const auto source = slots[i].sidechain;
             const bool side = source >= 0 && source != track && source < (int) state.song.mixer.size();
             const bool sounding = side && (std::size_t) source < trackActive.size() && trackActive[(std::size_t) source] != 0;
-            const auto* sl = sounding ? trackBuffer (source, 0) : nullptr;
-            const auto* sr = sounding ? trackBuffer (source, 1) : nullptr;
+            const auto* sl = sounding ? trackInput (source, 0) : nullptr;
+            const auto* sr = sounding ? trackInput (source, 1) : nullptr;
             for (int k = 0; k < n; ++k)
                 tap.side[(std::size_t) ((w + (std::uint32_t) k) & (ProcessTimes::AnalyzerTap::size - 1))].store (sl != nullptr ? 0.5f * (sl[k] + sr[k]) : 0.0f, std::memory_order_relaxed);
             tap.sideOn.store (side, std::memory_order_relaxed);
@@ -3232,7 +3700,8 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
         }
 
         const UnitTimer timer (profiling.load (std::memory_order_relaxed), units->effectNs[std::min (key, units->effectNs.size() - 1)],
-                               &units->effectMaxNs[std::min (key, units->effectNs.size() - 1)]);
+                               &units->effectMaxNs[std::min (key, units->effectNs.size() - 1)], (countsAudio ? &units->blockSlowest : nullptr),
+                               dropouts::effectUnit (std::min (key, units->effectNs.size() - 1)));
 
         // the hardware insert (round 164d): this piece's device input and output buses (none during an export)
         if (slots[i].kind == EffectKind::hardwareInsert || slots[i].kind == EffectKind::patcher) // (a Patcher hands them to its nodes, round 165c)
@@ -3240,8 +3709,7 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
 
         // Fruity Send / Patcher / Transmitter / Transporter: what it sends goes to its own buffer, pulled by the destination insert
         // (processed later)
-        if (slots[i].kind == EffectKind::fruitySend || slots[i].kind == EffectKind::patcher || slots[i].kind == EffectKind::transmitter
-            || slots[i].kind == EffectKind::flTransporter || slots[i].kind == EffectKind::equo || connections != nullptr)
+        if (plan.sends)
         {
             for (int o = 0; o < maxSlotSends; ++o)
             {
@@ -3260,6 +3728,10 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
                     effects[i]->setExtraOutput (o, nullptr, nullptr);
             }
         }
+
+        // round 190gp: whether an editor shows the slot's live meters (Apex Limiter's loudness meter runs only then)
+        if (plan.liveMeters && key < times->metersWanted.size())
+            effects[i]->setMetersShown (times->metersWanted[key].load (std::memory_order_relaxed) > 0);
 
         // round 170c: the slot's input peak for an editor's level meter (only while an editor asks)
         const bool levels = key < times->levelWanted.size() && times->levelWanted[key].load (std::memory_order_relaxed) > 0;
@@ -3284,12 +3756,22 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
         }
         else if (state.hasAutomation && ! isPlugin)
         {
-            auto params = slots[i].params; // copy without allocation
+            // round 190ge: only the automated parameters are worked out, into a copy only when there is one. Most slots of
+            // a song with automation have none, and the copy (768 bytes) and a lookup per parameter, at every block,
+            // were most of this function's own time in a big project (an unautomated parameter keeps its value either way)
+            // (round 190gp: the first automated one comes from the slot's plan)
             const auto& autos = state.effectParamAuto[(std::size_t) track][i];
-            const auto used = std::min (params.size(), effectInfo (slots[i].kind).params.size());
-
-            for (std::size_t p = 0; p < used; ++p)
-                params[p] = compensatedAutomation (state, autos[p], track, (int) i, automated (autos[p], params[p]));
+            const auto used = (std::size_t) plan.used;
+            const auto firstAutomated = (std::size_t) plan.firstAutomated;
+            EffectParams automatedParams; // (filled only when used)
+            if (firstAutomated < used)
+            {
+                automatedParams = slots[i].params;
+                for (std::size_t p = firstAutomated; p < used; ++p)
+                    if (autos[p] >= 0)
+                        automatedParams[p] = compensatedAutomation (state, autos[p], track, (int) i, automated (autos[p], automatedParams[p]));
+            }
+            const auto& params = firstAutomated < used ? automatedParams : slots[i].params;
 
             effects[i]->setSongPosition (chunkTick);
             effects[i]->setPlaying (chunkPlaying);
@@ -3351,7 +3833,7 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
         }
 
         // live meters for the editor (the mixing suite's gain reduction, LYNX Tune's pitch, Facet EQ's dynamic gains)
-        if (hasLiveMeters (slots[i].kind) && key < (std::size_t) maxMixerTracks * maxEffectSlots)
+        if (plan.liveMeters && key < (std::size_t) maxMixerTracks * maxEffectSlots)
             for (int o = 0; o < ProcessTimes::meterOutputs; ++o)
                 times->effectMeters[key * ProcessTimes::meterOutputs + (std::size_t) o].store (effects[i]->controlOutput (o), std::memory_order_relaxed);
 
@@ -3414,14 +3896,18 @@ void RackRenderer::process (const RackState* state,
                             LiveEventQueue* moreLive) noexcept
 {
     const ScopedFlushDenormals noDenormals;
-    const UnitTimer timer (profiling.load (std::memory_order_relaxed), units->processNs);
-    if (profiling.load (std::memory_order_relaxed))
+    const ScopedHostTimeline timelineScope (ownTimeline); // (round 190gq: a renderer ahead of the song has its own play head)
+    const UnitTimer timer (countsAudio && profiling.load (std::memory_order_relaxed), units->processNs);
+    if (countsAudio && profiling.load (std::memory_order_relaxed))
         units->processedSamples.fetch_add ((std::uint64_t) std::max (0, numSamples), std::memory_order_relaxed);
     std::memset (left, 0, sizeof (float) * (std::size_t) numSamples);
     std::memset (right, 0, sizeof (float) * (std::size_t) numSamples);
     events.clear();
+    splitChunk = 0;
+    if (splitBlock != nullptr && split != nullptr && split->exports)
+        splitBlock->chunks = 0;
 
-    if (state == nullptr || blockCapacity == 0)
+    if (state == nullptr || blockCapacity == 0 || ! buffersFor (*state))
         return;
 
     const auto timing = times->enabled.load (std::memory_order_relaxed);
@@ -3431,12 +3917,14 @@ void RackRenderer::process (const RackState* state,
     // prepare() does not allocate, so it can run here.
     if (state != lastState && state->sampleRate != sampleRate)
     {
-        for (auto& instrument : state->instruments)
-            instrument->prepare (sampleRate);
+        for (std::size_t c = 0; c < state->instruments.size(); ++c)
+            if (! foreignChannel ((int) c))
+                state->instruments[c]->prepare (sampleRate);
 
-        for (auto& track : state->effects)
-            for (auto& effect : track)
-                effect->prepare (sampleRate);
+        for (std::size_t t = 0; t < state->effects.size(); ++t)
+            if (! foreignTrack ((int) t))
+                for (auto& effect : state->effects[t])
+                    effect->prepare (sampleRate);
     }
 
     // channels inserted, removed or moved (round 168s): their held keys and voice order go with them
@@ -3471,12 +3959,7 @@ void RackRenderer::process (const RackState* state,
     {
         // the arpeggiators / echoes ran on the live clock while stopped (round 149): they restart on the song's
         liveRoutedCount = 0;
-        for (auto& arp : state->arpeggiators)
-            if (arp != nullptr)
-                arp->reset();
-        for (auto& echo : state->echoes)
-            if (echo != nullptr)
-                echo->reset();
+        resetNoteTools (*state);
     }
 
     // a start, a stop or a jump: every note was released (or none sounds yet)
@@ -3485,27 +3968,24 @@ void RackRenderer::process (const RackState* state,
 
     if ((wasPlaying && ! playing) || jumped)
     {
-        for (auto& instrument : state->instruments)
-            if (jumped)
-                instrument->allNotesOff();
-            else
-                instrument->transportStopped(); // (a hosted plugin: FL's "Send All Notes Off when playback stops")
+        for (std::size_t c = 0; c < state->instruments.size(); ++c)
+            if (! foreignChannel ((int) c))
+            {
+                if (jumped)
+                    state->instruments[c]->allNotesOff();
+                else
+                    state->instruments[c]->transportStopped(); // (a hosted plugin: FL's "Send All Notes Off when playback stops")
+            }
         heldNotes.fill ({});
         clearPolyLayers();
-
-        for (auto& arp : state->arpeggiators)
-            if (arp != nullptr)
-                arp->reset();
-        for (auto& echo : state->echoes)
-            if (echo != nullptr)
-                echo->reset();
+        resetNoteTools (*state);
     }
 
     // FL resets its generators when playback starts: a MIDI Out sends its bank, patch and controls again
     // (REA_rodada167i §1.4)
     if (playing && ! wasPlaying)
         for (std::size_t c = 0; c < state->song.channels.size() && c < state->instruments.size(); ++c)
-            if (state->song.channels[c].instrument == InstrumentKind::midiOut && state->instruments[c] != nullptr)
+            if (state->song.channels[c].instrument == InstrumentKind::midiOut && state->instruments[c] != nullptr && ! foreignChannel ((int) c))
                 state->instruments[c]->transportStarted();
 
     // started playing or jumped: audio clips in progress must start mid-way
@@ -3521,26 +4001,29 @@ void RackRenderer::process (const RackState* state,
     // playback starts or jumps (round 167k: instruments too, hosted plugins with their wrapper's reset option)
     if (resetPluginsOnTransport && playing && (! wasPlaying || jumped))
     {
-        for (auto& slots : state->effects)
-            for (auto& effect : slots)
-                if (effect != nullptr)
-                    effect->transportReset();
-        for (auto& instrument : state->instruments)
-            if (instrument != nullptr)
-                instrument->transportReset();
+        for (std::size_t t = 0; t < state->effects.size(); ++t)
+            if (! foreignTrack ((int) t))
+                for (auto& effect : state->effects[t])
+                    if (effect != nullptr)
+                        effect->transportReset();
+        for (std::size_t c = 0; c < state->instruments.size(); ++c)
+            if (state->instruments[c] != nullptr && ! foreignChannel ((int) c))
+                state->instruments[c]->transportReset();
     }
     wasPlaying = playing;
     // tempo automation: the tempo holds for the whole block (evaluated at its start)
-    bpm = tempoOverride > 0.0 ? tempoOverride : state->song.bpm;
+    ownBpm = state->song.bpm;
 
     // and FL's pattern Tempo events (issue #86, core/TempoMap.h): in song mode with the tempo clips, in pattern mode the
     // current pattern's. A tempo the user is dragging over its automation holds (as before).
-    if (tempoOverride <= 0.0 && state->tempoMap && ! (state->tempoAutomation >= 0 && isSlotOverridden (state->tempoAutomation)))
+    // (round 190gl: evaluated under an override too: the Link session proposes the song's own tempo to its peers)
+    if (state->tempoMap && ! (state->tempoAutomation >= 0 && isSlotOverridden (state->tempoAutomation)))
     {
         const auto songMode = state->song.mode == PlayMode::song;
         const auto length = (double) std::max<std::int64_t> (1, state->schedule.songLength);
-        bpm = tempomap::tempoAt (state->song, songMode ? std::fmod (std::max (0.0, startTick), length) : std::max (0.0, startTick));
+        ownBpm = tempomap::tempoAt (state->song, songMode ? linearSongTick (liveInput, startTick, length) : std::max (0.0, startTick));
     }
+    bpm = tempoOverride > 0.0 ? tempoOverride : ownBpm;
 
     const auto tps = ticksPerSample (bpm, sampleRate);
     expectedTick = startTick + numSamples * tps;
@@ -3556,17 +4039,18 @@ void RackRenderer::process (const RackState* state,
         {
             if (e.type == NoteEvent::Type::choke && e.channel == stopSoundChannel) // FL's Stop sound (round 170h2)
             {
-                for (auto& slots : state->effects)
-                    for (auto& effect : slots)
-                        if (effect != nullptr)
-                            effect->transportReset(); // native effects: reset(); plugins: their wrapper's reset option
+                for (std::size_t t = 0; t < state->effects.size(); ++t)
+                    if (! foreignTrack ((int) t))
+                        for (auto& effect : state->effects[t])
+                            if (effect != nullptr)
+                                effect->transportReset(); // native effects: reset(); plugins: their wrapper's reset option
                 continue;
             }
             if (e.type == NoteEvent::Type::choke && e.channel < 0) // panic: every channel stops sounding
             {
-                for (auto& instrument : state->instruments)
-                    if (instrument != nullptr)
-                        instrument->panic();
+                for (std::size_t c = 0; c < state->instruments.size(); ++c)
+                    if (state->instruments[c] != nullptr && ! foreignChannel ((int) c))
+                        state->instruments[c]->panic();
                 heldNotes.fill ({});
                 for (auto& order : voiceOrders)
                     order.clear();
@@ -3574,8 +4058,8 @@ void RackRenderer::process (const RackState* state,
                 continue;
             }
 
-            if (e.channel < 0 || e.channel >= (int) state->instruments.size())
-                continue;
+            if (e.channel < 0 || e.channel >= (int) state->instruments.size() || foreignChannel (e.channel))
+                continue; // (render-ahead routes a channel's live notes to the renderer that renders it)
 
             if (e.type == NoteEvent::Type::control)
             {
@@ -3610,6 +4094,8 @@ void RackRenderer::process (const RackState* state,
                     instrument.setNextClipStretch (e.clipStretch);
                 if (e.fadeIn > 0.0f || e.fadeOut > 0.0f || e.fadeShape != 0)
                     instrument.setNextClipFades (e.clipElapsed, e.clipRemaining, e.fadeIn, e.fadeOut, e.fadeShape, e.fadeInTension, e.fadeOutTension);
+                if (e.clipEnvelope >= 0) // (round 190gi)
+                    instrument.setNextClipEnvelope (e.clipEnvelope, e.clipEnvTick);
                 auto velocity = e.velocity;
                 if (e.gain != 1.0f && ! instrument.setNextNoteGain (e.gain))
                     velocity *= e.gain;
@@ -3738,30 +4224,65 @@ void RackRenderer::process (const RackState* state,
     // Blocks larger than the mixer buffers are done in pieces. With automation, small
     // pieces so values move smoothly.
     const auto chunk = std::min (blockCapacity, state->hasAutomation ? 128 : chunkCapacity);
+    // (round 190gh, B7: while playing with automation, the pieces are those an export makes — blocks of 512 from the
+    // start, cut in pieces of 128 and where a pattern event falls — whatever the audio device's block size; a piece the
+    // block's end cuts goes on in the next block with the automation values it began with)
+    constexpr int piece = 128, exportBlock = 512;
+    const auto grid = playing && tps > 0.0 && state->hasAutomation && chunk >= std::min (piece, blockCapacity);
+    if (! playing || tps <= 0.0)
+        gridNextTick = -1.0;
+    else if (gridNextTick < 0.0 || std::abs (startTick - gridNextTick) > 1.0e-3)
+        gridSample = pieceStart = 0; // started, or jumped (a seek, the loop)
 
     for (int done = 0; done < numSamples;)
     {
         auto n = std::min (chunk, numSamples - done);
+        auto continuing = false;
+        const auto pos = gridSample + done;
+        if (grid)
+        {
+            const auto blockEnd = (pos / exportBlock + 1) * exportBlock;
+            auto pieceEnd = std::min<std::int64_t> (pieceStart + piece, blockEnd);
+            if (pos >= pieceEnd)
+            {
+                pieceStart = pos;
+                pieceEnd = std::min<std::int64_t> (pos + piece, blockEnd);
+            }
+            continuing = pos > pieceStart;
+            n = (int) std::min<std::int64_t> (std::min (blockCapacity, numSamples - done), pieceEnd - pos);
+        }
 
         // pattern events take effect at their own sample, as in FL (REA_rodada85 §3): a chunk ends where one falls
+        auto atEvent = false;
         if (playing && ! state->eventLanes.empty() && tps > 0.0)
         {
             const auto ahead = ticksToNextEvent (*state, startTick + done * tps);
             if (ahead < (double) n * tps)
+            {
                 n = std::max (1, (int) std::ceil (ahead / tps - 1.0e-9));
+                atEvent = true;
+            }
         }
         liveInputOffset = done;
-        processChunk (*state, playing, startTick + done * tps, n, left + done, right + done, meters);
+        processChunk (*state, playing, startTick + done * tps, n, left + done, right + done, meters, continuing);
         resumeAudio = false;
         chaseNotes = false;
         done += n;
+        if (grid && atEvent)
+            pieceStart = pos + n; // (the next piece starts at the event, as in an export)
+    }
+    if (playing && tps > 0.0)
+    {
+        gridSample += numSamples;
+        gridNextTick = startTick + numSamples * tps;
     }
     publishSoundingKeys ((int) state->song.channels.size());
 
     if (timing)
     {
         times->wallNs.fetch_add (ProcessTimes::now() - wallStart, std::memory_order_relaxed);
-        times->audioNs.fetch_add ((std::uint64_t) ((double) numSamples / sampleRate * 1.0e9), std::memory_order_relaxed);
+        if (countsAudio)
+            times->audioNs.fetch_add ((std::uint64_t) ((double) numSamples / sampleRate * 1.0e9), std::memory_order_relaxed);
     }
 }
 
@@ -3808,7 +4329,7 @@ double RackRenderer::ticksToNextEvent (const RackState& state, double tick) noex
         if (current < 0 || current >= (int) song.patterns.size())
             return best;
         const auto& pattern = song.patterns[(std::size_t) current];
-        const auto length = (double) std::max<std::int64_t> (1, pattern.effectiveLength (song.beatsPerBar));
+        const auto length = (double) std::max<std::int64_t> (1, pattern.effectiveLength (song.meter()));
         const auto t = std::fmod (std::max (0.0, tick), length);
         for (const auto& lane : state.eventLanes)
             if (lane.pattern == current)
@@ -4003,7 +4524,7 @@ void RackRenderer::runVfxChannels (const RackState& state, bool playing, int num
     transport.playing = playing;
     for (const auto c : state.vfxChannels)
     {
-        if ((std::size_t) c >= state.instruments.size() || state.instruments[(std::size_t) c] == nullptr)
+        if ((std::size_t) c >= state.instruments.size() || state.instruments[(std::size_t) c] == nullptr || foreignChannel (c))
             continue;
         auto* processor = state.instruments[(std::size_t) c]->noteProcessor();
         if (processor == nullptr)
@@ -4085,9 +4606,29 @@ void RackRenderer::runVfxChannels (const RackState& state, bool playing, int num
     events.sortByOffset();
 }
 
-void RackRenderer::processChunk (const RackState& state, bool playing, double startTick, int numSamples,
-                                 float* left, float* right, MeterBank* meters) noexcept
+namespace
 {
+// Round 190ge: a chunk with almost nothing to do runs on the audio thread alone (see processChunk). The previous chunk's
+// wall time on this thread (one renderer per audio thread; only a heuristic: the samples are the same either way)
+thread_local std::uint64_t lastChunkNs = ~std::uint64_t (0);
+constexpr std::uint64_t lightChunkNs = 60000; // 60 µs (about 1 % of a 256-sample block at 44.1 kHz)
+// A7 (round 190gq): below this much work a chunk runs on the calling thread alone (190ge measured the hand-offs of 3
+// workers at 64 samples at ~110 µs of CPU per block in a light project), a mixer layer below layerSerialNs too, and the
+// channel pass hands out clusters of about clusterWorkNs
+constexpr std::uint64_t serialWorkNs = 150000, layerSerialNs = 30000, clusterWorkNs = 20000;
+constexpr double parallelShare = 0.6; // (round 190gq, REA 190hc: a snapshot that guessed "serial" goes parallel past this)
+// LYNX_A7=0: the round 190ge dispatch (A/B measurements with one build, as LYNX_TASKGRAPH)
+bool adaptiveThreads() noexcept
+{
+    static const bool on = [] { const char* e = std::getenv ("LYNX_A7"); return e == nullptr || std::atoi (e) != 0; }();
+    return on;
+}
+} // namespace
+
+void RackRenderer::processChunk (const RackState& state, bool playing, double startTick, int numSamples,
+                                 float* left, float* right, MeterBank* meters, bool continuing) noexcept
+{
+    const auto chunkStartNs = workers != nullptr ? ProcessTimes::now() : 0;
     chunkTick = startTick;
     chunkPlaying = playing;
     // FL: playback starting puts every control the user moved back under its automation (issue #125)
@@ -4104,10 +4645,15 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
 
     if (! state.modRoutes.empty()) // round 177b (before the automation applies the plugin-side parameters)
         updateModulators (state, playing ? startTick : liveTick, numSamples);
-    if (state.hasAutomation) // (a hair later: a chunk that starts on a pattern event's sample takes its value)
+    // (a hair later: a chunk that starts on a pattern event's sample takes its value; round 190gh: a piece that goes on
+    // from the previous block keeps the values it began with, as in an export)
+    if (state.hasAutomation && ! continuing)
         updateAutomation (state, startTick + 1.0e-6);
 
     chunkTps = ticksPerSample (bpm, sampleRate);
+    // (round 190gi: renderChannel hands the clip envelope table on while the song has one, and once after it is gone)
+    clipEnvTableShown = clipEnvTableWas;
+    clipEnvTableWas = ! song.clipEnvelopes.empty();
     chunkStartTick = playing ? startTick : liveTick; // stopped: live notes' arpeggios run on their own clock
     if (! playing)
         liveTick += numSamples * chunkTps;
@@ -4119,6 +4665,7 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         timeline.bpm.store (bpm, std::memory_order_relaxed);
         timeline.sampleRate.store (sampleRate, std::memory_order_relaxed);
         timeline.beatsPerBar.store (std::max (1, song.beatsPerBar), std::memory_order_relaxed);
+        timeline.beatUnit.store (meterUnit (song.beatUnit), std::memory_order_relaxed);
         timeline.playing.store (playing, std::memory_order_relaxed);
         timeline.looping.store (song.hasLoop(), std::memory_order_relaxed);
         timeline.loopStart.store ((double) song.loopStart, std::memory_order_relaxed);
@@ -4127,11 +4674,10 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         timeline.chunk.fetch_add (1, std::memory_order_relaxed);
     }
 
-    for (int t = 0; t < tracks; ++t)
-    {
-        std::memset (trackBuffer (t, 0), 0, sizeof (float) * (std::size_t) numSamples);
-        std::memset (trackBuffer (t, 1), 0, sizeof (float) * (std::size_t) numSamples);
-    }
+    // every insert's buffer starts the chunk as zeros (round 190gp: marked, not stored: trackBuffer stores them when the
+    // insert is first written or worked on; an insert nobody feeds, whose effects are smart-disabled, never is)
+    trackSamples = numSamples;
+    std::memset (trackUnwritten.data(), 1, (std::size_t) std::min (tracks, (int) trackUnwritten.size()));
 
     events.clear();
 
@@ -4206,7 +4752,7 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
     {
         const auto patternIndex = std::clamp (song.currentPattern, 0, (int) song.patterns.size() - 1);
         const auto& pattern = song.patterns[(std::size_t) patternIndex];
-        schedulePatternLoop (pattern, pattern.effectiveLength (song.beatsPerBar), startTick, numSamples,
+        schedulePatternLoop (pattern, pattern.effectiveLength (song.meter()), startTick, numSamples,
                              ticksPerSample (bpm, sampleRate), events, song.swing, &song.channels, chaseNotes,
                              liveInput != nullptr ? liveInput->patternOrigin.load (std::memory_order_relaxed) : -1.0, song.chanceSeed);
     }
@@ -4222,7 +4768,7 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         std::array<Instrument::MidiOutNote, 128> notes;
         for (std::size_t c = 0; c < state.midiOutTargets.size() && c < state.instruments.size(); ++c)
         {
-            if (state.midiOutTargets[c].empty())
+            if (state.midiOutTargets[c].empty() || foreignChannel ((int) c))
                 continue;
             const auto count = state.instruments[c]->takeMidiOutput (notes.data(), (int) notes.size());
             for (int k = 0; k < count; ++k)
@@ -4248,7 +4794,7 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         auto added = false;
         for (const auto c : state.portEventChannels)
         {
-            if ((std::size_t) c >= state.instruments.size() || state.instruments[(std::size_t) c] == nullptr)
+            if ((std::size_t) c >= state.instruments.size() || state.instruments[(std::size_t) c] == nullptr || foreignChannel (c))
                 continue;
             const auto count = state.instruments[(std::size_t) c]->takePortEvents (sent.data(), (int) sent.size());
             for (int k = 0; k < count; ++k)
@@ -4295,7 +4841,7 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
     // Dashboards (round 165, FL's Dashboard): the MIDI their controls and patch send reaches the plugins on their port
     for (const auto c : state.dashboardChannels)
     {
-        if ((std::size_t) c >= state.instruments.size() || state.instruments[(std::size_t) c] == nullptr)
+        if ((std::size_t) c >= state.instruments.size() || state.instruments[(std::size_t) c] == nullptr || foreignChannel (c))
             continue;
         std::array<std::uint32_t, midiout::maxResetMessages + 8> sent; // (a MIDI Out's reset: every active control at once)
         const auto count = state.instruments[(std::size_t) c]->takeMidiMessages (sent.data(), (int) sent.size());
@@ -4337,7 +4883,11 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         {
             const auto e = events[i];
 
-            if (e.type != NoteEvent::Type::on || e.channel < 0 || e.channel >= (int) state.cutTargets.size())
+            if (e.channel < 0 || e.channel >= (int) state.cutTargets.size())
+                continue;
+            // (round 190fe: an FL Studio Mobile pad of a lane that holds its notes cuts at the note's end as well)
+            if (e.type != NoteEvent::Type::on
+                && ! (e.type == NoteEvent::Type::off && (std::size_t) e.channel < song.channels.size() && song.channels[(std::size_t) e.channel].cutAtNoteEnd))
                 continue;
 
             for (auto target : state.cutTargets[(std::size_t) e.channel])
@@ -4358,17 +4908,59 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         for (int k = 0; k < events.size(); ++k)
             deliverToEffects (state, events[k]);
 
+    // Round 190ge: no note or event in this chunk, no live input, and the last one took under 60 µs (an idle project:
+    // the channels idle, the effects smart-disabled): the workers stay asleep. Waking them per chunk cost an idle
+    // project with 3 workers ~15 % of a core at 64 samples, ten times the work itself. Serial and parallel give the
+    // same samples (the task graph and the layers only change who computes what); the next note runs in parallel.
+    auto* const pool = workers;
+    if (pool != nullptr && events.size() == 0 && lastChunkNs < lightChunkNs && (liveInput == nullptr || liveInput->numChannels == 0))
+        workers = nullptr;
+    // A7 (round 190gq): the same when the work the chunk's units did last time comes to less than handing it out costs
+    // (waking the workers, their spinning, the last one's wait), and nothing starts in this chunk: a chunk where notes
+    // or events start can start voices the last one did not have (measured: Exoplanet's bursts after a quiet chunk ran
+    // past their block when this rule took them too). The units' times are measured whenever workers are there, serial
+    // or not, so the next chunk decides on fresh numbers.
+    // Round 190gq (REA 190hc action 1): whether the work goes to the workers at all is measured too. The snapshot's
+    // guess (2+ hosted plugins or 24+ channels) left a set of LYNX's own devices (Live's "Patience", 15 tracks) on one
+    // thread at 104-110 % of its deadline with every worker idle: a chunk whose units' work last time would fill most of
+    // its real time runs in parallel whatever its plugin and channel counts.
+    measureUnits = pool != nullptr && adaptiveThreads();
+    parallelChunk = state.parallel;
+    if (adaptiveThreads() && workers != nullptr)
+    {
+        std::uint64_t work = 0;
+        const auto channelCount = std::min<int> ({ (int) state.instruments.size(), (int) song.channels.size(), maxChannels });
+        for (int c = 0; c < channelCount; ++c)
+            work += channelCostNs[(std::size_t) c];
+        for (int t = 1; t < tracks && t < maxMixerTracks; ++t)
+            work += trackCostNs[(std::size_t) t];
+        // (the snapshot's guess, with A7's serial rule below; or, whatever the counts, when the chunk's measured work
+        // would take more than parallelShare of its real time on one thread: parallelism pays only near the deadline —
+        // measured: Patience at 64 samples, 53 % of a core in small units, cost more CPU and more overruns in parallel)
+        const auto chunkNs = sampleRate > 0.0 ? 1.0e9 * numSamples / sampleRate : 0.0;
+        parallelChunk = state.parallel || (double) work >= parallelShare * chunkNs;
+        lastWorkShareValue = chunkNs > 0.0 ? (double) work / chunkNs : 0.0;
+        if (events.size() == 0 && work < serialWorkNs && (liveInput == nullptr || liveInput->numChannels == 0))
+            workers = nullptr;
+    }
+
     // 1) channels, each with its own notes at the exact sample (in parallel when worth it)
     const auto channels = std::min<int> ({ (int) state.instruments.size(), (int) song.channels.size(), maxChannels });
     auto channel = [this, &state, numSamples] (int c) {
-        if (! times->enabled.load (std::memory_order_relaxed) || c >= ProcessTimes::channels)
+        const ScopedHostTimeline timelineScope (ownTimeline); // (a worker runs it: round 190gq)
+        const auto timed = times->enabled.load (std::memory_order_relaxed) && c < ProcessTimes::channels;
+        if (! timed && ! measureUnits)
         {
             renderChannel (state, c, numSamples);
             return;
         }
         const auto before = ProcessTimes::now();
         renderChannel (state, c, numSamples);
-        times->channelNs[(std::size_t) c].fetch_add (ProcessTimes::now() - before, std::memory_order_relaxed);
+        const auto spent = ProcessTimes::now() - before;
+        if (timed)
+            times->channelNs[(std::size_t) c].fetch_add (spent, std::memory_order_relaxed);
+        if (measureUnits)
+            channelCostNs[(std::size_t) c] = (std::uint32_t) std::min<std::uint64_t> (spent, 0xffffffffu);
     };
 
     // the task graph (round 165i): channels and inserts by readiness; else the channel pass, then the inserts by layers
@@ -4378,9 +4970,29 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
     const auto threadMixer = flsettings::options().multithreadMixer.load (std::memory_order_relaxed);
     if (! (threadGenerators && threadMixer) || ! runTaskGraph (state, playing, channels, numSamples, meters))
     {
-        if (workers != nullptr && state.parallel && threadGenerators && state.audioThreadChannels.empty())
-            workers->parallelFor (channels, channel);
-        else if (workers != nullptr && state.parallel && threadGenerators)
+        if (workers != nullptr && parallelChunk && threadGenerators && state.audioThreadChannels.empty())
+        {
+            // A7: neighbouring light channels go out together, a cluster about worth one hand-off
+            auto clusters = 0;
+            const auto target = adaptiveThreads() ? clusterWorkNs : 0;
+            std::uint64_t sum = target;
+            for (int c = 0; c < channels; ++c)
+            {
+                if (sum >= target)
+                {
+                    clusterStart[(std::size_t) clusters++] = (std::int16_t) c;
+                    sum = 0;
+                }
+                sum += channelCostNs[(std::size_t) c];
+            }
+            clusterStart[(std::size_t) clusters] = (std::int16_t) channels;
+            auto cluster = [this, &channel] (int k) {
+                for (int c = clusterStart[(std::size_t) k]; c < clusterStart[(std::size_t) k + 1]; ++c)
+                    channel (c);
+            };
+            workers->parallelFor (clusters, cluster);
+        }
+        else if (workers != nullptr && parallelChunk && threadGenerators)
         {
             // "Allow threaded processing" off: those channels on this thread, the rest in parallel
             auto threaded = [&state, &channel, channels] (int i) {
@@ -4412,8 +5024,9 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
                 dr[k] += sr[k];
             }
 
-            // extra outputs to other inserts (a generator Patcher's, REA_rodada141)
-            if ((std::size_t) c < state.instruments.size() && state.instruments[(std::size_t) c] != nullptr)
+            // extra outputs to other inserts (a generator Patcher's, REA_rodada141) (render-ahead: only the renderer that
+            // rendered the channel reads them; its targets are on its side, core/RenderAhead.h)
+            if ((std::size_t) c < state.instruments.size() && state.instruments[(std::size_t) c] != nullptr && ! foreignChannel (c))
             {
                 const auto& instrument = *state.instruments[(std::size_t) c];
                 for (int k = 0; k < instrument.auxOutputCount(); ++k)
@@ -4448,9 +5061,26 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         {
             const auto split = d < state.audioThreadLayers.size() && ! state.audioThreadLayers[d].empty();
             const auto& layer = split ? state.threadedLayers[d] : state.mixerLayers[d];
-            auto track = [this, &state, &layer, numSamples, meters] (int i) { processTrack (state, layer[(std::size_t) i], numSamples, meters); };
+            auto track = [this, &state, &layer, numSamples, meters] (int i) {
+                const ScopedHostTimeline timelineScope (ownTimeline);
+                const auto t = layer[(std::size_t) i];
+                if (! measureUnits)
+                {
+                    processTrack (state, t, numSamples, meters);
+                    return;
+                }
+                const auto before = ProcessTimes::now();
+                processTrack (state, t, numSamples, meters);
+                if (t >= 0 && t < maxMixerTracks)
+                    trackCostNs[(std::size_t) t] = (std::uint32_t) std::min<std::uint64_t> (ProcessTimes::now() - before, 0xffffffffu);
+            };
+            // A7: a layer whose inserts did less work last time than a hand-off costs runs here
+            std::uint64_t layerWork = 0;
+            for (const auto t : layer)
+                if (t >= 0 && t < maxMixerTracks)
+                    layerWork += trackCostNs[(std::size_t) t];
 
-            if (workers != nullptr && state.parallel && threadMixer && layer.size() > 1)
+            if (workers != nullptr && parallelChunk && threadMixer && layer.size() > 1 && (layerWork >= layerSerialNs || ! adaptiveThreads()))
                 workers->parallelFor ((int) layer.size(), track);
             else
                 for (int i = 0; i < (int) layer.size(); ++i)
@@ -4462,7 +5092,25 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         }
     }
 
+    workers = pool;
+
+    // render-ahead (round 190gq): what the live part takes from this one goes out now; the Master is the live part's
+    if (split != nullptr)
+    {
+        if (split->exports && splitBlock != nullptr)
+            exportSplit (numSamples);
+        ++splitChunk;
+        if (foreignTrack (0))
+        {
+            if (workers != nullptr)
+                lastChunkNs = ProcessTimes::now() - chunkStartNs;
+            return;
+        }
+    }
+
     // 3) Master: inputs, effects, fader. Without a configured mixer, it stays at 0 dB.
+    if (renderTaps != nullptr) // round 190gj: what the Master holds before its routes (its own channels)
+        copyToRenderTap (0, trackBuffer (0, 0), trackBuffer (0, 1), numSamples);
     pullInputs (state, 0, numSamples);
     if (meters != nullptr)
         meters->rollingLog.push (RollingAudioLog::Position::preEffects, trackBuffer (0, 0), trackBuffer (0, 1), numSamples);
@@ -4519,6 +5167,8 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
 
     if (hwOut != nullptr && ! state.hwRoutes.empty() && hwOut->active.load (std::memory_order_relaxed))
         mixHardwareOutputs (state, numSamples);
+    if (workers != nullptr)
+        lastChunkNs = ProcessTimes::now() - chunkStartNs;
 }
 
 // 4) inserts with a hardware output target: their post-fader output (the same signal the Master gets) into the
@@ -4534,8 +5184,8 @@ void RackRenderer::mixHardwareOutputs (const RackState& state, int n) noexcept
         if (t <= 0 || t >= maxMixerTracks)
             continue;
 
-        const float* l = trackActive[(std::size_t) t] ? trackBuffer (t, 0) : nullptr;
-        const float* r = trackActive[(std::size_t) t] ? trackBuffer (t, 1) : nullptr;
+        const float* l = trackActive[(std::size_t) t] ? trackInput (t, 0) : nullptr;
+        const float* r = trackActive[(std::size_t) t] ? trackInput (t, 1) : nullptr;
         const auto bypassed = pdcBypassNow && (std::size_t) t < state.bypassWhenIdle.size() && state.bypassWhenIdle[(std::size_t) t] != 0;
 
         if (route.delay != nullptr && ! bypassed)
@@ -4611,12 +5261,17 @@ void RackRenderer::sumChannelsInto (const RackState& state, int t, int channels,
 {
     if ((std::size_t) t >= state.trackChannels.size())
         return;
-    auto* dl = trackBuffer (t, 0);
-    auto* dr = trackBuffer (t, 1);
+    float* dl = nullptr;
+    float* dr = nullptr;
     for (const auto c : state.trackChannels[(std::size_t) t])
     {
         if (c >= channels || channelSilent[(std::size_t) c])
             continue;
+        if (dl == nullptr) // (round 190gp: the insert's buffer only once a channel sounds into it)
+        {
+            dl = trackBuffer (t, 0);
+            dr = trackBuffer (t, 1);
+        }
         const auto* sl = channelBuffer (c, 0);
         const auto* sr = channelBuffer (c, 1);
         for (int k = 0; k < n; ++k)
@@ -4639,13 +5294,16 @@ void RackRenderer::updatePdcBypass (const RackState& state, bool playing) noexce
         for (std::size_t t = 0; t < state.bypassWhenIdle.size() && t < state.sendDelays.size(); ++t)
             if (state.bypassWhenIdle[t] != 0)
             {
-                const auto plain = std::min (state.sendDelays[t].size(), 1 + state.song.mixer[t].sends.size()); // not the Fruity Send taps
+                const auto& sends = state.song.mixer[t].sends;
+                const auto plain = std::min (state.sendDelays[t].size(), 1 + sends.size()); // not the Fruity Send taps
                 for (std::size_t k = 0; k < plain; ++k)
-                    if (state.sendDelays[t][k] != nullptr)
+                    // (render-ahead: a line is run, so emptied, by the renderer of the insert it arrives at)
+                    if (state.sendDelays[t][k] != nullptr && ! foreignTrack (k == 0 ? 0 : sends[k - 1].target))
                         state.sendDelays[t][k]->clear();
             }
         for (const auto& route : state.hwRoutes)
-            if (route.delay != nullptr && (std::size_t) route.track < state.bypassWhenIdle.size() && state.bypassWhenIdle[(std::size_t) route.track] != 0)
+            if (route.delay != nullptr && (std::size_t) route.track < state.bypassWhenIdle.size() && state.bypassWhenIdle[(std::size_t) route.track] != 0
+                && ! foreignTrack (route.track))
                 route.delay->clear();
     }
     pdcBypassBefore = pdcBypassNow;
@@ -4655,7 +5313,7 @@ bool RackRenderer::runTaskGraph (const RackState& state, bool playing, int chann
 {
     // LYNX_TASKGRAPH=0: the layers only (A/B measurements)
     static const bool enabled = [] { const char* e = std::getenv ("LYNX_TASKGRAPH"); return e == nullptr || std::atoi (e) != 0; }();
-    if (! enabled || ! state.graphOk || workers == nullptr || ! state.parallel || state.graphChannels != channels)
+    if (! enabled || ! state.graphOk || workers == nullptr || ! parallelChunk || state.graphChannels != channels)
         return false;
     const auto tracks = std::max<int> (1, (int) state.song.mixer.size());
     const auto tasks = channels + tracks - 1;
@@ -4683,6 +5341,7 @@ bool RackRenderer::runTaskGraph (const RackState& state, bool playing, int chann
 
     const auto timing = times->enabled.load (std::memory_order_relaxed);
     auto task = [&] (int position) {
+        const ScopedHostTimeline timelineScope (ownTimeline);
         int id;
         for (int spins = 0; (id = graphSlots[(std::size_t) position].load (std::memory_order_acquire)) == 0; ++spins)
         {
@@ -4691,16 +5350,17 @@ bool RackRenderer::runTaskGraph (const RackState& state, bool playing, int chann
                 std::this_thread::yield();
         }
         --id;
+        for (;;) // (a serial chain runs here link after link: round 190gq)
+        {
+        const auto before = timing || measureUnits ? ProcessTimes::now() : 0; // (A7: every task's time, for the next chunk's choice)
         if (id < channels)
         {
-            if (! timing || id >= ProcessTimes::channels)
-                renderChannel (state, id, n);
-            else
-            {
-                const auto before = ProcessTimes::now();
-                renderChannel (state, id, n);
-                times->channelNs[(std::size_t) id].fetch_add (ProcessTimes::now() - before, std::memory_order_relaxed);
-            }
+            renderChannel (state, id, n);
+            const auto spent = ProcessTimes::now() - before;
+            if (timing && id < ProcessTimes::channels)
+                times->channelNs[(std::size_t) id].fetch_add (spent, std::memory_order_relaxed);
+            if (measureUnits)
+                channelCostNs[(std::size_t) id] = (std::uint32_t) std::min<std::uint64_t> (spent, 0xffffffffu);
         }
         else
         {
@@ -4711,6 +5371,13 @@ bool RackRenderer::runTaskGraph (const RackState& state, bool playing, int chann
             mixMetronome (state, t, n);
             mixSideInput (state, t, n);
             processTrack (state, t, n, meters);
+            if (measureUnits && t < maxMixerTracks)
+                trackCostNs[(std::size_t) t] = (std::uint32_t) std::min<std::uint64_t> (ProcessTimes::now() - before, 0xffffffffu);
+        }
+        const auto fused = (std::size_t) id < state.graphFused.size() ? state.graphFused[(std::size_t) id] : -1;
+        if (fused < 0)
+            break;
+        id = fused;
         }
         for (auto k = state.graphNextStart[(std::size_t) id]; k < state.graphNextStart[(std::size_t) id + 1]; ++k)
         {
@@ -4719,7 +5386,7 @@ bool RackRenderer::runTaskGraph (const RackState& state, bool playing, int chann
                 graphSlots[(std::size_t) graphPushed.fetch_add (1, std::memory_order_acq_rel)].store (j + 1, std::memory_order_release);
         }
     };
-    workers->parallelFor (tasks, task);
+    workers->parallelFor (tasks - state.graphFusedCount, task);
 
     // the Master's own channels and input (its effects run after, as before)
     sumChannelsInto (state, 0, channels, n);
@@ -4767,13 +5434,28 @@ void RackRenderer::mixSideInput (const RackState& state, int track, int n) noexc
     }
 }
 
+void RackRenderer::copyToRenderTap (int t, const float* l, const float* r, int n) noexcept
+{
+    if (! renderTaps->wants (t) || liveInputOffset < 0 || liveInputOffset + n > renderTaps->capacity)
+        return;
+    std::memcpy (renderTaps->left (t) + liveInputOffset, l, sizeof (float) * (std::size_t) n);
+    std::memcpy (renderTaps->right (t) + liveInputOffset, r, sizeof (float) * (std::size_t) n);
+}
+
 void RackRenderer::pullInputs (const RackState& state, int t, int n) noexcept
 {
     if ((std::size_t) t >= state.mixerInputs.size())
         return;
 
-    auto* dl = trackBuffer (t, 0);
-    auto* dr = trackBuffer (t, 1);
+    float* dl = nullptr; // (round 190gp: the insert's buffer only once something comes in)
+    float* dr = nullptr;
+    auto target = [&] {
+        if (dl == nullptr)
+        {
+            dl = trackBuffer (t, 0);
+            dr = trackBuffer (t, 1);
+        }
+    };
 
     for (const auto& in : state.mixerInputs[(std::size_t) t])
     {
@@ -4781,24 +5463,28 @@ void RackRenderer::pullInputs (const RackState& state, int t, int n) noexcept
         // an automated route level (fader curve, like the knob)
         const auto automatedLevel = in.automation >= 0 ? automationValues[(std::size_t) in.automation] : std::numeric_limits<float>::quiet_NaN();
         const auto level = std::isnan (automatedLevel) ? in.level : faderGain (automatedLevel);
-        const auto active = tap >= 0 ? tapActive[(std::size_t) tap] : trackActive[(std::size_t) in.source];
+        // (round 190ge: a source whose block came out all zeros, trackActive 2, adds nothing: its zeros would not change
+        // a sum that starts from +0, and its PDC line drains as if it had been fed them)
+        const auto active = tap >= 0 ? tapActive[(std::size_t) tap] != 0 : trackActive[(std::size_t) in.source] == 1;
         const auto& delays = state.sendDelays[(std::size_t) in.source];
         auto* delay = (std::size_t) in.delay < delays.size() ? delays[(std::size_t) in.delay].get() : nullptr;
         if (pdcBypassNow && (tap < 0 || in.pre) && state.bypassWhenIdle[(std::size_t) in.source] != 0)
             delay = nullptr; // FL's "When recording or not playing": no compensation now
-        auto* sl = tap >= 0 ? tapBuffer (tap, 0) : trackBuffer (in.source, 0);
-        auto* sr = tap >= 0 ? tapBuffer (tap, 1) : trackBuffer (in.source, 1);
+        const auto* sl = tap >= 0 ? tapBuffer (tap, 0) : trackInput (in.source, 0);
+        const auto* sr = tap >= 0 ? tapBuffer (tap, 1) : trackInput (in.source, 1);
 
         if (delay != nullptr)
         {
             // PDC: this edge is shorter than the slowest one arriving here. A silent source
             // still drains the tail that was in the line.
+            target();
             delay->mixInto (active ? sl : nullptr, active ? sr : nullptr, level, dl, dr, n);
             continue;
         }
 
         if (! active)
             continue;
+        target();
 
         for (int i = 0; i < n; ++i)
         {
@@ -4812,7 +5498,17 @@ namespace
 {
 bool isSilentBlock (const float* l, const float* r, int n) noexcept
 {
-    for (int i = 0; i < n; ++i)
+    int i = 0;
+#if defined(LYNX_X86)
+    // round 190ge: four lanes at a time (each idle insert scans its whole block); != 0 is true for a NaN, as below
+    {
+        const auto zero = _mm_setzero_ps();
+        for (; i + 4 <= n; i += 4)
+            if (_mm_movemask_ps (_mm_or_ps (_mm_cmpneq_ps (_mm_loadu_ps (l + i), zero), _mm_cmpneq_ps (_mm_loadu_ps (r + i), zero))) != 0)
+                return false;
+    }
+#endif
+    for (; i < n; ++i)
         if (l[i] != 0.0f || r[i] != 0.0f)
             return false;
     return true;
@@ -4876,6 +5572,11 @@ void RackRenderer::runSilencedTrack (const RackState& state, int t, int n, const
 
 void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank* meters) noexcept
 {
+    if (foreignTrack (t)) // (render-ahead: the other renderer runs it, and its inputs; the boundary brings its output here)
+    {
+        importTrack (state, t, n);
+        return;
+    }
     const auto& track = state.song.mixer[(std::size_t) t];
     pullInputs (state, t, n);
 
@@ -4883,7 +5584,10 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
     const auto taps = liveInput != nullptr && t > 0 ? liveInput->tappedPoints (t) : 0u;
     auto tap = [&] (RecordSource point, const float* l, const float* r) {
         if ((taps & (1u << (unsigned) point)) != 0)
+        {
+            (void) trackBuffer (t, 0); // (round 190gp: its zeros stored, if it has only those)
             liveInput->tap (t, point, l, r, liveInputOffset, n);
+        }
     };
 
     const auto silent = track.muted || ! state.mixerAudible[(std::size_t) t];
@@ -4929,8 +5633,11 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
     const auto from = std::isnan (last.ll) ? target : last;
     constexpr MixerMatrix zero { 0.0f, 0.0f, 0.0f, 0.0f };
 
-    auto* l = trackBuffer (t, 0);
-    auto* r = trackBuffer (t, 1);
+    // round 190gp: an insert nothing came into holds zeros it has not stored (trackZeros): what only reads them knows
+    // they are zeros, and they are stored (trackBuffer) only before something works on them
+    auto* l = rawTrackBuffer (t, 0);
+    auto* r = rawTrackBuffer (t, 1);
+    auto store = [&] { (void) trackBuffer (t, 0); };
 
     // pre-fader sends (round 190aq): the insert's signal before its fader goes to its tap, with the mute as a ramp
     const auto preTap = (std::size_t) t < state.preTap.size() ? state.preTap[(std::size_t) t] : -1;
@@ -4958,7 +5665,7 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
     // an idle insert (round 166d, up to 500 of them): no effects, no built-in EQ and nothing came in this block. Its
     // output is silence whatever the fader does, so it stays inactive and the tracks it feeds skip it (the same
     // samples: adding zeros changes nothing; a tap stays silent too)
-    if (track.effects.empty() && (state.song.cleanMixer || ! track.eq.active()) && isSilentBlock (l, r, n))
+    if (track.effects.empty() && (state.song.cleanMixer || ! track.eq.active()) && (trackZeros (t) || isSilentBlock (l, r, n)))
     {
         if (t < (int) trackEqs.size() && trackEqs[(std::size_t) t].running)
             trackEqs[(std::size_t) t] = {};
@@ -4971,11 +5678,14 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
 
     runEffects (state, t, n);
     tap (RecordSource::postEffects, l, r);
+    if (! state.song.cleanMixer && track.eq.active())
+        store();
     applyTrackEq (track, t, state.song.cleanMixer, l, r, n);
     tap (RecordSource::postEq, l, r);
     if ((taps & (1u << (unsigned) RecordSource::postLevel)) != 0)
         if (const auto dest = liveInput->tapDestination (t, RecordSource::postLevel, liveInputOffset, n); dest.first != nullptr)
         {
+            store();
             // the fader, pan and separation without the mute, with their own ramp
             auto& lastLevel = lastTapGain[(std::size_t) t];
             const auto fromLevel = std::isnan (lastLevel.ll) ? level : lastLevel;
@@ -4986,6 +5696,7 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
         auto g = std::isnan (lastPre) ? preTarget : lastPre;
         if (g > 0.0f || preTarget > 0.0f)
         {
+            store();
             auto* pl = tapBuffer (preTap, 0);
             auto* pr = tapBuffer (preTap, 1);
             constexpr float step = 0.001f; // (the fader ramp's step, applyMatrix)
@@ -5001,15 +5712,280 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
     }
     else
         lastPre = preTarget;
-    last = applyMatrix (l, r, l, r, n, from, target);
+    // round 190ge: an insert whose effects left only zeros (smart-disabled after the stop, a gate closed...): its fader
+    // on silence, with no ramp running and gains that cannot flip a zero's sign, would write the same zeros back, so it
+    // is not run; and the inserts it feeds skip it (trackActive 2). An idle project's mixer used to scale, delay and
+    // sum blocks of zeros on every insert with effects (most of its CPU once the effects were smart-disabled)
+    const auto silentOut = trackZeros (t) || isSilentBlock (l, r, n);
+    if (silentOut && from == target && target.rl == 0.0f && target.lr == 0.0f && ! std::signbit (target.ll) && ! std::signbit (target.rr))
+        last = target;
+    else
+    {
+        store();
+        last = applyMatrix (l, r, l, r, n, from, target);
+    }
     tap (RecordSource::postTrack, l, r);
 
-    trackActive[(std::size_t) t] = 1;
+    trackActive[(std::size_t) t] = silentOut ? 2 : 1;
+    // round 190gj: the single-pass stems' tap (what this insert sends on). Rollup 0.1.28: through trackInput, as 190gp's
+    // readers do: a silent insert may end here with zeros it never stored (trackZeros), its buffer then still holding
+    // an older block
+    if (renderTaps != nullptr)
+        copyToRenderTap (t, trackInput (t, 0), trackInput (t, 1), n);
 
     if (meters != nullptr)
     {
-        meters->accumulate (t, peakOf (l, n), peakOf (r, n));
-        meters->capture.push (t, l, r, n);
+        if (trackZeros (t)) // (round 190gp: its zeros, never stored: the readers read them as zeros)
+        {
+            meters->accumulate (t, 0.0f, 0.0f);
+            meters->capture.push (t, trackInput (t, 0), trackInput (t, 1), n);
+        }
+        else
+        {
+            meters->accumulate (t, peakOf (l, n), peakOf (r, n));
+            meters->capture.push (t, l, r, n);
+        }
+    }
+}
+// ---- render-ahead (round 190gq, core/RenderAhead.h) ----------------------------------------------------------------
+
+void RackRenderer::resetNoteTools (const RackState& state) noexcept
+{
+    for (std::size_t c = 0; c < state.arpeggiators.size(); ++c)
+        if (state.arpeggiators[c] != nullptr && ! foreignChannel ((int) c))
+            state.arpeggiators[c]->reset();
+    for (std::size_t c = 0; c < state.echoes.size(); ++c)
+        if (state.echoes[c] != nullptr && ! foreignChannel ((int) c))
+            state.echoes[c]->reset();
+}
+
+int RackRenderer::splitRow() noexcept
+{
+    if (splitBlock == nullptr || splitChunk >= SplitBlock::maxChunks || splitChunk >= splitBlock->chunks
+        || splitBlock->chunkOffset[(std::size_t) splitChunk] != liveInputOffset)
+        return -1;
+    return splitChunk;
+}
+
+void RackRenderer::exportSplit (int n) noexcept
+{
+    auto& b = *splitBlock;
+    if (splitChunk < SplitBlock::maxChunks)
+    {
+        b.chunkOffset[(std::size_t) splitChunk] = liveInputOffset;
+        b.chunks = splitChunk + 1;
+    }
+    const auto row = std::min (splitChunk, SplitBlock::maxChunks - 1);
+    for (int s = 0; s < split->slots; ++s)
+    {
+        const auto u = split->slotUnit[(std::size_t) s];
+        std::uint8_t flag = 0;
+        const float* l = nullptr;
+        const float* r = nullptr;
+        switch (split->slotKind[(std::size_t) s])
+        {
+            case Split::Kind::channel:
+                flag = (std::uint8_t) channelSilent[(std::size_t) u];
+                if (flag == 0)
+                    l = channelBuffer (u, 0), r = channelBuffer (u, 1);
+                break;
+            case Split::Kind::track:
+                flag = (std::uint8_t) trackActive[(std::size_t) u];
+                if (flag != 0)
+                    l = trackBuffer (u, 0), r = trackBuffer (u, 1);
+                break;
+            case Split::Kind::tap:
+                flag = (std::uint8_t) tapActive[(std::size_t) u];
+                if (flag != 0)
+                    l = tapBuffer (u, 0), r = tapBuffer (u, 1);
+                break;
+        }
+        b.flags[(std::size_t) row * Split::maxSlots + (std::size_t) s] = flag;
+        // (the samples are always written, zeros for a silent unit: a chunk that does not line up reads them as they are)
+        auto* dl = b.audio + ((std::size_t) s * 2) * (std::size_t) b.stride + (std::size_t) liveInputOffset;
+        auto* dr = dl + b.stride;
+        if (l != nullptr)
+        {
+            std::memcpy (dl, l, sizeof (float) * (std::size_t) n);
+            std::memcpy (dr, r, sizeof (float) * (std::size_t) n);
+        }
+        else
+        {
+            std::memset (dl, 0, sizeof (float) * (std::size_t) n);
+            std::memset (dr, 0, sizeof (float) * (std::size_t) n);
+        }
+    }
+}
+
+void RackRenderer::importChannel (int c, int n) noexcept
+{
+    const auto slot = split->channelSlot[(std::size_t) c];
+    if (split->exports || slot < 0 || splitBlock == nullptr)
+    {
+        channelSilent[(std::size_t) c] = 1;
+        return;
+    }
+    const auto row = splitRow();
+    if (row < 0)
+        ++splitMismatches;
+    const auto flag = row >= 0 ? splitBlock->flags[(std::size_t) row * Split::maxSlots + (std::size_t) slot] : (std::uint8_t) 0;
+    channelSilent[(std::size_t) c] = (char) flag;
+    if (flag != 0)
+        return;
+    const auto* sl = splitBlock->audio + ((std::size_t) slot * 2) * (std::size_t) splitBlock->stride + (std::size_t) liveInputOffset;
+    std::memcpy (channelBuffer (c, 0), sl, sizeof (float) * (std::size_t) n);
+    std::memcpy (channelBuffer (c, 1), sl + splitBlock->stride, sizeof (float) * (std::size_t) n);
+}
+
+void RackRenderer::importTrack (const RackState& state, int t, int n) noexcept
+{
+    const auto row = split->exports || splitBlock == nullptr ? -2 : splitRow();
+    if (row == -1)
+        ++splitMismatches;
+    auto take = [&] (int slot, float* l, float* r) -> std::uint8_t {
+        if (slot < 0 || row == -2)
+            return 0;
+        const auto flag = row >= 0 ? splitBlock->flags[(std::size_t) row * Split::maxSlots + (std::size_t) slot] : (std::uint8_t) 1;
+        if (flag != 0)
+        {
+            const auto* sl = splitBlock->audio + ((std::size_t) slot * 2) * (std::size_t) splitBlock->stride + (std::size_t) liveInputOffset;
+            std::memcpy (l, sl, sizeof (float) * (std::size_t) n);
+            std::memcpy (r, sl + splitBlock->stride, sizeof (float) * (std::size_t) n);
+        }
+        return flag;
+    };
+    trackActive[(std::size_t) t] = (char) take (split->trackSlot[(std::size_t) t], trackBuffer (t, 0), trackBuffer (t, 1));
+    // its send taps (Fruity Send and the other slot sends, the pre-fader send)
+    if ((std::size_t) t < state.slotTap.size())
+        for (const auto tap : state.slotTap[(std::size_t) t])
+            if (tap >= 0 && tap < RackState::maxSendTaps)
+                tapActive[(std::size_t) tap] = (char) take (split->tapSlot[(std::size_t) tap], tapBuffer (tap, 0), tapBuffer (tap, 1));
+    if (const auto pre = (std::size_t) t < state.preTap.size() ? state.preTap[(std::size_t) t] : -1; pre >= 0 && pre < RackState::maxSendTaps)
+        tapActive[(std::size_t) pre] = (char) take (split->tapSlot[(std::size_t) pre], tapBuffer (pre, 0), tapBuffer (pre, 1));
+}
+
+void RackRenderer::shareTimesWith (RackRenderer& other) noexcept
+{
+    units = other.units;
+    times = other.times;
+    countsAudio = false;
+}
+
+void RackRenderer::adoptGlobals (const RackRenderer& from) noexcept
+{
+    bpm = from.bpm;
+    wasPlaying = from.wasPlaying;
+    expectedTick = from.expectedTick;
+    resumeAudio = from.resumeAudio;
+    chaseNotes = from.chaseNotes;
+    playTruncatedOnTransport = from.playTruncatedOnTransport;
+    resetPluginsOnTransport = from.resetPluginsOnTransport;
+    userJumpSerial = from.userJumpSerial;
+    seenUserJumpSerial = from.seenUserJumpSerial;
+    lastState = from.lastState;
+    lastSerial = from.lastSerial;
+    automationValues = from.automationValues;
+    automatedBend = from.automatedBend;
+    automatedBendReset = from.automatedBendReset;
+    for (std::size_t w = 0; w < overridden.size(); ++w)
+    {
+        overridden[w].store (from.overridden[w].load (std::memory_order_relaxed), std::memory_order_relaxed);
+        released[w].store (from.released[w].load (std::memory_order_relaxed), std::memory_order_relaxed);
+    }
+    anyOverridden.store (from.anyOverridden.load (std::memory_order_relaxed), std::memory_order_relaxed);
+    anyReleased.store (from.anyReleased.load (std::memory_order_relaxed), std::memory_order_relaxed);
+    releaseWasPlaying = from.releaseWasPlaying;
+    modSeconds = from.modSeconds;
+    compensateTick = from.compensateTick;
+    compensateTicksPerSample = from.compensateTicksPerSample;
+    chunkStartTick = from.chunkStartTick;
+    chunkTps = from.chunkTps;
+    liveTick = from.liveTick;
+    layerTurn = from.layerTurn;
+    layerRandom = from.layerRandom;
+    chunkTick = from.chunkTick;
+    chunkPlaying = from.chunkPlaying;
+    pdcBypassNow = from.pdcBypassNow;
+    pdcBypassBefore = from.pdcBypassBefore;
+    *scheduledNotes = *from.scheduledNotes;
+    liveRoutedCount = 0;
+}
+
+void RackRenderer::adoptAutomationValues (const RackRenderer& from, const int* automations, int count) noexcept
+{
+    if (automations == nullptr)
+    {
+        automationValues = from.automationValues;
+        return;
+    }
+    for (int i = 0; i < count; ++i)
+        if (const auto a = automations[i]; a >= 0 && a < RackState::maxAutomations)
+            automationValues[(std::size_t) a] = from.automationValues[(std::size_t) a];
+}
+
+void RackRenderer::adoptUnits (const RackRenderer& from, const char* channels, const char* tracks) noexcept
+{
+    if (channels != nullptr)
+        for (std::size_t c = 0; c < (std::size_t) maxChannels; ++c)
+        {
+            if (channels[c] == 0)
+                continue;
+            heldNotes[c] = from.heldNotes[c];
+            struckNotes[c] = from.struckNotes[c];
+            voiceOrders[c] = from.voiceOrders[c];
+            automatedBend[c] = from.automatedBend[c];
+            layerTurn[c] = from.layerTurn[c];
+            if (c < polyLayers.size() && c < from.polyLayers.size())
+                polyLayers[c] = from.polyLayers[c];
+            if ((c + 1) * 128 <= layerPick.size() && (c + 1) * 128 <= from.layerPick.size())
+                std::copy (from.layerPick.begin() + (std::ptrdiff_t) (c * 128), from.layerPick.begin() + (std::ptrdiff_t) ((c + 1) * 128),
+                           layerPick.begin() + (std::ptrdiff_t) (c * 128));
+        }
+    if (tracks != nullptr)
+        for (std::size_t t = 0; t < (std::size_t) maxMixerTracks; ++t)
+        {
+            if (tracks[t] == 0)
+                continue;
+            lastTrackGain[t] = from.lastTrackGain[t];
+            lastTapGain[t] = from.lastTapGain[t];
+            lastMeterGain[t] = from.lastMeterGain[t];
+            lastPreGain[t] = from.lastPreGain[t];
+            if (t < trackEqs.size() && t < from.trackEqs.size())
+                trackEqs[t] = from.trackEqs[t];
+            for (std::size_t s = 0; s < (std::size_t) maxEffectSlots; ++s)
+            {
+                const auto key = t * maxEffectSlots + s;
+                if (key < smartDisable.size() && key < from.smartDisable.size())
+                    smartDisable[key] = from.smartDisable[key];
+                if (key < goalGlideAmount.size() && key < from.goalGlideAmount.size())
+                    goalGlideAmount[key] = from.goalGlideAmount[key];
+                if (key < goalGlideEffect.size() && key < from.goalGlideEffect.size())
+                    goalGlideEffect[key] = from.goalGlideEffect[key];
+                if (key < lowLatencySkipped.size() && key < from.lowLatencySkipped.size())
+                    lowLatencySkipped[key] = from.lowLatencySkipped[key];
+            }
+        }
+}
+
+void RackRenderer::silenceChannels (const RackState& state, const char* channels) noexcept
+{
+    for (std::size_t c = 0; c < state.instruments.size() && c < (std::size_t) maxChannels; ++c)
+    {
+        if (channels[c] == 0 || foreignChannel ((int) c))
+            continue;
+        if (state.instruments[c] != nullptr)
+            state.instruments[c]->allNotesOff();
+        heldNotes[c] = {};
+        struckNotes[c] = {};
+        voiceOrders[c].clear();
+        if (c < polyLayers.size())
+            polyLayers[c].clear();
+        if ((c + 1) * 128 <= layerPick.size())
+            std::fill (layerPick.begin() + (std::ptrdiff_t) (c * 128), layerPick.begin() + (std::ptrdiff_t) ((c + 1) * 128), (std::int16_t) -1);
+        if (c < state.arpeggiators.size() && state.arpeggiators[c] != nullptr)
+            state.arpeggiators[c]->reset();
+        if (c < state.echoes.size() && state.echoes[c] != nullptr)
+            state.echoes[c]->reset();
     }
 }
 } // namespace lynx

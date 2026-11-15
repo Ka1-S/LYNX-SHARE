@@ -193,6 +193,16 @@ Punished drums         | Voice = Grit; Drive = 12 dB; Punish = on; Mix = 50 %
 Thick triode bass      | Voice = Triode; Drive = 14 dB; Wide cuts = on; Low cut (wide) = 60 Hz; Thump = on
 Pentode edge           | Voice = Pentode; Drive = 16 dB; Wide cuts = on; High cut (wide) = 6 kHz; Steep = 30 dB/oct
 
+[Anvil Bus]
+Glue, gentle           | Drive = 10 %; Comp = On; Dry/Wet = 60 %
+Warm room              | Drive = 25 %; Drive type = Soft; Damp = 9 kHz; Transients = +20 %; Boom = 15 %; Boom freq. = 50 Hz
+Punchy kit             | Drive = 30 %; Drive type = Medium; Crunch = 20 %; Transients = +40 %; Comp = On; Output = -3 dB
+Hard hitter            | Drive = 60 %; Drive type = Hard; Crunch = 30 %; Transients = +30 %; Boom = 25 %; Boom freq. = 55 Hz; Comp = On; Output = -6 dB
+Tight and dry          | Drive = 15 %; Transients = -40 %; Damp = 12 kHz
+Sub thump              | Drive = 20 %; Boom = 50 %; Boom freq. = 45 Hz; Boom decay = 80 %; Damp = 10 kHz
+Crushed tape           | Drive = 80 %; Drive type = Soft; Crunch = 50 %; Damp = 4 kHz; Output = -6 dB
+Parallel smash         | Drive = 70 %; Drive type = Hard; Comp = On; Dry/Wet = 40 %
+
 [Voice Shift]
 Hard tune              | Mode = Quantize; Formant = +1.2 st; Drive = 4.6
 Octave down            | Pitch = -12.0 st; Formant = -12.0 st; Drive = 5.5

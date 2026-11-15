@@ -89,5 +89,24 @@ struct RefOptions
 // the state is unusable. `custom` (16384 floats) is the custom wave, if any.
 std::vector<float> renderReference (const std::vector<std::uint8_t>& state, const std::vector<RefNote>& notes, double sampleRate,
                                     int length, const RefOptions& options = {}, const std::vector<float>& custom = {});
+
+// --- round 190fe: FL Studio Mobile's 3x Osc parameters as automation targets (an imported .flm's lanes).
+// A channel from a .flm (threeOscIsFlm) takes AutomationTargetKind::channelParam `flmParamBase + k` with FLM's own
+// value v (0…1) of its parameter k (flm190n spec-3xosc.md §1); the engine converts it with the import's laws
+// (writeFlmParam), so a lane plays what the import writes for the same value. FLM's oscillator render reads the
+// module's oscillator fields on every call (0x1807d9eb0: shape, coarse, fine, detune, gain / invert, pan), its
+// modulation sums the cutoff, resonance and their offsets, its gain stage the Volume multiplier: the voices that sound
+// follow a lane, as here. Three targets carry two FLM parameters at once, folded by the import: 111 = the cutoff with
+// its offset (v111 + 2·v115 − 1), 112 = the resonance with its offset (v112 + 2·v116 − 1), 114 = half of FLM's gain
+// (v114 · clamp(2·v106 − 1, 0, 1)). Not targets: HQ (25), Pan (113: the channel's pan), the voice settings 117…145
+// (polyphony, porta, mono, tracking, gate, echo, arpeggiator) and Free Run (146…148).
+constexpr int flmParamBase = 0x3000;
+constexpr int flmParamCount = 149;
+bool isFlmTarget (int k) noexcept; // k = 1…24, 26…105, 107…112, 114
+// Writes target k at value v into a normalised (version-14, 460-byte) state as the .flm import does (111 / 112: the
+// folded values). The attack's "no tick = start at the top" rule needs the song's steps per beat and tempo. False for
+// 114 (the gain, not in the state) and non-targets.
+bool writeFlmParam (std::uint8_t* state, int k, double v, int stepsPerBeat, double bpm) noexcept;
+// --- end of round 190fe
 } // namespace threeosc
 } // namespace lynx

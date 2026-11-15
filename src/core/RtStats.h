@@ -17,20 +17,24 @@ class RtStats
 public:
     // Audio thread. `startMs`: when the callback began (a monotonic clock in ms), `usedMs`: how long it took,
     // `budgetMs`: the buffer duration (numSamples / sampleRate).
-    void record (double startMs, double usedMs, double budgetMs) noexcept
+    // `slowest` (round 190gg): the block's slowest channel / effect call (core/Dropouts.h pack(); 0 = not measured).
+    void record (double startMs, double usedMs, double budgetMs, std::uint64_t slowest = 0) noexcept
     {
         callbacks.fetch_add (1, std::memory_order_relaxed);
         const auto load = budgetMs > 0.0 ? usedMs / budgetMs : 0.0;
         const auto permille = (std::uint32_t) std::min (100000.0, std::max (0.0, load * 1000.0));
         raise (maxLoadPermille, permille);
         raise (windowMaxPermille, permille);
+        raise (dropoutWindowPermille, permille);
         totalUsedUs.fetch_add ((std::uint64_t) (usedMs * 1000.0), std::memory_order_relaxed);
         totalBudgetUs.fetch_add ((std::uint64_t) (budgetMs * 1000.0), std::memory_order_relaxed);
         histogram[(std::size_t) std::min<std::uint32_t> (permille / 100, bins - 1)].fetch_add (1, std::memory_order_relaxed);
 
         if (load >= 1.0)
         {
-            overBudget.fetch_add (1, std::memory_order_relaxed);
+            lastOverSlowest.store (slowest, std::memory_order_relaxed);
+            lastOverPermille.store (permille, std::memory_order_relaxed);
+            overBudget.fetch_add (1, std::memory_order_relaxed); // (after: a reader that sees the count sees these)
             lastOverMs.store (startMs, std::memory_order_relaxed);
         }
         else if (load >= 0.8)
@@ -64,6 +68,9 @@ public:
         double averageLoad = 0.0;   // processing time / deadline over everything since the last reset
         double lastOverMs = 0.0, lastLateMs = 0.0;
         std::array<std::uint64_t, bins> histogram {};
+        // round 190gg: the last block over its deadline: its slowest channel / effect (core/Dropouts.h) and its load
+        std::uint64_t lastOverSlowest = 0;
+        double lastOverLoad = 0.0;
     };
 
     Snapshot snapshot() const noexcept
@@ -80,8 +87,14 @@ public:
         s.lastLateMs = lastLateMs.load (std::memory_order_relaxed);
         for (std::size_t i = 0; i < bins; ++i)
             s.histogram[i] = histogram[i].load (std::memory_order_relaxed);
+        s.lastOverSlowest = lastOverSlowest.load (std::memory_order_relaxed);
+        s.lastOverLoad = lastOverPermille.load (std::memory_order_relaxed) / 1000.0;
         return s;
     }
+
+    // Round 190gg: the highest load since the previous call, for the dropout log (its own window: the CPU meter takes
+    // takeWindowMaxLoad). Message thread.
+    double takeDropoutWindowMaxLoad() noexcept { return dropoutWindowPermille.exchange (0, std::memory_order_relaxed) / 1000.0; }
 
     // The highest load since the previous call (for a meter that shows peaks between UI frames).
     double takeWindowMaxLoad() noexcept { return windowMaxPermille.exchange (0, std::memory_order_relaxed) / 1000.0; }
@@ -93,6 +106,9 @@ public:
             a->store (0, std::memory_order_relaxed);
         maxLoadPermille.store (0, std::memory_order_relaxed);
         windowMaxPermille.store (0, std::memory_order_relaxed);
+        dropoutWindowPermille.store (0, std::memory_order_relaxed);
+        lastOverSlowest.store (0, std::memory_order_relaxed);
+        lastOverPermille.store (0, std::memory_order_relaxed);
         lastOverMs.store (0.0, std::memory_order_relaxed);
         lastLateMs.store (0.0, std::memory_order_relaxed);
         for (auto& h : histogram)
@@ -110,7 +126,8 @@ private:
 
     std::atomic<std::uint64_t> callbacks { 0 }, overBudget { 0 }, nearBudget { 0 }, lateCalls { 0 };
     std::atomic<std::uint64_t> totalUsedUs { 0 }, totalBudgetUs { 0 };
-    std::atomic<std::uint32_t> maxLoadPermille { 0 }, windowMaxPermille { 0 };
+    std::atomic<std::uint32_t> maxLoadPermille { 0 }, windowMaxPermille { 0 }, dropoutWindowPermille { 0 }, lastOverPermille { 0 };
+    std::atomic<std::uint64_t> lastOverSlowest { 0 };
     std::atomic<double> lastStartMs { 0.0 }, lastOverMs { 0.0 }, lastLateMs { 0.0 };
     std::array<std::atomic<std::uint64_t>, bins> histogram {};
 };

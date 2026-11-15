@@ -7,6 +7,9 @@
 <h2 id="fl-studio-s-own-plugins">FL Studio自身のプラグイン</h2>
 <p>FL Studioのジェネレーターとエフェクトは読み込まれません。LYNX SHAREは保存された設定を読み、作り直したエンジンで再生します。各エンジンには品質レベルがあり、<code>Exact</code> (テストしたすべての状態で元のものとビット単位で一致) から <code>Placeholder</code> (設定は保持されるが、プラグインは無音か、オーディオをそのまま通すだけ) までの段階です。レベルの意味は<a href="/wiki/coming-from-fl-studio/">FL Studioから移る方へ</a>で説明しています。</p>
 <p><code>.flp</code> は、FL Studioがインストールされていなくても開けます。一部のエンジンは、波形、サンプル、インパルスを必要とし、実行時にお使いのFL Studioのインストールから読み込みます。</p>
+<p>FL Studioの「FL Studio Mobile Rack」を使う<code>.flp</code> (FL Studio Mobile自身の「Save as FLP」は、インストゥルメントトラックごとに1つ書き出します) は、そのインストゥルメントとエフェクトが<code>.flm</code>と同じエンジンで鳴り、「FL Studio Mobile Rack FX」エフェクトも同様です。ドラムキットや複数のインストゥルメントが入ったラックは、まだ内蔵シンセで鳴ります。</p>
+<h2 id="fl-studio-mobile-factory-sounds">FL Studio Mobileのファクトリーサウンド</h2>
+<p><code>.flm</code>が使うファクトリーサウンド (ドラムキット、DirectWaveのプログラム、SoundFont、GMSynthの波形) はFL Studio Mobileのものであり、LYNX SHAREには同梱されません。LYNX SHAREは、お使いのアプリのコピーの<code>Resources</code>フォルダーから探します。<code>設定 › ファイル › FL Studio Mobile のリソース</code>で追加してください (その1つ上のフォルダーやFL Studioのインストールフォルダーを指定しても動きます)。FL Studioのインストールにはその一部しか入っておらず、検索はお使いのフォルダーのあとに行われます。まだ見つからないファイルは、「見つからないファイル」ウィンドウに一覧されます。</p>
 <h2 id="missing-samples">見つからないサンプル</h2>
 <figure><a class="shot" href="/assets/img/wiki/missing-files.webp"><img src="/assets/img/wiki/missing-files.webp" srcset="/assets/img/wiki/missing-files.webp 1x, /assets/img/wiki/missing-files@2x.webp 2x" alt="見つからないファイルのウィンドウのサンプルタブ: 見つかったファイルは緑、見つからないものは琥珀色で、フォルダーを検索、場所を指定、スキップのボタンがある" loading="lazy" width="760" height="560"></a></figure>
 <p><code>サンプル</code> タブに、見つからなかったすべてのサンプルが、保存されていたパスとそれを使っているものとともに並びます。</p>

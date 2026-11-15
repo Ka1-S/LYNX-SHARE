@@ -234,9 +234,9 @@ TEST (drumrack190el_slice_per_list_and_names_follow_live)
     const char* expected[] { "Warp Marker", "Transient", "Bar", "1/2 Note", "1/4 Note", "1/8 Note", "1/16 Note", "1/32 Note" };
     for (int k = 0; k < rack::slicePerCount; ++k)
         CHECK (std::string (rack::slicePerName ((rack::SlicePer) k)) == expected[k]);
-    CHECK (rack::slicePerBeats (rack::SlicePer::bar, 4) == 4.0 && rack::slicePerBeats (rack::SlicePer::bar, 3) == 3.0);
-    CHECK (rack::slicePerBeats (rack::SlicePer::half, 4) == 2.0 && rack::slicePerBeats (rack::SlicePer::thirtySecond, 4) == 0.125);
-    CHECK (rack::slicePerBeats (rack::SlicePer::transient, 4) == 0.0 && rack::slicePerBeats (rack::SlicePer::warpMarker, 4) == 0.0);
+    CHECK (rack::slicePerBeats (rack::SlicePer::bar, lynx::Meter (4, 4)) == 4.0 && rack::slicePerBeats (rack::SlicePer::bar, lynx::Meter (3, 4)) == 3.0);
+    CHECK (rack::slicePerBeats (rack::SlicePer::half, lynx::Meter (4, 4)) == 2.0 && rack::slicePerBeats (rack::SlicePer::thirtySecond, lynx::Meter (4, 4)) == 0.125);
+    CHECK (rack::slicePerBeats (rack::SlicePer::transient, lynx::Meter (4, 4)) == 0.0 && rack::slicePerBeats (rack::SlicePer::warpMarker, lynx::Meter (4, 4)) == 0.0);
     // pads "Slice 1"…, the rack and the channel named after the clip (190ei B6b)
     const auto drum = rack::sliceToDrumRack ("/x/drums.wav", { 0.0f, 0.25f, 0.5f, 0.75f }, "Slice", rack::SliceTemplate::gated, 1.0f, "drums");
     const auto& r = *rack::rackOf (drum.patcher);

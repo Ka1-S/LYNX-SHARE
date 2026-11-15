@@ -10,7 +10,8 @@
 
 namespace lynx
 {
-// The metronome (core/MetronomeVoice.h has FL's measured behaviour): one click per beat, the downbeat two semitones
+// The metronome (core/MetronomeVoice.h has FL's measured behaviour): one click per beat of the meter (round 190fg: a
+// 6/8 bar clicks six eighths, metronome::beatAt), the downbeat two semitones
 // up and louder. It no longer plays straight to the output: the Channel Rack node renders it each block and the
 // mixer adds it to the "Metronome track" (Transport::metronomeTrack; the Master by default), as FL does.
 // Toggled by Transport::metronome; it also counts the count-in.
@@ -42,9 +43,10 @@ private:
     metronome::Voice voice;
     std::vector<float> left, right;
     std::int64_t lastBeat = -1;
+    bool hasLastBeat = false; // (round 190fg: lastBeat is a beat's first tick, which may be negative in a count-in)
 
-    // local copy of the Transport's time-signature table (start, bar length in ticks)
-    std::array<std::pair<std::int64_t, std::int64_t>, Transport::maxSignatures> signatures {};
+    // local copy of the Transport's time-signature table (start, bar and beat length in ticks)
+    std::array<metronome::Span, Transport::maxSignatures> signatures {};
     int signatureCount = 0;
     std::uint32_t signatureVersion = 0;
 

@@ -72,7 +72,7 @@ struct PianoRollComponent::ScriptJob
     std::vector<int> selection;    // and its selection
     std::int64_t timeFrom = -1, timeTo = -1;
     Note drawDefaults;
-    int beatsPerBar = 4;
+    int beatsPerBar = 4, beatUnit = 4;
     std::vector<prscript::Form> answers;
     // the last preview: what the Piano roll shows now
     bool previewShown = false;
@@ -232,6 +232,7 @@ void PianoRollComponent::runScript (const ScriptRef& ref)
     job->timeFrom = timeFrom;
     job->timeTo = timeTo;
     job->beatsPerBar = juce::jmax (1, song.beatsPerBar);
+    job->beatUnit = meterUnit (song.beatUnit);
     job->drawDefaults.channel = job->channel;
     job->drawDefaults.length = lastLength;
     scriptStep (job, job->answers, false);
@@ -247,7 +248,7 @@ void PianoRollComponent::scriptStep (std::shared_ptr<ScriptJob> job, std::vector
     std::thread ([self, job, answers = std::move (answers), preview, ticket] {
         auto r = std::make_shared<ScriptResult>();
         r->pattern = job->start;
-        auto score = prscript::scoreOf (job->start, job->channel, job->selection, job->beatsPerBar, 4, job->timeFrom, job->timeTo, job->drawDefaults);
+        auto score = prscript::scoreOf (job->start, job->channel, job->selection, job->beatsPerBar, job->beatUnit, job->timeFrom, job->timeTo, job->drawDefaults);
         r->outcome = prscript::run (job->source, score, answers, preview ? 5000.0 : 20000.0);
         if (r->outcome.status == prscript::Outcome::Status::done)
         {

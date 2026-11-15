@@ -25,9 +25,17 @@
 <p>Wątek audio powinien działać z priorytetem czasu rzeczywistego.</p>
 <ol><li>Otwórz <code>Opcje › Ustawienia audio...</code> i przeczytaj <code>Stan</code>. Pokazuje, czy wątek dostał priorytet czasu rzeczywistego.</li><li>Jeśli nie, zainstaluj rtkit (<code>sudo apt install rtkit</code>, <code>sudo dnf install rtkit</code> lub <code>sudo pacman -S rtkit</code>) albo dodaj siebie do grupy <code>audio</code> z limitem czasu rzeczywistego, jak w konfiguracjach JACK.</li><li>Wyloguj się i zaloguj ponownie.</li></ol>
 <p>Szczegóły są w <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/LINUX.md">LINUX.md</a>.</p>
+<h3 id="the-sound-crackles-or-drops-out">Dźwięk trzeszczy lub się urywa</h3>
+<p>LYNX SHARE zlicza każdy zanik (buffer underrun) i mówi, dlaczego do niego doszło. Wskaż wskaźnik <code>CPU</code> na pasku narzędzi albo otwórz <code>Narzędzia › Monitor wydajności pluginów...</code>. Czerwona liczba obok procentu CPU to licznik.</p>
+<p>Podpowiedź podaje przyczynę ostatniego zaniku:</p>
+<div class="tablewrap"><table><thead><tr><th>Przyczyna</th><th>Co to znaczy</th><th>Co spróbować</th></tr></thead><tbody><tr><td>Przetwarzanie trwało dłużej niż bufor</td><td>Blok audio liczył się dłużej, niż trwa. Podpowiedź podaje najwolniejszy kanał lub efekt w tym bloku</td><td>Zwiększ rozmiar bufora w <code>Opcje › Ustawienia audio...</code>, zamroź ten kanał albo obniż jakość pluginu</td></tr><tr><td>Przetwarzanie zbliżyło się do granicy bufora</td><td>Obciążenie było bliskie 100 % w okolicy zaniku</td><td>Zwiększ rozmiar bufora albo zamroź najcięższe kanały</td></tr><tr><td>Opóźnienie sterownika lub systemu</td><td>Sterownik lub system się spóźnił, choć obciążenie było niskie. Żaden plugin tego nie spowodował</td><td>Zwiększ rozmiar bufora, spróbuj innego sterownika (w Windows sterownika ASIO interfejsu), a w Linuksie sprawdź priorytet czasu rzeczywistego (wyżej)</td></tr></tbody></table></div>
+<p>Każdy zanik jest też zapisywany w <code>audio-glitches.log</code> w folderze ustawień, razem z urządzeniem, buforem i najcięższymi kanałami.</p>
 <h2 id="plugins">Pluginy</h2>
 <h3 id="a-plugin-crashes">Plugin się wywala</h3>
-<p>Uruchom go we własnym procesie, aby zatrzymał się tylko plugin.</p>
+<p>Większość awarii pluginów wyłącza tylko ten plugin: efekt jest pomijany (bypass), instrument milknie, a LYNX SHARE i projekt działają dalej. Komunikat <code>Plugin uległ awarii</code> proponuje wtedy:</p>
+<ul><li><code>Odśwież</code>, co uruchamia plugin od nowa z ustawieniami z ostatniego zapisu lub kopii zapasowej.</li><li><code>Zawsze uruchamiaj &lt;plugin&gt; w osobnym procesie</code>, co uruchamia go od nowa w jego własnym procesie, teraz i w każdym projekcie. Awaria tam nie może zatrzymać LYNX SHARE. Plugin w osobnym procesie otwiera swoje okno samodzielnie (nie można go zadokować).</li></ul>
+<p>Okno pluginu pokazuje te same dwa przyciski zamiast swojego edytora. <code>Opcje › Menedżer pluginów...</code> wymienia pluginy, które zawsze działają w osobnym procesie, w kolumnie <code>Osobny proces</code>; kliknij pole, aby włączyć lub wyłączyć jeden z nich.</p>
+<p>Aby uruchamiać każdy plugin w jego własnym procesie:</p>
 <ol><li>Otwórz <code>Opcje › Ustawienia ogólne...</code>.</li><li>Włącz <code>Uruchamiaj pluginy w osobnym procesie (chroni LYNX SHARE przed awariami)</code>.</li><li>Otwórz projekt ponownie.</li></ol>
 <p>Plugin, który się wywalił albo przestał odpowiadać we własnym procesie, zostaje wyciszony. Zapisz projekt i otwórz go ponownie, aby wczytać plugin jeszcze raz. Zobacz <a href="/wiki/plugins/">Pluginy zewnętrzne</a>.</p>
 <h3 id="a-plugin-is-not-in-the-list">Pluginu nie ma na liście</h3>

@@ -170,7 +170,7 @@ inline int writeChords (Song& song, int track, int bars = 4)
     const auto k = projectkey::get (song).value_or (defaultKey());
     const bool minor = projectkey::isMinor (k);
     const int minorDegrees[] { 0, 5, 2, 6 }, majorDegrees[] { 0, 4, 5, 3 };
-    const auto bar = (std::int64_t) std::max (1, song.beatsPerBar) * ppq;
+    const auto bar = song.barTicks();
     auto& p = song.patterns[(std::size_t) pattern];
     int written = 0;
     for (int b = 0; b < bars; ++b)

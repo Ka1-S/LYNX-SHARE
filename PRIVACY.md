@@ -62,6 +62,10 @@ is kept for three hours (`update-cache.json` in the settings folder), so LYNX SH
   asking to save your project) and starts again; the portable and macOS versions save the file to your Downloads
   folder; the Linux AppImage updates itself through AppImageUpdate when it is installed; the Linux .tar.gz opens the
   release page.
+- **Going back** (*Help › Go back to …*, *Settings › General › Updates*) happens only when you choose it: the same
+  release list and the earlier release's file come from GitHub, checked against its `SHA256SUMS.txt` like an update.
+  `updates.txt` remembers the version an update replaced (to offer it) and, after going back, the version you left
+  (so the automatic check does not offer it again at once). Nothing else is sent or kept.
 - **The Microsoft Store version never checks:** the Store updates it, so it has no update check and no *Update*
   button.
 

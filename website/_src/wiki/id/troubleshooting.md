@@ -1,5 +1,5 @@
 ---
-source: a3748d4a2a
+source: e5206a071d
 ---
 Setiap judul di bawah adalah satu masalah. Jika masalahmu tidak ada di sini, laporkan seperti dijelaskan di bagian akhir.
 
@@ -71,11 +71,32 @@ Thread audio sebaiknya berjalan dengan prioritas real-time.
 
 Detailnya ada di [LINUX.md](https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/LINUX.md).
 
+### Suara berderak atau putus
+
+LYNX SHARE menghitung setiap dropout (buffer underrun) dan menyebutkan penyebabnya. Arahkan kursor ke meter `CPU` di toolbar, atau buka `Alat › Monitor performa plugin...`. Angka merah di samping persentase CPU adalah jumlahnya.
+
+Petunjuk menyebutkan penyebab dropout terakhir:
+
+| Penyebab | Artinya | Yang bisa dicoba |
+|---|---|---|
+| Pemrosesan lebih lama dari buffer | Satu blok audio butuh waktu hitung lebih lama dari durasinya. Petunjuk menyebutkan channel atau efek paling lambat di blok itu | Perbesar ukuran buffer di `Opsi › Pengaturan audio...`, bekukan channel itu, atau turunkan kualitas plugin |
+| Pemrosesan mendekati batas buffer | Beban mendekati 100 % di sekitar dropout | Perbesar ukuran buffer, atau bekukan channel yang paling berat |
+| Latensi driver atau sistem | Driver atau sistem terlambat padahal beban tetap rendah. Tidak ada plugin yang menyebabkannya | Perbesar ukuran buffer, coba driver lain (di Windows, driver ASIO antarmuka), dan di Linux periksa prioritas real-time (di atas) |
+
+Setiap dropout juga ditulis ke `audio-glitches.log` di folder pengaturan, beserta perangkat, buffer, dan channel terberat.
+
 ## Plugin
 
 ### Plugin crash
 
-Jalankan di prosesnya sendiri, supaya hanya plugin itu yang berhenti.
+Sebagian besar crash plugin hanya mematikan plugin itu: efek di-bypass, instrumen menjadi senyap, dan LYNX SHARE serta proyek tetap berjalan. Pesan `Plugin crash` lalu menawarkan:
+
+- `Muat ulang`, yang memulai plugin lagi dengan pengaturan dari penyimpanan atau cadangan terakhir.
+- `Selalu jalankan <plugin> di proses terpisah`, yang memulainya lagi di prosesnya sendiri, sekarang dan di setiap proyek. Crash di sana tidak bisa menjatuhkan LYNX SHARE. Plugin di proses terpisah membuka jendelanya sendiri (tidak bisa di-dock).
+
+Jendela plugin menampilkan dua tombol yang sama sebagai ganti editornya. `Opsi › Pengelola plugin...` mencantumkan plugin yang selalu berjalan di proses terpisah di kolom `Proses terpisah`; klik kotaknya untuk menyalakan atau mematikannya.
+
+Untuk menjalankan setiap plugin di prosesnya sendiri:
 
 1. Buka `Opsi › Pengaturan umum...`.
 2. Nyalakan `Jalankan plugin di proses terpisah (melindungi LYNX SHARE dari crash)`.

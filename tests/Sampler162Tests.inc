@@ -66,7 +66,7 @@ Heard playLive (const lynx::SamplerSettings& settings, std::shared_ptr<lynx::Sam
     s.patterns.emplace_back();
     lynx::RackState::Factories f;
     f.samples = [sample] (const std::string&) { return std::shared_ptr<const lynx::SampleData> (sample); };
-    f.stretchedSamples = [sample] (const std::string&, double ratio, lynx::StretchMethod m, double, const lynx::StretchMap&) {
+    f.stretchedSamples = [sample] (const std::string&, double ratio, lynx::StretchMethod m, double, const lynx::StretchMap&, const lynx::StretchOptions&) {
         return std::shared_ptr<const lynx::SampleData> (lynx::timeStretch (*sample, ratio, m));
     };
     constexpr double rate = 44100.0;

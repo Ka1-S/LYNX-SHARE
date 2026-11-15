@@ -115,7 +115,7 @@ inline Song makeShowcaseSong (int currentPattern = 0)
     song.playlistTracks = { { "Drums" }, { "Groove" }, { "Bass" }, { "Chords" }, { "Melody" }, { "Hook" }, { "Automation" } };
     const auto bar = (std::int64_t) ppq * 4;
     auto clip = [&] (int pattern, int track, int fromBar, int bars) {
-        const auto length = song.patterns[(std::size_t) pattern].effectiveLength (song.beatsPerBar);
+        const auto length = song.patterns[(std::size_t) pattern].effectiveLength (song.meter());
         for (int b = fromBar; b < fromBar + bars;)
         {
             Clip c;

@@ -1,0 +1,452 @@
+// Rollup 0.1.28 (round 190fv): what two of the merged branches do together.
+// - follow190fg gave the song a meter with a denominator (Song::beatUnit, Meter; Pattern::effectiveLength takes a
+//   Meter, a bar of 6/8 = 3 quarters). livefreeze190ff's Consolidate and reabl190fo's Simple Sampler track were written
+//   against the numerator alone (a bar = beatsPerBar quarters); the rollup moved both to the song's meter.
+// - livefreeze190ff's track freeze holds an insert number (FreezeState::insert); reafl190fl's "Increase number of
+//   tracks to..." adds inserts: they go at the end, so a frozen track keeps its insert and stays frozen.
+
+#include <tuple>
+
+#include "core/MixerOps.h"
+#include "core/SimplePads.h"
+#include "core/SimpleTracks.h"
+#include "core/StandIns.h"
+
+namespace rollup028
+{
+// 6/8: six eighths, a bar of three quarters
+inline lynx::Song sixEight()
+{
+    auto s = lynx::Song::makeDefault();
+    s.beatsPerBar = 6;
+    s.beatUnit = 8;
+    return s;
+}
+
+struct LoopFlag
+{
+    explicit LoopFlag (bool on) : was (lynx::stretchedClipsLoop()) { lynx::setStretchedClipsLoop (on); }
+    ~LoopFlag() { lynx::setStretchedClipsLoop (was); }
+    bool was;
+};
+} // namespace rollup028
+
+TEST (rollup028_consolidate_loops_patterns_in_bars_of_the_song_meter)
+{
+    using lynx::ppq;
+    const rollup028::LoopFlag loops (true);
+    auto s = rollup028::sixEight();
+    CHECK (s.barTicks() == 3 * ppq);
+    s.playlist.clear();
+    s.playTruncatedNotes = false;
+    // a pattern without its own length: two notes in its first quarter notes, so it lasts one bar of the meter
+    lynx::Pattern p;
+    p.lengthTicks = 0;
+    for (const auto at : { (std::int64_t) 0, (std::int64_t) ppq })
+    {
+        lynx::Note n;
+        n.start = at;
+        n.length = ppq / 2;
+        n.channel = 0;
+        p.notes.push_back (n);
+    }
+    s.patterns.push_back (p);
+    const auto pattern = (int) s.patterns.size() - 1;
+    CHECK (s.patterns[(std::size_t) pattern].effectiveLength (s.meter()) == 3 * ppq);
+    // clip A stretched over two bars (the pattern loops twice), clip B one bar later on the same track
+    using Span = std::pair<std::int64_t, std::int64_t>;
+    for (const auto& [start, length] : { Span { 0, 6 * ppq }, Span { 8 * ppq, 3 * ppq } })
+    {
+        lynx::Clip c;
+        c.kind = lynx::ClipKind::pattern;
+        c.pattern = pattern;
+        c.track = 0;
+        c.start = start;
+        c.length = length;
+        s.playlist.push_back (c);
+    }
+    lynx::freeze::ConsolidatePlan plan;
+    CHECK (lynx::freeze::planConsolidate (s, { 0, 1 }, plan) == nullptr);
+    CHECK (! plan.audio);
+    const auto merged = lynx::freeze::consolidatePatternClips (s, plan);
+    CHECK (merged >= 0 && merged < (int) s.patterns.size());
+    if (merged < 0 || merged >= (int) s.patterns.size())
+        return;
+    const auto& m = s.patterns[(std::size_t) merged];
+    CHECK (m.lengthTicks == 11 * ppq);
+    // as played: the loop of 3 quarters twice (0, 1, 3, 4), then clip B (8, 9). With the numerator alone (a bar of
+    // 6 quarters) clip A would have played its pattern once: 0 and 1 only.
+    std::vector<std::int64_t> starts;
+    for (const auto& n : m.notes)
+        starts.push_back (n.start);
+    const std::vector<std::int64_t> want { 0, ppq, 3 * ppq, 4 * ppq, 8 * ppq, 9 * ppq };
+    CHECK (starts == want);
+    CHECK (s.playlist.size() == 1 && s.playlist[0].length == 11 * ppq);
+}
+
+TEST (rollup028_simple_sampler_track_records_into_four_bars_of_the_song_meter)
+{
+    using lynx::ppq;
+    // SimpleWorkflow::addPads (UI side) builds the 4-bar pattern from the song's bar, not from the numerator
+    const auto ui = i18ntest::readFile ("src/ui/SimpleWorkflow.cpp");
+    const auto at = ui.find ("bool SimpleWorkflow::addPads()");
+    CHECK (at != std::string::npos);
+    if (at == std::string::npos)
+        return;
+    const auto body = ui.substr (at, ui.find ("\n}\n", at) - at);
+    CHECK (body.find ("4 * engine.getSong().barTicks()") != std::string::npos);
+    CHECK (body.find ("beatsPerBar") == std::string::npos);
+    // ... and the core places that pattern as one clip of four 6/8 bars
+    auto s = rollup028::sixEight();
+    s.playlist.clear();
+    lynx::simpletracks::Request q;
+    q.kind = lynx::simpletracks::Kind::pads;
+    q.kit = lynx::simplepads::emptyKit();
+    lynx::Pattern p;
+    p.lengthTicks = 4 * s.barTicks();
+    q.pattern = p;
+    const auto r = lynx::simpletracks::addTrack (s, q);
+    CHECK (r.pattern >= 0 && r.pattern < (int) s.patterns.size());
+    CHECK (s.patterns[(std::size_t) r.pattern].effectiveLength (s.meter()) == 12 * ppq);
+    bool found = false;
+    for (const auto& c : s.playlist)
+        if (c.kind == lynx::ClipKind::pattern && c.pattern == r.pattern)
+        {
+            found = true;
+            CHECK (c.length == 4 * s.barTicks());
+        }
+    CHECK (found);
+}
+
+TEST (rollup028_more_mixer_tracks_keep_a_track_freeze)
+{
+    auto s = lynx::Song::makeDefault();
+    CHECK (! s.channels.empty() && s.mixer.size() > 4);
+    if (s.channels.empty() || s.mixer.size() <= 4)
+        return;
+    for (auto& c : s.channels)
+        c.mixerTrack = 0;
+    auto& lead = s.channels[0];
+    lead.mixerTrack = 3;
+    lynx::StandIn whole;
+    whole.path = "lead-frozen.wav";
+    whole.lengthTicks = 16 * lynx::ppq;
+    lead.freeze.stems = { whole };
+    lead.freeze.insert = 3;
+    CHECK (lynx::freeze::trackFreezeHolds (s, 0));
+    const auto before = lynx::mixerops::insertCount (s);
+    CHECK (lynx::mixerops::increaseInsertsTo (s, before + 5) == 5);
+    CHECK (lynx::mixerops::insertCount (s) == before + 5);
+    CHECK (s.channels[0].mixerTrack == 3 && s.channels[0].freeze.insert == 3);
+    CHECK (lynx::freeze::trackFreezeHolds (s, 0));
+    CHECK (lynx::freeze::frozenByInsert (s, 3) == 0);
+    // "Plugin delay compensation > Set for all tracks" leaves the freeze alone too
+    lynx::mixerops::setPdcForAllTracks (s);
+    CHECK (lynx::freeze::trackFreezeHolds (s, 0));
+}
+
+// Step 2 (realive190fm): Playlist clips play through grooves of the pool, and Live's MIDI Generate tab writes bars.
+// - livefreeze190ff's Consolidate makes one new clip without a groove: the clips' grooves are written into its notes
+//   (moved and accented as the Scheduler plays them), so the consolidated clip plays what the clips played.
+// - MIDI Generate's Stacks durations are bars: of the song's meter (follow190fg), not of its numerator.
+TEST (rollup028_consolidate_writes_a_clips_groove_into_the_notes)
+{
+    using namespace lynx;
+    auto s = groove190fm::song();
+    s.playlist[1].track = 0; // both clips on one track: bar 1 (with the groove) and bar 3 (straight)
+    auto g = groove190fm::offbeat (60);
+    g.velocity = 1.0f;
+    const auto id = groove::add (s.grooves, g);
+    CHECK (groove::setPlaylistClipGroove (s, { 0 }, id));
+    const auto before = groove190fm::play (s);
+    freeze::ConsolidatePlan plan;
+    CHECK (freeze::planConsolidate (s, { 0, 1 }, plan) == nullptr && ! plan.audio);
+    const auto merged = freeze::consolidatePatternClips (s, plan);
+    CHECK (merged >= 0 && s.playlist.size() == 1 && s.playlist[0].groove == 0);
+    const auto after = groove190fm::play (s);
+    CHECK (before.size() == after.size() && before.size() == 16);
+    if (before.size() != after.size())
+        return;
+    auto sorted = [] (std::vector<groove190fm::Heard> h) {
+        std::stable_sort (h.begin(), h.end(), [] (const auto& a, const auto& b) { return std::tie (a.tick, a.type, a.key) < std::tie (b.tick, b.type, b.key); });
+        return h;
+    };
+    const auto a = sorted (before), b = sorted (after);
+    for (std::size_t i = 0; i < a.size(); ++i)
+    {
+        CHECK (a[i].key == b[i].key && a[i].type == b[i].type);
+        CHECK (std::abs (a[i].tick - b[i].tick) < 1.0);
+        CHECK (std::abs (a[i].velocity - b[i].velocity) < 1.0e-6f);
+    }
+    // the grooved off-beat 16th of bar 1: 60 ticks late and at half the velocity, now in the notes themselves
+    const auto on61 = groove190fm::onsOf (after, 61);
+    CHECK (on61.size() == 2 && std::abs (on61[0] - 300.0) < 1.0 && std::abs (on61[1] - (2.0 * groove190fm::bar + 240.0)) < 1.0);
+}
+
+TEST (rollup028_midi_generate_stacks_count_bars_of_the_song_meter)
+{
+    using namespace lynx::midigen;
+    const auto& bank = lynxChordBank();
+    StacksOptions o; // one chord of one bar
+    auto c = mg190fm::bar (2);
+    c.beatsPerBar = 6;
+    c.beatUnit = 8;
+    c.to = 2 * 3 * lynx::ppq; // two bars of 6/8
+    const auto out = stacks (o, c, bank);
+    CHECK (out.size() == 6);
+    if (out.size() == 6)
+        CHECK (out[0].length == 3 * lynx::ppq && out[3].start == 3 * lynx::ppq);
+    // n/4 as before
+    const auto four = stacks (o, mg190fm::bar (2), bank);
+    CHECK (four.size() == 6 && four[0].length == 4 * lynx::ppq);
+}
+
+// Step 2 (ember190fj): Ember's Tape runs a measured magnetic core in new instances (Law = Measured). The Live imports
+// that build Ember stages on fits made on the Classic tape keep it there, as 190fj did for Saturator: realive190fm's
+// Roar (Polynomial = the tape style) and drumbus190fk's round-190ek Drum Buss rack.
+TEST (rollup028_live_imports_keep_embers_classic_tape)
+{
+    using namespace lynx;
+    using namespace lynx::alsdev;
+    using als190fm::par;
+    namespace em = mixsuite::ember;
+    const auto t = als190fm::translate (als190fm::roar (1, par ("Stage1_Shaper_Type", 7) + par ("Stage2_Shaper_Type", 7) + par ("Output_DryWet", 1.0)));
+    CHECK (t.has_value());
+    int embers = 0;
+    std::function<void (const EffectSlot&)> visit = [&] (const EffectSlot& slot) {
+        if (slot.kind == EffectKind::ember)
+        {
+            ++embers;
+            CHECK (em::styleOf (slot.params[em::style]) == em::Style::tape);
+            CHECK (slot.params[(std::size_t) em::law] == 0.0f && ! em::measuredTape (slot.params));
+        }
+        for (const auto& node : slot.patcher.nodes) // (racks, racks in racks)
+            visit (node.effect);
+    };
+    if (t.has_value())
+        visit (t->slot);
+    CHECK (embers >= 1);
+    // a new Ember in the Tape style is the measured one (190fj's default), so the pin above is what keeps the import
+    auto fresh = makeEffectSlot (EffectKind::ember);
+    fresh.params[em::style] = 1.0f / (float) (em::styles - 1);
+    CHECK (em::measuredTape (fresh.params));
+}
+
+// Step 3 (clipenv190gi): an audio clip may carry a volume / pan envelope (Clip::envelope into Song::clipEnvelopes).
+// livefreeze190ff's Consolidate of audio clips renders them into one new clip without an envelope: the render must hear
+// the envelopes (the render song keeps Song::clipEnvelopes and each clip's index), so the result sounds as before.
+TEST (rollup028_consolidated_audio_clips_keep_their_envelopes_in_the_render)
+{
+    using namespace lynx;
+    auto withEnvelope = clipenv190gi::rampSong();
+    auto second = withEnvelope.playlist[0];
+    second.start = ppq * 6;
+    second.envelope = -1;
+    withEnvelope.playlist.push_back (second);
+    auto without = withEnvelope;
+    without.playlist[0].envelope = -1;
+    freeze::ConsolidatePlan plan;
+    CHECK (freeze::planConsolidate (withEnvelope, { 0, 1 }, plan) == nullptr && plan.audio && plan.channel == 0);
+    freeze::ConsolidatePlan plain;
+    CHECK (freeze::planConsolidate (without, { 0, 1 }, plain) == nullptr);
+    const auto shapedSong = freeze::consolidateRenderSong (withEnvelope, plan);
+    CHECK (shapedSong.clipEnvelopes.size() == 1);
+    const auto shaped = clipenv190gi::render (shapedSong, 48000);
+    const auto flat = clipenv190gi::render (freeze::consolidateRenderSong (without, plain), 48000);
+    // one beat in (sample 24000 at 120 BPM): v = 0.85 on FL's Levels law, (11^0.85 − 1) / 10, as the clip played it
+    CHECK (std::abs (flat[24000]) > 1.0e-3f);
+    if (std::abs (flat[24000]) > 1.0e-3f)
+        CHECK (std::abs (shaped[24000] / flat[24000] - (std::pow (11.0f, 0.85f) - 1.0f) / 10.0f) < 0.003f);
+}
+
+// Step 4 (round 190gm, issue #165, extended to macOS by the coordinator): plugin and channel windows dock inside the main
+// window by default on Windows only (the docking glue is Win32 code); on Linux and macOS they are the system's own
+// windows unless LYNX_DOCKED_PLUGINS=1.
+#include "core/DockingPolicy.h"
+
+TEST (rollup028_plugin_windows_dock_by_default_on_windows_only)
+{
+    using lynx::dockpolicy::dockingOn;
+    CHECK (dockingOn ("", true) && dockingOn ("1", true) && ! dockingOn ("0", true));
+    CHECK (! dockingOn ("", false) && dockingOn ("1", false) && ! dockingOn ("0", false));
+    static_assert (dockingOn ("", true) && ! dockingOn ("", false));
+    // the app takes the Windows rule only on Windows (NativeChild.cpp)
+    const auto source = i18ntest::readFile ("src/ui/NativeChild.cpp");
+    const auto at = source.find ("bool dockingEnabled()");
+    CHECK (at != std::string::npos);
+    if (at != std::string::npos)
+    {
+        const auto body = source.substr (at, source.find ("\n}\n", at) - at);
+        CHECK (body.find ("#if JUCE_WINDOWS") != std::string::npos && body.find ("dockingOn (value, true)") != std::string::npos
+               && body.find ("dockingOn (value, false)") != std::string::npos);
+    }
+}
+
+// Step 8 (round 190gj × 190gp): the single-pass stems tap each insert's output after its fader. 190gp leaves an insert
+// that nothing came into this chunk with zeros it never stored (trackZeros) unless one of its slots runs, so the buffer
+// of an insert whose effects are all off still holds an older chunk between its notes; the tap reads it the way 190gp's
+// readers do (trackInput). The snare's and the hats' inserts get a slot that is off: between the hits their stems, made
+// from the one render's taps, still equal their own renders.
+TEST (rollup028_stem_taps_of_inserts_with_unstored_zeros_are_zeros)
+{
+    auto s = s190gj::song();
+    lynx::EffectSlot off;
+    off.kind = lynx::EffectKind::delay;
+    off.enabled = false;
+    s.mixer[2].effects.push_back (off);
+    s.mixer[3].effects.push_back (off);
+    const std::vector<int> channels (s.channels.size(), 0);
+    std::vector<std::vector<int>> slots (s.mixer.size());
+    for (std::size_t t = 0; t < s.mixer.size(); ++t)
+        slots[t].assign (s.mixer[t].effects.size(), 0);
+    constexpr int blocks = 420;
+
+    std::vector<lynx::exportopts::StemTap> plans;
+    std::vector<int> stems;
+    lynx::RackRenderer::RenderTaps taps;
+    taps.capacity = 512;
+    taps.wanted.assign (s.mixer.size(), 0);
+    taps.data.assign (s.mixer.size(), std::vector<float> (1024, 0.0f));
+    taps.wanted[0] = 1;
+    for (int t = 1; t < (int) s.mixer.size(); ++t)
+        if (auto p = lynx::exportopts::planStemTap (s, t, channels, slots, s190gj::rate); p.ok)
+        {
+            plans.push_back (p);
+            stems.push_back (t);
+            for (const auto& in : p.inputs)
+                taps.wanted[(std::size_t) in.track] = 1;
+        }
+    CHECK (std::find (stems.begin(), stems.end(), 3) != stems.end());
+    std::vector<lynx::exportopts::StemMixer> mixers;
+    for (const auto& p : plans)
+        mixers.emplace_back (p);
+    std::vector<std::vector<float>> made (stems.size(), std::vector<float> ((std::size_t) blocks * 1024));
+    s190gj::render (s, blocks, &taps, [&] (int b) {
+        for (std::size_t k = 0; k < stems.size(); ++k)
+        {
+            std::vector<const float*> l, r;
+            for (const auto& in : plans[k].inputs)
+            {
+                l.push_back (taps.left (in.track));
+                r.push_back (taps.right (in.track));
+            }
+            auto* out = made[k].data() + (std::size_t) b * 1024;
+            mixers[k].mix (taps.left (0), taps.right (0), l.data(), r.data(), out, out + 512, 512);
+        }
+    });
+    for (std::size_t k = 0; k < stems.size(); ++k)
+    {
+        const auto own = s190gj::render (lynx::makeBounceSong (s, stems[k]), blocks);
+        std::size_t differ = 0;
+        for (std::size_t i = 0; i < own.size(); ++i)
+            differ += own[i] != made[k][i] ? 1 : 0;
+        CHECK (differ == 0);
+        if (differ != 0)
+            std::printf ("  stem of insert %d: %zu samples differ\n", stems[k], differ);
+    }
+}
+
+// Step 9 (round 190gq × 190gp): an editor that shows a slot's effect meters (190gp's ProcessTimes::metersWanted: gain
+// reduction, band levels...) keeps that insert in the live part, as an editor with level meters does (levelWanted), so
+// what it shows stays in time with what is heard (190gq's rollup note).
+#include "core/RenderAhead.h"
+
+TEST (rollup028_render_ahead_keeps_inserts_with_shown_effect_meters_live)
+{
+    using namespace lynx;
+    auto song = ra190gq::makeSong (2);
+    auto state = RackState::build (song, nullptr, 44100.0);
+    std::vector<char> ch, tr;
+    int boundary = 0;
+    CHECK (RenderAhead::partitionOf (*state, nullptr, 0, nullptr, 0, nullptr, ch, tr, boundary));
+    CHECK (tr[2] == 1); // insert 2 (the side-chained compressor): rendered ahead with no editor open
+    auto editors = std::make_unique<ProcessTimes>();
+    editors->metersWanted[(std::size_t) (2 * maxEffectSlots + 0)].store (1);
+    CHECK (RenderAhead::partitionOf (*state, nullptr, 0, nullptr, 0, nullptr, ch, tr, boundary, editors.get()));
+    CHECK (tr[2] == 0); // its compressor's meters shown: real-time
+    CHECK (tr[1] == 1); // (the others stay ahead)
+    auto levels = std::make_unique<ProcessTimes>();
+    levels->levelWanted[(std::size_t) (1 * maxEffectSlots + 0)].store (1);
+    CHECK (RenderAhead::partitionOf (*state, nullptr, 0, nullptr, 0, nullptr, ch, tr, boundary, levels.get()));
+    CHECK (tr[1] == 0 && tr[2] == 1); // (190gq's own rule, unchanged)
+}
+
+// Step 9 (round 190gq × 190gi / 190gx / 190ff): render-ahead stays bit-exact with the rollup's audio-clip features in the
+// part rendered ahead: a clip volume envelope (190gi), an audio clip stretched by Beats on the Measured law (190gx), and
+// an audio channel as the stand-in a freeze leaves (190ff plays frozen audio as such a clip), each on an insert of its own
+// beside 190gq's synths.
+TEST (rollup028_render_ahead_is_bit_exact_with_clip_envelopes_beats_and_frozen_audio)
+{
+    using namespace lynx;
+    auto song = ra190gq::makeSong (4);
+    const auto firstAudio = (int) song.channels.size();
+    auto audio = clipenv190gi::rampSong();
+    for (int k = 0; k < 3; ++k)
+    {
+        auto c = audio.channels[0];
+        c.name = "Audio " + std::to_string (k + 1);
+        c.samplePath = "a" + std::to_string (k) + ".wav";
+        c.mixerTrack = k == 2 ? 6 : 5;
+        c.volume = 0.3f;
+        if (k == 1) // stretched by Beats, the Measured law
+        {
+            c.sampler.keepPitch = true;
+            c.sampler.stretchMethod = StretchMethod::beats;
+            c.sampler.warpModes.beatsLaw = WarpModeSettings::beatsLawMeasured;
+        }
+        song.channels.push_back (c);
+        song.patterns.emplace_back();
+        Clip clip;
+        clip.kind = ClipKind::audio;
+        clip.channel = firstAudio + k;
+        clip.track = 6 + k;
+        clip.start = (std::int64_t) k * ppq;
+        clip.length = ppq * 6;
+        if (k == 0) // the envelope
+        {
+            song.clipEnvelopes = audio.clipEnvelopes;
+            clip.envelope = 0;
+        }
+        song.playlist.push_back (clip);
+    }
+    song.mixer[5].effects.push_back (makeEffectSlot (EffectKind::delay));
+    song.mixer[6].effects.push_back (makeEffectSlot (EffectKind::reverb));
+    auto provider = [] (const std::string& path) {
+        auto d = std::make_shared<SampleData>();
+        d->sampleRate = 44100.0;
+        const auto f = path == "a1.wav" ? 220.0 : path == "a2.wav" ? 330.0 : 440.0;
+        for (int i = 0; i < 44100 * 4; ++i)
+            d->left.push_back ((float) (0.5 * std::sin (2.0 * 3.141592653589793 * f * i / 44100.0) * std::exp (-(i % 11025) / 4000.0)));
+        d->right = d->left;
+        return std::shared_ptr<const SampleData> (d);
+    };
+    const int blocks = 1400; // ~2 s at 64 samples
+    for (const auto workers : { 0, 2 })
+    {
+        auto state = RackState::build (song, nullptr, 44100.0, provider);
+        std::unique_ptr<WorkerPool> pool = workers > 0 ? std::make_unique<WorkerPool> (workers) : nullptr;
+        RackRenderer plain;
+        plain.setWorkerPool (pool.get());
+        plain.prepare (44100.0, 2048);
+        MeterBank meters;
+        LiveEventQueue live;
+        ra190gq::Callback cb0 (song, 64, 0.0);
+        std::vector<float> l0, r0, l1, r1;
+        cb0.run (blocks, l0, r0, [&] (double start, int n, double, float* a, float* b, int) {
+            plain.process (state.get(), true, start, n, a, b, &live, &meters, nullptr);
+            if (pool != nullptr)
+                pool->park();
+        });
+        ra190gq::AheadRig rig (song, workers, {});
+        rig.exchange.publish (RackState::build (song, nullptr, 44100.0, provider)); // (with the clips' audio)
+        ra190gq::Callback cb1 (song, 64, 0.0);
+        cb1.run (blocks, l1, r1, [&] (double start, int n, double tps, float* a, float* b, int) {
+            std::this_thread::sleep_for (std::chrono::microseconds (100));
+            rig.block (cb1, start, n, tps, a, b);
+        });
+        const auto& st = rig.ahead.stats();
+        CHECK (ra190gq::same (l0, l1) && ra190gq::same (r0, r1));
+        CHECK (st.engagements.load() >= 1 && st.splitMismatches.load() == 0 && st.fromRing.load() > (std::uint64_t) blocks / 2);
+        CHECK (ra190gq::energy (l0.data() + 44100, 44100) > 1.0); // (the audio clips sound)
+    }
+}

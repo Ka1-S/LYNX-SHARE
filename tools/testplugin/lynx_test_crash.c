@@ -9,6 +9,10 @@
  *               (LYNX --plugintest / --crashguardtest: the slot must be switched off, the render must finish)
  *   "memcpy"  - the same, but as a memcpy from a null pointer (the fault is inside the C library, issue #155)
  *   "state"   - a null-pointer write when a saved state is loaded into it (state extension load)
+ *   "thread"  - (Linux / macOS; round 190gg) in the Nth process() call it starts a thread of its own that writes to a
+ *               null pointer: a fault outside every call the host makes (LYNX --crashguardtest ... thread)
+ *   "editor-create" - (Linux / macOS; round 190gg) it offers an editor (CLAP gui, X11 / Cocoa) and writes to a null
+ *               pointer when the host creates it (LYNX --crashguardtest ... ui: the editor is made under the guard)
  *   "exit"    - (Windows) a fail-fast (0xC0000409) when the DLL is unloaded at process exit, like the Waves shell whose
  *               teardown crashed LYNX's scan child (LYNX.exe --scantest: the plugin must be found, not blacklisted)
  *   "editor"  - (Windows; issue #32, round 174a) an access violation in its own editor window's procedure, on the
@@ -18,6 +22,8 @@
  */
 #if defined(_WIN32)
  #include <windows.h>
+#else
+ #include <pthread.h>
 #endif
 #include <clap/clap.h>
 #include <stdint.h>
@@ -89,6 +95,14 @@ static void null_copy (void)
     memcpy (to, (const char*) from, size);
     sink = to[0];
 }
+#if ! defined(_WIN32)
+static void* faulting_thread (void* arg)
+{
+    (void) arg;
+    null_write();
+    return NULL;
+}
+#endif
 static clap_process_status p_process (const clap_plugin_t* p, const clap_process_t* proc)
 {
     static int calls = 0;
@@ -99,6 +113,14 @@ static clap_process_status p_process (const clap_plugin_t* p, const clap_process
             null_write();
         if (crash_mode ("memcpy"))
             null_copy();
+#if ! defined(_WIN32)
+        if (crash_mode ("thread"))
+        {
+            pthread_t thread;
+            if (pthread_create (&thread, NULL, faulting_thread, NULL) == 0)
+                pthread_detach (thread);
+        }
+#endif
     }
     if (proc->audio_inputs_count < 1 || proc->audio_outputs_count < 1) return CLAP_PROCESS_CONTINUE;
     for (uint32_t c = 0; c < 2 && c < proc->audio_inputs[0].channel_count && c < proc->audio_outputs[0].channel_count; ++c)
@@ -165,6 +187,44 @@ static bool g_hide (const clap_plugin_t* p) { (void) p; if (editor_window != NUL
 static const clap_plugin_gui_t gui = { g_api, g_preferred, g_create, g_destroy, g_scale, g_size, g_can_resize, g_hints, g_adjust,
                                        g_set_size, g_parent, g_transient, g_title, g_show, g_hide };
 
+#else
+/* Linux / macOS: an editor only in "editor-create" mode, which crashes as the host creates it */
+static bool g_api (const clap_plugin_t* p, const char* api, bool floating)
+{
+    (void) p;
+    return ! floating && (strcmp (api, CLAP_WINDOW_API_X11) == 0 || strcmp (api, CLAP_WINDOW_API_COCOA) == 0);
+}
+static bool g_preferred (const clap_plugin_t* p, const char** api, bool* floating)
+{
+    (void) p;
+#if defined(__APPLE__)
+    *api = CLAP_WINDOW_API_COCOA;
+#else
+    *api = CLAP_WINDOW_API_X11;
+#endif
+    *floating = false;
+    return true;
+}
+static bool g_create (const clap_plugin_t* p, const char* api, bool floating)
+{
+    if (crash_mode ("editor-create"))
+        null_write();
+    return g_api (p, api, floating);
+}
+static void g_destroy (const clap_plugin_t* p) { (void) p; }
+static bool g_scale (const clap_plugin_t* p, double s) { (void) p; (void) s; return true; }
+static bool g_size (const clap_plugin_t* p, uint32_t* w, uint32_t* h) { (void) p; *w = 240; *h = 120; return true; }
+static bool g_can_resize (const clap_plugin_t* p) { (void) p; return false; }
+static bool g_hints (const clap_plugin_t* p, clap_gui_resize_hints_t* h) { (void) p; (void) h; return false; }
+static bool g_adjust (const clap_plugin_t* p, uint32_t* w, uint32_t* h) { (void) p; *w = 240; *h = 120; return true; }
+static bool g_set_size (const clap_plugin_t* p, uint32_t w, uint32_t h) { (void) p; (void) w; (void) h; return true; }
+static bool g_parent (const clap_plugin_t* p, const clap_window_t* window) { (void) p; (void) window; return true; }
+static bool g_transient (const clap_plugin_t* p, const clap_window_t* w) { (void) p; (void) w; return false; }
+static void g_title (const clap_plugin_t* p, const char* t) { (void) p; (void) t; }
+static bool g_show (const clap_plugin_t* p) { (void) p; return true; }
+static bool g_hide (const clap_plugin_t* p) { (void) p; return true; }
+static const clap_plugin_gui_t gui = { g_api, g_preferred, g_create, g_destroy, g_scale, g_size, g_can_resize, g_hints, g_adjust,
+                                       g_set_size, g_parent, g_transient, g_title, g_show, g_hide };
 #endif
 
 /* state: 4 bytes; "state" mode crashes when one is loaded */
@@ -188,6 +248,9 @@ static const void* p_extension (const clap_plugin_t* p, const char* id)
     (void) p;
 #if defined(_WIN32)
     if (strcmp (id, CLAP_EXT_GUI) == 0)
+        return &gui;
+#else
+    if (strcmp (id, CLAP_EXT_GUI) == 0 && crash_mode ("editor-create"))
         return &gui;
 #endif
     if (strcmp (id, CLAP_EXT_STATE) == 0)

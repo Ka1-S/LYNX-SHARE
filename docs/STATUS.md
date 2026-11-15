@@ -214,7 +214,7 @@ Core Audio / ALSA + JACK (PipeWire).
   with settings, automation and macros: EQ Eight → Facet EQ, EQ Three → Prism, Channel EQ → EQ, Compressor / Glue →
   Crest (Expand → Sentry), Multiband Dynamics → Prism, Limiter → Apex, Gate → Sentry, Utility, Reverb → Atrium,
   Delay / Echo → Echoform, Auto Filter → Filter (+ Peak Controller for its LFO / follower), Saturator → Ember,
-  Overdrive → Distortion, Chorus-Ensemble → Chorus, Redux → Lo-fi, Auto Pan, Drum Buss → an Audio Effect Rack;
+  Overdrive → Distortion, Chorus-Ensemble → Chorus, Redux → Lo-fi, Auto Pan, Drum Buss → Anvil Bus (LYNX's drum-bus engine);
   Drift and non-FM Operator → built-in synth; Arpeggiator; Pitch / Velocity / Chord / Note Length baked into the
   notes; VST2 / VST3 automation by parameter id. Laws of EQ Eight, Utility, Auto Filter, Saturator, Glue, Drum Buss
   and Reverb decay fitted to Live 12.4.16 renders; others marked [ASSUMED] in docs/analise/ALS_FORMAT.md. Dropped

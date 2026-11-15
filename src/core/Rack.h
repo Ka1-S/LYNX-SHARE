@@ -269,5 +269,5 @@ enum class SlicePer : std::uint8_t { warpMarker, transient, bar, half, quarter, 
 constexpr int slicePerCount = 8;
 const char* slicePerName (SlicePer per) noexcept; // (English, translated by the UI: "Warp Marker", "Bar", "1/2 Note"…)
 // The beats one slice spans for a bar / note division (a whole note = 4 beats); 0 for warp markers and transients
-double slicePerBeats (SlicePer per, int beatsPerBar) noexcept;
+double slicePerBeats (SlicePer per, Meter meter) noexcept; // (in quarter notes)
 } // namespace lynx::rack

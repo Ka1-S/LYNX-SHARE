@@ -96,6 +96,9 @@ extern std::function<void (bool)> setShowLoudness;
 // Opens the Export window for these inserts only (FL's "Render armed / selected tracks to wave file(s)"; the main
 // window sets it, with the project's folder and name). `done` (optional) runs once the files are written.
 extern std::function<void (std::vector<int>, std::function<void (const std::vector<juce::File>&)> done)> renderTracks;
+// Selects these Playlist tracks and scrolls the first into view (FL's "Select › Channels and playlist tracks routed to
+// this track", round 190fl; the main window points it at its Playlist).
+extern std::function<void (std::vector<int>)> selectPlaylistTracks;
 // The items: this project's clean mixer, show only used inserts, remove unused inserts at the end and — with
 // `newProjects` — the new-project choices (inserts, Master chain, clean mixer, Playlist tracks).
 void addItems (juce::PopupMenu& menu, AudioEngine& engine, bool newProjects);
@@ -363,6 +366,7 @@ private:
     int selectAnchor = -1;
     bool selectAdding = true;
     std::vector<int> selectBase; // the selection kept under the range (Ctrl+Shift)
+    bool ctrlClickPending = false; // Ctrl alone: a release on the same strip toggles it (LYNX extra, issue #163)
     void dragSelectTo (int track);
     bool headerDragged = false;
     void showSendMenu (int track);
@@ -374,7 +378,13 @@ private:
     std::vector<std::pair<int, float>> groupStart; // (track, value) of the selection when a group drag starts
     float groupGrab = 0.0f;
     void showMenu (int track);
-    void askInsertMultiple (int at); // "Insert multiple..." / the "+" menu's "Add multiple..." (at most the room left)
+    void askInsertCount(); // the "+" menu's "Increase number of tracks to..." (round 190fl)
+    // the track menu's "Insert multiple..." (before track `at`) / the "+" menu's "Add multiple..." (`adding`: at the end);
+    // FL 2026's boxes, defaults and range rules (round 190gw)
+    void askInsertMultiple (int at, bool adding = false);
+public:
+    static std::unique_ptr<juce::AlertWindow> makeInsertMultipleBox (bool adding); // (its box; --hdrshot190ft draws it)
+private:
     void showTrackEq (int track);
     ui::ValueSpec specFor (Part part, int track) const;
     void setValue (Part part, int track, double value);
@@ -544,6 +554,9 @@ private:
     void showSlotMenu (int slot);
     juce::Rectangle<int> pluginButtonBounds() const;
     void openEditor (int slot);
+    // Freeze (round 190ff): a track freeze holds this insert's effects (not loaded): a click, wheel or drop on the slots
+    // (the FX switch, the side-chain button) is refused with a notice; the EQ, fader and routing stay live. True = refused.
+    bool refuseFrozenSlots (juce::Point<int> p);
     void toggleEditor (int slot); // FL: a click on the slot's name shows or hides its window (round 170b)
     juce::Rectangle<int> editorButtonBounds() const;
     // Round 177b: the selected effect's "Sidechain from" picker (effects with a side input; empty bounds = none)

@@ -382,7 +382,7 @@ Channel readChannel (Bytes body)
             ch.order = f.f64 (ch.order);
             if (! f.has (1084 - f.pos))
                 continue; // (an older channel header ends here)
-            f.f32();
+            ch.hue = f.f32 (-1.0f); // (round 190fn: the channel's colour as a hue, PROVEN-REA FLM 5.0.3 CSeqChannel::SetState)
             f.f64();
             f.f64();
             f.u32();
@@ -431,11 +431,11 @@ void readMeta (Bytes body, Project& p)
 {
     Reader r { body };
     p.created = r.fixed (256);
-    r.f64();
+    p.editSeconds = r.f64(); // (round 190fn: the time spent on the song)
     p.author = r.fixed (256);
     p.originalName = r.fixed (256);
     r.u8();
-    r.pos += 2048; // notes
+    p.notes = r.fixed (2048); // (round 190fn: the song's notes / description)
     p.saved = r.fixed (256);
 }
 
@@ -518,6 +518,27 @@ ModuleCategory moduleCategory (std::uint32_t type) noexcept
     return r != nullptr ? r->category : ModuleCategory::unknown;
 }
 
+std::uint32_t channelColour (float hue) noexcept
+{
+    // CSeqChannel::MakeChannelColor: HSL with the hue 0.73·h + 0.83 (one wrap), saturation 0.9, lightness 0.63;
+    // CColor::SetHSL is the usual HSL → RGB with each channel clamped to 0…1
+    const auto h0 = std::clamp (std::isfinite (hue) ? hue : 0.0f, 0.0f, 1.0f) * 0.73f + 0.83f;
+    const float s = 0.9f, l = 0.63f;
+    const auto q = l < 0.5f ? l * (1.0f + s) : l + s - l * s;
+    const auto p = 2.0f * l - q;
+    const auto channel = [p, q] (float t) {
+        if (t < 0.0f)
+            t += 1.0f;
+        if (t > 1.0f)
+            t -= 1.0f;
+        float v = t < 1.0f / 6.0f ? p + (q - p) * 6.0f * t : t < 0.5f ? q : t < 2.0f / 3.0f ? p + (q - p) * (4.0f - 6.0f * t) : p;
+        v = std::clamp (v, 0.0f, 1.0f);
+        return (std::uint32_t) std::lround (v * 255.0f);
+    };
+    const auto r = channel (h0 + 1.0f / 3.0f), g = channel (h0), b = channel (h0 - 1.0f / 3.0f);
+    return 0xFF000000u | (r << 16) | (g << 8) | b;
+}
+
 bool isFlmData (const std::uint8_t* data, std::size_t size) noexcept
 {
     if (data == nullptr || size < 12 || std::memcmp (data, "10LF", 4) != 0)
@@ -530,7 +551,7 @@ bool isFlmData (const std::uint8_t* data, std::size_t size) noexcept
     return (std::size_t) first <= size - 12;
 }
 
-std::optional<Project> parse (Bytes bytes, std::string* error)
+std::optional<Project> parse (Bytes bytes, std::string* error, bool racksOnly)
 {
     const auto fail = [error] (const char* why) -> std::optional<Project> {
         if (error != nullptr)
@@ -572,7 +593,7 @@ std::optional<Project> parse (Bytes bytes, std::string* error)
         else
             ++p.unknownChunks;
     }
-    if (p.channels.empty())
+    if (p.channels.empty() && ! racksOnly)
         return fail ("the project has no channels");
     return p;
 }

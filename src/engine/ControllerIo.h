@@ -34,6 +34,9 @@ public:
     const controller::Library& library() const noexcept { return profiles; }
     // The input devices now and their settings. `openOutputs`: open the ports for the feedback (the app; not tests).
     void configure (const prefs::MidiPrefs& prefs, const std::vector<std::string>& inputNames, bool openOutputs);
+    // The MIDI device list changed (round 190gh, hot-plug): a feedback port whose device is no longer listed under its
+    // identifier is closed and looked for again by name.
+    void devicesChanged() { apply (false); }
     // The profile a device runs (null: a generic controller), and the output port its feedback goes to ("" = none).
     std::shared_ptr<const controller::Profile> profileOf (const std::string& input) const;
     std::string outputOf (const std::string& input) const;
@@ -63,6 +66,7 @@ private:
     struct Port
     {
         std::string name;
+        std::string id; // the opened device's identifier (round 190gh, hot-plug)
         std::unique_ptr<juce::MidiOutput> device;
     };
 

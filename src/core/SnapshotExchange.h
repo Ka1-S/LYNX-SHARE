@@ -90,6 +90,38 @@ public:
         return active;
     }
 
+    // Audio (round 190gq, render-ahead): a newer snapshot is waiting
+    bool hasIncoming() const noexcept { return incoming.load (std::memory_order_relaxed) != nullptr; }
+
+    // Audio: like acquire(), but the previous snapshot is handed to the caller in `previous` instead of being returned
+    // to the UI (it is still in use elsewhere on the audio side); the caller gives it back with retire(). `previous`
+    // stays nullptr when nothing new was taken.
+    const T* acquireHolding (const T*& previous) noexcept
+    {
+        previous = nullptr;
+        auto* next = incoming.exchange (nullptr, std::memory_order_acq_rel);
+        if (next == nullptr)
+            return active;
+        previous = active;
+        active = next;
+        return active;
+    }
+
+    // Audio: a snapshot taken out with acquireHolding goes back to the UI to be freed. False when no slot is free now
+    // (try again on a later block).
+    bool retire (const T* old) noexcept
+    {
+        if (old == nullptr)
+            return true;
+        for (auto& slot : retired)
+            if (slot.load (std::memory_order_acquire) == nullptr)
+            {
+                slot.store (old, std::memory_order_release);
+                return true;
+            }
+        return false;
+    }
+
 private:
     void release (const T* old)
     {

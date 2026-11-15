@@ -25,9 +25,17 @@
 <p>音频线程应以实时优先级运行。</p>
 <ol><li>打开 <code>选项 › 音频设置...</code>，查看 <code>状态</code>。它显示线程是否获得了实时优先级。</li><li>如果没有，请安装 rtkit（<code>sudo apt install rtkit</code>、<code>sudo dnf install rtkit</code> 或 <code>sudo pacman -S rtkit</code>），或者像 JACK 的配置那样，把你自己加入带有实时限制的 <code>音频</code> 组。</li><li>注销后重新登录。</li></ol>
 <p>详情见 <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/LINUX.md">LINUX.md</a>。</p>
+<h3 id="the-sound-crackles-or-drops-out">声音有爆音或中断</h3>
+<p>LYNX SHARE 会统计每一次中断（缓冲区欠载），并说明原因。把鼠标指向工具栏中的 <code>CPU</code> 表，或打开 <code>工具 › 插件性能监视器...</code>。CPU 百分比旁边的红色数字就是次数。</p>
+<p>提示会说明最近一次中断的原因：</p>
+<div class="tablewrap"><table><thead><tr><th>原因</th><th>含义</th><th>可以尝试</th></tr></thead><tbody><tr><td>处理耗时超过缓冲区</td><td>一块音频的计算时间超过了它本身的时长。提示会指出这一块中最慢的通道或效果器</td><td>在 <code>选项 › 音频设置...</code> 中加大缓冲区，冻结该通道，或调低插件的质量</td></tr><tr><td>处理接近缓冲区的极限</td><td>中断前后负载接近 100 %</td><td>加大缓冲区，或冻结最重的通道</td></tr><tr><td>驱动或系统延迟</td><td>负载保持较低时，驱动或系统来得太晚。不是插件造成的</td><td>加大缓冲区，尝试其他驱动（在 Windows 上用接口的 ASIO 驱动），在 Linux 上检查实时优先级（见上文）</td></tr></tbody></table></div>
+<p>每次中断还会写入设置文件夹中的 <code>audio-glitches.log</code>，记录设备、缓冲区和最重的通道。</p>
 <h2 id="plugins">插件</h2>
 <h3 id="a-plugin-crashes">插件崩溃</h3>
-<p>让它在自己的进程中运行，这样停止的只是这个插件。</p>
+<p>大多数插件崩溃只会让该插件停止：效果器被旁通，乐器静音，LYNX SHARE 和工程继续运行。随后 <code>插件崩溃</code> 提示会提供：</p>
+<ul><li><code>重新加载</code>，用上次保存或备份时的设置重新启动插件。</li><li><code>始终在独立进程中运行 &lt;plugin&gt;</code>，让它在自己的进程中重新启动，现在以及在所有工程中都是如此。那里的崩溃不会拖垮 LYNX SHARE。在独立进程中的插件会在自己的窗口中打开（不能停靠）。</li></ul>
+<p>插件窗口会在编辑器的位置显示同样的两个按钮。<code>选项 › 插件管理器...</code> 在 <code>独立进程</code> 列中列出始终在独立进程中运行的插件；点击方框可开关。</p>
+<p>要让每个插件都在自己的进程中运行：</p>
 <ol><li>打开 <code>选项 › 常规设置...</code>。</li><li>打开 <code>在独立进程中运行插件（防止插件崩溃影响LYNX SHARE）</code>。</li><li>重新打开工程。</li></ol>
 <p>在自己进程中崩溃或停止响应的插件会被静音。保存工程并重新打开，即可再次加载该插件。见<a href="/wiki/plugins/">第三方插件</a>。</p>
 <h3 id="a-plugin-is-not-in-the-list">插件不在列表中</h3>

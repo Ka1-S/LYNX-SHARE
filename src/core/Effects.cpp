@@ -65,6 +65,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <limits>
 #include <cmath>
 #include <complex>
 #include <cstdio>
@@ -153,6 +154,11 @@ float chorusDepthMs (float v) { return v * 8.0f; }
 
 // ---------------------------------------------------------------------------
 
+// Round 190gp: how far a declared tail lets a built-in's state fall (from far above full scale to far below −120 dBFS)
+constexpr double tailDecayDb = 180.0;
+int tailOf (double samples) noexcept { return samples < 1.0e9 ? (int) std::ceil (samples) : std::numeric_limits<int>::max() / 2; }
+double tailOf (const Biquad& b) noexcept { return biquadTailSamples (b.a1, b.a2, tailDecayDb); }
+
 class Eq final : public Effect
 {
 public:
@@ -178,6 +184,7 @@ public:
             bands[1].peaking (sampleRate, eqMidHz (params[2]), 0.8, eqGainDb (params[1]));
             bands[2].shelf (sampleRate, 8000.0, eqGainDb (params[3]), true);
             output = dbToGain (eqGainDb (params[4]));
+            tail = tailOf (tailOf (bands[0]) + tailOf (bands[1]) + tailOf (bands[2])); // (round 190gp: three IIR sections in a row)
         }
 
         for (int i = 0; i < n; ++i)
@@ -195,11 +202,14 @@ public:
         }
     }
 
+    int tailSamples() const noexcept override { return tail; }
+
 private:
     double sampleRate = 44100.0;
     std::array<Biquad, 3> bands;
     std::array<float, maxEffectParams> lastParams {};
     float output = 1.0f;
+    int tail = -1;
 };
 
 // ---------------------------------------------------------------------------
@@ -262,6 +272,7 @@ public:
     {
         if (params[8] >= 0.5f)
         {
+            tail = -1; // (round 190gp: the measured voicing keeps the fixed hold)
             latency.store (vintage.latency(), std::memory_order_relaxed);
             float peakIn = 0.0f, peakOut = 0.0f;
             for (int i = 0; i < n; ++i)
@@ -294,6 +305,15 @@ public:
             return;
         }
         latency.store (0, std::memory_order_relaxed);
+        // round 190gp: its declared tail — the output is the input times a gain (silence in, silence out); what settles
+        // is the envelope, which falls with the release until it snaps to 0 (under 1e-4 dB of a reduction under 200 dB:
+        // 15 time constants), and the output limiter's gain (50 ms). Auto gain follows its powers for seconds: the
+        // fixed hold then.
+        {
+            const auto releaseSamples = (params[13] >= 0.5f ? rcReleaseMs (params[17]) : compReleaseMs (params[3])) * 0.001 * sampleRate;
+            const auto limitSamples = params[12] >= 0.5f ? 0.05 * sampleRate : 0.0;
+            tail = params[5] >= 0.5f ? -1 : tailOf (16.0 * std::max (releaseSamples, limitSamples) + 64.0);
+        }
         // "Auto gain" (round 107): the long-term level stays where it was (slow in/out power match, ±12 dB), so the
         // compressor shapes the dynamics without making the track quieter. Used where its settings are a guess (a
         // substitute for a missing plugin, whose own makeup gain is unknown).
@@ -398,7 +418,10 @@ public:
         useSidechain = true;
     }
 
+    int tailSamples() const noexcept override { return tail; }
+
 private:
+    int tail = -1;
     std::atomic<float> meterGr { 0.0f }, meterIn { 0.0f }, meterOut { 0.0f }, meterLimit { 0.0f }, meterChange { 0.0f };
     float limitGain = 1.0f;
     std::atomic<int> latency { 0 };
@@ -758,12 +781,16 @@ public:
     }
 
     int latencySamples() const noexcept override { return lookahead; }
+    int tailSamples() const noexcept override { return tail; }
 
     void process (float* l, float* r, int n, const EffectParams& params, double) noexcept override
     {
         const auto ceiling = dbToGain (limiterCeilingDb (params[0]));
         const auto input = dbToGain (limiterGainDb (params[1]));
         const auto release = (float) (1.0 - std::exp (-1.0 / (limiterReleaseMs (params[2]) * 0.001 * sampleRate)));
+        // round 190gp: its declared tail — the look-ahead line empties, then the gain climbs back to where it stops
+        // moving (16 release time constants)
+        tail = tailOf (lookahead + 16.0 * limiterReleaseMs (params[2]) * 0.001 * sampleRate + 64.0);
 
         for (int i = 0; i < n; ++i)
         {
@@ -816,6 +843,7 @@ private:
     std::vector<std::int64_t> maxTimes;
     int head = 0, count = 0;
     std::int64_t clock = 0;
+    int tail = -1;
 };
 
 // ---------------------------------------------------------------------------
@@ -851,6 +879,7 @@ public:
                 if (! wasSteep)
                     second.reset();
             }
+            tail = tailOf (tailOf (biquad) + (steep ? tailOf (second) : 0.0)); // (round 190gp)
         }
 
         const auto mix = params[3];
@@ -872,11 +901,14 @@ public:
         }
     }
 
+    int tailSamples() const noexcept override { return tail; }
+
 private:
     double sampleRate = 44100.0;
     Biquad biquad, second;
     bool steep = false;
     EffectParams last {};
+    int tail = -1;
 };
 
 // ---------------------------------------------------------------------------
@@ -899,6 +931,7 @@ public:
         {
             lastTone = params[1];
             tone.filter (sampleRate, 0, distortionToneHz (params[1]), 0.707);
+            tail = tailOf (tailOf (tone)); // (round 190gp: the shaper has no memory; the tone filter rings out)
         }
 
         const auto drive = dbToGain (distortionDriveDb (params[0]));
@@ -916,10 +949,13 @@ public:
         }
     }
 
+    int tailSamples() const noexcept override { return tail; }
+
 private:
     double sampleRate = 44100.0;
     Biquad tone;
     float lastTone = -1.0f;
+    int tail = -1;
 };
 
 // ---------------------------------------------------------------------------
@@ -1101,6 +1137,7 @@ public:
                 fl.set (peqfl::fromParams (params));
             }
             fl.process (l, r, n);
+            tail = -1;
             return;
         }
         flMode = false;
@@ -1131,6 +1168,10 @@ public:
             }
 
             output = (float) std::pow (10.0, peq::gainDb (params[peq::outputParam]) / 20.0);
+            double samples = 0.0; // (round 190gp: its sections in a row; FL's engines keep the fixed hold)
+            for (int k = 0; k < active; ++k)
+                samples += tailOf (*order[(std::size_t) k]);
+            tail = tailOf (samples);
         }
 
         for (int k = 0; k < active; ++k)
@@ -1153,6 +1194,10 @@ private:
     EffectParams lastParams {};
     peqfl::Engine fl;
     bool flMode = false;
+    int tail = -1;
+
+public:
+    int tailSamples() const noexcept override { return tail; }
 };
 
 // ---------------------------------------------------------------------------
@@ -2577,6 +2622,8 @@ public:
         }
     }
 
+    int tailSamples() const noexcept override { return 0; } // (round 190gp: no memory)
+
 private:
     float lastGainParam = -1.0f, cachedGain = 1.0f;
 };
@@ -2689,7 +2736,28 @@ std::string paramText (int param, float v)
 }
 } // namespace autopan
 
+namespace
+{
+const EffectInfo& effectInfoOf (EffectKind kind);
+}
+
+// Round 190ge: one table lookup. effectInfoOf below passes the guard of each of its ~120 local statics before its switch
+// on every call, and the renderer asks for a slot's info every block (0.8 % of a big project's render on its own).
 const EffectInfo& effectInfo (EffectKind kind)
+{
+    static const auto table = [] {
+        std::array<const EffectInfo*, 256> t {};
+        for (std::size_t k = 0; k < t.size(); ++k)
+            t[k] = &effectInfoOf ((EffectKind) k); // (a value past the last kind: EQ's, as effectInfoOf answers)
+        return t;
+    }();
+    static_assert (sizeof (EffectKind) == 1);
+    return *table[(std::size_t) kind];
+}
+
+namespace
+{
+const EffectInfo& effectInfoOf (EffectKind kind)
 {
     static const EffectInfo eq { "EQ", { { "Low", 0.5f }, { "Mid", 0.5f }, { "Mid freq.", 0.5f }, { "High", 0.5f }, { "Output", 0.5f } } };
     static const EffectInfo comp { "Compressor", { { "Threshold", 0.7f }, { "Ratio", 3.0f / 19.0f }, { "Attack", 0.67f }, { "Release", 0.54f }, { "Makeup", 0.0f }, { "Auto gain", 0.0f },
@@ -3138,6 +3206,7 @@ const EffectInfo& effectInfo (EffectKind kind)
             return info;
         }
         case EffectKind::strikeShaper: return mixsuite::strikeInfo();
+        case EffectKind::anvilBus: return mixsuite::anvilInfo();
         case EffectKind::pocketAutoduck:
         {
             static const EffectInfo info { "Pocket Autoduck", { { "Ducking", 0.501f }, { "Attack", 0.1f }, { "Curve", 0.501f }, { "Time", 1.0f },
@@ -3557,6 +3626,7 @@ const EffectInfo& effectInfo (EffectKind kind)
     }
     return eq;
 }
+} // namespace
 
 std::string formatEffectParam (EffectKind kind, int param, float v, double bpm, const EffectParams& context)
 {
@@ -4069,6 +4139,7 @@ std::string formatEffectParam (EffectKind kind, int param, float v, double bpm)
         case EffectKind::fretChannel:
         case EffectKind::shellChannel:
         case EffectKind::strikeShaper:
+        case EffectKind::anvilBus:
             return mixsuite::paramText (kind, param, v);
         case EffectKind::lynxTune:
             return lynxtune::paramText (param, v);
@@ -4236,6 +4307,32 @@ double filterSecondStageQ (double q) noexcept
     return 0.5 + x / (1.0 + x);
 }
 
+namespace
+{
+std::atomic<bool> declaredTailsFlag { true };
+}
+void setDeclaredTails (bool on) noexcept { declaredTailsFlag.store (on, std::memory_order_relaxed); }
+bool declaredTails() noexcept { return declaredTailsFlag.load (std::memory_order_relaxed); }
+
+double biquadTailSamples (double a1, double a2, double db) noexcept
+{
+    const auto disc = a1 * a1 - 4.0 * a2;
+    double radius = 0.0;
+    if (disc < 0.0)
+        radius = std::sqrt (std::max (0.0, a2)); // complex poles: |p|² = a2
+    else
+    {
+        const auto s = std::sqrt (disc);
+        radius = 0.5 * std::max (std::abs (-a1 + s), std::abs (-a1 - s));
+    }
+    if (! (radius < 1.0))
+        return std::numeric_limits<double>::infinity();
+    if (radius < 1.0e-9)
+        return 4.0;
+    const auto tau = -1.0 / std::log (radius); // samples per neper of decay
+    return db / 8.685889638065035 * tau + 8.0 * tau + 4.0;
+}
+
 EffectSlot makeEffectSlot (EffectKind kind)
 {
     EffectSlot slot;
@@ -4250,6 +4347,8 @@ EffectSlot makeEffectSlot (EffectKind kind)
         slot.state = visualfx::scene::toState (visualfx::scene::defaultScene());
     if (kind == EffectKind::grossBeat) // round 168m: a new Gross Beat starts with LYNX's factory slots (FL loads its default bank)
         slot.state = grossbeat::factoryContainer();
+    if (kind == EffectKind::spiralEcho) // round 190fy: a new Spiral Echo runs the measured loop's revision 1 (hidden parameter)
+        slot.params[(std::size_t) echosuite::spiral::revision] = 1.0f;
 
     return slot;
 }
@@ -4340,6 +4439,9 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     // round 190ar: … and before the Classic voicing's high-drive coupling keeps round trial187b's high-drive tables
     if (slot.kind == EffectKind::ember && savedCount <= (std::size_t) mixsuite::ember::classicHot)
         slot.params[(std::size_t) mixsuite::ember::classicHot] = 0.0f;
+    // round 190fj: … and before the measured tape core keeps the Classic tape curve
+    if (slot.kind == EffectKind::ember && savedCount <= (std::size_t) mixsuite::ember::law)
+        slot.params[(std::size_t) mixsuite::ember::law] = 0.0f;
     if (slot.kind == EffectKind::echoform && savedCount <= (std::size_t) echosuite::echoform::voicingStereo
         && slot.params.size() > (std::size_t) echosuite::echoform::voicingStereo)
         slot.params[(std::size_t) echosuite::echoform::voicingStereo] = 0.0f;
@@ -4400,6 +4502,9 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     // round 190do: a Spiral Echo saved before the measured loop keeps the classic one
     if (slot.kind == EffectKind::spiralEcho && savedCount <= (std::size_t) echosuite::spiral::law)
         slot.params[(std::size_t) echosuite::spiral::law] = 0.0f;
+    // round 190fy: … and one saved before the loop timing's revision (0.1.27: Law, no hidden revision) keeps round 190do's loop
+    if (slot.kind == EffectKind::spiralEcho && savedCount <= (std::size_t) echosuite::spiral::revision)
+        slot.params[(std::size_t) echosuite::spiral::revision] = 0.0f;
     // round 190ca: a Nebula saved before the cloud law keeps the classic engine in every mode
     if (slot.kind == EffectKind::nebula && savedCount <= (std::size_t) verbs::nebula::law)
         slot.params[(std::size_t) verbs::nebula::law] = 0.0f;
@@ -4571,7 +4676,8 @@ std::unique_ptr<Effect> makeEffect (EffectKind kind)
         case EffectKind::kilnChannel:
         case EffectKind::fretChannel:
         case EffectKind::shellChannel:
-        case EffectKind::strikeShaper: return mixsuite::make (kind); // LYNX's own mixing suite (REA_rodada96)
+        case EffectKind::strikeShaper:
+        case EffectKind::anvilBus: return mixsuite::make (kind); // LYNX's own mixing suite (REA_rodada96)
         case EffectKind::rackMixer: return rack::makeChainMixer(); // a rack chain's mixer (round 183c)
         case EffectKind::edison: return std::make_unique<edisonfx::Processor>(); // without its slot: nothing to play (round 190cd)
         case EffectKind::lynxTune: return lynxtune::make(); // LYNX's own pitch corrector (REA_rodada95)

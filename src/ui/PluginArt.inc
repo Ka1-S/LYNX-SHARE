@@ -1444,7 +1444,7 @@ juce::String artSelfTest()
                           EffectKind::glowLeveler, EffectKind::hushDeEsser, EffectKind::epochVerb, EffectKind::atrium, EffectKind::foilPlate,
                           EffectKind::halo, EffectKind::horizon, EffectKind::reeverb2, EffectKind::luxeVerb, EffectKind::reeverb1,
                           EffectKind::echoform, EffectKind::spiralEcho, EffectKind::orbit, EffectKind::latticeMod, EffectKind::geminiDoubler,
-                          EffectKind::fruityDelay2, EffectKind::fruityDelay3, EffectKind::fruityDelayBank, EffectKind::ember, EffectKind::kilnChannel, EffectKind::fretChannel, EffectKind::shellChannel, EffectKind::strikeShaper, EffectKind::aether,
+                          EffectKind::fruityDelay2, EffectKind::fruityDelay3, EffectKind::fruityDelayBank, EffectKind::ember, EffectKind::kilnChannel, EffectKind::fretChannel, EffectKind::shellChannel, EffectKind::strikeShaper, EffectKind::anvilBus, EffectKind::aether,
                           EffectKind::fruityBloodOverdrive, EffectKind::fruityFastDist, EffectKind::fruityWaveShaper, EffectKind::fruitySoftClipper,
                           EffectKind::hardcore, EffectKind::distructor, EffectKind::fruityChorus, EffectKind::hyperChorus, EffectKind::vintageChorus,
                           EffectKind::fruityFlanger, EffectKind::fruityFlangus, EffectKind::fruityPhaser, EffectKind::vintagePhaser,

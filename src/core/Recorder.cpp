@@ -151,7 +151,7 @@ bool placePatternClipAt (Song& song, int pattern, std::int64_t tick)
     clip.kind = ClipKind::pattern;
     clip.pattern = pattern;
     clip.start = bar.tick;
-    clip.length = song.patterns[(std::size_t) pattern].effectiveLength (song.beatsPerBar);
+    clip.length = song.patterns[(std::size_t) pattern].effectiveLength (song.meter());
 
     clip.track = patternClipTrack (song, clip.start);
     song.playlist.push_back (clip);
@@ -206,7 +206,7 @@ std::int64_t clipLoopLength (const Song& song, const Clip& c)
 {
     if (! stretchedClipsLoop() || c.pattern < 0 || c.pattern >= (int) song.patterns.size())
         return 0;
-    const auto length = song.patterns[(std::size_t) c.pattern].effectiveLength (song.beatsPerBar);
+    const auto length = song.patterns[(std::size_t) c.pattern].effectiveLength (song.meter());
     return length > 0 && c.offset + c.length > length ? length : 0;
 }
 
@@ -220,8 +220,8 @@ std::int64_t patternContentLength (const Song& song, int pattern)
         end = std::max (end, n.start + std::max<std::int64_t> (1, n.length));
     if (end <= 0)
         return 0;
-    const std::int64_t bar = (std::int64_t) ppq * std::max (1, song.beatsPerBar);
-    return std::min ((end + bar - 1) / bar * bar, std::max<std::int64_t> (1, p.effectiveLength (song.beatsPerBar)));
+    const std::int64_t bar = song.barTicks();
+    return std::min ((end + bar - 1) / bar * bar, std::max<std::int64_t> (1, p.effectiveLength (song.meter())));
 }
 
 std::int64_t takeOriginFor (const Song& song, std::int64_t tick, bool* fromClip)
@@ -265,7 +265,7 @@ bool growForSongTake (Song& song, int pattern, std::int64_t origin, std::int64_t
         lastStart = std::max (lastStart, n.start);
 
     // a set length grows by whole bars to the notes recorded past it (FL's pattern length follows its notes)
-    const std::int64_t bar = (std::int64_t) ppq * std::max (1, song.beatsPerBar);
+    const std::int64_t bar = song.barTicks();
     if (p.lengthTicks > 0 && lastStart >= p.lengthTicks)
     {
         p.lengthTicks = (lastStart / bar + 1) * bar;
@@ -290,7 +290,7 @@ bool growForSongTake (Song& song, int pattern, std::int64_t origin, std::int64_t
     if (take == nullptr)
         return changed;
     const auto lastBar = song.barAt (lastSong);
-    const auto end = std::max (lastBar.tick + std::max<std::int64_t> (1, lastBar.length), origin + p.effectiveLength (song.beatsPerBar));
+    const auto end = std::max (lastBar.tick + std::max<std::int64_t> (1, lastBar.length), origin + p.effectiveLength (song.meter()));
     if (end > take->end())
     {
         take->length = end - take->start;
@@ -848,7 +848,7 @@ CaptureResult captureMidi (Song& song, const std::vector<scorelog::Entry>& log, 
         return a.tick < b.tick || (a.tick == b.tick && ! a.on && b.on);
     });
     NoteRecorder recorder;
-    recorder.begin (song.patterns[(std::size_t) pattern].effectiveLength (song.beatsPerBar));
+    recorder.begin (song.patterns[(std::size_t) pattern].effectiveLength (song.meter()));
     // (Song mode: the positions are already the song's — played ones as the transport wrapped them, stopped ones laid
     // out from the playhead's bar — none wraps again at the song's end)
     recorder.setLinear (song.mode == PlayMode::song);

@@ -11,6 +11,7 @@
 #include <array>
 #include <cstdint>
 #include <memory>
+#include <limits>
 #include <vector>
 
 #include "core/Song.h"
@@ -27,6 +28,7 @@ namespace vfx
 {
 class Processor;
 }
+class ShifterStock; // core/TimeStretch.h
 
 // Gains a sampler's voices take from outside, per sample (round 190z: FPC's pad envelopes, layer pan and FPC's choke,
 // which FL steps on the voice's own tick grid). `voice` is the sampler's voice slot (0…15). Audio thread, no
@@ -97,6 +99,15 @@ public:
     // UI thread, before the instrument reaches the audio thread: a sampler whose sample is stretched keeping its pitch
     // allocates its per-voice pitch shifters (keys transpose it without changing its length, like FL's Stretch modes).
     virtual void prepareKeyShift (double /*sampleRate*/) {}
+    // Round 190gn (A1): before prepareKeyShift, the rack's shifter stock and how many shifters to make now (the voices the
+    // song can shift at once, at most 8); the others come from the stock the first time a voice needs one. Without a
+    // stock, prepareKeyShift makes all 8 as before.
+    virtual void useShifterStock (std::shared_ptr<ShifterStock> /*stock*/, int /*makeNow*/) {}
+    // The most seconds one note's voice can sound on this instrument (a sampler playing its sample once to the end; +inf
+    // when a loop, zones or a held pad can keep it longer). The song analysis of the shifters.
+    virtual double longestVoiceSeconds() const noexcept { return std::numeric_limits<double>::infinity(); }
+    // How many pitch shifters the instrument holds now (memory diagnostics, tests)
+    virtual int pitchShiftersHeld() const noexcept { return 0; }
 
     // The channel's pan (−1..1) and linear volume behind the gains of the next render() calls. Audio thread, before
     // every chunk. For an instrument that pans its parts around the channel's pan (FPC's pads, round 190q).
@@ -132,6 +143,11 @@ public:
     virtual void setClipShift (bool) {}
     virtual void setNextClipFades (float /*elapsed*/, float /*remaining*/, float /*fadeIn*/, float /*fadeOut*/, std::uint16_t /*shape*/ = 0,
                                   float /*inTension*/ = 0.0f, float /*outTension*/ = 0.0f) noexcept {}
+    // Audio clip envelopes (round 190gi, core/ClipEnvelope.h): the next clip note plays envelope `index` of the song's
+    // table from clip tick `tick` (before noteOn); and, every block, the table of the snapshot that plays (null: none)
+    // with the ticks per sample. The voice keeps only the index: the table is the one handed in for the block it renders.
+    virtual void setNextClipEnvelope (int /*index*/, double /*tick*/) noexcept {}
+    virtual void setClipEnvelopes (const std::vector<ClipEnvelope>* /*table*/, double /*ticksPerSample*/) noexcept {}
     // Pan, fine tuning and "porta" (inverts the channel's porta) of the next note (called right before
     // noteOn). Ignored if unsupported.
     virtual void setNextNoteExpression (float /*pan*/, float /*cents*/, bool /*porta*/ = false) noexcept {}
@@ -323,6 +339,10 @@ bool renderInProgress() noexcept;
 // FL's "HQ for all plugins" during an export (REA round 134): effects with an HQ switch use HQ whatever it is set to.
 void setHqForAllPlugins (bool on) noexcept;
 bool hqForAllPlugins() noexcept;
+// The built-in synth renders up to four voices side by side (round 190gp; the same samples as one voice at a time,
+// which `false` restores: for tests and A/B runs).
+void setSynthVoiceLanes (bool on) noexcept;
+bool synthVoiceLanes() noexcept;
 
 // Where the song is, for hosted plugins (tempo-synced effects, LFO/volume shapers, arpeggiators read the host's
 // transport): the renderer publishes it at the start of each chunk it renders.
@@ -335,6 +355,7 @@ struct HostTimeline
     std::atomic<double> sampleRate { 44100.0 };
     std::atomic<bool> playing { false };
     std::atomic<int> beatsPerBar { 4 };
+    std::atomic<int> beatUnit { 4 }; // (round 190fg: the meter's denominator)
     // round 169c (issue #32): the chunk's tempo in ticks per sample (0 = stopped) and a count raised for each chunk.
     // A generator is called once per stretch between its notes, so one chunk can be several plugin blocks: each block
     // reports the position where it starts (tickAt), not the chunk's start again. Before, every block of a chunk said

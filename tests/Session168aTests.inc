@@ -440,7 +440,7 @@ TEST (session168a_stand_in_plays_like_the_part)
     song.currentPattern = plugged.currentPattern = 0;
     plugged.mode = lynx::PlayMode::pattern;
     const auto loopPlayed = lynx::standins::project (plugged, [] (const lynx::PluginRef&) { return true; });
-    const auto length = song.patterns[0].effectiveLength (song.beatsPerBar);
+    const auto length = song.patterns[0].effectiveLength (song.meter());
     const auto o2 = session168aRender (song, 3 * length, none, false);
     const auto s2 = session168aRender (loopPlayed, 3 * length, provider, false);
     const auto [worstLoop, peakLoop] = diff (o2, s2, (std::size_t) std::llround ((double) length / tps) * 2);

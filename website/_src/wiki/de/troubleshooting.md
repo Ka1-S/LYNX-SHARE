@@ -1,5 +1,5 @@
 ---
-source: a3748d4a2a
+source: e5206a071d
 ---
 Jede Überschrift unten ist ein Problem. Steht deines nicht dabei, melde es wie am Ende beschrieben.
 
@@ -71,11 +71,32 @@ Der Audio-Thread sollte mit Echtzeit-Priorität laufen.
 
 Die Einzelheiten stehen in [LINUX.md](https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/LINUX.md).
 
+### Der Klang knistert oder setzt aus
+
+LYNX SHARE zählt jeden Aussetzer (Buffer Underrun) und sagt, warum er passiert ist. Zeige mit der Maus auf die `CPU`-Anzeige in der Werkzeugleiste oder öffne `Tools › Plugin-Leistungsmonitor...`. Eine rote Zahl neben dem CPU-Prozentwert ist die Anzahl.
+
+Der Hinweis nennt die Ursache des letzten Aussetzers:
+
+| Ursache | Was es bedeutet | Was du versuchen kannst |
+|---|---|---|
+| Die Verarbeitung dauerte länger als der Puffer | Ein Audioblock brauchte zur Berechnung länger, als er dauert. Der Hinweis nennt den langsamsten Kanal oder Effekt in diesem Block | Erhöhe die Puffergröße unter `Optionen › Audioeinstellungen...`, friere diesen Kanal ein oder senke die Qualität des Plugins |
+| Die Verarbeitung kam nahe an die Grenze des Puffers | Die Last lag rund um den Aussetzer nahe 100 % | Erhöhe die Puffergröße oder friere die schwersten Kanäle ein |
+| Treiber- oder Systemlatenz | Der Treiber oder das System war zu spät, während die Last niedrig blieb. Kein Plugin war die Ursache | Erhöhe die Puffergröße, probiere einen anderen Treiber (unter Windows den ASIO-Treiber des Interfaces) und prüfe unter Linux die Echtzeitpriorität (siehe oben) |
+
+Jeder Aussetzer wird außerdem in `audio-glitches.log` im Einstellungsordner festgehalten, mit Gerät, Puffer und den schwersten Kanälen.
+
 ## Plugins
 
 ### Ein Plugin stürzt ab
 
-Führe es in einem eigenen Prozess aus, damit nur das Plugin anhält.
+Die meisten Plugin-Abstürze schalten nur dieses Plugin ab: Ein Effekt wird umgangen, ein Instrument verstummt, und LYNX SHARE und das Projekt laufen weiter. Die Meldung `Plugin abgestürzt` bietet dann an:
+
+- `Neu laden`, was das Plugin mit den Einstellungen vom letzten Speichern oder der letzten Sicherung neu startet.
+- `<plugin> immer in separatem Prozess ausführen`, was es in einem eigenen Prozess neu startet, jetzt und in jedem Projekt. Ein Absturz dort kann LYNX SHARE nicht mitreißen. Ein Plugin in einem separaten Prozess öffnet sein Fenster für sich (es lässt sich nicht andocken).
+
+Das Fenster des Plugins zeigt dieselben beiden Schaltflächen anstelle seines Editors. `Optionen › Plugin-Manager...` listet die Plugins, die immer in einem separaten Prozess laufen, in der Spalte `Separater Prozess` auf; klicke auf das Kästchen, um eines ein- oder auszuschalten.
+
+So führst du jedes Plugin in einem eigenen Prozess aus:
 
 1. Öffne `Optionen › Allgemeine Einstellungen...`.
 2. Schalte `Plugins in einem separaten Prozess ausführen (schützt LYNX SHARE vor Abstürzen)` ein.

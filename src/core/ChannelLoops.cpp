@@ -27,7 +27,6 @@ bool hasNotes (const Pattern& pattern, int channel) noexcept
     return std::any_of (pattern.notes.begin(), pattern.notes.end(), [channel] (const Note& n) { return n.channel == channel; });
 }
 
-std::int64_t barTicks (int beatsPerBar) noexcept { return (std::int64_t) ppq * std::max (1, beatsPerBar); }
 } // namespace
 
 int storedSetting (const Pattern& pattern, int channel) noexcept
@@ -72,29 +71,29 @@ std::int64_t lastTick (const Pattern& pattern, int channel) noexcept
 
 namespace
 {
-std::int64_t boundaryAfter (std::int64_t last, int setting, int beatsPerBar) noexcept
+std::int64_t boundaryAfter (std::int64_t last, int setting, Meter meter) noexcept
 {
     last = std::max<std::int64_t> (last, 0);
     const auto unit = setting == ChannelLoop::nextStep ? (std::int64_t) ticksPerStep
-                    : setting == ChannelLoop::nextBeat ? (std::int64_t) ppq
-                                                       : barTicks (beatsPerBar);
+                    : setting == ChannelLoop::nextBeat ? meter.beat() // (round 190fg: the meter's beat, FL's steps per beat)
+                                                       : meter.bar();
     return (last / unit + 1) * unit;
 }
 } // namespace
 
-std::int64_t loopLength (const Pattern& pattern, int channel, int setting, std::int64_t patternLength, int beatsPerBar) noexcept
+std::int64_t loopLength (const Pattern& pattern, int channel, int setting, std::int64_t patternLength, Meter meter) noexcept
 {
     if (setting == ChannelLoop::dontLoop || patternLength <= 0)
         return 0;
     std::int64_t length = setting > 0 ? (std::int64_t) setting * ticksPerStep
-                                      : boundaryAfter (lastTick (pattern, channel), setting, beatsPerBar);
+                                      : boundaryAfter (lastTick (pattern, channel), setting, meter);
     length = std::min (length, patternLength);
     return length > 0 ? length : patternLength;
 }
 
-int nextBoundarySteps (const Pattern& pattern, int channel, int boundary, int beatsPerBar) noexcept
+int nextBoundarySteps (const Pattern& pattern, int channel, int boundary, Meter meter) noexcept
 {
-    const auto ticks = boundaryAfter (lastTick (pattern, channel), boundary == ChannelLoop::nextBar ? ChannelLoop::nextBar : ChannelLoop::nextBeat, beatsPerBar);
+    const auto ticks = boundaryAfter (lastTick (pattern, channel), boundary == ChannelLoop::nextBar ? ChannelLoop::nextBar : ChannelLoop::nextBeat, meter);
     return (int) std::max<std::int64_t> (1, ticks / ticksPerStep);
 }
 
@@ -127,11 +126,11 @@ void expandChannel (Pattern& pattern, int channel, std::int64_t length, std::int
     pattern.sortNotes();
 }
 
-void expandPattern (Pattern& pattern, int beatsPerBar)
+void expandPattern (Pattern& pattern, Meter meter)
 {
     if (! pattern.loopOn)
         return;
-    const auto patternLength = pattern.effectiveLength (beatsPerBar);
+    const auto patternLength = pattern.effectiveLength (meter);
     // one pass: each channel's last tick, then its loop length (O(notes), not O(channels × notes); the engine
     // snapshot runs this on every edit)
     int maxChannel = -1;
@@ -168,7 +167,7 @@ void expandPattern (Pattern& pattern, int beatsPerBar)
         std::int64_t l = 0;
         if (setting != ChannelLoop::dontLoop && patternLength > 0)
         {
-            l = setting > 0 ? (std::int64_t) setting * ticksPerStep : boundaryAfter (last[(std::size_t) c], setting, beatsPerBar);
+            l = setting > 0 ? (std::int64_t) setting * ticksPerStep : boundaryAfter (last[(std::size_t) c], setting, meter);
             l = std::min (l, patternLength);
             if (l <= 0)
                 l = patternLength;
@@ -213,15 +212,15 @@ void expandPattern (Pattern& pattern, int beatsPerBar)
 void expandSong (Song& song)
 {
     for (auto& p : song.patterns)
-        expandPattern (p, song.beatsPerBar);
+        expandPattern (p, song.meter());
 }
 
-std::vector<int> loopingChannels (const Pattern& pattern, int beatsPerBar)
+std::vector<int> loopingChannels (const Pattern& pattern, Meter meter)
 {
     std::vector<int> out;
     if (! pattern.loopOn)
         return out;
-    const auto patternLength = pattern.effectiveLength (beatsPerBar);
+    const auto patternLength = pattern.effectiveLength (meter);
     std::vector<int> channels;
     for (const auto& n : pattern.notes)
         if (std::find (channels.begin(), channels.end(), n.channel) == channels.end())
@@ -229,38 +228,38 @@ std::vector<int> loopingChannels (const Pattern& pattern, int beatsPerBar)
     std::sort (channels.begin(), channels.end());
     for (auto c : channels)
     {
-        const auto length = loopLength (pattern, c, effectiveSetting (pattern, c), patternLength, beatsPerBar);
+        const auto length = loopLength (pattern, c, effectiveSetting (pattern, c), patternLength, meter);
         if (length > 0 && length < patternLength)
             out.push_back (c);
     }
     return out;
 }
 
-bool burnChannel (Pattern& pattern, int channel, int beatsPerBar)
+bool burnChannel (Pattern& pattern, int channel, Meter meter)
 {
     if (! pattern.loopOn || ! hasNotes (pattern, channel))
         return false;
     const auto setting = effectiveSetting (pattern, channel);
     if (setting == ChannelLoop::dontLoop)
         return false;
-    const auto patternLength = pattern.effectiveLength (beatsPerBar);
-    const auto length = loopLength (pattern, channel, setting, patternLength, beatsPerBar);
+    const auto patternLength = pattern.effectiveLength (meter);
+    const auto length = loopLength (pattern, channel, setting, patternLength, meter);
     const auto auto_ = pattern.lengthTicks <= 0;
     if (length > 0 && length < patternLength)
         expandChannel (pattern, channel, length, patternLength);
     // (FL's burn: the loop point becomes "Don't loop", FUN_012cf150)
     setSetting (pattern, channel, ChannelLoop::dontLoop);
-    if (auto_ && pattern.effectiveLength (beatsPerBar) != patternLength)
+    if (auto_ && pattern.effectiveLength (meter) != patternLength)
         pattern.lengthTicks = patternLength;
     return true;
 }
 
-int burnChannels (Pattern& pattern, const std::vector<int>& channels, int beatsPerBar)
+int burnChannels (Pattern& pattern, const std::vector<int>& channels, Meter meter)
 {
     int burnt = 0;
-    const auto list = channels.empty() ? loopingChannels (pattern, beatsPerBar) : channels;
+    const auto list = channels.empty() ? loopingChannels (pattern, meter) : channels;
     for (auto c : list)
-        if (burnChannel (pattern, c, beatsPerBar))
+        if (burnChannel (pattern, c, meter))
             ++burnt;
     return burnt;
 }

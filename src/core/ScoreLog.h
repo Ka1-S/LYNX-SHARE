@@ -51,6 +51,7 @@ struct DumpOptions
     double minutes = 5.0;       // FL's menu: the last 2, 5, 10, 20 or 30 minutes
     double bpm = 130.0;         // milliseconds become ticks at this tempo
     int beatsPerBar = 4;        // a silence longer than two bars is shortened to two bars
+    int beatUnit = 4;           // (round 190fg: bars of the song's meter, Meter)
     std::int64_t minLength = ticksPerStep / 6; // FL's shortest note: a sixth of a step
 };
 

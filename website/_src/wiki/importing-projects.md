@@ -30,6 +30,12 @@ FL Studio's generators and effects are not loaded. LYNX SHARE reads their saved 
 
 Opening an `.flp` works without FL Studio installed. Some engines need waves, samples or impulses that are read from your own FL Studio installation at run time.
 
+An `.flp` that uses FL Studio's "FL Studio Mobile Rack" (FL Studio Mobile's own "Save as FLP" writes one per instrument track) plays its instrument and effects on the same engines as an `.flm`, and the "FL Studio Mobile Rack FX" effect too. A rack with a drum kit or several instruments still plays the built-in synth.
+
+## FL Studio Mobile factory sounds
+
+The factory sounds an `.flm` uses (drum kits, DirectWave programs, SoundFonts, the GMSynth waves) belong to FL Studio Mobile and are never shipped with LYNX SHARE. LYNX SHARE looks for them in your own copy of the app's `Resources` folder: add it under `Settings › Files › FL Studio Mobile resources` (picking the folder above it, or an FL Studio installation folder, also works). FL Studio's install holds only part of them, and is searched after your folders. Files that are still missing are listed in the Missing files window.
+
 ## Missing samples
 
 ![The Missing files window on its Samples tab: found files in green, missing ones in amber, with Search folder, Locate and Skip](/assets/img/wiki/missing-files.webp)
