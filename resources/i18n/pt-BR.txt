@@ -10474,3 +10474,4 @@ countries: br
 "Replace Samples(s)" = "Substituir sample(s)"
 "Current selection" = "Seleção atual"
 "Compatible velocity" = "Velocity compatível"
+"Play mode" = "Modo de execução"

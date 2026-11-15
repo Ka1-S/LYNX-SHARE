@@ -144,26 +144,32 @@ private:
 class CaptionLed final : public juce::Component
 {
 public:
-    CaptionLed (const juce::String& c) : caption (c) {}
+    CaptionLed (const juce::String& c, bool upwards = false) : vertical (upwards), caption (c) {}
     std::function<void()> onClick;
-    bool on = false;
+    bool on = false, vertical = false;
 
     void paint (juce::Graphics& g) override
     {
-        const auto h = (float) getHeight();
-        const juce::Rectangle<float> box (1.0f, 1.0f, h - 2.0f, h - 2.0f);
-        g.setColour (theme::colour::bg4);
-        g.fillRoundedRectangle (box, 2.0f);
+        // FL's round radio switch, its caption to the right (or upwards beside it when `vertical`)
+        const auto d = std::min ({ (float) getHeight(), (float) getWidth(), 12.0f * 1.25f }) - 2.0f;
+        const auto box = vertical ? juce::Rectangle<float> (d, d).withCentre ({ (float) getWidth() * 0.5f, d * 0.5f + 1.0f })
+                       : caption.isEmpty() ? juce::Rectangle<float> (d, d).withCentre (getLocalBounds().toFloat().getCentre())
+                                           : juce::Rectangle<float> (1.0f, ((float) getHeight() - d) * 0.5f, d, d);
+        g.setColour (on ? theme::colour::accent : theme::colour::bg0);
+        g.fillEllipse (box);
         g.setColour (theme::colour::borderStrong);
-        g.drawRoundedRectangle (box, 2.0f, 1.0f);
-        if (on)
-        {
-            g.setColour (theme::colour::accent);
-            g.fillEllipse (box.reduced (h * 0.25f));
-        }
+        g.drawEllipse (box, 1.0f);
         g.setColour (on ? theme::colour::textPrimary : theme::colour::textSecondary);
         g.setFont (theme::font (theme::type::caption));
-        g.drawText (caption, getLocalBounds().withTrimmedLeft ((int) h + 3), juce::Justification::centredLeft, false);
+        if (vertical)
+        {
+            const auto r = getLocalBounds().toFloat().withTrimmedTop (d + 3.0f);
+            juce::Graphics::ScopedSaveState keep (g);
+            g.addTransform (juce::AffineTransform::rotation (-juce::MathConstants<float>::halfPi, r.getCentreX(), r.getCentreY()));
+            g.drawText (caption, juce::Rectangle<float> (r.getHeight(), r.getWidth()).withCentre (r.getCentre()), juce::Justification::centred, false);
+        }
+        else
+            g.drawText (caption, getLocalBounds().withTrimmedLeft ((int) d + 5), juce::Justification::centredLeft, false);
     }
 
     void mouseDown (const juce::MouseEvent&) override
@@ -530,6 +536,26 @@ public:
             group (5, 168, 122, 52, tr ("SAMPLE"));
             group (131, 168, 400, 52, tr ("LOOP"));
         }
+        // the dropdowns' boxes: the name over the chosen entry, like the wheels' labels
+        for (const auto& m : menuNames)
+            if (m.label->isVisible())
+            {
+                const auto r = m.label->getBounds().getUnion (m.button->getBounds()).toFloat().withTop ((float) m.label->getY() - 15.0f * scale).expanded (2.0f, 1.0f);
+                g.setColour (theme::colour::bg4);
+                g.fillRoundedRectangle (r, 2.5f);
+                g.setColour (theme::colour::textPrimary);
+                g.setFont (theme::font (theme::type::caption, true));
+                g.drawText (m.name.toUpperCase(), r.withHeight (15.0f * scale).withTrimmedLeft (4.0f), juce::Justification::centredLeft, false);
+            }
+        if (sideTabs.current == 1)
+        {
+            const auto r = fl (741 + 5, 62 + 477, 240, 70).toFloat();
+            g.setColour (theme::colour::bg3);
+            g.fillRoundedRectangle (r, 3.0f);
+            g.setColour (theme::colour::textPrimary);
+            g.setFont (theme::font (theme::type::caption, true));
+            g.drawText (tr ("Compatibility"), r.withHeight (16.0f * scale).withTrimmedLeft (5.0f), juce::Justification::centredLeft, false);
+        }
     }
 
     void resized() override
@@ -603,6 +629,7 @@ private:
         ui::setHint (keyboard, tr ("Click to play; the selected zone's keys are marked"));
         pageTabs.vertical = true;
         pageTabs.names = { tr ("SAMPLE"), tr ("ZONE"), tr ("PROGRAM") };
+        pageTabs.current = page;
         pageTabs.onChange = [this] (int i) { setPage (i); };
         ui::setHint (pageTabs, tr ("Page selector"));
         addAndMakeVisible (pageTabs);
@@ -668,8 +695,10 @@ private:
         addAndMakeVisible (b);
     }
 
-    void menuButton (juce::TextButton& b, juce::Label& label, const juce::String& hint, std::function<void()> click)
+    void menuButton (juce::TextButton& b, juce::Label& label, const juce::String& hint, std::function<void()> click, const juce::String& name = {})
     {
+        if (name.isNotEmpty())
+            menuNames.push_back ({ &label, &b, name });
         b.setButtonText (juce::String::fromUTF8 ("\xe2\x96\xbe"));
         ui::setHint (b, hint);
         b.onClick = std::move (click);
@@ -761,18 +790,18 @@ private:
         // the menus' buttons and their labels
         menuButton (triggerGroup, triggerGroupLabel, tr ("Zone trigger group"), [this] { numberMenu (0, 99, current().altGroup, [this] (int v) {
                         editZones ([v] (dw::Zone& z) { z.altGroup = v; });
-                    }); });
+                    }); }, tr ("Group"));
         menuButton (triggerType, triggerTypeLabel, tr ("Zone trigger type"), [this] { listMenu (triggerTypes, groupOf (current()).mode, [this] (int v) {
                         editProgram ([this, v] (dw::Program& p) { p.groups[(std::size_t) std::clamp (current().altGroup, 0, 99)].mode = v; });
-                    }); });
+                    }); }, tr ("Type"));
         for (int k = 0; k < 2; ++k)
         {
             menuButton (filterType[k], filterTypeLabel[k], tr ("Filter type selector"), [this, k] { listMenu (filterTypes, current().filter[k].type, [this, k] (int v) {
                             editZones ([k, v] (dw::Zone& z) { z.filter[k].type = (std::uint8_t) v; });
-                        }); });
+                        }); }, tr ("Type"));
             menuButton (lfoWave[k], lfoWaveLabel[k], tr ("Zone mod LFO selector"), [this, k] { listMenu (waveforms, current().lfo[k].type, [this, k] (int v) {
                             editZones ([k, v] (dw::Zone& z) { z.lfo[k].type = (std::uint8_t) v; });
-                        }); });
+                        }); }, tr ("Waveform"));
             ui::setHint (lfoSync[k], tr ("Zone mod LFO tempo sync"));
             lfoSync[k].onChange = [this, k] (bool on) { editZones ([k, on] (dw::Zone& z) { z.lfo[k].sync = on ? 1 : 0; }); };
             addChildComponent (lfoSync[k]);
@@ -838,10 +867,11 @@ private:
             w->valueText = [this] (float v) { return juce::String ((std::int64_t) std::llround ((double) v * (double) std::max<std::int64_t> (0, current().frames))); };
         menuButton (loopType, loopTypeLabel, tr ("Loop type"), [this] { listMenu (loopModes, current().loopMode, [this] (int v) {
                         editZones ([v] (dw::Zone& z) { z.loopMode = v; });
-                    }); });
+                    }); }, tr ("Loop type"));
         sampleName.setFont (theme::font (theme::type::small));
         sampleName.setColour (juce::Label::textColourId, theme::colour::textPrimary);
-        sampleName.setJustificationType (juce::Justification::centred);
+        sampleName.setJustificationType (juce::Justification::centredLeft);
+        sampleName.setColour (juce::Label::backgroundColourId, theme::colour::bg0);
         addChildComponent (sampleName);
     }
 
@@ -874,12 +904,12 @@ private:
             programWheel (tr (chorusNames[i]), chorusText[i], 0.5f, [i] (dw::Program& p) -> float& { return p.chorus[i]; });
         menuButton (playMode, playModeLabel, tr ("Select play mode"), [this] { listMenu (playModes, prog.voiceMode, [this] (int v) {
                         editProgram ([v] (dw::Program& p) { p.voiceMode = v; });
-                    }); });
+                    }); }, tr ("Play mode"));
         for (int k = 0; k < 2; ++k)
         {
             menuButton (progLfoWave[k], progLfoWaveLabel[k], tr ("Select mod LFO {0} waveform", { juce::String (k + 1) }), [this, k] {
                 listMenu (waveforms, prog.lfo[k].type, [this, k] (int v) { editProgram ([k, v] (dw::Program& p) { p.lfo[k].type = (std::uint8_t) v; }); });
-            });
+            }, tr ("Waveform"));
             ui::setHint (progLfoSync[k], tr ("Master LFO {0} rate switch", { juce::String (k + 1) }));
             progLfoSync[k].onChange = [this, k] (bool on) { editProgram ([k, on] (dw::Program& p) { p.lfo[k].sync = on ? 1 : 0; }); };
             addChildComponent (progLfoSync[k]);
@@ -1024,13 +1054,13 @@ private:
     void layoutSamplePage()
     {
         const int ox = 30, oy = 396;
-        sampleView.setBounds (fl (ox + 6, oy + 5, 652, 160));
+        sampleView.setBounds (fl (ox + 6, oy + 5, 652, 140));
         static const int xs[] = { 90, 217, 332 }, lxs[] = { 12, 134, 252 };
         for (std::size_t i = 0; i < sampleWheels.size(); ++i)
             place (*sampleWheels[i], ox + xs[i], oy + 187, ox + lxs[i], oy + 203, 75);
         loopType.setBounds (fl (ox + 481, oy + 203, 21, 15));
         loopTypeLabel.setBounds (fl (ox + 373, oy + 202, 105, 15));
-        sampleName.setBounds (fl (ox + 169, oy + 170, 181, 13));
+        sampleName.setBounds (fl (ox + 6, oy + 148, 652, 15));
     }
 
     void layoutProgramPage()
@@ -1063,8 +1093,8 @@ private:
         delayOn.setBounds (fl (ox + 385, oy + 63, 19, 14));
         reverbOn.setBounds (fl (ox + 511, oy + 63, 19, 14));
         chorusOn.setBounds (fl (ox + 637, oy + 63, 19, 14));
-        delayBounce.setBounds (fl (ox + 386, oy + 100, 60, 14));
-        delayNormal.setBounds (fl (ox + 386, oy + 150, 60, 14));
+        delayBounce.setBounds (fl (ox + 386, oy + 96, 19, 51));
+        delayNormal.setBounds (fl (ox + 386, oy + 146, 19, 51));
         glideFixed.setBounds (fl (ox + 355, oy + 26, 49, 14));
         glideAuto.setBounds (fl (ox + 355, oy + 41, 48, 14));
     }
@@ -1861,7 +1891,7 @@ private:
         loopTypeLabel.setVisible (onSample);
         loopTypeLabel.setText (tr (entry (loopModes, z.loopMode)), juce::dontSendNotification);
         sampleName.setVisible (onSample);
-        sampleName.setText (text (z.name), juce::dontSendNotification);
+        sampleName.setText (text (z.path.empty() ? z.name : z.path), juce::dontSendNotification);
         // the program page
         for (std::size_t i = 0; i < programWheels.size(); ++i)
         {
@@ -2488,9 +2518,11 @@ private:
         playModeLabel, progLfoWaveLabel[2], sampleName;
     Led lfoSync[2], stretchMode, stretchSync, fxSwitch[4], progLfoSync[2], driveA, driveB, delayOn, reverbOn, chorusOn;
     CaptionLed serial { "" }, parallel { "" }, editSelection { tr ("Current selection") }, editAll { tr ("Global") };
-    CaptionLed delayBounce { tr ("Bounce") }, delayNormal { tr ("Normal") }, glideFixed { tr ("Fixed") }, glideAuto { tr ("Auto") };
+    CaptionLed delayBounce { tr ("Bounce"), true }, delayNormal { tr ("Normal"), true }, glideFixed { tr ("Fixed") }, glideAuto { tr ("Auto") };
     CaptionLed clipVolume { tr ("Clip volume") }, compatibleVelocity { tr ("Compatible velocity") };
     SampleView sampleView;
+    struct MenuName { juce::Label* label; juce::Component* button; juce::String name; };
+    std::vector<MenuName> menuNames;
 
     juce::TextButton browseHome, browseParent, browseFolder, browseRefresh, browsePreview;
     juce::Label browsePath, browseInfo;

@@ -183,7 +183,7 @@ TEST (directwave_zone_menu_actions_as_fl)
     copyToZones (z, 0, CopyRootKey, { false, false, true });
     CHECK (z[1].root == 60 && z[2].root == 48);
     // names and WAV chunks
-    CHECK (zoneNameOf ("C:\\Samples\\Piano C4.wav") == "Piano C4" && zoneNameOf ("/a/b.c/kick") == "kick" && zoneNameOf ("x.y.wav") == "x.y");
+    CHECK (zoneNameOf ("C:\\Samples\\Piano C4.wav") == "Piano C4" && zoneNameOf ("/a/b.c/kick") == "b" /* (FL cuts at the last dot first) */ && zoneNameOf ("x.y.wav") == "x.y");
     std::vector<std::uint8_t> wav { 'R', 'I', 'F', 'F', 0, 0, 0, 0, 'W', 'A', 'V', 'E' };
     auto chunk = [&wav] (const char* id, std::vector<std::uint8_t> body) {
         wav.insert (wav.end(), id, id + 4);
