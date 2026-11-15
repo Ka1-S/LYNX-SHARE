@@ -22,6 +22,34 @@ bool otherProgramAt (juce::Point<int> screenPos);
 
 namespace
 {
+// LYNX's component at a screen point. On X11 JUCE's own lookup (Desktop::findComponentAt) asks each window whether a
+// window of ours above it covers the point, and the drag image under the mouse (a window that lets the mouse through)
+// counts: over LYNX's own windows it found nothing. Here windows that let the mouse through are passed over; other
+// programs' windows were already ruled out (otherProgramAt). Elsewhere JUCE's lookup is right.
+juce::Component* componentAt (juce::Point<int> screenPos)
+{
+#if JUCE_LINUX || JUCE_BSD
+    auto& desktop = juce::Desktop::getInstance();
+    for (int i = desktop.getNumComponents(); --i >= 0;)
+    {
+        auto* c = desktop.getComponent (i);
+        if (c == nullptr || ! c->isVisible() || ! c->getScreenBounds().contains (screenPos))
+            continue;
+        if (auto* peer = c->getPeer(); peer != nullptr && (peer->getStyleFlags() & juce::ComponentPeer::windowIgnoresMouseClicks) != 0)
+            continue;
+        bool self = true, children = true;
+        c->getInterceptsMouseClicks (self, children);
+        if (! self && ! children)
+            continue;
+        if (auto* hit = c->getComponentAt (c->getLocalPoint (nullptr, screenPos)))
+            return hit;
+    }
+    return nullptr;
+#else
+    return juce::Desktop::getInstance().findComponentAt (screenPos);
+#endif
+}
+
 bool hookAt (juce::Point<int> screenPos)
 {
     return placeAt (screenPos) != Place::lynx;
@@ -51,7 +79,7 @@ Place placeAt (juce::Point<int> screenPos)
 #endif
     // (on Windows and macOS JUCE's own hit test already leaves out a point where another program's window is in front;
     // MainComponent puts JUCE's list of LYNX's windows in screen order when a drag starts)
-    auto* c = juce::Desktop::getInstance().findComponentAt (screenPos);
+    auto* c = componentAt (screenPos);
     if (c == nullptr)
         return Place::otherProgram;
     return isHostedPluginEditor (c) ? Place::pluginEditor : Place::lynx;

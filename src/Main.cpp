@@ -6935,8 +6935,22 @@ private:
                 juce::MemoryBlock state;
                 instance->getStateInformation (state);
                 const auto name = dropFile.getFileNameWithoutExtension().toStdString();
-                const auto* bytes = static_cast<const char*> (state.getData());
-                const auto received = ! name.empty() && std::search (bytes, bytes + state.getSize(), name.begin(), name.end()) != bytes + state.getSize();
+                auto holds = [&name] (const juce::MemoryBlock& block) {
+                    const auto* bytes = static_cast<const char*> (block.getData());
+                    return ! name.empty() && std::search (bytes, bytes + block.getSize(), name.begin(), name.end()) != bytes + block.getSize();
+                };
+                auto received = holds (state);
+                // (JUCE's VST3 host keeps the plugin's own state base64-encoded inside an XML of its own)
+                auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), (int) state.getSize());
+                if (xml == nullptr)
+                    xml = juce::parseXML (state.toString());
+                if (! received && xml != nullptr)
+                    for (auto* e : xml->getChildIterator())
+                    {
+                        juce::MemoryBlock inner;
+                        if (inner.fromBase64Encoding (e->getAllSubText().trim()) && holds (inner))
+                            received = true;
+                    }
                 step ("drop_received=" + juce::String ((int) received));
             }
 
