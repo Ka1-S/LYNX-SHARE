@@ -40,7 +40,8 @@ juce::StringArray filesOf (const juce::var& description, const Song* song);
 // the drag's files, copied (never moved).
 bool shouldDropFiles (const juce::DragAndDropTarget::SourceDetails& details, const Song* song, juce::StringArray& files, bool& canMoveFiles);
 
-// Sets JUCE's `lynxExternalDropAtHook` (fix 32) to placeAt() != Place::lynx. Message thread; safe to call again.
+// Sets JUCE's `lynxExternalDropAtHook` (fix 32) to placeAt(): outside LYNX the drag becomes the system's file drag,
+// over a plugin's editor after 300 ms, elsewhere after JUCE's 700 ms. Message thread; safe to call again.
 void install();
 } // namespace externaldrag
 } // namespace lynx

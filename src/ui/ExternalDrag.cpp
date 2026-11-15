@@ -10,7 +10,7 @@
 namespace juce
 {
 // cmake/LynxPatchJuce.cmake fix 32 (juce_DragAndDropContainer.cpp)
-extern bool (*lynxExternalDropAtHook) (Point<int> screenPos);
+extern int (*lynxExternalDropAtHook) (Point<int> screenPos);
 } // namespace juce
 
 namespace lynx::externaldrag
@@ -50,9 +50,16 @@ juce::Component* componentAt (juce::Point<int> screenPos)
 #endif
 }
 
-bool hookAt (juce::Point<int> screenPos)
+// (fix 32's answer: 0 LYNX, 1 outside the app, 2 a plugin's editor)
+int hookAt (juce::Point<int> screenPos)
 {
-    return placeAt (screenPos) != Place::lynx;
+    switch (placeAt (screenPos))
+    {
+        case Place::pluginEditor: return 2;
+        case Place::otherProgram: return 1;
+        case Place::lynx: break;
+    }
+    return 0;
 }
 } // namespace
 
