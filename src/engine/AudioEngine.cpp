@@ -31,6 +31,9 @@
 #include <limits>
 #include <map>
 #include <thread>
+#if defined(__GLIBC__)
+ #include <malloc.h>
+#endif
 
 #include "engine/Text.h"
 #include "ui/I18n.h"
@@ -3562,6 +3565,9 @@ std::vector<std::shared_ptr<const SampleData>> decodeSamplesInParallel (SampleLi
     worker();
     for (auto& t : pool)
         t.join();
+#if defined(__GLIBC__)
+    malloc_trim (0); // (the workers' malloc arenas keep their freed decode buffers otherwise: +27 MB on big200)
+#endif
     return decoded;
 }
 } // namespace
