@@ -1,5 +1,19 @@
 [
   {
+    "version": "0.1.29-alpha",
+    "tag": "v0.1.29-alpha",
+    "date": "2026-11-15",
+    "url": "https://github.com/Ka1-S/LYNX-SHARE/releases/tag/v0.1.29-alpha",
+    "title": "Fix release for 0.1.28: Go back to the previous version works",
+    "summary": "A small fix release for 0.1.28. Help › Go back to the previous version now installs the version you had before, and an older version you go back to no longer offers the newer one again right away.",
+    "new": [],
+    "better": [
+      "**Help › Go back to the previous version** (new in 0.1.28) offered 0.1.28 itself. It now installs the version you had before, with the same checksum check as an update, and the version you left is skipped by the automatic check."
+    ],
+    "fixed": [],
+    "known": []
+  },
+  {
     "version": "0.1.28-alpha",
     "tag": "v0.1.28-alpha",
     "date": "2026-11-15",
