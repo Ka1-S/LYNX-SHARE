@@ -1,0 +1,280 @@
+# Sign a release's Windows binaries after the fact (round 190ij, docs/CODE_SIGNING.md).
+#
+# The production SignPath policy (release-signing) needs a manual approval in the SignPath web app. release.yml's own
+# `sign` job waits for it for up to 5 h 45 min inside the release run; this workflow does the same for a tag that is
+# already built, and can be run again whenever the approval comes late:
+#   1. prepare  downloads LYNX-<label>-windows-x64.zip of the tag's draft or published release and takes LYNX.exe and
+#               LYNX-bridge32.exe out of it (the unsigned files)
+#   2. sign     submits them to SignPath (same project / policy / variables as release.yml), waits for the approval, or,
+#               with signing_request_id, skips the submission and picks up a request that was already completed
+#   3. publish  (Windows) checks the Authenticode signatures, rebuilds the portable zip and the installer with the signed
+#               files, self-tests them and ONLY THEN replaces the release's LYNX.exe, zip, setup and SHA256SUMS.txt
+# dry_run: true runs step 1 only (no SignPath request, no change to the release).
+# Secrets / variables: the same as release.yml (SIGNPATH_API_TOKEN, SIGNPATH_ORGANIZATION_ID, SIGNPATH_PROJECT_SLUG,
+# SIGNPATH_POLICY_SLUG). SIGNPATH_ENABLED is not consulted: running this workflow is the explicit switch.
+name: Sign release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag whose Windows files are signed, e.g. v0.1.30-alpha (draft or published release)'
+        required: true
+        type: string
+      signing_request_id:
+        description: 'Optional: id of an already completed SignPath signing request to use instead of submitting a new one'
+        required: false
+        default: ''
+        type: string
+      dry_run:
+        description: 'Only download and prepare the unsigned files; no SignPath request, no change to the release'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sign-release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Unsigned files of the release
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write   # reading a draft release needs write access
+    outputs:
+      label: ${{ steps.get.outputs.label }}
+      artifact-id: ${{ steps.up.outputs.artifact-id }}
+    steps:
+      - name: Download and unpack
+        id: get
+        shell: bash
+        env:
+          TAG: ${{ inputs.tag }}
+          REQID: ${{ inputs.signing_request_id }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$ ]] || { echo "::error::'$TAG' is not a release tag like v0.1.30-alpha"; exit 1; }
+          [[ -z "$REQID" || "$REQID" =~ ^[0-9a-fA-F-]{36}$ ]] || { echo "::error::signing_request_id must be a GUID"; exit 1; }
+          label="${TAG#v}"
+          gh release view "$TAG" --json tagName,isDraft,isPrerelease,assets --jq '"release \(.tagName) draft=\(.isDraft) prerelease=\(.isPrerelease) assets=\(.assets|length)"'
+          mkdir -p rel unsigned
+          gh release download "$TAG" --dir rel --pattern "LYNX-$label-windows-x64.zip"
+          unzip -q "rel/LYNX-$label-windows-x64.zip" -d rel/x
+          for f in LYNX.exe LYNX-bridge32.exe; do
+            [[ -f "rel/x/LYNX-$label-windows-x64/$f" ]] || { echo "::error::$f is not in the release zip"; exit 1; }
+            cp "rel/x/LYNX-$label-windows-x64/$f" unsigned/
+          done
+          sha256sum unsigned/* | tee "$RUNNER_TEMP/unsigned.sha"
+          echo "label=$label" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Sign release $TAG"
+            echo "Unsigned files taken from the release zip:"
+            echo '```'; cat "$RUNNER_TEMP/unsigned.sha"; echo '```'
+            echo "dry_run: ${{ inputs.dry_run }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the unsigned files (SignPath input)
+        id: up
+        uses: actions/upload-artifact@v7
+        with:
+          name: LYNX-unsigned-${{ steps.get.outputs.label }}
+          path: |
+            unsigned/LYNX.exe
+            unsigned/LYNX-bridge32.exe
+          if-no-files-found: error
+
+      - name: Keep the release zip (rebuilt with the signed files later)
+        if: ${{ !inputs.dry_run }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-zip-${{ steps.get.outputs.label }}
+          path: rel/LYNX-${{ steps.get.outputs.label }}-windows-x64.zip
+          if-no-files-found: error
+
+  sign:
+    name: Sign (SignPath)
+    needs: prepare
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 355  # GitHub-hosted jobs stop at 6 h; if the approval is later, run this workflow again with signing_request_id
+    permissions:
+      actions: read     # SignPath reads the job details and downloads the unsigned artifact
+      contents: read
+    outputs:
+      request-id: ${{ steps.id.outputs.request-id }}
+    env:
+      SP_ORG: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+      SP_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+    steps:
+      - name: Check the SignPath settings
+        shell: bash
+        run: |
+          [[ -n "$SP_ORG" && -n "$SP_TOKEN" ]] || { echo "::error::SIGNPATH_ORGANIZATION_ID / SIGNPATH_API_TOKEN are not set"; exit 1; }
+
+      - name: Submit signing request
+        id: submit
+        if: ${{ inputs.signing_request_id == '' }}
+        uses: signpath/github-action-submit-signing-request@v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'LYNX' }}
+          signing-policy-slug: ${{ vars.SIGNPATH_POLICY_SLUG || 'release-signing' }}
+          github-artifact-id: ${{ needs.prepare.outputs.artifact-id }}
+          wait-for-completion: false    # waiting is done below, so the request id is known (and printed) before the wait
+
+      - name: Request id
+        id: id
+        shell: bash
+        env:
+          GIVEN: ${{ inputs.signing_request_id }}
+          SUBMITTED: ${{ steps.submit.outputs.signing-request-id }}
+          WEB: ${{ steps.submit.outputs.signing-request-web-url }}
+        run: |
+          id="${GIVEN:-$SUBMITTED}"
+          [[ -n "$id" ]] || { echo "::error::no signing request id"; exit 1; }
+          echo "request-id=$id" >> "$GITHUB_OUTPUT"
+          {
+            echo "### SignPath request"
+            echo "id: \`$id\`"
+            [[ -n "$WEB" ]] && echo "Approve it here: $WEB"
+            echo "If the approval comes after this job stops, run **Sign release** again with signing_request_id = \`$id\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::notice title=SignPath::request $id ${WEB:+($WEB)} waits for approval in the SignPath web app"
+
+      - name: Wait for approval and download the signed files
+        shell: bash
+        env:
+          REQ: ${{ steps.id.outputs.request-id }}
+          API: ${{ steps.submit.outputs.signpath-api-url || 'https://app.signpath.io/API' }}
+        run: |
+          base="$API/v1/$SP_ORG/SigningRequests/$REQ"
+          deadline=$(( $(date +%s) + 20700 ))   # 5 h 45 min
+          while :; do
+            code=$(curl -sS -o req.json -w '%{http_code}' -H "Authorization: Bearer $SP_TOKEN" "$base") || code=000
+            if [[ "$code" == 200 ]]; then
+              status=$(jq -r '.status' req.json)
+              echo "$(date -u +%T) $status"
+              case "$status" in
+                Completed) break ;;
+                Failed|Denied|Canceled|Cancelled|Rejected) echo "::error::SignPath request ended as $status"; exit 1 ;;
+              esac
+            elif [[ "$code" == 401 || "$code" == 403 || "$code" == 404 ]]; then
+              echo "::error::SignPath answered HTTP $code for the request (token, organization or id wrong)"; exit 1
+            else
+              echo "SignPath answered HTTP $code, retrying"
+            fi
+            (( $(date +%s) < deadline )) || { echo "::error::no approval in time; run this workflow again with signing_request_id=$REQ"; exit 1; }
+            sleep 60
+          done
+          link=$(jq -r '.signedArtifactLink' req.json)
+          [[ "$link" == https://* ]] || { echo "::error::no signed artifact link"; exit 1; }
+          curl -fsSL -H "Authorization: Bearer $SP_TOKEN" -o signed.zip "$link"
+          mkdir signed && unzip -q signed.zip -d signed
+          for f in LYNX.exe LYNX-bridge32.exe; do [[ -s "signed/$f" ]] || { echo "::error::$f missing in the signed artifact"; exit 1; }; done
+          sha256sum signed/*
+
+      - name: Upload the signed files
+        uses: actions/upload-artifact@v7
+        with:
+          name: LYNX-signed-${{ needs.prepare.outputs.label }}
+          path: |
+            signed/LYNX.exe
+            signed/LYNX-bridge32.exe
+          if-no-files-found: error
+
+  publish:
+    name: Verify and replace the release files
+    needs: [prepare, sign]
+    if: ${{ !inputs.dry_run }}
+    runs-on: windows-latest
+    permissions:
+      contents: write   # replace the release assets
+    env:
+      LABEL: ${{ needs.prepare.outputs.label }}
+      TAG: ${{ inputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag }}   # the installer script of the release being signed
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: LYNX-signed-${{ env.LABEL }}
+          path: signed
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-zip-${{ env.LABEL }}
+          path: rel
+
+      - name: Verify the signatures
+        shell: pwsh
+        run: |
+          foreach ($f in 'LYNX.exe', 'LYNX-bridge32.exe') {
+            $exe = Get-Item "signed\$f"
+            $sig = Get-AuthenticodeSignature $exe.FullName
+            "${f}: $($sig.Status) $($sig.SignerCertificate.Subject)"
+            # same rule as release.yml: the test-signing policy's self-signed certificate is not trusted by Windows
+            if ('${{ vars.SIGNPATH_POLICY_SLUG }}' -eq 'test-signing') {
+              if ($sig.Status -eq 'NotSigned' -or $sig.SignerCertificate.Subject -notmatch 'Test certificate') { throw "$f carries no test signature" }
+            } elseif ($sig.Status -ne 'Valid') { throw "$f is not validly signed ($($sig.Status))" }
+          }
+          $v = (Get-Item signed\LYNX.exe).VersionInfo
+          if ($v.ProductName -ne 'LYNX SHARE') { throw "signed LYNX.exe lost its version resource" }
+
+      - name: Rebuild the zip and the installer with the signed files
+        shell: pwsh
+        run: |
+          $name = "LYNX-$env:LABEL-windows-x64"
+          $version = ($env:LABEL -split '-')[0]
+          Expand-Archive "rel\$name.zip" -DestinationPath rel\x
+          Copy-Item signed\LYNX.exe, signed\LYNX-bridge32.exe "rel\x\$name\" -Force
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive -Path "rel\x\$name" -DestinationPath "dist\$name.zip" -Force
+          Copy-Item signed\LYNX.exe dist\LYNX.exe
+          # same installer build as release.yml (NSIS is preinstalled on GitHub's Windows images)
+          $nsis = (Get-Command makensis -ErrorAction SilentlyContinue).Source
+          if (-not $nsis) { $nsis = "${env:ProgramFiles(x86)}\NSIS\makensis.exe" }
+          if (-not (Test-Path $nsis)) { choco install nsis -y --no-progress; $nsis = "${env:ProgramFiles(x86)}\NSIS\makensis.exe" }
+          & $nsis -V2 -INPUTCHARSET UTF8 "-DVERSION=$version" "-DSTAGE=$PWD\rel\x\$name" "-DOUTFILE=$PWD\dist\LYNX-$env:LABEL-setup-x64.exe" `
+            "-DICON=$PWD\resources\LYNX.ico" resources\installer\LYNX.nsi
+          if ($LASTEXITCODE -ne 0) { throw "makensis failed ($LASTEXITCODE)" }
+
+      - name: Self-test the signed build and the installer
+        shell: pwsh
+        run: |
+          $p = Start-Process signed\LYNX.exe -ArgumentList '--selftest', "$PWD\selftest.txt", "$PWD\selftest-demo.lynx" -Wait -PassThru
+          Get-Content selftest.txt
+          if ($p.ExitCode -ne 0 -or -not (Select-String -Path selftest.txt -Pattern '^result=OK' -Quiet)) { throw "self-test failed (exit $($p.ExitCode))" }
+          $inst = "$env:RUNNER_TEMP\lynx-inst"
+          Start-Process "dist\LYNX-$env:LABEL-setup-x64.exe" -ArgumentList '/S', "/D=$inst" -Wait
+          if (-not (Test-Path "$inst\LYNX.exe")) { throw "installer did not install LYNX.exe" }
+          Start-Process "$inst\Uninstall.exe" -ArgumentList '/S', "_?=$inst" -Wait
+          if (Test-Path "$inst\LYNX.exe") { throw "uninstaller left LYNX.exe" }
+
+      # Only here, after every check above passed, does the release change.
+      - name: Replace the release files and SHA256SUMS.txt
+        shell: pwsh
+        run: |
+          $names = @("LYNX-$env:LABEL-windows-x64.zip", "LYNX.exe", "LYNX-$env:LABEL-setup-x64.exe")
+          gh release download $env:TAG --dir old --pattern SHA256SUMS.txt
+          if ($LASTEXITCODE -ne 0) { throw "release has no SHA256SUMS.txt" }
+          $lines = Get-Content old\SHA256SUMS.txt | Where-Object { $_.Trim() -ne '' }
+          $new = foreach ($l in $lines) {
+            $n = ($l -replace '^\S+\s+\*?', '')
+            if ($names -contains $n) { "$((Get-FileHash "dist\$n" -Algorithm SHA256).Hash.ToLower())  $n" } else { $l }
+          }
+          [IO.File]::WriteAllText("$PWD\dist\SHA256SUMS.txt", (($new -join "`n") + "`n"))
+          Get-Content dist\SHA256SUMS.txt
+          $up = $names | ForEach-Object { "dist\$_" }
+          gh release upload $env:TAG @up dist\SHA256SUMS.txt --clobber
+          if ($LASTEXITCODE -ne 0) { throw "release upload failed" }
+          "Signed files uploaded to $env:TAG" | Out-File -Append $env:GITHUB_STEP_SUMMARY

@@ -99,11 +99,45 @@ English and `PT` strings) remove "pending approval", and drop the SmartScreen no
    `git tag vX.Y.Z-alpha && git push origin vX.Y.Z-alpha`.
 2. The `Release` workflow starts; the `sign` job submits a signing request and waits.
 3. Open the request in <https://app.signpath.io> (you also get an e-mail), check that it comes from the expected
-   commit and workflow run, and click **Approve** within 5 h 45 min (GitHub stops a hosted job at 6 h; if it times out, re-run the `sign` job from the Actions tab and then the jobs after it).
+   commit and workflow run, and click **Approve** within 5 h 45 min (GitHub stops a hosted job at 6 h; if it times out, use the separate **Sign release** workflow, section 6).
 4. The `package` job self-tests the signed exe and attaches `LYNX.exe`, the zip and `SHA256SUMS.txt` to the release
    (a draft is created if the release does not exist yet). Edit the notes and publish.
 
 Only binaries from this workflow may be signed; never upload a locally built exe for signing.
+
+### 6. Signing a release later, or when the approval is late (workflow `Sign release`)
+
+`release-signing` needs a manual approval in the SignPath web app. The `sign` job of `release.yml` waits for it for at
+most 5 h 45 min. The separate workflow [`sign-release.yml`](../.github/workflows/sign-release.yml) (*Actions* › **Sign
+release** › *Run workflow*) signs a release that already exists and can be run again as often as needed. It works on the
+files of the tag's draft or published release, so it is also the way to sign a release that was built unsigned.
+
+Inputs: `tag` (e.g. `v0.1.30-alpha`), `signing_request_id` (optional), `dry_run` (optional).
+
+1. **Run it with the tag.** Job `prepare` downloads `LYNX-<label>-windows-x64.zip` from the release and takes the unsigned
+   `LYNX.exe` and `LYNX-bridge32.exe` out of it. Job `sign` submits them to SignPath with the same project
+   (`SIGNPATH_PROJECT_SLUG`, default `LYNX`), policy (`SIGNPATH_POLICY_SLUG`, default `release-signing`),
+   organization and token as `release.yml`, and prints the **request id and its SignPath link in the job summary**.
+   Running the workflow is the switch: `SIGNPATH_ENABLED` is not consulted.
+2. **Approve in SignPath.** Open the request link (or <https://app.signpath.io> › *Signing requests*), check that it
+   comes from the expected tag and this repository, and click **Approve**. The job polls every minute and continues when
+   the request is `Completed`; it stops with an error when the request is denied, failed or cancelled.
+3. **Approval came late?** The job gives up after 5 h 45 min. The request itself stays open in SignPath, so approve it
+   whenever you like, then run **Sign release** again with the same `tag` and `signing_request_id` set to the id from the
+   first run's summary: no new request is made, the workflow only downloads the signed files of that request.
+4. **Only a verified signature changes the release.** Job `publish` (Windows) checks the Authenticode signature of both
+   files (`Valid`; with the `test-signing` policy: a signature from SignPath's test certificate, as in `release.yml`),
+   checks the version resource, rebuilds the portable zip and the installer from the zip's contents with the signed files,
+   self-tests the signed `LYNX.exe` and runs an install/uninstall of the new installer. Only then it uploads
+   `LYNX.exe`, `LYNX-<label>-windows-x64.zip`, `LYNX-<label>-setup-x64.exe` and a `SHA256SUMS.txt` with those three lines
+   updated (`--clobber`). Any failure leaves the release exactly as it was. The Store package is not touched (the Store
+   signs it).
+5. **`dry_run: true`** only does step 1 (download, unpack, hash, upload the SignPath input as a workflow artifact): no
+   SignPath request, no change to the release. Use it to check a tag before the first real run.
+
+`release.yml`'s own `sign` job keeps working as before (test signing, and release signing while the approval arrives within
+5 h 45 min); the two paths are independent. The installer file itself is not Authenticode-signed (SignPath's artifact
+configuration lists `LYNX.exe` and `LYNX-bridge32.exe`); it contains the signed ones.
 
 ## Things to keep in mind
 
