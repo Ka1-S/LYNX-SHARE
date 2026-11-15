@@ -105,6 +105,14 @@ of that script (name, formats opened and exported, plugin formats, platforms, re
 run it again, never edit the picture; keep them in line with the README. The preview is uploaded by hand in the
 repository's Settings > Social preview.
 
+## 0.1.28 release
+
+Branch wip/release0128 (round 190hj): the Updates entry (dated 2026-11-15: change it if the tag is later, build,
+check), the page texts and the three wiki pages that were behind (importing-projects, plugins, troubleshooting) in 15
+languages, and every picture re-drawn with `scripts/site-shots.sh` from the 0.1.28 Windows build (run 43695097250,
+fresh profile, test mode, no `--logo-was`); `?v=` bumped to 0.1.28 for the Home / Features pictures, the poster and the
+og:image. Not re-made: `media/demo.mp3` / `peaks.json` (0.1.27's Demo.lynx render) and `lynx-tour.mp4` (0.1.23).
+
 ## 0.1.27 release: what the texts do not cover yet
 
 Branch wip/rel190eu (round 190eu) has the 0.1.27 Updates entry and the page texts (features, fixes, why, home, FAQ,
