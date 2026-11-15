@@ -6,6 +6,7 @@
 // Playback and export turn them into plain pattern clips (expandSong), so the audio thread never sees them.
 
 #include <cstdint>
+#include <optional>
 #include <vector>
 
 #include "core/Song.h"
@@ -69,7 +70,36 @@ bool anyInRange (const Song& song, int pattern, std::int64_t fromTick, std::int6
 std::int64_t grabOffset (const Song& song, int pattern, std::int64_t tick);
 std::int64_t dragTarget (const Song& song, std::int64_t tick, std::int64_t grabOffset);
 
-// The blocks of the current arrangement as pattern clips on blockTrack (each its played span), in block order.
+// --- the other Playlist tools on blocks (issue #127 phase 2, round 190ht; docs/analise/REA_rodada190ht.md) -----------
+// FL 10's blocks follow the Playlist tools (the reporter's side-by-side test with FL 10): Mute, Select, Slice, Zoom and
+// Listen. Blocks are matched by (pattern, start), which normalize keeps unique.
+
+// The indices of the blocks of row `pattern` (every row: -1) whose played span meets [fromTick, toTick] (either order).
+std::vector<std::size_t> blocksInRange (const Song& song, int pattern, std::int64_t fromTick, std::int64_t toTick);
+// Mute tool: sets block `index`'s mute; false when there is no such block or it is already so.
+bool setMuted (Song& song, std::size_t index, bool muted);
+
+// Select tool: the blocks of rows [rowFrom, rowTo] (either order) whose played span meets [fromTick, toTick].
+std::vector<PatternBlock> inArea (const Song& song, int rowFrom, int rowTo, std::int64_t fromTick, std::int64_t toTick);
+// Whether `list` holds the block of `b`'s row starting where `b` starts (the mute state doesn't matter).
+bool contains (const std::vector<PatternBlock>& list, const PatternBlock& b) noexcept;
+// The index in song.blocks of the block of `b`'s row starting at b.start, or -1.
+int indexOf (const Song& song, const PatternBlock& b) noexcept;
+// Pencil / brush on a selected block: every block of `group` moves by `delta` ticks, each in its own row and on the
+// start of a bar (FL 10: the selection moves together). Either all of them move or none does (a block would start
+// before bar 1 or meet a block that stays). Returns the moved group (in the same order), or nothing.
+std::optional<std::vector<PatternBlock>> moveGroup (Song& song, const std::vector<PatternBlock>& group, std::int64_t delta);
+
+// Slice tool (FL 10, destructive): pattern `pattern` is cut at `cut` ticks from its start (0 < cut < its length). The
+// pattern keeps what comes before the cut (a note across it is shortened, not split in two; events and markers after
+// it go); a new pattern right after it ("<name> #2", as Clone) gets what starts at or after the cut, moved to its start.
+// Every block of the pattern gets a block of the new one where its own block now ends (muted like it), where it fits.
+// Clips keep their pattern numbers (patterns after it move down one, as when cloning). Returns the new pattern's
+// index, or -1 (no such pattern, or the cut is not inside it).
+int slice (Song& song, int pattern, std::int64_t cut);
+
+// The blocks of the current arrangement as pattern clips on blockTrack (each its played span; a muted block's clip is
+// muted), in block order.
 std::vector<Clip> asClips (const Song& song);
 
 // The end of the last block (0 without active blocks).

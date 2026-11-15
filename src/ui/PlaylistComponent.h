@@ -30,6 +30,7 @@ struct SampleData; // (core/Instruments.h)
 std::unique_ptr<juce::Component> makeSliceDialogForSnapshot (AudioEngine& engine, int clipIndex, int per);
 
 class PatternBlocksView;
+class EffectsPanel;
 class VideoLanesView;
 
 // FL-style Playlist (arrangement): tracks vertically, time horizontally.
@@ -209,6 +210,11 @@ public:
     // The track headers' width: FL's 96 px, the Simple workflow's wider headers (round 184a), or the linked headers
     // (round 190gz). updateHeaderWidth sets it; everything else only reads it.
     static constexpr int flHeaderWidth = 96, simpleHeaderWidth = 232, linkedHeaderWidth = 152;
+    // Issue #154 (round 190ht; core/TrackInserts.h), a LYNX extra, off by default (FL keeps an insert's effects in the
+    // Mixer): the linked headers get a column listing their mixer track's insert effects, and are this much wider.
+    static inline bool showTrackInserts = false; // ui-options.txt trackInserts, action playlist.trackInserts
+    static constexpr int insertsColumnWidth = 104;
+    juce::Rectangle<int> insertsListForSnapshot (int track) const { return trackInserts (track); }
     int headerWidth = flHeaderWidth;
     static constexpr int toolbarHeight = 32; // the panel title row (Workspace::titleHeight)
     static constexpr int overviewHeight = 16; // the overview strip under the toolbar (round 90)
@@ -514,6 +520,23 @@ private:
     juce::Rectangle<int> trackVolume (int track) const;
     juce::Rectangle<int> trackPan (int track) const;
     juce::Rectangle<int> trackFx (int track) const;
+    // issue #154 (round 190ht): the insert effects column of a linked header (empty: not shown on this track), the
+    // width it takes, the row under a point (an effect index, trackinserts::addRow, -1), its painting and gestures
+    juce::Rectangle<int> trackInserts (int track) const;
+    int insertsColumn() const;
+    int insertsItemAt (int track, juce::Point<int> p) const;
+    int insertsFirst (int track) const; // the first row shown (the list's scroll)
+    void paintInserts (juce::Graphics& g, int track, bool hovered);
+    bool insertsMouseDown (const juce::MouseEvent& e);
+    bool insertsMouseDrag (const juce::MouseEvent& e);
+    bool insertsMouseUp (const juce::MouseEvent& e);
+    bool insertsWheel (const juce::MouseEvent& e, float deltaY);
+    bool insertsDrop (int track, juce::Point<int> p, EffectSlot fx); // a Browser effect dropped on the list
+    EffectsPanel& insertActions (int insert); // the Mixer slot's own menus, windows and edits, on that insert
+    std::unique_ptr<EffectsPanel> insertActionsPanel;
+    std::map<int, int> insertsScroll; // insert -> first row shown (not saved)
+    int insertsPressTrack = -1, insertsPressItem = -1, insertsDropTrack = -1, insertsDropAt = -1;
+    bool insertsDragging = false;
     int simpleInsert (int track) const; // the insert a Simple (or linked) header's controls act on, -1 none
     // LYNX's "Link Playlist tracks to mixer tracks" (round 190gz, issue #170): with FL's headers, the project's switch is
     // on. The headers are then wider and a linked track's header carries its mixer track's M, S, volume and pan (the
@@ -673,11 +696,13 @@ private:
         bool header = false, led = false, arrow = false, arm = false, input = false, audition = false;
         bool solo = false, volume = false, pan = false, fx = false; // the Simple headers' controls (round 184a)
         int divider = -1; // the track whose bottom edge in the headers is under the mouse (resizes it)
+        int insertItem = -1; // issue #154: the insert effects column's row (an effect, trackinserts::addRow; -1 none)
+        bool insertLed = false; // ... and its on/off dot
         bool operator== (const Hover& o) const
         {
             return clip == o.clip && track == o.track && target == o.target && header == o.header && led == o.led && arrow == o.arrow
                    && arm == o.arm && input == o.input && audition == o.audition && solo == o.solo && volume == o.volume && pan == o.pan && fx == o.fx
-                   && divider == o.divider;
+                   && divider == o.divider && insertItem == o.insertItem && insertLed == o.insertLed;
         }
     };
     Hover hover;

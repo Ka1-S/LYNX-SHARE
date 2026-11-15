@@ -21,9 +21,9 @@ TEST (extras190am_extras_list)
         CHECK (item.note.back() == '.'); // one line of explanation, a sentence
         CHECK (item.note.find ("Also ") != std::string_view::npos); // ... that names the switch's own place
     }
-    CHECK (count == 12); // (round 190gz: project.linkTracks)
+    CHECK (count == 13); // (round 190gz: project.linkTracks; round 190ht: playlist.trackInserts)
     for (const auto* id : { "mixer.loudness", "mixer.usedOnly", "mixer.keepLostLinks", "mixer.followPlaylist", "playlist.automationLanes",
-                            "pianoRoll.songBarsRuler", "general.hoverValues" })
+                            "pianoRoll.songBarsRuler", "general.hoverValues", "playlist.trackInserts" })
         CHECK (ids.count (id) == 1);
     // the one kept in the MIDI settings is off in a fresh profile and round-trips under the key the list names
     prefs::MidiPrefs midi;
