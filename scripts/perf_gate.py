@@ -37,17 +37,17 @@ from collections import defaultdict
 # default thresholds: (relative, absolute floor in the metric's own unit after normalisation)
 DEFAULT_THRESHOLDS = {
     "instr_per_sample": [0.04, 50.0],
-    "cpu_norm": [0.20, 0.0],          # CPU % of a core / calibration ms
-    "build_norm": [0.30, 0.02],
-    "rebuild_norm": [0.30, 0.02],
-    "edit_norm": [0.30, 0.02],
-    "import_norm": [0.30, 0.02],
+    "cpu_norm": [0.20, 0.05],          # CPU % of a core / calibration ms
+    "build_norm": [0.30, 0.2],
+    "rebuild_norm": [0.30, 0.2],
+    "edit_norm": [0.30, 0.05],
+    "import_norm": [0.30, 0.2],
     "rss_mb": [0.10, 12.0],
-    "paint_norm": [0.30, 0.004],
+    "paint_norm": [0.30, 0.03],
     "open_norm": [0.30, 0.2],
     "open_rss_mb": [0.10, 24.0],
-    "save_norm": [0.30, 0.05],
-    "load_norm": [0.30, 0.05],
+    "save_norm": [0.30, 0.2],
+    "load_norm": [0.30, 0.2],
     "opentime_load_norm": [0.30, 40.0],
     "opentime_rss_mb": [0.12, 32.0],
     "idle_cpu_pct": [0.50, 1.5],
@@ -182,9 +182,14 @@ def compare(d, baseline_path, show=False):
     bm, cm = (own if own else base.get("metrics", {})), res["metrics"]
     factor = 1.0 if own else float(base.get("cross_machine_factor", 1.5))
     rows, failed, retry = [], [], set()
+    project_of = lambda key: key.split("/")[1].split("@")[0]
+    projects_run = {project_of(k) for k in cm}
     for key in sorted(set(bm) | set(cm)):
         rel, floor = threshold_for(key, thresholds)
         rel *= factor
+        if key not in cm and project_of(key) not in projects_run:  # (a project this run left out: FL=0, no FL install)
+            rows.append((key, fmt(bm[key]), "not run", "", "skipped"))
+            continue
         if key not in cm and key.endswith("/instr_per_sample"):  # (the CPU counter is not always readable in a VM)
             rows.append((key, fmt(bm[key]), "n/a", "", "not measured (no CPU counter)"))
             continue

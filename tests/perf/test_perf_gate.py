@@ -80,6 +80,12 @@ class PerfGateTests(unittest.TestCase):
         self.assertEqual(perf_gate.compare(d, b), 1)
         self.assertIn("paint:big200", open(os.path.join(d, "retry.txt")).read())
 
+    def test_a_project_left_out_is_skipped(self):
+        d0 = self.results()
+        write(d0, "bench-thief@256-1.txt", bench_line(50.0))
+        b = self.baseline(d0)
+        self.assertEqual(perf_gate.compare(self.results(), b), 0)  # (no thief at all in this run: FL=0)
+
     def test_baseline_thresholds_override_the_defaults(self):
         b = self.baseline(self.results())
         base = json.load(open(b))

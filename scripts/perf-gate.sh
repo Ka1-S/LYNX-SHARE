@@ -96,7 +96,8 @@ bench () { # cell (scenario@block) run
 }
 paint () { # project run
   quiet
-  LYNX_PAINTBENCH_FRAMES=${PAINT_FRAMES:-20} app_run --paintbench "$(project_file "$1")" "$OUT/paint-$1-$2.txt" > "$OUT/paint-$1-$2.log" 2>&1
+  # (a fresh profile each time: a second open would find the first one's stream cache and measure no decoding)
+  APP_PROFILE=$OUT/profile-paint-$1-$2 LYNX_PAINTBENCH_FRAMES=${PAINT_FRAMES:-20} app_run --paintbench "$(project_file "$1")" "$OUT/paint-$1-$2.txt" > "$OUT/paint-$1-$2.log" 2>&1
   grep -q '^result=OK' "$OUT/paint-$1-$2.txt" 2> /dev/null || echo "perf-gate: paintbench $1 failed" | tee -a "$OUT/errors.txt" >&2
 }
 opentime () { # project run (a window)
