@@ -155,7 +155,7 @@ Icon iconFor (const juce::File& f, bool folder)
         return Icon::pianoRoll;
     if (f.hasFileExtension ("lynx;flp;als;flm"))
         return Icon::project;
-    if (f.hasFileExtension ("fst;sf2;sf3;sfz;lynxpreset;fxp;fxb;vstpreset"))
+    if (f.hasFileExtension ("fst;sf2;sf3;sfz;lynxpreset;fxp;fxb;vstpreset;adv;adg")) // (round 190hr: Live device / rack presets too)
         return Icon::preset;
     return Icon::file;
 }

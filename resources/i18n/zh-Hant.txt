@@ -10144,3 +10144,14 @@ countries: tw hk mo
 "There is no track here to take the plugin." = "這裡沒有可以接收該外掛的軌道。"
 "Potentially slow operation" = "操作可能較慢"
 "Are you sure you want to load {0} plugins at once?" = "確定要一次載入 {0} 個外掛嗎?"
+
+# round 190hr: Live Racks finish (Group / Ungroup of an instrument, .adg presets, the chain drop area)
+"A MIDI Effect Rack takes MIDI effects only" = "MIDI Effect Rack 只接受 MIDI 效果器"
+"An Audio Effect Rack takes audio effects only" = "Audio Effect Rack 只接受音訊效果器"
+"This chain has an instrument already" = "此鏈已有一個樂器"
+"LYNX SHARE can't build a device from this preset." = "LYNX SHARE 無法從此預設建立裝置。"
+"LYNX SHARE can't build an instrument from this preset." = "LYNX SHARE 無法從此預設建立樂器。"
+"Save as Live rack preset (.adg)..." = "另存為 Live 機架預設 (.adg)..."
+"The rack preset could not be written" = "無法寫入機架預設"
+"Saved. Left out (Live has no such device):" = "已儲存。未包含（Live 沒有此類裝置）："
+"This instrument can't go into a rack (more than 16 automated parameters, or their values are unknown)" = "此樂器無法放入機架（超過 16 個自動化參數，或其值未知）"

@@ -8,6 +8,7 @@
 #include <map>
 #include <set>
 
+#include "core/AlsImport.h"
 #include "core/ClipLauncher.h"
 #include "core/ClipSample.h"
 #include "core/DetailChain.h"
@@ -42,6 +43,7 @@
 #include "ui/PluginHeader.h"
 #include "ui/PluginThumbs.h"
 #include "ui/QuickPick.h"
+#include "ui/RackEditor.h"
 #include "ui/Theme.h"
 #include "ui/TimerWhileShowing.h"
 #include "ui/ValueControl.h"
@@ -196,8 +198,21 @@ public:
     void selectCard (int i) { select (i); }
     void showCardMenuForSnapshot (int i)
     {
-        if (i >= 0 && i < (int) cards.size() && cards[(std::size_t) i].kind == Card::effect)
+        if (i >= 0 && i < (int) cards.size() && cards[(std::size_t) i].kind != Card::add)
             showCardMenu (i);
+    }
+    // (round 190hr shots and checks) Ctrl+G / Ctrl+Shift+G on the instrument card
+    bool groupCardForCheck (int i, bool ungroup)
+    {
+        if (i < 0 || i >= (int) cards.size() || cards[(std::size_t) i].kind != Card::instrument)
+            return false;
+        const auto channel = cards[(std::size_t) i].index;
+        if (ungroup)
+            ungroupInstrument (channel);
+        else
+            groupInstrument (channel);
+        const auto& song = engine.getSong();
+        return channel < (int) song.channels.size() && rack::isRack (song.channels[(std::size_t) channel]) != ungroup;
     }
     // the 0 key: the selected device on / off
     bool toggleSelectedOn()
@@ -486,6 +501,16 @@ public:
                 return true;
             }
         }
+        // round 190hr (racks-061 / -062): Group and Ungroup on the instrument: an Instrument Rack holding it, and back
+        if (key.getModifiers().isCommandDown() && ! key.getModifiers().isAltDown() && i >= 0 && cards[(std::size_t) i].kind == Card::instrument
+            && juce::CharacterFunctions::toUpperCase ((juce::juce_wchar) key.getKeyCode()) == 'G')
+        {
+            if (key.getModifiers().isShiftDown())
+                ungroupInstrument (cards[(std::size_t) i].index);
+            else
+                groupInstrument (cards[(std::size_t) i].index);
+            return true;
+        }
         if (key.getModifiers().isCommandDown() && ! key.getModifiers().isAltDown() && ! key.getModifiers().isShiftDown()
             && juce::CharacterFunctions::toUpperCase ((juce::juce_wchar) key.getKeyCode()) == 'V' && insert >= 0 && deviceClipboard().has_value())
         {
@@ -560,7 +585,7 @@ public:
     {
         int from = -1, slot = -1;
         return insert >= 0
-               && ((BrowserComponent::isBrowserDrag (details) && BrowserComponent::draggedFile (details).hasFileExtension ("fst"))
+               && ((BrowserComponent::isBrowserDrag (details) && BrowserComponent::draggedFile (details).hasFileExtension ("fst;adv;adg"))
                    || BrowserComponent::isEffectDrag (details) || BrowserComponent::isGeneratorDrag (details)
                    || (detailDeviceDrag (details.description, from, slot) && from == insert)); // (round 190dr: back into its own chain)
     }
@@ -629,6 +654,34 @@ public:
         std::optional<EffectSlot> fx;
         if (BrowserComponent::isEffectDrag (details))
             fx = BrowserComponent::draggedEffect (details);
+        else if (const auto file = BrowserComponent::draggedFile (details); RackWindows::isLivePreset (file))
+        {
+            // round 190hr: Live's device / rack presets — an effect into the chain; an instrument (an .adv instrument, an
+            // Instrument or Drum Rack) onto the instrument card replaces it, elsewhere it makes a channel, as a dropped plugin
+            juce::MemoryBlock data;
+            if (file.loadFileAsData (data))
+            {
+                const auto* bytes = static_cast<const std::uint8_t*> (data.getData());
+                if (auto live = importLiveDevicePreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize())))
+                    fx = std::move (live->slot);
+            }
+            if (! fx)
+            {
+                juce::String error;
+                auto c = RackWindows::instrumentFromLivePreset (file, error);
+                if (! c)
+                    return ui::postHint ({ error, {} }, 3000);
+                if (const auto hit = hitAt (details.localPosition); juce::isPositiveAndBelow (hit.card, (int) cards.size())
+                                                                     && cards[(std::size_t) hit.card].kind == Card::instrument)
+                {
+                    engine.editSong ([channel = cards[(std::size_t) hit.card].index, gen = std::move (*c)] (Song& song) mutable { replaceGenerator (song, channel, std::move (gen)); });
+                    refresh();
+                }
+                else if (hooks.instrumentDropped != nullptr)
+                    hooks.instrumentDropped (insert, std::move (*c));
+                return;
+            }
+        }
         else
         {
             juce::MemoryBlock data;
@@ -1024,6 +1077,20 @@ private:
         menu.addItem (folded.count (key) > 0 ? tr ("Unfold") : tr ("Fold"), [this, key] { toggleFold (key); });
         menu.addItem (tr ("Hot-swap in the Browser") + "\tQ", hooks.toggleHotSwap != nullptr, linkedTo (targetOf (c)), [this, c] { toggleSwap (targetOf (c)); });
         menu.addItem (tr ("Show or hide the window"), [this, c] { toggleWindow (c); });
+        if (c.kind == Card::instrument) // round 190hr: Live's Group / Ungroup on the instrument, and a rack's Save Preset
+        {
+            const auto& song = engine.getSong();
+            menu.addSeparator();
+            menu.addItem (tr ("Group") + "\tCtrl+G", rack::canGroupChannel (song, c.index), false, [this, ch = c.index] { groupInstrument (ch); });
+            menu.addItem (tr ("Ungroup") + "\tCtrl+Shift+G", rack::canUngroupChannel (song, c.index), false, [this, ch = c.index] { ungroupInstrument (ch); });
+            if (c.index >= 0 && c.index < (int) song.channels.size() && rack::isRack (song.channels[(std::size_t) c.index]))
+                menu.addItem (tr ("Save as Live rack preset (.adg)..."), [this, ch = c.index] { saveRackPreset (ch, -1); });
+        }
+        if (EffectsPanel::slotMenuForSnapshot != nullptr) // (shots: the menu as built)
+        {
+            *EffectsPanel::slotMenuForSnapshot = menu;
+            return;
+        }
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
     }
 
@@ -1048,12 +1115,16 @@ private:
     bool canSavePreset (int slot) const
     {
         const auto* fx = effectAt (slot);
+        if (fx != nullptr && rack::isRack (*fx)) // (round 190hr: a rack saves as Live's rack preset, .adg)
+            return true;
         return fx != nullptr && fx->kind != EffectKind::plugin && fx->kind != EffectKind::patcher && pluginheader::PresetBar (engine, insert, slot).hasLynxPresets();
     }
     void savePreset (int slot)
     {
         if (! canSavePreset (slot))
             return;
+        if (const auto* fx = effectAt (slot); fx != nullptr && rack::isRack (*fx))
+            return saveRackPreset (-1, slot);
         presetBar = std::make_unique<pluginheader::PresetBar> (engine, insert, slot);
         presetBar->savePreset (*this);
     }
@@ -1109,6 +1180,77 @@ private:
             instrumentSelected = false;
         }
         refresh();
+    }
+    // round 190hr: Group (Ctrl+G) on the instrument card: the channel's instrument into an Instrument Rack (Live's
+    // Group on an instrument [STR "Group"; Live 12 manual]); its automated plugin parameters become macros at their values
+    void groupInstrument (int channel)
+    {
+        const auto& song = engine.getSong();
+        if (! rack::canGroupChannel (song, channel))
+            return;
+        if (channel >= 0 && channel < (int) song.channels.size() && song.channels[(std::size_t) channel].freeze.on())
+            return (void) refuseLocked (Card { Card::instrument, channel });
+        engine.capturePluginStates();
+        // the plugin's parameters the song automates or links: their values now (read before the edit)
+        std::map<int, float> values;
+        auto probe = song;
+        probe.forEachTarget ([&] (AutomationTarget& t) {
+            if (t.kind == AutomationTargetKind::channelParam && t.index == channel && values.count (t.param) == 0)
+                values[t.param] = engine.currentTargetValue (t);
+        });
+        auto value = [values] (int, int param) {
+            const auto it = values.find (param);
+            return it != values.end() ? it->second : -1.0f;
+        };
+        auto trial = song;
+        if (! rack::groupChannel (trial, channel, value))
+        {
+            ui::postNotice ({ tr ("This instrument can't go into a rack (more than 16 automated parameters, or their values are unknown)"), {} }, 3000);
+            return;
+        }
+        engine.editSong ([channel, value] (Song& s) { rack::groupChannel (s, channel, value); });
+        refresh();
+    }
+    void ungroupInstrument (int channel)
+    {
+        if (! rack::canUngroupChannel (engine.getSong(), channel))
+            return;
+        engine.capturePluginStates();
+        engine.editSong ([channel] (Song& s) { rack::ungroupChannel (s, channel); });
+        refresh();
+    }
+    // round 190hr: a rack's Save Preset (Live's .adg): channel `channel`'s Instrument Rack, or effect slot `slot`'s rack
+    void saveRackPreset (int channel, int slot)
+    {
+        const auto& song = engine.getSong();
+        juce::String name;
+        RackLocator locate;
+        if (slot >= 0)
+        {
+            const auto* fx = effectAt (slot);
+            if (fx == nullptr || ! rack::isRack (*fx))
+                return;
+            name = utf8 (rack::rackOf (fx->patcher)->name);
+            locate = [t = insert, slot] (Song& s) -> PatcherDoc* {
+                if (t < 0 || t >= (int) s.mixer.size() || slot >= (int) s.mixer[(std::size_t) t].effects.size())
+                    return nullptr;
+                auto& x = s.mixer[(std::size_t) t].effects[(std::size_t) slot];
+                return rack::isRack (x) ? &x.patcher : nullptr;
+            };
+        }
+        else
+        {
+            if (channel < 0 || channel >= (int) song.channels.size() || ! rack::isRack (song.channels[(std::size_t) channel]))
+                return;
+            const auto& ch = song.channels[(std::size_t) channel];
+            name = utf8 (! rack::rackOf (ch.patcher)->name.empty() ? rack::rackOf (ch.patcher)->name : ch.name);
+            locate = [channel] (Song& s) -> PatcherDoc* {
+                if (channel >= (int) s.channels.size() || ! rack::isRack (s.channels[(std::size_t) channel]))
+                    return nullptr;
+                return &s.channels[(std::size_t) channel].patcher;
+            };
+        }
+        RackWindows::saveLivePreset (engine, std::move (locate), name);
     }
     void ungroupDevice (int slot)
     {
@@ -2715,6 +2857,7 @@ hotswap::Target DetailView::selectedDeviceTarget() const { return devicesPage &&
 void DetailView::hotSwapChanged() { chain->repaint(); }
 void DetailView::selectCardForCheck (int card) { chain->selectCard (card); }
 bool DetailView::duplicateCardForCheck (int card) { return chain->duplicateCard (card); }
+bool DetailView::groupCardForCheck (int card, bool ungroup) { return chain->groupCardForCheck (card, ungroup); }
 juce::PopupMenu DetailView::cardMenuForSnapshot (int card)
 {
     juce::PopupMenu menu;

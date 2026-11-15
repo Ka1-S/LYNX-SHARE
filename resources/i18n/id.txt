@@ -10144,3 +10144,14 @@ countries: id
 "There is no track here to take the plugin." = "Tidak ada trek di sini yang bisa menerima plugin."
 "Potentially slow operation" = "Operasi mungkin lambat"
 "Are you sure you want to load {0} plugins at once?" = "Yakin ingin memuat {0} plugin sekaligus?"
+
+# round 190hr: Live Racks finish (Group / Ungroup of an instrument, .adg presets, the chain drop area)
+"A MIDI Effect Rack takes MIDI effects only" = "MIDI Effect Rack hanya menerima efek MIDI"
+"An Audio Effect Rack takes audio effects only" = "Audio Effect Rack hanya menerima efek audio"
+"This chain has an instrument already" = "Rantai ini sudah memiliki instrumen"
+"LYNX SHARE can't build a device from this preset." = "LYNX SHARE tidak dapat membuat perangkat dari preset ini."
+"LYNX SHARE can't build an instrument from this preset." = "LYNX SHARE tidak dapat membuat instrumen dari preset ini."
+"Save as Live rack preset (.adg)..." = "Simpan sebagai preset rack Live (.adg)..."
+"The rack preset could not be written" = "Preset rack tidak dapat ditulis"
+"Saved. Left out (Live has no such device):" = "Tersimpan. Tidak disertakan (Live tidak punya perangkat ini):"
+"This instrument can't go into a rack (more than 16 automated parameters, or their values are unknown)" = "Instrumen ini tidak dapat masuk ke rack (lebih dari 16 parameter terotomasi, atau nilainya tidak diketahui)"

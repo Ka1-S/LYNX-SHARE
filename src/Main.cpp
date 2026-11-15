@@ -98,6 +98,7 @@
 #include "engine/Text.h"
 #include "platform/FileTypes.h"
 #include "platform/Package.h"
+#include "core/AlsExport.h"
 #include "core/AlsImport.h"
 #include "core/PianoRollScript.h"
 #include "ui/ScriptPanel.h"
@@ -2358,6 +2359,16 @@ public:
             return;
         }
 
+        if (args.contains ("--liverackshot190hr"))
+        {
+            // LYNX.exe --liverackshot190hr prefix: round 190hr off-screen, in the Ableton-style layout: the Device View's
+            // instrument menu with Group / Ungroup, an instrument grouped into an Instrument Rack and back, a rack's Save
+            // Preset button and drop area (a device dropped in, an instrument refused), Live's own .adg presets opened
+            // with their chains, and a saved .adg read back. Writes prefix-checks.txt.
+            runLiveRackShot190hr (args[args.indexOf ("--liverackshot190hr") + 1].unquoted());
+            quit();
+            return;
+        }
         if (args.contains ("--liveshot190ce"))
         {
             // LYNX.exe --liveshot190ce prefix: round 190ce off-screen, in the Ableton-style layout: the Device View's cards
@@ -22806,6 +22817,154 @@ private:
         juce::File (prefix + "-counts.txt").replaceWithText ("simple workflows before " + juce::String (madeBefore) + ", in pattern workflow "
                                                              + juce::String (madePattern) + ", after " + juce::String (lynx::SimpleWorkflow::instances.load())
                                                              + "\nstyle after " + lynx::layoutstyle::id (ui.getLayoutStyle()) + "\n" + keyCounts);
+    }
+
+    void runLiveRackShot190hr (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        lynx::MainComponent ui (offline, false);
+        const auto size = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_SNAPSHOT_SIZE", "1600x900"), "x", "");
+        ui.setSize (juce::jlimit (800, 3840, size[0].getIntValue()), juce::jlimit (450, 2160, size[1].getIntValue()));
+        const auto write = [&prefix, &ui, &offline] (const char* name) {
+            offline.dispatchPendingMessages();
+            const auto file = lynx::shot::file (juce::File (prefix + "-" + name + ".png"));
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (lynx::shot::snapshot (ui), out);
+        };
+        const auto writeView = [&prefix] (juce::Component& c, const char* name) {
+            const auto file = lynx::shot::file (juce::File (prefix + "-" + name + ".png"));
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (lynx::shot::paint (c, lynx::theme::panel), out);
+        };
+        juce::String checks;
+        const auto check = [&checks] (const juce::String& what, bool ok) { checks << (ok ? "ok   " : "FAIL ") << what << "\n"; };
+        const auto itemEnabled = [] (const juce::PopupMenu& menu, const juce::String& start) {
+            for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+                if (it.getItem().text.startsWith (start))
+                    return it.getItem().isEnabled ? 1 : 0;
+            return -1;
+        };
+
+        ui.setVisible (true);
+        lynx::DetailView::shownSetting = lynx::DetailView::devicesPage = true;
+        ui.setClipLaunchWorkflow (true);
+        ui.showPanelsForSnapshot ({ lynx::workspace::Panel::browser, lynx::workspace::Panel::playlist });
+        offline.editSong ([] (lynx::Song& s) {
+            if (s.channels.size() < 1)
+                s.channels.resize (1);
+            s.channels[0].name = "Lead";
+            s.channels[0].instrument = lynx::InstrumentKind::synth;
+            s.channels[0].mixerTrack = 2;
+            if (s.mixer.size() < 4)
+                s.mixer.resize (4);
+            s.mixer[2].name = "Lead";
+            s.mixer[2].effects.clear();
+            for (auto kind : { lynx::EffectKind::eq, lynx::EffectKind::delay })
+                s.mixer[2].effects.push_back (lynx::makeEffectSlot (kind));
+            while (s.patterns.size() < 1)
+                s.patterns.emplace_back();
+            lynx::Note note;
+            note.channel = 0;
+            note.key = 60;
+            s.patterns[0].notes = { note };
+            s.patterns[0].lengthTicks = 4 * lynx::ppq;
+            s.playlistTracks.resize (std::max<std::size_t> (s.playlistTracks.size(), 3));
+            s.playlistTracks[1].name = "Lead";
+            lynx::Clip clip;
+            clip.pattern = 0;
+            clip.length = 4 * lynx::ppq;
+            lynx::launcher::setClip (s, 1, 0, clip);
+        }, false);
+        offline.dispatchPendingMessages();
+        auto* detail = ui.getDetailViewForSnapshot();
+        if (detail == nullptr)
+        {
+            juce::File (prefix + "-checks.txt").replaceWithText ("FAIL no detail view\n");
+            return;
+        }
+        detail->showSelection (1, 0);
+        detail->setPage (lynx::DetailView::Page::devices);
+        detail->selectCardForCheck (0); // the instrument
+        write ("01-devices");
+        auto menu = detail->cardMenuForSnapshot (0);
+        saveMenus (juce::StringArray { "Instrument" }, std::vector<juce::PopupMenu> { menu }, prefix + "-02-instrument-menu.png");
+        check ("instrument menu: Group on, Ungroup off", itemEnabled (menu, lynx::tr ("Group")) == 1 && itemEnabled (menu, lynx::tr ("Ungroup")) == 0);
+        // Ctrl+G: the synth into an Instrument Rack (the card becomes the rack's)
+        check ("Ctrl+G groups the instrument into an Instrument Rack", detail->groupCardForCheck (0, false));
+        const auto& grouped = offline.getSong().channels[0];
+        check ("the channel keeps its insert and the rack holds the synth",
+               grouped.mixerTrack == 2 && lynx::rack::isRack (grouped) && lynx::rack::rackOf (grouped.patcher)->kind == lynx::RackDoc::Kind::instrument
+                   && lynx::rack::devices (*lynx::rack::rackOf (grouped.patcher), 0).size() == 1);
+        detail->selectCardForCheck (0);
+        write ("03-grouped");
+        menu = detail->cardMenuForSnapshot (0);
+        saveMenus (juce::StringArray { "Instrument Rack" }, std::vector<juce::PopupMenu> { menu }, prefix + "-04-rack-menu.png");
+        check ("rack menu: Ungroup on, Save as Live rack preset", itemEnabled (menu, lynx::tr ("Ungroup")) == 1
+                                                                    && itemEnabled (menu, lynx::tr ("Save as Live rack preset (.adg)...")) == 1);
+        check ("Ctrl+Shift+G ungroups it", detail->groupCardForCheck (0, true) && offline.getSong().channels[0].instrument == lynx::InstrumentKind::synth);
+        write ("05-ungrouped");
+
+        // a rack's view: Live's Save Preset button at the foot of the strip, the drop area
+        offline.editSong ([] (lynx::Song& s) {
+            auto rack = lynx::rack::makeRackSlot (lynx::RackDoc::Kind::audioEffect);
+            lynx::rack::rackOf (rack.patcher)->showDevices = true;
+            s.mixer[3].effects = { rack };
+        }, false);
+        offline.dispatchPendingMessages();
+        {
+            auto view = lynx::RackWindows::makeSlotView (offline, 3, 0, true);
+            view->setSize (std::max (520, view->preferredWidth (228)), 228);
+            writeView (*view, "06-rack-empty");
+            lynx::PatchNode fx;
+            fx.effect = lynx::makeEffectSlot (lynx::EffectKind::delay);
+            const juce::Point<int> inDevices { view->getWidth() - 30, view->getHeight() / 2 };
+            check ("an effect dropped on the chain goes in", view->dropNodeForCheck (fx, inDevices));
+            lynx::PatchNode synth;
+            synth.generator = true;
+            synth.channel.instrument = lynx::InstrumentKind::synth;
+            check ("an instrument dropped on an Audio Effect Rack is refused", ! view->dropNodeForCheck (synth, inDevices));
+            const auto* r = lynx::rack::rackOf (offline.getSong().mixer[3].effects[0].patcher);
+            check ("the chain holds one device", r != nullptr && lynx::rack::devices (*r, 0).size() == 1);
+            view->setSize (std::max (520, view->preferredWidth (228)), 228);
+            writeView (*view, "07-rack-after-drop");
+            // the rack as a Live preset and back
+            const auto out = lynx::exportLiveRackPreset (offline.getSong().mixer[3].effects[0].patcher, "Shot Rack");
+            check ("Save as .adg writes Live's preset form", out.xml.find ("<GroupDevicePreset>") != std::string::npos
+                                                              && out.xml.find ("<AudioEffectBranchPreset ") != std::string::npos);
+            const auto back = lynx::importLiveDevicePreset (out.bytes);
+            check ("the .adg reads back as the rack", back.has_value() && lynx::rack::isRack (back->slot)
+                                                         && lynx::rack::rackOf (back->slot.patcher)->chains.size() == 1);
+        }
+        // Live's own .adg (Core Library, read-only): before round 190hr it opened without chains
+        const juce::File live ("C:/ProgramData/Ableton/Live 12 Trial/Resources/Core Library/Racks/Audio Effect Racks/Distortion/Smokey Water.adg");
+        const juce::File liveWsl ("/mnt/c/ProgramData/Ableton/Live 12 Trial/Resources/Core Library/Racks/Audio Effect Racks/Distortion/Smokey Water.adg");
+        const auto adg = live.existsAsFile() ? live : liveWsl;
+        if (adg.existsAsFile())
+        {
+            juce::MemoryBlock data;
+            adg.loadFileAsData (data);
+            const auto* bytes = static_cast<const std::uint8_t*> (data.getData());
+            auto p = lynx::importLiveDevicePreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()));
+            check ("Live's Smokey Water.adg opens with its chain and devices", p.has_value() && lynx::rack::isRack (p->slot)
+                                                                                 && ! lynx::rack::rackOf (p->slot.patcher)->chains.empty()
+                                                                                 && lynx::rack::devices (*lynx::rack::rackOf (p->slot.patcher), 0).size() >= 3);
+            if (p)
+            {
+                lynx::rack::rackOf (p->slot.patcher)->showDevices = true;
+                lynx::rack::rackOf (p->slot.patcher)->showChains = true;
+                offline.editSong ([slot = p->slot] (lynx::Song& s) { s.mixer[3].effects = { slot }; }, false);
+                offline.dispatchPendingMessages();
+                auto view = lynx::RackWindows::makeSlotView (offline, 3, 0, true);
+                view->setSize (std::max (520, view->preferredWidth (228)), 228);
+                writeView (*view, "08-live-adg-smokey-water");
+            }
+        }
+        else
+            checks << "skip Live's Core Library is not on this machine\n";
+        juce::File (prefix + "-checks.txt").replaceWithText (checks);
     }
 
     void runLiveShot190ce (const juce::String& prefix)

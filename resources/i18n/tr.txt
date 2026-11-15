@@ -10144,3 +10144,14 @@ countries: tr
 "There is no track here to take the plugin." = "Burada eklentiyi alabilecek bir kanal yok."
 "Potentially slow operation" = "İşlem yavaş olabilir"
 "Are you sure you want to load {0} plugins at once?" = "{0} eklentiyi aynı anda yüklemek istediğinden emin misin?"
+
+# round 190hr: Live Racks finish (Group / Ungroup of an instrument, .adg presets, the chain drop area)
+"A MIDI Effect Rack takes MIDI effects only" = "MIDI Effect Rack yalnızca MIDI efektlerini alır"
+"An Audio Effect Rack takes audio effects only" = "Audio Effect Rack yalnızca ses efektlerini alır"
+"This chain has an instrument already" = "Bu zincirde zaten bir enstrüman var"
+"LYNX SHARE can't build a device from this preset." = "LYNX SHARE bu ön ayardan bir cihaz oluşturamıyor."
+"LYNX SHARE can't build an instrument from this preset." = "LYNX SHARE bu ön ayardan bir enstrüman oluşturamıyor."
+"Save as Live rack preset (.adg)..." = "Live rack ön ayarı olarak kaydet (.adg)..."
+"The rack preset could not be written" = "Rack ön ayarı yazılamadı"
+"Saved. Left out (Live has no such device):" = "Kaydedildi. Dışarıda kalan (Live'da böyle bir cihaz yok):"
+"This instrument can't go into a rack (more than 16 automated parameters, or their values are unknown)" = "Bu enstrüman bir rack'e giremez (16'dan fazla otomasyonlu parametre veya değerleri bilinmiyor)"

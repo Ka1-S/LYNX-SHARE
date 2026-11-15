@@ -10144,3 +10144,14 @@ countries: es mx ar co cl pe ve
 "There is no track here to take the plugin." = "Aquí no hay ninguna pista que pueda recibir el plugin."
 "Potentially slow operation" = "Operación posiblemente lenta"
 "Are you sure you want to load {0} plugins at once?" = "¿Seguro que quieres cargar {0} plugins a la vez?"
+
+# round 190hr: Live Racks finish (Group / Ungroup of an instrument, .adg presets, the chain drop area)
+"A MIDI Effect Rack takes MIDI effects only" = "Un MIDI Effect Rack solo admite efectos MIDI"
+"An Audio Effect Rack takes audio effects only" = "Un Audio Effect Rack solo admite efectos de audio"
+"This chain has an instrument already" = "Esta cadena ya tiene un instrumento"
+"LYNX SHARE can't build a device from this preset." = "LYNX SHARE no puede crear un dispositivo a partir de este preset."
+"LYNX SHARE can't build an instrument from this preset." = "LYNX SHARE no puede crear un instrumento a partir de este preset."
+"Save as Live rack preset (.adg)..." = "Guardar como preset de rack de Live (.adg)..."
+"The rack preset could not be written" = "No se pudo escribir el preset del rack"
+"Saved. Left out (Live has no such device):" = "Guardado. Quedó fuera (Live no tiene ese dispositivo):"
+"This instrument can't go into a rack (more than 16 automated parameters, or their values are unknown)" = "Este instrumento no puede ir a un rack (más de 16 parámetros automatizados, o sus valores son desconocidos)"

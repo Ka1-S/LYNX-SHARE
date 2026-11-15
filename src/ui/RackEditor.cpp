@@ -3,7 +3,11 @@
 #include <algorithm>
 #include <cmath>
 
+#include "core/AlsExport.h"
+#include "core/AlsImport.h"
 #include "core/Effects.h"
+#include "core/FlEffects.h"
+#include "core/NativeEngines.h"
 #include "core/NoteNames.h"
 #include "core/Patcher.h"
 #include "core/Rack.h"
@@ -16,6 +20,7 @@
 #include "ui/ControllerKnob.h"
 #include "ui/DetailView.h"
 #include "ui/FileChoosers.h"
+#include "ui/HintBar.h"
 #include "ui/I18n.h"
 #include "ui/MixerComponent.h"
 #include "ui/PatcherEditor.h"
@@ -664,6 +669,18 @@ struct RackView::Impl
             g.drawFittedText (columnLabel (items[(std::size_t) k]), b.toNearestInt(), juce::Justification::centred, 1, 0.6f);
         }
 
+        if (const auto save = saveButton(); ! save.isEmpty() && save.getY() > (items.empty() ? column.getY() : columnButton ((int) items.size() - 1).getBottom()))
+        {
+            g.setColour (col::bg4);
+            g.fillRoundedRectangle (save.toFloat(), theme::radius::sm);
+            // a floppy disk (Live's Save Preset glyph [190gu shot]), drawn
+            const auto d = save.toFloat().withSizeKeepingCentre (11.0f, 11.0f);
+            g.setColour (col::textSecondary);
+            g.drawRoundedRectangle (d, 1.5f, 1.2f);
+            g.fillRect (d.withTrimmedLeft (3.0f).withTrimmedRight (3.0f).withHeight (3.5f));
+            g.fillRect (d.withTrimmedTop (6.5f).reduced (2.5f, 0.0f).withTrimmedBottom (1.5f));
+        }
+
         if (! variations.isEmpty())
             paintVariations (g, *r);
         if (! macros.isEmpty())
@@ -678,6 +695,11 @@ struct RackView::Impl
             paintDevices (g, *r);
         if (! mapList.isEmpty())
             paintMapList (g, *r);
+        if (dropMarkerX >= 0 && ! devices.isEmpty()) // (round 190hr: where a dragged device lands)
+        {
+            g.setColour (col::accent);
+            g.fillRect (dropMarkerX - 1, devices.getY() + 4, 3, devices.getHeight() - 8);
+        }
     }
 
     void paintVariations (juce::Graphics& g, const RackDoc& r)
@@ -1209,6 +1231,8 @@ struct RackView::Impl
                 edit ([item] (PatcherDoc& d) { toggleColumn (*rack::rackOf (d), item); });
                 return;
             }
+        if (saveButton().contains (p) && ! e.mods.isPopupMenu())
+            return saveLivePreset();
 
         if (variations.contains (p))
             return variationsDown (e, *r);
@@ -1987,6 +2011,133 @@ struct RackView::Impl
         });
     }
 
+    // --- round 190hr: Live's drop area (racks-065) ------------------------------------------------------------------
+    // Where a drop at `p` goes: the chain row under it in the chain list, else the selected chain (a Drum Rack's empty
+    // pad: a new pad on it); before the device card whose middle is right of `p` in the devices pane, else last
+    int dropChainAt (const RackDoc& r, juce::Point<int> p) const
+    {
+        if (chains.contains (p) && p.y >= chains.getY() + headerStrip)
+            for (int c = 0; c < listedSlots (r); ++c)
+                if (slotRow (r, c).contains (p) && rowVisible (slotRow (r, c)))
+                    return c;
+        return emptyPadPane (r) ? -1 : r.selectedChain;
+    }
+    int dropPositionAt (const RackDoc& r, juce::Point<int> p) const
+    {
+        if (! devices.contains (p))
+            return -1;
+        const auto n = (int) shownDevices (r).size();
+        for (int i = 0; i < n; ++i)
+            if (p.x < deviceCard (i).getCentreX())
+                return i;
+        return -1;
+    }
+    // What the rack kind takes [Live MAN 25.2; 190gu shot live-audio-effect-rack-empty-default.png "Drop Audio Effects
+    // Here"]: an Audio Effect Rack (and a Drum Rack's return chain) audio effects; a MIDI Effect Rack MIDI effects; an
+    // Instrument Rack's chain MIDI effects, one instrument and audio effects. "" = taken.
+    juce::String refusal (const RackDoc& r, int chain, const PatchNode& n) const
+    {
+        const auto midiEffect = n.generator && n.channel.instrument == InstrumentKind::vfx;
+        const auto instrument = n.generator && ! midiEffect;
+        if (r.kind == RackDoc::Kind::midiEffect)
+            return midiEffect ? juce::String() : tr ("A MIDI Effect Rack takes MIDI effects only");
+        if (r.kind == RackDoc::Kind::audioEffect || rack::isReturnSlot (r, chain))
+            return n.generator ? tr ("An Audio Effect Rack takes audio effects only") : juce::String();
+        if (instrument && chain >= 0)
+            for (const auto x : rack::devices (r, chain))
+                if (x >= 0 && x < (int) shown.nodes.size() && shown.nodes[(std::size_t) x].generator
+                    && shown.nodes[(std::size_t) x].channel.instrument != InstrumentKind::vfx)
+                    return tr ("This chain has an instrument already");
+        return {};
+    }
+    bool dropNode (PatchNode node, juce::Point<int> p)
+    {
+        const auto* r = rack();
+        if (r == nullptr)
+            return false;
+        const auto chain = dropChainAt (*r, p);
+        if (chain < 0 && r->drum)
+        {
+            // an empty pad: a new pad there holding the instrument (Live's "Drop an Instrument or Sample Here")
+            if (! node.generator || node.channel.instrument == InstrumentKind::vfx)
+                return ui::postHint ({ tr ("Drop an instrument or sample here"), {} }, 3000), false;
+            const auto key = emptyPadKey >= 0 ? emptyPadKey : firstFreeKey (*r);
+            const auto name = node.channel.name.empty() ? std::string (node.channel.plugin.name) : node.channel.name;
+            edit ([key, name, node] (PatcherDoc& d) { rack::addPad (d, key, name, node); });
+            emptyPadKey = -1;
+            return true;
+        }
+        if (const auto why = refusal (*r, chain, node); why.isNotEmpty())
+            return ui::postHint ({ why, {} }, 3000), false;
+        const auto position = dropPositionAt (*r, p);
+        int added = -1;
+        engine.editSong ([l = locate, chain, position, node, &added] (Song& song) {
+            if (auto* d = l ? l (song) : nullptr)
+                added = rack::addDevice (*d, chain, node, position);
+        });
+        refresh();
+        return added >= 0;
+    }
+    // a device built from a preset file: an FL effect preset (.fst), a Live device / rack preset (.adv / .adg: an effect,
+    // else an instrument)
+    std::optional<PatchNode> nodeFromFile (const juce::File& file) const
+    {
+        juce::MemoryBlock data;
+        if (! file.loadFileAsData (data))
+            return std::nullopt;
+        const auto* bytes = static_cast<const std::uint8_t*> (data.getData());
+        const std::vector<std::uint8_t> v (bytes, bytes + data.getSize());
+        PatchNode n;
+        if (file.hasFileExtension ("adv;adg"))
+        {
+            if (auto fx = importLiveDevicePreset (v))
+            {
+                n.effect = std::move (fx->slot);
+                n.label = fx->name;
+                return n;
+            }
+            if (auto inst = importLiveInstrumentPreset (v))
+            {
+                n.generator = true;
+                n.channel = std::move (inst->channel);
+                n.label = inst->name;
+                return n;
+            }
+            return std::nullopt;
+        }
+        if (auto fx = effectFromFlPreset (v, engine.getSong().bpm, natives::flDataReader (flStudioAccess())))
+        {
+            n.effect = std::move (*fx);
+            return n;
+        }
+        return std::nullopt;
+    }
+    bool dropFile (const juce::File& file, juce::Point<int> p)
+    {
+        if (auto n = nodeFromFile (file))
+            return dropNode (std::move (*n), p);
+        ui::postHint ({ tr ("LYNX SHARE can't build a device from this preset."), {} }, 3000);
+        return false;
+    }
+    int dropMarkerX = -1; // a drop over the devices pane: where it lands (paintDevices draws the marker)
+
+    // --- round 190hr: Live's rack Save Preset (racks-068): the disk button at the foot of the view column [190gu shot
+    // live-audio-effect-rack-empty-default.png: hot-swap, save and "…" at the bottom of the rack's left strip] ---------
+    juce::Rectangle<int> saveButton() const
+    {
+        return column.isEmpty() ? juce::Rectangle<int>() : juce::Rectangle<int> (column.getX() + 2, column.getBottom() - 22, viewColumn - 4, 18);
+    }
+    void saveLivePreset()
+    {
+        const auto* r = rack();
+        if (r != nullptr)
+            RackWindows::saveLivePreset (engine, locate, ! r->name.empty() ? str (r->name) : rackKindName (*r));
+    }
+    static juce::String rackKindName (const RackDoc& r)
+    {
+        return r.drum ? tr ("Drum Rack") : r.kind == RackDoc::Kind::instrument ? tr ("Instrument Rack") : r.kind == RackDoc::Kind::midiEffect ? tr ("MIDI Effect Rack") : tr ("Audio Effect Rack");
+    }
+
     // the "+" card: what the rack kind takes (Live [MAN] 25.2): audio effects; MIDI effects; or both and one instrument
     void showAddMenu (int chain)
     {
@@ -2632,15 +2783,85 @@ int RackView::padKeyAt (juce::Point<int> p) const
 
 bool RackView::isInterestedInFileDrag (const juce::StringArray& files)
 {
-    if (! impl->drum())
-        return false;
     for (const auto& f : files)
-        if (SampleLibrary::isSampleFile (juce::File (f)))
+        if ((impl->drum() && SampleLibrary::isSampleFile (juce::File (f))) || juce::File (f).hasFileExtension ("fst;adv;adg"))
             return true;
     return false;
 }
 
-void RackView::filesDropped (const juce::StringArray& files, int x, int y) { impl->dropSamples (files, { x, y }); }
+void RackView::filesDropped (const juce::StringArray& files, int x, int y)
+{
+    impl->dropMarkerX = -1;
+    if (files.size() == 1 && juce::File (files[0]).hasFileExtension ("fst;adv;adg")) // (round 190hr: a preset into a chain)
+    {
+        impl->dropFile (juce::File (files[0]), { x, y });
+        return;
+    }
+    if (impl->drum())
+        impl->dropSamples (files, { x, y });
+}
+
+bool RackView::isInterestedInDragSource (const SourceDetails& details)
+{
+    if (impl->rack() == nullptr)
+        return false;
+    return BrowserComponent::isEffectDrag (details) || BrowserComponent::isGeneratorDrag (details)
+           || (BrowserComponent::isBrowserDrag (details) && BrowserComponent::draggedFile (details).hasFileExtension ("fst;adv;adg"));
+}
+
+void RackView::itemDragMove (const SourceDetails& details)
+{
+    const auto* r = impl->rack();
+    int x = -1;
+    if (r != nullptr && impl->devices.contains (details.localPosition))
+    {
+        const auto at = impl->dropPositionAt (*r, details.localPosition);
+        const auto n = (int) impl->shownDevices (*r).size();
+        x = (at < 0 ? impl->deviceCard (n) : impl->deviceCard (at)).getX() - 2;
+    }
+    if (x != impl->dropMarkerX)
+    {
+        impl->dropMarkerX = x;
+        repaint();
+    }
+}
+
+void RackView::itemDragExit (const SourceDetails&)
+{
+    impl->dropMarkerX = -1;
+    repaint();
+}
+
+void RackView::itemDropped (const SourceDetails& details)
+{
+    impl->dropMarkerX = -1;
+    repaint();
+    const auto p = details.localPosition;
+    if (BrowserComponent::isEffectDrag (details))
+    {
+        if (auto fx = BrowserComponent::draggedEffect (details))
+        {
+            PatchNode n;
+            n.effect = std::move (*fx);
+            impl->dropNode (std::move (n), p);
+        }
+        return;
+    }
+    if (BrowserComponent::isGeneratorDrag (details))
+    {
+        if (auto c = BrowserComponent::draggedGenerator (details))
+        {
+            PatchNode n;
+            n.generator = true;
+            n.channel = std::move (*c);
+            impl->dropNode (std::move (n), p);
+        }
+        return;
+    }
+    impl->dropFile (BrowserComponent::draggedFile (details), p);
+}
+
+bool RackView::dropNodeForCheck (PatchNode node, juce::Point<int> at) { return impl->dropNode (std::move (node), at); }
 void RackView::timerCallback()
 {
     impl->stepGlide();
@@ -2758,6 +2979,71 @@ void closeChannel (int channel)
 {
     if (auto* w = findToolWindow (channelKey (channel)))
         delete w;
+}
+
+bool isLivePreset (const juce::File& file) { return file.hasFileExtension ("adv;adg"); }
+
+std::optional<ChannelDef> instrumentFromLivePreset (const juce::File& file, juce::String& error)
+{
+    juce::MemoryBlock data;
+    if (! file.loadFileAsData (data))
+    {
+        error = tr ("Could not read {0}", { file.getFullPathName() });
+        return std::nullopt;
+    }
+    const auto* bytes = static_cast<const std::uint8_t*> (data.getData());
+    std::string why;
+    if (auto p = importLiveInstrumentPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), {}, &why))
+    {
+        if (p->channel.name.empty())
+            p->channel.name = file.getFileNameWithoutExtension().toStdString();
+        return std::move (p->channel);
+    }
+    error = tr ("LYNX SHARE can't build an instrument from this preset.");
+    return std::nullopt;
+}
+
+void saveLivePreset (AudioEngine& engine, RackLocator locate, const juce::String& name)
+{
+    static std::unique_ptr<juce::FileChooser> chooser; // (one save dialog at a time)
+    const auto folder = platform::settingsFile ("Presets").getChildFile ("Racks");
+    folder.createDirectory();
+    const auto stem = juce::File::createLegalFileName (name.isNotEmpty() ? name : juce::String ("Rack"));
+    chooser = lynx::ui::makeFileChooser (tr ("Save as Live rack preset (.adg)..."), folder.getChildFile (stem + ".adg"), "*.adg");
+    lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
+                             [&engine, locate, name] (const juce::FileChooser& c) {
+        auto file = c.getResult();
+        if (file == juce::File())
+            return;
+        if (! file.hasFileExtension ("adg"))
+            file = file.withFileExtension ("adg");
+        engine.capturePluginStates(); // (the plugins' current settings go into the preset)
+        auto& song = const_cast<Song&> (engine.getSong());
+        const auto* doc = locate ? locate (song) : nullptr;
+        if (doc == nullptr)
+            return;
+        AlsExportOptions options;
+        options.creator = "LYNX SHARE";
+        auto& host = engine.getPluginHost();
+        options.pluginRecord = [&host] (const PluginRef& ref, bool instrument) { return host.flWrapperRecord (ref, instrument); };
+        const auto result = exportLiveRackPreset (*doc, name.toStdString(), options);
+        if (result.bytes.empty() || ! file.replaceWithData (result.bytes.data(), result.bytes.size()))
+        {
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Save as Live rack preset (.adg)..."),
+                                                    tr ("The rack preset could not be written"));
+            return;
+        }
+        if (! result.notes.empty())
+        {
+            juce::StringArray lines;
+            for (std::size_t i = 0; i < std::min<std::size_t> (result.notes.size(), 8); ++i)
+                lines.add (juce::String::fromUTF8 (result.notes[i].c_str()));
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Save as Live rack preset (.adg)..."),
+                                                    tr ("Saved. Left out (Live has no such device):") + "\n" + lines.joinIntoString ("\n"));
+        }
+        else
+            ui::postHint ({ tr ("Saved {0}", { file.getFileName() }), {} }, 3000);
+    });
 }
 } // namespace RackWindows
 

@@ -106,6 +106,7 @@ public:
     // tests and --snapshot
     void selectCardForCheck (int card);
     bool duplicateCardForCheck (int card);
+    bool groupCardForCheck (int card, bool ungroup); // (round 190hr: Ctrl+G / Ctrl+Shift+G on the instrument card)
     juce::PopupMenu cardMenuForSnapshot (int card); // an effect card's right-click menu
     int cardCountForCheck() const;
     int chainInsertForCheck() const;

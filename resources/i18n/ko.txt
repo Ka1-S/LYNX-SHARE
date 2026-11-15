@@ -10144,3 +10144,14 @@ countries: kr
 "There is no track here to take the plugin." = "여기에는 플러그인을 받을 트랙이 없습니다."
 "Potentially slow operation" = "시간이 걸릴 수 있는 작업"
 "Are you sure you want to load {0} plugins at once?" = "플러그인 {0}개를 한 번에 불러올까요?"
+
+# round 190hr: Live Racks finish (Group / Ungroup of an instrument, .adg presets, the chain drop area)
+"A MIDI Effect Rack takes MIDI effects only" = "MIDI Effect Rack에는 MIDI 이펙트만 넣을 수 있습니다"
+"An Audio Effect Rack takes audio effects only" = "Audio Effect Rack에는 오디오 이펙트만 넣을 수 있습니다"
+"This chain has an instrument already" = "이 체인에는 이미 악기가 있습니다"
+"LYNX SHARE can't build a device from this preset." = "LYNX SHARE는 이 프리셋으로 장치를 만들 수 없습니다."
+"LYNX SHARE can't build an instrument from this preset." = "LYNX SHARE는 이 프리셋으로 악기를 만들 수 없습니다."
+"Save as Live rack preset (.adg)..." = "Live 랙 프리셋으로 저장 (.adg)..."
+"The rack preset could not be written" = "랙 프리셋을 쓸 수 없습니다"
+"Saved. Left out (Live has no such device):" = "저장했습니다. 제외된 항목 (Live에 해당 장치 없음):"
+"This instrument can't go into a rack (more than 16 automated parameters, or their values are unknown)" = "이 악기는 랙에 넣을 수 없습니다 (자동화된 파라미터가 16개를 넘거나 값을 알 수 없음)"

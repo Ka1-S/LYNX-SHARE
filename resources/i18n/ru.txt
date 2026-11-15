@@ -10144,3 +10144,14 @@ countries: ru by kz
 "There is no track here to take the plugin." = "Здесь нет дорожки, которая может принять плагин."
 "Potentially slow operation" = "Операция может быть медленной"
 "Are you sure you want to load {0} plugins at once?" = "Точно загрузить {0} плагинов за раз?"
+
+# round 190hr: Live Racks finish (Group / Ungroup of an instrument, .adg presets, the chain drop area)
+"A MIDI Effect Rack takes MIDI effects only" = "MIDI Effect Rack принимает только MIDI-эффекты"
+"An Audio Effect Rack takes audio effects only" = "Audio Effect Rack принимает только аудиоэффекты"
+"This chain has an instrument already" = "В этой цепи уже есть инструмент"
+"LYNX SHARE can't build a device from this preset." = "LYNX SHARE не может создать устройство из этого пресета."
+"LYNX SHARE can't build an instrument from this preset." = "LYNX SHARE не может создать инструмент из этого пресета."
+"Save as Live rack preset (.adg)..." = "Сохранить как пресет рэка Live (.adg)..."
+"The rack preset could not be written" = "Не удалось записать пресет рэка"
+"Saved. Left out (Live has no such device):" = "Сохранено. Не вошло (в Live нет такого устройства):"
+"This instrument can't go into a rack (more than 16 automated parameters, or their values are unknown)" = "Этот инструмент нельзя поместить в рэк (больше 16 автоматизированных параметров или их значения неизвестны)"

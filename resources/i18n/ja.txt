@@ -10144,3 +10144,14 @@ countries: jp
 "There is no track here to take the plugin." = "ここにはプラグインを受け取れるトラックがありません。"
 "Potentially slow operation" = "時間がかかる可能性のある操作"
 "Are you sure you want to load {0} plugins at once?" = "{0} 個のプラグインを一度に読み込みますか?"
+
+# round 190hr: Live Racks finish (Group / Ungroup of an instrument, .adg presets, the chain drop area)
+"A MIDI Effect Rack takes MIDI effects only" = "MIDI Effect Rack には MIDI エフェクトのみ入れられます"
+"An Audio Effect Rack takes audio effects only" = "Audio Effect Rack にはオーディオエフェクトのみ入れられます"
+"This chain has an instrument already" = "このチェーンにはすでにインストゥルメントがあります"
+"LYNX SHARE can't build a device from this preset." = "LYNX SHARE はこのプリセットからデバイスを作成できません。"
+"LYNX SHARE can't build an instrument from this preset." = "LYNX SHARE はこのプリセットからインストゥルメントを作成できません。"
+"Save as Live rack preset (.adg)..." = "Live のラックプリセットとして保存 (.adg)..."
+"The rack preset could not be written" = "ラックプリセットを書き込めませんでした"
+"Saved. Left out (Live has no such device):" = "保存しました。含まれていないもの (Live に該当デバイスなし):"
+"This instrument can't go into a rack (more than 16 automated parameters, or their values are unknown)" = "このインストゥルメントはラックに入れられません (オートメーションされたパラメーターが 16 を超えるか、値が不明です)"
