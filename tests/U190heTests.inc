@@ -16,8 +16,8 @@ TEST (u190he_scaling_offers_fl_sizes_and_lynx_default_stays_125)
     using namespace lynx::editorscale;
     // FL's PluginScalingMenu: 100 % … 400 %; LYNX opens at FL's size × 1.25
     CHECK (menuPercents.front() == 100 && menuPercents.back() == 400);
-    CHECK (percentOf (0) == 125);
-    CHECK (storedFor (125) == 0); // (the default writes nothing in the project)
+    CHECK (percentOf (0) == 125); // FL's "Host" (stored 0: nothing written in the project)
+    CHECK (storedFor (125) == 125); // (125 % chosen by hand is not Host: FL ticks one or the other)
     CHECK (storedFor (100) == 100);
     CHECK (percentOf (100) == 100);
     // FL's 100 % is smaller than LYNX's default: the window can be made smaller (the reporter's request)

@@ -5767,6 +5767,11 @@ public:
             juce::PopupMenu sizes;
             const auto* content = getContentComponent();
             const auto now = content != nullptr ? editorscale::percentForWidth (content->getWidth(), (int) std::ceil (designWidth * 1.25)) : 0;
+            // FL's items (System left out: LYNX's interface already follows the display's scale); Host = LYNX's 125 %
+            sizes.addItem (tr ("Host"), true, false, [safe = juce::Component::SafePointer<NativeEffectWindow> (this)] {
+                if (safe != nullptr)
+                    safe->setScalePercent (editorscale::defaultPercent);
+            });
             for (const auto percent : editorscale::menuPercents)
                 sizes.addItem (juce::String (percent) + "%", true, percent == now, [safe = juce::Component::SafePointer<NativeEffectWindow> (this), percent] {
                     if (safe != nullptr)

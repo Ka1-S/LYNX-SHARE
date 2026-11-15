@@ -6518,7 +6518,7 @@ public:
 
     void setStoredScale (int newStored)
     {
-        stored = editorscale::storedFor (editorscale::percentOf (newStored));
+        stored = newStored <= 0 ? 0 : editorscale::storedFor (newStored);
         fitToPage();
     }
 
@@ -6675,20 +6675,25 @@ public:
     void showScalingMenu()
     {
         juce::PopupMenu sizes;
-        const auto now = editorscale::percentOf (scaled->storedScale());
+        const auto stored = scaled->storedScale();
+        const juce::Component::SafePointer<SettingsWindow> safe (this);
+        // FL's items (System is left out: LYNX's whole interface already follows the display's scale)
+        sizes.addItem (tr ("Host"), true, stored == 0, [safe] {
+            if (safe != nullptr)
+                safe->setStoredScale (0);
+        });
         for (const auto percent : editorscale::menuPercents)
-            sizes.addItem (juce::String (percent) + "%", true, percent == now, [safe = juce::Component::SafePointer<SettingsWindow> (this), percent] {
+            sizes.addItem (juce::String (percent) + "%", true, stored == percent, [safe, percent] {
                 if (safe != nullptr)
-                    safe->setScalePercent (percent);
+                    safe->setStoredScale (editorscale::storedFor (percent));
             });
         juce::PopupMenu menu;
         menu.addSubMenu (tr ("Scaling"), sizes);
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
     }
 
-    void setScalePercent (int percent)
+    void setStoredScale (int stored)
     {
-        const auto stored = editorscale::storedFor (percent);
         scaled->setStoredScale (stored);
         setContentComponentSize (scaled->getWidth(), scaled->getHeight());
         remember (stored);
