@@ -2769,6 +2769,8 @@ void MainComponent::loadUiSettings()
             DetailView::shownSetting = on;
         else if (key == "sceneTempoShown") // round 190ef: the clip grid's scene tempo / time signature fields
             clipGridSceneTempoShown() = on;
+        else if (key == "clipGridClassicLook") // round 190ig: the clip grid without Live's look
+            clipGridClassicLook() = on;
         else if (key == "simpleDockHeight") // round 190bu: the Simple workflow's track dock
             SimpleDock::preferredHeight = juce::jlimit (SimpleDock::minHeight, 2000, line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
         else if (key == "simpleDockShown")
@@ -3025,6 +3027,7 @@ void MainComponent::saveUiSettings()
                                       + "\ndetailHeight=" + juce::String (DetailView::preferredHeight)
                                       + "\ndetailShown=" + juce::String (DetailView::shownSetting ? 1 : 0)
                                       + "\nsceneTempoShown=" + juce::String (clipGridSceneTempoShown() ? 1 : 0)
+                                      + "\nclipGridClassicLook=" + juce::String (clipGridClassicLook() ? 1 : 0)
                                       + "\nsimpleDockHeight=" + juce::String (SimpleDock::preferredHeight)
                                       + "\nsimpleDockShown=" + juce::String (SimpleDock::shownSetting ? 1 : 0)
                                       + "\nkeyboardMode=" + juce::String ((int) scalekeys::current().mode)
@@ -3689,6 +3692,13 @@ void MainComponent::addLayoutStyleItems (juce::PopupMenu& menu)
     if (isClipLaunchWorkflow() && clipGridView != nullptr)
         menu.addItem (tr ("Scene tempo and time signature"), true, clipGridSceneTempoShown(), [this] {
             clipGridSceneTempoShown() = ! clipGridSceneTempoShown();
+            refreshClipGrid (*clipGridView);
+            saveUiSettings();
+        });
+    // round 190ig: the clip grid in Live's look (the default) or round 181a's (an option, add-never-remove)
+    if (isClipLaunchWorkflow() && clipGridView != nullptr)
+        menu.addItem (tr ("Classic LYNX look for the clip grid"), true, clipGridClassicLook(), [this] {
+            clipGridClassicLook() = ! clipGridClassicLook();
             refreshClipGrid (*clipGridView);
             saveUiSettings();
         });

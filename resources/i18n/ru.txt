@@ -10145,3 +10145,4 @@ countries: ru by kz
 "Potentially slow operation" = "Операция может быть медленной"
 "Are you sure you want to load {0} plugins at once?" = "Точно загрузить {0} плагинов за раз?"
 "Sample settings" = "Настройки сэмпла"
+"Classic LYNX look for the clip grid" = "Классический вид LYNX для сетки клипов"

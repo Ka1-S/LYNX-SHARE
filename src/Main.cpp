@@ -24379,6 +24379,34 @@ private:
         offline.editSong ([] (lynx::Song&) {}, false); // (a change message: the Clip panel reads the playing state)
         offline.dispatchPendingMessages();
         write (ui, "06-clip-audio-warp-on");
+        // round 190ig (round 190ia CL-20a, the BPM row bug): the Audio box at Live's 190 px, 260 px and 350 px detail
+        // heights, in Re-Pitch (no settings rows) and in Beats (three rows: the most a mode shows)
+        if (audioChannel >= 0)
+        {
+            const auto heightBefore = lynx::DetailView::preferredHeight;
+            for (const auto beats : { false, true })
+            {
+                offline.editSong ([audioChannel, beats] (lynx::Song& s) {
+                    auto& sampler = s.channels[(std::size_t) audioChannel].sampler;
+                    sampler.keepPitch = beats;
+                    sampler.stretchMethod = beats ? lynx::StretchMethod::beats : sampler.stretchMethod;
+                }, false);
+                offline.dispatchPendingMessages();
+                for (const auto h : { 190, 260, 350 })
+                {
+                    lynx::DetailView::preferredHeight = h;
+                    ui.resized();
+                    offline.dispatchPendingMessages();
+                    write (ui, (juce::String ("06h-audio-box-") + (beats ? "beats-" : "repitch-") + juce::String (h)).toRawUTF8());
+                    check ("audio box at " + juce::String (h) + " px: the detail view is that high", detail->getHeight() == h);
+                }
+            }
+            offline.editSong ([audioChannel] (lynx::Song& s) { s.channels[(std::size_t) audioChannel].sampler.keepPitch = false; }, false);
+            offline.dispatchPendingMessages();
+            lynx::DetailView::preferredHeight = heightBefore;
+            ui.resized();
+            offline.dispatchPendingMessages();
+        }
         if (audioChannel >= 0)
         {
             const auto beforeLength = lynx::launcher::clipAt (*offline.getSong().clipGrid, 4, 0)->length;
