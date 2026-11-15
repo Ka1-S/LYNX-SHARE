@@ -2889,6 +2889,8 @@ juce::String toJson (const Song& song, bool stampVersion)
         root->setProperty ("autoPdc", false);
     if (! song.compensateAutomations)
         root->setProperty ("compensateAutomations", false);
+    if (song.compensateMixerLevels) // round 190hq: LYNX's fader / route automation compensation (absent = before 190hq: off)
+        root->setProperty ("mixerLevelPdc190hq", true);
     if (song.timeSignatureMode)
         root->setProperty ("timeSettings", "signature");
     if (song.scaleHighlight != Song::ScaleHighlight {})
@@ -3080,6 +3082,8 @@ juce::String toJson (const Song& song, bool stampVersion)
                 links.add (juce::Array<juce::var> { targetKindName (l.target.kind), l.target.index, l.target.slot, l.target.param, str (l.formula) });
             o->setProperty ("links", links);
         }
+        if (a.tempoMarkers) // round 190hq: the Playlist ruler's tempo markers (core/TempoMarkers.h)
+            o->setProperty ("tempoMarkers", true);
         if (a.isLive())
         {
             o->setProperty ("source", juce::Array<juce::var> { a.source.track, a.source.slot, a.source.output, a.source.channel });
@@ -3663,6 +3667,7 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
     song.flPluginLevels = root.getProperty ("pluginLevels", "lynx").toString() == "fl";
     song.autoPdc = (bool) root.getProperty ("autoPdc", true);
     song.compensateAutomations = (bool) root.getProperty ("compensateAutomations", true);
+    song.compensateMixerLevels = root.hasProperty ("mixerLevelPdc190hq"); // (round 190hq; a project from before: off, as it played)
     song.timeSignatureMode = root.getProperty ("timeSettings", "division").toString() == "signature";
     if (const auto& sh = root["scaleHighlight"]; sh.isArray() && sh.size() >= 2)
         song.scaleHighlight = { juce::jlimit (-3, 255, (int) sh[0]), juce::jlimit (0, 11, (int) sh[1]) };
@@ -3823,6 +3828,7 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
             if (const auto& source = a["source"]; source.isArray() && source.size() >= 3)
                 automation.source = { (int) source[0], (int) source[1], (int) source[2], source.size() >= 4 ? (int) source[3] : -1 };
             automation.recordLive = (bool) a["recordLive"];
+            automation.tempoMarkers = (bool) a["tempoMarkers"] && automation.target.kind == AutomationTargetKind::tempo; // (round 190hq)
             if (auto* links = a["links"].getArray()) // round 190gw
                 for (const auto& l : *links)
                     if (l.isArray() && l.size() >= 5)

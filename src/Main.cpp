@@ -64,6 +64,8 @@
 #include "core/SynthPresets.h"
 #include "core/FlWrapper.h"
 #include "engine/AudioEngine.h"
+#include "engine/ProjectDowngrade.h"
+#include "core/TempoMarkers.h"
 #include "engine/RemoteControl.h"
 #include "engine/RemoteError.h"
 #include "ui/RemoteControlSettings.h"
@@ -2696,6 +2698,68 @@ public:
             const auto i = args.indexOf ("--export");
             const auto insert = args.contains ("--insert") ? args[args.indexOf ("--insert") + 1].getIntValue() : 0;
             runExport (args[i + 1].unquoted(), args[i + 2].unquoted(), args.contains ("--pattern"), insert);
+            return;
+        }
+
+        if (args.contains ("--tempomarkershot"))
+        {
+            // LYNX --tempomarkershot <prefix> <project.lynx> (round 190hq): the Playlist of the project with its tempo
+            // markers on the ruler (-playlist.png) and the "Save a copy for an older LYNX" window for each release
+            // (-savecopy-<release>.png); no window, nothing saved
+            const auto i = args.indexOf ("--tempomarkershot");
+            const auto prefix = args[i + 1].unquoted();
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            lynx::AudioEngine shotEngine (false);
+            juce::String error;
+            auto ok = false;
+            if (auto song = lynx::ProjectFile::load (juce::File (args[i + 2].unquoted()), error))
+                shotEngine.setSong (std::move (*song)), ok = true;
+            if (ok)
+            {
+                {
+                    lynx::PlaylistComponent playlist (shotEngine);
+                    playlist.setBounds (0, 0, 1400, 420);
+                    playlist.setVisible (true);
+                    playlist.setViewForSnapshot (70.0, 0, 0);
+                    shotEngine.dispatchPendingMessages();
+                    saveSnapshot (playlist, prefix + "-playlist.png");
+                }
+                auto list = std::make_shared<juce::TextEditor>();
+                std::unique_ptr<juce::AlertWindow> w (lynx::MainComponent::buildSaveCopyWindow (lynx::ProjectFile::toJson (shotEngine.getSong()), list));
+                const auto releases = lynx::olderlynx::releases();
+                for (int k = 0; k < releases.size(); ++k)
+                {
+                    w->getComboBoxComponent ("release")->setSelectedItemIndex (k, juce::sendNotificationSync);
+                    saveSnapshot (*w, prefix + "-savecopy-" + releases[k] + ".png");
+                }
+            }
+            setApplicationReturnValue (ok ? 0 : 1);
+            quit();
+            return;
+        }
+
+        if (args.contains ("--savecopyfor"))
+        {
+            // LYNX --savecopyfor <in.lynx> <release> <out.lynx> (round 190hq, B20): File › "Save a copy for an older
+            // LYNX..." without the window; what the copy loses goes to <out.lynx>.txt (English), then result=OK
+            const auto i = args.indexOf ("--savecopyfor");
+            const juce::File input (args[i + 1].unquoted()), output (args[i + 3].unquoted());
+            const auto release = args[i + 2].unquoted();
+            juce::String report, error;
+            auto ok = false;
+            if (const auto song = lynx::ProjectFile::load (input, error))
+            {
+                const auto copy = lynx::olderlynx::forRelease (*song, release);
+                for (const auto& l : copy.lost)
+                    report << (l.sound ? "sound: " : "view: ") << juce::String (l.text).replace ("{0}", l.detail) << "\n";
+                ok = copy.ok && output.replaceWithText (copy.json, false, false, nullptr);
+                if (! copy.ok)
+                    error = copy.error;
+            }
+            report << "result=" << (ok ? juce::String ("OK") : "ERROR " + error) << "\n";
+            juce::File (output.getFullPathName() + ".txt").replaceWithText (report);
+            setApplicationReturnValue (ok ? 0 : 1);
+            quit();
             return;
         }
 
@@ -5641,6 +5705,69 @@ private:
                 sfModBase190heResult = "ERROR old project saved again";
         }
 
+        // round 190hq: tempo markers (B11) and the fader / route PDC switch (B13) in the .lynx, and the copy for an older
+        // LYNX (B20): an effect 0.1.27 does not know keeps its slot (as a switched-off Utility) and loses its automation,
+        // the later slots and their automation stay; the copy for 0.1.28 turns the markers into a plain tempo clip
+        juce::String community190hqResult = "OK";
+        {
+            auto song = lynx::Song::makeDefault();
+            song.mode = lynx::PlayMode::song;
+            lynx::tempomarkers::add (song, 4 * lynx::ppq, 90.0);
+            lynx::tempomarkers::add (song, 8 * lynx::ppq, 140.0, true);
+            song.mixer[1].effects.push_back (lynx::makeEffectSlot (lynx::EffectKind::anvilBus));
+            song.mixer[1].effects.push_back (lynx::makeEffectSlot (lynx::EffectKind::delay));
+            for (const auto slot : { 0, 1 })
+            {
+                lynx::Automation a;
+                a.name = slot == 0 ? "Anvil" : "Delay";
+                a.target = { lynx::AutomationTargetKind::effectParam, 1, slot, 1 };
+                a.points = { { 0, 0.2f }, { 1920, 0.8f } };
+                song.automations.push_back (a);
+            }
+            juce::String why;
+            const auto json = lynx::ProjectFile::toJson (song);
+            const auto back = lynx::ProjectFile::fromJson (json, why);
+            auto unmarked = juce::JSON::parse (json);
+            if (auto* o = unmarked.getDynamicObject())
+                o->removeProperty ("mixerLevelPdc190hq");
+            const auto old = lynx::ProjectFile::fromJson (juce::JSON::toString (unmarked), why);
+            const auto marks = back ? lynx::tempomarkers::list (*back) : std::vector<lynx::tempomarkers::Mark> {};
+            const auto for127 = lynx::olderlynx::forRelease (song, "0.1.27");
+            const auto for128 = lynx::olderlynx::forRelease (song, "0.1.28");
+            const auto copy127 = for127.ok ? lynx::ProjectFile::fromJson (for127.json, why) : std::optional<lynx::Song> {};
+            const auto copy128 = for128.ok ? lynx::ProjectFile::fromJson (for128.json, why) : std::optional<lynx::Song> {};
+            const auto anvilLost = std::any_of (for127.lost.begin(), for127.lost.end(), [] (const lynx::olderlynx::Loss& l) {
+                return juce::String (l.text).startsWith ("Anvil Bus");
+            });
+            auto targetOf = [] (const std::optional<lynx::Song>& s, const char* name) {
+                if (s)
+                    for (const auto& a : s->automations)
+                        if (a.name == name)
+                            return a.target;
+                return lynx::AutomationTarget {};
+            };
+            if (! back || ! back->compensateMixerLevels || ! old || old->compensateMixerLevels)
+                community190hqResult = "ERROR mixer level PDC mark " + why;
+            else if (marks.size() != 2 || marks[0].tick != 4 * lynx::ppq || std::abs (marks[1].bpm - 140.0) > 0.01 || ! marks[1].glide || marks[0].glide
+                     || std::abs (back->tempoAt (6.0 * lynx::ppq) - 90.0) > 0.01)
+                community190hqResult = "ERROR tempo markers round trip";
+            else if (! copy127 || for127.json.contains ("anvilBus") || copy127->mixer[1].effects.size() != 2
+                     || copy127->mixer[1].effects[0].kind != lynx::EffectKind::utility || copy127->mixer[1].effects[0].enabled
+                     || copy127->mixer[1].effects[1].kind != lynx::EffectKind::delay || ! anvilLost)
+                community190hqResult = "ERROR copy for 0.1.27: slots " + why;
+            else if (targetOf (copy127, "Anvil").kind != lynx::AutomationTargetKind::none
+                     || ! (targetOf (copy127, "Delay") == lynx::AutomationTarget { lynx::AutomationTargetKind::effectParam, 1, 1, 1 }))
+                community190hqResult = "ERROR copy for 0.1.27: automation";
+            else if (! juce::JSON::parse (for127.json)["savedBy"].toString().equalsIgnoreCase ("0.1.27") || for127.json.contains ("tempoMarkers")
+                     || for127.json.contains ("mixerLevelPdc190hq") || for127.json.contains ("beatsLaw190gx"))
+                community190hqResult = "ERROR copy for 0.1.27: fields";
+            else if (! copy128 || for128.json.contains ("tempoMarkers") || ! for128.json.contains ("anvilBus") || lynx::tempomarkers::automationIndex (*copy128) >= 0
+                     || std::abs (copy128->tempoAt (6.0 * lynx::ppq) - 90.0) > 0.01 || std::abs (copy128->tempoAt (12.0 * lynx::ppq) - 140.0) > 0.01)
+                community190hqResult = "ERROR copy for 0.1.28";
+            else if (lynx::olderlynx::forRelease (song, "0.1.9").ok)
+                community190hqResult = "ERROR unknown release accepted";
+        }
+
         // round 190dr: the Session mixer's sections come back from a project (a project without them: Live's defaults);
         // a device dragged to another track and a Warp switch are one undo step each in a real engine
         juce::String livescr190drResult = "OK";
@@ -5925,7 +6052,7 @@ private:
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && exportParity.startsWith ("OK") && midiHotplug.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
-                        && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK"
+                        && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK"
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
                         && hostedStateContentionResult.startsWith ("OK")
                         && danceWindowResult == "OK" && clickActivationResult == "OK";
@@ -5997,6 +6124,7 @@ private:
                << "beatslaw190gx_saved=" << beatslaw190gxResult << "\n"
                << "editor_scale190he_saved=" << editorScale190heResult << "\n"
                << "sf_mod_base190he=" << sfModBase190heResult << "\n"
+               << "community190hq_saved=" << community190hqResult << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
                << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n";
 

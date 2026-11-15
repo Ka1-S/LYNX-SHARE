@@ -1,0 +1,362 @@
+#include "engine/ProjectDowngrade.h"
+
+#include "engine/ProjectFile.h"
+
+#include <functional>
+
+// TR_NOOP marks the loss texts for translation (tools/i18n_keys.py); the UI translates them
+#ifndef TR_NOOP
+ #define TR_NOOP(text) text
+#endif
+
+namespace lynx::olderlynx
+{
+namespace
+{
+using Losses = std::vector<Loss>;
+
+juce::DynamicObject* objectOf (const juce::var& v) { return v.getDynamicObject(); }
+juce::Array<juce::var>* arrayOf (const juce::var& v) { return v.getArray(); }
+
+bool drop (juce::DynamicObject& o, const char* key)
+{
+    if (! o.hasProperty (key))
+        return false;
+    o.removeProperty (key);
+    return true;
+}
+
+juce::String channelName (const juce::var& c, int index)
+{
+    const auto name = c["name"].toString();
+    return name.isNotEmpty() ? "\"" + name + "\"" : "#" + juce::String (index + 1);
+}
+
+juce::String insertName (const juce::var& mixer, int track)
+{
+    if (track == 0)
+        return "Master";
+    const auto name = mixer[track]["name"].toString();
+    return "Insert " + juce::String (track) + (name.isNotEmpty() ? " \"" + name + "\"" : juce::String());
+}
+
+// "a, b, c" (at most four, then "…")
+juce::String listOf (const juce::StringArray& names)
+{
+    juce::StringArray shown;
+    for (int i = 0; i < names.size() && i < 4; ++i)
+        shown.add (names[i]);
+    return shown.joinIntoString (", ") + (names.size() > 4 ? ", …" : "");
+}
+
+void forEachChannel (const juce::var& root, const std::function<void (juce::DynamicObject&, int)>& fn)
+{
+    if (auto* channels = arrayOf (root["channels"]))
+        for (int i = 0; i < channels->size(); ++i)
+            if (auto* c = objectOf ((*channels)[i]))
+                fn (*c, i);
+}
+
+// every clip array of the project: the Playlist, the stored arrangements, the clip grid's slots
+void forEachClip (const juce::var& root, const std::function<void (juce::Array<juce::var>&)>& fn)
+{
+    auto list = [&] (const juce::var& clips) {
+        if (auto* a = arrayOf (clips))
+            for (auto& c : *a)
+                if (auto* fields = arrayOf (c))
+                    fn (*fields);
+    };
+    list (root["playlist"]);
+    if (auto* arrangements = arrayOf (root["arrangements"]))
+        for (const auto& a : *arrangements)
+            list (a["clips"]);
+    if (auto* slots = arrayOf (root["clipGrid"]["clips"]))
+        for (const auto& s : *slots)
+            list (s["clip"]);
+}
+
+// --- 0.1.29 / 0.1.30 → 0.1.28 ------------------------------------------------------------------------------------------
+void toRelease0128 (juce::var& root, Losses& lost)
+{
+    auto& o = *objectOf (root);
+    if (drop (o, "mixerLevelPdc190hq"))
+        lost.push_back ({ TR_NOOP ("Mixer › Plugin delay compensation › \"Compensate fader and route automations too\" is not in this release: that automation plays a little early behind plugins with latency"), {}, true });
+
+    int markers = 0;
+    if (auto* automations = arrayOf (root["automations"]))
+        for (auto& a : *automations)
+            if (auto* ao = objectOf (a); ao != nullptr && drop (*ao, "tempoMarkers"))
+                if (auto* points = arrayOf (a["points"]))
+                    markers += juce::jmax (0, points->size() - 1);
+    if (markers > 0)
+        lost.push_back ({ TR_NOOP ("{0} tempo marker(s) on the ruler become a plain tempo automation clip (the tempo plays the same)"), juce::String (markers), false });
+
+    // round 190hq's side-chain compensation is engine behaviour: nothing to drop, but an older release lines up less
+    bool sidechain = false;
+    if (auto* mixer = arrayOf (root["mixer"]))
+        for (const auto& t : *mixer)
+            if (auto* fx = arrayOf (t["effects"]))
+                for (const auto& e : *fx)
+                    sidechain = sidechain || (int) e.getProperty ("sidechain", -1) > 0 || (int) e.getProperty ("sidechain2", -1) > 0;
+    if (sidechain)
+        lost.push_back ({ TR_NOOP ("Side-chains are not lined up with plugin delay compensation in this release: behind plugins with latency, ducking may be a few milliseconds off"), {}, true });
+}
+
+// --- 0.1.28 → 0.1.27 -----------------------------------------------------------------------------------------------------
+// A slot 0.1.27 does not know (it would drop it, moving every later slot): a switched-off Utility in its place.
+bool flattenUnknownEffect (juce::var& e)
+{
+    auto* o = objectOf (e);
+    if (o == nullptr || e["kind"].toString() != "anvilBus")
+        return false;
+    auto replacement = std::make_unique<juce::DynamicObject>();
+    replacement->setProperty ("kind", "utility");
+    replacement->setProperty ("on", false);
+    for (const auto* keep : { "row", "sidechain", "sidechain2" })
+        if (o->hasProperty (keep))
+            replacement->setProperty (keep, o->getProperty (keep));
+    e = juce::var (replacement.release());
+    return true;
+}
+
+// nested chains (a Patcher's nodes, a rack's branches): every effect object below `v`
+void flattenNested (juce::var& v, int& count)
+{
+    if (auto* a = arrayOf (v))
+    {
+        for (auto& item : *a)
+            flattenNested (item, count);
+        return;
+    }
+    auto* o = objectOf (v);
+    if (o == nullptr)
+        return;
+    for (auto& p : o->getProperties())
+    {
+        auto value = p.value;
+        if (value.isObject() && value["kind"].toString() == "anvilBus" && (p.name.toString() == "effect" || p.name.toString() == "head"))
+        {
+            if (flattenUnknownEffect (value))
+            {
+                o->setProperty (p.name, value);
+                ++count;
+            }
+            continue;
+        }
+        if (auto* list = arrayOf (value); list != nullptr && (p.name.toString() == "chain" || p.name.toString() == "effects"))
+            for (auto& item : *list)
+                if (flattenUnknownEffect (item))
+                    ++count;
+        flattenNested (value, count);
+    }
+}
+
+// automation that drove slot (track, slot)'s parameters or mix now drives nothing ("none")
+void detachTargets (juce::var& v, int track, int slot)
+{
+    auto isSlotTarget = [&] (const juce::var& t) {
+        if (! t.isArray() || t.size() < 4)
+            return false;
+        const auto kind = t[0].toString();
+        return (kind == "effectParam" || kind == "effectMix") && (int) t[1] == track && (int) t[2] == slot;
+    };
+    if (auto* a = arrayOf (v))
+    {
+        for (auto& item : *a)
+            detachTargets (item, track, slot);
+        return;
+    }
+    auto* o = objectOf (v);
+    if (o == nullptr)
+        return;
+    for (auto& p : o->getProperties())
+    {
+        auto value = p.value;
+        if (p.name.toString() == "target" && isSlotTarget (value))
+            if (auto* t = arrayOf (value))
+                t->set (0, "none");
+        if (p.name.toString() == "links")
+            if (auto* links = arrayOf (value))
+                for (auto& l : *links)
+                    if (isSlotTarget (l))
+                        if (auto* t = arrayOf (l))
+                            t->set (0, "none");
+        detachTargets (value, track, slot);
+    }
+}
+
+void toRelease0127 (juce::var& root, Losses& lost)
+{
+    auto& o = *objectOf (root);
+
+    // the effect 0.1.28 added (Anvil Bus, round 190fk)
+    {
+        juce::StringArray where;
+        if (auto* mixer = arrayOf (root["mixer"]))
+            for (int t = 0; t < mixer->size(); ++t)
+                if (auto* fx = arrayOf ((*mixer)[t]["effects"]))
+                    for (int s = 0; s < fx->size(); ++s)
+                        if (flattenUnknownEffect (fx->getReference (s)))
+                        {
+                            where.add (insertName (o.getProperty ("mixer"), t) + ", slot " + juce::String (s + 1));
+                            detachTargets (root, t, s);
+                        }
+        int nested = 0;
+        if (auto* mixer = arrayOf (root["mixer"]))
+            for (auto& t : *mixer)
+                if (auto* fx = arrayOf (t["effects"]))
+                    for (auto& e : *fx)
+                        flattenNested (e, nested);
+        if (auto* channels = arrayOf (root["channels"]))
+            for (auto& c : *channels)
+                flattenNested (c, nested);
+        if (nested > 0)
+            where.add (juce::String (nested) + " inside Patchers");
+        if (! where.isEmpty())
+            lost.push_back ({ TR_NOOP ("Anvil Bus is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})"), listOf (where), true });
+    }
+
+    // channels
+    {
+        juce::StringArray cut, pads, warp, frozen, beats, soundfonts;
+        bool scales = false;
+        forEachChannel (root, [&] (juce::DynamicObject& c, int i) {
+            const auto name = channelName (juce::var (&c), i);
+            if (drop (c, "cutOthersOnly") | drop (c, "cutAtNoteEnd"))
+                cut.add (name);
+            scales = drop (c, "editorScale") || scales;
+            if (drop (c, "simplePad"))
+                pads.add (name);
+            if (drop (c, "trackFreeze"))
+                frozen.add (name);
+            if (auto* sampler = objectOf (c.getProperty ("samplerSettings")))
+            {
+                if (drop (*sampler, "warpModes"))
+                    warp.add (name);
+                if ((int) sampler->getProperty ("stretchMethod") == (int) StretchMethod::beats)
+                    beats.add (name);
+            }
+            if (c.getProperty ("instrument").toString() == "soundfont")
+                soundfonts.add (name);
+        });
+        if (! cut.isEmpty())
+            lost.push_back ({ TR_NOOP ("Cut group modes (\"Cut others only\", \"Cut at the note's end\"): {0}"), listOf (cut), true });
+        if (! pads.isEmpty())
+            lost.push_back ({ TR_NOOP ("Simple workflow pad settings (mode, tone, release, group): {0}"), listOf (pads), true });
+        if (! warp.isEmpty())
+            lost.push_back ({ TR_NOOP ("Warp mode settings (Preserve, loop mode, grain sizes) go back to their defaults: {0}"), listOf (warp), true });
+        if (! frozen.isEmpty())
+            lost.push_back ({ TR_NOOP ("Freeze Track: these channels play live again (the same sound, more CPU): {0}"), listOf (frozen), false });
+        if (scales)
+            lost.push_back ({ TR_NOOP ("Plugin window sizes (Scale)"), {}, false });
+        if (drop (o, "beatsLaw190gx") && ! beats.isEmpty())
+            lost.push_back ({ TR_NOOP ("Beats warping uses this release's older (Classic) law: {0}"), listOf (beats), true });
+        if (drop (o, "sfModBase190he") && ! soundfonts.isEmpty())
+            lost.push_back ({ TR_NOOP ("Soundfont modulation knobs centre at this release's older value: {0}"), listOf (soundfonts), true });
+    }
+
+    // clips: index 24 (a Playlist clip's groove, round 190fm) and 25 (its envelopes, round 190gi) are new
+    {
+        int grooves = 0, envelopes = 0;
+        forEachClip (root, [&] (juce::Array<juce::var>& clip) {
+            if (clip.size() > 24 && (juce::int64) clip[24] != 0)
+                ++grooves;
+            if (clip.size() > 25 && (int) clip[25] >= 0)
+                ++envelopes;
+            if (clip.size() > 24)
+                clip.removeRange (24, clip.size() - 24);
+        });
+        if (drop (o, "clipEnvelopes") && envelopes > 0)
+            lost.push_back ({ TR_NOOP ("{0} audio clip envelope(s): those clips play at their own level and pan"), juce::String (envelopes), true });
+        if (grooves > 0)
+            lost.push_back ({ TR_NOOP ("{0} Playlist clip groove(s): those clips play straight"), juce::String (grooves), true });
+    }
+
+    // automation clips with several target links (round 190gw): 0.1.27 drives the first one, 1:1
+    {
+        juce::StringArray linked;
+        if (auto* automations = arrayOf (root["automations"]))
+            for (int i = 0; i < automations->size(); ++i)
+                if (auto* a = objectOf ((*automations)[i]))
+                {
+                    const auto links = a->getProperty ("links");
+                    const auto formula = links.isArray() && links.size() > 0 && links[0].isArray() && links[0].size() >= 5 ? links[0][4].toString() : juce::String();
+                    if (drop (*a, "links") && (links.size() > 1 || formula.isNotEmpty()))
+                        linked.add ("\"" + a->getProperty ("name").toString() + "\"");
+                }
+        if (! linked.isEmpty())
+            lost.push_back ({ TR_NOOP ("Automation clips with several targets or a formula drive only their first target, 1:1: {0}"), listOf (linked), true });
+    }
+
+    // the song
+    if (o.hasProperty ("beatUnit"))
+    {
+        const auto unit = (int) o.getProperty ("beatUnit");
+        drop (o, "beatUnit");
+        lost.push_back ({ TR_NOOP ("The time signature's beat unit: n/{0} becomes n/4"), juce::String (unit), true });
+    }
+    if (drop (o, "linkTracksToMixer"))
+        lost.push_back ({ TR_NOOP ("\"Link Playlist tracks to mixer tracks\" (a setting)"), {}, false });
+    if (drop (o, "midiGenerate"))
+        lost.push_back ({ TR_NOOP ("MIDI generator settings"), {}, false });
+    if (drop (o, "playlistRowHeight"))
+        lost.push_back ({ TR_NOOP ("The Playlist's row height"), {}, false });
+}
+
+struct Step
+{
+    const char* release;                    // the release this step's output is for
+    void (*apply) (juce::var&, Losses&);
+};
+// newest first: a copy for release R runs every step down to R's
+constexpr Step steps[] = { { "0.1.28", toRelease0128 }, { "0.1.27", toRelease0127 } };
+} // namespace
+
+juce::StringArray releases()
+{
+    juce::StringArray r;
+    for (const auto& s : steps)
+        r.add (s.release);
+    return r;
+}
+
+Copy forRelease (const juce::String& projectJson, const juce::String& release)
+{
+    Copy copy;
+    if (! releases().contains (release))
+    {
+        copy.error = "no such release: " + release;
+        return copy;
+    }
+    auto root = juce::JSON::parse (projectJson);
+    if (objectOf (root) == nullptr)
+    {
+        copy.error = "not a project";
+        return copy;
+    }
+    const auto from = root["savedBy"].toString();
+    for (const auto& s : steps)
+    {
+        s.apply (root, copy.lost);
+        if (release == s.release)
+            break;
+    }
+    // stamped as that release's own file (no "saved by a newer version" notice there); where it came from, for us
+    objectOf (root)->setProperty ("savedBy", release);
+    if (from.isNotEmpty())
+        objectOf (root)->setProperty ("copiedFrom", from);
+    copy.json = juce::JSON::toString (root, true);
+    copy.ok = true;
+    return copy;
+}
+
+Copy forRelease (const Song& song, const juce::String& release)
+{
+    return forRelease (ProjectFile::toJson (song), release);
+}
+
+juce::String copyName (const juce::String& projectName, const juce::String& release)
+{
+    return (projectName.isNotEmpty() ? projectName : juce::String ("Untitled")) + " (for LYNX " + release + ")";
+}
+} // namespace lynx::olderlynx

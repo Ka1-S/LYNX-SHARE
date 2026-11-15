@@ -471,6 +471,7 @@ if(LYNX_BUILD_APP)
     src/engine/WavPackFormat.cpp
     src/engine/Mp3Format.cpp
         src/engine/ProjectFile.cpp
+        src/engine/ProjectDowngrade.cpp
         src/engine/ProjectPackage.cpp
         src/engine/SessionPack.cpp
         src/ui/SessionDialogs.cpp

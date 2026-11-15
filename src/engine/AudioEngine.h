@@ -1384,6 +1384,11 @@ private:
     // the live clock (round 170d): the musical position of the next block (count-in included), its tempo, and whether
     // it runs; the output latency the played notes are moved back by
     std::atomic<double> clockTick { 0.0 }, clockTicksPerMs { 0.0 }, outputCompensationMs { 0.0 };
+    // round 190hq (B13): the PDC plan's latency at the Master output (samples) of the last published rack
+    std::atomic<int> masterPdcSamples { 0 };
+    // what is heard comes out this long after the rack rendered it: the output buffer + the driver's output latency
+    // (outputCompensationMs) + the Master's plugin delay compensation (round 190hq). Any thread.
+    double heardLatencyMs() const noexcept;
     std::atomic<bool> clockRunning { false }, compensatePlayed { true };
     CountInCatch takeCatch; // UI thread
     double lastCaptureMs = -1.0; // UI thread: the newest note Capture MIDI took

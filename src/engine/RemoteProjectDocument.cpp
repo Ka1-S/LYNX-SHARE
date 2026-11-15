@@ -64,6 +64,7 @@ const DocumentFields& editableDocumentFields (DocumentShape shape)
         add (S::root, "playlistRowHeight linkTracksToMixer");
         add (S::root, "beatsLaw190gx", S::readOnly);
         add (S::root, "sfModBase190he", S::readOnly); // (round 190he: the mark of a song saved with the real Soundfont modulator centre)
+        add (S::root, "mixerLevelPdc190hq"); // (round 190hq: Mixer › Plugin delay compensation › compensate fader and route automations)
         add (S::root, "format version savedBy projectId nextUid session clipFadesPerClip", S::readOnly);
         // Not reviewed for document edits (yet): the groove pool (its ids are clip references), controller mappings
         // (formulas, ports, targets). They pass through unchanged; edit them in LYNX.
@@ -144,7 +145,7 @@ const DocumentFields& editableDocumentFields (DocumentShape shape)
         add (S::pattern, "name uid length colour loopOn loopStarterGenre loopMode channelLoops markers notes");
         add (S::pattern, "events", S::events, true);
         add (S::events, "target events");
-        add (S::automation, "name uid target points source curve lfo lfoFl recordLive");
+        add (S::automation, "name uid target points source curve lfo lfoFl recordLive tempoMarkers");
         add (S::automation, "links", S::readOnly);
         add (S::modulator, "name shape sync beats hz phase unipolar seed routes");
         add (S::vca, "name colour level muted members parent");

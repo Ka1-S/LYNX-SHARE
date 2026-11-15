@@ -11,6 +11,11 @@ bool PdcPlan::any() const noexcept
     if (std::any_of (channelDelay.begin(), channelDelay.end(), [] (int d) { return d > 0; }))
         return true;
 
+    for (const auto& t : sideDelay)
+        for (const auto& s : t)
+            if (std::any_of (s.begin(), s.end(), [] (int d) { return d > 0; }))
+                return true;
+
     for (const auto& t : sendDelay)
         if (std::any_of (t.begin(), t.end(), [] (int d) { return d > 0; }))
             return true;
@@ -30,6 +35,20 @@ int insertEffectsLatency (const PdcPlan& plan, const Song& song, int track, doub
         return 0;
     return std::max (0, plan.outLat[(std::size_t) track] - plan.inAlign[(std::size_t) track]
                             - manualLatencySamples (song.mixer[(std::size_t) track], sampleRate));
+}
+
+std::array<int, 4> sideSources (const Song& song, int track, const EffectSlot& slot)
+{
+    const auto n = (int) song.mixer.size();
+    auto valid = [&] (int source) { return source > 0 && source < n && source != track ? source : -1; };
+    std::array<int, 4> s { valid (slot.sidechain), valid (slot.sidechain2), -1, -1 };
+    if (slot.kind == EffectKind::plugin)
+        if (const auto c = slotConnections (song, track, slot); c.routed)
+        {
+            s[2] = valid (c.mainSource);
+            s[3] = valid (c.sideSource);
+        }
+    return s;
 }
 
 PdcPlan computePdc (const Song& song, const std::vector<int>& channelLatency, const std::vector<std::vector<int>>& slotLatency,
@@ -90,9 +109,37 @@ PdcPlan computePdc (const Song& song, const std::vector<int>& channelLatency, co
 
     auto manual = [&] (int t) { return t < (int) song.mixer.size() ? manualLatencySamples (song.mixer[(std::size_t) t], sampleRate) : 0; };
 
+    // round 190hq (B13, complaint "side-chain out of sync"): a slot's side inputs (side-chain, Connections) are the
+    // other inserts' outputs, as late as their outLat. FL's per-edge plan left them out, so a latent effect on the
+    // source (a kick through a limiter) or before the listening slot made the ducking early or late. The listening
+    // insert is aligned so that each source arrives no later than the slot's own input (its inAlign plus the active
+    // slots before it); sideDelay then holds what is missing. Sources come first in the mixer order (Song::mixerOrder
+    // counts side-chains; Connections sources are routed into the insert).
+    std::vector<char> planned ((std::size_t) tracks, 0);
+    std::vector<std::vector<std::array<int, 4>>> sources ((std::size_t) tracks);
+    auto alignSides = [&] (int t) {
+        if (t >= (int) song.mixer.size())
+            return;
+        const auto& slots = song.mixer[(std::size_t) t].effects;
+        auto& list = sources[(std::size_t) t];
+        list.assign (slots.size(), { -1, -1, -1, -1 });
+        int before = 0; // the active slots before this one
+        for (std::size_t s = 0; s < slots.size(); ++s)
+        {
+            list[s] = sideSources (song, t, slots[s]);
+            for (const auto source : list[s])
+                if (source > 0 && planned[(std::size_t) source] != 0)
+                    plan.inAlign[(std::size_t) t] = std::max (plan.inAlign[(std::size_t) t], plan.outLat[(std::size_t) source] - before);
+            if (song.slotActive (slots[s]) && t < (int) slotLatency.size() && s < slotLatency[(std::size_t) t].size())
+                before += slotLat (t, s);
+        }
+    };
+
     for (auto t : order)
     {
+        alignSides (t);
         plan.outLat[(std::size_t) t] = plan.inAlign[(std::size_t) t] + effectsLatency (t) + manual (t);
+        planned[(std::size_t) t] = 1;
         const auto& track = song.mixer[(std::size_t) t];
 
         if (track.toMaster)
@@ -107,6 +154,7 @@ PdcPlan computePdc (const Song& song, const std::vector<int>& channelLatency, co
             plan.inAlign[(std::size_t) tap.target] = std::max (plan.inAlign[(std::size_t) tap.target], tapLatency (t, tap.slot, tap.afterSlot));
     }
 
+    alignSides (0);
     plan.outLat[0] = plan.inAlign[0] + effectsLatency (0) + manual (0);
     plan.total = std::max (0, plan.outLat[0]);
 
@@ -123,6 +171,24 @@ PdcPlan computePdc (const Song& song, const std::vector<int>& channelLatency, co
             if (song.slotActive (slots[s]) && t < (int) slotLatency.size() && s < slotLatency[(std::size_t) t].size())
                 run += slotLat (t, s);
         }
+    }
+
+    plan.levelLag.assign ((std::size_t) tracks, 0);
+    for (int t = 0; t < tracks; ++t)
+        plan.levelLag[(std::size_t) t] = std::max (0, plan.outLat[(std::size_t) t] - manual (t));
+
+    // the side inputs' delays (sources bypassed "Always" are not delayed, as their routes)
+    plan.sideDelay.assign ((std::size_t) tracks, {});
+    for (int t = 0; t < (int) song.mixer.size(); ++t)
+    {
+        const auto& list = sources[(std::size_t) t];
+        auto& delays = plan.sideDelay[(std::size_t) t];
+        delays.assign (list.size(), { 0, 0, 0, 0 });
+        for (std::size_t s = 0; s < list.size() && s < plan.slotInput[(std::size_t) t].size(); ++s)
+            for (std::size_t k = 0; k < 4; ++k)
+                if (const auto source = list[s][k];
+                    source > 0 && planned[(std::size_t) source] != 0 && song.mixer[(std::size_t) source].latencyBypass != LatencyBypass::always)
+                    delays[s][k] = std::max (0, plan.slotInput[(std::size_t) t][s] - plan.outLat[(std::size_t) source]);
     }
 
     // per-edge delays (what's missing to reach the destination's alignment)

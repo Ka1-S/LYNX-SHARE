@@ -9,6 +9,7 @@
 
 #include <juce_audio_devices/juce_audio_devices.h>
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <memory>
@@ -45,6 +46,10 @@ public:
 
     // --- audio thread ---
     void deviceStarted (double sampleRate, int bufferSize, int outputLatencySamples) noexcept;
+    // Round 190hq (B13, complaint "sync off with latent plugins"): the rack's own delay before the Master output (its
+    // plugin delay compensation, ms); added to the device's latency for the clocks sent and followed. Audio thread.
+    void setRackLatencyMs (double ms) noexcept { rackLatencyMs = std::max (0.0, ms); }
+    double heardLatencyMs() const noexcept { return latencyMs + rackLatencyMs; }
     // Before the block: an external clock's commands and tempo move the transport. `callbackMs` = the callback's
     // Time::getMillisecondCounterHiRes().
     void beginBlock (Transport& transport, double callbackMs, int numSamples) noexcept;
@@ -105,7 +110,7 @@ private:
     void sendTransportNotesOff();            // sender thread
 
     // timing: the device block clock mapped to milliseconds (smoothed: callbacks wake up with jitter)
-    double sampleRate = 44100.0, latencyMs = 0.0;
+    double sampleRate = 44100.0, latencyMs = 0.0, rackLatencyMs = 0.0;
     double blockStartMs = 0.0, predictedMs = -1.0;
     midisync::BlockMessages scratch;
 
