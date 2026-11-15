@@ -63,6 +63,7 @@ const DocumentFields& editableDocumentFields (DocumentShape shape)
         // formulas and targets, as remoteMappings)
         add (S::root, "playlistRowHeight linkTracksToMixer");
         add (S::root, "beatsLaw190gx", S::readOnly);
+        add (S::root, "sfModBase190he", S::readOnly); // (round 190he: the mark of a song saved with the real Soundfont modulator centre)
         add (S::root, "format version savedBy projectId nextUid session clipFadesPerClip", S::readOnly);
         // Not reviewed for document edits (yet): the groove pool (its ids are clip references), controller mappings
         // (formulas, ports, targets). They pass through unchanged; edit them in LYNX.
@@ -82,7 +83,7 @@ const DocumentFields& editableDocumentFields (DocumentShape shape)
         add (S::info, "title author genre comments");
         add (S::info, "url showOnOpen created workSeconds", S::readOnly);
         add (S::channel, "name instrument volume pan muted ghostHidden soloLock sample controllerState pluginState modelParams zones "
-             "mixer maxPolyphony colour group swingMix arp cut keyRegion receiveFrom icon flWrapperFlags loopStarter uid "
+             "mixer maxPolyphony colour group swingMix arp cut keyRegion receiveFrom icon editorScale flWrapperFlags loopStarter uid "
              "cutOthersOnly cutAtNoteEnd simplePad");
         add (S::channel, "freeze trackFreeze", S::readOnly); // (rendered stems: files LYNX wrote, and the live channel)
         add (S::channel, "plugin", S::plugin);

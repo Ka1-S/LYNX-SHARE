@@ -670,6 +670,7 @@ void currentFieldsAllowlist()
     rich.channels[0].cutOthersOnly = true;
     rich.channels[0].cutAtNoteEnd = true;
     rich.channels[0].simplePad = { 3, 1, 0.25f, 0.5f, 1, 2 };
+    rich.channels[0].editorScale = 150; // (rollup 0.1.28: round 190he's per-channel window Scaling, editable)
     rich.mixer[1].sends[0].pre = true;
     rich.mixer[1].chainBlend = 0.123456791f;
     rich.mixer[1].chainPreset = "Vocal";
@@ -692,7 +693,7 @@ void currentFieldsAllowlist()
     const auto& p = accepted.channels[1].plugin;
     check (p.mpe && ! p.processInactive && p.pinned && p.velocityMode == prefs::pluginVelocityFixed && p.fixedVelocity == 90
            && p.inputs == plugin.inputs && p.playedBy == 7 && p.values == hosted.plugin.values
-           && accepted.channels[0].cutOthersOnly && accepted.channels[0].cutAtNoteEnd && accepted.channels[0].simplePad == rich.channels[0].simplePad
+           && accepted.channels[0].cutOthersOnly && accepted.channels[0].cutAtNoteEnd && accepted.channels[0].simplePad == rich.channels[0].simplePad && accepted.channels[0].editorScale == 150
            && accepted.mixer[1].sends[0].pre && accepted.mixer[1].chainBlend == 0.123456791f && accepted.mixer[1].chainPreset == "Vocal"
            && accepted.mixer[1].effects[0].goalAmount == 0.234567896f && accepted.mixer[1].effects[0].look == 1
            && accepted.beatUnit == 8 && accepted.muteRunsEffects && accepted.flPluginLevels && accepted.loopOff
