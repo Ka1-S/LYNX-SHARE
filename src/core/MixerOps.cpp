@@ -1,4 +1,5 @@
 #include "core/MixerOps.h"
+#include "core/MixSnapshots.h"
 #include "core/Effects.h"
 #include "core/ClipOps.h"
 #include "core/FlpExport.h"
@@ -295,6 +296,8 @@ void remapTrackReferences (Song& song, const std::function<int (int)>& map)
     for (auto& automation : song.automations)
         if (automation.source.track > 0)
             automation.source.track = map (automation.source.track); // -1 = no longer live
+
+    mixsnap::remap (song, map); // the mix snapshots' inserts and sends (round 190hp)
 }
 } // namespace
 

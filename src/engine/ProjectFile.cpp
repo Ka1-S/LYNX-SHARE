@@ -3173,6 +3173,34 @@ juce::String toJson (const Song& song, bool stampVersion)
         root->setProperty ("vcas", vcas);
     }
 
+    if (! song.mixSnapshots.empty()) // round 190hp (core/MixSnapshots.h): the Mixer menu's Mix snapshots
+    {
+        // {"current", "previous", "list": [{"name", "inserts": [[track, volume, pan, stereo, muted, toMaster,
+        // masterLevel, [[target, level, pre]...]]...]}]}, the numbers at the mixer's own precision
+        juce::Array<juce::var> list;
+        for (const auto& snap : song.mixSnapshots)
+        {
+            auto o = std::make_unique<juce::DynamicObject>();
+            o->setProperty ("name", str (snap.name));
+            juce::Array<juce::var> inserts;
+            for (const auto& e : snap.inserts)
+            {
+                juce::Array<juce::var> sends;
+                for (const auto& send : e.sends)
+                    sends.add (juce::Array<juce::var> { send.target, projectNumber (send.level, 10000.0f), send.pre });
+                inserts.add (juce::Array<juce::var> { e.track, e.volume, e.pan, projectNumber (e.stereo, 1000.0f), e.muted, e.toMaster,
+                                                      projectNumber (e.masterLevel, 10000.0f), sends });
+            }
+            o->setProperty ("inserts", inserts);
+            list.add (juce::var (o.release()));
+        }
+        auto snaps = std::make_unique<juce::DynamicObject>();
+        snaps->setProperty ("current", song.mixSnapshotCurrent);
+        snaps->setProperty ("previous", song.mixSnapshotPrevious);
+        snaps->setProperty ("list", list);
+        root->setProperty ("mixSnapshots", juce::var (snaps.release()));
+    }
+
     if (! song.midiLinks.empty())
     {
         juce::Array<juce::var> links, settings, noteLinks;
@@ -3921,6 +3949,48 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
             vca.parent = (int) v.getProperty ("parent", -1);
             song.vcas.push_back (std::move (vca));
         }
+    if (const auto& snaps = root["mixSnapshots"]; snaps.isObject()) // round 190hp
+    {
+        if (auto* list = snaps["list"].getArray())
+            for (const auto& item : *list)
+            {
+                if ((int) song.mixSnapshots.size() >= maxMixSnapshots)
+                    break;
+                MixSnapshot snap;
+                snap.name = item["name"].toString().toStdString();
+                if (auto* inserts = item["inserts"].getArray())
+                    for (const auto& v : *inserts)
+                    {
+                        const auto* a = v.getArray();
+                        if (a == nullptr || a->size() < 8)
+                            continue;
+                        MixSnapshot::Insert e;
+                        e.track = (int) (*a)[0];
+                        if (e.track < 0 || e.track >= maxMixerTracks)
+                            continue;
+                        e.volume = juce::jlimit (0.0f, 1.0f, (float) (double) (*a)[1]);
+                        e.pan = juce::jlimit (-1.0f, 1.0f, (float) (double) (*a)[2]);
+                        e.stereo = juce::jlimit (-1.0f, 1.0f, (float) (double) (*a)[3]);
+                        e.muted = (bool) (*a)[4];
+                        e.toMaster = (bool) (*a)[5];
+                        e.masterLevel = juce::jlimit (0.0f, maxFaderGain, (float) (double) (*a)[6]);
+                        if (auto* sends = (*a)[7].getArray())
+                            for (const auto& sv : *sends)
+                                if (const auto* x = sv.getArray(); x != nullptr && x->size() >= 2 && (int) (*x)[0] > 0 && (int) (*x)[0] < maxMixerTracks)
+                                {
+                                    MixerSend send { (int) (*x)[0], juce::jlimit (0.0f, maxFaderGain, (float) (double) (*x)[1]) };
+                                    send.pre = x->size() >= 3 && (bool) (*x)[2];
+                                    e.sends.push_back (send);
+                                }
+                        snap.inserts.push_back (std::move (e));
+                    }
+                song.mixSnapshots.push_back (std::move (snap));
+            }
+        const auto n = (int) song.mixSnapshots.size();
+        const auto index = [n] (const juce::var& v) { const auto i = (int) v; return i >= 0 && i < n ? i : -1; };
+        song.mixSnapshotCurrent = index (snaps.getProperty ("current", -1));
+        song.mixSnapshotPrevious = index (snaps.getProperty ("previous", -1));
+    }
     for (auto& v : song.vcas)
         if (v.parent < -1 || v.parent >= (int) song.vcas.size() || &song.vcas[(std::size_t) std::max (0, v.parent)] == &v)
             v.parent = -1;

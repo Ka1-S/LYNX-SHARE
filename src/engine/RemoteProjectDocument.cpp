@@ -68,6 +68,7 @@ const DocumentFields& editableDocumentFields (DocumentShape shape)
         // Not reviewed for document edits (yet): the groove pool (its ids are clip references), controller mappings
         // (formulas, ports, targets). They pass through unchanged; edit them in LYNX.
         add (S::root, "grooves midiLinkSettings midiNoteLinks remoteMappings", S::readOnly);
+        add (S::root, "mixSnapshots", S::readOnly); // (round 190hp: the Mixer menu's Mix snapshots; edit them in LYNX)
         add (S::root, "clipEnvelopes", S::clipEnvelope, true);
         add (S::root, "info", S::info);
         add (S::root, "channels", S::channel, true);

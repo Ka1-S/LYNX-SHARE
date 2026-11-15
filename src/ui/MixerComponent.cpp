@@ -5,6 +5,7 @@
 #include "ui/FileChoosers.h"
 #include "ui/ImageReadback.h"
 #include "ui/MixerComponent.h"
+#include "core/MixSnapshots.h"
 #include "ui/PluginOffTag.h"
 #include "ui/SlotWatch.h"
 #include "core/AlsImport.h"
@@ -4904,6 +4905,54 @@ void askNumber (const juce::String& title, const juce::String& text, int value, 
 }
 } // namespace
 
+juce::PopupMenu snapshotsMenu (AudioEngine& engine)
+{
+    // Round 190hp (slice B16 of the 0.1.28 pain report; LYNX's own, core/MixSnapshots.h): take, recall and compare whole
+    // mixes. Each change is one undo step.
+    const auto& song = engine.getSong();
+    juce::PopupMenu menu;
+    const auto count = (int) song.mixSnapshots.size();
+    const auto full = count >= maxMixSnapshots;
+    menu.addItem (full ? tr ("Take snapshot (at most {0})", { juce::String (maxMixSnapshots) }) : tr ("Take snapshot"), ! full, false, [&engine] {
+        int made = -1;
+        engine.editSong ([&made] (Song& s) { made = mixsnap::take (s, tr ("Snapshot").toStdString()); });
+        if (made >= 0)
+            ui::postHint ({ tr ("Mix saved as \"{0}\"", { juce::String::fromUTF8 (engine.getSong().mixSnapshots[(std::size_t) made].name.c_str()) }), {}, false, false }, 2500);
+    });
+    const auto ab = mixsnap::canCompare (song);
+    menu.addItem (ab ? tr ("Compare A/B: back to \"{0}\"", { juce::String::fromUTF8 (song.mixSnapshots[(std::size_t) song.mixSnapshotPrevious].name.c_str()) })
+                     : tr ("Compare A/B"),
+                  ab, false, [&engine] { engine.editSong ([] (Song& s) { mixsnap::compareAB (s); }); });
+    if (count == 0)
+        return menu;
+    menu.addSeparator();
+    for (int i = 0; i < count; ++i)
+    {
+        const auto& snap = song.mixSnapshots[(std::size_t) i];
+        const auto name = juce::String::fromUTF8 (snap.name.c_str());
+        // ticked: the mix is this snapshot now
+        const auto now = mixsnap::matches (song, snap);
+        juce::PopupMenu one;
+        one.addItem (tr ("Recall"), true, false, [&engine, i] { engine.editSong ([i] (Song& s) { mixsnap::recall (s, i); }); });
+        one.addItem (tr ("Update to the current mix"), ! now, false, [&engine, i] { engine.editSong ([i] (Song& s) { mixsnap::update (s, i); }); });
+        one.addItem (tr ("Rename..."), [&engine, i, name] {
+            auto* w = new juce::AlertWindow (tr ("Rename snapshot"), {}, juce::MessageBoxIconType::NoIcon);
+            w->addTextEditor ("name", name);
+            w->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+            w->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+            w->enterModalState (true, juce::ModalCallbackFunction::create ([w, &engine, i] (int result) {
+                const auto typed = w->getTextEditorContents ("name").trim().toStdString();
+                if (result == 1 && ! typed.empty())
+                    engine.editSong ([i, typed] (Song& s) { mixsnap::rename (s, i, typed); });
+            }), true);
+        });
+        one.addSeparator();
+        one.addItem (tr ("Delete"), [&engine, i] { engine.editSong ([i] (Song& s) { mixsnap::remove (s, i); }); });
+        menu.addSubMenu (name + (i == song.mixSnapshotCurrent ? "  (A)" : i == song.mixSnapshotPrevious ? "  (B)" : ""), one, true, juce::Image(), now);
+    }
+    return menu;
+}
+
 void addItems (juce::PopupMenu& menu, AudioEngine& engine, bool newProjects)
 {
     const auto& song = engine.getSong();
@@ -4939,6 +4988,7 @@ void addItems (juce::PopupMenu& menu, AudioEngine& engine, bool newProjects)
             MixerStrips::showLoudness = on;
         notifyChanged();
     });
+    menu.addSubMenu (tr ("Mix snapshots (LYNX)"), snapshotsMenu (engine));
     menu.addItem (tr ("Remove unused inserts at the end"), song.mixer.size() > 1 && ! song.insertInUse ((int) song.mixer.size() - 1), false, [&engine] {
         int removed = 0;
         engine.editSong ([&removed] (Song& s) { removed = mixerops::removeUnusedTrailingInserts (s); });
