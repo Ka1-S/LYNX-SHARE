@@ -115,10 +115,10 @@ inline std::vector<Entry> fadeCurve()
 }
 
 // LYNX's own audio clip items with no FL counterpart (kept: add, never remove), after FL's Fades below a line, in this
-// order. Round 190gi: Clip envelope ›, Auto-warp, Quantize audio (core/ClipEnvelope.h, core/ClipWarp.h). Comping's "Promote this take..." comes first when the clip is on a take lane (core/Comping, round 163).
+// order. Round 190gi: Clip envelope ›, Auto-warp, Quantize audio (core/ClipEnvelope.h, core/ClipWarp.h); round 190hp: Split at silence... (core/StripSilence.h). Comping's "Promote this take..." comes first when the clip is on a take lane (core/Comping, round 163).
 inline std::vector<std::string> lynxExtras()
 {
-    return { TR_NOOP ("Color palette"), TR_NOOP ("Split here"), TR_NOOP ("Merge clips"), TR_NOOP ("Reverse"), TR_NOOP ("Convert to MIDI"), TR_NOOP ("Slice to New MIDI Track..."), TR_NOOP ("Pitch... (semitones, cents, keep length)"),
+    return { TR_NOOP ("Color palette"), TR_NOOP ("Split here"), TR_NOOP ("Split at silence..."), TR_NOOP ("Merge clips"), TR_NOOP ("Reverse"), TR_NOOP ("Convert to MIDI"), TR_NOOP ("Slice to New MIDI Track..."), TR_NOOP ("Pitch... (semitones, cents, keep length)"),
              TR_NOOP ("Normalize"), TR_NOOP ("Clip volume"), TR_NOOP ("Clip envelope"), TR_NOOP ("Auto-warp"), TR_NOOP ("Quantize audio"),
              TR_NOOP ("Open in a new Sampler channel"), TR_NOOP ("Show the file in Explorer"), TR_NOOP ("Cut"), TR_NOOP ("Copy"), TR_NOOP ("Paste here") };
 }

@@ -16,6 +16,7 @@
 #include "core/TrackHeaderGestures.h"
 #include "core/PickerSelection.h"
 #include "core/PlaylistOps.h"
+#include "core/StripSilence.h"
 #include "engine/AudioEngine.h"
 #include "ui/EditorTools.h"
 #include "ui/FrameTicker.h"
@@ -201,6 +202,13 @@ public:
     std::size_t warpMarkerCountForSnapshot (int clip) const { return clipWarpMarkers (clip).size(); }
     double clipFileSecondsForSnapshot (int clip) const { return clipFileSeconds (clip); }
     juce::PopupMenu getClipMenuForSnapshot (int index); // --snapshot: the clip menu of that clip
+    // Round 190hp (slice B18, core/StripSilence.h): the audio clip menu's "Split at silence..." — these audio clips are
+    // cut where they stay below the threshold and the quiet parts go (one undo step). Returns the clips made (0: nothing
+    // to strip); `why` gets the hint shown. `canSplitAtSilence`: the clip is audio, its sample loaded and not warped.
+    int splitClipsAtSilence (const std::vector<int>& targets, const stripsilence::Options& options, juce::String* why = nullptr);
+    bool canSplitAtSilence (int index);
+    static stripsilence::Options& splitSilenceOptions(); // the dialog's last values (this run of LYNX)
+    std::unique_ptr<juce::Component> makeSplitSilenceDialogForSnapshot (int index);
     juce::PopupMenu getAutomationPointMenuForSnapshot (int clip, int point); // FL's point menu of an automation clip's point (round 190bw)
     juce::PopupMenu getTrackMenuForSnapshot (int track) { return buildTrackMenu (track); }
     // hovers the right edge of the first clip in view (grip, outline, menu button); returns its hint

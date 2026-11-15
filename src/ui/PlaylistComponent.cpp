@@ -7534,6 +7534,32 @@ juce::AlertWindow* buildSliceDialog (AudioEngine& engine, juce::Component* owner
     return box;
 }
 
+// Round 190hp (slice B18): the "Split at silence" dialog — Threshold (dB), Minimum silence, Pre-roll and Post-roll (ms),
+// with the last values used
+juce::AlertWindow* buildSplitSilenceDialog (juce::Component* owner)
+{
+    const auto& o = PlaylistComponent::splitSilenceOptions();
+    auto* box = new juce::AlertWindow (tr ("Split at silence"), tr ("Cuts the clip where it stays below the threshold and removes those quiet parts. The file is not changed."),
+                                       juce::MessageBoxIconType::NoIcon, owner);
+    box->addTextEditor ("threshold", juce::String (o.thresholdDb, 1), tr ("Threshold (dB)"));
+    box->addTextEditor ("minimum", juce::String (juce::roundToInt (o.minSilenceMs)), tr ("Minimum silence (ms)"));
+    box->addTextEditor ("pre", juce::String (juce::roundToInt (o.preRollMs)), tr ("Pre-roll (ms)"));
+    box->addTextEditor ("post", juce::String (juce::roundToInt (o.postRollMs)), tr ("Post-roll (ms)"));
+    box->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+    box->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+    return box;
+}
+
+stripsilence::Options readSplitSilenceDialog (juce::AlertWindow& box)
+{
+    stripsilence::Options o;
+    o.thresholdDb = juce::jlimit (-96.0f, 0.0f, box.getTextEditorContents ("threshold").trim().getFloatValue());
+    o.minSilenceMs = juce::jlimit (0.0, 10000.0, box.getTextEditorContents ("minimum").trim().getDoubleValue());
+    o.preRollMs = juce::jlimit (0.0, 2000.0, box.getTextEditorContents ("pre").trim().getDoubleValue());
+    o.postRollMs = juce::jlimit (0.0, 5000.0, box.getTextEditorContents ("post").trim().getDoubleValue());
+    return o;
+}
+
 void showSliceToNewTrackDialog (AudioEngine& engine, juce::Component& owner, int clipIndex, std::function<void()> done)
 {
     auto extras = std::make_shared<SliceDialogExtras>();
@@ -8159,6 +8185,20 @@ juce::PopupMenu PlaylistComponent::buildAudioClipMenu (int index, int mouseX)
         });
         sortClips();
     });
+    // round 190hp (slice B18, core/StripSilence.h): the clip cut where it stays quiet, the quiet parts left out
+    menu.addItem (tr ("Split at silence..."), canSplitAtSilence (index), false, [this, targets] {
+        juce::Component::SafePointer<PlaylistComponent> self (this);
+        auto* box = buildSplitSilenceDialog (this);
+        box->enterModalState (true, juce::ModalCallbackFunction::create ([self, box, targets] (int result) {
+                                  if (result != 1 || self == nullptr)
+                                      return;
+                                  splitSilenceOptions() = readSplitSilenceDialog (*box);
+                                  juce::String why;
+                                  self->splitClipsAtSilence (targets, splitSilenceOptions(), &why);
+                                  ui::postHint ({ why, {}, false, false }, 3000);
+                              }),
+                              true);
+    });
     menu.addItem (tr ("Merge clips"), clipops::canMerge (song, targets), false, [this, targets] {
         setSelection ({});
         engine.editSong ([targets] (Song& s) { clipops::mergeClips (s, targets); });
@@ -8352,6 +8392,119 @@ void PlaylistComponent::showDetectTempo (int index, std::shared_ptr<const Sample
     r.hasTempoInfo = sample->acidBeats > 0.0f;
     r.apply = [fitTo = clipFitter (index, sample)] (double beats) { fitTo ((float) beats, beats > 0.0); };
     ui::showTempoDetectionDialog (std::move (r));
+}
+
+// --- Split at silence (round 190hp, slice B18; core/StripSilence.h) ------------------------------------------------------
+stripsilence::Options& PlaylistComponent::splitSilenceOptions()
+{
+    static stripsilence::Options last;
+    return last;
+}
+
+bool PlaylistComponent::canSplitAtSilence (int index)
+{
+    const auto& song = engine.getSong();
+    if (index < 0 || index >= (int) song.playlist.size())
+        return false;
+    const auto& c = song.playlist[(std::size_t) index];
+    if (c.kind != ClipKind::audio || c.channel < 0 || c.channel >= (int) song.channels.size() || c.length < 2)
+        return false;
+    const auto& channel = song.channels[(std::size_t) c.channel];
+    // (warp markers bend the clip's time: its frames are not a straight line over its ticks)
+    if (channel.sampler.warp.size() >= 2)
+        return false;
+    const auto sample = engine.getSampleLibrary().load (juce::String::fromUTF8 (channel.samplePath.c_str()));
+    return sample != nullptr && sample->frames() > 0 && sample->sampleRate > 0.0;
+}
+
+int PlaylistComponent::splitClipsAtSilence (const std::vector<int>& targets, const stripsilence::Options& options, juce::String* why)
+{
+    const auto& song = engine.getSong();
+    std::vector<std::pair<int, std::vector<stripsilence::Span>>> plans;
+    auto allQuiet = 0, nothing = 0;
+    for (auto i : targets)
+    {
+        if (! canSplitAtSilence (i))
+            continue;
+        const auto& c = song.playlist[(std::size_t) i];
+        const auto& channel = song.channels[(std::size_t) c.channel];
+        const auto sample = engine.getSampleLibrary().load (juce::String::fromUTF8 (channel.samplePath.c_str()));
+        // the frames the clip plays (as Normalize finds them: its trim, stretch, pitch and direction)
+        const auto span = clipops::clipSpan (channel, sample);
+        const auto total = (double) span.frames;
+        const auto perTick = clipops::framesPerTick (channel, c, total, sample->sampleRate, song.bpm);
+        if (! (perTick > 0.0))
+            continue;
+        const auto backwards = clipops::playsBackwards (channel, c);
+        auto from = juce::jlimit (0.0, total, (double) c.offset * perTick);
+        auto to = juce::jlimit (from, total, (double) (c.offset + c.length) * perTick);
+        if (backwards)
+        {
+            const auto f = total - to, t = total - from;
+            from = f;
+            to = t;
+        }
+        const auto kept = stripsilence::keptSpans (sample->leftData(), sample->isStereo() ? sample->rightData() : nullptr, (std::int64_t) sample->frames(),
+                                                   sample->sampleRate, (std::int64_t) std::floor (from + (double) span.first),
+                                                   (std::int64_t) std::ceil (to + (double) span.first), options);
+        if (kept.empty())
+        {
+            ++allQuiet;
+            continue;
+        }
+        // file frames -> ticks from the clip's start (a backwards clip reads its span from the end)
+        const auto tickOf = [&] (std::int64_t frame) {
+            const auto inSpan = (double) frame - (double) span.first;
+            return (backwards ? (total - inSpan) / perTick : inSpan / perTick) - (double) c.offset;
+        };
+        std::vector<stripsilence::Span> pieces;
+        for (const auto& k : kept)
+        {
+            auto a = tickOf (k.from), b = tickOf (k.to);
+            if (backwards)
+                std::swap (a, b);
+            pieces.push_back ({ std::max<std::int64_t> (0, (std::int64_t) std::floor (a)), std::min<std::int64_t> (c.length, (std::int64_t) std::ceil (b)) });
+        }
+        std::sort (pieces.begin(), pieces.end(), [] (const stripsilence::Span& x, const stripsilence::Span& y) { return x.from < y.from; });
+        if (pieces.size() == 1 && pieces[0].from <= 0 && pieces[0].to >= c.length)
+        {
+            ++nothing;
+            continue;
+        }
+        plans.push_back ({ i, std::move (pieces) });
+    }
+    if (plans.empty())
+    {
+        if (why != nullptr)
+            *why = allQuiet > 0 && nothing == 0 ? tr ("All of it is below the threshold: nothing was split") : tr ("No silence to strip at this threshold");
+        return 0;
+    }
+    std::vector<int> made;
+    setSelection ({});
+    engine.editSong ([&] (Song& s) {
+        for (const auto& [clip, pieces] : plans) // (pieces are appended: the indices of the other clips stay)
+            for (auto k : stripsilence::splitClip (s.playlist, clip, pieces))
+                made.push_back (k);
+    });
+    sortClips();
+    if (why != nullptr)
+        *why = tr ("Split at silence: {0} clip(s)", { juce::String ((int) made.size()) });
+    repaint();
+    return (int) made.size();
+}
+
+std::unique_ptr<juce::Component> PlaylistComponent::makeSplitSilenceDialogForSnapshot (int)
+{
+    struct Holder final : juce::Component
+    {
+        std::unique_ptr<juce::AlertWindow> box;
+    };
+    auto holder = std::make_unique<Holder>();
+    holder->box.reset (buildSplitSilenceDialog (nullptr));
+    holder->addAndMakeVisible (*holder->box);
+    holder->box->setTopLeftPosition (0, 0);
+    holder->setSize (holder->box->getWidth(), holder->box->getHeight());
+    return holder;
 }
 
 void PlaylistComponent::normalizeClips (const std::vector<int>& targets, bool asGroup)
