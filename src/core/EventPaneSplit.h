@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <charconv>
 #include <cmath>
+#include <iomanip>
 #include <locale>
 #include <sstream>
 #include <string>
@@ -97,9 +98,26 @@ inline std::string toText (const State& s)
 {
     // the shortest text that reads back as the same float, with a "." whatever the user's locale
     auto number = [] (float v) {
+       #if defined (__APPLE__)
+        // (rollup 0.1.28: floating-point std::to_chars needs macOS 13.3 and LYNX targets 11.0, as in AlsExport.cpp's
+        // num(): the shortest precision that reads back as the same float)
+        for (int precision = 1;; ++precision)
+        {
+            std::ostringstream text;
+            text.imbue (std::locale::classic());
+            text << std::setprecision (precision) << v;
+            std::istringstream back (text.str());
+            back.imbue (std::locale::classic());
+            float read = 0.0f;
+            back >> read;
+            if (read == v || precision >= 9)
+                return text.str();
+        }
+       #else
         char text[32];
         const auto end = std::to_chars (text, text + sizeof (text), v).ptr;
         return std::string (text, end);
+       #endif
     };
     return "aspect=" + number (clampAspect (s.aspect)) + "\nspare=" + number (s.spare < 0.0f ? -1.0f : clampAspect (s.spare)) + "\n";
 }
