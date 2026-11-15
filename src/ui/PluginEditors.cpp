@@ -46,6 +46,7 @@
 #include "ui/DynamicsDisplays.h"
 #include "ui/HintBar.h"
 #include "ui/I18n.h"
+#include "ui/Motion.h"
 #include "ui/Icons.h"
 #include "ui/FacetEqEditor.h"
 #include "ui/ProEditors.h"
@@ -164,7 +165,7 @@ public:
                 times->levelWanted[levelKey()].fetch_add (1, std::memory_order_relaxed);
         if (! node.locate)
             startTimerHz (30); // live displays, and the controls following their automation (cheap while nothing moves)
-        else if (liveDisplays)
+        else if (liveDisplays || kind == EffectKind::grossBeat) // (round 190ih: Gross Beat's locator, in a Patcher too)
             startTimerHz (30);
         // round 170k2: never narrower than its header needs to show the whole name (the body keeps its scale)
         setSize (juce::jmax ((int) std::ceil ((float) l.width * initialScale), minimumWidth()),
@@ -635,12 +636,16 @@ public:
             return;
         }
 
-        paintHeader (g, *fx);
+        // round 190ih: Gross Beat's live parts (the locator, the playing cells) repaint small areas 30 times a second
+        // while the song plays: only the items they touch are drawn then (its 72 slot thumbnails are not cheap)
+        const auto cull = artLayer != nullptr || kind == EffectKind::grossBeat;
+        if (! cull || g.clipRegionIntersects (headerArea().getSmallestIntegerContainer()))
+            paintHeader (g, *fx);
 
         const auto& items = activeLayout().items;
         for (int i = 0; i < (int) items.size(); ++i)
             if (visible (items[(std::size_t) i])
-                && (artLayer == nullptr || g.clipRegionIntersects (rectOf (items[(std::size_t) i]).expanded (40.0f, 24.0f).getSmallestIntegerContainer())))
+                && (! cull || g.clipRegionIntersects (rectOf (items[(std::size_t) i]).expanded (40.0f, 24.0f).getSmallestIntegerContainer())))
             {
                 // round 170j: a partial repaint of the art draws only what it touches; round 170c: a control another mode bypasses is drawn dimmed
                 const auto idle = plugui::isIdle (kind, items[(std::size_t) i], fx->params);
@@ -5535,6 +5540,8 @@ private:
                     if (eqAnalyser.update (engine, track, slot, isMouseOver (true) || hasKeyboardFocus (true), graph))
                         repaint (graph.getSmallestIntegerContainer().expanded (2));
                 }
+        if (kind == EffectKind::grossBeat) // round 190ih: the playback locator and the playing / queued slots
+            gbLiveTick();
         if (! liveDisplays) return;
         learnScaleFromMidi();
         if (kind == EffectKind::hardwareInsert)

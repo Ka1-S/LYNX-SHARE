@@ -234,6 +234,18 @@ public:
     // in place on the two channels; `ticks` = song position at the block start
     void process (float* left, float* right, int n, double ticks) noexcept;
 
+    // Round 190ih (FL manual, Gross Beat › Envelope Mapping Panel: "the Playback locator ... visible only when the host
+    // is playing"; Time Slots and Volume Slots: "Green rectangle = Queued for playback. Green filled = Playing"): where
+    // each kind's envelope is now, 0 … 1 of its 4 beats, the slot it plays and the slot queued (-1 = none). Read on the
+    // thread that calls process(), after it; no allocation.
+    struct Live
+    {
+        bool playing = false;
+        std::array<double, 2> position { 0.0, 0.0 }; // [0] time, [1] volume
+        std::array<int, 2> slot { -1, -1 }, queued { -1, -1 };
+    };
+    Live live() const noexcept;
+
     struct Impl;
 
 private:

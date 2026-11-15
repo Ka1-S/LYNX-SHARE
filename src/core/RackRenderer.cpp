@@ -3419,7 +3419,8 @@ static bool hasLiveMeters (EffectKind kind) noexcept
            || kind == EffectKind::autoPan || kind == EffectKind::voiceShift // round 135: the pan position, the shifter's notes
            || kind == EffectKind::hardwareInsert // round 164d: send / return levels, the ping
            || kind == EffectKind::xyController || kind == EffectKind::xyzController // round 164: the pad's target and outputs
-           || kind == EffectKind::peakController; // issue #66: its display's Peak + LFO, Peak and LFO lines
+           || kind == EffectKind::peakController // issue #66: its display's Peak + LFO, Peak and LFO lines
+           || kind == EffectKind::grossBeat; // round 190ih: its playback locator and the playing / queued slots
 }
 
 RackState::SlotPlan RackState::planSlot (const RackState& state, int track, std::size_t i) noexcept

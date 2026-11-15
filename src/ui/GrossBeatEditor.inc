@@ -25,6 +25,80 @@
 
     static bool isGbItem (const LayoutItem& item, const char* id) { return item.type == Item::display && juce::String (item.display) == id; }
 
+    // --- live play state (round 190ih, PLAN R2: DP-1, DP-2, DP-3, DC-1, DC-2) ---------------------------------------
+    // FL's manual (Envelope Mapping Panel): "the Playback locator - a vertical ... scrolling line, visible only when the
+    // host is playing"; (Time Slots and Volume Slots) "Green rectangle = Queued for playback. Green filled = Playing".
+    // Captured in FL 2026 (details190if raw/c22, c24, c25): a 1 px line with a short fading trail behind it, and the
+    // playing slot of each grid filling from the left as its envelope plays; stopped, neither shows. The colour is
+    // LYNX's playhead (owner decision PL1). The engine publishes the state (GrossBeatEffect::controlOutput); the
+    // editor's 30 Hz timer reads it and repaints only the locator's old and new columns and the playing cells.
+    struct GbLive
+    {
+        bool playing = false;
+        std::array<float, 2> position { 0.0f, 0.0f }; // 0 … 1 of the 4-beat envelope: [0] time, [1] volume
+        std::array<int, 2> slot { -1, -1 }, queued { -1, -1 };
+        bool operator== (const GbLive& o) const { return playing == o.playing && position == o.position && slot == o.slot && queued == o.queued; }
+    };
+    GbLive gbLive;
+
+    GbLive gbReadLive() const
+    {
+        GbLive v;
+        if (! engine.getTransport().playing.load (std::memory_order_relaxed) || liveMeter (0) < 0.5f)
+            return v; // stopped: nothing drawn (FL: "visible only when the host is playing")
+        v.playing = true;
+        for (int k = 0; k < 2; ++k)
+        {
+            v.position[(std::size_t) k] = juce::jlimit (0.0f, 1.0f, liveMeter (1 + k));
+            v.slot[(std::size_t) k] = juce::roundToInt (liveMeter (3 + k)) - 1;
+            v.queued[(std::size_t) k] = juce::roundToInt (liveMeter (5 + k)) - 1;
+        }
+        return v;
+    }
+
+    // the locator's x in the envelope editor for a state, and the columns it covers with its trail
+    float gbLocatorX (const LayoutItem& item, const GbLive& v) const
+    {
+        return gbPos (gbArea (item), grossbeat::barBeats * (double) v.position[(std::size_t) gbEditKind], 0.0f).x;
+    }
+    juce::Rectangle<int> gbLocatorBounds (const LayoutItem& item, const GbLive& v) const
+    {
+        const auto inner = gbArea (item);
+        const auto x = gbLocatorX (item, v), trail = gbTrailWidth();
+        return juce::Rectangle<float> (x - trail - 2.0f, inner.getY(), trail + 5.0f, inner.getHeight()).getSmallestIntegerContainer();
+    }
+    float gbTrailWidth() const { return ui::motion::enabled() ? 6.0f * scale() : 0.0f; } // a fade: Settings › Animations
+
+    void gbLiveTick()
+    {
+        const auto now = gbReadLive();
+        if (now == gbLive)
+            return;
+        const auto before = gbLive;
+        gbLive = now;
+        for (const auto& item : activeLayout().items)
+        {
+            if (! visible (item))
+                continue;
+            if (isGbItem (item, "grossbeat"))
+            {
+                if (before.playing)
+                    repaint (gbLocatorBounds (item, before));
+                if (now.playing)
+                    repaint (gbLocatorBounds (item, now));
+            }
+            else if (const auto k = gbGridKind (item); k >= 0)
+            {
+                const auto kk = (std::size_t) k;
+                for (const auto cell : { before.slot[kk], now.slot[kk], before.queued[kk], now.queued[kk] })
+                    if (cell >= 0 && cell < grossbeat::slotsPerKind
+                        && (before.playing != now.playing || before.slot[kk] != now.slot[kk] || before.queued[kk] != now.queued[kk]
+                            || before.position[kk] != now.position[kk]))
+                        repaint (gbGridCell (item, cell).getSmallestIntegerContainer().expanded (1));
+            }
+        }
+    }
+
     const grossbeat::State& gbState() const
     {
         static const std::vector<std::uint8_t> none;
@@ -830,10 +904,17 @@
             for (int i = 0; i < grossbeat::slotsPerKind; ++i)
             {
                 const auto cell = gbGridCell (item, i).reduced (1.0f * s);
+                if (! g.clipRegionIntersects (cell.getSmallestIntegerContainer().expanded (2))) // (round 190ih: a playing cell repaints alone)
+                    continue;
                 const auto& slot = gbState().slots[(std::size_t) (k * grossbeat::slotsPerKind + i)];
                 const auto isSel = i == selected, hot = gbHoverCell == k * grossbeat::slotsPerKind + i;
                 g.setColour (isSel ? colour.withAlpha (0.22f) : hot ? colour::bg3 : (i / 4 + i) % 2 == 0 ? colour::bg1 : colour::bg2);
                 g.fillRoundedRectangle (cell, radius::sm * s);
+                if (gbLive.playing && i == gbLive.slot[(std::size_t) k]) // round 190ih: FL's "filled = playing", from the left
+                {
+                    g.setColour (colour.withAlpha (0.45f));
+                    g.fillRoundedRectangle (cell.withWidth (cell.getWidth() * gbLive.position[(std::size_t) k]), radius::sm * s);
+                }
                 const auto levels = grossbeat::renderSlot (slot, juce::jmax (8, (int) cell.getWidth()));
                 const auto flat = std::all_of (levels.begin(), levels.end(), [&] (float v) { return std::abs (v - levels.front()) < 1.0e-4f; });
                 if (! flat) // a thumbnail of the envelope, filled
@@ -865,7 +946,7 @@
                 g.setColour (isSel ? colour::textPrimary : named ? colour::textPrimary.withAlpha (0.85f) : colour::textDisabled);
                 g.drawFittedText (named ? juce::String::fromUTF8 (slot.name.c_str()) : juce::String (i + 1), cell.reduced (3.0f * s, 0.0f).toNearestInt(),
                                   juce::Justification::centred, 1, 0.65f);
-                if (isSel)
+                if (isSel || (gbLive.playing && i == gbLive.queued[(std::size_t) k])) // (FL: "rectangle = queued for playback")
                 {
                     g.setColour (colour);
                     g.drawRoundedRectangle (cell, radius::sm * s, 1.4f * s);
@@ -1019,4 +1100,18 @@
         g.setColour (kindColour.withAlpha (0.8f));
         g.setFont (font (juce::jmax (8.0f, 10.0f * s), true));
         g.drawText (gbEditKind == 0 ? tr ("time travel") : tr ("volume"), inner.reduced (6.0f * s).toNearestInt(), juce::Justification::topRight, false);
+
+        if (gbLive.playing) // round 190ih: the playback locator with its short fading trail (FL, raw/c24)
+        {
+            const auto x = std::floor (gbLocatorX (item, gbLive));
+            const auto lineW = juce::jmax (1.0f, std::floor (s));
+            if (const auto trail = gbTrailWidth(); trail > 0.0f)
+            {
+                const auto t = juce::Rectangle<float> (x - trail, inner.getY(), trail, inner.getHeight()).getIntersection (inner);
+                g.setGradientFill (juce::ColourGradient (colour::playhead.withAlpha (0.0f), x - trail, 0.0f, colour::playhead.withAlpha (0.45f), x, 0.0f, false));
+                g.fillRect (t);
+            }
+            g.setColour (colour::playhead);
+            g.fillRect (juce::Rectangle<float> (x, inner.getY(), lineW, inner.getHeight()).getIntersection (inner));
+        }
     }

@@ -2048,6 +2048,35 @@ void Engine::start (double ticks) { impl->start (ticks); }
 void Engine::stop() { impl->stop(); }
 bool Engine::playing() const noexcept { return impl->enabled; }
 
+// the player's place in its envelope, in beats: the points before its segment plus the part of the segment played
+// (segment `idx` runs from point idx - 1 to point idx and is p[idx].dx wide; phase is 0 … 1 across it)
+static double playerBeat (const Player& player, const std::vector<Point>& p) noexcept
+{
+    if (p.empty())
+        return 0.0;
+    const auto idx = std::clamp (player.idx, 0, (int) p.size() - 1);
+    double x = 0.0;
+    for (int k = 0; k < idx; ++k)
+        x += p[(std::size_t) k].dx;
+    x += std::clamp (player.phase, 0.0, 1.0) * std::max (0.0, p[(std::size_t) idx].dx);
+    return std::clamp (x, 0.0, barLength);
+}
+
+Engine::Live Engine::live() const noexcept
+{
+    Live out;
+    out.playing = impl->enabled;
+    for (int k = 0; k < 2; ++k)
+    {
+        const auto& K = impl->kinds[(std::size_t) k];
+        out.slot[(std::size_t) k] = K.current;
+        out.queued[(std::size_t) k] = K.pendingTime != intMax ? K.pendingIndex : -1;
+        if (K.current >= 0)
+            out.position[(std::size_t) k] = playerBeat (K.player, impl->currentSlot (k).points) / barLength;
+    }
+    return out;
+}
+
 void Engine::jump (double ticks)
 {
     impl->hostTicks = ticks;
@@ -2229,9 +2258,32 @@ public:
         expected = songTicks + (double) n * bpm / 60.0 * (double) ppq / (double) sampleRate;
         engine.process (l, r, n, flTicks);
         samplesDone += n;
+        publishLive();
+    }
+
+    // round 190ih: the editor's playback locator and slot states (outputs; the rack zeroes them for a bypassed slot)
+    float controlOutput (int output) const noexcept override
+    {
+        return output >= 0 && output < liveOutputs ? live[(std::size_t) output].load (std::memory_order_relaxed) : 0.0f;
     }
 
 private:
+    // outputs: 0 playing (1 / 0), 1 / 2 the time / volume envelope's position (0 … 1), 3 / 4 the time / volume slot
+    // playing + 1, 5 / 6 the slot queued + 1 (0 = none: what a cleared meter reads)
+    static constexpr int liveOutputs = 7;
+    std::array<std::atomic<float>, liveOutputs> live {};
+    void publishLive() noexcept
+    {
+        const auto s = engine.live();
+        live[0].store (s.playing ? 1.0f : 0.0f, std::memory_order_relaxed);
+        for (int k = 0; k < 2; ++k)
+        {
+            live[(std::size_t) (1 + k)].store ((float) s.position[(std::size_t) k], std::memory_order_relaxed);
+            live[(std::size_t) (3 + k)].store ((float) (s.slot[(std::size_t) k] + 1), std::memory_order_relaxed);
+            live[(std::size_t) (5 + k)].store ((float) (s.queued[(std::size_t) k] + 1), std::memory_order_relaxed);
+        }
+    }
+
     void takeMidiSettings (const State& s) noexcept
     {
         midiTrigger = s.midiTrigger;
