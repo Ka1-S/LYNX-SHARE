@@ -4982,6 +4982,8 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
     workers = pool;
 
     // 3) Master: inputs, effects, fader. Without a configured mixer, it stays at 0 dB.
+    if (renderTaps != nullptr) // round 190gj: what the Master holds before its routes (its own channels)
+        copyToRenderTap (0, trackBuffer (0, 0), trackBuffer (0, 1), numSamples);
     pullInputs (state, 0, numSamples);
     if (meters != nullptr)
         meters->rollingLog.push (RollingAudioLog::Position::preEffects, trackBuffer (0, 0), trackBuffer (0, 1), numSamples);
@@ -5293,6 +5295,14 @@ void RackRenderer::mixSideInput (const RackState& state, int track, int n) noexc
     }
 }
 
+void RackRenderer::copyToRenderTap (int t, const float* l, const float* r, int n) noexcept
+{
+    if (! renderTaps->wants (t) || liveInputOffset < 0 || liveInputOffset + n > renderTaps->capacity)
+        return;
+    std::memcpy (renderTaps->left (t) + liveInputOffset, l, sizeof (float) * (std::size_t) n);
+    std::memcpy (renderTaps->right (t) + liveInputOffset, r, sizeof (float) * (std::size_t) n);
+}
+
 void RackRenderer::pullInputs (const RackState& state, int t, int n) noexcept
 {
     if ((std::size_t) t >= state.mixerInputs.size())
@@ -5573,6 +5583,11 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
     tap (RecordSource::postTrack, l, r);
 
     trackActive[(std::size_t) t] = silentOut ? 2 : 1;
+    // round 190gj: the single-pass stems' tap (what this insert sends on). Rollup 0.1.28: through trackInput, as 190gp's
+    // readers do: a silent insert may end here with zeros it never stored (trackZeros), its buffer then still holding
+    // an older block
+    if (renderTaps != nullptr)
+        copyToRenderTap (t, trackInput (t, 0), trackInput (t, 1), n);
 
     if (meters != nullptr)
     {

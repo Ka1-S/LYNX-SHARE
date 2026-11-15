@@ -454,6 +454,38 @@ juce::String AudioEngine::exportParitySelfTest (const std::function<void (const 
         else if (firstSound (exportSong (makeBounceSong (sent, 5), o, "insert-5", mixFrames, nullptr)) < 0)
             errors.add ("insert 5 (fed only by a send) is silent");
     }
+    // round 190gj (owner decision 2026-11-14, FL's split render): an insert whose compressor listens to another insert
+    // keeps its ducking in its stem (the key plays unheard in the stem's render), so the stems still add up to the mix
+    {
+        auto o = options;
+        o.stems = exportopts::Stems::mixerTracks;
+        auto keyed = song;
+        auto comp = makeEffectSlot (EffectKind::compressor);
+        comp.params[0] = 0.1f; // (a low threshold and a high ratio: the key's hits are heard on insert 4)
+        comp.params[1] = 0.8f;
+        comp.sidechain = 1;
+        keyed.mixer[4].effects.push_back (comp);
+        std::int64_t keyedFrames = 0;
+        const auto keyedMix = exportSong (keyed, options, "keyed-mix", 0, &keyedFrames);
+        std::vector<Audio> parts;
+        for (auto t : { 3, 4 }) // (the inserts on the Master)
+            parts.push_back (exportSong (makeBounceSong (keyed, t), o, "keyed-insert-" + juce::String (t), keyedFrames, nullptr));
+        Audio sum;
+        sum.l.assign (keyedMix.l.size(), 0.0f);
+        sum.r.assign (keyedMix.r.size(), 0.0f);
+        for (const auto& p : parts)
+            for (std::size_t i = 0; i < juce::jmin (p.l.size(), sum.l.size()); ++i)
+                sum.l[i] += p.l[i], sum.r[i] += p.r[i];
+        const auto d = maxDiff (keyedMix, sum, keyedMix.l.size());
+        say ("side-chained insert: the stems' sum against the mix " + db (d));
+        if (keyedMix.l.empty() || d >= 3.16e-5f)
+            errors.add ("with a side-chained insert the stems don't add up to the mix (" + db (d) + ")");
+        auto unkeyed = makeBounceSong (keyed, 4);
+        unkeyed.mixer[4].effects.back().sidechain = -1;
+        const auto plain = exportSong (unkeyed, o, "unkeyed-insert-4", keyedFrames, nullptr);
+        if (parts.size() == 2 && maxDiff (parts[1], plain, plain.l.size()) < 1.0e-3f)
+            errors.add ("the side-chained insert's stem is not ducked (its key is silent in its render)");
+    }
     {
         auto o = options;
         o.stems = exportopts::Stems::channels;
@@ -478,6 +510,6 @@ juce::String AudioEngine::exportParitySelfTest (const std::function<void (const 
 
     if (! errors.isEmpty())
         return "ERROR " + errors.joinIntoString ("; ");
-    return "OK (export = playback, stems of 2 modes add up to the mix" + (notes.isEmpty() ? juce::String() : ", " + notes.joinIntoString (", ")) + ")";
+    return "OK (export = playback, stems of 2 modes add up to the mix, side-chained stems ducked" + (notes.isEmpty() ? juce::String() : ", " + notes.joinIntoString (", ")) + ")";
 }
 } // namespace lynx

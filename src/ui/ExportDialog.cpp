@@ -138,7 +138,9 @@ private:
 };
 
 // Stems: one file per insert that produces sound (FL's "split mixer tracks") or per channel that plays (each heard
-// through its mixer path), plus the full mix when asked. Each render creates its own engine; plugins are created and
+// through its mixer path), plus the full mix when asked. Round 190gj: the inserts' stems (and the full mix) come from
+// one render of the song, as FL makes them (engine/Exporter.h, StemPass); what one render cannot make exactly (channel
+// stems, an insert whose own render hears something else) gets its own render, as before. Plugins are created and
 // destroyed on the UI thread, so the background thread asks it to do that.
 class StemsThread final : public juce::ThreadWithProgressWindow
 {
@@ -151,141 +153,31 @@ public:
           afterRender (std::move (done)),
           options (o),
           baseFile (std::move (base)),
-          song (e.getSong())
+          plan (planStemExport (e.getSong(), o, baseFile, onlyTracks))
     {
-        // round 190ap: "One file per marker section" — each section is rendered as a time selection of the song, alone
-        // ("<name> - 02 Verse.wav") or with its stems ("<name> - 02 Verse - 3 Bass.wav")
-        if (exportopts::exportsSections (song, options))
-        {
-            sectioned = true;
-            const auto ext = exportopts::extension (options.format);
-            const auto sections = exportopts::markerSections (song);
-            const auto each = exportopts::sectionOptions (options);
-            const auto baseName = baseFile.getFileNameWithoutExtension().toStdString();
-            for (std::size_t i = 0; i < sections.size(); ++i)
-            {
-                const auto name = exportopts::sectionBaseName (baseName, (int) i + 1, (int) sections.size(), sections[i].name);
-                const auto file = baseFile.getSiblingFile (juce::String::fromUTF8 (name.c_str()) + ext);
-                const auto part = exportopts::makeSectionSong (song, sections[i]);
-                if (each.stems == exportopts::Stems::none)
-                    items.push_back ({ juce::String::fromUTF8 (sections[i].name.c_str()), file, part, each });
-                else
-                    addItems (part, each, file, onlyTracks, juce::String::fromUTF8 (sections[i].name.c_str()) + ": ");
-            }
-            return;
-        }
-        addItems (song, options, baseFile, onlyTracks, {});
-    }
-
-    // the files of one render set: the full mix when asked, then one per channel or insert
-    void addItems (const Song& from, const exportopts::Options& o, const juce::File& base, const std::vector<int>& onlyTracks, const juce::String& prefix)
-    {
-        const auto ext = exportopts::extension (o.format);
-        const auto baseName = base.getFileNameWithoutExtension().toStdString();
-        auto file = [&] (int number, const std::string& name) {
-            return base.getSiblingFile (juce::String::fromUTF8 (exportopts::stemFileName (baseName, number, name, ext).c_str()));
-        };
-
-        const auto set = (int) sets.size();
-        if (o.tail == exportopts::TailMode::leave) // (cut / wrap: every file is the music's length already)
-            sets.push_back ({ from, o });
-        const auto first = items.size();
-        if (o.stemsIncludeMaster)
-            items.push_back ({ prefix + juce::String ("Master"), base, from, o, -1, true });
-
-        if (o.stems == exportopts::Stems::channels || o.stems == exportopts::Stems::channelsDry)
-            for (auto c : exportopts::stemChannels (from, o.range))
-                items.push_back ({ prefix + juce::String::fromUTF8 (from.channels[(std::size_t) c].name.c_str()), file (c + 1, from.channels[(std::size_t) c].name),
-                                   exportopts::makeChannelStemSong (from, c, o.stems == exportopts::Stems::channelsDry), o });
-        else
-            for (auto t : exportopts::stemTracks (from, onlyTracks))
-                items.push_back ({ prefix + juce::String::fromUTF8 (from.mixer[(std::size_t) t].name.c_str()),
-                                   ! onlyTracks.empty() && recordToFile (from, t) != juce::File() ? recordToFile (from, t).withFileExtension (ext)
-                                                                                                  : file (t, from.mixer[(std::size_t) t].name),
-                                   makeBounceSong (from, t), o });
-        if (o.tail == exportopts::TailMode::leave)
-            for (auto i = first; i < items.size(); ++i)
-                items[i].set = set;
-    }
-
-    // FL's "Record <insert> to" file of an insert (round 167a): a track render writes there; none = File()
-    static juce::File recordToFile (const Song& song, int t)
-    {
-        if (t <= 0 || t >= (int) song.mixer.size())
-            return {};
-        const auto path = juce::String::fromUTF8 (song.mixer[(std::size_t) t].recordTo.c_str());
-        return path.isNotEmpty() && juce::File::isAbsolutePath (path) ? juce::File (path) : juce::File();
+        made.assign (plan.items.size(), 0);
     }
 
     void run() override
     {
-        for (std::size_t i = 0; i < items.size() && ! threadShouldExit(); ++i)
-        {
-            auto& item = items[i];
-            setStatusMessage (item.name);
-
-            // round 190gh (B7): the set's length, from its mix (exported first when asked, else rendered once to find it)
-            std::int64_t exact = 0;
-            if (item.set >= 0 && ! item.mix)
-            {
-                auto& set = sets[(std::size_t) item.set];
-                if (set.frames < 0)
-                    set.frames = probeLength (item.set);
-                exact = juce::jmax<std::int64_t> (0, set.frames);
-            }
-
-            JobOnMessageThread slot (*this);
-            auto* job = slot.create ([&item, exact] {
-                auto j = std::make_unique<ExportJob> (item.song, item.options, item.file);
-                j->setExtraData (true);
-                j->setExactFrames (exact);
-                return j;
+        runStemExport (
+            plan, [] (std::function<void()> f) { juce::MessageManager::callAsync (std::move (f)); }, [this] { return threadShouldExit(); },
+            [this] (double p) { setProgress (p); }, [this] (const juce::String& name) { setStatusMessage (name); },
+            [this] (std::size_t i, bool ok, float) {
+                if (ok && i < made.size())
+                {
+                    ++written;
+                    made[i] = 1;
+                }
             });
-            if (job == nullptr)
-                break; // (cancelled)
-
-            juce::String error;
-            const auto base = (double) i / (double) items.size();
-            const auto ok = job->run ([this, base] (double p) {
-                setProgress (base + p / (double) items.size());
-                return ! threadShouldExit();
-            }, error);
-
-            if (ok)
-            {
-                ++written;
-                files.push_back (item.file);
-                if (item.mix && item.set >= 0)
-                    sets[(std::size_t) item.set].frames = job->getWrittenFrames();
-            }
-
-            slot.release();
-        }
-    }
-
-    // the length of a set's mix (no file kept): a render to a temporary file
-    std::int64_t probeLength (int index)
-    {
-        const auto& set = sets[(std::size_t) index];
-        setStatusMessage (tr ("Measuring the length of the mix..."));
-        auto o = set.options;
-        o.format = exportopts::Format::wav;
-        o.moreFormats = 0;
-        o.wavBits = 16;
-        const juce::TemporaryFile temp (".wav");
-        JobOnMessageThread slot (*this);
-        const auto& mix = set.mix;
-        auto* job = slot.create ([&mix, &o, &temp] { return std::make_unique<ExportJob> (mix, o, temp.getFile()); });
-        if (job == nullptr)
-            return 0;
-        juce::String error;
-        const auto frames = job->run ([this] (double) { return ! threadShouldExit(); }, error) ? job->getWrittenFrames() : 0;
-        slot.release();
-        return frames;
+        for (std::size_t i = 0; i < made.size(); ++i) // (in the plan's order, as one render after another wrote them)
+            if (made[i] != 0)
+                files.push_back (plan.items[i].file);
     }
 
     void threadComplete (bool cancelled) override
     {
+        const auto sectioned = plan.sectioned;
         if (! cancelled && written > 0 && afterRender)
             afterRender (files);
         if (! cancelled && options.showWhenDone && written > 0)
@@ -303,30 +195,11 @@ public:
     }
 
 private:
-    struct Item
-    {
-        juce::String name;
-        juce::File file;
-        Song song;
-        exportopts::Options options; // (a section is rendered as a selection of the song, round 190ap)
-        int set = -1;                // round 190gh (B7): the render set (a stems export, or one section's) it belongs to
-        bool mix = false;            // the set's full mix ("Master")
-    };
-    // round 190gh (B7): every file of one stems export has the mix's length, as FL's split render (the tail ends where
-    // the mix's tail ends): the set's mix and its options, to find that length when the mix itself is not exported
-    struct RenderSet
-    {
-        Song mix;
-        exportopts::Options options;
-        std::int64_t frames = -1; // found: the mix's length after the trim
-    };
-    std::vector<RenderSet> sets;
-    bool sectioned = false;
     std::function<void (const std::vector<juce::File>&)> afterRender;
     exportopts::Options options;
     juce::File baseFile;
-    Song song;
-    std::vector<Item> items;
+    StemPlan plan;
+    std::vector<char> made;        // [item] written
     std::vector<juce::File> files; // written
     int written = 0;
 };
