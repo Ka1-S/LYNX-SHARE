@@ -6061,6 +6061,11 @@ juce::String AudioEngine::describeRealtime (bool withUnits) const
              << ", started " << n (r.engagements) << ", states taken at once " << n (r.statesSwapped) << ", channels joined live " << n (r.promoted)
              << ", partition changes " << n (r.partitionChanges) << ", boundary mismatches " << n (r.splitMismatches) << "; ahead "
              << r.aheadChannels.load() << " channels / " << r.aheadTracks.load() << " inserts, boundary " << r.boundary.load() << "\n";
+        // (perfgate190id) the engagement rule's probes: how often, what they kept, and the last one's measurements
+        text << "  render ahead probes " << n (r.probes) << ": kept on " << n (r.keptOn) << " (for fewer overruns " << n (r.keptForOverruns)
+             << "), kept off " << n (r.keptOff) << "; last probe CPU " << juce::String (r.probeCpuOff.load(), 1) << "% off / "
+             << juce::String (r.probeCpuOn.load(), 1) << "% on, overruns " << juce::String (r.probeOverOff.load(), 0) << " / "
+             << juce::String (r.probeOverOn.load(), 0) << " per minute\n";
     }
     if (withUnits && heaviestUnits.empty())
         text << "  heaviest: not measured yet\n";

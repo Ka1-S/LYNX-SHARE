@@ -136,7 +136,8 @@ struct Stats
 {
     std::atomic<std::uint64_t> blocks { 0 }, fromRing { 0 }, waited { 0 }, inline_ { 0 }, flushes { 0 }, drains { 0 },
         engagements { 0 }, partitionChanges { 0 }, promoted { 0 }, splitMismatches { 0 }, statesSwapped { 0 }, backoffs { 0 },
-        probes { 0 }, keptOn { 0 }, keptOff { 0 };
+        probes { 0 }, keptOn { 0 }, keptOff { 0 },
+        keptForOverruns { 0 }; // (perfgate190id: kept on by favourFewerOverruns alone, not by a CPU win)
     // the last probe: the rack's CPU (% of a core) and overruns per minute, render-ahead off and on
     std::atomic<float> probeCpuOff { 0.0f }, probeCpuOn { 0.0f }, probeOverOff { 0.0f }, probeOverOn { 0.0f };
     std::atomic<int> aheadChannels { 0 }, aheadTracks { 0 }, boundary { 0 }, window { 0 };

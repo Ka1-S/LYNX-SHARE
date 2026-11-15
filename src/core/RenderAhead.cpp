@@ -1032,6 +1032,8 @@ void RenderAhead::account (double wallNs, double cpuNs, int samples, bool playin
                 offHold = keep ? decidedSeconds : std::min (600.0, offHold * 2.0);
                 decidedState = state != nullptr ? state->serial : 0;
                 (keep ? counters.keptOn : counters.keptOff).fetch_add (1, std::memory_order_relaxed);
+                if (keep && ! (lessCpu && overRateOn <= overRateOff))
+                    counters.keptForOverruns.fetch_add (1, std::memory_order_relaxed);
                 if (! keep)
                     drain.store (true, std::memory_order_release);
             }

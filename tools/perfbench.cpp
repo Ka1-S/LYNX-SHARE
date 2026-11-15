@@ -17,7 +17,13 @@
 //   idle            the synth100 project with the transport stopped and nothing playing (the cost of an idle project)
 //   afterstop       the synth100 project played for --warmup seconds (not measured), then stopped (round 190gp: the
 //                   seconds after Stop, while the effects' tails die away and smart disable takes them out)
+//   big200          200 channels, 120 inserts with LYNX's own effects, 2,000 clips, 200 automation clips (round
+//                   perfgate190id; this and the next: core/PerfProjects.h, the big-project performance gate)
+//   automation      32 synths, 16 inserts, 400 dense automation clips and a tempo clip
+//   calibrate       a fixed piece of work no LYNX change touches: the machine's speed (the gate divides by it)
 //   flp:<path>      an FL Studio project, whole song (FL's own data from FL_ROOT, as renderwav)
+// --gate: one machine-readable "GATE key=value ..." line at the end (CPU, instructions, import / build / rebuild time,
+// peak memory, hash; dropouts with --paced) for scripts/perf_gate.py.
 // --threads N: N worker threads besides the calling one (the app's WorkerPool); the CPU time is then the process'
 // (every thread, spinning included) and the instructions are the calling thread's only.
 // Round 190gq (render-ahead, core/RenderAhead.h):
@@ -49,6 +55,9 @@
 #include <vector>
 
 #include <time.h>
+#if ! defined(_WIN32)
+ #include <sys/resource.h>
+#endif
 #if defined(__linux__)
  #include <linux/perf_event.h>
  #include <sys/ioctl.h>
@@ -65,6 +74,7 @@
 #include "core/Meters.h"
 #include "core/RackRenderer.h"
 #include "core/RenderAhead.h"
+#include "core/PerfProjects.h"
 #include "core/ShowcaseSong.h"
 #include "core/SynthPresets.h"
 #include "core/WorkerPool.h"
@@ -166,169 +176,61 @@ Song importProject (const std::string& path)
     return importFlp (flp::parseProject (bytes), options);
 }
 
-SynthSettings presetAt (std::size_t k)
+// the process' peak resident memory in MB (-1 when unknown)
+double peakRssMb()
 {
-    static const auto presets = synthPresets();
-    return presets.empty() ? SynthSettings {} : presets[k % presets.size()].second;
+#if ! defined(_WIN32)
+    rusage usage {};
+    if (getrusage (RUSAGE_SELF, &usage) == 0)
+ #if defined(__APPLE__)
+        return (double) usage.ru_maxrss / 1048576.0; // (bytes on macOS)
+ #else
+        return (double) usage.ru_maxrss / 1024.0; // (kilobytes on Linux)
+ #endif
+#endif
+    return -1.0;
 }
 
-Note makeNote (int channel, double beat, double beats, int key, float velocity)
+// perfgate190id: a fixed piece of DSP-like work (biquads, a soft clip, an interpolated table read over 256 KB) that no
+// LYNX change touches. The gate divides its CPU times by this one's, so a faster or slower machine (CI runners differ)
+// moves both alike; median of 7 runs, ms of thread CPU.
+double calibrationMs()
 {
-    Note n;
-    n.channel = channel;
-    n.start = (std::int64_t) (beat * ppq);
-    n.length = (std::int64_t) (beats * ppq);
-    n.key = key;
-    n.velocity = velocity;
-    return n;
-}
-
-// 100 synth channels, two per insert, 50 inserts with 3 effects each; every channel plays 4-bar loops (a held chord
-// on even channels, an eighth-note line on odd ones) for the whole song
-Song makeSynth100 (int bars)
-{
-    Song song;
-    song.bpm = 128.0;
-    song.mixer = Song::defaultMixer (50);
-    constexpr int channels = 100;
-    const EffectKind chains[][3] = {
-        { EffectKind::parametricEq, EffectKind::compressor, EffectKind::reverb },
-        { EffectKind::facetEq, EffectKind::crestCompressor, EffectKind::delay },
-        { EffectKind::eq, EffectKind::chorus, EffectKind::apexLimiter },
-        { EffectKind::filter, EffectKind::ember, EffectKind::atrium },
-        { EffectKind::ridgeStrip, EffectKind::echoform, EffectKind::limiter },
-    };
-    for (int t = 1; t <= 50; ++t)
-        for (const auto kind : chains[(std::size_t) (t % 5)])
-            song.mixer[(std::size_t) t].effects.push_back (makeEffectSlot (kind));
-    const int roots[4] = { 45, 41, 48, 43 };
-    for (int c = 0; c < channels; ++c)
+    std::vector<float> buffer ((std::size_t) 1 << 16), table (4096);
+    for (std::size_t i = 0; i < table.size(); ++i)
+        table[i] = (float) std::sin (6.283185307179586 * (double) i / (double) table.size());
+    std::uint32_t seed = 12345u;
+    for (auto& x : buffer)
     {
-        ChannelDef ch;
-        ch.name = "Synth " + std::to_string (c + 1);
-        ch.instrument = InstrumentKind::synth;
-        ch.synth = presetAt ((std::size_t) c);
-        ch.volume = 0.3f;
-        ch.mixerTrack = 1 + c / 2;
-        song.channels.push_back (ch);
-        auto& p = song.patterns.emplace_back();
-        p.name = ch.name;
-        for (int bar = 0; bar < 4; ++bar)
-        {
-            const auto root = roots[bar] + 12 * (c % 3);
-            if (c % 2 == 0)
-                for (int k : { 0, 4, 7 })
-                    p.notes.push_back (makeNote (c, bar * 4, 3.9, root + k, 0.7f));
-            else
-                for (int e = 0; e < 8; ++e)
-                    p.notes.push_back (makeNote (c, bar * 4 + e * 0.5, 0.4, root + 12 + (e * 5) % 12, 0.8f));
-        }
-        for (int b = 0; b < bars; b += 4)
-        {
-            Clip clip;
-            clip.pattern = c;
-            clip.track = c % 100;
-            clip.start = (std::int64_t) b * 4 * ppq;
-            clip.length = p.effectiveLength (song.meter());
-            song.playlist.push_back (clip);
-        }
+        seed = seed * 1664525u + 1013904223u;
+        x = (float) ((int) (seed >> 9) - (1 << 22)) / (float) (1 << 22);
     }
-    song.mode = PlayMode::song;
-    return song;
-}
-
-// one synth into insert 1; inserts 1..50 in a chain of sends (n → n+1), 4 effects each, the last to the Master
-Song makeInserts50 (int bars)
-{
-    Song song;
-    song.bpm = 128.0;
-    song.mixer = Song::defaultMixer (50);
-    const EffectKind kinds[] = { EffectKind::parametricEq, EffectKind::compressor, EffectKind::distortion, EffectKind::chorus,
-                                 EffectKind::facetEq, EffectKind::ember, EffectKind::delay, EffectKind::utility };
-    for (int t = 1; t <= 50; ++t)
+    std::vector<double> runs;
+    volatile float sink = 0.0f;
+    for (int run = 0; run < 7; ++run)
     {
-        for (int k = 0; k < 4; ++k)
-        {
-            auto slot = makeEffectSlot (kinds[(std::size_t) ((t + k) % 8)]);
-            slot.mix = 0.5f;
-            song.mixer[(std::size_t) t].effects.push_back (slot);
-        }
-        if (t < 50)
-        {
-            song.mixer[(std::size_t) t].sends.clear();
-            song.mixer[(std::size_t) t].toMaster = false;
-            MixerSend s;
-            s.target = t + 1;
-            song.mixer[(std::size_t) t].sends.push_back (s);
-        }
+        const auto t0 = cpuMs (CLOCK_THREAD_CPUTIME_ID);
+        float z1 = 0.0f, z2 = 0.0f, y1 = 0.0f, y2 = 0.0f, phase = 0.0f;
+        for (int pass = 0; pass < 48; ++pass)
+            for (auto& x : buffer)
+            {
+                const auto in = x;
+                const auto y = 0.2f * in + 0.4f * z1 + 0.2f * z2 + 0.6f * y1 - 0.25f * y2;
+                z2 = z1, z1 = in, y2 = y1, y1 = y;
+                phase += 0.013f;
+                phase -= (float) (int) phase;
+                const auto pos = phase * 4095.0f;
+                const auto k = (int) pos;
+                const auto frac = pos - (float) k;
+                const auto t = table[(std::size_t) k] + frac * (table[(std::size_t) k + 1] - table[(std::size_t) k]);
+                const auto v = y * 0.9f + 0.1f * t;
+                x = v / (1.0f + std::fabs (v)) + 1e-7f * in;
+            }
+        runs.push_back (cpuMs (CLOCK_THREAD_CPUTIME_ID) - t0);
+        sink = sink + buffer[(std::size_t) run];
     }
-    ChannelDef ch;
-    ch.name = "Saw";
-    ch.instrument = InstrumentKind::synth;
-    ch.synth = presetAt (3);
-    ch.mixerTrack = 1;
-    song.channels.push_back (ch);
-    auto& p = song.patterns.emplace_back();
-    for (int e = 0; e < 16; ++e)
-        p.notes.push_back (makeNote (0, e * 1.0, 0.9, 48 + (e * 7) % 12, 0.8f));
-    for (int b = 0; b < bars; b += 4)
-    {
-        Clip clip;
-        clip.pattern = 0;
-        clip.start = (std::int64_t) b * 4 * ppq;
-        clip.length = p.effectiveLength (song.meter());
-        song.playlist.push_back (clip);
-    }
-    song.mode = PlayMode::song;
-    return song;
-}
-
-// 24 audio clips of 60 s each, on 12 inserts, playing together
-Song makeStream (int seconds, std::map<std::string, std::shared_ptr<const SampleData>>& samples)
-{
-    Song song;
-    song.bpm = 120.0;
-    song.mixer = Song::defaultMixer (12);
-    constexpr int clips = 24;
-    for (int c = 0; c < clips; ++c)
-    {
-        auto data = std::make_shared<SampleData>();
-        const auto frames = (std::size_t) (44100.0 * seconds);
-        data->left.resize (frames);
-        data->right.resize (frames);
-        std::uint32_t seed = 1234567u + (std::uint32_t) c * 7919u;
-        double phase = 0.0;
-        const auto hz = 55.0 * (1 + c % 7);
-        for (std::size_t i = 0; i < frames; ++i)
-        {
-            seed = seed * 1664525u + 1013904223u;
-            const auto noise = (float) ((int) (seed >> 9) - (1 << 22)) / (float) (1 << 22);
-            phase += hz / 44100.0;
-            const auto tone = (float) std::sin (6.283185307179586 * phase);
-            data->left[i] = 0.2f * tone + 0.02f * noise;
-            data->right[i] = 0.2f * tone - 0.02f * noise;
-        }
-        const auto path = "/stream/take" + std::to_string (c) + ".wav";
-        samples[path] = data;
-        ChannelDef ch;
-        ch.name = "Take " + std::to_string (c + 1);
-        ch.instrument = InstrumentKind::audioClip;
-        ch.samplePath = path;
-        ch.mixerTrack = 1 + c % 12;
-        ch.volume = 0.4f;
-        song.channels.push_back (ch);
-        Clip clip;
-        clip.kind = ClipKind::audio;
-        clip.channel = c;
-        clip.track = c;
-        clip.start = 0;
-        clip.length = (std::int64_t) (seconds * song.bpm / 60.0 * ppq);
-        song.playlist.push_back (clip);
-    }
-    for (int t = 1; t <= 12; ++t)
-        song.mixer[(std::size_t) t].effects.push_back (makeEffectSlot (t % 2 == 0 ? EffectKind::parametricEq : EffectKind::compressor));
-    song.mode = PlayMode::song;
-    return song;
+    std::sort (runs.begin(), runs.end());
+    return runs[runs.size() / 2];
 }
 
 std::uint64_t hashSamples (const std::vector<float>& l, const std::vector<float>& r)
@@ -352,18 +254,25 @@ int main (int argc, char** argv)
 {
     if (argc < 2)
     {
-        std::fprintf (stderr, "usage: perfbench <demo|hiphop|pop|synth100|inserts50|stream|idle|flp:path> [--block N] [--threads N] "
+        std::fprintf (stderr, "usage: perfbench <demo|hiphop|pop|synth100|inserts50|stream|big200|automation|idle|calibrate|flp:path|als:path> [--block N] [--threads N] "
                               "[--seconds S] [--reps R] [--offline] [--nometers] [--raw path] [--stopped]\n");
         return 2;
     }
     applySwitches();
     const std::string scenario = argv[1];
+    if (scenario == "calibrate") // (perfgate190id: the machine's speed, see calibrationMs)
+    {
+        const auto ms = calibrationMs();
+        std::printf ("RESULT calibrate: %.2f ms\nGATE scenario=calibrate calib_ms=%.3f\n", ms, ms);
+        return 0;
+    }
     int blockSize = 256, threads = 0, reps = 5;
     double seconds = 0.0, warmup = 0.0;
     bool offline = false, meters = true, stopped = scenario == "idle" || scenario == "afterstop", units = false, aheadMode = false, paced = false, appTransport = false,
          aheadAlways = false;
     std::vector<int> liveChannels;
     int loopBars = 0;
+    bool gate = false;
     const bool playWarmup = scenario == "afterstop"; // (the warmup plays, the measured part is stopped)
     const char* raw = nullptr;
     for (int i = 2; i < argc; ++i)
@@ -402,23 +311,25 @@ int main (int argc, char** argv)
             appTransport = true;
         else if (a == "--loop")
             loopBars = std::max (0, std::atoi (next()));
+        else if (a == "--gate") // (perfgate190id: one machine-readable GATE line at the end, scripts/perf_gate.py)
+            gate = true;
     }
 
     constexpr int sampleRate = 44100;
     std::map<std::string, std::shared_ptr<const SampleData>> cache;
     Song song;
+    const auto import0 = std::chrono::steady_clock::now();
     if (scenario == "demo")
         song = makeShowcaseSong();
     else if (scenario == "hiphop")
         song = demos::make (1);
     else if (scenario == "pop")
         song = demos::make (2);
-    else if (scenario == "synth100" || scenario == "idle" || scenario == "afterstop")
-        song = makeSynth100 (16);
-    else if (scenario == "inserts50")
-        song = makeInserts50 (16);
-    else if (scenario == "stream")
-        song = makeStream (60, cache);
+    else if (scenario == "idle" || scenario == "afterstop")
+        song = perfprojects::synth100 (16);
+    else if (perfprojects::make (scenario, song, cache)) // (the gate's synthetic projects, core/PerfProjects.h)
+    {
+    }
     else if (scenario.rfind ("als:", 0) == 0) // (round 190gq: a Live set, its arrangement on the Playlist)
     {
         const auto path = scenario.substr (4);
@@ -460,6 +371,7 @@ int main (int argc, char** argv)
         return 2;
     }
 
+    const auto importMs = std::chrono::duration<double, std::milli> (std::chrono::steady_clock::now() - import0).count();
     std::int64_t songTicks = 0;
     song = makeExportSong (song, true, (std::int64_t) std::ceil (ticksPerSample (song.bpm, sampleRate) * sampleRate), songTicks);
     const auto tps = ticksPerSample (song.bpm, sampleRate);
@@ -488,13 +400,15 @@ int main (int argc, char** argv)
                  song.channels.size(), song.mixer.size(), (double) totalSamples / sampleRate, sampleRate, blockSize, threads,
                  offline ? "offline quality" : "live quality", meters ? "on" : "off", stopped ? ", stopped" : "");
 
-    std::vector<double> cpu, nsPerSample;
+    std::vector<double> cpu, nsPerSample, buildMs, droppedPerMin, overPerMin;
     std::vector<long long> instr;
     std::uint64_t firstHash = 0;
     bool sameHash = true;
     for (int rep = 0; rep < reps; ++rep)
     {
+        const auto build0 = std::chrono::steady_clock::now();
         auto state = RackState::build (song, nullptr, sampleRate, provider);
+        buildMs.push_back (std::chrono::duration<double, std::milli> (std::chrono::steady_clock::now() - build0).count());
         const auto* statePtr = state.get();
         auto renderer = std::make_unique<RackRenderer>();
         if (pool != nullptr)
@@ -652,6 +566,8 @@ int main (int argc, char** argv)
         {
             std::sort (callbackMs.begin(), callbackMs.end());
             const auto audioSeconds = (double) totalSamples / sampleRate;
+            droppedPerMin.push_back (dropouts * 60.0 / audioSeconds);
+            overPerMin.push_back (over * 60.0 / audioSeconds);
             std::printf ("paced: %d dropouts (%.2f per minute), %d callbacks over their block (%.2f per minute), worst callback %.3f ms, p99 %.3f ms, "
                          "median %.3f ms (budget %.3f ms)\n", dropouts, dropouts * 60.0 / audioSeconds, over, over * 60.0 / audioSeconds, worstMs, callbackMs[std::min (callbackMs.size() - 1, (std::size_t) (0.99 * (double) callbackMs.size()))],
                          callbackMs[callbackMs.size() / 2], 1000.0 * blockSize / sampleRate);
@@ -660,12 +576,12 @@ int main (int argc, char** argv)
         {
             const auto& st = ahead->stats();
             std::printf ("ahead: blocks %llu, from ring %llu, waited %llu, inline %llu, flushes %llu, drains %llu, engagements %llu, ahead channels %d, "
-                         "ahead inserts %d, boundary %d, window %d samples, split mismatches %llu, backoffs %llu, probes %llu, kept on %llu, kept off %llu (probe cpu %.1f%% off / %.1f%% on, overruns %.0f / %.0f per minute)\n",
+                         "ahead inserts %d, boundary %d, window %d samples, split mismatches %llu, backoffs %llu, probes %llu, kept on %llu (for fewer overruns %llu), kept off %llu (probe cpu %.1f%% off / %.1f%% on, overruns %.0f / %.0f per minute)\n",
                          (unsigned long long) st.blocks.load(), (unsigned long long) st.fromRing.load(), (unsigned long long) st.waited.load(),
                          (unsigned long long) st.inline_.load(), (unsigned long long) st.flushes.load(), (unsigned long long) st.drains.load(),
                          (unsigned long long) st.engagements.load(), st.aheadChannels.load(), st.aheadTracks.load(), st.boundary.load(), st.window.load(),
                          (unsigned long long) st.splitMismatches.load(), (unsigned long long) st.backoffs.load(),
-                         (unsigned long long) st.probes.load(), (unsigned long long) st.keptOn.load(), (unsigned long long) st.keptOff.load(),
+                         (unsigned long long) st.probes.load(), (unsigned long long) st.keptOn.load(), (unsigned long long) st.keptForOverruns.load(), (unsigned long long) st.keptOff.load(),
                          (double) st.probeCpuOff.load(), (double) st.probeCpuOn.load(), (double) st.probeOverOff.load(), (double) st.probeOverOn.load());
         }
         counter.pause();
@@ -722,5 +638,22 @@ int main (int argc, char** argv)
                  "hash %016llx%s\n",
                  scenario.c_str(), blockSize, threads, median (cpu), 100.0 * median (cpu) / audioMs, median (nsPerSample),
                  (double) median (instr) / (double) totalSamples, (unsigned long long) firstHash, sameHash ? "" : " (HASH VARIES BETWEEN REPS)");
+    // rep 0's build decodes the samples (a project's load); the later ones are what an edit's new snapshot costs
+    const auto firstBuild = buildMs.front();
+    const auto rebuild = buildMs.size() > 1 ? median (std::vector<double> (buildMs.begin() + 1, buildMs.end())) : firstBuild;
+    std::printf ("project: import %.1f ms, first build %.1f ms, rebuild %.1f ms (median), peak memory %.0f MB; %zu channels, %zu inserts, "
+                 "%zu playlist clips, %zu automations\n",
+                 importMs, firstBuild, rebuild, peakRssMb(), song.channels.size(), song.mixer.size(), song.playlist.size(), song.automations.size());
+    if (gate)
+    {
+        std::printf ("GATE scenario=%s block=%d threads=%d seconds=%.2f cpu_pct=%.3f ns_per_sample=%.2f instr_per_sample=%.0f import_ms=%.2f "
+                     "build_ms=%.2f rebuild_ms=%.2f rss_mb=%.1f hash=%016llx hash_stable=%d",
+                     scenario.c_str(), blockSize, threads, audioMs / 1000.0, 100.0 * median (cpu) / audioMs, median (nsPerSample),
+                     median (instr) < 0 ? -1.0 : (double) median (instr) / (double) totalSamples, importMs, firstBuild, rebuild, peakRssMb(),
+                     (unsigned long long) firstHash, sameHash ? 1 : 0);
+        if (paced)
+            std::printf (" dropouts_per_min=%.2f overruns_per_min=%.2f", median (droppedPerMin), median (overPerMin));
+        std::printf ("\n");
+    }
     return 0;
 }
