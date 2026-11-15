@@ -871,7 +871,7 @@ void PianoRollComponent::drumPaintAt (juce::Point<int> p, bool snapOn)
     editNotes ([&n] (Pattern& pat) { noteedit::paste (pat, { n }, 0); });
 
     if (key != previewKey)
-        previewOn (key, n.velocity);
+        previewEdit (key, n.velocity);
 }
 
 // --- painting ------------------------------------------------------------------
@@ -1653,6 +1653,12 @@ void PianoRollComponent::previewOn (int key, float velocity)
     repaint (0, headerHeight, keyboardWidth, getHeight());
 }
 
+void PianoRollComponent::previewEdit (int key, float velocity)
+{
+    if (gesture::previewsEditedNote (engine.getTransport().playing.load(), previewWhilePlaying))
+        previewOn (key, velocity);
+}
+
 void PianoRollComponent::previewOff()
 {
     previewNotes.releaseAll();
@@ -2218,7 +2224,7 @@ void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
         dragNote = added[grabbedAt];
         drag = Drag::move;
         grabOffset = ordered[grabbedAt].start - snap (xToTick (e.x), snapOn);
-        previewOn (ordered[grabbedAt].key, ordered[grabbedAt].velocity);
+        previewEdit (ordered[grabbedAt].key, ordered[grabbedAt].velocity);
         return;
     }
 
@@ -2244,7 +2250,7 @@ void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
         grabOffset = n.start - snap (xToTick (e.x), snapOn);
         lastLength = n.length;
         noteTemplate.takeFrom (n); // FL: new notes get the clicked note's properties (round 166e)
-        previewOn (n.key, n.velocity);
+        previewEdit (n.key, n.velocity);
         return;
     }
 
@@ -2268,7 +2274,7 @@ void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
         const auto start = juce::jmax<std::int64_t> (0, snap (xToTick (e.x), snapOn));
         paintNoteAt (start, snapKey (yToKey (e.y)), noteedit::monophonicPaint (e.mods.isShiftDown(), monophonicPainting));
         nextPaintTick = start + paintLength;
-        previewOn (snapKey (yToKey (e.y)), noteTemplate.velocity);
+        previewEdit (snapKey (yToKey (e.y)), noteTemplate.velocity);
         return;
     }
 
@@ -2302,7 +2308,7 @@ void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
         setSelection (added);
     drag = Drag::move;
     grabOffset = 0;
-    previewOn (n.key, n.velocity);
+    previewEdit (n.key, n.velocity);
 }
 
 void PianoRollComponent::mouseDrag (const juce::MouseEvent& e)
@@ -2560,7 +2566,7 @@ void PianoRollComponent::mouseDrag (const juce::MouseEvent& e)
             }
 
             if (snapKey (yToKey (e.y)) != previewKey)
-                previewOn (snapKey (yToKey (e.y)), noteTemplate.velocity);
+                previewEdit (snapKey (yToKey (e.y)), noteTemplate.velocity);
             return;
         }
 
@@ -2621,7 +2627,7 @@ void PianoRollComponent::mouseDrag (const juce::MouseEvent& e)
             const auto& moved = currentPattern (engine.getSong()).notes[(std::size_t) dragNote];
 
             if (moved.key != oldKey)
-                previewOn (moved.key, moved.velocity);
+                previewEdit (moved.key, moved.velocity);
             return;
         }
 
@@ -3344,6 +3350,11 @@ void PianoRollComponent::runOperation (const std::function<std::vector<int> (Pat
 
 void PianoRollComponent::showMoreMenu()
 {
+    moreMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&moreButton));
+}
+
+juce::PopupMenu PianoRollComponent::moreMenu()
+{
     const auto grid = gridTicks();
     const auto bar = engine.getSong().barTicks();
     juce::PopupMenu menu;
@@ -3402,6 +3413,12 @@ void PianoRollComponent::showMoreMenu()
         repaint();
     });
     menu.addItem (tr ("Resize notes from the left edge too") + "\tCtrl+Alt+Home", true, resizeFromLeft, [this] { resizeFromLeft = ! resizeFromLeft; });
+    // issue #183: FL keeps placed and dragged notes silent while the song / pattern plays; this hears them anyway
+    menu.addItem (tr ("Preview notes while playing"), true, previewWhilePlaying, [] {
+        previewWhilePlaying = ! previewWhilePlaying;
+        if (EditorGlobals::get().onOptionsChanged)
+            EditorGlobals::get().onOptionsChanged(); // (saved with the UI settings)
+    });
     menu.addItem (tr ("Show ghost notes") + "\tAlt+V", true, showGhosts,
                   [this] { ghostButton.setToggleState (! ghostButton.getToggleState(), juce::sendNotificationSync); });
     menu.addItem (tr ("Ghost notes are editable") + "\tCtrl+Alt+V", true, editGhosts, [this] {
@@ -3413,7 +3430,7 @@ void PianoRollComponent::showMoreMenu()
     menu.addSubMenu (tr ("Ghost channels"), ghostChannelsMenu());
     menu.addSeparator();
     menu.addSubMenu ("MIDI", midiMenu());
-    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&moreButton));
+    return menu;
 }
 
 bool PianoRollComponent::ghostShown (int channel) const noexcept
@@ -4126,7 +4143,7 @@ void PianoRollComponent::wheelNoteProperty (int note, float deltaY, bool fine, j
     const auto& n = notes[(std::size_t) heard];
     if (note >= 0)
         noteTemplate.takeFrom (n);
-    previewOn (n.key, n.velocity);
+    previewEdit (n.key, n.velocity);
     const auto serial = ++wheelPreviewSerial;
     juce::Timer::callAfterDelay (180, [safe = juce::Component::SafePointer<PianoRollComponent> (this), serial] {
         if (safe != nullptr && safe->wheelPreviewSerial == serial && safe->drag == Drag::none)
@@ -4419,7 +4436,7 @@ void PianoRollComponent::nudge (std::int64_t ticks, int keys)
     if (keys != 0 && selection.size() == 1)
     {
         const auto& n = currentPattern (engine.getSong()).notes[(std::size_t) selection[0]];
-        previewOn (n.key, n.velocity);
+        previewEdit (n.key, n.velocity);
         juce::Timer::callAfterDelay (150, [safe = juce::Component::SafePointer<PianoRollComponent> (this)] {
             if (safe != nullptr)
                 safe->previewOff();

@@ -10145,3 +10145,17 @@ countries: jp
 "Potentially slow operation" = "時間がかかる可能性のある操作"
 "Are you sure you want to load {0} plugins at once?" = "{0} 個のプラグインを一度に読み込みますか?"
 "Sample settings" = "サンプル設定"
+
+# --- Round 190ib: issues #170 (Track N = insert N), #181 (Ctrl+,), #183 (preview while playing)
+"Link Playlist tracks to mixer tracks" = "プレイリストのトラックをミキサートラックにリンク"
+"Settings (press again to close)" = "設定 (もう一度押すと閉じます)"
+"Preview notes while playing" = "再生中もノートを試聴"
+"Track {0} is linked to insert {0}" = "トラック{0}をインサート{0}にリンク"
+"{0}{1} moves to insert {2}, with its effects and routing" = "{0}{1}はエフェクトとルーティングごとインサート{2}へ移動"
+"{0}{1} sends into insert {2} instead of the Master" = "{0}{1}はマスターの代わりにインサート{2}へ送る"
+"{0}: {1} → insert {2}" = "{0}: {1} → インサート{2}"
+"(its sound changes: the effects or settings of the insert it leaves or joins apply)" = "(音が変わります: 離れる、または入るインサートのエフェクトや設定がかかります)"
+"Track {0} only repeats Track {1}'s instruments: it stays unlinked and plays through insert {1}" = "トラック{0}はトラック{1}の楽器を繰り返すだけ: リンクせず、インサート{1}を通して鳴ります"
+"Playlist track N becomes mixer insert N: what a track's own instruments and samples play goes through its insert, and its header's M, S, volume and pan are the insert's. This changes:" = "プレイリストのトラックNがミキサーのインサートNになります。トラック自身の楽器やサンプルの音はそのインサートを通り、ヘッダーのM、S、音量、パンはインサートのものです。変更内容:"
+"It is one step: Edit › Undo takes it all back." = "1ステップです: 編集 › 元に戻す ですべて戻せます。"
+"(repeats Track {0}'s instruments: plays through insert {0})" = "(トラック{0}の楽器を繰り返す: インサート{0}を通して鳴る)"

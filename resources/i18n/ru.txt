@@ -10145,3 +10145,17 @@ countries: ru by kz
 "Potentially slow operation" = "Операция может быть медленной"
 "Are you sure you want to load {0} plugins at once?" = "Точно загрузить {0} плагинов за раз?"
 "Sample settings" = "Настройки сэмпла"
+
+# --- Round 190ib: issues #170 (Track N = insert N), #181 (Ctrl+,), #183 (preview while playing)
+"Link Playlist tracks to mixer tracks" = "Связать дорожки Playlist с дорожками микшера"
+"Settings (press again to close)" = "Настройки (нажмите ещё раз, чтобы закрыть)"
+"Preview notes while playing" = "Прослушивать ноты во время воспроизведения"
+"Track {0} is linked to insert {0}" = "Дорожка {0} связывается с инсертом {0}"
+"{0}{1} moves to insert {2}, with its effects and routing" = "{0}{1} переходит на инсерт {2} со своими эффектами и маршрутизацией"
+"{0}{1} sends into insert {2} instead of the Master" = "{0}{1} посылает сигнал в инсерт {2} вместо мастера"
+"{0}: {1} → insert {2}" = "{0}: {1} → инсерт {2}"
+"(its sound changes: the effects or settings of the insert it leaves or joins apply)" = "(его звук меняется: действуют эффекты или настройки инсерта, который он покидает или в который входит)"
+"Track {0} only repeats Track {1}'s instruments: it stays unlinked and plays through insert {1}" = "Дорожка {0} только повторяет инструменты дорожки {1}: она остаётся несвязанной и звучит через инсерт {1}"
+"Playlist track N becomes mixer insert N: what a track's own instruments and samples play goes through its insert, and its header's M, S, volume and pan are the insert's. This changes:" = "Дорожка N в Playlist становится инсертом N микшера: всё, что играют собственные инструменты и сэмплы дорожки, идёт через её инсерт, а M, S, громкость и панорама в её заголовке — это параметры инсерта. Изменится:"
+"It is one step: Edit › Undo takes it all back." = "Это один шаг: Правка › Отменить вернёт всё обратно."
+"(repeats Track {0}'s instruments: plays through insert {0})" = "(повторяет инструменты дорожки {0}: звучит через инсерт {0})"

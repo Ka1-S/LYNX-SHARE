@@ -81,6 +81,7 @@ public:
 
     // The key map's pianoRoll.* actions (tool dialogs, zoom presets). Returns false for unknown ids.
     bool runAction (const std::string& id);
+    juce::PopupMenu moreMenuForSnapshot() { return moreMenu(); } // --userfixshot190ib (issue #183's item)
     // The shortcut text of a key map action for menus ("\tCtrl+Q"; empty when unbound), set by the main window.
     static inline std::function<juce::String (const std::string& id)> shortcutText;
 
@@ -126,6 +127,9 @@ public:
     // FL's General › "Monophonic painting in piano roll" (round 189o, off): on, the Paint tool paints monophonically
     // without Shift (noteedit::monophonicPaint). Saved with the UI options.
     static inline bool monophonicPainting = false;
+    // Issue #183: "Preview notes while playing" (the Piano roll's menu; LYNX's, off: FL keeps the notes you place silent
+    // while the song or pattern plays). Saved with the UI settings (prPreviewPlaying).
+    static inline bool previewWhilePlaying = false;
     // the keys of the selection, on every change (the toolbar's chord panel)
     static inline std::function<void (const std::vector<int>&)> onSelectedKeys;
     // View › Background waveform (Alt+N): an audio file dropped on the Piano roll is drawn behind the notes from the
@@ -291,8 +295,11 @@ private:
     void paintNoteAt (std::int64_t start, int key, bool monophonic);
     void runOperation (const std::function<std::vector<int> (Pattern&, const std::vector<int>&)>& op);
     void showMoreMenu();
+    juce::PopupMenu moreMenu(); // (the menu showMoreMenu shows)
     void updateScrollBars();
     void previewOn (int key, float velocity);
+    // previewOn for a note the mouse placed, dragged or edited: silent while playing unless previewWhilePlaying (#183)
+    void previewEdit (int key, float velocity);
     float keyVelocityAt (int x, int key) const; // velocity of a click on the keyboard at x
     void previewOff();
     void visibilityChanged() override;

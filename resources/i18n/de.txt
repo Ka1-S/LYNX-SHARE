@@ -10145,3 +10145,17 @@ countries: de at ch li lu
 "Potentially slow operation" = "Möglicherweise langsamer Vorgang"
 "Are you sure you want to load {0} plugins at once?" = "Möchtest du wirklich {0} Plugins auf einmal laden?"
 "Sample settings" = "Sample-Einstellungen"
+
+# --- Round 190ib: issues #170 (Track N = insert N), #181 (Ctrl+,), #183 (preview while playing)
+"Link Playlist tracks to mixer tracks" = "Playlist-Spuren mit Mixer-Spuren verknüpfen"
+"Settings (press again to close)" = "Einstellungen (zum Schließen erneut drücken)"
+"Preview notes while playing" = "Noten während der Wiedergabe vorhören"
+"Track {0} is linked to insert {0}" = "Spur {0} wird mit Insert {0} verknüpft"
+"{0}{1} moves to insert {2}, with its effects and routing" = "{0}{1} wandert auf Insert {2}, mit seinen Effekten und seinem Routing"
+"{0}{1} sends into insert {2} instead of the Master" = "{0}{1} sendet in Insert {2} statt in den Master"
+"{0}: {1} → insert {2}" = "{0}: {1} → Insert {2}"
+"(its sound changes: the effects or settings of the insert it leaves or joins apply)" = "(sein Klang ändert sich: die Effekte oder Einstellungen des Inserts, das er verlässt oder in das er kommt, wirken)"
+"Track {0} only repeats Track {1}'s instruments: it stays unlinked and plays through insert {1}" = "Spur {0} wiederholt nur die Instrumente von Spur {1}: Sie bleibt unverknüpft und klingt über Insert {1}"
+"Playlist track N becomes mixer insert N: what a track's own instruments and samples play goes through its insert, and its header's M, S, volume and pan are the insert's. This changes:" = "Playlist-Spur N wird Mixer-Insert N: Was die eigenen Instrumente und Samples einer Spur spielen, läuft durch ihr Insert, und M, S, Lautstärke und Panorama im Spurkopf sind die des Inserts. Das ändert sich:"
+"It is one step: Edit › Undo takes it all back." = "Es ist ein Schritt: Bearbeiten › Rückgängig nimmt alles zurück."
+"(repeats Track {0}'s instruments: plays through insert {0})" = "(wiederholt die Instrumente von Spur {0}: klingt über Insert {0})"

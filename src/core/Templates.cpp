@@ -235,6 +235,12 @@ std::string NewProjectDefaults::toText() const
            + "\nnewLinkTracks=" + (linkTracks ? "1" : "0") + "\n";
 }
 
+bool NewProjectDefaults::ownsKey (const std::string& key)
+{
+    return key == "newInserts" || key == "newMasterChain" || key == "newCleanMixer" || key == "playlistTracks" || key == "newAutoCrossfades"
+           || key == "newLinkTracks";
+}
+
 void NewProjectDefaults::readKey (const std::string& key, const std::string& value)
 {
     auto number = [&value] (int fallback) {

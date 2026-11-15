@@ -10145,3 +10145,17 @@ countries: cn sg
 "Potentially slow operation" = "操作可能较慢"
 "Are you sure you want to load {0} plugins at once?" = "确定要一次加载 {0} 个插件吗?"
 "Sample settings" = "采样设置"
+
+# --- Round 190ib: issues #170 (Track N = insert N), #181 (Ctrl+,), #183 (preview while playing)
+"Link Playlist tracks to mixer tracks" = "将播放列表音轨链接到混音器轨道"
+"Settings (press again to close)" = "设置（再按一次关闭）"
+"Preview notes while playing" = "播放时也试听音符"
+"Track {0} is linked to insert {0}" = "轨道{0}链接到插入轨{0}"
+"{0}{1} moves to insert {2}, with its effects and routing" = "{0}{1}连同其效果和路由移到插入轨{2}"
+"{0}{1} sends into insert {2} instead of the Master" = "{0}{1}改为发送到插入轨{2}，不再直接进主控"
+"{0}: {1} → insert {2}" = "{0}：{1} → 插入轨{2}"
+"(its sound changes: the effects or settings of the insert it leaves or joins apply)" = "（声音会变：将应用它离开或加入的插入轨的效果或设置）"
+"Track {0} only repeats Track {1}'s instruments: it stays unlinked and plays through insert {1}" = "轨道{0}只是重复轨道{1}的乐器：保持未链接，并经由插入轨{1}发声"
+"Playlist track N becomes mixer insert N: what a track's own instruments and samples play goes through its insert, and its header's M, S, volume and pan are the insert's. This changes:" = "播放列表轨道 N 成为混音器插入轨 N：轨道自身的乐器和采样所演奏的声音经过它的插入轨，轨道头上的 M、S、音量和声像就是插入轨的。将作如下更改："
+"It is one step: Edit › Undo takes it all back." = "这是一步操作：编辑 › 撤销可全部恢复。"
+"(repeats Track {0}'s instruments: plays through insert {0})" = "（重复轨道{0}的乐器：经由插入轨{0}发声）"

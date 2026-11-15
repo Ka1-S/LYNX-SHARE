@@ -560,6 +560,12 @@ public:
     }
 
 private:
+    // issue #182: typing jumps to the arrangement whose name starts with it (JUCE fix 37 reads the names)
+    juce::String getNameForRow (int row) override
+    {
+        const auto& all = engine.getSong().arrangements;
+        return juce::isPositiveAndBelow (row, (int) all.size()) ? juce::String::fromUTF8 (all[(std::size_t) row].name.c_str()) : juce::String();
+    }
     int getNumRows() override { return (int) engine.getSong().arrangements.size(); }
 
     void paintListBoxItem (int row, juce::Graphics& g, int width, int height, bool selected) override

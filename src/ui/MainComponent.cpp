@@ -117,6 +117,7 @@
 #include "ui/PluginWindow.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
+#include "ui/TypeAhead.h"
 #include "ui/WaveformView.h"
 
 #include "core/HintMarkup.h"
@@ -762,6 +763,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     };
     engine.nameAutomation = [this] (const AutomationTarget& t) { return describeAutomationTarget (engine, t).toStdString(); };
     externaldrag::install(); // issue #174: drags onto a hosted plugin's own editor become the system's file drag
+    ui::installTypeAhead(); // issue #182: type-to-jump in menus, dropdowns and lists (JUCE fix 37)
    #if JUCE_PLUGINHOST_VST3
     // round 177b: a right-click on a VST3 plugin's knob (when the plugin asks the host for the parameter's menu) offers
     // LYNX's parameter items first: Create automation clip, Edit events, Link to MIDI / internal controller...
@@ -1918,8 +1920,12 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
         return true;
 
     // 4. the key map
-    const auto action = keyMap.find (chord, focusContext(), pianoKeys);
-    return ! action.empty() && runAction (action);
+    if (const auto action = keyMap.find (chord, focusContext(), pianoKeys); ! action.empty() && runAction (action))
+        return true;
+
+    // 5. issue #182: in the Browser, a typed character no key above took jumps to the row that starts with it (the
+    // typing piano, FL's L / R and the hot-swap Q keep their keys)
+    return panelShown && focused == Panel::browser && browser.typeToJump (key);
 }
 
 bool MainComponent::isPlainKey (const keys::Chord& chord) noexcept
@@ -2184,6 +2190,14 @@ bool MainComponent::runAction (const std::string& id)
             case keys::SettingsKey::switchPage: switchSettingsPage (page); break;
             case keys::SettingsKey::open: openSettings ((int) page); break;
         }
+    }
+    else if (is ("view.settings"))
+    {
+        // issue #181: Ctrl+, / Cmd+, opens Settings where it was left (General at first), and closes it when open
+        if (shownSettingsPage() >= 0)
+            closeSettings();
+        else
+            openSettings (lastSettingsPage);
     }
     else if (is ("view.closeUnfocusedWindows")) closeUnfocusedWindows();
     else if (is ("view.alignChannelEditors")) alignAllChannelEditors (engine.getSelectedChannel());
@@ -2629,6 +2643,8 @@ void MainComponent::loadUiSettings()
             ChannelRackComponent::selectFirstChannelWithNotes = on;
         else if (key == "prPaintMode") // FL's PRPaintMode (round 189o)
             PianoRollComponent::monophonicPainting = on;
+        else if (key == "prPreviewPlaying") // issue #183: the Piano roll's "Preview notes while playing" (off)
+            PianoRollComponent::previewWhilePlaying = on;
         else if (key == "limitEditors") // FL's LimitEditors (round 189o; on unless saved off)
             editorlimit::enabled() = on;
         else if (key == "detachNewPlugins") // FL's General › "Detach all new plugins" (issue #116)
@@ -2929,7 +2945,7 @@ void MainComponent::loadUiSettings()
             recordQuantiseOn = on;
             updateRecordQuantise();
         }
-        else if (key == "newInserts" || key == "newMasterChain" || key == "newCleanMixer" || key == "playlistTracks" || key == "newAutoCrossfades")
+        else if (NewProjectDefaults::ownsKey (key.toStdString())) // (issue #170: newLinkTracks was missing from this list)
             newProjectDefaults().readKey (key.toStdString(), line.fromFirstOccurrenceOf ("=", false, false).trim().toStdString());
         else if (key == "mixerUsedOnly")
             MixerStrips::showUsedOnly = on;
@@ -2963,6 +2979,7 @@ void MainComponent::saveUiSettings()
                                       + juce::String (ChannelRackComponent::keepEditorsOpen ? 1 : 0)
                                       + "\nselFirstChanPatChanges=" + juce::String (ChannelRackComponent::selectFirstChannelWithNotes ? 1 : 0)
                                       + "\nprPaintMode=" + juce::String (PianoRollComponent::monophonicPainting ? 1 : 0)
+                                      + "\nprPreviewPlaying=" + juce::String (PianoRollComponent::previewWhilePlaying ? 1 : 0)
                                       + "\nlimitEditors=" + juce::String (editorlimit::enabled() ? 1 : 0)
                                       + "\ndetachNewPlugins=" + juce::String (engine.detachesNewPlugins() ? 1 : 0)
                                       + "\nautoSelectLinked=" + juce::String (ChannelRackComponent::autoSelectLinked ? 1 : 0)
@@ -7560,6 +7577,7 @@ void MainComponent::openLynxProject (const juce::File& file, bool withoutPlugins
 
 void MainComponent::openSettings (int page)
 {
+    lastSettingsPage = page; // (issue #181: Ctrl+, opens this page next time)
     const juce::Component::SafePointer<MainComponent> safe (this);
     SettingsHooks hooks;
     hooks.browserFoldersChanged = [safe] {
@@ -8663,7 +8681,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         // round 190gl: Ableton Link (LYNX's own in FL's menu: FL has no Link), the switch and its settings page
         menu.addItem (tr ("Ableton Link"), true, engine.getLink().isEnabled(), [this] { engine.setLinkEnabled (! engine.getLink().isEnabled()); });
         menu.addItem (tr ("Ableton Link settings..."), [this] { openSettings ((int) SettingsPage::link); });
-        menu.addItem (tr ("General settings..."), [this] { openSettings ((int) SettingsPage::general); });
+        menu.addItem (tr ("General settings...") + shortcutText ("view.settings"), [this] { openSettings ((int) SettingsPage::general); });
         menu.addItem (tr ("Theme (colors, background)..."), [this] { openSettings ((int) SettingsPage::theme); });
         menu.addItem (tr ("File settings (search folders)..."), [this] { openSettings ((int) SettingsPage::files); });
         menu.addItem (tr ("LYNX extras..."), [this] { openSettings ((int) SettingsPage::extras); }); // round 190am

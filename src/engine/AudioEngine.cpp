@@ -3622,12 +3622,13 @@ void AudioEngine::editSong (const std::function<void (Song&)>& edit, bool undoab
     const auto lengthsBefore = patternLengths (song);
     const auto auditioned = comp::auditionedTrack (song);
     const auto pluginsBefore = detachNewPluginsOn ? freshPluginCounts (song) : std::map<std::string, int>();
-    // LYNX's "Link Playlist tracks to mixer tracks" (round 190gz): what each track's clips called for before the edit
-    const auto contentBefore = song.linkTracksToMixer ? autolink::contentKinds (song) : std::vector<autolink::Plan::Kind>();
+    // LYNX's "Link Playlist tracks to mixer tracks" (rounds 190gz, 190ib): each instrument's home track and the linked
+    // tracks' names before the edit
+    const auto linkBefore = autolink::snapshot (song);
     edit (song);
     song.keepOnePattern(); // (round 190ea: what follows, and every listener, may read the current pattern)
-    if (song.linkTracksToMixer && ! contentBefore.empty()) // a track that just got its first clip (or notes) is linked
-        autolink::followNewContent (song, contentBefore);
+    if (song.linkTracksToMixer && linkBefore.on) // new content goes through its track's insert; renames follow the link
+        autolink::followNewContent (song, linkBefore);
     if (detachNewPluginsOn)
         detachNewPlugins (pluginsBefore, song);
     comp::checkAudition (song, auditioned);

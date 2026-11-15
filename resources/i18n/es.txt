@@ -10145,3 +10145,17 @@ countries: es mx ar co cl pe ve
 "Potentially slow operation" = "Operación posiblemente lenta"
 "Are you sure you want to load {0} plugins at once?" = "¿Seguro que quieres cargar {0} plugins a la vez?"
 "Sample settings" = "Configuración del sample"
+
+# --- Round 190ib: issues #170 (Track N = insert N), #181 (Ctrl+,), #183 (preview while playing)
+"Link Playlist tracks to mixer tracks" = "Vincular pistas de la Playlist a pistas del mezclador"
+"Settings (press again to close)" = "Configuración (pulsa de nuevo para cerrar)"
+"Preview notes while playing" = "Escuchar las notas durante la reproducción"
+"Track {0} is linked to insert {0}" = "La pista {0} se vincula al insert {0}"
+"{0}{1} moves to insert {2}, with its effects and routing" = "{0}{1} pasa al insert {2}, con sus efectos y su ruteo"
+"{0}{1} sends into insert {2} instead of the Master" = "{0}{1} envía al insert {2} en lugar del Master"
+"{0}: {1} → insert {2}" = "{0}: {1} → insert {2}"
+"(its sound changes: the effects or settings of the insert it leaves or joins apply)" = "(su sonido cambia: se aplican los efectos o ajustes del insert que deja o al que entra)"
+"Track {0} only repeats Track {1}'s instruments: it stays unlinked and plays through insert {1}" = "La pista {0} solo repite los instrumentos de la pista {1}: queda sin vincular y suena por el insert {1}"
+"Playlist track N becomes mixer insert N: what a track's own instruments and samples play goes through its insert, and its header's M, S, volume and pan are the insert's. This changes:" = "La pista N de la Playlist pasa a ser el insert N del mezclador: lo que tocan los instrumentos y samples propios de una pista pasa por su insert, y M, S, volumen y panorama de su cabecera son los del insert. Esto cambia:"
+"It is one step: Edit › Undo takes it all back." = "Es un solo paso: Editar › Deshacer lo revierte todo."
+"(repeats Track {0}'s instruments: plays through insert {0})" = "(repite los instrumentos de la pista {0}: suena por el insert {0})"

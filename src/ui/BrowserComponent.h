@@ -177,6 +177,9 @@ public:
     void showPreviewForSnapshot (const juce::File& file);
     // Up/Down (load = false) or Shift+Up/Down (load = true); Enter = loadSelected()
     void step (int delta, bool load);
+    // Issue #182: a typed character selects the next row whose name starts with it (more letters typed quickly: a
+    // longer prefix; ui/TypeAhead.h). The row is selected and shown, not previewed. False: not a typing key, or no match.
+    bool typeToJump (const juce::KeyPress& key);
     void loadSelected();
     juce::File getSelectedFile() const;
     // Left / Right: close / open the selected folder (Left on a file goes to its folder)
