@@ -70,6 +70,9 @@ public:
     std::function<void (EditTool)> onChange;
     // The tooltips with the keys the key map gives the tools now (`keyOf` returns "" for a tool without one).
     void refreshKeys (const std::function<juce::String (EditTool)>& keyOf);
+    // Round 190ig (FM-26): the Pattern layout's Playlist in FL's order and glyphs — delete ⊘ for the eraser, slip ◂▸ before
+    // the knife (FL: delete, mute, slip, slice); off: LYNX's own (the other layouts, the Piano roll)
+    void setFlPlaylistLook (bool on);
 
     void resized() override;
     void paint (juce::Graphics& g) override; // round 170e3: the tools sit in one well, apart from the header's other controls
@@ -81,6 +84,7 @@ private:
     std::vector<std::unique_ptr<IconButton>> buttons;
     std::vector<EditTool> tools;
     std::vector<juce::Rectangle<int>> wells; // one per tool group (round 170e3)
+    bool flPlaylistLook = false;
 };
 
 // --- grid --------------------------------------------------------------------------------

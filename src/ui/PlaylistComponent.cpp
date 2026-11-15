@@ -164,6 +164,96 @@ juce::Colour clipContentColour (juce::Colour base)
 
 float clipHeaderHeight (juce::Rectangle<float> r) { return juce::jmin (clipTitleHeight, juce::jmax (0.0f, r.getHeight() - 8.0f)); }
 
+// --- FL Studio's clip look, Pattern layout only (round 190ig, design190ia slice 3: FM-21, FM-22, FM-27) ----------------
+// Measured in FL Studio 2026 on "Ookay - Thief" (shots/ref/fl-playlist-zoom-audioclips.png at 50 px tracks, fl-playlist.png
+// at 26 px): a clip fills its track row down to the row's separator; on a tall track a header band in the clip's colour
+// (15 px with its rim) over a body of the track's colour at 50 % (the grid shows through), the waveform in a light tint
+// and a 1 px silence line; on a short track the whole clip is one header-coloured band with the waveform in the clip's
+// own colour. The Clip-launch and Simple layouts keep their look (theme::clipBody's Live / BandLab styles are theirs).
+bool flClipLook() noexcept { return layoutstyle::current() == layoutstyle::Style::pattern; }
+// FL's two clip forms: the band (one colour) below this track height, header + body from it. FL shows the band at its
+// default 26 px tracks and header + body at 50 px; the switch point between was not captured (an open item).
+constexpr int flBandBelow = 38;
+// FL keeps a clip's glyph and name in view at the Playlist's left edge when the clip starts further left (shots/ref/
+// fl-playing.png "GROSS BEAT - Saw Bass", "Main Vox" at bar 21). Those held titles are drawn last, over the lanes and
+// just under the playhead: by paint() itself, or over the cached picture (which never holds them, so a scroll can shift
+// it); a scroll step in which a clip's start crosses the left edge paints that clip's header band again (cacheShift).
+constexpr float flStickyTitleMax = 400.0f;
+// FL draws no beat lines at its zoom 17 (10 px a beat); where they start was not captured (an open item): 20 px a beat
+constexpr double flBeatLinesFrom = 20.0;
+float flHeaderHeight (juce::Rectangle<float> r) { return juce::jlimit (11.0f, 15.0f, std::round (r.getHeight() * 0.3f)); }
+
+// FL's track header (round 190ig, FM-23): the plate in the track's own colour (FL's grey #485156 without one), the name in a
+// light tint of it (FL: #AAF2A6 on #237719, colour + 130 per channel), or the primary text where the tint would be too faint
+juce::Colour flHeaderFill (std::uint32_t colour) { return colour != 0 ? juce::Colour (colour).withAlpha (1.0f) : juce::Colour (0xff485156); }
+juce::Colour flHeaderInk (juce::Colour plate)
+{
+    const auto f = [] (juce::uint8 v) { return (juce::uint8) juce::jmin (255, (int) v + 130); };
+    const auto tint = juce::Colour (f (plate.getRed()), f (plate.getGreen()), f (plate.getBlue()));
+    const auto luminance = [] (juce::Colour c) {
+        const auto lin = [] (float v) { return v <= 0.04045f ? v / 12.92f : std::pow ((v + 0.055f) / 1.055f, 2.4f); };
+        return 0.2126f * lin (c.getFloatRed()) + 0.7152f * lin (c.getFloatGreen()) + 0.0722f * lin (c.getFloatBlue());
+    };
+    const auto ratio = (luminance (tint) + 0.05f) / (luminance (plate) + 0.05f);
+    return ratio >= 4.5f ? tint : (plate.getPerceivedBrightness() > 0.6f ? theme::colour::bg0 : theme::colour::textPrimary);
+}
+
+// A Playlist track's colour (transparent: none set)
+juce::Colour trackColourIn (const Song& song, int track)
+{
+    return track >= 0 && track < (int) song.playlistTracks.size() ? juce::Colour (song.playlistTracks[(std::size_t) track].colour) : juce::Colour();
+}
+
+// A clip's rectangle in its row (x1 = the clip's end): FL fills the row down to its separator line; LYNX's look leaves a
+// pixel above and two below.
+juce::Rectangle<float> clipRectAt (float x0, float x1, float y, int trackHeight)
+{
+    if (flClipLook())
+        return { x0, y, juce::jmax (3.0f, x1 - x0 - 1.0f), (float) trackHeight - 1.0f };
+    return { x0, y + 1.0f, juce::jmax (3.0f, x1 - x0 - 1.0f), (float) trackHeight - 3.0f };
+}
+
+// FL's middle ellipsis (FM-14, "Titey..m #2", "VOC..CHED"): the head, "..", the tail (at least 40 % of what fits), so the
+// end of a name (a number, "#2") stays readable. The text itself when it fits.
+juce::String fitMiddleUncached (const juce::String& text, const juce::Font& font, float width);
+// (cached: a paint asks for the same few names again and again; the cache empties itself when it grows)
+juce::String fitMiddle (const juce::String& text, const juce::Font& font, float width)
+{
+    if (text.isEmpty())
+        return text;
+    static std::unordered_map<juce::String, juce::String> cache;
+    const auto key = text + "\x01" + font.getTypefaceName() + juce::String (font.getHeight(), 2) + (font.isBold() ? "b" : "") + "\x01"
+                     + juce::String ((int) width);
+    if (const auto found = cache.find (key); found != cache.end())
+        return found->second;
+    if (cache.size() > 4096)
+        cache.clear();
+    return cache[key] = fitMiddleUncached (text, font, width);
+}
+
+juce::String fitMiddleUncached (const juce::String& text, const juce::Font& font, float width)
+{
+    const auto widthOf = [&font] (const juce::String& t) { return juce::GlyphArrangement::getStringWidth (font, t); };
+    if (text.isEmpty() || widthOf (text) <= width)
+        return text;
+    const auto dots = juce::String ("..");
+    const auto room = width - widthOf (dots);
+    if (room <= 0.0f)
+        return {};
+    int head = 0, tail = 0;
+    const auto n = text.length();
+    // grow the tail to 40 % of the room, then the head, then the tail again
+    while (tail < n && widthOf (text.substring (n - tail - 1)) <= room * 0.4f)
+        ++tail;
+    while (head + tail < n && widthOf (text.substring (0, head + 1)) + widthOf (text.substring (n - tail)) <= room)
+        ++head;
+    while (head + tail < n && widthOf (text.substring (0, head)) + widthOf (text.substring (n - tail - 1)) <= room)
+        ++tail;
+    if (head == 0 && tail == 0)
+        return {};
+    return text.substring (0, head).trimEnd() + dots + text.substring (n - tail).trimStart();
+}
+
 // an audio clip's gain as FL's gain handle shows it (round 166e): "-INF" at the bottom of the range
 juce::String gainText (float gain)
 {
@@ -198,6 +288,97 @@ void paintClipGlyph (juce::Graphics& g, juce::Rectangle<float> box, ClipGlyph gl
             break;
         }
     }
+}
+
+// FL's header glyphs (round 190ig, measured at 1:1 in fl-playlist-zoom-audioclips.png): an audio clip's bar with an arrow
+// leaving it ("|->", 8 x 7 px), an automation clip's two nodes joined by a rising line (10 x 9 px). LYNX's own vectors.
+void paintFlClipGlyph (juce::Graphics& g, juce::Rectangle<float> box, ClipGlyph glyph, juce::Colour colour)
+{
+    g.setColour (colour);
+    const auto x = box.getX(), cy = box.getCentreY();
+    if (glyph == ClipGlyph::audio)
+    {
+        g.fillRect (juce::Rectangle<float> (x, cy - 3.5f, 1.2f, 7.0f));   // the bar
+        g.fillRect (juce::Rectangle<float> (x, cy - 0.6f, 6.0f, 1.2f));   // the shaft
+        juce::Path head;
+        head.addTriangle (x + 4.5f, cy - 2.6f, x + 8.0f, cy, x + 4.5f, cy + 2.6f);
+        g.fillPath (head);
+    }
+    else if (glyph == ClipGlyph::automation)
+    {
+        g.drawEllipse (juce::Rectangle<float> (x + 0.5f, cy + 0.5f, 3.2f, 3.2f), 1.0f);
+        g.drawEllipse (juce::Rectangle<float> (x + 6.3f, cy - 3.7f, 3.2f, 3.2f), 1.0f);
+        g.drawLine (x + 3.2f, cy + 1.2f, x + 6.8f, cy - 1.4f, 1.0f);
+    }
+    else
+        paintClipGlyph (g, box, glyph, colour);
+}
+
+// The FL frame: the header band (or, on a short track, the whole clip as one band), the body at its alpha and the rim.
+// Returns where the content goes: the body under the header, or the whole band (FL draws the waveform behind the name).
+juce::Rectangle<float> paintFlClipFrame (juce::Graphics& g, juce::Rectangle<float> r, const theme::ClipLook& look, bool band)
+{
+    const uitrace::Part tally (uitrace::part::frame);
+    const auto title = band ? r : r.withHeight (flHeaderHeight (r));
+    if (! band)
+    {
+        g.setColour (look.body.withMultipliedAlpha (look.bodyAlpha));
+        g.fillRect (r.withTrimmedTop (title.getHeight()));
+    }
+    // the header gradient as three flat bands (round 151: a gradient brush per clip costs a GPU geometry each)
+    g.setColour (look.headerTop.interpolatedWith (look.headerBottom, 0.5f));
+    g.fillRect (title);
+    if (title.getHeight() >= 6.0f && r.getWidth() >= 8.0f)
+    {
+        const auto third = title.getHeight() / 3.0f;
+        g.setColour (look.headerTop);
+        g.fillRect (title.withHeight (third));
+        g.setColour (look.headerBottom);
+        g.fillRect (title.withTrimmedTop (2.0f * third));
+    }
+    if (r.getWidth() >= 3.0f && title.getHeight() >= 4.0f)
+    {
+        g.setColour (look.edge); // the rim: top, bottom, and the right edge that keeps neighbours apart
+        g.fillRect (title.withHeight (1.0f));
+        g.fillRect (title.withTop (title.getBottom() - 1.0f));
+        g.fillRect (title.withLeft (title.getRight() - 1.0f));
+        if (! band)
+        {
+            g.setColour (look.edge.withAlpha (0.6f));
+            g.fillRect (r.withTrimmedTop (title.getHeight()).withLeft (r.getRight() - 1.0f));
+        }
+    }
+    return band ? r.reduced (0.0f, 1.0f) : r.withTrimmedTop (title.getHeight());
+}
+
+// The FL header's glyph and name, drawn after the content: the glyph from 16 px wide, the name from 34 px with FL's middle
+// ellipsis (FM-27, FM-14: FL keeps both on narrow clips). A muted clip leaves the glyph's place to its X (paintMutedVeil).
+void paintFlClipTitle (juce::Graphics& g, juce::Rectangle<float> r, const theme::ClipLook& look, const juce::String& name, ClipGlyph glyph,
+                       bool muted, bool band, float viewLeft, bool sticky)
+{
+    using namespace theme;
+    if (r.getX() < viewLeft && r.getRight() > viewLeft) // (FL: the title stays in view, at the left edge)
+    {
+        if (! sticky || muted) // (held titles are drawn last, PlaylistComponent::paintStickyTitles; a muted clip keeps
+            return;            //  its veil: no title held in view)
+        r = r.withLeft (juce::jmin (viewLeft, r.getRight() - 1.0f));
+    }
+    const auto title = band ? r : r.withHeight (flHeaderHeight (r));
+    const auto nameLine = title.withHeight (juce::jmin (title.getHeight(), 15.0f)).reduced (0.0f, 1.0f);
+    if (r.getWidth() < 16.0f || nameLine.getHeight() < 9.0f)
+        return;
+    auto text = nameLine.withTrimmedLeft (3.0f).withTrimmedRight (2.0f);
+    const auto glyphBox = text.removeFromLeft (11.0f);
+    if (! muted)
+        paintFlClipGlyph (g, glyphBox, glyph, look.ink);
+    if (r.getWidth() < 34.0f)
+        return;
+    const uitrace::Part tallyTitle (uitrace::part::title);
+    const auto f = font (type::caption, true);
+    g.setColour (look.ink);
+    g.setFont (f);
+    const auto box = text.withTrimmedLeft (2.0f);
+    textcache::drawText (g, fitMiddle (name, f, box.getWidth()), box.toNearestInt(), juce::Justification::centredLeft, false);
 }
 
 // The header's glyph place. A muted clip shows its X there, as FL Studio does, however narrow the clip (round 177c).
@@ -423,6 +604,7 @@ public:
             validNow.subtract (shift.area);
             validNow.subtract (shift.alsoChanged);
             validNow.add (moved);
+            validNow.subtract (shift.stickyTitles);
         }
         if (zoom.on)
         {
@@ -513,6 +695,7 @@ public:
                                 juce::AffineTransform::scale ((float) bounds.getWidth() / (float) imageBounds.getWidth(),
                                                               (float) bounds.getHeight() / (float) imageBounds.getHeight()),
                                 false);
+        owner.paintStickyTitles (g);
         owner.paintPlayhead (g);
         if (ui::pictureLostMeanwhile (lossesSeen, lossRetries))
             owner.repaint();
@@ -645,6 +828,40 @@ PlaylistComponent::CacheShift PlaylistComponent::cacheShift (const CacheView& fr
     {
         shift.area = { headerWidth, rulerTop, grid.getRight() - headerWidth, grid.getBottom() - rulerTop };
         shift.alsoChanged = { headerWidth, grid.getBottom(), grid.getWidth(), getHeight() - grid.getBottom() }; // (the pattern blocks)
+        if (flClipLook()) // round 190ig: FL's titles held at the left edge; only their header bands are painted again
+        {
+            const auto& song = engine.getSong();
+            const auto left = (float) grid.getX();
+            const auto titleFont = theme::font (theme::type::caption, true);
+            juce::Rectangle<int> titles;
+            for (const auto& c : song.playlist)
+            {
+                if (c.kind == ClipKind::pattern || c.muted || c.track < 0)
+                    continue;
+                const auto x0 = (float) tickToX ((double) c.start), x1 = (float) tickToX ((double) c.end());
+                if (((x0 < left) == (x0 - (float) dx < left)) || x1 - x0 < 16.0f) // (only a start that crosses the edge now)
+                    continue;
+                const auto y = trackToY (c.track), h = heightOf (c.track);
+                if (y > grid.getBottom() || y + h < grid.getY() || juce::jmax (x1, x1 - (float) dx) <= left || noteedit::isFoldedAway (song, c.track))
+                    continue;
+                const auto* name = c.kind == ClipKind::audio ? (c.channel >= 0 && c.channel < (int) song.channels.size() ? &song.channels[(std::size_t) c.channel].name : nullptr)
+                                                             : (c.automation >= 0 && c.automation < (int) song.automations.size() ? &song.automations[(std::size_t) c.automation].name : nullptr);
+                if (name == nullptr)
+                    continue;
+                // (the picture holds a clip's title only while its start is in view; a start that crosses the edge in this step
+                // leaves a cut title, or lacks one, in the shifted picture)
+                const auto xOld = x0 - (float) dx;
+                if ((x0 < left) == (xOld < left) || x1 - x0 < 16.0f) // (a clip under 16 px wide shows no title)
+                    continue;
+                const auto reach = 22.0f + (float) std::abs (dx) + juce::GlyphArrangement::getStringWidth (titleFont, juce::String::fromUTF8 (name->c_str()));
+                const auto r = clipRectAt (x0, x1, (float) y, h);
+                const auto bandHeight = r.getHeight() + 1.0f < (float) flBandBelow ? juce::jmin (r.getHeight(), 15.0f) : flHeaderHeight (r);
+                titles = titles.getUnion (juce::Rectangle<float> (left, r.getY(), reach, bandHeight).getSmallestIntegerContainer().getIntersection (grid));
+            }
+            // (one rectangle: a few separate ones would make the picture's repaint a masked clip region, slower than this)
+            if (! titles.isEmpty())
+                shift.stickyTitles.add (titles);
+        }
     }
     else
         shift.area = { 0, headerHeight, grid.getRight(), grid.getHeight() };
@@ -1417,11 +1634,24 @@ void PlaylistComponent::setTitleBarInsets (int left, int right)
 
 void PlaylistComponent::resized()
 {
+    updateHeaderWidth(); // (round 190ig: the header width follows the layout style)
     const auto h = toolbarHeight - 6;
     arrangementBox.setBounds (4 + titleInsetLeft, 3, juce::jmin (150, getWidth() / 5), h);
-    tools.setBounds (arrangementBox.getRight() + 8, 3, tools.getIdealWidth (h), h);
-    snapBox.setBounds (tools.getRight() + 8, 3, 128, h);
-    followButton.setBounds (snapBox.getRight() + 6, 3, h, h);
+    // round 190ig (FM-26): the Pattern layout's toolbar in FL's order — the snap (magnet) before the tools, and the tools'
+    // own FL order and glyphs; the other layouts keep LYNX's order
+    tools.setFlPlaylistLook (flClipLook() && ! simpleHeaders);
+    if (flClipLook() && ! simpleHeaders)
+    {
+        snapBox.setBounds (arrangementBox.getRight() + 8, 3, 128, h);
+        tools.setBounds (snapBox.getRight() + 8, 3, tools.getIdealWidth (h), h);
+        followButton.setBounds (tools.getRight() + 6, 3, h, h);
+    }
+    else
+    {
+        tools.setBounds (arrangementBox.getRight() + 8, 3, tools.getIdealWidth (h), h);
+        snapBox.setBounds (tools.getRight() + 8, 3, 128, h);
+        followButton.setBounds (snapBox.getRight() + 6, 3, h, h);
+    }
     stretchButton.setBounds (followButton.getRight() + 2, 3, h, h);
     // beside the clip grid the Playlist is narrow: what would run under the panel's title buttons goes (the inset keeps
     // 4 px of air before them). Anywhere else the toolbar stays exactly as it was.
@@ -1463,6 +1693,16 @@ void PlaylistComponent::showSongAfterOpen()
     scrollTicks = 0.0;
     const auto length = (double) engine.getSong().songLength();
 
+    // round 190ig (FM-24): FL opens a song at its own zoom, ~16 px a bar, not the whole song squeezed in
+    // (LYNX_FL_OPEN_ZOOM=0, diagnostics: the whole song as before, for like-for-like paint benchmarks)
+    static const auto flOpenZoom = juce::SystemStats::getEnvironmentVariable ("LYNX_FL_OPEN_ZOOM", "1") != "0";
+    if (flClipLook() && flOpenZoom)
+    {
+        pixelsPerTick = juce::jlimit (4.0 / (4 * ppq), 800.0 / (4 * ppq), 16.0 / (double) juce::jmax<std::int64_t> (1, engine.getSong().barTicks()));
+        updateScrollBars();
+        repaint();
+        return;
+    }
     if (length > width / pixelsPerTick)
         zoomAll(); // (also updates the scroll bars)
     else
@@ -1539,18 +1779,34 @@ void PlaylistComponent::paint (juce::Graphics& g)
         // (only the bars of the repainted columns: a playhead strip is 16 px wide, the view can hold hundreds of bars,
         // and every line is a renderer call even where it is clipped away; round 174e)
         const auto paintedX = grid.getIntersection (g.getClipBounds());
+        // round 190ig (Pattern layout, FL): FM-29 — each line on whole physical pixels (at 150 % a 1 px line at x = 37 fell on
+        // 55.5 device px and blurred over two columns); FM-24 — bars closer than 12 px: every 4th bar line only, as FL
+        // thins its grid when zoomed out (LYNX's 1 650 px "barcode" of the whole song)
+        const auto fl = flClipLook();
+        const auto lineScale = juce::jmax (1.0f, g.getInternalContext().getPhysicalPixelScaleFactor());
+        const auto lineWidth = juce::jmax (1.0f, std::round (lineScale)) / lineScale;
+        const auto vline = [&g, &grid, fl, lineScale, lineWidth] (double x) {
+            if (fl)
+                g.fillRect (juce::Rectangle<float> ((float) std::floor (x * lineScale) / lineScale, (float) grid.getY(), lineWidth, (float) grid.getHeight()));
+            else
+                g.drawVerticalLine ((int) x, (float) grid.getY(), (float) grid.getBottom());
+        };
+        const auto barEvery = fl && bar * pixelsPerTick < 12.0 ? 4 : 1;
         for (const auto& b : song.barsBetween (juce::jmax ((std::int64_t) std::max (0.0, scrollTicks), (std::int64_t) xToTick (paintedX.getX()) - bar),
                                                juce::jmin ((std::int64_t) xToTick (grid.getRight()), (std::int64_t) xToTick (paintedX.getRight())) + 1))
         {
+            if (barEvery > 1 && (b.number - 1) % barEvery != 0)
+                continue;
             g.setColour (colour::gridBar);
-            g.drawVerticalLine ((int) tickToX ((double) b.tick), (float) grid.getY(), (float) grid.getBottom());
+            vline (fl ? tickToX ((double) b.tick) : (double) (int) tickToX ((double) b.tick));
 
-            if (beatPixels < 8.0)
-                continue; // zoomed far out: bar lines only
+            // zoomed far out: bar lines only (FL: no beat lines yet at 10 px a beat, fl-playlist-zoom-audioclips.png)
+            if (beatPixels < (fl ? flBeatLinesFrom : 8.0))
+                continue;
 
             g.setColour (colour::gridBeat);
             for (auto tick = b.tick + ppq; tick < b.tick + b.length; tick += ppq)
-                g.drawVerticalLine ((int) tickToX ((double) tick), (float) grid.getY(), (float) grid.getBottom());
+                vline (fl ? tickToX ((double) tick) : (double) (int) tickToX ((double) tick));
         }
 
         paintLanes (g, grid); // round 177b (nothing when lanes are off)
@@ -1633,7 +1889,7 @@ void PlaylistComponent::paint (juce::Graphics& g)
             if (x1 < grid.getX() || x0 > grid.getRight() || y > grid.getBottom() || y + trackHeight < grid.getY())
                 continue;
 
-            const auto r = juce::Rectangle<float> (x0, y + 1.0f, juce::jmax (3.0f, x1 - x0 - 1.0f), (float) trackHeight - 3.0f);
+            const auto r = clipRectAt (x0, x1, y, trackHeight);
 
             if (! g.getClipBounds().toFloat().intersects (r.expanded (1.0f)))
                 continue; // outside the area being repainted
@@ -1812,6 +2068,9 @@ void PlaylistComponent::paint (juce::Graphics& g)
             g.fillPath (dashed);
         }
 
+        if (! cachePainting) // round 190ig: FL's held clip titles, last before the playhead (as over the cached picture)
+            paintStickyTitles (g);
+
         if (playheadTick >= 0.0 && ! cachePainting)
         {
             g.setColour (colour::playhead);
@@ -1843,7 +2102,12 @@ void PlaylistComponent::paint (juce::Graphics& g)
         }
 
         const auto barPixels = bar * pixelsPerTick;
-        const auto every = barPixels < 30.0 ? (barPixels < 10.0 ? 16 : 4) : 1; // numbers spaced further apart when zoomed out
+        auto every = barPixels < 30.0 ? (barPixels < 10.0 ? 16 : 4) : 1; // numbers spaced further apart when zoomed out
+        // round 190ig (FM-25, Pattern layout): FL's ruler — a number every 1, 2, 4, 8… bars, the smallest step that keeps
+        // them 28 px apart (FL: every 2 bars at 15.6 px a bar), and every other one larger and brighter (FL's 1, 5, 9…)
+        const auto flRuler = flClipLook();
+        if (flRuler)
+            for (every = 1; barPixels * every < 28.0 && every < (1 << 16); every *= 2) {}
 
         const auto rulerClip = g.getClipBounds(); // (the numbers reach 40 px right of their bar line)
         for (const auto& b : song.barsBetween (juce::jmax ((std::int64_t) std::max (0.0, scrollTicks), (std::int64_t) xToTick (rulerClip.getX() - 44) - bar),
@@ -1853,9 +2117,12 @@ void PlaylistComponent::paint (juce::Graphics& g)
                 continue;
 
             const auto x = (int) tickToX ((double) b.tick);
+            const auto major = flRuler && (b.number - 1) % juce::jmax (4, every * 2) == 0; // (FL: 1, 5, 9… at 1 and 2-bar steps)
             g.setColour (colour::textDisabled);
             g.drawVerticalLine (x, 12.0f, (float) timelineHeight);
-            g.setColour (colour::textSecondary);
+            g.setColour (major ? colour::textPrimary : colour::textSecondary);
+            if (flRuler)
+                g.setFont (font (major ? type::body : type::small, major));
             textcache::drawText (g, juce::String (b.number), x + 3, 2, 40, timelineHeight - 4, juce::Justification::centredLeft);
         }
 
@@ -1902,7 +2169,7 @@ void PlaylistComponent::paint (juce::Graphics& g)
         juce::Graphics::ScopedSaveState state (g);
         if (g.reduceClipRegion (headers)) // (not repainted, e.g. the playhead's strip: nothing to draw; round 174e)
         {
-            g.setColour (colour::bg2);
+            g.setColour (flHeaders() ? colour::bg0 : colour::bg2); // (FL: contiguous plates, a dark line between rows)
             g.fillRect (headers);
             g.setFont (font (type::small));
 
@@ -1921,6 +2188,13 @@ void PlaylistComponent::paint (juce::Graphics& g)
                 auto block = colour::bg3;
                 if (const auto c = colourOf (t); c != 0)
                     block = block.interpolatedWith (tame (juce::Colour (c)), 0.28f);
+                if (flHeaders()) // FL (round 190ig, FM-23): the group's own colour, its left side rounded (radius 6)
+                {
+                    g.setColour (flHeaderFill (colourOf (t)));
+                    g.fillRoundedRectangle (juce::Rectangle<float> (0.0f, (float) top, (float) (headerWidth - rightColumn()), (float) (bottom - top) - 1.0f), 6.0f);
+                    g.fillRect (juce::Rectangle<float> (8.0f, (float) top, (float) (headerWidth - rightColumn()) - 8.0f, (float) (bottom - top) - 1.0f));
+                    continue;
+                }
                 g.setColour (block);
                 g.fillRoundedRectangle (juce::Rectangle<float> (1.0f, (float) top + 1.0f, (float) headerWidth - 2.0f, (float) (bottom - top) - 2.0f), radius::md);
             }
@@ -1948,9 +2222,32 @@ void PlaylistComponent::paint (juce::Graphics& g)
                     plate = plate.interpolatedWith (tame (juce::Colour (trackColour)), muted ? 0.22f : (groupHead ? 0.62f : 0.5f));
                 if (hovered)
                     plate = plate.interpolatedWith (colour::bg5, 0.6f);
-                const auto plateArea = juce::Rectangle<float> (left, (float) y + 1.0f, (float) (headerWidth - rightColumn()) - 2.0f - left, (float) trackHeight - 3.0f);
-                g.setColour (plate);
-                g.fillRoundedRectangle (plateArea, radius::sm);
+                const auto fl = flHeaders() && simpleInsert (t) <= 0;
+                const auto plateArea = fl ? juce::Rectangle<float> (left, (float) y, (float) (headerWidth - rightColumn()) - left, (float) trackHeight - 1.0f)
+                                          : juce::Rectangle<float> (left, (float) y + 1.0f, (float) (headerWidth - rightColumn()) - 2.0f - left, (float) trackHeight - 3.0f);
+                if (fl)
+                {
+                    // FL (round 190ig, FM-23, fl-playlist-zoom-audioclips.png 370,240,472,1000): the plate filled with the
+                    // track's own colour (FL's grey #485156 when it has none), contiguous; a group header's left side rounded
+                    plate = flHeaderFill (trackColour);
+                    if (muted)
+                        plate = plate.interpolatedWith (colour::bg1, 0.55f);
+                    if (hovered)
+                        plate = plate.brighter (0.12f);
+                    g.setColour (plate);
+                    if (groupHead)
+                    {
+                        g.fillRoundedRectangle (plateArea, 6.0f);
+                        g.fillRect (plateArea.withTrimmedLeft (8.0f));
+                    }
+                    else
+                        g.fillRect (plateArea);
+                }
+                else
+                {
+                    g.setColour (plate);
+                    g.fillRoundedRectangle (plateArea, radius::sm);
+                }
 
                 // round 190w: FL's track header level (View › Show levels on audio / instrument tracks): a stereo peak
                 // meter in a column right of the plate, the mixer track's level with its hold line, as FL 2026 draws it
@@ -1982,6 +2279,14 @@ void PlaylistComponent::paint (juce::Graphics& g)
                     }
                 }
 
+                // FL's activity column (round 190ig, FM-28, fl-playing.png 465,330,480,400): lit in a light tint of the track's
+                // colour while a clip of the track plays
+                if (fl && t < (int) activityShown.size() && activityShown[(std::size_t) t] != 0)
+                {
+                    const auto c = flHeaderFill (trackColour);
+                    g.setColour (juce::Colour::fromHSV (c.getHue(), c.getSaturation() * 0.8f, 1.0f, 1.0f));
+                    g.fillRect (headerWidth - trackhdr::selectionStripWidth + 1, y + 1, trackhdr::selectionStripWidth - 2, juce::jmax (2, trackHeight - 3));
+                }
                 if (isTrackSelected (t) && simpleHeaders) // the Simple headers: a bar at the plate's left
                 {
                     g.setColour (colour::accent);
@@ -2057,6 +2362,18 @@ void PlaylistComponent::paint (juce::Graphics& g)
                             g.setFont (font (type::caption, true));
                             g.drawText (count > 0 ? "FX " + juce::String (count) : juce::String ("+ FX"), fx, juce::Justification::centred, false);
                         }
+                    }
+                }
+                else if (flHeaders()) // FL's LED (round 190ig): 11 px, a dark rim
+                {
+                    g.setColour (colour::bg0.withAlpha (0.7f));
+                    g.fillEllipse (led.withSizeKeepingCentre (11.0f, 11.0f));
+                    g.setColour (muteLed (muted));
+                    g.fillEllipse (led.withSizeKeepingCentre (8.0f, 8.0f));
+                    if (hovered && hover.led)
+                    {
+                        g.setColour (colour::textPrimary.withAlpha (0.7f));
+                        g.drawEllipse (led.withSizeKeepingCentre (12.0f, 12.0f), 1.0f);
                     }
                 }
                 else
@@ -2176,7 +2493,37 @@ void PlaylistComponent::paint (juce::Graphics& g)
                     textcache::drawText (g, "+A", plus, juce::Justification::centred);
                     textRight = juce::jmin (textRight, (float) plus.getX());
                 }
-                if (const auto icon = trackicons::iconFor (t < (int) song.playlistTracks.size() ? song.playlistTracks[(std::size_t) t].icon : 0);
+                const auto flTall = fl && trackHeight >= flTallHeader;
+                if (fl)
+                {
+                    // FL: the icon left of the LED and its buttons (on a tall track in their bottom row); the name at the
+                    // top left on a tall track; "..." at the bottom left (FL's header grip)
+                    if (const auto icon = trackicons::iconFor (t < (int) song.playlistTracks.size() ? song.playlistTracks[(std::size_t) t].icon : 0);
+                        icon != trackicons::Icon::none && trackHeight >= 14)
+                    {
+                        const auto size = (float) juce::jmin (14, trackHeight - 4);
+                        const auto box = juce::Rectangle<float> (textRight - size - 1.0f, (float) led.getCentreY() - size * 0.5f, size, size);
+                        ui::drawTrackIcon (g, icon, box, muted ? colour::textDisabled : flHeaderInk (plate).withMultipliedAlpha (0.85f));
+                        if (! flTall)
+                            textRight = box.getX() - 2.0f;
+                    }
+                    if (flTall)
+                    {
+                        g.setColour (flHeaderInk (plate).withMultipliedAlpha (0.6f));
+                        for (int k = 0; k < 3; ++k)
+                            g.fillRect (juce::Rectangle<float> (left + 6.0f + (float) k * 3.0f, (float) (y + trackHeight) - 7.0f, 1.5f, 1.5f));
+                    }
+                    g.setColour (muted ? colour::textDisabled : flHeaderInk (plate));
+                    const auto nameFont = font (type::body, true);
+                    g.setFont (nameFont);
+                    const auto name = custom ? juce::String::fromUTF8 (song.playlistTracks[(std::size_t) t].name.c_str()) : tr ("Track {0}", { juce::String (t + 1) });
+                    const auto nameLeft = (int) left + 6;
+                    const auto nameRight = flTall ? (int) plateArea.getRight() - 4 : (int) textRight - 2;
+                    const auto nameBox = flTall ? juce::Rectangle<int> (nameLeft, y + 3, juce::jmax (8, nameRight - nameLeft), 16)
+                                                : juce::Rectangle<int> (nameLeft, y, juce::jmax (8, nameRight - nameLeft), trackHeight - 1);
+                    textcache::drawText (g, fitMiddle (name, nameFont, (float) nameBox.getWidth()), nameBox, juce::Justification::centredLeft, false);
+                }
+                else if (const auto icon = trackicons::iconFor (t < (int) song.playlistTracks.size() ? song.playlistTracks[(std::size_t) t].icon : 0);
                     icon != trackicons::Icon::none && trackHeight >= 14)
                 {
                     const auto size = (float) juce::jmin (14, trackHeight - 4);
@@ -2184,12 +2531,15 @@ void PlaylistComponent::paint (juce::Graphics& g)
                                        muted ? colour::textDisabled : colour::textSecondary.brighter (0.3f));
                     textLeft += (int) size + 4;
                 }
-                g.setColour (muted ? colour::textDisabled : (custom ? colour::textPrimary : colour::textSecondary));
-                g.setFont (font (simpleHeaders ? type::body : type::small, groupHead || (simpleHeaders && custom)));
-                textcache::drawFittedText (g, custom ? juce::String::fromUTF8 (song.playlistTracks[(std::size_t) t].name.c_str())
-                                         : tr ("Track {0}", { juce::String (t + 1) }),
-                                  textLeft, y, juce::jmax (8, (int) textRight - textLeft - 2), nameHeight, juce::Justification::centredLeft,
-                                  nameHeight >= 30 ? 2 : 1, 0.8f);
+                if (! fl)
+                {
+                    g.setColour (muted ? colour::textDisabled : (custom ? colour::textPrimary : colour::textSecondary));
+                    g.setFont (font (simpleHeaders ? type::body : type::small, groupHead || (simpleHeaders && custom)));
+                    textcache::drawFittedText (g, custom ? juce::String::fromUTF8 (song.playlistTracks[(std::size_t) t].name.c_str())
+                                             : tr ("Track {0}", { juce::String (t + 1) }),
+                                      textLeft, y, juce::jmax (8, (int) textRight - textLeft - 2), nameHeight, juce::Justification::centredLeft,
+                                      nameHeight >= 30 ? 2 : 1, 0.8f);
+                }
 
                 // the divider under the header: lit while hovered or dragged (drag resizes the track)
                 if (hover.divider == t || (drag == Drag::trackResize && (resizeTrack == t || resizeAll)))
@@ -2289,6 +2639,64 @@ void PlaylistComponent::paintOverview (juce::Graphics& g, juce::Rectangle<float>
 
 // The playhead over the cached image (round 174e): the line in the grid and the triangle on the ruler, as paint()
 // draws them without the cache
+// Round 190ig (FL look, Pattern layout): the titles of the audio and automation clips that start left of the view, held at
+// its left edge, drawn last before the playhead (paint() and over the cached picture alike, so both look the same).
+void PlaylistComponent::paintStickyTitles (juce::Graphics& g)
+{
+    if (! flClipLook())
+        return;
+    const auto grid = gridArea();
+    const auto left = (float) grid.getX();
+    const juce::Graphics::ScopedSaveState state (g);
+    if (! g.reduceClipRegion (grid) || ! g.getClipBounds().intersects (juce::Rectangle<int> (grid.getX(), grid.getY(), (int) flStickyTitleMax, grid.getHeight())))
+        return;
+    const auto& song = engine.getSong();
+    // the clips that cross the left edge, found again only when the view or the song changed (a frame of a scroll or of
+    // the playhead draws the same few)
+    const HeldTitlesKey key { scrollTicks, pixelsPerTick, scrollY, engine.getPublishCount(), song.playlist.size(), grid };
+    if (! (key == heldTitlesKey))
+    {
+        heldTitlesKey = key;
+        heldTitles.clear();
+        for (int i = 0; i < (int) song.playlist.size(); ++i)
+        {
+            const auto& c = song.playlist[(std::size_t) i];
+            if (c.kind == ClipKind::pattern || c.muted || c.track < 0)
+                continue;
+            if (const auto x0 = tickToX ((double) c.start), x1 = tickToX ((double) c.end()); x0 >= (double) left || x1 <= (double) left || x1 - (double) left < 16.0)
+                continue;
+            if (const auto y = trackToY (c.track); y > grid.getBottom() || y + heightOf (c.track) < grid.getY() || noteedit::isFoldedAway (song, c.track))
+                continue;
+            heldTitles.push_back (i);
+        }
+    }
+    for (const auto i : heldTitles)
+    {
+        if (i >= (int) song.playlist.size())
+            break;
+        const auto& c = song.playlist[(std::size_t) i];
+        const auto x0 = (float) tickToX ((double) c.start), x1 = (float) tickToX ((double) c.end());
+        const auto y = trackToY (c.track), h = heightOf (c.track);
+        if (y > grid.getBottom() || y + h < grid.getY())
+            continue;
+        auto r = clipRectAt (x0, x1, (float) y, h);
+        r = r.withRight (juce::jmin (r.getRight(), left + flStickyTitleMax)); // (a held title is at most this wide)
+        const auto band = r.getHeight() + 1.0f < (float) flBandBelow;
+        if (c.kind == ClipKind::audio && c.channel >= 0 && c.channel < (int) song.channels.size())
+        {
+            const auto& channel = song.channels[(std::size_t) c.channel];
+            const auto look = theme::clipBody (juce::Colour (channel.colour), trackColourIn (song, c.track), ClipKind::audio, theme::ClipStyle::flTint);
+            paintFlClipTitle (g, r, look, juce::String::fromUTF8 (channel.name.c_str()), ClipGlyph::audio, false, band, left, true);
+        }
+        else if (c.kind == ClipKind::automation && c.automation >= 0 && c.automation < (int) song.automations.size())
+        {
+            const auto& automation = song.automations[(std::size_t) c.automation];
+            const auto look = theme::clipBody (juce::Colour (automation.colour), trackColourIn (song, c.track), ClipKind::automation, theme::ClipStyle::flTint);
+            paintFlClipTitle (g, r, look, juce::String::fromUTF8 (automation.name.c_str()), ClipGlyph::automation, false, band, left, true);
+        }
+    }
+}
+
 void PlaylistComponent::paintPlayhead (juce::Graphics& g)
 {
     if (playheadTick < 0.0)
@@ -2447,13 +2855,30 @@ void PlaylistComponent::addSmallClip (SmallClips& batch, float physicalScale, co
     else
         base = theme::tame (patternColour (song, c.pattern));
 
-    const auto title = r.withHeight (clipHeaderHeight (r));
-    const auto body = r.withTrimmedTop (title.getHeight());
-    batch.bodies[clipBodyColour (base).getARGB()].addWithoutMerging (body);
-    if (title.getHeight() >= 4.0f)
-        batch.bodies[clipHeaderColour (base).getARGB()].addWithoutMerging (title);
-    batch.edges[(current ? theme::colour::textPrimary.withAlpha (0.55f) : theme::colour::bg0.withAlpha (0.85f)).getARGB()].addWithoutMerging (
-        { r.getRight() - 1.0f, r.getY(), 1.0f, r.getHeight() });
+    // round 190ig: an audio clip in FL's recipe in the Pattern layout (the same three colours a full clip has, so the
+    // batch stays one fill per colour)
+    const auto flAudio = c.kind == ClipKind::audio && flClipLook();
+    const auto band = flAudio && r.getHeight() + 1.0f < (float) flBandBelow;
+    const auto look = flAudio ? theme::clipBody (juce::Colour (song.channels[(std::size_t) c.channel].colour), trackColourIn (song, c.track), ClipKind::audio,
+                                                 theme::ClipStyle::flTint)
+                              : theme::ClipLook {};
+    const auto title = flAudio ? (band ? r : r.withHeight (flHeaderHeight (r))) : r.withHeight (clipHeaderHeight (r));
+    const auto body = flAudio ? (band ? r.reduced (0.0f, 1.0f) : r.withTrimmedTop (title.getHeight())) : r.withTrimmedTop (title.getHeight());
+    if (flAudio)
+    {
+        if (! band)
+            batch.bodies[look.body.withMultipliedAlpha (look.bodyAlpha).getARGB()].addWithoutMerging (body);
+        batch.bodies[look.headerTop.interpolatedWith (look.headerBottom, 0.5f).getARGB()].addWithoutMerging (title);
+        batch.edges[look.edge.getARGB()].addWithoutMerging ({ r.getRight() - 1.0f, r.getY(), 1.0f, r.getHeight() });
+    }
+    else
+    {
+        batch.bodies[clipBodyColour (base).getARGB()].addWithoutMerging (body);
+        if (title.getHeight() >= 4.0f)
+            batch.bodies[clipHeaderColour (base).getARGB()].addWithoutMerging (title);
+        batch.edges[(current ? theme::colour::textPrimary.withAlpha (0.55f) : theme::colour::bg0.withAlpha (0.85f)).getARGB()].addWithoutMerging (
+            { r.getRight() - 1.0f, r.getY(), 1.0f, r.getHeight() });
+    }
 
     if (c.kind == ClipKind::audio && body.getWidth() >= 3.0f && body.getHeight() >= 3.0f)
     {
@@ -2471,7 +2896,7 @@ void PlaylistComponent::addSmallClip (SmallClips& batch, float physicalScale, co
         const auto startTick = (double) c.offset + (double) (wave.getX() - r.getX()) / pixelsPerTick;
         const auto forward = ! clipops::playsBackwards (channel, c);
         const auto startFrame = (double) span.first + (forward ? startTick * perTick : total - startTick * perTick);
-        const auto colour = clipContentColour (base);
+        const auto colour = flAudio ? (band ? look.compactContent : look.content) : clipContentColour (base);
         auto style = ui::currentWaveStyle (colour, juce::jmin (ui::normalisingGain (*summary), 4.0f) * c.gain);
         if (! style.spectral && c.gain > 1.0f)
             style.gain = juce::jmin (style.gain, 8.0f);
@@ -2540,7 +2965,13 @@ void PlaylistComponent::paintAudioClip (juce::Graphics& g, const Clip& c, juce::
     const auto& channel = song.channels[(std::size_t) c.channel];
     const auto colour = audioClipColour (channel);
     const auto name = juce::String::fromUTF8 (channel.name.c_str());
-    const auto body = paintClipFrame (g, r, colour, name, ClipGlyph::audio, c.muted);
+    // round 190ig (FM-21): FL's recipe in the Pattern layout — the channel's own colour for the header and the waveform,
+    // the track's colour for the body; LYNX's recipe in the other layouts
+    const auto fl = flClipLook();
+    const auto band = fl && r.getHeight() + 1.0f < (float) flBandBelow;
+    const auto look = fl ? theme::clipBody (juce::Colour (channel.colour), trackColourIn (song, c.track), ClipKind::audio, theme::ClipStyle::flTint)
+                         : theme::ClipLook {};
+    const auto body = fl ? paintFlClipFrame (g, r, look, band) : paintClipFrame (g, r, colour, name, ClipGlyph::audio, c.muted);
 
     // the waveform (ui/WaveformView, analysed in the background): the clean style fills the body with the
     // peak envelope mirrored around the centre, in a light tint of the clip colour
@@ -2559,9 +2990,12 @@ void PlaylistComponent::paintAudioClip (juce::Graphics& g, const Clip& c, juce::
         const auto startTick = (double) c.offset + (double) (wave.getX() - r.getX()) / pixelsPerTick;
         const auto forward = ! clipops::playsBackwards (channel, c);
         const auto startFrame = (double) span.first + (forward ? startTick * perTick : total - startTick * perTick);
-        auto style = ui::currentWaveStyle (clipContentColour (colour), juce::jmin (ui::normalisingGain (*summary), 4.0f) * c.gain);
+        auto style = ui::currentWaveStyle (fl ? (band ? look.compactContent : look.content) : clipContentColour (colour),
+                                           juce::jmin (ui::normalisingGain (*summary), 4.0f) * c.gain);
         if (! style.spectral && c.gain > 1.0f) // louder clip gain: the shape may hit the top, which is honest
             style.gain = juce::jmin (style.gain, 8.0f);
+        if (fl)
+            style.silenceLine = style.classic; // FL's 1 px silence line, in the waveform's colour
         const uitrace::Part tally (uitrace::part::waveform);
         // warp markers that bend the tempo (round 175a): each stretch between two markers drawn at its own speed
         auto markers = forward ? warpedit::playedMarkers (channel.sampler, total / summary->sampleRate) : std::vector<WarpPoint> {};
@@ -2586,7 +3020,10 @@ void PlaylistComponent::paintAudioClip (juce::Graphics& g, const Clip& c, juce::
             ui::paintWaveform (g, wave, *summary, startFrame, (forward ? perTick : -perTick) / pixelsPerTick, style);
     }
 
-    paintClipOutline (g, r, colour, false, false);
+    if (fl)
+        paintFlClipTitle (g, r, look, name, ClipGlyph::audio, c.muted, band, (float) headerWidth, false);
+    else
+        paintClipOutline (g, r, colour, false, false);
 
     // the warp markers: small flags on the body's top edge, the end marker included (the start one never moves)
     {
@@ -2685,11 +3122,22 @@ void PlaylistComponent::paintAutomationClip (juce::Graphics& g, const Clip& c, j
     const auto& automation = song.automations[(std::size_t) c.automation];
     const auto colour = automation.target.kind == AutomationTargetKind::none ? theme::colour::textDisabled
                                                                               : theme::colour::automation.withMultipliedSaturation (0.75f).withMultipliedBrightness (0.8f);
-    paintClipFrame (g, r, colour, juce::String::fromUTF8 (automation.name.c_str()), ClipGlyph::automation, c.muted);
-    paintClipOutline (g, r, colour, false, false);
+    // round 190ig (FM-22): in the Pattern layout FL's recipe in the clip's own colour (FL: its Automation Clip channel's)
+    const auto fl = flClipLook();
+    const auto band = fl && r.getHeight() + 1.0f < (float) flBandBelow;
+    const auto look = fl ? theme::clipBody (juce::Colour (automation.colour), trackColourIn (song, c.track), ClipKind::automation, theme::ClipStyle::flTint)
+                         : theme::ClipLook {};
+    if (fl)
+        paintFlClipFrame (g, r, look, band);
+    else
+    {
+        paintClipFrame (g, r, colour, juce::String::fromUTF8 (automation.name.c_str()), ClipGlyph::automation, c.muted);
+        paintClipOutline (g, r, colour, false, false);
+    }
 
     // automation curve over the clip's range
-    const auto body = r.withTrimmedTop (juce::jmin (14.0f, r.getHeight() * 0.4f)).reduced (1.0f, 2.0f); // = automationBody
+    const auto body = fl && ! band ? r.withTrimmedTop (flHeaderHeight (r)).reduced (1.0f, 2.0f)
+                                   : r.withTrimmedTop (juce::jmin (14.0f, r.getHeight() * 0.4f)).reduced (1.0f, 2.0f); // = automationBody
     const auto clip = g.getClipBounds().toFloat();
     juce::Path curve;
     bool started = false;
@@ -2718,8 +3166,27 @@ void PlaylistComponent::paintAutomationClip (juce::Graphics& g, const Clip& c, j
         started = true;
     }
 
-    g.setColour (automation.target.kind == AutomationTargetKind::none ? theme::colour::textSecondary : theme::colour::automation.brighter (0.3f));
-    g.strokePath (curve, juce::PathStrokeType (1.5f));
+    if (fl)
+    {
+        // FL: the area under the curve lit faintly, the curve in the clip's light tint, then the header's glyph and name
+        if (started && ! look.contentFill.isTransparent())
+        {
+            auto under = curve;
+            under.lineTo (lastX, body.getBottom() + 2.0f);
+            under.lineTo (curve.getBounds().getX(), body.getBottom() + 2.0f);
+            under.closeSubPath();
+            g.setColour (look.contentFill);
+            g.fillPath (under);
+        }
+        g.setColour (look.content);
+        g.strokePath (curve, juce::PathStrokeType (1.5f));
+        paintFlClipTitle (g, r, look, juce::String::fromUTF8 (automation.name.c_str()), ClipGlyph::automation, c.muted, band, (float) headerWidth, false);
+    }
+    else
+    {
+        g.setColour (automation.target.kind == AutomationTargetKind::none ? theme::colour::textSecondary : theme::colour::automation.brighter (0.3f));
+        g.strokePath (curve, juce::PathStrokeType (1.5f));
+    }
 
     // round 165: FL's tension handles between the points (hollow circles: drag up / down bends the segment)
     if (r.getWidth() > 24.0f && body.getHeight() >= 10.0f)
@@ -2833,7 +3300,9 @@ juce::Rectangle<float> PlaylistComponent::automationBody (const Clip& c) const
 {
     const auto x0 = (float) tickToX ((double) c.start), x1 = (float) tickToX ((double) c.end());
     const auto y = (float) trackToY (c.track);
-    const auto r = juce::Rectangle<float> (x0, y + 1.0f, juce::jmax (3.0f, x1 - x0 - 1.0f), (float) heightOf (c.track) - 3.0f);
+    const auto r = clipRectAt (x0, x1, y, heightOf (c.track));
+    if (flClipLook() && heightOf (c.track) >= flBandBelow) // (FL: the curve under the header band)
+        return r.withTrimmedTop (flHeaderHeight (r)).reduced (1.0f, 2.0f);
     return r.withTrimmedTop (juce::jmin (14.0f, r.getHeight() * 0.4f)).reduced (1.0f, 2.0f);
 }
 
@@ -6341,6 +6810,8 @@ juce::Rectangle<int> PlaylistComponent::trackLed (int track) const
         return { headerWidth - 28 - rightColumn(), trackToY (track) + juce::jmin (5, juce::jmax (0, h / 2 - 8)), 22, juce::jmin (15, h - 2) };
     if (simpleInsert (track) > 0) // a linked header's M button (round 190gz): the first row, or centred on a short row
         return { headerWidth - 22 - rightColumn(), trackToY (track) + (h >= linkedTwoRows ? 4 : juce::jmax (1, (h - 14) / 2)), 18, juce::jmin (14, h - 2) };
+    if (flHeaders() && h >= flTallHeader) // FL's tall track (round 190ig, FM-23): the LED at the bottom right
+        return { headerWidth - 16 - rightColumn(), trackToY (track) + h - 18, 12, 12 };
     return { headerWidth - 17 - rightColumn(), trackToY (track) + h / 2 - 6, 12, 12 };
 }
 
@@ -6359,7 +6830,8 @@ bool PlaylistComponent::linkedHeaders() const
 
 void PlaylistComponent::updateHeaderWidth()
 {
-    const auto width = simpleHeaders ? simpleHeaderWidth : linkedHeaders() ? linkedHeaderWidth : flHeaderWidth;
+    // (round 190ig, FM-23: FL's 98 px header plates + the 8 px selection / activity column in the Pattern layout)
+    const auto width = simpleHeaders ? simpleHeaderWidth : linkedHeaders() ? linkedHeaderWidth : flHeaderWidthNow();
     if (width == headerWidth)
         return;
     headerWidth = width;
@@ -9684,8 +10156,7 @@ juce::Rectangle<int> PlaylistComponent::clipBounds (int index) const
 {
     const auto& c = engine.getSong().playlist[(std::size_t) index];
     const auto x0 = (float) tickToX ((double) c.start), x1 = (float) tickToX ((double) c.end());
-    return juce::Rectangle<float> (x0, (float) trackToY (c.track) + 1.0f, juce::jmax (3.0f, x1 - x0 - 1.0f), (float) heightOf (c.track) - 3.0f)
-        .getSmallestIntegerContainer();
+    return clipRectAt (x0, x1, (float) trackToY (c.track), heightOf (c.track)).getSmallestIntegerContainer();
 }
 
 juce::Rectangle<int> PlaylistComponent::clipMenuButton (int index) const
@@ -10502,6 +10973,28 @@ bool PlaylistComponent::liveFrame (double nowMs)
     else if (moved)
         playheadTick = tick;
 
+    // round 190ig (FM-28): FL's activity column beside the headers — a track's strip lit while a clip of it plays under the
+    // playhead; only the strips that flip are repainted, nothing runs while stopped once they are dark
+    if (flHeaders() && isShowing() && (playing || ! activityShown.empty()))
+    {
+        std::vector<char> now;
+        if (playing && tick >= 0.0)
+        {
+            now.assign ((std::size_t) numTracks(), 0);
+            for (const auto& c : song.playlist)
+                if (! c.muted && c.track >= 0 && c.track < (int) now.size() && (double) c.start <= tick && tick < (double) c.end())
+                    now[(std::size_t) c.track] = 1;
+        }
+        const auto count = std::max (now.size(), activityShown.size());
+        for (std::size_t t = 0; t < count; ++t)
+        {
+            const auto was = t < activityShown.size() && activityShown[t] != 0, is = t < now.size() && now[t] != 0;
+            if (was != is && (int) t < numTracks())
+                repaint (headerWidth - trackhdr::selectionStripWidth, trackToY ((int) t), trackhdr::selectionStripWidth, heightOf ((int) t));
+        }
+        activityShown = std::move (now);
+    }
+
     // Performance mode: the launched and waiting clips (frames, progress) and the headers' track progress
     auto live = false;
     if (song.performanceMode && isShowing())
@@ -11018,7 +11511,8 @@ std::vector<PatternPicker::Row> PatternPicker::rows() const
 
     if (view == 2)
         for (int a = 0; a < (int) song.automations.size(); ++a)
-            list.push_back ({ ClipKind::automation, a, juce::String::fromUTF8 (song.automations[(std::size_t) a].name.c_str()), theme::colour::automation });
+            list.push_back ({ ClipKind::automation, a, juce::String::fromUTF8 (song.automations[(std::size_t) a].name.c_str()),
+                              flClipLook() ? flHeaderFill (song.automations[(std::size_t) a].colour) : theme::colour::automation }); // (round 190ig)
 
     return list;
 }
@@ -11090,6 +11584,12 @@ void PatternPicker::paint (juce::Graphics& g)
             const auto rowColour = tame (row.colour);
             const auto box = r.toFloat();
             auto fill = rowColour.interpolatedWith (colour::bg3, current ? 0.25f : 0.55f);
+            if (flClipLook()) // round 190ig (FM-S2 picker, FL): the row filled with its own colour, brightness 0.42-0.58
+            {
+                const auto own = row.kind == ClipKind::audio && row.index < (int) song.channels.size() ? flHeaderFill (song.channels[(std::size_t) row.index].colour)
+                                                                                                     : row.colour;
+                fill = own.withBrightness (juce::jlimit (0.42f, 0.58f, own.getBrightness()) + (current ? 0.08f : 0.0f));
+            }
             if (i == hoverRow && ! current)
                 fill = fill.interpolatedWith (colour::bg5, 0.35f);
             g.setColour (fill);
@@ -11133,7 +11633,7 @@ void PatternPicker::paint (juce::Graphics& g)
                 g.fillRoundedRectangle (box.withWidth (3.0f), 1.5f);
             }
 
-            g.setColour (clipTitleText (fill));
+            g.setColour (flClipLook() ? flHeaderInk (fill) : clipTitleText (fill));
             g.setFont (font (type::small, current));
             textcache::drawText (g, row.name, r.withTrimmedLeft (9).withTrimmedRight (4), juce::Justification::centredLeft, true);
         }
@@ -11356,4 +11856,14 @@ void PatternPicker::mouseWheelMove (const juce::MouseEvent&, const juce::MouseWh
     scroll = juce::jlimit (0, juce::jmax (0, rows - visible), scroll - (int) std::round (wheel.deltaY * 6.0f));
     repaint();
 }
+bool PlaylistComponent::flHeaders() const noexcept
+{
+    return ! simpleHeaders && flClipLook();
+}
+
+int PlaylistComponent::flHeaderWidthNow() noexcept
+{
+    return flClipLook() ? flPatternHeaderWidth : flHeaderWidth;
+}
+
 } // namespace lynx

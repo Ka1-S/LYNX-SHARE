@@ -2121,6 +2121,17 @@ public:
             return;
         }
 
+        if (args.contains ("--design190igshot"))
+        {
+            // LYNX --design190igshot prefix project.flp: round 190ig off-screen (design190ia slice 3) — the Pattern layout's
+            // Playlist with FL's clip and header look: the song at FL's default zoom (26 px tracks, 15.6 px a bar, bar 21),
+            // at FL's "zoom 17" (50 px tracks, 39.75 px a bar), and playing (the activity column), as FL's reference shots
+            const auto i = args.indexOf ("--design190igshot");
+            runDesign190igShot (args[i + 1].unquoted(), args[i + 2].unquoted());
+            quit();
+            return;
+        }
+
         if (args.contains ("--gridshot"))
         {
             // LYNX.exe --gridshot prefix [project]: the Clip-launch workflow's layout off-screen, with a grid of sample
@@ -14042,7 +14053,7 @@ private:
             pl.setSize (juce::jmax (pl.getWidth(), 900), juce::jmax (pl.getHeight(), 600));
             check ("gw_default_row_48", heightOf (0) == 48 && heightOf (5) == 48, juce::String (heightOf (0)));
             const auto rowMid = [&] (int t) { const auto r = pl.trackRowForSnapshot (t); return r.getY() + r.getHeight() / 2 - 4; };
-            const auto stripX = lynx::PlaylistComponent::flHeaderWidth - 4;
+            const auto stripX = pl.headerWidthForSnapshot() - 4;
             // the left strip (x < 10): the row flips to the smallest size and back; nothing selects
             press (pl, { 2, rowMid (2) }, {});
             check ("gw_left_strip_smallest", heightOf (2) == 16 && tracks()[2].lockedHeight == 1, juce::String (heightOf (2)));
@@ -14236,7 +14247,7 @@ private:
         const auto mixerOf = [&] (int t) { return t < (int) song().playlistTracks.size() ? song().playlistTracks[(std::size_t) t].mixerTrack : -1; };
 
         // ---- 1. FL's default: tracks and inserts apart, FL's narrow headers
-        check ("off_by_default", ! song().linkTracksToMixer && pl.headerWidthForSnapshot() == lynx::PlaylistComponent::flHeaderWidth,
+        check ("off_by_default", ! song().linkTracksToMixer && pl.headerWidthForSnapshot() == lynx::PlaylistComponent::flHeaderWidthNow(),
                juce::String (pl.headerWidthForSnapshot()));
         shotRows ("-off.png", 7);
 
@@ -14259,7 +14270,7 @@ private:
         engine.undo();
         engine.dispatchPendingMessages();
         check ("undo_switch_on", ! song().linkTracksToMixer && mode (0) == lynx::PlaylistTrackMode::unassigned && mode (1) == lynx::PlaylistTrackMode::unassigned
-                                     && song().channels[0].mixerTrack == 0 && pl.headerWidthForSnapshot() == lynx::PlaylistComponent::flHeaderWidth);
+                                     && song().channels[0].mixerTrack == 0 && pl.headerWidthForSnapshot() == lynx::PlaylistComponent::flHeaderWidthNow());
         engine.redo();
         engine.dispatchPendingMessages();
         check ("redo_switch_on", song().linkTracksToMixer && mixerOf (1) == 2 && pl.headerWidthForSnapshot() == lynx::PlaylistComponent::linkedHeaderWidth);
@@ -14398,7 +14409,7 @@ private:
         // ---- 7. off: FL's headers again (the links stay)
         pl.runAction ("playlist.linkTracks");
         engine.dispatchPendingMessages();
-        check ("switch_off_fl_headers", ! song().linkTracksToMixer && pl.headerWidthForSnapshot() == lynx::PlaylistComponent::flHeaderWidth
+        check ("switch_off_fl_headers", ! song().linkTracksToMixer && pl.headerWidthForSnapshot() == lynx::PlaylistComponent::flHeaderWidthNow()
                                             && mode (1) == lynx::PlaylistTrackMode::audio);
         shotRows ("-off-after.png", 7);
 
@@ -24148,6 +24159,63 @@ private:
         offline.dispatchPendingMessages();
         check ("05 Complex panel (no settings row)", shoot ("05-complex"));
         juce::File (prefix + "-checks.txt").replaceWithText (checks);
+    }
+
+    void runDesign190igShot (const juce::String& prefix, const juce::String& project)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        lynx::MainComponent ui (offline, false);
+        const auto size = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_SNAPSHOT_SIZE", "1920x1080"), "x", "");
+        ui.setSize (juce::jlimit (800, 3840, size[0].getIntValue()), juce::jlimit (450, 2160, size[1].getIntValue()));
+        const auto write = [&prefix] (juce::Component& c, const char* name) {
+            savePng (lynx::shot::snapshot (c), prefix + "-" + name + ".png");
+        };
+        if (project.isNotEmpty())
+            ui.openFile (juce::File (project));
+        offline.dispatchPendingMessages();
+        ui.selectTabForSnapshot (2); // the Playlist, maximized
+        auto& playlist = ui.getPlaylistForSnapshot();
+        offline.dispatchPendingMessages();
+        const auto settle = [&] { // (the waveforms are analysed in the background on the first paint)
+            write (playlist, "warmup");
+            lynx::ui::WaveformCache::getInstance()->waitUntilIdle (60000);
+            offline.dispatchPendingMessages();
+            juce::File (prefix + "-warmup.png").deleteFile();
+        };
+        const auto heights = [&] (int h) {
+            offline.editSong ([h] (lynx::Song& s) {
+                for (auto& t : s.playlistTracks)
+                    t.height = h;
+            }, false);
+            offline.dispatchPendingMessages();
+        };
+        // FL's default view (shots/ref/fl-playlist.png): 26 px tracks, bar 21 at the left, 15.6 px a bar, CUTS at the top
+        heights (26);
+        playlist.setViewForSnapshot (15.6, 20, 0);
+        playlist.setScrollYForSnapshot (19 * 26);
+        settle();
+        write (ui, "01-default");
+        write (playlist, "01-default-playlist");
+        // FL's "Zoom level 17" (shots/ref/fl-playlist-zoom-audioclips.png): 50 px tracks, 39.75 px a bar, Saw Bass at the top
+        heights (50);
+        playlist.setViewForSnapshot (39.75, 20, 0);
+        playlist.setScrollYForSnapshot (24 * 50 + 4);
+        settle();
+        write (ui, "02-zoom17");
+        write (playlist, "02-zoom17-playlist");
+        // playing (shots/ref/fl-playing.png): the playhead at bar 33, the activity column lit for the tracks that sound
+        offline.getTransport().positionTicks.store ((double) (32 * offline.getSong().barTicks()));
+        offline.getTransport().playing.store (true);
+        playlist.frameStepForSnapshot();
+        playlist.frameStepForSnapshot();
+        write (ui, "03-playing");
+        offline.getTransport().playing.store (false);
+        playlist.frameStepForSnapshot();
+        heights (26);
+        playlist.setViewForSnapshot (15.6, 0, 0);
+        playlist.setScrollYForSnapshot (0);
+        write (ui, "04-default-start");
     }
 
     void runLiveShot190dr (const juce::String& prefix)

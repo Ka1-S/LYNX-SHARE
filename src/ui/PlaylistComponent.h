@@ -188,6 +188,9 @@ public:
     void setViewForSnapshot (double pixelsPerBar, int firstBar, int firstTrack);
     void selectClipsForSnapshot (const std::vector<int>& clips) { setSelection (clips); repaint(); }
     void setScrollTickForSnapshot (double tick) { scrollTicks = tick; repaint(); }
+    // round 190ig (--design190igshot): the vertical scroll in px, and one frame step (the playhead, FL's activity column)
+    void setScrollYForSnapshot (int y) { scrollY = juce::jmax (0, y); updateScrollBars(); repaint(); }
+    void frameStepForSnapshot() { liveFrame (juce::Time::getMillisecondCounterHiRes()); }
     // round 190ef (--drawshot190ef): where a lane's curve is drawn, and the x of a tick
     juce::Rectangle<float> laneBodyForSnapshot (int track, int lane) const { return laneBody (track, lane); }
     juce::Rectangle<int> trackRowForSnapshot (int track) const { return { 0, trackToY (track), getWidth(), heightOf (track) }; } // (round 190fc)
@@ -209,6 +212,11 @@ public:
     // The track headers' width: FL's 96 px, the Simple workflow's wider headers (round 184a), or the linked headers
     // (round 190gz). updateHeaderWidth sets it; everything else only reads it.
     static constexpr int flHeaderWidth = 96, simpleHeaderWidth = 232, linkedHeaderWidth = 152;
+    // round 190ig (FM-23): the Pattern layout's FL headers — FL's 98 px plates + the 8 px selection / activity column
+    static constexpr int flPatternHeaderWidth = 106, flTallHeader = 40;
+    static int flHeaderWidthNow() noexcept;
+    bool flHeaders() const noexcept;
+    std::vector<char> activityShown; // round 190ig (FM-28): [track] its activity strip lit (FL's Pattern layout, while playing)
     int headerWidth = flHeaderWidth;
     static constexpr int toolbarHeight = 32; // the panel title row (Workspace::titleHeight)
     static constexpr int overviewHeight = 16; // the overview strip under the toolbar (round 90)
@@ -339,6 +347,7 @@ private:
     struct CacheShift
     {
         juce::Rectangle<int> area, alsoChanged;
+        juce::RectangleList<int> stickyTitles; // round 190ig: FL's clip titles at the left edge (header bands) to paint again
         int dx = 0, dy = 0;
     };
     CacheView cacheView() const;
@@ -353,6 +362,17 @@ private:
     bool zoomGesture = false;
     double zoomEndMs = -1.0e9;
     juce::TimedCallback zoomSettle { [this] { settleZoom(); } };
+    void paintStickyTitles (juce::Graphics& g);
+    struct HeldTitlesKey // round 190ig: what the held clip titles were last found for
+    {
+        double scrollTicks = -1.0, pixelsPerTick = 0.0;
+        int scrollY = 0;
+        std::uint64_t published = 0;
+        std::size_t clips = 0;
+        juce::Rectangle<int> grid;
+        bool operator== (const HeldTitlesKey&) const = default;
+    } heldTitlesKey;
+    std::vector<int> heldTitles;
     void paintPlayhead (juce::Graphics& g);
     void scrollBarMoved (juce::ScrollBar*, double) override;
 

@@ -1919,6 +1919,10 @@ struct Automation
         bool operator== (const Link&) const = default;
     };
     std::vector<Link> links;
+    // The clip's colour in the Playlist, ARGB (round 190ig): FL draws an automation clip in its Automation Clip channel's
+    // colour (the .flp's channel colour event 0x80, read on import and written back). 0 = none set: drawn in FL's default
+    // channel colour #485156, as FL draws a channel saved without a colour.
+    std::uint32_t colour = 0;
     bool isLive() const noexcept { return source.track >= 0 || source.channel >= 0; }
     std::uint64_t uid = 0; // stable id (Online Sessions, round 168a)
     float mapLive (float v) const noexcept; // applies the curve

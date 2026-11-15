@@ -399,6 +399,14 @@ Shape make (Icon icon)
             line (st, 10.0f, 7.0f, 10.0f, 13.0f);
             line (st, 7.0f, 10.0f, 13.0f, 10.0f);
             break;
+        case Icon::deleteTool: // FL's delete tool: a ring crossed by a slash (round 190ig)
+            st.addEllipse (4.5f, 4.5f, 15.0f, 15.0f);
+            line (st, 6.9f, 17.1f, 17.1f, 6.9f);
+            break;
+        case Icon::slipArrows: // FL's slip tool: two solid arrowheads pointing apart (round 190ig)
+            fi.addTriangle (3.0f, 12.0f, 10.5f, 6.5f, 10.5f, 17.5f);
+            fi.addTriangle (21.0f, 12.0f, 13.5f, 6.5f, 13.5f, 17.5f);
+            break;
         case Icon::slip: // a fixed frame with its content sliding inside
             roundRect (st, 3.5f, 5.5f, 17.0f, 13.0f, 2.0f);
             polyline (st, { { 9.0f, 9.5f }, { 6.5f, 12.0f }, { 9.0f, 14.5f } });
