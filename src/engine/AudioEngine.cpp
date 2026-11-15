@@ -5828,7 +5828,7 @@ AudioEngine::DropoutInfo AudioEngine::dropoutInfo() const
         d.slowest = unitDisplayName (dropouts::unitOf (slowest));
         d.slowestMs = (double) dropouts::nanosecondsOf (slowest) * 1.0e-6;
     }
-    if (auto* device = const_cast<juce::AudioDeviceManager&> (deviceManager).getCurrentAudioDevice())
+    if (auto* device = const_cast<LynxDeviceManager&> (deviceManager).getCurrentAudioDevice())
         if (device->getCurrentSampleRate() > 0.0)
             d.bufferMs = 1000.0 * device->getCurrentBufferSizeSamples() / device->getCurrentSampleRate();
     return d;
