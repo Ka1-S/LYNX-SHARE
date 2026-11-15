@@ -720,6 +720,11 @@ public:
     // A MIDI mapping of a clip slot, a scene, a track's stop button, Stop all clips or a transport switch fired (its
     // press or release); the main window acts on it. Message thread (from applyControllers).
     std::function<void (const remotemap::Fire&)> onRemoteFire;
+    // Round 190hp (slice B9): the Mapping Browser's "In every project (LYNX)" — a MIDI mapping moves from the project
+    // (one undo step) into the settings, or back (core/RemoteMap.h). The app's engine saves the settings. False = nothing
+    // moved. The global rows' Delete and Min / Max edit the settings (not undoable, as FL's global links).
+    bool moveMappingScope (const remotemap::Row& row, bool toEveryProject);
+    bool editGlobalMappingRow (const remotemap::Row& row, const std::function<bool (prefs::MidiPrefs&)>& edit);
     // "Omni" links follow the mixer's selected track: the mixer reports it here (-1 = unknown).
     std::function<int()> selectedMixerTrackForLinks;
     std::optional<MidiLink> globalLinkOf (const AutomationTarget& target) const;

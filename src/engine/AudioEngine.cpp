@@ -4839,6 +4839,8 @@ std::vector<MidiLink> AudioEngine::getGlobalLinks() const
         link.smooth = l.smooth;
         link.smoothing = l.smoothing;
         link.mode = l.mode;
+        link.min = l.min;
+        link.max = l.max;
         out.push_back (std::move (link));
     }
     return out;
@@ -4895,11 +4897,38 @@ void AudioEngine::setGlobalLink (const AutomationTarget& target, const std::opti
         g.smooth = link->smooth;
         g.smoothing = link->smoothing;
         g.mode = link->mode;
+        g.min = link->min;
+        g.max = link->max;
         p.globalLinks.push_back (std::move (g));
     }
     setMidiPrefs (p, saveGlobalLinks);
     linkSmoothing.clear();
     sendChangeMessage();
+}
+
+bool AudioEngine::moveMappingScope (const remotemap::Row& row, bool toEveryProject)
+{
+    auto p = midiPrefs;
+    if (! remotemap::canMove (song, p, row, toEveryProject))
+        return false;
+    auto moved = false;
+    editSong ([&] (Song& s) { moved = toEveryProject ? remotemap::moveToEveryProject (s, p, row) : remotemap::moveToThisProject (s, p, row); });
+    if (moved)
+        setMidiPrefs (p, saveGlobalLinks);
+    linkSmoothing.clear();
+    sendChangeMessage();
+    return moved;
+}
+
+bool AudioEngine::editGlobalMappingRow (const remotemap::Row& row, const std::function<bool (prefs::MidiPrefs&)>& edit)
+{
+    if (! row.global)
+        return false;
+    auto p = midiPrefs;
+    if (! edit (p))
+        return false;
+    setMidiPrefs (p, saveGlobalLinks);
+    return true;
 }
 
 void AudioEngine::setMapMode (remotemap::Mode mode)
@@ -5366,6 +5395,8 @@ void AudioEngine::applyControllers()
     }
 
     const auto links = linksWithGlobal (song.midiLinks, getGlobalLinks());
+    // round 190hp: the Map Mode's mappings kept for every project that act here (the project's own win)
+    const auto globalMappings = midiPrefs.globalMappings.empty() ? std::vector<RemoteMapping> {} : remotemap::activeGlobalMappings (song, midiPrefs);
     {
         std::uint64_t bits[2] {}, notes[2] {};
         for (const auto& link : links)
@@ -5374,6 +5405,7 @@ void AudioEngine::applyControllers()
             else if (isNoteLink (link.cc))
                 notes[(link.cc - linkNoteBase) >> 6] |= std::uint64_t { 1 } << ((link.cc - linkNoteBase) & 63);
         remotemap::usedNumbers (song, bits, notes); // (round 190ef: the MIDI mappings of slots, scenes, transport)
+        remotemap::usedNumbers (globalMappings, bits, notes); // (round 190hp: and those for every project)
         for (int w = 0; w < 2; ++w)
         {
             linkedCcs[(std::size_t) w].store (bits[w], std::memory_order_relaxed);
@@ -5384,11 +5416,11 @@ void AudioEngine::applyControllers()
         return;
 
     // round 190ef: the MIDI mappings of clip slots, scenes, track stop buttons and transport switches (presses and releases)
-    if (! song.remoteMappings.empty())
+    if (! song.remoteMappings.empty() || ! globalMappings.empty())
         for (const auto& ev : events)
         {
             auto& previous = remoteValues.try_emplace ({ ev.cc, ev.channel, ev.port }, -1).first->second;
-            const auto fires = remotemap::midiFires (song, ev.channel, ev.cc, ev.value, previous, ev.port);
+            const auto fires = remotemap::midiFires (song, globalMappings, ev.channel, ev.cc, ev.value, previous, ev.port);
             previous = ev.value;
             if (onRemoteFire != nullptr)
                 for (const auto& f : fires)

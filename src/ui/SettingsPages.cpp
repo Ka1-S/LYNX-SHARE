@@ -18,6 +18,7 @@
 #include "ui/AutomationUi.h"
 #include "ui/DetailView.h"
 #include "ui/Dialogs.h"
+#include "ui/MapMode.h"
 #include "ui/I18n.h"
 #include "ui/MixerComponent.h"
 #include "ui/NewProjectDialog.h"
@@ -1840,6 +1841,15 @@ public:
                 engine.editSong ([row] (Song& s) { s.midiLinks.erase (s.midiLinks.begin() + row); });
             else if (const auto global = engine.getGlobalLinks(); juce::isPositiveAndBelow (row - projectLinks, (int) global.size()))
                 engine.removeGlobalLink (global[(std::size_t) (row - projectLinks)].target);
+            else if (const auto mapping = row - projectLinks - (int) global.size(); juce::isPositiveAndBelow (mapping, (int) engine.getMidiPrefs().globalMappings.size()))
+            {
+                remotemap::Row r; // (round 190hp: a MIDI Map Mode mapping kept for every project)
+                r.global = true;
+                r.index = mapping;
+                engine.editGlobalMappingRow (r, [&r] (prefs::MidiPrefs& p) { return remotemap::removeGlobalRow (p, r); });
+                links.updateContent();
+                links.repaint();
+            }
         };
         removeAll.onClick = [this] { engine.editSong ([] (Song& s) { s.midiLinks.clear(); }); };
 
@@ -1985,7 +1995,10 @@ private:
     static std::string sampleFeedback (const juce::String& input) { return input.toStdString(); }
 
     // the project's links, then the global ones (settings; FL's "Override global link...", REA round 146)
-    int linkRows() const { return (int) (engine.getSong().midiLinks.size() + engine.getGlobalLinks().size()); }
+    int linkRows() const
+    {
+        return (int) (engine.getSong().midiLinks.size() + engine.getGlobalLinks().size() + engine.getMidiPrefs().globalMappings.size());
+    }
 
     void rebuildInputs()
     {
@@ -2116,6 +2129,26 @@ private:
         const auto projectLinks = (int) list.size();
         for (const auto& l : engine.getGlobalLinks())
             list.push_back (l);
+        // round 190hp: then the MIDI Map Mode's mappings kept for every project (transport, Stop all clips, scenes)
+        if (const auto& mappings = engine.getMidiPrefs().globalMappings; row >= (int) list.size() && row - (int) list.size() < (int) mappings.size())
+        {
+            const auto& m = mappings[(std::size_t) (row - (int) list.size())];
+            if (selected)
+            {
+                g.setColour (theme::colour::accentMuted);
+                g.fillRect (0, 0, width, height);
+            }
+            g.setFont (theme::font (theme::type::body));
+            g.setColour (theme::colour::info);
+            const auto source = (isNoteLink (m.number) ? tr ("Note") + " " + juce::MidiMessage::getMidiNoteName (m.number - linkNoteBase, true, true, 5)
+                                                       : "CC " + juce::String (m.number))
+                                + (m.channel >= 0 ? juce::String::fromUTF8 (" \xc2\xb7 ") + tr ("ch. {0}", { juce::String (m.channel + 1) }) : juce::String());
+            g.drawText (source, 10, 0, 110, height, juce::Justification::centredLeft);
+            g.setColour (theme::colour::textPrimary);
+            const auto [path, name] = mapmode::describe (engine, { (RemoteAction) m.action, {}, -1, m.scene });
+            g.drawText (path + juce::String::fromUTF8 (" \xe2\x80\xba ") + name + "  (" + tr ("global") + ")", 124, 0, width - 134, height, juce::Justification::centredLeft, true);
+            return;
+        }
         if (list.empty() || row >= (int) list.size())
         {
             g.setFont (theme::font (theme::type::small));
