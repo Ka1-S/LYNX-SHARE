@@ -10144,3 +10144,4 @@ countries: cn sg
 "There is no track here to take the plugin." = "这里没有可以接收该插件的轨道。"
 "Potentially slow operation" = "操作可能较慢"
 "Are you sure you want to load {0} plugins at once?" = "确定要一次加载 {0} 个插件吗?"
+"Sample settings" = "采样设置"

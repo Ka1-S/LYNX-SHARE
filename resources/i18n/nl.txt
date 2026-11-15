@@ -10144,3 +10144,4 @@ countries: nl be
 "There is no track here to take the plugin." = "Hier is geen track die de plugin kan opnemen."
 "Potentially slow operation" = "Mogelijk trage bewerking"
 "Are you sure you want to load {0} plugins at once?" = "Weet je zeker dat je {0} plugins tegelijk wilt laden?"
+"Sample settings" = "Sample-instellingen"

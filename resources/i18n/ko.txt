@@ -10144,3 +10144,4 @@ countries: kr
 "There is no track here to take the plugin." = "여기에는 플러그인을 받을 트랙이 없습니다."
 "Potentially slow operation" = "시간이 걸릴 수 있는 작업"
 "Are you sure you want to load {0} plugins at once?" = "플러그인 {0}개를 한 번에 불러올까요?"
+"Sample settings" = "샘플 설정"

@@ -10144,3 +10144,4 @@ countries: id
 "There is no track here to take the plugin." = "Tidak ada trek di sini yang bisa menerima plugin."
 "Potentially slow operation" = "Operasi mungkin lambat"
 "Are you sure you want to load {0} plugins at once?" = "Yakin ingin memuat {0} plugin sekaligus?"
+"Sample settings" = "Pengaturan sample"
