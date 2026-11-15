@@ -14216,7 +14216,7 @@ private:
         engine.dispatchPendingMessages();
         auto& pl = ui.getPlaylistForSnapshot();
         pl.setSize (juce::jmax (pl.getWidth(), 1000), juce::jmax (pl.getHeight(), 640));
-        pl.setViewForSnapshot (90.0, 1, 0);
+        pl.setViewForSnapshot (90.0, 0, 0); // (bar 1 at the left edge)
         pl.setBlocksHeight (6 + 5 * 18 + 6);
         engine.dispatchPendingMessages();
         const auto& song = [&]() -> const Song& { return engine.getSong(); };
