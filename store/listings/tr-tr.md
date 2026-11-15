@@ -39,13 +39,13 @@ LYNX SHARE alfa aşamasındadır: bazı pürüzler olabilir, lütfen sorunları 
 
 ## What's new
 
-LYNX SHARE 0.1.27: örnek alındıkları plugin'lere daha yakın ses vermesi için yeniden ayarlanan efektler, kayıtlı
-projeler seslerini korurken; Apex Limiter'ın true peak tavanı düzeltildi; FL Studio'dan daha fazla araç (Uzaktan
-kontrol ayarları, otomasyon eğrileri, bir mixer yuvasında Edison, döngü noktaları ve crossfade'li Sampler sayfası, ses
-klibi menüsü); klip ızgarası için bir Oturum mikseri, bir Drum Rack, sahneler ve eşleme modları ile Ableton Live'ın
-kendi cihazlarının çoğunun .als setlerinden açılması; FL Studio Mobile projelerinden DW Sampler, Slicer ve daha fazla
-efekt; Basit iş akışında bir Efektler sekmesi, bir Akor pedi ve bir ilk şarkı turu; Linux ve macOS'ta plugin'ler için
-bir çökme koruması; yeni bir logo; ve birçok düzeltme.
+LYNX SHARE 0.1.28: daha hafif ve hızlı; pencere yaklaşık bir saniyede hazır, büyük projeler daha hızlı açılıp daha az
+bellek kullanıyor, çalma daha akıcı, stem'ler tek geçişte dışa aktarılıyor ve küçük arabelleklerdeki ağır projeler
+için önceden işleme var; Ableton Link; Klip başlatma iş akışında Dondur ve Bounce; klip zarfları; plugin'lere
+sürüklenen sample'lar; .als setlerinden açılan Ableton Live'ın daha fazla kendi cihazı; uygulamanın kendi kopyanızdan
+FL Studio Mobile fabrika sesleri; Basit iş akışında 16 pad'li bir Sampler; yerleşik enstrümanlar için Preset kaydet;
+deneysel bir Uzaktan Kontrol API'si; kenarından yeniden boyutlanan Playlist izleri, birkaç izi seçmek için Ctrl+tık ve
+mixer izlerine bağlı Playlist izleri; ve birçok düzeltme.
 
 ## Features
 
