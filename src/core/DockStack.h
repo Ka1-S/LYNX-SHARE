@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cmath>
 #include <cstddef>
 #include <vector>
 
@@ -75,5 +76,19 @@ bool listMatches (const Window& main, const std::vector<Window>& wanted, IndexOf
 constexpr bool panelFades (bool animationsOn, bool panelIsChildWindow, bool windowsAlphaFlashes) noexcept
 {
     return animationsOn && ! (panelIsChildWindow && windowsAlphaFlashes);
+}
+// Issue #178 (round 190hx): a docked window's place in its parent's physical pixels. The position and the size are
+// rounded each on its own (as JUCE does for its own windows), so a window that only moves keeps its size in pixels at
+// any scale. Rounding the edges instead gave a size that depends on the position at 125 % / 150 % (a 101-unit-wide
+// window was 152 px at x = 0, 151 px at x = 1): every step of a drag resized the native window, and Windows showed the
+// new, still undrawn Direct2D buffers for a moment (a rapid flicker of other programs' old pictures).
+struct PhysicalRect
+{
+    int x = 0, y = 0, w = 0, h = 0;
+};
+inline PhysicalRect physicalPlace (int x, int y, int w, int h, double scale) noexcept
+{
+    const auto r = [] (double v) { return (int) std::lround (v); };
+    return { r (x * scale), r (y * scale), r (w * scale), r (h * scale) };
 }
 } // namespace lynx::dockstack
