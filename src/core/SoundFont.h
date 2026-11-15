@@ -166,6 +166,12 @@ const ParamInfo& paramInfo (int index) noexcept;
 // A channel's settings: modelParams in table order, missing ones at their default, each clamped to its range
 std::array<float, paramCount> readParams (const std::vector<float>& modelParams) noexcept;
 std::vector<float> defaultParams();
+// the parameters an automation clip / a linked controller drives (all but the bank, the program and the send tracks:
+// the editor's knobs with FL's parameter menu)
+constexpr bool automatable (int index) noexcept
+{
+    return index >= 0 && index < paramCount && index != pBank && index != pProgram && index != pReverbTrack && index != pChorusTrack;
+}
 // 0…1 (automation) ↔ a parameter's value
 float normalise (int index, float value) noexcept;
 float denormalise (int index, float value01) noexcept;
