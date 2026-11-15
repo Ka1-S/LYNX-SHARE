@@ -36,6 +36,7 @@ DEFAULT_THRESHOLDS = {
     "cpu_norm": [0.20, 0.0],          # CPU % of a core / calibration ms
     "build_norm": [0.30, 0.02],
     "rebuild_norm": [0.30, 0.02],
+    "edit_norm": [0.30, 0.02],
     "import_norm": [0.30, 0.02],
     "rss_mb": [0.10, 12.0],
     "paint_norm": [0.30, 0.004],
@@ -93,6 +94,8 @@ def collect(d):
                 if cell.endswith("@256"):  # (the project's load: once per scenario is enough)
                     add(base + "build_norm", float(g["build_ms"]) / calib)
                     add(base + "rebuild_norm", float(g["rebuild_ms"]) / calib)
+                    if "edit_ms" in g:
+                        add(base + "edit_norm", float(g["edit_ms"]) / calib)
                     add(base + "import_norm", float(g["import_ms"]) / calib)
                     add(base + "rss_mb", float(g["rss_mb"]))
                 info["hash/" + cell] = g["hash"]

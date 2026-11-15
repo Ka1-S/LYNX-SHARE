@@ -22,7 +22,7 @@
 //   automation      32 synths, 16 inserts, 400 dense automation clips and a tempo clip
 //   calibrate       a fixed piece of work no LYNX change touches: the machine's speed (the gate divides by it)
 //   flp:<path>      an FL Studio project, whole song (FL's own data from FL_ROOT, as renderwav)
-// --gate: one machine-readable "GATE key=value ..." line at the end (CPU, instructions, import / build / rebuild time,
+// --gate: one machine-readable "GATE key=value ..." line at the end (CPU, instructions, import / build / rebuild / edit time,
 // peak memory, hash; dropouts with --paced) for scripts/perf_gate.py.
 // --threads N: N worker threads besides the calling one (the app's WorkerPool); the CPU time is then the process'
 // (every thread, spinning included) and the instructions are the calling thread's only.
@@ -638,18 +638,32 @@ int main (int argc, char** argv)
                  "hash %016llx%s\n",
                  scenario.c_str(), blockSize, threads, median (cpu), 100.0 * median (cpu) / audioMs, median (nsPerSample),
                  (double) median (instr) / (double) totalSamples, (unsigned long long) firstHash, sameHash ? "" : " (HASH VARIES BETWEEN REPS)");
-    // rep 0's build decodes the samples (a project's load); the later ones are what an edit's new snapshot costs
+    // rep 0's build decodes the samples (a project's load); the later ones build everything new from decoded samples
+    // (the reps must not share instruments: their outputs are compared). An edit's snapshot (perfgate190id) is a
+    // build from the previous one, as AudioEngine publishes it: unchanged channels and effects are kept.
     const auto firstBuild = buildMs.front();
     const auto rebuild = buildMs.size() > 1 ? median (std::vector<double> (buildMs.begin() + 1, buildMs.end())) : firstBuild;
-    std::printf ("project: import %.1f ms, first build %.1f ms, rebuild %.1f ms (median), peak memory %.0f MB; %zu channels, %zu inserts, "
-                 "%zu playlist clips, %zu automations\n",
-                 importMs, firstBuild, rebuild, peakRssMb(), song.channels.size(), song.mixer.size(), song.playlist.size(), song.automations.size());
+    std::vector<double> editMs;
+    {
+        auto previous = RackState::build (song, nullptr, sampleRate, provider);
+        for (int k = 0; k < 5; ++k)
+        {
+            const auto t0 = std::chrono::steady_clock::now();
+            auto next = RackState::build (song, previous.get(), sampleRate, provider);
+            editMs.push_back (std::chrono::duration<double, std::milli> (std::chrono::steady_clock::now() - t0).count());
+            previous = std::move (next);
+        }
+    }
+    const auto edit = median (editMs);
+    std::printf ("project: import %.1f ms, first build %.1f ms, rebuild %.1f ms, edit snapshot %.1f ms (medians), peak memory %.0f MB; %zu channels, "
+                 "%zu inserts, %zu playlist clips, %zu automations\n",
+                 importMs, firstBuild, rebuild, edit, peakRssMb(), song.channels.size(), song.mixer.size(), song.playlist.size(), song.automations.size());
     if (gate)
     {
         std::printf ("GATE scenario=%s block=%d threads=%d seconds=%.2f cpu_pct=%.3f ns_per_sample=%.2f instr_per_sample=%.0f import_ms=%.2f "
-                     "build_ms=%.2f rebuild_ms=%.2f rss_mb=%.1f hash=%016llx hash_stable=%d",
+                     "build_ms=%.2f rebuild_ms=%.2f edit_ms=%.2f rss_mb=%.1f hash=%016llx hash_stable=%d",
                      scenario.c_str(), blockSize, threads, audioMs / 1000.0, 100.0 * median (cpu) / audioMs, median (nsPerSample),
-                     median (instr) < 0 ? -1.0 : (double) median (instr) / (double) totalSamples, importMs, firstBuild, rebuild, peakRssMb(),
+                     median (instr) < 0 ? -1.0 : (double) median (instr) / (double) totalSamples, importMs, firstBuild, rebuild, edit, peakRssMb(),
                      (unsigned long long) firstHash, sameHash ? 1 : 0);
         if (paced)
             std::printf (" dropouts_per_min=%.2f overruns_per_min=%.2f", median (droppedPerMin), median (overPerMin));

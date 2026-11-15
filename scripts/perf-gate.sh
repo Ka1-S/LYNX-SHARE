@@ -23,18 +23,20 @@
 #   LYNX_APP=path         the app (default: build-linux/LYNX_artefacts/Release/LYNX, then build/...); APP=0: skip it
 #   OPENTIME=1            also --opentime (opens a window: needs DISPLAY, xvfb-run, or XVFB=<Xvfb binary>)
 #   FL=1                  also FL's Thief / Exoplanet and Live's Patience (FL_ROOT, LIVE_DEMO)
-#   BLOCKS="64 128 256"   SCENARIOS="synth100 inserts50 stream big200 automation"   SECONDS_AUDIO=8   REPS=3
+#   BLOCKS="64 128 256"   SCENARIOS="synth100 inserts50 stream big200 automation"   SECONDS_AUDIO=4   REPS=3
 #   CORES=7-11            pin the measurements (taskset); LOAD_MAX=6 / LOAD_WAIT=1800: wait for a quiet machine (local)
 set -u
 cd "$(dirname "$0")/.."
 ROOT=$PWD
 mode=${1:-compare}
+# (keep OUT on a local disk: the generated projects' audio is read from there, and a network or WSL-mounted Windows
+# drive turns the open times into file-system times)
 OUT=${2:-$ROOT/build-perfgate/$(date +%Y%m%d-%H%M%S)}
 PROFILE=${PROFILE:-local}
 BASELINE=${BASELINE:-$ROOT/tests/perf/baseline-$PROFILE.json}
 BLOCKS=${BLOCKS:-"64 128 256"}
 SCENARIOS=${SCENARIOS:-"synth100 inserts50 stream big200 automation"}
-SECONDS_AUDIO=${SECONDS_AUDIO:-8}
+SECONDS_AUDIO=${SECONDS_AUDIO:-4}
 REPS=${REPS:-3}
 LOAD_MAX=${LOAD_MAX:-}
 LOAD_WAIT=${LOAD_WAIT:-1800}
@@ -68,8 +70,9 @@ quiet () { # wait for a quiet machine (local runs: other jobs skew the numbers);
 
 # the app's commands: a private Xvfb when there is no display and XVFB names one; else xvfb-run
 XPID=
-app_env=(env LYNX_TEST_MODE=1 LYNX_PROFILE_DIR="$OUT/profile" XDG_CONFIG_HOME="$OUT/xdg")
-app_run () { # report-producing app command (timeout 15 min)
+APP_PROFILE=$OUT/profile
+app_run () { # report-producing app command (timeout 15 min), in the profile $APP_PROFILE
+  local app_env=(env LYNX_TEST_MODE=1 LYNX_PROFILE_DIR="$APP_PROFILE" XDG_CONFIG_HOME="$OUT/xdg")
   if [ -n "${DISPLAY:-}" ]; then timeout 900 "${app_env[@]}" "${PIN[@]}" "$LYNX_APP" "$@"
   elif command -v xvfb-run > /dev/null; then timeout 900 "${app_env[@]}" xvfb-run -a "${PIN[@]}" "$LYNX_APP" "$@"
   else timeout 900 "${app_env[@]}" "${PIN[@]}" "$LYNX_APP" "$@"; fi
@@ -98,7 +101,8 @@ paint () { # project run
 }
 opentime () { # project run (a window)
   quiet
-  app_run --opentime "$(project_file "$1")" "$OUT/open-$1-$2.txt" 3 > "$OUT/open-$1-$2.log" 2>&1
+  # (a fresh profile each time, as a first start: a device saved by the run before could be opened differently)
+  APP_PROFILE=$OUT/profile-open-$1-$2 app_run --opentime "$(project_file "$1")" "$OUT/open-$1-$2.txt" 3 > "$OUT/open-$1-$2.log" 2>&1
   grep -q '^result=OK' "$OUT/open-$1-$2.txt" 2> /dev/null || echo "perf-gate: opentime $1 failed" | tee -a "$OUT/errors.txt" >&2
 }
 projects () { local p; for p in $SCENARIOS; do echo "$p"; done; for p in "${EXTRA[@]}"; do echo "$p"; done; }
