@@ -659,8 +659,15 @@ Before → after per case (the rack against the engine, same stimuli, same metri
   Instrument Rack's chain it is the chain's instrument. MIDI Effect Rack presets and Live's MIDI effects are refused:
   LYNX plays them only by writing them into a set's notes, with no live device (left out, listed in the handoff).
 - **Export** (`exportLiveRackPreset`, the rack's Save Preset button, the Device View's Save preset): the rack as a set
-  export writes it (§14, §18, §20), then rewritten into the preset form above, ids 0, gzip. LYNX's own built-in devices
-  have no Live device yet and are listed after saving (as in a set export).
+  export writes it (§14, §18, §20), then rewritten into the preset form above, ids 0, root `MinorVersion 12.0_12402`,
+  gzip. LYNX's own built-in devices have no Live device yet and are listed after saving (as in a set export).
+- **[LIVE] Live 12.4.16 check (2026-11-15, round 190hr, files opened through Live's own `.adg` open command):** Live's
+  Smokey Water.adg (control) loads; LYNX-written Audio Effect Racks (two chains, zones, a chain-volume macro shown as
+  "Chain Volume", nested racks), an Instrument Rack (two key-split chains, a "Chain Selector" macro), a MIDI Effect Rack
+  and a Drum Rack (a "Kick" pad on C1, a return chain) load. **Every LYNX-written `.adg` holding a VST3 plugin device
+  (kHs Gain, no saved state) made Live close** ("A serious program error", EXCEPTION_ACCESS_VIOLATION in Log.txt), at the
+  top level as in a nested rack. Plugins are therefore left out of rack presets and listed; whether a plugin with a
+  state Live saved itself loads is an open live check.
 - **Group / Ungroup of an instrument** (racks-061 / -062; Live's Group on an instrument makes an Instrument Rack
   [STR u16 2524-2531 "Group", "Ungroup"; manual]): Ctrl+G on the Device View's instrument (or its menu) moves the
   channel's instrument into an Instrument Rack's single chain (Patcherize, then the rack): the channel keeps its volume,

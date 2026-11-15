@@ -4526,6 +4526,23 @@ bool PianoRollComponent::handleKey (const juce::KeyPress& key)
     const auto grid = gridTicks();
     const auto bar = engine.getSong().barTicks();
 
+    // round 190hr: the Clip-launch layout's docked editor takes the reference's grid keys (Ctrl+1…5) and Quantize
+    // (Ctrl+U / Ctrl+Shift+U) before the FL editor's own (FL's Ctrl+U chop stays in the Pattern layout)
+    if (liveGridOn() && cmd && ! alt)
+    {
+        const char* live = nullptr;
+        if (letter == 'U')
+            live = shift ? "pianoRoll.liveQuantizeSettings" : "pianoRoll.liveQuantize";
+        else if (! shift && code >= '1' && code <= '5')
+        {
+            static constexpr const char* gridKeys[] { "pianoRoll.liveGridNarrower", "pianoRoll.liveGridWider", "pianoRoll.liveGridTriplet",
+                                                     "pianoRoll.liveGridSnap", "pianoRoll.liveGridFixed" };
+            live = gridKeys[code - '1'];
+        }
+        if (live != nullptr && runAction (live))
+            return true;
+    }
+
     if (code == juce::KeyPress::backspaceKey)
     {
         EditorGlobals::get().toggleGrid();

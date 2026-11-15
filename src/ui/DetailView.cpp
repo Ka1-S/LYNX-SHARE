@@ -2212,6 +2212,7 @@ public:
         duplicate.setBounds (cell (5, 0).withWidth (60));
         randomize.setBounds (cell (5, 0).withTrimmedLeft (64).withRight (n.getRight()));
     }
+    void reload() { load(); } // (the page docked an editor: it gets the column's hooks)
 
 private:
     void changeListenerCallback (juce::ChangeBroadcaster*) override { load(); }
@@ -2861,6 +2862,7 @@ private:
             {
                 editor = e;
                 addAndMakeVisible (*editor);
+                column.reload(); // (round 190hr: the column gives the docked editor its Quantize keys and the clip's scale)
                 resized();
             }
             open.setVisible (false);

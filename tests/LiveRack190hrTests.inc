@@ -10,6 +10,7 @@ namespace rack190hr
 using namespace lynx;
 
 bool approx (float a, float b, float tol = 1.0e-4f) { return std::abs (a - b) <= tol; }
+constexpr const char* liveRoot = "/mnt/c/ProgramData/Ableton/Live 12 Trial/Resources";
 
 std::vector<std::uint8_t> readAll (const std::filesystem::path& p)
 {
@@ -144,15 +145,19 @@ TEST (rack190hr_group_a_plugin_instrument_keeps_its_automation_through_the_macro
 TEST (rack190hr_rack_presets_are_written_in_lives_preset_form_and_read_back)
 {
     using namespace rack190hr;
-    // an Audio Effect Rack: two chains (a plugin; a nested rack holding a plugin), zones, volume / pan, a macro on a
-    // chain's volume and one on the plugin, a variation
+    // an Audio Effect Rack: two chains (a nested rack and a plugin; a nested rack holding a nested rack), zones,
+    // volume / pan, a macro on a chain's volume and one on the nested rack's macro 3, a variation. Plugins stay out of
+    // rack presets (Live 12.4 closed on them, round 190hr live check): listed in the notes.
     auto doc = rack::makeRack (RackDoc::Kind::audioEffect);
-    CHECK (rack::addDevice (doc, 0, pluginEffect ("Crusher", 1)) >= 0);
-    const auto second = rack::addChain (doc, "Wet");
     PatchNode nested;
     nested.effect = rack::makeRackSlot (RackDoc::Kind::audioEffect);
-    rack::addDevice (nested.effect.patcher, 0, pluginEffect ("Space", 9));
-    CHECK (rack::addDevice (doc, second, nested) >= 0);
+    CHECK (rack::addDevice (doc, 0, nested) >= 0);
+    CHECK (rack::addDevice (doc, 0, pluginEffect ("Crusher", 1)) >= 0);
+    const auto second = rack::addChain (doc, "Wet");
+    PatchNode outer;
+    outer.effect = rack::makeRackSlot (RackDoc::Kind::audioEffect);
+    rack::addDevice (outer.effect.patcher, 0, nested);
+    CHECK (rack::addDevice (doc, second, outer) >= 0);
     {
         auto* r = rack::rackOf (doc);
         r->name = "My Rack";
@@ -160,12 +165,12 @@ TEST (rack190hr_rack_presets_are_written_in_lives_preset_form_and_read_back)
         r->chains[(std::size_t) second].select = { 64, 127, 70, 120 };
         rack::compile (doc);
     }
-    rack::setChainVolume (doc, second, 0.5f);
     rack::setChainPan (doc, second, -0.25f);
     RackMapping vol;
     vol.target = RackMapping::Target::chainVolume;
     vol.chain = second;
     CHECK (rack::map (doc, 1, vol));
+    rack::setMacro (doc, 1, 100.0f);
     RackMapping p;
     p.node = rack::devices (*rack::rackOf (doc), 0).front();
     p.param = 2;
@@ -179,9 +184,11 @@ TEST (rack190hr_rack_presets_are_written_in_lives_preset_form_and_read_back)
     const auto& x = out.xml;
     // Live's preset form [DATA]: the chains in BranchPresets, the rack's own Branches list empty, ids 0
     CHECK (x.find ("<GroupDevicePreset>") != std::string::npos && x.find ("<OverwriteProtectionNumber Value=\"3077\" />") != std::string::npos);
-    CHECK (count (x, "<AudioEffectBranchPreset ") == 2 && x.find ("<AudioEffectBranch ") == std::string::npos);
+    CHECK (x.find ("MinorVersion=\"12.0_12402\"") != std::string::npos);
+    CHECK (count (x, "<AudioEffectBranchPreset ") == 5 && x.find ("<AudioEffectBranch ") == std::string::npos); // (2 + 3 nested racks' chains)
     CHECK (x.find ("<Branches />") != std::string::npos && x.find ("<ReturnBranchPresets />") != std::string::npos);
-    CHECK (count (x, "<GroupDevicePreset") == 2 && count (x, "<AbletonDevicePreset ") >= 4); // (2 plugins + 2 chain mixers… + nested)
+    CHECK (count (x, "<GroupDevicePreset") == 4 && x.find ("<PluginDevice") == std::string::npos);
+    CHECK (std::any_of (out.notes.begin(), out.notes.end(), [] (const std::string& n) { return n.find ("Plugin left out") != std::string::npos; }));
     CHECK (x.find ("<AudioBranchMixerDevice Id=\"0\">") != std::string::npos && x.find ("<Name Value=\"Wet\" />") != std::string::npos);
     CHECK (x.find ("<AutomationTarget Id=\"0\">") != std::string::npos && x.find ("<AutomationTarget Id=\"1") == std::string::npos);
     CHECK (x.find ("<UserName Value=\"My Rack\" />") != std::string::npos);
@@ -198,7 +205,7 @@ TEST (rack190hr_rack_presets_are_written_in_lives_preset_form_and_read_back)
     const auto& a = *rack::rackOf (doc);
     const auto& b = *rack::rackOf (back->slot.patcher);
     CHECK (b.chains.size() == 2 && b.chains[0].name == "Dry" && b.chains[1].name == "Wet" && b.chains[1].select == a.chains[1].select
-           && approx (b.chains[1].volume, a.chains[1].volume, 1.0e-5f) && approx (b.chains[1].pan, -0.25f, 1.0e-5f));
+           && approx (b.chains[1].volume, a.chains[1].volume, 1.0e-4f) && approx (b.chains[1].pan, -0.25f, 1.0e-5f));
     CHECK (rack::devices (b, 0).size() == 1 && rack::devices (b, 1).size() == 1);
     if (rack::devices (b, 1).size() == 1)
     {
@@ -224,7 +231,7 @@ TEST (rack190hr_rack_presets_are_written_in_lives_preset_form_and_read_back)
     {
         const auto& ir = *rack::rackOf (instBack->channel.patcher);
         CHECK (ir.kind == RackDoc::Kind::instrument && ir.chains.size() == 1 && ir.chains[0].key == (RackZone { 36, 72, 40, 70 })
-               && rack::devices (ir, 0).size() == 2);
+               && rack::devices (ir, 0).empty()); // (the plugins stay out)
     }
 
     auto drums = rack::makeDrumRack();
@@ -263,7 +270,7 @@ TEST (rack190hr_lives_own_rack_presets_open_with_their_chains)
 {
     using namespace rack190hr;
     // Live's Core Library on this machine (read-only; skipped without Live): every rack's chain count = its BranchPresets
-    const auto lib = std::string (als190fm::liveRoot()) + "/Core Library/Racks";
+    const auto lib = std::string (rack190hr::liveRoot) + "/Core Library/Racks";
     if (! std::filesystem::exists (lib))
         return;
     int audio = 0, audioOk = 0, instruments = 0, instrumentsOk = 0, midi = 0, midiRefused = 0;

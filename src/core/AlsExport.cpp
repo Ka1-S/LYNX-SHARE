@@ -315,7 +315,8 @@ Node devicePreset (Node device, int id);
 Node branchPreset (Node& b, int id)
 {
     const auto drum = b.name == "DrumBranch";
-    Node p = named (b.name + "Preset");
+    // (a Drum Rack's return chain, ReturnBranch in a set, is an AudioEffectBranchPreset in a preset [DATA])
+    Node p = named ((b.name == "ReturnBranch" ? std::string ("AudioEffectBranch") : b.name) + "Preset");
     p.set ("Id", std::to_string (id));
     std::string name;
     if (auto* n = b.at ("Name/UserName"))
@@ -527,6 +528,7 @@ struct Exporter
 
     // ---- Drum Racks (round 190ec, ALS_FORMAT.md §7): a pad's BranchInfo, its sends and Audio To, the return chains, and
     // a LYNX Sampler on a pad as Live's Simpler
+    bool rackPresetMode = false; // (round 190hr: writing an .adg)
     std::string drumTarget {}; // "AudioOut/Track.<track Id>/DeviceIn.<device Id>" of the Drum Rack about to be written (top level)
     static constexpr const char* sendFloor = "0.0003162277571"; // (Live's −70 dB send floor = −inf [DATA])
 
@@ -763,6 +765,15 @@ struct Exporter
                     const auto& node = doc.nodes[(std::size_t) n];
                     Node d;
                     bool made = false;
+                    if (rackPresetMode && ((node.generator && node.channel.instrument == InstrumentKind::plugin) || (! node.generator && node.effect.kind == EffectKind::plugin)))
+                    {
+                        // [LIVE, round 190hr] Live 12.4.16 closed ("A serious program error") on each LYNX-written .adg
+                        // holding a VST3 plugin device (kHs Gain, no saved state), while the same racks without it, nested
+                        // racks, Instrument / MIDI Effect / Drum Racks loaded: plugins stay out of rack presets until a
+                        // plugin with a state Live saved is checked
+                        note ("Plugin left out of the Live rack preset (Live 12.4 closes on it): " + patcher::nodeName (node));
+                        continue;
+                    }
                     if (node.generator && node.channel.instrument == InstrumentKind::plugin)
                         made = pluginDevice (node.channel.plugin, true, true, d);
                     else if (drum && node.generator && node.channel.instrument == InstrumentKind::sampler) // (round 190ec)
@@ -1585,12 +1596,18 @@ struct Exporter
         // a Drum Rack pad playing into a return chain: Live's presets route it relative to the rack [DATA: Drums Gritty.adg
         // "AudioOut/RELATIVE/DeviceIn.PARENT.R0,ChainIn"]
         drumTarget = r->drum ? "AudioOut/RELATIVE/DeviceIn.PARENT" : "";
+        rackPresetMode = true;
         Node device;
         if (! rackDevice (doc, true, name, device))
             return false;
         zeroIds (device);
         Node root = sk["Root"];
         root.set ("Creator", options.creator);
+        if (! live11) // (as Live 12.4 writes its presets [DATA]; checked loading in Live 12.4.16 [LIVE])
+        {
+            root.set ("MinorVersion", "12.0_12402");
+            root.set ("SchemaChangeCount", "1");
+        }
         root.kids.clear();
         root.add (rackPreset (std::move (device)));
         result.xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";

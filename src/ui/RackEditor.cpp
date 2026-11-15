@@ -1162,6 +1162,12 @@ struct RackView::Impl
             g.setColour (col::textDisabled);
             g.drawFittedText (tr ("Drop an instrument or sample here"), devices.withTrimmedLeft (deviceWidth + 12).reduced (8), juce::Justification::centredLeft, 3);
         }
+        else if (list.empty()) // (round 190hr: an empty chain is Live's drop area, "Drop Audio Effects Here" [190gu shot])
+        {
+            g.setColour (col::textDisabled);
+            g.drawFittedText (r.kind == RackDoc::Kind::instrument ? tr ("Drop an instrument or effect here") : tr ("Drop effects here"),
+                              devices.withTrimmedLeft (deviceWidth + 12).reduced (8), juce::Justification::centredLeft, 3);
+        }
         g.setColour (col::bg1);
         g.fillRoundedRectangle (plus, theme::radius::md);
         g.setColour (col::textSecondary);
