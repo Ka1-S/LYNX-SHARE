@@ -12,6 +12,10 @@
 //     in the mix), the bus's stem with its delay (group FX), and an insert fed only by a Fruity Send (an extra output)
 //     exported with its sound;
 //  3. the PDC trim: on, the mix starts where the project starts; off, the file starts with the 72 samples of latency.
+// Round 190hn: the playback check again with the start (startRealtimeBounce's seek and play) landing inside a device
+// callback, right after that callback took the position requests (AudioEngine::afterPositionRequests): the start must
+// still play from its position in the first block, not one block late (the macOS release self-test of 0.1.29 found the
+// real-time export one block late: "best lag 441").
 
 #include "engine/AudioEngine.h"
 
@@ -220,6 +224,23 @@ int firstSound (const Audio& a, float level = 1.0e-4f)
 
 juce::String db (float v) { return juce::String (juce::Decibels::gainToDecibels (v, -200.0f), 1) + " dBFS"; }
 
+// the UI's start inside a device callback (round 190hn): the audio thread waits here, after its position requests, until
+// the test thread has started playback
+struct StartRace
+{
+    juce::WaitableEvent entered, go;
+    std::atomic<bool> armed { false };
+    static void hook (void* p)
+    {
+        auto* race = static_cast<StartRace*> (p);
+        if (race->armed.exchange (false))
+        {
+            race->entered.signal();
+            race->go.wait (5000);
+        }
+    }
+};
+
 exportopts::Options parityOptions()
 {
     exportopts::Options o;
@@ -289,7 +310,8 @@ juce::String AudioEngine::exportParitySelfTest (const std::function<void (const 
         return "ERROR the mix: " + errors.joinIntoString ("; ");
     // playback through a stand-in device with callbacks of `block` samples: what the real-time bounce's tap records (as
     // Export › "Render through the hardware in real time"), the message thread doing its part (the engine's timer)
-    auto playback = [&] (int block, juce::String& error) {
+    // `raced` (round 190hn): the start lands inside a callback, after it took the position requests (StartRace)
+    auto playback = [&] (int block, juce::String& error, bool raced) {
         Audio played;
         ParityDevice::block = block;
         AudioEngine live (false);
@@ -307,15 +329,27 @@ juce::String AudioEngine::exportParitySelfTest (const std::function<void (const 
             live.timerCallback();
             juce::Thread::sleep (10);
         }
-        if (const auto e = live.startRealtimeBounce (0.0); e.isNotEmpty())
+        StartRace race;
+        if (raced)
         {
-            error = "playback (real-time bounce): " + e;
+            live.afterPositionRequestsContext = &race;
+            live.afterPositionRequests.store (&StartRace::hook, std::memory_order_release);
+            race.armed = true;
+            if (! race.entered.wait (5000))
+                notes.add ("the start race's callback did not come");
+        }
+        const auto started = live.startRealtimeBounce (0.0);
+        race.go.signal();
+        if (started.isNotEmpty())
+        {
+            live.afterPositionRequests.store (nullptr);
+            error = "playback (real-time bounce): " + started;
             return played;
         }
         const auto latency = (std::int64_t) live.bounceLatency();
         const auto wanted = latency + (std::int64_t) mix.l.size();
-        const auto started = juce::Time::getMillisecondCounter();
-        while ((std::int64_t) played.l.size() < wanted && juce::Time::getMillisecondCounter() - started < 60000 && live.bounceStillPlaying())
+        const auto since = juce::Time::getMillisecondCounter();
+        while ((std::int64_t) played.l.size() < wanted && juce::Time::getMillisecondCounter() - since < 60000 && live.bounceStillPlaying())
         {
             live.timerCallback();
             juce::Thread::sleep (20);
@@ -323,6 +357,7 @@ juce::String AudioEngine::exportParitySelfTest (const std::function<void (const 
         }
         const auto dropouts = live.bounceDropouts();
         live.finishRealtimeBounce();
+        live.afterPositionRequests.store (nullptr);
         live.deviceManager.removeAudioCallback (&live);
         live.deviceManager.closeAudioDevice();
         if (dropouts > 0)
@@ -336,7 +371,7 @@ juce::String AudioEngine::exportParitySelfTest (const std::function<void (const 
         played.r.erase (played.r.begin(), played.r.begin() + latency);
         played.l.resize (mix.l.size());
         played.r.resize (mix.r.size());
-        say ("playback in blocks of " + juce::String (block) + ": " + juce::String ((int) latency) + " samples of delay compensation trimmed");
+        say ("playback in blocks of " + juce::String (block) + (raced ? ", started inside a callback" : "") + ": " + juce::String ((int) latency) + " samples of delay compensation trimmed");
         // LYNX_EXPORTPARITY_KEEP=<folder>: the export and the playback kept as WAV files (for a closer look)
         if (const auto keep = juce::SystemStats::getEnvironmentVariable ("LYNX_EXPORTPARITY_KEEP", {}); juce::File::isAbsolutePath (keep))
         {
@@ -347,7 +382,7 @@ juce::String AudioEngine::exportParitySelfTest (const std::function<void (const 
             b.copyFrom (0, 0, played.l.data(), b.getNumSamples());
             b.copyFrom (1, 0, played.r.data(), b.getNumSamples());
             juce::WavAudioFormat wav;
-            const auto out = dir.getChildFile ("playback-" + juce::String (block) + ".wav");
+            const auto out = dir.getChildFile ("playback-" + juce::String (block) + (raced ? "-raced" : "") + ".wav");
             out.deleteFile();
             if (std::unique_ptr<juce::AudioFormatWriter> w (wav.createWriterFor (out.createOutputStream().release(), ParityDevice::rate, 2, 32, {}, 0)); w != nullptr)
                 w->writeFromAudioSampleBuffer (b, 0, b.getNumSamples());
@@ -368,14 +403,19 @@ juce::String AudioEngine::exportParitySelfTest (const std::function<void (const 
         }
         return juce::String ("never apart");
     };
-    juce::String playError;
-    const auto played = playback (441, playError);
-    if (playError.isNotEmpty())
-        return "ERROR " + playError;
-    {
+    // the playback (in blocks of 441) against the export; `how` names the variant in the error
+    auto checkPlayback = [&] (bool raced) {
+        const juce::String how = raced ? "playback started inside a callback" : "playback";
+        juce::String playError;
+        const auto played = playback (441, playError, raced);
+        if (playError.isNotEmpty())
+        {
+            errors.add (playError);
+            return;
+        }
         const auto n = juce::jmin (mix.l.size(), played.l.size());
         const auto d = maxDiff (mix, played, n);
-        say ("export vs playback: " + juce::String ((int) mix.l.size()) + " / " + juce::String ((int) played.l.size()) + " frames, max difference " + db (d)
+        say ("export vs " + how + ": " + juce::String ((int) mix.l.size()) + " / " + juce::String ((int) played.l.size()) + " frames, max difference " + db (d)
              + ", first sound at " + juce::String (firstSound (mix)) + " / " + juce::String (firstSound (played)));
         if (d >= 3.16e-5f)
         {
@@ -396,12 +436,15 @@ juce::String AudioEngine::exportParitySelfTest (const std::function<void (const 
                     worst = i;
             say ("  best lag " + juce::String (bestLag) + " (" + db (best) + "), the largest difference at frame " + juce::String ((int) worst));
             juce::String e512;
-            const auto same = playback (512, e512);
-            errors.add ("playback differs from the export by " + db (d) + " (best lag " + juce::String (bestLag) + ": " + db (best) + ", worst at frame "
-                        + juce::String ((int) worst) + ", " + where (mix, played) + "; in blocks of 512: "
-                        + (e512.isNotEmpty() ? e512 : db (maxDiff (mix, same, n)) + ", " + where (mix, same)) + ")");
+            const auto same = playback (512, e512, raced);
+            errors.add (how + " differs from the export by " + db (d) + " (best lag " + juce::String (bestLag) + ": " + db (best) + ", worst at frame "
+                        + juce::String ((int) worst) + ", " + where (mix, played) + ", first sound at " + juce::String (firstSound (mix)) + " / "
+                        + juce::String (firstSound (played)) + "; in blocks of 512: " + (e512.isNotEmpty() ? e512 : db (maxDiff (mix, same, n)) + ", " + where (mix, same))
+                        + ")");
         }
-    }
+    };
+    checkPlayback (false);
+    checkPlayback (true);
 
     // --- 2. stems ---------------------------------------------------------------------------------------------------
     auto checkSum = [&] (const juce::String& what, const std::vector<Audio>& parts) {
@@ -510,6 +553,6 @@ juce::String AudioEngine::exportParitySelfTest (const std::function<void (const 
 
     if (! errors.isEmpty())
         return "ERROR " + errors.joinIntoString ("; ");
-    return "OK (export = playback, stems of 2 modes add up to the mix, side-chained stems ducked" + (notes.isEmpty() ? juce::String() : ", " + notes.joinIntoString (", ")) + ")";
+    return "OK (export = playback, also started inside a callback, stems of 2 modes add up to the mix, side-chained stems ducked" + (notes.isEmpty() ? juce::String() : ", " + notes.joinIntoString (", ")) + ")";
 }
 } // namespace lynx
