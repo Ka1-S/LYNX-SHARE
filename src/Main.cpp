@@ -2038,6 +2038,16 @@ public:
             return;
         }
 
+        if (args.contains ("--pickerdropshot"))
+        {
+            // LYNX --pickerdropshot prefix: round 190hm (issue #177) — Picker panel entries dropped on the Playlist as FL
+            // places them (plain drop: one track per entry at the snapped time; Shift: one after another), off-screen,
+            // with <prefix>-checks.txt (OK / FAIL per placement)
+            setApplicationReturnValue (runPickerDropShot (args[args.indexOf ("--pickerdropshot") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+
         if (args.contains ("--trackmodeshot"))
         {
             // LYNX --trackmodeshot prefix: rollup 190cv (UI gate of PR #151) — Playlist track header › Track mode › Audio
@@ -19105,6 +19115,96 @@ private:
     }
 
     // round 190bw: FL's 13 curve modes of an automation clip's points (see --curveshot)
+    bool runPickerDropShot (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        juce::StringArray checks;
+        bool all = true;
+        const auto check = [&checks, &all] (bool ok, const juce::String& what) {
+            checks.add ((ok ? "OK   " : "FAIL ") + what);
+            all = all && ok;
+        };
+        {
+            lynx::MainComponent ui (offline, false);
+            ui.setSize (1600, 900);
+            offline.dispatchPendingMessages();
+            const auto bar = (std::int64_t) lynx::ppq * 4;
+            offline.editSong ([bar] (lynx::Song& s) {
+                s.patterns.resize (3);
+                const char* names[] = { "Pattern 1", "Pattern 2", "Pattern 3" };
+                for (int p = 0; p < 3; ++p)
+                {
+                    auto& pattern = s.patterns[(std::size_t) p];
+                    pattern.name = names[p];
+                    pattern.notes.clear();
+                    for (int n = 0; n < 4 * (p + 1); ++n)
+                    {
+                        lynx::Note note;
+                        note.start = (std::int64_t) n * lynx::ppq / 2;
+                        note.length = lynx::ppq / 4;
+                        note.key = 60 + (n * 5 + p * 3) % 12;
+                        pattern.notes.push_back (note);
+                    }
+                }
+                s.patterns[1].lengthTicks = bar * 2; // (Pattern 2 is two bars long)
+                s.currentPattern = 0;
+                s.playlist.clear();
+            }, false);
+            offline.dispatchPendingMessages();
+            ui.selectTabForSnapshot (2);
+            offline.dispatchPendingMessages();
+            auto& playlist = ui.getPlaylistForSnapshot();
+            playlist.setViewForSnapshot (120.0, 0, 0);
+            offline.dispatchPendingMessages();
+
+            // the drag's description survives the trip
+            {
+                auto kind = lynx::ClipKind::audio;
+                std::vector<int> entries;
+                const auto text = lynx::PlaylistComponent::pickerDragDescription (lynx::ClipKind::pattern, { 2, 0 });
+                check (lynx::PlaylistComponent::pickerDrag (text, kind, entries) && kind == lynx::ClipKind::pattern && entries == std::vector<int> ({ 2, 0 }),
+                       "drag description " + text);
+            }
+            const auto at = [&playlist] (int track, double ticks) {
+                return juce::Point<int> (juce::roundToInt (playlist.xOfTickForSnapshot (ticks)), playlist.trackRowForSnapshot (track).getCentreY());
+            };
+            const auto find = [&offline] (int track, int pattern) -> const lynx::Clip* {
+                for (const auto& c : offline.getSong().playlist)
+                    if (c.track == track && c.kind == lynx::ClipKind::pattern && c.pattern == pattern)
+                        return &c;
+                return nullptr;
+            };
+            // 1. Pattern 1 dropped on track 1 a little after bar 2's line: it starts on that line
+            playlist.dropFromPicker (lynx::ClipKind::pattern, { 0 }, at (0, (double) bar + lynx::ppq * 0.2), false);
+            offline.dispatchPendingMessages();
+            const auto* one = find (0, 0);
+            check (one != nullptr && one->start == bar && one->length == bar, "plain drop: Pattern 1 on track 1 at bar 2");
+            // 2. Pattern 2 + Pattern 3 (picked together) dropped on track 3 at bar 3: tracks 3 and 4, same time
+            playlist.dropFromPicker (lynx::ClipKind::pattern, { 1, 2 }, at (2, (double) bar * 2), false);
+            offline.dispatchPendingMessages();
+            const auto* two = find (2, 1);
+            const auto* three = find (3, 2);
+            check (two != nullptr && three != nullptr && two->start == bar * 2 && three->start == bar * 2,
+                   "two picked patterns: Pattern 2 on track 3, Pattern 3 on track 4, both at bar 3");
+            check (offline.getSong().currentPattern == 2, "the current pattern is the last dropped one (Pattern 3)");
+            saveSnapshot (ui, prefix + "-plain.png");
+            // 3. Shift: all three on track 6 from bar 1, one after the other
+            playlist.dropFromPicker (lynx::ClipKind::pattern, { 0, 1, 2 }, at (5, 0.0), true);
+            offline.dispatchPendingMessages();
+            const auto* a = find (5, 0);
+            const auto* b = find (5, 1);
+            const auto* c = find (5, 2);
+            check (a != nullptr && b != nullptr && c != nullptr && a->start == 0 && b->start == a->end() && c->start == b->end(),
+                   "Shift drop: Pattern 1, 2, 3 one after the other on track 6");
+            check (offline.getSong().currentPattern == 2, "Shift keeps the current pattern");
+            saveSnapshot (ui, prefix + "-shift.png");
+        }
+        checks.add (all ? "ALL OK" : "FAILURES");
+        juce::File (prefix + "-checks.txt").replaceWithText (checks.joinIntoString ("\n") + "\n");
+        return all;
+    }
+
     bool runTrackModeShot (const juce::String& prefix)
     {
         juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);

@@ -21,6 +21,7 @@
 #include "ui/TextCache.h"
 #include "ui/PlaylistComponent.h"
 #include "core/PaintTemplate.h"
+#include "core/PickerDrop.h"
 #include "core/ChainPresets.h"
 
 #include "core/EventEdit.h"
@@ -3991,28 +3992,38 @@ Clip PlaylistComponent::makeBrushClip (int track, std::int64_t start) const
             c.flFadeFlags = brush.picked->flFadeFlags;
         return c;
     }
+    return makeSourceClip (brush.kind, brush.kind == ClipKind::pattern ? song.currentPattern : brush.index, track, start);
+}
+
+Clip PlaylistComponent::makeSourceClip (ClipKind kind, int index, int track, std::int64_t start) const
+{
+    // a pattern (an invalid one: the current pattern), an audio clip's channel or an automation clip, with its plain length
+    const auto& song = engine.getSong();
     Clip c;
-    c.pattern = song.currentPattern;
+    c.pattern = kind == ClipKind::pattern && index >= 0 && index < (int) song.patterns.size() ? index : song.currentPattern;
     c.track = track;
     c.start = juce::jmax<std::int64_t> (0, start);
-    c.length = song.activePattern().effectiveLength (song.meter());
+    c.length = (c.pattern == song.currentPattern || c.pattern < 0 || c.pattern >= (int) song.patterns.size()
+                    ? song.activePattern()
+                    : song.patterns[(std::size_t) c.pattern])
+                   .effectiveLength (song.meter());
 
-    if (brush.kind == ClipKind::audio && brush.index >= 0 && brush.index < (int) song.channels.size()
-        && song.channels[(std::size_t) brush.index].instrument == InstrumentKind::audioClip)
+    if (kind == ClipKind::audio && index >= 0 && index < (int) song.channels.size()
+        && song.channels[(std::size_t) index].instrument == InstrumentKind::audioClip)
     {
         c.kind = ClipKind::audio;
-        c.channel = brush.index;
+        c.channel = index;
         c.pattern = 0;
         c.flFadeFlags = newClipFadeFlags();
 
         // audio length in ticks at the current BPM
-        if (auto data = engine.getSampleLibrary().load (juce::String::fromUTF8 (song.channels[(std::size_t) brush.index].samplePath.c_str())))
+        if (auto data = engine.getSampleLibrary().load (juce::String::fromUTF8 (song.channels[(std::size_t) index].samplePath.c_str())))
             c.length = juce::jmax<std::int64_t> (ppq / 4, (std::int64_t) ((double) data->frames() / data->sampleRate * song.bpm / 60.0 * ppq));
     }
-    else if (brush.kind == ClipKind::automation && brush.index >= 0 && brush.index < (int) song.automations.size())
+    else if (kind == ClipKind::automation && index >= 0 && index < (int) song.automations.size())
     {
         c.kind = ClipKind::automation;
-        c.automation = brush.index;
+        c.automation = index;
         c.pattern = 0;
         c.length = song.barTicks() * 4; // 4 bars
     }
@@ -10810,8 +10821,10 @@ void PlaylistComponent::zoomOnPerformanceClips()
 bool PlaylistComponent::isInterestedInDragSource (const SourceDetails& details)
 {
     int gridTrack = 0, gridScene = 0;
+    auto pickerKind = ClipKind::pattern;
+    std::vector<int> pickerEntries;
     return BrowserComponent::isBrowserDrag (details) || BrowserComponent::draggedPattern (details) >= 0
-           || clipGridDrag (details.description, gridTrack, gridScene)
+           || clipGridDrag (details.description, gridTrack, gridScene) || pickerDrag (details.description, pickerKind, pickerEntries)
            || (! simpleHeaders && (BrowserComponent::isGeneratorDrag (details) || BrowserComponent::isEffectDrag (details))); // (issue #152.6)
 }
 
@@ -10929,8 +10942,104 @@ void PlaylistComponent::applyGeneratorDrop (ChannelDef generator, std::vector<in
     repaint();
 }
 
+juce::String PlaylistComponent::pickerDragDescription (ClipKind kind, const std::vector<int>& entries)
+{
+    juce::StringArray list;
+    for (const auto e : entries)
+        list.add (juce::String (e));
+    return "lynx-picker|" + juce::String ((int) kind) + "|" + list.joinIntoString (",");
+}
+
+bool PlaylistComponent::pickerDrag (const juce::var& description, ClipKind& kind, std::vector<int>& entries)
+{
+    const auto text = description.toString();
+    if (! text.startsWith ("lynx-picker|"))
+        return false;
+    const auto parts = juce::StringArray::fromTokens (text, "|", "");
+    if (parts.size() != 3)
+        return false;
+    const auto k = parts[1].getIntValue();
+    if (k != (int) ClipKind::pattern && k != (int) ClipKind::audio && k != (int) ClipKind::automation)
+        return false;
+    kind = (ClipKind) k;
+    entries.clear();
+    for (const auto& e : juce::StringArray::fromTokens (parts[2], ",", ""))
+        if (e.isNotEmpty())
+            entries.push_back (e.getIntValue());
+    return ! entries.empty();
+}
+
+void PlaylistComponent::dropFromPicker (ClipKind kind, const std::vector<int>& entries, juce::Point<int> p, bool shift)
+{
+    // FL 2026 (FLEngine FUN_00e7a470, picker branch; FUN_012f30b0 with Shift; core/PickerDrop.h)
+    if (entries.empty() || p.y < tracksTop() || p.y >= gridArea().getBottom())
+        return;
+    const auto track = yToTrack (p.y);
+    // the mouse time, snapped with the Playlist's snap to the nearest line (FL's FUN_00e5a350; only its Cell snap, which
+    // LYNX has not, rounds down); over the track headers the view's left edge
+    const auto tick = juce::jmax (0.0, xToTick (juce::jmax (p.x, gridArea().getX())));
+    const auto start = juce::jmax<std::int64_t> (0, snapLine (tick));
+
+    const auto& song = engine.getSong();
+    std::vector<Clip> clips;
+    for (const auto e : entries)
+    {
+        const auto valid = kind == ClipKind::pattern    ? e >= 0 && e < (int) song.patterns.size()
+                           : kind == ClipKind::audio    ? e >= 0 && e < (int) song.channels.size() && song.channels[(std::size_t) e].instrument == InstrumentKind::audioClip
+                                                        : e >= 0 && e < (int) song.automations.size();
+        if (valid)
+            clips.push_back (makeSourceClip (kind, e, track, start));
+    }
+    if (clips.empty())
+        return;
+
+    const juce::Component::SafePointer<PlaylistComponent> safe (this);
+    auto apply = [safe, clips, track, start, shift] (bool moveOff) {
+        if (safe == nullptr)
+            return;
+        auto& engine = safe->engine;
+        const auto placed = pickerdrop::place (engine.getSong(), clips, track, start, shift, moveOff);
+        if (placed.empty())
+            return;
+        const auto first = (int) engine.getSong().playlist.size();
+        engine.editSong ([&placed, shift] (Song& s) { // (one undo step, FL's "drop")
+            s.playlist.insert (s.playlist.end(), placed.begin(), placed.end());
+            s.currentPattern = pickerdrop::currentPatternAfter (placed, shift, s.currentPattern);
+            s.mode = PlayMode::song;
+        });
+        std::vector<int> indices;
+        for (int i = first; i < (int) engine.getSong().playlist.size(); ++i)
+            indices.push_back (i);
+        safe->sortClips (std::move (indices)); // (audio clips on an audio track follow its mixer track, as a placed clip)
+        safe->repaint();
+    };
+
+    if (! pickerdrop::asksAboutInstrumentTrack (song, clips, track, shift))
+    {
+        apply (false);
+        return;
+    }
+    // FL asks once per drop (MB_YESNO | MB_ICONQUESTION); Yes = the next empty tracks, No = stop there
+    auto options = juce::MessageBoxOptions()
+                       .withIconType (juce::MessageBoxIconType::QuestionIcon)
+                       .withTitle (tr ("Can't drop on an instrument track"))
+                       .withMessage (tr ("Instrument tracks are not for audio or automation clips.") + "\n\n"
+                                     + tr ("Would you like to place the clip(s) on the next empty playlist track(s)?"))
+                       .withButton (tr ("Yes"))
+                       .withButton (tr ("No"))
+                       .withAssociatedComponent (this);
+    juce::AlertWindow::showAsync (options, [apply] (int result) { apply (result == 1); });
+}
+
 void PlaylistComponent::itemDropped (const SourceDetails& details)
 {
+    // issue #177: entries dragged out of the Picker panel
+    auto pickerKind = ClipKind::pattern;
+    if (std::vector<int> entries; pickerDrag (details.description, pickerKind, entries))
+    {
+        dropFromPicker (pickerKind, entries, details.localPosition, juce::ModifierKeys::currentModifiers.isShiftDown());
+        return;
+    }
     if (BrowserComponent::isGeneratorDrag (details) || BrowserComponent::isEffectDrag (details))
     {
         pluginDropped (details);
@@ -11168,11 +11277,15 @@ void PatternPicker::mouseDown (const juce::MouseEvent& e)
 
     const auto list = rows();
     const auto i = rowAt (e.y);
+    dragRow = -1;
+    dragging = false;
 
     if (i < 0)
         return;
 
     const auto& row = list[(std::size_t) i];
+    if (! flmods::popup (e.mods))
+        dragRow = i; // (issue #177: a drag from here places it on the Playlist)
     // issue #175 (FL 2026, checked live: shots/FL-175-picker-choice-paints-plain.png): a click on the item the clicked
     // clip came from keeps that clip as what the tools paint; another item paints its plain version
     {
@@ -11259,8 +11372,54 @@ juce::PopupMenu PatternPicker::pickerMenu()
     return menu;
 }
 
+void PatternPicker::mouseDrag (const juce::MouseEvent& e)
+{
+    // issue #177, FL's PickerPanelMouseMove (FUN_00e4daa0): with the left button held past the drag distance and Ctrl up,
+    // the entry is dragged; a pattern joins the picked ones (alone when it was not picked) and every picked one goes
+    if (dragging || dragRow < 0 || flmods::ctrl (e.mods) || ! e.mouseWasDraggedSinceMouseDown())
+        return;
+    const auto list = rows();
+    if (dragRow >= (int) list.size())
+        return;
+    const auto row = list[(std::size_t) dragRow];
+    auto* container = juce::DragAndDropContainer::findParentDragContainerFor (this);
+    if (container == nullptr || container->isDragAndDropActive())
+        return;
+
+    std::vector<int> entries { row.index };
+    if (row.kind == ClipKind::pattern)
+    {
+        pickersel::clamp (picked, (int) engine.getSong().patterns.size());
+        if (! picked.contains (row.index))
+        {
+            picked.clear();
+            picked.add (row.index);
+        }
+        entries = pickerdrop::draggedEntries (picked.items, row.index);
+    }
+    dragging = true;
+    pressedRow = -1; // (no selection change on the release)
+    deselectOnUp = false;
+
+    // the entry's own picture, centred on the mouse (FL's drag image hotspot is the middle of the item)
+    const auto bounds = juce::Rectangle<int> (4, headerHeight + (dragRow - scroll) * rowHeight + 2, getWidth() - 8, rowHeight - 4)
+                            .getIntersection (getLocalBounds());
+    auto image = bounds.isEmpty() ? juce::Image (juce::Image::ARGB, 1, 1, true) : createComponentSnapshot (bounds, true);
+    const juce::Point<int> offset (-image.getWidth() / 2, -image.getHeight() / 2);
+    repaint();
+    container->startDragging (PlaylistComponent::pickerDragDescription (row.kind, entries), this, juce::ScaledImage (image), false, &offset);
+}
+
 void PatternPicker::mouseUp (const juce::MouseEvent& e)
 {
+    if (dragging) // (issue #177: the drag ended; the press changed nothing more)
+    {
+        dragging = false;
+        dragRow = -1;
+        pressedRow = -1;
+        return;
+    }
+    dragRow = -1;
     // FL's PickerPanelMouseUp FUN_00e4e080: plain = only this one, Ctrl = toggle, Shift = the range from the first picked
     const auto i = rowAt (e.y);
     if (pressedRow < 0 || i != pressedRow)
@@ -11341,8 +11500,8 @@ ui::Hint PatternPicker::hintAt (juce::Point<int> p)
     {
         hint.value = list[(std::size_t) i].name;
         hint.text = list[(std::size_t) i].kind == ClipKind::pattern
-                        ? tr ("Pattern: [LMB] paint it with the pencil  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu")
-                        : tr ("Clip source: [LMB] paint it with the pencil");
+                        ? tr ("Pattern: [LMB] paint it with the pencil  [drag] place it on the Playlist (Shift on drop: one after another)  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu")
+                        : tr ("Clip source: [LMB] paint it with the pencil  [drag] place it on the Playlist");
         hint.hasMenu = list[(std::size_t) i].kind == ClipKind::pattern;
     }
 

@@ -10144,3 +10144,8 @@ countries: es mx ar co cl pe ve
 "There is no track here to take the plugin." = "Aquí no hay ninguna pista que pueda recibir el plugin."
 "Potentially slow operation" = "Operación posiblemente lenta"
 "Are you sure you want to load {0} plugins at once?" = "¿Seguro que quieres cargar {0} plugins a la vez?"
+"Pattern: [LMB] paint it with the pencil  [drag] place it on the Playlist (Shift on drop: one after another)  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Patrón: [LMB] pintarlo con el lápiz  [arrastrar] ponerlo en la Playlist (Shift al soltar: uno tras otro)  [Ctrl+LMB] / [Shift+LMB] elegir varios  [2xLMB] abrir  [RMB] menú"
+"Clip source: [LMB] paint it with the pencil  [drag] place it on the Playlist" = "Origen del clip: [LMB] pintarlo con el lápiz  [arrastrar] ponerlo en la Playlist"
+"Can't drop on an instrument track" = "No se puede soltar en una pista de instrumento"
+"Instrument tracks are not for audio or automation clips." = "Las pistas de instrumento no son para clips de audio o de automatización."
+"Would you like to place the clip(s) on the next empty playlist track(s)?" = "¿Quieres colocar el/los clip(s) en la(s) siguiente(s) pista(s) vacía(s) de la Playlist?"

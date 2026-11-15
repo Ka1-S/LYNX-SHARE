@@ -10144,3 +10144,8 @@ countries: tr
 "There is no track here to take the plugin." = "Burada eklentiyi alabilecek bir kanal yok."
 "Potentially slow operation" = "İşlem yavaş olabilir"
 "Are you sure you want to load {0} plugins at once?" = "{0} eklentiyi aynı anda yüklemek istediğinden emin misin?"
+"Pattern: [LMB] paint it with the pencil  [drag] place it on the Playlist (Shift on drop: one after another)  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Pattern: [LMB] kalemle boya  [sürükle] Playlist'e yerleştir (bırakırken Shift: art arda)  [Ctrl+LMB] / [Shift+LMB] birden çok seç  [2xLMB] aç  [RMB] menü"
+"Clip source: [LMB] paint it with the pencil  [drag] place it on the Playlist" = "Klip kaynağı: [LMB] kalemle boya  [sürükle] Playlist'e yerleştir"
+"Can't drop on an instrument track" = "Enstrüman kanalına bırakılamaz"
+"Instrument tracks are not for audio or automation clips." = "Enstrüman kanalları ses veya otomasyon klipleri için değildir."
+"Would you like to place the clip(s) on the next empty playlist track(s)?" = "Klip(ler) sonraki boş Playlist kanal(lar)ına yerleştirilsin mi?"

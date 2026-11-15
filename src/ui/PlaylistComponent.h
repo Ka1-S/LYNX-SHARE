@@ -174,6 +174,12 @@ public:
     // workflow, FL-exact: on a track header only (core/PluginDrop.h); Clip-launch workflow: on a track, as Live
     void pluginDropped (const SourceDetails& details);
     void applyGeneratorDrop (ChannelDef generator, std::vector<int> tracks, bool shift);
+    // Issue #177: entries dragged out of the Picker panel (patterns, audio clips, automation clips), placed as FL does
+    // (core/PickerDrop.h): entry k on the track under the mouse + k at the snapped mouse time; Shift: one after the other
+    // on that track. `at` is in this component's coordinates.
+    static juce::String pickerDragDescription (ClipKind kind, const std::vector<int>& entries);
+    static bool pickerDrag (const juce::var& description, ClipKind& kind, std::vector<int>& entries);
+    void dropFromPicker (ClipKind kind, const std::vector<int>& entries, juce::Point<int> at, bool shift);
     // The Browser's "Send to the Playlist as an audio clip": at the playhead (song mode) or the start, on the
     // first track that is free there; an audio-clip channel of the same file is reused.
     void addAudioClipAtPlayhead (const juce::File& file);
@@ -411,6 +417,7 @@ private:
     int clipAt (int x, int y, bool& onRightEdge) const;
     int clipAt (int x, int y, bool& onRightEdge, bool& onLeftEdge) const;
     Clip makeBrushClip (int track, std::int64_t start) const; // what a click on empty space places
+    Clip makeSourceClip (ClipKind kind, int index, int track, std::int64_t start) const; // a Picker entry's plain clip
     void cutWithKnife (juce::Point<int> from, juce::Point<int> to, bool snapOn);
     void zoomToTicks (double from, double to);
     void zoomIn (int anchorX);
@@ -745,6 +752,7 @@ public:
     void paint (juce::Graphics& g) override;
     void mouseDown (const juce::MouseEvent& e) override;
     void mouseUp (const juce::MouseEvent& e) override;
+    void mouseDrag (const juce::MouseEvent& e) override;
     void mouseDoubleClick (const juce::MouseEvent& e) override;
     void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override;
     void mouseMove (const juce::MouseEvent& e) override;
@@ -794,6 +802,8 @@ private:
     pickersel::Selection picked; // pattern indices (pattern view)
     bool deselectOnUp = false;   // a Ctrl+click on a picked pattern takes it out on release (FL)
     int pressedRow = -1;
+    int dragRow = -1;      // the row a left press landed on (issue #177: a drag from it goes to the Playlist)
+    bool dragging = false; // that drag has started
     int hoverTab = -1, hoverRow = -1;
     bool hoverAdd = false;
     static constexpr int rowHeight = 28, headerHeight = 26, footerHeight = 22;
