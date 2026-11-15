@@ -34,7 +34,12 @@ namespace lynx
 {
 namespace
 {
-constexpr int headerHeight = 26, rowHeight = 24, footerHeight = 30, columnWidth = 104, sceneBaseWidth = 128, launchZone = 20;
+constexpr int headerHeight = 26, rowHeight = 24, footerHeight = 30, columnWidth = 104, launchZone = 20;
+// round 190ig: the Live look of the clip grid (View › "Classic LYNX look for the clip grid" turns it off: round 181a's look)
+bool classicLook = false;
+bool liveLook() noexcept { return ! classicLook && layoutstyle::current() == layoutstyle::Style::clipLaunch; }
+// the scene column: Live's 84 px cells after a 2 px separator (round 190ia CL-14b, live-session.png x 1540..1625)
+int sceneBaseWidthNow() noexcept { return liveLook() ? 86 : 128; }
 constexpr int minColumns = 8, minRows = 8;
 // round 190bv: the row under the slots with each track's stop and arm buttons
 constexpr int statusHeight = 22, armWidth = 22;
@@ -46,7 +51,7 @@ constexpr int tempoFieldWidth = 46, signatureFieldWidth = 42, sceneFieldsWidth =
 bool sceneFieldsOn = false;
 // round 190em: Live 12.4.16's launch triangle of a scene without its own tempo / signature (190ei shot: #1E1E1E)
 const juce::Colour liveSceneTriangle { 0xff1e1e1e };
-int sceneWidthNow() noexcept { return sceneBaseWidth + (sceneFieldsOn ? sceneFieldsWidth : 0); }
+int sceneWidthNow() noexcept { return sceneBaseWidthNow() + (sceneFieldsOn ? sceneFieldsWidth : 0); }
 constexpr const char* playlistDragDescription = "lynx-playlist-clip";
 
 const std::pair<LaunchQuant, const char*> quantNames[] = {
@@ -213,13 +218,32 @@ public:
 
         // the scene column stays in place
         const juce::Rectangle<int> sceneColumn (cells.getRight(), 0, sceneWidthNow(), cells.getBottom() + statusHeight);
-        g.setColour (c::bg2);
-        g.fillRect (sceneColumn);
-        g.setColour (c::border);
-        g.fillRect (sceneColumn.getX(), 0, 1, sceneColumn.getHeight());
-        g.setColour (c::textSecondary);
-        g.setFont (theme::font (theme::type::small, true));
-        g.drawText (tr ("Scenes"), sceneColumn.withHeight (headerHeight).withTrimmedLeft (8), juce::Justification::centredLeft);
+        if (liveLook())
+        {
+            // Live's Main column (round 190ia CL-14b, live-session.png x 1540..1625 y 86..240): a 2 px separator, the "Main"
+            // header (#3C3C3C, its name in Live's text grey) over a 2 px separator, then the scene cells on #363636
+            namespace lv = theme::livelook;
+            g.setColour (lv::separator);
+            g.fillRect (sceneColumn);
+            g.setColour (lv::surface);
+            g.fillRect (sceneColumn.withTrimmedLeft (2).withTrimmedTop (headerHeight));
+            const auto head = sceneColumn.withTrimmedLeft (2).withHeight (headerHeight - 2);
+            g.setColour (lv::mainHeader);
+            g.fillRect (head);
+            g.setColour (lv::text);
+            g.setFont (theme::font (theme::type::small));
+            g.drawText (tr ("Main"), head.withTrimmedLeft (8), juce::Justification::centredLeft, true);
+        }
+        else
+        {
+            g.setColour (c::bg2);
+            g.fillRect (sceneColumn);
+            g.setColour (c::border);
+            g.fillRect (sceneColumn.getX(), 0, 1, sceneColumn.getHeight());
+            g.setColour (c::textSecondary);
+            g.setFont (theme::font (theme::type::small, true));
+            g.drawText (tr ("Scenes"), sceneColumn.withHeight (headerHeight).withTrimmedLeft (8), juce::Justification::centredLeft);
+        }
         if (! ui::paintCache() || g.clipRegionIntersects (sceneColumn.withTrimmedTop (headerHeight)))
         {
             juce::Graphics::ScopedSaveState rows (g);
@@ -575,7 +599,7 @@ public:
         }
         const juce::Rectangle<int> sceneColumn (cells.getRight(), cells.getY(), sceneWidthNow(), cells.getHeight());
         for (int r = firstRow(); r < scenes && rowY (r) < cells.getBottom(); ++r)
-            out.push_back ({ juce::Rectangle<int> (sceneColumn.getX(), rowY (r), sceneBaseWidth, rowHeight).getIntersection (sceneColumn),
+            out.push_back ({ juce::Rectangle<int> (sceneColumn.getX(), rowY (r), sceneBaseWidthNow(), rowHeight).getIntersection (sceneColumn),
                              remotemap::Target::sceneLaunch (r) });
     }
 
@@ -1040,6 +1064,11 @@ private:
         namespace c = theme::colour;
         static const ClipGridScene unnamed;
         const auto& scene = row < (int) grid.scenes.size() ? grid.scenes[(std::size_t) row] : unnamed;
+        if (liveLook())
+        {
+            paintSceneLive (g, scene, row, r);
+            return;
+        }
         const auto cell = r.reduced (1);
         g.setColour (scene.colour != 0 ? juce::Colour (scene.colour) : c::bg3);
         g.fillRect (cell);
@@ -1069,14 +1098,61 @@ private:
                 g.setColour (c::accent.withAlpha (0.8f));
                 g.drawRect (sceneFieldBox (r, selectedField).reduced (0, 3), 1);
             }
-            g.setColour (c::textPrimary);
         }
+        // (round 190ig, CL-14a: the name's own colour; it took the launch triangle's, Live's #1E1E1E on #23262C = 1.1:1)
+        g.setColour (c::textPrimary);
         g.drawText (! scene.name.empty() ? utf8 (scene.name) : juce::String (row + 1), nameArea, juce::Justification::centredLeft, true);
         if (sceneSelected && row == selectedScene) // (round 190ef: a selected scene, as a selected slot)
         {
             g.setColour (c::accent);
             g.drawRect (cell, 2);
         }
+    }
+
+    // A scene cell in Live's look (round 190ia CL-14a/b, live-session.png 1540,86,1630,340 and live-launch-states.png):
+    // a 17 px #363636 cell over a 1 px #242424 separator, a 7 x 9 #1E1E1E launch triangle 4 px in, the name centred
+    // between it and the scene number at the right (both #B5B5B5, cut without an ellipsis as Live cuts "Breakdo"); a
+    // selected scene #B0DDEB with #070707 text. A scene with its own tempo or time signature keeps LYNX's cyan triangle.
+    void paintSceneLive (juce::Graphics& g, const ClipGridScene& scene, int row, juce::Rectangle<int> r) const
+    {
+        namespace c = theme::colour;
+        namespace lv = theme::livelook;
+        const auto cell = r.withTrimmedLeft (2).withTrimmedBottom (1);
+        const auto selected = sceneSelected && row == selectedScene;
+        const auto fill = selected ? lv::selectionFocused : scene.colour != 0 ? juce::Colour (scene.colour) : lv::surface;
+        g.setColour (fill);
+        g.fillRect (cell);
+        const auto ink = selected ? lv::ink : scene.colour != 0 ? theme::liveShade (juce::Colour (scene.colour), 0.24f) : lv::text;
+        const auto a = juce::Rectangle<float> ((float) cell.getX() + 4.0f, (float) cell.getCentreY() - 4.5f, 7.0f, 9.0f);
+        theme::fillLaunchTriangle (g, a, scene.tempo > 0.0 || scene.beatsPerBar > 0 ? c::info : lv::well);
+        g.setFont (theme::font (theme::type::small));
+        auto nameArea = cell.withTrimmedLeft (14);
+        if (sceneFieldsOn)
+        {
+            // the fields keep round 190ef's places at the right (Live's look with them on was not captured: no number)
+            nameArea.removeFromRight (sceneFieldsWidth);
+            const auto& song = engine.getSong();
+            const auto field = [&] (juce::Rectangle<int> box, const juce::String& text, bool on) {
+                theme::fillRoundRect (g, box.toFloat().reduced (0.5f, 3.0f), 2.0f, on ? lv::well : lv::raised);
+                g.setColour (on ? lv::text : lv::text.withAlpha (0.55f));
+                g.drawText (text, box, juce::Justification::centred, false);
+            };
+            field (sceneFieldBox (r, 1), utf8 (session::sceneTempoText (scene.tempo > 0.0 ? scene.tempo : song.bpm)), scene.tempo > 0.0);
+            field (sceneFieldBox (r, 2), utf8 (scene.beatsPerBar > 0 ? session::sceneSignatureText (scene.beatsPerBar, scene.beatUnit)
+                                                                     : session::sceneSignatureText (song.beatsPerBar, 4)), scene.beatsPerBar > 0);
+            if (selected && selectedField != 0)
+            {
+                g.setColour (lv::ink);
+                g.drawRect (sceneFieldBox (r, selectedField).reduced (0, 3), 1);
+            }
+        }
+        else
+        {
+            g.setColour (ink);
+            g.drawText (juce::String (row + 1), nameArea.removeFromRight (24).withTrimmedRight (4), juce::Justification::centred, false);
+        }
+        g.setColour (ink);
+        g.drawText (utf8 (scene.name), nameArea, juce::Justification::centred, false);
     }
 
     // round 190ef: the scene cell's fields: 1 tempo, 2 / 3 the time signature (in the cell `r`; both parts share one box)
@@ -2054,6 +2130,8 @@ void setClipGridDeviceDropForSnapshot (juce::Component& grid, int track)
         g->deviceDropForSnapshot (track);
 }
 // --- round 190ef ---------------------------------------------------------------------------------------------------------
+bool& clipGridClassicLook() { return classicLook; }
+
 bool& clipGridSceneTempoShown()
 {
     return sceneFieldsOn;
