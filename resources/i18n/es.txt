@@ -10162,3 +10162,5 @@ countries: es mx ar co cl pe ve
 "Reminder: this project has unsaved changes (backups are off: Settings > General > Save a backup copy)" = "Recordatorio: este proyecto tiene cambios sin guardar (copias de seguridad desactivadas: Ajustes > General > Guardar una copia de seguridad)"
 "Never (just remind every 10 min)" = "Nunca (solo recordar cada 10 min)"
 "Input Level" = "Nivel de entrada"
+"Solo on Shift" = "Solo con Mayús"
+"Drag a handle (frequency and gain); mouse wheel = Q; right-click = type and key; double-click = 0 dB; Alt+click = reset; Ctrl = fine; Shift+click = solo while held (drag up / down: width)" = "Arrastra un punto (frecuencia y ganancia); rueda del ratón = Q; clic derecho = tipo y nota; doble clic = 0 dB; Alt+clic = restablecer; Ctrl = ajuste fino; Mayús+clic = solo mientras se mantiene (arrastra arriba / abajo: anchura)"

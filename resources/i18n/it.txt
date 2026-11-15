@@ -10162,3 +10162,5 @@ countries: it ch sm
 "Reminder: this project has unsaved changes (backups are off: Settings > General > Save a backup copy)" = "Promemoria: questo progetto ha modifiche non salvate (backup disattivati: Impostazioni > Generale > Salva una copia di backup)"
 "Never (just remind every 10 min)" = "Mai (ricorda solo ogni 10 min)"
 "Input Level" = "Livello di ingresso"
+"Solo on Shift" = "Solo con Maiusc"
+"Drag a handle (frequency and gain); mouse wheel = Q; right-click = type and key; double-click = 0 dB; Alt+click = reset; Ctrl = fine; Shift+click = solo while held (drag up / down: width)" = "Trascina una maniglia (frequenza e guadagno); rotella = Q; clic destro = tipo e nota; doppio clic = 0 dB; Alt+clic = reimposta; Ctrl = fine; Maiusc+clic = solo finché tenuto (trascina su / giù: larghezza)"

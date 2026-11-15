@@ -10162,3 +10162,5 @@ countries: tr
 "Reminder: this project has unsaved changes (backups are off: Settings > General > Save a backup copy)" = "Hatırlatma: bu projede kaydedilmemiş değişiklikler var (yedekler kapalı: Ayarlar > Genel > Yedek kopya kaydet)"
 "Never (just remind every 10 min)" = "Asla (yalnızca 10 dakikada bir hatırlat)"
 "Input Level" = "Giriş seviyesi"
+"Solo on Shift" = "Shift ile solo"
+"Drag a handle (frequency and gain); mouse wheel = Q; right-click = type and key; double-click = 0 dB; Alt+click = reset; Ctrl = fine; Shift+click = solo while held (drag up / down: width)" = "Bir tutamacı sürükleyin (frekans ve kazanç); fare tekerleği = Q; sağ tıklama = tür ve nota; çift tıklama = 0 dB; Alt+tıklama = sıfırla; Ctrl = ince ayar; Shift+tıklama = basılı tutulduğunda solo (yukarı / aşağı sürükle: genişlik)"

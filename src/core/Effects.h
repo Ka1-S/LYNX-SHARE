@@ -69,6 +69,8 @@ double savedEffectParamValue (float v) noexcept;
 // For shelves the "Q" is the cookbook shelf slope S (1 = default).
 // Slots imported from FL's Parametric EQ 2 / Parametric EQ run FL's exact engine instead and give some of these
 // parameters FL's own meaning (core/ParametricEqFl.h: width instead of Q, FL's order instead of the cut slope).
+class Effect; // (peq::setSoloBand, round 190ih)
+
 namespace peq
 {
 constexpr int bands = 7;
@@ -96,6 +98,14 @@ std::string widthText (const EffectParams& params, int band); // Q (LYNX) or ban
 
 // Response of the whole EQ (all bands and the output) in dB, for the editor graph.
 double responseDb (const EffectParams& params, double sampleRate, double hz);
+
+// Round 190ih (PLAN R9, DP-16; FL manual, Parametric EQ 2: "holding (Shift) and clicking the Band Tokens will
+// momentarily solo the Band"): while a band is soloed the running EQ's output passes through a band-pass at that
+// band's frequency and width, so only its region is heard. `band` -1 ends it. Any thread; `effect` must be a running
+// Parametric EQ (anything else is ignored). The band's width as a band-pass Q: LYNX's Q, or FL's bandwidth turned round.
+void setSoloBand (Effect* effect, int band) noexcept;
+int soloBand (const Effect* effect) noexcept; // -1 = none
+double soloQ (const EffectParams& params, int band) noexcept;
 } // namespace peq
 
 // Notes held on a Channel Rack channel: bit k of word k / 64 = MIDI key k

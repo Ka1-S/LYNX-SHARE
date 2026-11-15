@@ -10162,3 +10162,5 @@ countries: id
 "Reminder: this project has unsaved changes (backups are off: Settings > General > Save a backup copy)" = "Pengingat: proyek ini memiliki perubahan yang belum disimpan (cadangan mati: Pengaturan > Umum > Simpan salinan cadangan)"
 "Never (just remind every 10 min)" = "Tidak pernah (hanya ingatkan tiap 10 menit)"
 "Input Level" = "Level input"
+"Solo on Shift" = "Solo dengan Shift"
+"Drag a handle (frequency and gain); mouse wheel = Q; right-click = type and key; double-click = 0 dB; Alt+click = reset; Ctrl = fine; Shift+click = solo while held (drag up / down: width)" = "Seret pegangan (frekuensi dan gain); roda mouse = Q; klik kanan = tipe dan not; klik ganda = 0 dB; Alt+klik = reset; Ctrl = halus; Shift+klik = solo selama ditahan (seret atas / bawah: lebar)"

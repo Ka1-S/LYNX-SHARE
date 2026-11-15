@@ -2987,7 +2987,7 @@ public:
             else
             {
                 g.setColour (colour::textSecondary);
-                g.drawFittedText (tr ("Drag a handle (frequency and gain); mouse wheel = Q; right-click = type; double-click = 0 dB"),
+                g.drawFittedText (tr ("Drag a handle (frequency and gain); mouse wheel = Q; right-click = type and key; double-click = 0 dB; Alt+click = reset; Ctrl = fine; Shift+click = solo while held (drag up / down: width)"),
                                   r.reduced (4.0f * s, 0.0f).toNearestInt(), juce::Justification::centredLeft, 2, 0.8f);
             }
             return;
@@ -3687,7 +3687,32 @@ public:
             peqview::showBandMenu (*this, fx->params, band, [this] (std::vector<std::pair<int, float>> changes) { setParams (changes); });
             return true;
         }
+        // round 190ih (PLAN R9), FL's manual (Parametric EQ 2, Band Token): "Alt+Click a Band to reset a Band"
+        if (e.mods.isAltDown())
+        {
+            setParams (peqview::bandReset (fx->params, band));
+            return true;
+        }
         eqDragOffset = peqview::handlePosition (graph, fx->params, band, eqRange) - e.position;
+        eqDownPos = e.position;
+        eqDownWidth = fx->params[(std::size_t) peq::param (band, 3)];
+        eqFine = e.mods.isCtrlDown(); // "Ctrl+Click a Band to make fine adjustments"
+        // "Shift+Click and move mouse left/right on Bands" (or the middle button) = bandwidth; with "Solo on Shift"
+        // (FL's option, on: owner decision PL5) Shift+click "will momentarily solo the Band" and vertical moves set the
+        // bandwidth "while in this mode"
+        eqWidthDrag = 0;
+        if (e.mods.isMiddleButtonDown())
+            eqWidthDrag = 1;
+        else if (e.mods.isShiftDown())
+        {
+            eqWidthDrag = peqview::displaySettings().soloOnShift ? 2 : 1;
+            if (eqWidthDrag == 2)
+            {
+                peq::setSoloBand (runningEffect().get(), band);
+                eqSoloing = true;
+                repaint();
+            }
+        }
         eqDragging = true;
         return true;
     }
@@ -3698,7 +3723,16 @@ public:
         if (fx == nullptr || eqSelected < 0 || dragItem < 0)
             return;
         const auto graph = eqGraph (rectOf (activeLayout().items[(std::size_t) dragItem]));
-        const auto p = e.position + eqDragOffset;
+        const auto scale = eqFine ? 0.2f : 1.0f;
+        if (eqWidthDrag > 0) // the bandwidth: right (or up while soloing) = wider
+        {
+            const auto moved = (eqWidthDrag == 1 ? e.position.x - eqDownPos.x : eqDownPos.y - e.position.y) * 0.004f * scale;
+            const auto wider = peq::flLaw (fx->params) ? moved : -moved; // (FL's width grows with the value, LYNX's Q shrinks)
+            setParams ({ { peq::param (eqSelected, 3), eqDownWidth + wider } });
+            ui::showValueTip (*this, juce::Rectangle<int> (6, 6).withCentre (e.getPosition()), peqview::bandText (fx->params, eqSelected));
+            return;
+        }
+        const auto p = eqDownPos + (e.position - eqDownPos) * scale + eqDragOffset;
         std::vector<std::pair<int, float>> changes { { peq::param (eqSelected, 1), peq::hzValue (peqview::hzForX (graph, p.x)) } };
         if (peqview::hasGain (fx->params, eqSelected))
             changes.push_back ({ peq::param (eqSelected, 2), peq::gainValue (peqview::dbForY (graph, p.y, eqRange)) });
@@ -4865,6 +4899,12 @@ public:
     void mouseUp (const juce::MouseEvent& e) override
     {
         eqDragging = false;
+        if (eqSoloing) // round 190ih: the momentary band solo ends with the click
+        {
+            eqSoloing = false;
+            peq::setSoloBand (runningEffect().get(), -1);
+            repaint();
+        }
         if (portDragStart >= -1) // round 190ez
         {
             portDragStart = -2;
@@ -5325,7 +5365,7 @@ private:
         if (isGbAny (item)) // round 168m
             return { gbHint (item, p), {}, false, true };
         if (item.type == Item::display)
-            return { tr ("Drag a handle (frequency and gain); mouse wheel = Q; right-click = type; double-click = 0 dB"), {}, false, true };
+            return { tr ("Drag a handle (frequency and gain); mouse wheel = Q; right-click = type and key; double-click = 0 dB; Alt+click = reset; Ctrl = fine; Shift+click = solo while held (drag up / down: width)"), {}, false, true };
         if (hasStyle (item, plugui::pageTabs))
             return { tr ("Page: switch the controls shown"), {}, false, false };
         if (isMixItem (item) && captionArea (item).contains (p))
@@ -5703,6 +5743,12 @@ private:
     std::array<std::vector<std::uint8_t>, 4> sgPresets {}; // the installation's preset files A–D (read on demand)
     bool sgApprox = false; // a Soundgoodizer approximation container (no FL preset files) shown on the Soundgoodizer page
     juce::Point<float> eqDragOffset;
+    // round 190ih (R9): FL's band-token gestures — the click's place and the band's width then, Ctrl fine, the width
+    // drag (0 none, 1 Shift / middle button left-right, 2 Shift with "Solo on Shift": up-down), a held solo
+    juce::Point<float> eqDownPos;
+    float eqDownWidth = 0.0f;
+    bool eqFine = false, eqSoloing = false;
+    int eqWidthDrag = 0;
     dynui::History dynHistory; // the dynamics suite's scrolling gain-reduction graph
     int crossoverDrag = -1;    // the crossover parameter being dragged on a band display
     float vuNeedle = 0.0f;     // the VU display's needle (dB below 0 VU, with inertia)

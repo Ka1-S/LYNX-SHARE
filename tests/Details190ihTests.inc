@@ -204,3 +204,56 @@ TEST (details190ih_live_keys_only_in_the_clip_launch_layout)
     CHECK (lynx::livekeys::commandFor ({ 'M', ctrl }, Style::clipLaunch) == Command::none);  // (Ctrl+M: MIDI Map Mode)
     CHECK (lynx::livekeys::commandFor ({ 'O', ctrl }, Style::clipLaunch) == Command::none);
 }
+
+// R9 (DP-16, owner decision PL5): Parametric EQ 2's momentary band solo — while a band is soloed only its region
+// passes (FL manual: "holding (Shift) and clicking the Band Tokens will momentarily solo the Band"), for LYNX's own law
+// and for a slot running FL's engine; ending the solo gives the plain EQ back
+namespace details190ih
+{
+inline double rmsThrough (lynx::Effect& fx, const lynx::EffectParams& params, double hz)
+{
+    std::vector<float> l (512), r (512);
+    double sum = 0.0;
+    int count = 0;
+    for (int b = 0, n = 0; b < 60; ++b)
+    {
+        for (int i = 0; i < 512; ++i, ++n)
+            l[(std::size_t) i] = r[(std::size_t) i] = 0.5f * (float) std::sin (2.0 * 3.141592653589793 * hz * n / 48000.0);
+        fx.process (l.data(), r.data(), 512, params, 120.0);
+        if (b >= 20) // (past the filters' settling and any latency)
+            for (const auto v : l)
+                sum += (double) v * v, ++count;
+    }
+    return std::sqrt (sum / std::max (1, count));
+}
+} // namespace details190ih
+
+TEST (details190ih_peq2_band_solo_passes_only_that_band)
+{
+    for (const float law : { 0.0f, 0.5f }) // LYNX's own law, FL's Parametric EQ 2 engine (core/ParametricEqFl.h)
+    {
+        auto slot = lynx::makeEffectSlot (lynx::EffectKind::parametricEq);
+        slot.params[(std::size_t) lynx::peqfl::lawParam] = law;
+        slot.params[(std::size_t) lynx::peq::param (2, 1)] = lynx::peq::hzValue (5000.0);
+        auto fx = lynx::makeEffect (slot);
+        CHECK (fx != nullptr);
+        if (fx == nullptr)
+            continue;
+        fx->prepare (48000.0);
+        const auto lowPlain = details190ih::rmsThrough (*fx, slot.params, 100.0);
+        lynx::peq::setSoloBand (fx.get(), 2);
+        CHECK (lynx::peq::soloBand (fx.get()) == 2);
+        const auto lowSolo = details190ih::rmsThrough (*fx, slot.params, 100.0);
+        const auto highSolo = details190ih::rmsThrough (*fx, slot.params, 5000.0);
+        CHECK (lowPlain > 0.05);
+        CHECK (lowSolo < lowPlain * 0.15); // the rest of the spectrum is gone
+        CHECK (highSolo > 0.05);           // the band's own region passes
+        lynx::peq::setSoloBand (fx.get(), -1);
+        CHECK (lynx::peq::soloBand (fx.get()) == -1);
+        CHECK (std::abs (details190ih::rmsThrough (*fx, slot.params, 100.0) - lowPlain) < 0.02);
+    }
+    // anything else than a Parametric EQ ignores it
+    auto other = lynx::makeEffect (lynx::makeEffectSlot (lynx::EffectKind::grossBeat));
+    lynx::peq::setSoloBand (other.get(), 1);
+    CHECK (lynx::peq::soloBand (other.get()) == -1);
+}

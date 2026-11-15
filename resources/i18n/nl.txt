@@ -10162,3 +10162,5 @@ countries: nl be
 "Reminder: this project has unsaved changes (backups are off: Settings > General > Save a backup copy)" = "Herinnering: dit project heeft niet-opgeslagen wijzigingen (back-ups uit: Instellingen > Algemeen > Back-upkopie opslaan)"
 "Never (just remind every 10 min)" = "Nooit (alleen elke 10 min herinneren)"
 "Input Level" = "Ingangsniveau"
+"Solo on Shift" = "Solo met Shift"
+"Drag a handle (frequency and gain); mouse wheel = Q; right-click = type and key; double-click = 0 dB; Alt+click = reset; Ctrl = fine; Shift+click = solo while held (drag up / down: width)" = "Sleep een greep (frequentie en versterking); muiswiel = Q; rechtsklik = type en noot; dubbelklik = 0 dB; Alt+klik = resetten; Ctrl = fijn; Shift+klik = solo zolang ingedrukt (omhoog / omlaag slepen: breedte)"

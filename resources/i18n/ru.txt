@@ -10162,3 +10162,5 @@ countries: ru by kz
 "Reminder: this project has unsaved changes (backups are off: Settings > General > Save a backup copy)" = "Напоминание: в проекте есть несохранённые изменения (резервные копии выключены: Настройки > Общие > Сохранять резервную копию)"
 "Never (just remind every 10 min)" = "Никогда (только напоминать каждые 10 мин)"
 "Input Level" = "Уровень входа"
+"Solo on Shift" = "Соло с Shift"
+"Drag a handle (frequency and gain); mouse wheel = Q; right-click = type and key; double-click = 0 dB; Alt+click = reset; Ctrl = fine; Shift+click = solo while held (drag up / down: width)" = "Перетащите маркер (частота и усиление); колесо мыши = Q; правый щелчок = тип и нота; двойной щелчок = 0 дБ; Alt+щелчок = сброс; Ctrl = точно; Shift+щелчок = соло, пока удерживается (вверх / вниз: ширина)"

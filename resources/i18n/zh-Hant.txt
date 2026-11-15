@@ -10162,3 +10162,5 @@ countries: tw hk mo
 "Reminder: this project has unsaved changes (backups are off: Settings > General > Save a backup copy)" = "提醒：此專案有未儲存的變更（備份已關閉：設定 > 一般 > 儲存備份副本）"
 "Never (just remind every 10 min)" = "從不（僅每 10 分鐘提醒）"
 "Input Level" = "輸入電平"
+"Solo on Shift" = "按 Shift 獨奏"
+"Drag a handle (frequency and gain); mouse wheel = Q; right-click = type and key; double-click = 0 dB; Alt+click = reset; Ctrl = fine; Shift+click = solo while held (drag up / down: width)" = "拖曳控點（頻率和增益）；滑鼠滾輪 = Q；右鍵 = 類型和音符；按兩下 = 0 dB；Alt+按一下 = 重設；Ctrl = 微調；Shift+按一下 = 按住時獨奏（上下拖曳：寬度）"
