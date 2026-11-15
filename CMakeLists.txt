@@ -62,6 +62,8 @@ add_library(lynx_core STATIC
     src/core/AlsDevicesLot4.cpp
     src/core/FlmFormat.cpp
     src/core/FlmImport.cpp
+    src/core/BandFormat.cpp
+    src/core/BandImport.cpp
     src/core/FlmEffects.cpp
     src/core/FlmNoteFx.cpp
     src/core/FlmDwSampler.cpp

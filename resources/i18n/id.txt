@@ -54,6 +54,7 @@ countries: id
 "(imported from FL Studio)" = "(diimpor dari FL Studio)"
 "(imported from .als)" = "(diimpor dari .als)"
 "(imported from FL Studio Mobile)" = "(diimpor dari FL Studio Mobile)"
+"(imported from GarageBand)" = "(diimpor dari GarageBand)"
 "Could not save" = "Tidak dapat menyimpan"
 "File" = "File"
 "Edit" = "Edit"

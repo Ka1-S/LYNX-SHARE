@@ -38,6 +38,8 @@
 #include "core/FlpImport.h"
 #include "core/AlsImport.h"
 #include "core/FlmImport.h"
+#include "core/BandImport.h" // round 190ic: GarageBand projects
+#include "engine/ProjectPackage.h"
 #include "core/LoadTrace.h"
 #include "core/Instruments.h"
 #include "core/Denormals.h"
@@ -4108,9 +4110,11 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
                                     PreparedFlp& out)
 {
     juce::MemoryBlock data;
+    // a GarageBand project (round 190ic): a .band package folder, read file by file by its import
+    const auto bandFolder = ProjectPackage::garageBandPackage (file);
     {
         const loadtrace::Scope timing ("read_project");
-        if (! file.loadFileAsData (data))
+        if (bandFolder == juce::File() && ! file.loadFileAsData (data))
         {
             out.error = utf8 ("could not read the file");
             return;
@@ -4126,8 +4130,9 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
         const auto liveSet = file.hasFileExtension ("als");
         // an FL Studio Mobile project (.flm, .songtmpl; round 182c) too
         const auto mobileProject = file.hasFileExtension ("flm;songtmpl");
+        const auto garageBand = bandFolder != juce::File();
         std::optional<flp::Project> project;
-        if (! liveSet && ! mobileProject)
+        if (! liveSet && ! mobileProject && ! garageBand)
             project = flp::parseProject ({ fileBytes, data.getSize() });
         loadtrace::add ("parse", loadtrace::msSince (started));
 
@@ -4208,6 +4213,20 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
                 if (! song)
                 {
                     out.error = utf8 (flmError.empty() ? "not a readable FL Studio Mobile project" : flmError.c_str());
+                    return;
+                }
+                out.song = std::move (*song);
+            }
+            else if (garageBand)
+            {
+                BandImportOptions bandOptions;
+                bandOptions.common = options;
+                bandOptions.packageFolder = bandFolder.getFullPathName().toStdString();
+                std::string bandError;
+                auto song = importBandPackage (bandOptions, &bandError);
+                if (! song)
+                {
+                    out.error = utf8 (bandError.empty() ? "not a readable GarageBand project" : bandError.c_str());
                     return;
                 }
                 out.song = std::move (*song);

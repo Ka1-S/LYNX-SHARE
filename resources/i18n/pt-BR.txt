@@ -58,6 +58,7 @@ countries: br
 "(imported from FL Studio)" = "(importado do FL Studio)"
 "(imported from .als)" = "(importado de .als)"
 "(imported from FL Studio Mobile)" = "(importado do FL Studio Mobile)"
+"(imported from GarageBand)" = "(importado do GarageBand)"
 "Could not save" = "Não foi possível salvar"
 "File" = "Arquivo"
 "Edit" = "Editar"

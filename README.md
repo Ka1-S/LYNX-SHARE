@@ -187,7 +187,7 @@ Every one of them is listed, with a picture of its editor, in the
 
 ## Opens your projects
 
-*File › Open* (or a double-click in the Browser) takes `.lynx`, `.flp`, `.als`, `.flm` and MIDI files. Missing samples
+*File › Open* (or a double-click in the Browser) takes `.lynx`, `.flp`, `.als`, `.flm`, GarageBand `.band` and MIDI files. Missing samples
 are listed in the Missing files window, and *Help › Last project import report* tells you what was converted,
 approximated or left out. The original file is never changed: saving writes a `.lynx` project.
 
@@ -196,6 +196,7 @@ approximated or left out. The original file is never changed: saving writes a `.
 | **FL Studio** `.flp` | ✅ | ✅ | Channels, samples, patterns, every arrangement, automation, the mixer and native plugins with their settings. |
 | **Ableton Live** `.als` (Live 11 and 12) | ✅ | ✅ | Tracks, clips, warp markers, groups, returns, automation, racks and many of Live's devices. Session clips land in the clip grid. |
 | **FL Studio Mobile** `.flm` | ✅ partial | — | Arrangement, samples, drum kits, several instruments and effects, automation and chord sets. |
+| **GarageBand** `.band` (GarageBand 10, GarageBand for iOS) | ✅ partial | — | Tracks, MIDI and audio regions, tempo, key, levels, pan and mute, as Simple-workflow tracks. |
 | **MIDI** `.mid` | ✅ | ✅ | Notes, into or out of the Piano Roll or the whole song. |
 | **LYNX SHARE** `.lynx` | ✅ | ✅ | The native format (JSON), with autosave. |
 
@@ -234,6 +235,20 @@ instruments, FL Studio Mobile's effects, the mixer's levels, panning and routing
 locker. Point *Settings › Files › FL Studio Mobile resources* at your own copy of the app's Resources folder and the
 factory sounds play. FL Studio Mobile Rack channels in an `.flp` play on the same engines. Other instruments play LYNX SHARE's built-in synth for now, and anything not converted is listed in the import
 report. More in the [format notes](docs/analise/FLM_FORMAT.md).
+
+</details>
+
+<details>
+<summary><strong>GarageBand (<code>.band</code>): import only, partial</strong></summary>
+
+Projects saved by GarageBand 10 for Mac or GarageBand for iOS open as Simple-workflow tracks: tempo, time signature,
+key, song sections (as markers), each track's level, pan and mute, MIDI regions with their notes, and audio regions
+from the project's Media folder (with their trim). Open the `.band` package itself, the `projectData` file inside it,
+or a zip of it. GarageBand's instruments and effects are not stored in a readable form: instrument tracks play
+LYNX SHARE's built-in synth (a preset chosen by the patch name) and drum kits its built-in drums; Smart Drums, Drummer
+and pattern regions, take folders, tempo changes and Apple Loops that are not inside the project are listed in the
+import report. Projects from GarageBand 6–11 (2013 and older) are not readable: save them again in GarageBand 10, or
+export the tracks as audio (or MIDI) and bring the folder in with the Simple workflow's *Folder...* import.
 
 </details>
 
