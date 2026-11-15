@@ -87,6 +87,23 @@ class PerfGateTests(unittest.TestCase):
         json.dump(base, open(b, "w"))
         self.assertEqual(perf_gate.compare(self.results(cpu=65.0), b), 0)
 
+    def test_another_cpu_model_gets_wider_thresholds_and_its_own_numbers_once_added(self):
+        b = self.baseline(self.results())
+        d = self.results(cpu=65.0)  # +30 %: a regression on this model...
+        write(d, "machine.txt", "Linux x86_64, Other CPU, 4 threads, abc\n")
+        self.assertEqual(perf_gate.compare(d, b), 0)  # ...within 20 % x 1.5 on another one
+        os.environ["PERF_GATE_ADD_MACHINE"] = "1"
+        try:
+            perf_gate.update(d, b)
+        finally:
+            del os.environ["PERF_GATE_ADD_MACHINE"]
+        base = json.load(open(b))
+        self.assertIn("Other CPU", base["machines"])
+        self.assertAlmostEqual(base["metrics"]["bench/big200@256/cpu_norm"], 5.0)  # (the default set stays)
+        d2 = self.results(cpu=90.0)
+        write(d2, "machine.txt", "Linux x86_64, Other CPU, 4 threads, def\n")
+        self.assertEqual(perf_gate.compare(d2, b), 1)  # +38 % on its own numbers
+
     def test_the_command_line(self):
         d = self.results()
         b = os.path.join(d, "b.json")

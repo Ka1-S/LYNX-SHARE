@@ -20,6 +20,10 @@ Metrics are "lower is better". With several runs of a cell the best (lowest) val
 only ever adds time. Times are divided by the run's calibration (a fixed piece of work, perfbench calibrate), so a
 faster or slower machine moves both alike; memory and instruction counts are compared as they are.
 
+A baseline keeps one set of numbers per CPU model ("machines"; CI runners come with several): a run compares with
+its own model's numbers, or with the default set and every threshold widened by cross_machine_factor (1.5). With
+PERF_GATE_ADD_MACHINE=1, update only adds this run's CPU model.
+
 A metric regresses when it is worse than the baseline by more than its relative threshold AND by more than its
 absolute floor (small values are noisy in absolute terms). Missing metrics that the baseline has fail too (a step
 that stopped working). Metrics without a baseline are reported as new and never fail.
@@ -144,6 +148,12 @@ def threshold_for(key, thresholds):
     return thresholds.get(key) or thresholds.get(name) or DEFAULT_THRESHOLDS.get(name, [0.25, 0.0])
 
 
+def cpu_model(machine):
+    # "Linux x86_64, AMD EPYC 9V45 96-Core Processor, 4 threads, 0d442d6" -> the CPU model
+    parts = machine.split(", ")
+    return parts[1] if len(parts) > 2 else machine
+
+
 def cell_of(key):
     parts = key.split("/")
     if parts[0] == "bench":
@@ -165,10 +175,19 @@ def compare(d, baseline_path, show=False):
     base = json.load(open(baseline_path))
     thresholds = dict(DEFAULT_THRESHOLDS)
     thresholds.update(base.get("thresholds", {}))
-    bm, cm = base.get("metrics", {}), res["metrics"]
+    # a baseline measured on this CPU model compares as it is; another model's (CI runners differ) with the thresholds
+    # widened by cross_machine_factor
+    model = cpu_model(res["machine"])
+    own = base.get("machines", {}).get(model)
+    bm, cm = (own if own else base.get("metrics", {})), res["metrics"]
+    factor = 1.0 if own else float(base.get("cross_machine_factor", 1.5))
     rows, failed, retry = [], [], set()
     for key in sorted(set(bm) | set(cm)):
         rel, floor = threshold_for(key, thresholds)
+        rel *= factor
+        if key not in cm and key.endswith("/instr_per_sample"):  # (the CPU counter is not always readable in a VM)
+            rows.append((key, fmt(bm[key]), "n/a", "", "not measured (no CPU counter)"))
+            continue
         if key not in cm:
             rows.append((key, fmt(bm[key]), "missing", "", "FAIL (missing)"))
             failed.append(key)
@@ -186,6 +205,8 @@ def compare(d, baseline_path, show=False):
             retry.add(cell_of(key))
         rows.append((key, fmt(b), fmt(c), "%+.1f%%" % (100.0 * delta), verdict + " (limit +%.0f%%)" % (100 * rel)))
     out = ["# Performance gate: %s" % ("FAILED" if failed else "passed"), "",
+           ("Compared with this CPU model's own baseline (%s)." % model) if own else
+           ("No baseline for this CPU model (%s): the default one, thresholds × %.1f." % (model, factor)), "",
            "Baseline `%s` (%s, calibration %.2f ms); this run: %s, calibration %.2f ms (runs %s)." % (
                os.path.basename(baseline_path), base.get("machine", "?"), base.get("calib_ms", 0), res["machine"], res["calib_ms"],
                ", ".join("%.2f" % x for x in res["calib_runs"])), "",
@@ -209,11 +230,16 @@ def update(d, baseline_path, show=False):
     res = collect(d)
     json.dump(res, open(os.path.join(d, "results.json"), "w"), indent=1, sort_keys=True)
     old = json.load(open(baseline_path)) if os.path.exists(baseline_path) else {}
+    machines = dict(old.get("machines", {}))
+    machines[cpu_model(res["machine"])] = res["metrics"]
+    keep_default = os.environ.get("PERF_GATE_ADD_MACHINE") == "1" and old.get("metrics")  # (only add this CPU model)
     new = {"profile": old.get("profile", os.path.splitext(os.path.basename(baseline_path))[0]),
-           "machine": res["machine"], "calib_ms": res["calib_ms"], "metrics": res["metrics"], "info": res["info"],
-           "thresholds": old.get("thresholds", {})}
-    if old.get("note"):
-        new["note"] = old["note"]
+           "machine": old["machine"] if keep_default else res["machine"], "calib_ms": old["calib_ms"] if keep_default else res["calib_ms"],
+           "metrics": old["metrics"] if keep_default else res["metrics"], "info": res["info"],
+           "machines": machines, "thresholds": old.get("thresholds", {})}
+    for k in ("note", "cross_machine_factor"):
+        if k in old:
+            new[k] = old[k]
     json.dump(new, open(baseline_path, "w"), indent=1, sort_keys=True)
     open(baseline_path, "a").write("\n")
     if show:
