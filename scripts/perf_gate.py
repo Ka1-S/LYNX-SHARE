@@ -44,7 +44,7 @@ DEFAULT_THRESHOLDS = {
     "open_rss_mb": [0.10, 24.0],
     "save_norm": [0.30, 0.05],
     "load_norm": [0.30, 0.05],
-    "opentime_load_norm": [0.30, 0.5],
+    "opentime_load_norm": [0.30, 40.0],
     "opentime_rss_mb": [0.12, 32.0],
     "idle_cpu_pct": [0.50, 1.5],
 }
@@ -119,8 +119,9 @@ def collect(d):
             g = dict(line.strip().split("=", 1) for line in open(p, errors="replace") if "=" in line)
             if g.get("result") != "OK":
                 continue
-            loaded, window = float(g["loaded_s"]), float(g["window_s"])
-            add("opentime/" + proj + "/opentime_load_norm", 1000.0 * max(0.0, loaded - window) / calib)
+            # (from the process' start to the project loaded: the start-up file is opened before the window's probe
+            # starts, so "loaded - window" would miss a slow open)
+            add("opentime/" + proj + "/opentime_load_norm", 1000.0 * float(g["loaded_s"]) / calib)
             add("opentime/" + proj + "/opentime_rss_mb", float(g["working_set_mb"]))
             add("opentime/" + proj + "/idle_cpu_pct", float(g["idle_cpu_pct"]))
             continue
