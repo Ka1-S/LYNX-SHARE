@@ -85,6 +85,17 @@ public:
     static std::unique_ptr<juce::Component> makeSampleBrowserContent (AudioEngine& engine, const std::function<void (BrowserComponent&)>& wire);
     // Whether the Sample browser was open when LYNX last closed (its view file).
     static bool sampleBrowserWasOpen();
+    // Round 190hd: the Browser's search index kept up to date by a low-priority child process (LYNX --browser-indexer
+    // <parent pid> <roots file>) woken by file-system changes, as Live's Indexer. Main allows it for the normal window
+    // only (command-line modes and tests index in-process, as before); LYNX_INDEXER_PROCESS=0 turns it off.
+    static inline bool allowIndexerProcess = false;
+    static int runIndexerProcess (const juce::StringArray& args); // the child: never returns while its parent lives
+
+private:
+    bool constructing = true; // (round 190hd: the start-up trace's lines of the main Browser's construction)
+    void browserStartupMark (const char* step) const;
+
+public:
     static juce::Rectangle<int> sampleBrowserBounds(); // its last window bounds (empty: default)
 
     std::function<void (const juce::File&)> onOpenProject;

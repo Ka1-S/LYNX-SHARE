@@ -78,6 +78,27 @@ void Service::refresh (std::vector<std::string> roots, bool rebuild)
     wake.notify_all();
 }
 
+void Service::setExternalIndexer (bool on)
+{
+    const std::lock_guard<std::mutex> guard (lock);
+    external = on;
+}
+
+bool Service::hasExternalIndexer() const
+{
+    const std::lock_guard<std::mutex> guard (lock);
+    return external;
+}
+
+void Service::reload()
+{
+    {
+        const std::lock_guard<std::mutex> guard (lock);
+        reloadAsked = true;
+    }
+    wake.notify_all();
+}
+
 IndexStatus Service::status() const
 {
     const std::lock_guard<std::mutex> guard (lock);
@@ -87,7 +108,7 @@ IndexStatus Service::status() const
 bool Service::waitIdle (int timeoutMs)
 {
     std::unique_lock<std::mutex> guard (lock);
-    return idleWake.wait_for (guard, std::chrono::milliseconds (timeoutMs), [this] { return ! working && ! pendingSearch && passes.empty(); });
+    return idleWake.wait_for (guard, std::chrono::milliseconds (timeoutMs), [this] { return ! working && ! pendingSearch && passes.empty() && ! reloadAsked; });
 }
 
 bool Service::superseded (std::uint64_t id) const
@@ -122,11 +143,12 @@ void Service::run()
     {
         std::optional<SearchJob> job;
         std::optional<Pass> pass;
+        bool reloadNow = false;
         {
             std::unique_lock<std::mutex> guard (lock);
             working = false;
             idleWake.notify_all();
-            wake.wait (guard, [this] { return stopping || pendingSearch.has_value() || ! passes.empty(); });
+            wake.wait (guard, [this] { return stopping || pendingSearch.has_value() || ! passes.empty() || reloadAsked; });
             if (stopping)
                 break;
             working = true;
@@ -134,6 +156,11 @@ void Service::run()
             {
                 job = std::move (pendingSearch);
                 pendingSearch.reset();
+            }
+            else if (reloadAsked)
+            {
+                reloadAsked = false;
+                reloadNow = true;
             }
             else
             {
@@ -146,6 +173,8 @@ void Service::run()
         {
             if (job)
                 runSearch (*job);
+            else if (reloadNow)
+                reloadIndex();
             else if (pass && ! runPass (*pass))
             {
                 // interrupted by a search: carries on after it (the work done so far is kept)
@@ -189,6 +218,31 @@ void Service::loadIndex()
     setStatus ([] (IndexStatus& s) { s.loaded = true; });
 }
 
+void Service::reloadIndex()
+{
+    std::string text;
+    try
+    {
+        if (callbacks.load)
+            text = callbacks.load();
+    }
+    catch (const std::exception& e)
+    {
+        std::fprintf (stderr, "browser index: %s\n", e.what());
+        return;
+    }
+    Index newer;
+    if (text.empty() || ! newer.fromText (text)) // (no file, or one being replaced: the next reload reads it)
+        return;
+    {
+        const std::lock_guard<std::mutex> guard (indexLock);
+        index.adopt (newer);
+    }
+    setStatus ([this] (IndexStatus& s) { s.checkedAt = now(); });
+    if (callbacks.indexChanged)
+        callbacks.indexChanged();
+}
+
 std::shared_ptr<const FolderMatches> Service::folderMatches (int key, const std::function<bool (const std::string&)>& accept)
 {
     auto& cached = matchCache[key];
@@ -202,7 +256,7 @@ std::shared_ptr<const FolderMatches> Service::folderMatches (int key, const std:
 
 void Service::saveIndex()
 {
-    if (! callbacks.save)
+    if (! callbacks.save || hasExternalIndexer()) // (round 190hd: the indexer process writes the file)
         return;
     std::string text;
     {
@@ -328,6 +382,8 @@ void Service::runSearch (SearchJob& job)
             return;
         if (job.done)
             job.done (result);
+        if (external) // (round 190hd: the indexer process hears of the folders' changes itself)
+            return;
 
         // then the folders searched are checked again in the background (FL's "dirty folders"), unless that was just done
         std::vector<std::string> stale;

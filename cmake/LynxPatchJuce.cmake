@@ -171,6 +171,17 @@
 #    to its windows (all messages while the driver's control panel is open). LYNX can then make and open its device
 #    on a worker while the main window is built (engine/DllAsioDevice.h, prewarmAsioDevice). The audio callbacks still
 #    come from the driver's own thread. LYNX_ASIO_THREAD=0: as before (the caller's thread; no prewarm either).
+# 30. Windows only, juce_graphics/native/juce_Direct2DImage_windows.cpp (round 190hd, 28 in its branch; start-up): a thread can ask for
+#    software images (`juce::lynxSoftwareImagesOnThisThread (true)`): every image it makes after that, a decoded PNG
+#    included, is a plain software image instead of a Direct2D one. The splash card draws on a thread of its own with the
+#    CPU (ui/Splash.cpp); before, its logo was the process's first Direct2D image, so the Direct3D 11 + Direct2D device
+#    (~0.35-0.4 s) was made before the card could show. Other threads: as before.
+# 31. Windows only, juce_audio_devices/native/juce_ASIO_windows.cpp (round 190hd, 29 in its branch; start-up): JUCE starts an ASIO driver,
+#    sleeps 80 ms and stops it while it initialises the device ("because Cubase does it"); for "FL Studio ASIO" that is
+#    ~0.27 s of the start-up's critical path (its stop ends a Windows Audio stream). The ASIO protocol does not ask for
+#    it (init, channels, buffer sizes, createBuffers, start). `juce::lynxAsioQuickInit` (set by LYNX's prewarm for the
+#    one device it makes ahead, engine/DllAsioDevice.cpp) skips it for that device only; a device that then fails to
+#    open is made again the usual way (AudioEngine::openAudioDevice). Every other open: as JUCE does.
 #
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
@@ -270,6 +281,9 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("image readback put off (one image)" "LYNX patch (round 190bm): for one image"
             "        const bool skipReadback = lynxSkipImageReadback; // LYNX patch (round 174e2): the flag when made|NL|"
             "        // LYNX patch (round 174e2): the flag when made|NL|        // LYNX patch (round 190bm): for one image only (a Graphics made on another image meanwhile reads back as ever)|NL|        const bool skipReadback = lynxSkipImageReadback && lynxNoReadbackImage == self.get();|NL|")
+        lynx_juce_fix("software images on a thread that asks for them" "LYNX patch (round 190hd): software images"
+            "ImagePixelData::Ptr NativeImageType::create (Image::PixelFormat format, int width, int height, bool clearImage) const|NL|{|NL|    SharedResourcePointer<DirectX> directX;|NL|"
+            "// LYNX patch (round 190hd): software images on a thread that asks for them (cmake/LynxPatchJuce.cmake, fix 30)|NL|static thread_local bool lynxSoftwareImages = false;|NL|void lynxSoftwareImagesOnThisThread (bool on) { lynxSoftwareImages = on; }|NL||NL|ImagePixelData::Ptr NativeImageType::create (Image::PixelFormat format, int width, int height, bool clearImage) const|NL|{|NL|    if (lynxSoftwareImages) // LYNX patch (round 190hd): this thread draws with the CPU (no Direct2D device made for it)|NL|        return new SoftwarePixelData { format, width, height, clearImage };|NL||NL|    SharedResourcePointer<DirectX> directX;|NL|")
     elseif(file MATCHES "juce_Windowing_linux.cpp$")
         lynx_juce_fix("no X focus for menu windows" "LYNX patch (issue #45): never takes the X focus"
             "    void grabFocus() override|NL|    {|NL|"
@@ -338,6 +352,12 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("ASIO channel names after a reset on the ASIO thread" "LYNX patch (round 190go): the channel names"
             "                  currentSampleRate, currentBlockSizeSamples);|NL||NL|            reloadChannelNames();|NL|"
             "                  currentSampleRate, currentBlockSizeSamples);|NL||NL|            // LYNX patch (round 190go): the channel names from the ASIO thread|NL|            lynxAsioCall ([this] { reloadChannelNames(); });|NL|")
+        lynx_juce_fix("ASIO quick init for the start-up's device" "LYNX patch (round 190hd): no start / stop at init"
+            "                        // start and stop because cubase does it..|NL|                        err = asioObject->start();|NL|                        // ignore an error here, as it might start later after setting other stuff up|NL|                        JUCE_ASIO_LOG_ERROR (\"start\", err);|NL||NL|                        Thread::sleep (80);|NL|                        asioObject->stop();|NL|"
+            "                        // LYNX patch (round 190hd): no start / stop at init for the device the start-up makes ahead|NL|                        // (fix 31: lynxAsioQuickInit, set by LYNX's prewarm for its one device); every other open as JUCE does|NL|                        if (! lynxAsioQuickInit.exchange (false))|NL|                        {|NL|                        // start and stop because cubase does it..|NL|                        err = asioObject->start();|NL|                        // ignore an error here, as it might start later after setting other stuff up|NL|                        JUCE_ASIO_LOG_ERROR (\"start\", err);|NL||NL|                        Thread::sleep (80);|NL|                        asioObject->stop();|NL|                        }|NL|")
+        lynx_juce_fix("ASIO quick init flag" "LYNX patch (round 190hd): the quick init flag"
+            "static void sendASIODeviceChangeToListeners (ASIOAudioIODeviceType*);|NL|"
+            "static void sendASIODeviceChangeToListeners (ASIOAudioIODeviceType*);|NL||NL|// LYNX patch (round 190hd): the quick init flag (cmake/LynxPatchJuce.cmake, fix 31)|NL|std::atomic<bool> lynxAsioQuickInit { false };|NL|")
     elseif(file MATCHES "juce_WASAPI_windows.cpp$")
         lynx_juce_fix("shared mode keeps the mix format's channels" "LYNX patch (issue #134): shared mode"
             "        if (fallbackNumChannels >= maxNumChannelsToQuery)|NL|            return fallbackNumChannels;|NL|"

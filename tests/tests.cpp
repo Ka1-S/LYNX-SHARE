@@ -17712,6 +17712,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "PerfWin190gdTests.inc"
 #include "Ram190gnTests.inc"
 #include "Startup190goTests.inc"
+#include "Startup190hdTests.inc"
 #include "Freeze190ayTests.inc"
 #include "LiveFreeze190ffTests.inc"
 #include "QaFix190bjTests.inc"

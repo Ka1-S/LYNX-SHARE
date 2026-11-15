@@ -699,12 +699,21 @@ private:
     bool hintsFrozen = false; // --snapshot: keep the hint that was set
     juce::String idleHint() const;
 
+    // (round 190hd) a line of the start-up trace when made: where the main window's construction goes
+    struct StartupStep
+    {
+        explicit StartupStep (const char* step) { if (startupMark != nullptr) startupMark (step); }
+    };
+    StartupStep stepMembers { "  window: toolbar and the other members" };
     ChannelRackComponent rack;
     ChannelRackViewport rackViewport { rack };
+    StartupStep stepRack { "  window: channel rack" };
     PianoRollComponent pianoRoll;
+    StartupStep stepPianoRoll { "  window: piano roll" };
     PlaylistComponent playlist;
     PatternPicker picker { engine, playlist };
     PlaylistArea playlistArea { picker, playlist };
+    StartupStep stepPlaylist { "  window: playlist" };
     layoutstyle::Style layoutStyle = layoutstyle::Style::pattern;
     layoutstyle::SettingsReader startStyle; // the style saved in the UI settings (applied when the window is ready)
     // round 190ch: the docked Lyrics / Notes panel (made when first shown) and the ones living in tool windows
@@ -758,7 +767,9 @@ private:
     bool runDetailAction (const std::string& id);
     void openGridClip (int track, int scene);
     MixerComponent mixer;
+    StartupStep stepMixer { "  window: mixer" };
     BrowserComponent browser;
+    StartupStep stepBrowser { "  window: browser" };
     Workspace workspace; // after the panels' contents: it is destroyed first
     updater::UpdateBar updateBar; // "LYNX SHARE x.y.z is available" under the toolbar (round 166b)
     juce::Label remoteControlBar;
