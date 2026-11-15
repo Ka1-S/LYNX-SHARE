@@ -74,6 +74,10 @@ public:
     void mouseDown (const juce::MouseEvent& e) override; // right-click on the toolbar: the toolbar menu
     bool keyPressed (const juce::KeyPress& key) override;
     void dragOperationStarted (const juce::DragAndDropTarget::SourceDetails&) override; // (issue #12: drops on windows)
+    // issue #174: a Browser / Edison sample or a Playlist audio clip dragged onto a plugin's own editor (or out of LYNX)
+    // goes on as the system's file drag (ui/ExternalDrag.h)
+    bool shouldDropFilesWhenDraggedExternally (const juce::DragAndDropTarget::SourceDetails& details, juce::StringArray& files,
+                                               bool& canMoveFiles) override;
     bool keyFromSecondaryWindow (const juce::KeyPress& key); // a key a tool / plugin window left unused
     bool keyFromPluginView (const juce::KeyPress& key, bool optionOn); // a plain key over a focused plugin (issue #96)
     bool keyStateChanged (bool isKeyDown) override;

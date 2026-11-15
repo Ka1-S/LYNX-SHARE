@@ -5,6 +5,7 @@
 #include <thread>
 
 #include "core/SoundFont.h"
+#include "ui/ExternalDrag.h"
 #include "core/SoundFontIndex.h"
 #include "engine/PluginHost.h"
 #include "core/SearchQuery.h"
@@ -429,6 +430,14 @@ class SoundFontEditor final : public juce::Component,
                               private juce::Timer
 {
 public:
+    // issue #174: Edison's drag button may start its drag from this container (the first one it finds): its sample goes
+    // on as a file drag over a plugin's editor or out of LYNX
+    bool shouldDropFilesWhenDraggedExternally (const juce::DragAndDropTarget::SourceDetails& details, juce::StringArray& files,
+                                               bool& canMoveFiles) override
+    {
+        return externaldrag::shouldDropFiles (details, nullptr, files, canMoveFiles);
+    }
+
     SoundFontEditor (AudioEngine& e, SfTarget c) : engine (e), channel (std::move (c))
     {
         ensureSoundFontIndex();

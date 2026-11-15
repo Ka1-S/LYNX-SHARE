@@ -182,6 +182,19 @@
 #    it (init, channels, buffer sizes, createBuffers, start). `juce::lynxAsioQuickInit` (set by LYNX's prewarm for the
 #    one device it makes ahead, engine/DllAsioDevice.cpp) skips it for that device only; a device that then fails to
 #    open is made again the usual way (AudioEngine::openAudioDevice). Every other open: as JUCE does.
+# 32. Every platform, juce_gui_basics/mouse/juce_DragAndDropContainer.cpp (issue #174, round 190hf): an internal drag
+#    (a sample from LYNX's Browser) turns into the system's file drag only where JUCE finds no component of the app
+#    under the mouse. A hosted plugin's editor is a native window of the plugin (Windows HWND, X11 window via XEmbed,
+#    NSView) inside one of LYNX's windows, so JUCE saw LYNX's component there and the plugin never got the file.
+#    `lynxExternalDropAtHook` (set by LYNX, ui/ExternalDrag.cpp) says that a screen point is a plugin's own editor (or
+#    another program's window above LYNX's): there the drag counts as outside (after 300 ms instead of 700, and even
+#    when a LYNX drop target is behind the plugin), and goes on as the file drag the plugin's own drop target gets.
+#    Without the hook: JUCE's test only.
+# 33. Linux/BSD only, juce_gui_basics/native/juce_DragAndDrop_linux.cpp (issue #174): JUCE's XDND source sends a drag to
+#    the first XdndAware window under the pointer from the root down. Every JUCE window is XdndAware, so a plugin editor
+#    embedded in a LYNX window (its own XdndAware X window, reparented into LYNX's XEmbed host) never got it: LYNX's
+#    window took the drop. Below one of the app's OWN windows the search now goes on to a deeper XdndAware window (the
+#    plugin's) and sends it there; another program's windows are searched as before.
 #
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
@@ -229,6 +242,20 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("no stale drop state" "LYNX patch (issue #11): not left over"
             "        dragInfo.clear();|NL|        srcMimeTypeAtomList.clear();|NL||NL|        dragAndDropCurrentMimeType = 0;"
             "        dragInfo.clear();|NL|        srcMimeTypeAtomList.clear();|NL|        finishAfterDropDataReceived = false; // LYNX patch (issue #11): not left over from a failed drop|NL||NL|        dragAndDropCurrentMimeType = 0;")
+
+        lynx_juce_fix("XDND target below our own windows" "LYNX patch (issue #174): below one of our own windows"
+            "        if (isWindowDnDAware (target))|NL|            return target;|NL|"
+            "        if (isWindowDnDAware (target))|NL|        {|NL|            // LYNX patch (issue #174): below one of our own windows a deeper XdndAware window (a hosted plugin's editor,|NL|            // embedded through XEmbed) is the target, not our window around it|NL|            if (getPeerFor (target) != nullptr)|NL|            {|NL|                ::Window lynxChild = None, lynxRoot;|NL|                int lynxPos;|NL|                unsigned int lynxMask;|NL||NL|                if (X11Symbols::getInstance()->xQueryPointer (getDisplay(), target, &lynxRoot, &lynxChild, &lynxPos, &lynxPos, &lynxPos, &lynxPos, &lynxMask)|NL|                    && lynxChild != None)|NL|                    if (const auto deeper = externalFindDragTargetWindow (lynxChild); deeper != None)|NL|                        return deeper;|NL|            }|NL||NL|            return target;|NL|        }|NL|")
+    elseif(file MATCHES "juce_DragAndDropContainer.cpp$")
+        lynx_juce_fix("external drop hook: declaration" "LYNX patch (issue #174): a place on screen"
+            "bool juce_performDragDropText (const String&, bool& shouldStop);|NL|"
+            "bool juce_performDragDropText (const String&, bool& shouldStop);|NL||NL|// LYNX patch (issue #174): a place on screen LYNX knows is a hosted plugin's own editor (a native window of the plugin)|NL|// or another program's window counts as outside the app: the drag goes on as the system's file drag there. nullptr:|NL|// JUCE's test only.|NL|bool (*lynxExternalDropAtHook) (Point<int> screenPos) = nullptr;|NL|")
+        lynx_juce_fix("external drop hook: over a plugin" "LYNX patch (issue #174): over a hosted plugin's editor"
+            "            auto now = Time::getCurrentTime();|NL||NL|            if (getCurrentlyOver() != nullptr)|NL|                lastTimeOverTarget = now;|NL|            else if (now > lastTimeOverTarget + RelativeTime::milliseconds (700))|NL|                checkForExternalDrag (details, screenPos);"
+            "            auto now = Time::getCurrentTime();|NL|            // LYNX patch (issue #174): over a hosted plugin's editor no target of ours counts (it is the plugin's)|NL|            const auto lynxOutside = lynxExternalDropAtHook != nullptr && lynxExternalDropAtHook (screenPos);|NL||NL|            if (getCurrentlyOver() != nullptr && ! lynxOutside)|NL|                lastTimeOverTarget = now;|NL|            else if (now > lastTimeOverTarget + RelativeTime::milliseconds (lynxOutside ? 300 : 700))|NL|                checkForExternalDrag (details, screenPos, lynxOutside);")
+        lynx_juce_fix("external drop hook: the test" "LYNX patch (issue #174): `outside`"
+            "    void checkForExternalDrag (DragAndDropTarget::SourceDetails& details, Point<int> screenPos)|NL|    {|NL|        if (! hasCheckedForExternalDrag)|NL|        {|NL|            if (Desktop::getInstance().findComponentAt (screenPos) == nullptr)"
+            "    // LYNX patch (issue #174): `outside`: the hook said the point is a plugin's editor or another program's window|NL|    void checkForExternalDrag (DragAndDropTarget::SourceDetails& details, Point<int> screenPos, bool outside = false)|NL|    {|NL|        if (! hasCheckedForExternalDrag)|NL|        {|NL|            if (outside || Desktop::getInstance().findComponentAt (screenPos) == nullptr)")
     elseif(file MATCHES "juce_PopupMenu.cpp$")
         lynx_juce_fix("submenu corridor" "LYNX patch (issue #18): the way across"
             "        return areaTowardsSubMenu.contains (newGlobalPos.toFloat());|NL|    }"
@@ -452,6 +479,7 @@ endfunction()
 function(lynx_patch_juce juce_dir)
     lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/native/juce_DragAndDrop_linux.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/windows/juce_ComponentPeer.cpp")
+    lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/mouse/juce_DragAndDropContainer.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/menus/juce_PopupMenu.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/native/juce_Windowing_linux.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/desktop/juce_Displays.cpp")

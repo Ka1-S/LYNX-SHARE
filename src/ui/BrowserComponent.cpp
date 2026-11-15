@@ -1,4 +1,5 @@
 #include "ui/PluginPresetMenu.h"
+#include "ui/ExternalDrag.h"
 #include "ui/GeneratorPresetMenu.h"
 #include "ui/FileChoosers.h"
 #include "ui/QuickPick.h"
@@ -4219,6 +4220,13 @@ public:
 
     void resized() override { browser.setBounds (getLocalBounds()); }
 
+    // issue #174: a sample dragged from this window onto a plugin's own editor (or out of LYNX) goes on as a file drag
+    bool shouldDropFilesWhenDraggedExternally (const juce::DragAndDropTarget::SourceDetails& details, juce::StringArray& files,
+                                               bool& canMoveFiles) override
+    {
+        return externaldrag::shouldDropFiles (details, nullptr, files, canMoveFiles);
+    }
+
     static juce::File file() { return PluginHost::settingsFolder().getChildFile ("sample-browser-view.txt"); }
 
     BrowserComponent browser;
@@ -4948,6 +4956,14 @@ bool BrowserComponent::locateFile (const juce::File& file)
     }
     showNote (tr ("This file is not in a folder the Browser shows"));
     return false;
+}
+
+juce::Rectangle<int> BrowserComponent::selectedRowScreenBounds() const
+{
+    if (tree == nullptr || ! tree->isShowing() || tree->getSelectedRow() < 0)
+        return {};
+    const auto row = tree->getSelectedRow();
+    return tree->localAreaToGlobal (juce::Rectangle<int> (0, row * FileTree::rowHeight, tree->getWidth(), FileTree::rowHeight));
 }
 
 void BrowserComponent::showScores (const juce::String& subfolder)

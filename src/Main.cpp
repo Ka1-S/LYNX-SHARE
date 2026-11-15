@@ -12,6 +12,7 @@
 #include "core/DrawMode.h"
 #include "core/SessionOps.h"
 #include "ui/ClipGridComponent.h"
+#include "ui/ExternalDrag.h"
 #include "ui/SessionMixer.h"
 #include "core/FlSamplers.h"
 #include "core/ArrangeOps.h"
@@ -224,6 +225,7 @@
 #include "ui/ShotScale.h"
 #include "core/Links.h"
 
+#include <algorithm>
 #include <atomic>
 #include <exception>
 #include <chrono>
@@ -6878,6 +6880,65 @@ private:
             bool keysDone = false;
             bool dockOk = true;
             std::function<void (bool)> done;
+            // LYNX_PLUGWIN_DROP=<sample> (issue #174): a Sample browser window beside the plugin window with that file
+            // selected. The report gives the row's and the editor's places on screen with what LYNX sees there (for a
+            // real drag by xdotool / SendInput in that time), and, before the plugin is removed, whether the plugin took
+            // the file (its saved state names it).
+            juce::File dropFile;
+            std::unique_ptr<juce::DocumentWindow> dropWindow;
+            lynx::BrowserComponent* dropBrowser = nullptr;
+            int dropStage = 0;
+
+            void dropTick (int elapsedMs)
+            {
+                if (dropStage == 0 && elapsedMs >= 1000)
+                {
+                    lynx::externaldrag::install();
+                    auto content = lynx::BrowserComponent::makeSampleBrowserContent (*engine, [this] (lynx::BrowserComponent& b) { dropBrowser = &b; });
+                    dropWindow = std::make_unique<juce::DocumentWindow> ("LYNX test sample browser", juce::Colours::darkgrey, 0);
+                    dropWindow->setContentOwned (content.release(), false);
+                    dropWindow->setBounds (20, 240, 340, 520);
+                    dropWindow->setVisible (true);
+                    if (dropBrowser != nullptr)
+                    {
+                        dropBrowser->showFilterForSnapshot (dropFile.getParentDirectory(), lynx::browserview::ContentFilter::all);
+                        step ("drop_locate=" + juce::String ((int) dropBrowser->locateFile (dropFile)));
+                    }
+                    dropStage = 1;
+                }
+                else if (dropStage == 1 && elapsedMs >= 2500)
+                {
+                    using namespace lynx::externaldrag;
+                    const auto row = dropBrowser != nullptr ? dropBrowser->selectedRowScreenBounds() : juce::Rectangle<int>();
+                    const auto from = row.getCentre();
+                    // (physical pixels too: SendInput / xdotool work in those)
+                    auto physical = [] (juce::Point<int> p) {
+                        const auto q = juce::Desktop::getInstance().getDisplays().logicalToPhysical (p);
+                        return " phys=" + juce::String (q.x) + "," + juce::String (q.y);
+                    };
+                    step ("drop_source=" + juce::String (from.x) + "," + juce::String (from.y) + " place=" + placeName (placeAt (from)) + physical (from));
+                    if (const auto pid = lynx::sandboxedPluginProcessId (*instance); pid != 0)
+                        step ("drop_target_pid=" + juce::String (pid)); // (its window is the other process's)
+                    else if (auto* editor = instance->getActiveEditor())
+                    {
+                        const auto to = editor->getScreenBounds().getCentre();
+                        step ("drop_target=" + juce::String (to.x) + "," + juce::String (to.y) + " place=" + placeName (placeAt (to)) + physical (to));
+                    }
+                    const auto files = filesOf (juce::String (lynx::BrowserComponent::dragDescription) + "|" + dropFile.getFullPathName(), nullptr);
+                    step ("drop_files=" + files.joinIntoString (";"));
+                    dropStage = 2;
+                }
+            }
+
+            void dropResult()
+            {
+                juce::MemoryBlock state;
+                instance->getStateInformation (state);
+                const auto name = dropFile.getFileNameWithoutExtension().toStdString();
+                const auto* bytes = static_cast<const char*> (state.getData());
+                const auto received = ! name.empty() && std::search (bytes, bytes + state.getSize(), name.begin(), name.end()) != bytes + state.getSize();
+                step ("drop_received=" + juce::String ((int) received));
+            }
 
             // issue #116 (with LYNX_DOCKED_PLUGINS=1 and LYNX_PLUGWIN_DOCK=1), FL's f116 sequence for every floating
             // panel: the docked plugin window goes behind a clicked panel and comes back in front when clicked; a
@@ -7320,8 +7381,12 @@ private:
                 // (3 s apart: time for screenshots of each state)
                 if (phase == 1 && workspace != nullptr && dockStep < dockSteps && elapsedMs >= (dockStep + 1) * stepMs)
                     dockCheck (dockStep++);
+                if (phase == 1 && dropFile.existsAsFile())
+                    dropTick (elapsedMs);
                 if (phase == 1 && elapsedMs >= seconds * 1000 && (workspace == nullptr || dockStep >= dockSteps)) // remove the plugin from the song
                 {
+                    if (dropFile.existsAsFile())
+                        dropResult();
                     engine->editSong ([this] (lynx::Song& song) {
                         if (instrument)
                         {
@@ -7351,11 +7416,14 @@ private:
         auto* test = new Test();
         test->reportPath = reportPath;
         test->seconds = seconds;
+        if (const auto drop = juce::SystemStats::getEnvironmentVariable ("LYNX_PLUGWIN_DROP", {}); drop.isNotEmpty())
+            test->dropFile = juce::File (drop);
         test->done = [this, test] (bool ok) {
             setApplicationReturnValue (ok ? 0 : 1);
             juce::MessageManager::callAsync ([this, test] {
                 lynx::setMainWindowForOwnership (nullptr);
                 lynx::PluginWindows::setDockWorkspace (nullptr);
+                test->dropWindow = nullptr; // (its Browser before the engine)
                 test->workspace = nullptr;
                 test->mainWindow = nullptr; // (dock mode: the main component with it, before the engine)
                 test->engine = nullptr;

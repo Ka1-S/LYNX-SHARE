@@ -164,6 +164,8 @@ public:
     // FL's "Locate sample in browser" (the sampler's File row, round 190df): the ALL tab with the folders opened down to
     // the file, its row selected; false (and a note) when no folder the Browser shows holds it
     bool locateFile (const juce::File& file);
+    // --plugwintest's drop check (issue #174): the selected row of the tree on screen (empty: none shown)
+    juce::Rectangle<int> selectedRowScreenBounds() const;
     void showScores (const juce::String& subfolder = {});         // the Piano roll's File › Browse scores: FL's "Scores" (the user's Presets/Scores and Data/Patches/Scores)
     // FL's Shift+F8: the All tab with the Plugin database opened and scrolled into view; with a folder (the Plugin
     // picker's tab, round 171c; `generators` 1 / 0, -1 = none) that folder of the Generators / Effects opened
