@@ -259,4 +259,43 @@ using KeyMap = std::array<std::vector<std::int32_t>, 128>;
 // the key of the first automatically mapped region for a deck of n regions (60, an octave lower per 12 regions past 65)
 int autoBaseKey (int regions) noexcept;
 KeyMap keyMap (int deck, const std::vector<WavRegion>& deckA, const std::vector<WavRegion>& deckB, bool sameDeckOnly);
+
+// ---- the articulator editor's grid, zoom and snap (round 190hz, docs/analise/REA_rodada190hz_slicex.md)
+// FL's ruler step (0x844700): the smallest multiple n·base whose lines lie at least `minPixels` apart (12 on the time
+// axis, 8 on the level axis) and where n divides or is divided by base·n's count in step1 and in step2 (step2 0 = none).
+// `perStep1` / `perStep2` are the line counts in step1 / step2 at that step (FL's thicker lines; perStep2 0 = none).
+struct GridStep
+{
+    double step = 0.0;
+    int perStep1 = 1, perStep2 = 0;
+};
+GridStep rulerStep (double base, double step1, double step2, double pixelsPerUnit, double minPixels) noexcept;
+// The thickness class FL draws grid line `index` with (0 thin, 1 every step1, 2 every step2)
+int gridLineClass (long long index, const GridStep& g) noexcept;
+// The time axis of an envelope / LFO curve (FL 0x8442e0 with Slicex's subdivision 10, 0x881cb0): in 0.5 s units a base
+// of 0.02 with thick lines every 2.0; tempo-based, in beats, a base of 1/40 beat with lines every beat and every bar
+struct TimeAxis
+{
+    double base, step1, step2;
+};
+TimeAxis articulatorTimeAxis (bool tempoBased, int beatsPerBar = 4) noexcept;
+// The level axis (and a map's x axis): FL's fixed 1/16 with a thick line every 1/4 (0x886f60)
+inline constexpr double levelGridStep = 1.0 / 16.0;
+inline constexpr int levelGridPerQuarter = 4;
+// The time range FL shows for a curve whose last point is at `lastTime` (0x851120): the larger of lastTime + 1 and
+// lastTime · 1.25, at least 2 and at most 7200 units; an LFO's curve counts one unit past its last point
+double articulatorView (double lastTime, bool lfo) noexcept;
+// FL's snap (0x84daf0, grid mode): `v` rounded to the nearest multiple of `step` from `offset` (round half to even, as
+// Delphi's Round). Snap applies when the Snap button is on, Alt inverts it (0x864fe0); a point drag with Shift + Ctrl
+// held is never snapped (0x853c40)
+double snapToGrid (double v, double step, double offset = 0.0) noexcept;
+bool snapActive (bool snapButton, bool alt) noexcept;
+// The wheel's zoom factor for the shown time range (FrameMouseWheel 0x865070): exp(−notches · 0.075 · 3 · ln 2), a
+// quarter of that exponent with Ctrl (FL's 0.075 → 0.01875); < 1 zooms in. (3 = Windows' default wheel lines, read at
+// run time by FL; it gives zoomStep, FL's measured menu zoom, per notch)
+double wheelZoomFactor (double notches, bool fine) noexcept;
+
+// ---- the keyboard's marks (round 190hz, 0x898cf0): the keys that have regions on the current deck, in the full
+// display mode; deck A's in the other display modes
+inline int keyboardMarkDeck (int displayMode, int currentDeck) noexcept { return displayMode == 0 ? currentDeck : 0; }
 } // namespace lynx::slicex

@@ -10345,3 +10345,5 @@ countries: id
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] buka/tutup editor  [Alt]+[LMB] biarkan yang lain terbuka  [Ctrl]+[LMB] dengarkan  [2xLMB] Piano Roll  [LMB] seret naik/turun mengubah urutan  [RMB] menu channel"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak meter (kiri/kanan) dengan peak hold  [LMB] mematikan lampu clip"
 "Play mode" = "Mode main"
+"(empty)" = "(kosong)"
+"Time scroller: drag to scroll, drag an end to zoom" = "Penggulir waktu: seret untuk menggulir, seret salah satu ujung untuk zoom"

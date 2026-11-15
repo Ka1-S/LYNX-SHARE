@@ -10475,3 +10475,5 @@ countries: br
 "Current selection" = "Seleção atual"
 "Compatible velocity" = "Velocity compatível"
 "Play mode" = "Modo de execução"
+"(empty)" = "(vazio)"
+"Time scroller: drag to scroll, drag an end to zoom" = "Rolagem de tempo: arraste para rolar, arraste uma ponta para dar zoom"

@@ -10345,3 +10345,5 @@ countries: cn sg
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 打开/关闭编辑器  [Alt]+[LMB] 保持其他编辑器打开  [Ctrl]+[LMB] 试听  [2xLMB] 钢琴卷帘  [LMB] 上下拖动重新排序  [RMB] 通道菜单"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "峰值电平表（左/右）带峰值保持  [LMB] 清除削波指示灯"
 "Play mode" = "演奏模式"
+"(empty)" = "(空)"
+"Time scroller: drag to scroll, drag an end to zoom" = "时间滚动条：拖动以滚动，拖动一端以缩放"
