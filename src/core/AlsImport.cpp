@@ -3,6 +3,7 @@
 #include "core/AlsDevices.h"
 #include "core/Effects.h"
 #include "core/Rack.h"
+#include "core/LayoutStyle.h"
 
 #include <array>
 #include <algorithm>
@@ -1611,7 +1612,7 @@ int patternFromMidiClip (Ctx& ctx, const Element& clip, int channel, double leng
     }
     Pattern p;
     p.name = clip.value ("Name");
-    p.colour = alsColour ((int) clip.number ("Color", -1));
+    p.colour = alsImportColour ((int) clip.number ("Color", -1));
     const auto passes = passesOf (loopOverride != nullptr ? *loopOverride : loopOf (clip), length);
     // Live 12's probability groups (round 187c) [LIVE 12.4 save: NoteProbabilityGroup { GroupType 0 = Play All, 1 = Play
     // One; Notes/NoteId; Probability (the group's: its notes keep their own for an ungroup) }]: NoteId → group
@@ -2181,7 +2182,7 @@ void sessionToGrid (Ctx& ctx, const Element& set, const std::vector<Element>& tr
                 }
                 auto& slot = song.clipGrid->slots[(std::size_t) id];
                 slot.name = clip.value ("Name");
-                slot.colour = alsColour ((int) clip.number ("Color", -1));
+                slot.colour = alsImportColour ((int) clip.number ("Color", -1));
                 slot.mode = (LaunchMode) std::clamp ((int) clip.number ("LaunchMode", 0), 0, 3);
                 slot.quant = (LaunchQuant) std::clamp ((int) clip.number ("LaunchQuantisation", 0), 0, 14);
                 slot.legato = clip.boolean ("Legato", false);
@@ -2209,7 +2210,7 @@ void sessionToGrid (Ctx& ctx, const Element& set, const std::vector<Element>& tr
     {
         auto& sc = grid.scenes[s];
         sc.name = scenes[s].value ("Name");
-        sc.colour = alsColour ((int) scenes[s].number ("Color", -1));
+        sc.colour = alsImportColour ((int) scenes[s].number ("Color", -1));
         if (scenes[s].boolean ("IsTempoEnabled", false))
             sc.tempo = std::clamp (scenes[s].number ("Tempo", 120), 10.0, 999.0);
         int n = 4, d = 4;
@@ -2333,10 +2334,36 @@ std::uint32_t alsColour (int index) noexcept
     return 0xFF000000u | (to8 (r) << 16) | (to8 (g) << 8) | to8 (b);
 }
 
+// Round 190ig (round 190ia CL-6, owner decision "go with recommended", reversible): Live 12.4's own 70 clip / track
+// colours, index 0..69, read from "Ableton Live 12 Trial.exe" 12.4 (the code that fills the palette: `mov dword
+// [rax + 0x230 + 4 * i], 0xFFRRGGBB` at file offsets 0x345D026.., indices 60..69 stored right after at +0x460..; the
+// 13 colours round 190ia measured on screen in the "Patience" demo set — indices 2, 3, 25, 32..36, 41, 42, 50, 52, 55 —
+// match). Used for .als imports while the Clip-launch layout shows; the Pattern and Simple layouts keep alsColour's
+// approximation, so their imports are unchanged. Colour values are data, not artwork (round 190ia's note).
+std::uint32_t alsLiveColour (int index) noexcept
+{
+    static constexpr std::uint32_t live[70] = {
+        0xffff94a6, 0xffffa529, 0xffcc9927, 0xfff7f47c, 0xffbffb00, 0xff1aff2f, 0xff25ffa8, 0xff5cffe8, 0xff8bc5ff, 0xff5480e4, 0xff92a7ff, 0xffd86ce4, 0xffe553a0, 0xffffffff,
+        0xffff3636, 0xfff66c03, 0xff99724b, 0xfffff034, 0xff87ff67, 0xff3dc300, 0xff00bfaf, 0xff19e9ff, 0xff10a4ee, 0xff007dc0, 0xff886ce4, 0xffb677c6, 0xffff39d4, 0xffd0d0d0,
+        0xffe2675a, 0xffffa374, 0xffd3ad71, 0xffedffae, 0xffd2e498, 0xffbad074, 0xff9bc48d, 0xffd4fde1, 0xffcdf1f8, 0xffb9c1e3, 0xffcdbbe4, 0xffae98e5, 0xffe5dce1, 0xffa9a9a9,
+        0xffc6928b, 0xffb78256, 0xff99836a, 0xffbfba69, 0xffa6be00, 0xff7db04d, 0xff88c2ba, 0xff9bb3c4, 0xff85a5c2, 0xff8393cc, 0xffa595b5, 0xffbf9fbe, 0xffbc7196, 0xff7b7b7b,
+        0xffaf3333, 0xffa95131, 0xff724f41, 0xffdbc300, 0xff85961f, 0xff539f31, 0xff0a9c8e, 0xff236384, 0xff1a2f96, 0xff2f52a2, 0xff624bad, 0xffa34bad, 0xffcc2e6e, 0xff3c3c3c,
+    };
+    return index >= 0 && index < 70 ? live[index] : 0;
+}
+
+std::uint32_t alsImportColour (int index) noexcept
+{
+    return layoutstyle::current() == layoutstyle::Style::clipLaunch ? alsLiveColour (index) : alsColour (index);
+}
+
 int alsColourIndex (std::uint32_t argb) noexcept
 {
     if (argb == 0)
         return -1;
+    for (int i = 0; i < 70; ++i) // (a colour imported with Live's table goes back to its own index)
+        if (alsLiveColour (i) == (argb | 0xFF000000u))
+            return i;
     auto best = 0;
     auto bestD = 1 << 30;
     for (int i = 0; i < 70; ++i)
@@ -2573,7 +2600,7 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
             break;
         MixerTrack m;
         m.name = trackName (tracks[i]);
-        m.colour = alsColour ((int) tracks[i].number ("Color", -1));
+        m.colour = alsImportColour ((int) tracks[i].number ("Color", -1));
         song.mixer.push_back (std::move (m));
         insertOf[i] = (int) song.mixer.size() - 1;
         const auto kind = tracks[i].name();

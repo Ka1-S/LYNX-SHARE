@@ -19,6 +19,7 @@
 #include "ui/DetailView.h"
 #include "ui/HintBar.h"
 #include "ui/MapMode.h"
+#include "ui/Motion.h"
 #include "ui/GroovePoolComponent.h"
 #include "ui/SessionMixer.h"
 #include "ui/ExportDialog.h"
@@ -34,15 +35,27 @@ namespace lynx
 {
 namespace
 {
-constexpr int headerHeight = 26, rowHeight = 24, footerHeight = 30, columnWidth = 104, launchZone = 20;
+constexpr int footerHeight = 30;
 // round 190ig: the Live look of the clip grid (View › "Classic LYNX look for the clip grid" turns it off: round 181a's look)
 bool classicLook = false;
 bool liveLook() noexcept { return ! classicLook && layoutstyle::current() == layoutstyle::Style::clipLaunch; }
+// A size of the grid in round 181a's look and in Live's (round 190ig, CL-3: measured in live-session.png by rounds 190ia
+// and 190ig): reads as an int, the look's value.
+struct LookMetric
+{
+    int classic, live;
+    operator int() const noexcept { return liveLook() ? live : classic; }
+};
+// Live: a 17 px header over a 2 px separator, 17 px slots over a 1 px separator, 74 px columns with 2 px between them,
+// a 16 px launch zone then a 1 px divider (live-session.png x 396..412: triangle 400..407, divider 412), a 17 px status
+// row under a 2 px separator (live-clipview-audio.png y 395..413)
+const LookMetric headerHeight { 26, 19 }, rowHeight { 24, 18 }, columnWidth { 104, 76 }, launchZone { 20, 17 };
 // the scene column: Live's 84 px cells after a 2 px separator (round 190ia CL-14b, live-session.png x 1540..1625)
 int sceneBaseWidthNow() noexcept { return liveLook() ? 86 : 128; }
 constexpr int minColumns = 8, minRows = 8;
 // round 190bv: the row under the slots with each track's stop and arm buttons
-constexpr int statusHeight = 22, armWidth = 22;
+const LookMetric statusHeight { 22, 19 };
+constexpr int armWidth = 22;
 constexpr const char* gridDragDescription = "lynx-grid-clip";
 constexpr int fixedLengths[] = { 1, 2, 4, 8, 16, 32 };
 // round 190ef: the reference's View › "Scene Tempo And Time Signature" (a preference): each scene shows a tempo field
@@ -51,6 +64,34 @@ constexpr int tempoFieldWidth = 46, signatureFieldWidth = 42, sceneFieldsWidth =
 bool sceneFieldsOn = false;
 // round 190em: Live 12.4.16's launch triangle of a scene without its own tempo / signature (190ei shot: #1E1E1E)
 const juce::Colour liveSceneTriangle { 0xff1e1e1e };
+// round 190ig (CL-11, CL-12): a waiting launch in Live pulses: its triangle (a waiting stop: the track's stop square)
+// fades from black to the playing green #00D38D and back, one pulse every 400 ms whatever the tempo — filmed in Live
+// 12.4 (round 190ig: 10 pulses at 167 BPM and again at 100 BPM, best-fit period 400.0 ms both; a waiting stop's square
+// the same, /mnt/e/lynx-work/design190ig/s4/film1..3). Round 181a's look keeps its 150 ms on / off blink.
+constexpr int liveBlinkPeriodMs = 400;
+constexpr int classicBlinkPhaseMs = 150;
+// --design190igs4shot: the blink phase drawn (0 dark, 1 lit — round 190ia's two stills #002217 / #008A5C; -1: the clock's)
+int blinkPhaseForSnapshot = -1;
+// the blink's phase counter the repaint hashes compare: the Live pulse moves at the grid's 30 Hz; with Settings ›
+// General › Animations off it stays still (no phase repaints)
+std::uint32_t blinkPhaseNow() noexcept
+{
+    if (! liveLook())
+        return juce::Time::getMillisecondCounter() / (juce::uint32) classicBlinkPhaseMs;
+    if (! ui::motion::enabled())
+        return 0;
+    return juce::Time::getMillisecondCounter() / 33u;
+}
+// the pulse's level now, 0 (black) .. 1 (full colour); Animations off: Live's lit still #008A5C (0.65)
+float livePulse() noexcept
+{
+    if (blinkPhaseForSnapshot >= 0)
+        return blinkPhaseForSnapshot == 1 ? 0.655f : 0.16f;
+    if (! ui::motion::enabled())
+        return 0.655f;
+    const auto phase = (double) (juce::Time::getMillisecondCounter() % (juce::uint32) liveBlinkPeriodMs) / (double) liveBlinkPeriodMs;
+    return (float) (0.5 - 0.5 * std::cos (juce::MathConstants<double>::twoPi * phase));
+}
 int sceneWidthNow() noexcept { return sceneBaseWidthNow() + (sceneFieldsOn ? sceneFieldsWidth : 0); }
 constexpr const char* playlistDragDescription = "lynx-playlist-clip";
 
@@ -181,7 +222,8 @@ public:
     void paint (juce::Graphics& g) override
     {
         namespace c = theme::colour;
-        g.fillAll (c::bg1);
+        const auto live = liveLook();
+        g.fillAll (live ? theme::livelook::separator : c::bg1);
         const auto* grid = gridOf();
         if (grid == nullptr)
             return;
@@ -190,6 +232,23 @@ public:
         const auto cells = cellArea();
         const auto columns = columnCount();
         const auto scenes = rowCount();
+        if (live)
+        {
+            // Live (round 190ig, CL-8/CL-9; live190cw session190bv-02a): right of the last track the Session is #363636,
+            // the selected scene's row crossing it in #464646
+            const auto lastX = columnX (columns);
+            if (lastX < cells.getRight())
+            {
+                const juce::Rectangle<int> rest (lastX, headerHeight, cells.getRight() - lastX, cells.getHeight() + statusHeight);
+                g.setColour (theme::livelook::surface);
+                g.fillRect (rest);
+                if (selectedScene >= 0 && selectedScene < scenes)
+                {
+                    g.setColour (theme::livelook::raised);
+                    g.fillRect (rest.getIntersection ({ lastX, rowY (selectedScene), rest.getWidth(), (int) rowHeight - 1 }).getIntersection (cells));
+                }
+            }
+        }
 
         // column headers, slots and the stop row, clipped to the scrolling part
         {
@@ -213,6 +272,11 @@ public:
                 for (int r = firstRow(); r < scenes && rowY (r) < cells.getBottom(); ++r)
                     if (reaches ({ x, rowY (r), columnWidth, rowHeight }))
                         paintSlot (g, song, *grid, state, t, r, { x, rowY (r), columnWidth, rowHeight });
+                if (live && rowY (scenes) < cells.getBottom()) // (Live: the column goes on under the last scene, CL-8)
+                {
+                    g.setColour (t == selectedTrack ? theme::livelook::raised : theme::livelook::surface);
+                    g.fillRect (juce::Rectangle<int> (x, rowY (scenes), (int) columnWidth - 2, cells.getBottom() - rowY (scenes)).getIntersection (cells));
+                }
             }
         }
 
@@ -222,7 +286,7 @@ public:
         {
             // Live's Main column (round 190ia CL-14b, live-session.png x 1540..1625 y 86..240): a 2 px separator, the "Main"
             // header (#3C3C3C, its name in Live's text grey) over a 2 px separator, then the scene cells on #363636
-            namespace lv = theme::live;
+            namespace lv = theme::livelook;
             g.setColour (lv::separator);
             g.fillRect (sceneColumn);
             g.setColour (lv::surface);
@@ -251,7 +315,7 @@ public:
             for (int r = firstRow(); r < scenes && rowY (r) < cells.getBottom(); ++r)
                 paintScene (g, *grid, r, { sceneColumn.getX(), rowY (r), sceneWidthNow(), rowHeight });
         }
-        g.setColour (c::border); // (the status row's top edge, across the tracks and the scene column)
+        g.setColour (live ? theme::livelook::separator : c::border); // (the status row's top edge, across the tracks and the scene column)
         g.fillRect (0, cells.getBottom(), getWidth(), 1);
         // a clip or a file dragged over a slot: where it would land
         if (dropTrack >= 0 && dropScene >= 0)
@@ -893,6 +957,11 @@ private:
 
     void paintHeader (juce::Graphics& g, const Song& song, const launcher::Runtime* state, int t, juce::Rectangle<int> r) const
     {
+        if (liveLook())
+        {
+            paintHeaderLive (g, song, state, t, r);
+            return;
+        }
         namespace c = theme::colour;
         const auto* info = t < (int) song.playlistTracks.size() ? &song.playlistTracks[(std::size_t) t] : nullptr;
         const auto taken = state != nullptr && state->tracks[(std::size_t) t].taken.load (std::memory_order_relaxed);
@@ -929,6 +998,11 @@ private:
 
     void paintSlot (juce::Graphics& g, const Song& song, const ClipGrid& grid, const launcher::Runtime* state, int t, int row, juce::Rectangle<int> r) const
     {
+        if (liveLook())
+        {
+            paintSlotLive (g, song, grid, state, t, row, r);
+            return;
+        }
         namespace c = theme::colour;
         const auto* clip = launcher::clipAt (grid, t, row);
         const auto cell = r.reduced (1).withTrimmedBottom (0);
@@ -966,7 +1040,7 @@ private:
             if (waiting)
             {
                 // a slot that waits for its recording to start: its launch button blinks in the record colour
-                const auto blinkOn = (juce::Time::getMillisecondCounter() / 150) % 2 == 0;
+                const auto blinkOn = (juce::Time::getMillisecondCounter() / classicBlinkPhaseMs) % 2 == 0;
                 theme::fillLaunchTriangle (g, zone.withSizeKeepingCentre (9.0f, 11.0f), blinkOn ? c::record : c::record.withAlpha (0.3f));
             }
             else if (engine.isGridTrackArmed (t))
@@ -997,7 +1071,7 @@ private:
                 g.fillRect (cell.withHeight (3).withY (cell.getBottom() - 3).toFloat().withWidth ((float) cell.getWidth() * progress));
             }
             // the launch triangle: lit while playing, blinking while it waits for its grid point
-            const auto blinkOn = (juce::Time::getMillisecondCounter() / 150) % 2 == 0;
+            const auto blinkOn = (juce::Time::getMillisecondCounter() / classicBlinkPhaseMs) % 2 == 0;
             const auto blink = pending && blinkOn;
             // (a clip asked to stop blinks until its grid point: with a long quantisation it would seem to ignore the press)
             const auto stopping = playing && state->tracks[(std::size_t) t].stopping.load (std::memory_order_relaxed);
@@ -1026,6 +1100,11 @@ private:
     // The status cell under a track's slots (round 190bv): its stop button and its arm button.
     void paintStatus (juce::Graphics& g, const Song& song, const launcher::Runtime* state, int t, juce::Rectangle<int> r) const
     {
+        if (liveLook())
+        {
+            paintStatusLive (g, song, state, t, r);
+            return;
+        }
         namespace c = theme::colour;
         g.setColour (c::bg3);
         g.fillRect (r);
@@ -1056,6 +1135,233 @@ private:
             g.drawRoundedRectangle (arm.reduced (0.5f), 2.0f, 1.0f);
         }
         g.setColour (armed ? c::bg0 : c::textSecondary);
+        g.fillEllipse (arm.withSizeKeepingCentre (7.0f, 7.0f));
+    }
+
+    // ---- Live's look of the Session grid (round 190ig; round 190ia CL-3..CL-15, measured in live-session.png,
+    // live-launch-states.png, live-clipview-audio.png and live190cw session190bv-02a). Clip-launch layout only.
+
+    // The colour a Live clip is filled with: its own colour, else its track's (Live 12.4 Settings › Theme "Clip Color =
+    // Track Color"), else LYNX's colour for its pattern / audio (a project made in LYNX has uncoloured tracks).
+    static juce::Colour liveClipFill (const Song& song, const ClipGrid& grid, const Clip& clip, int t)
+    {
+        const auto& slot = grid.slots[(std::size_t) clip.gridSlot];
+        if (slot.colour != 0)
+            return juce::Colour (slot.colour);
+        if (t < (int) song.playlistTracks.size() && song.playlistTracks[(std::size_t) t].colour != 0)
+            return juce::Colour (song.playlistTracks[(std::size_t) t].colour);
+        return clip.kind == ClipKind::audio ? theme::colour::audioClip : theme::tame (PlaylistComponent::patternColour (song, clip.pattern));
+    }
+    // Live's ink on a clip colour is that colour × 0.24 (7–10:1 on Live's pastels); on a dark LYNX colour that would not
+    // read, so a dark fill takes Live's light text instead
+    static juce::Colour liveInk (juce::Colour fill)
+    {
+        return fill.getPerceivedBrightness() > 0.55f ? theme::liveShade (fill, 0.24f) : theme::livelook::text.brighter (0.4f);
+    }
+    // Live's grid text: LYNX's UI font at 12 px, 12 % wider — Live's own face is wider at the same 7 px cap ("Drums" 30 px
+    // in Live, 26 px in LYNX's plain font; round 190ia's font note); Live's face itself is not copied
+    static juce::Font liveFont() { return theme::font (theme::type::small).withHorizontalScale (1.12f); }
+    // the launch zone of a slot whose left edge is x: Live's 16 px zone, the 1 px divider after it
+    static juce::Rectangle<float> liveTriangle (juce::Rectangle<int> cell)
+    {
+        return { (float) cell.getX() + 4.0f, (float) cell.getCentreY() - 4.5f, 7.5f, 9.0f };
+    }
+
+    void paintHeaderLive (juce::Graphics& g, const Song& song, const launcher::Runtime* state, int t, juce::Rectangle<int> r) const
+    {
+        namespace lv = theme::livelook;
+        const auto* info = t < (int) song.playlistTracks.size() ? &song.playlistTracks[(std::size_t) t] : nullptr;
+        const auto taken = state != nullptr && state->tracks[(std::size_t) t].taken.load (std::memory_order_relaxed);
+        // CL-4: the title box filled with the track colour, its name in colour × 0.24 at 4 px, a 2 px separator under it
+        const auto box = r.withTrimmedRight (2).withTrimmedBottom (2);
+        const auto fill = info != nullptr && info->colour != 0 ? juce::Colour (info->colour) : lv::raised;
+        const auto ink = info != nullptr && info->colour != 0 ? liveInk (fill) : lv::text;
+        g.setColour (fill);
+        g.fillRect (box);
+        g.setColour (ink);
+        g.setFont (liveFont());
+        const auto name = info != nullptr && ! info->name.empty() ? utf8 (info->name) : tr ("Track {0}", { juce::String (t + 1) });
+        const auto frozen = frozenChannelOf (song, t) >= 0;
+        if (frozen)
+            theme::drawFrozenTag (g, juce::Rectangle<float> ((float) box.getRight() - (taken ? 38.0f : 18.0f), (float) box.getCentreY() - 6.5f, 14.0f, 13.0f),
+                                  ink, fill);
+        g.setColour (ink);
+        g.drawText (name, box.withTrimmedLeft (4).withTrimmedRight ((taken ? 18 : 0) + (frozen ? 18 : 0)), juce::Justification::centredLeft, false);
+        if (taken)
+        {
+            const auto mark = box.withTrimmedLeft (box.getWidth() - 20).withSizeKeepingCentre (14, 11).toFloat();
+            g.drawRect (mark, 1.0f);
+            g.drawLine (mark.getX(), mark.getBottom(), mark.getRight(), mark.getY(), 1.4f);
+        }
+    }
+
+    // Live's pulse of a waiting launch or stop (CL-11, CL-12), in a colour
+    static juce::Colour livePulsed (juce::Colour c) { return theme::liveShade (c, livePulse()); }
+
+    void paintSlotLive (juce::Graphics& g, const Song& song, const ClipGrid& grid, const launcher::Runtime* state, int t, int row, juce::Rectangle<int> r) const
+    {
+        namespace c = theme::colour;
+        namespace lv = theme::livelook;
+        const auto* clip = launcher::clipAt (grid, t, row);
+        const auto cell = r.withTrimmedRight (2).withTrimmedBottom (1);
+        const auto zone = cell.withWidth (16);
+        const auto* view = state != nullptr ? &state->tracks[(std::size_t) t] : nullptr;
+        const auto playing = view != nullptr && view->playing.load (std::memory_order_relaxed) == row;
+        const auto pending = view != nullptr && view->pending.load (std::memory_order_relaxed) == row;
+        const auto recording = view != nullptr && view->recording.load (std::memory_order_relaxed) == row;
+        const auto waiting = view != nullptr && view->recordPending.load (std::memory_order_relaxed) == row;
+        const auto stopping = playing && view->stopping.load (std::memory_order_relaxed);
+        const auto selected = t == selectedTrack && row == selectedScene && ! sceneSelected;
+        const auto focused = hasKeyboardFocus (true);
+        const auto selection = focused ? lv::selectionFocused : lv::selectionUnfocused;
+        const auto triangle = liveTriangle (cell);
+
+        if (clip == nullptr && ! recording)
+        {
+            // an empty slot: #363636, #464646 in the selected track's column and the selected scene's row (CL-8), the
+            // selection's own colour when selected (CL-7); its stop square, or an armed track's record circle (CL-9)
+            g.setColour (selected ? selection : t == selectedTrack || row == selectedScene ? lv::raised : lv::surface);
+            g.fillRect (cell);
+            const auto mark = juce::Rectangle<float> ((float) cell.getX() + 4.0f, (float) cell.getCentreY() - 4.5f, 9.0f, 9.0f);
+            if (waiting) // (a slot waiting for its recording: the circle pulses in the record red — Live not captured)
+            {
+                g.setColour (livePulsed (lv::arm));
+                g.fillEllipse (mark);
+            }
+            else if (engine.isGridTrackArmed (t))
+            {
+                g.setColour (lv::well);
+                g.fillEllipse (mark);
+            }
+            else
+            {
+                // a stop asked for on an empty slot of a playing track blinks its square in the queued greens (CL-11)
+                g.setColour (pending ? livePulsed (lv::playing) : lv::well);
+                g.fillRect (mark);
+            }
+            return;
+        }
+
+        // a clip (or the clip a recording makes): the clip colour, Live's dark ink, the divider after the launch zone
+        const auto trackColour = t < (int) song.playlistTracks.size() ? song.playlistTracks[(std::size_t) t].colour : 0u;
+        const auto fill = clip != nullptr ? liveClipFill (song, grid, *clip, t)
+                          : trackColour != 0 ? juce::Colour (trackColour)
+                                             : theme::tame (PlaylistComponent::patternColour (song, (int) song.patterns.size()));
+        const auto ink = liveInk (fill);
+        g.setColour (fill);
+        g.fillRect (cell);
+        // two clips one above the other: Live's dark tinted 1 px between them (instead of the #242424 separator)
+        if (row + 1 < rowCount() && launcher::clipAt (grid, t, row + 1) != nullptr)
+        {
+            g.setColour (theme::liveShade (fill, 0.06f));
+            g.fillRect (cell.getX(), cell.getBottom(), cell.getWidth(), 1);
+        }
+        g.setColour (theme::liveShade (fill, 0.6f));
+        g.fillRect (cell.getX() + 16, cell.getY(), 1, cell.getHeight());
+        // the launch zone: a #181818 box while the clip plays, waits for its start or its stop, or records (CL-10..13)
+        const auto active = playing || pending || recording;
+        if (active)
+        {
+            g.setColour (lv::stateBox);
+            g.fillRect (zone);
+        }
+        else if (selected)
+        {
+            g.setColour (focused ? lv::selectionFocusedFill : selection);
+            g.fillRect (zone);
+        }
+        if (selected)
+        {
+            g.setColour (selection);
+            g.drawRect (zone.withWidth (17), 1);
+        }
+        // (a stop asked for: Live keeps the triangle green and pulses the track's stop square, paintStatusLive)
+        juce::ignoreUnused (stopping);
+        const auto triangleColour = recording ? lv::arm
+                                  : playing ? lv::playing
+                                  : pending ? livePulsed (lv::playing)
+                                  : selected ? lv::well
+                                  : theme::liveShade (fill, 0.4f);
+        theme::fillLaunchTriangle (g, triangle, triangleColour);
+        g.setColour (ink);
+        g.setFont (liveFont());
+        const auto name = clip != nullptr ? clipName (song, grid, *clip)
+                          : engine.gridTrackInput (t) == AudioEngine::GridInput::midi ? utf8 (engine.slotRecordingName (t)) : juce::String();
+        g.drawText (name, cell.withTrimmedLeft (20).withTrimmedRight (2), juce::Justification::centredLeft, false);
+    }
+
+    // The track status cell (CL-15): a 17 px #363636 cell under a 2 px separator with the 9 x 9 stop square; while a clip
+    // plays "loops ◔ length": the loop count, an 11 px pie in the track colour filling with the clip's position, the loop
+    // length in beats ("+" when it is not whole; filmed in Live 12.4: the 32-beat Drums loop shows "1 ◔ 32", then "5 ◔ 32"); while recording the length counter on the track colour (CL-13)
+    void paintStatusLive (juce::Graphics& g, const Song& song, const launcher::Runtime* state, int t, juce::Rectangle<int> r) const
+    {
+        namespace c = theme::colour;
+        namespace lv = theme::livelook;
+        const auto cell = r.withTrimmedTop (2).withTrimmedRight (2);
+        g.setColour (t == selectedTrack ? lv::raised : lv::surface);
+        g.fillRect (cell);
+        const auto* view = state != nullptr ? &state->tracks[(std::size_t) t] : nullptr;
+        // (a stop waiting for its grid point: the square pulses black ↔ the playing green, as in Live — film3)
+        g.setColour (view != nullptr && view->stopping.load (std::memory_order_relaxed) ? livePulsed (lv::playing) : lv::well);
+        g.fillRect (juce::Rectangle<float> ((float) cell.getX() + 4.0f, (float) cell.getCentreY() - 4.5f, 9.0f, 9.0f));
+        const auto armShown = ! mixer->armsShown();
+        const auto arm = juce::Rectangle<int> (cell.getRight() - armWidth - 2, cell.getY(), armWidth, cell.getHeight()).withSizeKeepingCentre (armWidth, 13).toFloat();
+        const auto right = armShown ? (int) arm.getX() - 2 : cell.getRight() - 1;
+        const auto trackColour = t < (int) song.playlistTracks.size() && song.playlistTracks[(std::size_t) t].colour != 0
+                                     ? juce::Colour (song.playlistTracks[(std::size_t) t].colour) : lv::playing;
+        if (view != nullptr && view->recording.load (std::memory_order_relaxed) >= 0)
+        {
+            const auto elapsed = std::max (0.0, state->clockNow.load (std::memory_order_relaxed) - view->recordFrom.load (std::memory_order_relaxed));
+            const auto box = juce::Rectangle<float> ((float) cell.getX() + 16.0f, (float) cell.getCentreY() - 6.5f, (float) (right - cell.getX() - 16), 13.0f);
+            g.setColour (juce::Colour (0xff111111));
+            g.fillRect (box);
+            g.setColour (trackColour);
+            g.fillRect (box.reduced (1.0f));
+            g.setColour (liveInk (trackColour));
+            g.setFont (liveFont());
+            g.drawText (juce::String (session::lengthCounter (elapsed, song.meter())), box, juce::Justification::centred, false);
+        }
+        else if (const auto playing = view != nullptr ? view->playing.load (std::memory_order_relaxed) : -1; playing >= 0)
+        {
+            const auto* grid = gridOf();
+            const auto* clip = grid != nullptr ? launcher::clipAt (*grid, t, playing) : nullptr;
+            const auto progress = juce::jlimit (0.0f, 1.0f, view->progress.load (std::memory_order_relaxed));
+            const auto colour = clip != nullptr ? liveClipFill (song, *grid, *clip, t) : trackColour;
+            const auto area = juce::Rectangle<int> (cell.getX() + 14, cell.getY(), right - cell.getX() - 14, cell.getHeight());
+            const auto full = area.getWidth() >= 52;
+            const auto pie = juce::Rectangle<float> (full ? (float) area.getX() + 21.0f : (float) area.getCentreX() - 6.0f, (float) cell.getCentreY() - 6.0f, 12.0f, 12.0f);
+            g.setColour (juce::Colour (0xff262626));
+            g.fillEllipse (pie);
+            g.setColour (theme::liveShade (colour, 0.74f));
+            g.fillEllipse (pie.reduced (1.0f));
+            if (progress > 0.0f)
+            {
+                juce::Path wedge;
+                wedge.addPieSegment (pie.reduced (1.0f), 0.0f, juce::MathConstants<float>::twoPi * progress, 0.0f);
+                g.setColour (theme::liveShade (colour, 0.86f));
+                g.fillPath (wedge);
+            }
+            if (full && clip != nullptr)
+            {
+                const auto length = (double) std::max<std::int64_t> (1, clip->length);
+                const auto loops = (int) std::floor (std::max (0.0, state->clockNow.load (std::memory_order_relaxed) - view->anchor.load (std::memory_order_relaxed)) / length) + 1;
+                const auto beats = length / (double) lynx::ppq; // (Live: "1 ◔ 32" for the 32-beat Drums loop of the Patience set)
+                const auto whole = (int) std::floor (beats + 1.0e-9);
+                g.setColour (lv::text);
+                g.setFont (liveFont());
+                g.drawText (juce::String (loops), juce::Rectangle<float> ((float) area.getX(), (float) cell.getY(), pie.getX() - 4.0f - (float) area.getX(), (float) cell.getHeight()),
+                            juce::Justification::centredRight, false);
+                g.drawText (juce::String (whole) + (beats - whole > 1.0e-6 ? "+" : ""),
+                            juce::Rectangle<float> (pie.getRight() + 5.0f, (float) cell.getY(), (float) right - pie.getRight() - 5.0f, (float) cell.getHeight()),
+                            juce::Justification::centredLeft, false);
+            }
+        }
+        if (! armShown)
+            return;
+        const auto armed = engine.isGridTrackArmed (t);
+        g.setColour (armed ? lv::arm : lv::well);
+        g.fillRect (arm);
+        g.setColour (armed ? lv::ink : lv::text);
         g.fillEllipse (arm.withSizeKeepingCentre (7.0f, 7.0f));
     }
 
@@ -1116,7 +1422,7 @@ private:
     void paintSceneLive (juce::Graphics& g, const ClipGridScene& scene, int row, juce::Rectangle<int> r) const
     {
         namespace c = theme::colour;
-        namespace lv = theme::live;
+        namespace lv = theme::livelook;
         const auto cell = r.withTrimmedLeft (2).withTrimmedBottom (1);
         const auto selected = sceneSelected && row == selectedScene;
         const auto fill = selected ? lv::selectionFocused : scene.colour != 0 ? juce::Colour (scene.colour) : lv::surface;
@@ -1946,14 +2252,24 @@ private:
             {
                 rowDirty (now.pending);
                 rowDirty (now.recordPending);
-                if (now.stopping)
+                if (now.stopping && liveLook()) // (Live: a waiting stop pulses the track's stop square, not the triangle)
+                    repaint (juce::Rectangle<int> (x, cells.getBottom(), columnWidth, statusHeight + 1).getIntersection (visible));
+                else if (now.stopping)
                     rowDirty (now.playing);
             }
             if (now.recording >= 0 && was.recordTick != now.recordTick) // (the take's name; the length counter)
                 rowDirty (now.recording);
             if (was.recording != now.recording || (now.recording >= 0 && was.recordTick != now.recordTick))
                 repaint (juce::Rectangle<int> (x, cells.getBottom(), columnWidth, statusHeight + 1).getIntersection (visible));
-            if (now.playing >= 0 && now.playing == was.playing && now.progress != was.progress)
+            if (liveLook())
+            {
+                // Live (CL-15): the position is the status cell's pie, redrawn when it moves by a degree; the loop count
+                // and the length go with a clip starting or stopping
+                const auto degree = [] (const ColumnView& v) { return v.playing >= 0 ? (int) (juce::jlimit (0.0f, 1.0f, v.progress) * 360.0f) : -1; };
+                if (was.playing != now.playing || degree (was) != degree (now))
+                    repaint (juce::Rectangle<int> (x, cells.getBottom(), columnWidth, statusHeight + 1).getIntersection (visible));
+            }
+            else if (now.playing >= 0 && now.playing == was.playing && now.progress != was.progress)
             {
                 // the bar under the playing cell (paintSlot: 3 px high, cell width × progress, antialiased at its end)
                 const auto cell = juce::Rectangle<int> (x, rowY (now.playing), columnWidth, rowHeight).reduced (1);
@@ -1994,7 +2310,7 @@ private:
             if (c.playing >= 0)
                 c.progress = v.progress.load (std::memory_order_relaxed);
             if (c.pending >= 0 || c.recordPending >= 0 || c.stopping)
-                c.blink = juce::Time::getMillisecondCounter() / 150;
+                c.blink = blinkPhaseNow();
             if (c.recording >= 0)
                 c.recordTick = mixBits (mixBits (mixBits (1469598103934665603ull, bitsOf (v.recordFrom.load (std::memory_order_relaxed))),
                                                  bitsOf (state->clockNow.load (std::memory_order_relaxed))),
@@ -2049,7 +2365,7 @@ private:
             if (playing >= 0)
                 h = mixBits (h, bitsOf (v.progress.load (std::memory_order_relaxed)));
             if (pending >= 0 || recordPending >= 0 || stopping)
-                h = mixBits (h, juce::Time::getMillisecondCounter() / 150);
+                h = mixBits (h, blinkPhaseNow());
             if (recording >= 0) // (the length counter; a MIDI take's name)
             {
                 h = mixBits (h, bitsOf (v.recordFrom.load (std::memory_order_relaxed)));
@@ -2061,6 +2377,17 @@ private:
     }
     std::uint64_t lastDrawnState = 0;
     std::vector<std::uint64_t> columnStates; // [column] its last columnState, 0 = not known yet
+    // (Live's selection is light blue while the grid has the keys, grey-blue otherwise: round 190ig, CL-7)
+    void focusGained (FocusChangeType) override
+    {
+        if (liveLook())
+            repaint();
+    }
+    void focusLost (FocusChangeType) override
+    {
+        if (liveLook())
+            repaint();
+    }
     void componentMovedOrResized (bool, bool) override {}
     void componentPeerChanged() override { updateTimer(); }
     void componentVisibilityChanged() override { updateTimer(); }
@@ -2131,6 +2458,8 @@ void setClipGridDeviceDropForSnapshot (juce::Component& grid, int track)
 }
 // --- round 190ef ---------------------------------------------------------------------------------------------------------
 bool& clipGridClassicLook() { return classicLook; }
+
+void setClipGridBlinkPhaseForSnapshot (int phase) { blinkPhaseForSnapshot = phase; }
 
 bool& clipGridSceneTempoShown()
 {

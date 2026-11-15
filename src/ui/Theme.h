@@ -186,7 +186,7 @@ inline juce::Colour tame (juce::Colour c)
 // --- the Live look of the Clip-launch layout (round 190ig; tokens measured by round 190ia in Ableton Live 12.4's Dark
 // theme at 100 %, /mnt/e/lynx-work/design190ia/findings/cliplaunch.md §0). Used only while the Clip-launch layout shows,
 // so the Pattern layout never changes. Fixed values (the reference look), not user-theme tokens.
-namespace live
+namespace livelook
 {
 inline const juce::Colour window { 0xff2a2a2a };     // control bar, around the views
 inline const juce::Colour surface { 0xff363636 };    // slots, strips, scene cells
@@ -204,7 +204,7 @@ inline const juce::Colour queuedOn { 0xff008a5c };   // a queued launch's blink,
 inline const juce::Colour queuedOff { 0xff002217 };  // and its dark phase
 inline const juce::Colour stateBox { 0xff181818 };   // the launch zone of a playing / queued / recording clip
 inline const juce::Colour arm { 0xffff5559 };
-} // namespace live
+} // namespace livelook
 
 // Live derives every shade of a clip from its colour by multiplying the RGB channels (round 190ia: name ×0.24, idle
 // launch triangle ×0.40, launch-zone divider ×0.66, waveform ×0.15, grid in a clip ×0.88).
