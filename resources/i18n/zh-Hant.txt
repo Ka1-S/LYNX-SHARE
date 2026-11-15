@@ -10121,3 +10121,12 @@ countries: tw hk mo
 "Link Playlist tracks to mixer tracks (Track N with insert N; mute, solo, volume and pan on linked track headers)" = "將播放清單音軌連結到混音器軌道（音軌 N 對應插入軌 N；已連結音軌的軌頭顯示靜音、獨奏、音量和聲像）"
 "New projects start with every Playlist track that holds clips linked to a mixer track (Track N to insert N when that leaves the sound unchanged); linked track headers show mute, solo, volume and pan. Also on the Settings › Project page, with the switch for the open project." = "新專案開始時，每條含有片段的播放清單音軌都連結到一條混音器軌道（在不改變聲音時，音軌 N 對應插入軌 N）；已連結音軌的軌頭顯示靜音、獨奏、音量和聲像。也在 設定 › 專案 頁面中，並附有目前開啟專案的開關。"
 "Linked track: [LMB] mute / unmute its mixer track  [Ctrl][LMB] or [RMB] solo the Playlist track" = "已連結音軌：[LMB] 將其混音器軌道靜音 / 取消靜音  [Ctrl][LMB] 或 [RMB] 獨奏該播放清單音軌"
+
+# --- Slicex display modes, articulator editor buttons (round 190hg)
+"View keyboard" = "顯示鍵盤"
+"Display mode" = "顯示模式"
+"No audio editor" = "無音訊編輯器"
+"No region settings" = "無區域設定"
+"Freeze editing / hide points" = "凍結編輯 / 隱藏點"
+"Slide succeeding points / regions" = "滑動後續點 / 區域"
+"Flags" = "旗標"

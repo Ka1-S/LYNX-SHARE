@@ -10121,3 +10121,12 @@ countries: de at ch li lu
 "Link Playlist tracks to mixer tracks (Track N with insert N; mute, solo, volume and pan on linked track headers)" = "Playlist-Spuren mit Mixer-Spuren verknüpfen (Spur N mit Insert N; Stumm, Solo, Lautstärke und Panorama in den Köpfen verknüpfter Spuren)"
 "New projects start with every Playlist track that holds clips linked to a mixer track (Track N to insert N when that leaves the sound unchanged); linked track headers show mute, solo, volume and pan. Also on the Settings › Project page, with the switch for the open project." = "Neue Projekte beginnen mit jeder Playlist-Spur, die Clips enthält, verknüpft mit einer Mixer-Spur (Spur N mit Insert N, wenn das den Klang nicht ändert); die Köpfe verknüpfter Spuren zeigen Stumm, Solo, Lautstärke und Panorama. Auch auf der Seite Einstellungen › Projekt, mit dem Schalter für das offene Projekt."
 "Linked track: [LMB] mute / unmute its mixer track  [Ctrl][LMB] or [RMB] solo the Playlist track" = "Verknüpfte Spur: [LMB] ihre Mixer-Spur stumm / laut schalten  [Ctrl][LMB] oder [RMB] Solo der Playlist-Spur"
+
+# --- Slicex display modes, articulator editor buttons (round 190hg)
+"View keyboard" = "Tastatur anzeigen"
+"Display mode" = "Anzeigemodus"
+"No audio editor" = "Ohne Audio-Editor"
+"No region settings" = "Ohne Regionseinstellungen"
+"Freeze editing / hide points" = "Bearbeitung einfrieren / Punkte ausblenden"
+"Slide succeeding points / regions" = "Nachfolgende Punkte / Regionen mitschieben"
+"Flags" = "Flags"

@@ -11394,6 +11394,7 @@ private:
                     }
                     if (command.startsWith ("shot "))
                     {
+                        frame.setSize (panel->getWidth(), panel->getHeight()); // (round 190hg: the display modes resize the editor)
                         juce::Image image (juce::Image::ARGB, frame.getWidth(), frame.getHeight(), true);
                         {
                             juce::Graphics g (image);

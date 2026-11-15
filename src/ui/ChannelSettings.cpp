@@ -6147,11 +6147,39 @@ public:
         on.setBounds (right.removeFromRight (52).withSizeKeepingCentre (52, 24));
         // each page keeps its own size (some scale their drawing with it), centred under the header
         const auto body = getLocalBounds().withTrimmedTop (headerHeight);
+        const juce::ScopedValueSetter<bool> placing (laying, true);
         for (std::size_t i = 0; i < pages.size(); ++i)
         {
             const auto w = juce::jmin (body.getWidth(), sizes[i].x), h = juce::jmin (body.getHeight(), sizes[i].y);
             pages[i]->setBounds (body.getX() + (body.getWidth() - w) / 2, body.getY(), w, h);
         }
+    }
+
+    // A page that sizes itself (Slicex's display modes and keyboard button, round 190hg): the frame takes the new
+    // size and its window follows, as FL's plugin window does. Sizes set by resized() itself are not news.
+    void childBoundsChanged (juce::Component* child) override
+    {
+        if (laying)
+            return;
+        for (std::size_t i = 0; i < pages.size(); ++i)
+            if (pages[i].get() == child)
+            {
+                const juce::Point<int> now { juce::jmax (1, child->getWidth()), juce::jmax (1, child->getHeight()) };
+                if (now == sizes[i])
+                    return;
+                sizes[i] = now;
+                int width = node ? 1 : MiscPanel::preferredWidth, height = node ? 1 : MiscPanel::preferredHeight;
+                for (const auto& size : sizes)
+                {
+                    width = juce::jmax (width, size.x);
+                    height = juce::jmax (height, size.y);
+                }
+                if (width != getWidth() || headerHeight + height != getHeight())
+                    setSize (width, headerHeight + height);
+                else
+                    resized();
+                return;
+            }
     }
 
 private:
@@ -6172,6 +6200,7 @@ private:
     std::vector<std::unique_ptr<juce::TextButton>> tabs;
     std::vector<std::unique_ptr<juce::Component>> pages;
     std::vector<juce::Point<int>> sizes;
+    bool laying = false; // (resized() is placing the pages)
     std::vector<std::unique_ptr<FrameKnob>> header;
     juce::ToggleButton on;
     std::unique_ptr<ChannelPresetBar> presetBar;

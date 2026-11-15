@@ -10121,3 +10121,12 @@ countries: id
 "Link Playlist tracks to mixer tracks (Track N with insert N; mute, solo, volume and pan on linked track headers)" = "Tautkan trek Playlist ke trek mixer (Trek N dengan insert N; mute, solo, volume dan pan di header trek yang tertaut)"
 "New projects start with every Playlist track that holds clips linked to a mixer track (Track N to insert N when that leaves the sound unchanged); linked track headers show mute, solo, volume and pan. Also on the Settings › Project page, with the switch for the open project." = "Proyek baru dimulai dengan setiap trek Playlist yang berisi klip tertaut ke trek mixer (Trek N ke insert N bila itu tidak mengubah suara); header trek yang tertaut menampilkan mute, solo, volume dan pan. Juga di halaman Pengaturan › Proyek, bersama sakelar untuk proyek yang terbuka."
 "Linked track: [LMB] mute / unmute its mixer track  [Ctrl][LMB] or [RMB] solo the Playlist track" = "Trek tertaut: [LMB] bisukan / bunyikan trek mixer-nya  [Ctrl][LMB] atau [RMB] solo trek Playlist"
+
+# --- Slicex display modes, articulator editor buttons (round 190hg)
+"View keyboard" = "Tampilkan keyboard"
+"Display mode" = "Mode tampilan"
+"No audio editor" = "Tanpa editor audio"
+"No region settings" = "Tanpa pengaturan region"
+"Freeze editing / hide points" = "Bekukan pengeditan / sembunyikan titik"
+"Slide succeeding points / regions" = "Geser titik / region berikutnya"
+"Flags" = "Flag"
