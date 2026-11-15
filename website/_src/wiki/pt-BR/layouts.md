@@ -1,11 +1,11 @@
 ---
-source: e15b0e3ba5
+source: 4ac6a04fd7
 ---
 ![O fluxo por disparo de clipes: uma grade de clipes e cenas à esquerda, o Picker e a Playlist à direita](/assets/img/cliplaunch.webp)
 
 `Exibir › Estilo de layout` tem três entradas: `Fluxo por padrões (padrão)`, `Fluxo por disparo de clipes` e `Fluxo simples`. A mesma escolha está em `Opções › Configurações gerais`, em Fluxo de trabalho. A escolha é mantida quando você fecha o programa.
 
-O fluxo por padrões é o Channel Rack, os patterns e a Playlist. O fluxo por disparo de clipes acrescenta uma grade de clipes com cenas ao lado da Playlist. Os patterns e o Channel Rack continuam disponíveis.
+O fluxo por padrões, o que abre de início, funciona como o FL Studio: o Channel Rack, os patterns, o Piano Roll, a Playlist e o Mixer. O fluxo por disparo de clipes, no estilo do Ableton Live, acrescenta uma grade de clipes com cenas ao lado da Playlist, um mixer da sessão e as visões de clipe e de dispositivo; os patterns e o Channel Rack continuam disponíveis. O fluxo simples mistura o estilo acessível de janela única do BandLab com o jeito de trabalhar do FL Studio Mobile: faixas e linha do tempo, loops, pads e gravação rápida. Trocar de fluxo só muda as janelas: o projeto continua o mesmo.
 
 ## Disparar clipes na grade
 
@@ -62,7 +62,7 @@ Quando você abre um set do Live, os clipes e cenas de Session dele vão para a 
 
 ## O fluxo Simples
 
-`Exibir › Estilo de layout › Fluxo simples` é uma janela só com as faixas e a linha do tempo, para uma primeira música. `Exibir › Painel da faixa` mostra um painel sob a linha do tempo para a faixa selecionada, com as abas `Efeitos`, `Instrumento`, `Teclado` e `Editor`. Neste fluxo, o menu `Ajuda` tem `Tour da primeira música` e `Tela de boas-vindas...`, que oferece uma primeira música em sete passos, uma música de demonstração ou um projeto vazio. Veja [Layout simples](/wiki/simple-layout/).
+`Exibir › Estilo de layout › Fluxo simples` é uma janela só com as faixas e a linha do tempo, no estilo do BandLab e do FL Studio Mobile, e serve bem para uma primeira música. `Exibir › Painel da faixa` mostra um painel sob a linha do tempo para a faixa selecionada, com as abas `Efeitos`, `Instrumento`, `Teclado` e `Editor`. Neste fluxo, o menu `Ajuda` tem `Tour da primeira música` e `Tela de boas-vindas...`, que oferece uma primeira música em sete passos, uma música de demonstração ou um projeto vazio. Veja [Layout simples](/wiki/simple-layout/).
 
 `Letra e anotações` e `Igualar à referência...` no menu `Exibir`, e `Voz limpa` no menu de um insert do Mixer, existem em todos os layouts. No fluxo Simples, `Voz limpa` também está no menu de uma faixa.
 

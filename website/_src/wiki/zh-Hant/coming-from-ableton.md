@@ -3,7 +3,7 @@ source: d5cc625221
 ---
 ![片段啟動版面：播放清單旁邊有帶場景的片段格線](/assets/img/cliplaunch.webp)
 
-LYNX SHARE 預設採用樣式工作流程：通道機架、樣式和播放清單。片段啟動工作流程是選用的，會在播放清單旁加上帶場景的片段格線。LYNX SHARE 可讀寫 `.als` 套裝，但與 Ableton 沒有任何隸屬關係。
+LYNX SHARE 預設採用模式工作流程：通道機架、樣式和播放清單。片段啟動工作流程是選用的，會在播放清單旁加上帶場景的片段格線。LYNX SHARE 可讀寫 `.als` 套裝，但與 Ableton 沒有任何隸屬關係。
 
 ## 開啟 Live 套裝
 

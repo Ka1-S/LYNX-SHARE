@@ -1,7 +1,7 @@
 ---
-source: a6d9063ec3
+source: 0101adbb66
 ---
-LYNX SHARE는 Windows, macOS, Linux에서 쓸 수 있는 무료 오픈 소스 DAW입니다. 패턴을 중심으로 작업합니다. 채널 랙과 피아노 롤에서 패턴을 만들고, 플레이리스트에서 배치하고, 믹서에서 믹스합니다. FL Studio 프로젝트(`.flp`)와 Ableton Live 세트(`.als`)를 열 수 있고, 자체 형식인 `.lynx`로 저장합니다.
+LYNX SHARE는 Windows, macOS, Linux에서 쓸 수 있는 무료 오픈 소스 DAW로, 한 프로그램에 세 가지 워크플로가 있습니다. 기본은 FL Studio 워크플로입니다. 채널 랙과 피아노 롤에서 패턴을 만들고, 플레이리스트에서 배치하고, 믹서에서 믹스합니다. 클립 실행 워크플로는 Ableton Live 스타일로 그리드에서 클립과 씬을 실행하고, 간단한 워크플로는 BandLab의 쉬운 단일 창 스타일과 FL Studio Mobile의 작업 방식을 섞었습니다. `보기 › 레이아웃 스타일`에서 언제든지 전환할 수 있습니다. FL Studio 프로젝트(`.flp`), Ableton Live 세트(`.als`), FL Studio Mobile 프로젝트(`.flm`)를 열 수 있고, 자체 형식인 `.lynx`로 저장합니다.
 
 알파 버전입니다. 버그가 있을 수 있으니 자주 저장하세요.
 
@@ -9,7 +9,7 @@ LYNX SHARE는 Windows, macOS, Linux에서 쓸 수 있는 무료 오픈 소스 DA
 
 1. 아래 표에서 사용 중인 시스템이 지원되는지 확인합니다.
 2. 다운로드해서 설치합니다. 시스템별 단계는 [설치](/wiki/install/)에 있습니다.
-3. 실행합니다. 짧은 설정 마법사가 언어를 고르고, 오디오 출력을 테스트하고, 플러그인 폴더를 나열하며, 그 폴더는 백그라운드에서 스캔됩니다. 건너뛰어도 되고, 나중에 `옵션 › 설정 마법사(언어, 오디오, 플러그인 폴더)...` 메뉴에서 다시 열 수 있습니다.
+3. 실행합니다. 짧은 설정 마법사가 언어를 고르고, 오디오 출력을 테스트하고, 세 가지 워크플로 중 하나를 고르게 하고, 플러그인 폴더를 나열하며, 그 폴더는 백그라운드에서 스캔됩니다. 건너뛰어도 되고, 나중에 `옵션 › 설정 마법사(언어, 오디오, 플러그인 폴더)...` 메뉴에서 다시 열 수 있습니다.
 4. 소리가 나지 않으면 [오디오 설정](/wiki/audio-setup/)으로 갑니다.
 5. [창 둘러보기](/wiki/tour/)를 읽고 [첫 곡 만들기](/wiki/first-song/)를 해 보세요.
 
@@ -45,6 +45,7 @@ LYNX.exe --showcase out.lynx
 
 | 하고 싶은 일 | 읽을 문서 |
 |---|---|
+| 워크플로 고르기 | [레이아웃](/wiki/layouts/), [간단한 레이아웃](/wiki/simple-layout/) |
 | 각 창 익히기 | [채널 랙](/wiki/channel-rack/), [피아노 롤](/wiki/piano-roll/), [플레이리스트](/wiki/playlist/), [믹서](/wiki/mixer/), [브라우저](/wiki/browser/) |
 | 다른 프로그램의 프로젝트 열기 | [FL Studio에서 넘어오기](/wiki/coming-from-fl-studio/), [Ableton Live에서 넘어오기](/wiki/coming-from-ableton/) |
 | VST, CLAP, LV2, AU 플러그인 쓰기 | [플러그인](/wiki/plugins/) |

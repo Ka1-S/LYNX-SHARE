@@ -1,9 +1,9 @@
 ---
 title: Simple layout
-summary: One window with the tracks and the timeline, for a first song.
+summary: One window with tracks, loops, pads and quick recording, in the style of BandLab and FL Studio Mobile.
 status: short
 ---
-`View › Layout style › Simple workflow` shows one window with the tracks and the timeline. It is meant for a first song. The setup wizard offers it at the first start, next to the Pattern workflow (the default) and the Clip-launch workflow.
+`View › Layout style › Simple workflow` shows one window with the tracks and the timeline. It mixes BandLab's approachable one-window style with FL Studio Mobile's way of working (tracks, loops, pads and quick recording), and it suits a first song. FL Studio Mobile projects (`.flm`) open in it, as in the other workflows. The setup wizard offers it at the first start, next to the Pattern workflow (the default) and the Clip-launch workflow.
 
 ## What is in it
 

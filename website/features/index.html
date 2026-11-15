@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Features · LYNX SHARE</title>
-<meta name="description" content="What LYNX SHARE does in the current release: the windows, the Clip-launch and Simple layouts, .flp, .als and .flm projects, built-in instruments and effects, and the plugin formats it hosts.">
+<meta name="description" content="What LYNX SHARE does in the current release: the windows, its three workflows (FL Studio, Clip-launch and Simple), .flp, .als and .flm projects, built-in instruments and effects, and the plugin formats it hosts.">
 <meta property="og:title" content="Features · LYNX SHARE">
-<meta property="og:description" content="What LYNX SHARE does in the current release: the windows, the Clip-launch and Simple layouts, .flp, .als and .flm projects, built-in instruments and effects, and the plugin formats it hosts.">
+<meta property="og:description" content="What LYNX SHARE does in the current release: the windows, its three workflows (FL Studio, Clip-launch and Simple), .flp, .als and .flm projects, built-in instruments and effects, and the plugin formats it hosts.">
 <meta property="og:site_name" content="LYNX SHARE">
 <meta property="og:image" content="https://lynx-share.com/assets/img/hero.webp?v=0.1.28">
 <meta property="og:url" content="https://lynx-share.com/features/">
@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="8b3ec7c6";
+window.LYNX_LANG=lang;window.LYNX_V="4f8f5e26";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=8b3ec7c6">
+<link rel="stylesheet" href="/assets/site.css?v=4f8f5e26">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -97,7 +97,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <section class="sec" id="screens">
   <div class="wrap">
     <h2 data-i18n="fe.winT">The windows</h2>
-    <p class="lead" data-i18n="fe.winL">The layout follows FL Studio: Browser, Channel rack, Piano roll, Playlist and Mixer, each opened and closed with the same keys as there.</p>
+    <p class="lead" data-i18n="fe.winL">The default workflow follows FL Studio: Browser, Channel rack, Piano roll, Playlist and Mixer, each opened and closed with the same keys as there. The other two workflows, Clip-launch and Simple, are <a class="tlink" href="#clips">further down</a>.</p>
 
     <div class="frow">
       <figure><a class="shot" href="/assets/img/playlist.webp?v=0.1.28"><img src="/assets/img/playlist.webp?v=0.1.28" srcset="/assets/img/playlist.webp?v=0.1.28 1x, /assets/img/playlist@2x.webp?v=0.1.28 2x" alt="Playlist" width="1600" height="900"></a></figure>
@@ -143,14 +143,14 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 
 <section class="sec" id="clips">
   <div class="wrap">
-    <h2 data-i18n="fe.clT">Clip-launch and Simple layouts</h2>
+    <h2 data-i18n="fe.clT">Clip-launch and Simple workflows</h2>
     <div class="frow">
       <figure><a class="shot" href="/assets/img/cliplaunch.webp?v=0.1.28"><img src="/assets/img/cliplaunch.webp?v=0.1.28" srcset="/assets/img/cliplaunch.webp?v=0.1.28 1x, /assets/img/cliplaunch@2x.webp?v=0.1.28 2x" alt="Clip-launch workflow" loading="lazy" width="1920" height="1080"></a></figure>
       <div>
-        <p data-i18n="fe.clP">An optional layout (View › Layout style) puts a grid of clips and scenes next to the Playlist, in the manner of Ableton Live's Session view. Clips have launch modes, quantisation, legato, loop and follow actions.</p>
-        <p data-i18n="fe.clP2">Live sets bring their Session clips into this grid, and exporting an .als writes the grid back. The pattern layout stays the default and nothing changes in it.</p>
+        <p data-i18n="fe.clP">The Clip-launch workflow (View › Layout style) works in the style of Ableton Live: a grid of clips and scenes next to the Playlist, like Live's Session view. Clips have launch modes, quantisation, legato, loop and follow actions.</p>
+        <p data-i18n="fe.clP2">Live sets bring their Session clips into this grid, and exporting an .als writes the grid back. The FL Studio workflow stays the default and nothing changes in it.</p>
         <p data-i18n="fe.clP3">A selected clip opens in a Clip View with Clip, Launch and Notes panels and Live 12's MIDI tools. The selected track's effects show as a chain of cards, and racks with chains, zones and macros open from Live sets and are written back. A Session mixer sits under the grid, a Drum Rack plays pads with choke groups and return chains, and MIDI and Key Map Modes link controllers and computer keys to clips, scenes and knobs. Freeze Track and Bounce turn a track into audio, and Ableton Link keeps the tempo in sync with Live and other Link apps.</p>
-        <p data-i18n="fe.simP">The same menu has a third layout, the Simple workflow, for a first song: one window with the tracks and the timeline, a New track chooser, starter beats, a 16-pad Sampler, a track dock with one-knob effects and a Chord pad, a first-song tour and a Finish dock that saves the song as a file. A folder of stems and MIDI from another app comes in with one drop.</p>
+        <p data-i18n="fe.simP">The same menu has the third workflow, Simple, which mixes BandLab's approachable one-window style with FL Studio Mobile's way of working: one window with the tracks and the timeline, a New track chooser, starter beats, loops that follow the song's key, a 16-pad Sampler, quick recording on a voice track, a track dock with one-knob effects and a Chord pad, a first-song tour and a Finish dock that saves the song as a file. FL Studio Mobile projects (.flm) open in it, and a folder of stems and MIDI from another app comes in with one drop.</p>
         <p><a class="tlink" href="/wiki/coming-from-ableton/" data-i18n="fe.clL">Coming from Ableton Live</a></p>
       </div>
     </div>
@@ -278,8 +278,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=8b3ec7c6" defer></script>
-<script src="/assets/features.js?v=8b3ec7c6" defer></script>
-<script src="/assets/motion.js?v=8b3ec7c6" defer></script>
+<script src="/assets/site.js?v=4f8f5e26" defer></script>
+<script src="/assets/features.js?v=4f8f5e26" defer></script>
+<script src="/assets/motion.js?v=4f8f5e26" defer></script>
 </body>
 </html>

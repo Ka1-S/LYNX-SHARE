@@ -1,13 +1,13 @@
 ---
 title: Layouts
-summary: Switch between the Pattern workflow and the optional Clip-launch workflow.
+summary: Switch between the three workflows: Pattern (the FL Studio workflow), Clip-launch and Simple.
 status: full
 ---
 ![The Clip-launch workflow: a grid of clips and scenes on the left, the Picker and the Playlist on the right](/assets/img/cliplaunch.webp)
 
 `View › Layout style` has three entries: `Pattern workflow (default)`, `Clip-launch workflow` and `Simple workflow`. The same choice is in `Options › General settings`, under Workflow. The choice is kept when you close the program.
 
-The Pattern workflow is the Channel rack, patterns and the Playlist. The Clip-launch workflow adds a clip grid with scenes beside the Playlist. Patterns and the Channel rack stay available.
+The Pattern workflow, the default, works the way FL Studio does: the Channel rack, patterns, the Piano roll, the Playlist and the Mixer. The Clip-launch workflow, in the style of Ableton Live, adds a clip grid with scenes beside the Playlist, a Session mixer and the clip and device views; patterns and the Channel rack stay available. The Simple workflow mixes BandLab's approachable one-window style with FL Studio Mobile's way of working: tracks and a timeline, loops, pads and quick recording. Switching moves the windows only: the project stays the same.
 
 ## Launch clips in the grid
 
@@ -64,7 +64,7 @@ When you open a Live set, its Session clips and scenes go into the clip grid, wi
 
 ## The Simple workflow
 
-`View › Layout style › Simple workflow` is one window with the tracks and the timeline, for a first song. `View › Track dock` shows a dock under the timeline for the selected track, with the `Effects`, `Instrument`, `Keyboard` and `Editor` tabs. In this workflow, the `Help` menu has `First-song tour` and `Welcome screen...`, which offers a seven-step first song, a demo song or an empty project. See [Simple layout](/wiki/simple-layout/).
+`View › Layout style › Simple workflow` is one window with the tracks and the timeline, in the style of BandLab and FL Studio Mobile, and it suits a first song. `View › Track dock` shows a dock under the timeline for the selected track, with the `Effects`, `Instrument`, `Keyboard` and `Editor` tabs. In this workflow, the `Help` menu has `First-song tour` and `Welcome screen...`, which offers a seven-step first song, a demo song or an empty project. See [Simple layout](/wiki/simple-layout/).
 
 `Lyrics and notes` and `Reference match...` in the `View` menu, and `Clean voice` in a Mixer insert's menu, are there in every layout. In the Simple workflow, `Clean voice` is in a track's menu too.
 

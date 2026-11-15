@@ -1,11 +1,11 @@
 ---
-source: e15b0e3ba5
+source: 4ac6a04fd7
 ---
 ![Der Clip-Start-Arbeitsablauf: links ein Raster aus Clips und Szenen, rechts die Auswahl und die Playlist](/assets/img/cliplaunch.webp)
 
 `Ansicht › Layout-Stil` hat drei Einträge: `Pattern-Arbeitsablauf (Standard)`, `Clip-Start-Arbeitsablauf` und `Einfacher Arbeitsablauf`. Dieselbe Wahl gibt es unter `Optionen › Allgemeine Einstellungen`, im Bereich Arbeitsablauf. Die Wahl bleibt erhalten, wenn du das Programm schließt.
 
-Der Pattern-Arbeitsablauf besteht aus Channel Rack, Patterns und Playlist. Der Clip-Start-Arbeitsablauf ergänzt neben der Playlist ein Clip-Raster mit Szenen. Patterns und das Channel Rack bleiben verfügbar.
+Der Pattern-Arbeitsablauf, der Standard, arbeitet so wie FL Studio: Channel Rack, Patterns, Piano Roll, Playlist und Mixer. Der Clip-Start-Arbeitsablauf im Stil von Ableton Live ergänzt neben der Playlist ein Clip-Raster mit Szenen, einen Session-Mixer sowie die Clip- und Geräteansicht; Patterns und das Channel Rack bleiben verfügbar. Der Einfache Arbeitsablauf verbindet den zugänglichen Ein-Fenster-Stil von BandLab mit der Arbeitsweise von FL Studio Mobile: Spuren und Zeitleiste, Loops, Pads und schnelle Aufnahme. Ein Wechsel verschiebt nur die Fenster: Das Projekt bleibt dasselbe.
 
 ## Clips im Raster starten
 
@@ -62,7 +62,7 @@ Das Slot-Menü hat außerdem zwei Optionen für das ganze Raster: `Spuren beim S
 
 ## Der Einfache Arbeitsablauf
 
-`Ansicht › Layout-Stil › Einfacher Arbeitsablauf` ist ein Fenster mit den Spuren und der Zeitleiste, für einen ersten Song. `Ansicht › Spur-Dock` zeigt unter der Zeitleiste ein Dock für die gewählte Spur, mit den Tabs `Effekte`, `Instrument`, `Tastatur` und `Editor`. In diesem Arbeitsablauf hat das Menü `Hilfe` die Einträge `Tour zum ersten Song` und `Willkommensbildschirm...`, die einen ersten Song in sieben Schritten, einen Demo-Song oder ein leeres Projekt anbieten. Siehe [Einfaches Layout](/wiki/simple-layout/).
+`Ansicht › Layout-Stil › Einfacher Arbeitsablauf` ist ein Fenster mit den Spuren und der Zeitleiste, im Stil von BandLab und FL Studio Mobile, und eignet sich für einen ersten Song. `Ansicht › Spur-Dock` zeigt unter der Zeitleiste ein Dock für die gewählte Spur, mit den Tabs `Effekte`, `Instrument`, `Tastatur` und `Editor`. In diesem Arbeitsablauf hat das Menü `Hilfe` die Einträge `Tour zum ersten Song` und `Willkommensbildschirm...`, die einen ersten Song in sieben Schritten, einen Demo-Song oder ein leeres Projekt anbieten. Siehe [Einfaches Layout](/wiki/simple-layout/).
 
 `Text und Notizen` und `Referenzabgleich...` im Menü `Ansicht` sowie `Klare Stimme` im Menü eines Mixer-Inserts gibt es in jedem Layout. Im Einfachen Arbeitsablauf ist `Klare Stimme` auch im Menü einer Spur zu finden.
 

@@ -1,11 +1,11 @@
 ---
-source: e15b0e3ba5
+source: 4ac6a04fd7
 ---
 ![El flujo de lanzamiento de clips: una cuadrícula de clips y escenas a la izquierda, el Selector y la Playlist a la derecha](/assets/img/cliplaunch.webp)
 
 `Ver › Estilo de diseño` tiene tres entradas: `Flujo por patrones (predeterminado)`, `Flujo por lanzamiento de clips` y `Flujo simple`. La misma opción está en `Opciones › Configuración general`, bajo Flujo de trabajo. La elección se conserva al cerrar el programa.
 
-El flujo por patrones es el Channel Rack, los patrones y la Playlist. El flujo por lanzamiento de clips añade una cuadrícula de clips con escenas junto a la Playlist. Los patrones y el Channel Rack siguen disponibles.
+El flujo por patrones, el predeterminado, funciona como FL Studio: el Channel Rack, los patrones, el Piano Roll, la Playlist y el Mixer. El flujo por lanzamiento de clips, al estilo de Ableton Live, añade una cuadrícula de clips con escenas junto a la Playlist, un mezclador de sesión y las vistas de clip y de dispositivo; los patrones y el Channel Rack siguen disponibles. El flujo simple mezcla el estilo accesible de una sola ventana de BandLab con la forma de trabajar de FL Studio Mobile: pistas y línea de tiempo, loops, pads y grabación rápida. Al cambiar solo se mueven las ventanas: el proyecto sigue siendo el mismo.
 
 ## Lanzar clips en la cuadrícula
 
@@ -62,7 +62,7 @@ Cuando abres un set de Live, sus clips y escenas de Session pasan a la cuadrícu
 
 ## El flujo Simple
 
-`Ver › Estilo de diseño › Flujo simple` es una sola ventana con las pistas y la línea de tiempo, para una primera canción. `Ver › Panel de la pista` muestra bajo la línea de tiempo un panel para la pista seleccionada, con las pestañas `Efectos`, `Instrumento`, `Teclado` y `Editor`. En este flujo, el menú `Ayuda` tiene `Tour de la primera canción` y `Pantalla de bienvenida...`, que ofrece una primera canción en siete pasos, una canción de demostración o un proyecto vacío. Mira [Diseño Simple](/wiki/simple-layout/).
+`Ver › Estilo de diseño › Flujo simple` es una sola ventana con las pistas y la línea de tiempo, al estilo de BandLab y FL Studio Mobile, y va bien para una primera canción. `Ver › Panel de la pista` muestra bajo la línea de tiempo un panel para la pista seleccionada, con las pestañas `Efectos`, `Instrumento`, `Teclado` y `Editor`. En este flujo, el menú `Ayuda` tiene `Tour de la primera canción` y `Pantalla de bienvenida...`, que ofrece una primera canción en siete pasos, una canción de demostración o un proyecto vacío. Mira [Diseño Simple](/wiki/simple-layout/).
 
 `Letra y notas` y `Igualar a la referencia...` en el menú `Ver`, y `Voz limpia` en el menú de un insert del Mixer, están en todos los diseños. En el flujo Simple, `Voz limpia` también está en el menú de una pista.
 

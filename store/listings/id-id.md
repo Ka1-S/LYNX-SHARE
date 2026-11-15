@@ -8,14 +8,20 @@ LYNX SHARE
 
 ## Short description
 
-DAW gratis dan open source dengan alur kerja pattern dan peluncuran klip: Channel Rack, Piano Roll, Playlist, Mixer, dan grid klip. Membuka proyek .flp, .als, dan .flm.
+DAW gratis dan open source dengan tiga alur kerja dalam satu program: pattern ala FL Studio (Channel Rack, Piano Roll, Playlist, Mixer), peluncuran klip ala Ableton Live, dan mode sederhana satu jendela bergaya BandLab dan FL Studio Mobile. Membuka proyek .flp, .als, dan .flm.
 
 ## Description
 
-LYNX SHARE adalah workstation audio digital gratis dan open source untuk membuat beat dan lagu. LYNX SHARE menyatukan
-dua cara kerja: alur kerja pattern ala FL Studio (Channel Rack dengan step sequencer, pattern, Piano Roll, Playlist
-dengan aransemen, dan Mixer dengan insert, send, dan sidechain) sebagai bawaan, dan grid klip dengan scene ala Ableton
-Live, cukup satu pengaturan. Dibuat agar tetap ringan dan cepat di PC mana pun.
+LYNX SHARE adalah workstation audio digital gratis dan open source untuk membuat beat dan lagu. LYNX SHARE punya tiga
+alur kerja dalam satu program, yang bisa dialihkan kapan saja tanpa mengubah proyek:
+
+• Pattern ala FL Studio (bawaan): Channel Rack dengan step sequencer, pattern, Piano Roll, Playlist dengan aransemen,
+dan Mixer dengan insert, send, dan sidechain.
+• Peluncuran klip ala Ableton Live: grid klip dan scene, mixer Session, serta tampilan klip dan perangkat.
+• Alur kerja sederhana yang memadukan gaya satu jendela BandLab yang mudah dengan cara kerja FL Studio Mobile: track
+dan linimasa, loop, pad, dan perekaman cepat, dengan lagu pertama yang dipandu.
+
+Dibuat agar tetap ringan dan cepat di PC mana pun.
 
 • Ringan: mesin audio lock-free yang membagi channel dan track mixer ke seluruh core CPU, melewati channel yang tidak aktif, dan melakukan streaming audio panjang langsung dari disk.
 • Lengkap: lebih dari 100 instrumen dan efek bawaan — synth, drum machine, sampler, EQ, compressor, limiter, reverb, delay, koreksi pitch, visualizer, dan banyak lagi.
@@ -23,8 +29,6 @@ Live, cukup satu pengaturan. Dibuat agar tetap ringan dan cepat di PC mana pun.
 • Proyekmu: membuka proyek FL Studio (.flp) beserta pattern, not, mixer, otomasi, dan sample; membuka dan menyimpan
 set Ableton Live 11/12 (.als), termasuk klip Session; mengekspor .flp kembali ke FL Studio; mengimpor proyek FL Studio
 Mobile (.flm, sebagian) dan file MIDI.
-• Mulai mudah: Alur kerja sederhana memberi pemula satu jendela berisi track dan linimasa, beat awal, dan instrumen
-yang langsung bunyi dengan satu klik.
 • Latensi rendah: ASIO (termasuk driver ASIO milik LYNX SHARE sendiri untuk perangkat apa pun), WASAPI mode shared dan exclusive.
 • Rekam audio dan MIDI, edit audio, otomatisasi apa saja, render ke WAV, FLAC, MP3, OGG, atau stem.
 • Antarmuka dalam 15 bahasa, termasuk bahasa Indonesia, Inggris, Portugis, Spanyol, Prancis, Jerman, Italia, Belanda, Polandia, Rusia, Turki, Jepang, Korea, dan Tionghoa.
@@ -50,7 +54,7 @@ perbaikan.
 
 ## Features
 
-1. Tiga alur kerja: berbasis pattern (Channel Rack, Piano Roll, Playlist, Mixer) secara bawaan, grid klip dengan scene, atau Alur kerja sederhana untuk pemula
+1. Tiga alur kerja dalam satu program: pattern ala FL Studio secara bawaan, peluncuran klip ala Ableton Live, atau Alur kerja sederhana bergaya BandLab dan FL Studio Mobile
 2. Membuka proyek FL Studio (.flp), Ableton Live (.als), dan FL Studio Mobile (.flm) serta file MIDI; menyimpan .als dan .flp
 3. Lebih dari 100 instrumen dan efek bawaan
 4. Mendukung plugin VST3, CLAP, dan VST2, opsional diisolasi di proses tersendiri

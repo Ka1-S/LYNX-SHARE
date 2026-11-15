@@ -10,10 +10,13 @@ PackageName: LYNX SHARE
 PackageUrl: https://lynx-share.com
 License: AGPL-3.0-or-later
 LicenseUrl: https://github.com/Ka1-S/LYNX-SHARE/blob/main/LICENSE
-ShortDescription: Free, open-source digital audio workstation with a pattern-based workflow.
+ShortDescription: Free, open-source digital audio workstation with three workflows in one program.
 Description: |-
-  LYNX SHARE is a free, open-source DAW with a Channel Rack step sequencer, Piano Roll, Playlist and Mixer. It hosts VST3,
-  CLAP and VST2 plugins, has 100+ built-in instruments and effects and opens FL Studio projects (.flp) and MIDI files.
+  LYNX SHARE is a free, open-source DAW with three workflows, switchable at any time: FL Studio-style patterns (Channel
+  Rack, Piano Roll, Playlist and Mixer, the default), clip launching in the style of Ableton Live, and a Simple workflow
+  in the style of BandLab and FL Studio Mobile. It hosts VST3, CLAP and VST2 plugins, has 100+ built-in instruments and
+  effects, opens FL Studio (.flp), Ableton Live (.als) and FL Studio Mobile (.flm) projects and MIDI files, and exports
+  .flp and .als.
 Moniker: lynx
 Tags:
   - daw

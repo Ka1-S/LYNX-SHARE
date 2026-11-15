@@ -8,14 +8,20 @@ LYNX SHARE
 
 ## Short description
 
-Pattern ve klip başlatma iş akışlarına sahip ücretsiz, açık kaynaklı DAW: Channel Rack, Piano Roll, Playlist, Mixer ve bir klip ızgarası. .flp, .als ve .flm projelerini açar.
+Tek programda üç iş akışı sunan ücretsiz, açık kaynaklı DAW: FL Studio tarzı pattern'ler (Channel Rack, Piano Roll, Playlist, Mixer), Ableton Live tarzı klip başlatma ve BandLab ile FL Studio Mobile tarzında basit, tek pencereli bir mod. .flp, .als ve .flm projelerini açar.
 
 ## Description
 
-LYNX SHARE, beat ve şarkı yapmak için ücretsiz ve açık kaynaklı bir dijital ses iş istasyonu. İki çalışma biçimini bir
-araya getirir: varsayılan olan FL Studio tarzı pattern iş akışı (step sequencer'lı bir Channel Rack, pattern'ler, bir
-Piano Roll, aranjmanlı bir Playlist ve insert, send ve sidechain'li bir Mixer) ve tek bir ayar uzaklıktaki, sahneli
-Ableton Live tarzı klip ızgarası. Her PC'de hafif ve hızlı kalacak şekilde yapıldı.
+LYNX SHARE, beat ve şarkı yapmak için ücretsiz ve açık kaynaklı bir dijital ses iş istasyonu. Tek programda üç iş akışı
+sunar ve projeyi değiştirmeden aralarında istediğiniz zaman geçiş yapabilirsiniz:
+
+• FL Studio tarzı pattern'ler (varsayılan): step sequencer'lı bir Channel Rack, pattern'ler, bir Piano Roll, aranjmanlı
+bir Playlist ve insert, send ve sidechain'li bir Mixer.
+• Ableton Live tarzında klip başlatma: bir klip ve sahne ızgarası, bir Session mikseri ve klip ile cihaz görünümleri.
+• BandLab'in kolay tek pencereli tarzını FL Studio Mobile'ın çalışma biçimiyle birleştiren bir Basit iş akışı: parçalar
+ve zaman çizelgesi, loop'lar, pad'ler ve hızlı kayıt, rehberli bir ilk şarkıyla.
+
+Her PC'de hafif ve hızlı kalacak şekilde yapıldı.
 
 • Hafif: kanalları ve mixer kanallarını işlemci çekirdeklerine dağıtan, boştaki kanalları atlayan ve uzun ses dosyalarını doğrudan diskten akıtan kilitsiz (lock-free) bir ses motoru.
 • Eksiksiz: 100'den fazla dahili enstrüman ve efekt — synth'ler, davul makineleri, sampler'lar, EQ'lar, kompresörler, limiter'lar, reverb'ler, delay'ler, perde düzeltme, görselleştiriciler ve daha fazlası.
@@ -23,8 +29,6 @@ Ableton Live tarzı klip ızgarası. Her PC'de hafif ve hızlı kalacak şekilde
 • Projelerin: FL Studio projelerini (.flp) pattern'leri, notaları, mixer'ı, otomasyonu ve sample'larıyla açar; Ableton
 Live 11/12 setlerini (.als) Session klipleriyle birlikte açar ve kaydeder; .flp'yi FL Studio'ya geri aktarır; FL
 Studio Mobile projelerini (.flm, kısmen) ve MIDI dosyalarını içe aktarır.
-• Kolay başlangıç: Basit iş akışı yeni başlayanlara parçaların ve zaman çizelgesinin olduğu tek bir pencere, başlangıç
-ritimleri ve tek tıkla çalan enstrümanlar verir.
 • Düşük gecikme: ASIO (her cihaz için LYNX SHARE'in kendi ASIO sürücüsü dahil), paylaşımlı ve özel modda WASAPI.
 • Ses ve MIDI kaydedin, ses düzenleyin, her şeyi otomatikleştirin; WAV, FLAC, MP3, OGG veya stem olarak dışa aktarın.
 • Türkçe, İngilizce, Portekizce, İspanyolca, Fransızca, Almanca, İtalyanca, Felemenkçe, Lehçe, Rusça, Japonca, Korece ve Çince dahil 15 dilde arayüz.
@@ -49,7 +53,7 @@ mixer izlerine bağlı Playlist izleri; ve birçok düzeltme.
 
 ## Features
 
-1. Üç iş akışı: varsayılan olarak pattern tabanlı (Channel Rack, Piano Roll, Playlist, Mixer), sahneli bir klip ızgarası ya da yeni başlayanlar için Basit iş akışı
+1. Tek programda üç iş akışı: varsayılan olarak FL Studio tarzı pattern'ler, Ableton Live tarzı klip başlatma ya da BandLab ve FL Studio Mobile tarzında bir Basit iş akışı
 2. FL Studio (.flp), Ableton Live (.als) ve FL Studio Mobile (.flm) projelerini ve MIDI dosyalarını açar; .als ve .flp kaydeder
 3. 100'den fazla dahili enstrüman ve efekt
 4. VST3, CLAP ve VST2 eklenti desteği, isteğe bağlı olarak ayrı işlemde izole

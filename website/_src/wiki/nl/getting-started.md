@@ -1,7 +1,7 @@
 ---
-source: a6d9063ec3
+source: 0101adbb66
 ---
-LYNX SHARE is een gratis, opensource DAW voor Windows, macOS en Linux. Het werkt met patterns: je programmeert ze in het Channel Rack en de Piano Roll, arrangeert ze in de Playlist en mixt ze in de Mixer. Het opent FL Studio-projecten (`.flp`) en Ableton Live-sets (`.als`), en slaat zijn eigen `.lynx`-formaat op.
+LYNX SHARE is een gratis, opensource DAW voor Windows, macOS en Linux met drie werkwijzen in één programma. De standaard is de FL Studio-werkwijze: je programmeert patterns in het Channel Rack en de Piano Roll, arrangeert ze in de Playlist en mixt ze in de Mixer. De Clipstart-werkwijze start clips en scènes vanuit een raster, in de stijl van Ableton Live, en de Eenvoudige werkwijze brengt de toegankelijke stijl met één venster van BandLab samen met de werkwijze van FL Studio Mobile. `Beeld › Lay-outstijl` wisselt er op elk moment tussen. Het opent FL Studio-projecten (`.flp`), Ableton Live-sets (`.als`) en FL Studio Mobile-projecten (`.flm`), en slaat zijn eigen `.lynx`-formaat op.
 
 Het is een alpha. Verwacht bugs en sla vaak op.
 
@@ -9,7 +9,7 @@ Het is een alpha. Verwacht bugs en sla vaak op.
 
 1. Controleer in de tabel hieronder of je systeem wordt ondersteund.
 2. Download en installeer het. [Installeren](/wiki/install/) bevat de stappen voor elk systeem.
-3. Start het. Een korte installatiewizard kiest de taal, test de audio-uitgang en toont de pluginmappen, die daarna op de achtergrond worden gescand. Je kunt hem overslaan en later opnieuw openen met `Opties › Installatiewizard (taal, audio, pluginmappen)...`.
+3. Start het. Een korte installatiewizard kiest de taal, test de audio-uitgang, laat je een van de drie werkwijzen kiezen en toont de pluginmappen, die daarna op de achtergrond worden gescand. Je kunt hem overslaan en later opnieuw openen met `Opties › Installatiewizard (taal, audio, pluginmappen)...`.
 4. Hoor je niets, ga dan naar [Audio instellen](/wiki/audio-setup/).
 5. Lees [Rondleiding door het venster](/wiki/tour/) en maak dan [Je eerste nummer](/wiki/first-song/).
 
@@ -45,6 +45,7 @@ LYNX.exe --showcase out.lynx
 
 | Je wilt | Lees |
 |---|---|
+| Een werkwijze kiezen | [Lay-outs](/wiki/layouts/), [Eenvoudige lay-out](/wiki/simple-layout/) |
 | Elk venster leren kennen | [Channel Rack](/wiki/channel-rack/), [Piano Roll](/wiki/piano-roll/), [Playlist](/wiki/playlist/), [Mixer](/wiki/mixer/), [Browser](/wiki/browser/) |
 | Een project uit een ander programma openen | [Overstappen van FL Studio](/wiki/coming-from-fl-studio/), [Overstappen van Ableton Live](/wiki/coming-from-ableton/) |
 | Je VST-, CLAP-, LV2- of AU-plugins gebruiken | [Plugins](/wiki/plugins/) |

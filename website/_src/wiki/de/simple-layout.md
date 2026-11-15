@@ -1,7 +1,7 @@
 ---
-source: b8320812e9
+source: 2ccec7b23f
 ---
-`Ansicht › Layout-Stil › Einfacher Arbeitsablauf` zeigt ein Fenster mit den Spuren und der Zeitleiste. Er ist für einen ersten Song gedacht. Der Einrichtungsassistent bietet ihn beim ersten Start an, neben dem Pattern-Arbeitsablauf (dem Standard) und dem Clip-Start-Arbeitsablauf.
+`Ansicht › Layout-Stil › Einfacher Arbeitsablauf` zeigt ein Fenster mit den Spuren und der Zeitleiste. Er verbindet den zugänglichen Ein-Fenster-Stil von BandLab mit der Arbeitsweise von FL Studio Mobile (Spuren, Loops, Pads und schnelle Aufnahme) und eignet sich für einen ersten Song. FL-Studio-Mobile-Projekte (`.flm`) öffnen sich darin, wie in den anderen Arbeitsabläufen. Der Einrichtungsassistent bietet ihn beim ersten Start an, neben dem Pattern-Arbeitsablauf (dem Standard) und dem Clip-Start-Arbeitsablauf.
 
 ## Was drin ist
 

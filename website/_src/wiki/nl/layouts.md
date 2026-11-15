@@ -1,11 +1,11 @@
 ---
-source: e15b0e3ba5
+source: 4ac6a04fd7
 ---
 ![De Clipstart-werkwijze: links een raster van clips en scènes, rechts de Picker en de Playlist](/assets/img/cliplaunch.webp)
 
 `Beeld › Lay-outstijl` heeft drie items: `Patroonwerkwijze (standaard)`, `Clipstart-werkwijze` en `Eenvoudige werkwijze`. Dezelfde keuze staat in `Opties › Algemene instellingen`, onder Werkwijze. De keuze blijft bewaard als je het programma sluit.
 
-De Patroonwerkwijze is het Channel Rack, patterns en de Playlist. De Clipstart-werkwijze voegt naast de Playlist een clipraster met scènes toe. Patterns en het Channel Rack blijven beschikbaar.
+De Patroonwerkwijze, de standaard, werkt zoals FL Studio: het Channel Rack, patterns, de Piano Roll, de Playlist en de Mixer. De Clipstart-werkwijze, in de stijl van Ableton Live, voegt naast de Playlist een clipraster met scènes toe, een sessiemixer en de clip- en apparaatweergave; patterns en het Channel Rack blijven beschikbaar. De Eenvoudige werkwijze brengt de toegankelijke stijl met één venster van BandLab samen met de werkwijze van FL Studio Mobile: tracks en een tijdlijn, loops, pads en snel opnemen. Wisselen verplaatst alleen de vensters: het project blijft hetzelfde.
 
 ## Clips lanceren in het raster
 
@@ -62,7 +62,7 @@ Als je een Live-set opent, komen de Session-clips en scènes ervan met hun lance
 
 ## De Simple-werkwijze
 
-`Beeld › Lay-outstijl › Eenvoudige werkwijze` is één venster met de tracks en de tijdlijn, voor een eerste song. `Beeld › Spoordock` toont onder de tijdlijn een dock voor de geselecteerde track, met de tabs `Effecten`, `Instrument`, `Klavier` en `Editor`. In deze werkwijze heeft het menu `Help` de items `Tour van het eerste nummer` en `Welkomstscherm...`, dat een eerste song in zeven stappen, een demosong of een leeg project aanbiedt. Zie [Simple-lay-out](/wiki/simple-layout/).
+`Beeld › Lay-outstijl › Eenvoudige werkwijze` is één venster met de tracks en de tijdlijn, in de stijl van BandLab en FL Studio Mobile, en past goed bij een eerste song. `Beeld › Spoordock` toont onder de tijdlijn een dock voor de geselecteerde track, met de tabs `Effecten`, `Instrument`, `Klavier` en `Editor`. In deze werkwijze heeft het menu `Help` de items `Tour van het eerste nummer` en `Welkomstscherm...`, dat een eerste song in zeven stappen, een demosong of een leeg project aanbiedt. Zie [Simple-lay-out](/wiki/simple-layout/).
 
 `Songtekst en notities` en `Referentie-afstemming...` in het menu `Beeld`, en `Heldere stem` in het menu van een Mixer-insert, zijn er in elke lay-out. In de Simple-werkwijze zit `Heldere stem` ook in het menu van een track.
 

@@ -8,15 +8,22 @@ LYNX SHARE
 
 ## Short description
 
-DAW gratuite et open source avec des flux de travail par patterns et par lancement de clips : Channel Rack, Piano Roll, Playlist, Mixer et une grille de clips. Ouvre les projets .flp, .als et .flm.
+DAW gratuite et open source avec trois flux de travail dans un seul programme : des patterns à la manière de FL Studio (Channel Rack, Piano Roll, Playlist, Mixer), le lancement de clips à la manière d'Ableton Live et un mode simple en une seule fenêtre dans le style de BandLab et de FL Studio Mobile. Ouvre les projets .flp, .als et .flm.
 
 ## Description
 
-LYNX SHARE est une station audionumérique gratuite et open source pour créer des beats et des morceaux. Elle réunit
-deux façons de travailler : un flux de travail par patterns à la manière de FL Studio (un Channel Rack avec séquenceur
-pas à pas, des patterns, un Piano Roll, une Playlist avec arrangements et un Mixer avec inserts, envois et sidechain),
-par défaut, et une grille de clips avec scènes à la manière d'Ableton Live, à un réglage près. Elle est conçue pour
-rester légère et rapide sur n'importe quel PC.
+LYNX SHARE est une station audionumérique gratuite et open source pour créer des beats et des morceaux. Elle propose
+trois flux de travail dans un seul programme, et vous pouvez passer de l'un à l'autre à tout moment sans changer le
+projet :
+
+• Des patterns à la manière de FL Studio (par défaut) : un Channel Rack avec séquenceur pas à pas, des patterns, un
+Piano Roll, une Playlist avec arrangements et un Mixer avec inserts, envois et sidechain.
+• Le lancement de clips à la manière d'Ableton Live : une grille de clips et de scènes, une table de mixage de session
+et les vues clip et appareil.
+• Un Flux simple qui mêle le style accessible en une seule fenêtre de BandLab à la façon de travailler de FL Studio
+Mobile : des pistes et une timeline, des boucles, des pads et l'enregistrement rapide, avec un premier morceau guidé.
+
+Elle est conçue pour rester légère et rapide sur n'importe quel PC.
 
 • Légère : un moteur audio sans verrous (lock-free) qui répartit les canaux et les pistes du mixer sur les cœurs de votre processeur, ignore les canaux inactifs et lit les longs fichiers audio directement depuis le disque.
 • Complète : plus de 100 instruments et effets intégrés — synthés, boîtes à rythmes, samplers, égaliseurs, compresseurs, limiteurs, reverbs, delays, correction de hauteur, visualiseurs et bien plus.
@@ -24,8 +31,6 @@ rester légère et rapide sur n'importe quel PC.
 • Vos projets : ouvre les projets FL Studio (.flp) avec leurs patterns, notes, mixer, automation et samples ; ouvre et
 enregistre les sets Ableton Live 11/12 (.als), clips de la Session compris ; exporte des .flp vers FL Studio ; importe
 les projets FL Studio Mobile (.flm, en partie) et les fichiers MIDI.
-• Démarrage facile : un Flux simple offre aux débutants une fenêtre avec les pistes et la timeline, des beats de
-départ et des instruments qui jouent en un clic.
 • Faible latence : ASIO (y compris le pilote ASIO de LYNX SHARE, compatible avec n'importe quel périphérique), WASAPI en modes partagé et exclusif.
 • Enregistrez de l'audio et du MIDI, éditez l'audio, automatisez tout et exportez en WAV, FLAC, MP3, OGG ou en stems.
 • Interface en 15 langues, dont le français, l'anglais, l'espagnol, l'allemand, l'italien, le néerlandais, le polonais, le russe, le turc, le japonais, le coréen et le chinois.
@@ -51,7 +56,7 @@ plusieurs pistes, et des pistes de la Playlist reliées aux pistes du mixer ; et
 
 ## Features
 
-1. Trois flux de travail : par patterns (Channel Rack, Piano Roll, Playlist, Mixer) par défaut, une grille de clips avec scènes, ou un Flux simple pour les débutants
+1. Trois flux de travail dans un seul programme : des patterns façon FL Studio par défaut, le lancement de clips façon Ableton Live, ou un Flux simple dans le style de BandLab et de FL Studio Mobile
 2. Ouvre les projets FL Studio (.flp), Ableton Live (.als) et FL Studio Mobile (.flm) et les fichiers MIDI ; enregistre en .als et .flp
 3. Plus de 100 instruments et effets intégrés
 4. Charge les plugins VST3, CLAP et VST2, avec isolation optionnelle dans leur propre processus

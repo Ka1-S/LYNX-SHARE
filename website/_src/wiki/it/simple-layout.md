@@ -1,7 +1,7 @@
 ---
-source: b8320812e9
+source: 2ccec7b23f
 ---
-`Vista › Stile del layout › Flusso semplice` mostra una sola finestra con le tracce e la timeline. È pensato per un primo brano. La procedura guidata di configurazione lo offre al primo avvio, accanto al Flusso a pattern (quello predefinito) e al Flusso a lancio di clip.
+`Vista › Stile del layout › Flusso semplice` mostra una sola finestra con le tracce e la timeline. Unisce lo stile accessibile a finestra unica di BandLab al modo di lavorare di FL Studio Mobile (tracce, loop, pad e registrazione rapida), ed è adatto a un primo brano. I progetti di FL Studio Mobile (`.flm`) si aprono qui, come negli altri flussi. La procedura guidata di configurazione lo offre al primo avvio, accanto al Flusso a pattern (quello predefinito) e al Flusso a lancio di clip.
 
 ## Cosa contiene
 

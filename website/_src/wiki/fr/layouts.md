@@ -1,11 +1,11 @@
 ---
-source: e15b0e3ba5
+source: 4ac6a04fd7
 ---
 ![Le flux par lancement de clips : une grille de clips et de scènes à gauche, la Pipette et la Playlist à droite](/assets/img/cliplaunch.webp)
 
 `Vue › Style de disposition` propose trois entrées : `Flux par patterns (par défaut)`, `Flux par lancement de clips` et `Flux simple`. Le même choix existe dans `Options › Réglages généraux`, sous Flux de travail. Le choix est conservé quand vous fermez le programme.
 
-Le flux par patterns, c'est le Channel Rack, les patterns et la Playlist. Le flux par lancement de clips ajoute une grille de clips avec des scènes à côté de la Playlist. Les patterns et le Channel Rack restent disponibles.
+Le flux par patterns, celui par défaut, fonctionne comme FL Studio : le Channel Rack, les patterns, le Piano Roll, la Playlist et le Mixer. Le flux par lancement de clips, dans le style d'Ableton Live, ajoute une grille de clips avec des scènes à côté de la Playlist, une table de mixage de session et les vues clip et appareil ; les patterns et le Channel Rack restent disponibles. Le flux simple mêle le style accessible en une seule fenêtre de BandLab à la façon de travailler de FL Studio Mobile : des pistes et une timeline, des boucles, des pads et l'enregistrement rapide. Changer de flux ne déplace que les fenêtres : le projet reste le même.
 
 ## Lancer des clips dans la grille
 
@@ -62,7 +62,7 @@ Quand vous ouvrez un set Live, ses clips de session et ses scènes vont dans la 
 
 ## Le flux simple
 
-`Vue › Style de disposition › Flux simple` est une fenêtre unique avec les pistes et la timeline, pour un premier morceau. `Vue › Panneau de la piste` affiche sous la timeline un dock pour la piste sélectionnée, avec les onglets `Effets`, `Instrument`, `Clavier` et `Éditeur`. Dans ce flux, le menu `Aide` propose `Tour de la première chanson` et `Écran d'accueil...`, qui offre un premier morceau en sept étapes, un morceau de démonstration ou un projet vide. Voir [Disposition simple](/wiki/simple-layout/).
+`Vue › Style de disposition › Flux simple` est une fenêtre unique avec les pistes et la timeline, dans le style de BandLab et de FL Studio Mobile, et convient à un premier morceau. `Vue › Panneau de la piste` affiche sous la timeline un dock pour la piste sélectionnée, avec les onglets `Effets`, `Instrument`, `Clavier` et `Éditeur`. Dans ce flux, le menu `Aide` propose `Tour de la première chanson` et `Écran d'accueil...`, qui offre un premier morceau en sept étapes, un morceau de démonstration ou un projet vide. Voir [Disposition simple](/wiki/simple-layout/).
 
 `Paroles et notes` et `Correspondance de référence...` du menu `Vue`, et `Voix claire` dans le menu d'un insert du Mixer, existent dans toutes les dispositions. Dans le flux simple, `Voix claire` est aussi dans le menu d'une piste.
 

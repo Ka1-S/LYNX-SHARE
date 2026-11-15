@@ -8,14 +8,20 @@ LYNX SHARE
 
 ## Short description
 
-Darmowy DAW o otwartym kodzie z workflow opartym na patternach i na uruchamianiu klipów: Channel Rack, Piano Roll, Playlist, Mixer i siatka klipów. Otwiera projekty .flp, .als i .flm.
+Darmowy DAW o otwartym kodzie z trzema sposobami pracy w jednym programie: patterny w stylu FL Studio (Channel Rack, Piano Roll, Playlist, Mixer), uruchamianie klipów w stylu Ableton Live i prosty tryb w jednym oknie w stylu BandLab i FL Studio Mobile. Otwiera projekty .flp, .als i .flm.
 
 ## Description
 
-LYNX SHARE to darmowa cyfrowa stacja robocza audio o otwartym kodzie do tworzenia bitów i utworów. Łączy dwa sposoby
-pracy: workflow oparty na patternach w stylu FL Studio (Channel Rack z sekwencerem krokowym, patterny, Piano Roll,
-Playlist z aranżacjami i Mixer z insertami, sendami i sidechainem), który jest domyślny, oraz siatkę klipów ze scenami
-w stylu Ableton Live, jedno przełączenie dalej. Został zbudowany tak, by pozostać lekki i szybki na każdym PC.
+LYNX SHARE to darmowa cyfrowa stacja robocza audio o otwartym kodzie do tworzenia bitów i utworów. Ma trzy sposoby pracy
+w jednym programie i możesz przełączać się między nimi w dowolnej chwili, bez zmiany projektu:
+
+• Patterny w stylu FL Studio (domyślnie): Channel Rack z sekwencerem krokowym, patterny, Piano Roll, Playlist z
+aranżacjami i Mixer z insertami, sendami i sidechainem.
+• Uruchamianie klipów w stylu Ableton Live: siatka klipów i scen, mikser sesji oraz widok klipu i urządzeń.
+• Prosty sposób pracy, który łączy przystępny, jednookienkowy styl BandLab ze sposobem pracy FL Studio Mobile: ścieżki
+i oś czasu, pętle, pady i szybkie nagrywanie, z prowadzonym pierwszym utworem.
+
+Został zbudowany tak, by pozostać lekki i szybki na każdym PC.
 
 • Lekki: silnik audio bez blokad (lock-free), który rozkłada kanały i ścieżki miksera na rdzenie procesora, pomija nieaktywne kanały i strumieniuje długie pliki audio prosto z dysku.
 • Kompletny: ponad 100 wbudowanych instrumentów i efektów – syntezatory, automaty perkusyjne, samplery, korektory EQ, kompresory, limitery, pogłosy, delaye, korekcja wysokości dźwięku, wizualizery i wiele więcej.
@@ -23,8 +29,6 @@ w stylu Ableton Live, jedno przełączenie dalej. Został zbudowany tak, by pozo
 • Twoje projekty: otwiera projekty FL Studio (.flp) z patternami, nutami, mikserem, automatyką i samplami; otwiera i
 zapisuje sety Ableton Live 11/12 (.als) razem z klipami z Session; eksportuje .flp z powrotem do FL Studio; importuje
 projekty FL Studio Mobile (.flm, częściowo) i pliki MIDI.
-• Łatwy start: Prosty sposób pracy daje początkującym jedno okno ze ścieżkami i osią czasu, gotowe beaty i instrumenty
-grające jednym kliknięciem.
 • Niskie opóźnienia: ASIO (w tym własny sterownik ASIO LYNX SHARE dla dowolnego urządzenia), WASAPI w trybie współdzielonym i wyłącznym.
 • Nagrywaj audio i MIDI, edytuj audio, automatyzuj wszystko, renderuj do WAV, FLAC, MP3, OGG lub stemów.
 • Interfejs w 15 językach, w tym po polsku, angielsku, portugalsku, hiszpańsku, francusku, niemiecku, włosku, niderlandzku, rosyjsku, turecku, japońsku, koreańsku i chińsku.
@@ -50,7 +54,7 @@ poprawek.
 
 ## Features
 
-1. Trzy sposoby pracy: domyślnie oparty na patternach (Channel Rack, Piano Roll, Playlist, Mixer), siatka klipów ze scenami albo Prosty sposób pracy dla początkujących
+1. Trzy sposoby pracy w jednym programie: domyślnie patterny w stylu FL Studio, uruchamianie klipów w stylu Ableton Live albo Prosty sposób pracy w stylu BandLab i FL Studio Mobile
 2. Otwiera projekty FL Studio (.flp), Ableton Live (.als) i FL Studio Mobile (.flm) oraz pliki MIDI; zapisuje .als i .flp
 3. Ponad 100 wbudowanych instrumentów i efektów
 4. Obsługuje wtyczki VST3, CLAP i VST2, opcjonalnie izolowane we własnym procesie

@@ -1,11 +1,11 @@
 ---
-source: e15b0e3ba5
+source: 4ac6a04fd7
 ---
 ![Klip başlatma iş akışı: solda klip ve sahne gridi, sağda Picker ve Playlist](/assets/img/cliplaunch.webp)
 
 `Görünüm › Yerleşim stili` menüsünde üç giriş vardır: `Pattern iş akışı (varsayılan)`, `Klip başlatma iş akışı` ve `Basit iş akışı`. Aynı seçim `Seçenekler › Genel ayarlar` içinde, Workflow başlığı altında da bulunur. Seçim programı kapattığınızda korunur.
 
-Pattern iş akışı; Channel Rack, pattern'ler ve Playlist'ten oluşur. Klip başlatma iş akışı, Playlist'in yanına sahneli bir klip gridi ekler. Pattern'ler ve Channel Rack kullanılabilir kalır.
+Varsayılan olan Pattern iş akışı FL Studio gibi çalışır: Channel Rack, pattern'ler, Piano Roll, Playlist ve Mixer. Ableton Live tarzındaki Klip başlatma iş akışı, Playlist'in yanına sahneli bir klip gridi, bir Session mikseri ve klip ile cihaz görünümleri ekler; pattern'ler ve Channel Rack kullanılabilir kalır. Basit iş akışı, BandLab'in kolay tek pencereli tarzını FL Studio Mobile'ın çalışma biçimiyle birleştirir: izler ve zaman çizelgesi, loop'lar, pad'ler ve hızlı kayıt. Geçiş yapmak yalnızca pencereleri değiştirir: proje aynı kalır.
 
 ## Gridde klip başlatmak
 
@@ -62,7 +62,7 @@ Bir Live seti açtığınızda Session klipleri ve sahneleri, başlatma ayarlar�
 
 ## Basit iş akışı
 
-`Görünüm › Yerleşim stili › Basit iş akışı`, ilk şarkı için izlerin ve zaman çizelgesinin olduğu tek bir penceredir. `Görünüm › Parça paneli`, zaman çizelgesinin altında seçili iz için `Efektler`, `Enstrüman`, `Klavye` ve `Editör` sekmeleri olan bir dock gösterir. Bu iş akışında `Yardım` menüsünde `İlk şarkı turu` ve yedi adımlı bir ilk şarkı, bir demo şarkı veya boş bir proje sunan `Karşılama ekranı...` bulunur. Bkz. [Basit düzen](/wiki/simple-layout/).
+`Görünüm › Yerleşim stili › Basit iş akışı`, BandLab ve FL Studio Mobile tarzında, izlerin ve zaman çizelgesinin olduğu tek bir penceredir ve ilk şarkı için uygundur. `Görünüm › Parça paneli`, zaman çizelgesinin altında seçili iz için `Efektler`, `Enstrüman`, `Klavye` ve `Editör` sekmeleri olan bir dock gösterir. Bu iş akışında `Yardım` menüsünde `İlk şarkı turu` ve yedi adımlı bir ilk şarkı, bir demo şarkı veya boş bir proje sunan `Karşılama ekranı...` bulunur. Bkz. [Basit düzen](/wiki/simple-layout/).
 
 `Görünüm` menüsündeki `Söz ve notlar` ve `Referans eşleme...` ile bir Mixer insert'inin menüsündeki `Temiz ses` her düzende vardır. Basit iş akışında `Temiz ses` bir izin menüsünde de bulunur.
 

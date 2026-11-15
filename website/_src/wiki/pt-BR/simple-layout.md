@@ -1,7 +1,7 @@
 ---
-source: b8320812e9
+source: 2ccec7b23f
 ---
-`Exibir › Estilo de layout › Fluxo simples` mostra uma janela com as faixas e a linha do tempo. Ele serve para a primeira música. O assistente de configuração o oferece na primeira vez que o programa abre, ao lado do Fluxo por padrões (o padrão) e do Fluxo por disparo de clipes.
+`Exibir › Estilo de layout › Fluxo simples` mostra uma janela com as faixas e a linha do tempo. Ele mistura o estilo acessível de janela única do BandLab com o jeito de trabalhar do FL Studio Mobile (faixas, loops, pads e gravação rápida) e serve bem para uma primeira música. Projetos do FL Studio Mobile (`.flm`) abrem nele, como nos outros fluxos. O assistente de configuração o oferece na primeira vez que o programa abre, ao lado do Fluxo por padrões (o padrão) e do Fluxo por disparo de clipes.
 
 ## O que ele tem
 

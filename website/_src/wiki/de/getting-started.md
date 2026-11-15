@@ -1,7 +1,7 @@
 ---
-source: a6d9063ec3
+source: 0101adbb66
 ---
-LYNX SHARE ist eine kostenlose Open-Source-DAW für Windows, macOS und Linux. Sie arbeitet mit Patterns: Du programmierst sie im Channel Rack und im Piano Roll, arrangierst sie in der Playlist und mischst sie im Mixer. Sie öffnet FL-Studio-Projekte (`.flp`) und Ableton-Live-Sets (`.als`) und speichert im eigenen Format `.lynx`.
+LYNX SHARE ist eine kostenlose Open-Source-DAW für Windows, macOS und Linux mit drei Arbeitsabläufen in einem Programm. Der Standard ist der FL-Studio-Arbeitsablauf: Du programmierst Patterns im Channel Rack und im Piano Roll, arrangierst sie in der Playlist und mischst sie im Mixer. Der Clip-Start-Arbeitsablauf startet Clips und Szenen aus einem Raster, im Stil von Ableton Live, und der Einfache Arbeitsablauf verbindet den zugänglichen Ein-Fenster-Stil von BandLab mit der Arbeitsweise von FL Studio Mobile. `Ansicht › Layout-Stil` wechselt jederzeit zwischen ihnen. Sie öffnet FL-Studio-Projekte (`.flp`), Ableton-Live-Sets (`.als`) und FL-Studio-Mobile-Projekte (`.flm`) und speichert im eigenen Format `.lynx`.
 
 Es ist eine Alpha. Rechne mit Fehlern und speichere oft.
 
@@ -9,7 +9,7 @@ Es ist eine Alpha. Rechne mit Fehlern und speichere oft.
 
 1. Prüfe in der Tabelle unten, ob dein System unterstützt wird.
 2. Lade es herunter und installiere es. [Installation](/wiki/install/) hat die Schritte für jedes System.
-3. Starte es. Ein kurzer Einrichtungsassistent wählt die Sprache, testet den Audioausgang und listet die Plugin-Ordner auf, die danach im Hintergrund durchsucht werden. Du kannst ihn überspringen und später über `Optionen › Einrichtungsassistent (Sprache, Audio, Plugin-Ordner)...` wieder öffnen.
+3. Starte es. Ein kurzer Einrichtungsassistent wählt die Sprache, testet den Audioausgang, lässt dich einen der drei Arbeitsabläufe wählen und listet die Plugin-Ordner auf, die danach im Hintergrund durchsucht werden. Du kannst ihn überspringen und später über `Optionen › Einrichtungsassistent (Sprache, Audio, Plugin-Ordner)...` wieder öffnen.
 4. Wenn du nichts hörst, gehe zu [Audio einrichten](/wiki/audio-setup/).
 5. Lies [Rundgang durch das Fenster](/wiki/tour/) und mache dann [Dein erster Song](/wiki/first-song/).
 
@@ -45,6 +45,7 @@ LYNX.exe --showcase out.lynx
 
 | Du möchtest | Lies |
 |---|---|
+| Einen Arbeitsablauf wählen | [Layouts](/wiki/layouts/), [Einfaches Layout](/wiki/simple-layout/) |
 | Jedes Fenster kennenlernen | [Channel Rack](/wiki/channel-rack/), [Piano Roll](/wiki/piano-roll/), [Playlist](/wiki/playlist/), [Mixer](/wiki/mixer/), [Browser](/wiki/browser/) |
 | Ein Projekt aus einem anderen Programm öffnen | [Umstieg von FL Studio](/wiki/coming-from-fl-studio/), [Umstieg von Ableton Live](/wiki/coming-from-ableton/) |
 | Deine VST-, CLAP-, LV2- oder AU-Plugins nutzen | [Plugins](/wiki/plugins/) |

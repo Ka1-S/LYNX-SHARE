@@ -1,11 +1,11 @@
 ---
-source: e15b0e3ba5
+source: 4ac6a04fd7
 ---
 ![Il Clip-launch workflow: una griglia di clip e scene a sinistra, il Selettore e la Playlist a destra](/assets/img/cliplaunch.webp)
 
 `Vista › Stile del layout` ha tre voci: `Flusso a pattern (predefinito)`, `Flusso a lancio di clip` e `Flusso semplice`. La stessa scelta è in `Opzioni › Impostazioni generali`, sotto Flusso di lavoro. La scelta si mantiene quando chiudi il programma.
 
-Il flusso a pattern è il Channel Rack, i pattern e la Playlist. Il flusso a lancio di clip aggiunge una griglia di clip con scene accanto alla Playlist. I pattern e il Channel Rack restano disponibili.
+Il flusso a pattern, quello predefinito, funziona come FL Studio: il Channel Rack, i pattern, il Piano Roll, la Playlist e il Mixer. Il flusso a lancio di clip, nello stile di Ableton Live, aggiunge una griglia di clip con scene accanto alla Playlist, un mixer della sessione e le viste clip e dispositivo; i pattern e il Channel Rack restano disponibili. Il flusso semplice unisce lo stile accessibile a finestra unica di BandLab al modo di lavorare di FL Studio Mobile: tracce e timeline, loop, pad e registrazione rapida. Cambiare flusso sposta solo le finestre: il progetto resta lo stesso.
 
 ## Lanciare le clip nella griglia
 
@@ -62,7 +62,7 @@ Quando apri un set di Live, le sue clip Session e le sue scene vanno nella grigl
 
 ## Il flusso Simple
 
-`Vista › Stile del layout › Flusso semplice` è una sola finestra con le tracce e la timeline, per un primo brano. `Vista › Pannello della traccia` mostra sotto la timeline un pannello per la traccia selezionata, con le schede `Effetti`, `Strumento`, `Tastiera` e `Editor`. In questo flusso, il menu `Aiuto` ha `Tour della prima canzone` e `Schermata di benvenuto...`, che offre un primo brano in sette passi, un brano dimostrativo o un progetto vuoto. Vedi [Layout Simple](/wiki/simple-layout/).
+`Vista › Stile del layout › Flusso semplice` è una sola finestra con le tracce e la timeline, nello stile di BandLab e FL Studio Mobile, ed è adatto a un primo brano. `Vista › Pannello della traccia` mostra sotto la timeline un pannello per la traccia selezionata, con le schede `Effetti`, `Strumento`, `Tastiera` e `Editor`. In questo flusso, il menu `Aiuto` ha `Tour della prima canzone` e `Schermata di benvenuto...`, che offre un primo brano in sette passi, un brano dimostrativo o un progetto vuoto. Vedi [Layout Simple](/wiki/simple-layout/).
 
 `Testo e note` e `Abbinamento al riferimento...` nel menu `Vista`, e `Voce pulita` nel menu di un insert del Mixer, ci sono in ogni layout. Nel flusso Simple, `Voce pulita` è anche nel menu di una traccia.
 

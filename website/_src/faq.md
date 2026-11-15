@@ -13,7 +13,7 @@ Windows 10 and 11 (64-bit), macOS 11 or newer (Apple Silicon and Intel) and Linu
 
 ## Is this FL Studio, or made by Image-Line?
 
-No. LYNX SHARE is an independent program with an FL Studio-style workflow. FL Studio's behaviour and file format were studied clean-room, no Image-Line code was copied, and LYNX SHARE is not affiliated with Image-Line.
+No. LYNX SHARE is an independent program. Its default workflow works the way FL Studio does, next to a Clip-launch workflow in the style of Ableton Live and a Simple workflow in the style of BandLab and FL Studio Mobile. FL Studio's behaviour and file format were studied clean-room, no Image-Line code was copied, and LYNX SHARE is not affiliated with Image-Line.
 
 ## Does it open my FL Studio projects, and what is lost?
 
@@ -59,9 +59,9 @@ Fifteen: English, Simplified Chinese, Traditional Chinese, Dutch, French, German
 
 Open an issue at [github.com/Ka1-S/LYNX-SHARE/issues](https://github.com/Ka1-S/LYNX-SHARE/issues), or use `Help › Report a problem...` inside the program. The source code is in the same repository, and pull requests from contributors have been merged in past releases.
 
-## Is there a simpler layout for beginners?
+## What are the three workflows?
 
-Yes. `View › Layout style › Simple workflow` shows one window with the tracks and the timeline, and the setup wizard offers it at the first start. The Pattern workflow stays the default, and the same menu switches back. See [Simple layout](/wiki/simple-layout/).
+LYNX SHARE has three ways of working in one program, and `View › Layout style` switches between them at any time without changing the project. The Pattern workflow, the default, is the FL Studio workflow: Channel rack, Piano roll, Playlist and Mixer. The Clip-launch workflow, in the style of Ableton Live, adds a grid of clips and scenes, a Session mixer and the clip and device views. The Simple workflow mixes BandLab's approachable one-window style with FL Studio Mobile's way of working: tracks and a timeline, loops, pads and quick recording, which makes it a good place for a first song. The setup wizard offers all three at the first start. See [Layouts](/wiki/layouts/) and [Simple layout](/wiki/simple-layout/).
 
 ## Will an update change how my projects sound?
 

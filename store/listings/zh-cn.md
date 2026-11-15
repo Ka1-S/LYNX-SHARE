@@ -8,17 +8,22 @@ LYNX SHARE
 
 ## Short description
 
-免费开源的DAW，提供模式与片段启动两种工作流程：Channel Rack、Piano Roll、Playlist、Mixer和片段网格。可打开.flp、.als和.flm工程。
+免费开源的DAW，一个程序提供三种工作流程：FL Studio风格的模式（Channel Rack、Piano Roll、Playlist、Mixer）、Ableton Live风格的片段启动，以及BandLab和FL Studio Mobile风格的简易单窗口模式。可打开.flp、.als和.flm工程。
 
 ## Description
 
-LYNX SHARE是一款免费开源的数字音频工作站，用来制作节拍和歌曲。它把两种工作方式结合在一起：默认的FL Studio风格模式工作流程（带步进音序器的Channel Rack、模式、Piano Roll、带编曲的Playlist，以及带插入、发送和侧链的Mixer），以及只需切换一个设置的、带场景的Ableton Live风格片段网格。它在任何PC上都能保持轻快。
+LYNX SHARE是一款免费开源的数字音频工作站，用来制作节拍和歌曲。它在一个程序里提供三种工作流程，可随时切换，不会改变工程：
+
+• FL Studio风格的模式（默认）：带步进音序器的Channel Rack、模式、Piano Roll、带编曲的Playlist，以及带插入、发送和侧链的Mixer。
+• Ableton Live风格的片段启动：片段和场景的网格、会话混音器，以及片段视图和设备视图。
+• 简易工作流程，把BandLab易上手的单窗口风格和FL Studio Mobile的工作方式结合在一起：音轨和时间线、循环、打击垫和快速录音，还有引导式的第一首歌。
+
+它在任何PC上都能保持轻快。
 
 • 轻量：无锁音频引擎将通道和混音轨分配到所有 CPU 核心，自动跳过空闲通道，长音频直接从硬盘流式读取。
 • 齐全：100 多款内置乐器和效果器——合成器、鼓机、采样器、均衡器、压缩器、限幅器、混响、延迟、音高校正、可视化工具等等。
 • 你的插件：支持 VST3、CLAP 和 VST2 乐器与效果器，每个插件都可选择在独立的沙箱进程中运行，插件崩溃也不会拖垮整个工程。
 • 你的工程：打开FL Studio工程（.flp），包括模式、音符、混音器、自动化和采样；打开并保存Ableton Live 11/12套装（.als），包括Session片段；可导出.flp回到FL Studio；可导入FL Studio Mobile工程（.flm，部分支持）和MIDI文件。
-• 轻松上手：简易工作流程为新手提供一个包含音轨和时间线的窗口、起始节奏，以及一键就能演奏的乐器。
 • 低延迟：支持 ASIO（包括适用于任何设备的 LYNX SHARE 自带 ASIO 驱动）以及 WASAPI 共享和独占模式。
 • 录制音频和 MIDI、编辑音频、自动化任意参数，导出为 WAV、FLAC、MP3、OGG 或分轨（stems）。
 • 界面语言：简体中文、繁体中文、英语、葡萄牙语、西班牙语、法语、德语、日语、韩语等 15 种语言。
@@ -35,7 +40,7 @@ LYNX SHARE 0.1.28：更快更轻，窗口大约一秒就准备好，大型工程
 
 ## Features
 
-1. 三种工作流程：默认基于模式（Channel Rack、Piano Roll、Playlist、Mixer），或带场景的片段网格，或面向新手的简易工作流程
+1. 一个程序，三种工作流程：默认是FL Studio风格的模式，或Ableton Live风格的片段启动，或BandLab和FL Studio Mobile风格的简易工作流程
 2. 打开FL Studio（.flp）、Ableton Live（.als）和FL Studio Mobile（.flm）工程以及MIDI文件；保存为.als和.flp
 3. 100 多款内置乐器和效果器
 4. 支持 VST3、CLAP 和 VST2 插件，可选在独立进程中沙箱运行

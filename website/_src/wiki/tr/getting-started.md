@@ -1,7 +1,7 @@
 ---
-source: a6d9063ec3
+source: 0101adbb66
 ---
-LYNX SHARE; Windows, macOS ve Linux için ücretsiz, açık kaynaklı bir DAW'dır. Pattern'lerle çalışır: onları Channel Rack ve Piano Roll'da programlar, Playlist'te aranje eder ve Mixer'de mixlersiniz. FL Studio projelerini (`.flp`) ve Ableton Live set'lerini (`.als`) açar, kendi `.lynx` formatında kaydeder.
+LYNX SHARE; Windows, macOS ve Linux için tek programda üç iş akışı sunan, ücretsiz ve açık kaynaklı bir DAW'dır. Varsayılan, FL Studio iş akışıdır: pattern'leri Channel Rack ve Piano Roll'da programlar, Playlist'te aranje eder ve Mixer'de mixlersiniz. Klip başlatma iş akışı, Ableton Live tarzında klipleri ve sahneleri bir gridden başlatır; Basit iş akışı ise BandLab'in kolay tek pencereli tarzını FL Studio Mobile'ın çalışma biçimiyle birleştirir. `Görünüm › Yerleşim stili` aralarında istediğiniz zaman geçiş yapar. FL Studio projelerini (`.flp`), Ableton Live set'lerini (`.als`) ve FL Studio Mobile projelerini (`.flm`) açar, kendi `.lynx` formatında kaydeder.
 
 Alfa sürümdedir. Hatalar olabilir, sık sık kaydedin.
 
@@ -9,7 +9,7 @@ Alfa sürümdedir. Hatalar olabilir, sık sık kaydedin.
 
 1. Sisteminizin desteklenip desteklenmediğini aşağıdaki tablodan kontrol edin.
 2. İndirin ve kurun. [Kurulum](/wiki/install/) sayfasında her sistem için adımlar var.
-3. Başlatın. Kısa bir kurulum sihirbazı dili seçer, ses çıkışını dener ve arka planda taranacak plugin klasörlerini listeler. Sihirbazı atlayabilir, sonra `Seçenekler › Kurulum sihirbazı (dil, ses, plugin klasörleri)...` ile yeniden açabilirsiniz.
+3. Başlatın. Kısa bir kurulum sihirbazı dili seçer, ses çıkışını dener, üç iş akışından birini seçmenizi sağlar ve arka planda taranacak plugin klasörlerini listeler. Sihirbazı atlayabilir, sonra `Seçenekler › Kurulum sihirbazı (dil, ses, plugin klasörleri)...` ile yeniden açabilirsiniz.
 4. Hiçbir şey duymuyorsanız [Ses ayarı](/wiki/audio-setup/) sayfasına gidin.
 5. [Pencerenin turu](/wiki/tour/) sayfasını okuyun, sonra [İlk şarkınızı](/wiki/first-song/) yapın.
 
@@ -45,6 +45,7 @@ LYNX.exe --showcase out.lynx
 
 | İstediğiniz | Okuyun |
 |---|---|
+| Bir iş akışı seçmek | [Yerleşimler](/wiki/layouts/), [Basit yerleşim](/wiki/simple-layout/) |
 | Her pencereyi öğrenmek | [Channel Rack](/wiki/channel-rack/), [Piano Roll](/wiki/piano-roll/), [Playlist](/wiki/playlist/), [Mixer](/wiki/mixer/), [Browser](/wiki/browser/) |
 | Başka bir programdan proje açmak | [FL Studio'dan geliyorsanız](/wiki/coming-from-fl-studio/), [Ableton Live'dan geliyorsanız](/wiki/coming-from-ableton/) |
 | VST, CLAP, LV2 veya AU plugin'lerinizi kullanmak | [Plugin'ler](/wiki/plugins/) |

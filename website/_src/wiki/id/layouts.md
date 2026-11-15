@@ -1,11 +1,11 @@
 ---
-source: e15b0e3ba5
+source: 4ac6a04fd7
 ---
 ![Alur kerja peluncuran klip: kisi clip dan scene di kiri, Picker dan Playlist di kanan](/assets/img/cliplaunch.webp)
 
 `Tampilan › Gaya tata letak` punya tiga entri: `Alur kerja pattern (bawaan)`, `Alur kerja peluncuran klip`, dan `Alur kerja sederhana`. Pilihan yang sama ada di `Opsi › Pengaturan umum`, di bawah Workflow. Pilihan itu tersimpan saat kamu menutup program.
 
-Alur kerja Pattern adalah Channel Rack, pattern, dan Playlist. Alur kerja peluncuran klip menambahkan kisi clip dengan scene di samping Playlist. Pattern dan Channel Rack tetap tersedia.
+Alur kerja Pattern, yang menjadi bawaan, bekerja seperti FL Studio: Channel Rack, pattern, Piano Roll, Playlist, dan Mixer. Alur kerja peluncuran klip, bergaya Ableton Live, menambahkan kisi clip dengan scene di samping Playlist, mixer Session, serta tampilan clip dan perangkat; pattern dan Channel Rack tetap tersedia. Alur kerja sederhana memadukan gaya satu jendela BandLab yang mudah dengan cara kerja FL Studio Mobile: track dan timeline, loop, pad, dan perekaman cepat. Beralih hanya memindahkan jendela: proyeknya tetap sama.
 
 ## Meluncurkan clip di kisi
 
@@ -62,7 +62,7 @@ Saat kamu membuka set Live, clip Session dan scene-nya masuk ke kisi clip, beser
 
 ## Alur kerja Simple
 
-`Tampilan › Gaya tata letak › Alur kerja sederhana` adalah satu jendela dengan track dan timeline, untuk lagu pertama. `Tampilan › Dok trek` menampilkan dock di bawah timeline untuk track terpilih, dengan tab `Efek`, `Instrumen`, `Keyboard`, dan `Editor`. Dalam alur kerja ini, menu `Bantuan` punya `Tur lagu pertama` dan `Layar selamat datang...`, yang menawarkan lagu pertama tujuh langkah, lagu demo, atau proyek kosong. Lihat [Layout Simple](/wiki/simple-layout/).
+`Tampilan › Gaya tata letak › Alur kerja sederhana` adalah satu jendela dengan track dan timeline, bergaya BandLab dan FL Studio Mobile, dan cocok untuk lagu pertama. `Tampilan › Dok trek` menampilkan dock di bawah timeline untuk track terpilih, dengan tab `Efek`, `Instrumen`, `Keyboard`, dan `Editor`. Dalam alur kerja ini, menu `Bantuan` punya `Tur lagu pertama` dan `Layar selamat datang...`, yang menawarkan lagu pertama tujuh langkah, lagu demo, atau proyek kosong. Lihat [Layout Simple](/wiki/simple-layout/).
 
 `Lirik dan catatan` dan `Pencocokan referensi...` di menu `Tampilan`, serta `Suara bersih` di menu insert Mixer, tersedia di setiap layout. Dalam alur kerja Simple, `Suara bersih` juga ada di menu track.
 

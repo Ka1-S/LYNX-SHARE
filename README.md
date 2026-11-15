@@ -4,7 +4,7 @@
 
 <h1 align="center">LYNX SHARE</h1>
 
-<p align="center"><strong>A lightweight DAW with FL Studio-style patterns and Ableton Live-style clips.</strong><br>
+<p align="center"><strong>A lightweight DAW with three workflows in one program: FL Studio-style patterns, Ableton Live-style clip launching and a simple one-window mode.</strong><br>
 Free and open source, for Windows, macOS and Linux. Opens your FL Studio, Ableton Live and FL Studio Mobile projects.</p>
 
 <p align="center">
@@ -45,10 +45,18 @@ Free and open source, for Windows, macOS and Linux. Opens your FL Studio, Ableto
 
 ## What is LYNX SHARE?
 
-LYNX SHARE is a free, open-source digital audio workstation. Out of the box it works the way FL Studio does: you build
-patterns in the **Channel Rack** and **Piano Roll**, arrange them in the **Playlist** and mix in the **Mixer**, with the
-windows and shortcuts where you expect them. Two optional layouts sit one click away: a **Clip-launch** workflow with an
-Ableton Live-style clip grid and scenes, and a **Simple** workflow, inspired by BandLab, for making a first song.
+LYNX SHARE is a free, open-source digital audio workstation with three workflows in one program. You can switch
+between them at any time in *View › Layout style*; the project stays the same, only the windows change.
+
+1. **The FL Studio workflow** (the default, *Pattern workflow* in the menu): you build patterns in the **Channel Rack**
+   and **Piano Roll**, arrange them in the **Playlist** and mix in the **Mixer**, with the windows and shortcuts where
+   you expect them.
+2. **The Clip-launch workflow**, in the style of Ableton Live: a grid of clips and scenes to launch, a Session mixer
+   under it, and a Clip View and Device View for the selected clip and track. Live sets open with their Session clips
+   in the grid.
+3. **The Simple workflow**, which mixes BandLab's approachable one-window style with the way FL Studio Mobile works:
+   tracks and a timeline in one window, loops and pads, and quick recording. FL Studio Mobile projects (`.flm`) open
+   in it.
 
 It opens FL Studio (`.flp`), Ableton Live (`.als`) and FL Studio Mobile (`.flm`) projects, and exports `.flp` and
 `.als` back, so your work is not locked in. It is written from scratch in C++20 with JUCE 8, licensed under the
@@ -57,8 +65,9 @@ AGPL-3.0, and still an **alpha**.
 **It's for you if you…**
 
 - know FL Studio and want a free, open-source DAW that works the same way, on Windows, macOS or Linux;
+- like to launch clips and scenes the way Ableton Live does, and want that next to patterns in the same program;
 - move projects between FL Studio, FL Studio Mobile and Ableton Live, or collaborate with people who use them;
-- are making your first song and want one simple window to start in;
+- are making your first song, maybe coming from BandLab or FL Studio Mobile, and want one simple window to start in;
 - have a modest computer and want a DAW that stays light.
 
 ## Why LYNX SHARE
@@ -67,14 +76,14 @@ AGPL-3.0, and still an **alpha**.
 |---|---|
 | 🎹 **The FL Studio workflow** | Channel Rack, Piano Roll, Playlist with several arrangements, and a Mixer with inserts, sends and sidechain. The default layout, never watered down. |
 | 📂 **Your projects come with you** | Opens `.flp`, `.als` (Live 11 and 12) and `.flm`; exports `.flp` and `.als`. FL Studio's native plugins play on LYNX SHARE's own engines, so a project that uses them plays without FL Studio installed. |
-| 🎛️ **Three layouts, one program** | Patterns by default, a clip grid with scenes when you want to jam, or one simple window for a first song. Switch any time in *View › Layout style*. |
+| 🎛️ **Three workflows, one program** | The FL Studio workflow by default, a Clip-launch workflow in the style of Ableton Live, and a Simple workflow that mixes BandLab's one-window style with FL Studio Mobile's. Switch any time in *View › Layout style*; the project stays the same. |
 | 🤝 **Make music together** | Send a project to a friend as one file, or work on it live with up to three other people, end-to-end encrypted. |
 | ⚡ **Lightweight** | A lock-free engine that spreads channels and mixer tracks across CPU cores, skips idle channels, renders ahead what you are not playing live and streams long audio from disk. Measured on one Windows PC, LYNX SHARE 0.1.28 opened FL's *Thief* demo in 5.2 s with 345 MB of memory (FL Studio 2026: 12.2 s, 874 MB), its window was ready in about 1 s (FL Studio: 1.7 s), and a playing song is drawn at 143 frames a second (FL Studio: 143.8) ([0.1.28 notes](https://github.com/Ka1-S/LYNX-SHARE/releases/tag/v0.1.28-alpha)). |
 | 🆓 **Free, open source, clean-room** | No price, no account, no subscription. Every behaviour was studied from the outside and written from scratch: no Image-Line or Ableton code is in it. |
 
 ## Features
 
-### The pattern workflow (default)
+### The FL Studio workflow (default)
 
 <table>
 <tr>
@@ -111,7 +120,7 @@ any insert to any hardware output.
 </tr>
 </table>
 
-### The Clip-launch workflow (optional)
+### The Clip-launch workflow, in the style of Ableton Live (optional)
 
 <p align="center">
   <img src="docs/img/clip-launch.png" alt="The Clip-launch workflow: a clip grid with scenes next to the Playlist" width="100%">
@@ -122,14 +131,15 @@ columns, scenes are rows. Clips have launch modes, quantisation and follow actio
 View. Under the grid there is a Session mixer; there are also instrument, audio-effect and MIDI-effect racks, a Drum
 Rack, Draw Mode and MIDI / Key Map Modes, Live's Freeze Track and Bounce, clip envelopes, and **Ableton Link** to play
 in sync with Live and other Link apps. Live sets bring their Session clips and scenes straight into the grid. The
-pattern workflow stays the default, and nothing is taken away from it.
+FL Studio workflow stays the default, and nothing is taken away from it.
 
-### The Simple workflow (optional)
+### The Simple workflow, in the style of BandLab and FL Studio Mobile (optional)
 
-*View › Layout style › Simple workflow* is one window with the tracks and the timeline, inspired by BandLab and
-FL Studio Mobile. Add a voice, an instrument, a 16-pad sampler or a starter beat in one click, bring in a folder of
+*View › Layout style › Simple workflow* mixes BandLab's approachable one-window style with the way FL Studio Mobile
+works: the tracks and the timeline in one window, loops and pads, and quick recording. FL Studio Mobile projects
+(`.flm`) open in it too. Add a voice, an instrument, a 16-pad sampler or a starter beat in one click, bring in a folder of
 stems and MIDI from another app, shape the sound with eight one-knob effects, play chords on a Chord pad and save the song as a file from the Finish dock. *Make my first song*
-walks you through it step by step. The setup wizard offers all three layouts at the first start.
+walks you through it step by step. The setup wizard offers all three workflows at the first start.
 
 ### Instruments and effects
 
@@ -330,9 +340,9 @@ place with [Gear Lever](https://github.com/mijorus/gearlever) or AppImageUpdate.
 ## Getting started
 
 1. **Install** LYNX SHARE (above) and open it.
-2. **The setup wizard** picks the language, tests your audio device, lets you choose a layout and scans your plugin
-   folders in the background: the standard VST3 and CLAP folders plus the ones FL Studio uses on the same computer. You
-   can skip it and reopen it later from *Options › Setup wizard*.
+2. **The setup wizard** picks the language, tests your audio device, lets you choose one of the three workflows and
+   scans your plugin folders in the background: the standard VST3 and CLAP folders plus the ones FL Studio uses on the
+   same computer. You can skip it and reopen it later from *Options › Setup wizard*.
 3. **Open a project** with *File › Open*: one of yours (`.flp`, `.als`, `.flm`, MIDI), or the demo project
    (`Demo.lynx`, included with every download).
 4. **Learn as you go** with the [wiki](https://lynx-share.com/wiki/):

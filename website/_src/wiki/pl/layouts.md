@@ -1,11 +1,11 @@
 ---
-source: e15b0e3ba5
+source: 4ac6a04fd7
 ---
 ![Praca z uruchamianiem klipów: siatka klipów i scen po lewej, wybór pluginu i Playlist po prawej](/assets/img/cliplaunch.webp)
 
 `Widok › Styl układu` ma trzy pozycje: `Praca na wzorcach (domyślnie)`, `Praca z uruchamianiem klipów` i `Prosty sposób pracy`. Ten sam wybór jest w `Opcje › Ustawienia ogólne`, w sekcji Sposób pracy. Wybór jest zapamiętywany po zamknięciu programu.
 
-Praca na wzorcach to Channel Rack, patterny i Playlist. Praca z uruchamianiem klipów dodaje obok Playlisty siatkę klipów ze scenami. Patterny i Channel Rack pozostają dostępne.
+Praca na wzorcach, domyślna, działa tak jak FL Studio: Channel Rack, patterny, Piano Roll, Playlist i Mixer. Praca z uruchamianiem klipów, w stylu Ableton Live, dodaje obok Playlisty siatkę klipów ze scenami, mikser sesji oraz widok klipu i urządzeń; patterny i Channel Rack pozostają dostępne. Prosty sposób pracy łączy przystępny, jednookienkowy styl BandLab ze sposobem pracy FL Studio Mobile: ścieżki i oś czasu, pętle, pady i szybkie nagrywanie. Przełączenie przestawia tylko okna: projekt zostaje ten sam.
 
 ## Uruchamiaj klipy w siatce
 
@@ -62,7 +62,7 @@ Gdy otwierasz set Live, jego klipy i sceny Session trafiają do siatki klipów r
 
 ## Prosty sposób pracy
 
-`Widok › Styl układu › Prosty sposób pracy` to jedno okno ze ścieżkami i osią czasu, na pierwszy utwór. `Widok › Panel ścieżki` pokazuje pod osią czasu dok wybranej ścieżki, z kartami `Efekty`, `Instrument`, `Klawiatura` i `Edytor`. W tym sposobie pracy menu `Pomoc` ma `Samouczek pierwszej piosenki` i `Ekran powitalny...`, które oferuje siedmiokrokowy pierwszy utwór, utwór demo albo pusty projekt. Zobacz [Prosty układ](/wiki/simple-layout/).
+`Widok › Styl układu › Prosty sposób pracy` to jedno okno ze ścieżkami i osią czasu, w stylu BandLab i FL Studio Mobile, które dobrze nadaje się na pierwszy utwór. `Widok › Panel ścieżki` pokazuje pod osią czasu dok wybranej ścieżki, z kartami `Efekty`, `Instrument`, `Klawiatura` i `Edytor`. W tym sposobie pracy menu `Pomoc` ma `Samouczek pierwszej piosenki` i `Ekran powitalny...`, które oferuje siedmiokrokowy pierwszy utwór, utwór demo albo pusty projekt. Zobacz [Prosty układ](/wiki/simple-layout/).
 
 `Tekst i notatki` i `Dopasowanie do referencji...` w menu `Widok` oraz `Czysty wokal` w menu insertu Mixera są dostępne w każdym układzie. W prostym sposobie pracy `Czysty wokal` jest też w menu ścieżki.
 

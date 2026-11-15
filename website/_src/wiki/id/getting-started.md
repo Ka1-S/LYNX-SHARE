@@ -1,7 +1,7 @@
 ---
-source: a6d9063ec3
+source: 0101adbb66
 ---
-LYNX SHARE adalah DAW gratis dan open-source untuk Windows, macOS, dan Linux. Cara kerjanya berbasis pattern: kamu memprogramnya di Channel Rack dan Piano Roll, menyusunnya di Playlist, dan memixnya di Mixer. Program ini membuka proyek FL Studio (`.flp`) dan set Ableton Live (`.als`), dan menyimpan format `.lynx` miliknya sendiri.
+LYNX SHARE adalah DAW gratis dan open-source untuk Windows, macOS, dan Linux dengan tiga alur kerja dalam satu program. Bawaannya adalah alur kerja FL Studio: kamu memprogram pattern di Channel Rack dan Piano Roll, menyusunnya di Playlist, dan memixnya di Mixer. Alur kerja peluncuran klip meluncurkan clip dan scene dari kisi, bergaya Ableton Live, dan alur kerja sederhana memadukan gaya satu jendela BandLab yang mudah dengan cara kerja FL Studio Mobile. `Tampilan › Gaya tata letak` beralih di antaranya kapan saja. Program ini membuka proyek FL Studio (`.flp`), set Ableton Live (`.als`), dan proyek FL Studio Mobile (`.flm`), dan menyimpan format `.lynx` miliknya sendiri.
 
 Ini masih alpha. Harap maklum jika ada bug, dan simpan sesering mungkin.
 
@@ -9,7 +9,7 @@ Ini masih alpha. Harap maklum jika ada bug, dan simpan sesering mungkin.
 
 1. Periksa tabel di bawah untuk memastikan sistemmu didukung.
 2. Unduh dan instal. [Instalasi](/wiki/install/) berisi langkah untuk tiap sistem.
-3. Jalankan. Wizard pengaturan singkat memilih bahasa, menguji output audio, dan mencantumkan folder plugin, yang lalu dipindai di latar belakang. Kamu bisa melewatinya dan membukanya lagi nanti lewat `Opsi › Wizard penyiapan (bahasa, audio, folder plugin)...`.
+3. Jalankan. Wizard pengaturan singkat memilih bahasa, menguji output audio, memungkinkan kamu memilih salah satu dari tiga alur kerja, dan mencantumkan folder plugin, yang lalu dipindai di latar belakang. Kamu bisa melewatinya dan membukanya lagi nanti lewat `Opsi › Wizard penyiapan (bahasa, audio, folder plugin)...`.
 4. Jika kamu tidak mendengar apa-apa, buka [Pengaturan audio](/wiki/audio-setup/).
 5. Baca [Tur jendela](/wiki/tour/), lalu buat [Lagu pertamamu](/wiki/first-song/).
 
@@ -45,6 +45,7 @@ LYNX.exe --showcase out.lynx
 
 | Kamu ingin | Baca |
 |---|---|
+| Memilih alur kerja | [Tata letak](/wiki/layouts/), [Tata letak sederhana](/wiki/simple-layout/) |
 | Mempelajari tiap jendela | [Channel Rack](/wiki/channel-rack/), [Piano Roll](/wiki/piano-roll/), [Playlist](/wiki/playlist/), [Mixer](/wiki/mixer/), [Browser](/wiki/browser/) |
 | Membuka proyek dari program lain | [Pindahan dari FL Studio](/wiki/coming-from-fl-studio/), [Pindahan dari Ableton Live](/wiki/coming-from-ableton/) |
 | Memakai plugin VST, CLAP, LV2, atau AU milikmu | [Plugin](/wiki/plugins/) |

@@ -1,7 +1,7 @@
 ---
-source: b8320812e9
+source: 2ccec7b23f
 ---
-`Vue › Style de disposition › Flux simple` affiche une fenêtre avec les pistes et la timeline. Il est conçu pour un premier morceau. L'assistant de configuration le propose au premier démarrage, à côté du Flux par patterns (celui par défaut) et du Flux par lancement de clips.
+`Vue › Style de disposition › Flux simple` affiche une fenêtre avec les pistes et la timeline. Il mêle le style accessible en une seule fenêtre de BandLab à la façon de travailler de FL Studio Mobile (pistes, boucles, pads et enregistrement rapide), et convient à un premier morceau. Les projets FL Studio Mobile (`.flm`) s'y ouvrent, comme dans les autres flux. L'assistant de configuration le propose au premier démarrage, à côté du Flux par patterns (celui par défaut) et du Flux par lancement de clips.
 
 ## Ce qu'il contient
 

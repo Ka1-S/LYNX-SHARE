@@ -6,9 +6,9 @@
     "ws.ph": "Search the wiki"
   },
   "text": {
-    "m.home.t": "LYNX SHARE: a lightweight open-source DAW that opens FL Studio and Ableton Live projects",
-    "m.home.d": "LYNX SHARE is a free, open-source DAW for Windows, macOS and Linux with FL Studio's way of working: Channel rack, Piano roll, Playlist and Mixer. It opens .flp, .als and .flm projects and exports .flp and .als.",
-    "m.features.d": "What LYNX SHARE does in the current release: the windows, the Clip-launch and Simple layouts, .flp, .als and .flm projects, built-in instruments and effects, and the plugin formats it hosts.",
+    "m.home.t": "LYNX SHARE: a lightweight open-source DAW with three workflows that opens FL Studio and Ableton Live projects",
+    "m.home.d": "LYNX SHARE is a free, open-source DAW for Windows, macOS and Linux with three workflows in one program: FL Studio's way of working (Channel rack, Piano roll, Playlist and Mixer), clip launching in the style of Ableton Live, and a simple one-window mode in the style of BandLab and FL Studio Mobile. It opens .flp, .als and .flm projects and exports .flp and .als.",
+    "m.features.d": "What LYNX SHARE does in the current release: the windows, its three workflows (FL Studio, Clip-launch and Simple), .flp, .als and .flm projects, built-in instruments and effects, and the plugin formats it hosts.",
     "m.download.d": "Download LYNX SHARE for Windows, macOS or Linux: installer, portable zip, dmg, AppImage and tar.gz, with install notes for each system.",
     "m.updates.d": "What is new, better and fixed in each LYNX SHARE release, newest first.",
     "m.wiki.d": "The LYNX SHARE manual: getting started, every window of the workspace, a page for each built-in instrument and effect, settings, shortcuts, file formats and troubleshooting.",

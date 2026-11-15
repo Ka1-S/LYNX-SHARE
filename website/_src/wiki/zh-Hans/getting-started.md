@@ -1,7 +1,7 @@
 ---
-source: a6d9063ec3
+source: 0101adbb66
 ---
-LYNX SHARE 是一款免费开源的 DAW，支持 Windows、macOS 和 Linux。它以样式为核心：你在通道机架和钢琴卷帘中编写样式，在播放列表中编排，在混音台中混音。它能打开 FL Studio 工程（`.flp`）和 Ableton Live 套装（`.als`），并以自己的 `.lynx` 格式保存。
+LYNX SHARE 是一款免费开源的 DAW，支持 Windows、macOS 和 Linux，一个程序里有三种工作流程。默认是 FL Studio 工作流程：你在通道机架和钢琴卷帘中编写样式，在播放列表中编排，在混音台中混音。片段启动工作流程以 Ableton Live 的风格从网格启动片段和场景，简易工作流程则把 BandLab 易上手的单窗口风格和 FL Studio Mobile 的工作方式结合在一起。`视图 › 布局样式` 可随时在它们之间切换。它能打开 FL Studio 工程（`.flp`）、Ableton Live 套装（`.als`）和 FL Studio Mobile 工程（`.flm`），并以自己的 `.lynx` 格式保存。
 
 它目前是 alpha 版。可能会有错误，请经常保存。
 
@@ -9,7 +9,7 @@ LYNX SHARE 是一款免费开源的 DAW，支持 Windows、macOS 和 Linux。它
 
 1. 查看下面的表格，确认你的系统受支持。
 2. 下载并安装。[安装](/wiki/install/)中有各系统的步骤。
-3. 启动它。一个简短的设置向导会选择语言、测试音频输出，并列出插件文件夹，这些文件夹随后会在后台扫描。你可以跳过它，之后用 `选项 › 设置向导（语言、音频、插件文件夹）...` 重新打开。
+3. 启动它。一个简短的设置向导会选择语言、测试音频输出、让你从三种工作流程中选择一种，并列出插件文件夹，这些文件夹随后会在后台扫描。你可以跳过它，之后用 `选项 › 设置向导（语言、音频、插件文件夹）...` 重新打开。
 4. 如果听不到声音，请看[音频设置](/wiki/audio-setup/)。
 5. 阅读[窗口导览](/wiki/tour/)，然后做出[你的第一首歌](/wiki/first-song/)。
 
@@ -45,6 +45,7 @@ LYNX.exe --showcase out.lynx
 
 | 你想要 | 阅读 |
 |---|---|
+| 选择工作流程 | [布局](/wiki/layouts/)、[简易布局](/wiki/simple-layout/) |
 | 了解每个窗口 | [通道机架](/wiki/channel-rack/)、[钢琴卷帘](/wiki/piano-roll/)、[播放列表](/wiki/playlist/)、[混音台](/wiki/mixer/)、[浏览器](/wiki/browser/) |
 | 打开来自其他程序的工程 | [从 FL Studio 转来](/wiki/coming-from-fl-studio/)、[从 Ableton Live 转来](/wiki/coming-from-ableton/) |
 | 使用你的 VST、CLAP、LV2 或 AU 插件 | [插件](/wiki/plugins/) |

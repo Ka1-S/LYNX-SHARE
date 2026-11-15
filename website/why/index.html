@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="8b3ec7c6";
+window.LYNX_LANG=lang;window.LYNX_V="4f8f5e26";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=8b3ec7c6">
+<link rel="stylesheet" href="/assets/site.css?v=4f8f5e26">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -110,7 +110,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
     <article class="pain"><p class="who"><span>FL Studio</span><span>Ableton Live</span></p><h3 data-i18n="why.pain.9.c">Sidechaining takes five steps in the mixer.</h3><p data-i18n="why.pain.9.l">Effects with a side input have a "Sidechain from" list of the mixer inserts: pick one and the route is made. Third-party plugins with a second input get the same list.</p></article>
     <article class="pain"><p class="who"><span>FL Studio</span></p><h3 data-i18n="why.pain.10.c">Moving a mixer track rewires the sends and sidechains.</h3><p data-i18n="why.pain.10.l">Moving, inserting or deleting mixer tracks keeps sends, sidechains, automation and MIDI links on the track they belong to.</p></article>
     <article class="pain"><p class="who"><span>FL Studio</span><span data-i18n="why.pain.most">Most DAWs</span></p><h3 data-i18n="why.pain.11.c">Heavy instruments use up the computer, and bouncing them loses the way back.</h3><p data-i18n="why.pain.11.l">Right-click a channel in the Channel rack and choose Freeze: it plays audio rendered from it and its instrument is unloaded, third-party plugins included. Unfreeze brings back exactly what was there, and Tools › Plugin performance monitor shows which plugin uses the time.</p></article>
-    <article class="pain"><p class="who"><span>FL Studio</span><span data-i18n="why.pain.most">Most DAWs</span></p><h3 data-i18n="why.pain.12.c">Too many windows before the first song.</h3><p data-i18n="why.pain.12.l">View › Layout style › Simple workflow shows one window with the tracks and the timeline, and a first-song tour goes through it step by step. The setup wizard offers it at the first start, and the full windows stay one click away.</p></article>
+    <article class="pain"><p class="who"><span>FL Studio</span><span data-i18n="why.pain.most">Most DAWs</span></p><h3 data-i18n="why.pain.12.c">Too many windows before the first song.</h3><p data-i18n="why.pain.12.l">View › Layout style › Simple workflow shows one window with the tracks and the timeline, in the style of BandLab and FL Studio Mobile, and a first-song tour goes through it step by step. The setup wizard offers it at the first start, and the full windows stay one click away.</p></article>
   </div>
   <p class="painmore"><a class="btn btn-ghost btn-sm" href="/fixes/" data-i18n="why.pain.all">Every complaint and what LYNX SHARE does about it</a></p>
 </div></section>
@@ -177,13 +177,13 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <section class="why" id="workflows"><div class="wrap split rev">
   <div class="prose">
     <h2 data-i18n="why.work.t">Three workflows in one program</h2>
-    <p class="lead2" data-i18n="why.work.l">Patterns and a Playlist by default, a clip grid with scenes or one simple window when you want one.</p>
-    <p data-i18n="why.work.p1">The default layout is the pattern workflow FL Studio users know: Channel rack, Piano roll, Playlist and Mixer. View › Layout style › Clip-launch workflow adds a clip grid next to the Playlist, where Playlist tracks are columns and scenes are rows. Clips have launch modes, quantisation, legato, loop and follow actions, and a Grid / Both / Song switch chooses what plays.</p>
-    <p data-i18n="why.work.p4">View › Layout style › Simple workflow is for a first song: one window with the tracks and the timeline, a New track chooser that adds a voice, an instrument, a sampler or a starter beat in one click, a track dock with one-knob effects and a Chord pad, and a Finish dock that saves the song as a file. A first-song tour shows the way step by step. The setup wizard offers the three workflows at the first start.</p>
+    <p class="lead2" data-i18n="why.work.l">The FL Studio workflow by default, clip launching in the style of Ableton Live, or one simple window in the style of BandLab and FL Studio Mobile. Switch at any time.</p>
+    <p data-i18n="why.work.p1">The default is the FL Studio workflow: Channel rack, Piano roll, Playlist and Mixer. View › Layout style › Clip-launch workflow adds a clip grid next to the Playlist, in the style of Ableton Live, where Playlist tracks are columns and scenes are rows. Clips have launch modes, quantisation, legato, loop and follow actions, and a Grid / Both / Song switch chooses what plays.</p>
+    <p data-i18n="why.work.p4">View › Layout style › Simple workflow mixes BandLab's approachable one-window style with FL Studio Mobile's way of working, and suits a first song: one window with the tracks and the timeline, a New track chooser that adds a voice, an instrument, a sampler or a starter beat in one click, loops, pads and quick recording, a track dock with one-knob effects and a Chord pad, and a Finish dock that saves the song as a file. FL Studio Mobile projects (.flm) open in it. A first-song tour shows the way step by step. The setup wizard offers the three workflows at the first start, and switching later keeps the project as it is.</p>
     <h3 data-i18n="why.limits">Limits</h3>
     <ul>
-      <li data-i18n="why.work.x1">The clip grid and the Simple workflow are optional. The pattern workflow is unchanged when they are off.</li>
-      <li data-i18n="why.work.x2">It is one program with three layouts, not a copy of another DAW: Live's own devices are not there.</li>
+      <li data-i18n="why.work.x1">The Clip-launch and Simple workflows are optional. The FL Studio workflow is unchanged when they are off.</li>
+      <li data-i18n="why.work.x2">It is one program with three workflows, not a copy of another DAW: Live's own devices are not there.</li>
     </ul>
     <p><a class="tlink" href="/wiki/layouts/" data-i18n="why.guide">Read the guide</a></p>
   </div>
@@ -235,7 +235,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=8b3ec7c6" defer></script>
-<script src="/assets/motion.js?v=8b3ec7c6" defer></script>
+<script src="/assets/site.js?v=4f8f5e26" defer></script>
+<script src="/assets/motion.js?v=4f8f5e26" defer></script>
 </body>
 </html>

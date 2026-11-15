@@ -1,7 +1,7 @@
 ---
-source: b8320812e9
+source: 2ccec7b23f
 ---
-`Ver › Estilo de diseño › Flujo simple` muestra una ventana con las pistas y la línea de tiempo. Está pensado para una primera canción. El asistente de configuración lo ofrece en el primer inicio, junto al Flujo por patrones (el predeterminado) y el Flujo por lanzamiento de clips.
+`Ver › Estilo de diseño › Flujo simple` muestra una ventana con las pistas y la línea de tiempo. Mezcla el estilo accesible de una sola ventana de BandLab con la forma de trabajar de FL Studio Mobile (pistas, loops, pads y grabación rápida), y va bien para una primera canción. Los proyectos de FL Studio Mobile (`.flm`) se abren en él, igual que en los otros flujos. El asistente de configuración lo ofrece en el primer inicio, junto al Flujo por patrones (el predeterminado) y el Flujo por lanzamiento de clips.
 
 ## Qué incluye
 
