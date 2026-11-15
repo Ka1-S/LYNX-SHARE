@@ -33,7 +33,7 @@ struct GeneralOptions
     int startupProject = 1;       // issue #123: FL's "Startup project" (StartupProject: 0 empty, 1 default template, 2 last)
     juce::String defaultTemplate; // issue #123: TemplateChoice::toText of FL's "Default template" ("" = LYNX's default)
     bool menuEntry = false;     // Linux AppImage: LYNX in the applications menu + the .lynx file type (round 161)
-    bool typingPiano = true, keepEditorsOpen = false, rememberSeek = false;
+    bool typingPiano = true, keepEditorsOpen = false, rememberSeek = true;
     int layoutStyle = 0; // Settings › General › Workflow (rounds 181a, 184a): layoutstyle::Style, 0 = Pattern workflow, the default
     bool alsSessionOnPlaylist = false; // Settings › General › Workflow (round 181c): a Live set's Session clips → the clip grid (default) or the Playlist
     bool stretchedClipsLoop = true; // LYNX extra (issue #25): a stretched pattern clip loops its pattern; off = FL (once)

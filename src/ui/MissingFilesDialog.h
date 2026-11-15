@@ -45,6 +45,9 @@ std::unique_ptr<juce::Component> makeMissingFilesPanelSearching (MissingFilesInf
 bool missingFilesSearchState (juce::Component& panel, juce::String& status, bool& stopShown, bool& applyEnabled);
 void stopMissingFilesSearch (juce::Component& panel);
 
+// --selftest (issue #165): list rows past the end of each page draw nothing (and read nothing); "OK" or "ERROR ..."
+juce::String missingFilesSelfTest();
+
 // Sample content for the snapshots: a project with missing, located, skipped and relocated files and missing plugins.
 MissingFilesInfo missingFilesSnapshotInfo();
 } // namespace lynx
