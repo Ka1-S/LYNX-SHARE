@@ -6888,6 +6888,7 @@ private:
             std::unique_ptr<juce::DocumentWindow> dropWindow;
             lynx::BrowserComponent* dropBrowser = nullptr;
             int dropStage = 0;
+            juce::uint32 dropReadyMs = 0; // (the Browser may take long to list a big library: the time counts from here)
 
             void dropTick (int elapsedMs)
             {
@@ -6927,6 +6928,7 @@ private:
                     const auto files = filesOf (juce::String (lynx::BrowserComponent::dragDescription) + "|" + dropFile.getFullPathName(), nullptr);
                     step ("drop_files=" + files.joinIntoString (";"));
                     dropStage = 2;
+                    dropReadyMs = juce::Time::getMillisecondCounter();
                 }
             }
 
@@ -7397,7 +7399,10 @@ private:
                     dockCheck (dockStep++);
                 if (phase == 1 && dropFile.existsAsFile())
                     dropTick (elapsedMs);
-                if (phase == 1 && elapsedMs >= seconds * 1000 && (workspace == nullptr || dockStep >= dockSteps)) // remove the plugin from the song
+                // (with LYNX_PLUGWIN_DROP: `seconds` after the drop places were reported, time for the drag)
+                const auto dropDone = ! dropFile.existsAsFile()
+                                      || (dropStage == 2 && (int) (juce::Time::getMillisecondCounter() - dropReadyMs) >= seconds * 1000);
+                if (phase == 1 && elapsedMs >= seconds * 1000 && dropDone && (workspace == nullptr || dockStep >= dockSteps)) // remove the plugin from the song
                 {
                     if (dropFile.existsAsFile())
                         dropResult();
