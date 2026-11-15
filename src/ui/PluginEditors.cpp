@@ -5589,6 +5589,8 @@ public:
     // round 166f: the analyser part of the timer, for off-screen pictures (--eq166fshot)
     void tickDisplaysForSnapshot()
     {
+        if (kind == EffectKind::grossBeat) // round 190ih: the locator and slot states from the published meters
+            gbLiveTick();
         if (kind == EffectKind::parametricEq && ! node.locate)
             for (const auto& item : activeLayout().items)
                 if (item.type == Item::display && item.display != nullptr && std::strcmp (item.display, "eq") == 0)
@@ -5919,6 +5921,15 @@ juce::Point<int> nativeEditorMinimumSize (juce::Component& editor)
     if (native == nullptr) return {};
     const auto design = native->designSize();
     return { juce::jmax (design.x / 2, native->minimumWidth()), design.y / 2 };
+}
+
+bool showGrossBeatEnvelopeForSnapshot (juce::Component& editor, int envelopeKind)
+{
+    auto* native = dynamic_cast<NativeEffectEditor*> (&editor);
+    if (native == nullptr) return false;
+    native->gbEditKind = juce::jlimit (0, 1, envelopeKind);
+    native->repaint();
+    return true;
 }
 
 bool tickNativeEffectEditor (juce::Component& editor)

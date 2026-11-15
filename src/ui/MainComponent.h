@@ -170,6 +170,30 @@ public:
         addRecordOptions (menu);
         return menu;
     }
+    // round 190ih (--details190ihshot): the transport's live states with Record's blink phase fixed, the "Note on" hint
+    // of the last live note, the save reminder as it shows after ten minutes
+    void transportForSnapshot (bool playing, bool recordLit)
+    {
+        recordLitForSnapshot = recordLit;
+        playButton.setToggleState (playing, juce::dontSendNotification); // (the main timer's part)
+        refreshModeButton();
+        updateTransportStates (playing);
+    }
+    juce::String liveNoteHintForSnapshot()
+    {
+        updateLiveNoteHint();
+        const auto posted = ui::postedHint();
+        return posted ? posted->text : juce::String();
+    }
+    juce::String saveReminderForSnapshot()
+    {
+        autosaveMinutes = 0;
+        saveReminderTicks = 30 * 60 * 10 - 1;
+        updateSaveReminder();
+        saveButton.setToggleState (true, juce::dontSendNotification); // (the blink's lit phase)
+        const auto posted = ui::postedHint();
+        return posted ? posted->text : juce::String();
+    }
     void setHintForSnapshot (const ui::Hint& hint, bool live = false)
     {
         hintsFrozen = true; // the timer would replace it with the hint under the (off-screen) mouse
@@ -475,6 +499,7 @@ private:
     bool lastModified = false;
     void updateTransportStates (bool playing); // round 190ih: Play → Pause, Record blink (Pattern layout)
     bool shownPause = false, recordBlinkDark = false;
+    std::optional<bool> recordLitForSnapshot;
     void updateLiveNoteHint(); // round 190ih: "Note on: C4 / velocity: 100"
     void openRecent (int index); // round 190ih: Alt+1 … Alt+0
     bool runLiveKey (livekeys::Command command); // round 190ih: Live's keys in the Clip-launch layout

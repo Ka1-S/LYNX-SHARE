@@ -2612,6 +2612,8 @@ bool SimpleDock::renameKitForCheck (const juce::File& file, const juce::String& 
 // only when its drawn width changes.
 bool SimpleDock::inputMeterShown() const
 {
+    if (inputMeterForced)
+        return true;
     const auto& song = engine.getSong();
     if (track < 0 || insert <= 0 || insert >= (int) song.mixer.size() || ! engine.isInsertArmed (insert) || song.mixer[(std::size_t) insert].inputChannel < 0)
         return false;

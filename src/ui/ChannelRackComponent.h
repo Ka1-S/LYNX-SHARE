@@ -101,6 +101,15 @@ public:
     void sendSelectedToInserts();
     void toggleMute (int channel);
     void toggleSoloLock (int channel); // FL: Shift+click on the mute switch (round 190ih)
+    // round 190ih (--details190ihshot): a channel's activity light at `level` (0 … 1) without a note
+    void setActivityForSnapshot (int row, float level)
+    {
+        if (row >= (int) activityLights.size())
+            activityLights.resize ((std::size_t) row + 1);
+        if (row >= 0)
+            activityLights[(std::size_t) row].level = level;
+        repaint();
+    }
     void solo (int channel);
     void setSwingMixOfSelected (int channel); // "Swing mix..." (type a value for the selected channels)
 

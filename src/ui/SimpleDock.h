@@ -77,6 +77,7 @@ public:
     // Round 190ih: the input level of an armed track's input in the header ("Input Level", BandLab); the main window's
     // 30 Hz timer calls it (nothing happens while the dock is hidden)
     void tickInputMeter();
+    void inputLevelForSnapshot (float level) { inputMeterForced = true; inputLevel = level; repaint(); } // (--details190ihshot)
 
     // The height the owner gives it out of `available` px (the timeline keeps at least 40 %)
     int heightFor (int available) const noexcept;
@@ -185,7 +186,7 @@ private:
     bool inputMeterShown() const;
     juce::Rectangle<int> inputMeterArea() const, inputMeterBar() const;
     float inputLevel = 0.0f;
-    bool inputMeterWasShown = false;
+    bool inputMeterWasShown = false, inputMeterForced = false;
     int dragStartHeight = 0;
     bool resizing = false;
 

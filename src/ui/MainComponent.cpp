@@ -5361,7 +5361,7 @@ void MainComponent::updateTransportStates (bool playing)
     const auto recording = engine.isRecording();
     auto lit = recording;
     if (fl && recording && engine.getTransport().playing.load() && ui::motion::enabled())
-        lit = (juce::Time::getMillisecondCounter() / 250u) % 2u == 0u; // 2 blinks a second
+        lit = recordLitForSnapshot ? *recordLitForSnapshot : (juce::Time::getMillisecondCounter() / 250u) % 2u == 0u; // 2 blinks a second
     if (recording || recordBlinkDark)
     {
         recordBlinkDark = recording && ! lit;
