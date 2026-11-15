@@ -291,7 +291,7 @@ int slice (Song& song, int pattern, std::int64_t cut)
     if (! validPattern (song, pattern) || cut <= 0 || cut >= lengthOf (song, pattern))
         return -1;
     const auto current = song.currentPattern;
-    const auto added = rackops::clonePattern (song, pattern); // (clips and blocks of later patterns move down one)
+    const auto added = clonePattern (song, pattern); // (clips and blocks of later patterns move down one)
     if (added != pattern + 1)
         return -1;
     song.currentPattern = current > pattern ? current + 1 : current;
