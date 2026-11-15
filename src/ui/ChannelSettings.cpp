@@ -3272,6 +3272,11 @@ public:
                 menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&wave).withMousePosition());
         };
         addAndMakeVisible (wave);
+        // round 190ih (PLAN R11 part, DF-115), FL's manual (Sampler › Drag and Drop): the sample is dragged out of the
+        // waveform onto the Playlist, a channel, the Browser's targets... (as a Browser file drag; an OS file drag from
+        // a window outside the main one)
+        waveDrag.path = [this] { return wavePath; };
+        wave.addMouseListener (&waveDrag, false);
         waveScroll.setRangeLimits (0.0, 1.0, juce::dontSendNotification);
         waveScroll.setCurrentRange (0.0, 1.0, juce::dontSendNotification);
         waveScroll.setAutoHide (false);
@@ -3351,6 +3356,7 @@ public:
 
     ~SettingsPanel() override
     {
+        wave.removeMouseListener (&waveDrag);
         stopPreview();
         waveScroll.removeListener (this);
         engine.removeChangeListener (this);
@@ -4049,6 +4055,7 @@ private:
         locateButton.setEnabled (! c->samplePath.empty());
         removeButton.setEnabled (! c->samplePath.empty() || ! c->zones.empty());
         wave.setFile (path, [&e = engine, path] { return e.getSampleLibrary().load (path); });
+        wavePath = path;
         wave.setRegion (s.regionStart, s.regionEnd);
         wave.setReversed (s.reverse);
         wave.setStartOffset (s.startOffset); // round 190w (FL dims the region before it)
@@ -4331,6 +4338,27 @@ private:
     juce::ComboBox reverbType;
     // the waveform
     ui::WaveformDisplay wave;
+    struct SampleDragOut final : juce::MouseListener // (round 190ih: drag the sample out)
+    {
+        std::function<juce::String()> path;
+        bool started = false;
+        void mouseDown (const juce::MouseEvent&) override { started = false; }
+        void mouseDrag (const juce::MouseEvent& e) override
+        {
+            if (started || e.mods.isPopupMenu() || e.getDistanceFromDragStart() < 8 || path == nullptr)
+                return;
+            const juce::File file (path());
+            if (! file.existsAsFile())
+                return;
+            started = true;
+            if (auto* container = juce::DragAndDropContainer::findParentDragContainerFor (e.eventComponent))
+                container->startDragging (juce::String (BrowserComponent::dragDescription) + "|" + file.getFullPathName(), e.eventComponent);
+            else
+                juce::DragAndDropContainer::performExternalDragDropOfFiles ({ file.getFullPathName() }, false, e.eventComponent);
+        }
+    };
+    SampleDragOut waveDrag;
+    juce::String wavePath;
     juce::ScrollBar waveScroll { false };
     // LYNX extras
     MenuSlider gain, attack, decay, sustain, release, cutoff, resonance;
