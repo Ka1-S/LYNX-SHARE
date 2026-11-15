@@ -10122,3 +10122,5 @@ countries: de at ch li lu
 "Linked track: [LMB] mute / unmute its mixer track  [Ctrl][LMB] or [RMB] solo the Playlist track" = "Verknüpfte Spur: [LMB] ihre Mixer-Spur stumm / laut schalten  [Ctrl][LMB] oder [RMB] Solo der Playlist-Spur"
 "Render ahead (lower CPU at small buffers)" = "Vorausberechnen (weniger CPU bei kleinen Puffern)"
 "Tracks nobody plays live are rendered a little ahead on another thread, so heavy projects hold small buffers. Inputs, the channels being played and everything they feed stay real-time; edits on the other tracks can be heard up to about 25 ms late." = "Spuren, die niemand live spielt, werden auf einem anderen Thread etwas im Voraus berechnet, damit schwere Projekte mit kleinen Puffern laufen. Eingänge, die gespielten Kanäle und alles, was sie speisen, bleiben in Echtzeit; Änderungen an den anderen Spuren können bis zu etwa 25 ms später zu hören sein."
+"Event editor: alternate size" = "Event-Editor: alternative Größe"
+"Event editor size: drag  [RMB] or [Shift][Enter] alternate size  [MMB] default size" = "Größe des Event-Editors: ziehen  [RMB] oder [Shift][Enter] alternative Größe  [MMB] Standardgröße"

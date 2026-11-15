@@ -10122,3 +10122,5 @@ countries: jp
 "Linked track: [LMB] mute / unmute its mixer track  [Ctrl][LMB] or [RMB] solo the Playlist track" = "リンクしたトラック: [LMB] ミキサートラックをミュート / 解除  [Ctrl][LMB] または [RMB] プレイリストのトラックをソロ"
 "Render ahead (lower CPU at small buffers)" = "先行レンダリング（小さいバッファでCPU負荷を軽減）"
 "Tracks nobody plays live are rendered a little ahead on another thread, so heavy projects hold small buffers. Inputs, the channels being played and everything they feed stay real-time; edits on the other tracks can be heard up to about 25 ms late." = "ライブで演奏されていないトラックを別スレッドで少し先にレンダリングし、重いプロジェクトでも小さいバッファで再生できるようにします。入力、演奏中のチャンネル、それらが送るすべてはリアルタイムのままです。ほかのトラックへの編集は最大で約25 ms遅れて聞こえることがあります。"
+"Event editor: alternate size" = "イベントエディター：代替サイズ"
+"Event editor size: drag  [RMB] or [Shift][Enter] alternate size  [MMB] default size" = "イベントエディターのサイズ：ドラッグ  [RMB] または [Shift][Enter] 代替サイズ  [MMB] 既定のサイズ"

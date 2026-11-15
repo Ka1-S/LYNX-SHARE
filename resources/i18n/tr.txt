@@ -10122,3 +10122,5 @@ countries: tr
 "Linked track: [LMB] mute / unmute its mixer track  [Ctrl][LMB] or [RMB] solo the Playlist track" = "Bağlı parça: [LMB] mikser kanalını sustur / aç  [Ctrl][LMB] veya [RMB] Playlist parçasını solo yap"
 "Render ahead (lower CPU at small buffers)" = "Önceden işle (küçük arabelleklerde daha az CPU)"
 "Tracks nobody plays live are rendered a little ahead on another thread, so heavy projects hold small buffers. Inputs, the channels being played and everything they feed stay real-time; edits on the other tracks can be heard up to about 25 ms late." = "Kimsenin canlı çalmadığı parçalar başka bir iş parçacığında biraz önceden işlenir; böylece ağır projeler küçük arabelleklerle çalışır. Girişler, çalınan kanallar ve besledikleri her şey gerçek zamanlı kalır; diğer parçalardaki düzenlemeler yaklaşık 25 ms'ye kadar geç duyulabilir."
+"Event editor: alternate size" = "Olay editörü: alternatif boyut"
+"Event editor size: drag  [RMB] or [Shift][Enter] alternate size  [MMB] default size" = "Olay editörü boyutu: sürükleyin  [RMB] veya [Shift][Enter] alternatif boyut  [MMB] varsayılan boyut"

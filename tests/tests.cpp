@@ -169,6 +169,7 @@
 #include "core/LiveRecordView.h"
 #include "core/Recorder.h"
 #include "core/KeyMap.h"
+#include "core/EventPaneSplit.h" // round 190fz
 #include "core/UndoKeys.h"
 #include "core/SortOnce.h"
 #include "core/RackOps.h"
@@ -17795,3 +17796,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Toolchain190gtTests.inc"
 #include "RenderAhead190gqTests.inc"
 #include "Rollup028Tests.inc" // round 190fv: semantic interactions of the 0.1.28 rollup
+#include "EvPane190fzTests.inc"

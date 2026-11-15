@@ -10122,3 +10122,5 @@ countries: kr
 "Linked track: [LMB] mute / unmute its mixer track  [Ctrl][LMB] or [RMB] solo the Playlist track" = "연결된 트랙: [LMB] 믹서 트랙 음소거 / 해제  [Ctrl][LMB] 또는 [RMB] 플레이리스트 트랙 솔로"
 "Render ahead (lower CPU at small buffers)" = "미리 렌더링 (작은 버퍼에서 CPU 절약)"
 "Tracks nobody plays live are rendered a little ahead on another thread, so heavy projects hold small buffers. Inputs, the channels being played and everything they feed stay real-time; edits on the other tracks can be heard up to about 25 ms late." = "아무도 실시간으로 연주하지 않는 트랙을 다른 스레드에서 조금 미리 렌더링해 무거운 프로젝트도 작은 버퍼로 재생할 수 있게 합니다. 입력, 연주 중인 채널과 그것이 보내는 모든 경로는 실시간으로 유지되며, 다른 트랙의 편집은 최대 약 25 ms 늦게 들릴 수 있습니다."
+"Event editor: alternate size" = "이벤트 에디터: 대체 크기"
+"Event editor size: drag  [RMB] or [Shift][Enter] alternate size  [MMB] default size" = "이벤트 에디터 크기: 드래그  [RMB] 또는 [Shift][Enter] 대체 크기  [MMB] 기본 크기"

@@ -10122,3 +10122,5 @@ countries: cn sg
 "Linked track: [LMB] mute / unmute its mixer track  [Ctrl][LMB] or [RMB] solo the Playlist track" = "已链接音轨：[LMB] 将其混音器轨道静音 / 取消静音  [Ctrl][LMB] 或 [RMB] 独奏该播放列表音轨"
 "Render ahead (lower CPU at small buffers)" = "提前渲染（小缓冲区下更省 CPU）"
 "Tracks nobody plays live are rendered a little ahead on another thread, so heavy projects hold small buffers. Inputs, the channels being played and everything they feed stay real-time; edits on the other tracks can be heard up to about 25 ms late." = "无人实时演奏的轨道会在另一个线程上稍微提前渲染，让大型工程也能用小缓冲区播放。输入、正在演奏的通道及其送往的一切都保持实时；对其他轨道的编辑最多可能延迟约 25 毫秒才听到。"
+"Event editor: alternate size" = "事件编辑器：备用大小"
+"Event editor size: drag  [RMB] or [Shift][Enter] alternate size  [MMB] default size" = "事件编辑器大小：拖动  [RMB] 或 [Shift][Enter] 备用大小  [MMB] 默认大小"
