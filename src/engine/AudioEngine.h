@@ -1136,6 +1136,10 @@ private:
     void chooseSafeBufferSize();
     void updateRealtimeStats(); // timer: unit loads over a window, glitch log
     RtStats rtStats;
+    // Round 190hn (engine/ExportParityTest.cpp): called on the audio thread right after the device callback took the
+    // position requests (Rewind, a seek), so the self-test can make the UI's start land exactly there; nullptr otherwise
+    std::atomic<void (*) (void*)> afterPositionRequests { nullptr };
+    void* afterPositionRequestsContext = nullptr;
     std::vector<UnitLoad> heaviestUnits;
     dropouts::Log dropoutLog;
     juce::String unitDisplayName (std::uint32_t unit) const; // core/Dropouts.h unit → "Kick", "Insert 2 / 1 Serum"

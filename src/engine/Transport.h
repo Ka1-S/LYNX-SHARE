@@ -141,6 +141,9 @@ struct Transport
     // (inDeviceCallback); an offline render through the graph leaves them unset. Audio thread only.
     std::atomic<int> callbackSamples { 0 }, callbackOffset { 0 };
     std::atomic<bool> inDeviceCallback { false };
+    // (round 190hn) the callback's own view of `playing` for that sub-block: the rack renders with it, so a start from the
+    // UI landing between the callback's check and the rack's cannot play a block the callback does not move on from
+    std::atomic<bool> callbackPlaying { false };
 
     double ticksPerSample() const noexcept
     {

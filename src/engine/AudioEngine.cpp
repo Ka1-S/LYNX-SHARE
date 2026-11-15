@@ -6833,21 +6833,35 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
         return;
     }
 
-    if (transport.rewindRequested.exchange (false))
-    {
-        transport.positionTicks.store (0.0);
-        transport.userJumps.fetch_add (1, std::memory_order_relaxed);
-        if (transport.resetPluginsOnTransport.load (std::memory_order_relaxed))
-            midiSync.requestTransportNotesOff(); // FL: CC 123 to the "Send all notes off" outputs (REA 167l §6)
-    }
+    // the position the UI asked for (Rewind, a seek). Round 190hn: `playing` is read BEFORE the requests are taken. A
+    // start from the UI stores its position request first and `playing` after it (seek, then play(); the real-time
+    // export's startRealtimeBounce). When the start landed between this check and the loop's `playing` check below, the
+    // first block played from the old position and the request was taken one block later, as a jump back to the start:
+    // a real-time export one block late (the first block twice; the 0.1.29 macOS release self-test), a stutter at the
+    // start of playback. If `playing` turns on after this check, the requests are taken again before the first block
+    // that plays (the loop below).
+    auto requestsTakenWhilePlaying = transport.playing.load (std::memory_order_acquire);
+    auto takePositionRequests = [this] {
+        if (transport.rewindRequested.exchange (false))
+        {
+            transport.positionTicks.store (0.0);
+            transport.userJumps.fetch_add (1, std::memory_order_relaxed);
+            if (transport.resetPluginsOnTransport.load (std::memory_order_relaxed))
+                midiSync.requestTransportNotesOff(); // FL: CC 123 to the "Send all notes off" outputs (REA 167l §6)
+        }
 
-    if (const auto target = transport.seekRequest.exchange (-1.0); target >= 0.0)
-    {
-        transport.positionTicks.store (target);
-        transport.userJumps.fetch_add (1, std::memory_order_relaxed);
-        if (transport.resetPluginsOnTransport.load (std::memory_order_relaxed))
-            midiSync.requestTransportNotesOff();
-    }
+        if (const auto target = transport.seekRequest.exchange (-1.0); target >= 0.0)
+        {
+            transport.positionTicks.store (target);
+            transport.userJumps.fetch_add (1, std::memory_order_relaxed);
+            if (transport.resetPluginsOnTransport.load (std::memory_order_relaxed))
+                midiSync.requestTransportNotesOff();
+        }
+    };
+    takePositionRequests();
+    // (round 190hn, the export parity self-test only: the UI's start lands here, after the requests were taken)
+    if (auto* hook = afterPositionRequests.load (std::memory_order_acquire); hook != nullptr)
+        hook (afterPositionRequestsContext);
 
     transport.readMarkers (rtMarkers, rtMarkerVersion); // FL's marker actions (a new table when the song changed)
     // an external MIDI clock moves the transport (round 165f)
@@ -6887,7 +6901,11 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
             n = juce::jmin (n, linkStart - done);
         else if (linkStart >= 0 && done == linkStart)
             transport.playing.store (true, std::memory_order_relaxed);
-        const auto playing = transport.playing.load (std::memory_order_relaxed);
+        const auto playing = transport.playing.load (std::memory_order_acquire);
+        // (round 190hn) playback started after the requests were taken: the start's position request (stored before
+        // `playing`, so it is visible now) applies before this part plays, not one block late
+        if (playing && ! std::exchange (requestsTakenWhilePlaying, true))
+            takePositionRequests();
         const auto tps = transport.ticksPerSample();
         // Song mode: the loop region, or else the whole song (back to the start at its end, like FL)
         // (while audio takes record in Song mode without a loop region, the song plays on past its end instead of
@@ -7005,6 +7023,7 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
         // (round 190gq: render-ahead follows the device callback's blocks while the rack runs inside it)
         transport.callbackSamples.store (numSamples, std::memory_order_relaxed);
         transport.callbackOffset.store (done, std::memory_order_relaxed);
+        transport.callbackPlaying.store (playing, std::memory_order_relaxed); // (round 190hn: the rack plays what this part plays)
         transport.inDeviceCallback.store (true, std::memory_order_relaxed);
         player.audioDeviceIOCallbackWithContext (inputs.data(), numInputChannels, outputs.data(), numOutputChannels, n, context);
         transport.inDeviceCallback.store (false, std::memory_order_relaxed);

@@ -28,7 +28,10 @@ void ChannelRackProcessor::prepareToPlay (double sampleRate, int maximumExpected
 void ChannelRackProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
     const auto numSamples = buffer.getNumSamples();
-    const auto playing = transport.playing.load (std::memory_order_relaxed);
+    // (round 190hn) inside the device callback: playing as the callback saw it for this sub-block (a start from the UI that
+    // lands in between plays from the next block, where the callback moves the position on); an offline render: its own
+    const auto playing = transport.inDeviceCallback.load (std::memory_order_relaxed) ? transport.callbackPlaying.load (std::memory_order_relaxed)
+                                                                                      : transport.playing.load (std::memory_order_relaxed);
     const auto startTick = transport.positionTicks.load (std::memory_order_relaxed);
     // an external clock's or the Link session's tempo (rollup 0.1.28: both count as a tempo the render-ahead window cannot
     // foresee, 190gq's `external`: a Link session keeps render-ahead off, as an external MIDI clock does)
