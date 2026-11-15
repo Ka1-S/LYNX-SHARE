@@ -10121,3 +10121,4 @@ countries: jp
 "Link Playlist tracks to mixer tracks (Track N with insert N; mute, solo, volume and pan on linked track headers)" = "プレイリストのトラックをミキサートラックにリンク (トラック N とインサート N。リンクしたトラックのヘッダーにミュート、ソロ、ボリューム、パン)"
 "New projects start with every Playlist track that holds clips linked to a mixer track (Track N to insert N when that leaves the sound unchanged); linked track headers show mute, solo, volume and pan. Also on the Settings › Project page, with the switch for the open project." = "新規プロジェクトでは、クリップのあるプレイリストの各トラックがミキサートラックにリンクされます (音が変わらない場合はトラック N をインサート N に)。リンクしたトラックのヘッダーにミュート、ソロ、ボリューム、パンが表示されます。設定 › プロジェクト ページにもあり、開いているプロジェクト用のスイッチもあります。"
 "Linked track: [LMB] mute / unmute its mixer track  [Ctrl][LMB] or [RMB] solo the Playlist track" = "リンクしたトラック: [LMB] ミキサートラックをミュート / 解除  [Ctrl][LMB] または [RMB] プレイリストのトラックをソロ"
+"Scaling" = "スケーリング"
