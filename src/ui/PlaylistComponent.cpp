@@ -11051,7 +11051,15 @@ void PatternPicker::mouseDown (const juce::MouseEvent& e)
         return;
 
     const auto& row = list[(std::size_t) i];
-    playlist.brush = { row.kind, row.index };
+    // issue #175 (FL 2026, checked live: shots/FL-175-picker-choice-paints-plain.png): a click on the item the clicked
+    // clip came from keeps that clip as what the tools paint; another item paints its plain version
+    {
+        auto picked = playlist.brush.picked;
+        const auto current = row.kind == ClipKind::pattern ? row.index : engine.getSong().currentPattern;
+        if (picked && ! painttemplate::matches (*picked, row.kind, row.index, current))
+            picked.reset();
+        playlist.brush = { row.kind, row.index, std::move (picked) };
+    }
     seenBrush = row.kind;
 
     if (row.kind == ClipKind::pattern && row.index != engine.getSong().currentPattern)
