@@ -398,6 +398,9 @@ void PianoRollComponent::layoutEventPane()
 {
     if (fitKeysToNotes)
     {
+        // (round 190hy: the MPE tab's three lanes take up to half of the dock, 22 … 44 px each, so the notes stay in view)
+        if (mpeStacked)
+            velocityHeight = juce::jlimit (3 * 22, 3 * 44, (getHeight() - headerHeight) / 2);
         eventPaneBarTop = getHeight() - velocityHeight;
         return;
     }
@@ -5482,8 +5485,8 @@ void PianoRollComponent::setMpeView (bool on)
         return;
     mpeStacked = on;
     // (three lanes need room: the Clip-launch dock's 30 px lane grows while the MPE tab shows)
-    if (fitKeysToNotes)
-        velocityHeight = on ? 3 * 44 : compactVelocityHeight;
+    if (fitKeysToNotes && ! on)
+        velocityHeight = compactVelocityHeight; // (on: layoutEventPane sizes the three lanes)
     resized();
     repaint();
 }
