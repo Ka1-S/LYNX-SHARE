@@ -281,3 +281,67 @@ TEST (rollup028_plugin_windows_dock_by_default_on_windows_only)
                && body.find ("dockingOn (value, false)") != std::string::npos);
     }
 }
+
+// Step 8 (round 190gj × 190gp): the single-pass stems tap each insert's output after its fader. 190gp leaves an insert
+// that nothing came into this chunk with zeros it never stored (trackZeros) unless one of its slots runs, so the buffer
+// of an insert whose effects are all off still holds an older chunk between its notes; the tap reads it the way 190gp's
+// readers do (trackInput). The snare's and the hats' inserts get a slot that is off: between the hits their stems, made
+// from the one render's taps, still equal their own renders.
+TEST (rollup028_stem_taps_of_inserts_with_unstored_zeros_are_zeros)
+{
+    auto s = s190gj::song();
+    lynx::EffectSlot off;
+    off.kind = lynx::EffectKind::delay;
+    off.enabled = false;
+    s.mixer[2].effects.push_back (off);
+    s.mixer[3].effects.push_back (off);
+    const std::vector<int> channels (s.channels.size(), 0);
+    std::vector<std::vector<int>> slots (s.mixer.size());
+    for (std::size_t t = 0; t < s.mixer.size(); ++t)
+        slots[t].assign (s.mixer[t].effects.size(), 0);
+    constexpr int blocks = 420;
+
+    std::vector<lynx::exportopts::StemTap> plans;
+    std::vector<int> stems;
+    lynx::RackRenderer::RenderTaps taps;
+    taps.capacity = 512;
+    taps.wanted.assign (s.mixer.size(), 0);
+    taps.data.assign (s.mixer.size(), std::vector<float> (1024, 0.0f));
+    taps.wanted[0] = 1;
+    for (int t = 1; t < (int) s.mixer.size(); ++t)
+        if (auto p = lynx::exportopts::planStemTap (s, t, channels, slots, s190gj::rate); p.ok)
+        {
+            plans.push_back (p);
+            stems.push_back (t);
+            for (const auto& in : p.inputs)
+                taps.wanted[(std::size_t) in.track] = 1;
+        }
+    CHECK (std::find (stems.begin(), stems.end(), 3) != stems.end());
+    std::vector<lynx::exportopts::StemMixer> mixers;
+    for (const auto& p : plans)
+        mixers.emplace_back (p);
+    std::vector<std::vector<float>> made (stems.size(), std::vector<float> ((std::size_t) blocks * 1024));
+    s190gj::render (s, blocks, &taps, [&] (int b) {
+        for (std::size_t k = 0; k < stems.size(); ++k)
+        {
+            std::vector<const float*> l, r;
+            for (const auto& in : plans[k].inputs)
+            {
+                l.push_back (taps.left (in.track));
+                r.push_back (taps.right (in.track));
+            }
+            auto* out = made[k].data() + (std::size_t) b * 1024;
+            mixers[k].mix (taps.left (0), taps.right (0), l.data(), r.data(), out, out + 512, 512);
+        }
+    });
+    for (std::size_t k = 0; k < stems.size(); ++k)
+    {
+        const auto own = s190gj::render (lynx::makeBounceSong (s, stems[k]), blocks);
+        std::size_t differ = 0;
+        for (std::size_t i = 0; i < own.size(); ++i)
+            differ += own[i] != made[k][i] ? 1 : 0;
+        CHECK (differ == 0);
+        if (differ != 0)
+            std::printf ("  stem of insert %d: %zu samples differ\n", stems[k], differ);
+    }
+}
