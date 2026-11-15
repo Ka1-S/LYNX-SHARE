@@ -176,9 +176,8 @@ std::string boolean (bool b) { return b ? "true" : "false"; }
 // The project key as Live's scale (round 190o) [LIVE 12.4 save: ScaleInformation { Root, Name = the scale chooser's
 // index } beside the set's InKey and each MIDI clip's IsInKey; Live 11: a clip's ScaleInformation { RootNote, Name as
 // text }]. A project with no key, or with a scale Live has none like, is written with Scale Mode off (C Major).
-void writeLiveScale (Node& owner, const Song& song, std::string_view inKeyMember)
+void writeLiveScale (Node& owner, const std::optional<projectkey::Key>& key, std::string_view inKeyMember)
 {
-    const auto key = projectkey::get (song);
     const auto index = key ? livescales::indexFor (*key) : -1;
     auto* info = owner.child ("ScaleInformation");
     owner.value (inKeyMember, boolean (index >= 0 && info != nullptr)); // (the Live 12 skeleton's set has Scale Mode on)
@@ -193,6 +192,7 @@ void writeLiveScale (Node& owner, const Song& song, std::string_view inKeyMember
         name->set ("Value", numeric ? num (index) : std::string (livescales::scales()[(std::size_t) index].name));
     }
 }
+void writeLiveScale (Node& owner, const Song& song, std::string_view inKeyMember) { writeLiveScale (owner, projectkey::get (song), inKeyMember); }
 
 // ---------------------------------------------------------------------------------------------------------------
 // Skeletons (core/AlsSkeleton.h): one map of element kind → element per version, decoded once
@@ -1503,7 +1503,8 @@ struct Exporter
         {
             loop->value ("LoopStart", num (contentStart));
             loop->value ("LoopEnd", num (contentEnd));
-            loop->value ("StartRelative", "0");
+            // round 190hr: the Start marker inside the loop (Live's StartRelative, beats from LoopStart)
+            loop->value ("StartRelative", slot.loop ? num (launcher::startLead (slot, (std::int64_t) std::llround ((contentEnd - contentStart) * ppq)) / ppq) : std::string ("0"));
             loop->value ("LoopOn", boolean (slot.loop));
             loop->value ("OutMarker", num (contentEnd));
         }
@@ -1518,6 +1519,9 @@ struct Exporter
         c.value ("FollowAction/JumpIndexA", num (f.jumpA + 1)); // Live's jump number is 1-based [LIVE, 181c]
         c.value ("FollowAction/JumpIndexB", num (f.jumpB + 1));
         c.value ("FollowAction/FollowActionEnabled", boolean (f.enabled));
+        // round 190hr: a MIDI clip's own scale (Live's Clip Scale: ScaleInformation + IsInKey per clip)
+        if (c.child ("ScaleInformation") != nullptr && (slot.ownScale || ! slot.scaleOn))
+            writeLiveScale (c, projectkey::clipKey (slot, song), "IsInKey");
     }
 
     // The slot node of `scene` in a track's main clip slot list (nullptr past the list)

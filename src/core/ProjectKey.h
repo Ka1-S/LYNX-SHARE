@@ -43,6 +43,18 @@ inline std::optional<Key> get (const Song& song)
     return Key { std::clamp (h.root, 0, 11), h.scale };
 }
 
+// Round 190hr (Live's Clip Scale, detail-022): a grid clip's scale — its own (ClipGridSlot::ownScale) or the project's
+// key — and the key its tools use: that scale while the clip's Scale Mode is on, else none.
+inline std::optional<Key> clipScale (const ClipGridSlot& slot, const Song& song)
+{
+    if (! slot.ownScale)
+        return get (song);
+    if (! validFlScale (slot.scaleIndex))
+        return std::nullopt;
+    return Key { std::clamp ((int) slot.scaleRoot, 0, 11), (int) slot.scaleIndex };
+}
+inline std::optional<Key> clipKey (const ClipGridSlot& slot, const Song& song) { return slot.scaleOn ? clipScale (slot, song) : std::nullopt; }
+
 // The scale's degrees above the root (FL's table), e.g. { 0, 2, 4, 5, 7, 9, 11 } for Major.
 inline const std::vector<int>& intervals (const Key& key)
 {

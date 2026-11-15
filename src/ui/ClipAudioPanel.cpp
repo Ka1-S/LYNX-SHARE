@@ -608,9 +608,11 @@ public:
         // Pitch: the knob (semitones) and the semitone and cent boxes under it
         pitchKnob.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
         pitchKnob.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
-        pitchKnob.setRange (-12.0, 12.0, 1.0);
+        // round 190hr (detail-072): Live's Transpose ±48 st and Detune ±50 ct [SCHEMA AudioClip PitchCoarse / PitchFine;
+        // STR "Transposition/Semitones", "Transposition/Cents"; DOC Live's manual: ±48 semitones, ±50 cents]
+        pitchKnob.setRange (-48.0, 48.0, 1.0);
         pitchKnob.setDoubleClickReturnValue (true, 0.0);
-        pitchKnob.setTooltip (tr ("Clip pitch in semitones"));
+        pitchKnob.setTooltip (tr ("Transpose: the clip's pitch in semitones (±48)"));
         pitchKnob.onValueChange = [this] {
             if (refreshing)
                 return;
@@ -622,14 +624,14 @@ public:
             s->setDoubleClickReturnValue (true, 0.0);
             s->setColour (juce::Slider::trackColourId, colour::bg4);
             s->onValueChange = [this] {
-                const auto pitch = (float) juce::jlimit (-12.0, 12.0, semitones.getValue() + cents.getValue() / 100.0);
+                const auto pitch = (float) juce::jlimit (-48.0, 48.0, semitones.getValue() + cents.getValue() / 100.0);
                 editClip ([pitch] (Clip& c) { c.pitch = pitch; });
             };
         }
-        semitones.setRange (-12.0, 12.0, 1.0);
-        semitones.setTooltip (tr ("Clip pitch in semitones"));
+        semitones.setRange (-48.0, 48.0, 1.0);
+        semitones.setTooltip (tr ("Transpose: the clip's pitch in semitones (±48)"));
         cents.setRange (-50.0, 50.0, 1.0);
-        cents.setTooltip (tr ("Clip pitch, fine: cents"));
+        cents.setTooltip (tr ("Detune: the clip's fine pitch in cents (±50)"));
 
         reverse.setButtonText (tr ("Reverse"));
         reverse.setClickingTogglesState (true);

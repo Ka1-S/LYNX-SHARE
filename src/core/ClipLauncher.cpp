@@ -406,7 +406,8 @@ void Player::launch (const Song& song, const ClipGrid& grid, const GridIndex& in
     // legato: the position the clip it replaces will have reached
     const auto& replaced = t.current;
     const auto legato = settings.legato && replaced.slot >= 0 && replaced.until > from;
-    const auto anchor = legato ? replaced.anchor : from;
+    // round 190hr: a Start marker inside the loop (Live's StartRelative) — the first pass begins that far into the loop
+    const auto anchor = legato ? replaced.anchor : from - startLead (settings, clip->length);
 
     auto until = never;
     if (! settings.loop) // one pass, from where it starts
@@ -470,7 +471,7 @@ void Player::follow (const Song& song, const ClipGrid& grid, const GridIndex& in
     const auto length = (double) std::max<std::int64_t> (1, target->length);
     t.next = Play {};
     t.next.slot = slot;
-    t.next.anchor = grid.slots[(std::size_t) slot].legato ? t.current.anchor : from;
+    t.next.anchor = grid.slots[(std::size_t) slot].legato ? t.current.anchor : from - startLead (grid.slots[(std::size_t) slot], target->length);
     t.next.from = from;
     if (! grid.slots[(std::size_t) slot].loop)
         t.next.until = t.next.anchor + (std::floor ((from - t.next.anchor) / length + 1.0e-9) + 1.0) * length;
@@ -816,7 +817,8 @@ void Player::process (const Song& song, const ClipGrid& grid, const GridIndex& i
                 if (t.repeatEvery > 0.0 && t.heldSlot == t.current.slot)
                 {
                     t.next = t.current;
-                    t.next.anchor = t.next.from = t.current.from + t.repeatEvery;
+                    t.next.from = t.current.from + t.repeatEvery;
+                    t.next.anchor = t.next.from - (t.current.from - t.current.anchor); // (the same Start marker lead)
                     t.next.recorded = false;
                     scheduleFollow (grid, index, t.next);
                 }

@@ -1528,7 +1528,7 @@ struct Converter
                                      | (shape (0, (clip.flFadeFlags >> 8) & 3) << 8) | (shape (1, (clip.flFadeFlags >> 12) & 3) << 12);
                 }
                 item.gain = clip.gain;
-                item.pitch = clip.pitch;
+                item.pitch = std::clamp (clip.pitch, -12.0f, 12.0f); // (FL's clip pitch range; a Live transpose may reach ±48)
                 item.reversed = clip.reversed;
                 return item;
             }

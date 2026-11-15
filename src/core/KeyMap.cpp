@@ -189,6 +189,14 @@ std::vector<Action> makeActions()
         // the other tools with FL's keys (REA round 143: the piano roll Tools menu)
         { "pianoRoll.quantize", TR_NOOP ("Quantize..."), Context::pianoRoll, { chord ('Q', alt) } },
         { "pianoRoll.chop", TR_NOOP ("Chop..."), Context::pianoRoll, { chord ('U', alt) } },
+        // round 190hr: the reference's clip editor keys, acting only in the Clip-launch layout's docked editor (core/LiveGrid.h)
+        { "pianoRoll.liveGridNarrower", TR_NOOP ("Clip-launch editor: narrow the grid"), Context::pianoRoll, { chord ('1', ctrl) } },
+        { "pianoRoll.liveGridWider", TR_NOOP ("Clip-launch editor: widen the grid"), Context::pianoRoll, { chord ('2', ctrl) } },
+        { "pianoRoll.liveGridTriplet", TR_NOOP ("Clip-launch editor: triplet grid"), Context::pianoRoll, { chord ('3', ctrl) } },
+        { "pianoRoll.liveGridSnap", TR_NOOP ("Clip-launch editor: snap to grid"), Context::pianoRoll, { chord ('4', ctrl) } },
+        { "pianoRoll.liveGridFixed", TR_NOOP ("Clip-launch editor: fixed or adaptive grid"), Context::pianoRoll, { chord ('5', ctrl) } },
+        { "pianoRoll.liveQuantize", TR_NOOP ("Clip-launch editor: quantize"), Context::pianoRoll, { chord ('U', ctrl) } },
+        { "pianoRoll.liveQuantizeSettings", TR_NOOP ("Clip-launch editor: quantize settings..."), Context::pianoRoll, { chord ('U', ctrl | shift) } },
         { "pianoRoll.flam", TR_NOOP ("Flam..."), Context::pianoRoll, { chord ('F', alt) } },
         { "pianoRoll.claw", TR_NOOP ("Claw machine..."), Context::pianoRoll, { chord ('W', alt) } },
         { "pianoRoll.lfo", TR_NOOP ("LFO..."), Context::pianoRoll, { chord ('O', alt) } },
