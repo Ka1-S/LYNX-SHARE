@@ -21,17 +21,24 @@ namespace lynx::update
 struct Version
 {
     int major = 0, minor = 0, patch = 0;
+    int revision = 0;             // round 190hl: a fourth number ("0.1.28.1", a hotfix of 0.1.28); 0 when absent
     std::vector<std::string> pre; // "alpha", "1" for "-alpha.1"; empty for a release
     bool valid = false;
-    std::string text() const;     // "0.1.21-alpha"
+    std::string text() const;     // "0.1.21-alpha"; "0.1.28.1-alpha" (the fourth number only when it is not 0)
 };
 
-// "v0.1.21-alpha", "0.1.21", "0.1" (patch 0), "V1.2.3-rc.1+build.5" (build metadata ignored); invalid otherwise.
+// "v0.1.21-alpha", "0.1.21", "0.1" (patch 0), "0.1.28.1" (round 190hl), "V1.2.3-rc.1+build.5" (build metadata
+// ignored); invalid otherwise. (LYNX SHARE 0.1.28 and older read only two or three numbers: they drop a release whose
+// tag has four, so they never offer it.)
 Version parseVersion (const std::string& text);
 
-// <0, 0, >0 like strcmp, by semver 2.0 precedence: numbers first, then a prerelease sorts before the release of the
-// same numbers ("0.1.21-alpha" < "0.1.21"), prerelease identifiers compared one by one (numeric ones as numbers,
-// below alphanumeric ones; a shorter list sorts first when equal so far).
+// <0, 0, >0 like strcmp: the numbers first (major, minor, patch, revision), then the prerelease identifiers compared
+// one by one by semver 2.0 precedence (numeric ones as numbers, below alphanumeric ones; a shorter list sorts first
+// when equal so far: "1.0.0-alpha" < "1.0.0-alpha.1" < "1.0.0-beta").
+// Round 190hl: a version WITHOUT a prerelease equals every prerelease of the same numbers ("0.1.28" == "0.1.28-alpha").
+// LYNX SHARE builds carry CMake's bare "0.1.28" while their release tag is "v0.1.28-alpha": the running build IS that
+// release, so it is neither an update for it nor a version to go back to (under strict semver "0.1.28-alpha" <
+// "0.1.28" and Help › "Go back to..." in 0.1.28 reinstalled 0.1.28 itself). Two prereleases still order by semver.
 int compare (const Version& a, const Version& b);
 
 // --- releases ---------------------------------------------------------------------------------------------------
@@ -145,6 +152,8 @@ struct Settings
 };
 Settings parseSettings (const std::string& text);
 std::string formatSettings (const Settings&);
+// (Every version since 0.1.21 reads updates.txt line by line and ignores keys it does not know; "skipped" is read by
+// all of them, so a version left by going back is skipped in the older version too.)
 
 // Whether the bar shows `release`: a manual check always, an automatic one unless that version (or a newer one)
 // was skipped.
@@ -161,6 +170,23 @@ Settings afterUpdate (Settings settings, const Version& from);
 // The settings after going back from `left`: `left` is skipped, so the automatic check does not offer it again at once
 // (Help › Check for updates still does), and the recorded previous version is used up.
 Settings afterRollback (Settings settings, const Version& left);
+// Round 190hl: only the skip of afterRollback (an already skipped newer version stays). Written BEFORE the Windows
+// installer of the older version runs: 0.1.27 and older don't know about going back and never record the skip after
+// their restart, so without this their automatic check offered the version just left again at once.
+Settings skipLeft (Settings settings, const Version& left);
+
+// --- installing.txt (round 190hl) -------------------------------------------------------------------------------
+// The note the Windows installer path leaves in the update folder for the version it installs (read after the
+// restart): the version installed, the one it replaced, whether it went back. LYNX SHARE 0.1.27 and older read
+// everything after the first "version=" as the version, so "version=" is written LAST (round 190gh wrote it first
+// and 0.1.27 said "updated to 0.0.0"); 0.1.28 and newer read the lines in any order.
+struct InstallingNote
+{
+    std::string version, from;
+    bool rollback = false;
+};
+std::string formatInstalling (const InstallingNote&);
+InstallingNote parseInstalling (const std::string& text);
 
 // An automatic check reuses the cached release list for this long (GitHub allows 60 unauthenticated calls an hour
 // per address; LYNX started many times a day asks once every few hours).

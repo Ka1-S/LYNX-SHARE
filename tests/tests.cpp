@@ -17791,6 +17791,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Stability190ggTests.inc"
 #include "StemPass190gjTests.inc"
 #include "Small190ghTests.inc"
+#include "GoBack190hlTests.inc"
 #include "Link190glTests.inc"
 #include "SynthLanes190gpTests.inc"
 #include "SchedIndex190gpTests.inc"

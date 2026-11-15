@@ -36,19 +36,20 @@ TEST (update166b_versions_compare_like_semver)
     CHECK (v.text() == "0.1.21-alpha");
     CHECK (parseVersion ("0.1").valid && parseVersion ("0.1").patch == 0);
     CHECK (parseVersion (" V1.2.3-rc.1+build.5 ").valid && parseVersion ("V1.2.3-rc.1+build.5").pre.size() == 2);
-    for (const char* bad : { "", "nightly", "v1", "1.2.3.4", "1.x.3", "1.2.3-", "1.2.3-a..b", "1.2.3-ä" })
+    for (const char* bad : { "", "nightly", "v1", "1.2.3.4.5", "1.x.3", "1.2.3-", "1.2.3-a..b", "1.2.3-ä" }) // (four numbers: round 190hl)
         CHECK (! parseVersion (bad).valid);
 
     auto lt = [] (const char* a, const char* b) { return compare (parseVersion (a), parseVersion (b)) < 0 && compare (parseVersion (b), parseVersion (a)) > 0; };
     CHECK (lt ("0.1.20", "0.1.21-alpha"));   // a newer prerelease is an update for the running 0.1.20
-    CHECK (lt ("0.1.20-alpha", "0.1.20"));   // the release a build's CMake version names is not older than its tag
+    // the release a build's CMake version names IS its tag (round 190hl; strict semver had "0.1.20-alpha" < "0.1.20")
+    CHECK (compare (parseVersion ("0.1.20-alpha"), parseVersion ("0.1.20")) == 0);
     CHECK (lt ("0.1.9", "0.1.10"));          // numbers, not text
     CHECK (lt ("0.9.99", "1.0.0"));
     CHECK (lt ("1.0.0-alpha", "1.0.0-alpha.1"));
     CHECK (lt ("1.0.0-alpha.1", "1.0.0-alpha.beta"));
     CHECK (lt ("1.0.0-alpha.beta", "1.0.0-beta"));
     CHECK (lt ("1.0.0-beta.2", "1.0.0-beta.11"));
-    CHECK (lt ("1.0.0-rc.1", "1.0.0"));
+    CHECK (compare (parseVersion ("1.0.0-rc.1"), parseVersion ("1.0.0")) == 0); // (round 190hl: as above)
     CHECK (compare (parseVersion ("v0.1.20"), parseVersion ("0.1.20+build7")) == 0);
 }
 

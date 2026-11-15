@@ -16,6 +16,8 @@ namespace lynx::update
 std::string Version::text() const
 {
     std::string s = std::to_string (major) + "." + std::to_string (minor) + "." + std::to_string (patch);
+    if (revision != 0)
+        s += "." + std::to_string (revision);
     for (std::size_t i = 0; i < pre.size(); ++i)
         s += (i == 0 ? "-" : ".") + pre[i];
     return s;
@@ -85,9 +87,9 @@ Version parseVersion (const std::string& input)
             return v;
     }
     const auto numbers = split (core, '.');
-    if (numbers.size() < 2 || numbers.size() > 3)
+    if (numbers.size() < 2 || numbers.size() > 4)
         return v;
-    int values[3] = { 0, 0, 0 };
+    int values[4] = { 0, 0, 0, 0 };
     for (std::size_t i = 0; i < numbers.size(); ++i)
     {
         if (! allDigits (numbers[i]) || numbers[i].size() > 6)
@@ -104,17 +106,18 @@ Version parseVersion (const std::string& input)
     v.major = values[0];
     v.minor = values[1];
     v.patch = values[2];
+    v.revision = values[3];
     v.valid = true;
     return v;
 }
 
 int compare (const Version& a, const Version& b)
 {
-    for (auto [x, y] : { std::pair { a.major, b.major }, { a.minor, b.minor }, { a.patch, b.patch } })
+    for (auto [x, y] : { std::pair { a.major, b.major }, { a.minor, b.minor }, { a.patch, b.patch }, { a.revision, b.revision } })
         if (x != y)
             return x < y ? -1 : 1;
-    if (a.pre.empty() || b.pre.empty())
-        return a.pre.empty() == b.pre.empty() ? 0 : (a.pre.empty() ? 1 : -1);
+    if (a.pre.empty() || b.pre.empty()) // (round 190hl: the build of a release equals its tag, see the header)
+        return 0;
     for (std::size_t i = 0; i < a.pre.size() && i < b.pre.size(); ++i)
     {
         const auto& x = a.pre[i];
@@ -977,13 +980,49 @@ Settings afterUpdate (Settings settings, const Version& from)
     return settings;
 }
 
-Settings afterRollback (Settings settings, const Version& left)
+Settings skipLeft (Settings settings, const Version& left)
 {
     const auto skipped = parseVersion (settings.skipped);
     if (left.valid && (! skipped.valid || compare (left, skipped) > 0))
         settings.skipped = left.text();
+    return settings;
+}
+
+Settings afterRollback (Settings settings, const Version& left)
+{
+    settings = skipLeft (std::move (settings), left);
     settings.previous.clear();
     return settings;
+}
+
+std::string formatInstalling (const InstallingNote& note)
+{
+    std::string out;
+    if (! note.from.empty())
+        out += "from=" + note.from + "\n";
+    out += "rollback=" + std::string (note.rollback ? "1" : "0") + "\n";
+    return out + "version=" + note.version + "\n"; // (last: see the header)
+}
+
+InstallingNote parseInstalling (const std::string& text)
+{
+    InstallingNote note;
+    std::istringstream in (text);
+    std::string line;
+    while (std::getline (in, line))
+    {
+        const auto eq = line.find ('=');
+        if (eq == std::string::npos)
+            continue;
+        const auto key = trim (line.substr (0, eq)), value = trim (line.substr (eq + 1));
+        if (key == "version" && note.version.empty())
+            note.version = value;
+        else if (key == "from")
+            note.from = value;
+        else if (key == "rollback")
+            note.rollback = value == "1";
+    }
+    return note;
 }
 
 bool cacheFresh (std::int64_t lastCheckMs, std::int64_t nowMs)
