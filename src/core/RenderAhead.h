@@ -193,10 +193,12 @@ public:
     // returns once it is idle. prepare() lets it work again.
     void halt() noexcept;
 
-    // the partition of a state (tests): [channel] / [track] 1 = rendered ahead; false = nothing to render ahead
+    // the partition of a state (tests): [channel] / [track] 1 = rendered ahead; false = nothing to render ahead.
+    // `editors` (optional): the open editors' wants (levelWanted, metersWanted, the analyser's key) to partition with
     struct Partition;
     static bool partitionOf (const RackState& state, const int* liveChannels, int liveChannelCount, const int* liveTracks, int liveTrackCount,
-                             const LiveInput* input, std::vector<char>& aheadChannels, std::vector<char>& aheadTracks, int& boundary);
+                             const LiveInput* input, std::vector<char>& aheadChannels, std::vector<char>& aheadTracks, int& boundary,
+                             const ProcessTimes* editors = nullptr);
 
 private:
     struct Entry;

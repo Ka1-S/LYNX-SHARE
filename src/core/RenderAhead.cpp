@@ -569,9 +569,20 @@ bool RenderAhead::computePartition (const RackState& state, const Block& block, 
 }
 
 bool RenderAhead::partitionOf (const RackState& state, const int* liveChannels, int liveChannelCount, const int* liveTracks, int liveTrackCount,
-                               const LiveInput* input, std::vector<char>& aheadChannels, std::vector<char>& aheadTracks, int& boundary)
+                               const LiveInput* input, std::vector<char>& aheadChannels, std::vector<char>& aheadTracks, int& boundary,
+                               const ProcessTimes* editors)
 {
     RackRenderer scratch;
+    if (editors != nullptr)
+    {
+        auto& times = scratch.processTimes();
+        for (std::size_t k = 0; k < times.levelWanted.size(); ++k)
+        {
+            times.levelWanted[k].store (editors->levelWanted[k].load (std::memory_order_relaxed), std::memory_order_relaxed);
+            times.metersWanted[k].store (editors->metersWanted[k].load (std::memory_order_relaxed), std::memory_order_relaxed);
+        }
+        times.analyzer.key.store (editors->analyzer.key.load (std::memory_order_relaxed), std::memory_order_relaxed);
+    }
     RenderAhead r (scratch);
     r.liveInput = const_cast<LiveInput*> (input);
     r.targetChannelCount = std::clamp (liveChannelCount, 0, Targets::maxChannels);

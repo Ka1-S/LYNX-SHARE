@@ -345,3 +345,28 @@ TEST (rollup028_stem_taps_of_inserts_with_unstored_zeros_are_zeros)
             std::printf ("  stem of insert %d: %zu samples differ\n", stems[k], differ);
     }
 }
+
+// Step 9 (round 190gq × 190gp): an editor that shows a slot's effect meters (190gp's ProcessTimes::metersWanted: gain
+// reduction, band levels...) keeps that insert in the live part, as an editor with level meters does (levelWanted), so
+// what it shows stays in time with what is heard (190gq's rollup note).
+#include "core/RenderAhead.h"
+
+TEST (rollup028_render_ahead_keeps_inserts_with_shown_effect_meters_live)
+{
+    using namespace lynx;
+    auto song = ra190gq::makeSong (2);
+    auto state = RackState::build (song, nullptr, 44100.0);
+    std::vector<char> ch, tr;
+    int boundary = 0;
+    CHECK (RenderAhead::partitionOf (*state, nullptr, 0, nullptr, 0, nullptr, ch, tr, boundary));
+    CHECK (tr[2] == 1); // insert 2 (the side-chained compressor): rendered ahead with no editor open
+    auto editors = std::make_unique<ProcessTimes>();
+    editors->metersWanted[(std::size_t) (2 * maxEffectSlots + 0)].store (1);
+    CHECK (RenderAhead::partitionOf (*state, nullptr, 0, nullptr, 0, nullptr, ch, tr, boundary, editors.get()));
+    CHECK (tr[2] == 0); // its compressor's meters shown: real-time
+    CHECK (tr[1] == 1); // (the others stay ahead)
+    auto levels = std::make_unique<ProcessTimes>();
+    levels->levelWanted[(std::size_t) (1 * maxEffectSlots + 0)].store (1);
+    CHECK (RenderAhead::partitionOf (*state, nullptr, 0, nullptr, 0, nullptr, ch, tr, boundary, levels.get()));
+    CHECK (tr[1] == 0 && tr[2] == 1); // (190gq's own rule, unchanged)
+}
