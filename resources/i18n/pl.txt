@@ -10145,3 +10145,5 @@ countries: pl
 "Potentially slow operation" = "Operacja może być wolna"
 "Are you sure you want to load {0} plugins at once?" = "Czy na pewno chcesz wczytać {0} wtyczek naraz?"
 "Sample settings" = "Ustawienia sampla"
+"(empty)" = "(pusty)"
+"Time scroller: drag to scroll, drag an end to zoom" = "Przewijanie czasu: przeciągnij, aby przewinąć, przeciągnij koniec, aby powiększyć"

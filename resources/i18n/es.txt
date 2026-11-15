@@ -10145,3 +10145,5 @@ countries: es mx ar co cl pe ve
 "Potentially slow operation" = "Operación posiblemente lenta"
 "Are you sure you want to load {0} plugins at once?" = "¿Seguro que quieres cargar {0} plugins a la vez?"
 "Sample settings" = "Configuración del sample"
+"(empty)" = "(vacío)"
+"Time scroller: drag to scroll, drag an end to zoom" = "Barra de tiempo: arrastra para desplazar, arrastra un extremo para hacer zoom"

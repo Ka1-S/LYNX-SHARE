@@ -10145,3 +10145,5 @@ countries: tw hk mo
 "Potentially slow operation" = "操作可能較慢"
 "Are you sure you want to load {0} plugins at once?" = "確定要一次載入 {0} 個外掛嗎?"
 "Sample settings" = "取樣設定"
+"(empty)" = "(空)"
+"Time scroller: drag to scroll, drag an end to zoom" = "時間捲軸：拖曳以捲動，拖曳一端以縮放"

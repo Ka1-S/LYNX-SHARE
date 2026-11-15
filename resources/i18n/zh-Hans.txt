@@ -10145,3 +10145,5 @@ countries: cn sg
 "Potentially slow operation" = "操作可能较慢"
 "Are you sure you want to load {0} plugins at once?" = "确定要一次加载 {0} 个插件吗?"
 "Sample settings" = "采样设置"
+"(empty)" = "(空)"
+"Time scroller: drag to scroll, drag an end to zoom" = "时间滚动条：拖动以滚动，拖动一端以缩放"

@@ -10145,3 +10145,5 @@ countries: it ch sm
 "Potentially slow operation" = "Operazione potenzialmente lenta"
 "Are you sure you want to load {0} plugins at once?" = "Vuoi davvero caricare {0} plugin alla volta?"
 "Sample settings" = "Impostazioni del sample"
+"(empty)" = "(vuoto)"
+"Time scroller: drag to scroll, drag an end to zoom" = "Scorrimento del tempo: trascina per scorrere, trascina un estremo per lo zoom"

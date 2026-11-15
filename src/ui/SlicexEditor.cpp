@@ -353,21 +353,100 @@ public:
     std::function<const slicex::Curve*()> curve;
     std::function<const slicex::Articulator*()> articulator;
     std::function<int()> part; // 0 envelope, 1 LFO, 2…5 maps
+    std::function<int()> identity; // which curve is shown (group, target, part): a new one gets FL's view again
     std::function<void (const std::function<void (slicex::Curve&)>&, bool)> change; // (…, undoable)
+    std::function<void()> viewChanged; // the shown time range moved (the scroller follows)
     // FL's TMEnvEditor buttons under the graph (round 190hg, REA_rodada190hg §3): "Freeze editing / hide points" (off
     // by default) and "Slide succeeding points" (on by default: a dragged point takes the later points with it; off:
-    // it stays between its neighbours and they keep their times)
-    bool frozen = false, slide = true;
+    // it stays between its neighbours and they keep their times). Round 190hz: "Snap to grid" (off by default; Alt
+    // inverts it while dragging)
+    bool frozen = false, slide = true, snap = false;
+    int beatsPerBar = 4;
+
+    // ---- the shown time range (round 190hz, REA_rodada190hz_slicex §1). An envelope or LFO curve is shown over FL's
+    // range from 0 (articulatorView: its last point plus a margin, at least 2 units) and zoomed / scrolled from there by
+    // the wheel and the time scroller; a map is shown whole (0…its last x)
+    bool timeAxis() const { return (part ? part() : 0) < 2; }
+    double shownStart() const { return timeAxis() ? viewStart : 0.0; }
+    double shownLength() const
+    {
+        if (timeAxis())
+            return viewLength;
+        const auto* c = curve ? curve() : nullptr;
+        const auto s = c != nullptr ? span (*c) : 0.0;
+        return s > 0.0 ? s : 1.0;
+    }
+    // the end of the range the scroller spans: FL's range for the curve as it is now, or the end shown when further
+    double contentEnd() const { return std::max (bound(), shownStart() + shownLength()); }
+    // the smallest range: the time axis' base step (FL sets it as the scroller's smallest page, 0x851120)
+    double minLength() const { return slicex::articulatorTimeAxis (tempo(), beatsPerBar).base; }
+
+    void setView (double start, double length)
+    {
+        if (! timeAxis())
+            return;
+        length = std::clamp (length, minLength(), 7200.0);
+        start = std::clamp (start, 0.0, std::max (0.0, bound() - length));
+        if (start == viewStart && length == viewLength)
+            return;
+        viewStart = start;
+        viewLength = length;
+        repaint();
+        if (viewChanged)
+            viewChanged();
+    }
+
+    void resetView()
+    {
+        viewKey = identity ? identity() : 0;
+        viewStart = 0.0;
+        viewLength = bound();
+        repaint();
+        if (viewChanged)
+            viewChanged();
+    }
+
+    // a new curve shown (group, target, part or its tempo flag changed): FL's view of it
+    void syncView()
+    {
+        if ((identity ? identity() : 0) != viewKey || viewLength <= 0.0)
+            resetView();
+    }
+
+    // the grid FL draws on the time axis at the current zoom (the ruler, 0x844700); a map's x axis: 1/16 steps
+    slicex::GridStep timeGrid() const
+    {
+        if (! timeAxis())
+            return { slicex::levelGridStep, slicex::levelGridPerQuarter, 0 };
+        const auto a = slicex::articulatorTimeAxis (tempo(), beatsPerBar);
+        return slicex::rulerStep (a.base, a.step1, a.step2, pixelsPerUnit(), 12.0);
+    }
 
     void paint (juce::Graphics& g) override
     {
         g.fillAll (theme::colour::bg0);
         const auto r = area();
-        g.setColour (theme::colour::border);
-        for (int i = 1; i < 4; ++i)
-            g.drawHorizontalLine ((int) (r.getY() + r.getHeight() * (float) i / 4.0f), r.getX(), r.getRight());
-        for (int i = 1; i < 8; ++i)
-            g.drawVerticalLine ((int) (r.getX() + r.getWidth() * (float) i / 8.0f), r.getY(), r.getBottom());
+        // FL's grid: thin lines every step, thicker ones on step1 / step2 (time) and every 1/4 (level)
+        const juce::Colour lineColour[] = { theme::colour::border, theme::colour::borderStrong, theme::colour::textSecondary.withAlpha (0.55f) };
+        const auto yg = slicex::GridStep { slicex::levelGridStep, slicex::levelGridPerQuarter, 0 };
+        for (int i = 1; i < 16; ++i)
+        {
+            g.setColour (lineColour[slicex::gridLineClass (i, yg)]);
+            g.drawHorizontalLine ((int) std::round (r.getBottom() - r.getHeight() * (float) i / 16.0f), r.getX(), r.getRight());
+        }
+        const auto xg = timeGrid();
+        if (xg.step > 0.0)
+        {
+            const auto first = (long long) std::ceil (shownStart() / xg.step);
+            for (auto i = std::max (first, 1LL);; ++i)
+            {
+                const auto x = toX ((double) i * xg.step);
+                if (x >= r.getRight() || i - first > 4000)
+                    break;
+                g.setColour (lineColour[slicex::gridLineClass (i, xg)]);
+                g.drawVerticalLine ((int) std::round (x), r.getY(), r.getBottom());
+            }
+        }
         const auto* c = curve ? curve() : nullptr;
         if (c == nullptr || c->points.empty())
             return;
@@ -375,39 +454,56 @@ public:
         const auto map = p >= 2;
         const auto on = c->on() || map;
         const auto length = span (*c);
-        // the LFO's wave under its amplitude envelope
-        if (p == 1 && articulator && articulator() != nullptr)
-        {
-            const auto wave = slicex::lfoCycle (*articulator(), 64);
-            const auto amp = slicex::curveLevels (*c, false, std::max (2, (int) r.getWidth()));
-            juce::Path w;
-            for (int x = 0; x < (int) amp.size(); ++x)
-            {
-                const auto cycle = (float) x / 24.0f; // (a fixed number of cycles: the graph shows the shape)
-                const auto v = wave[(std::size_t) ((int) (cycle * 64.0f) % 64)] * amp[(std::size_t) x];
-                const auto y = r.getCentreY() - v * r.getHeight() * 0.5f;
-                x == 0 ? w.startNewSubPath (r.getX(), y) : w.lineTo (r.getX() + (float) x, y);
-            }
-            g.setColour (theme::colour::accent.withAlpha (on ? 0.45f : 0.2f));
-            g.strokePath (w, juce::PathStrokeType (1.0f));
-        }
-        // the curve, with FL's segment shapes
-        const auto levels = slicex::curveLevels (*c, map, std::max (2, (int) r.getWidth()));
-        juce::Path line;
-        for (int x = 0; x < (int) levels.size(); ++x)
-        {
-            const auto y = r.getBottom() - std::clamp (levels[(std::size_t) x], 0.0f, 1.0f) * r.getHeight();
-            x == 0 ? line.startNewSubPath (r.getX(), y) : line.lineTo (r.getX() + (float) x, y);
-        }
-        auto fill = line;
-        fill.lineTo (r.getRight(), r.getBottom());
-        fill.lineTo (r.getX(), r.getBottom());
-        fill.closeSubPath();
+        // the curve runs from its first point to its last (a single point: across the graph)
+        const auto x0 = toX (0.0), x1 = length > 0.0 ? toX (length) : r.getRight();
+        const auto from = std::max (x0, r.getX()), to = std::min (x1, r.getRight());
+        const auto count = length > 0.0 ? (int) std::clamp (std::ceil ((double) (x1 - x0)) + 1.0, 2.0, 200000.0) : 2;
+        const auto levels = slicex::curveLevels (*c, map, count);
+        auto levelAt = [&] (float x) {
+            if (! (length > 0.0))
+                return levels.front();
+            const auto pos = std::clamp ((double) (x - x0) / std::max (1.0e-9, (double) (x1 - x0)) * (double) (count - 1), 0.0, (double) (count - 1));
+            const auto k = (std::size_t) pos;
+            const auto k1 = std::min (k + 1, levels.size() - 1);
+            return levels[k] + (levels[k1] - levels[k]) * (float) (pos - (double) k);
+        };
         const auto colour = theme::colour::accent.withMultipliedAlpha (on ? 1.0f : 0.6f); // (FL draws a switched-off curve in its colour too)
-        g.setColour (colour.withAlpha (0.12f));
-        g.fillPath (fill);
-        g.setColour (colour);
-        g.strokePath (line, juce::PathStrokeType (1.5f));
+        if (to > from)
+        {
+            // the LFO's wave under its amplitude envelope
+            if (p == 1 && articulator && articulator() != nullptr)
+            {
+                const auto wave = slicex::lfoCycle (*articulator(), 64);
+                juce::Path w;
+                for (auto x = from; x <= to; x += 1.0f)
+                {
+                    const auto cycle = (x - r.getX()) / 24.0f; // (a fixed number of cycles: the graph shows the shape)
+                    const auto v = wave[(std::size_t) ((int) (cycle * 64.0f) % 64)] * levelAt (x);
+                    const auto y = r.getCentreY() - v * r.getHeight() * 0.5f;
+                    x == from ? w.startNewSubPath (x, y) : w.lineTo (x, y);
+                }
+                g.setColour (theme::colour::accent.withAlpha (on ? 0.45f : 0.2f));
+                g.strokePath (w, juce::PathStrokeType (1.0f));
+            }
+            // the curve, with FL's segment shapes
+            juce::Path line;
+            for (auto x = from;; x += 1.0f)
+            {
+                x = std::min (x, to);
+                const auto y = r.getBottom() - std::clamp (levelAt (x), 0.0f, 1.0f) * r.getHeight();
+                x == from ? line.startNewSubPath (x, y) : line.lineTo (x, y);
+                if (x >= to)
+                    break;
+            }
+            auto fill = line;
+            fill.lineTo (to, r.getBottom());
+            fill.lineTo (from, r.getBottom());
+            fill.closeSubPath();
+            g.setColour (colour.withAlpha (0.12f));
+            g.fillPath (fill);
+            g.setColour (colour);
+            g.strokePath (line, juce::PathStrokeType (1.5f));
+        }
         // the points; decay, loop start and sustain marked with their letter (frozen: FL hides the points)
         if (frozen)
             return;
@@ -417,8 +513,9 @@ public:
         {
             const auto& pt = c->points[(std::size_t) i];
             t += i == 0 ? 0.0 : pt.dt;
-            const auto at = juce::Point<float> (r.getX() + (length > 0.0 ? (float) (t / length) : 0.0f) * r.getWidth(),
-                                                r.getBottom() - (float) std::clamp (pt.y, 0.0, 1.0) * r.getHeight());
+            const auto at = pointPos (t, pt.y);
+            if (at.x < r.getX() - 4.0f || at.x > r.getRight() + 4.0f)
+                continue;
             g.setColour (i == hot ? theme::colour::textPrimary : colour.brighter (0.3f));
             g.fillEllipse (at.x - 3.5f, at.y - 3.5f, 7.0f, 7.0f);
             juce::String tag;
@@ -472,16 +569,22 @@ public:
         if (c == nullptr || dragging < 0 || dragging >= (int) c->points.size() || ! change)
             return;
         const auto r = area();
-        const auto length = span (*c);
         const auto i = dragging;
-        const auto y = std::clamp ((double) (r.getBottom() - e.position.y) / (double) r.getHeight(), 0.0, 1.0);
+        auto y = std::clamp ((double) (r.getBottom() - e.position.y) / (double) r.getHeight(), 0.0, 1.0);
         // the time since the previous point. Slide on (FL's default): the points after it keep their own distances, so
         // they move with it; slide off: it stays between its neighbours, the next one keeps its time (FL's point drag
         // clamps to the next point only then)
         double before = 0.0;
         for (int k = 1; k < i; ++k)
             before += c->points[(std::size_t) k].dt;
-        const auto t = (double) (e.position.x - r.getX()) / (double) r.getWidth() * (length > 0.0 ? length : 1.0);
+        auto t = fromX (e.position.x);
+        // Snap (round 190hz, EnvVisualMouseMove 0x853c40): the point's time to the time grid's step and its level to
+        // 1/16, while Snap is on (Alt inverts it); never with Shift + Ctrl held
+        if (slicex::snapActive (snap, e.mods.isAltDown()) && ! (e.mods.isShiftDown() && e.mods.isCtrlDown()))
+        {
+            t = slicex::snapToGrid (t, timeGrid().step);
+            y = std::clamp (slicex::snapToGrid (y, slicex::levelGridStep), 0.0, 1.0);
+        }
         auto dt = i == 0 ? 0.0 : std::max (0.0, t - before);
         const auto hasNext = i > 0 && i + 1 < (int) c->points.size();
         const auto gap = hasNext ? c->points[(std::size_t) i].dt + c->points[(std::size_t) i + 1].dt : 0.0;
@@ -501,8 +604,62 @@ public:
 
     void mouseUp (const juce::MouseEvent&) override { dragging = -1; }
 
+    // FL's FrameMouseWheel (0x865070): the wheel zooms the time axis about the mouse, Ctrl finer; the range's end stays
+    // within FL's range for the curve
+    void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& w) override
+    {
+        if (! timeAxis() || w.deltaY == 0.0f)
+            return;
+        zoomAbout (slicex::wheelZoomFactor (w.deltaY > 0.0f ? 1.0 : -1.0, e.mods.isCtrlDown()),
+                   std::clamp ((double) (e.position.x - area().getX()) / (double) area().getWidth(), 0.0, 1.0));
+    }
+
+    // FL's zoom about a point (0x6707d0): `anchor` 0…1 of the shown range stays where it is
+    void zoomAbout (double factor, double anchor)
+    {
+        const auto length = shownLength();
+        const auto at = shownStart() + length * anchor;
+        const auto next = std::clamp (length * factor, minLength(), 7200.0);
+        auto start = at - next * anchor;
+        if (start + next > bound())
+            start -= start + next - bound();
+        setView (std::max (0.0, start), next);
+    }
+
+    // (the editor test: where point `i` is drawn, and where time t / level y is)
+    juce::Point<float> pointPosition (int i) const
+    {
+        const auto* c = curve ? curve() : nullptr;
+        double t = 0.0;
+        for (int k = 1; c != nullptr && k <= i && k < (int) c->points.size(); ++k)
+            t += c->points[(std::size_t) k].dt;
+        return c != nullptr && i < (int) c->points.size() ? pointPos (t, c->points[(std::size_t) i].y) : juce::Point<float>();
+    }
+    juce::Point<float> positionOf (double t, double y) const { return pointPos (t, y); }
+
 private:
     juce::Rectangle<float> area() const { return getLocalBounds().toFloat().reduced (5.0f, 6.0f); }
+    double pixelsPerUnit() const { return (double) area().getWidth() / std::max (1.0e-9, shownLength()); }
+    float toX (double t) const { return area().getX() + (float) ((t - shownStart()) * pixelsPerUnit()); }
+    double fromX (float x) const { return std::max (0.0, shownStart() + (double) (x - area().getX()) / pixelsPerUnit()); }
+    juce::Point<float> pointPos (double t, double y) const
+    {
+        const auto r = area();
+        return { toX (t), r.getBottom() - (float) std::clamp (y, 0.0, 1.0) * r.getHeight() };
+    }
+    bool tempo() const
+    {
+        const auto* c = curve ? curve() : nullptr;
+        return c != nullptr && c->tempoBased();
+    }
+    // FL's range for the shown curve (0x851120)
+    double bound() const
+    {
+        if (! timeAxis())
+            return shownLength();
+        const auto* c = curve ? curve() : nullptr;
+        return slicex::articulatorView (c != nullptr ? span (*c) : 0.0, (part ? part() : 0) == 1);
+    }
 
     static double span (const slicex::Curve& c)
     {
@@ -517,15 +674,11 @@ private:
         const auto* c = curve ? curve() : nullptr;
         if (c == nullptr)
             return -1;
-        const auto r = area();
-        const auto length = span (*c);
         double t = 0.0;
         for (int i = 0; i < (int) c->points.size(); ++i)
         {
             t += i == 0 ? 0.0 : c->points[(std::size_t) i].dt;
-            const auto p = juce::Point<float> (r.getX() + (length > 0.0 ? (float) (t / length) : 0.0f) * r.getWidth(),
-                                               r.getBottom() - (float) std::clamp (c->points[(std::size_t) i].y, 0.0, 1.0) * r.getHeight());
-            if (p.getDistanceFrom (at) < 6.0f)
+            if (pointPos (t, c->points[(std::size_t) i].y).getDistanceFrom (at) < 6.0f)
                 return i;
         }
         return -1;
@@ -537,8 +690,7 @@ private:
         if (c == nullptr)
             return;
         const auto r = area();
-        const auto length = span (*c);
-        const auto t = std::max (0.0, (double) (at.x - r.getX()) / (double) r.getWidth() * (length > 0.0 ? length : 1.0));
+        const auto t = fromX (at.x);
         const auto y = std::clamp ((double) (r.getBottom() - at.y) / (double) r.getHeight(), 0.0, 1.0);
         change ([t, y] (slicex::Curve& k) {
             double sum = 0.0;
@@ -628,6 +780,100 @@ private:
 
     int hot = -1, dragging = -1;
     bool moved = false;
+    double viewStart = 0.0, viewLength = 0.0;
+    int viewKey = 0;
+};
+
+// FL's TimeScroller under the articulator graph (TQuickScroller: arrows, a knob to slide, handles to drag): the lit part
+// is the shown time range within the curve's range; drag it to scroll, drag one of its ends to zoom, an arrow scrolls by
+// an eighth of the shown range (FL's line size, TimeScrollerChange 0x84ef30)
+class TimeScroller final : public juce::Component
+{
+public:
+    CurveView* view = nullptr;
+
+    void paint (juce::Graphics& g) override
+    {
+        const auto r = getLocalBounds().toFloat();
+        g.setColour (theme::colour::bg1);
+        g.fillRoundedRectangle (r, 2.0f);
+        const auto a = arrow (false), b = arrow (true);
+        g.setColour (theme::colour::bg4);
+        g.fillRoundedRectangle (a.reduced (1.0f), 2.0f);
+        g.fillRoundedRectangle (b.reduced (1.0f), 2.0f);
+        g.setColour (theme::colour::textSecondary);
+        juce::Path p;
+        const auto u = a.getHeight() * 0.22f;
+        p.addTriangle (a.getCentreX() + u * 0.6f, a.getCentreY() - u, a.getCentreX() + u * 0.6f, a.getCentreY() + u, a.getCentreX() - u * 0.7f, a.getCentreY());
+        p.addTriangle (b.getCentreX() - u * 0.6f, b.getCentreY() - u, b.getCentreX() - u * 0.6f, b.getCentreY() + u, b.getCentreX() + u * 0.7f, b.getCentreY());
+        g.fillPath (p);
+        if (view == nullptr || ! view->timeAxis())
+            return;
+        const auto k = knob();
+        g.setColour (theme::colour::bg5);
+        g.fillRoundedRectangle (k, 2.0f);
+        g.setColour (theme::colour::borderStrong); // the handles at its ends
+        g.drawVerticalLine ((int) k.getX() + 2, k.getY() + 3.0f, k.getBottom() - 3.0f);
+        g.drawVerticalLine ((int) k.getRight() - 3, k.getY() + 3.0f, k.getBottom() - 3.0f);
+    }
+
+    void mouseDown (const juce::MouseEvent& e) override
+    {
+        mode = none;
+        if (view == nullptr || ! view->timeAxis())
+            return;
+        const auto step = view->shownLength() / 8.0;
+        if (arrow (false).contains (e.position))
+            return view->setView (view->shownStart() - step, view->shownLength());
+        if (arrow (true).contains (e.position))
+            return view->setView (view->shownStart() + step, view->shownLength());
+        const auto k = knob();
+        startView = { view->shownStart(), view->shownLength() };
+        if (std::abs (e.position.x - k.getX()) <= 4.0f)
+            mode = left;
+        else if (std::abs (e.position.x - k.getRight()) <= 4.0f)
+            mode = right;
+        else if (k.contains (e.position))
+            mode = move;
+    }
+
+    void mouseDrag (const juce::MouseEvent& e) override
+    {
+        if (view == nullptr || mode == none)
+            return;
+        const auto d = (double) e.getDistanceFromDragStartX() * unitsPerPixel();
+        const auto [s, l] = startView;
+        if (mode == move)
+            view->setView (s + d, l);
+        else if (mode == left)
+            view->setView (std::min (s + d, s + l - view->minLength()), l - std::min (d, l - view->minLength()));
+        else
+            view->setView (s, l + d);
+    }
+
+    void mouseUp (const juce::MouseEvent&) override { mode = none; }
+
+private:
+    juce::Rectangle<float> arrow (bool right) const
+    {
+        const auto r = getLocalBounds().toFloat();
+        const auto w = std::min (r.getHeight(), r.getWidth() * 0.25f);
+        return right ? r.withTrimmedLeft (r.getWidth() - w) : r.withWidth (w);
+    }
+    juce::Rectangle<float> track() const { return getLocalBounds().toFloat().reduced (arrow (false).getWidth(), 1.0f); }
+    double unitsPerPixel() const { return view != nullptr ? view->contentEnd() / std::max (1.0f, track().getWidth()) : 1.0; }
+    juce::Rectangle<float> knob() const
+    {
+        const auto t = track();
+        const auto end = view->contentEnd();
+        const auto x0 = t.getX() + (float) (view->shownStart() / end) * t.getWidth();
+        const auto x1 = t.getX() + (float) ((view->shownStart() + view->shownLength()) / end) * t.getWidth();
+        return { x0, t.getY(), std::max (8.0f, x1 - x0), t.getHeight() };
+    }
+
+    enum Mode { none, move, left, right };
+    Mode mode = none;
+    std::pair<double, double> startView;
 };
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -1520,6 +1766,11 @@ public:
         curveView.curve = [this] { return &shownCurve(); };
         curveView.articulator = [this] { return &art(); };
         curveView.part = [this] { return part(); };
+        curveView.identity = [this] { return ((groupIndex() * 8 + targetIndex()) * 8 + part()) * 2 + (shownCurve().tempoBased() ? 1 : 0); };
+        curveView.viewChanged = [this] { timeScroller.repaint(); };
+        timeScroller.view = &curveView;
+        ui::setHint (timeScroller, tr ("Time scroller: drag to scroll, drag an end to zoom"));
+        addAndMakeVisible (timeScroller);
         curveView.change = [this] (const std::function<void (slicex::Curve&)>& f, bool undoable) {
             edit ([this, &f] (State& s) { f (curveOf (s)); }, undoable);
         };
@@ -1534,6 +1785,11 @@ public:
         curveSlide.setToggleState (true, juce::dontSendNotification);
         curveSlide.onClick = [this] { curveView.slide = curveSlide.getToggleState(); };
         addAndMakeVisible (curveSlide);
+        // (round 190hz: FL's Snap button, between Step and Slide; off by default, Alt inverts it while dragging)
+        ui::setHint (curveSnap, tr ("Snap to grid"));
+        curveSnap.setClickingTogglesState (true);
+        curveSnap.onClick = [this] { curveView.snap = curveSnap.getToggleState(); };
+        addAndMakeVisible (curveSnap);
         // FL's envelope options menu, its "Flags" (LFOBipolarTensionMenuClick 0x84d510, LFOFrozenMenuClick 0x850fd0):
         // "Bipolar LFO tension" is the LFO curve's flag bit 2 cleared, "Frozen LFO" sets bit 3 and the global phase
         ui::setHint (curveOptions, tr ("LFO options"), true);
@@ -1658,8 +1914,10 @@ public:
             };
             addAndMakeVisible (v);
         }
+        // FL's keyboard (0x898cf0) marks the keys with regions on the current deck (deck A's outside the full display mode)
         keyboard.decksOn = [this] (int key) {
-            return key >= 0 && key < 128 ? ((maps[0][(std::size_t) key].empty() ? 0 : 1) | (maps[1][(std::size_t) key].empty() ? 0 : 2)) : 0;
+            const auto d = slicex::keyboardMarkDeck (displayMode(), currentDeck());
+            return key >= 0 && key < 128 && ! maps[(std::size_t) d][(std::size_t) key].empty() ? 1 << d : 0;
         };
         keyboard.current = [this] (int key) { return key == keyOfRegion (regionDeck(), regionIndex()); };
         keyboard.play = [this] (int key, bool on) {
@@ -1691,8 +1949,9 @@ public:
         for (auto* c : std::initializer_list<juce::Component*> { &regionMenuButton, &regionHeader, &regionSel, &output, &cutGroup, &outLabel, &cutLabel,
                                                                  &artGroupLabel, &artGroup, &filterLabel, &filterType, &filterOrder, &filterEnv, &filterCut,
                                                                  &filterRes, &filterEnvLabel, &filterCutLabel, &filterResLabel, &target, &partSel, &curveView,
-                                                                 &curveFreeze, &curveSlide })
+                                                                 &curveFreeze, &curveSnap, &curveSlide })
             artMembers.push_back ({ c, nullptr });
+        artMembers.push_back ({ &timeScroller, [this] { return part() < 2; } });
         for (int i = 0; i < 4; ++i)
         {
             const auto k = (std::size_t) i;
@@ -1800,6 +2059,48 @@ public:
         else if (cmd == "kb") { kbButton.setToggleState (w[1] != "0", juce::dontSendNotification); kbButton.onClick(); }
         else if (cmd == "dual") { dualButton.setToggleState (w[1] != "0", juce::dontSendNotification); dualButton.onClick(); }
         else if (cmd == "deck") deckSel.onChange (std::clamp (w[1].getIntValue(), 0, 1));
+        // round 190hz: the articulator editor's view, grid and snap; the deck title; the keyboard's marks
+        else if (cmd == "part") partSel.onChange (std::clamp (w[1].getIntValue(), 0, 5));
+        else if (cmd == "snap") { curveSnap.setToggleState (w[1] != "0", juce::dontSendNotification); curveSnap.onClick(); }
+        else if (cmd == "curvewheel") curveView.zoomAbout (slicex::wheelZoomFactor (w[1].getDoubleValue(), w[3] == "ctrl"), w[2].getDoubleValue());
+        else if (cmd == "curveview")
+        {
+            const auto g = curveView.timeGrid();
+            return "view " + juce::String (curveView.shownStart(), 5) + " " + juce::String (curveView.shownLength(), 5) + " step " + juce::String (g.step, 5) + " per "
+                   + juce::String (g.perStep1) + " " + juce::String (g.perStep2) + " end " + juce::String (curveView.contentEnd(), 5);
+        }
+        else if (cmd == "curve")
+        {
+            juce::String text;
+            for (const auto& pt : shownCurve().points)
+                text << juce::String (pt.dt, 5) << "," << juce::String (pt.y, 5) << " ";
+            return text.trim();
+        }
+        else if (cmd == "pointdrag") // pointdrag <index> <time> <level> [alt|shiftctrl]: a left drag of a point to there
+        {
+            const auto from = curveView.pointPosition (w[1].getIntValue());
+            const auto to = curveView.positionOf (w[2].getDoubleValue(), w[3].getDoubleValue());
+            auto mods = juce::ModifierKeys::leftButtonModifier | (w[4] == "alt" ? juce::ModifierKeys::altModifier : 0)
+                        | (w[4] == "shiftctrl" ? juce::ModifierKeys::shiftModifier | juce::ModifierKeys::ctrlModifier : 0);
+            auto ev = [&] (juce::Point<float> p, bool dragged) {
+                const auto now = juce::Time::getCurrentTime();
+                return juce::MouseEvent (juce::Desktop::getInstance().getMainMouseSource(), p, juce::ModifierKeys (mods), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, &curveView,
+                                         &curveView, now, from, now, 1, dragged);
+            };
+            curveView.mouseDown (ev (from, false));
+            for (int i = 1; i <= 4; ++i)
+                curveView.mouseDrag (ev (from + (to - from) * ((float) i / 4.0f), true));
+            curveView.mouseUp (ev (to, true));
+        }
+        else if (cmd == "title") return nameLabel.getText();
+        else if (cmd == "keys")
+        {
+            juce::String text;
+            for (int k = 0; k < 128; ++k)
+                if (const auto m = keyboard.decksOn ? keyboard.decksOn (k) : 0; m != 0)
+                    text << k << ":" << m << " ";
+            return text.trim();
+        }
         else if (cmd == "size") return juce::String (getWidth()) + " x " + juce::String (getHeight());
         else if (cmd == "rest") { stopTimer(); storeViews(); }
         else if (cmd == "load") loadSample (deck, w[1]);
@@ -1975,6 +2276,8 @@ public:
         curveOptions.setBounds (fl (491, 275, 17, 17));
         curveFreeze.setBounds (fl (612, 275, 17, 17)); // (FL: alRight in the editor's GlobalPanel, y 99 + 40 + 136)
         curveSlide.setBounds (fl (684, 275, 18, 17));
+        curveSnap.setBounds (fl (660, 275, 17, 17));
+        timeScroller.setBounds (fl (491, 259, 211, 15)); // (FL: TimeScroller at 153, 120 in the editor, 211 wide)
         curveOn.setBounds (fl (340, 264, 15, 15));
         for (int i = 0; i < 4; ++i)
         {
@@ -2257,6 +2560,7 @@ private:
         curveOn.setToggleState (c.on(), juce::dontSendNotification);
         curveTempo.setVisible (p < 2);
         curveTempo.setToggleState (c.tempoBased(), juce::dontSendNotification);
+        curveView.syncView();
         curveGlobal.setVisible (p == 1);
         curveGlobal.setToggleState ((c.flags & 2) != 0, juce::dontSendNotification);
         for (int i = 0; i < 4; ++i)
@@ -2285,9 +2589,12 @@ private:
                                 ? juce::String ((int) std::lround (beats * 60.0 * sample->sampleRate / (double) sample->frames())) + "BPM"
                                 : juce::String(),
                             juce::dontSendNotification);
+        // FL's title (0x892520): the current deck's sample name, "(empty)" when the deck has no audio
         auto title = wavTitle (state.decks[deck].wav);
         if (title.isEmpty())
             title = fileName (paths[deck]).upToLastOccurrenceOf (".", false, false);
+        if (sample == nullptr || sample->frames() <= 0)
+            title = tr ("(empty)");
         nameLabel.setText (title, juce::dontSendNotification);
         lengthText();
         loading = false;
@@ -3303,7 +3610,8 @@ private:
     Keyboard keyboard;
     // FL's View keyboard button and display mode selector (round 190hg): which panels the window shows
     IconButton kbButton { IconButton::keys };
-    IconButton curveFreeze { IconButton::freeze }, curveSlide { IconButton::slide }; // (the articulator editor's own)
+    IconButton curveFreeze { IconButton::freeze }, curveSlide { IconButton::slide }, curveSnap { IconButton::magnet }; // (the articulator editor's own)
+    TimeScroller timeScroller;
     IconButton curveOptions { IconButton::arrow }; // (FL's EnvOptionsMenu; LYNX: its LFO flags)
     Selector dispMode;
     struct Member

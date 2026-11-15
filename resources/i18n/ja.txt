@@ -10145,3 +10145,5 @@ countries: jp
 "Potentially slow operation" = "時間がかかる可能性のある操作"
 "Are you sure you want to load {0} plugins at once?" = "{0} 個のプラグインを一度に読み込みますか?"
 "Sample settings" = "サンプル設定"
+"(empty)" = "(空)"
+"Time scroller: drag to scroll, drag an end to zoom" = "時間スクローラー: ドラッグでスクロール、端をドラッグでズーム"

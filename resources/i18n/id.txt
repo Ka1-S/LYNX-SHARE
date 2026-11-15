@@ -10145,3 +10145,5 @@ countries: id
 "Potentially slow operation" = "Operasi mungkin lambat"
 "Are you sure you want to load {0} plugins at once?" = "Yakin ingin memuat {0} plugin sekaligus?"
 "Sample settings" = "Pengaturan sample"
+"(empty)" = "(kosong)"
+"Time scroller: drag to scroll, drag an end to zoom" = "Penggulir waktu: seret untuk menggulir, seret salah satu ujung untuk zoom"
