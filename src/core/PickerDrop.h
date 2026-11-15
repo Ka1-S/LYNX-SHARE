@@ -18,6 +18,12 @@
 // - With Shift held at the drop (FUN_012f30b0): every entry on the track under the mouse, one after the other from the
 //   snapped time (each starts where the previous one ends); audio / automation clips on an instrument track ask the same
 //   question first (No: nothing is placed). The current pattern does not change.
+// - The dropped clips become the Playlist's selection (flag 0x80 on each new item).
+// Live check (FL 2026, round 190hm, shots /mnt/e/lynx-work/pickerdrag190hm/shots fl-07 / fl-08 / fl-12): Bar snap, a drop
+// at bar 3.7 lands on bar 4 and one at 2.3 on bar 2 (nearest line); Pattern 2 + 3 picked and dropped on Track 5 → Tracks
+// 5 and 6; Shift on drop → Pattern 1, 2, 3 one after the other on one track; the new clips selected, the others not.
+// A Shift press on a picked entry renames the picked patterns instead (FL's "Name for patterns"), so Shift is pressed
+// once the drag is under way.
 
 #include <algorithm>
 #include <cstdint>
