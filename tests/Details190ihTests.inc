@@ -142,3 +142,35 @@ TEST (details190ih_engine_counts_note_strikes_per_channel)
     CHECK (rig.renderer.noteStrikes (0) == 0u); // the other channel stayed dark
     CHECK (rig.renderer.noteStrikes (-1) == 0u && rig.renderer.noteStrikes (100000) == 0u);
 }
+
+// R3 (DF-137): FL's Alt+1 … Alt+0 open the ten most recent projects; no other action has those chords
+TEST (details190ih_recent_projects_keys)
+{
+    using namespace lynx::keys;
+    for (int n = 1; n <= 10; ++n)
+    {
+        const auto* a = findAction ("file.recent" + std::to_string (n));
+        CHECK (a != nullptr);
+        if (a == nullptr)
+            continue;
+        const Chord chord { n == 10 ? '0' : '0' + n, alt };
+        CHECK (a->context == Context::global && a->defaults.size() == 1 && a->defaults[0] == chord);
+        for (const auto& other : actions())
+            if (std::string (other.id) != a->id)
+                for (const auto& c : other.defaults)
+                    CHECK (! (c == chord));
+    }
+}
+
+// R3 (DC-9): the engine keeps the last typing-keyboard / MIDI note for the hint bar ("Note on: C4 / velocity: 100");
+// a note-off shows its note-on's velocity, as FL's hint did (details190if shots/fl-hint-noteon.png)
+TEST (details190ih_last_live_note_packing)
+{
+    using namespace lynx::livenote;
+    const auto a = pack (0, 60, 100, true);
+    CHECK (a != 0u && key (a) == 60 && velocity (a) == 100 && on (a));
+    const auto b = pack (a, 60, 100, false); // the same key released: a new word (the serial moved)
+    CHECK (b != a && key (b) == 60 && velocity (b) == 100 && ! on (b));
+    const auto c = pack (0xffff0000u, 200, -5, true); // clamped; the serial wraps past 0 to 1
+    CHECK ((c >> 16) == 1u && key (c) == 127 && velocity (c) == 0);
+}
