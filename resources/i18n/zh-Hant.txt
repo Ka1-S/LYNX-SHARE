@@ -10164,3 +10164,4 @@ countries: tw hk mo
 "Input Level" = "輸入電平"
 "Solo on Shift" = "按 Shift 獨奏"
 "Drag a handle (frequency and gain); mouse wheel = Q; right-click = type and key; double-click = 0 dB; Alt+click = reset; Ctrl = fine; Shift+click = solo while held (drag up / down: width)" = "拖曳控點（頻率和增益）；滑鼠滾輪 = Q；右鍵 = 類型和音符；按兩下 = 0 dB；Alt+按一下 = 重設；Ctrl = 微調；Shift+按一下 = 按住時獨奏（上下拖曳：寬度）"
+"Hybridize" = "混合"

@@ -10164,3 +10164,4 @@ countries: tr
 "Input Level" = "Giriş seviyesi"
 "Solo on Shift" = "Shift ile solo"
 "Drag a handle (frequency and gain); mouse wheel = Q; right-click = type and key; double-click = 0 dB; Alt+click = reset; Ctrl = fine; Shift+click = solo while held (drag up / down: width)" = "Bir tutamacı sürükleyin (frekans ve kazanç); fare tekerleği = Q; sağ tıklama = tür ve nota; çift tıklama = 0 dB; Alt+tıklama = sıfırla; Ctrl = ince ayar; Shift+tıklama = basılı tutulduğunda solo (yukarı / aşağı sürükle: genişlik)"
+"Hybridize" = "Melezle"

@@ -10164,3 +10164,4 @@ countries: id
 "Input Level" = "Level input"
 "Solo on Shift" = "Solo dengan Shift"
 "Drag a handle (frequency and gain); mouse wheel = Q; right-click = type and key; double-click = 0 dB; Alt+click = reset; Ctrl = fine; Shift+click = solo while held (drag up / down: width)" = "Seret pegangan (frekuensi dan gain); roda mouse = Q; klik kanan = tipe dan not; klik ganda = 0 dB; Alt+klik = reset; Ctrl = halus; Shift+klik = solo selama ditahan (seret atas / bawah: lebar)"
+"Hybridize" = "Hibridisasi"

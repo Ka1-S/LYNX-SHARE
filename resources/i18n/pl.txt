@@ -10164,3 +10164,4 @@ countries: pl
 "Input Level" = "Poziom wejścia"
 "Solo on Shift" = "Solo z Shift"
 "Drag a handle (frequency and gain); mouse wheel = Q; right-click = type and key; double-click = 0 dB; Alt+click = reset; Ctrl = fine; Shift+click = solo while held (drag up / down: width)" = "Przeciągnij uchwyt (częstotliwość i wzmocnienie); kółko myszy = Q; prawy przycisk = typ i nuta; dwuklik = 0 dB; Alt+kliknięcie = resetuj; Ctrl = dokładnie; Shift+kliknięcie = solo podczas trzymania (przeciągnij w górę / dół: szerokość)"
+"Hybridize" = "Hybrydyzuj"

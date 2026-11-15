@@ -47,6 +47,7 @@
 #include "ui/HintBar.h"
 #include "ui/I18n.h"
 #include "ui/Motion.h"
+#include "core/PresetMix.h"
 #include "ui/Icons.h"
 #include "ui/FacetEqEditor.h"
 #include "ui/ProEditors.h"
@@ -5410,16 +5411,45 @@ private:
             bar.willEdit();
             fx->presetName = presetName.toStdString();
         }
-        engine.editSong ([t = track, s = slot, fx = *fx] (Song& song) {
+        // round 190ih: FL's Presets › Hybridize: a random half of the published settings come from the preset
+        const auto hybrid = hybridizePresets && current() != nullptr;
+        const auto published = (int) effectInfo (kind).params.size();
+        const auto seed = (std::uint32_t) juce::Random::getSystemRandom().nextInt();
+        engine.editSong ([t = track, s = slot, fx = *fx, hybrid, published, seed] (Song& song) {
             auto& target = song.mixer[(std::size_t) t].effects[(std::size_t) s];
             const auto enabled = target.enabled;
             const auto mix = target.mix;
+            const auto before = target.params;
             target = fx;
             target.enabled = enabled;
             target.mix = mix;
+            if (hybrid)
+                target.params = presetmix::hybridize (before, fx.params, published, seed);
         });
         repaint();
     }
+
+    // round 190ih (PLAN R8 part, owner decision PL4): FL's Presets › Randomize — random values for the published
+    // parameters, one undo step
+    void randomizeParams()
+    {
+        if (current() == nullptr)
+            return;
+        presetName = {};
+        if (usesBar())
+        {
+            bar.beginGesture();
+            bar.willEdit();
+        }
+        const auto published = (int) effectInfo (kind).params.size();
+        const auto seed = (std::uint32_t) juce::Random::getSystemRandom().nextInt();
+        editSlot ([published, seed] (EffectSlot& target) {
+            presetmix::randomize (target.params, published, seed);
+            target.presetName.clear();
+        });
+        repaint();
+    }
+    static inline bool hybridizePresets = false; // FL's Presets › Hybridize (a mode, as FL's)
 
     void stepPreset (int delta)
     {
@@ -5477,8 +5507,12 @@ private:
         }
 
         juce::PopupMenu menu;
+        // round 190ih: FL's Presets submenu also holds Randomize and Hybridize (FL manual, Plugin wrapper › Presets)
         if (presets.getNumItems() > 0)
-            menu.addSubMenu (tr ("Presets"), presets);
+            presets.addSeparator();
+        presets.addItem (tr ("Randomize"), [this] { randomizeParams(); });
+        presets.addItem (tr ("Hybridize"), true, hybridizePresets, [] { hybridizePresets = ! hybridizePresets; });
+        menu.addSubMenu (tr ("Presets"), presets);
         if (showsSidechain()) // round 177b
         {
             juce::PopupMenu side;

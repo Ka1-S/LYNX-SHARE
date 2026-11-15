@@ -10164,3 +10164,4 @@ countries: de at ch li lu
 "Input Level" = "Eingangspegel"
 "Solo on Shift" = "Solo mit Umschalt"
 "Drag a handle (frequency and gain); mouse wheel = Q; right-click = type and key; double-click = 0 dB; Alt+click = reset; Ctrl = fine; Shift+click = solo while held (drag up / down: width)" = "Griff ziehen (Frequenz und Pegel); Mausrad = Q; Rechtsklick = Typ und Note; Doppelklick = 0 dB; Alt+Klick = zurücksetzen; Strg = fein; Umschalt+Klick = Solo, solange gehalten (nach oben / unten ziehen: Breite)"
+"Hybridize" = "Hybridisieren"

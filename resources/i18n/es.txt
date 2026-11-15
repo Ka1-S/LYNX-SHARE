@@ -10164,3 +10164,4 @@ countries: es mx ar co cl pe ve
 "Input Level" = "Nivel de entrada"
 "Solo on Shift" = "Solo con Mayús"
 "Drag a handle (frequency and gain); mouse wheel = Q; right-click = type and key; double-click = 0 dB; Alt+click = reset; Ctrl = fine; Shift+click = solo while held (drag up / down: width)" = "Arrastra un punto (frecuencia y ganancia); rueda del ratón = Q; clic derecho = tipo y nota; doble clic = 0 dB; Alt+clic = restablecer; Ctrl = ajuste fino; Mayús+clic = solo mientras se mantiene (arrastra arriba / abajo: anchura)"
+"Hybridize" = "Hibridar"

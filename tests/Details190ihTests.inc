@@ -257,3 +257,34 @@ TEST (details190ih_peq2_band_solo_passes_only_that_band)
     lynx::peq::setSoloBand (other.get(), 1);
     CHECK (lynx::peq::soloBand (other.get()) == -1);
 }
+
+// R8 part (DP-92 / DP-93, owner decision PL4): FL's Presets › Randomize (random values for the published settings
+// only) and Hybridize (a preset brings a random half of the published settings)
+TEST (details190ih_presets_randomize_and_hybridize)
+{
+    lynx::EffectParams p {};
+    p.fill (0.25f);
+    lynx::presetmix::randomize (p, 10, 12345u);
+    int changed = 0;
+    for (int i = 0; i < 10; ++i)
+    {
+        CHECK (p[(std::size_t) i] >= 0.0f && p[(std::size_t) i] < 1.0f);
+        changed += p[(std::size_t) i] != 0.25f ? 1 : 0;
+    }
+    CHECK (changed >= 9);
+    CHECK (p[10] == 0.25f && p[(std::size_t) lynx::maxEffectParams - 1] == 0.25f); // the rest is left alone
+    auto again = lynx::EffectParams {};
+    again.fill (0.25f);
+    lynx::presetmix::randomize (again, 10, 12345u);
+    CHECK (again == p); // deterministic for a seed
+
+    lynx::EffectParams before {}, preset {};
+    before.fill (0.0f);
+    preset.fill (1.0f);
+    const auto mixed = lynx::presetmix::hybridize (before, preset, 100, 777u);
+    int fromPreset = 0;
+    for (int i = 0; i < 100; ++i)
+        fromPreset += mixed[(std::size_t) i] == 1.0f ? 1 : 0;
+    CHECK (fromPreset > 30 && fromPreset < 70); // about half
+    CHECK (mixed[100] == 1.0f);                 // past the published ones: the preset's
+}

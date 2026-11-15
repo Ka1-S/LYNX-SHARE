@@ -10164,3 +10164,4 @@ countries: kr
 "Input Level" = "입력 레벨"
 "Solo on Shift" = "Shift로 솔로"
 "Drag a handle (frequency and gain); mouse wheel = Q; right-click = type and key; double-click = 0 dB; Alt+click = reset; Ctrl = fine; Shift+click = solo while held (drag up / down: width)" = "핸들 드래그 (주파수와 게인); 마우스 휠 = Q; 오른쪽 클릭 = 유형과 음; 더블 클릭 = 0 dB; Alt+클릭 = 초기화; Ctrl = 미세 조정; Shift+클릭 = 누르는 동안 솔로 (위 / 아래로 드래그: 폭)"
+"Hybridize" = "하이브리드화"

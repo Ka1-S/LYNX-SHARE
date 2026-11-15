@@ -146,6 +146,7 @@
 #include "core/ActivityLight.h" // round 190ih
 #include "core/LiveNote.h"
 #include "core/LiveKeys.h"
+#include "core/PresetMix.h"
 #include "core/PinOnTop.h"
 #include "core/MetronomeVoice.h"
 #include "engine/Transport.h"
