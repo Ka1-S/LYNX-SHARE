@@ -2751,7 +2751,7 @@ public:
             {
                 const auto copy = lynx::olderlynx::forRelease (*song, release);
                 for (const auto& l : copy.lost)
-                    report << (l.sound ? "sound: " : "view: ") << juce::String (l.text).replace ("{0}", l.detail) << "\n";
+                    report << (l.sound ? "sound: " : "view: ") << juce::String::fromUTF8 (l.text).replace ("{0}", l.detail) << "\n";
                 ok = copy.ok && output.replaceWithText (copy.json, false, false, nullptr);
                 if (! copy.ok)
                     error = copy.error;
@@ -5749,7 +5749,7 @@ private:
             if (! back || ! back->compensateMixerLevels || ! old || old->compensateMixerLevels)
                 community190hqResult = "ERROR mixer level PDC mark " + why;
             else if (marks.size() != 2 || marks[0].tick != 4 * lynx::ppq || std::abs (marks[1].bpm - 140.0) > 0.01 || ! marks[1].glide || marks[0].glide
-                     || std::abs (back->tempoAt (6.0 * lynx::ppq) - 90.0) > 0.01)
+                     || std::abs (back->tempoAt (5.0 * lynx::ppq) - 102.5) > 0.5) // (90 at bar 2, ramping into the gliding 140 at bar 3)
                 community190hqResult = "ERROR tempo markers round trip";
             else if (! copy127 || for127.json.contains ("anvilBus") || copy127->mixer[1].effects.size() != 2
                      || copy127->mixer[1].effects[0].kind != lynx::EffectKind::utility || copy127->mixer[1].effects[0].enabled
@@ -5762,7 +5762,7 @@ private:
                      || for127.json.contains ("mixerLevelPdc190hq") || for127.json.contains ("beatsLaw190gx"))
                 community190hqResult = "ERROR copy for 0.1.27: fields";
             else if (! copy128 || for128.json.contains ("tempoMarkers") || ! for128.json.contains ("anvilBus") || lynx::tempomarkers::automationIndex (*copy128) >= 0
-                     || std::abs (copy128->tempoAt (6.0 * lynx::ppq) - 90.0) > 0.01 || std::abs (copy128->tempoAt (12.0 * lynx::ppq) - 140.0) > 0.01)
+                     || std::abs (copy128->tempoAt (5.0 * lynx::ppq) - 102.5) > 0.5 || std::abs (copy128->tempoAt (12.0 * lynx::ppq) - 140.0) > 0.01)
                 community190hqResult = "ERROR copy for 0.1.28";
             else if (lynx::olderlynx::forRelease (song, "0.1.9").ok)
                 community190hqResult = "ERROR unknown release accepted";

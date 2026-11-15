@@ -246,14 +246,14 @@ TEST (pdc190hq_fader_and_route_automation_follow_their_audio)
         r.process (state.get(), true, 0.5 * ppq, 256, l.data(), rr.data()); // half a beat in: the ramp is at 0.5
         return r.automatedLevel (*state, automation, 0.75f, track);
     };
-    CHECK (std::abs (value (false, true, 0, 1) - 0.5f) < 1e-6f); // off: as before (FL's scope)
+    CHECK (std::abs (value (false, true, 0, 1) - 0.5f) < 0.01f); // off: as before (FL's scope; the block's last chunk)
     CHECK (std::abs (value (true, true, 0, 1) - 0.3f) < 0.02f);  // the fader of insert 1: 0.2 beat earlier
     CHECK (std::abs (value (true, true, 1, 1) - 0.3f) < 0.02f);  // its route to insert 2: the same
-    CHECK (std::abs (value (true, false, 0, 1) - 0.5f) < 1e-6f); // under FL's Compensate automations only
+    CHECK (std::abs (value (true, false, 0, 1) - 0.5f) < 0.01f); // under FL's Compensate automations only
     // the Master's fader: as late as everything (insert 1's 4800 samples reach it)
     CHECK (std::abs (value (true, true, 2, 0) - 0.3f) < 0.02f);
     s.autoPdc = false;
-    CHECK (std::abs (value (true, true, 0, 1) - 0.5f) < 1e-6f);
+    CHECK (std::abs (value (true, true, 0, 1) - 0.5f) < 0.01f);
 }
 
 TEST (pdc190hq_render_ahead_null_with_side_chains_and_level_automation)

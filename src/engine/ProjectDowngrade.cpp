@@ -34,10 +34,9 @@ juce::String channelName (const juce::var& c, int index)
 
 juce::String insertName (const juce::var& mixer, int track)
 {
-    if (track == 0)
-        return "Master";
+    // (language-neutral: "#3 \"Kick\"", the Master as "#0")
     const auto name = mixer[track]["name"].toString();
-    return "Insert " + juce::String (track) + (name.isNotEmpty() ? " \"" + name + "\"" : juce::String());
+    return "#" + juce::String (track) + (name.isNotEmpty() ? " \"" + name + "\"" : juce::String());
 }
 
 // "a, b, c" (at most four, then "…")
@@ -46,7 +45,7 @@ juce::String listOf (const juce::StringArray& names)
     juce::StringArray shown;
     for (int i = 0; i < names.size() && i < 4; ++i)
         shown.add (names[i]);
-    return shown.joinIntoString (", ") + (names.size() > 4 ? ", …" : "");
+    return shown.joinIntoString (", ") + (names.size() > 4 ? juce::String::fromUTF8 (", \u2026") : juce::String());
 }
 
 void forEachChannel (const juce::var& root, const std::function<void (juce::DynamicObject&, int)>& fn)
@@ -79,7 +78,13 @@ void forEachClip (const juce::var& root, const std::function<void (juce::Array<j
 void toRelease0128 (juce::var& root, Losses& lost)
 {
     auto& o = *objectOf (root);
-    if (drop (o, "mixerLevelPdc190hq"))
+    // (reported only when the project has such automation: the mark is on in every new project)
+    bool levelAutomation = false;
+    if (auto* automations = arrayOf (root["automations"]))
+        for (const auto& a : *automations)
+            if (const auto kind = a["target"][0].toString(); kind == "mixerVolume" || kind == "mixerPan" || kind == "mixerSend" || kind == "vcaLevel")
+                levelAutomation = true;
+    if (drop (o, "mixerLevelPdc190hq") && levelAutomation)
         lost.push_back ({ TR_NOOP ("Mixer › Plugin delay compensation › \"Compensate fader and route automations too\" is not in this release: that automation plays a little early behind plugins with latency"), {}, true });
 
     int markers = 0;
@@ -198,7 +203,7 @@ void toRelease0127 (juce::var& root, Losses& lost)
                     for (int s = 0; s < fx->size(); ++s)
                         if (flattenUnknownEffect (fx->getReference (s)))
                         {
-                            where.add (insertName (o.getProperty ("mixer"), t) + ", slot " + juce::String (s + 1));
+                            where.add (insertName (o.getProperty ("mixer"), t) + juce::String::fromUTF8 (" \u203a ") + juce::String (s + 1));
                             detachTargets (root, t, s);
                         }
         int nested = 0;
@@ -211,7 +216,7 @@ void toRelease0127 (juce::var& root, Losses& lost)
             for (auto& c : *channels)
                 flattenNested (c, nested);
         if (nested > 0)
-            where.add (juce::String (nested) + " inside Patchers");
+            where.add (juce::String (nested) + juce::String::fromUTF8 (" \u00d7 Patcher"));
         if (! where.isEmpty())
             lost.push_back ({ TR_NOOP ("Anvil Bus is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})"), listOf (where), true });
     }

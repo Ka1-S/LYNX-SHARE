@@ -4395,7 +4395,7 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
 
         // round 190hq (B11): a tempo marker's tag: drag it along the ruler, double-click it to type its tempo (the right
         // button opens the ruler menu with its items)
-        if (const auto tempoHit = markerHit < 0 && ! fl.right && ! e.mods.isCtrlDown() && ! e.mods.isShiftDown() ? tempoTagAt (e.x, e.y) : -1; tempoHit >= 0)
+        if (const auto tempoHit = markerHit < 0 && ! fl.right && ! fl.ctrl && ! e.mods.isShiftDown() ? tempoTagAt (e.x, e.y) : -1; tempoHit >= 0)
         {
             if (e.getNumberOfClicks() >= 2)
             {
