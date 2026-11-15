@@ -2990,6 +2990,11 @@ private:
         s.channels.push_back (onMaster);
         for (int step : { 1, 5, 9, 13 })
             s.patterns[0].toggleStep ((int) s.channels.size() - 1, step);
+        for (int step : { 4, 12 })
+            s.patterns[0].toggleStep (3, step); // the snare
+        for (int k = 0; k < 4; ++k) // the synth under the kick (its compressor listens to it)
+            s.patterns[0].notes.push_back ({ (std::int64_t) k * lynx::ppq, lynx::ppq - 60, 4, 57 + 3 * k, 0.9f });
+        s.patterns[0].sortNotes();
         s.mixer[0].effects.push_back (lynx::makeEffectSlot (lynx::EffectKind::limiter));
         s.mixer[1].effects.push_back (lynx::makeEffectSlot (lynx::EffectKind::compressor));
         s.mixer[2].toMaster = false;
@@ -3001,6 +3006,7 @@ private:
         s.mixer[4].sends = { lynx::MixerSend { 6, 0.7f } };
         s.mixer[4].masterLevel = 0.8f;
         auto keyed = lynx::makeEffectSlot (lynx::EffectKind::compressor);
+        keyed.params[0] = 0.5f; // (−30 dB: the kick's hits pull the synth down)
         keyed.sidechain = 1;
         s.mixer[5].effects.push_back (keyed);
         s.mixer[6].effects.push_back (lynx::makeEffectSlot (lynx::EffectKind::distortion));

@@ -1,6 +1,7 @@
 // Round 190gj (P9): "Split mixer tracks" in one render. Each insert's stem is the render of makeBounceSong (song,
 // insert); exportopts::planStemTap / StemMixer make the same samples from the taps of one render of the whole song.
 // The engine side (RenderStream, the files) is checked by the app's --stemexport against the old per-stem renders.
+#include "core/Effects.h"
 #include "core/ExportOptions.h"
 
 namespace s190gj
@@ -23,9 +24,13 @@ lynx::Song song()
     auto& p = s.patterns[0];
     for (int step : { 1, 5, 9, 13 })
         p.toggleStep ((int) s.channels.size() - 1, step);
+    for (int step : { 4, 12 })
+        p.toggleStep (3, step); // the snare
+    for (int k = 0; k < 4; ++k) // the synth: held chords under the kick
+        p.notes.push_back ({ (std::int64_t) k * lynx::ppq, lynx::ppq - 60, 4, 57 + 3 * k, 0.9f });
+    p.sortNotes();
 
-    lynx::EffectSlot comp;
-    comp.kind = lynx::EffectKind::compressor;
+    auto comp = lynx::makeEffectSlot (lynx::EffectKind::compressor);
     s.mixer[1].effects.push_back (comp);
     s.mixer[2].toMaster = false;
     s.mixer[2].sends = { lynx::MixerSend { 6, 1.0f } };
@@ -41,6 +46,8 @@ lynx::Song song()
     s.mixer[4].masterLevel = 0.8f;
     auto keyed = comp;
     keyed.sidechain = 1; // the synth ducks under the kick: insert 1 does not feed insert 5
+    keyed.params[0] = 0.1f; // (a low threshold and a high ratio: the ducking is heard)
+    keyed.params[1] = 0.8f;
     s.mixer[5].effects.push_back (keyed);
     lynx::EffectSlot drive;
     drive.kind = lynx::EffectKind::distortion;
