@@ -370,3 +370,83 @@ TEST (rollup028_render_ahead_keeps_inserts_with_shown_effect_meters_live)
     CHECK (RenderAhead::partitionOf (*state, nullptr, 0, nullptr, 0, nullptr, ch, tr, boundary, levels.get()));
     CHECK (tr[1] == 0 && tr[2] == 1); // (190gq's own rule, unchanged)
 }
+
+// Step 9 (round 190gq × 190gi / 190gx / 190ff): render-ahead stays bit-exact with the rollup's audio-clip features in the
+// part rendered ahead: a clip volume envelope (190gi), an audio clip stretched by Beats on the Measured law (190gx), and
+// an audio channel as the stand-in a freeze leaves (190ff plays frozen audio as such a clip), each on an insert of its own
+// beside 190gq's synths.
+TEST (rollup028_render_ahead_is_bit_exact_with_clip_envelopes_beats_and_frozen_audio)
+{
+    using namespace lynx;
+    auto song = ra190gq::makeSong (4);
+    const auto firstAudio = (int) song.channels.size();
+    auto audio = clipenv190gi::rampSong();
+    for (int k = 0; k < 3; ++k)
+    {
+        auto c = audio.channels[0];
+        c.name = "Audio " + std::to_string (k + 1);
+        c.samplePath = "a" + std::to_string (k) + ".wav";
+        c.mixerTrack = k == 2 ? 6 : 5;
+        c.volume = 0.3f;
+        if (k == 1) // stretched by Beats, the Measured law
+        {
+            c.sampler.keepPitch = true;
+            c.sampler.stretchMethod = StretchMethod::beats;
+            c.sampler.warpModes.beatsLaw = WarpModeSettings::beatsLawMeasured;
+        }
+        song.channels.push_back (c);
+        song.patterns.emplace_back();
+        Clip clip;
+        clip.kind = ClipKind::audio;
+        clip.channel = firstAudio + k;
+        clip.track = 6 + k;
+        clip.start = (std::int64_t) k * ppq;
+        clip.length = ppq * 6;
+        if (k == 0) // the envelope
+        {
+            song.clipEnvelopes = audio.clipEnvelopes;
+            clip.envelope = 0;
+        }
+        song.playlist.push_back (clip);
+    }
+    song.mixer[5].effects.push_back (makeEffectSlot (EffectKind::delay));
+    song.mixer[6].effects.push_back (makeEffectSlot (EffectKind::reverb));
+    auto provider = [] (const std::string& path) {
+        auto d = std::make_shared<SampleData>();
+        d->sampleRate = 44100.0;
+        const auto f = path == "a1.wav" ? 220.0 : path == "a2.wav" ? 330.0 : 440.0;
+        for (int i = 0; i < 44100 * 4; ++i)
+            d->left.push_back ((float) (0.5 * std::sin (2.0 * 3.141592653589793 * f * i / 44100.0) * std::exp (-(i % 11025) / 4000.0)));
+        d->right = d->left;
+        return std::shared_ptr<const SampleData> (d);
+    };
+    const int blocks = 1400; // ~2 s at 64 samples
+    for (const auto workers : { 0, 2 })
+    {
+        auto state = RackState::build (song, nullptr, 44100.0, provider);
+        std::unique_ptr<WorkerPool> pool = workers > 0 ? std::make_unique<WorkerPool> (workers) : nullptr;
+        RackRenderer plain;
+        plain.setWorkerPool (pool.get());
+        plain.prepare (44100.0, 2048);
+        MeterBank meters;
+        LiveEventQueue live;
+        ra190gq::Callback cb0 (song, 64, 0.0);
+        std::vector<float> l0, r0, l1, r1;
+        cb0.run (blocks, l0, r0, [&] (double start, int n, double, float* a, float* b, int) {
+            plain.process (state.get(), true, start, n, a, b, &live, &meters, nullptr);
+            if (pool != nullptr)
+                pool->park();
+        });
+        ra190gq::AheadRig rig (song, workers, {});
+        rig.exchange.publish (RackState::build (song, nullptr, 44100.0, provider)); // (with the clips' audio)
+        ra190gq::Callback cb1 (song, 64, 0.0);
+        cb1.run (blocks, l1, r1, [&] (double start, int n, double tps, float* a, float* b, int) {
+            std::this_thread::sleep_for (std::chrono::microseconds (100));
+            rig.block (cb1, start, n, tps, a, b);
+        });
+        const auto& st = rig.ahead.stats();
+        CHECK (ra190gq::same (l0, l1) && ra190gq::same (r0, r1));
+        CHECK (st.engagements.load() >= 1 && st.splitMismatches.load() == 0 && st.fromRing.load() > (std::uint64_t) blocks / 2);
+        CHECK (ra190gq::energy (l0.data() + 44100, 44100) > 1.0); // (the audio clips sound)
+    }
+}
