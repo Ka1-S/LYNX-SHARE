@@ -16,6 +16,7 @@
 #include "ui/ColourPicker.h"
 #include "ui/FileChoosers.h"
 #include "ui/I18n.h"
+#include "ui/ImageReadback.h"
 #include "ui/PluginSkin.h"
 #include "ui/SlotWatch.h"
 #include "ui/Theme.h"
@@ -1128,9 +1129,14 @@ struct SceneRenderer::State
         {
             const auto w = juce::jmax (1, (int) std::round (area.getWidth())), h = juce::jmax (1, (int) std::round (area.getHeight()));
             // (an opaque picture is copied, not blended, when drawn)
-            entry.second = juce::Image (opaque ? juce::Image::RGB : juce::Image::ARGB, w, h, true, juce::SoftwareImageType());
-            juce::Graphics g (entry.second);
-            paint (g, juce::Rectangle<float> ((float) w, (float) h));
+            auto picture = juce::Image (opaque ? juce::Image::RGB : juce::Image::ARGB, w, h, true, juce::SoftwareImageType());
+            {
+                juce::Graphics g (picture);
+                paint (g, juce::Rectangle<float> ((float) w, (float) h));
+            }
+            // drawn every frame: kept as the window's kind of image (a software one becomes a new GPU bitmap on every
+            // draw on Windows; round 190gv), the same pixels
+            entry.second = lynx::ui::forScreen (picture);
             entry.first = key;
         }
         return entry.second;
