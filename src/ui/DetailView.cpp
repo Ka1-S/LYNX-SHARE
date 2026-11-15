@@ -1702,7 +1702,8 @@ public:
         // moved with the end and Length is the clip's length (core/ClipSample.h)
         start.setTooltip (tr ("Start: where the clip starts in its source (bar. beat. sixteenth; seconds for unwarped audio)"));
         end.setTooltip (tr ("End: where the clip ends in its source"));
-        position.setTooltip (tr ("Loop Position: moves the looped part, its length stays (the loop starts where the clip starts)"));
+        // round 190hr (detail-016): with Loop on, Start is a marker of its own inside the loop (Live's StartRelative)
+        position.setTooltip (tr ("Loop Position: where the loop starts; the Start marker stays where it is"));
         length.setTooltip (tr ("Loop Length (bars. beats. sixteenths)"));
         // round 190dr: Live's Set buttons beside the fields: the marker goes to where the playing clip is now; dim while
         // the clip does not play
@@ -1717,6 +1718,7 @@ public:
         setStart.setTooltip (tr ("Set: the clip starts where it plays now"));
         setEnd.setTooltip (tr ("Set: the clip ends where it plays now"));
         setPosition.setTooltip (tr ("Set: the loop moves to start where the clip plays now"));
+        start.setTooltip (tr ("Start: where the clip starts playing in its source (with Loop on, a marker inside the loop; bar. beat. sixteenth; seconds for unwarped audio)"));
         setLength.setTooltip (tr ("Set: the loop ends where the clip plays now"));
         showingTimer = std::make_unique<ui::TimerWhileShowing> (*this, static_cast<juce::Timer&> (*this), 10);
         // the Groove chooser: the project's Groove Pool (round 190bv), for MIDI clips (LYNX's grooves act on MIDI clips)
@@ -1751,6 +1753,75 @@ public:
         quant.onChange = [this] { editSlot ([q = quant.getSelectedId() - 1] (ClipGridSlot& slot) { slot.quant = (LaunchQuant) juce::jlimit (0, 14, q); }); };
         for (auto* c : { &mode, &quant })
             addAndMakeVisible (*c);
+
+        // round 190hr (detail-028): the Launch panel's Follow Action controls over the slot's follow action (the same model
+        // as the grid slot menu's Follow action submenu). Live 12's controls [STR live-exe-strings-u16.txt 2061-2075:
+        // Follow Action Enabled, A, B, Chance A, Chance B, Time, Linked, Multiplier, Jump Index A / B]
+        followOn.setButtonText (tr ("Follow Action"));
+        followOn.setClickingTogglesState (true);
+        followOn.setConnectedEdges (0);
+        followOn.setTooltip (tr ("Follow Action: after its time the clip launches another, A or B by their chances"));
+        followOn.onClick = [this] { editFollow ([on = followOn.getToggleState()] (ClipFollow& f) { f.enabled = on; }); };
+        linked.setButtonText (tr ("Linked"));
+        linked.setClickingTogglesState (true);
+        linked.setConnectedEdges (0);
+        linked.setTooltip (tr ("Linked: the follow action comes after the clip has played Multiplier times; off: after the Time"));
+        linked.onClick = [this] { editFollow ([on = linked.getToggleState()] (ClipFollow& f) { f.linked = on; }); };
+        for (auto* b : { &followOn, &linked })
+            addAndMakeVisible (*b);
+        const std::pair<FollowKind, const char*> actions[] = {
+            { FollowKind::none, TR_NOOP ("No action") }, { FollowKind::stop, TR_NOOP ("Stop") }, { FollowKind::playAgain, TR_NOOP ("Play again") },
+            { FollowKind::previous, TR_NOOP ("Previous") }, { FollowKind::next, TR_NOOP ("Next") }, { FollowKind::first, TR_NOOP ("First") },
+            { FollowKind::last, TR_NOOP ("Last") }, { FollowKind::any, TR_NOOP ("Any") }, { FollowKind::other, TR_NOOP ("Other") },
+            { FollowKind::jump, TR_NOOP ("Jump") }
+        };
+        for (auto* box : { &followA, &followB })
+        {
+            for (const auto& [k, text] : actions)
+                box->addItem (tr (text), (int) k + 1);
+            box->setTooltip (box == &followA ? tr ("Follow Action A") : tr ("Follow Action B"));
+            box->onChange = [this, box] {
+                if (loading || box->getSelectedId() < 1)
+                    return;
+                const auto k = (FollowKind) (box->getSelectedId() - 1);
+                editFollow ([k, isA = box == &followA] (ClipFollow& f) { (isA ? f.a : f.b) = k; });
+            };
+            addAndMakeVisible (*box);
+        }
+        const auto numberBox = [this] (std::unique_ptr<ui::NumBox>& box, const juce::String& name, double lo, double hi, std::function<juce::String (double)> text,
+                                       std::function<double (const ClipFollow&)> get, std::function<void (ClipFollow&, int)> set) {
+            ui::ValueSpec spec;
+            spec.name = name;
+            spec.minimum = lo;
+            spec.maximum = hi;
+            spec.interval = 1.0;
+            spec.pixelsForRange = std::min (300.0, (hi - lo) * 4.0);
+            spec.toText = std::move (text);
+            box = std::make_unique<ui::NumBox> (spec, [this, get] { const auto* f = follow(); return f != nullptr ? get (*f) : 0.0; },
+                                                [this, set] (double v) { editFollow ([set, v] (ClipFollow& f) { set (f, juce::roundToInt (v)); }); });
+            addAndMakeVisible (*box);
+        };
+        const auto percent = [] (double v) { return juce::String (juce::roundToInt (v)) + " %"; };
+        numberBox (chanceA, tr ("Follow Action Chance A"), 0, 100, percent, [] (const ClipFollow& f) { return (double) f.chanceA; }, [] (ClipFollow& f, int v) { f.chanceA = v; });
+        numberBox (chanceB, tr ("Follow Action Chance B"), 0, 100, percent, [] (const ClipFollow& f) { return (double) f.chanceB; }, [] (ClipFollow& f, int v) { f.chanceB = v; });
+        numberBox (multiplier, tr ("Follow Action Multiplier"), 1, 64, [] (double v) { return juce::String::fromUTF8 ("\xc3\x97") + juce::String (juce::roundToInt (v)); },
+                   [] (const ClipFollow& f) { return (double) f.iterations; }, [] (ClipFollow& f, int v) { f.iterations = std::max (1, v); });
+        const auto scene = [] (double v) { return juce::String (juce::roundToInt (v)); };
+        numberBox (jumpA, tr ("Follow Action Jump Index A"), 1, launcher::maxScenes, scene, [] (const ClipFollow& f) { return (double) f.jumpA + 1; }, [] (ClipFollow& f, int v) { f.jumpA = std::max (0, v - 1); });
+        numberBox (jumpB, tr ("Follow Action Jump Index B"), 1, launcher::maxScenes, scene, [] (const ClipFollow& f) { return (double) f.jumpB + 1; }, [] (ClipFollow& f, int v) { f.jumpB = std::max (0, v - 1); });
+        followTime.setFont (font (type::small));
+        followTime.setTooltip (tr ("Follow Action Time (bars. beats. sixteenths): with Linked off, the follow action comes after this time"));
+        followTime.onReturnKey = [this] { applyFollowTime(); };
+        followTime.onFocusLost = [this] { applyFollowTime(); };
+        followTime.onEscapeKey = [this] { load(); };
+        addAndMakeVisible (followTime);
+        for (auto* l : { &followTitle })
+        {
+            l->setFont (font (type::small, true));
+            l->setColour (juce::Label::textColourId, colour::textSecondary);
+            l->setText (tr ("Follow Action"), juce::dontSendNotification);
+            addAndMakeVisible (*l);
+        }
 
         // the reference's note tools, each the Piano roll's own operation on every note of the clip's pattern
         const std::pair<juce::TextButton*, const char*> tools[] = {
@@ -1789,7 +1860,7 @@ public:
         fitScale.setButtonText (tr ("Fit to scale"));
         timesTwo.setTooltip (tr ("Twice as slow: doubles every note's start and length"));
         divideTwo.setTooltip (tr ("Twice as fast: halves every note's start and length"));
-        fitScale.setTooltip (tr ("Moves every note of the clip onto the project's key"));
+        fitScale.setTooltip (tr ("Moves every note of the clip onto the clip's scale"));
         for (auto* b : { &timesTwo, &divideTwo, &fitScale })
         {
             b->setConnectedEdges (0);
@@ -1810,29 +1881,39 @@ public:
         timesTwo.onClick = [stretch] { stretch (true); };
         divideTwo.onClick = [stretch] { stretch (false); };
         fitScale.onClick = [this] {
-            notes ([] (Pattern& p, const std::vector<int>& all, const Song& song) {
-                if (const auto key = projectkey::get (song); key && projectkey::lynxScale (*key) > 0)
+            notes ([key = clipKeyOf (engine.getSong())] (Pattern& p, const std::vector<int>& all, const Song&) {
+                if (key && projectkey::lynxScale (*key) > 0)
                     notetools::snapNotesToScale (p, all, key->root, projectkey::lynxScale (*key));
             });
         };
 
-        // the Clip panel's Scale row: the project key (Live keeps a scale per clip; LYNX SHARE has one per project)
-        scaleRoot.addItem (tr ("None"), 1);
+        // the Clip panel's Scale row (round 190hr, detail-022): the clip's own scale, as Live's Clip Scale [SHOT
+        // live190gu/warp/live-clipview-beats-defaults-full.png, ableton190o/shots/live-02-clipview-scale-bhairav.png: the
+        // Scale Mode switch, the root and the scale name]. A clip follows the project key until its row is changed.
+        scaleMode.setButtonText (juce::String::fromUTF8 ("\xe2\x99\xad\xe2\x99\xaf")); // (flat sharp, Live's switch)
+        scaleMode.setClickingTogglesState (true);
+        scaleMode.setConnectedEdges (0);
+        scaleMode.setTooltip (tr ("Scale Mode: the clip's notes, editor and tools follow the clip's scale"));
+        scaleMode.onClick = [this] { editClip ([on = scaleMode.getToggleState()] (Clip&, ClipGridSlot& slot) { slot.scaleOn = on; }); };
+        addAndMakeVisible (scaleMode);
         for (int root = 0; root < 12; ++root)
-            scaleRoot.addItem (juce::String (projectkey::rootName (root)), root + 2);
+            scaleRoot.addItem (juce::String (projectkey::rootName (root)), root + 1);
         for (auto index : projectkey::commonFirst())
             scaleName.addItem (tr (notetools::flReferenceScales()[(std::size_t) index].name), index + 1);
         for (auto* c : { &scaleRoot, &scaleName })
         {
-            c->setTooltip (tr ("The project's key: the Piano roll highlights it and Fit to scale uses it (LYNX SHARE has one key per project)"));
+            c->setTooltip (tr ("The clip's scale: its root and name (a new clip follows the project's key)"));
             addAndMakeVisible (*c);
             c->onChange = [this] {
-                std::optional<projectkey::Key> key;
-                if (scaleRoot.getSelectedId() >= 2)
-                    key = projectkey::Key { scaleRoot.getSelectedId() - 2, std::max (0, scaleName.getSelectedId() - 1) };
-                if (key && scaleName.getSelectedId() == 0) // first key of a project: Major
-                    key->flScale = projectkey::commonFirst().front();
-                engine.editSong ([key] (Song& song) { projectkey::set (song, key); });
+                if (loading || scaleRoot.getSelectedId() < 1)
+                    return;
+                const auto root = scaleRoot.getSelectedId() - 1;
+                const auto index = scaleName.getSelectedId() >= 1 ? scaleName.getSelectedId() - 1 : projectkey::commonFirst().front();
+                editClip ([root, index] (Clip&, ClipGridSlot& slot) {
+                    slot.ownScale = true;
+                    slot.scaleRoot = (std::int8_t) root;
+                    slot.scaleIndex = (std::int16_t) index;
+                });
             };
         }
         engine.addChangeListener (this);
@@ -1840,11 +1921,11 @@ public:
     ~ClipColumn() override { engine.removeChangeListener (this); }
 
     // the reference's Clip / Launch / Notes panels side by side under the clip's name [SHOT d08]
-    static constexpr int clipPanel = 164, clipPanel2 = 164, launchPanel = 136, notesPanel = 172, gap = 8;
+    static constexpr int clipPanel = 164, clipPanel2 = 164, launchPanel = 136, followPanel = 144, notesPanel = 172, gap = 8;
     static constexpr int foldedTools = 20;
     int preferredWidth() const
     {
-        return gap + clipPanel + gap + clipPanel2 + gap + launchPanel + gap + (hasNotes ? notesPanel + gap + (toolsFolded ? foldedTools : MidiToolsPanel::panelWidth) + gap : 0);
+        return gap + clipPanel + gap + clipPanel2 + gap + launchPanel + gap + followPanel + gap + (hasNotes ? notesPanel + gap + (toolsFolded ? foldedTools : MidiToolsPanel::panelWidth) + gap : 0);
     }
     // the docked Piano roll (nullptr while it is not docked here): the MIDI Tools work on its selection
     std::function<PianoRollComponent*()> editorOf;
@@ -1927,7 +2008,15 @@ public:
         halves (take (c2, 14), signatureLabel, grooveLabel);
         halves (take (c2, 20), signature, groove);
         scaleLabel.setBounds (take (c2, 14));
-        halves (take (c2, 20), scaleRoot, scaleName);
+        {
+            auto row = take (c2, 20);
+            scaleMode.setBounds (row.removeFromLeft (22));
+            row.removeFromLeft (3);
+            const auto w = (row.getWidth() - 4) * 2 / 5;
+            scaleRoot.setBounds (row.removeFromLeft (w));
+            row.removeFromLeft (4);
+            scaleName.setBounds (row);
+        }
 
         // Launch: mode, quantisation, legato
         auto l = r.removeFromLeft (launchPanel);
@@ -1938,6 +2027,26 @@ public:
         quantLabel.setBounds (take (l, 12));
         quant.setBounds (take (l, 20));
         legato.setBounds (take (l, 20));
+
+        // Follow Action (round 190hr): the switch; A | B with their jump targets; the chances; Linked with the
+        // multiplier; the time
+        auto f = r.removeFromLeft (followPanel);
+        r.removeFromLeft (gap);
+        followTitle.setBounds (take (f, 14));
+        followOn.setBounds (take (f, 18));
+        halves (take (f, 20), followA, followB);
+        {
+            auto row = take (f, 18);
+            const auto w = (row.getWidth() - 6) / 2;
+            auto a = row.removeFromLeft (w);
+            row.removeFromLeft (6);
+            jumpA->setBounds (a.removeFromRight (jumpA->isVisible() ? 30 : 0));
+            chanceA->setBounds (a.withTrimmedRight (jumpA->isVisible() ? 3 : 0));
+            jumpB->setBounds (row.removeFromRight (jumpB->isVisible() ? 30 : 0));
+            chanceB->setBounds (row.withTrimmedRight (jumpB->isVisible() ? 3 : 0));
+        }
+        halves (take (f, 18), linked, *multiplier);
+        followTime.setBounds (take (f, 18));
 
         // Notes: the note tools, two columns
         auto n = r.removeFromLeft (notesPanel);
@@ -1994,14 +2103,27 @@ private:
         float progress = 0.0f;
         if (! clipPlays (&progress))
             return;
-        editClip ([which, progress] (Clip& c, ClipGridSlot&) {
+        editClip ([which, progress] (Clip& c, ClipGridSlot& slot) {
             const auto at = clipsample::playPosition (c, progress);
-            if (which == 0)
+            const auto marker = c.offset + (std::int64_t) launcher::startLead (slot, c.length);
+            if (which == 0 && slot.loop && at >= c.offset && at < c.offset + c.length)
+                slot.startMarker = at - c.offset; // (round 190hr: the Start marker inside the loop)
+            else if (which == 0)
+            {
                 clipsample::setStartAt (c, at);
+                slot.startMarker = 0;
+            }
             else if (which == 2)
+            {
                 clipsample::setPositionAt (c, at);
+                slot.startMarker = marker >= c.offset && marker < c.offset + c.length ? marker - c.offset : 0;
+            }
             else
+            {
                 clipsample::setEndAt (c, at);
+                if (slot.startMarker >= c.length)
+                    slot.startMarker = 0;
+            }
         });
     }
     // The clip's content is in seconds (an unwarped audio clip) rather than in beats
@@ -2043,8 +2165,9 @@ private:
         if (! name.hasKeyboardFocus (false))
             name.setText (slot != nullptr ? utf8 (slot->name) : juce::String(), false);
         const auto secs = inSeconds (*c);
+        const auto marker = slot != nullptr ? (std::int64_t) launcher::startLead (*slot, c->length) : 0;
         if (! start.hasKeyboardFocus (false))
-            start.setText (fieldText (c->offset, false, secs), false);
+            start.setText (fieldText (c->offset + marker, false, secs), false);
         if (! end.hasKeyboardFocus (false))
             end.setText (fieldText (c->offset + c->length, false, secs), false);
         if (! position.hasKeyboardFocus (false))
@@ -2076,6 +2199,25 @@ private:
             for (auto* ed : { &position, &length }) // (Live: the loop's fields are off with Loop off)
                 ed->setEnabled (slot->loop);
             legato.setToggleState (slot->legato, n);
+            {
+                const juce::ScopedValueSetter<bool> guard (loading, true);
+                const auto& fa = slot->follow;
+                followOn.setToggleState (fa.enabled, n);
+                followA.setSelectedId ((int) fa.a + 1, n);
+                followB.setSelectedId ((int) fa.b + 1, n);
+                linked.setToggleState (fa.linked, n);
+                if (! followTime.hasKeyboardFocus (false))
+                    followTime.setText (fieldText (fa.ticks, true, false), false);
+                followTime.setEnabled (! fa.linked);
+                multiplier->setEnabled (fa.linked);
+                const auto jumps = jumpA->isVisible() != (fa.a == FollowKind::jump) || jumpB->isVisible() != (fa.b == FollowKind::jump);
+                jumpA->setVisible (fa.a == FollowKind::jump);
+                jumpB->setVisible (fa.b == FollowKind::jump);
+                for (auto* box : { chanceA.get(), chanceB.get(), multiplier.get(), jumpA.get(), jumpB.get() })
+                    box->repaint();
+                if (jumps)
+                    resized();
+            }
             mode.setSelectedId ((int) slot->mode + 1, n);
             quant.setSelectedId ((int) slot->quant + 1, n);
         }
@@ -2105,10 +2247,44 @@ private:
         auto fill = slot != nullptr && slot->colour != 0 ? juce::Colour (slot->colour)
                     : c->kind == ClipKind::audio ? colour::audioClip : tame (PlaylistComponent::patternColour (song, c->pattern));
         chip.set (fill, ! c->muted);
-        const auto key = projectkey::get (song);
-        scaleRoot.setSelectedId (key ? key->root + 2 : 1, n);
-        scaleName.setSelectedId (key ? key->flScale + 1 : 0, n);
-        scaleName.setEnabled (key.has_value());
+        {
+            const juce::ScopedValueSetter<bool> guard (loading, true);
+            const auto shown = slot != nullptr ? projectkey::clipScale (*slot, song) : projectkey::get (song);
+            scaleRoot.setSelectedId (shown ? shown->root + 1 : 0, n);
+            scaleName.setSelectedId (shown ? shown->flScale + 1 : 0, n);
+            scaleMode.setToggleState (slot == nullptr || slot->scaleOn, n);
+            for (auto* box : { &scaleRoot, &scaleName })
+                box->setEnabled (pattern);
+            scaleMode.setEnabled (pattern);
+        }
+        // round 190hr: the docked editor's Quantize keys use the MIDI Tools' Quantize tool (Live 12's Edit › Quantize /
+        // Quantize Settings…)
+        if (auto* roll = editorOf != nullptr ? editorOf() : nullptr)
+        {
+            const juce::Component::SafePointer<ClipColumn> safe (this);
+            roll->onLiveQuantize = [safe] {
+                if (safe != nullptr)
+                    safe->tools.quantizeNow();
+            };
+            roll->onLiveQuantizeSettings = [safe] {
+                if (safe == nullptr)
+                    return;
+                if (std::exchange (toolsFolded, false))
+                {
+                    safe->load();
+                    if (auto* parent = safe->getParentComponent())
+                        parent->resized();
+                }
+                safe->tools.showQuantize();
+            };
+        }
+        const auto key = clipKeyOf (song);
+        // the docked editor shows the clip's scale (Live: the clip's Scale drives its editor), when it changes
+        if (auto* roll = editorOf != nullptr ? editorOf() : nullptr; roll != nullptr && pattern && key != shownKey)
+        {
+            shownKey = key;
+            roll->setScale (key ? key->root : 0, key ? projectkey::lynxScale (*key) : 0);
+        }
         tools.setVisible (pattern && ! toolsFolded);
         foldTools.setVisible (pattern);
         foldTools.setButtonText (toolsFolded ? juce::String ("+") : juce::String::fromUTF8 ("\xe2\x88\x92")); // (+ / minus sign)
@@ -2123,22 +2299,39 @@ private:
         const auto* c = clip();
         if (c == nullptr)
             return;
-        // the field that was typed in decides (Start keeps the end, Position keeps the length)
+        // the field that was typed in decides. Loop off: Start keeps the end, Position keeps the length. Loop on (round
+        // 190hr, Live's model): Start moves only the Start marker inside the loop; Position moves the loop and the Start
+        // marker stays where it is in the source; End / Length change the loop's end.
         const auto secs = inSeconds (*c);
+        const auto& song0 = engine.getSong();
+        const auto* slot0 = c->gridSlot >= 0 && c->gridSlot < (int) song0.clipGrid->slots.size() ? &song0.clipGrid->slots[(std::size_t) c->gridSlot] : nullptr;
+        const auto looping = slot0 != nullptr && slot0->loop;
+        const auto marker0 = slot0 != nullptr ? (std::int64_t) launcher::startLead (*slot0, c->length) : 0;
         const auto end0 = c->offset + c->length;
         auto offset = c->offset, len = c->length;
-        if (start.getText() != fieldText (c->offset, false, secs))
+        auto marker = marker0;
+        if (start.getText() != fieldText (c->offset + marker0, false, secs))
         {
             if (const auto t = fieldTicks (start, false, secs); t >= 0 && t < end0)
             {
-                offset = t;
-                len = end0 - t;
+                if (looping && t >= c->offset)
+                    marker = t - c->offset;
+                else
+                {
+                    offset = t;
+                    len = end0 - t;
+                    marker = 0;
+                }
             }
         }
         else if (position.getText() != fieldText (c->offset, false, secs))
         {
             if (const auto t = fieldTicks (position, false, secs); t >= 0)
+            {
                 offset = t;
+                const auto at = c->offset + marker0 - t; // (the Start marker keeps its place in the source)
+                marker = at >= 0 && at < len ? at : 0;
+            }
         }
         else if (end.getText() != fieldText (end0, false, secs))
         {
@@ -2150,9 +2343,11 @@ private:
             if (const auto t = fieldTicks (length, true, secs); t > 0)
                 len = t;
         }
+        if (marker >= len)
+            marker = 0;
         const auto newName = name.getText().trim().toStdString();
         const int t = track, sc = scene;
-        engine.editSong ([t, sc, offset, len, newName] (Song& song) {
+        engine.editSong ([t, sc, offset, len, marker, newName] (Song& song) {
             if (! song.clipGrid)
                 return;
             for (auto& clip : song.clipGrid->clips)
@@ -2162,9 +2357,33 @@ private:
                     clip.offset = offset;
                     clip.length = len;
                     song.clipGrid->slots[(std::size_t) clip.gridSlot].name = newName;
+                    song.clipGrid->slots[(std::size_t) clip.gridSlot].startMarker = marker;
                 }
         });
         load();
+    }
+
+    // round 190hr: the slot's follow action (one undo step) and its typed time
+    const ClipFollow* follow() const
+    {
+        const auto* c = clip();
+        const auto& song = engine.getSong();
+        return c != nullptr && c->gridSlot >= 0 && c->gridSlot < (int) song.clipGrid->slots.size() ? &song.clipGrid->slots[(std::size_t) c->gridSlot].follow : nullptr;
+    }
+    void editFollow (std::function<void (ClipFollow&)> fn)
+    {
+        editSlot ([fn] (ClipGridSlot& slot) { fn (slot.follow); });
+    }
+    void applyFollowTime()
+    {
+        const auto* f = follow();
+        if (f == nullptr)
+            return;
+        const auto t = fieldTicks (followTime, true, false);
+        if (t > 0 && t != f->ticks)
+            editFollow ([t] (ClipFollow& x) { x.ticks = t; });
+        else
+            load();
     }
 
     // the grid clip of the slot and its settings (one undo step)
@@ -2258,10 +2477,26 @@ private:
     bool loading = false;
     std::unique_ptr<ui::TimerWhileShowing> showingTimer;
     juce::ToggleButton loop, legato;
+    // round 190hr: the Follow Action controls
+    juce::Label followTitle;
+    juce::TextButton followOn, linked;
+    juce::ComboBox followA, followB;
+    std::unique_ptr<ui::NumBox> chanceA, chanceB, multiplier, jumpA, jumpB;
+    juce::TextEditor followTime;
     juce::ComboBox mode, quant;
     juce::TextButton invert, reverse, makeLegato, humanize, duplicate, quantize, randomize, timesTwo, divideTwo, fitScale;
     juce::Label scaleLabel;
-    juce::ComboBox scaleRoot, scaleName; // the project key (round 190o; Live: the clip's Scale)
+    juce::ComboBox scaleRoot, scaleName; // the clip's scale (round 190hr; before: the project key)
+    juce::TextButton scaleMode;          // Live's Scale Mode switch of the clip (IsInKey)
+    std::optional<projectkey::Key> shownKey; // the scale last handed to the docked editor
+    // the key the clip's tools use: its own scale (or the project's) while its Scale Mode is on
+    std::optional<projectkey::Key> clipKeyOf (const Song& song) const
+    {
+        const auto* c = clip();
+        if (c == nullptr || ! song.clipGrid || c->gridSlot < 0 || c->gridSlot >= (int) song.clipGrid->slots.size())
+            return projectkey::get (song);
+        return projectkey::clipKey (song.clipGrid->slots[(std::size_t) c->gridSlot], song);
+    }
 };
 
 // ---------------------------------------------------------------------------------------------------------------------

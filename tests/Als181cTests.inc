@@ -192,7 +192,7 @@ TEST (als181c_a_set_without_session_clips_adds_no_grid)
     CHECK (song.has_value() && ! song->clipGrid.has_value());
 }
 
-TEST (als181c_start_marker_inside_the_loop_is_reported)
+TEST (als181c_start_marker_inside_the_loop_is_kept)
 {
     using namespace lynx;
     auto set = als181c::sessionSet();
@@ -201,8 +201,11 @@ TEST (als181c_start_marker_inside_the_loop_is_reported)
     set.replace (at, std::string ("<StartRelative Value=\"0.000000\" />").size(), "<StartRelative Value=\"1\" />");
     FlpImportReport report;
     const auto song = importAls (als175a::bytesOf (set), als181c::options (&report));
-    CHECK (song.has_value() && als181c::clipNamed (*song, "Riff A") != nullptr);
-    CHECK (report.approximated.count ("Session clip whose start marker is inside its loop (it starts at the loop start)") == 1);
+    const ClipGridSlot* a = nullptr;
+    CHECK (song.has_value() && als181c::clipNamed (*song, "Riff A", &a) != nullptr);
+    // round 190hr: the Start marker inside the loop is kept (ClipGridSlot::startMarker), no longer approximated
+    CHECK (a != nullptr && a->startMarker == ppq);
+    CHECK (report.approximated.count ("Session clip whose start marker is inside its loop (it starts at the loop start)") == 0);
 }
 
 TEST (als181c_grid_round_trips_through_live_session_view)

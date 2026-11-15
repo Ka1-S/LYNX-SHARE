@@ -15,6 +15,7 @@
 // Threads: the UI posts commands into Runtime::commands; the audio thread applies them at the start of a block, never
 // allocates, and publishes what plays per track (Runtime::tracks).
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <bitset>
@@ -40,6 +41,14 @@ constexpr std::size_t slotKeyBase = 900000;
 ClipGrid& ensureGrid (Song& song);
 // The clip in (track, scene), or nullptr.
 const Clip* clipAt (const ClipGrid& grid, int track, int scene) noexcept;
+// Round 190hr (Live's Start marker inside the loop, detail-016): how far into its loop a launch of a clip `length` ticks
+// long starts — the slot's startMarker with Loop on (kept inside the loop), else 0.
+inline double startLead (const ClipGridSlot& slot, std::int64_t length) noexcept
+{
+    if (! slot.loop || slot.startMarker <= 0 || length <= 1)
+        return 0.0;
+    return (double) std::min<std::int64_t> (slot.startMarker, length - 1);
+}
 // Puts a clip in a slot, replacing what is there; its settings start at their defaults. `clip` keeps what it plays
 // (kind, source, length, offset, gain…); pattern and audio clips only. Returns the slot's id, −1 when it cannot be placed.
 int setClip (Song& song, int track, int scene, Clip clip);

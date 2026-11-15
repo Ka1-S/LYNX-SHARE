@@ -1923,7 +1923,7 @@ void addAudioClip (Ctx& ctx, const Element& clip, int row, int mixerTrack, doubl
         c.gain = (float) clip.number ("SampleVolume", 1);
         // Re-Pitch ignores the clip's transpose: the tempo alone sets the pitch [LIVE: +5 st on a Re-Pitch clip renders
         // at the original pitch, 2026-11-06]
-        c.pitch = (warped && mode == 3) || beatsPitch != 0.0 ? 0.0f : (float) std::clamp (transpose, -12.0, 12.0);
+        c.pitch = (warped && mode == 3) || beatsPitch != 0.0 ? 0.0f : (float) transpose; // (±48, Live's range; round 190hr)
         c.muted = clip.boolean ("Disabled", false);
         if (&pass == &passes.front())
             c.fadeIn = std::clamp (ticksOf (clip.number ("Fades/FadeInLength", 0)), (std::int64_t) 0, c.length);
@@ -2150,17 +2150,23 @@ void sessionToGrid (Ctx& ctx, const Element& set, const std::vector<Element>& tr
                     continue;
                 const auto own = loopOf (clip);
                 auto body = own;
+                double lead = 0.0; // round 190hr: the Start marker inside the loop (StartRelative) → ClipGridSlot::startMarker
                 if (own.on)
                 {
                     body.start = own.loopStart;
                     body.end = own.loopEnd;
-                    if (std::abs (own.start - own.loopStart) > 1e-6)
-                        ctx.note (&FlpImportReport::approximated, "Session clip whose start marker is inside its loop (it starts at the loop start)");
+                    if (own.start > own.loopStart + 1e-6 && own.start < own.loopEnd - 1e-6)
+                        lead = own.start - own.loopStart;
+                    else if (std::abs (own.start - own.loopStart) > 1e-6)
+                        ctx.note (&FlpImportReport::approximated, "Session clip whose start marker is before its loop (it starts at the loop start)");
                 }
                 body.on = false; // one pass: the grid's Loop repeats the clip
                 auto length = body.end - body.start;
                 if (clip.name() == "AudioClip" && ! clip.boolean ("IsWarped", true))
+                {
                     length *= song.bpm / 60.0; // an unwarped clip's loop values are seconds [DATA]
+                    lead *= song.bpm / 60.0;
+                }
                 if (length <= 1e-9)
                     continue;
                 std::vector<Clip> made;
@@ -2187,6 +2193,20 @@ void sessionToGrid (Ctx& ctx, const Element& set, const std::vector<Element>& tr
                 slot.legato = clip.boolean ("Legato", false);
                 slot.loop = own.on;
                 slot.follow = followOf (clip.child ("FollowAction"));
+                if (lead > 1e-9 && made.front().length > 1)
+                    slot.startMarker = std::clamp<std::int64_t> ((std::int64_t) std::llround (lead * ppq), 0, made.front().length - 1);
+                // round 190hr: the MIDI clip's own scale (ScaleInformation, Scale Mode = IsInKey) where it differs from
+                // the project's key
+                if (clip.name() == "MidiClip" && clip.child ("ScaleInformation"))
+                {
+                    slot.scaleOn = clip.boolean ("IsInKey", false);
+                    if (const auto mine = liveScaleOf (clip)) // (the same as the project's key: cleared once that is known)
+                    {
+                        slot.ownScale = true;
+                        slot.scaleRoot = (std::int8_t) mine->root;
+                        slot.scaleIndex = (std::int16_t) mine->flScale;
+                    }
+                }
                 any = placed = true;
                 break; // one clip per slot
             }
@@ -2883,6 +2903,16 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
         projectkey::set (song, liveScaleOf (set));
     else if (ctx.clipKeySeen)
         projectkey::set (song, ctx.clipKey);
+    if (song.clipGrid) // round 190hr: a clip scale equal to the project's key just follows it
+        for (auto& slot : song.clipGrid->slots)
+            if (slot.ownScale && projectkey::clipScale (slot, song) == projectkey::get (song))
+            {
+                ClipGridSlot plain;
+                plain.ownScale = false;
+                slot.ownScale = false;
+                slot.scaleRoot = plain.scaleRoot;
+                slot.scaleIndex = plain.scaleIndex;
+            }
     return std::move (ctx.song);
 }
 } // namespace lynx

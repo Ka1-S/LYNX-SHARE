@@ -1774,6 +1774,23 @@ miditools::Notes MidiToolsPanel::apply (const miditools::Notes& notes, std::int6
     }
 }
 
+void MidiToolsPanel::quantizeNow()
+{
+    if (target == nullptr)
+        return;
+    const auto t = target();
+    if (t.pattern < 0 || t.pattern >= (int) engine.getSong().patterns.size() || t.indices.empty())
+        return;
+    session.valid = false; // (a Transform run in progress keeps what it did)
+    std::vector<int> out;
+    engine.editSong ([&] (Song& s) {
+        auto& p = s.patterns[(std::size_t) t.pattern];
+        out = miditools::replaceNotes (p, t.indices, miditools::quantize (miditools::notesAt (p, t.indices), quantizeOptions, std::max<std::int64_t> (1, t.grid)));
+    });
+    if (t.selected && select != nullptr)
+        select (out);
+}
+
 void MidiToolsPanel::run()
 {
     if (target == nullptr)
