@@ -10122,3 +10122,4 @@ countries: ru by kz
 "New projects start with every Playlist track that holds clips linked to a mixer track (Track N to insert N when that leaves the sound unchanged); linked track headers show mute, solo, volume and pan. Also on the Settings › Project page, with the switch for the open project." = "Новые проекты начинаются с того, что каждая дорожка Playlist с клипами связана с дорожкой микшера (дорожка N с инсертом N, если это не меняет звук); заголовки связанных дорожек показывают заглушение, соло, громкость и панораму. Также на странице Настройки › Проект, вместе с переключателем для открытого проекта."
 "Linked track: [LMB] mute / unmute its mixer track  [Ctrl][LMB] or [RMB] solo the Playlist track" = "Связанная дорожка: [LMB] заглушить / включить её дорожку микшера  [Ctrl][LMB] или [RMB] соло дорожки Playlist"
 "Scaling" = "Масштаб"
+"Picker panel on / off" = "Панель выбора вкл. / выкл."

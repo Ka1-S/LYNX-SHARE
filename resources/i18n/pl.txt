@@ -10122,3 +10122,4 @@ countries: pl
 "New projects start with every Playlist track that holds clips linked to a mixer track (Track N to insert N when that leaves the sound unchanged); linked track headers show mute, solo, volume and pan. Also on the Settings › Project page, with the switch for the open project." = "Nowe projekty zaczynają się z każdą ścieżką Playlisty zawierającą klipy połączoną ze ścieżką miksera (ścieżka N z insertem N, gdy nie zmienia to brzmienia); nagłówki połączonych ścieżek pokazują wyciszenie, solo, głośność i panoramę. Także na stronie Ustawienia › Projekt, z przełącznikiem dla otwartego projektu."
 "Linked track: [LMB] mute / unmute its mixer track  [Ctrl][LMB] or [RMB] solo the Playlist track" = "Połączona ścieżka: [LMB] wycisz / włącz jej ścieżkę miksera  [Ctrl][LMB] lub [RMB] solo ścieżki Playlisty"
 "Scaling" = "Skalowanie"
+"Picker panel on / off" = "Panel wyboru wł. / wył."

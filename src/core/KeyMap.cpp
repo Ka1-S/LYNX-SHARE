@@ -280,6 +280,8 @@ std::vector<Action> makeActions()
         // FL's legacy Pattern Blocks (round 170f, issue #60)
         { "playlist.patternBlocks", TR_NOOP ("Pattern blocks (current project) on/off"), Context::playlist, {} },
         { "playlist.automationLanes", TR_NOOP ("Automation lanes on/off"), Context::playlist, {} },
+        // FL's Playlist menu › Picker panel › Enable (EEPatternsShowMenu; FL's shortcut page: Alt+P, issue #175)
+        { "playlist.pickerPanel", TR_NOOP ("Picker panel on / off"), Context::playlist, { chord ('P', alt) } },
         { "playlist.blocksToClips", TR_NOOP ("Turn pattern blocks into clips"), Context::playlist, {} },
         // FL's Select › time (round 167k: EESelAroundSelAction, EESelPrevAction / EESelNextAction, Playlist focused)
         { "playlist.selectTimeAround", TR_NOOP ("Select time around selection"), Context::playlist, { chord (enter, ctrl) } },

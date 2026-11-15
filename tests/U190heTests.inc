@@ -39,3 +39,67 @@ TEST (u190he_dragging_the_edge_gives_the_matching_percentage)
     CHECK (percentForWidth (100000, 800) == maxPercent);
     CHECK (percentForWidth (500, 0) == defaultPercent); // (no page yet)
 }
+
+// Issue #175 (FL's Playlist): a clip clicked with the Pencil / Brush is what they paint next, as it is
+#include "core/PaintTemplate.h"
+#include "core/KeyMap.h"
+
+TEST (u190he_pick_a_clicked_clip_paints_as_it_is)
+{
+    using namespace lynx;
+    Clip clicked;
+    clicked.kind = ClipKind::audio;
+    clicked.channel = 3;
+    clicked.track = 5;
+    clicked.start = 7680;
+    clicked.length = 1234;   // trimmed
+    clicked.offset = 480;    // starts later in the sample
+    clicked.stretch = 1.5;   // time-stretched
+    clicked.pitch = -2.0f;
+    clicked.gain = 0.5f;
+    clicked.fadeIn = 96;
+    clicked.reversed = true;
+    clicked.muted = true;    // (belongs to that placed clip)
+    clicked.uid = 77;
+    clicked.gridSlot = 2;
+    clicked.crossfadeIn = 30;
+    const auto t = painttemplate::fromClicked (clicked);
+    const auto painted = painttemplate::paint (t, 1, 960);
+    CHECK (painted.track == 1 && painted.start == 960);
+    CHECK (painted.kind == ClipKind::audio && painted.channel == 3);
+    CHECK (painted.length == 1234 && painted.offset == 480 && painted.stretch == 1.5 && painted.pitch == -2.0f);
+    CHECK (painted.gain == 0.5f && painted.fadeIn == 96 && painted.reversed);
+    CHECK (! painted.muted && painted.uid == 0 && painted.gridSlot == -1 && painted.crossfadeIn == 0);
+    CHECK (painttemplate::paint (t, 0, -50).start == 0);
+}
+
+TEST (u190he_pick_the_template_stands_while_its_source_is_what_the_tools_paint)
+{
+    using namespace lynx;
+    Clip pat;
+    pat.kind = ClipKind::pattern;
+    pat.pattern = 4;
+    CHECK (painttemplate::matches (pat, ClipKind::pattern, -1, 4));
+    CHECK (! painttemplate::matches (pat, ClipKind::pattern, -1, 2)); // another pattern chosen: its plain clip
+    Clip audio;
+    audio.kind = ClipKind::audio;
+    audio.channel = 6;
+    CHECK (painttemplate::matches (audio, ClipKind::audio, 6, 0));
+    CHECK (! painttemplate::matches (audio, ClipKind::audio, 7, 0));
+    CHECK (! painttemplate::matches (audio, ClipKind::automation, 6, 0));
+    Clip autom;
+    autom.kind = ClipKind::automation;
+    autom.automation = 2;
+    CHECK (painttemplate::matches (autom, ClipKind::automation, 2, 0) && ! painttemplate::matches (autom, ClipKind::automation, 1, 0));
+}
+
+TEST (u190he_pick_alt_p_toggles_the_picker_panel_in_the_playlist)
+{
+    using namespace lynx;
+    const auto* action = keys::findAction ("playlist.pickerPanel");
+    CHECK (action != nullptr);
+    keys::KeyMap map;
+    CHECK (map.find ({ 'P', keys::alt }, keys::Context::playlist, false) == "playlist.pickerPanel");
+    // (Alt+P stays the Piano roll's chord progression there)
+    CHECK (map.find ({ 'P', keys::alt }, keys::Context::pianoRoll, false) == "pianoRoll.chordProgression");
+}
