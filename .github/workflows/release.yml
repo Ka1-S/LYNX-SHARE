@@ -19,9 +19,8 @@
 #                       Linux and macOS, each checked with plugexporttest, pluginval and clap-validator); never in the
 #                       app's installer, and the app's release doesn't wait for it
 #   plugins-publish     on a tag push attaches LYNX-Plugins-<label>-* (with their own SHA256SUMS file) to the same release
-#   store    (windows)  on a tag (push, or a manual store_build resubmission run on the tag): the .msix as a new Microsoft
-#                       Store submission (msstore CLI); skipped with a notice until the MSSTORE_* secrets exist
-#                       (docs/STORE.md › Automatic Store submission)
+#   store    (ubuntu)   on a tag: only a notice. CI no longer submits to the Microsoft Store (the old package-only submission
+#                       reused outdated listings and failed certification); the full submission is made locally (docs/STORE.md)
 name: Release
 
 on:
@@ -535,69 +534,20 @@ jobs:
           ls -la dist
           gh release upload "$GITHUB_REF_NAME" dist/LYNX-Plugins-* --clobber
 
-  # Microsoft Store (round 168y): the release's LYNX-<label>-store.msix as a new submission of product 9NQRFBFDCX6N. The
-  # msstore CLI clones the last published submission (listings, pricing, "What's new" untouched), replaces its package
-  # with this one and commits it to certification. A pending (unpublished) submission is deleted first.
+  # Microsoft Store: DISABLED in CI (round 190ij, queue item 23). This job used to run `msstore publish`, which clones the
+  # last published submission and swaps only the package. That reused the old 0.1.22 listings and the old pepper icon,
+  # and certification failed (10.1.1.11 On Device Tiles, 10.1.1.3 Inaccurate Representation). The working path is a full
+  # submission (15 listings, images, certification note) made by the maintainer's local scripts (submit.sh +
+  # build_body.py, Partner Center API) after the release is published; see docs/STORE.md > Automatic Store submission.
+  # The job therefore creates NO submission and touches no Store secret; it only prints a reminder on a tag run.
   store:
-    name: Microsoft Store submission
+    name: Microsoft Store submission (manual)
     needs: [version, publish]
-    if: ${{ !cancelled() && needs.publish.result == 'success' }}
-    runs-on: windows-2025
-    env:
-      LABEL: ${{ needs.version.outputs.label }}
-      STORE_PRODUCT_ID: 9NQRFBFDCX6N
+    if: ${{ !cancelled() && needs.publish.result == 'success' && github.ref_type == 'tag' }}
+    runs-on: ubuntu-24.04
     steps:
-      - name: Store credentials
-        id: creds
-        shell: bash
+      - name: Reminder
         env:
-          MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
-          MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
-          MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
-          MSSTORE_SELLER_ID: ${{ secrets.MSSTORE_SELLER_ID }}
+          LABEL: ${{ needs.version.outputs.label }}
         run: |
-          if [[ "$GITHUB_REF_TYPE" != tag ]]; then
-            echo "::notice title=Microsoft Store::not a tag ($GITHUB_REF_NAME): no Store submission (run the workflow on the release tag)"
-            echo "run=false" >> "$GITHUB_OUTPUT"; exit 0
-          fi
-          missing=""
-          for n in MSSTORE_TENANT_ID MSSTORE_CLIENT_ID MSSTORE_CLIENT_SECRET MSSTORE_SELLER_ID; do
-            [[ -n "${!n}" ]] || missing="$missing $n"
-          done
-          if [[ -n "$missing" ]]; then
-            echo "::notice title=Microsoft Store::secrets not set:$missing — Store submission skipped (docs/STORE.md › Automatic Store submission)"
-            echo "run=false" >> "$GITHUB_OUTPUT"; exit 0
-          fi
-          echo "run=true" >> "$GITHUB_OUTPUT"
-
-      - name: Download the Store package
-        if: steps.creds.outputs.run == 'true'
-        uses: actions/download-artifact@v8
-        with:
-          name: LYNX-${{ env.LABEL }}-windows-x64
-          path: store
-
-      - name: Microsoft Store CLI
-        if: steps.creds.outputs.run == 'true'
-        uses: microsoft/microsoft-store-apppublisher@cc9910a8d59f2eb55cbb83df0a3800cf3b5300e0 # v1.4 (setup-msstore-cli)
-        with:
-          version: v0.4.4
-
-      - name: Submit to the Microsoft Store
-        if: steps.creds.outputs.run == 'true'
-        shell: pwsh
-        env:
-          MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
-          MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
-          MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
-          MSSTORE_SELLER_ID: ${{ secrets.MSSTORE_SELLER_ID }}
-        run: |
-          $msix = Get-Item "store\LYNX-$env:LABEL-store.msix" -ErrorAction Stop
-          Write-Host "Store package: $($msix.Name) ($($msix.Length) bytes)"
-          # (the secrets go in from the environment, never in the script text; GitHub masks them in the log)
-          msstore reconfigure --tenantId $env:MSSTORE_TENANT_ID --sellerId $env:MSSTORE_SELLER_ID `
-            --clientId $env:MSSTORE_CLIENT_ID --clientSecret $env:MSSTORE_CLIENT_SECRET
-          if ($LASTEXITCODE -ne 0) { throw "msstore reconfigure failed ($LASTEXITCODE)" }
-          msstore publish $msix.FullName --appId $env:STORE_PRODUCT_ID --output-stream stdout
-          if ($LASTEXITCODE -ne 0) { throw "msstore publish failed ($LASTEXITCODE)" }
-          msstore submission status $env:STORE_PRODUCT_ID
+          echo "::notice title=Microsoft Store::CI does not submit to the Store (it would reuse old listings). Submit LYNX-$LABEL-store.msix with the local full-submission script (docs/STORE.md)."

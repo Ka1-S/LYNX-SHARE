@@ -141,23 +141,25 @@ over Partner Center's limits.
 
 ## Updating the Store version
 
-With the four `MSSTORE_*` secrets set (next section), the Release workflow does this by itself: its **Microsoft Store
-submission** job sends `LYNX-<version>-store.msix` as a new submission after *Checksums and release*. By hand:
+The Release workflow no longer submits to the Store (see the next section); its **Microsoft Store submission** job only
+prints a reminder. Submit with the local full-submission script (next section), or by hand:
 
 1. Release as usual (`docs/RELEASE.md`); the workflow attaches `LYNX-<version>-store.msix`.
 2. Partner Center › LYNX SHARE › *Start update* → *Packages*: upload the new `.msix` (and remove the old one) → *What's new*
    from the release notes → *Submit to the Store*. Certification usually takes 1–3 working days.
 
-## Automatic Store submission (round 168y)
+## Store submission: CI disabled, local script (round 190ij)
 
-The `store` job of `.github/workflows/release.yml` runs on a release tag (the tag push, or a manual run of the workflow
-**on the tag** with `store_build` 1..9 for a resubmission). It sets up Microsoft's Store Developer CLI (`msstore` v0.4.4,
-through `microsoft/microsoft-store-apppublisher` v1.4, pinned by commit), signs in with the secrets and runs
-`msstore publish LYNX-<label>-store.msix --appId 9NQRFBFDCX6N`: a new submission cloned from the last published one
-(listings, screenshots, pricing and "What's new" stay as they are), its old package replaced by the new one, committed
-to certification. A pending submission that was never published is deleted first, so finish or delete one you are
-editing in Partner Center before a release. Without the secrets (or on a branch run) the job only prints a notice.
-The secrets go to the CLI through the environment and GitHub masks them in the log.
+The `store` job of `.github/workflows/release.yml` used to run `msstore publish`, which clones the last published
+submission and replaces only its package. That reused the old 0.1.22 listings and the old red-pepper icon, and
+certification failed (10.1.1.11, 10.1.1.3). **The job is now a notice only**: it creates no submission and reads no Store
+secret. A submission is made with the maintainer's local pipeline (Partner Center submission API), which sends a *full*
+submission: the 15 listings from `store/listings/`, the screenshots, logo and box art from `store/`, the package and a
+certification note. It refuses to run while another submission is pending (Partner Center-made drafts can only be deleted
+in Partner Center) and never reuses old listings. The client secret lives in `~/.config/lynx/msstore-secret` (mode 600),
+never in the repository or in a log. The old CI recipe is kept below for reference; the `MSSTORE_*` secrets are no longer used.
+
+Reference, the old CI setup:
 
 One-time setup (Partner Center, then GitHub):
 
@@ -171,5 +173,4 @@ One-time setup (Partner Center, then GitHub):
 5. GitHub › the repository › *Settings › Secrets and variables › Actions › New repository secret*, four times:
    `MSSTORE_TENANT_ID`, `MSSTORE_CLIENT_ID`, `MSSTORE_CLIENT_SECRET`, `MSSTORE_SELLER_ID`.
 
-The next release tag then submits to the Store by itself; the job's log shows the submission and its status. The
-first submission of a product can't be made this way (the CLI needs one published submission to clone).
+(Not needed any more: the CI job no longer submits.)
