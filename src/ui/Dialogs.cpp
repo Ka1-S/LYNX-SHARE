@@ -526,7 +526,16 @@ std::unique_ptr<juce::AlertWindow> makeNameAndColourDialog (const juce::String& 
 void showNameAndColourDialog (const juce::String& title, const juce::String& name, std::uint32_t colour,
                               std::function<void (const juce::String&, std::uint32_t)> onDone)
 {
+    // Issue #179: one rename window at a time, as in FL (F4 pressed again, or held, opened one more on every press and
+    // spamming it crashed LYNX). A second request while one is open brings that one to the front.
+    static juce::Component::SafePointer<NameAndColourWindow> open;
+    if (auto* existing = open.getComponent(); existing != nullptr && existing->isShowing())
+    {
+        existing->toFront (true);
+        return;
+    }
     auto* window = new NameAndColourWindow (title, name, colour);
+    open = window;
     window->enterModalState (true, juce::ModalCallbackFunction::create ([window, onDone] (int result) {
                                  const auto typed = window->getTextEditorContents ("name").trim();
 

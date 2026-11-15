@@ -1952,6 +1952,11 @@ void MainComponent::releaseTypingLaunches (bool all)
 
 bool MainComponent::keyFromSecondaryWindow (const juce::KeyPress& key)
 {
+    // Issue #179: while a modal dialog is open (Rename pattern, Export, a question...) LYNX is blocked as FL is: the keys the
+    // dialog leaves unused don't run the main window's shortcuts. F4 in "Rename pattern" opened one more rename window on
+    // every press (FL's dialog takes the key and nothing happens).
+    if (modalDialogOpen())
+        return false;
     // (round 165q / issue #12) a text field keeps its typing keys; the rest runs the global actions
     const auto typingIntoText = dynamic_cast<juce::TextEditor*> (juce::Component::getCurrentlyFocusedComponent()) != nullptr;
     const auto chord = chordFromKeyPress (key);

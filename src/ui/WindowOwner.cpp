@@ -881,6 +881,11 @@ LRESULT CALLBACK pluginKeyProc (int code, WPARAM removal, LPARAM data)
 } // namespace
 #endif
 
+bool modalDialogOpen()
+{
+    return juce::ModalComponentManager::getInstance()->getNumModalComponents() > 0;
+}
+
 void setSecondaryWindowKeyHandler (std::function<bool (const juce::KeyPress&)> handler)
 {
     keyForwarder().handler = std::move (handler);
