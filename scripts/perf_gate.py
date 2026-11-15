@@ -155,7 +155,7 @@ def fmt(v):
     return ("%.4g" % v) if abs(v) < 1000 else "%.0f" % v
 
 
-def compare(d, baseline_path):
+def compare(d, baseline_path, show=False):
     res = collect(d)
     json.dump(res, open(os.path.join(d, "results.json"), "w"), indent=1, sort_keys=True)
     base = json.load(open(baseline_path))
@@ -196,11 +196,12 @@ def compare(d, baseline_path):
     text = "\n".join(out) + "\n"
     open(os.path.join(d, "summary.md"), "w").write(text)
     open(os.path.join(d, "retry.txt"), "w").write("\n".join(sorted(retry)) + ("\n" if retry else ""))
-    print(text)
+    if show:
+        print(text)
     return 1 if failed else 0
 
 
-def update(d, baseline_path):
+def update(d, baseline_path, show=False):
     res = collect(d)
     json.dump(res, open(os.path.join(d, "results.json"), "w"), indent=1, sort_keys=True)
     old = json.load(open(baseline_path)) if os.path.exists(baseline_path) else {}
@@ -211,7 +212,8 @@ def update(d, baseline_path):
         new["note"] = old["note"]
     json.dump(new, open(baseline_path, "w"), indent=1, sort_keys=True)
     open(baseline_path, "a").write("\n")
-    print("perf_gate: wrote %s (%d metrics)" % (baseline_path, len(res["metrics"])))
+    if show:
+        print("perf_gate: wrote %s (%d metrics)" % (baseline_path, len(res["metrics"])))
     return 0
 
 
@@ -223,4 +225,4 @@ if __name__ == "__main__":
         json.dump(r, open(os.path.join(sys.argv[2], "results.json"), "w"), indent=1, sort_keys=True)
         print(json.dumps(r["metrics"], indent=1, sort_keys=True))
         sys.exit(0)
-    sys.exit((compare if sys.argv[1] == "compare" else update)(sys.argv[2], sys.argv[3]))
+    sys.exit((compare if sys.argv[1] == "compare" else update)(sys.argv[2], sys.argv[3], show=True))

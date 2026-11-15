@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# perf-gate.sh: the big-project performance gate (round perfgate190id, community slice B12; docs/PERFORMANCE-GATE.md).
+# perf-gate.sh: the big-project performance gate (round perfgate190id, community slice B12; docs/RELEASE.md step 2b).
 #
 # Measures, headless, on heavy projects: the audio engine's CPU per block size (64 / 128 / 256, one thread; also the
 # instructions retired where the CPU counters can be read), the project's import / first build / rebuild (an edit's

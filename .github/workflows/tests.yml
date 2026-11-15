@@ -161,6 +161,7 @@ jobs:
         if: runner.os == 'Linux'
         shell: bash
         run: |
+          python3 -m unittest discover -s tests/perf -p 'test_*.py'
           sudo sysctl -w kernel.perf_event_paranoid=1 > /dev/null 2>&1 || true # (the CPU's instruction counter, where the VM has one)
           PROFILE=ci-ubuntu PERFBENCH=build/perfbench LYNX_APP=build/LYNX_artefacts/Release/LYNX \
             scripts/perf-gate.sh compare "$PWD/perfgate"

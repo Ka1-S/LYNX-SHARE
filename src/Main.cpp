@@ -10408,7 +10408,7 @@ private:
             lynx::perfprojects::make (name, song, samples, audioFolder.getFullPathName().toStdString());
             for (const auto& [path, data] : samples)
             {
-                const juce::File wav (juce::String (path));
+                const juce::File wav { juce::String (path) };
                 if (wav.existsAsFile())
                     continue;
                 wav.getParentDirectory().createDirectory();
