@@ -23,6 +23,7 @@
 #include "core/MixerOps.h"
 #include "core/NoteNames.h"
 #include "core/LiveNote.h"
+#include "core/LiveKeys.h"
 #include "core/KeyGuess.h"
 #include "core/ProjectKey.h"
 #include "core/ScaleKeys.h"
@@ -1901,6 +1902,11 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
     if (const auto own = keyMap.findUserBound (chord, focusContext(), pianoKeys); ! own.empty() && runAction (own))
         return true;
 
+    // round 190ih: Live's keys in the Clip-launch layout (core/LiveKeys.h); in the other layouts none is taken
+    if (const auto live = livekeys::commandFor (chord, layoutStyle); live != livekeys::Command::none
+        && dynamic_cast<juce::TextEditor*> (juce::Component::getCurrentlyFocusedComponent()) == nullptr && runLiveKey (live))
+        return true;
+
     // round 190ef: B is the reference's Draw Mode switch in the Clip-launch layout (core/SessionKeys.h); in the other
     // layouts it stays the Playlist's and Piano roll's brush tool
     if (key.getKeyCode() == 'B' || key.getKeyCode() == 'b')
@@ -1924,6 +1930,35 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
     // 4. the key map
     const auto action = keyMap.find (chord, focusContext(), pianoKeys);
     return ! action.empty() && runAction (action);
+}
+
+bool MainComponent::runLiveKey (livekeys::Command command)
+{
+    using C = livekeys::Command;
+    switch (command)
+    {
+        case C::toggleView: // Session ↔ Arrangement (from "Both": the Session view)
+            if (clipGridView == nullptr)
+                return false;
+            setClipGridView (shownGridView == PlaylistArea::GridView::grid ? PlaylistArea::GridView::song : PlaylistArea::GridView::grid);
+            return true;
+        case C::metronome: return runAction ("transport.metronome");
+        case C::arrangementRecord: return runAction ("transport.record");
+        case C::sessionRecord:
+            if (clipGridView == nullptr)
+                return false;
+            engine.toggleSessionRecord (clipGridSelection (*clipGridView).second);
+            return true;
+        case C::backToArrangement:
+            engine.launcherCommand ({ launcher::Command::Type::backToArrangement });
+            return true;
+        case C::computerKeyboard: return runAction ("view.typingPiano");
+        case C::browser: return runAction ("panel.browser");
+        case C::follow: return runAction ("playlist.follow");
+        case C::consolidate: return runAction ("tools.consolidateSelection");
+        case C::none: break;
+    }
+    return false;
 }
 
 bool MainComponent::isPlainKey (const keys::Chord& chord) noexcept
@@ -3623,6 +3658,7 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
     if (clipGridView != nullptr || clipLaunch)
     {
         playlistArea.setClipGrid (clipLaunch ? clipGridView.get() : nullptr, PlaylistArea::GridView::beside);
+        shownGridView = PlaylistArea::GridView::beside;
         // the detail view docks under the grid and the Playlist (round 183a); other workflows: nothing docked
         if (detailView != nullptr)
             detailView->setVisible (clipLaunch && DetailView::shownSetting);
@@ -3915,6 +3951,7 @@ void MainComponent::openGridClip (int track, int scene)
 
 void MainComponent::setClipGridView (PlaylistArea::GridView view)
 {
+    shownGridView = view;
     if (clipGridView != nullptr)
         playlistArea.setClipGrid (clipGridView.get(), view);
     if (auto* flip = dynamic_cast<ClipGridSwitch*> (clipGridSwitch.get()))

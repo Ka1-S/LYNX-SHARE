@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/LiveKeys.h" // (round 190ih)
+
 #include "core/ProjectKey.h"
 #include "core/Preferences.h"
 #include "core/ChordReadout.h"
@@ -475,6 +477,8 @@ private:
     bool shownPause = false, recordBlinkDark = false;
     void updateLiveNoteHint(); // round 190ih: "Note on: C4 / velocity: 100"
     void openRecent (int index); // round 190ih: Alt+1 … Alt+0
+    bool runLiveKey (livekeys::Command command); // round 190ih: Live's keys in the Clip-launch layout
+    PlaylistArea::GridView shownGridView = PlaylistArea::GridView::beside;
     void updateSaveReminder();   // round 190ih: backups off = a reminder every 10 min, Save blinks
     int saveReminderTicks = 0;
 public:

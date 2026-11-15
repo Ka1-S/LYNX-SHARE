@@ -174,3 +174,33 @@ TEST (details190ih_last_live_note_packing)
     const auto c = pack (0xffff0000u, 200, -5, true); // clamped; the serial wraps past 0 to 1
     CHECK ((c >> 16) == 1u && key (c) == 127 && velocity (c) == 0);
 }
+
+// R12 (owner decision L1, DL-C): Live's keys act only in the Clip-launch layout; Pattern and Simple keep LYNX's keys
+TEST (details190ih_live_keys_only_in_the_clip_launch_layout)
+{
+    using namespace lynx::keys;
+    using lynx::livekeys::Command;
+    using lynx::layoutstyle::Style;
+    const struct { Chord chord; Command command; } live[] {
+        { { tab, none }, Command::toggleView },          { { 'O', none }, Command::metronome },
+        { { 'o', none }, Command::metronome },           { { f9, none }, Command::arrangementRecord },
+        { { f9, ctrl | shift }, Command::sessionRecord }, { { f10, none }, Command::backToArrangement },
+        { { 'M', none }, Command::computerKeyboard },    { { 'B', ctrl | alt }, Command::browser },
+        { { 'F', ctrl | shift }, Command::follow },      { { 'J', ctrl }, Command::consolidate },
+    };
+    for (const auto& k : live)
+    {
+        CHECK (lynx::livekeys::commandFor (k.chord, Style::clipLaunch) == k.command);
+        CHECK (lynx::livekeys::commandFor (k.chord, Style::pattern) == Command::none);
+        CHECK (lynx::livekeys::commandFor (k.chord, Style::simple) == Command::none);
+        CHECK (std::string (lynx::livekeys::menuKey (k.command, Style::clipLaunch)).size() > 1);
+        CHECK (std::string (lynx::livekeys::menuKey (k.command, Style::pattern)).empty());
+    }
+    // the FL keys these chords have in the Pattern layout are still in the key map (they are not changed)
+    CHECK (findAction ("transport.metronome") != nullptr && findAction ("transport.metronome")->defaults[0] == (Chord { 'M', ctrl }));
+    CHECK (findAction ("view.typingPiano") != nullptr && findAction ("view.typingPiano")->defaults[0] == (Chord { 'T', ctrl }));
+    // nearby chords stay free of Live's meaning
+    CHECK (lynx::livekeys::commandFor ({ tab, shift }, Style::clipLaunch) == Command::none); // (Shift+Tab: detail view switch)
+    CHECK (lynx::livekeys::commandFor ({ 'M', ctrl }, Style::clipLaunch) == Command::none);  // (Ctrl+M: MIDI Map Mode)
+    CHECK (lynx::livekeys::commandFor ({ 'O', ctrl }, Style::clipLaunch) == Command::none);
+}
