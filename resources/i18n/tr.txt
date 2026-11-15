@@ -10145,3 +10145,5 @@ countries: tr
 "Potentially slow operation" = "İşlem yavaş olabilir"
 "Are you sure you want to load {0} plugins at once?" = "{0} eklentiyi aynı anda yüklemek istediğinden emin misin?"
 "Sample settings" = "Sample ayarları"
+"Click: mute.  Ctrl+click or right-click: solo.  Shift+click: lock the mute state" = "Tıklama: sessize al.  Ctrl+tıklama veya sağ tıklama: solo.  Shift+tıklama: sessiz durumunu kilitle"
+"Shift+click" = "Shift+tıklama"

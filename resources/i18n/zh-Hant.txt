@@ -10145,3 +10145,5 @@ countries: tw hk mo
 "Potentially slow operation" = "操作可能較慢"
 "Are you sure you want to load {0} plugins at once?" = "確定要一次載入 {0} 個外掛嗎?"
 "Sample settings" = "取樣設定"
+"Click: mute.  Ctrl+click or right-click: solo.  Shift+click: lock the mute state" = "按一下：靜音。  Ctrl+按一下或右鍵按一下：獨奏。  Shift+按一下：鎖定靜音狀態"
+"Shift+click" = "Shift+按一下"

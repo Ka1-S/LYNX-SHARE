@@ -470,6 +470,8 @@ public:
     // The keys sounding on a channel right now (song / pattern notes, keyboard, MIDI): the Piano roll's keyboard lights
     // them (issue #14). Any thread.
     NoteMask soundingKeys (int channel) const noexcept;
+    // round 190ih: a counter that moves with every block that struck a note on the channel (the rack's activity light)
+    std::uint32_t noteStrikes (int channel) const noexcept;
 
     // FL's score logger (REA round 165f): every note played on a MIDI input or the typing keyboard, recording or
     // not, for Tools › Dump score log to selected pattern. Any thread (a short spin lock; never the audio thread).

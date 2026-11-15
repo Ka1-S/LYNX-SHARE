@@ -91,3 +91,54 @@ TEST (details190ih_gross_beat_publishes_its_play_position)
     block (false);
     CHECK (fx->controlOutput (0) == 0.0f);
 }
+
+// R4 (DC-8, DE-6): the Channel rack's activity light — bright at note-on, dimmer while held, dark after the release
+// (FL capture details190if shots/fl-rack-selector-typingkey-before-during-after.png); a note shorter than a frame
+// still lights it; Animations off = steady on / off
+TEST (details190ih_rack_activity_light_lights_dims_and_fades)
+{
+    using namespace lynx::activity;
+    Light a;
+    CHECK (step (a, 5, false, true) == 0.0f); // the first look learns the counter: opening the rack lights nothing
+    CHECK (step (a, 6, true, true) == peak);  // note-on
+    float last = peak;
+    for (int f = 0; f < 30; ++f)              // held: dims towards `held`, never below
+    {
+        const auto v = step (a, 6, true, true);
+        CHECK (v <= last && v >= held);
+        last = v;
+    }
+    CHECK (std::abs (last - held) < 0.01f);
+    int frames = 0;
+    while (step (a, 6, false, true) > 0.0f && frames < 60) // released: fades out
+        ++frames;
+    CHECK (frames > 0 && frames < 10);
+    CHECK (step (a, 7, false, true) == peak); // a note shorter than a frame: the counter moved
+    CHECK (step (a, 7, false, true) < peak);
+    // Animations off: steady
+    Light b;
+    step (b, 0, false, false);
+    CHECK (step (b, 1, true, false) == peak);
+    CHECK (step (b, 1, true, false) == peak);
+    CHECK (step (b, 1, false, false) == 0.0f);
+    CHECK (step (b, 2, false, false) == peak); // the one frame of a short note
+    CHECK (step (b, 2, false, false) == 0.0f);
+    CHECK (shade (0.0f) == 0 && shade (peak) == 24);
+}
+
+// R4: the engine counts the blocks that struck a note on a channel, from any source (here a live note, as the typing
+// keyboard and MIDI send them, while the transport is stopped); a held note strikes once
+TEST (details190ih_engine_counts_note_strikes_per_channel)
+{
+    layer164::Rig rig (1); // channel 0 = a Layer, channel 1 = a plugin
+    CHECK (rig.renderer.noteStrikes (1) == 0u);
+    rig.play (1, 60);
+    const auto once = rig.renderer.noteStrikes (1);
+    CHECK (once == 1u);
+    rig.play (1, 64, false); // a note-off of a key not held: no strike
+    CHECK (rig.renderer.noteStrikes (1) == once);
+    rig.play (1, 67);
+    CHECK (rig.renderer.noteStrikes (1) == once + 1u);
+    CHECK (rig.renderer.noteStrikes (0) == 0u); // the other channel stayed dark
+    CHECK (rig.renderer.noteStrikes (-1) == 0u && rig.renderer.noteStrikes (100000) == 0u);
+}

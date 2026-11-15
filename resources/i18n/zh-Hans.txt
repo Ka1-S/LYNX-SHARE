@@ -10145,3 +10145,5 @@ countries: cn sg
 "Potentially slow operation" = "操作可能较慢"
 "Are you sure you want to load {0} plugins at once?" = "确定要一次加载 {0} 个插件吗?"
 "Sample settings" = "采样设置"
+"Click: mute.  Ctrl+click or right-click: solo.  Shift+click: lock the mute state" = "单击：静音。  Ctrl+单击或右键单击：独奏。  Shift+单击：锁定静音状态"
+"Shift+click" = "Shift+单击"

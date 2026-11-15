@@ -4301,6 +4301,8 @@ void RackRenderer::publishSoundingKeys (int channels) noexcept
             const auto& held = heldNotes[(std::size_t) i];
             auto& struck = struckNotes[(std::size_t) i];
             now = { held[0] | struck[0], held[1] | struck[1] };
+            if ((struck[0] | struck[1]) != 0) // round 190ih: a note started in this block (the rack's activity light)
+                strikes[(std::size_t) i].store (strikes[(std::size_t) i].load (std::memory_order_relaxed) + 1u, std::memory_order_relaxed);
             struck = {};
         }
         if (now[0] != 0 || now[1] != 0)

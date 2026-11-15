@@ -10145,3 +10145,5 @@ countries: de at ch li lu
 "Potentially slow operation" = "Möglicherweise langsamer Vorgang"
 "Are you sure you want to load {0} plugins at once?" = "Möchtest du wirklich {0} Plugins auf einmal laden?"
 "Sample settings" = "Sample-Einstellungen"
+"Click: mute.  Ctrl+click or right-click: solo.  Shift+click: lock the mute state" = "Klick: stumm.  Strg+Klick oder Rechtsklick: Solo.  Umschalt+Klick: Stummzustand sperren"
+"Shift+click" = "Umschalt+Klick"

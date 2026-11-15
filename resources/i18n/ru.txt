@@ -10145,3 +10145,5 @@ countries: ru by kz
 "Potentially slow operation" = "Операция может быть медленной"
 "Are you sure you want to load {0} plugins at once?" = "Точно загрузить {0} плагинов за раз?"
 "Sample settings" = "Настройки сэмпла"
+"Click: mute.  Ctrl+click or right-click: solo.  Shift+click: lock the mute state" = "Щелчок: заглушить.  Ctrl+щелчок или правый щелчок: соло.  Shift+щелчок: закрепить состояние заглушения"
+"Shift+click" = "Shift+щелчок"

@@ -10145,3 +10145,5 @@ countries: jp
 "Potentially slow operation" = "時間がかかる可能性のある操作"
 "Are you sure you want to load {0} plugins at once?" = "{0} 個のプラグインを一度に読み込みますか?"
 "Sample settings" = "サンプル設定"
+"Click: mute.  Ctrl+click or right-click: solo.  Shift+click: lock the mute state" = "クリック: ミュート。  Ctrl+クリックまたは右クリック: ソロ。  Shift+クリック: ミュート状態をロック"
+"Shift+click" = "Shift+クリック"

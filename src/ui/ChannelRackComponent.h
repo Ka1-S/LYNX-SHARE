@@ -7,6 +7,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include "core/ActivityLight.h"
 #include "core/HeldNotes.h"
 
 #include "core/RackOps.h"
@@ -99,6 +100,7 @@ public:
     void pasteSelected();
     void sendSelectedToInserts();
     void toggleMute (int channel);
+    void toggleSoloLock (int channel); // FL: Shift+click on the mute switch (round 190ih)
     void solo (int channel);
     void setSwingMixOfSelected (int channel); // "Swing mix..." (type a value for the selected channels)
 
@@ -265,6 +267,10 @@ private:
     juce::Rectangle<int> controlBounds (Area area, int row) const; // knob / route box under the mouse (value tip)
     std::uint32_t shownAutomation = 0; // AutomationDisplay generation last drawn (issue #12)
     std::vector<int> automatedRows;
+    // round 190ih: each channel's activity light (FL's selector lights with every note the channel plays, then fades)
+    std::vector<activity::Light> activityLights;
+    void updateActivityLights();
+    juce::Rectangle<int> selectorBounds (int row) const;
     std::vector<std::array<float, 2>> shownLevels; // volume, pan per channel at the last full refresh (round 173f)
     void showTip (Area area, int row, bool transient);
     Area hoverArea = Area::none;

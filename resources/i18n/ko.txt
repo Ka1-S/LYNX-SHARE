@@ -10145,3 +10145,5 @@ countries: kr
 "Potentially slow operation" = "시간이 걸릴 수 있는 작업"
 "Are you sure you want to load {0} plugins at once?" = "플러그인 {0}개를 한 번에 불러올까요?"
 "Sample settings" = "샘플 설정"
+"Click: mute.  Ctrl+click or right-click: solo.  Shift+click: lock the mute state" = "클릭: 뮤트.  Ctrl+클릭 또는 오른쪽 클릭: 솔로.  Shift+클릭: 뮤트 상태 잠금"
+"Shift+click" = "Shift+클릭"

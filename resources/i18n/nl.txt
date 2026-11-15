@@ -10145,3 +10145,5 @@ countries: nl be
 "Potentially slow operation" = "Mogelijk trage bewerking"
 "Are you sure you want to load {0} plugins at once?" = "Weet je zeker dat je {0} plugins tegelijk wilt laden?"
 "Sample settings" = "Sample-instellingen"
+"Click: mute.  Ctrl+click or right-click: solo.  Shift+click: lock the mute state" = "Klik: dempen.  Ctrl+klik of rechtsklik: solo.  Shift+klik: dempstatus vergrendelen"
+"Shift+click" = "Shift+klik"
