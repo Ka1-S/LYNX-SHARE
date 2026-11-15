@@ -8,6 +8,8 @@
 #include "core/MidiControls.h"
 #include "core/SessionIds.h"
 #include "core/FlCurve.h"
+#include "core/SynthParams.h"
+#include "core/SoundFont.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -1313,6 +1315,12 @@ float Song::targetValue (const AutomationTarget& t) const noexcept
             // the Sampler's knobs (issue #12)
             if (channels[(std::size_t) t.index].instrument == InstrumentKind::sampler && t.param >= 0 && t.param < samplerparam::count)
                 return samplerparam::get (channels[(std::size_t) t.index].sampler, t.param);
+            // LYNX Soundfont's knobs (issue #152, round 190he: a linked controller moved nothing)
+            if (channels[(std::size_t) t.index].instrument == InstrumentKind::soundfont && sf::automatable (t.param))
+                return sf::normalise (t.param, sf::readParams (channels[(std::size_t) t.index].modelParams)[(std::size_t) t.param]);
+            // LYNX Synth's knobs (issue #152, round 190he; core/SynthParams.h)
+            if (channels[(std::size_t) t.index].instrument == InstrumentKind::synth && synthparam::valid (t.param))
+                return synthparam::get (channels[(std::size_t) t.index].synth, synthparam::indexOf (t.param));
             // a MIDI Out's patch and knobs (round 167i)
             if (channels[(std::size_t) t.index].instrument == InstrumentKind::midiOut && t.param >= 0 && t.param <= midiout::controlCount)
                 return midiout::paramValue (midiout::stateOf (channels[(std::size_t) t.index].pluginState), t.param);
@@ -1406,6 +1414,19 @@ bool Song::setTargetValue (const AutomationTarget& t, float v) noexcept
                 && t.param < samplerparam::count)
             {
                 samplerparam::set (channels[(std::size_t) t.index].sampler, t.param, v);
+                return true;
+            }
+            if (validChannel && channels[(std::size_t) t.index].instrument == InstrumentKind::soundfont && sf::automatable (t.param))
+            {
+                auto& c = channels[(std::size_t) t.index]; // (issue #152, round 190he)
+                auto params = sf::readParams (c.modelParams);
+                params[(std::size_t) t.param] = sf::denormalise (t.param, v);
+                c.modelParams.assign (params.begin(), params.end());
+                return true;
+            }
+            if (validChannel && channels[(std::size_t) t.index].instrument == InstrumentKind::synth && synthparam::valid (t.param))
+            {
+                synthparam::set (channels[(std::size_t) t.index].synth, synthparam::indexOf (t.param), v); // (issue #152, round 190he)
                 return true;
             }
             if (validChannel && channels[(std::size_t) t.index].instrument == InstrumentKind::midiOut && t.param >= 0

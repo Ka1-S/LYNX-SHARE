@@ -1,6 +1,7 @@
 #include "core/FruityDance.h"
 #include "core/FruitySlicer.h"
 #include "core/Instruments.h"
+#include "core/SynthParams.h"
 #include "core/FpcInstrument.h"
 #include "core/ControlSurface.h"
 #include "core/VoltageController.h"
@@ -969,6 +970,12 @@ private:
 class SynthInstrument final : public Instrument
 {
 public:
+    SynthInstrument()
+    {
+        for (auto& k : automatedKnobs)
+            k.store (std::numeric_limits<float>::quiet_NaN(), std::memory_order_relaxed);
+    }
+
     void prepare (double sr) noexcept override
     {
         sampleRate = sr;
@@ -983,6 +990,17 @@ public:
         bpm.store (std::max (1.0, songBpm)); // first: the synced LFO uses it when reading the settings
         channelPitch.store (channel.sampler.pitch * 100.0f); // the channel's PITCH knob (issue #14)
         updateFrames (channel.synth);
+        // an automated knob (issue #152, round 190he) keeps the automation's value until its Song value changes (the
+        // knob turned by hand, a MIDI link), as the Sampler's (issue #12)
+        for (int k = 0; k < synthparam::count; ++k)
+        {
+            const auto now = synthparam::get (channel.synth, k);
+            if (! (configuredKnobs[(std::size_t) k] == now))
+            {
+                configuredKnobs[(std::size_t) k] = now;
+                automatedKnobs[(std::size_t) k].store (std::numeric_limits<float>::quiet_NaN(), std::memory_order_relaxed);
+            }
+        }
         if (const auto& l = channel.misc.levels; l.modX != 0.0f || l.modY != 0.0f) // Levels adjustment Mod X / Y (round 190dz)
         {
             auto adjusted = channel.synth;
@@ -1017,6 +1035,32 @@ public:
 
     void setSongPosition (double ticks) noexcept override { songTicks = ticks; }
 
+    // an automation clip / a modulator on one of LYNX Synth's knobs (core/SynthParams.h, issue #152). Audio thread.
+    void setParameter (int index, float value) noexcept override
+    {
+        if (! synthparam::valid (index) || ! std::isfinite (value))
+            return;
+        auto& slot = automatedKnobs[(std::size_t) synthparam::indexOf (index)];
+        if (slot.load (std::memory_order_relaxed) == value)
+            return;
+        slot.store (value, std::memory_order_relaxed);
+        automatedGeneration.fetch_add (1, std::memory_order_release);
+    }
+
+    // the Song's settings (configure's mailbox) with the automated knobs on top; coefficients only when something changed
+    void pullSettings() noexcept
+    {
+        const auto fresh = mailbox.read (settings);
+        const auto generation = automatedGeneration.load (std::memory_order_acquire);
+        if (! fresh && generation == appliedGeneration)
+            return;
+        appliedGeneration = generation;
+        for (int k = 0; k < synthparam::count; ++k)
+            if (const auto v = automatedKnobs[(std::size_t) k].load (std::memory_order_relaxed); ! std::isnan (v))
+                synthparam::set (settings, k, v);
+        updateCoefficients();
+    }
+
     // portamento: the voice starts at `from` and glides to `to` over the porta time (channel porta,
     // inverted by the note)
     void glide (SynthVoice& v, double from, double to) noexcept
@@ -1038,8 +1082,7 @@ public:
 
     void noteOn (int key, float velocity) noexcept override
     {
-        if (mailbox.read (settings))
-            updateCoefficients();
+        pullSettings();
 
         if (settings.mono)
         {
@@ -1180,8 +1223,7 @@ public:
 
     void render (float* left, float* right, int n, float gl, float gr) noexcept override
     {
-        if (mailbox.read (settings))
-            updateCoefficients();
+        pullSettings();
         // new spectrum frames (built in configure): the old set goes back for the other thread to free
         if (retiredFrames.load() == nullptr)
             if (auto* frames = incomingFrames.exchange (nullptr))
@@ -1878,6 +1920,15 @@ private:
     double sampleRate = 44100.0;
     SettingsMailbox<SynthSettings> mailbox;
     SynthSettings settings;
+    // automated knobs (issue #152): 0…1 or NaN (not automated); the Song values configure last saw (UI thread)
+    std::array<std::atomic<float>, synthparam::count> automatedKnobs; // (NaN from the constructor)
+    std::array<float, synthparam::count> configuredKnobs { [] {
+        std::array<float, synthparam::count> a {};
+        a.fill (std::numeric_limits<float>::quiet_NaN());
+        return a;
+    }() };
+    std::atomic<std::uint32_t> automatedGeneration { 0 };
+    std::uint32_t appliedGeneration = 0; // audio thread
     float attackStep = 0.01f;
     float decayCoeff = 0.999f;
     float releaseCoeff = 0.999f;

@@ -48,6 +48,7 @@
 #include "core/PoiZone.h"
 #include "core/LynxBanks.h"
 #include "core/ModelParams.h"
+#include "core/SynthParams.h"
 #include "core/BassDrum.h"
 #include "core/FruitKick.h"
 #include "core/Toxic.h"
@@ -506,6 +507,7 @@ class ModelPanel final : public juce::Component,
                          public juce::TooltipClient,
                          public juce::DragAndDropTarget,
                          public juce::FileDragAndDropTarget,
+                         private juce::ChangeListener,
                          private juce::Timer
 {
 public:
@@ -1211,14 +1213,123 @@ public:
             const auto f = juce::jmin (layoutScale, 1200.0f / (float) layout->width, 720.0f / (float) layout->height);
             setSize ((int) std::ceil (f * (float) layout->width) + 16, (int) std::ceil (f * (float) layout->height) + layoutTop + 8);
         }
-        if (transistorBass && ref.index >= 0)
-            startTimerHz (10); // the page follows the program a note selects (round 169g2)
+        // issue #152 (round 190he): the knobs follow the channel's state (a MIDI link, Init song values, undo) and play
+        // their automation, as FL's editors do; the timer also follows Transistor Bass's program (round 169g2)
+        rememberState();
+        engine.addChangeListener (this);
+        if (ref.index >= 0 && (! modelKnobs.empty() || ! partKnobs.empty() || transistorBass))
+            startTimerHz (30);
+    }
+
+    ~ModelPanel() override
+    {
+        stopTimer();
+        engine.removeChangeListener (this);
+    }
+
+    // issue #152: a change of the channel's state that this page did not make (a linked controller, an Init song value,
+    // undo / redo, a preset loaded elsewhere) moves the knobs; nothing is redrawn when the state is the same
+    void changeListenerCallback (juce::ChangeBroadcaster*) override
+    {
+        const auto* c = channelNow();
+        if (c == nullptr || (c->pluginState == seenState && c->modelParams == seenParams))
+            return;
+        rememberState();
+        auto moved = false;
+        for (const auto& [k, index] : modelKnobs)
+            if (! k->isMouseButtonDown() && ! isAutomatedShown (k))
+                if (const auto v = modelparams::rawValue (*c, index); v && std::abs (*v - (float) k->getValue()) > 1.0e-6f)
+                {
+                    k->setValue (*v, juce::dontSendNotification);
+                    moved = true;
+                }
+        for (const auto& [k, control] : partKnobs)
+            if (! k->isMouseButtonDown() && ! isAutomatedShown (k))
+                if (const auto v = drumcontrols::value (*c, *control, drumPart); v && std::abs (*v - (float) k->getValue()) > 1.0e-6f)
+                {
+                    k->setValue (*v, juce::dontSendNotification);
+                    moved = true;
+                }
+        if (moved && layout != nullptr)
+            updateConditional();
+        if (moved)
+            repaint();
+    }
+
+    void rememberState()
+    {
+        if (const auto* c = channelNow())
+        {
+            seenState = c->pluginState;
+            seenParams = c->modelParams;
+        }
+    }
+
+    bool isAutomatedShown (const juce::Slider* k) const
+    {
+        return std::find (automatedShown.begin(), automatedShown.end(), k) != automatedShown.end();
+    }
+
+    // issue #152: while the song plays, an automated knob shows its automation's value (AutomationDisplay, as the
+    // Sampler's and the effects' knobs); when the automation stops driving it, it shows the channel's value again
+    void showAutomation()
+    {
+        if (ref.index < 0 || (modelKnobs.empty() && partKnobs.empty()))
+            return;
+        const auto& shown = engine.getAutomationDisplay();
+        if (shown.getGeneration() == shownGeneration)
+            return;
+        shownGeneration = shown.getGeneration();
+        if (automatedShown.empty() && ! shown.any())
+            return;
+        const auto* c = channelNow();
+        if (c == nullptr)
+            return;
+        std::vector<const juce::Slider*> now;
+        auto moved = false;
+        const auto show = [&] (juce::Slider* k, int index, std::optional<float> songRaw) {
+            if (k->isMouseButtonDown())
+                return;
+            const auto* p = modelparams::find (instrumentKind, index);
+            const auto v = shown.valueOf ({ AutomationTargetKind::channelParam, ref.index, 0, index });
+            if (v && p != nullptr)
+            {
+                k->setValue (p->raw (*v), juce::dontSendNotification);
+                now.push_back (k);
+                moved = true;
+            }
+            else if (isAutomatedShown (k) && songRaw)
+            {
+                k->setValue (*songRaw, juce::dontSendNotification);
+                moved = true;
+            }
+        };
+        for (const auto& [k, index] : modelKnobs)
+            show (k, index, modelparams::rawValue (*c, index));
+        for (const auto& [k, control] : partKnobs)
+            show (k, drumcontrols::absoluteIndex (instrumentKind, *control, drumPart), drumcontrols::value (*c, *control, drumPart));
+        automatedShown = std::move (now);
+        if (moved && layout != nullptr)
+            updateConditional();
+        if (moved)
+            repaint();
+    }
+
+    void timerCallback() override
+    {
+        if (isShowing())
+            showAutomation();
+        if (transistorBass && ref.index >= 0 && ++programTicks >= 3) // (10 times a second, as before)
+        {
+            programTicks = 0;
+            followTransistorBassProgram();
+        }
     }
 
     // Transistor Bass with its sequencer on: a note selects program = key (REA_rodada57 §2.10) and FL's editor shows
     // that program, so its knobs edit what plays. The channel's state takes the playing program (not an undo step)
     // and every knob reads it again (round 169g2)
-    void timerCallback() override
+    void followTransistorBassProgram()
     {
         const auto* c = channelNow();
         const auto instrument = engine.getChannelInstrument (ref.index);
@@ -1268,6 +1379,7 @@ public:
             knob->onDragStart = [this, target] { engine.noteTweaked (target(), true); };
             knob->onDragEnd = [this, target] { engine.tweakReleased (target()); };
         }
+        modelKnobs.push_back ({ knob.get(), index });
         addAndMakeVisible (*knob);
         knobs.push_back (std::move (knob));
     }
@@ -2677,6 +2789,12 @@ private:
     int editorKey = 60;
     int drumPart = 0; // round 168p: the Drumaxx pad / DrumSynth Live key the per-part knobs edit
     std::vector<std::pair<juce::Slider*, const drumcontrols::Control*>> partKnobs;
+    std::vector<std::pair<juce::Slider*, int>> modelKnobs; // a listed parameter's knob -> its index (issue #152)
+    std::vector<const juce::Slider*> automatedShown;      // the knobs showing their automation now
+    std::uint32_t shownGeneration = 0;
+    std::vector<std::uint8_t> seenState;                   // the channel's state the knobs show (issue #152)
+    std::vector<float> seenParams;
+    int programTicks = 0;
     std::vector<std::unique_ptr<juce::Slider>> knobs;
     const plugui::Layout* layout = nullptr;
     plugui::Layout hostedLayout;
@@ -4211,7 +4329,8 @@ private:
 
 // Built-in synth page: 3 oscillators, envelope and filter.
 class SynthPanel final : public juce::Component,
-                         private juce::ChangeListener
+                         private juce::ChangeListener,
+                         private juce::Timer
 {
 public:
     SynthPanel (AudioEngine& e, ChannelRef c)
@@ -4336,12 +4455,42 @@ public:
         mono.onClick = [this] { apply(); };
         addAndMakeVisible (mono);
 
+        // issue #152 (round 190he): every knob is one of the synth's parameters (core/SynthParams.h), as FL's plugin
+        // parameters are: right-click = FL's parameter menu (Link to controller, automation clip, Init song value); a
+        // move is a tweak; the knobs follow MIDI links (refresh) and play their automation (timer)
+        if (ref.index >= 0) // (a Patcher node: no automation target)
+        {
+            for (int o = 0; o < 3; ++o)
+            {
+                auto& row = rows[(std::size_t) o];
+                wire (row.octave, synthparam::oscParam (o, synthparam::octave));
+                wire (row.semitones, synthparam::oscParam (o, synthparam::semitones));
+                wire (row.detune, synthparam::oscParam (o, synthparam::detune));
+                wire (row.pan, synthparam::oscParam (o, synthparam::pan));
+                wire (row.level, synthparam::oscParam (o, synthparam::level));
+            }
+            for (auto [slider, k] : { std::pair { &attack, (int) synthparam::attack }, { &decay, (int) synthparam::decay },
+                                      { &sustain, (int) synthparam::sustain }, { &release, (int) synthparam::release },
+                                      { &cutoff, (int) synthparam::cutoff }, { &resonance, (int) synthparam::resonance },
+                                      { &porta, (int) synthparam::porta }, { &fm, (int) synthparam::fm }, { &fmDecay, (int) synthparam::fmDecay },
+                                      { &keyTrack, (int) synthparam::keyTrack }, { &sweep, (int) synthparam::sweep },
+                                      { &sweepTime, (int) synthparam::sweepTime }, { &bandLow, (int) synthparam::bandLow },
+                                      { &bandMid, (int) synthparam::bandMid }, { &bandHigh, (int) synthparam::bandHigh } })
+                wire (*slider, k);
+        }
+
         refresh();
         engine.addChangeListener (this);
         setSize (720, 510);
+        if (ref.index >= 0)
+            startTimerHz (30); // the knobs follow their automation while the song plays (cheap while nothing moves)
     }
 
-    ~SynthPanel() override { engine.removeChangeListener (this); }
+    ~SynthPanel() override
+    {
+        stopTimer();
+        engine.removeChangeListener (this);
+    }
 
     int getChannel() const noexcept { return ref.index; }
 
@@ -4406,7 +4555,7 @@ private:
     {
         juce::Label title;
         juce::ComboBox wave;
-        juce::Slider octave, semitones, detune, pan, level;
+        MenuSlider octave, semitones, detune, pan, level;
     };
 
     static constexpr int oscKnobs = 5; // oscillator knob labels come first
@@ -4494,8 +4643,63 @@ private:
             juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("FL presets"),
                                                     tr ("This preset is not for a synth LYNX SHARE converts, or it could not be read."));
     }
-    juce::Slider porta;
+    MenuSlider porta;
     juce::ComboBox filterTypeBox;
+
+    // a knob as the synth parameter k (issue #152)
+    AutomationTarget targetOf (int k) const { return { AutomationTargetKind::channelParam, ref.index, 0, synthparam::target (k) }; }
+    void wire (MenuSlider& slider, int k)
+    {
+        ui::setOwnMenu (slider);
+        slider.onMenu = [this, &slider, k] { ui::showSliderMenu (slider, &engine, targetOf (k)); };
+        slider.onDragStart = [this, k] { engine.noteTweaked (targetOf (k), true); };
+        slider.onDragEnd = [this, k] { engine.tweakReleased (targetOf (k)); };
+        wired.push_back ({ &slider, k });
+    }
+
+    // the knobs an automation drives show its value while the song plays; when it stops they show the Song's again
+    void timerCallback() override
+    {
+        if (isShowing())
+            showAutomation (false);
+    }
+
+    // `force`: after refresh() put the Song's values back (the automated ones go on the automation's value again)
+    void showAutomation (bool force)
+    {
+        if (wired.empty())
+            return;
+        const auto& shown = engine.getAutomationDisplay();
+        if (! force && shown.getGeneration() == shownGeneration)
+            return;
+        shownGeneration = shown.getGeneration();
+        if (automatedShown.empty() && ! shown.any())
+            return;
+        const auto* c = current();
+        if (c == nullptr)
+            return;
+        const juce::ScopedValueSetter<bool> guard (updating, true);
+        std::vector<juce::Slider*> now;
+        for (const auto& [slider, k] : wired)
+        {
+            if (slider->isMouseButtonDown())
+                continue;
+            const auto v = shown.valueOf (targetOf (k));
+            const auto was = std::find (automatedShown.begin(), automatedShown.end(), slider) != automatedShown.end();
+            if (v)
+            {
+                slider->setValue (synthparam::toNatural (k, *v), juce::dontSendNotification);
+                now.push_back (slider);
+            }
+            else if (was && ! force)
+                slider->setValue (synthparam::natural (c->synth, k), juce::dontSendNotification);
+        }
+        automatedShown = std::move (now);
+    }
+
+    std::vector<std::pair<MenuSlider*, int>> wired; // knob -> synth parameter
+    std::vector<juce::Slider*> automatedShown;
+    std::uint32_t shownGeneration = 0;
 
     void knob (juce::Slider& s, double lo, double hi, double step, const char* suffix)
     {
@@ -4557,6 +4761,7 @@ private:
         ring.setToggleState (s.ring, juce::dontSendNotification);
 
         updating = false;
+        showAutomation (true); // (issue #152: an automated knob keeps showing its automation)
 
         if (auto* w = findParentComponentOfClass<juce::DocumentWindow>())
             w->setName (tr ("Synth settings - {0}", { juce::String::fromUTF8 (c->name.c_str()) }));
@@ -4620,7 +4825,7 @@ private:
     ChannelRef ref;
     bool updating = false;
     std::array<Row, 3> rows;
-    juce::Slider attack, decay, sustain, release, cutoff, resonance, fm, fmDecay, keyTrack, sweep, sweepTime, bandLow, bandMid, bandHigh;
+    MenuSlider attack, decay, sustain, release, cutoff, resonance, fm, fmDecay, keyTrack, sweep, sweepTime, bandLow, bandMid, bandHigh;
     juce::ToggleButton ring;
     std::array<juce::Label, 20> labels;
     // round 190fs: the box lists LYNX's synth presets, then the user's own ("Your presets") and the preset items of
