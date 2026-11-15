@@ -25,3 +25,4 @@ LYNX_MODEL_PARAMS (sawer, sawerModelTable)                   // round 168q
 LYNX_MODEL_PARAMS (beepmap, beepMapModelTable)               // round 168q
 LYNX_MODEL_PARAMS (granulizer, granulizerModelTable)         // round 168q
 LYNX_MODEL_PARAMS (pocketSuperSaw, pocketSuperSawModelTable)   // round 190by (core/PocketSuperSaw.h)
+LYNX_MODEL_PARAMS (tetra, tetraModelTable)                     // round 190hs (core/FmSynth.h)

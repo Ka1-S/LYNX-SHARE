@@ -421,44 +421,12 @@ TEST (als190ed_operator_and_drift_become_the_synth)
     using namespace lynx::alsdev;
     using als190ed::near;
     using als190ed::par;
-    // the ratio as the synth's pitch: 0.5 = −12, 3 = +19.02, 1 + 500/1000 = +7.02
-    CHECK (near (operatorRatioSemitones (0, 0.0), -12.0) && near (operatorRatioSemitones (3, 0.0), 19.0196, 1.0e-3) && near (operatorRatioSemitones (1, 500.0), 7.0196, 1.0e-3));
+    // (round 190hs) Operator now imports onto Tetra (tests/Tetra190hsTests.inc); the synth's pitch helper stays for Drift
     SynthOscillator o;
     setOscillatorPitch (o, 19.0196);
     CHECK (o.octave == 1 && o.semitones == 7 && near (o.detune, 1.96, 0.01));
     setOscillatorPitch (o, -12.0);
     CHECK (o.octave == -1 && o.semitones == 0 && near (o.detune, 0.0, 1.0e-6));
-    // operator A alone (B … D at −inf), a sine at ratio 2
-    {
-        xml::Document doc;
-        CHECK (doc.parse (als190ed::operatorDevice (0, { 0.8, 0.000316227757, 0.000316227757, 0.000316227757 }, 0, 2)));
-        ChannelDef c;
-        Notes notes;
-        CHECK (operatorToSynth (doc.root(), c, 120.0, notes));
-        CHECK (c.instrument == InstrumentKind::synth && c.synth.osc[0].wave == Waveform::sine && c.synth.osc[0].octave == 1 && c.synth.osc[0].semitones == 0 &&
-               near (c.synth.osc[0].level, 0.8, 1.0e-6) && c.synth.osc[1].level == 0.0f && c.synth.osc[2].level == 0.0f);
-        CHECK (near (c.synth.attack, 0.002, 1.0e-6) && near (c.synth.decay, 0.4, 1.0e-6) && near (c.synth.sustain, 0.5, 1.0e-6) && near (c.synth.release, 0.3, 1.0e-6));
-        CHECK (near (channelGain (c.volume), 0.5, 1.0e-4) && near (c.synth.cutoff, 20000.0, 1.0e-3));
-    }
-    // FM in use (B sounding into A in algorithm 1): not translated
-    {
-        xml::Document doc;
-        CHECK (doc.parse (als190ed::operatorDevice (0, { 1.0, 0.3, 0.000316227757, 0.000316227757 })));
-        ChannelDef c;
-        Notes notes;
-        CHECK (! operatorToSynth (doc.root(), c, 120.0, notes));
-    }
-    // algorithm 11: carriers side by side; A's User wave = its harmonic table
-    {
-        xml::Document doc;
-        CHECK (doc.parse (als190ed::operatorDevice (10, { 1.0, 0.5, 0.25, 0.000316227757 }, 22)));
-        ChannelDef c;
-        Notes notes;
-        CHECK (operatorToSynth (doc.root(), c, 120.0, notes));
-        CHECK (c.synth.osc[0].wave == Waveform::spectral && c.synth.spectrum[0] == 1.0f && c.synth.spectrum[2] == 0.5f && c.synth.spectrum[1] == 0.0f);
-        CHECK (c.synth.osc[1].wave == Waveform::sine && near (c.synth.osc[1].level, 0.5, 1.0e-6) && near (c.synth.osc[2].level, 0.25, 1.0e-6));
-        CHECK (als190bq::hasNote (notes.approximated, "the carriers of algorithm 11"));
-    }
     // Drift: saw (type 4) an octave down, rectangle +7 st (detune 7), noise; the 24 dB filter at 2 kHz, the amp envelope, mono
     {
         const auto drift = "<Drift Id=\"8\">" + als190ed::on() + par ("Oscillator1_Type", 4) + par ("Oscillator1_Shape", 0.0) + par ("Oscillator1_Transpose", -1) +
@@ -479,13 +447,13 @@ TEST (als190ed_operator_and_drift_become_the_synth)
         CHECK (near (c.synth.attack, 0.01, 1.0e-6) && near (c.synth.sustain, 0.6, 1.0e-6) && c.synth.mono && c.synth.porta && near (c.synth.portaBeats, 0.1, 1.0e-6));
         CHECK (als190bq::hasNote (notes.dropped, "drift (the random detune") && als190bq::hasNote (notes.dropped, "modulation (envelope 2"));
     }
-    // through the importer: Operator with FM stays unsupported with its reason; the plain one is a fitted synth channel
+    // through the importer: Operator (with or without FM) is Tetra, with its values (round 190hs)
     FlpImportReport report;
     const auto song = als190ed::import (als190ed::set (als190ed::operatorDevice (0, { 1.0, 0.000316227757, 0.000316227757, 0.000316227757 }), {}), report);
-    CHECK (song.has_value() && report.partialEffects.count ("Operator -> built-in synth (settings fitted to LYNX's engine)") == 1);
+    CHECK (song.has_value() && report.converted.count ("Operator -> Tetra (LYNX's FM synth)") == 1);
     FlpImportReport fmReport;
     const auto fm = als190ed::import (als190ed::set (als190ed::operatorDevice (0, { 1.0, 0.5, 0.000316227757, 0.000316227757 }), {}), fmReport);
-    CHECK (fm.has_value() && fmReport.unsupported.count ("Operator (FM synthesis: no LYNX engine for it yet)") == 1);
+    CHECK (fm.has_value() && fmReport.converted.count ("Operator -> Tetra (LYNX's FM synth)") == 1 && fmReport.unsupported.empty());
 }
 
 TEST (als190ed_envelopes_of_racks_and_plugins_follow)

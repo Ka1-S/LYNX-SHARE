@@ -127,6 +127,8 @@ add_library(lynx_core STATIC
     src/core/Gms.cpp
     src/core/GmsMobile.cpp
     src/core/PocketSuperSaw.cpp
+    src/core/FmSynth.cpp
+    src/core/AlsDevicesFm.cpp
     src/core/Morphine.cpp
     src/core/FruitKick.cpp
     src/core/BassDrum.cpp
@@ -551,6 +553,7 @@ if(LYNX_BUILD_APP)
         src/ui/AdrWindow.cpp
         src/ui/WaveTravellerEditor.cpp
         src/ui/FpcEditor.cpp
+        src/ui/TetraEditor.cpp
         src/ui/FruitySlicerEditor.cpp
         src/ui/FlVoicePanel.cpp
         src/ui/SlicexEditor.cpp
