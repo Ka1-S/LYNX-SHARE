@@ -1286,11 +1286,6 @@ bool dockOrKeepAbove (juce::DocumentWindow& window)
     window.setUsingNativeTitleBar (false);
     window.setTitleBarButtonsRequired (juce::DocumentWindow::closeButton, false);
     window.setTitleBarHeight (26);
-    // round 190he (issue #152, "plugin windows can't be made smaller"): a resizable window gets LYNX's own resize border.
-    // JUCE leaves a window that is on the desktop to the system's borderless resize, which a child window never gets;
-    // the window is off the desktop here, so JUCE makes the border (the docked window's edge sizes it as FL's do)
-    if (window.isResizable())
-        window.setResizable (true, false);
     if (content != nullptr)
         window.setContentComponentSize (contentW, contentH);
 
