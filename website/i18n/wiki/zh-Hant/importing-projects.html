@@ -7,6 +7,9 @@
 <h2 id="fl-studio-s-own-plugins">FL Studio 自己的外掛</h2>
 <p>FL Studio 的產生器和效果器不會被載入。LYNX SHARE 讀取它們儲存的設定，並用自己重新製作的引擎來播放。每個引擎都有一個品質等級，從 <code>Exact</code>（在所有測試過的狀態下與原版位元完全一致）到 <code>Placeholder</code>（設定會保留，但外掛靜音或讓音訊直通）。各等級的說明見<a href="/wiki/coming-from-fl-studio/">從 FL Studio 轉換</a>。</p>
 <p>開啟 <code>.flp</code> 不需要安裝 FL Studio。有些引擎需要的波形、取樣或脈衝響應，會在執行時從你自己的 FL Studio 安裝中讀取。</p>
+<p>使用 FL Studio 的「FL Studio Mobile Rack」的 <code>.flp</code>（FL Studio Mobile 自己的「Save as FLP」會為每個樂器軌道寫出一個）會在與 <code>.flm</code> 相同的引擎上播放它的樂器和效果器，「FL Studio Mobile Rack FX」效果器也一樣。帶鼓組或多個樂器的機架仍使用內建合成器播放。</p>
+<h2 id="fl-studio-mobile-factory-sounds">FL Studio Mobile 原廠音色</h2>
+<p><code>.flm</code> 使用的原廠音色（鼓組、DirectWave 程式、SoundFont、GMSynth 波形）屬於 FL Studio Mobile，從不隨 LYNX SHARE 一起發行。LYNX SHARE 會在你自己的 App 副本的 <code>Resources</code> 資料夾中尋找它們：在 <code>設定 › 檔案 › FL Studio Mobile 資源</code> 下新增它（選擇它上一層的資料夾，或選擇 FL Studio 安裝資料夾，也可以）。FL Studio 的安裝只包含其中一部分，並且在你的資料夾之後才搜尋。仍然缺失的檔案會列在缺失的檔案視窗中。</p>
 <h2 id="missing-samples">缺失的取樣</h2>
 <figure><a class="shot" href="/assets/img/wiki/missing-files.webp"><img src="/assets/img/wiki/missing-files.webp" srcset="/assets/img/wiki/missing-files.webp 1x, /assets/img/wiki/missing-files@2x.webp 2x" alt="「缺失的檔案」視窗的 Samples 分頁：找到的檔案為綠色，缺失的為琥珀色，並有 Search folder、Locate 和 Skip" loading="lazy" width="760" height="560"></a></figure>
 <p><code>取樣</code> 分頁會列出每個找不到的取樣，以及它儲存的路徑和使用它的對象。</p>

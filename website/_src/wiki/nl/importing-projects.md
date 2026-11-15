@@ -1,5 +1,5 @@
 ---
-source: 358890815a
+source: c4e89e7e72
 ---
 `Bestand › Openen...` (`Ctrl+O`) opent de eigen `.lynx`-projecten van LYNX SHARE en ook `.flp`-, `.als`-, `.flm`- en `.mid`-bestanden. Een project uit een ander programma is een import: het wordt een nieuw, niet-opgeslagen LYNX SHARE-project, en het originele bestand wordt nooit overschreven.
 
@@ -27,6 +27,12 @@ Plugins van derden in VST2-, VST3- en CLAP-formaat in een `.flp`, en VST2- en VS
 De generators en effecten van FL Studio worden niet geladen. LYNX SHARE leest hun opgeslagen instellingen en speelt ze af op engines die het heeft nagebouwd. Elke engine heeft een kwaliteitsniveau, van `Exact` (bitidentiek aan het origineel bij elke geteste staat) tot `Placeholder` (de instellingen blijven bewaard, maar de plugin is stil of laat audio ongewijzigd door). De niveaus worden uitgelegd in [Overstappen van FL Studio](/wiki/coming-from-fl-studio/).
 
 Een `.flp` openen werkt zonder dat FL Studio is geïnstalleerd. Sommige engines hebben golven, samples of impulsen nodig die tijdens het draaien uit je eigen FL Studio-installatie worden gelezen.
+
+Een `.flp` die de "FL Studio Mobile Rack" van FL Studio gebruikt (het "Save as FLP" van FL Studio Mobile schrijft er één per instrumenttrack) speelt zijn instrument en effecten op dezelfde engines als een `.flm`, en het effect "FL Studio Mobile Rack FX" ook. Een rack met een drumkit of meerdere instrumenten speelt nog steeds de ingebouwde synth.
+
+## Fabrieksgeluiden van FL Studio Mobile
+
+De fabrieksgeluiden die een `.flm` gebruikt (drumkits, DirectWave-programma's, SoundFonts, de golven van GMSynth) behoren bij FL Studio Mobile en worden nooit met LYNX SHARE meegeleverd. LYNX SHARE zoekt ze in je eigen kopie van de map `Resources` van de app: voeg die toe onder `Instellingen › Bestanden › FL Studio Mobile-bronnen` (de map erboven kiezen, of een FL Studio-installatiemap, werkt ook). De installatie van FL Studio bevat er maar een deel van en wordt na je mappen doorzocht. Bestanden die nog ontbreken, staan in het venster Ontbrekende bestanden.
 
 ## Ontbrekende samples
 

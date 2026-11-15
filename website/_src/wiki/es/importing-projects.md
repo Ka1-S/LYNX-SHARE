@@ -1,5 +1,5 @@
 ---
-source: 358890815a
+source: c4e89e7e72
 ---
 `Archivo › Abrir...` (`Ctrl+O`) abre los proyectos `.lynx` propios de LYNX SHARE y también archivos `.flp`, `.als`, `.flm` y `.mid`. Un proyecto de otro programa es una importación: se convierte en un proyecto nuevo de LYNX SHARE sin guardar, y el archivo original nunca se modifica.
 
@@ -27,6 +27,12 @@ Los plugins VST2, VST3 y CLAP de terceros de un `.flp`, y los VST2 y VST3 de un 
 Los generadores y efectos de FL Studio no se cargan. LYNX SHARE lee sus ajustes guardados y los reproduce con motores que recreó. Cada motor tiene un nivel de calidad, desde `Exact` (idéntico bit a bit al original en cada estado probado) hasta `Placeholder` (los ajustes se conservan, pero el plugin está en silencio o deja pasar el audio). Los niveles se explican en [Si vienes de FL Studio](/wiki/coming-from-fl-studio/).
 
 Abrir un `.flp` funciona sin tener FL Studio instalado. Algunos motores necesitan ondas, samples o impulsos que se leen de tu propia instalación de FL Studio mientras funcionan.
+
+Un `.flp` que usa el "FL Studio Mobile Rack" de FL Studio (el "Save as FLP" del propio FL Studio Mobile escribe uno por pista de instrumento) toca su instrumento y sus efectos con los mismos motores que un `.flm`, y el efecto "FL Studio Mobile Rack FX" también. Un rack con un kit de batería o varios instrumentos sigue sonando con el sintetizador integrado.
+
+## Sonidos de fábrica de FL Studio Mobile
+
+Los sonidos de fábrica que usa un `.flm` (kits de batería, programas de DirectWave, SoundFonts, las ondas de GMSynth) pertenecen a FL Studio Mobile y nunca se distribuyen con LYNX SHARE. LYNX SHARE los busca en tu propia copia de la carpeta `Resources` de la app: añádela en `Configuración › Archivos › Recursos de FL Studio Mobile` (elegir la carpeta que la contiene, o una carpeta de instalación de FL Studio, también funciona). La instalación de FL Studio guarda solo una parte de ellos y se busca después de tus carpetas. Los archivos que sigan faltando se listan en la ventana Archivos que faltan.
 
 ## Samples que faltan
 

@@ -1,5 +1,5 @@
 ---
-source: 358890815a
+source: c4e89e7e72
 ---
 `Datei › Öffnen...` (`Ctrl+O`) öffnet die eigenen `.lynx`-Projekte von LYNX SHARE und außerdem `.flp`-, `.als`-, `.flm`- und `.mid`-Dateien. Ein Projekt aus einem anderen Programm ist ein Import: Es wird zu einem neuen, ungespeicherten LYNX-SHARE-Projekt, und die Originaldatei wird nie beschrieben.
 
@@ -27,6 +27,12 @@ Plugins von Drittanbietern (VST2, VST3 und CLAP in einer `.flp`, VST2 und VST3 i
 Die Generatoren und Effekte von FL Studio werden nicht geladen. LYNX SHARE liest ihre gespeicherten Einstellungen und spielt sie auf nachgebauten Engines ab. Jede Engine hat eine Qualitätsstufe, von `Exact` (bitidentisch mit dem Original bei jedem getesteten Zustand) bis `Placeholder` (die Einstellungen bleiben erhalten, aber das Plugin ist stumm oder reicht Audio durch). Die Stufen sind unter [Umstieg von FL Studio](/wiki/coming-from-fl-studio/) erklärt.
 
 Eine `.flp` zu öffnen funktioniert auch ohne installiertes FL Studio. Einige Engines brauchen Waves, Samples oder Impulse, die zur Laufzeit aus deiner eigenen FL-Studio-Installation gelesen werden.
+
+Eine `.flp`, die das „FL Studio Mobile Rack“ von FL Studio verwendet (das eigene „Save as FLP“ von FL Studio Mobile schreibt eines pro Instrumentenspur), spielt ihr Instrument und ihre Effekte auf denselben Engines wie eine `.flm`, und der Effekt „FL Studio Mobile Rack FX“ ebenso. Ein Rack mit einem Drum-Kit oder mehreren Instrumenten spielt weiterhin den eingebauten Synth.
+
+## Werkssounds von FL Studio Mobile
+
+Die Werkssounds, die eine `.flm` verwendet (Drum-Kits, DirectWave-Programme, SoundFonts, die Wellenformen von GMSynth), gehören zu FL Studio Mobile und werden nie mit LYNX SHARE ausgeliefert. LYNX SHARE sucht sie in deiner eigenen Kopie des `Resources`-Ordners der App: Füge ihn unter `Einstellungen › Dateien › FL Studio Mobile-Ressourcen` hinzu (der Ordner darüber oder ein FL-Studio-Installationsordner funktioniert ebenfalls). Die Installation von FL Studio enthält nur einen Teil davon und wird nach deinen Ordnern durchsucht. Dateien, die weiterhin fehlen, werden im Fenster Fehlende Dateien aufgelistet.
 
 ## Fehlende Samples
 

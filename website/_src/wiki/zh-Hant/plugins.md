@@ -1,5 +1,5 @@
 ---
-source: be0fc22373
+source: 1c440a7810
 ---
 ![外掛管理器的下半部，附有每個外掛檔案都在獨立處理程序中檢查的說明](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -89,6 +89,19 @@ macOS 上不代管 VST2。在 Linux 上，Windows 外掛可透過 [yabridge](htt
 ## 把樂器的輸出送到各別的插入軌
 
 有多個輸出的樂器外掛，可以讓每個輸出在自己的混音器插入軌上播放。在外掛視窗中點擊 `封裝器設定`，再點 `處理` 分頁。在 `連接` 下，每個輸出有一個開關燈號和一個數字：它在通道自己的插入軌之後第幾個插入軌上播放。`自動對應輸出` 會讓每個輸出使用下一個插入軌，`重設` 則回到預設值。
+
+## FL Studio 自帶的外掛
+
+FL Studio 的原生外掛，例如 Sytrus、Harmor 和 Patcher，只能在 FL Studio 內部執行。要在 LYNX SHARE 中使用它們，請使用隨 FL Studio 附帶的外掛版本。在 Windows 上，它安裝為 `C:\Program Files\Common Files\VST2` 中的 `FL Studio VSTi` 和 `FL Studio VSTi (Multi)`。在 macOS 上是 Audio Unit。
+
+1. 掃描外掛。兩者都會作為樂器出現，廠商是 Image-Line。第一次掃描可能要一些時間，因為整個 FL Studio 都會在外掛內啟動。
+2. 把 `FL Studio VSTi` 新增到一個通道並開啟它的視窗。按一下 FL Studio 標誌可開啟 FL Studio 自己的視窗，裡面有它的通道機架、混音器和瀏覽器。
+3. 在 FL Studio 的通道機架中新增一個樂器。新的 FL Studio 外掛開始時只有一個空的取樣器，在你新增樂器之前不會發聲。來自 LYNX SHARE 的音符會播放 FL Studio 通道機架中選取的通道。
+4. LYNX SHARE 播放時，FL Studio 自己的樣式也會播放，速度跟隨 LYNX SHARE 的速度。
+
+你在 FL Studio 內部建立的內容會隨 LYNX SHARE 專案一起儲存。`FL Studio VSTi (Multi)` 有 16 路立體聲輸出，可以在各自獨立的插入軌上播放（見上一節）。你的 FL Studio 授權決定哪些 FL 外掛能在其中使用。LYNX SHARE 自己不會載入 FL Studio 的外掛檔案。
+
+如果 FL Studio 外掛被列為 `載入失敗`，請在 `選項 › 外掛管理器...` 中對它按右鍵，選擇 `重試（立即掃描此檔案）`。
 
 ## 外掛資料庫資料夾
 

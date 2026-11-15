@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="3014ebcf";
+window.LYNX_LANG=lang;window.LYNX_V="b57b2774";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=3014ebcf">
+<link rel="stylesheet" href="/assets/site.css?v=b57b2774">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -149,8 +149,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
       <div>
         <p data-i18n="fe.clP">An optional layout (View › Layout style) puts a grid of clips and scenes next to the Playlist, in the manner of Ableton Live's Session view. Clips have launch modes, quantisation, legato, loop and follow actions.</p>
         <p data-i18n="fe.clP2">Live sets bring their Session clips into this grid, and exporting an .als writes the grid back. The pattern layout stays the default and nothing changes in it.</p>
-        <p data-i18n="fe.clP3">A selected clip opens in a Clip View with Clip, Launch and Notes panels and Live 12's MIDI tools. The selected track's effects show as a chain of cards, and racks with chains, zones and macros open from Live sets and are written back. A Session mixer sits under the grid, a Drum Rack plays pads with choke groups and return chains, and MIDI and Key Map Modes link controllers and computer keys to clips, scenes and knobs.</p>
-        <p data-i18n="fe.simP">The same menu has a third layout, the Simple workflow, for a first song: one window with the tracks and the timeline, a New track chooser, starter beats, a track dock with one-knob effects and a Chord pad, a first-song tour and a Finish dock that saves the song as a file.</p>
+        <p data-i18n="fe.clP3">A selected clip opens in a Clip View with Clip, Launch and Notes panels and Live 12's MIDI tools. The selected track's effects show as a chain of cards, and racks with chains, zones and macros open from Live sets and are written back. A Session mixer sits under the grid, a Drum Rack plays pads with choke groups and return chains, and MIDI and Key Map Modes link controllers and computer keys to clips, scenes and knobs. Freeze Track and Bounce turn a track into audio, and Ableton Link keeps the tempo in sync with Live and other Link apps.</p>
+        <p data-i18n="fe.simP">The same menu has a third layout, the Simple workflow, for a first song: one window with the tracks and the timeline, a New track chooser, starter beats, a 16-pad Sampler, a track dock with one-knob effects and a Chord pad, a first-song tour and a Finish dock that saves the song as a file. A folder of stems and MIDI from another app comes in with one drop.</p>
         <p><a class="tlink" href="/wiki/coming-from-ableton/" data-i18n="fe.clL">Coming from Ableton Live</a></p>
       </div>
     </div>
@@ -208,7 +208,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <div class="wrap">
     <h2 data-i18n="fe.pluT">FL Studio's plugins, recreated</h2>
     <div class="prose" style="max-width:780px">
-      <p data-i18n="cat.sub" data-args='[&quot;205&quot;, &quot;0.1.27&quot;]' data-count="205">205 instruments, effects and tools are built into LYNX SHARE 0.1.27. Each picture is the plugin's own editor, drawn by the released program. Third-party plugins (VST3, CLAP and others) load next to them.</p>
+      <p data-i18n="cat.sub" data-args='[&quot;205&quot;, &quot;0.1.28&quot;]' data-count="205">205 instruments, effects and tools are built into LYNX SHARE 0.1.28. Each picture is the plugin's own editor, drawn by the released program. Third-party plugins (VST3, CLAP and others) load next to them.</p>
       <p data-i18n="why.fl.p1">FL Studio's own plugins cannot be loaded by another program. LYNX SHARE has its own engine for most of them, written from scratch, and reads each plugin's saved settings from the .flp or from an .fst preset. A Sytrus channel opens as LYNX SHARE's Sytrus engine with the same patch, a Fruity Limiter slot as its limiter with the same values.</p>
       <p data-i18n="why.fl.x2">Some engines need wave data or samples that belong to FL Studio. LYNX SHARE reads those from your own FL Studio installation and ships none of them.</p>
     </div>
@@ -265,7 +265,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <section class="sec" id="engine">
   <div class="wrap prose" style="max-width:820px">
     <h2 data-i18n="fe.engT">Performance</h2>
-    <p data-i18n="fe.engP">The audio engine spreads channels and mixer tracks across CPU cores, skips channels that are silent and streams long audio files from disk. Measured against FL Studio 2026 on the developer's PC, it used 2.5 to 7 times less RAM and rendered the demo songs 2 to 3 times faster. The method and the numbers are in the <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/analise/REA_rodada116.md">benchmark notes</a>; your results will differ.</p>
+    <p data-i18n="fe.engP">The audio engine spreads channels and mixer tracks across CPU cores, skips channels that are silent, renders the part of a project you are not playing live a little ahead, and streams long audio files from disk. Measured on one PC (the developer's, Windows 11, Ryzen 5 3600) with FL Studio 2026's own demo song <i>Thief</i>, LYNX SHARE 0.1.28 opened it in 5.2 s with 345 MB of private memory, where FL Studio took 12.2 s and 874 MB, and its window was ready in about 1 s (FL Studio: 1.7 s). The method and the numbers are in the <a href="https://github.com/Ka1-S/LYNX-SHARE/releases/tag/v0.1.28-alpha">0.1.28 release notes</a>; your results will differ.</p>
   </div>
 </section>
 
@@ -278,8 +278,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=3014ebcf" defer></script>
-<script src="/assets/features.js?v=3014ebcf" defer></script>
-<script src="/assets/motion.js?v=3014ebcf" defer></script>
+<script src="/assets/site.js?v=b57b2774" defer></script>
+<script src="/assets/features.js?v=b57b2774" defer></script>
+<script src="/assets/motion.js?v=b57b2774" defer></script>
 </body>
 </html>

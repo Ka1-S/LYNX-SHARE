@@ -1,5 +1,5 @@
 ---
-source: be0fc22373
+source: 1c440a7810
 ---
 ![La parte inferior del Gestor de plugins, con su nota de que cada archivo de plugin se examina en un proceso aparte](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -89,6 +89,19 @@ En Windows, los plugins VST2 y VST3 de 32 bits se ejecutan a través de un puent
 ## Enviar las salidas de un instrumento a inserts separados
 
 Un plugin de instrumento con varias salidas puede reproducir cada una en su propio insert del Mixer. En la ventana del plugin, haz clic en `Configuración del wrapper` y luego en la pestaña `Procesamiento`. En `Conexiones`, cada salida tiene una luz que la activa o desactiva y un número: cuántos inserts después del insert del propio canal suena. `Asignar salidas automáticamente` da a cada salida el siguiente insert, y `Reset` vuelve a los valores por defecto.
+
+## Los plugins propios de FL Studio
+
+Los plugins nativos de FL Studio, como Sytrus, Harmor y Patcher, funcionan solo dentro de FL Studio. Para usarlos en LYNX SHARE, usa la versión en plugin de FL Studio que viene con él. En Windows se instala como `FL Studio VSTi` y `FL Studio VSTi (Multi)` en `C:\Program Files\Common Files\VST2`. En macOS es un Audio Unit.
+
+1. Escanea los plugins. Los dos aparecen como instrumentos con el fabricante Image-Line. El primer escaneo puede tardar, porque todo FL Studio se inicia dentro del plugin.
+2. Añade `FL Studio VSTi` a un canal y abre su ventana. Haz clic en el logotipo de FL Studio para abrir la ventana propia de FL Studio, con su Channel Rack, Mixer y browser.
+3. En el Channel Rack de FL Studio, añade un instrumento. Un plugin nuevo de FL Studio empieza con un Sampler vacío y no suena hasta que añades uno. Las notas de LYNX SHARE tocan el canal seleccionado en el Channel Rack de FL Studio.
+4. Los patrones propios de FL Studio suenan cuando suena LYNX SHARE, al tempo de LYNX SHARE.
+
+Lo que construyes dentro de FL Studio se guarda con el proyecto de LYNX SHARE. `FL Studio VSTi (Multi)` tiene 16 salidas estéreo, que pueden sonar en inserts separados (mira la sección anterior). Tu licencia de FL Studio decide qué plugins de FL funcionan dentro de él. LYNX SHARE no carga por sí solo los archivos de plugin de FL Studio.
+
+Si el plugin de FL Studio aparece como `Error al cargar`, haz clic derecho sobre él en `Opciones › Gestor de plugins...` y elige `Reintentar (escanear este archivo ahora)`.
 
 ## La carpeta Plugin database
 

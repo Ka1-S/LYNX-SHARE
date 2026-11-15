@@ -1,5 +1,5 @@
 ---
-source: 358890815a
+source: c4e89e7e72
 ---
 `Dosya › Aç...` (`Ctrl+O`), LYNX SHARE'in kendi `.lynx` projelerini ve ayrıca `.flp`, `.als`, `.flm` ve `.mid` dosyalarını açar. Başka bir programdan gelen proje bir içe aktarmadır: yeni, kaydedilmemiş bir LYNX SHARE projesi olur ve özgün dosyaya asla yazılmaz.
 
@@ -27,6 +27,12 @@ Bir `.flp` içindeki üçüncü taraf VST2, VST3 ve CLAP plugin'leri ile bir `.a
 FL Studio'nun generator'ları ve efektleri yüklenmez. LYNX SHARE onların kaydedilmiş ayarlarını okur ve yeniden oluşturduğu motorlarda çalar. Her motorun bir kalite seviyesi vardır: `Exact` (denenen her durumda orijinalle birebir aynı) seviyesinden `Placeholder` (ayarlar korunur ama plugin sessizdir ya da sesi olduğu gibi geçirir) seviyesine kadar. Seviyeler [FL Studio'dan geliyorsanız](/wiki/coming-from-fl-studio/) sayfasında açıklanmıştır.
 
 Bir `.flp` açmak FL Studio kurulu olmadan da çalışır. Bazı motorlar, çalışma anında kendi FL Studio kurulumunuzdan okunan wave'lere, sample'lara veya impulse'lara ihtiyaç duyar.
+
+FL Studio'nun “FL Studio Mobile Rack” plugin'ini kullanan bir `.flp` (FL Studio Mobile'ın kendi “Save as FLP”si her enstrüman izi için bir tane yazar), enstrümanını ve efektlerini bir `.flm` ile aynı motorlarda çalar; “FL Studio Mobile Rack FX” efekti de öyle. Bir davul kiti veya birkaç enstrümanlı bir rack hâlâ dahili synth ile çalar.
+
+## FL Studio Mobile fabrika sesleri
+
+Bir `.flm` dosyasının kullandığı fabrika sesleri (davul kit'leri, DirectWave programları, SoundFont'lar, GMSynth wave'leri) FL Studio Mobile'a aittir ve LYNX SHARE ile asla dağıtılmaz. LYNX SHARE onları uygulamanın kendi kopyanızdaki `Resources` klasöründe arar: `Ayarlar › Dosyalar › FL Studio Mobile kaynakları` altına ekleyin (onun üstündeki klasörü veya bir FL Studio kurulum klasörünü seçmek de işe yarar). FL Studio'nun kurulumu bunların yalnızca bir kısmını içerir ve sizin klasörlerinizden sonra aranır. Hâlâ eksik olan dosyalar Eksik dosyalar penceresinde listelenir.
 
 ## Eksik sample'lar
 

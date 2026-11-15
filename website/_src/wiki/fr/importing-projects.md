@@ -1,5 +1,5 @@
 ---
-source: 358890815a
+source: c4e89e7e72
 ---
 `Fichier › Ouvrir...` (`Ctrl+O`) ouvre les projets `.lynx` propres à LYNX SHARE, ainsi que les fichiers `.flp`, `.als`, `.flm` et `.mid`. Un projet venu d'un autre programme est un import : il devient un nouveau projet LYNX SHARE non enregistré, et le fichier d'origine n'est jamais modifié.
 
@@ -27,6 +27,12 @@ Les plugins tiers VST2, VST3 et CLAP d'un `.flp`, et les plugins VST2 et VST3 d'
 Les générateurs et effets de FL Studio ne sont pas chargés. LYNX SHARE lit leurs réglages enregistrés et les joue sur des moteurs qu'il a recréés. Chaque moteur a un niveau de qualité, de `Exact` (identique bit à bit à l'original pour chaque état testé) à `Placeholder` (les réglages sont conservés, mais le plugin est muet ou laisse passer l'audio tel quel). Les niveaux sont expliqués dans [Venir de FL Studio](/wiki/coming-from-fl-studio/).
 
 Ouvrir un `.flp` fonctionne sans FL Studio installé. Certains moteurs ont besoin d'ondes, de samples ou d'impulsions qui sont lus dans votre propre installation de FL Studio à l'exécution.
+
+Un `.flp` qui utilise le « FL Studio Mobile Rack » de FL Studio (le « Save as FLP » propre à FL Studio Mobile en écrit un par piste d'instrument) joue son instrument et ses effets sur les mêmes moteurs qu'un `.flm`, et l'effet « FL Studio Mobile Rack FX » aussi. Un rack avec un kit de batterie ou plusieurs instruments joue toujours le synthé intégré.
+
+## Sons d'usine de FL Studio Mobile
+
+Les sons d'usine qu'utilise un `.flm` (kits de batterie, programmes DirectWave, SoundFonts, les ondes de GMSynth) appartiennent à FL Studio Mobile et ne sont jamais fournis avec LYNX SHARE. LYNX SHARE les cherche dans votre propre copie du dossier `Resources` de l'application : ajoutez-le dans `Réglages › Fichiers › Ressources de FL Studio Mobile` (choisir le dossier au-dessus, ou un dossier d'installation de FL Studio, fonctionne aussi). L'installation de FL Studio n'en contient qu'une partie, et elle est parcourue après vos dossiers. Les fichiers encore manquants sont listés dans la fenêtre Fichiers manquants.
 
 ## Samples manquants
 

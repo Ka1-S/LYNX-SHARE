@@ -25,9 +25,17 @@
 <p>Thread audio sebaiknya berjalan dengan prioritas real-time.</p>
 <ol><li>Buka <code>Opsi › Pengaturan audio...</code> dan baca <code>Status</code>. Di situ terlihat apakah thread mendapat prioritas real-time.</li><li>Jika tidak, instal rtkit (<code>sudo apt install rtkit</code>, <code>sudo dnf install rtkit</code>, atau <code>sudo pacman -S rtkit</code>), atau tambahkan dirimu ke grup <code>audio</code> dengan batas real-time, seperti pada setup JACK.</li><li>Keluar dan masuk lagi.</li></ol>
 <p>Detailnya ada di <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/LINUX.md">LINUX.md</a>.</p>
+<h3 id="the-sound-crackles-or-drops-out">Suara berderak atau putus</h3>
+<p>LYNX SHARE menghitung setiap dropout (buffer underrun) dan menyebutkan penyebabnya. Arahkan kursor ke meter <code>CPU</code> di toolbar, atau buka <code>Alat › Monitor performa plugin...</code>. Angka merah di samping persentase CPU adalah jumlahnya.</p>
+<p>Petunjuk menyebutkan penyebab dropout terakhir:</p>
+<div class="tablewrap"><table><thead><tr><th>Penyebab</th><th>Artinya</th><th>Yang bisa dicoba</th></tr></thead><tbody><tr><td>Pemrosesan lebih lama dari buffer</td><td>Satu blok audio butuh waktu hitung lebih lama dari durasinya. Petunjuk menyebutkan channel atau efek paling lambat di blok itu</td><td>Perbesar ukuran buffer di <code>Opsi › Pengaturan audio...</code>, bekukan channel itu, atau turunkan kualitas plugin</td></tr><tr><td>Pemrosesan mendekati batas buffer</td><td>Beban mendekati 100 % di sekitar dropout</td><td>Perbesar ukuran buffer, atau bekukan channel yang paling berat</td></tr><tr><td>Latensi driver atau sistem</td><td>Driver atau sistem terlambat padahal beban tetap rendah. Tidak ada plugin yang menyebabkannya</td><td>Perbesar ukuran buffer, coba driver lain (di Windows, driver ASIO antarmuka), dan di Linux periksa prioritas real-time (di atas)</td></tr></tbody></table></div>
+<p>Setiap dropout juga ditulis ke <code>audio-glitches.log</code> di folder pengaturan, beserta perangkat, buffer, dan channel terberat.</p>
 <h2 id="plugins">Plugin</h2>
 <h3 id="a-plugin-crashes">Plugin crash</h3>
-<p>Jalankan di prosesnya sendiri, supaya hanya plugin itu yang berhenti.</p>
+<p>Sebagian besar crash plugin hanya mematikan plugin itu: efek di-bypass, instrumen menjadi senyap, dan LYNX SHARE serta proyek tetap berjalan. Pesan <code>Plugin crash</code> lalu menawarkan:</p>
+<ul><li><code>Muat ulang</code>, yang memulai plugin lagi dengan pengaturan dari penyimpanan atau cadangan terakhir.</li><li><code>Selalu jalankan &lt;plugin&gt; di proses terpisah</code>, yang memulainya lagi di prosesnya sendiri, sekarang dan di setiap proyek. Crash di sana tidak bisa menjatuhkan LYNX SHARE. Plugin di proses terpisah membuka jendelanya sendiri (tidak bisa di-dock).</li></ul>
+<p>Jendela plugin menampilkan dua tombol yang sama sebagai ganti editornya. <code>Opsi › Pengelola plugin...</code> mencantumkan plugin yang selalu berjalan di proses terpisah di kolom <code>Proses terpisah</code>; klik kotaknya untuk menyalakan atau mematikannya.</p>
+<p>Untuk menjalankan setiap plugin di prosesnya sendiri:</p>
 <ol><li>Buka <code>Opsi › Pengaturan umum...</code>.</li><li>Nyalakan <code>Jalankan plugin di proses terpisah (melindungi LYNX SHARE dari crash)</code>.</li><li>Buka ulang proyek.</li></ol>
 <p>Plugin yang crash atau berhenti merespons di prosesnya sendiri dibisukan. Simpan proyek dan buka ulang untuk memuat plugin itu lagi. Lihat <a href="/wiki/plugins/">Plugin pihak ketiga</a>.</p>
 <h3 id="a-plugin-is-not-in-the-list">Plugin tidak ada di daftar</h3>

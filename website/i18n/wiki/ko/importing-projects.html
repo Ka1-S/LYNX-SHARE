@@ -7,6 +7,9 @@
 <h2 id="fl-studio-s-own-plugins">FL Studio 자체 플러그인</h2>
 <p>FL Studio의 제너레이터와 이펙트는 로드되지 않습니다. LYNX SHARE는 저장된 설정을 읽어 새로 만든 엔진으로 재생합니다. 각 엔진에는 품질 단계가 있으며, 테스트한 모든 상태에서 원본과 비트 단위로 같은 <code>Exact</code>부터 <code>Placeholder</code>(설정은 유지되지만 플러그인이 무음이거나 오디오를 그대로 통과시킴)까지입니다. 단계 설명은 <a href="/wiki/coming-from-fl-studio/">FL Studio에서 넘어오기</a>에 있습니다.</p>
 <p><code>.flp</code> 파일은 FL Studio가 설치되어 있지 않아도 열립니다. 일부 엔진은 웨이브, 샘플, 임펄스가 필요하며, 이는 실행 중에 사용자의 FL Studio 설치 폴더에서 읽어 옵니다.</p>
+<p>FL Studio의 &quot;FL Studio Mobile Rack&quot;을 쓰는 <code>.flp</code>(FL Studio Mobile 자체의 &quot;Save as FLP&quot;는 악기 트랙마다 하나씩 만듭니다)는 악기와 이펙트가 <code>.flm</code>과 같은 엔진으로 재생되며, &quot;FL Studio Mobile Rack FX&quot; 이펙트도 마찬가지입니다. 드럼 키트나 여러 악기가 들어 있는 랙은 아직 내장 신스로 재생됩니다.</p>
+<h2 id="fl-studio-mobile-factory-sounds">FL Studio Mobile 팩토리 사운드</h2>
+<p><code>.flm</code>이 쓰는 팩토리 사운드(드럼 키트, DirectWave 프로그램, SoundFont, GMSynth 웨이브)는 FL Studio Mobile의 것이며 LYNX SHARE와 함께 배포되지 않습니다. LYNX SHARE는 본인이 가진 앱 사본의 <code>Resources</code> 폴더에서 찾습니다. <code>설정 › 파일 › FL Studio Mobile 리소스</code>에서 추가하세요(그 위 폴더나 FL Studio 설치 폴더를 지정해도 됩니다). FL Studio 설치 폴더에는 일부만 들어 있으며, 본인 폴더 다음에 검색됩니다. 아직 없는 파일은 누락된 파일 창에 나열됩니다.</p>
 <h2 id="missing-samples">누락된 샘플</h2>
 <figure><a class="shot" href="/assets/img/wiki/missing-files.webp"><img src="/assets/img/wiki/missing-files.webp" srcset="/assets/img/wiki/missing-files.webp 1x, /assets/img/wiki/missing-files@2x.webp 2x" alt="Samples 탭의 누락된 파일 창: 찾은 파일은 녹색, 없는 파일은 호박색이며 Search folder, Locate, Skip이 있다" loading="lazy" width="760" height="560"></a></figure>
 <p><code>샘플</code> 탭에는 찾지 못한 모든 샘플이 저장된 경로와 사용하는 곳과 함께 나열됩니다.</p>

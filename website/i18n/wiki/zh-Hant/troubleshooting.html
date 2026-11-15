@@ -25,9 +25,17 @@
 <p>音訊執行緒應以即時優先權執行。</p>
 <ol><li>開啟 <code>選項 › 音訊設定...</code> 並查看 <code>狀態</code>。它會顯示執行緒是否取得了即時優先權。</li><li>如果沒有，請安裝 rtkit（<code>sudo apt install rtkit</code>、<code>sudo dnf install rtkit</code> 或 <code>sudo pacman -S rtkit</code>），或者像 JACK 的設定那樣，把自己加入帶有即時限制的 <code>音訊</code> 群組。</li><li>登出後再登入。</li></ol>
 <p>詳細資訊見 <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/LINUX.md">LINUX.md</a>。</p>
+<h3 id="the-sound-crackles-or-drops-out">聲音有爆音或中斷</h3>
+<p>LYNX SHARE 會統計每一次中斷（緩衝區欠載），並說明原因。把滑鼠指向工具列中的 <code>CPU</code> 表，或開啟 <code>工具 › 外掛效能監視器...</code>。CPU 百分比旁邊的紅色數字就是次數。</p>
+<p>提示會說明最近一次中斷的原因：</p>
+<div class="tablewrap"><table><thead><tr><th>原因</th><th>含義</th><th>可以嘗試</th></tr></thead><tbody><tr><td>處理耗時超過緩衝區</td><td>一塊音訊的計算時間超過了它本身的長度。提示會指出這一塊中最慢的通道或效果器</td><td>在 <code>選項 › 音訊設定...</code> 中加大緩衝區，凍結該通道，或調低外掛的品質</td></tr><tr><td>處理接近緩衝區的極限</td><td>中斷前後負載接近 100 %</td><td>加大緩衝區，或凍結最重的通道</td></tr><tr><td>驅動程式或系統延遲</td><td>負載保持較低時，驅動程式或系統來得太晚。不是外掛造成的</td><td>加大緩衝區，嘗試其他驅動程式（在 Windows 上用介面的 ASIO 驅動程式），在 Linux 上檢查即時優先順序（見上文）</td></tr></tbody></table></div>
+<p>每次中斷還會寫入設定資料夾中的 <code>audio-glitches.log</code>，記錄裝置、緩衝區和最重的通道。</p>
 <h2 id="plugins">外掛</h2>
 <h3 id="a-plugin-crashes">外掛當掉</h3>
-<p>讓它在自己的處理程序中執行，這樣只有該外掛會停止。</p>
+<p>大多數外掛崩潰只會讓該外掛停止：效果器被旁通，樂器靜音，LYNX SHARE 和專案繼續執行。隨後 <code>外掛崩潰</code> 提示會提供：</p>
+<ul><li><code>重新載入</code>，用上次儲存或備份的設定重新啟動外掛。</li><li><code>始終在獨立處理程序中執行 &lt;plugin&gt;</code>，讓它在自己的處理程序中重新啟動，現在以及在所有專案中都是如此。那裡的崩潰不會拖垮 LYNX SHARE。在獨立處理程序中的外掛會在自己的視窗中開啟（不能停靠）。</li></ul>
+<p>外掛視窗會在編輯器的位置顯示同樣的兩個按鈕。<code>選項 › 外掛管理器...</code> 在 <code>獨立處理程序</code> 欄中列出始終在獨立處理程序中執行的外掛；按一下方框可開關。</p>
+<p>要讓每個外掛都在自己的處理程序中執行：</p>
 <ol><li>開啟 <code>選項 › 一般設定...</code>。</li><li>開啟 <code>在獨立處理程序中執行外掛（防止外掛崩潰影響LYNX SHARE）</code>。</li><li>重新開啟專案。</li></ol>
 <p>在自己處理程序中當掉或停止回應的外掛會被靜音。請儲存專案並重新開啟，才能再次載入該外掛。見<a href="/wiki/plugins/">第三方外掛</a>。</p>
 <h3 id="a-plugin-is-not-in-the-list">外掛不在清單中</h3>

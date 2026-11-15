@@ -1,5 +1,5 @@
 ---
-source: 358890815a
+source: c4e89e7e72
 ---
 `File › Buka...` (`Ctrl+O`) membuka proyek `.lynx` milik LYNX SHARE sendiri dan juga file `.flp`, `.als`, `.flm`, dan `.mid`. Proyek dari program lain adalah impor: ia menjadi proyek LYNX SHARE baru yang belum disimpan, dan file aslinya tidak pernah ditulisi.
 
@@ -27,6 +27,12 @@ Plugin pihak ketiga VST2, VST3, dan CLAP di file `.flp`, serta plugin VST2 dan V
 Generator dan efek FL Studio tidak dimuat. LYNX SHARE membaca pengaturan tersimpannya dan memainkannya di engine yang ia buat ulang. Setiap engine punya tingkat kualitas, dari `Exact` (identik bit demi bit dengan aslinya pada setiap state yang diuji) sampai `Placeholder` (pengaturan disimpan, tetapi plugin senyap atau hanya meneruskan audio). Tingkatannya dijelaskan di [Pindahan dari FL Studio](/wiki/coming-from-fl-studio/).
 
 Membuka `.flp` bisa dilakukan tanpa FL Studio terinstal. Beberapa engine membutuhkan wave, sample, atau impuls yang dibaca dari instalasi FL Studio milikmu sendiri saat berjalan.
+
+File `.flp` yang memakai "FL Studio Mobile Rack" milik FL Studio ("Save as FLP" milik FL Studio Mobile menulis satu per track instrumen) memainkan instrumen dan efeknya dengan engine yang sama seperti `.flm`, begitu juga efek "FL Studio Mobile Rack FX". Rack dengan drum kit atau beberapa instrumen masih dimainkan dengan synth bawaan.
+
+## Suara bawaan pabrik FL Studio Mobile
+
+Suara bawaan pabrik yang dipakai file `.flm` (drum kit, program DirectWave, SoundFont, wave GMSynth) milik FL Studio Mobile dan tidak pernah disertakan bersama LYNX SHARE. LYNX SHARE mencarinya di folder `Resources` salinan aplikasi milikmu sendiri: tambahkan di `Pengaturan › File › Sumber daya FL Studio Mobile` (memilih folder di atasnya, atau folder instalasi FL Studio, juga bisa). Instalasi FL Studio hanya memuat sebagian darinya, dan dicari setelah folder milikmu. File yang masih hilang dicantumkan di jendela File hilang.
 
 ## Sample yang hilang
 

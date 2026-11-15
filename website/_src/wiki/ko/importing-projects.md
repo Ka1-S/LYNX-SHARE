@@ -1,5 +1,5 @@
 ---
-source: 358890815a
+source: c4e89e7e72
 ---
 `파일 › 열기...` (`Ctrl+O`) 메뉴는 LYNX SHARE 자체 `.lynx` 프로젝트와 `.flp`, `.als`, `.flm`, `.mid` 파일을 엽니다. 다른 프로그램의 프로젝트는 가져오기로 처리됩니다. 저장되지 않은 새 LYNX SHARE 프로젝트가 만들어지고, 원본 파일에는 절대 쓰지 않습니다.
 
@@ -27,6 +27,12 @@ source: 358890815a
 FL Studio의 제너레이터와 이펙트는 로드되지 않습니다. LYNX SHARE는 저장된 설정을 읽어 새로 만든 엔진으로 재생합니다. 각 엔진에는 품질 단계가 있으며, 테스트한 모든 상태에서 원본과 비트 단위로 같은 `Exact`부터 `Placeholder`(설정은 유지되지만 플러그인이 무음이거나 오디오를 그대로 통과시킴)까지입니다. 단계 설명은 [FL Studio에서 넘어오기](/wiki/coming-from-fl-studio/)에 있습니다.
 
 `.flp` 파일은 FL Studio가 설치되어 있지 않아도 열립니다. 일부 엔진은 웨이브, 샘플, 임펄스가 필요하며, 이는 실행 중에 사용자의 FL Studio 설치 폴더에서 읽어 옵니다.
+
+FL Studio의 "FL Studio Mobile Rack"을 쓰는 `.flp`(FL Studio Mobile 자체의 "Save as FLP"는 악기 트랙마다 하나씩 만듭니다)는 악기와 이펙트가 `.flm`과 같은 엔진으로 재생되며, "FL Studio Mobile Rack FX" 이펙트도 마찬가지입니다. 드럼 키트나 여러 악기가 들어 있는 랙은 아직 내장 신스로 재생됩니다.
+
+## FL Studio Mobile 팩토리 사운드
+
+`.flm`이 쓰는 팩토리 사운드(드럼 키트, DirectWave 프로그램, SoundFont, GMSynth 웨이브)는 FL Studio Mobile의 것이며 LYNX SHARE와 함께 배포되지 않습니다. LYNX SHARE는 본인이 가진 앱 사본의 `Resources` 폴더에서 찾습니다. `설정 › 파일 › FL Studio Mobile 리소스`에서 추가하세요(그 위 폴더나 FL Studio 설치 폴더를 지정해도 됩니다). FL Studio 설치 폴더에는 일부만 들어 있으며, 본인 폴더 다음에 검색됩니다. 아직 없는 파일은 누락된 파일 창에 나열됩니다.
 
 ## 누락된 샘플
 

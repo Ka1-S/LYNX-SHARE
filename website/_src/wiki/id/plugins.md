@@ -1,5 +1,5 @@
 ---
-source: be0fc22373
+source: 1c440a7810
 ---
 ![Bagian bawah Pengelola plugin, dengan catatan bahwa setiap file plugin diperiksa di proses terpisah](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -89,6 +89,19 @@ Di Windows, plugin VST2 dan VST3 32-bit berjalan lewat bridge (`LYNX-bridge32.ex
 ## Kirim output sebuah instrumen ke insert terpisah
 
 Plugin instrumen dengan beberapa output bisa memutar tiap output di insert Mixer-nya sendiri. Di jendela plugin, klik `Pengaturan wrapper`, lalu tab `Pemrosesan`. Di bawah `Koneksi`, tiap output punya lampu yang menyalakan atau mematikannya dan sebuah angka: berapa insert setelah insert milik channel itu tempat output tersebut diputar. `Petakan output otomatis` memberi tiap output insert berikutnya, dan `Reset` kembali ke nilai bawaan.
+
+## Plugin bawaan FL Studio
+
+Plugin native FL Studio, seperti Sytrus, Harmor, dan Patcher, hanya berjalan di dalam FL Studio. Untuk memakainya di LYNX SHARE, gunakan versi plugin FL Studio yang disertakan bersamanya. Di Windows, plugin itu terpasang sebagai `FL Studio VSTi` dan `FL Studio VSTi (Multi)` di `C:\Program Files\Common Files\VST2`. Di macOS, plugin itu berupa Audio Unit.
+
+1. Pindai plugin. Keduanya muncul sebagai instrumen dengan vendor Image-Line. Pemindaian pertama bisa memakan waktu, karena seluruh FL Studio dijalankan di dalam plugin.
+2. Tambahkan `FL Studio VSTi` ke sebuah channel dan buka jendelanya. Klik logo FL Studio untuk membuka jendela FL Studio sendiri, dengan Channel Rack, Mixer, dan browser-nya.
+3. Di Channel Rack FL Studio, tambahkan instrumen. Plugin FL Studio baru dimulai dengan satu Sampler kosong dan tidak mengeluarkan suara sampai kamu menambahkan satu instrumen. Not dari LYNX SHARE memainkan channel yang dipilih di Channel Rack FL Studio.
+4. Pattern FL Studio sendiri dimainkan saat LYNX SHARE memutar, pada tempo LYNX SHARE.
+
+Apa yang kamu buat di dalam FL Studio disimpan bersama proyek LYNX SHARE. `FL Studio VSTi (Multi)` punya 16 output stereo, yang bisa dimainkan di insert terpisah (lihat bagian di atas). Lisensi FL Studio-mu menentukan plugin FL mana yang berfungsi di dalamnya. LYNX SHARE tidak memuat file plugin FL Studio dengan sendirinya.
+
+Jika plugin FL Studio tercantum sebagai `Gagal dimuat`, klik kanan di `Opsi › Pengelola plugin...` dan pilih `Coba lagi (pindai file ini sekarang)`.
 
 ## Folder Plugin database
 

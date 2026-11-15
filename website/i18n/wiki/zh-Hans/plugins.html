@@ -29,6 +29,11 @@
 <div class="tablewrap"><table><thead><tr><th>设置</th><th>作用</th></tr></thead><tbody><tr><td><code>查找</code></td><td>按插件、通道或插入轨筛选</td></tr><tr><td><code>仅插件</code></td><td>隐藏 LYNX SHARE 自己的乐器和效果器</td></tr><tr><td><code>冻结</code></td><td>停止更新数字</td></tr><tr><td><code>播放时重置</code></td><td>每次开始播放时重新计算平均值和峰值</td></tr><tr><td><code>重置</code></td><td>立即清除平均值和峰值</td></tr></tbody></table></div>
 <h2 id="send-an-instrument-s-outputs-to-separate-inserts">把乐器的输出送到不同的插入轨</h2>
 <p>有多个输出的乐器插件可以让每个输出在各自的混音台插入轨上播放。在插件窗口中，单击 <code>封装器设置</code>，再单击 <code>处理</code> 选项卡。在 <code>连接</code> 下，每个输出都有一个用来开关它的指示灯和一个数字：表示它在通道自己的插入轨之后的第几个插入轨上播放。<code>自动映射输出</code> 会给每个输出分配下一个插入轨，<code>重置</code> 则恢复默认值。</p>
+<h2 id="fl-studio-s-own-plugins">FL Studio 自带的插件</h2>
+<p>FL Studio 的原生插件，例如 Sytrus、Harmor 和 Patcher，只能在 FL Studio 内部运行。要在 LYNX SHARE 中使用它们，请使用随 FL Studio 附带的插件版本。在 Windows 上，它安装为 <code>C:\Program Files\Common Files\VST2</code> 中的 <code>FL Studio VSTi</code> 和 <code>FL Studio VSTi (Multi)</code>。在 macOS 上是 Audio Unit。</p>
+<ol><li>扫描插件。两者都会作为乐器出现，厂商是 Image-Line。第一次扫描可能要一些时间，因为整个 FL Studio 都会在插件内启动。</li><li>把 <code>FL Studio VSTi</code> 添加到一个通道并打开它的窗口。点击 FL Studio 标志可打开 FL Studio 自己的窗口，里面有它的通道机架、混音台和浏览器。</li><li>在 FL Studio 的通道机架中添加一个乐器。新的 FL Studio 插件开始时只有一个空的采样器，在你添加乐器之前不会发声。来自 LYNX SHARE 的音符会播放 FL Studio 通道机架中选中的通道。</li><li>LYNX SHARE 播放时，FL Studio 自己的样式也会播放，速度跟随 LYNX SHARE 的速度。</li></ol>
+<p>你在 FL Studio 内部搭建的内容会随 LYNX SHARE 工程一起保存。<code>FL Studio VSTi (Multi)</code> 有 16 路立体声输出，可以在各自独立的插入轨上播放（见上一节）。你的 FL Studio 许可证决定哪些 FL 插件能在其中使用。LYNX SHARE 自己不会加载 FL Studio 的插件文件。</p>
+<p>如果 FL Studio 插件被列为 <code>加载失败</code>，请在 <code>选项 › 插件管理器...</code> 中右键点击它，选择 <code>重试（立即扫描此文件）</code>。</p>
 <h2 id="the-plugin-database-folder">插件数据库文件夹</h2>
 <p><a href="/wiki/browser/">浏览器</a>的插件数据库、插件选择器和插件菜单中的文件夹，都对应磁盘上的一个文件夹：文档文件夹中的 <code>LYNX/Plugin database</code>。要打开它，请在浏览器中右键单击 <code>插件数据库</code>，然后选择 <code>打开</code>。</p>
 <ul><li><code>效果器</code> 和 <code>发生器</code> 里每个插件有一个 <code>.lynxplugin</code> 文件。可以新建文件夹和子文件夹（最多 4 层），再把文件移进去。</li><li>重命名文件即可在菜单中重命名插件。删除文件即可把插件从菜单中去掉，但不会卸载它。</li><li><code>已安装</code> 里有每个插件的条目。把其中一个复制到 <code>效果器</code> 或 <code>发生器</code>，即可找回该插件。</li></ul>

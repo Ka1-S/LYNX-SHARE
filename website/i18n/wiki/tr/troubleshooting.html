@@ -25,9 +25,17 @@
 <p>Ses thread'inin gerçek zamanlı öncelikle çalışması gerekir.</p>
 <ol><li><code>Seçenekler › Ses ayarları...</code> seçeneğini açın ve <code>Durum</code> değerini okuyun. Thread'in gerçek zamanlı öncelik alıp almadığını gösterir.</li><li>Almadıysa rtkit'i kurun (<code>sudo apt install rtkit</code>, <code>sudo dnf install rtkit</code> veya <code>sudo pacman -S rtkit</code>) ya da JACK kurulumlarında olduğu gibi kendinizi gerçek zamanlı sınırı olan <code>ses</code> grubuna ekleyin.</li><li>Oturumu kapatıp yeniden açın.</li></ol>
 <p>Ayrıntılar <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/LINUX.md">LINUX.md</a> içindedir.</p>
+<h3 id="the-sound-crackles-or-drops-out">Ses çıtırdıyor veya kesiliyor</h3>
+<p>LYNX SHARE her kesintiyi (arabellek boşalması) sayar ve nedenini söyler. Araç çubuğundaki <code>CPU</code> ölçerine gelin ya da <code>Araçlar › Plugin performans monitörü...</code> seçeneğini açın. CPU yüzdesinin yanındaki kırmızı sayı, kesinti sayısıdır.</p>
+<p>İpucu, son kesintinin nedenini söyler:</p>
+<div class="tablewrap"><table><thead><tr><th>Neden</th><th>Ne anlama gelir</th><th>Ne denenir</th></tr></thead><tbody><tr><td>İşleme arabellekten uzun sürdü</td><td>Bir ses bloğunun hesaplanması, sürdüğü süreden uzun sürdü. İpucu, o blokta en yavaş kanalı veya efekti adlandırır</td><td><code>Seçenekler › Ses ayarları...</code> içinde arabellek boyutunu artırın, o kanalı dondurun veya plugin'in kalitesini düşürün</td></tr><tr><td>İşleme arabelleğin sınırına yaklaştı</td><td>Yük, kesintinin çevresinde %100'e yakındı</td><td>Arabellek boyutunu artırın veya en ağır kanalları dondurun</td></tr><tr><td>Sürücü veya sistem gecikmesi</td><td>Yük düşük kalırken sürücü veya sistem geç kaldı. Hiçbir plugin buna neden olmadı</td><td>Arabellek boyutunu artırın, başka bir sürücü deneyin (Windows'ta arayüzün ASIO sürücüsü) ve Linux'ta gerçek zamanlı önceliği denetleyin (yukarıda)</td></tr></tbody></table></div>
+<p>Her kesinti ayrıca ayarlar klasöründeki <code>audio-glitches.log</code> dosyasına, aygıt, arabellek ve en ağır kanallarla birlikte yazılır.</p>
 <h2 id="plugins">Plugin'ler</h2>
 <h3 id="a-plugin-crashes">Bir plugin çöküyor</h3>
-<p>Yalnızca plugin durması için onu kendi sürecinde çalıştırın.</p>
+<p>Çoğu plugin çökmesi yalnızca o plugin'i kapatır: bir efekt bypass edilir, bir enstrüman susar ve LYNX SHARE ile proje çalışmaya devam eder. <code>Plugin çöktü</code> iletisi o zaman şunları sunar:</p>
+<ul><li><code>Yeniden yükle</code>, plugin'i son kayıttaki veya yedekteki ayarlarla yeniden başlatır.</li><li><code>Her zaman ayrı süreçte çalıştır: &lt;plugin&gt;</code>, onu şimdi ve her projede kendi sürecinde yeniden başlatır. Orada bir çökme LYNX SHARE'i düşüremez. Ayrı süreçteki bir plugin penceresini kendi başına açar (yerleştirilemez).</li></ul>
+<p>Plugin'in penceresi, editörünün yerine aynı iki düğmeyi gösterir. <code>Seçenekler › Plugin yöneticisi...</code>, her zaman ayrı süreçte çalışan plugin'leri <code>Ayrı süreç</code> sütununda listeler; birini açıp kapatmak için kutuya tıklayın.</p>
+<p>Her plugin'i kendi sürecinde çalıştırmak için:</p>
 <ol><li><code>Seçenekler › Genel ayarlar...</code> seçeneğini açın.</li><li><code>Plugin'leri ayrı süreçte çalıştır (LYNX SHARE'i çökmelere karşı korur)</code> seçeneğini açın.</li><li>Projeyi yeniden açın.</li></ol>
 <p>Kendi sürecinde çöken veya yanıt vermeyi bırakan bir plugin susturulur. Plugin'i yeniden yüklemek için projeyi kaydedip yeniden açın. Bkz. <a href="/wiki/plugins/">Üçüncü taraf plugin'ler</a>.</p>
 <h3 id="a-plugin-is-not-in-the-list">Bir plugin listede yok</h3>

@@ -1,5 +1,5 @@
 ---
-source: be0fc22373
+source: 1c440a7810
 ---
 ![Der untere Teil des Plugin-Managers mit dem Hinweis, dass jede Plugin-Datei in einem separaten Prozess geprüft wird](/assets/img/wiki/plugin-manager-scan.webp)
 
@@ -89,6 +89,19 @@ Unter Windows laufen 32-Bit-VST2- und -VST3-Plugins über eine Bridge (`LYNX-bri
 ## Die Ausgänge eines Instruments an getrennte Inserts senden
 
 Ein Instrument-Plugin mit mehreren Ausgängen kann jeden Ausgang auf einem eigenen Mixer-Insert spielen. Klicke im Fenster des Plugins auf `Wrapper-Einstellungen` und dann auf den Tab `Verarbeitung`. Unter `Verbindungen` hat jeder Ausgang ein Licht, das ihn ein- oder ausschaltet, und eine Zahl: auf dem wievielten Insert nach dem eigenen Insert des Kanals er spielt. `Ausgänge automatisch zuordnen` gibt jedem Ausgang das nächste Insert, und `Reset` stellt die Standardwerte wieder her.
+
+## Die eigenen Plugins von FL Studio
+
+Die nativen Plugins von FL Studio, wie Sytrus, Harmor und Patcher, laufen nur innerhalb von FL Studio. Um sie in LYNX SHARE zu verwenden, nutze die Plugin-Version von FL Studio, die dabei ist. Unter Windows wird sie als `FL Studio VSTi` und `FL Studio VSTi (Multi)` in `C:\Program Files\Common Files\VST2` installiert. Unter macOS ist es ein Audio Unit.
+
+1. Scanne nach Plugins. Beide erscheinen als Instrumente mit dem Hersteller Image-Line. Der erste Scan kann eine Weile dauern, weil das ganze FL Studio im Plugin startet.
+2. Füge `FL Studio VSTi` zu einem Kanal hinzu und öffne sein Fenster. Klicke auf das FL-Studio-Logo, um das eigene Fenster von FL Studio zu öffnen, mit seinem Channel Rack, Mixer und Browser.
+3. Füge im Channel Rack von FL Studio ein Instrument hinzu. Ein neues FL-Studio-Plugin startet mit einem leeren Sampler und macht keinen Ton, bis du eines hinzufügst. Noten von LYNX SHARE spielen den Kanal, der im Channel Rack von FL Studio gewählt ist.
+4. Die eigenen Patterns von FL Studio spielen, wenn LYNX SHARE spielt, im Tempo von LYNX SHARE.
+
+Was du in FL Studio aufbaust, wird mit dem LYNX-SHARE-Projekt gespeichert. `FL Studio VSTi (Multi)` hat 16 Stereoausgänge, die auf getrennten Inserts spielen können (siehe den Abschnitt oben). Deine FL-Studio-Lizenz entscheidet, welche FL-Plugins darin funktionieren. LYNX SHARE lädt die Plugin-Dateien von FL Studio nicht selbst.
+
+Wenn das FL-Studio-Plugin als `Ladefehler` aufgelistet ist, klicke es in `Optionen › Plugin-Manager...` mit der rechten Maustaste an und wähle `Erneut versuchen (diese Datei jetzt prüfen)`.
 
 ## Der Ordner Plugin database
 

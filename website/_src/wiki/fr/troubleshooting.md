@@ -1,5 +1,5 @@
 ---
-source: a3748d4a2a
+source: e5206a071d
 ---
 Chaque titre ci-dessous est un problème. Si le vôtre n'y figure pas, signalez-le comme décrit à la fin.
 
@@ -71,11 +71,32 @@ Le thread audio devrait tourner avec une priorité temps réel.
 
 Les détails sont dans [LINUX.md](https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/LINUX.md).
 
+### Le son craque ou saute
+
+LYNX SHARE compte chaque coupure (buffer underrun) et dit pourquoi elle s'est produite. Pointez le compteur `CPU` dans la barre d'outils, ou ouvrez `Outils › Moniteur de performances des plugins...`. Un nombre rouge à côté du pourcentage de CPU est ce compte.
+
+L'info-bulle nomme la cause de la dernière coupure :
+
+| Cause | Ce que cela signifie | Que faire |
+|---|---|---|
+| Le traitement a pris plus longtemps que le tampon | Un bloc d'audio a pris plus de temps à calculer qu'il n'en dure. L'info-bulle nomme le canal ou l'effet le plus lent de ce bloc | Augmentez la taille du tampon dans `Options › Réglages audio...`, gelez ce canal, ou baissez la qualité du plugin |
+| Le traitement a frôlé la limite du tampon | La charge était proche de 100 % autour de la coupure | Augmentez la taille du tampon, ou gelez les canaux les plus lourds |
+| Latence du pilote ou du système | Le pilote ou le système était en retard alors que la charge restait faible. Aucun plugin n'en est la cause | Augmentez la taille du tampon, essayez un autre pilote (sous Windows, le pilote ASIO de l'interface), et sous Linux vérifiez la priorité temps réel (voir plus haut) |
+
+Chaque coupure est aussi écrite dans `audio-glitches.log` dans le dossier des réglages, avec l'appareil, le tampon et les canaux les plus lourds.
+
 ## Plugins
 
 ### Un plugin plante
 
-Exécutez-le dans son propre processus, pour que seul le plugin s'arrête.
+La plupart des plantages de plugin ne désactivent que ce plugin : un effet est contourné, un instrument devient muet, et LYNX SHARE et le projet continuent de fonctionner. Le message `Le plugin a planté` propose alors :
+
+- `Recharger`, qui relance le plugin avec les réglages du dernier enregistrement ou de la dernière sauvegarde.
+- `Toujours exécuter <plugin> dans un processus séparé`, qui le relance dans un processus à part, maintenant et dans tous les projets. Un plantage à cet endroit ne peut pas faire tomber LYNX SHARE. Un plugin dans un processus séparé ouvre sa fenêtre à part (il ne peut pas être ancré).
+
+La fenêtre du plugin affiche les deux mêmes boutons à la place de son éditeur. `Options › Gestionnaire de plugins...` liste les plugins qui s'exécutent toujours dans un processus séparé dans sa colonne `Processus séparé` ; cliquez sur la case pour en activer ou désactiver un.
+
+Pour exécuter chaque plugin dans son propre processus :
 
 1. Ouvrez `Options › Réglages généraux...`.
 2. Activez `Exécuter les plugins dans un processus séparé (protège LYNX SHARE des plantages)`.

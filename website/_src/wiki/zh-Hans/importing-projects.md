@@ -1,5 +1,5 @@
 ---
-source: 358890815a
+source: c4e89e7e72
 ---
 `文件 › 打开...`（`Ctrl+O`）可以打开 LYNX SHARE 自己的 `.lynx` 工程，也可以打开 `.flp`、`.als`、`.flm` 和 `.mid` 文件。来自其他程序的工程属于导入：它会成为一个新的、未保存的 LYNX SHARE 工程，原文件绝不会被写入。
 
@@ -27,6 +27,12 @@ source: 358890815a
 FL Studio 的发生器和效果器不会被加载。LYNX SHARE 读取它们保存的设置，并在自己重建的引擎上播放。每个引擎都有一个质量等级，从 `Exact`（在所有测试过的状态下都与原版逐位一致）到 `Placeholder`（设置会保留，但插件静音或让音频直通）。各等级的含义见[从 FL Studio 转来](/wiki/coming-from-fl-studio/)。
 
 没有安装 FL Studio 也能打开 `.flp`。有些引擎需要波形、采样或脉冲响应，它们会在运行时从你自己的 FL Studio 安装中读取。
+
+使用 FL Studio 的“FL Studio Mobile Rack”的 `.flp`（FL Studio Mobile 自己的“Save as FLP”会为每个乐器轨道写出一个）会在与 `.flm` 相同的引擎上播放它的乐器和效果器，“FL Studio Mobile Rack FX”效果器也一样。带鼓组或多个乐器的机架仍使用内置合成器播放。
+
+## FL Studio Mobile 出厂音色
+
+`.flm` 使用的出厂音色（鼓组、DirectWave 程序、SoundFont、GMSynth 波形）属于 FL Studio Mobile，从不随 LYNX SHARE 一起发布。LYNX SHARE 会在你自己的 App 副本的 `Resources` 文件夹中查找它们：在 `设置 › 文件 › FL Studio Mobile 资源` 下添加它（选择它上一级的文件夹，或选择 FL Studio 安装文件夹，也可以）。FL Studio 的安装只包含其中一部分，并且在你的文件夹之后才搜索。仍然缺失的文件会列在缺失的文件窗口中。
 
 ## 缺失的采样
 

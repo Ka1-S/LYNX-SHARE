@@ -1,5 +1,5 @@
 ---
-source: a3748d4a2a
+source: e5206a071d
 ---
 Cada título de abajo es un problema. Si el tuyo no está, infórmalo como se describe al final.
 
@@ -71,11 +71,32 @@ El hilo de audio debería ejecutarse con prioridad de tiempo real.
 
 Los detalles están en [LINUX.md](https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/LINUX.md).
 
+### El sonido chasquea o se corta
+
+LYNX SHARE cuenta cada corte (búfer vacío) y dice por qué ocurrió. Apunta con el ratón al medidor `CPU` de la barra de herramientas, o abre `Herram. › Monitor de rendimiento de plugins...`. Un número rojo junto al porcentaje de CPU es el recuento.
+
+La indicación nombra la causa del último corte:
+
+| Causa | Qué significa | Qué probar |
+|---|---|---|
+| El procesamiento tardó más que el búfer | Un bloque de audio tardó más en calcularse que lo que dura. La indicación nombra el canal o efecto más lento de ese bloque | Sube el tamaño del búfer en `Opciones › Configuración de audio...`, congela ese canal o baja la calidad del plugin |
+| El procesamiento llegó cerca del límite del búfer | La carga estuvo cerca del 100 % alrededor del corte | Sube el tamaño del búfer o congela los canales más pesados |
+| Latencia del driver o del sistema | El driver o el sistema llegó tarde mientras la carga se mantuvo baja. Ningún plugin lo causó | Sube el tamaño del búfer, prueba otro driver (en Windows, el driver ASIO de la interfaz) y, en Linux, comprueba la prioridad en tiempo real (arriba) |
+
+Cada corte también se escribe en `audio-glitches.log` en la carpeta de ajustes, con el dispositivo, el búfer y los canales más pesados.
+
 ## Plugins
 
 ### Un plugin falla
 
-Ejecútalo en su propio proceso, para que solo se detenga el plugin.
+La mayoría de los fallos de plugins desactivan solo ese plugin: un efecto queda en bypass, un instrumento se queda en silencio, y LYNX SHARE y el proyecto siguen funcionando. El mensaje `El plugin falló` ofrece entonces:
+
+- `Recargar`, que inicia el plugin de nuevo con los ajustes del último guardado o copia de seguridad.
+- `Ejecutar siempre <plugin> en un proceso aparte`, que lo inicia de nuevo en un proceso propio, ahora y en todos los proyectos. Un fallo ahí no puede tumbar LYNX SHARE. Un plugin en un proceso aparte abre su ventana por su cuenta (no se puede acoplar).
+
+La ventana del plugin muestra los mismos dos botones en lugar de su editor. `Opciones › Gestor de plugins...` lista los plugins que siempre se ejecutan en un proceso aparte en su columna `Proceso aparte`; haz clic en la casilla para activar o desactivar uno.
+
+Para ejecutar todos los plugins en su propio proceso:
 
 1. Abre `Opciones › Configuración general...`.
 2. Activa `Ejecutar plugins en un proceso aparte (protege a LYNX SHARE de los cierres inesperados)`.
