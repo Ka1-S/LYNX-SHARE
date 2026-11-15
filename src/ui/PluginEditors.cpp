@@ -8,6 +8,7 @@
 #include "ui/VisualEditors.h"
 #include "ui/FlExtraEditors.h"
 #include "ui/PluginEditors.h"
+#include "core/EditorScale.h"
 #include "core/EditorLimit.h"
 #include "core/LuxeVerb.h"
 #include "core/PresetCycle.h"
@@ -5735,6 +5736,9 @@ public:
         setUsingNativeTitleBar (true);
         auto* editor = new NativeEffectEditor (engine, track, slot, 1.25f, 0);
         const auto design = editor->designSize();
+        designWidth = design.x;
+        designHeight = design.y;
+        fixedHeight = editor->getHeight() - (int) std::ceil ((float) design.y * 1.25f); // (header and footer)
         setContentOwned (editor, true);
         setResizable (true, false);
         // keep FL's proportions while resizing (the presets bar has a fixed height)
@@ -5754,6 +5758,34 @@ public:
 
     void closeButtonPressed() override;
 
+    // FL's plugin menu › Scaling (round 190he, core/EditorScale.h): 100 % … 400 % of the plugin's design size; LYNX opens
+    // it at 125 %. A right-click on the docked window's title bar (LYNX's own bar) shows it; the edge still sizes it freely.
+    void mouseDown (const juce::MouseEvent& e) override
+    {
+        if (e.mods.isPopupMenu() && e.eventComponent == this && ! isUsingNativeTitleBar() && e.y < getTitleBarHeight())
+        {
+            juce::PopupMenu sizes;
+            const auto* content = getContentComponent();
+            const auto now = content != nullptr ? editorscale::percentForWidth (content->getWidth(), (int) std::ceil (designWidth * 1.25)) : 0;
+            for (const auto percent : editorscale::menuPercents)
+                sizes.addItem (juce::String (percent) + "%", true, percent == now, [safe = juce::Component::SafePointer<NativeEffectWindow> (this), percent] {
+                    if (safe != nullptr)
+                        safe->setScalePercent (percent);
+                });
+            juce::PopupMenu menu;
+            menu.addSubMenu (tr ("Scaling"), sizes);
+            menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+            return;
+        }
+        juce::DocumentWindow::mouseDown (e);
+    }
+
+    void setScalePercent (int percent)
+    {
+        const auto f = (double) percent / 100.0;
+        setContentComponentSize (juce::roundToInt (designWidth * f), juce::roundToInt (designHeight * f) + fixedHeight);
+    }
+
     void activeWindowStatusChanged() override
     {
         DocumentWindow::activeWindowStatusChanged();
@@ -5763,6 +5795,7 @@ public:
 
 private:
     ui::SlotGoneWatcher gone;
+    int designWidth = 1, designHeight = 1, fixedHeight = 0;
 };
 
 std::map<std::pair<int, int>, std::unique_ptr<NativeEffectWindow>>& windows()

@@ -1,4 +1,5 @@
 #include "engine/ProjectFile.h"
+#include "core/EditorScale.h"
 #include "core/ClipEnvelope.h"
 #include "core/WarpModes.h"
 #include "core/LiveInput.h"
@@ -2005,6 +2006,8 @@ juce::var channelToVar (const ChannelDef& c)
         o->setProperty ("receiveFrom", juce::Array<juce::var> { str (c.receiveFrom), c.receiveMidiChannel });
     if (c.icon != 0) // FL's channel icon index (round 168j)
         o->setProperty ("icon", c.icon);
+    if (c.editorScale != 0) // the settings window's Scaling (round 190he)
+        o->setProperty ("editorScale", c.editorScale);
         if (c.flWrapperFlags >= 0)
             o->setProperty ("flWrapperFlags", c.flWrapperFlags);
     if (! c.flOrigin.empty()) // the FL generator it was imported from (round 171e)
@@ -2336,6 +2339,7 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
         }
     }
     def.icon = juce::jlimit (0, 0xFFFF, (int) c.getProperty ("icon", 0));
+    def.editorScale = editorscale::storedFor (editorscale::percentOf ((int) c.getProperty ("editorScale", 0)));
     def.flWrapperFlags = (int) c.getProperty ("flWrapperFlags", -1);
     if (c.hasProperty ("flOrigin"))
         def.flOrigin = flOriginFromVar (c["flOrigin"]);

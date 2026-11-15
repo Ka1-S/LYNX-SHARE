@@ -1039,6 +1039,9 @@ struct ChannelDef
     // FL's channel icon (.flp 0x9B, REA round 168j): FL's icon index, 0 = none. Kept and saved; drawn by the icon UI.
     int icon = 0;
     int flWrapperFlags = -1; // an imported .flp channel's plugin record flags (0xD4 +16, 0x20 = Smart disable): back in the export
+    // FL's plugin menu › Scaling (round 190he, core/EditorScale.h): the size of the channel's settings window, a
+    // percentage of FL's size; 0 = LYNX's default (125 %)
+    int editorScale = 0;
     // FL's Loop Starter (round 168b, core/LoopStarter.h): the channel belongs to the Loop Starter of pattern
     // `loopStarterPattern` (-1 = not a Loop Starter channel), plays the one-shot category `loopStarterCategory` in kit slot
     // `loopStarterSlot`; locked = "Replace all samples" leaves its sample (FL's channel menu "Locked")

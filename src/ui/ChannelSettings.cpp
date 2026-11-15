@@ -2,6 +2,7 @@
 #include "ui/WindowOwner.h"
 #include "core/NoteNames.h"
 #include "ui/ChannelSettings.h"
+#include "core/EditorScale.h"
 #include "core/FlControlMenus.h"
 #include "core/FlmDwSampler.h"
 #include "core/SamplerPage.h"
@@ -427,7 +428,11 @@ private:
 
         // only its own window: as a tab of the channel's window it left that window titled "Modulation - ..." while the
         // Sampler page showed (issue #12)
-        if (auto* w = findParentComponentOfClass<juce::DocumentWindow>(); w != nullptr && w->getContentComponent() == this)
+        // (round 190he: the window's content is the scaled holder around this page)
+        if (auto* w = findParentComponentOfClass<juce::DocumentWindow>();
+            w != nullptr && (w->getContentComponent() == this
+                             || (getParentComponent() == w->getContentComponent() && getParentComponent() != nullptr
+                                 && (bool) getParentComponent()->getProperties().getWithDefault ("lynxScaledContent", false))))
             w->setName (tr ("Modulation - {0}", { juce::String::fromUTF8 (c->name.c_str()) }));
     }
 
@@ -6286,13 +6291,121 @@ std::optional<juce::Point<int>>& alignedChannelEditorPosition()
     return at;
 }
 
+// Round 190he (issue #152: "the FL-engine plugins can't be made smaller"): a settings window's content at a scale of
+// its own (FL's plugin menu › Scaling, core/EditorScale.h). The page keeps its own size and layout and is drawn through a
+// transform; this holder is the page's size times the factor, and follows the page when it changes its size (a tab
+// with another size). When the window is sized by its edge, the holder takes the new size and the factor follows.
+class ScaledContent final : public juce::Component
+{
+public:
+    ScaledContent (std::unique_ptr<juce::Component> page, int storedScale)
+        : inner (std::move (page)),
+          stored (storedScale)
+    {
+        getProperties().set ("lynxScaledContent", true);
+        addAndMakeVisible (*inner);
+        fitToPage();
+    }
+
+    juce::Component& page() noexcept { return *inner; }
+    int storedScale() const noexcept { return stored; }
+    juce::Point<int> pageSize() const { return { juce::jmax (1, inner->getWidth()), juce::jmax (1, inner->getHeight()) }; }
+
+    void setStoredScale (int newStored)
+    {
+        stored = editorscale::storedFor (editorscale::percentOf (newStored));
+        fitToPage();
+    }
+
+    void resized() override
+    {
+        if (fitting)
+            return;
+        const auto size = pageSize();
+        const auto factor = juce::jmax (0.05, juce::jmin ((double) getWidth() / size.x, (double) getHeight() / size.y));
+        inner->setTransform (juce::AffineTransform::scale ((float) factor));
+        // (a pixel of rounding is not a new size: the window fitted to the page lands here too)
+        if (const auto percent = editorscale::percentForWidth (getWidth(), size.x); std::abs (percent - editorscale::percentOf (stored)) > 1)
+            stored = editorscale::storedFor (percent);
+    }
+
+    void childBoundsChanged (juce::Component* child) override
+    {
+        if (child == inner.get() && ! fitting)
+            fitToPage();
+    }
+
+private:
+    void fitToPage()
+    {
+        const juce::ScopedValueSetter<bool> busy (fitting, true);
+        const auto factor = editorscale::factorOf (stored);
+        inner->setTopLeftPosition (0, 0);
+        inner->setTransform (juce::AffineTransform::scale ((float) factor));
+        const auto size = pageSize();
+        setSize (juce::roundToInt (size.x * factor), juce::roundToInt (size.y * factor));
+    }
+
+    std::unique_ptr<juce::Component> inner;
+    int stored = 0;
+    bool fitting = false;
+};
+
+// Sizing a settings window by its edge keeps the page's proportions (the content area is the page times one factor),
+// between editorscale::minPercent and maxPercent.
+class PageAspectConstrainer final : public juce::ComponentBoundsConstrainer
+{
+public:
+    explicit PageAspectConstrainer (juce::ResizableWindow& w) : window (w) {}
+    std::function<juce::Point<int>()> pageSize;
+    std::function<void()> onResizeEnd; // (the size is remembered once, when the drag ends)
+
+    void resizeEnd() override
+    {
+        if (onResizeEnd != nullptr)
+            onResizeEnd();
+    }
+
+    void checkBounds (juce::Rectangle<int>& bounds, const juce::Rectangle<int>& previous, const juce::Rectangle<int>& limits, bool top,
+                      bool left, bool bottom, bool right) override
+    {
+        const auto page = pageSize != nullptr ? pageSize() : juce::Point<int>();
+        if (page.x <= 0 || page.y <= 0)
+        {
+            juce::ComponentBoundsConstrainer::checkBounds (bounds, previous, limits, top, left, bottom, right);
+            return;
+        }
+        const auto border = window.getContentComponentBorder();
+        const auto w = (double) (bounds.getWidth() - border.getLeftAndRight()), h = (double) (bounds.getHeight() - border.getTopAndBottom());
+        const auto sideways = left || right, upDown = top || bottom;
+        auto factor = sideways && ! upDown ? w / page.x : upDown && ! sideways ? h / page.y : juce::jmax (w / page.x, h / page.y);
+        factor = juce::jlimit ((double) editorscale::minPercent / editorscale::defaultPercent,
+                               (double) editorscale::maxPercent / editorscale::defaultPercent, factor);
+        const auto newW = juce::roundToInt (page.x * factor) + border.getLeftAndRight();
+        const auto newH = juce::roundToInt (page.y * factor) + border.getTopAndBottom();
+        if (left)
+            bounds.setLeft (bounds.getRight() - newW);
+        else
+            bounds.setWidth (newW);
+        if (top)
+            bounds.setTop (bounds.getBottom() - newH);
+        else
+            bounds.setHeight (newH);
+    }
+
+private:
+    juce::ResizableWindow& window;
+};
+
 class SettingsWindow final : public juce::DocumentWindow
 {
 public:
     SettingsWindow (AudioEngine& engine, int c, bool modulationWindow)
         : juce::DocumentWindow (tr ("Channel settings"), theme::colour::bg2, DocumentWindow::closeButton),
           channel (c),
-          modulation (modulationWindow)
+          modulation (modulationWindow),
+          engineRef (engine),
+          aspect (*this)
     {
         setUsingNativeTitleBar (true);
         // FL names the window after the channel and its mixer track (REA round 149 [EXEC]: "FL Studio VSTi (Master)",
@@ -6308,12 +6421,21 @@ public:
                      + (modulation ? " - " + tr ("Envelope / instrument") : juce::String()));
         }
 
+        std::unique_ptr<juce::Component> page;
         if (modulation)
-            setContentOwned (new ModulationPanel (engine, ChannelRef::rack (channel)), true);
+            page = std::make_unique<ModulationPanel> (engine, ChannelRef::rack (channel));
         else if (! hasChannelSettings (engine.getSong().channels[(std::size_t) channel].instrument))
-            setContentOwned (new ChannelFrame (engine, ChannelRef::rack (channel), nullptr, nullptr), true); // the Misc tab alone
+            page = std::make_unique<ChannelFrame> (engine, ChannelRef::rack (channel), nullptr, nullptr); // the Misc tab alone
         else
-            setContentOwned (makeChannelFrame (engine, channel).release(), true);
+            page = makeChannelFrame (engine, channel);
+        // FL's Scaling (round 190he): the channel's own size, remembered with the project (the modulation window too)
+        const auto& song = engine.getSong();
+        scaled = new ScaledContent (std::move (page), song.channels[(std::size_t) channel].editorScale);
+        setContentOwned (scaled, true);
+        aspect.pageSize = [this] { return scaled->pageSize(); };
+        aspect.onResizeEnd = [this] { remember (scaled->storedScale()); };
+        setConstrainer (&aspect);
+        setResizable (true, false);
 
         centreWithSize (getWidth(), getHeight());
         if (! modulation)
@@ -6326,11 +6448,61 @@ public:
 
     int getChannel() const { return channel; }
     bool isModulation() const { return modulation; }
+    juce::Component* page() const { return scaled != nullptr ? &scaled->page() : nullptr; }
     void closeButtonPressed() override;
 
+    // FL's plugin menu › Scaling (PluginScalingMenu: 100 % … 400 % of the plugin's size). LYNX's window has no wrapper
+    // menu, so a right-click on its title bar (docked: LYNX's own bar) shows it.
+    void mouseDown (const juce::MouseEvent& e) override
+    {
+        if (e.mods.isPopupMenu() && e.eventComponent == this && ! isUsingNativeTitleBar() && e.y < getTitleBarHeight())
+        {
+            showScalingMenu();
+            return;
+        }
+        juce::DocumentWindow::mouseDown (e);
+    }
+
+    void showScalingMenu()
+    {
+        juce::PopupMenu sizes;
+        const auto now = editorscale::percentOf (scaled->storedScale());
+        for (const auto percent : editorscale::menuPercents)
+            sizes.addItem (juce::String (percent) + "%", true, percent == now, [safe = juce::Component::SafePointer<SettingsWindow> (this), percent] {
+                if (safe != nullptr)
+                    safe->setScalePercent (percent);
+            });
+        juce::PopupMenu menu;
+        menu.addSubMenu (tr ("Scaling"), sizes);
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+    }
+
+    void setScalePercent (int percent)
+    {
+        const auto stored = editorscale::storedFor (percent);
+        scaled->setStoredScale (stored);
+        setContentComponentSize (scaled->getWidth(), scaled->getHeight());
+        remember (stored);
+    }
+
 private:
+    void remember (int stored)
+    {
+        const auto& song = engineRef.getSong();
+        if (channel < 0 || channel >= (int) song.channels.size() || song.channels[(std::size_t) channel].editorScale == stored)
+            return;
+        engineRef.editSong ([ch = channel, stored] (Song& s) {
+            if (ch < (int) s.channels.size())
+                s.channels[(std::size_t) ch].editorScale = stored;
+        }, false);
+        engineRef.markModified();
+    }
+
     int channel;
     bool modulation;
+    AudioEngine& engineRef;
+    PageAspectConstrainer aspect;
+    ScaledContent* scaled = nullptr; // (owned by the window: its content)
 };
 
 std::vector<std::unique_ptr<SettingsWindow>>& windows()
@@ -6400,7 +6572,7 @@ void openChannelMisc (AudioEngine& engine, int channel)
     openWindow (engine, channel, false);
     for (auto& w : windows())
         if (w->getChannel() == channel && ! w->isModulation())
-            if (auto* frame = dynamic_cast<ChannelFrame*> (w->getContentComponent()))
+            if (auto* frame = dynamic_cast<ChannelFrame*> (w->page()))
                 frame->showTab (frame->tabCount() - 1);
 }
 
