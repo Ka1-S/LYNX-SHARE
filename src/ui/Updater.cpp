@@ -585,11 +585,20 @@ void installAndRestart (const juce::File& setup)
         }
         updateFolder().getChildFile ("result.txt").deleteFile();
         // the version being installed, for the "was updated to" bar on the next start
-        // (round 190gh: the version it replaces, and whether it goes back, for the settings after the restart)
-        updateFolder().getChildFile ("installing.txt").replaceWithText ("version=" + juce::String (c.release.version.text()) + "\nfrom="
-                                                                          + juce::String (runningVersion().text()) + "\nrollback="
-                                                                          + (c.rollingBack ? "1" : "0") + "\n");
+        // (round 190gh: the version it replaces, and whether it goes back, for the settings after the restart;
+        // round 190hl: in a layout 0.1.27 and older read too, core/UpdateCheck.h formatInstalling)
+        update::InstallingNote note;
+        note.version = c.release.version.text();
+        note.from = runningVersion().text();
+        note.rollback = c.rollingBack;
+        updateFolder().getChildFile ("installing.txt").replaceWithText (fromUtf8 (update::formatInstalling (note)));
         updateFolder().getChildFile ("installing-notes.md").replaceWithText (fromUtf8 (c.release.body));
+        // round 190hl: going back skips the version left NOW, in the settings every older version reads; the older
+        // version that starts after the installer may not know about going back (0.1.27 and older) and would offer
+        // this one again at once. (The previous version is used up after the restart, by versions that know it.)
+        const auto settingsBefore = loadSettings();
+        if (c.rollingBack)
+            saveSettings (update::skipLeft (settingsBefore, runningVersion()));
         juce::StringArray args { helper.getFullPathName(), "--apply-update", setup.getFullPathName(), exe.getParentDirectory().getFullPathName(),
                                  juce::String ((juce::int64) currentPid()) };
         if (const auto project = c.host.currentProject ? c.host.currentProject() : juce::File(); project.existsAsFile())
@@ -598,9 +607,13 @@ void installAndRestart (const juce::File& setup)
         juce::ChildProcess child;
         if (! child.start (args, 0))
         {
+            if (c.rollingBack)
+                saveSettings (settingsBefore); // (nothing was installed: the skip goes again)
             fail (tr ("can't start {0}", { helper.getFullPathName() }));
             return;
         }
+        if (c.rollingBack)
+            log ("skipped " + fromUtf8 (runningVersion().text()) + " before the installer of " + versionText (c.release) + " runs");
         juce::JUCEApplication::quit();
     });
 }
@@ -712,7 +725,13 @@ void startUpdate()
             break;
         case update::Method::appImageUpdate: appImageUpdate(); break;
         case update::Method::openPage:
-            juce::URL (releasePage (c.release)).launchInDefaultBrowser();
+            if (! platform::testMode())
+                juce::URL (releasePage (c.release)).launchInDefaultBrowser();
+            else // (round 190hl: test runs never open the browser)
+                platform::testModeLog ("update: open " + releasePage (c.release));
+            // round 190hl: the tar.gz build records it like the zip and the dmg (the user installs the other version
+            // by hand): going back skips the version left, so the older version doesn't offer it again at once
+            recordSwitch();
             break;
         case update::Method::none: break;
     }
@@ -917,15 +936,12 @@ void afterStart()
         }
         resultFile.deleteFile();
         const auto installing = folder.getChildFile ("installing.txt");
-        // round 190gh (B2): the version it replaced and whether it went back
-        juce::String from;
-        bool wentBack = false;
-        for (const auto& line : juce::StringArray::fromLines (installing.loadFileAsString()))
-        {
-            if (line.startsWith ("version=") && version.isEmpty()) version = line.fromFirstOccurrenceOf ("=", false, false).trim();
-            if (line.startsWith ("from=")) from = line.fromFirstOccurrenceOf ("=", false, false).trim();
-            if (line.startsWith ("rollback=")) wentBack = line.fromFirstOccurrenceOf ("=", false, false).trim() == "1";
-        }
+        // round 190gh (B2): the version it replaced and whether it went back (any line order: round 190hl)
+        const auto note = update::parseInstalling (utf8 (installing.loadFileAsString()));
+        if (version.isEmpty())
+            version = fromUtf8 (note.version);
+        const auto from = fromUtf8 (note.from);
+        const bool wentBack = note.rollback;
         log ("after start: update result " + result + (detail.isNotEmpty() ? " (" + detail + ")" : juce::String()));
         if (result == "ok")
         {
