@@ -19188,6 +19188,17 @@ private:
             check (two != nullptr && three != nullptr && two->start == bar * 2 && three->start == bar * 2,
                    "two picked patterns: Pattern 2 on track 3, Pattern 3 on track 4, both at bar 3");
             check (offline.getSong().currentPattern == 2, "the current pattern is the last dropped one (Pattern 3)");
+            const auto selectedAre = [&playlist, &offline] (int track, std::size_t count) {
+                const auto& sel = playlist.getSelectedClips();
+                if (sel.size() != count)
+                    return false;
+                for (const auto i : sel)
+                    if (i < 0 || i >= (int) offline.getSong().playlist.size() || offline.getSong().playlist[(std::size_t) i].start != (track < 0 ? 2 * (std::int64_t) lynx::ppq * 4 : offline.getSong().playlist[(std::size_t) i].start)
+                        || (track >= 0 && offline.getSong().playlist[(std::size_t) i].track != track))
+                        return false;
+                return true;
+            };
+            check (selectedAre (-1, 2), "the two dropped clips are the selection (FL), Pattern 1's clip is not");
             saveSnapshot (ui, prefix + "-plain.png");
             // 3. Shift: all three on track 6 from bar 1, one after the other
             playlist.dropFromPicker (lynx::ClipKind::pattern, { 0, 1, 2 }, at (5, 0.0), true);
@@ -19198,6 +19209,7 @@ private:
             check (a != nullptr && b != nullptr && c != nullptr && a->start == 0 && b->start == a->end() && c->start == b->end(),
                    "Shift drop: Pattern 1, 2, 3 one after the other on track 6");
             check (offline.getSong().currentPattern == 2, "Shift keeps the current pattern");
+            check (selectedAre (5, 3), "the three chained clips are the selection");
             saveSnapshot (ui, prefix + "-shift.png");
         }
         checks.add (all ? "ALL OK" : "FAILURES");

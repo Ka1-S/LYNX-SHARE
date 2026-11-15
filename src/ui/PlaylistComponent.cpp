@@ -3908,7 +3908,7 @@ void PlaylistComponent::setSelection (std::vector<int> indices)
     repaint();
 }
 
-void PlaylistComponent::sortClips (std::vector<int> placed)
+std::vector<int> PlaylistComponent::sortClips (std::vector<int> placed)
 {
     auto tracked = selection;
     const auto selected = tracked.size();
@@ -3926,7 +3926,8 @@ void PlaylistComponent::sortClips (std::vector<int> placed)
     tracked.resize (selected);
     setSelection (tracked);
     if (! conflicts.empty())
-        askToMakeClipsUnique (std::move (placed), std::move (conflicts));
+        askToMakeClipsUnique (placed, std::move (conflicts));
+    return placed;
 }
 
 void PlaylistComponent::askToMakeClipsUnique (std::vector<int> placed, std::vector<int> channels)
@@ -11010,7 +11011,10 @@ void PlaylistComponent::dropFromPicker (ClipKind kind, const std::vector<int>& e
         std::vector<int> indices;
         for (int i = first; i < (int) engine.getSong().playlist.size(); ++i)
             indices.push_back (i);
-        safe->sortClips (std::move (indices)); // (audio clips on an audio track follow its mixer track, as a placed clip)
+        // the dropped clips become the selection (FL flags them selected; live check 190hm, shots fl-08 / fl-12); audio
+        // clips on an audio track follow its mixer track, as any placed clip
+        safe->setSelection ({});
+        safe->setSelection (safe->sortClips (std::move (indices)));
         safe->repaint();
     };
 
