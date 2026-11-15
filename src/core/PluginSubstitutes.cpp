@@ -2195,15 +2195,23 @@ int translateSslVocalstrip2 (const std::vector<std::uint8_t>& state, EffectSlot&
         p[r::lfFreq] = logNorm (at ("LowEqFreq", 200.0), 30.0, 450.0);
         p[r::lfBell] = sw ("LowEqBell", false);
         p[r::lmfGain] = gain (gMid * at ("LowMidEqGain", 0.0));
-        p[r::lmfFreq] = logNorm (at ("LowMidEqFreq", 1.0) * 1000.0 / (at ("LowMidEqDiv3", 0.0) >= 0.5 ? 3.0 : 1.0), 200.0, 2500.0);
+        // round 190ho: on the 4K G the ÷3 / ×3 switches act in its Pink EQ only (K4G_ir: Black with ÷3 or ×3 renders the
+        // same as without); Pink takes them as its own switches (they move its centre ×0.24 / ×2.9, not ÷3 / ×3)
+        const bool pink = k4g && at ("EqType", 1.0) < 0.5;
+        const bool div3 = ! k4g && at ("LowMidEqDiv3", 0.0) >= 0.5, mult3 = ! k4g && at ("HighMidEqMult3", 0.0) >= 0.5;
+        p[r::k4Pink] = pink ? 1.0f : 0.0f;
+        p[r::k4PinkDiv3] = pink && at ("LowMidEqDiv3", 0.0) >= 0.5 ? 1.0f : 0.0f;
+        p[r::k4PinkMult3] = pink && at ("HighMidEqMult3", 0.0) >= 0.5 ? 1.0f : 0.0f;
+        p[r::lmfFreq] = logNorm (at ("LowMidEqFreq", 1.0) * 1000.0 / (div3 ? 3.0 : 1.0), 200.0, 2500.0);
         p[r::lmfQ] = r::k4QValue (at ("LowMidEqQ", 1.5));
         p[r::hmfGain] = gain (gMid * at ("HighMidEqGain", 0.0));
-        p[r::hmfFreq] = logNorm (at ("HighMidEqFreq", 3.0) * 1000.0 * (at ("HighMidEqMult3", 0.0) >= 0.5 ? 3.0 : 1.0), 600.0, 7000.0);
+        p[r::hmfFreq] = logNorm (at ("HighMidEqFreq", 3.0) * 1000.0 * (mult3 ? 3.0 : 1.0), 600.0, 7000.0);
         p[r::hmfQ] = r::k4QValue (at ("HighMidEqQ", 1.5));
         p[r::hfGain] = gain (gHf * at ("HighEqGain", 0.0));
         p[r::hfFreq] = logNorm (at ("HighEqFreq", 8.0) * 1000.0, 1500.0, 16000.0);
         p[r::hfBell] = sw ("HighEqBell", false);
         p[r::eqOn] = sw ("EqIn", true);
+        // (the 4K G's Black = this console's Black; its Pink = the hidden Pink EQ above, the selector then reads Black)
         p[r::k4Colour] = r::k4ColourValue (k4g ? 1 : k4b ? 0 : (int) std::lround (at ("EqColour", 0.0)));
         // round tp172c4: the B's ratio, compressor release and gate release are switch steps (its ratio: out, 2, 4, 10 : 1,
         // "ds"; its releases: "ds", .2, .4, .8, 1.6 s, auto — the two non-numbered ones read as the times whose static

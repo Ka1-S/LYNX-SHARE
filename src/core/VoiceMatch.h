@@ -41,7 +41,8 @@ struct Settings
     // round 148: the console the settings drive — 0 the E-type channel of round 123, 1 the "4K" console measured on the
     // SSL 4K E trial (REA_rodada148 §2). The 4K's own controls (ignored by model 0):
     int model = 0;
-    int colour = 0;               // EQ colour: 0 Brown, 1 Black, 2 Orange
+    int colour = 0;               // EQ colour: 0 Brown, 1 Black, 2 Orange; round 190ho: 3 Pink (the 4K G's own EQ)
+    bool pinkDiv3 = false, pinkMult3 = false; // round 190ho: Pink's LMF ÷3 / HMF ×3 (they do nothing in the other colours)
     bool pre = false;             // the mic pre: drive `micDb` (0 … 50 dB, level-compensated)
     double micDb = 0.0;
     bool vca = false;             // the Analogue VCA (the dynamics' VCA colour)
@@ -59,6 +60,8 @@ double dialFromQ (double q) noexcept;
 
 // One EQ band / filter as a digital biquad at `sampleRate` (band 0 LF, 1 LMF, 2 HMF, 3 HF). False = flat (skip it).
 bool bandBiquad (int band, const Settings& s, double sampleRate, Biquad& out);
+// round 190ho: the band's second section (Pink's shelves: the overshoot bell after the shelf). False = none
+bool bandExtraBiquad (int band, const Settings& s, double sampleRate, Biquad& out);
 // The 3rd-order high-pass as a first-order section and a biquad
 bool highPass (const Settings& s, double sampleRate, Biquad& first, Biquad& second);
 bool lowPass (const Settings& s, double sampleRate, Biquad& out);
@@ -84,11 +87,11 @@ private:
     double sr = 48000.0;
     Settings designed {};
     bool designedOnce = false;
-    Biquad hp1, hp2, lp, bands[4], vcaHp;
+    Biquad hp1, hp2, lp, bands[4], extras[4], vcaHp;
     // round 165: the side chain's own copies of the filters / EQ (same coefficients, own state): [0] the gate's
     // detector (it hears the input), [1] the compressor's (it hears the compressor's output: a feedback design)
-    struct ScChain { Biquad hp1, hp2, lp, bands[4]; } sc[2];
-    bool hpOn = false, lpOn = false, bandOn[4] {};
+    struct ScChain { Biquad hp1, hp2, lp, bands[4], extras[4]; } sc[2];
+    bool hpOn = false, lpOn = false, bandOn[4] {}, extraOn[4] {};
     // dynamics state
     double env = 0.0, gr = 0.0, gr1 = 0.0, yl = 0.0, yr = 0.0;
     double genv = 0.0, ggr = 0.0;

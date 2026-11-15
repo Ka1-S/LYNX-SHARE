@@ -156,7 +156,11 @@ enum Param
     // round tp172c11, hidden the same way: the compressor's attack time constant (0 = the Fast switch's 1 / 10 ms, else
     // 0.25 s x the value), set by the Harrison 32Classic translation (its dial is a real time constant, 2.5 ms in Limiter
     // mode; Ridge has only the switch)
-    compAttackFine
+    compAttackFine,
+    // round 190ho, hidden the same way: the 4K voicing's Pink EQ (the SSL 4K G's own EQ, measured on its trial; core/VoiceMatch.cpp
+    // k4 Pink) in place of the colour selector's, and its LMF ÷3 / HMF ×3 switches — set by the 4K G translation (EQ Type
+    // Pink); 0 = the colour selector's EQ, so every project saved before plays as it did
+    k4Pink, k4PinkDiv3, k4PinkMult3
 };
 double compGrCapDb (float v) noexcept;   // 0 = no cap (a huge value), else 0 .. 60 dB
 double compAttackFineSeconds (float v) noexcept; // 0 .. 0.25 s

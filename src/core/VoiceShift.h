@@ -40,7 +40,12 @@ enum Param : int
     law,  // round 190dp (appended; Measured for new instances, Classic for projects saved before): the measured
           // unvoiced path — noise, breath and what lies above the detector's range move with the formants, as the
           // reference's do (black-box: its sweep and noise come out at the Formant shift where no pitch is found)
-    count
+    count,
+    // round 190ho, hidden (not in the info: no control, saved only while non-zero): the Measured law's revision.
+    // 0 = round 190dp's grains as they were (projects saved with 0.1.27 … 0.1.29), 1 = new instances: the start of a
+    // sung note, heard as unvoiced while the detector decides, is not read at the formant factor (it came out as a
+    // low thump at every onset; Psola::unshiftRecentUnvoiced). Law = Classic ignores it
+    revision = count
 };
 enum class Mode { transpose, quantize, robot };
 

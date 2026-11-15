@@ -550,7 +550,9 @@ vmatch::echannel::Settings consoleSettingsOf (const EffectParams& p) noexcept
     if (k4Voicing (p)) // round 148: the 4K console (its own Q scale, colour, mic pre, VCA, make-up, mix)
     {
         e.model = 1;
-        e.colour = k4ColourIndex (p[k4Colour]);
+        e.colour = on (p[k4Pink]) ? 3 : k4ColourIndex (p[k4Colour]); // round 190ho: Pink (hidden, set by the 4K G translation)
+        e.pinkDiv3 = on (p[k4PinkDiv3]);
+        e.pinkMult3 = on (p[k4PinkMult3]);
         e.lmfQ = k4Q (p[lmfQ]);
         e.hmfQ = k4Q (p[hmfQ]);
         e.lpKHz = e.lpKHz >= 15.9 ? 0.0 : e.lpKHz;

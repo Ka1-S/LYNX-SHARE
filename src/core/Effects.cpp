@@ -4349,6 +4349,8 @@ EffectSlot makeEffectSlot (EffectKind kind)
         slot.state = grossbeat::factoryContainer();
     if (kind == EffectKind::spiralEcho) // round 190fy: a new Spiral Echo runs the measured loop's revision 1 (hidden parameter)
         slot.params[(std::size_t) echosuite::spiral::revision] = 1.0f;
+    if (kind == EffectKind::voiceShift) // round 190ho: a new Voice Shift runs the Measured law's revision 1 (hidden parameter)
+        slot.params[(std::size_t) voiceshift::revision] = 1.0f;
 
     return slot;
 }
@@ -4458,6 +4460,9 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     // round 190dp: a Voice Shift saved before the measured unvoiced path keeps the classic one (unvoiced passes through)
     if (slot.kind == EffectKind::voiceShift && savedCount <= (std::size_t) voiceshift::law)
         slot.params[(std::size_t) voiceshift::law] = 0.0f;
+    // round 190ho: … and one saved before the law's revision (0.1.27 … 0.1.29: Law, no hidden revision) keeps round 190dp's grains
+    if (slot.kind == EffectKind::voiceShift && savedCount <= (std::size_t) voiceshift::revision)
+        slot.params[(std::size_t) voiceshift::revision] = 0.0f;
     // round 165w: a Gemini Doubler saved before the measured shelves keeps round 124's (−30 … +12 dB, first order)
     if (slot.kind == EffectKind::geminiDoubler && savedCount <= (std::size_t) voicetools::gemini::eqLaw)
         slot.params[(std::size_t) voicetools::gemini::eqLaw] = 0.0f;
