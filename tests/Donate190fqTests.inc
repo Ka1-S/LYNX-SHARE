@@ -120,7 +120,13 @@ TEST (donate190fq_test_and_ci_runs_never_count_or_show)
     CHECK (! quietEnvironment (false, "0", "false", "0"));
     // the start path: only after the command-line modes (they return before the window), and only through the quiet check
     const auto main = donate190fq::fileText ("src/Main.cpp");
-    CHECK (donate190fq::count (main, "startSupportNote();") == 2); // both start paths (with and without the splash)
+    // both start paths (with and without the splash) reach it through startAfterWindow (round 190go's after-window
+    // steps; rollup 0.1.28: before, each path called it itself)
+    CHECK (donate190fq::count (main, "startSupportNote();") == 1);
+    const auto after = main.find ("void startAfterWindow (bool offerSetupWizard)");
+    CHECK (after != std::string::npos && main.find ("startSupportNote();", after) < main.find ("void startSupportNote()", after));
+    CHECK (donate190fq::count (main, "startAfterWindow (false);") == 1); // no splash
+    CHECK (donate190fq::count (main, "startAfterWindow (true);") >= 1);  // the splash's landing
     CHECK (main.find ("lynx::supportnote::quietEnvironment (lynx::platform::testMode(), env (\"CI\"), env (\"GITHUB_ACTIONS\"), env (\"LYNX_NO_SUPPORT_NOTE\"))")
            != std::string::npos);
 }
