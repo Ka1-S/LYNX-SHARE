@@ -623,8 +623,9 @@ public:
         auto e = envArea().reduced (10, 6);
         e.removeFromTop (14);
         auto tabRow = e.removeFromLeft (56);
+        const auto tabH = tabRow.getHeight() / (int) tabs.size();
         for (auto& t : tabs)
-            t->setBounds (tabRow.removeFromTop (20).reduced (0, 1));
+            t->setBounds (tabRow.removeFromTop (tabH).reduced (0, 1));
         e.removeFromLeft (6);
         envelope.setBounds (e.removeFromLeft (300));
         e.removeFromLeft (8);
@@ -674,10 +675,11 @@ public:
         // global
         auto ga = globalArea().reduced (10, 6);
         ga.removeFromTop (14);
-        auto gs = ga.removeFromRight (120);
-        voices->setBounds (gs.removeFromTop (34).reduced (2, 0));
-        glide->setBounds (gs.removeFromTop (22).reduced (2, 2));
-        retrigger->setBounds (gs.removeFromTop (22).reduced (2, 2));
+        auto gs = ga.removeFromRight (150);
+        voices->setBounds (gs.removeFromTop (32).reduced (2, 0));
+        auto sw = gs.removeFromTop (22);
+        glide->setBounds (sw.removeFromLeft (sw.getWidth() / 2).reduced (2, 2));
+        retrigger->setBounds (sw.reduced (2, 2));
         const auto gw = ga.getWidth() / 7;
         for (auto* k : globalKnobs)
             k->setBounds (ga.removeFromLeft (gw).withSizeKeepingCentre (gw, 62));
