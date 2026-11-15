@@ -5694,7 +5694,15 @@ public:
         };
         instrumentPageFirst = instrumentPage != nullptr;
         if (instrumentPage != nullptr) // (none: a channel whose instrument has its own window, e.g. a hosted plugin)
-            addPage (std::move (instrumentPage), tr ("Plugin"), tr ("The instrument's own settings"));
+        {
+            const auto pageTitle =
+                channel >= 0 && channel < (int) engine.getSong().channels.size()
+                && engine.getSong().channels[(std::size_t) channel].instrument == InstrumentKind::audioClip
+                ? tr ("Sampler") : tr ("Plugin");
+            
+            addPage (std::move (instrumentPage), pageTitle,
+                    tr ("The instrument's own settings"));
+        }
         if (envelopePage != nullptr)
             addPage (std::move (envelopePage), tr ("Envelope / instrument"), tr ("Envelope / instrument settings: the filter and pitch envelopes and the LFOs"));
         if (node)
@@ -6159,6 +6167,7 @@ bool hasChannelSettings (InstrumentKind kind) noexcept
     {
         case InstrumentKind::synth:
         case InstrumentKind::sampler:
+        case InstrumentKind::audioClip:
         case InstrumentKind::controller:
         case InstrumentKind::midiOut:
         case InstrumentKind::sakura:
