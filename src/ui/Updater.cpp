@@ -725,7 +725,13 @@ void startUpdate()
             break;
         case update::Method::appImageUpdate: appImageUpdate(); break;
         case update::Method::openPage:
-            juce::URL (releasePage (c.release)).launchInDefaultBrowser();
+            if (! platform::testMode())
+                juce::URL (releasePage (c.release)).launchInDefaultBrowser();
+            else // (round 190hl: test runs never open the browser)
+                platform::testModeLog ("update: open " + releasePage (c.release));
+            // round 190hl: the tar.gz build records it like the zip and the dmg (the user installs the other version
+            // by hand): going back skips the version left, so the older version doesn't offer it again at once
+            recordSwitch();
             break;
         case update::Method::none: break;
     }
