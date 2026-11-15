@@ -80,7 +80,7 @@ void readZone (const Chunk& z, Zone& zone)
                     zone.gain = rf (b + 9); zone.pan = rf (b + 13); zone.altGroup = ri (b + 17);
                 }
                 break;
-            case 0x1F5: break;
+            case 0x1F5: zone.name.assign ((const char*) b, c.size); break;
             case 0x1F6: zone.path.assign ((const char*) b, c.size); break;
             case 0x1F7:
                 if (c.size >= 40)
@@ -181,6 +181,7 @@ void readProgram (const Chunk& top, Program& p)
                 }
                 break;
             case 0x66: p.name.assign ((const char*) b, c.size); break;
+            case 0x67: p.file.assign ((const char*) b, c.size); break;
             case 0x68:
                 if (c.size >= 10) { p.shape1 = b[0] != 0; p.shape2 = b[1] != 0; p.shape1Amount = rf (b + 2); p.shape2Amount = rf (b + 6); }
                 break;
@@ -225,6 +226,7 @@ void readProgram (const Chunk& top, Program& p)
             {
                 Zone z;
                 readZone (c, z);
+                z.origin = (int) p.zones.size();
                 p.zones.push_back (std::move (z));
                 break;
             }
@@ -246,6 +248,8 @@ std::optional<State> parseState (const std::vector<std::uint8_t>& d)
     forEachChunk (d.data() + 4, d.size() - 4, [&] (const Chunk& c) {
         if (c.id == 6 && c.size >= 4)
             s.flags = (std::uint32_t) ri (c.data);
+        else if (c.id == 5 && c.size >= 521 && ri (c.data) == 0)
+            s.slotProgram = c.data[520];
         else if (c.id == 1)
         {
             Program p;
@@ -2015,8 +2019,25 @@ void Engine::render (float* out, int n)
 
 
 // ================================================================================================= LYNX channel
+Program parseProgram (const std::uint8_t* body, std::size_t size)
+{
+    Program p;
+    readProgram (Chunk { 1, body, size }, p);
+    return p;
+}
+
+Zone parseZone (const std::uint8_t* body, std::size_t size)
+{
+    Zone z;
+    readZone (Chunk { 3, body, size }, z);
+    return z;
+}
+
 const Program* playedProgram (const State& state)
 {
+    for (const auto& p : state.programs)
+        if (p.index == state.slotProgram && ! p.zones.empty())
+            return &p;
     for (const auto& p : state.programs)
         if (! p.zones.empty())
             return &p;
@@ -2070,8 +2091,6 @@ std::shared_ptr<const ZoneSamples> zoneSamples (const SampleData& sample, bool i
     return z;
 }
 
-namespace
-{
 // a WAV whose audio is 16-bit PCM (format 1, or extensible with the PCM sub-format)
 bool isPcm16Wav (const std::vector<std::uint8_t>& w)
 {
@@ -2095,6 +2114,8 @@ bool isPcm16Wav (const std::vector<std::uint8_t>& w)
     return false;
 }
 
+namespace
+{
 std::vector<std::uint8_t> wavOf (const Zone& z)
 {
     const auto bytes = (std::size_t) (z.bits == 16 ? 2 : 4);

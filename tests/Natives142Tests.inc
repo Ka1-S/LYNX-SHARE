@@ -118,7 +118,7 @@ TEST (natives142_lists_and_no_fl_installation)
         if (c)
         {
             CHECK (c->instrument == e.kind && c->name == e.name);
-            CHECK (e.kind == InstrumentKind::fpc // (FL's empty kit: no samples, silent as FL)
+            CHECK (e.kind == InstrumentKind::fpc || e.kind == InstrumentKind::directwave // (FL's empty kit / FL's new DirectWave: no samples, silent as FL)
                    || e.kind == InstrumentKind::wavetraveller || e.kind == InstrumentKind::granulizer || e.kind == InstrumentKind::fruityslicer || e.kind == InstrumentKind::slicex // (play the channel's sample:
                    || natives142::renderChannel (*c, none, e.kind == InstrumentKind::drumaxx ? 36 : 60) > 1.0e-3); // none yet, silent as FL; Drumaxx: pad 1's key
         }

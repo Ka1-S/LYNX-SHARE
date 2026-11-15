@@ -1,5 +1,7 @@
 #include "core/NativeEngines.h"
 
+#include "core/DirectWaveState.h"
+
 #include <algorithm>
 #include <cmath>
 
@@ -145,6 +147,7 @@ const std::vector<InstrumentEngine>& instrumentEngines()
         { InstrumentKind::drumaxx, "Drumaxx", "Drumaxx", fl, false },
         { InstrumentKind::drumpad, "Drumpad", "Drumpad", fl, false },
         { InstrumentKind::fpc, "FPC", "FPC", own, false }, // (without FL: FL's empty kit; the kits are FL's and the user's .fst files)
+        { InstrumentKind::directwave, "DirectWave", "", own, false }, // (round 190hz: FL's new DirectWave, 128 empty programs)
         { InstrumentKind::fruitkick, "Fruit Kick", "Fruit Kick", fl, false },
         { InstrumentKind::bassdrum, "BassDrum", "BassDrum", fl, false },
     };
@@ -355,6 +358,11 @@ std::optional<ChannelDef> makeChannel (InstrumentKind kind, const FlAccess& acce
         def.pluginState = slicex::write (slicex::fresh());
     if (kind == InstrumentKind::fpc) // FL's "Empty" kit (32 pads on FL's default notes, no samples)
         setFpcKit (def, fpc::emptyKit(), {});
+    if (kind == InstrumentKind::directwave) // FL's new DirectWave (the plugin database's preset): no zones yet
+    {
+        def.pluginState = dw::writeDoc (dw::freshDoc());
+        def.modelParams = dw::encodeFormats ({});
+    }
     return def;
 }
 

@@ -141,6 +141,7 @@
 #include "ui/AudioClipboard.h"
 #include "ui/FlVoicePanel.h"
 #include "ui/SlicexEditor.h"
+#include "ui/DirectWaveEditor.h"
 #include "ui/FruitySlicerEditor.h"
 #include "core/GrossBeat.h"
 #include "core/LynxBanks.h"
@@ -834,6 +835,17 @@ public:
             const auto i = args.indexOf ("--slicexedittest");
             runSlicexEditTest (juce::File (args[i + 1].unquoted()), juce::File (args[i + 2].unquoted()), juce::File (args[i + 3].unquoted()),
                                args.size() > i + 4 ? args[i + 4].unquoted() : juce::String());
+            return;
+        }
+
+        if (args.contains ("--dwedittest"))
+        {
+            // LYNX --dwedittest project script.txt report.txt [png-prefix] (round 190hz): the DirectWave editor of the
+            // project's first DirectWave channel, off screen, driven by the script's commands (ui/DirectWaveEditor.h);
+            // "shot <name>" writes <png-prefix><name>.png. A project path "new" makes a new DirectWave channel.
+            const auto i = args.indexOf ("--dwedittest");
+            runDirectWaveEditTest (args[i + 1].unquoted(), juce::File (args[i + 2].unquoted()), juce::File (args[i + 3].unquoted()),
+                                   args.size() > i + 4 ? args[i + 4].unquoted() : juce::String());
             return;
         }
 
@@ -5225,6 +5237,8 @@ private:
                 if (kind == lynx::InstrumentKind::fruityslicer && one.channels[0].samplePath.empty())
                     continue;
                 if (kind == lynx::InstrumentKind::slicex && one.channels[0].samplePath.empty()) // (the same: no sample on its decks yet)
+                    continue;
+                if (kind == lynx::InstrumentKind::directwave && one.channels[0].zones.empty()) // (FL's new DirectWave: no zones yet, round 190hz)
                     continue;
                 if ((kind == lynx::InstrumentKind::granulizer || kind == lynx::InstrumentKind::wavetraveller) && one.channels[0].samplePath.empty())
                     one.channels[0].samplePath = toneWav.getFullPathName().toStdString();
@@ -11643,6 +11657,82 @@ private:
 
     // --cliplooptest (round 167q): see the command line above.
     // --slicexedittest (round 190aj): see the command line above
+    void runDirectWaveEditTest (const juce::String& project, const juce::File& script, const juce::File& report, const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        juce::StringArray lines;
+        {
+            lynx::AudioEngine offline (false);
+            lynx::MainComponent ui (offline, false);
+            ui.setSize (1280, 720);
+            if (project == "new")
+            {
+                if (auto c = lynx::natives::makeChannel (lynx::InstrumentKind::directwave, {}))
+                    offline.editSong ([c] (lynx::Song& s) { s.channels.push_back (*c); });
+            }
+            else
+                ui.openFile (juce::File (project));
+            offline.dispatchPendingMessages();
+            int channel = -1;
+            for (int c = 0; c < (int) offline.getSong().channels.size() && channel < 0; ++c)
+                if (offline.getSong().channels[(std::size_t) c].instrument == lynx::InstrumentKind::directwave)
+                    channel = c;
+            if (channel < 0)
+                lines.add ("no DirectWave channel in " + project);
+            else
+            {
+                auto panel = lynx::makeChannelSettingsPanel (offline, channel);
+                juce::Component frame;
+                frame.setSize (panel->getWidth(), panel->getHeight());
+                frame.setOpaque (true);
+                frame.addAndMakeVisible (*panel);
+                panel->setTopLeftPosition (0, 0);
+                offline.dispatchPendingMessages();
+                juce::StringArray commands;
+                script.readLines (commands);
+                for (const auto& raw : commands)
+                {
+                    const auto command = raw.trim();
+                    if (command.isEmpty() || command.startsWith ("#"))
+                    {
+                        lines.add (command);
+                        continue;
+                    }
+                    if (command.startsWith ("shot "))
+                    {
+                        frame.setSize (panel->getWidth(), panel->getHeight());
+                        juce::Image image (juce::Image::ARGB, frame.getWidth(), frame.getHeight(), true);
+                        {
+                            juce::Graphics g (image);
+                            g.fillAll (lynx::theme::panel);
+                            frame.paintEntireComponent (g, false);
+                        }
+                        const juce::File file (prefix + command.fromFirstOccurrenceOf (" ", false, false).trim() + ".png");
+                        file.deleteFile();
+                        juce::PNGImageFormat png;
+                        if (auto out = file.createOutputStream())
+                            png.writeImageToStream (image, *out);
+                        lines.add (command + " -> " + file.getFileName());
+                        continue;
+                    }
+                    if (command.startsWith ("savestate "))
+                    {
+                        const auto& st = offline.getSong().channels[(std::size_t) channel].pluginState;
+                        juce::File (command.fromFirstOccurrenceOf (" ", false, false).trim()).replaceWithData (st.data(), st.size());
+                        lines.add (command + " -> " + juce::String ((int) st.size()) + " bytes");
+                        continue;
+                    }
+                    const auto result = lynx::directWaveEditorTest (*panel, command);
+                    offline.dispatchPendingMessages();
+                    lines.add (command + " -> " + result);
+                }
+            }
+        }
+        report.replaceWithText (lines.joinIntoString ("\n") + "\nresult=DONE\n");
+        juce::LookAndFeel::setDefaultLookAndFeel (nullptr);
+        quit();
+    }
+
     void runSlicexEditTest (const juce::File& project, const juce::File& script, const juce::File& report, const juce::String& prefix)
     {
         juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
@@ -26326,6 +26416,14 @@ private:
                 if (offline.getSong().channels[(std::size_t) c].instrument == lynx::InstrumentKind::fpc)
                 {
                     saveWindow (lynx::makeChannelSettingsPanel (offline, c), "-fpc.png");
+                    break;
+                }
+
+            // round 190hz: DirectWave's editor
+            for (int c = 0; c < (int) offline.getSong().channels.size(); ++c)
+                if (offline.getSong().channels[(std::size_t) c].instrument == lynx::InstrumentKind::directwave)
+                {
+                    saveWindow (lynx::makeChannelSettingsPanel (offline, c), "-directwave.png");
                     break;
                 }
 

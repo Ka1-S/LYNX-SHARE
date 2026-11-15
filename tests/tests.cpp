@@ -17704,6 +17704,8 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "PluginsOff190apTests.inc"
 #include "ExportSections190apTests.inc"
 #include "DirectWave190ajTests.inc"
+#include "core/DirectWaveState.h"
+#include "DirectWave190hzTests.inc"
 #include "Similar190asTests.inc"
 #include "Controller190awTests.inc"
 #include "ControllerProfiles190awTests.inc"
