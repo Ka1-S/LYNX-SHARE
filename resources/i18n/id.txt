@@ -10124,3 +10124,12 @@ countries: id
 "Tracks nobody plays live are rendered a little ahead on another thread, so heavy projects hold small buffers. Inputs, the channels being played and everything they feed stay real-time; edits on the other tracks can be heard up to about 25 ms late." = "Track yang tidak dimainkan secara live dirender sedikit lebih dulu di thread lain, agar proyek berat tetap lancar dengan buffer kecil. Input, channel yang sedang dimainkan, dan semua yang mereka alirkan tetap real-time; suntingan pada track lain bisa terdengar hingga sekitar 25 ms lebih lambat."
 "Event editor: alternate size" = "Editor event: ukuran alternatif"
 "Event editor size: drag  [RMB] or [Shift][Enter] alternate size  [MMB] default size" = "Ukuran editor event: seret  [RMB] atau [Shift][Enter] ukuran alternatif  [MMB] ukuran bawaan"
+
+# --- Slicex display modes, articulator editor buttons (round 190hg)
+"View keyboard" = "Tampilkan keyboard"
+"Display mode" = "Mode tampilan"
+"No audio editor" = "Tanpa editor audio"
+"No region settings" = "Tanpa pengaturan region"
+"Freeze editing / hide points" = "Bekukan pengeditan / sembunyikan titik"
+"Slide succeeding points / regions" = "Geser titik / region berikutnya"
+"Flags" = "Flag"

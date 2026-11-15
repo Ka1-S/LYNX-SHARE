@@ -10244,3 +10244,12 @@ countries: br
 "Tracks nobody plays live are rendered a little ahead on another thread, so heavy projects hold small buffers. Inputs, the channels being played and everything they feed stay real-time; edits on the other tracks can be heard up to about 25 ms late." = "As faixas que ninguém toca ao vivo são renderizadas um pouco adiantadas em outro thread, para que projetos pesados aguentem buffers pequenos. Entradas, os canais tocados e tudo o que eles alimentam continuam em tempo real; edições nas outras faixas podem ser ouvidas até cerca de 25 ms depois."
 "Event editor: alternate size" = "Editor de eventos: tamanho alternativo"
 "Event editor size: drag  [RMB] or [Shift][Enter] alternate size  [MMB] default size" = "Tamanho do editor de eventos: arraste  [RMB] ou [Shift][Enter] tamanho alternativo  [MMB] tamanho padrão"
+
+# --- Slicex display modes, articulator editor buttons (round 190hg)
+"View keyboard" = "Ver teclado"
+"Display mode" = "Modo de exibição"
+"No audio editor" = "Sem editor de áudio"
+"No region settings" = "Sem configurações de região"
+"Freeze editing / hide points" = "Congelar edição / ocultar pontos"
+"Slide succeeding points / regions" = "Deslizar pontos / regiões seguintes"
+"Flags" = "Sinalizadores"

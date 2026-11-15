@@ -10124,3 +10124,12 @@ countries: cn sg
 "Tracks nobody plays live are rendered a little ahead on another thread, so heavy projects hold small buffers. Inputs, the channels being played and everything they feed stay real-time; edits on the other tracks can be heard up to about 25 ms late." = "无人实时演奏的轨道会在另一个线程上稍微提前渲染，让大型工程也能用小缓冲区播放。输入、正在演奏的通道及其送往的一切都保持实时；对其他轨道的编辑最多可能延迟约 25 毫秒才听到。"
 "Event editor: alternate size" = "事件编辑器：备用大小"
 "Event editor size: drag  [RMB] or [Shift][Enter] alternate size  [MMB] default size" = "事件编辑器大小：拖动  [RMB] 或 [Shift][Enter] 备用大小  [MMB] 默认大小"
+
+# --- Slicex display modes, articulator editor buttons (round 190hg)
+"View keyboard" = "显示键盘"
+"Display mode" = "显示模式"
+"No audio editor" = "无音频编辑器"
+"No region settings" = "无区域设置"
+"Freeze editing / hide points" = "冻结编辑 / 隐藏点"
+"Slide succeeding points / regions" = "滑动后续点 / 区域"
+"Flags" = "标志"

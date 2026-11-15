@@ -10124,3 +10124,12 @@ countries: ru by kz
 "Tracks nobody plays live are rendered a little ahead on another thread, so heavy projects hold small buffers. Inputs, the channels being played and everything they feed stay real-time; edits on the other tracks can be heard up to about 25 ms late." = "Дорожки, которые никто не играет вживую, рендерятся немного заранее в другом потоке, чтобы тяжёлые проекты работали с малыми буферами. Входы, исполняемые каналы и всё, что они питают, остаются в реальном времени; правки других дорожек могут быть слышны с задержкой примерно до 25 мс."
 "Event editor: alternate size" = "Редактор событий: альтернативный размер"
 "Event editor size: drag  [RMB] or [Shift][Enter] alternate size  [MMB] default size" = "Размер редактора событий: тяните  [RMB] или [Shift][Enter] альтернативный размер  [MMB] размер по умолчанию"
+
+# --- Slicex display modes, articulator editor buttons (round 190hg)
+"View keyboard" = "Показать клавиатуру"
+"Display mode" = "Режим отображения"
+"No audio editor" = "Без аудиоредактора"
+"No region settings" = "Без настроек региона"
+"Freeze editing / hide points" = "Заморозить правку / скрыть точки"
+"Slide succeeding points / regions" = "Сдвигать последующие точки / регионы"
+"Flags" = "Флаги"
