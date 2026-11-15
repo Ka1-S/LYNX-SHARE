@@ -3145,6 +3145,10 @@ juce::String toJson (const Song& song, bool stampVersion)
         }
         root->setProperty ("modulators", mods);
     }
+    if (song.soundfontModBaseReal) // round 190he: Soundfont knobs' modulation centres on the knob (absent = before 190he)
+    {
+        root->setProperty ("sfModBase190he", true);
+    }
 
     if (! song.vcas.empty()) // VCA faders (round 177a)
     {
@@ -4166,6 +4170,7 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
                 song.playlistTracks[index].compTrack = true;
             }
 
+    song.soundfontModBaseReal = root.hasProperty ("sfModBase190he"); // (round 190he; a project from before: 0.5, as then)
     if (auto* mods = root["modulators"].getArray()) // round 177b: LYNX's modulators
         for (const auto& v : *mods)
         {

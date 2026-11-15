@@ -1343,6 +1343,14 @@ float Song::targetValue (const AutomationTarget& t) const noexcept
     return -1.0f;
 }
 
+float Song::modulationBase (const AutomationTarget& t) const noexcept
+{
+    if (! soundfontModBaseReal && t.kind == AutomationTargetKind::channelParam && t.index >= 0 && t.index < (int) channels.size()
+        && channels[(std::size_t) t.index].instrument == InstrumentKind::soundfont)
+        return 0.5f; // (a project saved before round 190he: every Soundfont knob's value read 0.5 then)
+    return targetValue (t);
+}
+
 bool Song::setTargetValue (const AutomationTarget& t, float v) noexcept
 {
     v = std::clamp (v, 0.0f, 1.0f);

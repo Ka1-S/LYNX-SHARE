@@ -228,3 +228,40 @@ TEST (u190he_link_fl_engine_knob_reads_what_a_link_wrote)
     // an automation's 0…1 value shown on the knob is the same raw value (ModelPanel::showAutomation: p->raw (v))
     CHECK (std::abs (p->normalised (p->raw (0.3f)) - 0.3f) < 1.0e-5f);
 }
+
+// Coordinator's gate (owner rule: saved projects keep sounding the same). A LYNX Modulation route on a Soundfont knob
+// centred on 0.5 before round 190he (Song::targetValue had no Soundfont case); a project saved before keeps that start,
+// new songs centre on the knob's real position. RackState binds the centre (ModPlay::base) once per build.
+TEST (u190he_link_soundfont_modulation_of_old_projects_keeps_the_old_centre)
+{
+    using namespace lynx;
+    auto song = Song::makeDefault();
+    CHECK (song.soundfontModBaseReal); // a new song
+    song.channels[0] = sf::makeChannel();
+    const AutomationTarget cutoff { AutomationTargetKind::channelParam, 0, 0, sf::pCutoff };
+    CHECK (song.setTargetValue (cutoff, 0.8f));
+    Modulator m;
+    m.routes = { { cutoff, 0.25f } };
+    song.modulators.push_back (m);
+    const auto baseOf = [] (const Song& s) {
+        const auto state = RackState::build (s, nullptr, 48000.0);
+        return state != nullptr && state->modRoutes.size() == 1 ? state->modRoutes[0].base : -1.0f;
+    };
+    // new: around the knob
+    CHECK (std::abs (baseOf (song) - 0.8f) < 1.0e-4f);
+    CHECK (std::abs (song.modulationBase (cutoff) - song.targetValue (cutoff)) < 1.0e-6f);
+    // saved before 190he: exactly 0.5 whatever the knob (what 0.1.27 bound: targetValue's 0.5 for every Soundfont knob)
+    auto old = song;
+    old.soundfontModBaseReal = false;
+    CHECK (baseOf (old) == 0.5f);
+    CHECK (old.setTargetValue (cutoff, 0.1f));
+    CHECK (baseOf (old) == 0.5f);
+    // the rest of an old project is untouched: links and the knob's own value read the real position
+    CHECK (std::abs (old.targetValue (cutoff) - 0.1f) < 1.0e-4f);
+    // other instruments are not gated
+    auto sampler = old;
+    sampler.channels[0] = ChannelDef {};
+    sampler.channels[0].instrument = InstrumentKind::sampler;
+    const AutomationTarget attack { AutomationTargetKind::channelParam, 0, 0, samplerparam::attack };
+    CHECK (std::abs (sampler.modulationBase (attack) - sampler.targetValue (attack)) < 1.0e-6f);
+}

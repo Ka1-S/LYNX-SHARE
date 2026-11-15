@@ -2126,7 +2126,7 @@ void RackState::buildAutomationTables()
             if (slot >= maxAutomations || route.depth == 0.0f || ! Modulator::canModulate (song, route.target))
                 continue;
             const auto source = boundSlot (route.target);
-            modRoutes.push_back ({ slot, source, std::clamp (song.targetValue (route.target), 0.0f, 1.0f), m, route.depth });
+            modRoutes.push_back ({ slot, source, std::clamp (song.modulationBase (route.target), 0.0f, 1.0f), m, route.depth });
             bind (slot++, route.target);
         }
 
