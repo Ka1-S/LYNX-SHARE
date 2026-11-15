@@ -6561,7 +6561,10 @@ private:
 class PageAspectConstrainer final : public juce::ComponentBoundsConstrainer
 {
 public:
-    explicit PageAspectConstrainer (juce::ResizableWindow& w) : window (w) {}
+    explicit PageAspectConstrainer (juce::ResizableWindow& w) : window (w)
+    {
+        setMinimumOnscreenAmounts (0x10000, 16, 24, 16); // (as ResizableWindow's own constrainer: the title stays reachable)
+    }
     std::function<juce::Point<int>()> pageSize;
     std::function<void()> onResizeEnd; // (the size is remembered once, when the drag ends)
 
@@ -6596,6 +6599,7 @@ public:
             bounds.setTop (bounds.getBottom() - newH);
         else
             bounds.setHeight (newH);
+        juce::ComponentBoundsConstrainer::checkBounds (bounds, previous, limits, top, left, bottom, right); // (on screen)
     }
 
 private:
