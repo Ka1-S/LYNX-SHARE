@@ -6578,7 +6578,8 @@ public:
                       bool left, bool bottom, bool right) override
     {
         const auto page = pageSize != nullptr ? pageSize() : juce::Point<int>();
-        if (page.x <= 0 || page.y <= 0)
+        // (only a drag of an edge keeps the proportions: a move, or the system placing the window, keeps its size)
+        if (page.x <= 0 || page.y <= 0 || ! (top || left || bottom || right))
         {
             juce::ComponentBoundsConstrainer::checkBounds (bounds, previous, limits, top, left, bottom, right);
             return;
