@@ -224,9 +224,10 @@ private:
     double workShare = 0.0; // (an average of RackRenderer::lastWorkShare while off)
     double recentOverruns = 0.0; // (an average of overruns per second, the last couple of seconds)
     double offHold = decidedSeconds; // a "kept off" verdict holds this long; doubled for each one in a row (max 10 min)
-    // a project where render-ahead cuts the overruns 5-20x for a few % more CPU: off by the owner's rule (no project
-    // worse in any measure); true would keep it there (an owner decision, not taken)
-    static constexpr bool favourFewerOverruns = false;
+    // a project where render-ahead cuts the overruns 5-20x for a few % more CPU (at most probeCpuMargin): kept on.
+    // Owner decision for 0.1.28 (rollup step 9): on by default — synth100-type projects keep render-ahead (its probe:
+    // 340 -> 20 overruns / min at equal CPU); 190gq had it off (no project worse in any measure)
+    static constexpr bool favourFewerOverruns = true;
     static constexpr int probeRounds = 2;
     double probeLeft = 0.0, decidedLeft = 0.0, warmupLeft = 0.0;
     int probeRound = 0;

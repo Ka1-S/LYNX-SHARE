@@ -352,13 +352,15 @@ bool RenderAhead::computePartition (const RackState& state, const Block& block, 
     for (int i = 0; i < targetTrackCount; ++i)
         if (okTrack (targetTracks[(std::size_t) i]))
             p.live[(std::size_t) track (targetTracks[(std::size_t) i])] = 1;
-    // an editor showing a slot's live level meters or its spectrum: that insert stays in time with its pictures
+    // an editor showing a slot's live level meters (levelWanted), its effect meters (190gp's metersWanted: gain reduction,
+    // band levels...) or its spectrum: that insert stays in time with its pictures
     {
         auto& times = live.processTimes();
         std::uint32_t hash = 2166136261u;
         for (int t = 0; t < T; ++t)
             for (int s = 0; s < maxEffectSlots; ++s)
-                if (times.levelWanted[(std::size_t) (t * maxEffectSlots + s)].load (std::memory_order_relaxed) > 0)
+                if (times.levelWanted[(std::size_t) (t * maxEffectSlots + s)].load (std::memory_order_relaxed) > 0
+                    || times.metersWanted[(std::size_t) (t * maxEffectSlots + s)].load (std::memory_order_relaxed) > 0) // (rollup 0.1.28: 190gp's live meters too)
                 {
                     p.live[(std::size_t) track (t)] = 1;
                     hash = (hash ^ (std::uint32_t) (t * maxEffectSlots + s)) * 16777619u;
@@ -1008,9 +1010,10 @@ void RenderAhead::account (double wallNs, double cpuNs, int samples, bool playin
                 counters.probeOverOn.store ((float) (60.0 * overRateOn), std::memory_order_relaxed);
                 const auto fewerOverruns = overRateOn <= overRateOff * probeOverrunGain && overRateOff > 0.0;
                 const auto lessCpu = cpuShareOn <= cpuShareOff * probeCpuGain;
-                // (the owner's rule, no project worse: kept only for a CPU win beyond the probe's measuring error — about
-                // ten points in render-ahead's favour against whole runs — with no more overruns. Fewer overruns for a
-                // little more CPU (synth100, Exoplanet: 5-20x fewer for +5-9 %) would be `favourFewerOverruns`.)
+                // (kept for a CPU win beyond the probe's measuring error — about ten points in render-ahead's favour
+                // against whole runs — with no more overruns; and, since the owner's 0.1.28 decision
+                // (`favourFewerOverruns`), for clearly fewer overruns at no more than probeCpuMargin more CPU: synth100,
+                // Exoplanet: 5-20x fewer.)
                 const auto keep = (lessCpu && overRateOn <= overRateOff) || (favourFewerOverruns && fewerOverruns && cpuShareOn <= cpuShareOff * probeCpuMargin);
                 probe = keep ? Probe::decidedOn : Probe::decidedOff;
                 // (a project that keeps losing is probed less and less often: the probe's own "on" windows cost)
