@@ -11,6 +11,7 @@
 #include "core/ClipLauncher.h"
 #include "core/ClipSample.h"
 #include "core/DetailChain.h"
+#include "core/RackOps.h"
 #include "core/Groove.h"
 #include "core/Effects.h"
 #include "core/FlEffects.h"
@@ -605,7 +606,23 @@ public:
         }
         if (BrowserComponent::isGeneratorDrag (details))
         {
-            if (auto c = BrowserComponent::draggedGenerator (details); c && hooks.instrumentDropped != nullptr)
+            auto c = BrowserComponent::draggedGenerator (details);
+            if (! c)
+                return;
+            // issue #152 point 6 (Live: an instrument dropped onto the track's instrument in the Device View replaces
+            // only it; its effects stay): the instrument card under the mouse takes the plugin
+            if (const auto hit = hitAt (details.localPosition); juce::isPositiveAndBelow (hit.card, (int) cards.size())
+                                                                 && cards[(std::size_t) hit.card].kind == Card::instrument)
+            {
+                const auto channel = cards[(std::size_t) hit.card].index;
+                if (c->instrument != InstrumentKind::audioClip && c->instrument != InstrumentKind::controller)
+                {
+                    engine.editSong ([channel, gen = std::move (*c)] (Song& song) mutable { replaceGenerator (song, channel, std::move (gen)); });
+                    refresh();
+                }
+                return;
+            }
+            if (hooks.instrumentDropped != nullptr)
                 hooks.instrumentDropped (insert, std::move (*c));
             return;
         }

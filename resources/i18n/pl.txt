@@ -10135,3 +10135,12 @@ countries: pl
 "Flags" = "Flagi"
 "Scaling" = "Skalowanie"
 "Picker panel on / off" = "Panel wyboru wł. / wył."
+
+# round 190hf (issue #152 point 6): plugins dropped on the tracks
+"Can't load more than 20 instruments at once." = "Nie można wczytać więcej niż 20 instrumentów naraz."
+"There are no available effect slots on the mixer track." = "Ścieżka miksera nie ma wolnych slotów efektów."
+"Only generators can be used as instrument tracks." = "Tylko generatory mogą być ścieżkami instrumentów."
+"Only audio effects can go on an audio track." = "Ścieżka audio przyjmuje tylko efekty audio."
+"There is no track here to take the plugin." = "Nie ma tu ścieżki, która mogłaby przyjąć wtyczkę."
+"Potentially slow operation" = "Operacja może być wolna"
+"Are you sure you want to load {0} plugins at once?" = "Czy na pewno chcesz wczytać {0} wtyczek naraz?"

@@ -574,6 +574,8 @@ if(LYNX_BUILD_APP)
     list(APPEND LYNX_APP_SOURCES
         src/ui/Workspace.cpp
         src/ui/NativeChild.cpp
+        src/ui/ExternalDrag.cpp
+        src/ui/ExternalDragX11.cpp
         src/ui/ValueControl.cpp
         src/ui/Dialogs.cpp
         src/ui/SetupWizard.cpp

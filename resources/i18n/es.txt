@@ -10135,3 +10135,12 @@ countries: es mx ar co cl pe ve
 "Flags" = "Indicadores"
 "Scaling" = "Escalado"
 "Picker panel on / off" = "Panel selector activado / desactivado"
+
+# round 190hf (issue #152 point 6): plugins dropped on the tracks
+"Can't load more than 20 instruments at once." = "No se pueden cargar más de 20 instrumentos a la vez."
+"There are no available effect slots on the mixer track." = "No hay ranuras de efecto libres en la pista del mezclador."
+"Only generators can be used as instrument tracks." = "Solo los generadores pueden usarse como pistas de instrumento."
+"Only audio effects can go on an audio track." = "Una pista de audio solo admite efectos de audio."
+"There is no track here to take the plugin." = "Aquí no hay ninguna pista que pueda recibir el plugin."
+"Potentially slow operation" = "Operación posiblemente lenta"
+"Are you sure you want to load {0} plugins at once?" = "¿Seguro que quieres cargar {0} plugins a la vez?"

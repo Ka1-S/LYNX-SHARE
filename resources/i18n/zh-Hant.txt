@@ -10135,3 +10135,12 @@ countries: tw hk mo
 "Flags" = "旗標"
 "Scaling" = "縮放"
 "Picker panel on / off" = "選擇面板 開 / 關"
+
+# round 190hf (issue #152 point 6): plugins dropped on the tracks
+"Can't load more than 20 instruments at once." = "一次最多只能載入 20 個樂器。"
+"There are no available effect slots on the mixer track." = "該混音器軌道沒有空閒的效果器插槽。"
+"Only generators can be used as instrument tracks." = "只有產生器可以用作樂器軌道。"
+"Only audio effects can go on an audio track." = "音訊軌道只能放音訊效果器。"
+"There is no track here to take the plugin." = "這裡沒有可以接收該外掛的軌道。"
+"Potentially slow operation" = "操作可能較慢"
+"Are you sure you want to load {0} plugins at once?" = "確定要一次載入 {0} 個外掛嗎?"

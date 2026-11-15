@@ -10135,3 +10135,12 @@ countries: nl be
 "Flags" = "Vlaggen"
 "Scaling" = "Schaling"
 "Picker panel on / off" = "Kiezerpaneel aan / uit"
+
+# round 190hf (issue #152 point 6): plugins dropped on the tracks
+"Can't load more than 20 instruments at once." = "Er kunnen niet meer dan 20 instrumenten tegelijk worden geladen."
+"There are no available effect slots on the mixer track." = "De mixertrack heeft geen vrije effectslots meer."
+"Only generators can be used as instrument tracks." = "Alleen generatoren kunnen als instrumenttracks worden gebruikt."
+"Only audio effects can go on an audio track." = "Op een audiotrack passen alleen audio-effecten."
+"There is no track here to take the plugin." = "Hier is geen track die de plugin kan opnemen."
+"Potentially slow operation" = "Mogelijk trage bewerking"
+"Are you sure you want to load {0} plugins at once?" = "Weet je zeker dat je {0} plugins tegelijk wilt laden?"

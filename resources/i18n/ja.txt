@@ -10135,3 +10135,12 @@ countries: jp
 "Flags" = "フラグ"
 "Scaling" = "スケーリング"
 "Picker panel on / off" = "ピッカーパネルのオン / オフ"
+
+# round 190hf (issue #152 point 6): plugins dropped on the tracks
+"Can't load more than 20 instruments at once." = "一度に読み込める楽器は 20 個までです。"
+"There are no available effect slots on the mixer track." = "ミキサートラックに空きのエフェクトスロットがありません。"
+"Only generators can be used as instrument tracks." = "インストゥルメントトラックに使えるのはジェネレーターだけです。"
+"Only audio effects can go on an audio track." = "オーディオトラックに置けるのはオーディオエフェクトだけです。"
+"There is no track here to take the plugin." = "ここにはプラグインを受け取れるトラックがありません。"
+"Potentially slow operation" = "時間がかかる可能性のある操作"
+"Are you sure you want to load {0} plugins at once?" = "{0} 個のプラグインを一度に読み込みますか?"

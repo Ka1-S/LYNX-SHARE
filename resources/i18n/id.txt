@@ -10135,3 +10135,12 @@ countries: id
 "Flags" = "Flag"
 "Scaling" = "Penskalaan"
 "Picker panel on / off" = "Panel pemilih aktif / nonaktif"
+
+# round 190hf (issue #152 point 6): plugins dropped on the tracks
+"Can't load more than 20 instruments at once." = "Tidak bisa memuat lebih dari 20 instrumen sekaligus."
+"There are no available effect slots on the mixer track." = "Tidak ada slot efek kosong di trek mixer."
+"Only generators can be used as instrument tracks." = "Hanya generator yang bisa dipakai sebagai trek instrumen."
+"Only audio effects can go on an audio track." = "Trek audio hanya menerima efek audio."
+"There is no track here to take the plugin." = "Tidak ada trek di sini yang bisa menerima plugin."
+"Potentially slow operation" = "Operasi mungkin lambat"
+"Are you sure you want to load {0} plugins at once?" = "Yakin ingin memuat {0} plugin sekaligus?"

@@ -1,4 +1,5 @@
 #include "ui/ControllerBridge.h"
+#include "ui/ExternalDrag.h"
 #include "ui/AudioClipboard.h"
 #include "ui/MidiClipboard.h"
 #include "ui/VideoTracks.h"
@@ -760,6 +761,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         }
     };
     engine.nameAutomation = [this] (const AutomationTarget& t) { return describeAutomationTarget (engine, t).toStdString(); };
+    externaldrag::install(); // issue #174: drags onto a hosted plugin's own editor become the system's file drag
    #if JUCE_PLUGINHOST_VST3
     // round 177b: a right-click on a VST3 plugin's knob (when the plugin asks the host for the parameter's menu) offers
     // LYNX's parameter items first: Create automation clip, Edit events, Link to MIDI / internal controller...
@@ -1818,6 +1820,12 @@ void MainComponent::dragOperationStarted (const juce::DragAndDropTarget::SourceD
 {
     // a drop on a window above this one (the Sampler's waveform, a plugin...) lands there, not on the panel under it
     matchWindowOrderToScreen();
+}
+
+bool MainComponent::shouldDropFilesWhenDraggedExternally (const juce::DragAndDropTarget::SourceDetails& details, juce::StringArray& files,
+                                                          bool& canMoveFiles)
+{
+    return externaldrag::shouldDropFiles (details, &engine.getSong(), files, canMoveFiles);
 }
 
 bool MainComponent::keyPressed (const juce::KeyPress& key)

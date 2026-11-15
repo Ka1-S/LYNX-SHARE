@@ -10135,3 +10135,12 @@ countries: de at ch li lu
 "Flags" = "Flags"
 "Scaling" = "Skalierung"
 "Picker panel on / off" = "Auswahlbereich ein / aus"
+
+# round 190hf (issue #152 point 6): plugins dropped on the tracks
+"Can't load more than 20 instruments at once." = "Es können nicht mehr als 20 Instrumente auf einmal geladen werden."
+"There are no available effect slots on the mixer track." = "Die Mixer-Spur hat keinen freien Effekt-Slot mehr."
+"Only generators can be used as instrument tracks." = "Nur Generatoren können als Instrumentenspuren verwendet werden."
+"Only audio effects can go on an audio track." = "Auf eine Audiospur passen nur Audioeffekte."
+"There is no track here to take the plugin." = "Hier ist keine Spur, die das Plugin aufnehmen kann."
+"Potentially slow operation" = "Möglicherweise langsamer Vorgang"
+"Are you sure you want to load {0} plugins at once?" = "Möchtest du wirklich {0} Plugins auf einmal laden?"

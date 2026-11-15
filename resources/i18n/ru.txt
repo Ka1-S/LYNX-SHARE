@@ -10135,3 +10135,12 @@ countries: ru by kz
 "Flags" = "Флаги"
 "Scaling" = "Масштаб"
 "Picker panel on / off" = "Панель выбора вкл. / выкл."
+
+# round 190hf (issue #152 point 6): plugins dropped on the tracks
+"Can't load more than 20 instruments at once." = "Нельзя загрузить больше 20 инструментов за раз."
+"There are no available effect slots on the mixer track." = "На дорожке микшера нет свободных слотов эффектов."
+"Only generators can be used as instrument tracks." = "Дорожками инструментов могут быть только генераторы."
+"Only audio effects can go on an audio track." = "На аудиодорожку можно поставить только аудиоэффекты."
+"There is no track here to take the plugin." = "Здесь нет дорожки, которая может принять плагин."
+"Potentially slow operation" = "Операция может быть медленной"
+"Are you sure you want to load {0} plugins at once?" = "Точно загрузить {0} плагинов за раз?"
