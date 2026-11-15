@@ -15,6 +15,7 @@
 #include "core/MidiControls.h"
 #include "core/MidiOut.h"
 #include "core/FlSynths.h"
+#include "core/SynthParams.h"
 #include "engine/Text.h"
 #include "core/EditorGestures.h"
 #include "ui/EditorTools.h"
@@ -991,6 +992,13 @@ juce::String describeAutomationTarget (AudioEngine& engine, const AutomationTarg
                      && song.channels[(std::size_t) t.index].instrument == InstrumentKind::sampler && t.param >= 0
                      && t.param < samplerparam::count) // (issue #12)
                 param = tr (samplerparam::name (t.param));
+            else if (t.kind == AutomationTargetKind::channelParam && t.index >= 0 && t.index < (int) song.channels.size()
+                     && song.channels[(std::size_t) t.index].instrument == InstrumentKind::synth && synthparam::valid (t.param)) // (issue #152)
+            {
+                const auto k = synthparam::indexOf (t.param);
+                const auto knob = tr (synthparam::rangeOf (k).name);
+                param = synthparam::oscOf (k) > 0 ? tr ("Osc {0}", { juce::String (synthparam::oscOf (k)) }) + " " + knob : knob;
+            }
             else if (t.kind == AutomationTargetKind::channelParam && t.index >= 0 && t.index < (int) song.channels.size()
                      && song.channels[(std::size_t) t.index].instrument == InstrumentKind::midiOut && t.param >= 0
                      && t.param <= midiout::controlCount) // (round 167i)
