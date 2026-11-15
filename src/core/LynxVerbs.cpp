@@ -798,6 +798,9 @@ struct Engine::Impl
             loopAp[i].len = std::clamp ((int) (target[i] * loopApFraction), 1, loopAp[i].line.mask - 2);
         }
         first = false;
+        double step[lineCount]; // round 190ie: the glide per sample (fixed, or a tempo change spread over the block)
+        for (int i = 0; i < lineCount; ++i)
+            step[i] = s.lengthSpread > 0 ? std::min (0.25, std::abs (target[i] - curLen[i]) / (double) s.lengthSpread) : 0.25; // (0.25: the fixed glide)
         designLoop (s);
         designTone (s);
         // modulators as rotating pairs (one rotation per sample instead of a sine), the lines' rates as in law 0
@@ -818,7 +821,6 @@ struct Engine::Impl
                 mmRs = std::sin (inc);
             }
         }
-        const auto glide = 0.25;
         const auto norm = (float) (1.0 / std::sqrt ((double) lineCount));
         const auto early = (float) s.earlyLevel, late = (float) s.lateLevel, send = (float) s.earlySend;
         const auto gated = s.gateSec > 0.0, build = gated || s.buildSec > 0.0005;
@@ -934,7 +936,9 @@ struct Engine::Impl
             float sOut[lineCount];
             for (int i = 0; i < lineCount; ++i)
             {
-                curLen[i] += std::clamp (target[i] - curLen[i], -glide, glide);
+                curLen[i] += std::clamp (target[i] - curLen[i], -step[i], step[i]);
+                if (s.lengthSpread > 0) // (round 190ie: the loop all-pass follows its gliding line)
+                    loopAp[i].len = std::clamp ((int) (curLen[i] * loopApFraction), 1, loopAp[i].line.mask - 2);
                 const auto c = lfoC[i] * lfoRc[i] - lfoS[i] * lfoRs[i];
                 lfoS[i] = lfoS[i] * lfoRc[i] + lfoC[i] * lfoRs[i];
                 lfoC[i] = c;
@@ -1142,9 +1146,13 @@ struct Engine::Impl
                 shimmerB[v] = (float) (s.shimmerEnergy * a * f);
                 shimmerKeep[v] = 1.0f - shimmerB[v] * (float) (1.0 - f); // (unshifted: plain feedback, the RT law's own)
             }
-        double target[lineCount];
+        double target[lineCount], step[lineCount];
         for (int i = 0; i < lineCount; ++i)
+        {
             target[i] = targetLen (s, i);
+            // round 190ie: the glide per sample (fixed, or a tempo change spread over the block)
+            step[i] = s.lengthSpread > 0 ? std::min (glide, std::abs (target[i] - curLen[i]) / (double) s.lengthSpread) : glide;
+        }
 
         for (int t = 0; t < n; ++t)
         {
@@ -1196,7 +1204,9 @@ struct Engine::Impl
             float sOut[lineCount];
             for (int i = 0; i < lineCount; ++i)
             {
-                curLen[i] += std::clamp (target[i] - curLen[i], -glide, glide);
+                curLen[i] += std::clamp (target[i] - curLen[i], -step[i], step[i]);
+                if (s.lengthSpread > 0) // (round 190ie: the loop all-pass follows its gliding line)
+                    loopAp[i].len = std::clamp ((int) (curLen[i] * loopApFraction), 1, loopAp[i].line.mask - 2);
                 lfo[i] += modInc[i];
                 if (lfo[i] > 2.0 * pi)
                     lfo[i] -= 2.0 * pi;
@@ -1540,7 +1550,14 @@ protected:
             std::copy (l, l + m, dl.begin());
             std::copy (r, r + m, dr.begin());
             preStage (l, r, m, p, bpm);
-            engine.process (l, r, m, s);
+            if (s.lengthSpread > 0) // (round 190ie: a tempo change spreads over each chunk it covers)
+            {
+                auto spread = s;
+                spread.lengthSpread = m;
+                engine.process (l, r, m, spread);
+            }
+            else
+                engine.process (l, r, m, s);
             postStage (l, r, m, p, bpm);
             for (int i = 0; i < m; ++i)
             {
@@ -2121,6 +2138,10 @@ public:
         const auto want = p[nebulaLaw] >= 0.5f ? nebulaTopology (choice (p[12], nebula::modeCount)) : cloud::Topology::none;
         if (! placed)
             placed = true, active = want, before = p;
+        // round 190ie (issue #185): a synced delay whose tempo moved (and nothing else of its time): the lines' change
+        // spreads over the block (cloud::Controls::spread, Settings::lengthSpread) instead of the fixed glide's burst
+        tempoGlide = choice (p[1], 4) > 0 && lastBpm > 0.0 && bpm != lastBpm && p[1] == before[1] && p[2] == before[2] && p[3] == before[3];
+        lastBpm = bpm;
         if (want != active && change == Fade::none)
         {
             change = Fade::out;
@@ -2158,7 +2179,11 @@ public:
                 wet = 1.0f;
             }
             else
-                network.process (inL.data(), inR.data(), l, r, m, controls (q, bpm, active));
+            {
+                auto c = controls (q, bpm, active);
+                c.spread = tempoGlide && change == Fade::none ? m : 0;
+                network.process (inL.data(), inR.data(), l, r, m, c);
+            }
             for (int i = 0; i < m; ++i)
             {
                 auto w = wet;
@@ -2209,6 +2234,8 @@ private:
     }
 
     float lastClear = -1.0f;
+    double lastBpm = 0.0;
+    bool tempoGlide = false; // (this block: the synced delay's tempo moved)
     cloud::Network network;
     cloud::Topology active = cloud::Topology::none;
     Fade change = Fade::none;
@@ -2233,6 +2260,7 @@ protected:
         s.shape = 3;
         s.lineScale = delay * mult;
         s.lineSpread = sw;
+        s.lengthSpread = tempoGlide ? 1 : 0; // (round 190ie: VerbEffect::run spreads it over each chunk)
         // √F per pass of the delay: RT = 6·D / −log10 F, times the shape's measured decay multiple (which already holds
         // its line-length multiple); warp shortens the lines and so the decay
         const auto meanSec = delay * (1.0 - 0.53 * sw) / 1000.0; // (the warp fractions average 0.47)
