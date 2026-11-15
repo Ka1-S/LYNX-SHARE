@@ -10113,7 +10113,6 @@ countries: jp
 "Measured" = "実測"
 "Beats law: Classic plays as LYNX did before 0.1.28 (this project was saved then); Measured follows Live 12.4's renders" = "Beats の法則：Classic は 0.1.28 より前の LYNX と同じ鳴り方（このプロジェクトはその頃に保存）、実測は Live 12.4 のレンダーに従う"
 
-# --- Not in pt-BR.txt (yet)
 # round 190gz: Link Playlist tracks to mixer tracks (issue #170)
 "Link Playlist tracks to mixer tracks (current project) on/off" = "プレイリストのトラックをミキサートラックにリンク (このプロジェクト) オン/オフ"
 "Link Playlist tracks to mixer tracks (current project)" = "プレイリストのトラックをミキサートラックにリンク (このプロジェクト)"
@@ -10121,3 +10120,5 @@ countries: jp
 "Link Playlist tracks to mixer tracks (Track N with insert N; mute, solo, volume and pan on linked track headers)" = "プレイリストのトラックをミキサートラックにリンク (トラック N とインサート N。リンクしたトラックのヘッダーにミュート、ソロ、ボリューム、パン)"
 "New projects start with every Playlist track that holds clips linked to a mixer track (Track N to insert N when that leaves the sound unchanged); linked track headers show mute, solo, volume and pan. Also on the Settings › Project page, with the switch for the open project." = "新規プロジェクトでは、クリップのあるプレイリストの各トラックがミキサートラックにリンクされます (音が変わらない場合はトラック N をインサート N に)。リンクしたトラックのヘッダーにミュート、ソロ、ボリューム、パンが表示されます。設定 › プロジェクト ページにもあり、開いているプロジェクト用のスイッチもあります。"
 "Linked track: [LMB] mute / unmute its mixer track  [Ctrl][LMB] or [RMB] solo the Playlist track" = "リンクしたトラック: [LMB] ミキサートラックをミュート / 解除  [Ctrl][LMB] または [RMB] プレイリストのトラックをソロ"
+"Render ahead (lower CPU at small buffers)" = "先行レンダリング（小さいバッファでCPU負荷を軽減）"
+"Tracks nobody plays live are rendered a little ahead on another thread, so heavy projects hold small buffers. Inputs, the channels being played and everything they feed stay real-time; edits on the other tracks can be heard up to about 25 ms late." = "ライブで演奏されていないトラックを別スレッドで少し先にレンダリングし、重いプロジェクトでも小さいバッファで再生できるようにします。入力、演奏中のチャンネル、それらが送るすべてはリアルタイムのままです。ほかのトラックへの編集は最大で約25 ms遅れて聞こえることがあります。"

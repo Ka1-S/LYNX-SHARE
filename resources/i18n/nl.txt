@@ -10113,7 +10113,6 @@ countries: nl be
 "Measured" = "Gemeten"
 "Beats law: Classic plays as LYNX did before 0.1.28 (this project was saved then); Measured follows Live 12.4's renders" = "Beats-wet: Classic speelt zoals LYNX vóór 0.1.28 (dit project is toen opgeslagen); Gemeten volgt de renders van Live 12.4"
 
-# --- Not in pt-BR.txt (yet)
 # round 190gz: Link Playlist tracks to mixer tracks (issue #170)
 "Link Playlist tracks to mixer tracks (current project) on/off" = "Playlist-sporen koppelen aan mixersporen (huidig project) aan/uit"
 "Link Playlist tracks to mixer tracks (current project)" = "Playlist-sporen koppelen aan mixersporen (huidig project)"
@@ -10121,3 +10120,5 @@ countries: nl be
 "Link Playlist tracks to mixer tracks (Track N with insert N; mute, solo, volume and pan on linked track headers)" = "Playlist-sporen koppelen aan mixersporen (spoor N met insert N; dempen, solo, volume en pan in de koppen van gekoppelde sporen)"
 "New projects start with every Playlist track that holds clips linked to a mixer track (Track N to insert N when that leaves the sound unchanged); linked track headers show mute, solo, volume and pan. Also on the Settings › Project page, with the switch for the open project." = "Nieuwe projecten beginnen met elk Playlist-spoor met clips gekoppeld aan een mixerspoor (spoor N aan insert N als dat het geluid niet verandert); de koppen van gekoppelde sporen tonen dempen, solo, volume en pan. Ook op de pagina Instellingen › Project, met de schakelaar voor het open project."
 "Linked track: [LMB] mute / unmute its mixer track  [Ctrl][LMB] or [RMB] solo the Playlist track" = "Gekoppeld spoor: [LMB] het mixerspoor dempen / weer aan  [Ctrl][LMB] of [RMB] solo van het Playlist-spoor"
+"Render ahead (lower CPU at small buffers)" = "Vooruit renderen (minder CPU bij kleine buffers)"
+"Tracks nobody plays live are rendered a little ahead on another thread, so heavy projects hold small buffers. Inputs, the channels being played and everything they feed stay real-time; edits on the other tracks can be heard up to about 25 ms late." = "Sporen die niemand live speelt, worden op een andere thread iets vooruit gerenderd, zodat zware projecten kleine buffers aankunnen. Ingangen, de kanalen die gespeeld worden en alles wat ze voeden blijven realtime; bewerkingen op de andere sporen kunnen tot ongeveer 25 ms later hoorbaar zijn."

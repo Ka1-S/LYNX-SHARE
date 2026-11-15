@@ -70,6 +70,7 @@
  #include <mach/thread_policy.h>
  #include <pthread.h>
  #include <sys/qos.h>
+ #include <sys/sysctl.h>
 #elif JUCE_LINUX || JUCE_BSD
  #include <pthread.h>
  #include <sched.h>
@@ -355,13 +356,105 @@ void becomeTimeConstraintThread (double blockMs) noexcept
 }
 #endif
 
+// The render-ahead thread (round 190gq, core/RenderAhead.h): the workers' priority, except on macOS, where it is not
+// deadline work and must never join the device's Audio Workgroup (round 190gt joins the real-time workers): the
+// interactive QoS class only.
+void raiseRenderAheadThreadPriority()
+{
+   #if JUCE_MAC
+    pthread_set_qos_class_self_np (QOS_CLASS_USER_INTERACTIVE, 0);
+   #else
+    raiseAudioThreadPriority();
+   #endif
+}
+
+// Round 190gq (190gs Q7): the cores that give a block its full speed — physical cores (SMT siblings share one core's
+// units), and on hybrid CPUs only the performance class (a block waits for its slowest worker). 0 = unknown.
+int performanceCores()
+{
+   #if JUCE_WINDOWS
+    DWORD bytes = 0;
+    GetLogicalProcessorInformationEx (RelationProcessorCore, nullptr, &bytes);
+    if (bytes == 0)
+        return 0;
+    std::vector<std::uint8_t> buffer (bytes);
+    if (! GetLogicalProcessorInformationEx (RelationProcessorCore, reinterpret_cast<PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX> (buffer.data()), &bytes))
+        return 0;
+    int best = -1, count = 0;
+    for (DWORD at = 0; at < bytes;)
+    {
+        const auto* info = reinterpret_cast<const SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*> (buffer.data() + at);
+        if (info->Relationship == RelationProcessorCore)
+        {
+            const auto cls = (int) info->Processor.EfficiencyClass; // (higher = faster; all 0 on a non-hybrid CPU)
+            if (cls > best)
+            {
+                best = cls;
+                count = 0;
+            }
+            if (cls == best)
+                ++count;
+        }
+        if (info->Size == 0)
+            break;
+        at += info->Size;
+    }
+    return count;
+   #elif JUCE_MAC
+    int perf = 0;
+    auto size = sizeof (perf);
+    if (sysctlbyname ("hw.perflevel0.physicalcpu", &perf, &size, nullptr, 0) == 0 && perf > 0)
+        return perf;
+    int physical = 0;
+    size = sizeof (physical);
+    return sysctlbyname ("hw.physicalcpu", &physical, &size, nullptr, 0) == 0 ? physical : 0;
+   #elif JUCE_LINUX || JUCE_BSD
+    // sysfs: one (package, core) pair per physical core; on an Intel hybrid CPU only the cpu_core PMU's CPUs
+    std::vector<std::pair<int, int>> cores;
+    const juce::File root ("/sys/devices/system/cpu");
+    juce::String hybrid = juce::File ("/sys/devices/cpu_core/cpus").loadFileAsString().trim(); // e.g. "0-15"
+    auto inHybridSet = [&hybrid] (int cpu) {
+        if (hybrid.isEmpty())
+            return true;
+        for (const auto& range : juce::StringArray::fromTokens (hybrid, ",", {}))
+        {
+            const auto from = range.upToFirstOccurrenceOf ("-", false, false).getIntValue();
+            const auto to = range.contains ("-") ? range.fromFirstOccurrenceOf ("-", false, false).getIntValue() : from;
+            if (cpu >= from && cpu <= to)
+                return true;
+        }
+        return false;
+    };
+    for (int cpu = 0; cpu < 1024; ++cpu)
+    {
+        const auto dir = root.getChildFile ("cpu" + juce::String (cpu));
+        if (! dir.isDirectory())
+            break;
+        const auto core = dir.getChildFile ("topology/core_id").loadFileAsString().trim();
+        const auto package = dir.getChildFile ("topology/physical_package_id").loadFileAsString().trim();
+        if (core.isEmpty() || ! inHybridSet (cpu))
+            continue;
+        const std::pair<int, int> id { package.getIntValue(), core.getIntValue() };
+        if (std::find (cores.begin(), cores.end(), id) == cores.end())
+            cores.push_back (id);
+    }
+    return (int) cores.size();
+   #else
+    return 0;
+   #endif
+}
+
 int workerCount()
 {
     // diagnostics: LYNX_WORKERS=n fixes the number of extra threads
     if (const auto forced = juce::SystemStats::getEnvironmentVariable ("LYNX_WORKERS", {}); forced.isNotEmpty())
         return juce::jlimit (0, 31, forced.getIntValue());
 
-    // the audio thread works too; leave one core free for the UI
+    // round 190gq (190gs Q7): the audio thread and the workers on the performance cores, one per physical core, the
+    // audio thread's own included (the SMT siblings and the slower cores are left to the UI and the rest). Before:
+    // logical CPUs − 2 (7 workers on 6 cores / 12 threads). Unknown topology: as before.
+    if (const auto cores = performanceCores(); cores > 0)
+        return juce::jlimit (0, 7, cores - 1);
     const auto cores = (int) std::thread::hardware_concurrency();
     return juce::jlimit (0, 7, cores - 2);
 }
@@ -458,7 +551,7 @@ AudioEngine::AudioEngine (bool openAudioDevice, int workerThreads, bool userPlug
         player.setProcessor (&graph);
         // the settings that do not need the device (the window reads them; round 190go: built before the device opens)
         if (rackProcessor != nullptr)
-            rackProcessor->getRenderer().setProfiling (true); // per-unit CPU for the CPU meter and the glitch log
+            rackProcessor->setProfiling (true); // per-unit CPU for the CPU meter and the glitch log (both renderers: 190gq)
         midiPrefs = midiPrefsShared = prefs::MidiPrefs::fromText (midiSettingsFile().loadFileAsString().toStdString());
         performanceMidiChannel.store (midiPrefs.performanceChannel);
         controllerIo.loadProfiles (controllerProfilesFolder());
@@ -570,6 +663,8 @@ AudioLogger& AudioEngine::getAudioLogger()
 
 AudioEngine::~AudioEngine()
 {
+    if (rackProcessor != nullptr) // (round 190gq: the render-ahead thread stops before the snapshots are freed)
+        rackProcessor->haltRenderAhead();
     if (pluginHoldOwner.load() == this) // (round 190ap: the hold goes with its project's engine)
     {
         pluginHoldOwner.store (nullptr);
@@ -621,10 +716,12 @@ void AudioEngine::buildInitialGraph()
     graph.setPlayConfigDetails (0, 2, transport.sampleRate.load(), 512);
 
     auto output = graph.addNode (std::make_unique<IONode> (IONode::audioOutputNode));
-    auto rack = graph.addNode (std::make_unique<ChannelRackProcessor> (transport, rackExchange, liveEvents, midiEvents, meters, workers.get()));
+    auto rack = graph.addNode (std::make_unique<ChannelRackProcessor> (transport, rackExchange, liveEvents, midiEvents, meters, workers.get(),
+                                                                       raiseRenderAheadThreadPriority));
     rackProcessor = dynamic_cast<ChannelRackProcessor*> (rack->getProcessor());
     if (rackProcessor != nullptr)
     {
+        rackProcessor->setRenderAheadTargets (&renderAheadTargets); // (round 190gq)
         rackProcessor->setLiveInput (&liveInput);
         rackProcessor->setHardwareOutput (&hwOutput);
         rackProcessor->setPerformance (performanceLive.get());
@@ -1553,7 +1650,7 @@ void AudioEngine::clearScoreLog()
 
 NoteMask AudioEngine::soundingKeys (int channel) const noexcept
 {
-    return rackProcessor != nullptr ? rackProcessor->getRenderer().soundingKeys (channel) : NoteMask {};
+    return rackProcessor != nullptr ? rackProcessor->soundingKeys (channel) : NoteMask {};
 }
 
 std::vector<int> AudioEngine::heldInputKeys() const
@@ -3060,6 +3157,7 @@ void AudioEngine::setMidiPrefs (const prefs::MidiPrefs& p, bool save)
         const juce::SpinLock::ScopedLockType lock (midiPrefsLock);
         midiPrefsShared = p;
     }
+    publishRenderAheadTargets(); // (round 190gq: a MIDI input's own target channel is played live)
     performanceMidiChannel.store (p.performanceChannel);
     footPedalNoteOff.store (p.footPedalNoteOff);
     if (! p.pickup)
@@ -3553,6 +3651,7 @@ void AudioEngine::editLevels (const std::function<void (Song&)>& edit, bool undo
     // snapshot rebuild per move. While the song played that stalled the message thread and the fader (and the sound)
     // moved in steps of ~0.2 s. Here the edit changes only levels, so the snapshot in use takes the new values through
     // its live levels; the full publish follows once the mouse is released (timerCallback).
+    renderAheadTargets.tweaked(); // (round 190gq: the part rendered ahead hears a drag within about a block)
     if (publishedLevels == nullptr || ! publishedLevels->matches (song))
     {
         editSong (edit, undoable);
@@ -3884,6 +3983,44 @@ void AudioEngine::publishSelection()
             extraLiveChannels[(std::size_t) extra++].store (c);
 
     extraLiveCount.store (extra);
+    publishRenderAheadTargets();
+}
+
+// Render-ahead (round 190gq, core/RenderAhead.h): the channels notes are played into live stay real-time — the selected
+// channels (the typing keyboard, a MIDI input on "the selected channels"), each MIDI input's own target channel, the
+// channels locked to a MIDI input ("Receive notes from")
+void AudioEngine::publishRenderAheadTargets()
+{
+    std::array<int, renderahead::Targets::maxChannels> channels {};
+    int count = 0;
+    auto add = [&] (int c) {
+        if (c < 0 || count >= (int) channels.size() || std::find (channels.begin(), channels.begin() + count, c) != channels.begin() + count)
+            return;
+        channels[(std::size_t) count++] = c;
+    };
+    add (selectedChannel);
+    for (const auto c : selectedChannels)
+        add (c);
+    for (const auto& input : midiPrefs.inputs)
+        if (input.enabled)
+            add (input.target);
+    for (std::size_t c = 0; c < song.channels.size(); ++c)
+        if (! song.channels[c].receiveFrom.empty())
+            add ((int) c);
+    // hosted plugin editors on screen: their channel or insert
+    std::array<int, renderahead::Targets::maxTracks> tracks {};
+    int trackCount = 0;
+    for (const auto& e : openEditors)
+    {
+        if (e.track >= 0 && trackCount < (int) tracks.size())
+            tracks[(std::size_t) trackCount++] = e.track;
+        if (e.find)
+            if (const auto* ref = e.find (song))
+                for (std::size_t c = 0; c < song.channels.size(); ++c)
+                    if (&song.channels[c].plugin == ref)
+                        add ((int) c);
+    }
+    renderAheadTargets.publish (channels.data(), count, tracks.data(), trackCount);
 }
 
 namespace
@@ -4870,7 +5007,7 @@ void AudioEngine::publishReleasedTargets()
             if (a >= (int) song.automations.size() || ! song.automations[(std::size_t) a].isLive())
                 slots.push_back (a);
     }
-    rackProcessor->getRenderer().setReleasedSlots (slots);
+    rackProcessor->setReleasedSlots (slots);
 }
 
 void AudioEngine::tweakReleased (const AutomationTarget& target)
@@ -5014,7 +5151,7 @@ void AudioEngine::updateAutomationRecording (bool active)
         }
         if (slots.empty() && ! automationOverrideActive)
             return;
-        rackProcessor->getRenderer().setOverriddenSlots (slots);
+        rackProcessor->setOverriddenSlots (slots);
         automationOverrideActive = ! slots.empty();
     };
 
@@ -5856,6 +5993,25 @@ AudioEngine::DropoutInfo AudioEngine::dropoutInfo() const
     return d;
 }
 
+const renderahead::Stats* AudioEngine::renderAheadStats() const noexcept
+{
+    return rackProcessor != nullptr ? &rackProcessor->renderAheadStats() : nullptr;
+}
+
+void AudioEngine::setEditorOpen (const void* key, std::function<PluginRef* (Song&)> find, int track, bool open)
+{
+    openEditors.erase (std::remove_if (openEditors.begin(), openEditors.end(), [key] (const OpenEditor& e) { return e.key == key; }), openEditors.end());
+    if (open)
+        openEditors.push_back ({ key, std::move (find), track });
+    publishRenderAheadTargets();
+}
+
+void AudioEngine::setRenderAheadAlways (bool always) noexcept
+{
+    if (rackProcessor != nullptr)
+        rackProcessor->setRenderAheadAlways (always);
+}
+
 juce::String AudioEngine::describeRealtime (bool withUnits) const
 {
     juce::String text;
@@ -5895,6 +6051,17 @@ juce::String AudioEngine::describeRealtime (bool withUnits) const
              << (d.slowest.isNotEmpty() ? ", slowest " + d.slowest + " " + juce::String (d.slowestMs, 2) + " ms" : juce::String()) << "\n";
     if (latencyRepublishes > 0)
         text << "  latency changes re-planned PDC " << latencyRepublishes << " times (last: unit " << lastLatencyChange << ")\n";
+    if (rackProcessor != nullptr) // (round 190gq: Options › Audio settings › "Render ahead")
+    {
+        const auto& r = rackProcessor->renderAheadStats();
+        auto n = [] (const std::atomic<std::uint64_t>& v) { return juce::String ((juce::int64) v.load (std::memory_order_relaxed)); };
+        text << "  render ahead: " << (renderAheadOption().load() ? "on" : "off") << ", " << (r.engaged.load() ? "running" : "not running")
+             << ", window " << r.window.load() << " samples; blocks " << n (r.blocks) << ": from the ring " << n (r.fromRing) << ", waited "
+             << n (r.waited) << ", rendered in the callback " << n (r.inline_) << "; dropped " << n (r.flushes) << ", drained " << n (r.drains)
+             << ", started " << n (r.engagements) << ", states taken at once " << n (r.statesSwapped) << ", channels joined live " << n (r.promoted)
+             << ", partition changes " << n (r.partitionChanges) << ", boundary mismatches " << n (r.splitMismatches) << "; ahead "
+             << r.aheadChannels.load() << " channels / " << r.aheadTracks.load() << " inserts, boundary " << r.boundary.load() << "\n";
+    }
     if (withUnits && heaviestUnits.empty())
         text << "  heaviest: not measured yet\n";
     if (withUnits && ! heaviestUnits.empty())
@@ -6835,7 +7002,12 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
         // master sync out (round 165f): this part's clock / MTC messages, time-stamped for the sender thread
         midiSync.subBlock (transport.positionTicks.load (std::memory_order_relaxed), tps, n, done, playing);
 
+        // (round 190gq: render-ahead follows the device callback's blocks while the rack runs inside it)
+        transport.callbackSamples.store (numSamples, std::memory_order_relaxed);
+        transport.callbackOffset.store (done, std::memory_order_relaxed);
+        transport.inDeviceCallback.store (true, std::memory_order_relaxed);
         player.audioDeviceIOCallbackWithContext (inputs.data(), numInputChannels, outputs.data(), numOutputChannels, n, context);
+        transport.inDeviceCallback.store (false, std::memory_order_relaxed);
         routeOutputs (outputs.data(), numOutputChannels, n);
 
         if (takesLocked) // the tapped takes' part of this block, now rendered (round 168x)
@@ -6952,8 +7124,9 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
         ping.process (in, clickOut.data(), 2, numSamples);
     }
 
-    // the block is done: the workers sleep until the next one instead of spinning (REA round 116)
-    if (workers != nullptr)
+    // the block is done: the workers sleep until the next one instead of spinning (REA round 116) — unless render-ahead
+    // runs: its thread hands them blocks between the callbacks and parks them itself (round 190gq)
+    if (workers != nullptr && (rackProcessor == nullptr || ! rackProcessor->renderAheadOwnsWorkers()))
         workers->park();
 
     // the live clock (round 170d): the next block's musical position — during the count-in the metronome's count before

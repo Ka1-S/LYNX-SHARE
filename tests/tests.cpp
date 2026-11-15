@@ -193,6 +193,8 @@
 #include "ui/I18nData.h"
 #include "ui/I18nLocale.h"
 #include "core/CrashReport.h"
+#include "core/RenderAhead.h"
+#include "core/WorkerPool.h"
 
 namespace
 {
@@ -17790,4 +17792,5 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "SmartTails190gpTests.inc"
 #include "ApexMeter190gpTests.inc"
 #include "Toolchain190gtTests.inc"
+#include "RenderAhead190gqTests.inc"
 #include "Rollup028Tests.inc" // round 190fv: semantic interactions of the 0.1.28 rollup

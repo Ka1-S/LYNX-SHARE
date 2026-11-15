@@ -10113,7 +10113,6 @@ countries: tw hk mo
 "Measured" = "實測"
 "Beats law: Classic plays as LYNX did before 0.1.28 (this project was saved then); Measured follows Live 12.4's renders" = "Beats 規律：Classic 按 0.1.28 之前的 LYNX 播放（此專案當時儲存）；實測遵循 Live 12.4 的渲染"
 
-# --- Not in pt-BR.txt (yet)
 # round 190gz: Link Playlist tracks to mixer tracks (issue #170)
 "Link Playlist tracks to mixer tracks (current project) on/off" = "將播放清單音軌連結到混音器軌道（目前專案）開/關"
 "Link Playlist tracks to mixer tracks (current project)" = "將播放清單音軌連結到混音器軌道（目前專案）"
@@ -10121,3 +10120,5 @@ countries: tw hk mo
 "Link Playlist tracks to mixer tracks (Track N with insert N; mute, solo, volume and pan on linked track headers)" = "將播放清單音軌連結到混音器軌道（音軌 N 對應插入軌 N；已連結音軌的軌頭顯示靜音、獨奏、音量和聲像）"
 "New projects start with every Playlist track that holds clips linked to a mixer track (Track N to insert N when that leaves the sound unchanged); linked track headers show mute, solo, volume and pan. Also on the Settings › Project page, with the switch for the open project." = "新專案開始時，每條含有片段的播放清單音軌都連結到一條混音器軌道（在不改變聲音時，音軌 N 對應插入軌 N）；已連結音軌的軌頭顯示靜音、獨奏、音量和聲像。也在 設定 › 專案 頁面中，並附有目前開啟專案的開關。"
 "Linked track: [LMB] mute / unmute its mixer track  [Ctrl][LMB] or [RMB] solo the Playlist track" = "已連結音軌：[LMB] 將其混音器軌道靜音 / 取消靜音  [Ctrl][LMB] 或 [RMB] 獨奏該播放清單音軌"
+"Render ahead (lower CPU at small buffers)" = "提前算繪（小緩衝區下更省 CPU）"
+"Tracks nobody plays live are rendered a little ahead on another thread, so heavy projects hold small buffers. Inputs, the channels being played and everything they feed stay real-time; edits on the other tracks can be heard up to about 25 ms late." = "無人即時演奏的音軌會在另一個執行緒上稍微提前算繪，讓大型專案也能用小緩衝區播放。輸入、正在演奏的通道及其送往的一切都保持即時；對其他音軌的編輯最多可能延遲約 25 毫秒才聽到。"

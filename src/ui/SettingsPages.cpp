@@ -6,6 +6,7 @@
 #include "platform/FileTypes.h"
 #include "platform/Package.h"
 
+#include "core/RenderAhead.h"
 #include "core/FlSettings.h"
 #include "core/LayoutStyle.h"
 #include "core/LynxExtras.h"
@@ -741,7 +742,7 @@ public:
                                                                  &formatLabel, &formatBox, &takeNames, &latencyTitle, &latencyText, &pingOutLabel, &pingOutBox,
                                                                  &pingInLabel, &pingInBox, &measureButton, &pingNote, &useMeasured, &offsetLabel, &offsetSlider, &offsetNote,
                                                                  &mixerTitle, &metronomeTrackLabel, &metronomeTrackBox, &metronomeTrackNote, &playTruncated, &resetPlugins,
-                                                                 &autoClose, &cpuTitle, &threadGenerators, &threadMixer, &smartDisableAll, &resamplingLabel, &resamplingBox, &resamplingNote })
+                                                                 &autoClose, &cpuTitle, &threadGenerators, &threadMixer, &smartDisableAll, &renderAhead, &resamplingLabel, &resamplingBox, &resamplingNote })
             add (*c);
         setupRecordingControls();
         setupMixerControls();
@@ -864,7 +865,7 @@ private:
         offsetSlider.setBounds (r.row (offsetLabel, 200));
         offsetNote.setBounds (r.full (32).translated (0, -3));
         r.section (cpuTitle); // (FL's order: Input / output, CPU, Mixer)
-        for (auto* t : { &threadGenerators, &threadMixer, &smartDisableAll })
+        for (auto* t : { &threadGenerators, &threadMixer, &smartDisableAll, &renderAhead })
             t->setBounds (r.full (24));
         r.section (mixerTitle);
         resamplingBox.setBounds (r.row (resamplingLabel, 260)); // (FL: the Mixer panel's first row)
@@ -939,6 +940,11 @@ private:
         flag (threadMixer, tr ("Multithreaded mixer processing"), tr ("May increase CPU performance"), o.multithreadMixer);
         flag (smartDisableAll, tr ("Smart disable"),
               tr ("May increase CPU performance. Off: every effect is processed all the time, whatever its own Smart disable switch says"), o.smartDisable);
+        // LYNX extra (round 190gq, core/RenderAhead.h; owner decision O22: on by default)
+        flag (renderAhead, tr ("Render ahead (lower CPU at small buffers)"),
+              tr ("Tracks nobody plays live are rendered a little ahead on another thread, so heavy projects hold small buffers. Inputs, the "
+                  "channels being played and everything they feed stay real-time; edits on the other tracks can be heard up to about 25 ms late."),
+              renderAheadOption());
 
         styleLabel (resamplingLabel, tr ("Resampling quality"));
         styleCombo (resamplingBox);
@@ -1365,7 +1371,7 @@ private:
     // FL's Settings › Audio options of round 190bx (core/FlSettings.h)
     juce::ToggleButton autoClose;
     SectionTitle cpuTitle { tr ("CPU") };
-    juce::ToggleButton threadGenerators, threadMixer, smartDisableAll;
+    juce::ToggleButton threadGenerators, threadMixer, smartDisableAll, renderAhead;
     juce::Label resamplingLabel, resamplingNote;
     juce::ComboBox resamplingBox;
     juce::Label metronomeTrackLabel, metronomeTrackNote;
