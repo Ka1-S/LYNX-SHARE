@@ -436,6 +436,7 @@ private:
     void beginKeyZoom (const juce::MouseEvent&);
     // round 190j: the zoom wheel (FL's VZoomSelect) at the right end of the overview strip
     static constexpr int zoomWheelSize = 16;
+    bool zoomWheelHover = false; // (round 190he, issue #152 "no vertical zoom found": the box lights up under the mouse)
     juce::Rectangle<int> zoomWheelArea() const;
     int zoomAnchorKey() const; // the key whose centre stays put: the middle of the notes in view, else of the view
     void setRowHeightAround (int height, int key, int centreY);
