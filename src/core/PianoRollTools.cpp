@@ -580,6 +580,8 @@ void chop (Pattern& pattern, const std::vector<int>& indices, const Score& sourc
                     piece.length = length;
                     piece.key = std::clamp (n.key + p.key - 60, 0, 127);
                     piece.slide = p.slide;
+                    // (issue #108: each piece keeps its part of the note's MPE curves)
+                    piece.curves = notecurves::slice (n.curves, (double) (pos - n.start), (double) (pos - n.start + length));
                     blendLevels (piece, p, o.levels);
                     out.push_back (piece);
                 }

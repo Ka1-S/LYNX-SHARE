@@ -2849,6 +2849,15 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
             return; // (the zone's own configuration)
         if (mpeEvents[0].type == mpe::InEvent::Type::expr)
         {
+            // MPE stage 2 (issue #108): while a take records, each change also goes into the held note's curves
+            const auto taking = transport.recording.load() && (transport.playing.load() || isCountingIn());
+            auto tick = 0.0;
+            if (taking)
+            {
+                const auto now = juce::Time::getMillisecondCounterHiRes();
+                const auto stamped = m.getTimeStamp() * 1000.0;
+                tick = recordTickFor (std::abs (stamped - now) < 1000.0 ? stamped : now);
+            }
             for (int k = 0; k < count; ++k)
             {
                 const auto& x = mpeEvents[k];
@@ -2865,6 +2874,14 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
                     e.velocity = x.expr == mpe::Expr::pressure ? mpe::modYOfPressure (x.value) : x.value;
                     if (e.channel >= 0)
                         midiEvents.push (e);
+                    if (taking && e.channel >= 0)
+                    {
+                        RecordedEvent r { tick, e.channel, e.key, 0.0f, false };
+                        r.lane = (std::int8_t) (x.expr == mpe::Expr::pitch ? NoteCurveLane::pitch : x.expr == mpe::Expr::timbre ? NoteCurveLane::timbre
+                                                                                                                                  : NoteCurveLane::pressure);
+                        r.value = x.value;
+                        midiRecordQueue.push (r);
+                    }
                 }
             }
             return;
@@ -3024,7 +3041,7 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
         // (round 170d: during the count-in too; the time is the device's, against the audio clock)
         if (taking && mpeNote != nullptr) // (the "on": its bend and timbre; the "off": its peak pressure)
             midiRecordQueue.push ({ tick, e.channel, e.key, e.velocity, noteOn, true, mpe::finePitchOfCents (mpeNote->cents), mpeNote->timbre,
-                                    mpe::modYOfPressure (mpeNote->pressure) });
+                                    mpe::modYOfPressure (mpeNote->pressure), -1, mpeNote->cents });
         else if (taking)
             midiRecordQueue.push ({ tick, e.channel, e.key, e.velocity, noteOn });
         if (slotTaking.load (std::memory_order_relaxed)) // a slot of the clip grid records (round 190bv)
@@ -3380,6 +3397,12 @@ void AudioEngine::updateRecording()
 
     while (midiRecordQueue.pop (e))
     {
+        if (e.lane >= 0) // (an MPE note's expression: into its held note, issue #108)
+        {
+            if (recordOptions.recordNotes)
+                recorder.add (song, e);
+            continue;
+        }
         // (count-in notes: onto the start within the catch window, else at their real time; round 170d)
         if (! recordOptions.recordNotes || ! catchEarlyNote (e, takeCatch) || outsidePunch (e)) // recording filter: notes off
             continue;

@@ -3251,6 +3251,21 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
             }
             continue;
         }
+        if (e.port < 0 && e.type == NoteEvent::Type::voiceProp && e.expression)
+        {
+            // MPE stage 2 (issue #108, core/NoteCurves.h): a song note's pitch / timbre / pressure curve moving while it
+            // sounds, as a played MPE note's (the live queue): the channel's tuning on top of its own cents
+            if (e.sampleOffset > position)
+            {
+                instrument.render (l + position, r + position, e.sampleOffset - position, gl, gr);
+                position = e.sampleOffset;
+            }
+            if (! c.muted)
+                instrument.noteExpression (e.key, e.prop, e.velocity,
+                                           c.misc.fineTune + instrument.wheelCents()
+                                               + (c.misc.mainPitch && c.instrument != InstrumentKind::audioClip ? state.song.masterPitch : 0.0f));
+            continue;
+        }
         if (e.port >= 0 || e.type == NoteEvent::Type::voiceProp) // (what this channel sends out on a port is for the others)
             continue;
 

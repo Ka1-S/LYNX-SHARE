@@ -2992,7 +2992,10 @@ juce::String toJson (const Song& song, bool stampVersion)
             // [.., pan, fine pitch, muted] only when not default
             // [.., release, mod X, mod Y (, colour)]
             // [.., colour, group, chance, velocity range, chance group, play one] (round 187c)
-            const auto chanced = n.hasChance() || (exactNumbers && n.chanceOne);
+            // [.., chance group, play one, curves] (issue #108, MPE stage 2: core/NoteCurves.h): the note's pitch / timbre /
+            // pressure curves, each a flat [tick, value, tick, value, ...] list (ticks from the note's start), only with curves
+            const auto curved = n.curves.has();
+            const auto chanced = n.hasChance() || (exactNumbers && n.chanceOne) || curved;
             const auto extra = n.release != 0.5f || n.modX != 0.5f || n.modY != 0.5f || n.colour != 0 || n.group != 0 || chanced;
             if (n.pan != 0.0f || n.finePitch != 0.0f || n.muted || n.slide || n.porta || extra)
             {
@@ -3015,6 +3018,21 @@ juce::String toJson (const Song& song, bool stampVersion)
                     note.add (projectNumber (n.velocityRange, 10000.0f));
                     note.add (n.chanceGroup);
                     note.add (n.chanceOne);
+                }
+                if (curved)
+                {
+                    juce::Array<juce::var> lanes;
+                    for (int lane = 0; lane < noteCurveLaneCount; ++lane)
+                    {
+                        juce::Array<juce::var> points;
+                        for (const auto& q : n.curves->lane ((NoteCurveLane) lane))
+                        {
+                            points.add (projectNumber (q.tick, 100.0f));
+                            points.add (projectNumber (q.value, lane == (int) NoteCurveLane::pitch ? 100.0f : 10000.0f));
+                        }
+                        lanes.add (points);
+                    }
+                    note.add (lanes);
                 }
             }
 
@@ -3773,6 +3791,16 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
                             note.chanceGroup = juce::jmax (0, (int) n[17]);
                             note.chanceOne = (bool) n[18];
                         }
+                        if (n.size() >= 20) // (issue #108: the note's MPE curves)
+                            if (const auto* lanes = n[19].getArray())
+                            {
+                                NoteCurves curves;
+                                for (int lane = 0; lane < juce::jmin (noteCurveLaneCount, lanes->size()); ++lane)
+                                    if (const auto* points = (*lanes)[lane].getArray())
+                                        for (int i = 0; i + 1 < points->size() && (std::size_t) (i / 2) < notecurves::maxPoints; i += 2)
+                                            curves.lanes[(std::size_t) lane].push_back ({ (float) (double) (*points)[i], (float) (double) (*points)[i + 1] });
+                                note.curves = std::move (curves);
+                            }
                     }
 
                     if (note.channel >= 0 && note.channel < (int) song.channels.size())

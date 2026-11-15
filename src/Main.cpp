@@ -1421,6 +1421,16 @@ public:
             return;
         }
 
+        if (args.contains ("--mpeplaytest190hy"))
+        {
+            // LYNX --mpeplaytest190hy plugin.(clap|vst3) report.txt (round 190hy, issue #108): a song note with a pitch
+            // curve played by a hosted plugin with MPE on, through the whole song path (scheduler, renderer, the wrapper's
+            // MPE / CLAP note expressions), rendered offline; the pitch heard is measured (report.txt, report.wav)
+            const auto i = args.indexOf ("--mpeplaytest190hy");
+            runMpePlayTest190hy (args[i + 1].unquoted(), args[i + 2].unquoted());
+            return;
+        }
+
         if (args.contains ("--editortest"))
         {
             // LYNX.exe --editortest plugin.vst3 report.txt ["name"]: opens the plugin's own editor in a window for a few
@@ -2343,6 +2353,16 @@ public:
         if (args.contains ("--bandlabshot"))
         {
             runBandlabShot (args[args.indexOf ("--bandlabshot") + 1].unquoted());
+            quit();
+            return;
+        }
+
+        if (args.contains ("--mpeshot190hy"))
+        {
+            // LYNX --mpeshot190hy prefix: round 190hy (issue #108, MPE stage 2) off-screen: the Piano roll's MPE lanes (pitch
+            // bend, slide, pressure) over notes with curves in Pattern workflow, then the Clip-launch layout's Clip page with
+            // its Notes and MPE tabs. Writes prefix-checks.txt.
+            runMpeShot190hy (args[args.indexOf ("--mpeshot190hy") + 1].unquoted());
             quit();
             return;
         }
@@ -9264,6 +9284,117 @@ private:
     // instrument with the wrapper's MPE switch on gets each note on its own member channel, its fine pitch / Mod X /
     // Mod Y as tuning / brightness / pressure note expressions before the note on, and a sounding note's expression
     // on that note's channel alone. The plugin writes down what it received; no window, no audio device.
+    // Round 190hy: see --mpeplaytest190hy. Note A (C4, 1 s): its pitch curve holds 0 for 0.5 s, rises an octave over
+    // 0.25 s and holds it; then note B (G4, 0.5 s), no curve: it must not inherit A's bend. The frequencies come from the
+    // rendered audio's zero crossings (a silent logging plugin: its log shows the expressions instead).
+    void runMpePlayTest190hy (const juce::String& pluginPath, const juce::String& reportPath)
+    {
+        const auto log = juce::File (reportPath).getSiblingFile (juce::File (reportPath).getFileNameWithoutExtension() + "-plugin.txt");
+        log.deleteFile();
+       #if JUCE_WINDOWS
+        _putenv_s ("LYNX_TEST_MPE_REPORT", log.getFullPathName().toRawUTF8());
+       #else
+        setenv ("LYNX_TEST_MPE_REPORT", log.getFullPathName().toRawUTF8(), 1);
+       #endif
+        juce::String report;
+        auto ok = false;
+        const auto wavFile = juce::File (reportPath).withFileExtension ("wav");
+        constexpr double rate = 44100.0;
+        {
+            lynx::AudioEngine offline (false);
+            auto& host = offline.getPluginHost();
+            report << "plugins_in_file=" << host.addPluginFile (juce::File (pluginPath)) << "\n";
+            const auto wanted = juce::File (pluginPath).hasFileExtension ("clap") ? "CLAP" : "VST3";
+            std::optional<juce::PluginDescription> type;
+            for (const auto& t : host.getKnownPlugins().getTypes())
+                if (t.pluginFormatName == wanted && t.isInstrument && ! type)
+                    type = t;
+            report << "format=" << wanted << " found=" << (type ? type->name : juce::String ("none")) << "\n";
+            if (type)
+            {
+                lynx::Song s;
+                s.mixer = lynx::Song::defaultMixer (2);
+                s.bpm = 120.0;
+                lynx::ChannelDef c;
+                c.name = type->name.toStdString();
+                c.instrument = lynx::InstrumentKind::plugin;
+                c.plugin.id = type->createIdentifierString().toStdString();
+                c.plugin.name = type->name.toStdString();
+                c.plugin.mpe = true;
+                c.mixerTrack = 1;
+                s.channels.push_back (c);
+                s.patterns.emplace_back();
+                auto& p = s.patterns[0];
+                lynx::Note a;
+                a.channel = 0;
+                a.key = 60;
+                a.length = 2 * lynx::ppq;
+                a.velocity = 0.8f;
+                lynx::NoteCurves curves;
+                curves.lane (lynx::NoteCurveLane::pitch) = { { 0.0f, 0.0f }, { (float) lynx::ppq, 0.0f }, { 1.5f * (float) lynx::ppq, 1200.0f },
+                                                             { 2.0f * (float) lynx::ppq, 1200.0f } };
+                a.curves = curves;
+                auto b = a;
+                b.key = 67;
+                b.start = 2 * lynx::ppq;
+                b.length = lynx::ppq;
+                b.curves.clear();
+                p.notes = { a, b };
+                p.lengthTicks = 16 * lynx::ppq; // (one pass: the notes play once in the 1.2 s rendered)
+                offline.setSong (std::move (s));
+                wavFile.deleteFile();
+                juce::WavAudioFormat wav;
+                std::unique_ptr<juce::AudioFormatWriter> writer (wav.createWriterFor (wavFile.createOutputStream().release(), rate, 2, 24, {}, 0));
+                const auto peak = writer != nullptr ? offline.renderOffline (1.6, rate, writer.get()) : 0.0f;
+                writer.reset();
+                report << "peak=" << peak << "\n";
+                ok = writer == nullptr && wavFile.existsAsFile();
+            }
+        } // (the plugin writes its log, if any, as it is destroyed)
+
+        // the frequency of [from, to) seconds of the left channel from its rising zero crossings
+        juce::AudioBuffer<float> audio;
+        {
+            juce::AudioFormatManager formats;
+            formats.registerBasicFormats();
+            if (std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (wavFile)); reader != nullptr)
+            {
+                audio.setSize (1, (int) reader->lengthInSamples);
+                reader->read (&audio, 0, (int) reader->lengthInSamples, 0, true, false);
+            }
+        }
+        const auto frequency = [&audio] (double from, double to) {
+            const auto* x = audio.getReadPointer (0);
+            const auto n = audio.getNumSamples();
+            long first = -1, last = -1;
+            auto crossings = 0;
+            for (auto i = juce::jmax (1, (int) (from * rate)); i < juce::jmin (n, (int) (to * rate)); ++i)
+                if (x[i - 1] <= 0.0f && x[i] > 0.0f)
+                {
+                    if (first < 0)
+                        first = i;
+                    else
+                        ++crossings, last = i;
+                }
+            return crossings > 0 ? crossings * rate / (double) (last - first) : 0.0;
+        };
+        if (audio.getNumSamples() > 0 && audio.getMagnitude (0, 0, audio.getNumSamples()) > 0.001f)
+        {
+            const auto before = frequency (0.1, 0.45), during = frequency (0.55, 0.7), after = frequency (0.8, 0.98), next = frequency (1.1, 1.45);
+            report << "a_before_hz=" << before << " a_rising_hz=" << during << " a_after_hz=" << after << " b_hz=" << next << "\n";
+            report << "a_after_over_before=" << (before > 0.0 ? after / before : 0.0) << " (an octave: 2)\n";
+            report << "b_over_a_before=" << (before > 0.0 ? next / before : 0.0) << " (a fifth: 1.498)\n";
+        }
+        else
+            report << "audio=silent\n";
+        if (log.existsAsFile())
+            report << "--- plugin log ---\n" << log.loadFileAsString();
+        report << "result=" << (ok ? "RENDERED" : "FAILED") << "\n";
+        juce::File (reportPath).replaceWithText (report);
+        setApplicationReturnValue (ok ? 0 : 1);
+        quit();
+    }
+
     void runMpeTest (const juce::String& pluginPath, const juce::String& reportPath)
     {
         const auto log = juce::File (reportPath).getSiblingFile (juce::File (reportPath).getFileNameWithoutExtension() + "-plugin.txt");
@@ -24715,6 +24846,119 @@ private:
         write (strip, "generate-panels");
         checks << "settings saved with the project: " << (offline.getSong().midiGenerate.stacksOptions.sequence.size() == 2 ? "OK" : "FAIL") << "\n";
         juce::File (prefix + "-checks.txt").replaceWithText (checks);
+    }
+
+    // Round 190hy: see --mpeshot190hy
+    void runMpeShot190hy (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        lynx::MainComponent ui (offline, false);
+        const auto size = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_SNAPSHOT_SIZE", "1600x900"), "x", "");
+        ui.setSize (juce::jlimit (800, 3840, size[0].getIntValue()), juce::jlimit (450, 2160, size[1].getIntValue()));
+        const auto write = [&prefix, &ui] (const char* name) {
+            const auto file = lynx::shot::file (juce::File (prefix + "-" + name + ".png"));
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (lynx::shot::snapshot (ui), out);
+        };
+        ui.setVisible (true); // (not on the desktop: only so the Clip page sees itself shown and docks the Piano roll)
+        offline.editSong ([] (lynx::Song& s) {
+            if (s.channels.empty())
+                s.channels.resize (1);
+            s.channels[0].name = "MPE lead";
+            s.channels[0].mixerTrack = 1;
+            if (s.mixer.size() < 2)
+                s.mixer.resize (2);
+            while (s.patterns.empty())
+                s.patterns.emplace_back();
+            auto& p = s.patterns[0];
+            p.name = "MPE take";
+            p.notes.clear();
+            // four notes as an MPE controller plays them: a slide up an octave, a vibrato, a fall, a held chord tone
+            const auto note = [&p] (std::int64_t start, std::int64_t length, int key, lynx::NoteCurves c, float modX = 0.5f) {
+                lynx::Note n;
+                n.channel = 0;
+                n.start = start;
+                n.length = length;
+                n.key = key;
+                n.modX = modX;
+                n.curves = std::move (c);
+                p.notes.push_back (n);
+            };
+            const auto beat = (float) lynx::ppq;
+            lynx::NoteCurves glide;
+            glide.lane (lynx::NoteCurveLane::pitch) = { { 0.0f, 0.0f }, { beat * 0.5f, 0.0f }, { beat * 1.5f, 1200.0f }, { beat * 2.0f, 1200.0f } };
+            glide.lane (lynx::NoteCurveLane::timbre) = { { 0.0f, 0.3f }, { beat * 2.0f, 0.85f } };
+            glide.lane (lynx::NoteCurveLane::pressure) = { { 0.0f, 0.2f }, { beat * 0.4f, 0.9f }, { beat * 1.6f, 0.7f }, { beat * 2.0f, 0.0f } };
+            note (0, 2 * lynx::ppq, 60, glide, 0.3f);
+            lynx::NoteCurves vibrato;
+            for (int k = 0; k <= 24; ++k)
+                vibrato.lane (lynx::NoteCurveLane::pitch).push_back ({ beat * 0.0833f * (float) k, k < 4 ? 0.0f : 40.0f * std::sin ((float) k * 1.5708f) });
+            vibrato.lane (lynx::NoteCurveLane::pressure) = { { 0.0f, 0.5f }, { beat * 1.0f, 0.95f }, { beat * 2.0f, 0.4f } };
+            note (2 * lynx::ppq, 2 * lynx::ppq, 67, vibrato);
+            lynx::NoteCurves fall;
+            fall.lane (lynx::NoteCurveLane::pitch) = { { 0.0f, 0.0f }, { beat * 0.75f, 0.0f }, { beat * 1.0f, -500.0f } };
+            fall.lane (lynx::NoteCurveLane::timbre) = { { 0.0f, 0.6f }, { beat * 1.0f, 0.2f } };
+            note (4 * lynx::ppq, lynx::ppq, 72, fall, 0.6f);
+            note (5 * lynx::ppq, 3 * lynx::ppq, 64, {}); // (a note without curves: its own values, dashed)
+            p.lengthTicks = 8 * lynx::ppq;
+        }, false);
+        offline.dispatchPendingMessages();
+        juce::String checks;
+        auto& roll = ui.getPianoRollForSnapshot();
+        ui.selectTabForSnapshot (1);
+        roll.selectMidiToolResult ({ 0 });
+        roll.scrollToNotes();
+        for (const auto& [lane, name] : { std::pair { lynx::PianoRollComponent::laneMpePitch, "pitch" },
+                                          { lynx::PianoRollComponent::laneMpeSlide, "slide" },
+                                          { lynx::PianoRollComponent::laneMpePressure, "pressure" } })
+        {
+            roll.setLaneForSnapshot (lane);
+            offline.dispatchPendingMessages();
+            write (name);
+            checks << "lane " << name << ": areas " << (int) roll.mpeLaneAreasForTests().size() << "\n";
+        }
+        roll.setLaneForSnapshot (lynx::PianoRollComponent::laneVelocity);
+        int curved = 0;
+        for (const auto& n : offline.getSong().patterns[0].notes)
+            curved += n.curves.has() ? 1 : 0;
+        checks << "notes with curves: " << curved << " of " << (int) offline.getSong().patterns[0].notes.size() << "\n";
+
+        // the Clip-launch layout: the clip's Notes tab, then its MPE tab (Live 11+'s note expression lanes)
+        ui.selectTabForSnapshot (2);
+        lynx::DetailView::shownSetting = true;
+        lynx::DetailView::devicesPage = false;
+        ui.setClipLaunchWorkflow (true);
+        offline.editSong ([] (lynx::Song& s) {
+            lynx::Clip clip;
+            clip.pattern = 0;
+            clip.length = 8 * lynx::ppq;
+            lynx::launcher::setClip (s, 0, 0, clip);
+        }, false);
+        offline.dispatchPendingMessages();
+        if (auto* detail = ui.getDetailViewForSnapshot())
+        {
+            detail->showSelection (0, 0);
+            detail->setPage (lynx::DetailView::Page::clip);
+            detail->setClipTab (false);
+            offline.dispatchPendingMessages();
+            roll.scrollToNotes();
+            write ("clip-notes");
+            checks << "clip notes tab: mpe view " << (roll.isMpeView() ? 1 : 0) << "\n";
+            detail->setMpeTab();
+            offline.dispatchPendingMessages();
+            roll.selectMidiToolResult ({ 0 });
+            roll.scrollToNotes();
+            write ("clip-mpe");
+            checks << "clip MPE tab: mpe view " << (roll.isMpeView() ? 1 : 0) << ", lanes " << (int) roll.mpeLaneAreasForTests().size() << "\n";
+            detail->setClipTab (false);
+            offline.dispatchPendingMessages();
+            checks << "back to Notes: mpe view " << (roll.isMpeView() ? 1 : 0) << "\n";
+        }
+        else
+            checks << "no detail view\n";
+        lynx::shot::file (juce::File (prefix + "-checks.txt")).replaceWithText (checks);
     }
 
     void runDetailShot (const juce::String& prefix)
