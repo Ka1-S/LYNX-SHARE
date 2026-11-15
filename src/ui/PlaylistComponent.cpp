@@ -61,6 +61,7 @@
 #include "ui/MixerComponent.h"
 #include "engine/Text.h"
 #include "ui/BrowserComponent.h"
+#include "ui/PluginDropUi.h"
 #include "ui/ClipGridComponent.h"
 #include "core/SessionOps.h"
 #include "core/DetailChain.h"
@@ -10783,11 +10784,131 @@ bool PlaylistComponent::isInterestedInDragSource (const SourceDetails& details)
 {
     int gridTrack = 0, gridScene = 0;
     return BrowserComponent::isBrowserDrag (details) || BrowserComponent::draggedPattern (details) >= 0
-           || clipGridDrag (details.description, gridTrack, gridScene);
+           || clipGridDrag (details.description, gridTrack, gridScene)
+           || (! simpleHeaders && (BrowserComponent::isGeneratorDrag (details) || BrowserComponent::isEffectDrag (details))); // (issue #152.6)
+}
+
+void PlaylistComponent::pluginDropped (const SourceDetails& details)
+{
+    const auto p = details.localPosition;
+    auto generator = BrowserComponent::draggedGenerator (details);
+    auto fx = generator ? std::optional<EffectSlot>() : BrowserComponent::draggedEffect (details);
+    if (! generator && ! fx)
+        return;
+
+    if (layoutstyle::current() == layoutstyle::Style::clipLaunch)
+    {
+        // Live (DROP-FACTS C): a device dropped on an Arrangement track goes into that track as in the Session view;
+        // below the last track (Live's drop area) a new track holds it
+        if (p.y < tracksTop() || p.y >= gridArea().getBottom())
+            return;
+        auto track = yToTrack (p.y);
+        if (track < 0)
+            track = trackmodes::firstFreeTrack (engine.getSong());
+        if (track < 0)
+            return;
+        auto apply = [&] (Song& song) {
+            return generator ? plugindrop::instrumentOnSessionTrack (song, *generator, track) : plugindrop::effectOnSessionTrack (song, *fx, track);
+        };
+        auto trial = engine.getSong(); // (a refused drop leaves no undo step)
+        if (const auto check = apply (trial); ! check.ok())
+        {
+            ui::postHint ({ plugindropui::message (check.error), {} }, 4000);
+            return;
+        }
+        plugindrop::Result r;
+        engine.editSong ([&] (Song& song) { r = apply (song); });
+        selectTrack (track);
+        if (generator && ! r.replaced && onGeneratorAdded && ! r.channels.empty())
+            onGeneratorAdded (r.channels.front(), engine.getSong().channels[(std::size_t) r.channels.front()].instrument);
+        repaint();
+        return;
+    }
+
+    // FL (DROP-FACTS A/B, 0xe7a470): a plugin is taken only over the track-header column; on the lanes nothing happens
+    if (p.x >= headerWidth || p.y < tracksTop() || p.y >= gridArea().getBottom())
+        return;
+    const auto track = yToTrack (p.y);
+    if (track < 0)
+        return;
+    const auto shift = juce::ModifierKeys::currentModifiers.isShiftDown();
+
+    if (generator)
+    {
+        // the header under the mouse becomes the only selected track unless it is one of them; then every selected
+        // track takes the plugin (0xe79d60 -> 0x12ebbd0)
+        if (! isTrackSelected (track))
+            selectTrack (track);
+        auto tracks = plugindrop::generatorTargets (track, tracksForMenu (track));
+        if ((int) tracks.size() > plugindrop::maxInstrumentsAtOnce)
+        {
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Error"),
+                                                    plugindropui::message (plugindrop::Error::tooMany));
+            return;
+        }
+        if ((int) tracks.size() > plugindrop::askAboveInstruments)
+        {
+            const auto count = (int) tracks.size();
+            juce::AlertWindow::showOkCancelBox (juce::MessageBoxIconType::QuestionIcon, tr ("Potentially slow operation"),
+                                                tr ("Are you sure you want to load {0} plugins at once?", { juce::String (count) }),
+                                                tr ("Yes"), tr ("No"), this,
+                                                juce::ModalCallbackFunction::create ([safe = juce::Component::SafePointer<PlaylistComponent> (this),
+                                                                                      gen = std::move (*generator), tracks, shift] (int result) mutable {
+                                                    if (safe != nullptr && result == 1)
+                                                        safe->applyGeneratorDrop (std::move (gen), std::move (tracks), shift);
+                                                }));
+            return;
+        }
+        applyGeneratorDrop (std::move (*generator), std::move (tracks), shift);
+        return;
+    }
+
+    // an effect: into the first free slot of the mixer track the header plays through (0xe79d60 -> 0x12e69a0)
+    auto trial = engine.getSong();
+    if (const auto check = plugindrop::effectOnTrack (trial, *fx, track); ! check.ok())
+    {
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, plugindropui::title (check.error),
+                                                plugindropui::message (check.error));
+        return;
+    }
+    plugindrop::Result r;
+    engine.editSong ([&] (Song& song) { r = plugindrop::effectOnTrack (song, std::move (*fx), track); });
+    selectTrack (track);
+    if (onLinkedMixerTrack && r.insert > 0)
+        onLinkedMixerTrack (r.insert); // (FL points the Mixer at that mixer track)
+    repaint();
+}
+
+void PlaylistComponent::applyGeneratorDrop (ChannelDef generator, std::vector<int> tracks, bool shift)
+{
+    // (a drop refused before anything changed leaves no undo step; one that fails part-way keeps what it did, as FL)
+    auto trial = engine.getSong();
+    if (const auto check = plugindrop::generatorOnTracks (trial, generator, tracks); ! check.ok() && check.tracks.empty())
+    {
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, plugindropui::title (check.error),
+                                                plugindropui::message (check.error));
+        return;
+    }
+    plugindrop::Result r;
+    engine.editSong ([&] (Song& song) { r = plugindrop::generatorOnTracks (song, generator, tracks); });
+    if (! r.ok())
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, plugindropui::title (r.error), plugindropui::message (r.error));
+    selectTracks (r.tracks);
+    // the plugin's window opens for a single track; for several only while Shift is held (FL 0xe71980 / 0x12ebbd0)
+    if (onGeneratorAdded && (r.tracks.size() == 1 || shift))
+        for (const auto channel : r.channels)
+            if (channel >= 0 && channel < (int) engine.getSong().channels.size())
+                onGeneratorAdded (channel, engine.getSong().channels[(std::size_t) channel].instrument);
+    repaint();
 }
 
 void PlaylistComponent::itemDropped (const SourceDetails& details)
 {
+    if (BrowserComponent::isGeneratorDrag (details) || BrowserComponent::isEffectDrag (details))
+    {
+        pluginDropped (details);
+        return;
+    }
     // a clip dragged out of the clip grid (round 190bv): a copy of it where it is dropped, one pass long
     if (int gridTrack = 0, gridScene = 0; clipGridDrag (details.description, gridTrack, gridScene))
     {

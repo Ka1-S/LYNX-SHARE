@@ -166,6 +166,10 @@ public:
     // files dragged from the LYNX browser
     bool isInterestedInDragSource (const SourceDetails& details) override;
     void itemDropped (const SourceDetails& details) override;
+    // issue #152 point 6: a generator / effect from the Browser's Plugin database (or the Plugin picker). Pattern
+    // workflow, FL-exact: on a track header only (core/PluginDrop.h); Clip-launch workflow: on a track, as Live
+    void pluginDropped (const SourceDetails& details);
+    void applyGeneratorDrop (ChannelDef generator, std::vector<int> tracks, bool shift);
     // The Browser's "Send to the Playlist as an audio clip": at the playhead (song mode) or the start, on the
     // first track that is free there; an audio-clip channel of the same file is reused.
     void addAudioClipAtPlayhead (const juce::File& file);

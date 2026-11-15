@@ -10121,3 +10121,12 @@ countries: fr be ch ca lu
 "Link Playlist tracks to mixer tracks (Track N with insert N; mute, solo, volume and pan on linked track headers)" = "Lier les pistes de la Playlist aux pistes de mixage (piste N avec l'insert N ; muet, solo, volume et panoramique dans les en-têtes des pistes liées)"
 "New projects start with every Playlist track that holds clips linked to a mixer track (Track N to insert N when that leaves the sound unchanged); linked track headers show mute, solo, volume and pan. Also on the Settings › Project page, with the switch for the open project." = "Les nouveaux projets commencent avec chaque piste de la Playlist qui contient des clips liée à une piste de mixage (piste N à l'insert N quand cela ne change pas le son) ; les en-têtes des pistes liées affichent muet, solo, volume et panoramique. Aussi dans la page Réglages › Projet, avec l'option pour le projet ouvert."
 "Linked track: [LMB] mute / unmute its mixer track  [Ctrl][LMB] or [RMB] solo the Playlist track" = "Piste liée : [LMB] couper / rétablir sa piste de mixage  [Ctrl][LMB] ou [RMB] solo de la piste de la Playlist"
+
+# round 190hf (issue #152 point 6): plugins dropped on the tracks
+"Can't load more than 20 instruments at once." = "Impossible de charger plus de 20 instruments à la fois."
+"There are no available effect slots on the mixer track." = "La piste de mixage n'a plus d'emplacement d'effet libre."
+"Only generators can be used as instrument tracks." = "Seuls les générateurs peuvent servir de pistes d'instrument."
+"Only audio effects can go on an audio track." = "Une piste audio n'accepte que des effets audio."
+"There is no track here to take the plugin." = "Aucune piste ici ne peut recevoir le plugin."
+"Potentially slow operation" = "Opération potentiellement lente"
+"Are you sure you want to load {0} plugins at once?" = "Voulez-vous vraiment charger {0} plugins à la fois ?"

@@ -10121,3 +10121,12 @@ countries: ru by kz
 "Link Playlist tracks to mixer tracks (Track N with insert N; mute, solo, volume and pan on linked track headers)" = "Связать дорожки Playlist с дорожками микшера (дорожка N с инсертом N; заглушение, соло, громкость и панорама в заголовках связанных дорожек)"
 "New projects start with every Playlist track that holds clips linked to a mixer track (Track N to insert N when that leaves the sound unchanged); linked track headers show mute, solo, volume and pan. Also on the Settings › Project page, with the switch for the open project." = "Новые проекты начинаются с того, что каждая дорожка Playlist с клипами связана с дорожкой микшера (дорожка N с инсертом N, если это не меняет звук); заголовки связанных дорожек показывают заглушение, соло, громкость и панораму. Также на странице Настройки › Проект, вместе с переключателем для открытого проекта."
 "Linked track: [LMB] mute / unmute its mixer track  [Ctrl][LMB] or [RMB] solo the Playlist track" = "Связанная дорожка: [LMB] заглушить / включить её дорожку микшера  [Ctrl][LMB] или [RMB] соло дорожки Playlist"
+
+# round 190hf (issue #152 point 6): plugins dropped on the tracks
+"Can't load more than 20 instruments at once." = "Нельзя загрузить больше 20 инструментов за раз."
+"There are no available effect slots on the mixer track." = "На дорожке микшера нет свободных слотов эффектов."
+"Only generators can be used as instrument tracks." = "Дорожками инструментов могут быть только генераторы."
+"Only audio effects can go on an audio track." = "На аудиодорожку можно поставить только аудиоэффекты."
+"There is no track here to take the plugin." = "Здесь нет дорожки, которая может принять плагин."
+"Potentially slow operation" = "Операция может быть медленной"
+"Are you sure you want to load {0} plugins at once?" = "Точно загрузить {0} плагинов за раз?"

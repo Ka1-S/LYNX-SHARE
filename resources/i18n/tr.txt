@@ -10121,3 +10121,12 @@ countries: tr
 "Link Playlist tracks to mixer tracks (Track N with insert N; mute, solo, volume and pan on linked track headers)" = "Playlist parçalarını mikser kanallarına bağla (N. parça N. insert ile; bağlı parça başlıklarında sustur, solo, ses ve pan)"
 "New projects start with every Playlist track that holds clips linked to a mixer track (Track N to insert N when that leaves the sound unchanged); linked track headers show mute, solo, volume and pan. Also on the Settings › Project page, with the switch for the open project." = "Yeni projeler, klip içeren her Playlist parçası bir mikser kanalına bağlı olarak başlar (ses değişmiyorsa N. parça N. inserte); bağlı parça başlıkları sustur, solo, ses ve pan gösterir. Ayrıca Ayarlar › Proje sayfasında, açık projenin anahtarıyla birlikte."
 "Linked track: [LMB] mute / unmute its mixer track  [Ctrl][LMB] or [RMB] solo the Playlist track" = "Bağlı parça: [LMB] mikser kanalını sustur / aç  [Ctrl][LMB] veya [RMB] Playlist parçasını solo yap"
+
+# round 190hf (issue #152 point 6): plugins dropped on the tracks
+"Can't load more than 20 instruments at once." = "Aynı anda 20'den fazla enstrüman yüklenemez."
+"There are no available effect slots on the mixer track." = "Mikser kanalında boş efekt yuvası yok."
+"Only generators can be used as instrument tracks." = "Enstrüman kanalı olarak yalnızca jeneratörler kullanılabilir."
+"Only audio effects can go on an audio track." = "Ses kanalına yalnızca ses efektleri eklenebilir."
+"There is no track here to take the plugin." = "Burada eklentiyi alabilecek bir kanal yok."
+"Potentially slow operation" = "İşlem yavaş olabilir"
+"Are you sure you want to load {0} plugins at once?" = "{0} eklentiyi aynı anda yüklemek istediğinden emin misin?"

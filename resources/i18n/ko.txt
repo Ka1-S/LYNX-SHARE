@@ -10121,3 +10121,12 @@ countries: kr
 "Link Playlist tracks to mixer tracks (Track N with insert N; mute, solo, volume and pan on linked track headers)" = "플레이리스트 트랙을 믹서 트랙에 연결 (트랙 N과 인서트 N; 연결된 트랙 헤더에 음소거, 솔로, 볼륨, 팬)"
 "New projects start with every Playlist track that holds clips linked to a mixer track (Track N to insert N when that leaves the sound unchanged); linked track headers show mute, solo, volume and pan. Also on the Settings › Project page, with the switch for the open project." = "새 프로젝트는 클립이 있는 플레이리스트의 모든 트랙이 믹서 트랙에 연결된 상태로 시작합니다 (소리가 바뀌지 않으면 트랙 N을 인서트 N에). 연결된 트랙 헤더에 음소거, 솔로, 볼륨, 팬이 표시됩니다. 설정 › 프로젝트 페이지에도 있으며, 열린 프로젝트용 스위치도 함께 있습니다."
 "Linked track: [LMB] mute / unmute its mixer track  [Ctrl][LMB] or [RMB] solo the Playlist track" = "연결된 트랙: [LMB] 믹서 트랙 음소거 / 해제  [Ctrl][LMB] 또는 [RMB] 플레이리스트 트랙 솔로"
+
+# round 190hf (issue #152 point 6): plugins dropped on the tracks
+"Can't load more than 20 instruments at once." = "한 번에 20개가 넘는 악기를 불러올 수 없습니다."
+"There are no available effect slots on the mixer track." = "믹서 트랙에 빈 이펙트 슬롯이 없습니다."
+"Only generators can be used as instrument tracks." = "제너레이터만 악기 트랙으로 쓸 수 있습니다."
+"Only audio effects can go on an audio track." = "오디오 트랙에는 오디오 이펙트만 넣을 수 있습니다."
+"There is no track here to take the plugin." = "여기에는 플러그인을 받을 트랙이 없습니다."
+"Potentially slow operation" = "시간이 걸릴 수 있는 작업"
+"Are you sure you want to load {0} plugins at once?" = "플러그인 {0}개를 한 번에 불러올까요?"

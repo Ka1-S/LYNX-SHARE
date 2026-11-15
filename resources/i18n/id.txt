@@ -10121,3 +10121,12 @@ countries: id
 "Link Playlist tracks to mixer tracks (Track N with insert N; mute, solo, volume and pan on linked track headers)" = "Tautkan trek Playlist ke trek mixer (Trek N dengan insert N; mute, solo, volume dan pan di header trek yang tertaut)"
 "New projects start with every Playlist track that holds clips linked to a mixer track (Track N to insert N when that leaves the sound unchanged); linked track headers show mute, solo, volume and pan. Also on the Settings › Project page, with the switch for the open project." = "Proyek baru dimulai dengan setiap trek Playlist yang berisi klip tertaut ke trek mixer (Trek N ke insert N bila itu tidak mengubah suara); header trek yang tertaut menampilkan mute, solo, volume dan pan. Juga di halaman Pengaturan › Proyek, bersama sakelar untuk proyek yang terbuka."
 "Linked track: [LMB] mute / unmute its mixer track  [Ctrl][LMB] or [RMB] solo the Playlist track" = "Trek tertaut: [LMB] bisukan / bunyikan trek mixer-nya  [Ctrl][LMB] atau [RMB] solo trek Playlist"
+
+# round 190hf (issue #152 point 6): plugins dropped on the tracks
+"Can't load more than 20 instruments at once." = "Tidak bisa memuat lebih dari 20 instrumen sekaligus."
+"There are no available effect slots on the mixer track." = "Tidak ada slot efek kosong di trek mixer."
+"Only generators can be used as instrument tracks." = "Hanya generator yang bisa dipakai sebagai trek instrumen."
+"Only audio effects can go on an audio track." = "Trek audio hanya menerima efek audio."
+"There is no track here to take the plugin." = "Tidak ada trek di sini yang bisa menerima plugin."
+"Potentially slow operation" = "Operasi mungkin lambat"
+"Are you sure you want to load {0} plugins at once?" = "Yakin ingin memuat {0} plugin sekaligus?"

@@ -84,6 +84,11 @@ In the clip grid (Clip-launch workflow):
   mixer tracks, or none, shows no controls but its Arm button.
 - **Devices to another track**: drag a device's title bar out of the Device View onto another track's column in the
   grid: it moves to the end of that track's chain, with its automation. Hold Ctrl when you drop to put a copy there.
+- **Instruments and effects from the Browser** (its Plugin database, or the Plugin picker) onto a track's column in the
+  grid or onto an Arrangement track: an instrument replaces the track's instrument (its effects stay), an effect goes to
+  the end of the track's chain. On an empty column the track becomes a MIDI track (an instrument) or an audio track
+  (an effect) holding it. An instrument can't go on an audio track: the status bar says so. In the Device View, drop an
+  instrument on the track's instrument to replace it, an effect between two devices to put it there.
 - **Audio clips** in the Clip View: the **Warp** switch (on: the sample follows the song's tempo; off: it plays at its
   own speed; it belongs to the sample's channel), the warp mode, gain, pitch and Reverse, the sample's name, rate, depth
   and channels over its editor, and **Set** beside Start and End (for every clip): while the clip plays, Set puts that
@@ -125,6 +130,15 @@ controller, mapping formula, smoothing and FL's Mode list, also for note and but
 mixer slot (mixer menu › Open audio editor / ...and record) and records with its window closed. The **Sampler page**
 follows FL's layout (Content, Playback with loop points, Time stretching, Precomputed effects); LYNX's own controls are
 in its last box, LYNX extras.
+
+## Drag samples into plugins
+
+Drag a sample from the Browser (or Edison's drag button, or an audio clip from the Playlist) onto a plugin's own
+window, such as Serum, a sampler or a drum machine that takes dropped files, and let go there: the plugin gets the
+file, as when you drop it from your file manager. This works for plugins inside LYNX SHARE's windows, for plugins
+running in a separate process or in the 32-bit bridge, and on Windows, Linux and macOS. While the mouse is over LYNX
+SHARE's own panels the drag stays LYNX SHARE's, so the Channel rack, the Playlist and the Mixer take it as before. You
+can also drag a sample out to another program.
 
 ## Online sessions: make a song with a friend (phase 1, packages)
 

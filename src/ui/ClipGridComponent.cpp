@@ -8,6 +8,8 @@
 
 #include "core/ClipLauncher.h"
 #include "core/DetailChain.h"
+#include "core/PlaylistOps.h"
+#include "ui/PluginDropUi.h"
 #include "core/Groove.h"
 #include "core/SessionKeys.h"
 #include "core/SessionOps.h"
@@ -372,6 +374,7 @@ public:
     {
         int t = 0, r = 0;
         return clipGridDrag (details.description, t, r) || detailDeviceDrag (details.description, t, r) || playlistClipDrag (details.description, t)
+               || BrowserComponent::isGeneratorDrag (details) || BrowserComponent::isEffectDrag (details) // (issue #152 point 6)
                || BrowserComponent::draggedPattern (details) >= 0
                || SampleLibrary::isSampleFile (BrowserComponent::draggedFile (details));
     }
@@ -379,7 +382,7 @@ public:
     void itemDragMove (const SourceDetails& details) override
     {
         int insert = 0, slot = 0;
-        if (detailDeviceDrag (details.description, insert, slot))
+        if (detailDeviceDrag (details.description, insert, slot) || BrowserComponent::isGeneratorDrag (details) || BrowserComponent::isEffectDrag (details))
         {
             setDeviceDropTrack (trackAtX (details.localPosition.x));
             return;
@@ -393,6 +396,12 @@ public:
     }
     void itemDropped (const SourceDetails& details) override
     {
+        if (BrowserComponent::isGeneratorDrag (details) || BrowserComponent::isEffectDrag (details))
+        {
+            setDeviceDropTrack (-1);
+            pluginDropped (details);
+            return;
+        }
         // round 190dr: a device from the Device View dropped on a track (anywhere in its column): it moves to the end of
         // that track's chain, with Ctrl a copy goes there (core/DetailChain.h moveEffectToInsert)
         if (int from = 0, slot = 0; detailDeviceDrag (details.description, from, slot))
@@ -444,6 +453,36 @@ public:
         repaint();
         notify (GridPick::select);
     }
+    // issue #152 point 6 (Live, DROP-FACTS C): an instrument or an audio effect from the Browser dropped on a track's
+    // column goes into that track (an instrument replaces the track's, an effect goes to the end of its chain); on an
+    // empty column (Live's drop area) the track becomes a MIDI / audio track holding it. Refusals show in the status bar.
+    void pluginDropped (const SourceDetails& details)
+    {
+        auto t = trackAtX (details.localPosition.x);
+        if (t < 0 && details.localPosition.x >= 0 && details.localPosition.x < cellArea().getRight() + columnWidth)
+            t = trackmodes::firstFreeTrack (engine.getSong()); // (right of the last column: Live's drop area, a new track)
+        if (t < 0)
+            return;
+        auto generator = BrowserComponent::draggedGenerator (details);
+        auto fx = generator ? std::optional<EffectSlot>() : BrowserComponent::draggedEffect (details);
+        if (! generator && ! fx)
+            return;
+        auto apply = [&] (Song& song) {
+            return generator ? plugindrop::instrumentOnSessionTrack (song, *generator, t) : plugindrop::effectOnSessionTrack (song, *fx, t);
+        };
+        auto trial = engine.getSong(); // (a refused drop leaves no undo step)
+        const auto check = apply (trial);
+        if (! check.ok())
+        {
+            ui::postHint ({ plugindropui::message (check.error), {} }, 4000);
+            return;
+        }
+        engine.editSong ([&] (Song& song) { apply (song); });
+        selectedTrack = t;
+        repaint();
+        notify (GridPick::select);
+    }
+
     bool isInterestedInFileDrag (const juce::StringArray& files) override
     {
         return std::any_of (files.begin(), files.end(), [] (const juce::String& f) { return SampleLibrary::isSampleFile (juce::File (f)); });

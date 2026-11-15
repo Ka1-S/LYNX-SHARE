@@ -289,7 +289,7 @@ Each interaction has an ID, which section 3 uses for the gap matrix.
 | P20 | Arrangements: dropdown in the title bar; add, clone, rename, delete, merge one into another | [DOC][pl] |
 | P21 | Clip focus selector: chooses which clip type is on top for picking stacked clips | [DOC][pl-focus] |
 | P22 | Audio clip keys: transpose (7/8), reverse (9), stretch mode, fades view | [DOC][sc-pl] |
-| P23 | Dropping a plugin/audio file on a track header creates a linked instrument/audio track | [DOC][pl-trackmode] |
+| P23 | Dropping a plugin/audio file on a track header creates a linked instrument/audio track (round 190hf: a generator on a header makes it an instrument track, or replaces an instrument track's generator, on every selected track; an effect goes to the header's mixer track, first free slot; the lanes take no plugin; FLEngine 2026 [DECOMP], /mnt/e/lynx-work/dnd190hf/DROP-FACTS.md) | [DOC][pl-trackmode] |
 | P24 | Live clip launching ("performance" mode, Ctrl+P in the Playlist) | [DOC][perf] |
 | P25 | Audio clips show a detailed waveform at every zoom level; the sample's waveform is also drawn in the Sampler channel settings and while previewing in the Browser | [DOC][ac] [DOC][csm] [DOC][br] |
 
@@ -333,7 +333,7 @@ Each interaction has an ID, which section 3 uses for the gap matrix.
 | B1 | Click audio previews the first seconds; Alt+click (or an option) plays it fully; Shift+click from the mouse position | [DOC][br] |
 | B2 | Shift+Up/Down steps through files, previewing each, and **swaps each one into the selected channel** | [DOC][br] [DOC][sc] |
 | B3 | Enter / middle-click / "send to selected channel" loads the item into the selected channel | [DOC][br] [DOC][br-use] |
-| B4 | Drop targets: rack (new channel), Playlist (audio clip), mixer insert or slot (effect), mixer insert (instrument + routing), track header (linked track); Alt while dropping keeps the window closed | [DOC][br] [DOC][br-use] [DOC][mx] |
+| B4 | Drop targets: rack (new channel), Playlist (audio clip), mixer insert or slot (effect), mixer insert (instrument + routing), track header (linked track); Alt while dropping keeps the window closed. A sample dropped on a hosted plugin's own editor (Serum, a sampler) reaches the plugin as a file (issue #174: LYNX hands its drag to the system's file drag there) | [DOC][br] [DOC][br-use] [DOC][mx] |
 | B5 | Dropping on an existing channel / on the Piano Roll | not documented ([DOC][br]) |
 | B6 | Search (Ctrl+F): wildcards, AND/OR/NOT, exact phrase, current folder only, F2/F3 previous/next result | [DOC][br] |
 | B7 | Tabs (all, current project, plugin database, starred), user folders, layouts (tree, columns, samples with waveforms, plugin grid), tags, favourites (star) | [DOC][br] |

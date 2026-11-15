@@ -10121,3 +10121,12 @@ countries: pl
 "Link Playlist tracks to mixer tracks (Track N with insert N; mute, solo, volume and pan on linked track headers)" = "Połącz ścieżki Playlisty ze ścieżkami miksera (ścieżka N z insertem N; wyciszenie, solo, głośność i panorama w nagłówkach połączonych ścieżek)"
 "New projects start with every Playlist track that holds clips linked to a mixer track (Track N to insert N when that leaves the sound unchanged); linked track headers show mute, solo, volume and pan. Also on the Settings › Project page, with the switch for the open project." = "Nowe projekty zaczynają się z każdą ścieżką Playlisty zawierającą klipy połączoną ze ścieżką miksera (ścieżka N z insertem N, gdy nie zmienia to brzmienia); nagłówki połączonych ścieżek pokazują wyciszenie, solo, głośność i panoramę. Także na stronie Ustawienia › Projekt, z przełącznikiem dla otwartego projektu."
 "Linked track: [LMB] mute / unmute its mixer track  [Ctrl][LMB] or [RMB] solo the Playlist track" = "Połączona ścieżka: [LMB] wycisz / włącz jej ścieżkę miksera  [Ctrl][LMB] lub [RMB] solo ścieżki Playlisty"
+
+# round 190hf (issue #152 point 6): plugins dropped on the tracks
+"Can't load more than 20 instruments at once." = "Nie można wczytać więcej niż 20 instrumentów naraz."
+"There are no available effect slots on the mixer track." = "Ścieżka miksera nie ma wolnych slotów efektów."
+"Only generators can be used as instrument tracks." = "Tylko generatory mogą być ścieżkami instrumentów."
+"Only audio effects can go on an audio track." = "Ścieżka audio przyjmuje tylko efekty audio."
+"There is no track here to take the plugin." = "Nie ma tu ścieżki, która mogłaby przyjąć wtyczkę."
+"Potentially slow operation" = "Operacja może być wolna"
+"Are you sure you want to load {0} plugins at once?" = "Czy na pewno chcesz wczytać {0} wtyczek naraz?"
