@@ -57,12 +57,22 @@ Score per track 0…10 = 10 − 0.5 E_env − 0.25 E_spec (E_env: mean |dB| of 2
 the real import and song renderer (`tools/alsrender`). **Before** = today's stand-in (origin/main's import: the built-in
 synth when no FM is used, otherwise "unsupported"); **after** = Tetra.
 
-GATE_TABLE
+| Set | Tracks | Before (stand-in) | After (Tetra) | Tracks worse than before |
+|---|---:|---:|---:|---:|
+| f1 (waves, FM index, algorithms, feedback, tuning, levels, envelopes, loop modes, LFO, pitch envelope, filter, shaper, globals, voices) | 164 | 3.60 | **9.42** | 0 |
+| f2 (slopes, feedback, resonance, filter key / velocity / envelope / LFO, shaper with the filter on, velocity, Tone by pitch, mono, circuits, key scaling) | 78 | 2.11 | **9.18** | 0 |
+| 190ei m1 (Operator tracks: the Sine preset with Vel 30 %) | 9 | 2.58 | **9.67** | 0 |
 
-CPU (Tetra's engine, one core, −O2, 8 held 4-operator FM voices, 256-sample blocks): CPU_LINE. The operators of a
+By group (f1 before → after): waves 5.4 → 9.3, FM index 6.6 → 9.6, algorithms 7.3 → 9.0, feedback 4.5 → 9.8, tuning
+3.9 → 9.7, levels 2.2 → 9.8, envelopes 2.5 → 9.6, LFO 1.3 → 9.4, pitch envelope 2.8 → 9.7, filter 1.3 → 9.1, shaper
+4.9 → 9.8, globals 5.4 → 9.3, voices 4.1 → 9.2. The lowest after: the looped-noise wave (3.7: LYNX's own random partials,
+on purpose), Tone 0 with a 0 dB modulator (7.2), the noise LFO (7.2: other draws), resonance 0.8 at 300 Hz on a saw
+(7.3), the filter envelope at +72 st (7.8). Per-track tables: `/mnt/e/lynx-work/fm190hs/lynx/score-*.txt`.
+
+CPU (Tetra's engine, one core, −O2, 8 held 4-operator FM voices, 256-sample blocks): 0.21 % of a core per voice (0.33 % with the 24 dB filter on; the scalar path 0.24 %). The operators of a
 voice run per 16-sample step, one operator after the other (a modulator's step is ready before the operator it feeds);
 operators without feedback or noise take an SSE path (phases, modulation, table interpolation and level ramp four
-samples at a time, sse2neon on ARM): 20 % less CPU than the scalar path.
+samples at a time, sse2neon on ARM); the filter's coefficients are computed once per step. Idle: no voice, no work.
 
 ## 4. Import
 

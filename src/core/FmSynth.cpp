@@ -613,6 +613,7 @@ struct Voice
     std::array<float, opCount> scale {};     // each operator's velocity × key level scaling (set at the note's start)
     std::array<float, opCount + 3> timeScale {}; // each envelope's time factor (global Time, velocity)
     float cutoff = 1000.0f;
+    float fk = 2.0f, fg = 0.1f, fa1 = 1.0f, fa2 = 0.0f, fa3 = 0.0f; // the filter's coefficients (per modulation step)
 };
 
 constexpr int maxVoices = 64;
@@ -956,6 +957,18 @@ struct Engine::Impl
             if (p[g::lfoFilter] > 0.5)
                 hz *= std::pow (2.0, lfoA * 48.0 / 12.0);
             v.cutoff = (float) std::clamp (hz, 20.0, rate * 0.45);
+            const auto type = std::clamp ((int) std::lround (p[g::filterType]), 0, filterTypeCount - 1);
+            const bool steep = p[g::filterSlope] > 0.5;
+            const auto circuit = std::clamp ((int) std::lround (type <= 1 ? p[g::filterCircuit] : p[g::filterCircuitBp]), 0, circuitCount - 1);
+            static constexpr float resScale[circuitCount] { 1.0f, 0.85f, 1.08f, 0.97f, 0.88f };
+            const auto r = std::clamp ((float) p[g::filterRes] * resScale[circuit], 0.0f, 1.0f);
+            const auto kmin = steep ? 0.267f : 0.067f;
+            v.fk = kmin + (2.0f - kmin) * std::pow (1.0f - r, 2.1f);
+            const auto fhz = circuit > 0 ? v.cutoff * 0.88f : v.cutoff;
+            v.fg = std::tan ((float) pi * std::min (fhz, (float) rate * 0.45f) / (float) rate);
+            v.fa1 = 1.0f / (1.0f + v.fg * (v.fg + v.fk));
+            v.fa2 = v.fg * v.fa1;
+            v.fa3 = v.fg * v.fa2;
         }
     }
 
@@ -1066,13 +1079,8 @@ struct Engine::Impl
         // resonance → damping [MEASURED 190hs f0x on white noise: 24 dB/oct peaks +6.9 / +22.9 dB at Res 0.5 / 1, 12 dB/oct
         // +23.5 dB at Res 1; Res above 1 = 1]; the driven circuits resonate a little less or more and sit lower [f31…f35,
         // approximate: peaks −3.1 / +1.6 / −0.8 / −2.6 dB against Clean, at 0.88 × the frequency]
-        static constexpr float resScale[circuitCount] { 1.0f, 0.85f, 1.08f, 0.97f, 0.88f };
-        const auto r = std::clamp ((float) p[g::filterRes] * resScale[circuit], 0.0f, 1.0f);
-        const auto kmin = steep ? 0.267f : 0.067f;
-        const auto k = kmin + (2.0f - kmin) * std::pow (1.0f - r, 2.1f);
-        const auto hz = circuit > 0 ? v.cutoff * 0.88f : v.cutoff;
-        const auto gg = std::tan ((float) pi * std::min (hz, (float) rate * 0.45f) / (float) rate);
-        const auto a1 = 1.0f / (1.0f + gg * (gg + k)), a2 = gg * a1, a3 = gg * a2;
+        // (coefficients: once per modulation step, in control())
+        const auto k = v.fk, gg = v.fg, a1 = v.fa1, a2 = v.fa2, a3 = v.fa3;
         // Drive: a gain into the filter [MEASURED f4: +12 dB louder at Drive 12]; the driven circuits saturate softly
         // (the Clean circuit ignores Drive [MEASURED 190hs c0])
         if (circuit > 0)
