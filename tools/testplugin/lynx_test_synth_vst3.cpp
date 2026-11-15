@@ -13,6 +13,9 @@
 // without one (-1) it ends the oldest voice of its key. With the environment variable LYNX_TEST_SYNTH_LOG = a file path
 // it appends to <path>.<instance> one line per process call ("P<instance> <ppq> <samples> <playing> <rt|off> <voices>") and per
 // event ("E<instance> on|off <key> <sampleOffset> <noteId>"): what the host sent and when.
+// Round 190hn (issue #138): LYNX_TEST_SYNTH_BOOT_MS = n makes each instance behave like a hardware emulator booting its
+// firmware (gearmulator's JE-8086, ...): for its first n ms of processed audio after it was made, note ons are dropped
+// ("E<instance> drop <key> <sampleOffset>" in the log), as a booting firmware drops what arrives meanwhile.
 #define INIT_CLASS_IID
 #include "pluginterfaces/base/funknown.h"
 #include "pluginterfaces/base/ipluginbase.h"
@@ -92,6 +95,8 @@ public:
     // IPluginBase (shared by the component and the controller)
     tresult PLUGIN_API initialize (FUnknown*) override
     {
+        if (const char* boot = std::getenv ("LYNX_TEST_SYNTH_BOOT_MS"); boot != nullptr)
+            bootMs = std::atof (boot);
         if (log == nullptr)
             if (const char* path = std::getenv ("LYNX_TEST_SYNTH_LOG"); path != nullptr && *path != 0)
             {
@@ -220,6 +225,7 @@ public:
             }
             if (n == 0)
                 break;
+            ++processed;
             float v = 0.0f;
             for (int i = 0; i < voiceCount; ++i)
             {
@@ -276,6 +282,12 @@ private:
                 noteOff (e.noteOn.pitch, e.sampleOffset, -1);
                 return;
             }
+            if ((double) processed < bootMs * 0.001 * rate) // (still booting: the note is lost)
+            {
+                if (log != nullptr)
+                    std::fprintf (log, "E%d drop %d %d\n", id, (int) e.noteOn.pitch, (int) e.sampleOffset);
+                return;
+            }
             if (log != nullptr)
                 std::fprintf (log, "E%d on %d %d %d\n", id, (int) e.noteOn.pitch, (int) e.sampleOffset, (int) e.noteOn.noteId);
             if (voiceCount < maxVoices)
@@ -309,6 +321,8 @@ private:
     Voice voices[maxVoices];
     int voiceCount = 0;
     double rate = 44100.0;
+    double bootMs = 0.0;          // (round 190hn) LYNX_TEST_SYNTH_BOOT_MS
+    long long processed = 0;      // samples processed since the instance was made
     bool offline = false;
     std::FILE* log = nullptr;
     std::atomic<uint32> refs { 1 };

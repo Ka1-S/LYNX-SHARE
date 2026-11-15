@@ -215,6 +215,20 @@ jobs:
           cat sc.txt
           grep -q '^result=OK' sc.txt && grep -q '^plugin_crashes=0' sc.txt
 
+      # Issue #138 (round 190hn): a hosted synth that drops notes while it boots (1.5 s of audio, as a hardware emulator
+      # booting its firmware) must still play a short note at tick 0 of an export (the plugin warm-up)
+      - name: Short export of a booting synth (VST3)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          V="$RUNNER_TEMP/juce/modules/juce_audio_processors/format_types/VST3_SDK"
+          B="boot-plugin/LYNX Test Synth.vst3/Contents/x86_64-linux"
+          mkdir -p "$B"
+          c++ -shared -fPIC -O2 -std=c++17 -I"$V" tools/testplugin/lynx_test_synth_vst3.cpp "$V/pluginterfaces/base/funknown.cpp" -o "$B/LYNX Test Synth.so"
+          LYNX_TEST_SYNTH_BOOT_MS=1500 LYNX_PROFILE_DIR="$PWD/boot-profile" xvfb-run -a build/LYNX_artefacts/Release/LYNX --shortexporttest "$PWD/boot.txt" 1 --quick --plugin "$PWD/boot-plugin/LYNX Test Synth.vst3" || true
+          grep -E 'hosted|^short_export=|^result=' boot.txt
+          grep -q '^result=OK' boot.txt
+
       # Round 190dt: a hosted plugin that crashes in its audio processing (a null write, and a memcpy from null as in
       # issue #155) is switched off and LYNX keeps playing, saves and reloads it; a plugin that crashes on its saved state
       # is left out as the project opens; LYNX's own faults inside a plugin call still end in the crash handler.

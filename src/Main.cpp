@@ -796,6 +796,32 @@ public:
             return;
         }
 
+        if (args.contains ("--shortexportstress"))
+        {
+            // LYNX --shortexportstress report.txt [count] [--seed N] [--no-realtime] [--plugin file] (round 190hn, issue #138): `count`
+            // random export settings over short sounds at the very start of the song, each exported again a bar later; a
+            // file that comes out silent or quieter fails (engine/ShortExportTest.h). No window.
+            const auto i = args.indexOf ("--shortexportstress");
+            const juce::File report (args[i + 1].unquoted());
+            const auto count = args.size() > i + 2 && ! args[i + 2].startsWith ("--") ? args[i + 2].getIntValue() : 200;
+            const auto s = args.indexOf ("--seed");
+            const auto seed = s >= 0 && s + 1 < args.size() ? args[s + 1].getLargeIntValue() : juce::Time::currentTimeMillis();
+            auto text = std::make_shared<juce::String>();
+            const auto pl = args.indexOf ("--plugin");
+            lynx::shortexport::stress (count, seed, ! args.contains ("--no-realtime"), pl >= 0 && pl + 1 < args.size() ? args[pl + 1].unquoted() : juce::String(),
+                                       [report, text] (const juce::String& line) {
+                                           *text << line << "\n";
+                                           report.replaceWithText (*text + "(running)\n");
+                                       },
+                                       [this, report, text] (juce::String result) {
+                                           *text << "short_export_stress=" << result << "\nresult=" << (result.startsWith ("OK") ? "OK" : "FAILED") << "\n";
+                                           report.replaceWithText (*text);
+                                           setApplicationReturnValue (result.startsWith ("OK") ? 0 : 1);
+                                           quit();
+                                       });
+            return;
+        }
+
         if (args.contains ("--shortexporttest"))
         {
             // LYNX --shortexporttest report.txt [repeats] [--plugin file]... (round 190c, issue #138: a short note at
@@ -811,7 +837,7 @@ public:
                 if (args[k] == "--plugin")
                     plugins.add (args[k + 1].unquoted());
             auto text = std::make_shared<juce::String>();
-            lynx::shortexport::run (true, repeats > 0 ? repeats : 3, plugins,
+            lynx::shortexport::run (! args.contains ("--quick"), repeats > 0 ? repeats : 3, plugins, // (--quick: a handful of instruments, round 190hn)
                                     [report, text] (const juce::String& line) {
                                         *text << line << "\n";
                                         report.replaceWithText (*text + "(running)\n");
