@@ -1038,11 +1038,11 @@ public:
 
     void noteOn (int key, float velocity) noexcept override
     {
-        pending.push ({ key, velocity, true, nextPan, nextCents, startingNoteId() });
+        pending.push ({ key, velocity, NoteMsg::on, nextPan, nextCents, startingNoteId() });
         nextPan = 0, nextCents = 0;
     }
     // (round 190ej: the note's own voices — FL's SoundFont Player plays on the other note of the key [EXEC: /R render])
-    void noteOff (int key) noexcept override { pending.push ({ key, 0.0f, false, 0, 0, endingNoteId() }); }
+    void noteOff (int key) noexcept override { pending.push ({ key, 0.0f, NoteMsg::off, 0, 0, endingNoteId() }); }
     void setNextNoteExpression (float pan, float cents, bool) noexcept override { nextPan = pan, nextCents = cents; }
     // The channel's PITCH knob (issue #73: an FL project's SoundFont Player detuned −400 cents played undetuned) and its
     // fine tune + main pitch, before every render. FL's generators follow both on the sounding notes (round 167a): the
@@ -1076,7 +1076,15 @@ public:
     }
 
     bool followsSlides() const noexcept override { return true; } // (round 168l: a Mono channel's notes)
+    // Queued behind the notes like noteOn / noteOff (issue #165 follow-up, round 190ib): a slide note on the step of a
+    // note arrives right after that note's "on", which only becomes a voice in render(); applied at once, the slide found
+    // no voice and the note stayed flat (karatmep232's guitar, an FL SoundFont Player channel).
     void slideTo (int key, float cents, float samples) noexcept override
+    {
+        pending.push ({ key, samples, NoteMsg::slide, 0, cents, 0 });
+    }
+
+    void applySlide (int key, float cents, float samples) noexcept
     {
         // the sounding voices glide to the new key (FL's slide notes)
         for (auto& v : voices)
@@ -1149,7 +1157,9 @@ public:
         for (int i = 0; i < pending.count; ++i)
         {
             const auto& e = pending.events[(std::size_t) i];
-            if (e.on)
+            if (e.kind == NoteMsg::slide)
+                applySlide (e.key, e.cents, e.velocity); // (velocity = the slide's length in samples)
+            else if (e.kind == NoteMsg::on)
             {
                 startingId = e.id;
                 startNote (*font, e.key, e.velocity, e.pan, e.cents);
@@ -1180,7 +1190,11 @@ public:
     }
 
 private:
-    struct NoteMsg { int key; float velocity; bool on; float pan, cents; std::uint32_t id; };
+    struct NoteMsg
+    {
+        enum Kind : std::uint8_t { off, on, slide };
+        int key; float velocity; Kind kind; float pan, cents; std::uint32_t id;
+    };
     struct Pending
     {
         std::array<NoteMsg, 256> events {};
