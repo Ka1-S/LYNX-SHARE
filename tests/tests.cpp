@@ -17802,4 +17802,5 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "EvPane190fzTests.inc"
 #include "U190heLinkTests.inc" // round 190he (issue #152 item 2: linkable LYNX instruments, knobs that follow links)
 #include "PluginDrop190hfTests.inc" // issue #152 point 6: plugins dropped on the tracks (FL and Live layouts)
+#include "Community190hpTests.inc" // round 190hp: global MIDI mappings, mix snapshots, split at silence (0.1.28 pain report B9/B16/B18)
 #include "Rollup028Tests.inc" // round 190fv: semantic interactions of the 0.1.28 rollup
