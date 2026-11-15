@@ -10161,3 +10161,4 @@ countries: pl
 "Note off: {0} / velocity: {1}" = "Nuta wył.: {0} / dynamika: {1}"
 "Reminder: this project has unsaved changes (backups are off: Settings > General > Save a backup copy)" = "Przypomnienie: ten projekt ma niezapisane zmiany (kopie zapasowe wyłączone: Ustawienia > Ogólne > Zapisuj kopię zapasową)"
 "Never (just remind every 10 min)" = "Nigdy (tylko przypominaj co 10 min)"
+"Input Level" = "Poziom wejścia"

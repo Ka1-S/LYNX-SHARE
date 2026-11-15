@@ -1767,7 +1767,9 @@ public:
             }
         }
 
-        // the selected pad: its title and its waveform with the played region
+        // the selected pad: its title and its waveform with the played region (not when only a pad repaints)
+        if (! g.clipRegionIntersects (titleArea.getUnion (waveArea)))
+            return;
         const auto* c = channelOf (selected);
         const bool has = c != nullptr && ! c->samplePath.empty();
         g.setColour (colour::textPrimary);
@@ -1924,13 +1926,18 @@ public:
     }
 
     // a short light on a pad played by a key or a click (a timer runs only while a pad is lit)
+    // (round 190ih, DS-34: a pad's light changes only when it goes on or off, so only that pad repaints; it was the
+    // whole page, the selected pad's waveform included, on every tick)
     void timerCallback() override
     {
         bool any = false;
-        for (auto& f : flash)
-            if (f > 0)
-                --f, any = true;
-        repaint();
+        for (int p = 0; p < simplepads::padCount; ++p)
+        {
+            auto& f = flash[(std::size_t) p];
+            if (f > 0 && --f == 0)
+                repaint (padBounds (p).expanded (2));
+            any = any || f > 0;
+        }
         if (! any)
             stopTimer();
     }
@@ -1938,8 +1945,9 @@ public:
     {
         if (pad >= 0 && pad < simplepads::padCount)
         {
+            if (flash[(std::size_t) pad] == 0)
+                repaint (padBounds (pad).expanded (2));
             flash[(std::size_t) pad] = 5;
-            repaint();
             if (! isTimerRunning())
                 startTimerHz (30);
         }
@@ -2598,6 +2606,56 @@ juce::PopupMenu SimpleDock::kitMenuForSnapshot() { return padsPage->kitMenuForSn
 bool SimpleDock::saveKitForCheck (const juce::String& name) { return padsPage->saveKit (name); }
 bool SimpleDock::openKitForCheck (const juce::File& file) { return padsPage->openKit (file); }
 bool SimpleDock::renameKitForCheck (const juce::File& file, const juce::String& name) { return PadsPage::renameKit (file, name); }
+// Round 190ih (PLAN R14, DS-9): BandLab's dock shows "Input Level" with a slim bar on the right of its header
+// (bandlab190p shots/22-sampler-kits.png). Here it shows while the track's insert is armed to record from an input
+// (no input = no level), fed by the main window's 30 Hz timer only while the dock shows; only the bar repaints, and
+// only when its drawn width changes.
+bool SimpleDock::inputMeterShown() const
+{
+    const auto& song = engine.getSong();
+    if (track < 0 || insert <= 0 || insert >= (int) song.mixer.size() || ! engine.isInsertArmed (insert) || song.mixer[(std::size_t) insert].inputChannel < 0)
+        return false;
+    const auto kind = simpletracks::kindOf (song, track);
+    return kind && simpletracks::isAudioKind (*kind);
+}
+
+juce::Rectangle<int> SimpleDock::inputMeterArea() const
+{
+    const auto right = followButton.isVisible() ? followButton.getX() - 10 : hideButton.getX() - 10;
+    return { right - 190, 0, 190, stripHeight };
+}
+
+juce::Rectangle<int> SimpleDock::inputMeterBar() const
+{
+    const auto a = inputMeterArea();
+    return { a.getRight() - 110, a.getCentreY() - 2, 110, 4 };
+}
+
+void SimpleDock::tickInputMeter()
+{
+    if (! isShowing())
+        return;
+    const auto shown = inputMeterShown();
+    auto level = 0.0f;
+    if (shown && insert > 0)
+    {
+        const auto peak = juce::jmax (engine.takeInputPeak (insert, 0), engine.takeInputPeak (insert, 1));
+        const auto db = juce::Decibels::gainToDecibels (peak, -60.0f);
+        level = juce::jmax ((db + 60.0f) / 60.0f, inputLevel * 0.86f); // (a quick fall, as the Mixer's)
+        if (level < 0.01f)
+            level = 0.0f;
+    }
+    const auto width = juce::roundToInt (level * (float) inputMeterBar().getWidth());
+    if (shown != inputMeterWasShown)
+    {
+        inputMeterWasShown = shown;
+        repaint (getLocalBounds().withHeight (stripHeight)); // (the record hint moves left of it)
+    }
+    else if (width != juce::roundToInt (inputLevel * (float) inputMeterBar().getWidth()))
+        repaint (inputMeterBar().expanded (1));
+    inputLevel = level;
+}
+
 bool SimpleDock::recordHintShown() const
 {
     const auto& song = engine.getSong();
@@ -2696,7 +2754,21 @@ void SimpleDock::paint (juce::Graphics& g)
 
     const auto& song = engine.getSong();
     // round 190dg: the track's chain preset, right of the tabs (the header's FX button is too small to name it)
-    const auto rightEdge = followButton.isVisible() ? followButton.getX() - 10 : hideButton.getX() - 10;
+    auto rightEdge = followButton.isVisible() ? followButton.getX() - 10 : hideButton.getX() - 10;
+    if (inputMeterShown()) // round 190ih: "Input Level" and its bar (BandLab's dock header)
+    {
+        const auto area = inputMeterArea(), bar = inputMeterBar();
+        g.setColour (colour::textPrimary);
+        g.setFont (font (type::small, true));
+        g.drawText (tr ("Input Level"), area.withRight (bar.getX() - 10), juce::Justification::centredRight, true);
+        fillRoundRect (g, bar.toFloat(), 2.0f, colour::bg1);
+        if (const auto w = juce::roundToInt (inputLevel * (float) bar.getWidth()); w > 0)
+        {
+            const auto db = inputLevel * 60.0f - 60.0f;
+            fillRoundRect (g, bar.withWidth (w).toFloat(), 2.0f, db >= -0.5f ? colour::meterClip : db >= -9.0f ? colour::meterMid : colour::meterLow);
+        }
+        rightEdge = area.getX() - 10;
+    }
     if (followButton.isVisible()) // round 190ds: the loop's key and what following does
     {
         g.setColour (colour::textSecondary);

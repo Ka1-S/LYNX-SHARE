@@ -10161,3 +10161,4 @@ countries: id
 "Note off: {0} / velocity: {1}" = "Not mati: {0} / velositas: {1}"
 "Reminder: this project has unsaved changes (backups are off: Settings > General > Save a backup copy)" = "Pengingat: proyek ini memiliki perubahan yang belum disimpan (cadangan mati: Pengaturan > Umum > Simpan salinan cadangan)"
 "Never (just remind every 10 min)" = "Tidak pernah (hanya ingatkan tiap 10 menit)"
+"Input Level" = "Level input"

@@ -10161,3 +10161,4 @@ countries: ru by kz
 "Note off: {0} / velocity: {1}" = "Нота выкл.: {0} / скорость: {1}"
 "Reminder: this project has unsaved changes (backups are off: Settings > General > Save a backup copy)" = "Напоминание: в проекте есть несохранённые изменения (резервные копии выключены: Настройки > Общие > Сохранять резервную копию)"
 "Never (just remind every 10 min)" = "Никогда (только напоминать каждые 10 мин)"
+"Input Level" = "Уровень входа"

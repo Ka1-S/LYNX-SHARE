@@ -10161,3 +10161,4 @@ countries: cn sg
 "Note off: {0} / velocity: {1}" = "音符关：{0} / 力度：{1}"
 "Reminder: this project has unsaved changes (backups are off: Settings > General > Save a backup copy)" = "提醒：此项目有未保存的更改（备份已关闭：设置 > 常规 > 保存备份副本）"
 "Never (just remind every 10 min)" = "从不（仅每 10 分钟提醒）"
+"Input Level" = "输入电平"

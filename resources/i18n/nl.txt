@@ -10161,3 +10161,4 @@ countries: nl be
 "Note off: {0} / velocity: {1}" = "Noot uit: {0} / aanslag: {1}"
 "Reminder: this project has unsaved changes (backups are off: Settings > General > Save a backup copy)" = "Herinnering: dit project heeft niet-opgeslagen wijzigingen (back-ups uit: Instellingen > Algemeen > Back-upkopie opslaan)"
 "Never (just remind every 10 min)" = "Nooit (alleen elke 10 min herinneren)"
+"Input Level" = "Ingangsniveau"

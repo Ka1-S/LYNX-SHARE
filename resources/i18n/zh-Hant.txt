@@ -10161,3 +10161,4 @@ countries: tw hk mo
 "Note off: {0} / velocity: {1}" = "音符關：{0} / 力度：{1}"
 "Reminder: this project has unsaved changes (backups are off: Settings > General > Save a backup copy)" = "提醒：此專案有未儲存的變更（備份已關閉：設定 > 一般 > 儲存備份副本）"
 "Never (just remind every 10 min)" = "從不（僅每 10 分鐘提醒）"
+"Input Level" = "輸入電平"

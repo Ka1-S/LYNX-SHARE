@@ -10161,3 +10161,4 @@ countries: es mx ar co cl pe ve
 "Note off: {0} / velocity: {1}" = "Nota desactivada: {0} / velocidad: {1}"
 "Reminder: this project has unsaved changes (backups are off: Settings > General > Save a backup copy)" = "Recordatorio: este proyecto tiene cambios sin guardar (copias de seguridad desactivadas: Ajustes > General > Guardar una copia de seguridad)"
 "Never (just remind every 10 min)" = "Nunca (solo recordar cada 10 min)"
+"Input Level" = "Nivel de entrada"

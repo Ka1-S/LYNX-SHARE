@@ -74,6 +74,10 @@ public:
     void releaseEditor();
     bool isEditorDocked() const noexcept;
 
+    // Round 190ih: the input level of an armed track's input in the header ("Input Level", BandLab); the main window's
+    // 30 Hz timer calls it (nothing happens while the dock is hidden)
+    void tickInputMeter();
+
     // The height the owner gives it out of `available` px (the timeline keeps at least 40 %)
     int heightFor (int available) const noexcept;
 
@@ -177,6 +181,11 @@ private:
     bool playTabs = false;      // the track plays notes (Instrument / Sampler): Keyboard and Editor
     bool padsTab = false;       // round 190fo: a Sampler track's pads
     int track = -1, insert = -1, channel = -1;
+    // round 190ih (DS-9): the record dock's input level
+    bool inputMeterShown() const;
+    juce::Rectangle<int> inputMeterArea() const, inputMeterBar() const;
+    float inputLevel = 0.0f;
+    bool inputMeterWasShown = false;
     int dragStartHeight = 0;
     bool resizing = false;
 

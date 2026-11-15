@@ -10161,3 +10161,4 @@ countries: it ch sm
 "Note off: {0} / velocity: {1}" = "Nota rilasciata: {0} / velocity: {1}"
 "Reminder: this project has unsaved changes (backups are off: Settings > General > Save a backup copy)" = "Promemoria: questo progetto ha modifiche non salvate (backup disattivati: Impostazioni > Generale > Salva una copia di backup)"
 "Never (just remind every 10 min)" = "Mai (ricorda solo ogni 10 min)"
+"Input Level" = "Livello di ingresso"

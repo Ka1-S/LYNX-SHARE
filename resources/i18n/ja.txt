@@ -10161,3 +10161,4 @@ countries: jp
 "Note off: {0} / velocity: {1}" = "ノートオフ: {0} / ベロシティ: {1}"
 "Reminder: this project has unsaved changes (backups are off: Settings > General > Save a backup copy)" = "リマインダー: このプロジェクトには未保存の変更があります (バックアップはオフ: 設定 > 一般 > バックアップコピーを保存)"
 "Never (just remind every 10 min)" = "しない (10 分ごとに通知のみ)"
+"Input Level" = "入力レベル"

@@ -6364,6 +6364,8 @@ void MainComponent::timerCallback()
     playButton.setToggleState (playing, juce::dontSendNotification);
     updateTransportStates (playing);
     updateLiveNoteHint();
+    if (simpleWorkflow != nullptr && layoutStyle == layoutstyle::Style::simple) // round 190ih: the dock's input level
+        simpleWorkflow->tick();
 
     updateChordPanel();
 

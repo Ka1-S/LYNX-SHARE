@@ -10161,3 +10161,4 @@ countries: tr
 "Note off: {0} / velocity: {1}" = "Nota kapalı: {0} / vuruş hızı: {1}"
 "Reminder: this project has unsaved changes (backups are off: Settings > General > Save a backup copy)" = "Hatırlatma: bu projede kaydedilmemiş değişiklikler var (yedekler kapalı: Ayarlar > Genel > Yedek kopya kaydet)"
 "Never (just remind every 10 min)" = "Asla (yalnızca 10 dakikada bir hatırlat)"
+"Input Level" = "Giriş seviyesi"
