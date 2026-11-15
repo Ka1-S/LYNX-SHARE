@@ -86,5 +86,9 @@ std::string alsHexEncode (const std::vector<std::uint8_t>& bytes, std::size_t li
 
 // Live's 70-colour clip/track palette index → 0xFFRRGGBB (LYNX's own approximation of each hue; 0 for unknown).
 std::uint32_t alsColour (int index) noexcept;
-int alsColourIndex (std::uint32_t argb) noexcept; // the nearest palette index (for the export)
+// Round 190ig: Live 12.4's own colour of each index (0 for unknown), and the colour an .als import gives an index: Live's
+// while the Clip-launch layout shows (layoutstyle::current), alsColour's otherwise.
+std::uint32_t alsLiveColour (int index) noexcept;
+std::uint32_t alsImportColour (int index) noexcept;
+int alsColourIndex (std::uint32_t argb) noexcept; // Live's own index of one of its colours, else the nearest palette index (for the export)
 } // namespace lynx
