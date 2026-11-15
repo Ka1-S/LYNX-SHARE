@@ -7765,8 +7765,9 @@ countries: tw hk mo
 "Layout style" = "版面樣式"
 "Pattern workflow (default)" = "模式工作流程（預設）"
 "Clip-launch workflow" = "片段啟動工作流程"
-"Pattern workflow: channel rack, patterns and a Playlist." = "模式工作流程：通道架、模式和播放清單。"
-"Clip-launch workflow: a clip grid with scenes beside the Playlist; patterns and the channel rack stay one click away." = "片段啟動工作流程：播放清單旁的帶場景片段格線；模式和通道架只需點一下。"
+"Three workflows in one program. Switch any time in View › Layout style: the project stays the same, only the windows change." = "一個程式，三種工作流程。隨時在 檢視 › 版面樣式 中切換：專案維持不變，只有視窗改變。"
+"Pattern workflow: works the way FL Studio does, with the Channel Rack, Piano Roll, Playlist and Mixer." = "模式工作流程：與 FL Studio 的工作方式相同，使用通道架、鋼琴捲軸、播放清單和混音器。"
+"Clip-launch workflow: clips and scenes launched from a grid, in the style of Ableton Live, with a Session mixer and the clip and device views; patterns and the Channel Rack stay one click away." = "片段啟動工作流程：以 Ableton Live 的風格從格線啟動片段和場景，附工作階段混音器以及片段檢視和裝置檢視；模式和通道架只需點一下。"
 "Toggle" = "切換"
 "Launch mode" = "啟動模式"
 "Follow action" = "跟隨動作"
@@ -7981,7 +7982,7 @@ countries: tw hk mo
 
 # --- Simple workflow layout style (round 184a)
 "Simple workflow" = "簡易工作流程"
-"Simple workflow: one window with the tracks and the timeline; the other windows stay one click away." = "簡易工作流程：音軌和時間軸在同一個視窗中；其他視窗一鍵即可開啟。"
+"Simple workflow: BandLab's approachable one-window style mixed with FL Studio Mobile's way of working, with tracks and a timeline, loops, pads and quick recording; FL Studio Mobile projects (.flm) open too." = "簡易工作流程：BandLab 易上手的單一視窗風格，結合 FL Studio Mobile 的工作方式：音軌和時間軸、循環、打擊墊和快速錄音；也能開啟 FL Studio Mobile 專案 (.flm)。"
 
 # --- Simple workflow: New track chooser (round 184a)
 "@instrument: Bass" = "貝斯"
@@ -9614,7 +9615,7 @@ countries: tw hk mo
 "Start empty" = "從空白開始"
 "Go straight to the tracks." = "直接前往音軌。"
 "Welcome to LYNX" = "歡迎使用 LYNX"
-"What would you like to do?" = "你想做什麼？"
+"The Simple workflow: tracks and a timeline, loops, pads and quick recording, all in one window. What would you like to do?" = "簡易工作流程：音軌和時間軸、循環、打擊墊和快速錄音，全在一個視窗中。你想做什麼？"
 "You can open this screen again from Help." = "你可以隨時從「說明」再次開啟此畫面。"
 "First-song tour" = "首支歌曲導覽"
 "The tour builds a song from the start. Start it in a new project?" = "導覽會從頭建構一首歌。要在新專案中開始嗎？"

@@ -104,7 +104,8 @@ struct Rows
 
     // round 190bj (QA: Settings › MIDI's game-controller line was drawn squeezed sideways): a note label as tall as its
     // text needs at the page's width (never less than `minHeight`), wrapped, never squeezed
-    juce::Rectangle<int> note (juce::Label& label, int minHeight, int lift = 3)
+    // (`indent`: under the controls, past the label column, as indented() places it)
+    juce::Rectangle<int> note (juce::Label& label, int minHeight, int lift = 3, bool indent = false)
     {
         label.setMinimumHorizontalScale (1.0f);
         const auto border = label.getBorderSize();
@@ -112,9 +113,9 @@ struct Rows
         text.append (label.getText(), label.getFont());
         text.setWordWrap (juce::AttributedString::byWord);
         juce::TextLayout layout;
-        layout.createLayout (text, (float) juce::jmax (1, area.getWidth() - border.getLeftAndRight()));
+        layout.createLayout (text, (float) juce::jmax (1, area.getWidth() - (indent ? labelWidth : 0) - border.getLeftAndRight()));
         const auto height = juce::jmax (minHeight, (int) std::ceil (layout.getHeight()) + border.getTopAndBottom() + 1);
-        return full (height).translated (0, -lift);
+        return (indent ? indented (height) : full (height)).translated (0, -lift);
     }
 };
 
@@ -153,9 +154,10 @@ public:
             if (hooks.setGeneral)
                 hooks.setGeneral (options);
         };
-        styleNote (layoutStyleNote, tr ("Pattern workflow: channel rack, patterns and a Playlist.") + "\n"
-                                        + tr ("Clip-launch workflow: a clip grid with scenes beside the Playlist; patterns and the channel rack stay one click away.") + "\n"
-                                        + tr ("Simple workflow: one window with the tracks and the timeline; the other windows stay one click away."));
+        styleNote (layoutStyleNote, tr ("Three workflows in one program. Switch any time in View › Layout style: the project stays the same, only the windows change.") + "\n"
+                                        + tr ("Pattern workflow: works the way FL Studio does, with the Channel Rack, Piano Roll, Playlist and Mixer.") + "\n"
+                                        + tr ("Clip-launch workflow: clips and scenes launched from a grid, in the style of Ableton Live, with a Session mixer and the clip and device views; patterns and the Channel Rack stay one click away.") + "\n"
+                                        + tr ("Simple workflow: BandLab's approachable one-window style mixed with FL Studio Mobile's way of working, with tracks and a timeline, loops, pads and quick recording; FL Studio Mobile projects (.flm) open too."));
         styleLabel (alsSessionLabel, tr ("Session clips of Live sets"));
         alsSessionBox.addItem (tr ("Clip grid (default)"), 1);
         alsSessionBox.addItem (tr ("Playlist, after the arrangement"), 2);
@@ -489,7 +491,7 @@ private:
         Rows r (width);
         r.section (workflowTitle, true);
         layoutStyleBox.setBounds (r.row (layoutStyleLabel, 260));
-        layoutStyleNote.setBounds (r.indented (66).translated (0, -3));
+        layoutStyleNote.setBounds (r.note (layoutStyleNote, 66, 3, true)); // (round 190hw: longer, so measured)
         alsSessionBox.setBounds (r.row (alsSessionLabel, 260));
         r.section (languageTitle);
         languageBox.setBounds (r.row (languageLabel, 220));

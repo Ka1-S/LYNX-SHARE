@@ -342,7 +342,9 @@ public:
         title.setText (tr ("Welcome to LYNX"), juce::dontSendNotification);
         title.setFont (theme::font (theme::type::display, true));
         title.setJustificationType (juce::Justification::centred);
-        subtitle.setText (tr ("What would you like to do?"), juce::dontSendNotification);
+        // round 190hw: what this workflow is, then the question (two lines: wrapped, never squeezed)
+        subtitle.setText (tr ("The Simple workflow: tracks and a timeline, loops, pads and quick recording, all in one window. What would you like to do?"), juce::dontSendNotification);
+        subtitle.setMinimumHorizontalScale (1.0f);
         subtitle.setFont (theme::font (theme::type::body));
         subtitle.setColour (juce::Label::textColourId, theme::colour::textSecondary);
         subtitle.setJustificationType (juce::Justification::centred);
@@ -392,7 +394,7 @@ public:
         top.removeFromLeft (28);
         title.setBounds (top);
         c.removeFromTop (12);
-        subtitle.setBounds (c.removeFromTop (22));
+        subtitle.setBounds (c.removeFromTop (44));
         c.removeFromTop (10);
         footer.setBounds (c.removeFromBottom (20));
         c.removeFromBottom (8);

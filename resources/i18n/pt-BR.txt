@@ -7887,8 +7887,9 @@ countries: br
 "Layout style" = "Estilo de layout"
 "Pattern workflow (default)" = "Fluxo por padrões (padrão)"
 "Clip-launch workflow" = "Fluxo por disparo de clipes"
-"Pattern workflow: channel rack, patterns and a Playlist." = "Fluxo por padrões: channel rack, padrões e uma Playlist."
-"Clip-launch workflow: a clip grid with scenes beside the Playlist; patterns and the channel rack stay one click away." = "Fluxo por disparo de clipes: uma grade de clipes com cenas ao lado da Playlist; padrões e channel rack ficam a um clique."
+"Three workflows in one program. Switch any time in View › Layout style: the project stays the same, only the windows change." = "Três fluxos de trabalho em um só programa. Troque quando quiser em Exibir › Estilo de layout: o projeto continua o mesmo, só as janelas mudam."
+"Pattern workflow: works the way FL Studio does, with the Channel Rack, Piano Roll, Playlist and Mixer." = "Fluxo por padrões: funciona como o FL Studio, com Channel Rack, Piano Roll, Playlist e Mixer."
+"Clip-launch workflow: clips and scenes launched from a grid, in the style of Ableton Live, with a Session mixer and the clip and device views; patterns and the Channel Rack stay one click away." = "Fluxo por disparo de clipes: clipes e cenas disparados de uma grade, no estilo do Ableton Live, com um mixer da sessão e as visões de clipe e de dispositivo; padrões e Channel Rack ficam a um clique."
 "Toggle" = "Alternar"
 "Launch mode" = "Modo de disparo"
 "Follow action" = "Ação seguinte"
@@ -8107,7 +8108,7 @@ countries: br
 
 # --- Simple workflow layout style (round 184a)
 "Simple workflow" = "Fluxo simples"
-"Simple workflow: one window with the tracks and the timeline; the other windows stay one click away." = "Fluxo simples: uma única janela com as faixas e a linha do tempo; as outras janelas ficam a um clique."
+"Simple workflow: BandLab's approachable one-window style mixed with FL Studio Mobile's way of working, with tracks and a timeline, loops, pads and quick recording; FL Studio Mobile projects (.flm) open too." = "Fluxo simples: o estilo acessível de janela única do BandLab misturado ao jeito de trabalhar do FL Studio Mobile, com faixas e linha do tempo, loops, pads e gravação rápida; projetos do FL Studio Mobile (.flm) também abrem."
 
 # --- Simple workflow: New track chooser (round 184a)
 "@instrument: Bass" = "Baixo"
@@ -9735,7 +9736,7 @@ countries: br
 "Start empty" = "Começar do zero"
 "Go straight to the tracks." = "Vá direto para as faixas."
 "Welcome to LYNX" = "Boas-vindas ao LYNX"
-"What would you like to do?" = "O que você quer fazer?"
+"The Simple workflow: tracks and a timeline, loops, pads and quick recording, all in one window. What would you like to do?" = "O fluxo simples: faixas e linha do tempo, loops, pads e gravação rápida, tudo em uma janela. O que você quer fazer?"
 "You can open this screen again from Help." = "Você pode abrir esta tela de novo pela Ajuda."
 "First-song tour" = "Tour da primeira música"
 "The tour builds a song from the start. Start it in a new project?" = "O tour monta uma música do começo. Começar num projeto novo?"
