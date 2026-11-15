@@ -3122,12 +3122,15 @@ class SettingsPanel final : public juce::Component,
 public:
     // the page in FL's form units (FL's 561 x 399 sheet, then LYNX's extras below it)
     static constexpr int designWidth = 558, designHeight = 524;
+    static constexpr int clipDesignHeight = 390; // an audio clip's page: FL's sheet without LYNX's extras under it
     static constexpr float defaultScale = 1.25f;
 
     SettingsPanel (AudioEngine& e, ChannelRef c)
         : engine (e),
           ref (std::move (c))
     {
+        if (const auto* def = ref.get (engine))
+            clipChannel = def->instrument == InstrumentKind::audioClip;
         // ---- File row (round 190df; form GrooveBox, shot dock188a fl-05) ----
         fileLabel.setText (tr ("File"), juce::dontSendNotification);
         fileLabel.setJustificationType (juce::Justification::centredRight);
@@ -3254,7 +3257,7 @@ public:
         // ---- the waveform ----
         wave.setEmptyText (tr ("No sample loaded"));
         wave.setTooltip (tr ("Waveform") + " - " + tr ("click: preview the sample; mouse wheel: zoom"));
-        wave.setWatermark (tr ("Sampler"));
+        wave.setWatermark (clipChannel ? tr ("Audio clip") : tr ("Sampler")); // (FL's audio clip page: "Audio Clip")
         wave.setCaptionVisible (false);
         wave.setZoomable (true);
         wave.setFollowsSamplerViews (true); // (round 190gw: the waveform menu's Spectrum / Multichannel views)
@@ -3326,10 +3329,22 @@ public:
             tweakTargets.push_back ({ slider, param });
         }
 
+        // An audio clip's channel (live check 190ew, shot PL-x-audio-clip-channel-page-variants): FL's page has no
+        // Playback box (start offset, loop points) and nothing under the waveform. A Playlist clip plays its whole
+        // sample in LYNX too (SamplerInstrument clip mode skips the start offset, the loop knobs and the envelope /
+        // filter / portamento of LYNX's extras), so those controls are left out of it.
+        if (clipChannel)
+            for (auto* hidden : std::initializer_list<juce::Component*> { &startOffsetKnob, &startOffsetLabel, &loopStartKnob, &loopStartLabel,
+                                                                         &loopEndKnob, &loopEndLabel, &useLoops, &pingPong, &gain, &gainLabel,
+                                                                         &attack, &attackLabel, &decay, &decayLabel, &sustain, &sustainLabel,
+                                                                         &release, &releaseLabel, &cutoff, &cutoffLabel, &resonance,
+                                                                         &resonanceLabel, &filterType, &cut, &porta, &modulationButton })
+                hidden->setVisible (false);
+
         refresh();
         showLegacy();
         engine.addChangeListener (this);
-        setSize (juce::roundToInt (designWidth * defaultScale), juce::roundToInt (designHeight * defaultScale));
+        setSize (juce::roundToInt (designWidth * defaultScale), juce::roundToInt (pageHeight() * defaultScale));
         if (ref.index >= 0)
             startTimerHz (30); // the knobs follow their automation while the song plays (issue #12)
     }
@@ -3420,7 +3435,7 @@ public:
     void resized() override
     {
         // FL's layout in its own units, scaled to the page (the whole page fits; at 1.25 it is FL's at 125 %)
-        scale = juce::jmax (0.55f, juce::jmin ((float) getWidth() / (float) designWidth, (float) getHeight() / (float) designHeight));
+        scale = juce::jmax (0.55f, juce::jmin ((float) getWidth() / (float) designWidth, (float) getHeight() / (float) pageHeight()));
         offsetX = juce::jmax (0, (getWidth() - juce::roundToInt ((float) designWidth * scale)) / 2);
         groups.clear();
         const auto captionFont = theme::font (juce::jlimit (8.0f, 13.0f, scaled (8.6f)), true);
@@ -3451,11 +3466,12 @@ public:
         declickLabel.setBounds (R (14, 126, 100, 23));
         declick.setBounds (R (116, 126, 152, 23));
 
-        groups.push_back ({ R (7, 168, 268, 79), tr ("Playback"), 0 });
+        if (! clipChannel)
+            groups.push_back ({ R (7, 168, 268, 79), tr ("Playback"), 0 });
         place (startOffsetKnob, startOffsetLabel, 26, 194, 9, 68);
         place (loopStartKnob, loopStartLabel, 80, 194, 66, 40);
         place (loopEndKnob, loopEndLabel, 118, 194, 112, 30);
-        loopGlyph = R (105, 229, 10, 10);
+        loopGlyph = clipChannel ? juce::Rectangle<int>() : R (105, 229, 10, 10);
         useLoops.setBounds (R (150, 191, 122, 21));
         pingPong.setBounds (R (150, 213, 122, 21));
 
@@ -3500,7 +3516,8 @@ public:
         waveScroll.setBounds (R (7, 368, 544, 14));
 
         // LYNX extras (FL's page has no place for them)
-        groups.push_back ({ R (7, 390, 544, 128), extrasLabel.getText(), 0 });
+        if (! clipChannel)
+            groups.push_back ({ R (7, 390, 544, 128), extrasLabel.getText(), 0 });
         {
             int x = 18;
             for (auto [k, label] : { std::pair { &gain, &gainLabel }, { &attack, &attackLabel }, { &decay, &decayLabel },
@@ -3608,6 +3625,8 @@ public:
     juce::String shotModeText() const { return stretchMethod.getText(); }
 
 private:
+    int pageHeight() const noexcept { return clipChannel ? clipDesignHeight : designHeight; }
+
     juce::Rectangle<int> R (int x, int y, int w, int h) const
     {
         return { offsetX + juce::roundToInt ((float) x * scale), juce::roundToInt ((float) y * scale), juce::roundToInt ((float) w * scale),
@@ -4244,6 +4263,7 @@ private:
     };
     std::vector<Group> groups;
     juce::Rectangle<int> loopGlyph;
+    bool clipChannel = false; // an audio clip's channel: FL's audio clip page (no Playback box, no LYNX extras)
 
     // FL's TIME knob menu (r168s c_f20): (none), Autodetect, Project tempo, 1 beat, 2 beats, 1 bar, 2 bars, 3 bars, 4 bars
     struct StretchMenu final : juce::MouseListener
@@ -6165,7 +6185,17 @@ public:
         };
         instrumentPageFirst = instrumentPage != nullptr;
         if (instrumentPage != nullptr) // (none: a channel whose instrument has its own window, e.g. a hosted plugin)
-            addPage (std::move (instrumentPage), tr ("Plugin"), tr ("The instrument's own settings"));
+        {
+            // FL's channel window has one "Sample settings" sheet for the Sampler and for an audio clip's channel, and a
+            // "Plugin editor" sheet for every other generator (TPluginForm BtnHint "|Sample settings" / "|Plugin editor")
+            const auto kind = channel >= 0 && channel < (int) engine.getSong().channels.size()
+                                  ? engine.getSong().channels[(std::size_t) channel].instrument
+                                  : InstrumentKind::synth;
+            if (kind == InstrumentKind::sampler || kind == InstrumentKind::audioClip)
+                addPage (std::move (instrumentPage), tr ("Sample"), tr ("Sample settings"));
+            else
+                addPage (std::move (instrumentPage), tr ("Plugin"), tr ("The instrument's own settings"));
+        }
         if (envelopePage != nullptr)
             addPage (std::move (envelopePage), tr ("Envelope / instrument"), tr ("Envelope / instrument settings: the filter and pitch envelopes and the LFOs"));
         if (node)
@@ -6836,6 +6866,7 @@ bool hasChannelSettings (InstrumentKind kind) noexcept
     {
         case InstrumentKind::synth:
         case InstrumentKind::sampler:
+        case InstrumentKind::audioClip:
         case InstrumentKind::controller:
         case InstrumentKind::midiOut:
         case InstrumentKind::sakura:

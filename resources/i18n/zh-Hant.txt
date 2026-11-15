@@ -10144,3 +10144,4 @@ countries: tw hk mo
 "There is no track here to take the plugin." = "這裡沒有可以接收該外掛的軌道。"
 "Potentially slow operation" = "操作可能較慢"
 "Are you sure you want to load {0} plugins at once?" = "確定要一次載入 {0} 個外掛嗎?"
+"Sample settings" = "取樣設定"

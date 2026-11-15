@@ -10144,3 +10144,4 @@ countries: pl
 "There is no track here to take the plugin." = "Nie ma tu ścieżki, która mogłaby przyjąć wtyczkę."
 "Potentially slow operation" = "Operacja może być wolna"
 "Are you sure you want to load {0} plugins at once?" = "Czy na pewno chcesz wczytać {0} wtyczek naraz?"
+"Sample settings" = "Ustawienia sampla"

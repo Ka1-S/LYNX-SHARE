@@ -10144,3 +10144,4 @@ countries: fr be ch ca lu
 "There is no track here to take the plugin." = "Aucune piste ici ne peut recevoir le plugin."
 "Potentially slow operation" = "Opération potentiellement lente"
 "Are you sure you want to load {0} plugins at once?" = "Voulez-vous vraiment charger {0} plugins à la fois ?"
+"Sample settings" = "Réglages du sample"
