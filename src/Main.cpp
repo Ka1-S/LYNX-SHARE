@@ -229,6 +229,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <future>
 #include <mutex>
 #include <thread>
 
@@ -242,7 +243,10 @@ struct StartupTrace
 {
     using clock = std::chrono::steady_clock;
     const clock::time_point t0 = clock::now(); // static initialisation: no JUCE yet, standard library only
-    const bool on = std::getenv ("LYNX_TRACE_STARTUP") != nullptr;
+    // (round 190go: always kept, as a field-readable start-up timeline; written to startup.log 5 s and 15 s after the
+    // window — with LYNX_TRACE_STARTUP set, at every step as before, so a start that hangs still leaves its last step)
+    const bool on = true;
+    const bool eachStep = std::getenv ("LYNX_TRACE_STARTUP") != nullptr;
     juce::String text;
     clock::time_point last = t0;
     std::int64_t lastPrivate = 0;
@@ -263,8 +267,10 @@ struct StartupTrace
              << "  private " << mb (priv) << " MB (+" << mb (priv - lastPrivate).trim() << ")  ws " << mb (ws) << " MB  " << step << "\n";
         lastPrivate = priv;
         last = now;
-        lynx::platform::settingsFile ("startup.log").replaceWithText (text);
+        if (eachStep)
+            write();
     }
+    void write() const { lynx::platform::settingsFile ("startup.log").replaceWithText (text); }
 };
 StartupTrace startupTrace;
 void startupMarkHook (const char* step) { startupTrace.mark (step); }
@@ -2676,73 +2682,127 @@ public:
                 openTimeIdleSeconds = juce::jlimit (1, 120, args[i + 3].getIntValue());
         }
 
+        // round 190go: the ASIO device of the last session is made and opened from now on, while the splash and the
+        // window come up (see below)
+        lynx::AudioEngine::prewarmAudioDevice();
+        // round 190go: the built-in start-up sound is made while the splash and the window come up (pure maths)
+        if (startupOptions.sound && lynx::themeui::current().startupSound.empty())
+            startupSampleJob = std::async (std::launch::async, [] { return lynx::makeStartupSample(); });
+
+        // Round 190go (start-up faster than FL Studio): the main window is built first, with the engine ready but no
+        // audio device open; the device opens after it. An ASIO device of the last session was made and opened ahead,
+        // on a worker, while the window was built (AudioEngine::prewarmAudioDevice; the driver itself only ever runs on
+        // JUCE's ASIO thread, as COM wants). Play pressed before the device is open starts with it.
         if (! startupOptions.splash)
         {
             startEngine();
             createMainWindow();
             mainWindow->reveal();
-            showUncleanNotice();
             startupTrace.mark ("window revealed");
-            openStartupFile();
-            startupTrace.mark ("startup file opened");
-            startOpenTimeProbe();
-            startUpdateCheck();
-            startSupportNote();
-            juce::MessageManager::callAsync ([] { startupTrace.mark ("first message loop turn"); });
-            markSettled(); // (round 190gd)
+            // the device (and the start-up sound) once the window's first frame is on screen
+            mainWindow->whenPainted ([this] {
+                openAudioDevice();
+                openMidiDevices();
+                startAfterWindow (false);
+            });
             return;
         }
 
-        // the splash first, so it is on screen while the audio device opens; the main window is built
-        // once the logo has landed (the scene is still for a moment then) and shown when the splash ends
+        // the splash first; the main window is built behind its card (still: the logo has not started to drop; building
+        // it during the drop would stop the animation, both run on the message thread), then the audio device opens
+        // (the start-up sound needs it), and the drop starts with its sound. The window shows the moment the logo has
+        // landed (round 190go, A4: before, the window was built only after the drop: the drop, then ~0.6 s of build).
         splash = std::make_unique<lynx::SplashScreen>();
         startupTrace.mark ("splash made");
         splash->showOnDesktop();
         startupTrace.mark ("splash on the desktop");
 
-        juce::Timer::callAfterDelay (40, [this] {
+        // the rest once the card's first frame is on the screen (round 190go: before, a fixed 40 ms), at the latest
+        // after 40 ms
+        const auto goOn = [this, started = std::make_shared<bool> (false)] {
+            if (std::exchange (*started, true) || splash == nullptr) // (once; or quit meanwhile)
+                return;
             startEngine();
-
             if (splash == nullptr) // quit meanwhile
                 return;
+            createMainWindow();
+            if (splash == nullptr || mainWindow == nullptr)
+                return;
+            if (startupOptions.sound)
+                openAudioDevice (false); // (else after the splash: nothing waits for it)
+            // one turn of the message loop before the drop: what fell due while the window was built (JUCE's timers,
+            // the window's own async work) runs now, on the still card, not in the drop's first frames
+            juce::MessageManager::callAsync ([this] { startDrop(); });
+        };
+        splash->onFirstFrame = goOn;
+        juce::Timer::callAfterDelay (40, goOn);
+    }
 
-            splash->setStatus (lynx::tr ("Loading the workspace..."));
-            splash->startClock();
-            // the minimum counts from the process start (the audio device took part of it already)
-            splashDuration = lynx::SplashScreen::remainingDuration (startupTrace.seconds());
-            splash->setBarDuration (splashDuration);
+    // the logo's drop and the start-up sound together; the window shows the moment the logo has landed
+    void startDrop()
+    {
+        if (splash == nullptr || mainWindow == nullptr || engine == nullptr)
+            return;
+        if (startupOptions.sound)
+            playStartupSound();
+        splash->setStatus (lynx::tr ("Loading the workspace..."));
+        splash->startClock();
+        // the minimum counts from the process start (the window and the audio device took part of it already)
+        splashDuration = lynx::SplashScreen::remainingDuration (startupTrace.seconds());
+        splash->setBarDuration (splashDuration);
 
-            juce::Timer::callAfterDelay (1050, [this] {
-                if (splash == nullptr || engine == nullptr)
-                    return;
+        juce::Timer::callAfterDelay (juce::roundToInt (splashDuration * 1000.0), [this] {
+            if (splash == nullptr || mainWindow == nullptr)
+                return;
 
-                createMainWindow();
-                const auto wait = juce::jmax (0.0, splashDuration - splash->getElapsed());
-
-                juce::Timer::callAfterDelay ((int) (wait * 1000.0), [this] {
-                    if (splash == nullptr || mainWindow == nullptr)
-                        return;
-
-                    mainWindow->reveal();
-                    startupTrace.mark ("window revealed (after the splash)");
-                    splash->toFront (false);
-                    splash->finish ([this] { splash = nullptr; });
-                    showUncleanNotice();
-                    openStartupFile();
-                    startupTrace.mark ("startup file opened");
-                    startOpenTimeProbe();
-                    startUpdateCheck();
-                    startSupportNote();
-                    juce::MessageManager::callAsync ([] { startupTrace.mark ("first message loop turn"); });
-                    markSettled(); // (round 190gd)
-                    // first run: language, audio, plugin folders (FL Studio's included) and a background scan
-                    if (! lynx::setupWizardDone() && lynx::platform::testMode())
-                        lynx::platform::testModeLog ("setup wizard");
-                    else if (! lynx::setupWizardDone())
-                        mainWindow->showSetupWizard();
-                });
+            if (startupTrace.on)
+                startupTrace.mark (("splash: the drop in " + juce::String (splash->getDropFrames()) + " frames, longest gap "
+                                    + juce::String (splash->getLongestDropGapMs(), 1) + " ms").toRawUTF8());
+            mainWindow->reveal();
+            startupTrace.mark ("window revealed (after the splash)");
+            splash->toFront (false);
+            const auto deviceOpen = ! engine->isAudioDeviceOpenPending();
+            splash->finish ([this, deviceOpen] {
+                splash = nullptr;
+                // without the start-up sound the device opens now, once the card has faded (the window is up)
+                if (! deviceOpen)
+                    openAudioDevice();
+                openMidiDevices();
+                if (! deviceOpen)
+                    startAfterWindow (true);
             });
+            if (deviceOpen)
+                mainWindow->whenPainted ([this] { startAfterWindow (true); });
         });
+    }
+
+    // what follows the window's first frame (the audio device is open): the notice of an unclean end, the start-up
+    // project, the probes and the update check; on a first run (with the splash) the setup wizard
+    void startAfterWindow (bool offerSetupWizard)
+    {
+        if (std::exchange (startedAfterWindow, true) || mainWindow == nullptr)
+            return;
+        // (round 190go) each step after the window is a timed line of the start-up trace
+        showUncleanNotice();
+        startupTrace.mark ("after the window: unclean-session notice");
+        openStartupFile();
+        startupTrace.mark ("startup file opened");
+        startOpenTimeProbe();
+        startUpdateCheck();
+        startSupportNote(); // (round 190fq)
+        startupTrace.mark ("after the window: probes, update check scheduled");
+        juce::MessageManager::callAsync ([] { startupTrace.mark ("first message loop turn"); });
+        markSettled(); // (round 190gd)
+        // first run: language, audio, plugin folders (FL Studio's included) and a background scan
+        if (! offerSetupWizard)
+            return;
+        if (! lynx::setupWizardDone() && lynx::platform::testMode())
+            lynx::platform::testModeLog ("setup wizard");
+        else if (! lynx::setupWizardDone())
+        {
+            mainWindow->showSetupWizard();
+            startupTrace.mark ("after the window: setup wizard shown");
+        }
     }
 
     // round 190fq: the start-up support note (ui/SupportLynx.h) counts this start and, from the 10th on, may show its
@@ -2764,29 +2824,19 @@ public:
     {
         if (! startupTrace.on)
             return;
-        juce::Timer::callAfterDelay (5000, [] { startupTrace.mark ("5 s after the window"); });
-        juce::Timer::callAfterDelay (15000, [] { startupTrace.mark ("15 s after the window"); });
+        juce::Timer::callAfterDelay (5000, [] { startupTrace.mark ("5 s after the window"); startupTrace.write(); });
+        juce::Timer::callAfterDelay (15000, [] { startupTrace.mark ("15 s after the window"); startupTrace.write(); });
     }
 
     void startEngine()
     {
         startupTrace.mark ("before the audio engine");
-        engine = std::make_unique<lynx::AudioEngine>();
+        // (round 190go) ready to play, no device open yet: see openAudioDevice
+        engine = std::make_unique<lynx::AudioEngine> (true, -1, true, true);
         lynx::videoview::install (*engine); // (Fruity Video Player channels: their sound tracks)
-        startupTrace.mark ("audio engine + device");
+        startupTrace.mark ("audio engine (no device yet)");
         crashEngine = engine.get();
         lynx::crashreporter::watchAudioDevice (engine->getDeviceManager()); // (the session file names the device: crash reports)
-        addDriverFileDeviceType();
-
-        if (startupOptions.sound)
-        {
-            // Options › Theme › Startup sound (issue #12): the user's file, else (or when it can't be read) LYNX's own
-            std::shared_ptr<const lynx::SampleData> sound;
-            if (const auto& own = lynx::themeui::current().startupSound; ! own.empty() && juce::File (juce::String::fromUTF8 (own.c_str())).existsAsFile())
-                sound = engine->getSampleLibrary().load (juce::String::fromUTF8 (own.c_str()));
-            engine->previewSample (sound != nullptr ? sound : lynx::makeStartupSample());
-        }
-        startupTrace.mark ("startup sound");
 
         // a project given on the command line: its slow plugin modules (a Waves shell) start now, on their own
         // thread, while the splash and the main window come up (round 121)
@@ -2800,6 +2850,41 @@ public:
                 catch (const flp::Error&)
                 {
                 }
+    }
+
+    // The audio device of the last session, then (withSound) the start-up sound on it (once; message thread)
+    void openAudioDevice (bool withSound = true)
+    {
+        if (engine == nullptr || ! engine->isAudioDeviceOpenPending())
+            return;
+        engine->openAudioDevice();
+        if (const auto prewarmed = lynx::asioPrewarmReport(); prewarmed.isNotEmpty() && startupTrace.on)
+            startupTrace.mark (("  " + prewarmed).toRawUTF8());
+        startupTrace.mark ("audio device opened");
+        addDriverFileDeviceType();
+        if (withSound)
+            playStartupSound();
+    }
+
+    void playStartupSound()
+    {
+        if (startupOptions.sound && ! std::exchange (startupSoundPlayed, true) && engine != nullptr)
+        {
+            // Options › Theme › Startup sound (issue #12): the user's file, else (or when it can't be read) LYNX's own
+            std::shared_ptr<const lynx::SampleData> sound;
+            if (const auto& own = lynx::themeui::current().startupSound; ! own.empty() && juce::File (juce::String::fromUTF8 (own.c_str())).existsAsFile())
+                sound = engine->getSampleLibrary().load (juce::String::fromUTF8 (own.c_str()));
+            if (sound == nullptr && startupSampleJob.valid())
+                sound = startupSampleJob.get();
+            engine->previewSample (sound != nullptr ? sound : lynx::makeStartupSample());
+        }
+        startupTrace.mark ("startup sound");
+    }
+
+    void openMidiDevices()
+    {
+        if (engine != nullptr)
+            engine->openMidiDevices(); // (its own line in the start-up trace: "engine: MIDI inputs")
     }
 
     void createMainWindow()
@@ -26681,6 +26766,24 @@ private:
             });
         }
 
+        // Runs `then` once, right after the window's next frame (round 190go: the audio device opens behind the
+        // window's first frame, not before it); at the latest after 300 ms (a window that paints nothing: minimised).
+        void whenPainted (std::function<void()> then)
+        {
+            afterPaint = std::move (then);
+            afterPaintPosted = false;
+            repaint();
+            juce::Timer::callAfterDelay (300, [safe = juce::Component::SafePointer<MainWindow> (this)] {
+                if (safe != nullptr)
+                    safe->runAfterPaint();
+            });
+        }
+        void runAfterPaint()
+        {
+            if (auto then = std::exchange (afterPaint, nullptr))
+                then();
+        }
+
         // The window's place and maximized state for the next start (main-window.txt in the settings folder).
         void saveState() { stateFile().replaceWithText (getWindowStateAsString()); }
         static juce::File stateFile() { return lynx::PluginHost::settingsFolder().getChildFile ("main-window.txt"); }
@@ -26727,6 +26830,11 @@ private:
         void paintOverChildren (juce::Graphics& g) override
         {
             DocumentWindow::paintOverChildren (g);
+            if (afterPaint != nullptr && ! std::exchange (afterPaintPosted, true)) // (the frame is presented first)
+                juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<MainWindow> (this)] {
+                    if (safe != nullptr)
+                        safe->runAfterPaint();
+                });
             if (onFrame && frameStart > 0.0)
                 onFrame (juce::Time::getMillisecondCounterHiRes() - frameStart);
             frameStart = 0.0;
@@ -26737,6 +26845,8 @@ private:
         std::unique_ptr<lynx::ui::FrameProbe> probe; // (on top of the content; see watchFrames)
         double frameStart = 0.0;
         bool maximiseOnReveal = false;
+        std::function<void()> afterPaint; // (whenPainted)
+        bool afterPaintPosted = false;
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainWindow)
     };
@@ -26773,6 +26883,8 @@ private:
     std::unique_ptr<MainWindow> mainWindow;
     std::unique_ptr<juce::Timer> perf; // --uiperf
     std::unique_ptr<lynx::SplashScreen> splash;
+    std::future<std::shared_ptr<const lynx::SampleData>> startupSampleJob; // (round 190go: the built-in start-up sound)
+    bool startedAfterWindow = false, startupSoundPlayed = false;
     double splashDuration = lynx::SplashScreen::minimumDuration; // seconds of its clock (round 121: from the process start)
     lynx::StartupOptions startupOptions;
     juce::File fileToOpen;

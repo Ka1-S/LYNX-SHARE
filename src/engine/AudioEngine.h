@@ -1,5 +1,6 @@
 #pragma once
 
+#include "engine/DllAsioDevice.h"
 #include <array>
 #include <optional>
 #include <deque>
@@ -76,7 +77,22 @@ public:
     // userPluginList = false: the plugin host neither reads nor writes LYNX's plugin list and settings, nor reads FL's
     // plugin database in the background (round 180b: an editor inside another host must not, and its close must not
     // wait for that reader)
-    explicit AudioEngine (bool openAudioDevice = true, int workerThreads = -1, bool userPluginList = true);
+    // deferDeviceOpen (round 190go, the app's start): the engine is ready to play but opens no device, MIDI port or
+    // prefetcher until openAudioDevice() / openMidiDevices() (the main window is built first). Until then it behaves
+    // like an engine without a device; play pressed meanwhile starts with the device.
+    explicit AudioEngine (bool openAudioDevice = true, int workerThreads = -1, bool userPluginList = true, bool deferDeviceOpen = false);
+    // The audio device of the last session (else the default) and the parts that live with it: the device types,
+    // the audio callback, the saved-setup watcher and the stream prefetcher; then the project's inputs, hardware
+    // outputs and inserts open on it (what opening a project does). Message thread (JUCE's ASIO type wants one thread
+    // for a driver's whole life). Does nothing when it is open already or the engine has no device.
+    void openAudioDevice();
+    // The MIDI inputs and the MIDI sync outputs (FL's MIDI settings). Message thread; once.
+    void openMidiDevices();
+    bool isAudioDeviceOpenPending() const noexcept { return devicePending; }
+    // Windows (round 190go): the ASIO device of the last session is made and opened on a worker thread now (the
+    // driver itself on JUCE's ASIO thread, cmake/LynxPatchJuce.cmake fix 29); openAudioDevice() then takes it. Making
+    // and opening it took ~0.8 s of the start's critical path. Elsewhere, or for another device type: nothing.
+    static void prewarmAudioDevice();
     // Round 180b (LYNX's plugins in another host): this engine plays nothing, it serves an editor whose audio runs in the
     // plugin's own renderer. The editor's displays read that renderer's times and tap, and its running effect.
     void setExternalRuntime (ProcessTimes* times, std::function<std::shared_ptr<Effect>()> effect)
@@ -1152,7 +1168,7 @@ private:
     void adoptPrepared (PreparedFlp& prepared); // the plugins of a prepared import found / substituted (message thread)
 
     std::unique_ptr<WorkerPool> workers; // extra renderer threads (before the graph, which uses them)
-    juce::AudioDeviceManager deviceManager;
+    LynxDeviceManager deviceManager; // (JUCE's, taking the prewarmed ASIO device: round 190go)
     juce::AudioProcessorGraph graph;
     juce::AudioProcessorPlayer player;
     Transport transport;
@@ -1220,6 +1236,9 @@ private:
     bool learningGlobal = false;
     bool controllerLearnTick = false; // a MIDI learn was waiting at this tick's applyControllers (round 190aw)
     bool saveGlobalLinks = false; // only the engine with an audio device (the app) writes the settings file
+    bool devicePending = false, midiPending = false, midiOpen = false; // (round 190go: see deferDeviceOpen)
+    juce::MidiDeviceInfo savedMidiOutput; // the saved setup's default MIDI output, opened by openMidiDevices
+    bool followProjectOnDevice(); // true when the song changed (FL's insert inputs placed on the device)
     void applyControllers();
     std::atomic<int> pendingMarkerNote { -1 }; // MIDI thread -> timer: a "Song marker jump" note
     std::vector<RecordedEvent> uiRecorded;           // PC keyboard -> recording

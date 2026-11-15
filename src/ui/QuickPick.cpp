@@ -257,7 +257,8 @@ void refreshPluginDatabase (AudioEngine& engine, bool force)
         return;
     const juce::ScopedValueSetter<bool> busy (databaseBusy, true);
     plugindb::State state { host.databaseFolders(), host.pluginNames() };
-    if (plugindb::refresh (pluginDatabaseFolder().getFullPathName().toStdString(), databasePlugins (engine), state).ok)
+    // (Installed, the "copy from here" folder, is written on a thread of its own: round 190go)
+    if (plugindb::refresh (pluginDatabaseFolder().getFullPathName().toStdString(), databasePlugins (engine), state, true).ok)
         host.adoptDatabase (state.folders, state.names);
     lastDatabaseRefresh = juce::Time::getMillisecondCounter();
 }
@@ -267,7 +268,9 @@ void installPluginDatabase (AudioEngine& engine)
     auto& host = engine.getPluginHost();
     if (! host.isPersistent())
         return;
-    refreshPluginDatabase (engine, true);
+    // (round 190go: not forced: the Browser, built just before, read the folder a moment ago; read twice in a row it
+    // cost the start-up a second pass over every entry of the user's tree)
+    refreshPluginDatabase (engine);
     host.onDatabaseEdited = [&engine] {
         auto& h = engine.getPluginHost();
         if (databaseBusy)

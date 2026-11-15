@@ -2,13 +2,17 @@
 
 #include <algorithm>
 #include <cctype>
+#include <condition_variable>
 #include <cstdint>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <map>
+#include <mutex>
 #include <optional>
 #include <set>
 #include <sstream>
+#include <thread>
 
 namespace lynx::plugindb
 {
@@ -252,7 +256,90 @@ std::string signatureHash (const std::string& signature)
     return text;
 }
 
-// Installed/Effects|Generators/<format>/: one entry per plugin, as the list says now
+// Held while Installed is written (round 190go: also on the writer thread below) and while it is read
+// (entryFile, groupFolder) or its memory is forgotten (forgetSession)
+std::mutex& installedMutex()
+{
+    static std::mutex m;
+    return m;
+}
+
+void writeInstalled (const std::string& root, const std::vector<Plugin>& plugins);
+
+// Round 190go: Installed written on a thread of its own. The newest list per root waits; one write at a time.
+class InstalledWriter
+{
+public:
+    InstalledWriter()
+    {
+        installedMutex(); // (made first, so they outlive this writer at exit)
+        installedSignature();
+    }
+    ~InstalledWriter()
+    {
+        {
+            const std::lock_guard<std::mutex> lock (m);
+            stop = true;
+        }
+        cv.notify_all();
+        if (thread.joinable())
+            thread.join();
+    }
+
+    void post (const std::string& root, const std::vector<Plugin>& plugins)
+    {
+        {
+            const std::lock_guard<std::mutex> lock (m);
+            pending[root] = plugins;
+            if (! thread.joinable())
+                thread = std::thread ([this] { run(); });
+        }
+        cv.notify_all();
+    }
+
+    void wait()
+    {
+        std::unique_lock<std::mutex> lock (m);
+        cv.wait (lock, [this] { return pending.empty() && ! busy; });
+    }
+
+private:
+    void run()
+    {
+        std::unique_lock<std::mutex> lock (m);
+        for (;;)
+        {
+            cv.wait (lock, [this] { return stop || ! pending.empty(); });
+            if (stop) // (at exit: a list still waiting is written at the next start, see writeInstalled)
+                return;
+            auto job = std::move (*pending.begin());
+            pending.erase (pending.begin());
+            busy = true;
+            lock.unlock();
+            {
+                const std::lock_guard<std::mutex> folder (installedMutex());
+                writeInstalled (job.first, job.second);
+            }
+            lock.lock();
+            busy = false;
+            cv.notify_all();
+        }
+    }
+
+    std::mutex m;
+    std::condition_variable cv;
+    std::map<std::string, std::vector<Plugin>> pending;
+    bool busy = false, stop = false;
+    std::thread thread;
+};
+
+InstalledWriter& installedWriter()
+{
+    static InstalledWriter writer;
+    return writer;
+}
+
+// Installed/Effects|Generators/<format>/: one entry per plugin, as the list says now (installedMutex held)
 void writeInstalled (const std::string& root, const std::vector<Plugin>& plugins)
 {
     std::string signature;
@@ -629,11 +716,18 @@ bool parseEntry (const std::string& text, Entry& entry)
 
 void forgetSession (const std::string& root)
 {
+    finishInstalledWrites();
     lastDirs().erase (root);
+    const std::lock_guard<std::mutex> lock (installedMutex());
     installedSignature().erase (root);
 }
 
-Report refresh (const std::string& root, const std::vector<Plugin>& plugins, State& state)
+void finishInstalledWrites()
+{
+    installedWriter().wait();
+}
+
+Report refresh (const std::string& root, const std::vector<Plugin>& plugins, State& state, bool installedLater)
 {
     Report r;
     if (root.empty())
@@ -673,7 +767,13 @@ Report refresh (const std::string& root, const std::vector<Plugin>& plugins, Sta
     readState (root, plugins, seen, state);
     if (! indexed || seen != before)
         saveIndex (root, seen);
-    writeInstalled (root, plugins);
+    if (installedLater)
+        installedWriter().post (root, plugins);
+    else
+    {
+        const std::lock_guard<std::mutex> lock (installedMutex());
+        writeInstalled (root, plugins);
+    }
     writeReadMe (root);
     r.ok = true;
     return r;
@@ -681,6 +781,8 @@ Report refresh (const std::string& root, const std::vector<Plugin>& plugins, Sta
 
 std::string groupFolder (const std::string& root, bool instruments, const std::string& group)
 {
+    finishInstalledWrites(); // (Installed may be being written, or about to be: round 190go)
+    const std::lock_guard<std::mutex> lock (installedMutex());
     std::error_code ec;
     const auto installed = u8path (root) / "Installed" / (instruments ? "Generators" : "Effects");
     if (group == "LYNX")
@@ -700,6 +802,8 @@ std::string entryFile (const std::string& root, const std::string& key, bool ins
     if (const auto it = tree.entries.find (key); it != tree.entries.end())
         return utf8 (it->second.path);
     // not filed: its entry under Installed (FL's Browser shows the System items there too)
+    finishInstalledWrites(); // (it may be being written, or about to be: round 190go)
+    const std::lock_guard<std::mutex> lock (installedMutex());
     std::error_code ec;
     const auto installed = u8path (root) / "Installed" / (instrument ? "Generators" : "Effects");
     for (fs::recursive_directory_iterator it (installed, fs::directory_options::skip_permission_denied, ec), end; it != end && ! ec; it.increment (ec))
