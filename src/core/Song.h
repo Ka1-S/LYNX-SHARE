@@ -1039,6 +1039,9 @@ struct ChannelDef
     // FL's channel icon (.flp 0x9B, REA round 168j): FL's icon index, 0 = none. Kept and saved; drawn by the icon UI.
     int icon = 0;
     int flWrapperFlags = -1; // an imported .flp channel's plugin record flags (0xD4 +16, 0x20 = Smart disable): back in the export
+    // FL's plugin menu › Scaling (round 190he, core/EditorScale.h): the size of the channel's settings window, a
+    // percentage of FL's size; 0 = LYNX's default (125 %)
+    int editorScale = 0;
     // FL's Loop Starter (round 168b, core/LoopStarter.h): the channel belongs to the Loop Starter of pattern
     // `loopStarterPattern` (-1 = not a Loop Starter channel), plays the one-shot category `loopStarterCategory` in kit slot
     // `loopStarterSlot`; locked = "Replace all samples" leaves its sample (FL's channel menu "Locked")
@@ -2646,6 +2649,10 @@ struct Song
     // Settings' "Link Playlist tracks to mixer tracks in new projects" (off). The links themselves are FL track modes,
     // so an .flp export keeps them; the switch is LYNX's and stays in .lynx.
     bool linkTracksToMixer = false;
+    // Round 190he (issue #152): a LYNX Modulation route on a LYNX Soundfont knob centres on the knob's position. Before
+    // 190he the Song had no value for those knobs and every route there centred on 0.5; a project saved before
+    // (no "sfModBase190he" mark in the .lynx) keeps that, so it renders as it did. New songs: true.
+    bool soundfontModBaseReal = true;
     // LYNX comping (round 177c, core/Comping.h): the length of the equal-power crossfade where a comp switches takes (ms,
     // 0 = a hard cut). Saved with the project when it is not the default.
     static constexpr float defaultCompCrossfadeMs = 5.0f;
@@ -2819,6 +2826,9 @@ struct Song
 
     // Current value (from the model, without automation) of the target, 0..1; -1 if the target doesn't exist.
     float targetValue (const AutomationTarget& target) const noexcept;
+    // where a LYNX Modulation route on `target` centres (targetValue, except a Soundfont knob of a project saved before
+    // round 190he: 0.5, as then; soundfontModBaseReal)
+    float modulationBase (const AutomationTarget& target) const noexcept;
     // Changes the target's value in the model (0..1). Plugin parameters don't live here: returns false.
     bool setTargetValue (const AutomationTarget& target, float value) noexcept;
 

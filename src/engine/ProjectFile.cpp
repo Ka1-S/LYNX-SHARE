@@ -1,4 +1,5 @@
 #include "engine/ProjectFile.h"
+#include "core/EditorScale.h"
 #include "core/ClipEnvelope.h"
 #include "core/WarpModes.h"
 #include "core/LiveInput.h"
@@ -2005,6 +2006,8 @@ juce::var channelToVar (const ChannelDef& c)
         o->setProperty ("receiveFrom", juce::Array<juce::var> { str (c.receiveFrom), c.receiveMidiChannel });
     if (c.icon != 0) // FL's channel icon index (round 168j)
         o->setProperty ("icon", c.icon);
+    if (c.editorScale != 0) // the settings window's Scaling (round 190he)
+        o->setProperty ("editorScale", c.editorScale);
         if (c.flWrapperFlags >= 0)
             o->setProperty ("flWrapperFlags", c.flWrapperFlags);
     if (! c.flOrigin.empty()) // the FL generator it was imported from (round 171e)
@@ -2336,6 +2339,8 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
         }
     }
     def.icon = juce::jlimit (0, 0xFFFF, (int) c.getProperty ("icon", 0));
+    if (const auto scale = (int) c.getProperty ("editorScale", 0); scale > 0) // (0 / missing = Host, LYNX's default size)
+        def.editorScale = editorscale::storedFor (scale);
     def.flWrapperFlags = (int) c.getProperty ("flWrapperFlags", -1);
     if (c.hasProperty ("flOrigin"))
         def.flOrigin = flOriginFromVar (c["flOrigin"]);
@@ -3139,6 +3144,10 @@ juce::String toJson (const Song& song, bool stampVersion)
             mods.add (juce::var (o.release()));
         }
         root->setProperty ("modulators", mods);
+    }
+    if (song.soundfontModBaseReal) // round 190he: Soundfont knobs' modulation centres on the knob (absent = before 190he)
+    {
+        root->setProperty ("sfModBase190he", true);
     }
 
     if (! song.vcas.empty()) // VCA faders (round 177a)
@@ -4161,6 +4170,7 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
                 song.playlistTracks[index].compTrack = true;
             }
 
+    song.soundfontModBaseReal = root.hasProperty ("sfModBase190he"); // (round 190he; a project from before: 0.5, as then)
     if (auto* mods = root["modulators"].getArray()) // round 177b: LYNX's modulators
         for (const auto& v : *mods)
         {

@@ -1,6 +1,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "engine/FileSort.h"
 #include "platform/Paths.h"
+#include "core/EditorScale.h"
 #include "core/SimplePads.h"
 
 #include "core/ClipEnvelope.h"
@@ -5595,6 +5596,48 @@ private:
             else if (! trimmed || lawOf (nineJson) != lynx::WarpModeSettings::beatsLawClassic)
                 beatslaw190gxResult = "ERROR nine-number list";
         }
+        // round 190he (issue #152): a channel window's Scaling is saved with the channel; the default (125 %) writes
+        // nothing, so older projects and untouched channels read as before
+        juce::String editorScale190heResult = "OK";
+        {
+            auto song = lynx::Song::makeDefault();
+            song.channels[0].editorScale = 100;
+            song.channels[1].editorScale = 0;
+            juce::String why;
+            const auto json = lynx::ProjectFile::toJson (song);
+            const auto back = lynx::ProjectFile::fromJson (json, why);
+            auto outOfRange = juce::JSON::parse (json);
+            if (auto* chans = outOfRange.getProperty ("channels", {}).getArray(); chans != nullptr && ! chans->isEmpty())
+                if (auto* o = (*chans)[0].getDynamicObject())
+                    o->setProperty ("editorScale", 9000);
+            const auto clamped = lynx::ProjectFile::fromJson (juce::JSON::toString (outOfRange), why);
+            if (! back || back->channels[0].editorScale != 100 || back->channels[1].editorScale != 0)
+                editorScale190heResult = "ERROR round trip " + why;
+            else if (json.indexOf ("editorScale") != json.lastIndexOf ("editorScale"))
+                editorScale190heResult = "ERROR written for a default channel";
+            else if (! clamped || clamped->channels[0].editorScale != lynx::editorscale::maxPercent)
+                editorScale190heResult = "ERROR not clamped";
+        }
+        // round 190he (coordinator's gate): a project saved before 190he (no "sfModBase190he") keeps the old 0.5 centre of
+        // a Modulation route on a Soundfont knob; a new song, saved and opened again, centres on the knob
+        juce::String sfModBase190heResult = "OK";
+        {
+            auto song = lynx::Song::makeDefault();
+            juce::String why;
+            const auto json = lynx::ProjectFile::toJson (song);
+            auto oldVar = juce::JSON::parse (json);
+            if (auto* o = oldVar.getDynamicObject())
+                o->removeProperty ("sfModBase190he");
+            const auto back = lynx::ProjectFile::fromJson (json, why);
+            const auto old = lynx::ProjectFile::fromJson (juce::JSON::toString (oldVar), why);
+            auto resaved = old ? lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (*old), why) : std::optional<lynx::Song> {};
+            if (! json.contains ("sfModBase190he") || ! back || ! back->soundfontModBaseReal)
+                sfModBase190heResult = "ERROR new song " + why;
+            else if (! old || old->soundfontModBaseReal)
+                sfModBase190heResult = "ERROR old project " + why;
+            else if (! resaved || resaved->soundfontModBaseReal)
+                sfModBase190heResult = "ERROR old project saved again";
+        }
 
         // round 190dr: the Session mixer's sections come back from a project (a project without them: Live's defaults);
         // a device dragged to another track and a Warp switch are one undo step each in a real engine
@@ -5880,7 +5923,7 @@ private:
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && exportParity.startsWith ("OK") && midiHotplug.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
-                        && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && trackauto190gzResult == "OK"
+                        && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK"
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
                         && hostedStateContentionResult.startsWith ("OK")
                         && danceWindowResult == "OK" && clickActivationResult == "OK";
@@ -5950,6 +5993,8 @@ private:
                << "trackauto190gz_saved=" << trackauto190gzResult << "\n"
                << "clipenv190gi_saved=" << clipenv190giResult << "\n"
                << "beatslaw190gx_saved=" << beatslaw190gxResult << "\n"
+               << "editor_scale190he_saved=" << editorScale190heResult << "\n"
+               << "sf_mod_base190he=" << sfModBase190heResult << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
                << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n";
 

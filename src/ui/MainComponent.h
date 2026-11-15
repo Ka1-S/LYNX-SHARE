@@ -379,6 +379,9 @@ private:
     void flUndoBackwards();
     void runUndoStep (undokeys::Step step);
     bool alternateUndo = false; // Settings › General › "Alternate undo mode" (FL's default: off)
+    // FL's Playlist menu › Picker panel › Enable (issue #175; on by default, kept with the UI settings)
+    bool pickerPanelOn = true;
+    void setPickerPanelOn (bool on);
     std::unique_ptr<toolbar::EditOverlay> toolbarEditor;
     std::unique_ptr<juce::Component> pluginPickerView; // FL's Plugin picker (F8), its own window over the screen (rounds 169k, 175b)
     // round 184a, S16: the game controller, made only while Settings › MIDI › "Use a game controller" is on (no timer

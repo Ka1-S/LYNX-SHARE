@@ -10,6 +10,7 @@
 #include "core/SlicexInstrument.h"
 #include "core/TempoMap.h"
 #include "core/ModelParams.h"
+#include "core/SynthParams.h"
 #include "core/FlmDwSampler.h"
 #include "core/FlmSlicer.h"
 #include "core/SamplePrecompute.h"
@@ -1932,6 +1933,8 @@ void RackState::buildAutomationTables()
                                       && t.param < samplerparam::count)
                                   // the knobs of an FL engine kept in the channel's state (round 168n)
                                   || modelparams::find (song.channels[(std::size_t) t.index].instrument, t.param) != nullptr
+                                  // LYNX Synth's knobs (issue #152, round 190he)
+                                  || (song.channels[(std::size_t) t.index].instrument == InstrumentKind::synth && synthparam::valid (t.param))
                                   // FL Studio Mobile's DW Sampler: its own 34 values (round 190de)
                                   || (flmdw::isChannel (song.channels[(std::size_t) t.index]) && t.param >= flmdw::automationBase
                                       && t.param < flmdw::automationBase + flmdw::paramCount)
@@ -2137,7 +2140,7 @@ void RackState::buildAutomationTables()
             if (slot >= maxAutomations || route.depth == 0.0f || ! Modulator::canModulate (song, route.target))
                 continue;
             const auto source = boundSlot (route.target);
-            modRoutes.push_back ({ slot, source, std::clamp (song.targetValue (route.target), 0.0f, 1.0f), m, route.depth });
+            modRoutes.push_back ({ slot, source, std::clamp (song.modulationBase (route.target), 0.0f, 1.0f), m, route.depth });
             bind (slot++, route.target);
         }
 

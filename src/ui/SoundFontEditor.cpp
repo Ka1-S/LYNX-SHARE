@@ -121,7 +121,7 @@ ui::ValueSpec specFor (const SfTarget& target, int index, const juce::String& ch
     spec.pixelsForRange = info.integer ? juce::jlimit (60.0, 300.0, 6.0 * (info.max - info.min)) : 150.0;
     spec.toText = [index] (double v) { return shownValue (index, (float) v); };
     spec.fromText = ui::inverseOf (spec.toText, info.min, info.max);
-    if (target.channel >= 0 && index != sf::pBank && index != sf::pProgram && index != sf::pReverbTrack && index != sf::pChorusTrack)
+    if (target.channel >= 0 && sf::automatable (index))
         spec.target = AutomationTarget { AutomationTargetKind::channelParam, target.channel, 0, index };
     return spec;
 }
@@ -145,7 +145,14 @@ public:
     }
 
     ui::ValueSpec spec() const { return specFor (channel, param, channelLabel (engine, channel)); }
-    double value() const { return paramOf (engine, channel, param); }
+    // the Song's value, or (issue #152) the automation's while the song plays it, as the Sampler's knobs show
+    double value() const
+    {
+        if (channel.channel >= 0 && sf::automatable (param))
+            if (const auto v = engine.getAutomationDisplay().valueOf ({ AutomationTargetKind::channelParam, channel.channel, 0, param }))
+                return sf::denormalise (param, *v);
+        return paramOf (engine, channel, param);
+    }
     void set (double v) { setParam (engine, channel, param, (float) v); repaint(); }
 
     ui::Hint hintAt (juce::Point<int>) override { return ui::valueHint (spec(), value(), ui::valueGestures()); }
@@ -426,6 +433,7 @@ private:
 
 class SoundFontEditor final : public juce::Component,
                               public juce::DragAndDropContainer,
+                              private juce::ChangeListener,
                               private juce::Timer
 {
 public:
@@ -590,11 +598,15 @@ public:
         fontTab.setToggleState (true, juce::dontSendNotification);
         setSize (800, 500);
         refreshAll();
-        startTimerHz (5);
+        if (const auto* c = channelOf (engine, channel))
+            seenParams = c->modelParams;
+        engine.addChangeListener (this);
+        startTimerHz (30); // (the knobs follow their automation; the rest of the timer's work runs 5 times a second)
     }
 
     ~SoundFontEditor() override
     {
+        engine.removeChangeListener (this);
         stopTimer();
         if (noteKey >= 0)
             noteOff();
@@ -928,8 +940,29 @@ private:
             c->repaint();
     }
 
+    // issue #152 (round 190he): a linked controller, an Init song value or an undo moves the knobs (they read the Song)
+    void changeListenerCallback (juce::ChangeBroadcaster*) override
+    {
+        const auto* c = channelOf (engine, channel);
+        if (c == nullptr || c->modelParams == seenParams)
+            return;
+        seenParams = c->modelParams;
+        for (auto& k : knobs)
+            k->repaint();
+    }
+
     void timerCallback() override
     {
+        if (channel.channel >= 0 && isShowing())
+            if (const auto& shown = engine.getAutomationDisplay(); shown.getGeneration() != automationShown)
+            {
+                automationShown = shown.getGeneration();
+                for (auto& k : knobs)
+                    k->repaint();
+            }
+        if (++slowTicks < 6)
+            return;
+        slowTicks = 0;
         if (noteKey >= 0 && juce::Time::getMillisecondCounter() >= noteOffAt)
         {
             noteOff();
@@ -957,6 +990,9 @@ private:
     juce::Label status;
     PresetList list;
     std::vector<std::unique_ptr<SfKnob>> knobs;
+    std::vector<float> seenParams;       // the settings the knobs last drew (issue #152)
+    std::uint32_t automationShown = 0;
+    int slowTicks = 0;
     std::vector<std::unique_ptr<SfToggle>> toggles;
     std::vector<std::unique_ptr<SfChoice>> choices;
     SfKnob *attack {}, *decay {}, *sustain {}, *release {}, *lfoDelay {}, *lfoAmount {}, *lfoSpeed {}, *cutoff {}, *cutMod {}, *resonance {},

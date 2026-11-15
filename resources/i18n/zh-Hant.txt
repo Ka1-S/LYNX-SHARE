@@ -10133,3 +10133,5 @@ countries: tw hk mo
 "Freeze editing / hide points" = "凍結編輯 / 隱藏點"
 "Slide succeeding points / regions" = "滑動後續點 / 區域"
 "Flags" = "旗標"
+"Scaling" = "縮放"
+"Picker panel on / off" = "選擇面板 開 / 關"

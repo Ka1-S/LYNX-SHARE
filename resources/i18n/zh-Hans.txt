@@ -10133,3 +10133,5 @@ countries: cn sg
 "Freeze editing / hide points" = "冻结编辑 / 隐藏点"
 "Slide succeeding points / regions" = "滑动后续点 / 区域"
 "Flags" = "标志"
+"Scaling" = "缩放"
+"Picker panel on / off" = "选择面板 开 / 关"

@@ -10133,3 +10133,5 @@ countries: jp
 "Freeze editing / hide points" = "編集を凍結 / ポイントを隠す"
 "Slide succeeding points / regions" = "後続のポイント / リージョンをスライド"
 "Flags" = "フラグ"
+"Scaling" = "スケーリング"
+"Picker panel on / off" = "ピッカーパネルのオン / オフ"

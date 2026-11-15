@@ -20,6 +20,7 @@
 #include "ui/ImageReadback.h"
 #include "ui/TextCache.h"
 #include "ui/PlaylistComponent.h"
+#include "core/PaintTemplate.h"
 #include "core/ChainPresets.h"
 
 #include "core/EventEdit.h"
@@ -3981,6 +3982,14 @@ Clip PlaylistComponent::makeBrushClip (int track, std::int64_t start) const
 {
     // what is chosen in the Picker: the current pattern, an audio clip or an automation clip
     const auto& song = engine.getSong();
+    // issue #175: a clip clicked with the Pencil / Brush paints as it is (FL), while it still is what the tools paint
+    if (brush.picked.has_value() && painttemplate::matches (*brush.picked, brush.kind, brush.index, song.currentPattern))
+    {
+        auto c = painttemplate::paint (*brush.picked, track, start);
+        if (c.kind == ClipKind::audio)
+            c.flFadeFlags = brush.picked->flFadeFlags;
+        return c;
+    }
     Clip c;
     c.pattern = song.currentPattern;
     c.track = track;
@@ -4873,6 +4882,11 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
 
         const auto& c = engine.getSong().playlist[(std::size_t) hit];
 
+        // issue #175 (FL): the Pencil and the Brush paint the clicked clip from now on, as it is (trimmed, stretched...)
+        if (tool == EditTool::pencil || tool == EditTool::brush)
+            brush = { c.kind, c.kind == ClipKind::audio ? c.channel : c.kind == ClipKind::automation ? c.automation : -1,
+                      painttemplate::fromClicked (c) };
+
         if (c.kind == ClipKind::pattern && c.pattern != engine.getSong().currentPattern)
             engine.editSong ([p = c.pattern] (Song& s) { s.currentPattern = p; }, false);
         return;
@@ -4893,8 +4907,11 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
 
     auto c = makeBrushClip (yToTrack (e.y), snap (xToTick (e.x), snapOn));
 
-    if (c.kind == ClipKind::pattern)
-        brush = {};
+    if (c.kind == ClipKind::pattern) // (the current pattern; a clicked pattern clip stays the template, issue #175)
+    {
+        brush.kind = ClipKind::pattern;
+        brush.index = -1;
+    }
     // a track locked to content places its own content (FL: the paint loop of FUN_00e5cd20 → FUN_01220fe0, round 168f)
     pltracks::applyLockToContent (engine.getSong(), c);
 
@@ -6893,6 +6910,7 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
             sources.addItem (name, true, ticked, [this, key] {
                 brush.kind = key.first;
                 brush.index = key.first == ClipKind::pattern ? -1 : key.second;
+                brush.picked.reset(); // (a source chosen from the list: its plain version, as a Picker choice)
                 if (key.first == ClipKind::pattern)
                     engine.editSong ([p = key.second] (Song& s) { s.currentPattern = p; }, false);
                 engine.sendChangeMessage();
@@ -10404,7 +10422,15 @@ void PlaylistComponent::changeListenerCallback (juce::ChangeBroadcaster* source)
     if (engine.getSong().currentPattern != knownCurrentPattern)
     {
         knownCurrentPattern = engine.getSong().currentPattern;
-        brush = {};
+        // (a pattern clip clicked with the Pencil / Brush selected its pattern: it stays the template, issue #175)
+        const auto keep = brush.picked.has_value() && painttemplate::matches (*brush.picked, ClipKind::pattern, -1, knownCurrentPattern);
+        if (keep)
+        {
+            brush.kind = ClipKind::pattern;
+            brush.index = -1;
+        }
+        else
+            brush = {};
     }
 
     followButton.setToggleState (EditorGlobals::get().isFollowing (false), juce::dontSendNotification);
@@ -11026,7 +11052,15 @@ void PatternPicker::mouseDown (const juce::MouseEvent& e)
         return;
 
     const auto& row = list[(std::size_t) i];
-    playlist.brush = { row.kind, row.index };
+    // issue #175 (FL 2026, checked live: shots/FL-175-picker-choice-paints-plain.png): a click on the item the clicked
+    // clip came from keeps that clip as what the tools paint; another item paints its plain version
+    {
+        auto picked = playlist.brush.picked;
+        const auto current = row.kind == ClipKind::pattern ? row.index : engine.getSong().currentPattern;
+        if (picked && ! painttemplate::matches (*picked, row.kind, row.index, current))
+            picked.reset();
+        playlist.brush = { row.kind, row.index, std::move (picked) };
+    }
     seenBrush = row.kind;
 
     if (row.kind == ClipKind::pattern && row.index != engine.getSong().currentPattern)

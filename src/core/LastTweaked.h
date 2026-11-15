@@ -13,6 +13,7 @@
 
 #include "core/Effects.h"
 #include "core/Song.h"
+#include "core/SynthParams.h"
 
 namespace lynx::lasttweak
 {
@@ -76,6 +77,36 @@ inline std::string valueText (const Song& song, const AutomationTarget& t, float
         }
         case AutomationTargetKind::channelParam:
         {
+            // LYNX Synth's knobs (issue #152, round 190he): the page's units
+            if (t.index >= 0 && t.index < (int) song.channels.size() && song.channels[(std::size_t) t.index].instrument == InstrumentKind::synth
+                && synthparam::valid (t.param))
+            {
+                const auto k = synthparam::indexOf (t.param);
+                const auto x = synthparam::toNatural (k, v);
+                if (k < synthparam::attack)
+                    switch (k % synthparam::oscFields)
+                    {
+                        case synthparam::octave: std::snprintf (text, sizeof (text), "%+d oct", (int) std::lround (x)); break;
+                        case synthparam::semitones: std::snprintf (text, sizeof (text), "%+d st", (int) std::lround (x)); break;
+                        case synthparam::detune: std::snprintf (text, sizeof (text), "%+d ct", (int) std::lround (x)); break;
+                        default: std::snprintf (text, sizeof (text), "%.2f", (double) x); break;
+                    }
+                else if (k == synthparam::attack || k == synthparam::decay || k == synthparam::release || k == synthparam::fmDecay
+                         || k == synthparam::sweepTime)
+                    std::snprintf (text, sizeof (text), "%.3f s", (double) x);
+                else if (k == synthparam::cutoff)
+                {
+                    if (x >= 1000.0f)
+                        std::snprintf (text, sizeof (text), "%.1f kHz", (double) x / 1000.0);
+                    else
+                        std::snprintf (text, sizeof (text), "%d Hz", (int) std::lround (x));
+                }
+                else if (k == synthparam::porta)
+                    std::snprintf (text, sizeof (text), "%.3f t", (double) x);
+                else
+                    std::snprintf (text, sizeof (text), "%.2f", (double) x);
+                break;
+            }
             // the Sampler's knobs (issue #12)
             if (t.index < 0 || t.index >= (int) song.channels.size() || song.channels[(std::size_t) t.index].instrument != InstrumentKind::sampler
                 || t.param < 0 || t.param >= samplerparam::count)

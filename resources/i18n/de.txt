@@ -10133,3 +10133,5 @@ countries: de at ch li lu
 "Freeze editing / hide points" = "Bearbeitung einfrieren / Punkte ausblenden"
 "Slide succeeding points / regions" = "Nachfolgende Punkte / Regionen mitschieben"
 "Flags" = "Flags"
+"Scaling" = "Skalierung"
+"Picker panel on / off" = "Auswahlbereich ein / aus"

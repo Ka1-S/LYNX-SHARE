@@ -10253,3 +10253,5 @@ countries: br
 "Freeze editing / hide points" = "Congelar edição / ocultar pontos"
 "Slide succeeding points / regions" = "Deslizar pontos / regiões seguintes"
 "Flags" = "Sinalizadores"
+"Scaling" = "Escala"
+"Picker panel on / off" = "Painel de seleção ligado / desligado"

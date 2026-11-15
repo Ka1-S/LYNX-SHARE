@@ -10133,3 +10133,5 @@ countries: ru by kz
 "Freeze editing / hide points" = "Заморозить правку / скрыть точки"
 "Slide succeeding points / regions" = "Сдвигать последующие точки / регионы"
 "Flags" = "Флаги"
+"Scaling" = "Масштаб"
+"Picker panel on / off" = "Панель выбора вкл. / выкл."

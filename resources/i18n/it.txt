@@ -10133,3 +10133,5 @@ countries: it ch sm
 "Freeze editing / hide points" = "Blocca modifica / nascondi punti"
 "Slide succeeding points / regions" = "Sposta punti / regioni successivi"
 "Flags" = "Flag"
+"Scaling" = "Scala"
+"Picker panel on / off" = "Pannello selettore attivo / disattivo"

@@ -2208,6 +2208,7 @@ bool MainComponent::runAction (const std::string& id)
             showRenamePattern (engine.getSong().currentPattern);
     }
     else if (id.rfind ("pianoRoll.", 0) == 0) return pianoRoll.runAction (id);
+    else if (is ("playlist.pickerPanel")) setPickerPanelOn (! pickerPanelOn);
     else if (id.rfind ("playlist.", 0) == 0) return playlist.runAction (id);
     else if (id.rfind ("mixer.", 0) == 0) return mixer.runAction (id);
     else if (is ("file.new")) newProject();
@@ -2639,6 +2640,11 @@ void MainComponent::loadUiSettings()
             PlaylistComponent::showInstrumentTrackLevels = on;
         else if (key == "automationLanes") // round 177b: Playlist › Automation lanes
             autolanes::setShown (on);
+        else if (key == "pickerPanel") // issue #175: FL's Playlist menu › Picker panel › Enable
+        {
+            pickerPanelOn = on;
+            playlistArea.setPickerHidden (layoutStyle == layoutstyle::Style::simple || ! pickerPanelOn);
+        }
         else if (key == "alternateUndo")
             alternateUndo = on;
         else if (key == "waveSpectral") // ("waveColours", the old spectral-by-default key, is ignored)
@@ -2957,6 +2963,7 @@ void MainComponent::saveUiSettings()
                                       + "\naudioTrackLevels=" + juce::String (PlaylistComponent::showAudioTrackLevels ? 1 : 0)
                                       + "\ninstrumentTrackLevels=" + juce::String (PlaylistComponent::showInstrumentTrackLevels ? 1 : 0)
                                       + "\nautomationLanes=" + juce::String (autolanes::shown() ? 1 : 0)
+                                      + "\npickerPanel=" + juce::String (pickerPanelOn ? 1 : 0)
                                       + "\nalternateUndo=" + juce::String (alternateUndo ? 1 : 0)
                                       + "\neditPatternsIn="
                                       + juce::String (PlaylistComponent::editPatternsIn) + "\nsplash=" + juce::String (startup.splash ? 1 : 0)
@@ -3615,7 +3622,7 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
     // the Simple workflow's track headers and no pattern picker (no-ops for the other two styles: nothing changes there)
     playlist.setSimpleHeaders (style == Style::simple);
     playlist.setLiveStyle (style == Style::clipLaunch);
-    playlistArea.setPickerHidden (style == Style::simple);
+    playlistArea.setPickerHidden (style == Style::simple || ! pickerPanelOn);
     if (style == Style::simple && simpleWorkflow != nullptr)
         simpleWorkflow->entered(); // (after the grid's title accessory is gone: the Add track button takes its place)
 
@@ -3635,6 +3642,15 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
         resized();
         repaint();
     }
+}
+
+void MainComponent::setPickerPanelOn (bool on)
+{
+    // FL's Playlist menu › Picker panel › Enable (issue #175): the Playlist without its Picker column; clicked clips are
+    // still what the Pencil and the Brush paint (core/PaintTemplate.h). The Simple workflow never shows it.
+    pickerPanelOn = on;
+    playlistArea.setPickerHidden (layoutStyle == layoutstyle::Style::simple || ! pickerPanelOn);
+    saveUiSettings();
 }
 
 void MainComponent::addLayoutStyleItems (juce::PopupMenu& menu)
@@ -4062,7 +4078,16 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
             action (menu, "playlist.follow", tr ("Follow the playhead (auto scrolling)"), true, EditorGlobals::get().isFollowing (false));
             action (menu, "playlist.quantizeStarts", tr ("Quantize the clips' starts"));
             action (menu, "playlist.quantizeHalf", tr ("Quantize the clips' starts 50% (halfway to the grid)"));
-            menu.addSubMenu (tr ("Picker panel"), picker.pickerMenu()); // (round 177d: FL's Playlist menu › Picker panel)
+            {
+                // (round 177d: FL's Playlist menu › Picker panel; round 190he, issue #175: its first item, Enable, Alt+P)
+                juce::PopupMenu pickerPanel;
+                action (pickerPanel, "playlist.pickerPanel", tr ("Enable"), layoutStyle != layoutstyle::Style::simple, pickerPanelOn);
+                pickerPanel.addSeparator();
+                const auto tools = picker.pickerMenu();
+                for (juce::PopupMenu::MenuItemIterator it (tools); it.next();)
+                    pickerPanel.addItem (it.getItem());
+                menu.addSubMenu (tr ("Picker panel"), pickerPanel);
+            }
             action (menu, "playlist.stretchMode", tr ("Stretch audio when resizing audio clips"), true, EditorGlobals::get().stretchOnResize);
             {
                 // FL 2026's Playlist menu › View › Track headers (round 190w; [DFM] EEViewMenu, FL's defaults)

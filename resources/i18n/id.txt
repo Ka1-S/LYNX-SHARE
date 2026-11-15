@@ -10133,3 +10133,5 @@ countries: id
 "Freeze editing / hide points" = "Bekukan pengeditan / sembunyikan titik"
 "Slide succeeding points / regions" = "Geser titik / region berikutnya"
 "Flags" = "Flag"
+"Scaling" = "Penskalaan"
+"Picker panel on / off" = "Panel pemilih aktif / nonaktif"

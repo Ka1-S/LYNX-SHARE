@@ -20,6 +20,15 @@ int clickedWindow (const std::vector<Window>& ancestry, IsDocked isDocked)
     return -1;
 }
 
+// Round 190he: a click inside a docked window that the UI thread's message hook never sees (a plugin view made by
+// another thread, or by another process: a bridged 32-bit plugin) reaches the docked window as the system's notice to
+// the clicked window's ancestors; it raises the docked window then. A window of the UI thread itself is left to the hook
+// (one raise per click). 0 = no thread (the window went away meanwhile): nothing.
+constexpr bool clickNeedsParentNotice (unsigned long clickedThread, unsigned long uiThread) noexcept
+{
+    return clickedThread != 0 && clickedThread != uiThread;
+}
+
 // Whether `target` has to be raised: a sibling above it counts unless `staysAbove` says it is one that is always in front
 // (a hidden window, the dancers that "Keep in front", the setup wizard). `bottomUp`: the siblings, from the bottom of
 // the stacking order up. A window that is not among them is not raised.

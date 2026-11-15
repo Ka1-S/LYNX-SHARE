@@ -10133,3 +10133,5 @@ countries: kr
 "Freeze editing / hide points" = "편집 고정 / 포인트 숨기기"
 "Slide succeeding points / regions" = "뒤따르는 포인트 / 리전 밀기"
 "Flags" = "플래그"
+"Scaling" = "배율"
+"Picker panel on / off" = "선택 패널 켜기 / 끄기"

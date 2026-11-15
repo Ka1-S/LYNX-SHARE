@@ -1556,7 +1556,7 @@ void PianoRollComponent::paint (juce::Graphics& g)
     // the zoom wheel (round 190j): FL's small square with a mark in its middle, at the end of the time scroll bar
     {
         const auto wheel = zoomWheelArea().toFloat().reduced (1.0f);
-        const auto over = drag == Drag::keyZoom;
+        const auto over = drag == Drag::keyZoom || zoomWheelHover;
         g.setColour (bg2);
         g.fillRect (zoomWheelArea());
         g.setColour (over ? bg5 : bg4);
@@ -2818,12 +2818,19 @@ void PianoRollComponent::mouseUp (const juce::MouseEvent& e)
 
 void PianoRollComponent::mouseMove (const juce::MouseEvent& e)
 {
+    if (const auto over = zoomWheelArea().contains (e.getPosition()); over != zoomWheelHover)
+    {
+        zoomWheelHover = over;
+        repaint (zoomWheelArea());
+    }
     updateHover (e.getPosition(), e.mods);
 }
 
 void PianoRollComponent::mouseExit (const juce::MouseEvent&)
 {
     lastMouse = { -1, -1 };
+    if (std::exchange (zoomWheelHover, false))
+        repaint (zoomWheelArea());
 
     if (! (hover == Hover {}))
     {

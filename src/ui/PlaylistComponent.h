@@ -4,6 +4,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -69,6 +70,9 @@ public:
     {
         ClipKind kind = ClipKind::pattern;
         int index = -1; // audio or automation channel; for patterns the current pattern is used
+        // issue #175 (FL's rule): the clip last clicked with the Pencil or the Brush, as it is (core/PaintTemplate.h); a
+        // choice in the Picker (a new Brush) paints the plain item again
+        std::optional<Clip> picked;
     };
     Brush brush;
     int knownCurrentPattern = -1;

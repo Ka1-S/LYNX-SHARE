@@ -17767,6 +17767,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "FlClip190dzTests.inc"
 #include "Iss152Tests.inc"
 #include "Win190evTests.inc"
+#include "U190heTests.inc"
 #include "Mod190doTests.inc"
 #include "Parity190fyTests.inc"
 #include "Sampler190dhTests.inc"
@@ -17798,3 +17799,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "RenderAhead190gqTests.inc"
 #include "EvPane190fzTests.inc"
 #include "Rollup028Tests.inc" // round 190fv: semantic interactions of the 0.1.28 rollup
+#include "U190heLinkTests.inc" // round 190he (issue #152 item 2: linkable LYNX instruments, knobs that follow links)

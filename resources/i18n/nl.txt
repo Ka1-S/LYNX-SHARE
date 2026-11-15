@@ -10133,3 +10133,5 @@ countries: nl be
 "Freeze editing / hide points" = "Bewerken bevriezen / punten verbergen"
 "Slide succeeding points / regions" = "Volgende punten / regio's meeschuiven"
 "Flags" = "Vlaggen"
+"Scaling" = "Schaling"
+"Picker panel on / off" = "Kiezerpaneel aan / uit"
