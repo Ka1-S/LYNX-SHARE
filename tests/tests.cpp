@@ -17796,5 +17796,5 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "ApexMeter190gpTests.inc"
 #include "Toolchain190gtTests.inc"
 #include "RenderAhead190gqTests.inc"
-#include "Rollup028Tests.inc" // round 190fv: semantic interactions of the 0.1.28 rollup
 #include "EvPane190fzTests.inc"
+#include "Rollup028Tests.inc" // round 190fv: semantic interactions of the 0.1.28 rollup
