@@ -17820,3 +17820,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "TempoMarkers190hqTests.inc" // round 190hq B11: tempo markers, resampled audio under them, scene tempo hold
 #include "UserFix190ibTests.inc" // round 190ib: issues #165 (SoundFont same-step slide), #170, #181, #182, #183
 #include "LiveRack190hrTests.inc" // round 190hr: Live Racks finish (Group / Ungroup of an instrument, .adg presets)
+#include "Formats190iiTests.inc" // round 190ii (issue #149): .dwp / .dwb / .gig / NCW / Kontakt detection

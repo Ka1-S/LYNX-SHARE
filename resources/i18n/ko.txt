@@ -4459,6 +4459,14 @@ countries: kr
 "SoundFont: [LMB] preview its first preset  [2xLMB] new LYNX Soundfont channel (or into the selected one)  drag to the Channel Rack" = "SoundFont: [LMB] 첫 프리셋 미리 듣기  [2xLMB] 새 LYNX Soundfont 채널(또는 선택한 채널에)  채널 랙으로 드래그"
 "Load SoundFont" = "SoundFont 불러오기"
 "This file is not a SoundFont LYNX SHARE can read." = "이 파일은 LYNX SHARE가 읽을 수 있는 SoundFont가 아닙니다."
+
+# src/ui/SamplerImportUi.cpp, BrowserComponent.cpp: other samplers' instruments (round 190ii)
+"Imported as a DirectWave channel" = "DirectWave 채널로 가져옴"
+"Not brought over" = "가져오지 못한 항목"
+"Nothing was imported." = "아무것도 가져오지 않았습니다."
+"Sampler instrument (DirectWave, GigaStudio): [2xLMB] new DirectWave channel  [Enter] into the selected DirectWave channel  drag to the Channel Rack" = "샘플러 악기 (DirectWave, GigaStudio): [2xLMB] 새 DirectWave 채널  [Enter] 선택한 DirectWave 채널에  Channel Rack으로 드래그"
+"zones" = "존"
+
 "Click: preview. Double-click: load into this channel. Drag onto the Channel rack: a new channel." = "클릭: 미리 듣기. 더블 클릭: 이 채널에 불러오기. 채널 랙으로 드래그: 새 채널."
 "Load SoundFont..." = "SoundFont 불러오기..."
 "Open a .sf2 / .sf3 file" = ".sf2 / .sf3 파일 열기"

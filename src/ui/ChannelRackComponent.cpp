@@ -41,6 +41,7 @@
 #include "ui/ExportDialog.h"
 #include "core/StandIns.h"
 #include "ui/I18n.h"
+#include "ui/SamplerImportUi.h"
 #include "ui/LiveRemoteUi.h"
 #include "ui/BrowserComponent.h"
 
@@ -3115,7 +3116,8 @@ void ChannelRackComponent::sliceChannel (int channel)
 bool ChannelRackComponent::isInterestedInFileDrag (const juce::StringArray& files)
 {
     for (const auto& f : files)
-        if (SampleLibrary::isSampleFile (juce::File (f)) || juce::File (f).hasFileExtension ("sf2;sf3;sfz"))
+        if (SampleLibrary::isSampleFile (juce::File (f)) || juce::File (f).hasFileExtension ("sf2;sf3;sfz")
+            || isSamplerInstrumentFile (juce::File (f))) // (.dwp / .dwb / .gig / .nki: round 190ii)
             return true;
 
     return false;
@@ -3135,6 +3137,14 @@ void ChannelRackComponent::filesDropped (const juce::StringArray& files, int x, 
         {
             // a SoundFont: into the LYNX Soundfont channel it was dropped on, else a new channel
             openSoundFontFile (engine, file, target);
+            target = -1;
+            continue;
+        }
+        if (isSamplerInstrumentFile (file))
+        {
+            // another sampler's instrument (round 190ii, issue #149): into the DirectWave channel it was dropped on, else
+            // a new DirectWave channel
+            openSamplerInstrumentFile (engine, file, target);
             target = -1;
             continue;
         }
