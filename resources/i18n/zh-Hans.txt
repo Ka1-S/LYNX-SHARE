@@ -10145,3 +10145,8 @@ countries: cn sg
 "Potentially slow operation" = "操作可能较慢"
 "Are you sure you want to load {0} plugins at once?" = "确定要一次加载 {0} 个插件吗?"
 "Sample settings" = "采样设置"
+"A new interface font or text size is applied when LYNX SHARE restarts." = "新的界面字体或文字大小会在 LYNX SHARE 重启后生效。"
+"Text size" = "文字大小"
+"The size of the interface's text, role by role (labels, menus, buttons, titles). The UI size scales everything." = "界面文字的大小，按角色调整（标签、菜单、按钮、标题）。界面大小会缩放所有内容。"
+"The recording is silent: the audio input sent nothing but silence. Check that the insert's input is the channel your microphone or instrument is plugged into (the input box above its effect slots), that the interface's input is not muted, and that LYNX SHARE may use the microphone (Windows: Settings > Privacy > Microphone; macOS: System Settings > Privacy & Security > Microphone)." = "录音是静音的：音频输入只送来了静音。请检查插槽的输入是否为麦克风或乐器所接的通道（效果槽上方的输入框）、音频接口的输入是否被静音，以及 LYNX SHARE 是否可以使用麦克风（Windows：设置 > 隐私 > 麦克风；macOS：系统设置 > 隐私与安全性 > 麦克风）。"
+"Choose an input to record" = "请选择要录制的输入"

@@ -81,12 +81,26 @@ themes::Palette currentPalette();
 // --- typography ----------------------------------------------------------------------------------
 namespace type
 {
-inline constexpr float caption = 11.0f;  // grid numbers, small captions
-inline constexpr float small = 12.0f;    // secondary labels, status bar, tooltips
-inline constexpr float body = 13.0f;     // default control text
-inline constexpr float title = 15.0f;    // panel titles
-inline constexpr float display = 20.0f;  // the transport position
+// The text roles at 100 %. Settings › General › Text size (issue #189, round 190ir) scales them per role at start-up
+// (setTextSize): the sizes below are what the code reads, so they are variables, set once before any window exists.
+namespace base
+{
+inline constexpr float caption = 11.0f, small = 12.0f, body = 13.0f, title = 15.0f, display = 20.0f;
+}
+inline float caption = base::caption;  // grid numbers, small captions
+inline float small = base::small;      // secondary labels, status bar, tooltips
+inline float body = base::body;        // default control text
+inline float title = base::title;      // panel titles
+inline float display = base::display;  // the transport position
 } // namespace type
+
+// Settings › General › Text size (issue #189): the roles scaled per role (core/TextSize.h), saved in the profile
+// (ui-text-size.txt) and applied at start-up, as the interface font is (Labels and layouts take their sizes when they
+// are made).
+void setTextSize (int percent); // sets type::caption..display
+int textSize();                 // the percent in use
+int savedTextSize();            // 100 when none was saved
+void saveTextSize (int percent);
 
 // The UI font at `size` (plain or bold). Round 190gr (U1): the fonts come from a small cache, so a paint no longer makes a
 // new juce::Font whose typeface JUCE then looks up by name (its typeface cache compares the family and style strings),

@@ -10145,3 +10145,8 @@ countries: pl
 "Potentially slow operation" = "Operacja może być wolna"
 "Are you sure you want to load {0} plugins at once?" = "Czy na pewno chcesz wczytać {0} wtyczek naraz?"
 "Sample settings" = "Ustawienia sampla"
+"A new interface font or text size is applied when LYNX SHARE restarts." = "Nowa czcionka lub rozmiar tekstu interfejsu zostanie zastosowany po ponownym uruchomieniu LYNX SHARE."
+"Text size" = "Rozmiar tekstu"
+"The size of the interface's text, role by role (labels, menus, buttons, titles). The UI size scales everything." = "Rozmiar tekstu interfejsu, rola po roli (etykiety, menu, przyciski, tytuły). Rozmiar interfejsu skaluje wszystko."
+"The recording is silent: the audio input sent nothing but silence. Check that the insert's input is the channel your microphone or instrument is plugged into (the input box above its effect slots), that the interface's input is not muted, and that LYNX SHARE may use the microphone (Windows: Settings > Privacy > Microphone; macOS: System Settings > Privacy & Security > Microphone)." = "Nagranie jest ciche: wejście audio przesłało tylko ciszę. Sprawdź, czy wejście insertu to kanał, do którego podłączony jest mikrofon lub instrument (pole wejścia nad slotami efektów), czy wejście interfejsu nie jest wyciszone i czy LYNX SHARE może używać mikrofonu (Windows: Ustawienia > Prywatność > Mikrofon; macOS: Ustawienia systemowe > Prywatność i ochrona > Mikrofon)."
+"Choose an input to record" = "Wybierz wejście do nagrywania"

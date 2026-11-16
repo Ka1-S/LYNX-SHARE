@@ -10145,3 +10145,8 @@ countries: kr
 "Potentially slow operation" = "시간이 걸릴 수 있는 작업"
 "Are you sure you want to load {0} plugins at once?" = "플러그인 {0}개를 한 번에 불러올까요?"
 "Sample settings" = "샘플 설정"
+"A new interface font or text size is applied when LYNX SHARE restarts." = "새 인터페이스 글꼴이나 글자 크기는 LYNX SHARE를 다시 시작하면 적용됩니다."
+"Text size" = "글자 크기"
+"The size of the interface's text, role by role (labels, menus, buttons, titles). The UI size scales everything." = "인터페이스 글자의 크기를 역할별로 바꿉니다(레이블, 메뉴, 버튼, 제목). UI 크기는 모든 것을 확대합니다."
+"The recording is silent: the audio input sent nothing but silence. Check that the insert's input is the channel your microphone or instrument is plugged into (the input box above its effect slots), that the interface's input is not muted, and that LYNX SHARE may use the microphone (Windows: Settings > Privacy > Microphone; macOS: System Settings > Privacy & Security > Microphone)." = "녹음이 무음입니다: 오디오 입력이 무음만 보냈습니다. 인서트의 입력이 마이크나 악기를 연결한 채널인지(이펙트 슬롯 위의 입력 상자), 인터페이스 입력이 음소거되지 않았는지, LYNX SHARE가 마이크를 사용할 수 있는지(Windows: 설정 > 개인 정보 > 마이크, macOS: 시스템 설정 > 개인정보 보호 및 보안 > 마이크) 확인하세요."
+"Choose an input to record" = "녹음할 입력을 선택하세요"

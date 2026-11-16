@@ -10145,3 +10145,8 @@ countries: nl be
 "Potentially slow operation" = "Mogelijk trage bewerking"
 "Are you sure you want to load {0} plugins at once?" = "Weet je zeker dat je {0} plugins tegelijk wilt laden?"
 "Sample settings" = "Sample-instellingen"
+"A new interface font or text size is applied when LYNX SHARE restarts." = "Een nieuw interfacelettertype of nieuwe tekstgrootte wordt toegepast wanneer LYNX SHARE opnieuw start."
+"Text size" = "Tekstgrootte"
+"The size of the interface's text, role by role (labels, menus, buttons, titles). The UI size scales everything." = "De grootte van de interfacetekst, per rol (labels, menu's, knoppen, titels). De UI-grootte schaalt alles."
+"The recording is silent: the audio input sent nothing but silence. Check that the insert's input is the channel your microphone or instrument is plugged into (the input box above its effect slots), that the interface's input is not muted, and that LYNX SHARE may use the microphone (Windows: Settings > Privacy > Microphone; macOS: System Settings > Privacy & Security > Microphone)." = "De opname is stil: de audio-ingang stuurde alleen stilte. Controleer of de ingang van de insert het kanaal is waarop je microfoon of instrument is aangesloten (het ingangsvak boven de effectslots), of de ingang van de interface niet gedempt is en of LYNX SHARE de microfoon mag gebruiken (Windows: Instellingen > Privacy > Microfoon; macOS: Systeeminstellingen > Privacy en beveiliging > Microfoon)."
+"Choose an input to record" = "Kies een ingang om op te nemen"

@@ -280,10 +280,11 @@ void TimeDisplay::paint (juce::Graphics& g)
     g.drawText (readout, area.withTrimmedBottom (11), juce::Justification::centred, false);
     g.setColour (colour::textDisabled);
     g.setFont (font (type::caption - 1.0f));
-    g.drawText (mode == Mode::clock   ? tr ("MIN : SEC : CS")
-                : mode == Mode::smpte ? "SMPTE " + juce::String (timecode::rates[smpteRate].name)
-                                      : tr ("BAR : BEAT : STEP"), area.withTrimmedTop (area.getHeight() - 14).withTrimmedBottom (2),
-                juce::Justification::centred, false);
+    // (fitted: a translation or a larger Text size (issue #189) narrows the letters instead of cutting the label off)
+    g.drawFittedText (mode == Mode::clock   ? tr ("MIN : SEC : CS")
+                      : mode == Mode::smpte ? "SMPTE " + juce::String (timecode::rates[smpteRate].name)
+                                            : tr ("BAR : BEAT : STEP"), area.withTrimmedTop (area.getHeight() - 14).withTrimmedBottom (2).reduced (2, 0),
+                      juce::Justification::centred, 1, 0.6f);
 }
 
 void TimeDisplay::mouseUp (const juce::MouseEvent& e)
