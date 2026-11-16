@@ -516,7 +516,9 @@ TEST (comp177_a_take_never_replaces_clips_of_an_ordinary_group)
     const auto header = comp177::onTrack (song, 0);
     CHECK (header.size() == 1 && header[0].start == 1000 && header[0].length == 900 && header[0].channel == mine.channel);
     CHECK (comp::groupOf (song, 0).lanes() == 1);       // no lane was added
-    CHECK (song.playlist.size() == 2 && song.playlist.back().track >= 2); // the take went to a new track, as before
+    // round 190ir: FL's rule (FLEngine FUN_012aa4d0): the linked audio track is busy there, so the take goes to the first
+    // free track grouped right under it (its sub-track), Track 2; the group's own clips stay as they are
+    CHECK (song.playlist.size() == 2 && song.playlist.back().track == 1);
 }
 
 TEST (comp177_fl_clip_mute_survives_import_and_export)

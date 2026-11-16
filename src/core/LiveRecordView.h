@@ -43,6 +43,16 @@ public:
         frames += n;
     }
 
+    // the largest |sample| so far (round 190ir: a take of pure digital silence means the input gave nothing)
+    float maxPeak() const
+    {
+        const std::lock_guard<std::mutex> guard (lock);
+        auto v = pending;
+        for (const auto p : peaks)
+            v = std::max (v, p);
+        return v;
+    }
+
     // frames appended so far
     std::int64_t size() const
     {

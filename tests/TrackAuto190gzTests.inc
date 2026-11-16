@@ -325,10 +325,11 @@ TEST (trackauto190gz_recording_goes_to_the_paired_track)
     trackauto190gz::Setup s;
     autolink::setOn (s.song, true);
     s.song.mixer[14].name = "Mic";
-    // off: FL's rule (a post-EQ take of an insert no audio track is linked to plays through the Master, on a new track)
+    // off: FL's rule (a post-EQ take of an insert no audio track is linked to plays through the Master, on the first
+    // track it doesn't overlap: Track 8, whose clips start later; round 190ir, it used to be a new track after the last one)
     auto off = s.song;
     off.linkTracksToMixer = false;
-    CHECK (takes::playbackInsert (off, 14, RecordSource::postEq) == 0 && takes::takeTrack (off, 14, 0, 960) == 10);
+    CHECK (takes::playbackInsert (off, 14, RecordSource::postEq) == 0 && takes::takeTrack (off, 14, 0, 960) == 7);
     // on: insert 14's take goes to Track 14 (index 13), which becomes its audio track; the clip plays through insert 14
     CHECK (autolink::pairedTakeTrack (s.song, 14) == 13);
     CHECK (takes::playbackInsert (s.song, 14, RecordSource::postEq) == 14 && takes::takeTrack (s.song, 14, 0, 960) == 13);
@@ -339,7 +340,7 @@ TEST (trackauto190gz_recording_goes_to_the_paired_track)
     CHECK (s.track (13).mode == PlaylistTrackMode::audio && s.track (13).mixerTrack == 14 && s.track (13).name == "Mic");
     // the next take of the same insert finds its audio track (free there) as before
     CHECK (takes::takeTrack (s.song, 14, 2000, 3000) == 13 && autolink::pairedTakeTrack (s.song, 14) == -1);
-    // an insert whose paired track holds clips: FL's rule (a new track after the last one used)
+    // an insert whose paired track holds clips: FL's rule (the first track the take doesn't overlap)
     CHECK (autolink::pairedTakeTrack (s.song, 4) == -1); // (Track 4 holds an automation clip)
     CHECK (takes::playbackInsert (s.song, 4, RecordSource::postEq) == 0);
     // the linked audio track's insert records into it (Track 2: Loop on insert 2)
