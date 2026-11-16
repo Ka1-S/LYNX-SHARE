@@ -483,8 +483,7 @@ public:
         // the warp mode: Live's names first
         for (const auto& m : liveModes)
             mode.addItem (tr (m.name), m.method + 2);
-        if constexpr (warpmodes::complexProPlays) // (Live's last mode; its chooser then reads "Pro")
-            mode.addItem (tr ("Complex Pro"), complexProId);
+        mode.addItem (tr ("Complex Pro"), complexProId); // (Live's last mode; round 190ik plays it)
         mode.addSeparator();
         for (const auto& m : flModes)
             mode.addItem (tr (m.name), m.method + 2);
@@ -510,14 +509,23 @@ public:
             if (! refreshing)
                 editMode ([v = preserve.getSelectedId() - 1] (Song& s, int c) { warpmodes::setPreserve (s, c, v); });
         };
-        // round 190gx: Beats' law, shown only for a channel of a project saved before the Measured law (Classic), so it
-        // can be moved to Live's measured law (new channels are Measured and show Live's box alone)
+        // round 190gx: Beats' law, shown only for a channel of a project saved before the newest law (Classic, or round
+        // 190ik: Measured), so it can be moved on (new channels use the newest law and show Live's box alone)
         beatsLaw.addItem (tr ("Classic"), 1);
         beatsLaw.addItem (tr ("Measured"), 2);
-        beatsLaw.setTooltip (tr ("Beats law: Classic plays as LYNX did before 0.1.28 (this project was saved then); Measured follows Live 12.4's renders"));
+        beatsLaw.addItem (tr ("Pitch-aware"), 3);
+        beatsLaw.setTooltip (tr ("Beats law: Classic plays as LYNX did before 0.1.28, Measured as 0.1.28 and 0.1.29 did (this project was saved then); Pitch-aware also cuts where the pitch of a held note steps"));
         beatsLaw.onChange = [this] {
             if (! refreshing)
                 editMode ([v = beatsLaw.getSelectedId() - 1] (Song& s, int c) { warpmodes::setBeatsLaw (s, c, v); });
+        };
+        // round 190ik: the Texture / Complex Pro law, shown only for a channel of a project saved before 190ik
+        warpLaw.addItem (tr ("Classic"), 1);
+        warpLaw.addItem (tr ("Measured"), 2);
+        warpLaw.setTooltip (tr ("Texture and Complex Pro law: Classic plays as LYNX did before 0.1.30 (this project was saved then); Measured follows Live 12.4's renders (grains and Flux, formants kept)"));
+        warpLaw.onChange = [this] {
+            if (! refreshing)
+                editMode ([v = warpLaw.getSelectedId() - 1] (Song& s, int c) { warpmodes::setWarpLaw (s, c, v); });
         };
         loopMode.onChoose = [this] (int v) {
             if (! refreshing)
@@ -623,7 +631,10 @@ public:
             s->setColour (juce::Slider::trackColourId, colour::bg4);
             s->onValueChange = [this] {
                 const auto pitch = (float) juce::jlimit (-12.0, 12.0, semitones.getValue() + cents.getValue() / 100.0);
-                editClip ([pitch] (Clip& c) { c.pitch = pitch; });
+                if (warpmodes::proTransposes (sampler())) // (round 190ik: Complex Pro / Texture transpose offline)
+                    editMode ([pitch, t = track, sc = scene] (Song& song, int c) { warpmodes::setClipTranspose (song, c, t, sc, pitch); });
+                else
+                    editClip ([pitch] (Clip& c) { c.pitch = pitch; });
             };
         }
         semitones.setRange (-12.0, 12.0, 1.0);
@@ -653,7 +664,7 @@ public:
         for (auto* c : std::initializer_list<juce::Component*> { &warp, &mode, bpm.get(), &halve, &twice, &gain, &pitchKnob, &semitones, &cents, &reverse, &edit, &fade })
             addAndMakeVisible (*c);
         for (auto* c : std::initializer_list<juce::Component*> { &preserve, &loopMode, envelope.get(), grainTones.get(), grainTexture.get(), flux.get(),
-                                                                 proFormants.get(), proEnvelope.get(), &beatsLaw })
+                                                                 proFormants.get(), proEnvelope.get(), &beatsLaw, &warpLaw })
             addChildComponent (*c);
 
         editor = makeAudioEditorPanel (engine, channel, -1, true);
@@ -785,7 +796,9 @@ public:
             auto row3 = left.removeFromTop (20);
             flux->setBounds (row3);
             proEnvelope->setBounds (row3);
-            beatsLaw.setBounds (row3.withTrimmedTop (3)); // (Beats, Classic projects only)
+            beatsLaw.setBounds (row3.withTrimmedTop (3)); // (Beats, projects saved before its newest law only)
+            // (Texture / Complex Pro, projects saved before 190ik: beside the Flux / Envelope label, whose row is free there)
+            warpLaw.setBounds (modeLabel2.withTrimmedLeft (modeLabel2.getWidth() / 2 + 2).withTrimmedBottom (2));
         }
         fade.setBounds (left.removeFromBottom (18).withWidth (left.getWidth() / 2 - 2));
         left.removeFromBottom (4);
@@ -908,28 +921,33 @@ private:
             w->setEnabled (warped && fileSeconds > 0.0);
         bpm->repaint();
         gain.setValue (c->gain > 0.0f ? juce::jlimit (-70.0, 24.0, 20.0 * std::log10 ((double) c->gain)) : -70.0, n);
-        const auto whole = std::round ((double) c->pitch);
+        const auto shown = (double) c->pitch + (warpmodes::proTransposes (s) ? (double) s.stretchPitch : 0.0);
+        const auto whole = std::round (shown);
         semitones.setValue (whole, n);
         pitchKnob.setValue (whole, n);
-        cents.setValue (std::round (((double) c->pitch - whole) * 100.0), n);
+        cents.setValue (std::round ((shown - whole) * 100.0), n);
         reverse.setToggleState (c->reversed, n);
         // the mode's own settings: shown for the mode they belong to, only while the sample is warped and keeps its pitch
         const auto beats = warped && s.keepPitch && s.stretchMethod == StretchMethod::beats;
         const auto tones = warped && s.keepPitch && s.stretchMethod == StretchMethod::tones;
         const auto texture = warped && s.keepPitch && s.stretchMethod == StretchMethod::texture;
-        const auto pro = warpmodes::complexProPlays && warped && s.keepPitch && s.stretchMethod == StretchMethod::complex && s.warpModes.complexPro;
-        if (pro)
+        const auto proMode = warped && s.keepPitch && s.stretchMethod == StretchMethod::complex && s.warpModes.complexPro;
+        const auto pro = proMode && warpmodes::complexProPlays (s.warpModes);
+        if (proMode)
             mode.setSelectedId (complexProId, n);
-        flux->setVisible (texture && warpmodes::textureFluxPlays);
+        flux->setVisible (texture && warpmodes::textureFluxPlays (s.warpModes));
         proFormants->setVisible (pro);
         proEnvelope->setVisible (pro);
+        warpLawShown = warpLawShown || ((texture || proMode) && s.warpModes.warpLaw == WarpModeSettings::warpLawClassic);
+        warpLaw.setVisible ((texture || proMode) && warpLawShown);
+        warpLaw.setSelectedId (s.warpModes.warpLaw == WarpModeSettings::warpLawClassic ? 1 : 2, n);
         flux->repaint();
         proFormants->repaint();
         proEnvelope->repaint();
         preserve.setVisible (beats);
-        lawShown = lawShown || (beats && s.warpModes.beatsLaw == WarpModeSettings::beatsLawClassic);
+        lawShown = lawShown || (beats && s.warpModes.beatsLaw != WarpModeSettings::beatsLawPitchAware);
         beatsLaw.setVisible (beats && lawShown);
-        beatsLaw.setSelectedId (s.warpModes.beatsLaw == WarpModeSettings::beatsLawClassic ? 1 : 2, n);
+        beatsLaw.setSelectedId ((int) std::min<std::uint8_t> (s.warpModes.beatsLaw, WarpModeSettings::beatsLawPitchAware) + 1, n);
         loopMode.setVisible (beats);
         envelope->setVisible (beats);
         grainTones->setVisible (tones);
@@ -975,8 +993,9 @@ private:
     AudioEngine& engine;
     int track, scene, channel;
     juce::TextButton warp, halve, twice, reverse, edit, fade;
-    juce::ComboBox mode, preserve, beatsLaw;
-    bool lawShown = false;                         // round 190gx: a Classic channel was shown (the law chooser stays)
+    juce::ComboBox mode, preserve, beatsLaw, warpLaw;
+    bool lawShown = false;                         // round 190gx: a channel on an older Beats law was shown (the chooser stays)
+    bool warpLawShown = false;                     // round 190ik: the same for Texture / Complex Pro
     LoopModeChooser loopMode;                      // round 190gx: Live's icon chooser
     std::unique_ptr<ui::NumBox> bpm, envelope, grainTones, grainTexture, flux, proFormants, proEnvelope;
     static constexpr int complexProId = 100;       // (the mode chooser's Complex Pro item)

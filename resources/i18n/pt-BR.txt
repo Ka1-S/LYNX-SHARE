@@ -10265,3 +10265,6 @@ countries: br
 "Potentially slow operation" = "Operação possivelmente lenta"
 "Are you sure you want to load {0} plugins at once?" = "Tem certeza de que quer carregar {0} plugins de uma vez?"
 "Sample settings" = "Configurações do sample"
+"Pitch-aware" = "Sensível à altura"
+"Beats law: Classic plays as LYNX did before 0.1.28, Measured as 0.1.28 and 0.1.29 did (this project was saved then); Pitch-aware also cuts where the pitch of a held note steps" = "Lei do Beats: Clássico toca como o LYNX tocava antes da 0.1.28, Medido como a 0.1.28 e a 0.1.29 tocavam (este projeto foi salvo nessa época); Sensível à altura também corta onde a altura de uma nota sustentada muda"
+"Texture and Complex Pro law: Classic plays as LYNX did before 0.1.30 (this project was saved then); Measured follows Live 12.4's renders (grains and Flux, formants kept)" = "Lei do Texture e do Complex Pro: Clássico toca como o LYNX tocava antes da 0.1.30 (este projeto foi salvo nessa época); Medido segue as renderizações do Live 12.4 (grãos e Flux, formantes preservados)"
