@@ -17840,3 +17840,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Toolbar190ivTests.inc" // round 190iv: the toolbar per layout style (Simple capsules, Live control bar)
 #include "Details190imTests.inc" // round 190im: activity meter reader, deactivated grid clips, Live keys 0 / Ctrl+E
 #include "Capfix190jjTests.inc" // round 190jj: capture190ji changes (transport states per look, the master bar meter)
+#include "LiveLook190jnTests.inc" // round 190jn: the Clip-launch layout in Live's look (the Info View key)

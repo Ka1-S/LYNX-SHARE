@@ -2260,6 +2260,17 @@ public:
             return;
         }
 
+        if (args.contains ("--livelook190jnshot"))
+        {
+            // LYNX --livelook190jnshot prefix [set.als]: round 190jn off screen (design190ia slices 13, 17, 18, 19, 25: the
+            // Clip-launch layout in Live's look, and the classic look); prefix-checks.txt
+            const auto i = args.indexOf ("--livelook190jnshot");
+            const auto set = i + 2 < args.size() && ! args[i + 2].startsWith ("--") ? args[i + 2].unquoted() : juce::String();
+            runLiveLook190jnShot (args[i + 1].unquoted(), set);
+            quit();
+            return;
+        }
+
         if (args.contains ("--capfix190jjshot"))
         {
             // LYNX --capfix190jjshot prefix project.flp [set.als]: round 190jj off screen (capture190ji's changes: Simple
@@ -12012,6 +12023,21 @@ private:
                                    return "    tracks playing a clip: " + juce::String (playing) + "\n";
                                } });
         run->steps.push_back ({ "idle: clip grid, stopped", [this] { engine->stop(); }, {}, 3000, [ui] { ui->setClipLaunchWorkflow (false); return juce::String(); } });
+        // round 190jn: the Clip-launch layout's Arrangement (Live's look: 19 px lanes, colour blocks, dark waveforms) playing,
+        // then idle
+        run->steps.push_back ({ "clip arrangement, song playing", [this, ui] {
+                                   ui->selectTabForSnapshot (2);
+                                   ui->setClipLaunchWorkflow (true);
+                                   ui->setClipGridView (lynx::PlaylistArea::GridView::song);
+                                   engine->getTransport().songMode = true;
+                                   engine->rewind();
+                                   engine->play();
+                               }, {}, 3000 });
+        run->steps.push_back ({ "idle: clip arrangement, stopped", [this] { engine->stop(); }, {}, 3000, [ui] {
+                                   ui->setClipGridView (lynx::PlaylistArea::GridView::grid);
+                                   ui->setClipLaunchWorkflow (false);
+                                   return juce::String();
+                               } });
         // round 190ih: the plugin windows with live parts — Gross Beat (its locator), the Formula Controller (its monitor),
         // the Envelope Controller (its meters and key line) — idle with the song stopped, then Gross Beat while it plays
         // (CPU and frames; the windows are their own, so the main window's painted area stays the main window's)
@@ -22326,6 +22352,9 @@ private:
         ui.setClipLaunchWorkflow (true);
         ui.setClipGridView (lynx::PlaylistArea::GridView::grid);
         measureAll ("clip grid");
+        ui.setClipGridView (lynx::PlaylistArea::GridView::song); // (round 190jn: the Clip-launch layout's Arrangement)
+        measureAll ("clip arrangement");
+        ui.setClipGridView (lynx::PlaylistArea::GridView::grid);
         ui.setClipLaunchWorkflow (false);
         // LYNX_PAINTBENCH_SIMPLE=1 (round 190jc): the same project's Playlist in the Simple layout too
         if (juce::SystemStats::getEnvironmentVariable ("LYNX_PAINTBENCH_SIMPLE", {}) == "1")
@@ -26999,6 +27028,460 @@ private:
         offline.dispatchPendingMessages();
         check ("05 Complex panel (no settings row)", shoot ("05-complex"));
         juce::File (prefix + "-checks.txt").replaceWithText (checks);
+    }
+
+    // LYNX --livelook190jnshot prefix [set.als]: round 190jn off screen (design190ia slices 13 CL-D, 17 CL-E, 18 CL-H,
+    // 19 CL-F, 25 CL-I: the Clip-launch layout in Ableton Live's look) — the Session mixer (selected, armed, muted,
+    // soloed, I/O on and off, peak pills), the Device View (cards, a card off and one folded, the hot-swap link, a Drum
+    // Rack's pads, an Instrument Rack's macros), the Clip View (MIDI and audio, three detail heights), the Info View with a
+    // hovered control and the status strip; with a Live set: its Arrangement in 19 px lanes, the 38 px option and a tall
+    // audio lane; every view once more in the classic LYNX look (View › Classic LYNX look). prefix-checks.txt
+    void runLiveLook190jnShot (const juce::String& prefix, const juce::String& set)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        const juce::ScopedValueSetter<bool> shown (lynx::ui::showingForShots(), true);
+        juce::String checks;
+        const auto flush = [&] { juce::File (lynx::shot::file (juce::File (prefix + "-checks.txt"))).replaceWithText (checks); };
+        const auto check = [&] (const juce::String& what, bool ok) { checks << (ok ? "ok   " : "FAIL ") << what << "\n"; flush(); };
+        const auto line = [&] (const juce::String& what) { checks << "     " << what << "\n"; flush(); };
+        const auto write = [&prefix] (juce::Component& c, const juce::String& name) { savePng (lynx::shot::snapshot (c), prefix + "-" + name + ".png"); };
+        const auto area = [&prefix] (juce::Component& c, juce::Rectangle<int> r, const juce::String& name) { saveArea (c, r, prefix + "-" + name + ".png"); };
+        const auto size = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_SNAPSHOT_SIZE", "1920x1080"), "x", "");
+        const auto w = juce::jlimit (800, 3840, size[0].getIntValue()), h = juce::jlimit (450, 2160, size[1].getIntValue());
+        const auto classicBefore = lynx::clipGridClassicLook();
+        const auto tallBefore = lynx::playlistTallLiveLanes();
+        lynx::clipGridClassicLook() = false;
+        lynx::playlistTallLiveLanes() = false;
+        lynx::DetailView::infoViewShown = true;
+
+        // ---- A. a synthetic set (round 190dr's, with a Drum Rack and an audio loop) -----------------------------------
+        const auto wav = juce::File (prefix + "-loop.wav");
+        wav.deleteFile();
+        {
+            const double rate = 48000.0;
+            juce::AudioBuffer<float> buffer (2, (int) (rate * 4.0));
+            buffer.clear();
+            for (int hit = 0; hit < 16; ++hit)
+                for (int k = 0; k < 9000 && hit * 12000 + k < buffer.getNumSamples(); ++k)
+                    for (int ch = 0; ch < 2; ++ch)
+                        buffer.setSample (ch, hit * 12000 + k, (float) (std::sin (k * (hit % 4 == 0 ? 0.05 : 0.3)) * std::exp (-k / 2500.0) * 0.8));
+            if (auto out = std::unique_ptr<juce::FileOutputStream> (wav.createOutputStream()))
+                if (auto* writer = juce::WavAudioFormat().createWriterFor (out.get(), rate, 2, 16, {}, 0))
+                {
+                    out.release();
+                    std::unique_ptr<juce::AudioFormatWriter> owned (writer);
+                    owned->writeFromAudioSampleBuffer (buffer, 0, buffer.getNumSamples());
+                }
+        }
+        {
+            lynx::AudioEngine offline (false);
+            lynx::MainComponent ui (offline, false);
+            ui.setSize (w, h);
+            const auto settle = [&] {
+                for (int k = 0; k < 3; ++k)
+                    offline.dispatchPendingMessages();
+            };
+            ui.setVisible (true);
+            lynx::DetailView::shownSetting = true;
+            lynx::DetailView::devicesPage = true;
+            lynx::DetailView::preferredHeight = 228;
+            ui.setClipLaunchWorkflow (true);
+            ui.showPanelsForSnapshot ({ lynx::workspace::Panel::browser, lynx::workspace::Panel::playlist });
+            ui.getPlaylistForSnapshot().addAudioClipAtPlayhead (wav);
+            settle();
+            int audioChannel = -1;
+            offline.editSong ([&audioChannel] (lynx::Song& s) {
+                lynx::Clip audio;
+                if (! s.playlist.empty())
+                {
+                    audio = s.playlist.front();
+                    audioChannel = audio.channel;
+                    s.playlist.clear();
+                }
+                const int channels = (int) s.channels.size();
+                s.channels.resize ((std::size_t) channels + 3);
+                const char* names[] { "Drum kit", "Bass synth", "Keys" };
+                for (int k = 0; k < 3; ++k)
+                {
+                    auto& ch = s.channels[(std::size_t) (channels + k)];
+                    ch.name = names[k];
+                    ch.instrument = k == 0 ? lynx::InstrumentKind::patcher : lynx::InstrumentKind::synth;
+                    ch.mixerTrack = k + 1;
+                }
+                // the Drum kit: a Drum Rack with Live's 909 pad names, its two first macros mapped
+                {
+                    auto& kit = s.channels[(std::size_t) channels].patcher;
+                    kit = lynx::rack::makeDrumRack();
+                    const char* pads[] { "Bass Drum", "Rim Shot", "Snare Drum", "Hand Clap", "Snare Drum", "Closed Hi Hat", "Snare Drum", "Bass Drum",
+                                         "Low Tom", "Mid Tom", "Open Hi Hat", "Hi Tom", "Crash", "Crash", "Ride", "Ride" };
+                    for (int p = 0; p < 16; ++p)
+                    {
+                        lynx::PatchNode n;
+                        n.generator = true;
+                        n.channel.instrument = lynx::InstrumentKind::sampler;
+                        n.channel.name = pads[p];
+                        lynx::rack::addPad (kit, 36 + p, pads[p], n);
+                    }
+                    if (auto* r = lynx::rack::rackOf (kit))
+                    {
+                        r->name = "909 Core Kit";
+                        r->showMacros = true;
+                        r->showPads = true;
+                        r->shownMacros = 8;
+                        r->macros[0].name = "Low Gain";
+                        r->macros[1].name = "Mid Gain";
+                    }
+                    for (int m = 0; m < 2; ++m)
+                    {
+                        lynx::RackMapping map;
+                        map.target = lynx::RackMapping::Target::chainVolume;
+                        map.chain = m;
+                        lynx::rack::map (kit, m, map);
+                    }
+                    lynx::rack::compile (kit);
+                }
+                if (audioChannel >= 0)
+                    s.channels[(std::size_t) audioChannel].mixerTrack = 5;
+                if (s.mixer.size() < 8)
+                    s.mixer.resize (8);
+                const char* inserts[] { "Master", "Drums", "Bass", "Keys", "Vox", "Loop", "Reverb", "Delay" };
+                for (int i = 1; i < 8; ++i)
+                    s.mixer[(std::size_t) i].name = inserts[i];
+                s.mixer[1].volume = lynx::sessionmixer::positionForDb (-3.0);
+                s.mixer[2].pan = 0.3f;
+                s.mixer[2].effects.clear();
+                for (auto kind : { lynx::EffectKind::eq, lynx::EffectKind::compressor, lynx::EffectKind::delay, lynx::EffectKind::reverb })
+                {
+                    lynx::EffectSlot fx;
+                    fx.kind = kind;
+                    const auto& info = lynx::effectInfo (kind);
+                    for (std::size_t k = 0; k < info.params.size() && k < fx.params.size(); ++k)
+                        fx.params[k] = info.params[k].defaultValue;
+                    s.mixer[2].effects.push_back (fx);
+                }
+                s.mixer[2].effects[2].enabled = false; // (the Delay off: Live dims a device that is off)
+                s.mixer[3].muted = true;               // the Keys' activator off
+                s.mixer[4].inputChannel = 0;
+                s.mixer[4].inputStereo = true;
+                s.mixer[4].monitor = lynx::InputMonitor::automatic;
+                s.mixer[5].solo = true;
+                for (auto [from, to, level] : std::initializer_list<std::tuple<int, int, float>> { { 1, 6, 0.35f }, { 2, 6, 0.6f }, { 3, 6, 0.8f }, { 2, 7, 0.25f }, { 4, 7, 0.5f } })
+                {
+                    lynx::MixerSend send;
+                    send.target = to;
+                    send.level = lynx::faderGain (level);
+                    s.mixer[(std::size_t) from].sends.push_back (send);
+                }
+                while (s.patterns.size() < 3)
+                    s.patterns.emplace_back();
+                const char* patterns[] { "Beat", "Bassline", "Chords" };
+                for (int p = 0; p < 3; ++p)
+                {
+                    auto& pattern = s.patterns[(std::size_t) p];
+                    pattern.name = patterns[p];
+                    pattern.notes.clear();
+                    for (int k = 0; k < 6; ++k)
+                    {
+                        lynx::Note n;
+                        n.channel = channels + p;
+                        n.key = (p == 0 ? 36 : 48) + (k * 5) % 12 + p * 2;
+                        n.start = (std::int64_t) k * lynx::ppq / 2;
+                        n.length = lynx::ppq / 2;
+                        n.velocity = 0.55f + 0.07f * (float) k;
+                        pattern.notes.push_back (n);
+                    }
+                    pattern.lengthTicks = 4 * lynx::ppq;
+                }
+                s.playlistTracks.resize (std::max<std::size_t> (s.playlistTracks.size(), 8));
+                const char* tracks[] { "Drums", "Bass", "Keys", "Vox", "Loop", "FX" };
+                const std::uint32_t colours[] { 0xff9bc48d, 0xffd2e498, 0xffa595b5, 0xffcdf1f8, 0xfff7f47c, 0xffc6928b }; // (Live's palette)
+                for (int t = 0; t < 6; ++t)
+                {
+                    s.playlistTracks[(std::size_t) t].name = tracks[t];
+                    s.playlistTracks[(std::size_t) t].colour = colours[t];
+                }
+                s.playlistTracks[3].mode = lynx::PlaylistTrackMode::audio;
+                s.playlistTracks[3].mixerTrack = 4;
+                for (int t = 0; t < 3; ++t)
+                    for (int r = 0; r < 3; ++r)
+                        if (! (t == 2 && r == 0))
+                        {
+                            lynx::Clip clip;
+                            clip.pattern = t;
+                            clip.length = 4 * lynx::ppq;
+                            lynx::launcher::setClip (s, t, r, clip);
+                        }
+                if (audioChannel >= 0)
+                {
+                    lynx::clipsample::setWarp (s, audioChannel, true, 4.0);
+                    audio.track = 4;
+                    audio.start = 0;
+                    lynx::launcher::setClip (s, 4, 0, audio);
+                    lynx::launcher::setClip (s, 4, 1, audio);
+                }
+                auto& grid = lynx::launcher::ensureGrid (s);
+                const char* scenes[] { "Intro", "Verse", "Drop" };
+                grid.scenes.resize (5);
+                for (int r = 0; r < 3; ++r)
+                    grid.scenes[(std::size_t) r].name = scenes[r];
+            }, false);
+            settle();
+            offline.setGridTrackArmed (3, true);
+            ui.setClipGridView (lynx::PlaylistArea::GridView::grid);
+            settle();
+            ui.resized();
+            auto* gridView = ui.getClipGridForSnapshot();
+            auto* mixer = gridView != nullptr ? lynx::clipGridMixer (*gridView) : nullptr;
+            auto* detail = ui.getDetailViewForSnapshot();
+            if (gridView == nullptr || mixer == nullptr || detail == nullptr)
+            {
+                check ("a grid, a Session mixer and a detail view", false);
+                return;
+            }
+            check ("the Live look is on (Clip-launch, classic off)", lynx::theme::livelook::active());
+            const auto meters = [&] {
+                mixer->tick();
+                const float peaks[] { 0.9f, 0.5f, 0.7f, 0.0f, 0.3f, 0.45f, 0.2f, 0.12f };
+                for (int i = 0; i < 8; ++i)
+                    mixer->setMeterForSnapshot (i, peaks[i], peaks[i] * 0.85f, peaks[i] * 1.1f, peaks[i], i == 1 ? 1.2f : peaks[i] * 1.15f);
+            };
+            if (auto* runtime = offline.launcherStateForSnapshot())
+            {
+                runtime->tracks[0].playing.store (1);
+                runtime->tracks[0].progress.store (0.3f);
+                runtime->tracks[1].playing.store (1);
+                runtime->tracks[1].progress.store (0.3f);
+                runtime->tracks[4].playing.store (0);
+                runtime->tracks[4].progress.store (0.5f);
+                runtime->running.store (true);
+            }
+            lynx::selectClipGridSlotForSnapshot (*gridView, 1, 1); // (the Bass track selected: its strip #464646)
+            settle();
+            meters();
+            gridView->resized();
+            write (ui, "13-window");
+            write (*gridView, "13-grid-mixer");
+            area (*gridView, mixer->getBoundsInParent(), "13-mixer");
+            using Part = lynx::SessionMixerComponent::Part;
+            check ("mixer: the Drums strip has a peak pill in Live's look", ! mixer->partBounds (0, Part::peak).isEmpty());
+            check ("mixer: the Drums peak pill reads the clipped peak", mixer->loudestPeak (1) >= 1.0f);
+            line ("mixer: activator " + mixer->partBounds (0, Part::activator).toString() + ", solo " + mixer->partBounds (0, Part::solo).toString()
+                  + ", arm " + mixer->partBounds (0, Part::arm).toString() + ", pan " + mixer->partBounds (0, Part::pan).toString()
+                  + ", volume " + mixer->partBounds (0, Part::volume).toString() + ", peak " + mixer->partBounds (0, Part::peak).toString());
+            check ("mixer: the activator is Live's 21-23 px square", juce::jlimit (21, 23, mixer->partBounds (0, Part::activator).getWidth()) == mixer->partBounds (0, Part::activator).getWidth());
+            mixer->setHoverForSnapshot ({ 1, Part::solo, 0 });
+            area (*gridView, mixer->getBoundsInParent(), "13-mixer-hover-solo");
+            mixer->setHoverForSnapshot ({});
+            // the I/O section off (View › Mixer › I/O)
+            offline.editSong ([] (lynx::Song& s) { lynx::launcher::ensureGrid (s).mixerView.io = false; }, false);
+            settle();
+            gridView->resized();
+            meters();
+            area (*gridView, mixer->getBoundsInParent(), "13-mixer-io-off");
+            offline.editSong ([] (lynx::Song& s) { lynx::launcher::ensureGrid (s).mixerView.io = true; }, false);
+            settle();
+            gridView->resized();
+
+            // ---- 19 + 25: the Device View of the Bass track (EQ, Compressor, Delay off, Reverb folded), the Info View ----
+            detail->showSelection (1, 1);
+            detail->setPage (lynx::DetailView::Page::devices);
+            settle();
+            ui.resized();
+            settle();
+            const auto cards = detail->cardCountForCheck();
+            line ("device view: " + juce::String (cards) + " cards, insert " + juce::String (detail->chainInsertForCheck()));
+            if (cards >= 5)
+                detail->toggleFoldForCheck (4);
+            detail->selectCardForCheck (1);
+            meters();
+            // the Info View with a hovered control: the Bass strip's activator, as the hint timer would give it
+            {
+                const auto spot = mixer->partBounds (1, Part::activator).getCentre();
+                const auto hint = lynx::ui::hintFor (mixer, spot);
+                detail->setInfoHint (hint);
+                line ("info view: title '" + detail->infoViewForSnapshot().getTitleText() + "', body '" + detail->infoViewForSnapshot().getBodyText() + "'");
+                check ("info view: the hovered activator's hint shows", detail->infoViewForSnapshot().getBodyText().isNotEmpty());
+            }
+            write (ui, "19-window-devices");
+            write (*detail, "19-detail-devices");
+            area (ui, detail->getBoundsInParent().withTrimmedTop (detail->getHeight() - lynx::DetailView::stripHeight), "25-status-strip");
+            area (ui, detail->getBoundsInParent().withWidth (260), "25-info-view");
+            check ("device view: four effect cards and the instrument", cards >= 5);
+            check ("device view: the folded card stays folded", cards < 5 || detail->isFoldedForCheck (4));
+            // the hot-swap link on the selected card (Q)
+            ui.runActionForSnapshot ("view.hotSwap");
+            settle();
+            write (*detail, "19-detail-hotswap");
+            ui.runActionForSnapshot ("view.hotSwap");
+            settle();
+            // the Drum Rack (the Drums track's instrument)
+            detail->showSelection (0, 1);
+            settle();
+            detail->selectCardForCheck (0);
+            write (*detail, "19-detail-drumrack");
+            // an Instrument Rack (Keys grouped: Ctrl+G on the instrument card)
+            detail->showSelection (2, 1);
+            settle();
+            check ("device view: the Keys instrument grouped into an Instrument Rack", detail->groupCardForCheck (0, false));
+            settle();
+            write (*detail, "19-detail-instrumentrack");
+            // the Info View off (its (i) button), then back
+            detail->toggleInfoView();
+            write (*detail, "25-detail-info-off");
+            detail->toggleInfoView();
+
+            // ---- 17: the Clip View: a MIDI clip, then the audio clip at three detail heights --------------------------
+            detail->showSelection (1, 1);
+            detail->setPage (lynx::DetailView::Page::clip);
+            settle();
+            ui.resized();
+            settle();
+            write (ui, "17-window-clip-midi");
+            write (*detail, "17-detail-clip-midi");
+            // Launch (folded at first, as Live shows it) and Pitch & Time open, the column scrolled to them
+            detail->clipSectionsForSnapshot (true, true, true, 0);
+            write (*detail, "17-detail-clip-midi-launch-open");
+            detail->clipSectionsForSnapshot (true, true, true, 160);
+            write (*detail, "17-detail-clip-midi-scrolled");
+            detail->clipSectionsForSnapshot (true, false, true, 0);
+            detail->showSelection (4, 0);
+            settle();
+            for (const auto height : { 190, 260, 350 })
+            {
+                lynx::DetailView::preferredHeight = height;
+                ui.resized();
+                settle();
+                write (*detail, "17-detail-clip-audio-" + juce::String (height));
+            }
+            lynx::DetailView::preferredHeight = 228;
+            ui.resized();
+            settle();
+            write (ui, "17-window-clip-audio");
+
+            // ---- the same views in the classic LYNX look (View › Classic LYNX look in the Clip-launch layout) --------
+            lynx::clipGridClassicLook() = true;
+            lynx::refreshClipGrid (*gridView);
+            ui.getPlaylistForSnapshot().liveLanesChanged();
+            ui.resized();
+            detail->resized();
+            settle();
+            check ("classic look: the Live look is off", ! lynx::theme::livelook::active());
+            write (ui, "classic-window-clip-audio");
+            detail->setPage (lynx::DetailView::Page::devices);
+            detail->showSelection (1, 1);
+            settle();
+            meters();
+            write (ui, "classic-window-devices");
+            lynx::clipGridClassicLook() = false;
+            lynx::refreshClipGrid (*gridView);
+            ui.getPlaylistForSnapshot().liveLanesChanged();
+            ui.resized();
+            settle();
+
+            // ---- 18: the synthetic set's Arrangement (Song view) ------------------------------------------------------
+            offline.editSong ([audioChannel] (lynx::Song& s) {
+                for (int t = 0; t < 3; ++t)
+                    for (int bar = 0; bar < 8; bar += 2)
+                    {
+                        lynx::Clip clip;
+                        clip.pattern = t;
+                        clip.track = t;
+                        clip.start = (std::int64_t) bar * 4 * lynx::ppq + (t == 2 ? 4 * lynx::ppq : 0);
+                        clip.length = 4 * lynx::ppq * (t == 1 ? 2 : 1);
+                        if (! (t == 1 && bar % 4 != 0))
+                            s.playlist.push_back (clip);
+                    }
+                if (audioChannel >= 0)
+                    for (int bar = 0; bar < 8; bar += 2)
+                    {
+                        lynx::Clip audio;
+                        audio.channel = audioChannel;
+                        audio.track = 4;
+                        audio.start = (std::int64_t) bar * 4 * lynx::ppq;
+                        audio.length = 8 * lynx::ppq;
+                        audio.kind = lynx::ClipKind::audio;
+                        s.playlist.push_back (audio);
+                    }
+            }, false);
+            settle();
+            ui.setClipGridView (lynx::PlaylistArea::GridView::song);
+            settle();
+            ui.resized();
+            lynx::ui::WaveformCache::getInstance()->waitUntilIdle (30000);
+            settle();
+            ui.getPlaylistForSnapshot().repaint();
+            write (ui, "18-synthetic-arrangement-19");
+            lynx::playlistTallLiveLanes() = true;
+            ui.getPlaylistForSnapshot().liveLanesChanged();
+            settle();
+            write (ui, "18-synthetic-arrangement-38");
+            lynx::playlistTallLiveLanes() = false;
+            ui.getPlaylistForSnapshot().liveLanesChanged();
+            settle();
+        }
+
+        // ---- B. the Live set (its Arrangement with real audio) ----------------------------------------------------------
+        if (set.isNotEmpty() && juce::File (set).existsAsFile())
+        {
+            lynx::AudioEngine offline (false);
+            lynx::MainComponent ui (offline, false);
+            ui.setSize (w, h);
+            const auto settle = [&] {
+                for (int k = 0; k < 3; ++k)
+                    offline.dispatchPendingMessages();
+            };
+            ui.setVisible (true);
+            lynx::DetailView::shownSetting = true;
+            lynx::DetailView::devicesPage = true;
+            ui.selectTabForSnapshot (2);
+            ui.setClipLaunchWorkflow (true); // (first: the import takes Live's colour table in this layout, CL-6)
+            settle();
+            ui.openFile (juce::File (set));
+            settle();
+            ui.setClipGridView (lynx::PlaylistArea::GridView::song);
+            settle();
+            ui.resized();
+            lynx::ui::WaveformCache::getInstance()->waitUntilIdle (60000);
+            settle();
+            const auto& song = offline.getSong();
+            line ("set: " + juce::String ((int) song.playlist.size()) + " Arrangement clips, " + juce::String ((int) song.playlistTracks.size()) + " tracks");
+            int drums = -1;
+            for (int t = 0; t < (int) song.playlistTracks.size() && drums < 0; ++t)
+                if (juce::String::fromUTF8 (song.playlistTracks[(std::size_t) t].name.c_str()).containsIgnoreCase ("drum"))
+                    drums = t;
+            if (drums >= 0)
+                line ("set: Drums track colour #" + juce::String::toHexString ((int) (song.playlistTracks[(std::size_t) drums].colour & 0xffffff)).paddedLeft ('0', 6));
+            check ("set: the Drums track has Live's colour #9BC48D (CL-6)", drums >= 0 && (song.playlistTracks[(std::size_t) drums].colour & 0xffffff) == 0x9bc48d);
+            write (ui, "18-als-arrangement-19");
+            write (ui.getPlaylistForSnapshot(), "18-als-playlist-19");
+            lynx::playlistTallLiveLanes() = true;
+            ui.getPlaylistForSnapshot().liveLanesChanged();
+            settle();
+            write (ui, "18-als-arrangement-38");
+            // a tall audio lane (live-arrangement-audiolane.png: Vocal Main at ~250 px)
+            int vocal = -1;
+            for (int t = 0; t < (int) song.playlistTracks.size() && vocal < 0; ++t)
+                if (juce::String::fromUTF8 (song.playlistTracks[(std::size_t) t].name.c_str()).containsIgnoreCase ("vocal"))
+                    vocal = t;
+            if (vocal >= 0)
+            {
+                offline.editSong ([vocal] (lynx::Song& s) { s.playlistTracks[(std::size_t) vocal].height = 250; }, false);
+                lynx::playlistTallLiveLanes() = false;
+                ui.getPlaylistForSnapshot().liveLanesChanged();
+                settle();
+                write (ui, "18-als-audiolane");
+            }
+            line ("set: Vocal track " + juce::String (vocal));
+            lynx::clipGridClassicLook() = true;
+            ui.getPlaylistForSnapshot().liveLanesChanged();
+            settle();
+            write (ui, "classic-als-arrangement");
+            lynx::clipGridClassicLook() = false;
+        }
+        lynx::clipGridClassicLook() = classicBefore;
+        lynx::playlistTallLiveLanes() = tallBefore;
+        wav.deleteFile();
+        line ("done");
     }
 
     // LYNX --capfix190jjshot prefix project.flp set.als: round 190jj off screen (capture190ji's "Change in LYNX" lines) —
