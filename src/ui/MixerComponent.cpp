@@ -57,6 +57,7 @@
 #include "ui/QuickPick.h"
 #include "ui/TrackIcons.h"
 #include "core/TrackIcons.h"
+#include "core/MixerRouteArrow.h"
 
 namespace lynx
 {
@@ -531,7 +532,7 @@ MixerStrips::Rows MixerStrips::rows() const noexcept
     r.buttonsTop = r.knobsTop + r.knobsHeight;
     r.faderTop = r.buttonsTop + r.buttonsHeight + 6;
 
-    auto bottom = laneTop() - r.readoutHeight - 4;
+    auto bottom = laneTop() - r.readoutHeight - 4 - arrowRowHeight; // (round 190io: FL's route arrow at the strip's foot)
     if (compact)
     {
         r.armY = bottom - 14;
@@ -1155,6 +1156,11 @@ juce::Rectangle<int> MixerStrips::routeArea (int t) const
     return { stripX (t) + inset, laneTop() + 2, stripWidthOf (t) - spec().gap - 2 * inset, switchHeight };
 }
 
+juce::Rectangle<int> MixerStrips::arrowArea (int t) const
+{
+    return { stripX (t), laneTop() - arrowRowHeight - 2, stripWidthOf (t) - spec().gap, arrowRowHeight };
+}
+
 juce::Rectangle<int> MixerStrips::sendArea (int t) const
 {
     return { stripX (t), laneTop() + 2 + switchHeight, stripWidthOf (t) - spec().gap, sendKnobHeight };
@@ -1185,6 +1191,9 @@ MixerStrips::Part MixerStrips::partAt (int t, juce::Point<int> p) const
         return Part::input;
     if (headerArea (t).contains (p) || nameArea (t).contains (p))
         return Part::header;
+    // FL's route arrow (round 190io): the Send switch from the selected track, as the "→ n" pill
+    if (sending && arrowArea (t).contains (p) && (song.routes (selected, t) || song.canRoute (selected, t)))
+        return Part::route;
     if (panArea (t).contains (p))
         return Part::pan;
     if (stereoArea (t).contains (p))
@@ -1368,10 +1377,23 @@ void MixerStrips::paint (juce::Graphics& g)
             plate = plate.interpolatedWith (tame (juce::Colour (track.colour)), isSelected ? 0.26f : 0.2f);
         theme::fillRoundRect (g, strip.toFloat(), radius::md, plate);
 
-        if (track.colour != 0) // thin colour band at the top
+        // FL's header band (round 190io, design190ia FM-30): the top 36 px filled with the insert's colour (FL: #8C1F1C on
+        // insert 1), held at a brightness where its marks read; FL's grey for an insert without a colour. Rounded on top.
+        const auto band = colourFill (track.colour != 0 ? juce::Colour (track.colour) : juce::Colour (0xff485156), 0.45f, 0.6f)
+                              .withMultipliedAlpha (track.muted ? 0.55f : 1.0f);
+        const auto bandArea = juce::Rectangle<float> ((float) x, 2.0f, (float) plateWidth, (float) rows().header - 2.0f);
+        if (needs (bandArea.getSmallestIntegerContainer()))
         {
-            theme::fillRoundRect (g, strip.toFloat().withHeight (3.0f).reduced (6.0f, 0.0f), 1.5f, tame (juce::Colour (track.colour)));
+            juce::Path top;
+            top.addRoundedRectangle (bandArea.getX(), bandArea.getY(), bandArea.getWidth(), bandArea.getHeight(), radius::md, radius::md, true, true, false, false);
+            g.setColour (band);
+            g.fillPath (top);
         }
+        // the band's marks: FL's dark number (the colour × 0.3) where it reads, else white; the icon in a light tint
+        const auto bandInk = [&band] {
+            const auto dark = juce::Colour ((juce::uint8) (band.getRed() * 0.3f), (juce::uint8) (band.getGreen() * 0.3f), (juce::uint8) (band.getBlue() * 0.3f));
+            return contrast (dark, band) >= 3.0f ? dark : juce::Colours::white.withAlpha (0.92f);
+        }();
 
         if (inSelection && ! isSelected)
         {
@@ -1422,9 +1444,9 @@ void MixerStrips::paint (juce::Graphics& g)
         // header's last row (Extra large) or up a column of the strip (round 168h)
         if (needs (juce::Rectangle<int> (x, 0, plateWidth, 18).getUnion (iconArea (t))))
         {
-        g.setColour (isSelected ? colour::accent : colour::textSecondary);
-        g.setFont (font (compactLayout ? 9.5f : type::caption, isSelected));
-        textcache::drawFittedText (g, t == 0 ? juce::String ("M") : juce::String (t), juce::Rectangle<int> (x, 4, plateWidth, 13),
+        g.setColour (bandInk);
+        g.setFont (font (compactLayout ? 10.0f : type::body, true));
+        textcache::drawFittedText (g, t == 0 ? juce::String ("M") : juce::String (t), juce::Rectangle<int> (x, 4, plateWidth, 14),
                                    juce::Justification::centred, 1, 0.6f);
 
         if (t < (int) foldHead.size() && foldHead[(std::size_t) t]) // round 177a: fold / unfold the group
@@ -1439,12 +1461,14 @@ void MixerStrips::paint (juce::Graphics& g)
         }
 
         if (const auto icon = trackicons::iconFor (track.icon); icon != trackicons::Icon::none)
-            ui::drawTrackIcon (g, icon, iconArea (t).toFloat(), track.muted ? colour::textDisabled : colour::textPrimary.withAlpha (0.88f));
+            ui::drawTrackIcon (g, icon, iconArea (t).toFloat(),
+                               track.muted ? bandInk.withAlpha (0.5f)
+                                           : (track.colour != 0 ? juce::Colour (track.colour) : band).withMultipliedSaturation (0.45f).withBrightness (1.0f));
 
         if (! track.effects.empty() && sp.fxBadge)
         {
             const auto on = mixerops::anyEffectEnabled (song, t);
-            g.setColour (on ? colour::info : colour::textDisabled);
+            g.setColour (bandInk.withAlpha (on ? 1.0f : 0.5f)); // (on the band: its ink)
             g.setFont (font (9.0f, true));
             if (plateWidth >= 56)
                 textcache::drawText (g, "FX" + juce::String ((int) track.effects.size()), x + plateWidth - 26, 4, 23, 13, juce::Justification::centredRight);
@@ -1455,8 +1479,13 @@ void MixerStrips::paint (juce::Graphics& g)
 
         if (needs (nameArea (t).withX (x).withWidth (plateWidth)))
         {
-        g.setColour (track.muted ? colour::textDisabled : (hovered (Part::header) ? colour::textPrimary : colour::textPrimary.withAlpha (0.9f)));
-        g.setFont (font (compactLayout ? 10.0f : type::small, isSelected));
+        // FL's name in a light tint of the insert's colour ("KICK" red-pink on the red group; round 190io, FM-31), white
+        // where the tint would read below 4.5:1, one size up (FL's 10 px glyphs)
+        {
+            const auto tint = track.colour != 0 ? lightTint (juce::Colour (track.colour), plate, colour::textPrimary) : colour::textPrimary;
+            g.setColour (track.muted ? colour::textDisabled : hovered (Part::header) ? tint.brighter (0.2f) : tint.withAlpha (0.95f));
+        }
+        g.setFont (font (compactLayout ? 10.0f : type::body, isSelected));
         // Online Sessions (round 168a): a plugin of this insert is not installed here, its stand-in render plays (an
         // amber R before the name)
         const auto standIn = engine.insertPlaysStandIn (t);
@@ -1465,7 +1494,8 @@ void MixerStrips::paint (juce::Graphics& g)
         const auto name = juce::String::fromUTF8 (track.name.c_str());
         if (const auto box = nameArea (t); ! sp.verticalName)
         {
-            textcache::drawFittedText (g, name, box.withTrimmedLeft (standIn || pluginOff ? 16 : 0), juce::Justification::centred, 1, 0.7f);
+            const auto room = box.withTrimmedLeft (standIn || pluginOff ? 16 : 0);
+            textcache::drawFittedText (g, fitMiddle (name, g.getCurrentFont(), (float) room.getWidth() / 0.7f), room, juce::Justification::centred, 1, 0.7f);
             if (standIn)
                 drawStandInTag (g, { (float) box.getX() + 1.0f, (float) box.getY() + 0.5f, 13.0f, 13.0f });
             else if (pluginOff)
@@ -1488,7 +1518,9 @@ void MixerStrips::paint (juce::Graphics& g)
             juce::Graphics::ScopedSaveState state (g);
             g.addTransform (juce::AffineTransform::rotation (-juce::MathConstants<float>::halfPi, (float) column.getCentreX(), (float) column.getCentreY()));
             const auto rotated = juce::Rectangle<int> (column.getHeight(), column.getWidth()).withCentre (column.getCentre());
-            textcache::drawFittedText (g, name, rotated, juce::Justification::centredLeft, 1, 0.8f); // (laid out once: round 173f)
+            // FL's middle ellipsis ("CUTLAY..idated)", FM-14) past what squeezing to 80 % fits
+            textcache::drawFittedText (g, fitMiddle (name, g.getCurrentFont(), (float) rotated.getWidth() / 0.8f), rotated, juce::Justification::centredLeft, 1,
+                                       0.8f); // (laid out once: round 173f)
         }
 
         // FL's narrow strips show the level beside the name too: two thin bars (Wide layouts)
@@ -1640,6 +1672,44 @@ void MixerStrips::paint (juce::Graphics& g)
                 g.setColour (text.endsWith ("?") ? colour::textDisabled : colour::info);
                 g.setFont (font (9.0f, true));
                 textcache::drawFittedText (g, text, badge.toNearestInt(), juce::Justification::centred, 1, 0.7f);
+            }
+        }
+
+        // FL's route arrow at the strip's foot (round 190io, design190ia FM-32; FL manual › Routing Iconography): the
+        // selected track's downward arrow, a hollow up-arrow where it can send, lit where it sends, greyed where it would
+        // loop; the small "Send in use" arrow above it on a track others send into
+        if (const auto foot = arrowArea (t); needs (foot))
+        {
+            const auto state = routearrow::of (song, selected, t);
+            const auto c = foot.toFloat().getCentre();
+            const auto w = compactLayout ? 9.0f : 11.0f, h = compactLayout ? 7.0f : 8.0f;
+            const auto top = (float) foot.getY() + 5.0f;
+            juce::Path arrow;
+            if (state == routearrow::State::out)
+                arrow.addTriangle (c.x - w * 0.5f, top, c.x + w * 0.5f, top, c.x, top + h);
+            else
+                arrow.addTriangle (c.x - w * 0.5f, top + h, c.x + w * 0.5f, top + h, c.x, top);
+            const auto hot = hovered (Part::route);
+            switch (state)
+            {
+                case routearrow::State::out: g.setColour (colour::ledOn); g.fillPath (arrow); break;
+                case routearrow::State::routed: g.setColour (hot ? colour::accentHover : colour::accent); g.fillPath (arrow); break;
+                case routearrow::State::available:
+                    g.setColour (hot ? colour::textPrimary : colour::textSecondary.withAlpha (0.75f));
+                    g.strokePath (arrow, juce::PathStrokeType (1.0f, juce::PathStrokeType::mitered));
+                    break;
+                case routearrow::State::blocked:
+                    g.setColour (colour::textDisabled.withAlpha (0.45f));
+                    g.strokePath (arrow, juce::PathStrokeType (1.0f, juce::PathStrokeType::mitered));
+                    break;
+                case routearrow::State::none: break;
+            }
+            if (state != routearrow::State::none && routearrow::receives (song, t)) // "Send in use"
+            {
+                juce::Path small;
+                small.addTriangle (c.x - 3.0f, top - 1.5f, c.x + 3.0f, top - 1.5f, c.x, top - 4.5f);
+                g.setColour (colour::textSecondary);
+                g.fillPath (small);
             }
         }
 

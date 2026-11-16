@@ -3,6 +3,7 @@
 
 #include "core/FlpExport.h"
 #include "core/MiddleEllipsis.h"
+#include "core/MixerRouteArrow.h"
 #include <cmath>
 #include <cstdlib>
 #include <fstream>
@@ -156,4 +157,27 @@ TEST (rackmix190io_audio_clip_channel_plays_from_a_step)
             CHECK (! bytes.empty());
         }
     }
+}
+
+// FM-32: FL's route arrows (Routing Iconography): the selected track's ▼, an up-arrow on every other track (lit when the
+// selected track sends there), greyed where routing would loop; "Send in use" on tracks others send into
+TEST (rackmix190io_route_arrow_states)
+{
+    using namespace lynx;
+    auto s = Song::makeDefault();
+    while (s.mixer.size() < 6)
+        s.mixer.emplace_back();
+    s.setRoute (1, 3, true); // 1 → 3
+    s.setRoute (3, 4, true); // 3 → 4
+    using routearrow::State;
+    CHECK (routearrow::of (s, 3, 3) == State::out);
+    CHECK (routearrow::of (s, 3, 4) == State::routed);
+    CHECK (routearrow::of (s, 3, 1) == State::blocked);  // 1 feeds 3: back to 1 would loop
+    CHECK (routearrow::of (s, 3, 2) == State::available);
+    CHECK (routearrow::of (s, 3, 0) == (s.mixer[3].toMaster ? State::routed : State::available));
+    CHECK (routearrow::of (s, 4, 1) == State::blocked);  // 1 → 3 → 4: a loop through 3
+    CHECK (routearrow::of (s, 0, 2) == State::blocked);  // the Master sends nowhere inside the Mixer
+    CHECK (routearrow::of (s, 0, 0) == State::out);
+    CHECK (routearrow::of (s, 3, 99) == State::none);
+    CHECK (routearrow::receives (s, 3) && routearrow::receives (s, 4) && ! routearrow::receives (s, 2));
 }

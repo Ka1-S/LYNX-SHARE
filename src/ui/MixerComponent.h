@@ -184,6 +184,7 @@ public:
     // (LUFS) and the true peak (dBTP) of the Master's output, and a Reset button (core/MasterLoudness.h).
     static inline bool showLoudness = false;
     void setShowLoudness (bool on);
+    juce::Rectangle<int> routeArrowForSnapshot (int track) const { return arrowArea (track); }
     void resetLoudness();
     void refreshLoudnessForSnapshot() { loudnessShown = engine.getMeters().loudness.read(); repaint(); } // (--snapshot: no frames run)
     juce::Rectangle<int> loudnessArea() const noexcept; // the panel's plate; empty while it is off
@@ -333,6 +334,10 @@ private:
     juce::Rectangle<int> muteArea (int track) const;
     juce::Rectangle<int> soloArea (int track) const;
     juce::Rectangle<int> routeArea (int track) const;
+    // FL's route arrow at the strip's foot (round 190io, FM-32; core/MixerRouteArrow.h): the Send switch from the selected
+    // track, the selected track's own downward arrow; the "→ n" pill in the routing lane stays (LYNX)
+    juce::Rectangle<int> arrowArea (int track) const;
+    static constexpr int arrowRowHeight = 14;
     juce::Rectangle<int> armArea (int track) const;
     juce::Rectangle<int> inputArea (int track) const; // the input level bar (inserts with an input source)
     juce::Rectangle<int> stereoArea (int track) const;
