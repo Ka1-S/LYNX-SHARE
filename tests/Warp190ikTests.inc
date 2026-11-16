@@ -40,6 +40,30 @@ inline lynx::SampleData vowel (double seconds = 2.0, double rate = 44100.0)
     return d;
 }
 
+// the strongest frequency of x[from, to) between lo and hi Hz (Hann-windowed DFT scanned in 0.05 Hz steps): the pitch of a
+// tone whose phase drifts (overlapping grains) where zero crossings would wobble
+inline double peakFrequency (const std::vector<float>& x, long from, long to, double rate, double lo, double hi)
+{
+    const auto n = to - from;
+    double best = lo, bestP = -1.0;
+    for (double f = lo; f <= hi; f += 0.05)
+    {
+        double re = 0.0, im = 0.0;
+        for (long i = 0; i < n; i += 2)
+        {
+            const auto w = 0.5 - 0.5 * std::cos (twoPi * (double) i / (double) n);
+            re += w * x[(std::size_t) (from + i)] * std::cos (twoPi * f * (double) i / rate);
+            im += w * x[(std::size_t) (from + i)] * std::sin (twoPi * f * (double) i / rate);
+        }
+        if (re * re + im * im > bestP)
+        {
+            bestP = re * re + im * im;
+            best = f;
+        }
+    }
+    return best;
+}
+
 // frequency from the zero crossings of x[from, to)
 inline double frequency (const std::vector<float>& x, long from, long to, double rate)
 {
@@ -208,7 +232,7 @@ TEST (warp190ik_texture_grains_flux_and_determinism)
                 const auto n = (long) out->frames();
                 CHECK (n == (long) std::llround ((double) in.frames() * ratio));
                 // the pitch stays (grains read at the source's own speed); a grain's window never steps
-                CHECK (std::abs (cents (frequency (out->left, n / 4, 3 * n / 4, rate), 440.0)) < 4.0);
+                CHECK (std::abs (cents (peakFrequency (out->left, n / 4, 3 * n / 4, rate, 420.0, 460.0), 440.0)) < 4.0);
                 CHECK (roughness (out->left, 0, n, 440.0, rate, 0.5) < 1.6);
                 const auto again = timeStretch (in, ratio, StretchMethod::texture, 0.0, texture (grain, 50.0f));
                 CHECK (again->left == out->left);
@@ -220,7 +244,7 @@ TEST (warp190ik_texture_grains_flux_and_determinism)
         const auto up = timeStretch (in, 1.25, StretchMethod::texture, 7.0, texture (65.0f, 0.0f));
         const auto n = (long) up->frames();
         CHECK (n == (long) std::llround ((double) in.frames() * 1.25));
-        CHECK (std::abs (cents (frequency (up->left, n / 4, 3 * n / 4, 44100.0), 440.0 * std::pow (2.0, 7.0 / 12.0))) < 4.0);
+        CHECK (std::abs (cents (peakFrequency (up->left, n / 4, 3 * n / 4, 44100.0, 640.0, 680.0), 440.0 * std::pow (2.0, 7.0 / 12.0))) < 4.0);
         CHECK (stretchBakesPitch (StretchMethod::texture, texture().modes));
     }
     // Flux scatters the grains (another render), Grain Size changes them
