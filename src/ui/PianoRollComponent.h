@@ -152,6 +152,17 @@ public:
     std::function<void()> onBrowseScores;
     // "Note names on every key" was switched in the menu (the main window saves its settings)
     std::function<void()> onNoteNamesChanged;
+    // round 190im (R13): set by the Clip View while this editor is docked for a clip of the grid: the clip's pattern
+    // position while it is launched (−1: not playing); the playhead shows it
+    std::function<double()> launchedPlayhead;
+
+private:
+    // round 190im (R15): what the frame step saw of the view (a change it did not make = a scroll by hand), and the
+    // song's publish count at the last mouse press (a gesture that changed it = an edit)
+    double followSeenScroll = 0.0, followSeenZoom = 0.0;
+    std::uint64_t followEditStamp = 0;
+
+public:
     // The play button: click plays / pauses the pattern, right-click stops back at the last start (the main window's transport)
     std::function<void()> onPlayPause, onPlayRightClick;
     // The time selection (Ctrl+drag on the ruler; -1 = none) that Insert / Delete space and Trim use.
@@ -175,6 +186,9 @@ public:
 
     // For snapshots: the tool in use and the Note inspector of the selection.
     void setToolForSnapshot (EditTool tool) { tools.setTool (tool); }
+    // --details190imshot (round 190im): one display-rate frame step, and where the playhead is (−1: none)
+    void frameStepForSnapshot() { playheadFrame (0.0); }
+    double playheadForSnapshot() const noexcept { return playheadTick; }
     void setScaleForSnapshot (int root, int scale) { setScale (root, scale); }
     // The scale the rows show (LYNX's scale list index, 0 = none) on `root` (round 190ds: the Simple dock's "Only notes
     // in key" sets the project key here before folding)

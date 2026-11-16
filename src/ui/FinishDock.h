@@ -21,7 +21,7 @@ class FinishDock final : public juce::Component,
                          private juce::Timer
 {
 public:
-    static constexpr int width = 300;
+    static constexpr int width = 360; // (round 190jc, SG-16: 300 -> 360, look tiles near BandLab Mastering's 182 x 76)
 
     // What "Save the song as a file" opens (round 190t): the Export window on one format (0 WAV, 1 MP3) and
     // File › Export › For other apps. Without them the block is not shown.

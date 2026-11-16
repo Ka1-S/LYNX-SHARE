@@ -45,9 +45,21 @@ enum class Icon
     punch,      // recording: punch in/out on the loop region (a record dot between two brackets; round 170e3)
     note,       // the Browser's Scores folder: an eighth note (round 178a)
     deleteTool, // Playlist (Pattern layout): FL's delete tool, a circle with a slash (round 190ig, FM-26)
-    slipArrows  // Playlist (Pattern layout): FL's slip tool, two arrowheads back to back (round 190ig, FM-26)
+    slipArrows, // Playlist (Pattern layout): FL's slip tool, two arrowheads back to back (round 190ig, FM-26)
+    // round 190iv: the Simple top bar's save status and the Clip-launch layout's control bar (LYNX vectors drawn to read
+    // like BandLab's and Live's)
+    cloud,             // saved by LYNX's backup
+    cloudCheck,        // all changes saved
+    sessionView,       // Live's view selector: three columns (the clip grid)
+    arrangementView,   // three rows (the Playlist)
+    backToArrangement, // an arrow into a dashed line
+    capture,           // a dashed square (Capture MIDI)
+    sessionRecord,     // a ring
+    browserPanel,      // a left panel beside a page (show / hide the Browser)
+    metronomeDots,     // Live's metronome: a ring and a dot
+    toStart            // round 190jj: BandLab's Back-to-start (a bar and a triangle pointing left), the Simple capsule's idle Stop
 };
-constexpr int iconCount = (int) Icon::slipArrows + 1;
+constexpr int iconCount = (int) Icon::toStart + 1;
 
 namespace icons
 {
@@ -77,6 +89,7 @@ public:
     IconButton (const juce::String& name, Icon icon, const juce::String& text = {});
 
     void setIcon (Icon newIcon);
+    Icon getIcon() const noexcept { return icon; } // (round 190jj: tests and shots)
     void setText (const juce::String& newText);
     void setPrimary (bool shouldBePrimary);              // filled with the accent even when off
     void setOnColour (juce::Colour colour);              // background when toggled on (default: accent)
@@ -88,6 +101,18 @@ public:
     // The icon's box: `fraction` of the button's height, at most `maxPx` (default 0.66 and 20 px). Icons are
     // drawn on whole pixels, so 16, 20 and 24 px boxes stay crisp.
     void setIconSizing (float fraction, float maxPx);
+
+    // Round 190iv: how the button draws itself per toolbar look (core/ToolbarLayout.h Look). `standard` is every LYNX
+    // button as before; the others are used only by the Simple and Clip-launch toolbars:
+    //  - capsule: a segment of a BandLab capsule (the capsule's fill is drawn behind it): a hover / pressed fill only,
+    //    the glyph in `iconBoxPx`; on = the accent glyph (Record: a muted-red fill)
+    //  - liveBox: one of Live's 17 px control-bar boxes (#363636; hover #464646, pressed #1e1e1e, on #ffad56 with a
+    //    #070707 glyph)
+    //  - liveGlyph: Live's bare transport glyphs (#b5b5b5 on the band; on = playing green / recording red)
+    //  - liveSelector: Live's view selector glyphs (on = #ffad56, off = a grey that keeps 3:1 on the band)
+    enum class Look { standard, capsule, liveBox, liveGlyph, liveSelector };
+    void setLook (Look newLook, float iconBoxPx = 0.0f);
+    Look getLook() const noexcept { return look; }
 
     // Optional extra gestures: when set, a right-click calls onRightClick instead of clicking the button,
     // and a double-click calls onDoubleClick (after the two single clicks).
@@ -102,6 +127,9 @@ public:
 
 private:
     void timerCallback() override;
+    void paintLook (juce::Graphics&, bool highlighted, bool down);
+    Look look = Look::standard;
+    float lookIconBox = 0.0f;
     float hover = 0.0f; // 0 = at rest, 1 = under the mouse (animated)
     Icon icon;
     juce::String text;

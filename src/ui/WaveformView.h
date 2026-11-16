@@ -146,13 +146,30 @@ public:
     void setFollowsSamplerViews (bool follows);
 
     void paint (juce::Graphics& g) override;
+    // Round 190im (R11, DF-113; FL's manual, Sampler › Waveform controls: "All handles (Sample and Loop) are draggable in
+    // the Waveform View"): with handles editable, the "Start" marker and the two loop lines are dragged with the mouse
+    // (a left-right cursor over them); Shift moves the loop's start and end together (FL). The owner applies the value:
+    // the start as a fraction of the region in play order, a loop point as a fraction of the file.
+    enum class Handle { none, start, loopStart, loopEnd };
+    void setHandlesEditable (bool editable) { handlesEditable = editable; }
+    std::function<void (Handle, double value, bool shift)> onHandleDrag;
+    std::function<void (Handle)> onHandleDragEnd;
+    Handle handleAt (juce::Point<float> p) const;
+    bool isDraggingHandle() const noexcept { return dragged != Handle::none; }
+    float handleXForSnapshot (Handle h) const; // (--details190imshot: where a handle is drawn; −1: none)
     void mouseDown (const juce::MouseEvent& e) override
     {
+        dragged = Handle::none;
+        if (! e.mods.isPopupMenu() && (dragged = handleAt (e.position)) != Handle::none)
+            return; // (a handle: no preview click)
         if (e.mods.isPopupMenu() && onRightClick != nullptr)
             onRightClick();
         else if (onClick != nullptr)
             onClick();
     }
+    void mouseDrag (const juce::MouseEvent& e) override;
+    void mouseUp (const juce::MouseEvent& e) override;
+    void mouseMove (const juce::MouseEvent& e) override;
     void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& w) override;
 
 private:
@@ -168,6 +185,9 @@ private:
     float loopStart = -1.0f, loopEnd = -1.0f;
     double viewStart = 0.0, viewEnd = 1.0;
     bool samplerViews = false;
+    bool handlesEditable = false;
+    Handle dragged = Handle::none;
+    double fileFractionAt (float x) const; // (round 190im: the file fraction under x, through the view and the play order)
     juce::Image spectrumImage; // the last spectrogram drawn, and what it shows
     juce::String spectrumKey;
     void paintSpectrum (juce::Graphics& g, juce::Rectangle<float> inner, const SampleData& data);

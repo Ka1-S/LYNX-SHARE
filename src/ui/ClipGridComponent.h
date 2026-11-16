@@ -22,6 +22,12 @@ enum class GridPick { select, openClip, openTrack };
 void setClipGridPickListener (juce::Component& grid, std::function<void (int track, int scene, GridPick pick)> listener);
 // Round 190bv: shows or hides the Groove Pool under the grid (ui/GroovePoolComponent.h).
 void setClipGridGroovePoolShown (juce::Component& grid, bool shown);
+// Round 190iv (design190ia CL-25): the footer row of buttons. Live's look (the Clip-launch control bar) hides it: Back to
+// Arrangement, Session Record and the launch quantisation are in the control bar, Stop All Clips in the Main column's
+// status cell, the Groove Pool and the mixer sections in the View and "⋯" menus. Shown again as an option.
+void setClipGridButtonRowShown (juce::Component& grid, bool shown);
+bool clipGridGroovePoolShown (juce::Component& grid);
+void addClipGridMixerViewItems (juce::Component& grid, juce::PopupMenu& menu);
 // The menu of a slot (the right-click menu; --gridshot draws it).
 juce::PopupMenu clipGridSlotMenu (juce::Component& grid, int track, int scene);
 // A clip dragged out of a slot (the Playlist takes it as a clip of its own): true and its slot when `description` is one.
@@ -42,6 +48,16 @@ bool& clipGridSceneTempoShown();
 bool& clipGridClassicLook();
 // Round 190ig (--design190igs4shot): draw the waiting launches' blink in one phase (0 dark, 1 lit; -1: by the clock, as normal).
 void setClipGridBlinkPhaseForSnapshot (int phase);
+// Round 190im (--details190imshot): a scene launched as its button launches it (its pulse, the next scene selected); one
+// tick of the grid's timer; a cell's rectangle (kind 0 a slot, 1 a track's status cell, 2 a scene cell); the selected
+// scene and whether the scene is the selection; a slot selected; the hint at a point (text, value); a key pressed.
+void launchClipGridSceneForSnapshot (juce::Component& grid, int scene);
+void tickClipGridForSnapshot (juce::Component& grid);
+juce::Rectangle<int> clipGridCellForSnapshot (juce::Component& grid, int kind, int track, int scene);
+std::pair<int, bool> clipGridSceneSelectionForSnapshot (juce::Component& grid);
+void selectClipGridSlotForSnapshot (juce::Component& grid, int track, int scene);
+std::pair<juce::String, juce::String> clipGridHintForSnapshot (juce::Component& grid, juce::Point<int> p);
+bool clipGridKeyForSnapshot (juce::Component& grid, const juce::KeyPress& key);
 void refreshClipGrid (juce::Component& grid);
 void setClipGridSceneFieldsListener (juce::Component& grid, std::function<void()> listener);
 // The menus of a scene, a column title and a scene field (1 tempo, 2 time signature), as a right-click opens them

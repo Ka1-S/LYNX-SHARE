@@ -135,6 +135,8 @@
 #include "core/GeneratorPresets.h"
 #include "ui/PluginWindow.h"
 #include "ui/Motion.h"
+#include "ui/SimpleLook.h"
+#include "ui/ShotShowing.h"
 #include "ui/NativeChild.h"
 #include "ui/Workspace.h"
 #include "ui/PluginThumbs.h"
@@ -2245,6 +2247,44 @@ public:
             return;
         }
 
+        if (args.contains ("--toolbarshot190iv"))
+        {
+            // LYNX --toolbarshot190iv prefix [project.als]: round 190iv off screen — the toolbar of each layout style (Pattern,
+            // Simple, Clip-launch) at 1920 / 1366 / 1280, the Simple transport capsule idle / hover / pressed / playing /
+            // recording, the "Last saved" status in its four states, Live's control bar with every button idle / hover /
+            // pressed / lit, the "⋯" menus, and a report of the parts' bounds
+            const auto i = args.indexOf ("--toolbarshot190iv");
+            const auto project = i + 2 < args.size() && ! args[i + 2].startsWith ("--") ? args[i + 2].unquoted() : juce::String();
+            runToolbarShot190iv (args[i + 1].unquoted(), project);
+            quit();
+            return;
+        }
+
+        if (args.contains ("--capfix190jjshot"))
+        {
+            // LYNX --capfix190jjshot prefix project.flp [set.als]: round 190jj off screen (capture190ji's changes: Simple
+            // capsule states, master meter, pads press, held keys, drop lane ghosts; Live's control bar; FL's C-11 drop ghost
+            // and the picker's playing mark); prefix-checks.txt
+            const auto i = args.indexOf ("--capfix190jjshot");
+            const auto set = i + 3 < args.size() && ! args[i + 3].startsWith ("--") ? args[i + 3].unquoted() : juce::String();
+            runCapfix190jjShot (args[i + 1].unquoted(), args[i + 2].unquoted(), set);
+            quit();
+            return;
+        }
+
+        if (args.contains ("--details190imshot"))
+        {
+            // LYNX --details190imshot prefix project.flp [set.als]: round 190im off-screen (details190if R1, R5, R6, R11, R12,
+            // R13, R15) — the automation hints, the Playlist playing (picker marks, glow, overview, activity levels), a drop
+            // preview, Follow's pause, the Sampler's handles, and with the Live set the grid's one-shot / follow / queued
+            // scene / deactivated clip / hints and the Clip View's launched position; prefix-checks.txt
+            const auto i = args.indexOf ("--details190imshot");
+            const auto set = i + 3 < args.size() && ! args[i + 3].startsWith ("--") ? args[i + 3].unquoted() : juce::String();
+            runDetails190imShot (args[i + 1].unquoted(), args[i + 2].unquoted(), set);
+            quit();
+            return;
+        }
+
         if (args.contains ("--gridshot"))
         {
             // LYNX.exe --gridshot prefix [project]: the Clip-launch workflow's layout off-screen, with a grid of sample
@@ -2344,6 +2384,16 @@ public:
             // report: the dock's edits, a user preset saved and loaded, the same slots in the Pattern workflow's Mixer
             const auto i = args.indexOf ("--simplefxshot");
             runSimpleFxShot (args[i + 1].unquoted());
+            quit();
+            return;
+        }
+
+        if (args.contains ("--simple190jcshot"))
+        {
+            // LYNX.exe --simple190jcshot prefix: round 190jc's Simple layout look (design190ia slices 5, 14, 15, 22, 24 and
+            // Large controls) off-screen, at 1x and 2x, with a text report
+            const auto i = args.indexOf ("--simple190jcshot");
+            runSimple190jcShot (args[i + 1].unquoted());
             quit();
             return;
         }
@@ -11910,6 +11960,34 @@ private:
         for (int view = 0; view < 4; ++view)
             run->steps.push_back ({ juce::String ("idle: ") + idleViews[view] + ", stopped", [this, ui, view] { engine->stop(); ui->selectTabForSnapshot (view); }, {}, 3000 });
         run->steps.push_back ({ "idle: desktop, stopped", [this, ui] { engine->stop(); ui->showDesktopForSnapshot (false); }, {}, 3000 });
+        // round 190im (R1, DE-124): the automation editor window open over the Playlist, stopped and then playing (its
+        // timer only while it plays, its playhead columns only); closed after
+        {
+            int automation = -1;
+            for (const auto& c : engine->getSong().playlist)
+                if (c.kind == lynx::ClipKind::automation && c.automation >= 0 && automation < 0)
+                    automation = c.automation;
+            if (automation >= 0)
+            {
+                run->steps.push_back ({ "automation editor open, stopped", [this, ui, automation] {
+                                           engine->stop();
+                                           ui->selectTabForSnapshot (2);
+                                           lynx::openAutomationEditor (*engine, automation);
+                                       }, {}, 3000 });
+                run->steps.push_back ({ "automation editor open, song playing", [this] {
+                                           engine->getTransport().songMode = true;
+                                           engine->rewind();
+                                           engine->play();
+                                       }, {}, 3000, [this] {
+                                           engine->stop();
+                                           auto& desktop = juce::Desktop::getInstance();
+                                           for (int i = desktop.getNumComponents(); --i >= 0;)
+                                               if (auto* w = dynamic_cast<juce::DocumentWindow*> (desktop.getComponent (i)); w != nullptr && w->getName().startsWith ("Automation - "))
+                                                   w->closeButtonPressed();
+                                           return juce::String();
+                                       } });
+            }
+        }
         run->steps.push_back ({ "clip grid, song playing", [this, ui] {
                                    ui->selectTabForSnapshot (2);
                                    ui->setClipLaunchWorkflow (true);
@@ -12008,6 +12086,20 @@ private:
                                    engine->stop();
                                    lynx::NativeEffectWindows::closeAll();
                                    lynx::FormulaControllerWindows::closeAll();
+                                   return juce::String();
+                               } });
+        // round 190iv: the Simple layout (its toolbar) idle and while the song plays
+        run->steps.push_back ({ "idle: simple layout, stopped", [this, ui] {
+                                   engine->stop();
+                                   ui->setLayoutStyle (lynx::layoutstyle::Style::simple, false);
+                               }, {}, 3000 });
+        run->steps.push_back ({ "simple layout, song playing", [this] {
+                                   engine->getTransport().songMode = true;
+                                   engine->rewind();
+                                   engine->play();
+                               }, {}, 3000, [this, ui] {
+                                   engine->stop();
+                                   ui->setLayoutStyle (lynx::layoutstyle::Style::pattern, false);
                                    return juce::String();
                                } });
         // LYNX_UIPERF_ONLY=text: only the steps whose name has that text
@@ -22235,10 +22327,202 @@ private:
         ui.setClipGridView (lynx::PlaylistArea::GridView::grid);
         measureAll ("clip grid");
         ui.setClipLaunchWorkflow (false);
+        // LYNX_PAINTBENCH_SIMPLE=1 (round 190jc): the same project's Playlist in the Simple layout too
+        if (juce::SystemStats::getEnvironmentVariable ("LYNX_PAINTBENCH_SIMPLE", {}) == "1")
+        {
+            ui.setLayoutStyle (lynx::layoutstyle::Style::simple);
+            offline.dispatchPendingMessages();
+            if (auto* simple = ui.getSimpleWorkflowForSnapshot())
+                simple->hideChooser();
+            ui.selectTabForSnapshot (2);
+            measureAll ("simple playlist");
+            ui.setLayoutStyle (lynx::layoutstyle::Style::pattern);
+        }
         text << "result=OK\n";
         report.replaceWithText (text);
         if (profile.isNotEmpty())
             lynx::crashguard::stopMainProfiler();
+    }
+
+    // Round 190iv: the toolbar per layout style (see --toolbarshot190iv above)
+    void runToolbarShot190iv (const juce::String& prefix, const juce::String& projectPath)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::ui::motion::enabled() = false; // (hover states drawn at once, no fade)
+        lynx::AudioEngine offline (false);
+        lynx::MainComponent ui (offline, false);
+        ui.setSize (1920, 1080);
+        juce::String report;
+        const auto write = [&prefix] (const juce::Image& image, const juce::String& name) {
+            const auto file = lynx::shot::file (juce::File (prefix + "-" + name + ".png"));
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (image, out);
+        };
+        const auto bar = [&ui] { return ui.getLocalBounds().withHeight (juce::jmin (ui.getHeight(), 90)); };
+        const auto describe = [&ui, &report] (const juce::String& title) {
+            report << "== " << title << " (" << ui.getWidth() << "x" << ui.getHeight() << ")\n";
+            for (const auto* name : { "play", "stop", "record", "metronome", "tap", "tempo", "signature", "quantisation", "key", "link", "browser",
+                                      "backToArrangement", "position", "overdub", "capture", "sessionRecord", "punch", "draw", "computerKeys",
+                                      "keyMap", "midiMap", "cpu", "more", "sessionView", "arrangementView", "status", "finish" })
+                if (auto* c = ui.toolbarPartForSnapshot (name); c != nullptr && c->isVisible() && c->getParentComponent() == &ui)
+                    report << "  " << name << " " << c->getBounds().toString() << "\n";
+        };
+        const std::pair<int, int> sizes[] { { 1920, 1080 }, { 1366, 768 }, { 1280, 800 } };
+
+        // a song with a few tracks for the Simple layout (voice, instrument, drums), as --simpleshot makes them
+        offline.editSong ([] (lynx::Song& s) {
+            namespace st = lynx::simpletracks;
+            st::Request q;
+            q.kind = st::Kind::voice;
+            q.name = "Lead vocal";
+            st::addTrack (s, q);
+            q = {};
+            q.kind = st::Kind::instrument;
+            q.name = "Keys";
+            lynx::ChannelDef keys;
+            keys.instrument = lynx::InstrumentKind::synth;
+            q.channel = keys;
+            st::addTrack (s, q);
+            q = {};
+            q.kind = st::Kind::drums;
+            q.name = "Drums";
+            st::addTrack (s, q);
+            s.bpm = 120.0;
+        }, false);
+        offline.dispatchPendingMessages();
+
+        // 1. Pattern: FL's toolbar (it must stay as it was: compare with the base build's)
+        ui.selectTabForSnapshot (2);
+        for (const auto& [w, h] : sizes)
+        {
+            ui.setSize (w, h);
+            write (lynx::shot::snapshot (ui, bar()), "pattern-bar-" + juce::String (w));
+        }
+        ui.setSize (1920, 1080);
+
+        // 2. Simple
+        ui.setLayoutStyle (lynx::layoutstyle::Style::simple, false);
+        offline.dispatchPendingMessages();
+        for (const auto& [w, h] : sizes)
+        {
+            ui.setSize (w, h);
+            offline.dispatchPendingMessages();
+            write (lynx::shot::snapshot (ui), "simple-" + juce::String (w));
+            write (lynx::shot::snapshot (ui, bar()), "simple-bar-" + juce::String (w));
+            describe ("simple " + juce::String (w));
+        }
+        ui.setSize (1920, 1080);
+        auto* play = dynamic_cast<juce::Button*> (ui.toolbarPartForSnapshot ("play"));
+        auto* stop = dynamic_cast<juce::Button*> (ui.toolbarPartForSnapshot ("stop"));
+        auto* rec = dynamic_cast<juce::Button*> (ui.toolbarPartForSnapshot ("record"));
+        const auto capsuleArea = [&] {
+            juce::Rectangle<int> r;
+            for (const auto* name : { "play", "stop", "record", "position", "metronome", "tempo", "signature", "key" })
+                if (auto* c = ui.toolbarPartForSnapshot (name); c != nullptr && c->isVisible())
+                    r = r.isEmpty() ? c->getBounds() : r.getUnion (c->getBounds());
+            return r.expanded (8, 10);
+        };
+        if (play != nullptr && stop != nullptr && rec != nullptr)
+        {
+            write (lynx::shot::snapshot (ui, capsuleArea()), "simple-transport-idle");
+            play->setState (juce::Button::buttonOver);
+            write (lynx::shot::snapshot (ui, capsuleArea()), "simple-transport-hover");
+            play->setState (juce::Button::buttonDown);
+            write (lynx::shot::snapshot (ui, capsuleArea()), "simple-transport-pressed");
+            play->setState (juce::Button::buttonNormal);
+            play->setToggleState (true, juce::dontSendNotification);
+            write (lynx::shot::snapshot (ui, capsuleArea()), "simple-transport-playing");
+            rec->setToggleState (true, juce::dontSendNotification);
+            write (lynx::shot::snapshot (ui, capsuleArea()), "simple-transport-recording");
+            play->setToggleState (false, juce::dontSendNotification);
+            rec->setToggleState (false, juce::dontSendNotification);
+        }
+        if (auto* status = ui.toolbarPartForSnapshot ("status"))
+        {
+            using S = lynx::toolbarlayout::SaveState;
+            int n = 0;
+            for (const auto state : { S::fresh, S::unsaved, S::backedUp, S::saved })
+            {
+                ui.setSaveStatusForSnapshot (state);
+                auto r = status->getBounds();
+                if (auto* finish = ui.toolbarPartForSnapshot ("finish"); finish != nullptr && finish->isVisible())
+                    r = r.getUnion (finish->getBounds());
+                write (lynx::shot::snapshot (ui, r.expanded (8, 10)), "simple-status-" + juce::String (n++));
+            }
+        }
+        {
+            auto more = ui.makeToolbarMoreMenuForSnapshot();
+            saveMenus (juce::StringArray { "More" }, std::vector<juce::PopupMenu> { more }, prefix + "-simple-more-menu.png");
+        }
+
+        // 3. Clip-launch: Live's control bar (the Live demo set when given, else an empty grid)
+        if (projectPath.isNotEmpty())
+        {
+            ui.openFile (juce::File (projectPath));
+            offline.dispatchPendingMessages();
+        }
+        ui.setLayoutStyle (lynx::layoutstyle::Style::clipLaunch, false);
+        offline.dispatchPendingMessages();
+        ui.setClipGridView (lynx::PlaylistArea::GridView::grid);
+        for (const auto& [w, h] : sizes)
+        {
+            ui.setSize (w, h);
+            offline.dispatchPendingMessages();
+            write (lynx::shot::snapshot (ui), "live-" + juce::String (w));
+            write (lynx::shot::snapshot (ui, bar()), "live-bar-" + juce::String (w));
+            describe ("clip-launch " + juce::String (w));
+        }
+        ui.setSize (1920, 1080);
+        ui.setClipGridView (lynx::PlaylistArea::GridView::song);
+        write (lynx::shot::snapshot (ui), "live-arrangement-1920");
+        ui.setClipGridView (lynx::PlaylistArea::GridView::beside);
+        write (lynx::shot::snapshot (ui), "live-both-1920");
+        ui.setClipGridView (lynx::PlaylistArea::GridView::grid);
+        // every control-bar button idle / hover / pressed / lit, all at once per picture
+        std::vector<juce::Button*> buttons;
+        for (const auto* name : { "play", "stop", "record", "metronome", "tap", "browser", "backToArrangement", "overdub", "capture", "sessionRecord", "punch",
+                                  "draw", "computerKeys", "keyMap", "midiMap", "more", "sessionView", "arrangementView" })
+            if (auto* b = dynamic_cast<juce::Button*> (ui.toolbarPartForSnapshot (name)); b != nullptr && b->isVisible())
+                buttons.push_back (b);
+        std::vector<bool> lit;
+        for (auto* b : buttons)
+            lit.push_back (b->getToggleState());
+        const auto controlBar = ui.getLocalBounds().withTrimmedTop (lynx::toolbarlayout::livebar::menuRow).withHeight (lynx::toolbarlayout::livebar::band);
+        write (lynx::shot::snapshot (ui, controlBar), "live-states-idle");
+        for (const auto& [state, name] : { std::pair<juce::Button::ButtonState, const char*> { juce::Button::buttonOver, "hover" }, { juce::Button::buttonDown, "pressed" } })
+        {
+            for (auto* b : buttons)
+                b->setState (state);
+            write (lynx::shot::snapshot (ui, controlBar), juce::String ("live-states-") + name);
+        }
+        for (auto* b : buttons)
+        {
+            b->setState (juce::Button::buttonNormal);
+            b->setToggleState (true, juce::dontSendNotification);
+        }
+        write (lynx::shot::snapshot (ui, controlBar), "live-states-lit");
+        for (std::size_t k = 0; k < buttons.size(); ++k)
+            buttons[k]->setToggleState (lit[k], juce::dontSendNotification);
+        {
+            auto more = ui.makeToolbarMoreMenuForSnapshot();
+            saveMenus (juce::StringArray { "More" }, std::vector<juce::PopupMenu> { more }, prefix + "-live-more-menu.png");
+        }
+        // the Session button row kept as an option
+        ui.setSessionButtonRowShown (true);
+        write (lynx::shot::snapshot (ui), "live-buttonrow-1920");
+        ui.setSessionButtonRowShown (false);
+
+        // 4. back to Pattern: FL's toolbar again, as it was
+        ui.setLayoutStyle (lynx::layoutstyle::Style::pattern, false);
+        offline.dispatchPendingMessages();
+        for (const auto& [w, h] : sizes)
+        {
+            ui.setSize (w, h);
+            write (lynx::shot::snapshot (ui, bar()), "pattern-after-bar-" + juce::String (w));
+        }
+        juce::File (prefix + "-report.txt").replaceWithText (report);
+        lynx::ui::motion::enabled() = true;
     }
 
     void runGridShot (const juce::String& prefix, const juce::String& projectPath = {})
@@ -23183,7 +23467,7 @@ private:
         }());
 
         // --- step 5: a voice or a loop (no "Do it for me": a loop is dropped as a user would) ------------------------------
-        stepIs (lynx::tour::loop, "simple.addTrack");
+        stepIs (lynx::tour::loop, "simple.dropLane"); // (round 190jc, SG-18: it rang "+ Add track")
         window ("step5-loop", true);
         {
             const auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("lynx-190dv-loops");
@@ -24240,6 +24524,303 @@ private:
         shots ("picker-plugins");
         line (report.contains ("ERROR ") ? "RESULT ERROR" : "RESULT OK");
         juce::File (prefix + "-report.txt").replaceWithText (report);
+    }
+
+    // LYNX --simple190jcshot prefix (round 190jc, design190ia slices 5, 14, 15, 22, 24 + Large controls): the Simple
+    // layout's tracks (only real rows, the round "+", M S, type icons, the track-colour volume and clips; muted, soloed,
+    // selected), the drop lane idle and lit, the dock (close X, icon tabs, a lone tab, the sound picker, the keyboard's
+    // keycaps and octave capsule, effect cards), the pads in all 8 colours (label contrast measured), the chooser,
+    // starter beats, Finish, the tour card beside its ring with the beacon (Animations on / off), and Large controls;
+    // windows at 1x and 2x, and a text report of the checks
+    void runSimple190jcShot (const juce::String& prefix)
+    {
+        namespace st = lynx::simpletracks;
+        namespace sp = lynx::simplepads;
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        lynx::MainComponent ui (offline, false);
+        const auto size = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_SNAPSHOT_SIZE", "1600x900"), "x", "");
+        ui.setSize (juce::jlimit (800, 3840, size[0].getIntValue()), juce::jlimit (450, 2160, size[1].getIntValue()));
+        ui.setVisible (true);
+        const auto writeImage = [&prefix] (const juce::Image& image, const juce::String& name) {
+            const auto file = juce::File (prefix + "-" + name + ".png");
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (image, out);
+        };
+        juce::String report;
+        const auto line = [&report, &prefix] (const juce::String& text) {
+            report << text << "\n";
+            juce::File (prefix + "-report.txt").replaceWithText (report);
+        };
+        const auto check = [&line] (const juce::String& what, bool ok) { line ((ok ? "OK    " : "ERROR ") + what); };
+        const auto settle = [&] {
+            for (int k = 0; k < 3; ++k)
+                offline.dispatchPendingMessages();
+        };
+        const auto whole = [&] (const juce::String& name, bool twoX = true) {
+            settle();
+            writeImage (ui.createComponentSnapshot (ui.getLocalBounds(), true, 1.0f), name);
+            if (twoX)
+                writeImage (ui.createComponentSnapshot (ui.getLocalBounds(), true, 2.0f), name + "@2x");
+        };
+
+        ui.selectTabForSnapshot (2);
+        ui.setLayoutStyle (lynx::layoutstyle::Style::simple);
+        settle();
+        auto* simple = ui.getSimpleWorkflowForSnapshot();
+        auto& playlist = ui.getPlaylistForSnapshot();
+        if (simple == nullptr)
+        {
+            line ("ERROR no Simple workflow");
+            return;
+        }
+        // an empty project: the drop lane alone, the round "+"
+        offline.setSong ([] {
+            lynx::Song s;
+            s.mixer = lynx::Song::defaultMixer();
+            return s;
+        }());
+        settle();
+        simple->hideChooser();
+        whole ("empty");
+        check ("an empty song shows one row (the drop lane), with the round +", st::rowsShown (offline.getSong(), 500) == 1 && ! playlist.simpleAddButtonForSnapshot().isEmpty());
+
+        // --- sounds ------------------------------------------------------------------------------------------------------
+        const auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("lynx-190jc");
+        dir.deleteRecursively();
+        dir.createDirectory();
+        const auto writeWav = [] (const juce::File& wav, int frames, const std::function<float (int)>& f) {
+            wav.getParentDirectory().createDirectory();
+            juce::AudioBuffer<float> audio (1, frames);
+            for (int i = 0; i < frames; ++i)
+                audio.setSample (0, i, f (i));
+            juce::WavAudioFormat format;
+            std::unique_ptr<juce::OutputStream> out (wav.createOutputStream().release());
+            if (auto* w = format.createWriterFor (out.get(), 48000.0, 1, 16, {}, 0))
+            {
+                out.release();
+                std::unique_ptr<juce::AudioFormatWriter> writer (w);
+                writer->writeFromAudioSampleBuffer (audio, 0, frames);
+            }
+            return wav;
+        };
+        const auto pi = juce::MathConstants<double>::pi;
+        juce::Random rnd (190);
+        const auto loop = writeWav (dir.getChildFile ("Vocal chop 100.wav"), 230400, [pi] (int i) {
+            const auto t = i / 48000.0, inBeat = std::fmod (t, 0.6);
+            return (float) (0.7 * std::exp (-inBeat * 5.0) * std::sin (2.0 * pi * 220.0 * t + 1.5 * std::sin (2.0 * pi * 440.0 * t)));
+        });
+        std::vector<juce::File> padSounds;
+        const char* padNames[] { "Kick", "Snare", "Hat", "Clap", "Chord stab", "Vox hey", "Perc", "Bass hit" };
+        for (int k = 0; k < 8; ++k)
+            padSounds.push_back (writeWav (dir.getChildFile (juce::String ("pads/") + padNames[k] + ".wav"), 12000 + 3000 * k, [&rnd, k] (int i) {
+                return (float) ((rnd.nextFloat() * 2.0f - 1.0f) * 0.6f * std::exp (-i / (600.0f + 500.0f * (float) k)));
+            }));
+
+        // --- tracks: a voice with a loop, keys with chords, drums, a bass take, a Sampler track --------------------------------
+        int vocal = -1, keys = -1, drums = -1, bass = -1;
+        offline.editSong ([&] (lynx::Song& s) {
+            st::Request q;
+            q.kind = st::Kind::audio;
+            q.name = "Vocal chop";
+            q.audioFile = loop.getFullPathName().toStdString();
+            q.audioLength = 8 * lynx::ppq;
+            q.audioBeats = 8.0f;
+            vocal = st::addTrack (s, q).track;
+            q = {};
+            q.kind = st::Kind::instrument;
+            q.name = "Keys";
+            lynx::ChannelDef synth;
+            synth.instrument = lynx::InstrumentKind::synth;
+            q.channel = synth;
+            lynx::Pattern chords;
+            for (int i = 0; i < 4; ++i)
+                for (int k : { 60, 64, 67 })
+                    chords.notes.push_back (lynx::Note { (std::int64_t) i * 4 * lynx::ppq, 4 * lynx::ppq - lynx::ppq / 4, 0, k });
+            q.pattern = chords;
+            const auto r = st::addTrack (s, q);
+            keys = r.track;
+            q = {};
+            q.kind = st::Kind::drums;
+            q.name = "Drums";
+            for (auto kind : { lynx::InstrumentKind::kick, lynx::InstrumentKind::snare, lynx::InstrumentKind::hat })
+            {
+                lynx::ChannelDef c;
+                c.instrument = kind;
+                q.kit.push_back (c);
+            }
+            lynx::Pattern beat;
+            for (int step = 0; step < 16; step += 2)
+                beat.notes.push_back (lynx::Note { (std::int64_t) step * lynx::ticksPerStep, lynx::ticksPerStep, 2, 60 });
+            for (int step : { 0, 8 })
+                beat.notes.push_back (lynx::Note { (std::int64_t) step * lynx::ticksPerStep, lynx::ticksPerStep, 0, 60 });
+            q.pattern = beat;
+            q.fillBars = 4;
+            const auto d = st::addTrack (s, q);
+            drums = d.track;
+            q = {};
+            q.kind = st::Kind::bass;
+            q.name = "Bass";
+            bass = st::addTrack (s, q).track;
+            if (r.insert > 0)
+            {
+                s.mixer[(std::size_t) r.insert].volume = 0.55f;
+                s.mixer[(std::size_t) r.insert].pan = -0.4f;
+                s.mixer[(std::size_t) r.insert].solo = true;
+            }
+            if (d.insert > 0)
+                s.mixer[(std::size_t) d.insert].muted = true;
+        });
+        settle();
+        check ("the Sampler tile's track was added", simple->addPads());
+        settle();
+        const auto& song = offline.getSong();
+        int pads = -1;
+        for (int t = 0; t < (int) song.playlistTracks.size() && pads < 0; ++t)
+            if (st::kindOf (song, t) == st::Kind::pads)
+                pads = t;
+        lynx::ui::WaveformCache::getInstance()->find (loop.getFullPathName(), [&offline, &loop] { return offline.getSampleLibrary().load (loop.getFullPathName()); });
+        lynx::ui::WaveformCache::getInstance()->waitUntilIdle (30000);
+        simple->hideChooser();
+        playlist.selectTrack (keys);
+        settle();
+        const auto rows = st::rowsShown (song, 500);
+        line ("tracks: vocal " + juce::String (vocal) + " keys " + juce::String (keys) + " drums " + juce::String (drums) + " bass " + juce::String (bass)
+              + " pads " + juce::String (pads) + "; rows shown " + juce::String (rows));
+        check ("five tracks + the drop lane are the rows shown (no placeholder rows)", rows == 6);
+        whole ("tracks");
+        {
+            // the Simple Playlist's whole paint (its rows only, no placeholder rows): CPU ms per frame
+            juce::Image img (juce::Image::ARGB, juce::jmax (1, playlist.getWidth()), juce::jmax (1, playlist.getHeight()), true);
+            std::vector<double> ms;
+            for (int f = -3; f < 40; ++f)
+            {
+                const auto t0 = lynx::threadCpuSeconds();
+                {
+                    juce::Graphics g (img);
+                    playlist.paintEntireComponent (g, true);
+                }
+                if (f >= 0)
+                    ms.push_back (1000.0 * (lynx::threadCpuSeconds() - t0));
+            }
+            std::sort (ms.begin(), ms.end());
+            line ("simple playlist " + juce::String (playlist.getWidth()) + "x" + juce::String (playlist.getHeight()) + " whole paint: median "
+                  + juce::String (ms[ms.size() / 2], 3) + " ms, p90 " + juce::String (ms[ms.size() * 9 / 10], 3) + " ms");
+        }
+        playlist.setDropLaneHotForSnapshot (true);
+        whole ("droplane-hot", false);
+        playlist.setDropLaneHotForSnapshot (false);
+
+        // --- the dock ------------------------------------------------------------------------------------------------------
+        auto* dock = simple->dockForSnapshot();
+        if (dock == nullptr)
+        {
+            line ("ERROR no dock");
+            return;
+        }
+        const auto dockShots = [&] (const juce::String& name) {
+            settle();
+            for (float scale : { 1.0f, 2.0f })
+                writeImage (dock->createComponentSnapshot (dock->getLocalBounds(), true, scale), "dock-" + name + (scale > 1.0f ? "@2x" : ""));
+        };
+        simple->trackSelected (keys);
+        dock->setTab (lynx::SimpleDock::Tab::instrument);
+        dockShots ("instrument");
+        whole ("window-dock-instrument", false);
+        dock->showKeyboard();
+        dockShots ("keyboard");
+        simple->trackSelected (vocal);
+        settle();
+        check ("an audio track's dock has one tab (drawn as a title)", dock->getTab() == lynx::SimpleDock::Tab::effects);
+        dockShots ("audio-lone-tab");
+        simple->showEffectsOfInsert (st::insertOf (offline.getSong(), keys));
+        dock->addOneKnobForCheck (1);
+        dock->addOneKnobForCheck (2);
+        dockShots ("effects");
+
+        // --- pads: 8 sounds in the 8 colours --------------------------------------------------------------------------------
+        if (pads >= 0)
+        {
+            simple->trackSelected (pads);
+            settle();
+            for (int p = 0; p < 8; ++p)
+                dock->padsLoadForCheck (p, padSounds[(std::size_t) p]);
+            offline.editSong ([pads] (lynx::Song& s) {
+                for (int p = 0; p < 8; ++p)
+                    if (const auto c = sp::padChannel (s, pads, p); c >= 0)
+                        s.channels[(std::size_t) c].simplePad.colour = (std::uint8_t) (p + 1);
+            });
+            dock->padsSelectForCheck (4);
+            dock->padsUpdateForCheck();
+            dockShots ("pads");
+            dock->padsHitForCheck (2);
+            dockShots ("pads-hit");
+            whole ("window-pads", false);
+            // the labels' contrast on the 8 colours, unlit and lit (the same colours the page draws)
+            static const juce::uint32 palette[] { 0xffe5383b, 0xffe8833a, 0xffe2c044, 0xff5fbf6a, 0xff3fb6b0, 0xff4f8ee0, 0xff9a6fe0, 0xffe06aa8 };
+            float worst = 99.0f;
+            for (auto argb : palette)
+                for (bool lit : { false, true })
+                {
+                    const auto fill = juce::Colour (argb).withMultipliedBrightness (lit ? 1.0f : 0.55f).withMultipliedSaturation (lit ? 1.0f : 0.8f);
+                    const auto ratio = lynx::ui::simplelook::contrast (lynx::ui::simplelook::inkOn (fill), fill);
+                    worst = juce::jmin (worst, ratio);
+                    line ("pad " + juce::String::toHexString ((int) argb).substring (2) + (lit ? " lit  " : " unlit") + ": label " + juce::String (ratio, 2) + ":1");
+                }
+            check ("pad labels >= 4.5:1 on all 8 colours, lit and unlit (worst " + juce::String (worst, 2) + ":1)", worst >= 4.5f);
+        }
+
+        // --- chooser, starters, Finish ---------------------------------------------------------------------------------------
+        simple->showChooser();
+        whole ("chooser");
+        simple->showStarterPageForSnapshot();
+        whole ("starters");
+        simple->hideChooser();
+        simple->showFinish();
+        whole ("finish");
+        simple->hideFinish();
+
+        // --- the tour: the card beside its ring, the beacon with Animations on and off -----------------------------------------
+        if (auto* tour = simple->tourForSnapshot())
+        {
+            simple->showWelcome();
+            settle();
+            tour->clickForSnapshot ("welcome.tour");
+            settle();
+            const auto ring = tour->ringForSnapshot();
+            const auto card = tour->cardBoundsForSnapshot();
+            const auto distance = juce::jmax (0, juce::jmax (card.getY() - ring.getBottom(), ring.getY() - card.getBottom()))
+                                  + juce::jmax (0, juce::jmax (card.getX() - ring.getRight(), ring.getX() - card.getRight()));
+            line ("tour step 1: ring " + ring.toString() + " card " + card.toString() + " gap " + juce::String (distance) + " px");
+            check ("the card sits beside its ring (<= 24 px)", ! ring.isEmpty() && distance <= 24 && ! card.intersects (ring));
+            check ("the beacon pulses after a step change (Animations on)", tour->pulsingForCheck());
+            tour->setPulseForSnapshot (0.5f);
+            whole ("tour-pulse-on", false);
+            lynx::ui::motion::enabled() = false;
+            tour->clickForSnapshot ("next");
+            settle();
+            check ("no pulse timer with Animations off", ! tour->pulsingForCheck());
+            tour->setPulseForSnapshot (0.0f);
+            whole ("tour-pulse-off", false);
+            lynx::ui::motion::enabled() = true;
+            tour->clickForSnapshot ("skip");
+            settle();
+        }
+
+        // --- Large controls ---------------------------------------------------------------------------------------------------
+        ui.setSimpleLargeControls (true);
+        simple->hideChooser();
+        playlist.selectTrack (keys);
+        settle();
+        whole ("large-tracks", false);
+        if (pads >= 0)
+        {
+            simple->trackSelected (pads);
+            dockShots ("large-pads");
+        }
+        ui.setSimpleLargeControls (false);
+        line ("done");
     }
 
     void runSimpleShot (const juce::String& prefix)
@@ -26417,6 +26998,718 @@ private:
         offline.editSong ([&] (lynx::Song& s) { lynx::warpmodes::setMode (s, channelOf (0), (int) lynx::StretchMethod::complex); }, false);
         offline.dispatchPendingMessages();
         check ("05 Complex panel (no settings row)", shoot ("05-complex"));
+        juce::File (prefix + "-checks.txt").replaceWithText (checks);
+    }
+
+    // LYNX --capfix190jjshot prefix project.flp set.als: round 190jj off screen (capture190ji's "Change in LYNX" lines) —
+    // the Simple capsule idle / playing / count-in / recording with the master meter, the pads at rest and pressed, the
+    // keys held in the track's colour, the drop lane's ghosts; Live's control bar idle / playing / recording / punch;
+    // FL's C-11 picker drop ghost with the drag image, the drop, and the picker's playing mark; prefix-checks.txt
+    void runCapfix190jjShot (const juce::String& prefix, const juce::String& project, const juce::String& set)
+    {
+        namespace st = lynx::simpletracks;
+        namespace sp = lynx::simplepads;
+        using Look = lynx::toolbarlayout::Look;
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        const juce::ScopedValueSetter<bool> shown (lynx::ui::showingForShots(), true);
+        juce::String checks;
+        const auto flush = [&] { juce::File (lynx::shot::file (juce::File (prefix + "-checks.txt"))).replaceWithText (checks); };
+        const auto check = [&] (const juce::String& what, bool ok) { checks << (ok ? "ok   " : "FAIL ") << what << "\n"; flush(); };
+        const auto line = [&] (const juce::String& what) { checks << "     " << what << "\n"; flush(); };
+        const auto write = [&prefix] (juce::Component& c, const juce::String& name) { savePng (lynx::shot::snapshot (c), prefix + "-" + name + ".png"); };
+        const auto area = [&prefix] (juce::Component& c, juce::Rectangle<int> r, const juce::String& name) { saveArea (c, r, prefix + "-" + name + ".png"); };
+        const auto size = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_SNAPSHOT_SIZE", "1920x1080"), "x", "");
+        const auto w = juce::jlimit (800, 3840, size[0].getIntValue()), h = juce::jlimit (450, 2160, size[1].getIntValue());
+
+        // ---- A. Simple ----------------------------------------------------------------------------------------------------
+        {
+            lynx::AudioEngine offline (false);
+            lynx::MainComponent ui (offline, false);
+            ui.setSize (w, h);
+            const auto settle = [&] {
+                for (int k = 0; k < 3; ++k)
+                    offline.dispatchPendingMessages();
+            };
+            ui.selectTabForSnapshot (2);
+            ui.setLayoutStyle (lynx::layoutstyle::Style::simple);
+            settle();
+            auto* simple = ui.getSimpleWorkflowForSnapshot();
+            auto& playlist = ui.getPlaylistForSnapshot();
+            if (simple == nullptr)
+            {
+                check ("a Simple workflow", false);
+                return;
+            }
+            offline.setSong ([] {
+                lynx::Song s;
+                s.mixer = lynx::Song::defaultMixer();
+                s.bpm = 120.0;
+                return s;
+            }());
+            settle();
+            simple->hideChooser();
+
+            const auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("lynx-190jj");
+            dir.deleteRecursively();
+            dir.createDirectory();
+            const auto writeWav = [] (const juce::File& wav, int frames, const std::function<float (int)>& f) {
+                wav.getParentDirectory().createDirectory();
+                juce::AudioBuffer<float> audio (1, frames);
+                for (int i = 0; i < frames; ++i)
+                    audio.setSample (0, i, f (i));
+                juce::WavAudioFormat format;
+                std::unique_ptr<juce::OutputStream> out (wav.createOutputStream().release());
+                if (auto* wr = format.createWriterFor (out.get(), 48000.0, 1, 16, {}, 0))
+                {
+                    out.release();
+                    std::unique_ptr<juce::AudioFormatWriter> writer (wr);
+                    writer->writeFromAudioSampleBuffer (audio, 0, frames);
+                }
+                return wav;
+            };
+            const auto pi = juce::MathConstants<double>::pi;
+            juce::Random rnd (190);
+            // a 4-bar loop at 120 bpm (8 s), as BandLab's "TRAP_160_Piano1_Bm_4bars" is four bars
+            const auto loop = writeWav (dir.getChildFile ("TRAP_120_Piano1_Bm_4bars.wav"), 384000, [pi] (int i) {
+                const auto t = i / 48000.0, inBeat = std::fmod (t, 0.5);
+                return (float) (0.6 * std::exp (-inBeat * 6.0) * std::sin (2.0 * pi * 247.0 * t));
+            });
+            std::vector<juce::File> padSounds;
+            const char* padNames[] { "Kick", "Snare", "Hat", "Clap", "Stab", "Vox", "Perc", "Bass" };
+            for (int k = 0; k < 8; ++k)
+                padSounds.push_back (writeWav (dir.getChildFile (juce::String ("pads/") + padNames[k] + ".wav"), 12000 + 3000 * k, [&rnd, k] (int i) {
+                    return (float) ((rnd.nextFloat() * 2.0f - 1.0f) * 0.6f * std::exp (-i / (600.0f + 500.0f * (float) k)));
+                }));
+            int vocal = -1, keys = -1;
+            offline.editSong ([&] (lynx::Song& s) {
+                st::Request q;
+                q.kind = st::Kind::audio;
+                q.name = "Piano loop";
+                q.audioFile = loop.getFullPathName().toStdString();
+                q.audioLength = 16 * lynx::ppq;
+                q.audioBeats = 16.0f;
+                vocal = st::addTrack (s, q).track;
+                q = {};
+                q.kind = st::Kind::instrument;
+                q.name = "Instrument";
+                lynx::ChannelDef synth;
+                synth.instrument = lynx::InstrumentKind::synth;
+                q.channel = synth;
+                keys = st::addTrack (s, q).track;
+            });
+            settle();
+            check ("the Sampler (pads) track was added", simple->addPads());
+            settle();
+            const auto& song = offline.getSong();
+            int pads = -1;
+            for (int t = 0; t < (int) song.playlistTracks.size() && pads < 0; ++t)
+                if (st::kindOf (song, t) == st::Kind::pads)
+                    pads = t;
+            simple->hideChooser();
+            playlist.selectTrack (keys);
+            settle();
+
+            // 1. the transport capsule (+ tempo, key, master) in its four states
+            const auto bar = [&ui] {
+                juce::Rectangle<int> r;
+                for (const auto* name : { "play", "stop", "record", "position", "metronome", "tempo", "signature", "key", "masterVolume", "masterPitch" })
+                    if (auto* c = ui.toolbarPartForSnapshot (name); c != nullptr && c->isVisible())
+                        r = r.isEmpty() ? c->getBounds() : r.getUnion (c->getBounds());
+                return r.expanded (8, 6);
+            };
+            auto& transport = offline.getTransport();
+            auto* tempo = ui.toolbarPartForSnapshot ("tempo");
+            auto* stopButton = dynamic_cast<lynx::IconButton*> (ui.toolbarPartForSnapshot ("stop"));
+            auto* playButton = dynamic_cast<lynx::IconButton*> (ui.toolbarPartForSnapshot ("play"));
+            auto* master = dynamic_cast<lynx::toolbar::MasterKnob*> (ui.toolbarPartForSnapshot ("masterVolume"));
+            ui.transportTickForSnapshot();
+            area (ui, bar(), "simple-bar-idle");
+            check ("idle: Play shows Play, the second button Back-to-start", playButton != nullptr && playButton->getIcon() == lynx::Icon::play
+                                                                                && stopButton != nullptr && stopButton->getIcon() == lynx::Icon::toStart);
+            transport.positionTicks.store ((double) (2 * song.barTicks()) + 0.3 * lynx::ppq);
+            transport.playing.store (true);
+            if (master != nullptr)
+                master->meterForSnapshot ({ 0.62f, 0.57f });
+            ui.transportTickForSnapshot();
+            area (ui, bar(), "simple-bar-playing");
+            check ("playing: Pause and Stop (BandLab)", playButton != nullptr && playButton->getIcon() == lynx::Icon::pause && stopButton->getIcon() == lynx::Icon::stop);
+            transport.playing.store (false);
+            transport.positionTicks.store (0.0);
+            offline.setRecording (true);
+            transport.countIn.store (0.85 * (double) song.barTicks()); // (-1.7 s of a 2 s bar at 120 bpm)
+            ui.transportTickForSnapshot();
+            area (ui, bar(), "simple-bar-countin");
+            check ("count-in: tempo greyed, Pause shown", tempo != nullptr && ! tempo->isEnabled() && playButton->getIcon() == lynx::Icon::pause);
+            transport.countIn.store (0.0);
+            transport.playing.store (true);
+            transport.positionTicks.store (0.45 * (double) song.barTicks());
+            ui.transportTickForSnapshot();
+            area (ui, bar(), "simple-bar-recording");
+            line ("record start kept: " + juce::String (ui.simpleRecordStartForCheck(), 1) + " ticks");
+            check ("recording: the take's start is kept (the count-in's target, 0)", ui.simpleRecordStartForCheck() == 0.0);
+            auto* rec = dynamic_cast<juce::Button*> (ui.toolbarPartForSnapshot ("record"));
+            const auto litA = rec != nullptr && rec->getToggleState();
+            juce::Thread::sleep (260);
+            ui.transportTickForSnapshot();
+            const auto litB = rec != nullptr && rec->getToggleState();
+            check ("recording: Record steady (lit 260 ms apart, no blink in Simple)", litA && litB);
+            transport.seekRequest.store (-1.0);
+            ui.stopForCheck();
+            line ("seek after Stop: " + juce::String (transport.seekRequest.load(), 1));
+            check ("Stop after a take goes back to where it started", transport.seekRequest.load() == 0.0);
+            offline.setRecording (false);
+            transport.playing.store (false);
+            ui.transportTickForSnapshot();
+            check ("stopped: tempo enabled again", tempo != nullptr && tempo->isEnabled());
+            if (master != nullptr)
+            {
+                area (ui, master->getBounds().expanded (6, 4), "simple-master-idle");
+                master->meterForSnapshot ({ 0.62f, 0.57f });
+                area (ui, master->getBounds().expanded (6, 4), "simple-master-playing");
+                master->meterForSnapshot ({ 0.0f, 0.0f });
+            }
+
+            // 2. the dock: pads at rest and pressed, keys held
+            if (auto* dock = simple->dockForSnapshot(); dock != nullptr && pads >= 0)
+            {
+                simple->trackSelected (pads);
+                settle();
+                for (int p = 0; p < 8; ++p)
+                    dock->padsLoadForCheck (p, padSounds[(std::size_t) p]);
+                offline.editSong ([pads] (lynx::Song& s) {
+                    for (int p = 0; p < 8; ++p)
+                        if (const auto c = sp::padChannel (s, pads, p); c >= 0)
+                            s.channels[(std::size_t) c].simplePad.colour = (std::uint8_t) (p + 1);
+                });
+                dock->padsSelectForCheck (0);
+                dock->padsUpdateForCheck();
+                settle();
+                write (*dock, "dock-pads-rest");
+                dock->padsPressForSnapshot (3, 1.0f);
+                dock->padsPressForSnapshot (5, 0.5f);
+                write (*dock, "dock-pads-pressed");
+                dock->padsPressForSnapshot (3, 0.0f);
+                dock->padsPressForSnapshot (5, 0.0f);
+                simple->trackSelected (keys);
+                settle();
+                dock->showKeyboard();
+                settle();
+                if (auto* kb = dock->keyboardForSnapshot())
+                {
+                    lynx::keyboardPressForSnapshot (*kb);
+                    write (*dock, "dock-keys-held");
+                }
+            }
+
+            // 3. the drop lane while the loop is dragged (the Browser's file drag)
+            simple->hideChooser();
+            playlist.selectTrack (vocal);
+            settle();
+            const auto lane = st::nextEmptyTrack (offline.getSong());
+            const juce::var drag (juce::String ("lynx-arquivo|") + loop.getFullPathName());
+            const auto x = (int) playlist.xOfTickForSnapshot (9.0 * (double) song.barTicks()) + 6;
+            playlist.dragOverForSnapshot (drag, { x, playlist.trackRowForSnapshot (lane).getCentreY() });
+            write (playlist, "simple-drop-lane");
+            check ("over the lane: a ghost, no reason", ! playlist.dropGhostAreaForCheck().isEmpty() && playlist.dropGhostReasonForCheck().isEmpty());
+            playlist.dragOverForSnapshot (drag, { x, playlist.trackRowForSnapshot (vocal).getCentreY() });
+            write (playlist, "simple-drop-audio-track");
+            check ("over an audio track: no reason", playlist.dropGhostReasonForCheck().isEmpty());
+            playlist.dragOverForSnapshot (drag, { x, playlist.trackRowForSnapshot (pads).getCentreY() });
+            write (playlist, "simple-drop-refused");
+            check ("over the Sampler track: red, with the reason", playlist.dropGhostReasonForCheck().isNotEmpty());
+            playlist.dragOverForSnapshot (drag, { x, playlist.trackRowForSnapshot (keys).getCentreY() });
+            check ("over an instrument track: red, with the reason", playlist.dropGhostReasonForCheck().isNotEmpty());
+            playlist.dragOverForSnapshot (drag, { x, playlist.trackRowForSnapshot (lane).getBottom() + 60 });
+            write (playlist, "simple-drop-below");
+            check ("below the lane: only the tag", playlist.dropGhostTagOnlyForCheck());
+            playlist.dragOverForSnapshot ({}, {});
+            check ("after the drag: nothing left to paint", playlist.dropGhostAreaForCheck().isEmpty());
+            const auto clipsBefore = offline.getSong().playlist.size();
+            playlist.filesDropped ({ loop.getFullPathName() }, x, playlist.trackRowForSnapshot (pads).getCentreY());
+            settle();
+            check ("a loop dropped on the Sampler track is refused", offline.getSong().playlist.size() == clipsBefore);
+            write (ui, "simple-window");
+            dir.deleteRecursively();
+        }
+
+        // ---- B. Clip-launch: Live's control bar ----------------------------------------------------------------------------
+        if (set.isNotEmpty())
+        {
+            lynx::AudioEngine offline (false);
+            lynx::MainComponent ui (offline, false);
+            ui.setSize (w, h);
+            ui.openFile (juce::File (set));
+            offline.dispatchPendingMessages();
+            ui.setLayoutStyle (lynx::layoutstyle::Style::clipLaunch, false);
+            offline.dispatchPendingMessages();
+            ui.setClipGridView (lynx::PlaylistArea::GridView::grid);
+            offline.dispatchPendingMessages();
+            const auto centre = [&ui] {
+                juce::Rectangle<int> r;
+                for (const auto* name : { "backToArrangement", "position", "play", "stop", "record", "overdub", "capture", "sessionRecord", "punch" })
+                    if (auto* c = ui.toolbarPartForSnapshot (name); c != nullptr && c->isVisible())
+                        r = r.isEmpty() ? c->getBounds() : r.getUnion (c->getBounds());
+                return r.expanded (8, 8);
+            };
+            auto& transport = offline.getTransport();
+            ui.transportTickForSnapshot();
+            area (ui, centre(), "live-bar-idle");
+            transport.playing.store (true);
+            ui.transportTickForSnapshot();
+            area (ui, centre(), "live-bar-playing");
+            offline.setRecording (true);
+            ui.transportTickForSnapshot();
+            area (ui, centre(), "live-bar-recording");
+            auto* rec = dynamic_cast<juce::Button*> (ui.toolbarPartForSnapshot ("record"));
+            const auto litA = rec != nullptr && rec->getToggleState();
+            juce::Thread::sleep (260);
+            ui.transportTickForSnapshot();
+            check ("Live look: Record steady while recording (no blink)", litA && rec->getToggleState());
+            if (auto* punch = dynamic_cast<juce::Button*> (ui.toolbarPartForSnapshot ("punch")))
+            {
+                punch->setToggleState (true, juce::dontSendNotification);
+                area (ui, centre(), "live-bar-punch-lit");
+                punch->setToggleState (false, juce::dontSendNotification);
+            }
+            offline.setRecording (false);
+            transport.playing.store (false);
+            ui.transportTickForSnapshot();
+        }
+
+        // ---- C. Pattern (FL): C-11 drop ghost + drag image, the drop, the picker's playing mark ----------------------------------
+        if (project.isNotEmpty())
+        {
+            lynx::layoutstyle::setCurrent (lynx::layoutstyle::Style::pattern); // (the style is global: A and B changed it)
+            lynx::AudioEngine offline (false);
+            lynx::MainComponent ui (offline, false);
+            ui.setSize (w, h);
+            ui.openFile (juce::File (project));
+            offline.dispatchPendingMessages();
+            ui.setLayoutStyle (lynx::layoutstyle::Style::pattern, false);
+            ui.selectTabForSnapshot (2);
+            offline.dispatchPendingMessages();
+            auto& playlist = ui.getPlaylistForSnapshot();
+            auto& picker = ui.getPickerForSnapshot();
+            const auto& song = offline.getSong();
+            write (playlist, "warmup");
+            lynx::ui::WaveformCache::getInstance()->waitUntilIdle (60000);
+            offline.dispatchPendingMessages();
+            juce::File (lynx::shot::file (juce::File (prefix + "-warmup.png"))).deleteFile();
+            int synthBass = 0;
+            for (int p = 0; p < (int) song.patterns.size(); ++p)
+                if (juce::String::fromUTF8 (song.patterns[(std::size_t) p].name.c_str()).equalsIgnoreCase ("Synth Bass"))
+                {
+                    synthBass = p;
+                    break;
+                }
+            // an empty track low in the view (FL's capture: Track 43 / 47, past the song's tracks)
+            // (an unnamed track past the song's own, as FL's Track 43 / 47)
+            const auto target = (int) song.playlistTracks.size() + 2;
+            for (int first = juce::jmax (0, target - 30); first <= target; ++first) // (the row in the lower part of the view)
+            {
+                playlist.setViewForSnapshot (15.6, 0, first);
+                if (playlist.trackRowForSnapshot (target).getBottom() < playlist.getHeight() - 40)
+                    break;
+            }
+            offline.dispatchPendingMessages();
+            const auto row = playlist.trackRowForSnapshot (target);
+            const auto mouse = juce::Point<int> ((int) playlist.xOfTickForSnapshot (9.1 * (double) song.barTicks()), row.getCentreY());
+            const juce::var drag (lynx::PlaylistComponent::pickerDragDescription (lynx::ClipKind::pattern, { synthBass }));
+            playlist.dragOverForSnapshot (drag, mouse);
+            {
+                // the window as the drag shows it: the ghost in the row, the entry's picture below right of the mouse
+                auto image = lynx::shot::snapshot (ui);
+                const auto scale = (float) image.getWidth() / (float) juce::jmax (1, ui.getWidth());
+                const auto listRow = picker.listRowOfPattern (synthBass);
+                if (listRow >= 0)
+                {
+                    const auto entry = picker.dragImageOf (listRow);
+                    const auto at = ui.getLocalPoint (&playlist, mouse) + lynx::PatternPicker::dragImageOffset();
+                    juce::Graphics g (image);
+                    g.addTransform (juce::AffineTransform::scale (scale));
+                    g.drawImageAt (entry, at.x, at.y);
+                    g.setColour (juce::Colours::white);
+                    juce::Path arrow; // (the mouse pointer, so the pair reads as FL's film still)
+                    arrow.startNewSubPath ((float) ui.getLocalPoint (&playlist, mouse).x, (float) ui.getLocalPoint (&playlist, mouse).y);
+                    arrow.lineTo (arrow.getCurrentPosition() + juce::Point<float> (0.0f, 16.0f));
+                    arrow.lineTo (arrow.getCurrentPosition() + juce::Point<float> (4.0f, -4.0f));
+                    arrow.lineTo (arrow.getCurrentPosition() + juce::Point<float> (7.0f, 0.0f));
+                    arrow.closeSubPath();
+                    g.fillPath (arrow);
+                    g.setColour (juce::Colours::black);
+                    g.strokePath (arrow, juce::PathStrokeType (1.0f));
+                }
+                savePng (image, prefix + "-fl-c11-drag.png");
+            }
+            const auto ghost = playlist.dropGhostAreaForCheck();
+            line ("ghost " + ghost.toString() + ", row " + row.toString() + ", mouse " + mouse.toString());
+            check ("C-11: the ghost lies in the row under the mouse", ! ghost.isEmpty() && ghost.getY() >= row.getY() - 2 && ghost.getBottom() <= row.getBottom() + 2);
+            const auto first = (int) offline.getSong().playlist.size();
+            playlist.dropForSnapshot (drag, mouse);
+            offline.dispatchPendingMessages();
+            const auto& dropped = offline.getSong(); // (an edit publishes a new Song: read it again; the Playlist sorts its clips)
+            int onRow = 0, at = -1;
+            for (int c = 0; c < (int) dropped.playlist.size(); ++c)
+                if (dropped.playlist[(std::size_t) c].track == target)
+                {
+                    ++onRow;
+                    at = c;
+                }
+            line ("clips " + juce::String (first) + " -> " + juce::String ((int) dropped.playlist.size()) + ", on the row " + juce::String (onRow));
+            check ("C-11: the drop places one clip on the row", (int) dropped.playlist.size() == first + 1 && onRow == 1);
+            check ("C-11: the dropped clip is selected", at >= 0 && playlist.isClipSelectedForCheck (at));
+            check ("C-11: nothing of the ghost is left", playlist.dropGhostAreaForCheck().isEmpty());
+            write (ui, "fl-c11-dropped");
+
+            // the picker's playing mark: Synth Bass plays in the first bars; then another pattern selected
+            offline.getTransport().positionTicks.store (0.5 * (double) offline.getSong().barTicks());
+            offline.getTransport().playing.store (true);
+            offline.getTransport().songMode = true;
+            playlist.frameStepForSnapshot();
+            playlist.frameStepForSnapshot();
+            write (picker, "fl-picker-playing");
+            line ("playing patterns: " + juce::String ((int) picker.playingForCheck().size()));
+            const auto other = juce::jmin ((int) offline.getSong().patterns.size() - 1, 7);
+            offline.editSong ([other] (lynx::Song& s) { s.currentPattern = other; }, false);
+            offline.dispatchPendingMessages();
+            playlist.frameStepForSnapshot();
+            write (picker, "fl-picker-playing-other-selected");
+            check ("DC-3: the mark follows what plays, not the selection",
+                   std::find (picker.playingForCheck().begin(), picker.playingForCheck().end(), other) == picker.playingForCheck().end()
+                       || std::count_if (offline.getSong().playlist.begin(), offline.getSong().playlist.end(), [&] (const lynx::Clip& c) {
+                              return c.kind == lynx::ClipKind::pattern && c.pattern == other && (double) c.start <= 0.5 * (double) offline.getSong().barTicks()
+                                     && (double) c.end() > 0.5 * (double) offline.getSong().barTicks();
+                          }) > 0);
+            offline.getTransport().playing.store (false);
+            playlist.frameStepForSnapshot();
+            write (picker, "fl-picker-stopped");
+            check ("DC-3: no mark once stopped", picker.playingForCheck().empty());
+        }
+        line ("done");
+    }
+
+    void runDetails190imShot (const juce::String& prefix, const juce::String& project, const juce::String& set)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        const juce::ScopedValueSetter<bool> shown (lynx::ui::showingForShots(), true); // (the live frame steps run off-screen)
+        juce::String checks;
+        const auto check = [&checks] (const juce::String& what, bool ok) { checks << (ok ? "ok   " : "FAIL ") << what << "\n"; };
+        const auto line = [&checks] (const juce::String& what) { checks << "     " << what << "\n"; };
+        const auto write = [&prefix] (juce::Component& c, const juce::String& name) { savePng (lynx::shot::snapshot (c), prefix + "-" + name + ".png"); };
+        const auto size = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_SNAPSHOT_SIZE", "1920x1080"), "x", "");
+        {
+            // ---- Pattern layout, the FL demo
+            lynx::AudioEngine offline (false);
+            lynx::MainComponent ui (offline, false);
+            ui.setSize (juce::jlimit (800, 3840, size[0].getIntValue()), juce::jlimit (450, 2160, size[1].getIntValue()));
+            if (project.isNotEmpty())
+                ui.openFile (juce::File (project));
+            offline.dispatchPendingMessages();
+            ui.selectTabForSnapshot (2);
+            auto& playlist = ui.getPlaylistForSnapshot();
+            offline.dispatchPendingMessages();
+            const auto settle = [&] {
+                write (playlist, "warmup");
+                lynx::ui::WaveformCache::getInstance()->waitUntilIdle (60000);
+                offline.dispatchPendingMessages();
+                juce::File (prefix + "-warmup.png").deleteFile();
+            };
+            const auto& song = offline.getSong();
+            offline.editSong ([] (lynx::Song& s) { for (auto& t : s.playlistTracks) t.height = 50; }, false);
+            offline.dispatchPendingMessages();
+            const auto toolbar = ui.getToolbarBoundsForSnapshot();
+
+            // R1: the automation clip with the most points in view, its second point dragged, its first segment bent
+            int autoClip = -1;
+            for (int c = 0; c < (int) song.playlist.size(); ++c)
+                if (const auto& clip = song.playlist[(std::size_t) c]; clip.kind == lynx::ClipKind::automation && clip.automation >= 0
+                    && clip.automation < (int) song.automations.size() && song.automations[(std::size_t) clip.automation].points.size() >= 3
+                    && (autoClip < 0 || song.automations[(std::size_t) clip.automation].points.size() > song.automations[(std::size_t) song.playlist[(std::size_t) autoClip].automation].points.size()))
+                    autoClip = c;
+            check ("R1: an automation clip with points in the project", autoClip >= 0);
+            if (autoClip >= 0)
+            {
+                const auto& clip = song.playlist[(std::size_t) autoClip];
+                const auto bar = (int) (clip.start / song.barTicks());
+                playlist.setViewForSnapshot (39.75, juce::jmax (0, bar - 2), juce::jmax (0, clip.track - 3));
+                settle();
+                const auto point = playlist.dragHintForSnapshot (autoClip, 1, false);
+                line ("point drag hint: " + point.text + " | " + point.value);
+                check ("R1: a dragged automation-clip point shows its value (DE-117)", point.value.isNotEmpty());
+                ui.setHintForSnapshot (point);
+                saveArea (ui, toolbar, prefix + "-r1-hint-point.png");
+                write (ui, "r1-window-point");
+                int bent = 0; // (a segment that is bent, when the clip has one)
+                const auto& points = song.automations[(std::size_t) clip.automation].points;
+                for (int k = 0; k + 1 < (int) points.size(); ++k)
+                    if (points[(std::size_t) k].tension != 0.0f)
+                    {
+                        bent = k;
+                        break;
+                    }
+                const auto tension = playlist.dragHintForSnapshot (autoClip, bent, true);
+                line ("tension drag hint: " + tension.text + " | " + tension.value);
+                check ("R1: a bent segment shows its tension (DE-118)", tension.value.startsWith (lynx::tr ("Tension: {0}", { "" }).upToFirstOccurrenceOf (" ", false, false).trimEnd()));
+                ui.setHintForSnapshot (tension);
+                saveArea (ui, toolbar, prefix + "-r1-hint-tension.png");
+                const auto body = playlist.curveBodyForSnapshot (autoClip);
+                const auto hoverX = juce::jlimit (playlist.headerWidthForSnapshot() + 20, playlist.getWidth() - 40, (int) body.getX() + 80);
+                const auto hover = playlist.hintAt ({ hoverX, (int) body.getCentreY() });
+                line ("hover hint: " + hover.text + " | " + hover.value);
+                check ("R1: hovering the curve shows the value at the mouse (DE-119)", hover.value.contains ("  "));
+                ui.setHintForSnapshot (hover);
+                saveArea (ui, toolbar, prefix + "-r1-hint-hover.png");
+            }
+
+            // R5: playing at bar 33 (FL's fl-playing.png), the meters fed so the activity strips show their steps
+            playlist.setViewForSnapshot (39.75, 20, 24);
+            settle();
+            offline.getTransport().positionTicks.store ((double) (32 * song.barTicks()));
+            offline.getTransport().playing.store (true);
+            const auto feed = [&offline] {
+                const float levels[] { 1.0f, 0.3f, 0.08f, 0.02f };
+                for (int k = 1; k < lynx::maxMixerTracks; ++k)
+                    offline.getMeters().accumulate (k, levels[k % 4], levels[k % 4]);
+            };
+            feed();
+            playlist.frameStepForSnapshot();
+            feed();
+            playlist.frameStepForSnapshot();
+            write (ui, "r5-playing");
+            write (ui.getPickerForSnapshot(), "r5-picker-playing");
+            const auto px = (int) playlist.xOfTickForSnapshot (32.0 * (double) song.barTicks());
+            saveArea (playlist, { px - 40, lynx::PlaylistComponent::headerHeight, 60, 120 }, prefix + "-r5-playhead.png");
+            saveArea (playlist, { 0, lynx::PlaylistComponent::toolbarHeight, playlist.getWidth(), lynx::PlaylistComponent::overviewHeight }, prefix + "-r5-overview.png");
+            saveArea (playlist, { 0, lynx::PlaylistComponent::headerHeight, playlist.headerWidthForSnapshot() + 4, playlist.getHeight() - lynx::PlaylistComponent::headerHeight }, prefix + "-r5-headers.png");
+            lynx::ui::motion::enabled() = false;
+            playlist.frameStepForSnapshot();
+            saveArea (playlist, { px - 40, lynx::PlaylistComponent::headerHeight, 60, 120 }, prefix + "-r5-playhead-noanim.png");
+            lynx::ui::motion::enabled() = true;
+            playlist.frameStepForSnapshot();
+            // a drop preview: two patterns dragged from the Picker (issue #177's description) over track 4, bar 36
+            const auto row = playlist.trackRowForSnapshot (27);
+            playlist.dragOverForSnapshot (juce::var ("lynx-picker|0|0,1"), { (int) playlist.xOfTickForSnapshot (35.6 * (double) song.barTicks()), row.getCentreY() });
+            write (ui, "r5-drop-preview");
+            playlist.dragOverForSnapshot ({}, {});
+            offline.getTransport().playing.store (false);
+            playlist.frameStepForSnapshot();
+            write (ui, "r5-stopped");
+            write (ui.getPickerForSnapshot(), "r5-picker-stopped");
+            saveArea (playlist, { 0, lynx::PlaylistComponent::toolbarHeight, playlist.getWidth(), lynx::PlaylistComponent::overviewHeight }, prefix + "-r5-overview-stopped.png");
+
+            // R15: a scroll by hand while playing — Pattern layout: Follow goes on (off by default); the option on: it pauses
+            auto& globals = lynx::EditorGlobals::get();
+            const auto scrollWhilePlaying = [&] {
+                offline.getTransport().playing.store (true);
+                playlist.frameStepForSnapshot();
+                playlist.setScrollTickForSnapshot (playlist.scrollTicksForSnapshot() + 4.0 * (double) song.barTicks());
+                playlist.frameStepForSnapshot();
+                const auto paused = playlist.followPausedForSnapshot();
+                offline.getTransport().playing.store (false);
+                playlist.frameStepForSnapshot();
+                return paused;
+            };
+            check ("R15: Pattern layout (option off by default): no pause", ! globals.followPausing() && ! scrollWhilePlaying());
+            globals.followPausesOnEdit = 1;
+            check ("R15: option on: a scroll while playing pauses Follow", scrollWhilePlaying());
+            check ("R15: a stop lifts the pause", ! playlist.followPausedForSnapshot());
+            globals.followPausesOnEdit = -1;
+        }
+        {
+            // ---- R11: the Sampler's handles (a 1 s tone, loop points on)
+            lynx::AudioEngine engine (false);
+            const auto tone = juce::File (prefix).getParentDirectory().getChildFile ("details190im-tone.wav");
+            {
+                juce::AudioBuffer<float> buffer (1, 44100);
+                for (int i = 0; i < buffer.getNumSamples(); ++i)
+                    buffer.setSample (0, i, (float) (0.6 * std::sin (juce::MathConstants<double>::twoPi * 110.0 * i / 44100.0) * (1.0 - i / 44100.0)));
+                tone.deleteFile();
+                juce::WavAudioFormat wav;
+                if (auto out = std::unique_ptr<juce::AudioFormatWriter> (wav.createWriterFor (tone.createOutputStream().release(), 44100.0, 1, 16, {}, 0)))
+                    out->writeFromAudioSampleBuffer (buffer, 0, buffer.getNumSamples());
+            }
+            engine.editSong ([&] (lynx::Song& s) {
+                if (s.channels.empty())
+                    s.channels.resize (1);
+                lynx::audioclips::loadSampleInto (s.channels[0], tone.getFullPathName().toStdString(), "Tone");
+            });
+            const auto sampler = [&engine] { return engine.getSong().channels[0].sampler; };
+            auto frame = lynx::makeChannelFrame (engine, 0, 0);
+            frame->setSize (frame->getWidth() > 0 ? frame->getWidth() : 700, frame->getHeight() > 0 ? frame->getHeight() : 720);
+            frame->createComponentSnapshot (frame->getLocalBounds());
+            lynx::ui::WaveformCache::getInstance()->waitUntilIdle (8000);
+            auto& f = *frame;
+            lynx::samplerPageTurn (f, "useLoops", 1.0);
+            lynx::samplerPageTurn (f, "loopStart", 11025.0);
+            lynx::samplerPageTurn (f, "loopEnd", 22050.0);
+            lynx::samplerPageTurn (f, "smpStart", 0.0);
+            savePng (f.createComponentSnapshot (f.getLocalBounds()), prefix + "-r11-sampler-before.png");
+            for (const auto* h : { "Start", "LoopStart", "LoopEnd" })
+                line (juce::String ("press on the drawn ") + h + " handle takes: " + lynx::samplerPageQuery (f, juce::String ("handleAt") + h));
+            check ("R11: a press on the loop start line takes the loop start", lynx::samplerPageQuery (f, "handleAtLoopStart") == "loopStart");
+            check ("R11: a press on the loop end line takes the loop end", lynx::samplerPageQuery (f, "handleAtLoopEnd") == "loopEnd");
+            check ("R11: a press on the Start marker takes the start", lynx::samplerPageQuery (f, "handleAtStart") == "start");
+            lynx::samplerPageTurn (f, "dragLoopEnd", 0.75);
+            check ("R11: the loop end dragged to 3/4", std::abs ((double) sampler().loopEnd - 0.75 * 44099.0) < 2.0);
+            lynx::samplerPageTurn (f, "dragLoopStart", 0.375, true);
+            check ("R11: Shift drags the whole loop", sampler().loopStart > 16000 && sampler().loopEnd - sampler().loopStart > 22000);
+            line ("loop after the drags: " + juce::String (sampler().loopStart) + " - " + juce::String (sampler().loopEnd));
+            lynx::samplerPageTurn (f, "dragStart", 0.2);
+            check ("R11: the Start marker dragged to 20 %", std::abs (sampler().startOffset - 0.2f) < 0.01f);
+            savePng (f.createComponentSnapshot (f.getLocalBounds()), prefix + "-r11-sampler-after.png");
+            tone.deleteFile();
+        }
+        if (set.isNotEmpty())
+        {
+            // ---- Clip-launch layout, the Live set
+            lynx::AudioEngine offline (false);
+            lynx::MainComponent ui (offline, false);
+            ui.setSize (juce::jlimit (800, 3840, size[0].getIntValue()), juce::jlimit (450, 2160, size[1].getIntValue()));
+            ui.setVisible (true);
+            ui.selectTabForSnapshot (2);
+            ui.setClipLaunchWorkflow (true);
+            offline.dispatchPendingMessages();
+            ui.openFile (juce::File (set));
+            offline.dispatchPendingMessages();
+            ui.setClipGridView (lynx::PlaylistArea::GridView::grid);
+            offline.dispatchPendingMessages();
+            ui.resized();
+            auto* gridView = ui.getClipGridForSnapshot();
+            auto* runtime = offline.launcherStateForSnapshot();
+            const auto& song = offline.getSong();
+            check ("grid and launcher", gridView != nullptr && runtime != nullptr && song.clipGrid.has_value());
+            if (gridView == nullptr || runtime == nullptr || ! song.clipGrid.has_value())
+            {
+                juce::File (prefix + "-checks.txt").replaceWithText (checks);
+                return;
+            }
+            auto& grid = *gridView;
+            gridView->resized();
+            const auto firstClip = [&song] (int track, lynx::ClipKind kind) {
+                for (int r = 0; r < 64; ++r)
+                    if (const auto* c = lynx::launcher::clipAt (*song.clipGrid, track, r); c != nullptr && c->kind == kind)
+                        return r;
+                return -1;
+            };
+            const auto bigCrop = [&] (const juce::String& name, juce::Rectangle<int> area) { saveArea (grid, area, prefix + "-" + name + ".png"); };
+            // R6: track 0 plays a one-shot (Loop off), track 1 loops in its 2nd pass, track 2's clip has a follow action
+            int rows[3] { -1, -1, -1 };
+            for (int t = 0; t < 3; ++t)
+                for (const auto kind : { lynx::ClipKind::audio, lynx::ClipKind::pattern })
+                    if (rows[t] < 0)
+                        rows[t] = firstClip (t, kind);
+            offline.editSong ([&rows] (lynx::Song& s) {
+                if (rows[0] >= 0)
+                    lynx::launcher::settingsAt (*s.clipGrid, 0, rows[0])->loop = false;
+                if (rows[2] >= 0)
+                {
+                    auto& f = lynx::launcher::settingsAt (*s.clipGrid, 2, rows[2])->follow;
+                    f.enabled = true;
+                    f.a = lynx::FollowKind::next;
+                }
+            }, false);
+            offline.dispatchPendingMessages();
+            runtime->running.store (true);
+            for (int t = 0; t < 2; ++t)
+                if (rows[t] >= 0)
+                {
+                    const auto length = (double) lynx::launcher::clipAt (*song.clipGrid, t, rows[t])->length;
+                    runtime->tracks[(std::size_t) t].playing.store (rows[t]);
+                    runtime->tracks[(std::size_t) t].progress.store (0.4f);
+                    runtime->tracks[(std::size_t) t].anchor.store (0.0);
+                    runtime->clockNow.store (length * 1.4);
+                }
+            lynx::tickClipGridForSnapshot (grid);
+            grid.repaint();
+            write (grid, "r6-grid-playing");
+            bigCrop ("r6-status-oneshot", lynx::clipGridCellForSnapshot (grid, 1, 0, 0).getUnion (lynx::clipGridCellForSnapshot (grid, 1, 1, 0)));
+            if (rows[2] >= 0)
+            {
+                const auto cell = lynx::clipGridCellForSnapshot (grid, 0, 2, rows[2]);
+                bigCrop ("r6-follow-stripes", cell);
+            }
+            // the queued scene's pulse, both phases, then the next scene selected
+            const auto scene = juce::jmax (0, rows[1]);
+            lynx::setClipGridBlinkPhaseForSnapshot (1);
+            lynx::launchClipGridSceneForSnapshot (grid, scene);
+            grid.repaint();
+            bigCrop ("r6-scene-queued-lit", lynx::clipGridCellForSnapshot (grid, 2, 0, scene));
+            lynx::setClipGridBlinkPhaseForSnapshot (0);
+            grid.repaint();
+            bigCrop ("r6-scene-queued-dark", lynx::clipGridCellForSnapshot (grid, 2, 0, scene));
+            lynx::setClipGridBlinkPhaseForSnapshot (-1);
+            const auto [selected, sceneSelected] = lynx::clipGridSceneSelectionForSnapshot (grid);
+            check ("R6: after a scene launch the scene below is selected (DL-6)", selected == juce::jmin (scene + 1, (int) song.clipGrid->scenes.size() - 1) && sceneSelected);
+            write (grid, "r6-grid-scene-launched");
+            // the hints of each part
+            const auto hintAt = [&] (const juce::String& what, juce::Point<int> p) {
+                const auto [text, value] = lynx::clipGridHintForSnapshot (grid, p);
+                line ("hint " + what + ": " + text + " | " + value);
+                return text;
+            };
+            const auto slot = lynx::clipGridCellForSnapshot (grid, 0, 1, juce::jmax (0, rows[1]));
+            const auto launchHint = hintAt ("clip launch button", { slot.getX() + 7, slot.getCentreY() });
+            hintAt ("clip", { slot.getCentreX(), slot.getCentreY() });
+            hintAt ("stop button", { lynx::clipGridCellForSnapshot (grid, 1, 1, 0).getX() + 7, lynx::clipGridCellForSnapshot (grid, 1, 1, 0).getCentreY() });
+            hintAt ("status", { lynx::clipGridCellForSnapshot (grid, 1, 1, 0).getCentreX(), lynx::clipGridCellForSnapshot (grid, 1, 1, 0).getCentreY() });
+            const auto sceneCell = lynx::clipGridCellForSnapshot (grid, 2, 0, 0);
+            hintAt ("scene launch button", { sceneCell.getX() + 6, sceneCell.getCentreY() });
+            hintAt ("scene", { sceneCell.getCentreX(), sceneCell.getCentreY() });
+            check ("R6: the grid's parts have hints (DL-21)", launchHint.isNotEmpty());
+            ui.setHintForSnapshot ({ launchHint, {}, false, false });
+            saveArea (ui, ui.getToolbarBoundsForSnapshot(), prefix + "-r6-hint-launch.png");
+
+            // R12: 0 on the selected clip deactivates it (greyed), again activates it; the scene column's font
+            lynx::selectClipGridSlotForSnapshot (grid, 1, juce::jmax (0, rows[1]));
+            grid.grabKeyboardFocus();
+            const auto activeNow = [&] { const auto* s = lynx::launcher::settingsAt (*const_cast<lynx::Song&> (song).clipGrid, 1, juce::jmax (0, rows[1])); return s == nullptr || s->active; };
+            check ("R12: 0 is taken by the grid", lynx::clipGridKeyForSnapshot (grid, juce::KeyPress ('0')));
+            offline.dispatchPendingMessages();
+            check ("R12: 0 deactivates the selected clip", ! activeNow());
+            for (auto& v : runtime->tracks)
+                v.playing.store (-1);
+            grid.repaint();
+            write (grid, "r12-clip-deactivated");
+            bigCrop ("r12-clip-deactivated-cell", slot);
+            lynx::clipGridKeyForSnapshot (grid, juce::KeyPress ('0'));
+            offline.dispatchPendingMessages();
+            check ("R12: 0 again activates it", activeNow());
+            bigCrop ("r12-scene-column", lynx::clipGridCellForSnapshot (grid, 2, 0, 0).getUnion (lynx::clipGridCellForSnapshot (grid, 2, 0, juce::jmin (7, (int) song.clipGrid->scenes.size() - 1))));
+
+            // R13: the Clip View of a launched MIDI clip: the Piano roll's playhead at the clip's position
+            int midiTrack = -1, midiRow = -1;
+            for (int t = 0; t < 16 && midiTrack < 0; ++t)
+                if (const auto r = firstClip (t, lynx::ClipKind::pattern); r >= 0)
+                {
+                    midiTrack = t;
+                    midiRow = r;
+                }
+            check ("R13: the set has a MIDI clip", midiTrack >= 0);
+            if (auto* detail = ui.getDetailViewForSnapshot(); detail != nullptr && midiTrack >= 0)
+            {
+                ui.setClipGridView (lynx::PlaylistArea::GridView::grid);
+                lynx::DetailView::shownSetting = true;
+                detail->showSelection (midiTrack, midiRow);
+                detail->setPage (lynx::DetailView::Page::clip);
+                offline.dispatchPendingMessages();
+                ui.resized();
+                const auto& clip = *lynx::launcher::clipAt (*song.clipGrid, midiTrack, midiRow);
+                runtime->running.store (true);
+                runtime->tracks[(std::size_t) midiTrack].playing.store (midiRow);
+                runtime->tracks[(std::size_t) midiTrack].anchor.store (0.0);
+                runtime->clockNow.store ((double) clip.length * 2.3);
+                offline.getTransport().playing.store (true);
+                auto& roll = ui.getPianoRollForSnapshot();
+                roll.frameStepForSnapshot();
+                const auto expect = (double) clip.offset + 0.3 * (double) clip.length;
+                line ("piano roll playhead " + juce::String (roll.playheadForSnapshot(), 1) + ", the launched clip at " + juce::String (expect, 1));
+                check ("R13: the docked Piano roll shows the launched clip's position (DL-74)", std::abs (roll.playheadForSnapshot() - expect) < (double) lynx::ppq);
+                write (ui, "r13-clipview-midi");
+                offline.getTransport().playing.store (false);
+                runtime->tracks[(std::size_t) midiTrack].playing.store (-1);
+                roll.frameStepForSnapshot();
+            }
+        }
         juce::File (prefix + "-checks.txt").replaceWithText (checks);
     }
 

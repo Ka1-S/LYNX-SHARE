@@ -40,7 +40,9 @@ public:
         std::function<juce::File()> sampleFolder;          // where the Sampler tile's file dialog starts (the Browser's samples)
         std::function<void (int format)> exportAudio;      // the Export window on one format (0 WAV, 1 MP3): the Finish dock
         std::function<void()> exportOtherApps;             // File › Export › For other apps
-        std::function<juce::String()> saveStatus;          // "Backed up 2 min ago", "Not saved yet"...: beside the title tools
+        std::function<juce::String()> saveStatus;          // "Backed up 2 min ago", "Not saved yet"... (round 190iv: the top bar shows it)
+        std::function<void()> saveStatusChanged;           // round 190iv: the song changed; the top bar's status may have
+        std::function<void (const juce::String&)> statusForSnapshot; // round 190iv: setStatusForSnapshot, on the top bar
         std::function<void (juce::Component*, int)> setSideDock; // the dock on the right of the Playlist (nullptr: none)
         // round 190bu: the dock for the selected track, under the timeline
         std::function<void (juce::Component*, std::function<int (int)>)> setBottomDock; // (nullptr: none; its height out of the panel's)
@@ -73,6 +75,8 @@ public:
     // The song changed (MainComponent's change callback, only while the style is on): a new or emptied project shows the
     // chooser again, unless it was closed for this project.
     void songChanged();
+    // round 190jc: View › Large controls changed (the dock grows or shrinks; the tracks are the Playlist's)
+    void lookChanged();
 
     void showChooser();
     void hideChooser();
@@ -94,6 +98,8 @@ public:
     void showFinish();
     void hideFinish();
     bool isFinishShowing() const noexcept;
+    // Round 190iv: the Finish button, placed by the main window at the right of the Simple top bar (design190ia SG-A)
+    juce::Component* finishComponent() const noexcept { return finishButton.get(); }
 
     // The dock for the selected track (slices S5, S6, S13, S14; ui/SimpleDock.h): its sound and its effects, under the
     // timeline. Made the first time it shows.

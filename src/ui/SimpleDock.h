@@ -85,7 +85,10 @@ public:
     // User settings (ui-options.txt; not the project)
     static inline int preferredHeight = 248;
     static inline bool shownSetting = true; // Ctrl+Alt+L
-    static constexpr int minHeight = 150, edgeHeight = 5, stripHeight = 30;
+    static constexpr int minHeight = 150, edgeHeight = 5;
+    // the header strip (round 190jc, design190ia SG-7: 30 -> 36 px, BandLab's Track View header; Large controls 48)
+    static int stripHeight();
+    void lookChanged(); // round 190jc: View › Large controls changed
 
     // The folder of the user's own chain presets (.lynxtrack files)
     static juce::File userPresetFolder();
@@ -139,6 +142,10 @@ public:
     void padsRegionForCheck (float start, float end);
     void padsNormalizeForCheck();
     void padsHitForCheck (int pad);
+    void padsPressForSnapshot (int pad, float amount); // round 190jj: a pad drawn pressed (0 = at rest, 1 = darkest)
+    void padsWatchForCheck();                           // round 190jj: one look at the song's notes (the 30 Hz tick)
+    float padsPressForCheck (int pad) const;            // ... and the press a pad shows now
+    juce::Component* keyboardForSnapshot() { return keyboardPage.get(); }
     void padsDragForCheck (int from, int to, bool copy);
     void padsUpdateForCheck();
     juce::PopupMenu padMenuForSnapshot (int pad);
@@ -173,7 +180,16 @@ private:
     std::unique_ptr<EditorPage> editorPage;
     std::unique_ptr<PadsPage> padsPage;
     std::unique_ptr<juce::Component> keyboardPage; // (made the first time the Keyboard tab shows)
-    juce::TextButton instrumentButton, keyboardButton, editorButton, effectsButton, padsButton, hideButton;
+    // round 190jc (design190ia SG-7, SG-8): the strip's buttons draw themselves: the tabs with a vector icon before the
+    // label (a lone tab as a section title), the hide button as BandLab's round close X at the strip's left
+    class StripButton final : public juce::TextButton
+    {
+    public:
+        int glyph = -1;    // ui::simplelook::Glyph of a tab; -1: the round close X
+        bool lone = false; // the only tab: drawn as a section title
+        void paintButton (juce::Graphics& g, bool over, bool down) override;
+    };
+    StripButton instrumentButton, keyboardButton, editorButton, effectsButton, padsButton, hideButton;
     juce::ToggleButton followButton;
     juce::String followText;
     Tab tab = Tab::effects;
@@ -182,6 +198,7 @@ private:
     bool playTabs = false;      // the track plays notes (Instrument / Sampler): Keyboard and Editor
     bool padsTab = false;       // round 190fo: a Sampler track's pads
     int track = -1, insert = -1, channel = -1;
+    juce::Colour trackColourNow() const; // round 190jj: the shown track's colour (its own, else its kind's), for held keys
     // round 190ih (DS-9): the record dock's input level
     bool inputMeterShown() const;
     juce::Rectangle<int> inputMeterArea() const, inputMeterBar() const;
