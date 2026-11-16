@@ -8718,28 +8718,26 @@ void PlaylistComponent::showClipMenu (int index)
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
 }
 
-// round 190jr (BUILD-LIST 13, BandLab's region menu): the Simple layout's loop items first
+// round 190jr (BUILD-LIST 13, BandLab's region loop): the Simple layout's loop items, added at the end of the clip's own
+// menu (its layout and header stay as they are)
 juce::PopupMenu PlaylistComponent::withRegionLoopItems (juce::PopupMenu menu, int index)
 {
     if (! simpleHeaders || ! regionloop::loopable (engine.getSong(), index) || menu.getNumItems() == 0)
         return menu;
     const auto run = regionloop::runOf (engine.getSong(), index);
     const auto& region = engine.getSong().playlist[(std::size_t) run.clips.front()];
-    juce::PopupMenu withLoop;
     auto at = [this, track = region.track, start = region.start, like = region] { return regionloop::regionAt (engine.getSong(), track, start, like); };
-    withLoop.addItem (tr ("Loop until next"), [this, at] {
+    menu.addSeparator();
+    menu.addItem (tr ("Loop until next"), [this, at] {
         const auto end = juce::jmax (engine.getSong().songLength(), (std::int64_t) 0);
         engine.editSong ([end, region = at()] (Song& s) { regionloop::loopUntilNext (s, region, end); });
         sortClips();
     });
-    withLoop.addItem (tr ("Unloop"), run.passes() > 1, false, [this, at] {
+    menu.addItem (tr ("Unloop"), run.passes() > 1, false, [this, at] {
         engine.editSong ([region = at()] (Song& s) { regionloop::unloop (s, region); });
         sortClips();
     });
-    withLoop.addSeparator();
-    for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
-        withLoop.addItem (it.getItem());
-    return withLoop;
+    return menu;
 }
 
 juce::PopupMenu PlaylistComponent::getClipMenuForSnapshot (int index)

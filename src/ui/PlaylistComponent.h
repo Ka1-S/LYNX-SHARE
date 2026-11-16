@@ -711,7 +711,7 @@ private:
     juce::Rectangle<int> simpleAutoMenu (int track) const; // the header's parameter menu (in place of volume, pan, FX)
     void showSimpleAutoMenu (int track);
     juce::PopupMenu buildSimpleAutoMenu (int track);
-    juce::PopupMenu withRegionLoopItems (juce::PopupMenu menu, int clip); // the Simple layout's Loop until next / Unloop first
+    juce::PopupMenu withRegionLoopItems (juce::PopupMenu menu, int clip); // the Simple layout's Loop until next / Unloop (at the end)
     bool simpleAutoMouseDown (const juce::MouseEvent& e); // true: handled
     void paintSimpleAutomation (juce::Graphics& g, juce::Rectangle<int> grid);
     void showGainMenu (int clip);

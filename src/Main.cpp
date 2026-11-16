@@ -17136,7 +17136,7 @@ private:
         if (auto* simple = ui.getSimpleWorkflowForSnapshot())
             simple->hideChooser();
         auto& playlist = ui.getPlaylistForSnapshot();
-        playlist.setViewForSnapshot (96.0, 1, 0);
+        playlist.setViewForSnapshot (96.0, 0, 0);
         offline.dispatchPendingMessages();
         writeImage (lynx::shot::snapshot (ui), "blx-simple");
         writeImage (lynx::shot::snapshot (playlist), "loop-handles");
@@ -17157,7 +17157,7 @@ private:
             bool hasLoop = false;
             for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
                 hasLoop = hasLoop || it.getItem().text == lynx::tr ("Unloop");
-            check ("the Simple clip menu starts with Loop until next / Unloop", hasLoop);
+            check ("the Simple clip menu has Loop until next / Unloop", hasLoop);
             saveMenus (juce::StringArray { "Clip" }, std::vector<juce::PopupMenu> { menu }, prefix + "-clip-menu.png");
         }
 
