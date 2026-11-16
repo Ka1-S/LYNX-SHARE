@@ -2283,7 +2283,9 @@ void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
 
     if (hit >= 0)
     {
-        if (! isSelected (hit)) // a grouped note brings its group along (FL's note groups)
+        const auto wasSelected = isSelected (hit);
+
+        if (! wasSelected) // a grouped note brings its group along (FL's note groups)
         {
             const auto members = notetools::groupOf (currentPattern (engine.getSong()), hit);
             setSelection (members.size() > 1 ? members : std::vector<int> {});
@@ -2303,7 +2305,8 @@ void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
         grabOffset = n.start - snap (xToTick (e.x), snapOn);
         lastLength = n.length;
         noteTemplate.takeFrom (n); // FL: new notes get the clicked note's properties (round 166e)
-        previewEdit (n.key, n.velocity);
+        if (gesture::previewsGrabbedNote (rightEdge || leftEdge, wasSelected)) // FL: no sound on a resize or a selected grab
+            previewEdit (n.key, n.velocity);
         return;
     }
 
