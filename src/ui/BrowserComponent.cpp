@@ -63,6 +63,7 @@
 #include "ui/Icons.h"
 #include "ui/PlaylistComponent.h"
 #include "ui/Theme.h"
+#include "ui/LabelFont.h"
 #include "ui/ValueControl.h"
 #include "ui/WaveformView.h"
 #include "ui/AudioEditor.h"
@@ -1399,7 +1400,7 @@ public:
                               : n.folder || ! isAudio (n.file) ? n.file.getFileName()
                                                                : n.file.getFileNameWithoutExtension();
             const auto bold = (n.folder && n.expanded) || n.current || n.kind == Kind::project;
-            const juce::Font font (theme::font (theme::type::body, bold));
+            const juce::Font font (theme::labelFont (theme::type::body, bold)); // (round 190je: condensed with FL-style labels on)
             g.setFont (font);
 
             auto nameColour = playing ? accentHover : n.folder || i == hovered || i == selected ? textPrimary : textPrimary.withAlpha (0.86f);

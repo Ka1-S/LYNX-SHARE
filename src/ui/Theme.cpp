@@ -27,6 +27,8 @@
 #include "core/TextSize.h"
 #include "core/UiFontChoice.h"
 #include "platform/Paths.h"
+#include "ui/CondensedFontData.h"
+#include "ui/LabelFont.h"
 #include "ui/Icons.h"
 #include "ui/ImageCaches.h"
 #include "ui/PaintAB.h"
@@ -66,21 +68,26 @@ FontCache& fontCache()
     return *cache;
 }
 
+juce::Typeface::Ptr condensedFace (bool bold); // (below)
+
 juce::FontOptions fontOptions (float size, int kind)
 {
     if (kind == 2)
         return juce::FontOptions (juce::Font::getDefaultMonospacedFontName(), size, juce::Font::plain);
-    return juce::FontOptions (size, kind == 1 ? juce::Font::bold : juce::Font::plain);
+    if (kind >= 3)
+        if (auto face = condensedFace (kind == 4))
+            return juce::FontOptions (face).withHeight (size);
+    return juce::FontOptions (size, kind == 1 || kind == 4 ? juce::Font::bold : juce::Font::plain);
 }
 
-// kind 0 plain, 1 bold, 2 monospaced
+// kind 0 plain, 1 bold, 2 monospaced, 3 condensed, 4 condensed bold
 juce::Font cachedFont (float size, int kind)
 {
     if (! lynx::ui::paintCache())
         return juce::Font (fontOptions (size, kind));
     std::uint32_t bits = 0;
     std::memcpy (&bits, &size, sizeof (bits));
-    const auto key = ((std::uint64_t) bits << 2) | (std::uint64_t) kind;
+    const auto key = ((std::uint64_t) bits << 3) | (std::uint64_t) kind;
     auto& cache = fontCache();
     const juce::SpinLock::ScopedLockType lock (cache.lock);
     if (const auto it = cache.fonts.find (key); it != cache.fonts.end())
@@ -99,6 +106,41 @@ juce::Font font (float size, bool bold)
 juce::Font monoFont (float size)
 {
     return cachedFont (size, 2);
+}
+
+// --- Settings › General › "Condensed labels (FL style)" (round 190je, FM-5 / FM-S8) -----------------------------------
+namespace
+{
+bool condensedOn = false;
+constexpr float condensedScale = 1.15f; // a step larger: Open Sans Condensed is about 80 % as wide, so the text keeps its width
+juce::File condensedFile() { return platform::settingsFile ("ui-condensed-labels.txt"); }
+} // namespace
+
+juce::Font labelFont (float size, bool bold)
+{
+    if (! condensedOn)
+        return font (size, bold);
+    return cachedFont (size * condensedScale, bold ? 4 : 3);
+}
+
+void setCondensedLabels (bool on)
+{
+    if (on != condensedOn)
+    {
+        condensedOn = on;
+        clearFontCache();
+    }
+}
+
+bool condensedLabels() { return condensedOn; }
+bool savedCondensedLabels() { return condensedFile().loadFileAsString().trim() == "1"; }
+
+void saveCondensedLabels (bool on)
+{
+    if (on)
+        condensedFile().replaceWithText ("1");
+    else
+        condensedFile().deleteFile();
 }
 
 void clearFontCache()
@@ -1047,6 +1089,38 @@ const std::array<juce::Typeface::Ptr, 2>& bundledFaces()
 bool typefaceFallbackOff = false; // (fontSelfTest only)
 } // namespace
 
+namespace
+{
+// Open Sans Condensed (round 190je), decoded from ui/CondensedFontData.h on first use: only when the option is on, so the
+// default look never meets these faces. On Linux they get Open Sans's adjusted line metrics (issue #189), as the
+// regular face does, so both draw their letters at the same scale.
+juce::Typeface::Ptr condensedFace (bool bold)
+{
+    static const std::array<juce::Typeface::Ptr, 2> faces = [] {
+        const auto decode = [] (const char* const* pieces, int count) {
+            juce::String text;
+            for (int i = 0; i < count; ++i)
+                text += pieces[i];
+            juce::MemoryOutputStream out;
+            juce::Base64::convertFromBase64 (out, text);
+            return out.getMemoryBlock();
+        };
+        const auto make = [] (const juce::MemoryBlock& data) -> juce::Typeface::Ptr {
+            if (data.getSize() == 0)
+                return {};
+           #if LYNX_BUNDLED_FONT
+            return bundledFace ((const unsigned char*) data.getData(), (int) data.getSize());
+           #else
+            return juce::Typeface::createSystemTypefaceFor (data.getData(), data.getSize());
+           #endif
+        };
+        return std::array<juce::Typeface::Ptr, 2> { make (decode (condensedfont::semiBold, condensedfont::semiBoldPieces)),
+                                                    make (decode (condensedfont::bold, condensedfont::boldPieces)) };
+    }();
+    return faces[bold ? 1 : 0] != nullptr ? faces[bold ? 1 : 0] : faces[0];
+}
+} // namespace
+
 juce::StringArray fontFoldersToScan (const juce::StringArray& fontconfigFolders, const std::function<bool (const juce::String&)>& exists)
 {
     // JUCE splits its list at ';' and ',' and scans each folder with everything below it: a folder inside another
@@ -1716,7 +1790,7 @@ Colours colours()
 
 juce::Font LookAndFeel::getPopupMenuFont()
 {
-    return uiFont (menus::textSize());
+    return labelFont (menus::textSize());
 }
 
 void LookAndFeel::getIdealPopupMenuItemSize (const juce::String& text, bool isSeparator, int standardMenuItemHeight, int& idealWidth,
@@ -1734,7 +1808,7 @@ void LookAndFeel::getIdealPopupMenuItemSize (const juce::String& text, bool isSe
     {
         // JUCE asks with -1 for a section header and then adds half of the answer: hand back 2/3 of the wanted height
         idealHeight = (menus::headerHeight() * 2 + 2) / 3;
-        idealWidth = juce::roundToInt (juce::GlyphArrangement::getStringWidth (uiFont (type::small), text)) + 24;
+        idealWidth = juce::roundToInt (juce::GlyphArrangement::getStringWidth (labelFont (type::small), text)) + 24;
         return;
     }
     idealHeight = standardMenuItemHeight > 0 ? standardMenuItemHeight : menus::itemHeight();
@@ -1794,7 +1868,7 @@ void LookAndFeel::drawPopupMenuItem (juce::Graphics& g, const juce::Rectangle<in
     if (shortcutKeyText.isNotEmpty())
     {
         // FL's shortcut column: right-aligned, italic, a step smaller; white under the mouse as FL's
-        const auto keyFont = uiFont (type::small).italicised();
+        const auto keyFont = labelFont (type::small).italicised();
         g.setColour (! isActive ? look.disabled : hot ? look.hoverText : look.shortcut);
         g.setFont (keyFont);
         g.drawText (shortcutKeyText, content.removeFromRight (juce::roundToInt (juce::GlyphArrangement::getStringWidth (keyFont, shortcutKeyText)) + 4),
@@ -1826,7 +1900,7 @@ void LookAndFeel::drawPopupMenuSectionHeader (juce::Graphics& g, const juce::Rec
     const auto band = area.withTrimmedTop (juce::jmax (0, area.getHeight() - menus::headerHeight()));
     g.setColour (look.band);
     g.fillRect (band);
-    g.setFont (uiFont (type::small));
+    g.setFont (labelFont (type::small));
     g.setColour (look.bandText);
     g.drawFittedText (sectionName, band.reduced (8, 0), juce::Justification::centredLeft, 1);
 }
@@ -1838,7 +1912,7 @@ void LookAndFeel::drawMenuBarBackground (juce::Graphics&, int, int, bool, juce::
 
 juce::Font LookAndFeel::getMenuBarFont (juce::MenuBarComponent&, int, const juce::String&)
 {
-    return uiFont (type::body);
+    return labelFont (type::body);
 }
 
 int LookAndFeel::getMenuBarItemWidth (juce::MenuBarComponent& bar, int itemIndex, const juce::String& itemText)

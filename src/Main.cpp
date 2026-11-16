@@ -14,6 +14,7 @@
 #include "core/SessionOps.h"
 #include "ui/ClipGridComponent.h"
 #include "ui/ExternalDrag.h"
+#include "ui/LabelFont.h"
 #include "ui/SessionMixer.h"
 #include "core/FlSamplers.h"
 #include "core/ArrangeOps.h"
@@ -682,7 +683,9 @@ public:
         // text size (issue #189): saved in Settings › General; --textsize 125 overrides it for this run
         const auto textSizeArg = args.indexOf ("--textsize");
         lynx::theme::setTextSize (textSizeArg >= 0 ? args[textSizeArg + 1].getIntValue() : lynx::theme::savedTextSize());
-        // round 190je: --menustyle flClassic: FL's light menus for one run (Settings › Theme keeps the saved choice)
+        // round 190je: FL-style condensed labels (Settings › General); --condensedlabels for one run. --menustyle flClassic: FL's
+        // light menus for one run (Settings › Theme keeps the saved choice)
+        lynx::theme::setCondensedLabels (args.contains ("--condensedlabels") || lynx::theme::savedCondensedLabels());
         if (const auto menuStyleArg = args.indexOf ("--menustyle"); menuStyleArg >= 0)
         {
             lynx::theme::menus::setStyle (lynx::themes::menuStyleFromId (args[menuStyleArg + 1].unquoted().toStdString()));

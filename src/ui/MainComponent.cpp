@@ -1,5 +1,6 @@
 #include "ui/ControllerBridge.h"
 #include "ui/ExternalDrag.h"
+#include "ui/LabelFont.h"
 #include "ui/AudioClipboard.h"
 #include "ui/MidiClipboard.h"
 #include "ui/VideoTracks.h"
@@ -7804,6 +7805,7 @@ void MainComponent::openSettings (int page)
         o.language = i18n::saved();
         o.uiFont = theme::savedUiFont();
         o.textSize = theme::savedTextSize();
+        o.condensedLabels = theme::savedCondensedLabels();
         o.uiScale = safe->toolbarLayout.uiScale;
         o.compactMenus = theme::menus::compact();
         o.waveSpectral = ui::WaveformCache::spectral;
@@ -7961,6 +7963,8 @@ void MainComponent::openSettings (int page)
             theme::saveUiFont (o.uiFont);
         if (o.textSize != theme::savedTextSize())
             theme::saveTextSize (o.textSize);
+        if (o.condensedLabels != theme::savedCondensedLabels())
+            theme::saveCondensedLabels (o.condensedLabels);
         if (o.language != i18n::saved())
             self.showLanguageChoice (o.language);
     };
