@@ -21,9 +21,10 @@ inline const juce::Colour wellDisabled { 0xff757575 }; // a rack column toggle t
 inline const juce::Colour padName { 0xffb5b5b5 };    // a Drum Rack pad's name area
 
 // Live's knob: an open ring (#111111, ~2 px, open 70° at the bottom), a needle (#181818) from the centre through the
-// ring, the value arc (#03C3D5) from the default (the centre of a bipolar knob, else the start) to the value, and a small
-// ▼ over the ring where a bipolar knob's default is. Measured at 25 px (Utility's Gain: ring x 1167..1191).
-inline void drawKnob (juce::Graphics& g, juce::Rectangle<float> bounds, float value01, bool bipolar)
+// ring, the value arc (#03C3D5) from the default to the value (Utility's Gain at its 0 dB default: no arc; a macro: from
+// the start), and a small ▼ over the ring at the default when that is not the start (Utility's Gain, Mid/Side, Balance).
+// `default01`: the default's place on the knob, 0..1. Measured at 25 px (Utility's Gain: ring x 1167..1191).
+inline void drawKnob (juce::Graphics& g, juce::Rectangle<float> bounds, float value01, float default01)
 {
     const auto size = juce::jmin (bounds.getWidth(), bounds.getHeight()) - 2.0f;
     if (size <= 6.0f)
@@ -38,7 +39,8 @@ inline void drawKnob (juce::Graphics& g, juce::Rectangle<float> bounds, float va
     ring.addCentredArc (centre.x, centre.y, radius, radius, 0.0f, start, start + range, true);
     g.setColour (knobRing);
     g.strokePath (ring, juce::PathStrokeType (thickness));
-    const auto from = bipolar ? start + range * 0.5f : start, to = start + range * value;
+    const auto home = juce::jlimit (0.0f, 1.0f, default01);
+    const auto from = start + range * home, to = start + range * value;
     if (std::abs (to - from) > 0.001f)
     {
         juce::Path arc;
@@ -49,14 +51,23 @@ inline void drawKnob (juce::Graphics& g, juce::Rectangle<float> bounds, float va
     const auto tip = radius + thickness * 0.5f;
     g.setColour (needle);
     g.drawLine (centre.x, centre.y, centre.x + std::sin (to) * tip, centre.y - std::cos (to) * tip, 1.5f);
-    if (bipolar)
+    if (home > 0.001f)
     {
-        const auto top = centre.y - radius - thickness * 0.5f - 1.0f;
+        const auto r = radius + thickness * 0.5f + 1.0f; // (its tip just off the ring, pointing at the centre)
+        const auto a = from, tip = juce::Point<float> (centre.x + std::sin (a) * r, centre.y - std::cos (a) * r);
+        const auto base = juce::Point<float> (centre.x + std::sin (a) * (r + 3.5f), centre.y - std::cos (a) * (r + 3.5f));
+        const auto side = juce::Point<float> (std::cos (a) * 3.5f, std::sin (a) * 3.5f);
         juce::Path t;
-        t.addTriangle (centre.x - 3.5f, top - 3.5f, centre.x + 3.5f, top - 3.5f, centre.x, top);
+        t.addTriangle (base.x - side.x, base.y - side.y, base.x + side.x, base.y + side.y, tip.x, tip.y);
         g.setColour (knobRing);
         g.fillPath (t);
     }
+}
+
+// The same knob with a bipolar knob's default at its centre, any other's at its start.
+inline void drawKnob (juce::Graphics& g, juce::Rectangle<float> bounds, float value01, bool bipolar)
+{
+    drawKnob (g, bounds, value01, bipolar ? 0.5f : 0.0f);
 }
 
 // The power disc of a device's title bar: 13 px with a 1 px #121212 rim, filled #FFAD56 while on, #1E1E1E while off.

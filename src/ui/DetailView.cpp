@@ -1693,7 +1693,8 @@ private:
             const auto knob = rr.removeFromTop (knobSize).toFloat().withSizeKeepingCentre (27.0f, 27.0f);
             const auto range = spec.maximum - spec.minimum;
             const auto v01 = range > 0.0 ? (float) ((value - spec.minimum) / range) : 0.0f;
-            ll::drawKnob (g, knob, juce::jlimit (0.0f, 1.0f, v01), spec.minimum < 0.0);
+            const auto home = range > 0.0 ? (float) ((juce::jlimit (spec.minimum, spec.maximum, spec.defaultValue) - spec.minimum) / range) : 0.0f;
+            ll::drawKnob (g, knob, juce::jlimit (0.0f, 1.0f, v01), home);
             g.setColour (hot ? colour::textPrimary : ll::text);
             g.drawText (spec.text (value), rr.removeFromTop (14), juce::Justification::centred, true);
         }

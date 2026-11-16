@@ -71,6 +71,7 @@ public:
     // loudest peak, linear gain; >= 1 = clipped), and a hovered part. The next tick() moves the meters on as usual.
     void setMeterForSnapshot (int insert, float left, float right, float holdLeft, float holdRight, float maxPeak);
     void setHoverForSnapshot (Hit hit) { hover = hit; repaint(); }
+    juce::String tipForSnapshot (const Hit& hit) const { return tipFor (hit); } // (the Info View's text for a part)
     // the loudest peak the pill holds (linear gain, 0 = none)
     float loudestPeak (int insert) const noexcept
     {

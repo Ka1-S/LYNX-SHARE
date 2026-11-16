@@ -27183,8 +27183,8 @@ private:
                     for (int k = 0; k < 6; ++k)
                     {
                         lynx::Note n;
-                        n.channel = channels + p;
-                        n.key = (p == 0 ? 36 : 48) + (k * 5) % 12 + p * 2;
+                        n.channel = p == 1 ? 0 : channels + p; // (Bassline: the selected channel, the docked Piano roll's)
+                        n.key = (p == 0 ? 36 : p == 1 ? 86 : 48) + (k * 5) % 12 + p * 2;
                         n.start = (std::int64_t) k * lynx::ppq / 2;
                         n.length = lynx::ppq / 2;
                         n.velocity = 0.55f + 0.07f * (float) k;
@@ -27296,16 +27296,16 @@ private:
             meters();
             // the Info View with a hovered control: the Bass strip's activator, as the hint timer would give it
             {
-                const auto spot = mixer->partBounds (1, Part::activator).getCentre();
-                const auto hint = lynx::ui::hintFor (mixer, spot);
+                lynx::ui::Hint hint; // (the mixer's hint is its tooltip, read at the mouse: off screen its text for the part)
+                hint.text = mixer->tipForSnapshot ({ 1, Part::activator, 0 });
                 detail->setInfoHint (hint);
                 line ("info view: title '" + detail->infoViewForSnapshot().getTitleText() + "', body '" + detail->infoViewForSnapshot().getBodyText() + "'");
                 check ("info view: the hovered activator's hint shows", detail->infoViewForSnapshot().getBodyText().isNotEmpty());
             }
             write (ui, "19-window-devices");
             write (*detail, "19-detail-devices");
-            area (ui, detail->getBoundsInParent().withTrimmedTop (detail->getHeight() - lynx::DetailView::stripHeight), "25-status-strip");
-            area (ui, detail->getBoundsInParent().withWidth (260), "25-info-view");
+            area (*detail, detail->getLocalBounds().withTrimmedTop (detail->getHeight() - lynx::DetailView::stripHeight), "25-status-strip");
+            area (*detail, detail->getLocalBounds().withWidth (260), "25-info-view");
             check ("device view: four effect cards and the instrument", cards >= 5);
             check ("device view: the folded card stays folded", cards < 5 || detail->isFoldedForCheck (4));
             // the hot-swap link on the selected card (Q)
@@ -27350,11 +27350,16 @@ private:
             {
                 lynx::DetailView::preferredHeight = height;
                 ui.resized();
+                if (auto* parent = detail->getParentComponent()) // (the Playlist area lays its docked detail view out)
+                    parent->resized();
                 settle();
                 write (*detail, "17-detail-clip-audio-" + juce::String (height));
+                check ("audio box at " + juce::String (height) + " px: the detail view is that high", detail->getHeight() == height);
             }
             lynx::DetailView::preferredHeight = 228;
             ui.resized();
+            if (auto* parent = detail->getParentComponent())
+                parent->resized();
             settle();
             write (ui, "17-window-clip-audio");
 
