@@ -276,7 +276,8 @@ TEST (warp190fm_als_round_trip)
         CHECK (w.textureFlux == 60.0f && w.proFormants == 30.0f && w.proEnvelope == 64.0f);
         CHECK (w.complexPro == (mode[0] == '6'));
         CHECK (ch->sampler.stretchMethod == (mode[0] == '6' ? StretchMethod::complex : StretchMethod::beats));
-        CHECK ((report.partialEffects.count ("Warp mode Complex Pro (plays as Complex; Formants and Envelope kept for export)") > 0) == (mode[0] == '6'));
+        // (round 190ik: Complex Pro's Formants / Envelope play, nothing is reported as left out)
+        CHECK (report.partialEffects.count ("Warp mode Complex Pro (plays as Complex; Formants and Envelope kept for export)") == 0);
         const auto out = exportAls (*song);
         for (const auto* member : { "<GranularityTones Value=\"12\"", "<GranularityTexture Value=\"80\"", "<FluctuationTexture Value=\"60\"",
                                     "<TransientResolution Value=\"3\"", "<TransientLoopMode Value=\"1\"", "<TransientEnvelope Value=\"40\"",
