@@ -10145,3 +10145,5 @@ countries: ru by kz
 "Potentially slow operation" = "Операция может быть медленной"
 "Are you sure you want to load {0} plugins at once?" = "Точно загрузить {0} плагинов за раз?"
 "Sample settings" = "Настройки сэмпла"
+"Balanced (half the refresh on fast screens)" = "Сбалансированно (половина частоты на быстрых экранах)"
+"How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); Balanced halves it on fast screens (72 Hz on a 144 Hz screen); 60 Hz or 30 Hz use the least CPU (laptops, slower computers)." = "Как часто движутся курсор воспроизведения, индикаторы и осциллографы. «Дисплей» следует частоте обновления вашего монитора (плавнее всего); «Сбалансированно» делит её пополам на быстрых экранах (72 Гц на экране 144 Гц); 60 Гц или 30 Гц нагружают процессор меньше всего (ноутбуки, медленные компьютеры)."

@@ -10145,3 +10145,5 @@ countries: fr be ch ca lu
 "Potentially slow operation" = "Opération potentiellement lente"
 "Are you sure you want to load {0} plugins at once?" = "Voulez-vous vraiment charger {0} plugins à la fois ?"
 "Sample settings" = "Réglages du sample"
+"Balanced (half the refresh on fast screens)" = "Équilibré (moitié de la fréquence sur les écrans rapides)"
+"How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); Balanced halves it on fast screens (72 Hz on a 144 Hz screen); 60 Hz or 30 Hz use the least CPU (laptops, slower computers)." = "La fréquence à laquelle la tête de lecture, les vumètres et les oscilloscopes bougent. Écran suit la fréquence de rafraîchissement de votre moniteur (le plus fluide) ; Équilibré la divise par deux sur les écrans rapides (72 Hz sur un écran 144 Hz) ; 60 Hz ou 30 Hz utilisent le moins de CPU (portables, ordinateurs plus lents)."

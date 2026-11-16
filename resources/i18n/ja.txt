@@ -10145,3 +10145,5 @@ countries: jp
 "Potentially slow operation" = "時間がかかる可能性のある操作"
 "Are you sure you want to load {0} plugins at once?" = "{0} 個のプラグインを一度に読み込みますか?"
 "Sample settings" = "サンプル設定"
+"Balanced (half the refresh on fast screens)" = "バランス（高速な画面ではリフレッシュレートの半分）"
+"How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); Balanced halves it on fast screens (72 Hz on a 144 Hz screen); 60 Hz or 30 Hz use the least CPU (laptops, slower computers)." = "再生ヘッド、メーター、スコープが動く頻度です。ディスプレイは画面のリフレッシュレートに合わせます（最も滑らか）。バランスは高速な画面でその半分にします（144 Hz の画面で 72 Hz）。60 Hz または 30 Hz は CPU 使用量が最も少なくなります（ノート PC、低速なコンピューター）。"

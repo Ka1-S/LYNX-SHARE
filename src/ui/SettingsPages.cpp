@@ -246,15 +246,22 @@ public:
                 [this] (bool on) { options.uiAnimations = on; });
         // round 174e2: how often the playhead, meters and scopes move (the display's refresh by default, as FL)
         styleLabel (animationLabel, tr ("Animation rate"));
+        // round 190ip: Balanced (Live's rule: the refresh halved until it is at most 100 Hz); the capped rates are evenly paced
         animationBox.addItem (tr ("Display (default)"), 1);
+        animationBox.addItem (tr ("Balanced (half the refresh on fast screens)"), 4);
         animationBox.addItem (tr ("60 Hz"), 2);
         animationBox.addItem (tr ("30 Hz"), 3);
-        animationBox.setSelectedId (options.animationRate == 30 ? 3 : options.animationRate == 60 ? 2 : 1, juce::dontSendNotification);
+        animationBox.setSelectedId (options.animationRate == 30 ? 3 : options.animationRate == 60 ? 2 : options.animationRate < 0 ? 4 : 1,
+                                    juce::dontSendNotification);
         animationBox.onChange = [this] {
-            change ([&] { options.animationRate = animationBox.getSelectedId() == 3 ? 30 : animationBox.getSelectedId() == 2 ? 60 : 0; });
+            change ([&] {
+                const auto id = animationBox.getSelectedId();
+                options.animationRate = id == 3 ? 30 : id == 2 ? 60 : id == 4 ? -1 : 0;
+            });
         };
         styleNote (animationNote, tr ("How often the playhead, meters and scopes move. Display follows your screen's refresh rate "
-                                      "(smoothest); 60 Hz or 30 Hz use less CPU on slower computers."));
+                                      "(smoothest); Balanced halves it on fast screens (72 Hz on a 144 Hz screen); 60 Hz or 30 Hz "
+                                      "use the least CPU (laptops, slower computers)."));
         toggle (gpuRendering, tr ("Draw with the GPU (Direct2D). Turn off if LYNX SHARE crashes in the graphics driver or the screen flickers"),
                 options.gpuRendering, [this] (bool on) { options.gpuRendering = on; });
        #if ! JUCE_WINDOWS

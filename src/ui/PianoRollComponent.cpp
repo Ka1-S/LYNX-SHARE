@@ -145,6 +145,7 @@ bool isMidiFile (const juce::File& f) { return f.hasFileExtension ("mid;midi"); 
 PianoRollComponent::PianoRollComponent (AudioEngine& e)
     : engine (e)
 {
+    gpuPlayhead.onHidden = [this] { repaint (playheadColumn (playheadTick)); }; // (round 190ip: painted again)
     auto sender = [this] (int channel, int key, float velocity, bool on) { engine.sendLiveNote (channel, key, velocity, on); };
     previewNotes.setSender (sender);
     listenNotes.setSender (sender);
@@ -1216,7 +1217,7 @@ void PianoRollComponent::paint (juce::Graphics& g)
             g.fillPath (dashed);
         }
 
-        if (playheadTick >= 0.0)
+        if (playheadTick >= 0.0 && ! gpuPlayhead.isShowing()) // (round 190ip: the GPU moves it while playing)
         {
             g.setColour (playhead);
             g.drawVerticalLine ((int) tickToX (playheadTick), (float) grid.getY(), (float) grid.getBottom());
@@ -1387,7 +1388,7 @@ void PianoRollComponent::paint (juce::Graphics& g)
             textcache::drawText (g, label, (int) x + 8, rulerTop + 10, 110, timelineHeight - 11, juce::Justification::centredLeft);
         }
 
-        if (playheadTick >= 0.0)
+        if (playheadTick >= 0.0 && ! gpuPlayhead.isShowing())
         {
             const auto x = (float) tickToX (playheadTick);
             juce::Path tri;
@@ -4802,6 +4803,42 @@ void PianoRollComponent::timerCallback()
         playButton.setToggleState (playing, juce::dontSendNotification);
 }
 
+// round 190ip: the playhead as paint() draws it (the line in the grid, the triangle in the ruler), for the GPU overlay
+void PianoRollComponent::paintPlayheadAt (juce::Graphics& g, float x)
+{
+    const auto grid = gridArea();
+    g.setColour (theme::colour::playhead);
+    {
+        juce::Graphics::ScopedSaveState state (g);
+        if (g.reduceClipRegion (grid))
+            g.drawVerticalLine ((int) x, (float) grid.getY(), (float) grid.getBottom());
+    }
+    juce::Graphics::ScopedSaveState state (g);
+    if (g.reduceClipRegion (juce::Rectangle<int> (keyboardWidth, rulerTop, grid.getWidth(), timelineHeight)))
+    {
+        juce::Path tri;
+        tri.addTriangle (x - 5, (float) rulerTop, x + 5, (float) rulerTop, x, (float) rulerTop + 8);
+        g.fillPath (tri);
+    }
+}
+
+ui::MotionOverlay::Mark PianoRollComponent::playheadMark() const
+{
+    const auto grid = gridArea();
+    ui::MotionOverlay::Mark m;
+    m.x = (float) tickToX (playheadTick);
+    m.extent = juce::Rectangle<int>::leftTopRightBottom (-7, rulerTop, 7, grid.getBottom());
+    m.clip = juce::Rectangle<int>::leftTopRightBottom (grid.getX(), rulerTop, grid.getRight(), grid.getBottom());
+    m.look = ((std::uint64_t) (std::uint32_t) theme::colour::playhead.getARGB() << 32) ^ ((std::uint64_t) (std::uint32_t) grid.getY() << 20)
+             ^ (std::uint64_t) (std::uint32_t) grid.getHeight() ^ ((std::uint64_t) (std::uint32_t) keyboardWidth << 44);
+    return m;
+}
+
+juce::Rectangle<int> PianoRollComponent::playheadColumn (double tick) const
+{
+    return tick >= 0.0 ? juce::Rectangle<int> ((int) tickToX (tick) - 7, 0, 14, getHeight()) : juce::Rectangle<int>();
+}
+
 bool PianoRollComponent::playheadFrame (double)
 {
     auto& transport = engine.getTransport();
@@ -4822,12 +4859,16 @@ bool PianoRollComponent::playheadFrame (double)
     // whenever it moved: the line is anti-aliased, so even a fraction of a pixel shows (zoomed out, a playhead crossing
     // a few pixels a second glides at the display's rate instead of stepping, as FL's does)
     const auto moved = (tick < 0.0) != (playheadTick < 0.0) || std::abs ((tick - playheadTick) * pixelsPerTick) >= 0.002;
+    // round 190ip: stopped (step edit keeps it), the playhead is painted again; the overlay goes once that is on screen
+    if (gpuPlayhead.isShowing() && (! playing || ! isShowing()))
+    {
+        gpuPlayhead.hide (tick >= 0.0);
+        repaint (playheadColumn (playheadTick));
+    }
     if (moved)
     {
         // (old and new column as one rectangle when they overlap: each rectangle of a repaint is a paint)
-        auto column = [this] (double t) {
-            return t >= 0.0 ? juce::Rectangle<int> ((int) tickToX (t) - 7, 0, 14, getHeight()) : juce::Rectangle<int>();
-        };
+        auto column = [this] (double t) { return playheadColumn (t); };
         auto dirty = [this] (juce::Rectangle<int> r) {
             if (! r.isEmpty())
                 repaint (r);
@@ -4835,6 +4876,9 @@ bool PianoRollComponent::playheadFrame (double)
 
         const auto before = column (playheadTick);
         playheadTick = tick;
+        // while playing the GPU moves it (nothing under it is painted); the frame that starts or ends, the columns are
+        // painted once
+        const auto gpu = ui::stepMark (gpuPlayhead, playing && tick >= 0.0 && isShowing(), playheadMark(), tick >= 0.0);
 
         // Follow: a page further when the playhead leaves the view (off: the view stays where it is)
         const auto grid = gridArea();
@@ -4852,6 +4896,12 @@ bool PianoRollComponent::playheadFrame (double)
             scrollTicks = newStart;
             updateScrollBars();
             repaint();
+            if (gpuPlayhead.isShowing())
+                gpuPlayhead.show (playheadMark()); // (at its place in the new page)
+        }
+        else if (gpu.onOverlay && ! gpu.flipped)
+        {
+            // (the GPU moved it: nothing under it is painted)
         }
         else if (const auto after = column (tick); ! before.isEmpty() && ! after.isEmpty() && std::abs (after.getX() - before.getX()) <= 14)
             dirty (before.getUnion (after));

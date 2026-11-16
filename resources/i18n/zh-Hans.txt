@@ -10145,3 +10145,5 @@ countries: cn sg
 "Potentially slow operation" = "操作可能较慢"
 "Are you sure you want to load {0} plugins at once?" = "确定要一次加载 {0} 个插件吗?"
 "Sample settings" = "采样设置"
+"Balanced (half the refresh on fast screens)" = "均衡（高刷新率屏幕上为刷新率的一半）"
+"How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); Balanced halves it on fast screens (72 Hz on a 144 Hz screen); 60 Hz or 30 Hz use the least CPU (laptops, slower computers)." = "播放头、电平表和示波器的移动频率。显示器跟随屏幕的刷新率（最流畅）；均衡在高刷新率屏幕上将其减半（144 Hz 屏幕上为 72 Hz）；60 Hz 或 30 Hz 占用的 CPU 最少（笔记本电脑、较慢的电脑）。"
