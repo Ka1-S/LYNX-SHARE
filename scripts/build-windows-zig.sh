@@ -275,6 +275,8 @@ APP_SOURCES+=(src/core/WaveAnalysis.cpp src/core/Spectrogram.cpp src/ui/Waveform
 APP_SOURCES+=(src/core/Plucked.cpp src/core/BeepMap.cpp src/core/Sawer.cpp)
 # LYNX Soundfont: SF2 / SF3 player with a preset search (round 158, issue #6)
 APP_SOURCES+=(src/core/SoundFont.cpp src/core/SoundFontLoad.cpp src/core/SoundFontIndex.cpp src/ui/SoundFontEditor.cpp)
+# other samplers' instruments as DirectWave channels, NCW samples (round 190ii, issue #149)
+APP_SOURCES+=(src/core/SamplerImport.cpp src/core/GigFile.cpp src/core/Ncw.cpp src/core/KontaktFile.cpp src/engine/NcwFormat.cpp src/ui/SamplerImportUi.cpp)
 APP_SOURCES+=(src/ui/VfxEditors.cpp)
 # the Browser's "Find similar samples" (round 190as)
 APP_SOURCES+=(src/core/SampleSimilarity.cpp)

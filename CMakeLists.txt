@@ -260,6 +260,10 @@ add_library(lynx_core STATIC
     src/core/BeepMap.cpp
     src/core/Sawer.cpp
     src/core/Inflate.cpp
+    src/core/SamplerImport.cpp
+    src/core/GigFile.cpp
+    src/core/Ncw.cpp
+    src/core/KontaktFile.cpp
     src/core/WavPack.cpp)
 target_include_directories(lynx_core PUBLIC src third_party/sse2neon)
 
@@ -469,6 +473,7 @@ if(LYNX_BUILD_APP)
         src/engine/Metronome.cpp
         src/engine/SampleLibrary.cpp
     src/engine/WavPackFormat.cpp
+    src/engine/NcwFormat.cpp
     src/engine/Mp3Format.cpp
         src/engine/ProjectFile.cpp
         src/engine/ProjectPackage.cpp
@@ -560,6 +565,7 @@ if(LYNX_BUILD_APP)
         src/ui/Controllers164.cpp
         src/ui/VoltageEditor.cpp
         src/ui/SoundFontEditor.cpp
+        src/ui/SamplerImportUi.cpp
         src/ui/VfxEditors.cpp
         src/ui/BrowserComponent.cpp
         src/ui/Theme.cpp

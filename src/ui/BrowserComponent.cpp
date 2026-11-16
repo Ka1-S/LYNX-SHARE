@@ -69,6 +69,7 @@
 #include "ui/ChannelRackComponent.h"
 #include "ui/MixerComponent.h"
 #include "ui/SoundFontEditor.h"
+#include "ui/SamplerImportUi.h"
 #include "ui/ToolWindow.h"
 
 namespace lynx
@@ -82,7 +83,7 @@ bool isAudio (const juce::File& f)
 
 bool isListed (const juce::File& f)
 {
-    return f.hasFileExtension ("wav;flac;ogg;mp3;aif;aiff;wv;mid;midi;lynx;flp;als;flm;fst;sf2;sf3;sfz");
+    return f.hasFileExtension ("wav;flac;ogg;mp3;aif;aiff;wv;ncw;mid;midi;lynx;flp;als;flm;fst;sf2;sf3;sfz;dwp;dwb;gig");
 }
 
 constexpr int maxResults = 500;
@@ -155,7 +156,7 @@ Icon iconFor (const juce::File& f, bool folder)
         return Icon::pianoRoll;
     if (f.hasFileExtension ("lynx;flp;als;flm"))
         return Icon::project;
-    if (f.hasFileExtension ("fst;sf2;sf3;sfz;lynxpreset;fxp;fxb;vstpreset"))
+    if (f.hasFileExtension ("fst;sf2;sf3;sfz;lynxpreset;fxp;fxb;vstpreset;dwp;dwb;gig"))
         return Icon::preset;
     return Icon::file;
 }
@@ -184,6 +185,9 @@ juce::String rowHint (const juce::File& f, bool folder, bool expanded)
         return tr ("SFZ instrument: [LMB] preview  [2xLMB] new LYNX Soundfont channel (or into the selected one)  drag to the Channel Rack");
     if (f.hasFileExtension ("sf2;sf3;sfz"))
         return tr ("SoundFont: [LMB] preview its first preset  [2xLMB] new LYNX Soundfont channel (or into the selected one)  drag to the Channel Rack");
+    if (isSamplerInstrumentFile (f))
+        return tr ("Sampler instrument (DirectWave, GigaStudio): [2xLMB] new DirectWave channel  [Enter] into the selected DirectWave channel  "
+                   "drag to the Channel Rack");
     return {};
 }
 
@@ -4718,6 +4722,15 @@ void BrowserComponent::showFileMenu (const juce::File& file)
         menu.addItem (tr ("Open in a new channel"), [this, file] { openSoundFontFile (engine, file); });
         menu.addItem (tr ("Send to the selected channel"), selectedIsFont, false, [this, file, selected] { openSoundFontFile (engine, file, selected); });
     }
+    else if (isSamplerInstrumentFile (file))
+    {
+        const auto selected = engine.getSelectedChannel();
+        const auto& song = engine.getSong();
+        const auto selectedIsDw = selected >= 0 && selected < (int) song.channels.size()
+                                  && song.channels[(std::size_t) selected].instrument == InstrumentKind::directwave;
+        menu.addItem (tr ("Open in a new channel"), [this, file] { openSamplerInstrumentFile (engine, file); });
+        menu.addItem (tr ("Send to the selected channel"), selectedIsDw, false, [this, file, selected] { openSamplerInstrumentFile (engine, file, selected); });
+    }
 
     addSystemItems (menu, file);
     menu.addItem (tr ("Collapse all folders"), [this] { tree->collapseAll(); });
@@ -5466,6 +5479,12 @@ void BrowserComponent::loadSelected()
     if (! file.existsAsFile())
         return;
 
+    if (isSamplerInstrumentFile (file))
+    {
+        // Enter: into the selected DirectWave channel, else a new one (round 190ii)
+        openSamplerInstrumentFile (engine, file, engine.getSelectedChannel());
+        return;
+    }
     if (file.hasFileExtension ("sf2;sf3;sfz"))
     {
         // Enter: into the selected LYNX Soundfont channel, else a new one
@@ -5581,6 +5600,11 @@ void BrowserComponent::openFile (const juce::File& file)
     {
         if (! openSoundFontFile (engine, file))
             juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Load SoundFont"), tr ("This file is not a SoundFont LYNX SHARE can read."));
+        return;
+    }
+    if (isSamplerInstrumentFile (file))
+    {
+        openSamplerInstrumentFile (engine, file); // (round 190ii, issue #149: a new DirectWave channel)
         return;
     }
     if (isAudio (file) && file.hasFileExtension ("speech"))

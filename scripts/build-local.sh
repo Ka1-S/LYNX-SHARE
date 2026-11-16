@@ -87,6 +87,8 @@ CORE="$CORE src/core/HardcoreFx.cpp"
 CORE="$CORE src/core/DirectWave.cpp"
 # LYNX Soundfont: SF2 / SF3 player (round 158; TinySoundFont + stb_vorbis in third_party)
 CORE="$CORE src/core/SoundFont.cpp src/core/SoundFontLoad.cpp src/core/SoundFontIndex.cpp"
+# other samplers' instruments as DirectWave channels: .dwp / .dwb, .gig, NCW, Kontakt detection (round 190ii, issue #149)
+CORE="$CORE src/core/SamplerImport.cpp src/core/GigFile.cpp src/core/Ncw.cpp src/core/KontaktFile.cpp"
 # Ogg Vorbis decoding as FL does (REA round 77)
 CORE="$CORE src/core/OggVorbis.cpp"
 # export options, MP3 encoding, plugin performance monitor, clip properties / arrangements (round 84)
