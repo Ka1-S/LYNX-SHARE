@@ -132,9 +132,14 @@ std::string text (std::vector<std::uint8_t> b)
 
 std::string infoName (File& f, const std::vector<Ck>& kids)
 {
+    // (the INFO list's children are kept in a variable: `find` points into the list, so a temporary would be gone
+    // before the name is read — rollup 0.1.30, macOS libc++ read freed memory there)
     if (const auto* info = find (kids, kList, kInfo))
-        if (const auto* inam = find (f.children (*info), kInam))
+    {
+        const auto infoKids = f.children (*info);
+        if (const auto* inam = find (infoKids, kInam))
             return text (f.body (*inam, 1024));
+    }
     return {};
 }
 
@@ -394,8 +399,11 @@ struct Reader
                 s = (std::uint8_t) (s ^ 0x80);
         std::string name;
         if (const auto* info = find (kids, kList, kInfo))
-            if (const auto* inam = find (file->children (*info), kInam))
+        {
+            const auto infoKids = file->children (*info); // (kept: `find` points into it)
+            if (const auto* inam = find (infoKids, kInam))
                 name = text (file->body (*inam, 256));
+        }
         if (name.empty())
             name = base + " " + std::to_string (index + 1);
         const auto wav = wavFile (pcm.data(), pcm.size(), w.channels, w.bits, w.rate, d.loop ? d.loopStart : -1,
