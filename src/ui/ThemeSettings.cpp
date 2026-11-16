@@ -106,8 +106,9 @@ void apply (const themes::Spec& spec, bool save)
 {
     const auto before = theme::currentPalette();
     state() = spec;
-    const auto after = themes::derivePalette (spec.accent, spec.background);
+    const auto after = themes::paletteFor (spec);
     theme::setPalette (after);
+    theme::menus::setStyle (spec.menuStyle);
     refreshOpenWindows (before, after);
     if (save)
     {
@@ -124,7 +125,8 @@ void loadSaved()
     if (auto spec = loadFile (savedFile()))
     {
         state() = *spec;
-        theme::setPalette (themes::derivePalette (spec->accent, spec->background));
+        theme::setPalette (themes::paletteFor (*spec));
+        theme::menus::setStyle (spec->menuStyle);
         if (auto* look = dynamic_cast<theme::LookAndFeel*> (&juce::LookAndFeel::getDefaultLookAndFeel()))
             look->refreshColours();
     }
@@ -145,6 +147,10 @@ juce::String toJson (const themes::Spec& spec)
     o->setProperty ("dim", spec.dim);
     if (! spec.startupSound.empty())
         o->setProperty ("startupSound", juce::String::fromUTF8 (spec.startupSound.c_str()));
+    if (spec.gridIntensity != 1.0f) // (round 190je; files without it keep the theme's own lines)
+        o->setProperty ("gridIntensity", spec.gridIntensity);
+    if (spec.menuStyle != themes::MenuStyle::lynxDark)
+        o->setProperty ("menuStyle", juce::String (themes::menuStyleId (spec.menuStyle)));
     return juce::JSON::toString (juce::var (o));
 }
 
@@ -171,6 +177,9 @@ std::optional<themes::Spec> fromJson (const juce::String& json)
     if (! v["dim"].isVoid())
         spec.dim = juce::jlimit (0.0f, 1.0f, (float) v["dim"]);
     spec.startupSound = v["startupSound"].toString().toStdString();
+    if (! v["gridIntensity"].isVoid())
+        spec.gridIntensity = (float) juce::jlimit (themes::gridIntensityMin, themes::gridIntensityMax, (double) v["gridIntensity"]);
+    spec.menuStyle = themes::menuStyleFromId (v["menuStyle"].toString().toStdString());
     return spec;
 }
 
@@ -354,8 +363,25 @@ public:
                                                                  &picker, &contrastNote, &imageTitle, &imageButton, &removeImage, &imageName, &fitLabel,
                                                                  &fitBox, &opacityLabel, &opacitySlider, &dimLabel, &dimSlider, &imageListLabel, &imageList,
                                                                  &openBackgrounds, &imageNote, &soundTitle, &soundName, &soundButton, &soundPlay,
-                                                                 &soundDefault, &soundNote })
+                                                                 &soundDefault, &soundNote, &lookTitle, &menuStyleLabel, &menuStyleBox, &gridLabel,
+                                                                 &gridSlider, &lookNote })
             add (*c);
+
+        // round 190je: the menus' palette (FL's classic light grey as an option, design190ia FW-16) and how strongly the
+        // editors' grid lines show (Live's "Grid Line Intensity", FM-18); presets leave both alone
+        styleLabel (menuStyleLabel, tr ("Menu style"));
+        menuStyleBox.addItem (tr ("LYNX dark (default)"), 1);
+        menuStyleBox.addItem (tr ("FL classic (light)"), 2);
+        menuStyleBox.onChange = [this] {
+            edit ([style = menuStyleBox.getSelectedId() == 2 ? themes::MenuStyle::flClassic : themes::MenuStyle::lynxDark] (themes::Spec& s) { s.menuStyle = style; });
+        };
+        styleLabel (gridLabel, tr ("Grid line intensity"));
+        gridSlider.setRange (themes::gridIntensityMin * 100.0, themes::gridIntensityMax * 100.0, 5.0);
+        gridSlider.setTextValueSuffix ("%");
+        gridSlider.setTextBoxStyle (juce::Slider::TextBoxRight, false, 52, 20);
+        gridSlider.setDoubleClickReturnValue (true, 100.0);
+        gridSlider.onValueChange = [this] { edit ([v = (float) gridSlider.getValue() / 100.0f] (themes::Spec& s) { s.gridIntensity = v; }, false); };
+        styleNote (lookNote, tr ("Grid line intensity: the bar, beat and step lines of the Piano roll, Playlist and Channel rack (100 % = the theme's own; double-click resets)."));
 
         // the Backgrounds folder next to LYNX.exe (issue #12): its images in a list, the folder a click away
         styleLabel (imageListLabel, tr ("Backgrounds folder"));
@@ -492,6 +518,14 @@ private:
             openBackgrounds.setBounds (r.removeFromLeft (juce::jmin (130, r.getWidth())));
         }
         imageNote.setBounds (row (32));
+        lookTitle.setBounds (row (24));
+        for (auto [label, control] : { std::pair<juce::Component*, juce::Component*> { &menuStyleLabel, &menuStyleBox }, { &gridLabel, &gridSlider } })
+        {
+            auto r = row (26);
+            label->setBounds (r.removeFromLeft (130));
+            control->setBounds (r.removeFromLeft (juce::jmin (300, r.getWidth())));
+        }
+        lookNote.setBounds (row (32));
         for (auto [label, control] : { std::pair<juce::Component*, juce::Component*> { &fitLabel, &fitBox }, { &opacityLabel, &opacitySlider }, { &dimLabel, &dimSlider } })
         {
             auto r = row (26);
@@ -612,6 +646,8 @@ private:
         dimSlider.setValue (std::round (spec.dim * 100.0f), juce::dontSendNotification);
         for (auto* c : std::initializer_list<juce::Component*> { &fitBox, &opacitySlider, &dimSlider })
             c->setEnabled (! spec.image.empty());
+        menuStyleBox.setSelectedId (spec.menuStyle == themes::MenuStyle::flClassic ? 2 : 1, juce::dontSendNotification);
+        gridSlider.setValue (std::round (spec.gridIntensity * 100.0f), juce::dontSendNotification);
     }
 
     void choosePreset()
@@ -735,7 +771,10 @@ private:
     juce::Array<juce::File> backgroundFiles;
     juce::TextButton openBackgrounds { tr ("Open folder") }, soundButton { tr ("Choose sound...") }, soundPlay { tr ("Play") },
         soundDefault { tr ("Default") };
-    SectionTitle soundTitle { tr ("Startup sound") };
+    SectionTitle soundTitle { tr ("Startup sound") }, lookTitle { tr ("Menus and grid") };
+    juce::Label menuStyleLabel, gridLabel, lookNote;
+    juce::ComboBox menuStyleBox;
+    juce::Slider gridSlider { juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight };
     ColourWell accentWell { tr ("Accent color") }, backgroundWell { tr ("Background") }, workspaceWell { tr ("Workspace") };
     ColourWell* selected = nullptr;
     juce::ToggleButton autoWorkspace;

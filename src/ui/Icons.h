@@ -80,7 +80,9 @@ void draw (juce::Graphics& g, Icon icon, juce::Rectangle<float> area, juce::Colo
 // A flat button that shows an icon, optionally followed by text. Uses the theme colours:
 // neutral at rest, red accent when toggled on (or when `primary`).
 //
-// Hover and press states fade in and out (about 120 ms) instead of switching at once.
+// Hover and press states fade in and out (about 120 ms) instead of switching at once. The states follow LYNX's one rule
+// for every button kind (core/ThemePalette.h buttonLook, round 190je): a switch previews its "on" look under the mouse
+// (FL 2024), a button that acts once lights a tile.
 class IconButton : public juce::Button,
                    private juce::Timer
 {
@@ -95,6 +97,9 @@ public:
     void setIconColour (juce::Colour colour);            // icon colour at rest (default: the theme's secondary text)
     void setFlat (bool shouldBeFlat);                    // no background at rest (toolbar style)
     void setCorners (bool roundLeft, bool roundRight);   // for segmented groups
+    // Whether the button is a switch (its hover previews the "on" look) or acts once. By default a switch is a button that
+    // toggles on click, sits in a radio group or was given its own "on" colours.
+    void setToggleLook (bool isSwitch);
     int getIdealWidth (int height) const;
     // The icon's box: `fraction` of the button's height, at most `maxPx` (default 0.66 and 20 px). Icons are
     // drawn on whole pixels, so 16, 20 and 24 px boxes stay crisp.
@@ -134,5 +139,8 @@ private:
     bool primary = false, flat = false, roundLeft = true, roundRight = true;
     float iconFraction = 0.66f, iconMax = 20.0f;
     juce::Colour onColour, iconOnColour, iconColour;
+    int toggleLook = -1; // -1 automatic, 0 acts once, 1 a switch
+    bool onColoursSet = false;
+    bool actsAsSwitch() const;
 };
 } // namespace lynx

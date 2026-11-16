@@ -64,6 +64,7 @@
 #include "ui/Icons.h"
 #include "ui/PlaylistComponent.h"
 #include "ui/Theme.h"
+#include "ui/LabelFont.h"
 #include "ui/ValueControl.h"
 #include "ui/WaveformView.h"
 #include "ui/AudioEditor.h"
@@ -1443,8 +1444,9 @@ public:
                               : n.folder || ! isAudio (n.file) ? n.file.getFileName()
                                                                : n.file.getFileNameWithoutExtension();
             const auto bold = (n.folder && n.expanded) || n.current || n.kind == Kind::project;
-            // round 190iz: FL's tree face one step larger (FM-9); Live's list a step smaller
-            const juce::Font font (theme::font (live ? theme::type::small : theme::type::body + 1.0f, bold));
+            // round 190iz: FL's tree face one step larger (FM-9); Live's list a step smaller. Round 190je: the FL tree is
+            // condensed with FL-style labels on (theme::labelFont = theme::font while the option is off)
+            const juce::Font font (live ? theme::font (theme::type::small, bold) : theme::labelFont (theme::type::body + 1.0f, bold));
             g.setFont (font);
 
             auto nameColour = playing ? accentHover : n.folder || i == hovered || i == selected ? textPrimary : textPrimary.withAlpha (0.86f);

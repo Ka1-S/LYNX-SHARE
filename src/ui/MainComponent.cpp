@@ -1,5 +1,6 @@
 #include "ui/ControllerBridge.h"
 #include "ui/ExternalDrag.h"
+#include "ui/LabelFont.h"
 #include "ui/AudioClipboard.h"
 #include "ui/MidiClipboard.h"
 #include "ui/VideoTracks.h"
@@ -740,6 +741,10 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
             b.setOnColour (colour::textPrimary.withAlpha (0.08f));
             b.setIconColourWhenOn (colour::textPrimary);
         }
+        // round 190je (one state rule): the transport and the save reminder light up when they act, they are not
+        // switches whose "on" look a hover should preview (the others with "on" colours are)
+        for (auto* b : { &playButton, &recordButton, &saveButton })
+            b->setToggleLook (false);
     }
     quickTips = std::make_unique<ui::QuickTipWindow>();
 
@@ -7937,6 +7942,7 @@ void MainComponent::openSettings (int page)
         o.language = i18n::saved();
         o.uiFont = theme::savedUiFont();
         o.textSize = theme::savedTextSize();
+        o.condensedLabels = theme::savedCondensedLabels();
         o.uiScale = safe->toolbarLayout.uiScale;
         o.compactMenus = theme::menus::compact();
         o.waveSpectral = ui::WaveformCache::spectral;
@@ -8096,6 +8102,8 @@ void MainComponent::openSettings (int page)
             theme::saveUiFont (o.uiFont);
         if (o.textSize != theme::savedTextSize())
             theme::saveTextSize (o.textSize);
+        if (o.condensedLabels != theme::savedCondensedLabels())
+            theme::saveCondensedLabels (o.condensedLabels);
         if (o.language != i18n::saved())
             self.showLanguageChoice (o.language);
     };

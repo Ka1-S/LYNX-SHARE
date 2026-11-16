@@ -27,11 +27,19 @@
 #include "core/TextSize.h"
 #include "core/UiFontChoice.h"
 #include "platform/Paths.h"
+#include "ui/CondensedFontData.h"
+#include "ui/LabelFont.h"
 #include "ui/Icons.h"
 #include "ui/ImageCaches.h"
 #include "ui/PaintAB.h"
 #include "ui/PluginSkin.h"
 #include "ui/WindowOwner.h"
+
+// cmake/LynxPatchJuce.cmake fix 40 (round 190je): where a tall menu breaks into a second column (set by the LookAndFeel)
+namespace juce
+{
+extern int (*lynxTallMenuBreakHook) (const int* heights, const int* kinds, int count, int screenHeight);
+}
 
 namespace lynx::theme
 {
@@ -60,21 +68,26 @@ FontCache& fontCache()
     return *cache;
 }
 
+juce::Typeface::Ptr condensedFace (bool bold); // (below)
+
 juce::FontOptions fontOptions (float size, int kind)
 {
     if (kind == 2)
         return juce::FontOptions (juce::Font::getDefaultMonospacedFontName(), size, juce::Font::plain);
-    return juce::FontOptions (size, kind == 1 ? juce::Font::bold : juce::Font::plain);
+    if (kind >= 3)
+        if (auto face = condensedFace (kind == 4))
+            return juce::FontOptions (face).withHeight (size);
+    return juce::FontOptions (size, kind == 1 || kind == 4 ? juce::Font::bold : juce::Font::plain);
 }
 
-// kind 0 plain, 1 bold, 2 monospaced
+// kind 0 plain, 1 bold, 2 monospaced, 3 condensed, 4 condensed bold
 juce::Font cachedFont (float size, int kind)
 {
     if (! lynx::ui::paintCache())
         return juce::Font (fontOptions (size, kind));
     std::uint32_t bits = 0;
     std::memcpy (&bits, &size, sizeof (bits));
-    const auto key = ((std::uint64_t) bits << 2) | (std::uint64_t) kind;
+    const auto key = ((std::uint64_t) bits << 3) | (std::uint64_t) kind;
     auto& cache = fontCache();
     const juce::SpinLock::ScopedLockType lock (cache.lock);
     if (const auto it = cache.fonts.find (key); it != cache.fonts.end())
@@ -93,6 +106,41 @@ juce::Font font (float size, bool bold)
 juce::Font monoFont (float size)
 {
     return cachedFont (size, 2);
+}
+
+// --- Settings › General › "Condensed labels (FL style)" (round 190je, FM-5 / FM-S8) -----------------------------------
+namespace
+{
+bool condensedOn = false;
+constexpr float condensedScale = 1.15f; // a step larger: Open Sans Condensed is about 80 % as wide, so the text keeps its width
+juce::File condensedFile() { return platform::settingsFile ("ui-condensed-labels.txt"); }
+} // namespace
+
+juce::Font labelFont (float size, bool bold)
+{
+    if (! condensedOn)
+        return font (size, bold);
+    return cachedFont (size * condensedScale, bold ? 4 : 3);
+}
+
+void setCondensedLabels (bool on)
+{
+    if (on != condensedOn)
+    {
+        condensedOn = on;
+        clearFontCache();
+    }
+}
+
+bool condensedLabels() { return condensedOn; }
+bool savedCondensedLabels() { return condensedFile().loadFileAsString().trim() == "1"; }
+
+void saveCondensedLabels (bool on)
+{
+    if (on)
+        condensedFile().replaceWithText ("1");
+    else
+        condensedFile().deleteFile();
 }
 
 void clearFontCache()
@@ -316,6 +364,13 @@ constexpr bool nativeTiles =
     false;
    #endif
 std::uint64_t paletteStamp = 0; // (setPalette: +1; part of the knob tiles' keys)
+
+// the palette of the tokens in use (setPalette), for the state rules that read several tokens at once (round 190je)
+themes::Palette& paletteInUse()
+{
+    static themes::Palette palette = themes::defaultPalette();
+    return palette;
+}
 // (the largest channel difference a tile may show against its shape drawn straight, --selftest; see paintCacheSelfTest)
 constexpr int nativeTolerance = 1, nativeKnobTolerance = 3;
 } // namespace
@@ -911,6 +966,7 @@ juce::String paintCacheSelfTest()
 void setPalette (const themes::Palette& p)
 {
     ++paletteStamp;
+    paletteInUse() = p;
     auto c = [] (std::uint32_t argb) { return juce::Colour (argb); };
     bg0 = c (p.bg0); bg1 = c (p.bg1); bg2 = c (p.bg2); bg3 = c (p.bg3); bg4 = c (p.bg4); bg5 = c (p.bg5); bg6 = c (p.bg6);
     border = c (p.border); borderStrong = c (p.borderStrong);
@@ -922,11 +978,18 @@ void setPalette (const themes::Palette& p)
     gridBar = c (p.gridBar); gridBeat = c (p.gridBeat); gridStep = c (p.gridStep); keyBlack = c (p.keyBlack);
     rowWhite = c (p.rowWhite); rowBlack = c (p.rowBlack);
     noteSoft = c (p.noteSoft); noteHard = c (p.noteHard); noteMuted = c (p.noteMuted); ledOff = c (p.ledOff);
+    colour::outline = c (p.outline);
 
     // the legacy names
     theme::window = bg1; theme::panel = bg2; theme::toolbar = bg3; theme::channelButton = bg4; theme::channelButtonSelected = bg6;
     theme::knobBackground = bg0; theme::stepOn = accent; theme::stepOnOffGrid = stepNote; theme::accentOrange = accent;
     theme::playhead = accent; theme::text = textPrimary;
+}
+
+ButtonColours buttonColours (themes::ButtonKind kind, bool on, float hover, bool down, bool enabled)
+{
+    const auto look = themes::buttonLook (paletteInUse(), kind, on, (double) hover, down, enabled);
+    return { juce::Colour (look.fill), juce::Colour (look.edge), juce::Colour (look.content) };
 }
 
 juce::String mnemonic (const juce::String& text, char key)
@@ -960,7 +1023,7 @@ themes::Palette currentPalette()
     return { c (bg0), c (bg1), c (bg2), c (bg3), c (bg4), c (bg5), c (bg6), c (border), c (borderStrong), c (textPrimary), c (textSecondary),
              c (textDisabled), c (accent), c (accentHover), c (accentPressed), c (accentMuted), c (onAccent), c (selectionFill), c (knobArc),
              c (knobTrack), c (colour::stepOff), c (stepOffAlt), c (stepNote), c (gridBar), c (gridBeat), c (gridStep), c (keyBlack), c (rowWhite),
-             c (rowBlack), c (noteSoft), c (noteHard), c (noteMuted), c (ledOff) };
+             c (rowBlack), c (noteSoft), c (noteHard), c (noteMuted), c (ledOff), c (colour::outline) };
 }
 
 namespace
@@ -1026,6 +1089,38 @@ const std::array<juce::Typeface::Ptr, 2>& bundledFaces()
 bool typefaceFallbackOff = false; // (fontSelfTest only)
 } // namespace
 
+namespace
+{
+// Open Sans Condensed (round 190je), decoded from ui/CondensedFontData.h on first use: only when the option is on, so the
+// default look never meets these faces. On Linux they get Open Sans's adjusted line metrics (issue #189), as the
+// regular face does, so both draw their letters at the same scale.
+juce::Typeface::Ptr condensedFace (bool bold)
+{
+    static const std::array<juce::Typeface::Ptr, 2> faces = [] {
+        const auto decode = [] (const char* const* pieces, int count) {
+            juce::String text;
+            for (int i = 0; i < count; ++i)
+                text += pieces[i];
+            juce::MemoryOutputStream out;
+            juce::Base64::convertFromBase64 (out, text);
+            return out.getMemoryBlock();
+        };
+        const auto make = [] (const juce::MemoryBlock& data) -> juce::Typeface::Ptr {
+            if (data.getSize() == 0)
+                return {};
+           #if LYNX_BUNDLED_FONT
+            return bundledFace ((const unsigned char*) data.getData(), (int) data.getSize());
+           #else
+            return juce::Typeface::createSystemTypefaceFor (data.getData(), data.getSize());
+           #endif
+        };
+        return std::array<juce::Typeface::Ptr, 2> { make (decode (condensedfont::semiBold, condensedfont::semiBoldPieces)),
+                                                    make (decode (condensedfont::bold, condensedfont::boldPieces)) };
+    }();
+    return faces[bold ? 1 : 0] != nullptr ? faces[bold ? 1 : 0] : faces[0];
+}
+} // namespace
+
 juce::StringArray fontFoldersToScan (const juce::StringArray& fontconfigFolders, const std::function<bool (const juce::String&)>& exists)
 {
     // JUCE splits its list at ';' and ',' and scans each folder with everything below it: a folder inside another
@@ -1072,6 +1167,14 @@ LookAndFeel::LookAndFeel()
    #endif
     clearFontCache(); // (the cached fonts may hold the typeface of the family before)
     refreshColours();
+
+    // FL's columns for long menus (round 190je, FW-13): a menu taller than 70 % of the screen breaks once at a group
+    juce::lynxTallMenuBreakHook = [] (const int* heights, const int* kinds, int count, int screenHeight) {
+        std::vector<themes::MenuRow> rows ((std::size_t) juce::jmax (0, count));
+        for (int i = 0; i < count; ++i)
+            rows[(std::size_t) i] = { heights[i], kinds[i] == 1, kinds[i] == 2 };
+        return themes::tallMenuBreak (rows, screenHeight * 7 / 10);
+    };
 }
 
 // JUCE expects a typeface for every font ("the look and feel must return a typeface!") but, on Linux, has none for a
@@ -1306,11 +1409,13 @@ void LookAndFeel::refreshColours()
     setColour (juce::ComboBox::buttonColourId, bg4);
     setColour (juce::ComboBox::focusedOutlineColourId, accent);
 
-    setColour (juce::PopupMenu::backgroundColourId, bg3);
-    setColour (juce::PopupMenu::textColourId, textPrimary);
-    setColour (juce::PopupMenu::headerTextColourId, textSecondary);
-    setColour (juce::PopupMenu::highlightedBackgroundColourId, bg5);
-    setColour (juce::PopupMenu::highlightedTextColourId, textPrimary);
+    // (round 190je: the menu style's colours, LYNX dark or FL classic)
+    const auto menuLook = menus::colours();
+    setColour (juce::PopupMenu::backgroundColourId, menuLook.background);
+    setColour (juce::PopupMenu::textColourId, menuLook.text);
+    setColour (juce::PopupMenu::headerTextColourId, menuLook.bandText);
+    setColour (juce::PopupMenu::highlightedBackgroundColourId, menuLook.hover);
+    setColour (juce::PopupMenu::highlightedTextColourId, menuLook.hoverText);
 
     setColour (juce::Label::textColourId, textPrimary);
     setColour (juce::Label::backgroundColourId, juce::Colours::transparentBlack);
@@ -1323,7 +1428,7 @@ void LookAndFeel::refreshColours()
     setColour (juce::TextEditor::textColourId, textPrimary);
     setColour (juce::TextEditor::highlightColourId, accent.withAlpha (0.35f));
     setColour (juce::TextEditor::highlightedTextColourId, textPrimary);
-    setColour (juce::TextEditor::outlineColourId, border);
+    setColour (juce::TextEditor::outlineColourId, colour::outline); // (round 190je: 3:1, was border 1.1:1)
     setColour (juce::TextEditor::focusedOutlineColourId, accent);
     setColour (juce::TextEditor::shadowColourId, juce::Colours::transparentBlack);
     setColour (juce::CaretComponent::caretColourId, accent);
@@ -1386,14 +1491,27 @@ void LookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& button,
     auto bounds = button.getLocalBounds().toFloat().reduced (0.5f);
     const auto on = button.getToggleState();
     auto base = backgroundColour; // already buttonOnColour when toggled
+    juce::Colour edge;
 
-    if (down)
-        base = on ? accentPressed : (base == bg4 ? bg6 : base.brighter (0.18f));
-    else if (highlighted)
-        base = on ? accentHover : (base == bg4 ? bg5 : base.brighter (0.1f));
+    // LYNX's own colours (a secondary button: bg4; on / primary: the accent) follow the one state rule (round 190je);
+    // a button given colours of its own keeps its shading
+    const auto standard = base == bg4 || base == accent;
+    if (standard)
+    {
+        const auto look = buttonColours (themes::ButtonKind::secondary, on || base == accent, highlighted ? 1.0f : 0.0f, down, button.isEnabled());
+        base = look.fill;
+        edge = look.edge;
+    }
+    else
+    {
+        if (down)
+            base = on ? accentPressed : base.brighter (0.18f);
+        else if (highlighted)
+            base = on ? accentHover : base.brighter (0.1f);
 
-    if (! button.isEnabled())
-        base = base.withMultipliedAlpha (0.5f);
+        if (! button.isEnabled())
+            base = base.withMultipliedAlpha (0.5f);
+    }
 
     const auto flatLeft = button.isConnectedOnLeft(), flatRight = button.isConnectedOnRight();
     juce::Path p;
@@ -1401,6 +1519,16 @@ void LookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& button,
                            ! flatRight, ! flatLeft, ! flatRight);
     g.setColour (base);
     g.fillPath (p);
+    if (! edge.isTransparent())
+    {
+        // 1 px outline (round 190je, FW idea 6): the fill alone reads 1.1:1 on the panels
+        // (on the pixel centres: `bounds` is the button inset by half a pixel, so the line covers exactly its edge pixels)
+        juce::Path rim;
+        rim.addRoundedRectangle (bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight(), radius::md, radius::md, ! flatLeft, ! flatRight,
+                                 ! flatLeft, ! flatRight);
+        g.setColour (edge);
+        g.strokePath (rim, juce::PathStrokeType (1.0f));
+    }
 
     if ((button.hasKeyboardFocus (false) || button.getProperties().contains ("lynxSnapshotFocus")) // (--snapshot: see saveWindow)
         && button.getWantsKeyboardFocus())
@@ -1419,8 +1547,9 @@ void LookAndFeel::drawButtonText (juce::Graphics& g, juce::TextButton& button, b
 {
     const auto font = getTextButtonFont (button, button.getHeight());
     g.setFont (font);
-    const auto fg = button.findColour (button.getToggleState() ? juce::TextButton::textColourOnId : juce::TextButton::textColourOffId)
-                        .withMultipliedAlpha (button.isEnabled() ? 1.0f : 0.45f);
+    const auto own = button.findColour (button.getToggleState() ? juce::TextButton::textColourOnId : juce::TextButton::textColourOffId);
+    // disabled: the disabled text token (3.6:1, round 190je) for LYNX's own text colours, else the colour dimmed as before
+    const auto fg = button.isEnabled() ? own : (own == textPrimary || own == onAccent) ? textDisabled : own.withMultipliedAlpha (0.45f);
     g.setColour (fg);
 
     auto area = button.getLocalBounds().reduced (juce::jmin (8, button.getWidth() / 6), 0);
@@ -1454,7 +1583,8 @@ void LookAndFeel::drawTickBox (juce::Graphics& g, juce::Component& component, fl
         const auto circle = box.withSizeKeepingCentre (juce::jmin (box.getWidth(), box.getHeight()), juce::jmin (box.getWidth(), box.getHeight()));
         g.setColour (bg0);
         g.fillEllipse (circle);
-        g.setColour (ticked ? (enabled ? (highlighted ? accentHover : accent) : accentMuted) : (highlighted ? textSecondary : borderStrong));
+        g.setColour (ticked ? (enabled ? (highlighted ? accentHover : accent) : accentMuted)
+                            : (highlighted ? textSecondary : enabled ? colour::outline : colour::outline.withMultipliedAlpha (0.5f)));
         g.drawEllipse (circle.reduced (0.5f), 1.2f);
         if (ticked)
             g.fillEllipse (circle.reduced (circle.getWidth() * 0.28f));
@@ -1466,7 +1596,8 @@ void LookAndFeel::drawTickBox (juce::Graphics& g, juce::Component& component, fl
     else
     {
         fillRounded (g, box, radius::sm, bg0);
-        outlineRounded (g, box, radius::sm, highlighted ? textSecondary : borderStrong);
+        // (round 190je: the outline at 3:1, was borderStrong 1.4:1)
+        outlineRounded (g, box.expanded (0.5f), radius::sm, highlighted ? textSecondary : enabled ? colour::outline : colour::outline.withMultipliedAlpha (0.5f));
     }
 
     if (ticked)
@@ -1481,7 +1612,8 @@ void LookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& butto
     drawTickBox (g, button, 2.0f, ((float) button.getHeight() - tickSize) * 0.5f, tickSize, tickSize, button.getToggleState(),
                  button.isEnabled(), highlighted, down);
 
-    g.setColour (button.findColour (juce::ToggleButton::textColourId).withMultipliedAlpha (button.isEnabled() ? 1.0f : 0.5f));
+    const auto own = button.findColour (juce::ToggleButton::textColourId);
+    g.setColour (button.isEnabled() ? own : own == textPrimary ? textDisabled : own.withMultipliedAlpha (0.5f));
     g.setFont (uiFont (fontSize));
     const auto textArea = button.getLocalBounds().withTrimmedLeft (juce::roundToInt (tickSize) + 8).withTrimmedRight (2);
     g.drawFittedText (button.getButtonText(), textArea, juce::Justification::centredLeft, 2, 0.85f);
@@ -1494,12 +1626,17 @@ void LookAndFeel::drawComboBox (juce::Graphics& g, int width, int height, bool, 
 {
     const auto bounds = juce::Rectangle<float> (0.0f, 0.0f, (float) width, (float) height).reduced (0.5f);
     const auto hover = box.isMouseOver (true) && box.isEnabled();
-    fillRounded (g, bounds, radius::md, hover ? bg5 : box.findColour (juce::ComboBox::backgroundColourId));
+    const auto own = box.findColour (juce::ComboBox::backgroundColourId);
+    // LYNX's own box (bg4) follows the button rule (round 190je): bg5 under the mouse, a 1 px outline at 3:1
+    const auto look = buttonColours (themes::ButtonKind::secondary, false, hover ? 1.0f : 0.0f, false, box.isEnabled());
+    fillRounded (g, bounds, radius::md, own == bg4 ? look.fill : hover ? bg5 : own);
 
     if ((box.hasKeyboardFocus (true) || box.getProperties().contains ("lynxSnapshotFocus")) && box.getWantsKeyboardFocus())
         outlineRounded (g, bounds, radius::md, accent.withAlpha (0.7f));
-    else if (! box.findColour (juce::ComboBox::outlineColourId).isTransparent())
-        outlineRounded (g, bounds, radius::md, box.findColour (juce::ComboBox::outlineColourId));
+    else if (const auto rim = box.findColour (juce::ComboBox::outlineColourId); ! rim.isTransparent() && rim != borderStrong)
+        outlineRounded (g, bounds, radius::md, rim);
+    else if (own == bg4 || rim == borderStrong) // (Settings' boxes asked for borderStrong, 1.4:1: the 3:1 outline)
+        outlineRounded (g, bounds.expanded (0.5f), radius::md, look.edge); // (expanded: the helper insets half a pixel, crisp)
 
     const auto arrowSize = juce::jmin (14.0f, (float) height * 0.6f);
     const auto arrowArea = juce::Rectangle<float> ((float) width - arrowSize - 7.0f, ((float) height - arrowSize) * 0.5f, arrowSize, arrowSize);
@@ -1516,7 +1653,8 @@ void LookAndFeel::positionComboBoxText (juce::ComboBox& box, juce::Label& label)
     const auto arrowSize = juce::jmin (14, juce::roundToInt ((float) box.getHeight() * 0.6f));
     label.setBounds (2, 1, box.getWidth() - arrowSize - 12, box.getHeight() - 2);
     label.setFont (getComboBoxFont (box));
-    label.setColour (juce::Label::textColourId, box.findColour (juce::ComboBox::textColourId).withMultipliedAlpha (box.isEnabled() ? 1.0f : 0.5f));
+    const auto own = box.findColour (juce::ComboBox::textColourId);
+    label.setColour (juce::Label::textColourId, box.isEnabled() ? own : own == textPrimary ? textDisabled : own.withMultipliedAlpha (0.5f));
 }
 
 void LookAndFeel::preparePopupMenuWindow (juce::Component& window)
@@ -1607,9 +1745,22 @@ void LookAndFeel::preparePopupMenuWindow (juce::Component& window)
 void LookAndFeel::drawPopupMenuBackground (juce::Graphics& g, int width, int height)
 {
     const auto bounds = juce::Rectangle<float> (0.0f, 0.0f, (float) width, (float) height);
-    g.fillAll (bg3);
-    g.setColour (borderStrong);
+    const auto look = menus::colours();
+    g.fillAll (look.background);
+    g.setColour (look.border);
     g.drawRect (bounds, 1.0f);
+}
+
+// FL's 1 px line between the columns of a long menu (round 190je, FW-13)
+void LookAndFeel::drawPopupMenuColumnSeparatorWithOptions (juce::Graphics& g, const juce::Rectangle<int>& bounds, const juce::PopupMenu::Options&)
+{
+    g.setColour (menus::colours().separator);
+    g.fillRect (bounds.withSizeKeepingCentre (1, bounds.getHeight()));
+}
+
+int LookAndFeel::getPopupMenuColumnSeparatorWidthWithOptions (const juce::PopupMenu::Options&)
+{
+    return 1;
 }
 
 namespace menus
@@ -1617,17 +1768,29 @@ namespace menus
 namespace
 {
 bool compactMenus = true;
+themes::MenuStyle menuStyle = themes::MenuStyle::lynxDark;
 }
 void setCompact (bool c) { compactMenus = c; }
 bool compact() { return compactMenus; }
 int itemHeight() { return compactMenus ? 21 : 26; }
-int headerHeight() { return compactMenus ? 19 : 39; }
+int headerHeight() { return compactMenus ? 17 : 22; }
 int separatorHeight() { return compactMenus ? 5 : 9; }
+float textSize() { return textsize::scaled (14.0f, theme::textSize(), textsize::Role::body); }
+void setStyle (themes::MenuStyle s) { menuStyle = s; }
+themes::MenuStyle style() { return menuStyle; }
+
+Colours colours()
+{
+    const auto m = themes::menuColours (paletteInUse(), menuStyle);
+    const auto c = [] (std::uint32_t argb) { return juce::Colour (argb); };
+    return { c (m.background), c (m.border), c (m.text), c (m.shortcut), c (m.disabled), c (m.band), c (m.bandText), c (m.hover), c (m.hoverText),
+             c (m.separator), c (m.check) };
+}
 } // namespace menus
 
 juce::Font LookAndFeel::getPopupMenuFont()
 {
-    return uiFont (type::body);
+    return labelFont (menus::textSize());
 }
 
 void LookAndFeel::getIdealPopupMenuItemSize (const juce::String& text, bool isSeparator, int standardMenuItemHeight, int& idealWidth,
@@ -1645,7 +1808,7 @@ void LookAndFeel::getIdealPopupMenuItemSize (const juce::String& text, bool isSe
     {
         // JUCE asks with -1 for a section header and then adds half of the answer: hand back 2/3 of the wanted height
         idealHeight = (menus::headerHeight() * 2 + 2) / 3;
-        idealWidth = juce::roundToInt (juce::GlyphArrangement::getStringWidth (uiFont (type::small, true), caps (text)) * 0.8f) + 24;
+        idealWidth = juce::roundToInt (juce::GlyphArrangement::getStringWidth (labelFont (type::small), text)) + 24;
         return;
     }
     idealHeight = standardMenuItemHeight > 0 ? standardMenuItemHeight : menus::itemHeight();
@@ -1658,40 +1821,44 @@ void LookAndFeel::drawPopupMenuItem (juce::Graphics& g, const juce::Rectangle<in
                                      bool isTicked, bool hasSubMenu, const juce::String& text, const juce::String& shortcutKeyText,
                                      const juce::Drawable* icon, const juce::Colour* textColourToUse)
 {
+    const auto look = menus::colours();
     if (isSeparator)
     {
-        g.setColour (border.brighter (0.1f));
+        g.setColour (look.separator);
         g.fillRect (area.reduced (8, 0).withHeight (1).withY (area.getCentreY()));
         return;
     }
 
-    auto r = area.reduced (4, 1);
+    auto r = area.reduced (0, 0);
+    const auto hot = isHighlighted && isActive;
 
-    if (isHighlighted && isActive)
+    // FL's hover: the whole row, square, no accent bar (round 190je, FW-14: the accent stays for selected states)
+    if (hot)
     {
-        fillRounded (g, r.toFloat(), radius::sm, bg5);
-        g.setColour (accent);
-        g.fillRoundedRectangle (r.toFloat().withWidth (3.0f).reduced (0.0f, 4.0f), 1.5f);
+        g.setColour (look.hover);
+        g.fillRect (r);
     }
 
-    auto textColour = textColourToUse != nullptr ? *textColourToUse : textPrimary;
+    auto textColour = textColourToUse != nullptr ? *textColourToUse : look.text;
     if (! isActive)
-        textColour = textDisabled;
+        textColour = look.disabled;
+    else if (hot && textColourToUse == nullptr)
+        textColour = look.hoverText;
 
-    auto content = r.reduced (8, 0);
+    auto content = r.reduced (12, 0);
     auto iconArea = content.removeFromLeft (juce::roundToInt ((float) r.getHeight() * 0.8f)).toFloat();
 
     if (icon != nullptr)
         icon->drawWithin (g, iconArea.withSizeKeepingCentre (14.0f, 14.0f), juce::RectanglePlacement::centred, isActive ? 1.0f : 0.4f);
     else if (isTicked)
-        icons::draw (g, Icon::check, iconArea.withSizeKeepingCentre (16.0f, 16.0f), isActive ? accent : textDisabled);
+        icons::draw (g, Icon::check, iconArea.withSizeKeepingCentre (16.0f, 16.0f), ! isActive ? look.disabled : hot ? look.hoverText : look.check);
 
     if (hasSubMenu)
     {
         const auto arrow = content.removeFromRight (14).toFloat().withSizeKeepingCentre (12.0f, 12.0f);
         juce::Graphics::ScopedSaveState state (g);
         g.addTransform (juce::AffineTransform::rotation (-pi * 0.5f, arrow.getCentreX(), arrow.getCentreY()));
-        icons::draw (g, Icon::chevronDown, arrow, isHighlighted ? textPrimary : textSecondary);
+        icons::draw (g, Icon::chevronDown, arrow, ! isActive ? look.disabled : hot ? look.hoverText : look.shortcut);
     }
 
     content.removeFromLeft (4);
@@ -1700,9 +1867,11 @@ void LookAndFeel::drawPopupMenuItem (juce::Graphics& g, const juce::Rectangle<in
 
     if (shortcutKeyText.isNotEmpty())
     {
-        g.setColour (textSecondary.withMultipliedAlpha (isActive ? 1.0f : 0.6f));
-        g.setFont (uiFont (type::small));
-        g.drawText (shortcutKeyText, content.removeFromRight (juce::roundToInt (juce::GlyphArrangement::getStringWidth (uiFont (type::small), shortcutKeyText)) + 4),
+        // FL's shortcut column: right-aligned, italic, a step smaller; white under the mouse as FL's
+        const auto keyFont = labelFont (type::small).italicised();
+        g.setColour (! isActive ? look.disabled : hot ? look.hoverText : look.shortcut);
+        g.setFont (keyFont);
+        g.drawText (shortcutKeyText, content.removeFromRight (juce::roundToInt (juce::GlyphArrangement::getStringWidth (keyFont, shortcutKeyText)) + 4),
                     juce::Justification::centredRight, false);
         g.setFont (font);
     }
@@ -1726,9 +1895,14 @@ void LookAndFeel::drawPopupMenuItem (juce::Graphics& g, const juce::Rectangle<in
 
 void LookAndFeel::drawPopupMenuSectionHeader (juce::Graphics& g, const juce::Rectangle<int>& area, const juce::String& sectionName)
 {
-    g.setFont (uiFont (type::small, true));
-    g.setColour (textSecondary);
-    g.drawFittedText (caps (sectionName), area.reduced (14, 0).withTrimmedTop (menus::compact() ? 2 : 4), juce::Justification::centredLeft, 1);
+    // FL's section band (round 190je, FW-12): the full row filled, the title in sentence case ("Recent projects")
+    const auto look = menus::colours();
+    const auto band = area.withTrimmedTop (juce::jmax (0, area.getHeight() - menus::headerHeight()));
+    g.setColour (look.band);
+    g.fillRect (band);
+    g.setFont (labelFont (type::small));
+    g.setColour (look.bandText);
+    g.drawFittedText (sectionName, band.reduced (8, 0), juce::Justification::centredLeft, 1);
 }
 
 void LookAndFeel::drawMenuBarBackground (juce::Graphics&, int, int, bool, juce::MenuBarComponent&)
@@ -1738,7 +1912,7 @@ void LookAndFeel::drawMenuBarBackground (juce::Graphics&, int, int, bool, juce::
 
 juce::Font LookAndFeel::getMenuBarFont (juce::MenuBarComponent&, int, const juce::String&)
 {
-    return uiFont (type::body);
+    return labelFont (type::body);
 }
 
 int LookAndFeel::getMenuBarItemWidth (juce::MenuBarComponent& bar, int itemIndex, const juce::String& itemText)

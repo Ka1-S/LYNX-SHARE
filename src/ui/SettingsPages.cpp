@@ -1,6 +1,7 @@
 #include "ui/RemoteControl.h"
 #include "ui/NumBox.h"
 #include "ui/SettingsPages.h"
+#include "ui/LabelFont.h"
 #include "core/TextSize.h"
 #include "ui/RemoteControlSettings.h"
 #include "platform/Paths.h"
@@ -557,6 +558,7 @@ private:
         fontPreview.setBounds (r.indented (22).translated (0, -3));
         fontNote.setBounds (r.indentedNote (fontNote, 16).translated (0, -5));
         textSizeBox.setBounds (r.row (textSizeLabel, 120));
+        condensedLabels.setBounds (r.indented (24));
         scaleBox.setBounds (r.row (scaleLabel, 120));
         menuBox.setBounds (r.row (menuLabel, 160));
         wavesBox.setBounds (r.row (wavesLabel, 0));
@@ -696,8 +698,13 @@ private:
     // (Labels and caches hold the old font's shapes). The sample line shows the choice right away.
     void setupFontRow()
     {
-        for (auto* c : std::initializer_list<juce::Component*> { &fontLabel, &fontBox, &fontReset, &fontPreview, &fontNote, &textSizeLabel, &textSizeBox })
+        for (auto* c : std::initializer_list<juce::Component*> { &fontLabel, &fontBox, &fontReset, &fontPreview, &fontNote, &textSizeLabel, &textSizeBox,
+                                                                 &condensedLabels })
             add (*c);
+        // round 190je (design190ia FM-5): FL's condensed face for the FL-landmark labels, off by default; at the next start
+        toggle (condensedLabels, tr ("Condensed labels (FL style)"), options.condensedLabels, [this] (bool on) { options.condensedLabels = on; });
+        condensedLabels.setTooltip (tr ("Menus, the menu bar, the Browser, Playlist track names and Mixer strip names in a condensed face, "
+                                        "a step larger, as FL Studio draws them (Open Sans Condensed). Applied when LYNX SHARE restarts."));
         styleLabel (fontLabel, tr ("Interface font"));
         styleNote (fontNote, tr ("A new interface font or text size is applied when LYNX SHARE restarts."));
         // issue #189: the text roles' size next to the font (core/TextSize.h), applied at the next start as the font is
@@ -769,6 +776,7 @@ private:
     juce::Label longestWaitLabel, animationLabel, animationNote, languageLabel, languageNote, scaleLabel, menuLabel, wavesLabel, noteNamesLabel, blackNotesLabel, pluginStyleLabel, editInLabel, undoLabel, autosaveLabel, keepLabel, sandboxLabel, sandboxNote, substitutesNote, shortcutsNote, crashLabel, crashNote, updatesNote, previousLabel;
     juce::Label fontLabel, fontPreview, fontNote, textSizeLabel;
     juce::ComboBox fontBox, textSizeBox;
+    juce::ToggleButton condensedLabels;
     juce::Label templateLabel, templateNote, startupProjectLabel;
     juce::ComboBox templateBox, startupProjectBox;
     std::vector<TemplateChoice> templateChoices; // templateBox's item id - 1

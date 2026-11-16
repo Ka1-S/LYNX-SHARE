@@ -81,6 +81,7 @@
 #include "ui/HintBar.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
+#include "ui/LabelFont.h"
 #include "ui/WaveformView.h"
 #include "ui/AudioEditor.h"
 #include "ui/PluginPicker.h"
@@ -2628,7 +2629,7 @@ void PlaylistComponent::paint (juce::Graphics& g)
                             g.fillRect (juce::Rectangle<float> (left + 6.0f + (float) k * 3.0f, (float) (y + trackHeight) - 7.0f, 1.5f, 1.5f));
                     }
                     g.setColour (muted ? colour::textDisabled : flHeaderInk (plate));
-                    const auto nameFont = font (type::body, true);
+                    const auto nameFont = labelFont (type::body, true); // (round 190je: condensed with FL-style labels on)
                     g.setFont (nameFont);
                     const auto name = custom ? juce::String::fromUTF8 (song.playlistTracks[(std::size_t) t].name.c_str()) : tr ("Track {0}", { juce::String (t + 1) });
                     const auto nameLeft = (int) left + 6;

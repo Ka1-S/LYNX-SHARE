@@ -34,10 +34,11 @@ inline juce::Colour bg6 { 0xff434852 };   // controls pressed / neutral "on"
 
 inline juce::Colour border { 0xff2a2d34 };       // hairlines between areas
 inline juce::Colour borderStrong { 0xff3b3f48 }; // control outlines
+inline juce::Colour outline { 0xff747983 };      // outlines that must read at 3:1 on the panels, bg4 included (round 190je: buttons, fields)
 
 inline juce::Colour textPrimary { 0xffeceef2 };
 inline juce::Colour textSecondary { 0xffa1a6b0 };
-inline juce::Colour textDisabled { 0xff60656f };
+inline juce::Colour textDisabled { 0xff767b85 }; // round 190je: 3.6:1 on bg3 (was #60656F, 2.6:1)
 
 // the red accent
 inline juce::Colour accent { 0xffe5383b };
@@ -85,6 +86,15 @@ inline juce::Colour audioClip { 0xff5a87b8 };
 void setPalette (const themes::Palette& palette); // the tokens only (ThemeSettings also refreshes the windows)
 themes::Palette currentPalette();
 
+// --- one state language for every button kind (round 190je, design190ia G1; the rule: core/ThemePalette.h buttonLook) ---
+// idle / hover (0..1, faded by IconButton) / pressed / on / disabled for a secondary button, a flat momentary icon or a
+// flat switch (whose hover previews its "on" look, FL 2024). Text buttons, icon buttons, combo boxes and tick boxes use it.
+struct ButtonColours
+{
+    juce::Colour fill, edge, content; // transparent: not drawn
+};
+ButtonColours buttonColours (themes::ButtonKind kind, bool on, float hover, bool down, bool enabled);
+
 // --- typography ----------------------------------------------------------------------------------
 namespace type
 {
@@ -117,6 +127,7 @@ void saveTextSize (int percent);
 juce::Font font (float size, bool bold = false);
 void clearFontCache();
 
+
 // The width a column of labels needs: `minWidth` when every text fits in it (the English layout), else the widest
 // text (+ the label borders), up to `maxWidth` (round 165o: translated labels are often longer).
 int labelColumnWidth (std::initializer_list<const juce::Label*> labels, int minWidth, int maxWidth);
@@ -147,8 +158,19 @@ namespace menus
 void setCompact (bool compact);
 bool compact();
 int itemHeight();    // a normal row
-int headerHeight();  // a section header (the "DOCUMENTS" titles)
+int headerHeight();  // a section header: FL's full-width band (round 190je: 17 px compact, 22 comfortable)
 int separatorHeight();
+// The menu text, one step larger than the body text (round 190je, design190ia FW-15: FL's cap 8 px, LYNX's was 7): 14 at
+// 100 %, scaled by Settings › General › Text size like the body role. The shortcut column uses type::small, italic as FL's.
+float textSize();
+// Settings › Theme › Menu style (round 190je, FW-16): LYNX's dark menus (the default) or FL's classic light grey ones.
+void setStyle (themes::MenuStyle style);
+themes::MenuStyle style();
+struct Colours
+{
+    juce::Colour background, border, text, shortcut, disabled, band, bandText, hover, hoverText, separator, check;
+};
+Colours colours(); // the palette in use, in the style in use
 } // namespace menus
 
 juce::Font monoFont (float size); // (cached as font() is)
@@ -390,7 +412,9 @@ public:
     void drawPopupMenuSectionHeader (juce::Graphics&, const juce::Rectangle<int>& area, const juce::String& sectionName) override;
     juce::Font getPopupMenuFont() override;
     void getIdealPopupMenuItemSize (const juce::String& text, bool isSeparator, int standardMenuItemHeight, int& idealWidth, int& idealHeight) override;
-    int getPopupMenuBorderSize() override { return 4; }
+    int getPopupMenuBorderSize() override { return 2; } // (round 190je: 4 → 2, FL's rows reach the frame)
+    void drawPopupMenuColumnSeparatorWithOptions (juce::Graphics&, const juce::Rectangle<int>&, const juce::PopupMenu::Options&) override;
+    int getPopupMenuColumnSeparatorWidthWithOptions (const juce::PopupMenu::Options&) override;
     // keeps a submenu from opening over its own multi-column parent menu (round 162d: JUCE then misses the click on
     // the submenu's items — the mixer track menu's "Change color" did nothing, issue #9)
     void preparePopupMenuWindow (juce::Component& newWindow) override;

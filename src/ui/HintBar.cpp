@@ -373,6 +373,7 @@ const juce::Identifier quickTipProperty ("lynxQuickTip");
 juce::Font tipNameFont() { return juce::Font (theme::font (theme::type::caption)); }
 juce::Font tipKeyFont() { return juce::Font (theme::font (theme::type::caption - 1.0f)); }
 constexpr float tipPadX = 7.0f, tipGap = 8.0f;
+constexpr float tipCapPad = 8.0f; // the shortcut's key cap around its text (round 190je, SG-25: as the hint bar's keys)
 constexpr int tipHeight = 20;
 } // namespace
 
@@ -391,7 +392,7 @@ juce::Rectangle<int> quickTipSize (const juce::String& tip)
     const auto name = tip.upToFirstOccurrenceOf ("\t", false, false), key = tip.fromFirstOccurrenceOf ("\t", false, false);
     auto w = juce::GlyphArrangement::getStringWidth (tipNameFont(), name) + 2.0f * tipPadX;
     if (key.isNotEmpty())
-        w += tipGap + juce::GlyphArrangement::getStringWidth (tipKeyFont(), key);
+        w += tipGap + juce::GlyphArrangement::getStringWidth (tipKeyFont(), key) + tipCapPad;
     return { 0, 0, (int) std::ceil (w) + 2, tipHeight };
 }
 
@@ -405,17 +406,25 @@ void paintQuickTip (juce::Graphics& g, juce::Rectangle<float> bubble, const juce
     g.drawRoundedRectangle (bubble.reduced (0.5f), radius::sm, 1.0f);
 
     auto text = bubble.reduced (tipPadX, 0.0f);
-    g.setColour (colour::textPrimary.withAlpha (0.92f));
+    g.setColour (colour::textPrimary); // (round 190je, SG-25: the full token, was × 0.92)
     g.setFont (tipNameFont());
     const auto nameWidth = juce::GlyphArrangement::getStringWidth (tipNameFont(), name);
     g.drawText (name, text.removeFromLeft (nameWidth + 1.0f), juce::Justification::centredLeft, false);
 
     if (key.isNotEmpty())
     {
+        // the shortcut as a key cap, the way the hint bar shows keys (round 190je, SG-25: the text read 4.6:1 at × 0.85)
         text.removeFromLeft (tipGap);
-        g.setColour (colour::textSecondary.withAlpha (0.85f));
+        const auto keyWidth = juce::GlyphArrangement::getStringWidth (tipKeyFont(), key) + tipCapPad;
+        const auto cap = text.withWidth (juce::jmin (keyWidth, text.getWidth()))
+                             .withSizeKeepingCentre (juce::jmin (keyWidth, text.getWidth()), juce::jmin (text.getHeight() - 4.0f, tipKeyFont().getHeight() + 4.0f));
+        g.setColour (colour::bg4);
+        g.fillRoundedRectangle (cap, radius::sm);
+        g.setColour (colour::borderStrong);
+        g.drawRoundedRectangle (cap.reduced (0.5f), radius::sm, 1.0f);
+        g.setColour (colour::textPrimary);
         g.setFont (tipKeyFont());
-        g.drawText (key, text, juce::Justification::centredLeft, false);
+        g.drawText (key, cap, juce::Justification::centred, false);
     }
 }
 
