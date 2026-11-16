@@ -27347,9 +27347,17 @@ private:
             const auto first = (int) offline.getSong().playlist.size();
             playlist.dropForSnapshot (drag, mouse);
             offline.dispatchPendingMessages();
-            const auto& dropped = offline.getSong(); // (an edit publishes a new Song: read it again)
-            check ("C-11: the drop places one clip on the row", (int) dropped.playlist.size() == first + 1 && dropped.playlist.back().track == target);
-            check ("C-11: the dropped clip is selected", (int) dropped.playlist.size() == first + 1 && playlist.isClipSelectedForCheck (first));
+            const auto& dropped = offline.getSong(); // (an edit publishes a new Song: read it again; the Playlist sorts its clips)
+            int onRow = 0, at = -1;
+            for (int c = 0; c < (int) dropped.playlist.size(); ++c)
+                if (dropped.playlist[(std::size_t) c].track == target)
+                {
+                    ++onRow;
+                    at = c;
+                }
+            line ("clips " + juce::String (first) + " -> " + juce::String ((int) dropped.playlist.size()) + ", on the row " + juce::String (onRow));
+            check ("C-11: the drop places one clip on the row", (int) dropped.playlist.size() == first + 1 && onRow == 1);
+            check ("C-11: the dropped clip is selected", at >= 0 && playlist.isClipSelectedForCheck (at));
             check ("C-11: nothing of the ghost is left", playlist.dropGhostAreaForCheck().isEmpty());
             write (ui, "fl-c11-dropped");
 
