@@ -4,6 +4,13 @@
 
 #include "core/ThemePalette.h"
 
+#include <cstdint>
+
+namespace lynx
+{
+enum class ClipKind : std::uint8_t; // (core/Song.h)
+}
+
 // LYNX design tokens: the single source of colours, type sizes, spacing and radii for the whole UI,
 // plus the LookAndFeel that draws every stock JUCE widget with them.
 //
@@ -182,6 +189,64 @@ inline juce::Colour tame (juce::Colour c)
 {
     return c.withMultipliedSaturation (0.8f).withBrightness (juce::jmin (c.getBrightness(), 0.72f));
 }
+
+// --- the Live look of the Clip-launch layout (round 190ig; tokens measured by round 190ia in Ableton Live 12.4's Dark
+// theme at 100 %, /mnt/e/lynx-work/design190ia/findings/cliplaunch.md §0). Used only while the Clip-launch layout shows,
+// so the Pattern layout never changes. Fixed values (the reference look), not user-theme tokens.
+namespace livelook
+{
+inline const juce::Colour window { 0xff2a2a2a };     // control bar, around the views
+inline const juce::Colour surface { 0xff363636 };    // slots, strips, scene cells
+inline const juce::Colour raised { 0xff464646 };     // selected track column / scene row, title bars
+inline const juce::Colour separator { 0xff242424 };  // 2 px between columns, 1 px between rows
+inline const juce::Colour well { 0xff1e1e1e };       // stop squares, record circles, fields
+inline const juce::Colour mainHeader { 0xff3c3c3c }; // the Main column's header
+inline const juce::Colour text { 0xffb5b5b5 };       // text on the greys
+inline const juce::Colour ink { 0xff070707 };        // text on a light selection
+inline const juce::Colour selectionFocused { 0xffb0ddeb }; // a selected scene; a focused slot's edge
+inline const juce::Colour selectionFocusedFill { 0xff95bbc7 }; // a focused selected slot's launch zone
+inline const juce::Colour selectionUnfocused { 0xff637e86 };
+inline const juce::Colour playing { 0xff00d38d };    // a playing clip's launch triangle
+inline const juce::Colour queuedOn { 0xff008a5c };   // a queued launch's blink, lit phase
+inline const juce::Colour queuedOff { 0xff002217 };  // and its dark phase
+inline const juce::Colour stateBox { 0xff181818 };   // the launch zone of a playing / queued / recording clip
+inline const juce::Colour arm { 0xffff5559 };
+} // namespace livelook
+
+// Live derives every shade of a clip from its colour by multiplying the RGB channels (round 190ia: name ×0.24, idle
+// launch triangle ×0.40, launch-zone divider ×0.66, waveform ×0.15, grid in a clip ×0.88).
+inline juce::Colour liveShade (juce::Colour c, float k)
+{
+    const auto m = [k] (juce::uint8 v) { return (juce::uint8) juce::jlimit (0, 255, juce::roundToInt ((float) v * k)); };
+    return juce::Colour (m (c.getRed()), m (c.getGreen()), m (c.getBlue()), c.getAlpha());
+}
+
+// --- one colour system for clips (round 190ig, design190ia PLAN §2) ---------------------------------------------------
+// A clip's colours from its own colour (FL: its channel's or pattern's; Live: its slot's, else its track's) and the
+// colour of the track it sits on, in the look of one layout: FL Studio's tint (Pattern layout), Live's pastel blocks
+// (Clip-launch) or BandLab's track hue (Simple). Each layout's painter picks its style; the slices that restyle the other
+// layouts only choose theirs here.
+enum class ClipStyle { flTint, livePastel, bandlabHue };
+
+struct ClipLook
+{
+    juce::Colour headerTop, headerBottom; // the header band, a vertical gradient (one colour: no gradient)
+    juce::Colour edge;                    // 1 px rim of the header band
+    juce::Colour body;                    // the body, filled at bodyAlpha over the lane (FL: the grid shows through)
+    float bodyAlpha = 1.0f;
+    juce::Colour content;                 // waveform, automation curve, note marks
+    juce::Colour contentFill;             // under an automation curve (transparent: none)
+    juce::Colour compactContent;          // FL: the waveform when the whole clip is one band (a short track)
+    juce::Colour ink;                     // the name and kind glyph on the header
+};
+
+// FL (measured in FL Studio 2026 on "Ookay - Thief", round 190ig, fl-playlist-zoom-audioclips.png / fl-playlist.png):
+// header = the clip colour, a gradient from colour − 13 to colour − 28 per channel, its rim colour × 0.66; body = the
+// TRACK's colour at 50 % over the lane (the Riser Noise clip: an orange header on the yellow RISER SWEEP track has a
+// yellow body); waveform = colour + 72 per channel, automation curve = colour + 84 with colour + 84 at 13 % under it;
+// name = colour + 124; on a short track the clip is one header-coloured band with its waveform in the clip colour.
+// `trackColour` 0 / `clipColour` 0 = FL's default grey #485156 (a channel or track saved without a colour).
+ClipLook clipBody (juce::Colour clipColour, juce::Colour trackColour, ClipKind kind, ClipStyle style);
 
 // Upper case for small caption headers, including accented Latin letters (ã -> Ã), which the C
 // runtime's towupper leaves alone on Windows.

@@ -10145,3 +10145,4 @@ countries: nl be
 "Potentially slow operation" = "Mogelijk trage bewerking"
 "Are you sure you want to load {0} plugins at once?" = "Weet je zeker dat je {0} plugins tegelijk wilt laden?"
 "Sample settings" = "Sample-instellingen"
+"Classic LYNX look for the clip grid" = "Klassieke LYNX-weergave voor het clipraster"

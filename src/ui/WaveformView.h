@@ -78,6 +78,9 @@ struct WaveStyle
     bool spectral = false;
     bool stereo = false;
     float gain = 1.0f; // display gain (normalisation)
+    // FL's Playlist clips (round 190ig, FM-21): each lane's centre on a whole pixel row and a 1 px line there in this
+    // colour (FL's silence line); transparent = none, the centre where it falls (every other view)
+    juce::Colour silenceLine { 0x00000000 };
 };
 
 // Draws the summary into `body`: pixel column x shows frames [startFrame + x * framesPerPixel, + framesPerPixel)

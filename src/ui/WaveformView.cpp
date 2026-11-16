@@ -288,9 +288,14 @@ void appendCleanWaveform (juce::Path& wave, float scale, juce::Rectangle<float> 
             smooth[(std::size_t) x] = std::max (c, (l + 2.0f * c + r) * 0.25f);
         }
 
-        const auto centre = body.getY() + laneHeight * ((float) lane + 0.5f);
+        auto centre = body.getY() + laneHeight * ((float) lane + 0.5f);
         const auto half = laneHeight * 0.5f - 1.0f;
-        const auto minHalf = 0.5f; // silence still shows as a hairline
+        auto minHalf = 0.5f; // silence still shows as a hairline
+        if (! style.silenceLine.isTransparent()) // (round 190ig: FL's 1 px silence line carries silence; the centre on a pixel)
+        {
+            centre = (std::floor (centre * scale) + 0.5f) / scale;
+            minHalf = 0.0f;
+        }
 
         // one closed path per run of valid columns: the top edge left to right, the bottom edge back
         int x = 0;
@@ -324,6 +329,16 @@ void paintCleanWaveform (juce::Graphics& g, juce::Rectangle<float> body, juce::R
     const auto scale = juce::jlimit (1.0f, 4.0f, g.getInternalContext().getPhysicalPixelScaleFactor());
     juce::Path wave;
     appendCleanWaveform (wave, scale, body, visible, summary, startFrame, framesPerPixel, style);
+    if (! style.silenceLine.isTransparent()) // FL's silence line: one physical pixel row per lane, under the waveform
+    {
+        const auto lanes = style.stereo && summary.channels > 1 ? 2 : 1;
+        g.setColour (style.silenceLine);
+        for (int lane = 0; lane < lanes; ++lane)
+        {
+            const auto centre = std::floor ((body.getY() + body.getHeight() / (float) lanes * ((float) lane + 0.5f)) * scale) / scale;
+            g.fillRect (juce::Rectangle<float> (visible.getX(), centre, visible.getWidth(), 1.0f / scale));
+        }
+    }
     g.setColour (style.classic);
     g.fillPath (wave);
 }

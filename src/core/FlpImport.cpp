@@ -3730,6 +3730,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
 
         Automation a;
         a.name = c.name.empty() ? "Automation " + std::to_string (c.index + 1) : c.name;
+        if (c.colour != 0) // (round 190ig: the clip's colour in FL's Playlist is its channel's)
+            a.colour = 0xFF000000u | c.colour;
         std::function<float (float)> valueMap; // FL normalized value -> ours (effect parameters)
 
         for (const auto& link : project.automationLinks)

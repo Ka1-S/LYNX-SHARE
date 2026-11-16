@@ -767,26 +767,9 @@ public:
         warp.setBounds (left.removeFromTop (20).withWidth (left.getWidth() / 2));
         left.removeFromTop (4);
         mode.setBounds (left.removeFromTop (22));
-        // the mode's own settings under it, placed as Live's Audio box [LIVE 190gu warp/live-audio-box-4-modes.png]: a label
-        // row, then its box, full width (Beats: Preserve › its chooser, then the loop-mode icon chooser and the Transient
-        // Envelope box side by side; Tones: Grain Size; Texture: Grain Size, Flux; Complex Pro: Formants, Envelope)
-        {
-            modeLabel1 = left.removeFromTop (16);
-            auto row1 = left.removeFromTop (20);
-            preserve.setBounds (row1);
-            grainTones->setBounds (row1);
-            grainTexture->setBounds (row1);
-            proFormants->setBounds (row1);
-            left.removeFromTop (3);
-            auto row2 = left.removeFromTop (20);
-            loopMode.setBounds (row2.withWidth (row2.getWidth() / 2 - 4));
-            envelope->setBounds (row2.withTrimmedLeft (row2.getWidth() / 2 + 2));
-            modeLabel2 = row2;
-            auto row3 = left.removeFromTop (20);
-            flux->setBounds (row3);
-            proEnvelope->setBounds (row3);
-            beatsLaw.setBounds (row3.withTrimmedTop (3)); // (Beats, Classic projects only)
-        }
+        // round 190ig (round 190ia CL-20a, a bug): the bottom rows first — Fade, Reverse | Edit, then BPM ÷2 ×2 above them —
+        // so they keep their height in a short Clip View; the BPM row was squeezed to ~2 px in a 203 px detail view
+        // because the mode's settings rows above took their room whether the mode showed them or not
         fade.setBounds (left.removeFromBottom (18).withWidth (left.getWidth() / 2 - 2));
         left.removeFromBottom (4);
         {
@@ -804,6 +787,44 @@ public:
             row.removeFromLeft (2);
             twice.setBounds (row);
             bpmLabel = left.removeFromBottom (14);
+        }
+        // the mode's own settings between the mode box and BPM, placed as Live's Audio box [LIVE 190gu
+        // warp/live-audio-box-4-modes.png]: a label row, then its box, full width (Beats: Preserve › its chooser, then the
+        // loop-mode icon chooser and the Transient Envelope box side by side; Tones: Grain Size; Texture: Grain Size, Flux;
+        // Complex Pro: Formants, Envelope). Only the rows the mode shows take room; a row that does not fit in a short
+        // Clip View folds away until the view is taller (its setting is kept).
+        {
+            left.removeFromBottom (2);
+            const auto first = preserve.isVisible() || grainTones->isVisible() || grainTexture->isVisible() || proFormants->isVisible();
+            const auto beatsRow = loopMode.isVisible() || envelope->isVisible();
+            const auto secondBox = flux->isVisible() || proEnvelope->isVisible(); // (its label in the second row, its box in the third)
+            const auto take = [&left] (int h) {
+                return left.getHeight() >= h ? left.removeFromTop (h) : juce::Rectangle<int> (left.getX(), left.getY(), left.getWidth(), 0);
+            };
+            juce::Rectangle<int> row1, row2, row3;
+            modeLabel1 = {};
+            if (first && left.getHeight() >= 36)
+            {
+                modeLabel1 = take (16);
+                row1 = take (20);
+            }
+            if ((beatsRow || secondBox) && left.getHeight() >= (secondBox ? 43 : 23))
+            {
+                left.removeFromTop (3);
+                row2 = take (20);
+            }
+            if ((secondBox && ! row2.isEmpty()) || (beatsLaw.isVisible() && left.getHeight() >= 20))
+                row3 = take (20);
+            preserve.setBounds (row1);
+            grainTones->setBounds (row1);
+            grainTexture->setBounds (row1);
+            proFormants->setBounds (row1);
+            loopMode.setBounds (row2.withWidth (juce::jmax (0, row2.getWidth() / 2 - 4)));
+            envelope->setBounds (row2.withTrimmedLeft (row2.getWidth() / 2 + 2));
+            modeLabel2 = row2;
+            flux->setBounds (row3);
+            proEnvelope->setBounds (row3);
+            beatsLaw.setBounds (row3.isEmpty() ? row3 : row3.withTrimmedTop (3)); // (Beats, Classic projects only)
         }
 
         gainLabel = right.removeFromTop (14);
@@ -934,6 +955,7 @@ private:
         envelope->setVisible (beats);
         grainTones->setVisible (tones);
         grainTexture->setVisible (texture);
+        resized(); // (round 190ig: only the rows of the shown settings take room)
         preserve.setSelectedId ((int) s.warpModes.beatsPreserve + 1, n);
         loopMode.setMode ((int) s.warpModes.beatsLoop);
         envelope->repaint();

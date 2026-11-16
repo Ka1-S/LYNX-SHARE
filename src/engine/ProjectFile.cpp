@@ -3090,6 +3090,8 @@ juce::String toJson (const Song& song, bool stampVersion)
             if (a.recordLive) // "Record automation" (round 190cs)
                 o->setProperty ("recordLive", true);
         }
+        if (a.colour != 0) // round 190ig: the clip's colour (FL: its channel's); absent = none, as older files
+            o->setProperty ("colour", (juce::int64) a.colour);
         if (const auto& l = a.lfo; ! l.isDefault()) // round 177b: FL's clip LFO
         {
             juce::Array<juce::var> amp;
@@ -3823,6 +3825,7 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
             if (const auto& source = a["source"]; source.isArray() && source.size() >= 3)
                 automation.source = { (int) source[0], (int) source[1], (int) source[2], source.size() >= 4 ? (int) source[3] : -1 };
             automation.recordLive = (bool) a["recordLive"];
+            automation.colour = (std::uint32_t) (juce::int64) a.getProperty ("colour", 0);
             if (auto* links = a["links"].getArray()) // round 190gw
                 for (const auto& l : *links)
                     if (l.isArray() && l.size() >= 5)

@@ -1388,6 +1388,7 @@ struct Converter
             c.index = (int) out.channels.size();
             c.type = flp::ChannelType::automationClip;
             c.name = src.name;
+            c.colour = src.colour != 0 ? rgb (src.colour) : 0; // (round 190ig: the clip's colour; none = FL's default)
             // an automation clip's channel levels are its range: pan = minimum, volume = maximum (of 12800, in the
             // target's whole range) [DATA: FL's tempo clips keep 1250…4250 = 60…180 BPM; FL 2026 played a clip written
             // with a channel's default levels over 6400…10000: round 171e, FL render]. Always the whole range here.

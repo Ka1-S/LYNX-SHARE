@@ -1,6 +1,8 @@
 #include "ui/FlMods.h"
 #include "ui/EditorTools.h"
 
+#include <algorithm>
+
 #include "core/NoteEdit.h"
 #include "core/NoteTools.h"
 #include "ui/HintBar.h"
@@ -126,6 +128,25 @@ ToolStrip::ToolStrip (bool includeSlip)
         buttons.push_back (std::move (button));
         tools.push_back (info.tool);
     }
+}
+
+void ToolStrip::setFlPlaylistLook (bool on)
+{
+    if (on == flPlaylistLook)
+        return;
+    flPlaylistLook = on;
+    const auto at = [this] (EditTool t) { return (std::size_t) (std::find (tools.begin(), tools.end(), t) - tools.begin()); };
+    if (const auto knife = at (EditTool::knife), slip = at (EditTool::slip); knife < tools.size() && slip < tools.size())
+    {
+        std::swap (tools[knife], tools[slip]);
+        std::swap (buttons[knife], buttons[slip]);
+    }
+    if (const auto eraser = at (EditTool::eraser); eraser < tools.size())
+        buttons[eraser]->setIcon (on ? Icon::deleteTool : Icon::erase);
+    if (const auto slip = at (EditTool::slip); slip < tools.size())
+        buttons[slip]->setIcon (on ? Icon::slipArrows : Icon::slip);
+    resized();
+    repaint();
 }
 
 void ToolStrip::setTool (EditTool newTool)

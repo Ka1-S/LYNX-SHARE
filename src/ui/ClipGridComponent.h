@@ -37,6 +37,11 @@ void setClipGridDeviceDropForSnapshot (juce::Component& grid, int track);
 // kept with the UI settings: each scene shows its tempo and time signature fields); refreshClipGrid after a change; the
 // listener hears the grid's own switch (in its options menu).
 bool& clipGridSceneTempoShown();
+// Round 190ig: View › "Classic LYNX look for the clip grid" (a preference, off by default: the grid takes Live's look in the
+// Clip-launch layout; on: round 181a's look); refreshClipGrid after a change.
+bool& clipGridClassicLook();
+// Round 190ig (--design190igs4shot): draw the waiting launches' blink in one phase (0 dark, 1 lit; -1: by the clock, as normal).
+void setClipGridBlinkPhaseForSnapshot (int phase);
 void refreshClipGrid (juce::Component& grid);
 void setClipGridSceneFieldsListener (juce::Component& grid, std::function<void()> listener);
 // The menus of a scene, a column title and a scene field (1 tempo, 2 time signature), as a right-click opens them

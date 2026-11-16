@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "core/MenuPlacement.h"
+#include "core/Song.h"
 #include "core/UiFontChoice.h"
 #include "platform/Paths.h"
 #include "ui/Icons.h"
@@ -315,6 +316,58 @@ std::uint64_t paletteStamp = 0; // (setPalette: +1; part of the knob tiles' keys
 // (the largest channel difference a tile may show against its shape drawn straight, --selftest; see paintCacheSelfTest)
 constexpr int nativeTolerance = 1, nativeKnobTolerance = 3;
 } // namespace
+
+ClipLook clipBody (juce::Colour clipColour, juce::Colour trackColour, ClipKind kind, ClipStyle style)
+{
+    const juce::Colour flGrey { 0xff485156 }; // FL's default channel / track colour
+    if (clipColour.getAlpha() == 0)
+        clipColour = flGrey;
+    if (trackColour.getAlpha() == 0)
+        trackColour = style == ClipStyle::flTint ? flGrey : clipColour;
+    const auto add = [] (juce::Colour c, int d) {
+        const auto f = [d] (juce::uint8 v) { return (juce::uint8) juce::jlimit (0, 255, (int) v + d); };
+        return juce::Colour (f (c.getRed()), f (c.getGreen()), f (c.getBlue()));
+    };
+    ClipLook look;
+    switch (style)
+    {
+        case ClipStyle::flTint:
+        {
+            look.headerTop = add (clipColour, -13);
+            look.headerBottom = add (clipColour, -28);
+            look.edge = liveShade (clipColour, 0.66f).withAlpha (1.0f);
+            look.body = trackColour.withAlpha (1.0f);
+            look.bodyAlpha = 0.5f;
+            look.content = add (clipColour, kind == ClipKind::automation ? 84 : 72);
+            look.contentFill = kind == ClipKind::automation ? look.content.withAlpha (0.13f) : juce::Colours::transparentBlack;
+            look.compactContent = clipColour.withAlpha (1.0f);
+            look.ink = add (clipColour, 124);
+            // a light theme (issue #95: the lanes near white): the body then is pale, so the content takes a dark shade
+            if (colour::bg2.getPerceivedBrightness() > 0.6f)
+            {
+                look.content = liveShade (clipColour, 0.45f).withAlpha (1.0f);
+                look.contentFill = kind == ClipKind::automation ? look.content.withAlpha (0.13f) : juce::Colours::transparentBlack;
+            }
+            break;
+        }
+        case ClipStyle::livePastel: // Live 12.4 (round 190ia CL-5, CL-17, CL-18): one block in the colour, dark marks
+            look.headerTop = look.headerBottom = look.body = clipColour.withAlpha (1.0f);
+            look.edge = liveShade (clipColour, 0.66f).withAlpha (1.0f);
+            look.content = look.compactContent = liveShade (clipColour, 0.15f).withAlpha (1.0f);
+            look.contentFill = juce::Colours::transparentBlack;
+            look.ink = liveShade (clipColour, 0.24f).withAlpha (1.0f);
+            break;
+        case ClipStyle::bandlabHue: // BandLab web Studio (round 190ia SG-5: header ×0.45, body ×0.57, waveform the hue)
+            look.headerTop = look.headerBottom = liveShade (trackColour, 0.45f).withAlpha (1.0f);
+            look.body = liveShade (trackColour, 0.57f).withAlpha (1.0f);
+            look.edge = liveShade (trackColour, 0.35f).withAlpha (1.0f);
+            look.content = look.compactContent = trackColour.withAlpha (1.0f);
+            look.contentFill = juce::Colours::transparentBlack;
+            look.ink = juce::Colours::white.withAlpha (0.92f);
+            break;
+    }
+    return look;
+}
 
 void fillLaunchTriangle (juce::Graphics& g, juce::Rectangle<float> a, juce::Colour colour)
 {

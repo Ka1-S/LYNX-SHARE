@@ -41,9 +41,11 @@ enum class Icon
     loopRecord, // recording: loop record (a loop arrow around a record dot; round 170e3)
     stepEdit,   // recording: step edit (steps typed one after another, an arrow to the next; round 170e3)
     punch,      // recording: punch in/out on the loop region (a record dot between two brackets; round 170e3)
-    note        // the Browser's Scores folder: an eighth note (round 178a)
+    note,       // the Browser's Scores folder: an eighth note (round 178a)
+    deleteTool, // Playlist (Pattern layout): FL's delete tool, a circle with a slash (round 190ig, FM-26)
+    slipArrows  // Playlist (Pattern layout): FL's slip tool, two arrowheads back to back (round 190ig, FM-26)
 };
-constexpr int iconCount = (int) Icon::note + 1;
+constexpr int iconCount = (int) Icon::slipArrows + 1;
 
 namespace icons
 {

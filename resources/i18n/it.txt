@@ -10145,3 +10145,4 @@ countries: it ch sm
 "Potentially slow operation" = "Operazione potenzialmente lenta"
 "Are you sure you want to load {0} plugins at once?" = "Vuoi davvero caricare {0} plugin alla volta?"
 "Sample settings" = "Impostazioni del sample"
+"Classic LYNX look for the clip grid" = "Aspetto LYNX classico per la griglia dei clip"
