@@ -941,6 +941,25 @@ bool RenderAhead::renderAheadAllowed() const noexcept
     return alwaysEngage || probe == Probe::on || probe == Probe::decidedOn;
 }
 
+RenderAhead::ProbeVerdict RenderAhead::probeVerdict (double cpuShareOff, double cpuShareOn, double overRateOff, double overRateOn) noexcept
+{
+    ProbeVerdict v;
+    const auto fewerOverruns = overRateOn <= overRateOff * probeOverrunGain && overRateOff > 0.0;
+    const auto muchFewer = overRateOn <= overRateOff * probeMuchFewer && overRateOff > 0.0;
+    const auto lessCpu = cpuShareOn <= cpuShareOff * probeCpuGain;
+    // kept for a CPU win beyond the probe's measuring error (about ten points in render-ahead's favour against whole
+    // runs) with no more overruns. Since the owner's 0.1.28 decision (`favourFewerOverruns`) also for clearly fewer
+    // overruns at no more than probeCpuMargin more CPU (synth100, Exoplanet: 5-20x fewer), and since 0.1.30 for at
+    // least 4x fewer at no more than probeCpuMarginMuchFewer.
+    const auto cpuWin = lessCpu && overRateOn <= overRateOff;
+    const auto forOverruns = favourFewerOverruns
+                             && ((fewerOverruns && cpuShareOn <= cpuShareOff * probeCpuMargin)
+                                 || (muchFewer && cpuShareOn <= cpuShareOff * probeCpuMarginMuchFewer));
+    v.keep = cpuWin || forOverruns;
+    v.forOverruns = v.keep && ! cpuWin;
+    return v;
+}
+
 void RenderAhead::account (double wallNs, double cpuNs, int samples, bool playing, const RackState* state) noexcept
 {
     if (alwaysEngage || samples <= 0 || sampleRate <= 0.0)
@@ -1019,20 +1038,15 @@ void RenderAhead::account (double wallNs, double cpuNs, int samples, bool playin
                 counters.probeCpuOn.store ((float) (100.0 * cpuShareOn), std::memory_order_relaxed);
                 counters.probeOverOff.store ((float) (60.0 * overRateOff), std::memory_order_relaxed);
                 counters.probeOverOn.store ((float) (60.0 * overRateOn), std::memory_order_relaxed);
-                const auto fewerOverruns = overRateOn <= overRateOff * probeOverrunGain && overRateOff > 0.0;
-                const auto lessCpu = cpuShareOn <= cpuShareOff * probeCpuGain;
-                // (kept for a CPU win beyond the probe's measuring error — about ten points in render-ahead's favour
-                // against whole runs — with no more overruns; and, since the owner's 0.1.28 decision
-                // (`favourFewerOverruns`), for clearly fewer overruns at no more than probeCpuMargin more CPU: synth100,
-                // Exoplanet: 5-20x fewer.)
-                const auto keep = (lessCpu && overRateOn <= overRateOff) || (favourFewerOverruns && fewerOverruns && cpuShareOn <= cpuShareOff * probeCpuMargin);
+                const auto verdict = probeVerdict (cpuShareOff, cpuShareOn, overRateOff, overRateOn);
+                const auto keep = verdict.keep;
                 probe = keep ? Probe::decidedOn : Probe::decidedOff;
                 // (a project that keeps losing is probed less and less often: the probe's own "on" windows cost)
                 decidedLeft = keep ? decidedSeconds : offHold;
                 offHold = keep ? decidedSeconds : std::min (600.0, offHold * 2.0);
                 decidedState = state != nullptr ? state->serial : 0;
                 (keep ? counters.keptOn : counters.keptOff).fetch_add (1, std::memory_order_relaxed);
-                if (keep && ! (lessCpu && overRateOn <= overRateOff))
+                if (verdict.forOverruns)
                     counters.keptForOverruns.fetch_add (1, std::memory_order_relaxed);
                 if (! keep)
                     drain.store (true, std::memory_order_release);

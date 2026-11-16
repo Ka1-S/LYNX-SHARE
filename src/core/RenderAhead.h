@@ -201,6 +201,15 @@ public:
                              const LiveInput* input, std::vector<char>& aheadChannels, std::vector<char>& aheadTracks, int& boundary,
                              const ProcessTimes* editors = nullptr);
 
+    // The probe's verdict (round perfgate190id, the engagement rule as a function for tests): from the rack's CPU share
+    // (of a core) and the overruns per second measured with render-ahead off and on. `forOverruns`: kept by
+    // favourFewerOverruns (fewer overruns for some more CPU), not by a CPU win.
+    struct ProbeVerdict
+    {
+        bool keep = false, forOverruns = false;
+    };
+    static ProbeVerdict probeVerdict (double cpuShareOff, double cpuShareOn, double overRateOff, double overRateOn) noexcept;
+
 private:
     struct Entry;
     void processBlock (SnapshotExchange<RackState>& exchange, const renderahead::Block& block, float* left, float* right, LiveEventQueue* live,
@@ -231,6 +240,11 @@ private:
     // Owner decision for 0.1.28 (rollup step 9): on by default — synth100-type projects keep render-ahead (its probe:
     // 340 -> 20 overruns / min at equal CPU); 190gq had it off (no project worse in any measure)
     static constexpr bool favourFewerOverruns = true;
+    // Owner decision for 0.1.30 (round perfgate190id, recommended option): with at least 4x fewer overruns
+    // (probeMuchFewer) up to probeCpuMarginMuchFewer (+5 %) more CPU is accepted. On a loaded machine the probe measured
+    // synth100 at 64 samples going from 29438 to 1429 overruns / min at +2.5 % CPU, and the +2 % margin kept it off.
+    // Fewer dropouts matter more than a little CPU.
+    static constexpr double probeMuchFewer = 0.25, probeCpuMarginMuchFewer = 1.05;
     static constexpr int probeRounds = 2;
     double probeLeft = 0.0, decidedLeft = 0.0, warmupLeft = 0.0;
     int probeRound = 0;

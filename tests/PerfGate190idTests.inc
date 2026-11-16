@@ -133,3 +133,32 @@ TEST (perfgate_tempo_scan_reads_only_the_tempo_clips_and_gives_the_same_tempo)
     CHECK (same);
     CHECK (tempomap::active (song));
 }
+
+TEST (render_ahead_probe_keeps_four_times_fewer_overruns_for_up_to_five_percent_more_cpu)
+{
+    // owner decision 0.1.30 (round perfgate190id): with 4x fewer overruns or better, up to +5 % CPU keeps render-ahead
+    // on; the 0.1.28 rule (fewer overruns at up to +2 %) and the CPU-win rule stay as they were
+    using namespace lynx;
+    const auto v = [] (double cpuOff, double cpuOn, double overOff, double overOn) {
+        return RenderAhead::probeVerdict (cpuOff, cpuOn, overOff / 60.0, overOn / 60.0); // (per minute -> per second)
+    };
+    // the loaded-machine probes of round perfgate190id: synth100 at 64, 20x fewer at +2.5 % (kept off before)
+    CHECK (v (2.089, 2.141, 29438.0, 1429.0).keep);
+    CHECK (v (2.089, 2.141, 29438.0, 1429.0).forOverruns);
+    // ... and Exoplanet at 64, 10x fewer at +12.8 %: still off
+    CHECK (! v (1.048, 1.182, 14724.0, 1419.0).keep);
+    // the edges: exactly 4x and +5 % on; just past either off
+    CHECK (v (1.0, 1.05, 400.0, 100.0).keep);
+    CHECK (! v (1.0, 1.0501, 400.0, 100.0).keep);
+    CHECK (! v (1.0, 1.04, 400.0, 101.0).keep);
+    // the 0.1.28 rule: 20 % fewer (here 3x) at up to +2 %
+    CHECK (v (1.0, 1.02, 300.0, 100.0).keep);
+    CHECK (! v (1.0, 1.03, 300.0, 100.0).keep);
+    // a CPU win with no more overruns: kept, not "for overruns"
+    CHECK (v (1.0, 0.85, 100.0, 100.0).keep);
+    CHECK (! v (1.0, 0.85, 100.0, 100.0).forOverruns);
+    CHECK (! v (1.0, 0.85, 100.0, 120.0).keep); // (more overruns)
+    // no overruns with it off: only a CPU win can keep it
+    CHECK (! v (1.0, 1.0, 0.0, 0.0).keep);
+    CHECK (v (1.0, 0.8, 0.0, 0.0).keep);
+}
