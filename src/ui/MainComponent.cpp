@@ -87,6 +87,7 @@
 #include "core/Templates.h"
 #include "ui/NewProjectDialog.h"
 #include "ui/PluginMonitorWindow.h"
+#include "ui/SimpleLook.h"
 #include "ui/TouchKeyboard.h"
 #include "engine/MidiFileIo.h"
 #include "engine/ProjectFile.h"
@@ -1033,6 +1034,7 @@ MainComponent::~MainComponent()
         playlist.onTrackEffects = nullptr;
         playlist.onSimpleTrackSelected = nullptr;
         playlist.onSimpleFilesDropped = nullptr;
+        playlist.onSimpleAddTrack = nullptr;
         playlist.onExportTrack = nullptr;
         simpleWorkflow.reset();
     }
@@ -2867,6 +2869,8 @@ void MainComponent::loadUiSettings()
             DetailView::extraSelectInMixer = on;
         else if (key == "alsSessionOnPlaylist")
             AudioEngine::alsSessionOnPlaylist = on;
+        else if (key == "simpleLargeControls") // round 190jc: View › Large controls (Simple layout)
+            ui::simplelook::largeControls() = on;
         else if (key == "followPlaylist" || key == "followPianoRoll")
             EditorGlobals::get().setFollowing (key == "followPianoRoll", on, false);
         else if (key == "followChannelRack" || key == "followAudioEditor")
@@ -3115,6 +3119,7 @@ void MainComponent::saveUiSettings()
                                       + "\ndetailExtraWindowKey=" + juce::String (DetailView::extraWindowKey ? 1 : 0)
                                       + "\ndetailExtraSelectInMixer=" + juce::String (DetailView::extraSelectInMixer ? 1 : 0)
                                       + "\nalsSessionOnPlaylist=" + juce::String (AudioEngine::alsSessionOnPlaylist.load() ? 1 : 0)
+                                      + "\nsimpleLargeControls=" + juce::String (ui::simplelook::largeControls() ? 1 : 0)
                                       + "\nfollowPlaylist=" + juce::String (EditorGlobals::get().isFollowing (false) ? 1 : 0)
                                       + "\nfollowPianoRoll=" + juce::String (EditorGlobals::get().isFollowing (true) ? 1 : 0)
                                       + "\nfollowChannelRack=" + juce::String (EditorGlobals::get().isFollowingView (EditorGlobals::FollowView::channelRack) ? 1 : 0)
@@ -3518,6 +3523,18 @@ void MainComponent::syncClipLaunchSwitches()
 }
 
 
+void MainComponent::setSimpleLargeControls (bool on)
+{
+    // round 190jc (owner decision 9, design190ia SG-C/SG-D): the Simple headers, the dock and the pads at touch size
+    if (on == ui::simplelook::largeControls())
+        return;
+    ui::simplelook::largeControls() = on;
+    playlist.simpleLookChanged();
+    if (simpleWorkflow != nullptr)
+        simpleWorkflow->lookChanged();
+    saveUiSettings();
+}
+
 void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
 {
     using layoutstyle::Style;
@@ -3630,6 +3647,11 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
         playlist.onSimpleFilesDropped = [this] (const juce::StringArray& files, std::int64_t tick) {
             if (simpleWorkflow != nullptr)
                 simpleWorkflow->dropFiles (files, tick);
+        };
+        // round 190jc (design190ia SG-2): the round "+" under the Simple tracks opens the New-track chooser
+        playlist.onSimpleAddTrack = [this] {
+            if (simpleWorkflow != nullptr && layoutStyle == layoutstyle::Style::simple)
+                simpleWorkflow->showChooser();
         };
         // round 190fo: "Export this track" in the Simple track menu
         playlist.onExportTrack = [this] (int track, bool asMidi) {
@@ -8867,6 +8889,9 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         menu.addSeparator();
         menu.addItem (tr ("Typing keyboard to piano") + shortcutText ("view.typingPiano"), true, typingPiano, [this] { toggleTypingPiano(); });
         menu.addItem (tr ("Touch keyboard") + shortcutText ("view.touchKeyboard"), true, isTouchKeyboardOpen(), [this] { toggleTouchKeyboard (engine); });
+        if (layoutStyle == layoutstyle::Style::simple) // round 190jc (owner decision 9): touch-size controls, Simple only
+            menu.addItem (tr ("Large controls (touch size)"), true, ui::simplelook::largeControls(),
+                          [this] { setSimpleLargeControls (! ui::simplelook::largeControls()); });
         {
             // FL's View › Background (audit round 165z-a): the workspace image and colour of Options › Theme
             juce::PopupMenu background;

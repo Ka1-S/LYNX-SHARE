@@ -17830,6 +17830,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "UserFix190ibTests.inc" // round 190ib: issues #165 (SoundFont same-step slide), #170, #181, #182, #183
 #include "LiveRack190hrTests.inc" // round 190hr: Live Racks finish (Group / Ungroup of an instrument, .adg presets)
 #include "Formats190iiTests.inc" // round 190ii (issue #149): .dwp / .dwb / .gig / NCW / Kontakt detection
+#include "Simple190jcTests.inc" // round 190jc: the Simple layout's BandLab / FLM look (design190ia slices 5, 14, 15, 22, 24)
 #include "Rollup030Tests.inc" // round 190il: semantic interactions of the 0.1.30 rollup (keep last)
 #include "Bug190ieTests.inc" // round 190ie (issue #185: tempo automation through the basic Delay)
 #include "PerfGate190idTests.inc" // round perfgate190id: the performance gate's synthetic projects (community slice B12)

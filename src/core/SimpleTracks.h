@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "core/Song.h"
+#include "core/TrackIcons.h"
 
 namespace lynx::simpletracks
 {
@@ -38,10 +39,16 @@ const char* defaultName (Kind kind) noexcept;
 // The colour a new track of this kind takes (0xFFRRGGBB), the same for its track, insert and channels.
 std::uint32_t defaultColour (Kind kind) noexcept;
 bool isAudioKind (Kind kind) noexcept; // voice, guitar, bass, audio
+// The kind's type icon (round 190jc, design190ia SG-3/SG-7/SG-14: BandLab's coloured type icon), drawn in the Simple
+// header, the dock and the New-track chooser for a track whose own icon is not set (the song is not changed)
+trackicons::Icon iconOf (Kind kind) noexcept;
 
 // The first Playlist track nothing uses yet: no clip on it in any clip list (every arrangement and the clip grid), no
 // track mode, no name. -1 when all of FL's 500 tracks are used.
 int nextEmptyTrack (const Song& song);
+// The rows the Simple layout shows (round 190jc, design190ia SG-2): every track up to the last one the song uses (a clip
+// in the Playlist, a mode or a name), then the drop lane's row (nextEmptyTrack); at least 1, at most `rows`.
+int rowsShown (const Song& song, int rows);
 
 struct Request
 {

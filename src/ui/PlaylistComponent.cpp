@@ -82,6 +82,8 @@
 #include "ui/AudioEditor.h"
 #include "ui/PluginPicker.h"
 #include "ui/QuickPick.h"
+#include "ui/Icons.h"
+#include "ui/SimpleLook.h"
 
 #include <map>
 #include <unordered_map>
@@ -199,6 +201,30 @@ juce::Colour flHeaderInk (juce::Colour plate)
     };
     const auto ratio = (luminance (tint) + 0.05f) / (luminance (plate) + 0.05f);
     return ratio >= 4.5f ? tint : (plate.getPerceivedBrightness() > 0.6f ? theme::colour::bg0 : theme::colour::textPrimary);
+}
+
+// The Simple headers' sizes (round 190jc, design190ia SG-3, BandLab's 82 px rows: M S 26x22, a 26 px pan knob, the volume
+// a line in the track colour with a 12 px thumb; LYNX keeps its rows a little lower). Large controls: touch sizes.
+struct SimpleHeaderSizes
+{
+    int row, twoRows, top, button, buttonHeight, gap, icon, knob, fxWidth, fxHeight, volumeHit, add;
+};
+SimpleHeaderSizes simpleSizes()
+{
+    if (ui::simplelook::largeControls())
+        return { 88, 76, 8, 40, 32, 6, 20, 30, 60, 30, 32, 48 };
+    return { 64, 54, 6, 24, 20, 4, 16, 20, 44, 18, 20, 40 };
+}
+
+// A Simple track's type icon: its own, else its kind's (round 190jc, SG-3; the song is not changed)
+trackicons::Icon simpleTrackIcon (const Song& song, int track)
+{
+    if (track < 0 || track >= (int) song.playlistTracks.size())
+        return trackicons::Icon::none;
+    if (const auto own = trackicons::iconFor (song.playlistTracks[(std::size_t) track].icon); own != trackicons::Icon::none)
+        return own;
+    const auto kind = simpletracks::kindOf (song, track);
+    return kind ? simpletracks::iconOf (*kind) : trackicons::Icon::none;
 }
 
 // A Playlist track's colour (transparent: none set)
@@ -396,29 +422,33 @@ constexpr float mutedMarkMinWidth = 14.0f;
 
 // Clip body with the header bar, glyph and name; returns the body below the header. A muted clip leaves the glyph's place
 // empty for the X its veil draws on top (paintMutedVeil).
+// `look` (round 190jc, the Simple layout's BandLab colours, theme::clipBody bandlabHue): its header, body and ink instead of
+// the tints of `base`.
 juce::Rectangle<float> paintClipFrame (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour base, const juce::String& name,
-                                       ClipGlyph glyph = ClipGlyph::pattern, bool muted = false)
+                                       ClipGlyph glyph = ClipGlyph::pattern, bool muted = false, const theme::ClipLook* look = nullptr)
 {
     using namespace theme;
     const uitrace::Part tally (uitrace::part::frame);
     const auto title = r.withHeight (clipHeaderHeight (r));
+    const auto bodyColour = look != nullptr ? look->body : clipBodyColour (base);
+    const auto headerColour = look != nullptr ? look->headerTop : clipHeaderColour (base);
 
     // zoomed far out (a clip a few pixels wide, often a thousand of them on screen): plain rectangles, the same
     // colours. Rounded shapes and gradients cost a path each on the GPU renderer (round 151: 1 350 clips of
     // Thief's chopped vocals took 20-40 ms a frame), and at this size they look the same.
     if (r.getWidth() < 8.0f)
     {
-        g.setColour (clipBodyColour (base));
+        g.setColour (bodyColour);
         g.fillRect (r);
         if (title.getHeight() >= 4.0f)
         {
-            g.setColour (clipHeaderColour (base));
+            g.setColour (headerColour);
             g.fillRect (title);
         }
         return r.withTrimmedTop (title.getHeight());
     }
 
-    g.setColour (clipBodyColour (base));
+    g.setColour (bodyColour);
     g.fillRoundedRectangle (r, radius::sm);
 
     if (title.getHeight() >= 4.0f)
@@ -426,7 +456,7 @@ juce::Rectangle<float> paintClipFrame (juce::Graphics& g, juce::Rectangle<float>
         // the header band: rounded top corners, square bottom; a lighter top half gives it the slight sheen of a
         // gradient (round 151: drawn with the renderer's rounded-rectangle and rectangle primitives, not a path and
         // a gradient brush, which cost a GPU geometry each for every clip)
-        const auto header = clipHeaderColour (base);
+        const auto header = headerColour;
         g.setColour (header);
         g.fillRoundedRectangle (title, radius::sm);
         g.fillRect (title.withTrimmedTop (juce::jmin (radius::sm, title.getHeight() * 0.5f)));
@@ -441,9 +471,9 @@ juce::Rectangle<float> paintClipFrame (juce::Graphics& g, juce::Rectangle<float>
             if (muted)
                 text.removeFromLeft (13.0f);
             else if (r.getWidth() >= 40.0f) // room for the glyph (where the clip menu opens)
-                paintClipGlyph (g, text.removeFromLeft (13.0f), glyph, clipTitleText (header).withMultipliedAlpha (0.8f));
+                paintClipGlyph (g, text.removeFromLeft (13.0f), glyph, (look != nullptr ? look->ink : clipTitleText (header)).withMultipliedAlpha (0.8f));
             const uitrace::Part tallyTitle (uitrace::part::title);
-            g.setColour (clipTitleText (header));
+            g.setColour (look != nullptr ? look->ink : clipTitleText (header));
             g.setFont (font (type::caption, true));
             textcache::drawText (g, name, text.withTrimmedLeft (2.0f).toNearestInt(), juce::Justification::centredLeft, true);
         }
@@ -1109,6 +1139,10 @@ juce::Rectangle<int> PlaylistComponent::rulerArea() const
 PlaylistComponent::PlaylistComponent (AudioEngine& e)
     : engine (e)
 {
+    // round 190jc (design190ia SG-18): the drop lane as a component the first-song tour can ring (transparent, no clicks)
+    dropLaneProbe.setComponentID ("simple.dropLane");
+    dropLaneProbe.setInterceptsMouseClicks (false, false);
+    addChildComponent (dropLaneProbe);
     setWantsKeyboardFocus (false);
     setMouseClickGrabsKeyboardFocus (false);
 
@@ -1442,7 +1476,7 @@ int PlaylistComponent::heightOf (int track) const
 int PlaylistComponent::baseRowHeight() const
 {
     if (simpleHeaders)
-        return simpleTrackHeight;
+        return simpleTrackHeight();
     if (liveStyle)
         return liveTrackHeight;
     return polish::clampTrackHeight (engine.getSong().playlistRowHeight);
@@ -1642,6 +1676,7 @@ void PlaylistComponent::setTitleBarInsets (int left, int right)
 void PlaylistComponent::resized()
 {
     updateHeaderWidth(); // (round 190ig: the header width follows the layout style)
+    updateDropLaneProbe();
     const auto h = toolbarHeight - 6;
     arrangementBox.setBounds (4 + titleInsetLeft, 3, juce::jmin (150, getWidth() / 5), h);
     // round 190ig (FM-26): the Pattern layout's toolbar in FL's order — the snap (magnet) before the tools, and the tools'
@@ -1724,6 +1759,8 @@ void PlaylistComponent::paint (juce::Graphics& g)
     const uitrace::Scope trace ("PlaylistComponent paint", true, g.getClipBounds());
     if (trackTops.size() != (std::size_t) numTracks() + 1) // the track list grew or shrank since the last change message
         refreshTrackLayout();
+    if (simpleHeaders || dropLaneProbe.isVisible())
+        updateDropLaneProbe();
 
     const auto& song = engine.getSong();
     const auto grid = gridArea();
@@ -1752,8 +1789,9 @@ void PlaylistComponent::paint (juce::Graphics& g)
         juce::Graphics::ScopedSaveState state (g);
         g.reduceClipRegion (grid);
         const auto paintedRows = g.getClipBounds();
+        const auto rows = this->paintedRows(); // (round 190jc, SG-2: the Simple layout's real tracks and its drop lane only)
 
-        for (int t = 0; t < tracks; ++t)
+        for (int t = 0; t < rows; ++t)
         {
             const auto y = trackToY (t);
             const auto trackHeight = heightOf (t);
@@ -1945,9 +1983,11 @@ void PlaylistComponent::paint (juce::Graphics& g)
             const auto base = tame (patternColour (song, c.pattern));
             const auto current = c.pattern == song.currentPattern;
             const auto selected = isSelected (i);
+            const auto simpleLook = simpleClipLook (c); // (round 190jc: the Simple layout's BandLab colours)
 
             // body + name strip
-            const auto clipBody = paintClipFrame (g, r, base, juce::String::fromUTF8 (song.patterns[(std::size_t) c.pattern].name.c_str()), ClipGlyph::pattern, c.muted);
+            const auto clipBody = paintClipFrame (g, r, base, juce::String::fromUTF8 (song.patterns[(std::size_t) c.pattern].name.c_str()), ClipGlyph::pattern, c.muted,
+                                                  simpleLook ? &*simpleLook : nullptr);
 
             // note thumbnail: the pattern's notes as small rounded bars in a light tint of the clip colour,
             // spread over the body's height by pitch (a few keys of padding so single notes don't hug the edges)
@@ -1968,7 +2008,7 @@ void PlaylistComponent::paint (juce::Graphics& g)
                 const auto bottomKey = (low + high) / 2.0f - span / 2.0f;
                 const auto rows = (float) span + 1.0f;
                 const auto noteHeight = juce::jlimit (1.5f, 2.5f, body.getHeight() / rows);
-                g.setColour (clipContentColour (base));
+                g.setColour (simpleLook ? simpleLook->content : clipContentColour (base));
 
                 juce::Graphics::ScopedSaveState clip (g);
                 g.reduceClipRegion (body.toNearestInt());
@@ -2230,14 +2270,35 @@ void PlaylistComponent::paint (juce::Graphics& g)
             // issue #170 (round 190ib): with the tracks linked to the mixer, a track that only repeats a track above it
             // says whose insert it plays through
             const auto repeats = linkedHeaders() ? autolink::repeatedTracks (song) : std::vector<int>();
+            // round 190jc (design190ia SG-2): the Simple headers stop after the real tracks; the drop lane's header is a
+            // round "+" (FL Studio Mobile's add button under its tracks), the New-track chooser
+            const auto headerRows = paintedRows();
+            const auto addRow = simpleHeaders ? dropLaneTrack() : -1;
 
-            for (int t = 0; t < tracks; ++t)
+            for (int t = 0; t < headerRows; ++t)
             {
                 const auto y = trackToY (t);
                 const auto trackHeight = heightOf (t);
 
                 if (y > headers.getBottom() || y + trackHeight < headers.getY())
                     continue;
+
+                if (t == addRow)
+                {
+                    if (const auto add = simpleAddButton().toFloat(); add.getWidth() >= 12.0f)
+                    {
+                        const auto lit = hover.header && hover.addTrack;
+                        g.setColour (lit ? colour::bg5 : colour::bg4);
+                        g.fillEllipse (add);
+                        g.setColour (lit ? colour::textPrimary : colour::textSecondary);
+                        const auto arm = juce::jmin (add.getWidth() * 0.18f, 9.0f);
+                        const auto c = add.getCentre();
+                        const auto stroke = ui::simplelook::px (2.0f, 2.5f);
+                        g.fillRoundedRectangle (juce::Rectangle<float> (2.0f * arm, stroke).withCentre (c), stroke * 0.5f);
+                        g.fillRoundedRectangle (juce::Rectangle<float> (stroke, 2.0f * arm).withCentre (c), stroke * 0.5f);
+                    }
+                    continue;
+                }
 
                 if (noteedit::isFoldedAway (song, t))
                     continue; // the group block shows through: a thin row, as FL draws a folded group
@@ -2254,6 +2315,8 @@ void PlaylistComponent::paint (juce::Graphics& g)
                     plate = plate.interpolatedWith (tame (juce::Colour (trackColour)), muted ? 0.22f : (groupHead ? 0.62f : 0.5f));
                 if (hovered)
                     plate = plate.interpolatedWith (colour::bg5, 0.6f);
+                if (simpleHeaders && isTrackSelected (t)) // round 190jc (SG-4): the selected plate is lifted
+                    plate = plate.interpolatedWith (colour::bg6, 0.25f);
                 const auto fl = flHeaders() && simpleInsert (t) <= 0;
                 const auto plateArea = fl ? juce::Rectangle<float> (left, (float) y, (float) (headerWidth - rightColumn()) - left, (float) trackHeight - 1.0f)
                                           : juce::Rectangle<float> (left, (float) y + 1.0f, (float) (headerWidth - rightColumn()) - 2.0f - left, (float) trackHeight - 3.0f);
@@ -2319,10 +2382,10 @@ void PlaylistComponent::paint (juce::Graphics& g)
                     g.setColour (juce::Colour::fromHSV (c.getHue(), c.getSaturation() * 0.8f, 1.0f, 1.0f));
                     g.fillRect (headerWidth - trackhdr::selectionStripWidth + 1, y + 1, trackhdr::selectionStripWidth - 2, juce::jmax (2, trackHeight - 3));
                 }
-                if (isTrackSelected (t) && simpleHeaders) // the Simple headers: a bar at the plate's left
+                if (isTrackSelected (t) && simpleHeaders) // the Simple headers (round 190jc, SG-4): a 1 px accent outline
                 {
                     g.setColour (colour::accent);
-                    g.fillRoundedRectangle (plateArea.withWidth (3.0f).reduced (0.0f, 3.0f), 1.5f);
+                    g.drawRoundedRectangle (plateArea.reduced (0.5f), radius::md, 1.0f);
                 }
                 else if (isTrackSelected (t)) // FL (live check 190gu B1): an outlined box in the selection strip
                 {
@@ -2336,7 +2399,9 @@ void PlaylistComponent::paint (juce::Graphics& g)
 
                 const auto led = trackLed (t).toFloat();
                 auto textRight = led.getX() - 2.0f;
-                if (simpleHeaders || simpleInsert (t) > 0)
+                if (simpleHeaders)
+                    paintSimpleHeaderControls (g, t, plateArea, hovered);
+                else if (simpleInsert (t) > 0)
                 {
                     // the Simple headers (round 184a): M and S buttons on the track's insert, a colour bar, and on tall
                     // rows the insert's volume, pan and effects. Round 190gz: a linked track's header (FL's layout, the
@@ -2567,13 +2632,17 @@ void PlaylistComponent::paint (juce::Graphics& g)
                                                 : juce::Rectangle<int> (nameLeft, y, juce::jmax (8, nameRight - nameLeft), trackHeight - 1);
                     textcache::drawText (g, playlistFitMiddle (name, nameFont, (float) nameBox.getWidth()), nameBox, juce::Justification::centredLeft, false);
                 }
-                else if (const auto icon = trackicons::iconFor (t < (int) song.playlistTracks.size() ? song.playlistTracks[(std::size_t) t].icon : 0);
+                else if (const auto icon = simpleHeaders ? simpleTrackIcon (song, t)
+                                                         : trackicons::iconFor (t < (int) song.playlistTracks.size() ? song.playlistTracks[(std::size_t) t].icon : 0);
                     icon != trackicons::Icon::none && trackHeight >= 14)
                 {
-                    const auto size = (float) juce::jmin (14, trackHeight - 4);
-                    ui::drawTrackIcon (g, icon, juce::Rectangle<float> ((float) textLeft, (float) y + ((float) nameHeight - size) * 0.5f, size, size),
-                                       muted ? colour::textDisabled : colour::textSecondary.brighter (0.3f));
-                    textLeft += (int) size + 4;
+                    // round 190jc (SG-3): a Simple track's type icon, BandLab's, in the track's colour (kept readable on its plate)
+                    const auto size = (float) juce::jmin (simpleHeaders ? simpleSizes().icon : 14, trackHeight - 4);
+                    const auto ink = muted ? colour::textDisabled
+                                     : simpleHeaders && trackColour != 0 ? ui::simplelook::readableOn (juce::Colour (trackColour), plate, 3.0f)
+                                                                         : colour::textSecondary.brighter (0.3f);
+                    ui::drawTrackIcon (g, icon, juce::Rectangle<float> ((float) textLeft, (float) y + ((float) nameHeight - size) * 0.5f, size, size), ink);
+                    textLeft += (int) size + (simpleHeaders ? 6 : 4);
                 }
                 if (! fl)
                 {
@@ -2604,17 +2673,41 @@ void PlaylistComponent::paint (juce::Graphics& g)
         const auto y = trackToY (laneTrack), h = heightOf (laneTrack);
         if (g.reduceClipRegion (grid) && y < grid.getBottom() && y + h > grid.getY())
         {
-            const auto lane = juce::Rectangle<float> ((float) grid.getX() + 6.0f, (float) y + 4.0f, (float) grid.getWidth() - 12.0f, (float) h - 8.0f);
+            // round 190jc (design190ia SG-6, BandLab's empty-state lane): the outline on whole pixels in a 3:1 grey, a "note +"
+            // icon over one centred line; lit in the accent while something is dragged over it (repainted on enter / exit)
+            const auto lane = juce::Rectangle<float> ((float) grid.getX() + 6.5f, (float) y + 4.5f, (float) grid.getWidth() - 13.0f, (float) h - 9.0f);
+            if (dropLaneHot)
+            {
+                g.setColour (colour::accent.withAlpha (0.08f));
+                g.fillRoundedRectangle (lane, radius::lg);
+            }
             juce::Path outline;
             outline.addRoundedRectangle (lane, radius::lg);
             juce::Path dashed;
-            const float dashes[] { 6.0f, 5.0f };
-            juce::PathStrokeType (1.0f).createDashedStroke (dashed, outline, dashes, 2);
-            g.setColour (colour::borderStrong);
+            const float dashes[] { 6.0f, 4.0f };
+            juce::PathStrokeType (dropLaneHot ? 1.5f : 1.0f).createDashedStroke (dashed, outline, dashes, 2);
+            g.setColour (dropLaneHot ? colour::accent : colour::textDisabled);
             g.fillPath (dashed);
-            g.setColour (colour::textSecondary);
-            g.setFont (font (type::body));
-            g.drawText (tr ("Drop a loop, audio or MIDI file here"), lane.reduced (12.0f, 0.0f), juce::Justification::centredLeft, true);
+            const auto text = tr ("Drop a loop, audio or MIDI file here");
+            const auto textFont = font (type::title, true);
+            const auto textHeight = std::ceil (textFont.getHeight());
+            const auto iconSize = lane.getHeight() >= 44.0f ? 20.0f : 0.0f;
+            const auto block = iconSize + (iconSize > 0.0f ? 3.0f : 0.0f) + textHeight;
+            auto content = lane.withSizeKeepingCentre (lane.getWidth() - 24.0f, block);
+            if (iconSize > 0.0f)
+            {
+                const auto icon = content.removeFromTop (iconSize).withSizeKeepingCentre (iconSize, iconSize);
+                const auto ink = dropLaneHot ? colour::textPrimary : colour::textSecondary;
+                icons::draw (g, Icon::note, icon.withTrimmedRight (4.0f).withTrimmedTop (2.0f), ink);
+                g.setColour (ink); // the "+" at the note's top right
+                const auto c = juce::Point<float> (icon.getRight() - 3.0f, icon.getY() + 4.0f);
+                g.fillRect (juce::Rectangle<float> (7.0f, 1.5f).withCentre (c));
+                g.fillRect (juce::Rectangle<float> (1.5f, 7.0f).withCentre (c));
+                content.removeFromTop (3.0f);
+            }
+            g.setColour (dropLaneHot ? colour::textPrimary : colour::textSecondary);
+            g.setFont (textFont);
+            g.drawText (text, content, juce::Justification::centred, true);
         }
     }
 
@@ -2948,6 +3041,14 @@ void PlaylistComponent::addSmallClip (SmallClips& batch, float physicalScale, co
         batch.bodies[look.headerTop.interpolatedWith (look.headerBottom, 0.5f).getARGB()].addWithoutMerging (title);
         batch.edges[look.edge.getARGB()].addWithoutMerging ({ r.getRight() - 1.0f, r.getY(), 1.0f, r.getHeight() });
     }
+    else if (const auto simple = simpleClipLook (c)) // round 190jc: the Simple layout's BandLab colours
+    {
+        batch.bodies[simple->body.getARGB()].addWithoutMerging (body);
+        if (title.getHeight() >= 4.0f)
+            batch.bodies[simple->headerTop.getARGB()].addWithoutMerging (title);
+        batch.edges[(current ? theme::colour::textPrimary.withAlpha (0.55f) : theme::colour::bg0.withAlpha (0.85f)).getARGB()].addWithoutMerging (
+            { r.getRight() - 1.0f, r.getY(), 1.0f, r.getHeight() });
+    }
     else
     {
         batch.bodies[clipBodyColour (base).getARGB()].addWithoutMerging (body);
@@ -2973,7 +3074,8 @@ void PlaylistComponent::addSmallClip (SmallClips& batch, float physicalScale, co
         const auto startTick = (double) c.offset + (double) (wave.getX() - r.getX()) / pixelsPerTick;
         const auto forward = ! clipops::playsBackwards (channel, c);
         const auto startFrame = (double) span.first + (forward ? startTick * perTick : total - startTick * perTick);
-        const auto colour = flAudio ? (band ? look.compactContent : look.content) : clipContentColour (base);
+        const auto simple = flAudio ? std::optional<theme::ClipLook>() : simpleClipLook (c);
+        const auto colour = flAudio ? (band ? look.compactContent : look.content) : simple ? simple->content : clipContentColour (base);
         auto style = ui::currentWaveStyle (colour, juce::jmin (ui::normalisingGain (*summary), 4.0f) * c.gain);
         if (! style.spectral && c.gain > 1.0f)
             style.gain = juce::jmin (style.gain, 8.0f);
@@ -3000,7 +3102,8 @@ void PlaylistComponent::addSmallClip (SmallClips& batch, float physicalScale, co
         const auto bottomKey = (low + high) / 2.0f - span / 2.0f;
         const auto rows = (float) span + 1.0f;
         const auto noteHeight = juce::jlimit (1.5f, 2.5f, inner.getHeight() / rows);
-        auto& marks = batch.contents[clipContentColour (base).getARGB()];
+        const auto simple = simpleClipLook (c);
+        auto& marks = batch.contents[(simple ? simple->content : clipContentColour (base)).getARGB()];
         // what plays: looped along a stretched clip with the LYNX option (issue #25), else once (FL, round 168k)
         const auto passes = clipPasses (c, song.patterns[(std::size_t) c.pattern].effectiveLength (song.meter()));
         for (auto pass = passes.first; pass <= passes.last; ++pass)
@@ -3048,7 +3151,8 @@ void PlaylistComponent::paintAudioClip (juce::Graphics& g, const Clip& c, juce::
     const auto band = fl && r.getHeight() + 1.0f < (float) flBandBelow;
     const auto look = fl ? theme::clipBody (juce::Colour (channel.colour), trackColourIn (song, c.track), ClipKind::audio, theme::ClipStyle::flTint)
                          : theme::ClipLook {};
-    const auto body = fl ? paintFlClipFrame (g, r, look, band) : paintClipFrame (g, r, colour, name, ClipGlyph::audio, c.muted);
+    const auto simpleLook = simpleClipLook (c); // (round 190jc, SG-5: the Simple layout draws an audio clip in its track's colour)
+    const auto body = fl ? paintFlClipFrame (g, r, look, band) : paintClipFrame (g, r, colour, name, ClipGlyph::audio, c.muted, simpleLook ? &*simpleLook : nullptr);
 
     // the waveform (ui/WaveformView, analysed in the background): the clean style fills the body with the
     // peak envelope mirrored around the centre, in a light tint of the clip colour
@@ -3067,7 +3171,7 @@ void PlaylistComponent::paintAudioClip (juce::Graphics& g, const Clip& c, juce::
         const auto startTick = (double) c.offset + (double) (wave.getX() - r.getX()) / pixelsPerTick;
         const auto forward = ! clipops::playsBackwards (channel, c);
         const auto startFrame = (double) span.first + (forward ? startTick * perTick : total - startTick * perTick);
-        auto style = ui::currentWaveStyle (fl ? (band ? look.compactContent : look.content) : clipContentColour (colour),
+        auto style = ui::currentWaveStyle (fl ? (band ? look.compactContent : look.content) : simpleLook ? simpleLook->content : clipContentColour (colour),
                                            juce::jmin (ui::normalisingGain (*summary), 4.0f) * c.gain);
         if (! style.spectral && c.gain > 1.0f) // louder clip gain: the shape may hit the top, which is honest
             style.gain = juce::jmin (style.gain, 8.0f);
@@ -3187,6 +3291,26 @@ void PlaylistComponent::paintAudioClip (juce::Graphics& g, const Clip& c, juce::
 juce::Colour PlaylistComponent::audioClipColour (const ChannelDef& channel)
 {
     return channel.colour != 0 ? theme::tame (juce::Colour (channel.colour)) : theme::colour::audioClip;
+}
+
+std::optional<theme::ClipLook> PlaylistComponent::simpleClipLook (const Clip& c) const
+{
+    // round 190jc (design190ia SG-5, BandLab: a clip in its TRACK's colour, audio and MIDI alike; the Simple layout only)
+    if (! simpleHeaders || c.kind == ClipKind::automation)
+        return std::nullopt;
+    const auto& song = engine.getSong();
+    juce::Colour own;
+    if (c.kind == ClipKind::audio)
+    {
+        if (c.channel < 0 || c.channel >= (int) song.channels.size())
+            return std::nullopt;
+        own = audioClipColour (song.channels[(std::size_t) c.channel]);
+    }
+    else if (c.pattern >= 0 && c.pattern < (int) song.patterns.size())
+        own = theme::tame (patternColour (song, c.pattern));
+    else
+        return std::nullopt;
+    return theme::clipBody (own, trackColourIn (song, c.track), c.kind, theme::ClipStyle::bandlabHue);
 }
 
 void PlaylistComponent::paintAutomationClip (juce::Graphics& g, const Clip& c, juce::Rectangle<float> r)
@@ -4749,6 +4873,18 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
     if (e.x < headerWidth && e.y >= tracksTop() && e.y < gridArea().getBottom())
     {
         const auto track = yToTrack (e.y);
+
+        if (simpleHeaders) // round 190jc (SG-2): the round "+" adds a track; the rows under the real tracks are not there
+        {
+            if (track == dropLaneTrack())
+            {
+                if (! flmods::popup (e.mods) && simpleAddButton().contains (e.getPosition()) && onSimpleAddTrack)
+                    onSimpleAddTrack();
+                return;
+            }
+            if (track >= paintedRows())
+                return;
+        }
 
         if (! flmods::popup (e.mods)) // round 177b: the lanes' fold arrow and "+A"
         {
@@ -7023,11 +7159,93 @@ void PlaylistComponent::switchLinkTracks (AudioEngine& engine, bool on, std::fun
                                         }));
 }
 
+// The Simple header's controls (round 184a; round 190jc, design190ia SG-3/SG-4, BandLab's header): one colour bar at the
+// plate's left; M then S (24 x 20, radius 4) on the track's insert; on the second row the volume as a line in the track's
+// colour with a round thumb, the pan knob and "+FX"
+void PlaylistComponent::paintSimpleHeaderControls (juce::Graphics& g, int t, juce::Rectangle<float> plateArea, bool hovered)
+{
+    using namespace theme;
+    const auto& song = engine.getSong();
+    const auto z = simpleSizes();
+    const auto trackColour = t < (int) song.playlistTracks.size() ? song.playlistTracks[(std::size_t) t].colour : 0u;
+    if (trackColour != 0)
+    {
+        g.setColour (juce::Colour (trackColour));
+        g.fillRoundedRectangle (plateArea.withWidth (4.0f).reduced (0.0f, 2.0f), 1.5f);
+    }
+    const auto insert = simpleInsert (t);
+    const auto* m = insert > 0 ? &song.mixer[(std::size_t) insert] : nullptr;
+    const auto buttonFont = font (ui::simplelook::largeControls() ? type::body : type::small, true);
+    const auto button = [&g, &buttonFont] (juce::Rectangle<float> r, const char* text, bool on, juce::Colour onColour, bool lit) {
+        g.setColour (on ? onColour : (lit ? colour::bg6 : colour::bg4));
+        g.fillRoundedRectangle (r, radius::md);
+        g.setColour (on ? colour::bg0 : (lit ? colour::textPrimary : colour::textSecondary));
+        g.setFont (buttonFont);
+        g.drawText (text, r, juce::Justification::centred, false);
+    };
+    button (trackLed (t).toFloat(), "M", m != nullptr ? m->muted : song.isTrackMuted (t), colour::warning, hovered && hover.led);
+    if (const auto solo = trackSolo (t).toFloat(); ! solo.isEmpty() && m != nullptr)
+        button (solo, "S", m->solo, colour::info, hovered && hover.solo);
+
+    const auto bar = trackVolume (t).toFloat();
+    if (bar.isEmpty() || m == nullptr)
+        return;
+    // volume: a 4 px line, filled in the track's colour up to the fader, a tick at 0 dB and a round thumb
+    const auto lit = (hovered && hover.volume) || (levelDrag == 1 && levelInsert == insert);
+    const auto hue = trackColour != 0 ? juce::Colour (trackColour) : colour::accent;
+    const auto line = bar.withSizeKeepingCentre (bar.getWidth(), ui::simplelook::px (4.0f, 6.0f));
+    g.setColour (colour::bg0);
+    g.fillRoundedRectangle (line, line.getHeight() * 0.5f);
+    const auto at = line.getX() + line.getWidth() * juce::jlimit (0.0f, 1.0f, m->volume);
+    g.setColour (lit ? hue.brighter (0.25f) : hue);
+    g.fillRoundedRectangle (line.withRight (juce::jmax (line.getX() + line.getHeight(), at)), line.getHeight() * 0.5f);
+    g.setColour (colour::textSecondary.withAlpha (0.6f));
+    g.fillRect (juce::Rectangle<float> (bar.getX() + bar.getWidth() * unityFader - 0.5f, line.getY() - 3.0f, 1.0f, line.getHeight() + 6.0f));
+    const auto thumb = ui::simplelook::px (12.0f, 20.0f);
+    g.setColour (colour::bg0.withAlpha (0.5f)); // (a dark rim keeps the thumb apart from a light track colour)
+    g.fillEllipse (juce::Rectangle<float> (thumb + 2.0f, thumb + 2.0f).withCentre ({ at, line.getCentreY() }));
+    g.setColour (lit ? colour::onAccent : colour::textPrimary);
+    g.fillEllipse (juce::Rectangle<float> (thumb, thumb).withCentre ({ at, line.getCentreY() }));
+
+    // pan: a knob, its arc from the top
+    const auto pan = trackPan (t).toFloat();
+    const auto knob = pan.getWidth() * 0.5f - 1.5f;
+    g.setColour (colour::bg4);
+    g.fillEllipse (pan.reduced (1.0f));
+    juce::Path arc;
+    const auto angle = m->pan * 2.356f;
+    arc.addCentredArc (pan.getCentreX(), pan.getCentreY(), knob, knob, 0.0f, juce::jmin (0.0f, angle), juce::jmax (0.0f, angle), true);
+    g.setColour ((hovered && hover.pan) || (levelDrag == 2 && levelInsert == insert) ? colour::accentHover : colour::info);
+    g.strokePath (arc, juce::PathStrokeType (2.0f));
+    g.setColour (colour::textPrimary);
+    g.drawLine (pan.getCentreX(), pan.getCentreY(), pan.getCentreX() + (knob - 1.5f) * std::sin (angle), pan.getCentreY() - (knob - 1.5f) * std::cos (angle), 1.5f);
+
+    // "+FX", with the insert's effect count
+    if (const auto fx = trackFx (t).toFloat(); ! fx.isEmpty())
+    {
+        const auto count = (int) m->effects.size();
+        g.setColour (hovered && hover.fx ? colour::bg6 : colour::bg4);
+        g.fillRoundedRectangle (fx, fx.getHeight() * 0.5f);
+        g.setColour (count > 0 ? colour::accentHover : colour::textSecondary);
+        g.setFont (buttonFont);
+        g.drawText (count > 0 ? "FX " + juce::String (count) : juce::String ("+ FX"), fx, juce::Justification::centred, false);
+    }
+}
+
+int PlaylistComponent::simpleTrackHeight() { return simpleSizes().row; }
+int PlaylistComponent::simpleTwoRows() { return simpleSizes().twoRows; }
+
 juce::Rectangle<int> PlaylistComponent::trackLed (int track) const
 {
     const auto h = heightOf (track);
-    if (simpleHeaders) // the M button, in the first row (round 184a)
-        return { headerWidth - 28 - rightColumn(), trackToY (track) + juce::jmin (5, juce::jmax (0, h / 2 - 8)), 22, juce::jmin (15, h - 2) };
+    if (simpleHeaders)
+    {
+        // the M button, in the first row (round 184a); round 190jc (SG-3): M then S, as BandLab, Live and most DAWs order
+        // them, so M sits left of the S place
+        const auto z = simpleSizes();
+        const auto height = juce::jmin (z.buttonHeight, h - 2);
+        return { headerWidth - 10 - rightColumn() - 2 * z.button - z.gap, trackToY (track) + juce::jmin (z.top, juce::jmax (0, h / 2 - height / 2)), z.button, height };
+    }
     if (simpleInsert (track) > 0) // a linked header's M button (round 190gz): the first row, or centred on a short row
         return { headerWidth - 22 - rightColumn() - insertsColumn(), trackToY (track) + (h >= linkedTwoRows ? 4 : juce::jmax (1, (h - 14) / 2)), 18,
                  juce::jmin (14, h - 2) };
@@ -7053,7 +7271,7 @@ void PlaylistComponent::updateHeaderWidth()
 {
     // (round 190ig, FM-23: FL's 98 px header plates + the 8 px selection / activity column in the Pattern layout;
     // round 190ht, issue #154: the linked headers' inserts column)
-    const auto width = simpleHeaders ? simpleHeaderWidth : linkedHeaders() ? linkedHeaderWidth + insertsColumn() : flHeaderWidthNow();
+    const auto width = simpleHeaders ? (ui::simplelook::largeControls() ? simpleHeaderWidthLarge : simpleHeaderWidth) : linkedHeaders() ? linkedHeaderWidth + insertsColumn() : flHeaderWidthNow();
     if (width == headerWidth)
         return;
     headerWidth = width;
@@ -7066,16 +7284,23 @@ juce::Rectangle<int> PlaylistComponent::trackSolo (int track) const
 {
     if (simpleInsert (track) < 0 || noteedit::isFoldedAway (engine.getSong(), track))
         return {};
-    return trackLed (track).translated (simpleHeaders ? -25 : -20, 0);
+    if (simpleHeaders) // (round 190jc: right of M)
+        return trackLed (track).translated (simpleSizes().button + simpleSizes().gap, 0);
+    return trackLed (track).translated (-20, 0);
 }
 
 juce::Rectangle<int> PlaylistComponent::trackVolume (int track) const
 {
     const auto h = heightOf (track);
-    if (simpleInsert (track) < 0 || h < (simpleHeaders ? simpleTwoRows : linkedTwoRows) || noteedit::isFoldedAway (engine.getSong(), track))
+    if (simpleInsert (track) < 0 || h < (simpleHeaders ? simpleTwoRows() : linkedTwoRows) || noteedit::isFoldedAway (engine.getSong(), track))
         return {};
     if (simpleHeaders)
-        return { 12, trackToY (track) + h - 20, headerWidth - 122, 12 };
+    {
+        // round 190jc (SG-3): the volume line from the name's left to the pan knob, the "+FX" pill at the plate's right
+        const auto z = simpleSizes();
+        const auto right = headerWidth - rightColumn() - 10 - z.fxWidth - 8 - z.knob - 10;
+        return { 12, trackToY (track) + h - 6 - z.volumeHit, juce::jmax (20, right - 12), z.volumeHit };
+    }
     // a linked header (round 190gz): the bar under the first row, the pan knob at its right (Logic / Bitwig's compact row)
     const auto& song = engine.getSong();
     const auto left = noteedit::groupHeaderOf (song, track) >= 0 && ! noteedit::isGroupHeader (song, track) ? groupIndent : 2;
@@ -7089,13 +7314,21 @@ juce::Rectangle<int> PlaylistComponent::trackPan (int track) const
     const auto v = trackVolume (track);
     if (v.isEmpty())
         return {};
-    return simpleHeaders ? juce::Rectangle<int> (v.getRight() + 10, v.getCentreY() - 8, 16, 16) : juce::Rectangle<int> (v.getRight() + 6, v.getCentreY() - 7, 14, 14);
+    if (simpleHeaders)
+    {
+        const auto knob = simpleSizes().knob;
+        return { v.getRight() + 10, v.getCentreY() - knob / 2, knob, knob };
+    }
+    return { v.getRight() + 6, v.getCentreY() - 7, 14, 14 };
 }
 
 juce::Rectangle<int> PlaylistComponent::trackFx (int track) const
 {
     const auto v = trackVolume (track);
-    return v.isEmpty() || ! simpleHeaders ? juce::Rectangle<int>() : juce::Rectangle<int> (v.getRight() + 34, v.getCentreY() - 8, 44, 16);
+    if (v.isEmpty() || ! simpleHeaders)
+        return {};
+    const auto z = simpleSizes();
+    return { trackPan (track).getRight() + 8, v.getCentreY() - z.fxHeight / 2, z.fxWidth, z.fxHeight };
 }
 
 // --- issue #154 (round 190ht): the insert effects column of the linked headers -------------------------------------
@@ -7440,13 +7673,70 @@ int PlaylistComponent::dropLaneTrack() const
     return simpleHeaders ? simpletracks::nextEmptyTrack (engine.getSong()) : -1;
 }
 
+int PlaylistComponent::paintedRows() const
+{
+    return simpleHeaders ? simpletracks::rowsShown (engine.getSong(), numTracks()) : numTracks();
+}
+
+juce::Rectangle<int> PlaylistComponent::simpleAddButton() const
+{
+    const auto lane = dropLaneTrack();
+    if (lane < 0)
+        return {};
+    const auto size = juce::jmin (simpleSizes().add, heightOf (lane) - 6);
+    return juce::Rectangle<int> (size, size).withCentre ({ (headerWidth - rightColumn()) / 2, trackToY (lane) + heightOf (lane) / 2 });
+}
+
+juce::Rectangle<int> PlaylistComponent::dropLaneArea() const
+{
+    const auto lane = dropLaneTrack();
+    if (lane < 0)
+        return {};
+    const auto grid = gridArea();
+    return juce::Rectangle<int> (grid.getX(), trackToY (lane), grid.getWidth(), heightOf (lane)).getIntersection (grid);
+}
+
+void PlaylistComponent::simpleLookChanged()
+{
+    if (! simpleHeaders)
+        return;
+    hover = {};
+    headerWidth = -1; // (laid out again: the Large controls width)
+    updateHeaderWidth();
+    refreshTrackLayout();
+    updateScrollBars();
+    repaint();
+}
+
+void PlaylistComponent::updateDropLaneProbe()
+{
+    const auto area = simpleHeaders ? dropLaneArea().reduced (6, 4) : juce::Rectangle<int>();
+    if (area != dropLaneProbe.getBounds())
+        dropLaneProbe.setBounds (area);
+    dropLaneProbe.setVisible (! area.isEmpty());
+}
+
+void PlaylistComponent::setDropLaneHot (bool hot)
+{
+    if (hot == dropLaneHot)
+        return;
+    dropLaneHot = hot;
+    repaint (dropLaneArea()); // (only the lane: no timer, a repaint on enter and exit)
+}
+
+void PlaylistComponent::fileDragMove (const juce::StringArray&, int x, int y) { setDropLaneHot (simpleHeaders && dropLaneArea().contains (x, y)); }
+void PlaylistComponent::fileDragExit (const juce::StringArray&) { setDropLaneHot (false); }
+void PlaylistComponent::itemDragMove (const SourceDetails& details) { setDropLaneHot (simpleHeaders && dropLaneArea().contains (details.localPosition)); }
+void PlaylistComponent::itemDragExit (const SourceDetails&) { setDropLaneHot (false); }
+
 juce::Rectangle<int> PlaylistComponent::trackArrow (int track) const
 {
     if (! noteedit::isGroupHeader (engine.getSong(), track))
         return {};
 
     const auto solo = trackSolo (track);
-    const auto led = solo.isEmpty() ? trackLed (track) : solo;
+    // (the leftmost button: S left of the LED with FL's / the linked headers, M left of S on the Simple ones)
+    const auto led = solo.isEmpty() ? trackLed (track) : solo.getX() < trackLed (track).getX() ? solo : trackLed (track);
     return { led.getX() - 15, led.getY() - 1, 13, led.getHeight() + 2 };
 }
 
@@ -7460,7 +7750,7 @@ juce::Rectangle<int> PlaylistComponent::trackArm (int track) const
         return {}; // (a drum track is FL's audio track only to keep its insert: nothing to record on it)
     const auto arrow = trackArrow (track);
     const auto solo = trackSolo (track);
-    const auto led = solo.isEmpty() ? trackLed (track) : solo;
+    const auto led = solo.isEmpty() ? trackLed (track) : solo.getX() < trackLed (track).getX() ? solo : trackLed (track); // (leftmost)
     if (simpleHeaders || simpleInsert (track) > 0) // (the Simple and the linked headers: beside the S button)
         return { (arrow.isEmpty() ? led.getX() : arrow.getX()) - 17, led.getY() + (led.getHeight() - 12) / 2, 12, 12 };
     return { (arrow.isEmpty() ? led.getX() : arrow.getX()) - 15, led.getY(), 12, 12 };
@@ -10928,6 +11218,19 @@ PlaylistComponent::Hover PlaylistComponent::hoverAt (juce::Point<int> p) const
             h.insertLed = h.insertItem >= 0 && p.x < trackInserts (h.track).getX() + trackinserts::ledWidth + 1;
         }
         h.audition = ! folded && h.divider < 0 && trackAudition (h.track).expanded (2).contains (p);
+        if (simpleHeaders) // round 190jc: the round "+" in the drop lane's header; nothing under the real tracks
+        {
+            if (h.track == dropLaneTrack())
+            {
+                Hover add;
+                add.header = true;
+                add.track = h.track;
+                add.addTrack = simpleAddButton().contains (p);
+                return add;
+            }
+            if (h.track >= paintedRows())
+                return {};
+        }
         return h;
     }
 
@@ -11075,6 +11378,9 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
         hint.value = juce::String (juce::roundToInt (trackZoom * 100.0)) + "%";
         return hint;
     }
+
+    if (h.header && h.addTrack) // round 190jc: the round "+" under the Simple tracks
+        return { tr ("Add a track: voice, instrument, drums, sampler, guitar or bass, or import files"), {} };
 
     if (h.header && h.divider >= 0)
     {
@@ -11399,6 +11705,7 @@ bool addAudioClip (AudioEngine& engine, const juce::File& file, std::int64_t sta
 
 void PlaylistComponent::filesDropped (const juce::StringArray& files, int x, int y)
 {
+    setDropLaneHot (false);
     // on a track header (round 189e): FL's Edit › Drop audio on track headers, on an unassigned track
     if (x < headerWidth && y >= tracksTop() && y < gridArea().getBottom())
         if (const auto track = yToTrack (y); track >= 0 && (track >= (int) engine.getSong().playlistTracks.size()
@@ -11639,6 +11946,7 @@ void PlaylistComponent::scrollBarMoved (juce::ScrollBar* bar, double start)
 
 void PlaylistComponent::changeListenerCallback (juce::ChangeBroadcaster* source)
 {
+    updateDropLaneProbe();
     if (source == ui::WaveformCache::getInstanceWithoutCreating())
     {
         repaint();
@@ -12302,6 +12610,7 @@ void PlaylistComponent::dropFromPicker (ClipKind kind, const std::vector<int>& e
 
 void PlaylistComponent::itemDropped (const SourceDetails& details)
 {
+    setDropLaneHot (false);
     // issue #177: entries dragged out of the Picker panel
     auto pickerKind = ClipKind::pattern;
     if (std::vector<int> entries; pickerDrag (details.description, pickerKind, entries))
