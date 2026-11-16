@@ -80,6 +80,11 @@ constexpr int targetLevelParam = 115;
 // 6 and 12 dB/oct cuts have one section and sound the same under both.
 constexpr int cutLawParam = 116;
 constexpr int paramCount = 117;
+// round 190jh (Pro-Q 4 parity), hidden — past paramCount, not in the info: no control, no text; saved while non-zero, so
+// every project saved before loads 0 and plays as before: [117 + b] band b's automatic threshold (Pro-Q 4's "Auto",
+// the default of its dynamic bands; set by the Pro-Q 4 translator). See autoThreshold below.
+constexpr int autoThresholdParam0 = paramCount; // + band
+constexpr int storedParamCount = autoThresholdParam0 + 8;
 constexpr int maxSections = 8; // 96 dB/oct = 16th order
 
 enum class Shape { off, bell, lowShelf, highShelf, lowCut, highCut, notch, bandPass, tiltShelf, flatTilt, allPass };
@@ -145,6 +150,18 @@ float displayRangeValue (double db) noexcept;
 // frequencies (20 Hz … 20 kHz) with the dynamics at rest.
 double autoGainDb (const EffectParams& params, double sampleRate) noexcept;
 
+// Round 190jh: the automatic threshold, measured black-box on refcap030's Pro-Q 4 captures (round 190hv; Dynamic Range
+// -30 / -15 / +15 dB x the stairs and time-constant probes at 1 kHz; the threshold control has no effect there). The band
+// tracks a "top" level: it jumps to the detector level when that is higher, falls by autoDecayDbPerSecond otherwise and
+// never sits below autoFloorDb (where it starts); the threshold is the top minus the range's size, so a band reaches its
+// full range at the loudest recent level and moves 1 dB per dB below it, over a soft knee of autoKneeDb. The band's
+// total gain (static + dynamic) stays within +-30 dB as the reference's does. Fitted on the gain trajectories (10 ms
+// windows, Nelder-Mead): 1.06 dB rms over 6 trajectories (a fixed threshold at the floor: 4.9 dB) [model: the reference's
+// own detector is not known; its top settles ~9 dB under short loud bursts, which this follower does not do].
+constexpr double autoFloorDb = -39.7, autoDecayDbPerSecond = 1.70, autoKneeDb = 30.5;
+bool autoThreshold (const EffectParams& params, int band) noexcept;
+// the auto mode's gain law: dynamicGainDb with the auto knee
+double autoDynamicGainDb (double levelDb, double topDb, double rangeDb) noexcept;
 // The dynamic gain (dB) a band applies for a detector level (dB, sine peak): 0 below the knee, then 1 dB per dB over the
 // threshold (10 dB soft knee), clamped at the range; the sign follows the range.
 double dynamicGainDb (double levelDb, double thresholdDb, double rangeDb) noexcept;

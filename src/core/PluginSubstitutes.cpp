@@ -229,8 +229,14 @@ preset = Mix=1; Style=0.9; Sync L=0.625; Note L=0.45; Sync R=0.625; Note R=0.45;
 [waves-supertap]
 product = SuperTap
 vendor = Waves
-lynx = Fruity Delay 3
+# round 190jh: LYNX's multi-mode echo (was Fruity Delay 3 at FL's default, which added echoes to a SuperTap whose taps are
+# off): the state's taps, feedback, tap filter and direct level are translated onto Echoform's clean two-line echo,
+# measured on refcap182's SuperTap programme captures (docs/PARITY.md "Round 190jh"). Without a readable state: the
+# dry signal (SuperTap's default: the direct path on, every tap off)
+lynx = Echoform
 waves = SuperTap
+translate = waves-supertap
+preset = Mix=0
 
 [soundtoys-echoboy]
 product = EchoBoy
@@ -425,6 +431,9 @@ product = Waves L1 / L2 / L3
 vendor = Waves
 lynx = Limiter
 waves = L1; L2; L3; L3-16; L3-LL Multi; L4
+# round 190jh: an L2 state's RealWorld list is translated (threshold = the input gain, out ceiling, release; ARC = the
+# Limiter's shortest release), measured on refcap182's L2 programme captures (docs/PARITY.md "Round 190jh")
+translate = waves-l2
 
 [fabfilter-pro-l]
 product = FabFilter Pro-L
@@ -477,6 +486,9 @@ vendor = Waves
 lynx = Compressor
 waves = CLA-3A; C1 comp; C1comp; SSLComp; API-2500
 preset = Threshold=0.75; Ratio=0.0526; Auto gain=1
+# round 190jh: an SSLComp state's RealWorld list is translated (threshold, ratio, attack, release, make-up, mix),
+# measured on refcap182's SSLComp programme captures; the others keep the preset
+translate = waves-sslcomp
 
 [fabfilter-pro-c]
 product = FabFilter Pro-C
@@ -1500,6 +1512,125 @@ int translateWavesRComp (const std::vector<std::uint8_t>& state, EffectSlot& slo
     return 6;
 }
 
+// SSLComp (22 values; round 190jh [EXEC]: refcap182's states against the settings set through the trial's parameters):
+// 0 threshold (−15 … +15, the console's dB), 1 ratio (0 = 2:1, 1 = 4:1, 2 = 10:1), 3 attack (0 … 5 = 0.1, 0.3, 1, 3, 10,
+// 30 ms), 4 release (0 … 4 = 0.1, 0.3, 0.6, 1.2 s, Auto), 5 make-up dB, 19 mix %, 21 side-chain high-pass Hz (20 = off,
+// not translated). Compressor's classic voicing takes them as they are, the threshold moved by sslCompThresholdDb to
+// dBFS and Auto as sslCompAutoReleaseMs — fitted on refcap182's programme (D, X1 … X4 x drums, bass, guitar, vocal, mix:
+// offsets −15 / −20 / −23 / −25 / −30 dB scored 2.64 / 4.20 / 5.56 / 5.40 / 3.08; Auto at 300 / 600 ms 5.56 / 5.68).
+constexpr double sslCompThresholdDb = -23.0, sslCompAutoReleaseMs = 600.0;
+int translateWavesSslComp (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    const auto rw = wavesRealWorldParams (state);
+    const auto threshold = wavesValue (rw, 0), ratio = wavesValue (rw, 1);
+    if (slot.kind != EffectKind::compressor || ! threshold || ! ratio || wavesPluginName (state) != "SSLComp")
+        return 0;
+    static constexpr double ratios[3] { 2.0, 4.0, 10.0 }, attacks[6] { 0.1, 0.3, 1.0, 3.0, 10.0, 30.0 };
+    static constexpr double releases[5] { 100.0, 300.0, 600.0, 1200.0, sslCompAutoReleaseMs };
+    const auto pick = [&] (std::size_t i, double fallback, int count) { return std::clamp ((int) std::lround (wavesValue (rw, i).value_or (fallback)), 0, count - 1); };
+    slot.params[0] = linNorm (*threshold + sslCompThresholdDb, -60.0, 0.0);
+    slot.params[1] = linNorm (ratios[pick (1, 1.0, 3)], 1.0, 20.0);
+    slot.params[2] = logNorm (attacks[pick (3, 2.0, 6)], 0.1, 100.0);
+    slot.params[3] = logNorm (releases[pick (4, 3.0, 5)], 10.0, 1000.0);
+    slot.params[4] = linNorm (wavesValue (rw, 5).value_or (0.0), 0.0, 24.0);
+    slot.params[5] = 0.0f;
+    slot.params[6] = (float) std::clamp (wavesValue (rw, 19).value_or (100.0) / 100.0, 0.0, 1.0);
+    return 7;
+}
+
+// round 190jh: SuperTap's echo levels on Echoform (see translateWavesSuperTap), fitted on refcap182's programme
+constexpr double superTapLossDb = 0.3, superTapHardDb = 3.0, superTapFeedback = 1.0, superTapHalfPi = 1.5707963267948966;
+
+// L2 (16 values; round 190jh [EXEC]: refcap182's L2 states against the settings set through the trial's parameters):
+// 0 release ms (the dial; 1 ms with ARC, its default), 1 threshold dB (-30 … 0: the input gain, negated), 2 out ceiling dB,
+// 8 quantize, 13 ARC (1 on). LYNX's Limiter is a look-ahead brickwall of the same structure (input gain, ceiling,
+// release): the threshold becomes its gain (0 … 24 dB), the ceiling its ceiling (-12 … 0 dB), the release the dial's
+// milliseconds (10 … 1000) and ARC its shortest release, 10 ms — on refcap182's programme (X1 … X4 x drums, bass,
+// guitar, vocal, mix) ARC at 10 / 50 ms scored 6.90 / 6.65, the manual 100 ms at 1 / 2 / 4 x the dial 6.0 / 6.2 / 5.8.
+int translateWavesL2 (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    const auto rw = wavesRealWorldParams (state);
+    const auto threshold = wavesValue (rw, 1), ceiling = wavesValue (rw, 2);
+    if (slot.kind != EffectKind::limiter || ! threshold || ! ceiling || wavesPluginName (state) != "L2") // (L1 / L3 / L4: their own lists)
+        return 0;
+    const bool arc = wavesValue (rw, 13).value_or (1.0) >= 0.5;
+    const auto releaseMs = arc ? 10.0 : std::clamp (wavesValue (rw, 0).value_or (10.0), 10.0, 1000.0);
+    slot.params[0] = linNorm (*ceiling, -12.0, 0.0);
+    slot.params[1] = linNorm (-*threshold, 0.0, 24.0);
+    slot.params[2] = logNorm (releaseMs, 10.0, 1000.0);
+    return 3;
+}
+
+// SuperTap 2-Taps (98 values; round 190jh [EXEC]: refcap182's states against the settings set through the trial's own
+// parameters, and the tap times / levels read off its programme renders): 4 tempo BPM, 10 feedback on, 11 feedback %,
+// 13 feedback delay; tap k (k = 0, 1) at 33 + 10 k: on, gain dB, pan (−45 … +45°), delay, 6 filter kHz, 8 filter on.
+// Delays are stored in units of 4 beats at 120 BPM (the time is delay × 240 / BPM s: 0.064 at 136.4 BPM = 112.6 ms,
+// echo found at 112.9 ms). The pan is constant-power around the centre (centre = the tap's gain on both sides, hard =
+// +3 dB on one). Echoform plays them as its clean two-line echo — one tap: Single at its time; two: Dual, the left
+// line at the first tap's time and the right at the second's, Width from the pans — with the dry path at unity (Mix
+// low, the echoes raised by Output, which acts on the echoes only), the feedback on the lines (SuperTap's own
+// feedback delay is not modelled) and the tap filter as the high cut.
+int translateWavesSuperTap (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    namespace e = echosuite::echoform;
+    const auto rw = wavesRealWorldParams (state);
+    if (slot.kind != EffectKind::echoform || rw.size() < 52 || ! wavesValue (rw, 33) || ! wavesValue (rw, 43))
+        return 0;
+    struct Tap { double gain, pan, sec, filterKHz; bool filter; };
+    const double bpm = std::clamp (wavesValue (rw, 4).value_or (120.0), 20.0, 400.0);
+    std::vector<Tap> taps;
+    for (const std::size_t base : { (std::size_t) 33, (std::size_t) 43 })
+        if (wavesValue (rw, base).value_or (0.0) >= 0.5)
+            taps.push_back ({ wavesValue (rw, base + 1).value_or (0.0), wavesValue (rw, base + 2).value_or (0.0),
+                              wavesValue (rw, base + 3).value_or (0.0) * 240.0 / bpm, wavesValue (rw, base + 6).value_or (20.0),
+                              wavesValue (rw, base + 8).value_or (0.0) >= 0.5 });
+    auto& p = slot.params;
+    p[e::mode] = e::modeValue (e::Mode::clean);
+    p[e::syncL] = p[e::syncR] = 0.0f;
+    p[e::age] = p[e::modDepth] = p[e::wow] = p[e::flutter] = 0.0f;
+    p[e::voicingStereo] = 0.0f;
+    p[e::lrOffset] = 0.0f;
+    if (taps.empty())
+    {
+        p[e::mix] = 0.0f;
+        return 1;
+    }
+    double gain = -120.0, spread = 0.0;
+    for (const auto& t : taps)
+    {
+        gain = std::max (gain, t.gain);
+        spread = std::max (spread, std::min (1.0, std::abs (t.pan) / 45.0));
+    }
+    // the echoes' level on a side: the tap's gain, +3 dB at a hard pan; Echoform's clean line loses 0.3 dB [EXEC probe]
+    const double echoDb = gain + superTapLossDb + superTapHardDb * spread;
+    double mix = 0.05;
+    while (20.0 * std::log10 (std::sin (mix * superTapHalfPi)) + 18.0 < echoDb && mix < 1.0)
+        mix += 0.01;
+    p[e::mix] = (float) std::min (1.0, mix);
+    p[e::output] = linNorm (echoDb - 20.0 * std::log10 (std::sin (std::min (1.0, mix) * superTapHalfPi)), -18.0, 18.0);
+    p[e::timeL] = e::timeValue (taps[0].sec * 1000.0);
+    if (taps.size() == 1)
+    {
+        p[e::style] = e::styleValue (e::Style::single);
+        p[e::timeR] = p[e::timeL];
+    }
+    else
+    {
+        p[e::style] = e::styleValue (e::Style::dual);
+        p[e::timeR] = e::timeValue (taps[1].sec * 1000.0);
+        p[e::width] = (float) (0.5 + 0.5 * spread);
+    }
+    p[e::feedback] = wavesValue (rw, 10).value_or (0.0) >= 0.5
+                         ? (float) std::clamp (superTapFeedback * wavesValue (rw, 11).value_or (0.0) / 200.0, 0.0, 1.0) : 0.0f;
+    double lp = 1e9;
+    for (const auto& t : taps)
+        if (t.filter)
+            lp = std::min (lp, t.filterKHz * 1000.0);
+    if (lp < 20000.0)
+        p[e::highCut] = linNorm (lp, 200.0, 20000.0);
+    return (int) taps.size() * 4 + 2;
+}
+
 // DeEsser (15 values): 0 frequency Hz, 2 threshold dB, 10 monitor (1 = side chain), 13 side chain (1 = high pass,
 // 2 = band pass), 14 audio (0 = split, 1 = wideband). Round 123: Hush's "classic split" voicing is the de-esser measured
 // black-box on the official trial (core/VoiceMatch.h; REA_rodada123 §2), so the controls map one to one.
@@ -1599,7 +1730,11 @@ int translateWavesCla76 (const std::vector<std::uint8_t>& state, EffectSlot& slo
     p[c::autoRelease] = 0.0f;
     p[c::autoGain] = 0.0f;
     p[c::mix] = 1.0f;
-    p[c::output] = linNorm (31.5 + (inDb + 8.7) + (outDb + 16.9), -36.0, 36.0);
+    // round 190jh [EXEC] (refcap182's CLA-76 programme captures: D, X1 at 4:1, X2 at 8:1, X4 at 12:1, all at 100 % mix): with a
+    // single ratio button the reference's wet path stands higher than the all-buttons fit puts it — Crest's output +7.7 /
+    // +11 / +10.2 dB at 4 / 8 / 12 (and 20) : 1 (refcap182 D / X1 / X2 / X4, 20 files: 1.00 → 4.95); the all-buttons fit is unchanged
+    static constexpr double singleButtonDb[4] { 10.2, 10.2, 11.0, 7.7 };
+    p[c::output] = linNorm (31.5 + (inDb + 8.7) + (outDb + 16.9) + (ratioIndex < 4 ? singleButtonDb[ratioIndex] : 0.0), -36.0, 36.0);
     slot.mix = (float) std::clamp (at (103, 100.0) / 100.0, 0.0, 1.0);
     return 11;
 }
@@ -2931,6 +3066,12 @@ RawTranslator rawTranslatorNamed (std::string_view name)
         return translateWavesCla2a;
     if (name == "waves-cla-76")
         return translateWavesCla76;
+    if (name == "waves-l2")
+        return translateWavesL2;
+    if (name == "waves-supertap")
+        return translateWavesSuperTap;
+    if (name == "waves-sslcomp")
+        return translateWavesSslComp;
     return nullptr;
 }
 

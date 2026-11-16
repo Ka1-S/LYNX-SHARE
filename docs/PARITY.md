@@ -3797,3 +3797,88 @@ left-only input (the Stereo Width grid: −2 … −12 dB), Pro-R 2 Brightness a
 (highs −3 dB, lows +5 … +9 dB on music); Little Plate at 44.1 kHz (the reference is ~1.5 dB quieter there than at 48 kHz:
 a reference quirk). The waveform score saturates near 4 on reverb rows (ESR cannot null a second reverb): the steps
 above are spectrum (≤ 2.5 dB) and level (≤ 1.5 dB) moving files from 1 … 3 to 4.
+
+## Round 190jh: the Waves roles scored and translated; Facet EQ ← Pro-Q 4's dynamic bands (automatic threshold)
+
+Black-box, on captures already on disk (lab and evidence: `/mnt/e/lynx-work/parity190jh/`, HANDOFF.md). Same score as rounds
+190iq / is / it (`scripts/fxparity.py`, 0–10, higher is better), the references' own renders against LYNX loading the
+plug-in's saved state through its substitute / translator.
+
+**The Waves roles, first scored.** refcap182's programme bank (round 182a, with Waves' licence: D and X1 … X4 × drums, bass,
+guitar, vocal, mix, 35 s each, and each setting's component state) through LYNX's substitute for the state, the slot's dry /
+wet applied as the mixer does (`tools/fxrender --slotmix`, new: substitutes such as Reeverb 2's 25 % mix were rendered at 100 %
+before). refcap0124's one-control sweeps of these plug-ins are not usable (the controls did not take on most renders: every
+SuperTap / PuigTec sweep equals the default). Translations added (RealWorld lists read against the settings set through
+the trials' own parameters, constants fitted on the programme renders):
+- **Limiter ← L2**: threshold → input gain, out ceiling → ceiling, release → release, ARC → the Limiter's shortest (10 ms;
+  ARC at 10 / 50 ms scored 6.90 / 6.65; the manual release at 1 / 2 / 4 × the dial 6.0 / 6.2 / 5.8). L1 / L3 / L4 keep the default.
+- **SuperTap → Echoform** (was Fruity Delay 3 at FL's default, which put echoes on a SuperTap whose taps are off — its
+  default): the taps' times are the stored delay × 240 / BPM (0.064 at 136.4 BPM = 112.6 ms, the echo found at 112.9 ms), the
+  pan constant-power (hard = +3 dB on one side), played by Echoform's clean Single / Dual echo with the dry path at unity
+  (Mix low, the echoes raised by Output, which acts on the echoes only), the feedback on the lines and the tap filter as the
+  high cut. SuperTap's separate feedback delay and its modulation are not modelled. No state: the dry signal.
+- **Compressor ← SSLComp**: threshold + −23 dB (offsets −15 / −20 / −23 / −25 / −30 scored 2.64 / 4.20 / 5.56 / 5.40 / 3.08),
+  ratio 2 / 4 / 10, attack 0.1 … 30 ms, release 0.1 … 1.2 s and Auto as 600 ms, make-up, mix. CLA-3A / C1 / API-2500 keep the preset.
+- **Crest ← CLA-76, single ratio buttons**: the all-buttons fit (round 148) put the 4 / 8 / 12 : 1 settings 7 … 12 dB under the
+  reference; their wet path is now +7.7 / +11 / +10.2 dB (20 : 1 as 12 : 1). The all-buttons fit is unchanged.
+
+| refcap182 reference (25 files) | LYNX stand-in | before → after | up / same / down |
+|---|---|---|---|
+| L2 | Limiter | 3.44 → **7.32** (D 9.0, X1 3.0 → 7.2, X2 1.2 → 6.6, X3 2.0 → 6.0, X4 2.0 → 7.8) | 20 / 5 / 0 |
+| SuperTap 2-Taps | Echoform (was Fruity Delay 3) | 1.88 → **6.44** (D 1.2 → 10.0, X1 → 7.6, X2 → 5.6, X3 → 5.0, X4 → 4.0) | 25 / 0 / 0 |
+| SSLComp | Compressor | 2.92 → **5.68** (D 4.4 → 5.0, X1 4.0 → 5.6, X2 2.2 → 5.8, X3 2.2 → 6.6, X4 1.8 → 5.4) | 20 / 4 / 1 (D mix 6 → 5) |
+| CLA-76 | Crest Compressor | 2.20 → **5.36** (D / X1 / X2 / X4 1.0 → 5.6 / 5.6 / 4.0 / 4.6; X3 all buttons 7.0) | 20 / 5 / 0 |
+| S1 Imager | Stereo Shaper | 10.00 (unchanged) | — |
+| SSL Channel | Ridge Strip | 8.12 (unchanged) | — |
+| RVerb / H-Reverb / TrueVerb | Reeverb 2 (25 % mix) | 2.04 / 1.72 / 3.24 (unchanged; lab below) | — |
+| PuigTec EQP-1A | none (missing plug-in: the dry signal) | 3.72 (unchanged) | — |
+
+Not changed: **Stereo Shaper ← S1 Imager 10.00** and **Ridge Strip ← SSL Channel 8.12** (their translators already hold),
+**PuigTec EQP-1A**: no substitute (a project keeps the missing plug-in; its dry signal scores 3.72 — the reference adds
++1.1 dB and its boosts / cuts); a Pultec curve model needs measured curves, which the capture set does not have.
+**The Waves reverbs** were translated in the lab (decay, pre-delay, size, diffusion, a wet level per decay) and are **not**
+shipped: no setting of the stand-in Reeverb 2 kept every file — RVerb 2.04 → 2.60 (15 up, X1 / X3 drums 2 → 1), H-Reverb
+1.72 → 2.00 (7 up, 5 down), TrueVerb below the current 25 % mix (3.24) in every try (its direct path is attenuated with
+Distance in a way Reeverb's dry control cannot follow); owner decision below.
+
+**Facet EQ ← Pro-Q 4's dynamic bands.** Round 124's translator kept dynamic bands static; refcap030's Dynamic Range ×
+Threshold grid scored 2.60. The state holds them (band b at 23b: 9 range dB, 10 dynamics on, 11 Auto, 12 the manual
+threshold, 13 / 14 attack / release %), and every captured state has **Auto** on (Pro-Q 4's default; the threshold control
+then has no effect: thresholds −90 … 0 render bit-identical). Measured on the grid's stairs and time-constant probes at
+1 kHz (10 ms gain trajectories, ranges −30 / −15 / +15 dB): the band reaches its full range at the loudest recent level and
+moves 1 dB per dB below it; that "top" follows a louder detector level at once, falls by ~1.7 dB/s otherwise and never sits
+below −40 dB (where it starts); the band's total gain stays within ±30 dB (+30 range: the gain stops at +24 over a +6 bell).
+Facet gets this as an **automatic threshold per band** — hidden parameters past the info (no control, no string, 0 i18n
+keys), saved only while on — fitted by Nelder-Mead on the six trajectories: top −39.7 dB, fall 1.70 dB/s, soft knee 30.5 dB,
+gain attack / release 18.1 / 305 ms (Pro-Q's 50 %; other percentages one decade per 50 % [model]): 1.06 dB rms. The
+translator now carries range, Auto (→ the automatic threshold) or the manual threshold (the parameter's own texts: −90 /
+−66 / −45 dB at 0 / 0.125 / 0.25, then linear to 0 dB), and the first dynamic band's attack / release (Facet has one timing).
+
+| refcap030 Pro-Q 4 block | files | before → after | up / same / down |
+|---|---|---|---|
+| grid2 (Dynamic Range × Threshold; stairs, time constants) | 50 | 2.60 → **6.60** | 40 / 10 / 0 |
+| grid, mode, pairs, 44.1 / 48 / 96 kHz | 150 | 9.33 / 8.74 / 9.19 / 9.27 / 9.27 / 9.73, each unchanged | 0 / 150 / 0 |
+| all (row) | 200 | 7.53 → **8.53** | 40 / 160 / 0 |
+
+Other Pro-Q 4 banks: refcap182 programme 9.40 → 9.40 and tp172b (no dynamic band in their states: unchanged by construction,
+programme re-rendered identical). **Old projects**: a project or preset saved before has the automatic threshold off — gold
+(base commit's objects against the round's, Facet with manual dynamic bands at 44.1 / 48 / 96 kHz, every phase mode): 6 / 6
+renders identical (`tests/Parity190jhGold.inc`). The translators only change what a project with the missing plug-in loads.
+
+**CPU** (thread time, 20 s at 48 kHz in blocks of 512, best of 5, three runs, one pinned core; `cpu/bench.log`): Facet with
+one manual dynamic band 0.21 … 0.25 % (base) / 0.22 % (round) — unchanged; with the automatic threshold 0.30 … 0.33 % (its gain
+keeps moving, so the band is redesigned more often); SuperTap's stand-in Echoform (two taps + feedback) 1.19 … 1.38 % against
+Fruity Delay 3's 0.60 … 0.69 %; Limiter 0.11 % either way. No latency change.
+
+**Still off / measured, not built:**
+- Facet's automatic threshold settles ~9 dB under a short loud burst in the reference (after −6 dBFS bursts of 2 … 200 ms the
+  top sits at −15 dB, not −6): the −30 dB range time-constant probe stays at 2.
+- **EchoBoy's LowCut / HighCut** (refcap030 pairs PX2 against S1's own echo, the first echo's spectrum): both are shelves,
+  not cuts — HighCut 0.2 / 0.5 / 0.8: a high shelf down to −3.5 / −8.9 / −14.3 dB (reached by ~8 kHz, half-way at ~2 … 3 kHz);
+  LowCut 0.2 / 0.5 / 0.8: a low shelf, −14.7 / −23.4 / −28.4 dB at 20 Hz and −1.0 / −2.5 / −5.0 dB at 500 Hz (~4 dB/oct
+  between). (LowCut 0.2 with HighCut 0.2 nearly mutes the echo: a reference quirk or a bad render.) Not built: an EchoBoy
+  state reaches LYNX encoded (the hash table carries no filter), so the law only matters for the value-map lab (tp172d's map
+  sets none) — Echoform's 12 dB/oct Low / High cut would need a shelving EchoBoy mode first.
+- **Hush ← Pro-DS Single Vocal**: round 190iq's finding stands (the reference takes the whole range once a 5 … 9 kHz burst stands
+  ~8 dB over the body, ~10 ms late, independent of the threshold); not modelled in this round.
+- PuigTec, the Waves reverbs (above), SuperTap's feedback delay and modulation, Q10 / Renaissance EQ (never captured).

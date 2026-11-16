@@ -130,22 +130,23 @@ matches by name).
 | Waves NS1 | Quell Denoiser (round 119) | Waves name | the one knob (RealWorld 229), Quell fitted to the official trial [EXEC] (round 119 §3) |
 | Waves Doubler (2 / 4 voices) | Gemini Doubler (round 119) | Waves name | every control of voices 1–2, direct, align, shelves, feedback cut, range [EXEC] (round 119 §4) |
 | Soundtoys EchoBoy / PrimalTap | Echoform (round 129; tape / lo-fi echo, 1/4 note, 25 % feedback, 25 % mix; was Fruity Delay 3) | VST2 ID [DATA] (EchoBoy), names | — |
-| Waves SuperTap, FabFilter Timeless | Fruity Delay 3 | names | — |
+| Waves SuperTap | Echoform (round 190jh; was Fruity Delay 3; no state: the dry signal, as SuperTap's default) | Waves name | taps 1–2 (on, gain, pan, delay at its BPM), feedback, tap filter → Echoform's clean Single / Dual echo, dry at unity [EXEC] (refcap182) |
+| FabFilter Timeless | Fruity Delay 3 | names | — |
 | ValhallaDelay | Echoform (round 101) | VST3 class ID [derived], name | every setting but Era / taps / repeat-swell: mix, style, sync, times, feedback, filters, modulation, shift, pitch, ducking; the 17 modes onto Echoform's 12 characters |
 | ValhallaFreqEcho | Spiral Echo (round 101) | VST3 class ID [derived], name | all 8 settings |
 | ValhallaSpaceModulator | Orbit (round 101) | VST3 class ID [derived], name | all 6 settings |
 | ValhallaUberMod | Lattice Mod (round 101) | VST3 class ID [derived], name | all but DelaySync and InputPan (meaning not confirmed) |
-| Waves L1/L2/L3/L4 | Limiter | Waves name | — |
+| Waves L1/L2/L3/L4 | Limiter | Waves name | L2 (round 190jh): threshold → input gain, out ceiling, release (ARC → 10 ms) [EXEC] (refcap182) |
 | FabFilter Pro-L | Apex Limiter (round 99) | names | — |
-| Waves CLA-76 | Crest Compressor (Bus style fitted to the official trial; round 127) | Waves name | Input, Output, Attack, Release, Ratio (59), Mix (103 → slot dry / wet), fitted at her state [EXEC] (round 127 §3) |
-| Waves RComp, CLA-3A, C1, SSLComp, API-2500 | Compressor (2:1 above −15 dBFS, auto gain; round 113) | VST3 class ID [DATA], Waves names | RComp: threshold, ratio, attack, release (ARC), gain, laws measured on the official trial [EXEC] (round 113 §3c) |
+| Waves CLA-76 | Crest Compressor (Bus style fitted to the official trial; round 127) | Waves name | Input, Output, Attack, Release, Ratio (59), Mix (103 → slot dry / wet), fitted at her state [EXEC] (round 127 §3); round 190jh: the single ratio buttons' wet level (refcap182) |
+| Waves RComp, CLA-3A, C1, SSLComp, API-2500 | Compressor (2:1 above −15 dBFS, auto gain; round 113) | VST3 class ID [DATA], Waves names | RComp: threshold, ratio, attack, release (ARC), gain, laws measured on the official trial [EXEC] (round 113 §3c); SSLComp (round 190jh): threshold (+ −23 dB), ratio, attack, release (Auto 600 ms), make-up, mix [EXEC] (refcap182) |
 | FabFilter Pro-C (2 / 3) | Crest Compressor (round 108) | names | Pro-C 3: style, threshold, ratio, knee, range, attack, release, hold, look-ahead, character, side-chain EQ (3 bands), levels, mix, oversampling [EXEC layout] |
 | FabFilter Pro-MB | Prism Multiband (round 108) | names | enabled bands laid out on Prism's four, threshold, ratio, range, mode, knee, attack / release, level, solo, look-ahead, mix [EXEC layout] |
 | FabFilter Pro-G | Sentry Gate (round 108) | names | every control [EXEC layout] |
 | Waves CLA-2A | Glow Leveler (peak reduction 30 %, gain +2 dB; round 113) | VST3 class ID [DATA], Waves name | gain, peak reduction, comp / limit, laws measured on the official trial [EXEC] (round 113 §3c) |
 | Waves SSL E-Channel, SSL Native Channel Strip / 4K E / 4K B / Vocalstrip | Ridge Strip (neutral; round 96) | VST3 class ID [DATA], Waves name, names | SSL E-Channel: filters, 4-band EQ, compressor, output, band laws measured on the official trial [EXEC] (round 113 §3c) |
 | Waves Q10, REQ, SSLEQ | Parametric EQ (flat) | Waves names | — |
-| FabFilter Pro-Q | Facet EQ (flat, round 99) | names | — |
+| FabFilter Pro-Q | Facet EQ (flat, round 99) | names | Pro-Q 4: bands, shapes, slopes, phase mode (round 124 / 144); round 190jh: dynamic bands (range, Auto → Facet's automatic threshold, manual threshold, attack / release) |
 | Waves DeEsser | Hush De-esser (5.5 kHz, −20 dBFS, 4 dB; round 113) | Waves name | frequency, threshold, split / wideband, side-chain filter, monitor, laws measured on the official trial [EXEC] (round 113 §3c) |
 | FabFilter Pro-DS, Harrison De-Esser | Hush De-esser (default; round 96) | names | — |
 | Slate Digital Fresh Air | Aether (neutral without a state; round 96) | name | Mid / High Air → Aether's air shelf gain and frequency, laws measured on the official trial (within 0.5 dB RMS for her settings) [EXEC] (round 113) |
