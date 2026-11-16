@@ -1954,14 +1954,8 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
             return true;
         }
 
-    // round 190iv: Tab = Live's Session ↔ Arrangement in the Clip-launch layout (the control bar's view selector; from
-    // "Both", the Session view). Round 190ih's core/LiveKeys.h does the same; whichever lands first answers
-    if (toolbarLook == toolbarlayout::Look::live && key.getKeyCode() == juce::KeyPress::tabKey && isPlainKey (chord) && clipGridView != nullptr
-        && dynamic_cast<juce::TextEditor*> (juce::Component::getCurrentlyFocusedComponent()) == nullptr)
-    {
-        setClipGridView (playlistArea.getGridView() == PlaylistArea::GridView::grid ? PlaylistArea::GridView::song : PlaylistArea::GridView::grid);
-        return true;
-    }
+    // (round 190iv's Tab = Session ↔ Arrangement is round 190ih's livekeys::Command::toggleView above, which answers first
+    // in the Clip-launch layout; its setClipGridView refreshes 190iv's view selector. One handler kept: rollup 0.1.30)
 
     // 3. the focused panel's own keys
     const auto focused = workspace.getFocused();
