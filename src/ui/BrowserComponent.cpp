@@ -2569,7 +2569,7 @@ private:
                     dir = juce::File (juce::String::fromUTF8 (plugindb::groupFolder (dir.getFullPathName().toStdString(), n.parent->folderKind == 1, n.group).c_str()));
                 databaseDir = dir;
             }
-            if ((n.kind == Kind::project || n.kind == Kind::plugins) && n.parent == nullptr && browser.tab == allTab) // round 163
+            if ((n.kind == Kind::project || n.kind == Kind::plugins) && n.parent == nullptr && browser.shownTab() == allTab) // round 163
             {
                 menu.addSeparator();
                 browser.addHideItem (menu, n.kind == Kind::project ? browserview::projectRootId : browserview::pluginsRootId, n.label);
@@ -4738,7 +4738,7 @@ void BrowserComponent::rebuildTree()
     const auto allLike = liveLayout ? cat == Category::all : tab == allTab;
     if (liveLayout ? (cat == Category::currentProject || (allLike && view.shows (browserview::projectRootId)))
                    : (tab == projectTab || (allLike && view.shows (browserview::projectRootId))))
-        top.push_back (FileTree::makeProject (tab == projectTab || (liveLayout && cat == Category::currentProject)));
+        top.push_back (FileTree::makeProject (shownTab() == projectTab));
     // FL's Plugin database, under the project (round 142); always while hot-swap is on (round 190ce: it is what the
     // linked device is replaced from, also when the user's view leaves it out)
     if (allLike && (view.shows (browserview::pluginsRootId) || swapSession.active()))
@@ -4788,6 +4788,21 @@ void BrowserComponent::rebuildTree()
 void BrowserComponent::setTab (int newTab)
 {
     newTab = juce::jlimit (0, tabCount - 1, newTab);
+    if (liveLayout) // round 190iz: no tabs in the Clip-launch layout: Live's All / Current Project / Favorites instead
+    {
+        browserplaces::Entry e;
+        if (newTab == projectTab)
+            e.category = browserplaces::Category::currentProject;
+        else if (newTab == starredTab)
+        {
+            e.group = browserplaces::Group::collections;
+            e.category = browserplaces::Category::collection;
+            e.collection = 0;
+        }
+        if (e.category != liveSelection.category || e.collection != liveSelection.collection || ! liveSelection.path.empty())
+            showLiveEntry (e);
+        return;
+    }
     if (newTab == tab)
         return;
     tab = newTab;
@@ -4822,7 +4837,7 @@ void BrowserComponent::changeListenerCallback (juce::ChangeBroadcaster* source)
     {
         applyFilterToTree();
         // the background check found changed folders: the results shown are searched again, in place
-        if (resultsView->isVisible() && tab != projectTab && searchBox.getText().trim().isNotEmpty())
+        if (resultsView->isVisible() && shownTab() != projectTab && searchBox.getText().trim().isNotEmpty())
             runSearch (true);
         return;
     }
@@ -5028,13 +5043,16 @@ void BrowserComponent::addSystemItems (juce::PopupMenu& menu, const juce::File& 
     menu.addSeparator();
     menu.addItem (tr ("Starred"), true, isStarred (file), [this, file] { setStarred (file, ! isStarred (file)); });
     addCollectionItems (menu, file.getFullPathName().toStdString());
-    if (resultsView->isVisible() && tab != projectTab) // round 190ce: from a search result to its place in the folders
+    if (resultsView->isVisible() && shownTab() != projectTab) // round 190ce: from a search result to its place in the folders
         menu.addItem (tr ("Show in its folder"), [safe = juce::Component::SafePointer<BrowserComponent> (this), file] {
             if (safe == nullptr)
                 return;
             safe->searchBox.setText ({}, false);
             safe->runSearch();
-            safe->setTab (allTab);
+            if (safe->liveLayout) // (round 190iz: Live's All shows every place)
+                safe->showLiveEntry ({});
+            else
+                safe->setTab (allTab);
             if (const auto row = safe->tree->revealFile (file); row >= 0)
                 safe->tree->select (row, false);
             else
@@ -5145,7 +5163,7 @@ void BrowserComponent::showFolderMenu (const juce::File& folder, std::function<v
     menu.addItem (tr ("Open in the file manager"), [folder] { folder.startAsProcess(); });
     menu.addItem (tr ("Copy the file path"), [folder] { juce::SystemClipboard::copyTextToClipboard (folder.getFullPathName()); });
     menu.addSeparator();
-    if (const auto id = rootId (folder); id.isNotEmpty() && tab == allTab)
+    if (const auto id = rootId (folder); id.isNotEmpty() && shownTab() == allTab)
     {
         addHideItem (menu, id, allRootNames[allRoots.indexOf (folder)]);
         if (allRootKinds[(std::size_t) allRoots.indexOf (folder)] == browserview::RootKind::user)
@@ -5370,7 +5388,10 @@ bool BrowserComponent::locateFile (const juce::File& file)
         searchBox.setText ({}, false);
         runSearch();
     }
-    setTab (allTab);
+    if (liveLayout) // (round 190iz: Live's All shows every place)
+        showLiveEntry ({});
+    else
+        setTab (allTab);
     if (const auto row = tree->revealFile (file); row >= 0)
     {
         tree->select (row, false);
@@ -5484,7 +5505,7 @@ void BrowserComponent::timerCallback()
     if (std::exchange (projectDirty, false))
     {
         tree->refreshProject();
-        if (tab == projectTab && resultsView->isVisible())
+        if (shownTab() == projectTab && resultsView->isVisible())
             runSearch();
     }
 }
@@ -5496,7 +5517,7 @@ void BrowserComponent::runSearch (bool quiet)
     if (similarTo != juce::File())
     {
         // similar samples are listed while the box still says so; any other text is an ordinary search again
-        if (tab != projectTab && searchBox.getText() == similarLabel())
+        if (shownTab() != projectTab && searchBox.getText() == similarLabel())
         {
             runSimilar (quiet);
             return;
@@ -5522,7 +5543,7 @@ void BrowserComponent::runSearch (bool quiet)
         return;
     }
 
-    if (tab == projectTab) // the project's own items, at once
+    if (shownTab() == projectTab) // the project's own items, at once
     {
         auto found = FileTree::projectMatches (engine.getSong(), query);
         const auto none = found.empty();
@@ -5628,7 +5649,7 @@ void BrowserComponent::indexStatusChanged()
         return; // similar samples are listed: their own line stays
     const auto st = searcher->service->status();
     juce::String line;
-    if (resultsView->isVisible() && tab != projectTab && searchBox.getText().trim().isNotEmpty())
+    if (resultsView->isVisible() && shownTab() != projectTab && searchBox.getText().trim().isNotEmpty())
     {
         // a search is shown: its line stays; while the folders are indexed, the progress is added
         line = statusLine.upToFirstOccurrenceOf ("  ·  ", false, false);
@@ -5664,7 +5685,7 @@ void BrowserComponent::findSimilar (const juce::File& file)
 {
     if (! file.existsAsFile())
         return;
-    if (tab == projectTab)
+    if (shownTab() == projectTab)
         setTab (allTab);
     similarTo = file;
     searchPending = false;
@@ -5787,7 +5808,7 @@ void BrowserComponent::findSimilarForSnapshot (const juce::File& file, const juc
     similar->passAsked = true;
     similar->service->refresh (toPaths ({ folder }));
     similar->service->waitIdle (300000);
-    if (tab == projectTab)
+    if (shownTab() == projectTab)
         setTab (allTab);
     similarTo = file;
     searchBox.setText (similarLabel(), juce::dontSendNotification);

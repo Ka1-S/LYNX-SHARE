@@ -157,6 +157,12 @@ public:
     };
     void setTab (int tab);
     int getTab() const noexcept { return tab; }
+    // round 190iz: the tab the content acts as — in the Clip-launch layout (no tabs) PROJECT for Live's Current Project,
+    // else ALL
+    int shownTab() const noexcept
+    {
+        return ! liveLayout ? tab : liveSelection.category == browserplaces::Category::currentProject ? (int) projectTab : (int) allTab;
+    }
 
     void focusSearch();
     void addUserFolder(); // asks for a folder and adds it to the folder list
