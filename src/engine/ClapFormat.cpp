@@ -1407,6 +1407,8 @@ struct Crawl
     juce::String path;
 };
 
+std::atomic<bool> discoveryStop { false }; // (the application is closing: a crawl stops between files)
+
 std::vector<FoundPreset> discoverPresets (const ClapModule& module)
 {
     std::vector<FoundPreset> result;
@@ -1527,8 +1529,7 @@ std::vector<FoundPreset> discoverPresets (const ClapModule& module)
 
 // The crawls (round 190jg, measured on Windows: Surge XT's 2970 presets took 6.6 s): on a thread of their own, as the
 // CLAP spec encourages (its factory is thread-safe); until one is done its plugin has no programs. One per module and
-// session; at exit the running ones are told to stop and are waited for (they hold their module).
-std::atomic<bool> discoveryStop { false };
+// session; at exit the running ones are told to stop (discoveryStop) and are waited for (they hold their module).
 struct Discoveries
 {
     std::mutex lock;
