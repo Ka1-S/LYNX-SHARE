@@ -10558,6 +10558,7 @@ countries: es mx ar co cl pe ve
 "Clip scales (Scale Mode) of {0} clip slot(s)" = "Escalas de clip (Scale Mode) de {0} ranura(s) de clip"
 "Voice Shift's Measured law plays its earlier version (a low thump at sung onsets): {0}" = "La ley Measured de Voice Shift suena con su versión anterior (un golpe grave al inicio de las notas cantadas): {0}"
 "Ridge Strip's 4K Pink EQ plays as the Black EQ: {0}" = "El EQ Pink 4K de Ridge Strip suena como el EQ Black: {0}"
+"Hush De-esser's Allround mode plays its earlier timing: {0}" = "El modo Allround de Hush De-esser suena con su temporización anterior: {0}"
 "Automation clip colours" = "Colores de los clips de automatización"
 "Mix snapshots (the Mixer menu)" = "Instantáneas de la mezcla (el menú del Mixer)"
 "Click: mute.  Ctrl+click or right-click: solo.  Shift+click: lock the mute state" = "Clic: silenciar.  Ctrl+clic o clic derecho: solo.  Mayús+clic: bloquear el estado de silencio"

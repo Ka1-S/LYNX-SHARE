@@ -10558,6 +10558,7 @@ countries: tr
 "Clip scales (Scale Mode) of {0} clip slot(s)" = "{0} klip yuvasının klip gamları (Scale Mode)"
 "Voice Shift's Measured law plays its earlier version (a low thump at sung onsets): {0}" = "Voice Shift'in Measured yasası önceki sürümünü çalar (söylenen notaların başında pes bir vuruş): {0}"
 "Ridge Strip's 4K Pink EQ plays as the Black EQ: {0}" = "Ridge Strip'in 4K Pink EQ'su Black EQ olarak çalar: {0}"
+"Hush De-esser's Allround mode plays its earlier timing: {0}" = "Hush De-esser'ın Allround modu önceki zamanlamasıyla çalar: {0}"
 "Automation clip colours" = "Otomasyon klibi renkleri"
 "Mix snapshots (the Mixer menu)" = "Miks anlık görüntüleri (Mixer menüsü)"
 "Click: mute.  Ctrl+click or right-click: solo.  Shift+click: lock the mute state" = "Tıklama: sessize al.  Ctrl+tıklama veya sağ tıklama: solo.  Shift+tıklama: sessiz durumunu kilitle"

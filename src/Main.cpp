@@ -5979,7 +5979,7 @@ private:
 
         // rollup 0.1.30 (round 190il): the copy for 0.1.28 knows what the other 0.1.30 rounds save: a Tetra channel becomes
         // an empty Sampler, MPE note curves, muted Pattern Blocks, clips transposed past ±12, clip slots' Start markers and
-        // scales, Voice Shift's revision 1, Ridge's Pink EQ, automation colours and mix snapshots are reported and taken
+        // scales, Voice Shift's revision 1, Ridge's Pink EQ, Hush's Allround timing (round 190iy), automation colours and mix snapshots are reported and taken
         // out; a DirectWave state's 36-byte sample format record is completed (0.1.28 skipped it, and the loop with it)
         juce::String rollup030Result = "OK";
         {
@@ -6040,6 +6040,9 @@ private:
             auto ridgeSlot = lynx::makeEffectSlot (lynx::EffectKind::ridgeStrip);
             ridgeSlot.params[(std::size_t) lynx::mixsuite::ridge::k4Pink] = 1.0f;
             song.mixer[2].effects.push_back (ridgeSlot);
+            auto hushSlot = lynx::makeEffectSlot (lynx::EffectKind::hushDeEsser); // (a new one: the measured timing, round 190iq)
+            hushSlot.params[(std::size_t) lynx::mixsuite::hush::allround] = 1.0f;
+            song.mixer[3].effects.push_back (hushSlot);
             lynx::Automation coloured;
             coloured.name = "Cutoff";
             coloured.colour = 0xFFC03030u;
@@ -6100,8 +6103,9 @@ private:
                 rollup030Result = "ERROR clip pitch";
             else if (copy.json.contains ("startMarker") || copy.json.contains ("clipScale") || ! said ("{0} clip slot(s) launch") || ! said ("Clip scales"))
                 rollup030Result = "ERROR clip slots";
-            else if (! said ("Voice Shift's Measured law") || ! said ("Ridge Strip's 4K Pink EQ")
-                     || parsed["mixer"][1]["effects"][0]["params"].size() > lynx::voiceshift::revision)
+            else if (! said ("Voice Shift's Measured law") || ! said ("Ridge Strip's 4K Pink EQ") || ! said ("Hush De-esser's Allround mode")
+                     || parsed["mixer"][1]["effects"][0]["params"].size() > lynx::voiceshift::revision
+                     || parsed["mixer"][3]["effects"][0]["params"].size() > lynx::mixsuite::hush::timing)
                 rollup030Result = "ERROR effects";
             else if (copy.json.contains ("mixSnapshots") || ! said ("Mix snapshots") || ! said ("Automation clip colours")
                      || std::any_of (back->automations.begin(), back->automations.end(), [] (const lynx::Automation& a) { return a.colour != 0; }))
@@ -6110,7 +6114,7 @@ private:
                      ! plain.ok || std::any_of (plain.lost.begin(), plain.lost.end(), [] (const lynx::olderlynx::Loss& l) {
                          const auto t = juce::String (l.text);
                          return t.startsWith ("Tetra") || t.contains ("MPE") || t.contains ("Pattern Block") || t.contains ("Voice Shift")
-                                || t.contains ("Ridge") || t.startsWith ("Automation clip colours") || t.startsWith ("Mix snapshots");
+                                || t.contains ("Ridge") || t.contains ("Hush") || t.startsWith ("Automation clip colours") || t.startsWith ("Mix snapshots");
                      }))
                 rollup030Result = "ERROR a plain project reports a loss it does not have";
         }

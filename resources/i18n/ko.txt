@@ -10558,6 +10558,7 @@ countries: kr
 "Clip scales (Scale Mode) of {0} clip slot(s)" = "클립 슬롯 {0}개의 클립 스케일 (Scale Mode)"
 "Voice Shift's Measured law plays its earlier version (a low thump at sung onsets): {0}" = "Voice Shift의 Measured 법칙은 이전 버전으로 재생됩니다 (노래한 음의 시작에 낮은 쿵 소리): {0}"
 "Ridge Strip's 4K Pink EQ plays as the Black EQ: {0}" = "Ridge Strip의 4K Pink EQ는 Black EQ로 재생됩니다: {0}"
+"Hush De-esser's Allround mode plays its earlier timing: {0}" = "Hush De-esser의 Allround 모드는 이전 타이밍으로 재생됩니다: {0}"
 "Automation clip colours" = "오토메이션 클립 색상"
 "Mix snapshots (the Mixer menu)" = "믹스 스냅샷 (Mixer 메뉴)"
 "Click: mute.  Ctrl+click or right-click: solo.  Shift+click: lock the mute state" = "클릭: 뮤트.  Ctrl+클릭 또는 오른쪽 클릭: 솔로.  Shift+클릭: 뮤트 상태 잠금"

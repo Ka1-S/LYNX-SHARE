@@ -10558,6 +10558,7 @@ countries: ru by kz
 "Clip scales (Scale Mode) of {0} clip slot(s)" = "Лады клипов (Scale Mode) в слотах клипов: {0}"
 "Voice Shift's Measured law plays its earlier version (a low thump at sung onsets): {0}" = "Закон Measured в Voice Shift играет прежнюю версию (низкий удар в начале спетых нот): {0}"
 "Ridge Strip's 4K Pink EQ plays as the Black EQ: {0}" = "EQ Pink 4K в Ridge Strip играет как EQ Black: {0}"
+"Hush De-esser's Allround mode plays its earlier timing: {0}" = "Режим Allround в Hush De-esser играет с прежними временными параметрами: {0}"
 "Automation clip colours" = "Цвета клипов автоматизации"
 "Mix snapshots (the Mixer menu)" = "Снимки микса (меню микшера)"
 "Click: mute.  Ctrl+click or right-click: solo.  Shift+click: lock the mute state" = "Щелчок: заглушить.  Ctrl+щелчок или правый щелчок: соло.  Shift+щелчок: закрепить состояние заглушения"

@@ -234,12 +234,14 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
             lost.push_back ({ TR_NOOP ("Clip scales (Scale Mode) of {0} clip slot(s)"), juce::String (scales), false });
     }
 
-    // effects (round 190ho): Voice Shift's Measured law revision 1, Ridge Strip's 4K Pink EQ (hidden parameters 0.1.28
-    // ignores: it plays revision 0, and Black)
+    // effects (round 190ho): Voice Shift's Measured law revision 1, Ridge Strip's 4K Pink EQ; (round 190iq) Hush De-esser's
+    // measured Allround timing (hidden parameters 0.1.28 ignores: it plays revision 0, Black, and the earlier timing)
     {
-        juce::StringArray thump, pink;
+        juce::StringArray thump, pink, hushTiming;
         forEachEffect (root, [&] (juce::DynamicObject& e, const juce::String& where) {
             auto* params = arrayOf (e.getProperty ("params"));
+            if (params == nullptr) // (a slot written without parameters)
+                return;
             const auto kind = e.getProperty ("kind").toString();
             if (kind == "voiceShift" && params->size() > voiceshift::revision)
             {
@@ -253,11 +255,20 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
                     addOnce (pink, where);
                 params->removeRange (mixsuite::ridge::k4Pink, params->size() - mixsuite::ridge::k4Pink);
             }
+            else if (kind == "hushDeEsser" && params->size() > mixsuite::hush::timing)
+            {
+                // (the timing is the Allround law's: Single Vocal plays the same either way)
+                if ((float) (double) (*params)[mixsuite::hush::timing] >= 0.5f && (float) (double) (*params)[mixsuite::hush::allround] >= 0.5f)
+                    addOnce (hushTiming, where);
+                params->removeRange (mixsuite::hush::timing, params->size() - mixsuite::hush::timing);
+            }
         });
         if (! thump.isEmpty())
             lost.push_back ({ TR_NOOP ("Voice Shift's Measured law plays its earlier version (a low thump at sung onsets): {0}"), listOf (thump), true });
         if (! pink.isEmpty())
             lost.push_back ({ TR_NOOP ("Ridge Strip's 4K Pink EQ plays as the Black EQ: {0}"), listOf (pink), true });
+        if (! hushTiming.isEmpty())
+            lost.push_back ({ TR_NOOP ("Hush De-esser's Allround mode plays its earlier timing: {0}"), listOf (hushTiming), true });
     }
 
     // the view

@@ -10558,6 +10558,7 @@ countries: cn sg
 "Clip scales (Scale Mode) of {0} clip slot(s)" = "{0} 个片段槽的片段音阶（Scale Mode）"
 "Voice Shift's Measured law plays its earlier version (a low thump at sung onsets): {0}" = "Voice Shift 的 Measured 规律按其早期版本播放（演唱音符起音处有低沉的撞击声）：{0}"
 "Ridge Strip's 4K Pink EQ plays as the Black EQ: {0}" = "Ridge Strip 的 4K Pink EQ 按 Black EQ 播放：{0}"
+"Hush De-esser's Allround mode plays its earlier timing: {0}" = "Hush De-esser 的 Allround 模式按其早期的时间特性播放：{0}"
 "Automation clip colours" = "自动化片段的颜色"
 "Mix snapshots (the Mixer menu)" = "混音快照（Mixer 菜单）"
 "Click: mute.  Ctrl+click or right-click: solo.  Shift+click: lock the mute state" = "单击：静音。  Ctrl+单击或右键单击：独奏。  Shift+单击：锁定静音状态"

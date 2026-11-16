@@ -10558,6 +10558,7 @@ countries: id
 "Clip scales (Scale Mode) of {0} clip slot(s)" = "Skala klip (Scale Mode) dari {0} slot klip"
 "Voice Shift's Measured law plays its earlier version (a low thump at sung onsets): {0}" = "Hukum Measured Voice Shift diputar dengan versi sebelumnya (dentuman rendah di awal not yang dinyanyikan): {0}"
 "Ridge Strip's 4K Pink EQ plays as the Black EQ: {0}" = "EQ Pink 4K Ridge Strip diputar sebagai EQ Black: {0}"
+"Hush De-esser's Allround mode plays its earlier timing: {0}" = "Mode Allround Hush De-esser diputar dengan timing sebelumnya: {0}"
 "Automation clip colours" = "Warna klip otomasi"
 "Mix snapshots (the Mixer menu)" = "Snapshot mix (menu Mixer)"
 "Click: mute.  Ctrl+click or right-click: solo.  Shift+click: lock the mute state" = "Klik: bisukan.  Ctrl+klik atau klik kanan: solo.  Shift+klik: kunci status bisu"

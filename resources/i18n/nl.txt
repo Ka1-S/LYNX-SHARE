@@ -10558,6 +10558,7 @@ countries: nl be
 "Clip scales (Scale Mode) of {0} clip slot(s)" = "Clipschalen (Scale Mode) van {0} clipslot(s)"
 "Voice Shift's Measured law plays its earlier version (a low thump at sung onsets): {0}" = "De Measured-wet van Voice Shift speelt zijn eerdere versie (een lage dreun bij het begin van gezongen noten): {0}"
 "Ridge Strip's 4K Pink EQ plays as the Black EQ: {0}" = "De 4K Pink EQ van Ridge Strip speelt als de Black EQ: {0}"
+"Hush De-esser's Allround mode plays its earlier timing: {0}" = "De Allround-modus van Hush De-esser speelt met zijn eerdere timing: {0}"
 "Automation clip colours" = "Kleuren van automatiseringsclips"
 "Mix snapshots (the Mixer menu)" = "Mix-snapshots (het Mixer-menu)"
 "Click: mute.  Ctrl+click or right-click: solo.  Shift+click: lock the mute state" = "Klik: dempen.  Ctrl+klik of rechtsklik: solo.  Shift+klik: dempstatus vergrendelen"
