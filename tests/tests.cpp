@@ -17772,6 +17772,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Mod190doTests.inc"
 #include "Parity190fyTests.inc"
 #include "Parity190iqTests.inc"
+#include "Parity190itTests.inc"
 #include "Sampler190dhTests.inc"
 #include "Fix190eaTests.inc"
 #include "Iss158Tests.inc"

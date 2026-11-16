@@ -150,6 +150,18 @@ struct Shifter
 
 double clampPos (double v, double lo, double hi) noexcept { return std::isfinite (v) ? std::clamp (v, lo, hi) : lo; }
 
+// round 190it: where revision 1's build groups part (Hz; 250 / 400 / 600 / 800 tried on refcap030's room bank: 600 kept
+// the long-decay music renders where they were); the lab build reads LYNX_SPLITHZ
+double splitHz() noexcept
+{
+   #ifdef LYNX_VERB_FIT
+    static const double hz = [] { const char* e = std::getenv ("LYNX_SPLITHZ"); return e != nullptr ? std::atof (e) : 600.0; }();
+    return hz;
+   #else
+    return 600.0;
+   #endif
+}
+
 // ---- engine law 1 (0.1.27, round 190bz) ------------------------------------------------------------------------
 // Per-band decay (Jot & Chaigne 1991: one absorption filter per line whose attenuation in dB is proportional to the
 // line's length gives the same RT60 on every line; the filter here is a cascade of first-order shelves whose gains are
@@ -361,6 +373,7 @@ struct Engine::Impl
     double lfo[lineCount] {};
     Shifter shifters[4]; // inside lines 0, 2, 4, 6 (shimmer)
     float shiftHp[4][2] {}; // round tp172d: the shifted branch's two one-pole high-pass states (energy-keeping shimmer)
+    float splitLp[2][4] {};  // round 190it: the build groups' low band (one-pole states), which still reaches the lines as one sum
     Biquad outLow, outHigh, shelfLow, shelfHigh, toneHigh, toneMid, toneLow, band[maxBandSections];
     bool outLowOn = false, outHighOn = false, shelfLowOn = false, shelfHighOn = false, toneHighOn = false, toneMidOn = false, toneLowOn = false, bandOn = false;
     int bandSections = 0;
@@ -470,6 +483,9 @@ struct Engine::Impl
             sh.clear();
         for (auto& h : shiftHp)
             h[0] = h[1] = 0.0f;
+        for (auto& c : splitLp)
+            for (auto& z : c)
+                z = 0.0f;
         outLow.reset();
         outHigh.reset();
         shelfLow.reset();
@@ -822,6 +838,8 @@ struct Engine::Impl
         const auto norm = (float) (1.0 / std::sqrt ((double) lineCount));
         const auto early = (float) s.earlyLevel, late = (float) s.lateLevel, send = (float) s.earlySend;
         const auto gated = s.gateSec > 0.0, build = gated || s.buildSec > 0.0005;
+        const auto split = s.buildSplit && ! gated; // round 190it: the build-up taps in four groups (below)
+        const auto splitCoef = (float) (1.0 - std::exp (-2.0 * pi * splitHz() / sr));
         const auto crossAngle = 0.25 * pi * std::clamp (s.crossFeed, 0.0, 1.0);
         const auto crossCos0 = std::cos (crossAngle), crossSin0 = std::sin (crossAngle);
         const auto mixA = 0.25 * pi * std::clamp (s.mixAngle, 0.0, 1.0);
@@ -857,6 +875,7 @@ struct Engine::Impl
         {
             float x[2] = { L[t], R[t] };
             float e[2], d[2], pin[2];
+            float dg[2][4] {};
             for (int c = 0; c < 2; ++c)
             {
                 pre[c].write (x[c]);
@@ -884,7 +903,28 @@ struct Engine::Impl
                 for (int k = 0; k < 4; ++k)
                     if (inG[k] != 0.0f)
                         v = inAp[c][k].process (v, inG[k]);
-                if (build)
+                if (build && split)
+                {
+                    // revision 1 (round 190it): four interleaved groups of the build-up taps, each spanning the whole
+                    // build, reach the four lines of the half through a 4-point Hadamard (below) instead of one FIR
+                    // into every line: one fixed random-sign FIR left its ripple (±3 … 4 dB, 50 … 200 Hz wide) on the
+                    // whole tail; four independent ones average it out (a steady sine meets the tail's mean gain)
+                    dif[c].write (v);
+                    float g4[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+                    for (int k = 0; k < buildTaps; ++k)
+                        g4[k & 3] += bW[c][k] * (bD[c][k] == 0 ? v : dif[c].read (bD[c][k]));
+                    // below ~600 Hz the groups go on as one sum (the build's low band as before: there the few modes
+                    // of the tank, not the taps, set the tone, and music read them as before); above, apart
+                    float low = 0.0f;
+                    for (int g = 0; g < 4; ++g)
+                    {
+                        splitLp[c][g] += splitCoef * (g4[g] - splitLp[c][g]);
+                        low += splitLp[c][g];
+                        dg[c][g] = g4[g] - splitLp[c][g];
+                    }
+                    v = low;
+                }
+                else if (build)
                 {
                     dif[c].write (v);
                     float b = 0.0f;
@@ -1034,8 +1074,19 @@ struct Engine::Impl
                     }
                 }
                 const auto alt = (i & 1) == 0 ? 0.5f : -0.5f;
-                lines[i].write (u + alt * in[0]);
-                lines[i + 4].write (w + alt * in[1]);
+                if (build && split)
+                {
+                    const auto hb = 0.5f * (1.0f - onsetFeed);
+                    const auto hl = dg[0][0] + (i & 1 ? -dg[0][1] : dg[0][1]) + (i & 2 ? -dg[0][2] : dg[0][2]) + ((i == 1 || i == 2) ? -dg[0][3] : dg[0][3]);
+                    const auto hr = dg[1][0] + (i & 1 ? -dg[1][1] : dg[1][1]) + (i & 2 ? -dg[1][2] : dg[1][2]) + ((i == 1 || i == 2) ? -dg[1][3] : dg[1][3]);
+                    lines[i].write (u + alt * in[0] + hb * hl);
+                    lines[i + 4].write (w + alt * in[1] + hb * hr);
+                }
+                else
+                {
+                    lines[i].write (u + alt * in[0]);
+                    lines[i + 4].write (w + alt * in[1]);
+                }
             }
             if ((++renorm & 8191u) == 0) // the rotating pairs drift by rounding: back onto the unit circle
             {
@@ -1463,6 +1514,21 @@ void fitOverride (Settings& s)
         else if (k == "width") s.width *= v;
         else if (k == "earlyms") s.earlySec = v / 1000.0;
         else if (k == "bl") s.bandLimit *= v;
+        else if (k == "rev") s.revision = (int) v;
+        else if (k == "split") s.buildSplit = v >= 0.5;
+        else if (k == "lbw") s.loopBandwidth = v;
+        else if (k == "hcut") s.outHighCut = v;
+        else if (k == "lcut") s.outLowCut = v;
+        else if (k == "lsdb") s.lowShelfDb = v;
+        else if (k == "lshz") s.lowShelfHz = v;
+        else if (k == "hsdb") s.highShelfDb = v;
+        else if (k == "hshz") s.highShelfHz = v;
+        else if (k == "tmdb") s.toneMidDb = v;
+        else if (k == "ebuild") s.buildRise = v;
+        else if (k == "shim") s.shimmerEnergy *= v;
+        else if (k == "shfb") s.shiftFeedback *= v;
+        else if (k == "lowmult") s.lowMult *= v;
+        else if (k == "highmult") s.highMult *= v;
         else if (k.size() == 3 && k[0] == 'b' && (k[1] == 'f' || k[1] == 'g' || k[1] == 'q') && k[2] >= '0' && k[2] <= '2')
             (k[1] == 'f' ? s.bellHz : k[1] == 'g' ? s.bellDb : s.bellQ)[k[2] - '0'] = v;
     }
@@ -1587,6 +1653,110 @@ struct EpochMode
 #else
 #define LYNX_FIT_TABLE const
 #endif
+
+// round 190it: revision 1's trims per type / mode, measured on refcap030's black-box captures (each type / mode at the
+// capture's base setting against the reference's impulse): the wet level (dB) and the tone corrector (dB added per octave
+// band, 63 Hz … 8 kHz). Neutral = the 0.1.27 Measured law
+struct Rev1Trim
+{
+    double gainDb = 0.0;
+    double db[engineBands] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+};
+// Epoch Verb ← ValhallaVintageVerb's ReverbMode sweep (base Decay 0.51 s; two passes of the closed loop; Concert Hall, the
+// mode of every other capture, keeps the 0.1.27 voicing); faded out by Decay 1.41 s (the front-end)
+LYNX_FIT_TABLE Rev1Trim epochTrim[epoch::modeCount] = {
+    {}, // Concert Hall
+    { 9.61, { -4.69, -4.20, -0.99, -0.50, -0.90, 0.78, 5.83, 8.39 } }, // Plate
+    { 2.64, { 1.64, 1.89, -0.39, -1.30, 0.48, 0.52, -1.21, -1.82 } }, // Room
+    { 5.75, { -5.15, -3.53, 0.12, -0.79, -1.89, 0.86, 5.24, 8.18 } }, // Chamber
+    { 0.78, { -0.70, -0.01, -1.31, -2.10, -0.64, 1.80, 2.26, -1.39 } }, // Random Space
+    { 6.89, { -1.34, 0.87, -0.46, -1.63, -0.84, 1.22, 0.85, -4.69 } }, // Chorus Space
+    { 8.59, { -3.62, -4.93, -1.21, -0.82, -2.59, 2.12, 7.44, 9.41 } }, // Ambience
+    { 5.04, { -3.57, -2.60, -2.05, -1.92, -1.13, 0.71, 6.98, 12.96 } }, // Bright Hall
+    { 5.90, { 2.10, -2.48, -3.26, 0.65, 2.22, 3.39, -0.52, -14.57 } }, // Nave
+    { 2.98, { -1.90, -5.90, -1.84, 2.74, 2.75, 5.34, -3.07, -20.56 } }, // Grit Hall
+    { -0.75, { -0.85, -1.41, -1.33, -1.20, -0.41, 3.00, 1.35, -10.24 } }, // Grit Plate
+    { 5.73, { -2.66, -3.85, -0.89, 1.00, 0.17, 2.85, 0.72, -12.61 } }, // Smooth Plate
+    { 9.37, { 7.68, 7.33, 3.15, -4.53, -3.14, 1.07, -3.86, -17.78 } }, // Smooth Room
+    { 6.79, { 8.10, 6.32, 0.66, -3.45, -1.97, 1.36, -2.91, -16.40 } }, // Smooth Space
+    { -0.63, { 0.87, 1.07, 0.89, 0.50, 0.43, 2.94, -5.83, -17.37 } }, // Gated
+    { 6.21, { -3.32, -3.60, -0.98, -1.01, -1.09, 1.08, 5.59, 10.46 } }, // Drift Chamber
+    { 7.74, { -3.33, -6.49, -2.05, 2.00, 1.74, 3.35, 1.45, -11.92 } }, // Drift Hall
+    { -3.48, { 1.08, 1.38, 0.80, -0.64, 0.29, 4.17, -6.00, -14.52 } }, // Drift Space
+    { -4.48, { -0.55, -1.86, 0.11, 0.50, -0.27, 2.86, -1.36, -11.65 } }, // Cathedral
+    { -3.93, { 3.64, -2.34, -0.88, 2.28, 2.00, 4.49, -5.56, -14.07 } }, // Grand Hall
+    { -6.17, { 1.19, -1.22, -1.27, 0.88, 0.86, 2.55, -1.82, -11.16 } }, // Vintage Chamber
+    { -2.85, { 0.07, -5.03, -1.68, 1.48, 1.22, 4.32, -0.31, -12.19 } }, // Vintage Hall
+};
+// Atrium ← ValhallaRoom's type sweep (3-point smoothed over the bands, half the 63 Hz band's; Large Room, the type of
+// every other capture, keeps its 0.1.27 voicing; Medium Room's level a compromise between its impulse (+2 dB) and its
+// test signal (−3 dB))
+LYNX_FIT_TABLE Rev1Trim atriumTrim[atrium::typeCount] = {
+    {}, // Large Room
+    { -1.50, { 0.77, -1.36, -0.63, 0.39, 0.02, 0.45, 1.13, 1.24 } }, // Medium Room
+    {}, // Bright Room (its 0.1.27 law was fitted on tp172d's S2, which the sweep's trim cost a step)
+    { -0.75, { 0.04, 0.01, 0.26, 1.05, 0.45, -0.63, -1.14, -1.63 } }, // Large Chamber
+    { 0.40, { 0.01, 1.43, 0.90, 0.45, 0.00, -0.87, -1.90, -3.50 } }, // Dark Room
+    { -0.20, { 0.08, 0.20, 0.11, 0.92, 0.43, -0.85, -0.82, -0.22 } }, // Dark Chamber
+    { 2.30, { -1.15, -0.14, 0.89, 1.18, 0.04, -1.07, -0.91, -0.23 } }, // Dark Space
+    { 3.75, { -1.13, 0.74, 1.19, 0.98, -0.26, -1.38, -1.26, -0.93 } }, // Deep Space
+    { 2.42, { -0.56, 0.82, 0.80, 0.56, 0.07, -0.91, -1.35, -1.30 } }, // Mirror Space
+    { 3.05, { -0.86, 0.03, 1.16, 1.51, 0.16, -1.32, -1.54, -1.17 } }, // Vast Space
+    { 5.16, { -1.21, 1.24, 1.62, 1.05, -0.22, -1.62, -2.06, -2.00 } }, // Distant Space
+    {}, // Dense Room
+};
+// Foil Plate ← ValhallaPlate's type sweep (as Atrium's; Silver and Pewter, the types of the other captures, keep theirs:
+// Pewter's trim at the sweep's decay cost the 0.5 decay of refcap182's S2 a step); the last entry: the measured plate voicing
+LYNX_FIT_TABLE Rev1Trim foilTrim[foil::typeCount + 1] = {
+    {}, // Silver
+    {}, // Pewter
+    { 3.26, { -1.89, -0.54, 0.24, 0.47, 0.04, -0.13, -0.08, -0.79 } }, // Nickel
+    { 1.65, { -0.36, 0.27, 0.31, 0.61, 0.10, -0.82, -0.46, 0.09 } }, // Bronze
+    { 1.87, { -1.12, -0.78, 0.06, 1.34, 0.90, -0.35, -1.18, -2.21 } }, // Bismuth
+    { 0.39, { 1.63, 1.84, 0.02, -0.88, -0.69, -0.38, 0.09, 0.21 } }, // Tin
+    { 0.28, { -0.85, -0.82, -0.67, -0.31, -0.10, 0.50, 1.39, 1.48 } }, // Zinc
+    { 3.88, { 0.55, 1.93, 1.04, -0.30, -0.64, -1.11, -0.92, -0.18 } }, // Platinum
+    { 2.14, { 0.71, 0.58, -1.25, -1.52, -0.19, 1.17, 1.20, -0.70 } }, // Tungsten
+    { 3.74, { -0.55, 0.54, 0.41, 0.29, -0.02, -0.26, -0.96, -3.08 } }, // Iron
+    { 2.39, { -0.35, -0.03, -1.06, -0.94, -0.02, 0.97, 1.08, -0.80 } }, // Gold
+    { 0.68, { 0.93, 0.69, -0.59, -0.32, 0.30, 0.22, -0.31, -1.42 } }, // Lead
+    {}, // the measured plate voicing
+};
+LYNX_FIT_TABLE Rev1Trim haloTrim[7] = {};                   // per reverb mode
+#ifdef LYNX_VERB_FIT
+// the fitting harness: LYNX_VTRIM=<file>, lines "<epoch|atrium|foil|halo> <index> <gain dB> <8 × dB>"
+bool loadTrims()
+{
+    if (const char* f = std::getenv ("LYNX_VTRIM"))
+        if (auto* in = std::fopen (f, "r"))
+        {
+            char name[32];
+            int i;
+            Rev1Trim t;
+            while (std::fscanf (in, "%31s %d %lf %lf %lf %lf %lf %lf %lf %lf %lf", name, &i, &t.gainDb, &t.db[0], &t.db[1], &t.db[2],
+                                &t.db[3], &t.db[4], &t.db[5], &t.db[6], &t.db[7]) == 11)
+            {
+                const std::string n = name;
+                Rev1Trim* table = n == "epoch" ? epochTrim : n == "atrium" ? atriumTrim : n == "foil" ? foilTrim : n == "halo" ? haloTrim : nullptr;
+                const int count = n == "epoch" ? epoch::modeCount : n == "atrium" ? atrium::typeCount : n == "foil" ? foil::typeCount + 1 : 7;
+                if (table != nullptr && i >= 0 && i < count)
+                    table[i] = t;
+            }
+            std::fclose (in);
+        }
+    return true;
+}
+#endif
+void applyTrim (Settings& s, const Rev1Trim& t, double weight = 1.0) noexcept
+{
+   #ifdef LYNX_VERB_FIT
+    static const bool loaded = loadTrims();
+    (void) loaded;
+   #endif
+    s.gain *= std::pow (10.0, weight * t.gainDb / 20.0);
+    for (int b = 0; b < engineBands; ++b)
+        s.bandDb[b] += weight * t.db[b];
+}
 LYNX_FIT_TABLE EpochMode epochModes[epoch::modeCount] = {
     { "Concert Hall", 0, 0.9394, 1, 1.2, 1, 0.975, 0.4, 42.94, 0.0, 1, 1.031, 3.2, 0.0 },
     { "Plate", 2, 0.80, 0.90, 0.45, 1.0, 1.0, 0.10, 2.0, 60.0, 1.0, 0.70, 2.0, 0.0 },
@@ -1749,6 +1919,13 @@ protected:
         s.gain *= 0.92;
         if (p[epoch::engineLaw] >= 0.5f)
             applyLaw (s, epochLaw[modeIndex]);
+        if (p[epoch::engineLaw] >= 0.5f && p[epoch::revision] >= 0.5f)
+        {
+            s.revision = 1; // round 190it
+            // Epoch's trims were measured at the capture's base Decay (0.51 s); its Room mode needs none at 1.41 s
+            // (refcap182 S2): they fade out between the two on the decay's logarithm
+            applyTrim (s, epochTrim[modeIndex], std::clamp (std::log (1.41 / std::max (0.01, decay)) / std::log (1.41 / 0.51), 0.0, 1.0));
+        }
     }
 };
 
@@ -1849,6 +2026,12 @@ protected:
             s.outLowCut = 0.0;
         if (p[atrium::engineLaw] >= 0.5f)
             applyLaw (s, atriumLaw[choice (p[19], atrium::typeCount)]);
+        if (p[atrium::engineLaw] >= 0.5f && p[atrium::revision] >= 0.5f)
+        {
+            s.revision = 1; // round 190it
+            applyTrim (s, atriumTrim[choice (p[19], atrium::typeCount)]);
+            s.buildSplit = true;
+        }
     }
 };
 
@@ -2040,6 +2223,11 @@ protected:
             }
             else
                 applyLaw (s, foilLaw[choice (p[11], foil::typeCount)]);
+            if (p[foil::revision] >= 0.5f)
+            {
+                s.revision = 1; // round 190it
+                applyTrim (s, foilTrim[p[14] >= 0.5f ? foil::typeCount : choice (p[11], foil::typeCount)]);
+            }
         }
     }
 };
@@ -2308,6 +2496,25 @@ double haloShiftSemis (float v) { return -12.0 + 24.0 * v; }
 // fitted with the tail lab (round 190bz; the reference and the scores per row: docs/PARITY.md); a neutral entry is the classic voicing on the new loop
 LYNX_FIT_TABLE LawVoicing haloLaw = { { 1.108, 1.268, 1.316, 1.083, 1.164, 1.001, 1.182, 1.427 }, { 1.63, -1.12, -1.41, -0.40, -0.68, -1.46, -1.95, -0.59 }, 2.13, 0.000, 30, 0.00, 0.00, 1.00, 1.00, 0.00, 0.30, 6.00, 1.00, { 63, 159, 5000 }, { -2.29, -1.54, 0.00 }, { 2.0, 2.0, 1.4 } };
 
+// round 190it (revision 1): the RT per reverb mode against the reference's (refcap030's mode sweep, impulses: ours ran
+// ×1.13 / ×0.75 / ×1.0 / ×2.85 its RT in Mono / Small / Medium / Big stereo)
+LYNX_FIT_TABLE double haloRev1Rt[7] = { 1.0, 0.88, 1.33, 1.0, 1.0, 0.35, 1.0 };
+#ifdef LYNX_VERB_FIT
+const double* haloRtTable()
+{
+    static const bool once = []
+    {
+        if (const char* e = std::getenv ("LYNX_HALORT"))
+            std::sscanf (e, "%lf,%lf,%lf,%lf,%lf,%lf,%lf", &haloRev1Rt[0], &haloRev1Rt[1], &haloRev1Rt[2], &haloRev1Rt[3], &haloRev1Rt[4], &haloRev1Rt[5], &haloRev1Rt[6]);
+        return true;
+    }();
+    (void) once;
+    return haloRev1Rt;
+}
+#else
+const double* haloRtTable() { return haloRev1Rt; }
+#endif
+
 class HaloFx final : public VerbEffect
 {
 public:
@@ -2349,7 +2556,11 @@ protected:
             // with less diffusion the reference's tail is shorter (Diffusion 0 / 50 %: ~5.5 / 6 s against 9.8 s at 92 %)
             const auto dn = std::clamp ((double) p[3] / 0.92, 0.0, 1.0);
             s.rt60 = (1.5 + 12.5 * size) * m.rtScale * (mPlain + (mShift - mPlain) * f) * (0.55 + 0.45 * dn * dn * dn);
+            if (p[halo::engineLaw] >= 0.5f && p[halo::revision] >= 0.5f)
+                s.rt60 *= haloRtTable()[haloModeIndex (p[9])];
         }
+        // (the energy of its impulse matched before the RT did: a mode's RT moves with the energy kept, gain × 1 / √RT ratio)
+        const auto rtKeep = p[halo::engineLaw] >= 0.5f && p[halo::revision] >= 0.5f ? 1.0 / std::sqrt (haloRtTable()[haloModeIndex (p[9])]) : 1.0;
         // round tp172d: its first 0.3 s are 5–9 dB under ours at 0.45; with less diffusion they are empty (Diffusion 50 %:
         // −55 dB, 0 %: silent until the first arrival at 1.2 s)
         s.earlyLevel = 0.3 * std::pow (std::clamp ((double) p[3] / 0.92, 0.0, 1.0), 8.0);
@@ -2363,7 +2574,19 @@ protected:
         s.outHighOrder = 1;
         if (shiftMode == 2 || shiftMode == 3 || m.bright > 0.0)
             s.highShelfDb = 4.0, s.highShelfHz = 3000.0;
-        s.loopBandwidth = dark ? 5000.0 : 0.0;
+        // round 190it (revision 1): the reference's Dark colour is a tone on the output, not in the loop: against
+        // Bright its tail keeps the RT at every octave (8.4 / 7.8 s at 4 / 8 kHz against 8.8 / 8.7) and its spectrum
+        // falls −3 / −6.6 / −11.7 dB at 4 / 8 / 16 kHz and −4.7 … −7.9 dB below 50 Hz, the mids −0.5 dB (refcap030's
+        // colour sweep); the loop low-pass took the highs' RT down to 2.2 s and 2 dB of the level
+        const auto rev1 = p[halo::engineLaw] >= 0.5f && p[halo::revision] >= 0.5f;
+        s.loopBandwidth = dark && ! rev1 ? 5000.0 : 0.0;
+        if (dark && rev1)
+        {
+            s.toneHighHz = 6500.0;
+            s.toneHighDb = -13.0;
+            s.toneLowHz = 70.0;
+            s.toneLowDb = -6.0;
+        }
         s.modRateHz = 0.05 + 4.95 * p[7];
         s.modDepthMs = 1.2 * p[8] / std::sqrt (std::max (0.3, s.modRateHz));
         // round tp172d: the wet level measured on music and drums (refs/halo): −3 dB up to Feedback 75 %, rising to +1 dB
@@ -2372,8 +2595,12 @@ protected:
         {
             const auto fb = (double) p[2];
             const auto dn = std::clamp ((double) p[3] / 0.92, 0.0, 1.0); // less diffusion: louder (+4.5 / +5.4 dB measured at 0 / 50 %)
-            const auto trimDb = (fb <= 0.75 ? -3.0 : -3.0 + 16.0 * (fb - 0.75)) + 5.0 * (1.0 - dn * dn * dn);
-            s.gain = (dark ? 0.75 : 0.95) * std::pow (10.0, trimDb / 20.0);
+            // round 190it (revision 1, refcap030: Feedback × Diffusion pairs, music and impulse): half that lift (at 20 /
+            // 50 % diffusion ours ran 2.5 dB over its level at 80 %, where the reference's does not), and 0.5 dB less overall
+            // (its music and test signal sat 2.6 dB under ours at the capture's base setting, the impulse 0.1 dB: −1 dB
+            // scored higher on refcap030 but cost tp172d's impulses, −0.5 dB is the cut no bank loses a block to)
+            const auto trimDb = (fb <= 0.75 ? -3.0 : -3.0 + 16.0 * (fb - 0.75)) + (rev1 ? 2.5 : 5.0) * (1.0 - dn * dn * dn) - (rev1 ? 0.5 : 0.0);
+            s.gain = (dark ? (rev1 ? 0.95 * 0.94 : 0.75) : 0.95) * std::pow (10.0, trimDb / 20.0) * rtKeep;
         }
         s.shimmerEnergy = 0.2; // the shifted voice's share added per pass (× the shimmer amount)
         if (m.stereo == 2)
@@ -2389,6 +2616,12 @@ protected:
         }
         if (p[halo::engineLaw] >= 0.5f)
             applyLaw (s, haloLaw);
+        if (p[halo::engineLaw] >= 0.5f && p[halo::revision] >= 0.5f)
+        {
+            s.revision = 1; // round 190it
+            applyTrim (s, haloTrim[haloModeIndex (p[9])]);
+            s.buildSplit = true;
+        }
     }
 
     // the reference's Mono mode sums the input (mono in, a stereo tail)

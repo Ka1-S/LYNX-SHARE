@@ -124,6 +124,12 @@ struct Settings
     double matrixModDepth = 0.0, matrixModRateHz = 0.3;
     // three bells after the tone corrector (a mode's own narrow colour, where an octave band is too wide)
     double bellHz[3] = { 100.0, 1000.0, 5000.0 }, bellDb[3] = { 0.0, 0.0, 0.0 }, bellQ[3] = { 1.4, 1.4, 1.4 };
+
+    // ---- revision (round 190it), law 1 only: 0 = the 0.1.27 law as it was (projects saved before keep it, bit for bit);
+    // 1 = the 0.1.30 revision (the front-ends' trims; see each effect)
+    int revision = 0;
+    bool buildSplit = false; // round 190it: above ~600 Hz the build-up taps reach the tank in four independent groups (a
+                             // tail without the one FIR's ripple: a steady tone meets the tail's mean gain); Atrium, Halo
 };
 constexpr int engineBands = 8;
 // the octave-band RT60 (s, 63 Hz … 8 kHz) the engine aims at for a line of lineMs under law 1 (tests, fitting)
@@ -150,6 +156,8 @@ namespace epoch
 {
 constexpr int paramCount = 18;
 constexpr int engineLaw = 17; // round 190bz: 0 = the classic engine (projects saved before), 1 = the 0.1.27 law
+constexpr int revision = paramCount; // round 190it, hidden (no control, saved while non-zero): 1 = the 0.1.30 revision of
+                                     //   the Measured law (new instances, translated states); 0 = projects saved before
 constexpr int modeCount = 22;
 constexpr int colourCount = 3;
 const char* modeName (int index) noexcept;
@@ -161,6 +169,8 @@ namespace atrium
 {
 constexpr int paramCount = 23;
 constexpr int engineLaw = 22; // round 190bz: 0 = the classic engine (projects saved before), 1 = the 0.1.27 law
+constexpr int revision = paramCount; // round 190it, hidden (no control, saved while non-zero): 1 = the 0.1.30 revision of
+                                     //   the Measured law (new instances, translated states); 0 = projects saved before
 constexpr int typeCount = 12;
 const char* typeName (int index) noexcept;
 double decaySec (float v) noexcept;
@@ -170,6 +180,8 @@ namespace foil
 {
 constexpr int paramCount = 17; // round 135: + Infinite, Low cut; round 150: + Voicing; 152: + View; 190bz: + Law
 constexpr int engineLaw = 16; // round 190bz: 0 = the classic engine (projects saved before), 1 = the 0.1.27 law
+constexpr int revision = paramCount; // round 190it, hidden (no control, saved while non-zero): 1 = the 0.1.30 revision of
+                                     //   the Measured law (new instances, translated states); 0 = projects saved before
 constexpr int typeCount = 12;
 const char* typeName (int index) noexcept;
 double decaySec (float v) noexcept;
@@ -188,6 +200,8 @@ namespace halo
 {
 constexpr int paramCount = 13;
 constexpr int engineLaw = 12; // round 190bz: 0 = the classic engine (projects saved before), 1 = the 0.1.27 law
+constexpr int revision = paramCount; // round 190it, hidden (no control, saved while non-zero): 1 = the 0.1.30 revision of
+                                     //   the Measured law (new instances, translated states); 0 = projects saved before
 }
 namespace horizon
 {

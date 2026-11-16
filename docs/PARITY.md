@@ -3742,3 +3742,58 @@ identical. CPU (48 kHz, 20 s, blocks of 512, best of 5; three voicings at Satura
 make-up is a block constant, the lag a 32-sample ring.
 Latency unchanged (0). Not done: EchoBoy's LowCut / HighCut law (unmeasured), Jr's own styles, PrimalTap's algorithms /
 VCO / feedback-path droop, the PrimalTap family's dry-path dip above 8 kHz.
+
+## Round 190it: the reverb stand-ins' 0.1.30 revision (refcap030's captures, LYNX's own translators)
+
+Round 190iq turned refcap030 (black-box captures of the third-party references, round 190hv) into a parity bank: every
+render whose setting has a saved state is rendered by LYNX through the same translator a project uses and scored with
+`scripts/fxparity.py` (0–10). This round measured what differs on the reverb rows and changed the DSP and the
+translators one measured step at a time (lab and evidence: `/mnt/e/lynx-work/parity190it/`).
+
+Every change sits behind a **hidden revision** (no control, no string, saved while non-zero, as Hush's timing in
+round 190iq): `verbs::epoch / atrium / foil / halo::revision` (one past the Law), `echosuite::lattice::revision`, and
+LuxeVerb's Space-engine Ducking (`luxeVerbSpaceDucking`, 0 unless the Pro-R 2 translator sets it). A new instance and a
+translated state run revision 1; a project or preset saved before loads 0 and renders bit for bit as the base commit
+(63 / 63 renders at 44.1 / 48 / 96 kHz, `gold/`; fingerprints in `tests/Parity190itTests.inc`). Live's Reverb → Atrium
+map (round 190cz, measured on the 0.1.27 law) keeps revision 0.
+
+| What was measured | What changed (revision 1) |
+|---|---|
+| Atrium / Epoch / Halo's tail is lumpy: the 40 Hz-smoothed spectrum of the tail varies ±3.3 dB (the references ±0.9 … 1.1). The build-up taps — one random-sign 40-tap FIR feeding every line — leave their ripple on the whole tail, so a steady 1 kHz tone (the staircase of the test signal) met a dip 6 … 11 dB deep where the reference meets its mean gain | Above 600 Hz the build-up taps reach the tank as four interleaved groups through a 4-point Hadamard (four independent FIRs: ripple ±1.9 … 2.1 dB); below, one sum as before (there the tank's few modes set the tone, and the long-decay music renders stayed where they were: 250 / 400 / 600 / 800 Hz tried). Atrium and Halo; Epoch measured no gain from it and keeps one FIR |
+| Halo's Dark colour: against Bright the reference keeps its RT at every octave (8.4 / 7.8 s at 4 / 8 kHz) and falls −3 / −6.6 / −11.7 dB at 4 / 8 / 16 kHz and −5 … −8 dB below 50 Hz; ours was a 5 kHz low-pass in the loop (RT 2.2 s at 4 … 8 kHz, −2 dB). Its colour turns Dark between 0.479 and 0.521 (the translator stepped at 0.525) | Dark = an output tone (high shelf −13 dB at 6.5 kHz, low shelf −6 dB at 70 Hz), the loop untouched; the translator's step at 0.5 |
+| Halo's level: music and test signal 2.6 dB over the reference at the capture's base, the impulse on it; at 20 / 50 % diffusion ours 2.5 dB over its own level at 80 % (the reference not); RT per reverb mode ×1.13 / ×0.75 / ×1.0 / ×2.85 the reference's (Mono / Small / Medium / Big stereo) | Half the low-diffusion lift, −0.5 dB overall (−1 dB scored higher here but cost tp172d's impulses a step), the RT per mode matched with the impulse's energy kept (gain × 1/√ratio) |
+| Atrium per type, Foil Plate per type, Epoch per mode at the sweep's base setting: wet level and octave balance against the reference's impulse | Trims (level + the tone corrector's eight bands, 3-point smoothed) for the types / modes only the sweep holds; the types every other capture uses (Atrium's Large and Bright Room, Foil's Silver and Pewter, Epoch's Concert Hall) keep their 0.1.27 voicing, since their sweep trim cost a step on refcap182 / tp172d. Epoch's (measured at Decay 0.51 s; its Room mode needs none at 1.41 s, refcap182 S2) fade out between those two decays |
+| Lattice Mod: from the type's 8th step the reference's low end was 20 … 30 dB under ours (8 / 16 taps summed into the loop: a loop gain of √N × the feedback below 200 Hz); past its tenth step (0.4375 …) the reference plays the dry signal alone, at unity (its impulse: the dry click, no wet) | The loop hears the longest tap at the feedback's own gain (through its own copy of the tap filters; the summed loop / √N was tried: 4.77 against 4.88); the values past the tenth step play the dry signal |
+| Pro-R 2's Ducking (state value 8, dB 0 … 48) was not translated: with it on, ours was 4 … 25 dB over | The Space engine dips its wet part by 0.71 × the setting (dB) while the input plays (detector 1 / 5 ms, keyed from −50 … −40 dBFS; the dip in 10 ms, back with τ = 115 ms in dB), measured on a −6 dB RMS noise burst at 0 / 25 / 50 / 75 / 100 % |
+
+**Scores** (refcap030 bank, files; before → after; files up / down):
+
+| Reference → stand-in | files | before → after | up / down | blocks |
+|---|---|---|---|---|
+| ValhallaUberMod → Lattice Mod | 172 | 3.20 → **4.88** | 42 / 1 | mode 2.80 → 5.62, pairs 3.47 → 3.97, sr48 / sr96 = |
+| ValhallaShimmer → Halo | 194 | 3.04 → **3.61** | 87 / 0 | mode 3.03 → 3.65, pairs 2.39 → 3.17, sr48 3.44 → 3.75, sr96 3.50 → 3.69 |
+| ValhallaRoom → Atrium | 116 | 3.28 → **3.63** | 27 / 0 | mode 2.50 → 3.31, pairs 4.22 =, sr48 3.44 =, sr96 3.38 → 3.44 |
+| ValhallaPlate → Foil Plate | 124 | 3.60 → **3.74** | 16 / 0 | mode 3.19 → 3.54, the rest = |
+| ValhallaVintageVerb → Epoch Verb | 154 | 2.49 → **2.67** | 21 / 3 | mode 1.86 → 2.16, the rest = |
+| FabFilter Pro-R 2 → LuxeVerb | 323 | 3.25 → **3.30** | 11 / 1 | grid2 2.70 → 2.81 (Ducking), the rest = |
+| Little Plate → Foil Plate | 90 | 3.57 → 3.57 | 0 / 0 | (the measured plate voicing: no change) |
+
+The other banks of these stand-ins (`lab/gate2.py`: tp172d matched settings, verb183b's captures, refcap182's programme,
+tp172b): equal or up everywhere except two files — Halo's tp172d S1 drums 3 → 2 (its spectrum was already 3.9 dB off:
+the block 3.50 → 3.42) and one of verb183b's −20 dB impulses (Halo 3.21 → 3.37 on that bank); Atrium's refcap182 S2 bass
+4 → 3 beside S1 guitar 3 → 4 (the block equal). Up: Halo's refcap182 programme 3.35 → 3.55, Atrium's verb183b captures
+3.82 → 3.88.
+
+**CPU** (thread time on one pinned core, 20 s at 48 kHz, blocks of 512, best of 2 × 5; base / revision 0 / revision 1,
+% of real time): Atrium Medium Room 1.72 / 1.83 / 1.94, Atrium default 2.18 / 1.96 / 2.20, Halo default 1.74 / 1.59 /
+1.96, Halo Big stereo Dark 1.80 / 1.63 / 1.98, Epoch Room 2.37 / 2.18 / 2.08, Foil Bismuth 1.33 / 1.17 / 1.31, Lattice
+default 0.73 / 0.66 / 0.71, Lattice 16 taps 6.68 / 6.74 / 6.65, LuxeVerb Space with Ducking 50 % 4.83 / 4.83 / 5.16.
+Revision 0 is the base (within the machine's ±10 %); revision 1 costs Halo ≈ +0.2 point of one core (the build groups'
+eight one-poles and the four-way injection), the Ducking +0.3 point when it is on. Latency unchanged (none).
+
+**Still off**: Epoch Verb's mode sweep (most algorithms 5 … 9 dB under the reference at Decay 0.51 s before the trims:
+one setting per mode, so the trims stay limited to that decay); Pro-R 2 at Space 0 (6 … 11 dB under) and with a
+left-only input (the Stereo Width grid: −2 … −12 dB), Pro-R 2 Brightness at its ends (+4 … +8 dB); Halo's Feedback 80 %
+(highs −3 dB, lows +5 … +9 dB on music); Little Plate at 44.1 kHz (the reference is ~1.5 dB quieter there than at 48 kHz:
+a reference quirk). The waveform score saturates near 4 on reverb rows (ESR cannot null a second reverb): the steps
+above are spectrum (≤ 2.5 dB) and level (≤ 1.5 dB) moving files from 1 … 3 to 4.

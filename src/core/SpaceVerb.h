@@ -36,6 +36,11 @@ struct Settings
     double mix = 0.3;         // dry/wet
     // decay-rate EQ: decay multipliers below / above two corner frequencies (1 = no change)
     double lowMult = 1.0, lowHz = 200.0, highMult = 1.0, highHz = 4000.0;
+    // round 190it: ducking, 0 … 1 (the reference's 0 … 48 dB): the wet part dips while the input plays. Measured on
+    // refcap030's Pro-R 2 captures (a −6 dB RMS noise burst, Ducking 0 / 25 / 50 / 75 / 100 %): the tail sits 8.5 / 17 /
+    // 25.5 / 34 dB down by the burst's end (0.71 × the setting in dB), down within the first 50 ms, and comes back over
+    // ~0.3 s once the input stops (−34 → −25 → −16 → −11 → −7 dB in 50 ms steps: τ ≈ 115 ms in dB)
+    double ducking = 0.0;
     bool operator== (const Settings&) const = default;
 };
 
@@ -194,6 +199,7 @@ public:
         for (auto& f : tone) f.clear();
         for (auto& f : toneLp) f.clear();
         phase = 0.0;
+        duckEnv = duckDb = 0.0;
     }
 
     void set (const Settings& s) noexcept
@@ -249,9 +255,24 @@ public:
     {
         using namespace detail;
         const auto& erTaps = cur.style == Style::modern ? erModern : cur.style == Style::vintage ? erVintage : erPlate;
+        const bool duck = cur.ducking > 0.0;
+        const double duckDepthDb = 0.71 * 48.0 * clamp01 (cur.ducking);
+        const double envA = std::exp (-1.0 / (0.001 * sr)), envR = std::exp (-1.0 / (0.005 * sr));
+        const double attA = std::exp (-1.0 / (0.01 * sr)), attR = std::exp (-1.0 / (0.115 * sr));
         for (int i = 0; i < n; ++i)
         {
             const double inL = left[i], inR = right[i];
+            double duckGain = 1.0;
+            if (duck)
+            {
+                // the input's envelope (peak, 1 / 5 ms) keys the dip in full from −40 dBFS up (fading in from −50)
+                const double a = std::max (std::abs (inL), std::abs (inR));
+                duckEnv = a > duckEnv ? a + envA * (duckEnv - a) : a + envR * (duckEnv - a);
+                const double key = clamp01 ((20.0 * std::log10 (duckEnv + 1e-12) + 50.0) / 10.0);
+                const double target = duckDepthDb * key;
+                duckDb = target > duckDb ? target + attA * (duckDb - target) : target + attR * (duckDb - target);
+                duckGain = std::pow (10.0, -duckDb / 20.0);
+            }
             pre.push (0.5 * (inL + inR));
             const double x = preS >= 1.0 ? pre.read (preS) : 0.5 * (inL + inR);
             er.push (x);
@@ -293,7 +314,7 @@ public:
             double wL = (oL * lateGain + eL * erGain) * norm, wR = (oR * lateGain + eR * erGain) * norm;
             wL = toneLp[0].run (tone[0].run (wL));
             wR = toneLp[1].run (tone[1].run (wR));
-            const double mid = 0.5 * (wL + wR), sd = 0.5 * (wL - wR) * side;
+            const double mid = 0.5 * (wL + wR) * duckGain, sd = 0.5 * (wL - wR) * side * duckGain;
             left[i] = (float) (inL * dryGain + (mid + sd) * wetGain);
             right[i] = (float) (inR * dryGain + (mid - sd) * wetGain);
         }
@@ -325,5 +346,6 @@ private:
     detail::Delay pre, er;
     double preS = 0.0, modDepth = 0.0, modInc = 0.0, phase = 0.0, erGain = 1.0, erSpread = 1.0, lateGain = 1.0;
     double side = 1.0, dryGain = 0.89, wetGain = 0.45, norm = 0.3;
+    double duckEnv = 0.0, duckDb = 0.0; // round 190it
 };
 } // namespace lynx::spaceverb

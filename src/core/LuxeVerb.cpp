@@ -1542,6 +1542,7 @@ static spaceverb::Settings settingsOf (const EffectParams& p) noexcept
     s.lowHz = lowHz (at (lowFreq));
     s.highMult = multOf (at (highMult));
     s.highHz = highHz (at (highFreq));
+    s.ducking = p[(std::size_t) luxeVerbSpaceDucking]; // round 190it (hidden: the Pro-R 2 translator sets it)
     return s;
 }
 } // namespace luxeverb::sp
