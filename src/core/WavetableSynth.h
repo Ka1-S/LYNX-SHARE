@@ -157,6 +157,8 @@ public:
     void note (int key, float velocity, float pitch = 0.0f, float slide = -1.0f, float pressure = 0.0f) noexcept;
     // MPE: a sounding note's own pitch (semitones), slide (0…1) or pressure (0…1) changed
     void notePitch (int key, float semitones) noexcept;
+    // the held voices glide to `semitones` (a key, with its cents) over `samples` (FL's slide notes; rollup 0.1.30)
+    void slideTo (float semitones, float samples) noexcept;
     void noteSlide (int key, float slide) noexcept;
     void notePressure (int key, float pressure) noexcept;
     void setPitchOffset (float semitones) noexcept;  // the channel's pitch, live

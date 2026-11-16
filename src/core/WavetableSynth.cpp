@@ -343,6 +343,7 @@ struct Voice
     std::array<double, 2> lfoPhase {};
     std::array<float, 2> lfoHeld {}, lfoAge {};
     float glideFrom = 0.0f, glidePos = 1.0f;   // semitones below / above the note at the start, 0…1 through the glide
+    HostSlide host;                            // FL's channel porta and slide notes (rollup 0.1.30, core/HostSlide.h): cents
     std::array<OscState, 2> osc {};
     std::uint32_t subPhase = 0;
     FilterState f1, f2;
@@ -452,6 +453,17 @@ struct Engine::Impl
         v.pressure = pressure;
         v.gate = true;
         v.age = ++clock;
+        // FL's channel porta (rollup 0.1.30, as round 190ix's Tetra): the rack starts the note `fromCents` from its own
+        // pitch and puts that in the note's cents, which Helix hears only through the matrix (Live's Note PB): the voice
+        // starts there and glides to its own pitch (HostSlide::pendingGlide); a slide note moves it later (slideTo). The
+        // channel's live pitch moves every voice through pitchOffset, so the slide does not track it.
+        v.host = {};
+        if (auto& g = HostSlide::pendingGlide(); g.samples > 0.0f)
+        {
+            v.host.cents = g.fromCents;
+            v.host.start (0.0f, g.samples);
+            g.taken = true;
+        }
         if (legato && v.active)
             return; // (mono legato: the envelopes go on)
         v.active = true;
@@ -679,7 +691,8 @@ struct Engine::Impl
             v.glidePos = std::min (1.0f, v.glidePos + (float) (dt / g));
         }
         const auto glideNow = v.glideFrom * (1.0f - v.glidePos);
-        auto notePitch = (double) v.key + fp (transpose) + glideNow + pitchOffset + bend + laws.pitchSemis * mod[tgt::pitch];
+        const auto hostSt = v.host.left > 0.0f || v.host.cents != 0.0f ? v.host.advance ((float) n) * 0.01f : 0.0f; // (FL's porta / slides)
+        auto notePitch = (double) v.key + fp (transpose) + glideNow + hostSt + pitchOffset + bend + laws.pitchSemis * mod[tgt::pitch];
         if (p[(std::size_t) matrixIndex (tgt::pitch, src::notePitchBend)] == 0.0)
             notePitch += 0.0; // (the note's own pitch is a matrix source; without its cell it does not move the pitch, as in Live)
         // unison
@@ -1096,6 +1109,15 @@ double Engine::param (int index) const noexcept { return index >= 0 && index < s
 void Engine::note (int key, float velocity, float pitch, float slide, float pressure) noexcept
 {
     impl->note (key, std::clamp (velocity, 0.0f, 1.0f), std::isfinite (pitch) ? pitch : 0.0f, slide, std::clamp (pressure, 0.0f, 1.0f));
+}
+
+void Engine::slideTo (float semitones, float samples) noexcept
+{
+    if (! std::isfinite (semitones) || ! std::isfinite (samples))
+        return;
+    for (auto& v : impl->voices)
+        if (v.active && v.gate)
+            v.host.start ((semitones - (float) v.key) * 100.0f, std::max (samples, 1.0f));
 }
 
 void Engine::notePitch (int key, float semitones) noexcept
@@ -1596,6 +1618,14 @@ public:
     }
 
     void noteOff (int key) noexcept override { engine.note (std::clamp (key, 0, 127), 0.0f); }
+    // FL's channel porta / Mono and slide notes (rollup 0.1.30, as round 190ix's Tetra): the voices take
+    // HostSlide::pendingGlide at note on and glide to a slide note's pitch (`cents`: the note's cents, as noteOn's)
+    bool followsChannelPorta() const noexcept override { return true; }
+    void slideTo (int key, float cents, float samples) noexcept override
+    {
+        take();
+        engine.slideTo ((float) std::clamp (key, 0, 127) + (cents - liveRest()) * 0.01f, samples);
+    }
     void allNotesOff() noexcept override { engine.allNotesOff(); }
     void panic() noexcept override { engine.reset(); }
     bool idle() const noexcept override { return engine.idle(); }

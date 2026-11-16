@@ -20,7 +20,7 @@ if args[:1] == ["--hints"]:
 
 
 def stable(engine, key, note):
-    m = re.match(r"hint:(\d+)(\+.*)?$", key)
+    m = re.match(r"hint:(\d{1,5})(\+.*)?$", key)  # (an older survey's index; a stable id is 8 hex digits, some all digits)
     if not m:
         return key
     best = None

@@ -61,6 +61,9 @@ const std::vector<Allowed>& allowed()
         // rows only, a filter's input comes from the FM layer (REA_rodada11 §1.5, FUN_0086dd40 [DECOMP + EXEC])
         { "Sytrus", "RM op * to filter *", "fl-inert: FL's voice assembly reads the RM layer for operators only; a filter's input is the FM layer's row (REA_rodada11 §1.5)" },
         { "Harmless", "Threaded", "non-audio: renders the voices on worker threads (same output)" },
+        // (rollup 0.1.30) Helix keeps Live's HiQ switch for the .als round trip; its oscillators are always band-limited
+        // (round 190ja: every table's mipmaps), so the switch changes nothing in LYNX
+        { "Helix", "HiQ", "non-audio: Helix is always band-limited (round 190ja); HiQ is kept for Live's round trip" },
     };
     // FL's Drumaxx engine reads pad 1's Noise Retrig and EG Retrig (pad fields 5, 6) for every pad (REA_rodada67 §6.2),
     // so pads 2…16's own switches do nothing in FL either
@@ -173,7 +176,7 @@ void auditEngines (const std::set<std::string>& names, bool except, bool without
 // the slow engines in tests of their own (the build runs the chunks in parallel)
 const std::set<std::string>& slow()
 {
-    static const std::set<std::string> s { "GMS", "Sawer", "Toxic Biohazard", "Harmless", "Kepler Exo", "Transistor Bass", "Sytrus", "Drumaxx", "Tetra" };
+    static const std::set<std::string> s { "GMS", "Sawer", "Toxic Biohazard", "Harmless", "Kepler Exo", "Transistor Bass", "Sytrus", "Drumaxx", "Tetra", "Helix" };
     return s;
 }
 } // namespace ctlwake173d
@@ -190,6 +193,9 @@ TEST (ctlwake173d_generator_controls_transistor_bass) { ctlwake173d::auditEngine
 TEST (ctlwake173d_generator_controls_drumaxx) { ctlwake173d::auditEngines ({ "Drumaxx" }, false); }
 // (round 190ix: LYNX's own FM synth needs nothing of FL, so it runs on CI too; its contexts are Tetra hints in tools/CtlWake.h)
 TEST (ctlwake173d_generator_controls_tetra) { ctlwake173d::auditEngines ({ "Tetra" }, false, true); }
+// (rollup 0.1.30: Helix, LYNX's own wavetable synth (round 190ja), needs nothing of FL either; its contexts are Helix hints in
+// tools/CtlWake.h, its keys from a tools/ctlwake survey: 100 controls, 0 dead, HiQ allowed)
+TEST (ctlwake173d_generator_controls_helix) { ctlwake173d::auditEngines ({ "Helix" }, false, true); }
 
 // every editor control reads and writes on the engine's new channel: a state saved before a parameter existed (Slayer's
 // version 0, Kepler's 34 floats, Kepler Exo's 151) silently dropped its edits

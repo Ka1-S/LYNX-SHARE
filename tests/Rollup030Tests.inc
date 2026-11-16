@@ -153,3 +153,88 @@ TEST (rollup030_directwave_copy_for_an_older_release_completes_short_records)
     auto fullDoc = lynx::dw::readDoc (full);
     CHECK (fullDoc && lynx::dw::completeShortZoneRecords (*fullDoc) == 0 && lynx::dw::writeDoc (*fullDoc) == full);
 }
+
+// Rollup 0.1.30 step 3 (round 190jk): Helix (round 190ja) follows FL's host pitch features as round 190ix made Tetra do: a
+// slide note moves the held voices (issue #14), a Porta channel starts a note at the last one's pitch and glides (round
+// 168l), a Mono channel moves its voice legato. The FL-Data audits check every engine; these run without FL's Data (CI).
+namespace rollup030
+{
+inline lynx::ChannelDef helixChannel()
+{
+    lynx::ChannelDef c;
+    c.name = "Helix";
+    c.instrument = lynx::InstrumentKind::helix;
+    return c;
+}
+} // namespace rollup030
+
+TEST (rollup030_helix_follows_slide_notes)
+{
+    using namespace lynx;
+    const auto c = rollup030::helixChannel();
+    Note held;
+    held.key = 60;
+    held.length = ppq * 8;
+    held.velocity = 0.8f;
+    Note slide;
+    slide.key = 67;
+    slide.start = ppq;
+    slide.length = ppq / 4;
+    slide.slide = true;
+    auto fifth = held;
+    fifth.key = 67;
+    const auto base = issue14::pitchAt (issue14::renderPattern (c, { held }, 0.0f, 1.5), 1.0);
+    const auto ref = issue14::pitchAt (issue14::renderPattern (c, { fifth }, 0.0f, 1.5), 1.0);
+    const auto out = issue14::renderPattern (c, { held, slide }, 0.0f, 1.5);
+    CHECK (base > 200.0 && std::abs (issue14::cents (base, ref) - 700.0) < 10.0);
+    CHECK (std::abs (issue14::cents (ref, issue14::pitchAt (out, 1.0))) < 10.0);
+    CHECK (std::abs (issue14::cents (base, issue14::pitchAt (out, 0.3))) < 10.0); // (before the slide note)
+    const auto mid = issue14::cents (base, issue14::pitchAt (out, 0.53));
+    CHECK (mid > 100.0 && mid < 650.0);
+    // the main pitch still moves a slid voice
+    const auto master = issue14::pitchAt (issue14::renderPattern (c, { held, slide }, 100.0f, 1.5), 1.0);
+    CHECK (std::abs (issue14::cents (ref, master) - 100.0) < 10.0);
+}
+
+TEST (rollup030_helix_follows_channel_porta_and_mono)
+{
+    using namespace lynx;
+    auto inst = makeInstrument (InstrumentKind::helix);
+    CHECK (inst != nullptr && inst->followsChannelPorta() && inst->followsSlides());
+    if (inst == nullptr)
+        return;
+    inst->prepare (48000.0);
+    inst->configure (rollup030::helixChannel(), 120.0);
+    HostSlide::pendingGlide() = { -700.0f, 1000.0f, false };
+    inst->setNextNoteExpression (0.0f, -700.0f, false);
+    inst->noteOn (60, 0.8f);
+    CHECK (HostSlide::pendingGlide().taken);
+    HostSlide::pendingGlide() = {};
+
+    const auto c = rollup030::helixChannel();
+    Note low;
+    low.key = 60;
+    low.velocity = 0.8f;
+    auto high = low;
+    high.key = 67;
+    auto held = low;
+    held.key = 67;
+    held.length = ppq * 8;
+    const auto ref = issue14::pitchAt (issue14::renderPattern (c, { held }, 0.0f, 1.6), 1.0);
+    auto porta = c;
+    setChannelPortamento (porta, true, 1.0f);
+    low.length = ppq / 2;
+    high.start = ppq;
+    high.length = ppq * 3;
+    const auto glide = issue14::renderPattern (porta, { low, high }, 0.0f, 1.6);
+    const auto mid = issue14::cents (ref, issue14::pitchAt (glide, 0.6)), end = issue14::cents (ref, issue14::pitchAt (glide, 1.2));
+    CHECK (mid > -620.0 && mid < -250.0);
+    CHECK (std::abs (end) < 10.0);
+    auto mono = c;
+    setChannelMono (mono, true);
+    low.length = ppq * 2;
+    high.length = ppq * 2;
+    const auto legato = issue14::renderPattern (mono, { low, high }, 0.0f, 1.6);
+    CHECK (std::abs (issue14::cents (ref, issue14::pitchAt (legato, 0.3)) + 700.0) < 10.0);
+    CHECK (std::abs (issue14::cents (ref, issue14::pitchAt (legato, 1.1))) < 10.0);
+}
