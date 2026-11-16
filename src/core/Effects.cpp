@@ -441,6 +441,10 @@ class Delay final : public Effect
 {
 public:
     static constexpr double maxSeconds = 3.0;
+    // Round 190ie (issue #185): a tempo change glides the delay to its new length in this time, as FL's Fruity Delay 3
+    // does at its default Time smoothing (REA_rodada52 §3.2, REA_rodada190ie): d ← d + (target − d)·k per sample with
+    // k = 1 − 0.01^(1 / (T·rate)), snapped onto the target within 0.001 sample, read between samples (linear)
+    static constexpr double glideSeconds = 0.5;
 
     Delay()
     {
@@ -449,7 +453,12 @@ public:
         buffer[1].assign (size, 0.0f);
     }
 
-    void prepare (double sr) noexcept override { sampleRate = sr; reset(); }
+    void prepare (double sr) noexcept override
+    {
+        sampleRate = sr;
+        glideK = 1.0 - std::pow (0.01, 1.0 / (glideSeconds * sr));
+        reset();
+    }
 
     void reset() noexcept override
     {
@@ -457,11 +466,13 @@ public:
         std::fill (buffer[1].begin(), buffer[1].end(), 0.0f);
         damp[0] = damp[1] = 0.0f;
         write = 0;
+        settled = false;
     }
 
     void process (float* l, float* r, int n, const EffectParams& params, double bpm) noexcept override
     {
-        const auto beats = delayDivisions[(std::size_t) delayIndex (params[0])];
+        const auto index = delayIndex (params[0]);
+        const auto beats = delayDivisions[(std::size_t) index];
         const auto seconds = std::min (maxSeconds - 0.01, beats * 60.0 / std::max (bpm, 20.0));
         const auto delaySamples = std::max<std::size_t> (1, (std::size_t) (seconds * sampleRate));
         const auto feedback = params[1] * 0.95f;
@@ -470,12 +481,16 @@ public:
         const auto dampCoeff = 1.0f - params[4] * 0.9f; // 1 = no filter in the feedback path
         const auto size = buffer[0].size();
 
-        for (int i = 0; i < n; ++i)
-        {
-            const auto readPos = (write + size - delaySamples) % size;
-            auto echoL = buffer[0][readPos];
-            auto echoR = buffer[1][readPos];
+        // the first block and a move of the Time knob take the new length at once (as before round 190ie); only a
+        // tempo change glides (the renderer steps the tempo at every block of a tempo clip: each step was a jump of
+        // the read position, a click at the block rate that the feedback kept)
+        const auto target = (double) delaySamples;
+        if (! settled || index != lastIndex)
+            current = target;
+        settled = true;
+        lastIndex = index;
 
+        auto sample = [&] (int i, float echoL, float echoR) noexcept {
             // 1-pole low-pass in the feedback path: repeats get darker
             damp[0] += dampCoeff * (echoL - damp[0]);
             damp[1] += dampCoeff * (echoR - damp[1]);
@@ -498,11 +513,31 @@ public:
             l[i] = inL + mix * echoL;
             r[i] = inR + mix * echoR;
             write = (write + 1) % size;
+        };
+
+        int i = 0;
+        for (; i < n && current != target; ++i) // gliding toward the new tempo's length
+        {
+            const auto diff = target - current;
+            current = std::abs (diff) < 0.001 ? target : current + diff * glideK;
+            const auto whole = (std::size_t) current; // (≥ 1 and < size)
+            const auto frac = (float) (current - (double) whole);
+            const auto at = write >= whole ? write - whole : write + size - whole, before = at == 0 ? size - 1 : at - 1;
+            sample (i, buffer[0][at] + (buffer[0][before] - buffer[0][at]) * frac, buffer[1][at] + (buffer[1][before] - buffer[1][at]) * frac);
+        }
+        for (; i < n; ++i) // the steady length: whole samples, bit for bit as before
+        {
+            const auto readPos = (write + size - delaySamples) % size;
+            sample (i, buffer[0][readPos], buffer[1][readPos]);
         }
     }
 
 private:
     double sampleRate = 44100.0;
+    double glideK = 1.0;
+    double current = 0.0; // the length read now (samples), gliding toward the tempo's
+    int lastIndex = -1;
+    bool settled = false;
     std::array<std::vector<float>, 2> buffer;
     std::size_t write = 0;
     float damp[2] {};

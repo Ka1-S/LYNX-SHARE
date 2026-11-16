@@ -65,6 +65,11 @@ struct Controls
     double highCutHz = 20000.0; // 200 … 20000
     double modRateHz = 0.5;     // 0.01 … 10
     double modDepth = 0.5;      // 0 … 1
+    // round 190ie (issue #185): > 0 = the line lengths' change of this block is a tempo change (a synced delay under a
+    // tempo clip, which steps the tempo at every block): it spreads evenly over this many samples, so the lines move at
+    // the tempo's own pace instead of a burst at the fixed glide's 0.25 sample per sample and a stop, every block (a
+    // buzz at the block rate). 0 = the fixed glide (every other change, as before)
+    int spread = 0;
 };
 
 class Network

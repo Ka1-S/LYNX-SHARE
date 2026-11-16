@@ -22,8 +22,11 @@
 #include <vector>
 
 // The model rounds every float32 operation: no fused multiply-adds here (on FMA targets they move the output by
-// ~1e-7 and, over time, the instant of a splice)
+// ~1e-7 and, over time, the instant of a splice). Round 190ie: clang saves the includer's floating-point state and
+// gives it back at the end of the header (float_control push / pop); it used to end on "contract(on)", which left
+// fused multiply-adds on for the rest of core/Effects.cpp under clang (not under GCC, which pops its options)
 #if defined(__clang__)
+#pragma float_control(push)
 #pragma clang fp contract(off)
 #elif defined(__GNUC__)
 #pragma GCC push_options
@@ -687,7 +690,7 @@ private:
 } // namespace lynx::pitcher
 
 #if defined(__clang__)
-#pragma clang fp contract(on)
+#pragma float_control(pop)
 #elif defined(__GNUC__)
 #pragma GCC pop_options
 #endif

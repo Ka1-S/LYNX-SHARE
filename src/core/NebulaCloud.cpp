@@ -41,6 +41,7 @@ struct Network::Impl
     double extra[maxLines] {};
     double modCos[maxLines] {}, modSin[maxLines] {};
     double target[maxLines] {}, length[maxLines] {};
+    double step[maxLines] {}; // round 190ie: each line's glide per sample (the fixed glide, or a tempo change spread)
     float reader[maxLines] {}; // state of each line's all-pass interpolator
 
     float loop[maxLines] {};               // what the lines returned last (the feedback networks)
@@ -162,7 +163,10 @@ struct Network::Impl
         for (int i = 1; i < maxLines; ++i)
             power[i] = power[i - 1] * ratio;
         for (int i = 0; i < maxLines; ++i)
+        {
             target[i] = samples * power[exponent[i]] + fixedOffset + extra[i];
+            step[i] = c.spread > 0 ? std::min (glide, std::abs (target[i] - length[i]) / (double) c.spread) : glide;
+        }
 
         const auto feedback = std::clamp (c.feedback, 0.0, 1.0);
         const auto gain = std::min (0.9995, std::sqrt (feedback)); // (the cap keeps a network at Feedback 100 % decaying)
@@ -235,7 +239,7 @@ struct Network::Impl
         for (int k = 0; k < count; ++k)
         {
             const auto i = first + k;
-            length[i] += std::clamp (target[i] - length[i], -glide, glide);
+            length[i] += std::clamp (target[i] - length[i], -step[i], step[i]);
             // (the loop itself is one sample long, hence the −1)
             const auto d = std::clamp (length[i] + modSine * modCos[i] + modCosine * modSin[i] - 1.0, 2.0, maxDelay);
             const auto whole = (int) (d - 0.49999);

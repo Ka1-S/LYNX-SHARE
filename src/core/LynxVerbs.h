@@ -71,6 +71,11 @@ struct Settings
     int shape = 0;                 // line-length set (see LynxVerbs.cpp)
     double lineScale = 1.0;        // multiplier of the shape's lengths
     double lineSpread = 1.0;       // delay-network shape only: 0 = every line lineScale ms long, 1 = the full spread
+    // round 190ie (issue #185): > 0 = this block's change of the line lengths is a tempo change (Nebula's synced delay
+    // under a tempo clip, which steps the tempo at every block): it spreads evenly over this many samples and the loop
+    // all-passes follow the gliding lines, instead of the fixed 0.25-sample glide's burst and the all-passes' jump at
+    // every block. 0 = the fixed glide (every other change, as before)
+    int lengthSpread = 0;
     double rt60 = 2.0;             // mid-band decay (s)
     double lowMult = 1.0, lowXover = 300.0;    // RT multiplier below lowXover
     double highMult = 1.0, highXover = 8000.0; // RT multiplier above highXover
