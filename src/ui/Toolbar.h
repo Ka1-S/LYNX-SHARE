@@ -324,6 +324,7 @@ public:
 private:
     AudioEngine& engine;
     juce::String shown;
+    int shownSignature = -1;
     toolbarlayout::Look look = toolbarlayout::Look::live;
 };
 
@@ -345,6 +346,7 @@ public:
 private:
     AudioEngine& engine;
     juce::String shown;
+    int shownQuant = -1;
 };
 
 // The Simple top bar's "Last saved" status (design190ia SG-17; BandLab's "Last Saved" at its top right): a 14 px icon

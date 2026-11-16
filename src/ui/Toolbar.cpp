@@ -1985,9 +1985,12 @@ juce::String SignatureBox::text() const
 
 void SignatureBox::update()
 {
-    if (const auto t = text(); t != shown)
+    // (the timer's check compares two numbers; the text is made only when they changed)
+    const auto& song = engine.getSong();
+    if (const auto now = song.beatsPerBar * 1000 + song.beatUnit; now != shownSignature)
     {
-        shown = t;
+        shownSignature = now;
+        shown = text();
         repaint();
     }
 }
@@ -2061,9 +2064,10 @@ juce::String QuantBox::text() const { return quantName (globalQuantOf (engine.ge
 
 void QuantBox::update()
 {
-    if (const auto t = text(); t != shown)
+    if (const auto now = (int) globalQuantOf (engine.getSong()); now != shownQuant)
     {
-        shown = t;
+        shownQuant = now;
+        shown = text();
         repaint();
     }
 }
