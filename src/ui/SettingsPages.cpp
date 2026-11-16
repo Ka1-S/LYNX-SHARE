@@ -1,6 +1,7 @@
 #include "ui/RemoteControl.h"
 #include "ui/NumBox.h"
 #include "ui/SettingsPages.h"
+#include "ui/LabelFont.h"
 #include "core/TextSize.h"
 #include "ui/RemoteControlSettings.h"
 #include "platform/Paths.h"
@@ -549,6 +550,7 @@ private:
             boldLabel.setBounds (row.removeFromLeft (juce::jmin (row.getWidth() / 3, theme::labelColumnWidth ({ &boldLabel }, Rows::h (80), Rows::h (160)))));
             boldBox.setBounds (row.withTrimmedLeft (6).withWidth (juce::jmin (row.getWidth() - 6, Rows::h (220))));
         }
+        condensedLabels.setBounds (r.indented (24));
         scaleBox.setBounds (r.row (scaleLabel, 120));
         menuBox.setBounds (r.row (menuLabel, 160));
         wavesBox.setBounds (r.row (wavesLabel, 0));
@@ -706,8 +708,12 @@ private:
     void setupFontRow()
     {
         for (auto* c : std::initializer_list<juce::Component*> { &fontLabel, &fontBox, &fontReset, &fontPreview, &fontNote, &textSizeLabel, &textSizeBox,
-                                                                 &boldLabel, &boldBox })
+                                                                 &boldLabel, &boldBox, &condensedLabels })
             add (*c);
+        // round 190je (design190ia FM-5): FL's condensed face for the FL-landmark labels, off by default; at the next start
+        toggle (condensedLabels, tr ("Condensed labels (FL style)"), options.condensedLabels, [this] (bool on) { options.condensedLabels = on; });
+        condensedLabels.setTooltip (tr ("Menus, the menu bar, the Browser, Playlist track names and Mixer strip names in a condensed face, "
+                                        "a step larger, as FL Studio draws them (Open Sans Condensed). Applied when LYNX SHARE restarts."));
         styleLabel (fontLabel, tr ("Interface font"));
         styleNote (fontNote, tr ("A new interface font, text size or bold text is applied when LYNX SHARE restarts."));
         // issue #189: the text roles' size next to the font (core/TextSize.h), applied at the next start as the font is
@@ -788,6 +794,7 @@ private:
     juce::Label longestWaitLabel, animationLabel, animationNote, languageLabel, languageNote, scaleLabel, menuLabel, wavesLabel, noteNamesLabel, blackNotesLabel, pluginStyleLabel, editInLabel, undoLabel, autosaveLabel, keepLabel, sandboxNote, substitutesNote, shortcutsNote, crashLabel, crashNote, updatesNote, previousLabel;
     juce::Label fontLabel, fontPreview, fontNote, textSizeLabel, boldLabel;
     juce::ComboBox fontBox, textSizeBox, boldBox;
+    juce::ToggleButton condensedLabels;
     juce::Label templateLabel, templateNote, startupProjectLabel;
     juce::ComboBox templateBox, startupProjectBox;
     std::vector<TemplateChoice> templateChoices; // templateBox's item id - 1

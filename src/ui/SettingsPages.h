@@ -22,6 +22,7 @@ struct GeneralOptions
     juce::String uiFont;        // family; empty: the platform's default (ui-font.txt, read at start-up)
     int boldText = 0;           // Bold text, textsize::Bold: off, labels, all (round 190jp; ui-bold-text.txt, read at start-up)
     int textSize = 100;         // Text size, percent of each text role (issue #189; ui-text-size.txt, read at start-up)
+    bool condensedLabels = false; // "Condensed labels (FL style)" (round 190je; ui-condensed-labels.txt, read at start-up)
     int uiScale = 100;          // percent
     bool compactMenus = true;   // menu density: compact (native-like rows) or comfortable (round 163)
     bool waveSpectral = false, waveStereo = false;

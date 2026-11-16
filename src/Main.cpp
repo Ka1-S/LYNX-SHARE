@@ -14,6 +14,7 @@
 #include "core/SessionOps.h"
 #include "ui/ClipGridComponent.h"
 #include "ui/ExternalDrag.h"
+#include "ui/LabelFont.h"
 #include "ui/SessionMixer.h"
 #include "core/FlSamplers.h"
 #include "core/ArrangeOps.h"
@@ -688,6 +689,14 @@ public:
         // bold text (round 190jp): saved in Settings › General; --boldtext 1 (labels) or 2 (all) overrides it for this run
         const auto boldTextArg = args.indexOf ("--boldtext");
         lynx::theme::setBoldText (boldTextArg >= 0 ? args[boldTextArg + 1].getIntValue() : lynx::theme::savedBoldText());
+        // round 190je: FL-style condensed labels (Settings › General); --condensedlabels for one run. --menustyle flClassic: FL's
+        // light menus for one run (Settings › Theme keeps the saved choice)
+        lynx::theme::setCondensedLabels (args.contains ("--condensedlabels") || lynx::theme::savedCondensedLabels());
+        if (const auto menuStyleArg = args.indexOf ("--menustyle"); menuStyleArg >= 0)
+        {
+            lynx::theme::menus::setStyle (lynx::themes::menuStyleFromId (args[menuStyleArg + 1].unquoted().toStdString()));
+            lookAndFeel.refreshColours();
+        }
 
         if (args.contains ("--showcase"))
         {
@@ -30037,6 +30046,8 @@ private:
             saveSplashFrames (prefix);
             saveIconSheet (prefix + "-icons.png", 1.0f);
             saveIconSheet (prefix + "-icons-150.png", 1.5f);
+            saveStateSheet (prefix + "-states190je.png", 1.0f); // round 190je: the one state rule, per button kind
+            saveStateSheet (prefix + "-states190je-z3.png", 3.0f);
             saveWindow (lynx::MainComponent::makeHelpContent(), "-help.png");
             saveWindow (lynx::ui::makeTrackIconGrid (5, {}), "-trackicons168h.png"); // round 168h: the icon picker
             saveWindow (std::make_unique<lynx::toolbar::CustomizePanel> (lynx::toolbarlayout::Layout::makeDefault()), "-customize-toolbar.png");
@@ -31258,37 +31269,82 @@ private:
         saveMenus (names, source, path);
     }
 
-    // menus side by side, each under its name
+    // menus side by side, each under its name, in the columns JUCE shows them in: its own column breaks, or (round 190je,
+    // cmake/LynxPatchJuce.cmake fix 39) the split of a menu taller than 70 % of a 1080 px screen
     static void saveMenus (const juce::StringArray& names, const std::vector<juce::PopupMenu>& source, const juce::String& path)
     {
         auto& lf = juce::LookAndFeel::getDefaultLookAndFeel();
+        struct Row
+        {
+            const juce::PopupMenu::Item* item;
+            int height;
+        };
         struct Laid
         {
             juce::PopupMenu menu;
+            std::vector<std::vector<Row>> columns;
+            std::vector<int> widths;
             int width = 0, height = 0;
         };
         std::vector<Laid> menus;
+        menus.reserve ((std::size_t) names.size());
         const auto border = lf.getPopupMenuBorderSize();
+        const auto separatorWidth = lf.getPopupMenuColumnSeparatorWidthWithOptions (juce::PopupMenu::Options());
         for (int m = 0; m < names.size(); ++m)
         {
-            Laid laid { source[(std::size_t) m] };
-            int width = 160, height = 2 * border;
-
+            menus.push_back (Laid { source[(std::size_t) m] });
+            auto& laid = menus.back();
+            std::vector<Row> rows;
+            std::vector<lynx::themes::MenuRow> shape;
+            std::vector<int> breaks;
             for (juce::PopupMenu::MenuItemIterator it (laid.menu); it.next();)
             {
                 const auto& item = it.getItem();
                 int w = 0, h = 0;
-                lf.getIdealPopupMenuItemSize (item.text, item.isSeparator, item.isSectionHeader ? -1 : 0, w, h);
+                if (item.customComponent != nullptr)
+                    item.customComponent->getIdealSize (w, h); // (a title band: its own height, as JUCE asks it)
+                else
+                    lf.getIdealPopupMenuItemSize (item.text, item.isSeparator, item.isSectionHeader ? -1 : 0, w, h);
                 if (item.isSectionHeader) h += h / 2; // as JUCE does
+                rows.push_back ({ &item, h });
+                shape.push_back ({ h, item.isSeparator, item.isSectionHeader });
+                if (item.shouldBreakAfter)
+                    breaks.push_back ((int) rows.size() - 1);
+            }
+            if (breaks.empty())
+                if (const auto at = lynx::themes::tallMenuBreak (shape, 1080 * 7 / 10); at >= 0)
+                    breaks.push_back (at);
+
+            laid.columns.emplace_back();
+            laid.widths.push_back (160);
+            for (int i = 0; i < (int) rows.size(); ++i)
+            {
+                const auto& item = *rows[(std::size_t) i].item;
+                int w = 0, h = 0;
+                if (item.customComponent != nullptr)
+                    item.customComponent->getIdealSize (w, h);
+                else
+                    lf.getIdealPopupMenuItemSize (item.text, item.isSeparator, item.isSectionHeader ? -1 : 0, w, h);
                 if (item.shortcutKeyDescription.isNotEmpty() || item.text.containsChar ('\t'))
                     w += 90;
-                width = juce::jmax (width, w + 10);
-                height += h;
+                laid.columns.back().push_back (rows[(std::size_t) i]);
+                laid.widths.back() = juce::jmax (laid.widths.back(), w + 10);
+                if (std::find (breaks.begin(), breaks.end(), i) != breaks.end() && i + 1 < (int) rows.size())
+                {
+                    laid.columns.emplace_back();
+                    laid.widths.push_back (160);
+                }
             }
 
-            laid.width = width;
-            laid.height = height;
-            menus.push_back (std::move (laid));
+            laid.width = (int) (laid.columns.size() - 1) * separatorWidth;
+            for (std::size_t c = 0; c < laid.columns.size(); ++c)
+            {
+                laid.width += laid.widths[c];
+                int h = 2 * border;
+                for (const auto& row : laid.columns[c])
+                    h += row.height;
+                laid.height = juce::jmax (laid.height, h);
+            }
         }
 
         int totalWidth = 16, totalHeight = 0;
@@ -31304,6 +31360,7 @@ private:
             lynx::shot::logical (g);
             g.fillAll (lynx::theme::colour::bg1);
             int x = 16;
+            bool first = true;
 
             for (int m = 0; m < (int) menus.size(); ++m)
             {
@@ -31316,30 +31373,44 @@ private:
                     g.reduceClipRegion (x, 24, l.width, l.height);
                     g.setOrigin (x, 24);
                     lf.drawPopupMenuBackground (g, l.width, l.height);
-                    int y = border;
-                    bool first = true;
-
-                    for (juce::PopupMenu::MenuItemIterator it (l.menu); it.next();)
+                    int columnX = 0;
+                    for (std::size_t c = 0; c < l.columns.size(); ++c)
                     {
-                        const auto& item = it.getItem();
-                        int w = 0, h = 0;
-                        lf.getIdealPopupMenuItemSize (item.text, item.isSeparator, item.isSectionHeader ? -1 : 0, w, h);
-                if (item.isSectionHeader) h += h / 2; // as JUCE does
-                        const juce::Rectangle<int> r (0, y, l.width, h);
-                        auto text = item.text, shortcut = item.shortcutKeyDescription;
-                        if (text.containsChar ('\t'))
+                        int y = border;
+                        for (const auto& row : l.columns[c])
                         {
-                            shortcut = text.fromFirstOccurrenceOf ("\t", false, false);
-                            text = text.upToFirstOccurrenceOf ("\t", false, false);
-                        }
+                            const auto& item = *row.item;
+                            const juce::Rectangle<int> r (columnX + (c == 0 ? border : 0), y, l.widths[c] - (c == 0 ? border : 0) - (c + 1 == l.columns.size() ? border : 0),
+                                                          row.height);
+                            auto text = item.text, shortcut = item.shortcutKeyDescription;
+                            if (text.containsChar ('\t'))
+                            {
+                                shortcut = text.fromFirstOccurrenceOf ("\t", false, false);
+                                text = text.upToFirstOccurrenceOf ("\t", false, false);
+                            }
 
-                        if (item.isSectionHeader)
-                            lf.drawPopupMenuSectionHeader (g, r, text);
-                        else
-                            lf.drawPopupMenuItem (g, r, item.isSeparator, item.isEnabled, first && ! item.isSeparator && m == 0, item.isTicked,
-                                                  item.subMenu != nullptr, text, shortcut, item.image.get(), nullptr);
-                        first = false;
-                        y += h;
+                            if (item.isSectionHeader)
+                                lf.drawPopupMenuSectionHeader (g, r, text);
+                            else if (item.customComponent != nullptr)
+                            {
+                                juce::Graphics::ScopedSaveState itemState (g);
+                                g.setOrigin (r.getPosition());
+                                item.customComponent->setSize (r.getWidth(), r.getHeight());
+                                item.customComponent->paintEntireComponent (g, false);
+                            }
+                            else
+                                lf.drawPopupMenuItem (g, r, item.isSeparator, item.isEnabled, first && ! item.isSeparator && m == 0, item.isTicked,
+                                                      item.subMenu != nullptr, text, shortcut, item.image.get(), nullptr);
+                            first = false;
+                            y += row.height;
+                        }
+                        columnX += l.widths[c];
+                        if (c + 1 < l.columns.size())
+                        {
+                            lf.drawPopupMenuColumnSeparatorWithOptions (g, juce::Rectangle<int> (columnX, border, separatorWidth, l.height - 2 * border),
+                                                                       juce::PopupMenu::Options());
+                            columnX += separatorWidth;
+                        }
                     }
                 }
                 x += l.width + 16;
@@ -31391,6 +31462,141 @@ private:
 
     // every icon at 16, 20 and 24 px (at `scale`, e.g. 1.5 for a 150% display), in the toolbar's
     // colours: at rest, hovered and switched on
+    // round 190je (design190ia G1): one state sheet per button kind: idle, hover, pressed, on, disabled, as the one state rule
+    // draws them (core/ThemePalette.h buttonLook); the menu rows in both menu styles
+    static void saveStateSheet (const juce::String& path, float scale)
+    {
+        using namespace lynx;
+        scale *= shot::scale();
+        auto& lf = juce::LookAndFeel::getDefaultLookAndFeel();
+        const int labelWidth = 220, cellW = 120, cellH = 40, columns = 5;
+        const juce::String heads[] = { "idle", "hover", "pressed", "on", "disabled" };
+        enum Kind { text, iconFilled, iconOnce, iconSwitch, iconSwitchOwn, tick, radio, combo, tab, menuDark, menuFl, kinds };
+        const char* names[] = { "Text button", "Icon button (filled)", "Toolbar icon (acts once)", "Toolbar switch", "Toolbar switch (own colours)",
+                                "Tick box", "Radio choice", "Combo box", "Tab", "Menu item (LYNX dark)", "Menu item (FL classic)" };
+        const auto w = labelWidth + columns * cellW + 16, h = 30 + kinds * cellH + 16;
+        juce::Image image (juce::Image::ARGB, juce::roundToInt ((float) w * scale), juce::roundToInt ((float) h * scale), true);
+        {
+            juce::Graphics g (image);
+            g.addTransform (juce::AffineTransform::scale (scale));
+            g.fillAll (theme::colour::bg3);
+            g.setFont (theme::font (theme::type::small, true));
+            g.setColour (theme::colour::textSecondary);
+            for (int c = 0; c < columns; ++c)
+                g.drawText (heads[c], labelWidth + c * cellW, 6, cellW, 20, juce::Justification::centred);
+
+            const auto styleBefore = theme::menus::style();
+            for (int k = 0; k < kinds; ++k)
+            {
+                const auto y = 30 + k * cellH;
+                g.setFont (theme::font (theme::type::small));
+                g.setColour (theme::colour::textPrimary);
+                g.drawText (names[k], 8, y, labelWidth - 12, cellH, juce::Justification::centredLeft);
+                for (int c = 0; c < columns; ++c)
+                {
+                    const auto hover = c == 1, down = c == 2, on = c == 3, disabled = c == 4;
+                    const juce::Rectangle<int> cell (labelWidth + c * cellW, y, cellW, cellH);
+                    juce::Graphics::ScopedSaveState state (g);
+                    g.reduceClipRegion (cell);
+                    switch (k)
+                    {
+                        case text:
+                        {
+                            juce::TextButton b ("Export");
+                            b.setSize (96, 26);
+                            b.setToggleState (on, juce::dontSendNotification);
+                            b.setEnabled (! disabled);
+                            g.setOrigin (cell.getX() + 12, cell.getY() + 7);
+                            lf.drawButtonBackground (g, b, b.findColour (on ? juce::TextButton::buttonOnColourId : juce::TextButton::buttonColourId), hover, down);
+                            lf.drawButtonText (g, b, hover, down);
+                            break;
+                        }
+                        case iconFilled:
+                        case iconOnce:
+                        case iconSwitch:
+                        case iconSwitchOwn:
+                        {
+                            IconButton b ("state", k == iconFilled ? Icon::plus : k == iconOnce ? Icon::save : Icon::metronome);
+                            b.setFlat (k != iconFilled);
+                            if (k == iconSwitch)
+                                b.setToggleLook (true);
+                            if (k == iconSwitchOwn)
+                            {
+                                b.setOnColour (theme::colour::bg6);
+                                b.setIconColourWhenOn (theme::colour::accent);
+                            }
+                            b.setSize (k == iconFilled ? 34 : 30, 30);
+                            b.setToggleState (on, juce::dontSendNotification);
+                            b.setEnabled (! disabled);
+                            g.setOrigin (cell.getX() + 12, cell.getY() + 5);
+                            b.paintButton (g, hover, down);
+                            break;
+                        }
+                        case tick:
+                        case radio:
+                        {
+                            juce::ToggleButton b (k == tick ? "Snap to grid" : "Pattern");
+                            if (k == radio)
+                                b.getProperties().set ("lynxRadio", true);
+                            b.setSize (110, 24);
+                            b.setToggleState (on, juce::dontSendNotification);
+                            b.setEnabled (! disabled);
+                            g.setOrigin (cell.getX() + 6, cell.getY() + 8);
+                            lf.drawToggleButton (g, b, hover, down);
+                            break;
+                        }
+                        case combo:
+                        {
+                            if (hover || down || on) // (a combo box's hover comes from the mouse itself: --uitest covers it)
+                                break;
+                            juce::ComboBox b;
+                            b.setSize (100, 24);
+                            b.setEnabled (! disabled);
+                            g.setOrigin (cell.getX() + 10, cell.getY() + 8);
+                            lf.drawComboBox (g, 100, 24, false, 0, 0, 0, 0, b);
+                            g.setColour (disabled ? theme::colour::textDisabled : theme::colour::textPrimary);
+                            g.setFont (lf.getComboBoxFont (b));
+                            g.drawText ("1/16 step", 6, 0, 70, 24, juce::Justification::centredLeft);
+                            break;
+                        }
+                        case tab:
+                        {
+                            if (disabled)
+                                break;
+                            juce::TabbedButtonBar bar (juce::TabbedButtonBar::TabsAtTop);
+                            bar.setSize (220, 32);
+                            bar.addTab ("Audio", theme::colour::bg2, -1);
+                            bar.addTab ("MIDI", theme::colour::bg2, -1);
+                            bar.setCurrentTabIndex (on ? 1 : 0, false);
+                            auto* tabButton = bar.getTabButton (1);
+                            tabButton->setBounds (0, 0, 100, 32);
+                            g.setOrigin (cell.getX() + 10, cell.getY() + 4);
+                            g.setColour (theme::colour::bg1);
+                            g.fillRect (0, 0, 100, 32);
+                            lf.drawTabButton (*tabButton, g, hover, down);
+                            break;
+                        }
+                        case menuDark:
+                        case menuFl:
+                        {
+                            if (down)
+                                break;
+                            theme::menus::setStyle (k == menuFl ? themes::MenuStyle::flClassic : themes::MenuStyle::lynxDark);
+                            g.setOrigin (cell.getX() + 4, cell.getY() + 8);
+                            lf.drawPopupMenuBackground (g, 112, 25);
+                            lf.drawPopupMenuItem (g, { 2, 2, 108, 21 }, false, ! disabled, hover, on, false, theme::mnemonic ("Open", 'O'), "Ctrl+O", nullptr, nullptr);
+                            theme::menus::setStyle (styleBefore);
+                            break;
+                        }
+                        default:
+                            break;
+                    }
+                }
+            }
+        }
+        writePng (image, path);
+    }
+
     static void saveIconSheet (const juce::String& path, float scale)
     {
         scale *= lynx::shot::scale();

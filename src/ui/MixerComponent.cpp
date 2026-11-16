@@ -53,6 +53,7 @@
 #include "ui/Icons.h"
 #include "ui/ValueControl.h"
 #include "ui/Theme.h"
+#include "ui/LabelFont.h"
 #include "ui/AudioEditor.h"
 #include "ui/Dialogs.h"
 #include "ui/QuickPick.h"
@@ -1738,7 +1739,7 @@ void MixerStrips::paint (juce::Graphics& g)
             const auto tint = track.colour != 0 ? lightTint (juce::Colour (track.colour), plate, colour::textPrimary) : colour::textPrimary;
             g.setColour (track.muted ? colour::textDisabled : hovered (Part::header) ? tint.brighter (0.2f) : tint.withAlpha (0.95f));
         }
-        g.setFont (font (compactLayout ? 10.0f : type::body, isSelected));
+        g.setFont (labelFont (compactLayout ? 10.0f : type::body, isSelected)); // (round 190je: condensed with FL-style labels on)
         // Online Sessions (round 168a): a plugin of this insert is not installed here, its stand-in render plays (an
         // amber R before the name)
         const auto standIn = engine.insertPlaysStandIn (t);

@@ -17841,3 +17841,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Details190imTests.inc" // round 190im: activity meter reader, deactivated grid clips, Live keys 0 / Ctrl+E
 #include "Capfix190jjTests.inc" // round 190jj: capture190ji changes (transport states per look, the master bar meter)
 #include "Polish190jpTests.inc" // round 190jp: Theme Adjustments and colour dots, bold interface text, Simple follow-ups
+#include "G1menus190jeTests.inc" // round 190je: contrast floors, one state language, grid intensity, FL menus (design190ia G1, FW-S3)
