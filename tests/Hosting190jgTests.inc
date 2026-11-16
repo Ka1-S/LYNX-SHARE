@@ -182,3 +182,51 @@ TEST (s190jg_a_ramp_moves_every_16_samples_with_timed_automation)
     }
     CHECK (worstOn < worstOff / 4.0f);
 }
+
+namespace hosting190jg
+{
+struct TailedPlugin final : lynx::Effect
+{
+    int tail = -1;
+    long processed = 0;
+    void prepare (double) noexcept override {}
+    void reset() noexcept override {}
+    int tailSamples() const noexcept override { return tail; }
+    void process (float*, float*, int n, const lynx::EffectParams&, double) noexcept override { processed += n; }
+};
+
+long processedSamples (int tail)
+{
+    using namespace lynx;
+    Song song;
+    song.mixer = Song::defaultMixer (1);
+    auto slot = makeEffectSlot (EffectKind::plugin);
+    slot.plugin.id = "CLAP-Tailed";
+    slot.plugin.allowSmartDisable = true;
+    slot.smartDisable = true;
+    song.mixer[1].effects = { slot };
+    std::shared_ptr<TailedPlugin> effect;
+    RackState::Factories f;
+    f.pluginEffects = [&] (const PluginRef&, double) -> std::shared_ptr<Effect> {
+        effect = std::make_shared<TailedPlugin>();
+        effect->tail = tail;
+        return effect;
+    };
+    auto state = RackState::build (song, nullptr, 44100.0, f);
+    RackRenderer renderer;
+    renderer.prepare (44100.0, 2048);
+    std::vector<float> l (256), r (256);
+    for (int pos = 0; pos < 44100; pos += 256)
+        renderer.process (state.get(), false, 0.0, 256, l.data(), r.data());
+    return effect != nullptr ? effect->processed : -1;
+}
+} // namespace hosting190jg
+
+TEST (s190jg_a_hosted_plugins_declared_tail_ends_its_smart_disable_hold)
+{
+    // a silent insert: a plugin that declares a 1000-sample tail (CLAP's clap.tail) stops being run after it; one that
+    // declares none keeps the plugins' fixed 4 s hold (the whole second here)
+    const auto declared = hosting190jg::processedSamples (1000), none = hosting190jg::processedSamples (-1);
+    CHECK (none >= 44100 - 256);
+    CHECK (declared >= 1000 && declared <= 1000 + 2 * 256);
+}

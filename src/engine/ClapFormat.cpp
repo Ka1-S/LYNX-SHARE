@@ -891,6 +891,7 @@ public:
         return out;
     }
     std::pair<int, int> threadPoolUse() const { return { threadPoolRequests.load(), threadPoolTasks.load() }; }
+    bool declaresTail() const noexcept { return tailExt != nullptr; }
     const std::shared_ptr<ClapModule>& moduleOf() const { return life->module; }
     const juce::PluginDescription& describedAs() const { return description; }
 
@@ -1680,6 +1681,12 @@ ClapVoiceInfo clapVoiceInfo (juce::AudioPluginInstance& plugin)
         return clap->voiceInfo;
     }
     return {};
+}
+
+bool clapDeclaresTail (const juce::AudioPluginInstance& plugin)
+{
+    const auto* clap = dynamic_cast<const ClapInstance*> (&plugin);
+    return clap != nullptr && clap->declaresTail();
 }
 
 std::pair<int, int> clapThreadPoolUse (juce::AudioPluginInstance& plugin)

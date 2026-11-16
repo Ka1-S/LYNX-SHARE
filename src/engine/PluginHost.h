@@ -321,6 +321,9 @@ public:
     {
         return crashed.load (std::memory_order_relaxed) ? 0 : plugin->getLatencySamples() + (fixed != nullptr ? fixed->latency() : 0);
     }
+    // Round 190jg: a CLAP plugin's declared tail (clap.tail) plus its latency, for smart disable (−1: none declared, or an
+    // infinite one: the fixed 4 s hold, as for every other plugin)
+    int tailSamples() const noexcept override;
 
     // The plugin crashed inside a call (caught by platform/CrashGuard.h): it is never called again, the slot plays
     // through (effect) or stays silent (instrument) and the UI is told (pluginCrashes()).
@@ -376,6 +379,8 @@ private:
 
     TimedParameterQueue timed; // round 190jg
     bool timedOk = false;
+    bool declaresTail = false; // round 190jg: a CLAP plugin with clap.tail
+    double tailRate = 44100.0;
     std::unique_ptr<juce::AudioPluginInstance> plugin;
     mutable HostedParameterChanges parameterChanges;
     juce::AudioBuffer<float> buffer;

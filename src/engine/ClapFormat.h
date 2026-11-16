@@ -104,6 +104,8 @@ ClapVoiceInfo clapVoiceInfo (juce::AudioPluginInstance& plugin);
 // What a CLAP plugin offers and what LYNX made of it (--clapext): its extensions, presets found, remote pages, voice
 // info, tail; message thread
 juce::String describeClapPlugin (juce::AudioPluginInstance& plugin);
+// clap.tail: whether the plugin declares its tail (then getTailLengthSeconds is the plugin's own, used by smart disable)
+bool clapDeclaresTail (const juce::AudioPluginInstance& plugin);
 // thread-pool use since the plugin was made: requests and tasks (tests)
 std::pair<int, int> clapThreadPoolUse (juce::AudioPluginInstance& plugin);
 } // namespace lynx

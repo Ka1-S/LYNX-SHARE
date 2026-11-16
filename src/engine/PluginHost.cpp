@@ -993,6 +993,16 @@ void PluginInstrument::setParameter (int index, float value) noexcept
     audioParameter (*plugin, parameterChanges, crashed, name, index, value);
 }
 
+int PluginEffect::tailSamples() const noexcept
+{
+    if (! declaresTail || crashed.load (std::memory_order_relaxed))
+        return -1;
+    const auto seconds = plugin->getTailLengthSeconds();
+    if (! std::isfinite (seconds) || seconds < 0.0 || seconds > 3600.0)
+        return -1;
+    return (int) std::ceil (seconds * tailRate) + latencySamples();
+}
+
 // --- round 190jg: sample-accurate automation (engine/TimedParameters.h) ---------------------------------------------
 bool TimedParameterQueue::supports (const juce::AudioPluginInstance& plugin)
 {
@@ -1270,6 +1280,8 @@ PluginEffect::PluginEffect (std::unique_ptr<juce::AudioPluginInstance> instance,
       name (plugin->getName().toStdString())
 {
     timedOk = TimedParameterQueue::supports (*plugin);
+    declaresTail = clapDeclaresTail (*plugin);
+    tailRate = plugin->getSampleRate() > 0.0 ? plugin->getSampleRate() : 44100.0;
     buffer.setSize (bufferChannels (*plugin), blockSize);
     midi.ensureSize (2048); // MIDI CC "parameters" (core/MidiControls.h)
     sideBus = hasSideBus (*plugin);

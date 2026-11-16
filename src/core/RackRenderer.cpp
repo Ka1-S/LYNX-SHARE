@@ -3672,7 +3672,8 @@ RackState::SlotPlan RackState::planSlot (const RackState& state, int track, std:
                       && ! (slot.kind == EffectKind::facetEq && facet::listensToTarget (slot.params));
     // round 190gp: a built-in's declared tail (Effect::tailSamples) may end its smart-disable hold early; not with a
     // side input (what it hears there moves its state while its own input is silent)
-    p.tailHold = ! p.longHold && slot.sidechain < 0 && slot.sidechain2 < 0;
+    // (round 190jg: a hosted plugin too, when it declares its tail — CLAP's clap.tail, PluginEffect::tailSamples)
+    p.tailHold = (! p.longHold || p.isPlugin) && slot.sidechain < 0 && slot.sidechain2 < 0;
     p.used = (int) std::min (slot.params.size(), effectInfo (slot.kind).params.size());
     p.firstAutomated = p.used;
     if ((std::size_t) track < state.effectParamAuto.size() && i < state.effectParamAuto[(std::size_t) track].size())
