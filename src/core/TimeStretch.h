@@ -10,6 +10,7 @@
 
 #include <array>
 #include <atomic>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -36,9 +37,15 @@ StretchOptions stretchOptionsOf (const SamplerSettings& sampler);
 // defaults do (so every key made before 190fm stays the same).
 std::string stretchOptionsKey (const StretchOptions& options, StretchMethod method);
 
+// Whether `method` with `modes` renders a transposition (`semitones`) offline: Beats (round 175a), and under warpLaw Measured
+// (round 190ik) Complex Pro (its formants kept) and Texture (each grain resampled, as Live's). Every other mode ignores
+// `semitones` (the voice shifts in real time).
+bool stretchBakesPitch (StretchMethod method, const WarpModeSettings& modes) noexcept;
+
 // `ratio` = output duration / input duration (2 = twice as long, same pitch).
-// `semitones` (Beats only, else ignored): each piece is also resampled by that much, offline (Live's clip transpose in
-// Beats mode); the pieces keep their places on the grid.
+// `semitones` (Beats and Complex Pro, see stretchBakesPitch; else ignored): Beats resamples each piece by that much,
+// offline (Live's clip transpose in Beats mode), the pieces keeping their places on the grid; Complex Pro transposes the
+// whole stretch and keeps its formants (round 190ik).
 std::shared_ptr<SampleData> timeStretch (const SampleData& input, double ratio, StretchMethod method = StretchMethod::general,
                                          double semitones = 0.0, const StretchOptions& options = {});
 
@@ -175,6 +182,11 @@ std::vector<long> detectAttacks (const float* mono, long frames, double sampleRa
 // Where LYNX's Beats warp mode cuts the audio (round 175a, N4): the attacks, each moved to where it rises fastest.
 // `measured` false: the Classic law's cut, the start of the 10 ms window before the steepest rise (round 190gx)
 std::vector<long> beatsCuts (const float* mono, long frames, double sampleRate, bool measured = true);
+// The cuts of a Beats law (round 190ik): Classic and Measured as beatsCuts; PitchAware = Measured's cuts made pitch aware
+// (core/WarpEngines' pitchAwareCuts: legato pitch steps added, glide / vibrato cuts dropped)
+std::vector<long> beatsCutsOfLaw (const float* mono, long frames, double sampleRate, int beatsLaw);
+// Texture's grain scatter seed for a source of `frames` frames (round 190ik: a fixed sequence, the same render each time)
+std::uint32_t textureSeed (long frames) noexcept;
 // The ratio band that is resampled instead of stretched.
 constexpr double resampleTolerance = 0.001;
 

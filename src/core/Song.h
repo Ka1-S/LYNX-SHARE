@@ -381,8 +381,9 @@ constexpr int stretchMethodCount = 7;
 //    its transients; beatsLoop = what fills the gap after a piece when the audio is slowed down: 0 nothing (silence),
 //    1 the piece again from its start, 2 back and forth; beatsEnvelope 0…100 = a fade over each piece (100: none).
 //  - Tones / Texture: the grain sizes (Live's numbers; LYNX scales its spectral block by size / default).
-//  - textureFlux, proFormants, proEnvelope, complexPro: kept so a Live set goes back out as it came in; LYNX has no
-//    engine for them (Texture's random grain variation, Complex Pro's formant keeping): they do not change the sound.
+//  - textureFlux, proFormants, proEnvelope, complexPro: Texture's grain scatter and Complex Pro's formant keeping. Round
+//    190ik (warpLaw Measured) renders them (core/WarpEngines); with warpLaw Classic they are only kept so a Live set goes
+//    back out as it came in.
 struct WarpModeSettings
 {
     static constexpr int preserveTransients = 6;
@@ -402,8 +403,17 @@ struct WarpModeSettings
     // Round 190gx: Beats' law. Measured (the default: new channels, .als / .flp imports) = Live 12.4's fill, Transient
     // Envelope and cut laws measured on its renders; Classic = how LYNX rendered Beats before 190gx, kept bit for bit for
     // projects saved before then (engine/ProjectFile.cpp: a project without the "beatsLaw190gx" mark loads Classic).
-    static constexpr std::uint8_t beatsLawClassic = 0, beatsLawMeasured = 1;
-    std::uint8_t beatsLaw = beatsLawMeasured;
+    // Round 190ik adds PitchAware (the new default): Measured with the pitch-aware transient detector (legato pitch steps
+    // cut, glides and vibrato do not); a project saved before 190ik keeps Measured (engine/ProjectFile.cpp, mark
+    // "warpLaw190ik").
+    static constexpr std::uint8_t beatsLawClassic = 0, beatsLawMeasured = 1, beatsLawPitchAware = 2;
+    std::uint8_t beatsLaw = beatsLawPitchAware;
+    // Round 190ik: Texture's and Complex Pro's engines. Measured (the default) = Texture granular with Grain Size and Flux,
+    // Complex Pro's transposition rendered offline with its Formants and Envelope (core/WarpEngines, fitted on Live 12.4's
+    // renders); Classic = how LYNX rendered them before 190ik (Texture = the spectral stretcher, Complex Pro = Complex with
+    // the clip's pitch shifted in real time), kept bit for bit for projects saved before then.
+    static constexpr std::uint8_t warpLawClassic = 0, warpLawMeasured = 1;
+    std::uint8_t warpLaw = warpLawMeasured;
     bool operator== (const WarpModeSettings&) const = default;
 };
 
@@ -458,7 +468,8 @@ struct SamplerSettings
     StretchMethod stretchMethod = StretchMethod::general; // with keepPitch: the stretcher's preset
     int flStretchMode = 0;     // FL's own mode from an imported .flp (0 = none known): the export writes it back
     int flStretchPitch = 0;    // the part of `pitch` that came from FL's stretch PITCH knob (cents): it goes back there
-    float stretchPitch = 0.0f; // Beats: semitones each piece is resampled by, offline (a Live clip's transpose; round 175a)
+    float stretchPitch = 0.0f; // Beats: semitones each piece is resampled by, offline (a Live clip's transpose; round 175a);
+                               // Complex Pro / Texture (warpLaw Measured, round 190ik): the transposition rendered offline
     // audio clips, round 190ds (core/KeyFollow.h): the musical key of the audio (a loop's key read from its name or
     // detected), −1 = not known; minor = the key is minor; how it was found (0 none, 1 the file's name, 2 detected from
     // the audio, 3 set by the user)
@@ -470,11 +481,19 @@ struct SamplerSettings
     // rest of the stretch). Fewer than 2 markers, or markers in a straight line: one speed (round 175a, M1)
     std::vector<WarpPoint> warp;
     WarpModeSettings warpModes; // round 190fm: the warp mode's own settings (Live's Preserve, loop mode, grain...)
-    // outside Beats nothing renders stretchPitch offline: it moves to the Pitch knob (-24..24), so the sample stays at its
+    // Whether the warp mode renders stretchPitch offline: Beats, and under warpLaw Measured (round 190ik) Complex Pro (its
+    // formants are kept, which the real-time shifter cannot do) and Texture (its grains resampled, as Live's)
+    bool bakesPitch() const noexcept
+    {
+        const auto measured = warpModes.warpLaw >= WarpModeSettings::warpLawMeasured;
+        return stretchMethod == StretchMethod::beats || (stretchMethod == StretchMethod::texture && measured)
+               || (stretchMethod == StretchMethod::complex && warpModes.complexPro && measured);
+    }
+    // outside those nothing renders stretchPitch offline: it moves to the Pitch knob (-24..24), so the sample stays at its
     // pitch. True if it moved.
     bool moveBakedPitchToKnob() noexcept
     {
-        if (stretchPitch == 0.0f || (stretchMethod == StretchMethod::beats && keepPitch))
+        if (stretchPitch == 0.0f || (keepPitch && bakesPitch()))
             return false;
         pitch = std::clamp (pitch + stretchPitch, -24.0f, 24.0f);
         stretchPitch = 0.0f;

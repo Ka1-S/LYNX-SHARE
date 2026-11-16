@@ -1,4 +1,5 @@
 #include "core/TimeStretch.h"
+#include "core/WarpEngines.h"
 
 #include <cstdlib>
 #include <algorithm>
@@ -65,6 +66,9 @@ std::shared_ptr<SampleData> sampleOf (Planar&& p, const SampleData& like)
         out->right = std::move (p.ch[1]);
     return out;
 }
+
+Planar spectralStretchMapped (const Planar& in, const StretchMap& map, double sampleRate, double blockSeconds, double intervalSeconds);
+Planar spectralStretch (const Planar& in, long outFrames, double sampleRate, double blockSeconds, double intervalSeconds);
 
 std::vector<float> monoOf (const Planar& p)
 {
@@ -442,7 +446,7 @@ Planar beatsStretch (const Planar& in, long outFrames, double sampleRate, double
     const auto mono = monoOf (in);
     const auto division = stretchdetail::preserveDivisionBeats (modes.beatsPreserve);
     auto cuts = division > 0.0 && sourceBeats > 0.0 && toSource ? stretchdetail::gridCuts (n, outFrames, sourceBeats, division, toSource)
-                                                                 : stretchdetail::beatsCuts (mono.data(), n, sampleRate);
+                                                                 : stretchdetail::beatsCutsOfLaw (mono.data(), n, sampleRate, modes.beatsLaw);
     const auto loopMode = std::min<int> (modes.beatsLoop, 2);
     const auto envelope = std::clamp (modes.beatsEnvelope, 0.0f, 100.0f);
     cuts.insert (cuts.begin(), 0L);
@@ -604,6 +608,21 @@ std::vector<long> beatsCuts (const float* mono, long n, double sampleRate, bool 
     }
     cuts.erase (std::remove_if (cuts.begin(), cuts.end(), [n] (long c) { return c <= 0 || c >= n; }), cuts.end());
     return cuts;
+}
+
+std::vector<long> beatsCutsOfLaw (const float* mono, long n, double sampleRate, int beatsLaw)
+{
+    if (beatsLaw == WarpModeSettings::beatsLawClassic)
+        return beatsCuts (mono, n, sampleRate, false);
+    auto cuts = beatsCuts (mono, n, sampleRate, true);
+    if (beatsLaw >= WarpModeSettings::beatsLawPitchAware)
+        cuts = warpengine::pitchAwareCuts (mono, n, sampleRate, cuts);
+    return cuts;
+}
+
+std::uint32_t textureSeed (long frames) noexcept
+{
+    return 0x190ac5u ^ (std::uint32_t) ((std::uint64_t) frames * 2654435761u);
 }
 
 std::vector<long> detectAttacks (const float* mono, long frames, double sampleRate, double minRiseDb)
@@ -1065,21 +1084,75 @@ void copySpanInfo (const SampleData& span, SampleData& out)
     }
 }
 
+namespace
+{
+// Round 190ik: whether Texture renders with the granular engine (warpLaw Measured)
+bool granularTexture (StretchMethod method, const WarpModeSettings& modes) noexcept
+{
+    return method == StretchMethod::texture && modes.warpLaw >= WarpModeSettings::warpLawMeasured;
+}
+
+// Live's Texture (round 190ik, core/WarpEngines): grains of Grain Size at the source's own speed, scattered by Flux
+Planar textureStretch (const Planar& in, long outFrames, double sampleRate, const std::function<double (double)>& toSource, const WarpModeSettings& modes,
+                       double semitones)
+{
+    Planar out;
+    out.ch = warpengine::texture (in.ch, outFrames, sampleRate, toSource, modes.textureGrain, modes.textureFlux, stretchdetail::textureSeed (in.frames()),
+                                  std::pow (2.0, std::clamp (semitones, -48.0, 48.0) / 12.0));
+    return out;
+}
+
+// Live's Complex Pro with a transposition (round 190ik): the spectral stretch to the transposed length (along the warp map
+// scaled by it, when there is one), a band-limited resampling back to the clip's length (the transposition), and the
+// formant correction (Formants, Envelope)
+Planar proStretch (const Planar& in, long outFrames, double sampleRate, double semitones, const WarpModeSettings& modes, const StretchMap* map)
+{
+    const auto factor = std::pow (2.0, std::clamp (semitones, -48.0, 48.0) / 12.0);
+    // (the voice shifter's analysis — 100 ms blocks, overlap 4 — rather than Complex's 90 ms: closer to Live's Formants 0
+    // renders, W2 chords cpro-f0+7 spectrum 1.02 → 0.58 dB)
+    const stretchdetail::Preset preset { 0.1, 0.025, 0.0, 0.0 };
+    Planar stretched;
+    if (map != nullptr)
+    {
+        auto scaled = *map;
+        for (auto& point : scaled)
+            point.second *= factor;
+        stretched = spectralStretchMapped (in, scaled, sampleRate, preset.blockSeconds, preset.intervalSeconds);
+    }
+    else
+        stretched = spectralStretch (in, std::max (1L, (long) std::llround ((double) outFrames * factor)), sampleRate, preset.blockSeconds,
+                                     preset.intervalSeconds);
+    Planar out;
+    out.ch = warpengine::resampleTo (stretched.ch, outFrames);
+    warpengine::keepFormants (out.ch, sampleRate, factor, std::clamp ((double) modes.proFormants, 0.0, 100.0) / 100.0, modes.proEnvelope);
+    return out;
+}
+} // namespace
+
+bool stretchBakesPitch (StretchMethod method, const WarpModeSettings& modes) noexcept
+{
+    return method == StretchMethod::beats || granularTexture (method, modes)
+           || (method == StretchMethod::complex && modes.complexPro && modes.warpLaw >= WarpModeSettings::warpLawMeasured);
+}
+
 std::shared_ptr<SampleData> timeStretch (const SampleData& in, double ratio, StretchMethod method, double semitones,
                                          const StretchOptions& options)
 {
     const auto frames = (long) in.frames();
-    if (method != StretchMethod::beats)
+    if (! stretchBakesPitch (method, options.modes))
         semitones = 0.0;
 
-    if (frames >= 4 && ratio > 0.0 && semitones != 0.0)
+    // (round 190ik: the granular Texture runs at any ratio, as Live's does)
+    if (frames >= 4 && ratio > 0.0 && (semitones != 0.0 || granularTexture (method, options.modes)))
     {
         const auto outFrames = std::max (1L, (long) std::llround ((double) frames * std::clamp (ratio, 0.05, 20.0)));
-    {
         const auto r = (double) outFrames / (double) frames;
-        return sampleOf (beatsStretch (planarOf (in), outFrames, in.sampleRate, std::clamp (semitones, -48.0, 48.0), [r] (double x) { return x * r; },
-                                       options.modes, options.sourceBeats, [r] (double y) { return y / r; }), in);
-    }
+        if (method == StretchMethod::beats)
+            return sampleOf (beatsStretch (planarOf (in), outFrames, in.sampleRate, std::clamp (semitones, -48.0, 48.0), [r] (double x) { return x * r; },
+                                           options.modes, options.sourceBeats, [r] (double y) { return y / r; }), in);
+        if (granularTexture (method, options.modes))
+            return sampleOf (textureStretch (planarOf (in), outFrames, in.sampleRate, [r] (double y) { return y / r; }, options.modes, semitones), in);
+        return sampleOf (proStretch (planarOf (in), outFrames, in.sampleRate, semitones, options.modes, nullptr), in);
     }
 
     if (frames < 4 || ! (ratio > 0.0) || std::abs (ratio - 1.0) < 1e-9)
@@ -1242,7 +1315,7 @@ std::shared_ptr<SampleData> timeStretchMapped (const SampleData& in, const Stret
         if (! (dx > 0.0) || ! (dy > 0.0) || dy / dx < 0.05 || dy / dx > 20.0)
             return plain();
     }
-    if (method != StretchMethod::beats)
+    if (! stretchBakesPitch (method, options.modes))
         semitones = 0.0;
     const auto outFrames = std::max (1L, (long) std::llround (map.back().second));
     const auto planar = planarOf (in);
@@ -1250,6 +1323,11 @@ std::shared_ptr<SampleData> timeStretchMapped (const SampleData& in, const Stret
     if (method == StretchMethod::beats)
         return sampleOf (beatsStretch (planar, outFrames, in.sampleRate, std::clamp (semitones, -48.0, 48.0), toOut, options.modes,
                                        options.sourceBeats, [&map] (double y) { return stretchMapSource (map, y); }), in);
+    if (granularTexture (method, options.modes)) // (round 190ik: each grain anchor reads where the map puts it)
+        return sampleOf (textureStretch (planar, outFrames, in.sampleRate, [&map] (double y) { return stretchMapSource (map, y); }, options.modes, semitones),
+                         in);
+    if (semitones != 0.0) // (Complex Pro, round 190ik)
+        return sampleOf (proStretch (planar, outFrames, in.sampleRate, semitones, options.modes, &map), in);
 
     const auto preset = stretchdetail::presetFor (method, options.modes);
     auto out = spectralStretchMapped (planar, map, in.sampleRate, preset.blockSeconds, preset.intervalSeconds);
@@ -1275,6 +1353,8 @@ std::string stretchOptionsKey (const StretchOptions& o, StretchMethod method)
     {
         if (o.modes.beatsLaw == WarpModeSettings::beatsLawClassic) // (round 190gx: the law before 190gx)
             key += "|classic";
+        else if (o.modes.beatsLaw >= WarpModeSettings::beatsLawPitchAware) // (round 190ik; Measured keeps its keys)
+            key += "|pa";
         if (o.modes.beatsPreserve != d.beatsPreserve && stretchdetail::preserveDivisionBeats (o.modes.beatsPreserve) > 0.0)
             key += "|bp" + std::to_string ((int) o.modes.beatsPreserve) + "@" + num (o.sourceBeats);
         if (std::min<int> (o.modes.beatsLoop, 2) != d.beatsLoop)
@@ -1284,8 +1364,12 @@ std::string stretchOptionsKey (const StretchOptions& o, StretchMethod method)
     }
     else if (method == StretchMethod::tones && o.modes.tonesGrain != d.tonesGrain)
         key += "|tg" + num (o.modes.tonesGrain);
+    else if (granularTexture (method, o.modes)) // (round 190ik: the granular engine, its grain and flux always count)
+        key += "|gx" + num (o.modes.textureGrain) + "f" + num (o.modes.textureFlux);
     else if (method == StretchMethod::texture && o.modes.textureGrain != d.textureGrain)
         key += "|xg" + num (o.modes.textureGrain);
+    else if (method == StretchMethod::complex && stretchBakesPitch (method, o.modes)) // (Complex Pro, round 190ik; its transposition is keyed by the caller)
+        key += "|pro" + num (o.modes.proFormants) + "," + num (o.modes.proEnvelope);
     return key;
 }
 } // namespace lynx
