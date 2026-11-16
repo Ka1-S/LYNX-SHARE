@@ -5990,7 +5990,7 @@ private:
             }
             song.mixer[1].effects.push_back (lynx::makeEffectSlot (lynx::EffectKind::voiceShift)); // (a new one: revision 1)
             auto ridgeSlot = lynx::makeEffectSlot (lynx::EffectKind::ridgeStrip);
-            ridgeSlot.params[(std::size_t) lynx::ridge::k4Pink] = 1.0f;
+            ridgeSlot.params[(std::size_t) lynx::mixsuite::ridge::k4Pink] = 1.0f;
             song.mixer[2].effects.push_back (ridgeSlot);
             lynx::Automation coloured;
             coloured.name = "Cutoff";
@@ -15078,7 +15078,11 @@ private:
         pl.runAction ("playlist.linkTracks");
         PlaylistComponent::answerLinkConfirmation = nullptr;
         engine.dispatchPendingMessages();
-        check ("linked", song().linkTracksToMixer && song().playlistTracks[1].mixerTrack == 12 && pl.headerWidthForSnapshot() == PlaylistComponent::linkedHeaderWidth,
+        // (rollup 0.1.30: round 190ib links Playlist track N to insert N, moving the inserts there: the Vox chain and
+        // the Kick follow their tracks, so the checks read the inserts the tracks are linked to)
+        const auto vox = song().playlistTracks.size() > 1 ? song().playlistTracks[1].mixerTrack : -1;
+        const auto kick = song().playlistTracks.size() > 0 ? song().playlistTracks[0].mixerTrack : -1;
+        check ("linked", song().linkTracksToMixer && vox > 0 && song().mixer[(std::size_t) vox].name == "Vox chain" && pl.headerWidthForSnapshot() == PlaylistComponent::linkedHeaderWidth,
                juce::String (pl.headerWidthForSnapshot()));
         check ("inserts_off_by_default", ! PlaylistComponent::showTrackInserts && pl.insertsListForSnapshot (1).isEmpty());
         const auto shotRows = [&] (const juce::String& name, int rows) {
@@ -15102,7 +15106,7 @@ private:
             return juce::Point<int> (dot ? r.getX() + 5 : r.getX() + 40, r.getY() + row * 13 + 6);
         };
         const auto hintOf = [&] (juce::Point<int> p) { return pl.hintAt (p); };
-        check ("hint_names_the_effect", hintOf (rowPoint (1, 1, false)).value == quickpick::slotName (engine, song().mixer[12].effects[1]),
+        check ("hint_names_the_effect", hintOf (rowPoint (1, 1, false)).value == quickpick::slotName (engine, song().mixer[(std::size_t) vox].effects[1]),
                hintOf (rowPoint (1, 1, false)).value);
         check ("hint_add_row", hintOf (rowPoint (0, 1, false)).text.contains ("add an effect"));
 
@@ -15133,29 +15137,29 @@ private:
                    delay = juce::String ((int) EffectKind::delay), verb = juce::String ((int) EffectKind::reverb);
         // the dot bypasses / un-bypasses, as the Mixer slot's LED (one undo step each)
         press (rowPoint (1, 0, true), {});
-        check ("dot_bypasses", ! song().mixer[12].effects[0].enabled);
+        check ("dot_bypasses", ! song().mixer[(std::size_t) vox].effects[0].enabled);
         press (rowPoint (1, 2, true), {});
-        check ("dot_switches_on", song().mixer[12].effects[2].enabled);
+        check ("dot_switches_on", song().mixer[(std::size_t) vox].effects[2].enabled);
         engine.undo();
         engine.dispatchPendingMessages();
-        check ("undo_dot", ! song().mixer[12].effects[2].enabled && ! song().mixer[12].effects[0].enabled);
+        check ("undo_dot", ! song().mixer[(std::size_t) vox].effects[2].enabled && ! song().mixer[(std::size_t) vox].effects[0].enabled);
         press (rowPoint (1, 0, true), {});
         shotRows ("-inserts-bypass.png", 3);
         // drag the reverb (row 4) above the EQ: the chain order changes, as the Device View's drag
-        const auto before = kinds (12);
+        const auto before = kinds (vox);
         press (rowPoint (1, 3, false), {}, rowPoint (1, 0, false) - juce::Point<int> (0, 4));
-        check ("drag_reorders", kinds (12) == verb + "," + eq + "," + comp + "," + delay + "-", before + " -> " + kinds (12));
+        check ("drag_reorders", kinds (vox) == verb + "," + eq + "," + comp + "," + delay + "-", before + " -> " + kinds (vox));
         // Ctrl + drag copies (the compressor, under the delay)
         press (rowPoint (1, 2, false), juce::ModifierKeys (ctrl), rowPoint (1, 4, false) - juce::Point<int> (0, 4));
-        check ("ctrl_drag_copies", kinds (12) == verb + "," + eq + "," + comp + "," + delay + "-," + comp, kinds (12));
+        check ("ctrl_drag_copies", kinds (vox) == verb + "," + eq + "," + comp + "," + delay + "-," + comp, kinds (vox));
         // onto another linked track's list: it moves to that insert (the Kick's)
         press (rowPoint (1, 1, false), {}, rowPoint (0, 0, false));
-        check ("drag_to_another_track_moves", kinds (3) == comp + "," + eq && kinds (12) == verb + "," + comp + "," + delay + "-," + comp,
-               kinds (3) + " | " + kinds (12));
+        check ("drag_to_another_track_moves", kinds (kick) == comp + "," + eq && kinds (vox) == verb + "," + comp + "," + delay + "-," + comp,
+               kinds (kick) + " | " + kinds (vox));
         // the wheel scrolls a list longer than its track (Kick's 4 effects + "add" in a 3-row header)
-        engine.editSong ([] (Song& s) {
-            s.mixer[3].effects.push_back (makeEffectSlot (EffectKind::delay));
-            s.mixer[3].effects.push_back (makeEffectSlot (EffectKind::reverb));
+        engine.editSong ([kick] (Song& s) {
+            s.mixer[(std::size_t) kick].effects.push_back (makeEffectSlot (EffectKind::delay));
+            s.mixer[(std::size_t) kick].effects.push_back (makeEffectSlot (EffectKind::reverb));
         });
         engine.dispatchPendingMessages();
         const auto firstName = hintOf (rowPoint (0, 0, false)).value;
@@ -15163,7 +15167,7 @@ private:
         pl.mouseWheelMove (event (rowPoint (0, 0, false), {}, rowPoint (0, 0, false), 0, false), juce::MouseWheelDetails { 0.0f, -0.5f, false, false, false });
         const auto afterWheel = hintOf (rowPoint (0, 0, false));
         check ("wheel_scrolls_a_long_list", rowsShown < 5 && afterWheel.value != firstName
-                                                && afterWheel.value == quickpick::slotName (engine, song().mixer[3].effects[1]),
+                                                && afterWheel.value == quickpick::slotName (engine, song().mixer[(std::size_t) kick].effects[1]),
                juce::String (rowsShown) + " rows, " + firstName + " -> " + afterWheel.value);
         shotRows ("-inserts-edited.png", 3);
         // a view option: not saved with the project

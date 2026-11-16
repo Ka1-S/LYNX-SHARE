@@ -247,11 +247,11 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
                     addOnce (thump, where);
                 params->removeRange (voiceshift::revision, params->size() - voiceshift::revision);
             }
-            else if (kind == "ridgeStrip" && params->size() > ridge::k4Pink)
+            else if (kind == "ridgeStrip" && params->size() > mixsuite::ridge::k4Pink)
             {
-                if ((float) (double) (*params)[ridge::k4Pink] >= 0.5f)
+                if ((float) (double) (*params)[mixsuite::ridge::k4Pink] >= 0.5f)
                     addOnce (pink, where);
-                params->removeRange (ridge::k4Pink, params->size() - ridge::k4Pink);
+                params->removeRange (mixsuite::ridge::k4Pink, params->size() - mixsuite::ridge::k4Pink);
             }
         });
         if (! thump.isEmpty())
