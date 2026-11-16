@@ -252,7 +252,19 @@ void releaseTarget (HWND hwnd)
 
 struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentListener
 {
-    static constexpr int phases = 8; // sub-pixel positions of the mark's picture (1/8 of a physical pixel)
+    // Sub-pixel positions of the mark's picture: 1/32 of a physical pixel. A playhead zoomed out moves a few pixels a
+    // second (Thief's whole song on screen: ~6 px/s, 0.04 px a frame at 144 Hz); with 1/8 its picture changed only ~47
+    // times a second (round 190ip, measured: 93 screen updates a second against 139-143 painted). Pictures are painted
+    // only for the phases used. LYNX_OVERLAY_PHASES=1..64 (A/B).
+    static constexpr int maxPhases = 64;
+    static int phases()
+    {
+        static const int n = [] {
+            const auto v = juce::SystemStats::getEnvironmentVariable ("LYNX_OVERLAY_PHASES", {});
+            return v.isEmpty() ? 32 : juce::jlimit (1, maxPhases, v.getIntValue());
+        }();
+        return n;
+    }
 
     Impl (MotionOverlay& o, juce::Component& ownerIn, Painter p, bool over)
         : overlay (o), owner (ownerIn), painter (std::move (p)), overChildren (over)
@@ -338,13 +350,15 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
                 hideNow (false);
             return true;
         }
-        // A docked panel is a native child of the main window, and the system shows a child window's new composition only
-        // when its top-level window presents too (as for its Direct2D frames, cmake/LynxPatchJuce.cmake fix 34: measured
-        // 74 screen updates a second with the visual in the child's own target). So the visual goes in the top-level
-        // window's topmost target, shifted to the child's place, and the sibling windows above the child (other panels,
-        // docked plugin windows, floaters) make it fall back where they cover the mark. LYNX_OVERLAY_TARGET=child: the
-        // child's own target (A/B).
-        static const bool inRoot = juce::SystemStats::getEnvironmentVariable ("LYNX_OVERLAY_TARGET", {}) != "child";
+        // The visual is in the topmost target of the view's own window (a docked panel: its native child window). The
+        // system composes it with that window, so the sibling windows in front of it (other panels, docked plugin
+        // windows, floaters) cover it as they cover the view. Measured (round 190ip): a DirectComposition commit there is
+        // shown at once; a child window's Direct2D frames are not (cmake/LynxPatchJuce.cmake fix 34). The 74 screen
+        // updates first seen with Thief were the Playlist behind the maximised Channel rack (nothing moves on screen
+        // but the toolbar), and the 93 with the Playlist in front were the 1/8-pixel phases (see phases()).
+        // LYNX_OVERLAY_TARGET=root (A/B): the main window's topmost target, shifted to the child's place, with the
+        // sibling windows in front of the child checked by hand.
+        static const bool inRoot = juce::SystemStats::getEnvironmentVariable ("LYNX_OVERLAY_TARGET", {}) == "root";
         auto targetHwnd = hwnd;
         POINT shift { 0, 0 };
         if (inRoot && (GetWindowLongPtr (hwnd, GWL_STYLE) & WS_CHILD) != 0)
@@ -366,10 +380,10 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
         if (! attachTo (peer, targetHwnd))
             return false;
 
-        // the picture of this phase, painted once per look: the mark at the reference place + phase / 8 of a pixel
+        // the picture of this phase, painted once per look: the mark at the reference place + phase / 32 of a pixel
         const auto xWin = ownerPos.x + (double) mark.x * s;
         const auto whole = std::floor (xWin);
-        const auto phase = juce::jlimit (0, phases - 1, (int) std::floor ((xWin - whole) * phases));
+        const auto phase = juce::jlimit (0, phases() - 1, (int) std::floor ((xWin - whole) * phases()));
         const auto left = (int) std::floor ((double) mark.extent.getX() * s) - 1;
         const auto topY = (int) std::floor (ownerPos.y + (double) mark.extent.getY() * s) - 1;
         const auto w = (int) std::ceil ((double) mark.extent.getWidth() * s) + 3, h = (int) std::ceil ((double) mark.extent.getHeight() * s) + 3;
@@ -386,7 +400,7 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
         {
             const auto originX = reference + left;
             const auto at = juce::AffineTransform::scale ((float) s).translated ((float) (ownerPos.x - originX), (float) (ownerPos.y - topY));
-            const auto xAt = ((double) reference + (double) phase / phases - ownerPos.x) / s;
+            const auto xAt = ((double) reference + (double) phase / phases() - ownerPos.x) / s;
             if (! paintPicture (picture, w, h, at, (float) xAt))
                 return false;
         }
@@ -647,7 +661,7 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
     HWND attachedHwnd = nullptr;
     int generation = -1;
     Com<IDCompositionVisual> visual;
-    std::array<Picture, phases> pictures;
+    std::array<Picture, maxPhases> pictures;
     // what the pictures were painted for (a change paints them again)
     struct PictureKey
     {
