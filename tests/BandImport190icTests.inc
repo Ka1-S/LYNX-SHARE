@@ -4,6 +4,8 @@
 
 #include "core/BandFormat.h"
 #include "core/BandImport.h"
+#include "core/ProjectKey.h"  // (rollup 0.1.30: the CMake test build needs these two itself)
+#include "core/SimpleTracks.h"
 
 namespace band190ic
 {
