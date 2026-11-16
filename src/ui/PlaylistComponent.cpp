@@ -12190,6 +12190,20 @@ static bool activityLevelSteps()
     return on;
 }
 
+// (rollup 0.1.30) `c` or one of its parents lies wholly under a later, visible, opaque sibling (a maximised panel's
+// frame): repainting it would only make that sibling paint again
+static bool hiddenBehindOpaque (const juce::Component& c)
+{
+    for (const auto* a = &c; a->getParentComponent() != nullptr; a = a->getParentComponent())
+    {
+        const auto* parent = a->getParentComponent();
+        for (int i = parent->getIndexOfChildComponent (a) + 1; i < parent->getNumChildComponents(); ++i)
+            if (const auto* s = parent->getChildComponent (i); s->isVisible() && s->isOpaque() && s->getBounds().contains (a->getBounds()))
+                return true;
+    }
+    return false;
+}
+
 // the strip's brightness step 1..4 for a level (-1: no audio, full)
 static char activityStepOf (float level)
 {
@@ -12288,14 +12302,20 @@ bool PlaylistComponent::liveFrame (double nowMs)
     else if (moved)
         playheadTick = tick;
 
+    // rollup 0.1.30 (step 3 perf): a Playlist behind a maximised panel (Piano roll, Channel rack, Mixer) is still
+    // "showing"; a repaint of its covered parts makes the opaque panel in front paint that area again (measured: +5
+    // window frames a second and the message thread 3.6 -> 17 % with the Piano roll or the Channel rack maximised, from
+    // the overview's position line). The live parts below stand still while it is covered.
+    const auto seen = ui::showingOrShot (*this) && ! hiddenBehindOpaque (*this);
+
     // round 190im (R5, DC-6): the song position in the overview strip while playing (none when stopped, as FL)
-    overview.setPosition (playing && ui::showingOrShot (*this) ? tick : -1.0);
+    overview.setPosition (playing && seen ? tick : -1.0);
 
     // round 190ig (FM-28): FL's activity column beside the headers — a track's strip lit while a clip of it plays under the
     // playhead; only the strips that flip are repainted, nothing runs while stopped once they are dark
     // round 190im (R5, DC-3): the same pass finds the patterns that play, for the picker's marks
-    const auto pickerShown = livePicker != nullptr && ui::showingOrShot (*livePicker);
-    if ((flHeaders() && ui::showingOrShot (*this) && (playing || ! activityShown.empty())) || (pickerShown && (playing || ! livePicker->playingPatterns.empty())))
+    const auto pickerShown = livePicker != nullptr && ui::showingOrShot (*livePicker) && ! hiddenBehindOpaque (*livePicker);
+    if ((flHeaders() && seen && (playing || ! activityShown.empty())) || (pickerShown && (playing || ! livePicker->playingPatterns.empty())))
     {
         std::vector<char> now;
         std::vector<int> patternsNow;
@@ -12341,7 +12361,7 @@ bool PlaylistComponent::liveFrame (double nowMs)
             patternsNow.erase (std::unique (patternsNow.begin(), patternsNow.end()), patternsNow.end());
             livePicker->setPlayingPatterns (std::move (patternsNow));
         }
-        if (! (flHeaders() && ui::showingOrShot (*this)))
+        if (! (flHeaders() && seen))
             now.clear();
         const auto count = std::max (now.size(), activityShown.size());
         for (std::size_t t = 0; t < count; ++t)
