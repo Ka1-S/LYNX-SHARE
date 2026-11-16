@@ -323,7 +323,14 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 
     // transport: Play toggles play / stop-and-back; Stop returns to the start; double-click Stop = all notes off
     playButton.setTooltip (tr ("Play; pressed again, stops and goes back to where it started") + " (Space; Ctrl+Space pauses)");
-    playButton.onClick = [this] { playStop(); };
+    playButton.onClick = [this] {
+        // round 190jj: the Simple capsule's Play shows Pause while the song runs (BandLab), and pauses
+        if (toolbarlayout::transportStates (toolbarLook).stopWhilePlaying
+            && (engine.getTransport().playing.load() || engine.isCountingIn() || engine.isWaitingForInput()))
+            playPause();
+        else
+            playStop();
+    };
     stopButton.setTooltip (tr ("Stop and return to the start (double-click: back to the start and all notes off)"));
     stopButton.onClick = [this] { stopAndRewind(); };
     stopButton.onDoubleClick = [this] { // FL-like: a double Stop goes back to the very start (and silences hanging notes)
@@ -3351,6 +3358,18 @@ void MainComponent::stopAndRewind (bool toStart)
     // FL: the transport's Stop also ends a Browser sample preview (issue #11)
     browser.stopPreview(); // (the engine's one preview voice: the Sample browser window's preview stops too)
 
+    // round 190jj (Simple, BandLab: "After Stop, the playhead jumps back to where recording started"): the first Stop after
+    // a take goes to its start
+    if (simpleRecordStart >= 0.0 && ! alreadyStopped && toolbarlayout::transportStates (toolbarLook).stopWhilePlaying)
+    {
+        const auto start = simpleRecordStart;
+        simpleRecordStart = -1.0;
+        engine.seek (start);
+        playStartTicks = start;
+        return;
+    }
+    simpleRecordStart = -1.0;
+
     if (back > 0) // "Remember seek time": back to the position clicked on a ruler, or where playback started
         engine.seek ((double) back);
     else
@@ -5477,7 +5496,10 @@ void MainComponent::showPatternMenu()
 void MainComponent::updateTransportStates (bool playing)
 {
     const auto states = toolbarlayout::transportStates (toolbarLook); // (round 190iv's R3 merge: FL look only)
-    const auto pause = states.pauseWhilePlaying && playing;
+    const auto simple = toolbarLook == toolbarlayout::Look::simple;
+    const auto countingIn = engine.isCountingIn();
+    // (round 190jj: BandLab's Pause shows during the count-in too)
+    const auto pause = states.pauseWhilePlaying && (playing || (simple && countingIn));
     if (pause != shownPause)
     {
         shownPause = pause;
@@ -5494,6 +5516,38 @@ void MainComponent::updateTransportStates (bool playing)
         recordBlinkDark = recording && ! lit;
         recordButton.setToggleState (lit, juce::dontSendNotification);
     }
+    updateSimpleTransport (playing, recording, countingIn);
+}
+
+// Round 190jj (capture190ji §1d, shots/bl-d-transport-states.png; Simple layout only): BandLab's capsule while it runs —
+// Back-to-start becomes Stop, the tempo / time signature / metronome grey out while it records or counts in, and the
+// position where the recording started is kept for Stop. Each change touches only its widgets (the 30 Hz timer).
+void MainComponent::updateSimpleTransport (bool playing, bool recording, bool countingIn)
+{
+    const auto states = toolbarlayout::transportStates (toolbarLook);
+    const auto stopGlyph = ! states.stopWhilePlaying || playing || countingIn;
+    if (stopGlyph != shownStopGlyph)
+    {
+        shownStopGlyph = stopGlyph;
+        stopButton.setIcon (stopGlyph ? Icon::stop : Icon::toStart);
+    }
+    const auto lock = toolbarLook == toolbarlayout::Look::simple && recording && (playing || countingIn);
+    if (lock != shownRecordLock)
+    {
+        shownRecordLock = lock;
+        for (auto* c : std::initializer_list<juce::Component*> { &tempoDisplay, &signatureBox, &metronomeButton })
+        {
+            c->setEnabled (! lock);
+            c->repaint();
+        }
+    }
+    // where the take starts: the position the count-in counts towards, or the song position when Record joins a song
+    // that already plays
+    const auto runs = recording && (playing || countingIn);
+    if (runs && ! shownRecordingRuns)
+        simpleRecordStart = playing && ! countingIn && engine.getSong().mode == PlayMode::song ? engine.songPlayheadTicks()
+                                                                                              : engine.getTransport().positionTicks.load();
+    shownRecordingRuns = runs;
 }
 
 // Round 190ih (PLAN R3, DC-9): FL's hint bar names each typing-keyboard / MIDI note as it is played and released
@@ -5677,12 +5731,13 @@ void MainComponent::TempoDisplay::paint (juce::Graphics& g)
         const auto w1 = juce::GlyphArrangement::getStringWidth (big, number), w2 = juce::GlyphArrangement::getStringWidth (unit, "bpm");
         auto x = (float) box.getCentreX() - (w1 + 4.0f + w2) / 2.0f;
         const auto baseline = (float) box.getCentreY() + 5.0f;
-        g.setColour (colour::textPrimary);
+        // (round 190jj: greyed while a take records or counts in, as BandLab's)
+        g.setColour (isEnabled() ? colour::textPrimary : colour::textDisabled);
         g.setFont (big);
         g.drawSingleLineText (number, juce::roundToInt (x), juce::roundToInt (baseline));
         x += w1 + 4.0f;
         decimalX = juce::roundToInt (x);
-        g.setColour (colour::textSecondary);
+        g.setColour (isEnabled() ? colour::textSecondary : colour::textDisabled);
         g.setFont (unit);
         g.drawSingleLineText ("bpm", juce::roundToInt (x), juce::roundToInt (baseline));
         return;

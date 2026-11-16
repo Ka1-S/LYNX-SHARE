@@ -14,7 +14,9 @@ TEST (toolbar190iv_each_layout_style_has_its_toolbar_look)
     CHECK (std::string (lookId (Look::fl)).empty()); // (FL's widgets keep no look property: their paint is untouched)
     // round 190ih's R3 states (green Pause, Record blink) stay FL's; Simple and Live light their buttons instead
     CHECK (transportStates (Look::fl).pauseWhilePlaying && transportStates (Look::fl).recordBlinks);
-    CHECK (! transportStates (Look::simple).pauseWhilePlaying && ! transportStates (Look::live).recordBlinks);
+    // (round 190jj, capture190ji: BandLab's capsule shows Pause and Stop while it runs, its Record steady; Live keeps none)
+    CHECK (transportStates (Look::simple).pauseWhilePlaying && transportStates (Look::simple).stopWhilePlaying && ! transportStates (Look::simple).recordBlinks);
+    CHECK (! transportStates (Look::live).pauseWhilePlaying && ! transportStates (Look::live).recordBlinks && ! transportStates (Look::fl).stopWhilePlaying);
     // Simple: BandLab's landmarks; the expert groups go to "⋯" (windows, meters, snap and pattern, recording options)
     for (auto g : { Group::transport, Group::master, Group::file, Group::key, Group::link })
         CHECK (simpleShows (g));
