@@ -102,6 +102,9 @@ extern std::function<void (std::vector<int>)> selectPlaylistTracks;
 // The items: this project's clean mixer, show only used inserts, remove unused inserts at the end and — with
 // `newProjects` — the new-project choices (inserts, Master chain, clean mixer, Playlist tracks).
 void addItems (juce::PopupMenu& menu, AudioEngine& engine, bool newProjects);
+// The "Mix snapshots (LYNX)" submenu (round 190hp, core/MixSnapshots.h): Take snapshot, Compare A/B, then each snapshot
+// (Recall, Update to the current mix, Rename..., Delete; ticked while the mix is that snapshot).
+juce::PopupMenu snapshotsMenu (AudioEngine& engine);
 } // namespace mixeroptions
 
 // FL-style mixer: one compact vertical strip per track (Master first).

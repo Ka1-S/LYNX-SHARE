@@ -2480,6 +2480,15 @@ public:
             return;
         }
 
+        if (args.contains ("--communityshot190hp"))
+        {
+            // LYNX --communityshot190hp prefix (round 190hp): global MIDI mappings, Mix snapshots and Split at silence
+            // off-screen; writes prefix-checks.txt
+            runCommunityShot190hp (args[args.indexOf ("--communityshot190hp") + 1].unquoted());
+            quit();
+            return;
+        }
+
         if (args.contains ("--mapshot190ef"))
         {
             // LYNX.exe --mapshot190ef prefix: round 190ef's map modes off-screen, in the Clip-launch workflow: MIDI Map Mode
@@ -23616,6 +23625,263 @@ private:
         const auto stats = link.stats();
         checks << "audio-thread cost of the Link step: mean " << juce::String (stats.meanUs, 2) << " us, max " << juce::String (stats.maxUs, 1)
                << " us over " << (juce::int64) stats.blocks << " blocks\n";
+        juce::File (prefix + "-checks.txt").replaceWithText (checks);
+    }
+
+    // LYNX --communityshot190hp <prefix> (round 190hp): the three community slices off-screen, with checks in
+    // prefix-checks.txt — B9 the MIDI Map Mode's "In every project (LYNX)" (the row menu, the Mapping Browser with the
+    // global rows, a new project still playing on the mapped CC, Settings' list), B16 the Mixer menu's Mix snapshots
+    // (take, recall, Compare A/B, the .lynx round trip), B18 the audio clip menu's "Split at silence..." (the dialog and
+    // the Playlist before / after).
+    void runCommunityShot190hp (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        lynx::MainComponent ui (offline, false);
+        ui.setSize (1600, 900);
+        const auto write = [&prefix] (juce::Component& c, const char* name) {
+            const auto file = lynx::shot::file (juce::File (prefix + "-" + name + ".png"));
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (lynx::shot::snapshot (c), out);
+        };
+        juce::String checks;
+        const auto check = [&checks] (const juce::String& what, bool ok) { checks << (ok ? "ok   " : "FAIL ") << what << "\n"; };
+        const auto plain = [] (juce::String t) { return t.upToFirstOccurrenceOf ("\t", false, false).removeCharacters ("&"); };
+        const auto find = [&plain] (const juce::PopupMenu& menu, const juce::String& text) -> const juce::PopupMenu::Item* {
+            for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+                if (plain (it.getItem().text) == plain (text))
+                    return &it.getItem();
+            return nullptr;
+        };
+        const auto click = [&find] (const juce::PopupMenu& menu, const juce::String& text) {
+            const auto* item = find (menu, text);
+            if (item == nullptr || ! item->isEnabled || item->action == nullptr)
+                return false;
+            item->action();
+            return true;
+        };
+        using namespace lynx::remotemap;
+        ui.setVisible (true);
+
+        // ---- B9: the MIDI Map Mode's mappings for every project ---------------------------------------------------------
+        ui.setClipLaunchWorkflow (true);
+        offline.editSong ([] (lynx::Song& s) {
+            auto& grid = lynx::launcher::ensureGrid (s);
+            grid.scenes.resize (4);
+            assignMidi (s, Target::of (lynx::RemoteAction::play), { 0, 118, -1 });
+            assignMidi (s, Target::of (lynx::RemoteAction::stop), { 0, 117, -1 });
+            assignMidi (s, Target::sceneLaunch (0), { 0, lynx::linkNoteBase + 44, -1 });
+            assignMidi (s, Target::slot (0, 0), { 0, lynx::linkNoteBase + 36, -1 });
+            assignMidi (s, Target::parameter ({ lynx::AutomationTargetKind::mixerVolume, 0, 0, 0 }), { 0, 7, -1 });
+        }, false);
+        offline.dispatchPendingMessages();
+        ui.showPanelsForSnapshot ({ lynx::workspace::Panel::playlist, lynx::workspace::Panel::browser });
+        ui.setClipGridView (lynx::PlaylistArea::GridView::grid);
+        ui.setMapMode (Mode::midi);
+        auto* list = ui.mappingBrowserForSnapshot();
+        if (list == nullptr)
+        {
+            juce::File (prefix + "-checks.txt").replaceWithText (checks + "FAIL no Mapping Browser\n");
+            return;
+        }
+        list->setMode (Mode::midi);
+        ui.resized();
+        const auto rowOf = [&] (const Target& t) {
+            const auto rows = list->rowsShown();
+            for (int r = 0; r < (int) rows.size(); ++r)
+                if (rows[(std::size_t) r].target == t)
+                    return r;
+            return -1;
+        };
+        const auto everyProject = lynx::tr ("In every project (LYNX)");
+        {
+            const auto slotMenu = list->rowMenu (rowOf (Target::slot (0, 0)));
+            const auto* item = find (slotMenu, everyProject);
+            check ("row menu: a clip slot cannot be for every project (greyed)", item != nullptr && ! item->isEnabled);
+            const auto playRow = rowOf (Target::of (lynx::RemoteAction::play));
+            list->selectRow (playRow);
+            const auto playMenu = list->rowMenu (playRow);
+            const auto* p = find (playMenu, everyProject);
+            check ("row menu: Play can, unticked", p != nullptr && p->isEnabled && ! p->isTicked);
+            saveMenus (juce::StringArray { "Row" }, std::vector<juce::PopupMenu> { playMenu }, prefix + "-b9-01-row-menu.png");
+            check ("Play goes to every project", click (playMenu, everyProject) && offline.getMidiPrefs().globalMappings.size() == 1);
+        }
+        check ("Stop goes too", click (list->rowMenu (rowOf (Target::of (lynx::RemoteAction::stop))), everyProject));
+        check ("the Master volume link goes too (FL's global links)",
+               click (list->rowMenu (rowOf (Target::parameter ({ lynx::AutomationTargetKind::mixerVolume, 0, 0, 0 }))), everyProject)
+                   && offline.getMidiPrefs().globalLinks.size() == 1 && offline.getSong().midiLinks.empty());
+        list->setMode (Mode::midi);
+        const auto shown = list->rowsShown();
+        check ("Mapping Browser: 2 project rows, then 3 global ones (" + juce::String ((int) shown.size()) + ")",
+               shown.size() == 5 && ! shown[0].global && ! shown[1].global && shown[2].global && shown[4].global);
+        {
+            const auto* ticked = find (list->rowMenu (2), everyProject);
+            check ("a global row's item is ticked", ticked != nullptr && ticked->isTicked);
+        }
+        write (*list, "b9-02-mapping-browser-global");
+        // a new project: the global mappings are there and act (CC 118 plays, CC 117 stops)
+        offline.setSong (lynx::Song::makeDefault());
+        offline.dispatchPendingMessages();
+        list->setMode (Mode::midi);
+        const auto fresh = list->rowsShown();
+        check ("new project: the 3 global rows (" + juce::String ((int) fresh.size()) + ")", fresh.size() == 3 && fresh[0].global);
+        write (*list, "b9-03-new-project-browser");
+        ui.setMapMode (Mode::off);
+        offline.injectControllerForTest (118, 0, 127);
+        offline.dispatchPendingMessages();
+        check ("new project: CC 118 plays", offline.getTransport().playing.load());
+        offline.injectControllerForTest (118, 0, 0);
+        offline.injectControllerForTest (117, 0, 127);
+        offline.dispatchPendingMessages();
+        check ("new project: CC 117 stops", ! offline.getTransport().playing.load());
+        offline.injectControllerForTest (7, 0, 0);
+        offline.dispatchPendingMessages();
+        check ("new project: CC 7 moves the Master", offline.currentTargetValue ({ lynx::AutomationTargetKind::mixerVolume, 0, 0, 0 }) < 0.01f);
+        // the Pattern layout: they act there too, and Settings › MIDI lists them
+        ui.setClipLaunchWorkflow (false);
+        offline.injectControllerForTest (117, 0, 0);
+        offline.injectControllerForTest (118, 0, 127);
+        offline.dispatchPendingMessages();
+        check ("Pattern layout: CC 118 plays", offline.getTransport().playing.load());
+        offline.stop();
+        // back into one project, then cleared (the settings of this test engine are never written)
+        ui.setClipLaunchWorkflow (true);
+        ui.setMapMode (Mode::midi);
+        list->setMode (Mode::midi);
+        check ("back into this project", click (list->rowMenu (rowOf (Target::of (lynx::RemoteAction::play))), everyProject)
+                                             && offline.getMidiPrefs().globalMappings.size() == 1 && offline.getSong().remoteMappings.size() == 1);
+        ui.setMapMode (Mode::off);
+        ui.setClipLaunchWorkflow (false);
+
+        // ---- B16: Mix snapshots ----------------------------------------------------------------------------------------
+        offline.setSong (lynx::Song::makeDefault());
+        offline.dispatchPendingMessages();
+        offline.editSong ([] (lynx::Song& s) {
+            const char* names[] { "Master", "Drums", "Bass", "Keys", "Vox", "Reverb" };
+            for (int i = 1; i < 6 && i < (int) s.mixer.size(); ++i)
+                s.mixer[(std::size_t) i].name = names[i];
+            s.mixer[1].volume = 0.7f;
+            s.mixer[4].pan = -0.3f;
+            s.setRoute (4, 5, true, 0.5f);
+        });
+        juce::PopupMenu mixerMenu;
+        lynx::mixeroptions::addItems (mixerMenu, offline, false);
+        const auto* snaps = find (mixerMenu, lynx::tr ("Mix snapshots (LYNX)"));
+        check ("Mixer menu: Mix snapshots (LYNX)", snaps != nullptr && snaps->subMenu != nullptr);
+        check ("Take snapshot", click (lynx::mixeroptions::snapshotsMenu (offline), lynx::tr ("Take snapshot")) && offline.getSong().mixSnapshots.size() == 1);
+        offline.editSong ([] (lynx::Song& s) {
+            s.mixer[1].volume = 0.4f;
+            s.mixer[4].pan = 0.6f;
+            s.mixer[3].muted = true;
+            s.setRoute (4, 5, false);
+        });
+        check ("Take snapshot again", click (lynx::mixeroptions::snapshotsMenu (offline), lynx::tr ("Take snapshot")) && offline.getSong().mixSnapshots.size() == 2);
+        {
+            const auto menu = lynx::mixeroptions::snapshotsMenu (offline);
+            const auto* first = find (menu, juce::String ("Snapshot 1  (B)"));
+            check ("snapshot 1 listed as B", first != nullptr && first->subMenu != nullptr && ! first->isTicked);
+            const auto* second = find (menu, juce::String ("Snapshot 2  (A)"));
+            check ("snapshot 2 ticked: the mix is it", second != nullptr && second->isTicked);
+            saveMenus (juce::StringArray { "Mixer", "Mix snapshots (LYNX)", "Snapshot 1" },
+                       std::vector<juce::PopupMenu> { mixerMenu, menu, first != nullptr ? *first->subMenu : juce::PopupMenu() }, prefix + "-b16-01-menus.png");
+            check ("Recall snapshot 1", first != nullptr && click (*first->subMenu, lynx::tr ("Recall")));
+        }
+        const auto& m = offline.getSong().mixer;
+        check ("recalled: fader, pan, mute, send", m[1].volume == 0.7f && m[4].pan == -0.3f && ! m[3].muted && offline.getSong().routes (4, 5));
+        ui.showPanelsForSnapshot ({ lynx::workspace::Panel::mixer });
+        ui.resized();
+        offline.dispatchPendingMessages();
+        write (ui, "b16-02-mixer-recalled");
+        check ("Compare A/B", click (lynx::mixeroptions::snapshotsMenu (offline), lynx::tr ("Compare A/B: back to \"{0}\"", { "Snapshot 2" }))
+                                  && m[1].volume == 0.4f && m[3].muted);
+        offline.undo();
+        check ("one undo step: back to snapshot 1", m[1].volume == 0.7f);
+        {
+            const auto file = juce::File (prefix + "-b16-snapshots.lynx");
+            juce::String error;
+            const auto saved = lynx::ProjectFile::save (offline.getSong(), file, error);
+            const auto back = lynx::ProjectFile::load (file, error);
+            check ("saved and loaded: the snapshots and A/B", saved && back && back->mixSnapshots == offline.getSong().mixSnapshots
+                                                                  && back->mixSnapshotCurrent == offline.getSong().mixSnapshotCurrent
+                                                                  && back->mixSnapshotPrevious == offline.getSong().mixSnapshotPrevious);
+            file.deleteFile();
+        }
+
+        // ---- B18: Split at silence -------------------------------------------------------------------------------------
+        {
+            // a "vocal take": 0.5 s silence, three phrases with pauses of 0.6 s and 0.15 s, quiet hiss in the gaps
+            const double rate = 44100.0;
+            juce::AudioBuffer<float> buffer (1, (int) (rate * 4.0));
+            buffer.clear();
+            juce::Random noise (190);
+            for (int i = 0; i < buffer.getNumSamples(); ++i)
+            {
+                const auto t = i / rate;
+                const auto phrase = (t >= 0.5 && t < 1.4) || (t >= 2.0 && t < 2.6) || (t >= 2.75 && t < 3.3);
+                buffer.setSample (0, i, phrase ? (float) (0.4 * std::sin (juce::MathConstants<double>::twoPi * 180.0 * t) * (0.6 + 0.4 * std::sin (6.0 * t)))
+                                               : (noise.nextFloat() - 0.5f) * 0.0004f);
+            }
+            const auto wav = juce::File (prefix + "-b18-take.wav");
+            wav.deleteFile();
+            juce::WavAudioFormat format;
+            if (auto out = std::unique_ptr<juce::AudioFormatWriter> (format.createWriterFor (wav.createOutputStream().release(), rate, 1, 16, {}, 0)))
+                out->writeFromAudioSampleBuffer (buffer, 0, buffer.getNumSamples());
+            auto song = lynx::Song::makeDefault();
+            song.channels.push_back ({});
+            song.channels.back().name = "Vocal take";
+            song.channels.back().instrument = lynx::InstrumentKind::audioClip;
+            song.channels.back().samplePath = wav.getFullPathName().toStdString();
+            lynx::Clip c;
+            c.kind = lynx::ClipKind::audio;
+            c.channel = (int) song.channels.size() - 1;
+            c.track = 1;
+            c.start = 4 * lynx::ppq;
+            c.length = (std::int64_t) std::llround (4.0 * song.bpm / 60.0 * lynx::ppq); // (the whole file at the song tempo)
+            song.playlist.push_back (c);
+            offline.setSong (std::move (song));
+            offline.dispatchPendingMessages();
+            ui.showPanelsForSnapshot ({ lynx::workspace::Panel::playlist });
+            ui.resized();
+            auto& playlist = ui.getPlaylistForSnapshot();
+            const auto index = (int) offline.getSong().playlist.size() - 1;
+            const auto menu = playlist.getClipMenuForSnapshot (index);
+            const auto* item = find (menu, lynx::tr ("Split at silence..."));
+            const auto* splitHere = find (menu, lynx::tr ("Split here"));
+            check ("clip menu: Split at silence... in LYNX extras, enabled", item != nullptr && item->isEnabled && splitHere != nullptr);
+            savePng (columnMenuImage (menu), prefix + "-b18-01-clip-menu.png");
+            {
+                auto dialog = playlist.makeSplitSilenceDialogForSnapshot (index);
+                write (*dialog, "b18-02-dialog");
+            }
+            offline.dispatchPendingMessages();
+            write (ui, "b18-03-playlist-before");
+            juce::String why;
+            const auto made = playlist.splitClipsAtSilence ({ index }, lynx::PlaylistComponent::splitSilenceOptions(), &why);
+            offline.dispatchPendingMessages();
+            const auto& clips = offline.getSong().playlist;
+            std::vector<const lynx::Clip*> audio;
+            for (const auto& x : clips)
+                if (x.kind == lynx::ClipKind::audio)
+                    audio.push_back (&x);
+            std::sort (audio.begin(), audio.end(), [] (const lynx::Clip* a, const lynx::Clip* b) { return a->start < b->start; });
+            const auto secondsAt = [&] (std::int64_t ticks) { return (double) (ticks - 4 * lynx::ppq) / lynx::ppq * 60.0 / offline.getSong().bpm; };
+            check ("split into 2 clips (the 0.15 s pause stays inside): " + juce::String (made) + ", " + why, made == 2 && audio.size() == 2);
+            if (audio.size() == 2)
+                check ("the clips start at the phrases less the pre-roll, end after them: " + juce::String (secondsAt (audio[0]->start), 3) + "-"
+                           + juce::String (secondsAt (audio[0]->end()), 3) + ", " + juce::String (secondsAt (audio[1]->start), 3) + "-" + juce::String (secondsAt (audio[1]->end()), 3),
+                       std::abs (secondsAt (audio[0]->start) - 0.49) < 0.02 && std::abs (secondsAt (audio[0]->end()) - 1.45) < 0.02
+                           && std::abs (secondsAt (audio[1]->start) - 1.99) < 0.02 && std::abs (secondsAt (audio[1]->end()) - 3.35) < 0.02
+                           && audio[1]->offset - audio[0]->offset == audio[1]->start - audio[0]->start);
+            write (ui, "b18-04-playlist-after");
+            offline.undo();
+            check ("one undo step", offline.getSong().playlist.size() == clips.size() && std::count_if (offline.getSong().playlist.begin(), offline.getSong().playlist.end(),
+                                                                                                   [] (const lynx::Clip& x) { return x.kind == lynx::ClipKind::audio; }) == 1);
+            lynx::stripsilence::Options loud;
+            loud.thresholdDb = -1.0f;
+            check ("all below the threshold: nothing split", playlist.splitClipsAtSilence ({ index }, loud, &why) == 0);
+            wav.deleteFile();
+        }
         juce::File (prefix + "-checks.txt").replaceWithText (checks);
     }
 

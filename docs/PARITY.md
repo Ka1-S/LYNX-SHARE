@@ -3592,3 +3592,17 @@ branch, no new filter). Latency 0, memory unchanged.
 Tools: `/mnt/e/lynx-work/parityfx190fy` (`lab/spiral.py`, `lab/refcap_sp.py`, `lab/sp_search.py`, `lab/cands.sh`,
 `lab/echoes.py`, `lab/loopid.py`, `lab/bands.py`, `lab/lf.py`, `gold/`, `cpu/`).
 
+
+## Round 190hp: community complaints B9, B16, B18 (global MIDI mappings, mix snapshots, split at silence)
+Three slices of the 0.1.28 pain report (`/mnt/e/lynx-work/pain190gc/REPORT.md` §4, complaints #10, #30, #32). All
+three are LYNX's own additions, off until used; FL's and the reference DAW's own features stay as they were.
+
+| Item | FL Studio 2026 | Ableton Live 12 | LYNX |
+|---|---|---|---|
+| A parameter's controller link for every project | "Override global link..." (window "Global link settings", `Mapping\Generic`) | none: mappings are kept with the set (the complaint) | ✅ unchanged (REA round 146 / 190bt); the settings file now keeps the links of sends, VCAs and Levels adjustments too (before, they were dropped at the next start) and a link's Min / Max |
+| A MIDI Map Mode mapping for every project | — | — | ✅ Mapping Browser row menu › "In every project (LYNX)" (Clip-launch layout): a parameter becomes FL's global link (the same list), Play / Stop / Record / Session Record / Metronome / Stop all clips / a scene's launch button go to the settings (`prefs::GlobalMapping`). Global rows are listed after the project's, "Every project ›" in their Path, dimmed while the project maps that control or target itself (the project's own wins, as FL's project links over global ones). A scene launch acts while the project has that scene. They act in both layouts and are listed (and removable) in Settings › MIDI. ❌ clip slots and track stop buttons (they belong to one project's tracks), key mappings |
+| Hide unused mixer inserts | — ("Trim unused mixer tracks" deletes them) | — | ✅ already there: Mixer menu › "Show only used inserts" (round 163 / 190am). FL's "Trim unused mixer tracks" (strings in FLEngine_x64.dll: "Remove unused tracks", "Unlinked tracks only", "Unlinked and non-empty tracks") is not built: its menu place and rules need a live check |
+| Mix snapshots | per insert only: Mixer states (.fst, LYNX has them) | none | ✅ Mixer menu › "Mix snapshots (LYNX)" (`core/MixSnapshots.h`): Take snapshot (16 per project), Compare A/B (the snapshot recalled before), and per snapshot Recall / Update to the current mix / Rename... / Delete; ticked while the mix is it. A snapshot holds every insert's fader, pan, separation, mute, route to the Master and sends; a recall is one undo step, follows the inserts' reordering and skips a send that would make a loop. Saved in .lynx (`mixSnapshots`, read-only for the remote API) |
+| Strip silence from a clip | Edison: Trim side noise, Trim all noise & slice up (edit the sample; LYNX has both) | none | ✅ audio clip menu › LYNX extras › "Split at silence..." (`core/StripSilence.h`): threshold (dB, 5 ms peak windows), minimum silence, pre-roll, post-roll; the quiet parts go, the clips left play the same audio at the same time, the file is not touched; one undo step, several selected clips at once. ❌ clips with warp markers (greyed) |
+
+Tests: `tests/Community190hpTests.inc` (7 core tests); `LYNX --communityshot190hp <prefix>` (shots and checks).

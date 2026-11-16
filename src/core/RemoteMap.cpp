@@ -275,6 +275,273 @@ std::string controlText (int number)
     return {};
 }
 
+// --- for every project (round 190hp) ---------------------------------------------------------------------------------------
+namespace
+{
+RemoteMapping fromGlobal (const prefs::GlobalMapping& g)
+{
+    RemoteMapping m;
+    m.source = RemoteMapping::Source::midi;
+    m.channel = g.channel;
+    m.number = g.number;
+    m.port = g.port;
+    m.action = (RemoteAction) g.action;
+    m.scene = g.action == (int) RemoteAction::sceneLaunch ? g.scene : -1;
+    return m;
+}
+AutomationTarget targetOfGlobal (const prefs::GlobalLink& l)
+{
+    return { (AutomationTargetKind) l.kind, l.index, l.slot, l.param };
+}
+bool sceneExists (const Song& song, int scene) noexcept
+{
+    return scene >= 0 && song.clipGrid && scene < (int) song.clipGrid->scenes.size();
+}
+// The project maps this control (a link or a MIDI mapping on the same number, channel and port) or this target itself.
+bool projectOverrides (const Song& song, const Target& target, int channel, int number, int port)
+{
+    const auto sameControl = [&] (int ch, int num, int p) { return num == number && p == port && (ch < 0 || channel < 0 || ch == channel); };
+    for (const auto& l : song.midiLinks)
+        if (sameControl (l.channel, l.cc, l.port) || (target.action == RemoteAction::parameter && l.target == target.param))
+            return true;
+    for (const auto& m : song.remoteMappings)
+        if (m.source == RemoteMapping::Source::midi && (sameControl (m.channel, m.number, m.port) || targetOf (m) == target))
+            return true;
+    return false;
+}
+} // namespace
+
+bool canBeGlobal (const Target& t) noexcept
+{
+    switch (t.action)
+    {
+        case RemoteAction::parameter: return t.param.kind != AutomationTargetKind::none;
+        case RemoteAction::sceneLaunch: return t.scene >= 0;
+        case RemoteAction::stopAllClips:
+        case RemoteAction::play:
+        case RemoteAction::stop:
+        case RemoteAction::record:
+        case RemoteAction::sessionRecord:
+        case RemoteAction::metronome: return true;
+        case RemoteAction::clipSlot:
+        case RemoteAction::trackStop: return false;
+    }
+    return false;
+}
+
+std::vector<Row> globalRows (const Song& song, const prefs::MidiPrefs& prefs)
+{
+    std::vector<Row> out;
+    for (int i = 0; i < (int) prefs.globalLinks.size(); ++i)
+    {
+        const auto& l = prefs.globalLinks[(std::size_t) i];
+        Row r;
+        r.link = true;
+        r.global = true;
+        r.index = i;
+        r.channel = l.channel;
+        r.number = l.cc;
+        r.target = Target::parameter (targetOfGlobal (l));
+        r.min = l.min;
+        r.max = l.max;
+        r.hasRange = true;
+        r.overridden = projectOverrides (song, r.target, l.channel, l.cc, l.port);
+        out.push_back (r);
+    }
+    for (int i = 0; i < (int) prefs.globalMappings.size(); ++i)
+    {
+        const auto m = fromGlobal (prefs.globalMappings[(std::size_t) i]);
+        Row r;
+        r.global = true;
+        r.index = i;
+        r.channel = m.channel;
+        r.number = m.number;
+        r.target = targetOf (m);
+        r.overridden = projectOverrides (song, r.target, m.channel, m.number, m.port);
+        out.push_back (r);
+    }
+    return out;
+}
+
+bool canMove (const Song& song, const prefs::MidiPrefs& prefs, const Row& row, bool toEveryProject)
+{
+    if (row.index < 0)
+        return false;
+    if (toEveryProject)
+    {
+        if (row.global || ! canBeGlobal (row.target))
+            return false;
+        if (row.link)
+            return row.index < (int) song.midiLinks.size();
+        return row.index < (int) song.remoteMappings.size() && song.remoteMappings[(std::size_t) row.index].source == RemoteMapping::Source::midi;
+    }
+    if (! row.global)
+        return false;
+    if (row.link)
+        return row.index < (int) prefs.globalLinks.size();
+    if (row.index >= (int) prefs.globalMappings.size())
+        return false;
+    const auto m = fromGlobal (prefs.globalMappings[(std::size_t) row.index]);
+    return m.action != RemoteAction::sceneLaunch || sceneExists (song, m.scene);
+}
+
+bool moveToEveryProject (Song& song, prefs::MidiPrefs& prefs, const Row& row)
+{
+    if (! canMove (song, prefs, row, true))
+        return false;
+    if (row.link)
+    {
+        if (row.index < 0 || row.index >= (int) song.midiLinks.size())
+            return false;
+        const auto l = song.midiLinks[(std::size_t) row.index];
+        prefs::GlobalLink g { l.cc, l.channel, (int) l.target.kind, l.target.index, l.target.slot, l.target.param };
+        g.port = l.port;
+        g.formula = l.formula;
+        g.smooth = l.smooth;
+        g.smoothing = l.smoothing;
+        g.mode = l.mode;
+        g.min = l.min;
+        g.max = l.max;
+        auto& list = prefs.globalLinks;
+        list.erase (std::remove_if (list.begin(), list.end(),
+                                    [&] (const prefs::GlobalLink& o) {
+                                        return targetOfGlobal (o) == l.target || (o.cc == g.cc && o.channel == g.channel && o.port == g.port);
+                                    }),
+                    list.end());
+        list.push_back (std::move (g));
+        song.midiLinks.erase (song.midiLinks.begin() + row.index);
+        return true;
+    }
+    if (row.index < 0 || row.index >= (int) song.remoteMappings.size())
+        return false;
+    const auto m = song.remoteMappings[(std::size_t) row.index];
+    if (m.source != RemoteMapping::Source::midi)
+        return false;
+    prefs::GlobalMapping g { m.channel, m.number, m.port, (int) m.action, m.action == RemoteAction::sceneLaunch ? m.scene : -1 };
+    auto& list = prefs.globalMappings;
+    list.erase (std::remove_if (list.begin(), list.end(),
+                                [&] (const prefs::GlobalMapping& o) {
+                                    return targetOf (fromGlobal (o)) == targetOf (m) || (o.number == g.number && o.channel == g.channel && o.port == g.port);
+                                }),
+                list.end());
+    list.push_back (g);
+    song.remoteMappings.erase (song.remoteMappings.begin() + row.index);
+    return true;
+}
+
+bool moveToThisProject (Song& song, prefs::MidiPrefs& prefs, const Row& row)
+{
+    if (! canMove (song, prefs, row, false))
+        return false;
+    if (row.link)
+    {
+        if (row.index < 0 || row.index >= (int) prefs.globalLinks.size())
+            return false;
+        const auto g = prefs.globalLinks[(std::size_t) row.index];
+        MidiLink l { g.cc, g.channel, targetOfGlobal (g) };
+        l.port = g.port;
+        l.formula = g.formula;
+        l.smooth = g.smooth;
+        l.smoothing = g.smoothing;
+        l.mode = g.mode;
+        l.min = g.min;
+        l.max = g.max;
+        song.midiLinks.erase (std::remove_if (song.midiLinks.begin(), song.midiLinks.end(), [&] (const MidiLink& o) { return o.target == l.target; }),
+                              song.midiLinks.end());
+        song.midiLinks.push_back (std::move (l));
+        prefs.globalLinks.erase (prefs.globalLinks.begin() + row.index);
+        return true;
+    }
+    if (row.index < 0 || row.index >= (int) prefs.globalMappings.size())
+        return false;
+    const auto m = fromGlobal (prefs.globalMappings[(std::size_t) row.index]);
+    if (m.action == RemoteAction::sceneLaunch && ! sceneExists (song, m.scene))
+        return false; // (no such scene here)
+    unmap (song, targetOf (m), Mode::midi);
+    song.remoteMappings.push_back (m);
+    prefs.globalMappings.erase (prefs.globalMappings.begin() + row.index);
+    return true;
+}
+
+bool removeGlobalRow (prefs::MidiPrefs& prefs, const Row& row)
+{
+    if (! row.global)
+        return false;
+    if (row.link)
+    {
+        if (row.index < 0 || row.index >= (int) prefs.globalLinks.size())
+            return false;
+        prefs.globalLinks.erase (prefs.globalLinks.begin() + row.index);
+        return true;
+    }
+    if (row.index < 0 || row.index >= (int) prefs.globalMappings.size())
+        return false;
+    prefs.globalMappings.erase (prefs.globalMappings.begin() + row.index);
+    return true;
+}
+
+bool setGlobalRange (prefs::MidiPrefs& prefs, const Row& row, float min, float max)
+{
+    if (! row.global || ! row.link || row.index < 0 || row.index >= (int) prefs.globalLinks.size())
+        return false;
+    auto& l = prefs.globalLinks[(std::size_t) row.index];
+    l.min = clamp01 (min);
+    l.max = clamp01 (max);
+    return true;
+}
+
+std::vector<RemoteMapping> activeGlobalMappings (const Song& song, const prefs::MidiPrefs& prefs)
+{
+    std::vector<RemoteMapping> out;
+    for (const auto& g : prefs.globalMappings)
+    {
+        const auto m = fromGlobal (g);
+        if (! valid (targetOf (m)) || ! canBeGlobal (targetOf (m)) || (m.action == RemoteAction::sceneLaunch && ! sceneExists (song, m.scene)))
+            continue;
+        if (! projectOverrides (song, targetOf (m), m.channel, m.number, m.port))
+            out.push_back (m);
+    }
+    return out;
+}
+
+Assigned midiOf (const Song& song, const prefs::MidiPrefs& prefs, const Target& target)
+{
+    if (const auto own = midiOf (song, target); own.found)
+        return own;
+    if (target.action == RemoteAction::parameter)
+    {
+        for (const auto& l : prefs.globalLinks)
+            if (targetOfGlobal (l) == target.param && ! projectOverrides (song, target, l.channel, l.cc, l.port))
+                return { true, l.channel, l.cc, 0 };
+        return {};
+    }
+    for (const auto& m : activeGlobalMappings (song, prefs))
+        if (targetOf (m) == target)
+            return { true, m.channel, m.number, 0 };
+    return {};
+}
+
+std::vector<Fire> midiFires (const Song& song, const std::vector<RemoteMapping>& global, int channel, int number, int value, int previous, int port)
+{
+    auto out = midiFires (song, channel, number, value, previous, port);
+    const auto edge = midiEdge (number, value, previous);
+    if (edge == Edge::none)
+        return out;
+    for (const auto& m : global)
+        if (m.action != RemoteAction::parameter && sameMidi (m, channel, number, port))
+            out.push_back ({ targetOf (m), edge, m.min, m.max });
+    return out;
+}
+
+void usedNumbers (const std::vector<RemoteMapping>& global, std::uint64_t ccs[2], std::uint64_t notes[2]) noexcept
+{
+    for (const auto& m : global)
+        if (m.number >= 0 && m.number < 128)
+            ccs[m.number >> 6] |= std::uint64_t { 1 } << (m.number & 63);
+        else if (isNoteLink (m.number))
+            notes[(m.number - linkNoteBase) >> 6] |= std::uint64_t { 1 } << ((m.number - linkNoteBase) & 63);
+}
+
 void scenesInserted (Song& song, int at) noexcept
 {
     for (auto& m : song.remoteMappings)

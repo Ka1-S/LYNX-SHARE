@@ -187,8 +187,23 @@ struct GlobalLink
     bool smooth = false;
     int smoothing = 469;
     int mode = 0; // FL's "Mode" (round 190cs; linkformula::LinkMode)
+    // the Mapping Browser's Min / Max (round 190hp: a mapping of the MIDI Map Mode made global keeps its range)
+    float min = 0.0f, max = 1.0f;
     bool hasSettings() const noexcept { return port >= 0 || ! formula.empty() || smooth || smoothing != 469 || mode != 0; }
     bool operator== (const GlobalLink&) const = default;
+};
+
+// A MIDI mapping of the Clip-launch layout's MIDI Map Mode kept in the settings, for every project (round 190hp, slice
+// B9 of the 0.1.28 pain report; LYNX's own: the reference DAW keeps its mappings with each set, which users complain
+// about). Made with the Mapping Browser's "In every project (LYNX)". Only targets that exist in any project: the
+// transport switches, Stop all clips and a scene's launch button (it acts while the project has that scene). A
+// project's own mapping of the same MIDI control wins. Parameter mappings become FL's global links (GlobalLink).
+struct GlobalMapping
+{
+    int channel = -1, number = -1, port = -1; // as RemoteMapping (number: a controller 0..127 or a key 256 + n)
+    int action = 0;                           // RemoteAction (its enum value)
+    int scene = -1;                           // sceneLaunch
+    bool operator== (const GlobalMapping&) const = default;
 };
 
 // An output device (FL's Options › MIDI "Output" panel, REA round 165f): master sync and all-notes-off.
@@ -210,6 +225,7 @@ struct MidiPrefs
     std::string clockInput;             // "External clock sync": the input LYNX follows ("" = off)
     int clockOffsetMs = 0;              // "External sync offset (milliseconds)", -1000…1000
     std::vector<GlobalLink> globalLinks;
+    std::vector<GlobalMapping> globalMappings; // (round 190hp)
     VelocityCurve velocity = VelocityCurve::linear;
     bool pickup = false;                // a controller takes over a parameter only once it reaches its value
     // FL's "Foot pedal controls note off" (KbHoldSupportBox, on; round 187a): LYNX holds the notes on CC 64 (sustain)

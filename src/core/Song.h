@@ -1637,6 +1637,29 @@ struct Vca
     bool operator== (const Vca&) const = default;
 };
 
+// A mix snapshot (round 190hp, slice B16 of the 0.1.28 pain report, complaint #30; LYNX's own: FL keeps one insert's
+// state in a file, Mixer states, and the reference DAW has no snapshots either). The Mixer menu's "Mix snapshots
+// (LYNX)" takes one (every insert's fader, pan, separation, mute, its route to the Master and its sends) and recalls it
+// in one undo step; "Compare A/B" goes back to the snapshot recalled before. Insert numbers follow the mixer's
+// reordering (mixerops' remap); an insert deleted since is skipped. At most maxMixSnapshots per project. Saved.
+struct MixSnapshot
+{
+    struct Insert
+    {
+        int track = 0; // 0 = Master
+        float volume = unityFader, pan = 0.0f, stereo = 0.0f;
+        bool muted = false;
+        bool toMaster = true;
+        float masterLevel = 1.0f;
+        std::vector<MixerSend> sends;
+        bool operator== (const Insert&) const = default;
+    };
+    std::string name;
+    std::vector<Insert> inserts;
+    bool operator== (const MixSnapshot&) const = default;
+};
+constexpr int maxMixSnapshots = 16;
+
 struct Note
 {
     std::int64_t start = 0;   // ticks
@@ -2636,6 +2659,10 @@ struct Song
 
     std::vector<MixerTrack> mixer; // [0] = Master; empty = everything straight to the output
     std::vector<Vca> vcas;         // VCA faders (round 177a); empty = none (no cost anywhere)
+    // Mix snapshots (round 190hp; core/MixSnapshots.h): the list, and the snapshots recalled last and the one before
+    // it (indices, -1 = none; "Compare A/B" swaps them). Saved with the project.
+    std::vector<MixSnapshot> mixSnapshots;
+    int mixSnapshotCurrent = -1, mixSnapshotPrevious = -1;
     // A/B of the LYNX substitutes (round 113): when set, every substitute slot plays as bypassed (the project's own
     // effects and the hosted plugins still play). Saved with the project.
     bool substitutesBypassed = false;
