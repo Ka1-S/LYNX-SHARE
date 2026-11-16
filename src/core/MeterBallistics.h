@@ -74,16 +74,72 @@ struct PeakHold
             clipped = true;
     }
 
+    // FL's Mixer peak hold (round 190jd, live check 190iw Q6, notes/q6-peakhold.txt): advance() with the hold line
+    // held flPeakHoldMs after the last higher peak, then falling with a constant acceleration (flPeakFallDb) until it
+    // meets the bar or the floor. The bar's ballistics are advance()'s. Nothing resets on Stop: the ticks decay on.
+    void advanceFl (float blockPeak, double elapsedMs, float decay = 0.86f) noexcept;
+
     void resetClip() noexcept
     {
         clipped = false;
         peak = level;
         holdLeft = 0;
         holdMsLeft = 0.0;
+        heldMs = 0.0;
+        heldGain = peak;
     }
 
     double holdMsLeft = 0.0; // advance(): the hold left, in ms
+    double heldMs = 0.0;     // advanceFl(): time since the hold line was set
+    float heldGain = 0.0f;   // advanceFl(): the level it was set at
 };
+
+// FL's hold time: the tick stays ~2.6 s after the last higher peak (set at 5571 ms, first move at 8161 ms; again
+// 2333 -> 4993 ms; 62 fps film, +-90 ms GUI steps).
+constexpr double flPeakHoldMs = 2600.0;
+// Then it falls with acceleration: per ~90 ms step 1, 1, 2, 1, 2, 2, 2, 1, 1, 2, 1, 3, 5, 5, 6 px, i.e. ~3.2 dB in the
+// first 1.3 s and ~4.5-5 dB/s by then: a fall of a * t^2 dB with a = 1.9 dB/s^2 fits it (3.2 dB at 1.3 s, 4.9 dB/s).
+constexpr double flPeakFallAccel = 1.9; // dB / s^2 (half the acceleration)
+
+// How far (dB) FL's hold line has fallen `msSinceSet` ms after it was set: 0 during the hold.
+inline double flPeakFallDb (double msSinceSet) noexcept
+{
+    const auto t = std::max (0.0, msSinceSet - flPeakHoldMs) / 1000.0;
+    return flPeakFallAccel * t * t;
+}
+
+inline void PeakHold::advanceFl (float blockPeak, double elapsedMs, float decay) noexcept
+{
+    constexpr double tickMs = 1000.0 / 30.0;
+    const auto ticks = std::clamp (elapsedMs / tickMs, 0.0, 30.0);
+    blockPeak = std::max (0.0f, blockPeak);
+    level = std::max (blockPeak, level * (float) std::pow ((double) decay, ticks));
+    if (level < 0.001f)
+        level = 0.0f;
+
+    if (blockPeak >= peak)
+    {
+        peak = blockPeak;
+        heldGain = blockPeak;
+        heldMs = 0.0;
+    }
+    else
+    {
+        heldMs = std::min (heldMs + std::max (0.0, elapsedMs), 600000.0);
+        if (heldMs > flPeakHoldMs)
+        {
+            const auto fallen = heldGain * (float) std::pow (10.0, -flPeakFallDb (heldMs) / 20.0);
+            peak = std::max (level, fallen);
+            if (peak < 0.001f)
+                peak = 0.0f;
+        }
+    }
+    holdMsLeft = std::max (0.0, flPeakHoldMs - heldMs);
+    holdLeft = (int) std::ceil (holdMsLeft / tickMs);
+
+    if (blockPeak > 1.0f)
+        clipped = true;
+}
 
 // The rows of a meter `heightPx` tall that must be redrawn when its bar goes from `before` to `after` (round 174e):
 // the band between the two bar tops and around the two hold lines (2 px each), from the top (0) down; empty when
@@ -107,6 +163,9 @@ struct DirtyRows
     }
 };
 
+// FL draws the hold tick orange above about -3 dB (live check 190iw Q6), in the meter's own colour below.
+constexpr float flTickOrange = 0.70795f; // -3 dB
+
 template <typename Position>
 DirtyRows dirtyRows (const PeakHold& before, const PeakHold& after, int heightPx, Position position) noexcept
 {
@@ -118,7 +177,8 @@ DirtyRows dirtyRows (const PeakHold& before, const PeakHold& after, int heightPx
     // the hold line: 2 px from one above its top (drawn only above 0.001)
     const auto line = [&] (float peak) { return peak > 0.001f ? barTop (peak) - 1 : -1000; };
     const auto pa = line (before.peak), pb = line (after.peak);
-    if (pa != pb || (before.peak >= 0.5f) != (after.peak >= 0.5f) || (before.peak >= 1.0f) != (after.peak >= 1.0f))
+    if (pa != pb || (before.peak >= 0.5f) != (after.peak >= 0.5f) || (before.peak >= flTickOrange) != (after.peak >= flTickOrange)
+        || (before.peak >= 1.0f) != (after.peak >= 1.0f))
     {
         if (pa > -1000)
             rows.add (std::max (0, pa), std::max (0, pa) + 2);
