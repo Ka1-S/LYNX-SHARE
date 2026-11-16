@@ -17838,3 +17838,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Rackmix190ioTests.inc" // round 190io: FL rack + Mixer landmarks, Mixer details, issue #154 part 2
 #include "Bugs190irTests.inc" // round 190ir: issue #189 text size, takes on the tracks FL picks (Discord report)
 #include "Toolbar190ivTests.inc" // round 190iv: the toolbar per layout style (Simple capsules, Live control bar)
+#include "Details190imTests.inc" // round 190im: activity meter reader, deactivated grid clips, Live keys 0 / Ctrl+E

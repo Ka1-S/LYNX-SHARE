@@ -28,6 +28,8 @@ public:
         raise (t.view[1], right);
         raise (t.session[0], left);
         raise (t.session[1], right);
+        raise (t.activity[0], left);
+        raise (t.activity[1], right);
     }
 
     // UI: peak since the last read. channel 0 = left, 1 = right.
@@ -59,6 +61,16 @@ public:
         return tracks[(std::size_t) track].session[channel & 1].exchange (0.0f, std::memory_order_relaxed);
     }
 
+    // A fourth reader (round 190im: the Playlist's activity strips, FL's lit column beside the track headers, whose
+    // brightness follows the level), so it takes no peaks from the Mixer, the headers or the Session mixer.
+    float takeActivityPeak (int track, int channel) noexcept
+    {
+        if (track < 0 || track >= maxMixerTracks)
+            return 0.0f;
+
+        return tracks[(std::size_t) track].activity[channel & 1].exchange (0.0f, std::memory_order_relaxed);
+    }
+
     // the audio editor's recording tap (round 86): input, Master (0) or a mixer insert
     AudioCapture capture;
     // the audio logger's tap (REA round 153): the Master, while Tools > Audio logger is on
@@ -85,7 +97,7 @@ private:
     // workers, and 8 tracks shared a line before; the three readers' peaks of a track are written together
     struct alignas (64) TrackPeaks
     {
-        std::array<std::atomic<float>, 2> peak {}, view {}, session {};
+        std::array<std::atomic<float>, 2> peak {}, view {}, session {}, activity {};
     };
     std::array<TrackPeaks, maxMixerTracks> tracks {};
 };

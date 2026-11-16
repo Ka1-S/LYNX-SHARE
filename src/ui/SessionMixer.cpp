@@ -1,3 +1,4 @@
+#include "ui/TextCache.h"
 #include "ui/SessionMixer.h"
 #include "ui/PaintAB.h"
 
@@ -54,7 +55,7 @@ void drawBox (juce::Graphics& g, juce::Rectangle<int> r, const juce::String& tex
         tri.addTriangle (a.getX(), a.getY(), a.getRight(), a.getY(), a.getCentreX(), a.getBottom());
         g.fillPath (tri);
     }
-    g.drawText (text, inner, juce::Justification::centredLeft, true);
+    textcache::drawText (g, text, inner, juce::Justification::centredLeft, true);
 }
 
 void drawToggle (juce::Graphics& g, juce::Rectangle<int> r, const juce::String& text, bool on, juce::Colour onColour, bool hot)
@@ -68,14 +69,14 @@ void drawToggle (juce::Graphics& g, juce::Rectangle<int> r, const juce::String& 
     }
     g.setColour (on ? c::bg0 : c::textSecondary);
     g.setFont (theme::font (theme::type::caption, on));
-    g.drawText (text, r, juce::Justification::centred, false);
+    textcache::drawText (g, text, r, juce::Justification::centred, false);
 }
 
 void drawLabel (juce::Graphics& g, juce::Rectangle<int> r, const juce::String& text)
 {
     g.setColour (c::textSecondary);
     g.setFont (theme::font (theme::type::caption));
-    g.drawText (text, r, juce::Justification::centredLeft, true);
+    textcache::drawText (g, text, r, juce::Justification::centredLeft, true);
 }
 } // namespace
 
@@ -486,7 +487,7 @@ void SessionMixerComponent::paintStrip (juce::Graphics& g, int column)
             label (3, tr ("MIDI From"));
             g.setColour (c::textPrimary);
             g.setFont (theme::font (theme::type::caption));
-            g.drawText (tr ("All Ins"), partBounds (column, Part::inType).reduced (4, 0), juce::Justification::centredLeft, true);
+            textcache::drawText (g, tr ("All Ins"), partBounds (column, Part::inType).reduced (4, 0), juce::Justification::centredLeft, true);
         }
         else if (m != nullptr)
         {
@@ -519,7 +520,7 @@ void SessionMixerComponent::paintStrip (juce::Graphics& g, int column)
             theme::drawKnob (g, knob.toFloat(), std::max (0.0f, pos), false, pos > 0.0f ? c::info : c::knobArc.withAlpha (0.5f), hot (Part::send, r));
             g.setColour (pos >= 0.0f ? c::textSecondary : c::textDisabled);
             g.setFont (theme::font (theme::type::caption));
-            g.drawText (insertName (song, rows[(std::size_t) r]), juce::Rectangle<int> (knob.getRight() + 3, knob.getY(), x0 + w - pad - knob.getRight() - 3, knob.getHeight()),
+            textcache::drawText (g, insertName (song, rows[(std::size_t) r]), juce::Rectangle<int> (knob.getRight() + 3, knob.getY(), x0 + w - pad - knob.getRight() - 3, knob.getHeight()),
                         juce::Justification::centredLeft, true);
         }
 
@@ -532,7 +533,7 @@ void SessionMixerComponent::paintStrip (juce::Graphics& g, int column)
         drawBox (g, box, juce::String (sessionmixer::trackDelayMs (song, strip.insert) + 0.0, 2), false, hot (Part::delay));
         g.setColour (c::textSecondary);
         g.setFont (theme::font (theme::type::caption));
-        g.drawText ("ms", juce::Rectangle<int> (box.getRight() + 3, box.getY(), 18, box.getHeight()), juce::Justification::centredLeft, false);
+        textcache::drawText (g, "ms", juce::Rectangle<int> (box.getRight() + 3, box.getY(), 18, box.getHeight()), juce::Justification::centredLeft, false);
     }
 
     // Volume: the volume box, pan, Track Activator, Solo, Arm on the left; the meter with its handle and scale on the right
@@ -543,7 +544,7 @@ void SessionMixerComponent::paintStrip (juce::Graphics& g, int column)
         {
             g.setColour (c::textDisabled);
             g.setFont (theme::font (theme::type::caption));
-            g.drawFittedText (strip.insertCount > 1 ? tr ("{0} mixer tracks", { juce::String (strip.insertCount) }) : tr ("No mixer track"),
+            textcache::drawFittedText (g, strip.insertCount > 1 ? tr ("{0} mixer tracks", { juce::String (strip.insertCount) }) : tr ("No mixer track"),
                               juce::Rectangle<int> (x0 + pad, top + 20, w - 2 * pad, 36), juce::Justification::centred, 2);
         }
         if (m != nullptr)
@@ -558,7 +559,7 @@ void SessionMixerComponent::paintStrip (juce::Graphics& g, int column)
                 theme::fillRoundRect (g, act.toFloat(), 2.0f, m->muted ? c::bg4 : c::ledOn);
                 g.setColour (m->muted ? c::textSecondary : c::bg0);
                 g.setFont (theme::font (theme::type::small, true));
-                g.drawText (juce::String (column + 1), act, juce::Justification::centred, false);
+                textcache::drawText (g, juce::String (column + 1), act, juce::Justification::centred, false);
                 drawToggle (g, partBounds (column, Part::solo), "S", m->solo, c::accent, hot (Part::solo));
             }
             paintMeter (g, strip.insert, partBounds (column, Part::fader));
@@ -619,7 +620,7 @@ void SessionMixerComponent::paintMeter (juce::Graphics& g, int insert, juce::Rec
         g.setColour (c::textDisabled);
         g.fillRect ((float) bars.getRight() + 1.0f, y, 3.0f, 1.0f);
         g.setColour (c::textSecondary);
-        g.drawText (juce::String (db), juce::Rectangle<float> ((float) bars.getRight() + 5.0f, y - 5.0f, 18.0f, 10.0f), juce::Justification::centredLeft, false);
+        textcache::drawText (g, juce::String (db), juce::Rectangle<float> ((float) bars.getRight() + 5.0f, y - 5.0f, 18.0f, 10.0f), juce::Justification::centredLeft, false);
     }
     // the volume handle: a triangle pointing at the meter at the fader's level
     const auto volumeDb = sessionmixer::volumeDb (song.mixer[(std::size_t) insert].volume);

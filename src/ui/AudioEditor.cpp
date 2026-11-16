@@ -2605,6 +2605,11 @@ private:
             g.setColour (colour::playhead);
             g.fillRect (juce::Rectangle<float> (frameToX ((double) playhead) - 0.5f, (float) waveArea.getY(), 2.0f, (float) waveArea.getHeight()));
         }
+        else if (launchedHead >= 0) // round 190im (R13): where the clip launched from the grid plays now
+        {
+            g.setColour (colour::playhead);
+            g.fillRect (juce::Rectangle<float> (frameToX ((double) launchedHead) - 0.5f, (float) waveArea.getY(), 2.0f, (float) waveArea.getHeight()));
+        }
         if (recState != RecState::idle)
         {
             auto badge = juce::Rectangle<float> ((float) waveArea.getX() + 8.0f, (float) waveArea.getY() + 8.0f, recState == RecState::recording ? 70.0f : 150.0f, 20.0f);
@@ -3439,6 +3444,7 @@ private:
 
     void startPlayback()
     {
+        EditorGlobals::get().resumeFollow (EditorGlobals::FollowView::audioEditor); // (round 190im: a play lifts the pause)
         if (doc.audio.empty() || recState != RecState::idle)
             return;
         auto r = selection;
@@ -4318,6 +4324,8 @@ private:
                 return;
             repaint();
         }
+        watchFollowPause();
+        stepLaunchedHead();
         if (playing)
         {
             const auto slotPlayer = slotMode() ? processor() : nullptr;
@@ -4331,17 +4339,97 @@ private:
             const auto before = playhead;
             playhead = playFrom < 0 ? -1 : playFrom + (std::int64_t) pos; // (a tool preview is not on the timeline)
             // page along with the playhead (Follow on, issue #12)
-            if (playhead >= 0 && EditorGlobals::get().isFollowingView (EditorGlobals::FollowView::audioEditor)
+            if (playhead >= 0 && EditorGlobals::get().followsNow (EditorGlobals::FollowView::audioEditor)
                 && (unitOfFrame ((double) playhead) > viewStart + (double) waveArea.getWidth() * fpp || unitOfFrame ((double) playhead) < viewStart) && fpp < maxFpp())
             {
                 viewStart = unitOfFrame ((double) playhead);
                 clampView();
+                followSeenView = viewStart; // (round 190im: not a scroll by hand)
                 repaint();
             }
             else if (before != playhead)
                 repaint (waveArea.withTrimmedTop (-2));
         }
     }
+
+    // Round 190im (R13, DL-73; Live's manual 8.7): opened in the Clip View for a clip of the grid, the editor shows
+    // where that clip plays while it is launched — its content position (launcher clock − the clip's anchor, wrapped
+    // at its length, from its start offset) on the sample: through the warp axis for a warped clip, at the song's
+    // tempo otherwise. On the editor's existing timer, only while that clip plays; the old and new 2 px columns are
+    // repainted. Follow pages along (and pauses on a scroll or an edit, round 190im R15).
+    std::int64_t launchedFrame() const
+    {
+        if (source.gridTrack < 0 || source.gridTrack >= launcher::maxTracks || doc.audio.empty() || playing || recState != RecState::idle)
+            return -1;
+        const auto* state = engine.launcherState();
+        if (state == nullptr || ! state->running.load (std::memory_order_relaxed))
+            return -1;
+        const auto& view = state->tracks[(std::size_t) source.gridTrack];
+        if (view.playing.load (std::memory_order_relaxed) != source.gridScene)
+            return -1;
+        const auto& song = engine.getSong();
+        const auto* clip = song.clipGrid ? launcher::clipAt (*song.clipGrid, source.gridTrack, source.gridScene) : nullptr;
+        if (clip == nullptr || clip->kind != ClipKind::audio || clip->length <= 0)
+            return -1;
+        const auto into = std::fmod (juce::jmax (0.0, state->clockNow.load (std::memory_order_relaxed) + engine.playheadAdvanceTicks()
+                                                          - view.anchor.load (std::memory_order_relaxed)), (double) clip->length);
+        const auto tick = (double) clip->offset + into;
+        const auto frame = axis.valid() ? frameOfUnit (axis.unitOfBeat (tick / (double) ppq))
+                                        : tick / (double) ppq * 60.0 / juce::jmax (1.0, song.bpm) * doc.audio.sampleRate;
+        return juce::jlimit<std::int64_t> (0, doc.audio.frames(), (std::int64_t) frame);
+    }
+    void stepLaunchedHead()
+    {
+        const auto now = isShowing() ? launchedFrame() : (std::int64_t) -1;
+        if (now == launchedHead)
+            return;
+        const auto column = [this] (std::int64_t f) {
+            return f >= 0 ? juce::Rectangle<int> ((int) frameToX ((double) f) - 2, waveArea.getY(), 5, waveArea.getHeight()).getIntersection (waveArea)
+                          : juce::Rectangle<int>();
+        };
+        const auto before = column (launchedHead);
+        launchedHead = now;
+        if (now >= 0 && followLaunched())
+        {
+            viewStart = unitOfFrame ((double) now);
+            clampView();
+            followSeenView = viewStart; // (round 190im: not a scroll by hand)
+            repaint();
+            return;
+        }
+        if (! before.isEmpty())
+            repaint (before);
+        if (const auto after = column (now); ! after.isEmpty())
+            repaint (after);
+    }
+    // Follow on: the view pages along when the launched clip's position leaves it
+    bool followLaunched() const
+    {
+        if (! EditorGlobals::get().followsNow (EditorGlobals::FollowView::audioEditor))
+            return false;
+        const auto unit = unitOfFrame ((double) launchedHead);
+        return (unit > viewStart + (double) waveArea.getWidth() * fpp || unit < viewStart) && fpp < maxFpp();
+    }
+    std::int64_t launchedHead = -1;
+
+    // Round 190im (R15, Live's manual 8.7: "Follow will pause if you make an edit in the Sample Editor"): while the
+    // editor's own playback or a launched clip moves its playhead, a scroll by hand (the view moved at the same zoom, not
+    // by Follow) or an edit (the undo history moved) pauses Follow, until the next play / stop or a Follow click.
+    void watchFollowPause()
+    {
+        auto& globals = EditorGlobals::get();
+        globals.noteTransport (engine.getTransport().playing.load (std::memory_order_relaxed));
+        const auto edits = std::pair (history.size(), history.getPosition());
+        if ((playing || launchedHead >= 0) && followSeenKnown && ((viewStart != followSeenView && fpp == followSeenFpp) || edits != followSeenEdits))
+            globals.pauseFollow (EditorGlobals::FollowView::audioEditor);
+        followSeenView = viewStart;
+        followSeenFpp = fpp;
+        followSeenEdits = edits;
+        followSeenKnown = true;
+    }
+    double followSeenView = 0.0, followSeenFpp = 0.0;
+    std::pair<int, int> followSeenEdits;
+    bool followSeenKnown = false;
 
     // --- Edison's tools (round 165l): the tool windows' host ---------------------------------------------------
 public:

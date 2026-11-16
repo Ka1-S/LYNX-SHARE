@@ -33,6 +33,7 @@ std::unique_ptr<juce::Component> makeSliceDialogForSnapshot (AudioEngine& engine
 
 class PatternBlocksView;
 class EffectsPanel;
+class PatternPicker;
 class VideoLanesView;
 
 // FL-style Playlist (arrangement): tracks vertically, time horizontally.
@@ -134,6 +135,7 @@ public:
 
     // Editing shortcuts; the main window forwards keys when the Playlist is visible.
     bool handleKey (const juce::KeyPress& key);
+    void splitSelectionForLive(); // round 190im (R12): Live's Ctrl+E Split of the selected clips
     // The key map's actions of this editor (its tools and single letters: "pianoRoll.tool.knife"...); false if not one.
     bool runKeyAction (const std::string& id);
     // The tool buttons' tooltips show the keys the key map gives them (`keyOf`: action id -> key text, "" = none).
@@ -181,11 +183,18 @@ public:
     // files dragged from the LYNX browser
     bool isInterestedInDragSource (const SourceDetails& details) override;
     void itemDropped (const SourceDetails& details) override;
-    // round 190jc (design190ia SG-6): the Simple drop lane lights while files or Browser items are dragged over it
+    // round 190jj merge: 190jc's Simple drop lane and 190im's drop ghost (R5) both follow the drag
     void fileDragMove (const juce::StringArray& files, int x, int y) override;
     void fileDragExit (const juce::StringArray& files) override;
+    void itemDragEnter (const SourceDetails& details) override;
     void itemDragMove (const SourceDetails& details) override;
     void itemDragExit (const SourceDetails& details) override;
+    // --details190imshot: a drag of `description` held over `at` (the ghost drawn), then let go (cleared)
+    void dragOverForSnapshot (const juce::var& description, juce::Point<int> at);
+    // --details190imshot: the hint an automation clip's point (or its segment's tension) drag shows, as the drag makes it
+    ui::Hint dragHintForSnapshot (int clip, int point, bool tension);
+    bool followPausedForSnapshot() const { return EditorGlobals::get().isFollowPaused (EditorGlobals::FollowView::playlist); }
+    double scrollTicksForSnapshot() const noexcept { return scrollTicks; }
     // issue #152 point 6: a generator / effect from the Browser's Plugin database (or the Plugin picker). Pattern
     // workflow, FL-exact: on a track header only (core/PluginDrop.h); Clip-launch workflow: on a track, as Live
     void pluginDropped (const SourceDetails& details);
@@ -252,6 +261,34 @@ public:
     static inline bool showTrackInserts = false; // ui-options.txt trackInserts, action playlist.trackInserts
     static constexpr int insertsColumnWidth = 104;
     juce::Rectangle<int> insertsListForSnapshot (int track) const { return trackInserts (track); }
+    // round 190im (R5, DC-7): the lit strip's brightness step 1..4 follows the level of what the track plays (its clips'
+    // mixer tracks, read through the meters' activity reader); a track without audio (automation) lights at 4
+    std::map<int, std::pair<float, std::uint32_t>> activityInsertLevels; // [mixer track] the held level, the frame it was read in
+    std::vector<std::vector<int>> patternInserts; // [pattern] the mixer tracks its channels go to (rebuilt on a song change)
+    std::uint64_t patternInsertsStamp = ~(std::uint64_t) 0;
+    double activityMs = -1.0, activityElapsedMs = 0.0;
+    std::uint32_t activityFrame = 0;
+    float activityLevelOf (const Song& song, const Clip& clip);
+    // round 190im (R5, DC-3): the picker beside this Playlist (it registers itself) and the patterns it shows as playing
+    PatternPicker* livePicker = nullptr;
+    friend class PatternPicker;
+    // round 190im (R5, DC-5): the playhead's glow trail (Animations on, while playing) as last painted
+    bool trailShown = false;
+    // round 190im (R15): what the frame step saw of the view (a change it did not make = a scroll by hand), and the
+    // song's publish count at the last mouse press (a gesture that changed it = an edit)
+    double followSeenScroll = 0.0, followSeenZoom = 0.0;
+    std::uint64_t followEditStamp = 0;
+    static constexpr int playheadTrail = 14; // (FL: ≈14 px of fading glow behind the line, shots/fl-playhead-glow-zoom.png)
+    bool playheadTrailOn() const;
+    // round 190im (R5, DE-135): the clips a drag over the Playlist would place, drawn where they would land
+    std::vector<Clip> dropGhost;
+    juce::Rectangle<int> dropGhostArea;
+    void updateDropGhost (const SourceDetails& details);
+    void clearDropGhost();
+    void paintDropGhost (juce::Graphics& g);
+    juce::Rectangle<int> dropGhostBounds() const;
+    juce::String dropGhostFile; // (an audio file's length, read once per drag)
+    std::int64_t dropGhostFileTicks = 0;
     int headerWidth = flHeaderWidth;
     static constexpr int toolbarHeight = 32; // the panel title row (Workspace::titleHeight)
     static constexpr int overviewHeight = 16; // the overview strip under the toolbar (round 90)
@@ -392,6 +429,9 @@ private:
     {
         juce::Rectangle<int> area, alsoChanged;
         juce::RectangleList<int> stickyTitles; // round 190ig: FL's clip titles at the left edge (header bands) to paint again
+        // round 190im (perf): the same bands where the clip alone covers them (its header is opaque): repaired by painting
+        // that one clip in its band, not by a whole exact paint pass (clip index, band)
+        std::vector<std::pair<int, juce::Rectangle<int>>> heldBands;
         int dx = 0, dy = 0;
     };
     CacheView cacheView() const;
@@ -407,6 +447,7 @@ private:
     double zoomEndMs = -1.0e9;
     juce::TimedCallback zoomSettle { [this] { settleZoom(); } };
     void paintStickyTitles (juce::Graphics& g);
+    void paintHeldClip (juce::Graphics& g, int index); // round 190im: one audio / automation clip as paint() draws it
     struct HeldTitlesKey // round 190ig: what the held clip titles were last found for
     {
         double scrollTicks = -1.0, pixelsPerTick = 0.0;
@@ -425,6 +466,7 @@ private:
     ui::MotionOverlay::Mark playheadMark() const;
     juce::Rectangle<int> playheadColumn (double tick) const;
     void repaintPlayheadColumn (double tick);
+    void paintPlayheadTrail (juce::Graphics& g, float x, juce::Rectangle<int> grid) const; // round 190im (R5, DC-5)
     void scrollBarMoved (juce::ScrollBar*, double) override;
 
     juce::Rectangle<int> gridArea() const;
@@ -733,6 +775,7 @@ private:
     void editCurve (int clip, const std::function<void (std::vector<AutomationPoint>&)>& fn);
     float curveValueAt (int clip, double clipTick) const;
     juce::String curveValueText (int clip, float value) const;
+    static juce::String tensionText (float tension); // round 190im: "Tension: 40%" (FL's sign)
     void paintClipEnvelope (juce::Graphics& g, const Clip& c, const ClipEnvelope& envelope);
     int automationPointAt (int clip, juce::Point<int> p) const;
     bool isOnAutomationCurve (int clip, juce::Point<int> p) const;
@@ -797,6 +840,7 @@ private:
     void updateCursor (juce::ModifierKeys mods);
     juce::Rectangle<int> clipBounds (int clip) const;
     void postDragHint (); // what the gesture in progress does (hint bar)
+    bool makeDragHint (ui::Hint& hint); // (round 190im: the hint; false = none for this drag)
     juce::Rectangle<int> clipMenuButton (int clip) const; // the menu button in a clip's title strip (empty if too narrow)
     juce::uint32 lastWheelEdit = 0;
     magiclasso::Trail lassoPath; // FL's Magic lasso (round 189g): the mouse trail while the option is on
@@ -877,6 +921,10 @@ public:
     // patterns" and "Merge identical patterns".
     juce::PopupMenu pickerMenu();
 
+    // round 190im (R5, DC-3): the patterns playing now, marked as FL marks them (a light-blue bar at the entry's right
+    // edge, shots/fl-picker-stopped-vs-playing.png); only the entries that change are repainted
+    void setPlayingPatterns (std::vector<int> now);
+
     // the kind listed: 0 = patterns, 1 = audio clips, 2 = automation clips
     void setView (int newView);
     int getView() const noexcept { return view; }
@@ -909,6 +957,8 @@ private:
     bool dragging = false; // that drag has started
     int hoverTab = -1, hoverRow = -1;
     bool hoverAdd = false;
+    std::vector<int> playingPatterns; // round 190im: sorted
+    friend class PlaylistComponent;
     static constexpr int rowHeight = 28, headerHeight = 26, footerHeight = 22;
 };
 

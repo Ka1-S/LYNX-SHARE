@@ -1,3 +1,4 @@
+#include "ui/Motion.h"
 #include "ui/FlMods.h"
 #include "ui/EditorTools.h"
 
@@ -540,6 +541,16 @@ void EditorGlobals::setDefaultNoteLength (std::int64_t ticks)
 void EditorGlobals::setFollowing (bool pianoRoll, bool on, bool save)
 {
     auto& flag = pianoRoll ? followPianoRoll : followPlaylist;
+    // (round 190im, R15: a Follow click while it is paused resumes it, as Live's; it stays on)
+    if (auto& paused = followPaused[(std::size_t) (pianoRoll ? FollowView::pianoRoll : FollowView::playlist)]; paused)
+    {
+        paused = false;
+        if (! on && flag)
+        {
+            sendChangeMessage();
+            return;
+        }
+    }
 
     if (flag != on)
     {
@@ -555,6 +566,15 @@ void EditorGlobals::setFollowingView (FollowView v, bool on, bool save)
     if (v == FollowView::playlist || v == FollowView::pianoRoll)
         return setFollowing (v == FollowView::pianoRoll, on, save);
     auto& flag = v == FollowView::channelRack ? followRack : followAudioEditor;
+    if (auto& paused = followPaused[(std::size_t) v]; paused)
+    {
+        paused = false;
+        if (! on && flag)
+        {
+            sendChangeMessage();
+            return;
+        }
+    }
     if (flag != on)
     {
         flag = on;
@@ -640,8 +660,29 @@ void OverviewBar::setRange (double newTotal, double newStart, double newLength)
         total = newTotal;
         start = newStart;
         length = newLength;
+        positionX = positionXFor (position); // (round 190im: the line moves with the scale)
         repaint();
     }
+}
+
+int OverviewBar::positionXFor (double units) const
+{
+    return units < 0.0 || total <= 0.0 ? -1 : (int) std::floor (units / total * (double) getWidth());
+}
+
+void OverviewBar::setPosition (double units)
+{
+    position = units;
+    const auto x = positionXFor (units);
+    if (x == positionX)
+        return;
+    // the line and the trail left of it (a few pixels), old and new
+    const auto strip = [this] (int at) { return juce::Rectangle<int> (at - 6, 0, 8, getHeight()); };
+    if (positionX >= 0)
+        repaint (strip (positionX));
+    if (x >= 0)
+        repaint (strip (x));
+    positionX = x;
 }
 
 juce::Rectangle<float> OverviewBar::windowArea() const
@@ -702,6 +743,21 @@ void OverviewBar::paint (juce::Graphics& g)
 
     g.setColour (border);
     g.fillRect (area.withTop (area.getBottom() - 1.0f));
+
+    // round 190im (R5, DC-6): the song position while playing — FL draws a 1 px line with a short glow behind it
+    // (shots/fl-overview-stopped-vs-playing.png: ≈4 px fading in); LYNX's playhead colour (decision PL1), the glow only
+    // with Animations on
+    if (const auto px = positionXFor (position); px >= 0)
+    {
+        const auto x = (float) px;
+        if (ui::motion::enabled())
+        {
+            g.setGradientFill (juce::ColourGradient (playhead.withAlpha (0.0f), x - 4.0f, 0.0f, playhead.withAlpha (0.45f), x, 0.0f, false));
+            g.fillRect (juce::Rectangle<float> (x - 4.0f, 0.0f, 4.0f, area.getHeight() - 1.0f));
+        }
+        g.setColour (playhead);
+        g.fillRect (juce::Rectangle<float> (x, 0.0f, 1.0f, area.getHeight() - 1.0f));
+    }
 }
 
 void OverviewBar::mouseMove (const juce::MouseEvent& e)

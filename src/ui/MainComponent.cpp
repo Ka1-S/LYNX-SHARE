@@ -2812,6 +2812,8 @@ void MainComponent::loadUiSettings()
             EditorGlobals::get().snapFadeHandles = on;
         else if (key == "plAutomationFollowsClips") // round 190cg (absent = as the layout)
             EditorGlobals::get().automationFollowsClips = on ? 1 : 0;
+        else if (key == "followPausesOnEdit") // round 190im (absent = as the layout)
+            EditorGlobals::get().followPausesOnEdit = on ? 1 : 0;
         else if (key == "plMagicLasso")
             EditorGlobals::get().magicLasso = on;
         else if (key == "dropAudioOnHeaders") // round 189e: FL's Edit › Drop audio on track headers (DropAudioToPLMode)
@@ -3115,6 +3117,8 @@ void MainComponent::saveUiSettings()
                                       + "\nplSnapFadeHandles=" + juce::String (EditorGlobals::get().snapFadeHandles ? 1 : 0)
                                       + (EditorGlobals::get().automationFollowsClips < 0 ? juce::String()
                                              : "\nplAutomationFollowsClips=" + juce::String (EditorGlobals::get().automationFollowsClips))
+                                      + (EditorGlobals::get().followPausesOnEdit < 0 ? juce::String()
+                                             : "\nfollowPausesOnEdit=" + juce::String (EditorGlobals::get().followPausesOnEdit))
                                       + "\nplMagicLasso=" + juce::String (EditorGlobals::get().magicLasso ? 1 : 0)
                                       + "\ndropAudioOnHeaders=" + juce::String ((int) trackmodes::headerDropOptions().mode)
                                       + "\ndropLocksToContent=" + juce::String (trackmodes::headerDropOptions().lockToContent ? 1 : 0)
@@ -9057,6 +9061,13 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
                 for (auto v : { EditorGlobals::FollowView::playlist, EditorGlobals::FollowView::pianoRoll,
                                 EditorGlobals::FollowView::channelRack, EditorGlobals::FollowView::audioEditor })
                     g.setFollowingView (v, ! on);
+            });
+            // round 190im (R15, owner decision L3): Live's Follow pause after a scroll or an edit by hand; on by default
+            // in the Clip-launch layout, off in the others until FL's behaviour is captured
+            const auto pausing = globals.followPausing();
+            menu.addItem (tr ("Auto scrolling pauses on a scroll or an edit"), true, pausing, [this, pausing] {
+                EditorGlobals::get().followPausesOnEdit = pausing ? 0 : 1;
+                saveUiSettings();
             });
         }
         // FL's "Multilink to controllers" (Ctrl+J), the last of FL's Switches (after Auto scrolling and Enable groups;
