@@ -146,6 +146,9 @@ public:
     std::function<void()> onBrowseScores;
     // "Note names on every key" was switched in the menu (the main window saves its settings)
     std::function<void()> onNoteNamesChanged;
+    // round 190im (R13): set by the Clip View while this editor is docked for a clip of the grid: the clip's pattern
+    // position while it is launched (−1: not playing); the playhead shows it
+    std::function<double()> launchedPlayhead;
     // The play button: click plays / pauses the pattern, right-click stops back at the last start (the main window's transport)
     std::function<void()> onPlayPause, onPlayRightClick;
     // The time selection (Ctrl+drag on the ruler; -1 = none) that Insert / Delete space and Trim use.

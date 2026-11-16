@@ -4817,6 +4817,11 @@ bool PianoRollComponent::playheadFrame (double)
         // (between two audio blocks it moves on at the song's tempo: smooth at 144 Hz, round 174e)
         tick = transportedit::patternPlayhead (song, song.currentPattern, transport.positionTicks.load() + engine.playheadAdvanceTicks(),
                                                engine.patternLinearOrigin());
+        // round 190im (R13, DL-74): docked in the Clip View for a clip of the grid, the clip's own position while it is
+        // launched (Live's manual 8.7) wins over the Playlist's
+        if (launchedPlayhead != nullptr)
+            if (const auto launched = launchedPlayhead(); launched >= 0.0)
+                tick = launched;
     }
 
     // whenever it moved: the line is anti-aliased, so even a fraction of a pixel shows (zoomed out, a playhead crossing

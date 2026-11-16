@@ -2331,6 +2331,24 @@ public:
             takenBack = false; // (Notes: the Piano roll docks again)
         update();
     }
+    // Round 190im (R13, DL-74): the docked clip's position in its pattern while it is launched from the grid (the
+    // launcher clock − its anchor, wrapped at its length, from its start offset); −1 when it does not play
+    double launchedTick() const
+    {
+        const auto* state = engine.launcherState();
+        if (state == nullptr || dockedTrack < 0 || dockedTrack >= launcher::maxTracks || ! state->running.load (std::memory_order_relaxed))
+            return -1.0;
+        const auto& view = state->tracks[(std::size_t) dockedTrack];
+        if (view.playing.load (std::memory_order_relaxed) != dockedScene)
+            return -1.0;
+        const auto& song = engine.getSong();
+        const auto* clip = song.clipGrid ? launcher::clipAt (*song.clipGrid, dockedTrack, dockedScene) : nullptr;
+        if (clip == nullptr || clip->kind != ClipKind::pattern || clip->length <= 0)
+            return -1.0;
+        return (double) clip->offset + std::fmod (juce::jmax (0.0, state->clockNow.load (std::memory_order_relaxed) + engine.playheadAdvanceTicks()
+                                                                       - view.anchor.load (std::memory_order_relaxed)), (double) clip->length);
+    }
+
     void release()
     {
         dropEvents();
@@ -2480,6 +2498,10 @@ private:
             dockedTrack = track;
             dockedScene = scene;
             auto* e = hooks.dockPianoRoll (clip->pattern);
+            if (auto* roll = dynamic_cast<PianoRollComponent*> (e)) // (round 190im, R13: the launched clip's position)
+                roll->launchedPlayhead = [safe = juce::Component::SafePointer<ClipPage> (this), roll] {
+                    return safe != nullptr && safe->editor == roll ? safe->launchedTick() : -1.0;
+                };
             if (e != nullptr && e != editor)
             {
                 editor = e;
