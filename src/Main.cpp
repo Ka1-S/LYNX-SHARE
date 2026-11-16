@@ -6224,8 +6224,6 @@ private:
             song.mixer[5].effects.push_back (haloSlot);
             song.mixer[6].effects.push_back (lynx::makeEffectSlot (lynx::EffectKind::latticeMod));
             auto luxeSlot = lynx::makeEffectSlot (lynx::EffectKind::luxeVerb);
-            if (luxeSlot.params.size() <= (std::size_t) lynx::luxeVerbSpaceDucking)
-                luxeSlot.params.resize ((std::size_t) lynx::luxeVerbSpaceDucking + 1, 0.0f);
             luxeSlot.params[(std::size_t) lynx::luxeVerbSpaceDucking] = 0.5f;
             song.mixer[7].effects.push_back (luxeSlot);
 
