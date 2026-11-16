@@ -25,6 +25,7 @@
 #include "ui/SimpleLook.h"
 #include "ui/SoundFontEditor.h"
 #include "ui/TrackIcons.h"
+#include "ui/Motion.h"
 #include "ui/Theme.h"
 #include "ui/TouchKeyboard.h"
 
@@ -1762,11 +1763,13 @@ public:
             const auto* c = channelOf (p);
             const bool has = c != nullptr && ! c->samplePath.empty();
             const auto tint = padColour (c != nullptr ? c->simplePad.colour : 0, trackColour);
-            const bool lit = flash[(std::size_t) p] > 0;
             // round 190jc (design190ia SG-11): the label is black or white, whichever reads better on the pad (>= 4.58:1 on any
-            // fill; white "Hat" on orange was 2.71:1)
-            const auto fill = has ? tint.withMultipliedBrightness (lit ? 1.0f : 0.55f).withMultipliedSaturation (lit ? 1.0f : 0.8f) : colour::bg2;
-            const auto ink = ui::simplelook::inkOn (fill);
+            // fill; white "Hat" on orange was 2.71:1). Round 190jj: a press darkens the plate (BandLab); the label keeps the
+            // ink of the pad at rest, as BandLab's glyph keeps its colour
+            const auto rest = has ? tint.withMultipliedBrightness (0.55f).withMultipliedSaturation (0.8f) : colour::bg2;
+            const auto press = pressShown[(std::size_t) p];
+            const auto fill = has && press > 0.0f ? rest.withMultipliedBrightness (1.0f - pressDepth * press) : rest;
+            const auto ink = ui::simplelook::inkOn (rest);
             if (has)
             {
                 fillRoundRect (g, r, radius::md, fill);
@@ -1963,18 +1966,43 @@ public:
         loadFile (at >= 0 ? at : selected, BrowserComponent::draggedFile (d));
     }
 
-    // a short light on a pad played by a key or a click (a timer runs only while a pad is lit)
-    // (round 190ih, DS-34: a pad's light changes only when it goes on or off, so only that pad repaints; it was the
-    // whole page, the selected pad's waveform included, on every tick)
+    // Round 190jj (capture190ji §1a, shots/bl-a-pads-flash-z2.png, films/play-sampler-pads): BandLab's pad "press" — a
+    // pad that sounds darkens from its colour to ~55 % brightness in ~50 ms and back in ~90 ms (eased both ways), for a
+    // click, a key, and the notes the song plays. The timer runs only while a press runs (60 Hz with Animations on; with
+    // Animations off the pad darkens at once and comes back after the same 140 ms: two repaints). Only the pressed pad
+    // repaints. (Round 190ih, DS-34: the page is never repainted whole for a press.)
+    static constexpr double pressInMs = 50.0, pressOutMs = 90.0;
+    static constexpr float pressDepth = 0.45f; // (to 55 % of the colour)
+    float pressAmount (int p, double nowMs) const
+    {
+        const auto start = pressStart[(std::size_t) p];
+        if (start < 0.0)
+            return 0.0f;
+        const auto t = nowMs - start;
+        if (t >= pressInMs + pressOutMs || t < 0.0)
+            return 0.0f;
+        if (! ui::motion::enabled())
+            return 1.0f;
+        auto ease = [] (double x) { return (float) (x * x * (3.0 - 2.0 * x)); }; // (smoothstep: eased both ways)
+        return t < pressInMs ? ease (t / pressInMs) : 1.0f - ease ((t - pressInMs) / pressOutMs);
+    }
     void timerCallback() override
     {
+        const auto now = juce::Time::getMillisecondCounterHiRes();
         bool any = false;
         for (int p = 0; p < simplepads::padCount; ++p)
         {
-            auto& f = flash[(std::size_t) p];
-            if (f > 0 && --f == 0)
+            if (pressStart[(std::size_t) p] < 0.0)
+                continue;
+            const auto amount = pressAmount (p, now);
+            if (amount <= 0.0f && now - pressStart[(std::size_t) p] >= pressInMs + pressOutMs)
+                pressStart[(std::size_t) p] = -1.0;
+            if (amount != pressShown[(std::size_t) p])
+            {
+                pressShown[(std::size_t) p] = amount;
                 repaint (padBounds (p).expanded (2));
-            any = any || f > 0;
+            }
+            any = any || pressStart[(std::size_t) p] >= 0.0;
         }
         if (! any)
             stopTimer();
@@ -1983,12 +2011,36 @@ public:
     {
         if (pad >= 0 && pad < simplepads::padCount)
         {
-            if (flash[(std::size_t) pad] == 0)
-                repaint (padBounds (pad).expanded (2));
-            flash[(std::size_t) pad] = 5;
+            pressStart[(std::size_t) pad] = juce::Time::getMillisecondCounterHiRes();
             if (! isTimerRunning())
-                startTimerHz (30); // (5 ticks, then it stops)
+                startTimerHz (ui::motion::enabled() ? 60 : 30);
+            timerCallback(); // (the first frame now)
         }
+    }
+    // Round 190jj: the notes the song plays press their pads (BandLab). Called on the main window's 30 Hz timer; it reads
+    // the pads' channels' note-strike counters (the engine's activity counters: a new note-on, even one shorter than a
+    // frame) only while the song runs and the page shows; stopped it does nothing.
+    void watchPlayback()
+    {
+        const auto runs = engine.getTransport().playing.load (std::memory_order_relaxed) && isShowing() && track >= 0;
+        for (int p = 0; p < simplepads::padCount; ++p)
+        {
+            const auto ch = channelIndex (p);
+            const auto strikes = runs && ch >= 0 ? engine.noteStrikes (ch) : 0u;
+            if (runs && watching && ch == seenChannel[(std::size_t) p] && strikes != seenStrikes[(std::size_t) p] && hasSound (p))
+                lightPad (p);
+            seenStrikes[(std::size_t) p] = strikes;
+            seenChannel[(std::size_t) p] = ch;
+        }
+        watching = runs;
+    }
+    float pressShownForCheck (int pad) const { return pad >= 0 && pad < simplepads::padCount && pressStart[(std::size_t) pad] >= 0.0 ? 1.0f : pressShown[(std::size_t) pad]; }
+    float pressForSnapshot (int pad, float amount)
+    {
+        pressStart[(std::size_t) pad] = -1.0;
+        pressShown[(std::size_t) pad] = amount;
+        repaint();
+        return amount;
     }
 
 private:
@@ -2455,7 +2507,11 @@ private:
     AudioEngine& engine;
     int track = -1, selected = 0, dragFrom = -1, dropTarget = -1, regionDrag = 0, clipboard = -1, heldChannel = -1;
     std::vector<int> channels;
-    std::array<int, simplepads::padCount> flash {};
+    std::array<double, simplepads::padCount> pressStart = [] { std::array<double, simplepads::padCount> a; a.fill (-1.0); return a; }();
+    std::array<float, simplepads::padCount> pressShown {};
+    std::array<std::uint32_t, simplepads::padCount> seenStrikes {};
+    std::array<int, simplepads::padCount> seenChannel {};
+    bool watching = false;
     juce::Rectangle<int> gridArea, titleArea, waveArea;
     juce::TextButton load, browse, kit, normalize, group;
     juce::ToggleButton reverse;
@@ -2625,7 +2681,7 @@ void SimpleDock::showPage()
     button.setToggleState (true, juce::dontSendNotification);
     if (tab == Tab::keyboard && keyboardPage == nullptr)
     {
-        keyboardPage = makeKeyboardPanel (engine, [this] { return channel; });
+        keyboardPage = makeKeyboardPanel (engine, [this] { return channel; }, [this] { return trackColourNow(); });
         addChildComponent (*keyboardPage);
         resized();
     }
@@ -2653,6 +2709,9 @@ void SimpleDock::padsKnobForCheck (int knob, float v) { padsPage->turnForCheck (
 void SimpleDock::padsRegionForCheck (float start, float end) { padsPage->setRegionForCheck (start, end); }
 void SimpleDock::padsNormalizeForCheck() { padsPage->normalizeForCheck(); }
 void SimpleDock::padsHitForCheck (int pad) { padsPage->hit (pad); }
+void SimpleDock::padsPressForSnapshot (int pad, float amount) { padsPage->pressForSnapshot (pad, amount); }
+void SimpleDock::padsWatchForCheck() { padsPage->watchPlayback(); }
+float SimpleDock::padsPressForCheck (int pad) const { return padsPage->pressShownForCheck (pad); }
 void SimpleDock::padsDragForCheck (int from, int to, bool copy) { padsPage->dragPadForCheck (from, to, copy); }
 void SimpleDock::padsUpdateForCheck() { padsPage->update(); }
 juce::PopupMenu SimpleDock::padMenuForSnapshot (int pad) { return padsPage->padMenuForSnapshot (pad); }
@@ -2687,10 +2746,22 @@ juce::Rectangle<int> SimpleDock::inputMeterBar() const
     return { a.getRight() - 110, a.getCentreY() - 2, 110, 4 };
 }
 
+juce::Colour SimpleDock::trackColourNow() const
+{
+    const auto& song = engine.getSong();
+    if (track < 0)
+        return theme::colour::accent;
+    const auto own = track < (int) song.playlistTracks.size() ? song.playlistTracks[(std::size_t) track].colour : 0u;
+    const auto kind = simpletracks::kindOf (song, track);
+    return own != 0 ? juce::Colour (own).withAlpha (1.0f) : kind ? juce::Colour (simpletracks::defaultColour (*kind)).withAlpha (1.0f) : theme::colour::accent;
+}
+
 void SimpleDock::tickInputMeter()
 {
     if (! isShowing())
         return;
+    if (padsPage != nullptr && padsPage->isVisible()) // round 190jj: the song's notes press the pads (BandLab)
+        padsPage->watchPlayback();
     const auto shown = inputMeterShown();
     auto level = 0.0f;
     if (shown && insert > 0)
