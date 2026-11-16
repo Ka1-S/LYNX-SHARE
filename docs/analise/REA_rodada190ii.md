@@ -47,6 +47,11 @@ programs played without their loops. LYNX now completes short records the way Di
 `readZone` (accept 36 bytes, bits = 32) would also fix version-36 states inside old `.flp` projects; it is left to
 the round that owns DirectWave.cpp (190hz touches the neighbouring lines).
 
+*Rollup 0.1.30 (round 190il):* the tolerance moved into `readZone` itself (DirectWave.cpp: every zone record shorter than
+LYNX reads is completed with zeros, the sample format record's bit depth with 32), so version-36 states in old `.flp`
+projects and the DirectWave editor's "Open program" keep their loops too; `msimport::stateOfFile` now keeps the file's
+records as stored and relies on it (tests/Rollup030Tests.inc).
+
 ### 1.3 Finding the samples [DEC `0x18001ddb0` → `0x18001dc20`, `0x180006590`, `0x180040350`]
 
 When the zone's saved path does not open, DirectWave (with "find missing samples" on):

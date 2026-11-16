@@ -379,7 +379,8 @@ TEST (formats190ii_dwp_v36_format_record_completed)
 {
     using namespace lynx;
     const auto file = formats190ii::legacyDwp ("%FLStudioData%\\Patches\\Packs\\Piano\\Piano 2\\a.wav", 45, 44, 46, 2, 300, 800);
-    // as stored, LYNX's reader skipped the 36-byte record (and with it the loop); DirectWave reads it partly, bits = 32
+    // LYNX's reader used to skip the 36-byte record (and with it the loop); DirectWave reads it partly, bits = 32 (readZone
+    // does so since the 0.1.30 rollup; tests/Rollup030Tests.inc)
     const auto state = msimport::stateOfFile (file);
     CHECK (state.has_value());
     if (! state)

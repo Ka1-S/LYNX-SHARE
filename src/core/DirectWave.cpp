@@ -65,10 +65,45 @@ float rf (const std::uint8_t* p) { float f; std::memcpy (&f, p, 4); return f; }
 std::int32_t ri (const std::uint8_t* p) { std::int32_t v; std::memcpy (&v, p, 4); return v; }
 std::uint16_t ru16 (const std::uint8_t* p) { std::uint16_t v; std::memcpy (&v, p, 2); return v; }
 
+// The bytes LYNX reads of a zone record (0 = a record it reads whole, or none it knows).
+std::size_t zoneRecordSize (std::uint32_t id) noexcept
+{
+    switch (id)
+    {
+        case 0x1F4: return 25;
+        case 0x1F7: return 40;
+        case 0x1F8: return 8;
+        case 0x1F9: return 14;
+        case 0x1FA: case 0x1FD: case 0x202: return 16;
+        case 0x1FB: case 0x203: return 20;
+        case 0x1FC: return 2;
+        case 0x1FE: case 0x1FF: case 0x200: case 0x201: return 9;
+        case 0x204: return 8;
+        default: return 0;
+    }
+}
+
 void readZone (const Chunk& z, Zone& zone)
 {
     int filters = 0, envs = 0, lfos = 0, mods = 0;
-    forEachChunk (z.data, z.size, [&] (const Chunk& c) {
+    forEachChunk (z.data, z.size, [&] (const Chunk& chunk) {
+        // FL's own reader (DirectWave_x64.dll 0x18003f840; docs/analise/REA_rodada190ii.md §1.2) reads every record with
+        // read (min (chunk size, record size)) over a record that starts as zeros, the sample format record's bit depth
+        // as 32: a short chunk keeps those values for its missing tail. FL's shipped version-36 programs (and the
+        // version-36 states in old .flp projects) store the sample format record in 36 bytes, without the bit depth:
+        // their loops are read, bits = 32 (round 190il; before, the whole record was skipped and with it the loop).
+        std::uint8_t completed[40] {};
+        auto c = chunk;
+        if (const auto want = zoneRecordSize (chunk.id); want != 0 && chunk.size < want)
+        {
+            std::memcpy (completed, chunk.data, chunk.size);
+            if (chunk.id == 0x1F7 && chunk.size <= 36)
+            {
+                const std::int32_t bits = 32;
+                std::memcpy (completed + 36, &bits, 4);
+            }
+            c = Chunk { chunk.id, completed, want };
+        }
         const auto* b = c.data;
         switch (c.id)
         {

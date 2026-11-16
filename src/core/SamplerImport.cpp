@@ -148,9 +148,11 @@ void writeZone (Out& o, const Zone& z)
 std::uint32_t le32 (const std::uint8_t* p) { std::uint32_t v; std::memcpy (&v, p, 4); return v; }
 std::uint64_t le64 (const std::uint8_t* p) { std::uint64_t v; std::memcpy (&v, p, 8); return v; }
 
-// Copies a chunk list, completing short chunks as DirectWave's readers do (they read min(size, record) bytes over a
-// record that starts as zeros; the sample format record's bit depth starts as 32 — DirectWave_x64.dll 0x18003f840).
-// Returns false when the list does not parse.
+// Copies a chunk list, checking that it parses (a program file's state, as DirectWave stores it). Short records stay
+// as stored: dw::parseState completes them the way DirectWave reads them (DirectWave.cpp readZone, FL's
+// read (min (size, record)) over a record of zeros, the sample format record's bit depth 32; round 190il — the
+// shipped version-36 programs' 36-byte sample format records keep their loops, in .flp projects and the DirectWave
+// editor's "Open program" too). Returns false when the list does not parse.
 bool normalise (const std::uint8_t* p, std::size_t n, Out& o, int depth)
 {
     std::size_t at = 0;
@@ -169,33 +171,7 @@ bool normalise (const std::uint8_t* p, std::size_t n, Out& o, int depth)
             o.close (c);
         }
         else
-        {
-            std::vector<std::uint8_t> v (body, body + size);
-            std::size_t want = 0;
-            if (depth == 2)
-                switch (id)
-                {
-                    case 0x1F4: want = 25; break;
-                    case 0x1F7: want = 40; break;
-                    case 0x1F8: want = 8; break;
-                    case 0x1F9: want = 14; break;
-                    case 0x1FA: want = 16; break;
-                    case 0x1FB: case 0x203: want = 20; break;
-                    case 0x1FC: want = 2; break;
-                    case 0x1FD: case 0x202: want = 16; break;
-                    case 0x1FE: case 0x1FF: case 0x200: case 0x201: want = 9; break;
-                    case 0x204: want = 8; break;
-                    default: break;
-                }
-            if (want != 0 && v.size() < want)
-            {
-                const auto had = v.size();
-                v.resize (want, 0);
-                if (id == 0x1F7 && had <= 36)
-                    v[36] = 32;
-            }
-            o.chunk (id, v);
-        }
+            o.chunk (id, std::vector<std::uint8_t> (body, body + size));
         at += 12 + (std::size_t) size;
     }
     return true;
