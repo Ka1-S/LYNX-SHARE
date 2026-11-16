@@ -452,10 +452,9 @@ double autoFilter2LfoBeats (int timeMode, double hz, double seconds, int syncedR
 void autoFilterModulation (const xml::Element& device, const Context& context, Translated& out);
 
 // ---- Live's synths → the built-in synth -------------------------------------------------------------------------
-// Operator's coarse ratio [DOC: 0 = 0.5, then 1 … 48] and fine (thousandths of it) as semitones above the note
-double operatorRatioSemitones (int coarse, double fine) noexcept;
-// false: not translated (FM in use, a waveform LYNX's synth has no exact counterpart for): the caller lists the device
-bool operatorToSynth (const xml::Element& device, ChannelDef& channel, double bpm, Notes& notes);
+// Operator → Tetra, LYNX's own FM synth (round 190hs, core/AlsDevicesFm.cpp): every parameter Tetra has, in Operator's
+// units; `notes` lists what has no place. False: not an Operator device
+bool operatorToTetra (const xml::Element& device, ChannelDef& channel, Notes& notes);
 bool driftToSynth (const xml::Element& device, ChannelDef& channel, double bpm, Notes& notes);
 // The ratio's semitones as the synth's octave / semitones / cents (octave −3 … 3, semitones −11 … 11, cents ±100)
 void setOscillatorPitch (SynthOscillator& osc, double semitones) noexcept;

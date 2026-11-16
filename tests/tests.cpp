@@ -17603,6 +17603,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "AlsDevices190cfTests.inc"
 #include "AlsDevices190edTests.inc"
 #include "AlsDevices190ekTests.inc"
+#include "Tetra190hsTests.inc" // round 190hs
 #include "AlsDevices190fmTests.inc"
 #include "Merge180cTests.inc"
 #include "Slicer180cTests.inc"

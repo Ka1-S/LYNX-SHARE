@@ -1295,13 +1295,29 @@ bool instrumentFrom (Ctx& ctx, const Element& device, ChannelDef& channel, std::
                     }
         return false;
     }
-    // (round 190ed) Operator without FM in use and Drift: the built-in synth with their oscillators, filter and amp
-    // envelope (core/AlsDevices.h); the report lists the pair as fitted and what has no place
-    if (tag == "Operator" || tag == "Drift")
+    // (round 190hs) Operator: Tetra, LYNX's own FM synth, with Operator's values as they are (core/AlsDevicesFm.cpp)
+    if (tag == "Operator")
+    {
+        alsdev::Notes notes;
+        ChannelDef fm = channel;
+        if (alsdev::operatorToTetra (device, fm, notes))
+        {
+            channel = std::move (fm);
+            ctx.note (&FlpImportReport::converted, "Operator -> Tetra (LYNX's FM synth)");
+            for (const auto& n : notes.approximated)
+                ctx.note (&FlpImportReport::partialEffects, "Operator: " + n);
+            for (const auto& n : notes.dropped)
+                ctx.note (&FlpImportReport::partialEffects, "Operator: " + n + " (not applied)");
+            return true;
+        }
+    }
+    // (round 190ed) Drift: the built-in synth with its oscillators, filter and amp envelope (core/AlsDevices.h); the
+    // report lists the pair as fitted and what has no place
+    if (tag == "Drift")
     {
         alsdev::Notes notes;
         ChannelDef synth = channel;
-        if (tag == "Operator" ? alsdev::operatorToSynth (device, synth, ctx.song.bpm, notes) : alsdev::driftToSynth (device, synth, ctx.song.bpm, notes))
+        if (alsdev::driftToSynth (device, synth, ctx.song.bpm, notes))
         {
             channel = std::move (synth);
             ctx.note (&FlpImportReport::partialEffects, tag + " -> built-in synth (settings fitted to LYNX's engine)");
@@ -1310,12 +1326,6 @@ bool instrumentFrom (Ctx& ctx, const Element& device, ChannelDef& channel, std::
             for (const auto& n : notes.dropped)
                 ctx.note (&FlpImportReport::partialEffects, tag + ": " + n + " (not applied)");
             return true;
-        }
-        if (tag == "Operator")
-        {
-            // FM (or a waveform whose order is not settled): no LYNX engine holds it yet
-            ctx.note (&FlpImportReport::unsupported, deviceName (device) + " (FM synthesis: no LYNX engine for it yet)");
-            return false;
         }
     }
     // Live's synths: no LYNX equivalent; the channel keeps a built-in synth, as for an unknown FL generator
