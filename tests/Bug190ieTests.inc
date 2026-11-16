@@ -116,6 +116,22 @@ struct Result
 };
 
 // steady 120 and 140 BPM against a ramp 120 → 140 over the render (blocks of `block`)
+// (survey only: LYNX_SURVEY_190IE_DUMP=<folder> writes each row's steady and ramp renders there as raw floats, L then R,
+// to compare builds; `dumpName` names the row)
+inline std::string dumpName;
+inline void dump (const char* what, const std::vector<float>& l, const std::vector<float>& r)
+{
+    const char* dir = std::getenv ("LYNX_SURVEY_190IE_DUMP");
+    if (dir == nullptr || dumpName.empty())
+        return;
+    if (auto* f = std::fopen ((std::string (dir) + "/" + dumpName + "_" + what + ".f32").c_str(), "wb"))
+    {
+        std::fwrite (l.data(), sizeof (float), l.size(), f);
+        std::fwrite (r.data(), sizeof (float), r.size(), f);
+        std::fclose (f);
+    }
+}
+
 inline Result rampVsSteady (const lynx::EffectSlot& slot, double rate, int block, double seconds)
 {
     Result res;
@@ -126,6 +142,8 @@ inline Result rampVsSteady (const lynx::EffectSlot& slot, double rate, int block
     const auto c = render (slot, in, rate, block, [] (int, int) { return 140.0; });
     const auto ramp = render (slot, in, rate, block, [] (int at, int n) { return 120.0 + 20.0 * at / n; });
     res.ran = true;
+    dump ("steady", a.l, a.r);
+    dump ("ramp", ramp.l, ramp.r);
     res.steadyHash = hashOf (a);
     res.finite = a.finite && c.finite && ramp.finite;
     const auto ha = hf (a), hc = hf (c), hr = hf (ramp);
@@ -440,7 +458,12 @@ TEST (bug190ie_survey_tempo_ramp_all_effects)
             variants.push_back ({ "sync", synced });
         for (const auto& [name, slot] : variants)
         {
+            dumpName = std::to_string (k) + "_";
+            for (const char* c = lynx::effectInfo (kind).name; *c != 0; ++c)
+                dumpName += std::isalnum ((unsigned char) *c) ? *c : '-';
+            dumpName += "_" + name;
             const auto r = rampVsSteady (slot, rate, 256, 3.0);
+            dumpName.clear();
             if (! r.ran)
                 continue;
             std::printf ("  %-28s %-8s %9.1f %9.1f %9.1f %11.1f %11.1f  %016llx%s%s\n", lynx::effectInfo (kind).name, name.c_str(), r.tempoDepDb, r.excessDb, r.peakExcessDb, r.rampPeakDb, r.steadyPeakDb, (unsigned long long) r.steadyHash,
