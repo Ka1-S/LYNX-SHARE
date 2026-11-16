@@ -11082,6 +11082,20 @@ private:
                                    return "    tracks playing a clip: " + juce::String (playing) + "\n";
                                } });
         run->steps.push_back ({ "idle: clip grid, stopped", [this] { engine->stop(); }, {}, 3000, [ui] { ui->setClipLaunchWorkflow (false); return juce::String(); } });
+        // round 190iv: the Simple layout (its toolbar) idle and while the song plays
+        run->steps.push_back ({ "idle: simple layout, stopped", [this, ui] {
+                                   engine->stop();
+                                   ui->setLayoutStyle (lynx::layoutstyle::Style::simple, false);
+                               }, {}, 3000 });
+        run->steps.push_back ({ "simple layout, song playing", [this] {
+                                   engine->getTransport().songMode = true;
+                                   engine->rewind();
+                                   engine->play();
+                               }, {}, 3000, [this, ui] {
+                                   engine->stop();
+                                   ui->setLayoutStyle (lynx::layoutstyle::Style::pattern, false);
+                                   return juce::String();
+                               } });
         // LYNX_UIPERF_ONLY=text: only the steps whose name has that text
         if (const auto only = juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_ONLY", {}); only.isNotEmpty())
             run->steps.erase (std::remove_if (run->steps.begin(), run->steps.end(), [&only] (const auto& s) { return ! juce::String (s.name).contains (only); }), run->steps.end());

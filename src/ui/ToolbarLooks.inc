@@ -10,7 +10,7 @@
 // Performance: static paint. No timer of its own: the main window's timer calls updateLookFields(), and each field
 // repaints only when what it shows changed; the CPU box repaints at the meter's rate, nothing else moves.
 
-#include "ui/MainComponent.h"
+#include "ui/MainComponent.h" // (included at the end of MainComponent.cpp)
 
 #include "core/ClipLauncher.h"
 #include "core/DrawMode.h"
@@ -253,7 +253,8 @@ void MainComponent::layoutSimpleToolbar (juce::Rectangle<int> bar, int menuWidth
     int used = 0;
     for (int i = 0; i < sb::partCount; ++i)
         used += shown[(std::size_t) i] ? widths[(std::size_t) i] + sb::gap : 0;
-    const auto hintWidth = juce::jlimit (minHint, juce::jmax (minHint, 560), toolbar.getWidth() - used);
+    // (the hint column keeps FL's width, so the transport capsule sits where FL's transport does: owner decision SG-A)
+    const auto hintWidth = juce::jlimit (minHint, juce::jmax (minHint, 340), toolbar.getWidth() - used);
 
     // 1. the menu over the hint bar, as in the FL layout
     {

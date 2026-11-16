@@ -3968,6 +3968,8 @@ void MainComponent::setClipGridView (PlaylistArea::GridView view)
         playlistArea.setClipGrid (clipGridView.get(), view);
     if (auto* flip = dynamic_cast<ClipGridSwitch*> (clipGridSwitch.get()))
         flip->show (view);
+    if (toolbarLook != toolbarlayout::Look::fl)
+        updateLookFields(); // (round 190iv: the control bar's view selector shows the new view at once)
 }
 
 void MainComponent::selectTabForSnapshot (int tab)
@@ -9462,3 +9464,6 @@ void MainComponent::gamepadChanges (const gamepad::Changes& c, const gamepad::St
         engine.editLevels ([insert, pan] (Song& song) { song.mixer[(std::size_t) insert].pan = juce::jlimit (-1.0f, 1.0f, pan); });
 }
 } // namespace lynx
+
+// round 190iv: the toolbar per layout style (Simple capsules, Live control bar); kept in its own file
+#include "ui/ToolbarLooks.inc"
