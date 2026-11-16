@@ -432,6 +432,14 @@ constexpr bool previewsEditedNote (bool playing, bool previewWhilePlaying) noexc
     return ! playing || previewWhilePlaying;
 }
 
+// Round 190jd (FL 2026, live check 190iw Q1): pressing the mouse on an existing note sounds it only for a grab of a note
+// that was not selected (a move); a press on a note edge (resize, left or right) and a grab of an already-selected note
+// are silent. Placing a new note and the key changes of a drag still sound (previewsEditedNote decides the transport part).
+constexpr bool previewsGrabbedNote (bool resizeEdge, bool wasSelected) noexcept
+{
+    return ! resizeEdge && ! wasSelected;
+}
+
 // Alt+wheel over a note: the property moves by 4/127 per notch (Ctrl+Alt: 1/127), clamped to 0..1.
 inline double wheelStepValue (double value, double deltaY, bool fine)
 {

@@ -1319,6 +1319,10 @@ struct EffectSlot
     // every layout, the Mixer and the exports see a normal effect. Saved in .lynx.
     std::uint8_t goal = 0;
     float goalAmount = 0.5f;
+    // Which view the editor's display shows, per slot (round 190jd; 0 = the default). Fruity Limiter: 0 = FL's scrolling
+    // analysis graph, 1 = LYNX's transfer curve with its grid and level trail. Saved in .lynx ("displayView"); FL's .flp
+    // has no such setting. Editor only: the audio never reads it.
+    std::uint8_t displayView = 0;
     FlOrigin flOrigin;    // imported from FL: the original effect plugin (round 171e)
     InstanceTag instance; // runtime identity of the slot (never saved, not compared)
 

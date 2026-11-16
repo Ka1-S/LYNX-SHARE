@@ -26,6 +26,7 @@
 #include "core/FruityShapers.h"
 #include "core/FlCurve.h"
 #include "core/GrossBeat.h"
+#include "core/GrossBeatLocator.h"
 #include "core/LynxTune.h"
 #include "core/MaximusFx.h"
 #include "core/MixSuite.h"
@@ -34,6 +35,7 @@
 #include "core/ParametricEqFl.h"
 #include "core/VocalPitch.h"
 #include "core/FruityBasicFx.h"
+#include "core/DynamicsHistory.h"
 #include "core/PluginLayout.h"
 #include "core/StateParams.h"
 #include "core/ConvolverFx.h"
@@ -204,6 +206,9 @@ public:
         for (const auto& item : l.items) // round 170c: a level meter well shows the slot's live input / output peaks
             if (item.type == Item::display && item.display != nullptr && levelDisplay (item.display))
                 levelMeter = true;
+        for (const auto& item : l.items) // round 190jd: FL's scrolling Limiter display / Maximus Monitor (the same levels)
+            if (item.type == Item::display && monitorDisplay (item.display))
+                monitorShown = levelMeter = true;
         levelTrail.fill ({ -60.0f, -60.0f });
         if (levelMeter && ! node.locate)
             if (auto* times = engine.getProcessTimes(); times != nullptr && levelKey() < times->levelWanted.size())
@@ -422,7 +427,8 @@ public:
             if (item.type == Item::display && rectOf (item).contains (p)
                 && (plugui::displayTakesMouse (item.display) // round 168x: the list lives in PluginLayout (Maximus' curve added)
                     || isBars (item) || isRhythmEdit (item) || isRhythmPatterns (item)
-                    || isGbAny (item))) // round 168m: Gross Beat's editor parts
+                    || isGbAny (item) // round 168m: Gross Beat's editor parts
+                    || (limiterViewItem (item) && limiterViewPartAt (item, p) >= 0))) // round 190jd: the Limiter's view switch
                 return i;
             if (item.type == Item::display || (item.param == nullptr && ! hasStyle (item, plugui::pageTabs)))
                 continue;
@@ -1376,6 +1382,8 @@ public:
 
             case Item::display:
                 paintDisplay (g, item, r, fx);
+                if (limiterViewItem (item)) // round 190jd: the view switch in the display's corner
+                    paintLimiterViewSwitch (g, item, fx);
                 break;
 
             case Item::menu:
@@ -2698,7 +2706,20 @@ public:
             skin::glowStroke (g, p, curveColour, juce::jmax (1.5f, 2.0f * s), fx.enabled ? 1.0f : 0.0f);
         };
 
-        if (id == "limiter" || id == "compressor" || id == "dynamics")
+        if (id == "limiter" && kind == EffectKind::fruityLimiter && fx.displayView == 0)
+        {
+            // FL's analysis display (round 190jd, live check 190iw Q7, q7-fl-limiter-playing-sheet.png): no grid, the
+            // ceiling (white) and the compressor threshold (cyan) as still lines on FL's level axis, the history
+            // scrolling right to left while the song plays. The ceiling knob is the axis itself (law3, 0..+12 dB).
+            const auto yAt = [&] (float v01) { return std::round (inner.getBottom() - inner.getHeight() * juce::jlimit (0.0f, 1.0f, v01)); };
+            paintMonitor (g, inner, false, fx.enabled);
+            const auto thresholdLevel = (float) ((std::pow (7.0, (double) param01 ("Comp. threshold")) - 1.0) / 6.0); // law7
+            g.setColour (juce::Colour (0xff268396).withMultipliedAlpha (fx.enabled ? 1.0f : 0.4f));
+            g.fillRect (inner.getX(), yAt (dynhistory::axis (thresholdLevel)), inner.getWidth(), 1.0f);
+            g.setColour (juce::Colour (0xffb8c0bf).withMultipliedAlpha (fx.enabled ? 1.0f : 0.4f));
+            g.fillRect (inner.getX(), yAt (param01 ("Ceiling")), inner.getWidth(), 1.0f);
+        }
+        else if (id == "limiter" || id == "compressor" || id == "dynamics")
         {
             // static transfer curve: input level (x, −60…0 dB) to output level (y)
             grid (6, 4);
@@ -3023,6 +3044,11 @@ public:
                 g.drawText (hz >= 1000.0 ? juce::String ((int) (hz / 1000.0)) + "k" : juce::String ((int) hz),
                             juce::Rectangle<float> (30.0f * s, 12.0f * s).withCentre ({ xOf (hz), inner.getBottom() - 6.0f * s }).toNearestInt(),
                             juce::Justification::centred, false);
+            // FL's Monitor graph (round 190jd, live check 190iw Q7, q7-fl-maximus-playing-sheet.png): the blue 0 dB line
+            // (2 px) and, while the song plays, the history scrolling right to left over the bands
+            paintMonitor (g, inner, true, fx.enabled);
+            g.setColour (juce::Colour (0xff5b98c9).withMultipliedAlpha (fx.enabled ? 1.0f : 0.4f));
+            g.fillRect (inner.getX(), std::round (inner.getBottom() - inner.getHeight() * dynhistory::axis (1.0f)) - 1.0f, inner.getWidth(), juce::jmax (2.0f, 2.0f * s));
         }
         else if (id == "eq")
         {
@@ -4485,6 +4511,14 @@ public:
         if (kind == EffectKind::grossBeat && gbMouseDown (e, item, index)) // round 168m: the envelope editor and slot settings
             return;
 
+        // round 190jd: Fruity Limiter's display switch (FL's scrolling graph by default; LYNX's transfer curve as a second view)
+        if (! e.mods.isPopupMenu() && limiterViewItem (item))
+            if (const auto part = limiterViewPartAt (item, e.position); part >= 0)
+            {
+                setLimiterView (part);
+                return;
+            }
+
         if (! e.mods.isPopupMenu() && isMixItem (item) && captionArea (item).contains (e.position))
         {
             pluginheader::toggleMixLock (kind);
@@ -5387,6 +5421,9 @@ private:
         if (index < 0)
             return {};
         const auto& item = activeLayout().items[(std::size_t) index];
+        if (limiterViewItem (item) && limiterViewPartAt (item, p) >= 0) // round 190jd
+            return { tr ("Display: FL's scrolling graph or LYNX's transfer curve  [LMB] switch (kept for this effect)"),
+                     limiterViewPartAt (item, p) == 0 ? tr ("GRAPH") : tr ("CURVE"), false, false };
         if (item.type == Item::display && juce::String (item.display) == "sgamount")
             return { tr ("Amount: drag up or down (Ctrl: fine)"), juce::String (soundgoodizerAmount() * 100.0f, 0) + "%", false, false };
         if (item.type == Item::display && juce::String (item.display) == "sgpresets")
@@ -5653,6 +5690,16 @@ public:
     {
         if (kind == EffectKind::grossBeat) // round 190ih: the locator and slot states from the published meters
             gbLiveTick();
+        // round 190jd: the scrolling Limiter display / Maximus Monitor as while playing (--parityshot with
+        // LYNX_PARITYSHOT_DEMO=1; the idle pictures stay idle, as FL's originals)
+        if (monitorShown && juce::SystemStats::getEnvironmentVariable ("LYNX_PARITYSHOT_DEMO", {}) == "1")
+            if (auto* times = engine.getProcessTimes(); times != nullptr && levelKey() < times->levelWanted.size())
+            {
+                const auto in = times->slotLevels[levelKey() * 2].exchange (0.0f, std::memory_order_relaxed);
+                const auto out = times->slotLevels[levelKey() * 2 + 1].exchange (0.0f, std::memory_order_relaxed);
+                monitorStep (in, out, 1000.0 / 30.0, true);
+                monitorPainted = monitor.pushed();
+            }
         if (kind == EffectKind::parametricEq && ! node.locate)
             for (const auto& item : activeLayout().items)
                 if (item.type == Item::display && item.display != nullptr && std::strcmp (item.display, "eq") == 0)
@@ -5680,6 +5727,7 @@ private:
                 }
         if (kind == EffectKind::grossBeat) // round 190ih: the playback locator and the playing / queued slots
             gbLiveTick();
+        repaintMonitor(); // round 190jd: FL's scrolling Limiter display / Maximus Monitor (new columns only)
         if (! liveDisplays) return;
         learnScaleFromMidi();
         if (kind == EffectKind::hardwareInsert)
@@ -5780,9 +5828,11 @@ private:
         levelFrameMs = nowMs;
         const auto fall = (float) (24.0 * elapsed / 1000.0);
         bool moved = false;
+        std::array<float, 2> peaks {};
         for (int k = 0; k < 2; ++k)
         {
             const auto peak = times->slotLevels[levelKey() * 2 + (std::size_t) k].exchange (0.0f, std::memory_order_relaxed);
+            peaks[(std::size_t) k] = peak;
             const auto db = juce::jlimit (-60.0f, 6.0f, juce::Decibels::gainToDecibels (peak, -100.0f));
             auto& shown = levelDb[(std::size_t) k];
             auto& hold = levelHoldDb[(std::size_t) k];
@@ -5797,11 +5847,134 @@ private:
                 hold = juce::jmax (shown, hold - fall);
             moved = moved || std::abs (shown - before) > 0.01f || std::abs (hold - holdBefore) > 0.01f;
         }
+        if (monitorShown) // round 190jd: the scrolling display takes the peaks; it moves only while playing and shown
+            monitorStep (peaks[0], peaks[1], elapsed, engine.getTransport().playing.load (std::memory_order_relaxed) && isShowing());
         if (moved)
             for (const auto& item : activeLayout().items)
-                if (item.type == Item::display && item.display != nullptr && levelDisplay (item.display) && visible (item))
+                if (item.type == Item::display && item.display != nullptr && levelDisplay (item.display) && ! monitorDisplay (item.display) && visible (item))
                     repaint (rectOf (item).getSmallestIntegerContainer().expanded (2));
         return moved;
+    }
+
+    // Round 190jd (owner: add, never remove): Fruity Limiter's display shows FL's scrolling analysis graph by default and
+    // LYNX's transfer curve (grid, curve, level trail) as a second view, picked with a two-part switch in the display's
+    // top-right corner ("GRAPH | CURVE") and kept per slot (EffectSlot::displayView, saved in .lynx).
+    bool limiterViewItem (const LayoutItem& item) const
+    {
+        return kind == EffectKind::fruityLimiter && item.type == Item::display && item.display != nullptr && std::strcmp (item.display, "limiter") == 0;
+    }
+    juce::Rectangle<float> limiterViewSwitch (const LayoutItem& item) const
+    {
+        const auto s = scale();
+        const auto inner = rectOf (item).reduced (6.0f * s);
+        return { inner.getRight() - 92.0f * s, inner.getY() + 3.0f * s, 89.0f * s, 14.0f * s };
+    }
+    // 0 = the GRAPH half, 1 = the CURVE half, -1 = outside the switch
+    int limiterViewPartAt (const LayoutItem& item, juce::Point<float> p) const
+    {
+        const auto r = limiterViewSwitch (item);
+        if (! r.contains (p))
+            return -1;
+        return p.x < r.getCentreX() ? 0 : 1;
+    }
+    void setLimiterView (int view)
+    {
+        const auto* fx = current();
+        if (fx == nullptr || fx->displayView == (std::uint8_t) view)
+            return;
+        editSlot ([v = (std::uint8_t) view] (EffectSlot& target) { target.displayView = v; });
+        repaint();
+    }
+    void paintLimiterViewSwitch (juce::Graphics& g, const LayoutItem& item, const EffectSlot& fx) const
+    {
+        const auto s = scale();
+        const auto r = limiterViewSwitch (item);
+        const auto f = theme::font (juce::jmax (7.0f, 8.5f * s), true);
+        g.setFont (f);
+        for (int part = 0; part < 2; ++part)
+        {
+            const auto half = part == 0 ? r.withWidth (r.getWidth() * 0.5f) : r.withTrimmedLeft (r.getWidth() * 0.5f);
+            const auto on = (int) fx.displayView == part;
+            g.setColour (on ? accent.withAlpha (fx.enabled ? 0.85f : 0.4f) : theme::colour::bg0.withAlpha (0.55f));
+            g.fillRect (half.reduced (0.5f * s, 0.0f));
+            g.setColour (on ? theme::colour::textPrimary : theme::colour::textSecondary);
+            g.drawText (part == 0 ? tr ("GRAPH") : tr ("CURVE"), half.toNearestInt(), juce::Justification::centred, false);
+        }
+        g.setColour (theme::colour::borderStrong.withAlpha (0.8f));
+        g.drawRect (r, juce::jmax (1.0f, std::floor (s)));
+    }
+
+    // FL's scrolling dynamics displays (round 190jd, live check 190iw Q7; core/DynamicsHistory.h): Fruity Limiter's
+    // analysis display and Maximus' Monitor graph. Fed at the levels' frame rate; repainted by the 30 Hz timer.
+    bool monitorShown = false;
+    dynhistory::History monitor;
+    long long monitorPainted = 0;
+    bool monitorDisplay (const char* id) const
+    {
+        return id != nullptr && ((kind == EffectKind::fruityLimiter && std::strcmp (id, "limiter") == 0) || std::strcmp (id, "maxbands") == 0);
+    }
+    void monitorStep (float inPeak, float outPeak, double elapsedMs, bool playing)
+    {
+        monitor.feed (inPeak, outPeak);
+        if (playing)
+            monitor.advance (elapsedMs);
+    }
+    void repaintMonitor()
+    {
+        if (! monitorShown || monitor.pushed() == monitorPainted)
+            return;
+        monitorPainted = monitor.pushed();
+        for (const auto& item : activeLayout().items)
+            if (item.type == Item::display && monitorDisplay (item.display) && visible (item))
+                repaint (rectOf (item).getSmallestIntegerContainer());
+    }
+    // the history over `area`: newest column at the right edge, one column per pixel at 100 %; the input as a light fill,
+    // its part above the output in purple, the gain (output / input) as a line on the same axis (1 = the 0 dB line)
+    void paintMonitor (juce::Graphics& g, juce::Rectangle<float> area, bool maximusLook, bool enabled) const
+    {
+        const auto n = monitor.size();
+        if (n == 0)
+            return;
+        const auto colW = juce::jmax (0.5f, scale());
+        const auto dim = [enabled] (juce::Colour c) { return enabled ? c : c.withMultipliedAlpha (0.35f); };
+        const auto yOf = [&] (float level) { return area.getBottom() - area.getHeight() * dynhistory::axis (level); };
+        juce::RectangleList<float> fills, purples;
+        juce::Path gain;
+        bool started = false;
+        const auto columns = juce::jmin (n, (int) std::ceil (area.getWidth() / colW));
+        for (int a = columns - 1; a >= 0; --a) // oldest first (the line runs left to right)
+        {
+            const auto& c = monitor.at (a);
+            const auto x1 = area.getRight() - (float) a * colW, x0 = juce::jmax (area.getX(), x1 - colW);
+            if (c.in > 1.0e-4f)
+            {
+                const auto yIn = yOf (c.in), yOut = yOf (juce::jmin (c.out, c.in));
+                fills.addWithoutMerging ({ x0, yOut, x1 - x0, area.getBottom() - yOut });
+                if (yIn < yOut - 0.25f)
+                    purples.addWithoutMerging ({ x0, yIn, x1 - x0, yOut - yIn });
+            }
+            if (! c.started) // (FL's line starts with the first sound)
+                continue;
+            const auto gy = juce::jlimit (area.getY(), area.getBottom() - 1.0f, yOf (c.gain));
+            if (! started)
+                gain.startNewSubPath (x0, gy);
+            else
+                gain.lineTo (x0, gy);
+            gain.lineTo (x1, gy);
+            started = true;
+        }
+        const juce::Graphics::ScopedSaveState state (g);
+        g.reduceClipRegion (area.getSmallestIntegerContainer());
+        // FL's colours, measured in the captures (Limiter / Maximus)
+        g.setColour (dim (juce::Colour (maximusLook ? 0xffadbfb0 : 0xffd5ead7)));
+        g.fillRectList (fills);
+        g.setColour (dim (juce::Colour (maximusLook ? 0xff6e5d94 : 0xff836bb2)));
+        g.fillRectList (purples);
+        if (started)
+        {
+            g.setColour (dim (juce::Colour (maximusLook ? 0xffd6e3e6 : 0xffd5ffff)));
+            g.strokePath (gain, juce::PathStrokeType (juce::jmax (1.0f, colW)));
+        }
     }
     static bool levelDisplay (const char* id)
     {

@@ -152,6 +152,7 @@
 #include "ui/PluginMonitorWindow.h"
 #include "ui/TouchKeyboard.h"
 #include "ui/AutomationUi.h"
+#include "core/GrossBeatLocator.h"
 #include "ui/PluginSkin.h"
 #include "ui/ChannelSettings.h"
 #include "ui/TempoDetectionDialog.h"
@@ -12945,13 +12946,9 @@ private:
                     if (command.startsWith ("shot "))
                     {
                         frame.setSize (panel->getWidth(), panel->getHeight());
-                        juce::Image image (juce::Image::ARGB, frame.getWidth(), frame.getHeight(), true);
-                        {
-                            juce::Graphics g (image);
-                            g.fillAll (lynx::theme::panel);
-                            frame.paintEntireComponent (g, false);
-                        }
-                        const juce::File file (prefix + command.fromFirstOccurrenceOf (" ", false, false).trim() + ".png");
+                        // (round 190jd: at the shot scale, --shot-scale / LYNX_SHOT_SCALE, with its suffix; scale 1 = the same pixels)
+                        const auto image = lynx::shot::paint (frame, lynx::theme::panel);
+                        const auto file = lynx::shot::file (juce::File (prefix + command.fromFirstOccurrenceOf (" ", false, false).trim() + ".png"));
                         file.deleteFile();
                         juce::PNGImageFormat png;
                         if (auto out = file.createOutputStream())
@@ -13015,18 +13012,21 @@ private:
                     if (command.startsWith ("shot "))
                     {
                         frame.setSize (panel->getWidth(), panel->getHeight()); // (round 190hg: the display modes resize the editor)
-                        juce::Image image (juce::Image::ARGB, frame.getWidth(), frame.getHeight(), true);
-                        {
-                            juce::Graphics g (image);
-                            g.fillAll (lynx::theme::panel);
-                            frame.paintEntireComponent (g, false);
-                        }
-                        const juce::File file (prefix + command.fromFirstOccurrenceOf (" ", false, false).trim() + ".png");
+                        // (round 190jd: at the shot scale, --shot-scale / LYNX_SHOT_SCALE, with its suffix; scale 1 = the same pixels)
+                        const auto image = lynx::shot::paint (frame, lynx::theme::panel);
+                        const auto file = lynx::shot::file (juce::File (prefix + command.fromFirstOccurrenceOf (" ", false, false).trim() + ".png"));
                         file.deleteFile();
                         juce::PNGImageFormat png;
                         if (auto out = file.createOutputStream())
                             png.writeImageToStream (image, *out);
                         lines.add (command + " -> " + file.getFileName());
+                        continue;
+                    }
+                    if (command.startsWith ("menushot ")) // round 190jd: the deck's Snap menu as a picture
+                    {
+                        const auto file = prefix + command.fromFirstOccurrenceOf (" ", false, false).trim() + ".png";
+                        saveMenus (juce::StringArray { "Slicex deck: Snap" }, std::vector<juce::PopupMenu> { lynx::slicexSnapMenuForSnapshot (*panel) }, file);
+                        lines.add (command + " -> " + juce::File (file).getFileName());
                         continue;
                     }
                     const auto result = lynx::slicexEditorTest (*panel, command);
@@ -18176,6 +18176,8 @@ private:
         }
         const auto kind = (lynx::EffectKind) kindIndex;
         auto fx = lynx::makeEffectSlot (kind);
+        // round 190jd: LYNX_PARITYSHOT_VIEW=1 = the editor display's second view (Fruity Limiter: LYNX's transfer curve)
+        fx.displayView = (std::uint8_t) juce::jlimit (0, 1, juce::SystemStats::getEnvironmentVariable ("LYNX_PARITYSHOT_VIEW", "0").getIntValue());
         if (paramsFile.isNotEmpty())
             for (const auto& line : juce::StringArray::fromLines (juce::File (paramsFile).loadFileAsString()))
             {
@@ -18255,6 +18257,7 @@ private:
             }
             target->mouseUp (event (local, {}, false));
             target->mouseExit (event ({ -1000.0f, -1000.0f }, {}, false));
+            offline.dispatchPendingMessages(); // (round 190jd: an edit the click made, e.g. a display view, reaches the slot)
         }
         // round tp172b6: LYNX_PARITYSHOT_SHOW=1 puts the same editor in a real window and keeps it open (for a guarded GUI check
         // of its pop-up menus, which the offscreen picture cannot hold); closing the window quits
@@ -28085,6 +28088,74 @@ private:
         playlist.setViewForSnapshot (15.6, 0, 0);
         playlist.setScrollYForSnapshot (0);
         write (ui, "04-default-start");
+
+        // round 190jd (live check 190iw Q4): FL's grid levels at its Ctrl+wheel steps — bars only at 9.9 px a beat, beat
+        // lines from 11.5, half-beat lines from 21.5 (shots/q4-fl-zoom-levels-ruler-grid.png), at bar 9 like FL's shot
+        heights (32);
+        for (const auto beat : { 9.9, 11.5, 18.4, 21.5 })
+        {
+            playlist.setViewForSnapshot (beat * 4.0, 8, 0);
+            playlist.setScrollYForSnapshot (0);
+            write (playlist, ("05-grid-" + juce::String (beat, 1) + "px-beat").toRawUTF8());
+        }
+        // round 190jd: NEW automation clips from the first channel's volume and pan knobs take FL's colours by parameter
+        // (#8C5F5F, #7F8C5E; shots/q4-fl-new-automation-clip-zoom2.png); the editor windows they open are closed again
+        if (! offline.getSong().channels.empty())
+        {
+            // (the channels of FL's capture: Synth Bass pan + volume, Grv Kick 27 volume + pan; else the first channel)
+            const auto channelNamed = [&offline] (const char* name) {
+                const auto& channels = offline.getSong().channels;
+                for (int c = 0; c < (int) channels.size(); ++c)
+                    if (juce::String (channels[(std::size_t) c].name).startsWithIgnoreCase (name))
+                        return c;
+                return 0;
+            };
+            juce::String report;
+            offline.editSong ([] (lynx::Song& s) { s.loopStart = s.loopEnd = 0; }, false);
+            offline.getTransport().positionTicks.store (0.0);
+            const auto before = offline.getSong().automations.size();
+            for (const auto& [name, kind] : { std::pair { "Synth Bass", lynx::AutomationTargetKind::channelPan },
+                                              std::pair { "Grv Kick", lynx::AutomationTargetKind::channelVolume },
+                                              std::pair { "Synth Bass", lynx::AutomationTargetKind::channelVolume },
+                                              std::pair { "Grv Kick", lynx::AutomationTargetKind::channelPan } })
+            {
+                lynx::AutomationTarget t;
+                t.kind = kind;
+                t.index = channelNamed (name);
+                lynx::createAutomationClip (offline, t);
+                offline.dispatchPendingMessages();
+            }
+            lynx::closeAutomationEditors();
+            offline.dispatchPendingMessages();
+            int first = -1;
+            for (std::size_t a = before; a < offline.getSong().automations.size(); ++a)
+            {
+                const auto& au = offline.getSong().automations[a];
+                for (const auto& c : offline.getSong().playlist)
+                    if (c.kind == lynx::ClipKind::automation && c.automation == (int) a)
+                    {
+                        first = first < 0 ? c.track : std::min (first, c.track);
+                        report << "new clip '" << au.name << "' track " << (c.track + 1) << " colour #"
+                               << juce::String::toHexString ((int) (au.colour & 0xFFFFFF)).paddedLeft ('0', 6).toUpperCase() << "\n";
+                    }
+            }
+            report << "automations " << (int) before << " -> " << (int) offline.getSong().automations.size() << "\n";
+            juce::File (prefix + "-190jd-automation.txt").replaceWithText (report);
+            heights (50);
+            playlist.setViewForSnapshot (39.75, 0, 0);
+            playlist.setScrollYForSnapshot (std::max (0, first - 1) * 50);
+            write (playlist, "06-new-automation-clips");
+        }
+        // round 190jd (live check 190iw Q7, shots/q7-fl-countin-sheet.png): a 1-bar count-in — the time display reads
+        // "REC IN 4" on its first beat and "REC IN 1" on its last, Play shows its Pause glyph, Record stays lit
+        for (const auto beatsLeft : { 4, 1 })
+        {
+            offline.getTransport().countIn.store ((double) beatsLeft * lynx::ppq - 1.0);
+            ui.tickLinkForSnapshot();
+            ui.transportForSnapshot (true, true);
+            write (ui, ("07-countin-" + juce::String (beatsLeft)).toRawUTF8());
+        }
+        offline.getTransport().countIn.store (0.0);
     }
 
     void runDesign190igS4Shot (const juce::String& prefix, const juce::String& projectPath)
@@ -28953,6 +29024,18 @@ private:
             roll.scrollToNotes();
             write ("clip-mpe");
             checks << "clip MPE tab: mpe view " << (roll.isMpeView() ? 1 : 0) << ", lanes " << (int) roll.mpeLaneAreasForTests().size() << "\n";
+            // round 190jd (Live 12.4's MPE tab): the value ghost point on note 1's Pressure line, the "Show Lane:" menu,
+            // then all four lanes shown (Slide, Pressure, Velocity, Release Velocity)
+            checks << "ghost on the Pressure line: '" << roll.hoverMpeLineForSnapshot (lynx::PianoRollComponent::laneMpePressure, (double) lynx::ppq) << "'\n";
+            write ("clip-mpe-ghost190jd");
+            roll.hoverMpeLineForSnapshot (0, 0.0);
+            saveMenus (juce::StringArray { "MPE tab: Show Lane" }, std::vector<juce::PopupMenu> { roll.getMpeLaneMenuForSnapshot() },
+                       prefix + "-clip-mpe-showlane190jd.png");
+            roll.setMpeLanesForSnapshot (lynx::mpetab::allLanes);
+            offline.dispatchPendingMessages();
+            write ("clip-mpe-lanes4-190jd");
+            checks << "four lanes: " << (int) roll.mpeLaneAreasForTests().size() << "\n";
+            roll.setMpeLanesForSnapshot (lynx::mpetab::defaultLanes);
             detail->setClipTab (false);
             offline.dispatchPendingMessages();
             checks << "back to Notes: mpe view " << (roll.isMpeView() ? 1 : 0) << "\n";
@@ -29701,6 +29784,20 @@ private:
             publish (false); // stopped: no locator, no fill
             lynx::tickNativeEffectEditor (*editor);
             savePng (lynx::shot::snapshot (*editor), prefix + "-r2-grossbeat-stopped.png");
+            // round 190jd (live check 190iw Q7): the locator in FL's colours (the editor's Options menu) on the beat (cream,
+            // 3 px trail), a third into it (orange) and near its end (dusty red); LYNX's playhead colour stays the default
+            lynx::gblocator::setFlStyle (true);
+            lynx::showGrossBeatEnvelopeForSnapshot (*editor, 1);
+            for (const auto at : { 4.02, 4.35, 4.9 })
+            {
+                while ((double) done * tps / lynx::ppq < at)
+                    block (queued);
+                publish (true);
+                juce::Thread::sleep (60); // (the editor's frame budget: ~21 frames a second in this style)
+                lynx::tickNativeEffectEditor (*editor);
+                savePng (lynx::shot::snapshot (*editor), prefix + "-r2-grossbeat-fl-colours-" + juce::String (at - 4.0, 2) + ".png");
+            }
+            lynx::gblocator::setFlStyle (false);
             offline.getTransport().playing.store (false);
         }
         {

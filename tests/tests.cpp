@@ -17851,3 +17851,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Hosting190jgTests.inc" // round 190jg: sample-accurate automation for hosted plugins (BUILD-LIST 18)
 #include "G1menus190jeTests.inc" // round 190je: contrast floors, one state language, grid intensity, FL menus (design190ia G1, FW-S3)
 #include "Capfix190jjTests.inc" // round 190jj: capture190ji changes (transport states per look, the master bar meter)
+#include "Livefix190jdTests.inc" // round 190jd: live check 190iw — previews, automation clip colours, count-in, Gross Beat locator, .flp audio clip step
+#include "Livefix190jdATests.inc" // round 190jd: DirectWave zone map, Slicex deck Snap menu and play line
+#include "Livefix190jdBTests.inc" // round 190jd: the Clip View MPE tab as Live 12.4
+#include "Livefix190jdCTests.inc" // round 190jd: Mixer peak hold and Extra large list, Limiter / Maximus history

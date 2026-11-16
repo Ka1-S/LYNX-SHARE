@@ -135,13 +135,15 @@ TEST (rackmix190io_audio_clip_channel_plays_from_a_step)
     const auto data = r190io::sine (2.0);
     const auto clipSong = r190io::stepSong (InstrumentKind::audioClip, "sine");
     const auto samplerSong = r190io::stepSong (InstrumentKind::sampler, "sine");
-    const auto clipSecs = r190io::soundingSeconds (clipSong, data, 3.0);
-    const auto samplerSecs = r190io::soundingSeconds (samplerSong, data, 3.0);
+    // (round 190jd: a window shorter than the 2 s pattern loop. With 3 s the loop's second trigger at 2.0 s sounded until
+    // 2.13 s, which passed for "the whole clip" while the step really cut the clip at 0.13 s)
+    const auto clipSecs = r190io::soundingSeconds (clipSong, data, 1.9);
+    const auto samplerSecs = r190io::soundingSeconds (samplerSong, data, 1.9);
     std::printf ("rackmix190io: one step plays the audio clip channel %.3f s, the Sampler %.3f s (sample 2 s)\n", clipSecs, samplerSecs);
     // the step plays the whole clip once, at its own pitch, not just the step's 1/16 (a playlist clip's end stops its
     // voice, a step's note-off does not); FL's render of the same project: docs/analise/REA_rodada190io.md §2
-    CHECK (clipSecs > 1.95 && clipSecs < 2.3);
-    CHECK (samplerSecs > 1.9); // (a Sampler step plays its sample out too)
+    CHECK (clipSecs > 1.85);
+    CHECK (samplerSecs > 1.85); // (a Sampler step plays its sample out too)
 
     if (const char* dir = std::getenv ("LYNX_190IO_FLDIR"); dir != nullptr && *dir != 0)
     {

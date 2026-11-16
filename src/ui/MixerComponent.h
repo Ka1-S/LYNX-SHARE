@@ -13,6 +13,7 @@
 #include "core/MeterBallistics.h"
 #include "core/MixerLayout.h"
 #include "core/MixerOps.h"
+#include "core/StripInserts.h"
 #include "engine/AudioEngine.h"
 #include "ui/TimerWhileShowing.h"
 #include "ui/FrameTicker.h"
@@ -197,6 +198,10 @@ public:
     static inline bool showStripInserts = false;
     void setShowStripInserts (bool on);
     juce::Rectangle<int> stripInsertsForSnapshot (int track) const { return insertsArea (track); }
+    // FL's Extra large list (round 190jd): the used slots' names at the strip's foot, 23 px rows, while the LYNX view
+    // above is off (core/StripInserts.h flListShown)
+    static bool flInsertList() noexcept { return stripinserts::flListShown (layout, showStripInserts); }
+    static stripinserts::Geometry insertsGeometry() noexcept { return flInsertList() ? stripinserts::flExtraLarge : stripinserts::lynxView; }
     juce::Rectangle<int> routeArrowForSnapshot (int track) const { return arrowArea (track); }
     void resetLoudness();
     void refreshLoudnessForSnapshot() { loudnessShown = engine.getMeters().loudness.read(); repaint(); } // (--snapshot: no frames run)
@@ -357,6 +362,7 @@ private:
     int insertsFirst (int track) const;
     int insertsItemAt (int track, juce::Point<int> p) const;
     void paintStripInserts (juce::Graphics& g, int track);
+    void paintFlInsertList (juce::Graphics& g, int track); // FL's Extra large list (round 190jd)
     bool insertsMouseDown (const juce::MouseEvent& e, int track);
     bool insertsMouseDrag (const juce::MouseEvent& e);
     bool insertsMouseUp (const juce::MouseEvent& e);

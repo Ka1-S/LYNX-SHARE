@@ -25,4 +25,6 @@ void loadSlicexSampleWhenOpened (int channel, const juce::String& path);
 // The editor test (LYNX --slicexedittest, round 190aj): one command for the Slicex editor inside `root` (the channel's
 // settings panel), on its current deck; the result as text. The commands are listed at SlicexEditor::test.
 juce::String slicexEditorTest (juce::Component& root, const juce::String& command);
+// round 190jd: the deck's Snap menu (FL's five radio items) for the pictures
+juce::PopupMenu slicexSnapMenuForSnapshot (juce::Component& root);
 } // namespace lynx

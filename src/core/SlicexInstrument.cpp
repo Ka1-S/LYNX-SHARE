@@ -277,6 +277,8 @@ public:
     }
 
     bool idle() const noexcept override { return engine.idle(); }
+    // the editor's play line (round 190jd)
+    slicex::Engine::PlayMark playMark() const noexcept { return engine.playMark(); }
 
     void render (float* left, float* right, int n, float gl, float gr) noexcept override
     {
@@ -303,7 +305,10 @@ public:
         }
         sinceBlock += n;
         if (engine.idle())
+        {
+            engine.clearPlayMark();
             return;
+        }
         if (! std::any_of (notes.begin(), notes.end(), [] (const Held& h) { return h.id >= 0 && (h.slide.moving() || h.stepped.active()); }))
         {
             engine.render (left, right, n);
@@ -440,4 +445,16 @@ std::unique_ptr<Instrument> makeSlicexInstrument (std::shared_ptr<const SampleDa
 {
     return std::make_unique<SlicexInstrument> (std::move (deckA), std::move (deckB));
 }
+
+namespace slicex
+{
+PlayLine playLine (const Instrument* instrument) noexcept
+{
+    const auto* x = dynamic_cast<const SlicexInstrument*> (instrument);
+    if (x == nullptr)
+        return {};
+    const auto m = x->playMark();
+    return { m.deck, m.frame };
+}
+} // namespace slicex
 } // namespace lynx

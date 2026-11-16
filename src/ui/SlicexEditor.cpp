@@ -12,11 +12,14 @@
 #include "core/Instruments.h"
 #include "core/Slicex.h"
 #include "core/SlicexEngine.h"
+#include "core/SlicexDeckSnap.h"
 #include "core/SlicexInstrument.h"
 #include "core/Song.h"
 #include "engine/AudioEngine.h"
 #include "engine/SampleLibrary.h"
+#include "ui/FrameTicker.h"
 #include "ui/I18n.h"
+#include "ui/MotionOverlay.h"
 #include "ui/Theme.h"
 #include "ui/ValueControl.h"
 
@@ -168,6 +171,17 @@ public:
     enum Icon { loop, play, stop, file, flag, dual, arrow, keys, zoom, select, freeze, slide, magnet };
     explicit IconButton (Icon i) : juce::Button ({}), icon (i) {}
 
+    // FL lights the deck's Play button orange while the Slicex channel plays (round 190jd, live check 190iw Q7)
+    void setLit (bool on)
+    {
+        if (lit != on)
+        {
+            lit = on;
+            repaint();
+        }
+    }
+    bool isLit() const noexcept { return lit; }
+
     void paintButton (juce::Graphics& g, bool over, bool down) override
     {
         const auto r = getLocalBounds().toFloat().reduced (1.0f);
@@ -176,7 +190,7 @@ public:
         g.fillRoundedRectangle (r, 3.0f);
         const auto c = r.getCentre();
         const auto u = std::min (r.getWidth(), r.getHeight()) * 0.26f;
-        g.setColour (on ? theme::colour::accent : theme::colour::textPrimary);
+        g.setColour (lit ? juce::Colour (0xfffda830) : on ? theme::colour::accent : theme::colour::textPrimary); // (FL's orange: 253, 168, 48)
         juce::Path p;
         switch (icon)
         {
@@ -255,6 +269,7 @@ public:
 
 private:
     Icon icon;
+    bool lit = false;
 };
 
 // FL's TVectorDigiWheel: a number in a well; drag up / down or wheel to change
@@ -900,6 +915,9 @@ public:
     std::function<bool (const juce::KeyPress&)> key;           // the deck's shortcuts (FL's menu keys)
     std::function<bool()> frozen;                              // FL's "Freeze all": the regions cannot be edited
     std::function<void()> viewChanged;
+    // where a dragged selection edge lands (the deck's Snap menu; round 190jd), given the frame and the frames per pixel;
+    // null or Alt held: where the mouse is
+    std::function<double (double, double)> snapSelection;
 
     // the frames shown: [viewStart, viewStart + viewLength); a length of 0 = the whole sample
     double viewStart = 0.0, viewLength = 0.0;
@@ -908,7 +926,51 @@ public:
     double selFrom = -1.0, selTo = -1.0;
     bool collapsed = false; // (round 190hg: FL's 37 / 53 / 85 px strips)
 
-    DeckView() { setWantsKeyboardFocus (true); }
+    DeckView()
+    {
+        setWantsKeyboardFocus (true);
+        waveLine.onHidden = [this] { repaint (waveLineArea (playFrame)); };
+        barLine.onHidden = [this] { repaint (barLineArea (playFrame)); };
+    }
+
+    // FL's play line (round 190jd, live check 190iw Q7): a red 1 px line moves through the wave (with a short fading
+    // trail) and over the overview strip, over the slice being played; −1 = none. Only the columns it leaves and enters
+    // are repainted (or, on Windows, the GPU overlay moves it: ui::MotionOverlay)
+    void setPlayFrame (double frame)
+    {
+        if (frame == playFrame)
+            return;
+        const auto before = playFrame;
+        playFrame = frame;
+        const auto moving = frame >= 0.0;
+        ui::MotionOverlay::Mark wave, bar;
+        if (moving)
+        {
+            const auto tabs = tabArea(), area = waveArea();
+            wave.x = xOf (frame);
+            wave.extent = { -trailWidth - 1, (int) tabs.getY(), trailWidth + 3, (int) std::ceil (area.getBottom() - tabs.getY()) };
+            wave.clip = tabs.getUnion (area).toNearestInt();
+            wave.look = (std::uint64_t) getHeight();
+            bar.x = barX (frame);
+            bar.extent = { -1, (int) barArea().getY(), 3, (int) std::ceil (barArea().getHeight()) };
+            bar.clip = barArea().toNearestInt();
+            bar.look = (std::uint64_t) getHeight();
+        }
+        const auto w = ui::stepMark (waveLine, moving && wave.x >= -2.0f && wave.x <= (float) getWidth() + 2.0f, wave, false);
+        const auto b = ui::stepMark (barLine, moving && ! collapsed, bar, false);
+        // (two small columns, not their union: a jump from one slice to another must not repaint the deck between)
+        if (! w.onOverlay || w.flipped)
+        {
+            repaint (waveLineArea (before));
+            repaint (waveLineArea (frame));
+        }
+        if (! b.onOverlay || b.flipped)
+        {
+            repaint (barLineArea (before));
+            repaint (barLineArea (frame));
+        }
+    }
+    double getPlayFrame() const noexcept { return playFrame; }
 
     bool hasSelection() const { return selFrom >= 0.0 && selTo > selFrom; }
     void setSelection (double from, double to, bool done = true)
@@ -997,6 +1059,37 @@ public:
         if (! collapsed)
             paintBar (g, *data, bar, total);
         paintRest (g, data, list, total, v0, length, tabs, wave);
+        if (playFrame >= 0.0)
+        {
+            if (! waveLine.isShowing())
+                paintWaveLine (g, xOf (playFrame));
+            if (! collapsed && ! barLine.isShowing())
+                paintBarLine (g, barX (playFrame));
+        }
+    }
+
+    // FL's play line: red, added over what is under it (FL raises only the red channel: ~+95 on the line, a 3 px trail
+    // fading to its left)
+    void paintWaveLine (juce::Graphics& g, float x) const
+    {
+        const auto tabs = tabArea(), area = waveArea();
+        const auto top = tabs.getY(), bottom = area.getBottom();
+        const auto x0 = std::floor (x);
+        static constexpr float trail[trailWidth] { 0.06f, 0.1f, 0.15f };
+        for (int i = 0; i < trailWidth; ++i)
+        {
+            g.setColour (playRed.withAlpha (trail[i]));
+            g.fillRect (juce::Rectangle<float> (x0 - (float) (trailWidth - i), top, 1.0f, bottom - top));
+        }
+        g.setColour (playRed.withAlpha (0.45f));
+        g.fillRect (juce::Rectangle<float> (x0, top, 1.0f, bottom - top));
+    }
+
+    void paintBarLine (juce::Graphics& g, float x) const
+    {
+        const auto bar = barArea();
+        g.setColour (playRed.withAlpha (0.55f));
+        g.fillRect (juce::Rectangle<float> (std::floor (x), bar.getY(), 1.0f, bar.getHeight()));
     }
 
     void paintBar (juce::Graphics& g, const SampleData& data, juce::Rectangle<float> bar, double total)
@@ -1204,7 +1297,7 @@ public:
         }
         // the wave: FL's selection. Without one a drag makes it; with one the nearer edge goes to the mouse (a click
         // alone moves it) and follows it. A plain click without a selection picks the region and plays it (LYNX).
-        const auto frame = std::clamp (frameAt (p.x), 0.0, frames());
+        const auto frame = snapped (std::clamp (frameAt (p.x), 0.0, frames()), e.mods);
         mode = Mode::select;
         moved = false;
         hadSelection = hasSelection();
@@ -1253,7 +1346,7 @@ public:
             if (! moved && ! hadSelection && std::abs (e.getDistanceFromDragStartX()) < 3)
                 return;
             moved = true;
-            setSelection (anchor, std::clamp (frameAt (e.position.x), 0.0, total), false);
+            setSelection (anchor, snapped (std::clamp (frameAt (e.position.x), 0.0, total), e.mods), false);
         }
     }
 
@@ -1368,6 +1461,28 @@ private:
         return step > 0.0 ? std::floor (shownStart() / step) * step : 0.0;
     }
     float xOf (double frame) const { return (float) ((frame - originFrame()) / shownLength() * (double) getWidth()); }
+    float barX (double frame) const { return (float) (frame / std::max (1.0, frames())) * barArea().getWidth(); }
+    double snapped (double frame, const juce::ModifierKeys& mods) const
+    {
+        if (! snapSelection || mods.isAltDown())
+            return frame;
+        return std::clamp (snapSelection (frame, shownLength() / (double) std::max (1, getWidth())), 0.0, frames());
+    }
+    juce::Rectangle<int> waveLineArea (double frame) const
+    {
+        if (frame < 0.0)
+            return {};
+        const auto x = (int) std::floor (xOf (frame));
+        const auto top = (int) tabArea().getY();
+        return { x - trailWidth - 1, top, trailWidth + 3, getHeight() - top };
+    }
+    juce::Rectangle<int> barLineArea (double frame) const
+    {
+        if (frame < 0.0 || collapsed)
+            return {};
+        const auto bar = barArea();
+        return { (int) std::floor (barX (frame)) - 1, (int) bar.getY(), 3, (int) std::ceil (bar.getHeight()) };
+    }
     double frameAt (float x) const { return originFrame() + (double) x / (double) std::max (1, getWidth()) * shownLength(); }
     // a region's start as drawn (the one being dragged follows the mouse)
     std::int64_t startOf (const std::vector<slicex::WavRegion>& list, int i) const { return i == dragging && moved && ! dragEnd ? dragTo : list[(std::size_t) i].start; }
@@ -1469,6 +1584,12 @@ private:
     std::int64_t dragTo = 0;
     double grab = 0.0, anchor = 0.0;
     bool moved = false, dragEnd = false, hadSelection = false;
+    // the play line (round 190jd)
+    static constexpr int trailWidth = 3;
+    static inline const juce::Colour playRed { 0xffff3a4a };
+    double playFrame = -1.0;
+    ui::MotionOverlay waveLine { *this, [this] (juce::Graphics& g, float x) { paintWaveLine (g, x); } };
+    ui::MotionOverlay barLine { *this, [this] (juce::Graphics& g, float x) { paintBarLine (g, x); } };
 };
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -1864,9 +1985,13 @@ public:
         tool (loopButton, tr ("Loop"), [this] { edit ([on = loopButton.getToggleState()] (State& s) { s.setOptionByte (slicex::oLoop, on ? 1 : 0); }, false); });
         loopButton.setClickingTogglesState (true);
         tool (playButton, tr ("Play / pause"), [this] { playDeck(); });
-        tool (stopButton, tr ("Stop"), [this] { engine.previewSample (nullptr); });
+        tool (stopButton, tr ("Stop"), [this] {
+            engine.previewSample (nullptr);
+            previewDeck = -1;
+        });
         tool (fileButton, tr ("File"), [this] { fileMenu(); }, true);
         tool (regionsButton, tr ("Regions"), [this] { regionsMenu(); }, true);
+        tool (snapButton, tr ("Snap"), [this] { snapMenu(); }, true); // (round 190jd: FL's deck Snap menu, keys 1…5)
         tool (selectButton, tr ("Select"), [this] { selectMenu(); }, true);
         tool (zoomButton, tr ("Zoom"), [this] { zoomMenu(); }, true);
         tool (dualButton, tr ("Display single / dual deck"), [this] { edit ([on = dualButton.getToggleState()] (State& s) { s.setOptionByte (slicex::oDualDeck, on ? 1 : 0); }, false); });
@@ -1906,6 +2031,7 @@ public:
             };
             v.key = [this, d] (const juce::KeyPress& k) { return deckKey (d, k); };
             v.viewChanged = [this] { startTimer (300); }; // (the zoom goes into the state once it rests, as FL saves it)
+            v.snapSelection = [this, d] (double frame, double framesPerPixel) { return snapSelectionFrame (d, frame, framesPerPixel); };
             v.frozen = [this, d] { return frozen (d) || displayMode() > 0; }; // (FL freezes the decks' editing outside full mode)
             v.menu = [this, d] (int i) {
                 if (i >= 0)
@@ -1968,7 +2094,7 @@ public:
         artMembers.push_back ({ &curveTempo, [this] { return part() < 2; } });
         artMembers.push_back ({ &curveGlobal, [this] { return part() == 1; } });
         artMembers.push_back ({ &curveOptions, [this] { return part() == 1; } });
-        for (auto* c : std::initializer_list<juce::Component*> { &loopButton, &playButton, &stopButton, &fileButton, &regionsButton, &selectButton,
+        for (auto* c : std::initializer_list<juce::Component*> { &loopButton, &playButton, &stopButton, &fileButton, &regionsButton, &snapButton, &selectButton,
                                                                  &zoomButton, &dualButton, &deckSel, &rateLabel, &tempoLabel, &nameLabel, &selLabel })
             deckMembers.push_back ({ c, nullptr });
 
@@ -1992,7 +2118,7 @@ public:
     // 714-pixel deck: drag a b | click a | dclick a (in the wave), tabdrag a b (in the tag row); menu <entry>;
     // addregion <name> | addmarker <name>; key <pgup|pgdn|home|end|up|left|right|ctrl+left|ctrl+right|ctrl+a>;
     // rest (the zoom goes into the state); state; savewav <file> (the deck's WAV as the state holds it);
-    // load <file> (File > Load sample); regions (the deck's region list)
+    // load <file> (File > Load sample); regions (the deck's region list); decksnap <1…5>; playline <deck> <fraction> | off
     juce::String test (const juce::StringArray& w)
     {
         const auto deck = currentDeck();
@@ -2091,6 +2217,19 @@ public:
             for (int i = 1; i <= 4; ++i)
                 curveView.mouseDrag (ev (from + (to - from) * ((float) i / 4.0f), true));
             curveView.mouseUp (ev (to, true));
+        }
+        // round 190jd: the deck's Snap menu (decksnap 1…5, as its keys) and the play line (playline <deck> <fraction of the
+        // sample> | playline off: as while the channel plays, for the pictures)
+        else if (cmd == "decksnap") { setDeckSnap (w[1].getIntValue() - 1); return snapCaption ((int) deckSnap); }
+        else if (cmd == "playline")
+        {
+            const auto d = std::clamp (w[1].getIntValue(), 0, 1);
+            const auto& data = samples[(std::size_t) d];
+            const auto on = w[1] != "off" && data != nullptr;
+            for (int k = 0; k < 2; ++k)
+                deckView[(std::size_t) k].setPlayFrame (on && k == d ? w[2].getDoubleValue() * (double) data->frames() : -1.0);
+            playButton.setLit (on);
+            return on ? "line at " + juce::String (deckView[(std::size_t) d].getPlayFrame(), 0) : juce::String ("no line");
         }
         else if (cmd == "title") return nameLabel.getText();
         else if (cmd == "keys")
@@ -2298,6 +2437,7 @@ public:
         stopButton.setBounds (fl (67, 297, 29, 30));
         fileButton.setBounds (fl (160, 298, 24, 34));
         regionsButton.setBounds (fl (264, 298, 24, 34));
+        snapButton.setBounds (fl (316, 298, 24, 34)); // (FL: the magnet left of Select)
         selectButton.setBounds (fl (342, 298, 24, 34));
         zoomButton.setBounds (fl (368, 298, 24, 34));
         dualButton.setBounds (fl (639, 339, 18, 21));
@@ -2756,9 +2896,102 @@ private:
         else if (plain && (code == 'M' || code == 'm')) addRegion (deck, true);
         else if (alt && (code == 'M' || code == 'm')) addRegion (deck, false);
         else if (alt && (code == 'L' || code == 'l')) setLoop (deck);
+        else if (plain && code >= '1' && code < '1' + slicex::deckSnapCount) setDeckSnap (code - '1'); // (FL's Snap menu keys)
         else
             return false;
         return true;
+    }
+
+    // ---- FL's deck Snap menu (round 190jd, live check 190iw Q2): five radio items, keys 1…5, "Snap to grid" by default;
+    // what each does: core/SlicexDeckSnap.h
+    static juce::String snapCaption (int mode)
+    {
+        static const char* const names[] { TR_NOOP ("Snap to grid"), TR_NOOP ("Snap to regions"), TR_NOOP ("Snap to samples"),
+                                           TR_NOOP ("Snap to zero-crossing"), TR_NOOP ("Snap to pitch period") };
+        return tr (names[std::clamp (mode, 0, slicex::deckSnapCount - 1)]);
+    }
+
+    void setDeckSnap (int mode)
+    {
+        deckSnap = (slicex::DeckSnap) std::clamp (mode, 0, slicex::deckSnapCount - 1);
+        ui::setHint (snapButton, tr ("Snap") + ": " + snapCaption ((int) deckSnap), true);
+    }
+
+public:
+    juce::PopupMenu makeSnapMenu() // (public: slicexSnapMenuForSnapshot)
+    {
+        static const char* const keys[] { "1", "2", "3", "4", "5" };
+        juce::PopupMenu m;
+        for (int i = 0; i < slicex::deckSnapCount; ++i)
+            entry (m, i + 1, snapCaption (i), true, keys[i], (int) deckSnap == i);
+        return m;
+    }
+
+private:
+    void snapMenu()
+    {
+        auto m = makeSnapMenu();
+        juce::Component::SafePointer<SlicexEditor> self (this);
+        m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&snapButton), [self] (int r) {
+            if (self != nullptr && r > 0)
+                self->setDeckSnap (r - 1);
+        });
+    }
+
+    double snapSelectionFrame (int deck, double frame, double framesPerPixel) const
+    {
+        const auto& data = samples[(std::size_t) deck];
+        if (data == nullptr || data->frames() == 0 || deckSnap == slicex::DeckSnap::grid)
+            return frame;
+        const slicex::DeckWave wave { data->leftData(), data->isStereo() ? data->rightData() : nullptr, (std::int64_t) data->frames(), data->sampleRate };
+        std::vector<std::int64_t> edges;
+        if (deckSnap == slicex::DeckSnap::regions)
+            for (const auto& r : regions[(std::size_t) deck])
+            {
+                edges.push_back (r.start);
+                if (! r.marker)
+                    edges.push_back (r.end + 1);
+            }
+        return slicex::snapDeckFrame (deckSnap, frame, wave, framesPerPixel, edges);
+    }
+
+    // ---- FL's play line and lit Play button (round 190jd, live check 190iw Q7): while the channel's voices sound (or the
+    // deck's own Play previews it), the deck's Play button is lit and a red line follows the newest voice in its deck.
+    // A FrameTicker step: it runs only while the editor shows, at most 30 times a second, and goes idle (a 20 Hz poll of
+    // one atomic) once nothing moves
+    bool followPlay()
+    {
+        int deck = -1;
+        double frame = -1.0;
+        if (channel >= 0)
+        {
+            const auto line = slicex::playLine (engine.getChannelInstrument (channel).get());
+            deck = line.deck;
+            frame = line.frame;
+        }
+        if (deck < 0 && previewDeck >= 0)
+        {
+            if (const auto pos = engine.getPreviewPosition(); pos >= 0.0)
+            {
+                deck = previewDeck;
+                frame = (double) previewFrom + pos;
+                previewQuiet = 0;
+            }
+            else if (++previewQuiet > 15) // (the preview ended; it has a few frames to start first)
+                previewDeck = -1;
+        }
+        auto moved = false;
+        for (int d = 0; d < 2; ++d)
+        {
+            const auto target = d == deck ? frame : -1.0;
+            if (deckView[(std::size_t) d].getPlayFrame() != target)
+            {
+                deckView[(std::size_t) d].setPlayFrame (target);
+                moved = true;
+            }
+        }
+        playButton.setLit (deck >= 0);
+        return moved;
     }
 
     void selectShown (int deck)
@@ -2933,6 +3166,10 @@ private:
         if (data->isStereo())
             piece->right.assign (data->rightData() + from, data->rightData() + to);
         engine.previewSample (piece, state.optionByte (slicex::oLoop) != 0);
+        previewDeck = deck;
+        previewFrom = from;
+        previewQuiet = 0;
+        playTicker.wake();
     }
 
     void playDeck()
@@ -3621,8 +3858,30 @@ private:
     };
     std::vector<Member> artMembers, deckMembers;
     std::unique_ptr<juce::FileChooser> chooser;
+    // round 190jd: the deck's Snap menu, and the play line / lit Play button (the deck preview being played: its deck and
+    // first frame; −1 = none)
+    IconButton snapButton { IconButton::magnet };
+    slicex::DeckSnap deckSnap = slicex::DeckSnap::grid;
+    int previewDeck = -1, previewQuiet = 0;
+    std::int64_t previewFrom = 0;
+    ui::FrameTicker playTicker { *this, [this] (double) { return followPlay(); }, 30.0 };
 };
 } // namespace
+
+// round 190jd: the deck's Snap menu as it opens, for --slicexedittest's "menushot" (the picture of FL's radio list)
+juce::PopupMenu slicexSnapMenuForSnapshot (juce::Component& root)
+{
+    std::function<SlicexEditor* (juce::Component&)> find = [&find] (juce::Component& c) -> SlicexEditor* {
+        if (auto* e = dynamic_cast<SlicexEditor*> (&c))
+            return e;
+        for (auto* child : c.getChildren())
+            if (auto* e = find (*child))
+                return e;
+        return nullptr;
+    };
+    auto* editor = find (root);
+    return editor != nullptr ? editor->makeSnapMenu() : juce::PopupMenu();
+}
 
 juce::String slicexEditorTest (juce::Component& root, const juce::String& command)
 {

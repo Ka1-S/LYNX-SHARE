@@ -188,8 +188,13 @@ constexpr int flBandBelow = 38;
 // just under the playhead: by paint() itself, or over the cached picture (which never holds them, so a scroll can shift
 // it); a scroll step in which a clip's start crosses the left edge paints that clip's header band again (cacheShift).
 constexpr float flStickyTitleMax = 400.0f;
-// FL draws no beat lines at its zoom 17 (10 px a beat); where they start was not captured (an open item): 20 px a beat
-constexpr double flBeatLinesFrom = 20.0;
+// FL's grid levels by zoom (live check 190iw Q4, FL 2026's Ctrl+wheel steps measured on the empty grid): bar lines only up
+// to 9.9 px a beat, beat lines from 11.5, and a third, faintest level every half beat from 21.5 px a beat (none at 18.4).
+// FL's own steps skip the values in between, so the thresholds sit in those gaps.
+constexpr double flBeatLinesFrom = 11.0;
+constexpr double flHalfBeatLinesFrom = 21.0;
+// FL's half-beat line darkens the lane about 10/18 as much as its beat line does (#24343E vs #1C2C36 on #2E3E48)
+constexpr float flHalfBeatAlpha = 0.55f;
 float flHeaderHeight (juce::Rectangle<float> r) { return juce::jlimit (11.0f, 15.0f, std::round (r.getHeight() * 0.3f)); }
 
 // FL's track header (round 190ig, FM-23): the plate in the track's own colour (FL's grey #485156 without one), the name in a
@@ -1841,6 +1846,13 @@ void PlaylistComponent::paint (juce::Graphics& g)
             g.setColour (colour::gridBeat);
             for (auto tick = b.tick + ppq; tick < b.tick + b.length; tick += ppq)
                 vline (fl ? tickToX ((double) tick) : (double) (int) tickToX ((double) tick));
+
+            if (fl && beatPixels >= flHalfBeatLinesFrom && ppq >= 2)
+            {
+                g.setColour (colour::gridBeat.withMultipliedAlpha (flHalfBeatAlpha));
+                for (auto tick = b.tick + ppq / 2; tick < b.tick + b.length; tick += ppq)
+                    vline (tickToX ((double) tick));
+            }
         }
 
         paintLanes (g, grid); // round 177b (nothing when lanes are off)

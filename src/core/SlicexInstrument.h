@@ -31,6 +31,16 @@ void setDeckBPath (ChannelDef& channel, const std::string& path);
 // (round 190aj)
 double sampleBeats (const SampleData& sample) noexcept;
 
+// The deck play line of a Slicex channel's instrument (round 190jd; FL lights the deck's Play button and draws a red line
+// over the slice being played): the deck (0 / 1) and the frame of its sample the newest sounding voice reads; deck −1
+// when nothing sounds or the instrument is not a Slicex. Any thread.
+struct PlayLine
+{
+    int deck = -1;
+    double frame = -1.0;
+};
+PlayLine playLine (const Instrument* instrument) noexcept;
+
 // Fills an imported channel (FlpImport): the state and the decks' samples (the files it names, resolved with
 // `existing`, or the WAVs it holds, stored with `saveEmbedded`). False: not a state LYNX reads, or no deck's audio is
 // on this machine.

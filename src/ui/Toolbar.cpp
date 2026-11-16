@@ -3,6 +3,8 @@
 #include <juce_dsp/juce_dsp.h>
 
 #include "core/ClipLauncher.h"
+#include "core/CountIn.h"
+#include "core/LayoutStyle.h"
 #include "core/MarkerPlan.h"
 #include "core/Timecode.h"
 #include "core/TempoMap.h"
@@ -258,6 +260,12 @@ double secondsForTicksCached (const Song& song, std::uint64_t stamp, std::int64_
 juce::String TimeDisplay::text() const
 {
     const auto& song = engine.getSong();
+    // FL's count-in (round 190jd, live check 190iw Q7): "REC IN 4" ... "REC IN 1", one per beat, before the position
+    // (the Pattern layout's FL look; the Clip-launch and Simple layouts keep showing the position)
+    if (layoutstyle::current() == layoutstyle::Style::pattern)
+        if (const auto left = countin::beatsLeft (engine.getTransport().countIn.load(), song.beatUnit, ppq); left > 0)
+            return tr ("REC IN {0}", { juce::String (left) });
+
     const auto ticks = playheadTicks (engine);
 
     // round 190jj (Simple, capture190ji §1d): BandLab shows its count-in only as negative time counting up to zero
