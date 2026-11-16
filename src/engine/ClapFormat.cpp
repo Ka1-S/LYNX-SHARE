@@ -5,6 +5,7 @@
 #include <array>
 #include <atomic>
 #include <map>
+#include <set>
 #include <mutex>
 #include <thread>
 #include <unordered_map>
@@ -891,6 +892,14 @@ public:
         return out;
     }
     std::pair<int, int> threadPoolUse() const { return { threadPoolRequests.load(), threadPoolTasks.load() }; }
+    // the presets are still being found (round 190jg: on their own thread; the first presets() call starts it)
+    bool presetsPending()
+    {
+        if (presetLoadExt == nullptr || presetsFound)
+            return false;
+        presets();
+        return ! presetsFound;
+    }
     bool declaresTail() const noexcept { return tailExt != nullptr; }
     const std::shared_ptr<ClapModule>& moduleOf() const { return life->module; }
     const juce::PluginDescription& describedAs() const { return description; }
@@ -1502,7 +1511,7 @@ std::vector<FoundPreset> discoverPresets (const ClapModule& module)
                     }
                 for (const auto& f : list)
                 {
-                    if (++files > maxFiles || crawl.found.size() >= maxPresets)
+                    if (++files > maxFiles || crawl.found.size() >= maxPresets || discoveryStop.load())
                         break;
                     crawl.path = f.getFullPathName();
                     provider->get_metadata (provider, CLAP_PRESET_DISCOVERY_LOCATION_FILE, crawl.path.toRawUTF8(), &receiver);
@@ -1516,11 +1525,28 @@ std::vector<FoundPreset> discoverPresets (const ClapModule& module)
     return result;
 }
 
-std::mutex discoveryLock;
-std::map<juce::String, std::shared_ptr<const std::vector<FoundPreset>>>& discoveries()
+// The crawls (round 190jg, measured on Windows: Surge XT's 2970 presets took 6.6 s): on a thread of their own, as the
+// CLAP spec encourages (its factory is thread-safe); until one is done its plugin has no programs. One per module and
+// session; at exit the running ones are told to stop and are waited for (they hold their module).
+std::atomic<bool> discoveryStop { false };
+struct Discoveries
 {
-    static std::map<juce::String, std::shared_ptr<const std::vector<FoundPreset>>> map;
-    return map;
+    std::mutex lock;
+    std::map<juce::String, std::shared_ptr<const std::vector<FoundPreset>>> done;
+    std::set<juce::String> running;
+    std::vector<std::thread> threads;
+    ~Discoveries()
+    {
+        discoveryStop.store (true);
+        for (auto& t : threads)
+            if (t.joinable())
+                t.join();
+    }
+};
+Discoveries& discoveries()
+{
+    static Discoveries d;
+    return d;
 }
 
 thread_local ClapStateContext stateContextNow = ClapStateContext::project;
@@ -1533,21 +1559,26 @@ const std::vector<ClapInstance::Preset>& ClapInstance::presets()
         return none;
     if (! presetsFound)
     {
-        if (! isMessageThread())
-            return none; // (found on the message thread only: the plugin's indexer runs there, as LYNX's other calls)
-        presetsFound = true;
         std::shared_ptr<const std::vector<FoundPreset>> found;
         const auto key = description.fileOrIdentifier;
         {
-            const std::lock_guard<std::mutex> l (discoveryLock);
-            found = discoveries()[key];
+            auto& d = discoveries();
+            const std::lock_guard<std::mutex> l (d.lock);
+            if (const auto it = d.done.find (key); it != d.done.end())
+                found = it->second;
+            else if (d.running.insert (key).second && ! discoveryStop.load())
+                d.threads.emplace_back ([key, module = life->module] {
+                    juce::Thread::setCurrentThreadName ("LYNX CLAP presets");
+                    auto list = std::make_shared<const std::vector<FoundPreset>> (discoverPresets (*module));
+                    auto& dd = discoveries();
+                    const std::lock_guard<std::mutex> ll (dd.lock);
+                    dd.done[key] = std::move (list);
+                    dd.running.erase (key);
+                });
         }
         if (found == nullptr)
-        {
-            found = std::make_shared<const std::vector<FoundPreset>> (discoverPresets (*life->module));
-            const std::lock_guard<std::mutex> l (discoveryLock);
-            discoveries()[key] = found;
-        }
+            return none; // (still being found: the preset bar asks again when its menu opens)
+        presetsFound = true;
         const auto ownId = juce::String::fromUTF8 (plugin->desc != nullptr && plugin->desc->id != nullptr ? plugin->desc->id : "");
         for (const auto& p : *found)
             if (p.pluginIds.isEmpty() || p.pluginIds.contains (ownId))
@@ -1713,6 +1744,11 @@ juce::String describeClapPlugin (juce::AudioPluginInstance& plugin)
     for (std::size_t i = 0; i < pages.size() && i < 4; ++i)
         out << (i == 0 ? " [" : ", ") << pages[i].section << "/" << pages[i].name;
     out << (pages.empty() ? "" : "]") << "\n";
+    // (the crawl runs on its own thread: a test waits for it, up to 60 s)
+    const auto crawlStart = juce::Time::getMillisecondCounterHiRes();
+    while (clap->presetsPending() && juce::Time::getMillisecondCounterHiRes() - crawlStart < 60000.0)
+        juce::Thread::sleep (20);
+    out << "preset_crawl_ms=" << juce::String (juce::Time::getMillisecondCounterHiRes() - crawlStart, 0) << " (background thread)\n";
     const auto& presetList = clap->presets();
     out << "presets=" << (int) presetList.size();
     for (std::size_t i = 0; i < presetList.size() && i < 5; ++i)

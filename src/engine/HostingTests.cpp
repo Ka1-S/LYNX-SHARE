@@ -316,11 +316,12 @@ int runSandboxBench (const juce::String& pluginPath, const juce::String& reportP
         return 1;
     }
     report << "type=" << type->name << " (" << type->pluginFormatName << (type->isInstrument ? ", instrument" : ", effect") << ")\n";
-    report << "mode | chain us/block mean | p99 | max | deadline misses | IPC us per plugin-block | CPU % of one core (all processes) | processes\n";
+    report << "load average at the start: " << juce::File ("/proc/loadavg").loadFileAsString().upToFirstOccurrenceOf (" ", false, false) << "\n";
+    report << "mode | chain us/block median | mean | p99 | max | deadline misses | IPC us per plugin-block (median) | CPU % of one core (all processes) | processes\n";
 
     struct Result
     {
-        double mean = 0, p99 = 0, max = 0, cpu = 0;
+        double mean = 0, p50 = 0, p99 = 0, max = 0, cpu = 0;
         int misses = 0, processes = 0;
         bool ok = false;
     };
@@ -402,6 +403,7 @@ int runSandboxBench (const juce::String& pluginPath, const juce::String& reportP
         std::sort (sorted.begin(), sorted.end());
         for (const auto t : times)
             r.mean += t / blocks;
+        r.p50 = sorted[(std::size_t) ((blocks - 1) / 2)];
         r.p99 = sorted[(std::size_t) ((blocks - 1) * 0.99)];
         r.max = sorted.back();
         const auto deadline = block / rate * 1.0e6;
@@ -421,8 +423,8 @@ int runSandboxBench (const juce::String& pluginPath, const juce::String& reportP
         if (const auto it = results.find (mode); it != results.end())
         {
             const auto& r = it->second;
-            const auto ipc = mode == "in-process" ? 0.0 : (r.mean - base.mean) / plugins;
-            report << mode << " | " << juce::String (r.mean, 1) << " | " << juce::String (r.p99, 1) << " | " << juce::String (r.max, 1) << " | "
+            const auto ipc = mode == "in-process" ? 0.0 : (r.p50 - base.p50) / plugins;
+            report << mode << " | " << juce::String (r.p50, 1) << " | " << juce::String (r.mean, 1) << " | " << juce::String (r.p99, 1) << " | " << juce::String (r.max, 1) << " | "
                    << r.misses << " | " << juce::String (ipc, 1) << " | " << juce::String (r.cpu, 2) << " (+" << juce::String (r.cpu - base.cpu, 2)
                    << ") | " << r.processes << (r.ok ? "" : " (a plugin died)") << "\n";
         }
