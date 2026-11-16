@@ -6023,6 +6023,13 @@ void RackRenderer::adoptGlobals (const RackRenderer& from) noexcept
     pdcBypassBefore = from.pdcBypassBefore;
     *scheduledNotes = *from.scheduledNotes;
     liveRoutedCount = 0;
+    // Round 190jb: the automation's grid (round 190gh: pieces of 128 inside blocks of 512 counted from where playback
+    // started). Without it the part rendered ahead took it as a jump when it engaged in the middle of a song (its load
+    // probe under load) and started a grid of its own there: an automated fader then moved at other samples than in the
+    // export (the rare export_parity miss "first apart at 3.56 s", -70 dBFS, in 190hn / 190ip)
+    gridSample = from.gridSample;
+    pieceStart = from.pieceStart;
+    gridNextTick = from.gridNextTick;
 }
 
 void RackRenderer::adoptAutomationValues (const RackRenderer& from, const int* automations, int count) noexcept
