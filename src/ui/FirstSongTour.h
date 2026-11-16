@@ -94,5 +94,6 @@ private:
     std::unique_ptr<Layer> layer;
     std::unique_ptr<Welcome> welcome;
     juce::Component::SafePointer<juce::Component> shownIn; // the window the card and the ring are in (while shown)
+    int shownStep = -1; // round 190jc: the step the ring last pulsed for
 };
 } // namespace lynx

@@ -588,6 +588,8 @@ private:
     bool dropLaneHot = false;
     void setDropLaneHot (bool hot);
     juce::Rectangle<int> dropLaneArea() const; // the lane in the grid (empty: none or not on screen)
+    juce::Component dropLaneProbe; // its place for the first-song tour's ring ("simple.dropLane")
+    void updateDropLaneProbe();
     juce::Rectangle<int> trackSolo (int track) const;
     juce::Rectangle<int> trackVolume (int track) const;
     juce::Rectangle<int> trackPan (int track) const;

@@ -22642,7 +22642,7 @@ private:
         }());
 
         // --- step 5: a voice or a loop (no "Do it for me": a loop is dropped as a user would) ------------------------------
-        stepIs (lynx::tour::loop, "simple.addTrack");
+        stepIs (lynx::tour::loop, "simple.dropLane"); // (round 190jc, SG-18: it rang "+ Add track")
         window ("step5-loop", true);
         {
             const auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("lynx-190dv-loops");

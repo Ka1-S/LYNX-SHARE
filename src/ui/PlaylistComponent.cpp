@@ -1136,6 +1136,10 @@ juce::Rectangle<int> PlaylistComponent::rulerArea() const
 PlaylistComponent::PlaylistComponent (AudioEngine& e)
     : engine (e)
 {
+    // round 190jc (design190ia SG-18): the drop lane as a component the first-song tour can ring (transparent, no clicks)
+    dropLaneProbe.setComponentID ("simple.dropLane");
+    dropLaneProbe.setInterceptsMouseClicks (false, false);
+    addChildComponent (dropLaneProbe);
     setWantsKeyboardFocus (false);
     setMouseClickGrabsKeyboardFocus (false);
 
@@ -1668,6 +1672,7 @@ void PlaylistComponent::setTitleBarInsets (int left, int right)
 void PlaylistComponent::resized()
 {
     updateHeaderWidth(); // (round 190ig: the header width follows the layout style)
+    updateDropLaneProbe();
     const auto h = toolbarHeight - 6;
     arrangementBox.setBounds (4 + titleInsetLeft, 3, juce::jmin (150, getWidth() / 5), h);
     // round 190ig (FM-26): the Pattern layout's toolbar in FL's order — the snap (magnet) before the tools, and the tools'
@@ -1750,6 +1755,8 @@ void PlaylistComponent::paint (juce::Graphics& g)
     const uitrace::Scope trace ("PlaylistComponent paint", true, g.getClipBounds());
     if (trackTops.size() != (std::size_t) numTracks() + 1) // the track list grew or shrank since the last change message
         refreshTrackLayout();
+    if (simpleHeaders || dropLaneProbe.isVisible())
+        updateDropLaneProbe();
 
     const auto& song = engine.getSong();
     const auto grid = gridArea();
@@ -7652,6 +7659,14 @@ juce::Rectangle<int> PlaylistComponent::dropLaneArea() const
     return juce::Rectangle<int> (grid.getX(), trackToY (lane), grid.getWidth(), heightOf (lane)).getIntersection (grid);
 }
 
+void PlaylistComponent::updateDropLaneProbe()
+{
+    const auto area = simpleHeaders ? dropLaneArea().reduced (6, 4) : juce::Rectangle<int>();
+    if (area != dropLaneProbe.getBounds())
+        dropLaneProbe.setBounds (area);
+    dropLaneProbe.setVisible (! area.isEmpty());
+}
+
 void PlaylistComponent::setDropLaneHot (bool hot)
 {
     if (hot == dropLaneHot)
@@ -11882,6 +11897,7 @@ void PlaylistComponent::scrollBarMoved (juce::ScrollBar* bar, double start)
 
 void PlaylistComponent::changeListenerCallback (juce::ChangeBroadcaster* source)
 {
+    updateDropLaneProbe();
     if (source == ui::WaveformCache::getInstanceWithoutCreating())
     {
         repaint();
