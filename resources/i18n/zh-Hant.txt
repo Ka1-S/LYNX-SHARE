@@ -10480,6 +10480,9 @@ countries: tw hk mo
 "Replace Samples(s)" = "取代取樣"
 "Current selection" = "目前選擇"
 "Compatible velocity" = "相容力度"
+"Pitch-aware" = "感知音高"
+"Beats law: Classic plays as LYNX did before 0.1.28, Measured as 0.1.28 and 0.1.29 did (this project was saved then); Pitch-aware also cuts where the pitch of a held note steps" = "Beats 規則：Classic 依 0.1.28 之前的 LYNX 播放，實測 依 0.1.28 與 0.1.29 播放（此專案於當時儲存）；感知音高 也會在持續音的音高變化處切分"
+"Texture and Complex Pro law: Classic plays as LYNX did before 0.1.30 (this project was saved then); Measured follows Live 12.4's renders (grains and Flux, formants kept)" = "Texture 與 Complex Pro 規則：Classic 依 0.1.30 之前的 LYNX 播放（此專案於當時儲存）；實測 遵循 Live 12.4 的渲染（顆粒與 Flux，保留共振峰）"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 開啟/關閉編輯器  [Alt]+[LMB] 保持其他編輯器開啟  [Ctrl]+[LMB] 試聽  [2xLMB] 鋼琴捲軸  [LMB] 上下拖曳重新排序  [RMB] 通道選單"

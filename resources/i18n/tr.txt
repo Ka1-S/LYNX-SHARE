@@ -10480,6 +10480,9 @@ countries: tr
 "Replace Samples(s)" = "Sample'ları Değiştir"
 "Current selection" = "Geçerli seçim"
 "Compatible velocity" = "Uyumlu velocity"
+"Pitch-aware" = "Perdeye duyarlı"
+"Beats law: Classic plays as LYNX did before 0.1.28, Measured as 0.1.28 and 0.1.29 did (this project was saved then); Pitch-aware also cuts where the pitch of a held note steps" = "Beats yasası: Classic, LYNX'in 0.1.28 öncesindeki gibi, Ölçülmüş 0.1.28 ve 0.1.29'daki gibi çalar (bu proje o zaman kaydedildi); Perdeye duyarlı, tutulan bir notanın perdesinin değiştiği yerde de keser"
+"Texture and Complex Pro law: Classic plays as LYNX did before 0.1.30 (this project was saved then); Measured follows Live 12.4's renders (grains and Flux, formants kept)" = "Texture ve Complex Pro yasası: Classic, LYNX'in 0.1.30 öncesindeki gibi çalar (bu proje o zaman kaydedildi); Ölçülmüş, Live 12.4'ün render'larını izler (taneler ve Flux, formantlar korunur)"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editörü aç/kapat  [Alt]+[LMB] diğerlerini açık tut  [Ctrl]+[LMB] dinle  [2xLMB] Piano Roll  [LMB] yukarı/aşağı sürükle sıralar  [RMB] kanal menüsü"

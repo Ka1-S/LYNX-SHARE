@@ -10480,6 +10480,9 @@ countries: id
 "Replace Samples(s)" = "Ganti Sample"
 "Current selection" = "Pilihan saat ini"
 "Compatible velocity" = "Velocity kompatibel"
+"Pitch-aware" = "Peka nada"
+"Beats law: Classic plays as LYNX did before 0.1.28, Measured as 0.1.28 and 0.1.29 did (this project was saved then); Pitch-aware also cuts where the pitch of a held note steps" = "Hukum Beats: Classic berbunyi seperti LYNX sebelum 0.1.28, Terukur seperti 0.1.28 dan 0.1.29 (proyek ini disimpan saat itu); Peka nada juga memotong di tempat nada dari not yang ditahan berpindah"
+"Texture and Complex Pro law: Classic plays as LYNX did before 0.1.30 (this project was saved then); Measured follows Live 12.4's renders (grains and Flux, formants kept)" = "Hukum Texture dan Complex Pro: Classic berbunyi seperti LYNX sebelum 0.1.30 (proyek ini disimpan saat itu); Terukur mengikuti render Live 12.4 (grain dan Flux, forman dipertahankan)"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] buka/tutup editor  [Alt]+[LMB] biarkan yang lain terbuka  [Ctrl]+[LMB] dengarkan  [2xLMB] Piano Roll  [LMB] seret naik/turun mengubah urutan  [RMB] menu channel"

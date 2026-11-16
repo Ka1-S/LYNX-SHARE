@@ -10480,6 +10480,9 @@ countries: kr
 "Replace Samples(s)" = "샘플 교체"
 "Current selection" = "현재 선택"
 "Compatible velocity" = "호환 벨로시티"
+"Pitch-aware" = "음높이 인식"
+"Beats law: Classic plays as LYNX did before 0.1.28, Measured as 0.1.28 and 0.1.29 did (this project was saved then); Pitch-aware also cuts where the pitch of a held note steps" = "Beats 법칙: 클래식은 0.1.28 이전의 LYNX처럼, 측정은 0.1.28과 0.1.29처럼 재생합니다 (이 프로젝트는 그때 저장됨). 음높이 인식은 지속음의 음높이가 바뀌는 곳에서도 자릅니다"
+"Texture and Complex Pro law: Classic plays as LYNX did before 0.1.30 (this project was saved then); Measured follows Live 12.4's renders (grains and Flux, formants kept)" = "Texture 및 Complex Pro 법칙: 클래식은 0.1.30 이전의 LYNX처럼 재생합니다 (이 프로젝트는 그때 저장됨). 측정은 Live 12.4의 렌더를 따릅니다 (그레인과 Flux, 포먼트 유지)"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 에디터 열기/닫기  [Alt]+[LMB] 다른 에디터 유지  [Ctrl]+[LMB] 미리 듣기  [2xLMB] 피아노 롤  [LMB] 위/아래 드래그로 순서 변경  [RMB] 채널 메뉴"

@@ -2850,6 +2850,7 @@ juce::String toJson (const Song& song, bool stampVersion)
     if (stampVersion)
         root->setProperty ("savedBy", JUCE_APPLICATION_VERSION_STRING); // the build that wrote it (round 177d, pain point 37)
     root->setProperty ("beatsLaw190gx", true); // round 190gx: channels without a Beats law of their own use the Measured one
+    root->setProperty ("warpLaw190ik", true); // round 190ik: channels without laws of their own use PitchAware Beats and the new engines
     root->setProperty ("bpm", song.bpm);
     root->setProperty ("beatsPerBar", song.beatsPerBar);
     if (song.beatUnit != 4) // (round 190fg: the meter's denominator; older files read n/4)
@@ -4512,6 +4513,15 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
     if (! (bool) root.getProperty ("beatsLaw190gx", false))
         for (auto& c : song.channels)
             c.sampler.warpModes.beatsLaw = WarpModeSettings::beatsLawClassic;
+    // Round 190ik: a project saved before the pitch-aware Beats detector and the Texture / Complex Pro engines keeps the laws
+    // it was made with (Beats Measured stays Measured, Texture and Complex Pro the Classic engines)
+    if (! (bool) root.getProperty ("warpLaw190ik", false))
+        for (auto& c : song.channels)
+        {
+            auto& w = c.sampler.warpModes;
+            w.beatsLaw = std::min (w.beatsLaw, WarpModeSettings::beatsLawMeasured);
+            w.warpLaw = WarpModeSettings::warpLawClassic;
+        }
     return song;
 }
 

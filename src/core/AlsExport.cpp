@@ -1334,8 +1334,11 @@ struct Exporter
             c.value ("ComplexProFormants", num ((double) w.proFormants));
             c.value ("ComplexProEnvelope", num ((double) w.proEnvelope));
         }
-        // a Beats channel's offline transposition (stretchPitch) is the clip's transpose in Live
-        const auto baked = mode == 0 && ch.sampler.keepPitch && ch.sampler.stretchBeats > 0.0f ? (double) ch.sampler.stretchPitch : 0.0;
+        // a Beats (or, round 190ik, Complex Pro / Texture) channel's offline transposition (stretchPitch) is the clip's
+        // transpose in Live
+        const auto baked = (mode == 0 || mode == 2 || mode == 6) && ch.sampler.keepPitch && ch.sampler.bakesPitch() && ch.sampler.stretchBeats > 0.0f
+                               ? (double) ch.sampler.stretchPitch
+                               : 0.0;
         const auto pitch = mode == 3 ? 0.0 : std::clamp ((double) clip.pitch + baked, -48.0, 48.0);
         const auto coarse = std::round (pitch);
         c.value ("PitchCoarse", num (coarse));

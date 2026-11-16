@@ -283,6 +283,28 @@ std::uint64_t stretchFingerprint (StretchMethod method)
     return prints[m];
 }
 
+// Round 190ik: Complex Pro's own engine print (its transposition with the formants kept), keyed only into Complex Pro's
+// copies so the plain Complex ones stay valid
+juce::String proFingerprintKey (StretchMethod method, const StretchOptions& options)
+{
+    if (method != StretchMethod::complex || ! stretchBakesPitch (method, options.modes))
+        return {};
+    static const auto print = [] {
+        SampleData test;
+        test.sampleRate = 44100.0;
+        for (int i = 0; i < 6000; ++i)
+        {
+            const auto t = (double) i / test.sampleRate;
+            test.left.push_back ((float) (0.3 * std::sin (2.0 * 3.14159265358979 * 220.0 * t) + 0.2 * std::sin (2.0 * 3.14159265358979 * 660.0 * t)));
+        }
+        StretchOptions pro;
+        pro.modes.complexPro = true;
+        const auto out = timeStretch (test, 2.6, StretchMethod::complex, 5.0, pro);
+        return fnv (out->left.data(), out->left.size() * sizeof (float));
+    }();
+    return "|pf" + juce::String::toHexString ((juce::int64) print);
+}
+
 // A warp map's part of a cache key ("" for none). "wm1": the mapped renderer's version — raise it when its output changes
 juce::String stretchMapKey (const StretchMap& map)
 {
@@ -303,7 +325,7 @@ juce::File stretchCacheFile (const juce::String& path, double ratio, StretchMeth
     const auto key = source.getFullPathName() + "|" + juce::String (source.getSize()) + "|" + juce::String (source.getLastModificationTime().toMilliseconds())
                    + "|" + juce::String (ratio, 10) + "|" + juce::String ((int) method) + "|" + juce::String::toHexString ((juce::int64) stretchFingerprint (method))
                    + (semitones != 0.0 ? "|st" + juce::String (semitones, 6) : juce::String()) + stretchMapKey (map)
-                   + juce::String (stretchOptionsKey (options, method));
+                   + juce::String (stretchOptionsKey (options, method)) + proFingerprintKey (method, options);
     return SampleLibrary::cacheFolder().getChildFile (juce::String::toHexString (key.hashCode64()) + ".str");
 }
 
@@ -319,7 +341,8 @@ juce::File spanCacheFile (const SampleData& span, double ratio, StretchMethod me
     const auto key = "span|" + juce::String::toHexString ((juce::int64) h) + "|" + juce::String (span.sampleRate, 3) + "|" + juce::String ((juce::int64) span.frames())
                      + "|" + juce::String (ratio, 10) + "|" + juce::String ((int) method) + "|" + juce::String::toHexString ((juce::int64) stretchFingerprint (method))
                      + (semitones != 0.0 ? "|st" + juce::String (semitones, 6) : juce::String())
-                     + juce::String (stretchOptionsKey (options, method)); // (rollup 0.1.28: round 190fm's warp settings)
+                     + juce::String (stretchOptionsKey (options, method)) // (rollup 0.1.28: round 190fm's warp settings)
+                     + proFingerprintKey (method, options);
     return SampleLibrary::cacheFolder().getChildFile (juce::String::toHexString (key.hashCode64()) + ".str");
 }
 
@@ -604,8 +627,8 @@ void writeStretchedLater (const juce::File& file, std::shared_ptr<const SampleDa
 std::shared_ptr<const SampleData> SampleLibrary::loadStretched (const juce::String& path, double ratio, StretchMethod method, double semitones,
                                                                const StretchMap& map, const StretchOptions& options)
 {
-    if (method != StretchMethod::beats)
-        semitones = 0.0; // (only Beats renders a transposition offline)
+    if (! stretchBakesPitch (method, options.modes))
+        semitones = 0.0; // (only Beats and, round 190ik, Complex Pro render a transposition offline)
     // 10 significant digits: ratios within 0.1 % of 1 are resampled to the exact length, so 4 decimals were too coarse
     const auto key = path + "|" + juce::String (ratio, 10) + "|" + juce::String ((int) method)
                      + (semitones != 0.0 ? "|st" + juce::String (semitones, 6) : juce::String()) + stretchMapKey (map)
@@ -661,7 +684,7 @@ std::shared_ptr<const SampleData> SampleLibrary::loadStretchedSpan (const juce::
 {
     if (span == nullptr || span->frames() == 0)
         return nullptr;
-    if (method != StretchMethod::beats)
+    if (! stretchBakesPitch (method, options.modes))
         semitones = 0.0;
     const auto key = path + "|span|" + juce::String::fromUTF8 (variantKey.c_str()) + "|" + juce::String (ratio, 10) + "|"
                      + juce::String ((int) method) + (semitones != 0.0 ? "|st" + juce::String (semitones, 6) : juce::String())

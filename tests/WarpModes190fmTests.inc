@@ -29,29 +29,33 @@ bool warp190fmSame (const lynx::SampleData& a, const lynx::SampleData& b)
 TEST (warp190fm_defaults_render_as_before)
 {
     const auto in = warp190fmPieces();
-    // Live's defaults are LYNX's render before 190fm: every method, with and without a source length in beats
-    lynx::StretchOptions withBeats;
+    // Live's defaults are LYNX's render before 190fm: every method, with and without a source length in beats (round
+    // 190ik: on the laws of then — Beats Measured, Texture / Complex Pro Classic; the newer laws key their own renders)
+    lynx::StretchOptions then, withBeats;
+    then.modes.beatsLaw = lynx::WarpModeSettings::beatsLawMeasured;
+    then.modes.warpLaw = lynx::WarpModeSettings::warpLawClassic;
+    withBeats = then;
     withBeats.sourceBeats = 8.0;
     for (int m = 0; m < lynx::stretchMethodCount; ++m)
     {
         const auto method = (lynx::StretchMethod) m;
-        CHECK (lynx::stretchOptionsKey ({}, method).empty());
+        CHECK (lynx::stretchOptionsKey (then, method).empty());
         CHECK (lynx::stretchOptionsKey (withBeats, method).empty());
         const auto p0 = lynx::stretchdetail::presetFor (method), p1 = lynx::stretchdetail::presetFor (method, lynx::WarpModeSettings {});
         CHECK (p0.blockSeconds == p1.blockSeconds && p0.intervalSeconds == p1.intervalSeconds);
     }
     for (auto ratio : { 1.25, 0.8 })
     {
-        const auto before = lynx::timeStretch (in, ratio, lynx::StretchMethod::beats);
+        const auto before = lynx::timeStretch (in, ratio, lynx::StretchMethod::beats, 0.0, then);
         const auto after = lynx::timeStretch (in, ratio, lynx::StretchMethod::beats, 0.0, withBeats);
         CHECK (warp190fmSame (*before, *after));
     }
-    const auto up = lynx::timeStretch (in, 1.25, lynx::StretchMethod::beats, 3.0);
+    const auto up = lynx::timeStretch (in, 1.25, lynx::StretchMethod::beats, 3.0, then);
     CHECK (warp190fmSame (*up, *lynx::timeStretch (in, 1.25, lynx::StretchMethod::beats, 3.0, withBeats)));
-    // a sampler that never touched its settings asks for exactly the old options
+    // a sampler that never touched its settings asks for exactly the default options (round 190ik: the PitchAware key)
     lynx::SamplerSettings s;
     CHECK (s.warpModes == lynx::WarpModeSettings {});
-    CHECK (lynx::stretchOptionsKey (lynx::stretchOptionsOf (s), lynx::StretchMethod::beats).empty());
+    CHECK (lynx::stretchOptionsKey (lynx::stretchOptionsOf (s), lynx::StretchMethod::beats) == "|pa");
 }
 
 TEST (warp190fm_beats_preserve_grid)
@@ -70,7 +74,7 @@ TEST (warp190fm_beats_preserve_grid)
     lynx::StretchOptions o;
     o.modes.beatsPreserve = 2;
     o.sourceBeats = 4.0;
-    CHECK (lynx::stretchOptionsKey (o, lynx::StretchMethod::beats) == "|bp2@4");
+    CHECK (lynx::stretchOptionsKey (o, lynx::StretchMethod::beats) == "|pa|bp2@4"); // (round 190ik: the PitchAware law's key first)
     CHECK (lynx::stretchOptionsKey (o, lynx::StretchMethod::tones).empty()); // (Beats only)
 
     // the pieces start on the grid: on the test signal at 1.25x with Preserve 1/2 (0.5 s pieces = 1/2 note at 120 BPM
@@ -133,8 +137,8 @@ TEST (warp190fm_beats_loop_modes_and_envelope)
     // Transient Envelope 0: each piece's fill dies away quickly (the law: WarpLive190gxTests)
     CHECK (gapEnergy (*faded) < 0.05 * gapEnergy (*backForth));
     CHECK (lynx::stretchdetail::beatsEnvelopeGain (100.0f, 500, 44100.0) == 1.0f);
-    CHECK (lynx::stretchOptionsKey (off, lynx::StretchMethod::beats) == "|bl0");
-    CHECK (lynx::stretchOptionsKey (env, lynx::StretchMethod::beats) == "|be0");
+    CHECK (lynx::stretchOptionsKey (off, lynx::StretchMethod::beats) == "|pa|bl0");
+    CHECK (lynx::stretchOptionsKey (env, lynx::StretchMethod::beats) == "|pa|be0");
     // transposed Beats honours them too (each piece read faster, then silence)
     const auto upOff = lynx::timeStretch (in, 1.5, lynx::StretchMethod::beats, 5.0, off);
     const auto upBack = lynx::timeStretch (in, 1.5, lynx::StretchMethod::beats, 5.0);
@@ -155,7 +159,10 @@ TEST (warp190fm_grain_sizes)
     lynx::StretchOptions o;
     o.modes = w;
     CHECK (lynx::stretchOptionsKey (o, lynx::StretchMethod::tones) == "|tg60");
+    CHECK (lynx::stretchOptionsKey (o, lynx::StretchMethod::texture) == "|gx2f25"); // (round 190ik: the granular engine)
+    o.modes.warpLaw = lynx::WarpModeSettings::warpLawClassic;
     CHECK (lynx::stretchOptionsKey (o, lynx::StretchMethod::texture) == "|xg2");
+    o.modes.warpLaw = lynx::WarpModeSettings::warpLawMeasured;
     // the render follows: another block, the same length
     const auto in = warp190fmPieces();
     const auto a = lynx::timeStretch (in, 1.25, lynx::StretchMethod::tones);
@@ -276,7 +283,8 @@ TEST (warp190fm_als_round_trip)
         CHECK (w.textureFlux == 60.0f && w.proFormants == 30.0f && w.proEnvelope == 64.0f);
         CHECK (w.complexPro == (mode[0] == '6'));
         CHECK (ch->sampler.stretchMethod == (mode[0] == '6' ? StretchMethod::complex : StretchMethod::beats));
-        CHECK ((report.partialEffects.count ("Warp mode Complex Pro (plays as Complex; Formants and Envelope kept for export)") > 0) == (mode[0] == '6'));
+        // (round 190ik: Complex Pro's Formants / Envelope play, nothing is reported as left out)
+        CHECK (report.partialEffects.count ("Warp mode Complex Pro (plays as Complex; Formants and Envelope kept for export)") == 0);
         const auto out = exportAls (*song);
         for (const auto* member : { "<GranularityTones Value=\"12\"", "<GranularityTexture Value=\"80\"", "<FluctuationTexture Value=\"60\"",
                                     "<TransientResolution Value=\"3\"", "<TransientLoopMode Value=\"1\"", "<TransientEnvelope Value=\"40\"",

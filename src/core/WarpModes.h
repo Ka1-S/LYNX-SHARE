@@ -32,12 +32,14 @@ inline const std::array<const char*, 3>& loopNames()
 }
 
 // The .lynx form of a channel's warpModes (engine/ProjectFile.cpp "warpModes"): the struct's numbers in its order, the
-// tenth the Beats law (round 190gx; a nine-number list was saved before it: Classic); a channel with the defaults writes
-// nothing. fromList clamps to the ranges LYNX keeps; fewer than nine numbers: defaults.
-inline std::array<double, 10> toList (const WarpModeSettings& w)
+// tenth the Beats law (round 190gx; a nine-number list was saved before it: Classic), the eleventh the Texture / Complex
+// Pro law (round 190ik; a ten-number list was saved before it: Classic); a channel with the defaults writes nothing.
+// fromList clamps to the ranges LYNX keeps; fewer than nine numbers: defaults.
+inline std::array<double, 11> toList (const WarpModeSettings& w)
 {
     return { (double) w.beatsPreserve, (double) w.beatsLoop, (double) w.beatsEnvelope, (double) w.tonesGrain, (double) w.textureGrain,
-             (double) w.textureFlux, (double) w.proFormants, (double) w.proEnvelope, w.complexPro ? 1.0 : 0.0, (double) w.beatsLaw };
+             (double) w.textureFlux, (double) w.proFormants, (double) w.proEnvelope, w.complexPro ? 1.0 : 0.0, (double) w.beatsLaw,
+             (double) w.warpLaw };
 }
 template <typename List>
 WarpModeSettings fromList (const List& m, std::size_t size)
@@ -55,7 +57,10 @@ WarpModeSettings fromList (const List& m, std::size_t size)
     w.proFormants = (float) std::clamp (at (6), 0.0, 100.0);
     w.proEnvelope = (float) std::clamp (at (7), 8.0, 256.0);
     w.complexPro = at (8) != 0.0;
-    w.beatsLaw = size >= 10 && at (9) >= 0.5 ? WarpModeSettings::beatsLawMeasured : WarpModeSettings::beatsLawClassic;
+    w.beatsLaw = size >= 10 && at (9) >= 1.5   ? WarpModeSettings::beatsLawPitchAware
+                 : size >= 10 && at (9) >= 0.5 ? WarpModeSettings::beatsLawMeasured
+                                               : WarpModeSettings::beatsLawClassic;
+    w.warpLaw = size >= 11 && at (10) >= 0.5 ? WarpModeSettings::warpLawMeasured : WarpModeSettings::warpLawClassic;
     return w;
 }
 
@@ -122,6 +127,7 @@ inline bool setMode (Song& song, int channel, int method)
     if (method >= 0)
         s.stretchMethod = (StretchMethod) std::clamp (method, 0, stretchMethodCount - 1);
     s.warpModes.complexPro = false; // (a mode chosen in LYNX is LYNX's own Complex, not an imported Complex Pro)
+    s.moveBakedPitchToKnob();       // (round 190ik: a Complex Pro transposition goes to the Pitch knob outside it)
     return true;
 }
 
@@ -162,10 +168,45 @@ inline bool setGrain (Song& song, int channel, double value)
     return true;
 }
 // Texture's Flux and Complex Pro's Formants / Envelope (round 190gx): the Clip View shows them under their mode, as Live
-// does [LIVE 190gu warp/live-audio-box-{texture,complex-pro}.png], only when LYNX's engine plays them (no dead controls);
-// the values are kept for the .als either way.
-inline constexpr bool textureFluxPlays = false;
-inline constexpr bool complexProPlays = false;
+// does [LIVE 190gu warp/live-audio-box-{texture,complex-pro}.png], only when LYNX's engine plays them (no dead controls):
+// round 190ik's engines (warpLaw Measured) do; the values are kept for the .als either way.
+inline bool textureFluxPlays (const WarpModeSettings& w) noexcept { return w.warpLaw >= WarpModeSettings::warpLawMeasured; }
+inline bool complexProPlays (const WarpModeSettings& w) noexcept { return w.warpLaw >= WarpModeSettings::warpLawMeasured; }
+// Whether a clip transposition of this channel is rendered offline with its warp mode (round 190ik: stretchPitch — Complex
+// Pro keeps the formants, Texture resamples its grains; Beats keeps the clip's real-time pitch in the Clip View)
+inline bool proTransposes (const SamplerSettings& s) noexcept
+{
+    return s.keepPitch && s.bakesPitch() && s.stretchMethod != StretchMethod::beats;
+}
+// The grid clip in (track, scene) transposed by `semitones` (round 190ik): on a Complex Pro or Texture channel the channel's
+// offline transposition (Live's clip transpose; `channel` must already be the clip's own, O16), else the clip's real-time
+// pitch.
+inline bool setClipTranspose (Song& song, int channel, int track, int scene, float semitones)
+{
+    auto* clip = gridAudioClip (song, track, scene);
+    if (clip == nullptr || channel < 0 || channel >= (int) song.channels.size())
+        return false;
+    auto& s = song.channels[(std::size_t) channel].sampler;
+    if (proTransposes (s))
+    {
+        s.stretchPitch = std::clamp (semitones, -48.0f, 48.0f);
+        clip->pitch = 0.0f;
+    }
+    else
+        clip->pitch = std::clamp (semitones, -12.0f, 12.0f);
+    return true;
+}
+// The Texture / Complex Pro law (round 190ik): Classic (before 190ik) or Measured (the granular Texture, Complex Pro's
+// formants)
+inline bool setWarpLaw (Song& song, int channel, int law)
+{
+    if (channel < 0 || channel >= (int) song.channels.size())
+        return false;
+    auto& s = song.channels[(std::size_t) channel].sampler;
+    s.warpModes.warpLaw = law != 0 ? WarpModeSettings::warpLawMeasured : WarpModeSettings::warpLawClassic;
+    s.moveBakedPitchToKnob(); // (back to Classic: Complex Pro's transposition plays in real time again)
+    return true;
+}
 inline bool setFlux (Song& song, int channel, double value)
 {
     if (channel < 0 || channel >= (int) song.channels.size())
@@ -187,21 +228,24 @@ inline bool setProEnvelope (Song& song, int channel, double value)
     song.channels[(std::size_t) channel].sampler.warpModes.proEnvelope = (float) std::clamp (value, 8.0, 256.0);
     return true;
 }
-// Beats' law (round 190gx): Classic (before 190gx) or Measured (Live 12.4's renders)
+// Beats' law (round 190gx): Classic (before 190gx), Measured (Live 12.4's renders) or (round 190ik) PitchAware
 inline bool setBeatsLaw (Song& song, int channel, int law)
 {
     if (channel < 0 || channel >= (int) song.channels.size())
         return false;
     song.channels[(std::size_t) channel].sampler.warpModes.beatsLaw
-        = law != 0 ? WarpModeSettings::beatsLawMeasured : WarpModeSettings::beatsLawClassic;
+        = law >= 2 ? WarpModeSettings::beatsLawPitchAware : law != 0 ? WarpModeSettings::beatsLawMeasured : WarpModeSettings::beatsLawClassic;
     return true;
 }
 // Live's Complex Pro: LYNX's Complex with the clip's formants kept (complexPro)
 inline bool setComplexPro (Song& song, int channel)
 {
-    if (! setMode (song, channel, (int) StretchMethod::complex))
+    if (channel < 0 || channel >= (int) song.channels.size())
         return false;
-    song.channels[(std::size_t) channel].sampler.warpModes.complexPro = true;
+    auto& s = song.channels[(std::size_t) channel].sampler;
+    s.keepPitch = true;
+    s.stretchMethod = StretchMethod::complex;
+    s.warpModes.complexPro = true; // (an offline transposition it already had stays: round 190ik)
     return true;
 }
 } // namespace lynx::warpmodes

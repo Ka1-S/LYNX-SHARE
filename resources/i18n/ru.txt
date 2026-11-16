@@ -10480,6 +10480,9 @@ countries: ru by kz
 "Replace Samples(s)" = "Заменить сэмпл(ы)"
 "Current selection" = "Текущее выделение"
 "Compatible velocity" = "Совместимый velocity"
+"Pitch-aware" = "С учётом высоты"
+"Beats law: Classic plays as LYNX did before 0.1.28, Measured as 0.1.28 and 0.1.29 did (this project was saved then); Pitch-aware also cuts where the pitch of a held note steps" = "Закон Beats: Классический играет как LYNX до 0.1.28, Измеренный как 0.1.28 и 0.1.29 (проект сохранён тогда); С учётом высоты также режет там, где меняется высота выдержанной ноты"
+"Texture and Complex Pro law: Classic plays as LYNX did before 0.1.30 (this project was saved then); Measured follows Live 12.4's renders (grains and Flux, formants kept)" = "Закон Texture и Complex Pro: Классический играет как LYNX до 0.1.30 (проект сохранён тогда); Измеренный следует рендерам Live 12.4 (гранулы и Flux, форманты сохраняются)"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] открыть/закрыть редактор  [Alt]+[LMB] не закрывать другие  [Ctrl]+[LMB] прослушать  [2xLMB] Piano Roll  [LMB] перетаскивание вверх/вниз меняет порядок  [RMB] меню канала"

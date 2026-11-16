@@ -63,6 +63,7 @@ const DocumentFields& editableDocumentFields (DocumentShape shape)
         // formulas and targets, as remoteMappings)
         add (S::root, "playlistRowHeight linkTracksToMixer");
         add (S::root, "beatsLaw190gx", S::readOnly);
+        add (S::root, "warpLaw190ik", S::readOnly); // (round 190ik: the Beats detector / Texture / Complex Pro laws' mark)
         add (S::root, "sfModBase190he", S::readOnly); // (round 190he: the mark of a song saved with the real Soundfont modulator centre)
         add (S::root, "mixerLevelPdc190hq"); // (round 190hq: Mixer › Plugin delay compensation › compensate fader and route automations)
         add (S::root, "format version savedBy projectId nextUid session clipFadesPerClip", S::readOnly);

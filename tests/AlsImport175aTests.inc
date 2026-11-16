@@ -975,20 +975,30 @@ TEST (als175a_warp_markers_place_the_audio)
     for (auto method : { StretchMethod::general, StretchMethod::transients, StretchMethod::mono, StretchMethod::beats, StretchMethod::tones,
                          StretchMethod::texture, StretchMethod::complex })
     {
-        const auto out = timeStretchMapped (in, map, method);
+      // (round 190ik: Texture's granular engine reads each grain at the source's speed from its anchor, as Live's does, so
+      // a burst lands within a grain period of its place; the Classic Texture keeps the 8 ms check)
+      for (const auto law : { WarpModeSettings::warpLawClassic, WarpModeSettings::warpLawMeasured })
+      {
+        if (law == WarpModeSettings::warpLawMeasured && method != StretchMethod::texture)
+            continue;
+        StretchOptions options;
+        options.modes.warpLaw = law;
+        const auto out = timeStretchMapped (in, map, method, 0.0, options);
         CHECK (out != nullptr && out->frames() == 88200 && out->isStereo());
         if (out == nullptr || out->frames() != 88200)
             continue;
+        const auto tolerance = law == WarpModeSettings::warpLawMeasured ? (long) (0.075 * 44100.0) : 353L; // (65 ms grains + scatter / 8 ms)
         int placed = 0;
         for (std::size_t k = 0; k < at.size(); ++k)
         {
             const auto want = (long) std::llround (stretchMapOutput (map, (double) sourcePeak[k]));
             const auto got = als175a::envelopePeak (*out, want);
-            placed += std::abs (got - want) <= 353; // 8 ms
+            placed += std::abs (got - want) <= tolerance;
         }
         CHECK (placed == 4);
         if (placed != 4)
-            std::printf ("  warp markers: method %d placed %d of 4 bursts\n", (int) method, placed);
+            std::printf ("  warp markers: method %d law %d placed %d of 4 bursts\n", (int) method, (int) law, placed);
+      }
     }
     // fewer than 3 points: the plain stretch at the overall ratio (the same samples as timeStretch)
     const auto plain = timeStretchMapped (in, { { 0.0, 0.0 }, { 88200.0, 110250.0 } }, StretchMethod::complex);

@@ -5854,15 +5854,15 @@ private:
             auto nineVar = juce::JSON::parse (lynx::ProjectFile::toJson (nine));
             bool trimmed = false;
             if (auto* channels = nineVar.getProperty ("channels", {}).getArray(); channels != nullptr && (int) index < channels->size())
-                if (auto* modes = (*channels)[(int) index].getProperty ("samplerSettings", {}).getProperty ("warpModes", {}).getArray(); modes != nullptr && modes->size() == 10)
+                if (auto* modes = (*channels)[(int) index].getProperty ("samplerSettings", {}).getProperty ("warpModes", {}).getArray(); modes != nullptr && modes->size() == 11)
                 {
-                    modes->removeLast();
+                    modes->removeLast (2); // (round 190ik's eleventh number too)
                     trimmed = true;
                 }
             const auto nineJson = juce::JSON::toString (nineVar);
             if (! json.contains ("beatsLaw190gx") || old.contains ("beatsLaw190gx"))
                 beatslaw190gxResult = "ERROR mark";
-            else if (lawOf (json) != lynx::WarpModeSettings::beatsLawMeasured)
+            else if (lawOf (json) != lynx::WarpModeSettings::beatsLawPitchAware) // (round 190ik: the new default)
                 beatslaw190gxResult = "ERROR new " + why;
             else if (lawOf (old) != lynx::WarpModeSettings::beatsLawClassic)
                 beatslaw190gxResult = "ERROR old " + why;
@@ -5870,6 +5870,60 @@ private:
                 beatslaw190gxResult = "ERROR classic kept " + why;
             else if (! trimmed || lawOf (nineJson) != lynx::WarpModeSettings::beatsLawClassic)
                 beatslaw190gxResult = "ERROR nine-number list";
+        }
+        // round 190ik: the pitch-aware Beats law and the Texture / Complex Pro engines in the .lynx — a new project's channels
+        // use them; a project saved before 190ik (no "warpLaw190ik" mark, or a ten-number warpModes list) keeps Beats Measured
+        // and the Classic engines; a channel kept on an older law stays on it when saved again
+        juce::String warplaw190ikResult = "OK";
+        {
+            auto song = lynx::Song::makeDefault();
+            lynx::ChannelDef channel;
+            channel.instrument = lynx::InstrumentKind::audioClip;
+            channel.samplePath = "warplaw190ik.wav";
+            channel.sampler.keepPitch = true;
+            channel.sampler.stretchMethod = lynx::StretchMethod::texture;
+            song.channels.push_back (channel);
+            const auto index = song.channels.size() - 1;
+            juce::String why;
+            const auto lawsOf = [&] (const juce::String& text) {
+                const auto back = lynx::ProjectFile::fromJson (text, why);
+                if (! back || back->channels.size() <= index)
+                    return std::pair<int, int> { -1, -1 };
+                const auto& w = back->channels[index].sampler.warpModes;
+                return std::pair<int, int> { (int) w.beatsLaw, (int) w.warpLaw };
+            };
+            const auto json = lynx::ProjectFile::toJson (song);
+            auto oldVar = juce::JSON::parse (json); // (the mark removed: a project saved by 0.1.28 / 0.1.29)
+            if (auto* o = oldVar.getDynamicObject())
+                o->removeProperty ("warpLaw190ik");
+            const auto old = juce::JSON::toString (oldVar);
+            auto kept = song; // a channel left on the older laws
+            kept.channels[index].sampler.warpModes.beatsLaw = lynx::WarpModeSettings::beatsLawMeasured;
+            kept.channels[index].sampler.warpModes.warpLaw = lynx::WarpModeSettings::warpLawClassic;
+            auto ten = song; // a changed setting saved by 0.1.28: a ten-number list
+            ten.channels[index].sampler.warpModes.textureFlux = 60.0f;
+            auto tenVar = juce::JSON::parse (lynx::ProjectFile::toJson (ten));
+            bool trimmed = false;
+            if (auto* channels = tenVar.getProperty ("channels", {}).getArray(); channels != nullptr && (int) index < channels->size())
+                if (auto* modes = (*channels)[(int) index].getProperty ("samplerSettings", {}).getProperty ("warpModes", {}).getArray(); modes != nullptr && modes->size() == 11)
+                {
+                    modes->removeLast();
+                    modes->set (9, 1); // (0.1.28 wrote Measured)
+                    trimmed = true;
+                }
+            const auto tenJson = juce::JSON::toString (tenVar);
+            const std::pair<int, int> newest { lynx::WarpModeSettings::beatsLawPitchAware, lynx::WarpModeSettings::warpLawMeasured };
+            const std::pair<int, int> older { lynx::WarpModeSettings::beatsLawMeasured, lynx::WarpModeSettings::warpLawClassic };
+            if (! json.contains ("warpLaw190ik") || old.contains ("warpLaw190ik"))
+                warplaw190ikResult = "ERROR mark";
+            else if (lawsOf (json) != newest)
+                warplaw190ikResult = "ERROR new " + why;
+            else if (lawsOf (old) != older)
+                warplaw190ikResult = "ERROR old " + why;
+            else if (lawsOf (lynx::ProjectFile::toJson (kept)) != older)
+                warplaw190ikResult = "ERROR older laws kept " + why;
+            else if (! trimmed || lawsOf (tenJson) != std::pair<int, int> { lynx::WarpModeSettings::beatsLawMeasured, lynx::WarpModeSettings::warpLawClassic })
+                warplaw190ikResult = "ERROR ten-number list";
         }
         // round 190he (issue #152): a channel window's Scaling is saved with the channel; the default (125 %) writes
         // nothing, so older projects and untouched channels read as before
@@ -6404,7 +6458,7 @@ private:
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && exportParity.startsWith ("OK") && midiHotplug.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
-                        && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK"
+                        && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK"
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
                         && hostedStateContentionResult.startsWith ("OK")
                         && danceWindowResult == "OK" && clickActivationResult == "OK" && motionOverlayResult.startsWith ("OK");
@@ -6475,6 +6529,7 @@ private:
                << "trackauto190gz_saved=" << trackauto190gzResult << "\n"
                << "clipenv190gi_saved=" << clipenv190giResult << "\n"
                << "beatslaw190gx_saved=" << beatslaw190gxResult << "\n"
+               << "warplaw190ik_saved=" << warplaw190ikResult << "\n"
                << "editor_scale190he_saved=" << editorScale190heResult << "\n"
                << "sf_mod_base190he=" << sfModBase190heResult << "\n"
                << "community190hq_saved=" << community190hqResult << "\n"
@@ -26145,16 +26200,16 @@ private:
         check ("02 Tones (Grain Size 30.00)", shoot ("02-audio-tones", 900, 250, 1) != nullptr);
         setMode ((int) lynx::StretchMethod::texture);
         check ("03 Texture (Grain Size 65.00, Flux only when it plays)", shoot ("03-audio-texture", 900, 250, 1) != nullptr);
-        if constexpr (lynx::warpmodes::complexProPlays)
-        {
+        { // (round 190ik: Complex Pro plays, its Formants and Envelope show)
             offline.editSong ([&] (lynx::Song& s) { lynx::warpmodes::setComplexPro (s, channelOf()); }, false);
             offline.dispatchPendingMessages();
             check ("04 Complex Pro (Formants 100.00, Envelope 128)", shoot ("04-audio-complex-pro", 900, 250, 1) != nullptr);
-        }
-        else
-        {
-            setMode ((int) lynx::StretchMethod::complex);
-            check ("04 Complex (nothing under the chooser)", shoot ("04-audio-complex", 900, 250, 1) != nullptr);
+            offline.editSong ([&] (lynx::Song& s) { lynx::warpmodes::setWarpLaw (s, channelOf(), 0); }, false);
+            offline.dispatchPendingMessages();
+            check ("04b Complex Pro of a project saved before 0.1.30 (law chooser, no Formants / Envelope)",
+                   shoot ("04b-audio-complex-pro-classic", 900, 250, 1) != nullptr);
+            offline.editSong ([&] (lynx::Song& s) { lynx::warpmodes::setWarpLaw (s, channelOf(), 1); }, false);
+            offline.dispatchPendingMessages();
         }
         setMode ((int) lynx::StretchMethod::beats);
         {

@@ -1952,9 +1952,12 @@ void addAudioClip (Ctx& ctx, const Element& clip, int row, int mixerTrack, doubl
             fileRate = 1.0;
         }
     // Beats with a transpose: Live resamples each piece (higher and shorter, still on its beat), so the transposition is
-    // rendered offline with the stretch, keyed by the pitch, and the clip itself plays untransposed [LIVE: Beats-up5]
+    // rendered offline with the stretch, keyed by the pitch, and the clip itself plays untransposed [LIVE: Beats-up5].
+    // Round 190ik: Complex Pro and Texture too — Complex Pro's transposition keeps the formants (Formants / Envelope), a
+    // Texture clip's grains are resampled, which only the offline engines do (core/WarpEngines); Live's whole ±48 st range
+    // then plays
     const auto transpose = std::clamp (clip.number ("PitchCoarse", 0) + clip.number ("PitchFine", 0) / 100.0, -48.0, 48.0);
-    const auto bakePitch = warped && mode == 0 && transpose != 0.0;
+    const auto bakePitch = warped && (mode == 0 || mode == 2 || mode == 6) && transpose != 0.0;
     double fileBeats = 0.0, beatsPitch = 0.0;
     std::vector<WarpPoint> warp;
     if (warped && mode != 3 && fileFrames > 0 && fileRate > 0 && (std::abs (stretch - 1.0) > 1.0e-9 || bakePitch || bends))
@@ -1981,13 +1984,7 @@ void addAudioClip (Ctx& ctx, const Element& clip, int row, int mixerTrack, doubl
     // content position (beats, or seconds when not warped) → LYNX playback ticks from the sample's start
     const auto contentTicks = [&] (double v) { return warped ? (v - beatAtZero) * ppq : v * bpm / 60.0 * ppq; };
     const auto modes = warpModesOf (clip);
-    if (warped && ctx.report != nullptr) // what LYNX keeps but does not render (round 190fm)
-    {
-        if (mode == 6)
-            ++ctx.report->partialEffects["Warp mode Complex Pro (plays as Complex; Formants and Envelope kept for export)"];
-        if (mode == 2 && modes.textureFlux != WarpModeSettings {}.textureFlux)
-            ++ctx.report->partialEffects["Warp mode Texture: Flux (kept for export, not rendered)"];
-    }
+    // (round 190ik: Complex Pro's Formants / Envelope and Texture's Flux play — core/WarpEngines — so nothing is reported)
     const auto channel = audioChannelFor (ctx, path, mixerTrack, mode, warped, fileBeats, beatsPitch, warp, modes);
     const auto loop = loopOverride != nullptr ? *loopOverride : loopOf (clip);
     // not warped: the loop values are seconds [DATA: IsWarped=false clips]; the clip length is in beats either way

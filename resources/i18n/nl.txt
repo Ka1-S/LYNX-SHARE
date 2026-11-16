@@ -10480,6 +10480,9 @@ countries: nl be
 "Replace Samples(s)" = "Sample(s) vervangen"
 "Current selection" = "Huidige selectie"
 "Compatible velocity" = "Compatibele velocity"
+"Pitch-aware" = "Toonhoogtebewust"
+"Beats law: Classic plays as LYNX did before 0.1.28, Measured as 0.1.28 and 0.1.29 did (this project was saved then); Pitch-aware also cuts where the pitch of a held note steps" = "Beats-wet: Classic speelt zoals LYNX vóór 0.1.28, Gemeten zoals 0.1.28 en 0.1.29 (dit project is toen opgeslagen); Toonhoogtebewust knipt ook waar de toonhoogte van een aangehouden noot verspringt"
+"Texture and Complex Pro law: Classic plays as LYNX did before 0.1.30 (this project was saved then); Measured follows Live 12.4's renders (grains and Flux, formants kept)" = "Wet voor Texture en Complex Pro: Classic speelt zoals LYNX vóór 0.1.30 (dit project is toen opgeslagen); Gemeten volgt de renders van Live 12.4 (grains en Flux, formanten behouden)"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editor openen/sluiten  [Alt]+[LMB] andere open houden  [Ctrl]+[LMB] voorbeluisteren  [2xLMB] Piano Roll  [LMB] omhoog/omlaag slepen herschikt  [RMB] kanaalmenu"
