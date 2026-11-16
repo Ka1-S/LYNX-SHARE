@@ -33,6 +33,12 @@
 #include "ui/PluginSkin.h"
 #include "ui/WindowOwner.h"
 
+// cmake/LynxPatchJuce.cmake fix 39 (round 190je): where a tall menu breaks into a second column (set by the LookAndFeel)
+namespace juce
+{
+extern int (*lynxTallMenuBreakHook) (const int* heights, const int* kinds, int count, int screenHeight);
+}
+
 namespace lynx::theme
 {
 using namespace colour;
@@ -1087,6 +1093,14 @@ LookAndFeel::LookAndFeel()
    #endif
     clearFontCache(); // (the cached fonts may hold the typeface of the family before)
     refreshColours();
+
+    // FL's columns for long menus (round 190je, FW-13): a menu taller than 70 % of the screen breaks once at a group
+    juce::lynxTallMenuBreakHook = [] (const int* heights, const int* kinds, int count, int screenHeight) {
+        std::vector<themes::MenuRow> rows ((std::size_t) juce::jmax (0, count));
+        for (int i = 0; i < count; ++i)
+            rows[(std::size_t) i] = { heights[i], kinds[i] == 1, kinds[i] == 2 };
+        return themes::tallMenuBreak (rows, screenHeight * 7 / 10);
+    };
 }
 
 // JUCE expects a typeface for every font ("the look and feel must return a typeface!") but, on Linux, has none for a
@@ -1321,11 +1335,13 @@ void LookAndFeel::refreshColours()
     setColour (juce::ComboBox::buttonColourId, bg4);
     setColour (juce::ComboBox::focusedOutlineColourId, accent);
 
-    setColour (juce::PopupMenu::backgroundColourId, bg3);
-    setColour (juce::PopupMenu::textColourId, textPrimary);
-    setColour (juce::PopupMenu::headerTextColourId, textSecondary);
-    setColour (juce::PopupMenu::highlightedBackgroundColourId, bg5);
-    setColour (juce::PopupMenu::highlightedTextColourId, textPrimary);
+    // (round 190je: the menus' colours)
+    const auto menuLook = menus::colours();
+    setColour (juce::PopupMenu::backgroundColourId, menuLook.background);
+    setColour (juce::PopupMenu::textColourId, menuLook.text);
+    setColour (juce::PopupMenu::headerTextColourId, menuLook.bandText);
+    setColour (juce::PopupMenu::highlightedBackgroundColourId, menuLook.hover);
+    setColour (juce::PopupMenu::highlightedTextColourId, menuLook.hoverText);
 
     setColour (juce::Label::textColourId, textPrimary);
     setColour (juce::Label::backgroundColourId, juce::Colours::transparentBlack);
@@ -1655,9 +1671,22 @@ void LookAndFeel::preparePopupMenuWindow (juce::Component& window)
 void LookAndFeel::drawPopupMenuBackground (juce::Graphics& g, int width, int height)
 {
     const auto bounds = juce::Rectangle<float> (0.0f, 0.0f, (float) width, (float) height);
-    g.fillAll (bg3);
-    g.setColour (borderStrong);
+    const auto look = menus::colours();
+    g.fillAll (look.background);
+    g.setColour (look.border);
     g.drawRect (bounds, 1.0f);
+}
+
+// FL's 1 px line between the columns of a long menu (round 190je, FW-13)
+void LookAndFeel::drawPopupMenuColumnSeparatorWithOptions (juce::Graphics& g, const juce::Rectangle<int>& bounds, const juce::PopupMenu::Options&)
+{
+    g.setColour (menus::colours().separator);
+    g.fillRect (bounds.withSizeKeepingCentre (1, bounds.getHeight()));
+}
+
+int LookAndFeel::getPopupMenuColumnSeparatorWidthWithOptions (const juce::PopupMenu::Options&)
+{
+    return 1;
 }
 
 namespace menus
@@ -1669,13 +1698,22 @@ bool compactMenus = true;
 void setCompact (bool c) { compactMenus = c; }
 bool compact() { return compactMenus; }
 int itemHeight() { return compactMenus ? 21 : 26; }
-int headerHeight() { return compactMenus ? 19 : 39; }
+int headerHeight() { return compactMenus ? 17 : 22; }
 int separatorHeight() { return compactMenus ? 5 : 9; }
+float textSize() { return textsize::scaled (14.0f, theme::textSize(), textsize::Role::body); }
+
+Colours colours()
+{
+    const auto m = themes::menuColours (paletteInUse());
+    const auto c = [] (std::uint32_t argb) { return juce::Colour (argb); };
+    return { c (m.background), c (m.border), c (m.text), c (m.shortcut), c (m.disabled), c (m.band), c (m.bandText), c (m.hover), c (m.hoverText),
+             c (m.separator), c (m.check) };
+}
 } // namespace menus
 
 juce::Font LookAndFeel::getPopupMenuFont()
 {
-    return uiFont (type::body);
+    return uiFont (menus::textSize());
 }
 
 void LookAndFeel::getIdealPopupMenuItemSize (const juce::String& text, bool isSeparator, int standardMenuItemHeight, int& idealWidth,
@@ -1693,7 +1731,7 @@ void LookAndFeel::getIdealPopupMenuItemSize (const juce::String& text, bool isSe
     {
         // JUCE asks with -1 for a section header and then adds half of the answer: hand back 2/3 of the wanted height
         idealHeight = (menus::headerHeight() * 2 + 2) / 3;
-        idealWidth = juce::roundToInt (juce::GlyphArrangement::getStringWidth (uiFont (type::small, true), caps (text)) * 0.8f) + 24;
+        idealWidth = juce::roundToInt (juce::GlyphArrangement::getStringWidth (uiFont (type::small), text)) + 24;
         return;
     }
     idealHeight = standardMenuItemHeight > 0 ? standardMenuItemHeight : menus::itemHeight();
@@ -1706,40 +1744,44 @@ void LookAndFeel::drawPopupMenuItem (juce::Graphics& g, const juce::Rectangle<in
                                      bool isTicked, bool hasSubMenu, const juce::String& text, const juce::String& shortcutKeyText,
                                      const juce::Drawable* icon, const juce::Colour* textColourToUse)
 {
+    const auto look = menus::colours();
     if (isSeparator)
     {
-        g.setColour (border.brighter (0.1f));
+        g.setColour (look.separator);
         g.fillRect (area.reduced (8, 0).withHeight (1).withY (area.getCentreY()));
         return;
     }
 
-    auto r = area.reduced (4, 1);
+    auto r = area.reduced (0, 0);
+    const auto hot = isHighlighted && isActive;
 
-    if (isHighlighted && isActive)
+    // FL's hover: the whole row, square, no accent bar (round 190je, FW-14: the accent stays for selected states)
+    if (hot)
     {
-        fillRounded (g, r.toFloat(), radius::sm, bg5);
-        g.setColour (accent);
-        g.fillRoundedRectangle (r.toFloat().withWidth (3.0f).reduced (0.0f, 4.0f), 1.5f);
+        g.setColour (look.hover);
+        g.fillRect (r);
     }
 
-    auto textColour = textColourToUse != nullptr ? *textColourToUse : textPrimary;
+    auto textColour = textColourToUse != nullptr ? *textColourToUse : look.text;
     if (! isActive)
-        textColour = textDisabled;
+        textColour = look.disabled;
+    else if (hot && textColourToUse == nullptr)
+        textColour = look.hoverText;
 
-    auto content = r.reduced (8, 0);
+    auto content = r.reduced (12, 0);
     auto iconArea = content.removeFromLeft (juce::roundToInt ((float) r.getHeight() * 0.8f)).toFloat();
 
     if (icon != nullptr)
         icon->drawWithin (g, iconArea.withSizeKeepingCentre (14.0f, 14.0f), juce::RectanglePlacement::centred, isActive ? 1.0f : 0.4f);
     else if (isTicked)
-        icons::draw (g, Icon::check, iconArea.withSizeKeepingCentre (16.0f, 16.0f), isActive ? accent : textDisabled);
+        icons::draw (g, Icon::check, iconArea.withSizeKeepingCentre (16.0f, 16.0f), ! isActive ? look.disabled : hot ? look.hoverText : look.check);
 
     if (hasSubMenu)
     {
         const auto arrow = content.removeFromRight (14).toFloat().withSizeKeepingCentre (12.0f, 12.0f);
         juce::Graphics::ScopedSaveState state (g);
         g.addTransform (juce::AffineTransform::rotation (-pi * 0.5f, arrow.getCentreX(), arrow.getCentreY()));
-        icons::draw (g, Icon::chevronDown, arrow, isHighlighted ? textPrimary : textSecondary);
+        icons::draw (g, Icon::chevronDown, arrow, ! isActive ? look.disabled : hot ? look.hoverText : look.shortcut);
     }
 
     content.removeFromLeft (4);
@@ -1748,9 +1790,11 @@ void LookAndFeel::drawPopupMenuItem (juce::Graphics& g, const juce::Rectangle<in
 
     if (shortcutKeyText.isNotEmpty())
     {
-        g.setColour (textSecondary.withMultipliedAlpha (isActive ? 1.0f : 0.6f));
-        g.setFont (uiFont (type::small));
-        g.drawText (shortcutKeyText, content.removeFromRight (juce::roundToInt (juce::GlyphArrangement::getStringWidth (uiFont (type::small), shortcutKeyText)) + 4),
+        // FL's shortcut column: right-aligned, italic, a step smaller; white under the mouse as FL's
+        const auto keyFont = uiFont (type::small).italicised();
+        g.setColour (! isActive ? look.disabled : hot ? look.hoverText : look.shortcut);
+        g.setFont (keyFont);
+        g.drawText (shortcutKeyText, content.removeFromRight (juce::roundToInt (juce::GlyphArrangement::getStringWidth (keyFont, shortcutKeyText)) + 4),
                     juce::Justification::centredRight, false);
         g.setFont (font);
     }
@@ -1774,9 +1818,14 @@ void LookAndFeel::drawPopupMenuItem (juce::Graphics& g, const juce::Rectangle<in
 
 void LookAndFeel::drawPopupMenuSectionHeader (juce::Graphics& g, const juce::Rectangle<int>& area, const juce::String& sectionName)
 {
-    g.setFont (uiFont (type::small, true));
-    g.setColour (textSecondary);
-    g.drawFittedText (caps (sectionName), area.reduced (14, 0).withTrimmedTop (menus::compact() ? 2 : 4), juce::Justification::centredLeft, 1);
+    // FL's section band (round 190je, FW-12): the full row filled, the title in sentence case ("Recent projects")
+    const auto look = menus::colours();
+    const auto band = area.withTrimmedTop (juce::jmax (0, area.getHeight() - menus::headerHeight()));
+    g.setColour (look.band);
+    g.fillRect (band);
+    g.setFont (uiFont (type::small));
+    g.setColour (look.bandText);
+    g.drawFittedText (sectionName, band.reduced (8, 0), juce::Justification::centredLeft, 1);
 }
 
 void LookAndFeel::drawMenuBarBackground (juce::Graphics&, int, int, bool, juce::MenuBarComponent&)

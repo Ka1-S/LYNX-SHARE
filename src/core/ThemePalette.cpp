@@ -227,7 +227,51 @@ Palette paletteFor (const Spec& spec)
     return withGridIntensity (derivePalette (spec.accent, spec.background), spec.gridIntensity);
 }
 
+MenuColours menuColours (const Palette& p)
+{
+    // LYNX's dark menus: the band between bg3 and bg5 (FW-12)
+    return { p.bg3, p.borderStrong, p.textPrimary, p.textSecondary, p.textDisabled, mix (p.bg3, p.bg5, 0.55), p.textSecondary, p.bg5, p.textPrimary,
+             mix (p.border, p.borderStrong, 0.5), p.accent };
+}
 
+int tallMenuBreak (const std::vector<MenuRow>& rows, int maxHeight)
+{
+    if (rows.size() < 4 || maxHeight <= 0)
+        return -1;
+    int total = 0;
+    for (const auto& r : rows)
+        total += r.height;
+    if (total <= maxHeight)
+        return -1;
+
+    // the boundaries: before a section header (best: the second column starts with its band, as FL's Add menu), after a
+    // separator (the line closes the first column)
+    int best = -1, bestTallest = 0;
+    bool bestIsHeader = false;
+    int above = 0;
+    for (std::size_t i = 0; i + 1 < rows.size(); ++i)
+    {
+        above += rows[i].height;
+        const auto header = rows[i + 1].header;
+        if (! header && ! rows[i].separator)
+            continue;
+        if (rows[i].header) // (never a header alone at the foot of a column)
+            continue;
+        const auto tallest = std::max (above, total - above);
+        // a header boundary wins over a separator one unless the separator's columns are clearly more even (3 rows)
+        const auto better = best < 0 || (header == bestIsHeader ? tallest < bestTallest
+                                                                : header ? tallest < bestTallest + 63 : tallest + 63 < bestTallest);
+        if (better)
+        {
+            best = (int) i;
+            bestTallest = tallest;
+            bestIsHeader = header;
+        }
+    }
+    if (best < 0 || bestTallest > maxHeight * 10 / 7) // (two columns still taller than the screen: JUCE's own split)
+        return -1;
+    return best;
+}
 
 std::uint32_t litStepColour (std::uint32_t channelColour, const Palette& palette)
 {

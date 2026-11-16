@@ -158,8 +158,16 @@ namespace menus
 void setCompact (bool compact);
 bool compact();
 int itemHeight();    // a normal row
-int headerHeight();  // a section header (the "DOCUMENTS" titles)
+int headerHeight();  // a section header: FL's full-width band (round 190je: 17 px compact, 22 comfortable)
 int separatorHeight();
+// The menu text, one step larger than the body text (round 190je, design190ia FW-15: FL's cap 8 px, LYNX's was 7): 14 at
+// 100 %, scaled by Settings › General › Text size like the body role. The shortcut column uses type::small, italic as FL's.
+float textSize();
+struct Colours
+{
+    juce::Colour background, border, text, shortcut, disabled, band, bandText, hover, hoverText, separator, check;
+};
+Colours colours(); // from the palette in use
 } // namespace menus
 
 juce::Font monoFont (float size); // (cached as font() is)
@@ -401,7 +409,9 @@ public:
     void drawPopupMenuSectionHeader (juce::Graphics&, const juce::Rectangle<int>& area, const juce::String& sectionName) override;
     juce::Font getPopupMenuFont() override;
     void getIdealPopupMenuItemSize (const juce::String& text, bool isSeparator, int standardMenuItemHeight, int& idealWidth, int& idealHeight) override;
-    int getPopupMenuBorderSize() override { return 4; }
+    int getPopupMenuBorderSize() override { return 2; } // (round 190je: 4 → 2, FL's rows reach the frame)
+    void drawPopupMenuColumnSeparatorWithOptions (juce::Graphics&, const juce::Rectangle<int>&, const juce::PopupMenu::Options&) override;
+    int getPopupMenuColumnSeparatorWidthWithOptions (const juce::PopupMenu::Options&) override;
     // keeps a submenu from opening over its own multi-column parent menu (round 162d: JUCE then misses the click on
     // the submenu's items — the mixer track menu's "Change color" did nothing, issue #9)
     void preparePopupMenuWindow (juce::Component& newWindow) override;

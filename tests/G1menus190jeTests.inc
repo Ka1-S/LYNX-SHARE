@@ -1,4 +1,5 @@
-// Round 190je: design190ia slice 10 (G1: contrast floors, one state language, grid line intensity). The rules live in core/ThemePalette.h.
+// Round 190je: design190ia slice 10 (G1: contrast floors, one state language, grid line intensity) and slice 16 (FW-S3:
+// menus with FL's landmarks and columns). The rules live in core/ThemePalette.h.
 
 #include "core/ThemePalette.h"
 
@@ -99,4 +100,62 @@ TEST (g1menus190je_grid_line_intensity)
     Spec spec;
     spec.gridIntensity = 1.5f;
     CHECK (paletteFor (spec) == strong);
+}
+
+TEST (g1menus190je_menu_colours_read)
+{
+    using namespace lynx::themes;
+    const auto& p = defaultPalette();
+    const auto m = menuColours (p);
+    CHECK (m.background == p.bg3 && m.band == 0xff2d3139);
+    CHECK (contrastRatio (m.text, m.background) >= textContrastFloor);
+    CHECK (contrastRatio (m.shortcut, m.background) >= textContrastFloor);
+    CHECK (contrastRatio (m.disabled, m.background) >= disabledContrastFloor);
+    CHECK (contrastRatio (m.hoverText, m.hover) >= textContrastFloor);
+    CHECK (contrastRatio (m.bandText, m.band) >= textContrastFloor);
+}
+
+TEST (g1menus190je_tall_menus_break_at_a_group)
+{
+    using namespace lynx::themes;
+    const auto item = [] { return MenuRow { 21, false, false }; };
+    const auto sep = [] { return MenuRow { 5, true, false }; };
+    const auto head = [] { return MenuRow { 17, false, true }; };
+    std::vector<MenuRow> rows;
+    for (int i = 0; i < 10; ++i)
+        rows.push_back (item());
+    CHECK (tallMenuBreak (rows, 756) == -1); // fits: one column
+    // FL's mixer track menu shape: groups under section headers, 1370 px in LYNX
+    rows.clear();
+    for (int group = 0; group < 6; ++group)
+    {
+        rows.push_back (head());
+        for (int i = 0; i < 10; ++i)
+            rows.push_back (item());
+    }
+    const auto at = tallMenuBreak (rows, 756);
+    CHECK (at == 32); // the row before the fourth header: three groups per column
+    CHECK (rows[(std::size_t) at + 1].header);
+    // only separators: after the one nearest the middle
+    rows.clear();
+    for (int group = 0; group < 4; ++group)
+    {
+        for (int i = 0; i < 12; ++i)
+            rows.push_back (item());
+        if (group < 3)
+            rows.push_back (sep());
+    }
+    const auto atSep = tallMenuBreak (rows, 756);
+    CHECK (atSep >= 0 && rows[(std::size_t) atSep].separator && atSep == 25);
+    // no group boundary at all, or two columns still taller than the screen: JUCE's own split
+    rows.assign (60, item());
+    CHECK (tallMenuBreak (rows, 756) == -1);
+    rows.clear();
+    rows.push_back (head());
+    for (int i = 0; i < 100; ++i)
+        rows.push_back (item());
+    rows.push_back (head());
+    for (int i = 0; i < 100; ++i)
+        rows.push_back (item());
+    CHECK (tallMenuBreak (rows, 756) == -1);
 }

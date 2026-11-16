@@ -72,7 +72,24 @@ ButtonLook buttonLook (const Palette& palette, ButtonKind kind, bool on, double 
 constexpr double gridIntensityMin = 0.6, gridIntensityMax = 1.6;
 Palette withGridIntensity (Palette palette, double intensity);
 
+// --- menus with FL's landmarks (round 190je, design190ia FW-12 / FW-14): the colours LYNX's dark menus draw with
+struct MenuColours
+{
+    std::uint32_t background, border, text, shortcut, disabled, band, bandText, hover, hoverText, separator, check;
+};
+MenuColours menuColours (const Palette& palette);
 
+// --- long menus in columns (round 190je, design190ia FW-13) ------------------------------------------------------------
+// FL splits its long context menus into columns (the Channel rack menu: 2 columns, 305 px). A menu without column
+// breaks that is taller than `maxHeight` (LYNX: 70 % of the screen) breaks once, where the two columns come out most
+// even: before a section header, else after a separator, else nowhere (-1; JUCE's own split takes over when even two
+// columns don't fit). Returns the row after which the second column starts.
+struct MenuRow
+{
+    int height = 0;
+    bool separator = false, header = false;
+};
+int tallMenuBreak (const std::vector<MenuRow>& rows, int maxHeight);
 
 // FL's number wheels ("digiwheels": channel RANGE / TRACK, the channel rack's insert box) in the LYNX skin (round
 // 168s): a dark inset display with light text, red (the accent) only while hovered or dragged. C = a colour type.
