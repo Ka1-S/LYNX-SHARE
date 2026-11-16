@@ -2940,11 +2940,15 @@ public:
         if (clipMode)
         {
             // the clip ended: its voice fades out quickly. A clip carries its own key (audioClipKey), so the next clip
-            // of the same channel that already started (a crossfade) keeps playing; other callers stop everything.
+            // of the same channel that already started (a crossfade) keeps playing.
             // FL's per-clip edge declicker (round 189i, FUN_00d253d0 / FUN_00d24400): the channel's declicking release,
             // or a sharp cut where the clip's end has no declick (Disabled, manual, a seamless join, a fade out)
+            // Round 190jd (live check 190iw Q6): the end of a NOTE of the channel (a step, a Piano roll note, a key played
+            // on it; keys below audioClipKeyBase) leaves the clip playing to its end, as FL does — FL's renders of one
+            // step on a 1 / 2 / 5 s clip channel play 1.010 / 2.010 / 5.010 s, the same as a Sampler without its volume
+            // envelope; LYNX stopped every voice at the step's end (0.13 s). Stop, cut groups and choke still end it.
             if (key < audioClipKeyBase)
-                allNotesOff();
+                return;
             else
                 for (auto& v : voices)
                     if (v.active && v.key == key && ! v.stolen)
