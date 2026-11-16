@@ -2743,6 +2743,7 @@ public:
 
     void setTempoRatio (double ratio, bool moves) noexcept override
     {
+        tempoHooked = true; // (rollup 0.1.30: round 190hq's per-voice rate step below stands down, see render)
         tempoMoves = moves;
         const auto c = warpedTempo.load (std::memory_order_relaxed) && std::isfinite (ratio) && ratio > 0.0 ? std::clamp (ratio, 0.05, 20.0) : 1.0;
         if (c == tempoC)
@@ -3210,7 +3211,10 @@ public:
         // round 190hq (B11, complaint #22): a channel stretched to a number of beats in Resample mode lasts those beats at
         // the tempo that plays now, as FL's does under its tempo automation: its sounding voices speed up or slow down with a
         // moving tempo (tempo markers, a tempo clip) instead of keeping the project tempo they started with
-        if (const auto now = liveBpm; now > 0.0 && stretchBeats.load (std::memory_order_relaxed) > 0.0f)
+        // (rollup 0.1.30: issue #187's tempo hook (round 190ik, setTempoRatio) moves the same voices by the same ratio, for
+        // Resample and pitch-kept channels alike; with both, a stretched sample sped up twice under a moving tempo. This
+        // step stays only for a renderer that does not call the hook: tempofollow off, tests' A/B)
+        if (const auto now = liveBpm; now > 0.0 && ! tempoHooked && stretchBeats.load (std::memory_order_relaxed) > 0.0f)
             for (auto& v : voices)
                 if (v.active)
                 {
@@ -3842,6 +3846,7 @@ private:
     double lastFactor = 1.0; // the last shifted note's transposition (where its portamento starts)
     // issue #187 (round 190ik): the playing tempo over the song's (1 unless the sample is warped), whether it can move
     double tempoC = 1.0;
+    bool tempoHooked = false; // (rollup 0.1.30: the renderer calls setTempoRatio, issue #187's tempo following)
     bool tempoMoves = false;
     std::atomic<bool> warpedTempo { false };
     double bendMul = 1.0;    // the pitch wheel (pitchBend), audio thread
