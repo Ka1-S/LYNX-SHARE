@@ -2290,7 +2290,15 @@ public:
                 std::vector<std::uint8_t> state (count);
                 for (std::size_t k = 0; k < count; ++k)
                     state[k] = (std::uint8_t) std::clamp ((int) mp[(std::size_t) harmlessCompIndex + 1 + k], 0, 255);
-                s.comp = hlfx::makeMaximusPreset (state);
+                // (round perfgate190id: the same state keeps its preset. Built again on every edit of the project it
+                // cost 13 ms per Harmless channel of each snapshot (Exoplanet: 52 of 60 ms), and the new pointer made
+                // the audio thread rebuild the rack compressor, its state reset, at every edit anywhere)
+                if (compPreset == nullptr || state != compState)
+                {
+                    compPreset = hlfx::makeMaximusPreset (state);
+                    compState = std::move (state);
+                }
+                s.comp = compPreset;
             }
         }
         mailbox.write (s);
@@ -2449,6 +2457,8 @@ private:
     Engine engine;
     Settings settings, incoming;
     Mailbox<Settings> mailbox;
+    std::vector<std::uint8_t> compState; // (message thread: configure's last compressor state and its preset)
+    std::shared_ptr<const hlfx::MaximusPreset> compPreset;
     bool dirty = false, rackBuilt = false;
     std::array<float, 11> rackInputs {};
     std::shared_ptr<const hlfx::MaximusPreset> rackComp;

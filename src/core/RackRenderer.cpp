@@ -521,7 +521,25 @@ struct VoicePlan
 {
     std::optional<Song> expanded; // (empty: the song itself)
     double ticksPerSecond = 0.0; // at the fastest tempo; 0 = unknown (a pattern's own tempo lane)
+    // (round perfgate190id) each pattern's notes by channel: (channel, note index) sorted, for the played song's
+    // patterns and, when Pattern Blocks expanded it, the song's own. Each keep-pitch channel then reads only its own
+    // notes instead of every note of every clip's pattern (Exoplanet: 99 of an edit snapshot's 161 ms)
+    std::vector<std::vector<std::pair<int, std::uint32_t>>> playedNotes, songNotes;
 };
+
+std::vector<std::vector<std::pair<int, std::uint32_t>>> notesByChannel (const std::vector<Pattern>& patterns)
+{
+    std::vector<std::vector<std::pair<int, std::uint32_t>>> index (patterns.size());
+    for (std::size_t p = 0; p < patterns.size(); ++p)
+    {
+        auto& list = index[p];
+        list.reserve (patterns[p].notes.size());
+        for (std::size_t k = 0; k < patterns[p].notes.size(); ++k)
+            list.push_back ({ patterns[p].notes[k].channel, (std::uint32_t) k });
+        std::sort (list.begin(), list.end());
+    }
+    return index;
+}
 
 VoicePlan voicePlan (const Song& song)
 {
@@ -534,11 +552,15 @@ VoicePlan voicePlan (const Song& song)
         if (song.mode != PlayMode::song)
             return plan;
         const auto length = (double) std::max<std::int64_t> (ppq, song.songLength());
+        const auto clips = tempomap::tempoClips (song); // (round perfgate190id: Exoplanet's 2,578 clips read 7,000 times)
         for (double t = 0.0; t <= length; t += ppq / 16.0)
-            bpm = std::max (bpm, tempomap::tempoAt (song, t));
+            bpm = std::max (bpm, tempomap::tempoAtIn (song, clips, t));
         bpm *= 1.01;
     }
     plan.ticksPerSecond = bpm * ppq / 60.0;
+    plan.songNotes = notesByChannel (song.patterns);
+    if (plan.expanded)
+        plan.playedNotes = notesByChannel (plan.expanded->patterns);
     return plan;
 }
 
@@ -598,8 +620,22 @@ int voicesAtOnce (const Song& song, const VoicePlan& plan, std::size_t c, double
         edges.clear();
     };
 
+    // the notes of the channels in `plays`, of pattern `p` (through the plan's index: the order differs from the
+    // pattern's, which the sort of the edges makes irrelevant)
+    std::vector<int> players;
+    for (std::size_t k = 0; k < plays.size(); ++k)
+        if (plays[k])
+            players.push_back ((int) k);
+    const auto forNotes = [&players] (const std::vector<std::pair<int, std::uint32_t>>& byChannel, const Pattern& pattern, auto&& fn) {
+        for (const auto ch : players)
+            for (auto it = std::lower_bound (byChannel.begin(), byChannel.end(), std::pair<int, std::uint32_t> { ch, 0u });
+                 it != byChannel.end() && it->first == ch; ++it)
+                fn (pattern.notes[it->second]);
+    };
+
     // the song: pattern clips (with their repeats), audio clips of the channel
     const Song& played = plan.expanded ? *plan.expanded : song;
+    const auto& playedNotes = plan.expanded ? plan.playedNotes : plan.songNotes;
     for (const auto& clip : played.playlist)
     {
         if (clip.kind == ClipKind::audio && clip.channel >= 0 && (std::size_t) clip.channel < plays.size() && plays[(std::size_t) clip.channel])
@@ -609,10 +645,9 @@ int voicesAtOnce (const Song& song, const VoicePlan& plan, std::size_t c, double
         const auto& pattern = played.patterns[(std::size_t) clip.pattern];
         const auto period = std::max<std::int64_t> (1, pattern.effectiveLength (played.meter()));
         const auto lastPass = (clip.offset + clip.length - 1) / period;
-        for (const auto& n : pattern.notes)
-        {
+        forNotes (playedNotes[(std::size_t) clip.pattern], pattern, [&] (const Note& n) {
             if (! ofChannel (n))
-                continue;
+                return;
             for (std::int64_t pass = 0; pass <= lastPass; ++pass)
             {
                 const auto at = n.start + pass * period;
@@ -621,23 +656,25 @@ int voicesAtOnce (const Song& song, const VoicePlan& plan, std::size_t c, double
                 if (at >= clip.offset && at < clip.offset + clip.length)
                     addNote ((double) (clip.start + at - clip.offset));
             }
-        }
+        });
     }
     count();
 
     // pattern mode: each pattern on its own, looping
-    for (const auto& pattern : song.patterns)
+    for (std::size_t p = 0; p < song.patterns.size(); ++p)
     {
+        const auto& pattern = song.patterns[p];
         const auto period = (double) std::max<std::int64_t> (1, pattern.effectiveLength (song.meter()));
         const auto loops = std::max (2.0, std::ceil ((voiceTicks + 2.0 * slack) / period) + 1.0);
         auto any = false;
-        for (const auto& n : pattern.notes)
+        forNotes (plan.songNotes[p], pattern, [&] (const Note& n) {
             if (ofChannel (n))
             {
                 any = true;
                 for (double k = 0.0; k < loops; ++k)
                     addNote ((double) n.start + k * period);
             }
+        });
         if (any)
             count();
         if (best >= all)

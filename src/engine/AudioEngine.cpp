@@ -32,6 +32,9 @@
 #include <limits>
 #include <map>
 #include <thread>
+#if defined(__GLIBC__)
+ #include <malloc.h>
+#endif
 
 #include "engine/Text.h"
 #include "ui/I18n.h"
@@ -3561,6 +3564,67 @@ int AudioEngine::switchPluginOn (const std::string& id)
     return slots;
 }
 
+namespace
+{
+// the sample files a song's channels and effects read (the instruments that load their channel's sample, zones,
+// effects with a sample): what RackState::build asks the sample provider for
+std::vector<std::string> songSamplePaths (const Song& song)
+{
+    std::vector<std::string> paths;
+    auto addPath = [&paths] (const std::string& p) {
+        if (! p.empty() && std::find (paths.begin(), paths.end(), p) == paths.end())
+            paths.push_back (p);
+    };
+    for (const auto& c : song.channels)
+    {
+        if (c.instrument == InstrumentKind::sampler || c.instrument == InstrumentKind::audioClip || c.instrument == InstrumentKind::granulizer
+            || c.instrument == InstrumentKind::wavetraveller || c.instrument == InstrumentKind::fruityslicer
+            || c.instrument == InstrumentKind::slicex
+            || c.instrument == InstrumentKind::flkeys || c.instrument == InstrumentKind::directwave)
+            addPath (c.samplePath);
+        for (const auto& z : c.zones)
+            addPath (z.path);
+    }
+    for (const auto& track : song.mixer)
+        for (const auto& fx : track.effects)
+            addPath (fx.samplePath);
+    return paths;
+}
+
+// Round perfgate190id (community slice B12, the big-project gate): the samples of a song decoded in parallel (as an
+// .flp import does, round 112), so the rack build that follows finds them decoded instead of decoding them one by one
+// on the message thread. Keep the result alive until the song is published.
+std::vector<std::shared_ptr<const SampleData>> decodeSamplesInParallel (SampleLibrary& samples, const Song& forSong)
+{
+    std::vector<std::shared_ptr<const SampleData>> decoded;
+    const auto paths = songSamplePaths (forSong);
+    if (paths.size() < 2) // (one file: the rack build decodes it as fast)
+        return decoded;
+    const loadtrace::Scope timing ("samples_parallel");
+    std::atomic<std::size_t> next { 0 };
+    std::mutex keep;
+    auto worker = [&] {
+        for (auto i = next++; i < paths.size(); i = next++)
+            if (auto sample = samples.load (juce::String::fromUTF8 (paths[i].c_str())))
+            {
+                const std::scoped_lock l (keep);
+                decoded.push_back (std::move (sample));
+            }
+    };
+    const auto threads = (std::size_t) juce::jlimit (1, 6, juce::SystemStats::getNumCpus() - 1);
+    std::vector<std::thread> pool;
+    for (std::size_t i = 1; i < juce::jmin (threads, paths.size()); ++i)
+        pool.emplace_back (worker);
+    worker();
+    for (auto& t : pool)
+        t.join();
+#if defined(__GLIBC__)
+    malloc_trim (0); // (the workers' malloc arenas keep their freed decode buffers otherwise: +27 MB on big200)
+#endif
+    return decoded;
+}
+} // namespace
+
 void AudioEngine::setSong (Song newSong)
 {
     // round 190ap: another project in the engine that was opened without third-party plugins: the mode ends
@@ -3590,6 +3654,9 @@ void AudioEngine::setSong (Song newSong)
         setInsertArmed (t, false);
     followProjectOnDevice();
 
+    // (round perfgate190id: a .lynx with 24 one-minute takes froze the window for 5-50 s while the rack build decoded
+    // them one after the other into the stream cache)
+    const auto decoded = decodeSamplesInParallel (samples, song);
     publishSong();
 }
 
@@ -6168,6 +6235,11 @@ juce::String AudioEngine::describeRealtime (bool withUnits) const
              << ", started " << n (r.engagements) << ", states taken at once " << n (r.statesSwapped) << ", channels joined live " << n (r.promoted)
              << ", partition changes " << n (r.partitionChanges) << ", boundary mismatches " << n (r.splitMismatches) << "; ahead "
              << r.aheadChannels.load() << " channels / " << r.aheadTracks.load() << " inserts, boundary " << r.boundary.load() << "\n";
+        // (perfgate190id) the engagement rule's probes: how often, what they kept, and the last one's measurements
+        text << "  render ahead probes " << n (r.probes) << ": kept on " << n (r.keptOn) << " (for fewer overruns " << n (r.keptForOverruns)
+             << "), kept off " << n (r.keptOff) << "; last probe CPU " << juce::String (r.probeCpuOff.load(), 1) << "% off / "
+             << juce::String (r.probeCpuOn.load(), 1) << "% on, overruns " << juce::String (r.probeOverOff.load(), 0) << " / "
+             << juce::String (r.probeOverOn.load(), 0) << " per minute\n";
     }
     if (withUnits && heaviestUnits.empty())
         text << "  heaviest: not measured yet\n";

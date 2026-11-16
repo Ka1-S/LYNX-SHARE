@@ -143,6 +143,8 @@
 #include "core/DelphiMath.h"
 #include "core/LiveEventQueue.h"
 #include "core/RackRenderer.h"
+#include "core/PerfProjects.h"
+#include "core/TempoMap.h"
 #include "core/PinOnTop.h"
 #include "core/MetronomeVoice.h"
 #include "engine/Transport.h"
@@ -17826,3 +17828,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Formats190iiTests.inc" // round 190ii (issue #149): .dwp / .dwb / .gig / NCW / Kontakt detection
 #include "Rollup030Tests.inc" // round 190il: semantic interactions of the 0.1.30 rollup (keep last)
 #include "Bug190ieTests.inc" // round 190ie (issue #185: tempo automation through the basic Delay)
+#include "PerfGate190idTests.inc" // round perfgate190id: the performance gate's synthetic projects (community slice B12)

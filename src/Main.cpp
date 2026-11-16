@@ -59,6 +59,7 @@
 #include "flp/Flp.h"
 #include "core/DemoSongs.h"
 #include "core/FirstSongTour.h"
+#include "core/PerfProjects.h"
 #include "core/ShowcaseSong.h"
 #include "core/RenderAhead.h"
 #include "core/SynthPresets.h"
@@ -692,6 +693,17 @@ public:
             // (resources/demos/ in the repository)
             const auto i = args.indexOf ("--demosongs");
             runDemoSongs (args[i + 1].unquoted());
+            return;
+        }
+
+        if (args.contains ("--perfgen"))
+        {
+            // round perfgate190id: the big-project performance gate's synthetic projects (core/PerfProjects.h) as .lynx
+            // files with their WAVs: --perfgen <folder> [report.txt] [name,name...]; the save and load times in the report
+            const auto i = args.indexOf ("--perfgen");
+            const auto report = i + 2 < args.size() && ! args[i + 2].startsWith ("--") ? args[i + 2].unquoted() : juce::String();
+            const auto only = i + 3 < args.size() && ! args[i + 3].startsWith ("--") ? args[i + 3].unquoted() : juce::String();
+            runPerfGen (args[i + 1].unquoted(), report, only);
             return;
         }
 
@@ -10906,6 +10918,87 @@ private:
             juce::String error;
             ok = lynx::ProjectFile::save (lynx::demos::make (d), folder.getChildFile (lynx::demos::fileName (d)), error) && ok;
         }
+        setApplicationReturnValue (ok ? 0 : 1);
+        quit();
+    }
+
+    // --perfgen (round perfgate190id): each synthetic project of the performance gate written as <folder>/<name>.lynx, its
+    // audio as 16-bit WAVs in <folder>/<name>/ (written once: the same code makes the same audio). The report gives, per
+    // project, the .lynx size, the time to write it (ProjectFile::save, which reads it back) and to read it
+    // (ProjectFile::load), the medians of 5, and a hash of its text.
+    void runPerfGen (const juce::String& folderPath, const juce::String& reportPath, const juce::String& only)
+    {
+        const juce::File folder (folderPath);
+        folder.createDirectory();
+        const auto wanted = juce::StringArray::fromTokens (only, ",", "");
+        juce::String report;
+        bool ok = true;
+        auto median = [] (std::vector<double> v) {
+            std::sort (v.begin(), v.end());
+            return v[v.size() / 2];
+        };
+        for (const auto& name : lynx::perfprojects::names())
+        {
+            if (! wanted.isEmpty() && ! wanted.contains (juce::String (name)))
+                continue;
+            lynx::Song song;
+            lynx::perfprojects::Samples samples;
+            const auto audioFolder = folder.getChildFile (juce::String (name));
+            lynx::perfprojects::make (name, song, samples, audioFolder.getFullPathName().toStdString());
+            for (const auto& [path, data] : samples)
+            {
+                const juce::File wav { juce::String (path) };
+                if (wav.existsAsFile())
+                    continue;
+                wav.getParentDirectory().createDirectory();
+                const auto frames = (int) data->frames();
+                juce::AudioBuffer<float> audio (2, frames);
+                audio.copyFrom (0, 0, data->leftData(), frames);
+                audio.copyFrom (1, 0, data->rightData(), frames);
+                juce::WavAudioFormat format;
+                std::unique_ptr<juce::OutputStream> out (wav.createOutputStream().release());
+                if (auto* w = out != nullptr ? format.createWriterFor (out.get(), data->sampleRate, 2, 16, {}, 0) : nullptr)
+                {
+                    out.release();
+                    std::unique_ptr<juce::AudioFormatWriter> writer (w);
+                    ok = writer->writeFromAudioSampleBuffer (audio, 0, frames) && ok;
+                }
+                else
+                    ok = false;
+            }
+            const auto file = folder.getChildFile (juce::String (name) + ".lynx");
+            std::vector<double> saveMs, loadMs;
+            juce::String error;
+            bool loadedOk = true;
+            for (int rep = 0; rep < 5; ++rep)
+            {
+                const auto t0 = juce::Time::getMillisecondCounterHiRes();
+                ok = lynx::ProjectFile::save (song, file, error) && ok;
+                const auto t1 = juce::Time::getMillisecondCounterHiRes();
+                const auto loaded = lynx::ProjectFile::load (file, error);
+                const auto t2 = juce::Time::getMillisecondCounterHiRes();
+                loadedOk = loadedOk && loaded.has_value() && loaded->channels.size() == song.channels.size()
+                           && loaded->playlist.size() == song.playlist.size() && loaded->automations.size() == song.automations.size();
+                saveMs.push_back (t1 - t0);
+                loadMs.push_back (t2 - t1);
+            }
+            ok = ok && loadedOk;
+            const auto text = file.loadFileAsString();
+            std::uint64_t h = 1469598103934665603ull;
+            for (auto* c = text.toRawUTF8(); *c != 0; ++c)
+                h = (h ^ (std::uint8_t) *c) * 1099511628211ull;
+            report << name << ": channels=" << (int) song.channels.size() << " inserts=" << (int) song.mixer.size() - 1
+                   << " clips=" << (int) song.playlist.size() << " automations=" << (int) song.automations.size()
+                   << " wavs=" << (int) samples.size() << " lynx_kb=" << juce::String ((double) file.getSize() / 1024.0, 1)
+                   << " save_ms=" << juce::String (median (saveMs), 2) << " load_ms=" << juce::String (median (loadMs), 2)
+                   << " roundtrip=" << (loadedOk ? "OK" : "FAILED") << " text_hash=" << juce::String::toHexString ((juce::int64) h)
+                   << (error.isNotEmpty() ? " error=" + error : juce::String()) << "\n";
+        }
+        report << "result=" << (ok ? "OK" : "FAILED") << "\n";
+        if (reportPath.isNotEmpty())
+            juce::File (reportPath).replaceWithText (report);
+        else
+            std::fputs (report.toRawUTF8(), stdout);
         setApplicationReturnValue (ok ? 0 : 1);
         quit();
     }
@@ -21585,8 +21678,14 @@ private:
              << ", window " << ui.getWidth() << "x" << ui.getHeight() << "\n";
         if (project.existsAsFile())
         {
+            // (round perfgate190id) the time to open it headless, and the memory after
+            const auto open0 = juce::Time::getMillisecondCounterHiRes();
+            const auto cpu0 = lynx::threadCpuSeconds();
             ui.openFile (project);
             offline.dispatchPendingMessages();
+            text << "open: " << juce::String (juce::Time::getMillisecondCounterHiRes() - open0, 1) << " ms wall, "
+                 << juce::String (1000.0 * (lynx::threadCpuSeconds() - cpu0), 1) << " ms message thread CPU, working set "
+                 << juce::String ((double) lynx::toolbar::PerformanceMeter::processMemoryBytes() / 1048576.0, 0) << " MB\n";
         }
         const auto& song = offline.getSong();
         text << "channels " << (int) song.channels.size() << ", patterns " << (int) song.patterns.size() << ", playlist clips " << (int) song.playlist.size()
