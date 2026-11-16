@@ -26115,6 +26115,30 @@ private:
 
             ui.selectTabForSnapshot (0);
             saveSnapshot (ui, prefix + "-rack.png");
+            // round 190io (design190ia FM-10…14): steps on the first channels, audio clip channels included (they show
+            // their steps as in FL), a few selected rows, a muted channel; then the project as it was
+            {
+                const auto& kept = offline.getSong();
+                const auto keptSelection = offline.getSelectedChannels();
+                const auto keptPrimary = offline.getSelectedChannel();
+                const auto channels = (int) kept.channels.size();
+                offline.editSong ([channels] (lynx::Song& s) {
+                    auto& p = s.activePattern();
+                    for (int c = 0; c < juce::jmin (12, channels); ++c)
+                        for (const auto step : { 0, 4 + (c % 3) * 2, 8, 12 + (c % 2) * 2 })
+                            if (! p.hasStep (c, step))
+                                p.toggleStep (c, step);
+                    if (channels > 5)
+                        s.channels[5].muted = true;
+                });
+                if (channels > 3)
+                    offline.setChannelSelection ({ 1, 2, 3 }, 2);
+                offline.dispatchPendingMessages();
+                saveSnapshot (ui, prefix + "-rack190io-steps.png");
+                offline.undo(); // (one undo step: the project and its history as they were)
+                offline.setChannelSelection (keptSelection, keptPrimary);
+                offline.dispatchPendingMessages();
+            }
             {
                 // a pattern with piano-roll notes: those rows show a miniature instead of steps (round 90)
                 int found = -1;

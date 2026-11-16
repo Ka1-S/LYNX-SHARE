@@ -434,7 +434,8 @@ juce::Rectangle<int> ChannelRackComponent::rowBounds (int row) const
 
 juce::Rectangle<int> ChannelRackComponent::stepBounds (int row, int step) const
 {
-    return { gridLeft() + step * stepWidth + 1, rowY (row) + 4, stepWidth - 3, rowHeight - 8 };
+    // FL's step keycaps (round 190io, FM-11): 15 x 20 at an 18 px pitch (FL: 13 x 20 at 16; a bit wider for the mouse)
+    return { gridLeft() + step * stepWidth + 1, rowY (row) + 5, stepWidth - 3, rowHeight - 10 };
 }
 
 // --- channel looping (FL 20.5+, round 165f-rack) ------------------------------------------------------
@@ -736,9 +737,29 @@ bool ChannelRackComponent::channelHitsNow (int row) const
 
 void ChannelRackComponent::paintStepHit (juce::Graphics& g, juce::Rectangle<float> r)
 {
-    theme::fillRoundRect (g, r, theme::radius::sm, juce::Colours::white.withAlpha (0.55f));
+    theme::fillRoundRect (g, r, keycapRadius, juce::Colours::white.withAlpha (0.55f));
     g.setColour (theme::colour::playhead);
-    g.drawRoundedRectangle (r.reduced (0.75f), theme::radius::sm, 1.5f);
+    g.drawRoundedRectangle (r.reduced (0.75f), keycapRadius, 1.5f);
+}
+
+// FL's raised step keycap (round 190io, design190ia FM-11; FL: a light top edge, a dark bottom edge and the dark LED slot
+// a quarter down): the body in the step's colour, a 1 px highlight on top, a 1 px shade at the bottom and the 1 px slot
+// line, which turns light on a lit step. Plain rectangles, so a playhead frame costs what the flat tiles did.
+void ChannelRackComponent::paintKeycap (juce::Graphics& g, juce::Rectangle<int> r, juce::Colour fill, bool lit)
+{
+    using namespace theme::colour;
+    theme::fillRoundRect (g, r.toFloat(), keycapRadius, fill);
+    const auto inner = r.reduced (1, 0);
+    const auto slotY = r.getY() + juce::roundToInt ((float) r.getHeight() * 0.25f);
+    // the bevel: the cap's upper part a step lighter down to the slot (FL: #767C80 over a #63696D body)
+    g.setColour (fill.brighter (lit ? 0.12f : 0.18f));
+    g.fillRect (inner.getX(), r.getY() + 1, inner.getWidth(), slotY - r.getY() - 1);
+    g.setColour (lit ? fill.brighter (0.4f) : borderStrong.brighter (0.25f));
+    g.fillRect (inner.withHeight (1));
+    g.setColour (lit ? fill.darker (0.45f) : bg0);
+    g.fillRect (inner.withTop (r.getBottom() - 1).withHeight (1));
+    g.setColour (lit ? onAccent.withAlpha (0.6f) : bg0.withAlpha (0.85f));
+    g.fillRect (r.getX() + 3, slotY, r.getWidth() - 6, 1);
 }
 
 void ChannelRackComponent::paint (juce::Graphics& g)
@@ -803,14 +824,8 @@ void ChannelRackComponent::paint (juce::Graphics& g)
             g.fillRect (gridLeft() + playheadStep * stepWidth - 1, y, stepWidth, rowHeight);
         }
 
-        if (channel.instrument == InstrumentKind::audioClip)
-        {
-            g.setColour (textDisabled);
-            g.setFont (theme::font (theme::type::small));
-            textcache::drawText (g, tr ("audio clip — plays from the Playlist"), gridLeft() + 4, y, 400, rowHeight, juce::Justification::centredLeft);
-            g.setFont (theme::font (theme::type::body));
-            continue;
-        }
+        // (round 190io, FM-12: an audio clip channel shows its steps as every channel does; FL's manual: "If desired,
+        // Audio Clips can be triggered from the Step Sequencer or the Piano roll")
 
         const auto loopSteps = loopStepsOf (row); // the row loops: the repeats after its loop point are ghost steps
         const auto stepOn = litOn; // (the channel's lit-step colour, or the theme's)
@@ -850,18 +865,18 @@ void ChannelRackComponent::paint (juce::Graphics& g)
                 const auto source = step % loopSteps;
                 const auto repeated = pattern.hasStep (row, source) || hasNote (row, source);
                 auto fill = repeated ? stepOn : theme::stepOff (step);
-                theme::fillRoundRect (g, r.toFloat(), theme::radius::sm, fill.withMultipliedAlpha (hoverStepHere ? 0.75f : repeated ? 0.45f : 0.3f));
+                theme::fillRoundRect (g, r.toFloat(), keycapRadius, fill.withMultipliedAlpha (hoverStepHere ? 0.75f : repeated ? 0.45f : 0.3f));
                 if (repeated && step == playheadStep) // the repeat plays: lit as a hit (below)
                     paintStepHit (g, r.toFloat());
                 if (any)
                 {
                     g.setColour (textDisabled);
-                    g.drawRoundedRectangle (r.toFloat().reduced (1.5f), theme::radius::sm, 1.0f);
+                    g.drawRoundedRectangle (r.toFloat().reduced (1.5f), keycapRadius, 1.0f);
                 }
                 if (hoverStepHere)
                 {
                     g.setColour (textSecondary.withAlpha (0.7f));
-                    g.drawRoundedRectangle (r.toFloat().reduced (0.5f), theme::radius::sm, 1.0f);
+                    g.drawRoundedRectangle (r.toFloat().reduced (0.5f), keycapRadius, 1.0f);
                 }
                 continue;
             }
@@ -869,12 +884,12 @@ void ChannelRackComponent::paint (juce::Graphics& g)
             auto fill = any ? (onGrid ? stepOn : stepNote) : theme::stepOff (step);
             if (ghost) // a faint outlined cell, filled while hovered
             {
-                theme::fillRoundRect (g, r.toFloat(), theme::radius::sm, fill.withMultipliedAlpha (hoverStepHere ? 0.9f : 0.35f));
+                theme::fillRoundRect (g, r.toFloat(), keycapRadius, fill.withMultipliedAlpha (hoverStepHere ? 0.9f : 0.35f));
                 g.setColour (fill.brighter (0.25f).withMultipliedAlpha (0.55f));
-                g.drawRoundedRectangle (r.toFloat().reduced (0.5f), theme::radius::sm, 1.0f);
+                g.drawRoundedRectangle (r.toFloat().reduced (0.5f), keycapRadius, 1.0f);
             }
             else
-                theme::fillRoundRect (g, r.toFloat(), theme::radius::sm, hoverStepHere ? fill.brighter (any ? 0.15f : 0.35f) : fill);
+                paintKeycap (g, r, hoverStepHere ? fill.brighter (any ? 0.15f : 0.35f) : fill, any);
 
             // FL lights the step as the playhead hits it (its LED turns red, round 170a [SHOT]): a step that plays now glows
             if (any && step == playheadStep && step < realSteps)
@@ -883,7 +898,7 @@ void ChannelRackComponent::paint (juce::Graphics& g)
             if (hoverStepHere)
             {
                 g.setColour (textSecondary.withAlpha (0.7f));
-                g.drawRoundedRectangle (r.toFloat().reduced (0.5f), theme::radius::sm, 1.0f);
+                g.drawRoundedRectangle (r.toFloat().reduced (0.5f), keycapRadius, 1.0f);
             }
         }
 
@@ -980,22 +995,25 @@ void ChannelRackComponent::paint (juce::Graphics& g)
                             juce::Justification::centred);
                 g.setFont (theme::font (theme::type::body));
 
-                // name button: tinted with the channel colour (from the .flp or user-picked), so channels are found by
-                // colour as in FL; kept dark and toned down (LYNX look), with the colour strip at its left
+                // name button: filled with the channel colour as FL's (round 190io, design190ia FM-10: FL's Synth Bass
+                // #11479C, Grv Kick #892019), its brightness held where white text reads (0.42-0.58), a slight top-down
+                // gradient (+6 % / -6 %); FL's grey #485156 for a channel without a colour; muted = greyed and darker
                 {
-                    auto plate = row == primary ? bg6 : hovered (Area::name) ? bg5 : bg4;
-                    if (channel.colour != 0)
-                        plate = plate.interpolatedWith (theme::tame (juce::Colour (channel.colour)), row == primary ? 0.42f : 0.32f);
-                    theme::fillRoundRect (g, nameArea, theme::radius::md, plate);
+                    auto fill = theme::colourFill (channel.colour != 0 ? juce::Colour (channel.colour) : juce::Colour (0xff485156), 0.42f, 0.58f);
+                    if (channel.muted)
+                        fill = fill.withMultipliedSaturation (0.45f).withMultipliedBrightness (0.7f);
+                    if (hovered (Area::name))
+                        fill = fill.brighter (0.12f);
+                    g.setGradientFill (juce::ColourGradient::vertical (fill.withMultipliedBrightness (1.06f), nameArea.getY(),
+                                                                       fill.withMultipliedBrightness (0.94f), nameArea.getBottom()));
+                    g.fillRoundedRectangle (nameArea, theme::radius::sm);
                 }
 
-                if (row == primary)
+                if (row == primary) // the focused channel: a light outline (the selector beside it shows the selection)
                 {
-                    g.setColour (accent);
-                    g.drawRoundedRectangle (nameArea.reduced (0.5f), theme::radius::md, 1.0f);
+                    g.setColour (textPrimary);
+                    g.drawRoundedRectangle (nameArea.reduced (0.75f), theme::radius::sm, 1.5f);
                 }
-
-                theme::fillRoundRect (g, nameArea.withWidth (4.0f).reduced (0.0f, 3.0f).translated (3.0f, 0.0f), 1.5f, channel.colour != 0 ? theme::tame (juce::Colour (channel.colour)) : bg6.brighter (0.2f));
 
                 const auto locked = ! channel.receiveFrom.empty();
                 if (locked) // FL's lock icon: the channel receives the notes of one MIDI input ("Receive notes from")
@@ -1038,22 +1056,32 @@ void ChannelRackComponent::paint (juce::Graphics& g)
                     theme::fillRoundRect (g, nameArea, theme::radius::md, bg1.withAlpha (0.35f)); // the plate, dimmed
                     theme::drawFrozenTag (g, tag, (attention ? warning : info).withAlpha (0.85f), bg1);
                 }
-                // the channel's icon before its name, as FL's channel button shows it (round 168h)
-                auto iconWidth = 0;
+                // the channel's icon (round 168h) at the button's right edge, where FL draws it (round 190io, FM-10: FL's
+                // audio clip glyph sits 6 px from the right), left of the lock / tags
+                const auto rightUsed = (locked ? 18.0f : 0.0f) + badgeWidth;
+                auto iconWidth = 0.0f;
                 if (const auto icon = trackicons::iconFor (channel.icon); icon != trackicons::Icon::none)
                 {
-                    iconWidth = 16;
-                    ui::drawTrackIcon (g, icon, juce::Rectangle<float> (nameArea.getX() + 12.0f, nameArea.getCentreY() - 7.0f, 14.0f, 14.0f),
-                                       channel.muted ? textDisabled : textSecondary.brighter (0.3f));
+                    iconWidth = 18.0f;
+                    ui::drawTrackIcon (g, icon, juce::Rectangle<float> (nameArea.getRight() - 6.0f - rightUsed - 14.0f, nameArea.getCentreY() - 7.0f, 14.0f, 14.0f),
+                                       onAccent.withAlpha (channel.muted ? 0.45f : 0.85f));
                 }
-                g.setColour (channel.muted ? textDisabled : frozen ? textSecondary : textPrimary);
-                textcache::drawText (g, juce::String::fromUTF8 (channel.name.c_str()),
-                                     nameArea.withTrimmedLeft ((float) (14 + iconWidth)).withTrimmedRight ((locked ? 18 : 6) + badgeWidth).toNearestInt(), juce::Justification::centredLeft, true);
+                // white on the colour (FL), the name's middle dropped when it is too long ("Titey..m #2", FM-14)
+                g.setColour (onAccent.withAlpha (channel.muted ? 0.5f : frozen ? 0.7f : 0.92f));
+                g.setFont (theme::font (theme::type::body + 1.0f));
+                const auto textArea = nameArea.withTrimmedLeft (7.0f).withTrimmedRight (juce::jmax (5.0f, rightUsed + iconWidth + 4.0f));
+                textcache::drawText (g, theme::fitMiddle (juce::String::fromUTF8 (channel.name.c_str()), g.getCurrentFont(), textArea.getWidth()), textArea,
+                                     juce::Justification::centredLeft, false);
+                g.setFont (theme::font (theme::type::body));
             }
 
-            // selector: a slim pill, lit when the row is selected
-            const auto pill = juce::Rectangle<float> ((float) selectLeft() + 3.0f, (float) y + 7.0f, (float) selectWidth - 6.0f, (float) rowHeight - 14.0f);
-            theme::fillRoundRect (g, pill, 3.0f, selected ? (hovered (Area::select) ? accentHover : accent) : hovered (Area::select) ? textDisabled : ledOff);
+            // selector: FL's tall slot (round 190io, design190ia FM-13: 12 x 27 with a 2 px outline when selected), here
+            // 10 x 24 in the inset colour with a hairline, outlined 2 px in the accent while its channel is selected
+            const auto slot = juce::Rectangle<float> ((float) selectLeft() + 1.0f, (float) y + 3.0f, (float) selectWidth - 2.0f, (float) rowHeight - 6.0f);
+            theme::fillRoundRect (g, slot, 2.0f, bg1);
+            g.setColour (selected ? (hovered (Area::select) ? accentHover : accent) : hovered (Area::select) ? textDisabled : border);
+            g.drawRoundedRectangle (selected ? slot.reduced (1.0f) : slot.reduced (0.5f), 2.0f, selected ? 2.0f : 1.0f);
+            const auto pill = slot.reduced (selected ? 3.0f : 2.0f);
             // FL flashes the channel's selector as its note plays (round 170a [SHOT]): the "sound lighting up when it hits"
             // round 190ih: and with every note the channel plays (typing keyboard, MIDI, Piano roll, off-grid notes), bright
             // at note-on, dimmer while held, fading out after the release (FL capture, details190if); orange for a
@@ -1064,7 +1092,7 @@ void ChannelRackComponent::paint (juce::Graphics& g)
             {
                 const auto top = selected ? 0.75f : 0.9f;
                 const auto colour = ! channel.receiveFrom.empty() ? warning : juce::Colours::white;
-                theme::fillRoundRect (g, pill.expanded (1.0f, 0.0f), 3.0f, colour.withAlpha (juce::jmax (hit ? top : 0.0f, lit * top)));
+                theme::fillRoundRect (g, pill, 1.5f, colour.withAlpha (juce::jmax (hit ? top : 0.0f, lit * top)));
             }
         }
 
@@ -1790,7 +1818,7 @@ void ChannelRackComponent::fillSelected (int every)
         auto& p = s.activePattern();
         const auto length = patternSteps (s, p);
         for (auto r : rows)
-            if (r < (int) s.channels.size() && s.channels[(std::size_t) r].instrument != InstrumentKind::audioClip)
+            if (r < (int) s.channels.size()) // (audio clip channels too: they show their steps, round 190io)
                 fillEverySteps (p, r, every, length);
     });
 }
@@ -2468,7 +2496,6 @@ void ChannelRackComponent::applyPaint (const juce::MouseEvent& e)
         return;
 
     if (row < 0 || row >= (int) song.channels.size() || step < 0 || step >= shownSteps() || e.x < stickyX + gridLeft()
-        || song.channels[(std::size_t) row].instrument == InstrumentKind::audioClip
         || showsNotePreview (song.activePattern(), row, pianoRollView)) // drag-paint skips note rows
         return;
 

@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "core/MenuPlacement.h"
+#include "core/MiddleEllipsis.h"
 #include "core/UiFontChoice.h"
 #include "platform/Paths.h"
 #include "ui/Icons.h"
@@ -315,6 +316,47 @@ std::uint64_t paletteStamp = 0; // (setPalette: +1; part of the knob tiles' keys
 // (the largest channel difference a tile may show against its shape drawn straight, --selftest; see paintCacheSelfTest)
 constexpr int nativeTolerance = 1, nativeKnobTolerance = 3;
 } // namespace
+
+float contrast (juce::Colour a, juce::Colour b)
+{
+    const auto lum = [] (juce::Colour c) {
+        const auto lin = [] (float v) { return v <= 0.03928f ? v / 12.92f : std::pow ((v + 0.055f) / 1.055f, 2.4f); };
+        return 0.2126f * lin (c.getFloatRed()) + 0.7152f * lin (c.getFloatGreen()) + 0.0722f * lin (c.getFloatBlue());
+    };
+    const auto la = lum (a), lb = lum (b);
+    return (juce::jmax (la, lb) + 0.05f) / (juce::jmin (la, lb) + 0.05f);
+}
+
+juce::Colour colourFill (juce::Colour c, float lo, float hi)
+{
+    return c.withBrightness (juce::jlimit (lo, hi, c.getBrightness()));
+}
+
+juce::Colour lightTint (juce::Colour c, juce::Colour background, juce::Colour fallback)
+{
+    const auto tint = c.withMultipliedSaturation (0.45f).withBrightness (0.95f);
+    return contrast (tint, background) >= 4.5f ? tint : fallback;
+}
+
+juce::String fitMiddle (const juce::String& text, const juce::Font& font, float width)
+{
+    // (message thread only, as every paint; a project switch or a long session starts the cache again)
+    static std::unordered_map<juce::String, juce::String> cache;
+    const auto key = text + "\x01" + juce::String (font.getHeight(), 2) + "\x01" + font.getTypefaceName() + "\x01" + font.getTypefaceStyle()
+                     + "\x01" + juce::String (juce::roundToInt (width * 4.0f));
+    if (const auto it = cache.find (key); it != cache.end())
+        return it->second;
+    if (cache.size() > 4000)
+        cache.clear();
+    const auto n = text.length();
+    const auto widthOf = [&] (int first, int count) { return juce::GlyphArrangement::getStringWidth (font, text.substring (first, first + count)); };
+    const auto [head, tail] = middleellipsis::split (n, width, juce::GlyphArrangement::getStringWidth (font, ".."), widthOf);
+    auto fitted = tail == 0 && head == n ? text
+                  : head == 0               ? text.substring (0, 1) // (nothing fits: the drawText that follows clips it)
+                                            : text.substring (0, head).trimEnd() + ".." + text.substring (n - tail).trimStart();
+    cache.emplace (key, fitted);
+    return fitted;
+}
 
 void fillLaunchTriangle (juce::Graphics& g, juce::Rectangle<float> a, juce::Colour colour)
 {
