@@ -1022,6 +1022,7 @@ MainComponent::~MainComponent()
         playlist.onTrackEffects = nullptr;
         playlist.onSimpleTrackSelected = nullptr;
         playlist.onSimpleFilesDropped = nullptr;
+        playlist.onSimpleAddTrack = nullptr;
         playlist.onExportTrack = nullptr;
         simpleWorkflow.reset();
     }
@@ -3582,6 +3583,11 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
         playlist.onSimpleFilesDropped = [this] (const juce::StringArray& files, std::int64_t tick) {
             if (simpleWorkflow != nullptr)
                 simpleWorkflow->dropFiles (files, tick);
+        };
+        // round 190jc (design190ia SG-2): the round "+" under the Simple tracks opens the New-track chooser
+        playlist.onSimpleAddTrack = [this] {
+            if (simpleWorkflow != nullptr && layoutStyle == layoutstyle::Style::simple)
+                simpleWorkflow->showChooser();
         };
         // round 190fo: "Export this track" in the Simple track menu
         playlist.onExportTrack = [this] (int track, bool asMidi) {

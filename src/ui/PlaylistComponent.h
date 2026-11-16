@@ -180,6 +180,11 @@ public:
     // files dragged from the LYNX browser
     bool isInterestedInDragSource (const SourceDetails& details) override;
     void itemDropped (const SourceDetails& details) override;
+    // round 190jc (design190ia SG-6): the Simple drop lane lights while files or Browser items are dragged over it
+    void fileDragMove (const juce::StringArray& files, int x, int y) override;
+    void fileDragExit (const juce::StringArray& files) override;
+    void itemDragMove (const SourceDetails& details) override;
+    void itemDragExit (const SourceDetails& details) override;
     // issue #152 point 6: a generator / effect from the Browser's Plugin database (or the Plugin picker). Pattern
     // workflow, FL-exact: on a track header only (core/PluginDrop.h); Clip-launch workflow: on a track, as Live
     void pluginDropped (const SourceDetails& details);
@@ -235,6 +240,7 @@ public:
     // The track headers' width: FL's 96 px, the Simple workflow's wider headers (round 184a), or the linked headers
     // (round 190gz). updateHeaderWidth sets it; everything else only reads it.
     static constexpr int flHeaderWidth = 96, simpleHeaderWidth = 232, linkedHeaderWidth = 152;
+    static constexpr int simpleHeaderWidthLarge = 272; // round 190jc: the Simple headers with Large controls
     // round 190ig (FM-23): the Pattern layout's FL headers — FL's 98 px plates + the 8 px selection / activity column
     static constexpr int flPatternHeaderWidth = 106, flTallHeader = 40;
     static int flHeaderWidthNow() noexcept;
@@ -260,6 +266,8 @@ public:
     static constexpr int scrollBarSize = 12;
 
     static juce::Colour patternColour (const Song& song, int pattern);
+    // round 190jc: a clip's colours in the Simple layout (BandLab's track hue; nullopt in the other layouts)
+    std::optional<theme::ClipLook> simpleClipLook (const Clip& c) const;
 
     // The Simple workflow's track headers (round 184a, slice S4; core/SimpleTracks.h): wider headers whose controls act
     // on the track's mixer insert (mute, solo, record arm, volume, pan, "+FX"), taller rows by default, a lane under
@@ -285,6 +293,10 @@ public:
     std::function<void (int insert)> onLinkedMixerTrack;
     // Files dropped below the tracks (or MIDI files anywhere) while the Simple headers are on: new tracks from `tick`
     std::function<void (const juce::StringArray& files, std::int64_t tick)> onSimpleFilesDropped;
+    // round 190jc (design190ia SG-2): the round "+" under the Simple tracks (the New-track chooser, as "+ Add track")
+    std::function<void()> onSimpleAddTrack;
+    juce::Rectangle<int> simpleAddButtonForSnapshot() const { return simpleAddButton(); }
+    void setDropLaneHotForSnapshot (bool hot) { setDropLaneHot (hot); }
     // round 190fo: the Simple workflow's track menu "Export this track" › As audio / As MIDI (nullptr: not offered)
     std::function<void (int track, bool asMidi)> onExportTrack;
 
@@ -565,7 +577,17 @@ private:
     bool liveStyle = false;
     bool dragCopies = false; // the clips being moved are copies made at the press
     arrange::TimeClip timeClipboard;
-    static constexpr int simpleTrackHeight = 56, simpleTwoRows = 44; // the default row; the height that shows the second row
+    // the Simple headers' row and the height that shows their second row (round 190jc, SG-3: 64 / 54; Large controls 88 / 76)
+    static int simpleTrackHeight();
+    static int simpleTwoRows();
+    // round 190jc (design190ia SG-2): the Simple layout paints its real tracks and the drop lane's row, nothing under
+    // them (FL's 500 rows stay in the song); every other layout paints them all
+    int paintedRows() const;
+    juce::Rectangle<int> simpleAddButton() const; // the round "+" in the drop lane's header (empty: no drop lane)
+    void paintSimpleHeaderControls (juce::Graphics& g, int track, juce::Rectangle<float> plateArea, bool hovered);
+    bool dropLaneHot = false;
+    void setDropLaneHot (bool hot);
+    juce::Rectangle<int> dropLaneArea() const; // the lane in the grid (empty: none or not on screen)
     juce::Rectangle<int> trackSolo (int track) const;
     juce::Rectangle<int> trackVolume (int track) const;
     juce::Rectangle<int> trackPan (int track) const;
@@ -745,6 +767,7 @@ private:
         gesture::Target target = gesture::Target::empty;
         bool header = false, led = false, arrow = false, arm = false, input = false, audition = false;
         bool solo = false, volume = false, pan = false, fx = false; // the Simple headers' controls (round 184a)
+        bool addTrack = false; // round 190jc: the round "+" under the Simple tracks
         int divider = -1; // the track whose bottom edge in the headers is under the mouse (resizes it)
         int insertItem = -1; // issue #154: the insert effects column's row (an effect, trackinserts::addRow; -1 none)
         bool insertLed = false; // ... and its on/off dot
@@ -752,7 +775,7 @@ private:
         {
             return clip == o.clip && track == o.track && target == o.target && header == o.header && led == o.led && arrow == o.arrow
                    && arm == o.arm && input == o.input && audition == o.audition && solo == o.solo && volume == o.volume && pan == o.pan && fx == o.fx
-                   && divider == o.divider && insertItem == o.insertItem && insertLed == o.insertLed;
+                   && divider == o.divider && insertItem == o.insertItem && insertLed == o.insertLed && addTrack == o.addTrack;
         }
     };
     Hover hover;
