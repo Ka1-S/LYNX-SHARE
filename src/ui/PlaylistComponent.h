@@ -16,6 +16,7 @@
 #include "core/TrackHeaderGestures.h"
 #include "core/PickerSelection.h"
 #include "core/PlaylistOps.h"
+#include "core/PlaylistViewOptions.h"
 #include "core/StripSilence.h"
 #include "engine/AudioEngine.h"
 #include "ui/EditorTools.h"
@@ -237,6 +238,14 @@ public:
     int numTracksForSnapshot() const { return numTracks(); } // (round 190gw)
     juce::Rectangle<int> trackLedForSnapshot (int track) const { return trackLed (track); } // (round 190jf)
     int headerWidthForSnapshot() const noexcept { return headerWidth; }
+    // round 190jq (core/PlaylistViewOptions.h): the layout's own header width (without the dragged extra), the rows as
+    // drawn (automation clips as lanes), and the switches' state read again (after Settings, the menu or a key)
+    int headerBaseWidthForSnapshot() const noexcept { return headerBaseWidth; }
+    const cliplanes::Projection& projectionForSnapshot() const noexcept { return projection; }
+    juce::Component& pointerButtonForSnapshot() noexcept { return pointerButton; }
+    void refreshViewOptions();
+    double playheadTickForSnapshot() const noexcept { return playheadTick; }
+    juce::Rectangle<int> trackLaneArrowForSnapshot (int track) const { return trackLaneArrow (track); }
     double xOfTickForSnapshot (double tick) const { return tickToX (tick); }
     juce::Rectangle<int> clipBoundsForSnapshot (int clip) const { return clipBounds (clip); } // (round 190gi)
     juce::Rectangle<float> curveBodyForSnapshot (int clip) const; // (round 190gi: where an envelope / automation curve is drawn)
@@ -397,7 +406,7 @@ public:
 private:
     enum class Drag { none, move, resize, trimLeft, slip, erase, seek, loop, select, fadeIn, fadeOut, paint, muting, knife, zoomRange, listen, pan, timeMove, timeShift, autoPoint, autoTension,
                       lanePoint, laneTension, laneDraw, trackResize, headerSelect, preview, trackZoom, heightZoom, timeZoom, perfLaunch, clipGain, swipe, warpMarker,
-                      tempoMarker, headerMove };
+                      tempoMarker, headerMove, headerWidth };
     void swipeTimeSelectionToComp (int lane);
     // a swipe on a take lane (round 177c): the lane and the range so far
     int swipeLane = -1;
@@ -425,6 +434,23 @@ private:
     void setStretchOnResize (bool on);           // the STRETCH switch (Shift+M)
     std::vector<Clip> stretchOriginals;          // the clips when a stretching resize started
     IconButton stretchButton { "stretch", Icon::stretch };
+    // Round 190jq (core/PlaylistViewOptions.h, all LYNX extras). #191: the pointer-click switch beside Stretch (shown with
+    // its Settings › LYNX extras switch); a pointer press on empty space (its release moves the song position); a double
+    // click that placed a clip (its double-click action, opening the clip, is skipped).
+    IconButton pointerButton { "pointerClick", Icon::pointer };
+    bool pointerPress = false, placedByDoubleClick = false;
+    // #164: the header column's width before the dragged extra, and the extra when a drag started; the grip is lit
+    int headerBaseWidth = flHeaderWidth, headerWidthDragStart = 0;
+    bool headerGripLit = false;
+    bool onHeaderGrip (juce::Point<int> p) const;
+    // #191.3: automation clips drawn as lanes under their owner track (a projection of the rows; the song is untouched)
+    cliplanes::Projection projection;
+    std::uint64_t projectionStamp = ~(std::uint64_t) 0;
+    std::vector<juce::String> laneNames; // [track] the name a lane's header shows (its clips' automation)
+    bool clipLanesShown() const noexcept;
+    void updateProjection (int count);
+    bool laneHidden (int owner) const; // the owner's lanes are folded away (its arrow, a folded track or group)
+    void paintClipLaneHeader (juce::Graphics& g, int track, int y, int height, bool hovered);
     bool showClipProgress = true, showTrackProgress = true; // FL's View › Performance clip / track progress
 
     void changeListenerCallback (juce::ChangeBroadcaster*) override;

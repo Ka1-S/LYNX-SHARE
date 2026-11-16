@@ -788,6 +788,13 @@ Shape make (Icon icon)
             fi.addPath (tri.createPathWithRoundedCorners (1.5f));
             break;
         }
+        case Icon::pointer: // round 190jq: a mouse pointer, outlined (the system arrow's shape, LYNX's 24-unit grid)
+        {
+            juce::Path p;
+            polyline (p, { { 6.0f, 3.5f }, { 6.0f, 18.5f }, { 10.0f, 14.75f }, { 12.75f, 20.5f }, { 15.25f, 19.25f }, { 12.5f, 13.5f }, { 18.0f, 13.5f } }, true);
+            st.addPath (p.createPathWithRoundedCorners (1.0f));
+            break;
+        }
     }
 
     return s;

@@ -237,7 +237,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         if (safe != nullptr)
         {
             safe->saveUiSettings();
-            safe->playlist.repaint();
+            safe->playlist.refreshViewOptions(); // (round 190jq: header width, pointer click, automation clip lanes)
             if (trackonly::active())
                 safe->hidePanelForTrackOnly();
         }
@@ -2805,6 +2805,9 @@ void MainComponent::loadUiSettings()
         else if (key == "trackInserts") // round 190ht (issue #154): Playlist › Edit › Show insert effects on linked tracks
             PlaylistComponent::showTrackInserts = on;
         else if (workflowextras::readUiOption (key, on)) // round 190iu (issues #186, #191)
+        {
+        }
+        else if (workflowextras::readUiValue (key, line.fromFirstOccurrenceOf ("=", false, false).trim())) // round 190jq (#164)
         {
         }
         else if (key == "pickerPanel") // issue #175: FL's Playlist menu › Picker panel › Enable

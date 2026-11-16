@@ -2506,6 +2506,14 @@ public:
             return;
         }
 
+        // --playlistshot190jq <prefix> (round 190jq, issues #164 and #191): src/PlaylistShot190jq.inc
+        if (args.contains ("--playlistshot190jq"))
+        {
+            setApplicationReturnValue (runPlaylistShot190jq (args[args.indexOf ("--playlistshot190jq") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+
         // --workflowshot190iu <prefix> (round 190iu, issues #186 and #191): src/WorkflowShot190iu.inc
         if (args.contains ("--workflowshot190iu"))
         {
@@ -15714,6 +15722,7 @@ private:
     }
 
 #include "WorkflowShot190iu.inc" // round 190iu
+#include "PlaylistShot190jq.inc" // round 190jq
     // --trackautoshot190gz (round 190gz): see the dispatch above
     bool runTrackAutoShot190gz (const juce::String& prefix)
     {

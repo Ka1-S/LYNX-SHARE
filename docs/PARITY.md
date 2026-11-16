@@ -3789,6 +3789,17 @@ learn:comp, Apex ← pure:limit / learn:limit, Facet ← smart:EQ 4 / pure:EQ / 
 Foil Plate ← smart:reverb 2 / pure:verb / learn:reverb): their states are not translated (LYNX plays the role's preset)
 and this round's sonible captures (`refcap030/sonible`, started with the trial running; /mnt/e/lynx-work/parity190iq/HANDOFF.md) are
 the first usable ones (refcap0124's pure:verb renders are all bypass).
+## Round 190jq: issue #164 (header width), issue #191 (pointer click, automation clips as lanes)
+
+Evidence: FL 2026 checked for the #164 thread (the header column keeps its width; its right strip selects tracks);
+design190ia shots/ref/fl-playlist.png (fixed 100 px column, names cut as "Pitch A..t (VOX)"); Live 12 lanes
+(live190cw/shots/warp190cg-08a/08b). Side by side: /mnt/e/lynx-work/playlist190jq/shots/pairs/.
+
+| Feature | FL Studio / Live | LYNX | Status |
+| Wider track header column (#164) | FL: fixed width; only the row height is dragged (the header's bottom band). REAPER: the track control panel's width is dragged at its edge | Settings › LYNX extras / Playlist menu "Drag the track header column's right edge to widen it", off: the column's right edge (1 px of the selection strip + 3 px of the arrangement) drags the width, up to half the Playlist; a double click goes back to FL's width; Pattern / Clip-launch / linked headers (Simple keeps its own). A preference (ui-options.txt headerWidthExtra), not saved in the project | LYNX extra (optional) |
+| Single click on empty space without placing (#191, Nuelka) | FL: the Pencil / Brush place the last pattern or clip; the Select tool (E) deselects on a click and draws a box on a drag. Live: a click in the Arrangement moves the position (insert marker) | Settings › LYNX extras "Pointer click switch in the Playlist toolbar" shows a switch beside Stretch (also Playlist menu, key action): while lit, the Pencil / Brush on empty space act as FL's Select tool (click deselects, drag = box) and the click moves the song position (Live); a double click places the clip. Clips keep the Pencil's gestures | LYNX extra (optional) |
+| Automation clips drawn as lanes under their track (#191.3, view option) | FL: automation clips on tracks of their own. Live: automation lanes under each track, folding with the track | Playlist menu / Settings › LYNX extras "Automation clips as lanes under their tracks": a track holding only automation clips of one owner (instrument track of the channel, or the track linked to the insert; core/LaneView.h) is drawn right under the owner, indented with a lane header, folding with the owner's lane arrow. The song is untouched (clips stay on their tracks; .flp unchanged); a lane's clips move in time only and no other clip lands in a lane. On by default in Clip-launch (Live), off in Pattern (FL), never in Simple | LYNX extra (Pattern) / Live-like (Clip-launch) |
+
 ## Round 190iu: issues #186 and #191 (workflow; FL's own way stays the default)
 
 Sources: docs/analise/REA_rodada190iu.md.

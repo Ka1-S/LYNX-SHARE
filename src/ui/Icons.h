@@ -57,9 +57,10 @@ enum class Icon
     sessionRecord,     // a ring
     browserPanel,      // a left panel beside a page (show / hide the Browser)
     metronomeDots,     // Live's metronome: a ring and a dot
-    toStart            // round 190jj: BandLab's Back-to-start (a bar and a triangle pointing left), the Simple capsule's idle Stop
+    toStart,           // round 190jj: BandLab's Back-to-start (a bar and a triangle pointing left), the Simple capsule's idle Stop
+    pointer            // round 190jq: the Playlist's pointer-click switch, a mouse pointer (issue #191)
 };
-constexpr int iconCount = (int) Icon::toStart + 1;
+constexpr int iconCount = (int) Icon::pointer + 1;
 
 namespace icons
 {
