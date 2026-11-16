@@ -187,6 +187,19 @@ constexpr int flBandBelow = 38;
 // just under the playhead: by paint() itself, or over the cached picture (which never holds them, so a scroll can shift
 // it); a scroll step in which a clip's start crosses the left edge paints that clip's header band again (cacheShift).
 constexpr float flStickyTitleMax = 400.0f;
+// --- Live 12.4's Arrangement, Clip-launch layout only (round 190jn, design190ia CL-17, CL-18) ----------------------------
+// Measured in live-arrangement.png (default zoom, 5.4 px a bar) and live-arrangement-audiolane.png (34.7 px a bar):
+// lanes 17 px + a 2 px #242424 separator; the lane background alternates by groups of bars, #323232 / #363636, a group
+// being the smallest power of two of bars at least 80 px wide (16 bars = 86 px, 4 bars = 139 px); in the dark group the
+// group's first line #232323, bar lines #282828, beat lines #2c2c2c; in the light one #262626 / #2b2b2b / #303030; bars under
+// 8 px apart: a line every 2^k bars (at least 8 px apart) in the group-line colour (10.8 px apart at 2 bars); beats from
+// 6 px apart. A clip: one block in its colour, a 1 px rim of colour x 0.53 on its top row, its left column and the row
+// under its 15 px title strip (y + 16; on a collapsed lane that is its last row); the name at x + 4, centred in the strip,
+// in colour x 0.24; on a taller lane the body below has the grid in colour x 0.88 (beats), x 0.79 (bars), x 0.68 (a group's
+// first bar), and the waveform / notes / curve in colour x 0.15.
+bool tallLiveLanes = false;
+const juce::Colour liveLaneSeparator { 0xff242424 };
+constexpr int liveStripHeight = 17; // a lane's title strip (all a collapsed lane shows)
 // FL draws no beat lines at its zoom 17 (10 px a beat); where they start was not captured (an open item): 20 px a beat
 constexpr double flBeatLinesFrom = 20.0;
 float flHeaderHeight (juce::Rectangle<float> r) { return juce::jlimit (11.0f, 15.0f, std::round (r.getHeight() * 0.3f)); }
@@ -240,6 +253,10 @@ juce::Colour trackColourIn (const Song& song, int track)
 // pixel above and two below.
 juce::Rectangle<float> clipRectAt (float x0, float x1, float y, int trackHeight)
 {
+    // round 190jn (CL-17): Live fills its 17 px lane above the 2 px separator; clips meet edge to edge (the next one's rim
+    // shows where they meet: live-arrangement.png x 580, y 242..258)
+    if (theme::livelook::active())
+        return { x0, y, juce::jmax (3.0f, x1 - x0), (float) trackHeight - 2.0f };
     if (flClipLook())
         return { x0, y, juce::jmax (3.0f, x1 - x0 - 1.0f), (float) trackHeight - 1.0f };
     return { x0, y + 1.0f, juce::jmax (3.0f, x1 - x0 - 1.0f), (float) trackHeight - 3.0f };
@@ -1508,8 +1525,8 @@ int PlaylistComponent::baseRowHeight() const
 {
     if (simpleHeaders)
         return simpleTrackHeight();
-    if (liveStyle)
-        return liveTrackHeight;
+    if (liveStyle) // (round 190jn, owner decision CL-17: Live's 19 px collapsed lanes in its look, 38 px an option)
+        return liveArrangeLook() && ! tallLiveLanes ? liveCollapsedHeight : liveTrackHeight;
     return polish::clampTrackHeight (engine.getSong().playlistRowHeight);
 }
 
@@ -1821,6 +1838,10 @@ void PlaylistComponent::paint (juce::Graphics& g)
         g.reduceClipRegion (grid);
         const auto paintedRows = g.getClipBounds();
         const auto rows = this->paintedRows(); // (round 190jc, SG-2: the Simple layout's real tracks and its drop lane only)
+        // round 190jn (CL-17): Live's lanes — the bar groups' shading and grid over the whole grid, a 2 px separator under each lane
+        const auto live = liveArrangeLook();
+        if (live)
+            paintLiveGrid (g, grid);
 
         for (int t = 0; t < rows; ++t)
         {
@@ -1832,13 +1853,21 @@ void PlaylistComponent::paint (juce::Graphics& g)
                 continue;
             const uitrace::Part tally (uitrace::part::lanes);
 
-            auto lane = t % 2 == 0 ? colour::bg2 : colour::bg2.interpolatedWith (colour::bg1, 0.5f);
-            if (t == hover.track && drag == Drag::none)
-                lane = lane.interpolatedWith (colour::textPrimary, 0.025f); // the track under the mouse
-            g.setColour (lane);
-            g.fillRect (grid.getX(), y, grid.getWidth(), trackHeight);
-            g.setColour (colour::bg0);
-            g.drawHorizontalLine (y + trackHeight - 1, (float) grid.getX(), (float) grid.getRight());
+            if (live)
+            {
+                g.setColour (liveLaneSeparator);
+                g.fillRect (grid.getX(), y + trackHeight - 2, grid.getWidth(), 2);
+            }
+            else
+            {
+                auto lane = t % 2 == 0 ? colour::bg2 : colour::bg2.interpolatedWith (colour::bg1, 0.5f);
+                if (t == hover.track && drag == Drag::none)
+                    lane = lane.interpolatedWith (colour::textPrimary, 0.025f); // the track under the mouse
+                g.setColour (lane);
+                g.fillRect (grid.getX(), y, grid.getWidth(), trackHeight);
+                g.setColour (colour::bg0);
+                g.drawHorizontalLine (y + trackHeight - 1, (float) grid.getX(), (float) grid.getRight());
+            }
 
             if (const auto lanes = laneBlockHeight (t); lanes > 0) // round 177b: the track's automation lanes
             {
@@ -1868,6 +1897,7 @@ void PlaylistComponent::paint (juce::Graphics& g)
                 g.drawVerticalLine ((int) x, (float) grid.getY(), (float) grid.getBottom());
         };
         const auto barEvery = fl && bar * pixelsPerTick < 12.0 ? 4 : 1;
+        if (! live) // (Live's grid: paintLiveGrid)
         for (const auto& b : song.barsBetween (juce::jmax ((std::int64_t) std::max (0.0, scrollTicks), (std::int64_t) xToTick (paintedX.getX()) - bar),
                                                juce::jmin ((std::int64_t) xToTick (grid.getRight()), (std::int64_t) xToTick (paintedX.getRight())) + 1))
         {
@@ -1899,8 +1929,8 @@ void PlaylistComponent::paint (juce::Graphics& g)
             g.drawVerticalLine ((int) lx1, (float) grid.getY(), (float) grid.getBottom());
         }
 
-        // end of song
-        if (! song.playlist.empty())
+        // end of song (Live does not shade past the end: round 190jn)
+        if (! song.playlist.empty() && ! live)
         {
             const auto endX = (float) tickToX ((double) song.songLength());
             g.setColour (colour::bg0.withAlpha (0.45f));
@@ -2015,10 +2045,12 @@ void PlaylistComponent::paint (juce::Graphics& g)
             const auto current = c.pattern == song.currentPattern;
             const auto selected = isSelected (i);
             const auto simpleLook = simpleClipLook (c); // (round 190jc: the Simple layout's BandLab colours)
+            const auto liveLook = live ? std::optional<theme::ClipLook> (liveClipLook (c)) : std::nullopt; // (round 190jn, CL-17)
 
             // body + name strip
-            const auto clipBody = paintClipFrame (g, r, base, juce::String::fromUTF8 (song.patterns[(std::size_t) c.pattern].name.c_str()), ClipGlyph::pattern, c.muted,
-                                                  simpleLook ? &*simpleLook : nullptr);
+            const auto patternName = juce::String::fromUTF8 (song.patterns[(std::size_t) c.pattern].name.c_str());
+            const auto clipBody = liveLook ? paintLiveClipFrame (g, r, *liveLook, patternName)
+                                           : paintClipFrame (g, r, base, patternName, ClipGlyph::pattern, c.muted, simpleLook ? &*simpleLook : nullptr);
 
             // note thumbnail: the pattern's notes as small rounded bars in a light tint of the clip colour,
             // spread over the body's height by pitch (a few keys of padding so single notes don't hug the edges)
@@ -2039,7 +2071,7 @@ void PlaylistComponent::paint (juce::Graphics& g)
                 const auto bottomKey = (low + high) / 2.0f - span / 2.0f;
                 const auto rows = (float) span + 1.0f;
                 const auto noteHeight = juce::jlimit (1.5f, 2.5f, body.getHeight() / rows);
-                g.setColour (simpleLook ? simpleLook->content : clipContentColour (base));
+                g.setColour (liveLook ? liveLook->content : simpleLook ? simpleLook->content : clipContentColour (base));
 
                 juce::Graphics::ScopedSaveState clip (g);
                 g.reduceClipRegion (body.toNearestInt());
@@ -2075,7 +2107,8 @@ void PlaylistComponent::paint (juce::Graphics& g)
             }
 
             veilIfMuted (c, r);
-            paintClipOutline (g, r, base, selected, current);
+            if (! liveLook || selected) // (Live: no outline around a clip; the selection keeps LYNX's)
+                paintClipOutline (g, r, base, selected, liveLook ? false : current);
         }
 
         {
@@ -2271,7 +2304,9 @@ void PlaylistComponent::paint (juce::Graphics& g)
         juce::Graphics::ScopedSaveState state (g);
         if (g.reduceClipRegion (headers)) // (not repainted, e.g. the playhead's strip: nothing to draw; round 174e)
         {
-            g.setColour (flHeaders() ? colour::bg0 : colour::bg2); // (FL: contiguous plates, a dark line between rows)
+            // (FL: contiguous plates, a dark line between rows; Live, round 190jn: its #242424 separators between rows)
+            const auto live = liveHeaders();
+            g.setColour (live ? liveLaneSeparator : flHeaders() ? colour::bg0 : colour::bg2);
             g.fillRect (headers);
             g.setFont (font (type::small));
 
@@ -2352,9 +2387,30 @@ void PlaylistComponent::paint (juce::Graphics& g)
                 if (simpleHeaders && isTrackSelected (t)) // round 190jc (SG-4): the selected plate is lifted
                     plate = plate.interpolatedWith (colour::bg6, 0.25f);
                 const auto fl = flHeaders() && simpleInsert (t) <= 0;
-                const auto plateArea = fl ? juce::Rectangle<float> (left, (float) y, (float) (headerWidth - rightColumn()) - left, (float) trackHeight - 1.0f)
+                // round 190jn (CL-17, live-arrangement.png 1324..1625): Live's header row — the name box in the track colour
+                // up to the controls, a 2 px separator, the controls panel (#363636; #464646 for the selected track), all
+                // the lane's height above its 2 px separator
+                auto liveNameRight = 0.0f;
+                if (live)
+                {
+                    auto leftmost = trackLed (t).getX();
+                    for (const auto& other : { trackArm (t), trackArrow (t), trackAudition (t), trackInput (t) })
+                        if (! other.isEmpty())
+                            leftmost = juce::jmin (leftmost, other.getX());
+                    liveNameRight = (float) leftmost - 6.0f;
+                }
+                const auto plateArea = live ? juce::Rectangle<float> (left, (float) y, juce::jmax (8.0f, liveNameRight - left), (float) trackHeight - 2.0f)
+                                     : fl ? juce::Rectangle<float> (left, (float) y, (float) (headerWidth - rightColumn()) - left, (float) trackHeight - 1.0f)
                                           : juce::Rectangle<float> (left, (float) y + 1.0f, (float) (headerWidth - rightColumn()) - 2.0f - left, (float) trackHeight - 3.0f);
-                if (fl)
+                if (live)
+                {
+                    plate = trackColour != 0 ? juce::Colour (trackColour).withAlpha (1.0f) : juce::Colour (0xffa9a9a9); // (Live's grey, palette 41)
+                    g.setColour (isTrackSelected (t) ? theme::livelook::raised : theme::livelook::surface);
+                    g.fillRect (juce::Rectangle<float> (plateArea.getRight() + 2.0f, (float) y, (float) headerWidth - plateArea.getRight() - 2.0f, plateArea.getHeight()));
+                    g.setColour (plate);
+                    g.fillRect (plateArea);
+                }
+                else if (fl)
                 {
                     // FL (round 190ig, FM-23, fl-playlist-zoom-audioclips.png 370,240,472,1000): the plate filled with the
                     // track's own colour (FL's grey #485156 when it has none), contiguous; a group header's left side rounded
@@ -2423,7 +2479,7 @@ void PlaylistComponent::paint (juce::Graphics& g)
                     g.setColour (colour::accent);
                     g.drawRoundedRectangle (plateArea.reduced (0.5f), radius::md, 1.0f);
                 }
-                else if (isTrackSelected (t)) // FL (live check 190gu B1): an outlined box in the selection strip
+                else if (isTrackSelected (t) && ! live) // FL (live check 190gu B1): an outlined box in the selection strip
                 {
                     // as FL draws it (rollup 0.1.28, coordinator): a clearly visible lime outline, the whole 9 px column, the
                     // whole row's height, on whole pixels (a 1 px line at half-pixel places blurred into a faint box)
@@ -2496,6 +2552,21 @@ void PlaylistComponent::paint (juce::Graphics& g)
                             g.drawText (count > 0 ? "FX " + juce::String (count) : juce::String ("+ FX"), fx, juce::Justification::centred, false);
                         }
                     }
+                }
+                else if (live)
+                {
+                    // Live's track activator (live-arrangement.png x 1509..1554, y 187..199): 44 x 11 px #ffad56 in a 1 px
+                    // #111111 frame, the track number in #070707; off (the track muted): the #1e1e1e well, its number #696969
+                    // (captured by round 190jn, shots/ref/live-mixer-solo-deactivated.png: Mello deactivated); no hover state
+                    const auto box = trackLed (t);
+                    g.setColour (theme::livelook::knobRing);
+                    g.fillRect (box);
+                    g.setColour (muted ? theme::livelook::well : theme::livelook::on);
+                    g.fillRect (box.reduced (1));
+                    g.setColour (muted ? juce::Colour (0xff696969) : theme::livelook::ink);
+                    g.setFont (font (type::small));
+                    textcache::drawText (g, juce::String (t + 1), box, juce::Justification::centred, false);
+                    textRight = plateArea.getRight() - 2.0f;
                 }
                 else if (flHeaders()) // FL's LED (round 190ig): 11 px, a dark rim
                 {
@@ -2668,7 +2739,8 @@ void PlaylistComponent::paint (juce::Graphics& g)
                                                 : juce::Rectangle<int> (nameLeft, y, juce::jmax (8, nameRight - nameLeft), trackHeight - 1);
                     textcache::drawText (g, playlistFitMiddle (name, nameFont, (float) nameBox.getWidth()), nameBox, juce::Justification::centredLeft, false);
                 }
-                else if (const auto icon = simpleHeaders ? simpleTrackIcon (song, t)
+                else if (const auto icon = live ? trackicons::Icon::none // (Live's name box has no icon)
+                                           : simpleHeaders ? simpleTrackIcon (song, t)
                                                          : trackicons::iconFor (t < (int) song.playlistTracks.size() ? song.playlistTracks[(std::size_t) t].icon : 0);
                     icon != trackicons::Icon::none && trackHeight >= 14)
                 {
@@ -2680,7 +2752,18 @@ void PlaylistComponent::paint (juce::Graphics& g)
                     ui::drawTrackIcon (g, icon, juce::Rectangle<float> ((float) textLeft, (float) y + ((float) nameHeight - size) * 0.5f, size, size), ink);
                     textLeft += (int) size + (simpleHeaders ? 6 : 4);
                 }
-                if (! fl)
+                if (live)
+                {
+                    // Live: the name in the track colour x 0.24 (live-arrangement.png "Drums" #252f22 on #9bc48d), in the first
+                    // 17 px of the box (an expanded lane keeps its controls at the top)
+                    g.setColour (theme::liveShade (plate, 0.24f));
+                    g.setFont (font (type::small, groupHead));
+                    const auto nameRight = (int) juce::jmin (textRight, plateArea.getRight() - 3.0f);
+                    const auto nameBox = juce::Rectangle<int> (textLeft - 1, y, juce::jmax (8, nameRight - textLeft + 1), juce::jmin (trackHeight - 2, liveStripHeight));
+                    textcache::drawText (g, custom ? juce::String::fromUTF8 (song.playlistTracks[(std::size_t) t].name.c_str()) : tr ("Track {0}", { juce::String (t + 1) }),
+                                         nameBox, juce::Justification::centredLeft, false);
+                }
+                else if (! fl)
                 {
                     g.setColour (muted ? colour::textDisabled : (custom ? colour::textPrimary : colour::textSecondary));
                     g.setFont (font (simpleHeaders ? type::body : type::small, groupHead || (simpleHeaders && custom)));
@@ -3110,9 +3193,21 @@ void PlaylistComponent::addSmallClip (SmallClips& batch, float physicalScale, co
     const auto look = flAudio ? theme::clipBody (juce::Colour (song.channels[(std::size_t) c.channel].colour), trackColourIn (song, c.track), ClipKind::audio,
                                                  theme::ClipStyle::flTint)
                               : theme::ClipLook {};
+    // round 190jn (CL-17, CL-18): Live's look — the block in the clip colour, its rim, the body under the 17 px strip
+    const auto live = liveArrangeLook();
+    const auto liveLook = live ? liveClipLook (c) : theme::ClipLook {};
     const auto title = flAudio ? (band ? r : r.withHeight (flHeaderHeight (r))) : r.withHeight (clipHeaderHeight (r));
-    const auto body = flAudio ? (band ? r.reduced (0.0f, 1.0f) : r.withTrimmedTop (title.getHeight())) : r.withTrimmedTop (title.getHeight());
-    if (flAudio)
+    const auto body = live ? (r.getHeight() >= (float) liveStripHeight + 4.0f ? r.withTrimmedTop ((float) liveStripHeight).withTrimmedLeft (1.0f) : juce::Rectangle<float>())
+                    : flAudio ? (band ? r.reduced (0.0f, 1.0f) : r.withTrimmedTop (title.getHeight())) : r.withTrimmedTop (title.getHeight());
+    if (live)
+    {
+        batch.bodies[liveLook.body.getARGB()].addWithoutMerging (r);
+        const auto rim = theme::liveShade (liveLook.body, 0.53f).getARGB();
+        batch.edges[rim].addWithoutMerging ({ r.getX(), r.getY(), 1.0f, r.getHeight() });
+        batch.edges[rim].addWithoutMerging (r.withHeight (1.0f));
+        batch.edges[rim].addWithoutMerging ({ r.getX(), r.getY() + juce::jmin ((float) liveStripHeight, r.getHeight()) - 1.0f, r.getWidth(), 1.0f });
+    }
+    else if (flAudio)
     {
         if (! band)
             batch.bodies[look.body.withMultipliedAlpha (look.bodyAlpha).getARGB()].addWithoutMerging (body);
@@ -3152,8 +3247,8 @@ void PlaylistComponent::addSmallClip (SmallClips& batch, float physicalScale, co
         const auto startTick = (double) c.offset + (double) (wave.getX() - r.getX()) / pixelsPerTick;
         const auto forward = ! clipops::playsBackwards (channel, c);
         const auto startFrame = (double) span.first + (forward ? startTick * perTick : total - startTick * perTick);
-        const auto simple = flAudio ? std::optional<theme::ClipLook>() : simpleClipLook (c);
-        const auto colour = flAudio ? (band ? look.compactContent : look.content) : simple ? simple->content : clipContentColour (base);
+        const auto simple = flAudio || live ? std::optional<theme::ClipLook>() : simpleClipLook (c);
+        const auto colour = live ? liveLook.content : flAudio ? (band ? look.compactContent : look.content) : simple ? simple->content : clipContentColour (base);
         auto style = ui::currentWaveStyle (colour, juce::jmin (ui::normalisingGain (*summary), 4.0f) * c.gain);
         if (! style.spectral && c.gain > 1.0f)
             style.gain = juce::jmin (style.gain, 8.0f);
@@ -3181,7 +3276,7 @@ void PlaylistComponent::addSmallClip (SmallClips& batch, float physicalScale, co
         const auto rows = (float) span + 1.0f;
         const auto noteHeight = juce::jlimit (1.5f, 2.5f, inner.getHeight() / rows);
         const auto simple = simpleClipLook (c);
-        auto& marks = batch.contents[(simple ? simple->content : clipContentColour (base)).getARGB()];
+        auto& marks = batch.contents[(live ? liveLook.content : simple ? simple->content : clipContentColour (base)).getARGB()];
         // what plays: looped along a stretched clip with the LYNX option (issue #25), else once (FL, round 168k)
         const auto passes = clipPasses (c, song.patterns[(std::size_t) c.pattern].effectiveLength (song.meter()));
         for (auto pass = passes.first; pass <= passes.last; ++pass)
@@ -3230,7 +3325,11 @@ void PlaylistComponent::paintAudioClip (juce::Graphics& g, const Clip& c, juce::
     const auto look = fl ? theme::clipBody (juce::Colour (channel.colour), trackColourIn (song, c.track), ClipKind::audio, theme::ClipStyle::flTint)
                          : theme::ClipLook {};
     const auto simpleLook = simpleClipLook (c); // (round 190jc, SG-5: the Simple layout draws an audio clip in its track's colour)
-    const auto body = fl ? paintFlClipFrame (g, r, look, band) : paintClipFrame (g, r, colour, name, ClipGlyph::audio, c.muted, simpleLook ? &*simpleLook : nullptr);
+    // round 190jn (CL-18): Live's audio clip — the block in the clip colour, the waveform dark (colour x 0.15) under the strip
+    const auto liveLook = liveArrangeLook() ? std::optional<theme::ClipLook> (liveClipLook (c)) : std::nullopt;
+    const auto body = fl ? paintFlClipFrame (g, r, look, band)
+                    : liveLook ? paintLiveClipFrame (g, r, *liveLook, name)
+                               : paintClipFrame (g, r, colour, name, ClipGlyph::audio, c.muted, simpleLook ? &*simpleLook : nullptr);
 
     // the waveform (ui/WaveformView, analysed in the background): the clean style fills the body with the
     // peak envelope mirrored around the centre, in a light tint of the clip colour
@@ -3249,12 +3348,12 @@ void PlaylistComponent::paintAudioClip (juce::Graphics& g, const Clip& c, juce::
         const auto startTick = (double) c.offset + (double) (wave.getX() - r.getX()) / pixelsPerTick;
         const auto forward = ! clipops::playsBackwards (channel, c);
         const auto startFrame = (double) span.first + (forward ? startTick * perTick : total - startTick * perTick);
-        auto style = ui::currentWaveStyle (fl ? (band ? look.compactContent : look.content) : simpleLook ? simpleLook->content : clipContentColour (colour),
+        auto style = ui::currentWaveStyle (fl ? (band ? look.compactContent : look.content) : liveLook ? liveLook->content : simpleLook ? simpleLook->content : clipContentColour (colour),
                                            juce::jmin (ui::normalisingGain (*summary), 4.0f) * c.gain);
         if (! style.spectral && c.gain > 1.0f) // louder clip gain: the shape may hit the top, which is honest
             style.gain = juce::jmin (style.gain, 8.0f);
-        if (fl)
-            style.silenceLine = style.classic; // FL's 1 px silence line, in the waveform's colour
+        if (fl || liveLook)
+            style.silenceLine = style.classic; // FL's 1 px silence line, in the waveform's colour (Live draws one too: audiolane y 476)
         const uitrace::Part tally (uitrace::part::waveform);
         // warp markers that bend the tempo (round 175a): each stretch between two markers drawn at its own speed
         auto markers = forward ? warpedit::playedMarkers (channel.sampler, total / summary->sampleRate) : std::vector<WarpPoint> {};
@@ -3281,12 +3380,15 @@ void PlaylistComponent::paintAudioClip (juce::Graphics& g, const Clip& c, juce::
 
     if (fl)
         paintFlClipTitle (g, r, look, name, ClipGlyph::audio, c.muted, band, (float) headerWidth, false);
-    else
+    else if (! liveLook)
         paintClipOutline (g, r, colour, false, false);
 
-    // the warp markers: small flags on the body's top edge, the end marker included (the start one never moves)
+    // the warp markers: small flags on the body's top edge, the end marker included (the start one never moves). Live's
+    // look (round 190jn, CL-18): only while they are edited — the clip under the mouse or a marker being dragged; none on a
+    // collapsed lane
+    if (const auto index = playlistIndexOf (song, c);
+        ! liveLook || (! body.isEmpty() && index >= 0 && (hover.clip == index || (drag == Drag::warpMarker && warpClip == index))))
     {
-        const auto index = playlistIndexOf (song, c);
         auto markers = index >= 0 ? clipWarpMarkers (index) : std::vector<WarpPoint> {};
         if (drag == Drag::warpMarker && warpClip == index && warpIndex >= 0 && warpIndex < (int) markers.size())
             markers[(std::size_t) warpIndex].beats = warpBeat;
@@ -3323,7 +3425,7 @@ void PlaylistComponent::paintAudioClip (juce::Graphics& g, const Clip& c, juce::
         const auto inX = r.getX() + (float) (fadeIn * pixelsPerTick);
         const auto outX = r.getRight() - (float) (fadeOut * pixelsPerTick);
         const auto shade = theme::colour::bg0.withAlpha (0.45f);
-        const auto line = clipContentColour (colour).withAlpha (0.9f);
+        const auto line = (liveLook ? liveLook->content : clipContentColour (colour)).withAlpha (0.9f);
         // the gain curve from x0 to x1 (rising: a fade in), as a line along the body
         auto curve = [&body] (float x0, float x1, bool rising, bool sCurve, bool equalPower) {
             juce::Path p;
@@ -3406,8 +3508,17 @@ void PlaylistComponent::paintAutomationClip (juce::Graphics& g, const Clip& c, j
     const auto band = fl && r.getHeight() + 1.0f < (float) flBandBelow;
     const auto look = fl ? theme::clipBody (juce::Colour (automation.colour), trackColourIn (song, c.track), ClipKind::automation, theme::ClipStyle::flTint)
                          : theme::ClipLook {};
+    // round 190jn (CL-17): Live's look — the block in the clip colour, the curve dark under the strip; nothing more on a collapsed lane
+    const auto liveLook = liveArrangeLook() ? std::optional<theme::ClipLook> (liveClipLook (c)) : std::nullopt;
+    juce::Rectangle<float> liveBody;
     if (fl)
         paintFlClipFrame (g, r, look, band);
+    else if (liveLook)
+    {
+        liveBody = paintLiveClipFrame (g, r, *liveLook, juce::String::fromUTF8 (automation.name.c_str()));
+        if (liveBody.getHeight() < 6.0f) // (= automationBody: none on a collapsed lane)
+            return;
+    }
     else
     {
         paintClipFrame (g, r, colour, juce::String::fromUTF8 (automation.name.c_str()), ClipGlyph::automation, c.muted);
@@ -3415,7 +3526,8 @@ void PlaylistComponent::paintAutomationClip (juce::Graphics& g, const Clip& c, j
     }
 
     // automation curve over the clip's range
-    const auto body = fl && ! band ? r.withTrimmedTop (flHeaderHeight (r)).reduced (1.0f, 2.0f)
+    const auto body = liveLook ? liveBody.reduced (1.0f, 2.0f)
+                    : fl && ! band ? r.withTrimmedTop (flHeaderHeight (r)).reduced (1.0f, 2.0f)
                                    : r.withTrimmedTop (juce::jmin (14.0f, r.getHeight() * 0.4f)).reduced (1.0f, 2.0f); // = automationBody
     const auto clip = g.getClipBounds().toFloat();
     juce::Path curve;
@@ -3463,7 +3575,8 @@ void PlaylistComponent::paintAutomationClip (juce::Graphics& g, const Clip& c, j
     }
     else
     {
-        g.setColour (automation.target.kind == AutomationTargetKind::none ? theme::colour::textSecondary : theme::colour::automation.brighter (0.3f));
+        g.setColour (liveLook ? liveLook->content
+                     : automation.target.kind == AutomationTargetKind::none ? theme::colour::textSecondary : theme::colour::automation.brighter (0.3f));
         g.strokePath (curve, juce::PathStrokeType (1.5f));
     }
 
@@ -3582,6 +3695,9 @@ juce::Rectangle<float> PlaylistComponent::automationBody (const Clip& c) const
     const auto r = clipRectAt (x0, x1, y, heightOf (c.track));
     if (flClipLook() && heightOf (c.track) >= flBandBelow) // (FL: the curve under the header band)
         return r.withTrimmedTop (flHeaderHeight (r)).reduced (1.0f, 2.0f);
+    if (liveArrangeLook()) // (round 190jn: Live's body under the 17 px strip, as paintLiveClipFrame; none on a collapsed lane)
+        return r.getHeight() >= (float) liveStripHeight + 6.0f ? r.withTrimmedTop ((float) liveStripHeight).withTrimmedLeft (1.0f).reduced (1.0f, 2.0f)
+                                                               : juce::Rectangle<float>();
     return r.withTrimmedTop (juce::jmin (14.0f, r.getHeight() * 0.4f)).reduced (1.0f, 2.0f);
 }
 
@@ -6833,9 +6949,171 @@ void PlaylistComponent::setLiveStyle (bool on)
     if (on == liveStyle)
         return;
     liveStyle = on;
-    refreshTrackLayout(); // (round 190gw: the Clip-launch layout keeps LYNX's 38 px default row)
+    refreshTrackLayout(); // (round 190gw: the Clip-launch layout keeps LYNX's 38 px default row; round 190jn: Live's 19 px in its look)
+    updateHeaderWidth();  // (round 190jn: Live's header row is wider)
     updateScrollBars();
     repaint();
+}
+
+// --- round 190jn: Live's Arrangement look (design190ia CL-17, CL-18) -------------------------------------------------------
+bool& playlistTallLiveLanes() { return tallLiveLanes; }
+
+bool PlaylistComponent::liveArrangeLook() const noexcept
+{
+    return liveStyle && theme::livelook::active();
+}
+
+bool PlaylistComponent::liveHeaders() const
+{
+    return liveArrangeLook() && ! simpleHeaders && ! linkedHeaders();
+}
+
+void PlaylistComponent::liveLanesChanged()
+{
+    refreshTrackLayout();
+    updateHeaderWidth();
+    updateScrollBars();
+    repaint();
+}
+
+juce::Colour PlaylistComponent::liveClipColour (const Clip& c) const
+{
+    // Live: a clip's own colour (an imported set's clip colour, Live's table: round 190ig CL-6), else its track's
+    const auto& song = engine.getSong();
+    std::uint32_t own = 0;
+    if (c.kind == ClipKind::audio && c.channel >= 0 && c.channel < (int) song.channels.size())
+        own = song.channels[(std::size_t) c.channel].colour;
+    else if (c.kind == ClipKind::automation && c.automation >= 0 && c.automation < (int) song.automations.size())
+        own = song.automations[(std::size_t) c.automation].colour;
+    else if (c.kind == ClipKind::pattern && c.pattern >= 0 && c.pattern < (int) song.patterns.size())
+        own = song.patterns[(std::size_t) c.pattern].colour;
+    if (own == 0 && c.track >= 0 && c.track < (int) song.playlistTracks.size())
+        own = song.playlistTracks[(std::size_t) c.track].colour;
+    if (own != 0)
+        return juce::Colour (own).withAlpha (1.0f);
+    return c.kind == ClipKind::pattern ? patternColour (song, c.pattern) : c.kind == ClipKind::audio ? theme::colour::audioClip : theme::colour::automation;
+}
+
+theme::ClipLook PlaylistComponent::liveClipLook (const Clip& c) const
+{
+    const auto colour = liveClipColour (c);
+    return theme::clipBody (colour, colour, c.kind, theme::ClipStyle::livePastel);
+}
+
+template <typename Line>
+void PlaylistComponent::forEachLiveGridLine (double x0, double x1, Line&& line) const
+{
+    const auto& song = engine.getSong();
+    const auto barPx = (double) song.barTicks() * pixelsPerTick;
+    if (barPx <= 0.0)
+        return;
+    int group = 1; // bars a shading group spans
+    while ((double) group * barPx < 80.0 && group < (1 << 16))
+        group *= 2;
+    int every = 1; // bars between two lines
+    while ((double) every * barPx < 8.0 && every < (1 << 16))
+        every *= 2;
+    const auto beats = ppq * pixelsPerTick >= 6.0 && every == 1;
+    const auto from = juce::jmax ((std::int64_t) 0, (std::int64_t) xToTick ((int) std::floor (x0)) - song.barTicks());
+    const auto to = (std::int64_t) xToTick ((int) std::ceil (x1)) + 1;
+    for (const auto& b : song.barsBetween (from, to))
+    {
+        const auto index = b.number - 1;
+        const auto odd = ((index / group) & 1) != 0;
+        if (index % every == 0)
+            line (tickToX ((double) b.tick), every > 1 || index % group == 0 ? 0 : 1, odd, b);
+        if (beats)
+            for (auto tick = b.tick + ppq; tick < b.tick + b.length; tick += ppq)
+                line (tickToX ((double) tick), 2, odd, b);
+    }
+}
+
+void PlaylistComponent::paintLiveGrid (juce::Graphics& g, juce::Rectangle<int> grid) const
+{
+    const auto visible = grid.getIntersection (g.getClipBounds());
+    if (visible.isEmpty())
+        return;
+    static const juce::Colour shade[2] = { juce::Colour (0xff323232), juce::Colour (0xff363636) };
+    static const juce::Colour lines[2][3] = { { juce::Colour (0xff232323), juce::Colour (0xff282828), juce::Colour (0xff2c2c2c) },
+                                              { juce::Colour (0xff262626), juce::Colour (0xff2b2b2b), juce::Colour (0xff303030) } };
+    // the groups' shading, one rectangle per group (each bar's start: a group starts at its first bar)
+    g.setColour (shade[0]);
+    g.fillRect (visible);
+    const auto& song = engine.getSong();
+    const auto barPx = (double) song.barTicks() * pixelsPerTick;
+    int group = 1;
+    while (barPx > 0.0 && (double) group * barPx < 80.0 && group < (1 << 16))
+        group *= 2;
+    {
+        double runStart = -1.0;
+        const auto from = juce::jmax ((std::int64_t) 0, (std::int64_t) xToTick (visible.getX()) - song.barTicks());
+        const auto to = (std::int64_t) xToTick (visible.getRight()) + 1;
+        const auto fillRun = [&] (double end) {
+            if (runStart >= 0.0 && end > runStart)
+                g.fillRect (juce::Rectangle<double> (runStart, (double) visible.getY(), end - runStart, (double) visible.getHeight()).toFloat()
+                                .getIntersection (visible.toFloat()));
+        };
+        g.setColour (shade[1]);
+        for (const auto& b : song.barsBetween (from, to))
+        {
+            const auto odd = (((b.number - 1) / group) & 1) != 0;
+            const auto x = (double) (int) tickToX ((double) b.tick);
+            if (odd && runStart < 0.0)
+                runStart = x;
+            else if (! odd && runStart >= 0.0)
+            {
+                fillRun (x);
+                runStart = -1.0;
+            }
+        }
+        fillRun ((double) visible.getRight());
+    }
+    forEachLiveGridLine ((double) visible.getX(), (double) visible.getRight(), [&] (double x, int level, bool odd, const Bar&) {
+        g.setColour (lines[odd ? 1 : 0][level]);
+        g.fillRect ((int) x, visible.getY(), 1, visible.getHeight());
+    });
+}
+
+juce::Rectangle<float> PlaylistComponent::paintLiveClipFrame (juce::Graphics& g, juce::Rectangle<float> r, const theme::ClipLook& look,
+                                                              const juce::String& name) const
+{
+    const uitrace::Part tally (uitrace::part::frame);
+    const auto rim = theme::liveShade (look.body, 0.53f);
+    g.setColour (look.body);
+    g.fillRect (r);
+    g.setColour (rim);
+    g.fillRect (r.withHeight (1.0f));
+    g.fillRect (r.withWidth (1.0f));
+    const auto strip = (float) liveStripHeight;
+    g.fillRect (r.getX(), r.getY() + juce::jmin (strip, r.getHeight()) - 1.0f, r.getWidth(), 1.0f);
+
+    juce::Rectangle<float> body;
+    if (r.getHeight() >= strip + 4.0f)
+    {
+        body = r.withTrimmedTop (strip).withTrimmedLeft (1.0f);
+        // the grid inside the body (Live: beats x 0.88, bars x 0.79, a group's first bar x 0.68)
+        const auto inner = body.getIntersection (g.getClipBounds().toFloat());
+        if (! inner.isEmpty())
+        {
+            const juce::Colour lines[3] = { theme::liveShade (look.body, 0.68f), theme::liveShade (look.body, 0.79f), theme::liveShade (look.body, 0.88f) };
+            forEachLiveGridLine ((double) inner.getX(), (double) inner.getRight(), [&] (double x, int level, bool, const Bar&) {
+                if (x < (double) inner.getX() || x >= (double) inner.getRight())
+                    return;
+                g.setColour (lines[level]);
+                g.fillRect (juce::Rectangle<float> ((float) (int) x, body.getY(), 1.0f, body.getHeight()));
+            });
+        }
+    }
+
+    if (r.getWidth() > 12.0f && name.isNotEmpty())
+    {
+        const uitrace::Part tallyTitle (uitrace::part::title);
+        g.setColour (look.ink);
+        g.setFont (theme::font (theme::type::small));
+        const auto text = juce::Rectangle<float> (r.getX() + 4.0f, r.getY() + 1.0f, r.getWidth() - 6.0f, juce::jmin (strip, r.getHeight()) - 2.0f);
+        textcache::drawText (g, name, text.toNearestInt(), juce::Justification::centredLeft, false);
+    }
+    return body;
 }
 
 bool PlaylistComponent::automationFollows() const noexcept
@@ -7402,6 +7680,8 @@ juce::Rectangle<int> PlaylistComponent::trackLed (int track) const
     if (simpleInsert (track) > 0) // a linked header's M button (round 190gz): the first row, or centred on a short row
         return { headerWidth - 22 - rightColumn() - insertsColumn(), trackToY (track) + (h >= linkedTwoRows ? 4 : juce::jmax (1, (h - 14) / 2)), 18,
                  juce::jmin (14, h - 2) };
+    if (liveHeaders()) // round 190jn: Live's activator, 46 x 13 with its frame, 2 px under the row's top (an expanded lane: at its top)
+        return { headerWidth - rightColumn() - 4 - 46, trackToY (track) + juce::jmin (2, juce::jmax (0, (h - 2 - 13) / 2)), 46, juce::jmin (13, h - 2) };
     if (flHeaders() && h >= flTallHeader) // FL's tall track (round 190ig, FM-23): the LED at the bottom right
         return { headerWidth - 16 - rightColumn(), trackToY (track) + h - 18, 12, 12 };
     return { headerWidth - 17 - rightColumn(), trackToY (track) + h / 2 - 6, 12, 12 };
@@ -7424,7 +7704,8 @@ void PlaylistComponent::updateHeaderWidth()
 {
     // (round 190ig, FM-23: FL's 98 px header plates + the 8 px selection / activity column in the Pattern layout;
     // round 190ht, issue #154: the linked headers' inserts column)
-    const auto width = simpleHeaders ? (ui::simplelook::largeControls() ? simpleHeaderWidthLarge : simpleHeaderWidth) : linkedHeaders() ? linkedHeaderWidth + insertsColumn() : flHeaderWidthNow();
+    const auto width = simpleHeaders ? (ui::simplelook::largeControls() ? simpleHeaderWidthLarge : simpleHeaderWidth) : linkedHeaders() ? linkedHeaderWidth + insertsColumn()
+                     : liveHeaders() ? liveHeaderWidth : flHeaderWidthNow();
     if (width == headerWidth)
         return;
     headerWidth = width;
