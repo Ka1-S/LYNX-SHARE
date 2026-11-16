@@ -10278,3 +10278,4 @@ countries: br
 "Clip Launch button: [LMB] launches the clip (at the launch quantisation)  [Enter] launches the selected clip" = "Botão de disparar clipe: [LMB] dispara o clipe (na quantização de disparo)  [Enter] dispara o clipe selecionado"
 "Clip: [LMB] selects it, drag moves it ([Ctrl] copies)  [2xLMB] opens it  [RMB] clip menu" = "Clipe: [LMB] seleciona, arrastar move ([Ctrl] copia)  [2xLMB] abre  [RMB] menu do clipe"
 "(Follow Action)" = "(Ação seguinte)"
+"Auto scrolling pauses on a scroll or an edit" = "A rolagem automática pausa ao rolar ou editar"

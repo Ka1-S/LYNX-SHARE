@@ -10158,3 +10158,4 @@ countries: ru by kz
 "Clip Launch button: [LMB] launches the clip (at the launch quantisation)  [Enter] launches the selected clip" = "Кнопка запуска клипа: [LMB] запускает клип (по квантованию запуска)  [Enter] запускает выбранный клип"
 "Clip: [LMB] selects it, drag moves it ([Ctrl] copies)  [2xLMB] opens it  [RMB] clip menu" = "Клип: [LMB] выбирает его, перетаскивание перемещает ([Ctrl] копирует)  [2xLMB] открывает  [RMB] меню клипа"
 "(Follow Action)" = "(Следующее действие)"
+"Auto scrolling pauses on a scroll or an edit" = "Автопрокрутка приостанавливается при прокрутке или правке"

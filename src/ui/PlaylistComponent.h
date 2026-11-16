@@ -236,6 +236,10 @@ public:
     friend class PatternPicker;
     // round 190im (R5, DC-5): the playhead's glow trail (Animations on, while playing) as last painted
     bool trailShown = false;
+    // round 190im (R15): what the frame step saw of the view (a change it did not make = a scroll by hand), and the
+    // song's publish count at the last mouse press (a gesture that changed it = an edit)
+    double followSeenScroll = 0.0, followSeenZoom = 0.0;
+    std::uint64_t followEditStamp = 0;
     static constexpr int playheadTrail = 14; // (FL: ≈14 px of fading glow behind the line, shots/fl-playhead-glow-zoom.png)
     bool playheadTrailOn() const;
     // round 190im (R5, DE-135): the clips a drag over the Playlist would place, drawn where they would land

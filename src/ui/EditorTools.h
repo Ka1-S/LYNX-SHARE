@@ -1,5 +1,7 @@
 #pragma once
 
+#include <array>
+
 // Shared pieces of the Piano Roll and Playlist editors: the edit tools, the global grid (with the
 // per-editor "Follow global" choice and the default note length) and the Note inspector.
 
@@ -235,6 +237,34 @@ public:
         return v == FollowView::channelRack ? followRack : v == FollowView::audioEditor ? followAudioEditor : isFollowing (v == FollowView::pianoRoll);
     }
     void setFollowingView (FollowView v, bool on, bool save = true);
+    // Round 190im (R15, owner decision L3; Live's manual 6.2 / 8.7: "Follow will pause if you make an edit or scroll the
+    // view horizontally", it goes on with the next play / stop or a Follow click): a view's Follow pauses after a scroll
+    // or an edit by hand. −1 = as the layout: on in the Clip-launch workflow, off in the others until FL's behaviour is
+    // captured; 0 / 1 = set by hand (Options › "Auto scrolling pauses on a scroll or an edit", saved with the UI options).
+    int followPausesOnEdit = -1;
+    bool followPausing() const noexcept { return followPausesOnEdit < 0 ? clipLaunchWorkflow : followPausesOnEdit != 0; }
+    void pauseFollow (FollowView v) noexcept
+    {
+        if (followPausing() && isFollowingView (v))
+            followPaused[(std::size_t) v] = true;
+    }
+    bool isFollowPaused (FollowView v) const noexcept { return followPaused[(std::size_t) v]; }
+    // Follow is on for the view and not paused now
+    bool followsNow (FollowView v) const noexcept { return isFollowingView (v) && ! followPaused[(std::size_t) v]; }
+    // the song changed during a gesture or a key of the view (an edit by hand)
+    void pauseFollowIfEdited (FollowView v, std::uint64_t before, std::uint64_t after) noexcept
+    {
+        if (before != after)
+            pauseFollow (v);
+    }
+    void resumeFollow (FollowView v) noexcept { followPaused[(std::size_t) v] = false; }
+    // each view's frame step tells the transport's state: a play or a stop lifts every pause
+    void noteTransport (bool playing) noexcept
+    {
+        if (playing != lastTransportPlaying)
+            followPaused = {};
+        lastTransportPlaying = playing;
+    }
     // Called after an option the main window saves changed here (it writes ui-options.txt).
     std::function<void()> onOptionsChanged;
 
@@ -243,6 +273,8 @@ private:
     int gridOption = grid::screenOption, lastGridOption = grid::screenOption;
     std::int64_t defaultNoteLength = 0;
     bool followPlaylist = true, followPianoRoll = true, followRack = true, followAudioEditor = true;
+    std::array<bool, 4> followPaused {}; // round 190im: [FollowView]
+    bool lastTransportPlaying = false;
 };
 
 // The global grid selector of the main toolbar: left-click picks the grid, right-click sets the

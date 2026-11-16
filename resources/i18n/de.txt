@@ -10158,3 +10158,4 @@ countries: de at ch li lu
 "Clip Launch button: [LMB] launches the clip (at the launch quantisation)  [Enter] launches the selected clip" = "Clip-Starttaste: [LMB] startet den Clip (zur Start-Quantisierung)  [Enter] startet den gewählten Clip"
 "Clip: [LMB] selects it, drag moves it ([Ctrl] copies)  [2xLMB] opens it  [RMB] clip menu" = "Clip: [LMB] wählt ihn, Ziehen verschiebt ihn ([Ctrl] kopiert)  [2xLMB] öffnet ihn  [RMB] Clip-Menü"
 "(Follow Action)" = "(Folgeaktion)"
+"Auto scrolling pauses on a scroll or an edit" = "Auto-Scrollen pausiert beim Scrollen oder Bearbeiten"

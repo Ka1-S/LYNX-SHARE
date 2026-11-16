@@ -10158,3 +10158,4 @@ countries: nl be
 "Clip Launch button: [LMB] launches the clip (at the launch quantisation)  [Enter] launches the selected clip" = "Clip-startknop: [LMB] start de clip (op de startkwantisering)  [Enter] start de geselecteerde clip"
 "Clip: [LMB] selects it, drag moves it ([Ctrl] copies)  [2xLMB] opens it  [RMB] clip menu" = "Clip: [LMB] selecteert hem, slepen verplaatst hem ([Ctrl] kopieert)  [2xLMB] opent hem  [RMB] clipmenu"
 "(Follow Action)" = "(Vervolgactie)"
+"Auto scrolling pauses on a scroll or an edit" = "Automatisch scrollen pauzeert bij scrollen of bewerken"

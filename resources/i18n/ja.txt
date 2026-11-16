@@ -10158,3 +10158,4 @@ countries: jp
 "Clip Launch button: [LMB] launches the clip (at the launch quantisation)  [Enter] launches the selected clip" = "クリップローンチボタン: [LMB] クリップをローンチ (ローンチクオンタイズで)  [Enter] 選択中のクリップをローンチ"
 "Clip: [LMB] selects it, drag moves it ([Ctrl] copies)  [2xLMB] opens it  [RMB] clip menu" = "クリップ: [LMB] 選択、ドラッグで移動 ([Ctrl] でコピー)  [2xLMB] 開く  [RMB] クリップメニュー"
 "(Follow Action)" = "(フォローアクション)"
+"Auto scrolling pauses on a scroll or an edit" = "スクロールや編集で自動スクロールを一時停止"

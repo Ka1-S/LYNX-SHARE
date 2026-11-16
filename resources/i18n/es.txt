@@ -10158,3 +10158,4 @@ countries: es mx ar co cl pe ve
 "Clip Launch button: [LMB] launches the clip (at the launch quantisation)  [Enter] launches the selected clip" = "Botón de lanzamiento de clip: [LMB] lanza el clip (con la cuantización de lanzamiento)  [Enter] lanza el clip seleccionado"
 "Clip: [LMB] selects it, drag moves it ([Ctrl] copies)  [2xLMB] opens it  [RMB] clip menu" = "Clip: [LMB] lo selecciona, arrastrar lo mueve ([Ctrl] copia)  [2xLMB] lo abre  [RMB] menú de clip"
 "(Follow Action)" = "(Acción siguiente)"
+"Auto scrolling pauses on a scroll or an edit" = "El desplazamiento automático se pausa al desplazar o editar"

@@ -10158,3 +10158,4 @@ countries: tw hk mo
 "Clip Launch button: [LMB] launches the clip (at the launch quantisation)  [Enter] launches the selected clip" = "片段啟動按鈕：[LMB] 啟動片段（按啟動量化）  [Enter] 啟動選取的片段"
 "Clip: [LMB] selects it, drag moves it ([Ctrl] copies)  [2xLMB] opens it  [RMB] clip menu" = "片段：[LMB] 選取，拖曳可移動（[Ctrl] 複製）  [2xLMB] 開啟  [RMB] 片段選單"
 "(Follow Action)" = "（跟隨動作）"
+"Auto scrolling pauses on a scroll or an edit" = "捲動或編輯時暫停自動捲動"

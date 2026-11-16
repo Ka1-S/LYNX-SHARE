@@ -1874,6 +1874,7 @@ void PianoRollComponent::beginTimeZoom (const juce::MouseEvent& e)
 
 void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
 {
+    followEditStamp = engine.getPublishCount(); // (round 190im, R15)
     if (engine.getSong().channels.empty())
         return;
 
@@ -2766,6 +2767,7 @@ void PianoRollComponent::postDragHint (const juce::MouseEvent& e)
 
 void PianoRollComponent::mouseUp (const juce::MouseEvent& e)
 {
+    EditorGlobals::get().pauseFollowIfEdited (EditorGlobals::FollowView::pianoRoll, followEditStamp, engine.getPublishCount()); // (round 190im, R15)
     ui::clearPostedHint();
     if (drag == Drag::eventPaneBar) // round 190fz: remembered once the drag ends
         saveEventPaneState();
@@ -4431,6 +4433,10 @@ void PianoRollComponent::nudge (std::int64_t ticks, int keys)
 
 bool PianoRollComponent::handleKey (const juce::KeyPress& key)
 {
+    // round 190im (R15): a key that changed the song is an edit by hand: Follow pauses (when that option is on)
+    const juce::ScopeGuard followEdit { [this, before = engine.getPublishCount()] {
+        EditorGlobals::get().pauseFollowIfEdited (EditorGlobals::FollowView::pianoRoll, before, engine.getPublishCount());
+    } };
     const auto mods = key.getModifiers();
     const auto cmd = mods.isCommandDown();
     const auto alt = mods.isAltDown();
@@ -4807,6 +4813,13 @@ bool PianoRollComponent::playheadFrame (double)
     auto& transport = engine.getTransport();
     auto tick = -1.0;
     const auto playing = transport.playing.load();
+    // round 190im (R15): a scroll by hand while playing (sideways, same zoom, not by Follow) pauses Follow
+    auto& globals = EditorGlobals::get();
+    globals.noteTransport (playing);
+    if (playing && scrollTicks != followSeenScroll && pixelsPerTick == followSeenZoom)
+        globals.pauseFollow (EditorGlobals::FollowView::pianoRoll);
+    followSeenScroll = scrollTicks;
+    followSeenZoom = pixelsPerTick;
 
     // the playhead shows while the edited pattern plays: Pattern mode, or a clip of it in Song mode (round 162);
     // stopped in Step edit too (round 170e5): it is where the next played note goes (FL enters step-edit notes at the
@@ -4852,9 +4865,10 @@ bool PianoRollComponent::playheadFrame (double)
         const auto newStart = transportedit::followViewStartInLoop (scrollTicks, grid.getWidth() / pixelsPerTick, tick, 20.0 / pixelsPerTick,
                                                                     20.0 / pixelsPerTick, loopTicks);
 
-        if (EditorGlobals::get().isFollowing (true) && tick >= 0.0 && newStart != scrollTicks && drag == Drag::none)
+        if (EditorGlobals::get().followsNow (EditorGlobals::FollowView::pianoRoll) && tick >= 0.0 && newStart != scrollTicks && drag == Drag::none)
         {
             scrollTicks = newStart;
+            followSeenScroll = scrollTicks; // (round 190im: not a scroll by hand)
             updateScrollBars();
             repaint();
         }

@@ -10158,3 +10158,4 @@ countries: it ch sm
 "Clip Launch button: [LMB] launches the clip (at the launch quantisation)  [Enter] launches the selected clip" = "Pulsante Lancia clip: [LMB] lancia la clip (alla quantizzazione di lancio)  [Enter] lancia la clip selezionata"
 "Clip: [LMB] selects it, drag moves it ([Ctrl] copies)  [2xLMB] opens it  [RMB] clip menu" = "Clip: [LMB] la seleziona, trascinare la sposta ([Ctrl] copia)  [2xLMB] la apre  [RMB] menu clip"
 "(Follow Action)" = "(Azione successiva)"
+"Auto scrolling pauses on a scroll or an edit" = "Lo scorrimento automatico si ferma con uno scorrimento o una modifica"

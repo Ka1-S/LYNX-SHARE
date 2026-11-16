@@ -4563,6 +4563,7 @@ ui::Hint PlaylistComponent::hoverForSnapshot()
 
 void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
 {
+    followEditStamp = engine.getPublishCount(); // (round 190im, R15)
     downMods = e.mods;
     startedOnEmpty = erasedSomething = holdExpired = false;
     dragCopies = false;
@@ -6159,6 +6160,8 @@ void PlaylistComponent::postDragHint()
 
 void PlaylistComponent::mouseUp (const juce::MouseEvent& e)
 {
+    // round 190im (R15): a gesture that changed the song is an edit by hand: Follow pauses (when that option is on)
+    EditorGlobals::get().pauseFollowIfEdited (EditorGlobals::FollowView::playlist, followEditStamp, engine.getPublishCount());
     if (drag == Drag::headerSelect && headerCtrlPending)
     {
         // LYNX extra (issue #163; FL has no Ctrl+click toggle): Ctrl+click adds / removes the track, its clips follow
@@ -10014,6 +10017,10 @@ void PlaylistComponent::duplicateSelection()
 
 bool PlaylistComponent::handleKey (const juce::KeyPress& key)
 {
+    // round 190im (R15): a key that changed the song is an edit by hand: Follow pauses (when that option is on)
+    const juce::ScopeGuard followEdit { [this, before = engine.getPublishCount()] {
+        EditorGlobals::get().pauseFollowIfEdited (EditorGlobals::FollowView::playlist, before, engine.getPublishCount());
+    } };
     const auto mods = key.getModifiers();
     const auto cmd = mods.isCommandDown();
     const auto code = key.getKeyCode();
@@ -11028,6 +11035,14 @@ bool PlaylistComponent::liveFrame (double nowMs)
     auto& transport = engine.getTransport();
     const auto& song = engine.getSong();
     const auto playing = transport.playing.load();
+    // round 190im (R15): a scroll by hand while playing (the view moved sideways at the same zoom, not by Follow) pauses
+    // Follow; a play or a stop lifts the pause
+    auto& globals = EditorGlobals::get();
+    globals.noteTransport (playing);
+    if (playing && scrollTicks != followSeenScroll && pixelsPerTick == followSeenZoom)
+        globals.pauseFollow (EditorGlobals::FollowView::playlist);
+    followSeenScroll = scrollTicks;
+    followSeenZoom = pixelsPerTick;
     auto tick = -1.0;
 
     // (between two audio blocks the playhead moves on at the song's tempo: smooth at 144 Hz, round 174e)
@@ -11067,9 +11082,10 @@ bool PlaylistComponent::liveFrame (double nowMs)
         const auto newStart = transportedit::followViewStart (scrollTicks, grid.getWidth() / pixelsPerTick, tick, 20.0 / pixelsPerTick,
                                                               20.0 / pixelsPerTick);
 
-        if (EditorGlobals::get().isFollowing (false) && playing && newStart != scrollTicks)
+        if (EditorGlobals::get().followsNow (EditorGlobals::FollowView::playlist) && playing && newStart != scrollTicks)
         {
             scrollTicks = newStart;
+            followSeenScroll = scrollTicks; // (round 190im: not a scroll by hand)
             updateScrollBars();
             repaint();
         }
