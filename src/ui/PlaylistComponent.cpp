@@ -5035,7 +5035,17 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
                     noteedit::soloGroup (s, track, count, &flsettings::trackSoloMemory(), flsettings::options().restoreStateAfterSolo.load());
                 });
             else
-                engine.editSong ([track] (Song& s) { noteedit::muteGroup (s, track); });
+            {
+                // (rollup 0.1.30: on linked headers, round 190ib, the LED is the insert's mute too)
+                std::vector<int> inserts;
+                if (linkedHeaders() || simpleHeaders)
+                    for (const auto t : noteedit::groupMuteSet (engine.getSong(), track))
+                    {
+                        inserts.resize ((std::size_t) juce::jmax ((int) inserts.size(), t + 1), -1);
+                        inserts[(std::size_t) t] = simpleInsert (t);
+                    }
+                engine.editSong ([track, inserts] (Song& s) { noteedit::muteGroup (s, track, inserts); });
+            }
             return;
         }
 

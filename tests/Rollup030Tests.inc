@@ -238,3 +238,30 @@ TEST (rollup030_helix_follows_channel_porta_and_mono)
     CHECK (std::abs (issue14::cents (ref, issue14::pitchAt (legato, 0.3)) + 700.0) < 10.0);
     CHECK (std::abs (issue14::cents (ref, issue14::pitchAt (legato, 1.1))) < 10.0);
 }
+
+// Rollup 0.1.30 step 4 (round 190jt): round 190jf's FL group mute (Alt+click a member's LED) on Playlist tracks linked
+// to the mixer (round 190ib), whose LED is the insert's mute as well: the clicked track's lit state flips, and a group
+// switched back on unmutes its linked inserts too, so every LED of the group goes out together.
+TEST (rollup030_group_mute_on_linked_tracks)
+{
+    using namespace lynx;
+    Song s;
+    s.mixer.resize (6);
+    s.playlistTracks.resize (4);
+    for (int t = 1; t <= 2; ++t)
+        s.playlistTracks[(std::size_t) t].grouped = true; // a group: track 0 and its members 1, 2; track 3 alone
+    const std::vector<int> inserts { 1, 2, -1, 3 };     // track 2 repeats track 1 (unassigned, round 190ib's "→ 1")
+    s.mixer[2].muted = true;                            // track 1's LED is lit by its insert
+    CHECK (noteedit::muteGroup (s, 1, inserts));        // lit → the group goes off: the Playlist tracks unmute ...
+    CHECK (! s.playlistTracks[0].muted && ! s.playlistTracks[1].muted && ! s.playlistTracks[2].muted);
+    CHECK (! s.mixer[1].muted && ! s.mixer[2].muted);   // ... and so do their linked inserts
+    CHECK (noteedit::muteGroup (s, 2, inserts));        // nothing lit → the whole group mutes (FL: the Playlist tracks)
+    CHECK (s.playlistTracks[0].muted && s.playlistTracks[1].muted && s.playlistTracks[2].muted && ! s.playlistTracks[3].muted);
+    CHECK (! s.mixer[3].muted);
+    CHECK (noteedit::muteGroup (s, 0, inserts));        // lit again → all go out
+    CHECK (! s.playlistTracks[0].muted && ! s.playlistTracks[1].muted && ! s.playlistTracks[2].muted);
+    // FL's groups (no link): as round 190jf
+    s.mixer[1].muted = true;
+    CHECK (noteedit::muteGroup (s, 0));
+    CHECK (s.playlistTracks[0].muted && s.mixer[1].muted);
+}

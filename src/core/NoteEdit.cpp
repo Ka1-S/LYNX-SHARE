@@ -1061,15 +1061,26 @@ std::vector<int> groupMuteSet (const Song& song, int track)
     return out;
 }
 
-bool muteGroup (Song& song, int track)
+bool muteGroup (Song& song, int track, const std::vector<int>& insertOf)
 {
     const auto set = groupMuteSet (song, track);
     if (set.empty())
         return false;
-    const auto muted = ! (track < (int) song.playlistTracks.size() && song.playlistTracks[(std::size_t) track].muted);
+    // (rollup 0.1.30) a linked header's insert: its mute lights the same LED
+    const auto insert = [&] (int t) {
+        const auto i = t >= 0 && t < (int) insertOf.size() ? insertOf[(std::size_t) t] : -1;
+        return i > 0 && i < (int) song.mixer.size() ? i : -1;
+    };
+    const auto lit = (track < (int) song.playlistTracks.size() && song.playlistTracks[(std::size_t) track].muted)
+                     || (insert (track) > 0 && song.mixer[(std::size_t) insert (track)].muted);
+    const auto muted = ! lit;
     auto& h = headers (song, set.back() + 1);
     for (const auto t : set)
+    {
         h[(std::size_t) t].muted = muted;
+        if (! muted && insert (t) > 0)
+            song.mixer[(std::size_t) insert (t)].muted = false;
+    }
     return true;
 }
 

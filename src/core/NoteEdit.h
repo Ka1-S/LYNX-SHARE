@@ -237,7 +237,11 @@ bool normalizeFolders (Song& song);
 // every other track is muted; on a group already playing alone everything plays again (or, with `restore`, what
 // played before). Both return false when the track is in no group.
 std::vector<int> groupMuteSet (const Song& song, int track);
-bool muteGroup (Song& song, int track);
+// `insertOf` (rollup 0.1.30, round 190jf × 190ib): the mixer insert a linked header's M button mutes (≤ 0: none), for
+// the Playlist tracks linked to the mixer. Their LED is lit by the track's mute or by the insert's, so the clicked
+// track's state is that lit state, and a group switched back on also unmutes its linked inserts: every LED of the
+// group goes out, as every LED came on. Empty: FL's groups (the Playlist mutes only).
+bool muteGroup (Song& song, int track, const std::vector<int>& insertOf = {});
 bool soloGroup (Song& song, int track, int trackCount, flsettings::SoloMemory* memory = nullptr, bool restore = false);
 // Moves `track` with its folder so that it starts at the old index `before` (count = to the end), at folder `depth`
 // (clamped to what the place allows: at most one deeper than the track above). The clips follow. Returns the track's
