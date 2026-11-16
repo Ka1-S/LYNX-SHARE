@@ -176,8 +176,10 @@ enum class InstrumentKind : std::uint8_t
                    // samplePath, deck B's in zones[0].path
     fpc,           // FL's FPC (round 190q, core/Fpc.h, core/FpcInstrument.h): the kit's FL state in pluginState, the files of its
                    // layers in `zones` (one per layer with a sample, in the state's order; only `path` is used)
-    pocketSuperSaw // Pocket SuperSaw (round 190by, core/PocketSuperSaw.h): FL Studio Mobile's SuperSaw module; its 59
-                   // values 0…1 in modelParams (FLM's parameter k + 1 at index k)
+    pocketSuperSaw, // Pocket SuperSaw (round 190by, core/PocketSuperSaw.h): FL Studio Mobile's SuperSaw module; its 59
+                    // values 0…1 in modelParams (FLM's parameter k + 1 at index k)
+    tetra           // Tetra (round 190hs, core/FmSynth.h): LYNX's own 4-operator FM synth (Live's Operator imports onto it);
+                    // its values in Operator's units in modelParams (fm::stateSize: parameters, then the user waves' partials)
 };
 
 // External plugin: format identifier (the app knows how to find the file) + saved state.

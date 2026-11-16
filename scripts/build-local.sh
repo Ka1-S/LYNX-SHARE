@@ -49,6 +49,8 @@ CORE="$CORE src/core/ThreeOsc.cpp"
 CORE="$CORE src/core/GmsMobile.cpp"
 # Pocket SuperSaw: FL Studio Mobile's SuperSaw (round 190by)
 CORE="$CORE src/core/PocketSuperSaw.cpp"
+# Tetra: LYNX's own FM synth and the import of Live's Operator onto it (round 190hs)
+CORE="$CORE src/core/FmSynth.cpp src/core/AlsDevicesFm.cpp"
 # FL Studio integration: plugin database and sample relocation (read-only)
 CORE="$CORE src/core/FlPluginDb.cpp"
 # missing files of an opened project: search and relocation (round 81)
@@ -266,6 +268,8 @@ $CXX $FLAGS $CORE $WAVPACK tests/RemotePatternEditsTests.cpp -o build-local/lynx
 $CXX $FLAGS src/flp/Flp.cpp tools/flpdump.cpp -o build-local/flpdump 2> >(grep -v 'glibc version' >&2)
 
 $CXX $FLAGS $CORE $WAVPACK tools/renderwav.cpp -o build-local/renderwav 2> >(grep -v 'glibc version' >&2)
+# a Live set, one WAV per MIDI track (round 190hs: the LYNX side of the Operator / Tetra quality gate)
+$CXX $FLAGS $CORE $WAVPACK tools/alsrender.cpp -o build-local/alsrender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS src/core/OggVorbis.cpp $(ls build-local/vorbis/*.o | tr '\n' ' ') tools/oggdecode.cpp -o build-local/oggdecode 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS $CORE $WAVPACK tools/comparewav.cpp -o build-local/comparewav 2> >(grep -v 'glibc version' >&2)
 # LYNX effects offline, the LYNX side of the third-party parity harness (round tp172b)
