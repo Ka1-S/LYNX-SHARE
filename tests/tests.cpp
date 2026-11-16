@@ -17855,3 +17855,5 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Livefix190jdATests.inc" // round 190jd: DirectWave zone map, Slicex deck Snap menu and play line
 #include "Livefix190jdBTests.inc" // round 190jd: the Clip View MPE tab as Live 12.4
 #include "Livefix190jdCTests.inc" // round 190jd: Mixer peak hold and Extra large list, Limiter / Maximus history
+#include "Folders190jfTests.inc" // round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Alt+drag)
+#include "DawProject190jfTests.inc" // round 190jf B22: DAWproject import / export (core/DawProject.h, core/ZipLite.h)

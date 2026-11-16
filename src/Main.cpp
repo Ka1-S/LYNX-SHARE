@@ -57,6 +57,8 @@
 #include "core/FlEffects.h"
 #include "core/FlpImport.h"
 #include "core/NoteEdit.h"
+#include "core/PlaylistTrackOps.h" // round 190jf (FoldersShot190jf.inc)
+#include "ui/DawProjectExport.h" // round 190jf (--dawprojcheck190jf)
 #include "core/MaximusFx.h"
 #include "core/ChainPresets.h"
 #include "core/GoalKnobs.h"
@@ -248,6 +250,7 @@
 #include "core/Links.h"
 
 #include <algorithm>
+#include <set> // (round 190jf: --dawprojcheck190jf)
 #include <atomic>
 #include <exception>
 #include <chrono>
@@ -2532,6 +2535,24 @@ public:
         if (args.contains ("--hdrshot190ft"))
         {
             setApplicationReturnValue (runHdrShot190ft (args[args.indexOf ("--hdrshot190ft") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+
+        // --dawprojcheck190jf <prefix> <project> (round 190jf, slice B22): export to DAWproject and open it again
+        if (args.contains ("--dawprojcheck190jf") && args.indexOf ("--dawprojcheck190jf") + 2 < args.size())
+        {
+            const auto at = args.indexOf ("--dawprojcheck190jf");
+            setApplicationReturnValue (runDawProjectCheck190jf (args[at + 1].unquoted(), juce::File (args[at + 2].unquoted())) ? 0 : 1);
+            quit();
+            return;
+        }
+
+        // --foldersshot190jf <prefix> <thief.flp> (round 190jf, slice B17): the Playlist's folders; prefix-checks.txt
+        if (args.contains ("--foldersshot190jf") && args.indexOf ("--foldersshot190jf") + 2 < args.size())
+        {
+            const auto at = args.indexOf ("--foldersshot190jf");
+            setApplicationReturnValue (runFoldersShot190jf (args[at + 1].unquoted(), juce::File (args[at + 2].unquoted())) ? 0 : 1);
             quit();
             return;
         }
@@ -15484,6 +15505,8 @@ private:
         juce::File (prefix + "-checks.txt").replaceWithText (report.joinIntoString ("\n") + "\nresult=" + (allOk ? "OK" : "FAIL") + "\n");
         return allOk;
     }
+
+#include "FoldersShot190jf.inc" // round 190jf (slice B17)
 
     // --userfixshot190ib (round 190ib): see the dispatch above
     bool runUserFixShot190ib (const juce::String& prefix)

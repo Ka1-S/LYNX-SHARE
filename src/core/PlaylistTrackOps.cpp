@@ -758,6 +758,7 @@ int cloneTracks (Song& song, const std::vector<int>& tracks, const CloneOptions&
         // grouping (+0x3e copied): a member's clone stays grouped (under the group it lands in); a header and its
         // members cloned together make a new group
         clone.grouped = info.grouped && at > 0;
+        clone.nest = clone.grouped ? info.nest : 0; // (round 190jf: a nested folder's clones keep their level)
         trackAt (song, at) = clone;
         if (! info.name.empty())
             song.playlistTracks[(std::size_t) at].name = uniqueTrackName (song, info.name, at);
@@ -828,6 +829,7 @@ int cloneTracks (Song& song, const std::vector<int>& tracks, const CloneOptions&
         }
         ++at;
     }
+    noteedit::normalizeFolders (song); // (round 190jf: a clone may land under a shallower track)
     return firstClone;
 }
 

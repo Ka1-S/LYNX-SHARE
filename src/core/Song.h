@@ -2284,6 +2284,11 @@ struct PlaylistTrack
     // ungrouped track above it (the group's header). `collapsed` on a header folds its members into thin rows.
     bool grouped = false;
     bool collapsed = false;
+    // Round 190jf (slice B17, LYNX's nested folders; FL's groups have one level): the extra nesting levels of a grouped
+    // track. Its folder depth is `grouped ? 1 + nest : 0` and it belongs to the nearest track above it with a smaller
+    // depth (core/NoteEdit.h › folders). 0 everywhere = FL's groups; a .flp gets them flattened. Saved apart
+    // ("playlistTrackNest") so an older LYNX opens the groups one level deep.
+    int nest = 0;
     // A comp track (round 177c, core/Comping.h): this group header is what plays, its grouped tracks are take lanes. Set
     // only by "Comp these takes"; a group of takes is an ordinary track group until then.
     bool compTrack = false;

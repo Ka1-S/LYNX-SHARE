@@ -10749,3 +10749,23 @@ countries: kr
 "GRAPH" = "그래프"
 "CURVE" = "곡선"
 "Display: FL's scrolling graph or LYNX's transfer curve  [LMB] switch (kept for this effect)" = "표시: FL의 스크롤 그래프 또는 LYNX의 전달 곡선  [LMB] 전환 (이 이펙트에 저장)"
+
+# --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
+"Hide collapsed grouped tracks" = "접힌 그룹 트랙 숨기기"
+"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "트랙: [LMB] 뮤트 / 뮤트 해제  [Ctrl][LMB] 또는 [RMB] 솔로  [Alt][LMB] 그룹 뮤트  [Alt][RMB] 그룹 솔로"
+"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "트랙: [LMB] 선택  [Ctrl][LMB] 추가 / 제거  [Ctrl] 드래그: 클립까지 포함한 트랙  [Shift][LMB] 범위  [RMB] 메뉴  [2xLMB] 클립 소스 열기  [Shift][Wheel] 위 / 아래로 이동  [Alt] 드래그: 그룹 안으로 / 그룹 밖으로"
+"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "트랙을 그룹과 함께 이동 중  [Alt] 오른쪽 / 왼쪽으로 드래그: 더 깊게 / 그룹 밖으로"
+"In a group, level {0}" = "그룹 안, 레벨 {0}"
+"Not in a group" = "그룹 밖"
+"Nest under the track above (a group in the group)" = "위 트랙 아래에 중첩 (그룹 안의 그룹)"
+"Move out of its group (one level up)" = "그룹에서 빼기 (한 레벨 위로)"
+"Hiding collapsed tracks" = "접힌 트랙 숨기기"
+"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "이 옵션은 Playlist의 접힌 트랙을 숨깁니다. 상위 트랙에 숨겨진 트랙을 여는 아래쪽 화살표가 표시됩니다. 계속할까요?"
+# --- Round 190jf: B22 DAWproject import / export
+"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
+"(imported from DAWproject)" = "(DAWproject에서 가져옴)"
+"Export DAWproject" = "DAWproject 내보내기"
+"The DAWproject file could not be written" = "DAWproject 파일을 쓸 수 없습니다"
+"Everything went over to the DAWproject file." = "모든 것이 DAWproject 파일로 옮겨졌습니다."
+"Not carried over or approximated:" = "옮기지 못했거나 근사한 항목:"
+"... and {0} more" = "... 외 {0}개"

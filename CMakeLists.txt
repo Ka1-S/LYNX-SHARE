@@ -69,6 +69,7 @@ add_library(lynx_core STATIC
     src/core/FlmDwSampler.cpp
     src/core/FlmSlicer.cpp
     src/core/AlsExport.cpp
+    src/core/DawProject.cpp src/core/ZipLite.cpp
     src/flp/FlpWrite.cpp
     src/core/Effects.cpp
     src/core/NoteEdit.cpp
@@ -549,6 +550,7 @@ if(LYNX_BUILD_APP)
         src/ui/ExportDialog.cpp
         src/ui/FlStudioExportDialog.cpp
         src/ui/AlsExportDialog.cpp
+        src/ui/DawProjectExport.cpp
         src/ui/GamepadInput.cpp
         src/ui/ControllerBridge.cpp
         src/ui/OtherAppsExport.cpp

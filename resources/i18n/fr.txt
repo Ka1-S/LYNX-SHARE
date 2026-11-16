@@ -10749,3 +10749,23 @@ countries: fr be ch ca lu
 "GRAPH" = "GRAPHE"
 "CURVE" = "COURBE"
 "Display: FL's scrolling graph or LYNX's transfer curve  [LMB] switch (kept for this effect)" = "Affichage : le graphe défilant de FL ou la courbe de transfert de LYNX  [LMB] basculer (conservé pour cet effet)"
+
+# --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
+"Hide collapsed grouped tracks" = "Masquer les pistes groupées repliées"
+"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "Piste : [LMB] muet / réactiver  [Ctrl][LMB] ou [RMB] solo  [Alt][LMB] muet du groupe  [Alt][RMB] solo du groupe"
+"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "Piste : [LMB] sélectionner  [Ctrl][LMB] ajouter / retirer  [Ctrl] glisser : pistes avec leurs clips  [Maj][LMB] plage  [RMB] menu  [2xLMB] ouvrir la source du clip  [Maj][Wheel] monter / descendre  [Alt] glisser : entrer dans / sortir d'un groupe"
+"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "Déplacement de la piste avec son groupe  [Alt] glisser à droite / à gauche : plus profond / hors du groupe"
+"In a group, level {0}" = "Dans un groupe, niveau {0}"
+"Not in a group" = "Hors groupe"
+"Nest under the track above (a group in the group)" = "Imbriquer sous la piste au-dessus (un groupe dans le groupe)"
+"Move out of its group (one level up)" = "Sortir de son groupe (un niveau plus haut)"
+"Hiding collapsed tracks" = "Masquer les pistes repliées"
+"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "Cette option masque les pistes repliées de la Playlist. La piste parente affichera une flèche vers le bas pour ouvrir les pistes masquées. Continuer ?"
+# --- Round 190jf: B22 DAWproject import / export
+"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
+"(imported from DAWproject)" = "(importé depuis DAWproject)"
+"Export DAWproject" = "Exporter en DAWproject"
+"The DAWproject file could not be written" = "Impossible d'écrire le fichier DAWproject"
+"Everything went over to the DAWproject file." = "Tout est passé dans le fichier DAWproject."
+"Not carried over or approximated:" = "Non repris ou approché :"
+"... and {0} more" = "... et {0} de plus"

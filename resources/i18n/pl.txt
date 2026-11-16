@@ -10749,3 +10749,23 @@ countries: pl
 "GRAPH" = "WYKRES"
 "CURVE" = "KRZYWA"
 "Display: FL's scrolling graph or LYNX's transfer curve  [LMB] switch (kept for this effect)" = "Wyświetlacz: przewijany wykres FL lub krzywa przenoszenia LYNX  [LMB] przełącz (zapamiętane dla tego efektu)"
+
+# --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
+"Hide collapsed grouped tracks" = "Ukryj zwinięte zgrupowane ścieżki"
+"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "Ścieżka: [LMB] wycisz / przywróć  [Ctrl][LMB] lub [RMB] solo  [Alt][LMB] wycisz grupę  [Alt][RMB] solo grupy"
+"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "Ścieżka: [LMB] zaznacz  [Ctrl][LMB] dodaj / usuń  [Ctrl] przeciągnij: ścieżki z ich klipami  [Shift][LMB] zakres  [RMB] menu  [2xLMB] otwórz źródło klipu  [Shift][Wheel] przesuń w górę / w dół  [Alt] przeciągnij: do grupy / z grupy"
+"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "Przenoszenie ścieżki z jej grupą  [Alt] przeciągnij w prawo / w lewo: głębiej / poza grupę"
+"In a group, level {0}" = "W grupie, poziom {0}"
+"Not in a group" = "Poza grupą"
+"Nest under the track above (a group in the group)" = "Zagnieźdź pod ścieżką powyżej (grupa w grupie)"
+"Move out of its group (one level up)" = "Wyjmij ze swojej grupy (poziom wyżej)"
+"Hiding collapsed tracks" = "Ukrywanie zwiniętych ścieżek"
+"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "Ta opcja ukrywa zwinięte ścieżki Playlisty. Ścieżka nadrzędna pokaże strzałkę w dół, aby otworzyć ukryte ścieżki. Kontynuować?"
+# --- Round 190jf: B22 DAWproject import / export
+"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
+"(imported from DAWproject)" = "(zaimportowano z DAWproject)"
+"Export DAWproject" = "Eksportuj DAWproject"
+"The DAWproject file could not be written" = "Nie udało się zapisać pliku DAWproject"
+"Everything went over to the DAWproject file." = "Wszystko trafiło do pliku DAWproject."
+"Not carried over or approximated:" = "Nieprzeniesione lub przybliżone:"
+"... and {0} more" = "... i jeszcze {0}"

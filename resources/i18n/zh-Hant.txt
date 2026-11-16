@@ -10749,3 +10749,23 @@ countries: tw hk mo
 "GRAPH" = "圖形"
 "CURVE" = "曲線"
 "Display: FL's scrolling graph or LYNX's transfer curve  [LMB] switch (kept for this effect)" = "顯示：FL 的捲動圖形或 LYNX 的傳輸曲線  [LMB] 切換（為此效果保存）"
+
+# --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
+"Hide collapsed grouped tracks" = "隱藏已摺疊的群組軌道"
+"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "軌道：[LMB] 靜音/取消靜音  [Ctrl][LMB] 或 [RMB] 獨奏  [Alt][LMB] 靜音整個群組  [Alt][RMB] 獨奏整個群組"
+"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "軌道：[LMB] 選取  [Ctrl][LMB] 加入 / 移除  [Ctrl] 拖曳：連同片段選取軌道  [Shift][LMB] 範圍  [RMB] 選單  [2xLMB] 開啟片段來源  [Shift][Wheel] 向上 / 向下移動  [Alt] 拖曳：移入 / 移出群組"
+"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "正在連同群組移動軌道  [Alt] 向右 / 向左拖曳：更深一層 / 移出群組"
+"In a group, level {0}" = "在群組中，第 {0} 層"
+"Not in a group" = "不在群組中"
+"Nest under the track above (a group in the group)" = "巢狀放到上方軌道之下（群組中的群組）"
+"Move out of its group (one level up)" = "移出所在群組（上移一層）"
+"Hiding collapsed tracks" = "隱藏已摺疊的軌道"
+"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "此選項會隱藏 Playlist 中已摺疊的軌道。父軌道會顯示一個向下箭頭，用來展開隱藏的軌道。要繼續嗎？"
+# --- Round 190jf: B22 DAWproject import / export
+"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
+"(imported from DAWproject)" = "（從 DAWproject 匯入）"
+"Export DAWproject" = "匯出 DAWproject"
+"The DAWproject file could not be written" = "無法寫入 DAWproject 檔案"
+"Everything went over to the DAWproject file." = "所有內容都已寫入 DAWproject 檔案。"
+"Not carried over or approximated:" = "未帶過去或近似處理的內容："
+"... and {0} more" = "……還有 {0} 項"
