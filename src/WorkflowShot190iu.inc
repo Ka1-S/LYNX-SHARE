@@ -107,7 +107,7 @@
         const auto& song = [&]() -> const Song& { return engine.getSong(); };
         const auto snap = [&] (const juce::String& name, int rows) {
             const auto bottom = pl.trackRowForSnapshot (juce::jmin (rows, pl.numTracksForSnapshot() - 1)).getY();
-            savePng (pl.createComponentSnapshot ({ 0, 0, juce::jmin (pl.getWidth(), 1000), juce::jmin (pl.getHeight(), bottom + 12) }), prefix + name);
+            savePng (shot::snapshot (pl, juce::Rectangle<int> (0, 0, juce::jmin (pl.getWidth(), 1000), juce::jmin (pl.getHeight(), bottom + 12))), prefix + name);
         };
         snap ("-start.png", 9);
 
@@ -176,7 +176,7 @@
         {
             const auto area = ui.getToolStripAreaForSnapshot (true);
             if (! area.isEmpty())
-                savePng (ui.createComponentSnapshot (area.expanded (4)), prefix + "-temptool-held.png");
+                savePng (shot::snapshot (ui, area.expanded (4)), prefix + "-temptool-held.png");
         }
         hold.releaseNow (juce::Time::getMillisecondCounter() + 2000);
         check ("released_back_to_pencil", pl.currentTool() == EditTool::pencil && ! hold.holding());
@@ -258,6 +258,8 @@
         pl.repaint();
         snap ("-lanes-before.png", 9);
         check ("lanes_movable_clip", laneview::movableClips (song()).size() == 1);
+        saveMenus (juce::StringArray { "Playlist" }, std::vector<juce::PopupMenu> { ui.getPanelMenuForSnapshot (workspace::Panel::playlist) },
+                   prefix + "-playlist-menu-lanes.png");
         workflowextras::runAction ("playlist.clipsToLanes");
         engine.dispatchPendingMessages();
         check ("lanes_clip_moved_under_lead", song().playlistTracks[2].lanes.size() == 1
@@ -280,7 +282,7 @@
             engine.dispatchPendingMessages();
             check ("track_only_new_instrument_gets_a_track", ! trackmodes::instrumentTracksOf (song(), (int) channels).empty());
         }
-        savePng (ui.createComponentSnapshot (ui.getLocalBounds()), prefix + "-track-only.png");
+        savePng (shot::snapshot (ui, ui.getLocalBounds()), prefix + "-track-only.png");
         trackonly::setEnabled (false);
 
         // ---- 7. the Clip-launch layout: MIDI files on its arrangement and its grid (Live: always)
@@ -302,7 +304,7 @@
                 engine.dispatchPendingMessages();
                 check ("grid_slot_drop", ok && song().clipGrid.has_value() && launcher::clipAt (*song().clipGrid, free, 1) != nullptr);
                 gridView->setSize (juce::jmax (gridView->getWidth(), 900), juce::jmax (gridView->getHeight(), 420));
-                savePng (gridView->createComponentSnapshot (gridView->getLocalBounds()), prefix + "-grid-mid.png");
+                savePng (shot::snapshot (*gridView, gridView->getLocalBounds()), prefix + "-grid-mid.png");
             }
             snap ("-cliplaunch-mid.png", 9);
         }

@@ -2229,6 +2229,7 @@ public:
                 refresh(); // (what the app really did, e.g. an action that was refused)
             };
             styleNote (row.note, tr (std::string (item.note).c_str()));
+            row.note.setMinimumHorizontalScale (1.0f); // (round 190iu: a long note wraps instead of being squeezed onto one line)
             add (row.toggle);
             add (row.note);
         }
