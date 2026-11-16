@@ -3357,7 +3357,9 @@ void ChannelRackComponent::changeListenerCallback (juce::ChangeBroadcaster* sour
 
 juce::Rectangle<int> ChannelRackComponent::selectorBounds (int row) const
 {
-    return { stickyX + selectLeft() + 2, rowY (row) + 6, selectWidth - 4, rowHeight - 12 };
+    // the whole selector slot (round 190io's tall slot, y + 3 … rowHeight - 6, whose lit pill reaches y + 5: rollup 0.1.30,
+    // round 190iy; 190ih's bounds were the slim pill's, so a fading light left its top and bottom rows lit), 1 px around
+    return { stickyX + selectLeft(), rowY (row) + 2, selectWidth, rowHeight - 4 };
 }
 
 // round 190ih (PLAN R4, DC-8 / DE-6): one step of every channel's activity light; only the selectors whose shade
