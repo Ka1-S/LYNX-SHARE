@@ -10797,3 +10797,10 @@ countries: fr be ch ca lu
 "MIDI file {0}: a clip of pattern \"{1}\"" = "Fichier MIDI {0} : un clip du pattern « {1} »"
 "Delete (its clips and its channel)" = "Supprimer (avec ses clips et son canal)"
 "Delete (with its {0} clips)" = "Supprimer (avec ses {0} clips)"
+
+# --- rollup 0.1.30 step 4: Save a copy for 0.1.28 knows rounds 190jh / 190jl / 190jg / 190jf / 190jd
+"Facet EQ's automatic dynamic thresholds play with the bands' manual threshold: {0}" = "Les seuils dynamiques automatiques de Facet EQ jouent avec le seuil manuel des bandes : {0}"
+"MIDI Out channels and plugins' MIDI output reach only plugins in this release, not hardware MIDI outputs: {0}" = "Les canaux MIDI Out et la sortie MIDI des plugins n'atteignent que des plugins dans cette version, pas les sorties MIDI matérielles : {0}"
+"Automation of hosted CLAP and VST3 plugins changes once per 128 samples in this release (0.1.30 places each change at its own sample)" = "L'automation des plugins CLAP et VST3 hébergés change une fois tous les 128 échantillons dans cette version (0.1.30 place chaque changement sur son propre échantillon)"
+"{0} track(s) in nested Playlist folders open one level deep" = "{0} piste(s) dans des dossiers imbriqués de la Playlist s'ouvrent sur un seul niveau"
+"Fruity Limiter's CURVE view (its display shows the scrolling graph): {0}" = "La vue CURVE de Fruity Limiter (son affichage montre le graphe défilant) : {0}"

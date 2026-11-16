@@ -10797,3 +10797,10 @@ countries: cn sg
 "MIDI file {0}: a clip of pattern \"{1}\"" = "MIDI 文件 {0}：样式“{1}”的剪辑"
 "Delete (its clips and its channel)" = "删除（连同其剪辑和通道）"
 "Delete (with its {0} clips)" = "删除（连同其 {0} 个剪辑）"
+
+# --- rollup 0.1.30 step 4: Save a copy for 0.1.28 knows rounds 190jh / 190jl / 190jg / 190jf / 190jd
+"Facet EQ's automatic dynamic thresholds play with the bands' manual threshold: {0}" = "Facet EQ 的自动动态阈值将以各频段的手动阈值播放：{0}"
+"MIDI Out channels and plugins' MIDI output reach only plugins in this release, not hardware MIDI outputs: {0}" = "在此版本中，MIDI Out 通道和插件的 MIDI 输出只送到插件，不送到硬件 MIDI 输出：{0}"
+"Automation of hosted CLAP and VST3 plugins changes once per 128 samples in this release (0.1.30 places each change at its own sample)" = "在此版本中，托管的 CLAP 和 VST3 插件的自动化每 128 个采样变化一次（0.1.30 将每个变化放在其自己的采样上）"
+"{0} track(s) in nested Playlist folders open one level deep" = "嵌套 Playlist 文件夹中的 {0} 条轨道以一层打开"
+"Fruity Limiter's CURVE view (its display shows the scrolling graph): {0}" = "Fruity Limiter 的 CURVE 视图（其显示为滚动图形）：{0}"

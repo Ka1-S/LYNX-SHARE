@@ -6337,6 +6337,36 @@ private:
             auto luxeSlot = lynx::makeEffectSlot (lynx::EffectKind::luxeVerb);
             luxeSlot.params[(std::size_t) lynx::luxeVerbSpaceDucking] = 0.5f;
             song.mixer[7].effects.push_back (luxeSlot);
+            // rollup step 4 (round 190jt): Facet's automatic threshold (190jh), a MIDI Out channel (190jl), a hosted VST3's
+            // automated parameter (190jg), a nested Playlist folder (190jf), the Limiter's CURVE view (190jd)
+            auto facetSlot = lynx::makeEffectSlot (lynx::EffectKind::facetEq);
+            facetSlot.params[(std::size_t) lynx::facet::autoThresholdParam0 + 2] = 1.0f;
+            song.mixer[8].effects.push_back (facetSlot);
+            auto limiterSlot = lynx::makeEffectSlot (lynx::EffectKind::fruityLimiter);
+            limiterSlot.displayView = 1;
+            song.mixer[9].effects.push_back (limiterSlot);
+            lynx::ChannelDef midiOut;
+            midiOut.name = "Hardware";
+            midiOut.instrument = lynx::InstrumentKind::midiOut;
+            song.channels.push_back (midiOut);
+            lynx::ChannelDef hosted;
+            hosted.name = "Hosted";
+            hosted.instrument = lynx::InstrumentKind::plugin;
+            hosted.plugin.id = "VST3-Test Synth-1a2b3c4d-5e6f7a8b";
+            hosted.plugin.name = "Test Synth";
+            song.channels.push_back (hosted);
+            lynx::Automation pluginKnob;
+            pluginKnob.name = "Test Synth - Cutoff";
+            pluginKnob.target.kind = lynx::AutomationTargetKind::channelParam;
+            pluginKnob.target.index = (int) song.channels.size() - 1;
+            pluginKnob.target.param = 3;
+            pluginKnob.points = { { 0, 0.1f }, { 1920, 0.9f } };
+            song.automations.push_back (pluginKnob);
+            if (song.playlistTracks.size() < 4)
+                song.playlistTracks.resize (4);
+            song.playlistTracks[1].grouped = true;
+            song.playlistTracks[2].grouped = true;
+            song.playlistTracks[2].nest = 1;
 
             const auto copy = lynx::olderlynx::forRelease (song, "0.1.28");
             juce::String why;
@@ -6417,13 +6447,22 @@ private:
                                   + (said ("Complex Pro and Texture transpositions") ? "" : "transpose ") + (said ("Warped samples do not follow") ? "" : "tempo");
             else if (copy.json.contains ("\"inactive\"") || ! said ("{0} deactivated clip slot(s)"))
                 rollup030Result = "ERROR deactivated slots";
+            else if (! said ("Facet EQ's automatic dynamic thresholds") || parsed["mixer"][8]["effects"][0]["params"].size() > lynx::facet::autoThresholdParam0)
+                rollup030Result = "ERROR Facet automatic threshold";
+            else if (! said ("MIDI Out channels and plugins' MIDI output") || ! said ("Automation of hosted CLAP and VST3 plugins"))
+                rollup030Result = juce::String ("ERROR engine notes ") + (said ("MIDI Out channels") ? "" : "midi-out ") + (said ("Automation of hosted") ? "" : "timed");
+            else if (copy.json.contains ("playlistTrackNest") || copy.json.contains ("displayView") || ! said ("{0} track(s) in nested Playlist folders")
+                     || ! said ("Fruity Limiter's CURVE view"))
+                rollup030Result = "ERROR step-4 view items";
             else if (const auto plain = lynx::olderlynx::forRelease (lynx::Song::makeDefault(), "0.1.28");
                      ! plain.ok || std::any_of (plain.lost.begin(), plain.lost.end(), [] (const lynx::olderlynx::Loss& l) {
                          const auto t = juce::String (l.text);
                          return t.startsWith ("Tetra") || t.contains ("MPE") || t.contains ("Pattern Block") || t.contains ("Voice Shift")
                                 || t.contains ("Ridge") || t.contains ("Hush") || t.startsWith ("Automation clip colours") || t.startsWith ("Mix snapshots")
                                 || t.startsWith ("Helix") || t.contains ("Echoform") || t.contains ("Halo") || t.contains ("Lattice") || t.contains ("LuxeVerb")
-                                || t.contains ("Texture") || t.contains ("Beats'") || t.startsWith ("Warped") || t.contains ("deactivated");
+                                || t.contains ("Texture") || t.contains ("Beats'") || t.startsWith ("Warped") || t.contains ("deactivated")
+                                || t.contains ("Facet") || t.contains ("MIDI Out") || t.contains ("hosted CLAP") || t.contains ("nested Playlist")
+                                || t.contains ("CURVE");
                      }))
                 rollup030Result = "ERROR a plain project reports a loss it does not have";
         }

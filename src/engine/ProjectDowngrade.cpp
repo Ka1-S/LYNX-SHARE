@@ -4,6 +4,7 @@
 
 #include "core/DirectWaveState.h"
 #include "core/EchoSuite.h"
+#include "core/FacetEq.h"
 #include "core/LuxeVerb.h"
 #include "core/LynxVerbs.h"
 #include "core/MixSuite.h"
@@ -384,8 +385,94 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
             lost.push_back ({ TR_NOOP ("{0} deactivated clip slot(s) play again"), juce::String (inactive), true });
     }
 
+    // rollup step 4, round 190jh: Facet EQ's automatic dynamic thresholds (hidden parameters past its count; 0.1.28 plays
+    // those bands with their manual threshold)
+    {
+        juce::StringArray autoBands;
+        forEachEffect (root, [&] (juce::DynamicObject& e, const juce::String& where) {
+            auto* params = arrayOf (e.getProperty ("params"));
+            if (params == nullptr || e.getProperty ("kind").toString() != "facetEq" || params->size() <= facet::autoThresholdParam0)
+                return;
+            for (int b = 0; b < 8 && facet::autoThresholdParam0 + b < params->size(); ++b)
+                if ((float) (double) (*params)[facet::autoThresholdParam0 + b] >= 0.5f)
+                    addOnce (autoBands, where);
+            params->removeRange (facet::autoThresholdParam0, params->size() - facet::autoThresholdParam0);
+        });
+        if (! autoBands.isEmpty())
+            lost.push_back ({ TR_NOOP ("Facet EQ's automatic dynamic thresholds play with the bands' manual threshold: {0}"), listOf (autoBands), true });
+    }
+
+    // rollup step 4, round 190jl: MIDI Out channels and the plugin wrappers' Output port reach hardware MIDI outputs from
+    // 0.1.30 on (0.1.28 sends them to plugins on that port only); engine behaviour, nothing to drop
+    {
+        juce::StringArray hardware;
+        forEachChannel (root, [&] (juce::DynamicObject& c, int i) {
+            // (the wrapper's "midiOutPort" is written only when it has a port)
+            if (c.getProperty ("instrument").toString() == "midiOut" || c.getProperty ("plugin").hasProperty ("midiOutPort"))
+                addOnce (hardware, channelName (juce::var (&c), i));
+        });
+        if (! hardware.isEmpty())
+            lost.push_back ({ TR_NOOP ("MIDI Out channels and plugins' MIDI output reach only plugins in this release, not hardware MIDI outputs: {0}"), listOf (hardware), true });
+    }
+
+    // rollup step 4, round 190jg: sample-accurate automation of hosted CLAP / VST3 plugins (0.1.28 applies a change once
+    // per piece of up to 128 samples); engine behaviour, reported when automation drives such a plugin's parameter
+    {
+        const auto hosted = [] (const juce::var& plugin) {
+            const auto id = plugin["id"].toString();
+            return id.startsWith ("VST3-") || id.startsWith ("CLAP-");
+        };
+        bool timed = false;
+        std::function<void (const juce::var&)> walk = [&] (const juce::var& v) {
+            if (timed)
+                return;
+            if (auto* a = arrayOf (v))
+            {
+                for (const auto& item : *a)
+                    walk (item);
+                return;
+            }
+            auto* o = objectOf (v);
+            if (o == nullptr)
+                return;
+            if (const auto& target = o->getProperty ("target"); target.isArray() && target.size() >= 4)
+            {
+                const auto kind = target[0].toString();
+                const auto index = (int) target[1], slot = (int) target[2];
+                if (kind == "channelParam")
+                    timed = root["channels"][index]["instrument"].toString() == "plugin" && hosted (root["channels"][index]["plugin"]);
+                else if (kind == "effectParam")
+                    timed = root["mixer"][index]["effects"][slot]["kind"].toString() == "plugin" && hosted (root["mixer"][index]["effects"][slot]["plugin"]);
+            }
+            for (const auto& p : o->getProperties())
+                walk (p.value);
+        };
+        walk (root["automations"]);
+        walk (root["patterns"]);
+        walk (root["playlistTracks"]);
+        if (timed)
+            lost.push_back ({ TR_NOOP ("Automation of hosted CLAP and VST3 plugins changes once per 128 samples in this release (0.1.30 places each change at its own sample)"), {}, true });
+    }
+
     // the view
     {
+        // rollup step 4: round 190jf's nested Playlist folders (0.1.28 opens the groups one level deep), round 190jd's
+        // second display view of an effect (Fruity Limiter's CURVE; 0.1.28 shows its one view)
+        if (auto* nests = arrayOf (root["playlistTrackNest"]))
+        {
+            const auto count = nests->size();
+            drop (o, "playlistTrackNest");
+            if (count > 0)
+                lost.push_back ({ TR_NOOP ("{0} track(s) in nested Playlist folders open one level deep"), juce::String (count), false });
+        }
+        juce::StringArray views;
+        forEachEffect (root, [&] (juce::DynamicObject& e, const juce::String& where) {
+            if (drop (e, "displayView"))
+                addOnce (views, where);
+        });
+        if (! views.isEmpty())
+            lost.push_back ({ TR_NOOP ("Fruity Limiter's CURVE view (its display shows the scrolling graph): {0}"), listOf (views), false });
+
         bool colours = false;
         if (auto* automations = arrayOf (root["automations"]))
             for (auto& a : *automations)

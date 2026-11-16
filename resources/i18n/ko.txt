@@ -10797,3 +10797,10 @@ countries: kr
 "MIDI file {0}: a clip of pattern \"{1}\"" = "MIDI 파일 {0}: 패턴 \"{1}\"의 클립"
 "Delete (its clips and its channel)" = "삭제 (클립과 채널 포함)"
 "Delete (with its {0} clips)" = "삭제 (클립 {0}개 포함)"
+
+# --- rollup 0.1.30 step 4: Save a copy for 0.1.28 knows rounds 190jh / 190jl / 190jg / 190jf / 190jd
+"Facet EQ's automatic dynamic thresholds play with the bands' manual threshold: {0}" = "Facet EQ의 자동 다이내믹 임계값은 밴드의 수동 임계값으로 재생됩니다: {0}"
+"MIDI Out channels and plugins' MIDI output reach only plugins in this release, not hardware MIDI outputs: {0}" = "이 릴리스에서는 MIDI Out 채널과 플러그인의 MIDI 출력이 플러그인에만 전달되고 하드웨어 MIDI 출력에는 전달되지 않습니다: {0}"
+"Automation of hosted CLAP and VST3 plugins changes once per 128 samples in this release (0.1.30 places each change at its own sample)" = "이 릴리스에서는 호스팅된 CLAP 및 VST3 플러그인의 오토메이션이 128샘플마다 한 번 바뀝니다 (0.1.30은 각 변화를 해당 샘플에 둡니다)"
+"{0} track(s) in nested Playlist folders open one level deep" = "중첩된 Playlist 폴더의 트랙 {0}개가 한 단계로 열립니다"
+"Fruity Limiter's CURVE view (its display shows the scrolling graph): {0}" = "Fruity Limiter의 CURVE 보기 (화면에는 흐르는 그래프가 표시됩니다): {0}"
