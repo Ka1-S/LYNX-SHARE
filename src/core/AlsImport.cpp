@@ -355,6 +355,16 @@ std::optional<ForeignPlugin> pluginOf (const Element& device)
     return std::nullopt;
 }
 
+// A plugin device's "MPE Mode" (round 190hy) → PluginRef::mpe [SKELETON, Live 11 / 12: PluginDevice/MpeEnabled
+// "true" / "false"; the preset copy (Vst3Preset / VstPreset/MpeEnabled) is an int, 0 in every save seen, read as a fallback]
+bool pluginMpeOf (const Element& device)
+{
+    if (device.child ("MpeEnabled"))
+        return device.boolean ("MpeEnabled", false);
+    return device.number ("PluginDesc/Vst3PluginInfo/Preset/Vst3Preset/MpeEnabled", 0) != 0
+           || device.number ("PluginDesc/VstPluginInfo/Preset/VstPreset/MpeEnabled", 0) != 0;
+}
+
 // Live's instrument devices [DATA: the device tags in the shipped sets]
 bool isInstrumentDevice (std::string_view tag)
 {
@@ -731,6 +741,7 @@ int rackDeviceFrom (Ctx& ctx, const Element& d, PatcherDoc& doc, int chain, bool
             node.channel.instrument = InstrumentKind::plugin;
             node.channel.plugin.name = p->name;
             node.channel.plugin.foreign = *p;
+            node.channel.plugin.mpe = pluginMpeOf (d);
             node.channel.name = p->name;
         }
         else
@@ -1106,6 +1117,7 @@ bool instrumentFrom (Ctx& ctx, const Element& device, ChannelDef& channel, std::
             channel.instrument = InstrumentKind::plugin;
             channel.plugin.name = p->name;
             channel.plugin.foreign = *p;
+            channel.plugin.mpe = pluginMpeOf (device);
             ctx.note (&FlpImportReport::converted, "Plugin: " + p->name);
             // (round 190ed) envelopes on the plugin's parameters (the track's own instrument only)
             if (depth == 0 && ! ctx.inDrumPad)
@@ -1603,6 +1615,66 @@ std::optional<projectkey::Key> liveScaleOf (const Element& owner)
     return livescales::keyFor ((int) info.number ("Root", info.number ("RootNote", 0)), index);
 }
 
+// Live's per-note expression (MPE stage 2, issue #108, round 190hy; core/NoteCurves.h) [DATA: the 5491 lists of Live 12
+// Suite's "Patience" demo set]: Notes/PerNoteEventStore/EventLists/PerNoteEventList{@NoteId, @CC}/Events/PerNoteEvent
+// {@TimeOffset (beats from the note's start), @Value [, @CurveControl1X/1Y/2X/2Y]}. CC −2 = pitch bend in units of
+// 8191.5 / 48 per semitone (−1706.5625 = −10 st, 1194.59375 = +7 st), 74 = slide 0…127, −1 = pressure 0…127.
+// The curve controls (Live 12) bend the segment that starts at their event: a cubic Bézier from (0, 0) to (1, 1) in
+// that segment's normalised (time, value) space (2227 of the 5491 first events carry them, only 44 last ones: those
+// shape nothing and are ignored). LYNX's lanes are linear, so a curved segment is flattened into eight steps.
+std::map<int, NoteCurves> perNoteCurvesOf (const Element& clip)
+{
+    std::map<int, NoteCurves> out;
+    for (const auto& list : clip.path ("Notes/PerNoteEventStore/EventLists").children ("PerNoteEventList"))
+    {
+        const auto cc = (int) numberAttr (list, "CC", 0);
+        if (cc != -2 && cc != 74 && cc != -1)
+            continue; // (no other CC in the data)
+        const auto lane = cc == -2 ? NoteCurveLane::pitch : cc == 74 ? NoteCurveLane::timbre : NoteCurveLane::pressure;
+        const auto valueOf = [cc] (double v) {
+            if (cc == -2)
+                return (float) (v * (double) notecurves::maxPitchCents / 8191.5);
+            v = std::clamp (v, 0.0, 127.0);
+            // slide: core/Mpe.h's modXOfTimbre law, unrounded (CC 74 at 64 = Mod X 0.5)
+            return cc == 74 ? (float) (v >= 64.0 ? 0.5 + (v - 64.0) / 126.0 : v / 128.0) : (float) (v / 127.0);
+        };
+        struct Event
+        {
+            double time, value;
+            bool curved;
+            double x1, y1, x2, y2;
+        };
+        std::vector<Event> events;
+        for (const auto& e : list.path ("Events").children ("PerNoteEvent"))
+            events.push_back ({ std::max (0.0, numberAttr (e, "TimeOffset")), numberAttr (e, "Value"), e.hasAttr ("CurveControl1X"),
+                                std::clamp (numberAttr (e, "CurveControl1X"), 0.0, 1.0), numberAttr (e, "CurveControl1Y"),
+                                std::clamp (numberAttr (e, "CurveControl2X", 1.0), 0.0, 1.0), numberAttr (e, "CurveControl2Y", 1.0) });
+        if (events.empty())
+            continue;
+        std::stable_sort (events.begin(), events.end(), [] (const Event& a, const Event& b) { return a.time < b.time; });
+        std::vector<NoteCurvePoint> points;
+        for (std::size_t i = 0; i < events.size(); ++i)
+        {
+            const auto& a = events[i];
+            points.push_back ({ (float) (a.time * ppq), valueOf (a.value) });
+            if (! a.curved || i + 1 >= events.size())
+                continue;
+            const auto& b = events[i + 1];
+            constexpr int steps = 8;
+            for (int k = 1; k < steps; ++k)
+            {
+                const auto s = (double) k / steps, r = 1.0 - s;
+                const auto x = 3.0 * r * r * s * a.x1 + 3.0 * r * s * s * a.x2 + s * s * s;
+                const auto y = 3.0 * r * r * s * a.y1 + 3.0 * r * s * s * a.y2 + s * s * s;
+                points.push_back ({ (float) ((a.time + (b.time - a.time) * x) * ppq), valueOf (a.value + (b.value - a.value) * y) });
+            }
+        }
+        // (a recorded take holds a point every few ms: keep what is needed within the lane's tolerance, as a recording does)
+        out[(int) numberAttr (list, "NoteId", -1)].lane (lane) = notecurves::thin (points, notecurves::thinTolerance (lane));
+    }
+    return out;
+}
+
 int patternFromMidiClip (Ctx& ctx, const Element& clip, int channel, double length, const ClipLoop* loopOverride = nullptr)
 {
     if (! ctx.clipKeySeen && clip.boolean ("IsInKey", false))
@@ -1630,6 +1702,7 @@ int patternFromMidiClip (Ctx& ctx, const Element& clip, int channel, double leng
         for (const auto& id : g.path ("Notes").children ("NoteId"))
             groupOfNote[(int) numberAttr (id, "NoteId", -1)] = group;
     }
+    const auto curvesOfNote = perNoteCurvesOf (clip);
     for (const auto& keyTrack : clip.path ("Notes/KeyTracks").children ("KeyTrack"))
     {
         const auto key = (int) keyTrack.number ("MidiKey", 60);
@@ -1637,6 +1710,7 @@ int patternFromMidiClip (Ctx& ctx, const Element& clip, int channel, double leng
         {
             const auto t = numberAttr (n, "Time"), d = numberAttr (n, "Duration", 0.25);
             const auto grouped = groupOfNote.find ((int) numberAttr (n, "NoteId", -1));
+            const auto curves = n.hasAttr ("NoteId") ? curvesOfNote.find ((int) numberAttr (n, "NoteId", -1)) : curvesOfNote.end();
             for (std::size_t passIndex = 0; passIndex < passes.size(); ++passIndex)
             {
                 const auto& pass = passes[passIndex];
@@ -1659,6 +1733,9 @@ int patternFromMidiClip (Ctx& ctx, const Element& clip, int channel, double leng
                     note.chanceOne = grouped->second.playOne;
                     note.chance = (float) grouped->second.chance;
                 }
+                // its expression (round 190hy); Live notes have no fine pitch, so the pitch lane is the bend alone
+                if (curves != curvesOfNote.end())
+                    note.curves = curves->second;
                 p.notes.push_back (note);
             }
         }

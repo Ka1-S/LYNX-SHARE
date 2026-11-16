@@ -3,6 +3,7 @@
 // Recording of notes played live (MIDI or PC keyboard) into the current pattern.
 // Runs on the UI thread; events arrive with the absolute transport position.
 
+#include <array>
 #include <cstdint>
 #include <map>
 #include <vector>
@@ -23,6 +24,11 @@ struct RecordedEvent
     // the "on" its fine pitch (cents) and Mod X, the "off" its Mod Y (the note's peak pressure)
     bool expression = false;
     float finePitch = 0.0f, modX = 0.5f, modY = 0.5f;
+    // MPE stage 2 (issue #108, core/NoteCurves.h): −1 = a note's "on" / "off"; 0..2 = a NoteCurveLane — the held note
+    // (channel, key)'s bend (`value` in cents) / timbre (0..1, Mod X law) / pressure (0..1) changed at `tick`. On an
+    // MPE note's "on", `value` = its whole bend in cents (finePitch is clamped to the piano roll's ±120).
+    std::int8_t lane = -1;
+    float value = 0.0f;
 };
 
 // Where an absolute transport position falls within the current pattern: in pattern mode,
@@ -297,9 +303,14 @@ private:
         float velocity;
         bool expression = false; // (issue #108: an MPE note's own fine pitch / Mod X / Mod Y)
         float finePitch = 0.0f, modX = 0.5f, modY = 0.5f;
+        // (MPE stage 2: the take's bend / timbre / pressure, ticks from the note's start; thinned into Note::curves)
+        std::array<std::vector<NoteCurvePoint>, noteCurveLaneCount> curve {};
     };
+    static constexpr std::size_t maxTakePoints = 20000; // per lane of one held note (the rest of a very long note is dropped)
 
     void finish (const Song& song, int channel, int key, const Held& held, double endTick);
+    static NoteCurvesRef takeCurves (const std::array<std::vector<NoteCurvePoint>, noteCurveLaneCount>& take, float finePitch, float modX,
+                                     double length);
     Note makeNote (const Song& song, int channel, int key, const Held& h, double endTick, std::int64_t& takeOrigin, bool& takeFromClip,
                    std::int64_t& takeReach) const;
 

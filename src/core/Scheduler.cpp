@@ -97,6 +97,69 @@ const ChannelDef* channelOf (const std::vector<ChannelDef>* channels, int channe
 {
     return channels != nullptr && channel >= 0 && channel < (int) channels->size() ? &(*channels)[(std::size_t) channel] : nullptr;
 }
+
+// MPE stage 2 (issue #108, core/NoteCurves.h): the note's expression `rel` ticks into it, as the voice takes it — the
+// note's own cents (fine pitch + its pitch curve), Mod X (its timbre curve, else its Mod X) and Mod Y (0.5 + pressure / 2
+// from its pressure curve, else its Mod Y)
+struct CurveValues
+{
+    float cents, modX, modY;
+};
+CurveValues curveValuesAt (const Note& note, double rel) noexcept
+{
+    const auto& c = *note.curves;
+    const auto& pressure = c.lane (NoteCurveLane::pressure);
+    return { note.finePitch + c.valueAt (NoteCurveLane::pitch, rel, 0.0f), c.valueAt (NoteCurveLane::timbre, rel, note.modX),
+             pressure.empty() ? note.modY : 0.5f + 0.5f * c.valueAt (NoteCurveLane::pressure, rel, 0.0f) };
+}
+
+// The voice property changes of a note with moving curves while it sounds in the block: one per moving lane at every
+// `step`-th sample of the song's sample grid (64 samples, coarser in long blocks so a block holds at most 16 per lane),
+// after the note's first sample and before its last. Live voice properties (NoteEvent::expression) that the renderer
+// gives the note's voices (Instrument::noteExpression): native engines move them, a hosted plugin with MPE on sends
+// them on the note's member channel. `occurrence` = the note's start in song ticks (this repetition of it).
+void emitCurves (const Note& note, double occurrence, std::int64_t length, double startTick, int numSamples, double tps,
+                 EventBuffer& out) noexcept
+{
+    constexpr std::uint8_t propPitch = 1, propModX = 3, propModY = 4; // vfx::Prop
+    const auto& c = *note.curves;
+    const bool lanes[3] = { c.moves (NoteCurveLane::pitch), c.moves (NoteCurveLane::timbre), c.moves (NoteCurveLane::pressure) };
+    if (! lanes[0] && ! lanes[1] && ! lanes[2])
+        return;
+    const auto first = std::nearbyint (startTick / tps);
+    const auto step = std::max (64, (numSamples + 15) / 16);
+    const auto from = std::max (0.0, std::floor (occurrence / tps - first) + 1.0);
+    const auto to = std::min ((double) numSamples - 1.0, std::ceil (((double) occurrence + (double) length) / tps - first) - 1.0);
+    if (to < from)
+        return;
+    const auto grid = (std::int64_t) first;
+    auto j = (std::int64_t) from;
+    if (const auto r = (grid + j) % step; r != 0)
+        j += step - (r < 0 ? r + step : r);
+    for (; (double) j <= to; j += step)
+    {
+        const auto rel = (double) (grid + j) * tps - occurrence;
+        if (rel <= 0.0 || rel >= (double) length)
+            continue;
+        const auto v = curveValuesAt (note, rel);
+        NoteEvent e;
+        e.type = NoteEvent::Type::voiceProp;
+        e.expression = true;
+        e.sampleOffset = (int) j;
+        e.channel = note.channel;
+        e.key = note.key;
+        e.colour = (std::int8_t) (note.colour & 15);
+        const float values[3] = { v.cents, v.modX, v.modY };
+        const std::uint8_t props[3] = { propPitch, propModX, propModY };
+        for (int lane = 0; lane < 3; ++lane)
+            if (lanes[lane])
+            {
+                e.prop = props[lane];
+                e.velocity = values[lane];
+                out.add (e);
+            }
+    }
+}
 } // namespace
 
 // FL's Misc › Time (REA round 146b [EXEC]): Shift delays a channel's notes (on and off), Gate cuts the long ones to its
@@ -190,6 +253,12 @@ void schedulePatternLoop (const Pattern& pattern,
         on.modY = note.modY;
         on.release = note.release;
         on.colour = (std::int8_t) (note.colour & 15);
+        const auto curved = note.curves.has(); // (issue #108: the note starts at its curves' first values)
+        if (curved)
+        {
+            const auto v = curveValuesAt (note, 0.0);
+            on.cents = v.cents, on.modX = v.modX, on.modY = v.modY;
+        }
         const auto timing = noteTiming (note, swing, channelOf (channels, note.channel));
         const auto start = timing.start;
 
@@ -212,7 +281,33 @@ void schedulePatternLoop (const Pattern& pattern,
             {
                 auto chased = on;
                 chased.velocity = velocity;
+                if (curved) // (it starts where its curves are at that point)
+                {
+                    const auto v = curveValuesAt (note, position - (double) start);
+                    chased.cents = v.cents, chased.modX = v.modX, chased.modY = v.modY;
+                }
                 out.add (chased);
+            }
+        }
+        if (curved)
+        {
+            // the note's repetitions sounding in this block (a loop: every pass; once: at the origin)
+            auto drawn = 0.0f;
+            if (linear)
+            {
+                if (roll == nullptr || chance::plays (*roll, 0, drawn))
+                    emitCurves (note, linearOrigin + (double) start, timing.length, startTick, numSamples, tps, out);
+            }
+            else
+            {
+                const auto len = (double) patternLength;
+                for (auto k = std::ceil ((startTick - (double) start - (double) timing.length) / len); (double) start + k * len < endTick; k += 1.0)
+                {
+                    auto velocity = 0.0f;
+                    if (roll != nullptr && ! chance::plays (*roll, (std::int64_t) k, velocity))
+                        continue;
+                    emitCurves (note, (double) start + k * len, timing.length, startTick, numSamples, tps, out);
+                }
             }
         }
 

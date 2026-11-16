@@ -191,7 +191,16 @@ public:
     ui::Hint hoverForSnapshot();
     // the lane box's note properties (ids; pattern event lanes follow from eventLaneIdBase)
     static constexpr int laneVelocity = 1, lanePan = 2, laneFinePitch = 3, laneRelease = 4, laneModX = 5, laneModY = 6, laneChance = 7,
-                         laneVelocityRange = 8, laneLast = 8;
+                         laneVelocityRange = 8,
+                         // MPE stage 2 (issue #108, core/NoteCurves.h): the notes' own pitch bend / slide / pressure curves
+                         laneMpePitch = 9, laneMpeSlide = 10, laneMpePressure = 11, laneLast = 11;
+    static constexpr bool isMpeLane (int id) noexcept { return id >= laneMpePitch && id <= laneMpePressure; }
+    // The Clip-launch layout's MPE tab (Live 11+'s note expression editor, round 190hy): the bottom lane becomes the three
+    // expression lanes stacked (pitch bend, slide, pressure) and the notes show their pitch curves
+    void setMpeView (bool on);
+    bool isMpeView() const noexcept { return mpeStacked; }
+    // (tests / snapshots: the lane rectangles shown and the edit target at x)
+    std::vector<std::pair<juce::Rectangle<int>, int>> mpeLaneAreasForTests() const { return mpeLaneAreas(); }
     // the bottom lane's property (laneVelocity … laneVelocityRange; round 187c)
     void setLaneForSnapshot (int id) { laneBox.setSelectedId (id, juce::sendNotificationSync); }
     // The divider between the note grid and the event editor (round 190fz, FL's TQuickSplitter; core/EventPaneSplit.h):
@@ -221,6 +230,8 @@ public:
         if (fitKeysToNotes == docked)
             return;
         fitKeysToNotes = docked;
+        if (! docked)
+            mpeStacked = false; // (round 190hy: the MPE tab's stacked lanes are the dock's)
         velocityHeight = docked ? compactVelocityHeight : defaultVelocityHeight;
         if (docked)
             undockedRowHeight = rowHeight;
@@ -248,7 +259,8 @@ public:
 private:
     enum class Drag { none, move, resize, resizeLeft, erase, keyboard, select, velocity, velocityLine, velocitySet, paint, muting, knife,
                       zoomRange, listen, pan, keyZoom, timeZoom, keySelect, rulerSelect, seek, drumPaint, stretch, eventDraw, eventErase,
-                      eventPaneBar, eventPaneAlternate }; // (round 190fz: dragging the divider; a right-click on it, swapped on release)
+                      eventPaneBar, eventPaneAlternate, // (round 190fz: dragging the divider; a right-click on it, swapped on release)
+                      mpePoint, mpeDraw, mpeErase }; // (round 190hy: a curve point moved, drawn, erased in an MPE lane)
 
     // Channel selector: the wheel steps through the channels with notes (Ctrl+wheel: all channels).
     class ChannelBox final : public juce::ComboBox
@@ -456,6 +468,26 @@ private:
     void postDragHint (const juce::MouseEvent& e); // what the gesture in progress does (hint bar)
     juce::uint32 lastWheelEdit = 0;    // wheel edits within a burst are one undo step
     std::vector<Note> laneOriginals;   // right-drag line / Shift+drag: the pattern's notes when it started
+
+    // MPE lanes (round 190hy, issue #108; core/NoteCurves.h). Lane ids are laneMpePitch … laneMpePressure.
+    bool mpeStacked = false;           // the Clip-launch MPE tab: three lanes stacked
+    int mpeDragLane = 0, mpeDragNote = -1, mpeDragPoint = -1, lastMpeX = 0, lastMpeY = 0;
+    float mpeDragRange = 1200.0f;      // the pitch lane's half range (cents) when the drag started (kept while it lasts)
+    juce::uint32 mpeCreatedAt = 0;     // a click that drew a point: the double click that follows does not delete it
+    std::vector<std::pair<juce::Rectangle<int>, int>> mpeLaneAreas() const; // (area, lane id) shown now; none = not an MPE lane
+    int mpeLaneAt (juce::Point<int> p, juce::Rectangle<int>* area = nullptr) const;
+    float mpePitchRange() const;       // half range of the pitch lane: ±12, ±24 or ±48 semitones, as the curves need
+    float mpeNorm (int lane, float value, float range) const noexcept;  // a curve value -> 0..1 of the lane's height
+    float mpeValue (int lane, float norm, float range) const noexcept;  // and back
+    static float mpeBase (int lane, const Note& n) noexcept;           // the lane's value without a curve
+    int mpeNoteAt (int x) const;       // the note an MPE lane edits at x: a selected one first, else the latest started
+    int mpePointAt (int note, int lane, juce::Rectangle<int> area, juce::Point<int> p, float range) const;
+    void paintMpeLane (juce::Graphics& g, juce::Rectangle<int> area, int lane, float range);
+    void paintMpePitchOnNotes (juce::Graphics& g, juce::Rectangle<int> grid);
+    bool mpeMouseDown (const juce::MouseEvent& e);
+    bool mpeMouseDrag (const juce::MouseEvent& e);
+    bool mpeDoubleClick (const juce::MouseEvent& e);
+    void editNoteCurves (int note, const std::function<void (Note&)>& edit);
     float laneSetValue = 0.0f;
     // pattern event lanes in the lane box (ids eventLaneIdBase + k; REA round 146)
     static constexpr int eventLaneIdBase = 100;

@@ -174,6 +174,11 @@ int split (Pattern& pattern, int index, std::int64_t tick)
     tail.length = n.start + n.length - tick;
     tail.slide = false; // the tail continues the note; it does not glide again
     tail.porta = false;
+    if (n.curves.has()) // (issue #108: each part keeps its own stretch of the MPE curves)
+    {
+        tail.curves = notecurves::slice (n.curves, (double) (tick - n.start), (double) n.length);
+        n.curves = notecurves::slice (n.curves, 0.0, (double) (tick - n.start));
+    }
     n.length = tick - n.start;
     pattern.notes.push_back (tail);
     return (int) pattern.notes.size() - 1;
@@ -208,6 +213,38 @@ std::vector<int> chop (Pattern& pattern, const std::vector<int>& indices, std::i
     return pieces;
 }
 
+// Issue #108 (MPE stage 2): a joined note keeps both notes' curves, as Live 12 keeps MPE envelopes when it joins notes
+// (its What's New lesson, "Join"): from the second note's start on, its own curve (or its own values where it has
+// none); before it, the first note's.
+static void joinCurves (Note& k, const Note& n)
+{
+    if (! k.curves.has() && ! n.curves.has())
+        return;
+    const auto off = (double) (n.start - k.start);
+    const auto base = [] (const Note& m, NoteCurveLane l) {
+        return l == NoteCurveLane::pitch ? 0.0f : l == NoteCurveLane::timbre ? m.modX : std::clamp ((m.modY - 0.5f) * 2.0f, 0.0f, 1.0f);
+    };
+    NoteCurves joined = *k.curves;
+    for (int i = 0; i < noteCurveLaneCount; ++i)
+    {
+        const auto l = (NoteCurveLane) i;
+        const auto& from = n.curves->lane (l);
+        auto& to = joined.lane (l);
+        if (from.empty() && to.empty())
+            continue;
+        if (to.empty())
+            to.push_back ({ 0.0f, base (k, l) });
+        const auto held = joined.valueAt (l, off, base (k, l));
+        to.erase (std::remove_if (to.begin(), to.end(), [off] (const NoteCurvePoint& q) { return (double) q.tick >= off; }), to.end());
+        to.push_back ({ (float) std::max (0.0, off - 1.0), held });
+        if (from.empty())
+            to.push_back ({ (float) off, base (n, l) });
+        for (const auto& q : from)
+            to.push_back ({ (float) (off + (double) q.tick), q.value });
+    }
+    k.curves = std::move (joined);
+}
+
 int join (Pattern& pattern, const std::vector<int>& indices)
 {
     std::vector<int> order;
@@ -237,6 +274,7 @@ int join (Pattern& pattern, const std::vector<int>& indices)
 
             if (k.channel == n.channel && k.key == n.key && n.start <= k.start + k.length)
             {
+                joinCurves (k, n);
                 k.length = std::max (k.start + k.length, n.start + n.length) - k.start;
                 doomed.push_back (i);
                 continue;

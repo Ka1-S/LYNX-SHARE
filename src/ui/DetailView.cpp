@@ -2651,7 +2651,7 @@ public:
     {
         addChildComponent (column); // (slice 2b: shown while a grid clip is)
         column.editorOf = [this] { return dynamic_cast<PianoRollComponent*> (editor); };
-        for (auto* b : { &notesTab, &envelopesTab })
+        for (auto* b : { &notesTab, &envelopesTab, &mpeTab })
         {
             addChildComponent (*b);
             b->setConnectedEdges (0);
@@ -2662,8 +2662,11 @@ public:
         notesTab.setButtonText (tr ("Notes"));
         envelopesTab.setButtonText (tr ("Envelopes"));
         envelopesTab.setTooltip (tr ("The pattern's events: the levels and controls it changes while it plays"));
+        mpeTab.setButtonText (tr ("MPE"));
+        mpeTab.setTooltip (tr ("Each note's own pitch bend, slide and pressure curves (MPE)"));
         notesTab.onClick = [this] { showTab (false); };
         envelopesTab.onClick = [this] { showTab (true); };
+        mpeTab.onClick = [this] { showTab (false, true); };
         addChildComponent (open);
         open.onClick = [this] {
             if (dockable())
@@ -2702,12 +2705,19 @@ public:
         }
         update();
     }
-    void showTab (bool envelopes)
+    void showTab (bool envelopes, bool mpe = false)
     {
         DetailView::envelopesTab = envelopes;
+        DetailView::mpeTab = mpe && ! envelopes;
         if (! envelopes)
-            takenBack = false; // (Notes: the Piano roll docks again)
+            takenBack = false; // (Notes / MPE: the Piano roll docks again)
         update();
+    }
+    // (round 190hy) the docked Piano roll shows the MPE lanes while the MPE tab does
+    void applyMpeView()
+    {
+        if (auto* roll = dynamic_cast<PianoRollComponent*> (editor))
+            roll->setMpeView (DetailView::mpeTab && ! DetailView::envelopesTab);
     }
     void release()
     {
@@ -2741,8 +2751,10 @@ public:
             audioPanel->setBounds (area);
         if (notesTab.isVisible())
         {
-            // the clip's tabs, top right, as the reference's Notes | Envelopes [SHOT d08]
+            // the clip's tabs, top right, as the reference's Notes | Envelopes [SHOT d08] (| MPE: Live 11+, round 190hy)
             auto bar = area.removeFromTop (tabHeight).reduced (2, 2);
+            mpeTab.setBounds (bar.removeFromRight (72));
+            bar.removeFromRight (2);
             envelopesTab.setBounds (bar.removeFromRight (96));
             bar.removeFromRight (2);
             notesTab.setBounds (bar.removeFromRight (96));
@@ -2833,14 +2845,18 @@ private:
         {
             notesTab.setVisible (tabs);
             envelopesTab.setVisible (tabs);
+            mpeTab.setVisible (tabs);
             resized();
         }
-        notesTab.setToggleState (! DetailView::envelopesTab, juce::dontSendNotification);
+        notesTab.setToggleState (! DetailView::envelopesTab && ! DetailView::mpeTab, juce::dontSendNotification);
         envelopesTab.setToggleState (DetailView::envelopesTab, juce::dontSendNotification);
+        mpeTab.setToggleState (DetailView::mpeTab && ! DetailView::envelopesTab, juce::dontSendNotification);
         if (tabs && DetailView::envelopesTab)
         {
             if (editor != nullptr && hooks.undockPianoRoll != nullptr) // (the Piano roll goes home while Envelopes shows)
             {
+                if (auto* roll = dynamic_cast<PianoRollComponent*> (editor))
+                    roll->setMpeView (false);
                 editor = nullptr;
                 dockedTrack = dockedScene = -1;
                 hooks.undockPianoRoll();
@@ -2854,7 +2870,10 @@ private:
         if (clip != nullptr && clip->kind == ClipKind::pattern && onScreen() && ! takenBack && hooks.dockPianoRoll != nullptr)
         {
             if (editor != nullptr && dockedTrack == track && dockedScene == scene)
+            {
+                applyMpeView();
                 return; // (already showing this clip: the user may have picked another pattern in it meanwhile)
+            }
             dockedTrack = track;
             dockedScene = scene;
             auto* e = hooks.dockPianoRoll (clip->pattern);
@@ -2865,6 +2884,7 @@ private:
                 column.reload(); // (round 190hr: the column gives the docked editor its Quantize keys and the clip's scale)
                 resized();
             }
+            applyMpeView();
             open.setVisible (false);
             repaint();
             return;
@@ -2919,7 +2939,7 @@ private:
     juce::TextButton open;
     juce::String text;
     ClipColumn column;
-    juce::TextButton notesTab, envelopesTab;
+    juce::TextButton notesTab, envelopesTab, mpeTab;
     static constexpr int tabHeight = 26;
     std::unique_ptr<juce::Component> events; // the Envelopes tab's Event editor
     int eventsTrack = -1, eventsScene = -1;
@@ -2986,6 +3006,7 @@ void DetailView::togglePage() { setPage (devicesPage ? Page::clip : Page::device
 void DetailView::editorTakenBack() { clipPage->editorTakenBack(); }
 void DetailView::releaseEditor() { clipPage->release(); }
 void DetailView::setClipTab (bool envelopes) { clipPage->showTab (envelopes); }
+void DetailView::setMpeTab() { clipPage->showTab (false, true); }
 
 void DetailView::showPage()
 {

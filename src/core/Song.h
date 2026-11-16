@@ -19,6 +19,7 @@
 
 #include "core/Adr.h"
 #include "core/MidiGenerateOptions.h"
+#include "core/NoteCurves.h"
 #include "core/VideoTrack.h"
 
 namespace lynx
@@ -1689,6 +1690,10 @@ struct Note
     int chanceGroup = 0;
     bool chanceOne = false;
     bool hasChance() const noexcept { return chance < 1.0f || velocityRange != 0.0f || chanceGroup != 0; }
+    // MPE stage 2 (issue #108, core/NoteCurves.h): the note's own pitch bend / timbre / pressure curves while it sounds
+    // (recorded from an MPE controller, drawn in the Piano roll's MPE lanes, Live's per-note expression); none = the
+    // note plays its fine pitch, Mod X and Mod Y alone, as before
+    NoteCurvesRef curves;
     bool operator== (const Note&) const = default; // (Online Sessions P2: entity comparison, round 169b)
 };
 

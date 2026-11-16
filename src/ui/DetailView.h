@@ -85,6 +85,7 @@ public:
     void releaseEditor();
     // The Clip page's tab for a pattern clip: Notes (the Piano roll) or Envelopes (the pattern's events).
     void setClipTab (bool envelopes);
+    void setMpeTab(); // (round 190hy: the Clip page's MPE tab, as its button does)
 
     // The height the owner gives it out of `available` px (the dock keeps at least half for the grid and Playlist).
     int heightFor (int available) const noexcept;
@@ -96,6 +97,9 @@ public:
     static inline bool extraWindowKey = false;     // LYNX extra (off by default): W shows the selected card's window
     static inline bool extraSelectInMixer = false; // LYNX extra (off by default): selecting a card selects its insert
     static inline bool envelopesTab = false;       // the Clip page shows Envelopes instead of Notes (not saved)
+    // round 190hy (issue #108): the Clip page's MPE tab, Live 11+'s note expression editor — the docked Piano roll with
+    // its three MPE lanes stacked under the notes (not saved; envelopesTab wins when both are set)
+    static inline bool mpeTab = false;
     static constexpr int minHeight = 140, edgeHeight = 5, stripHeight = 22;
 
     // Round 190ce: the selected card's device (none: the Device View is not showing or nothing is selected) for the

@@ -186,6 +186,47 @@ void exactDocuments()
            "Metadata-only edit changed unrelated double precision");
     check (remote_document::hash (remote_document::bytes (source)).size() == 64, "Document hash malformed");
 }
+// Issue #108 (MPE stage 2, round 190hy): a note's curves are saved in .lynx (the note's 20th element, three flat
+// [tick, value, ...] lanes), load back, leave notes without curves as they were saved before, and stay editable through
+// document edits (plain data arrays).
+void noteCurvesDocuments()
+{
+    auto source = fixture();
+    NoteCurves curves;
+    curves.lane (NoteCurveLane::pitch) = { { 0.0f, -12.3456f }, { 480.25f, 1200.0f }, { 960.0f, -4800.0f } };
+    curves.lane (NoteCurveLane::timbre) = { { 10.0f, 0.123456f } };
+    curves.lane (NoteCurveLane::pressure) = { { 0.0f, 0.0f }, { 333.33f, 1.0f } };
+    source.patterns[0].notes[1].curves = curves;
+    juce::String error;
+    const auto ordinary = ProjectFile::fromJson (ProjectFile::toJson (source), error);
+    check (ordinary.has_value(), "A project with note curves did not load");
+    const auto& loaded = ordinary->patterns[0].notes[1].curves;
+    check (loaded.has() && ! ordinary->patterns[0].notes[0].curves.has(), "Note curves were not saved or reached another note");
+    for (int lane = 0; lane < noteCurveLaneCount; ++lane)
+    {
+        const auto& a = curves.lane ((NoteCurveLane) lane);
+        const auto& b = loaded->lane ((NoteCurveLane) lane);
+        check (a.size() == b.size(), "A saved curve lost points");
+        for (std::size_t i = 0; i < a.size() && i < b.size(); ++i)
+            check (std::abs (a[i].tick - b[i].tick) <= 0.005f && std::abs (a[i].value - b[i].value) <= (lane == 0 ? 0.005f : 0.00005f),
+                   "A saved curve point moved");
+    }
+    const auto exact = ProjectFile::fromJson (ProjectFile::toJsonExact (source), error);
+    check (exact.has_value() && exact->patterns == source.patterns, "Exact documents lost note curves");
+    // a note without curves keeps the old, shorter form (old LYNX versions read the curved note and drop its curves)
+    const auto document = json (ProjectFile::toJson (source).toRawUTF8());
+    const auto& notes = document["patterns"][0]["notes"];
+    check (notes[0].size() < 20 && notes[1].size() == 20, "Note curves changed the saved form of plain notes");
+    // document edits: a curve added to the first note through a replace of its note array
+    auto withCurve = json (ProjectFile::toJsonExact (source).toRawUTF8())["patterns"][0]["notes"][1].clone();
+    auto* patch = new juce::DynamicObject();
+    patch->setProperty ("op", "replace");
+    patch->setProperty ("path", "/patterns/0/notes/0");
+    patch->setProperty ("value", withCurve);
+    const auto staged = remote_document::stage (source, juce::Array<juce::var> { juce::var (patch) });
+    check (staged.patterns[0].notes[0].curves == source.patterns[0].notes[1].curves, "A document edit could not set note curves");
+}
+
 void transactionValidation()
 {
     const auto source = fixture();
@@ -780,6 +821,7 @@ int main()
         run ("patchSemantics", patchSemantics);
         run ("exactDocuments", exactDocuments);
         run ("remoteNotesRoundtrip", remoteNotesRoundtrip);
+        run ("noteCurvesDocuments", noteCurvesDocuments);
         run ("transactionValidation", transactionValidation);
         run ("currentModelDocuments", currentModelDocuments);
         run ("documentIoPolicy", documentIoPolicy);

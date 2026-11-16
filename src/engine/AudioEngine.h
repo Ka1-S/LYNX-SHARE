@@ -1229,7 +1229,7 @@ private:
     void markHeldKey (int midiChannel, int key, bool on) noexcept;
     std::atomic<int> lastHitKey { 60 };
     KeyLedger playedKeys;        // UI thread: the keys the typing piano started (after the scale snap)
-    SpscQueue<RecordedEvent, 1024> midiRecordQueue; // MIDI thread -> UI (recording)
+    SpscQueue<RecordedEvent, 4096> midiRecordQueue; // MIDI thread -> UI (recording)
     // a controller's pitch wheel while recording (MIDI thread -> UI): key = its MIDI channel 0…15, velocity = 0..1;
     // written as the channel's pitch bend automation like a moved knob (issue #12: the bend was heard, not recorded)
     SpscQueue<RecordedEvent, 2048> bendRecordQueue;

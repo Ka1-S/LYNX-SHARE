@@ -638,6 +638,25 @@ void NoteRecorder::add (const Song& song, const RecordedEvent& e)
     if (! active)
         return;
 
+    if (e.lane >= 0) // MPE stage 2 (issue #108): a held MPE note's bend / timbre / pressure moved
+    {
+        if (e.lane >= noteCurveLaneCount)
+            return;
+        const auto it = held.find (std::make_pair (e.channel, e.key));
+        if (it == held.end() || ! it->second.expression)
+            return;
+        auto& curve = it->second.curve[(std::size_t) e.lane];
+        const auto at = (float) std::max (0.0, e.tick - it->second.tick);
+        if (curve.size() < maxTakePoints)
+        {
+            if (! curve.empty() && curve.back().tick >= at)
+                curve.back().value = e.value; // (two changes on one tick: the later)
+            else
+                curve.push_back ({ at, e.value });
+        }
+        return;
+    }
+
     const auto id = std::make_pair (e.channel, e.key);
 
     if (e.on)
@@ -658,7 +677,14 @@ void NoteRecorder::add (const Song& song, const RecordedEvent& e)
         if (auto it = held.find (id); it != held.end())
             finish (song, e.channel, e.key, it->second, e.tick);
 
-        held[id] = { e.tick, e.velocity, e.expression, e.finePitch, e.modX, e.modY };
+        held[id] = { e.tick, e.velocity, e.expression, e.finePitch, e.modX, e.modY, {} };
+        if (e.expression) // (the take's curves start at the note's own values)
+        {
+            auto& h = held[id];
+            h.curve[(std::size_t) NoteCurveLane::pitch].push_back ({ 0.0f, std::isfinite (e.value) ? e.value : e.finePitch });
+            h.curve[(std::size_t) NoteCurveLane::timbre].push_back ({ 0.0f, e.modX });
+            h.curve[(std::size_t) NoteCurveLane::pressure].push_back ({ 0.0f, std::clamp ((e.modY - 0.5f) * 2.0f, 0.0f, 1.0f) });
+        }
         return;
     }
 
@@ -720,8 +746,39 @@ Note NoteRecorder::makeNote (const Song& song, int channel, int key, const Held&
         n.finePitch = std::isfinite (h.finePitch) ? std::clamp (h.finePitch, -120.0f, 120.0f) : 0.0f;
         n.modX = std::isfinite (h.modX) ? std::clamp (h.modX, 0.0f, 1.0f) : 0.5f;
         n.modY = std::isfinite (h.modY) ? std::clamp (h.modY, 0.0f, 1.0f) : 0.5f;
+        n.curves = takeCurves (h.curve, n.finePitch, n.modX, (double) n.length);
     }
     return n;
+}
+
+// MPE stage 2 (issue #108): a held MPE note's take as its curves (core/NoteCurves.h), thinned. The pitch lane is the
+// bend over the note's fine pitch (which holds the bend at the "on", clamped to ±120 cents); a lane that never moved
+// is left out (the note's fine pitch / Mod X / Mod Y already say it), and so is what came after the note's end.
+NoteCurvesRef NoteRecorder::takeCurves (const std::array<std::vector<NoteCurvePoint>, noteCurveLaneCount>& take, float finePitch,
+                                        float modX, double length)
+{
+    NoteCurves c;
+    for (int i = 0; i < noteCurveLaneCount; ++i)
+    {
+        const auto lane = (NoteCurveLane) i;
+        std::vector<NoteCurvePoint> points;
+        for (const auto& q : take[(std::size_t) i])
+            if ((double) q.tick <= length)
+                points.push_back ({ q.tick, notecurves::clampValue (lane, lane == NoteCurveLane::pitch ? q.value - finePitch : q.value) });
+        if (points.empty())
+            continue;
+        const auto base = lane == NoteCurveLane::pitch ? 0.0f : lane == NoteCurveLane::timbre ? modX : points.front().value;
+        const auto tolerance = notecurves::thinTolerance (lane);
+        const auto moved = std::any_of (points.begin(), points.end(), [&] (const NoteCurvePoint& q) { return std::abs (q.value - base) > tolerance; });
+        // (the pitch lane also stays when it is constant but off the fine pitch: a bend beyond ±120 cents at the "on")
+        if (! moved)
+            continue;
+        if (points.size() >= 2 || lane == NoteCurveLane::pitch)
+            c.lane (lane) = notecurves::thin (points, tolerance);
+    }
+    NoteCurvesRef out;
+    out = std::move (c);
+    return out;
 }
 
 void NoteRecorder::finish (const Song& song, int channel, int key, const Held& h, double endTick)

@@ -17716,6 +17716,8 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Maps190caTests.inc"
 #include "Mpe190bbTests.inc"
 #include "Mpe190bbLiveTests.inc"
+#include "Mpe190hyTests.inc"
+#include "Mpe190hyAlsTests.inc"
 #include "PluginDb190baTests.inc"
 #include "PerfWin190gdTests.inc"
 #include "Ram190gnTests.inc"

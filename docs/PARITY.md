@@ -2519,7 +2519,22 @@ FL Studio 2026 has no MPE switch (docs/analise/REA_rodada190bb-mpe.md §1); LYNX
 | MPE controller input (lower zone, member channels 2 … 16, bend range 48) | — | Settings › MIDI › device › "MPE controller" + member channel count | ✅ played per note; recorded as the note's fine pitch (bend at the note on), Mod X (CC 74), Mod Y (peak pressure) |
 | Per-note response of built-in instruments | — | Sampler (pitch, Mod X / Mod Y filter), built-in synth (pitch) | ✅ those two; ❌ the other generators |
 | MPE to hosted plugins | — (fine pitch as key / VST3 tuning, Mod X as poly aftertouch) | wrapper Settings › MIDI › "MPE": one member channel per note with bend / CC 74 / pressure; CLAP note expressions (tuning, brightness, pressure) for CLAP-note plugins | ✅ ; ❌ VST3 note expression events (MPE MIDI instead) |
-| Per-note expression curves in the piano roll | — | — | ❌ stage 2 |
+| Per-note expression curves in the piano roll | — | — | ✅ stage 2 (round 190hy, below) |
+
+## Round 190hy: MPE, stage 2 — per-note expression curves (issue #108)
+
+FL 2026 still has no per-note curves (docs/analise/REA_rodada190hy-mpe.md §1); they follow Ableton Live 11 / 12.
+
+| Feature | FL 2026 | Live 12 | LYNX | State |
+|---|---|---|---|---|
+| Per-note pitch bend / slide / pressure curves | — (one value per note, slide notes) | `PerNoteEventStore`, MPE view | `Note::curves` (core/NoteCurves.h) | ✅ |
+| Recording from an MPE controller | — | records the curves | the take's bend / CC 74 / pressure per note, thinned | ✅ |
+| Editing | — | MPE tab: Pitch Bend / Slide / Pressure lanes, curve over the note | Piano roll lane list "MPE pitch bend / slide / pressure"; Clip-launch Clip page tab **MPE** (three lanes stacked); pitch curve over the notes | ✅ (Live's tab layout and gestures: needs a live check) |
+| Split / chop / knife / join keep the curves | — | Join keeps MPE envelopes | ✅ | ✅ |
+| Playback to built-in instruments | — | — | Sampler (pitch, filter by Mod X / Y), built-in synth (pitch), FPC | ✅ those; ❌ other generators |
+| Playback to hosted plugins | — | MPE per plugin | wrapper MPE switch: member-channel MPE MIDI; CLAP note expressions | ✅ ; ❌ VST3 note expression events (MPE MIDI instead) |
+| `.lynx` / `.als` / `.flp` | — | `.als` lists by NoteId (CC −2 / 74 / −1) | `.lynx` note element 20; `.als` import (Bézier flattened) and export (linear); `.flp`: start values only | ✅ ; ⚠️ Bézier controls not written |
+| Remote control | — | — | `pattern.notes` field `expression` (editable) | ✅ |
 
 ## Round 190i: the plugin window's Detached flag in `.flp` (issue #116)
 FL saves a plugin window's **Detached** state in the plugin record (`0xD4`, flags bit `0x4`; FL 2026 driven, see

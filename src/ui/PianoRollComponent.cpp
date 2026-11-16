@@ -16,6 +16,8 @@
 #include "core/MarkerPlan.h"
 #include "core/NoteEdit.h"
 #include "core/NoteTools.h"
+#include "core/Mpe.h"
+#include "core/NoteCurves.h"
 #include "core/Rack.h"
 
 #include <array>
@@ -403,6 +405,9 @@ void PianoRollComponent::layoutEventPane()
 {
     if (fitKeysToNotes)
     {
+        // (round 190hy: the MPE tab's three lanes take up to half of the dock, 22 … 44 px each, so the notes stay in view)
+        if (mpeStacked)
+            velocityHeight = juce::jlimit (3 * 22, 3 * 44, (getHeight() - headerHeight) / 2);
         eventPaneBarTop = getHeight() - velocityHeight;
         return;
     }
@@ -667,7 +672,7 @@ void PianoRollComponent::resized()
     place (moreButton, h);
     place (chordLabel, 84, true);
     laneBox.setBounds (2, velocityArea().getY() + 4, keyboardWidth - 4, 20);
-    laneBox.setVisible (velocityHeight >= 24); // (the event editor folded away: FL hides its target panel too)
+    laneBox.setVisible (velocityHeight >= 24 && ! mpeStacked); // (the event editor folded away: FL hides its target panel too; the MPE tab names its lanes)
     overview.setBounds (keyboardWidth, toolbarHeight, getWidth() - keyboardWidth - zoomWheelSize, overviewHeight);
     vBar.setBounds (getWidth() - scrollBarSize, headerHeight, scrollBarSize, gridArea().getHeight());
     updateScrollBars();
@@ -1216,6 +1221,9 @@ void PianoRollComponent::paint (juce::Graphics& g)
             }
         }
 
+        if (! mpeLaneAreas().empty()) // (round 190hy: as Live's MPE view, each note's pitch curve over it)
+            paintMpePitchOnNotes (g, grid);
+
         if (! rubberBand.isEmpty())
         {
             g.setColour (selectionFill);
@@ -1294,12 +1302,22 @@ void PianoRollComponent::paint (juce::Graphics& g)
                 textcache::drawText (g, tr ("No events yet: draw them here"), lane.reduced (8, 4), juce::Justification::centredLeft, true);
             }
         }
-        // the lane's name in it, as FL writes it next to "Control" (round 149: the box on the left is narrow)
-        g.setColour (theme::colour::textSecondary.withAlpha (0.8f));
-        g.setFont (theme::font (theme::type::caption, true));
-        textcache::drawText (g, laneBox.getText(), lane.reduced (8, 3).removeFromTop (14), juce::Justification::topLeft, true);
+        const auto mpeLanes = mpeLaneAreas(); // (round 190hy: the notes' MPE curves instead of their stems)
+        if (! mpeLanes.empty())
+        {
+            const auto range = drag == Drag::mpePoint || drag == Drag::mpeDraw ? mpeDragRange : mpePitchRange();
+            for (const auto& [area, id] : mpeLanes)
+                paintMpeLane (g, area, id, range);
+        }
+        else
+        {
+            // the lane's name in it, as FL writes it next to "Control" (round 149: the box on the left is narrow)
+            g.setColour (theme::colour::textSecondary.withAlpha (0.8f));
+            g.setFont (theme::font (theme::type::caption, true));
+            textcache::drawText (g, laneBox.getText(), lane.reduced (8, 3).removeFromTop (14), juce::Justification::topLeft, true);
+        }
 
-        for (int i = 0; i < (int) pattern.notes.size() && ! eventLaneTarget(); ++i)
+        for (int i = 0; i < (int) pattern.notes.size() && ! eventLaneTarget() && mpeLanes.empty(); ++i)
         {
             const auto& n = pattern.notes[(std::size_t) i];
 
@@ -1712,6 +1730,11 @@ void PianoRollComponent::addNoteLanes()
     laneBox.addItem (tr ("Mod Y"), laneModY);
     laneBox.addItem (tr ("Chance"), laneChance);
     laneBox.addItem (tr ("Velocity range (LYNX)"), laneVelocityRange);
+    // MPE stage 2 (round 190hy, issue #108): each note's own pitch bend / slide (CC 74) / pressure curve, as Live 11+'s
+    // note expression lanes (LYNX additions: FL 2026 has no per-note curves)
+    laneBox.addItem (tr ("MPE pitch bend"), laneMpePitch);
+    laneBox.addItem (tr ("MPE slide"), laneMpeSlide);
+    laneBox.addItem (tr ("MPE pressure"), laneMpePressure);
 }
 
 float PianoRollComponent::laneValue (const Note& n) const
@@ -1725,6 +1748,9 @@ float PianoRollComponent::laneValue (const Note& n) const
         case laneModY: return n.modY;
         case laneChance: return n.chance;
         case laneVelocityRange: return (n.velocityRange + 1.0f) * 0.5f;
+        case laneMpePitch: return 0.5f; // (the MPE lanes edit curves, not one value: round 190hy)
+        case laneMpeSlide: return n.modX;
+        case laneMpePressure: return mpe::pressureOfModY (n.modY);
         default: return n.velocity;
     }
 }
@@ -1744,6 +1770,9 @@ void PianoRollComponent::setLaneValue (Note& n, float v) const
         case laneVelocityRange: // whole Live velocity steps (1/127); snaps to none
             n.velocityRange = std::abs (v - 0.5f) < 0.02f ? 0.0f : std::round ((v * 2.0f - 1.0f) * 127.0f) / 127.0f;
             break;
+        case laneMpePitch:
+        case laneMpeSlide:
+        case laneMpePressure: break; // (curves: the MPE lanes' own gestures edit them)
         default: n.velocity = v; break;
     }
 }
@@ -1751,7 +1780,7 @@ void PianoRollComponent::setLaneValue (Note& n, float v) const
 bool PianoRollComponent::laneIsBipolar() const
 {
     const auto id = laneBox.getSelectedId();
-    return id == lanePan || id == laneFinePitch || id == laneVelocityRange || id >= eventLaneIdBase;
+    return id == lanePan || id == laneFinePitch || id == laneVelocityRange || id == laneMpePitch || id >= eventLaneIdBase;
 }
 
 bool PianoRollComponent::laneIsChance() const { return laneBox.getSelectedId() == laneChance; }
@@ -2025,6 +2054,9 @@ void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
     // Freeze (round 190ay): a frozen channel's notes and their lane are read-only (the keyboard, the ruler and the
     // view gestures above still work)
     if ((velocityArea().contains (e.getPosition()) || gridArea().contains (e.getPosition())) && refuseFrozenEdit())
+        return;
+
+    if (velocityArea().contains (e.getPosition()) && mpeMouseDown (e))
         return;
 
     if (velocityArea().contains (e.getPosition()) && eventLaneTarget())
@@ -2345,6 +2377,12 @@ void PianoRollComponent::mouseDrag (const juce::MouseEvent& e)
     switch (drag)
     {
         case Drag::none:
+            return;
+
+        case Drag::mpePoint: // round 190hy: the notes' MPE curves
+        case Drag::mpeDraw:
+        case Drag::mpeErase:
+            mpeMouseDrag (e);
             return;
 
         case Drag::eventPaneBar: // round 190fz: the divider follows the mouse (FL's SplitterChanging rule)
@@ -2738,6 +2776,24 @@ void PianoRollComponent::postDragHint (const juce::MouseEvent& e)
                                                                                : juce::String (juce::roundToInt (value * 100.0f)) + "%";
             break;
         }
+        case Drag::mpePoint:
+        case Drag::mpeDraw:
+        case Drag::mpeErase:
+        {
+            juce::Rectangle<int> area;
+            const auto id = mpeDragLane;
+            mpeLaneAt ({ lastMpeX, lastMpeY }, &area);
+            hint.text = drag == Drag::mpeErase ? tr ("Erasing the curve's points") : drag == Drag::mpePoint ? tr ("Moving the curve's point")
+                                                                                                         : tr ("Drawing the note's curve");
+            if (drag != Drag::mpeErase && ! area.isEmpty())
+            {
+                const auto norm = juce::jlimit (0.0f, 1.0f, (float) (area.getBottom() - 2 - lastMpeY) / (float) juce::jmax (1, area.getHeight() - 8));
+                const auto v = mpeValue (id, norm, mpeDragRange);
+                hint.value = id == laneMpePitch ? tr ("{0} st", { juce::String (v / 100.0f, 2) })
+                                                : juce::String (juce::roundToInt (id == laneMpeSlide ? (float) mpe::timbreOfModX (v) : v * 127.0f));
+            }
+            break;
+        }
         case Drag::velocity:
         case Drag::velocitySet:
         case Drag::velocityLine:
@@ -3029,6 +3085,14 @@ ui::Hint PianoRollComponent::hintAt (juce::Point<int> p)
         return hint;
     }
 
+    if (velocityArea().contains (p) && mpeLaneAt (p) != 0)
+    {
+        hint.text = tr ("MPE curve of the note: [LMB] drag draws  drag a point: move it  double-click a point: delete it  [RMB] drag erases  [Alt][LMB] clear");
+        if (const auto note = mpeNoteAt (p.x); note >= 0)
+            hint.value = noteValue (note);
+        return hint;
+    }
+
     if (velocityArea().contains (p))
     {
         hint.text = tr ("{0} lane: [LMB] drag draws  [RMB] drag draws a line  [Shift][LMB] one value  [Alt][LMB] reset  [Alt][Wheel] over a note: adjust",
@@ -3076,6 +3140,8 @@ ui::Hint PianoRollComponent::hintAt (juce::Point<int> p)
 
 void PianoRollComponent::mouseDoubleClick (const juce::MouseEvent& e)
 {
+    if (velocityArea().contains (e.getPosition()) && mpeDoubleClick (e))
+        return;
     if (! gridArea().contains (e.getPosition()) || e.mods.isRightButtonDown() || flmods::ctrl (e.mods))
         return;
 
@@ -5526,5 +5592,350 @@ void PianoRollComponent::showPatternMarkerMenu (int index)
     menu.addSeparator();
     menu.addSubMenu (tr ("Time markers"), markersMenu());
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+}
+// --- MPE lanes (round 190hy, issue #108; core/NoteCurves.h, docs/analise/REA_rodada190hy-mpe.md) -------------------
+// Each note's own pitch bend / slide / pressure curve, edited as Live 11+ edits its note expression: the lane shows the
+// curves over the notes' lengths (the selected notes brighter), a drag draws the curve of the note under the mouse (a
+// selected one first), a point is dragged to move it and double-clicked to delete it; LYNX's own lane gestures on top
+// (right-drag erases, Alt+click clears). FL 2026 has no per-note curves (FLEngine / Fruity Wrapper strings: none).
+
+void PianoRollComponent::setMpeView (bool on)
+{
+    if (mpeStacked == on)
+        return;
+    mpeStacked = on;
+    // (three lanes need room: the Clip-launch dock's 30 px lane grows while the MPE tab shows)
+    if (fitKeysToNotes && ! on)
+        velocityHeight = compactVelocityHeight; // (on: layoutEventPane sizes the three lanes)
+    resized();
+    repaint();
+}
+
+std::vector<std::pair<juce::Rectangle<int>, int>> PianoRollComponent::mpeLaneAreas() const
+{
+    std::vector<std::pair<juce::Rectangle<int>, int>> out;
+    const auto lane = velocityArea();
+    if (lane.getHeight() < 12)
+        return out;
+    if (mpeStacked)
+    {
+        auto rest = lane;
+        const auto h = lane.getHeight() / 3;
+        out.push_back ({ rest.removeFromTop (h), laneMpePitch });
+        out.push_back ({ rest.removeFromTop (h), laneMpeSlide });
+        out.push_back ({ rest, laneMpePressure });
+    }
+    else if (isMpeLane (laneBox.getSelectedId()))
+        out.push_back ({ lane, laneBox.getSelectedId() });
+    return out;
+}
+
+int PianoRollComponent::mpeLaneAt (juce::Point<int> p, juce::Rectangle<int>* area) const
+{
+    for (const auto& [r, id] : mpeLaneAreas())
+        if (r.contains (p))
+        {
+            if (area != nullptr)
+                *area = r;
+            return id;
+        }
+    return 0;
+}
+
+float PianoRollComponent::mpePitchRange() const
+{
+    // ±12 semitones, or ±24 / ±48 when a shown note's curve goes further (Live's lane spans the MPE range, ±48)
+    auto reach = 0.0f;
+    const auto& notes = currentPattern (engine.getSong()).notes;
+    for (auto i : channelNotes())
+        if (const auto& n = notes[(std::size_t) i]; n.curves.has())
+            for (const auto& q : n.curves->lane (NoteCurveLane::pitch))
+                reach = juce::jmax (reach, std::abs (q.value));
+    return reach <= 1200.0f ? 1200.0f : reach <= 2400.0f ? 2400.0f : notecurves::maxPitchCents;
+}
+
+float PianoRollComponent::mpeNorm (int lane, float value, float range) const noexcept
+{
+    return lane == laneMpePitch ? juce::jlimit (0.0f, 1.0f, 0.5f + value / (2.0f * range)) : juce::jlimit (0.0f, 1.0f, value);
+}
+
+float PianoRollComponent::mpeValue (int lane, float norm, float range) const noexcept
+{
+    norm = juce::jlimit (0.0f, 1.0f, norm);
+    if (lane != laneMpePitch)
+        return norm;
+    const auto cents = (norm - 0.5f) * 2.0f * range;
+    return std::abs (cents) < range * 0.015f ? 0.0f : std::round (cents); // (snaps to no bend; whole cents)
+}
+
+float PianoRollComponent::mpeBase (int lane, const Note& n) noexcept
+{
+    return lane == laneMpePitch ? 0.0f : lane == laneMpeSlide ? n.modX : mpe::pressureOfModY (n.modY);
+}
+
+int PianoRollComponent::mpeNoteAt (int x) const
+{
+    const auto tick = xToTick (x);
+    const auto& notes = currentPattern (engine.getSong()).notes;
+    auto best = -1;
+    auto bestSelected = false;
+    for (auto i : channelNotes())
+    {
+        const auto& n = notes[(std::size_t) i];
+        if (tick < (double) n.start || tick >= (double) (n.start + n.length))
+            continue;
+        const auto selected = isSelected (i);
+        if (best < 0 || (selected && ! bestSelected)
+            || (selected == bestSelected && n.start >= notes[(std::size_t) best].start))
+        {
+            best = i;
+            bestSelected = selected;
+        }
+    }
+    return best;
+}
+
+int PianoRollComponent::mpePointAt (int note, int lane, juce::Rectangle<int> area, juce::Point<int> p, float range) const
+{
+    const auto& notes = currentPattern (engine.getSong()).notes;
+    if (note < 0 || note >= (int) notes.size() || ! notes[(std::size_t) note].curves.has())
+        return -1;
+    const auto& n = notes[(std::size_t) note];
+    const auto usable = (float) area.getHeight() - 8.0f;
+    const auto& points = n.curves->lane ((NoteCurveLane) (lane - laneMpePitch));
+    auto best = -1;
+    auto bestDistance = 6.0f;
+    for (int k = 0; k < (int) points.size(); ++k)
+    {
+        const auto x = (float) tickToX ((double) n.start + (double) points[(std::size_t) k].tick);
+        const auto y = (float) area.getBottom() - 2.0f - usable * mpeNorm (lane, points[(std::size_t) k].value, range);
+        if (const auto d = juce::jmax (std::abs (x - (float) p.x), std::abs (y - (float) p.y)); d < bestDistance)
+        {
+            bestDistance = d;
+            best = k;
+        }
+    }
+    return best;
+}
+
+void PianoRollComponent::paintMpeLane (juce::Graphics& g, juce::Rectangle<int> area, int lane, float range)
+{
+    using namespace theme::colour;
+    juce::Graphics::ScopedSaveState state (g);
+    g.reduceClipRegion (area);
+    const auto& notes = currentPattern (engine.getSong()).notes;
+    const auto usable = (float) area.getHeight() - 8.0f;
+    const auto yOf = [&] (float norm) { return (float) area.getBottom() - 2.0f - usable * norm; };
+    const auto curveLane = (NoteCurveLane) (lane - laneMpePitch);
+    if (mpeStacked && lane != laneMpePitch) // (the stacked lanes' dividers)
+    {
+        g.setColour (border);
+        g.drawHorizontalLine (area.getY(), (float) area.getX(), (float) area.getRight());
+    }
+    if (lane == laneMpePitch) // the "no bend" line, and one per octave
+    {
+        g.setColour (textPrimary.withAlpha (0.15f));
+        g.drawHorizontalLine ((int) yOf (0.5f), (float) area.getX(), (float) area.getRight());
+        for (auto c = 1200.0f; c < range; c += 1200.0f)
+            for (auto sign : { -1.0f, 1.0f })
+            {
+                g.setColour (textPrimary.withAlpha (0.06f));
+                g.drawHorizontalLine ((int) yOf (mpeNorm (lane, sign * c, range)), (float) area.getX(), (float) area.getRight());
+            }
+    }
+
+    for (auto i : channelNotes())
+    {
+        const auto& n = notes[(std::size_t) i];
+        const auto x0 = (float) tickToX ((double) n.start), x1 = (float) tickToX ((double) (n.start + n.length));
+        if (x1 < (float) area.getX() || x0 > (float) area.getRight())
+            continue;
+        const auto selected = isSelected (i);
+        auto colour = selected ? accentHover.brighter (0.15f) : theme::noteGroupColour (n.colour, n.velocity);
+        if (n.muted)
+            colour = noteMuted;
+        // the note's length, faintly (where its curve lives)
+        g.setColour (colour.withAlpha (selected ? 0.10f : 0.05f));
+        g.fillRect (juce::Rectangle<float> (x0, (float) area.getY() + 1.0f, juce::jmax (1.0f, x1 - x0), (float) area.getHeight() - 1.0f));
+        const auto& points = n.curves->lane (curveLane);
+        const auto base = mpeBase (lane, n);
+        if (points.empty()) // (no curve: the note's own value, dashed)
+        {
+            const auto y = yOf (mpeNorm (lane, base, range));
+            const float dash[] = { 3.0f, 3.0f };
+            g.setColour (colour.withAlpha (selected ? 0.55f : 0.3f));
+            g.drawDashedLine (juce::Line<float> (x0, y, x1, y), dash, 2, 1.0f);
+            continue;
+        }
+        juce::Path path;
+        path.startNewSubPath (x0, yOf (mpeNorm (lane, points.front().value, range)));
+        for (const auto& q : points)
+        {
+            if ((double) q.tick > (double) n.length)
+                break;
+            path.lineTo ((float) tickToX ((double) n.start + (double) q.tick), yOf (mpeNorm (lane, q.value, range)));
+        }
+        path.lineTo (x1, yOf (mpeNorm (lane, n.curves->valueAt (curveLane, (double) n.length, base), range)));
+        g.setColour (colour.withAlpha (selected ? 0.95f : 0.6f));
+        g.strokePath (path, juce::PathStrokeType (selected ? 1.6f : 1.2f));
+        if (selected || points.size() <= 64) // (a recorded take's many points only on the notes being edited)
+            for (const auto& q : points)
+                if ((double) q.tick <= (double) n.length)
+                {
+                    const auto px = (float) tickToX ((double) n.start + (double) q.tick), py = yOf (mpeNorm (lane, q.value, range));
+                    g.fillEllipse (px - (selected ? 2.5f : 1.8f), py - (selected ? 2.5f : 1.8f), selected ? 5.0f : 3.6f, selected ? 5.0f : 3.6f);
+                }
+    }
+
+    // the lane's name and range, top left (as the property lanes write theirs)
+    juce::String name = lane == laneMpePitch ? tr ("MPE pitch bend") : lane == laneMpeSlide ? tr ("MPE slide") : tr ("MPE pressure");
+    if (lane == laneMpePitch)
+        name << "  " << juce::String::fromUTF8 ("\xc2\xb1") << tr ("{0} st", { juce::String (juce::roundToInt (range / 100.0f)) });
+    g.setColour (textSecondary.withAlpha (0.8f));
+    g.setFont (theme::font (theme::type::caption, true));
+    textcache::drawText (g, name, area.reduced (8, 3).removeFromTop (14), juce::Justification::topLeft, true);
+}
+
+void PianoRollComponent::paintMpePitchOnNotes (juce::Graphics& g, juce::Rectangle<int> grid)
+{
+    // as Live's MPE view: the note's pitch over its key row, one row per semitone (its fine pitch included)
+    using namespace theme::colour;
+    juce::Graphics::ScopedSaveState state (g);
+    g.reduceClipRegion (grid);
+    const auto& notes = currentPattern (engine.getSong()).notes;
+    for (auto i : channelNotes())
+    {
+        const auto& n = notes[(std::size_t) i];
+        if (! n.curves.has() || n.curves->lane (NoteCurveLane::pitch).empty())
+            continue;
+        const auto x0 = (float) tickToX ((double) n.start), x1 = (float) tickToX ((double) (n.start + n.length));
+        if (x1 < (float) grid.getX() || x0 > (float) grid.getRight())
+            continue;
+        const auto centre = (float) keyToY (n.key) + (float) rowHeight * 0.5f;
+        const auto yOf = [&] (float cents) { return centre - (n.finePitch + cents) / 100.0f * (float) rowHeight; };
+        const auto& points = n.curves->lane (NoteCurveLane::pitch);
+        juce::Path path;
+        path.startNewSubPath (x0, yOf (points.front().value));
+        for (const auto& q : points)
+        {
+            if ((double) q.tick > (double) n.length)
+                break;
+            path.lineTo ((float) tickToX ((double) n.start + (double) q.tick), yOf (q.value));
+        }
+        path.lineTo (x1, yOf (n.curves->valueAt (NoteCurveLane::pitch, (double) n.length, 0.0f)));
+        g.setColour (juce::Colours::black.withAlpha (0.45f));
+        g.strokePath (path, juce::PathStrokeType (2.6f));
+        g.setColour ((isSelected (i) ? accentHover.brighter (0.4f) : textPrimary).withAlpha (0.9f));
+        g.strokePath (path, juce::PathStrokeType (1.3f));
+    }
+}
+
+void PianoRollComponent::editNoteCurves (int note, const std::function<void (Note&)>& edit)
+{
+    editNotes ([note, &edit] (Pattern& p) {
+        if (note >= 0 && note < (int) p.notes.size())
+            edit (p.notes[(std::size_t) note]);
+    });
+}
+
+bool PianoRollComponent::mpeMouseDown (const juce::MouseEvent& e)
+{
+    juce::Rectangle<int> area;
+    const auto lane = mpeLaneAt (e.getPosition(), &area);
+    if (lane == 0)
+        return false;
+    mpeDragLane = lane;
+    mpeDragRange = mpePitchRange();
+    lastMpeX = e.x;
+    lastMpeY = e.y;
+    mpeDragNote = mpeNoteAt (e.x);
+    mpeDragPoint = -1;
+    if (mpeDragNote < 0)
+        return true; // (no note there: nothing to draw on)
+    const auto curveLane = (NoteCurveLane) (lane - laneMpePitch);
+    const auto& n = currentPattern (engine.getSong()).notes[(std::size_t) mpeDragNote];
+    const auto norm = (float) (area.getBottom() - 2 - e.y) / (float) juce::jmax (1, area.getHeight() - 8);
+    const auto value = mpeValue (lane, norm, mpeDragRange);
+    const auto tick = juce::jlimit (0.0, (double) n.length, xToTick (e.x) - (double) n.start);
+    const auto base = mpeBase (lane, n);
+
+    if (e.mods.isAltDown() && e.mods.isLeftButtonDown()) // Alt+click: the note's lane back to its own value
+    {
+        editNoteCurves (mpeDragNote, [curveLane] (Note& m) { notecurves::clearLane (m.curves, curveLane); });
+        mpeDragNote = -1;
+        return true;
+    }
+    if (e.mods.isRightButtonDown()) // right-drag erases the points it crosses
+    {
+        drag = Drag::mpeErase;
+        editNoteCurves (mpeDragNote, [curveLane, tick] (Note& m) { notecurves::erase (m.curves, curveLane, tick - 1.0, tick + 1.0); });
+        return true;
+    }
+    if (const auto point = mpePointAt (mpeDragNote, lane, area, e.getPosition(), mpeDragRange); point >= 0)
+    {
+        drag = Drag::mpePoint; // (a point: dragged)
+        mpeDragPoint = point;
+        return true;
+    }
+    drag = Drag::mpeDraw; // (elsewhere: drawing starts with a point here)
+    mpeCreatedAt = juce::Time::getMillisecondCounter();
+    editNoteCurves (mpeDragNote, [curveLane, tick, value, base] (Note& m) { notecurves::addPoint (m.curves, curveLane, tick, value, base); });
+    return true;
+}
+
+bool PianoRollComponent::mpeMouseDrag (const juce::MouseEvent& e)
+{
+    const auto& notes = currentPattern (engine.getSong()).notes;
+    if (mpeDragNote < 0 || mpeDragNote >= (int) notes.size())
+        return true;
+    juce::Rectangle<int> area;
+    for (const auto& [r, id] : mpeLaneAreas())
+        if (id == mpeDragLane)
+            area = r;
+    if (area.isEmpty())
+        return true;
+    const auto& n = notes[(std::size_t) mpeDragNote];
+    const auto lane = mpeDragLane;
+    const auto curveLane = (NoteCurveLane) (lane - laneMpePitch);
+    const auto valueAtY = [&] (int y) { return mpeValue (lane, (float) (area.getBottom() - 2 - y) / (float) juce::jmax (1, area.getHeight() - 8), mpeDragRange); };
+    const auto tickAtX = [&] (int x) { return juce::jlimit (0.0, (double) n.length, xToTick (x) - (double) n.start); };
+    const auto t0 = tickAtX (lastMpeX), t1 = tickAtX (e.x);
+    const auto v0 = valueAtY (lastMpeY), v1 = valueAtY (e.y);
+    const auto base = mpeBase (lane, n);
+    if (drag == Drag::mpePoint)
+    {
+        const auto point = mpeDragPoint;
+        editNoteCurves (mpeDragNote, [curveLane, point, t1, v1] (Note& m) { notecurves::movePoint (m.curves, curveLane, point, t1, v1); });
+    }
+    else if (drag == Drag::mpeDraw)
+    {
+        // (one point every 3 pixels along the drag)
+        const auto step = juce::jmax (1.0, 3.0 / juce::jmax (1.0e-9, pixelsPerTick));
+        editNoteCurves (mpeDragNote, [=] (Note& m) { notecurves::drawLine (m.curves, curveLane, t0, v0, t1, v1, step, base); });
+    }
+    else
+        editNoteCurves (mpeDragNote, [=] (Note& m) { notecurves::erase (m.curves, curveLane, juce::jmin (t0, t1) - 1.0, juce::jmax (t0, t1) + 1.0); });
+    lastMpeX = e.x;
+    lastMpeY = e.y;
+    return true;
+}
+
+bool PianoRollComponent::mpeDoubleClick (const juce::MouseEvent& e)
+{
+    juce::Rectangle<int> area;
+    const auto lane = mpeLaneAt (e.getPosition(), &area);
+    if (lane == 0 || e.mods.isRightButtonDown())
+        return lane != 0;
+    // the first click of this double click drew the point: that was adding it, not deleting it
+    if (juce::Time::getMillisecondCounter() - mpeCreatedAt < 800)
+        return true;
+    const auto note = mpeNoteAt (e.x);
+    const auto range = mpePitchRange();
+    if (const auto point = mpePointAt (note, lane, area, e.getPosition(), range); point >= 0)
+    {
+        const auto curveLane = (NoteCurveLane) (lane - laneMpePitch);
+        editNoteCurves (note, [curveLane, point] (Note& m) { notecurves::removePoint (m.curves, curveLane, point); });
+    }
+    return true;
 }
 } // namespace lynx

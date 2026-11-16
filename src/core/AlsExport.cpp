@@ -503,6 +503,9 @@ struct Exporter
         else
             return false;
         out.value ("On/Manual", boolean (on));
+        // the plugin's MPE Mode (round 190hy): the device's own MpeEnabled, which the import reads (the preset copy stays
+        // the skeleton's 0, as in every save seen)
+        out.value ("MpeEnabled", boolean (ref.mpe));
         return true;
     }
 
@@ -1167,6 +1170,7 @@ struct Exporter
             std::vector<int> ids;
         };
         std::map<int, ChanceGroup> chanceGroups;
+        std::vector<std::pair<int, NoteCurvesRef>> expression; // (NoteId, the note's curves as exported)
         if (keyTracks != nullptr)
         {
             keyTracks->kids.clear();
@@ -1203,6 +1207,21 @@ struct Exporter
                         g.chance = n->chance;
                         g.ids.push_back (noteId);
                     }
+                    if (n->curves.has())
+                    {
+                        // (a note cut by the clip's end keeps the part that sounds)
+                        auto curves = n->start + n->length > offset + length ? notecurves::slice (n->curves, 0.0, (double) (offset + length - n->start))
+                                                                            : n->curves;
+                        // Live has no fine pitch per note: a pitch bend carries it (without one it stays unexported, as before)
+                        if (n->finePitch != 0.0f && curves.has() && ! curves->lane (NoteCurveLane::pitch).empty())
+                        {
+                            for (auto& point : curves.edit().lane (NoteCurveLane::pitch))
+                                point.value += n->finePitch;
+                            curves.tidy();
+                        }
+                        if (curves.has())
+                            expression.emplace_back (noteId, std::move (curves));
+                    }
                     e.set ("NoteId", num (noteId++));
                     list->add (std::move (e));
                 }
@@ -1210,6 +1229,7 @@ struct Exporter
             }
         }
         c.value ("Notes/NoteIdGenerator/NextId", num (noteId));
+        writePerNoteExpression (c, expression);
         if (auto* groups = c.at ("Notes/NoteProbabilityGroups"); groups != nullptr && ! chanceGroups.empty())
         {
             int index = 0;
@@ -1247,6 +1267,47 @@ struct Exporter
             c.value ("Notes/ProbabilityGroupIdGenerator/NextId", num (index + 1));
         }
         return c;
+    }
+
+    // The notes' expression (MPE stage 2, round 190hy; the import's perNoteCurvesOf has the format and its evidence): a
+    // PerNoteEventList per lane that has points, linear points only (no CurveControl). Clips without any keep the
+    // skeleton's empty store, as Live writes it.
+    void writePerNoteExpression (Node& clip, const std::vector<std::pair<int, NoteCurvesRef>>& expression)
+    {
+        auto* lists = clip.at ("Notes/PerNoteEventStore/EventLists");
+        if (lists == nullptr || expression.empty())
+            return;
+        lists->kids.clear();
+        int listId = 0;
+        for (const auto& [id, curves] : expression)
+            for (const auto lane : { NoteCurveLane::pitch, NoteCurveLane::timbre, NoteCurveLane::pressure })
+            {
+                const auto& points = curves->lane (lane);
+                if (points.empty())
+                    continue;
+                Node list;
+                list.name = "PerNoteEventList";
+                list.set ("Id", num (listId++));
+                list.set ("NoteId", num (id));
+                list.set ("CC", lane == NoteCurveLane::pitch ? "-2" : lane == NoteCurveLane::timbre ? "74" : "-1");
+                Node events;
+                events.name = "Events";
+                for (const auto& point : points)
+                {
+                    const auto x = (double) point.value;
+                    // pitch: 8191.5 / 48 per semitone; slide: the inverse of core/Mpe.h's timbre law, unrounded
+                    const auto value = lane == NoteCurveLane::pitch ? std::clamp (x * 8191.5 / (double) notecurves::maxPitchCents, -8191.5, 8191.5)
+                                       : lane == NoteCurveLane::timbre ? std::clamp (x >= 0.5 ? 64.0 + (x - 0.5) * 126.0 : x * 128.0, 0.0, 127.0)
+                                                                       : std::clamp (x * 127.0, 0.0, 127.0);
+                    Node event;
+                    event.name = "PerNoteEvent";
+                    event.set ("TimeOffset", num (std::max (0.0, (double) point.tick / (double) ppq)));
+                    event.set ("Value", num (value));
+                    events.add (std::move (event));
+                }
+                list.add (std::move (events));
+                lists->add (std::move (list));
+            }
     }
 
     Node audioClip (const Clip& clip, int id)
