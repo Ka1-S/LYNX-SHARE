@@ -1643,7 +1643,13 @@ void MixerStrips::paint (juce::Graphics& g)
             const auto cap = juce::Rectangle<float> (capWidth, 12.0f).withCentre ({ railX, capY });
             theme::fillRoundRect (g, cap.translated (0.0f, 1.5f), radius::sm, juce::Colours::black.withAlpha (0.35f));
             // same cap as the LookAndFeel's linear faders
-            theme::fillRoundRect (g, cap, radius::sm, capActive ? juce::Colour (0xffffffff) : juce::Colour (0xffd4d7dd));
+            // FL's fader colours (manual, Mixer › Level faders: "Grey (Default), Green (Selected), Orange (Armed for
+            // recording)"; details190if fl-fader-selected-green.png): LYNX's green LED colour and its warning orange
+            {
+                const auto armedCap = t > 0 && engine.isInsertArmed (t);
+                auto capColour = armedCap ? colour::warning : isSelected ? colour::ledOn : juce::Colour (0xffd4d7dd);
+                theme::fillRoundRect (g, cap, radius::sm, capActive ? (armedCap || isSelected ? capColour.brighter (0.25f) : juce::Colour (0xffffffff)) : capColour);
+            }
             g.setColour ((dragging (Part::fader) ? colour::accent : colour::bg0).withAlpha (0.8f));
             g.fillRect (cap.withSizeKeepingCentre (capWidth - 8.0f, 1.5f));
 
@@ -4163,7 +4169,8 @@ void MixerStrips::paintMeterLevel (juce::Graphics& g, int t, int ch, juce::Recta
     if (meter.peak > 0.001f) // peak hold line
     {
         const auto peakY = bar.getBottom() - (int) (meterPosition (meter.peak) * (float) bar.getHeight());
-        g.setColour (tone (meter.peak >= 1.0f ? colour::meterClip : meter.peak >= 0.5f ? colour::meterMid : colour::textPrimary.withAlpha (0.85f)));
+        // FL's peak tick is in the meter's own colour (its lime; details190if fl-mixer-meters-strips-3frames.png; round 190io)
+        g.setColour (tone (meter.peak >= 1.0f ? colour::meterClip : meter.peak >= 0.5f ? colour::meterMid : colour::meterLow));
         g.fillRect (bar.getX(), juce::jmax (bar.getY(), peakY - 1), bar.getWidth(), 2);
     }
 
