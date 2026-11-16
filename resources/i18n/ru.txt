@@ -10641,3 +10641,8 @@ countries: ru by kz
 "Theme A: compare two versions of the theme" = "Тема A: сравнить две версии темы"
 "Theme B: compare two versions of the theme" = "Тема B: сравнить две версии темы"
 "A and B keep two versions of the theme while this page is open: switch to compare them." = "A и B хранят две версии темы, пока открыта эта страница: переключайтесь, чтобы сравнить."
+"Bold text" = "Жирный текст"
+"Labels, buttons and menus" = "Подписи, кнопки и меню"
+"All text" = "Весь текст"
+"Draws the interface's text in the bold face: the labels, buttons and menus, or every text. Applied when LYNX SHARE restarts." = "Рисует текст интерфейса жирным: подписи, кнопки и меню или весь текст. Применяется после перезапуска LYNX SHARE."
+"A new interface font, text size or bold text is applied when LYNX SHARE restarts." = "Новый шрифт интерфейса, размер текста или жирный текст применяются после перезапуска LYNX SHARE."

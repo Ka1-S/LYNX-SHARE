@@ -55,4 +55,37 @@ inline int parse (const std::string& text) noexcept
     }
     return digits ? clamp (value) : standard;
 }
+
+// Settings › General › Bold text (round 190jp, a Discord request): the text roles drawn in the bold face, chosen per role
+// as the size is, applied at the next start as the font and the size are. Off: LYNX's own weights. Labels: the small and
+// body roles (labels, buttons, menus, lists). All: every role.
+enum class Bold : int { off = 0, labels = 1, all = 2 };
+
+inline bool boldFor (int setting, Role role) noexcept
+{
+    if (setting == (int) Bold::all)
+        return true;
+    return setting == (int) Bold::labels && (role == Role::small || role == Role::body);
+}
+
+// The saved text ("1"); anything else is off.
+inline int parseBold (const std::string& text) noexcept
+{
+    for (const auto ch : text)
+        if (ch == '1' || ch == '2')
+            return ch - '0';
+        else if (ch != ' ' && ch != '\n' && ch != '\r' && ch != '\t')
+            return (int) Bold::off;
+    return (int) Bold::off;
+}
+
+// The role a font of `size` px is, from the sizes the roles have now (caption..display, rising): the nearest one, the
+// boundary half-way between two roles belongs to the lower one (a label at body + 1 is still a body text).
+inline Role roleOf (float size, const std::array<float, 5>& sizes) noexcept
+{
+    for (int i = 0; i < 4; ++i)
+        if (size <= (sizes[(std::size_t) i] + sizes[(std::size_t) i + 1]) * 0.5f)
+            return (Role) i;
+    return Role::display;
+}
 } // namespace lynx::textsize

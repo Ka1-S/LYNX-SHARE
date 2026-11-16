@@ -545,7 +545,14 @@ private:
         }
         fontPreview.setBounds (r.indented (22).translated (0, -3));
         fontNote.setBounds (r.indentedNote (fontNote, 16).translated (0, -5));
-        textSizeBox.setBounds (r.row (textSizeLabel, 120));
+        {
+            // the size, then Bold text on the same row (round 190jp)
+            auto row = r.row (textSizeLabel, 0);
+            textSizeBox.setBounds (row.removeFromLeft (120));
+            row.removeFromLeft (8);
+            boldLabel.setBounds (row.removeFromLeft (juce::jmin (row.getWidth() / 3, theme::labelColumnWidth ({ &boldLabel }, Rows::h (80), Rows::h (160)))));
+            boldBox.setBounds (row.withTrimmedLeft (6).withWidth (juce::jmin (row.getWidth() - 6, Rows::h (220))));
+        }
         scaleBox.setBounds (r.row (scaleLabel, 120));
         menuBox.setBounds (r.row (menuLabel, 160));
         wavesBox.setBounds (r.row (wavesLabel, 0));
@@ -684,10 +691,11 @@ private:
     // (Labels and caches hold the old font's shapes). The sample line shows the choice right away.
     void setupFontRow()
     {
-        for (auto* c : std::initializer_list<juce::Component*> { &fontLabel, &fontBox, &fontReset, &fontPreview, &fontNote, &textSizeLabel, &textSizeBox })
+        for (auto* c : std::initializer_list<juce::Component*> { &fontLabel, &fontBox, &fontReset, &fontPreview, &fontNote, &textSizeLabel, &textSizeBox,
+                                                                 &boldLabel, &boldBox })
             add (*c);
         styleLabel (fontLabel, tr ("Interface font"));
-        styleNote (fontNote, tr ("A new interface font or text size is applied when LYNX SHARE restarts."));
+        styleNote (fontNote, tr ("A new interface font, text size or bold text is applied when LYNX SHARE restarts."));
         // issue #189: the text roles' size next to the font (core/TextSize.h), applied at the next start as the font is
         styleLabel (textSizeLabel, tr ("Text size"));
         for (const auto percent : textsize::choices)
@@ -695,6 +703,15 @@ private:
         selectNearest (textSizeBox, options.textSize);
         textSizeBox.setTooltip (tr ("The size of the interface's text, role by role (labels, menus, buttons, titles). The UI size scales everything."));
         textSizeBox.onChange = [this] { change ([&] { options.textSize = textSizeBox.getSelectedId(); }); };
+        // round 190jp (a Discord request): bold text next to the size, per role, applied at the next start as they are
+        styleLabel (boldLabel, tr ("Bold text"));
+        boldLabel.setJustificationType (juce::Justification::centredRight);
+        boldBox.addItem (tr ("Off"), 1);
+        boldBox.addItem (tr ("Labels, buttons and menus"), 2);
+        boldBox.addItem (tr ("All text"), 3);
+        boldBox.setSelectedId (juce::jlimit (0, 2, options.boldText) + 1, juce::dontSendNotification);
+        boldBox.setTooltip (tr ("Draws the interface's text in the bold face: the labels, buttons and menus, or every text. Applied when LYNX SHARE restarts."));
+        boldBox.onChange = [this] { change ([&] { options.boldText = boldBox.getSelectedId() - 1; }); };
         const auto fallback = theme::defaultUiFont();
         fontBox.addItem (fallback.isNotEmpty() ? tr ("Default ({0})", { fallback }) : tr ("Default"), 1);
         fontBox.addSeparator();
@@ -755,8 +772,8 @@ private:
     SectionTitle languageTitle { tr ("Language and display") }, displayTitle, startupTitle { tr ("Startup") }, editingTitle { tr ("Editing") },
         backupTitle { tr ("Backup") }, hintsTitle { tr ("Hints and warnings") }, pluginsTitle { tr ("Plugins and shortcuts") }, reportsTitle { tr ("Crash reports") }, updatesTitle { tr ("Updates") }, remoteTitle { tr ("Remote control") };
     juce::Label longestWaitLabel, animationLabel, animationNote, languageLabel, languageNote, scaleLabel, menuLabel, wavesLabel, noteNamesLabel, blackNotesLabel, pluginStyleLabel, editInLabel, undoLabel, autosaveLabel, keepLabel, sandboxNote, substitutesNote, shortcutsNote, crashLabel, crashNote, updatesNote, previousLabel;
-    juce::Label fontLabel, fontPreview, fontNote, textSizeLabel;
-    juce::ComboBox fontBox, textSizeBox;
+    juce::Label fontLabel, fontPreview, fontNote, textSizeLabel, boldLabel;
+    juce::ComboBox fontBox, textSizeBox, boldBox;
     juce::Label templateLabel, templateNote, startupProjectLabel;
     juce::ComboBox templateBox, startupProjectBox;
     std::vector<TemplateChoice> templateChoices; // templateBox's item id - 1

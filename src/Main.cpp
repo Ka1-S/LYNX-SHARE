@@ -685,6 +685,9 @@ public:
         // text size (issue #189): saved in Settings › General; --textsize 125 overrides it for this run
         const auto textSizeArg = args.indexOf ("--textsize");
         lynx::theme::setTextSize (textSizeArg >= 0 ? args[textSizeArg + 1].getIntValue() : lynx::theme::savedTextSize());
+        // bold text (round 190jp): saved in Settings › General; --boldtext 1 (labels) or 2 (all) overrides it for this run
+        const auto boldTextArg = args.indexOf ("--boldtext");
+        lynx::theme::setBoldText (boldTextArg >= 0 ? args[boldTextArg + 1].getIntValue() : lynx::theme::savedBoldText());
 
         if (args.contains ("--showcase"))
         {

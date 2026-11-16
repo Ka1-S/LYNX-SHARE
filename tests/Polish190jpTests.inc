@@ -65,3 +65,27 @@ TEST (polish190jp_colour_dots_set_their_tokens)
     CHECK (spec.hasDots() && ! spec.isDefaultLook());
     CHECK (std::string (dotId (Dot::selection)) == "selection" && std::string (dotId (Dot::text)) == "text" && dotCount == 8);
 }
+
+#include "core/TextSize.h"
+
+TEST (polish190jp_bold_text_per_role)
+{
+    using namespace lynx::textsize;
+    // off: nothing; labels: the small and body roles (labels, buttons, menus, lists); all: every role
+    for (const auto role : { Role::caption, Role::small, Role::body, Role::title, Role::display })
+    {
+        CHECK (! boldFor ((int) Bold::off, role));
+        CHECK (boldFor ((int) Bold::all, role));
+        CHECK (boldFor ((int) Bold::labels, role) == (role == Role::small || role == Role::body));
+    }
+    CHECK (parseBold ("1") == 1 && parseBold ("2\n") == 2 && parseBold ("") == 0 && parseBold ("x") == 0 && parseBold ("7") == 0);
+    // the role of a size: the nearest role, the boundary half-way (as the roles are at 100 % and at 150 %)
+    const std::array<float, 5> standard { 11.0f, 12.0f, 13.0f, 15.0f, 20.0f };
+    CHECK (roleOf (11.0f, standard) == Role::caption && roleOf (12.0f, standard) == Role::small && roleOf (13.0f, standard) == Role::body);
+    CHECK (roleOf (14.0f, standard) == Role::body && roleOf (15.0f, standard) == Role::title && roleOf (18.0f, standard) == Role::display);
+    CHECK (roleOf (9.0f, standard) == Role::caption && roleOf (26.0f, standard) == Role::display);
+    std::array<float, 5> large {};
+    for (int i = 0; i < 5; ++i)
+        large[(std::size_t) i] = scaled (standard[(std::size_t) i], 150, (Role) i);
+    CHECK (roleOf (large[2], large) == Role::body && roleOf (large[3], large) == Role::title);
+}

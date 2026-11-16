@@ -108,6 +108,12 @@ void setTextSize (int percent); // sets type::caption..display
 int textSize();                 // the percent in use
 int savedTextSize();            // 100 when none was saved
 void saveTextSize (int percent);
+// Settings › General › Bold text (round 190jp): textsize::Bold, set once at start-up (ui-bold-text.txt); theme::font
+// then gives the bold face for the chosen roles.
+void setBoldText (int setting);
+int boldText();
+int savedBoldText(); // 0 (off) when none was saved
+void saveBoldText (int setting);
 
 // The UI font at `size` (plain or bold). Round 190gr (U1): the fonts come from a small cache, so a paint no longer makes a
 // new juce::Font whose typeface JUCE then looks up by name (its typeface cache compares the family and style strings),

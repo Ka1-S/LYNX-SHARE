@@ -10641,3 +10641,8 @@ countries: tw hk mo
 "Theme A: compare two versions of the theme" = "主題 A：比較主題的兩個版本"
 "Theme B: compare two versions of the theme" = "主題 B：比較主題的兩個版本"
 "A and B keep two versions of the theme while this page is open: switch to compare them." = "此頁面開啟期間，A 和 B 保存主題的兩個版本：切換即可比較。"
+"Bold text" = "粗體文字"
+"Labels, buttons and menus" = "標籤、按鈕和選單"
+"All text" = "全部文字"
+"Draws the interface's text in the bold face: the labels, buttons and menus, or every text. Applied when LYNX SHARE restarts." = "以粗體顯示介面文字：標籤、按鈕和選單，或全部文字。重新啟動 LYNX SHARE 後生效。"
+"A new interface font, text size or bold text is applied when LYNX SHARE restarts." = "新的介面字型、文字大小或粗體在重新啟動 LYNX SHARE 後生效。"

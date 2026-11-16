@@ -10641,3 +10641,8 @@ countries: jp
 "Theme A: compare two versions of the theme" = "テーマ A: テーマの 2 つのバージョンを比べる"
 "Theme B: compare two versions of the theme" = "テーマ B: テーマの 2 つのバージョンを比べる"
 "A and B keep two versions of the theme while this page is open: switch to compare them." = "このページを開いている間、A と B はテーマの 2 つのバージョンを保持します。切り替えて比べてください。"
+"Bold text" = "太字"
+"Labels, buttons and menus" = "ラベル、ボタン、メニュー"
+"All text" = "すべてのテキスト"
+"Draws the interface's text in the bold face: the labels, buttons and menus, or every text. Applied when LYNX SHARE restarts." = "インターフェースのテキストを太字で表示します: ラベル、ボタン、メニュー、またはすべてのテキスト。LYNX SHARE の再起動後に適用されます。"
+"A new interface font, text size or bold text is applied when LYNX SHARE restarts." = "新しいインターフェースフォント、文字サイズ、太字は LYNX SHARE の再起動後に適用されます。"

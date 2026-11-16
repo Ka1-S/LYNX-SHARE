@@ -10641,3 +10641,8 @@ countries: es mx ar co cl pe ve
 "Theme A: compare two versions of the theme" = "Tema A: compara dos versiones del tema"
 "Theme B: compare two versions of the theme" = "Tema B: compara dos versiones del tema"
 "A and B keep two versions of the theme while this page is open: switch to compare them." = "A y B guardan dos versiones del tema mientras esta página está abierta: cambia entre ellas para compararlas."
+"Bold text" = "Texto en negrita"
+"Labels, buttons and menus" = "Etiquetas, botones y menús"
+"All text" = "Todo el texto"
+"Draws the interface's text in the bold face: the labels, buttons and menus, or every text. Applied when LYNX SHARE restarts." = "Dibuja el texto de la interfaz en negrita: las etiquetas, botones y menús, o todo el texto. Se aplica al reiniciar LYNX SHARE."
+"A new interface font, text size or bold text is applied when LYNX SHARE restarts." = "Una nueva fuente de interfaz, tamaño de texto o texto en negrita se aplica al reiniciar LYNX SHARE."

@@ -7979,6 +7979,7 @@ void MainComponent::openSettings (int page)
         o.language = i18n::saved();
         o.uiFont = theme::savedUiFont();
         o.textSize = theme::savedTextSize();
+        o.boldText = theme::savedBoldText();
         o.uiScale = safe->toolbarLayout.uiScale;
         o.compactMenus = theme::menus::compact();
         o.waveSpectral = ui::WaveformCache::spectral;
@@ -8136,6 +8137,8 @@ void MainComponent::openSettings (int page)
             theme::saveUiFont (o.uiFont);
         if (o.textSize != theme::savedTextSize())
             theme::saveTextSize (o.textSize);
+        if (o.boldText != theme::savedBoldText())
+            theme::saveBoldText (o.boldText);
         if (o.language != i18n::saved())
             self.showLanguageChoice (o.language);
     };

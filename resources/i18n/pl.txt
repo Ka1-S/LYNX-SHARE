@@ -10641,3 +10641,8 @@ countries: pl
 "Theme A: compare two versions of the theme" = "Motyw A: porównaj dwie wersje motywu"
 "Theme B: compare two versions of the theme" = "Motyw B: porównaj dwie wersje motywu"
 "A and B keep two versions of the theme while this page is open: switch to compare them." = "A i B przechowują dwie wersje motywu, dopóki ta strona jest otwarta: przełączaj, aby je porównać."
+"Bold text" = "Pogrubiony tekst"
+"Labels, buttons and menus" = "Etykiety, przyciski i menu"
+"All text" = "Cały tekst"
+"Draws the interface's text in the bold face: the labels, buttons and menus, or every text. Applied when LYNX SHARE restarts." = "Rysuje tekst interfejsu pogrubioną czcionką: etykiety, przyciski i menu albo cały tekst. Stosowane po ponownym uruchomieniu LYNX SHARE."
+"A new interface font, text size or bold text is applied when LYNX SHARE restarts." = "Nowa czcionka interfejsu, rozmiar tekstu lub pogrubienie są stosowane po ponownym uruchomieniu LYNX SHARE."

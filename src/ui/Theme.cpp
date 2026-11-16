@@ -85,8 +85,16 @@ juce::Font cachedFont (float size, int kind)
 }
 } // namespace
 
+namespace
+{
+int boldTextInUse = 0; // textsize::Bold (round 190jp)
+} // namespace
+
 juce::Font font (float size, bool bold)
 {
+    // Bold text (round 190jp): the roles the user chose take the bold face (the role from the size, as the roles are now)
+    if (! bold && boldTextInUse != 0)
+        bold = textsize::boldFor (boldTextInUse, textsize::roleOf (size, { type::caption, type::small, type::body, type::title, type::display }));
     return cachedFont (size, bold ? 1 : 0);
 }
 
@@ -1253,6 +1261,30 @@ void saveTextSize (int percent)
         textSizeFile().deleteFile();
     else
         textSizeFile().replaceWithText (juce::String (textsize::clamp (percent)));
+}
+
+// --- Settings › General › Bold text (round 190jp) ------------------------------------------------------------
+namespace
+{
+juce::File boldTextFile() { return platform::settingsFile ("ui-bold-text.txt"); }
+} // namespace
+
+void setBoldText (int setting)
+{
+    boldTextInUse = juce::jlimit (0, 2, setting);
+    clearFontCache();
+}
+
+int boldText() { return boldTextInUse; }
+
+int savedBoldText() { return textsize::parseBold (boldTextFile().loadFileAsString().toStdString()); }
+
+void saveBoldText (int setting)
+{
+    if (juce::jlimit (0, 2, setting) == 0)
+        boldTextFile().deleteFile();
+    else
+        boldTextFile().replaceWithText (juce::String (juce::jlimit (0, 2, setting)));
 }
 
 juce::String savedUiFont() { return uiFontFile().loadFileAsString().trim(); }
