@@ -3271,6 +3271,22 @@ public:
             if (menu.getNumItems() > 0)
                 menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&wave).withMousePosition());
         };
+        // round 190im (R11, DF-113): FL's handles dragged on the waveform — the "Start" marker turns the Start offset knob,
+        // the loop lines the loop Start / End knobs (Shift: the whole loop moves, as Shift on the knobs; FL)
+        wave.setHandlesEditable (true);
+        wave.onHandleDrag = [this] (ui::WaveformDisplay::Handle h, double v, bool shift) {
+            using H = ui::WaveformDisplay::Handle;
+            if (h == H::start)
+            {
+                startOffsetKnob.setValue (v, juce::sendNotificationSync);
+                return;
+            }
+            if (shownFrames <= 1 || ! loopStartKnob.isEnabled())
+                return;
+            const juce::ScopedValueSetter<bool> shiftNow (shiftHeld, shift);
+            auto& knob = h == H::loopStart ? loopStartKnob : loopEndKnob;
+            knob.setValue (std::round (v * (double) (shownFrames - 1)), juce::sendNotificationSync);
+        };
         addAndMakeVisible (wave);
         waveScroll.setRangeLimits (0.0, 1.0, juce::dontSendNotification);
         waveScroll.setCurrentRange (0.0, 1.0, juce::dontSendNotification);
