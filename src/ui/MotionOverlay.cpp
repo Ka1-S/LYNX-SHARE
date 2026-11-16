@@ -351,10 +351,8 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
         const auto topY = (int) std::floor (ownerPos.y + (double) mark.extent.getY() * s) - 1;
         const auto w = (int) std::ceil ((double) mark.extent.getWidth() * s) + 3, h = (int) std::ceil ((double) mark.extent.getHeight() * s) + 3;
         const auto reference = (int) std::floor ((double) clipTop.getCentreX() * topScale); // (where the painter clips nothing of it)
-        const auto key = juce::String::toHexString ((juce::int64) mark.look) + ":" + juce::String (w) + "x" + juce::String (h) + "@"
-                         + juce::String (s, 5) + "r" + juce::String (reference) + "y" + juce::String (topY) + "o"
-                         + juce::String (ownerPos.x - std::floor (ownerPos.x), 4) + "," + juce::String (ownerPos.y - std::floor (ownerPos.y), 4);
-        if (key != pictureKey)
+        const PictureKey key { mark.look, w, h, reference, topY, s, ownerPos.x - std::floor (ownerPos.x), ownerPos.y };
+        if (! (key == pictureKey))
         {
             pictureKey = key;
             for (auto& p : pictures)
@@ -386,7 +384,27 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
             deviceLost();
             return false;
         }
+        nudgeTopLevel (hwnd);
         return true;
+    }
+
+    // LYNX_OVERLAY_NUDGE=1 (A/B measurements): a docked panel's window is a native child; as for its Direct2D frames
+    // (cmake/LynxPatchJuce.cmake fix 34) the main window also paints the one pixel under the child's corner
+    static void nudgeTopLevel (HWND hwnd)
+    {
+        static const bool nudge = juce::SystemStats::getEnvironmentVariable ("LYNX_OVERLAY_NUDGE", {}) == "1";
+        if (! nudge || (GetWindowLongPtr (hwnd, GWL_STYLE) & WS_CHILD) == 0)
+            return;
+        const auto root = GetAncestor (hwnd, GA_ROOT);
+        for (int i = 0; i < juce::ComponentPeer::getNumPeers(); ++i)
+            if (auto* top = juce::ComponentPeer::getPeer (i); top != nullptr && (HWND) top->getNativeHandle() == root)
+            {
+                POINT corner { 0, 0 };
+                MapWindowPoints (hwnd, root, &corner, 1);
+                const auto scale = top->getPlatformScaleFactor() * (double) top->getComponent().getDesktopScaleFactor();
+                top->repaint ({ (int) (corner.x / scale), (int) (corner.y / scale), 1, 1 });
+                return;
+            }
     }
 
     // Something in the view's window over the mark: a later sibling of the view or of one of its parents, the view's own
@@ -522,7 +540,7 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
         visual.reset();
         for (auto& p : pictures)
             p = {};
-        pictureKey.clear();
+        pictureKey = {};
         if (target != nullptr && Devices::get().generation == generation)
             releaseTarget (attachedHwnd); // (a target of a lost device was dropped by useTarget already, or is now)
         else if (const auto found = targets().find (attachedHwnd); target != nullptr && found != targets().end() && found->second.generation == generation)
@@ -582,7 +600,15 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
     int generation = -1;
     Com<IDCompositionVisual> visual;
     std::array<Picture, phases> pictures;
-    juce::String pictureKey;
+    // what the pictures were painted for (a change paints them again)
+    struct PictureKey
+    {
+        std::uint64_t look = 0;
+        int w = 0, h = 0, reference = 0, topY = 0;
+        double scale = 0.0, ownerFractionX = -1.0, ownerY = 0.0;
+        bool operator== (const PictureKey&) const = default;
+    };
+    PictureKey pictureKey;
     bool showing = false, inTree = false;
     double lastShowMs = 0.0, hideAtMs = 0.0;
 };

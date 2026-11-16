@@ -10501,7 +10501,7 @@ bool PlaylistComponent::liveFrame (double nowMs)
     // frames later, once that paint is on screen
     if (gpuPlayhead.isShowing() && (! playing || ! isShowing()))
     {
-        gpuPlayhead.hide (true);
+        gpuPlayhead.hide (isShowing()); // (no longer shown: at once)
         repaintPlayheadColumn (playheadTick);
     }
     if (moved && isShowing())

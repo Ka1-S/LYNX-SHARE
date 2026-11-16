@@ -4862,7 +4862,7 @@ bool PianoRollComponent::playheadFrame (double)
     // round 190ip: stopped (step edit keeps it), the playhead is painted again; the overlay goes once that is on screen
     if (gpuPlayhead.isShowing() && (! playing || ! isShowing()))
     {
-        gpuPlayhead.hide (tick >= 0.0);
+        gpuPlayhead.hide (tick >= 0.0 && isShowing()); // (gone or no longer shown: at once)
         repaint (playheadColumn (playheadTick));
     }
     if (moved)
