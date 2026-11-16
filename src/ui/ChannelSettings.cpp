@@ -3301,6 +3301,7 @@ public:
         // waveform onto the Playlist, a channel, the Browser's targets... (as a Browser file drag; an OS file drag from
         // a window outside the main one)
         waveDrag.path = [this] { return wavePath; };
+        waveDrag.handleDragged = [this] { return wave.isDraggingHandle(); };
         wave.addMouseListener (&waveDrag, false);
         waveScroll.setRangeLimits (0.0, 1.0, juce::dontSendNotification);
         waveScroll.setCurrentRange (0.0, 1.0, juce::dontSendNotification);
@@ -4384,11 +4385,12 @@ private:
     struct SampleDragOut final : juce::MouseListener // (round 190ih: drag the sample out)
     {
         std::function<juce::String()> path;
+        std::function<bool()> handleDragged; // (rollup 0.1.30: round 190im's Start / loop handles take the press)
         bool started = false;
         void mouseDown (const juce::MouseEvent&) override { started = false; }
         void mouseDrag (const juce::MouseEvent& e) override
         {
-            if (started || e.mods.isPopupMenu() || e.getDistanceFromDragStart() < 8 || path == nullptr)
+            if (started || e.mods.isPopupMenu() || e.getDistanceFromDragStart() < 8 || path == nullptr || (handleDragged != nullptr && handleDragged()))
                 return;
             const juce::File file (path());
             if (! file.existsAsFile())
