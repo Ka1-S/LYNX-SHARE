@@ -1510,6 +1510,15 @@ void PianoRollComponent::paint (juce::Graphics& g)
                 g.setColour (key % 12 == 0 && ! (isBlackKey (key) && ! list) && colour != accent ? colour.withMultipliedBrightness (0.9f) : colour);
             g.fillRect (r);
         };
+        // (FL's black keys shade lighter towards their tip, the right: one gradient set per black key at rest)
+        const juce::ColourGradient blackKeys (keyBlack, 0.0f, 0.0f, keyBlack.interpolatedWith (keyWhite, 0.16f), (float) blackWidth, 0.0f, false);
+        const auto fillBlack = [&] (juce::Colour colour, juce::Rectangle<int> r) {
+            if (colour == keyBlack)
+                g.setGradientFill (blackKeys);
+            else
+                g.setColour (colour);
+            g.fillRect (r);
+        };
         const auto keyColour = [&] (int key) {
             const auto black = isBlackKey (key) && ! list;
             const auto pressed = key == previewKey || isLit (key);
@@ -1549,8 +1558,7 @@ void PianoRollComponent::paint (juce::Graphics& g)
                     const auto inset = rowHeight >= 12 ? 1 : 0;
                     g.setColour (bg0);
                     g.fillRect (0, y + inset, blackWidth + 1, rowHeight - 2 * inset);
-                    g.setColour (colour);
-                    g.fillRect (0, y + inset, blackWidth, rowHeight - 2 * inset);
+                    fillBlack (colour, { 0, y + inset, blackWidth, rowHeight - 2 * inset });
                     if (! pressed && rowHeight >= 12) // a light edge along the top, as on a real black key
                     {
                         g.setColour (keyWhite.withAlpha (0.14f));
@@ -1570,10 +1578,7 @@ void PianoRollComponent::paint (juce::Graphics& g)
             else
             {
                 if (black)
-                {
-                    g.setColour (colour);
-                    g.fillRect (0, y, width, rowHeight);
-                }
+                    fillBlack (colour, { 0, y, width, rowHeight });
                 else
                     fillKey (key, colour, { 0, y, width, rowHeight });
                 g.setColour (black ? bg0 : keyWhite.darker (0.3f));
