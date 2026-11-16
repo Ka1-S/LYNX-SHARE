@@ -68,6 +68,12 @@ public:
     // --mtshot190fm: the generators' settings as in Live's picture (Stacks: two chords)
     void setGenerateShotSettingsForSnapshot();
     void transformNow(); // the Transform button
+    // Round 190hr (miditools-098; Live 12 manual, MIDI Tools: Edit › Quantize Settings… Ctrl+Shift+U opens the Quantize
+    // tool here, Edit › Quantize Ctrl+U quantizes the selection with that tool's settings): one undo step, whatever
+    // tool shows
+    void quantizeNow();
+    void showQuantize() { setTool (quantize); }
+    const miditools::QuantizeOptions& quantizeSettings() const noexcept { return quantizeOptions; }
     void setAuto (bool on);
     // --detailshot: the settings of round 190aa's Live shots (Chop part 1 emphasised, Quantize 1/8 + 1/8T, Time Warp
     // breakpoint 2 at x2)

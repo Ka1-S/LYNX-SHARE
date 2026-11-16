@@ -2385,6 +2385,17 @@ struct ClipGridSlot
     bool blankName = false;
     ClipFollow follow;
     std::uint32_t groove = 0;       // the groove of the project's pool this clip plays through (Groove::id; 0 = none; core/Groove.h)
+    // round 190hr (Live's Clip panel, detail-016): with Loop on, the clip's Clip::offset / length are the loop (Live's
+    // Loop Position / Length) and the Start marker sits `startMarker` ticks into it (Live's StartRelative): a launch plays
+    // from the Start marker to the loop's end, then the loop. 0 = the Start marker on the loop start, as every clip saved
+    // before; kept in [0, length). Saved in .lynx ("startMarker") only when not 0.
+    std::int64_t startMarker = 0;
+    // round 190hr (Live's Clip Scale, detail-022): the clip's own scale. `ownScale` off = the clip follows the project key
+    // (every clip saved before; Live's new clips take the current scale). On: `scaleRoot` (0…11) and `scaleIndex` (FL's
+    // reference-scale index, as projectkey::Key::flScale). `scaleOn`: Live's Scale Mode switch of the clip (IsInKey).
+    bool ownScale = false, scaleOn = true;
+    std::int8_t scaleRoot = 0;
+    std::int16_t scaleIndex = 0;
     bool operator== (const ClipGridSlot&) const = default;
 };
 

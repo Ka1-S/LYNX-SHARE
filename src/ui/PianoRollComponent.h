@@ -3,6 +3,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "core/EventPaneSplit.h"
+#include "core/LiveGrid.h"
 #include "core/NoteTools.h"
 #include "core/PianoKeys.h"
 #include "core/ScaleSnap.h"
@@ -229,6 +230,17 @@ public:
         repaint();
     }
     bool fitKeysToNotes = false;
+    // Round 190hr (detail-055, miditools-098): docked in the Clip-launch detail view, the editor uses the reference's
+    // grid (core/LiveGrid.h: adaptive / fixed, narrower / wider, triplet, snap; its value at the toolbar's grid place)
+    // and its Quantize (Ctrl+U) / Quantize Settings (Ctrl+Shift+U), which the Clip View's MIDI Tools Quantize tool does
+    // (Live 12: Quantize Settings… opens that tool; the dock sets the two hooks). The FL layout keeps FL's snap box. UI
+    // state, not saved.
+    livegrid::Grid liveGrid;
+    std::function<void()> onLiveQuantize, onLiveQuantizeSettings;
+    bool liveGridOn() const noexcept { return fitKeysToNotes; }
+    juce::PopupMenu liveGridMenu();
+    std::int64_t gridStepForCheck() const { return gridTicks(); }
+    juce::String liveGridTextForCheck() const { return liveGridButton.getButtonText(); }
     int undockedRowHeight = 14;
     int rowHeight = 14; // vertical zoom (Ctrl+middle-drag, Ctrl+Alt+wheel): gesture::minKeyHeight..maxKeyHeight px per key
     static constexpr int scrollBarSize = 12;
@@ -343,6 +355,7 @@ private:
     int titleInsetLeft = 0, titleInsetRight = 0; // the window's title and buttons share the toolbar row
     ChannelBox channelBox;
     SnapBox snapBox { true };         // "Main" (the toolbar snap) or this editor's own grid
+    juce::TextButton liveGridButton;  // round 190hr: docked, the reference's grid value ("1/16 ▾") and its menu
     IconButton ghostButton { "ghosts", Icon::ghost };
     IconButton scaleSnapButton { "scaleSnap", Icon::scaleSnap }; // snap to the scale (next to the scale box)
     IconButton moreButton { "more", Icon::more }; // note operations, left-edge resize, MIDI import/export

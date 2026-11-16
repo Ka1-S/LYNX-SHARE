@@ -68,6 +68,19 @@ struct LiveDevicePreset
 std::optional<LiveDevicePreset> importLiveDevicePreset (const std::vector<std::uint8_t>& fileBytes, const AlsImportOptions& options = {},
                                                         std::string* error = nullptr);
 
+// (round 190hr, racks-069) A Live instrument preset — an instrument .adv (Simpler, Sampler, Operator, Drift, a VST
+// instrument) or an Instrument / Drum Rack .adg — as a channel's instrument, through the set import's translators.
+// nullopt + `error`: not an instrument preset, a MIDI effect preset (no live counterpart in LYNX: refused), or an
+// instrument with no LYNX counterpart. `channel` holds only the instrument (and its name): the caller places it.
+struct LiveInstrumentPreset
+{
+    ChannelDef channel;
+    std::string name;
+    bool rack = false;
+};
+std::optional<LiveInstrumentPreset> importLiveInstrumentPreset (const std::vector<std::uint8_t>& fileBytes, const AlsImportOptions& options = {},
+                                                                std::string* error = nullptr);
+
 // The set's third-party plugins (no import): for the targeted scan before an open, as flpForeignPlugins for an .flp.
 std::vector<FlpPluginUse> alsForeignPlugins (const std::vector<std::uint8_t>& fileBytes);
 

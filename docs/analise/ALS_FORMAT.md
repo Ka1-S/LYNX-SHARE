@@ -630,3 +630,48 @@ Before → after per case (the rack against the engine, same stimuli, same metri
   ramps are straight in different units a volume ramp is cut into pieces both ways until the gain agrees within 0.05 dB
   (above −60 dB). **Track Panning law:** constant power with +3 dB at the sides, L = √2·cos((p+1)·π/4),
   R = √2·sin((p+1)·π/4) — the same as LYNX's voice pan, so the pan lane maps one to one.
+
+## 26. Rack presets (.adg) in and out, and Group / Ungroup of an instrument (round 190hr) [DATA, SCHEMA]
+- **A rack preset keeps its chains apart from the rack device.** Every one of the 1,071 `.adg` files of Live 12.4's Core
+  Library (Instrument 814, Audio Effect 148, Drum 90, MIDI Effect 19; `MinorVersion 12.0_12402`) holds
+  `GroupDevicePreset{OverwriteProtectionNumber (3077), Device (the rack element: its Branches and ReturnBranches lists
+  EMPTY), PresetRef, BranchPresets, ReturnBranchPresets}` [SCHEMA lines 2760-2766]. Each chain is a `<Kind>BranchPreset`
+  {`Name` (a plain string), `IsSoloed`, `DevicePresets` (one `AbletonDevicePreset{OverwriteProtectionNumber, Device,
+  PresetRef}` per device; a nested rack is a `GroupDevicePreset` in turn), `MixerPreset` (an AbletonDevicePreset whose
+  Device is `AudioBranchMixerDevice` — `MidiBranchMixerDevice` in a MIDI Effect Rack — with the same members as a set's
+  branch `MixerDevice`), `BranchSelectorRange`, `SessionViewBranchWidth`, `DocumentColorIndex` (the set's `Color`),
+  `AutoColored`, `AutoColorScheme`, `SourceContext`, and `ZoneSettings`} [SCHEMA 241-252, 1860-1872, 2915-2927,
+  4611-4623]. Instrument and MIDI Effect chains: `ZoneSettings{KeyRange, VelocityRange}`; a Drum Rack pad:
+  `ZoneSettings{ReceivingNote, SendingNote, ChokeGroup}` (a set's `BranchInfo`). A Drum Rack's return chains are
+  `AudioEffectBranchPreset`s in `ReturnBranchPresets`; a pad playing into one routes to
+  `AudioOut/RELATIVE/DeviceIn.PARENT.R<k>,ChainIn` (a set: `AudioOut/Track.<id>/DeviceIn.<n>.R<k>,ChainIn`).
+- Ids: every `Pointee`, `AutomationTarget`, `ModulationTarget` Id in a preset is 0 (Live numbers them when it loads the
+  preset). `PresetRef` is a slot (`Slot<PresetRef>`): Live writes a `FilePresetRef` / `AbletonDefaultPresetRef` to the
+  file it came from; LYNX writes it empty, as `SourceContext` is written empty in Live's own branch presets.
+- **Import (fix):** the round-190fm reader took the chains from `Device/…/Branches`, which is always empty in a preset,
+  so every Live `.adg` opened as a rack without chains. LYNX now rewrites the preset into a set's form (Branches filled
+  from BranchPresets, ZoneSettings → BranchInfo on a pad, MixerPreset → MixerDevice, nested GroupDevicePresets in turn)
+  and reads it with the set reader. Test: every Core Library Audio Effect Rack and a sample of 120 Instrument / Drum Racks
+  open with as many chains as they have BranchPresets.
+- **Instrument presets** (`importLiveInstrumentPreset`): an instrument `.adv` (Simpler, Sampler, Operator, Drift, a VST
+  instrument) or an Instrument / Drum Rack `.adg` becomes a channel's instrument through the set's translators. Dropped on
+  the Device View's instrument it replaces it (as a plugin dropped there); elsewhere it makes a channel; into an
+  Instrument Rack's chain it is the chain's instrument. MIDI Effect Rack presets and Live's MIDI effects are refused:
+  LYNX plays them only by writing them into a set's notes, with no live device (left out, listed in the handoff).
+- **Export** (`exportLiveRackPreset`, the rack's Save Preset button, the Device View's Save preset): the rack as a set
+  export writes it (§14, §18, §20), then rewritten into the preset form above, ids 0, root `MinorVersion 12.0_12402`,
+  gzip. LYNX's own built-in devices have no Live device yet and are listed after saving (as in a set export).
+- **[LIVE] Live 12.4.16 check (2026-11-15, round 190hr, files opened through Live's own `.adg` open command):** Live's
+  Smokey Water.adg (control) loads; LYNX-written Audio Effect Racks (two chains, zones, a chain-volume macro shown as
+  "Chain Volume", nested racks), an Instrument Rack (two key-split chains, a "Chain Selector" macro), a MIDI Effect Rack
+  and a Drum Rack (a "Kick" pad on C1, a return chain) load. **Every LYNX-written `.adg` holding a VST3 plugin device
+  (kHs Gain, no saved state) made Live close** ("A serious program error", EXCEPTION_ACCESS_VIOLATION in Log.txt), at the
+  top level as in a nested rack. Plugins are therefore left out of rack presets and listed; whether a plugin with a
+  state Live saved itself loads is an open live check.
+- **Group / Ungroup of an instrument** (racks-061 / -062; Live's Group on an instrument makes an Instrument Rack
+  [STR u16 2524-2531 "Group", "Ungroup"; manual]): Ctrl+G on the Device View's instrument (or its menu) moves the
+  channel's instrument into an Instrument Rack's single chain (Patcherize, then the rack): the channel keeps its volume,
+  pan, insert, arpeggiator and Misc settings; its automated plugin parameters become macros 1-16 at their current values,
+  so the sound and the automation stay (null test). Ctrl+Shift+G ungroups a one-chain Instrument Rack whose chain starts
+  with its instrument: the instrument returns to the channel and the audio effects after it go to the front of the
+  channel's mixer insert (refused when the channel plays into Master or the insert has no room).

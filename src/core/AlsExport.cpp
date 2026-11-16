@@ -176,9 +176,8 @@ std::string boolean (bool b) { return b ? "true" : "false"; }
 // The project key as Live's scale (round 190o) [LIVE 12.4 save: ScaleInformation { Root, Name = the scale chooser's
 // index } beside the set's InKey and each MIDI clip's IsInKey; Live 11: a clip's ScaleInformation { RootNote, Name as
 // text }]. A project with no key, or with a scale Live has none like, is written with Scale Mode off (C Major).
-void writeLiveScale (Node& owner, const Song& song, std::string_view inKeyMember)
+void writeLiveScale (Node& owner, const std::optional<projectkey::Key>& key, std::string_view inKeyMember)
 {
-    const auto key = projectkey::get (song);
     const auto index = key ? livescales::indexFor (*key) : -1;
     auto* info = owner.child ("ScaleInformation");
     owner.value (inKeyMember, boolean (index >= 0 && info != nullptr)); // (the Live 12 skeleton's set has Scale Mode on)
@@ -193,6 +192,7 @@ void writeLiveScale (Node& owner, const Song& song, std::string_view inKeyMember
         name->set ("Value", numeric ? num (index) : std::string (livescales::scales()[(std::size_t) index].name));
     }
 }
+void writeLiveScale (Node& owner, const Song& song, std::string_view inKeyMember) { writeLiveScale (owner, projectkey::get (song), inKeyMember); }
 
 // ---------------------------------------------------------------------------------------------------------------
 // Skeletons (core/AlsSkeleton.h): one map of element kind → element per version, decoded once
@@ -269,6 +269,154 @@ struct LiveTrack
     float pan = 0.0f;
     bool muted = false, solo = false;
 };
+
+// ---------------------------------------------------------------------------------------------------------------
+// Rack presets (.adg, round 190hr): the set form of a rack (Branches/<Kind>Branch with their devices, as a track holds it)
+// rewritten into Live's preset form [DATA: every .adg of Live 12.4's Core Library; SCHEMA 12402 lines 2-10, 241-252,
+// 1860-1872, 2760-2766, 2915-2927, 4611-4623]: GroupDevicePreset{OverwriteProtectionNumber, Device (the rack with an
+// empty Branches / ReturnBranches), PresetRef, BranchPresets, ReturnBranchPresets}; each chain a <Kind>BranchPreset
+// {Name, IsSoloed, DevicePresets, MixerPreset, BranchSelectorRange, SessionViewBranchWidth, DocumentColorIndex,
+// AutoColored, AutoColorScheme, SourceContext[, ZoneSettings]}; each device an AbletonDevicePreset (a nested rack a
+// GroupDevicePreset). Live's own presets write 3077 as OverwriteProtectionNumber and every pointee / target Id as 0.
+constexpr const char* presetProtection = "3077";
+
+Node scalar (std::string name, std::string value)
+{
+    Node n;
+    n.name = std::move (name);
+    n.set ("Value", std::move (value));
+    return n;
+}
+
+Node named (std::string name)
+{
+    Node n;
+    n.name = std::move (name);
+    return n;
+}
+
+bool isRackTag (const std::string& tag)
+{
+    return tag == "AudioEffectGroupDevice" || tag == "InstrumentGroupDevice" || tag == "MidiEffectGroupDevice" || tag == "DrumGroupDevice";
+}
+
+void zeroIds (Node& e)
+{
+    const auto target = e.name == "Pointee" || (e.name.size() > 6 && e.name.compare (e.name.size() - 6, 6, "Target") == 0)
+                        || e.name.rfind ("ControllerTargets.", 0) == 0;
+    if (target && e.has ("Id"))
+        e.set ("Id", "0");
+    for (auto& k : e.kids)
+        zeroIds (k);
+}
+
+Node devicePreset (Node device, int id);
+
+Node branchPreset (Node& b, int id)
+{
+    const auto drum = b.name == "DrumBranch";
+    // (a Drum Rack's return chain, ReturnBranch in a set, is an AudioEffectBranchPreset in a preset [DATA])
+    Node p = named ((b.name == "ReturnBranch" ? std::string ("AudioEffectBranch") : b.name) + "Preset");
+    p.set ("Id", std::to_string (id));
+    std::string name;
+    if (auto* n = b.at ("Name/UserName"))
+        name = n->get ("Value");
+    if (name.empty())
+        if (auto* n = b.at ("Name/EffectiveName"))
+            name = n->get ("Value");
+    p.add (scalar ("Name", name));
+    p.add (scalar ("IsSoloed", b.child ("IsSoloed") != nullptr ? b.child ("IsSoloed")->get ("Value") : "false"));
+    Node presets = named ("DevicePresets");
+    for (const auto* chain : { "DeviceChain/AudioToAudioDeviceChain/Devices", "DeviceChain/MidiToAudioDeviceChain/Devices",
+                               "DeviceChain/MidiToMidiDeviceChain/Devices" })
+        if (auto* devices = b.at (chain))
+            for (auto& d : devices->kids)
+                presets.add (devicePreset (std::move (d), (int) presets.kids.size()));
+    p.add (std::move (presets));
+    Node mixer = named ("MixerPreset");
+    if (auto* m = b.child ("MixerDevice"))
+    {
+        Node inner = std::move (*m);
+        inner.name = b.name == "MidiEffectBranch" ? "MidiBranchMixerDevice" : "AudioBranchMixerDevice";
+        inner.attrs.clear();
+        inner.set ("Id", "0");
+        Node wrap = named ("AbletonDevicePreset");
+        wrap.set ("Id", "0");
+        wrap.add (scalar ("OverwriteProtectionNumber", presetProtection));
+        Node device = named ("Device");
+        device.add (std::move (inner));
+        wrap.add (std::move (device));
+        wrap.add (named ("PresetRef"));
+        mixer.add (std::move (wrap));
+    }
+    p.add (std::move (mixer));
+    if (auto* range = b.child ("BranchSelectorRange"))
+        p.add (*range);
+    const auto value = [&b] (const char* member, const char* fallback) {
+        const auto* e = b.child (member);
+        return e != nullptr && e->has ("Value") ? e->get ("Value") : std::string (fallback);
+    };
+    p.add (scalar ("SessionViewBranchWidth", value ("SessionViewBranchWidth", "55")));
+    p.add (scalar ("DocumentColorIndex", value ("Color", "0")));
+    p.add (scalar ("AutoColored", value ("AutoColored", "true")));
+    p.add (scalar ("AutoColorScheme", value ("AutoColorScheme", "0")));
+    p.add (named ("SourceContext"));
+    if (drum)
+    {
+        Node zones = named ("ZoneSettings");
+        if (auto* info = b.child ("BranchInfo"))
+            for (const auto* member : { "ReceivingNote", "SendingNote", "ChokeGroup" })
+                if (auto* x = info->child (member))
+                    zones.add (*x);
+        p.add (std::move (zones));
+    }
+    else if (auto* zones = b.child ("ZoneSettings"))
+        p.add (*zones);
+    return p;
+}
+
+Node rackPreset (Node device)
+{
+    Node p = named ("GroupDevicePreset");
+    p.add (scalar ("OverwriteProtectionNumber", presetProtection));
+    Node branches = named ("BranchPresets"), returns = named ("ReturnBranchPresets");
+    if (auto* list = device.child ("Branches"))
+    {
+        for (auto& b : list->kids)
+            branches.add (branchPreset (b, (int) branches.kids.size()));
+        list->kids.clear();
+    }
+    if (auto* list = device.child ("ReturnBranches"))
+    {
+        for (auto& b : list->kids)
+            returns.add (branchPreset (b, (int) returns.kids.size()));
+        list->kids.clear();
+    }
+    device.set ("Id", "0");
+    Node holder = named ("Device");
+    holder.add (std::move (device));
+    p.add (std::move (holder));
+    p.add (named ("PresetRef"));
+    p.add (std::move (branches));
+    p.add (std::move (returns));
+    return p;
+}
+
+Node devicePreset (Node device, int id)
+{
+    Node p = isRackTag (device.name) ? rackPreset (std::move (device)) : named ("AbletonDevicePreset");
+    if (p.name == "AbletonDevicePreset")
+    {
+        device.set ("Id", "0");
+        p.add (scalar ("OverwriteProtectionNumber", presetProtection));
+        Node holder = named ("Device");
+        holder.add (std::move (device));
+        p.add (std::move (holder));
+        p.add (named ("PresetRef"));
+    }
+    p.set ("Id", std::to_string (id));
+    return p;
+}
 
 struct Exporter
 {
@@ -380,6 +528,7 @@ struct Exporter
 
     // ---- Drum Racks (round 190ec, ALS_FORMAT.md §7): a pad's BranchInfo, its sends and Audio To, the return chains, and
     // a LYNX Sampler on a pad as Live's Simpler
+    bool rackPresetMode = false; // (round 190hr: writing an .adg)
     std::string drumTarget {}; // "AudioOut/Track.<track Id>/DeviceIn.<device Id>" of the Drum Rack about to be written (top level)
     static constexpr const char* sendFloor = "0.0003162277571"; // (Live's −70 dB send floor = −inf [DATA])
 
@@ -616,6 +765,15 @@ struct Exporter
                     const auto& node = doc.nodes[(std::size_t) n];
                     Node d;
                     bool made = false;
+                    if (rackPresetMode && ((node.generator && node.channel.instrument == InstrumentKind::plugin) || (! node.generator && node.effect.kind == EffectKind::plugin)))
+                    {
+                        // [LIVE, round 190hr] Live 12.4.16 closed ("A serious program error") on each LYNX-written .adg
+                        // holding a VST3 plugin device (kHs Gain, no saved state), while the same racks without it, nested
+                        // racks, Instrument / MIDI Effect / Drum Racks loaded: plugins stay out of rack presets until a
+                        // plugin with a state Live saved is checked
+                        note ("Plugin left out of the Live rack preset (Live 12.4 closes on it): " + patcher::nodeName (node));
+                        continue;
+                    }
                     if (node.generator && node.channel.instrument == InstrumentKind::plugin)
                         made = pluginDevice (node.channel.plugin, true, true, d);
                     else if (drum && node.generator && node.channel.instrument == InstrumentKind::sampler) // (round 190ec)
@@ -1356,7 +1514,8 @@ struct Exporter
         {
             loop->value ("LoopStart", num (contentStart));
             loop->value ("LoopEnd", num (contentEnd));
-            loop->value ("StartRelative", "0");
+            // round 190hr: the Start marker inside the loop (Live's StartRelative, beats from LoopStart)
+            loop->value ("StartRelative", slot.loop ? num (launcher::startLead (slot, (std::int64_t) std::llround ((contentEnd - contentStart) * ppq)) / ppq) : std::string ("0"));
             loop->value ("LoopOn", boolean (slot.loop));
             loop->value ("OutMarker", num (contentEnd));
         }
@@ -1371,6 +1530,9 @@ struct Exporter
         c.value ("FollowAction/JumpIndexA", num (f.jumpA + 1)); // Live's jump number is 1-based [LIVE, 181c]
         c.value ("FollowAction/JumpIndexB", num (f.jumpB + 1));
         c.value ("FollowAction/FollowActionEnabled", boolean (f.enabled));
+        // round 190hr: a MIDI clip's own scale (Live's Clip Scale: ScaleInformation + IsInKey per clip)
+        if (c.child ("ScaleInformation") != nullptr && (slot.ownScale || ! slot.scaleOn))
+            writeLiveScale (c, projectkey::clipKey (slot, song), "IsInKey");
     }
 
     // The slot node of `scene` in a track's main clip slot list (nullptr past the list)
@@ -1421,6 +1583,38 @@ struct Exporter
                 add (events[i].first, events[i].second);
         }
         list->add (std::move (env));
+    }
+
+    // ---------------------------------------------------------------------------------------------------------------
+    // (round 190hr) one rack as a Live rack preset (.adg)
+    bool runRackPreset (const PatcherDoc& doc, const std::string& name)
+    {
+        live11 = sk.kinds.count ("Root") > 0 && sk["Root"].get ("MinorVersion").rfind ("11.", 0) == 0;
+        const auto* r = rack::rackOf (doc);
+        if (r == nullptr)
+            return false;
+        // a Drum Rack pad playing into a return chain: Live's presets route it relative to the rack [DATA: Drums Gritty.adg
+        // "AudioOut/RELATIVE/DeviceIn.PARENT.R0,ChainIn"]
+        drumTarget = r->drum ? "AudioOut/RELATIVE/DeviceIn.PARENT" : "";
+        rackPresetMode = true;
+        Node device;
+        if (! rackDevice (doc, true, name, device))
+            return false;
+        zeroIds (device);
+        Node root = sk["Root"];
+        root.set ("Creator", options.creator);
+        if (! live11) // (as Live 12.4 writes its presets [DATA]; checked loading in Live 12.4.16 [LIVE])
+        {
+            root.set ("MinorVersion", "12.0_12402");
+            root.set ("SchemaChangeCount", "1");
+        }
+        root.kids.clear();
+        root.add (rackPreset (std::move (device)));
+        result.xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+        write (root, result.xml, 0);
+        const auto* data = reinterpret_cast<const std::uint8_t*> (result.xml.data());
+        result.bytes = gzip::compressStored (data, result.xml.size());
+        return true;
     }
 
     // ---------------------------------------------------------------------------------------------------------------
@@ -2025,6 +2219,26 @@ AlsExportResult exportAls (const Song& song, const AlsExportOptions& options)
     e.run();
     return result;
 }
+AlsExportResult exportLiveRackPreset (const PatcherDoc& rack, const std::string& name, const AlsExportOptions& options)
+{
+    AlsExportResult result;
+    const auto& sk = skeletons (options.version);
+    if (sk.kinds.empty())
+    {
+        result.notes.push_back ("internal error: the set skeletons could not be read");
+        return result;
+    }
+    static const Song empty;
+    Exporter e { empty, options, sk, result, false, {} };
+    if (! e.runRackPreset (rack, name))
+    {
+        result.bytes.clear();
+        if (result.notes.empty())
+            result.notes.push_back ("not a rack");
+    }
+    return result;
+}
+
 bool alsSampleNeedsWav (const std::string& extension, const std::uint8_t* head, std::size_t size)
 {
     std::string ext;

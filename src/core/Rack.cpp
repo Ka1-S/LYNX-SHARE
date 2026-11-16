@@ -4,8 +4,10 @@
 #include <cmath>
 #include <memory>
 
+#include "core/DetailChain.h"
 #include "core/Effects.h"
 #include "core/NoteEdit.h"
+#include "core/Patcherize.h"
 
 namespace lynx::rack
 {
@@ -1036,6 +1038,188 @@ int ungroupSlot (Song& song, int track, int slot)
     fx.insert (fx.begin() + slot, out.begin(), out.end());
     song.removeDeadMidiLinks();
     return slot;
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Group / Ungroup of an instrument (round 190hr)
+
+bool canGroupChannel (const Song& song, int channel)
+{
+    if (! patcherize::canPatcherizeChannel (song, channel))
+        return false;
+    const auto& ch = song.channels[(std::size_t) channel];
+    return ! ch.freeze.on() && ch.instrument != InstrumentKind::vfx;
+}
+
+bool groupChannel (Song& song, int channel, const std::function<float (int node, int param)>& pluginValue)
+{
+    if (! canGroupChannel (song, channel))
+        return false;
+    auto scratch = song; // (a refusal leaves `song` untouched; Patcherize publishes what the song automates or links)
+    if (! patcherize::patcherizeChannel (scratch, channel))
+        return false;
+    auto& doc = scratch.channels[(std::size_t) channel].patcher;
+    if (doc.nodes.size() != 1 || ! doc.nodes[0].generator || doc.published.size() > (std::size_t) rackMacroCount || ! doc.surface.empty())
+        return false;
+    // the published parameters (the plugin's automated / linked ones) become the macros: each at the plugin's value now
+    std::vector<float> now (doc.published.size(), 0.0f);
+    for (std::size_t k = 0; k < doc.published.size(); ++k)
+    {
+        const auto& p = doc.published[k];
+        if (p.node != 0 || p.curve.size() > 2)
+            return false;
+        now[k] = pluginValue ? pluginValue (0, p.param) : -1.0f;
+        if (! (now[k] >= 0.0f))
+            return false;
+    }
+    const auto published = doc.published;
+    RackDoc r;
+    r.kind = RackDoc::Kind::instrument;
+    r.showDevices = true;
+    doc.rack.push_back (std::move (r));
+    RackChain chain;
+    chain.name = "Chain 1";
+    chain.nodes = { 0 };
+    chain.select = { 0, 127, 0, 127 };
+    addChainNodes (doc, chain, RackDoc::Kind::instrument);
+    auto* rk = rackOf (doc);
+    rk->chains.push_back (std::move (chain));
+    for (int k = 0; k < (int) published.size(); ++k)
+    {
+        const auto& p = published[(std::size_t) k];
+        RackMapping m;
+        m.node = 0;
+        m.param = p.param;
+        if (p.curve.size() == 2)
+            m.min = p.curve[0], m.max = p.curve[1];
+        auto& macro = rk->macros[(std::size_t) k];
+        macro.name = p.name;
+        macro.mappings.push_back (m);
+        if (m.max != m.min)
+            macro.value = std::clamp ((now[(std::size_t) k] - m.min) / (m.max - m.min), 0.0f, 1.0f) * 127.0f;
+    }
+    compile (doc);
+    // the same moves on the song itself (automation and links of the plugin's parameters → the published ones = macros)
+    if (! patcherize::patcherizeChannel (song, channel))
+        return false;
+    song.channels[(std::size_t) channel].patcher = std::move (doc);
+    return true;
+}
+
+namespace
+{
+// The chain's instrument node and its effects after it, or false when the rack is not one Ungroup takes
+bool ungroupable (const ChannelDef& ch, int& instrument, std::vector<int>& effects)
+{
+    const auto* r = rackOf (ch.patcher);
+    if (! isRack (ch) || r == nullptr || r->kind != RackDoc::Kind::instrument || r->drum || r->chains.size() != 1 || ch.freeze.on())
+        return false;
+    const auto& nodes = r->chains.front().nodes;
+    instrument = -1;
+    effects.clear();
+    for (const auto n : nodes)
+    {
+        if (n < 0 || n >= (int) ch.patcher.nodes.size())
+            return false;
+        const auto& node = ch.patcher.nodes[(std::size_t) n];
+        if (node.generator)
+        {
+            if (instrument >= 0 || ! effects.empty() || node.channel.instrument == InstrumentKind::vfx)
+                return false; // (a second instrument, or MIDI effects: they have no place on a channel)
+            instrument = n;
+        }
+        else if (instrument < 0)
+            return false;
+        else
+            effects.push_back (n);
+    }
+    return instrument >= 0;
+}
+} // namespace
+
+bool canUngroupChannel (const Song& song, int channel)
+{
+    if (channel < 0 || channel >= (int) song.channels.size())
+        return false;
+    const auto& ch = song.channels[(std::size_t) channel];
+    int instrument = -1;
+    std::vector<int> effects;
+    if (! ungroupable (ch, instrument, effects))
+        return false;
+    if (effects.empty())
+        return true;
+    const auto t = ch.mixerTrack;
+    return t > 0 && t < (int) song.mixer.size() && (int) (song.mixer[(std::size_t) t].effects.size() + effects.size()) <= maxEffectSlots;
+}
+
+bool ungroupChannel (Song& song, int channel)
+{
+    if (! canUngroupChannel (song, channel))
+        return false;
+    auto& ch = song.channels[(std::size_t) channel];
+    int instrument = -1;
+    std::vector<int> effects;
+    ungroupable (ch, instrument, effects);
+    const auto doc = ch.patcher; // (a copy: the channel's patcher goes below)
+    const auto& r = *rackOf (doc);
+    std::vector<EffectSlot> out;
+    for (const auto n : effects)
+        out.push_back (doc.nodes[(std::size_t) n].effect);
+    // the macros' values onto the native effect parameters they move; macros with one full-range mapping onto the
+    // instrument move their automation onto its parameter
+    std::array<int, rackMacroCount> moveParam {};
+    moveParam.fill (-1);
+    for (int m = 0; m < rackMacroCount; ++m)
+    {
+        const auto& macro = r.macros[(std::size_t) m];
+        const auto u = std::clamp (macro.value / 127.0f, 0.0f, 1.0f);
+        for (const auto& x : macro.mappings)
+        {
+            if (x.target != RackMapping::Target::param || x.param < 0)
+                continue;
+            const auto it = std::find (effects.begin(), effects.end(), x.node);
+            if (it == effects.end())
+                continue;
+            auto& dev = out[(std::size_t) (it - effects.begin())];
+            if (dev.kind != EffectKind::plugin && x.param < maxEffectParams)
+                dev.params[(std::size_t) x.param] = std::clamp (x.min + (x.max - x.min) * u, 0.0f, 1.0f);
+        }
+        if (macro.mappings.size() == 1 && macro.mappings[0].target == RackMapping::Target::param && macro.mappings[0].node == instrument
+            && macro.mappings[0].min == 0.0f && macro.mappings[0].max == 1.0f)
+            moveParam[(std::size_t) m] = macro.mappings[0].param;
+    }
+    // the instrument back on the channel: its own settings from the chain's copy, the channel's settings stay
+    const auto& inner = doc.nodes[(std::size_t) instrument].channel;
+    ch.instrument = inner.instrument;
+    ch.samplePath = inner.samplePath;
+    ch.zones = inner.zones;
+    ch.maxPolyphony = inner.maxPolyphony;
+    ch.plugin = inner.plugin;
+    ch.modelParams = inner.modelParams;
+    ch.sampler = inner.sampler;
+    ch.synth = inner.synth;
+    ch.patcher = inner.patcher;
+    ch.layer = inner.layer;
+    ch.controllerState = inner.controllerState;
+    ch.pluginState = inner.pluginState;
+    ch.flOrigin = inner.flOrigin;
+    ch.flWrapperFlags = inner.flWrapperFlags;
+    song.forEachTarget ([&] (AutomationTarget& t) {
+        if (t.kind != AutomationTargetKind::channelParam || t.index != channel)
+            return;
+        if (t.param >= 0 && t.param < rackMacroCount && moveParam[(std::size_t) t.param] >= 0)
+            t.param = moveParam[(std::size_t) t.param];
+        else
+            t.kind = AutomationTargetKind::none;
+    });
+    for (int k = 0; k < (int) out.size(); ++k)
+    {
+        out[(std::size_t) k].instance.renew();
+        out[(std::size_t) k].row = -1;
+        detailchain::insertEffectAt (song, ch.mixerTrack, std::move (out[(std::size_t) k]), k);
+    }
+    song.removeDeadMidiLinks();
+    return true;
 }
 
 // ---------------------------------------------------------------------------------------------------------------

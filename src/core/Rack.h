@@ -129,6 +129,25 @@ std::vector<EffectSlot> ungroup (const EffectSlot& rackSlot);
 // for an empty rack, which just goes), or −1 with the song untouched.
 int ungroupSlot (Song& song, int track, int slot);
 
+// Round 190hr (Live's Group / Ungroup on an instrument, racks-061 / -062 [STR u16 2524-2531 "Group", "Ungroup";
+// Live 12 manual: grouping an instrument makes an Instrument Rack]): channel `channel`'s instrument into a new Instrument
+// Rack with one chain holding it (the Patcherize copy: the channel keeps its name, volume, pan, insert, arpeggiator and
+// Misc settings, the instrument in the chain plays with neutral ones). Automated or linked plugin parameters become
+// macros 1…16 on the same parameters (full range), each starting at the plugin's value now (`pluginValue (0, param)`,
+// 0..1; −1 = unknown → false). False, song untouched: audio clips, controllers, Layers, Patchers / racks already,
+// frozen channels, more than 16 automated parameters.
+bool canGroupChannel (const Song& song, int channel);
+bool groupChannel (Song& song, int channel, const std::function<float (int node, int param)>& pluginValue = {});
+// Ungroup of a channel's Instrument Rack with one chain whose first device is its instrument (Live ungroups a rack with
+// one chain): the instrument becomes the channel's again (with the channel's own settings), the audio effects after it in
+// the chain go to the front of the channel's mixer insert, in order. Each native effect parameter a macro moves keeps the
+// value the macro gives it now; automation of a macro with one full-range mapping onto the instrument's parameter moves
+// onto that parameter; other macro, selector and morph automation is dropped (the macros go). False, song untouched: not
+// such a rack (a Drum Rack, several chains, no instrument first, a second instrument), effects but no insert of its own
+// (Master) or no room for them (10 slots).
+bool canUngroupChannel (const Song& song, int channel);
+bool ungroupChannel (Song& song, int channel);
+
 // ---------------------------------------------------------------------------------------------------------------
 // Macros
 

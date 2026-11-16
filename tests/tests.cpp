@@ -17599,6 +17599,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Session190bvTests.inc"
 #include "DetailView183aTests.inc"
 #include "Als181cTests.inc"
+#include "DetailView190hrTests.inc"
 #include "Groove190fmTests.inc"
 #include "AlsDevices190bqTests.inc"
 #include "AlsDevices190cfTests.inc"
@@ -17812,3 +17813,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Pdc190hqTests.inc" // round 190hq B13: side inputs, level automation and render-ahead under PDC
 #include "TempoMarkers190hqTests.inc" // round 190hq B11: tempo markers, resampled audio under them, scene tempo hold
 #include "UserFix190ibTests.inc" // round 190ib: issues #165 (SoundFont same-step slide), #170, #181, #182, #183
+#include "LiveRack190hrTests.inc" // round 190hr: Live Racks finish (Group / Ungroup of an instrument, .adg presets)

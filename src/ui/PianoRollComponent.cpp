@@ -178,6 +178,13 @@ PianoRollComponent::PianoRollComponent (AudioEngine& e)
     snapBox.setMouseClickGrabsKeyboardFocus (false);
     snapBox.onChange = [this] { repaint(); };
     addAndMakeVisible (snapBox);
+    // round 190hr: the reference's grid value and menu (docked only)
+    liveGridButton.setConnectedEdges (0);
+    liveGridButton.setTooltip (tr ("Grid: adaptive or fixed, narrower (Ctrl+1) or wider (Ctrl+2), triplet (Ctrl+3), snap (Ctrl+4), fixed / adaptive (Ctrl+5)"));
+    liveGridButton.onClick = [this] {
+        liveGridMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&liveGridButton));
+    };
+    addChildComponent (liveGridButton);
 
     tools.onChange = [this] (EditTool) {
         stopListening();
@@ -528,6 +535,8 @@ int PianoRollComponent::keyboardKeyAt (int x, int y) const
 
 std::int64_t PianoRollComponent::gridTicks() const
 {
+    if (liveGridOn()) // round 190hr: the reference's grid while docked in the Clip-launch detail view
+        return liveGrid.snap ? std::max<std::int64_t> (1, livegrid::stepTicks (liveGrid, pixelsPerTick)) : 1;
     const auto bar = engine.getSong().barTicks();
     const auto& option = grid::resolve (snapBox);
 
@@ -568,7 +577,7 @@ std::int64_t PianoRollComponent::snap (double tick, bool enabled) const
     if (! enabled)
         return (std::int64_t) std::floor (tick);
 
-    if (grid::resolve (snapBox).kind == grid::Kind::nearest)
+    if (! liveGridOn() && grid::resolve (snapBox).kind == grid::Kind::nearest)
         return noteedit::snapNearest (tick, snapCandidates(), 10.0 / pixelsPerTick, gridTicks());
 
     return noteedit::snapDown (tick, gridTicks());
@@ -632,7 +641,18 @@ void PianoRollComponent::resized()
     place (playButton, h);
     place (channelBox, 150);
     place (tools, tools.getIdealWidth (h));
-    place (snapBox, 128);
+    if (liveGridOn()) // round 190hr: the reference's grid value in place of FL's snap box
+    {
+        snapBox.setVisible (false);
+        liveGridButton.setButtonText (liveGrid.snap ? juce::String (livegrid::stepText (gridTicks(), liveGrid.triplet)) + juce::String::fromUTF8 (" \xe2\x96\xbe")
+                                                    : tr ("Off") + juce::String::fromUTF8 (" \xe2\x96\xbe"));
+        place (liveGridButton, 72);
+    }
+    else
+    {
+        liveGridButton.setVisible (false);
+        place (snapBox, 128);
+    }
     place (ghostButton, h);
     place (followButton, h);
     place (slideButton, h, true);
@@ -3946,10 +3966,76 @@ void PianoRollComponent::updateChordBubble()
         chordBubble.setVisible (false);
 }
 
+// Round 190hr: the reference's grid menu [STR AGridContextMenu: Widest … Narrowest (adaptive), Fixed with its values,
+// Triplet; DOC: Snap to Grid Ctrl+4, Fixed / Adaptive Ctrl+5]. Each pick changes this editor's grid at once.
+juce::PopupMenu PianoRollComponent::liveGridMenu()
+{
+    const juce::Component::SafePointer<PianoRollComponent> safe (this);
+    const auto change = [safe] (std::function<void (livegrid::Grid&)> fn) {
+        return [safe, fn] {
+            if (safe == nullptr)
+                return;
+            fn (safe->liveGrid);
+            safe->resized();
+            safe->repaint();
+        };
+    };
+    juce::PopupMenu menu;
+    menu.addSectionHeader (tr ("Adaptive Grid"));
+    for (int d = 0; d < livegrid::densityCount; ++d)
+        menu.addItem (tr (livegrid::densityName (d)), true, ! liveGrid.fixed && liveGrid.density == d, change ([d] (livegrid::Grid& g) {
+                          g.fixed = false;
+                          g.density = d;
+                          g.snap = true;
+                      }));
+    menu.addSectionHeader (tr ("Fixed Grid"));
+    for (int i = 0; i < livegrid::fixedCount; ++i)
+    {
+        const auto f = livegrid::fixedValues[i];
+        const auto text = f.den == 1 ? (f.num == 1 ? tr ("1 Bar") : tr ("{0} Bars", { juce::String (f.num) })) : juce::String (f.num) + "/" + juce::String (f.den);
+        menu.addItem (text, true, liveGrid.fixed && liveGrid.fixedIndex == i, change ([i] (livegrid::Grid& g) {
+                          g.fixed = true;
+                          g.fixedIndex = i;
+                          g.snap = true;
+                      }));
+    }
+    menu.addSeparator();
+    menu.addItem (tr ("Triplet Grid") + "\tCtrl+3", true, liveGrid.triplet, change ([] (livegrid::Grid& g) { g.triplet = ! g.triplet; }));
+    menu.addItem (tr ("Snap to Grid") + "\tCtrl+4", true, liveGrid.snap, change ([] (livegrid::Grid& g) { g.snap = ! g.snap; }));
+    menu.addSeparator();
+    menu.addItem (tr ("Narrow Grid") + "\tCtrl+1", true, false, change ([] (livegrid::Grid& g) { livegrid::narrower (g); }));
+    menu.addItem (tr ("Widen Grid") + "\tCtrl+2", true, false, change ([] (livegrid::Grid& g) { livegrid::wider (g); }));
+    menu.addSeparator();
+    menu.addItem (tr ("Quantize") + "\tCtrl+U", onLiveQuantize != nullptr, false, [safe] { if (safe != nullptr && safe->onLiveQuantize != nullptr) safe->onLiveQuantize(); });
+    menu.addItem (tr ("Quantize Settings...") + "\tCtrl+Shift+U", onLiveQuantizeSettings != nullptr, false, [safe] {
+        if (safe != nullptr && safe->onLiveQuantizeSettings != nullptr)
+            safe->onLiveQuantizeSettings();
+    });
+    return menu;
+}
+
 bool PianoRollComponent::runAction (const std::string& id)
 {
     auto is = [&id] (const char* name) { return id == name; };
 
+    // round 190hr: the reference's grid and quantize keys, only while docked in the Clip-launch detail view
+    if (id.rfind ("pianoRoll.live", 0) == 0)
+    {
+        if (! liveGridOn())
+            return false;
+        if (is ("pianoRoll.liveGridNarrower")) livegrid::narrower (liveGrid);
+        else if (is ("pianoRoll.liveGridWider")) livegrid::wider (liveGrid);
+        else if (is ("pianoRoll.liveGridTriplet")) liveGrid.triplet = ! liveGrid.triplet;
+        else if (is ("pianoRoll.liveGridSnap")) liveGrid.snap = ! liveGrid.snap;
+        else if (is ("pianoRoll.liveGridFixed")) liveGrid.fixed = ! liveGrid.fixed;
+        else if (is ("pianoRoll.liveQuantize") && onLiveQuantize != nullptr) onLiveQuantize();
+        else if (is ("pianoRoll.liveQuantizeSettings") && onLiveQuantizeSettings != nullptr) onLiveQuantizeSettings();
+        else
+            return false;
+        resized();
+        repaint();
+        return true;
+    }
     if (is ("pianoRoll.arpeggiate")) openNoteTool (NoteTool::arpeggiate);
     else if (is ("pianoRoll.strum")) openNoteTool (NoteTool::strum);
     else if (is ("pianoRoll.flip")) openNoteTool (NoteTool::flip);
@@ -4456,6 +4542,23 @@ bool PianoRollComponent::handleKey (const juce::KeyPress& key)
     const auto letter = keys::letterOfKeyCode (code); // (0 for F-keys, numpad, arrows: issue #12)
     const auto grid = gridTicks();
     const auto bar = engine.getSong().barTicks();
+
+    // round 190hr: the Clip-launch layout's docked editor takes the reference's grid keys (Ctrl+1…5) and Quantize
+    // (Ctrl+U / Ctrl+Shift+U) before the FL editor's own (FL's Ctrl+U chop stays in the Pattern layout)
+    if (liveGridOn() && cmd && ! alt)
+    {
+        const char* live = nullptr;
+        if (letter == 'U')
+            live = shift ? "pianoRoll.liveQuantizeSettings" : "pianoRoll.liveQuantize";
+        else if (! shift && code >= '1' && code <= '5')
+        {
+            static constexpr const char* gridKeys[] { "pianoRoll.liveGridNarrower", "pianoRoll.liveGridWider", "pianoRoll.liveGridTriplet",
+                                                     "pianoRoll.liveGridSnap", "pianoRoll.liveGridFixed" };
+            live = gridKeys[code - '1'];
+        }
+        if (live != nullptr && runAction (live))
+            return true;
+    }
 
     if (code == juce::KeyPress::backspaceKey)
     {

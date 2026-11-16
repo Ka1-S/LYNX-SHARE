@@ -1924,7 +1924,7 @@ void addAudioClip (Ctx& ctx, const Element& clip, int row, int mixerTrack, doubl
         c.gain = (float) clip.number ("SampleVolume", 1);
         // Re-Pitch ignores the clip's transpose: the tempo alone sets the pitch [LIVE: +5 st on a Re-Pitch clip renders
         // at the original pitch, 2026-11-06]
-        c.pitch = (warped && mode == 3) || beatsPitch != 0.0 ? 0.0f : (float) std::clamp (transpose, -12.0, 12.0);
+        c.pitch = (warped && mode == 3) || beatsPitch != 0.0 ? 0.0f : (float) transpose; // (±48, Live's range; round 190hr)
         c.muted = clip.boolean ("Disabled", false);
         if (&pass == &passes.front())
             c.fadeIn = std::clamp (ticksOf (clip.number ("Fades/FadeInLength", 0)), (std::int64_t) 0, c.length);
@@ -2151,17 +2151,23 @@ void sessionToGrid (Ctx& ctx, const Element& set, const std::vector<Element>& tr
                     continue;
                 const auto own = loopOf (clip);
                 auto body = own;
+                double lead = 0.0; // round 190hr: the Start marker inside the loop (StartRelative) → ClipGridSlot::startMarker
                 if (own.on)
                 {
                     body.start = own.loopStart;
                     body.end = own.loopEnd;
-                    if (std::abs (own.start - own.loopStart) > 1e-6)
-                        ctx.note (&FlpImportReport::approximated, "Session clip whose start marker is inside its loop (it starts at the loop start)");
+                    if (own.start > own.loopStart + 1e-6 && own.start < own.loopEnd - 1e-6)
+                        lead = own.start - own.loopStart;
+                    else if (std::abs (own.start - own.loopStart) > 1e-6)
+                        ctx.note (&FlpImportReport::approximated, "Session clip whose start marker is before its loop (it starts at the loop start)");
                 }
                 body.on = false; // one pass: the grid's Loop repeats the clip
                 auto length = body.end - body.start;
                 if (clip.name() == "AudioClip" && ! clip.boolean ("IsWarped", true))
+                {
                     length *= song.bpm / 60.0; // an unwarped clip's loop values are seconds [DATA]
+                    lead *= song.bpm / 60.0;
+                }
                 if (length <= 1e-9)
                     continue;
                 std::vector<Clip> made;
@@ -2188,6 +2194,20 @@ void sessionToGrid (Ctx& ctx, const Element& set, const std::vector<Element>& tr
                 slot.legato = clip.boolean ("Legato", false);
                 slot.loop = own.on;
                 slot.follow = followOf (clip.child ("FollowAction"));
+                if (lead > 1e-9 && made.front().length > 1)
+                    slot.startMarker = std::clamp<std::int64_t> ((std::int64_t) std::llround (lead * ppq), 0, made.front().length - 1);
+                // round 190hr: the MIDI clip's own scale (ScaleInformation, Scale Mode = IsInKey) where it differs from
+                // the project's key
+                if (clip.name() == "MidiClip" && clip.child ("ScaleInformation"))
+                {
+                    slot.scaleOn = clip.boolean ("IsInKey", false);
+                    if (const auto mine = liveScaleOf (clip)) // (the same as the project's key: cleared once that is known)
+                    {
+                        slot.ownScale = true;
+                        slot.scaleRoot = (std::int8_t) mine->root;
+                        slot.scaleIndex = (std::int16_t) mine->flScale;
+                    }
+                }
                 any = placed = true;
                 break; // one clip per slot
             }
@@ -2452,6 +2472,190 @@ std::optional<Song> importAls (const std::vector<std::uint8_t>& bytes, const Als
     return importAlsXml (doc, options, error);
 }
 
+namespace
+{
+// ---- Rack presets (.adg) as a set holds the rack (round 190hr) ---------------------------------------------------
+// [DATA, Live 12.4's Core Library: 1,071 .adg, every one] A rack preset keeps its chains apart from the rack device:
+// GroupDevicePreset/Device holds the rack element with an EMPTY Branches list, and BranchPresets one
+// <Kind>BranchPreset per chain {Name (a plain string), IsSoloed, DevicePresets (AbletonDevicePreset{…, Device} or a
+// nested GroupDevicePreset per device), MixerPreset (AbletonDevicePreset{Device: Audio/MidiBranchMixerDevice}),
+// BranchSelectorRange, SessionViewBranchWidth, DocumentColorIndex, AutoColored, AutoColorScheme, SourceContext,
+// ZoneSettings (Instrument / MIDI: KeyRange + VelocityRange; Drum: ReceivingNote, SendingNote, ChokeGroup)};
+// ReturnBranchPresets the Drum Rack's return chains (AudioEffectBranchPreset). [SCHEMA lines 241-252, 1860-1872,
+// 2760-2766, 2915-2927, 4611-4623.] The set form (a track's rack) has the chains as Branches/<Kind>Branch{Name{…},
+// DeviceChain/<chain kind>/Devices, MixerDevice (the same members as the BranchMixerDevice), ZoneSettings or, on a Drum
+// Rack pad, BranchInfo}. rackFrom reads the set form: a preset's rack is rewritten into it first.
+void emitXml (const Element& e, std::string& out, std::string_view name = {})
+{
+    out += '<';
+    out += name.empty() ? e.name() : name;
+    for (const auto& [k, v] : e.attributes())
+        out += ' ' + k + "=\"" + xml::escape (v) + '"';
+    const auto kids = e.children();
+    const auto text = e.text();
+    if (kids.empty() && text.empty())
+    {
+        out += "/>";
+        return;
+    }
+    out += '>';
+    out += xml::escape (text);
+    for (const auto& k : kids)
+        emitXml (k, out);
+    out += "</";
+    out += name.empty() ? e.name() : name;
+    out += '>';
+}
+
+void emitValue (std::string& out, std::string_view name, const std::string& value)
+{
+    out += '<';
+    out += name;
+    out += " Value=\"" + xml::escape (value) + "\"/>";
+}
+
+void deviceFromPreset (const Element& preset, std::string& out, int depth);
+
+// A chain's devices: each DevicePresets entry's device (a nested rack preset rewritten in turn)
+void presetDevices (const Element& branchPreset, std::string& out, int depth)
+{
+    for (const auto& p : branchPreset.path ("DevicePresets").children())
+    {
+        if (p.name() == "GroupDevicePreset")
+            deviceFromPreset (p, out, depth + 1);
+        else if (const auto d = p.path ("Device").children(); ! d.empty())
+            emitXml (d.front(), out);
+    }
+}
+
+void branchFromPreset (const Element& bp, int id, std::string& out, int depth)
+{
+    auto tag = std::string (bp.name());
+    if (tag.size() > 6 && tag.compare (tag.size() - 6, 6, "Preset") == 0)
+        tag.resize (tag.size() - 6);
+    const auto chainKind = tag == "AudioEffectBranch" ? "AudioToAudioDeviceChain" : tag == "MidiEffectBranch" ? "MidiToMidiDeviceChain" : "MidiToAudioDeviceChain";
+    out += "<" + tag + " Id=\"" + std::to_string (id) + "\">";
+    const auto name = bp.value ("Name");
+    out += "<Name>";
+    emitValue (out, "EffectiveName", name);
+    emitValue (out, "UserName", name);
+    out += "</Name>";
+    emitValue (out, "IsSoloed", bp.value ("IsSoloed", "false"));
+    out += std::string ("<DeviceChain><") + chainKind + "><Devices>";
+    presetDevices (bp, out, depth);
+    out += std::string ("</Devices></") + chainKind + "></DeviceChain>";
+    if (const auto range = bp.child ("BranchSelectorRange"))
+        emitXml (range, out);
+    emitValue (out, "Color", bp.value ("DocumentColorIndex", "0"));
+    if (const auto mixer = bp.path ("MixerPreset").children(); ! mixer.empty())
+        if (const auto device = mixer.front().path ("Device").children(); ! device.empty())
+            emitXml (device.front(), out, "MixerDevice");
+    if (const auto zones = bp.child ("ZoneSettings"))
+        emitXml (zones, out, tag == "DrumBranch" ? "BranchInfo" : "ZoneSettings");
+    out += "</" + tag + ">";
+}
+
+// The rack element of a GroupDevicePreset with its Branches (and a Drum Rack's ReturnBranches) filled from the presets
+void deviceFromPreset (const Element& preset, std::string& out, int depth)
+{
+    const auto devices = preset.path ("Device").children();
+    if (devices.empty())
+        return;
+    const auto rack = devices.front();
+    out += '<';
+    out += rack.name();
+    for (const auto& [k, v] : rack.attributes())
+        out += ' ' + k + "=\"" + xml::escape (v) + '"';
+    out += '>';
+    for (const auto& k : rack.children())
+    {
+        const auto name = k.name();
+        if (depth < 8 && (name == "Branches" || name == "ReturnBranches") && k.children().empty())
+        {
+            const auto presets = preset.path (name == "Branches" ? "BranchPresets" : "ReturnBranchPresets").children();
+            out += '<';
+            out += name;
+            out += '>';
+            for (int i = 0; i < (int) presets.size(); ++i)
+                branchFromPreset (presets[(std::size_t) i], i, out, depth);
+            out += "</";
+            out += name;
+            out += '>';
+        }
+        else
+            emitXml (k, out);
+    }
+    out += "</";
+    out += rack.name();
+    out += '>';
+}
+
+// The preset's device in the set form: `holder` keeps the rewritten text alive. Invalid for a file that is not a Live
+// device or rack preset.
+Element presetDevice (const xml::Document& doc, xml::Document& holder, std::string* why)
+{
+    const auto root = doc.root();
+    if (root.name() != "Ableton" || root.child ("LiveSet"))
+    {
+        if (why != nullptr)
+            *why = "not a Live device preset";
+        return {};
+    }
+    // [DATA] an .adv holds the device element right under <Ableton> (or inside AbletonDevicePreset/Device); an .adg
+    // holds GroupDevicePreset
+    if (const auto group = root.child ("GroupDevicePreset"))
+    {
+        std::string text;
+        deviceFromPreset (group, text, 0);
+        if (text.empty() || ! holder.parse (std::move (text), why))
+            return {};
+        return holder.root();
+    }
+    const auto preset = root.child ("AbletonDevicePreset");
+    const auto devices = preset ? preset.child ("Device").children() : root.children();
+    if (devices.empty())
+    {
+        if (why != nullptr)
+            *why = "the preset holds no device";
+        return {};
+    }
+    return devices.front();
+}
+} // namespace
+
+std::optional<LiveInstrumentPreset> importLiveInstrumentPreset (const std::vector<std::uint8_t>& bytes, const AlsImportOptions& options, std::string* error)
+{
+    const auto fail = [error] (const std::string& why) -> std::optional<LiveInstrumentPreset> {
+        if (error != nullptr)
+            *error = why;
+        return std::nullopt;
+    };
+    xml::Document doc, holder;
+    if (! parseSet (bytes, doc, error))
+        return std::nullopt;
+    std::string why;
+    const auto d = presetDevice (doc, holder, &why);
+    if (! d)
+        return fail (why.empty() ? "the preset could not be read" : why);
+    const auto tag = std::string (d.name());
+    if (tag == "MidiEffectGroupDevice" || isMidiEffect (tag))
+        return fail ("a MIDI effect preset (LYNX has no live counterpart for Live's MIDI effects yet)");
+    if (! isInstrumentDevice (tag) && tag != "InstrumentGroupDevice" && tag != "DrumGroupDevice"
+        && ! (tag == "PluginDevice" && (int) d.number ("PluginDesc/Vst3PluginInfo/DeviceType", 0) == 1)
+        && ! (tag == "PluginDevice" && (int) d.number ("PluginDesc/VstPluginInfo/Category", 0) == 2))
+        return fail ("not an instrument preset");
+    Ctx ctx (options);
+    LiveInstrumentPreset out;
+    out.name = d.value ("UserName");
+    if (out.name.empty())
+        out.name = deviceName (d);
+    out.channel.name = out.name;
+    if (! instrumentFrom (ctx, d, out.channel, nullptr, 1)) // (depth 1: no track-level automation to collect)
+        return fail ("Live's " + deviceName (d) + " has no LYNX counterpart yet");
+    out.rack = rack::isRack (out.channel);
+    return out;
+}
+
 std::optional<LiveDevicePreset> importLiveDevicePreset (const std::vector<std::uint8_t>& bytes, const AlsImportOptions& options, std::string* error)
 {
     const auto fail = [error] (const std::string& why) -> std::optional<LiveDevicePreset> {
@@ -2459,23 +2663,16 @@ std::optional<LiveDevicePreset> importLiveDevicePreset (const std::vector<std::u
             *error = why;
         return std::nullopt;
     };
-    xml::Document doc;
+    xml::Document doc, holder;
     if (! parseSet (bytes, doc, error))
         return std::nullopt;
     // [SCHEMA] AbletonDevicePreset {OverwriteProtectionNumber, Device, PresetRef} (.adv); GroupDevicePreset {…, Device,
-    // PresetRef, BranchPresets, ReturnBranchPresets} (.adg): the Device slot holds the device element as a set does
-    // [DATA, Live 12.4's Core Library] an .adv holds the device element right under <Ableton> (no AbletonDevicePreset
-    // wrapper); an .adg holds GroupDevicePreset/Device
-    const auto root = doc.root();
-    auto preset = root.child ("AbletonDevicePreset");
-    if (! preset)
-        preset = root.child ("GroupDevicePreset");
-    if (root.name() != "Ableton" || root.child ("LiveSet"))
-        return fail ("not a Live device preset");
-    const auto devices = preset ? preset.child ("Device").children() : root.children();
-    if (devices.empty())
-        return fail ("the preset holds no device");
-    const auto d = devices.front();
+    // PresetRef, BranchPresets, ReturnBranchPresets} (.adg): the rack's chains are in BranchPresets (round 190hr: the
+    // rack is rewritten into a set's form first; before, an .adg opened as a rack without chains)
+    std::string why;
+    const auto d = presetDevice (doc, holder, &why);
+    if (! d)
+        return fail (why.empty() ? "the preset could not be read" : why);
     const auto tag = std::string (d.name());
     Ctx ctx (options);
     LiveDevicePreset out;
@@ -2910,6 +3107,16 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
         projectkey::set (song, liveScaleOf (set));
     else if (ctx.clipKeySeen)
         projectkey::set (song, ctx.clipKey);
+    if (song.clipGrid) // round 190hr: a clip scale equal to the project's key just follows it
+        for (auto& slot : song.clipGrid->slots)
+            if (slot.ownScale && projectkey::clipScale (slot, song) == projectkey::get (song))
+            {
+                ClipGridSlot plain;
+                plain.ownScale = false;
+                slot.ownScale = false;
+                slot.scaleRoot = plain.scaleRoot;
+                slot.scaleIndex = plain.scaleIndex;
+            }
     return std::move (ctx.song);
 }
 } // namespace lynx

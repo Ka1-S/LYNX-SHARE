@@ -1671,7 +1671,7 @@ std::vector<Clip> clipsFromVar (const juce::var& v, const Song& song)
                 clip.muted = c.size() >= 11 && (bool) c[10];
                 clip.offsetFraction = c.size() >= 12 ? juce::jlimit (-0.5f, 0.5f, (float) (double) c[11]) : 0.0f;
                 clip.pan = c.size() >= 13 ? juce::jlimit (-1.0f, 1.0f, (float) (double) c[12]) : 0.0f;
-                clip.pitch = c.size() >= 14 ? juce::jlimit (-12.0f, 12.0f, (float) (double) c[13]) : 0.0f;
+                clip.pitch = c.size() >= 14 ? juce::jlimit (-48.0f, 48.0f, (float) (double) c[13]) : 0.0f; // (±48: Live's Transpose, round 190hr)
                 clip.reversed = c.size() >= 15 && (bool) c[14];
                 clip.stretch = c.size() >= 16 ? juce::jlimit (0.01, 100.0, (double) c[15]) : 1.0;
                 clip.uid = c.size() >= 17 ? uidFrom (c[16]) : 0;
@@ -1769,6 +1769,13 @@ juce::var clipGridToVar (const ClipGrid& grid, const std::vector<int>* envelopes
             o->setProperty ("blankName", true);
         if (slot.groove != 0)
             o->setProperty ("groove", (juce::int64) slot.groove);
+        if (slot.startMarker != 0) // (round 190hr: Live's Start marker inside the loop)
+            o->setProperty ("startMarker", (juce::int64) slot.startMarker);
+        if (slot.ownScale || ! slot.scaleOn) // (round 190hr: the clip's own scale)
+        {
+            juce::Array<juce::var> scale { slot.ownScale, slot.scaleOn, (int) slot.scaleRoot, (int) slot.scaleIndex };
+            o->setProperty ("clipScale", scale);
+        }
         if (slot.follow != ClipFollow {})
         {
             const auto& f = slot.follow;
@@ -1820,6 +1827,14 @@ std::optional<ClipGrid> clipGridFromVar (const juce::var& v, const Song& song)
             slot.noStop = (bool) o.getProperty ("noStop", false);
             slot.blankName = (bool) o.getProperty ("blankName", false);
             slot.groove = (std::uint32_t) (juce::int64) o.getProperty ("groove", 0);
+            slot.startMarker = juce::jmax<juce::int64> (0, (juce::int64) o.getProperty ("startMarker", 0));
+            if (const auto sc = o["clipScale"]; sc.isArray() && sc.size() >= 4)
+            {
+                slot.ownScale = (bool) sc[0];
+                slot.scaleOn = (bool) sc[1];
+                slot.scaleRoot = (std::int8_t) juce::jlimit (0, 11, (int) sc[2]);
+                slot.scaleIndex = (std::int16_t) juce::jmax (0, (int) sc[3]);
+            }
             if (const auto f = o["follow"]; f.isArray() && f.size() >= 10)
             {
                 const auto kind = [] (const juce::var& k) { return (FollowKind) juce::jlimit (0, (int) FollowKind::jump, (int) k); };
