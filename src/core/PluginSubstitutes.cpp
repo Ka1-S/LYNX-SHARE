@@ -148,7 +148,8 @@ map = xml:parameter8 -> Mod depth
 # round 135: its four reverb modes (Mono / three stereo sizes, steps at 0.25 / 0.5 / 0.75 [EXEC]) -> Halo's same four
 map = xml:parameter9 -> Reverb mode | steps 0:0.125 0.25:0.25 0.5:0.375 0.75:0.625
 map = xml:parameter10 -> Shift mode | steps 0:0 0.25:0.25 0.45:0.5 0.65:0.75 0.85:1
-map = xml:parameter11 -> Color | steps 0:0 0.525:1
+# round 190it: its colour turns Dark between 0.479 and 0.521 (refcap030's colour sweep), so at 0.5
+map = xml:parameter11 -> Color | steps 0:0 0.5:1
 
 [valhalla-futureverb]
 product = ValhallaFutureVerb

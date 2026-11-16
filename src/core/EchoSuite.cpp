@@ -2851,6 +2851,16 @@ double tapLevel (const EffectParams& p, int tap, int taps) noexcept
 
 namespace
 {
+// round 190it: what feeds the loop in revision 1 (0 = the longest tap; the lab build can try 1 = the sum / √taps)
+int latticeFeedMode() noexcept
+{
+   #ifdef LYNX_VERB_FIT
+    static const int m = [] { const char* e = std::getenv ("LYNX_LAT"); return e != nullptr ? std::atoi (e) : 0; }();
+    return m;
+   #else
+    return 0;
+   #endif
+}
 
 class LatticeMod final : public Effect
 {
@@ -2883,7 +2893,10 @@ public:
             c.hi.reset();
             c.dark.reset();
             c.xover.reset();
-            c.fb = 0.0f;
+            c.fbLo.reset();
+            c.fbHi.reset();
+            c.fbDark.reset();
+            c.fb = c.longest = c.fbSrc = 0.0f;
         }
         vibPhase = 0.0;
         tapsLive = false;
@@ -2896,6 +2909,11 @@ public:
         float dryGain = 1.0f, wetGain = 0.0f;
         equalPowerMix (p[mix], dryGain, wetGain);
         const auto nTaps = tapCount (p[lattice::taps]);
+        // round 190it: revision 1 (see lattice::revision)
+        const auto rev1 = p[lattice::revision] >= 0.5f;
+        const auto longestFeeds = rev1 && latticeFeedMode() == 0;
+        if (rev1 && (int) std::floor (clamp01 (p[lattice::taps]) * 24.0f + 1e-4f) >= 10)
+            dryGain = 1.0f, wetGain = 0.0f;
         const auto half = on (p[halfSpeed]);
         const auto syncMs = syncedDelayMs (p, bpm); // round 144: the reference's DelaySync law, else the older one
         const auto delayScale = syncMs > 0.0 && delayMs (p[delay]) > 0.0 ? syncMs / delayMs (p[delay]) : 1.0;
@@ -2947,6 +2965,9 @@ public:
             else
                 c.dark.open();
             c.xover.set (10.0 + 1990.0 * (double) clamp01 (p[xover]), sr);
+            c.fbLo.a = c.lo.a; // (coefficients only: each keeps its own state)
+            c.fbHi.a = c.hi.a;
+            c.fbDark.a = c.dark.a;
         }
         const auto driveFn = [inGain, outGain] (float x) { return outGain * std::tanh (inGain * x); };
 
@@ -2985,17 +3006,29 @@ public:
                     const auto det = detuneAmp > 0.0 ? detK * detuneAmp * (double) s.detune[(std::size_t) k].next (detuneHz, sr) / 2.1 : 0.0;
                     const auto vib = vibAmp > 0.0 ? vibAmp * std::sin (twoPi * (vibPhase + (double) k / (double) nTaps)) : 0.0;
                     const auto d = tapNow[(std::size_t) c][(std::size_t) k] + std::abs (det) + vibAmp + sign * (det + vib) * 0.5;
-                    y += gains[(std::size_t) k] * (double) s.line.at (std::max (2.0, d));
+                    const auto at = (double) s.line.at (std::max (2.0, d));
+                    y += gains[(std::size_t) k] * at;
+                    if (k == 0)
+                        s.longest = (float) at;
                 }
                 auto v = (float) y;
                 v = s.dark.lp (s.hi.lp (s.lo.hp (v)));
+                if (longestFeeds) // round 190it: the loop hears the longest tap, through the same filters
+                    s.fbSrc = s.fbDark.lp (s.fbHi.lp (s.fbLo.hp (s.longest)));
+                else if (rev1)
+                    s.fbSrc = v * (float) (1.0 / std::sqrt ((double) std::max (1, nTaps)));
                 if (useDrive && post)
+                {
                     v = driveFn (v) + noiseLevel * s.noise.next();
+                    if (longestFeeds)
+                        s.fbSrc = driveFn (s.fbSrc); // (the drive after the taps is in the loop as before)
+                }
                 wet[c] = v;
             }
             // feedback, rotated between the channels
-            const auto fl = cr * wet[0] - sn * wet[1];
-            const auto fr = sn * wet[0] + cr * wet[1];
+            const float fw[2] = { rev1 ? ch[0].fbSrc : wet[0], rev1 ? ch[1].fbSrc : wet[1] };
+            const auto fl = cr * fw[0] - sn * fw[1];
+            const auto fr = sn * fw[0] + cr * fw[1];
             const float fbv[2] = { fl, fr };
             for (int c = 0; c < 2; ++c)
             {
@@ -3029,7 +3062,8 @@ private:
         RandomLfo diffLfo;
         Noise noise;
         OnePole lo, hi, dark, xover;
-        float fb = 0.0f;
+        OnePole fbLo, fbHi, fbDark; // round 190it: the longest tap's own filters (the loop's source in revision 1)
+        float fb = 0.0f, longest = 0.0f, fbSrc = 0.0f;
     };
     double sr = 48000.0;
     std::array<Channel, 2> ch;

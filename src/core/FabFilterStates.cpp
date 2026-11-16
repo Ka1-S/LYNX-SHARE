@@ -722,7 +722,7 @@ int fromProL2 (const State& s, EffectSlot& slot)
 // layout (FFBS v1, 136 values, observed black-box by saving the state after each control change): 0 space (the
 // knob's normalized value; 0.1286 / 0.25 / 0.5 / 0.7 / 0.8444 read 0.5 / 1 / 2.5 / 4 / 6 s), 1 decay rate
 // (log4: −0.5 = 50 %, 0.5 = 200 %), 2 distance, 3 brightness (0.5 = 0 %), 4 style (0 Modern, 1 Vintage, 2 Plate),
-// 5 character, 6 thickness (−1 … 1), 7 stereo width, 9 mix %, 16 pre-delay (normalized, 0.3333 = 20 ms: cubic over
+// 5 character, 6 thickness (−1 … 1), 7 stereo width, 8 ducking (dB, 0 … 48), 9 mix %, 16 pre-delay (normalized, 0.3333 = 20 ms: cubic over
 // 500 ms), 19 + 7b decay-rate EQ band b (used, enabled, log2 Hz, gain (log2 of the decay multiplier), Q, shape
 // (1 low shelf, 2 high shelf, others: bells), …)
 int fromProR2 (const State& s, EffectSlot& slot)
@@ -743,7 +743,9 @@ int fromProR2 (const State& s, EffectSlot& slot)
     set (width, s.at (7));
     set (mix, s.at (9) / 100.0);
     set (predelay, s.at (16));
-    int n = 11;
+    // round 190it: value 8 is Ducking in dB (0 … 48, read from states saved at 0 / 50 / 100 %: 0 / 24 / 48)
+    p[(std::size_t) luxeVerbSpaceDucking] = (float) std::clamp ((double) s.at (8) / 48.0, 0.0, 1.0);
+    int n = 12;
     for (int b = 0; b < 6; ++b)
     {
         const std::size_t o = 19 + 7 * (std::size_t) b;
