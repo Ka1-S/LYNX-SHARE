@@ -4459,6 +4459,14 @@ countries: tw hk mo
 "SoundFont: [LMB] preview its first preset  [2xLMB] new LYNX Soundfont channel (or into the selected one)  drag to the Channel Rack" = "SoundFont：[LMB] 預覽其第一個預設集  [2xLMB] 新增LYNX Soundfont通道（或載入所選通道）  拖到通道機架"
 "Load SoundFont" = "載入SoundFont"
 "This file is not a SoundFont LYNX SHARE can read." = "此檔案不是LYNX SHARE可讀取的SoundFont。"
+
+# src/ui/SamplerImportUi.cpp, BrowserComponent.cpp: other samplers' instruments (round 190ii)
+"Imported as a DirectWave channel" = "已匯入為 DirectWave 通道"
+"Not brought over" = "未匯入的內容"
+"Nothing was imported." = "沒有匯入任何內容。"
+"Sampler instrument (DirectWave, GigaStudio): [2xLMB] new DirectWave channel  [Enter] into the selected DirectWave channel  drag to the Channel Rack" = "取樣器樂器 (DirectWave, GigaStudio)：[2xLMB] 新增 DirectWave 通道  [Enter] 匯入到所選 DirectWave 通道  拖到 Channel Rack"
+"zones" = "個區域"
+
 "Click: preview. Double-click: load into this channel. Drag onto the Channel rack: a new channel." = "點擊：預覽。雙擊：載入此通道。拖到通道機架上：新通道。"
 "Load SoundFont..." = "載入SoundFont..."
 "Open a .sf2 / .sf3 file" = "開啟.sf2 / .sf3檔案"

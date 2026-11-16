@@ -4514,6 +4514,14 @@ countries: br
 "SoundFont: [LMB] preview its first preset  [2xLMB] new LYNX Soundfont channel (or into the selected one)  drag to the Channel Rack" = "SoundFont: [LMB] pré-ouvir o primeiro preset  [2xLMB] novo canal LYNX Soundfont (ou no selecionado)  arraste para o Channel Rack"
 "Load SoundFont" = "Carregar SoundFont"
 "This file is not a SoundFont LYNX SHARE can read." = "Este arquivo não é um SoundFont que o LYNX SHARE consiga ler."
+
+# src/ui/SamplerImportUi.cpp, BrowserComponent.cpp: other samplers' instruments (round 190ii)
+"Imported as a DirectWave channel" = "Importado como canal DirectWave"
+"Not brought over" = "Não importado"
+"Nothing was imported." = "Nada foi importado."
+"Sampler instrument (DirectWave, GigaStudio): [2xLMB] new DirectWave channel  [Enter] into the selected DirectWave channel  drag to the Channel Rack" = "Instrumento de sampler (DirectWave, GigaStudio): [2xLMB] novo canal DirectWave  [Enter] no canal DirectWave selecionado  arraste para o Channel Rack"
+"zones" = "zonas"
+
 "Click: preview. Double-click: load into this channel. Drag onto the Channel rack: a new channel." = "Clique: pré-ouvir. Clique duplo: carregar neste canal. Arraste para o Channel Rack: um novo canal."
 "Load SoundFont..." = "Carregar SoundFont..."
 "Open a .sf2 / .sf3 file" = "Abrir um arquivo .sf2 / .sf3"
