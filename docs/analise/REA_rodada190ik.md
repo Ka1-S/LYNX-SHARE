@@ -154,7 +154,43 @@ Realtime factor = render time / output length (lower is better; load average ~16
 Everything new runs in `timeStretch` (the stretch cache: loader threads / message thread), never on the audio thread; a
 transposed Complex Pro or Texture clip no longer runs a real-time pitch shifter per voice (≈ 2 % of a core each).
 
-## 8. Left out / live checks
+## 8. Issue #187: warped clips follow tempo automation
+
+Evidence (this round, `/mnt/e/lynx-work/warp190ik/t187/`): one song made by LYNX — 120 BPM, a 4 s file with a click on
+each of its 8 beats warped to 8 beats (keeps pitch, Complex / FL Stretch), a tempo automation ramp 120 → 90 BPM over
+the clip — exported by LYNX's own .als / .flp writers and rendered by Live 12.4 (Export, Main) and FL 2026 (`FL64 /R
+/Ewav`, no input). Click times (ms) against the ramp's beats (16·ln(120 / (120 − 3.75 b)) s):
+
+| beat | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+|---|---|---|---|---|---|---|---|
+| ramp | 508.0 | 1032.6 | 1575.0 | 2136.5 | 2718.4 | 3322.2 | 3949.8 |
+| Live 12.4 | 508.0 | 1032.5 | 1575.4 | 2136.5 | 2718.3 | 3322.8 | 3949.8 |
+| FL 2026 | 505.5 | 1030.0 | 1572.3 | 2133.6 | 2715.4 | 3319.0 | 3946.3 |
+| LYNX before | 500 | 1000 | 1500 | 2000 | 2500 | 3000 | 3500 |
+| LYNX now | 507.6 | 1032.2 | 1574.6 | 2136.2 | 2718.0 | 3321.4 | 3949.5 |
+
+Both follow the ramp beat for beat (FL a constant ~3 ms early). LYNX before: the stretched file played at the song's
+fixed tempo, so the clicks ran ahead of the beats (450 ms by beat 7). LYNX now: within 0.5 ms of LYNX's own transport
+(which itself matches the ramp within 0.2 ms; `p/t187.cpp`, click peaks less the click's own 2.0 ms peak offset).
+
+LYNX now (`Instrument::setTempoRatio`, `RackRenderer::process`): every block the renderer passes the block's tempo over
+the song's (tempo automation, pattern Tempo events, a dragged or Link tempo) and whether the tempo can move. A warped
+sampler / audio-clip channel (`stretchBeats > 0`) reads its warped sample that much faster or slower — a voice without a
+shifter changes its speed (a resampling channel's pitch follows, as FL's Resample), a pitch-keeping channel's voices go
+through their pitch shifters, which consume the source `ratio` times faster and keep the pitch; when the ratio changes the
+shifter's input moves by its output latency times the change, because at another input rate the latency covers another
+stretch of the source (without it the ramp drifted 12 ms early by beat 7). In a song whose tempo can
+move such voices take a shifter from the note's start (even untransposed), so no voice switches mid-note. The position
+and the transport use the same block tempo, so the clip stays locked to the beats; a ratio change is a block's speed
+step, never a jump of the read position. At a fixed tempo the ratio is exactly 1 and nothing is called differently:
+the renders with the hook on and off are identical (test).
+
+Tests (`tests/Warp190ikTests.inc`, `issue187_*`): beat lock of all 7 beats within 6 ms under 120 → 90 (pitch-keeping and
+resampling channels), warp markers (0 / 0.9 / 2.1 / 3.0 s on beats 0 / 2 / 4 / 6) landing on their beats and bar line
+under the ramp, the pitch kept at 440 Hz late in a 120 → 80 ramp (the resampling channel follows the tempo down), and the
+fixed-tempo A/B (bit-identical with the hook off).
+
+## 9. Left out / live checks
 
 - Flux between 0 and 25 (assumed linear); Grain Size below 10 not measured with the new model (g2 buzzes differently:
   spectrum 6.8 → 7.7 dB, the one Texture setting that got worse on spectrum).
@@ -163,7 +199,7 @@ transposed Complex Pro or Texture clip no longer runs a real-time pitch shifter 
   and vibrato not to cut). An octave error of the pitch track can still cut a glide.
 - The real-time clip pitch of Playlist clips (FL layout) on a Complex Pro / Texture channel stays the voice shifter.
 
-## 9. Best way?
+## 10. Best way?
 
 FL has no Complex Pro / Texture counterparts (its stretch modes map to LYNX's General / Transients / Mono). Live's
 behaviour is matched where measured; the detector deliberately goes beyond Live (glides and vibrato do not cut) because

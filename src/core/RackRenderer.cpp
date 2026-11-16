@@ -66,6 +66,16 @@
 
 namespace lynx
 {
+namespace tempofollow
+{
+namespace
+{
+std::atomic<bool> on { true };
+}
+bool enabled() noexcept { return on.load (std::memory_order_relaxed); }
+void setEnabled (bool yes) noexcept { on.store (yes, std::memory_order_relaxed); }
+} // namespace tempofollow
+
 namespace
 {
 // a hosted plugin is created again when its processing options change (fixed blocks, own process) or the options it
@@ -4024,6 +4034,16 @@ void RackRenderer::process (const RackState* state,
         ownBpm = tempomap::tempoAt (state->song, songMode ? linearSongTick (liveInput, startTick, length) : std::max (0.0, startTick));
     }
     bpm = tempoOverride > 0.0 ? tempoOverride : ownBpm;
+    // issue #187 (round 190ik): warped samples follow the playing tempo (automation, Tempo events, a dragged or Link
+    // tempo); at the song's own fixed tempo the ratio is exactly 1 and nothing changes
+    if (tempofollow::enabled())
+    {
+        const auto moves = state->tempoMap || tempoOverride > 0.0;
+        const auto ratio = bpm / std::max (1.0, state->song.bpm);
+        for (auto& instrument : state->instruments)
+            if (instrument != nullptr)
+                instrument->setTempoRatio (ratio, moves);
+    }
 
     const auto tps = ticksPerSample (bpm, sampleRate);
     expectedTick = startTick + numSamples * tps;

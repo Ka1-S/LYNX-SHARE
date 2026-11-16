@@ -187,6 +187,11 @@ public:
     virtual int selectedProgram() const noexcept { return -1; }
     // Song position (ticks) at the start of the block, for the global LFOs. Audio thread.
     virtual void setSongPosition (double /*ticks*/) noexcept {}
+    // Issue #187 (round 190ik): the block's tempo over the song's own (tempo automation, pattern Tempo events, a dragged
+    // tempo) and whether the tempo can move while the song plays. A warped sample (stretched to its beats at the song's
+    // tempo) follows it: its voices read it that much faster or slower, keeping their pitch through their shifters when
+    // the channel keeps the pitch. Called at the start of every block, before its notes. Audio thread.
+    virtual void setTempoRatio (double /*ratio*/, bool /*moves*/) noexcept {}
     // No voice sounding: render would only produce silence (the mixer skips the channel until a note arrives).
     virtual bool idle() const noexcept { return false; }
     // The notes it sent out in its renders since the last call (a hosted plugin's MIDI output, FL's wrapper "Output

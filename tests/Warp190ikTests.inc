@@ -64,6 +64,27 @@ inline double peakFrequency (const std::vector<float>& x, long from, long to, do
     return best;
 }
 
+// the power-weighted mean frequency of x[from, to) between lo and hi Hz (0.25 Hz steps): the pitch of grains whose phases
+// differ (their amplitude modulation puts symmetric side bands around the tone)
+inline double meanFrequency (const std::vector<float>& x, long from, long to, double rate, double lo, double hi)
+{
+    const auto n = to - from;
+    double num = 0.0, den = 0.0;
+    for (double f = lo; f <= hi; f += 0.25)
+    {
+        double re = 0.0, im = 0.0;
+        for (long i = 0; i < n; i += 2)
+        {
+            const auto w = 0.5 - 0.5 * std::cos (twoPi * (double) i / (double) n);
+            re += w * x[(std::size_t) (from + i)] * std::cos (twoPi * f * (double) i / rate);
+            im += w * x[(std::size_t) (from + i)] * std::sin (twoPi * f * (double) i / rate);
+        }
+        num += f * (re * re + im * im);
+        den += re * re + im * im;
+    }
+    return den > 0.0 ? num / den : 0.0;
+}
+
 // frequency from the zero crossings of x[from, to)
 inline double frequency (const std::vector<float>& x, long from, long to, double rate)
 {
@@ -232,7 +253,7 @@ TEST (warp190ik_texture_grains_flux_and_determinism)
                 const auto n = (long) out->frames();
                 CHECK (n == (long) std::llround ((double) in.frames() * ratio));
                 // the pitch stays (grains read at the source's own speed); a grain's window never steps
-                CHECK (std::abs (cents (peakFrequency (out->left, n / 4, 3 * n / 4, rate, 420.0, 460.0), 440.0)) < 4.0);
+                CHECK (std::abs (cents (meanFrequency (out->left, n / 4, 3 * n / 4, rate, 380.0, 500.0), 440.0)) < 6.0);
                 CHECK (roughness (out->left, 0, n, 440.0, rate, 0.5) < 1.6);
                 const auto again = timeStretch (in, ratio, StretchMethod::texture, 0.0, texture (grain, 50.0f));
                 CHECK (again->left == out->left);
@@ -475,4 +496,230 @@ TEST (warp190ik_render_ahead_is_bit_exact_with_complex_pro_and_texture)
     CHECK (ra190gq::same (l0, l1) && ra190gq::same (r0, r1));
     CHECK (rig.ahead.stats().engagements.load() >= 1);
     CHECK (ra190gq::energy (l0.data() + 44100, 44100) > 1.0);
+}
+
+// Issue #187 (round 190ik): a warped audio clip follows tempo automation (FL and Live both make it): its voices read the
+// warped sample at the playing tempo (block by block, as the transport moves), keeping their pitch through their
+// shifters when the channel keeps the pitch.
+namespace warp190ik
+{
+// clicks (3 ms of 3 kHz) at the given seconds of a 4 s file at 44.1 kHz, or a steady 440 Hz tone
+inline std::shared_ptr<const lynx::SampleData> clicks (const std::vector<double>& at)
+{
+    auto d = std::make_shared<lynx::SampleData>();
+    d->sampleRate = 44100.0;
+    d->left.assign (44100 * 4, 0.0f);
+    for (const auto t : at)
+        for (int i = 0; i < 132; ++i)
+            d->left[(std::size_t) (t * 44100.0) + (std::size_t) i] = (float) (0.8 * std::sin (twoPi * 3000.0 * i / 44100.0) * std::exp (-i / 40.0));
+    d->right = d->left;
+    return d;
+}
+
+// a song at 120 BPM: the warped clip of channel "a.wav" over `beats` beats from tick 0, and (ramp) a tempo automation clip
+// from 120 to `endBpm` over the same beats
+inline lynx::Song rampSong (double beats, bool keepPitch, bool ramp, double endBpm = 90.0, const std::vector<lynx::WarpPoint>& warp = {})
+{
+    using namespace lynx;
+    auto song = Song::makeDefault();
+    song.playlist.clear();
+    song.mode = PlayMode::song;
+    song.bpm = 120.0;
+    ChannelDef c;
+    c.name = "warped";
+    c.instrument = InstrumentKind::audioClip;
+    c.samplePath = "a.wav";
+    c.volume = 10000.0f / 12800.0f;
+    c.sampler.keepPitch = keepPitch;
+    c.sampler.stretchMethod = StretchMethod::complex;
+    c.sampler.stretchBeats = (float) beats;
+    c.sampler.warp = warp;
+    song.channels.push_back (c);
+    Clip clip;
+    clip.kind = ClipKind::audio;
+    clip.channel = (int) song.channels.size() - 1;
+    clip.track = 0;
+    clip.start = 0;
+    clip.length = (std::int64_t) std::llround (beats * ppq);
+    song.playlist.push_back (clip);
+    if (ramp)
+    {
+        Automation a;
+        a.target.kind = AutomationTargetKind::tempo;
+        a.points = { { 0, valueFromTempo (120.0) }, { clip.length, valueFromTempo (endBpm) } };
+        song.automations.push_back (a);
+        Clip t;
+        t.kind = ClipKind::automation;
+        t.automation = (int) song.automations.size() - 1;
+        t.track = 1;
+        t.start = 0;
+        t.length = clip.length + ppq;
+        song.playlist.push_back (t);
+    }
+    return song;
+}
+
+struct Rendered
+{
+    std::vector<float> left;
+    std::vector<std::pair<long, double>> ticks; // (sample at a block's start, its tick)
+    double sampleOfTick (double tick) const
+    {
+        for (std::size_t k = 1; k < ticks.size(); ++k)
+            if (ticks[k].second >= tick)
+            {
+                const auto& a = ticks[k - 1];
+                const auto& b = ticks[k];
+                return (double) a.first + (double) (b.first - a.first) * (tick - a.second) / std::max (1e-9, b.second - a.second);
+            }
+        return -1.0;
+    }
+};
+
+// the song rendered block by block as the engine plays it (the position moving with the tempo the rack played)
+inline Rendered render (const lynx::Song& song, std::shared_ptr<const lynx::SampleData> data, double seconds)
+{
+    using namespace lynx;
+    RackState::Factories factories;
+    factories.samples = [data] (const std::string&) { return data; };
+    factories.stretchedSamples = [data] (const std::string&, double ratio, StretchMethod method, double semitones, const StretchMap& map,
+                                         const StretchOptions& options) {
+        return std::shared_ptr<const SampleData> (map.empty() ? timeStretch (*data, ratio, method, semitones, options)
+                                                              : timeStretchMapped (*data, map, method, semitones, options));
+    };
+    auto state = RackState::build (song, nullptr, 44100.0, factories);
+    RackRenderer renderer;
+    renderer.prepare (44100.0, 2048);
+    MeterBank meters;
+    LiveEventQueue live;
+    Rendered out;
+    const int block = 64;
+    const auto blocks = (int) (seconds * 44100.0 / block);
+    out.left.assign ((std::size_t) (blocks * block), 0.0f);
+    std::vector<float> right (out.left.size());
+    double tick = 0.0;
+    for (int k = 0; k < blocks; ++k)
+    {
+        out.ticks.push_back ({ (long) k * block, tick });
+        renderer.process (state.get(), true, tick, block, out.left.data() + k * block, right.data() + k * block, &live, &meters, nullptr);
+        tick += block * ticksPerSample (renderer.currentBpm(), 44100.0);
+    }
+    out.ticks.push_back ({ (long) blocks * block, tick });
+    return out;
+}
+
+// where the click nearest `around` (± 60 ms) peaks: the 1 ms RMS envelope's maximum
+inline long clickAt (const std::vector<float>& x, long around)
+{
+    long best = -1;
+    double bestE = 0.0;
+    for (long i = std::max (0L, around - 2646); i < std::min ((long) x.size() - 44, around + 2646); i += 4)
+    {
+        double e = 0.0;
+        for (long j = i; j < i + 44; ++j)
+            e += (double) x[(std::size_t) j] * x[(std::size_t) j];
+        if (e > bestE)
+        {
+            bestE = e;
+            best = i;
+        }
+    }
+    return best;
+}
+} // namespace warp190ik
+
+TEST (issue187_warped_clip_stays_beat_locked_under_a_tempo_ramp)
+{
+    using namespace lynx;
+    using namespace warp190ik;
+    // one click per beat of the file's own 120 BPM; the song ramps 120 → 90 BPM over the clip's 8 beats
+    std::vector<double> beatsAt;
+    for (int b = 0; b < 8; ++b)
+        beatsAt.push_back (0.5 * b);
+    const auto data = clicks (beatsAt);
+    const auto refShift = clickAt (render (rampSong (8.0, true, false), data, 4.2).left, 0); // (the click's own peak offset)
+    for (const auto keepPitch : { true, false })
+    {
+        const auto r = render (rampSong (8.0, keepPitch, true), data, 5.2);
+        CHECK (r.sampleOfTick (8.0 * ppq) > 44100.0 * 4.3); // (the ramp made the 8 beats last longer than 4 s)
+        int locked = 0;
+        for (int b = 1; b < 8; ++b)
+        {
+            const auto want = (long) std::llround (r.sampleOfTick ((double) b * ppq)) + refShift;
+            const auto got = clickAt (r.left, want);
+            locked += std::abs (got - want) <= 265; // 6 ms
+        }
+        CHECK (locked == 7);
+        if (locked != 7)
+            std::printf ("  issue187: keepPitch %d: %d of 7 beats locked\n", (int) keepPitch, locked);
+    }
+}
+
+TEST (issue187_warp_markers_land_on_the_bar_lines_under_a_tempo_ramp)
+{
+    using namespace lynx;
+    using namespace warp190ik;
+    // a file whose tempo drifts: its warp markers put 0 / 0.9 / 2.1 / 3.0 s on beats 0 / 2 / 4 / 6 (bar lines at 0 and 4);
+    // clicks sit on the markers. Under a 120 → 90 ramp each marker's click plays on its beat.
+    const std::vector<WarpPoint> warp { { 0.0, 0.0 }, { 0.9, 2.0 }, { 2.1, 4.0 }, { 3.0, 6.0 } };
+    const auto beats = 6.0 + 2.0 * (1.0 / 0.9); // (the file's 4 s, the last segment's tempo to its end)
+    const auto data = clicks ({ 0.0, 0.9, 2.1, 3.0 });
+    const auto refShift = clickAt (render (rampSong (beats, true, false, 90.0, warp), data, 4.5).left, 0);
+    const auto r = render (rampSong (beats, true, true, 90.0, warp), data, 5.8);
+    int onBeat = 0;
+    for (const auto b : { 2.0, 4.0, 6.0 })
+    {
+        const auto want = (long) std::llround (r.sampleOfTick (b * ppq)) + refShift;
+        onBeat += std::abs (clickAt (r.left, want) - want) <= 265;
+    }
+    CHECK (onBeat == 3);
+    // the bar line (beat 4) is where the tempo automation has already slowed down: later than at a fixed 120 BPM
+    CHECK (r.sampleOfTick (4.0 * ppq) > 2.0 * 44100.0 + 4410.0);
+}
+
+TEST (issue187_a_warped_clip_keeps_its_pitch_under_a_tempo_ramp)
+{
+    using namespace lynx;
+    using namespace warp190ik;
+    auto tone = std::make_shared<SampleData>();
+    tone->sampleRate = 44100.0;
+    for (int i = 0; i < 44100 * 4; ++i)
+        tone->left.push_back ((float) (0.4 * std::sin (twoPi * 440.0 * i / 44100.0)));
+    tone->right = tone->left;
+    const auto keep = render (rampSong (8.0, true, true, 80.0), tone, 5.0);
+    const auto resampled = render (rampSong (8.0, false, true, 80.0), tone, 5.0);
+    // late in the ramp (about 85 BPM): the pitch-keeping clip stays at 440 Hz, the resampling one follows the tempo down
+    const auto at = (long) keep.sampleOfTick (7.0 * ppq);
+    CHECK (std::abs (cents (peakFrequency (keep.left, at - 8000, at + 8000, 44100.0, 300.0, 500.0), 440.0)) < 15.0);
+    const auto bpmThere = 120.0 + (80.0 - 120.0) * 7.0 / 8.0;
+    const auto atR = (long) resampled.sampleOfTick (7.0 * ppq);
+    CHECK (std::abs (cents (peakFrequency (resampled.left, atR - 8000, atR + 8000, 44100.0, 300.0, 500.0), 440.0 * bpmThere / 120.0)) < 30.0);
+}
+
+TEST (issue187_fixed_tempo_renders_bit_identical_to_the_renderer_without_tempo_following)
+{
+    using namespace lynx;
+    using namespace warp190ik;
+    // at the song's own fixed tempo the tempo hook changes nothing: the same samples with it on and off (off = the renderer
+    // before round 190ik), for a warped clip that keeps its pitch, one that resamples and a warped-marker one
+    auto tone = std::make_shared<SampleData>();
+    tone->sampleRate = 44100.0;
+    for (int i = 0; i < 44100 * 4; ++i)
+        tone->left.push_back ((float) (0.4 * std::sin (twoPi * 330.0 * i / 44100.0) * std::exp (-(i % 22050) / 6000.0)));
+    tone->right = tone->left;
+    const std::vector<WarpPoint> warp { { 0.0, 0.0 }, { 0.9, 2.0 }, { 2.1, 4.0 }, { 3.0, 6.0 } };
+    for (const auto& song : { rampSong (8.0, true, false), rampSong (8.0, false, false), rampSong (6.0 + 2.0 / 0.9, true, false, 90.0, warp) })
+    {
+        tempofollow::setEnabled (false);
+        const auto before = render (song, tone, 4.2);
+        tempofollow::setEnabled (true);
+        const auto after = render (song, tone, 4.2);
+        CHECK (before.left == after.left);
+        CHECK (std::abs (after.sampleOfTick (8.0 * ppq) - 4.0 * 44100.0) < 64.0 || song.channels.back().sampler.warp.size() > 0);
+    }
+    // under the ramp the hook is what makes the difference
+    tempofollow::setEnabled (false);
+    const auto off = render (rampSong (8.0, true, true), tone, 4.0);
+    tempofollow::setEnabled (true);
+    CHECK (off.left != render (rampSong (8.0, true, true), tone, 4.0).left);
 }

@@ -861,6 +861,11 @@ void VoicePitchShifter::start (const float* l, const float* r, int frames) noexc
     impl->stretch.outputSeek (in, frames);
 }
 
+int VoicePitchShifter::outputLatency() const noexcept
+{
+    return impl != nullptr ? impl->stretch.outputLatency() : 0;
+}
+
 void VoicePitchShifter::process (const float* inL, const float* inR, int inFrames, float* outL, float* outR, int outFrames) noexcept
 {
     if (impl == nullptr)

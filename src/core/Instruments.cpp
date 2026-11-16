@@ -2218,6 +2218,7 @@ public:
         // with "keep pitch" the sample arrives already stretched (RackState): play at normal speed; the keys then
         // transpose it through each voice's pitch shifter (round 162), so its length stays
         stretchBeats.store (s.keepPitch ? 0.0f : std::max (0.0f, s.stretchBeats));
+        warpedTempo.store (s.stretchBeats > 0.0f); // (issue #187: a warped sample follows the playing tempo)
         // keep length (round 163): with "keep pitch" a transposition never changes the length — the keys of a sampler, the
         // pitch knob and the fine tune of a sampler or an audio clip go through each voice's pitch shifter, stretched to
         // the tempo or not
@@ -2564,6 +2565,10 @@ public:
             startKeyShift (*target, clipPitch, base, true);
         else
             startKeyShift (*target, semitones + clipPitch + (clipStretch != 1.0 ? 12.0 * std::log2 (clipStretch) : 0.0), base);
+        // issue #187: a warped voice that plays without a shifter reads at the playing tempo (its pitch follows, as a
+        // resampled stretch does); a shifted one keeps its rate and its shifter takes the tempo
+        if (tempoC != 1.0 && ! shifts[(std::size_t) (target - voices.data())].on)
+            target->rate *= tempoC;
         nextPan = nextCents = 0.0f;
         nextModX = nextModY = 0.5f;
         nextPorta = false;
@@ -2583,6 +2588,7 @@ public:
         std::array<float, keyShiftBlock * 4 + 2> inL {}, inR {}; // the source read `factor` times faster
         std::array<float, keyShiftBlock> outL {}, outR {};
         double owed = 0.0; // input frames owed to the shifter (n / factor per block, the fraction carried)
+        double tempoAt = 1.0; // issue #187: the tempo ratio the shifter's alignment is set for (its priming assumes 1)
         int pos = 0, count = 0;
     };
     // Stretch keeping pitch (round 162, issue #9): a transposed note reads the stretched sample at its own speed, so it
@@ -2595,7 +2601,10 @@ public:
         auto& ks = shifts[index];
         ks.on = false;
         ks.shifter = nullptr;
-        if ((! keyShift.load (std::memory_order_relaxed) && ! (keepRate && clipShift)) || std::abs (semitones) < 1.0e-6)
+        // (issue #187: while the tempo can move, a warped voice that keeps its pitch takes a shifter even untransposed, so a
+        // tempo change never changes its pitch)
+        const auto followsTempo = tempoMoves && keyShift.load (std::memory_order_relaxed) && warpedTempo.load (std::memory_order_relaxed);
+        if ((! keyShift.load (std::memory_order_relaxed) && ! (keepRate && clipShift)) || (std::abs (semitones) < 1.0e-6 && ! followsTempo))
         {
             if (keyShift.load (std::memory_order_relaxed))
                 lastFactor = 1.0;
@@ -2644,6 +2653,7 @@ public:
         ks.primed = false;
         ks.pos = ks.count = 0;
         ks.owed = 0.0;
+        ks.tempoAt = 1.0;
     }
 
     // the transposition the shifter applies now: the note's (gliding), the pitch envelope / LFO and the pitch wheel
@@ -2702,8 +2712,16 @@ public:
                 ks.glideLeft -= k;
             }
             const auto factor = shiftFactor (v, ks);
-            ks.owed += keyShiftBlock / factor;
-            const auto frames = std::min ((int) ks.inL.size(), (int) ks.owed);
+            ks.owed += keyShiftBlock * tempoC / factor; // (issue #187: the source read tempoC times faster, the pitch kept)
+            if (tempoC != ks.tempoAt)
+            {
+                // issue #187: the shifter's output lags its input by its output latency, in output frames; at another
+                // input rate that lag covers another stretch of the source, so the input moves by the difference and the
+                // content stays on the beat (measured: without it a 120 → 90 ramp drifted 12 ms early over 8 beats)
+                ks.owed += (double) ks.shifter->outputLatency() * (tempoC - ks.tempoAt) / factor;
+                ks.tempoAt = tempoC;
+            }
+            const auto frames = std::clamp ((int) ks.owed, 0, (int) ks.inL.size());
             ks.owed -= frames;
             for (int i = 0; i < frames; ++i)
                 readAhead (v, ks, factor, ks.inL[(std::size_t) i], ks.inR[(std::size_t) i]);
@@ -2717,6 +2735,20 @@ public:
     }
 
     void setClipShift (bool on) override { clipShift = on; }
+
+    void setTempoRatio (double ratio, bool moves) noexcept override
+    {
+        tempoMoves = moves;
+        const auto c = warpedTempo.load (std::memory_order_relaxed) && std::isfinite (ratio) && ratio > 0.0 ? std::clamp (ratio, 0.05, 20.0) : 1.0;
+        if (c == tempoC)
+            return;
+        // the voices already sounding: an unshifted one changes its speed by the step (its shifted ones take tempoC at
+        // their next shifter block); the step is a block's, never a jump in the read position
+        for (auto& v : voices)
+            if (v.active && ! shifts[(std::size_t) (&v - voices.data())].on)
+                v.rate *= c / tempoC;
+        tempoC = c;
+    }
 
     void setNextClipPitch (float semitones) noexcept override { nextClipPitch = std::isfinite (semitones) ? semitones : 0.0f; }
     void setNextClipStretch (float stretch) noexcept override { nextClipStretch = std::isfinite (stretch) && stretch > 0.0f ? stretch : 1.0f; }
@@ -3387,7 +3419,7 @@ public:
                     right[i] += sr * gain * gr * v.panR;
                 }
 
-                v.position += ks.on ? v.rate : v.rate * v.pitchMul * bendMul;
+                v.position += ks.on ? v.rate * tempoC : v.rate * v.pitchMul * bendMul;
                 ++v.age;
 
                 if (v.glideLeft > 0)
@@ -3647,7 +3679,7 @@ public:
                     endGain *= table[(std::size_t) v.offFade++];
                 }
                 flG[(std::size_t) m] = gain * endGain;
-                v.position += shifts[(std::size_t) (&v - voices.data())].on ? v.rate : v.rate * v.pitchMul * bendMul;
+                v.position += shifts[(std::size_t) (&v - voices.data())].on ? v.rate * tempoC : v.rate * v.pitchMul * bendMul;
                 ++v.age;
                 if (v.glideLeft > 0)
                 {
@@ -3787,6 +3819,10 @@ private:
     std::atomic<bool> keyShift { false };
     std::atomic<int> keyShiftMethod { 0 };
     double lastFactor = 1.0; // the last shifted note's transposition (where its portamento starts)
+    // issue #187 (round 190ik): the playing tempo over the song's (1 unless the sample is warped), whether it can move
+    double tempoC = 1.0;
+    bool tempoMoves = false;
+    std::atomic<bool> warpedTempo { false };
     double bendMul = 1.0;    // the pitch wheel (pitchBend), audio thread
     int quality = flrs::liveQuality;        // FL's interpolation index (prepare)
     bool preparedOffline = false;           // prepare() ran for an export: `quality` stays the export's

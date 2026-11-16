@@ -39,6 +39,14 @@
 
 namespace lynx
 {
+// Issue #187 (round 190ik): warped samples follow the playing tempo (Instrument::setTempoRatio, every block). The switch
+// exists for the tests' A/B (off = the renderer before 190ik); it is always on in the app.
+namespace tempofollow
+{
+bool enabled() noexcept;
+void setEnabled (bool yes) noexcept;
+} // namespace tempofollow
+
 // The levels a drag moves (round 171c, discussion #10): mixer volume / pan / separation and channel volume / pan.
 // A snapshot carries its own copy as atomics; while a fader or knob is dragged the UI writes the new value here
 // (AudioEngine::editLevels) instead of rebuilding the whole snapshot for every mouse move, and the renderer reads them

@@ -101,6 +101,9 @@ public:
     // `l`/`r` (r may equal l): primeLength (factor) frames of the transposed source from the note's start
     void start (const float* l, const float* r, int frames) noexcept;
     void process (const float* inL, const float* inR, int inFrames, float* outL, float* outR, int outFrames) noexcept;
+    // the stretcher's output latency (frames): how far its output lags, in output frames (issue #187: a voice whose input
+    // rate changes keeps its content aligned by this much times the change)
+    int outputLatency() const noexcept;
 
 private:
     struct Impl;
