@@ -47,4 +47,15 @@ inline bool readSetting (std::string_view key, int value, int& bars, int& length
     }
     return false;
 }
+// FL's time display during the count-in reads "REC IN n", n = the beats left, one per beat (live check 190iw Q7: REC IN 4,
+// 3, 2, 1 over one bar of 4/4 at 150 BPM, ~400 ms each). `ticksLeft` = Transport::countIn, `beatUnit` = the meter's note
+// value (a beat = 4 / beatUnit quarter notes of `ppqn` ticks). 0 when not counting in.
+inline int beatsLeft (double ticksLeft, int beatUnit, int ppqn) noexcept
+{
+    if (! (ticksLeft > 0.0) || ppqn <= 0)
+        return 0;
+    const auto beat = (double) ppqn * 4.0 / (double) (beatUnit > 0 ? beatUnit : 4);
+    const auto n = (int) (ticksLeft / beat - 1.0e-6) + 1; // the beat being counted: 4 at the very start, 1 on the last
+    return n < 1 ? 1 : n;
+}
 } // namespace lynx::countin

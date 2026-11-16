@@ -6442,7 +6442,8 @@ void MainComponent::timerCallback()
     if (engine.getLink().takeRemoteStop() && (transport.playing.load() || engine.isLinkWaiting()))
         playStop();
 
-    const auto playing = transport.playing.load() || engine.isLinkWaiting(); // (lit while the start waits for Link)
+    // (lit while the start waits for Link; FL shows its Pause glyph through the count-in too, live check 190iw Q7)
+    const auto playing = transport.playing.load() || engine.isLinkWaiting() || (engine.isCountingIn() && layoutStyle == layoutstyle::Style::pattern);
     playButton.setToggleState (playing, juce::dontSendNotification);
     updateTransportStates (playing);
     updateLiveNoteHint();
