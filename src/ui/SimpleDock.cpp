@@ -22,7 +22,9 @@
 #include "ui/I18n.h"
 #include "ui/MixerComponent.h"
 #include "ui/QuickPick.h"
+#include "ui/SimpleLook.h"
 #include "ui/SoundFontEditor.h"
+#include "ui/TrackIcons.h"
 #include "ui/Theme.h"
 #include "ui/TouchKeyboard.h"
 
@@ -37,7 +39,7 @@ juce::String glyph (const char* bytes) { return juce::String::fromUTF8 (bytes); 
 
 // geometry (px at 100 %)
 constexpr int sideWidth = 212, cardWidth = 148, cardGap = 8, addWidth = 52, titleHeight = 26, pad = 8;
-constexpr int rowHeight = 24, categoryWidth = 168;
+constexpr int rowHeight = 28, categoryWidth = 168; // (round 190jc, SG-9: sound rows 24 -> 28 px)
 
 // Words that mean something else elsewhere in the UI get their own translation here ("Keys" the instruments, not
 // the computer's keys; "Punch" the effect, not punch-in recording)
@@ -177,19 +179,35 @@ private:
     bool dragging = false, dimmed = false;
 };
 
-// A small flat button of a card's title bar (‹ › ×)
+// A small flat button of a card's title bar and of the sound picker (‹ › ×). Round 190jc (design190ia SG-9, SG-10): vector
+// glyphs (`size` px: chevrons 5 x 9 / 6 x 10, the X 8 x 8, stroke 1.5) instead of 2-5 px text glyphs; a round hover fill.
 class GlyphButton final : public juce::Button
 {
 public:
-    explicit GlyphButton (const juce::String& text) : juce::Button (text) {}
+    GlyphButton (const juce::String& name, ui::simplelook::Glyph g, juce::Point<float> glyphSize, bool roundHover = true)
+        : juce::Button (name), glyph (g), size (glyphSize), round (roundHover)
+    {
+    }
     void paintButton (juce::Graphics& g, bool over, bool down) override
     {
-        if (over || down)
-            fillRoundRect (g, getLocalBounds().toFloat().reduced (1.0f), radius::sm, down ? colour::bg6 : colour::bg5);
-        g.setColour (! isEnabled() ? colour::textDisabled : over ? colour::textPrimary : colour::textSecondary);
-        g.setFont (font (type::title));
-        g.drawText (getName(), getLocalBounds(), juce::Justification::centred, false);
+        const auto r = getLocalBounds().toFloat();
+        if (isEnabled() && (over || down))
+        {
+            g.setColour (down ? colour::bg6 : colour::bg5);
+            if (round)
+                g.fillEllipse (r.withSizeKeepingCentre (juce::jmin (r.getWidth(), r.getHeight()), juce::jmin (r.getWidth(), r.getHeight())).reduced (0.5f));
+            else
+                g.fillRoundedRectangle (r.reduced (1.0f), radius::lg);
+        }
+        const auto scale = ui::simplelook::px (1.0f, 1.4f);
+        ui::simplelook::drawGlyph (g, glyph, r.withSizeKeepingCentre (size.x * scale, size.y * scale),
+                                   ! isEnabled() ? colour::textDisabled : over ? colour::textPrimary : colour::textSecondary, 1.5f);
     }
+
+private:
+    ui::simplelook::Glyph glyph;
+    juce::Point<float> size;
+    bool round;
 };
 
 // The last "card" of the chain: a big + in a dashed frame
@@ -628,15 +646,17 @@ private:
             repaint();
         }
 
-        juce::Rectangle<int> ledBounds() const { return { 8, 7, 12, 12 }; }
+        juce::Rectangle<int> ledBounds() const { return { 7, 6, 14, 14 }; } // (round 190jc, SG-10: 14 px, ringed when off)
 
         void resized() override
         {
             auto r = getLocalBounds();
             auto bar = r.removeFromTop (titleHeight);
-            close.setBounds (bar.removeFromRight (22).reduced (0, 2));
-            right.setBounds (bar.removeFromRight (20).reduced (0, 2));
-            left.setBounds (bar.removeFromRight (20).reduced (0, 2));
+            // round 190jc (SG-10): 20 x 20 hit boxes
+            bar.removeFromRight (3);
+            close.setBounds (bar.removeFromRight (20).withSizeKeepingCentre (20, 20));
+            right.setBounds (bar.removeFromRight (20).withSizeKeepingCentre (20, 20));
+            left.setBounds (bar.removeFromRight (20).withSizeKeepingCentre (20, 20));
             r.reduce (pad, 6);
             editor.setBounds (r.removeFromBottom (24));
             r.removeFromBottom (4);
@@ -657,6 +677,11 @@ private:
             g.drawRoundedRectangle (r.reduced (0.5f), radius::lg, 1.0f);
             g.setColour (on ? colour::accent : colour::ledOff);
             g.fillEllipse (ledBounds().toFloat());
+            if (! on)
+            {
+                g.setColour (colour::textDisabled);
+                g.drawEllipse (ledBounds().toFloat().reduced (0.5f), 1.0f);
+            }
             if (ledHover)
             {
                 g.setColour (colour::textPrimary.withAlpha (0.6f));
@@ -716,7 +741,9 @@ private:
         juce::String title, sub;
         DockKnob knob;
         juce::TextButton editor;
-        GlyphButton left { glyph ("\xe2\x80\xb9") }, right { glyph ("\xe2\x80\xba") }, close { glyph ("\xc3\x97") };
+        GlyphButton left { glyph ("\xe2\x80\xb9"), ui::simplelook::Glyph::chevronLeft, { 5.0f, 9.0f } },
+            right { glyph ("\xe2\x80\xba"), ui::simplelook::Glyph::chevronRight, { 5.0f, 9.0f } },
+            close { glyph ("\xc3\x97"), ui::simplelook::Glyph::cross, { 8.0f, 8.0f } };
     };
 
     // The row of cards (inside the viewport): it paints the drop mark while a card is dragged
@@ -945,9 +972,11 @@ public:
         auto r = getLocalBounds().reduced (pad);
         auto side = r.removeFromLeft (sideWidth - pad);
         soundCaption.setBounds (side.removeFromTop (16));
-        auto row = side.removeFromTop (30);
-        prev.setBounds (row.removeFromLeft (26));
-        next.setBounds (row.removeFromRight (26));
+        // round 190jc (SG-9, BandLab's "‹ Studio Grand ›" field): a 32 px field with the chevrons in 28 px ends
+        auto row = side.removeFromTop (32);
+        pickerField = row;
+        prev.setBounds (row.removeFromLeft (28));
+        next.setBounds (row.removeFromRight (28));
         name.setBounds (row);
         detail.setBounds (side.removeFromTop (18));
         side.removeFromTop (8);
@@ -977,7 +1006,10 @@ public:
     {
         g.setColour (colour::border);
         g.fillRect (sideWidth, pad, 1, getHeight() - 2 * pad);
+        g.setColour (colour::bg4);
+        g.fillRoundedRectangle (pickerField.toFloat(), radius::lg);
     }
+    juce::Rectangle<int> pickerField;
 
     void visibilityChanged() override
     {
@@ -1273,7 +1305,8 @@ private:
     }
 
     juce::Label soundCaption, name, detail, listHint;
-    GlyphButton prev { glyph ("\xe2\x80\xb9") }, next { glyph ("\xe2\x80\xba") };
+    GlyphButton prev { glyph ("\xe2\x80\xb9"), ui::simplelook::Glyph::chevronLeft, { 6.0f, 10.0f }, false },
+        next { glyph ("\xe2\x80\xba"), ui::simplelook::Glyph::chevronRight, { 6.0f, 10.0f }, false };
     juce::TextButton editorButton, keysButton, ownButton, fontsButton, pluginsButton, folderButton;
     juce::TextEditor search;
     CategoryModel categoryModel;
@@ -2465,7 +2498,13 @@ SimpleDock::SimpleDock (AudioEngine& e, Hooks h) : engine (e), hooks (std::move 
     followButton.setTooltip (tr ("The loop is moved to the project key (its length stays); off: it plays in its own key"));
     followButton.onClick = [this] { clickFollowForCheck(); };
     addChildComponent (followButton);
-    hideButton.setButtonText (glyph ("\xe2\x96\xbe"));
+    // round 190jc (SG-8): each tab's icon; (SG-7) the hide button is the round close X at the strip's left
+    instrumentButton.glyph = (int) ui::simplelook::Glyph::piano;
+    keyboardButton.glyph = (int) ui::simplelook::Glyph::keyboard;
+    editorButton.glyph = (int) ui::simplelook::Glyph::notes;
+    effectsButton.glyph = (int) ui::simplelook::Glyph::fx;
+    padsButton.glyph = (int) ui::simplelook::Glyph::pads;
+    hideButton.setButtonText (tr ("Hide the track dock"));
     hideButton.setTooltip (tr ("Hide the track dock"));
     hideButton.onClick = [this] {
         shownSetting = false;
@@ -2684,19 +2723,19 @@ int SimpleDock::heightFor (int available) const noexcept
 void SimpleDock::paint (juce::Graphics& g)
 {
     g.fillAll (colour::bg1);
-    auto strip = getLocalBounds().withHeight (stripHeight);
+    auto strip = getLocalBounds().withHeight (stripHeight());
     g.setColour (colour::bg3);
     g.fillRect (strip);
     g.setColour (colour::border);
     g.fillRect (0, 0, getWidth(), 1);
-    g.fillRect (0, stripHeight - 1, getWidth(), 1);
+    g.fillRect (0, stripHeight() - 1, getWidth(), 1);
     // the resize grip in the middle of the top edge
     g.setColour (colour::borderStrong);
     g.fillRoundedRectangle ((float) getWidth() * 0.5f - 16.0f, 2.0f, 32.0f, 2.0f, 1.0f);
 
     const auto& song = engine.getSong();
     // round 190dg: the track's chain preset, right of the tabs (the header's FX button is too small to name it)
-    const auto rightEdge = followButton.isVisible() ? followButton.getX() - 10 : hideButton.getX() - 10;
+    const auto rightEdge = followButton.isVisible() ? followButton.getX() - 10 : getWidth() - 10;
     if (followButton.isVisible()) // round 190ds: the loop's key and what following does
     {
         g.setColour (colour::textSecondary);
@@ -2722,7 +2761,7 @@ void SimpleDock::paint (juce::Graphics& g)
         g.setFont (font (type::small));
         g.drawText (tr ("Preset") + glyph (": ") + name, area, juce::Justification::centredRight, true);
     }
-    auto text = strip.withTrimmedLeft (12).withRight (instrumentButton.isVisible() ? instrumentButton.getX() - 12
+    auto text = strip.withLeft (hideButton.getRight() + 10).withRight (instrumentButton.isVisible() ? instrumentButton.getX() - 12
                                                       : keyboardButton.isVisible() ? keyboardButton.getX() - 12
                                                       : padsButton.isVisible()     ? padsButton.getX() - 12
                                                                                    : effectsButton.getX() - 12);
@@ -2735,11 +2774,25 @@ void SimpleDock::paint (juce::Graphics& g)
     }
     const auto own = track < (int) song.playlistTracks.size() ? song.playlistTracks[(std::size_t) track].colour : 0u;
     const auto kind = simpletracks::kindOf (song, track);
-    g.setColour (own != 0 ? juce::Colour (own) : kind ? juce::Colour (simpletracks::defaultColour (*kind)) : colour::textSecondary);
-    g.fillRoundedRectangle ((float) text.getX(), (float) strip.getCentreY() - 7.0f, 4.0f, 14.0f, 2.0f);
-    text.removeFromLeft (12);
+    const auto hue = own != 0 ? juce::Colour (own) : kind ? juce::Colour (simpletracks::defaultColour (*kind)) : colour::textSecondary;
+    // round 190jc (SG-7): the track's type icon in its colour (BandLab's Track View header), else the colour bar
+    const auto ownIcon = track < (int) song.playlistTracks.size() ? trackicons::iconFor (song.playlistTracks[(std::size_t) track].icon) : trackicons::Icon::none;
+    const auto icon = ownIcon != trackicons::Icon::none ? ownIcon : kind ? simpletracks::iconOf (*kind) : trackicons::Icon::none;
+    if (icon != trackicons::Icon::none)
+    {
+        const auto size = (float) ui::simplelook::px (16, 20);
+        ui::drawTrackIcon (g, icon, juce::Rectangle<float> ((float) text.getX(), (float) strip.getCentreY() - size * 0.5f, size, size),
+                           ui::simplelook::readableOn (hue, colour::bg3, 3.0f));
+        text.removeFromLeft ((int) size + 8);
+    }
+    else
+    {
+        g.setColour (hue);
+        g.fillRoundedRectangle ((float) text.getX(), (float) strip.getCentreY() - 7.0f, 4.0f, 14.0f, 2.0f);
+        text.removeFromLeft (12);
+    }
     g.setColour (colour::textPrimary);
-    g.setFont (font (type::body, true));
+    g.setFont (font (ui::simplelook::largeControls() ? type::title : type::body, true));
     const auto title = trackTitle (song, track);
     const auto titleWidth = juce::jmin (text.getWidth(), juce::GlyphArrangement::getStringWidthInt (g.getCurrentFont(), title) + 4);
     g.drawText (title, text.removeFromLeft (titleWidth), juce::Justification::centredLeft, true);
@@ -2751,14 +2804,63 @@ void SimpleDock::paint (juce::Graphics& g)
     }
 }
 
+int SimpleDock::stripHeight() { return ui::simplelook::px (36, 48); }
+
+void SimpleDock::StripButton::paintButton (juce::Graphics& g, bool over, bool down)
+{
+    using namespace theme;
+    const auto r = getLocalBounds().toFloat();
+    if (glyph < 0) // BandLab's round close X (the same action as the old caret: hides the dock)
+    {
+        const auto d = juce::jmin (r.getWidth(), r.getHeight());
+        const auto circle = juce::Rectangle<float> (d, d).withCentre (r.getCentre());
+        g.setColour (down ? colour::bg6 : over ? colour::bg5 : colour::bg4);
+        g.fillEllipse (circle);
+        ui::simplelook::drawGlyph (g, ui::simplelook::Glyph::cross, circle.withSizeKeepingCentre (d * 0.34f, d * 0.34f), colour::textPrimary, 1.5f);
+        return;
+    }
+    const auto on = getToggleState() && ! lone;
+    if (! lone)
+    {
+        // one pill per tab, joined into a segmented control: rounded only at the group's ends
+        const auto left = ! isConnectedOnLeft(), right = ! isConnectedOnRight();
+        const auto fill = on ? (down ? colour::accentPressed : over ? colour::accentHover : colour::accent) : down ? colour::bg6 : over ? colour::bg5 : colour::bg4;
+        juce::Path p;
+        p.addRoundedRectangle (r.getX(), r.getY(), r.getWidth() - (right ? 0.0f : 1.0f), r.getHeight(), radius::lg, radius::lg, left, right, left, right);
+        g.setColour (fill);
+        g.fillPath (p);
+    }
+    const auto f = font (ui::simplelook::largeControls() ? type::title : type::body, on || lone);
+    const auto text = getButtonText();
+    const auto iconSize = (float) ui::simplelook::px (14, 18), gap = 6.0f;
+    const auto textWidth = juce::GlyphArrangement::getStringWidth (f, text);
+    const auto total = juce::jmin (r.getWidth() - 12.0f, iconSize + gap + textWidth);
+    auto content = lone ? r.withTrimmedLeft (4.0f).withWidth (total) : r.withSizeKeepingCentre (total, r.getHeight());
+    const auto ink = on ? colour::onAccent : lone ? colour::textPrimary : over ? colour::textPrimary : colour::textSecondary;
+    ui::simplelook::drawGlyph (g, (ui::simplelook::Glyph) glyph, content.removeFromLeft (iconSize).withSizeKeepingCentre (iconSize, iconSize), ink, 1.4f);
+    content.removeFromLeft (gap);
+    g.setColour (ink);
+    g.setFont (f);
+    g.drawFittedText (text, content.toNearestInt(), juce::Justification::centredLeft, 1, 0.8f);
+    if (lone) // a section title: a short accent line under it
+    {
+        g.setColour (colour::accent);
+        g.fillRoundedRectangle (r.getX() + 4.0f, r.getBottom() - 2.0f, 24.0f, 2.0f, 1.0f);
+    }
+}
+
 void SimpleDock::resized()
 {
-    auto strip = getLocalBounds().withHeight (stripHeight).reduced (0, 4);
-    hideButton.setBounds (strip.removeFromRight (34).withTrimmedRight (8));
-    followButton.setBounds (strip.removeFromRight (190).withTrimmedRight (10));
+    // round 190jc (SG-7, SG-8): the round close X at the left (28 px; Large controls 40), tabs 28 px tall (40) with icons
+    const auto stripAll = getLocalBounds().withHeight (stripHeight());
+    const auto closeSize = ui::simplelook::px (28, 40);
+    hideButton.setBounds (juce::Rectangle<int> (8, (stripAll.getHeight() - closeSize) / 2, closeSize, closeSize));
+    const auto tabHeight = ui::simplelook::px (28, 40), tabWidth = ui::simplelook::px (112, 136);
+    auto strip = stripAll.withSizeKeepingCentre (stripAll.getWidth(), tabHeight);
+    followButton.setBounds (strip.removeFromRight (190).withTrimmedRight (10).withSizeKeepingCentre (180, juce::jmin (24, tabHeight)));
     // the tabs sit after the track's name, left of the middle
     const auto count = 1 + (instrumentTab ? 1 : 0) + (playTabs ? 2 : 0) + (padsTab ? 1 : 0);
-    auto tabs = strip.withLeft (juce::jmin (300, getWidth() / 3)).withWidth (100 * count);
+    auto tabs = strip.withLeft (juce::jmin (300, getWidth() / 3)).withWidth (tabWidth * count);
     std::vector<juce::TextButton*> shown;
     if (instrumentTab)
         shown.push_back (&instrumentButton);
@@ -2770,9 +2872,10 @@ void SimpleDock::resized()
     for (std::size_t i = 0; i < shown.size(); ++i)
     {
         shown[i]->setConnectedEdges ((i > 0 ? juce::Button::ConnectedOnLeft : 0) | (i + 1 < shown.size() ? juce::Button::ConnectedOnRight : 0));
-        shown[i]->setBounds (tabs.removeFromLeft (100));
+        static_cast<StripButton*> (shown[i])->lone = shown.size() == 1; // (round 190jc: an audio track's only tab is a title)
+        shown[i]->setBounds (tabs.removeFromLeft (tabWidth));
     }
-    const auto body = getLocalBounds().withTrimmedTop (stripHeight);
+    const auto body = getLocalBounds().withTrimmedTop (stripHeight());
     effectsPage->setBounds (body);
     instrumentPage->setBounds (body);
     editorPage->setBounds (body);
