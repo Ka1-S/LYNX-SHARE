@@ -426,6 +426,8 @@ public:
         {
             auto* b = quickButtons.add (new IconButton (q.text, q.icon));
             b->setFlat (true);
+            if (quickButtons.size() > 4) // (Edison's tool grid: raised tiles, as the Pattern toolbar's; cut / copy / paste / delete stay flat)
+                b->setLook (IconButton::Look::flTile, 18.0f);
             // the tool's name, then what it does (both existing texts); a tool form: its title
             const auto toolIndex = quickButtons.size() - 1 - 19;
             static const audiotools::Tool forms[] = { audiotools::Tool::equalize, audiotools::Tool::denoise, audiotools::Tool::reverb };
@@ -2382,7 +2384,7 @@ private:
         for (const auto& m : doc.markers)
             if (viewRegions && m.isRegion())
             {
-                g.setColour (colour::warning.withAlpha (0.07f));
+                g.setColour (colour::warning.withAlpha (edisonLayout() ? 0.025f : 0.07f)); // (Edison: the regions in the ruler, the canvas stays navy)
                 g.fillRect (juce::Rectangle<float>::leftTopRightBottom (frameToX ((double) m.start), (float) waveArea.getY(), frameToX ((double) m.end),
                                                                         (float) waveArea.getBottom()));
             }

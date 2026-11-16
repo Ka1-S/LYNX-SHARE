@@ -137,8 +137,18 @@ void MainComponent::applyFlTiles()
         b->setLook (fl ? BL::flTile : BL::standard, box);
     for (auto& b : panelButtons)
         b.setLook (fl ? BL::flTile : BL::standard, box);
+    // FM-4 / FM-7: FL's larger menu-bar text and hint (the window starts in the Pattern look without a look change, so
+    // this runs from applyIconSizing as well as from applyToolbarLook)
+    if ((bool) menuBar.getProperties().getWithDefault ("lynxFlMenuBar", false) != fl)
+    {
+        menuBar.getProperties().set ("lynxFlMenuBar", fl);
+        menuBar.repaint();
+    }
+    hintBar.setLarger (fl);
     if (! fl)
         return;
+    for (auto* b : { &playButton, &stopButton, &recordButton })
+        b->setLook (BL::flTile, 0.0f);
     for (auto* b : { &metronomeButton, &tapTempoButton, &blendButton, &punchButton, &typingPianoButton })
         b->setLook (BL::flTile, box);
 }
@@ -179,10 +189,7 @@ void MainComponent::applyToolbarLook()
     for (auto* b : { &sessionViewButton, &arrangementViewButton })
         b->setLook (BL::liveSelector, 15.0f);
     moreButton.setLook (look == Look::live ? BL::liveBox : BL::standard, look == Look::live ? 13.0f : 0.0f);
-    applyFlTiles(); // (round 190jo: FL's tiles on the Pattern toolbar's other buttons; the other looks keep theirs)
-    menuBar.getProperties().set ("lynxFlMenuBar", fl); // (round 190jo FM-4: FL's larger menu-bar text, Pattern toolbar only)
-    hintBar.setLarger (fl);                            // (round 190jo FM-7: the hint a step larger, Pattern toolbar only)
-    menuBar.repaint();
+    applyFlTiles(); // (round 190jo: FL's tiles, menu and hint on the Pattern toolbar; the other looks keep theirs)
 
     tempoDisplay.look = look;
     tempoDisplay.setRepaintsOnMouseActivity (! fl);
