@@ -121,10 +121,11 @@ bool isAllowed (const std::string& engine, const std::string& control)
     return false;
 }
 
-void auditEngines (const std::set<std::string>& names, bool except)
+// (`withoutFl`: engines that need nothing of FL's run without its Data folder too, e.g. Tetra on CI)
+void auditEngines (const std::set<std::string>& names, bool except, bool withoutFl = false)
 {
     using namespace lynx;
-    if (realFlpDir.empty())
+    if (realFlpDir.empty() && ! withoutFl)
         return;
     static const auto fl = natives142::flAccess();
     ctlaudit::flAccess = &fl;
@@ -172,7 +173,7 @@ void auditEngines (const std::set<std::string>& names, bool except)
 // the slow engines in tests of their own (the build runs the chunks in parallel)
 const std::set<std::string>& slow()
 {
-    static const std::set<std::string> s { "GMS", "Sawer", "Toxic Biohazard", "Harmless", "Kepler Exo", "Transistor Bass", "Sytrus", "Drumaxx" };
+    static const std::set<std::string> s { "GMS", "Sawer", "Toxic Biohazard", "Harmless", "Kepler Exo", "Transistor Bass", "Sytrus", "Drumaxx", "Tetra" };
     return s;
 }
 } // namespace ctlwake173d
@@ -187,6 +188,8 @@ TEST (ctlwake173d_generator_controls_sytrus) { ctlwake173d::auditEngines ({ "Syt
 TEST (ctlwake173d_generator_controls_kepler_exo) { ctlwake173d::auditEngines ({ "Kepler Exo" }, false); }
 TEST (ctlwake173d_generator_controls_transistor_bass) { ctlwake173d::auditEngines ({ "Transistor Bass" }, false); }
 TEST (ctlwake173d_generator_controls_drumaxx) { ctlwake173d::auditEngines ({ "Drumaxx" }, false); }
+// (round 190ix: LYNX's own FM synth needs nothing of FL, so it runs on CI too; its contexts are Tetra hints in tools/CtlWake.h)
+TEST (ctlwake173d_generator_controls_tetra) { ctlwake173d::auditEngines ({ "Tetra" }, false, true); }
 
 // every editor control reads and writes on the engine's new channel: a state saved before a parameter existed (Slayer's
 // version 0, Kepler's 34 floats, Kepler Exo's 151) silently dropped its edits

@@ -123,6 +123,8 @@ public:
     double param (int index) const noexcept;
     // velocity 0…1 (0 = note off), the note's own pitch offset in semitones
     void note (int key, float velocity, float pitch = 0.0f) noexcept;
+    // the held voices glide to `semitones` (key + the note's own offset) over `samples` (FL's slide notes, round 190ix)
+    void slideTo (float semitones, float samples) noexcept;
     void setPitchOffset (float semitones) noexcept; // the channel's pitch, live
     void setPitchBend (float semitones) noexcept;   // the MIDI wheel in semitones
     void allNotesOff() noexcept;

@@ -31,6 +31,7 @@
 #include <sstream>
 
 #include "CtlAudit.h"
+#include "core/FmSynth.h"
 #include "core/Morphine.h"
 #include "core/TransistorBass.h"
 
@@ -362,6 +363,88 @@ inline std::vector<Hint> hintsFor (InstrumentKind kind, const std::vector<Contro
             named ("the delay mixed in", { { "Delay mix", 0.7f } });
             named ("the mod wheel at full on a negative amount", { { "Mod wheel amount", 0.25f } }, "pat:mod");
             break;
+        case InstrumentKind::tetra:
+        {
+            // (round 190ix) Tetra's new channel plays operator A alone (B…D off, at the −70 dB floor), with the LFO, the pitch
+            // envelope and the filter off and every envelope a click attack onto a full sustain (core/FmSynth.cpp defaults):
+            // a section's controls are heard with it on. Operator's laws keep some of them context-bound: an operator's
+            // feedback acts only where nothing modulates it, a fixed frequency only with Fixed on, a loop time / repeat
+            // only in its loop mode, a band-pass circuit only on a band / notch / morph filter.
+            const char* const ops[] { "A", "B", "C", "D" };
+            const char* const envs[] { "A Env", "B Env", "C Env", "D Env", "LFO Env", "Pitch Env", "Filter Env" };
+            std::vector<std::pair<std::string, float>> on;
+            for (const auto* o : ops)
+            {
+                on.push_back ({ std::string (o) + " On", 1.0f });
+                on.push_back ({ std::string (o) + " Level", 0.5f });
+            }
+            auto with = [&on] (std::vector<std::pair<std::string, float>> more) {
+                auto v = on;
+                v.insert (v.end(), more.begin(), more.end());
+                return v;
+            };
+            // every envelope slow and shaped (levels from a start to a sustain and on to an end), in a loop mode
+            auto shaped = [&] (float loopMode) {
+                std::vector<std::pair<std::string, float>> v;
+                for (const auto* e : envs)
+                {
+                    const std::string n = e;
+                    const bool pitch = n == "Pitch Env";
+                    for (const auto& [what, x] : std::vector<std::pair<const char*, float>> {
+                             { " Attack", 150.0f }, { " Initial", pitch ? 12.0f : 0.5f }, { " Decay", 150.0f }, { " Peak", pitch ? -12.0f : 1.0f },
+                             { " Sustain", pitch ? 7.0f : 0.3f }, { " Release", 150.0f }, { " End", pitch ? -7.0f : 0.2f }, { " Loop Mode", loopMode } })
+                        v.push_back ({ n + what, x });
+                }
+                for (const auto* o : ops)
+                {
+                    v.push_back ({ std::string (o) + " Pitch Env On", 1.0f });
+                    v.push_back ({ std::string (o) + " LFO On", 1.0f });
+                }
+                for (const auto& kv : std::vector<std::pair<std::string, float>> { { "Pitch Env On", 1.0f }, { "LFO On", 1.0f }, { "LFO Amount", 0.5f },
+                                                                                   { "Filter On", 1.0f }, { "Filter Freq", 800.0f }, { "Filter Env Amount", 36.0f },
+                                                                                   { "LFO Filter On", 1.0f } })
+                    v.push_back (kv);
+                return with (v);
+            };
+            named ("every operator on at half level, in a chain", on);
+            named ("every operator on at half level and heard (algorithm 11)", with ({ { "Algorithm", 10.0f } }));
+            named ("every operator on at half level, at a fixed frequency", with ({ { "A Fixed", 1.0f }, { "B Fixed", 1.0f }, { "C Fixed", 1.0f }, { "D Fixed", 1.0f } }));
+            named ("every operator on, the chord hit again", with ({ { "A Phase", 25.0f }, { "B Phase", 25.0f }, { "C Phase", 25.0f }, { "D Phase", 25.0f } }), "pat:retrig");
+            named ("every operator on, the LFO at full on each", with ({ { "LFO On", 1.0f }, { "LFO Amount", 1.0f }, { "A LFO On", 1.0f }, { "B LFO On", 1.0f }, { "C LFO On", 1.0f }, { "D LFO On", 1.0f } }));
+            named ("every operator on, the LFO at full on each, tempo-synced", with ({ { "LFO On", 1.0f }, { "LFO Amount", 1.0f }, { "LFO Range", 2.0f } }));
+            named ("every operator on, the LFO at full on each, a note after a gap", with ({ { "LFO On", 1.0f }, { "LFO Amount", 1.0f }, { "LFO Rate", 40.0f } }), "pat:gap");
+            named ("the LFO at full on the filter", { { "LFO On", 1.0f }, { "LFO Amount", 1.0f }, { "LFO Filter On", 1.0f }, { "Filter On", 1.0f }, { "Filter Freq", 1000.0f } });
+            named ("every operator on, the pitch envelope on each from an octave up",
+                   with ({ { "Pitch Env On", 1.0f }, { "Pitch Env Initial", 12.0f }, { "Pitch Env Attack", 150.0f }, { "A Pitch Env On", 1.0f }, { "B Pitch Env On", 1.0f },
+                           { "C Pitch Env On", 1.0f }, { "D Pitch Env On", 1.0f } }));
+            named ("every section on, every envelope slow and shaped", shaped (0.0f));
+            named ("every section on, every envelope slow and shaped, looping", shaped (1.0f), "pat:long");
+            named ("every section on, every envelope slow and shaped, in Beat mode", shaped (2.0f), "pat:long");
+            named ("the filter on as a band pass", { { "Filter On", 1.0f }, { "Filter Type", 2.0f }, { "Filter Freq", 1000.0f }, { "Filter Res", 0.8f } });
+            named ("the filter on as a morph filter", { { "Filter On", 1.0f }, { "Filter Type", 4.0f }, { "Filter Freq", 1000.0f }, { "Filter Res", 0.8f } });
+            named ("the filter on at 1 kHz, its envelope at full", { { "Filter On", 1.0f }, { "Filter Freq", 1000.0f }, { "Filter Env Amount", 72.0f }, { "Filter Env Attack", 150.0f } });
+            named ("the filter on at 1 kHz, its morph at the high pass", { { "Filter On", 1.0f }, { "Filter Freq", 1000.0f }, { "Filter Morph", 0.5f } });
+            named ("the filter on at 1 kHz, a driven circuit", { { "Filter On", 1.0f }, { "Filter Freq", 1000.0f }, { "Filter Circuit", 1.0f }, { "Filter Res", 0.5f } });
+            named ("the filter on at 1 kHz with the shaper", { { "Filter On", 1.0f }, { "Filter Freq", 1000.0f }, { "Shaper", 1.0f }, { "Shaper Drive", 12.0f } });
+            named ("glide on, a legato second note", { { "Glide", 1.0f } }, "pat:mono");
+            {
+                // the user wave (no editor knob: the wave editor's 64 partials) as a saw, heard where an operator picks it
+                named ("every operator on, its user wave a saw", on);
+                out.back().apply = [] (ChannelDef& d) {
+                    if ((int) d.modelParams.size() < fm::stateSize)
+                    {
+                        const auto def = tetraDefaults();
+                        const auto have = d.modelParams.size();
+                        d.modelParams.resize ((std::size_t) fm::stateSize);
+                        std::copy (def.begin() + (std::ptrdiff_t) have, def.end(), d.modelParams.begin() + (std::ptrdiff_t) have);
+                    }
+                    for (int k = 0; k < fm::opCount; ++k)
+                        for (int i = 0; i < fm::harmonics; ++i)
+                            d.modelParams[(std::size_t) (fm::harmonicsBase + k * fm::harmonics + i)] = 1.0f / (float) (i + 1);
+                };
+            }
+            break;
+        }
         default:
             break;
     }
@@ -493,8 +576,13 @@ inline std::vector<float> valuesFrom (const Control& k, float v)
     const auto other = out[0] == k.low ? k.high : k.low;
     if (std::abs (other - v) > 1e-6f * std::max (1.0f, std::abs (k.high - k.low)))
         out.push_back (other);
-    // a phase's two ends are the same angle: half a cycle away too (the effects' rule, round 173d)
-    if (k.name.size() >= 5 && k.name.compare (k.name.size() - 5, 5, "phase") == 0)
+    // a phase's two ends are the same angle: half a cycle away too (the effects' rule, round 173d). Round 190ix: "Phase"
+    // too, and Tetra's Filter Morph, whose two ends are both the low pass (Operator's low → band → high → notch → low)
+    const auto endsWith = [&k] (const char* tail) {
+        const auto n = std::strlen (tail);
+        return k.name.size() >= n && k.name.compare (k.name.size() - n, n, tail) == 0;
+    };
+    if (endsWith ("phase") || endsWith ("Phase") || endsWith ("Filter Morph"))
         out.push_back (0.5f * (k.low + k.high) + (v < 0.5f * (k.low + k.high) ? 0.0f : -0.25f * (k.high - k.low)));
     return out;
 }

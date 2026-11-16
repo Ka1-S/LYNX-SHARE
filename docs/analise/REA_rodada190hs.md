@@ -89,3 +89,19 @@ range becomes the channel's pitch range.
 - Repeat / LFO sync indices other than 0, 3, 6, 7, 9; LFO ranges' exact ends; the filter circuits' and 4 Bit shaper's
   shapes; LFO → filter depth; feedback above 50 %.
 - The random waves (looped noise, S&H, noise LFO) are LYNX's own draws.
+
+## 6. Round 190ix: FL's host pitch features and the control audit
+
+- **Slide notes, channel Porta and Mono** (FL host features, not Operator's): FL's host owns each voice's pitch and
+  every native generator follows it (REA_rodada166a §4, [INFERENCE]; round 168l's channel porta laws, core/ChannelPoly.h).
+  Tetra now does what LYNX's other generators do: each voice keeps a `HostSlide` (core/HostSlide.h) added to its pitch
+  at the modulation step; a note started by the rack's porta takes `HostSlide::pendingGlide()` and glides from the last
+  note; `slideTo` moves the held voices (a slide note, a Mono channel's next note) linearly in cents over the slide
+  time; released voices stay where they are. Operator's own Glide (above) is unchanged and independent of it. A voice
+  started without a porta glide renders exactly as before (the 190hs scores are unchanged).
+- **Control audit** (ctlwake173d, issue #77's rule): every control reached the engine; the 172 "changes nothing" were
+  controls of sections a new Tetra has off (operators B…D at the floor, the LFO, the pitch envelope, the filter, the
+  loop modes, Fixed) or Operator's own context rules (feedback only on an unmodulated operator, a phase's 0 % and 100 %
+  being one angle, the default user wave being a sine). Tetra's contexts are hints in tools/CtlWake.h (every operator
+  on, the LFO / pitch envelope / filter on, slow shaped envelopes in each loop mode, a saw user wave); the audit's
+  half-cycle try of a phase now also matches "Phase".

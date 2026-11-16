@@ -605,6 +605,7 @@ struct Voice
     double lfoPhase = 0.0;
     float lfoHeld = 0.0f, lfoNext = 0.0f;
     float glideSt = 0.0f, glideStep = 0.0f; // semitones still to slide (towards 0) and per ms
+    HostSlide slide;                        // FL's channel porta and slide notes (round 190ix, core/HostSlide.h): cents
     float pan = 0.0f, detune = 0.0f;        // spread: this voice's side and detune (cents)
     int pair = -1;                          // the other voice of a spread note
     std::uint32_t noise = 1;
@@ -780,6 +781,11 @@ struct Engine::Impl
             for (auto& s : v.svf)
                 s = {};
         }
+        // FL's channel porta (round 190ix): the rack starts the note at the previous note's pitch (its cents hold it) and
+        // the voice glides back to its own pitch (HostSlide::pendingGlide); a slide note moves it later (slideTo). The
+        // channel's live pitch moves every voice through pitchOffset, so the slide does not track it (NaN reference).
+        v.slide = {};
+        v.slide.anchor (NAN);
         // glide from the last note [190hs x8 / x9]
         v.glideSt = 0.0f;
         v.glideStep = 0.0f;
@@ -854,6 +860,14 @@ struct Engine::Impl
         stealOverCap();
     }
 
+    // FL's slide note / a Mono channel's next note: the held voices glide to `toSt` (semitones, the frame of key + pitch)
+    void slideTo (float toSt, float samples) noexcept
+    {
+        for (auto& v : voices)
+            if (v.active && v.gate)
+                v.slide.start ((toSt - ((float) v.key + v.pitch)) * 100.0f, samples);
+    }
+
     void noteOff (int key) noexcept
     {
         for (auto& v : voices)
@@ -918,7 +932,8 @@ struct Engine::Impl
             const auto stepSt = v.glideStep * dt;
             v.glideSt = std::abs (v.glideSt) <= stepSt ? 0.0f : v.glideSt - std::copysign (stepSt, v.glideSt);
         }
-        const auto noteSt = (float) v.key + v.pitch + v.glideSt + (float) p[g::transpose] + pitchOffset + bend + v.detune * 0.01f;
+        const auto slideSt = v.slide.left > 0.0f || v.slide.cents != 0.0f ? v.slide.advance ((float) n) * 0.01f : 0.0f;
+        const auto noteSt = (float) v.key + v.pitch + v.glideSt + slideSt + (float) p[g::transpose] + pitchOffset + bend + v.detune * 0.01f;
         const auto noteHz = 440.0 * std::pow (2.0, (noteSt - 69.0f) / 12.0);
         const auto penv = p[g::penvOn] > 0.5 ? v.penv.value * (float) laws.penvSemitones * (float) p[g::penvAmount] * (float) (p[g::penvAmountA] / 100.0) : 0.0f;
 
@@ -1235,6 +1250,12 @@ void Engine::note (int key, float velocity, float pitch) noexcept
         impl->noteOn (std::clamp (key, 0, 127), std::clamp (velocity, 0.0f, 1.0f), pitch);
     else
         impl->noteOff (key);
+}
+
+void Engine::slideTo (float semitones, float samples) noexcept
+{
+    if (std::isfinite (semitones) && std::isfinite (samples))
+        impl->slideTo (semitones, std::max (samples, 1.0f));
 }
 
 void Engine::setPitchOffset (float semitones) noexcept { impl->pitchOffset = std::isfinite (semitones) ? semitones : 0.0f; }
@@ -1678,6 +1699,14 @@ public:
     }
 
     void noteOff (int key) noexcept override { engine.note (std::clamp (key, 0, 127), 0.0f); }
+    // FL's channel porta / Mono and slide notes (round 190ix): the voices take HostSlide::pendingGlide at note on and
+    // glide to a slide note's pitch (`cents`: the note's cents, the fine tune and main pitch, as noteOn's)
+    bool followsChannelPorta() const noexcept override { return true; }
+    void slideTo (int key, float cents, float samples) noexcept override
+    {
+        take();
+        engine.slideTo ((float) std::clamp (key, 0, 127) + (cents - liveRest()) * 0.01f, samples);
+    }
     void allNotesOff() noexcept override { engine.allNotesOff(); }
     void panic() noexcept override { engine.reset(); }
     bool idle() const noexcept override { return engine.idle(); }
