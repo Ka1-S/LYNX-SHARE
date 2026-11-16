@@ -10,6 +10,7 @@
 #include "ui/ClipGridComponent.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
+#include "ui/LiveLook.h"
 
 #ifndef TR_NOOP
  #define TR_NOOP(text) text
@@ -211,17 +212,8 @@ void liveWell (juce::Graphics& g, juce::Rectangle<int> r, juce::Colour fill)
 // bottom (from -135° to +135°), and a 3 px needle from the centre to the rim at the value
 void drawLiveKnob (juce::Graphics& g, juce::Rectangle<float> box, float value01)
 {
-    const auto centre = box.getCentre();
-    const auto radius = box.getWidth() * 0.5f - 1.5f;
-    constexpr auto from = -juce::MathConstants<float>::pi * 0.75f, to = juce::MathConstants<float>::pi * 0.75f;
-    juce::Path ring;
-    ring.addCentredArc (centre.x, centre.y, radius, radius, 0.0f, from, to, true);
-    g.setColour (lv::knobRing);
-    g.strokePath (ring, juce::PathStrokeType (3.0f, juce::PathStrokeType::curved, juce::PathStrokeType::butt));
-    const auto angle = from + juce::jlimit (0.0f, 1.0f, value01) * (to - from);
-    const auto tip = centre.getPointOnCircumference (radius + 1.0f, angle);
-    g.setColour (juce::Colour (0xff181818));
-    g.drawLine ({ centre, tip }, 3.0f);
+    // (ui/LiveLook.h's mixer knob, from a cached tile: drawn straight, each ring was a new Direct2D path geometry)
+    theme::drawLiveKnobTile (g, box, value01, 0.0f, 1, &lv::drawMixerKnobDirect);
 }
 } // namespace
 
@@ -947,10 +939,7 @@ void SessionMixerComponent::paintStripLive (juce::Graphics& g, int column, int s
         if (arrow)
         {
             const auto a = inner.removeFromRight (8).toFloat().withSizeKeepingCentre (7.0f, 4.0f);
-            juce::Path tri;
-            tri.addTriangle (a.getX(), a.getY(), a.getRight(), a.getY(), a.getCentreX(), a.getBottom());
-            g.setColour (lv::text);
-            g.fillPath (tri);
+            lv::fillDownMark (g, a.getCentreX(), a.getY(), 7, lv::text);
         }
         g.setColour (dim ? lv::text.withAlpha (0.5f) : lv::text);
         textcache::drawText (g, t, inner, juce::Justification::centredLeft, true);
@@ -1038,10 +1027,7 @@ void SessionMixerComponent::paintStripLive (juce::Graphics& g, int column, int s
 
         // pan: the knob with Live's centre mark over it (x 414..420 y 694..698)
         const auto pan = partBounds (column, Part::pan).toFloat();
-        juce::Path mark;
-        mark.addTriangle (pan.getCentreX() - 3.5f, pan.getY() - 6.0f, pan.getCentreX() + 3.5f, pan.getY() - 6.0f, pan.getCentreX(), pan.getY() - 1.5f);
-        g.setColour (lv::knobRing);
-        g.fillPath (mark);
+        lv::fillDownMark (g, pan.getCentreX(), pan.getY() - 6.0f, 7, lv::knobRing);
         drawLiveKnob (g, pan, (m->pan + 1.0f) * 0.5f);
 
         if (! main)
@@ -1135,10 +1121,7 @@ void SessionMixerComponent::paintMeterLive (juce::Graphics& g, int insert, juce:
     g.fillRect (meter.getX() - 5, meter.getY() + juce::roundToInt (liveScaleFloor * (float) meter.getHeight() / (float) liveMeterHeight), 3, 1);
     const auto volumeDb = sessionmixer::volumeDb (song.mixer[(std::size_t) insert].volume);
     const auto hy = (float) meter.getY() + liveMeterY (std::isfinite (volumeDb) ? (float) volumeDb : -INFINITY, meter.getHeight());
-    juce::Path tri;
-    tri.addTriangle ((float) meter.getX() - 12.0f, hy - 6.5f, (float) meter.getX() - 1.0f, hy, (float) meter.getX() - 12.0f, hy + 6.5f);
-    g.setColour (lv::text);
-    g.fillPath (tri);
+    theme::fillLaunchTriangle (g, { (float) meter.getX() - 12.0f, hy - 6.5f, 11.0f, 13.0f }, lv::text); // (a cached tile)
 }
 
 void SessionMixerComponent::setMeterForSnapshot (int insert, float left, float right, float holdLeft, float holdRight, float maxPeak)

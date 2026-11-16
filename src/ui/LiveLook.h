@@ -12,6 +12,14 @@
 
 #include "ui/Theme.h"
 
+namespace lynx::theme
+{
+// Live's knobs drawn from cached tiles (Theme.cpp, as theme::drawKnob: on Windows each arc drawn straight is a new
+// Direct2D path geometry): `direct` paints one (bounds, value, default) into the tile; `style` keeps the kinds apart.
+void drawLiveKnobTile (juce::Graphics& g, juce::Rectangle<float> bounds, float value01, float default01, int style,
+                       void (*direct) (juce::Graphics&, juce::Rectangle<float>, float, float));
+} // namespace lynx::theme
+
 namespace lynx::theme::livelook
 {
 inline const juce::Colour knobValue { 0xff03c3d5 };  // a knob's value arc (909 Core Kit Low Gain / Tune / Decay)
@@ -24,7 +32,7 @@ inline const juce::Colour padName { 0xffb5b5b5 };    // a Drum Rack pad's name a
 // ring, the value arc (#03C3D5) from the default to the value (Utility's Gain at its 0 dB default: no arc; a macro: from
 // the start), and a small ▼ over the ring at the default when that is not the start (Utility's Gain, Mid/Side, Balance).
 // `default01`: the default's place on the knob, 0..1. Measured at 25 px (Utility's Gain: ring x 1167..1191).
-inline void drawKnob (juce::Graphics& g, juce::Rectangle<float> bounds, float value01, float default01)
+inline void drawKnobDirect (juce::Graphics& g, juce::Rectangle<float> bounds, float value01, float default01)
 {
     const auto size = juce::jmin (bounds.getWidth(), bounds.getHeight()) - 2.0f;
     if (size <= 6.0f)
@@ -65,10 +73,43 @@ inline void drawKnob (juce::Graphics& g, juce::Rectangle<float> bounds, float va
     }
 }
 
+// Live's knob from a tile (the way to draw it; drawKnobDirect paints the tile).
+inline void drawKnob (juce::Graphics& g, juce::Rectangle<float> bounds, float value01, float default01)
+{
+    drawLiveKnobTile (g, bounds, value01, default01, 0, &drawKnobDirect);
+}
+
 // The same knob with a bipolar knob's default at its centre, any other's at its start.
 inline void drawKnob (juce::Graphics& g, juce::Rectangle<float> bounds, float value01, bool bipolar)
 {
     drawKnob (g, bounds, value01, bipolar ? 0.5f : 0.0f);
+}
+
+// The Session mixer's knob (round 190jn slice 13, live-session.png x 403..429 y 581..605): an open ring 27 px across,
+// 3 px thick in #111111, open at the bottom (from -135° to +135°), a 3 px #181818 needle from the centre to the rim
+// (`default01` unused: the mixer's knobs show no value arc).
+inline void drawMixerKnobDirect (juce::Graphics& g, juce::Rectangle<float> box, float value01, float)
+{
+    const auto centre = box.getCentre();
+    const auto radius = box.getWidth() * 0.5f - 1.5f;
+    constexpr auto from = -juce::MathConstants<float>::pi * 0.75f, to = juce::MathConstants<float>::pi * 0.75f;
+    juce::Path ring;
+    ring.addCentredArc (centre.x, centre.y, radius, radius, 0.0f, from, to, true);
+    g.setColour (knobRing);
+    g.strokePath (ring, juce::PathStrokeType (3.0f, juce::PathStrokeType::curved, juce::PathStrokeType::butt));
+    const auto angle = from + juce::jlimit (0.0f, 1.0f, value01) * (to - from);
+    const auto tip = centre.getPointOnCircumference (radius + 1.0f, angle);
+    g.setColour (needle);
+    g.drawLine ({ centre, tip }, 3.0f);
+}
+
+// A small ▼ (`width` px across its top, odd) as rows of whole pixels from `top`: no path to build (Direct2D) and crisp.
+inline void fillDownMark (juce::Graphics& g, float centreX, float top, int width, juce::Colour colour)
+{
+    g.setColour (colour);
+    const auto left = std::round (centreX - (float) width * 0.5f);
+    for (int row = 0; width - 2 * row > 0; ++row)
+        g.fillRect (left + (float) row, std::round (top) + (float) row, (float) (width - 2 * row), 1.0f);
 }
 
 // The power disc of a device's title bar: 13 px with a 1 px #121212 rim, filled #FFAD56 while on, #1E1E1E while off.

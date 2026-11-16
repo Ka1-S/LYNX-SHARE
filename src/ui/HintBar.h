@@ -95,6 +95,9 @@ public:
 
 private:
     juce::String title, body;
+    juce::String lastText, lastValue; // (the hint as given: the same again changes nothing, with no text work)
+    juce::TextLayout layout;          // the body laid out (again only when the text or the width changes)
+    float layoutWidth = -1.0f;
 };
 
 // FL's Tools › Last tweaked as a toolbar read-out (round 162d, issue #8): the name and value of the last moved

@@ -304,6 +304,10 @@ void HintBar::setHint (const Hint& hint, bool isLive)
 
 void InfoView::setHint (const Hint& hint)
 {
+    if (hint.text == lastText && hint.value == lastValue) // (the hint timer's every tick: nothing new)
+        return;
+    lastText = hint.text;
+    lastValue = hint.value;
     auto text = plainHint (withMarkup (hint.text)).trim();
     juce::String t, b = text;
     if (const auto colon = text.indexOfChar (':'); colon > 0 && colon <= 48 && ! text.substring (0, colon).containsChar ('\n'))
@@ -317,6 +321,7 @@ void InfoView::setHint (const Hint& hint)
         return;
     title = t;
     body = b;
+    layoutWidth = -1.0f;
     repaint();
 }
 
@@ -334,13 +339,16 @@ void InfoView::paint (juce::Graphics& g)
     g.drawText (title, bar.withTrimmedLeft (5).withTrimmedRight (4), juce::Justification::centredLeft, true);
     g.setFont (theme::font (theme::type::small));
     // Live: 15 px lines from 6 px in (its text 15..226 in a 231 px view)
-    juce::AttributedString text;
-    text.append (body, theme::font (theme::type::small), ll::text);
-    text.setLineSpacing (15.0f - theme::font (theme::type::small).getHeight());
-    text.setWordWrap (juce::AttributedString::byWord);
-    juce::TextLayout layout;
     const auto area = r.withTrimmedTop (4).reduced (6, 0).toFloat();
-    layout.createLayout (text, area.getWidth());
+    if (area.getWidth() != layoutWidth)
+    {
+        juce::AttributedString text;
+        text.append (body, theme::font (theme::type::small), ll::text);
+        text.setLineSpacing (15.0f - theme::font (theme::type::small).getHeight());
+        text.setWordWrap (juce::AttributedString::byWord);
+        layout.createLayout (text, area.getWidth());
+        layoutWidth = area.getWidth();
+    }
     juce::Graphics::ScopedSaveState save (g);
     g.reduceClipRegion (area.toNearestInt());
     layout.draw (g, area.withHeight (layout.getHeight()));

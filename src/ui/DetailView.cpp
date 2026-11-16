@@ -1,3 +1,4 @@
+#include "ui/TextCache.h"
 #include "ui/DetailView.h"
 #include "core/StandIns.h"
 #include "ui/MapMode.h"
@@ -3733,7 +3734,14 @@ void DetailView::paintLiveStrip (juce::Graphics& g)
     const auto glyphs = pageGlyphArea (false).getX();
     const auto name = track >= 0 ? trackName (song, track) : juce::String();
     g.setFont (font (type::small));
-    const auto nameWidth = name.isEmpty() ? 0 : juce::jmin (180, juce::roundToInt (juce::TextLayout::getStringWidth (g.getCurrentFont(), name)) + 12);
+    static juce::String measuredName; // (the name's width, measured once per name)
+    static int measuredWidth = 0;
+    if (name != measuredName)
+    {
+        measuredName = name;
+        measuredWidth = name.isEmpty() ? 0 : juce::jmin (180, juce::roundToInt (juce::TextLayout::getStringWidth (g.getCurrentFont(), name)) + 12);
+    }
+    const auto nameWidth = measuredWidth;
     auto field = juce::Rectangle<int> (42, strip.getY() + (stripHeight - 19) / 2, std::max (0, glyphs - nameWidth - 12 - 42), 19);
     g.setColour (ll::surface);
     g.fillRoundedRectangle (field.toFloat(), 3.0f);
@@ -3748,9 +3756,9 @@ void DetailView::paintLiveStrip (juce::Graphics& g)
         what = tr ("Clip");
     what << "   (" << tr ("Shift+Tab: {0}", { devicesPage ? tr ("Clip") : tr ("Devices") }) << ")";
     g.setColour (ll::text);
-    g.drawText (what, field.reduced (6, 0), juce::Justification::centredLeft, true);
+    textcache::drawText (g, what, field.reduced (6, 0), juce::Justification::centredLeft, true);
     if (nameWidth > 0)
-        g.drawText (name, juce::Rectangle<int> (glyphs - nameWidth - 6, strip.getY(), nameWidth, stripHeight), juce::Justification::centredLeft, true);
+        textcache::drawText (g, name, juce::Rectangle<int> (glyphs - nameWidth - 6, strip.getY(), nameWidth, stripHeight), juce::Justification::centredLeft, true);
     // the Clip glyph (a clip block with its waveform) and the Device glyph (Live's three bars)
     for (const auto devices : { false, true })
     {

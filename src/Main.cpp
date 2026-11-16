@@ -22354,6 +22354,12 @@ private:
         measureAll ("clip grid");
         ui.setClipGridView (lynx::PlaylistArea::GridView::song); // (round 190jn: the Clip-launch layout's Arrangement)
         measureAll ("clip arrangement");
+        // (and with View > Tall Arrangement lanes: LYNX's 38 px rows in Live's look, the classic look's row height)
+        lynx::playlistTallLiveLanes() = true;
+        ui.getPlaylistForSnapshot().liveLanesChanged();
+        measureAll ("clip arrangement, tall lanes");
+        lynx::playlistTallLiveLanes() = false;
+        ui.getPlaylistForSnapshot().liveLanesChanged();
         ui.setClipGridView (lynx::PlaylistArea::GridView::grid);
         ui.setClipLaunchWorkflow (false);
         // LYNX_PAINTBENCH_SIMPLE=1 (round 190jc): the same project's Playlist in the Simple layout too

@@ -1,4 +1,5 @@
 #include "ui/Theme.h"
+#include "ui/LiveLook.h"
 
 #include "core/MenuMnemonic.h"
 
@@ -719,6 +720,24 @@ void drawKnob (juce::Graphics& g, juce::Rectangle<float> bounds, float value01, 
         sprite = &cache.add (key, std::move (image));
     }
     blit (g, *sprite, at, scale, false, textPrimary); // (the colour drawKnobDirect leaves set: its pointer's)
+}
+
+// Round 190jn: Live's knobs (ui/LiveLook.h) from tiles, as drawKnob above. Values and defaults in sixteenths of a degree.
+void drawLiveKnobTile (juce::Graphics& g, juce::Rectangle<float> bounds, float value01, float default01, int style,
+                       void (*direct) (juce::Graphics&, juce::Rectangle<float>, float, float))
+{
+    if (! g.clipRegionIntersects (bounds.getSmallestIntegerContainer().expanded (5)))
+        return;
+    const auto value = juce::roundToInt (juce::jlimit (0.0f, 1.0f, value01) * 1440.0f), home = juce::roundToInt (juce::jlimit (0.0f, 1.0f, default01) * 1440.0f);
+    static SpriteCache cache;
+    static const bool registered = lynx::ui::registerImageCache ([] { cache.images.clear(); });
+    (void) registered;
+    const auto key = mix (mix (mix (0x9e3779b97f4a7c15ull, (std::uint64_t) value), (std::uint64_t) home), (std::uint64_t) style);
+    const auto drawn = tilesForPaths() && drawTile (g, cache, bounds, 5.0f, key, nativeTiles, juce::Colour (0xff181818), [&] (juce::Graphics& ig, juce::Rectangle<float> r) {
+        direct (ig, r, (float) value / 1440.0f, (float) home / 1440.0f);
+    });
+    if (! drawn)
+        direct (g, bounds, value01, default01);
 }
 
 namespace
