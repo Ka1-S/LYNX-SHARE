@@ -150,6 +150,7 @@ struct Settings
     bool proLink = false, linkSide = false;
     double link = 1.0, linkOnly = 0.0;
     bool gate = true; // round tp172b: false = the reference's Allround mode (no single-vocal gate, the same level law)
+    int timing = 0;   // round 190iq: 1 = the Allround law's measured timing revision (detector, gain, look-ahead); Single Vocal ignores it
 };
 
 class DeEsser

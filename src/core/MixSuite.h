@@ -289,7 +289,11 @@ enum Param { frequency, threshold, range, mode, detector, listen, lookahead, rel
              // round 190dm (appended, every default = the sound before): Air — a high shelf on the processed signal
              // (0 … +12 dB, measured on a de-esser reference's wet path: 8.15 kHz, S 0.5) — and Mix (dry / processed;
              // the dry signal delayed by the latency), for every voicing
-             air, mix, count };
+             air, mix, count,
+             // round 190iq, hidden (not in the info: no control, no text; saved while non-zero): the measured timing of the
+             // reference's Allround law (vmatch::vocalds Settings::timing = 1; Single Vocal is unchanged); a new Hush and a
+             // translated Pro-DS state get 1, a project or preset saved before keeps 0 (tp172b's timing, bit for bit)
+             timing = count };
 double airDb (float v) noexcept;        // round 190dm: 0 … +12 dB
 constexpr double airHz = 8151.0, airSlope = 0.5;
 bool extended (const EffectParams& p) noexcept;         // round 165x: the extended law (and not the classic voicing)

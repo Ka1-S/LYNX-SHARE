@@ -5,6 +5,10 @@
 #include <complex>
 #include <cmath>
 #include <cstring>
+#ifdef LYNX_LAB190IQ
+ #include <cstdio>
+ #include <cstdlib>
+#endif
 #include <iterator>
 
 namespace lynx::vmatch
@@ -894,10 +898,32 @@ constexpr double lawOffsetDb = 4.1, spanDb = 0.0, spanScale = 1.0;
 // 10 log10 (7 kHz / the band's width), with its law's offset allroundOffsetDb (round 148's span, 0.1 − threshold)
 constexpr double allroundOffsetDb = 5.3, allroundBw = 0.72; // (bank fit 6.34; 5.3 keeps the measured 7 kHz sine point, -4.5 dB at -18 dBFS, within 0.6 dB)
 double pole (double ms, double sr) noexcept { return ms <= 0.0 ? 0.0 : std::exp (-1.0 / (ms * 0.001 * sr)); }
+// round 190iq [EXEC] (refcap030: the Pro-DS trial's `ess` probe — a 500 Hz body under 5 … 9 kHz bursts of rising level
+// and a band sweep — at 35 settings, both modes): timing revision 1 of the Allround law. The reference's gain on the
+// body moves later and releases slower than tp172b's timing, whose gain led it by ~5 ms at the default 10 ms look-ahead;
+// fitted on the Allround renders' gain trajectories (0.25 ms steps; Nelder-Mead from tp172b's timing,
+// /mnt/e/lynx-work/parity190iq/hush/fit.py): 0.73 → 0.30 dB rms. The gain looks 1.0945 × the dial − 4.85 ms ahead (≈ 6.1 ms
+// at 10 ms; never below 0) and releases 3.3 times slower. Single Vocal keeps round 148's timing in both revisions (the same
+// timing cost its vocal / drum programme files a step: its own gate opens ~10 ms after the burst, a different model)
+struct Timing190iq
+{
+    double detAttackMs, detReleaseMs, gainAttackMs, gainReleaseMs, aheadScale, aheadOffsetMs;
+};
+#ifdef LYNX_LAB190IQ
+ #define TIMING_190IQ_CONSTEXPR static
+#else
+ #define TIMING_190IQ_CONSTEXPR constexpr
+#endif
+TIMING_190IQ_CONSTEXPR Timing190iq timingAll190iq { 0.0084, 1.4611, 2.9413, 5.8197, 1.0945, -4.8461 };
 } // namespace
 
 void DeEsser::prepare (double sampleRate) noexcept
 {
+#ifdef LYNX_LAB190IQ
+    if (const char* e = std::getenv ("LYNX_LAB_IQA"))
+        std::sscanf (e, "%lf,%lf,%lf,%lf,%lf,%lf", &timingAll190iq.detAttackMs, &timingAll190iq.detReleaseMs, &timingAll190iq.gainAttackMs,
+                     &timingAll190iq.gainReleaseMs, &timingAll190iq.aheadScale, &timingAll190iq.aheadOffsetMs);
+#endif
     sr = sampleRate > 0.0 ? sampleRate : 48000.0;
     latency = std::clamp ((int) std::lround (0.015 * sr), 1, ring / 2);
     designedHp = designedLp = -1.0;
@@ -941,13 +967,18 @@ void DeEsser::design (const Settings& s) noexcept
 void DeEsser::process (float* l, float* r, int n, const Settings& s) noexcept
 {
     design (s);
-    const double ca = pole (detAttackMs, sr), cr = pole (s.gate ? sDetReleaseMs : detReleaseMs, sr);
-    const double ga = pole (s.gate ? sGainAttackMs : gainAttackMs, sr), gr = pole (s.gate ? sGainReleaseMs : gainReleaseMs, sr);
+    const bool t1 = s.timing >= 1 && ! s.gate; // round 190iq: timing revision 1 (the Allround law only)
+    const auto& T = timingAll190iq;
+    const double ca = pole (t1 ? T.detAttackMs : detAttackMs, sr), cr = pole (t1 ? T.detReleaseMs : s.gate ? sDetReleaseMs : detReleaseMs, sr);
+    const double ga = pole (t1 ? T.gainAttackMs : s.gate ? sGainAttackMs : gainAttackMs, sr);
+    const double gr = pole (t1 ? T.gainReleaseMs : s.gate ? sGainReleaseMs : gainReleaseMs, sr);
     const double cq = pole (ratioMs, sr);
     const double thr = std::clamp (s.thresholdDb, -60.0, 0.0), range = std::clamp (s.rangeDb, 0.0, 24.0);
     const double span = s.gate ? std::max (1.0, spanDb + spanScale * (0.1 - thr)) : 0.1 - thr;
     const double laAdj = s.gate ? lawOffsetDb : allroundOffsetDb + allroundBw * 10.0 * std::log10 (7000.0 / std::max (100.0, designedLp - designedHp));
-    const int ahead = std::clamp ((int) std::lround ((s.lookahead ? std::clamp (s.lookaheadMs, 0.0, 15.0) + extraAheadMs : 0.0) * 0.001 * sr), 0, latency);
+    const double aheadMs = t1 ? T.aheadScale * (s.lookahead ? std::clamp (s.lookaheadMs, 0.0, 15.0) : 0.0) + T.aheadOffsetMs
+                              : (s.lookahead ? std::clamp (s.lookaheadMs, 0.0, 15.0) + extraAheadMs : 0.0);
+    const int ahead = std::clamp ((int) std::lround (aheadMs * 0.001 * sr), 0, latency);
     constexpr std::int64_t m = ring - 1;
     float maxGr = 0.0f, maxDet = -300.0f;
     // round 165x: the reference's link (two lanes when the channels hear different signals)

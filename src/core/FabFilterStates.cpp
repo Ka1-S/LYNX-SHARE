@@ -670,6 +670,7 @@ int fromProDS (const State& s, EffectSlot& slot)
     p[inputPan] = linValue (std::clamp ((double) s.at (16), -1.0, 1.0), -1.0, 1.0);
     p[outputPan] = linValue (std::clamp ((double) s.at (18), -1.0, 1.0), -1.0, 1.0);
     p[oversampling] = (float) std::clamp (roundIndex (s.at (14)), 0, 2) / 3.0f;
+    p[timing] = 1.0f; // round 190iq: the Allround law's measured timing (refcap030's ess probes)
     if (s.at (19) >= 0.5f)
         slot.enabled = false;
     return 20;

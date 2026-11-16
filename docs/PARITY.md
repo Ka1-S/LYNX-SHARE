@@ -83,7 +83,7 @@ there.
 | Spiral Echo | ValhallaFreqEcho | 9 | 9 | 7 | 8 | 190fy | 190do: measured loop (fxparity 3.38 → 3.88); 190fy: the loop's read and all-pass refitted, revision 1 (fxparity 3.88 → 4.50, 7 up / 9 same / 0 down, tail 6.79 → 6.98; refcap0124 36 captures 3.69 → 3.75) |
 | Lattice Mod | ValhallaUberMod | 9 | 9 | 4 | 8 | 144 |  |
 | Quell Denoiser | NS1 (Waves) | 9 | 9 | 4 (ref expired) | 6 | 137 |  |
-| Hush De-esser | Pro-DS | 10 | 9 | 6 | 6 | tp172b | 8 → 9 → 10 / 8 → 8 → 9 (165w: pans, state levels; 165x: ranges, the 0 … 200 % link knob) |
+| Hush De-esser | Pro-DS | 10 | 9 | 6 | 6 | 190iq | 8 → 9 → 10 / 8 → 8 → 9 (165w: pans, state levels; 165x: ranges, the 0 … 200 % link knob); 190iq: the Allround law's measured timing (refcap030 bank 5.62 → 5.79, tp172b 6.55 → 6.70, programme 8.56 → 8.60, no file down) |
 | Foil Plate | ValhallaPlate | 9 | 10 | 4 | 8 | 135 | 183b: sound 3 → 4 (fxparity 3.13 → 3.73, verb 8.15 → 8.49; bank 3.03 → 3.64 / 8.13 → 8.48): EQ laws, Width keeps the level, the reference's tone |
 | Gemini Doubler | Doubler2 / Doubler4 (Waves) | 10 | 8 | 6 (ref expired) | 8 | 165w | 9 → 10 / 8 → 8 (defaults; 165w: shelf range −88 … +12 and law) |
 | Compressor (stand-in) | Renaissance Compressor (Waves) | 10 | 8 | 6 (ref expired) | 8 | 152 | 190fx: the FET references' maps and translators refitted on the pink stairs — FG-116 4.80 → 5.80, Modern 4.08 → 4.76, Vintage 5.00 → 5.56, all-buttons 4.28 → 4.48 — this pair unchanged |
@@ -3590,3 +3590,94 @@ branch, no new filter). Latency 0, memory unchanged.
 Tools: `/mnt/e/lynx-work/parityfx190fy` (`lab/spiral.py`, `lab/refcap_sp.py`, `lab/sp_search.py`, `lab/cands.sh`,
 `lab/echoes.py`, `lab/loopid.py`, `lab/bands.py`, `lab/lf.py`, `gold/`, `cpu/`).
 
+
+## Round 190iq: refcap030 as a parity bank; Hush De-esser ← Pro-DS, the Allround timing (revision 1)
+
+Queue item 17 of 0.1.30 ("parity round 2: the next lowest Sound rows"). All black-box: the references' own renders
+(refcap030, round 190hv: FabFilter 12, Soundtoys 23, Valhalla 9) and their saved states, nothing inside a plug-in.
+
+**The bank.** refcap030 saved no plug-in state per setting, and LYNX loads a missing plug-in through its own translator
+of that state. So every refcap030 setting's state was taken through the same scripts (the render scripts' setup lines,
+`savecomponent` instead of the renders): FabFilter 1 949 (before its trial ended on 11-16), Soundtoys + Valhalla 799 — in
+`refcap030/<vendor>/<plug-in>/st/<block>/`; the 44.1 / 48 / 96 kHz blocks reuse refcap182's states (the same settings).
+Each render is then rendered by LYNX as a project would load it (`--ff` for FabFilter, `--sub` for Valhalla; Soundtoys'
+encoded states through tp172d's value map) at the capture's rate, and scored with `scripts/fxparity.py` (0–10). Mono
+blocks are not scored (fxrender is stereo). Tools: `/mnt/e/lynx-work/parity190iq/lab` (`rc030.py`, `bank.sh`, `agg.py`).
+
+Waveform score (fxparity, 0–10) per reference over every scored block, lowest first ("after" = this round's build;
+only Hush moved). Reverbs, delays and modulation sit at 3 … 4 on this score by nature (their tails do not null).
+EchoBoy Jr, PrimalTap and Little PrimalTap load with LYNX's generic Echoform preset (their states are encoded and not
+among the known ones), so their rows measure exactly that. Little AlterBoy's row is what a project with an unknown Little
+AlterBoy state plays (LYNX Tune, its most used preset); Voice Shift through the value map is being re-scored (HANDOFF).
+Not in the table yet (still scoring when this was written; HANDOFF has the final numbers): Saturn 2 (Ember, 1 004
+renders), Timeless 3 (Fruity Delay 3), ValhallaDelay, ValhallaVintageVerb, ValhallaFreqEcho.
+
+| refcap030 reference | LYNX stand-in | files | score before → after | lowest blocks |
+|---|---|---|---|---|
+| LittleAlterBoy | Voice Shift | 87 | 1.56 → 1.56 | mode 1.40, sr44 1.50 |
+| LittlePrimalTap | Echoform | 108 | 2.59 → 2.59 | pairs 2.50, mode 2.58 |
+| ValhallaShimmer | Halo | 194 | 3.04 → 3.04 | pairs 2.39, mode 3.03 |
+| ValhallaUberMod | Lattice Mod | 172 | 3.20 → 3.20 | mode 2.80, pairs 3.47 |
+| FabFilter_Pro_R_2 | LuxeVerb | 323 | 3.25 → 3.25 | grid2 2.70, pairs 3.38 |
+| ValhallaRoom | Atrium | 116 | 3.28 → 3.28 | mode 2.50, sr96 3.38 |
+| PrimalTap | Echoform | 165 | 3.39 → 3.39 | sr44 3.10, sr96 3.15 |
+| LittlePlate | Foil Plate | 90 | 3.57 → 3.57 | sr44 2.88, pairs 3.58 |
+| ValhallaPlate | Foil Plate | 124 | 3.60 → 3.60 | mode 3.19, sr48 3.55 |
+| EchoBoy | Echoform | 375 | 3.62 → 3.62 | styles 2.94, pairs 3.30 |
+| ValhallaSpaceModulator | Orbit | 106 | 3.69 → 3.69 | mode 2.85, pairs 4.33 |
+| EchoBoyJr | Echoform | 186 | 3.82 → 3.82 | pairs 3.31, mode 3.73 |
+| ValhallaSupermassive | Nebula | 106 | 4.51 → 4.51 | mode 3.23, pairs 5.39 |
+| Decapitator | Ember Saturator | 180 | 4.56 → 4.56 | styles 3.70, sr44 4.17 |
+| PanMan | Auto-pan | 87 | 5.14 → 5.14 | pairs 5.06, mode 5.17 |
+| FabFilter_Pro_DS | Hush De-esser | 106 | 5.62 → 5.79 | grid 4.00, mode 5.39 |
+| FabFilter_Pro_C_3 | Crest Compressor | 508 | 6.30 → 6.30 | prog 5.95, styles 6.01 |
+| FabFilter_Pro_L_2 | Apex Limiter | 359 | 7.30 → 7.30 | sr96 6.21, pairs 6.69 |
+| FabFilter_Pro_Q_4 | Facet EQ | 200 | 7.53 → 7.53 | grid2 2.60, mode 8.74 |
+| FabFilter_Pro_MB | Prism Multiband | 203 | 8.17 → 8.17 | grid 7.50, mode 7.62 |
+| FabFilter_Pro_G | Sentry Gate | 204 | 8.21 → 8.21 | sr48 7.54, sr44 7.58 |
+
+**Hush De-esser ← Pro-DS: the Allround law's timing, revision 1.** On the `ess` probe (trial190k: a 500 Hz body under
+5 … 9 kHz bursts of rising level, then a band sweep), the reference's gain on the body moves later than LYNX's: by ~5 ms
+at the default 10 ms look-ahead (a shift of LYNX's gain trajectory by +5.25 ms takes its error from 0.63 to 0.31 dB rms),
+and it releases over ~10 ms where LYNX's gain was back within ~3 ms. Fitted on the Allround renders' gain trajectories
+(the body demodulated at 0.25 ms steps; Nelder-Mead from tp172b's timing): detector attack / release 0.0084 / 1.46 ms,
+gain attack / release 2.94 / 5.82 ms, the gain looking 1.0945 × the dial − 4.85 ms ahead (≈ 6.1 ms at 10 ms; never
+below 0): 0.73 → 0.30 dB rms. Single Vocal keeps round 148's timing: the same timing cost its vocal / drum programme files
+a step (its reference opens its gate ~10 ms after a burst starts and then takes the full range at once — a different
+model, listed below as open).
+
+| Bank | Files | Score before → after | Up / same / down |
+|---|---|---|---|
+| refcap030 Pro-DS (every block: mode, pairs, grid, 44.1 / 48 / 96 kHz; ess, stim, mix) | 106 | 5.62 → 5.79 | 12 / 94 / 0 |
+| refcap182 programme (D, S1 … S4 × drums, bass, guitar, vocal, mix) | 25 | 8.56 → 8.60 | 1 / 24 / 0 |
+| tp172b (D, S1 … S4 × vocal, music, sweep, drums) | 20 | 6.55 → 6.70 | 2 / 18 / 0 |
+
+The revision is a hidden parameter (`hush::timing`, not in the info: no control, no string): a new Hush and a translated
+Pro-DS state run it, a project or preset saved before keeps tp172b's timing bit for bit (`upgradeLoadedEffectParams`;
+fingerprints from the base commit's objects in `tests/Parity190iqTests.inc`). CPU (thread time, 20 s at 48 kHz in blocks of 512, best of 5): Allround 0.452 % of a core (base) → 0.449 % (revision 1), Single Vocal 0.433 → 0.432 % — the same; latency unchanged (15 ms).
+
+Open (evidence in `/mnt/e/lynx-work/parity190iq`):
+- **Single Vocal's gate** (Pro-DS's default mode): on `ess` the reference leaves bursts at the body's level alone (the 7, 10
+  and 14 kHz sweep bursts, and the −12 dBFS 5 … 9 kHz burst gets −0.3 dB) and takes the whole range once a burst stands
+  ~8 dB over the body (−12 / −19.2 dB at range 12 / 19.2, the same at thresholds −48, −30 and −12), opening ~10 ms after
+  the burst starts; LYNX's gate (band against everything under the high-pass) opens on all of them and follows its level
+  law (−4 … −10 dB). A model of the reference's "stands out" test (a broad high band against the body) is the next step.
+- **Facet EQ ← Pro-Q 4 dynamic bands**: not translated (round 124 had no state with them): refcap030's grid of Dynamic
+  Range × Threshold scores 2.6 (range −30 dB: LYNX stays static, the reference cuts 24 … 30 dB). The state holds them
+  (band b at 23b: 9 range dB, 10 dynamics on, 11 "auto", 12 threshold, 13 / 14 attack / release %), but the reference
+  ignored the threshold in every captured state (thresholds −90 and −15 render bit-identical; its threshold follows the
+  signal: −24 dB at −42 … −3 dBFS on the rising stairs, −14 dB at −18 dBFS on the falling ones), i.e. an automatic
+  threshold Facet does not have. Needs the auto-threshold law measured (a capture with "auto" off would settle it).
+- **Little AlterBoy** loads as LYNX Tune (its states are encoded; an unknown one gets the most used preset, drive 4.6):
+  through `--sub` refcap030 scores 1.6; Voice Shift through the value map is the parity row (above).
+
+**Stand-ins that still have no scored reference** (none of the parity banks, v1 … v3 scoreboards or this one, scores them):
+Strike Shaper (Transient Designer: never on this PC, no capture at all); captured (refcap0124 one-control sweeps, refcap182
+programme) but never scored, the Waves roles whose licence has lapsed: Limiter ← L2, Parametric EQ ← SSL Channel /
+PuigTec EQP-1A (Q10 and Renaissance EQ never captured), Reeverb 2 ← RVerb / H-Reverb / TrueVerb, Stereo Shaper ← S1
+Imager, Fruity Delay 3 ← SuperTap, Compressor ← CLA-76 / SSLComp; LYNX Tune ← Waves Tune Real-Time and Auto-Tune (only the
+tune157 / tune165 pitch measurements, no fxparity bank); and the sonible roles (Crest ← smart:comp 3 / pure:comp /
+learn:comp, Apex ← pure:limit / learn:limit, Facet ← smart:EQ 4 / pure:EQ / learn:EQ, Hush ← smart:deess / pure:deess,
+Foil Plate ← smart:reverb 2 / pure:verb / learn:reverb): their states are not translated (LYNX plays the role's preset)
+and this round's sonible captures (`refcap030/sonible`, started with the trial running; /mnt/e/lynx-work/parity190iq/HANDOFF.md) are
+the first usable ones (refcap0124's pure:verb renders are all bypass).

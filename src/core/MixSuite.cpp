@@ -1812,6 +1812,7 @@ private:
             v.lookaheadMs = lookaheadTimeMs (p[lookaheadTime]);
             v.wideband = on (p[mode]);
             v.listen = on (p[listen]);
+            v.timing = on (p[timing]) ? 1 : 0; // round 190iq
             vocalEngine.process (l, r, n, v);
             const auto out = (float) dbToGain (levelDb (p[output], extLaw));
             for (int i = 0; i < n; ++i) { l[i] *= out; r[i] *= out; }
