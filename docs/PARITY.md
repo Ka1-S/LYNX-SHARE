@@ -3590,3 +3590,64 @@ branch, no new filter). Latency 0, memory unchanged.
 Tools: `/mnt/e/lynx-work/parityfx190fy` (`lab/spiral.py`, `lab/refcap_sp.py`, `lab/sp_search.py`, `lab/cands.sh`,
 `lab/echoes.py`, `lab/loopid.py`, `lab/bands.py`, `lab/lf.py`, `gold/`, `cpu/`).
 
+
+## Round 190is: Echoform ← the Soundtoys delays (EchoBoy voicings revision 1, Little PrimalTap's own default)
+Black-box on refcap030's captures (round 190hv) and round 190iq's bank (`/mnt/e/lynx-work/parity190iq/lab/rc030.py`:
+each render with a saved state, rendered as LYNX loads it; EchoBoy through tp172d's value map, the other three through
+the substitute's fallback, since their states are encoded). Lab: `/mnt/e/lynx-work/parity190is` (HANDOFF.md).
+
+**The states stay undecoded.** The Soundtoys component state carries `PRESET =` + an encoded payload; on two states that
+differ in one control the payload changes from that control's position to its end (858 of 1859 bytes for one PrimalTap
+Algorithm step), i.e. a chained encoding. Black-box rules out decoding it, so the translators keep the round-136 hash
+table (her real projects' states) and a fallback per plug-in for any other state.
+
+**What differed (EchoBoy styles × Saturation 4.8 / 12 / 19.2 dB, impulses at 0 / −20 / −40 dBFS, noise bursts):**
+- *Saturation in the loop.* The reference's repeats fall by the same dB per pass at every Saturation (−40 dBFS impulse,
+  feedback 0.50: 8.4 / 8.4 / 8.4 dB per pass on Master Tape, 7.6 / 7.6 / 7.5 on Space Echo), while its first echo rises
+  by the curve's small-signal gain. Echoform applied that gain on every pass: at 19.2 dB most voicings ran away (rms
+  +20 … +50 dB, 45 files at score 1).
+- *Diffusion.* A Schroeder allpass of small gain passes its input mostly delayed by its length, so a voicing's loop
+  diffusion (EchoPlex-, TelRay-, Fat-, Ambient-like styles) made every pass ~33 ms (× size) longer than the echo time
+  (EchoPlex: 16 dB "loss" per pass in the reference's windows; its repeats keep the time).
+- *Timing.* The reference's echoes sit 8 / 7.7 / 5 samples behind n · T + the L/R offset at 44.1 / 48 / 96 kHz (against
+  its dry, every style alike); Echoform's were on the grid. (tp172d's map also set 249.95 ms for 250: the closest text.)
+- *Little PrimalTap:* a clean line band-limited by a steep low-pass at 12.3 kHz with a droop (−1.9 dB at 4 kHz, −4.6 at
+  8 kHz), the echo 6 samples late, mix on a **linear** law (50 %: dry and echo −6 dB), the dry slightly dipped above
+  8 kHz; its feedback path adds a stronger droop and ~40 samples per pass. PrimalTap: the same family (13.2 kHz), its
+  mix equal-power, the two taps hard-panned, BEATS 0.5 → 254.65 ms on the trial. EchoBoy Jr: its Studio Tape is darker
+  and ~+3 dB louder at low frequencies than EchoBoy's.
+
+**Built (Echoform, hidden revision 1):** the saturation curve runs at unity small-signal gain inside the loop and its
+make-up is applied once on the echoes; the voicing's loop diffusion reads that much earlier (the period stays T); the
+echoes 8 / 5 samples late (≤ 64 kHz / 96 kHz). Only with an echo voicing. `echoform::revision` = paramCount (no control,
+no string): a new Echoform and every translated / substituted one run it, a project or preset saved before keeps rounds
+147 / 150 bit for bit (8 / 8 renders hash-identical to the base commit with revision 0, `tests/Parity190isTests.inc`).
+**Substitutes:** Little PrimalTap gets its own entry playing its measured default (Clean character, Age 0.221 = the steep
+12.3 kHz low-pass, High cut 0.45, 113.125 ms, Mix 2/3 + Output −4.8 dB = the linear law). EchoBoy Jr gets its own entry
+with EchoBoy's fallback in revision 0 (`#108=0`: the preset grammar now names a hidden parameter by index): revision 1's
+8-sample lag is EchoBoy's, EchoBoy Jr's is ~3, and on its steady tones the lag moved the echo's phase against the dry
+(5 mode / sr96 files a step lower). PrimalTap's and EchoBoy Jr's own defaults were tried as their fallbacks and **not**
+shipped: refcap030's blocks, mostly 95 / 120 ms or mix 25 … 30 %, scored lower with them (PrimalTap mode 3.67 → 3.04,
+pairs 3.37 → 3.00; EchoBoy Jr lower in every block).
+
+| refcap030 row (as LYNX loads it) | files | before | after | per block (before → after) |
+|---|---|---|---|---|
+| Little PrimalTap | 108 | 2.59 | **3.53** | mode 2.58 → 3.58, pairs 2.50 → 2.81, sr44 2.65 → 3.95, sr48 2.70 → 4.00, sr96 2.60 → 3.90 |
+| PrimalTap | 165 | 3.39 | 3.39 | unchanged (its fallback is not a voicing; sr48 re-run identical) |
+| EchoBoy (tp172d's map) | 375 | 3.62 | **4.13** | mode 4.83 → 5.26, pairs 3.30 → 3.37, sr44 4.65 → 5.20, sr48 4.60 → 5.15, sr96 4.80 → 4.90, styles 2.94 → 3.65 |
+| EchoBoy Jr | 186 | 3.82 | 3.82 | unchanged (its fallback runs revision 0) |
+
+Per file: EchoBoy 106 up / 259 same / 10 down (styles: TelRay / FM-radio / Queeked noise bursts 1–2 dB louder now that
+the loop no longer loses the curve's sub-unity gain each pass, and four 19.2 dB impulse files whose first-echo spectrum
+moved), Little PrimalTap 77 up / 18 same / 13 down (pairs: its feedback path's droop and extra delay are not modelled).
+**Value-map lab** (the plug-ins' own parameter values mapped onto Echoform — what a decodable state would give;
+`/mnt/e/lynx-work/parity190is/lab/vmap.py`, not a product path): EchoBoy 4.47 (the exact time, Dual / Note / Rhythm modes,
+Input / Output, Groove / Feel / Prime numbers), PrimalTap 3.76, Little PrimalTap 3.66, EchoBoy Jr 4.26 (its styles block
+lower: Jr's styles are not EchoBoy's).
+**Other banks** (`/mnt/e/lynx-work/echo190dl/lab/bank_echo.py`, the 10 Echoform rows): EchoBoy (tp172d) wave 5.15 → 5.40,
+tail 6.34 → 6.56; the other nine rows (H-Delay, ValhallaDelay, the prog182 Soundtoys rows on their fitted maps, tp172c)
+identical. CPU (48 kHz, 20 s, blocks of 512, best of 5; three voicings at Saturation 12 dB, feedback 50 %): revision 1 2.2 / 3.7 /
+5.2 % of one core, revision 0 2.4 / 4.1 / 4.6 %, base objects 3.4 / 3.8 / 5.0 % — within the run-to-run noise (±10 %): the
+make-up is a block constant, the lag a 32-sample ring.
+Latency unchanged (0). Not done: EchoBoy's LowCut / HighCut law (unmeasured), Jr's own styles, PrimalTap's algorithms /
+VCO / feedback-path droop, the PrimalTap family's dry-path dip above 8 kHz.

@@ -1030,11 +1030,17 @@ public:
             for (auto& a : b.diff)
                 a.line.allocate (sr * 0.05);
         }
+        // round 190is [EXEC] refcap030 EchoBoy (S1 impulse, every style alike): the reference's echoes arrive 8 / 7.7 / 5
+        // samples after n · T (+ the L/R offset) at 44.1 / 48 / 96 kHz, against the dry; revision 1 plays them that late
+        wetLag = sr < 64000.0 ? 8 : (int) std::lround (5.0 * sr / 96000.0);
         reset();
     }
 
     void reset() noexcept override
     {
+        for (auto& w : wetBuf) // round 190is
+            w.fill (0.0f);
+        wetPos = 0;
         std::uint32_t seed = 0x1234567u;
         for (auto& c : ch)
         {
@@ -1151,6 +1157,11 @@ private:
         const VoicingData* vd = vk > 0 ? &voicingData (vk) : nullptr;
         const int stk = satTypeOf (p[satType]);
         prepareSaturation (stk > 0 ? &satTypeData (stk) : vd, 24.0 * (double) clamp01 (p[drive]));
+        // round 190is (revision 1, hidden): refcap030's EchoBoy captures — at Saturation 4.8 / 12 / 19.2 dB the reference's
+        // repeats fall by the same dB per pass (−40 dBFS impulses, every style), while its first echo rises by the curve's
+        // small-signal gain: the make-up is heard once. Revision 0 put it on every pass (at 19.2 dB most voicings ran away)
+        const bool rev1 = vd != nullptr && p[revision] >= 0.5f;
+        satLoopUnity = rev1;
         if (vd != nullptr && (vk != toneVoicing || sr != toneSr))
         {
             toneVoicing = vk;
@@ -1254,6 +1265,7 @@ private:
         const auto duckThresholdDb = -51.0 * std::pow ((double) std::max (1e-6f, duck), 1.28);
         const auto duckReleaseStep = 85.0 / sr;
         static constexpr double diffMs[4] = { 4.3, 6.7, 9.1, 12.7 };
+        static constexpr double diffDelay = diffMs[0] + diffMs[1] + diffMs[2] + diffMs[3];
 
         // round 135w: quad taps / swell, groove / feel / accent, prime numbers, cross feedback, balance, freeze, start side
         const bool tapOn[4] = { p[tapA] >= 0.5f, p[tapB] >= 0.5f, p[tapC] >= 0.5f, p[tapD] >= 0.5f };
@@ -1321,6 +1333,7 @@ private:
         for (int i = 0; i < n; ++i)
         {
             const float in[2] = { l[i], r[i] };
+            wetPos = (wetPos + 1) & 31;
 
             // modulation (ms): wow / flutter in the tape characters, an LFO in the others
             lfoPhase += rate / sr;
@@ -1399,6 +1412,11 @@ private:
             {
                 auto& s = ch[(std::size_t) c];
                 d[c] = std::max (2.0, s.time.next (target[c], 0.12, sr) + modMs[c] * 0.001 * sr);
+                // round 190is (revision 1): a Schroeder allpass of small gain passes its input mostly delayed by its
+                // length, so the voicing's loop diffusion made every pass 33 ms (× size) longer than the echo time —
+                // the reference's diffused styles keep the time (refcap030 EchoBoy, irlv): read that much earlier
+                if (rev1 && diffAmount > 0.0f && ! postDiff)
+                    d[c] = std::max (2.0, d[c] - diffDelay * diffScale * 0.001 * sr * (c == 1 ? 1.07 : 1.0));
                 if (clockMod) // round 190dl: a swing of up to 1.5 x the time stays inside the line
                     d[c] = std::min (d[c], maxRead);
             }
@@ -1503,9 +1521,14 @@ private:
                     fbSig[c] = y;
                 if (vd != nullptr) // round 147: the voicing's output tone (once, on the way out)
                 {
-                    y *= outLin;
+                    y *= rev1 ? outLin * satSmall : outLin; // round 190is: the saturation's make-up, once
                     for (int k = 0; k < outN; ++k)
                         y = outQ[(std::size_t) k].process (y, c);
+                }
+                if (rev1) // round 190is: the echoes a few samples behind (wetLag)
+                {
+                    wetBuf[(std::size_t) c][(std::size_t) wetPos] = y;
+                    y = wetBuf[(std::size_t) c][(std::size_t) ((wetPos - wetLag) & 31)];
                 }
                 echo[c] = y;
             }
@@ -2230,6 +2253,7 @@ private:
         {
             satThreshold = satStep (v->thresholdDb, driveDb);
             satMakeup = satStep (v->makeupDb, driveDb);
+            satSmall = std::pow (10.0, satMakeup / 20.0);
             compAttack = 1.0 - std::exp (-1.0 / (0.004 * sr));
             compRelease = 1.0 - std::exp (-1.0 / (0.120 * sr));
         }
@@ -2237,6 +2261,7 @@ private:
         {
             satDrive = std::pow (10.0, satStep (v->driveDb, driveDb) / 20.0);
             satGain = std::pow (10.0, satStep (v->gainDb, driveDb) / 20.0);
+            satSmall = satGain;
             satSlope = std::pow (1.0 + std::pow (std::abs ((double) v->b), (double) v->p), -1.0 / v->p - 1.0);
             satKb = kneeShape ((double) v->b, (double) v->p);
         }
@@ -2251,15 +2276,19 @@ private:
             const auto a = (double) std::abs (x);
             e += (a - e) * (a > e ? compAttack : compRelease);
             const auto lvl = 20.0 * std::log10 (std::max (1e-9, e));
-            const auto gdb = satMakeup - compressCurve (lvl - satThreshold, v.ratio);
+            const auto gdb = (satLoopUnity ? 0.0 : satMakeup) - compressCurve (lvl - satThreshold, v.ratio);
             return (float) (x * std::exp (gdb * 0.11512925464970228)); // 10^(dB / 20)
         }
         const auto u = satDrive * (double) x + (double) v.b;
         const auto y = (kneeShape (u, (double) v.p) - satKb) / satSlope;
-        return (float) (satGain * y / satDrive);
+        return (float) ((satLoopUnity ? 1.0 : satGain) * y / satDrive);
     }
 
     const VoicingData* satCurve = nullptr;
+    std::array<std::array<float, 32>, 2> wetBuf {};
+    int wetPos = 0, wetLag = 8;
+    bool satLoopUnity = false; // round 190is: the voicing's loop saturates at unity small-signal gain (revision 1)
+    double satSmall = 1.0;     // the curve's small-signal gain (its make-up), heard once on the echoes in revision 1
     double satDrive = 1.0, satGain = 1.0, satSlope = 1.0, satKb = 0.0, satThreshold = 0.0, satMakeup = 0.0;
     double compAttack = 0.0, compRelease = 0.0, compEnv[2] {};
     std::array<Biquad, 9> outQ {};
