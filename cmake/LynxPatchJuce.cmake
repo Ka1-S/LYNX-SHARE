@@ -229,6 +229,17 @@
 #    one that receives it, as OLE (Windows) and AppKit (macOS) pick the innermost registered window. A program with one
 #    XdndAware window (most) is reached as before.
 #
+# 38. Linux/BSD only (37 is round 190ib's), juce_gui_basics/native/juce_Windowing_linux.cpp (issue #188, round 190ir): a
+#    minimised LYNX window (Settings, Tap tempo...) kept swallowing the clicks on the main window where it had been.
+#    JUCE's X11 peer decides whether a point is "in" a window by asking every JUCE window above it in JUCE's own list
+#    (not the X server's stacking) whether it covers that point, from its bounds alone. A minimised window is still
+#    `isVisible()` for JUCE and keeps its bounds, and LYNX keeps its secondary windows above the main window in that list
+#    (matchWindowOrderToScreen, issue #12), so the main window answered "not mine" there and MouseInputSource dropped
+#    the click (findComponentAt -> nullptr). Nothing in the X server or the window manager is involved, so it happens
+#    with every WM: KWin on X11 or Wayland (LYNX runs through XWayland there), GNOME, openbox (reproduced on Xvfb).
+#    A window above now covers the point only while it is on the screen: mapped and viewable, and not minimised
+#    (_NET_WM_STATE_HIDDEN). The X round trips run only for a point inside such a window's bounds.
+#
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
 
@@ -348,6 +359,12 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("no X focus for menu windows" "LYNX patch (issue #45): never takes the X focus"
             "    void grabFocus() override|NL|    {|NL|"
             "    void grabFocus() override|NL|    {|NL|        // LYNX patch (issue #45): never takes the X focus when it ignores key presses (a popup menu, a tooltip)|NL|        if ((getStyleFlags() & windowIgnoresKeyPresses) != 0)|NL|            return;|NL||NL|")
+        lynx_juce_fix("a minimised window covers nothing" "LYNX patch (issue #188): a window above"
+            "            if (auto* peer = static_cast<LinuxComponentPeer*> (otherPeer))|NL|                if (peer->contains (globalToLocal (*peer, localToGlobal (*this, localPos.toFloat())).roundToInt(), true))|NL|                    return false;|NL|"
+            "            // LYNX patch (issue #188): a window above covers the point only while it is on the screen (a minimised|NL|            // window keeps its bounds and stays visible for JUCE; the X round trips only inside its bounds)|NL|            if (auto* peer = static_cast<LinuxComponentPeer*> (otherPeer))|NL|                if (peer->contains (globalToLocal (*peer, localToGlobal (*this, localPos.toFloat())).roundToInt(), true)|NL|                    && peer->lynxIsOnScreen())|NL|                    return false;|NL|")
+        lynx_juce_fix("a minimised window covers nothing: on the screen" "LYNX patch (issue #188): on the screen"
+            "    bool contains (Point<int> localPos, bool trueIfInAChildWindow) const override|NL|    {|NL|"
+            "    // LYNX patch (issue #188): on the screen = mapped, viewable (its ancestors mapped too) and not minimised|NL|    bool lynxIsOnScreen() const|NL|    {|NL|        if (windowH == 0)|NL|            return false;|NL||NL|        {|NL|            XWindowSystemUtilities::ScopedXLock xLock;|NL|            XWindowAttributes atts;|NL||NL|            if (! X11Symbols::getInstance()->xGetWindowAttributes (XWindowSystem::getInstance()->getDisplay(), windowH, &atts)|NL|                || atts.map_state != IsViewable)|NL|                return false;|NL|        }|NL||NL|        return ! XWindowSystem::getInstance()->isMinimised (windowH);|NL|    }|NL||NL|    bool contains (Point<int> localPos, bool trueIfInAChildWindow) const override|NL|    {|NL|")
     elseif(file MATCHES "juce_Displays.cpp$")
         lynx_juce_fix("monitors that touch no other" "LYNX patch (issue #45): a monitor that touches"
             "        // All of the nodes should have a parent|NL|        jassert (node.parent != nullptr);|NL|"

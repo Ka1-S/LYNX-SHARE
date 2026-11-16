@@ -1143,11 +1143,14 @@ void matchWindowOrderToScreen()
     if (owner == nullptr)
         return;
 
-    // the windows above the main window, from the lowest up (raising them in that order keeps their order)
+    // the windows above the main window, from the lowest up (raising them in that order keeps their order). Issue #188
+    // (round 190ir): a minimised window is not on the screen, so it is not put back above the main window in JUCE's list
+    // (isShowing: visible and not minimised). Up there it counted as covering the main window where it had been: on
+    // X11 JUCE asks the windows above in its list, and those clicks were lost (cmake/LynxPatchJuce.cmake, fix 38).
     std::vector<juce::Component*> above;
     auto& desktop = juce::Desktop::getInstance();
     for (int i = 0; i < desktop.getNumComponents(); ++i)
-        if (auto* c = desktop.getComponent (i); c != owner && c->isVisible() && ! c->isAlwaysOnTop() && ! nativechild::isAttached (*c)
+        if (auto* c = desktop.getComponent (i); c != owner && c->isShowing() && ! c->isAlwaysOnTop() && ! nativechild::isAttached (*c)
                                                  && isAboveMainWindow (*c))
             above.push_back (c);
 
