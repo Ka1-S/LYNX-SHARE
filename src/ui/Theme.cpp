@@ -1748,7 +1748,11 @@ juce::Font LookAndFeel::getMenuBarFont (juce::MenuBarComponent& bar, int, const 
 int LookAndFeel::getMenuBarItemWidth (juce::MenuBarComponent& bar, int itemIndex, const juce::String& itemText)
 {
     // a long (translated) menu bar takes tighter item padding so the toolbar keeps its panels (round 165o)
-    const auto padding = (bool) bar.getProperties().getWithDefault ("lynxTightMenuBar", false) ? 8 : 16;
+    // (round 190jo: the Pattern toolbar's larger menu text with FL's closer items, 12 px: the bar keeps its ~292 px, as FL's
+    // eight menus take, so no toolbar panel drops out)
+    const auto padding = (bool) bar.getProperties().getWithDefault ("lynxTightMenuBar", false)  ? 8
+                         : (bool) bar.getProperties().getWithDefault ("lynxFlMenuBar", false) ? 12
+                                                                                               : 16;
     return juce::roundToInt (juce::GlyphArrangement::getStringWidth (getMenuBarFont (bar, itemIndex, itemText), itemText)) + padding;
 }
 
