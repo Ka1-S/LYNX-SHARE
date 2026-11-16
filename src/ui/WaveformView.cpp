@@ -582,6 +582,16 @@ WaveformDisplay::Handle WaveformDisplay::handleAt (juce::Point<float> p) const
     return Handle::none;
 }
 
+float WaveformDisplay::handleXForSnapshot (Handle h) const
+{
+    if (h == Handle::start)
+        return regionX (startOffset);
+    if (loopStart < 0.0f || loopEnd < loopStart)
+        return -1.0f;
+    const auto atStart = (h == Handle::loopStart) != reversed;
+    return displayX (reversed ? 1.0 - (double) (atStart ? loopEnd : loopStart) : (double) (atStart ? loopStart : loopEnd));
+}
+
 void WaveformDisplay::mouseMove (const juce::MouseEvent& e)
 {
     setMouseCursor (handleAt (e.position) != Handle::none ? juce::MouseCursor::LeftRightResizeCursor : juce::MouseCursor::NormalCursor);

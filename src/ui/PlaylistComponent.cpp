@@ -7,6 +7,7 @@
 #include "ui/CleanVoiceMenu.h"
 #include "ui/FlMods.h"
 #include "ui/Motion.h"
+#include "ui/ShotShowing.h"
 #include "core/FlSettings.h"
 #include "core/RulerGestures.h"
 #include "ui/ColourPicker.h"
@@ -6101,7 +6102,7 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
     }
 }
 
-void PlaylistComponent::postDragHint()
+bool PlaylistComponent::makeDragHint (ui::Hint& hint)
 {
     const auto& song = engine.getSong();
     const auto count = juce::String ((int) std::max<std::size_t> (1, dragIndices.size()));
@@ -6111,20 +6112,19 @@ void PlaylistComponent::postDragHint()
         return juce::String (bar.number) + ":" + juce::String (beat);
     };
     const auto clip = dragClip >= 0 && dragClip < (int) song.playlist.size() ? &song.playlist[(std::size_t) dragClip] : nullptr;
-    ui::Hint hint;
 
     switch (drag)
     {
         case Drag::move:
             if (clip == nullptr)
-                return;
+                return false;
             hint.text = tr ("Moving {0} clip(s)  [Alt] no snap", { count });
             hint.value = position (clip->start) + "  " + tr ("Track {0}", { juce::String (clip->track + 1) });
             break;
         case Drag::resize:
         case Drag::trimLeft:
             if (clip == nullptr)
-                return;
+                return false;
             hint.text = tr ("Resizing {0} clip(s)  [Alt] no snap", { count });
             hint.value = position (drag == Drag::resize ? clip->end() : clip->start);
             break;
@@ -6132,7 +6132,7 @@ void PlaylistComponent::postDragHint()
         case Drag::swipe: hint.text = tr ("Swiping this range to the comp  [Alt] no snap"); break;
         case Drag::clipGain:
             if (clip == nullptr)
-                return;
+                return false;
             hint.text = tr ("Clip gain: drag up / down ({0} clip(s))", { count });
             hint.value = tr ("Gain: {0}", { gainText (clip->gain) });
             break;
@@ -6164,7 +6164,7 @@ void PlaylistComponent::postDragHint()
         {
             const auto a = laneAutomation (laneTrack, laneIndex);
             if (a < 0 || autoPoint < 0 || autoPoint >= (int) song.automations[(std::size_t) a].points.size())
-                return;
+                return false;
             const auto& automation = song.automations[(std::size_t) a];
             hint.text = drag == Drag::lanePoint ? tr ("Moving the point: then [Shift] keeps time  [Ctrl] keeps value")
                                                 : tr ("Bending the segment: drag up / down  [Ctrl] fine");
@@ -6205,10 +6205,28 @@ void PlaylistComponent::postDragHint()
         case Drag::heightZoom:
         case Drag::timeZoom:
         case Drag::preview:
-        case Drag::none: return;
+        case Drag::none: return false;
     }
 
-    ui::postHint (hint);
+    return true;
+}
+
+void PlaylistComponent::postDragHint()
+{
+    if (ui::Hint hint; makeDragHint (hint))
+        ui::postHint (hint);
+}
+
+ui::Hint PlaylistComponent::dragHintForSnapshot (int clip, int point, bool tension)
+{
+    const auto was = drag;
+    drag = tension ? Drag::autoTension : Drag::autoPoint;
+    autoClip = clip;
+    autoPoint = point;
+    ui::Hint hint;
+    makeDragHint (hint);
+    drag = was;
+    return hint;
 }
 
 void PlaylistComponent::mouseUp (const juce::MouseEvent& e)
@@ -11153,7 +11171,7 @@ bool PlaylistComponent::liveFrame (double nowMs)
     const auto trail = playheadTrailOn();
     const auto trailFlip = trail != trailShown;
     trailShown = trail;
-    if ((moved || trailFlip) && isShowing())
+    if ((moved || trailFlip) && ui::showingOrShot (*this))
     {
         // only the cursor column (old and new) is repainted: large projects stay cheap. One rectangle for both: the
         // two strips overlap (a frame moves the line by a pixel or less), and each rectangle of a repaint is a paint
@@ -11197,13 +11215,13 @@ bool PlaylistComponent::liveFrame (double nowMs)
         playheadTick = tick;
 
     // round 190im (R5, DC-6): the song position in the overview strip while playing (none when stopped, as FL)
-    overview.setPosition (playing && isShowing() ? tick : -1.0);
+    overview.setPosition (playing && ui::showingOrShot (*this) ? tick : -1.0);
 
     // round 190ig (FM-28): FL's activity column beside the headers — a track's strip lit while a clip of it plays under the
     // playhead; only the strips that flip are repainted, nothing runs while stopped once they are dark
     // round 190im (R5, DC-3): the same pass finds the patterns that play, for the picker's marks
-    const auto pickerShown = livePicker != nullptr && livePicker->isShowing();
-    if ((flHeaders() && isShowing() && (playing || ! activityShown.empty())) || (pickerShown && (playing || ! livePicker->playingPatterns.empty())))
+    const auto pickerShown = livePicker != nullptr && ui::showingOrShot (*livePicker);
+    if ((flHeaders() && ui::showingOrShot (*this) && (playing || ! activityShown.empty())) || (pickerShown && (playing || ! livePicker->playingPatterns.empty())))
     {
         std::vector<char> now;
         std::vector<int> patternsNow;
@@ -11249,7 +11267,7 @@ bool PlaylistComponent::liveFrame (double nowMs)
             patternsNow.erase (std::unique (patternsNow.begin(), patternsNow.end()), patternsNow.end());
             livePicker->setPlayingPatterns (std::move (patternsNow));
         }
-        if (! (flHeaders() && isShowing()))
+        if (! (flHeaders() && ui::showingOrShot (*this)))
             now.clear();
         const auto count = std::max (now.size(), activityShown.size());
         for (std::size_t t = 0; t < count; ++t)

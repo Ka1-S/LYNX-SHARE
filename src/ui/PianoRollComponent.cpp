@@ -1,3 +1,4 @@
+#include "ui/ShotShowing.h"
 #include "ui/FlMods.h"
 #include "ui/Motion.h"
 #include "ui/FileChoosers.h"
@@ -4824,7 +4825,7 @@ bool PianoRollComponent::playheadFrame (double)
     // the playhead shows while the edited pattern plays: Pattern mode, or a clip of it in Song mode (round 162);
     // stopped in Step edit too (round 170e5): it is where the next played note goes (FL enters step-edit notes at the
     // song position, which it draws in the Piano roll), and it moves a snap step on after each one
-    if ((playing || engine.isStepEdit()) && isShowing())
+    if ((playing || engine.isStepEdit()) && ui::showingOrShot (*this))
     {
         const auto& song = engine.getSong();
         // (between two audio blocks it moves on at the song's tempo: smooth at 144 Hz, round 174e)

@@ -156,6 +156,7 @@ public:
     std::function<void (Handle)> onHandleDragEnd;
     Handle handleAt (juce::Point<float> p) const;
     bool isDraggingHandle() const noexcept { return dragged != Handle::none; }
+    float handleXForSnapshot (Handle h) const; // (--details190imshot: where a handle is drawn; −1: none)
     void mouseDown (const juce::MouseEvent& e) override
     {
         dragged = Handle::none;

@@ -2046,6 +2046,28 @@ public:
     }
 
     // --- round 190ef: scene work ---------------------------------------------------------------------------------------
+    // --details190imshot (round 190im): a scene launched as its button launches it; the grid's timer tick; the cell
+    // rectangles (0 a slot, 1 a track's status cell, 2 a scene cell); the selection
+    void launchSceneForSnapshot (int scene) { launchScene (scene); }
+    void tickForSnapshot() { timerCallback(); }
+    juce::Rectangle<int> cellForSnapshot (int kind, int track, int scene) const
+    {
+        const auto cells = cellArea();
+        if (kind == 1)
+            return { columnX (track), cells.getBottom(), columnWidth, statusHeight };
+        if (kind == 2)
+            return { cells.getRight(), rowY (scene), sceneWidthNow(), rowHeight };
+        return { columnX (track), rowY (scene), columnWidth, rowHeight };
+    }
+    std::pair<int, bool> sceneSelectionForSnapshot() const { return { selectedScene, sceneSelected }; }
+    void selectSlotForSnapshot (int track, int scene)
+    {
+        selectedTrack = track;
+        selectedScene = scene;
+        sceneSelected = titleSelected = false;
+        repaint();
+    }
+
     void selectSceneForSnapshot (int scene, int field = 0)
     {
         selectedScene = scene;
@@ -2681,6 +2703,53 @@ void setClipGridDeviceDropForSnapshot (juce::Component& grid, int track)
 bool& clipGridClassicLook() { return classicLook; }
 
 void setClipGridBlinkPhaseForSnapshot (int phase) { blinkPhaseForSnapshot = phase; }
+
+void launchClipGridSceneForSnapshot (juce::Component& grid, int scene)
+{
+    if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
+        g->launchSceneForSnapshot (scene);
+}
+
+void tickClipGridForSnapshot (juce::Component& grid)
+{
+    if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
+        g->tickForSnapshot();
+}
+
+juce::Rectangle<int> clipGridCellForSnapshot (juce::Component& grid, int kind, int track, int scene)
+{
+    if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
+        return g->cellForSnapshot (kind, track, scene);
+    return {};
+}
+
+std::pair<int, bool> clipGridSceneSelectionForSnapshot (juce::Component& grid)
+{
+    if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
+        return g->sceneSelectionForSnapshot();
+    return { -1, false };
+}
+
+void selectClipGridSlotForSnapshot (juce::Component& grid, int track, int scene)
+{
+    if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
+        g->selectSlotForSnapshot (track, scene);
+}
+
+std::pair<juce::String, juce::String> clipGridHintForSnapshot (juce::Component& grid, juce::Point<int> p)
+{
+    if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
+    {
+        const auto hint = g->hintAt (p);
+        return { hint.text, hint.value };
+    }
+    return {};
+}
+
+bool clipGridKeyForSnapshot (juce::Component& grid, const juce::KeyPress& key)
+{
+    return grid.keyPressed (key);
+}
 
 bool& clipGridSceneTempoShown()
 {

@@ -177,6 +177,10 @@ public:
     void itemDragExit (const SourceDetails&) override { clearDropGhost(); }
     // --details190imshot: a drag of `description` held over `at` (the ghost drawn), then let go (cleared)
     void dragOverForSnapshot (const juce::var& description, juce::Point<int> at);
+    // --details190imshot: the hint an automation clip's point (or its segment's tension) drag shows, as the drag makes it
+    ui::Hint dragHintForSnapshot (int clip, int point, bool tension);
+    bool followPausedForSnapshot() const { return EditorGlobals::get().isFollowPaused (EditorGlobals::FollowView::playlist); }
+    double scrollTicksForSnapshot() const noexcept { return scrollTicks; }
     // issue #152 point 6: a generator / effect from the Browser's Plugin database (or the Plugin picker). Pattern
     // workflow, FL-exact: on a track header only (core/PluginDrop.h); Clip-launch workflow: on a track, as Live
     void pluginDropped (const SourceDetails& details);
@@ -748,6 +752,7 @@ private:
     void updateCursor (juce::ModifierKeys mods);
     juce::Rectangle<int> clipBounds (int clip) const;
     void postDragHint (); // what the gesture in progress does (hint bar)
+    bool makeDragHint (ui::Hint& hint); // (round 190im: the hint; false = none for this drag)
     juce::Rectangle<int> clipMenuButton (int clip) const; // the menu button in a clip's title strip (empty if too narrow)
     juce::uint32 lastWheelEdit = 0;
     magiclasso::Trail lassoPath; // FL's Magic lasso (round 189g): the mouse trail while the option is on
