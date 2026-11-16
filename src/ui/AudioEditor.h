@@ -62,6 +62,9 @@ void askRemoveAllEdisonInstances (AudioEngine& engine);
 
 // --snapshot: the editor showing `doc` (selection = the second quarter), in the waveform or spectrogram view.
 std::unique_ptr<juce::Component> makeAudioEditorForSnapshot (AudioEngine& engine, audioedit::Document doc, bool spectrum);
+// round 190jo (design190ia FW-S4): the editor with `file` opened as the Browser opens it (its WAV markers, regions and
+// loop kept), nothing selected, zoomed to fit; set its size before painting (Edison's layout from 900 x 420).
+std::unique_ptr<juce::Component> makeAudioEditorForFileSnapshot (AudioEngine& engine, const juce::File& file);
 // --snapshot: the items of the editor's main menu, one per line ("Section > Item"), for the menu check.
 juce::StringArray audioEditorMenuForSnapshot (juce::Component& editor);
 // round 190ee: a marker's menu as lines ("Trigger note > C5  [x]"), and FL's snap mode set (snapping on) with where

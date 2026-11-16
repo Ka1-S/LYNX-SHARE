@@ -76,7 +76,10 @@ bool readAudioFile (const juce::File& file, ae::Audio& out)
 }
 
 // the clean clip look (docs/analise/UI_STUDY_playlist_clips.md): one light filled shape in a tint of the audio colour
-juce::Colour waveColour() { return theme::colour::audioClip.interpolatedWith (juce::Colours::white, 0.7f); }
+// Round 190jo (design190ia FW-24): Edison's canvas. FL's navy #353C4C read a step darker so it sits with LYNX's dark
+// panels (the waveform keeps 9.2:1 on it), its grid lines, and the light waveform.
+juce::Colour waveColour() { return juce::Colour (0xffd2d9e9); }
+const juce::Colour canvasColour { 0xff2b3140 }, canvasGrid { 0xff363d4e }, canvasGridStrong { 0xff434b5e };
 
 enum class TimeFormat
 {
@@ -348,9 +351,10 @@ public:
             b.setTooltip (tip);
             addAndMakeVisible (b);
         };
-        setupText (loopButton, tr ("Loop"), tr ("Loop the playback") + " (L)");
+        // round 190jo (design190ia FW-22): Loop, Spectrum and the envelope mode are icon buttons in Edison's places (the loop
+        // in the transport capsule; the view switches in the small icon row); their tooltips keep the texts
+        setupIcon (loopButton, tr ("Loop") + ": " + tr ("Loop the playback") + " (L)");
         loopButton.setClickingTogglesState (true);
-        loopButton.setColour (juce::TextButton::buttonOnColourId, theme::colour::accent);
         loopButton.onClick = [this] {
             loopPlay = loopButton.getToggleState();
             if (slotMode())
@@ -373,14 +377,13 @@ public:
         };
         addAndMakeVisible (volumeKnob);
         refreshVolumeKnob();
-        setupText (viewButton, tr ("Spectrum"), tr ("Show the waveform or the spectrogram") + " (S)");
+        setupIcon (viewButton, tr ("Spectrum") + ": " + tr ("Show the waveform or the spectrogram") + " (S)");
         viewButton.setClickingTogglesState (true);
-        viewButton.setColour (juce::TextButton::buttonOnColourId, theme::colour::accent);
         viewButton.onClick = [this] {
             spectrumView = viewButton.getToggleState();
             repaint();
         };
-        setupText (envButton, tr ("Edit: Wave"), tr ("What the mouse edits: the waveform, or the volume / panning / stereo separation envelope drawn over it (E)"));
+        setupIcon (envButton, tr ("Edit: Wave") + ": " + tr ("What the mouse edits: the waveform, or the volume / panning / stereo separation envelope drawn over it (E)"));
         envButton.onClick = [this] { envModeMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&envButton)); };
         setupText (sendButton, tr ("Send"), tr ("Send to the Playlist as an audio clip, to a new Sampler channel or back to the channel"));
         sendButton.setColour (juce::TextButton::buttonColourId, theme::colour::accentMuted);
@@ -392,32 +395,43 @@ public:
             const char* text;
             const char* tip;
             std::function<void()> action;
+            Icon icon; // (round 190jo: Edison's icon tools; 0-3 sit in the small icon row, the rest in the 2 x 9 grid)
         };
         const Quick quick[] = {
-            { TR_NOOP ("Cut"), TR_NOOP ("Cut the selection (Ctrl+X)"), [this] { cutSelection(); } },
-            { TR_NOOP ("Copy"), TR_NOOP ("Copy the selection (Ctrl+C)"), [this] { copySelection(); } },
-            { TR_NOOP ("Paste"), TR_NOOP ("Paste at the cursor, or over the selection (Ctrl+V)"), [this] { paste (false); } },
-            { TR_NOOP ("Delete"), TR_NOOP ("Delete the selection (Del)"), [this] { deleteSelection(); } },
-            { TR_NOOP ("Trim"), TR_NOOP ("Keep only the selection"), [this] { trimSelection(); } },
-            { TR_NOOP ("Silence"), TR_NOOP ("Silence the selection (Clear)"), [this] { edit (tr ("Silence"), [] (ae::Document& d, ae::Range r) { ae::clear (d, r); }, true); } },
-            { TR_NOOP ("Fade in"), TR_NOOP ("Fade in over the selection (curve: the arrow next to Fade out)"), [this] { fade (true); } },
-            { TR_NOOP ("Fade out"), TR_NOOP ("Fade out over the selection"), [this] { fade (false); } },
-            { "~", TR_NOOP ("Fade curve"), [this] { curveMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (quickButtons[8])); } },
-            { TR_NOOP ("Normalize"), TR_NOOP ("Normalize the selection (or everything) to 0 dB"), [this] { edit (tr ("Normalize"), [] (ae::Document& d, ae::Range r) { ae::normalize (d, r); }); } },
-            { TR_NOOP ("Amp..."), TR_NOOP ("Volume and panning"), [this] { showAmp(); } },
-            { TR_NOOP ("Reverse"), TR_NOOP ("Reverse the selection (or everything)"), [this] { edit (tr ("Reverse"), [] (ae::Document& d, ae::Range r) { ae::reverse (d, r); }); } },
-            { TR_NOOP ("Invert"), TR_NOOP ("Reverse the polarity"), [this] { edit (tr ("Reverse polarity"), [] (ae::Document& d, ae::Range r) { ae::invert (d, r); }); } },
-            { TR_NOOP ("Center"), TR_NOOP ("Remove the DC offset"), [this] { edit (tr ("Remove DC offset"), [] (ae::Document& d, ae::Range r) { ae::removeDc (d, r); }); } },
-            { TR_NOOP ("Stretch..."), TR_NOOP ("Time stretch / pitch shift"), [this] { openEdisonTool (audiotools::Tool::stretch); } },
-            { TR_NOOP ("Resample..."), TR_NOOP ("Change the sample rate"), [this] { showResample(); } },
-            { TR_NOOP ("Marker"), TR_NOOP ("Add a marker at the cursor (M)"), [this] { addMarkerAtCursor(); } },
-            { TR_NOOP ("Region"), TR_NOOP ("Make the selection a region"), [this] { addRegionFromSelection(); } },
-            { TR_NOOP ("Set loop"), TR_NOOP ("Make the selection the loop"), [this] { setLoopFromSelection(); } },
+            { TR_NOOP ("Cut"), TR_NOOP ("Cut the selection (Ctrl+X)"), [this] { cutSelection(); }, Icon::scissors },
+            { TR_NOOP ("Copy"), TR_NOOP ("Copy the selection (Ctrl+C)"), [this] { copySelection(); }, Icon::copy },
+            { TR_NOOP ("Paste"), TR_NOOP ("Paste at the cursor, or over the selection (Ctrl+V)"), [this] { paste (false); }, Icon::paste },
+            { TR_NOOP ("Delete"), TR_NOOP ("Delete the selection (Del)"), [this] { deleteSelection(); }, Icon::trash },
+            { TR_NOOP ("Trim"), TR_NOOP ("Keep only the selection"), [this] { trimSelection(); }, Icon::trim },
+            { TR_NOOP ("Silence"), TR_NOOP ("Silence the selection (Clear)"), [this] { edit (tr ("Silence"), [] (ae::Document& d, ae::Range r) { ae::clear (d, r); }, true); }, Icon::silence },
+            { TR_NOOP ("Fade in"), TR_NOOP ("Fade in over the selection (curve: the arrow next to Fade out)"), [this] { fade (true); }, Icon::fadeIn },
+            { TR_NOOP ("Fade out"), TR_NOOP ("Fade out over the selection"), [this] { fade (false); }, Icon::fadeOut },
+            { "~", TR_NOOP ("Fade curve"), [this] { curveMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (quickButtons[8])); }, Icon::fadeCurve },
+            { TR_NOOP ("Normalize"), TR_NOOP ("Normalize the selection (or everything) to 0 dB"), [this] { edit (tr ("Normalize"), [] (ae::Document& d, ae::Range r) { ae::normalize (d, r); }); }, Icon::normalize },
+            { TR_NOOP ("Amp..."), TR_NOOP ("Volume and panning"), [this] { showAmp(); }, Icon::amp },
+            { TR_NOOP ("Reverse"), TR_NOOP ("Reverse the selection (or everything)"), [this] { edit (tr ("Reverse"), [] (ae::Document& d, ae::Range r) { ae::reverse (d, r); }); }, Icon::reverse },
+            { TR_NOOP ("Invert"), TR_NOOP ("Reverse the polarity"), [this] { edit (tr ("Reverse polarity"), [] (ae::Document& d, ae::Range r) { ae::invert (d, r); }); }, Icon::invert },
+            { TR_NOOP ("Center"), TR_NOOP ("Remove the DC offset"), [this] { edit (tr ("Remove DC offset"), [] (ae::Document& d, ae::Range r) { ae::removeDc (d, r); }); }, Icon::dcCenter },
+            { TR_NOOP ("Stretch..."), TR_NOOP ("Time stretch / pitch shift"), [this] { openEdisonTool (audiotools::Tool::stretch); }, Icon::stretch },
+            { TR_NOOP ("Resample..."), TR_NOOP ("Change the sample rate"), [this] { showResample(); }, Icon::resample },
+            { TR_NOOP ("Marker"), TR_NOOP ("Add a marker at the cursor (M)"), [this] { addMarkerAtCursor(); }, Icon::marker },
+            { TR_NOOP ("Region"), TR_NOOP ("Make the selection a region"), [this] { addRegionFromSelection(); }, Icon::region },
+            { TR_NOOP ("Set loop"), TR_NOOP ("Make the selection the loop"), [this] { setLoopFromSelection(); }, Icon::setLoop },
+            // round 190jo: three of Edison's tool forms in the grid too (they stay in the Tools menu)
+            { "", nullptr, [this] { openEdisonTool (audiotools::Tool::equalize); }, Icon::equalizer },
+            { "", nullptr, [this] { openEdisonTool (audiotools::Tool::denoise); }, Icon::denoise },
+            { "", nullptr, [this] { openEdisonTool (audiotools::Tool::reverb); }, Icon::reverb },
         };
         for (const auto& q : quick)
         {
-            auto* b = quickButtons.add (new juce::TextButton (q.text[0] == '~' ? juce::String (juce::CharPointer_UTF8 ("\xe2\x96\xbe")) : tr (q.text)));
-            b->setTooltip (tr (q.tip));
+            auto* b = quickButtons.add (new IconButton (q.text, q.icon));
+            b->setFlat (true);
+            // the tool's name, then what it does (both existing texts); a tool form: its title
+            const auto toolIndex = quickButtons.size() - 1 - 19;
+            static const audiotools::Tool forms[] = { audiotools::Tool::equalize, audiotools::Tool::denoise, audiotools::Tool::reverb };
+            b->setTooltip (q.tip == nullptr ? tr (audiotools::toolTitle (forms[juce::jlimit (0, 2, toolIndex)]))
+                           : q.text[0] == '~' ? tr (q.tip)
+                                              : tr (q.text) + ": " + tr (q.tip));
             b->onClick = q.action;
             addAndMakeVisible (b);
         }
@@ -698,6 +712,14 @@ public:
         }
 
         d.title = file.getFileNameWithoutExtension().toStdString();
+        // round 190jo: the file's bit depth for the info strip's FORMAT (the header only; the save format stays as chosen)
+        fileBits = 0;
+        {
+            juce::AudioFormatManager formats;
+            formats.registerBasicFormats();
+            if (std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (file)); reader != nullptr)
+                fileBits = reader->usesFloatingPointData ? 32 : (int) reader->bitsPerSample;
+        }
         setDocument (std::move (d), tr ("Open"));
         lastFile = file;
         return true;
@@ -1344,123 +1366,157 @@ public:
     std::int64_t snapFrameForSnapshot (std::int64_t f) const { return snapFrame (f); }
 
     // --- layout and painting ---------------------------------------------------------------------------------
+    // Round 190jo (design190ia FW-22/23/24): Edison's layout. A 92 px panel: at the left the transport capsule (loop,
+    // play, stop), the round Record button with the record controls, and under them a small icon row (file, edit,
+    // undo, view switches); at the right a 2 x 9 grid of icon tools. Under the panel a 30 px info strip (sample rate,
+    // format, tempo, title / length, bar:beat:tick); then the navy canvas and a 28 px overview. A short or narrow editor
+    // (the Clip View's panel) keeps a compact form: one icon row and the tools wrapping in rows of small icon buttons.
+    static constexpr int panelHeight = 92, stripHeight = 30, toolW = 36, toolH = 28, toolGap = 4, toolColumns = 9;
+    bool edisonLayout() const noexcept { return getWidth() >= 900 && getHeight() >= 420; }
+
     void resized() override
     {
         auto area = getLocalBounds();
-        auto bar = area.removeFromTop (36).reduced (6, 4);
-        auto place = [&bar] (juce::Component& c, int w, int gap = 2) {
-            c.setBounds (bar.removeFromLeft (w));
-            bar.removeFromLeft (gap);
-        };
-        place (menuButton, 28, 8);
-        place (undoButton, 28);
-        place (redoButton, 28);
-        place (historyButton, 18, 12);
-        place (recordButton, 30);
-        place (recordMenuButton, 18, 6);
-        place (playButton, 30);
-        place (stopButton, 30, 6);
-        place (loopButton, 54, 4);
-        place (volumeKnob, 26, 12);
-        place (viewButton, 76, 6);
-        place (envButton, 120, 6);
-        place (snapButton, 28);
-        place (fitButton, 28);
-        place (followButton, 28, 8);
-        if (warpButton.isVisible())
-            place (warpButton, 100);
-        if (autoWarpButton.isVisible())
-            place (autoWarpButton, 78);
-        if (warpBpmBox.isVisible())
-        {
-            place (warpBpmBox, 58);
-            place (warpHalveButton, 26);
-            place (warpDoubleButton, 26);
-        }
-        sendButton.setBounds (bar.removeFromRight (70));
-        bar.removeFromRight (6);
-        dragButton.setBounds (bar.removeFromRight (28));
-        bar.removeFromRight (2);
-        saveButton.setBounds (bar.removeFromRight (28));
-
-        if (slotMode()) // the plugin's own switches, under the transport (FL: next to its Record button)
-        {
-            auto row = area.removeFromTop (30).reduced (6, 3);
-            row.removeFromLeft (112); // (they start under the Record button)
-            auto put = [&row] (juce::Component& c, int w, int gap = 4) {
-                c.setBounds (row.removeFromLeft (w));
-                row.removeFromLeft (gap);
-            };
-            put (recModeBox, 104);
-            put (maxTimeBox, 96);
-            put (appendButton, 72, 14);
-            put (slaveButton, 64);
-            put (muteInputButton, 96);
-        }
-
-        // each button gets the width its text needs, plus an equal share of what is left (round 165o: translated
-        // labels such as "Normalisieren" or "Ausschneiden" are never cut). When one row cannot hold them all (German,
-        // Russian, Polish… at the default width) the buttons go on two rows instead; English keeps its single row.
+        capsuleArea = stripArea = {};
+        const auto full = edisonLayout();
         const auto n = quickButtons.size();
-        const auto curveWidth = 18;
-        const juce::Font font (theme::font (theme::type::body));
-        std::vector<float> natural;
-        float total = 0.0f;
-        for (int i = 0; i < n; ++i)
-        {
-            natural.push_back (i == 8 ? (float) curveWidth : juce::GlyphArrangement::getStringWidth (font, quickButtons[i]->getButtonText()) + 18.0f);
-            total += natural.back() + (i == 7 ? 0.0f : 2.0f);
-        }
-        const auto rowWidth = (float) (area.getWidth() - 12);
-        const auto twoRows = total - 14.0f * (float) (n - 1) > rowWidth && n > 9; // not even with 4 px padding
-        auto tools = area.removeFromTop (twoRows ? 56 : 30).reduced (6, 2);
-        // lays out buttons [first, last) in one row: natural widths plus an equal share of the free space; still too
-        // narrow -> the padding goes first (down to 4 px a side), then the text squeezes (drawFittedText)
-        auto layoutRow = [&] (juce::Rectangle<int> row, int first, int last)
-        {
-            float need = 0.0f;
-            int stretchable = 0;
-            for (int i = first; i < last; ++i)
+        const auto editTools = 4; // Cut, Copy, Paste, Delete: the small icon row (FL's scissors / copy place)
+
+        // the small icon row: file, edit, undo, menu, view switches, the playback volume
+        auto smallRow = [&] (juce::Rectangle<int> row, int size) {
+            auto place = [&row, size] (juce::Component& c, int w = 0, int gap = 2) {
+                c.setBounds (row.removeFromLeft (juce::jmin (w > 0 ? w : size, row.getWidth())).withSizeKeepingCentre (w > 0 ? w : size, size));
+                row.removeFromLeft (juce::jmin (gap, row.getWidth()));
+            };
+            place (saveButton);
+            place (dragButton, 0, 8);
+            for (int i = 0; i < editTools && i < n; ++i)
+                place (*quickButtons[i], 0, i == editTools - 1 ? 8 : 2);
+            place (undoButton);
+            place (redoButton);
+            place (historyButton, 14, 8);
+            place (menuButton, 0, 8);
+            place (snapButton);
+            place (fitButton);
+            place (followButton, 0, 8);
+            place (viewButton);
+            place (envButton, 0, 8);
+            place (volumeKnob, size + 2, 8);
+            return row;
+        };
+        auto warpRow = [this] (juce::Rectangle<int> row) {
+            auto place = [&row] (juce::Component& c, int w, int gap = 2) {
+                c.setBounds (row.removeFromLeft (juce::jmin (w, row.getWidth())));
+                row.removeFromLeft (juce::jmin (gap, row.getWidth()));
+            };
+            if (warpButton.isVisible())
+                place (warpButton, 100, 4);
+            if (autoWarpButton.isVisible())
+                place (autoWarpButton, 78, 4);
+            if (warpBpmBox.isVisible())
             {
-                need += natural[(std::size_t) i] + (i == 7 || i == last - 1 ? 0.0f : 2.0f);
-                stretchable += i == 8 ? 0 : 1;
-            }
-            const auto avail = (float) row.getWidth();
-            const auto extra = juce::jmax (0.0f, avail - need) / (float) juce::jmax (1, stretchable);
-            auto shrink = 0.0f, scale = 1.0f;
-            if (need > avail)
-            {
-                const auto padding = 14.0f * (float) stretchable;
-                shrink = 14.0f * juce::jlimit (0.0f, 1.0f, (need - avail) / padding);
-                const auto after = need - shrink * (float) stretchable;
-                scale = after > avail ? avail / after : 1.0f;
-            }
-            float x = (float) row.getX();
-            for (int i = first; i < last; ++i)
-            {
-                const auto w = i == 8 ? (float) curveWidth : (natural[(std::size_t) i] - shrink) * scale + extra;
-                quickButtons[i]->setBounds (juce::roundToInt (x), row.getY(), juce::roundToInt (x + w) - juce::roundToInt (x), row.getHeight());
-                x += w + (i == 7 ? 0.0f : 2.0f);
+                place (warpBpmBox, 58);
+                place (warpHalveButton, 26);
+                place (warpDoubleButton, 26);
             }
         };
-        if (! twoRows)
-            layoutRow (tools, 0, n);
+
+        if (full)
+        {
+            auto panel = area.removeFromTop (panelHeight).reduced (8, 6);
+            // the tool grid at the right: 2 rows x 9, 36 x 28, 4 px apart (the edit tools sit in the small row)
+            const auto gridTools = n - editTools;
+            const auto rows = 2, columns = juce::jmax (toolColumns, (gridTools + rows - 1) / rows);
+            const auto gridW = columns * toolW + (columns - 1) * toolGap, gridH = rows * toolH + toolGap;
+            const auto grid = juce::Rectangle<int> (panel.getRight() - gridW, panel.getY() + (panel.getHeight() - gridH) / 2, gridW, gridH);
+            for (int i = editTools; i < n; ++i)
+            {
+                const auto k = i - editTools;
+                quickButtons[i]->setBounds (grid.getX() + (k % columns) * (toolW + toolGap), grid.getY() + (k / columns) * (toolH + toolGap), toolW, toolH);
+            }
+            panel.setRight (grid.getX() - 10);
+            sendButton.setBounds (juce::Rectangle<int> (panel.getRight() - 70, panel.getY(), 70, 28));
+
+            // row 1: the capsule (loop, play, stop), Record and its controls
+            auto row1 = panel.removeFromTop (28);
+            capsuleArea = row1.removeFromLeft (3 * 30 + 8);
+            auto inCapsule = capsuleArea.reduced (4, 0);
+            for (auto* b : std::initializer_list<juce::Component*> { &loopButton, &playButton, &stopButton })
+                b->setBounds (inCapsule.removeFromLeft (30));
+            row1.removeFromLeft (8);
+            recordButton.setBounds (row1.removeFromLeft (28));
+            row1.removeFromLeft (4);
+            auto row2 = panel.removeFromTop (22).withTrimmedTop (2);
+            if (slotMode())
+            {
+                recModeBox.setBounds (row1.removeFromLeft (104).reduced (0, 3));
+                row1.removeFromLeft (4);
+                maxTimeBox.setBounds (row1.removeFromLeft (96).reduced (0, 3));
+                // under them, as FL's APPEND under its record controls
+                row2.setX (recordButton.getX());
+                auto put = [&row2] (juce::Component& c, int w, int gap = 4) {
+                    c.setBounds (row2.removeFromLeft (juce::jmin (w, row2.getWidth())));
+                    row2.removeFromLeft (juce::jmin (gap, row2.getWidth()));
+                };
+                put (appendButton, 72);
+                put (slaveButton, 64);
+                put (muteInputButton, 96);
+            }
+            else
+            {
+                recordMenuButton.setBounds (row1.removeFromLeft (18));
+                warpRow (row2);
+            }
+            panel.removeFromTop (4);
+            smallRow (panel.removeFromTop (24), 24);
+            stripArea = area.removeFromTop (stripHeight);
+        }
         else
         {
-            // split near half the total width, never between Fade out (7) and its curve menu (8)
-            int split = 1;
-            float run = 0.0f;
-            while (split < n - 1 && run + natural[(std::size_t) split - 1] < total * 0.5f)
-                run += natural[(std::size_t) split++ - 1] + 2.0f;
-            if (split == 8)
-                ++split;
-            const auto top = tools.removeFromTop (tools.getHeight() / 2);
-            layoutRow (top.withTrimmedBottom (1), 0, split);
-            layoutRow (tools.withTrimmedTop (1), split, n);
+            // compact (a short or narrow editor): one icon row, then the tools wrapping in rows of 30 x 26
+            auto bar = area.removeFromTop (34).reduced (6, 3);
+            sendButton.setBounds (bar.removeFromRight (64));
+            bar.removeFromRight (6);
+            capsuleArea = bar.removeFromLeft (3 * 28 + 8);
+            auto inCapsule = capsuleArea.reduced (4, 0);
+            for (auto* b : std::initializer_list<juce::Component*> { &loopButton, &playButton, &stopButton })
+                b->setBounds (inCapsule.removeFromLeft (28));
+            bar.removeFromLeft (6);
+            recordButton.setBounds (bar.removeFromLeft (28));
+            if (! slotMode())
+                recordMenuButton.setBounds (bar.removeFromLeft (16));
+            bar.removeFromLeft (8);
+            bar = smallRow (bar, 26);
+            warpRow (bar);
+
+            if (slotMode()) // the plugin's own switches, under the transport (FL: next to its Record button)
+            {
+                auto row = area.removeFromTop (30).reduced (6, 3);
+                auto put = [&row] (juce::Component& c, int w, int gap = 4) {
+                    c.setBounds (row.removeFromLeft (juce::jmin (w, row.getWidth())));
+                    row.removeFromLeft (juce::jmin (gap, row.getWidth()));
+                };
+                put (recModeBox, 104);
+                put (maxTimeBox, 96);
+                put (appendButton, 72, 14);
+                put (slaveButton, 64);
+                put (muteInputButton, 96);
+            }
+
+            const auto avail = juce::jmax (30, getWidth() - 12);
+            const auto perRow = juce::jmax (1, (avail + 2) / 32);
+            const auto gridTools = n - editTools;
+            const auto rows = (gridTools + perRow - 1) / perRow;
+            auto tools = area.removeFromTop (rows * 28 + 2).reduced (6, 1);
+            for (int i = editTools; i < n; ++i)
+            {
+                const auto k = i - editTools;
+                quickButtons[i]->setBounds (tools.getX() + (k % perRow) * 32, tools.getY() + (k / perRow) * 28, 30, 26);
+            }
         }
 
         infoArea = area.removeFromBottom (24);
-        overviewArea = area.removeFromBottom (18).reduced (6, 2);
+        overviewArea = area.removeFromBottom (full ? 32 : 18).reduced (6, 2);
         area.removeFromBottom (2);
         area = area.reduced (6, 0);
         levelArea = area.removeFromLeft (34);
@@ -1477,10 +1533,31 @@ public:
         if (syncAxis()) // (the markers changed elsewhere: the Playlist, undo; the whole view follows)
             repaint();
         g.fillAll (colour::bg2);
+        // round 190jo: Edison's panel (92 px; the compact form's icon row) and its transport capsule / round Record
+        auto top = 34;
+        if (! edisonLayout())
+            for (auto* b : quickButtons)
+                top = juce::jmax (top, b->getBottom() + 2);
+        else
+            top = panelHeight;
         g.setColour (colour::bg3);
-        g.fillRect (getLocalBounds().removeFromTop (36));
+        g.fillRect (getLocalBounds().removeFromTop (top));
         g.setColour (colour::border);
-        g.drawHorizontalLine (36, 0.0f, (float) getWidth());
+        g.drawHorizontalLine (top, 0.0f, (float) getWidth());
+        if (! capsuleArea.isEmpty())
+        {
+            const auto pill = capsuleArea.toFloat();
+            g.setColour (colour::bg1);
+            g.fillRoundedRectangle (pill, juce::jmin (14.0f, pill.getHeight() * 0.5f));
+            g.setColour (colour::borderStrong);
+            g.drawRoundedRectangle (pill.reduced (0.5f), juce::jmin (14.0f, pill.getHeight() * 0.5f) - 0.5f, 1.0f);
+            const auto ring = recordButton.getBounds().toFloat().reduced (0.5f);
+            g.setColour (colour::bg1);
+            g.fillEllipse (ring);
+            g.setColour (colour::borderStrong);
+            g.drawEllipse (ring, 1.0f);
+        }
+        paintStrip (g);
 
         paintRuler (g);
         paintLevels (g);
@@ -2120,7 +2197,7 @@ private:
     void paintWave (juce::Graphics& g)
     {
         using namespace theme;
-        g.setColour (colour::bg0);
+        g.setColour (canvasColour);
         g.fillRect (waveArea);
 
         if (doc.audio.empty())
@@ -2147,10 +2224,10 @@ private:
             const auto half = r.getHeight() * 0.5f - 2.0f;
 
             // level guides: centre line and -6 dB
-            g.setColour (colour::gridBeat);
+            g.setColour (canvasGrid);
             g.drawHorizontalLine ((int) (centre - half * 0.5f), r.getX(), r.getRight());
             g.drawHorizontalLine ((int) (centre + half * 0.5f), r.getX(), r.getRight());
-            g.setColour (colour::gridBar);
+            g.setColour (canvasGridStrong);
             g.drawHorizontalLine ((int) centre, r.getX(), r.getRight());
             if (const auto mark = shownNoiseThreshold(); viewNoiseMark && mark > 0.0f && mark < 1.0f)
             {
@@ -2294,7 +2371,7 @@ private:
         {
             const auto x = (float) waveArea.getX() + (float) ((axis.unitOfBeat (b) - viewStart) / fpp);
             const auto onBar = std::abs (b / perBar - std::round (b / perBar)) < 1.0e-6;
-            g.setColour (onBar ? colour::gridBar : colour::gridBeat);
+            g.setColour (onBar ? canvasGridStrong : canvasGrid);
             g.drawVerticalLine ((int) x, (float) waveArea.getY(), (float) waveArea.getBottom());
         }
     }
@@ -2320,7 +2397,7 @@ private:
     void paintSpectrum (juce::Graphics& g)
     {
         using namespace theme;
-        g.setColour (colour::bg0);
+        g.setColour (canvasColour);
         g.fillRect (waveArea);
         if (doc.audio.empty())
         {
@@ -2539,14 +2616,17 @@ private:
                 g.setColour (colour::warning.withAlpha (0.22f));
                 g.fillRect (juce::Rectangle<float>::leftTopRightBottom (x, (float) rulerArea.getY() + 12.0f, frameToX ((double) m.end), (float) rulerArea.getBottom() - 5.0f));
             }
-            juce::Path flag;
-            flag.addTriangle (x, (float) rulerArea.getY() + 12.0f, x + 7.0f, (float) rulerArea.getY() + 15.5f, x, (float) rulerArea.getY() + 19.0f);
-            g.setColour (colour::warning);
-            g.fillPath (flag);
-            g.drawVerticalLine ((int) x, (float) rulerArea.getY() + 12.0f, (float) rulerArea.getBottom());
+            // round 190jo (FW-24): Edison's marker flag, 6 x 10 in the accent, its name in 11 px beside it
+            g.setColour (colour::accent);
+            g.fillRect (juce::Rectangle<float> (x, (float) rulerArea.getY() + 11.0f, 6.0f, 10.0f));
+            g.drawVerticalLine ((int) x, (float) rulerArea.getY() + 11.0f, (float) rulerArea.getBottom());
             if (! m.name.empty())
-                g.drawText (juce::String::fromUTF8 (m.name.c_str()), juce::Rectangle<float> (x + 8.0f, (float) rulerArea.getY() + 12.0f, 120.0f, 8.0f),
+            {
+                g.setFont (font (type::caption));
+                g.setColour (colour::textPrimary);
+                g.drawText (juce::String::fromUTF8 (m.name.c_str()), juce::Rectangle<float> (x + 8.0f, (float) rulerArea.getY() + 10.0f, 120.0f, 12.0f),
                             juce::Justification::centredLeft);
+            }
         }
         if (doc.hasLoop() && viewLoop)
         {
@@ -2570,11 +2650,11 @@ private:
         {
             if (! viewRegions)
                 break;
-            g.setColour (colour::warning.withAlpha (0.55f));
+            g.setColour (colour::accent.withAlpha (0.6f)); // (round 190jo: Edison's marker lines take the flags' colour)
             g.drawVerticalLine ((int) frameToX ((double) m.start), (float) waveArea.getY(), (float) waveArea.getBottom());
             if (m.isRegion())
             {
-                g.setColour (colour::warning.withAlpha (0.3f));
+                g.setColour (colour::accent.withAlpha (0.3f));
                 g.drawVerticalLine ((int) frameToX ((double) m.end), (float) waveArea.getY(), (float) waveArea.getBottom());
             }
         }
@@ -2633,7 +2713,7 @@ private:
         const auto perPixel = frames / juce::jmax (1, overviewArea.getWidth());
         const auto centre = (float) overviewArea.getCentreY();
         const auto half = overviewArea.getHeight() * 0.5f - 1.0f;
-        g.setColour (waveColour().withAlpha (0.55f));
+        g.setColour (juce::Colour (0xff8a93a8)); // (round 190jo, FW-24: Edison's overview wave)
         for (int x = 0; x < overviewArea.getWidth(); ++x)
         {
             // (round 190db: in beats, each pixel shows the file its beats play)
@@ -2645,10 +2725,76 @@ private:
         }
         const auto x0 = (float) overviewArea.getX() + (float) (viewStart / frames) * overviewArea.getWidth();
         const auto w = (float) ((double) waveArea.getWidth() * fpp / frames) * overviewArea.getWidth();
-        g.setColour (colour::accent.withAlpha (0.18f));
+        // the view window: a 1 px light frame (red stays for the selection and the playhead)
+        g.setColour (colour::textSecondary.withAlpha (0.12f));
         g.fillRect (juce::Rectangle<float> (x0, (float) overviewArea.getY(), juce::jmax (3.0f, w), (float) overviewArea.getHeight()));
-        g.setColour (colour::accent);
+        g.setColour (colour::textSecondary);
         g.drawRect (juce::Rectangle<float> (x0, (float) overviewArea.getY(), juce::jmax (3.0f, w), (float) overviewArea.getHeight()), 1.0f);
+    }
+
+    // Round 190jo (design190ia FW-23): Edison's info strip under the panel. FL's captions (SAMPLERATE, FORMAT, TEMPO,
+    // TITLE / LENGTH, BAR:BEAT:TICK) in small bold caps over their values; the caption words are FL's labels, kept as FL
+    // writes them. Tempo: the one in the file name (as Auto-warp reads it), else the song's while the channel's warp
+    // markers lock the audio to it ("SYNCED").
+    void paintStrip (juce::Graphics& g)
+    {
+        using namespace theme;
+        if (stripArea.isEmpty())
+            return;
+        g.setColour (colour::bg1);
+        g.fillRect (stripArea);
+        g.setColour (colour::border);
+        g.drawHorizontalLine (stripArea.getBottom() - 1, 0.0f, (float) getWidth());
+        const auto captionFont = font (9.0f, true), valueFont = font (type::body);
+        auto area = stripArea.reduced (10, 2);
+        auto field = [&] (juce::Rectangle<int> r, const juce::String& caption, const juce::String& value, juce::Justification j,
+                          const juce::String& badge = {}) {
+            g.setFont (captionFont);
+            g.setColour (colour::textSecondary);
+            g.drawText (caption, r.withHeight (11), j, false);
+            if (badge.isNotEmpty())
+            {
+                const auto w = juce::GlyphArrangement::getStringWidth (captionFont, caption) + 6.0f;
+                g.setColour (colour::textPrimary);
+                g.drawText (badge, r.withHeight (11).withTrimmedLeft ((int) w), juce::Justification::centredLeft, false);
+            }
+            g.setFont (valueFont);
+            g.setColour (colour::textPrimary);
+            g.drawFittedText (value, r.withTrimmedTop (11), j, 1, 0.8f);
+        };
+        const auto has = ! doc.audio.empty();
+        const auto bitsText = juce::String (fileBits > 0 ? fileBits : bits == ae::WavFormat::int16 ? 16 : bits == ae::WavFormat::int24 ? 24 : 32);
+        field (area.removeFromLeft (84), "SAMPLERATE", has ? juce::String (juce::roundToInt (doc.audio.sampleRate)) + " Hz" : juce::String ("-"),
+               juce::Justification::centredLeft);
+        area.removeFromLeft (8);
+        field (area.removeFromLeft (84), "FORMAT", has ? bitsText + "  " + (doc.audio.numChannels() > 1 ? tr ("Stereo") : tr ("Mono")) : juce::String ("-"),
+               juce::Justification::centredLeft);
+        area.removeFromLeft (8);
+        auto bpm = autowarp::bpmInName (doc.title.empty() ? juce::File (source.path).getFileNameWithoutExtension().toStdString() : doc.title);
+        const auto synced = ! warpMarkers().empty();
+        if (synced)
+            bpm = engine.getSong().bpm;
+        field (area.removeFromLeft (110), "TEMPO", bpm > 0.0 ? juce::String (bpm, std::abs (bpm - std::round (bpm)) < 0.005 ? 0 : 2) + " BPM" : juce::String ("-"),
+               juce::Justification::centredLeft, synced ? juce::String ("SYNCED") : juce::String());
+        area.removeFromLeft (8);
+        auto right = area.removeFromRight (juce::jmin (260, area.getWidth() / 2));
+        const auto at = selection.empty() ? cursor : selection.start;
+        field (right.removeFromRight (110), "BAR:BEAT:TICK", has ? barBeatTick (at) : juce::String ("-"), juce::Justification::centredRight);
+        right.removeFromRight (12);
+        field (right, "LENGTH", has ? formatTime (doc.audio.frames()) : juce::String ("-"), juce::Justification::centredRight);
+        field (area, "TITLE", doc.title.empty() ? juce::String ("-") : juce::String::fromUTF8 (doc.title.c_str()), juce::Justification::centredLeft);
+    }
+
+    // FL's bar:beat:tick ("003:01:000"): bars and beats of the song's tempo and meter, ticks at FL's 96 per quarter note
+    juce::String barBeatTick (std::int64_t frames) const
+    {
+        const auto rate = juce::jmax (1.0, doc.audio.sampleRate);
+        const auto beats = (double) frames / rate * engine.getSong().bpm / 60.0;
+        const auto perBar = juce::jmax (1, (int) std::lround ((double) engine.getSong().barTicks() / ppq));
+        const auto bar = (int) (beats / perBar);
+        const auto beat = (int) beats - bar * perBar;
+        const auto tick = juce::jlimit (0, 95, (int) ((beats - std::floor (beats)) * 96.0));
+        return juce::String (bar + 1).paddedLeft ('0', 3) + ":" + juce::String (beat + 1).paddedLeft ('0', 2) + ":" + juce::String (tick).paddedLeft ('0', 3);
     }
 
     void paintInfo (juce::Graphics& g)
@@ -2670,9 +2816,12 @@ private:
             return;
 
         juce::StringArray parts;
-        parts.add (juce::String (juce::roundToInt (doc.audio.sampleRate)) + " Hz");
-        parts.add (doc.audio.numChannels() > 1 ? tr ("Stereo") : tr ("Mono"));
-        parts.add (tr ("Length") + " " + formatTime (doc.audio.frames()));
+        if (stripArea.isEmpty()) // (round 190jo: with Edison's info strip the rate, channels and length are up there)
+        {
+            parts.add (juce::String (juce::roundToInt (doc.audio.sampleRate)) + " Hz");
+            parts.add (doc.audio.numChannels() > 1 ? tr ("Stereo") : tr ("Mono"));
+            parts.add (tr ("Length") + " " + formatTime (doc.audio.frames()));
+        }
         const auto r = ae::orAll (doc, selection);
         if (! selection.empty())
             parts.add (tr ("Selection") + " " + formatTime (selection.start) + " - " + formatTime (selection.end) + " (" + formatTime (selection.length()) + ")");
@@ -4512,6 +4661,7 @@ private:
     {
         envMode = m;
         envButton.setButtonText (tr (envModeName (m)));
+        envButton.setTooltip (tr (envModeName (m)) + ": " + tr ("What the mouse edits: the waveform, or the volume / panning / stereo separation envelope drawn over it (E)"));
         envButton.setToggleState (m != EnvMode::wave, juce::dontSendNotification);
         if (m != EnvMode::wave)
             setStatus (tr ("Right-click (or click) adds a point, drag moves it, right-click or Alt+click on a point deletes it, the hollow handles bend. Tools > Mixdown amp envelopes applies it."), false);
@@ -4900,6 +5050,7 @@ private:
     bool modified = false;
     juce::File lastFile;
     ae::WavFormat bits = ae::WavFormat::int24;
+    int fileBits = 0; // (round 190jo) the opened file's bit depth, 0 = not from a file (the info strip then shows the save format)
 
     ae::Range selection;
     std::int64_t cursor = 0, anchor = 0;
@@ -4950,6 +5101,7 @@ private:
     std::unique_ptr<juce::FileChooser> chooser;
 
     juce::Rectangle<int> rulerArea, waveArea, levelArea, overviewArea, infoArea;
+    juce::Rectangle<int> capsuleArea, stripArea; // (round 190jo: Edison's transport capsule and info strip)
     IconButton menuButton { "menu", Icon::panelMenu }, undoButton { "undo", Icon::undo }, redoButton { "redo", Icon::redo },
         historyButton { "history", Icon::chevronDown }, recordButton { "record", Icon::record }, recordMenuButton { "recordMenu", Icon::chevronDown },
         playButton { "play", Icon::play }, stopButton { "stop", Icon::stop }, snapButton { "snap", Icon::magnet }, fitButton { "fit", Icon::zoom },
@@ -4983,7 +5135,9 @@ private:
         }
     };
     DragSourceButton dragButton { "drag", Icon::audioFile };
-    juce::TextButton loopButton, viewButton, sendButton, envButton;
+    // (round 190jo: Loop, Spectrum and the envelope mode as icon buttons, design190ia FW-22)
+    IconButton loopButton { "loop", Icon::loop }, viewButton { "spectrum", Icon::spectrogram }, envButton { "envelopeMode", Icon::envelope };
+    juce::TextButton sendButton;
     // warp markers (round 175a, M3): a lane above the waveform with the channel's markers, for a channel source
     juce::TextButton warpButton, autoWarpButton;
     bool warpMode = false;
@@ -5014,7 +5168,7 @@ private:
     juce::Image spectrumWarped;
     juce::String spectrumWarpedKey;
     juce::Slider volumeKnob { juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::NoTextBox };
-    juce::OwnedArray<juce::TextButton> quickButtons;
+    juce::OwnedArray<IconButton> quickButtons; // (round 190jo: Edison's icon tools, Quick table order)
 
     void refreshVolumeKnob()
     {
@@ -5574,6 +5728,13 @@ std::unique_ptr<juce::Component> makeAudioEditorForSnapshot (AudioEngine& engine
     const auto frames = doc.audio.frames();
     editor->setDocument (std::move (doc), tr ("Open"));
     editor->selectForSnapshot ({ frames / 4, frames / 2 }, spectrum);
+    return editor;
+}
+
+std::unique_ptr<juce::Component> makeAudioEditorForFileSnapshot (AudioEngine& engine, const juce::File& file)
+{
+    auto editor = std::make_unique<AudioEditor> (engine, Source { Source::Kind::file, -1, file.getFullPathName() });
+    editor->loadFile (file); // (markers, regions and the loop from the WAV; no selection; zoomed to fit)
     return editor;
 }
 
