@@ -4386,6 +4386,8 @@ EffectSlot makeEffectSlot (EffectKind kind)
         slot.params[(std::size_t) echosuite::spiral::revision] = 1.0f;
     if (kind == EffectKind::voiceShift) // round 190ho: a new Voice Shift runs the Measured law's revision 1 (hidden parameter)
         slot.params[(std::size_t) voiceshift::revision] = 1.0f;
+    if (kind == EffectKind::hushDeEsser) // round 190iq: a new Hush runs the measured Allround timing (hidden)
+        slot.params[(std::size_t) mixsuite::hush::timing] = 1.0f;
 
     return slot;
 }
@@ -4545,6 +4547,9 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     // round 190fy: … and one saved before the loop timing's revision (0.1.27: Law, no hidden revision) keeps round 190do's loop
     if (slot.kind == EffectKind::spiralEcho && savedCount <= (std::size_t) echosuite::spiral::revision)
         slot.params[(std::size_t) echosuite::spiral::revision] = 0.0f;
+    // round 190iq: a Hush saved before the measured Allround timing keeps tp172b's (bit for bit)
+    if (slot.kind == EffectKind::hushDeEsser && savedCount <= (std::size_t) mixsuite::hush::timing)
+        slot.params[(std::size_t) mixsuite::hush::timing] = 0.0f;
     // round 190ca: a Nebula saved before the cloud law keeps the classic engine in every mode
     if (slot.kind == EffectKind::nebula && savedCount <= (std::size_t) verbs::nebula::law)
         slot.params[(std::size_t) verbs::nebula::law] = 0.0f;
