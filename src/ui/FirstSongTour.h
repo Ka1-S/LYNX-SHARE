@@ -70,7 +70,11 @@ public:
     tour::Machine& machineForCheck() noexcept { return machine; }
     juce::Component* welcomeForSnapshot();
     juce::Component* cardForSnapshot();
-    juce::Rectangle<int> ringForSnapshot();    // where the ring is drawn now (window coordinates; empty: no target)
+    juce::Rectangle<int> ringForSnapshot();
+    // round 190jc: the beacon's pulse (0 = still, 0..1 = a moment of the 1.2 s cycle) and whether its timer runs
+    void setPulseForSnapshot (float phase);
+    bool pulsingForCheck() const;
+    juce::Rectangle<int> cardBoundsForSnapshot() const;    // where the ring is drawn now (window coordinates; empty: no target)
     juce::String targetIdForSnapshot() const;  // the component ID it rings
     void clickForSnapshot (const juce::String& button); // "next", "back", "do", "skip", "close", "save", "demo"
 

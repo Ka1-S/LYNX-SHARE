@@ -115,6 +115,11 @@ public:
         startTimerHz (30);
     }
     bool pulsing() const noexcept { return isTimerRunning(); }
+    void setPhaseForSnapshot (float p)
+    {
+        phase = p;
+        repaint();
+    }
     void stopPulse()
     {
         stopTimer();
@@ -857,6 +862,19 @@ juce::Rectangle<int> FirstSongTour::ringForSnapshot()
 {
     update();
     return layer != nullptr ? layer->getRing() : juce::Rectangle<int>();
+}
+
+void FirstSongTour::setPulseForSnapshot (float phase)
+{
+    if (layer != nullptr)
+        layer->setPhaseForSnapshot (phase);
+}
+
+bool FirstSongTour::pulsingForCheck() const { return layer != nullptr && layer->pulsing(); }
+
+juce::Rectangle<int> FirstSongTour::cardBoundsForSnapshot() const
+{
+    return card != nullptr && shownIn != nullptr ? nativechild::boundsIn (*card, *shownIn.getComponent()) : juce::Rectangle<int>();
 }
 
 juce::String FirstSongTour::targetIdForSnapshot() const
