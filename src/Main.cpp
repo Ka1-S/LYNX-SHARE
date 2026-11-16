@@ -26467,6 +26467,49 @@ private:
         playlist.setViewForSnapshot (15.6, 0, 0);
         playlist.setScrollYForSnapshot (0);
         write (ui, "04-default-start");
+
+        // round 190jd (live check 190iw Q4): FL's grid levels at its Ctrl+wheel steps — bars only at 9.9 px a beat, beat
+        // lines from 11.5, half-beat lines from 21.5 (shots/q4-fl-zoom-levels-ruler-grid.png), at bar 9 like FL's shot
+        heights (32);
+        for (const auto beat : { 9.9, 11.5, 18.4, 21.5 })
+        {
+            playlist.setViewForSnapshot (beat * 4.0, 8, 0);
+            playlist.setScrollYForSnapshot (0);
+            write (playlist, ("05-grid-" + juce::String (beat, 1) + "px-beat").toRawUTF8());
+        }
+        // round 190jd: NEW automation clips from the first channel's volume and pan knobs take FL's colours by parameter
+        // (#8C5F5F, #7F8C5E; shots/q4-fl-new-automation-clip-zoom2.png); the editor windows they open are closed again
+        if (! offline.getSong().channels.empty())
+        {
+            offline.editSong ([] (lynx::Song& s) { s.loopStart = s.loopEnd = 0; }, false);
+            for (const auto kind : { lynx::AutomationTargetKind::channelVolume, lynx::AutomationTargetKind::channelPan })
+            {
+                lynx::AutomationTarget t;
+                t.kind = kind;
+                t.index = 0;
+                lynx::createAutomationClip (offline, t);
+            }
+            lynx::closeAutomationEditors();
+            offline.dispatchPendingMessages();
+            heights (50);
+            playlist.setViewForSnapshot (39.75, 0, 0);
+            int first = 0;
+            for (const auto& c : offline.getSong().playlist)
+                if (c.kind == lynx::ClipKind::automation)
+                    first = std::max (first, c.track);
+            playlist.setScrollYForSnapshot (std::max (0, first - 3) * 50);
+            write (playlist, "06-new-automation-clips");
+        }
+        // round 190jd (live check 190iw Q7, shots/q7-fl-countin-sheet.png): a 1-bar count-in — the time display reads
+        // "REC IN 4" on its first beat and "REC IN 1" on its last, Play shows its Pause glyph, Record stays lit
+        for (const auto beatsLeft : { 4, 1 })
+        {
+            offline.getTransport().countIn.store ((double) beatsLeft * lynx::ppq - 1.0);
+            ui.tickLinkForSnapshot();
+            ui.transportForSnapshot (true, true);
+            write (ui, ("07-countin-" + juce::String (beatsLeft)).toRawUTF8());
+        }
+        offline.getTransport().countIn.store (0.0);
     }
 
     void runDesign190igS4Shot (const juce::String& prefix, const juce::String& projectPath)

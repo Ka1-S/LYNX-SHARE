@@ -393,6 +393,20 @@ struct Place
 // track: the first one, from the top, with no clips at all (checked live in FL 2026: a free gap on a used track is not
 // taken; instrument tracks take no automation clips: FL's "Instrument tracks are not for audio or automation clips.").
 Place forNewClip (const Song& song, bool atPlayback, std::int64_t playTick);
+
+// The colour FL gives a NEW automation clip (Automation::colour, ARGB): by parameter, not the channel's (live check 190iw
+// Q4, four clips made with "Create automation clip" from Channel rack knobs: volume #8C5F5F / #8D5F5F, pan #7F8C5E /
+// #808D5F, whatever the channel's colour; HSV s 0.33, v 0.55, hue 0 / 77). Other targets were not sampled: 0 = FL's
+// default channel grey #485156, as before.
+constexpr std::uint32_t colourFor (const AutomationTarget& target) noexcept
+{
+    switch (target.kind)
+    {
+        case AutomationTargetKind::channelVolume: return 0xff8c5f5fu;
+        case AutomationTargetKind::channelPan:    return 0xff7f8c5eu;
+        default:                                  return 0;
+    }
+}
 } // namespace lynx::autoclipplace
 
 // Round 177b: optional automation lanes under Playlist tracks (Song.h AutomationLane). Plain edits for editSong.

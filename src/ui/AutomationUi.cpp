@@ -1141,6 +1141,7 @@ void addAutomationClip (AudioEngine& engine, const AutomationTarget& target, con
         a.name = name;
         a.target = target;
         a.points = { { 0, value, 0.0f }, { place.length, value, 0.0f } };
+        a.colour = autoclipplace::colourFor (target); // FL: by parameter (round 190jd)
         s.automations.push_back (std::move (a));
 
         Clip clip;
