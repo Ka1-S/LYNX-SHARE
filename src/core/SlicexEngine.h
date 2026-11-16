@@ -82,6 +82,17 @@ public:
     // adds `frames` stereo frames to left / right
     void render (float* left, float* right, int frames) noexcept;
 
+    // For the editor's play line (round 190jd; FL lights the deck's Play button and draws a red line over the slice being
+    // played): the deck (0 / 1) of the newest sounding voice and the frame of that deck's sample it reads; deck −1 when
+    // no voice sounds. Written by render (audio thread), read on any thread.
+    struct PlayMark
+    {
+        int deck = -1;
+        double frame = -1.0;
+    };
+    PlayMark playMark() const noexcept;
+    void clearPlayMark() noexcept; // (the host found the engine idle and skipped render)
+
 private:
     struct Impl;
     std::unique_ptr<Impl> d;

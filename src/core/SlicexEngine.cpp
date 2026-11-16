@@ -5,6 +5,7 @@
 // Philter (core/FlCurves.inc); Slicex adds the envelope's ATT / DEC / SUS / REL knobs, the decay point and the release.
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstring>
 
@@ -505,6 +506,7 @@ struct Engine::Impl
     u32 seed = 0x2545f491u;
     int nextNote = 0;
     double songBeats = 0.0, songSeconds = 0.0;
+    std::atomic<std::int64_t> mark { -1 }; // playMark(): frame · 2 + deck, −1 = none
 
     double random() noexcept // Delphi's generator: a 32-bit LCG scaled to [0, 1)
     {
@@ -1262,6 +1264,7 @@ void Engine::killAll() noexcept
 {
     for (auto& v : d->voices)
         v.state = 10;
+    d->mark.store (-1, std::memory_order_relaxed);
 }
 
 void Engine::setNoteLevels (int id, float vol, float pan, float pitchCents) noexcept
@@ -1289,12 +1292,44 @@ int Engine::voiceCount() const noexcept
 void Engine::render (float* left, float* right, int frames) noexcept
 {
     if (d->program == nullptr || frames <= 0)
+    {
+        d->mark.store (-1, std::memory_order_relaxed);
         return;
-    const flvp::X87Extended x87; // FL's interpolation kernels run at 64-bit x87 precision
-    // newest voice first, as the plugin walks its list
-    for (int i = maxVoices - 1; i >= 0; --i)
-        if (d->voices[(std::size_t) i].state < 10)
-            d->renderVoice (d->voices[(std::size_t) i], left, right, frames);
+    }
+    {
+        const flvp::X87Extended x87; // FL's interpolation kernels run at 64-bit x87 precision
+        // newest voice first, as the plugin walks its list
+        for (int i = maxVoices - 1; i >= 0; --i)
+            if (d->voices[(std::size_t) i].state < 10)
+                d->renderVoice (d->voices[(std::size_t) i], left, right, frames);
+    }
+    // the play line: the newest voice still reading its region (the highest note id; ids grow by one per note)
+    const Voice* newest = nullptr;
+    for (const auto& v : d->voices)
+        if (v.state < 9 && v.delay <= 0 && v.deck != nullptr && (newest == nullptr || v.note > newest->note))
+            newest = &v;
+    std::int64_t packed = -1;
+    if (newest != nullptr)
+    {
+        const int deck = newest->deck == &d->program->decks[1] ? 1 : 0;
+        const auto frame = std::clamp<std::int64_t> (newest->regionStart + (std::int64_t) std::floor (std::max (0.0, newest->pos)), 0,
+                                                     std::max<std::int64_t> (0, newest->deck->audio.frames - 1));
+        packed = frame * 2 + deck;
+    }
+    d->mark.store (packed, std::memory_order_relaxed);
+}
+
+Engine::PlayMark Engine::playMark() const noexcept
+{
+    const auto packed = d->mark.load (std::memory_order_relaxed);
+    if (packed < 0)
+        return {};
+    return { (int) (packed & 1), (double) (packed >> 1) };
+}
+
+void Engine::clearPlayMark() noexcept
+{
+    d->mark.store (-1, std::memory_order_relaxed);
 }
 
 // ---- for editors: the shapes as the voices play them
