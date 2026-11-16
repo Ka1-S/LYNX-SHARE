@@ -143,6 +143,7 @@
 #include "ui/PluginMonitorWindow.h"
 #include "ui/TouchKeyboard.h"
 #include "ui/AutomationUi.h"
+#include "core/GrossBeatLocator.h"
 #include "ui/PluginSkin.h"
 #include "ui/ChannelSettings.h"
 #include "ui/TempoDetectionDialog.h"
@@ -28138,6 +28139,20 @@ private:
             publish (false); // stopped: no locator, no fill
             lynx::tickNativeEffectEditor (*editor);
             savePng (lynx::shot::snapshot (*editor), prefix + "-r2-grossbeat-stopped.png");
+            // round 190jd (live check 190iw Q7): the locator in FL's colours (the editor's Options menu) on the beat (cream,
+            // 3 px trail), a third into it (orange) and near its end (dusty red); LYNX's playhead colour stays the default
+            lynx::gblocator::setFlStyle (true);
+            lynx::showGrossBeatEnvelopeForSnapshot (*editor, 1);
+            for (const auto at : { 4.02, 4.35, 4.9 })
+            {
+                while ((double) done * tps / lynx::ppq < at)
+                    block (queued);
+                publish (true);
+                juce::Thread::sleep (60); // (the editor's frame budget: ~21 frames a second in this style)
+                lynx::tickNativeEffectEditor (*editor);
+                savePng (lynx::shot::snapshot (*editor), prefix + "-r2-grossbeat-fl-colours-" + juce::String (at - 4.0, 2) + ".png");
+            }
+            lynx::gblocator::setFlStyle (false);
             offline.getTransport().playing.store (false);
         }
         {

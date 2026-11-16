@@ -67,7 +67,14 @@
         const auto x = gbLocatorX (item, v), trail = gbTrailWidth();
         return juce::Rectangle<float> (x - trail - 2.0f, inner.getY(), trail + 5.0f, inner.getHeight()).getSmallestIntegerContainer();
     }
-    float gbTrailWidth() const { return ui::motion::enabled() ? 6.0f * scale() : 0.0f; } // a fade: Settings › Animations
+    float gbTrailWidth() const // a fade: Settings › Animations (FL's colours: up to 3 px, round 190jd)
+    {
+        return ui::motion::enabled() ? (gblocator::flStyle() ? 3.0f : 6.0f) * scale() : 0.0f;
+    }
+    // round 190jd: the beat phase the FL-colours locator is drawn at (set before each paint / overlay step)
+    double gbPaintPhase = 0.0;
+    double gbLastOverlayMs = 0.0;
+    double gbPhaseOf (const GbLive& v) const { return gblocator::beatPhase ((double) v.position[(std::size_t) gbEditKind], (int) grossbeat::barBeats); }
     double gbLastFrameMs = 0.0;
 
     // Rollup 0.1.30 (round 190iy): the locator on round 190ip's GPU overlay (ui/MotionOverlay.h) while the song plays. It
@@ -90,6 +97,22 @@
     {
         using namespace theme;
         const auto lineW = juce::jmax (1.0f, std::floor (scale()));
+        if (gblocator::flStyle()) // round 190jd: FL's colours, cycling once per beat (core/GrossBeatLocator.h)
+        {
+            // (drawn at the phase's colour step, so the overlay's pictures stay a bounded set)
+            const auto phase = (gblocator::stepOf (gbPaintPhase) + 0.5) / gblocator::stepsPerBeat;
+            const auto line = juce::Colour (gblocator::lineColour (phase));
+            if (ui::motion::enabled())
+                for (int px = 1; px <= 3; ++px)
+                    if (const auto a = gblocator::trailAlpha (px, phase); a > 0.0f)
+                    {
+                        g.setColour (line.withAlpha (a));
+                        g.fillRect (juce::Rectangle<float> (x - (float) px * lineW, inner.getY(), lineW, inner.getHeight()).getIntersection (inner));
+                    }
+            g.setColour (line);
+            g.fillRect (juce::Rectangle<float> (x, inner.getY(), lineW, inner.getHeight()).getIntersection (inner));
+            return;
+        }
         if (const auto trail = gbTrailWidth(); trail > 0.0f)
         {
             const auto t = juce::Rectangle<float> (x - trail, inner.getY(), trail, inner.getHeight()).getIntersection (inner);
@@ -123,6 +146,12 @@
                     repaint (gbLocatorBounds (*it, gbLive));
             };
         }
+        // FL's colours (round 190jd): the locator jumps about 21 times a second, as FL's does
+        const auto nowMs = juce::Time::getMillisecondCounterHiRes();
+        if (gblocator::flStyle() && wanted && gbOverlay->isShowing() && nowMs - gbLastOverlayMs < 1000.0 / gblocator::flRateHz - 4.0)
+            return;
+        gbLastOverlayMs = nowMs;
+        gbPaintPhase = gbPhaseOf (now);
         ui::MotionOverlay::Mark mark;
         if (item != nullptr)
         {
@@ -133,7 +162,8 @@
             mark.extent = juce::Rectangle<float> (-trail - 1.0f, inner.getY(), trail + lineW + 2.0f, inner.getHeight()).getSmallestIntegerContainer();
             mark.clip = inner.getSmallestIntegerContainer();
             mark.look = ((std::uint64_t) theme::colour::playhead.getARGB() << 32) ^ ((std::uint64_t) juce::roundToInt (trail * 64.0f) << 16)
-                        ^ ((std::uint64_t) juce::roundToInt (lineW) << 12) ^ (std::uint64_t) mark.clip.getHeight();
+                        ^ ((std::uint64_t) juce::roundToInt (lineW) << 12) ^ (std::uint64_t) mark.clip.getHeight()
+                        ^ (gblocator::flStyle() ? ((std::uint64_t) (gblocator::stepOf (gbPaintPhase) + 1) << 56) : 0); // (round 190jd)
         }
         const auto gpu = ui::stepMark (*gbOverlay, wanted, mark, false);
         if (gpu.flipped && item != nullptr && gbLive.playing) // (the painted locator goes, or comes back)
@@ -142,7 +172,8 @@
     // 15 a second by default: measured in one process against the static window (round 190ih, Thief, interleaved
     // 2.5 s steps), 30 a second cost +5 … +13 points of process CPU, 15 or fewer stayed inside the measurement's own
     // noise; LYNX_GB_DIAG's high byte overrides it for measurements
-    static double gbMaxHz() { const auto hz = gbDiag() >> 8; return hz > 0 ? (double) hz : 15.0; }
+    // (round 190jd: FL's colours move at FL's ~21 Hz)
+    static double gbMaxHz() { const auto hz = gbDiag() >> 8; return hz > 0 ? (double) hz : gblocator::flStyle() ? gblocator::flRateHz : 15.0; }
 
     // the drawn width of the playing cell's fill, in px
     int gbFillPx (const LayoutItem& item, int kind, const GbLive& v) const
@@ -594,6 +625,12 @@
         menu.addItem (tr ("Rename..."), [this] { gbRename(); });
         menu.addSubMenu (tr ("Factory slots"), gbFactorySlots());
         menu.addItem (tr ("Load LYNX SHARE's factory slots (keeps the selected slots)"), [this] { gbWriteState (gbWithFactory()); });
+        menu.addSeparator();
+        // round 190jd: the playback locator in FL's colours (cream on the beat, fading to red) instead of LYNX's playhead
+        menu.addItem (tr ("Playback locator in FL's colours"), true, gblocator::flStyle(), [this] {
+            gblocator::setFlStyle (! gblocator::flStyle()); // (kept in ui-options "grossBeatFlLocator")
+            repaint();
+        });
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withTargetScreenArea (localAreaToGlobal (at.toNearestInt())));
     }
 
@@ -1225,5 +1262,8 @@
         // round 190ih: the playback locator with its short fading trail (FL, raw/c24); round 190iy: unless the GPU overlay
         // shows it
         if (gbLive.playing && ! gbLocatorOnGpu())
+        {
+            gbPaintPhase = gbPhaseOf (gbLive); // (round 190jd: the phase of what it draws)
             gbPaintLocator (g, inner, std::floor (gbLocatorX (item, gbLive)));
+        }
     }

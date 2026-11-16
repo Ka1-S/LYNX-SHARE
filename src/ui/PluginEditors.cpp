@@ -26,6 +26,7 @@
 #include "core/FruityShapers.h"
 #include "core/FlCurve.h"
 #include "core/GrossBeat.h"
+#include "core/GrossBeatLocator.h"
 #include "core/LynxTune.h"
 #include "core/MaximusFx.h"
 #include "core/MixSuite.h"
