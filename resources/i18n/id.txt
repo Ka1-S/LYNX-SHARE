@@ -10601,3 +10601,23 @@ countries: id
 "The recording is silent: the audio input sent nothing but silence. Check that the insert's input is the channel your microphone or instrument is plugged into (the input box above its effect slots), that the interface's input is not muted, and that LYNX SHARE may use the microphone (Windows: Settings > Privacy > Microphone; macOS: System Settings > Privacy & Security > Microphone)." = "Rekaman hening: input audio hanya mengirim keheningan. Periksa bahwa input insert adalah kanal tempat mikrofon atau instrumen Anda tersambung (kotak input di atas slot efeknya), input interface tidak dibisukan, dan LYNX SHARE boleh memakai mikrofon (Windows: Pengaturan > Privasi > Mikrofon; macOS: Pengaturan Sistem > Privasi & Keamanan > Mikrofon)."
 "Choose an input to record" = "Pilih input untuk direkam"
 "How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); Balanced halves it on fast screens (72 Hz on a 144 Hz screen); 60 Hz or 30 Hz use the least CPU (laptops, slower computers)." = "Seberapa sering playhead, meter, dan skop bergerak. Layar mengikuti laju penyegaran monitor Anda (paling mulus); Seimbang membaginya dua pada layar cepat (72 Hz pada layar 144 Hz); 60 Hz atau 30 Hz memakai CPU paling sedikit (laptop, komputer yang lebih lambat)."
+
+# --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
+"Hide collapsed grouped tracks" = "Sembunyikan track grup yang diciutkan"
+"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "Track: [LMB] mute / bunyikan lagi  [Ctrl][LMB] atau [RMB] solo  [Alt][LMB] mute grupnya  [Alt][RMB] solo grupnya"
+"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "Track: [LMB] pilih  [Ctrl][LMB] tambah / buang  [Ctrl] seret: track beserta clip-nya  [Shift][LMB] rentang  [RMB] menu  [2xLMB] buka sumber clip  [Shift][Wheel] pindah ke atas / bawah  [Alt] seret: masuk ke / keluar dari grup"
+"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "Memindahkan track bersama grupnya  [Alt] seret ke kanan / kiri: lebih dalam / keluar dari grup"
+"In a group, level {0}" = "Dalam grup, level {0}"
+"Not in a group" = "Tidak dalam grup"
+"Nest under the track above (a group in the group)" = "Sarangkan di bawah track di atas (grup di dalam grup)"
+"Move out of its group (one level up)" = "Keluarkan dari grupnya (naik satu level)"
+"Hiding collapsed tracks" = "Menyembunyikan track yang diciutkan"
+"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "Opsi ini menyembunyikan track Playlist yang diciutkan. Track induk akan menampilkan ikon panah bawah untuk membuka track yang tersembunyi. Lanjutkan?"
+# --- Round 190jf: B22 DAWproject import / export
+"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
+"(imported from DAWproject)" = "(diimpor dari DAWproject)"
+"Export DAWproject" = "Ekspor DAWproject"
+"The DAWproject file could not be written" = "File DAWproject tidak dapat ditulis"
+"Everything went over to the DAWproject file." = "Semuanya masuk ke file DAWproject."
+"Not carried over or approximated:" = "Tidak terbawa atau didekati:"
+"... and {0} more" = "... dan {0} lagi"

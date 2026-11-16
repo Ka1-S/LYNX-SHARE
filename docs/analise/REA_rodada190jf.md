@@ -48,3 +48,38 @@ are on hidden tracks. Proceed?" question (LYNX never edits clips of hidden rows 
 - **Users:** "groups in groups" (FL wishlists), fewer clicks to move tracks into groups.
 - **Verdict:** FL-exact by default (one level unless the user nests; FL's Alt gestures; Hide option off); nesting, the
   Alt+drag and the bus for every group are LYNX additions that change nothing until used.
+
+## 2. B22 — DAWproject
+
+- **Format and licence:** DAWproject by Bitwig and PreSonus, https://github.com/bitwig/dawproject — `Project.xsd`,
+  `MetaData.xsd`, the README and a Java reference library. **MIT licence** ("Copyright (c) 2020 Bitwig", checked in the
+  repository's LICENSE). LYNX's reader / writer is clean-room from the XSDs and the README (no Java code taken); the
+  README's example project is a test fixture with the MIT notice (`tests/data/dawproject/BitwigReadmeProject.inc`). The
+  repository ships no example `.dawproject` file (only `test-data/white-glasses.wav`).
+- **Programs that read / write it:** Bitwig Studio, Studio One, Cubase / Nuendo, Cubasis, VST Live, n-Track (the README's
+  list). FL Studio and Live do not.
+- **Container:** ZIP with `project.xml`, `metadata.xml`, `audio/…`, `plugins/…` (`core/ZipLite.h`: stored + deflate read,
+  CRC, ZIP64; stored write with a fixed date, so the output is deterministic).
+- **What maps** (both directions unless said): tracks with notes / audio / automation, folder tracks (nested, → LYNX
+  folders of §1), channel roles master / effect / submix, volume (linear / dB), pan, mute, solo, sends (pre / post),
+  VST3 (`.vstpreset` Comp / Cont, byte-exact), VST2 (`.fxp` / `.fxb`), CLAP (raw state stream — assumption), LYNX's own
+  devices (`deviceVendor="LYNX"`, the project file's JSON of the channel / effect, so LYNX → DAWproject → LYNX keeps every
+  field), clips (time, duration, playStart, loops unrolled, fades, nested clips), warps (exact), automation points on
+  volume / pan / send / device parameter (lanes under the row), tempo map (tempo markers; the clip goes back to its row),
+  time signature and its automation, markers, metadata (title, artist, genre, website, comment). Import only: built-in
+  Compressor / Limiter / NoiseGate / Equalizer → Crest / Apex / Sentry / Facet EQ (approximated, reported), scenes /
+  clip slots → the clip grid.
+- **What does not map** (always listed: the export's notes, the import's report):
+  - Import: note effects, analyzers, unknown built-in devices, a second instrument, Mute / Enabled / built-in device
+    parameter automation, MIDI and per-note expressions, notes' MIDI channels, send pan, disabled sends, marker colours,
+    VCA role (an ordinary insert), other metadata, external plug-in states.
+  - Export: the clip grid, other arrangements, song loop, VCAs, Pattern Blocks, patterns not on the Playlist, muted notes,
+    note pan / fine pitch / slide / porta / Mod X/Y / chance, clip gain / pan / pitch / reverse / envelopes, automation of
+    channel volume / pan, effect mix, VCA, level adjustment or route to the Master, automation curves (straight lines),
+    clip LFOs, controller links, insert-to-Master levels, sends to deleted inserts, effect side-chains, arpeggiators,
+    inserts no track plays through.
+  - Structural: a channel's own volume / pan folds into its track's Channel; inserts several tracks share become submix
+    tracks, so a re-import gives each track its own insert; automation clips come back merged per target (as lanes).
+- **Best way?** FL and Live have no DAWproject. Users moving between Bitwig / Studio One / Cubase and FL-style workflows
+  ask for an open exchange format (pain point #46). Verdict: a LYNX-own import / export next to .flp / .als / .flm, with
+  the not-mapped list shown after every export.

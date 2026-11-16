@@ -4631,4 +4631,40 @@ void applyMixerTrackState (MixerTrack& target, const MixerTrack& state, bool tak
     target.chainBlend = state.chainBlend; // (round 190bu: a state is the whole chain, its Blend and its preset name too)
     target.chainPreset = state.chainPreset;
 }
+
+// Round 190jf (B22): one channel / effect slot as the project stores it, for a LYNX device inside a DAWproject file
+// (core/DawProject.h's nativeInstrumentState / nativeEffectState): LYNX → DAWproject → LYNX keeps every field
+std::vector<std::uint8_t> channelStateBytes (const ChannelDef& channel)
+{
+    auto* root = new juce::DynamicObject();
+    root->setProperty ("format", "lynx-channel");
+    root->setProperty ("channel", channelToVar (channel));
+    const auto json = juce::JSON::toString (juce::var (root), true).toStdString();
+    return std::vector<std::uint8_t> (json.begin(), json.end());
+}
+
+std::optional<ChannelDef> channelFromStateBytes (const std::vector<std::uint8_t>& bytes)
+{
+    const auto root = juce::JSON::parse (juce::String::fromUTF8 ((const char*) bytes.data(), (int) bytes.size()));
+    if (root["format"].toString() != "lynx-channel" || ! root["channel"].isObject())
+        return std::nullopt;
+    return channelFromVar (root["channel"], Song {});
+}
+
+std::vector<std::uint8_t> effectStateBytes (const EffectSlot& slot)
+{
+    auto* root = new juce::DynamicObject();
+    root->setProperty ("format", "lynx-effect");
+    root->setProperty ("effect", effectToVar (slot));
+    const auto json = juce::JSON::toString (juce::var (root), true).toStdString();
+    return std::vector<std::uint8_t> (json.begin(), json.end());
+}
+
+std::optional<EffectSlot> effectFromStateBytes (const std::vector<std::uint8_t>& bytes)
+{
+    const auto root = juce::JSON::parse (juce::String::fromUTF8 ((const char*) bytes.data(), (int) bytes.size()));
+    if (root["format"].toString() != "lynx-effect" || ! root["effect"].isObject())
+        return std::nullopt;
+    return effectFromVar (root["effect"]);
+}
 } // namespace lynx::ProjectFile

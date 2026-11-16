@@ -10601,3 +10601,23 @@ countries: ru by kz
 "The recording is silent: the audio input sent nothing but silence. Check that the insert's input is the channel your microphone or instrument is plugged into (the input box above its effect slots), that the interface's input is not muted, and that LYNX SHARE may use the microphone (Windows: Settings > Privacy > Microphone; macOS: System Settings > Privacy & Security > Microphone)." = "Запись беззвучна: аудиовход передал только тишину. Проверьте, что вход инсерта — это канал, к которому подключены микрофон или инструмент (поле входа над слотами эффектов), что вход интерфейса не заглушён и что LYNX SHARE разрешён доступ к микрофону (Windows: Параметры > Конфиденциальность > Микрофон; macOS: Системные настройки > Конфиденциальность и безопасность > Микрофон)."
 "Choose an input to record" = "Выберите вход для записи"
 "How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); Balanced halves it on fast screens (72 Hz on a 144 Hz screen); 60 Hz or 30 Hz use the least CPU (laptops, slower computers)." = "Как часто движутся курсор воспроизведения, индикаторы и осциллографы. «Дисплей» следует частоте обновления вашего монитора (плавнее всего); «Сбалансированно» делит её пополам на быстрых экранах (72 Гц на экране 144 Гц); 60 Гц или 30 Гц нагружают процессор меньше всего (ноутбуки, медленные компьютеры)."
+
+# --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
+"Hide collapsed grouped tracks" = "Скрывать свёрнутые сгруппированные дорожки"
+"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "Дорожка: [LMB] заглушить / включить  [Ctrl][LMB] или [RMB] соло  [Alt][LMB] заглушить группу  [Alt][RMB] соло группы"
+"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "Дорожка: [LMB] выбрать  [Ctrl][LMB] добавить / убрать  [Ctrl] перетаскивание: дорожки с их клипами  [Shift][LMB] диапазон  [RMB] меню  [2xLMB] открыть источник клипа  [Shift][Wheel] вверх / вниз  [Alt] перетаскивание: в группу / из группы"
+"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "Перемещение дорожки вместе с её группой  [Alt] вправо / влево: глубже / из группы"
+"In a group, level {0}" = "В группе, уровень {0}"
+"Not in a group" = "Вне группы"
+"Nest under the track above (a group in the group)" = "Вложить под дорожку выше (группа в группе)"
+"Move out of its group (one level up)" = "Вынуть из группы (на уровень выше)"
+"Hiding collapsed tracks" = "Скрытие свёрнутых дорожек"
+"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "Этот параметр скрывает свёрнутые дорожки Playlist. На родительской дорожке появится стрелка вниз, чтобы открыть скрытые дорожки. Продолжить?"
+# --- Round 190jf: B22 DAWproject import / export
+"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
+"(imported from DAWproject)" = "(импортировано из DAWproject)"
+"Export DAWproject" = "Экспорт в DAWproject"
+"The DAWproject file could not be written" = "Не удалось записать файл DAWproject"
+"Everything went over to the DAWproject file." = "Всё перенесено в файл DAWproject."
+"Not carried over or approximated:" = "Не перенесено или передано приближённо:"
+"... and {0} more" = "... и ещё {0}"

@@ -10601,3 +10601,23 @@ countries: tr
 "The recording is silent: the audio input sent nothing but silence. Check that the insert's input is the channel your microphone or instrument is plugged into (the input box above its effect slots), that the interface's input is not muted, and that LYNX SHARE may use the microphone (Windows: Settings > Privacy > Microphone; macOS: System Settings > Privacy & Security > Microphone)." = "Kayıt sessiz: ses girişi yalnızca sessizlik gönderdi. Insert'ün girişinin mikrofonunuzun veya enstrümanınızın takılı olduğu kanal olduğunu (efekt yuvalarının üstündeki giriş kutusu), arayüzün girişinin sessize alınmadığını ve LYNX SHARE'in mikrofonu kullanabildiğini kontrol edin (Windows: Ayarlar > Gizlilik > Mikrofon; macOS: Sistem Ayarları > Gizlilik ve Güvenlik > Mikrofon)."
 "Choose an input to record" = "Kayıt için bir giriş seçin"
 "How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); Balanced halves it on fast screens (72 Hz on a 144 Hz screen); 60 Hz or 30 Hz use the least CPU (laptops, slower computers)." = "Çalma imleci, ölçerler ve osiloskopların ne sıklıkla hareket ettiği. Ekran, monitörünüzün yenileme hızını izler (en akıcı); Dengeli, hızlı ekranlarda bunu yarıya indirir (144 Hz ekranda 72 Hz); 60 Hz veya 30 Hz en az CPU kullanır (dizüstü bilgisayarlar, daha yavaş bilgisayarlar)."
+
+# --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
+"Hide collapsed grouped tracks" = "Daraltılmış gruplanmış izleri gizle"
+"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "İz: [LMB] sustur / sesi aç  [Ctrl][LMB] veya [RMB] solo  [Alt][LMB] grubu sustur  [Alt][RMB] grubu solo"
+"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "İz: [LMB] seç  [Ctrl][LMB] ekle / çıkar  [Ctrl] sürükle: klipleriyle birlikte izler  [Shift][LMB] aralık  [RMB] menü  [2xLMB] klibin kaynağını aç  [Shift][Wheel] yukarı / aşağı taşı  [Alt] sürükle: bir gruba sok / gruptan çıkar"
+"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "İz grubuyla birlikte taşınıyor  [Alt] sağa / sola sürükle: daha içe / grubun dışına"
+"In a group, level {0}" = "Bir grupta, seviye {0}"
+"Not in a group" = "Grupta değil"
+"Nest under the track above (a group in the group)" = "Üstteki izin altına yerleştir (grup içinde grup)"
+"Move out of its group (one level up)" = "Grubundan çıkar (bir seviye yukarı)"
+"Hiding collapsed tracks" = "Daraltılmış izleri gizleme"
+"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "Bu seçenek Playlist'teki daraltılmış izleri gizler. Üst iz, gizli izleri açmak için aşağı ok simgesi gösterir. Devam edilsin mi?"
+# --- Round 190jf: B22 DAWproject import / export
+"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
+"(imported from DAWproject)" = "(DAWproject'ten içe aktarıldı)"
+"Export DAWproject" = "DAWproject olarak dışa aktar"
+"The DAWproject file could not be written" = "DAWproject dosyası yazılamadı"
+"Everything went over to the DAWproject file." = "Her şey DAWproject dosyasına aktarıldı."
+"Not carried over or approximated:" = "Aktarılmayan veya yaklaşık aktarılan:"
+"... and {0} more" = "... ve {0} tane daha"

@@ -10731,3 +10731,23 @@ countries: br
 "The recording is silent: the audio input sent nothing but silence. Check that the insert's input is the channel your microphone or instrument is plugged into (the input box above its effect slots), that the interface's input is not muted, and that LYNX SHARE may use the microphone (Windows: Settings > Privacy > Microphone; macOS: System Settings > Privacy & Security > Microphone)." = "A gravação está em silêncio: a entrada de áudio só enviou silêncio. Verifique se a entrada do insert é o canal onde o microfone ou o instrumento está ligado (a caixa de entrada acima dos slots de efeito), se a entrada da interface não está mutada e se o LYNX SHARE pode usar o microfone (Windows: Configurações > Privacidade > Microfone; macOS: Ajustes do Sistema > Privacidade e Segurança > Microfone)."
 "Choose an input to record" = "Escolha uma entrada para gravar"
 "How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); Balanced halves it on fast screens (72 Hz on a 144 Hz screen); 60 Hz or 30 Hz use the least CPU (laptops, slower computers)." = "Com que frequência o cursor de reprodução, os medidores e os osciloscópios se movem. Tela segue a taxa de atualização do seu monitor (mais suave); Equilibrado usa a metade em telas rápidas (72 Hz numa tela de 144 Hz); 60 Hz ou 30 Hz usam menos CPU (notebooks, computadores mais lentos)."
+
+# --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
+"Hide collapsed grouped tracks" = "Ocultar faixas agrupadas recolhidas"
+"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "Faixa: [LMB] silencia / reativa  [Ctrl][LMB] ou [RMB] solo  [Alt][LMB] silencia o grupo  [Alt][RMB] solo do grupo"
+"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "Faixa: [LMB] seleciona  [Ctrl][LMB] inclui / tira  [Ctrl] arraste: faixas com os clipes delas  [Shift][LMB] intervalo  [RMB] menu  [2xLMB] abre a fonte do clipe  [Shift][Wheel] move para cima / baixo  [Alt] arraste: põe em / tira de um grupo"
+"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "Movendo a faixa com o seu grupo  [Alt] arraste para a direita / esquerda: mais fundo / fora do grupo"
+"In a group, level {0}" = "Num grupo, nível {0}"
+"Not in a group" = "Fora de grupo"
+"Nest under the track above (a group in the group)" = "Aninhar sob a faixa de cima (um grupo dentro do grupo)"
+"Move out of its group (one level up)" = "Tirar do seu grupo (um nível acima)"
+"Hiding collapsed tracks" = "Ocultando faixas recolhidas"
+"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "Esta opção oculta as faixas recolhidas da Playlist. A faixa principal mostra uma seta para baixo para abrir as faixas ocultas. Continuar?"
+# --- Round 190jf: B22 DAWproject import / export
+"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
+"(imported from DAWproject)" = "(importado de DAWproject)"
+"Export DAWproject" = "Exportar DAWproject"
+"The DAWproject file could not be written" = "Não foi possível gravar o arquivo DAWproject"
+"Everything went over to the DAWproject file." = "Tudo foi para o arquivo DAWproject."
+"Not carried over or approximated:" = "Não levado ou aproximado:"
+"... and {0} more" = "... e mais {0}"
