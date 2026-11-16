@@ -23788,6 +23788,7 @@ private:
         dir.deleteRecursively();
         dir.createDirectory();
         const auto writeWav = [] (const juce::File& wav, int frames, const std::function<float (int)>& f) {
+            wav.getParentDirectory().createDirectory();
             juce::AudioBuffer<float> audio (1, frames);
             for (int i = 0; i < frames; ++i)
                 audio.setSample (0, i, f (i));

@@ -154,7 +154,7 @@ public:
         g.drawFittedText (name, text.removeFromTop (20), juce::Justification::centredLeft, 1, 0.85f);
         g.setColour (theme::colour::textSecondary);
         g.setFont (theme::font (theme::type::body));
-        g.drawFittedText (help, text, juce::Justification::topLeft, 2, 0.9f);
+        g.drawFittedText (help, text, juce::Justification::topLeft, 2, 0.75f);
     }
 
     void mouseEnter (const juce::MouseEvent&) override { repaint(); }
@@ -375,7 +375,7 @@ public:
 
         // tiles: two columns, then Guitar / bass across, then Import and Loops
         const auto gap = 10;
-        const auto rowH = juce::jlimit (50, 84, (c.getHeight() - 4 * gap) / 5);
+        const auto rowH = juce::jlimit (50, 84, (c.getHeight() - 3 * gap) / 4); // (four rows: two pairs, Guitar / bass, a pair)
         auto tiles = c;
         auto row = [&] { auto r = tiles.removeFromTop (rowH); tiles.removeFromTop (gap); return r; };
         auto pair = [&] (juce::Component& a, juce::Component& b) {
@@ -429,9 +429,9 @@ public:
 private:
     juce::Rectangle<int> card() const
     {
-        // round 190jc: room for 64 px icons on the tiles page (rows up to 84 px); the starter page as tall as its rows
+        // round 190jc: the tiles page's four rows up to 84 px (64 px icons); the starter page as tall as its rows
         const auto starterRows = ((int) genreButtons.size() + 2) / 3;
-        const auto wanted = starterPage ? 14 + 50 + 28 + 10 + starterRows * (starterRowHeight + 8) + 14 : 600;
+        const auto wanted = starterPage ? 14 + 50 + 28 + 10 + starterRows * (starterRowHeight + 8) + 14 : 520;
         const auto w = juce::jmin (680, getWidth() - 24), h = juce::jmin (wanted, getHeight() - 24);
         return getLocalBounds().withSizeKeepingCentre (juce::jmax (320, w), juce::jmax (300, h));
     }
