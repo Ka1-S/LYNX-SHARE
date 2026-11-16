@@ -1185,6 +1185,8 @@ juce::var effectToVar (const EffectSlot& slot)
         e->setProperty ("row", slot.row);
     if (slot.look != 0) // part of a Master look (round 189k)
         e->setProperty ("look", (int) slot.look);
+    if (slot.displayView != 0) // the editor display's second view (round 190jd)
+        e->setProperty ("displayView", (int) slot.displayView);
     if (slot.goal != 0) // a one-knob effect (round 190bu): the goal and where its knob stands
     {
         e->setProperty ("goal", (int) slot.goal);
@@ -1277,6 +1279,7 @@ std::optional<EffectSlot> effectFromVar (const juce::var& e)
     slot.smartDisable = (bool) e.getProperty ("smartDisable", true);
     slot.row = juce::jlimit (-1, maxEffectSlots - 1, (int) e.getProperty ("row", -1));
     slot.look = (std::uint8_t) juce::jlimit (0, 255, (int) e.getProperty ("look", 0));
+    slot.displayView = (std::uint8_t) juce::jlimit (0, 1, (int) e.getProperty ("displayView", 0));
     slot.goal = (std::uint8_t) juce::jlimit (0, 255, (int) e.getProperty ("goal", 0));
     slot.goalAmount = juce::jlimit (0.0f, 1.0f, (float) (double) e.getProperty ("goalAmount", 0.5));
 

@@ -10614,3 +10614,6 @@ countries: ru by kz
 "MPE curve of the note: click the line: add a point  drag a point: move it  double-click a point: delete it  [B] Draw Mode  [RMB] drag erases" = "MPE-кривая ноты: клик по линии: добавить точку  перетащить точку: сдвинуть  двойной клик по точке: удалить  [B] режим рисования  [RMB] перетаскивание стирает"
 "Pitch on the note: [LMB] click adds a pitch point  drag a point: bend in semitones  [Shift] fine  double-click a point: delete it" = "Высота на ноте: [LMB] клик добавляет точку высоты  перетащить точку: изгиб по полутонам  [Shift] точно  двойной клик по точке: удалить"
 "Insert effects: [LMB] opens one  drag: reorder or onto another strip, [Ctrl] copies  [RMB] slot menu  [Wheel] scrolls" = "Эффекты вставки: [LMB] открывает  перетаскивание: порядок или на другую линейку, [Ctrl] копирует  [RMB] меню слота  [Wheel] прокрутка"
+"GRAPH" = "ГРАФИК"
+"CURVE" = "КРИВАЯ"
+"Display: FL's scrolling graph or LYNX's transfer curve  [LMB] switch (kept for this effect)" = "Дисплей: бегущий график FL или передаточная кривая LYNX  [LMB] переключить (сохраняется для этого эффекта)"

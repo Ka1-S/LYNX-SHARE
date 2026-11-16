@@ -10614,3 +10614,6 @@ countries: kr
 "MPE curve of the note: click the line: add a point  drag a point: move it  double-click a point: delete it  [B] Draw Mode  [RMB] drag erases" = "노트의 MPE 커브: 선 클릭: 포인트 추가  포인트 드래그: 이동  포인트 더블클릭: 삭제  [B] 그리기 모드  [RMB] 드래그로 지우기"
 "Pitch on the note: [LMB] click adds a pitch point  drag a point: bend in semitones  [Shift] fine  double-click a point: delete it" = "노트 위의 피치: [LMB] 클릭으로 피치 포인트 추가  포인트 드래그: 반음 단위 벤드  [Shift] 미세  포인트 더블클릭: 삭제"
 "Insert effects: [LMB] opens one  drag: reorder or onto another strip, [Ctrl] copies  [RMB] slot menu  [Wheel] scrolls" = "인서트 이펙트: [LMB] 열기  드래그: 순서 변경 또는 다른 스트립으로, [Ctrl] 복사  [RMB] 슬롯 메뉴  [Wheel] 스크롤"
+"GRAPH" = "그래프"
+"CURVE" = "곡선"
+"Display: FL's scrolling graph or LYNX's transfer curve  [LMB] switch (kept for this effect)" = "표시: FL의 스크롤 그래프 또는 LYNX의 전달 곡선  [LMB] 전환 (이 이펙트에 저장)"

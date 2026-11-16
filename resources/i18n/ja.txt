@@ -10614,3 +10614,6 @@ countries: jp
 "MPE curve of the note: click the line: add a point  drag a point: move it  double-click a point: delete it  [B] Draw Mode  [RMB] drag erases" = "ノートの MPE カーブ: ライン上をクリック: ポイント追加  ポイントをドラッグ: 移動  ポイントをダブルクリック: 削除  [B] ドローモード  [RMB] ドラッグで消去"
 "Pitch on the note: [LMB] click adds a pitch point  drag a point: bend in semitones  [Shift] fine  double-click a point: delete it" = "ノート上のピッチ: [LMB] クリックでピッチポイント追加  ポイントをドラッグ: 半音単位でベンド  [Shift] 微調整  ポイントをダブルクリック: 削除"
 "Insert effects: [LMB] opens one  drag: reorder or onto another strip, [Ctrl] copies  [RMB] slot menu  [Wheel] scrolls" = "インサートエフェクト: [LMB] 開く  ドラッグ: 並べ替え／別のストリップへ、[Ctrl] でコピー  [RMB] スロットメニュー  [Wheel] スクロール"
+"GRAPH" = "グラフ"
+"CURVE" = "カーブ"
+"Display: FL's scrolling graph or LYNX's transfer curve  [LMB] switch (kept for this effect)" = "表示: FL のスクロールグラフ、または LYNX の伝達カーブ  [LMB] 切り替え (このエフェクトに保存)"

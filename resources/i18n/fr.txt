@@ -10614,3 +10614,6 @@ countries: fr be ch ca lu
 "MPE curve of the note: click the line: add a point  drag a point: move it  double-click a point: delete it  [B] Draw Mode  [RMB] drag erases" = "Courbe MPE de la note : clic sur la ligne : ajouter un point  glisser un point : le déplacer  double-clic sur un point : le supprimer  [B] mode dessin  [RMB] glisser efface"
 "Pitch on the note: [LMB] click adds a pitch point  drag a point: bend in semitones  [Shift] fine  double-click a point: delete it" = "Hauteur sur la note : [LMB] un clic ajoute un point de hauteur  glisser un point : courber en demi-tons  [Shift] fin  double-clic sur un point : le supprimer"
 "Insert effects: [LMB] opens one  drag: reorder or onto another strip, [Ctrl] copies  [RMB] slot menu  [Wheel] scrolls" = "Effets d'insert : [LMB] en ouvre un  glisser : réordonner ou vers une autre tranche, [Ctrl] copie  [RMB] menu du slot  [Wheel] fait défiler"
+"GRAPH" = "GRAPHE"
+"CURVE" = "COURBE"
+"Display: FL's scrolling graph or LYNX's transfer curve  [LMB] switch (kept for this effect)" = "Affichage : le graphe défilant de FL ou la courbe de transfert de LYNX  [LMB] basculer (conservé pour cet effet)"

@@ -1381,6 +1381,8 @@ public:
 
             case Item::display:
                 paintDisplay (g, item, r, fx);
+                if (limiterViewItem (item)) // round 190jd: the view switch in the display's corner
+                    paintLimiterViewSwitch (g, item, fx);
                 break;
 
             case Item::menu:
@@ -2703,7 +2705,7 @@ public:
             skin::glowStroke (g, p, curveColour, juce::jmax (1.5f, 2.0f * s), fx.enabled ? 1.0f : 0.0f);
         };
 
-        if (id == "limiter" && kind == EffectKind::fruityLimiter)
+        if (id == "limiter" && kind == EffectKind::fruityLimiter && fx.displayView == 0)
         {
             // FL's analysis display (round 190jd, live check 190iw Q7, q7-fl-limiter-playing-sheet.png): no grid, the
             // ceiling (white) and the compressor threshold (cyan) as still lines on FL's level axis, the history
@@ -4508,6 +4510,14 @@ public:
         if (kind == EffectKind::grossBeat && gbMouseDown (e, item, index)) // round 168m: the envelope editor and slot settings
             return;
 
+        // round 190jd: Fruity Limiter's display switch (FL's scrolling graph by default; LYNX's transfer curve as a second view)
+        if (! e.mods.isPopupMenu() && limiterViewItem (item))
+            if (const auto part = limiterViewPartAt (item, e.position); part >= 0)
+            {
+                setLimiterView (part);
+                return;
+            }
+
         if (! e.mods.isPopupMenu() && isMixItem (item) && captionArea (item).contains (e.position))
         {
             pluginheader::toggleMixLock (kind);
@@ -5410,6 +5420,9 @@ private:
         if (index < 0)
             return {};
         const auto& item = activeLayout().items[(std::size_t) index];
+        if (limiterViewItem (item) && limiterViewPartAt (item, p) >= 0) // round 190jd
+            return { tr ("Display: FL's scrolling graph or LYNX's transfer curve  [LMB] switch (kept for this effect)"),
+                     limiterViewPartAt (item, p) == 0 ? tr ("GRAPH") : tr ("CURVE"), false, false };
         if (item.type == Item::display && juce::String (item.display) == "sgamount")
             return { tr ("Amount: drag up or down (Ctrl: fine)"), juce::String (soundgoodizerAmount() * 100.0f, 0) + "%", false, false };
         if (item.type == Item::display && juce::String (item.display) == "sgpresets")
@@ -5840,6 +5853,54 @@ private:
                 if (item.type == Item::display && item.display != nullptr && levelDisplay (item.display) && ! monitorDisplay (item.display) && visible (item))
                     repaint (rectOf (item).getSmallestIntegerContainer().expanded (2));
         return moved;
+    }
+
+    // Round 190jd (owner: add, never remove): Fruity Limiter's display shows FL's scrolling analysis graph by default and
+    // LYNX's transfer curve (grid, curve, level trail) as a second view, picked with a two-part switch in the display's
+    // top-right corner ("GRAPH | CURVE") and kept per slot (EffectSlot::displayView, saved in .lynx).
+    bool limiterViewItem (const LayoutItem& item) const
+    {
+        return kind == EffectKind::fruityLimiter && item.type == Item::display && item.display != nullptr && std::strcmp (item.display, "limiter") == 0;
+    }
+    juce::Rectangle<float> limiterViewSwitch (const LayoutItem& item) const
+    {
+        const auto s = scale();
+        const auto inner = rectOf (item).reduced (6.0f * s);
+        return { inner.getRight() - 92.0f * s, inner.getY() + 3.0f * s, 89.0f * s, 14.0f * s };
+    }
+    // 0 = the GRAPH half, 1 = the CURVE half, -1 = outside the switch
+    int limiterViewPartAt (const LayoutItem& item, juce::Point<float> p) const
+    {
+        const auto r = limiterViewSwitch (item);
+        if (! r.contains (p))
+            return -1;
+        return p.x < r.getCentreX() ? 0 : 1;
+    }
+    void setLimiterView (int view)
+    {
+        const auto* fx = current();
+        if (fx == nullptr || fx->displayView == (std::uint8_t) view)
+            return;
+        editSlot ([v = (std::uint8_t) view] (EffectSlot& target) { target.displayView = v; });
+        repaint();
+    }
+    void paintLimiterViewSwitch (juce::Graphics& g, const LayoutItem& item, const EffectSlot& fx) const
+    {
+        const auto s = scale();
+        const auto r = limiterViewSwitch (item);
+        const auto f = theme::font (juce::jmax (7.0f, 8.5f * s), true);
+        g.setFont (f);
+        for (int part = 0; part < 2; ++part)
+        {
+            const auto half = part == 0 ? r.withWidth (r.getWidth() * 0.5f) : r.withTrimmedLeft (r.getWidth() * 0.5f);
+            const auto on = (int) fx.displayView == part;
+            g.setColour (on ? accent.withAlpha (fx.enabled ? 0.85f : 0.4f) : theme::colour::bg0.withAlpha (0.55f));
+            g.fillRect (half.reduced (0.5f * s, 0.0f));
+            g.setColour (on ? theme::colour::textPrimary : theme::colour::textSecondary);
+            g.drawText (part == 0 ? tr ("GRAPH") : tr ("CURVE"), half.toNearestInt(), juce::Justification::centred, false);
+        }
+        g.setColour (theme::colour::borderStrong.withAlpha (0.8f));
+        g.drawRect (r, juce::jmax (1.0f, std::floor (s)));
     }
 
     // FL's scrolling dynamics displays (round 190jd, live check 190iw Q7; core/DynamicsHistory.h): Fruity Limiter's

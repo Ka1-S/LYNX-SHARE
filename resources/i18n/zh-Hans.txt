@@ -10614,3 +10614,6 @@ countries: cn sg
 "MPE curve of the note: click the line: add a point  drag a point: move it  double-click a point: delete it  [B] Draw Mode  [RMB] drag erases" = "音符的 MPE 曲线：点击线条：添加点  拖动点：移动  双击点：删除  [B] 绘制模式  [RMB] 拖动擦除"
 "Pitch on the note: [LMB] click adds a pitch point  drag a point: bend in semitones  [Shift] fine  double-click a point: delete it" = "音符上的音高：[LMB] 点击添加音高点  拖动点：按半音弯曲  [Shift] 精细  双击点：删除"
 "Insert effects: [LMB] opens one  drag: reorder or onto another strip, [Ctrl] copies  [RMB] slot menu  [Wheel] scrolls" = "插入效果：[LMB] 打开  拖动：重新排序或移到另一个通道条，[Ctrl] 复制  [RMB] 插槽菜单  [Wheel] 滚动"
+"GRAPH" = "图形"
+"CURVE" = "曲线"
+"Display: FL's scrolling graph or LYNX's transfer curve  [LMB] switch (kept for this effect)" = "显示：FL 的滚动图形或 LYNX 的传输曲线  [LMB] 切换（为此效果保存）"

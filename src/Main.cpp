@@ -17859,6 +17859,8 @@ private:
         }
         const auto kind = (lynx::EffectKind) kindIndex;
         auto fx = lynx::makeEffectSlot (kind);
+        // round 190jd: LYNX_PARITYSHOT_VIEW=1 = the editor display's second view (Fruity Limiter: LYNX's transfer curve)
+        fx.displayView = (std::uint8_t) juce::jlimit (0, 1, juce::SystemStats::getEnvironmentVariable ("LYNX_PARITYSHOT_VIEW", "0").getIntValue());
         if (paramsFile.isNotEmpty())
             for (const auto& line : juce::StringArray::fromLines (juce::File (paramsFile).loadFileAsString()))
             {

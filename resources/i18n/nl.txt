@@ -10614,3 +10614,6 @@ countries: nl be
 "MPE curve of the note: click the line: add a point  drag a point: move it  double-click a point: delete it  [B] Draw Mode  [RMB] drag erases" = "MPE-curve van de noot: klik op de lijn: punt toevoegen  punt slepen: verplaatsen  dubbelklik op een punt: verwijderen  [B] tekenmodus  [RMB] slepen wist"
 "Pitch on the note: [LMB] click adds a pitch point  drag a point: bend in semitones  [Shift] fine  double-click a point: delete it" = "Toonhoogte op de noot: [LMB] klik voegt een toonhoogtepunt toe  punt slepen: buigen in halve tonen  [Shift] fijn  dubbelklik op een punt: verwijderen"
 "Insert effects: [LMB] opens one  drag: reorder or onto another strip, [Ctrl] copies  [RMB] slot menu  [Wheel] scrolls" = "Inserteffecten: [LMB] opent er een  slepen: herschikken of naar een andere strip, [Ctrl] kopieert  [RMB] slotmenu  [Wheel] scrollt"
+"GRAPH" = "GRAFIEK"
+"CURVE" = "CURVE"
+"Display: FL's scrolling graph or LYNX's transfer curve  [LMB] switch (kept for this effect)" = "Weergave: de scrollende grafiek van FL of de overdrachtscurve van LYNX  [LMB] wisselen (bewaard voor dit effect)"

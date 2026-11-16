@@ -101,3 +101,17 @@ TEST (livefix190jd_flp_audio_clip_channel_step_plays_the_whole_clip)
     std::printf ("livefix190jd: the imported audio clip channel's step sounds %.3f s of a 1.9 s window (clip 2 s)\n", seconds);
     CHECK (seconds > 1.85);
 }
+
+// Coordinator 190jd (add, never remove): Fruity Limiter's display keeps LYNX's transfer curve as a second view, chosen per
+// slot; FL's scrolling graph is the default. The choice is part of the slot (undo, compare, copy) and of nothing audible.
+TEST (livefix190jd_limiter_display_view_is_kept_per_slot)
+{
+    using namespace lynx;
+    auto a = makeEffectSlot (EffectKind::fruityLimiter);
+    CHECK (a.displayView == 0); // FL's graph by default
+    auto b = a;
+    b.displayView = 1;
+    CHECK (! (a == b)); // a slot's own setting: compared, so an edit of it is an undoable change
+    b.displayView = 0;
+    CHECK (a == b);
+}

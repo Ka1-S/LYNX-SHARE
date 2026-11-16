@@ -10614,3 +10614,6 @@ countries: tr
 "MPE curve of the note: click the line: add a point  drag a point: move it  double-click a point: delete it  [B] Draw Mode  [RMB] drag erases" = "Notanın MPE eğrisi: çizgiye tıkla: nokta ekle  noktayı sürükle: taşı  noktaya çift tıkla: sil  [B] Çizim Modu  [RMB] sürükleme siler"
 "Pitch on the note: [LMB] click adds a pitch point  drag a point: bend in semitones  [Shift] fine  double-click a point: delete it" = "Nota üzerinde perde: [LMB] tıklama perde noktası ekler  noktayı sürükle: yarım tonlarla bük  [Shift] ince  noktaya çift tıkla: sil"
 "Insert effects: [LMB] opens one  drag: reorder or onto another strip, [Ctrl] copies  [RMB] slot menu  [Wheel] scrolls" = "Insert efektleri: [LMB] birini açar  sürükle: yeniden sırala veya başka şeride, [Ctrl] kopyalar  [RMB] slot menüsü  [Wheel] kaydırır"
+"GRAPH" = "GRAFİK"
+"CURVE" = "EĞRİ"
+"Display: FL's scrolling graph or LYNX's transfer curve  [LMB] switch (kept for this effect)" = "Ekran: FL'in kayan grafiği ya da LYNX'in aktarım eğrisi  [LMB] değiştir (bu efekt için saklanır)"

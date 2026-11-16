@@ -10614,3 +10614,6 @@ countries: id
 "MPE curve of the note: click the line: add a point  drag a point: move it  double-click a point: delete it  [B] Draw Mode  [RMB] drag erases" = "Kurva MPE not: klik garis: tambah titik  seret titik: pindahkan  klik ganda titik: hapus  [B] Mode Gambar  [RMB] seret menghapus"
 "Pitch on the note: [LMB] click adds a pitch point  drag a point: bend in semitones  [Shift] fine  double-click a point: delete it" = "Nada pada not: [LMB] klik menambah titik nada  seret titik: bengkokkan per semitone  [Shift] halus  klik ganda titik: hapus"
 "Insert effects: [LMB] opens one  drag: reorder or onto another strip, [Ctrl] copies  [RMB] slot menu  [Wheel] scrolls" = "Efek insert: [LMB] membuka satu  seret: urutkan ulang atau ke strip lain, [Ctrl] menyalin  [RMB] menu slot  [Wheel] menggulir"
+"GRAPH" = "GRAFIK"
+"CURVE" = "KURVA"
+"Display: FL's scrolling graph or LYNX's transfer curve  [LMB] switch (kept for this effect)" = "Tampilan: grafik bergulir FL atau kurva transfer LYNX  [LMB] ganti (disimpan untuk efek ini)"
