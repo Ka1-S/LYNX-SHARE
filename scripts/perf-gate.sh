@@ -86,7 +86,7 @@ trap cleanup EXIT
 
 { echo "$(uname -sm), $(grep -m1 'model name' /proc/cpuinfo 2> /dev/null | cut -d: -f2 | sed 's/^ //'), $(nproc) threads, $(git rev-parse --short HEAD 2> /dev/null)"; } > "$OUT/machine.txt"
 
-calibrate () { "${PIN[@]}" "$PERFBENCH" calibrate > "$OUT/calib-$1.txt" 2>&1; }
+calibrate () { quiet; "${PIN[@]}" "$PERFBENCH" calibrate > "$OUT/calib-$1.txt" 2>&1; } # (gated as the cells: the times are divided by it)
 bench () { # cell (scenario@block) run
   local s=${1%@*} b=${1#*@} extra=()
   quiet
