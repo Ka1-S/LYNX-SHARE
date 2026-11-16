@@ -10629,3 +10629,5 @@ countries: de at ch li lu
 "Activate Clip" = "Clip aktivieren"
 "[0] deactivates / activates it" = "[0] deaktiviert / aktiviert ihn"
 "Region not supported by this track" = "Region wird von dieser Spur nicht unterstützt"
+"Bar : Step : Tick" = "Takt : Step : Tick"
+"Time: bar : step : tick" = "Zeit: Takt : Step : Tick"

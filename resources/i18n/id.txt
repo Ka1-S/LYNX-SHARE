@@ -10629,3 +10629,5 @@ countries: id
 "Activate Clip" = "Aktifkan Klip"
 "[0] deactivates / activates it" = "[0] menonaktifkan / mengaktifkannya"
 "Region not supported by this track" = "Region tidak didukung oleh trek ini"
+"Bar : Step : Tick" = "Bar : Step : Tick"
+"Time: bar : step : tick" = "Waktu: bar : step : tick"

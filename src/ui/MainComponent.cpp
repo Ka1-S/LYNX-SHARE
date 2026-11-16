@@ -734,6 +734,10 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         recordButton.setIconColourWhenOn (colour::record);
         saveButton.setOnColour (onWash); // (round 190ih: the save reminder's blink)
         saveButton.setIconColourWhenOn (onIcon);
+        // round 190jo (FM-2): on FL's tiles the switches preview their "on" look under the mouse (FL 2024+)
+        for (auto* b : { &playButton, &recordButton, &metronomeButton, &typingPianoButton, &countInButton, &waitInputButton, &blendButton, &loopRecordButton,
+                          &stepEditButton, &punchButton, &multilinkButton, &snapToggleButton })
+            b->setHoverShowsOn (true);
         for (auto* b : { &metronomeButton, &typingPianoButton, &countInButton, &waitInputButton, &blendButton, &loopRecordButton, &stepEditButton, &punchButton,
                           &patternModeButton, &songModeButton, &multilinkButton })
         {
@@ -1590,6 +1594,7 @@ void MainComponent::applyIconSizing (toolbarlayout::IconSize size)
         b.setIconSizing (fraction, maxPx);
     for (auto* b : { &playButton, &stopButton, &recordButton }) // solid transport glyphs on big buttons (round 170e3)
         b->setIconSizing (0.42f, maxPx + 2.0f);
+    applyFlTiles(); // (round 190jo: the tiles' glyph box follows the row height)
 
     ToolStrip::iconSize = size;
     pianoRoll.resized();
@@ -2797,7 +2802,7 @@ void MainComponent::loadUiSettings()
             notenames::currentStyle.store (juce::jlimit (0, 2, line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue()));
         else if (key == "noteFlats")
             notenames::currentFlats.store (on);
-        else if (key == "noteNamesEveryKey")
+        else if (key == "pianoRollEveryKeyName") // (round 190jo: a new name, so the FL default reaches everybody once)
             notenames::everyKey.store (on);
         else if (key == "rackPlayheadColumn")
             ChannelRackComponent::playheadColumn.store (on);
@@ -3106,7 +3111,7 @@ void MainComponent::saveUiSettings()
                                       + "\nsamplerMultichannelView=" + juce::String (samplerpage::waveViews().multichannel ? 1 : 0)
                                       + "\nnoteNames=" + juce::String (notenames::currentStyle.load())
                                       + "\nnoteFlats=" + juce::String (notenames::currentFlats.load() ? 1 : 0)
-                                      + "\nnoteNamesEveryKey=" + juce::String (notenames::everyKey.load() ? 1 : 0)
+                                      + "\npianoRollEveryKeyName=" + juce::String (notenames::everyKey.load() ? 1 : 0)
                                       + "\nrackPlayheadColumn=" + juce::String (ChannelRackComponent::playheadColumn.load() ? 1 : 0)
                                       + "\nrackStepsChannelColour=" + juce::String (ChannelRackComponent::stepsChannelColour.load() ? 1 : 0)
                                       + "\nrackCompletePreview=" + juce::String (ChannelRackComponent::completePreview.load() ? 1 : 0)
@@ -5758,7 +5763,15 @@ void MainComponent::TempoDisplay::paint (juce::Graphics& g)
     const auto whole = juce::String ((int) std::floor (bpm + 1e-9));
     const auto fraction = juce::String (bpm - std::floor (bpm + 1e-9), 3).fromFirstOccurrenceOf (".", false, false).paddedRight ('0', 3).substring (0, 3);
 
-    const juce::Font big (monoFont (18.0f)), small (monoFont (11.0f)), caption (font (type::caption - 1.0f));
+    // (round 190jo FM-6: the whole BPM from cap 13 to cap 16, FL's large digits; ".000" stays small; narrower at the
+    // compact widths so the readout always fits)
+    juce::Font big (monoFont (22.0f));
+    const juce::Font small (monoFont (11.0f)), caption (font (type::caption - 1.0f));
+    {
+        const auto rest = juce::GlyphArrangement::getStringWidth (small, "." + fraction) + 6.0f + juce::GlyphArrangement::getStringWidth (caption, "BPM");
+        for (int i = 0; i < 8 && juce::GlyphArrangement::getStringWidth (big, whole) + rest > area.getWidth() - 6.0f; ++i)
+            big = big.withHeight (big.getHeight() * 0.94f);
+    }
     const auto wholeWidth = juce::GlyphArrangement::getStringWidth (big, whole);
     const auto fracWidth = juce::GlyphArrangement::getStringWidth (small, "." + fraction);
     const auto unitWidth = juce::GlyphArrangement::getStringWidth (caption, "BPM");

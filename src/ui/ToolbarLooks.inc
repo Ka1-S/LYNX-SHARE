@@ -118,6 +118,31 @@ void MainComponent::hideToolbarParts()
             c->setVisible (false);
 }
 
+// Round 190jo (design190ia FM-1/FM-3): the glyph box of a tiled Pattern-toolbar button: 24 px on the default 31 px rows
+// (ink about 18 px, FL's 16-20), 20 / 28 px on the small / large rows
+float MainComponent::flTileIconBox() const
+{
+    return std::floor ((float) rowHeight * 0.78f);
+}
+
+// Round 190jo: FL's tiles on the Pattern toolbar's buttons that applyToolbarLook does not set per look (the file, window,
+// recording-option, snap and pattern buttons); in the other looks they stay the standard flat buttons they were
+void MainComponent::applyFlTiles()
+{
+    using BL = IconButton::Look;
+    const auto fl = toolbarLook == Look::fl;
+    const auto box = fl ? flTileIconBox() : 0.0f;
+    for (auto* b : { &newButton, &openButton, &saveButton, &exportButton, &undoButton, &redoButton, &recordMenuButton, &countInButton, &waitInputButton,
+                     &loopRecordButton, &stepEditButton, &newPatternButton, &patternMenuButton, &pluginPickerButton, &snapToggleButton, &multilinkButton })
+        b->setLook (fl ? BL::flTile : BL::standard, box);
+    for (auto& b : panelButtons)
+        b.setLook (fl ? BL::flTile : BL::standard, box);
+    if (! fl)
+        return;
+    for (auto* b : { &metronomeButton, &tapTempoButton, &blendButton, &punchButton, &typingPianoButton })
+        b->setLook (BL::flTile, box);
+}
+
 // The widgets' looks for the layout style shown now. Pattern: every widget back to FL's look (the parts only the other
 // looks have are hidden); the FL toolbar's code then lays it out as before.
 void MainComponent::applyToolbarLook()
@@ -131,29 +156,33 @@ void MainComponent::applyToolbarLook()
     using BL = IconButton::Look;
 
     // the transport: FL's flat buttons / BandLab's capsule segments (SG-1 glyph sizes) / Live's bare glyphs (~12-13 px)
-    playButton.setLook (fl ? BL::standard : simple ? BL::capsule : BL::liveGlyph, fl ? 0.0f : simple ? sb::playBox : 21.0f);
-    stopButton.setLook (fl ? BL::standard : simple ? BL::capsule : BL::liveGlyph, fl ? 0.0f : simple ? sb::stopBox : 22.0f);
-    recordButton.setLook (fl ? BL::standard : simple ? BL::capsule : BL::liveGlyph, fl ? 0.0f : simple ? sb::recordBox : 22.0f);
+    playButton.setLook (fl ? BL::flTile : simple ? BL::capsule : BL::liveGlyph, fl ? 0.0f : simple ? sb::playBox : 21.0f);
+    stopButton.setLook (fl ? BL::flTile : simple ? BL::capsule : BL::liveGlyph, fl ? 0.0f : simple ? sb::stopBox : 22.0f);
+    recordButton.setLook (fl ? BL::flTile : simple ? BL::capsule : BL::liveGlyph, fl ? 0.0f : simple ? sb::recordBox : 22.0f);
     playButton.setCorners (true, ! simple);
     stopButton.setCorners (! simple, ! simple);
     recordButton.setCorners (! simple, ! simple);
     // the metronome: the first segment of the tempo capsule / Live's ring-and-dot box
-    metronomeButton.setLook (fl ? BL::standard : simple ? BL::capsule : BL::liveBox, simple ? 20.0f : fl ? 0.0f : 13.0f);
+    metronomeButton.setLook (fl ? BL::flTile : simple ? BL::capsule : BL::liveBox, simple ? 20.0f : fl ? flTileIconBox() : 13.0f);
     metronomeButton.setCorners (true, fl);
     metronomeButton.setIcon (look == Look::live ? Icon::metronomeDots : Icon::metronome);
     // Live's "Tap" box, overdub "+", punch, computer MIDI keyboard
-    tapTempoButton.setLook (look == Look::live ? BL::liveBox : BL::standard);
+    tapTempoButton.setLook (look == Look::live ? BL::liveBox : fl ? BL::flTile : BL::standard, fl ? flTileIconBox() : 0.0f);
     tapTempoButton.setIcon (look == Look::live ? Icon::none : Icon::tapTempo);
     tapTempoButton.setText (look == Look::live ? juce::String ("Tap") : juce::String());
-    blendButton.setLook (look == Look::live ? BL::liveBox : BL::standard, look == Look::live ? 13.0f : 0.0f);
+    blendButton.setLook (look == Look::live ? BL::liveBox : fl ? BL::flTile : BL::standard, look == Look::live ? 13.0f : fl ? flTileIconBox() : 0.0f);
     blendButton.setIcon (look == Look::live ? Icon::plus : Icon::blend);
     for (auto* b : { &punchButton, &typingPianoButton })
-        b->setLook (look == Look::live ? BL::liveBox : BL::standard, look == Look::live ? 14.0f : 0.0f);
+        b->setLook (look == Look::live ? BL::liveBox : fl ? BL::flTile : BL::standard, look == Look::live ? 14.0f : fl ? flTileIconBox() : 0.0f);
     for (auto* b : { &browserToggleButton, &backToArrangementButton, &captureButton, &sessionRecordButton, &drawModeButton, &keyMapButton, &midiMapButton })
         b->setLook (BL::liveBox, 13.0f);
     for (auto* b : { &sessionViewButton, &arrangementViewButton })
         b->setLook (BL::liveSelector, 15.0f);
     moreButton.setLook (look == Look::live ? BL::liveBox : BL::standard, look == Look::live ? 13.0f : 0.0f);
+    applyFlTiles(); // (round 190jo: FL's tiles on the Pattern toolbar's other buttons; the other looks keep theirs)
+    menuBar.getProperties().set ("lynxFlMenuBar", fl); // (round 190jo FM-4: FL's larger menu-bar text, Pattern toolbar only)
+    hintBar.setLarger (fl);                            // (round 190jo FM-7: the hint a step larger, Pattern toolbar only)
+    menuBar.repaint();
 
     tempoDisplay.look = look;
     tempoDisplay.setRepaintsOnMouseActivity (! fl);

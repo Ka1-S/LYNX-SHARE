@@ -76,10 +76,21 @@ public:
     void setHint (const Hint& hint, bool live = false);
     const Hint& getHint() const noexcept { return current; }
     void paint (juce::Graphics& g) override;
+    // Round 190jo (design190ia FM-7, the Pattern toolbar only): the hint a step larger and brighter, as FL's (cap 8 on one
+    // line, cap 7 on two; FL cap 11 / 9); the other toolbars and windows keep the smaller text
+    void setLarger (bool shouldBeLarger)
+    {
+        if (larger != shouldBeLarger)
+        {
+            larger = shouldBeLarger;
+            repaint();
+        }
+    }
 
 private:
     Hint current;
     bool live = false;
+    bool larger = false;
 };
 // FL's Tools › Last tweaked as a toolbar read-out (round 162d, issue #8): the name and value of the last moved
 // automatable control (a LYNX knob or a hosted plugin's own parameter); a click opens that parameter's menu (create

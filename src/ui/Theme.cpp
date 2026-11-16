@@ -1736,8 +1736,12 @@ void LookAndFeel::drawMenuBarBackground (juce::Graphics&, int, int, bool, juce::
     // transparent: the menu sits inside the main toolbar, which paints the band behind it
 }
 
-juce::Font LookAndFeel::getMenuBarFont (juce::MenuBarComponent&, int, const juce::String&)
+juce::Font LookAndFeel::getMenuBarFont (juce::MenuBarComponent& bar, int, const juce::String&)
 {
+    // round 190jo (design190ia FM-4): the Pattern toolbar's menu one step larger, FL's landmark (FL cap 12, LYNX's 13 gave
+    // cap 7; 15 gives cap 8 in about 335 px at 1920); the Simple and Live menu rows keep theirs
+    if ((bool) bar.getProperties().getWithDefault ("lynxFlMenuBar", false))
+        return uiFont (type::title);
     return uiFont (type::body);
 }
 
@@ -1758,7 +1762,8 @@ void LookAndFeel::drawMenuBarItem (juce::Graphics& g, int width, int height, int
         fillRounded (g, juce::Rectangle<float> (0.0f, 2.0f, (float) width, (float) height - 4.0f).reduced (1.0f, 0.0f), radius::sm,
                      isMenuOpen ? bg4 : bg3);
 
-    g.setColour (active ? textPrimary : textSecondary.brighter (0.2f));
+    // (round 190jo FM-4: the Pattern toolbar's menu titles in textPrimary at rest, as FL's bright caps)
+    g.setColour (active || (bool) bar.getProperties().getWithDefault ("lynxFlMenuBar", false) ? textPrimary : textSecondary.brighter (0.2f));
     g.setFont (getMenuBarFont (bar, itemIndex, itemText));
     g.drawFittedText (itemText, 0, 0, width, height, juce::Justification::centred, 1);
 }

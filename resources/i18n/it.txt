@@ -10629,3 +10629,5 @@ countries: it ch sm
 "Activate Clip" = "Attiva clip"
 "[0] deactivates / activates it" = "[0] la disattiva / attiva"
 "Region not supported by this track" = "Regione non supportata da questa traccia"
+"Bar : Step : Tick" = "Battuta : Step : Tick"
+"Time: bar : step : tick" = "Tempo: battuta : step : tick"

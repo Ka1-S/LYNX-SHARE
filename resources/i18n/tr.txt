@@ -10629,3 +10629,5 @@ countries: tr
 "Activate Clip" = "Klibi etkinleştir"
 "[0] deactivates / activates it" = "[0] devre dışı bırakır / etkinleştirir"
 "Region not supported by this track" = "Bölge bu parça tarafından desteklenmiyor"
+"Bar : Step : Tick" = "Ölçü : Step : Tik"
+"Time: bar : step : tick" = "Zaman: ölçü : step : tik"

@@ -10629,3 +10629,5 @@ countries: cn sg
 "Activate Clip" = "启用片段"
 "[0] deactivates / activates it" = "[0] 停用 / 启用"
 "Region not supported by this track" = "此轨道不支持该区域"
+"Bar : Step : Tick" = "小节 : 步 : 滴答"
+"Time: bar : step : tick" = "时间：小节 : 步 : 滴答"

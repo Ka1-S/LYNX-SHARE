@@ -10629,3 +10629,5 @@ countries: pl
 "Activate Clip" = "Aktywuj klip"
 "[0] deactivates / activates it" = "[0] dezaktywuje / aktywuje go"
 "Region not supported by this track" = "Region nieobsługiwany przez tę ścieżkę"
+"Bar : Step : Tick" = "Takt : Krok : Tyknięcie"
+"Time: bar : step : tick" = "Czas: takt : krok : tyknięcie"

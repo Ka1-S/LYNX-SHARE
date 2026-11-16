@@ -10629,3 +10629,5 @@ countries: ru by kz
 "Activate Clip" = "Включить клип"
 "[0] deactivates / activates it" = "[0] отключает / включает его"
 "Region not supported by this track" = "Регион не поддерживается этой дорожкой"
+"Bar : Step : Tick" = "Такт : Шаг : Тик"
+"Time: bar : step : tick" = "Время: такт : шаг : тик"

@@ -10629,3 +10629,5 @@ countries: es mx ar co cl pe ve
 "Activate Clip" = "Activar clip"
 "[0] deactivates / activates it" = "[0] lo desactiva / activa"
 "Region not supported by this track" = "Región no compatible con esta pista"
+"Bar : Step : Tick" = "Compás : Paso : Tic"
+"Time: bar : step : tick" = "Tiempo: compás : paso : tic"

@@ -10629,3 +10629,5 @@ countries: jp
 "Activate Clip" = "クリップを有効化"
 "[0] deactivates / activates it" = "[0] 無効化 / 有効化"
 "Region not supported by this track" = "このトラックではリージョンを扱えません"
+"Bar : Step : Tick" = "小節 : ステップ : ティック"
+"Time: bar : step : tick" = "時間: 小節 : ステップ : ティック"

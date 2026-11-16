@@ -10629,3 +10629,5 @@ countries: tw hk mo
 "Activate Clip" = "啟用片段"
 "[0] deactivates / activates it" = "[0] 停用 / 啟用"
 "Region not supported by this track" = "此軌道不支援該區域"
+"Bar : Step : Tick" = "小節 : 步 : 滴答"
+"Time: bar : step : tick" = "時間：小節 : 步 : 滴答"

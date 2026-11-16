@@ -10629,3 +10629,5 @@ countries: kr
 "Activate Clip" = "클립 활성화"
 "[0] deactivates / activates it" = "[0] 비활성화 / 활성화"
 "Region not supported by this track" = "이 트랙에서 지원하지 않는 리전입니다"
+"Bar : Step : Tick" = "마디 : 스텝 : 틱"
+"Time: bar : step : tick" = "시간: 마디 : 스텝 : 틱"

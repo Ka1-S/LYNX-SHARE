@@ -761,6 +761,8 @@ private:
     // The same widgets are reused in each look (their setLook / IconButton::setLook); the parts only one look has are
     // below. Nothing here runs a timer: the main window's timer updates them and each repaints only on a change.
     toolbarlayout::Look toolbarLook = toolbarlayout::Look::fl;
+    void applyFlTiles();          // round 190jo: FL's tiles on the Pattern toolbar (design190ia FM-1)
+    float flTileIconBox() const;  // their glyph box for the row height
     void applyToolbarLook();                                // the widgets' looks for the layout style now shown
     void layoutSimpleToolbar (juce::Rectangle<int> bar, int menuWidth);
     void layoutLiveControlBar (juce::Rectangle<int> bar, int menuWidth);
