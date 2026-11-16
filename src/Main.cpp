@@ -14903,7 +14903,11 @@ private:
             s.playlistTracks[1].height = 70;
         });
         engine.dispatchPendingMessages();
+        // (rollup 0.1.30: since round 190ib, switching the link on asks first when it moves inserts or routes channels;
+        // this run accepts, as the user clicking "Link")
+        PlaylistComponent::answerLinkConfirmation = [] (const autolink::Report&) { return true; };
         pl.runAction ("playlist.linkTracks");
+        PlaylistComponent::answerLinkConfirmation = nullptr;
         engine.dispatchPendingMessages();
         check ("linked", song().linkTracksToMixer && song().playlistTracks[1].mixerTrack == 12 && pl.headerWidthForSnapshot() == PlaylistComponent::linkedHeaderWidth,
                juce::String (pl.headerWidthForSnapshot()));
