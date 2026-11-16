@@ -1556,10 +1556,25 @@ juce::String artSelfTest()
             const StyleScope scope (st);
             titleText (g, { 66.0f, 0.0f, 400.0f, 26.0f }, "Fruity Blood Overdrive", juce::Colours::red);
             expect (lastTitleFit().lines == 1 && ! lastTitleFit().clipped && lastTitleFit().size >= 12.0f, "a wide box keeps the one-line name");
-            // the narrowest box the name may get (titleMinWidth): too narrow for one line at the smallest size in any style
-            titleText (g, { 66.0f, 0.0f, titleMinWidth ("Fruity Blood Overdrive", 26.0f), 26.0f }, "Fruity Blood Overdrive", juce::Colours::red);
-            const auto f = lastTitleFit();
-            if (f.lines != 2 || f.clipped)
+            // the narrowest box the name may get (titleMinWidth) shows it whole. Round 190in (design190ia FW-10): the
+            // Hardware badge has one form, one line; the other styles put "Fruity" above the name in a box too narrow
+            // for one line
+            const auto widest = titleMinWidth ("Fruity Blood Overdrive", 26.0f);
+            titleText (g, { 66.0f, 0.0f, widest, 26.0f }, "Fruity Blood Overdrive", juce::Colours::red);
+            auto f = lastTitleFit();
+            auto ok = ! f.clipped && (st == Style::hardware ? f.lines == 1 : true);
+            auto split = false;
+            for (auto w = widest; w > 40.0f && st != Style::hardware; w -= 2.0f)
+            {
+                titleText (g, { 66.0f, 0.0f, w, 26.0f }, "Fruity Blood Overdrive", juce::Colours::red);
+                if (lastTitleFit().lines == 2 && ! lastTitleFit().clipped)
+                {
+                    split = true;
+                    break;
+                }
+            }
+            ok = ok && (st == Style::hardware || split);
+            if (! ok)
                 errors.add ("a narrow box puts Fruity above the name (" + juce::String (styleName (st)) + ": lines " + juce::String (f.lines) + ", size "
                             + juce::String (f.size, 1) + ", need " + juce::String (f.need, 1) + ")");
         }

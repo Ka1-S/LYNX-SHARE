@@ -15,6 +15,7 @@
 #include "ui/TimerWhileShowing.h"
 #include "ui/FrameTicker.h"
 #include "ui/ValueControl.h"
+#include "ui/WrapperMenu.h"
 
 namespace lynx
 {
@@ -125,6 +126,9 @@ public:
     void closeEditorForHotSwap (int channel) { closeEditor (channel); }
     void assignSampleForHotSwap (int channel, const juce::File& file) { assignSample (channel, file); }
     juce::PopupMenu getChannelMenuForSnapshot (int channel) { return buildChannelMenu (channel); }
+    // round 190in (R8): the channel's items of FL's wrapper ▸ menu (the channel and plugin windows ask through
+    // channelWrapperItemsHandler)
+    void fillWindowMenu (int channel, wrappermenu::Spec& spec);
     // the window a new generator opens with (round 190dx: the Playlist's new instrument tracks use it too)
     void openGeneratorWindow (int row, InstrumentKind kind) { openNewGenerator (row, kind); }
     ui::Hint getChannelHintForSnapshot (int channel); // the hint of the channel's name button (--freezetest)
@@ -242,6 +246,7 @@ private:
     std::vector<std::uint8_t> noteCellBits; // (paint: [channel * steps + step] a Piano Roll note starts there; round 190gr)
     void applyPaint (const juce::MouseEvent& e);
     juce::PopupMenu buildChannelMenu (int channel);
+    juce::PopupMenu replaceMenu (int channel);
     void showChannelMenu (int channel);
     void chooseSample (int channel, int insertAt = -1); // channel < 0 = new channel (at the end, or at row insertAt)
     void openNewGenerator (int row, InstrumentKind kind); // the window a new / replaced generator opens with

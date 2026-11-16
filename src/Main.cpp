@@ -1669,6 +1669,17 @@ public:
             return;
         }
 
+        if (args.contains ("--design190inshot"))
+        {
+            // LYNX --design190inshot prefix [project.flp]: round 190in off screen (no desktop window, no audio device) —
+            // the channel window as it shows docked (FL's ▸, two-tone title, presets in the title bar, the 46 px strip
+            // with icon tabs, LED, knobs, RANGE / TRACK badges) on each tab, the floating strip, and FL's ▸ menu
+            const auto i = args.indexOf ("--design190inshot");
+            runDesign190inShot (args[i + 1].unquoted(), i + 2 < args.size() && ! args[i + 2].startsWith ("--") ? args[i + 2].unquoted() : juce::String());
+            quit();
+            return;
+        }
+
         if (args.contains ("--plugui"))
         {
             // LYNX.exe --plugui <folder>: the native effect editors at FL's size (one PNG per editor and page), each
@@ -8044,6 +8055,28 @@ private:
                 const auto elapsedMs = (int) (juce::Time::getMillisecondCounter() - phaseStartMs);
                 if (phase == 1 && ticks == 20 && checked != nullptr)
                     step ("param_after_1s=" + juce::String (checked->getValue(), 4));
+                // round 190in: LYNX_PLUGWIN_MENU=<png>: FL's ▸ wrapper menu of the open window (two columns for a channel)
+                if (const auto menuShot = juce::SystemStats::getEnvironmentVariable ("LYNX_PLUGWIN_MENU", {}); phase == 1 && ticks == 10 && menuShot.isNotEmpty())
+                    if (const auto menu = lynx::PluginWindows::wrapperMenuForSnapshot (*instance))
+                    {
+                        juce::PopupMenu left, right;
+                        auto* to = &left;
+                        for (juce::PopupMenu::MenuItemIterator it (*menu); it.next();)
+                        {
+                            to->addItem (it.getItem());
+                            if (it.getItem().shouldBreakAfter)
+                                to = &right;
+                        }
+                        juce::StringArray names { "Plugin" };
+                        std::vector<juce::PopupMenu> menus { left };
+                        if (right.getNumItems() > 0)
+                        {
+                            names.add ("Channel");
+                            menus.push_back (right);
+                        }
+                        LynxApplication::saveMenus (names, menus, menuShot);
+                        step ("wrapper_menu_items=" + juce::String (left.getNumItems()) + "+" + juce::String (right.getNumItems()));
+                    }
                 // (3 s apart: time for screenshots of each state)
                 if (phase == 1 && workspace != nullptr && dockStep < dockSteps && elapsedMs >= (dockStep + 1) * stepMs)
                     dockCheck (dockStep++);
@@ -8082,6 +8115,9 @@ private:
             }
         };
 
+        // round 190in: LYNX_PLUGWIN_ZOOM=<percent>: LYNX's interface zoom for the run (the wrapper's header at 150 %)
+        if (const auto zoom = juce::SystemStats::getEnvironmentVariable ("LYNX_PLUGWIN_ZOOM", {}).getIntValue(); zoom >= 50 && zoom <= 300)
+            juce::Desktop::getInstance().setGlobalScaleFactor ((float) zoom / 100.0f);
         auto* test = new Test();
         test->reportPath = reportPath;
         test->seconds = seconds;
@@ -18413,6 +18449,133 @@ private:
         artGui->start();
     }
 
+    void runDesign190inShot (const juce::String& prefix, const juce::String& project)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        juce::String report;
+        {
+            lynx::AudioEngine engine (false);
+            juce::String error;
+            if (const juce::File input (project); input.existsAsFile() && input.hasFileExtension ("flp"))
+                report << "import: " << (engine.importFlpFile (input, error) ? "ok" : "failed " + error) << "\n";
+            engine.dispatchPendingMessages();
+            // a native FL generator with FL's presets (FL's capture: FLEX's "Piano Dark"), on a mixer track of its own
+            const auto& fl = lynx::flStudioAccess();
+            auto osc = lynx::natives::makeChannel (lynx::InstrumentKind::threeosc, fl);
+            int generator = -1, sampler = -1;
+            engine.editSong ([&] (lynx::Song& s) {
+                if (osc)
+                {
+                    osc->mixerTrack = s.claimFreeInsert();
+                    s.channels.push_back (*osc);
+                    generator = (int) s.channels.size() - 1;
+                }
+                if (const juce::File kick (juce::String::fromUTF8 (fl.roots.data.c_str()) + "/Patches/Packs/Drums/Kicks/808 Kick.wav"); kick.existsAsFile())
+                {
+                    lynx::ChannelDef d; // FL's Sampler with a kick, as FL's default channel (the Sample, Envelope and Misc tabs)
+                    d.instrument = lynx::InstrumentKind::sampler;
+                    lynx::audioclips::loadSampleInto (d, kick.getFullPathName().toStdString(), "808 Kick");
+                    d.mixerTrack = s.claimFreeInsert();
+                    s.channels.push_back (d);
+                    sampler = (int) s.channels.size() - 1;
+                }
+                for (const auto withSample : { true, false }) // (a sampler with its sample first, else any)
+                    for (int c = 0; c < (int) s.channels.size() && sampler < 0; ++c)
+                        if (s.channels[(std::size_t) c].instrument == lynx::InstrumentKind::sampler && (! withSample || ! s.channels[(std::size_t) c].samplePath.empty()))
+                            sampler = c;
+            });
+            engine.dispatchPendingMessages();
+            lynx::MainComponent ui (engine, false); // (sets the Channel rack's wrapper-menu items)
+            ui.setSize (1920, 1080);
+            report << "generator " << generator << ", sampler " << sampler << "\n";
+            auto shoot = [&] (juce::Component& c, const juce::String& name) {
+                savePng (lynx::shot::snapshot (c), prefix + name);
+                report << name << " " << c.getWidth() << "x" << c.getHeight() << "\n";
+            };
+            auto window = [&] (int channel, int tab, const juce::String& name) {
+                if (channel < 0)
+                    return;
+                if (auto w = lynx::makeChannelWindowForShot (engine, channel, tab))
+                    shoot (*w, name);
+            };
+            window (generator, 0, "-cw-plugin.png");
+            window (generator, -1, "-cw-plugin-misc.png");
+            window (sampler, 0, "-cw-sample.png");
+            window (sampler, 1, "-cw-envelope.png");
+            window (sampler, -1, "-cw-misc.png");
+            // the strip of a window with the system's title bar (docking off): ▸ and the presets stay in it
+            if (generator >= 0)
+                if (auto frame = lynx::makeChannelFrame (engine, generator, 0))
+                {
+                    shoot (*frame, "-frame-floating.png");
+                    if (auto menu = lynx::channelWrapperMenu (*frame))
+                    {
+                        // FL's two columns: the plugin's items, then the Channel column (split at the column break)
+                        juce::PopupMenu left, right;
+                        auto* to = &left;
+                        for (juce::PopupMenu::MenuItemIterator it (*menu); it.next();)
+                        {
+                            to->addItem (it.getItem());
+                            if (it.getItem().shouldBreakAfter)
+                                to = &right;
+                        }
+                        saveMenus (juce::StringArray { "Plugin", "Channel" }, std::vector<juce::PopupMenu> { left, right }, prefix + "-menu-channel.png");
+                        report << "menu items " << left.getNumItems() << " + " << right.getNumItems() << "\n";
+                    }
+                }
+        }
+        {
+            // FW-8: LYNX engines standing in for FL plugins of an imported project (the import's flOrigin) are titled
+            // with FL's name; LYNX's own Delay (no FL origin) keeps its own
+            lynx::AudioEngine offline (false);
+            lynx::Song song;
+            song.mixer.resize (2);
+            song.mixer[0].name = "Master";
+            song.mixer[1].name = "Insert 1";
+            const std::vector<std::pair<lynx::EffectKind, const char*>> standIns { { lynx::EffectKind::limiter, "Fruity Limiter" },
+                { lynx::EffectKind::utility, "Fruity Stereo Shaper" }, { lynx::EffectKind::delay, "Fruity Delay 3" },
+                { lynx::EffectKind::reverb, "Fruity Reeverb 2" }, { lynx::EffectKind::delay, "" } };
+            for (const auto& [kind, origin] : standIns)
+            {
+                auto fx = lynx::makeEffectSlot (kind);
+                fx.flOrigin.plugin = origin;
+                song.mixer[1].effects.push_back (fx);
+            }
+            offline.setSong (std::move (song));
+            offline.dispatchPendingMessages();
+            std::vector<juce::Image> strips;
+            int width = 0, height = 0;
+            for (int k = 0; k < (int) standIns.size(); ++k)
+                if (auto editor = lynx::makeNativeEffectEditor (offline, 1, k, 1.0f, 0))
+                {
+                    auto image = lynx::shot::paint (*editor, lynx::theme::panel); // (as --plugui draws the editors)
+                    const auto h = juce::jmin (image.getHeight(), (int) std::ceil (30.0f * lynx::shot::scale()));
+                    juce::Image strip (juce::Image::ARGB, image.getWidth(), h, true);
+                    juce::Graphics (strip).drawImageAt (image, 0, 0);
+                    strips.push_back (strip);
+                    width = juce::jmax (width, image.getWidth());
+                    height += h + 4;
+                }
+            if (! strips.empty())
+            {
+                juce::Image all (juce::Image::RGB, width, height, true);
+                {
+                    juce::Graphics g (all); // (flushed when it goes: a native image's context draws on its release)
+                    g.fillAll (juce::Colours::black);
+                    int y = 0;
+                    for (auto& strip : strips)
+                    {
+                        g.drawImageAt (strip, 0, y);
+                        y += strip.getHeight() + 4;
+                    }
+                }
+                savePng (all, prefix + "-names.png");
+                report << "names " << (int) strips.size() << "\n";
+            }
+        }
+        juce::File (prefix + "-report.txt").replaceWithText (report);
+    }
+
     void runPluginEditorSnapshots (const juce::String& folder)
     {
         juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
@@ -18466,7 +18629,13 @@ private:
                     {
                         const auto* bytes = static_cast<const std::uint8_t*> (data.getData());
                         if (auto loaded = lynx::effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), 130.0, lynx::natives::flDataReader (lynx::flStudioAccess())); loaded && loaded->kind == kind)
+                        {
                             fx = *loaded;
+                            // round 190in (FW-8): a LYNX engine loaded with an FL plugin's preset stands in for that
+                            // plugin as an imported slot does (its header shows FL's name)
+                            if (fx.flOrigin.empty() && ! lynx::plugui::hasFlLayout (kind))
+                                fx.flOrigin.plugin = plugin;
+                        }
                     }
                     name = juce::String::fromUTF8 (plugin.c_str());
                     break;

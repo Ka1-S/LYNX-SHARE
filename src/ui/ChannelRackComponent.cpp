@@ -2592,11 +2592,68 @@ void ChannelRackComponent::applyPaint (const juce::MouseEvent& e)
 
 // --- menus -------------------------------------------------------------------------------------
 
-juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
+// Round 190in (details190if R8): the channel's items of FL's wrapper ▸ menu in the channel and plugin windows, done the
+// way this rack's own channel menu does them
+void ChannelRackComponent::fillWindowMenu (int channel, wrappermenu::Spec& spec)
+{
+    if (channel < 0 || channel >= (int) engine.getSong().channels.size())
+        return;
+    const juce::Component::SafePointer<ChannelRackComponent> safe (this);
+    spec.pianoRoll = [safe, channel] {
+        if (safe == nullptr || channel >= (int) safe->engine.getSong().channels.size())
+            return;
+        safe->selectionAnchor = channel;
+        safe->selectRows ({ channel }, channel);
+        if (safe->onOpenPianoRoll)
+            safe->onOpenPianoRoll();
+    };
+    spec.replace = [safe, channel] (juce::PopupMenu& m) {
+        if (safe != nullptr && channel < (int) safe->engine.getSong().channels.size())
+            m = safe->replaceMenu (channel);
+    };
+    if (engine.getSong().channels.size() > 1)
+        spec.remove = [safe, channel] {
+            if (safe == nullptr || channel >= (int) safe->engine.getSong().channels.size() || safe->engine.getSong().channels.size() < 2)
+                return;
+            safe->closeEditor (channel);
+            safe->engine.editSong ([channel] (Song& s) { s.removeChannel (channel); });
+            safe->openEditorRow = -1;
+        };
+    spec.rename = [safe, channel] {
+        if (safe != nullptr && channel < (int) safe->engine.getSong().channels.size())
+            safe->rename (channel);
+    };
+    spec.changeColour = [safe, channel] (juce::PopupMenu& m) {
+        if (safe == nullptr || channel >= (int) safe->engine.getSong().channels.size())
+            return;
+        m = ui::colourMenu (safe->engine.getSong().channels[(std::size_t) channel].colour, [safe, channel] (std::uint32_t colour) {
+                if (safe != nullptr && channel < (int) safe->engine.getSong().channels.size())
+                    safe->engine.editSong ([channel, colour] (Song& s) { s.channels[(std::size_t) channel].colour = colour; });
+            }, juce::Rectangle<int> (juce::Desktop::getMousePosition().x, juce::Desktop::getMousePosition().y, 1, 1));
+    };
+    spec.randomColour = [safe, channel] {
+        if (safe == nullptr || channel >= (int) safe->engine.getSong().channels.size())
+            return;
+        const auto& palette = lynxPalette();
+        const auto colour = palette[(std::size_t) juce::Random::getSystemRandom().nextInt ((int) palette.size())];
+        safe->engine.editSong ([channel, colour] (Song& s) { s.channels[(std::size_t) channel].colour = colour; });
+    };
+    spec.changeIcon = [safe, channel] {
+        if (safe == nullptr || channel >= (int) safe->engine.getSong().channels.size())
+            return;
+        ui::showTrackIconPicker (juce::Rectangle<int> (juce::Desktop::getMousePosition().x, juce::Desktop::getMousePosition().y, 1, 1),
+                                 safe->engine.getSong().channels[(std::size_t) channel].icon, [safe, channel] (int icon) {
+                                     if (safe != nullptr && channel < (int) safe->engine.getSong().channels.size())
+                                         safe->engine.editSong ([channel, icon] (Song& s) { s.channels[(std::size_t) channel].icon = icon; });
+                                 });
+    };
+}
+
+// Replace › lists exactly what Insert › and "+" list (issue #18: one source, quickpick::addGeneratorMenu); the channel
+// keeps its place, notes, insert, levels and colour (FL; core replaceGenerator). (Round 190in: also the wrapper menu's.)
+juce::PopupMenu ChannelRackComponent::replaceMenu (int channel)
 {
     const auto& c = engine.getSong().channels[(std::size_t) channel];
-    // Replace › lists exactly what Insert › and "+" list (issue #18: one source, quickpick::addGeneratorMenu); the
-    // channel keeps its place, notes, insert, levels and colour (FL; core replaceGenerator)
     juce::PopupMenu instruments;
     quickpick::addGeneratorMenu (instruments, engine, [this, channel] (ChannelDef generator) {
         if (channel >= (int) engine.getSong().channels.size())
@@ -2608,6 +2665,13 @@ juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
         selectRows ({ channel }, channel);
         openNewGenerator (channel, kind);
     }, [this, channel] { chooseSample (channel); }, &c, this);
+    return instruments;
+}
+
+juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
+{
+    const auto& c = engine.getSong().channels[(std::size_t) channel];
+    auto instruments = replaceMenu (channel);
 
     // FL's layout (REA round 104): two columns, the channel on the left (editors, name and colour, sample,
     // insert / replace / clone / delete) and its steps on the right (clipboard, fills, rotation); LYNX's own

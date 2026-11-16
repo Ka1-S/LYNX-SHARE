@@ -484,6 +484,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
             mixer.selectTrack (insert);
     };
     openMixerInsertHandler() = rack.onOpenMixerInsert; // and on the channel window's TRACK box (round 168s)
+    channelWrapperItemsHandler() = [this] (int channel, wrappermenu::Spec& spec) { rack.fillWindowMenu (channel, spec); }; // (round 190in, R8)
     locateInBrowserHandler() = [this] (const juce::File& file) { // (the sampler's File row, round 190df)
         showPanel (Panel::browser);
         browser.locateFile (file);
@@ -1014,6 +1015,7 @@ MainComponent::~MainComponent()
         sessionMarker.deleteFile();
     mixerinput::openAudioSettings = nullptr;
     openMixerInsertHandler() = nullptr;
+    channelWrapperItemsHandler() = nullptr;
     locateInBrowserHandler() = nullptr;
     openInNewChannelHandler() = nullptr;
     PatcherWindows::onBrowsePluginDatabase = nullptr;

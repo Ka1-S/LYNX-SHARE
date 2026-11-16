@@ -34,6 +34,25 @@ enum class Part
     next
 };
 
+// Round 190in (design190ia FW-S2, FW-9): one slot grid for the header of every native editor (the generic panels,
+// the display-first editors, Facet EQ), so nothing jumps from one editor to the next. The left slots count from the
+// header's left edge, the right ones from its right edge; a header narrower than `compactBelow` (FL's small Fruity
+// windows) uses the compact grid (no LYNX mark, no A→B, a smaller preset box), the same for every such editor.
+//   [▸ 16][mark 18][LED][title …]  …  [undo 18][redo 18] 8 [A 18][B 18][A→B 30] 8 [preset 160][◂ 16][▸ 16]
+// A slot an editor cannot use is drawn disabled in its place (paintDisabledSlots), never left out.
+constexpr float compactBelow = 520.0f;
+struct HeaderSlots
+{
+    bool compact = false;
+    juce::Rectangle<float> menu, logo, title;            // left (title: what is left between the LED and `undo`)
+    juce::Point<float> led;                              // the power LED's centre
+    juce::Rectangle<float> undo, redo, a, b, copy, preset, prev, next; // right (copy: empty in the compact grid)
+};
+HeaderSlots headerSlots (juce::Rectangle<float> header);
+constexpr float ledDiameter = 7.0f;
+// undo / redo / A / B / A→B of an editor without them (its setting is not its parameters): 35 % and no hover
+void paintDisabledSlots (juce::Graphics& g, const HeaderSlots& slots);
+
 class PresetBar
 {
 public:
@@ -43,6 +62,9 @@ public:
     // keepLeft (round 170k2): the width the caller needs at the left of `area` (its title): the copy button goes and the
     // preset box shrinks (down to 70 px) before the bar eats into it
     juce::Rectangle<float> place (juce::Rectangle<float> area, bool withPresets = true, float keepLeft = 0.0f);
+    // round 190in (FW-9): the bar in the header's fixed slot grid (`header`: the whole header strip); returns the title
+    // space (between the LED and the undo slot)
+    juce::Rectangle<float> placeInGrid (juce::Rectangle<float> header, bool withPresets = true);
     // round 170k2: the width the bar takes in a narrow window (no copy button, the preset box at its smallest)
     static float narrowWidth (bool withPresets = true);
     void paint (juce::Graphics& g, juce::Colour accent) const;

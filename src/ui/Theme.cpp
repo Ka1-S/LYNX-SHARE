@@ -2015,6 +2015,12 @@ void LookAndFeel::drawDocumentWindowTitleBar (juce::DocumentWindow& window, juce
 
     const auto font = uiFont (type::body);
     g.setFont (font);
+    // round 190in (design190ia FW-5): a plugin / channel window's title bar holds FL's ▸ at the left and the presets at
+    // the right (the window says how much room they take), and its "Name (target)" in FL's two tones
+    const auto& props = window.getProperties();
+    const auto insetLeft = (int) props.getWithDefault ("lynxTitleLeft", 0), insetRight = (int) props.getWithDefault ("lynxTitleRight", 0);
+    titleSpaceX += insetLeft;
+    titleSpaceW = juce::jmax (0, titleSpaceW - insetLeft - insetRight);
     auto textW = juce::GlyphArrangement::getStringWidthInt (font, window.getName());
     auto iconW = 0;
 
@@ -2036,7 +2042,20 @@ void LookAndFeel::drawDocumentWindowTitleBar (juce::DocumentWindow& window, juce
     }
 
     g.setColour (window.isActiveWindow() ? textPrimary : textSecondary);
-    g.drawText (window.getName(), textX, 0, textW, h, juce::Justification::centredLeft, true);
+    const auto name = window.getName();
+    if (const auto open = name.lastIndexOf (" ("); (bool) props.getWithDefault ("lynxTitleTwoTone", false) && open > 0 && name.endsWithChar (')'))
+    {
+        const auto head = name.substring (0, open);
+        const auto room = juce::jmax (0, titleSpaceX + titleSpaceW - textX); // (the bold name is wider than textW measured)
+        g.setFont (uiFont (type::body, true));
+        const auto headW = juce::jmin (room, juce::GlyphArrangement::getStringWidthInt (g.getCurrentFont(), head) + 1);
+        g.drawText (head, textX, 0, headW, h, juce::Justification::centredLeft, true);
+        g.setFont (font);
+        g.setColour (textSecondary);
+        g.drawText (name.substring (open), textX + headW, 0, juce::jmax (0, room - headW), h, juce::Justification::centredLeft, true);
+        return;
+    }
+    g.drawText (name, textX, 0, textW, h, juce::Justification::centredLeft, true);
 }
 
 juce::Button* LookAndFeel::createDocumentWindowButton (int buttonType)

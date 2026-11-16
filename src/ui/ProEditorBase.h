@@ -401,13 +401,17 @@ protected:
             bar.click (part, *this);
             return;
         }
-        if (e.mods.isPopupMenu() && headerArea().contains (e.position)) // round 126: the editor's style
+        // round 126: the editor's style; round 190in (FW-9): also from the header's ▸ slot, as in every native editor
+        const auto onMenu = pluginheader::headerSlots (headerArea()).menu.expanded (2.0f).contains (e.position);
+        if ((e.mods.isPopupMenu() && headerArea().contains (e.position)) || onMenu)
         {
             juce::PopupMenu m;
             skin::addStyleMenu (m, skin::styleKey (kind), [safe = juce::Component::SafePointer<juce::Component> (this)] {
                 if (safe != nullptr) safe->repaint();
             });
-            m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+            auto options = juce::PopupMenu::Options().withTargetComponent (this);
+            m.showMenuAsync (onMenu ? options.withTargetScreenArea (localAreaToGlobal (pluginheader::headerSlots (headerArea()).menu.toNearestInt()))
+                                    : options.withMousePosition());
             return;
         }
         bar.beginGesture();
@@ -644,20 +648,40 @@ protected:
         using namespace theme;
         const auto h = headerArea();
         skin::headerBar (g, h, accent);
-        skin::brandMark (g, juce::Rectangle<float> (8.0f, 0.0f, 20.0f, h.getHeight()));
-        skin::powerLed (g, { 36.0f, h.getCentreY() }, 7.0f, fx.enabled);
+        // round 190in (design190ia FW-9): the slot grid every native editor shares (▸, mark, LED, title … undo, A / B,
+        // presets)
+        const auto grid = pluginheader::headerSlots (h);
+        drawHeaderArrow (g, grid.menu, mouse.x >= 0.0f && grid.menu.expanded (2.0f).contains (mouse) ? accent : colour::textSecondary);
+        if (! grid.logo.isEmpty())
+            skin::brandMark (g, grid.logo);
+        skin::powerLed (g, grid.led, pluginheader::ledDiameter, fx.enabled);
         const auto name = title();
-        const auto w = skin::titleText (g, juce::Rectangle<float> (46.0f, 0.0f, 300.0f, h.getHeight()), name, accent);
+        auto text = grid.title;
+        const auto w = skin::titleText (g, text, name, accent);
+        text.removeFromLeft (w + 12.0f);
         g.setColour (colour::textSecondary);
         g.setFont (font (type::small));
-        if (! plugui::hostedElsewhere) // (no mixer around a plugin in another host, round 188b)
-            g.drawText (trackName() + "  -  " + tr ("slot {0}", { juce::String (slot + 1) }), juce::Rectangle<float> (58.0f + w, 0.0f, 220.0f, h.getHeight()),
-                        juce::Justification::centredLeft, true);
-        const auto left = bar.place (h.withTrimmedLeft (w + 270.0f));
+        const auto where = trackName() + "  -  " + tr ("slot {0}", { juce::String (slot + 1) });
+        if (! plugui::hostedElsewhere && juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), where) <= text.getWidth()) // (round 188b)
+        {
+            g.drawText (where, text, juce::Justification::centredLeft, true);
+            text.removeFromLeft (juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), where) + 12.0f);
+        }
+        bar.placeInGrid (h);
         bar.paint (g, accent);
         g.setColour (colour::textDisabled);
         g.setFont (font (type::caption));
-        g.drawText (gestures(), left.withTrimmedRight (8.0f), juce::Justification::centredRight, true);
+        g.drawText (gestures(), text.withTrimmedRight (8.0f), juce::Justification::centredRight, true);
+    }
+
+    // FL's ▸ at the far left of a plugin's header (round 190in)
+    static void drawHeaderArrow (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour c)
+    {
+        juce::Path p;
+        p.addTriangle (-3.0f, -5.0f, -3.0f, 5.0f, 4.0f, 0.0f);
+        p.applyTransform (juce::AffineTransform::translation (r.getCentreX(), r.getCentreY()));
+        g.setColour (c);
+        g.fillPath (p);
     }
 
     // the colour a control is drawn in: the plugin's accent unless the editor gave it its own
