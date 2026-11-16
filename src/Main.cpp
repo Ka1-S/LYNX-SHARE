@@ -21705,6 +21705,17 @@ private:
         ui.setClipGridView (lynx::PlaylistArea::GridView::grid);
         measureAll ("clip grid");
         ui.setClipLaunchWorkflow (false);
+        // LYNX_PAINTBENCH_SIMPLE=1 (round 190jc): the same project's Playlist in the Simple layout too
+        if (juce::SystemStats::getEnvironmentVariable ("LYNX_PAINTBENCH_SIMPLE", {}) == "1")
+        {
+            ui.setLayoutStyle (lynx::layoutstyle::Style::simple);
+            offline.dispatchPendingMessages();
+            if (auto* simple = ui.getSimpleWorkflowForSnapshot())
+                simple->hideChooser();
+            ui.selectTabForSnapshot (2);
+            measureAll ("simple playlist");
+            ui.setLayoutStyle (lynx::layoutstyle::Style::pattern);
+        }
         text << "result=OK\n";
         report.replaceWithText (text);
         if (profile.isNotEmpty())
@@ -23875,6 +23886,24 @@ private:
               + " pads " + juce::String (pads) + "; rows shown " + juce::String (rows));
         check ("five tracks + the drop lane are the rows shown (no placeholder rows)", rows == 6);
         whole ("tracks");
+        {
+            // the Simple Playlist's whole paint (its rows only, no placeholder rows): CPU ms per frame
+            juce::Image img (juce::Image::ARGB, juce::jmax (1, playlist.getWidth()), juce::jmax (1, playlist.getHeight()), true);
+            std::vector<double> ms;
+            for (int f = -3; f < 40; ++f)
+            {
+                const auto t0 = lynx::threadCpuSeconds();
+                {
+                    juce::Graphics g (img);
+                    playlist.paintEntireComponent (g, true);
+                }
+                if (f >= 0)
+                    ms.push_back (1000.0 * (lynx::threadCpuSeconds() - t0));
+            }
+            std::sort (ms.begin(), ms.end());
+            line ("simple playlist " + juce::String (playlist.getWidth()) + "x" + juce::String (playlist.getHeight()) + " whole paint: median "
+                  + juce::String (ms[ms.size() / 2], 3) + " ms, p90 " + juce::String (ms[ms.size() * 9 / 10], 3) + " ms");
+        }
         playlist.setDropLaneHotForSnapshot (true);
         whole ("droplane-hot", false);
         playlist.setDropLaneHotForSnapshot (false);
