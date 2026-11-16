@@ -1140,12 +1140,15 @@ void ChannelRackComponent::paint (juce::Graphics& g)
                     ui::drawTrackIcon (g, icon, juce::Rectangle<float> (nameArea.getRight() - 6.0f - rightUsed - 14.0f, nameArea.getCentreY() - 7.0f, 14.0f, 14.0f),
                                        onAccent.withAlpha (channel.muted ? 0.45f : 0.85f));
                 }
-                // white on the colour (FL), the name's middle dropped when it is too long ("Titey..m #2", FM-14)
+                // white on the colour (FL), the name's middle dropped when it is too long ("Titey..m #2", FM-14), centred in
+                // the room left of the icon and tags as FL centres it (round 190jp: "Synth Bass" on the button's centre line,
+                // "Titey Tom" between the left edge and the icon)
                 g.setColour (onAccent.withAlpha (channel.muted ? 0.5f : frozen ? 0.7f : 0.92f));
                 g.setFont (theme::font (theme::type::body + 1.0f));
-                const auto textArea = nameArea.withTrimmedLeft (7.0f).withTrimmedRight (juce::jmax (5.0f, rightUsed + iconWidth + 4.0f));
+                const auto rightTrim = rightUsed + iconWidth > 0.0f ? rightUsed + iconWidth + 4.0f : 6.0f;
+                const auto textArea = nameArea.withTrimmedLeft (6.0f).withTrimmedRight (rightTrim);
                 textcache::drawText (g, theme::fitMiddle (juce::String::fromUTF8 (channel.name.c_str()), g.getCurrentFont(), textArea.getWidth()), textArea,
-                                     juce::Justification::centredLeft, false);
+                                     juce::Justification::centred, false);
                 g.setFont (theme::font (theme::type::body));
             }
 
