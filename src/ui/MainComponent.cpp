@@ -2688,6 +2688,8 @@ void MainComponent::loadUiSettings()
             PlaylistComponent::showInstrumentTrackLevels = on;
         else if (key == "automationLanes") // round 177b: Playlist › Automation lanes
             autolanes::setShown (on);
+        else if (key == "trackInserts") // round 190ht (issue #154): Playlist › Edit › Show insert effects on linked tracks
+            PlaylistComponent::showTrackInserts = on;
         else if (key == "pickerPanel") // issue #175: FL's Playlist menu › Picker panel › Enable
         {
             pickerPanelOn = on;
@@ -3011,6 +3013,7 @@ void MainComponent::saveUiSettings()
                                       + "\naudioTrackLevels=" + juce::String (PlaylistComponent::showAudioTrackLevels ? 1 : 0)
                                       + "\ninstrumentTrackLevels=" + juce::String (PlaylistComponent::showInstrumentTrackLevels ? 1 : 0)
                                       + "\nautomationLanes=" + juce::String (autolanes::shown() ? 1 : 0)
+                                      + "\ntrackInserts=" + juce::String (PlaylistComponent::showTrackInserts ? 1 : 0)
                                       + "\npickerPanel=" + juce::String (pickerPanelOn ? 1 : 0)
                                       + "\nalternateUndo=" + juce::String (alternateUndo ? 1 : 0)
                                       + "\neditPatternsIn="
@@ -4125,6 +4128,7 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
             action (menu, "playlist.patternBlocks", tr ("Pattern blocks (current project)"), true, engine.getSong().patternBlocksOn);
             action (menu, "playlist.blocksToClips", tr ("Turn pattern blocks into clips"), ! engine.getSong().blocks.empty());
             action (menu, "playlist.automationLanes", tr ("Automation lanes"), true, autolanes::shown()); // round 177b
+            action (menu, "playlist.trackInserts", tr ("Show insert effects on linked tracks"), true, PlaylistComponent::showTrackInserts); // round 190ht
             action (menu, "playlist.follow", tr ("Follow the playhead (auto scrolling)"), true, EditorGlobals::get().isFollowing (false));
             action (menu, "playlist.quantizeStarts", tr ("Quantize the clips' starts"));
             action (menu, "playlist.quantizeHalf", tr ("Quantize the clips' starts 50% (halfway to the grid)"));

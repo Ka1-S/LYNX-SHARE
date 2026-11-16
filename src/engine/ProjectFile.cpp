@@ -1475,12 +1475,13 @@ std::vector<StandIn> standInsFromVar (const juce::var& v)
     return out;
 }
 
-// FL's legacy Pattern Blocks (round 170f): [[pattern, start], ...]
+// FL's legacy Pattern Blocks (round 170f): [[pattern, start], ...]; a muted block (issue #127, round 190ht) has a third
+// element, 1 (older versions skip it)
 juce::var blocksToVar (const std::vector<PatternBlock>& list)
 {
     juce::Array<juce::var> out;
     for (const auto& b : list)
-        out.add (juce::Array<juce::var> { b.pattern, (juce::int64) b.start });
+        out.add (b.muted ? juce::Array<juce::var> { b.pattern, (juce::int64) b.start, 1 } : juce::Array<juce::var> { b.pattern, (juce::int64) b.start });
     return out;
 }
 
@@ -1489,8 +1490,8 @@ std::vector<PatternBlock> blocksFromVar (const juce::var& v, const Song& song)
     std::vector<PatternBlock> out;
     if (auto* list = v.getArray())
         for (const auto& b : *list)
-            if (b.isArray() && b.size() == 2)
-                out.push_back ({ (int) b[0], (std::int64_t) (juce::int64) b[1] });
+            if (b.isArray() && (b.size() == 2 || b.size() == 3))
+                out.push_back ({ (int) b[0], (std::int64_t) (juce::int64) b[1], b.size() == 3 && (int) b[2] != 0 });
     patternblocks::normalize (out, (int) song.patterns.size());
     return out;
 }

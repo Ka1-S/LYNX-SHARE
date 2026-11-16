@@ -1,8 +1,10 @@
 #include "core/PatternBlocks.h"
 #include "core/PlaylistTrackOps.h"
+#include "core/RackOps.h"
 
 #include <algorithm>
 #include <limits>
+#include <tuple>
 
 namespace lynx::patternblocks
 {
@@ -61,7 +63,10 @@ void normalize (std::vector<PatternBlock>& blocks, int patternCount)
                                   [patternCount] (const PatternBlock& b) { return b.pattern < 0 || b.pattern >= patternCount || b.start < 0; }),
                   blocks.end());
     std::sort (blocks.begin(), blocks.end(), before);
-    blocks.erase (std::unique (blocks.begin(), blocks.end()), blocks.end());
+    // one block per (pattern, start), whatever its mute
+    blocks.erase (std::unique (blocks.begin(), blocks.end(),
+                               [] (const PatternBlock& a, const PatternBlock& b) { return a.pattern == b.pattern && a.start == b.start; }),
+                  blocks.end());
 }
 
 std::int64_t playedEnd (const Song& song, const std::vector<PatternBlock>& blocks, std::size_t index) noexcept
@@ -156,7 +161,8 @@ std::int64_t move (Song& song, int pattern, std::int64_t fromTick, std::int64_t 
         song.blocks.insert (std::upper_bound (song.blocks.begin(), song.blocks.end(), block, before), block);
         return start;
     }
-    const PatternBlock moved { pattern, to };
+    auto moved = block; // (its mute goes with it)
+    moved.start = to;
     song.blocks.insert (std::upper_bound (song.blocks.begin(), song.blocks.end(), moved, before), moved);
     return to;
 }
@@ -197,6 +203,151 @@ std::int64_t dragTarget (const Song& song, std::int64_t tick, std::int64_t grabO
     return snapToBar (song, std::max<std::int64_t> (0, snapToBar (song, tick) - std::max<std::int64_t> (0, grabOffset)));
 }
 
+std::vector<std::size_t> blocksInRange (const Song& song, int pattern, std::int64_t fromTick, std::int64_t toTick)
+{
+    if (toTick < fromTick)
+        std::swap (fromTick, toTick);
+    std::vector<std::size_t> out;
+    std::size_t first = 0, last = song.blocks.size();
+    if (pattern >= 0)
+        std::tie (first, last) = rowRange (song.blocks, pattern);
+    for (auto i = first; i < last; ++i)
+        if (song.blocks[i].start <= toTick && fromTick < playedEnd (song, song.blocks, i))
+            out.push_back (i);
+    return out;
+}
+
+bool setMuted (Song& song, std::size_t index, bool muted)
+{
+    if (index >= song.blocks.size() || song.blocks[index].muted == muted)
+        return false;
+    song.blocks[index].muted = muted;
+    return true;
+}
+
+std::vector<PatternBlock> inArea (const Song& song, int rowFrom, int rowTo, std::int64_t fromTick, std::int64_t toTick)
+{
+    if (rowTo < rowFrom)
+        std::swap (rowFrom, rowTo);
+    std::vector<PatternBlock> out;
+    for (auto row = std::max (0, rowFrom); row <= rowTo && row < (int) song.patterns.size(); ++row)
+        for (auto i : blocksInRange (song, row, fromTick, toTick))
+            out.push_back (song.blocks[i]);
+    return out;
+}
+
+bool contains (const std::vector<PatternBlock>& list, const PatternBlock& b) noexcept
+{
+    return std::any_of (list.begin(), list.end(), [&b] (const PatternBlock& x) { return x.pattern == b.pattern && x.start == b.start; });
+}
+
+int indexOf (const Song& song, const PatternBlock& b) noexcept
+{
+    const auto [first, last] = rowRange (song.blocks, b.pattern);
+    for (auto i = first; i < last; ++i)
+        if (song.blocks[i].start == b.start)
+            return (int) i;
+    return -1;
+}
+
+std::optional<std::vector<PatternBlock>> moveGroup (Song& song, const std::vector<PatternBlock>& group, std::int64_t delta)
+{
+    if (group.empty())
+        return std::nullopt;
+    // the blocks themselves, as they are now (their mute included)
+    std::vector<PatternBlock> moving;
+    for (const auto& g : group)
+    {
+        const auto i = indexOf (song, g);
+        if (i < 0)
+            return std::nullopt;
+        moving.push_back (song.blocks[(std::size_t) i]);
+    }
+    std::vector<PatternBlock> moved;
+    for (auto b : moving)
+    {
+        if (b.start + delta < 0)
+            return std::nullopt; // (the group keeps its shape: nothing goes before bar 1)
+        b.start = snapToBar (song, b.start + delta);
+        moved.push_back (b);
+    }
+    const auto saved = song.blocks;
+    song.blocks.erase (std::remove_if (song.blocks.begin(), song.blocks.end(), [&moving] (const PatternBlock& b) { return contains (moving, b); }),
+                       song.blocks.end());
+    for (const auto& b : moved)
+    {
+        if (! fits (song, b.pattern, b.start))
+        {
+            song.blocks = saved;
+            return std::nullopt;
+        }
+        song.blocks.insert (std::upper_bound (song.blocks.begin(), song.blocks.end(), b, before), b);
+    }
+    return moved;
+}
+
+int slice (Song& song, int pattern, std::int64_t cut)
+{
+    if (! validPattern (song, pattern) || cut <= 0 || cut >= lengthOf (song, pattern))
+        return -1;
+    const auto current = song.currentPattern;
+    const auto added = clonePattern (song, pattern); // (clips and blocks of later patterns move down one)
+    if (added != pattern + 1)
+        return -1;
+    song.currentPattern = current > pattern ? current + 1 : current;
+
+    auto& head = song.patterns[(std::size_t) pattern];
+    auto& tail = song.patterns[(std::size_t) added];
+    // the pattern keeps what is before the cut: a note across it is shortened (FL 10 doesn't split it in two)
+    head.notes.erase (std::remove_if (head.notes.begin(), head.notes.end(), [cut] (const Note& n) { return n.start >= cut; }), head.notes.end());
+    for (auto& n : head.notes)
+        n.length = std::min (n.length, cut - n.start);
+    // the new one what starts at or after it, moved to its start
+    tail.notes.erase (std::remove_if (tail.notes.begin(), tail.notes.end(), [cut] (const Note& n) { return n.start < cut; }), tail.notes.end());
+    for (auto& n : tail.notes)
+        n.start -= cut;
+    for (auto& lane : head.events)
+        lane.events.erase (std::remove_if (lane.events.begin(), lane.events.end(), [cut] (const PatternEvent& e) { return e.tick >= cut; }),
+                           lane.events.end());
+    for (auto& lane : tail.events)
+    {
+        lane.events.erase (std::remove_if (lane.events.begin(), lane.events.end(), [cut] (const PatternEvent& e) { return e.tick < cut; }),
+                           lane.events.end());
+        for (auto& e : lane.events)
+            e.tick -= cut;
+    }
+    tail.events.erase (std::remove_if (tail.events.begin(), tail.events.end(), [] (const PatternEvents& l) { return l.events.empty(); }), tail.events.end());
+    head.events.erase (std::remove_if (head.events.begin(), head.events.end(), [] (const PatternEvents& l) { return l.events.empty(); }), head.events.end());
+    head.markers.erase (std::remove_if (head.markers.begin(), head.markers.end(), [cut] (const Marker& m) { return m.tick >= cut; }), head.markers.end());
+    tail.markers.erase (std::remove_if (tail.markers.begin(), tail.markers.end(), [cut] (const Marker& m) { return m.tick < cut; }), tail.markers.end());
+    for (auto& m : tail.markers)
+        m.tick -= cut;
+    if (head.lengthTicks > 0) // a set length is shared out; an automatic one stays automatic (whole bars)
+    {
+        tail.lengthTicks = head.lengthTicks - cut;
+        head.lengthTicks = cut;
+    }
+
+    // where each block of the pattern now ends, a block of the new one starts (in every arrangement)
+    const auto headLength = lengthOf (song, pattern), tailLength = lengthOf (song, added);
+    song.forEachBlockList ([&] (std::vector<PatternBlock>& list) {
+        std::vector<PatternBlock> follow;
+        for (const auto& b : list)
+            if (b.pattern == pattern)
+                follow.push_back ({ added, b.start + headLength, b.muted });
+        for (const auto& b : follow)
+        {
+            const auto [first, last] = rowRange (list, added);
+            auto free = tailLength > 0;
+            for (auto i = first; i < last && free; ++i)
+                free = ! (list[i].start < b.start + tailLength && b.start < playedEnd (song, list, i));
+            if (free)
+                list.insert (std::upper_bound (list.begin(), list.end(), b, before), b);
+        }
+    });
+    return added;
+}
+
 std::vector<Clip> asClips (const Song& song)
 {
     std::vector<Clip> out;
@@ -212,6 +363,7 @@ std::vector<Clip> asClips (const Song& song)
         c.track = blockTrack;
         c.start = b.start;
         c.length = playedEnd (song, song.blocks, i) - b.start;
+        c.muted = b.muted; // (issue #127: the Mute tool)
         if (c.length > 0)
             out.push_back (c);
     }

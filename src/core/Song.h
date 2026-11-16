@@ -2266,6 +2266,7 @@ struct PatternBlock
 {
     int pattern = 0;
     std::int64_t start = 0; // ticks: the start of a bar
+    bool muted = false;     // the Mute tool (issue #127): a muted block stays in place and plays nothing
     bool operator== (const PatternBlock&) const = default;
 };
 

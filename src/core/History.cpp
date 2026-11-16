@@ -99,6 +99,8 @@ ChangeLabel label (const char* text, std::string arg = {})
 ChangeLabel describeChange (const Song& before, const Song& after)
 {
     // patterns and notes
+    if (after.patterns.size() == before.patterns.size() + 1 && after.blocks.size() > before.blocks.size()) // (issue #127: the Slice tool on a block)
+        return label (TR_NOOP ("Slice pattern"));
     if (before.patterns.size() != after.patterns.size())
         return label (after.patterns.size() > before.patterns.size() ? TR_NOOP ("Add pattern") : TR_NOOP ("Delete pattern"));
 
@@ -196,6 +198,10 @@ ChangeLabel describeChange (const Song& before, const Song& after)
     {
         if (after.blocks.empty() && after.playlist.size() > before.playlist.size())
             return label (TR_NOOP ("Turn pattern blocks into clips"));
+        if (after.blocks.size() == before.blocks.size()
+            && std::equal (before.blocks.begin(), before.blocks.end(), after.blocks.begin(),
+                           [] (const PatternBlock& a, const PatternBlock& b) { return a.pattern == b.pattern && a.start == b.start; }))
+            return label (TR_NOOP ("Mute pattern blocks"));
         if (after.blocks.size() > before.blocks.size())
             return label (TR_NOOP ("Paint pattern blocks"));
         if (after.blocks.size() < before.blocks.size())

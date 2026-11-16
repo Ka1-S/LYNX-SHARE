@@ -22,6 +22,7 @@
 #include "ui/MixerComponent.h"
 #include "ui/NewProjectDialog.h"
 #include "ui/PianoRollComponent.h"
+#include "ui/PlaylistComponent.h"
 #include "ui/PluginSkin.h"
 #include "ui/Updater.h"
 
@@ -2409,6 +2410,7 @@ bool lynxExtraOn (AudioEngine& engine, const SettingsHooks& hooks, std::string_v
     if (id == "mixer.keepLostLinks") return MixerStrips::keepLostLinks;
     if (id == "mixer.followPlaylist") return MixerStrips::followPlaylist;
     if (id == "playlist.automationLanes") return autolanes::shown();
+    if (id == "playlist.trackInserts") return PlaylistComponent::showTrackInserts;
     if (id == "pianoRoll.songBarsRuler") return PianoRollComponent::songBarsRuler;
     if (id == "general.hoverValues") return hooks.getGeneral && hooks.getGeneral().hoverValues;
     if (id == "project.linkTracks") return hooks.getGeneral && hooks.getGeneral().linkTracksInNewProjects;
@@ -2463,6 +2465,14 @@ void setLynxExtra (AudioEngine& engine, const SettingsHooks& hooks, std::string_
         if (! toggledBy ("playlist.automationLanes"))
         {
             autolanes::setShown (on);
+            saved();
+        }
+    }
+    else if (id == "playlist.trackInserts")
+    {
+        if (! toggledBy ("playlist.trackInserts"))
+        {
+            PlaylistComponent::showTrackInserts = on;
             saved();
         }
     }
