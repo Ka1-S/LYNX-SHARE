@@ -7,6 +7,7 @@
 
 #include "core/ClipLauncher.h"
 #include "engine/AudioEngine.h"
+#include "ui/ClipGridComponent.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
 
@@ -78,6 +79,150 @@ void drawLabel (juce::Graphics& g, juce::Rectangle<int> r, const juce::String& t
     g.setFont (theme::font (theme::type::caption));
     textcache::drawText (g, text, r, juce::Justification::centredLeft, true);
 }
+
+// --- round 190jn (design190ia slice 13, CL-16 + DL-107): Live 12.4's Session mixer -----------------------------------
+// Measured in live-session.png (strips x 318..1625, y 575..797: an idle set) and live-clipview-audio.png (strips
+// x 318..1000, y 470..636: the same set playing). Every number is px at 100 % from the strip's left edge (tracks: the
+// 2 px column separator is the strip's last 2 px; Main: its first 2 px) or from the section's top.
+namespace lv = theme::livelook;
+bool liveLook() noexcept { return lv::active(); }
+// a 2 px separator over the first section; each section ends in its own 2 px separator; a 6 px track-colour stripe
+// closes the strip (live-session.png y 575..576, 632..633, 790..791; stripe 792..797)
+constexpr int liveTop = 2, liveSeparator = 2, liveStripe = 6;
+// the Volume section: peak pill, volume field, pan, Track Activator, Solo, Arm left; the meter right (y 634..789)
+constexpr int liveVolumeHeight = 156;
+// Sends: knobs in a zigzag, one every 17 px, left / right (y 577..631 for two sends: 21 + 17 per send)
+constexpr int liveSendPitch = 17, liveSendsBase = 21;
+// the meter: 13 x 144 px (two 6 px wells, a 1 px #3E3E3E line between them), its top 6 px under the section's top
+constexpr int liveMeterHeight = 144;
+// Live's level scale on that meter (ticks at the meter's left, live-session.png x 446..448): dB -> px under the meter's
+// top. The fader and the meter share it (the handle points at the meter level it sets).
+struct LiveTick
+{
+    float db, y;
+};
+constexpr LiveTick liveScale[] = { { 6.0f, 1.0f },     { 0.0f, 15.0f },    { -6.0f, 29.0f },   { -12.0f, 43.0f },
+                                   { -18.0f, 57.0f },  { -24.0f, 71.0f },  { -30.0f, 86.0f },  { -36.0f, 98.0f },
+                                   { -42.0f, 109.0f }, { -48.0f, 118.0f }, { -54.0f, 127.0f }, { -60.0f, 134.0f } };
+constexpr float liveScaleFloor = 140.0f; // -inf (the last tick)
+// Live's colours not in theme::livelook: the meter's 0 dB line and the line between its wells, the level ramp
+// (live-clipview-audio.png: green #00F758 to -18 dB, hold lines #E4DA00 at -11 dB and #F69B00 at -5 dB; red over 0 dB is
+// Live's clip red, not captured lit), ticks (white at 30 %: #757575 on #363636, #7D7D7D on #464646)
+const juce::Colour liveZeroLine { 0xff868686 }, liveWellLine { 0xff3e3e3e }, liveGreen { 0xff00f758 }, liveYellow { 0xffe4da00 },
+    liveOrange { 0xfff69b00 }, liveRed { 0xffff3636 };
+// Captured in Live 12.4 by round 190jn (shots/ref/live-mixer-solo-deactivated.png, the Patience set with Drums soloed
+// and Mello deactivated): Solo lit #3C6AB6 with its S in #070707; while any track is soloed every active activator turns
+// #757575 with its number #242424; a deactivated one is #1E1E1E inside a 1 px #919191 ring, its number #696969. A hovered
+// S keeps its colours (no hover state).
+const juce::Colour liveSoloOn { 0xff3c6ab6 }, liveSoloing { 0xff757575 }, liveSoloingInk { 0xff242424 }, liveOffRing { 0xff919191 },
+    liveOffInk { 0xff696969 };
+
+float liveMeterY (float db, int height) noexcept
+{
+    float y = liveScaleFloor;
+    if (! std::isfinite (db) || db <= -80.0f)
+        y = liveScaleFloor;
+    else if (db >= liveScale[0].db)
+        y = liveScale[0].y;
+    else if (db <= -60.0f)
+        y = 134.0f + (-60.0f - db) / 20.0f * (liveScaleFloor - 134.0f);
+    else
+        for (std::size_t i = 1; i < std::size (liveScale); ++i)
+            if (db >= liveScale[i].db)
+            {
+                const auto& a = liveScale[i - 1];
+                const auto& b = liveScale[i];
+                y = b.y + (db - b.db) / (a.db - b.db) * (a.y - b.y);
+                break;
+            }
+    return y * (float) height / (float) liveMeterHeight;
+}
+
+double liveDbAt (float y, int height) noexcept
+{
+    y = y * (float) liveMeterHeight / (float) std::max (1, height);
+    if (y >= liveScaleFloor)
+        return -INFINITY;
+    if (y <= liveScale[0].y)
+        return liveScale[0].db;
+    if (y > 134.0f)
+        return -60.0 - (y - 134.0f) / (liveScaleFloor - 134.0f) * 20.0;
+    for (std::size_t i = 1; i < std::size (liveScale); ++i)
+        if (y <= liveScale[i].y)
+        {
+            const auto& a = liveScale[i - 1];
+            const auto& b = liveScale[i];
+            return a.db + (y - a.y) / (b.y - a.y) * (b.db - a.db);
+        }
+    return -60.0;
+}
+
+juce::Colour liveLevelColour (float db) noexcept
+{
+    struct Stop
+    {
+        float db;
+        juce::Colour colour;
+    };
+    const Stop stops[] = { { -18.0f, liveGreen }, { -12.0f, liveYellow }, { -5.0f, liveOrange }, { 0.0f, liveRed } };
+    if (db <= stops[0].db)
+        return stops[0].colour;
+    for (std::size_t i = 1; i < std::size (stops); ++i)
+        if (db <= stops[i].db)
+            return stops[i - 1].colour.interpolatedWith (stops[i].colour, (db - stops[i - 1].db) / (stops[i].db - stops[i - 1].db));
+    return liveRed;
+}
+
+juce::Font liveFont (float size = theme::type::caption, bool bold = false)
+{
+    return theme::font (size, bold).withHorizontalScale (1.12f); // (the clip grid's Live text: Live's wider face)
+}
+
+// Live's volume field: one decimal, "0" at unity (live-session.png "-4.0", "-6.3", "0"; live-clipview "0.2", "-14.4")
+juce::String liveVolumeText (float position)
+{
+    const auto db = sessionmixer::volumeDb (position);
+    if (! std::isfinite (db) || db < -95.0)
+        return "-inf";
+    if (std::abs (db) < 0.05)
+        return "0";
+    return juce::String (db, 1);
+}
+
+// The peak pill: the loudest peak in three digits ("-12.9", "-8.66", "-1.91", "-94.4"), "-∞" before any sound
+juce::String livePeakText (float gain)
+{
+    if (gain <= 1.0e-6f)
+        return juce::String::fromUTF8 ("-\xe2\x88\x9e");
+    const auto db = juce::Decibels::gainToDecibels (gain, -150.0f);
+    return juce::String (db, std::abs (db) >= 9.995f ? 1 : 2);
+}
+
+// a field with Live's 1 px #111111 rim: #242424 (volume, peak) or #1E1E1E (buttons)
+void liveWell (juce::Graphics& g, juce::Rectangle<int> r, juce::Colour fill)
+{
+    g.setColour (lv::knobRing);
+    g.fillRect (r);
+    g.setColour (fill);
+    g.fillRect (r.reduced (1));
+}
+
+// Live's knob (live-session.png x 403..429 y 581..605): an open ring 27 px across, 3 px thick in #111111, open at the
+// bottom (from -135° to +135°), and a 3 px needle from the centre to the rim at the value
+void drawLiveKnob (juce::Graphics& g, juce::Rectangle<float> box, float value01)
+{
+    const auto centre = box.getCentre();
+    const auto radius = box.getWidth() * 0.5f - 1.5f;
+    constexpr auto from = -juce::MathConstants<float>::pi * 0.75f, to = juce::MathConstants<float>::pi * 0.75f;
+    juce::Path ring;
+    ring.addCentredArc (centre.x, centre.y, radius, radius, 0.0f, from, to, true);
+    g.setColour (lv::knobRing);
+    g.strokePath (ring, juce::PathStrokeType (3.0f, juce::PathStrokeType::curved, juce::PathStrokeType::butt));
+    const auto angle = from + juce::jlimit (0.0f, 1.0f, value01) * (to - from);
+    const auto tip = centre.getPointOnCircumference (radius + 1.0f, angle);
+    g.setColour (juce::Colour (0xff181818));
+    g.drawLine ({ centre, tip }, 3.0f);
+}
 } // namespace
 
 SessionMixerComponent::SessionMixerComponent (AudioEngine& e) : engine (e)
@@ -85,6 +230,7 @@ SessionMixerComponent::SessionMixerComponent (AudioEngine& e) : engine (e)
     setTitle (tr ("Session mixer"));
     setRepaintsOnMouseActivity (false);
     levels.resize ((std::size_t) maxMixerTracks * 2);
+    loudest.resize ((std::size_t) maxMixerTracks, 0.0f);
 }
 
 void SessionMixerComponent::setColumns (int count, int width, int scrollX, int tracks, int main)
@@ -144,11 +290,39 @@ int SessionMixerComponent::stripX (int column) const noexcept
     return column == mainColumn ? tracksWidth : column * columnWidth - scroll;
 }
 
+namespace
+{
+// Round 190jn: the sections in Live's look (each with its 2 px separator under it; the top separator and the stripe
+// are added by liveFrame), left out from the top as the classic look leaves them out when they do not fit
+sessionmixer::Sections liveSections (const SessionMixerView& view, int sendRowCount, int available)
+{
+    sessionmixer::Sections s;
+    if (! view.shown)
+        return s;
+    available -= liveTop + liveStripe;
+    s.volume = view.volume ? liveVolumeHeight + liveSeparator : 0;
+    s.trackOptions = view.trackOptions ? sessionmixer::trackOptionsHeight + liveSeparator : 0;
+    s.sends = view.sends && sendRowCount > 0 ? liveSendsBase + liveSendPitch * sendRowCount + liveSeparator : 0;
+    s.io = view.io ? sessionmixer::ioHeight + liveSeparator : 0;
+    for (auto* part : { &s.io, &s.sends, &s.trackOptions, &s.volume })
+        if (s.total() > std::max (0, available))
+            *part = 0;
+    return s;
+}
+int liveFrame (const sessionmixer::Sections& s) noexcept { return s.total() > 0 ? liveTop + liveStripe : 0; }
+} // namespace
+
 int SessionMixerComponent::wantedHeight (int available) const
 {
     const auto& song = engine.getSong();
     refreshCache();
-    return sessionmixer::sectionHeights (song.clipGrid ? song.clipGrid->mixerView : SessionMixerView {}, (int) allRows.size(), available).total();
+    const auto view = song.clipGrid ? song.clipGrid->mixerView : SessionMixerView {};
+    if (liveLook())
+    {
+        const auto s = liveSections (view, (int) allRows.size(), available);
+        return s.total() + liveFrame (s);
+    }
+    return sessionmixer::sectionHeights (view, (int) allRows.size(), available).total();
 }
 
 void SessionMixerComponent::layoutSections()
@@ -156,7 +330,8 @@ void SessionMixerComponent::layoutSections()
     const auto& song = engine.getSong();
     refreshCache();
     rows = allRows;
-    sections = sessionmixer::sectionHeights (song.clipGrid ? song.clipGrid->mixerView : SessionMixerView {}, (int) rows.size(), getHeight());
+    const auto view = song.clipGrid ? song.clipGrid->mixerView : SessionMixerView {};
+    sections = liveLook() ? liveSections (view, (int) rows.size(), getHeight()) : sessionmixer::sectionHeights (view, (int) rows.size(), getHeight());
     if (sections.sends == 0)
         rows.clear();
 }
@@ -176,9 +351,13 @@ bool SessionMixerComponent::tick()
         {
             auto& meter = levels[(std::size_t) insert * 2 + (std::size_t) ch];
             const auto before = meter;
-            meter.tick (meterBank.takeSessionPeak (insert, ch));
+            const auto blockPeak = meterBank.takeSessionPeak (insert, ch);
+            meter.tick (blockPeak);
             if (meter.level != before.level || meter.peak != before.peak || meter.clipped != before.clipped)
                 moved = true, movedInsert[(std::size_t) insert] = true;
+            // round 190jn (DL-107): Live's peak pill holds the loudest peak until it is clicked
+            if (auto& top = loudest[(std::size_t) insert]; blockPeak > top)
+                top = blockPeak, moved = true, movedInsert[(std::size_t) insert] = true;
         }
     };
     if (sections.volume > 0)
@@ -193,7 +372,11 @@ bool SessionMixerComponent::tick()
             juce::Rectangle<int> dirty;
             const auto add = [&] (int column) {
                 if (const auto insert = insertFor (column); insert >= 0 && insert < maxMixerTracks && movedInsert[(std::size_t) insert])
+                {
                     dirty = dirty.getUnion (partBounds (column, Part::fader).expanded (1));
+                    if (const auto pill = partBounds (column, Part::peak); ! pill.isEmpty()) // (Live's look: the peak pill)
+                        dirty = dirty.getUnion (pill);
+                }
             };
             add (mainColumn);
             for (int t = std::max (0, scroll / std::max (1, columnWidth)); t < columns && stripX (t) < tracksWidth; ++t)
@@ -214,6 +397,16 @@ bool SessionMixerComponent::tick()
             repaint();
         }
     }
+    // round 190jn: Live's look fills the grid's selected track's strip #464646; it follows the selection
+    if (liveLook())
+        if (auto* parent = getParentComponent())
+            if (const auto selected = clipGridSelection (*parent).first; selected != selectedShown)
+            {
+                for (const auto t : { selectedShown, selected })
+                    if (t >= 0 && t < columns)
+                        repaint (stripX (t), 0, columnWidth, getHeight());
+                selectedShown = selected;
+            }
     // the song may have changed (a send, a routing): the rows follow
     const auto before = rows;
     const auto sectionsBefore = sections.total();
@@ -250,6 +443,8 @@ juce::Rectangle<int> SessionMixerComponent::partBounds (int column, Part part, i
 {
     if (column != mainColumn && (column < 0 || column >= columns))
         return {};
+    if (liveLook())
+        return livePartBounds (column, part, row);
     const auto x0 = stripX (column), w = stripWidth (column);
     const auto ioY = 0, sendsY = sections.io, optionsY = sendsY + sections.sends, volumeY = optionsY + sections.trackOptions;
     const auto main = column == mainColumn;
@@ -293,6 +488,69 @@ juce::Rectangle<int> SessionMixerComponent::partBounds (int column, Part part, i
         case Part::fader:
             // the meter and its handle: from the handle's left to the scale
             return sections.volume > 0 && strip.insert >= 0 ? juce::Rectangle<int> (x0 + pad + 48, volumeY + 6, 20, sessionmixer::volumeHeight - 12) : juce::Rectangle<int>();
+        case Part::peak: // (Live's look only)
+        case Part::none:
+            break;
+    }
+    return {};
+}
+
+// Round 190jn: the parts in Live's look (live-session.png, strip 2 x 396..471: the volume section from y 634, Sends
+// from y 577; Main x 1540..1625). The meter sits 21 px (Main 22 px) before the strip's right edge; the peak pill and the
+// volume field are 35 px wide, 51 px left of the meter; pan, activator, Solo and Arm are centred under them.
+juce::Rectangle<int> SessionMixerComponent::livePartBounds (int column, Part part, int row) const
+{
+    using R = juce::Rectangle<int>;
+    const auto x0 = stripX (column), w = stripWidth (column);
+    const auto main = column == mainColumn;
+    const auto strip = stripFor (column);
+    const auto ioY = liveTop, sendsY = ioY + sections.io, optionsY = sendsY + sections.sends, volumeY = optionsY + sections.trackOptions;
+    const auto contentX = main ? x0 + 2 : x0, contentW = w - 2;
+    const auto full = [&] (int y, int h) { return R (contentX + 4, y, contentW - 8, h); };
+    const auto meterX = x0 + w - (main ? 22 : 21);
+    const auto fieldX = meterX - 51, centreX = fieldX + 17;
+    const auto volume = sections.volume > 0 && strip.insert >= 0;
+    const auto trackButtons = sections.volume > 0 && ! main && strip.insert > 0;
+    switch (part)
+    {
+        case Part::inType:
+            return sections.io > 0 && ! main ? full (ioY + 15, 16) : R();
+        case Part::inChannel:
+            return sections.io > 0 && ! main && ! strip.notes && strip.insert > 0 ? full (ioY + 33, 16) : R();
+        case Part::monIn:
+        case Part::monAuto:
+        case Part::monOff:
+        {
+            if (sections.io == 0 || main || strip.notes || strip.insert <= 0)
+                return {};
+            const auto r = full (ioY + 63, 16);
+            const auto each = (r.getWidth() - 4) / 3;
+            const auto i = part == Part::monIn ? 0 : part == Part::monAuto ? 1 : 2;
+            return { r.getX() + i * (each + 2), r.getY(), i == 2 ? r.getRight() - (r.getX() + 2 * (each + 2)) : each, r.getHeight() };
+        }
+        case Part::output:
+            return sections.io > 0 && ! main && strip.insert > 0 ? full (ioY + 93, 16) : R();
+        case Part::send:
+            if (sections.sends == 0 || main || strip.insert <= 0 || row < 0 || row >= (int) rows.size())
+                return {};
+            // A at x 7, B at x 40, each 17 px under the one before (x 403..429 y 581; x 436..462 y 598)
+            return { x0 + (row % 2 == 0 ? 7 : 40), sendsY + 4 + row * liveSendPitch, 27, 27 };
+        case Part::delay:
+            return sections.trackOptions > 0 && ! main && strip.insert > 0 ? R (contentX + 4, optionsY + 18, contentW - 8 - 20, 16) : R();
+        case Part::peak: // y 640..652
+            return volume ? R (fieldX, volumeY + 6, 35, 13) : R();
+        case Part::volume: // y 658..670
+            return volume ? R (fieldX, volumeY + 24, 35, 13) : R();
+        case Part::fader: // the handle (x 43..53), the ticks (50..52) and the meter (55..67), y 640..783
+            return volume ? R (meterX - 12, volumeY + 6, 25, liveMeterHeight) : R();
+        case Part::pan: // the ring y 700..726 (its centre mark from y 694)
+            return volume ? R (centreX - 13, volumeY + 66, 27, 27) : R();
+        case Part::activator: // 23 x 23 with its 1 px rim, y 727..749
+            return trackButtons ? R (centreX - 11, volumeY + 93, 23, 23) : R();
+        case Part::solo: // y 754..766
+            return trackButtons ? R (centreX - 11, volumeY + 120, 23, 13) : R();
+        case Part::arm: // y 771..783
+            return sections.volume > 0 && ! main ? R (centreX - 11, volumeY + 137, 23, 13) : R();
         case Part::none:
             break;
     }
@@ -305,7 +563,7 @@ SessionMixerComponent::Hit SessionMixerComponent::hitAt (juce::Point<int> p) con
     if (column != mainColumn && (column < 0 || column >= columns))
         return {};
     for (auto part : { Part::inType, Part::inChannel, Part::monIn, Part::monAuto, Part::monOff, Part::output, Part::delay, Part::volume, Part::pan,
-                       Part::activator, Part::solo, Part::arm, Part::fader })
+                       Part::activator, Part::solo, Part::arm, Part::fader, Part::peak })
         if (partBounds (column, part).contains (p))
             return { column, part, 0 };
     for (int r = 0; r < (int) rows.size(); ++r)
@@ -445,6 +703,23 @@ void SessionMixerComponent::setValue (const Hit& hit, double v)
 
 void SessionMixerComponent::paint (juce::Graphics& g)
 {
+    if (liveLook())
+    {
+        // round 190jn: Live's strips on its #242424 separators
+        g.fillAll (lv::separator);
+        if (sections.total() == 0)
+            return;
+        auto* parent = getParentComponent();
+        const auto selected = parent != nullptr ? clipGridSelection (*parent).first : -1;
+        {
+            juce::Graphics::ScopedSaveState save (g);
+            g.reduceClipRegion (juce::Rectangle<int> (0, 0, tracksWidth, getHeight()));
+            for (int t = std::max (0, scroll / std::max (1, columnWidth)); t < columns && stripX (t) < tracksWidth; ++t)
+                paintStripLive (g, t, selected);
+        }
+        paintStripLive (g, mainColumn, selected);
+        return;
+    }
     g.fillAll (c::bg2);
     if (sections.total() == 0)
         return;
@@ -631,6 +906,253 @@ void SessionMixerComponent::paintMeter (juce::Graphics& g, int insert, juce::Rec
     g.fillPath (tri);
 }
 
+// Round 190jn (design190ia CL-16): one strip in Live 12.4's look. Live's text is #B5B5B5 on its greys; the fields
+// are #242424 with a 1 px #111111 rim; buttons #1E1E1E; the Track Activator #FFAD56 with its number #070707.
+void SessionMixerComponent::paintStripLive (juce::Graphics& g, int column, int selected)
+{
+    const auto& song = engine.getSong();
+    const auto strip = stripFor (column);
+    const auto main = column == mainColumn;
+    const auto x0 = stripX (column), w = stripWidth (column);
+    const auto content = juce::Rectangle<int> (main ? x0 + 2 : x0, liveTop, w - 2, sections.total());
+    const auto hot = [this, column] (Part p, int row = 0) { return hover == Hit { column, p, row } || dragging == Hit { column, p, row }; };
+    const auto* m = strip.insert >= 0 && strip.insert < (int) song.mixer.size() ? &song.mixer[(std::size_t) strip.insert] : nullptr;
+
+    // the strip (selected track #464646), each section's 2 px separator under it, the track-colour stripe at the foot
+    g.setColour (! main && column == selected ? lv::raised : lv::surface);
+    g.fillRect (content);
+    g.setColour (lv::separator);
+    {
+        auto y = liveTop;
+        for (const auto h : { sections.io, sections.sends, sections.trackOptions, sections.volume })
+            if (h > 0)
+                g.fillRect (content.getX(), (y += h) - liveSeparator, content.getWidth(), liveSeparator);
+    }
+    const auto* info = ! main && column >= 0 && column < (int) song.playlistTracks.size() ? &song.playlistTracks[(std::size_t) column] : nullptr;
+    g.setColour (main ? lv::mainHeader : info != nullptr && info->colour != 0 ? juce::Colour (info->colour) : lv::raised);
+    g.fillRect (content.getX(), content.getBottom(), content.getWidth(), liveStripe);
+
+    const auto text = [&g] (const juce::String& t, juce::Rectangle<int> r, juce::Justification j, juce::Colour colour = lv::text) {
+        g.setColour (colour);
+        textcache::drawText (g, t, r, j, false);
+    };
+    g.setFont (liveFont());
+
+    // In/Out and Track Options: Live's greys on LYNX's own layout (Live's In/Out section is hidden in the reference set:
+    // not captured; its lit monitor state in Live's orange)
+    const auto box = [&] (Part part, const juce::String& t, bool arrow, bool dim = false) {
+        const auto r = partBounds (column, part);
+        liveWell (g, r, hot (part) ? lv::raised : lv::well);
+        auto inner = r.reduced (4, 0);
+        if (arrow)
+        {
+            const auto a = inner.removeFromRight (8).toFloat().withSizeKeepingCentre (7.0f, 4.0f);
+            juce::Path tri;
+            tri.addTriangle (a.getX(), a.getY(), a.getRight(), a.getY(), a.getCentreX(), a.getBottom());
+            g.setColour (lv::text);
+            g.fillPath (tri);
+        }
+        g.setColour (dim ? lv::text.withAlpha (0.5f) : lv::text);
+        textcache::drawText (g, t, inner, juce::Justification::centredLeft, true);
+    };
+    const auto toggle = [&] (Part part, const juce::String& t, bool on) {
+        const auto r = partBounds (column, part);
+        liveWell (g, r, on ? lv::on : hot (part) ? lv::raised : lv::well);
+        text (t, r, juce::Justification::centred, on ? lv::ink : lv::text);
+    };
+    const auto label = [&] (int y, const juce::String& t) { text (t, { content.getX() + 4, y, content.getWidth() - 8, 12 }, juce::Justification::centredLeft); };
+    if (sections.io > 0 && ! main)
+    {
+        const auto y0 = liveTop;
+        if (strip.notes)
+        {
+            label (y0 + 3, tr ("MIDI From"));
+            text (tr ("All Ins"), partBounds (column, Part::inType).reduced (4, 0), juce::Justification::centredLeft);
+        }
+        else if (m != nullptr)
+        {
+            label (y0 + 3, tr ("Audio From"));
+            const auto names = engine.getInputChannelNames();
+            box (Part::inType, m->inputChannel >= 0 ? tr ("Ext. In") : tr ("No Input"), true);
+            if (m->inputChannel >= 0)
+                box (Part::inChannel, utf8 (sessionmixer::inputChannelText (m->inputChannel, m->inputStereo)), true, m->inputChannel >= (int) names.size());
+            label (y0 + 51, tr ("Monitor"));
+            const auto mode = sessionmixer::monitorOf (m->monitor);
+            toggle (Part::monIn, tr ("In"), mode == sessionmixer::Monitor::in);
+            toggle (Part::monAuto, tr ("Auto"), mode == sessionmixer::Monitor::autoMode);
+            toggle (Part::monOff, tr ("Off"), mode == sessionmixer::Monitor::off);
+        }
+        if (m != nullptr)
+        {
+            label (y0 + 81, tr ("Audio To"));
+            const auto out = sessionmixer::outputOf (song, strip.insert);
+            box (Part::output, out == 0 ? tr ("Main") : out < 0 ? tr ("Sends Only") : insertName (song, out), true);
+        }
+    }
+
+    // Sends: "Sends" at the top right (x 435..465 y 583..591), the knobs in a zigzag with their letter under the centre
+    if (sections.sends > 0 && ! main && m != nullptr && ! rows.empty())
+    {
+        const auto sendsY = liveTop + sections.io;
+        text (tr ("Sends"), { x0 + 38, sendsY + 5, 36, 10 }, juce::Justification::centredLeft);
+        for (int r = 0; r < (int) rows.size(); ++r)
+        {
+            const auto knob = partBounds (column, Part::send, r);
+            const auto pos = sessionmixer::sendPosition (song, strip.insert, rows[(std::size_t) r]);
+            drawLiveKnob (g, knob.toFloat(), std::max (0.0f, pos));
+            text (juce::String::charToString ((juce::juce_wchar) ('A' + r % 26)), { knob.getX(), knob.getY() + 21, knob.getWidth(), 8 }, juce::Justification::centred,
+                  pos >= 0.0f ? lv::text : lv::text.withAlpha (0.5f));
+        }
+    }
+
+    if (sections.trackOptions > 0 && ! main && m != nullptr)
+    {
+        const auto y = liveTop + sections.io + sections.sends;
+        label (y + 4, tr ("Track Delay"));
+        const auto r = partBounds (column, Part::delay);
+        box (Part::delay, juce::String (sessionmixer::trackDelayMs (song, strip.insert) + 0.0, 2), false);
+        text ("ms", { r.getRight() + 3, r.getY(), 18, r.getHeight() }, juce::Justification::centredLeft);
+    }
+
+    if (sections.volume <= 0)
+        return;
+    const auto top = liveTop + sections.io + sections.sends + sections.trackOptions;
+    if (m == nullptr && ! main)
+    {
+        g.setColour (lv::text.withAlpha (0.6f));
+        textcache::drawFittedText (g, strip.insertCount > 1 ? tr ("{0} mixer tracks", { juce::String (strip.insertCount) }) : tr ("No mixer track"),
+                                   juce::Rectangle<int> (content.getX() + 4, top + 20, content.getWidth() - 8, 36), juce::Justification::centred, 2);
+    }
+    if (m != nullptr)
+    {
+        // the peak pill (#242424 capsule, 1 px #111111 rim; red once a peak went over 0 dB) and the volume field
+        const auto pill = partBounds (column, Part::peak).toFloat();
+        const auto peakGain = loudestPeak (strip.insert);
+        const auto clipped = peakGain >= 1.0f;
+        theme::fillRoundRect (g, pill, pill.getHeight() * 0.5f, lv::knobRing);
+        theme::fillRoundRect (g, pill.reduced (1.0f), pill.getHeight() * 0.5f - 1.0f, clipped ? liveRed : hot (Part::peak) ? lv::raised : juce::Colour (0xff242424));
+        text (livePeakText (peakGain), pill.toNearestInt(), juce::Justification::centred, clipped ? lv::ink : lv::text);
+        const auto field = partBounds (column, Part::volume);
+        liveWell (g, field, hot (Part::volume) ? lv::raised : juce::Colour (0xff242424));
+        text (liveVolumeText (m->volume), field, juce::Justification::centred);
+
+        // pan: the knob with Live's centre mark over it (x 414..420 y 694..698)
+        const auto pan = partBounds (column, Part::pan).toFloat();
+        juce::Path mark;
+        mark.addTriangle (pan.getCentreX() - 3.5f, pan.getY() - 6.0f, pan.getCentreX() + 3.5f, pan.getY() - 6.0f, pan.getCentreX(), pan.getY() - 1.5f);
+        g.setColour (lv::knobRing);
+        g.fillPath (mark);
+        drawLiveKnob (g, pan, (m->pan + 1.0f) * 0.5f);
+
+        if (! main)
+        {
+            // the Track Activator carries the track's number: #FFAD56 while the track plays (an inactive one: Live's
+            // grey button, not captured lit off), Solo and Arm as 23 x 13 buttons with a 1 px #111111 rim
+            const auto act = partBounds (column, Part::activator);
+            const auto active = ! m->muted;
+            const auto& mixerTracks = engine.getSong().mixer;
+            const auto soloing = std::any_of (mixerTracks.begin(), mixerTracks.end(), [] (const auto& t) { return t.solo; });
+            if (! active)
+            {
+                g.setColour (liveOffRing);
+                g.drawRect (act.expanded (1), 1);
+            }
+            liveWell (g, act, ! active ? lv::well : soloing ? liveSoloing : lv::on);
+            g.setFont (liveFont (theme::type::body, true));
+            text (juce::String (column + 1), act, juce::Justification::centred, ! active ? liveOffInk : soloing ? liveSoloingInk : lv::ink);
+            g.setFont (liveFont());
+            const auto solo = partBounds (column, Part::solo);
+            liveWell (g, solo, m->solo ? liveSoloOn : lv::well);
+            text ("S", solo, juce::Justification::centred, m->solo ? lv::ink : lv::text);
+        }
+        paintMeterLive (g, strip.insert, partBounds (column, Part::fader));
+    }
+    if (! main)
+    {
+        // Arm (x 406..428 y 771..783): a 7 px disc; a track of notes has Live's notch in it (live-session.png strips
+        // 1..3; the audio track 14 a plain disc); armed: #FF5559 with the glyph #070707
+        const auto arm = partBounds (column, Part::arm);
+        const auto armed = engine.isGridTrackArmed (column);
+        const auto fill = armed ? lv::arm : hot (Part::arm) ? lv::raised : lv::well;
+        liveWell (g, arm, fill);
+        const auto disc = arm.toFloat().withSizeKeepingCentre (7.0f, 7.0f);
+        g.setColour (armed ? lv::ink : lv::text);
+        g.fillEllipse (disc);
+        if (strip.notes)
+        {
+            const auto cx = disc.getCentreX() + 0.5f, cy = disc.getCentreY() + 1.0f;
+            g.setColour (fill);
+            g.drawLine (cx, disc.getY() + 1.0f, cx, cy, 1.0f);
+            g.drawLine (cx, cy, cx - 2.0f, cy + 1.5f, 1.0f);
+        }
+    }
+}
+
+// Live's meter (live-clipview-audio.png x 527..539 y 479..622): a 13 x 144 #181818 well with rounded ends and a 1 px
+// #3E3E3E line between the channels; each bar fills its 5 px from the bottom in Live's level colours; a 1 px hold line;
+// the 0 dB line #868686; ticks at Live's scale on the left; the volume handle (#B5B5B5, 11 x 13) points at the level
+void SessionMixerComponent::paintMeterLive (juce::Graphics& g, int insert, juce::Rectangle<int> area) const
+{
+    const auto& song = engine.getSong();
+    if (insert < 0 || insert >= (int) song.mixer.size())
+        return;
+    const auto meter = juce::Rectangle<int> (area.getRight() - 13, area.getY(), 13, area.getHeight());
+    const auto yAt = [&meter] (float db) { return meter.getY() + juce::roundToInt (liveMeterY (db, meter.getHeight())); };
+    theme::fillRoundRect (g, meter.toFloat(), 1.5f, lv::meterWell);
+    g.setColour (liveWellLine);
+    g.fillRect (meter.getX() + 6, meter.getY() + 1, 1, meter.getHeight() - 2);
+    for (int ch = 0; ch < 2; ++ch)
+    {
+        const auto& level = levels[(std::size_t) insert * 2 + (std::size_t) ch];
+        const auto bar = juce::Rectangle<int> (meter.getX() + (ch == 0 ? 1 : 7), meter.getY() + 1, 5, meter.getHeight() - 2);
+        if (level.level > 0.0f)
+        {
+            const auto db = juce::Decibels::gainToDecibels (level.level, -100.0f);
+            const auto lit = bar.withTop (juce::jlimit (bar.getY(), bar.getBottom(), yAt (db)));
+            // (one fill per colour band of Live's ramp: green below -18 dB, then towards yellow, orange and red)
+            const auto bandY = [&] (float d) { return juce::jlimit (lit.getY(), lit.getBottom(), yAt (d)); };
+            g.setColour (liveGreen);
+            g.fillRect (lit.withTop (bandY (-18.0f)));
+            for (auto y = lit.getY(); y < bandY (-18.0f); ++y)
+            {
+                g.setColour (liveLevelColour ((float) liveDbAt ((float) (y - meter.getY()), meter.getHeight())));
+                g.fillRect (lit.getX(), y, lit.getWidth(), 1);
+            }
+        }
+        if (level.peak > 0.001f)
+        {
+            const auto db = juce::Decibels::gainToDecibels (level.peak, -100.0f);
+            g.setColour (level.peak >= 1.0f ? liveRed : liveLevelColour (db));
+            g.fillRect (bar.getX(), juce::jlimit (bar.getY(), bar.getBottom() - 1, yAt (db)), bar.getWidth(), 1);
+        }
+    }
+    g.setColour (liveZeroLine);
+    g.fillRect (meter.getX() + 1, yAt (0.0f), 5, 1);
+    g.fillRect (meter.getX() + 7, yAt (0.0f), 5, 1);
+    g.setColour (juce::Colours::white.withAlpha (0.3f));
+    for (const auto& tick : liveScale)
+        g.fillRect (meter.getX() - 5, yAt (tick.db), 3, 1);
+    g.fillRect (meter.getX() - 5, meter.getY() + juce::roundToInt (liveScaleFloor * (float) meter.getHeight() / (float) liveMeterHeight), 3, 1);
+    const auto volumeDb = sessionmixer::volumeDb (song.mixer[(std::size_t) insert].volume);
+    const auto hy = (float) meter.getY() + liveMeterY (std::isfinite (volumeDb) ? (float) volumeDb : -INFINITY, meter.getHeight());
+    juce::Path tri;
+    tri.addTriangle ((float) meter.getX() - 12.0f, hy - 6.5f, (float) meter.getX() - 1.0f, hy, (float) meter.getX() - 12.0f, hy + 6.5f);
+    g.setColour (lv::text);
+    g.fillPath (tri);
+}
+
+void SessionMixerComponent::setMeterForSnapshot (int insert, float left, float right, float holdLeft, float holdRight, float maxPeak)
+{
+    if (insert < 0 || insert >= maxMixerTracks)
+        return;
+    auto& l = levels[(std::size_t) insert * 2];
+    auto& r = levels[(std::size_t) insert * 2 + 1];
+    l.level = left, r.level = right, l.peak = holdLeft, r.peak = holdRight;
+    l.clipped = holdLeft >= 1.0f, r.clipped = holdRight >= 1.0f;
+    loudest[(std::size_t) insert] = maxPeak;
+    repaint();
+}
+
 // --- mouse ------------------------------------------------------------------------------------------------------------
 
 void SessionMixerComponent::mouseDown (const juce::MouseEvent& e)
@@ -671,6 +1193,14 @@ void SessionMixerComponent::mouseDown (const juce::MouseEvent& e)
             ui::showValueTip (*this, partBounds (hit.column, hit.part, hit.row), spec.text (valueFor (hit)));
             return;
         }
+        case Part::peak: // round 190jn (DL-107): a click resets the peak pill and the meter's clip state
+            if (insert >= 0 && insert < maxMixerTracks)
+            {
+                loudest[(std::size_t) insert] = 0.0f;
+                for (int ch = 0; ch < 2; ++ch)
+                    levels[(std::size_t) insert * 2 + (std::size_t) ch].clipped = false;
+            }
+            break;
         case Part::activator:
             if (! popup)
                 engine.editSong ([insert, on = ! sessionmixer::isActive (song, insert)] (Song& s) { sessionmixer::setActive (s, insert, on); });
@@ -716,9 +1246,14 @@ void SessionMixerComponent::mouseDrag (const juce::MouseEvent& e)
     {
         // the handle follows the pointer on the meter's dB scale
         const auto area = partBounds (dragging.column, Part::fader);
-        const auto pos = juce::jlimit (0.0f, 1.0f, (float) (area.getBottom() - e.y) / (float) std::max (1, area.getHeight()));
-        const auto db = pos <= 0.0f ? -INFINITY : -60.0 + 66.0 * pos;
-        v = sessionmixer::positionForDb (db);
+        if (liveLook()) // (round 190jn: on Live's scale, the meter's own)
+            v = sessionmixer::positionForDb (liveDbAt ((float) (e.y - area.getY()), area.getHeight()));
+        else
+        {
+            const auto pos = juce::jlimit (0.0f, 1.0f, (float) (area.getBottom() - e.y) / (float) std::max (1, area.getHeight()));
+            const auto db = pos <= 0.0f ? -INFINITY : -60.0 + 66.0 * pos;
+            v = sessionmixer::positionForDb (db);
+        }
     }
     else
         v = drag.update (e, spec);
@@ -803,7 +1338,11 @@ juce::String SessionMixerComponent::tipFor (const Hit& hit) const
         case Part::monAuto: return tr ("Monitor Auto: hear the input while the track is armed, not while it plays back");
         case Part::monOff: return tr ("Monitor Off: never hear the input");
         case Part::output: return tr ("Audio To: where the track's mixer track goes (Main, or another mixer track)");
-        case Part::send: return tr ("Send level. Turning it up from zero makes the send");
+        case Part::send:
+            if (liveLook() && hit.row >= 0 && hit.row < (int) rows.size()) // (round 190jn: Live's knob shows only its letter)
+                return tr ("Send {0} to {1}. Turning it up from zero makes the send",
+                           { juce::String::charToString ((juce::juce_wchar) ('A' + hit.row % 26)), insertName (engine.getSong(), rows[(std::size_t) hit.row]) });
+            return tr ("Send level. Turning it up from zero makes the send");
         case Part::delay: return tr ("Track Delay in milliseconds: positive plays the track later, negative earlier");
         case Part::volume: return tr ("Volume in dB: drag up or down, double-click to type");
         case Part::fader: return tr ("Drag the handle to set the volume; double-click the meter for 0 dB");
@@ -811,6 +1350,7 @@ juce::String SessionMixerComponent::tipFor (const Hit& hit) const
         case Part::activator: return tr ("Track Activator: switches the track's mixer track on or off");
         case Part::solo: return tr ("Solo (Ctrl-click: solo several tracks)");
         case Part::arm: return tr ("Arm Recording (Ctrl-click: arm several tracks)");
+        case Part::peak: return tr ("Peak level: the loudest peak since the last reset. Click to reset it");
         case Part::none: break;
     }
     return {};
