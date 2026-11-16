@@ -28721,6 +28721,8 @@ private:
             saveSplashFrames (prefix);
             saveIconSheet (prefix + "-icons.png", 1.0f);
             saveIconSheet (prefix + "-icons-150.png", 1.5f);
+            saveStateSheet (prefix + "-states190je.png", 1.0f); // round 190je: the one state rule, per button kind
+            saveStateSheet (prefix + "-states190je-z3.png", 3.0f);
             saveWindow (lynx::MainComponent::makeHelpContent(), "-help.png");
             saveWindow (lynx::ui::makeTrackIconGrid (5, {}), "-trackicons168h.png"); // round 168h: the icon picker
             saveWindow (std::make_unique<lynx::toolbar::CustomizePanel> (lynx::toolbarlayout::Layout::makeDefault()), "-customize-toolbar.png");
@@ -30075,6 +30077,128 @@ private:
 
     // every icon at 16, 20 and 24 px (at `scale`, e.g. 1.5 for a 150% display), in the toolbar's
     // colours: at rest, hovered and switched on
+    // round 190je (design190ia G1): one state sheet per button kind: idle, hover, pressed, on, disabled, as the one state rule
+    // draws them (core/ThemePalette.h buttonLook)
+    static void saveStateSheet (const juce::String& path, float scale)
+    {
+        using namespace lynx;
+        scale *= shot::scale();
+        auto& lf = juce::LookAndFeel::getDefaultLookAndFeel();
+        const int labelWidth = 220, cellW = 120, cellH = 40, columns = 5;
+        const juce::String heads[] = { "idle", "hover", "pressed", "on", "disabled" };
+        enum Kind { text, iconFilled, iconOnce, iconSwitch, iconSwitchOwn, tick, radio, combo, tab, kinds };
+        const char* names[] = { "Text button", "Icon button (filled)", "Toolbar icon (acts once)", "Toolbar switch", "Toolbar switch (own colours)",
+                                "Tick box", "Radio choice", "Combo box", "Tab" };
+        const auto w = labelWidth + columns * cellW + 16, h = 30 + kinds * cellH + 16;
+        juce::Image image (juce::Image::ARGB, juce::roundToInt ((float) w * scale), juce::roundToInt ((float) h * scale), true);
+        {
+            juce::Graphics g (image);
+            g.addTransform (juce::AffineTransform::scale (scale));
+            g.fillAll (theme::colour::bg3);
+            g.setFont (theme::font (theme::type::small, true));
+            g.setColour (theme::colour::textSecondary);
+            for (int c = 0; c < columns; ++c)
+                g.drawText (heads[c], labelWidth + c * cellW, 6, cellW, 20, juce::Justification::centred);
+
+            for (int k = 0; k < kinds; ++k)
+            {
+                const auto y = 30 + k * cellH;
+                g.setFont (theme::font (theme::type::small));
+                g.setColour (theme::colour::textPrimary);
+                g.drawText (names[k], 8, y, labelWidth - 12, cellH, juce::Justification::centredLeft);
+                for (int c = 0; c < columns; ++c)
+                {
+                    const auto hover = c == 1, down = c == 2, on = c == 3, disabled = c == 4;
+                    const juce::Rectangle<int> cell (labelWidth + c * cellW, y, cellW, cellH);
+                    juce::Graphics::ScopedSaveState state (g);
+                    g.reduceClipRegion (cell);
+                    switch (k)
+                    {
+                        case text:
+                        {
+                            juce::TextButton b ("Export");
+                            b.setSize (96, 26);
+                            b.setToggleState (on, juce::dontSendNotification);
+                            b.setEnabled (! disabled);
+                            g.setOrigin (cell.getX() + 12, cell.getY() + 7);
+                            lf.drawButtonBackground (g, b, b.findColour (on ? juce::TextButton::buttonOnColourId : juce::TextButton::buttonColourId), hover, down);
+                            lf.drawButtonText (g, b, hover, down);
+                            break;
+                        }
+                        case iconFilled:
+                        case iconOnce:
+                        case iconSwitch:
+                        case iconSwitchOwn:
+                        {
+                            IconButton b ("state", k == iconFilled ? Icon::plus : k == iconOnce ? Icon::save : Icon::metronome);
+                            b.setFlat (k != iconFilled);
+                            if (k == iconSwitch)
+                                b.setToggleLook (true);
+                            if (k == iconSwitchOwn)
+                            {
+                                b.setOnColour (theme::colour::bg6);
+                                b.setIconColourWhenOn (theme::colour::accent);
+                            }
+                            b.setSize (k == iconFilled ? 34 : 30, 30);
+                            b.setToggleState (on, juce::dontSendNotification);
+                            b.setEnabled (! disabled);
+                            g.setOrigin (cell.getX() + 12, cell.getY() + 5);
+                            b.paintButton (g, hover, down);
+                            break;
+                        }
+                        case tick:
+                        case radio:
+                        {
+                            juce::ToggleButton b (k == tick ? "Snap to grid" : "Pattern");
+                            if (k == radio)
+                                b.getProperties().set ("lynxRadio", true);
+                            b.setSize (110, 24);
+                            b.setToggleState (on, juce::dontSendNotification);
+                            b.setEnabled (! disabled);
+                            g.setOrigin (cell.getX() + 6, cell.getY() + 8);
+                            lf.drawToggleButton (g, b, hover, down);
+                            break;
+                        }
+                        case combo:
+                        {
+                            if (hover || down || on) // (a combo box's hover comes from the mouse itself: --uitest covers it)
+                                break;
+                            juce::ComboBox b;
+                            b.setSize (100, 24);
+                            b.setEnabled (! disabled);
+                            g.setOrigin (cell.getX() + 10, cell.getY() + 8);
+                            lf.drawComboBox (g, 100, 24, false, 0, 0, 0, 0, b);
+                            g.setColour (disabled ? theme::colour::textDisabled : theme::colour::textPrimary);
+                            g.setFont (lf.getComboBoxFont (b));
+                            g.drawText ("1/16 step", 6, 0, 70, 24, juce::Justification::centredLeft);
+                            break;
+                        }
+                        case tab:
+                        {
+                            if (disabled)
+                                break;
+                            juce::TabbedButtonBar bar (juce::TabbedButtonBar::TabsAtTop);
+                            bar.setSize (220, 32);
+                            bar.addTab ("Audio", theme::colour::bg2, -1);
+                            bar.addTab ("MIDI", theme::colour::bg2, -1);
+                            bar.setCurrentTabIndex (on ? 1 : 0, false);
+                            auto* tabButton = bar.getTabButton (1);
+                            tabButton->setBounds (0, 0, 100, 32);
+                            g.setOrigin (cell.getX() + 10, cell.getY() + 4);
+                            g.setColour (theme::colour::bg1);
+                            g.fillRect (0, 0, 100, 32);
+                            lf.drawTabButton (*tabButton, g, hover, down);
+                            break;
+                        }
+                        default:
+                            break;
+                    }
+                }
+            }
+        }
+        writePng (image, path);
+    }
+
     static void saveIconSheet (const juce::String& path, float scale)
     {
         scale *= lynx::shot::scale();

@@ -737,6 +737,10 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
             b.setOnColour (colour::textPrimary.withAlpha (0.08f));
             b.setIconColourWhenOn (colour::textPrimary);
         }
+        // round 190je (one state rule): the transport and the save reminder light up when they act, they are not
+        // switches whose "on" look a hover should preview (the others with "on" colours are)
+        for (auto* b : { &playButton, &recordButton, &saveButton })
+            b->setToggleLook (false);
     }
     quickTips = std::make_unique<ui::QuickTipWindow>();
 

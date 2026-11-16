@@ -17836,3 +17836,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Details190ihTests.inc" // round 190ih: DETAILS slices R2, R3, R4, R7, R9, R12, R14
 #include "Rackmix190ioTests.inc" // round 190io: FL rack + Mixer landmarks, Mixer details, issue #154 part 2
 #include "Bugs190irTests.inc" // round 190ir: issue #189 text size, takes on the tracks FL picks (Discord report)
+#include "G1menus190jeTests.inc" // round 190je: contrast floors, one state language, grid intensity, FL menus (design190ia G1, FW-S3)

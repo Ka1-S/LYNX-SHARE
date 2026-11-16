@@ -23,9 +23,56 @@ struct Palette
     std::uint32_t knobArc, knobTrack, stepOff, stepOffAlt, stepNote;
     std::uint32_t gridBar, gridBeat, gridStep, keyBlack, rowWhite, rowBlack;
     std::uint32_t noteSoft, noteHard, noteMuted, ledOff;
+    // the 1 px outline of controls whose fill alone does not read on the panels (secondary buttons, combo boxes, tick
+    // boxes, text fields): at least partContrastFloor against bg4, the highest surface they sit on (round 190je, design190ia
+    // G1 / FW idea 6)
+    std::uint32_t outline;
 
     bool operator== (const Palette&) const = default;
 };
+
+// --- contrast floors (round 190je, design190ia G1; COMMUNITY.md: low contrast is the first complaint about FL, Live,
+// BandLab and FL Studio Mobile alike). WCAG 2: text >= 4.5:1, UI parts (outlines, icons) >= 3:1. Disabled text is held
+// at 3:1 too: still readable, clearly dimmer than the rest. Measured against bg3, the surface of menus, toolbars and
+// dialogs; derivePalette lifts a user theme's tokens to them.
+constexpr double textContrastFloor = 4.5;
+constexpr double partContrastFloor = 3.0;
+constexpr double disabledContrastFloor = 3.0;
+// `colour` moved away from `background` (towards white on a dark one, black on a light one) just far enough to reach
+// `ratio`; unchanged when it already does.
+std::uint32_t withContrast (std::uint32_t colour, std::uint32_t background, double ratio);
+
+// --- one state language for every button kind (round 190je, design190ia G1: FM-2, FM idea 5, FW idea 5) -------------
+// FL 2024: "toolbar buttons show if they're pressed when hovered": hovering a toggle previews its "on" look. One rule
+// for every kind, so the rack, the mixer and the toolbars read alike:
+//   idle      secondary: bg4 + outline; flat: nothing;
+//   hover     momentary: bg5 (+ outline, or borderStrong on a flat one), content textPrimary;
+//             toggle that is off: its "on" look at partial strength (accentMuted 70 %, accent edge 50 %, accentHover icon);
+//   pressed   bg0 (a toggle: accentMuted, accent edge); an "on" button: accentPressed;
+//   on        the accent (accentHover under the mouse), content onAccent;
+//   disabled  the idle fill and edge at half alpha, content textDisabled, no hover.
+enum class ButtonKind
+{
+    secondary,     // a filled text / icon button (TextButton, a non-flat IconButton, a combo box)
+    flatMomentary, // a toolbar icon that acts once (save, undo, a menu)
+    flatToggle     // a toolbar icon that switches something on and off (metronome, panels, snap)
+};
+struct ButtonLook
+{
+    std::uint32_t fill, edge, content; // ARGB; alpha 0 = not drawn
+
+    bool operator== (const ButtonLook&) const = default;
+};
+// `hover` 0..1 (IconButton fades it over 120 ms); `on`: toggled on (or a primary button).
+ButtonLook buttonLook (const Palette& palette, ButtonKind kind, bool on, double hover, bool down, bool enabled);
+
+// --- Settings › Theme › Grid line intensity (round 190je, design190ia FM-18; Live 12's "Grid Line Intensity") -------
+// The bar, beat and step lines pushed away from (or towards) the field they sit on (rowWhite) by `intensity`; 1 = the
+// theme's own lines, unchanged.
+constexpr double gridIntensityMin = 0.6, gridIntensityMax = 1.6;
+Palette withGridIntensity (Palette palette, double intensity);
+
+
 
 // FL's number wheels ("digiwheels": channel RANGE / TRACK, the channel rack's insert box) in the LYNX skin (round
 // 168s): a dark inset display with light text, red (the accent) only while hovered or dragged. C = a colour type.
@@ -83,10 +130,14 @@ struct Spec
     float imageOpacity = 1.0f;       // 0..1
     float dim = 0.0f;                // 0..1: darkens the image towards the backdrop colour
     std::string startupSound;        // audio file played at start instead of LYNX's own sound (empty = LYNX's; issue #12)
+    float gridIntensity = 1.0f;      // Grid line intensity (round 190je): gridIntensityMin..Max, 1 = the theme's lines
 
     bool isDefaultLook() const noexcept { return accent == defaultAccent && background == defaultBackground && workspace == 0 && image.empty(); }
     bool operator== (const Spec&) const = default;
 };
+
+// The palette a theme draws with: derivePalette, then its grid line intensity.
+Palette paletteFor (const Spec& spec);
 
 // The built-in themes ("LYNX" first = the default look).
 const std::vector<Spec>& builtInThemes();

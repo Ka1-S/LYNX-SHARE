@@ -351,7 +351,7 @@ void drawSplashFrame (juce::Graphics& g, const SplashFrame& frame)
             g.setColour (colour::textSecondary.withAlpha (info));
             g.setFont (fonts[2]);
             g.drawText (frame.subtitle, 302, (int) baseline2 + 24, 240, 22, juce::Justification::centredLeft);
-            g.setColour (colour::textDisabled.withAlpha (info));
+            g.setColour (colour::textSecondary.withAlpha (info)); // (round 190je: 7:1; textDisabled read 3.0:1 on the card)
             g.setFont (fonts[3]);
             g.drawText (frame.version, 302, (int) baseline2 + 48, 240, 18, juce::Justification::centredLeft);
         }
@@ -364,7 +364,7 @@ void drawSplashFrame (juce::Graphics& g, const SplashFrame& frame)
         g.fillRoundedRectangle (bar, 1.5f);
         g.setColour (colour::accent);
         g.fillRoundedRectangle (bar.withWidth (bar.getWidth() * (float) easeOutCubic (juce::jmin (1.0, t / juce::jmax (0.1, frame.barDuration)))), 1.5f);
-        g.setColour (colour::textDisabled);
+        g.setColour (colour::textSecondary); // (round 190je, design190ia SG-23: was textDisabled, 3.1:1)
         g.setFont (fonts[3]);
         g.drawText (frame.status, juce::Rectangle<float> (24.0f, bar.getY() - 24.0f, card.getWidth() - 48.0f, 18.0f), juce::Justification::centredLeft);
     }

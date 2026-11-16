@@ -316,6 +316,13 @@ constexpr bool nativeTiles =
     false;
    #endif
 std::uint64_t paletteStamp = 0; // (setPalette: +1; part of the knob tiles' keys)
+
+// the palette of the tokens in use (setPalette), for the state rules that read several tokens at once (round 190je)
+themes::Palette& paletteInUse()
+{
+    static themes::Palette palette = themes::defaultPalette();
+    return palette;
+}
 // (the largest channel difference a tile may show against its shape drawn straight, --selftest; see paintCacheSelfTest)
 constexpr int nativeTolerance = 1, nativeKnobTolerance = 3;
 } // namespace
@@ -911,6 +918,7 @@ juce::String paintCacheSelfTest()
 void setPalette (const themes::Palette& p)
 {
     ++paletteStamp;
+    paletteInUse() = p;
     auto c = [] (std::uint32_t argb) { return juce::Colour (argb); };
     bg0 = c (p.bg0); bg1 = c (p.bg1); bg2 = c (p.bg2); bg3 = c (p.bg3); bg4 = c (p.bg4); bg5 = c (p.bg5); bg6 = c (p.bg6);
     border = c (p.border); borderStrong = c (p.borderStrong);
@@ -922,11 +930,18 @@ void setPalette (const themes::Palette& p)
     gridBar = c (p.gridBar); gridBeat = c (p.gridBeat); gridStep = c (p.gridStep); keyBlack = c (p.keyBlack);
     rowWhite = c (p.rowWhite); rowBlack = c (p.rowBlack);
     noteSoft = c (p.noteSoft); noteHard = c (p.noteHard); noteMuted = c (p.noteMuted); ledOff = c (p.ledOff);
+    colour::outline = c (p.outline);
 
     // the legacy names
     theme::window = bg1; theme::panel = bg2; theme::toolbar = bg3; theme::channelButton = bg4; theme::channelButtonSelected = bg6;
     theme::knobBackground = bg0; theme::stepOn = accent; theme::stepOnOffGrid = stepNote; theme::accentOrange = accent;
     theme::playhead = accent; theme::text = textPrimary;
+}
+
+ButtonColours buttonColours (themes::ButtonKind kind, bool on, float hover, bool down, bool enabled)
+{
+    const auto look = themes::buttonLook (paletteInUse(), kind, on, (double) hover, down, enabled);
+    return { juce::Colour (look.fill), juce::Colour (look.edge), juce::Colour (look.content) };
 }
 
 juce::String mnemonic (const juce::String& text, char key)
@@ -960,7 +975,7 @@ themes::Palette currentPalette()
     return { c (bg0), c (bg1), c (bg2), c (bg3), c (bg4), c (bg5), c (bg6), c (border), c (borderStrong), c (textPrimary), c (textSecondary),
              c (textDisabled), c (accent), c (accentHover), c (accentPressed), c (accentMuted), c (onAccent), c (selectionFill), c (knobArc),
              c (knobTrack), c (colour::stepOff), c (stepOffAlt), c (stepNote), c (gridBar), c (gridBeat), c (gridStep), c (keyBlack), c (rowWhite),
-             c (rowBlack), c (noteSoft), c (noteHard), c (noteMuted), c (ledOff) };
+             c (rowBlack), c (noteSoft), c (noteHard), c (noteMuted), c (ledOff), c (colour::outline) };
 }
 
 namespace
@@ -1323,7 +1338,7 @@ void LookAndFeel::refreshColours()
     setColour (juce::TextEditor::textColourId, textPrimary);
     setColour (juce::TextEditor::highlightColourId, accent.withAlpha (0.35f));
     setColour (juce::TextEditor::highlightedTextColourId, textPrimary);
-    setColour (juce::TextEditor::outlineColourId, border);
+    setColour (juce::TextEditor::outlineColourId, colour::outline); // (round 190je: 3:1, was border 1.1:1)
     setColour (juce::TextEditor::focusedOutlineColourId, accent);
     setColour (juce::TextEditor::shadowColourId, juce::Colours::transparentBlack);
     setColour (juce::CaretComponent::caretColourId, accent);
@@ -1386,14 +1401,27 @@ void LookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& button,
     auto bounds = button.getLocalBounds().toFloat().reduced (0.5f);
     const auto on = button.getToggleState();
     auto base = backgroundColour; // already buttonOnColour when toggled
+    juce::Colour edge;
 
-    if (down)
-        base = on ? accentPressed : (base == bg4 ? bg6 : base.brighter (0.18f));
-    else if (highlighted)
-        base = on ? accentHover : (base == bg4 ? bg5 : base.brighter (0.1f));
+    // LYNX's own colours (a secondary button: bg4; on / primary: the accent) follow the one state rule (round 190je);
+    // a button given colours of its own keeps its shading
+    const auto standard = base == bg4 || base == accent;
+    if (standard)
+    {
+        const auto look = buttonColours (themes::ButtonKind::secondary, on || base == accent, highlighted ? 1.0f : 0.0f, down, button.isEnabled());
+        base = look.fill;
+        edge = look.edge;
+    }
+    else
+    {
+        if (down)
+            base = on ? accentPressed : base.brighter (0.18f);
+        else if (highlighted)
+            base = on ? accentHover : base.brighter (0.1f);
 
-    if (! button.isEnabled())
-        base = base.withMultipliedAlpha (0.5f);
+        if (! button.isEnabled())
+            base = base.withMultipliedAlpha (0.5f);
+    }
 
     const auto flatLeft = button.isConnectedOnLeft(), flatRight = button.isConnectedOnRight();
     juce::Path p;
@@ -1401,6 +1429,16 @@ void LookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& button,
                            ! flatRight, ! flatLeft, ! flatRight);
     g.setColour (base);
     g.fillPath (p);
+    if (! edge.isTransparent())
+    {
+        // 1 px outline (round 190je, FW idea 6): the fill alone reads 1.1:1 on the panels
+        // (on the pixel centres: `bounds` is the button inset by half a pixel, so the line covers exactly its edge pixels)
+        juce::Path rim;
+        rim.addRoundedRectangle (bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight(), radius::md, radius::md, ! flatLeft, ! flatRight,
+                                 ! flatLeft, ! flatRight);
+        g.setColour (edge);
+        g.strokePath (rim, juce::PathStrokeType (1.0f));
+    }
 
     if ((button.hasKeyboardFocus (false) || button.getProperties().contains ("lynxSnapshotFocus")) // (--snapshot: see saveWindow)
         && button.getWantsKeyboardFocus())
@@ -1419,8 +1457,9 @@ void LookAndFeel::drawButtonText (juce::Graphics& g, juce::TextButton& button, b
 {
     const auto font = getTextButtonFont (button, button.getHeight());
     g.setFont (font);
-    const auto fg = button.findColour (button.getToggleState() ? juce::TextButton::textColourOnId : juce::TextButton::textColourOffId)
-                        .withMultipliedAlpha (button.isEnabled() ? 1.0f : 0.45f);
+    const auto own = button.findColour (button.getToggleState() ? juce::TextButton::textColourOnId : juce::TextButton::textColourOffId);
+    // disabled: the disabled text token (3.6:1, round 190je) for LYNX's own text colours, else the colour dimmed as before
+    const auto fg = button.isEnabled() ? own : (own == textPrimary || own == onAccent) ? textDisabled : own.withMultipliedAlpha (0.45f);
     g.setColour (fg);
 
     auto area = button.getLocalBounds().reduced (juce::jmin (8, button.getWidth() / 6), 0);
@@ -1454,7 +1493,8 @@ void LookAndFeel::drawTickBox (juce::Graphics& g, juce::Component& component, fl
         const auto circle = box.withSizeKeepingCentre (juce::jmin (box.getWidth(), box.getHeight()), juce::jmin (box.getWidth(), box.getHeight()));
         g.setColour (bg0);
         g.fillEllipse (circle);
-        g.setColour (ticked ? (enabled ? (highlighted ? accentHover : accent) : accentMuted) : (highlighted ? textSecondary : borderStrong));
+        g.setColour (ticked ? (enabled ? (highlighted ? accentHover : accent) : accentMuted)
+                            : (highlighted ? textSecondary : enabled ? colour::outline : colour::outline.withMultipliedAlpha (0.5f)));
         g.drawEllipse (circle.reduced (0.5f), 1.2f);
         if (ticked)
             g.fillEllipse (circle.reduced (circle.getWidth() * 0.28f));
@@ -1466,7 +1506,8 @@ void LookAndFeel::drawTickBox (juce::Graphics& g, juce::Component& component, fl
     else
     {
         fillRounded (g, box, radius::sm, bg0);
-        outlineRounded (g, box, radius::sm, highlighted ? textSecondary : borderStrong);
+        // (round 190je: the outline at 3:1, was borderStrong 1.4:1)
+        outlineRounded (g, box.expanded (0.5f), radius::sm, highlighted ? textSecondary : enabled ? colour::outline : colour::outline.withMultipliedAlpha (0.5f));
     }
 
     if (ticked)
@@ -1481,7 +1522,8 @@ void LookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& butto
     drawTickBox (g, button, 2.0f, ((float) button.getHeight() - tickSize) * 0.5f, tickSize, tickSize, button.getToggleState(),
                  button.isEnabled(), highlighted, down);
 
-    g.setColour (button.findColour (juce::ToggleButton::textColourId).withMultipliedAlpha (button.isEnabled() ? 1.0f : 0.5f));
+    const auto own = button.findColour (juce::ToggleButton::textColourId);
+    g.setColour (button.isEnabled() ? own : own == textPrimary ? textDisabled : own.withMultipliedAlpha (0.5f));
     g.setFont (uiFont (fontSize));
     const auto textArea = button.getLocalBounds().withTrimmedLeft (juce::roundToInt (tickSize) + 8).withTrimmedRight (2);
     g.drawFittedText (button.getButtonText(), textArea, juce::Justification::centredLeft, 2, 0.85f);
@@ -1494,12 +1536,17 @@ void LookAndFeel::drawComboBox (juce::Graphics& g, int width, int height, bool, 
 {
     const auto bounds = juce::Rectangle<float> (0.0f, 0.0f, (float) width, (float) height).reduced (0.5f);
     const auto hover = box.isMouseOver (true) && box.isEnabled();
-    fillRounded (g, bounds, radius::md, hover ? bg5 : box.findColour (juce::ComboBox::backgroundColourId));
+    const auto own = box.findColour (juce::ComboBox::backgroundColourId);
+    // LYNX's own box (bg4) follows the button rule (round 190je): bg5 under the mouse, a 1 px outline at 3:1
+    const auto look = buttonColours (themes::ButtonKind::secondary, false, hover ? 1.0f : 0.0f, false, box.isEnabled());
+    fillRounded (g, bounds, radius::md, own == bg4 ? look.fill : hover ? bg5 : own);
 
     if ((box.hasKeyboardFocus (true) || box.getProperties().contains ("lynxSnapshotFocus")) && box.getWantsKeyboardFocus())
         outlineRounded (g, bounds, radius::md, accent.withAlpha (0.7f));
-    else if (! box.findColour (juce::ComboBox::outlineColourId).isTransparent())
-        outlineRounded (g, bounds, radius::md, box.findColour (juce::ComboBox::outlineColourId));
+    else if (const auto rim = box.findColour (juce::ComboBox::outlineColourId); ! rim.isTransparent() && rim != borderStrong)
+        outlineRounded (g, bounds, radius::md, rim);
+    else if (own == bg4 || rim == borderStrong) // (Settings' boxes asked for borderStrong, 1.4:1: the 3:1 outline)
+        outlineRounded (g, bounds.expanded (0.5f), radius::md, look.edge); // (expanded: the helper insets half a pixel, crisp)
 
     const auto arrowSize = juce::jmin (14.0f, (float) height * 0.6f);
     const auto arrowArea = juce::Rectangle<float> ((float) width - arrowSize - 7.0f, ((float) height - arrowSize) * 0.5f, arrowSize, arrowSize);
@@ -1516,7 +1563,8 @@ void LookAndFeel::positionComboBoxText (juce::ComboBox& box, juce::Label& label)
     const auto arrowSize = juce::jmin (14, juce::roundToInt ((float) box.getHeight() * 0.6f));
     label.setBounds (2, 1, box.getWidth() - arrowSize - 12, box.getHeight() - 2);
     label.setFont (getComboBoxFont (box));
-    label.setColour (juce::Label::textColourId, box.findColour (juce::ComboBox::textColourId).withMultipliedAlpha (box.isEnabled() ? 1.0f : 0.5f));
+    const auto own = box.findColour (juce::ComboBox::textColourId);
+    label.setColour (juce::Label::textColourId, box.isEnabled() ? own : own == textPrimary ? textDisabled : own.withMultipliedAlpha (0.5f));
 }
 
 void LookAndFeel::preparePopupMenuWindow (juce::Component& window)

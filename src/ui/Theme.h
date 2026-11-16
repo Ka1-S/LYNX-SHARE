@@ -34,10 +34,11 @@ inline juce::Colour bg6 { 0xff434852 };   // controls pressed / neutral "on"
 
 inline juce::Colour border { 0xff2a2d34 };       // hairlines between areas
 inline juce::Colour borderStrong { 0xff3b3f48 }; // control outlines
+inline juce::Colour outline { 0xff747983 };      // outlines that must read at 3:1 on the panels, bg4 included (round 190je: buttons, fields)
 
 inline juce::Colour textPrimary { 0xffeceef2 };
 inline juce::Colour textSecondary { 0xffa1a6b0 };
-inline juce::Colour textDisabled { 0xff60656f };
+inline juce::Colour textDisabled { 0xff767b85 }; // round 190je: 3.6:1 on bg3 (was #60656F, 2.6:1)
 
 // the red accent
 inline juce::Colour accent { 0xffe5383b };
@@ -85,6 +86,15 @@ inline juce::Colour audioClip { 0xff5a87b8 };
 void setPalette (const themes::Palette& palette); // the tokens only (ThemeSettings also refreshes the windows)
 themes::Palette currentPalette();
 
+// --- one state language for every button kind (round 190je, design190ia G1; the rule: core/ThemePalette.h buttonLook) ---
+// idle / hover (0..1, faded by IconButton) / pressed / on / disabled for a secondary button, a flat momentary icon or a
+// flat switch (whose hover previews its "on" look, FL 2024). Text buttons, icon buttons, combo boxes and tick boxes use it.
+struct ButtonColours
+{
+    juce::Colour fill, edge, content; // transparent: not drawn
+};
+ButtonColours buttonColours (themes::ButtonKind kind, bool on, float hover, bool down, bool enabled);
+
 // --- typography ----------------------------------------------------------------------------------
 namespace type
 {
@@ -116,6 +126,7 @@ void saveTextSize (int percent);
 // LYNX_PAINT_CACHE=0 (diagnostics) makes a new font on every call, as before.
 juce::Font font (float size, bool bold = false);
 void clearFontCache();
+
 
 // The width a column of labels needs: `minWidth` when every text fits in it (the English layout), else the widest
 // text (+ the label borders), up to `maxWidth` (round 165o: translated labels are often longer).
