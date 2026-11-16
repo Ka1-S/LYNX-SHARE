@@ -433,6 +433,10 @@ void fillLaunchTriangle (juce::Graphics& g, juce::Rectangle<float> a, juce::Colo
 // Round 190io: FL's raised step keycap and the colour-filled plates (rack buttons, Mixer header bands), drawn from cached
 // tiles where the context's scale is whole (as the rounded rectangles): one blit per keycap instead of five fills
 // (paintbench: the rack's whole frame went from 16 to 35 ms with the fills).
+// Rollup 0.1.30 (round 190iy): tilesForPaths(), not tilesForPrimitives(): on Windows the latter is off (Direct2D draws a
+// rounded rectangle as one GPU primitive), so these drew five fills per keycap and a new path geometry per plate there
+// — the rack's whole frame on Thief 10 → 22 ms (--paintbench, Windows); as the knobs and triangles, they are Direct2D
+// bitmaps there now (Linux unchanged: both switches are the same there).
 void drawKeycap (juce::Graphics& g, juce::Rectangle<int> r, juce::Colour fill, bool lit)
 {
     if (r.isEmpty() || ! g.clipRegionIntersects (r))
@@ -456,7 +460,7 @@ void drawKeycap (juce::Graphics& g, juce::Rectangle<int> r, juce::Colour fill, b
     static SpriteCache cache;
     static const bool registered = lynx::ui::registerImageCache ([] { cache.images.clear(); }); (void) registered;
     const auto key = mix (mix (mix (0x6a09e667f3bcc908ull, (std::uint64_t) fill.getARGB()), lit ? 1u : 0u), paletteStamp);
-    if (! tilesForPrimitives() || ! drawTile (g, cache, r.toFloat(), 0.0f, key, nativeTiles, fill, direct))
+    if (! tilesForPaths() || ! drawTile (g, cache, r.toFloat(), 0.0f, key, nativeTiles, fill, direct))
         direct (g, r.toFloat());
 }
 
@@ -497,7 +501,7 @@ void drawStepStrip (juce::Graphics& g, juce::Rectangle<int> firstCell, int pitch
     static const bool registered = lynx::ui::registerImageCache ([] { cache.images.clear(); }); (void) registered;
     const auto key = mix (mix (mix (mix (mix (0x3c6ef372fe94f82bull, (std::uint64_t) a.getARGB()), (std::uint64_t) b.getARGB()), (std::uint64_t) pitch),
                                ghost ? 1u : 0u), paletteStamp);
-    if (! tilesForPrimitives() || ! drawTile (g, cache, bounds.toFloat(), 0.0f, key, nativeTiles, a, direct))
+    if (! tilesForPaths() || ! drawTile (g, cache, bounds.toFloat(), 0.0f, key, nativeTiles, a, direct))
         direct (g, bounds.toFloat());
 }
 
@@ -518,7 +522,7 @@ void fillPlate (juce::Graphics& g, juce::Rectangle<float> r, float corner, juce:
     static const bool registered = lynx::ui::registerImageCache ([] { cache.images.clear(); }); (void) registered;
     const auto key = mix (mix (mix (mix (0xbb67ae8584caa73bull, (std::uint64_t) top.getARGB()), (std::uint64_t) bottom.getARGB()),
                                (std::uint64_t) eighth (corner)), squareBottom ? 1u : 0u);
-    if (! tilesForPrimitives() || ! drawTile (g, cache, r, 0.0f, key, nativeTiles, bottom, direct))
+    if (! tilesForPaths() || ! drawTile (g, cache, r, 0.0f, key, nativeTiles, bottom, direct))
         direct (g, r);
 }
 
