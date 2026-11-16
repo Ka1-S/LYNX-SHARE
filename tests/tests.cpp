@@ -17836,3 +17836,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Details190ihTests.inc" // round 190ih: DETAILS slices R2, R3, R4, R7, R9, R12, R14
 #include "Rackmix190ioTests.inc" // round 190io: FL rack + Mixer landmarks, Mixer details, issue #154 part 2
 #include "Bugs190irTests.inc" // round 190ir: issue #189 text size, takes on the tracks FL picks (Discord report)
+#include "Livefix190jdTests.inc" // round 190jd: live check 190iw — previews, automation clip colours, count-in, Gross Beat locator, .flp audio clip step
+#include "Livefix190jdATests.inc" // round 190jd: DirectWave zone map, Slicex deck Snap menu and play line
+#include "Livefix190jdBTests.inc" // round 190jd: the Clip View MPE tab as Live 12.4
+#include "Livefix190jdCTests.inc" // round 190jd: Mixer peak hold and Extra large list, Limiter / Maximus history
