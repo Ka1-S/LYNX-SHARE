@@ -1763,11 +1763,15 @@ public:
             const bool has = c != nullptr && ! c->samplePath.empty();
             const auto tint = padColour (c != nullptr ? c->simplePad.colour : 0, trackColour);
             const bool lit = flash[(std::size_t) p] > 0;
+            // round 190jc (design190ia SG-11): the label is black or white, whichever reads better on the pad (>= 4.58:1 on any
+            // fill; white "Hat" on orange was 2.71:1)
+            const auto fill = has ? tint.withMultipliedBrightness (lit ? 1.0f : 0.55f).withMultipliedSaturation (lit ? 1.0f : 0.8f) : colour::bg2;
+            const auto ink = ui::simplelook::inkOn (fill);
             if (has)
             {
-                fillRoundRect (g, r, radius::md, tint.withMultipliedBrightness (lit ? 1.0f : 0.55f).withMultipliedSaturation (lit ? 1.0f : 0.8f));
-                g.setColour (lit ? colour::onAccent : colour::textPrimary);
-                g.setFont (font (type::small, true));
+                fillRoundRect (g, r, radius::md, fill);
+                g.setColour (ink);
+                g.setFont (font (ui::simplelook::largeControls() ? type::body : type::small, true));
                 g.drawFittedText (utf8 (c->name), r.reduced (6.0f, 4.0f).withTrimmedTop (12.0f).toNearestInt(), juce::Justification::centredLeft, 2, 0.8f);
             }
             else
@@ -1784,7 +1788,7 @@ public:
                 g.fillRect (juce::Rectangle<float> (1.5f, 10.0f).withCentre (r.getCentre()));
             }
             // the typing key that plays it, top left
-            g.setColour (has ? colour::onAccent.withAlpha (0.75f) : colour::textSecondary);
+            g.setColour (has ? ink : colour::textSecondary);
             g.setFont (font (type::caption, true));
             g.drawText (juce::String::charToString ((juce::juce_wchar) simplepads::typingKey (p)), r.reduced (6.0f, 3.0f).toNearestInt(),
                         juce::Justification::topLeft, false);
@@ -1819,13 +1823,14 @@ public:
                               waveArea.reduced (10, 4), juce::Justification::centred, 2, 0.9f);
             return;
         }
-        drawWave (g, *c, w);
+        drawWave (g, *c, w, padColour (c->simplePad.colour, trackColour));
     }
 
     void resized() override
     {
         auto r = getLocalBounds().reduced (pad, 6);
-        const auto side = juce::jlimit (34, 64, (r.getHeight() - 3 * 4) / 4);
+        // round 190jc (SG-11): touch size at least (44 px; Large controls 48), up to 72
+        const auto side = juce::jlimit (ui::simplelook::px (44, 48), 72, (r.getHeight() - 3 * 4) / 4);
         gridArea = r.removeFromLeft (side * 4 + 3 * 4).withHeight (side * 4 + 3 * 4);
         r.removeFromLeft (14);
         auto top = r.removeFromTop (26);
@@ -1957,13 +1962,17 @@ public:
     }
 
     // a short light on a pad played by a key or a click (a timer runs only while a pad is lit)
+    // round 190jc (details DS-34): each tick repaints only the pads that are lit, not the whole page
     void timerCallback() override
     {
         bool any = false;
-        for (auto& f : flash)
-            if (f > 0)
-                --f, any = true;
-        repaint();
+        for (int p = 0; p < simplepads::padCount; ++p)
+            if (auto& f = flash[(std::size_t) p]; f > 0)
+            {
+                --f;
+                any = any || f > 0;
+                repaint (padBounds (p));
+            }
         if (! any)
             stopTimer();
     }
@@ -1972,9 +1981,9 @@ public:
         if (pad >= 0 && pad < simplepads::padCount)
         {
             flash[(std::size_t) pad] = 5;
-            repaint();
+            repaint (padBounds (pad));
             if (! isTimerRunning())
-                startTimerHz (30);
+                startTimerHz (30); // (5 ticks, then it stops)
         }
     }
 
@@ -2387,9 +2396,11 @@ private:
                            });
     }
 
-    void drawWave (juce::Graphics& g, const ChannelDef& c, juce::Rectangle<float> w)
+    // round 190jc (SG-11): the waveform in the pad's colour, one column per PHYSICAL pixel (at @2x it stepped every 2 px)
+    void drawWave (juce::Graphics& g, const ChannelDef& c, juce::Rectangle<float> w, juce::Colour hue)
     {
-        const auto width = juce::jmax (1, (int) w.getWidth());
+        const auto scale = juce::jlimit (1.0f, 4.0f, g.getInternalContext().getPhysicalPixelScaleFactor());
+        const auto width = juce::jmax (1, (int) std::round (w.getWidth() * scale));
         if (waveFor != c.samplePath || (int) wave.size() != width)
         {
             wave.assign ((std::size_t) width, 0.0f);
@@ -2409,15 +2420,19 @@ private:
         }
         const auto mid = w.getCentreY(), half = w.getHeight() * 0.45f;
         const auto s = w.getX() + c.sampler.regionStart * w.getWidth(), e = w.getX() + c.sampler.regionEnd * w.getWidth();
+        const auto played = ui::simplelook::readableOn (hue, colour::bg0, 3.0f);
+        juce::RectangleList<float> inRegion, outside; // (two fills, not one per column)
         for (int x = 0; x < width; ++x)
         {
-            const auto px = w.getX() + (float) x;
-            const auto inside = px >= s && px <= e;
+            const auto px = w.getX() + (float) x / scale;
             const auto idx = c.sampler.reverse ? width - 1 - x : x;
-            const auto h = juce::jmax (0.5f, wave[(std::size_t) idx] * half);
-            g.setColour (inside ? colour::accent.withAlpha (0.9f) : colour::textDisabled.withAlpha (0.6f));
-            g.fillRect (px, mid - h, 1.0f, h * 2.0f);
+            const auto h = juce::jmax (0.5f / scale, wave[(std::size_t) idx] * half);
+            (px >= s && px <= e ? inRegion : outside).addWithoutMerging ({ px, mid - h, 1.0f / scale, h * 2.0f });
         }
+        g.setColour (played.withAlpha (0.95f));
+        g.fillRectList (inRegion);
+        g.setColour (colour::textDisabled.withAlpha (0.6f));
+        g.fillRectList (outside);
         // the region's handles
         g.setColour (colour::textPrimary);
         for (auto x : { s, e })
@@ -2575,8 +2590,11 @@ void SimpleDock::setTab (Tab t)
     tabChosen = true; // (a refresh keeps a tab that was asked for)
     if ((t == Tab::instrument && ! instrumentTab) || ((t == Tab::keyboard || t == Tab::editor) && ! playTabs) || (t == Tab::pads && ! padsTab))
         t = Tab::effects;
+    const auto padsBefore = tab == Tab::pads;
     tab = t;
     showPage();
+    if (padsBefore != (tab == Tab::pads) && hooks.layoutChanged) // (round 190jc: the Pads tab's least height)
+        hooks.layoutChanged();
 }
 
 void SimpleDock::cycleTab()
@@ -2717,7 +2735,9 @@ juce::Component* SimpleDock::keyboardPanelForSnapshot()
 
 int SimpleDock::heightFor (int available) const noexcept
 {
-    return juce::jlimit (std::min (minHeight, available / 2), std::max (minHeight, available * 6 / 10), preferredHeight);
+    // round 190jc (SG-11): the Pads tab needs its 4 x 44 px pads (Large controls: 48) under the strip
+    const auto least = tab == Tab::pads && padsTab ? stripHeight() + 4 * ui::simplelook::px (44, 48) + 12 + 12 + 8 : minHeight;
+    return juce::jlimit (std::min (least, available / 2), std::max (least, available * 6 / 10), juce::jmax (least, preferredHeight));
 }
 
 void SimpleDock::paint (juce::Graphics& g)

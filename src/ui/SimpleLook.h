@@ -42,11 +42,11 @@ inline juce::Colour readableOn (juce::Colour ink, juce::Colour ground, float rat
     return ink;
 }
 
-// The label colour for text on a coloured fill (a pad, a tile): near-black on a light fill, white on a dark one, whichever
-// reads better (design190ia SG-11: white "Hat" on orange was 2.71:1)
+// The label colour for text on a coloured fill (a pad, a tile): black on a light fill, white on a dark one, whichever
+// reads better (design190ia SG-11: white "Hat" on orange was 2.71:1). The better of the two is at least 4.58:1 on any fill.
 inline juce::Colour inkOn (juce::Colour fill)
 {
-    const juce::Colour dark (0xff0e0f12);
+    const juce::Colour dark (0xff000000);
     return contrast (juce::Colours::white, fill) >= contrast (dark, fill) ? juce::Colours::white : dark;
 }
 
