@@ -1,5 +1,6 @@
 #include "engine/AudioEngine.h"
 #include "core/VideoPlayer.h"
+#include "core/TempoMap.h"
 #include "engine/ProjectFile.h"
 #include "engine/RemoteError.h"
 #include "engine/RemoteHistory.h"
@@ -1763,6 +1764,13 @@ LiveClock AudioEngine::liveClock() const noexcept
     return c;
 }
 
+double AudioEngine::heardLatencyMs() const noexcept
+{
+    const auto rate = transport.sampleRate.load (std::memory_order_relaxed);
+    return outputCompensationMs.load (std::memory_order_relaxed)
+           + (rate > 0.0 ? 1000.0 * std::max (0, masterPdcSamples.load (std::memory_order_relaxed)) / rate : 0.0);
+}
+
 double AudioEngine::recordTickFor (double eventMs) const noexcept
 {
     const auto clock = liveClock();
@@ -1770,7 +1778,8 @@ double AudioEngine::recordTickFor (double eventMs) const noexcept
     if (! clock.running)
         return transport.positionTicks.load (std::memory_order_relaxed)
                - (transport.playing.load (std::memory_order_relaxed) ? 0.0 : transport.countIn.load (std::memory_order_relaxed));
-    return liveTickAt (clock, eventMs, compensatePlayed.load (std::memory_order_relaxed) ? outputCompensationMs.load (std::memory_order_relaxed) : 0.0);
+    // (round 190hq: the Master's delay compensation too — a note is recorded where the song was heard)
+    return liveTickAt (clock, eventMs, compensatePlayed.load (std::memory_order_relaxed) ? heardLatencyMs() : 0.0);
 }
 
 CaptureResult AudioEngine::captureMidi()
@@ -3447,7 +3456,12 @@ void AudioEngine::launcherCommand (const launcher::Command& command)
         if (const auto& scene = song.clipGrid->scenes[(std::size_t) command.scene]; scene.tempo > 0.0 || scene.beatsPerBar > 0)
             editSong ([tempo = scene.tempo, bar = scene.beatsPerBar, unit = scene.beatUnit] (Song& s) {
                 if (tempo > 0.0)
+                {
                     s.bpm = tempo;
+                    // round 190hq (Live-exact): the scene's tempo wins over the Playlist's tempo automation / tempo
+                    // markers until Back to Playlist
+                    s.sceneTempoHold = tempomap::tempoAutomation (s) >= 0 || tempomap::hasTempoEvents (s);
+                }
                 if (bar > 0)
                 {
                     // round 190fg: the song takes the scene's meter as it is (6 / 8: six eighths a bar; it was 3/4)
@@ -3455,6 +3469,8 @@ void AudioEngine::launcherCommand (const launcher::Command& command)
                     s.beatUnit = session::sceneBeatUnit (unit);
                 }
             }, false);
+    if (command.type == T::backToArrangement && song.sceneTempoHold) // (round 190hq: the tempo map plays again)
+        editSong ([] (Song& s) { s.sceneTempoHold = false; }, false);
     if (starts && ! transport.playing.load() && ! isCountingIn())
     {
         // a recording into a slot counts in first, as the record options say (round 190bv)
@@ -4806,6 +4822,10 @@ void AudioEngine::publishSong()
     lastPublishedShape.pdc = state->pdc;
     lastPublishedShape.channelDelays = state->channelDelays;
     lastPublishedShape.sendDelays = state->sendDelays;
+    lastPublishedShape.sideLines = state->sideLines; // (round 190hq: the side inputs' lines carry over as the sends' do)
+    // round 190hq (B13): what the Master hears is this much later than what the rack renders (the clocks LYNX sends and
+    // follows, Link and played notes count it, as they count the output buffer)
+    masterPdcSamples.store (state->pdc.total, std::memory_order_relaxed);
     lastPublishedShape.shifterStock = state->shifterStock; // (round 190gn: the next build keeps the rack's shifter stock)
 
     const auto mark = [&] (const char* what) {
@@ -6897,10 +6917,11 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
 
     transport.readMarkers (rtMarkers, rtMarkerVersion); // FL's marker actions (a new table when the song changed)
     // an external MIDI clock moves the transport (round 165f)
+    midiSync.setRackLatencyMs (heardLatencyMs() - outputCompensationMs.load (std::memory_order_relaxed)); // (round 190hq)
     midiSync.beginBlock (transport, callbackStart, numSamples);
     // Ableton Link (round 190gl): the session's tempo and phase move the transport; a Play waiting for the session's
     // phase starts at `linkStart` (a sample of this block; -1 = none), to the sample like the count-in's end
-    const auto linkStart = abletonLink.beginBlock (transport, numSamples, outputCompensationMs.load (std::memory_order_relaxed));
+    const auto linkStart = abletonLink.beginBlock (transport, numSamples, heardLatencyMs()); // (round 190hq: + the Master's PDC)
 
     // With the loop region on, the block is split at the loop end and the position jumps back to
     // its start (the nodes see a jump and release their notes, as in FL).

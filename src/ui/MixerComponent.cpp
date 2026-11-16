@@ -3732,6 +3732,9 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
                      [this] { engine.editSong ([] (Song& s) { s.autoPdc = ! s.autoPdc; }); });
         pdc.addItem (tr ("Compensate automations (delay a plugin's automation with its audio)"), true, song.compensateAutomations,
                      [this] { engine.editSong ([] (Song& s) { s.compensateAutomations = ! s.compensateAutomations; }); });
+        // round 190hq (LYNX extra, Song::compensateMixerLevels): the faders, pans, route levels and VCA faders too
+        pdc.addItem (tr ("Compensate fader and route automations too (LYNX)"), song.compensateAutomations, song.compensateMixerLevels,
+                     [this] { engine.editSong ([] (Song& s) { s.compensateMixerLevels = ! s.compensateMixerLevels; }); });
         menu.addSubMenu (tr ("Plugin delay compensation"), pdc);
     }
     menu.addSubMenu (tr ("Mixer layout"), MixerLayoutBox::menu (*this)); // as the title bar's drop-down (issue #52)

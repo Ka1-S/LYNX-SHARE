@@ -966,6 +966,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
     // highlighting 0xF3, the data folder 0xCA
     song.autoPdc = project.autoPdc;
     song.compensateAutomations = project.compensateAutomations;
+    song.compensateMixerLevels = false; // (round 190hq: FL's own scope, mixer effect parameters only)
     song.timeSignatureMode = project.timeSignatureMode;
     if (project.hasScaleHighlight)
         song.scaleHighlight = { project.scaleHighlight >= -3 && project.scaleHighlight < 256 ? project.scaleHighlight : -2,

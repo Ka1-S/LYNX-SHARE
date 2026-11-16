@@ -2003,6 +2003,7 @@ struct SamplerVoice
     bool active = false;
     double position = 0.0; // read position in region order (reversed voices read the region backwards)
     double rate = 1.0;     // frames per output sample (> 0)
+    double rateBpm = 0.0;  // round 190hq: the tempo `rate` was set for (a tempo-synced Resample voice follows the tempo)
     bool reversed = false;
     int loops = 0;         // times the zone loop has wrapped (FL lets taps before the loop start wrap only then)
     flrs::Kernel kernel;
@@ -3170,6 +3171,22 @@ public:
             ~Publish() { s.publishPosition(); }
         } publish { *this };
 
+        // round 190hq (B11, complaint #22): a channel stretched to a number of beats in Resample mode lasts those beats at
+        // the tempo that plays now, as FL's does under its tempo automation: its sounding voices speed up or slow down with a
+        // moving tempo (tempo markers, a tempo clip) instead of keeping the project tempo they started with
+        if (const auto now = liveBpm; now > 0.0 && stretchBeats.load (std::memory_order_relaxed) > 0.0f)
+            for (auto& v : voices)
+                if (v.active)
+                {
+                    if (! (v.rateBpm > 0.0))
+                        v.rateBpm = bpm.load (std::memory_order_relaxed);
+                    if (v.rateBpm > 0.0 && now != v.rateBpm)
+                    {
+                        v.rate *= now / v.rateBpm;
+                        v.rateBpm = now;
+                    }
+                }
+
         if (sample == nullptr && zones.empty())
             return;
 
@@ -3839,8 +3856,11 @@ private:
     std::atomic<float> portaBeats { 0.125f };
     std::vector<LoadedZone> zones; // multi-sample (fixed after creation)
     double songTicks = 0.0;         // song position in the block (global LFO)
+    double liveBpm = 0.0;           // round 190hq: the tempo now (setSongTempo; audio thread)
 
 public:
+    // round 190hq: the tempo of the block about to render (the renderer, while the tempo can move); 0 = the project's
+    void setSongTempo (double songBpm) noexcept override { liveBpm = songBpm; }
     void setSongPosition (double ticks) noexcept override
     {
         songTicks = ticks;

@@ -10,6 +10,9 @@ lynx::Song song()
     auto s = lynx::Song::makeDefault();
     s.bpm = 120.0;
     s.mode = lynx::PlayMode::song;
+    // (FL's clip rule, from FL renders without latency on the Master: LYNX's fader compensation of round 190hq would take
+    // the Master fader's automation as late as the default Master's limiter look-ahead)
+    s.compensateMixerLevels = false;
     return s;
 }
 

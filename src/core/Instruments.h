@@ -187,6 +187,9 @@ public:
     virtual int selectedProgram() const noexcept { return -1; }
     // Song position (ticks) at the start of the block, for the global LFOs. Audio thread.
     virtual void setSongPosition (double /*ticks*/) noexcept {}
+    // The tempo (BPM) of the block about to render while the tempo can move (tempo automation, tempo markers; round
+    // 190hq), 0 when it is the project's own. Audio thread, before setSongPosition.
+    virtual void setSongTempo (double /*bpm*/) noexcept {}
     // No voice sounding: render would only produce silence (the mixer skips the channel until a note arrives).
     virtual bool idle() const noexcept { return false; }
     // The notes it sent out in its renders since the last call (a hosted plugin's MIDI output, FL's wrapper "Output

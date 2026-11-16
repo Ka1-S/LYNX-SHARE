@@ -17808,3 +17808,5 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Community190hpTests.inc" // round 190hp: global MIDI mappings, mix snapshots, split at silence (0.1.28 pain report B9/B16/B18)
 #include "Rollup028Tests.inc" // round 190fv: semantic interactions of the 0.1.28 rollup
 #include "Design190igTests.inc" // round 190ig: automation clip colours (design190ia slice 3)
+#include "Pdc190hqTests.inc" // round 190hq B13: side inputs, level automation and render-ahead under PDC
+#include "TempoMarkers190hqTests.inc" // round 190hq B11: tempo markers, resampled audio under them, scene tempo hold

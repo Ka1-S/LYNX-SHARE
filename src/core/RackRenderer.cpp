@@ -1644,6 +1644,31 @@ void RackState::buildPdc (const RackState* previous)
         }
     }
 
+    // round 190hq (B13): the slots' side inputs, delayed to their own input's lateness
+    sideLines.assign (pdc.sideDelay.size(), {});
+    for (std::size_t t = 0; t < pdc.sideDelay.size(); ++t)
+    {
+        sideLines[t].resize (pdc.sideDelay[t].size());
+        for (std::size_t s = 0; s < pdc.sideDelay[t].size(); ++s)
+            for (std::size_t k = 0; k < 4; ++k)
+            {
+                const auto length = pdc.sideDelay[t][s][k];
+                if (length <= 0)
+                    continue;
+                const RackState::SideLine* old = nullptr;
+                if (previous != nullptr && t < previous->sideLines.size() && s < previous->sideLines[t].size())
+                    old = previous->sideLines[t][s][k].get();
+                if (old != nullptr && old->delay != nullptr && old->delay->length() == length)
+                    sideLines[t][s][k] = previous->sideLines[t][s][k];
+                else
+                {
+                    auto line = std::make_shared<SideLine>();
+                    line->delay = std::make_shared<DelayLine> (length);
+                    sideLines[t][s][k] = std::move (line);
+                }
+            }
+    }
+
     // inserts with a hardware output target: aligned with the Master's output (which waits for the longest path)
     hwRoutes.clear();
     for (std::size_t t = 1; t < song.mixer.size() && t < (std::size_t) maxMixerTracks; ++t)
@@ -2937,6 +2962,21 @@ float RackRenderer::compensatedAutomation (const RackState& state, int automatio
     return std::isnan (earlier) ? current : earlier;
 }
 
+float RackRenderer::automatedLevel (const RackState& state, int automation, float base, int track) const noexcept
+{
+    const auto current = automated (automation, base);
+    if (! state.song.compensateMixerLevels || compensateTicksPerSample <= 0.0 || compensateTick < 0.0 || automation < 0
+        || automation >= RackState::maxAutomations || (std::size_t) automation >= state.automationClips.size()
+        || state.automationClips[(std::size_t) automation].empty() || std::isnan (automationValues[(std::size_t) automation])
+        || (std::size_t) track >= state.pdc.levelLag.size())
+        return current;
+    const auto lag = state.pdc.levelLag[(std::size_t) track];
+    if (lag <= 0)
+        return current;
+    const auto earlier = automationValueAt (state, automation, std::max (0.0, compensateTick - lag * compensateTicksPerSample));
+    return std::isnan (earlier) ? current : earlier;
+}
+
 void RackRenderer::applyPluginParams (const RackState& state, int firstSlot, bool andLive) noexcept
 {
     for (const auto& b : state.pluginParams)
@@ -3111,7 +3151,11 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
     auto* r = channelBuffer (i, 1);
 
     if ((std::size_t) i < state.instruments.size() && state.instruments[(std::size_t) i] != nullptr)
+    {
+        // (round 190hq: while the tempo can move, the tempo this chunk plays at; tempo-synced Resample samples follow it)
+        state.instruments[(std::size_t) i]->setSongTempo (state.tempoMap || tempoOverride > 0.0 ? bpm : 0.0);
         state.instruments[(std::size_t) i]->setSongPosition (chunkTick);
+    }
 
     auto& instrument = *state.instruments[(std::size_t) i];
     instrument.beginChunk (n); // (extra outputs: a generator Patcher's, REA_rodada141)
@@ -3488,7 +3532,31 @@ void RackState::buildSlotPlans()
     }
 }
 
-void RackRenderer::setSidechain (const RackState& state, const EffectSlot& slot, Effect& effect, int track) noexcept
+std::pair<const float*, const float*> RackRenderer::sideInput (const RackState& state, int track, int index, int k, int source,
+                                                              bool sounding, int n) noexcept
+{
+    const RackState::SideLine* line = nullptr;
+    if ((std::size_t) track < state.sideLines.size() && (std::size_t) index < state.sideLines[(std::size_t) track].size())
+        line = state.sideLines[(std::size_t) track][(std::size_t) index][(std::size_t) k].get();
+    // FL's "When recording or not playing" source: no compensation now (as its routes)
+    if (line != nullptr && pdcBypassNow && (std::size_t) source < state.bypassWhenIdle.size() && state.bypassWhenIdle[(std::size_t) source] != 0)
+        line = nullptr;
+    if (line == nullptr || line->delay == nullptr)
+        return sounding ? std::pair { trackInput (source, 0), trackInput (source, 1) } : std::pair<const float*, const float*> { nullptr, nullptr };
+    // round 190hq (B13): the source, as late as the slot's own input. A silent source still drains what the line holds.
+    auto& delay = *line->delay;
+    if (! sounding && delay.silent())
+        return { nullptr, nullptr };
+    n = std::min (n, RackState::SideLine::capacity);
+    auto* out = const_cast<float*> (line->out.data()); // (the slot's own buffer: only this slot's renderer writes it)
+    auto* outR = out + RackState::SideLine::capacity;
+    std::memset (out, 0, sizeof (float) * (std::size_t) n);
+    std::memset (outR, 0, sizeof (float) * (std::size_t) n);
+    delay.mixInto (sounding ? trackInput (source, 0) : nullptr, sounding ? trackInput (source, 1) : nullptr, 1.0f, out, outR, n);
+    return { out, outR };
+}
+
+void RackRenderer::setSidechain (const RackState& state, const EffectSlot& slot, Effect& effect, int track, int index, int n) noexcept
 {
     // the source was already processed in this pass (earlier layer); silent = no signal in the detector
     for (const auto second : { false, true })
@@ -3497,8 +3565,7 @@ void RackRenderer::setSidechain (const RackState& state, const EffectSlot& slot,
         if (source < 0 || source == track || source >= (int) state.song.mixer.size())
             continue;
         const auto active = (std::size_t) source < trackActive.size() && trackActive[(std::size_t) source] != 0;
-        const auto* left = active ? trackInput (source, 0) : nullptr;
-        const auto* right = active ? trackInput (source, 1) : nullptr;
+        const auto [left, right] = sideInput (state, track, index, second ? 1 : 0, source, active, n);
         if (second)
             effect.setSidechain2 (left, right);
         else
@@ -3506,7 +3573,8 @@ void RackRenderer::setSidechain (const RackState& state, const EffectSlot& slot,
     }
 }
 
-void RackRenderer::connect (const RackState& state, const SlotConnections& c, Effect& effect, int track, const float* l, const float* r) noexcept
+void RackRenderer::connect (const RackState& state, const SlotConnections& c, Effect& effect, int track, int index, const float* l, const float* r,
+                            int n) noexcept
 {
     // a hosted effect's Connections (round 189j [EXEC FL 2026]): input 1 from the insert its index picks (processed
     // earlier, like a sidechain source; silent when it is), input 2 the slot's own input when no source feeds it
@@ -3514,16 +3582,25 @@ void RackRenderer::connect (const RackState& state, const SlotConnections& c, Ef
         return source > 0 && source != track && source < (int) state.song.mixer.size() && (std::size_t) source < trackActive.size()
                && trackActive[(std::size_t) source] != 0;
     };
+    auto valid = [&] (int source) { return source > 0 && source != track && source < (int) state.song.mixer.size(); };
     if (c.mainSource == -2)
         effect.setMainInput (nullptr, nullptr);
     else if (c.mainSource > 0)
-        effect.setMainInput (sounding (c.mainSource) ? trackInput (c.mainSource, 0) : nullptr, sounding (c.mainSource) ? trackInput (c.mainSource, 1) : nullptr);
+    {
+        const auto [ml, mr] = valid (c.mainSource) ? sideInput (state, track, index, 2, c.mainSource, sounding (c.mainSource), n)
+                                                   : std::pair<const float*, const float*> { nullptr, nullptr };
+        effect.setMainInput (ml, mr);
+    }
     if (c.sideSource == -1)
         effect.setSidechain (l, r);
     else if (c.sideSource == -2)
         effect.setSidechain (nullptr, nullptr);
     else // (its index, when no side input source is picked: setSidechain fed the slot's own one, if any)
-        effect.setSidechain (sounding (c.sideSource) ? trackInput (c.sideSource, 0) : nullptr, sounding (c.sideSource) ? trackInput (c.sideSource, 1) : nullptr);
+    {
+        const auto [sl, sr] = valid (c.sideSource) ? sideInput (state, track, index, 3, c.sideSource, sounding (c.sideSource), n)
+                                                   : std::pair<const float*, const float*> { nullptr, nullptr };
+        effect.setSidechain (sl, sr);
+    }
 }
 
 void RackRenderer::runGoalSlot (const EffectSlot& slot, Effect& effect, std::size_t key, float* l, float* r, int n, const EffectParams& params,
@@ -3776,9 +3853,9 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
             effects[i]->setSongPosition (chunkTick);
             effects[i]->setPlaying (chunkPlaying);
             effects[i]->setHeldNotes (heldNotes.data(), maxChannels);
-            setSidechain (state, slots[i], *effects[i], track);
+            setSidechain (state, slots[i], *effects[i], track, (int) i, n);
             if (connections != nullptr)
-                connect (state, *connections, *effects[i], track, l, r);
+                connect (state, *connections, *effects[i], track, (int) i, l, r, n);
             timed (key, [&] { runGoalSlot (slots[i], *effects[i], key, l, r, n, params, bpm); });
         }
         else
@@ -3786,9 +3863,9 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
             effects[i]->setSongPosition (chunkTick);
             effects[i]->setPlaying (chunkPlaying);
             effects[i]->setHeldNotes (heldNotes.data(), maxChannels);
-            setSidechain (state, slots[i], *effects[i], track);
+            setSidechain (state, slots[i], *effects[i], track, (int) i, n);
             if (connections != nullptr)
-                connect (state, *connections, *effects[i], track, l, r);
+                connect (state, *connections, *effects[i], track, (int) i, l, r, n);
             const auto& shown = overrideParams != nullptr && track == overrideTrack && (int) i == overrideSlot ? *overrideParams : slots[i].params;
             timed (key, [&] { runGoalSlot (slots[i], *effects[i], key, l, r, n, shown, bpm); });
         }
@@ -4017,7 +4094,8 @@ void RackRenderer::process (const RackState* state,
     // and FL's pattern Tempo events (issue #86, core/TempoMap.h): in song mode with the tempo clips, in pattern mode the
     // current pattern's. A tempo the user is dragging over its automation holds (as before).
     // (round 190gl: evaluated under an override too: the Link session proposes the song's own tempo to its peers)
-    if (state->tempoMap && ! (state->tempoAutomation >= 0 && isSlotOverridden (state->tempoAutomation)))
+    // (round 190hq: a launched scene's tempo holds the tempo map, as Live's scene tempo overrides its tempo automation)
+    if (state->tempoMap && ! state->song.sceneTempoHold && ! (state->tempoAutomation >= 0 && isSlotOverridden (state->tempoAutomation)))
     {
         const auto songMode = state->song.mode == PlayMode::song;
         const auto length = (double) std::max<std::int64_t> (1, state->schedule.songLength);
@@ -5131,8 +5209,8 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         const auto& master = song.mixer[0];
         const auto fader = liveLevel (state, &LiveLevels::mixerVolume, 0, master.volume);
         const auto knob = liveLevel (state, &LiveLevels::mixerPan, 0, master.pan);
-        const auto volume = state.hasAutomation ? automated (state.mixerVolumeAuto[0], fader) : fader;
-        const auto pan = state.hasAutomation ? automated (state.mixerPanAuto[0], (knob + 1.0f) * 0.5f) * 2.0f - 1.0f : knob;
+        const auto volume = state.hasAutomation ? automatedLevel (state, state.mixerVolumeAuto[0], fader, 0) : fader;
+        const auto pan = state.hasAutomation ? automatedLevel (state, state.mixerPanAuto[0], (knob + 1.0f) * 0.5f, 0) * 2.0f - 1.0f : knob;
         const auto level = mixerMatrix (master, volume, pan, song.panTriangular, liveLevel (state, &LiveLevels::mixerStereo, 0, master.stereo));
         target = master.muted ? MixerMatrix { 0.0f, 0.0f, 0.0f, 0.0f } : level;
         if (master.muted && meters != nullptr && ! song.mutedInsertsSkip)
@@ -5305,6 +5383,25 @@ void RackRenderer::updatePdcBypass (const RackState& state, bool playing) noexce
             if (route.delay != nullptr && (std::size_t) route.track < state.bypassWhenIdle.size() && state.bypassWhenIdle[(std::size_t) route.track] != 0
                 && ! foreignTrack (route.track))
                 route.delay->clear();
+        // round 190hq: the side inputs from such a source (run by the listening insert's renderer)
+        for (std::size_t t = 0; t < state.sideLines.size() && t < state.song.mixer.size(); ++t)
+        {
+            if (foreignTrack ((int) t))
+                continue;
+            const auto& slots = state.song.mixer[t].effects;
+            for (std::size_t s = 0; s < state.sideLines[t].size() && s < slots.size(); ++s)
+            {
+                // (no allocation here: the Connections as the state holds them)
+                const auto* c = t < state.slotConnections.size() && s < state.slotConnections[t].size() && state.slotConnections[t][s].routed
+                                    ? &state.slotConnections[t][s]
+                                    : nullptr;
+                const std::array<int, 4> sources { slots[s].sidechain, slots[s].sidechain2, c != nullptr ? c->mainSource : -1, c != nullptr ? c->sideSource : -1 };
+                for (std::size_t k = 0; k < 4; ++k)
+                    if (const auto& line = state.sideLines[t][s][k]; line != nullptr && line->delay != nullptr && sources[k] > 0
+                        && (std::size_t) sources[k] < state.bypassWhenIdle.size() && state.bypassWhenIdle[(std::size_t) sources[k]] != 0)
+                        line->delay->clear();
+            }
+        }
     }
     pdcBypassBefore = pdcBypassNow;
 }
@@ -5461,8 +5558,10 @@ void RackRenderer::pullInputs (const RackState& state, int t, int n) noexcept
     {
         const auto tap = in.tap >= 0 && in.tap < RackState::maxSendTaps ? in.tap : -1;
         // an automated route level (fader curve, like the knob)
-        const auto automatedLevel = in.automation >= 0 ? automationValues[(std::size_t) in.automation] : std::numeric_limits<float>::quiet_NaN();
-        const auto level = std::isnan (automatedLevel) ? in.level : faderGain (automatedLevel);
+        // (round 190hq: taken as late as the source's audio, Song::compensateMixerLevels)
+        const auto routeAutomation = in.automation >= 0 ? automatedLevel (state, in.automation, std::numeric_limits<float>::quiet_NaN(), in.source)
+                                                        : std::numeric_limits<float>::quiet_NaN();
+        const auto level = std::isnan (routeAutomation) ? in.level : faderGain (routeAutomation);
         // (round 190ge: a source whose block came out all zeros, trackActive 2, adds nothing: its zeros would not change
         // a sum that starts from +0, and its PDC line drains as if it had been fed them)
         const auto active = tap >= 0 ? tapActive[(std::size_t) tap] != 0 : trackActive[(std::size_t) in.source] == 1;
@@ -5606,8 +5705,8 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
     {
         const auto fader = liveLevel (state, &LiveLevels::mixerVolume, t, track.volume);
         const auto knob = liveLevel (state, &LiveLevels::mixerPan, t, track.pan);
-        const auto volume = state.hasAutomation ? automated (state.mixerVolumeAuto[(std::size_t) t], fader) : fader;
-        const auto pan = state.hasAutomation ? automated (state.mixerPanAuto[(std::size_t) t], (knob + 1.0f) * 0.5f) * 2.0f - 1.0f : knob;
+        const auto volume = state.hasAutomation ? automatedLevel (state, state.mixerVolumeAuto[(std::size_t) t], fader, t) : fader;
+        const auto pan = state.hasAutomation ? automatedLevel (state, state.mixerPanAuto[(std::size_t) t], (knob + 1.0f) * 0.5f, t) * 2.0f - 1.0f : knob;
         level = mixerMatrix (track, volume, pan, state.song.panTriangular, liveLevel (state, &LiveLevels::mixerStereo, t, track.stereo));
         if ((std::size_t) t < state.vcaChains.size() && ! state.vcaChains[(std::size_t) t].empty()) // VCA faders (round 177a)
         {
@@ -5616,7 +5715,7 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
             {
                 const auto position = liveLevel (state, &LiveLevels::vcaLevel, v, state.song.vcas[(std::size_t) v].level);
                 const auto automatedPosition = state.hasAutomation && (std::size_t) v < state.vcaLevelAuto.size()
-                                                   ? automated (state.vcaLevelAuto[(std::size_t) v], position)
+                                                   ? automatedLevel (state, state.vcaLevelAuto[(std::size_t) v], position, t)
                                                    : position;
                 g *= faderGain (automatedPosition);
             }

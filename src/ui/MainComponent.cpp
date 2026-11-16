@@ -87,6 +87,7 @@
 #include "ui/TouchKeyboard.h"
 #include "engine/MidiFileIo.h"
 #include "engine/ProjectFile.h"
+#include "engine/ProjectDowngrade.h"
 #include "engine/ProjectPackage.h"
 #include "engine/SessionPack.h"
 #include "ui/SessionDialogs.h"
@@ -7334,6 +7335,82 @@ void MainComponent::saveAsTemplate()
     }), true);
 }
 
+juce::AlertWindow* MainComponent::buildSaveCopyWindow (const juce::String& json, std::shared_ptr<juce::TextEditor> list)
+{
+    // round 190hq (B20): the release, and what the copy loses there (worked out again for each release)
+    const auto releases = olderlynx::releases();
+    auto* w = new juce::AlertWindow (tr ("Save a copy for an older LYNX"),
+                                     tr ("The copy opens in the release you pick. The open project stays as it is."), juce::MessageBoxIconType::NoIcon);
+    juce::StringArray names;
+    for (const auto& r : releases)
+        names.add ("LYNX SHARE " + r);
+    w->addComboBox ("release", names, tr ("For"));
+    list->setMultiLine (true);
+    list->setReadOnly (true);
+    list->setScrollbarsShown (true);
+    list->setCaretVisible (false);
+    list->setSize (560, 240);
+    w->addCustomComponent (list.get());
+    auto* combo = w->getComboBoxComponent ("release");
+    auto update = [json, releases, combo, list] {
+        const auto copy = olderlynx::forRelease (json, releases[juce::jmax (0, combo->getSelectedItemIndex())]);
+        juce::String sound, other;
+        for (const auto& l : copy.lost)
+            (l.sound ? sound : other) << "- " << tr (l.text, { l.detail }) << "\n";
+        juce::String text;
+        if (sound.isNotEmpty())
+            text << tr ("May sound different there:") << "\n" << sound << "\n";
+        if (other.isNotEmpty())
+            text << tr ("Left out (the sound stays):") << "\n" << other;
+        if (text.isEmpty())
+            text = tr ("Nothing is lost: the copy holds the whole project.");
+        list->setText (text.trimEnd(), false);
+    };
+    combo->onChange = update;
+    combo->setSelectedItemIndex (0, juce::dontSendNotification);
+    update();
+    w->addButton (tr ("Save copy..."), 1, juce::KeyPress (juce::KeyPress::returnKey));
+    w->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+    return w;
+}
+
+void MainComponent::saveCopyForOlder()
+{
+    // round 190hq (B20, engine/ProjectDowngrade.h): the release and its losses, then where to save the copy. The open
+    // project and its file are not touched.
+    engine.capturePluginStates();
+    const auto json = ProjectFile::toJson (engine.getSong());
+    const auto releases = olderlynx::releases();
+    auto list = std::make_shared<juce::TextEditor>();
+    auto* w = buildSaveCopyWindow (json, list);
+    w->enterModalState (true, juce::ModalCallbackFunction::create ([w, list, json, releases, safe = juce::Component::SafePointer<MainComponent> (this)] (int result) {
+        const auto release = releases[juce::jmax (0, w->getComboBoxComponent ("release")->getSelectedItemIndex())];
+        if (result != 1 || safe == nullptr)
+            return;
+        const auto start = (safe->currentFile != juce::File() ? safe->currentFile.getParentDirectory()
+                                                              : juce::File::getSpecialLocation (juce::File::userDocumentsDirectory))
+                               .getChildFile (olderlynx::copyName (projectStem (safe->projectName), release) + ProjectFile::extension);
+        safe->fileChooser = lynx::ui::makeFileChooser (tr ("Save a copy for LYNX SHARE {0}", { release }), start, juce::String ("*") + ProjectFile::extension);
+        lynx::ui::launchChooser (safe->fileChooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
+                                  [json, release] (const juce::FileChooser& chooser) {
+                                      auto file = chooser.getResult();
+                                      if (file == juce::File())
+                                          return;
+                                      file = ProjectFile::withProjectExtension (file);
+                                      const auto copy = olderlynx::forRelease (json, release);
+                                      juce::TemporaryFile temp (file);
+                                      if (! copy.ok || ! temp.getFile().replaceWithText (copy.json, false, false, nullptr) || ! temp.overwriteTargetFileWithTemporary()
+                                          || file.loadFileAsString() != copy.json)
+                                      {
+                                          juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not save"),
+                                                                                  copy.ok ? file.getFullPathName() : copy.error);
+                                          return;
+                                      }
+                                      ui::postHint ({ tr ("Saved a copy for LYNX SHARE {0}", { release }), file.getFileName() }, 6000);
+                                  });
+    }), true);
+}
+
 void MainComponent::chooseFileToOpen()
 {
     confirmDiscard ([this] { chooseFileToOpenNow(); });
@@ -8491,6 +8568,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         menu.addItem (tr ("Save new version") + shortcutText ("file.saveNewVersion"), [this] { saveNewVersion(); });
         menu.addItem (tr ("Save to new project folder..."), [this] { saveToNewProjectFolder(); });
         menu.addItem (tr ("Save as template..."), [this] { saveAsTemplate(); });
+        menu.addItem (tr ("Save a copy for an older LYNX..."), [this] { saveCopyForOlder(); }); // (round 190hq, LYNX extra)
         menu.addItem (tr ("Delete unused recordings and save..."), [this] { deleteUnusedRecordingsAndSave(); });
         menu.addSeparator();
         {

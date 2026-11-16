@@ -2156,6 +2156,7 @@ private:
         if (state != nullptr)
             for (int t = 0, n = columnCount(); t < n && ! taken; ++t)
                 taken = state->tracks[(std::size_t) t].taken.load (std::memory_order_relaxed);
+        taken = taken || engine.getSong().sceneTempoHold; // (round 190hq: a scene's tempo holds the Playlist's tempo automation)
         sessionRecord.setToggleState (engine.isSessionRecording(), juce::dontSendNotification);
         if (backToPlaylist.getToggleState() != taken)
         {

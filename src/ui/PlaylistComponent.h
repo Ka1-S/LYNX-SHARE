@@ -312,7 +312,8 @@ public:
 
 private:
     enum class Drag { none, move, resize, trimLeft, slip, erase, seek, loop, select, fadeIn, fadeOut, paint, muting, knife, zoomRange, listen, pan, timeMove, timeShift, autoPoint, autoTension,
-                      lanePoint, laneTension, laneDraw, trackResize, headerSelect, preview, trackZoom, heightZoom, timeZoom, perfLaunch, clipGain, swipe, warpMarker };
+                      lanePoint, laneTension, laneDraw, trackResize, headerSelect, preview, trackZoom, heightZoom, timeZoom, perfLaunch, clipGain, swipe, warpMarker,
+                      tempoMarker };
     void swipeTimeSelectionToComp (int lane);
     // a swipe on a take lane (round 177c): the lane and the range so far
     int swipeLane = -1;
@@ -494,6 +495,12 @@ private:
     static juce::String markerLabel (const Marker& m);   // the text of a marker's tag on the ruler
     int markerTagAt (int x, int y) const;                 // the marker whose tag is under (x, y), or -1
     void editMarkerName (std::int64_t tick, int existing); // existing = index, or -1 to create
+    // Round 190hq (B11, core/TempoMarkers.h): the tempo markers' tags on the ruler (LYNX extra): the one under (x, y), or
+    // -1; the dialog that adds one at `tick` (existing −1) or edits marker `existing`; the tag being dragged
+    int tempoTagAt (int x, int y) const;
+    void editTempoMarker (std::int64_t tick, int existing);
+    int tempoDragMarker = -1;
+    std::int64_t tempoDragTick = 0;
     // FL 2026's Playlist › Time markers keys (round 167k): Alt+T, Ctrl+T, Shift+Alt+T, Shift+T
     std::int64_t songPositionTick() const;      // the playhead (song position), wrapped like centreOnPlayhead
     void addMarkerByKey();                      // "Add one..." at the time selection / visible playhead / first bar

@@ -20,6 +20,7 @@
 #include "ui/ImageReadback.h"
 #include "ui/TextCache.h"
 #include "ui/PlaylistComponent.h"
+#include "core/TempoMarkers.h"
 #include "core/PaintTemplate.h"
 #include "core/PickerDrop.h"
 #include "core/ChainPresets.h"
@@ -2149,6 +2150,27 @@ void PlaylistComponent::paint (juce::Graphics& g)
             g.drawVerticalLine ((int) x, 0.0f, (float) timelineHeight);
             g.setColour (colour::bg0);
             textcache::drawText (g, label, tag.reduced (3.0f, 0.0f), juce::Justification::centredLeft, false);
+        }
+
+        // round 190hq (B11): the tempo markers (LYNX extra, core/TempoMarkers.h), in the automation colour of the tempo clip
+        // they write; "/" before a tempo the song glides into. The tag being dragged is drawn where it would land.
+        {
+            const auto marks = tempomarkers::list (song);
+            for (int i = 0; i < (int) marks.size(); ++i)
+            {
+                const auto& m = marks[(std::size_t) i];
+                const auto x = (float) tickToX ((double) (i == tempoDragMarker && drag == Drag::tempoMarker ? tempoDragTick : m.tick));
+                if (x < (float) ruler.getX() - 200.0f || x > (float) ruler.getRight())
+                    continue;
+                const auto label = (m.glide ? juce::String ("/ ") : juce::String()) + juce::String (tempomarkers::tempoText (m.bpm));
+                const auto width = (float) juce::GlyphArrangement::getStringWidthInt (g.getCurrentFont(), label) + 8.0f;
+                const auto tag = juce::Rectangle<float> (x, (float) timelineHeight - 11.0f, width, 11.0f);
+                g.setColour (colour::automation);
+                g.fillRoundedRectangle (tag, 2.0f);
+                g.drawVerticalLine ((int) x, 0.0f, (float) timelineHeight);
+                g.setColour (colour::bg0);
+                textcache::drawText (g, label, tag.reduced (3.0f, 0.0f), juce::Justification::centredLeft, false);
+            }
         }
 
         if (playheadTick >= 0.0 && ! cachePainting)
@@ -4859,6 +4881,21 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
         const auto tick = juce::jmax<std::int64_t> (0, snap (xToTick (e.x), snapOn));
         const auto markerHit = markerTagAt (e.x, e.y);
 
+        // round 190hq (B11): a tempo marker's tag: drag it along the ruler, double-click it to type its tempo (the right
+        // button opens the ruler menu with its items)
+        if (const auto tempoHit = markerHit < 0 && ! fl.right && ! fl.ctrl && ! e.mods.isShiftDown() ? tempoTagAt (e.x, e.y) : -1; tempoHit >= 0)
+        {
+            if (e.getNumberOfClicks() >= 2)
+            {
+                editTempoMarker (0, tempoHit);
+                return;
+            }
+            drag = Drag::tempoMarker;
+            tempoDragMarker = tempoHit;
+            tempoDragTick = tempomarkers::list (song)[(std::size_t) tempoHit].tick;
+            return;
+        }
+
         ruler::Press press;
         press.mods = fl;
         press.clicks = e.getNumberOfClicks();
@@ -5735,6 +5772,11 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
             seekTo (e.x, snapOn);
             return;
 
+        case Drag::tempoMarker: // (round 190hq: the tag follows the mouse; the marker moves on release)
+            tempoDragTick = juce::jmax<std::int64_t> (1, snap (xToTick (e.x), snapOn));
+            repaint (0, rulerTop, getWidth(), timelineHeight);
+            return;
+
         case Drag::loop:
         {
             const auto here = juce::jmax<std::int64_t> (0, snap (xToTick (e.x) + (snapOn ? gridTicks() / 2.0 : 0.0), snapOn));
@@ -6078,6 +6120,10 @@ void PlaylistComponent::postDragHint()
         case Drag::fadeIn:
         case Drag::fadeOut: hint.text = EditorGlobals::get().snapFadeHandles ? tr ("Setting the fade  [Alt] no snap") : tr ("Setting the fade"); break;
         case Drag::warpMarker: hint.text = tr ("Moving the warp marker: the audio around it stretches  [Alt] no snap"); break;
+        case Drag::tempoMarker:
+            hint.text = tr ("Moving the tempo change  [Alt] no snap");
+            hint.value = position (tempoDragTick);
+            break;
         case Drag::autoPoint:
             hint.text = tr ("Moving the point: then [Shift] keeps time  [Ctrl] keeps value");
             if (const auto curve = curveOf (autoClip); curve.lane != 0 && autoPoint >= 0 && autoPoint < (int) curve.points->size())
@@ -6193,6 +6239,16 @@ void PlaylistComponent::mouseUp (const juce::MouseEvent& e)
         engine.performanceCommand (c);
         drag = Drag::none;
         perfTrack = -1;
+        return;
+    }
+    if (drag == Drag::tempoMarker)
+    {
+        drag = Drag::none;
+        const auto marks = tempomarkers::list (engine.getSong());
+        if (tempoDragMarker >= 0 && tempoDragMarker < (int) marks.size() && marks[(std::size_t) tempoDragMarker].tick != tempoDragTick)
+            engine.editSong ([m = tempoDragMarker, t = tempoDragTick] (Song& s) { tempomarkers::move (s, m, t); });
+        tempoDragMarker = -1;
+        repaint();
         return;
     }
     if (drag == Drag::warpMarker)
@@ -7865,6 +7921,52 @@ int PlaylistComponent::markerTagAt (int x, int y) const
     return -1;
 }
 
+int PlaylistComponent::tempoTagAt (int x, int y) const
+{
+    if (y < rulerTop + timelineHeight - 12 || y >= headerHeight)
+        return -1;
+    const auto marks = tempomarkers::list (engine.getSong());
+    const auto f = theme::font (theme::type::caption, true);
+    for (int i = (int) marks.size(); --i >= 0;)
+    {
+        const auto& m = marks[(std::size_t) i];
+        const auto mx = tickToX ((double) m.tick);
+        const auto label = (m.glide ? juce::String ("/ ") : juce::String()) + juce::String (tempomarkers::tempoText (m.bpm));
+        const auto width = (double) juce::GlyphArrangement::getStringWidthInt (f, label) + 8.0;
+        if (x >= mx - 2.0 && x <= mx + width)
+            return i;
+    }
+    return -1;
+}
+
+void PlaylistComponent::editTempoMarker (std::int64_t tick, int existing)
+{
+    // round 190hq (B11): the tempo (BPM) of a new or existing tempo marker; it writes the tempo markers' automation clip
+    const auto& song = engine.getSong();
+    const auto marks = tempomarkers::list (song);
+    const auto editing = existing >= 0 && existing < (int) marks.size();
+    const auto current = editing ? marks[(std::size_t) existing].bpm : song.tempoAt ((double) tick);
+    auto* window = new juce::AlertWindow (editing ? tr ("Edit tempo change") : tr ("Add tempo change"), {}, juce::MessageBoxIconType::NoIcon, this);
+    window->addTextEditor ("bpm", juce::String (current, 2), tr ("Tempo (BPM)"));
+    window->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+    window->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+    window->enterModalState (true, juce::ModalCallbackFunction::create ([this, tick, existing, editing, window] (int result) {
+                                 if (result != 1)
+                                     return;
+                                 const auto bpm = window->getTextEditorContents ("bpm").getDoubleValue();
+                                 if (! (bpm >= minTempo && bpm <= maxTempo))
+                                     return;
+                                 engine.editSong ([tick, existing, editing, bpm] (Song& s) {
+                                     if (editing)
+                                         tempomarkers::setTempo (s, existing, bpm);
+                                     else
+                                         tempomarkers::add (s, tick, bpm);
+                                 });
+                                 repaint();
+                             }),
+                             true);
+}
+
 void PlaylistComponent::showRulerMenu (int x)
 {
     const auto& song = engine.getSong();
@@ -7894,6 +7996,35 @@ void PlaylistComponent::showRulerMenu (int x)
                 m.erase (std::remove_if (m.begin(), m.end(), [] (const Marker& x) { return x.numerator > 0 && x.tick > 0; }), m.end());
             });
         });
+    }
+    // round 190hq (B11, LYNX extra): tempo markers on the ruler, written into the tempo markers' automation clip
+    {
+        const auto marks = tempomarkers::list (song);
+        menu.addItem (tr ("Add tempo change here...") + " (LYNX)", [this, tick] { editTempoMarker (tick, -1); });
+        menu.addItem (tr ("Delete all tempo changes"), ! marks.empty(), false, [this] {
+            engine.editSong ([] (Song& s) {
+                while (! tempomarkers::list (s).empty())
+                    tempomarkers::remove (s, 0);
+            });
+        });
+        int tempoNear = -1;
+        for (int i = 0; i < (int) marks.size(); ++i)
+            if (std::abs (tickToX ((double) marks[(std::size_t) i].tick) - x) <= 6.0)
+                tempoNear = i;
+        if (tempoNear >= 0)
+        {
+            const auto& m = marks[(std::size_t) tempoNear];
+            menu.addSeparator();
+            menu.addSectionHeader (juce::String (tempomarkers::tempoText (m.bpm)));
+            menu.addItem (tr ("Edit tempo..."), [this, tempoNear] { editTempoMarker (0, tempoNear); });
+            menu.addItem (tr ("Glide into this tempo"), true, m.glide, [this, tempoNear, glide = ! m.glide] {
+                engine.editSong ([tempoNear, glide] (Song& s) { tempomarkers::setGlide (s, tempoNear, glide); });
+            });
+            menu.addItem (tr ("Remove tempo change"), [this, tempoNear] {
+                engine.editSong ([tempoNear] (Song& s) { tempomarkers::remove (s, tempoNear); });
+            });
+            menu.addSeparator();
+        }
     }
     // FL's marker actions "Start recording" / "Stop recording" (punch in / out; Record menu › Enable recording markers)
     menu.addItem (tr ("Add a Start recording marker here"), [this, tick] {
@@ -7964,6 +8095,11 @@ void PlaylistComponent::showRulerMenu (int x)
             engine.editSong ([tick] (Song& s) { markers::addJumpToNextBar (s, tick); });
         });
         timeMarkers.addItem (tr ("Add time signature change...") + "\tShift+Alt+T", [this] { runAction ("playlist.markerSignature"); });
+        // round 190hq (B11, LYNX extra; FL has no tempo marker): at the time selection's start, else the song position
+        timeMarkers.addItem (tr ("Add tempo change...") + " (LYNX)", [this] {
+            const auto& sg = engine.getSong();
+            editTempoMarker (sg.hasLoop() ? sg.loopStart : snap ((double) songPositionTick(), true), -1);
+        });
         timeMarkers.addItem (tr ("Place loop") + "\tShift+T", [this] { runAction ("playlist.markerLoop"); });
         timeMarkers.addItem (tr ("Change to marker loop"), song.hasLoop(), false, [this] {
             engine.editSong ([] (Song& s) { markers::changeToMarkerLoop (s); });

@@ -1946,6 +1946,9 @@ struct Automation
     // colour (the .flp's channel colour event 0x80, read on import and written back). 0 = none set: drawn in FL's default
     // channel colour #485156, as FL draws a channel saved without a colour.
     std::uint32_t colour = 0;
+    // Round 190hq (core/TempoMarkers.h): this tempo automation is the Playlist ruler's tempo markers (LYNX extra; saved as
+    // "tempoMarkers", which older LYNX releases ignore: they play it as the plain tempo clip it is)
+    bool tempoMarkers = false;
     bool isLive() const noexcept { return source.track >= 0 || source.channel >= 0; }
     std::uint64_t uid = 0; // stable id (Online Sessions, round 168a)
     float mapLive (float v) const noexcept; // applies the curve
@@ -2730,6 +2733,16 @@ struct Song
     // whose input the compensation delays is delayed with it (the value it gets is the one at its delayed position).
     bool autoPdc = true;
     bool compensateAutomations = true;
+    // LYNX extra (round 190hq, B13; complaint "automation early with latent plugins"): with "Compensate automations" on,
+    // the automation of an insert's fader and pan, of a route's level and of a VCA fader is taken as late as the audio
+    // it acts on (the insert's input alignment plus its effects' latencies). FL's "Compensate automations" is proven for
+    // mixer effect parameters only (REA round 168j), so a project from before (and an .flp import) keeps this off; a new
+    // project starts with it on. Saved as "mixerLevelPdc190hq" when on.
+    bool compensateMixerLevels = true;
+    // Round 190hq (Live 12.4: a launched scene's tempo overrides the Arrangement's tempo automation until "Back to
+    // Arrangement"): while set, the song plays at `bpm` and its tempo automation / tempo markers are held. Set by a scene
+    // launch with its own tempo (AudioEngine::launcherCommand), cleared by Back to Playlist. Not saved.
+    bool sceneTempoHold = false;
     // FL's Options › Project › Time settings (REA round 168j, .flp 0x23, TimeSettingComboChange): show the project's time
     // settings as a time signature (beats per bar / beat unit) instead of FL's time division (beats per bar, steps per beat)
     bool timeSignatureMode = false;

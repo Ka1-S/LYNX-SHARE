@@ -226,7 +226,8 @@ void MidiSyncIo::beginBlock (Transport& transport, double callbackMs, int numSam
     {
         // phase lock: the block's first sample is heard `latencyMs` from now; it should then be where the master is
         // (plus the user's offset: positive = LYNX later)
-        const auto target = clockIn.ticksAt (nowSeconds + (latencyMs - clockOffsetMs.load (std::memory_order_relaxed)) * 0.001);
+        // (round 190hq: heard after the rack's delay compensation too)
+        const auto target = clockIn.ticksAt (nowSeconds + (heardLatencyMs() - clockOffsetMs.load (std::memory_order_relaxed)) * 0.001);
         const auto position = transport.positionTicks.load (std::memory_order_relaxed);
         const auto error = target - position;
         if (std::abs (error) > 480.0) // half a beat off (a jump on the master's side): relocate
@@ -262,7 +263,7 @@ void MidiSyncIo::subBlock (double startTicks, double ticksPerSample, int numSamp
         scratch.clear();
         const auto songSeconds = ticksPerSample > 0.0 ? startTicks / (ticksPerSample * sampleRate) : 0.0;
         slot.generator.process (block, songSeconds, scratch);
-        const auto base = blockStartMs + latencyMs + slot.offsetMs.load (std::memory_order_relaxed);
+        const auto base = blockStartMs + heardLatencyMs() + slot.offsetMs.load (std::memory_order_relaxed);
         for (int i = 0; i < scratch.count; ++i)
         {
             const auto& m = scratch.items[(std::size_t) i];

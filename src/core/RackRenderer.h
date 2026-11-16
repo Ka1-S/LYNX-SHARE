@@ -157,6 +157,15 @@ struct RackState
     std::vector<std::shared_ptr<DelayLine>> channelDelays;
     std::vector<std::vector<std::shared_ptr<DelayLine>>> sendDelays; // [track][k] like PdcPlan::sendDelay
     std::vector<int> latencies; // channels, then slots of all tracks
+    // Round 190hq (B13): a slot's side input (PdcPlan::sideDelay, k = 0…3) delayed to line up with the slot's own input,
+    // into its own chunk buffer (the slot's effect reads it while it processes). nullptr = no delay.
+    struct SideLine
+    {
+        static constexpr int capacity = 512; // (the renderer's chunk)
+        std::shared_ptr<DelayLine> delay;
+        std::array<float, 2 * capacity> out {};
+    };
+    std::vector<std::vector<std::array<std::shared_ptr<SideLine>, 4>>> sideLines; // [track][slot][k]
 
     // The Simple workflow's Blend (round 190bu, MixerTrack::chainBlend): the dry/wet of an insert's whole effect chain.
     // One stage per insert whose Blend is under 100 % (nullptr = 100 %: nothing is copied or mixed): the insert's
@@ -716,6 +725,9 @@ public:
     // FL's "Compensate automations" (REA round 168j): a mixer effect whose input the delay compensation delays gets its
     // automation clips' value at its own, delayed, position (`current` = the value at the song position)
     float compensatedAutomation (const RackState& state, int automation, int track, int slot, float current) const noexcept;
+    // Round 190hq (Song::compensateMixerLevels): `automated (automation, base)` for a level that acts on insert
+    // `track`'s audio after its effects (fader, pan, a route's level, a VCA fader over it), taken as late as that audio.
+    float automatedLevel (const RackState& state, int automation, float base, int track) const noexcept;
 
 private:
     void processChunk (const RackState& state, bool playing, double startTick, int numSamples,
@@ -756,8 +768,11 @@ private:
     // one slot's process, with a moved one-knob slot's glide (round 190dg)
     void runGoalSlot (const EffectSlot& slot, Effect& effect, std::size_t key, float* l, float* r, int n, const EffectParams& params,
                       double bpm) noexcept;
-    void setSidechain (const RackState& state, const EffectSlot& slot, Effect& effect, int track) noexcept;
-    void connect (const RackState& state, const SlotConnections& c, Effect& effect, int track, const float* l, const float* r) noexcept;
+    void setSidechain (const RackState& state, const EffectSlot& slot, Effect& effect, int track, int index, int n) noexcept;
+    // a side input of slot `index` of `track` (k as PdcPlan::sideDelay) from insert `source`: its buffer, or the slot's
+    // delayed copy of it when the PDC plan delays it (round 190hq); {nullptr, nullptr} when it is silent
+    std::pair<const float*, const float*> sideInput (const RackState& state, int track, int index, int k, int source, bool sounding, int n) noexcept;
+    void connect (const RackState& state, const SlotConnections& c, Effect& effect, int track, int index, const float* l, const float* r, int n) noexcept;
     void updateAutomation (const RackState& state, double startTick) noexcept;
     void updateModulators (const RackState& state, double tick, int numSamples) noexcept; // round 177b
     double modSeconds = 0.0; // the free-running modulators' clock

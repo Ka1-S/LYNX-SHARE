@@ -63,6 +63,9 @@ class MainComponent final : public juce::Component,
                             private juce::ChangeListener
 {
 public:
+    // round 190hq (B20): the "Save a copy for an older LYNX" window for project text `json` (its list goes into `list`,
+    // which must outlive the window); --tempomarkershot paints it
+    static juce::AlertWindow* buildSaveCopyWindow (const juce::String& json, std::shared_ptr<juce::TextEditor> list);
     void backupNowForTest() { autosave(); } // --rtstress --backuptest (round 177d)
     // `restoreUserSettings`: load/save the workspace layout, key map and UI options from the user
     // settings (off for --snapshot, which must look the same on every machine).
@@ -404,6 +407,7 @@ private:
     void newProject (bool askAlways = false); // File › New: the New project window unless turned off
     void startNewProject (Song song, const juce::File& file);
     void saveAsTemplate();
+    void saveCopyForOlder(); // round 190hq (B20): File › "Save a copy for an older LYNX..."
     void chooseFileToOpen();
     void chooseFileToOpenNow();
     // `afterSaved`: runs once the project is on disk, also when a "Save as" dialog had to ask first (never after a
