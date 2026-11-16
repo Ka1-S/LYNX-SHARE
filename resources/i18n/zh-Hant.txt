@@ -10628,3 +10628,4 @@ countries: tw hk mo
 "Deactivate Clip" = "停用片段"
 "Activate Clip" = "啟用片段"
 "[0] deactivates / activates it" = "[0] 停用 / 啟用"
+"Region not supported by this track" = "此軌道不支援該區域"

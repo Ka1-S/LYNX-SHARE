@@ -10628,3 +10628,4 @@ countries: id
 "Deactivate Clip" = "Nonaktifkan Klip"
 "Activate Clip" = "Aktifkan Klip"
 "[0] deactivates / activates it" = "[0] menonaktifkan / mengaktifkannya"
+"Region not supported by this track" = "Region tidak didukung oleh trek ini"

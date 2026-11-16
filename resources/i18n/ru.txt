@@ -10628,3 +10628,4 @@ countries: ru by kz
 "Deactivate Clip" = "Отключить клип"
 "Activate Clip" = "Включить клип"
 "[0] deactivates / activates it" = "[0] отключает / включает его"
+"Region not supported by this track" = "Регион не поддерживается этой дорожкой"

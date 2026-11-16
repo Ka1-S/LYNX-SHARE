@@ -10758,3 +10758,4 @@ countries: br
 "Deactivate Clip" = "Desativar clipe"
 "Activate Clip" = "Ativar clipe"
 "[0] deactivates / activates it" = "[0] desativa / ativa"
+"Region not supported by this track" = "Região não suportada por esta faixa"

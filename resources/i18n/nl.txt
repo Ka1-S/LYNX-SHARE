@@ -10628,3 +10628,4 @@ countries: nl be
 "Deactivate Clip" = "Clip deactiveren"
 "Activate Clip" = "Clip activeren"
 "[0] deactivates / activates it" = "[0] deactiveert / activeert hem"
+"Region not supported by this track" = "Regio wordt niet ondersteund door dit spoor"

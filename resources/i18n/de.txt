@@ -10628,3 +10628,4 @@ countries: de at ch li lu
 "Deactivate Clip" = "Clip deaktivieren"
 "Activate Clip" = "Clip aktivieren"
 "[0] deactivates / activates it" = "[0] deaktiviert / aktiviert ihn"
+"Region not supported by this track" = "Region wird von dieser Spur nicht unterstützt"

@@ -10628,3 +10628,4 @@ countries: it ch sm
 "Deactivate Clip" = "Disattiva clip"
 "Activate Clip" = "Attiva clip"
 "[0] deactivates / activates it" = "[0] la disattiva / attiva"
+"Region not supported by this track" = "Regione non supportata da questa traccia"

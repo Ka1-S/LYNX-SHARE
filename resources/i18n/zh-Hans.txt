@@ -10628,3 +10628,4 @@ countries: cn sg
 "Deactivate Clip" = "停用片段"
 "Activate Clip" = "启用片段"
 "[0] deactivates / activates it" = "[0] 停用 / 启用"
+"Region not supported by this track" = "此轨道不支持该区域"
