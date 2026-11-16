@@ -57,9 +57,12 @@ enum class Icon
     sessionRecord,     // a ring
     browserPanel,      // a left panel beside a page (show / hide the Browser)
     metronomeDots,     // Live's metronome: a ring and a dot
-    toStart            // round 190jj: BandLab's Back-to-start (a bar and a triangle pointing left), the Simple capsule's idle Stop
+    toStart,           // round 190jj: BandLab's Back-to-start (a bar and a triangle pointing left), the Simple capsule's idle Stop
+    // round 190jo (design190ia FW-22): the audio editor's tool grid and small icon row, LYNX vectors with Edison's metaphors
+    copy, paste, trash, trim, silence, fadeIn, fadeOut, fadeCurve, normalize, amp, reverse, invert, dcCenter, resample,
+    marker, region, setLoop, equalizer, denoise, reverb, spectrogram
 };
-constexpr int iconCount = (int) Icon::toStart + 1;
+constexpr int iconCount = (int) Icon::spectrogram + 1;
 
 namespace icons
 {
@@ -110,9 +113,16 @@ public:
     //    #070707 glyph)
     //  - liveGlyph: Live's bare transport glyphs (#b5b5b5 on the band; on = playing green / recording red)
     //  - liveSelector: Live's view selector glyphs (on = #ffad56, off = a grey that keeps 3:1 on the band)
-    enum class Look { standard, capsule, liveBox, liveGlyph, liveSelector };
+    //  - flTile (round 190jo, design190ia FM-1/FM-2/FM-3; the Pattern toolbar only): FL's button tile, 30x30 at 100 % with
+    //    radius 4, fill bg3 and a 1 px `border` outline; hover on a switch previews its "on" look (accentMuted at 70 %,
+    //    accentHover glyph, accent outline at 50 %; FL 2024: "toolbar buttons show if they're pressed when hovered"), on a
+    //    plain button bg5 with a borderStrong outline; pressed bg0; on = the button's own on colours over the tile;
+    //    disabled = the glyph at 35 %. The glyph in `iconBoxPx` (0: the button's icon sizing)
+    enum class Look { standard, capsule, liveBox, liveGlyph, liveSelector, flTile };
     void setLook (Look newLook, float iconBoxPx = 0.0f);
     Look getLook() const noexcept { return look; }
+    // flTile: hover previews the "on" look (a switch) instead of the plain hover (a momentary button)
+    void setHoverShowsOn (bool shouldShowOn) { hoverShowsOn = shouldShowOn; }
 
     // Optional extra gestures: when set, a right-click calls onRightClick instead of clicking the button,
     // and a double-click calls onDoubleClick (after the two single clicks).
@@ -128,8 +138,10 @@ public:
 private:
     void timerCallback() override;
     void paintLook (juce::Graphics&, bool highlighted, bool down);
+    void paintFlTile (juce::Graphics&, bool highlighted, bool down);
     Look look = Look::standard;
     float lookIconBox = 0.0f;
+    bool hoverShowsOn = false;
     float hover = 0.0f; // 0 = at rest, 1 = under the mouse (animated)
     Icon icon;
     juce::String text;
