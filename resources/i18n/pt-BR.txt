@@ -10710,3 +10710,6 @@ countries: br
 "Solo on Shift" = "Solo com Shift"
 "Drag a handle (frequency and gain); mouse wheel = Q; right-click = type and key; double-click = 0 dB; Alt+click = reset; Ctrl = fine; Shift+click = solo while held (drag up / down: width)" = "Arraste uma alça (frequência e ganho); roda do mouse = Q; clique direito = tipo e nota; duplo clique = 0 dB; Alt+clique = redefinir; Ctrl = ajuste fino; Shift+clique = solo enquanto segura (arraste para cima / baixo: largura)"
 "Hybridize" = "Hibridizar"
+"Insert effects on the strips (LYNX)" = "Efeitos de insert nas faixas do mixer (LYNX)"
+"Each Mixer strip lists its insert's effects under its header: click one to open it, its dot to bypass it, drag to reorder or onto another strip (Ctrl: a copy), right-click for the slot menu. Also in the Mixer menu." = "Cada faixa do mixer lista os efeitos do seu insert abaixo do cabeçalho: clique em um para abri-lo, no ponto para fazer bypass, arraste para reordenar ou para outra faixa (Ctrl: uma cópia), botão direito para o menu do slot. Também no menu do Mixer."
+"Insert effects: [LMB] opens one  [LMB] on its dot: bypass  drag: reorder or onto another strip, [Ctrl] copies  [RMB] slot menu  [Wheel] scrolls" = "Efeitos de insert: [LMB] abre um  [LMB] no ponto: bypass  arrastar: reordena ou leva a outra faixa, [Ctrl] copia  [RMB] menu do slot  [Wheel] rola"

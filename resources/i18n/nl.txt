@@ -10580,3 +10580,6 @@ countries: nl be
 "Solo on Shift" = "Solo met Shift"
 "Drag a handle (frequency and gain); mouse wheel = Q; right-click = type and key; double-click = 0 dB; Alt+click = reset; Ctrl = fine; Shift+click = solo while held (drag up / down: width)" = "Sleep een greep (frequentie en versterking); muiswiel = Q; rechtsklik = type en noot; dubbelklik = 0 dB; Alt+klik = resetten; Ctrl = fijn; Shift+klik = solo zolang ingedrukt (omhoog / omlaag slepen: breedte)"
 "Hybridize" = "Hybridiseren"
+"Insert effects on the strips (LYNX)" = "Inserteffecten op de kanaalstrips (LYNX)"
+"Each Mixer strip lists its insert's effects under its header: click one to open it, its dot to bypass it, drag to reorder or onto another strip (Ctrl: a copy), right-click for the slot menu. Also in the Mixer menu." = "Elke mixerstrip toont de effecten van zijn insert onder zijn kop: klik op een effect om het te openen, op zijn stip om het te bypassen, sleep om te herschikken of naar een andere strip (Ctrl: een kopie), rechtsklik voor het slotmenu. Ook in het Mixer-menu."
+"Insert effects: [LMB] opens one  [LMB] on its dot: bypass  drag: reorder or onto another strip, [Ctrl] copies  [RMB] slot menu  [Wheel] scrolls" = "Inserteffecten: [LMB] opent er een  [LMB] op de stip: bypass  slepen: herschikken of naar een andere strip, [Ctrl] kopieert  [RMB] slotmenu  [Wheel] scrollt"

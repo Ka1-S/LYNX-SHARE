@@ -10580,3 +10580,6 @@ countries: cn sg
 "Solo on Shift" = "按 Shift 独奏"
 "Drag a handle (frequency and gain); mouse wheel = Q; right-click = type and key; double-click = 0 dB; Alt+click = reset; Ctrl = fine; Shift+click = solo while held (drag up / down: width)" = "拖动手柄（频率和增益）；鼠标滚轮 = Q；右键 = 类型和音符；双击 = 0 dB；Alt+单击 = 重置；Ctrl = 微调；Shift+单击 = 按住时独奏（上下拖动：宽度）"
 "Hybridize" = "混合"
+"Insert effects on the strips (LYNX)" = "在通道条上显示插入效果 (LYNX)"
+"Each Mixer strip lists its insert's effects under its header: click one to open it, its dot to bypass it, drag to reorder or onto another strip (Ctrl: a copy), right-click for the slot menu. Also in the Mixer menu." = "每个混音器通道条在标题下列出其插入的效果：单击一个将其打开，单击其圆点可旁通，拖动可重新排序或移到另一个通道条 (Ctrl：复制)，右键单击打开插槽菜单。也在混音器菜单中。"
+"Insert effects: [LMB] opens one  [LMB] on its dot: bypass  drag: reorder or onto another strip, [Ctrl] copies  [RMB] slot menu  [Wheel] scrolls" = "插入效果：[LMB] 打开  在圆点上 [LMB]：旁通  拖动：重新排序或移到另一个通道条，[Ctrl] 复制  [RMB] 插槽菜单  [Wheel] 滚动"

@@ -10580,3 +10580,6 @@ countries: tr
 "Solo on Shift" = "Shift ile solo"
 "Drag a handle (frequency and gain); mouse wheel = Q; right-click = type and key; double-click = 0 dB; Alt+click = reset; Ctrl = fine; Shift+click = solo while held (drag up / down: width)" = "Bir tutamacı sürükleyin (frekans ve kazanç); fare tekerleği = Q; sağ tıklama = tür ve nota; çift tıklama = 0 dB; Alt+tıklama = sıfırla; Ctrl = ince ayar; Shift+tıklama = basılı tutulduğunda solo (yukarı / aşağı sürükle: genişlik)"
 "Hybridize" = "Melezle"
+"Insert effects on the strips (LYNX)" = "Şeritlerde insert efektleri (LYNX)"
+"Each Mixer strip lists its insert's effects under its header: click one to open it, its dot to bypass it, drag to reorder or onto another strip (Ctrl: a copy), right-click for the slot menu. Also in the Mixer menu." = "Her mikser şeridi, başlığının altında insert efektlerini listeler: birine tıklamak onu açar, noktasına tıklamak bypass yapar, sürüklemek sırasını değiştirir veya başka bir şeride taşır (Ctrl: kopya), sağ tık slot menüsünü açar. Mikser menüsünde de var."
+"Insert effects: [LMB] opens one  [LMB] on its dot: bypass  drag: reorder or onto another strip, [Ctrl] copies  [RMB] slot menu  [Wheel] scrolls" = "Insert efektleri: [LMB] birini açar  noktasında [LMB]: bypass  sürükle: yeniden sırala veya başka şeride, [Ctrl] kopyalar  [RMB] slot menüsü  [Wheel] kaydırır"

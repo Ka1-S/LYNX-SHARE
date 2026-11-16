@@ -183,7 +183,7 @@ public:
     static constexpr int routeWidth = 30;
     static constexpr int nameWidth = 150;
     static constexpr int selectWidth = 12;
-    static constexpr int stepWidth = 22;
+    static constexpr int stepWidth = 18; // (round 190io, FM-11: FL's keycap pitch is 16, LYNX 18; was 22)
 
 private:
     enum class Area { none, mute, pan, volume, route, name, select, grid, addRow, laneLevels, lane, loop };
@@ -295,6 +295,8 @@ private:
     static constexpr int positionStripHeight = 9; // FL's "Playing step" LED strip, at the top of the add row
     bool channelHitsNow (int row) const;
     static void paintStepHit (juce::Graphics&, juce::Rectangle<float>);
+    static void paintKeycap (juce::Graphics&, juce::Rectangle<int>, juce::Colour fill, bool lit); // FL's raised step (round 190io)
+    static constexpr float keycapRadius = 2.0f;
 
     enum class PaintMode { none, add, remove } paintMode = PaintMode::none;
     int lastPaintedRow = -1, lastPaintedStep = -1;

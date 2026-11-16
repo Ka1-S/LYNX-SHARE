@@ -2441,6 +2441,7 @@ std::unique_ptr<juce::Component> makeLinkPage (AudioEngine& engine, const Settin
 bool lynxExtraOn (AudioEngine& engine, const SettingsHooks& hooks, std::string_view id)
 {
     if (id == "mixer.loudness") return MixerStrips::showLoudness;
+    if (id == "mixer.stripInserts") return MixerStrips::showStripInserts;
     if (id == "mixer.usedOnly") return MixerStrips::showUsedOnly;
     if (id == "mixer.keepLostLinks") return MixerStrips::keepLostLinks;
     if (id == "mixer.followPlaylist") return MixerStrips::followPlaylist;
@@ -2473,6 +2474,14 @@ void setLynxExtra (AudioEngine& engine, const SettingsHooks& hooks, std::string_
             mixeroptions::setShowLoudness (on);
         else
             MixerStrips::showLoudness = on;
+        saved();
+    }
+    else if (id == "mixer.stripInserts") // round 190io (issue #154 part 2)
+    {
+        if (mixeroptions::setShowStripInserts)
+            mixeroptions::setShowStripInserts (on);
+        else
+            MixerStrips::showStripInserts = on;
         saved();
     }
     else if (id == "mixer.usedOnly")

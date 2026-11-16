@@ -10580,3 +10580,6 @@ countries: ru by kz
 "Solo on Shift" = "Соло с Shift"
 "Drag a handle (frequency and gain); mouse wheel = Q; right-click = type and key; double-click = 0 dB; Alt+click = reset; Ctrl = fine; Shift+click = solo while held (drag up / down: width)" = "Перетащите маркер (частота и усиление); колесо мыши = Q; правый щелчок = тип и нота; двойной щелчок = 0 дБ; Alt+щелчок = сброс; Ctrl = точно; Shift+щелчок = соло, пока удерживается (вверх / вниз: ширина)"
 "Hybridize" = "Гибридизировать"
+"Insert effects on the strips (LYNX)" = "Эффекты вставки на линейках (LYNX)"
+"Each Mixer strip lists its insert's effects under its header: click one to open it, its dot to bypass it, drag to reorder or onto another strip (Ctrl: a copy), right-click for the slot menu. Also in the Mixer menu." = "Каждая линейка микшера показывает под заголовком эффекты своей вставки: щелчок открывает эффект, щелчок по точке обходит его (bypass), перетаскивание меняет порядок или переносит на другую линейку (Ctrl: копия), правый щелчок открывает меню слота. Также в меню микшера."
+"Insert effects: [LMB] opens one  [LMB] on its dot: bypass  drag: reorder or onto another strip, [Ctrl] copies  [RMB] slot menu  [Wheel] scrolls" = "Эффекты вставки: [LMB] открывает  [LMB] по точке: обход  перетаскивание: порядок или на другую линейку, [Ctrl] копирует  [RMB] меню слота  [Wheel] прокрутка"

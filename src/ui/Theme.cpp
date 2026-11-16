@@ -22,6 +22,7 @@
 
 #include "core/MenuPlacement.h"
 #include "core/Song.h"
+#include "core/MiddleEllipsis.h"
 #include "core/UiFontChoice.h"
 #include "platform/Paths.h"
 #include "ui/Icons.h"
@@ -369,6 +370,47 @@ ClipLook clipBody (juce::Colour clipColour, juce::Colour trackColour, ClipKind k
     return look;
 }
 
+float contrast (juce::Colour a, juce::Colour b)
+{
+    const auto lum = [] (juce::Colour c) {
+        const auto lin = [] (float v) { return v <= 0.03928f ? v / 12.92f : std::pow ((v + 0.055f) / 1.055f, 2.4f); };
+        return 0.2126f * lin (c.getFloatRed()) + 0.7152f * lin (c.getFloatGreen()) + 0.0722f * lin (c.getFloatBlue());
+    };
+    const auto la = lum (a), lb = lum (b);
+    return (juce::jmax (la, lb) + 0.05f) / (juce::jmin (la, lb) + 0.05f);
+}
+
+juce::Colour colourFill (juce::Colour c, float lo, float hi)
+{
+    return c.withBrightness (juce::jlimit (lo, hi, c.getBrightness()));
+}
+
+juce::Colour lightTint (juce::Colour c, juce::Colour background, juce::Colour fallback)
+{
+    const auto tint = c.withMultipliedSaturation (0.45f).withBrightness (0.95f);
+    return contrast (tint, background) >= 4.5f ? tint : fallback;
+}
+
+juce::String fitMiddle (const juce::String& text, const juce::Font& font, float width)
+{
+    // (message thread only, as every paint; a project switch or a long session starts the cache again)
+    static std::unordered_map<juce::String, juce::String> cache;
+    const auto key = text + "\x01" + juce::String (font.getHeight(), 2) + "\x01" + font.getTypefaceName() + "\x01" + font.getTypefaceStyle()
+                     + "\x01" + juce::String (juce::roundToInt (width * 4.0f));
+    if (const auto it = cache.find (key); it != cache.end())
+        return it->second;
+    if (cache.size() > 4000)
+        cache.clear();
+    const auto n = text.length();
+    const auto widthOf = [&] (int first, int count) { return juce::GlyphArrangement::getStringWidth (font, text.substring (first, first + count)); };
+    const auto [head, tail] = middleellipsis::split (n, width, juce::GlyphArrangement::getStringWidth (font, ".."), widthOf);
+    auto fitted = tail == 0 && head == n ? text
+                  : head == 0               ? text.substring (0, 1) // (nothing fits: the drawText that follows clips it)
+                                            : text.substring (0, head).trimEnd() + ".." + text.substring (n - tail).trimStart();
+    cache.emplace (key, fitted);
+    return fitted;
+}
+
 void fillLaunchTriangle (juce::Graphics& g, juce::Rectangle<float> a, juce::Colour colour)
 {
     g.setColour (colour);
@@ -384,6 +426,98 @@ void fillLaunchTriangle (juce::Graphics& g, juce::Rectangle<float> a, juce::Colo
     };
     if (! (tilesForPaths() && lynx::ui::paintTiles()) || ! drawTile (g, cache, a, 0.0f, mix (0x3c6ef372fe94f82bull, (std::uint64_t) colour.getARGB()), nativeTiles, colour, direct))
         direct (g, a);
+}
+
+// Round 190io: FL's raised step keycap and the colour-filled plates (rack buttons, Mixer header bands), drawn from cached
+// tiles where the context's scale is whole (as the rounded rectangles): one blit per keycap instead of five fills
+// (paintbench: the rack's whole frame went from 16 to 35 ms with the fills).
+void drawKeycap (juce::Graphics& g, juce::Rectangle<int> r, juce::Colour fill, bool lit)
+{
+    if (r.isEmpty() || ! g.clipRegionIntersects (r))
+        return;
+    const auto direct = [fill, lit] (juce::Graphics& k, juce::Rectangle<float> b) {
+        using namespace colour;
+        const auto x = b.getX(), y = b.getY(), w = b.getWidth(), h = b.getHeight();
+        const auto slotY = y + std::round (h * 0.25f);
+        k.setColour (fill);
+        k.fillRoundedRectangle (b, 2.0f);
+        // the bevel: the cap's upper part a step lighter down to the slot (FL: #767C80 over a #63696D body)
+        k.setColour (fill.brighter (lit ? 0.12f : 0.18f));
+        k.fillRect (juce::Rectangle<float> (x + 1.0f, y + 1.0f, w - 2.0f, slotY - y - 1.0f));
+        k.setColour (lit ? fill.brighter (0.4f) : borderStrong.brighter (0.25f));
+        k.fillRect (juce::Rectangle<float> (x + 1.0f, y, w - 2.0f, 1.0f));
+        k.setColour (lit ? fill.darker (0.45f) : bg0);
+        k.fillRect (juce::Rectangle<float> (x + 1.0f, y + h - 1.0f, w - 2.0f, 1.0f));
+        k.setColour (lit ? onAccent.withAlpha (0.6f) : bg0.withAlpha (0.85f));
+        k.fillRect (juce::Rectangle<float> (x + 3.0f, slotY, w - 6.0f, 1.0f));
+    };
+    static SpriteCache cache;
+    static const bool registered = lynx::ui::registerImageCache ([] { cache.images.clear(); }); (void) registered;
+    const auto key = mix (mix (mix (0x6a09e667f3bcc908ull, (std::uint64_t) fill.getARGB()), lit ? 1u : 0u), paletteStamp);
+    if (! tilesForPrimitives() || ! drawTile (g, cache, r.toFloat(), 0.0f, key, nativeTiles, fill, direct))
+        direct (g, r.toFloat());
+}
+
+void drawStepStrip (juce::Graphics& g, juce::Rectangle<int> firstCell, int pitch, juce::Colour a, juce::Colour b, bool ghost)
+{
+    const auto bounds = firstCell.withWidth (7 * pitch + firstCell.getWidth());
+    if (! g.clipRegionIntersects (bounds))
+        return;
+    const auto w = (float) firstCell.getWidth();
+    const auto cell = [ghost, w] (juce::Graphics& k, juce::Rectangle<float> c, juce::Colour fill) {
+        if (! ghost)
+        {
+            using namespace colour; // (drawKeycap's keycap, unlit)
+            const auto slotY = c.getY() + std::round (c.getHeight() * 0.25f);
+            k.setColour (fill);
+            k.fillRoundedRectangle (c, 2.0f);
+            k.setColour (fill.brighter (0.18f));
+            k.fillRect (juce::Rectangle<float> (c.getX() + 1.0f, c.getY() + 1.0f, w - 2.0f, slotY - c.getY() - 1.0f));
+            k.setColour (borderStrong.brighter (0.25f));
+            k.fillRect (juce::Rectangle<float> (c.getX() + 1.0f, c.getY(), w - 2.0f, 1.0f));
+            k.setColour (bg0);
+            k.fillRect (juce::Rectangle<float> (c.getX() + 1.0f, c.getBottom() - 1.0f, w - 2.0f, 1.0f));
+            k.setColour (bg0.withAlpha (0.85f));
+            k.fillRect (juce::Rectangle<float> (c.getX() + 3.0f, slotY, w - 6.0f, 1.0f));
+            return;
+        }
+        // a step past the pattern's end: faint, outlined
+        k.setColour (fill.withMultipliedAlpha (0.35f));
+        k.fillRoundedRectangle (c, 2.0f);
+        k.setColour (fill.brighter (0.25f).withMultipliedAlpha (0.55f));
+        k.drawRoundedRectangle (c.reduced (0.5f), 2.0f, 1.0f);
+    };
+    const auto direct = [&cell, pitch, w, a, b] (juce::Graphics& k, juce::Rectangle<float> r) {
+        for (int i = 0; i < 8; ++i)
+            cell (k, juce::Rectangle<float> (r.getX() + (float) (i * pitch), r.getY(), w, r.getHeight()), i < 4 ? a : b);
+    };
+    static SpriteCache cache;
+    static const bool registered = lynx::ui::registerImageCache ([] { cache.images.clear(); }); (void) registered;
+    const auto key = mix (mix (mix (mix (mix (0x3c6ef372fe94f82bull, (std::uint64_t) a.getARGB()), (std::uint64_t) b.getARGB()), (std::uint64_t) pitch),
+                               ghost ? 1u : 0u), paletteStamp);
+    if (! tilesForPrimitives() || ! drawTile (g, cache, bounds.toFloat(), 0.0f, key, nativeTiles, a, direct))
+        direct (g, bounds.toFloat());
+}
+
+void fillPlate (juce::Graphics& g, juce::Rectangle<float> r, float corner, juce::Colour top, juce::Colour bottom, bool squareBottom)
+{
+    if (r.isEmpty() || ! g.clipRegionIntersects (r.getSmallestIntegerContainer()))
+        return;
+    const auto direct = [corner, top, bottom, squareBottom] (juce::Graphics& k, juce::Rectangle<float> b) {
+        if (top == bottom)
+            k.setColour (top);
+        else
+            k.setGradientFill (juce::ColourGradient::vertical (top, b.getY(), bottom, b.getBottom()));
+        juce::Path p;
+        p.addRoundedRectangle (b.getX(), b.getY(), b.getWidth(), b.getHeight(), corner, corner, true, true, ! squareBottom, ! squareBottom);
+        k.fillPath (p);
+    };
+    static SpriteCache cache;
+    static const bool registered = lynx::ui::registerImageCache ([] { cache.images.clear(); }); (void) registered;
+    const auto key = mix (mix (mix (mix (0xbb67ae8584caa73bull, (std::uint64_t) top.getARGB()), (std::uint64_t) bottom.getARGB()),
+                               (std::uint64_t) eighth (corner)), squareBottom ? 1u : 0u);
+    if (! tilesForPrimitives() || ! drawTile (g, cache, r, 0.0f, key, nativeTiles, bottom, direct))
+        direct (g, r);
 }
 
 void fillRoundRect (juce::Graphics& g, juce::Rectangle<float> r, float corner, juce::Colour colour)

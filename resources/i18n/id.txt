@@ -10580,3 +10580,6 @@ countries: id
 "Solo on Shift" = "Solo dengan Shift"
 "Drag a handle (frequency and gain); mouse wheel = Q; right-click = type and key; double-click = 0 dB; Alt+click = reset; Ctrl = fine; Shift+click = solo while held (drag up / down: width)" = "Seret pegangan (frekuensi dan gain); roda mouse = Q; klik kanan = tipe dan not; klik ganda = 0 dB; Alt+klik = reset; Ctrl = halus; Shift+klik = solo selama ditahan (seret atas / bawah: lebar)"
 "Hybridize" = "Hibridisasi"
+"Insert effects on the strips (LYNX)" = "Efek insert di strip (LYNX)"
+"Each Mixer strip lists its insert's effects under its header: click one to open it, its dot to bypass it, drag to reorder or onto another strip (Ctrl: a copy), right-click for the slot menu. Also in the Mixer menu." = "Setiap strip Mixer menampilkan efek insert-nya di bawah header: klik satu untuk membukanya, klik titiknya untuk bypass, seret untuk mengurutkan ulang atau ke strip lain (Ctrl: salinan), klik kanan untuk menu slot. Juga di menu Mixer."
+"Insert effects: [LMB] opens one  [LMB] on its dot: bypass  drag: reorder or onto another strip, [Ctrl] copies  [RMB] slot menu  [Wheel] scrolls" = "Efek insert: [LMB] membuka satu  [LMB] pada titiknya: bypass  seret: urutkan ulang atau ke strip lain, [Ctrl] menyalin  [RMB] menu slot  [Wheel] menggulir"

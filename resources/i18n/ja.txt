@@ -10580,3 +10580,6 @@ countries: jp
 "Solo on Shift" = "Shift でソロ"
 "Drag a handle (frequency and gain); mouse wheel = Q; right-click = type and key; double-click = 0 dB; Alt+click = reset; Ctrl = fine; Shift+click = solo while held (drag up / down: width)" = "ハンドルをドラッグ (周波数とゲイン)、マウスホイール = Q、右クリック = タイプとキー、ダブルクリック = 0 dB、Alt+クリック = リセット、Ctrl = 微調整、Shift+クリック = 押している間ソロ (上下にドラッグ: 幅)"
 "Hybridize" = "ハイブリッド化"
+"Insert effects on the strips (LYNX)" = "ストリップにインサートエフェクトを表示 (LYNX)"
+"Each Mixer strip lists its insert's effects under its header: click one to open it, its dot to bypass it, drag to reorder or onto another strip (Ctrl: a copy), right-click for the slot menu. Also in the Mixer menu." = "各ミキサーストリップのヘッダーの下に、そのインサートのエフェクトを一覧表示します。クリックで開き、ドットでバイパス、ドラッグで並べ替えまたは別のストリップへ移動 (Ctrl: コピー)、右クリックでスロットメニュー。ミキサーメニューにもあります。"
+"Insert effects: [LMB] opens one  [LMB] on its dot: bypass  drag: reorder or onto another strip, [Ctrl] copies  [RMB] slot menu  [Wheel] scrolls" = "インサートエフェクト: [LMB] 開く  ドットで [LMB]: バイパス  ドラッグ: 並べ替え／別のストリップへ、[Ctrl] でコピー  [RMB] スロットメニュー  [Wheel] スクロール"

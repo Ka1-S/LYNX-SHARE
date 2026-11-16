@@ -248,6 +248,32 @@ struct ClipLook
 // `trackColour` 0 / `clipColour` 0 = FL's default grey #485156 (a channel or track saved without a colour).
 ClipLook clipBody (juce::Colour clipColour, juce::Colour trackColour, ClipKind kind, ClipStyle style);
 
+// --- FL's colour-filled buttons and tinted names (round 190io, design190ia FM-10 / FM-30 / FM-31) ------------------------
+// WCAG contrast ratio of two colours (1 … 21).
+float contrast (juce::Colour a, juce::Colour b);
+
+// A user colour as FL fills a button or a header band with it: the colour itself (FL keeps its saturation: Synth Bass
+// #0E4498, Grv Kick #8A211A measured in fl-channelrack.png), its brightness held in [lo, hi] so white text on it keeps
+// its contrast (LYNX: FL's lighter fills such as Titey Tom #B65227 read 4.2:1 with white).
+juce::Colour colourFill (juce::Colour c, float lo, float hi);
+
+// FL's light tint of a track colour for its name ("KICK" red-pink on the red group): saturation × 0.45, brightness 0.95;
+// `fallback` when the tint reads below 4.5:1 on `background`.
+juce::Colour lightTint (juce::Colour c, juce::Colour background, juce::Colour fallback);
+
+// FL's raised step keycap (round 190io, FM-11) in `fill`; `lit`: a lit step's light edges and slot line. From a cached tile.
+void drawKeycap (juce::Graphics& g, juce::Rectangle<int> r, juce::Colour fill, bool lit);
+// Eight step keycaps in a row (the Channel rack's idle steps, two groups of four: `a` then `b`) at `pitch` from `firstCell`,
+// one tile per row instead of eight; `ghost`: the faint outlined steps past a pattern's end (round 190io).
+void drawStepStrip (juce::Graphics& g, juce::Rectangle<int> firstCell, int pitch, juce::Colour a, juce::Colour b, bool ghost);
+// A plate filled top-down from `top` to `bottom` (one colour: equal), rounded `corner` (only on top with `squareBottom`):
+// FL's colour-filled channel buttons and Mixer header bands (round 190io). From a cached tile.
+void fillPlate (juce::Graphics& g, juce::Rectangle<float> r, float corner, juce::Colour top, juce::Colour bottom, bool squareBottom = false);
+
+// FL's middle ellipsis (core/MiddleEllipsis.h): `text` as it fits in `width` with `font`, start + ".." + end when it is
+// too long. Cached by text, font height and width, so a paint measures each name once.
+juce::String fitMiddle (const juce::String& text, const juce::Font& font, float width);
+
 // Upper case for small caption headers, including accented Latin letters (ã -> Ã), which the C
 // runtime's towupper leaves alone on Windows.
 inline juce::String caps (const juce::String& text)
