@@ -455,6 +455,11 @@ void autoFilterModulation (const xml::Element& device, const Context& context, T
 // Operator → Tetra, LYNX's own FM synth (round 190hs, core/AlsDevicesFm.cpp): every parameter Tetra has, in Operator's
 // units; `notes` lists what has no place. False: not an Operator device
 bool operatorToTetra (const xml::Element& device, ChannelDef& channel, Notes& notes);
+// Wavetable → Helix, LYNX's own wavetable synth (round 190ja, core/AlsDevicesWt.cpp): every parameter in Wavetable's
+// units, the modulation matrix, Live's tables mapped onto LYNX's own; `notes` lists what differs. False: not a Wavetable
+bool wavetableToHelix (const xml::Element& device, ChannelDef& channel, Notes& notes);
+// Live's element names of Helix's automatable values, in Helix's parameter order
+const std::vector<std::string>& helixLiveNames();
 bool driftToSynth (const xml::Element& device, ChannelDef& channel, double bpm, Notes& notes);
 // The ratio's semitones as the synth's octave / semitones / cents (octave −3 … 3, semitones −11 … 11, cents ±100)
 void setOscillatorPitch (SynthOscillator& osc, double semitones) noexcept;

@@ -1324,6 +1324,23 @@ bool instrumentFrom (Ctx& ctx, const Element& device, ChannelDef& channel, std::
             return true;
         }
     }
+    // (round 190ja) Wavetable: Helix, LYNX's own wavetable synth, with Wavetable's values as they are; Live's tables map
+    // onto LYNX's own (core/AlsDevicesWt.cpp)
+    if (tag == "InstrumentVector")
+    {
+        alsdev::Notes notes;
+        ChannelDef wt = channel;
+        if (alsdev::wavetableToHelix (device, wt, notes))
+        {
+            channel = std::move (wt);
+            ctx.note (&FlpImportReport::converted, "Wavetable -> Helix (LYNX's wavetable synth)");
+            for (const auto& n : notes.approximated)
+                ctx.note (&FlpImportReport::partialEffects, "Wavetable: " + n);
+            for (const auto& n : notes.dropped)
+                ctx.note (&FlpImportReport::partialEffects, "Wavetable: " + n + " (not applied)");
+            return true;
+        }
+    }
     // (round 190ed) Drift: the built-in synth with its oscillators, filter and amp envelope (core/AlsDevices.h); the
     // report lists the pair as fitted and what has no place
     if (tag == "Drift")

@@ -221,6 +221,7 @@ APP_SOURCES+=(src/ui/SlicexEditor.cpp)
 APP_SOURCES+=(src/ui/FpcEditor.cpp) # round 190q
 APP_SOURCES+=(src/ui/TetraEditor.cpp) # round 190hs
 APP_SOURCES+=(src/ui/DirectWaveEditor.cpp) # round 190hz
+APP_SOURCES+=(src/ui/HelixEditor.cpp) # round 190ja
 # Windows file association (.lynx) and its icon
 APP_SOURCES+=(src/platform/FileTypes.cpp src/platform/Paths.cpp src/platform/Package.cpp src/platform/NativeEmbed.cpp)
 # SEH guard around calls into hosted plugins (round 111): the only unit built with -fms-extensions (__try / __except)
@@ -240,6 +241,8 @@ APP_SOURCES+=(src/core/GmsMobile.cpp)
 APP_SOURCES+=(src/core/PocketSuperSaw.cpp)
 # Tetra: LYNX's own FM synth and the import of Live's Operator onto it (round 190hs)
 APP_SOURCES+=(src/core/FmSynth.cpp src/core/AlsDevicesFm.cpp)
+# Helix: LYNX's own wavetable synth and the import of Live's Wavetable onto it (round 190ja)
+APP_SOURCES+=(src/core/WavetableSynth.cpp src/core/WavetableTables.cpp src/core/AlsDevicesWt.cpp)
 # onboarding: FL Studio integration (plugin database, sample relocation), background scan, setup wizard
 APP_SOURCES+=(src/core/FlPluginDb.cpp src/engine/FlStudio.cpp src/ui/SetupWizard.cpp)
 APP_SOURCES+=(src/core/PluginCatalog.cpp src/ui/PluginPicker.cpp)

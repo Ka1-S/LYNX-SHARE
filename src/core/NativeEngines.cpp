@@ -135,6 +135,7 @@ const std::vector<InstrumentEngine>& instrumentEngines()
         { InstrumentKind::minisynth, "MiniSynth", "MiniSynth", fl, false },
         { InstrumentKind::pocketSuperSaw, "Pocket SuperSaw", "", own, false }, // (FL Studio Mobile's SuperSaw: plays from its defaults)
         { InstrumentKind::tetra, "Tetra", "", own, false }, // (round 190hs: LYNX's own FM synth, plays from its defaults: one sine)
+        { InstrumentKind::helix, "Helix", "", own, false }, // (round 190ja: LYNX's own wavetable synth, plays from its defaults)
         { InstrumentKind::dx10, "Fruity DX10", "Fruity DX10", own, false },
         { InstrumentKind::plucked, "Plucked!", "Plucked!", own, false },
         { InstrumentKind::sawer, "Sawer", "Sawer", fl, false },

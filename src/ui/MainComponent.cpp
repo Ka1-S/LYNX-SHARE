@@ -71,6 +71,7 @@
 #include "ui/PatcherEditor.h"
 #include "ui/ToolWindow.h"
 #include "ui/RackEditor.h"
+#include "ui/HelixEditor.h"
 #include "ui/LoopStarterWindow.h"
 #include "ui/WindowOwner.h"
 
@@ -189,6 +190,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 {
     if (startupMark != nullptr) startupMark ("main window: panels constructed (rack, piano roll, playlist, mixer, browser)"); // (round 190gd)
     rackcards::install(); // (round 183c: racks show as their own card in the Device View)
+    helixcards::install(); // (round 190ja: Helix shows as Live's Wavetable in the Device View)
     heldKeys.setSender ([this] (int channel, int key, float velocity, bool on) { engine.sendLiveNote (channel, key, velocity, on, true); });
     connectBrowser (browser);
     if (restoreUserSettings) // (issue #104: the Plugin database folder on disk; changes made in LYNX are written to it)

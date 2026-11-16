@@ -51,6 +51,8 @@ CORE="$CORE src/core/GmsMobile.cpp"
 CORE="$CORE src/core/PocketSuperSaw.cpp"
 # Tetra: LYNX's own FM synth and the import of Live's Operator onto it (round 190hs)
 CORE="$CORE src/core/FmSynth.cpp src/core/AlsDevicesFm.cpp"
+# Helix: LYNX's own wavetable synth and the import of Live's Wavetable onto it (round 190ja)
+CORE="$CORE src/core/WavetableSynth.cpp src/core/WavetableTables.cpp src/core/AlsDevicesWt.cpp"
 # FL Studio integration: plugin database and sample relocation (read-only)
 CORE="$CORE src/core/FlPluginDb.cpp"
 # missing files of an opened project: search and relocation (round 81)

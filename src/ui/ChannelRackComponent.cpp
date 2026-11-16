@@ -126,6 +126,7 @@ juce::String instrumentName (InstrumentKind k)
         case InstrumentKind::fpc: return "FPC";
         case InstrumentKind::pocketSuperSaw: return "Pocket SuperSaw";
         case InstrumentKind::tetra: return "Tetra";
+        case InstrumentKind::helix: return "Helix";
     }
     return "?";
 }

@@ -38,6 +38,9 @@
 #include "core/Patcher.h"
 #include "core/Rack.h"
 #include "ui/RackEditor.h"
+#include "ui/HelixEditor.h"
+#include "core/AlsDevices.h"
+#include "core/XmlLite.h"
 #include "ui/DrumRackShot.h"
 #include "ui/GroovePoolComponent.h"
 #include "core/Patcherize.h"
@@ -2587,6 +2590,17 @@ public:
             quit();
             return;
         }
+        if (args.contains ("--helixshot190ja"))
+        {
+            // LYNX --helixshot190ja prefix [Wavetable preset .adv]: round 190ja off-screen, the Clip-launch layout's Device
+            // View with a Helix track (the preset's values imported as a Live set would bring them, else Helix's defaults):
+            // the device and its pages (Matrix, MIDI, MPE, Env 2, LFO 1, Osc 2), then the Pattern layout's channel window.
+            const auto i = args.indexOf ("--helixshot190ja");
+            runHelixShot190ja (args[i + 1].unquoted(), i + 2 < args.size() && ! args[i + 2].startsWith ("--") ? args[i + 2].unquoted() : juce::String());
+            quit();
+            return;
+        }
+
         if (args.contains ("--liveshot190ce"))
         {
             // LYNX.exe --liveshot190ce prefix: round 190ce off-screen, in the Ableton-style layout: the Device View's cards
@@ -25325,6 +25339,98 @@ private:
         }
         else
             checks << "skip Live's Core Library is not on this machine\n";
+        juce::File (prefix + "-checks.txt").replaceWithText (checks);
+    }
+
+    void runHelixShot190ja (const juce::String& prefix, const juce::String& preset)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        lynx::MainComponent ui (offline, false);
+        const auto size = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_SNAPSHOT_SIZE", "1920x1080"), "x", "");
+        ui.setSize (juce::jlimit (800, 3840, size[0].getIntValue()), juce::jlimit (450, 2160, size[1].getIntValue()));
+        juce::String checks;
+        const auto check = [&checks] (const juce::String& what, bool ok) { checks << (ok ? "ok   " : "FAIL ") << what << "\n"; };
+        const auto write = [&prefix, &ui, &offline] (const char* name) {
+            offline.dispatchPendingMessages();
+            const auto file = lynx::shot::file (juce::File (prefix + "-" + name + ".png"));
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (lynx::shot::snapshot (ui), out);
+        };
+        // the Helix channel: Helix's defaults, or a Live Wavetable preset's values through the .als import's own mapping
+        lynx::ChannelDef helix;
+        helix.instrument = lynx::InstrumentKind::helix;
+        helix.name = "Helix";
+        if (preset.isNotEmpty())
+        {
+            juce::MemoryBlock raw;
+            juce::File (preset).loadFileAsData (raw);
+            juce::MemoryInputStream in (raw, false);
+            juce::GZIPDecompressorInputStream gz (&in, false, juce::GZIPDecompressorInputStream::gzipFormat);
+            const auto text = juce::File (preset).getFileExtension() == ".adv" ? gz.readEntireStreamAsString() : juce::String();
+            lynx::xml::Document doc;
+            lynx::alsdev::Notes notes;
+            const auto parsed = doc.parse (text.toStdString());
+            auto device = parsed ? doc.root().child ("InstrumentVector") : lynx::xml::Element();
+            check ("preset read: " + preset, parsed && (bool) device && lynx::alsdev::wavetableToHelix (device, helix, notes));
+            helix.name = juce::File (preset).getFileNameWithoutExtension().toStdString();
+        }
+        ui.setVisible (true);
+        lynx::DetailView::shownSetting = lynx::DetailView::devicesPage = true;
+        ui.setClipLaunchWorkflow (true);
+        ui.showPanelsForSnapshot ({ lynx::workspace::Panel::playlist });
+        offline.editSong ([&helix] (lynx::Song& s) {
+            if (s.channels.empty())
+                s.channels.resize (1);
+            helix.mixerTrack = s.channels[0].mixerTrack;
+            s.channels[0] = helix;
+            while (s.patterns.empty())
+                s.patterns.emplace_back();
+            lynx::Note note;
+            note.channel = 0;
+            note.key = 60;
+            s.patterns[0].name = "Chords";
+            s.patterns[0].notes = { note };
+            s.patterns[0].lengthTicks = 4 * lynx::ppq;
+            s.playlistTracks.resize (std::max<std::size_t> (s.playlistTracks.size(), 2));
+            s.playlistTracks[0].name = helix.name;
+            lynx::Clip clip;
+            clip.pattern = 0;
+            clip.length = 4 * lynx::ppq;
+            lynx::launcher::setClip (s, 0, 0, clip);
+        }, false);
+        offline.dispatchPendingMessages();
+        auto* detail = ui.getDetailViewForSnapshot();
+        check ("detail view", detail != nullptr);
+        if (detail != nullptr)
+        {
+            detail->showSelection (0, 0);
+            detail->setPage (lynx::DetailView::Page::devices);
+            offline.dispatchPendingMessages();
+            write ("01-device");
+            struct View
+            {
+                const char* name;
+                int modTab, source, osc;
+            };
+            for (const auto v : { View { "02-matrix", 1, 0, 0 }, View { "03-midi", 2, 0, 0 }, View { "04-mpe", 3, 0, 0 }, View { "05-env2", 0, 1, 0 },
+                                  View { "06-lfo1", 0, 3, 0 }, View { "07-osc2", 0, 0, 1 } })
+            {
+                check (juce::String ("Helix card shown for ") + v.name, lynx::helixcards::showView (*detail, v.modTab, v.source, v.osc) > 0);
+                write (v.name);
+            }
+            lynx::helixcards::showView (*detail, 0, 0, 0);
+        }
+        // the Pattern layout: the channel window's page alone
+        {
+            auto page = lynx::makeHelixEditor (offline, [] (lynx::Song& s) -> lynx::ChannelDef* { return s.channels.empty() ? nullptr : &s.channels[0]; }, 0);
+            const auto file = lynx::shot::file (juce::File (prefix + "-10-window.png"));
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (lynx::shot::snapshot (*page), out);
+            check ("channel window page", page->getWidth() > 0);
+        }
         juce::File (prefix + "-checks.txt").replaceWithText (checks);
     }
 
