@@ -1,5 +1,5 @@
 // Round 190je: design190ia slice 10 (G1: contrast floors, one state language, grid line intensity) and slice 16 (FW-S3:
-// menus with FL's landmarks and columns). The rules live in core/ThemePalette.h.
+// menus with FL's landmarks and columns, the FL classic menu style). The rules live in core/ThemePalette.h.
 
 #include "core/ThemePalette.h"
 
@@ -106,13 +106,30 @@ TEST (g1menus190je_menu_colours_read)
 {
     using namespace lynx::themes;
     const auto& p = defaultPalette();
-    const auto m = menuColours (p);
+    const auto m = menuColours (p, MenuStyle::lynxDark);
     CHECK (m.background == p.bg3 && m.band == 0xff2d3139);
     CHECK (contrastRatio (m.text, m.background) >= textContrastFloor);
     CHECK (contrastRatio (m.shortcut, m.background) >= textContrastFloor);
     CHECK (contrastRatio (m.disabled, m.background) >= disabledContrastFloor);
     CHECK (contrastRatio (m.hoverText, m.hover) >= textContrastFloor);
     CHECK (contrastRatio (m.bandText, m.band) >= textContrastFloor);
+}
+
+TEST (g1menus190je_fl_classic_menu_style)
+{
+    using namespace lynx::themes;
+    const auto& p = defaultPalette();
+    CHECK (menuStyleFromId (menuStyleId (MenuStyle::flClassic)) == MenuStyle::flClassic);
+    CHECK (menuStyleFromId ("lynx") == MenuStyle::lynxDark && menuStyleFromId ("bogus") == MenuStyle::lynxDark);
+    const auto fl = menuColours (p, MenuStyle::flClassic);
+    CHECK (fl.background == 0xffbbc4c9 && fl.text == 0xff0f1f29 && fl.band == 0xff919ca4 && fl.hover == 0xff5e6c75); // FL 2026's
+    CHECK (contrastRatio (fl.text, fl.background) >= textContrastFloor);
+    CHECK (contrastRatio (fl.shortcut, fl.background) >= textContrastFloor);
+    CHECK (contrastRatio (fl.disabled, fl.background) >= disabledContrastFloor);
+    CHECK (contrastRatio (fl.hoverText, fl.hover) >= textContrastFloor);
+    CHECK (contrastRatio (fl.bandText, fl.band) >= textContrastFloor);
+    Spec spec;
+    CHECK (spec.menuStyle == MenuStyle::lynxDark); // dark menus stay the default
 }
 
 TEST (g1menus190je_tall_menus_break_at_a_group)

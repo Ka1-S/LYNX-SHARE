@@ -10603,3 +10603,7 @@ countries: tw hk mo
 "How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); Balanced halves it on fast screens (72 Hz on a 144 Hz screen); 60 Hz or 30 Hz use the least CPU (laptops, slower computers)." = "播放頭、電平表和示波器的移動頻率。顯示器跟隨螢幕的更新率（最流暢）；平衡在高更新率螢幕上將其減半（144 Hz 螢幕上為 72 Hz）；60 Hz 或 30 Hz 佔用的 CPU 最少（筆電、較慢的電腦）。"
 "Grid line intensity" = "格線強度"
 "Grid line intensity: the bar, beat and step lines of the Piano roll, Playlist and Channel rack (100 % = the theme's own; double-click resets)." = "格線強度：鋼琴捲簾、播放清單和通道機架中的小節線、拍線和步進線（100 % = 主題預設；按兩下還原）。"
+"Menu style" = "選單樣式"
+"LYNX dark (default)" = "LYNX 深色（預設）"
+"FL classic (light)" = "FL 經典（淺色）"
+"Menus and grid" = "選單與格線"

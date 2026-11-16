@@ -1335,7 +1335,7 @@ void LookAndFeel::refreshColours()
     setColour (juce::ComboBox::buttonColourId, bg4);
     setColour (juce::ComboBox::focusedOutlineColourId, accent);
 
-    // (round 190je: the menus' colours)
+    // (round 190je: the menu style's colours, LYNX dark or FL classic)
     const auto menuLook = menus::colours();
     setColour (juce::PopupMenu::backgroundColourId, menuLook.background);
     setColour (juce::PopupMenu::textColourId, menuLook.text);
@@ -1694,6 +1694,7 @@ namespace menus
 namespace
 {
 bool compactMenus = true;
+themes::MenuStyle menuStyle = themes::MenuStyle::lynxDark;
 }
 void setCompact (bool c) { compactMenus = c; }
 bool compact() { return compactMenus; }
@@ -1701,10 +1702,12 @@ int itemHeight() { return compactMenus ? 21 : 26; }
 int headerHeight() { return compactMenus ? 17 : 22; }
 int separatorHeight() { return compactMenus ? 5 : 9; }
 float textSize() { return textsize::scaled (14.0f, theme::textSize(), textsize::Role::body); }
+void setStyle (themes::MenuStyle s) { menuStyle = s; }
+themes::MenuStyle style() { return menuStyle; }
 
 Colours colours()
 {
-    const auto m = themes::menuColours (paletteInUse());
+    const auto m = themes::menuColours (paletteInUse(), menuStyle);
     const auto c = [] (std::uint32_t argb) { return juce::Colour (argb); };
     return { c (m.background), c (m.border), c (m.text), c (m.shortcut), c (m.disabled), c (m.band), c (m.bandText), c (m.hover), c (m.hoverText),
              c (m.separator), c (m.check) };

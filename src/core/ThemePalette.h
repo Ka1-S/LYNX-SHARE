@@ -72,12 +72,20 @@ ButtonLook buttonLook (const Palette& palette, ButtonKind kind, bool on, double 
 constexpr double gridIntensityMin = 0.6, gridIntensityMax = 1.6;
 Palette withGridIntensity (Palette palette, double intensity);
 
-// --- menus with FL's landmarks (round 190je, design190ia FW-12 / FW-14): the colours LYNX's dark menus draw with
+// --- Settings › Theme › Menu style (round 190je, design190ia FW-16) ----------------------------------------------------
+// LYNX's dark menus (the default), or FL Studio's classic light grey ones (measured in FL Studio 2026, ref/fl-menu-file.png).
+enum class MenuStyle
+{
+    lynxDark,
+    flClassic
+};
+const char* menuStyleId (MenuStyle style); // "lynx", "flClassic"
+MenuStyle menuStyleFromId (const std::string& id);
 struct MenuColours
 {
     std::uint32_t background, border, text, shortcut, disabled, band, bandText, hover, hoverText, separator, check;
 };
-MenuColours menuColours (const Palette& palette);
+MenuColours menuColours (const Palette& palette, MenuStyle style);
 
 // --- long menus in columns (round 190je, design190ia FW-13) ------------------------------------------------------------
 // FL splits its long context menus into columns (the Channel rack menu: 2 columns, 305 px). A menu without column
@@ -148,6 +156,7 @@ struct Spec
     float dim = 0.0f;                // 0..1: darkens the image towards the backdrop colour
     std::string startupSound;        // audio file played at start instead of LYNX's own sound (empty = LYNX's; issue #12)
     float gridIntensity = 1.0f;      // Grid line intensity (round 190je): gridIntensityMin..Max, 1 = the theme's lines
+    MenuStyle menuStyle = MenuStyle::lynxDark; // Menu style (round 190je)
 
     bool isDefaultLook() const noexcept { return accent == defaultAccent && background == defaultBackground && workspace == 0 && image.empty(); }
     bool operator== (const Spec&) const = default;

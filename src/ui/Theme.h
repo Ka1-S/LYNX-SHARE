@@ -163,11 +163,14 @@ int separatorHeight();
 // The menu text, one step larger than the body text (round 190je, design190ia FW-15: FL's cap 8 px, LYNX's was 7): 14 at
 // 100 %, scaled by Settings › General › Text size like the body role. The shortcut column uses type::small, italic as FL's.
 float textSize();
+// Settings › Theme › Menu style (round 190je, FW-16): LYNX's dark menus (the default) or FL's classic light grey ones.
+void setStyle (themes::MenuStyle style);
+themes::MenuStyle style();
 struct Colours
 {
     juce::Colour background, border, text, shortcut, disabled, band, bandText, hover, hoverText, separator, check;
 };
-Colours colours(); // from the palette in use
+Colours colours(); // the palette in use, in the style in use
 } // namespace menus
 
 juce::Font monoFont (float size); // (cached as font() is)

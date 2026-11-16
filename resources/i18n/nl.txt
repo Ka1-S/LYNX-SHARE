@@ -10603,3 +10603,7 @@ countries: nl be
 "How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); Balanced halves it on fast screens (72 Hz on a 144 Hz screen); 60 Hz or 30 Hz use the least CPU (laptops, slower computers)." = "Hoe vaak de afspeelkop, meters en scopes bewegen. Scherm volgt de verversingsfrequentie van je monitor (het vloeiendst); Gebalanceerd halveert die op snelle schermen (72 Hz op een 144 Hz-scherm); 60 Hz of 30 Hz gebruiken de minste CPU (laptops, tragere computers)."
 "Grid line intensity" = "Intensiteit van de rasterlijnen"
 "Grid line intensity: the bar, beat and step lines of the Piano roll, Playlist and Channel rack (100 % = the theme's own; double-click resets)." = "Intensiteit van de rasterlijnen: de maat-, tel- en staplijnen van de Piano roll, de Playlist en het Channel rack (100 % = die van het thema; dubbelklik zet terug)."
+"Menu style" = "Menustijl"
+"LYNX dark (default)" = "LYNX donker (standaard)"
+"FL classic (light)" = "FL klassiek (licht)"
+"Menus and grid" = "Menu's en raster"

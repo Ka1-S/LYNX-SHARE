@@ -10603,3 +10603,7 @@ countries: jp
 "How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); Balanced halves it on fast screens (72 Hz on a 144 Hz screen); 60 Hz or 30 Hz use the least CPU (laptops, slower computers)." = "再生ヘッド、メーター、スコープが動く頻度です。ディスプレイは画面のリフレッシュレートに合わせます（最も滑らか）。バランスは高速な画面でその半分にします（144 Hz の画面で 72 Hz）。60 Hz または 30 Hz は CPU 使用量が最も少なくなります（ノート PC、低速なコンピューター）。"
 "Grid line intensity" = "グリッド線の濃さ"
 "Grid line intensity: the bar, beat and step lines of the Piano roll, Playlist and Channel rack (100 % = the theme's own; double-click resets)." = "グリッド線の濃さ: ピアノロール、プレイリスト、チャンネルラックの小節・拍・ステップの線（100 % = テーマの標準。ダブルクリックで元に戻す）。"
+"Menu style" = "メニューのスタイル"
+"LYNX dark (default)" = "LYNX ダーク（既定）"
+"FL classic (light)" = "FL クラシック（ライト）"
+"Menus and grid" = "メニューとグリッド"

@@ -10603,3 +10603,7 @@ countries: fr be ch ca lu
 "How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); Balanced halves it on fast screens (72 Hz on a 144 Hz screen); 60 Hz or 30 Hz use the least CPU (laptops, slower computers)." = "La fréquence à laquelle la tête de lecture, les vumètres et les oscilloscopes bougent. Écran suit la fréquence de rafraîchissement de votre moniteur (le plus fluide) ; Équilibré la divise par deux sur les écrans rapides (72 Hz sur un écran 144 Hz) ; 60 Hz ou 30 Hz utilisent le moins de CPU (portables, ordinateurs plus lents)."
 "Grid line intensity" = "Intensité des lignes de la grille"
 "Grid line intensity: the bar, beat and step lines of the Piano roll, Playlist and Channel rack (100 % = the theme's own; double-click resets)." = "Intensité des lignes de la grille : les lignes de mesure, de temps et de pas du Piano roll, de la Playlist et du Channel rack (100 % = celles du thème ; double-clic pour réinitialiser)."
+"Menu style" = "Style des menus"
+"LYNX dark (default)" = "LYNX sombre (par défaut)"
+"FL classic (light)" = "FL classique (clair)"
+"Menus and grid" = "Menus et grille"

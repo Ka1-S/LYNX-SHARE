@@ -10603,3 +10603,7 @@ countries: tr
 "How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); Balanced halves it on fast screens (72 Hz on a 144 Hz screen); 60 Hz or 30 Hz use the least CPU (laptops, slower computers)." = "Çalma imleci, ölçerler ve osiloskopların ne sıklıkla hareket ettiği. Ekran, monitörünüzün yenileme hızını izler (en akıcı); Dengeli, hızlı ekranlarda bunu yarıya indirir (144 Hz ekranda 72 Hz); 60 Hz veya 30 Hz en az CPU kullanır (dizüstü bilgisayarlar, daha yavaş bilgisayarlar)."
 "Grid line intensity" = "Izgara çizgisi yoğunluğu"
 "Grid line intensity: the bar, beat and step lines of the Piano roll, Playlist and Channel rack (100 % = the theme's own; double-click resets)." = "Izgara çizgisi yoğunluğu: Piano roll, Playlist ve Channel rack'teki ölçü, vuruş ve adım çizgileri (%100 = temanın kendi çizgileri; çift tıklama sıfırlar)."
+"Menu style" = "Menü stili"
+"LYNX dark (default)" = "LYNX koyu (varsayılan)"
+"FL classic (light)" = "FL klasik (açık)"
+"Menus and grid" = "Menüler ve ızgara"

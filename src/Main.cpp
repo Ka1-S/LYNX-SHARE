@@ -682,6 +682,12 @@ public:
         // text size (issue #189): saved in Settings › General; --textsize 125 overrides it for this run
         const auto textSizeArg = args.indexOf ("--textsize");
         lynx::theme::setTextSize (textSizeArg >= 0 ? args[textSizeArg + 1].getIntValue() : lynx::theme::savedTextSize());
+        // round 190je: --menustyle flClassic: FL's light menus for one run (Settings › Theme keeps the saved choice)
+        if (const auto menuStyleArg = args.indexOf ("--menustyle"); menuStyleArg >= 0)
+        {
+            lynx::theme::menus::setStyle (lynx::themes::menuStyleFromId (args[menuStyleArg + 1].unquoted().toStdString()));
+            lookAndFeel.refreshColours();
+        }
 
         if (args.contains ("--showcase"))
         {
@@ -30138,7 +30144,7 @@ private:
     // every icon at 16, 20 and 24 px (at `scale`, e.g. 1.5 for a 150% display), in the toolbar's
     // colours: at rest, hovered and switched on
     // round 190je (design190ia G1): one state sheet per button kind: idle, hover, pressed, on, disabled, as the one state rule
-    // draws them (core/ThemePalette.h buttonLook)
+    // draws them (core/ThemePalette.h buttonLook); the menu rows in both menu styles
     static void saveStateSheet (const juce::String& path, float scale)
     {
         using namespace lynx;
@@ -30146,9 +30152,9 @@ private:
         auto& lf = juce::LookAndFeel::getDefaultLookAndFeel();
         const int labelWidth = 220, cellW = 120, cellH = 40, columns = 5;
         const juce::String heads[] = { "idle", "hover", "pressed", "on", "disabled" };
-        enum Kind { text, iconFilled, iconOnce, iconSwitch, iconSwitchOwn, tick, radio, combo, tab, menuDark, kinds };
+        enum Kind { text, iconFilled, iconOnce, iconSwitch, iconSwitchOwn, tick, radio, combo, tab, menuDark, menuFl, kinds };
         const char* names[] = { "Text button", "Icon button (filled)", "Toolbar icon (acts once)", "Toolbar switch", "Toolbar switch (own colours)",
-                                "Tick box", "Radio choice", "Combo box", "Tab", "Menu item" };
+                                "Tick box", "Radio choice", "Combo box", "Tab", "Menu item (LYNX dark)", "Menu item (FL classic)" };
         const auto w = labelWidth + columns * cellW + 16, h = 30 + kinds * cellH + 16;
         juce::Image image (juce::Image::ARGB, juce::roundToInt ((float) w * scale), juce::roundToInt ((float) h * scale), true);
         {
@@ -30160,6 +30166,7 @@ private:
             for (int c = 0; c < columns; ++c)
                 g.drawText (heads[c], labelWidth + c * cellW, 6, cellW, 20, juce::Justification::centred);
 
+            const auto styleBefore = theme::menus::style();
             for (int k = 0; k < kinds; ++k)
             {
                 const auto y = 30 + k * cellH;
@@ -30251,12 +30258,15 @@ private:
                             break;
                         }
                         case menuDark:
+                        case menuFl:
                         {
                             if (down)
                                 break;
+                            theme::menus::setStyle (k == menuFl ? themes::MenuStyle::flClassic : themes::MenuStyle::lynxDark);
                             g.setOrigin (cell.getX() + 4, cell.getY() + 8);
                             lf.drawPopupMenuBackground (g, 112, 25);
                             lf.drawPopupMenuItem (g, { 2, 2, 108, 21 }, false, ! disabled, hover, on, false, theme::mnemonic ("Open", 'O'), "Ctrl+O", nullptr, nullptr);
+                            theme::menus::setStyle (styleBefore);
                             break;
                         }
                         default:

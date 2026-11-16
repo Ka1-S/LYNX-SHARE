@@ -227,8 +227,23 @@ Palette paletteFor (const Spec& spec)
     return withGridIntensity (derivePalette (spec.accent, spec.background), spec.gridIntensity);
 }
 
-MenuColours menuColours (const Palette& p)
+const char* menuStyleId (MenuStyle style)
 {
+    return style == MenuStyle::flClassic ? "flClassic" : "lynx";
+}
+
+MenuStyle menuStyleFromId (const std::string& id)
+{
+    return id == "flClassic" ? MenuStyle::flClassic : MenuStyle::lynxDark;
+}
+
+MenuColours menuColours (const Palette& p, MenuStyle style)
+{
+    if (style == MenuStyle::flClassic)
+        // FL Studio 2026's menus (ref/fl-menu-file.png, fl-channel-rack-menu-flex.png): light grey, dark text, a darker
+        // section band, a slate hover with white text. FL's band text is light (#E6EEF2, 2.4:1) and its shortcuts 4.5:1:
+        // here dark band text (6.0:1) and a slightly darker shortcut grey (4.7:1)
+        return { 0xffbbc4c9, 0xff5f686d, 0xff0f1f29, 0xff4c4e57, 0xff5e6870, 0xff919ca4, 0xff0f1f29, 0xff5e6c75, 0xffffffff, 0xff949ca2, 0xff0f1f29 };
     // LYNX's dark menus: the band between bg3 and bg5 (FW-12)
     return { p.bg3, p.borderStrong, p.textPrimary, p.textSecondary, p.textDisabled, mix (p.bg3, p.bg5, 0.55), p.textSecondary, p.bg5, p.textPrimary,
              mix (p.border, p.borderStrong, 0.5), p.accent };

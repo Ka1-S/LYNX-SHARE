@@ -10603,3 +10603,7 @@ countries: cn sg
 "How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); Balanced halves it on fast screens (72 Hz on a 144 Hz screen); 60 Hz or 30 Hz use the least CPU (laptops, slower computers)." = "播放头、电平表和示波器的移动频率。显示器跟随屏幕的刷新率（最流畅）；均衡在高刷新率屏幕上将其减半（144 Hz 屏幕上为 72 Hz）；60 Hz 或 30 Hz 占用的 CPU 最少（笔记本电脑、较慢的电脑）。"
 "Grid line intensity" = "网格线强度"
 "Grid line intensity: the bar, beat and step lines of the Piano roll, Playlist and Channel rack (100 % = the theme's own; double-click resets)." = "网格线强度：钢琴卷帘、播放列表和通道机架中的小节线、拍线和步进线（100 % = 主题自带；双击复原）。"
+"Menu style" = "菜单样式"
+"LYNX dark (default)" = "LYNX 深色（默认）"
+"FL classic (light)" = "FL 经典（浅色）"
+"Menus and grid" = "菜单与网格"
