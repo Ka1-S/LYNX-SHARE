@@ -248,7 +248,7 @@ public:
         styleLabel (animationLabel, tr ("Animation rate"));
         // round 190ip: Balanced (Live's rule: the refresh halved until it is at most 100 Hz); the capped rates are evenly paced
         animationBox.addItem (tr ("Display (default)"), 1);
-        animationBox.addItem (tr ("Balanced (half the refresh on fast screens)"), 4);
+        animationBox.addItem (tr ("Balanced"), 4); // (the note says what it is: a narrow box)
         animationBox.addItem (tr ("60 Hz"), 2);
         animationBox.addItem (tr ("30 Hz"), 3);
         animationBox.setSelectedId (options.animationRate == 30 ? 3 : options.animationRate == 60 ? 2 : options.animationRate < 0 ? 4 : 1,

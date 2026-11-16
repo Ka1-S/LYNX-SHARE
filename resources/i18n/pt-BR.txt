@@ -10265,5 +10265,4 @@ countries: br
 "Potentially slow operation" = "Operação possivelmente lenta"
 "Are you sure you want to load {0} plugins at once?" = "Tem certeza de que quer carregar {0} plugins de uma vez?"
 "Sample settings" = "Configurações do sample"
-"Balanced (half the refresh on fast screens)" = "Equilibrado (metade da taxa em telas rápidas)"
 "How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); Balanced halves it on fast screens (72 Hz on a 144 Hz screen); 60 Hz or 30 Hz use the least CPU (laptops, slower computers)." = "Com que frequência o cursor de reprodução, os medidores e os osciloscópios se movem. Tela segue a taxa de atualização do seu monitor (mais suave); Equilibrado usa a metade em telas rápidas (72 Hz numa tela de 144 Hz); 60 Hz ou 30 Hz usam menos CPU (notebooks, computadores mais lentos)."

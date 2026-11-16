@@ -155,6 +155,7 @@ public:
         setSize (980, 400);
         targetChanged();
         setWantsKeyboardFocus (true);
+        gpuPlayhead.onHidden = [this] { repaint(); }; // (round 190ip: the overlay hid itself: the line is painted again)
         startTimerHz (30);
     }
 

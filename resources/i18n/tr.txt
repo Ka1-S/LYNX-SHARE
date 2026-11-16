@@ -10145,5 +10145,4 @@ countries: tr
 "Potentially slow operation" = "İşlem yavaş olabilir"
 "Are you sure you want to load {0} plugins at once?" = "{0} eklentiyi aynı anda yüklemek istediğinden emin misin?"
 "Sample settings" = "Sample ayarları"
-"Balanced (half the refresh on fast screens)" = "Dengeli (hızlı ekranlarda yenileme hızının yarısı)"
 "How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); Balanced halves it on fast screens (72 Hz on a 144 Hz screen); 60 Hz or 30 Hz use the least CPU (laptops, slower computers)." = "Çalma imleci, ölçerler ve osiloskopların ne sıklıkla hareket ettiği. Ekran, monitörünüzün yenileme hızını izler (en akıcı); Dengeli, hızlı ekranlarda bunu yarıya indirir (144 Hz ekranda 72 Hz); 60 Hz veya 30 Hz en az CPU kullanır (dizüstü bilgisayarlar, daha yavaş bilgisayarlar)."

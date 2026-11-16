@@ -10145,5 +10145,4 @@ countries: id
 "Potentially slow operation" = "Operasi mungkin lambat"
 "Are you sure you want to load {0} plugins at once?" = "Yakin ingin memuat {0} plugin sekaligus?"
 "Sample settings" = "Pengaturan sample"
-"Balanced (half the refresh on fast screens)" = "Seimbang (setengah laju segar pada layar cepat)"
 "How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); Balanced halves it on fast screens (72 Hz on a 144 Hz screen); 60 Hz or 30 Hz use the least CPU (laptops, slower computers)." = "Seberapa sering playhead, meter, dan skop bergerak. Layar mengikuti laju penyegaran monitor Anda (paling mulus); Seimbang membaginya dua pada layar cepat (72 Hz pada layar 144 Hz); 60 Hz atau 30 Hz memakai CPU paling sedikit (laptop, komputer yang lebih lambat)."

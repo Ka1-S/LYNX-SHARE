@@ -10145,5 +10145,4 @@ countries: tw hk mo
 "Potentially slow operation" = "操作可能較慢"
 "Are you sure you want to load {0} plugins at once?" = "確定要一次載入 {0} 個外掛嗎?"
 "Sample settings" = "取樣設定"
-"Balanced (half the refresh on fast screens)" = "平衡（高更新率螢幕上為更新率的一半）"
 "How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); Balanced halves it on fast screens (72 Hz on a 144 Hz screen); 60 Hz or 30 Hz use the least CPU (laptops, slower computers)." = "播放頭、電平表和示波器的移動頻率。顯示器跟隨螢幕的更新率（最流暢）；平衡在高更新率螢幕上將其減半（144 Hz 螢幕上為 72 Hz）；60 Hz 或 30 Hz 佔用的 CPU 最少（筆電、較慢的電腦）。"

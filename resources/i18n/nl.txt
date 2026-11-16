@@ -10145,5 +10145,4 @@ countries: nl be
 "Potentially slow operation" = "Mogelijk trage bewerking"
 "Are you sure you want to load {0} plugins at once?" = "Weet je zeker dat je {0} plugins tegelijk wilt laden?"
 "Sample settings" = "Sample-instellingen"
-"Balanced (half the refresh on fast screens)" = "Gebalanceerd (halve verversingsfrequentie op snelle schermen)"
 "How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); Balanced halves it on fast screens (72 Hz on a 144 Hz screen); 60 Hz or 30 Hz use the least CPU (laptops, slower computers)." = "Hoe vaak de afspeelkop, meters en scopes bewegen. Scherm volgt de verversingsfrequentie van je monitor (het vloeiendst); Gebalanceerd halveert die op snelle schermen (72 Hz op een 144 Hz-scherm); 60 Hz of 30 Hz gebruiken de minste CPU (laptops, tragere computers)."

@@ -10145,5 +10145,4 @@ countries: kr
 "Potentially slow operation" = "시간이 걸릴 수 있는 작업"
 "Are you sure you want to load {0} plugins at once?" = "플러그인 {0}개를 한 번에 불러올까요?"
 "Sample settings" = "샘플 설정"
-"Balanced (half the refresh on fast screens)" = "균형 (빠른 화면에서는 주사율의 절반)"
 "How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); Balanced halves it on fast screens (72 Hz on a 144 Hz screen); 60 Hz or 30 Hz use the least CPU (laptops, slower computers)." = "재생 헤드, 미터, 스코프가 움직이는 빈도입니다. 디스플레이는 모니터의 주사율을 따릅니다(가장 부드러움). 균형은 빠른 화면에서 이를 절반으로 줄입니다(144 Hz 화면에서 72 Hz). 60 Hz 또는 30 Hz는 CPU를 가장 적게 씁니다(노트북, 느린 컴퓨터)."
