@@ -2223,6 +2223,10 @@ void PlaylistComponent::paint (juce::Graphics& g)
                 g.fillRoundedRectangle (juce::Rectangle<float> (1.0f, (float) top + 1.0f, (float) headerWidth - 2.0f, (float) (bottom - top) - 2.0f), radius::md);
             }
 
+            // issue #170 (round 190ib): with the tracks linked to the mixer, a track that only repeats a track above it
+            // says whose insert it plays through
+            const auto repeats = linkedHeaders() ? autolink::repeatedTracks (song) : std::vector<int>();
+
             for (int t = 0; t < tracks; ++t)
             {
                 const auto y = trackToY (t);
@@ -2408,6 +2412,16 @@ void PlaylistComponent::paint (juce::Graphics& g)
                     {
                         g.setColour (colour::textPrimary.withAlpha (0.7f));
                         g.drawEllipse (led.withSizeKeepingCentre (12.0f, 12.0f), 1.0f);
+                    }
+                    if (t < (int) repeats.size() && repeats[(std::size_t) t] >= 0 && trackHeight >= 12)
+                    {
+                        // "→ 1": plays through Track 1's insert (the hint bar says it in full)
+                        const auto tag = juce::String::fromUTF8 ("\xe2\x86\x92 ") + juce::String (repeats[(std::size_t) t] + 1);
+                        const auto box = juce::Rectangle<float> (led.getX() - 30.0f, led.getCentreY() - 8.0f, 28.0f, 16.0f);
+                        g.setColour (colour::textSecondary);
+                        g.setFont (font (type::caption));
+                        g.drawText (tag, box, juce::Justification::centredRight, false);
+                        textRight = box.getX() - 2.0f;
                     }
                 }
 
@@ -6887,6 +6901,91 @@ juce::PopupMenu PlaylistComponent::selectMenu()
     return select;
 }
 
+juce::String PlaylistComponent::describeLinkPlan (const Song& song, const autolink::Report& report)
+{
+    using Kind = autolink::Change::Kind;
+    const auto u8 = [] (const std::string& s) { return juce::String::fromUTF8 (s.c_str()); };
+    const auto insert = [] (int m) { return m <= 0 ? tr ("Master") : tr ("Insert {0}", { juce::String (m) }); };
+    const auto named = [&u8] (const std::string& name) { return name.empty() ? juce::String() : " (" + u8 (name) + ")"; };
+    const auto bullet = juce::String::fromUTF8 ("\xe2\x80\xa2  ");
+    juce::StringArray lines;
+    for (const auto& c : report.changes)
+    {
+        juce::String line;
+        switch (c.kind)
+        {
+            case Kind::linkTrack:
+                line = tr ("Track {0} is linked to insert {0}", { juce::String (c.to) });
+                if (! c.name.empty())
+                    line += " (" + u8 (c.name) + ")";
+                break;
+            case Kind::moveInsert:
+                line = tr ("{0}{1} moves to insert {2}, with its effects and routing", { insert (c.from), named (c.name), juce::String (c.to) });
+                break;
+            case Kind::routeInsert:
+                line = tr ("{0}{1} sends into insert {2} instead of the Master", { insert (c.from), named (c.name), juce::String (c.to) });
+                break;
+            case Kind::routeChannel:
+                line = tr ("{0}: {1} → insert {2}", { u8 (c.name), insert (c.from), juce::String (c.to) });
+                if (c.changesSound)
+                    line += "  " + tr ("(its sound changes: the effects or settings of the insert it leaves or joins apply)");
+                break;
+        }
+        lines.add (bullet + line);
+    }
+    for (const auto& [track, home] : report.repeats)
+        lines.add (bullet + tr ("Track {0} only repeats Track {1}'s instruments: it stays unlinked and plays through insert {1}",
+                               { juce::String (track + 1), juce::String (home + 1) }));
+    constexpr int shown = 24;
+    if (lines.size() > shown)
+    {
+        const auto more = lines.size() - shown;
+        lines.removeRange (shown, more);
+        lines.add (tr ("...and {0} more", { juce::String (more) }));
+    }
+    juce::ignoreUnused (song);
+    return tr ("Playlist track N becomes mixer insert N: what a track's own instruments and samples play goes through its "
+               "insert, and its header's M, S, volume and pan are the insert's. This changes:")
+           + "\n\n" + lines.joinIntoString ("\n") + "\n\n" + tr ("It is one step: Edit › Undo takes it all back.");
+}
+
+void PlaylistComponent::switchLinkTracks (AudioEngine& engine, bool on, std::function<void (bool)> done)
+{
+    const auto apply = [&engine, on, done] {
+        engine.editSong ([on] (Song& s) { autolink::setOn (s, on); });
+        if (done != nullptr)
+            done (true);
+    };
+    if (! on)
+    {
+        apply();
+        return;
+    }
+    // issue #170: switching on can move inserts and route channels; it says what first
+    const auto plan = autolink::planOn (engine.getSong());
+    if (! plan.changesRouting() && plan.repeats.empty())
+    {
+        apply();
+        return;
+    }
+    if (answerLinkConfirmation != nullptr)
+    {
+        if (answerLinkConfirmation (plan))
+            apply();
+        else if (done != nullptr)
+            done (false);
+        return;
+    }
+    juce::AlertWindow::showOkCancelBox (plan.changesSound() ? juce::MessageBoxIconType::WarningIcon : juce::MessageBoxIconType::QuestionIcon,
+                                        tr ("Link Playlist tracks to mixer tracks"), describeLinkPlan (engine.getSong(), plan), tr ("Link"),
+                                        tr ("Cancel"), nullptr, juce::ModalCallbackFunction::create ([apply, done] (int result) {
+                                            if (result == 1)
+                                                apply();
+                                            else if (done != nullptr)
+                                                done (false);
+                                        }));
+}
+
 juce::Rectangle<int> PlaylistComponent::trackLed (int track) const
 {
     const auto h = heightOf (track);
@@ -9759,7 +9858,7 @@ bool PlaylistComponent::runAction (const std::string& id)
     else if (is ("playlist.rippleDelete")) rippleDeleteSelection();
     else if (is ("playlist.ripple")) setRipple (! ripple);
     else if (is ("playlist.autoCrossfades")) engine.editSong ([] (Song& s) { s.autoCrossfades = ! s.autoCrossfades; });
-    else if (is ("playlist.linkTracks")) engine.editSong ([] (Song& s) { autolink::setOn (s, ! s.linkTracksToMixer); }); // round 190gz
+    else if (is ("playlist.linkTracks")) switchLinkTracks (engine, ! engine.getSong().linkTracksToMixer); // rounds 190gz, 190ib
     else if (is ("playlist.trackInserts")) // round 190ht (issue #154): a view option, not the project's
     {
         showTrackInserts = ! showTrackInserts;
@@ -10998,6 +11097,9 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
         if (const auto mode = trackmodes::describe (song, h.track); ! mode.empty()) // FL's "(Instrument track)" / "(Audio track, ...)"
             hint.value += " " + (mode.rfind ("(Audio", 0) == 0 ? tr ("(Audio track, linked to mixer track {0})", { juce::String (song.playlistTracks[(std::size_t) h.track].mixerTrack) })
                                                                  : tr ("(Instrument track)"));
+        else if (linkedHeaders()) // issue #170 (round 190ib): a track that only repeats a track above it
+            if (const auto repeats = autolink::repeatedTracks (song); h.track >= 0 && h.track < (int) repeats.size() && repeats[(std::size_t) h.track] >= 0)
+                hint.value += " " + tr ("(repeats Track {0}'s instruments: plays through insert {0})", { juce::String (repeats[(std::size_t) h.track] + 1) });
         hint.hasMenu = ! h.led && ! h.arrow && ! h.arm && ! h.input;
         return hint;
     }

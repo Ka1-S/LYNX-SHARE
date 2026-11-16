@@ -60,6 +60,9 @@ struct NewProjectDefaults
     // unknown or missing keys keep the defaults, values are clamped.
     std::string toText() const;
     void readKey (const std::string& key, const std::string& value);
+    // Whether `key` is one of toText's keys (the settings loader hands those to readKey). Issue #170: the loader's own
+    // list missed newLinkTracks, so "Link ... in new projects" was saved but never read back at the next start.
+    static bool ownsKey (const std::string& key);
 };
 
 // Applies the defaults to a song made from a built-in template (or Song::makeDefault): the mixer gets exactly

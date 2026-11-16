@@ -423,6 +423,15 @@ inline float keyClickVelocity (double along, double length)
     return (float) std::clamp ((along + 1.0) / length, 1.0 / 127.0, 1.0);
 }
 
+// Issue #183: whether the Piano roll sounds a note the mouse places, drags, resizes or edits. While the song or pattern
+// plays it doesn't (FL leaves the notes you draw to the playback; the Channel rack's step clicks are silent either way),
+// unless the Piano roll's "Preview notes while playing" is on (LYNX's, off by default). Clicks on the Piano roll's own
+// keyboard always sound: they play the instrument, they don't edit a note.
+constexpr bool previewsEditedNote (bool playing, bool previewWhilePlaying) noexcept
+{
+    return ! playing || previewWhilePlaying;
+}
+
 // Alt+wheel over a note: the property moves by 4/127 per notch (Ctrl+Alt: 1/127), clamped to 0..1.
 inline double wheelStepValue (double value, double deltaY, bool fine)
 {

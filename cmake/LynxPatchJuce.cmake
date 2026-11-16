@@ -229,6 +229,15 @@
 #    one that receives it, as OLE (Windows) and AppKit (macOS) pick the innermost registered window. A program with one
 #    XdndAware window (most) is reached as before.
 #
+# 37. Every platform, juce_gui_basics/menus/juce_PopupMenu.cpp + widgets/juce_ListBox.cpp (issue #182, round 190ib): type-to-jump.
+#    JUCE's menus and lists take no typed letters. A typed character (no Ctrl / Cmd / Alt) now asks `lynxTypeAheadHook`
+#    (set by LYNX, ui/TypeAhead.h; the rule is core/TypeAhead.h) which row to go to: the first letter jumps to the next
+#    item that starts with it, more letters typed within a second narrow it to a longer prefix. A menu highlights the
+#    item (Enter runs it, a submenu opens with Right as before); fix 13's accelerator letters still win in menus that
+#    have them, except while a prefix is being typed (within a second of a key that jumped); a space typed then is part of
+#    the prefix (JUCE: Space runs the item). A ListBox selects the row (and scrolls to it) when its model names its rows (getNameForRow; JUCE's
+#    default "Row N" names are left alone). Null hook: JUCE's keys only.
+#
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
 
@@ -307,6 +316,22 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("menu accelerator keys" "LYNX patch (round 170a): accelerator letters"
             "            dismissMenu (nullptr);|NL|        }|NL|        else|NL|        {|NL|            return false;|NL|        }"
             "            dismissMenu (nullptr);|NL|        }|NL|        else if (! lynxMenuMnemonic (key)) // LYNX patch (round 170a): accelerator letters|NL|        {|NL|            return false;|NL|        }")
+        lynx_juce_fix("menu type-to-jump" "LYNX patch (round 190ib, issue #182): type-to-jump"
+            "    bool keyPressed (const KeyPress& key) override|NL|    {|NL|        if (key.isKeyCode (KeyPress::downKey))"
+            "    // LYNX patch (round 190ib, issue #182): type-to-jump (fix 37): the item whose text starts with what was typed|NL|    bool lynxMenuTypeAhead (const KeyPress& key)|NL|    {|NL|        extern int (*lynxTypeAheadHook) (const void*, juce_wchar, int, int, const std::function<String (int)>&);|NL|        const auto mods = key.getModifiers();|NL|        const auto typed = key.getTextCharacter();|NL|        if (lynxTypeAheadHook == nullptr || typed < 32 || mods.isCtrlDown() || mods.isCommandDown() || mods.isAltDown())|NL|            return false;|NL||NL|        Array<ItemComponent*> rows;|NL|        for (auto* child : items)|NL|            if (canBeTriggered (child->item) || hasActiveSubMenu (child->item))|NL|                rows.add (child);|NL||NL|        const auto row = lynxTypeAheadHook (this, typed, rows.indexOf (currentChild.getComponent()), rows.size(),|NL|                                            [&rows] (int i) { return rows[i]->item.text; });|NL|        if (! isPositiveAndBelow (row, rows.size()))|NL|            return false;|NL||NL|        lynxTypedAt = Time::getMillisecondCounter();|NL|        disableTimerUntilMouseMoves();|NL|        ensureItemComponentIsVisible (*rows[row], -1);|NL|        setCurrentlyHighlightedChild (rows[row]);|NL|        return true;|NL|    }|NL||NL|    // a prefix is being typed (a key within a second of the last one that jumped): its next letters go to it first, not to|NL|    // the accelerator letters|NL|    uint32 lynxTypedAt = 0;|NL|    bool lynxTypingNow() const { return lynxTypedAt != 0 && Time::getMillisecondCounter() - lynxTypedAt < 1000; }|NL||NL|    bool keyPressed (const KeyPress& key) override|NL|    {|NL|        if (key.isKeyCode (KeyPress::downKey))")
+        lynx_juce_fix("menu type-to-jump keys" "LYNX patch (round 190ib): type-to-jump after them"
+            "        else if (! lynxMenuMnemonic (key)) // LYNX patch (round 170a): accelerator letters"
+            "        else if (! (lynxTypingNow() ? lynxMenuTypeAhead (key) || lynxMenuMnemonic (key) : lynxMenuMnemonic (key) || lynxMenuTypeAhead (key))) // LYNX patch (round 170a): accelerator letters; LYNX patch (round 190ib): type-to-jump after them")
+        lynx_juce_fix("menu type-to-jump: space inside a prefix" "LYNX patch (round 190ib): a space inside a typed prefix"
+            "        else if (key.isKeyCode (KeyPress::returnKey) || key.isKeyCode (KeyPress::spaceKey))|NL|        {|NL|            triggerCurrentlyHighlightedItem();"
+            "        else if (key.isKeyCode (KeyPress::returnKey) || (key.isKeyCode (KeyPress::spaceKey) && ! lynxTypingNow())) // LYNX patch (round 190ib): a space inside a typed prefix is typed|NL|        {|NL|            triggerCurrentlyHighlightedItem();")
+    elseif(file MATCHES "juce_ListBox.cpp$")
+        lynx_juce_fix("list type-to-jump: the hook" "LYNX patch (round 190ib, issue #182): type-to-jump"
+            "bool ListBox::keyPressed (const KeyPress& key)|NL|{|NL|"
+            "// LYNX patch (round 190ib, issue #182): type-to-jump (cmake/LynxPatchJuce.cmake, fix 37). Set by LYNX (ui/TypeAhead.h): the|NL|// row to go to after `typed` in a list (or menu) of `count` rows, -1 for none. Null: JUCE's keys only.|NL|int (*lynxTypeAheadHook) (const void* owner, juce_wchar typed, int current, int count, const std::function<String (int)>& textOf) = nullptr;|NL||NL|static int lynxListTypeAheadRow (const void* owner, ListBoxModel* model, const KeyPress& key, int current, int count)|NL|{|NL|    const auto mods = key.getModifiers();|NL|    const auto typed = key.getTextCharacter();|NL|    if (lynxTypeAheadHook == nullptr || model == nullptr || count <= 0 || typed < 32 || mods.isCtrlDown() || mods.isCommandDown() || mods.isAltDown())|NL|        return -1;|NL||NL|    if (model->getNameForRow (0) == \"Row 1\") // (JUCE's default names: the model doesn't name its rows)|NL|        return -1;|NL||NL|    return lynxTypeAheadHook (owner, typed, current, count, [model] (int row) { return model->getNameForRow (row); });|NL|}|NL||NL|bool ListBox::keyPressed (const KeyPress& key)|NL|{|NL|")
+        lynx_juce_fix("list type-to-jump: the keys" "LYNX patch (round 190ib): a typed character selects"
+            "        selectRangeOfRows (0, std::numeric_limits<int>::max());|NL|    }|NL|    else|NL|    {|NL|        return false;|NL|    }"
+            "        selectRangeOfRows (0, std::numeric_limits<int>::max());|NL|    }|NL|    else if (const auto lynxRow = lynxListTypeAheadRow (this, model, key, lastRowSelected, totalItems); lynxRow >= 0)|NL|    {|NL|        selectRow (lynxRow); // LYNX patch (round 190ib): a typed character selects the row that starts with it (fix 37)|NL|    }|NL|    else|NL|    {|NL|        return false;|NL|    }")
     elseif(file MATCHES "juce_Direct2DImage_windows.cpp$")
         lynx_juce_fix("image contexts without readback" "LYNX patch (round 174e2): no readback flag"
             "/*  Returns new software bitmap storage with content matching the provided hardware bitmap. */"
@@ -642,6 +667,7 @@ function(lynx_patch_juce juce_dir)
     lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/windows/juce_ComponentPeer.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/mouse/juce_DragAndDropContainer.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/menus/juce_PopupMenu.cpp")
+    lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/widgets/juce_ListBox.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/native/juce_Windowing_linux.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/desktop/juce_Displays.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/native/juce_XWindowSystem_linux.cpp")

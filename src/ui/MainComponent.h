@@ -238,6 +238,7 @@ private:
     // project (only when something is missing; the FL import report follows it), else from the menu (always).
     void showMissingFiles (bool afterOpening);
     void openSettings (int page); // ui/SettingsDialog.h SettingsPage: 0 Project, 1 Info, 2 Files, 3 General, 4 Audio, 5 MIDI
+    int lastSettingsPage = 3; // the page openSettings showed last (SettingsPage::general at first): Ctrl+, opens it (issue #181)
     void showPluginManager();
     void showShortcutManager();
     int scansSeen = 0; // background plugin scans already announced in the hint bar

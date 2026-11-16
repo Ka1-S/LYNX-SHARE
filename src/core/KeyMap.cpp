@@ -87,6 +87,9 @@ std::vector<Action> makeActions()
         // F10 / F11 toggle like FL's (round 167o, settingsKeyPress): Settings on another page switches to this one
         { "view.midiSettings", TR_NOOP ("MIDI settings (press again to close)"), Context::global, { chord (f10) } },
         { "view.projectInfo", TR_NOOP ("Project info (press again to close)"), Context::global, { chord (f11) } },
+        // Issue #181 (LYNX's own, beside FL's F10 / F11): Ctrl+, (Cmd+, on macOS), the settings key of most apps. It opens
+        // Settings on the page shown last (General at first) and closes it when it is open.
+        { "view.settings", TR_NOOP ("Settings (press again to close)"), Context::global, { chord (',', ctrl) } },
         { "view.closeWindows", TR_NOOP ("Close all windows (plugins, channel settings, tools)"), Context::global, { chord (f12) } },
         // Round 183a: the Clip-launch workflow's detail view, with the reference DAW's keys (its View menu, Live 12.4
         // [SHOT] detail183a/live/d05). They do nothing in Pattern workflow, where the keys keep their old meaning.

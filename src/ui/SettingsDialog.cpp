@@ -1,4 +1,5 @@
 #include "ui/SettingsDialog.h"
+#include "ui/PlaylistComponent.h"
 #include "core/Comping.h"
 #include "ui/FileChoosers.h"
 #include "ui/ThemeSettings.h"
@@ -101,7 +102,14 @@ public:
         add (crossfadesNew);
         // LYNX extra (round 190gz, issue #170): Playlist tracks linked to mixer tracks, for this project and new ones
         linkTracks.setButtonText (tr ("Link Playlist tracks to mixer tracks (Track N with insert N; mute, solo, volume and pan on linked track headers)"));
-        linkTracks.onClick = [this] { edit ([on = linkTracks.getToggleState()] (Song& s) { autolink::setOn (s, on); }); };
+        // (round 190ib: switching on lists what it changes and asks first; Cancel leaves the box as the project is)
+        linkTracks.onClick = [this] {
+            PlaylistComponent::switchLinkTracks (engine, linkTracks.getToggleState(),
+                                                 [safe = juce::Component::SafePointer<ProjectPage> (this)] (bool) {
+                                                     if (safe != nullptr)
+                                                         safe->linkTracks.setToggleState (safe->engine.getSong().linkTracksToMixer, juce::dontSendNotification);
+                                                 });
+        };
         add (linkTracks);
         linkTracksNew.setButtonText (tr ("Link Playlist tracks to mixer tracks in new projects"));
         linkTracksNew.onClick = [this] {
@@ -515,6 +523,8 @@ public:
     }
 
 private:
+    // issue #182: typing jumps to the folder whose name starts with it (JUCE fix 37 reads the names)
+    juce::String getNameForRow (int row) override { return juce::isPositiveAndBelow (row, folders.size()) ? juce::File (folders[row]).getFileName() : juce::String(); }
     int getNumRows() override { return juce::jmax (1, folders.size()); }
 
     void paintListBoxItem (int row, juce::Graphics& g, int width, int height, bool selected) override

@@ -1,3 +1,4 @@
+#include "ui/TypeAhead.h"
 #include "ui/PluginPresetMenu.h"
 #include "ui/ExternalDrag.h"
 #include "ui/GeneratorPresetMenu.h"
@@ -1087,6 +1088,15 @@ public:
             if (n->kind == Kind::fsFolder && n->depth == 0)
                 return n->file;
         return {};
+    }
+
+    // the name a row shows (issue #182's type-to-jump matches it)
+    juce::String rowName (int row) const
+    {
+        if (! juce::isPositiveAndBelow (row, (int) rows.size()))
+            return {};
+        const auto& n = *rows[(std::size_t) row];
+        return n.label.isNotEmpty() ? n.label : n.folder || ! isAudio (n.file) ? n.file.getFileName() : n.file.getFileNameWithoutExtension();
     }
 
     bool selectedIsFolder() const { return juce::isPositiveAndBelow (selected, (int) rows.size()) && rows[(std::size_t) selected]->folder; }
@@ -5449,6 +5459,16 @@ void BrowserComponent::step (int delta, bool load)
 
     if (load && file.existsAsFile() && onLoadIntoChannel)
         onLoadIntoChannel (file);
+}
+
+bool BrowserComponent::typeToJump (const juce::KeyPress& key)
+{
+    auto& list = activeList();
+    const auto row = ui::typeAheadRow (&list, key, list.getSelectedRow(), list.numRows(), [&list] (int r) { return list.rowName (r); });
+    if (row < 0)
+        return false;
+    list.select (row, false);
+    return true;
 }
 
 void BrowserComponent::openFolder (bool open)

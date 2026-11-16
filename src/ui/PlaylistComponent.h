@@ -153,6 +153,14 @@ public:
     juce::PopupMenu selectMenu();
     // The shortcut text of a key map action for menus ("\tShift+C"; empty when unbound), set by the main window.
     static inline std::function<juce::String (const std::string& id)> shortcutText;
+    // Issue #170 (round 190ib): turns the project's "Link Playlist tracks to mixer tracks" on or off. Switching on first
+    // lists what it will change (core/PlaylistOps.h autolink::planOn: inserts moved, channels routed, tracks that only
+    // repeat others) and asks when it changes more than links; it is one undo step. `done (applied)` runs after.
+    static void switchLinkTracks (AudioEngine& engine, bool on, std::function<void (bool applied)> done = {});
+    // The confirmation's text for a plan (tests and --linkshot190ib read it).
+    static juce::String describeLinkPlan (const Song& song, const autolink::Report& report);
+    // Tests: answers the confirmation instead of the dialog (null: the dialog).
+    static inline std::function<bool (const autolink::Report&)> answerLinkConfirmation;
     // FL's "Clone — What do you want to clone along with the track?" window (round 168f), for --snapshot too.
     static std::unique_ptr<juce::AlertWindow> makeCloneTracksDialog (bool groupHeaderSelected);
     // FL's "Dropped sample(s)" question of a header drop (round 189e), for --snapshot too.

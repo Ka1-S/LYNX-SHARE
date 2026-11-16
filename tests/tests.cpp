@@ -17810,3 +17810,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Design190igTests.inc" // round 190ig: automation clip colours (design190ia slice 3)
 #include "Pdc190hqTests.inc" // round 190hq B13: side inputs, level automation and render-ahead under PDC
 #include "TempoMarkers190hqTests.inc" // round 190hq B11: tempo markers, resampled audio under them, scene tempo hold
+#include "UserFix190ibTests.inc" // round 190ib: issues #165 (SoundFont same-step slide), #170, #181, #182, #183

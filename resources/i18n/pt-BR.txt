@@ -10346,3 +10346,17 @@ countries: br
 "Glide into this tempo" = "Deslizar até este andamento"
 "Remove tempo change" = "Remover mudança de andamento"
 "Add tempo change..." = "Adicionar mudança de andamento..."
+
+# --- Round 190ib: issues #170 (Track N = insert N), #181 (Ctrl+,), #183 (preview while playing)
+"Link Playlist tracks to mixer tracks" = "Vincular faixas da Playlist às trilhas do mixer"
+"Settings (press again to close)" = "Configurações (pressione de novo para fechar)"
+"Preview notes while playing" = "Ouvir as notas durante a reprodução"
+"Track {0} is linked to insert {0}" = "A faixa {0} fica vinculada ao insert {0}"
+"{0}{1} moves to insert {2}, with its effects and routing" = "{0}{1} vai para o insert {2}, com seus efeitos e roteamento"
+"{0}{1} sends into insert {2} instead of the Master" = "{0}{1} passa a enviar para o insert {2} em vez do Master"
+"{0}: {1} → insert {2}" = "{0}: {1} → insert {2}"
+"(its sound changes: the effects or settings of the insert it leaves or joins apply)" = "(o som muda: valem os efeitos ou ajustes do insert que ele deixa ou no qual entra)"
+"Track {0} only repeats Track {1}'s instruments: it stays unlinked and plays through insert {1}" = "A faixa {0} só repete os instrumentos da faixa {1}: fica sem vínculo e toca pelo insert {1}"
+"Playlist track N becomes mixer insert N: what a track's own instruments and samples play goes through its insert, and its header's M, S, volume and pan are the insert's. This changes:" = "A faixa N da Playlist passa a ser o insert N do mixer: o que os instrumentos e samples próprios de uma faixa tocam passa pelo insert dela, e M, S, volume e pan no cabeçalho são os do insert. Isto muda:"
+"It is one step: Edit › Undo takes it all back." = "É um passo só: Editar › Desfazer volta tudo."
+"(repeats Track {0}'s instruments: plays through insert {0})" = "(repete os instrumentos da faixa {0}: toca pelo insert {0})"

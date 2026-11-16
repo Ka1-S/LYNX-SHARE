@@ -2307,6 +2307,16 @@ public:
             return;
         }
 
+        // --userfixshot190ib <prefix> (round 190ib): issue #182's type-to-jump in a real popup menu (the Playlist's Edit menu
+        // of the issue's screenshot, typed into), #183's Piano roll item, #181's Ctrl+, through the main window's keys;
+        // prefix-checks.txt
+        if (args.contains ("--userfixshot190ib"))
+        {
+            setApplicationReturnValue (runUserFixShot190ib (args[args.indexOf ("--userfixshot190ib") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+
         // --issuesshot190ht <prefix> (round 190ht): issue #127's other tools on Pattern Blocks (Mute, Select + group move,
         // Slice, Zoom) and issue #154's insert effects list on linked headers, driven with synthetic mouse events,
         // offscreen; prefix-checks.txt and pictures
@@ -5600,9 +5610,20 @@ private:
             const auto back = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (song), why);
             if (! plain || plain->linkTracksToMixer)
                 trackauto190gzResult = "ERROR defaults " + why;
-            else if (! back || ! back->linkTracksToMixer || back->playlistTracks.size() < 2 || back->playlistTracks[1].mode != lynx::PlaylistTrackMode::instrument
-                     || back->playlistTracks[1].mixerTrack != 1 || back->playlistTracks[0].mode != lynx::PlaylistTrackMode::unassigned)
+            // (round 190ib: Track 1 holds Kick, Clap and Hat, so they all go through insert 1 and Track 1 is its audio
+            // track; Track 2 only repeats Kick and stays unassigned)
+            // (a .lynx keeps the tracks up to the last one that differs from a plain track: Track 2 may not be written)
+            else if (! back || ! back->linkTracksToMixer || back->playlistTracks.empty() || back->playlistTracks[0].mode != lynx::PlaylistTrackMode::audio
+                     || back->playlistTracks[0].mixerTrack != 1
+                     || (back->playlistTracks.size() > 1 && back->playlistTracks[1].mode != lynx::PlaylistTrackMode::unassigned)
+                     || back->channels[1].mixerTrack != 1 || back->channels[2].mixerTrack != 1)
+            {
                 trackauto190gzResult = "ERROR round trip " + why;
+                if (back && ! back->playlistTracks.empty() && back->channels.size() >= 3)
+                    trackauto190gzResult << " tracks " << (int) back->playlistTracks.size() << " mode " << (int) back->playlistTracks[0].mode << " insert "
+                                         << back->playlistTracks[0].mixerTrack << " routes " << back->channels[0].mixerTrack << " "
+                                         << back->channels[1].mixerTrack << " " << back->channels[2].mixerTrack;
+            }
         }
 
         // round 190fm: the MIDI Tools generators' settings come back from a project; a project without them loads with
@@ -14333,6 +14354,70 @@ private:
         return allOk;
     }
 
+    // --userfixshot190ib (round 190ib): see the dispatch above
+    bool runUserFixShot190ib (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        juce::StringArray report;
+        bool allOk = true;
+        const auto check = [&report, &allOk] (const char* name, bool ok, const juce::String& detail = {}) {
+            report.add (juce::String (name) + "=" + (ok ? "OK" : "FAIL") + (detail.isEmpty() ? juce::String() : " " + detail));
+            allOk = allOk && ok;
+        };
+        lynx::AudioEngine engine (false);
+        lynx::MainComponent ui (engine, false);
+        ui.setSize (1600, 900);
+        engine.dispatchPendingMessages();
+
+        // ---- #182: a real JUCE popup menu inside a host component, keys sent to its window as the keyboard would
+        juce::Component host;
+        host.setSize (560, 900);
+        const auto typeInto = [&host] (const juce::String& text) {
+            auto* menuWindow = host.getNumChildComponents() > 0 ? host.getChildComponent (host.getNumChildComponents() - 1) : nullptr;
+            for (auto c : text)
+                if (menuWindow != nullptr)
+                    menuWindow->keyPressed (juce::KeyPress ((int) juce::CharacterFunctions::toLowerCase (c), 0, c));
+            return menuWindow != nullptr;
+        };
+        const auto shotMenu = [&host, &prefix] (const juce::String& name) {
+            savePng (host.createComponentSnapshot (host.getLocalBounds()), prefix + name);
+        };
+        {
+            auto& pl = ui.getPlaylistForSnapshot();
+            pl.editMenu().showMenuAsync (juce::PopupMenu::Options().withParentComponent (&host).withTargetScreenArea ({ 8, 8, 1, 1 }));
+            check ("menu_shown", host.getNumChildComponents() > 0, juce::String (host.getNumChildComponents()));
+            shotMenu ("-menu-0.png");
+            typeInto ("d");
+            shotMenu ("-menu-d.png"); // the first item starting with D
+            typeInto ("d");
+            shotMenu ("-menu-dd.png"); // D again: the next one
+            juce::Time::waitForMillisecondCounter (juce::Time::getMillisecondCounter() + 1100); // (a pause: a new prefix)
+            typeInto ("drop a");
+            shotMenu ("-menu-drop-a.png"); // "Drop audio on track headers"
+            juce::PopupMenu::dismissAllActiveMenus();
+        }
+        {
+            auto& pr = ui.getPianoRollForSnapshot();
+            pr.moreMenuForSnapshot().showMenuAsync (juce::PopupMenu::Options().withParentComponent (&host).withTargetScreenArea ({ 8, 8, 1, 1 }));
+            juce::Time::waitForMillisecondCounter (juce::Time::getMillisecondCounter() + 1100);
+            typeInto ("preview");
+            shotMenu ("-pianoroll-preview.png"); // #183's item, reached by typing its name
+            juce::PopupMenu::dismissAllActiveMenus();
+            check ("preview_while_playing_off_by_default", ! lynx::PianoRollComponent::previewWhilePlaying);
+        }
+
+        // ---- #181: Ctrl+, (Cmd+, on macOS) through the main window's key handling opens Settings, again closes it
+        const auto ctrlComma = juce::KeyPress (',', juce::ModifierKeys::commandModifier, ',');
+        check ("settings_closed_first", lynx::shownSettingsPage() < 0);
+        ui.keyPressed (ctrlComma);
+        check ("ctrl_comma_opens_settings", lynx::shownSettingsPage() == (int) lynx::SettingsPage::general, juce::String (lynx::shownSettingsPage()));
+        ui.keyPressed (ctrlComma);
+        check ("ctrl_comma_again_closes_it", lynx::shownSettingsPage() < 0, juce::String (lynx::shownSettingsPage()));
+
+        juce::File (prefix + "-checks.txt").replaceWithText (report.joinIntoString ("\n") + "\nresult=" + (allOk ? "OK" : "FAIL") + "\n");
+        return allOk;
+    }
+
     // --issuesshot190ht (round 190ht): see the dispatch above
     bool runIssuesShot190ht (const juce::String& prefix)
     {
@@ -14743,6 +14828,7 @@ private:
             clip (1, ClipKind::audio, loop, 0, 8);
             clip (3, ClipKind::pattern, lead, 2, 4);
             clip (4, ClipKind::audio, vox, 4, 4);
+            clip (6, ClipKind::pattern, kick, 4, 2); // (round 190ib: Track 7 only repeats Track 1's Kick)
             song.playlistTracks.resize (8);
             engine.setSong (std::move (song));
         }
@@ -14765,20 +14851,50 @@ private:
                juce::String (pl.headerWidthForSnapshot()));
         shotRows ("-off.png", 7);
 
-        // ---- 2. the switch (Playlist › Edit, Track mode, Settings › Project): one undo step
+        // ---- 2. the switch (Playlist › Edit, Track mode, Settings › Project): it lists what it changes and asks (round
+        //         190ib: inserts move, channels are routed), then it is one undo step
+        lynx::autolink::Report plan;
+        bool asked = false;
+        lynx::PlaylistComponent::answerLinkConfirmation = [&] (const lynx::autolink::Report& r) {
+            plan = r;
+            asked = true;
+            return true;
+        };
+        {
+            const auto text = lynx::PlaylistComponent::describeLinkPlan (song(), lynx::autolink::planOn (song()));
+            juce::AlertWindow box (lynx::tr ("Link Playlist tracks to mixer tracks"), text, juce::MessageBoxIconType::QuestionIcon);
+            box.addButton (lynx::tr ("Link"), 1);
+            box.addButton (lynx::tr ("Cancel"), 0);
+            box.sendLookAndFeelChange();
+            savePng (lynx::shot::snapshot (box), prefix + "-confirm.png");
+        }
         pl.runAction ("playlist.linkTracks");
         engine.dispatchPendingMessages();
+        const auto moved = [&plan] (int from, int to) {
+            return std::any_of (plan.changes.begin(), plan.changes.end(), [=] (const lynx::autolink::Change& c) {
+                return c.kind == lynx::autolink::Change::Kind::moveInsert && c.from == from && c.to == to;
+            });
+        };
+        check ("asked_first_with_the_moves", asked && moved (9, 4) && moved (12, 5) && plan.repeats.size() == 1 && ! plan.changesSound(),
+               juce::String ((int) plan.changes.size()));
         check ("switch_on", song().linkTracksToMixer && pl.headerWidthForSnapshot() == lynx::PlaylistComponent::linkedHeaderWidth,
                juce::String (pl.headerWidthForSnapshot()));
         check ("kick_instrument_track_insert_1", mode (0) == lynx::PlaylistTrackMode::instrument && mixerOf (0) == 1 && song().channels[0].mixerTrack == 1,
                juce::String (mixerOf (0)));
         check ("loop_audio_track_insert_2", mode (1) == lynx::PlaylistTrackMode::audio && mixerOf (1) == 2 && song().mixer[2].name == "Drum loop",
                juce::String (mixerOf (1)));
-        check ("mixed_beat_stays_unassigned", mode (2) == lynx::PlaylistTrackMode::unassigned);
-        check ("synth_on_its_bus", mode (3) == lynx::PlaylistTrackMode::instrument && mixerOf (3) == 9, juce::String (mixerOf (3)));
-        check ("vocal_on_its_chain", mode (4) == lynx::PlaylistTrackMode::audio && mixerOf (4) == 12 && song().mixer[12].effects.size() == 1,
+        // (round 190ib: Track N = insert N for every track with content of its own)
+        check ("beat_track_insert_3", mode (2) == lynx::PlaylistTrackMode::audio && mixerOf (2) == 3 && song().channels[1].mixerTrack == 3
+                                          && song().channels[2].mixerTrack == 3 && song().channels[3].mixerTrack == 3,
+               juce::String (mixerOf (2)));
+        check ("synth_bus_moves_to_insert_4", mode (3) == lynx::PlaylistTrackMode::instrument && song().channels[4].mixerTrack == 4
+                                                  && song().mixer[4].name == "Synth bus" && song().playlistTracks[3].name == "Synth bus",
+               juce::String (song().channels[4].mixerTrack));
+        check ("vocal_chain_moves_to_insert_5", mode (4) == lynx::PlaylistTrackMode::audio && mixerOf (4) == 5 && song().mixer[5].effects.size() == 1
+                                                    && song().mixer[5].name == "Vox chain",
                juce::String (mixerOf (4)));
-        check ("empty_tracks_stay", mode (5) == lynx::PlaylistTrackMode::unassigned && mode (6) == lynx::PlaylistTrackMode::unassigned);
+        check ("empty_and_repeat_tracks_stay", mode (5) == lynx::PlaylistTrackMode::unassigned && mode (6) == lynx::PlaylistTrackMode::unassigned
+                                                   && lynx::autolink::repeatedTracks (song())[6] == 0);
         shotRows ("-on.png", 7);
         // one undo step: Undo brings FL's tracks back, Redo the links
         engine.undo();
@@ -14846,10 +14962,10 @@ private:
         shotRows ("-controls.png", 7);
         doubleClick (panAt (1));
         check ("pan_double_click_centre", insert2().pan == 0.0f, juce::String (insert2().pan, 3));
-        // an instrument track's header acts on its channel's insert (Synth: insert 9)
+        // an instrument track's header acts on its channel's insert (Synth: insert 4 since round 190ib)
         press (volumeAt (3, 0.4f), {});
-        check ("instrument_track_volume_on_its_insert", std::abs (song().mixer[9].volume - 0.4f) < 0.03f, juce::String (song().mixer[9].volume, 3));
-        engine.editSong ([] (lynx::Song& s) { s.mixer[9].volume = lynx::unityFader; });
+        check ("instrument_track_volume_on_its_insert", std::abs (song().mixer[4].volume - 0.4f) < 0.03f, juce::String (song().mixer[4].volume, 3));
+        engine.editSong ([] (lynx::Song& s) { s.mixer[4].volume = lynx::unityFader; });
         // FL's track mute and solo stay on the Playlist track: Ctrl+click on M solos it, a muted track lights M and the
         // first click unmutes it
         press (mAt (1), ctrl);
@@ -14862,10 +14978,15 @@ private:
         });
         press (mAt (1), {});
         check ("m_unmutes_a_muted_playlist_track_first", ! song().isTrackMuted (1) && ! insert2().muted);
-        // an unlinked track keeps FL's LED (track 3, the mixed beat): a click mutes the Playlist track
-        press (juce::Point<int> (w - 9 - 11, row (2).getCentreY()), {});
-        check ("unlinked_led_is_fl", song().isTrackMuted (2));
-        engine.editSong ([] (lynx::Song& s) { s.playlistTracks[2].muted = false; });
+        // a track that only repeats another keeps FL's LED (Track 7, Track 1's Kick): a click mutes the Playlist track
+        press (juce::Point<int> (w - 9 - 11, row (6).getCentreY()), {});
+        check ("unlinked_led_is_fl", song().isTrackMuted (6));
+        engine.editSong ([] (lynx::Song& s) { s.playlistTracks[6].muted = false; });
+        // round 190ib: a linked track and its insert keep one name, whichever is renamed
+        engine.editSong ([] (lynx::Song& s) { s.mixer[3].name = "Drums"; });
+        check ("insert_rename_renames_the_track", song().playlistTracks[2].name == "Drums");
+        engine.editSong ([] (lynx::Song& s) { s.playlistTracks[2].name = "Beat"; });
+        check ("track_rename_renames_the_insert", song().mixer[3].name == "Beat");
 
         // ---- 4. new content follows: a sample on empty Track 6 makes it an audio track (insert 6)
         engine.editSong ([] (lynx::Song& s) {
@@ -14921,6 +15042,7 @@ private:
         }
 
         // ---- 7. off: FL's headers again (the links stay)
+        lynx::PlaylistComponent::answerLinkConfirmation = nullptr;
         pl.runAction ("playlist.linkTracks");
         engine.dispatchPendingMessages();
         check ("switch_off_fl_headers", ! song().linkTracksToMixer && pl.headerWidthForSnapshot() == lynx::PlaylistComponent::flHeaderWidthNow()

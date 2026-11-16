@@ -10218,3 +10218,17 @@ countries: id
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] buka/tutup editor  [Alt]+[LMB] biarkan yang lain terbuka  [Ctrl]+[LMB] dengarkan  [2xLMB] Piano Roll  [LMB] seret naik/turun mengubah urutan  [RMB] menu channel"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak meter (kiri/kanan) dengan peak hold  [LMB] mematikan lampu clip"
+
+# --- Round 190ib: issues #170 (Track N = insert N), #181 (Ctrl+,), #183 (preview while playing)
+"Link Playlist tracks to mixer tracks" = "Tautkan trek Playlist ke trek mixer"
+"Settings (press again to close)" = "Pengaturan (tekan lagi untuk menutup)"
+"Preview notes while playing" = "Dengarkan not saat diputar"
+"Track {0} is linked to insert {0}" = "Track {0} ditautkan ke insert {0}"
+"{0}{1} moves to insert {2}, with its effects and routing" = "{0}{1} pindah ke insert {2}, beserta efek dan routing-nya"
+"{0}{1} sends into insert {2} instead of the Master" = "{0}{1} mengirim ke insert {2}, bukan ke Master"
+"{0}: {1} → insert {2}" = "{0}: {1} → insert {2}"
+"(its sound changes: the effects or settings of the insert it leaves or joins apply)" = "(suaranya berubah: efek atau pengaturan insert yang ditinggalkan atau dimasukinya berlaku)"
+"Track {0} only repeats Track {1}'s instruments: it stays unlinked and plays through insert {1}" = "Track {0} hanya mengulang instrumen Track {1}: tetap tidak ditautkan dan berbunyi lewat insert {1}"
+"Playlist track N becomes mixer insert N: what a track's own instruments and samples play goes through its insert, and its header's M, S, volume and pan are the insert's. This changes:" = "Track N di Playlist menjadi insert N di mixer: apa yang dimainkan instrumen dan sample milik sebuah track melewati insert-nya, dan M, S, volume, serta pan di header-nya adalah milik insert. Yang berubah:"
+"It is one step: Edit › Undo takes it all back." = "Ini satu langkah: Edit › Urungkan mengembalikan semuanya."
+"(repeats Track {0}'s instruments: plays through insert {0})" = "(mengulang instrumen Track {0}: berbunyi lewat insert {0})"

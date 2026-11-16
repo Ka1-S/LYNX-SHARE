@@ -10218,3 +10218,17 @@ countries: nl be
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editor openen/sluiten  [Alt]+[LMB] andere open houden  [Ctrl]+[LMB] voorbeluisteren  [2xLMB] Piano Roll  [LMB] omhoog/omlaag slepen herschikt  [RMB] kanaalmenu"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Piekmeter (links/rechts) met peak hold  [LMB] wist het cliplampje"
+
+# --- Round 190ib: issues #170 (Track N = insert N), #181 (Ctrl+,), #183 (preview while playing)
+"Link Playlist tracks to mixer tracks" = "Playlist-sporen koppelen aan mixersporen"
+"Settings (press again to close)" = "Instellingen (druk nogmaals om te sluiten)"
+"Preview notes while playing" = "Noten tijdens het afspelen voorbeluisteren"
+"Track {0} is linked to insert {0}" = "Track {0} wordt gekoppeld aan insert {0}"
+"{0}{1} moves to insert {2}, with its effects and routing" = "{0}{1} verhuist naar insert {2}, met zijn effecten en routing"
+"{0}{1} sends into insert {2} instead of the Master" = "{0}{1} stuurt naar insert {2} in plaats van naar de Master"
+"{0}: {1} → insert {2}" = "{0}: {1} → insert {2}"
+"(its sound changes: the effects or settings of the insert it leaves or joins apply)" = "(het geluid verandert: de effecten of instellingen van de insert die het verlaat of waar het bij komt, gelden)"
+"Track {0} only repeats Track {1}'s instruments: it stays unlinked and plays through insert {1}" = "Track {0} herhaalt alleen de instrumenten van track {1}: hij blijft ongekoppeld en speelt via insert {1}"
+"Playlist track N becomes mixer insert N: what a track's own instruments and samples play goes through its insert, and its header's M, S, volume and pan are the insert's. This changes:" = "Playlist-track N wordt mixer-insert N: wat de eigen instrumenten en samples van een track spelen, gaat door zijn insert, en M, S, volume en pan in zijn kop zijn die van de insert. Dit verandert:"
+"It is one step: Edit › Undo takes it all back." = "Het is één stap: Bewerken › Ongedaan maken draait alles terug."
+"(repeats Track {0}'s instruments: plays through insert {0})" = "(herhaalt de instrumenten van track {0}: speelt via insert {0})"

@@ -1,3 +1,4 @@
+#include "ui/TypeAhead.h"
 #include "ui/PluginManager.h"
 
 #include "core/PluginCatalog.h"
@@ -283,6 +284,21 @@ private:
     const prefs::PluginRow* rowAt (int row) const
     {
         return juce::isPositiveAndBelow (row, (int) visible.size()) ? &rows[(std::size_t) visible[(std::size_t) row]] : nullptr;
+    }
+
+    // issue #182: typing in the table jumps to the plugin whose name starts with it (ui/TypeAhead.h)
+    bool keyPressed (const juce::KeyPress& key) override
+    {
+        if (! table.hasKeyboardFocus (true))
+            return false;
+        const auto row = ui::typeAheadRow (&table, key, table.getSelectedRow(), getNumRows(), [this] (int r) {
+            const auto* p = rowAt (r);
+            return p != nullptr ? u8 (p->name) : juce::String();
+        });
+        if (row < 0)
+            return false;
+        table.selectRow (row);
+        return true;
     }
 
     // --- table -------------------------------------------------------------------------------------------------

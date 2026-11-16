@@ -10218,3 +10218,17 @@ countries: fr be ch ca lu
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] ouvrir/fermer l'éditeur  [Alt]+[LMB] garder les autres ouverts  [Ctrl]+[LMB] écouter  [2xLMB] Piano Roll  [LMB] glisser haut/bas réordonne  [RMB] menu du canal"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Crêtemètre (gauche/droite) avec maintien de crête  [LMB] efface le voyant d'écrêtage"
+
+# --- Round 190ib: issues #170 (Track N = insert N), #181 (Ctrl+,), #183 (preview while playing)
+"Link Playlist tracks to mixer tracks" = "Lier les pistes de la Playlist aux pistes de mixage"
+"Settings (press again to close)" = "Réglages (appuyez à nouveau pour fermer)"
+"Preview notes while playing" = "Entendre les notes pendant la lecture"
+"Track {0} is linked to insert {0}" = "La piste {0} est liée à l'insert {0}"
+"{0}{1} moves to insert {2}, with its effects and routing" = "{0}{1} passe à l'insert {2}, avec ses effets et son routage"
+"{0}{1} sends into insert {2} instead of the Master" = "{0}{1} envoie vers l'insert {2} au lieu du Master"
+"{0}: {1} → insert {2}" = "{0} : {1} → insert {2}"
+"(its sound changes: the effects or settings of the insert it leaves or joins apply)" = "(son son change : les effets ou réglages de l'insert qu'il quitte ou rejoint s'appliquent)"
+"Track {0} only repeats Track {1}'s instruments: it stays unlinked and plays through insert {1}" = "La piste {0} ne fait que répéter les instruments de la piste {1} : elle reste non liée et joue par l'insert {1}"
+"Playlist track N becomes mixer insert N: what a track's own instruments and samples play goes through its insert, and its header's M, S, volume and pan are the insert's. This changes:" = "La piste N de la Playlist devient l'insert N du mixeur : ce que jouent les instruments et samples propres à une piste passe par son insert, et les M, S, volume et panoramique de son en-tête sont ceux de l'insert. Ce qui change :"
+"It is one step: Edit › Undo takes it all back." = "C'est une seule étape : Éditer › Annuler revient sur tout."
+"(repeats Track {0}'s instruments: plays through insert {0})" = "(répète les instruments de la piste {0} : joue par l'insert {0})"

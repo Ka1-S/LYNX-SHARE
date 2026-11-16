@@ -120,6 +120,8 @@ public:
         setOutlineThickness (1);
     }
 
+    // issue #182: typing jumps to the template whose name starts with it (JUCE fix 37 reads the names)
+    juce::String getNameForRow (int row) override { return juce::isPositiveAndBelow (row, (int) items.size()) ? items[(std::size_t) row].name : juce::String(); }
     int getNumRows() override { return (int) items.size(); }
 
     void paintListBoxItem (int row, juce::Graphics& g, int width, int height, bool selected) override
