@@ -200,8 +200,9 @@ void MidiSyncIo::channelMessage (int port, int sample, const std::uint8_t* bytes
         Timed t;
         // heard with the block's audio (one buffer + the device's latency), as FL sends them when the audio is played
         // (REA midiout190jl: FL's MIDI thread sends what the played position reached; the master sync offset is the
-        // clock's alone, FLEngine 0xbb0b00 / 0x15e05e8)
-        t.dueMs = blockStartMs + latencyMs + 1000.0 * sample / sampleRate;
+        // clock's alone, FLEngine 0xbb0b00 / 0x15e05e8). Rollup 0.1.30: the rack's delay compensation too (round
+        // 190hq's heardLatencyMs, as the clock): the block's audio is heard that much later behind latent plugins
+        t.dueMs = blockStartMs + heardLatencyMs() + 1000.0 * sample / sampleRate;
         t.message.sample = sample;
         t.message.size = (std::uint8_t) size;
         std::copy (bytes, bytes + size, t.message.bytes.begin());
@@ -328,7 +329,7 @@ void MidiSyncIo::beginBlock (Transport& transport, double callbackMs, int numSam
             if (slot.port.load (std::memory_order_relaxed) >= 0)
             {
                 Timed t;
-                t.dueMs = blockStartMs + latencyMs;
+                t.dueMs = blockStartMs + heardLatencyMs(); // (after the notes queued with the same delay)
                 t.message.size = 0; // (the marker)
                 if (! slot.portQueue.push (t))
                     droppedCount.fetch_add (1, std::memory_order_relaxed);
@@ -704,6 +705,34 @@ juce::String MidiSyncIo::portSelfTest (bool& ok)
         if (find ("Synth B", { 0x91, 61, 90 }) == nullptr || find ("Synth B", { 0x81, 61, 0 }) == nullptr)
             fail ("a port change left a note on");
     }
+    // rollup 0.1.30: behind latent plugins the notes go out when their audio is heard, after the rack's delay
+    // compensation as well (round 190hq's heardLatencyMs, which the clock uses), and a stop's notes off after them
+    {
+        const std::lock_guard<std::mutex> g (lock);
+        sent.clear();
+    }
+    io.setRackLatencyMs (20.0);
+    const auto t1 = juce::Time::getMillisecondCounterHiRes() + 5.0;
+    io.beginBlock (transport, t1, 256);
+    const std::uint8_t onA[3] { 0x90, 64, 100 };
+    io.channelMessage (1, 48, onA, 3, 0);
+    io.requestPortNotesOff();
+    io.beginBlock (transport, t1, 256);
+    std::this_thread::sleep_for (std::chrono::milliseconds (100));
+    {
+        const std::lock_guard<std::mutex> g (lock);
+        const auto* a = find ("Synth A", { 0x90, 64, 100 });
+        const auto* off = find ("Synth A", { 0x80, 64, 0 });
+        const auto due = t1 + latency + 20.0 + 1000.0 * 48 / 48000.0;
+        if (a == nullptr || std::abs (a->due - due) > 1.0e-6)
+            fail ("due time behind latent plugins " + juce::String (a != nullptr ? a->due - t1 : -1.0, 4));
+        else if (off == nullptr || off->at < a->at)
+            fail ("notes off before the note behind latent plugins");
+        else
+            report << "behind 20 ms of plugin delay compensation: due +" << juce::String (a->due - t1, 3) << " ms (expected "
+                   << juce::String (due - t1, 3) << ")\n";
+    }
+    io.setRackLatencyMs (0.0);
     io.stopThread (1000);
     report << (ok ? "OK" : "FAILED") << "\n";
     return report;
