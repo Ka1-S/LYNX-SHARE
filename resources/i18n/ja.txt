@@ -10178,3 +10178,6 @@ countries: jp
 "Track effects: [LMB] add an effect to its mixer track  (drop one from the Browser here too)" = "トラックのエフェクト: [LMB] ミキサートラックにエフェクトを追加  (ブラウザーからここへドロップも可)"
 "Track effect: [LMB] on / off (bypass)" = "トラックのエフェクト: [LMB] オン / オフ（バイパス）"
 "Track effect: [LMB] open / close its window  drag: move it ([Ctrl] copy; onto another track: move it there)  [RMB] its menu" = "トラックのエフェクト: [LMB] ウィンドウを開く / 閉じる  ドラッグ: 移動 ([Ctrl] コピー、別のトラックへ: そこへ移動)  [RMB] メニュー"
+"Insert effects on the strips (LYNX)" = "ストリップにインサートエフェクトを表示 (LYNX)"
+"Each Mixer strip lists its insert's effects under its header: click one to open it, its dot to bypass it, drag to reorder or onto another strip (Ctrl: a copy), right-click for the slot menu. Also in the Mixer menu." = "各ミキサーストリップのヘッダーの下に、そのインサートのエフェクトを一覧表示します。クリックで開き、ドットでバイパス、ドラッグで並べ替えまたは別のストリップへ移動 (Ctrl: コピー)、右クリックでスロットメニュー。ミキサーメニューにもあります。"
+"Insert effects: [LMB] opens one  [LMB] on its dot: bypass  drag: reorder or onto another strip, [Ctrl] copies  [RMB] slot menu  [Wheel] scrolls" = "インサートエフェクト: [LMB] 開く  ドットで [LMB]: バイパス  ドラッグ: 並べ替え／別のストリップへ、[Ctrl] でコピー  [RMB] スロットメニュー  [Wheel] スクロール"

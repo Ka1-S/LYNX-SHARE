@@ -57,7 +57,10 @@
 #include "ui/QuickPick.h"
 #include "ui/TrackIcons.h"
 #include "core/TrackIcons.h"
+#include "core/DetailChain.h"
+#include "core/MiddleEllipsis.h"
 #include "core/MixerRouteArrow.h"
+#include "core/StripInserts.h"
 
 namespace lynx
 {
@@ -523,6 +526,12 @@ MixerStrips::Rows MixerStrips::rows() const noexcept
     r.readoutHeight = sp.dbReadout ? 16 : 0;
 
     auto y = r.header;
+    if (showStripInserts && stripinserts::shownIn (layout)) // issue #154 part 2 (round 190io): the effects list under the band
+    {
+        r.insertsTop = y + 2;
+        r.insertsHeight = stripinserts::height (stripinserts::rowsFor (getHeight()));
+        y += r.insertsHeight + 2;
+    }
     if (sp.verticalName && ! sp.nameLow)
     {
         r.nameTop = y;
@@ -1161,6 +1170,241 @@ juce::Rectangle<int> MixerStrips::arrowArea (int t) const
     return { stripX (t), laneTop() - arrowRowHeight - 2, stripWidthOf (t) - spec().gap, arrowRowHeight };
 }
 
+juce::Rectangle<int> MixerStrips::insertsArea (int t) const
+{
+    const auto r = rows();
+    if (r.insertsHeight <= 0 || t < 0 || t >= (int) engine.getSong().mixer.size() || isFoldTab (t))
+        return {};
+    return { stripX (t) + 2, r.insertsTop, stripWidthOf (t) - spec().gap - 4, r.insertsHeight - 4 };
+}
+
+// --- issue #154 part 2 (round 190io): the strip's insert effects list (the linked track headers' list, round 190ht) ----
+void MixerStrips::setShowStripInserts (bool on)
+{
+    showStripInserts = on;
+    insertsScroll.clear();
+    hoverInsertItem = -1;
+    updateSize();
+    repaint();
+}
+
+int MixerStrips::insertsFirst (int t) const
+{
+    const auto found = insertsScroll.find (t);
+    const auto effects = (int) engine.getSong().mixer[(std::size_t) t].effects.size();
+    return trackinserts::clampFirst (found == insertsScroll.end() ? 0 : found->second, effects, trackinserts::rowsThatFit (insertsArea (t).getHeight()));
+}
+
+int MixerStrips::insertsItemAt (int t, juce::Point<int> p) const
+{
+    const auto box = insertsArea (t);
+    if (! box.contains (p))
+        return -1;
+    const auto effects = (int) engine.getSong().mixer[(std::size_t) t].effects.size();
+    return trackinserts::itemAt (effects, insertsFirst (t), trackinserts::rowsThatFit (box.getHeight()), p.y - box.getY());
+}
+
+void MixerStrips::paintStripInserts (juce::Graphics& g, int t)
+{
+    using namespace theme;
+    const auto box = insertsArea (t);
+    const auto& fx = engine.getSong().mixer[(std::size_t) t].effects;
+    const auto effects = (int) fx.size();
+    const auto rows = trackinserts::rowsThatFit (box.getHeight());
+    const auto first = insertsFirst (t);
+    const auto hoveredHere = hoverTrack == t && hoverPart == Part::inserts;
+    const auto led = juce::jmin (trackinserts::ledWidth, box.getWidth() / 3);
+
+    // a recessed well, as the Mixer's slot list; one row per effect in chain order, then "+" while a slot is free
+    theme::fillRoundRect (g, box.toFloat().expanded (1.0f, 2.0f), radius::sm, colour::bg0.withAlpha (0.7f));
+    g.setFont (font (10.0f));
+    for (int r = 0; r < rows; ++r)
+    {
+        const auto item = first + r;
+        if (item > effects || (item == effects && effects >= maxEffectSlots))
+            break;
+        const auto row = juce::Rectangle<int> (box.getX(), box.getY() + r * trackinserts::rowHeight, box.getWidth(), trackinserts::rowHeight);
+        const auto isAdd = item == effects;
+        const auto under = hoveredHere && hoverInsertItem == (isAdd ? trackinserts::addRow : item);
+        const auto dragged = insertsDragging && insertsPressTrack == t && insertsPressItem == item;
+        if (under || dragged)
+            theme::fillRoundRect (g, row.toFloat().reduced (0.0f, 0.5f), 2.0f, colour::bg5.withAlpha (dragged ? 0.9f : 0.6f));
+        if (isAdd)
+        {
+            g.setColour (under ? colour::textPrimary : colour::textSecondary.withAlpha (0.8f));
+            textcache::drawText (g, "+", row.withWidth (led), juce::Justification::centred, false);
+            textcache::drawText (g, tr ("Add"), row.withTrimmedLeft (led + 1), juce::Justification::centredLeft, true);
+            continue;
+        }
+        const auto& slot = fx[(std::size_t) item];
+        // the on/off dot (the Mixer slot's LED): filled while on, a ring while bypassed
+        const auto dot = row.withWidth (led).toFloat().withSizeKeepingCentre (6.0f, 6.0f);
+        const auto dotHot = under && hoverInsertLed;
+        if (slot.enabled)
+        {
+            g.setColour (dotHot ? colour::accentHover : colour::accent);
+            g.fillEllipse (dot);
+        }
+        else
+        {
+            g.setColour (dotHot ? colour::textPrimary : colour::textSecondary.withAlpha (0.7f));
+            g.drawEllipse (dot.reduced (0.5f), 1.0f);
+        }
+        g.setColour (slot.enabled ? colour::textPrimary : colour::textSecondary.withAlpha (0.6f));
+        textcache::drawText (g, quickpick::slotName (engine, slot), row.withTrimmedLeft (led + 1).withTrimmedRight (2), juce::Justification::centredLeft, true);
+    }
+    // more rows than fit: a thin scroll mark at the right edge
+    if (const auto items = trackinserts::itemCount (effects); items > rows)
+    {
+        const auto h = juce::jmax (4.0f, (float) box.getHeight() * (float) rows / (float) items);
+        const auto y = (float) box.getY() + ((float) box.getHeight() - h) * (float) first / (float) juce::jmax (1, items - rows);
+        theme::fillRoundRect (g, juce::Rectangle<float> ((float) box.getRight() - 2.0f, y, 2.0f, h), 1.0f, colour::textSecondary.withAlpha (0.5f));
+    }
+    // a drag in progress: where the effect lands
+    if (insertsDragging && insertsDropTrack == t && insertsDropAt >= 0)
+    {
+        const auto y = box.getY() + (insertsDropAt - first) * trackinserts::rowHeight;
+        if (y >= box.getY() - 1 && y <= box.getBottom() + 1)
+        {
+            g.setColour (colour::accent);
+            g.fillRect (box.getX() + 1, juce::jlimit (box.getY(), box.getBottom() - 2, y - 1), box.getWidth() - 2, 2);
+        }
+    }
+}
+
+EffectsPanel& MixerStrips::insertActions (int insert)
+{
+    if (insertActionsPanel == nullptr)
+    {
+        insertActionsPanel = std::make_unique<EffectsPanel> (engine); // never shown: the Mixer slot's own code
+        insertActionsPanel->setMenuTarget (this);
+    }
+    insertActionsPanel->setTrack (insert);
+    return *insertActionsPanel;
+}
+
+bool MixerStrips::insertsMouseDown (const juce::MouseEvent& e, int t)
+{
+    if (! insertsArea (t).contains (e.getPosition()))
+        return false;
+    const auto item = insertsItemAt (t, e.getPosition());
+    insertsPressTrack = insertsPressItem = insertsDropTrack = insertsDropAt = -1;
+    insertsDragging = false;
+    const auto& fx = engine.getSong().mixer[(std::size_t) t].effects;
+    if (flmods::popup (e.mods))
+    {
+        // the Mixer slot's own menu; on "+" or below the list, the slot's add menu
+        auto& actions = insertActions (t);
+        if (item >= 0)
+            actions.showSlotMenuFor (item);
+        else if (fx.size() < (std::size_t) maxEffectSlots)
+            actions.showAddMenuFor (trackinserts::nextFreeRow (fx));
+        return true;
+    }
+    if (e.getNumberOfClicks() > 1)
+        return true; // (a double click opens nothing twice)
+    insertsPressTrack = t;
+    insertsPressItem = item;
+    return true;
+}
+
+bool MixerStrips::insertsMouseDrag (const juce::MouseEvent& e)
+{
+    if (insertsPressTrack < 0)
+        return false;
+    if (insertsPressItem >= 0 && (insertsDragging || e.getDistanceFromDragStart() > 4))
+    {
+        // drag an effect: up / down in its list reorders it, onto another strip's list moves it there (Ctrl: a copy)
+        insertsDragging = true;
+        const auto over = trackAt (juce::jlimit (0, getWidth() - 1, e.x));
+        const auto box = over >= 0 ? insertsArea (over) : juce::Rectangle<int>();
+        if (! box.isEmpty() && e.y >= box.getY() - trackinserts::rowHeight && e.y < box.getBottom() + trackinserts::rowHeight)
+        {
+            const auto effects = (int) engine.getSong().mixer[(std::size_t) over].effects.size();
+            insertsDropTrack = over;
+            insertsDropAt = over == insertsPressTrack
+                                ? trackinserts::dropPosition (effects, insertsFirst (over), trackinserts::rowsThatFit (box.getHeight()), e.y - box.getY())
+                                : effects;
+        }
+        else
+            insertsDropTrack = insertsDropAt = -1;
+        repaint (0, rows().insertsTop - 3, getWidth(), rows().insertsHeight + 4);
+    }
+    return true;
+}
+
+bool MixerStrips::insertsMouseUp (const juce::MouseEvent& e)
+{
+    if (insertsPressTrack < 0)
+        return false;
+    const auto insert = insertsPressTrack, item = insertsPressItem, dropTrack = insertsDropTrack, dropAt = insertsDropAt;
+    const auto dragged = insertsDragging;
+    insertsPressTrack = insertsPressItem = insertsDropTrack = insertsDropAt = -1;
+    insertsDragging = false;
+    if (insert < 0 || insert >= (int) engine.getSong().mixer.size())
+        return true;
+    const auto copy = flmods::ctrl (e.mods);
+    const auto full = [] { ui::postHint ({ tr ("This insert has no free slot (10 effects)"), {} }, 3000); };
+    if (dragged)
+    {
+        const auto target = item >= 0 ? dropTrack : -1; // (outside a list: nothing changes)
+        if (target >= 0 && target != insert)
+        {
+            auto moved = -1;
+            engine.editSongStructural ([insert, item, target, copy, &moved] (Song& s) { moved = detailchain::moveEffectToInsert (s, insert, item, target, copy); });
+            if (moved < 0)
+                full();
+        }
+        else if (target == insert && copy)
+        {
+            if (engine.getSong().mixer[(std::size_t) insert].effects.size() >= (std::size_t) maxEffectSlots)
+                full();
+            else
+                engine.editSong ([insert, item, dropAt] (Song& s) { detailchain::duplicateEffect (s, insert, item, dropAt); });
+        }
+        else if (target == insert)
+            engine.editSongStructural ([insert, item, dropAt] (Song& s) { detailchain::moveEffectBefore (s, insert, item, dropAt); });
+        repaint();
+        return true;
+    }
+    if (item == trackinserts::addRow)
+    {
+        insertActions (insert).showAddMenuFor (trackinserts::nextFreeRow (engine.getSong().mixer[(std::size_t) insert].effects));
+        return true;
+    }
+    if (item < 0)
+        return true;
+    if (e.getMouseDownX() < insertsArea (insert).getX() + juce::jmin (trackinserts::ledWidth, insertsArea (insert).getWidth() / 3) + 1)
+    {
+        // the dot: the effect on / off (the Mixer slot LED's edit)
+        engine.editSong ([insert, item] (Song& s) {
+            auto& fx = s.mixer[(std::size_t) insert].effects;
+            if (item < (int) fx.size())
+                fx[(std::size_t) item].enabled = ! fx[(std::size_t) item].enabled;
+        });
+        return true;
+    }
+    insertActions (insert).toggleSlotEditor (item); // the name: its window (as a click on a Mixer slot)
+    return true;
+}
+
+bool MixerStrips::insertsWheel (const juce::MouseEvent& e, float deltaY)
+{
+    const auto t = trackAt (e.x);
+    if (t < 0 || deltaY == 0.0f)
+        return false;
+    const auto box = insertsArea (t);
+    if (! box.contains (e.getPosition()))
+        return false;
+    const auto effects = (int) engine.getSong().mixer[(std::size_t) t].effects.size();
+    const auto rows = trackinserts::rowsThatFit (box.getHeight());
+    if (trackinserts::itemCount (effects) <= rows)
+        return false; // everything shows: the wheel scrolls the Mixer as usual
+    insertsScroll[t] = trackinserts::clampFirst (insertsFirst (t) + (deltaY > 0 ? -1 : 1), effects, rows);
+    repaint (box.expanded (2));
+    return true;
+}
+
 juce::Rectangle<int> MixerStrips::sendArea (int t) const
 {
     return { stripX (t), laneTop() + 2 + switchHeight, stripWidthOf (t) - spec().gap, sendKnobHeight };
@@ -1189,6 +1433,8 @@ MixerStrips::Part MixerStrips::partAt (int t, juce::Point<int> p) const
     if (t > 0 && t < (int) engine.getSong().mixer.size() && engine.getSong().mixer[(std::size_t) t].inputChannel >= 0
         && inputArea (t).expanded (0, 2).contains (p))
         return Part::input;
+    if (insertsArea (t).contains (p))
+        return Part::inserts;
     if (headerArea (t).contains (p) || nameArea (t).contains (p))
         return Part::header;
     // FL's route arrow (round 190io): the Send switch from the selected track, as the "→ n" pill
@@ -1278,7 +1524,18 @@ void MixerStrips::mouseMove (const juce::MouseEvent& e)
         repaint (loudnessResetArea().expanded (2));
     }
     const auto t = trackAt (e.x);
-    setHover (t >= 0 ? partAt (t, e.getPosition()) : Part::none, t);
+    const auto part = t >= 0 ? partAt (t, e.getPosition()) : Part::none;
+    // issue #154 part 2: the effect row (and its dot) under the mouse
+    const auto item = part == Part::inserts ? insertsItemAt (t, e.getPosition()) : -1;
+    const auto led = item >= 0 && e.x < insertsArea (t).getX() + juce::jmin (trackinserts::ledWidth, insertsArea (t).getWidth() / 3) + 1;
+    if (item != hoverInsertItem || led != hoverInsertLed)
+    {
+        hoverInsertItem = item;
+        hoverInsertLed = led;
+        if (part == Part::inserts && hoverPart == part && hoverTrack == t)
+            repaint (insertsArea (t).expanded (2));
+    }
+    setHover (part, t);
 }
 
 void MixerStrips::mouseExit (const juce::MouseEvent&)
@@ -1719,6 +1976,10 @@ void MixerStrips::paint (juce::Graphics& g)
             }
         }
 
+        // issue #154 part 2 (round 190io): the insert's effects under the band, while the view is on
+        if (const auto list = insertsArea (t); ! list.isEmpty() && needs (list))
+            paintStripInserts (g, t);
+
         // round 186c's option: the selected insert's sends to deleted inserts, as a greyed dashed chip in its own (empty)
         // route-switch place: the deleted insert's name (or how many); the insert menu's "Disconnected links" acts on them
         if (t == selected && t > 0 && ! song.mixer[(std::size_t) t].lostSends.empty() && needs (routeArea (t)))
@@ -1870,6 +2131,9 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
     const auto part = partAt (t, e.getPosition());
     headerDragTrack = -1;
     headerDragged = false;
+
+    if (part == Part::inserts && insertsMouseDown (e, t)) // issue #154 part 2 (round 190io)
+        return;
 
     if (part == Part::add && flmods::popup (e.mods))
     {
@@ -2247,6 +2511,8 @@ void MixerStrips::stepRailOnce()
 
 void MixerStrips::mouseDrag (const juce::MouseEvent& e)
 {
+    if (insertsMouseDrag (e)) // issue #154 part 2: an effect dragged in / between the strips' lists
+        return;
     if (railStrip != railNone) // the cap goes on towards where the mouse is now
     {
         railMouseY = e.y;
@@ -2582,6 +2848,9 @@ void MixerStrips::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWh
         return;
     }
 
+    if (! e.mods.isShiftDown() && insertsWheel (e, wheel.deltaY)) // issue #154 part 2: a long effects list scrolls
+        return;
+
     const auto t = trackAt (e.x);
 
     if (t > 0 && t < (int) engine.getSong().mixer.size() && e.mods.isShiftDown())
@@ -2691,6 +2960,10 @@ ui::Hint MixerStrips::hintAt (juce::Point<int> p)
         case Part::meter: h.text = name + " - " + tr ("Peak meter (left/right) with peak hold  [LMB] selects the track and clears the clip light"); break;
         case Part::route: h.text = name + " - " + tr ("Route the selected inserts to this one (drag after enabling: level). Ctrl+click: this track only, Shift: sidechain, Ctrl+Shift: sidechain only, right-click: menu"); h.hasMenu = true; break;
         case Part::add: h.text = tr ("Add a mixer insert"); break;
+        case Part::inserts: // issue #154 part 2 (round 190io)
+            h.text = name + " - " + tr ("Insert effects: [LMB] opens one  [LMB] on its dot: bypass  drag: reorder or onto another strip, [Ctrl] copies  [RMB] slot menu  [Wheel] scrolls");
+            h.hasMenu = true;
+            break;
         case Part::fold:
             h.text = name + " - " + (mixerops::isFolded (song, t) ? tr ("Unfold this group  [Alt]+[LMB] all groups")
                                                                 : tr ("Fold this group to its bus strip, or to a slim tab  [Alt]+[LMB] all groups"));
@@ -2716,8 +2989,10 @@ ui::Hint MixerStrips::hintAt (juce::Point<int> p)
     return h;
 }
 
-void MixerStrips::mouseUp (const juce::MouseEvent&)
+void MixerStrips::mouseUp (const juce::MouseEvent& e)
 {
+    if (insertsMouseUp (e)) // issue #154 part 2
+        return;
     railRepeat.stopTimer();
     railStrip = railNone;
 
@@ -4957,6 +5232,7 @@ namespace mixeroptions
 std::function<void()> changed;
 std::function<void (bool)> setShowUsedOnly;
 std::function<void (bool)> setShowLoudness;
+std::function<void (bool)> setShowStripInserts;
 std::function<void (std::vector<int>, std::function<void (const std::vector<juce::File>&)>)> renderTracks;
 std::function<void (std::vector<int>)> selectPlaylistTracks;
 
@@ -5005,6 +5281,15 @@ void addItems (juce::PopupMenu& menu, AudioEngine& engine, bool newProjects)
             setShowUsedOnly (on);
         else
             MixerStrips::showUsedOnly = on;
+        notifyChanged();
+    });
+    // LYNX's own (issue #154 part 2, round 190io; off = FL's mixer): each strip lists its insert's effects
+    menu.addItem (tr ("Insert effects on the strips (LYNX)"), true, MixerStrips::showStripInserts, [] {
+        const auto on = ! MixerStrips::showStripInserts;
+        if (setShowStripInserts)
+            setShowStripInserts (on);
+        else
+            MixerStrips::showStripInserts = on;
         notifyChanged();
     });
     // LYNX's own (round 190am; off = FL's mixer): the Master's loudness in LUFS and its true peak, beside the Master

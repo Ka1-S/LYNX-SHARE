@@ -10178,3 +10178,6 @@ countries: tw hk mo
 "Track effects: [LMB] add an effect to its mixer track  (drop one from the Browser here too)" = "音軌效果：[LMB] 為其混音器軌道新增效果（也可從瀏覽器拖放到這裡）"
 "Track effect: [LMB] on / off (bypass)" = "音軌效果：[LMB] 開 / 關（旁通）"
 "Track effect: [LMB] open / close its window  drag: move it ([Ctrl] copy; onto another track: move it there)  [RMB] its menu" = "音軌效果：[LMB] 開啟 / 關閉其視窗  拖曳：移動（[Ctrl] 複製；拖到另一條音軌：移到那裡）  [RMB] 其選單"
+"Insert effects on the strips (LYNX)" = "在通道條上顯示插入效果 (LYNX)"
+"Each Mixer strip lists its insert's effects under its header: click one to open it, its dot to bypass it, drag to reorder or onto another strip (Ctrl: a copy), right-click for the slot menu. Also in the Mixer menu." = "每個混音器通道條在標題下列出其插入的效果：按一下其中一個將其開啟，按一下其圓點可旁通，拖曳可重新排序或移到另一個通道條 (Ctrl：複製)，按右鍵開啟插槽選單。也在混音器選單中。"
+"Insert effects: [LMB] opens one  [LMB] on its dot: bypass  drag: reorder or onto another strip, [Ctrl] copies  [RMB] slot menu  [Wheel] scrolls" = "插入效果：[LMB] 開啟  在圓點上 [LMB]：旁通  拖曳：重新排序或移到另一個通道條，[Ctrl] 複製  [RMB] 插槽選單  [Wheel] 捲動"

@@ -93,6 +93,8 @@ extern std::function<void()> changed;
 extern std::function<void (bool)> setShowUsedOnly;
 // Shows or hides the loudness panel beside the Master and starts or stops its measurement (round 190am).
 extern std::function<void (bool)> setShowLoudness;
+// Shows or hides the insert effects list on the strips (issue #154 part 2, round 190io).
+extern std::function<void (bool)> setShowStripInserts;
 // Opens the Export window for these inserts only (FL's "Render armed / selected tracks to wave file(s)"; the main
 // window sets it, with the project's folder and name). `done` (optional) runs once the files are written.
 extern std::function<void (std::vector<int>, std::function<void (const std::vector<juce::File>&)> done)> renderTracks;
@@ -117,6 +119,8 @@ void addItems (juce::PopupMenu& menu, AudioEngine& engine, bool newProjects);
 //    (click toggles the send from the selected insert; right-click: send only / sidechain), a send
 //    level knob when the send is on, and wires show where the selected insert goes (red) and what
 //    feeds it (blue)
+class EffectsPanel;
+
 class MixerStrips final : public juce::Component,
                           public ui::HintSource,
                           public juce::DragAndDropTarget,
@@ -184,6 +188,12 @@ public:
     // (LUFS) and the true peak (dBTP) of the Master's output, and a Reset button (core/MasterLoudness.h).
     static inline bool showLoudness = false;
     void setShowLoudness (bool on);
+    // Mixer menu › "Insert effects on the strips (LYNX)" (issue #154 part 2, round 190io; ui-options.txt
+    // "mixerStripInserts"; off by default = FL's Mixer): each strip lists its insert's effects under its header band, the
+    // linked track headers' list (core/StripInserts.h, core/TrackInserts.h) with the same edits.
+    static inline bool showStripInserts = false;
+    void setShowStripInserts (bool on);
+    juce::Rectangle<int> stripInsertsForSnapshot (int track) const { return insertsArea (track); }
     juce::Rectangle<int> routeArrowForSnapshot (int track) const { return arrowArea (track); }
     void resetLoudness();
     void refreshLoudnessForSnapshot() { loudnessShown = engine.getMeters().loudness.read(); repaint(); } // (--snapshot: no frames run)
@@ -215,7 +225,7 @@ public:
     std::pair<int, int> cacheCountersForPerf() noexcept { return { std::exchange (pictureInvalidations, 0), std::exchange (pictureRefills, 0) }; }
 
 private:
-    enum class Part { none, pan, stereo, fader, meter, mute, solo, route, send, header, body, add, arm, input, fold, tab };
+    enum class Part { none, pan, stereo, fader, meter, mute, solo, route, send, header, body, add, arm, input, fold, tab, inserts };
 
     void changeListenerCallback (juce::ChangeBroadcaster*) override;
 
@@ -299,6 +309,7 @@ private:
         int knobsTop = 0, knobsHeight = 0, buttonsTop = 0, buttonsHeight = 0;
         int faderTop = 0, faderBottom = 0, readoutHeight = 0;
         int armY = -1;                                  // compact layouts: the arm button's row under the fader
+        int insertsTop = 0, insertsHeight = 0;          // issue #154 part 2: the insert effects list (0: the view is off)
     };
     Rows rows() const noexcept;
     juce::Rectangle<int> nameArea (int track) const;
@@ -338,6 +349,20 @@ private:
     // track, the selected track's own downward arrow; the "→ n" pill in the routing lane stays (LYNX)
     juce::Rectangle<int> arrowArea (int track) const;
     static constexpr int arrowRowHeight = 14;
+    // issue #154 part 2 (round 190io): the strip's insert effects list (empty while the view is off)
+    juce::Rectangle<int> insertsArea (int track) const;
+    int insertsFirst (int track) const;
+    int insertsItemAt (int track, juce::Point<int> p) const;
+    void paintStripInserts (juce::Graphics& g, int track);
+    bool insertsMouseDown (const juce::MouseEvent& e, int track);
+    bool insertsMouseDrag (const juce::MouseEvent& e);
+    bool insertsMouseUp (const juce::MouseEvent& e);
+    bool insertsWheel (const juce::MouseEvent& e, float deltaY);
+    EffectsPanel& insertActions (int insert);
+    std::unique_ptr<EffectsPanel> insertActionsPanel; // never shown: the Mixer slot's own code for the list's edits
+    std::map<int, int> insertsScroll;                        // insert -> first row shown
+    int insertsPressTrack = -1, insertsPressItem = -1, insertsDropTrack = -1, insertsDropAt = -1, hoverInsertItem = -1;
+    bool insertsDragging = false, hoverInsertLed = false;
     juce::Rectangle<int> armArea (int track) const;
     juce::Rectangle<int> inputArea (int track) const; // the input level bar (inserts with an input source)
     juce::Rectangle<int> stereoArea (int track) const;

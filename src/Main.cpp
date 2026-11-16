@@ -27142,6 +27142,16 @@ private:
                     offline.editSong ([] (lynx::Song& s) { s.setRoute (1, 5, false); s.setRoute (1, 6, false); s.setRoute (4, 1, false); });
                 ui.getMixerForSnapshot().selectTrack (0);
             }
+            // round 190io (issue #154 part 2): the Mixer view that lists each strip's insert effects (a LYNX view, off by
+            // default), with an insert selected whose sends light the route arrows
+            {
+                auto& strips = ui.getMixerForSnapshot().getStripsForSnapshot();
+                strips.setShowStripInserts (true);
+                offline.dispatchPendingMessages();
+                saveSnapshot (ui, prefix + "-mixer190io-inserts.png");
+                strips.setShowStripInserts (false);
+                offline.dispatchPendingMessages();
+            }
 
             // the Playlist with ripple editing on
             ui.selectTabForSnapshot (2);

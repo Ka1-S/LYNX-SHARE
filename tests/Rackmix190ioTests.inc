@@ -4,6 +4,7 @@
 #include "core/FlpExport.h"
 #include "core/MiddleEllipsis.h"
 #include "core/MixerRouteArrow.h"
+#include "core/StripInserts.h"
 #include <cmath>
 #include <cstdlib>
 #include <fstream>
@@ -180,4 +181,18 @@ TEST (rackmix190io_route_arrow_states)
     CHECK (routearrow::of (s, 0, 0) == State::out);
     CHECK (routearrow::of (s, 3, 99) == State::none);
     CHECK (routearrow::receives (s, 3) && routearrow::receives (s, 4) && ! routearrow::receives (s, 2));
+}
+
+// #154 part 2: the Mixer view that lists each strip's insert effects (a LYNX extra, off by default): its rows and hits
+TEST (rackmix190io_strip_inserts_layout)
+{
+    using namespace lynx;
+    CHECK (! stripinserts::defaultOn);
+    CHECK (stripinserts::shownIn (mixerlayout::Layout::wide) && stripinserts::shownIn (mixerlayout::Layout::extraLarge));
+    CHECK (! stripinserts::shownIn (mixerlayout::Layout::compact) && ! stripinserts::shownIn (mixerlayout::Layout::compactAlt));
+    // the list's height: rows that fit the strip, between 3 and 6, plus its margins
+    CHECK (stripinserts::rowsFor (300) == 3 && stripinserts::rowsFor (2000) == 6);
+    CHECK (stripinserts::height (stripinserts::rowsFor (900)) == stripinserts::rowsFor (900) * trackinserts::rowHeight + 4);
+    // hits as the track header list's (core/TrackInserts.h): effects, then "add" while a slot is free
+    CHECK (trackinserts::itemAt (2, 0, 4, 0) == 0 && trackinserts::itemAt (2, 0, 4, 2 * trackinserts::rowHeight) == trackinserts::addRow);
 }
