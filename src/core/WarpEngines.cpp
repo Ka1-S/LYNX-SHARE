@@ -155,9 +155,10 @@ void keepFormants (Channels& y, double sampleRate, double factor, double amount,
     const auto channels = y.size();
     const auto shift = std::pow (factor, std::clamp (amount, 0.0, 1.0)); // the envelope is read this much higher
     const auto lifter = std::min (formantLifter (envelope, sampleRate), bins - 2);
-    // the most the correction raises a bin (nepers): 6 dB when shifted up, 12 dB down [the W2 grid, REA_rodada190ik §2: the
-    // best mean of spectrum, frame and formant distance to Live's renders of 0 / 6 / 12 / 24 dB both ways]
-    const double maxBoost = (factor > 1.0 ? 6.0 : 12.0) / 8.685889638;
+    // the most the correction raises a bin (nepers): 6 dB when shifted up, 60 dB down [the W2 grids, REA_rodada190ik §2:
+    // shifted down, Live raises the faint top of the spectrum back to the formant-kept level — octave-down chords keep
+    // their highs (spectrum 6.2 → 5.4 dB vs Live); shifted up, a larger raise overshoots the first formant]
+    const double maxBoost = (factor > 1.0 ? 6.0 : 60.0) / 8.685889638;
 
     signalsmith::linear::RealFFT<float> fft (size);
     std::vector<float> window ((std::size_t) size), frame ((std::size_t) size), ceps ((std::size_t) size);
@@ -185,7 +186,7 @@ void keepFormants (Channels& y, double sampleRate, double factor, double amount,
     const auto scale = 1.0f / ((float) size * 1.5f); // (ifft unscaled; Hann² at a quarter hop sums to 1.5)
 
     // the smooth (liftered) cepstral envelope of `in` (log magnitudes, bins + 1 values) into `outEnv`
-    const auto smooth = [&] (const std::vector<double>& in, std::vector<double>& outEnv) {
+    const auto smoothWith = [&] (const std::vector<double>& in, std::vector<double>& outEnv, int lifter) {
         cs[0] = { (float) in[0], (float) in[(std::size_t) bins] };
         for (int k = 1; k < bins; ++k)
             cs[(std::size_t) k] = { (float) in[(std::size_t) k], 0.0f };
@@ -200,6 +201,18 @@ void keepFormants (Channels& y, double sampleRate, double factor, double amount,
         for (int k = 1; k < bins; ++k)
             outEnv[(std::size_t) k] = cs[(std::size_t) k].real();
     };
+    const auto smooth = [&] (const std::vector<double>& in, std::vector<double>& outEnv) { smoothWith (in, outEnv, lifter); };
+    std::vector<double> power ((std::size_t) bins + 1);
+    // Complex Pro's level after the correction (Live 12.4, W2 voice / vowel / chords at −12…+12 st, Formants 0 / 50 / 100,
+    // Envelope 32…256): a law of the effective shift u = semitones × Formants × h(Envelope) — −0.69·u^0.75 dB up,
+    // +0.016·u² dB down — blended (0.65) with the level the correction itself gives; only as far as the frame is pitched
+    const auto shiftSt = 12.0 * std::log2 (factor) * std::clamp (amount, 0.0, 1.0);
+    const auto envOctaves = std::log2 (std::clamp (envelope, 8.0, 256.0));
+    const auto envFactor = envOctaves <= 5.0 ? 0.0 : envOctaves <= 6.0 ? 0.6 * (envOctaves - 5.0)
+                         : envOctaves <= 7.0 ? 0.6 + 0.4 * (envOctaves - 6.0) : 1.0 + 0.2 * (envOctaves - 7.0);
+    const auto effective = shiftSt * envFactor;
+    const auto lawDb = effective >= 0.0 ? -0.69 * std::pow (effective, 0.75) : 0.016 * effective * effective;
+    constexpr double lawShare = 0.65;
 
     for (long start = -size + hop; start < frames; start += hop)
     {
@@ -226,10 +239,11 @@ void keepFormants (Channels& y, double sampleRate, double factor, double amount,
             peak = std::max (peak, logMag[(std::size_t) k]);
         }
         const auto silent = peak < 1e-7;
-        // how pitched the frame is: the highest normalised autocorrelation at a lag of 1…16.7 ms (60 Hz…1 kHz), from the
-        // power spectrum, the window's own autocorrelation divided out. Live corrects the formants of pitched sound only
-        // [W2: its drums render at +7 st with Formants 100 differs from Formants 0 by 0.03 dB, spectrum 0.78 dB; the
-        // voice by 1.4 dB / 3.9 dB]: noise and hits keep their transposed spectrum
+        // the frame's fundamental: the highest normalised autocorrelation at a lag of 1…16.7 ms (60 Hz…1 kHz), from the
+        // power spectrum, the window's own autocorrelation divided out. How tonal it is: the spectral flatness over
+        // 300 Hz…8 kHz (0.003 and below: tonal, also polyphonic; 0.03 and above: noise and hits). Live corrects the
+        // formants of tonal sound only [W2: its drums render at +7 st with Formants 100 differs from Formants 0 by 0.03 dB,
+        // spectrum 0.78 dB; the voice by 1.4 dB / 3.9 dB, the chords by 2.7 / 3.7]
         double weight = 0.0;
         int bestLag = lagMax;
         if (! silent)
@@ -246,11 +260,22 @@ void keepFormants (Channels& y, double sampleRate, double factor, double amount,
                         best = r;
                         bestLag = lag;
                     }
-            weight = std::clamp ((best - 0.4) / 0.35, 0.0, 1.0);
+            const auto k0 = std::max (1, (int) (300.0 * size / sampleRate)), k1 = std::min (bins, (int) (8000.0 * size / sampleRate));
+            double logSum = 0.0, sum = 0.0;
+            for (int k = k0; k < k1; ++k)
+            {
+                const auto p = logMag[(std::size_t) k] * logMag[(std::size_t) k] + 1e-20;
+                logSum += std::log (p);
+                sum += p;
+            }
+            const auto flat = std::exp (logSum / (k1 - k0)) / (sum / (k1 - k0));
+            weight = std::clamp ((std::log10 (std::max (flat, 1e-9)) - std::log10 (0.03)) / (std::log10 (0.003) - std::log10 (0.03)), 0.0, 1.0);
         }
         if (! silent && weight > 0.0)
         {
             const auto floorMag = peak * 1e-5;
+            for (int k = 0; k <= bins; ++k)
+                power[(std::size_t) k] = logMag[(std::size_t) k] * logMag[(std::size_t) k];
             for (auto& v : logMag)
                 v = std::log (std::max (v, floorMag));
             // the "true envelope": the cepstral envelope raised until it passes through the spectral peaks (Röbel & Rodet)
@@ -277,9 +302,24 @@ void keepFormants (Channels& y, double sampleRate, double factor, double amount,
                 const auto k0 = (int) from;
                 const auto f = from - k0;
                 const auto wanted = k0 >= bins ? env[(std::size_t) bins] : env[(std::size_t) k0] + (env[(std::size_t) k0 + 1] - env[(std::size_t) k0]) * f;
-                // (a raise is limited: Live's down-shifted vowel keeps its first formants but its harmonics above them stay
-                // 15…25 dB under the formant-kept spectrum, W2 cpro-5 / cpro-12)
                 target[(std::size_t) k] = std::exp (weight * std::clamp (wanted - env[(std::size_t) k], -4.6, maxBoost)); // (−40 dB…the limit)
+            }
+            // the level law (above)
+            {
+                double total = 0.0, now = 0.0;
+                for (int k = 0; k <= bins; ++k)
+                {
+                    total += power[(std::size_t) k];
+                    now += power[(std::size_t) k] * target[(std::size_t) k] * target[(std::size_t) k];
+                }
+                if (total > 0.0 && now > 0.0)
+                {
+                    const auto naturalDb = 10.0 * std::log10 (now / total);
+                    const auto wantDb = (1.0 - lawShare) * naturalDb + lawShare * lawDb * weight;
+                    const auto sc = std::clamp (std::pow (10.0, (wantDb - naturalDb) / 20.0), 0.125, 8.0);
+                    for (auto& g : target)
+                        g *= sc;
+                }
             }
             for (std::size_t c = 0; c < channels; ++c)
             {
@@ -310,6 +350,11 @@ double textureGrainPeriodMs (double grainMs) noexcept
 {
     // Live 12.4 (W1 flux-0 renders): one grain every Grain Size ms [the grains' source jumps sit exactly 65.0 ms apart at
     // Grain Size 65, both speeds]
+    // below 10 ms the period no longer follows Grain Size one to one [W1 Grain Size 2 renders: the comb of a 2 ms period
+    // is not Live's; 10 ms × (size / 10)^0.2, i.e. 7.2 ms at 2, matched them best of 0.1 / 0.2 / 0.35 — voice spectrum 7.7 →
+    // 3.4 dB; at 10 and up the W2 renders keep one grain per Grain Size ms]
+    if (grainMs < 10.0)
+        return 10.0 * std::pow (std::max (grainMs, 1.0) / 10.0, 0.2);
     return std::clamp (grainMs, 1.0, 263.0);
 }
 
