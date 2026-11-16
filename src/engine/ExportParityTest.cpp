@@ -680,6 +680,7 @@ juce::String AudioEngine::exportLiveSelfTest (const std::function<void (const ju
                                 : "ERROR " + errors.joinIntoString ("; ");
 
     auto options = parityOptions();
+    options.pluginWarmUp = true; // (the Export window's default: new instances wait for their plugins, lent ones only settle)
     auto exportSong = [&] (const Song& s, const exportopts::Options& o, const juce::String& name, int* lent) {
         const auto file = folder.getChildFile (name + ".wav");
         Audio a;
@@ -721,7 +722,9 @@ juce::String AudioEngine::exportLiveSelfTest (const std::function<void (const ju
         const auto errorsBefore = errors.size();
 
         // 1. new instances (the old way); its length is what playback records
+        const auto freshStart = juce::Time::getMillisecondCounterHiRes();
         const auto fresh = exportSong (song, options, "fresh", nullptr);
+        const auto freshMs = juce::Time::getMillisecondCounterHiRes() - freshStart;
         if (fresh.l.empty())
             continue;
 
@@ -739,7 +742,10 @@ juce::String AudioEngine::exportLiveSelfTest (const std::function<void (const ju
             live.timerCallback();
             juce::Thread::sleep (10);
         }
+        juce::StringArray aheadCounts; // render-ahead's engagements so far, after each playback
         auto playOnce = [&] (const juce::String& what) {
+          for (int attempt = 0;; ++attempt)
+          {
             Audio played;
             const auto started = live.startRealtimeBounce (0.0);
             if (started.isNotEmpty())
@@ -756,11 +762,19 @@ juce::String AudioEngine::exportLiveSelfTest (const std::function<void (const ju
                 juce::Thread::sleep (20);
                 live.pullRealtimeBounce (played.l, played.r);
             }
+            const auto dropouts = live.bounceDropouts();
             live.finishRealtimeBounce();
+            if (live.rackProcessor != nullptr) // (render-ahead may engage in the middle: its load probe)
+                aheadCounts.add (what + " " + juce::String ((int) live.rackProcessor->renderAheadStats().engagements.load()));
             for (int i = 0; i < 10; ++i) // (the engine's timer after a stop)
             {
                 live.timerCallback();
                 juce::Thread::sleep (5);
+            }
+            if (dropouts > 0 && attempt < 3) // (the stand-in device's thread starved by the machine's load: again)
+            {
+                notes.add (name + ", " + what + ": " + juce::String (dropouts) + " dropout(s), played again");
+                continue;
             }
             if ((std::int64_t) played.l.size() < wanted)
             {
@@ -772,6 +786,39 @@ juce::String AudioEngine::exportLiveSelfTest (const std::function<void (const ju
             played.l.resize (fresh.l.size());
             played.r.resize (fresh.r.size());
             return played;
+          }
+        };
+        // where two renders part (the first 10 ms window above -90 dBFS), and how far apart their levels are: the
+        // largest difference of 10 ms RMS windows (a plugin that does not repeat its waveform, Surge XT's oscillators'
+        // phases, still repeats its level)
+        auto apart = [] (const Audio& a, const Audio& b) {
+            const auto n = juce::jmin (a.l.size(), b.l.size());
+            for (std::size_t w = 0; w < n; w += 480)
+            {
+                float m = 0.0f;
+                for (std::size_t i = w; i < juce::jmin (n, w + 480); ++i)
+                    m = juce::jmax (m, std::abs (a.l[i] - b.l[i]), std::abs (a.r[i] - b.r[i]));
+                if (m >= 3.16e-5f)
+                    return "apart from " + juce::String ((double) w / ParityDevice::rate, 2) + " s";
+            }
+            return juce::String ("never apart");
+        };
+        auto levels = [] (const Audio& a, const Audio& b) {
+            const auto n = juce::jmin (a.l.size(), b.l.size());
+            float worst = 0.0f;
+            for (std::size_t w = 0; w < n; w += 480)
+            {
+                double ea = 0.0, eb = 0.0;
+                const auto end = juce::jmin (n, w + 480);
+                for (std::size_t i = w; i < end; ++i)
+                {
+                    ea += (double) a.l[i] * a.l[i] + (double) a.r[i] * a.r[i];
+                    eb += (double) b.l[i] * b.l[i] + (double) b.r[i] * b.r[i];
+                }
+                const auto count = (double) (2 * (end - w));
+                worst = juce::jmax (worst, (float) std::abs (std::sqrt (ea / count) - std::sqrt (eb / count)));
+            }
+            return worst;
         };
         auto hostedNow = [&]() -> juce::AudioPluginInstance* {
             auto* p = dynamic_cast<PluginInstrument*> (live.getChannelInstrument (3).get());
@@ -786,13 +833,16 @@ juce::String AudioEngine::exportLiveSelfTest (const std::function<void (const ju
         // 3. the export with the hold (the Export window's)
         int lent = 0;
         Audio held;
+        double heldMs = 0.0;
         {
             auto hold = LiveExportHold::open (live);
             if (hold == nullptr)
                 errors.add (name + ": the live engine could not be held");
             else if (! live.heldForExport())
                 errors.add (name + ": the hold is open but the engine is not held");
+            const auto heldStart = juce::Time::getMillisecondCounterHiRes();
             held = exportSong (song, options, "held", &lent);
+            heldMs = juce::Time::getMillisecondCounterHiRes() - heldStart;
             if (hold != nullptr && lent < 1)
                 errors.add (name + ": the export did not take the live plugin (" + hold->lastRefusal() + ")");
         } // (4. the hold given back)
@@ -840,14 +890,23 @@ juce::String AudioEngine::exportLiveSelfTest (const std::function<void (const ju
         const auto playVsPlay = maxDiff (second, first, n);
         const auto freshVsPlay = maxDiff (fresh, first, n);
         const auto stemSame = maxDiff (stemHeld, stemFresh, juce::jmax (stemHeld.l.size(), stemFresh.l.size()));
+        const auto heldLevels = levels (held, first), playLevels = levels (second, first);
         // (a plugin that does not repeat itself from one playback to the next is held to that much)
         const auto allowed = juce::jmax (3.16e-5f, playVsPlay * 2.0f);
         say (name + ": export with the live instance vs playback " + db (heldVsPlay) + " (" + juce::String (lent) + " plugin(s) lent), playback after it vs before "
-             + db (playVsPlay) + ", export with a new instance vs playback " + db (freshVsPlay) + "; insert 4's stem with / without the hold "
+             + db (playVsPlay) + " (" + apart (second, first) + "), export with a new instance vs playback " + db (freshVsPlay)
+             + "; 10 ms levels: export vs playback " + db (heldLevels) + ", playback vs playback " + db (playLevels) + "; insert 4's stem with / without the hold "
              + db (stemSame) + " (" + juce::String (stemLent) + " lent); at 44.1 kHz: " + juce::String (otherLent) + " lent, the plugin at "
-             + juce::String (rateDuring) + " Hz during the export's hold, " + juce::String (rateAfter) + " Hz after, peak " + db (peakOf (other)));
+             + juce::String (rateDuring) + " Hz during the export's hold, " + juce::String (rateAfter) + " Hz after, peak " + db (peakOf (other))
+             + "; render-ahead engagements after each playback: " + aheadCounts.joinIntoString (", ")
+             + "; export time with new instances " + juce::String (freshMs, 0) + " ms, with the live ones " + juce::String (heldMs, 0) + " ms");
         if (heldVsPlay >= allowed)
             errors.add (name + ": the export with the live instance differs from playback by " + db (heldVsPlay));
+        // (a plugin that repeats itself: the export left nothing behind that playback hears afterwards)
+        if (heldVsPlay < 3.16e-5f && playVsPlay >= 3.16e-5f)
+            errors.add (name + ": playback after the export differs from playback before it by " + db (playVsPlay) + " (" + apart (second, first) + ")");
+        if (heldLevels >= juce::jmax (3.16e-5f, playLevels * 2.0f))
+            errors.add (name + ": the export's levels differ from playback's by " + db (heldLevels));
         if (playVsPlay >= 3.16e-5f && heldVsPlay >= 3.16e-5f)
             notes.add (name + " does not repeat itself (two playbacks differ by " + db (playVsPlay) + ")");
         if (stemHeld.l.size() != stemFresh.l.size() || stemSame > 0.0f)
