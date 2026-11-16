@@ -454,16 +454,11 @@ struct Engine::Impl
         v.gate = true;
         v.age = ++clock;
         // FL's channel porta (rollup 0.1.30, as round 190ix's Tetra): the rack starts the note `fromCents` from its own
-        // pitch and puts that in the note's cents, which Helix hears only through the matrix (Live's Note PB): the voice
-        // starts there and glides to its own pitch (HostSlide::pendingGlide); a slide note moves it later (slideTo). The
-        // channel's live pitch moves every voice through pitchOffset, so the slide does not track it.
+        // pitch (the note's cents hold it) and the voice glides back to its own pitch (HostSlide::pendingGlide); a slide
+        // note moves it later (slideTo). The channel's live pitch moves every voice through pitchOffset, so the slide does
+        // not track it (NaN reference).
         v.host = {};
-        if (auto& g = HostSlide::pendingGlide(); g.samples > 0.0f)
-        {
-            v.host.cents = g.fromCents;
-            v.host.start (0.0f, g.samples);
-            g.taken = true;
-        }
+        v.host.anchor (NAN);
         if (legato && v.active)
             return; // (mono legato: the envelopes go on)
         v.active = true;
