@@ -858,6 +858,7 @@ public:
         if (session->isDead() || shared == nullptr || frames <= 0)
         {
             buffer.clear();
+            midi.clear(); // (rollup 0.1.30: nothing came out)
             return;
         }
 
@@ -901,6 +902,7 @@ public:
         if (! session->runBlock (isNonRealtime() ? 30000 : 500))
         {
             buffer.clear();
+            midi.clear(); // (rollup 0.1.30: nothing came out)
             return;
         }
 
@@ -908,6 +910,12 @@ public:
             std::memcpy (buffer.getWritePointer (c), shared->audio[c], sizeof (float) * (std::size_t) frames);
         for (int c = channels; c < buffer.getNumChannels(); ++c)
             buffer.clear (c, 0, frames);
+
+        // rollup 0.1.30: the buffer holds the plugin's own output afterwards, as in LYNX's process (SharedBlock::midiOut)
+        midi.clear();
+        for (int i = 0; i < std::min ((int) shared->midiOutCount, SharedBlock::maxMidi); ++i)
+            if (const auto& e = shared->midiOut[i]; e.size >= 1 && e.size <= 3)
+                midi.addEvent (e.bytes, e.size, juce::jlimit (0, frames - 1, (int) e.offset));
 
         for (int i = 0; i < std::min (shared->paramOutCount, SharedBlock::maxParams); ++i)
             if (const auto k = shared->paramsOut[i].index; k >= 0 && k < (int) remoteParams.size())

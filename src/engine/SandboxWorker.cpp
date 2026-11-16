@@ -264,6 +264,18 @@ private:
             plugin->processBlock (buffer, midiBuffer);
         }
         juce::lynxTimedParamCount = 0;
+        // (rollup 0.1.30) what the plugin sent out, for the parent's buffer
+        int outCount = 0;
+        if (frames > 0)
+            for (const auto m : midiBuffer)
+                if (m.numBytes >= 1 && m.numBytes <= 3 && outCount < SharedBlock::maxMidi)
+                {
+                    auto& e = shared->midiOut[outCount++];
+                    e.offset = juce::jlimit (0, frames - 1, m.samplePosition);
+                    e.size = (std::uint8_t) m.numBytes;
+                    std::memcpy (e.bytes, m.data, (std::size_t) m.numBytes);
+                }
+        shared->midiOutCount = outCount;
 
         shared->paramOutCount = changed.drain (shared->paramsOut, SharedBlock::maxParams);
         shared->latency = plugin->getLatencySamples();

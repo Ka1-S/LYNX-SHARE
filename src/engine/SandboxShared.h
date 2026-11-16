@@ -97,6 +97,12 @@ struct SharedBlock
     std::int32_t timedCount;
     Param timed[maxTimed];
     std::int32_t timedOffsets[maxTimed];
+    // rollup 0.1.30: the MIDI the plugin sent out of this block (what its MidiBuffer holds after processBlock), so the
+    // parent's buffer holds the plugin's output as in LYNX's own process: an arpeggiator's notes for the note lights and
+    // the wrapper's Output port, which also reaches hardware MIDI outputs (round 190jl). Before, the parent's buffer
+    // still held what went in.
+    std::int32_t midiOutCount;
+    Midi midiOut[maxMidi];
 };
 // one layout for the 64-bit LYNX and the 32-bit bridge (x86 MinGW aligns doubles to 8 as x64 does; alignas pins it)
 static_assert (offsetof (SharedBlock, transport) == 40 && sizeof (SharedBlock::Transport) == 64, "SharedBlock layout");

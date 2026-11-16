@@ -198,6 +198,25 @@ int runSandboxGroupTest (const juce::String& pluginPath, const juce::String& rep
                    peakC = runBlocks (*c, fc, 40, block, rate), peakO = runBlocks (*own, fo, 40, block, rate),
                    peakL = runBlocks (*local, fl, 40, block, rate);
         report << "peaks before a=" << peakA << " b=" << peakB << " c=" << peakC << " own=" << peakO << " local=" << peakL << "\n";
+        // rollup 0.1.30: after a block the buffer holds what the plugin sent out, in a separate process as in LYNX's own
+        // (SharedBlock::midiOut; before, the sandboxed buffer kept what went in whatever the plugin did with it)
+        {
+            auto midiAfter = [&] (juce::AudioPluginInstance& p) {
+                juce::AudioBuffer<float> buffer (juce::jmax (2, p.getTotalNumInputChannels(), p.getTotalNumOutputChannels()), block);
+                buffer.clear();
+                juce::MidiBuffer midi;
+                midi.addEvent (juce::MidiMessage::noteOn (2, 61, (juce::uint8) 90), 17);
+                midi.addEvent (juce::MidiMessage::controllerEvent (2, 7, 100), 40);
+                p.processBlock (buffer, midi);
+                juce::String text;
+                for (const auto m : midi)
+                    text << m.samplePosition << ":" << juce::String::toHexString (m.data, m.numBytes) << " ";
+                return text.trim();
+            };
+            const auto inProcess = midiAfter (*local), separate = midiAfter (*a);
+            report << "midi after a block: in LYNX's process [" << inProcess << "], separate [" << separate << "]\n";
+            check (inProcess == separate, "a separate process gives back the plugin's MIDI output as LYNX's process does");
+        }
         check (peakA > 1.0e-4f && peakB > 1.0e-4f && peakC > 1.0e-4f && peakO > 1.0e-4f && peakL > 1.0e-4f, "all five play");
 
         // group A's process crashes (the worker aborts, as a crashing plugin does)
