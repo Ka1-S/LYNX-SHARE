@@ -130,6 +130,7 @@ TEST (echo190dl_classic_law_renders_as_the_base_commit_did)
     {
         auto slot = makeEffectSlot (EffectKind::echoform);
         slot.params[e::engineLaw] = 0.0f;
+        slot.params[(std::size_t) e::revision] = 0.0f; // round 190is: a project saved before also keeps the voicings' revision 0
         for (int k = 0; k < 3; ++k)
             if (c.idx[k] >= 0)
                 slot.params[(std::size_t) c.idx[k]] = c.val[k];

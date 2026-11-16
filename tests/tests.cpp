@@ -17804,3 +17804,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "U190heLinkTests.inc" // round 190he (issue #152 item 2: linkable LYNX instruments, knobs that follow links)
 #include "PluginDrop190hfTests.inc" // issue #152 point 6: plugins dropped on the tracks (FL and Live layouts)
 #include "Rollup028Tests.inc" // round 190fv: semantic interactions of the 0.1.28 rollup
+#include "Parity190isTests.inc" // round 190is: Echoform voicings revision 1, the Soundtoys echoes' own defaults
