@@ -10629,3 +10629,4 @@ countries: fr be ch ca lu
 "Activate Clip" = "Activer le clip"
 "[0] deactivates / activates it" = "[0] le désactive / l'active"
 "Region not supported by this track" = "Région non prise en charge par cette piste"
+"Save changes to {0}?" = "Enregistrer les modifications de {0} ?"

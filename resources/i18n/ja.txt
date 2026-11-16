@@ -10629,3 +10629,4 @@ countries: jp
 "Activate Clip" = "クリップを有効化"
 "[0] deactivates / activates it" = "[0] 無効化 / 有効化"
 "Region not supported by this track" = "このトラックではリージョンを扱えません"
+"Save changes to {0}?" = "{0} への変更を保存しますか？"

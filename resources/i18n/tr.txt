@@ -10629,3 +10629,4 @@ countries: tr
 "Activate Clip" = "Klibi etkinleştir"
 "[0] deactivates / activates it" = "[0] devre dışı bırakır / etkinleştirir"
 "Region not supported by this track" = "Bölge bu parça tarafından desteklenmiyor"
+"Save changes to {0}?" = "{0} değişiklikleri kaydedilsin mi?"

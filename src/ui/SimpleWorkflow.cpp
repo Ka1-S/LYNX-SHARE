@@ -10,6 +10,7 @@
 #include "engine/AudioEngine.h"
 #include "engine/MidiFileIo.h"
 #include "ui/FileChoosers.h"
+#include "ui/DialogFrame.h"
 #include "ui/FinishDock.h"
 #include "ui/FirstSongTour.h"
 #include "ui/I18n.h"
@@ -221,8 +222,7 @@ public:
         setWantsKeyboardFocus (true);
         getProperties().set ("lynxKeepsKeys", true); // (round 190fc: its tiles' keys while it is up)
         title.setText (tr ("New track"), juce::dontSendNotification);
-        title.setFont (theme::font (theme::type::display, true));
-        title.setJustificationType (juce::Justification::centred);
+        ui::dialog::styleTitle (title); // (round 190jp: the one dialog title, design190ia SG-20)
         footer.setText (tr ("Each track gets its own channel and mixer track."), juce::dontSendNotification);
         footer.setFont (theme::font (theme::type::small));
         footer.setColour (juce::Label::textColourId, theme::colour::textSecondary);
@@ -291,8 +291,7 @@ public:
 
         // the starter-beat page
         starterTitle.setText (tr ("Starter beat"), juce::dontSendNotification);
-        starterTitle.setFont (theme::font (theme::type::display, true));
-        starterTitle.setJustificationType (juce::Justification::centred);
+        ui::dialog::styleTitle (starterTitle);
         back.setButtonText (juce::String::fromUTF8 ("\xe2\x80\xb9 ") + tr ("Back"));
         back.onClick = [this] { showTilesPage(); };
         useTempo.setButtonText (tr ("Use the suggested tempo"));
@@ -339,27 +338,18 @@ public:
 
     void paint (juce::Graphics& g) override
     {
-        g.fillAll (theme::colour::bg0.withAlpha (0.72f)); // the timeline stays faintly visible behind
-        const auto c = card().toFloat();
-        g.setColour (juce::Colours::black.withAlpha (0.35f));
-        g.fillRoundedRectangle (c.translated (0.0f, 4.0f).expanded (2.0f), theme::radius::lg + 2.0f);
-        g.setColour (theme::colour::bg2);
-        g.fillRoundedRectangle (c, theme::radius::lg);
-        g.setColour (theme::colour::borderStrong);
-        g.drawRoundedRectangle (c.reduced (0.5f), theme::radius::lg, 1.0f);
-        g.setColour (theme::colour::accent);
-        g.fillRect (c.getX() + 24.0f, c.getY() + 52.0f, c.getWidth() - 48.0f, 1.0f);
+        ui::dialog::paintDim (g, getLocalBounds()); // the timeline stays faintly visible behind
+        ui::dialog::paintFrame (g, card().toFloat(), ui::dialog::Kind::overlay); // (round 190jp: the one dialog frame)
     }
 
     void resized() override
     {
-        auto c = card().reduced (20, 14);
-        auto top = c.removeFromTop (34);
+        auto top = ui::dialog::titleRow (card()).reduced (10, 0);
         close.setBounds (top.removeFromRight (28).withSizeKeepingCentre (28, 28));
         back.setBounds (top.removeFromLeft (90).withSizeKeepingCentre (90, 28));
-        title.setBounds (top);
-        starterTitle.setBounds (top);
-        c.removeFromTop (16);
+        title.setBounds (ui::dialog::titleRow (card()).reduced (100, 0)); // (centred on the card: Back and the X stay clear)
+        starterTitle.setBounds (title.getBounds());
+        auto c = ui::dialog::bodyOf (card()).reduced (20, 14);
         footer.setBounds (c.removeFromBottom (20));
         c.removeFromBottom (6);
         {
@@ -397,7 +387,7 @@ public:
         bassButton.setBounds (sw);
 
         // the starter-beat page: the tempo switch, then the starters in three columns (a click adds one)
-        auto s = card().reduced (20, 14).withTrimmedTop (50);
+        auto s = ui::dialog::bodyOf (card()).reduced (20, 14);
         useTempo.setBounds (s.removeFromTop (28));
         s.removeFromTop (10);
         const auto columns = 3, buttonH = starterRowHeight;

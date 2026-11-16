@@ -106,6 +106,7 @@
 #include "core/ClipLauncher.h"
 #include "ui/ClipGridComponent.h"
 #include "ui/Dialogs.h"
+#include "ui/DialogFrame.h"
 #include "ui/EventEditor.h"
 #include "ui/EditorTools.h"
 #include "ui/AudioEditor.h"
@@ -6713,11 +6714,14 @@ void MainComponent::updateTitle()
 
 std::unique_ptr<juce::AlertWindow> MainComponent::makeConfirmDiscardWindow()
 {
-    auto window = std::make_unique<juce::AlertWindow> (tr ("Save changes?"), tr ("The project has unsaved changes."),
-                                                       juce::MessageBoxIconType::QuestionIcon);
-    window->addButton (tr ("Save"), 1, juce::KeyPress (juce::KeyPress::returnKey));
-    window->addButton (tr ("Discard"), 2);
-    window->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+    // round 190jp (design190ia FW-17, FL's confirm): "Save changes to <file>?" with the name in the highlight colour, the
+    // default button in the accent, an underlined letter on each button (S / D / C), FL's Y / N for Save / Discard
+    const auto name = currentFile.existsAsFile() ? currentFile.getFileName() : projectName.isNotEmpty() ? projectName : tr ("Untitled");
+    auto window = std::make_unique<ui::dialog::Dialog> (tr ("Confirm"), 400, juce::MessageBoxIconType::QuestionIcon);
+    window->setSentence (ui::dialog::sentence (tr ("Save changes to {0}?"), name, theme::font (theme::type::title)));
+    window->addDialogButton (tr ("Save"), 1, true, false, "y");
+    window->addDialogButton (tr ("Discard"), 2, false, false, "n");
+    window->addDialogButton (tr ("Cancel"), 0, false, true);
     return window;
 }
 
@@ -9254,43 +9258,69 @@ void MainComponent::startSupportNote (bool quietRun)
 
 std::unique_ptr<juce::AlertWindow> MainComponent::makeAboutWindow()
 {
-    struct Logo final : juce::Component
+    // round 190jp (design190ia SG-22): LYNX's own layout, every block on the dialog's centre line (JUCE's AlertWindow put
+    // the logo 56 px left of it and wrapped the donation line to a lone word); the version on a quiet line under the
+    // title, the logo 128 px, the texts in balanced centred lines; OK is the accent default, Support the secondary
+    static constexpr int width = 432, logoSize = 128; // (a local class can't have static members)
+    struct Body final : juce::Component
     {
-        Logo() { setSize (300, 150); }
+        Body()
+        {
+            const auto quiet = theme::colour::textSecondary;
+            add (version, tr ("Version {0}", { JUCE_APPLICATION_VERSION_STRING }), theme::font (theme::type::body), quiet);
+            add (about,
+                 tr ("Lightweight C++/JUCE DAW: FL Studio-style patterns and Ableton Live-style clips.\n"
+                     "Independent implementation: no Image-Line or Ableton code was copied."),
+                 theme::font (theme::type::body), theme::colour::textPrimary);
+            add (credits,
+                 tr ("Logo by {0}", { "w3teal" }) // the community member who made it
+                     // round 190gl: Ableton Link's credit (GPL-2.0-or-later; THIRD_PARTY.md lists every component)
+                     + "\n" + tr ("Ableton Link by Ableton AG (GPL 2.0 or later). Every open-source component and its licence: THIRD_PARTY.md"),
+                 theme::font (theme::type::small), quiet);
+            // round 190fq: one short line under the logo, and a button to the Support window (Help › Support LYNX SHARE...)
+            add (support, tr ("LYNX SHARE is free and open source. Donations are optional and help it keep going."), theme::font (theme::type::body), quiet);
+            setSize (width, top (version) + 14 + logoSize + 14 + height (about) + 10 + height (credits) + 14 + height (support));
+        }
+        void add (juce::TextLayout& l, const juce::String& text, const juce::Font& font, juce::Colour colour)
+        {
+            juce::AttributedString s;
+            s.append (text, font, colour);
+            s.setJustification (juce::Justification::centredTop);
+            s.setWordWrap (juce::AttributedString::byWord);
+            s.setLineSpacing (2.0f);
+            l.createLayoutWithBalancedLineLengths (s, (float) width);
+        }
+        static int height (const juce::TextLayout& l) { return (int) std::ceil (l.getHeight()); }
+        static int top (const juce::TextLayout& l) { return height (l); }
         void paint (juce::Graphics& g) override
         {
-            g.drawImageWithin (logoImage(), 0, 0, getWidth(), getHeight(), juce::RectanglePlacement::centred);
+            auto y = 0.0f;
+            const auto block = [&] (const juce::TextLayout& l, float gapAfter) {
+                l.draw (g, { 0.0f, y, (float) width, l.getHeight() });
+                y += (float) height (l) + gapAfter;
+            };
+            block (version, 14.0f);
+            g.drawImageWithin (logoImage(), (width - logoSize) / 2, (int) y, logoSize, logoSize, juce::RectanglePlacement::centred);
+            y += (float) logoSize + 14.0f;
+            block (about, 10.0f);
+            block (credits, 14.0f);
+            block (support, 0.0f);
         }
+        juce::TextLayout version, about, credits, support;
     };
-    struct About final : juce::AlertWindow
+    struct About final : ui::dialog::Dialog
     {
-        About()
-            : juce::AlertWindow ("LYNX SHARE " JUCE_APPLICATION_VERSION_STRING,
-                                 tr ("Lightweight C++/JUCE DAW: FL Studio-style patterns and Ableton Live-style clips.\n"
-                                     "Independent implementation: no Image-Line or Ableton code was copied.")
-                                     + "\n\n" + tr ("Logo by {0}", { "w3teal" }) // the community member who made it
-                                     // round 190gl: Ableton Link's credit (GPL-2.0-or-later; THIRD_PARTY.md lists every component)
-                                     + "\n" + tr ("Ableton Link by Ableton AG (GPL 2.0 or later). Every open-source component and its licence: THIRD_PARTY.md"),
-                                 juce::MessageBoxIconType::NoIcon)
+        About() : ui::dialog::Dialog ("LYNX SHARE", width + 2 * ui::dialog::padding)
         {
-            addCustomComponent (&logo);
-            // round 190fq: one short line under the logo, and a button to the Support window (Help › Support LYNX SHARE...)
-            supportLine.setText (tr ("LYNX SHARE is free and open source. Donations are optional and help it keep going."), juce::dontSendNotification);
-            supportLine.setJustificationType (juce::Justification::centred);
-            supportLine.setFont (theme::font (theme::type::body));
-            supportLine.setColour (juce::Label::textColourId, theme::colour::textSecondary);
-            supportLine.setMinimumHorizontalScale (1.0f);
-            supportLine.setSize (360, 40);
-            addCustomComponent (&supportLine);
+            setComponentID ("about.window");
+            addContent (body);
+            setButtonsCentred (true);
         }
-        Logo logo;
-        juce::Label supportLine;
+        Body body;
     };
     auto window = std::make_unique<About>();
-    window->addButton (tr ("Support LYNX SHARE"), 2);
-    if (auto* supportButton = window->getButton (0))
-        supportButton->setComponentID ("about.support");
-    window->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+    window->addDialogButton (tr ("Support LYNX SHARE"), 2).setComponentID ("about.support");
+    window->addDialogButton (tr ("OK"), 1, true);
     return std::unique_ptr<juce::AlertWindow> (window.release());
 }
 

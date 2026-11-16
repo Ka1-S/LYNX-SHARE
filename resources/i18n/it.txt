@@ -10629,3 +10629,4 @@ countries: it ch sm
 "Activate Clip" = "Attiva clip"
 "[0] deactivates / activates it" = "[0] la disattiva / attiva"
 "Region not supported by this track" = "Regione non supportata da questa traccia"
+"Save changes to {0}?" = "Salvare le modifiche a {0}?"

@@ -166,6 +166,7 @@
 #include "core/Sfz.h"
 #include "core/Slicex.h"
 #include "ui/Dialogs.h"
+#include "ui/DialogFrame.h"
 #include "ui/FileChoosers.h"
 #include "ui/TrackIcons.h"
 #include "core/RackOps.h"
@@ -23066,6 +23067,8 @@ private:
             frame.removeChildComponent (&w);
         };
         const auto buttonTexts = [] (juce::AlertWindow& w) {
+            if (auto* d = dynamic_cast<lynx::ui::dialog::Dialog*> (&w)) // (round 190jp: LYNX's dialog, its own buttons)
+                return d->dialogButtonTexts();
             juce::StringArray texts;
             for (int b = 0; b < w.getNumButtons(); ++b)
                 if (auto* button = w.getButton (b))
@@ -23118,7 +23121,8 @@ private:
                 const auto texts = buttonTexts (*w);
                 check ("Support window: Donate on Ko-fi, Close", texts == juce::StringArray { lynx::tr ("Donate on Ko-fi"), lynx::tr ("Close") });
                 check ("Support window: Donate on Ko-fi points at the constant",
-                       w->getButton (0) != nullptr && w->getButton (0)->getTooltip() == juce::String (lynx::links::donate));
+                       dynamic_cast<lynx::ui::dialog::Dialog*> (w.get()) != nullptr
+                           && static_cast<lynx::ui::dialog::Dialog*> (w.get())->dialogButton (0)->getTooltip() == juce::String (lynx::links::donate));
                 check ("Support window title", w->getName() == lynx::tr ("Support LYNX SHARE"));
                 saveAlert (*w, "support");
             }

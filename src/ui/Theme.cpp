@@ -2032,7 +2032,7 @@ juce::Font LookAndFeel::getAlertWindowFont() { return uiFont (type::body); }
 void LookAndFeel::drawAlertBox (juce::Graphics& g, juce::AlertWindow& alert, const juce::Rectangle<int>& textArea, juce::TextLayout& textLayout)
 {
     auto bounds = alert.getLocalBounds().toFloat();
-    g.fillAll (bg3);
+    g.fillAll (bg2); // (round 190jp, design190ia SG-20: the one dialog body colour, as ui/DialogFrame.h)
     g.setColour (borderStrong);
     g.drawRect (bounds, 1.0f);
     g.setColour (accent);
