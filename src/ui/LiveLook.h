@@ -54,7 +54,8 @@ inline void drawKnob (juce::Graphics& g, juce::Rectangle<float> bounds, float va
     if (home > 0.001f)
     {
         const auto r = radius + thickness * 0.5f + 1.0f; // (its tip just off the ring, pointing at the centre)
-        const auto a = from, tip = juce::Point<float> (centre.x + std::sin (a) * r, centre.y - std::cos (a) * r);
+        const auto a = from;
+        const auto tip = juce::Point<float> (centre.x + std::sin (a) * r, centre.y - std::cos (a) * r);
         const auto base = juce::Point<float> (centre.x + std::sin (a) * (r + 3.5f), centre.y - std::cos (a) * (r + 3.5f));
         const auto side = juce::Point<float> (std::cos (a) * 3.5f, std::sin (a) * 3.5f);
         juce::Path t;
