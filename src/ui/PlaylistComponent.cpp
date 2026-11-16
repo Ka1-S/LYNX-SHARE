@@ -2156,6 +2156,18 @@ void PlaylistComponent::paint (juce::Graphics& g)
         // they write; "/" before a tempo the song glides into. The tag being dragged is drawn where it would land.
         {
             const auto marks = tempomarkers::list (song);
+            // round 190im: in the Pattern layout's FL look the tags take the tempo clip's own header colour and ink, as
+            // round 190ig draws that clip (FL: its Automation Clip channel's colour); the other looks keep the automation colour
+            auto tagFill = colour::automation, tagInk = colour::bg0;
+            if (const auto a = tempomarkers::automationIndex (song); ! marks.empty() && a >= 0 && flClipLook())
+            {
+                const auto* clip = tempomarkers::clipOf (song, a);
+                const auto look = theme::clipBody (juce::Colour (song.automations[(std::size_t) a].colour),
+                                                   clip != nullptr ? trackColourIn (song, clip->track) : juce::Colour(), ClipKind::automation,
+                                                   theme::ClipStyle::flTint);
+                tagFill = look.headerTop.interpolatedWith (look.headerBottom, 0.5f);
+                tagInk = look.ink;
+            }
             for (int i = 0; i < (int) marks.size(); ++i)
             {
                 const auto& m = marks[(std::size_t) i];
@@ -2165,10 +2177,10 @@ void PlaylistComponent::paint (juce::Graphics& g)
                 const auto label = (m.glide ? juce::String ("/ ") : juce::String()) + juce::String (tempomarkers::tempoText (m.bpm));
                 const auto width = (float) juce::GlyphArrangement::getStringWidthInt (g.getCurrentFont(), label) + 8.0f;
                 const auto tag = juce::Rectangle<float> (x, (float) timelineHeight - 11.0f, width, 11.0f);
-                g.setColour (colour::automation);
+                g.setColour (tagFill);
                 g.fillRoundedRectangle (tag, 2.0f);
                 g.drawVerticalLine ((int) x, 0.0f, (float) timelineHeight);
-                g.setColour (colour::bg0);
+                g.setColour (tagInk);
                 textcache::drawText (g, label, tag.reduced (3.0f, 0.0f), juce::Justification::centredLeft, false);
             }
         }
