@@ -506,9 +506,20 @@ PresetBar::PresetBar (juce::AudioPluginInstance& p, std::function<void()> change
     }
 }
 
+void PresetBar::setTitleLook (bool shouldBe)
+{
+    titleLook = shouldBe;
+    prev.setVisible (! titleLook);
+    next.setVisible (! titleLook);
+    resized();
+    repaint();
+}
+
 void PresetBar::resized()
 {
     auto r = getLocalBounds();
+    if (titleLook)
+        return; // (painted and hit-tested by areas: the name, then ◀ ▶ at the right)
     prev.setBounds (r.removeFromLeft (24));
     r.removeFromLeft (2);
     next.setBounds (r.removeFromLeft (24));
@@ -517,6 +528,26 @@ void PresetBar::resized()
 void PresetBar::paint (juce::Graphics& g)
 {
     using namespace theme;
+    if (titleLook)
+    {
+        auto r = getLocalBounds();
+        const auto nextArea = r.removeFromRight (16), prevArea = r.removeFromRight (16);
+        const auto mouse = getMouseXYRelative();
+        const auto over = isMouseOver();
+        g.setColour (over && r.contains (mouse) ? colour::textPrimary : colour::textSecondary);
+        g.setFont (font (type::small));
+        g.drawText (current.isEmpty() ? tr ("Presets") : current, r.withTrimmedRight (4), juce::Justification::centredRight, true);
+        for (const auto left : { true, false })
+        {
+            const auto a = (left ? prevArea : nextArea).toFloat();
+            juce::Path p;
+            p.addTriangle (left ? 3.0f : -3.0f, -4.5f, left ? 3.0f : -3.0f, 4.5f, left ? -3.0f : 3.0f, 0.0f);
+            p.applyTransform (juce::AffineTransform::translation (a.getCentreX(), a.getCentreY()));
+            g.setColour (over && a.contains (mouse.toFloat()) ? colour::accent : colour::textPrimary);
+            g.fillPath (p);
+        }
+        return;
+    }
     auto r = getLocalBounds().withTrimmedLeft (54).toFloat();
     g.setColour (isMouseOver() ? colour::bg5 : colour::bg4);
     g.fillRoundedRectangle (r, radius::md);
@@ -533,7 +564,19 @@ void PresetBar::paint (juce::Graphics& g)
 
 void PresetBar::mouseUp (const juce::MouseEvent& e)
 {
-    if (e.x >= 54 && ! e.mouseWasDraggedSinceMouseDown())
+    if (e.mouseWasDraggedSinceMouseDown())
+        return;
+    if (titleLook)
+    {
+        if (e.x >= getWidth() - 16)
+            step (1);
+        else if (e.x >= getWidth() - 32)
+            step (-1);
+        else
+            showMenu();
+        return;
+    }
+    if (e.x >= 54)
         showMenu();
 }
 

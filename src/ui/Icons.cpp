@@ -297,6 +297,20 @@ Shape make (Icon icon)
         }
 
         // --- content ---
+        case Icon::envelope: // an ADSR line on a base line (attack up, decay, sustain, release)
+            polyline (st, { { 3.5f, 18.5f }, { 8.0f, 5.5f }, { 11.5f, 11.0f }, { 15.5f, 11.0f }, { 20.5f, 18.5f } });
+            line (st, 3.5f, 20.0f, 20.5f, 20.0f);
+            break;
+        case Icon::wrench: // an open-end wrench, head at the upper right
+        {
+            juce::Path w;
+            w.startNewSubPath (5.0f, 19.0f);
+            w.lineTo (12.5f, 11.5f);
+            st.addPath (w);
+            // the head: a ring open towards the upper right (the jaws)
+            st.addCentredArc (15.5f, 8.5f, 4.5f, 4.5f, 0.0f, pi * 0.55f, pi * 1.95f, true);
+            break;
+        }
         case Icon::audioFile: // a short waveform
         {
             const float heights[] = { 5.0f, 11.0f, 16.0f, 8.0f, 12.0f, 4.0f };

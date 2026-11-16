@@ -55,6 +55,11 @@ public:
     void resized() override;
     void paint (juce::Graphics&) override;
     void mouseUp (const juce::MouseEvent&) override;
+    void mouseMove (const juce::MouseEvent&) override
+    {
+        if (titleLook)
+            repaint(); // (the hovered part)
+    }
 
     int preferredWidth() const { return 250; }
     // Items the window adds at the end of the menu (issue #116: FL's "Detached", the last item of FL's plugin menu)
@@ -75,7 +80,6 @@ private:
     void step (int delta);
     void apply (const Entry& entry);
     void showMenu();
-    void saveAs();
     void loadFile();
     void exportFile();
     void setName (const juce::String& name);
@@ -89,3 +93,4 @@ private:
     std::unique_ptr<juce::FileChooser> chooser;
 };
 } // namespace lynx::pluginpresetui
+    bool titleLook = false;

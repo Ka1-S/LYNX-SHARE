@@ -1602,6 +1602,17 @@ public:
             return;
         }
 
+        if (args.contains ("--design190inshot"))
+        {
+            // LYNX --design190inshot prefix [project.flp]: round 190in off screen (no desktop window, no audio device) —
+            // the channel window as it shows docked (FL's ▸, two-tone title, presets in the title bar, the 46 px strip
+            // with icon tabs, LED, knobs, RANGE / TRACK badges) on each tab, the floating strip, and FL's ▸ menu
+            const auto i = args.indexOf ("--design190inshot");
+            runDesign190inShot (args[i + 1].unquoted(), i + 2 < args.size() && ! args[i + 2].startsWith ("--") ? args[i + 2].unquoted() : juce::String());
+            quit();
+            return;
+        }
+
         if (args.contains ("--plugui"))
         {
             // LYNX.exe --plugui <folder>: the native effect editors at FL's size (one PNG per editor and page), each
@@ -7653,6 +7664,9 @@ private:
         test->mainWindow = std::make_unique<juce::DocumentWindow> ("LYNX test main window", juce::Colours::darkgrey, 0);
         test->mainWindow->setBounds (20, 20, 300, 200);
         if (juce::SystemStats::getEnvironmentVariable ("LYNX_PLUGWIN_DOCK", {}) == "1" && lynx::nativechild::dockingEnabled())
+        // round 190in: LYNX_PLUGWIN_ZOOM=<percent>: LYNX's interface zoom for the run (the wrapper's header at 150 %)
+        if (const auto zoom = juce::SystemStats::getEnvironmentVariable ("LYNX_PLUGWIN_ZOOM", {}).getIntValue(); zoom >= 50 && zoom <= 300)
+            juce::Desktop::getInstance().setGlobalScaleFactor ((float) zoom / 100.0f);
         {
             // the real main window's contents (it docks plugin windows in its own desktop), so the panels are real
             juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
@@ -17150,42 +17164,6 @@ private:
         artGui->start();
     }
 
-    void runPluginEditorSnapshots (const juce::String& folder)
-    {
-        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
-        {
-            const juce::File out (folder);
-            out.createDirectory();
-            lynx::AudioEngine offline (false);
-            const auto roots = lynx::findFlStudioRoots();
-            const auto presets = juce::File (juce::String::fromUTF8 (roots.data.c_str())).getChildFile ("Patches/Plugin presets/Effects");
-
-            auto kinds = lynx::plugui::flLayoutKinds();
-            kinds.push_back (lynx::EffectKind::maximus); // Soundgoodizer (below)
-            for (const auto own : lynx::plugui::ownLayoutKinds()) // LYNX's own panels (mixing suite, round 96)
-                kinds.push_back (own);
-            kinds.push_back (lynx::EffectKind::apexLimiter); // round 114: display-first editor
-            kinds.push_back (lynx::EffectKind::ridgeStrip); // round 145: the second pass shows the Vocal strip voicing
-            kinds.push_back (lynx::EffectKind::ridgeStrip); // round 165: the third pass shows the E console voicing
-            kinds.push_back (lynx::EffectKind::compressor); // round 152: the RComp role's panel (vintage voicing, RComp ranges)
-            const auto database = juce::File (juce::String::fromUTF8 (roots.data.c_str())).getChildFile ("Patches/Plugin database/Effects");
-
-            auto maximusPasses = 0; // Maximus has its own page (first pass); the second pass shows Soundgoodizer
-            auto ridgePasses = 0;
-            // round 173d3: the parity pictures of one editor — LYNX_PLUGUI_ONLY=<effect name>, LYNX_PLUGUI_PRESET=<.fst>,
-            // LYNX_PLUGUI_PAGES=<page,page,…> (the page numbers as the editor encodes them)
-            const auto only = juce::SystemStats::getEnvironmentVariable ("LYNX_PLUGUI_ONLY", {});
-            const auto onlyPreset = juce::SystemStats::getEnvironmentVariable ("LYNX_PLUGUI_PRESET", {});
-            const auto onlyPages = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_PLUGUI_PAGES", {}), ",", "");
-            for (const auto kind : kinds)
-            {
-                if (only.isNotEmpty() && only != lynx::effectInfo (kind).name)
-                    continue;
-                auto fx = lynx::makeEffectSlot (kind);
-                juce::String name (lynx::effectInfo (kind).name);
-                for (const auto& plugin : lynx::flPluginsForEffect (kind))
-                {
-                    const auto dir = presets.getChildFile (juce::String::fromUTF8 (plugin.c_str()));
     void runDesign190inShot (const juce::String& prefix, const juce::String& project)
     {
         juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
@@ -17335,6 +17313,42 @@ private:
                     name = juce::String::fromUTF8 (plugin.c_str());
                     break;
                 }
+    void runPluginEditorSnapshots (const juce::String& folder)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        {
+            const juce::File out (folder);
+            out.createDirectory();
+            lynx::AudioEngine offline (false);
+            const auto roots = lynx::findFlStudioRoots();
+            const auto presets = juce::File (juce::String::fromUTF8 (roots.data.c_str())).getChildFile ("Patches/Plugin presets/Effects");
+
+            auto kinds = lynx::plugui::flLayoutKinds();
+            kinds.push_back (lynx::EffectKind::maximus); // Soundgoodizer (below)
+            for (const auto own : lynx::plugui::ownLayoutKinds()) // LYNX's own panels (mixing suite, round 96)
+                kinds.push_back (own);
+            kinds.push_back (lynx::EffectKind::apexLimiter); // round 114: display-first editor
+            kinds.push_back (lynx::EffectKind::ridgeStrip); // round 145: the second pass shows the Vocal strip voicing
+            kinds.push_back (lynx::EffectKind::ridgeStrip); // round 165: the third pass shows the E console voicing
+            kinds.push_back (lynx::EffectKind::compressor); // round 152: the RComp role's panel (vintage voicing, RComp ranges)
+            const auto database = juce::File (juce::String::fromUTF8 (roots.data.c_str())).getChildFile ("Patches/Plugin database/Effects");
+
+            auto maximusPasses = 0; // Maximus has its own page (first pass); the second pass shows Soundgoodizer
+            auto ridgePasses = 0;
+            // round 173d3: the parity pictures of one editor — LYNX_PLUGUI_ONLY=<effect name>, LYNX_PLUGUI_PRESET=<.fst>,
+            // LYNX_PLUGUI_PAGES=<page,page,…> (the page numbers as the editor encodes them)
+            const auto only = juce::SystemStats::getEnvironmentVariable ("LYNX_PLUGUI_ONLY", {});
+            const auto onlyPreset = juce::SystemStats::getEnvironmentVariable ("LYNX_PLUGUI_PRESET", {});
+            const auto onlyPages = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_PLUGUI_PAGES", {}), ",", "");
+            for (const auto kind : kinds)
+            {
+                if (only.isNotEmpty() && only != lynx::effectInfo (kind).name)
+                    continue;
+                auto fx = lynx::makeEffectSlot (kind);
+                juce::String name (lynx::effectInfo (kind).name);
+                for (const auto& plugin : lynx::flPluginsForEffect (kind))
+                {
+                    const auto dir = presets.getChildFile (juce::String::fromUTF8 (plugin.c_str()));
 
                 if (kind == lynx::EffectKind::maximus && ++maximusPasses == 2) // Soundgoodizer: preset A of the installation, Amount 60 %
                 {
@@ -17352,7 +17366,13 @@ private:
 
                 if (kind == lynx::EffectKind::ridgeStrip && ++ridgePasses == 2) // round 145: her Vocalstrip 2 setting
                 {
+                        {
                     for (const auto& [param, value] : { std::pair<const char*, float> { "Vocal strip", 1.0f }, { "Compander", 1.0f },
+                            // round 190in (FW-8): a LYNX engine loaded with an FL plugin's preset stands in for that
+                            // plugin as an imported slot does (its header shows FL's name)
+                            if (fx.flOrigin.empty() && ! lynx::plugui::hasFlLayout (kind))
+                                fx.flOrigin.plugin = plugin;
+                        }
                                                         { "Compander threshold", 0.3083f }, { "Compander ratio", 0.6929f }, { "Compander attack", 0.2543f },
                                                         { "Compander release", 0.5316f }, { "Make-up", 0.2917f }, { "Soft knee", 1.0f },
                                                         { "Expander threshold", 0.2198f }, { "Vocal input", 0.6792f }, { "Vocal output", 0.3938f },
@@ -17368,11 +17388,6 @@ private:
                         fx.params[(std::size_t) lynx::plugui::paramIndex (kind, param)] = value;
                     name = "Ridge Strip (E console)";
                 }
-                            // round 190in (FW-8): a LYNX engine loaded with an FL plugin's preset stands in for that
-                            // plugin as an imported slot does (its header shows FL's name)
-                            if (fx.flOrigin.empty() && ! lynx::plugui::hasFlLayout (kind))
-                                fx.flOrigin.plugin = plugin;
-                        }
                 else if (kind == lynx::EffectKind::ridgeStrip) // a vocal setting, so the graphs show something
                     for (const auto& [param, value] : { std::pair<const char*, float> { "HPF", 0.3f }, { "LMF gain", 0.35f }, { "HF gain", 0.7f },
                                                         { "Ratio", 0.3f }, { "Comp. threshold", 0.55f } })

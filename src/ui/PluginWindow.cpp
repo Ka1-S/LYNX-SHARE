@@ -31,6 +31,8 @@
 #include "ui/PluginHeader.h"
 #include "ui/RemoteControl.h"
 #include "ui/Workspace.h"
+#include "ui/WrapperMenu.h"
+#include "ui/ChannelSettings.h"
 #include "platform/Paths.h"
 #include "ui/Theme.h"
 
@@ -1057,7 +1059,15 @@ public:
         };
         for (auto* b : { &pluginTab, &settingsTab })
         {
-            b->setClickingTogglesState (false); // LYNX's tab look (as the channel window's): the shown one filled
+            // round 190in (design190ia FW-7): FL's 44 px icon tabs (the plug, the wrench), as the channel window's
+            b->setClickingTogglesState (false);
+            b->setFlat (true);
+            b->setCorners (false, false);
+            b->setOnColour (theme::colour::bg5);
+            b->setIconColourWhenOn (theme::colour::ledOn);
+            b->setIconColour (theme::colour::textSecondary);
+            b->setIconSizing (0.5f, 22.0f);
+            b->setWantsKeyboardFocus (false);
             addAndMakeVisible (b);
         }
         pluginTab.setTooltip (tr ("The plugin's own editor"));
@@ -1157,18 +1167,27 @@ public:
 
     void paint (juce::Graphics& g) override
     {
-        g.setColour (theme::colour::bg0);
+        // round 190in (FW-7): FL's 46 px strip, as the channel window's (bg3, a line under it, a line after each tab)
+        g.setColour (theme::colour::bg3);
         g.fillRect (getLocalBounds().removeFromTop (headerHeight));
     }
 
     void resized() override
     {
         auto area = getLocalBounds();
-        auto header = area.removeFromTop (headerHeight).reduced (4, 3);
-        pluginTab.setBounds (header.removeFromLeft (80));
-        header.removeFromLeft (4);
-        settingsTab.setBounds (header.removeFromLeft (130));
-        header.removeFromLeft (8);
+        auto header = area.removeFromTop (headerHeight - 1);
+        if (menuArrow.isVisible())
+            menuArrow.setBounds (header.removeFromLeft (20).withSizeKeepingCentre (20, 24));
+        pluginTab.setBounds (header.removeFromLeft (44));
+        header.removeFromLeft (1);
+        settingsTab.setBounds (header.removeFromLeft (44));
+        header.removeFromLeft (9);
+        if (channelControls != nullptr)
+        {
+            channelControls->setBounds (header.removeFromRight (channelHeaderControlsWidth()));
+            header.removeFromRight (4);
+        }
+        header = header.withSizeKeepingCentre (header.getWidth(), 26);
         if (pin.isVisible())
         {
             pin.setBounds (header.removeFromRight (26));
@@ -1181,7 +1200,8 @@ public:
         }
         keyboardPriority.setBounds (header.removeFromLeft (26));
         header.removeFromLeft (4);
-        presets.setBounds (header.removeFromLeft (juce::jmin (presets.preferredWidth(), header.getWidth())));
+        if (! presetsInTitle)
+            presets.setBounds (header.removeFromLeft (juce::jmin (presets.preferredWidth(), header.getWidth())));
         page.setBounds (area);
         notice.setBounds (area);
         if (editor != nullptr && ! settings && ! down)
@@ -1201,7 +1221,9 @@ public:
     }
 
 private:
-    static constexpr int headerHeight = 30, minWidth = 4 + 80 + 4 + 130 + 8 + 30 + 250 + 4;
+    // round 190in (FW-5 / FW-7): FL's 46 px strip; ▸, two 44 px tabs, the keyboard button, the presets
+    static constexpr int headerHeight = 46, minWidth = 20 + 44 + 1 + 44 + 9 + 30 + 250 + 4;
+    int minimumWidth() const { return minWidth + (channelControls != nullptr ? channelHeaderControlsWidth() + 4 : 0); }
     AudioEngine& engineRef;
     juce::AudioPluginInstance& hosted; // (round 190df: the plugin menu's spare state and parameter items)
     int sideTrack = -1, sideSlot = -1;
@@ -1213,9 +1235,23 @@ private:
     void fitEditor()
     {
         if (down) // (the notice: at least a readable size, the editor's when that is larger)
-            setSize (juce::jmax (minWidth, getWidth()), juce::jmax (150 + headerHeight, getHeight()));
+        g.setColour (theme::colour::border);
+        g.fillRect (0, headerHeight - 1, getWidth(), 1);
+        for (auto* t : { &pluginTab, &settingsTab })
+            g.fillRect (t->getRight(), 0, 1, headerHeight - 1);
+    }
+
+    // round 190in (FW-5 / R8): a docked frame shows the presets and the ▸ menu in its title strip
+    void movePresetsTo (juce::Component& titleOwner)
+    {
+        presetsInTitle = true;
+        menuArrow.setVisible (false);
+        presets.setTitleLook (true);
+        titleOwner.addAndMakeVisible (presets);
+        resized();
+            setSize (juce::jmax (minimumWidth(), getWidth()), juce::jmax (150 + headerHeight, getHeight()));
         else if (editor != nullptr)
-            setSize (juce::jmax (minWidth, editor->getWidth()), editor->getHeight() + headerHeight);
+            setSize (juce::jmax (minimumWidth(), editor->getWidth()), editor->getHeight() + headerHeight);
     }
 
     void show (bool showSettings)
@@ -1260,8 +1296,10 @@ private:
     WrapperSettingsPage page;
     CrashNotice notice;
     pluginpresetui::PresetBar presets;
-    juce::TextButton pluginTab { tr ("Plugin") }, settingsTab { juce::String::fromUTF8 ("\xe2\x9a\x99 ") + tr ("Wrapper settings") };
-    bool settings = false, laying = false, down = false;
+    IconButton pluginTab { tr ("Plugin"), Icon::pluginPicker }, settingsTab { tr ("Wrapper settings"), Icon::wrench };
+    wrappermenu::MenuArrow menuArrow;
+    std::unique_ptr<juce::Component> channelControls; // (a channel's plugin: FL's ON / PAN / VOL / PITCH / RANGE / TRACK)
+    bool settings = false, laying = false, down = false, presetsInTitle = false;
 };
 
 // Issue #116: FL's docked plugin windows (developer switch, ui/NativeChild.h). The desktop that hosts them, and whether
@@ -1615,7 +1653,7 @@ public:
         setName (title);
         setOpaque (true);
         setWantsKeyboardFocus (true);
-        for (auto* b : { &menuButton, &minimiseButton, &closeButton })
+        for (auto* b : { &minimiseButton, &closeButton })
         {
             b->setFlat (true);
             b->setIconSizing (0.62f, 14.0f);
@@ -1763,8 +1801,14 @@ public:
         g.fillRect (strip.removeFromBottom (1));
         g.setColour (colour::textPrimary);
         g.setFont (font (type::body, true));
-        auto text = getLocalBounds().removeFromTop (titleHeight).withTrimmedLeft (menuButton.getRight() + 4).withTrimmedRight (2 * titleHeight + 6);
-        g.drawFittedText (hostTitle(), text, juce::Justification::centredLeft, 1, 0.9f);
+        const auto headW = juce::jmin (text.getWidth(), juce::GlyphArrangement::getStringWidthInt (g.getCurrentFont(), head) + 1);
+        g.drawFittedText (head, text.withWidth (headW), juce::Justification::centredLeft, 1, 0.9f);
+        if (head.length() < title.length())
+        {
+            g.setColour (colour::textSecondary);
+            g.setFont (font (type::body));
+            g.drawText (title.substring (open), text.withTrimmedLeft (headW), juce::Justification::centredLeft, true);
+        }
     }
 
     void paintOverChildren (juce::Graphics& g) override
@@ -1776,7 +1820,7 @@ public:
     void resized() override
     {
         auto strip = getLocalBounds().removeFromTop (titleHeight).reduced (3, 2);
-        menuButton.setBounds (strip.removeFromLeft (strip.getHeight()));
+        menuButton.setBounds (strip.removeFromLeft (18));
         closeButton.setBounds (strip.removeFromRight (strip.getHeight()));
         strip.removeFromRight (2);
         minimiseButton.setBounds (strip.removeFromRight (strip.getHeight()));
@@ -1793,6 +1837,12 @@ public:
     }
 
     // the editor resized itself (or its wrapper switched pages): the frame follows
+        // round 190in (design190ia FW-5): FL's title strip holds the preset ◀ name ▶ (the strip under it gives them up)
+        if (auto* wrapped = dynamic_cast<WrappedEditor*> (content.get()))
+        {
+            wrapped->movePresetsTo (*this);
+            titlePresets = &wrapped->presetComponent();
+        }
     void childBoundsChanged (juce::Component* child) override
     {
         if (child == shownContent && ! laying && ! minimised)
@@ -1801,16 +1851,6 @@ public:
 
 private:
     static constexpr int titleHeight = 24;
-
-    void showMenu()
-    {
-        juce::PopupMenu menu;
-        menu.addSectionHeader (hostTitle());
-        addDetachedItem (menu);
-        menu.addSeparator();
-        menu.addItem (tr ("Close"), [k = key()] { juce::MessageManager::callAsync ([k] { closeHostOf (k); }); });
-        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&menuButton));
-    }
 
     // FL's minimise of a docked window: only the title strip stays
     void setMinimisedFrame (bool shouldBe)
@@ -1845,7 +1885,9 @@ private:
     }
 
     Workspace& workspace;
-    IconButton menuButton { "menu", Icon::panelMenu }, minimiseButton { "minimise", Icon::minimise }, closeButton { "close", Icon::close };
+    wrappermenu::MenuArrow menuButton;
+    IconButton minimiseButton { "minimise", Icon::minimise }, closeButton { "close", Icon::close };
+    juce::Component* titlePresets = nullptr; // the wrapper's preset bar, in the title strip (owned by the wrapper)
     juce::ComponentBoundsConstrainer limits;
     std::unique_ptr<juce::ResizableCornerComponent> corner;
     juce::Rectangle<int> dragStart;
@@ -1929,6 +1971,13 @@ std::unique_ptr<EditorHost> makeHost (std::shared_ptr<void> owner, juce::AudioPl
 {
     if (! opensDetached (plugin, context))
         return std::make_unique<DockedPluginFrame> (std::move (owner), plugin, title, std::move (context), *dockWorkspace());
+        auto text = getLocalBounds().removeFromTop (titleHeight).withTrimmedLeft (menuButton.getRight() + 4).withTrimmedRight (2 * titleHeight + 6);
+        if (titlePresets != nullptr && titlePresets->getParentComponent() == this)
+            text.setRight (titlePresets->getX() - 6);
+        // FL's two tones (round 190in, FW-5): "Name" bright, " (target)" dim
+        const auto title = hostTitle();
+        const auto open = title.lastIndexOf (" (");
+        const auto head = open > 0 && title.endsWithChar (')') ? title.substring (0, open) : title;
     return std::make_unique<PluginWindow> (std::move (owner), plugin, title, std::move (context));
 }
 
@@ -1948,6 +1997,11 @@ void setDetachedAndReopen (juce::AudioPluginInstance& plugin, bool detached, boo
         context.engine->editSong ([find = context.find, detached] (Song& song) {
             if (auto* ref = find (song))
                 ref->detached = detached;
+        if (titlePresets != nullptr && titlePresets->getParentComponent() == this)
+        {
+            strip.removeFromRight (6);
+            titlePresets->setBounds (strip.removeFromRight (juce::jmin (190, juce::jmax (0, strip.getWidth() / 2))));
+        }
         });
     PluginWindows::open (std::move (keep), plugin, title, context);
 }

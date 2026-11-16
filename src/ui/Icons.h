@@ -27,6 +27,8 @@ enum class Icon
     drumBrush,  // Piano Roll: the drum paint tool
     graph,      // Channel Rack: the step graph editor (velocity, pan... bars)
     follow,     // Playlist / Piano Roll: the view follows the playhead (auto scrolling)
+    envelope,   // channel window: the Envelope / instrument tab, an ADSR line (round 190in, design190ia FW-1)
+    wrench,     // channel / plugin window: the Misc and wrapper settings tabs, FL's wrench (round 190in, FW-1)
     loop,       // Channel Rack: channel looping (round 165f-rack)
     dice,       // Channel Rack: Loop Starter (round 168b)
     stretch,    // Playlist: stretch audio when resizing audio clips (round 168f)
