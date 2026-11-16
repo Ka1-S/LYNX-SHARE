@@ -1,5 +1,7 @@
 #include "core/Preferences.h"
 
+#include "core/ControllerProfile.h"
+
 #include <algorithm>
 #include <cstdlib>
 #include <cctype>
@@ -406,6 +408,20 @@ void MidiPrefs::setOutput (const MidiOutputPrefs& out)
         outputs.push_back (out);
 }
 
+int MidiPrefs::inheritedOutputPort (const std::string& name) const
+{
+    for (const auto& i : inputs)
+        if (i.port >= 0 && controller::pairedOutput (i.name, { name }) == name)
+            return std::min (i.port, 255);
+    return -1;
+}
+
+int MidiPrefs::outputPort (const std::string& name) const
+{
+    const auto own = output (name).port;
+    return own >= 0 ? std::min (own, 255) : inheritedOutputPort (name);
+}
+
 bool MidiPrefs::accepts (const std::string& device, int channel) const
 {
     const auto i = input (device);
@@ -477,6 +493,10 @@ std::string MidiPrefs::toText() const
     for (const auto& o : outputs)
         out += "output=" + std::string (o.masterSync ? "1" : "0") + "|" + o.syncType + "|" + std::to_string (o.offsetMs) + "|"
                + (o.allNotesOff ? "1" : "0") + "|" + o.name + "\n";
+    // outputport=<port>|<device name> (round 190jl; its own line: older versions skip it)
+    for (const auto& o : outputs)
+        if (o.port >= 0)
+            out += "outputport=" + std::to_string (o.port) + "|" + o.name + "\n";
     // clockin=<offset ms>|<device name>
     if (! clockInput.empty() || clockOffsetMs != 0)
         out += "clockin=" + std::to_string (clockOffsetMs) + "|" + clockInput + "\n";
@@ -636,6 +656,16 @@ MidiPrefs MidiPrefs::fromText (const std::string& text)
             o.offsetMs = std::clamp (toInt (trim (parts[2]), 0), -1000, 1000);
             o.allNotesOff = trim (parts[3]) == "1";
             o.name = parts[4];
+            o.port = p.output (o.name).port; // (an "outputport" line may come first in a hand-edited file)
+            p.setOutput (o);
+        }
+        else if (key == "outputport") // (round 190jl)
+        {
+            const auto parts = split (value, '|', 2);
+            if (parts.size() != 2 || parts[1].empty())
+                continue;
+            auto o = p.output (parts[1]);
+            o.port = std::clamp (toInt (trim (parts[0]), -1), -1, 255);
             p.setOutput (o);
         }
         else if (key == "clockin")

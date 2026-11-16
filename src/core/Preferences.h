@@ -214,6 +214,10 @@ struct MidiOutputPrefs
     std::string syncType = "clock"; // midisync::syncTypeKey: MIDI clock + SPP, or an MTC rate
     int offsetMs = 0;          // "Master sync offset (milliseconds)", -1000…1000 (later = positive)
     bool allNotesOff = false;  // "Send all notes off" on init and after an export
+    // FL's output "Port" (Options › MIDI › Output, OutPortSel "Output port number", none by default; round 190jl): the
+    // MIDI Out channels (and plugin wrapper output ports) on this port send their notes, controllers, program / bank
+    // changes, pitch bend and aftertouch to this device
+    int port = -1;
 
     bool operator== (const MidiOutputPrefs&) const = default;
 };
@@ -251,6 +255,11 @@ struct MidiPrefs
     void setInput (const MidiInputPrefs& input);
     MidiOutputPrefs output (const std::string& name) const;
     void setOutput (const MidiOutputPrefs& output);
+    // The port an output device sends on (round 190jl): its own, else FL's default — the port of the input that is the
+    // same device (the same name, or its paired name: controller::pairedOutput; REA midiout190jl, FLEngine 0x117cdb0 /
+    // 0xfd9430: an output takes the matching input's port, a saved port ≥ 0 wins). −1 = none.
+    int outputPort (const std::string& name) const;
+    int inheritedOutputPort (const std::string& name) const; // (the matching input's port alone)
 
     // Should a message on MIDI channel `channel` (1..16) from `device` be played?
     bool accepts (const std::string& device, int channel) const;

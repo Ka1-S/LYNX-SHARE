@@ -66,6 +66,9 @@ struct NoteEvent
     // (the live queue ignores them otherwise), and a live voiceProp is that note's expression changing as it sounds
     bool expression = false;
     std::int8_t colour = 0; // the note's colour group 0…15 (FL's note colours: VFX Color Mapper, round 164b)
+    // a live note / control (round 190jl): the MIDI input it came from (AudioEngine's input number, 0 = none), so a MIDI
+    // Out channel does not send a device's own input back to it (core/Instruments.h HardwareMidi)
+    std::uint8_t source = 0;
     // A VFX channel (round 164b): −1 = an ordinary note; −2 = one its processor takes (it goes nowhere else); N ≥ 0 =
     // what the processor sent on MIDI port N (only the routes on that port take it)
     std::int16_t port = -1;

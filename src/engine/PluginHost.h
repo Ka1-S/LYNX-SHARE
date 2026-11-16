@@ -180,6 +180,10 @@ public:
     void midiMessage (const std::uint8_t* bytes, int size) noexcept override { queueMidi (bytes, size); }
     void pitchBend (float) noexcept override {} // (the plugin takes the raw MIDI pitch bend, midiMessage)
     int takeMidiOutput (MidiOutNote* out, int max) noexcept override;
+    // round 190jl: the plugin's MIDI output to the hardware outputs on its wrapper output port (FL's Options › MIDI ›
+    // Output "Port"): every short channel message, at its sample in the chunk
+    void setHardwareMidi (bool on) noexcept override { hardwareOut = on; }
+    int takeHardwareMidi (HardwareMidi* out, int max) noexcept override;
     // Issue #14: the channel's PITCH knob, fine tune and main pitch reach the plugin as MIDI pitch bend (scaled by the
     // wrapper's pitch bend range), and a slide note bends the sounding notes to its key over its length
     void setLivePitch (float cents) noexcept override { livePitch = cents; }
@@ -223,6 +227,11 @@ private:
     bool producesMidi = false;
     std::array<MidiOutNote, 256> midiOut {};
     int midiOutCount = 0;
+    // round 190jl: the hardware outputs' copy (collectMidiOutput, with the block's start in the chunk)
+    bool hardwareOut = false;
+    std::array<HardwareMidi, 512> hardwareMidi {};
+    int hardwareMidiCount = 0, hardwareBlockAt = 0;
+    bool hardwarePositions = true; // false: a fixed block's events (their samples are the fixed block's, not the chunk's)
     HostedOptions options;
     std::atomic<bool> flVelocity { false };
     juce::uint8 midiVelocity (float velocity) const noexcept;

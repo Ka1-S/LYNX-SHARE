@@ -497,6 +497,7 @@ if(LYNX_BUILD_APP)
         src/engine/ShortExportTest.cpp
         src/engine/ExportParityTest.cpp
         src/engine/MidiHotplugTest.cpp
+        src/engine/MidiOutPortTest.cpp
         src/ui/LiveSessionUi.cpp
         src/ui/LiveChat.cpp
         src/engine/LiveRemotePlugins.cpp

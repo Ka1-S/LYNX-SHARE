@@ -23,6 +23,7 @@
 #include "core/DetailChain.h"
 #include "core/SessionOps.h"
 #include "core/MarkerPlan.h"
+#include "core/MidiOut.h"
 #include "engine/AudioLogger.h"
 
 #include "core/HardwareInsert.h"
@@ -652,7 +653,7 @@ void AudioEngine::openMidiDevices()
                 break;
             }
     enableAllMidiInputs();
-    midiSync.configure (midiPrefs);
+    configureMidiOutputs();
     midiSync.sendAllNotesOff(); // FL's "Send all notes off": on init and after a render
     if (! platform::testMode()) // (round 190gl: Link on as it was left; never in a test run, which must not join a session)
         applyLinkPrefs();
@@ -734,6 +735,7 @@ void AudioEngine::buildInitialGraph()
         rackProcessor->setHardwareOutput (&hwOutput);
         rackProcessor->setPerformance (performanceLive.get());
         rackProcessor->getRenderer().reserveFor (lastPublishedShape); // (round 190gn: a song published before the graph)
+        rackProcessor->getRenderer().setHardwareMidiPorts (hardwareMidiPorts); // (round 190jl)
         // FL's own metronome sounds from its install (Data\System), LYNX's stand-ins without it (round 165z-a2)
         const auto& flData = flStudioAccess().roots.data;
         rackProcessor->setMetronome (std::make_unique<Metronome> (transport, flData.empty() ? juce::File() : platform::localFile (flData)));
@@ -1799,6 +1801,7 @@ void AudioEngine::panic()
     e.type = NoteEvent::Type::choke;
     e.channel = -1; // every channel
     liveEvents.push (e);
+    midiSync.requestPortNotesOff(); // (round 190jl: the hardware MIDI outputs' notes end too)
     for (auto& channel : heldKeyCount)
         for (auto& c : channel)
             c.store (0);
@@ -1810,6 +1813,7 @@ void AudioEngine::panic()
 void AudioEngine::stopSound()
 {
     panic();
+    midiSync.requestTransportNotesOff(); // (FL's "Stop sound": CC 123 to the "Send all notes off" outputs; REA midiout190jl, 0xf1de20)
     NoteEvent e;
     e.type = NoteEvent::Type::choke;
     e.channel = RackRenderer::stopSoundChannel; // and every effect / plugin reset
@@ -2879,6 +2883,7 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
     auto velocityCurve = prefs::VelocityCurve::linear;
     auto locked = -1; // a channel that "receives notes from" this device (FL's channel lock)
     auto jumpChannel = 0;
+    std::uint8_t inputSource = 0; // round 190jl: NoteEvent::source (0 = unknown)
     const auto deviceName = source != nullptr ? source->getName().toStdString() : std::string();
     {
         const juce::SpinLock::ScopedLockType lock (midiPrefsLock);
@@ -2894,6 +2899,12 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
                     break; // a lock on this very MIDI channel wins over one on any channel
             }
         jumpChannel = midiPrefsShared.songMarkerJumpChannel;
+        for (std::size_t k = 0; k < midiSourceNames.size(); ++k) // (round 190jl: the input's source number)
+            if (midiSourceNames[k] == name)
+            {
+                inputSource = (std::uint8_t) (k + 1);
+                break;
+            }
     }
     if (locked >= 0)
         device.target = locked;
@@ -3017,8 +3028,9 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
     // channel's pitch range. A CC with a MIDI link only moves its parameter.
     const auto recordBend = transport.recording.load() && transport.playing.load();
     const auto bendTick = recordBend ? estimatedPositionNow() : 0.0;
-    auto playControl = [this, &device, &m, recordBend, bendTick] (int control, float value) {
+    auto playControl = [this, &device, &m, recordBend, bendTick, inputSource] (int control, float value) {
         NoteEvent e;
+        e.source = inputSource;
         e.type = NoteEvent::Type::control;
         e.key = control;
         e.velocity = value;
@@ -3058,6 +3070,7 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
             auto pedal = [&] (int channel) {
                 pedalHold.setMode (channel, mode, [&] (int key) {
                     NoteEvent e;
+                    e.source = inputSource;
                     e.type = NoteEvent::Type::off;
                     e.channel = channel;
                     e.key = key;
@@ -3143,8 +3156,9 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
     const auto taking = transport.recording.load() && (transport.playing.load() || isCountingIn());
     const auto tick = recordTickFor (eventMs);
 
-    auto push = [this, taking, tick, mpeNote] (const InputHeldNotes::Target& t, bool noteOn, float velocity) {
+    auto push = [this, taking, tick, mpeNote, inputSource] (const InputHeldNotes::Target& t, bool noteOn, float velocity) {
         NoteEvent e;
+        e.source = inputSource;
         e.type = noteOn ? NoteEvent::Type::on : NoteEvent::Type::off;
         e.channel = t.channel;
         e.key = t.key;
@@ -3233,6 +3247,14 @@ void AudioEngine::enableAllMidiInputs()
     lastMidiInputIds.clear();
     for (const auto& port : available)
         lastMidiInputIds.push_back (port.id);
+    {
+        // (round 190jl: each input's source number, for the MIDI Out channels' echo guard; the outputs learn a new one
+        // from configureMidiOutputs, which follows every list change)
+        const juce::SpinLock::ScopedLockType lock (midiPrefsLock);
+        for (const auto& port : available)
+            if (midiSourceNames.size() < 63 && std::find (midiSourceNames.begin(), midiSourceNames.end(), port.name) == midiSourceNames.end())
+                midiSourceNames.push_back (port.name);
+    }
 
     // round 190gh (B8): what was plugged in or out since the last check (inputs and outputs)
     std::vector<prefs::MidiPort> ports;
@@ -3254,7 +3276,7 @@ void AudioEngine::enableAllMidiInputs()
     {
         ++midiDeviceListVersion;
         controllerIo.devicesChanged(); // (feedback ports: an output that came back under another identifier)
-        midiSync.configure (midiPrefs); // (sync / notes-off outputs: closed when gone, opened again by name)
+        configureMidiOutputs(); // (sync / notes-off / port outputs: closed when gone, opened again by name)
         juce::StringArray added, removed;
         for (const auto& n : change.added)
             added.add (juce::String::fromUTF8 (n.c_str()));
@@ -3288,6 +3310,21 @@ void AudioEngine::reconnectMidiInputs()
     enableAllMidiInputs();
 }
 
+void AudioEngine::configureMidiOutputs()
+{
+    std::vector<std::string> sources;
+    {
+        const juce::SpinLock::ScopedLockType lock (midiPrefsLock);
+        sources = midiSourceNames;
+    }
+    midiSync.configure (midiPrefs, true, false, sources);
+    // round 190jl: the MIDI Out channels on these ports send to the devices (FL's Options › MIDI › Output "Port")
+    hardwareMidiPorts = midiSync.hardwarePorts();
+    if (rackProcessor != nullptr)
+        rackProcessor->getRenderer().setHardwareMidiPorts (hardwareMidiPorts);
+    publishRenderAheadTargets(); // (those channels render live: their notes are timed with the device's blocks)
+}
+
 void AudioEngine::setMidiPrefs (const prefs::MidiPrefs& p, bool save)
 {
     midiPrefs = p;
@@ -3303,7 +3340,7 @@ void AudioEngine::setMidiPrefs (const prefs::MidiPrefs& p, bool save)
     if (midiOpen) // (only with an audio device: the real app, once its MIDI devices are open; they open with these)
     {
         enableAllMidiInputs();
-        midiSync.configure (p);
+        configureMidiOutputs();
         applyLinkPrefs();
     }
     if (save)
@@ -4223,6 +4260,16 @@ void AudioEngine::publishRenderAheadTargets()
     for (std::size_t c = 0; c < song.channels.size(); ++c)
         if (! song.channels[c].receiveFrom.empty())
             add ((int) c);
+    // round 190jl: a MIDI Out channel (or a plugin's output port) that sends to a hardware MIDI output
+    if ((hardwareMidiPorts[0] | hardwareMidiPorts[1] | hardwareMidiPorts[2] | hardwareMidiPorts[3]) != 0)
+        for (std::size_t c = 0; c < song.channels.size(); ++c)
+        {
+            const auto& ch = song.channels[c];
+            const auto port = ch.instrument == InstrumentKind::midiOut ? midiout::stateOf (ch.pluginState).port
+                              : ch.instrument == InstrumentKind::plugin ? ch.plugin.midiOutPort : -1;
+            if (port >= 0 && port < 256 && (hardwareMidiPorts[(std::size_t) port >> 6] >> (port & 63) & 1u) != 0)
+                add ((int) c);
+        }
     // hosted plugin editors on screen: their channel or insert
     std::array<int, renderahead::Targets::maxTracks> tracks {};
     int trackCount = 0;
@@ -4869,6 +4916,9 @@ void AudioEngine::publishSong()
     } };
     ++songStamp;
     ++publishCount;
+    // round 190jl: a MIDI Out channel added, or moved to a port a hardware output has, renders live
+    if ((hardwareMidiPorts[0] | hardwareMidiPorts[1] | hardwareMidiPorts[2] | hardwareMidiPorts[3]) != 0)
+        publishRenderAheadTargets();
     // round 190ea: FL's invariant, at the one place every song state passes (new / opened / imported project, edit, undo,
     // redo, a live session's remote change): at least one pattern and the current one in range. A Song built without a
     // pattern used to crash the docked Piano roll (its listener read the current pattern of an empty list).
@@ -7380,6 +7430,20 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
         player.audioDeviceIOCallbackWithContext (inputs.data(), numInputChannels, outputs.data(), numOutputChannels, n, context);
         transport.inDeviceCallback.store (false, std::memory_order_relaxed);
         routeOutputs (outputs.data(), numOutputChannels, n);
+        // round 190jl: what the MIDI Out channels on a hardware output's port played in this part, timed like the clock
+        if (rackProcessor != nullptr && midiSync.hasPorts())
+        {
+            const auto count = rackProcessor->getRenderer().takeHardwareMidi (hardwareMidiTaken.data(), (int) hardwareMidiTaken.size());
+            for (int k = 0; k < count; ++k)
+            {
+                const auto& h = hardwareMidiTaken[(std::size_t) k];
+                midiSync.channelMessage (h.port, done + h.sample, h.bytes.data(), h.size, h.source);
+            }
+            // the transport stopped: every note the port devices still sound ends ("Send all notes off": CC 123 too)
+            if (hardwareMidiWasPlaying && ! transport.playing.load (std::memory_order_relaxed))
+                midiSync.requestPortNotesOff();
+        }
+        hardwareMidiWasPlaying = transport.playing.load (std::memory_order_relaxed);
 
         if (takesLocked) // the tapped takes' part of this block, now rendered (round 168x)
         {
