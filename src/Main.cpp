@@ -27279,12 +27279,13 @@ private:
         // ---- C. Pattern (FL): C-11 drop ghost + drag image, the drop, the picker's playing mark ----------------------------------
         if (project.isNotEmpty())
         {
+            lynx::layoutstyle::setCurrent (lynx::layoutstyle::Style::pattern); // (the style is global: A and B changed it)
             lynx::AudioEngine offline (false);
             lynx::MainComponent ui (offline, false);
             ui.setSize (w, h);
             ui.openFile (juce::File (project));
             offline.dispatchPendingMessages();
-            ui.setLayoutStyle (lynx::layoutstyle::Style::pattern, false); // (the style is global: A and B changed it)
+            ui.setLayoutStyle (lynx::layoutstyle::Style::pattern, false);
             ui.selectTabForSnapshot (2);
             offline.dispatchPendingMessages();
             auto& playlist = ui.getPlaylistForSnapshot();
@@ -27343,30 +27344,34 @@ private:
             const auto ghost = playlist.dropGhostAreaForCheck();
             line ("ghost " + ghost.toString() + ", row " + row.toString() + ", mouse " + mouse.toString());
             check ("C-11: the ghost lies in the row under the mouse", ! ghost.isEmpty() && ghost.getY() >= row.getY() - 2 && ghost.getBottom() <= row.getBottom() + 2);
-            const auto first = (int) song.playlist.size();
+            const auto first = (int) offline.getSong().playlist.size();
             playlist.dropForSnapshot (drag, mouse);
             offline.dispatchPendingMessages();
-            check ("C-11: the drop places one clip on the row", (int) song.playlist.size() == first + 1 && song.playlist.back().track == target);
-            check ("C-11: the dropped clip is selected", (int) song.playlist.size() == first + 1 && playlist.isClipSelectedForCheck (first));
+            const auto& dropped = offline.getSong(); // (an edit publishes a new Song: read it again)
+            check ("C-11: the drop places one clip on the row", (int) dropped.playlist.size() == first + 1 && dropped.playlist.back().track == target);
+            check ("C-11: the dropped clip is selected", (int) dropped.playlist.size() == first + 1 && playlist.isClipSelectedForCheck (first));
             check ("C-11: nothing of the ghost is left", playlist.dropGhostAreaForCheck().isEmpty());
             write (ui, "fl-c11-dropped");
 
             // the picker's playing mark: Synth Bass plays in the first bars; then another pattern selected
-            offline.getTransport().positionTicks.store (0.5 * (double) song.barTicks());
+            offline.getTransport().positionTicks.store (0.5 * (double) offline.getSong().barTicks());
             offline.getTransport().playing.store (true);
             offline.getTransport().songMode = true;
             playlist.frameStepForSnapshot();
             playlist.frameStepForSnapshot();
             write (picker, "fl-picker-playing");
             line ("playing patterns: " + juce::String ((int) picker.playingForCheck().size()));
-            const auto other = juce::jmin ((int) song.patterns.size() - 1, 7);
+            const auto other = juce::jmin ((int) offline.getSong().patterns.size() - 1, 7);
             offline.editSong ([other] (lynx::Song& s) { s.currentPattern = other; }, false);
             offline.dispatchPendingMessages();
             playlist.frameStepForSnapshot();
             write (picker, "fl-picker-playing-other-selected");
             check ("DC-3: the mark follows what plays, not the selection",
                    std::find (picker.playingForCheck().begin(), picker.playingForCheck().end(), other) == picker.playingForCheck().end()
-                       || std::count_if (song.playlist.begin(), song.playlist.end(), [&] (const lynx::Clip& c) { return c.pattern == other && c.start <= 0.5 * song.barTicks() && c.end() > 0.5 * song.barTicks(); }) > 0);
+                       || std::count_if (offline.getSong().playlist.begin(), offline.getSong().playlist.end(), [&] (const lynx::Clip& c) {
+                              return c.kind == lynx::ClipKind::pattern && c.pattern == other && (double) c.start <= 0.5 * (double) offline.getSong().barTicks()
+                                     && (double) c.end() > 0.5 * (double) offline.getSong().barTicks();
+                          }) > 0);
             offline.getTransport().playing.store (false);
             playlist.frameStepForSnapshot();
             write (picker, "fl-picker-stopped");
