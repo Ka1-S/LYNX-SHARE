@@ -3568,6 +3568,8 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
         };
         // round 190ch: Lyrics / Notes, Reference match and a new project from the "Start from" list
         host.toggleLyrics = [this] { toggleLyrics(); };
+        host.setAutomation = [this] (bool on) { playlist.setSimpleAutomation (on); }; // round 190jr
+        host.openProject = [this] (const juce::File& file) { openFileRequest (file); };
         host.showReferenceMatch = [this] { showReferenceMatch(); };
         host.startFrom = [this] (Song song) {
             auto shared = std::make_shared<Song> (std::move (song));
@@ -3618,6 +3620,10 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
                                                    }));
         };
         simpleWorkflow = std::make_unique<SimpleWorkflow> (engine, std::move (host));
+        playlist.onSimpleAutomationChanged = [this] (bool on) { // round 190jr: the title bar's switch follows the view
+            if (simpleWorkflow != nullptr)
+                simpleWorkflow->automationShown (on);
+        };
         // the Simple headers' "+FX": the dock's Effects tab on that track (round 190bu; the Mixer shows the same slots)
         playlist.onTrackEffects = [this] (int insert) {
             if (simpleWorkflow != nullptr)
@@ -3707,6 +3713,8 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
     }
     // the Simple workflow's track headers and no pattern picker (no-ops for the other two styles: nothing changes there)
     playlist.setSimpleHeaders (style == Style::simple);
+    if (style != Style::simple)
+        playlist.setSimpleAutomation (false); // (round 190jr: the Simple automation view belongs to the Simple layout)
     playlist.setLiveStyle (style == Style::clipLaunch);
     playlistArea.setPickerHidden (style == Style::simple || ! pickerPanelOn);
     if (style == Style::simple && simpleWorkflow != nullptr)
@@ -7542,7 +7550,7 @@ void MainComponent::chooseFileToOpenNow()
 {
     fileChooser = lynx::ui::makeFileChooser (tr ("Open project"), currentFile.getParentDirectory(),
                                                        juce::String ("*") + ProjectFile::extension
-                                                           + ";*.dawproj;*.flp;*.als;*.flm;*.band;projectData;ProjectData;*.zip;*.lynxpack;*.mid;*.midi");
+                                                           + ";*.dawproj;*.flp;*.als;*.flm;*.band;projectData;ProjectData;*.blx;*.zip;*.lynxpack;*.mid;*.midi");
 
     // (a GarageBand .band is a folder: macOS's dialog shows it as one file; elsewhere its "projectData" is picked)
     lynx::ui::launchChooser (fileChooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
@@ -7577,7 +7585,9 @@ void MainComponent::openFile (const juce::File& file)
     crashguard::note (("opening project " + file.getFileName()).toStdString()); // session breadcrumb (round 111)
 
     // (round 190ic: a GarageBand song that arrived as one zipped file keeps its ".band" name: unpacked as a package)
-    if (file.hasFileExtension ("zip") || (file.hasFileExtension ("band") && file.existsAsFile()))
+    // (round 190jr: a .blx that is a zip of the project, rather than its JSON, is unpacked the same way)
+    if (file.hasFileExtension ("zip") || (file.hasFileExtension ("band") && file.existsAsFile())
+        || (file.hasFileExtension ("blx") && [&file] { juce::FileInputStream in (file); return in.openedOk() && in.readByte() == 'P' && in.readByte() == 'K'; }()))
     {
         // a project package (File › Export project with samples, or FL's zipped loop package): extracted into a
         // folder of its own, then the project inside is opened (its samples are found next to it)
@@ -7629,7 +7639,7 @@ void MainComponent::openFile (const juce::File& file)
 
     // (a Live set takes the .flp import's path, round 175a; an FL Studio Mobile project too, round 182c; a GarageBand
     // project too, round 190ic)
-    if (file.hasFileExtension ("flp;als;flm;songtmpl") || ProjectPackage::garageBandPackage (file) == file)
+    if (file.hasFileExtension ("flp;als;flm;songtmpl;blx") || ProjectPackage::garageBandPackage (file) == file)
     {
         if (! persistent) // (command-line modes open synchronously, without scanning)
         {
@@ -7681,6 +7691,7 @@ void MainComponent::flpImported (const juce::File& file)
         importedSuffix = " " + (file.hasFileExtension ("als")            ? tr ("(imported from .als)")
                                 : file.hasFileExtension ("flm;songtmpl") ? tr ("(imported from FL Studio Mobile)")
                                 : file.hasFileExtension ("band")         ? tr ("(imported from GarageBand)")
+                                : file.hasFileExtension ("blx")          ? tr ("(imported from BandLab)")
                                                                          : tr ("(imported from FL Studio)"));
         updateTitle();
         playlist.showSongAfterOpen();
@@ -9140,7 +9151,7 @@ void MainComponent::showLanguageChoice (const juce::String& id)
 
 bool MainComponent::isProjectFile (const juce::File& file)
 {
-    return file.hasFileExtension (juce::String (ProjectFile::extension) + ";dawproj;flp;als;flm;zip;" + sessionpack::extension);
+    return file.hasFileExtension (juce::String (ProjectFile::extension) + ";dawproj;flp;als;flm;blx;zip;" + sessionpack::extension);
 }
 
 bool MainComponent::isInterestedInFileDrag (const juce::StringArray& files)

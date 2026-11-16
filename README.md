@@ -187,7 +187,7 @@ Every one of them is listed, with a picture of its editor, in the
 
 ## Opens your projects
 
-*File › Open* (or a double-click in the Browser) takes `.lynx`, `.flp`, `.als`, `.flm`, GarageBand `.band` and MIDI files. Missing samples
+*File › Open* (or a double-click in the Browser) takes `.lynx`, `.flp`, `.als`, `.flm`, GarageBand `.band`, BandLab `.blx` and MIDI files. Missing samples
 are listed in the Missing files window, and *Help › Last project import report* tells you what was converted,
 approximated or left out. The original file is never changed: saving writes a `.lynx` project.
 
@@ -197,6 +197,7 @@ approximated or left out. The original file is never changed: saving writes a `.
 | **Ableton Live** `.als` (Live 11 and 12) | ✅ | ✅ | Tracks, clips, warp markers, groups, returns, automation, racks and many of Live's devices. Session clips land in the clip grid. |
 | **FL Studio Mobile** `.flm` | ✅ partial | — | Arrangement, samples, drum kits, several instruments and effects, automation and chord sets. |
 | **GarageBand** `.band` (GarageBand 10, GarageBand for iOS) | ✅ partial | — | Tracks, MIDI and audio regions, tempo, key, levels, pan and mute, as Simple-workflow tracks. |
+| **BandLab** `.blx` (BandLab project downloaded by Cakewalk / Sonar) | ✅ partial | — | Tracks, MIDI and audio regions with their loops, tempo, key, levels, pan, mute, volume and pan automation and the common effects, as Simple-workflow tracks. |
 | **MIDI** `.mid` | ✅ | ✅ | Notes, into or out of the Piano Roll or the whole song. |
 | **LYNX SHARE** `.lynx` | ✅ | ✅ | The native format (JSON), with autosave. |
 
@@ -249,6 +250,22 @@ LYNX SHARE's built-in synth (a preset chosen by the patch name) and drum kits it
 and pattern regions, take folders, tempo changes and Apple Loops that are not inside the project are listed in the
 import report. Projects from GarageBand 6–11 (2013 and older) are not readable: save them again in GarageBand 10, or
 export the tracks as audio (or MIDI) and bring the folder in with the Simple workflow's *Folder...* import.
+
+</details>
+
+<details>
+<summary><strong>BandLab (<code>.blx</code>): import only, partial</strong></summary>
+
+A BandLab project downloaded by Cakewalk or Sonar (*Documents\BandLab\Downloads\<project>*, the `.blx` with its audio
+and MIDI files beside it) opens as Simple-workflow tracks: tempo, time signature, key, each track's volume, pan, mute,
+volume and pan automation (as automation lanes) and its send to BandLab's shared reverb, MIDI regions with their notes
+and audio regions with their offset, gain, fades, pitch and speed; looped regions repeat. BandLab's compressor, 3-band
+and graphic EQs, reverbs, delays, chorus, distortions and limiters come over on LYNX SHARE's effects; other pedals,
+the Mastering preset, BandLab's instrument sounds and sampler kits are listed in the import report (instrument tracks
+play LYNX SHARE's built-in synth and drums). Open the `.blx`, or pick its folder with the Simple workflow's *Folder...*
+import. Without Cakewalk, BandLab's *Download › Tracks* stems and MIDI come in with the same *Folder...* import. The
+reader follows BandLab's project data as BandLab's own apps write it and was tested on made-up projects only: if a `.blx`
+of yours doesn't open as it should, please open an issue.
 
 </details>
 

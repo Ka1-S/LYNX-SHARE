@@ -33,6 +33,10 @@ public:
         // round 190ch: the Lyrics / Notes panel (the main window's, the same in every layout), Reference match, and a
         // new project from the "Start from" list
         std::function<void()> toggleLyrics;
+        // round 190jr (BUILD-LIST 13): the Playlist's automation view for the Simple tracks (BandLab's automation switch)
+        std::function<void (bool)> setAutomation;
+        // round 190jr (B15): a BandLab project (.blx) picked or dropped in the Simple layout opens as the project
+        std::function<void (const juce::File&)> openProject;
         std::function<void()> showReferenceMatch;
         std::function<void (Song song)> startFrom;
         std::function<void (int track)> trackAdded;        // a track was added (select it, scroll to it)
@@ -68,6 +72,8 @@ public:
     // chooser.
     void entered();
     void left();
+    // round 190jr: the automation view was switched (here or by the Playlist): the title bar's switch follows
+    void automationShown (bool on);
     // round 190ih: the main window's 30 Hz timer, while this workflow shows (the dock's input level)
     void tick();
     // The song changed (MainComponent's change callback, only while the style is on): a new or emptied project shows the
@@ -161,6 +167,7 @@ private:
     bool active = false;
     std::string dismissedFor; // the project (Song::projectId) whose chooser was closed by hand
     std::unique_ptr<juce::Component> startFrom, lyricsButton; // round 190ch
+    std::unique_ptr<juce::Component> automationButton;        // round 190jr
     std::unique_ptr<Chooser> chooser;
     std::unique_ptr<juce::Component> addButton, finishButton, titleTools;
     std::unique_ptr<juce::Component> finishDock;

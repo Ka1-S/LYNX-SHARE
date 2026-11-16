@@ -266,6 +266,15 @@ public:
     // on the track's mixer insert (mute, solo, record arm, volume, pan, "+FX"), taller rows by default, a lane under
     // the tracks to drop files on, and a click that also selects the track's channel. Off: FL's headers, unchanged.
     void setSimpleHeaders (bool on);
+    // Round 190jr (BUILD-LIST 13, BandLab's automation switch): the Simple layout's automation view — each Simple track's
+    // row shows one parameter's line over its dimmed regions (the header's menu picks it: Volume, Pan, the insert's
+    // effect parameters); a click on the line adds a point. Turning it on changes nothing in the song: a lane is made
+    // only when a point is first added. A view state, not saved.
+    void setSimpleAutomation (bool on);
+    bool isSimpleAutomation() const noexcept { return simpleAutomation; }
+    std::function<void (bool)> onSimpleAutomationChanged;
+    juce::PopupMenu getSimpleAutoMenuForSnapshot (int track) { return buildSimpleAutoMenu (track); }
+    void setSimpleAutoTargetForSnapshot (int track, AutomationTarget target) { simpleAutoTargets[track] = target; repaint(); }
     // The Clip-launch workflow (round 190cg): track fold, "Group with above track" makes the group a bus, and automation
     // follows clips unless set otherwise. The data is the Song's either way; the other layouts show it all the same.
     void setLiveStyle (bool on);
@@ -322,7 +331,7 @@ public:
 private:
     enum class Drag { none, move, resize, trimLeft, slip, erase, seek, loop, select, fadeIn, fadeOut, paint, muting, knife, zoomRange, listen, pan, timeMove, timeShift, autoPoint, autoTension,
                       lanePoint, laneTension, laneDraw, trackResize, headerSelect, preview, trackZoom, heightZoom, timeZoom, perfLaunch, clipGain, swipe, warpMarker,
-                      tempoMarker };
+                      tempoMarker, regionLoop };
     void swipeTimeSelectionToComp (int lane);
     // a swipe on a take lane (round 177c): the lane and the range so far
     int swipeLane = -1;
@@ -683,6 +692,28 @@ private:
     // FL 2026's audio clip gain handle (round 166e): a semicircle at the bottom centre of the clip; a vertical drag
     // changes the gain of the clip (or of every selected audio clip, each from its own value) by 0.05 dB per pixel
     juce::Rectangle<float> gainHandle (int clip) const; // empty: the clip has none (not audio, too small)
+    // round 190jr (BUILD-LIST 13): the Simple layout's region loop handle — BandLab's circular arrow at the right end of a
+    // region's title strip; a drag right repeats the region (core/RegionLoop.h). Empty: none (not Simple, not loopable,
+    // too narrow, or a repeat that another repeat follows).
+    juce::Rectangle<float> regionLoopHandle (int clip) const;
+    bool regionLoopContinues (int clip) const; // a repeat of the same run starts where `clip` ends
+    void regionLoopDragTo (int x);
+    int loopTrack = -1;                 // the run being dragged: its region's track, start and source
+    std::int64_t loopStart = 0;
+    Clip loopLike;
+    // the Simple automation view (setSimpleAutomation)
+    bool simpleAutomation = false;
+    std::map<int, AutomationTarget> simpleAutoTargets; // per track: the parameter its row shows (none: the insert's volume)
+    bool simpleAutoOn (int track) const;                // the view is on and `track` is a Simple track
+    AutomationTarget simpleAutoTarget (int track) const;
+    int simpleAutoLane (int track) const;              // the lane of that target on the track, or -1
+    float simpleAutoCurrent (const AutomationTarget& target) const; // the target's value now (0..1), for the flat line
+    juce::Rectangle<int> simpleAutoMenu (int track) const; // the header's parameter menu (in place of volume, pan, FX)
+    void showSimpleAutoMenu (int track);
+    juce::PopupMenu buildSimpleAutoMenu (int track);
+    juce::PopupMenu withRegionLoopItems (juce::PopupMenu menu, int clip); // the Simple layout's Loop until next / Unloop first
+    bool simpleAutoMouseDown (const juce::MouseEvent& e); // true: handled
+    void paintSimpleAutomation (juce::Graphics& g, juce::Rectangle<int> grid);
     void showGainMenu (int clip);
     std::vector<double> gainStartDb; // per dragIndices, when the gain drag started
     int gainStartY = 0;

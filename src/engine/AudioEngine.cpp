@@ -44,6 +44,7 @@
 #include "core/AlsImport.h"
 #include "core/FlmImport.h"
 #include "core/BandImport.h" // round 190ic: GarageBand projects
+#include "core/BlxImport.h"  // round 190jr: BandLab projects (.blx)
 #include "engine/ProjectPackage.h"
 #include "core/LoadTrace.h"
 #include "core/Instruments.h"
@@ -4301,8 +4302,10 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
         // an FL Studio Mobile project (.flm, .songtmpl; round 182c) too
         const auto mobileProject = file.hasFileExtension ("flm;songtmpl");
         const auto garageBand = bandFolder != juce::File();
+        // a BandLab project (.blx, round 190jr): its revision JSON, the samples beside it
+        const auto bandLab = file.hasFileExtension ("blx");
         std::optional<flp::Project> project;
-        if (! liveSet && ! mobileProject && ! garageBand)
+        if (! liveSet && ! mobileProject && ! garageBand && ! bandLab)
             project = flp::parseProject ({ fileBytes, data.getSize() });
         loadtrace::add ("parse", loadtrace::msSince (started));
 
@@ -4399,6 +4402,35 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
                     out.error = utf8 (bandError.empty() ? "not a readable GarageBand project" : bandError.c_str());
                     return;
                 }
+                out.song = std::move (*song);
+            }
+            else if (bandLab)
+            {
+                BlxImportOptions blxOptions;
+                blxOptions.common = options;
+                const auto folder = file.getParentDirectory();
+                blxOptions.folder = folder.getFullPathName().toStdString();
+                // the files beside the .blx (its Audio / MIDI folders), for the samples by id or name; a .blx left in a
+                // big folder (Downloads, the Desktop) is not walked past a few thousand files
+                {
+                    juce::RangedDirectoryIterator it (folder, true, "*", juce::File::findFiles);
+                    int seen = 0;
+                    for (const auto& entry : it)
+                    {
+                        if (++seen > 5000)
+                            break;
+                        blxOptions.files.push_back (entry.getFile().getRelativePathFrom (folder).replaceCharacter ('\\', '/').toStdString());
+                    }
+                }
+                std::string blxError;
+                auto song = importBlxBytes (std::vector<std::uint8_t> (fileBytes, fileBytes + data.getSize()), blxOptions, &blxError);
+                if (! song)
+                {
+                    out.error = utf8 (blxError.empty() ? "not a readable BandLab project" : blxError.c_str());
+                    return;
+                }
+                if (song->info.title.empty())
+                    song->info.title = file.getFileNameWithoutExtension().toStdString();
                 out.song = std::move (*song);
             }
             else if (liveSet)
