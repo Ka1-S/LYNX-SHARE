@@ -30,6 +30,7 @@ struct SampleData; // (core/Instruments.h)
 std::unique_ptr<juce::Component> makeSliceDialogForSnapshot (AudioEngine& engine, int clipIndex, int per);
 
 class PatternBlocksView;
+class PatternPicker;
 class VideoLanesView;
 
 // FL-style Playlist (arrangement): tracks vertically, time horizontally.
@@ -170,6 +171,11 @@ public:
     // files dragged from the LYNX browser
     bool isInterestedInDragSource (const SourceDetails& details) override;
     void itemDropped (const SourceDetails& details) override;
+    void itemDragEnter (const SourceDetails& details) override { updateDropGhost (details); }
+    void itemDragMove (const SourceDetails& details) override { updateDropGhost (details); }
+    void itemDragExit (const SourceDetails&) override { clearDropGhost(); }
+    // --details190imshot: a drag of `description` held over `at` (the ghost drawn), then let go (cleared)
+    void dragOverForSnapshot (const juce::var& description, juce::Point<int> at);
     // issue #152 point 6: a generator / effect from the Browser's Plugin database (or the Plugin picker). Pattern
     // workflow, FL-exact: on a track header only (core/PluginDrop.h); Clip-launch workflow: on a track, as Live
     void pluginDropped (const SourceDetails& details);
@@ -217,6 +223,30 @@ public:
     static int flHeaderWidthNow() noexcept;
     bool flHeaders() const noexcept;
     std::vector<char> activityShown; // round 190ig (FM-28): [track] its activity strip lit (FL's Pattern layout, while playing)
+    // round 190im (R5, DC-7): the lit strip's brightness step 1..4 follows the level of what the track plays (its clips'
+    // mixer tracks, read through the meters' activity reader); a track without audio (automation) lights at 4
+    std::map<int, std::pair<float, std::uint32_t>> activityInsertLevels; // [mixer track] the held level, the frame it was read in
+    std::vector<std::vector<int>> patternInserts; // [pattern] the mixer tracks its channels go to (rebuilt on a song change)
+    std::uint64_t patternInsertsStamp = ~(std::uint64_t) 0;
+    double activityMs = -1.0, activityElapsedMs = 0.0;
+    std::uint32_t activityFrame = 0;
+    float activityLevelOf (const Song& song, const Clip& clip);
+    // round 190im (R5, DC-3): the picker beside this Playlist (it registers itself) and the patterns it shows as playing
+    PatternPicker* livePicker = nullptr;
+    friend class PatternPicker;
+    // round 190im (R5, DC-5): the playhead's glow trail (Animations on, while playing) as last painted
+    bool trailShown = false;
+    static constexpr int playheadTrail = 14; // (FL: ≈14 px of fading glow behind the line, shots/fl-playhead-glow-zoom.png)
+    bool playheadTrailOn() const;
+    // round 190im (R5, DE-135): the clips a drag over the Playlist would place, drawn where they would land
+    std::vector<Clip> dropGhost;
+    juce::Rectangle<int> dropGhostArea;
+    void updateDropGhost (const SourceDetails& details);
+    void clearDropGhost();
+    void paintDropGhost (juce::Graphics& g);
+    juce::Rectangle<int> dropGhostBounds() const;
+    juce::String dropGhostFile; // (an audio file's length, read once per drag)
+    std::int64_t dropGhostFileTicks = 0;
     int headerWidth = flHeaderWidth;
     static constexpr int toolbarHeight = 32; // the panel title row (Workspace::titleHeight)
     static constexpr int overviewHeight = 16; // the overview strip under the toolbar (round 90)
@@ -374,6 +404,7 @@ private:
     } heldTitlesKey;
     std::vector<int> heldTitles;
     void paintPlayhead (juce::Graphics& g);
+    void paintPlayheadTrail (juce::Graphics& g, float x, juce::Rectangle<int> grid) const; // round 190im (R5, DC-5)
     void scrollBarMoved (juce::ScrollBar*, double) override;
 
     juce::Rectangle<int> gridArea() const;
@@ -787,6 +818,10 @@ public:
     // patterns" and "Merge identical patterns".
     juce::PopupMenu pickerMenu();
 
+    // round 190im (R5, DC-3): the patterns playing now, marked as FL marks them (a light-blue bar at the entry's right
+    // edge, shots/fl-picker-stopped-vs-playing.png); only the entries that change are repainted
+    void setPlayingPatterns (std::vector<int> now);
+
     // the kind listed: 0 = patterns, 1 = audio clips, 2 = automation clips
     void setView (int newView);
     int getView() const noexcept { return view; }
@@ -817,6 +852,8 @@ private:
     int pressedRow = -1;
     int hoverTab = -1, hoverRow = -1;
     bool hoverAdd = false;
+    std::vector<int> playingPatterns; // round 190im: sorted
+    friend class PlaylistComponent;
     static constexpr int rowHeight = 28, headerHeight = 26, footerHeight = 22;
 };
 

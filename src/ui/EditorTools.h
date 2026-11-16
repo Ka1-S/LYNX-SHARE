@@ -273,6 +273,9 @@ public:
 
     void setRange (double total, double start, double length);
     double getTotal() const noexcept { return total; }
+    // round 190im (R5, DC-6): the song position as a line in the strip while playing (< 0: none, as FL shows none
+    // stopped); only the old and new few pixels are repainted, and only when the line's pixel changes
+    void setPosition (double units);
 
     // draws the miniature into `area` (the whole strip), `total` units across
     std::function<void (juce::Graphics&, juce::Rectangle<float> area, double total)> paintContent;
@@ -295,6 +298,9 @@ private:
     void updateCursor (gesture::OverviewGrab g);
 
     double total = 1.0, start = 0.0, length = 1.0;
+    double position = -1.0;
+    int positionX = -1; // (the pixel the line was last drawn at, -1: none)
+    int positionXFor (double units) const;
     gesture::OverviewGrab grab = gesture::OverviewGrab::none, hoverGrab = gesture::OverviewGrab::none;
     gesture::OverviewWindow grabFrom;
     bool dragging = false;

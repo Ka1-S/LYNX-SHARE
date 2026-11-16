@@ -22,6 +22,7 @@
 #include "ui/PlaylistComponent.h"
 #include "core/PaintTemplate.h"
 #include "core/ChainPresets.h"
+#include "core/ClipLauncher.h"
 
 #include "core/EventEdit.h"
 #include "ui/EventEditor.h"
@@ -2073,6 +2074,9 @@ void PlaylistComponent::paint (juce::Graphics& g)
 
         if (playheadTick >= 0.0 && ! cachePainting)
         {
+            const juce::Graphics::ScopedSaveState trailClip (g);
+            if (g.reduceClipRegion (grid))
+                paintPlayheadTrail (g, (float) tickToX (playheadTick), grid); // (round 190im: as over the cached picture)
             g.setColour (colour::playhead);
             g.fillRect (juce::Rectangle<float> ((float) tickToX (playheadTick) - 0.5f, (float) grid.getY(), 1.5f, (float) grid.getHeight()));
         }
@@ -2284,7 +2288,9 @@ void PlaylistComponent::paint (juce::Graphics& g)
                 if (fl && t < (int) activityShown.size() && activityShown[(std::size_t) t] != 0)
                 {
                     const auto c = flHeaderFill (trackColour);
-                    g.setColour (juce::Colour::fromHSV (c.getHue(), c.getSaturation() * 0.8f, 1.0f, 1.0f));
+                    // (round 190im, DC-7: the brightness follows the level, steps 1..4; FL's lit strips are brightest loud)
+                    const auto step = juce::jlimit (1, 4, (int) activityShown[(std::size_t) t]);
+                    g.setColour (juce::Colour::fromHSV (c.getHue(), c.getSaturation() * 0.8f, 0.55f + 0.15f * (float) (step - 1), 1.0f));
                     g.fillRect (headerWidth - trackhdr::selectionStripWidth + 1, y + 1, trackhdr::selectionStripWidth - 2, juce::jmax (2, trackHeight - 3));
                 }
                 if (isTrackSelected (t) && simpleHeaders) // the Simple headers: a bar at the plate's left
@@ -2697,6 +2703,16 @@ void PlaylistComponent::paintStickyTitles (juce::Graphics& g)
     }
 }
 
+void PlaylistComponent::paintPlayheadTrail (juce::Graphics& g, float x, juce::Rectangle<int> grid) const
+{
+    if (! trailShown)
+        return;
+    const auto from = x - 0.5f - (float) playheadTrail;
+    juce::ColourGradient glow (theme::colour::playhead.withAlpha (0.0f), from, 0.0f, theme::colour::playhead.withAlpha (0.38f), x - 0.5f, 0.0f, false);
+    g.setGradientFill (glow);
+    g.fillRect (juce::Rectangle<float> (from, (float) grid.getY(), (float) playheadTrail, (float) grid.getHeight()));
+}
+
 void PlaylistComponent::paintPlayhead (juce::Graphics& g)
 {
     if (playheadTick < 0.0)
@@ -2708,6 +2724,9 @@ void PlaylistComponent::paintPlayhead (juce::Graphics& g)
         juce::Graphics::ScopedSaveState state (g);
         if (g.reduceClipRegion (grid))
         {
+            // round 190im (R5, DC-5): FL's soft glow trail behind the line while playing (shots/fl-playhead-glow-zoom.png:
+            // ≈14 px fading in towards the line), in LYNX's playhead colour (decision PL1); Animations off: no trail
+            paintPlayheadTrail (g, x, grid);
             g.setColour (colour::playhead);
             g.fillRect (juce::Rectangle<float> (x - 0.5f, (float) grid.getY(), 1.5f, (float) grid.getHeight()));
         }
@@ -2736,6 +2755,8 @@ void PlaylistComponent::swipeTimeSelectionToComp (int lane)
 
 void PlaylistComponent::paintOverChildren (juce::Graphics& g)
 {
+    paintDropGhost (g); // (round 190im: a drag's landing place)
+
     if (drag == Drag::swipe && swipeLane >= 0 && swipeEnd != swipeAnchor)
     {
         const auto x0 = (float) tickToX ((double) juce::jmin (swipeAnchor, swipeEnd));
@@ -10946,6 +10967,62 @@ void PlaylistComponent::changeListenerCallback (juce::ChangeBroadcaster* source)
     repaint();
 }
 
+// Round 190im (R5, DC-7): the level behind a lit activity strip: the held level of the mixer tracks a playing clip goes
+// to (an audio track's own mixer track; a pattern's channels' mixer tracks; an audio clip's channel's), read through the
+// meters' fourth reader (MeterBank::takeActivityPeak) once per mixer track and frame. -1: the clip plays no audio
+// (automation), lit at full brightness as FL lights it.
+float PlaylistComponent::activityLevelOf (const Song& song, const Clip& c)
+{
+    if (const auto stamp = engine.getPublishCount(); stamp != patternInsertsStamp)
+    {
+        patternInsertsStamp = stamp;
+        patternInserts.assign (song.patterns.size(), {});
+        for (std::size_t p = 0; p < song.patterns.size(); ++p)
+        {
+            auto& list = patternInserts[p];
+            for (const auto& n : song.patterns[p].notes)
+                if (n.channel >= 0 && n.channel < (int) song.channels.size())
+                    list.push_back (song.channels[(std::size_t) n.channel].mixerTrack);
+            std::sort (list.begin(), list.end());
+            list.erase (std::unique (list.begin(), list.end()), list.end());
+        }
+    }
+    auto level = -1.0f;
+    auto read = [&] (int insert) {
+        if (insert < 0 || insert >= maxMixerTracks)
+            return;
+        auto& held = activityInsertLevels[insert];
+        if (held.second != activityFrame) // (once per frame: the held level falls ~20 dB a second, a peak lifts it at once)
+        {
+            auto& bank = engine.getMeters();
+            const auto peak = juce::jmax (bank.takeActivityPeak (insert, 0), bank.takeActivityPeak (insert, 1));
+            held = { juce::jmax (peak, held.first * ui::fallFor (0.92f, activityElapsedMs)), activityFrame };
+        }
+        level = juce::jmax (level, held.first);
+    };
+    const auto linked = c.track >= 0 && c.track < (int) song.playlistTracks.size() ? song.playlistTracks[(std::size_t) c.track].mixerTrack : -1;
+    if (c.kind == ClipKind::pattern && c.pattern >= 0 && c.pattern < (int) patternInserts.size())
+        for (const auto insert : patternInserts[(std::size_t) c.pattern])
+            read (insert);
+    else if (c.kind == ClipKind::audio)
+        read (linked >= 0 ? linked : c.channel >= 0 && c.channel < (int) song.channels.size() ? song.channels[(std::size_t) c.channel].mixerTrack : -1);
+    return level;
+}
+
+// the strip's brightness step 1..4 for a level (-1: no audio, full)
+static char activityStepOf (float level)
+{
+    if (level < 0.0f)
+        return 4;
+    const auto db = juce::Decibels::gainToDecibels (level, -100.0f);
+    return (char) (db > -9.0f ? 4 : db > -18.0f ? 3 : db > -30.0f ? 2 : 1);
+}
+
+bool PlaylistComponent::playheadTrailOn() const
+{
+    return ui::motion::enabled() && engine.getTransport().playing.load (std::memory_order_relaxed) && playheadTick >= 0.0;
+}
+
 bool PlaylistComponent::liveFrame (double nowMs)
 {
     auto& transport = engine.getTransport();
@@ -10960,12 +11037,19 @@ bool PlaylistComponent::liveFrame (double nowMs)
     // whenever it moved: the line is anti-aliased, so even a fraction of a pixel shows (zoomed out, a playhead crossing
     // a few pixels a second glides at the display's rate instead of stepping, as FL's does)
     const auto moved = (tick < 0.0) != (playheadTick < 0.0) || std::abs ((tick - playheadTick) * pixelsPerTick) >= 0.002;
-    if (moved && isShowing())
+    // round 190im (R5, DC-5): the glow trail behind the line while playing (Animations on); its own repaint when it
+    // comes or goes without the line moving (Stop: the line stays, the trail goes)
+    const auto trail = playheadTrailOn();
+    const auto trailFlip = trail != trailShown;
+    trailShown = trail;
+    if ((moved || trailFlip) && isShowing())
     {
         // only the cursor column (old and new) is repainted: large projects stay cheap. One rectangle for both: the
         // two strips overlap (a frame moves the line by a pixel or less), and each rectangle of a repaint is a paint
-        auto column = [this] (double t) {
-            return t >= 0.0 ? juce::Rectangle<int> ((int) tickToX (t) - 8, 0, 16, getHeight()) : juce::Rectangle<int>();
+        // (round 190im: the column reaches the trail's width left of the line while it shows)
+        const auto left = trail || trailFlip ? 8 + playheadTrail : 8;
+        auto column = [this, left] (double t) {
+            return t >= 0.0 ? juce::Rectangle<int> ((int) tickToX (t) - left, 0, left + 8, getHeight()) : juce::Rectangle<int>();
         };
         auto dirty = [this] (juce::Rectangle<int> r) {
             if (r.isEmpty())
@@ -11000,22 +11084,65 @@ bool PlaylistComponent::liveFrame (double nowMs)
     else if (moved)
         playheadTick = tick;
 
+    // round 190im (R5, DC-6): the song position in the overview strip while playing (none when stopped, as FL)
+    overview.setPosition (playing && isShowing() ? tick : -1.0);
+
     // round 190ig (FM-28): FL's activity column beside the headers — a track's strip lit while a clip of it plays under the
     // playhead; only the strips that flip are repainted, nothing runs while stopped once they are dark
-    if (flHeaders() && isShowing() && (playing || ! activityShown.empty()))
+    // round 190im (R5, DC-3): the same pass finds the patterns that play, for the picker's marks
+    const auto pickerShown = livePicker != nullptr && livePicker->isShowing();
+    if ((flHeaders() && isShowing() && (playing || ! activityShown.empty())) || (pickerShown && (playing || ! livePicker->playingPatterns.empty())))
     {
         std::vector<char> now;
+        std::vector<int> patternsNow;
         if (playing && tick >= 0.0)
         {
+            // (round 190im, DC-7: the brightness steps follow the level 15 times a second — a strip that lights or goes
+            // dark does so at once — so the strips' repaints stay few beside the playhead's column)
+            const auto levelsDue = activityMs < 0.0 || nowMs - activityMs >= 1000.0 / 15.0;
+            if (levelsDue)
+            {
+                ++activityFrame;
+                activityElapsedMs = activityMs < 0.0 ? 1000.0 / 60.0 : juce::jlimit (0.0, 1000.0, nowMs - activityMs);
+                activityMs = nowMs;
+            }
             now.assign ((std::size_t) numTracks(), 0);
+            std::vector<float> levels (now.size(), -2.0f); // (-2: dark; -1: lit by a clip without audio)
+            const auto strips = flHeaders();
             for (const auto& c : song.playlist)
                 if (! c.muted && c.track >= 0 && c.track < (int) now.size() && (double) c.start <= tick && tick < (double) c.end())
-                    now[(std::size_t) c.track] = 1;
+                {
+                    auto& l = levels[(std::size_t) c.track];
+                    if (strips && levelsDue) // (round 190im, DC-7: the brightness step from the level of what the track plays)
+                    {
+                        const auto own = activityLevelOf (song, c);
+                        l = l < -1.5f ? own : juce::jmax (own, l); // (a level ≥ 0 beats -1)
+                    }
+                    else
+                        l = juce::jmax (l, -1.0f);
+                    if (c.kind == ClipKind::pattern && pickerShown)
+                        patternsNow.push_back (c.pattern);
+                }
+            for (std::size_t t = 0; t < now.size(); ++t)
+                if (levels[t] > -1.5f)
+                    now[t] = strips && ! levelsDue && t < activityShown.size() && activityShown[t] != 0 ? activityShown[t] : activityStepOf (levels[t]);
         }
+        else if (playing && song.mode == PlayMode::pattern && pickerShown) // (Pattern mode: the current pattern plays)
+            patternsNow.push_back (song.currentPattern);
+        if (! (playing && tick >= 0.0))
+            activityMs = -1.0;
+        if (pickerShown)
+        {
+            std::sort (patternsNow.begin(), patternsNow.end());
+            patternsNow.erase (std::unique (patternsNow.begin(), patternsNow.end()), patternsNow.end());
+            livePicker->setPlayingPatterns (std::move (patternsNow));
+        }
+        if (! (flHeaders() && isShowing()))
+            now.clear();
         const auto count = std::max (now.size(), activityShown.size());
         for (std::size_t t = 0; t < count; ++t)
         {
-            const auto was = t < activityShown.size() && activityShown[t] != 0, is = t < now.size() && now[t] != 0;
+            const auto was = t < activityShown.size() ? activityShown[t] : (char) 0, is = t < now.size() ? now[t] : (char) 0;
             if (was != is && (int) t < numTracks())
                 repaint (headerWidth - trackhdr::selectionStripWidth, trackToY ((int) t), trackhdr::selectionStripWidth, heightOf ((int) t));
         }
@@ -11449,8 +11576,174 @@ void PlaylistComponent::applyGeneratorDrop (ChannelDef generator, std::vector<in
     repaint();
 }
 
+// Round 190im (R5, DE-135): while something is dragged over the Playlist, the clips the drop would make are drawn where
+// they would land (the snapped time, the track under the mouse, their length), so the place is seen before the release.
+// FL's own drop feedback is not captured yet (capture C-11; FL's picker drag shows the entry's picture under the
+// mouse, FLEngine FUN_00e4daa0): this is LYNX's aid in every layout. Sources: the Picker panel (issue #177's drag
+// description, "lynx-picker|kind|entries", branch wip/pickerdrag190hm: entry k on the track under the mouse + k at the
+// nearest snap line; Shift: one after the other on that track), a clip of the clip grid, a pattern or an audio file of
+// the Browser. Only the old and new ghost rectangles are repainted, on drag moves only.
+void PlaylistComponent::updateDropGhost (const SourceDetails& details)
+{
+    std::vector<Clip> ghost;
+    const auto& song = engine.getSong();
+    const auto grid = gridArea();
+    const auto p = details.localPosition;
+    if (p.y >= tracksTop() && p.y < grid.getBottom() && p.x < grid.getRight())
+    {
+        const auto track = juce::jmax (0, yToTrack (p.y));
+        const auto snapped = juce::jmax<std::int64_t> (0, snap (xToTick (p.x), true));
+        const auto ticksOfSeconds = [&song] (double seconds) { return juce::jmax<std::int64_t> (ppq / 4, (std::int64_t) (seconds * song.bpm / 60.0 * ppq)); };
+        const auto channelTicks = [&] (int channel) -> std::int64_t {
+            if (channel < 0 || channel >= (int) song.channels.size())
+                return 0;
+            if (auto data = engine.getSampleLibrary().findLoaded (juce::String::fromUTF8 (song.channels[(std::size_t) channel].samplePath.c_str())))
+                return ticksOfSeconds ((double) data->frames() / data->sampleRate);
+            return 0;
+        };
+        const auto add = [&] (ClipKind kind, int index, int t, std::int64_t start, std::int64_t length) {
+            if (length <= 0 || t < 0)
+                return;
+            Clip c;
+            c.kind = kind;
+            c.pattern = kind == ClipKind::pattern ? index : 0;
+            c.channel = kind == ClipKind::audio ? index : -1;
+            c.automation = kind == ClipKind::automation ? index : -1;
+            c.track = t;
+            c.start = start;
+            c.length = length;
+            ghost.push_back (c);
+        };
+        const auto patternTicks = [&song] (int pattern) {
+            return pattern >= 0 && pattern < (int) song.patterns.size()
+                       ? juce::jmax<std::int64_t> (ppq, song.patterns[(std::size_t) pattern].effectiveLength (song.meter())) : (std::int64_t) 0;
+        };
+        const auto text = details.description.toString();
+        int gridTrack = 0, gridScene = 0;
+        if (text.startsWith ("lynx-picker|"))
+        {
+            const auto parts = juce::StringArray::fromTokens (text, "|", "");
+            const auto kind = parts.size() == 3 ? (ClipKind) parts[1].getIntValue() : ClipKind::pattern;
+            const auto shift = juce::ModifierKeys::currentModifiers.isShiftDown();
+            auto at = juce::jmax<std::int64_t> (0, snapLine (juce::jmax (0.0, xToTick (juce::jmax (p.x, grid.getX())))));
+            int k = 0;
+            for (const auto& e : juce::StringArray::fromTokens (parts[2], ",", ""))
+            {
+                const auto index = e.getIntValue();
+                const auto length = kind == ClipKind::pattern ? patternTicks (index)
+                                    : kind == ClipKind::audio  ? channelTicks (index)
+                                                               : (index >= 0 && index < (int) song.automations.size() ? song.barTicks() * 4 : 0);
+                add (kind, index, shift ? track : track + k, at, length);
+                if (shift)
+                    at += juce::jmax<std::int64_t> (1, length);
+                ++k;
+            }
+        }
+        else if (clipGridDrag (details.description, gridTrack, gridScene))
+        {
+            if (const auto* c = song.clipGrid ? launcher::clipAt (*song.clipGrid, gridTrack, gridScene) : nullptr)
+                add (c->kind, c->kind == ClipKind::audio ? c->channel : c->kind == ClipKind::automation ? c->automation : c->pattern, track, snapped, c->length);
+        }
+        else if (const auto pattern = BrowserComponent::draggedPattern (details); pattern >= 0)
+            add (ClipKind::pattern, pattern, track, snapped, patternTicks (pattern));
+        else if (const auto file = BrowserComponent::draggedFile (details); file.existsAsFile() && p.x >= headerWidth)
+        {
+            if (file.getFullPathName() != dropGhostFile)
+            {
+                dropGhostFile = file.getFullPathName();
+                dropGhostFileTicks = 0;
+                if (auto data = engine.getSampleLibrary().findLoaded (dropGhostFile))
+                    dropGhostFileTicks = ticksOfSeconds ((double) data->frames() / data->sampleRate);
+                else
+                {
+                    static juce::AudioFormatManager formats; // (the header only: its length)
+                    if (formats.getNumKnownFormats() == 0)
+                        formats.registerBasicFormats();
+                    if (std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (file)); reader != nullptr && reader->sampleRate > 0.0)
+                        dropGhostFileTicks = ticksOfSeconds ((double) reader->lengthInSamples / reader->sampleRate);
+                }
+            }
+            add (ClipKind::audio, -1, track, snapped, dropGhostFileTicks);
+        }
+    }
+    if (ghost.size() == dropGhost.size()
+        && std::equal (ghost.begin(), ghost.end(), dropGhost.begin(), [] (const Clip& a, const Clip& b) {
+               return a.track == b.track && a.start == b.start && a.length == b.length && a.kind == b.kind;
+           }))
+        return;
+    dropGhost = std::move (ghost);
+    const auto now = dropGhostBounds();
+    if (! dropGhostArea.isEmpty())
+        repaint (dropGhostArea);
+    if (! now.isEmpty())
+        repaint (now);
+    dropGhostArea = now;
+}
+
+void PlaylistComponent::clearDropGhost()
+{
+    dropGhost.clear();
+    dropGhostFile.clear();
+    if (! dropGhostArea.isEmpty())
+        repaint (dropGhostArea);
+    dropGhostArea = {};
+}
+
+juce::Rectangle<int> PlaylistComponent::dropGhostBounds() const
+{
+    juce::Rectangle<int> area;
+    const auto grid = gridArea();
+    for (const auto& c : dropGhost)
+    {
+        if (c.track >= numTracks())
+            continue;
+        const auto x0 = (int) std::floor (tickToX ((double) c.start)), x1 = (int) std::ceil (tickToX ((double) c.end()));
+        area = area.getUnion (juce::Rectangle<int> (x0, trackToY (c.track), juce::jmax (2, x1 - x0), heightOf (c.track)).expanded (2).getIntersection (grid));
+    }
+    return area;
+}
+
+void PlaylistComponent::paintDropGhost (juce::Graphics& g)
+{
+    if (dropGhost.empty())
+        return;
+    const auto& song = engine.getSong();
+    const juce::Graphics::ScopedSaveState keep (g);
+    g.reduceClipRegion (gridArea());
+    for (const auto& c : dropGhost)
+    {
+        if (c.track >= numTracks())
+            continue;
+        auto colour = theme::colour::accent;
+        if (c.kind == ClipKind::pattern)
+            colour = patternColour (song, c.pattern);
+        else if (c.kind == ClipKind::audio && c.channel >= 0 && c.channel < (int) song.channels.size())
+            colour = audioClipColour (song.channels[(std::size_t) c.channel]);
+        else if (c.kind == ClipKind::automation && c.automation >= 0 && c.automation < (int) song.automations.size() && song.automations[(std::size_t) c.automation].colour != 0)
+            colour = juce::Colour (song.automations[(std::size_t) c.automation].colour);
+        const auto x0 = (float) tickToX ((double) c.start), x1 = (float) tickToX ((double) c.end());
+        const auto r = juce::Rectangle<float> (x0, (float) trackToY (c.track) + 1.0f, juce::jmax (2.0f, x1 - x0), (float) heightOf (c.track) - 2.0f);
+        g.setColour (colour.withAlpha (0.45f));
+        g.fillRect (r);
+        g.setColour (colour.brighter (0.8f));
+        g.drawRect (r, 1.5f);
+        g.fillRect (r.withWidth (2.0f)); // (the start, where the snap put it)
+    }
+}
+
+void PlaylistComponent::dragOverForSnapshot (const juce::var& description, juce::Point<int> at)
+{
+    if (description.isVoid())
+    {
+        clearDropGhost();
+        return;
+    }
+    updateDropGhost (SourceDetails (description, nullptr, at));
+}
+
 void PlaylistComponent::itemDropped (const SourceDetails& details)
 {
+    clearDropGhost();
     if (BrowserComponent::isGeneratorDrag (details) || BrowserComponent::isEffectDrag (details))
     {
         pluginDropped (details);
@@ -11494,11 +11787,29 @@ PatternPicker::PatternPicker (AudioEngine& e, PlaylistComponent& p)
 {
     engine.addChangeListener (this);
     seenBrush = playlist.brush.kind;
+    playlist.livePicker = this; // (round 190im: the Playlist's frame step tells it what plays)
 }
 
 PatternPicker::~PatternPicker()
 {
+    if (playlist.livePicker == this)
+        playlist.livePicker = nullptr;
     engine.removeChangeListener (this);
+}
+
+void PatternPicker::setPlayingPatterns (std::vector<int> now)
+{
+    if (now == playingPatterns)
+        return;
+    // only the entries whose mark comes or goes (the pattern list: entry i = pattern i)
+    std::vector<int> changed;
+    std::set_symmetric_difference (playingPatterns.begin(), playingPatterns.end(), now.begin(), now.end(), std::back_inserter (changed));
+    playingPatterns = std::move (now);
+    if (view != 0)
+        return;
+    for (const auto p : changed)
+        if (const auto y = headerHeight + (p - scroll) * rowHeight; p >= scroll && y < listBottom())
+            repaint (0, y, getWidth(), rowHeight);
 }
 
 void PatternPicker::changeListenerCallback (juce::ChangeBroadcaster*)
@@ -11658,6 +11969,14 @@ void PatternPicker::paint (juce::Graphics& g)
             {
                 g.setColour (colour::accent);
                 g.fillRoundedRectangle (box.withWidth (3.0f), 1.5f);
+            }
+
+            // round 190im (R5, DC-3): a pattern that plays now — FL's light-blue bar at the entry's right edge (#A2E7FF,
+            // 4 px wide, the entry's whole height: shots/fl-picker-stopped-vs-playing.png); LYNX's looks: the playhead colour
+            if (row.kind == ClipKind::pattern && std::binary_search (playingPatterns.begin(), playingPatterns.end(), row.index))
+            {
+                g.setColour (flClipLook() ? juce::Colour (0xffa2e7ff) : colour::playhead);
+                g.fillRect (box.withLeft (box.getRight() - 4.0f));
             }
 
             g.setColour (flClipLook() ? flHeaderInk (fill) : clipTitleText (fill));
