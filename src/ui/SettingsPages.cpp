@@ -381,7 +381,7 @@ public:
 
         styleLabel (autosaveLabel, tr ("Save a backup copy"));
         for (auto minutes : prefs::autosaveIntervals())
-            autosaveBox.addItem (minutes == 0 ? tr ("Never")
+            autosaveBox.addItem (minutes == 0 ? tr ("Never (just remind every 10 min)") // (FL's wording; round 190ih)
                                  : minutes == 1 ? tr ("Every minute")
                                                 : tr ("Every {0} minutes", { juce::String (minutes) }),
                                  minutes + 1);

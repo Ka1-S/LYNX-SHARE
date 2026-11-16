@@ -38,6 +38,8 @@ void setNativeEditorDemo (bool on);
 // Round 166f (--eq166fshot): one display tick of a native editor without its timer (Parametric EQ 2's spectrum and
 // heatmap read the slot's analyser tap, which this claims); false when `editor` is not a native effect editor.
 bool tickNativeEffectEditor (juce::Component& editor);
+// round 190ih (--details190ihshot): Gross Beat's editor on its time (0) or volume (1) envelope
+bool showGrossBeatEnvelopeForSnapshot (juce::Component& editor, int envelopeKind);
 // round 170k2: the smallest size its window allows (the header still shows the whole name); {} for another component
 juce::Point<int> nativeEditorMinimumSize (juce::Component& editor);
 } // namespace lynx

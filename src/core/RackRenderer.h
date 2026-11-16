@@ -609,6 +609,13 @@ public:
             return {};
         return { sounding[(std::size_t) channel][0].load (std::memory_order_relaxed), sounding[(std::size_t) channel][1].load (std::memory_order_relaxed) };
     }
+    // Round 190ih (FL's channel activity light, PLAN R4): how many blocks struck a note on the channel (any source: song,
+    // pattern, typing keyboard, MIDI, Piano roll preview, arpeggiator); a change since the last look = a new note-on,
+    // even one shorter than the UI's frame. Safe to read from any thread.
+    std::uint32_t noteStrikes (int channel) const noexcept
+    {
+        return channel >= 0 && channel < maxChannels ? strikes[(std::size_t) channel].load (std::memory_order_relaxed) : 0u;
+    }
     void setProfiling (bool on) noexcept { profiling.store (on, std::memory_order_relaxed); }
     bool isProfiling() const noexcept { return profiling.load (std::memory_order_relaxed); }
     const UnitTimes& unitTimes() const noexcept { return *units; }
@@ -847,6 +854,7 @@ private:
     std::array<char, maxChannels> channelSilent {};          // channel skipped in this chunk (idle, no notes)
     std::array<NoteMask, maxChannels> heldNotes {};          // keys held on each channel (effects that follow notes: LYNX Tune)
     std::array<std::array<std::atomic<std::uint64_t>, 2>, maxChannels> sounding {};
+    std::array<std::atomic<std::uint32_t>, maxChannels> strikes {}; // (noteStrikes; written only by publishSoundingKeys)
     std::array<NoteMask, maxChannels> struckNotes {};        // keys started in this block (a note shorter than a block still shows)
     std::array<NoteMask, maxChannels> publishedNotes {};     // what soundingKeys holds (stored only on a change)
     int publishedTop = 0;                                   // channels past it have nothing published

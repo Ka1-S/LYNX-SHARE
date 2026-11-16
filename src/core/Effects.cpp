@@ -1138,6 +1138,7 @@ public:
             }
             fl.process (l, r, n);
             tail = -1;
+            listen (l, r, n, params);
             return;
         }
         flMode = false;
@@ -1183,9 +1184,48 @@ public:
                 l[i] *= output;
                 r[i] *= output;
             }
+        listen (l, r, n, params);
     }
 
+    // round 190ih: the momentary band solo (peq::setSoloBand)
+    std::atomic<int> solo { -1 };
+
 private:
+    // after the EQ (its latency and sound kept), only the soloed band's region passes
+    void listen (float* l, float* r, int n, const EffectParams& params) noexcept
+    {
+        const auto band = solo.load (std::memory_order_relaxed);
+        if (band < 0 || band >= peq::bands)
+        {
+            soloShown = -1;
+            return;
+        }
+        const auto hz = params[(std::size_t) peq::param (band, 1)];
+        const auto width = params[(std::size_t) peq::param (band, 3)];
+        if (band != soloShown || hz != soloHz || width != soloWidth)
+        {
+            if (band != soloShown)
+                soloFilter.reset();
+            soloShown = band;
+            soloHz = hz;
+            soloWidth = width;
+            EffectParams bp {};
+            bp[(std::size_t) peq::param (0, 0)] = peq::typeValue (peq::BandType::bandPass);
+            bp[(std::size_t) peq::param (0, 1)] = hz;
+            bp[(std::size_t) peq::param (0, 3)] = peq::qValue (peq::soloQ (params, band));
+            std::array<Biquad, 4> fresh;
+            if (bandStages (bp, 0, sampleRate, fresh) > 0)
+            {
+                soloFilter.b0 = fresh[0].b0; soloFilter.b1 = fresh[0].b1; soloFilter.b2 = fresh[0].b2;
+                soloFilter.a1 = fresh[0].a1; soloFilter.a2 = fresh[0].a2;
+            }
+        }
+        soloFilter.processBlock (l, r, n);
+    }
+
+    Biquad soloFilter;
+    int soloShown = -1;
+    float soloHz = -1.0f, soloWidth = -1.0f;
     double sampleRate = 44100.0;
     std::array<std::array<Biquad, 4>, peq::bands> stages;
     std::array<Biquad*, peq::bands * 4> order {};
@@ -1552,6 +1592,27 @@ private:
 // Parameters: 0 period/64 beats, 1 depth ((a + 1)/2, a = maximum pan excursion), 2 phase
 // offset (cycles), 3 fixed pan ((p + 1)/2). Pan law: the utility's balance (FL's has not been decoded).
 } // namespace
+
+namespace peq
+{
+void setSoloBand (Effect* effect, int band) noexcept
+{
+    if (auto* eq = dynamic_cast<ParametricEq*> (effect))
+        eq->solo.store (band >= 0 && band < bands ? band : -1, std::memory_order_relaxed);
+}
+
+int soloBand (const Effect* effect) noexcept
+{
+    const auto* eq = dynamic_cast<const ParametricEq*> (effect);
+    return eq != nullptr ? eq->solo.load (std::memory_order_relaxed) : -1;
+}
+
+double soloQ (const EffectParams& params, int band) noexcept
+{
+    const auto v = params[(std::size_t) param (std::clamp (band, 0, bands - 1), 3)];
+    return std::clamp (q (flLaw (params) ? 1.0f - v : v), 0.5, 18.0); // (FL's bandwidth grows with the value; LYNX's Q shrinks)
+}
+} // namespace peq
 
 // FL's mode-0 pan law (REA_rodada27 §3.1): G_L = √2·cos((1 + pan)π/4), G_R = √2·sin((1 + pan)π/4) (unit volume),
 // the near side keeps 1 − f/2 of its input and gets f/2 of the other, f = 1 − (far gain); no clamp of pan

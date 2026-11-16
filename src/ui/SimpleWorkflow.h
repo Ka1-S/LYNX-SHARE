@@ -68,6 +68,8 @@ public:
     // chooser.
     void entered();
     void left();
+    // round 190ih: the main window's 30 Hz timer, while this workflow shows (the dock's input level)
+    void tick();
     // The song changed (MainComponent's change callback, only while the style is on): a new or emptied project shows the
     // chooser again, unless it was closed for this project.
     void songChanged();
