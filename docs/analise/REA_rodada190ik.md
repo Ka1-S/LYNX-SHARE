@@ -42,22 +42,31 @@ Engine (`proStretch` + `warpengine::keepFormants`), warpLaw Measured only:
 2. band-limited resampling back to `outFrames` (Kaiser sinc, cut-off lowered when read faster);
 3. formant correction per 46 ms frame (quarter hop): the cepstral **true envelope** (Röbel & Rodet) of the mono power,
    lifter = Envelope / 4 samples at 44.1 kHz, the envelope read back at `bin × factor^(Formants/100)`; gain limited to
-   −40 dB … +6 dB (up) / +12 dB (down); held at the frame's fundamental below it; scaled by how pitched the frame is (the
-   normalised autocorrelation peak at 1…16.7 ms, 0.4 → 0 … 0.75 → 1).
+   −40 dB … +6 dB (up) / +60 dB (down: Live keeps the highs of a down-shift); held at the frame's fundamental below it;
+   scaled by how tonal the frame is (spectral flatness over 300 Hz…8 kHz, 0.03 → 0 … 0.003 → 1: chords are tonal although
+   barely periodic, drum hits stay as transposed);
+4. level law (level pass): Live's output level after the correction is not the source's — up-shifts get quieter, down-
+   shifts louder, depending on Formants and Envelope (W2, vs the source: voice / vowel / chords +7 −1.4 / −5.7 / −2.7 dB,
+   −12 +2.2 / +0.8 / +4.0 dB; Formants 50 about half; Envelope 32 none). Fitted law of the effective shift u = semitones ×
+   Formants × h(Envelope) (h: 0 at 32, 0.6 at 64, 1 at 128, 1.2 at 256): −0.69·u^0.75 dB up, +0.016·u² dB down; each frame's
+   level is set to 0.65 × that law + 0.35 × the level the correction itself gives, scaled by the frame's tonality.
 
 The lifter, the raise limits and the block were chosen by a grid on the 40 transposed r1.0 cells (`ana/grid*.txt`: score =
-spectrum + LSD/2 + formant shift + |level|/2; before 10.70, chosen 7.34; lifter Envelope/2 9.19, no raise 8.26, ±24 dB
-7.46, resample-before-stretch 7.56).
+spectrum + LSD/2 + formant shift + |level|/2; before 10.70, first pass 7.34; lifter Envelope/2 9.19, no raise 8.26, ±24 dB
+7.46, resample-before-stretch 7.56). Level pass (`ana/gridL*`, `spq.py`): a tilt-based level law (κ 0.5…1) 7.04…7.07, a
+peak-interpolated log-frequency envelope worse (spectrum 4.6 → 5.0…5.6 on the 12-cell check), the fitted law with the
+flatness weight and the down-shift raise 60 dB best (12-cell check: |level| 2.25 → 1.10, spectrum 4.59 → 3.59).
 
 | Complex Pro (W1 + W2) | cases | \|level\| dB | env corr | env dev dB | spectrum dB | LSD dB | formant shift st | cells better / worse |
 |---|---|---|---|---|---|---|---|---|
-| transposed (Formants > 0) | 60 | 1.74 → 1.73 | 0.87 → 0.88 | 2.52 → 2.62 | 3.87 → 2.62 | 6.24 → 4.59 | 3.21 → 1.30 | 204 / 129 |
+| transposed (Formants > 0) | 60 | 1.74 → **0.80** | 0.87 → 0.89 | 2.52 → 1.96 | 3.87 → 2.36 | 6.24 → 4.44 | 3.21 → 1.20 | 261 / 63 |
 | Formants 0 | 8 | 0.20 → 0.11 | 0.98 → 0.99 | 1.35 → 1.02 | 0.53 → 0.43 | 3.00 → 2.68 | 0.58 → 0.44 | 27 / 6 |
 | no transposition | 8 | unchanged (Complex) | | | | | | 0 / 0 |
 
-Worse cells, by kind: level / envelope deviation where LYNX's corrected level differs from Live's (voice +7: +4.7 dB vs
-Live's −1.4 dB from the source), and the chords at −12 st (spectrum 6.2 → 11.7 dB: Live's octave-down chords keep more
-high partials than a formant correction gives). Complex Pro transposes offline now: no real-time shifter runs for it.
+Every mean improves; level within 0.8 dB of Live on average (by source: voice 0.65, drums 0.57, vowel 1.22, chords 0.95).
+Octave-down chords: spectrum 6.2 (before) → 5.4 dB (first pass 11.7). Remaining worse cells (63): mostly envelope
+correlation / deviation of single cells and drums at −12 (spectrum 3.0 → 5.2: the tonal frames of the drum loop take the
+down-shift raise). Complex Pro transposes offline now: no real-time shifter runs for it.
 
 ## 3. Texture
 
@@ -70,6 +79,10 @@ Facts (W1 / W2, `ana/grains.py`, `gmodel.py`, `lvl.py`, `fluxfit*.py`):
   flux-0 grains is 0.931…0.934 for all three), about ⅛ of the grain period from Grain Size 65 up, relatively less below.
   Between 0 and 25 the law is assumed linear (not rendered).
 - A transposed Texture clip resamples its grains (its formants move: vowel +7 shifts 6.6 st).
+- Below Grain Size 10 the period stops following the size one to one (level pass): 10 ms × (size / 10)^0.2 (7.2 ms at 2)
+  matched the W1 Grain Size 2 renders best (exponents 0.1 / 0.2 / 0.35): voice spectrum 7.7 → 3.4 (r0.8) and 8.8 → 5.4 dB
+  (r1.5), now under the spectral stretcher's 6.8 / 7.1; drums 3.0 → 2.8 / 1.0 → 1.9 (before 2.0 / 2.6). Grain Size 10 and
+  up unchanged.
 
 Engine (`warpengine::texture`, warpLaw Measured): the model above; the scatter is a fixed pseudo-random sequence per
 source (renders repeat exactly); a transposition reads each grain `2^(st/12)` faster, rendered offline.
@@ -77,7 +90,7 @@ source (renders repeat exactly); a transposition reads each grain `2^(st/12)` fa
 | Texture (W1 + W2) | cases | \|level\| dB | env corr | env dev dB | spectrum dB | LSD dB | formant shift st | cells better / worse |
 |---|---|---|---|---|---|---|---|---|
 | Flux 0 | 8 | 0.60 → 0.04 | 0.89 → 0.99 | 2.73 → 0.19 | 1.07 → 0.08 | 3.66 → 0.34 | 0.86 → 0.04 | 45 / 0 |
-| Flux > 0 (random) | 48 | 0.42 → 0.32 | 0.90 → 0.88 | 2.44 → 2.39 | 1.44 → 1.21 | 4.41 → 3.96 | 1.09 → 0.88 | 133 / 92 |
+| Flux > 0 (random) | 48 | 0.42 → 0.31 | 0.90 → 0.88 | 2.44 → 2.39 | 1.44 → 1.06 | 4.41 → 3.72 | 1.09 → 0.79 | 140 / 85 |
 
 Flux > 0, statistics: the envelope's modulation depth is off Live's by 1.45 → 0.21 dB on average (48 cells), the long-term
 spectrum 1.44 → 1.21 dB (the spectral stretcher had almost no grain modulation). Worse cells there are envelope correlation / deviation of two random draws (e.g. vowel r0.8 flux 50: env corr
@@ -192,9 +205,10 @@ fixed-tempo A/B (bit-identical with the hook off).
 
 ## 9. Left out / live checks
 
-- Flux between 0 and 25 (assumed linear); Grain Size below 10 not measured with the new model (g2 buzzes differently:
-  spectrum 6.8 → 7.7 dB, the one Texture setting that got worse on spectrum).
-- Complex Pro levels: LYNX's corrected level is off Live's by 1.7 dB on average (unchanged); octave-down chords.
+- Flux between 0 and 25 (assumed linear); the grain period below Grain Size 10 is a fit on the two Grain Size 2 renders
+  (no render between 2 and 10).
+- Complex Pro level law: fitted on voice / vowel / chords; the vowel stays the farthest (1.2 dB on average); drums at −12
+  st take the down-shift raise on their tonal frames (spectrum 3.0 → 5.2 dB).
 - The Beats detector does not follow Live's cuts at vibrato / vowel changes (Live cuts there; the brief asked for glides
   and vibrato not to cut). An octave error of the pitch track can still cut a glide.
 - The real-time clip pitch of Playlist clips (FL layout) on a Complex Pro / Texture channel stays the voice shifter.
