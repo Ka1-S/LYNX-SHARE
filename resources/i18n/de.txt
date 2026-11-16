@@ -10701,3 +10701,15 @@ countries: de at ch li lu
 "FX 2" = "FX 2"
 "Note PB" = "Noten-PB"
 "Helix" = "Helix"
+
+# --- rollup 0.1.30 step 3: Save a copy for 0.1.28 knows rounds 190ja / 190is / 190it / 190ik / 190im
+"Helix is not in this release: its channels become empty Samplers and play nothing: {0}" = "Helix gibt es in dieser Version nicht: seine Kanäle werden zu leeren Samplern und spielen nichts: {0}"
+"Echoform's echo voicings play their earlier loop: {0}" = "Die Echo-Voicings von Echoform spielen ihre frühere Schleife: {0}"
+"Epoch Verb, Atrium, Foil Plate and Halo play the 0.1.27 version of their Measured law: {0}" = "Epoch Verb, Atrium, Foil Plate und Halo spielen die Version 0.1.27 ihres Measured-Gesetzes: {0}"
+"Lattice Mod plays its earlier tap network: {0}" = "Lattice Mod spielt sein früheres Tap-Netz: {0}"
+"LuxeVerb's Space ducking is not in this release: {0}" = "Das Space-Ducking von LuxeVerb gibt es in dieser Version nicht: {0}"
+"Beats' pitch-aware cuts play as the Measured law: {0}" = "Die tonhöhenbewussten Schnitte von Beats spielen nach dem Measured-Gesetz: {0}"
+"Texture and Complex Pro play their earlier engine (no grains or formants): {0}" = "Texture und Complex Pro spielen ihre frühere Engine (ohne Grains und Formanten): {0}"
+"Complex Pro and Texture transpositions play through the Pitch knob: {0}" = "Transpositionen von Complex Pro und Texture spielen über den Pitch-Regler: {0}"
+"Warped samples do not follow tempo changes in this release: they keep the project tempo" = "Gewarpte Samples folgen in dieser Version keinen Tempowechseln: sie behalten das Projekttempo"
+"{0} deactivated clip slot(s) play again" = "{0} deaktivierte Clip-Slot(s) spielen wieder"

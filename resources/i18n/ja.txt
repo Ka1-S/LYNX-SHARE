@@ -10701,3 +10701,15 @@ countries: jp
 "FX 2" = "FX 2"
 "Note PB" = "ノート PB"
 "Helix" = "Helix"
+
+# --- rollup 0.1.30 step 3: Save a copy for 0.1.28 knows rounds 190ja / 190is / 190it / 190ik / 190im
+"Helix is not in this release: its channels become empty Samplers and play nothing: {0}" = "このリリースには Helix がありません: そのチャンネルは空の Sampler になり、何も鳴りません: {0}"
+"Echoform's echo voicings play their earlier loop: {0}" = "Echoform のエコーボイシングは以前のループで再生されます: {0}"
+"Epoch Verb, Atrium, Foil Plate and Halo play the 0.1.27 version of their Measured law: {0}" = "Epoch Verb、Atrium、Foil Plate、Halo は Measured 法則の 0.1.27 版で再生されます: {0}"
+"Lattice Mod plays its earlier tap network: {0}" = "Lattice Mod は以前のタップネットワークで再生されます: {0}"
+"LuxeVerb's Space ducking is not in this release: {0}" = "このリリースには LuxeVerb の Space ダッキングがありません: {0}"
+"Beats' pitch-aware cuts play as the Measured law: {0}" = "ピッチに従う Beats のカットは Measured 法則で再生されます: {0}"
+"Texture and Complex Pro play their earlier engine (no grains or formants): {0}" = "Texture と Complex Pro は以前のエンジンで再生されます (グレインやフォルマントなし): {0}"
+"Complex Pro and Texture transpositions play through the Pitch knob: {0}" = "Complex Pro と Texture のトランスポーズは Pitch ノブで再生されます: {0}"
+"Warped samples do not follow tempo changes in this release: they keep the project tempo" = "このリリースではワープしたサンプルはテンポの変化に従いません: プロジェクトのテンポのままです"
+"{0} deactivated clip slot(s) play again" = "無効化した {0}個のクリップスロットが再び鳴ります"

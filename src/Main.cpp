@@ -50,6 +50,8 @@
 #include "core/MixSuite.h"
 #include "core/HardwareInsert.h"
 #include "core/EchoSuite.h"
+#include "core/LuxeVerb.h"
+#include "core/LynxVerbs.h"
 #include "core/LynxTune.h"
 #include "core/FlEffects.h"
 #include "core/FlpImport.h"
@@ -6192,6 +6194,40 @@ private:
             coloured.points = { { 0, 0.2f }, { 1920, 0.8f } };
             song.automations.push_back (coloured);
             lynx::mixsnap::take (song);
+            // rollup step 3 (round 190jk): Helix (190ja), the effects' hidden revisions (190is / 190it), a warped Texture
+            // channel with its offline transposition and tempo automation (190ik), a deactivated clip slot (190im)
+            lynx::ChannelDef helix;
+            helix.name = "WT";
+            helix.instrument = lynx::InstrumentKind::helix;
+            helix.modelParams = { 0.5f };
+            song.channels.push_back (helix);
+            lynx::ChannelDef loop;
+            loop.name = "Loop";
+            loop.sampler.stretchBeats = 8.0f;
+            loop.sampler.keepPitch = true;
+            loop.sampler.stretchMethod = lynx::StretchMethod::texture;
+            loop.sampler.stretchPitch = 5.0f;
+            song.channels.push_back (loop);
+            lynx::Automation tempoClip;
+            tempoClip.name = "Tempo";
+            tempoClip.target.kind = lynx::AutomationTargetKind::tempo;
+            tempoClip.points = { { 0, 0.4f }, { 1920, 0.6f } };
+            song.automations.push_back (tempoClip);
+            if (song.clipGrid)
+                for (auto& slot : song.clipGrid->slots)
+                    slot.active = false;
+            auto echoSlot = lynx::makeEffectSlot (lynx::EffectKind::echoform); // (new: voicings revision 1)
+            echoSlot.params[(std::size_t) lynx::echosuite::echoform::voicing] = 1.0f;
+            song.mixer[4].effects.push_back (echoSlot);
+            auto haloSlot = lynx::makeEffectSlot (lynx::EffectKind::halo); // (new: revision 1 of the Measured law)
+            haloSlot.params[(std::size_t) lynx::verbs::halo::engineLaw] = 1.0f;
+            song.mixer[5].effects.push_back (haloSlot);
+            song.mixer[6].effects.push_back (lynx::makeEffectSlot (lynx::EffectKind::latticeMod));
+            auto luxeSlot = lynx::makeEffectSlot (lynx::EffectKind::luxeVerb);
+            if (luxeSlot.params.size() <= (std::size_t) lynx::luxeVerbSpaceDucking)
+                luxeSlot.params.resize ((std::size_t) lynx::luxeVerbSpaceDucking + 1, 0.0f);
+            luxeSlot.params[(std::size_t) lynx::luxeVerbSpaceDucking] = 0.5f;
+            song.mixer[7].effects.push_back (luxeSlot);
 
             const auto copy = lynx::olderlynx::forRelease (song, "0.1.28");
             juce::String why;
@@ -6201,12 +6237,17 @@ private:
             };
             const auto parsed = juce::JSON::parse (copy.json);
             const auto* channels = parsed["channels"].getArray();
-            bool fmEmpty = false, notesCut = true, waveDone = false;
+            bool fmEmpty = false, notesCut = true, waveDone = false, wtEmpty = false, loopKnob = false;
             if (channels != nullptr)
                 for (const auto& c : *channels)
                 {
                     if (c["name"].toString() == "FM")
                         fmEmpty = c["instrument"].toString() == "sampler" && ! c.hasProperty ("modelParams");
+                    if (c["name"].toString() == "WT")
+                        wtEmpty = c["instrument"].toString() == "sampler" && ! c.hasProperty ("modelParams");
+                    if (c["name"].toString() == "Loop")
+                        loopKnob = std::abs ((double) c["sampler"]["pitch"] - 5.0) < 1.0e-6 && ! c["sampler"].hasProperty ("stretchPitch")
+                                   && (! c["sampler"]["warpModes"].isArray() || c["sampler"]["warpModes"].size() <= 10);
                     if (c["name"].toString() == "Piano")
                     {
                         juce::MemoryOutputStream bytes;
@@ -6253,11 +6294,26 @@ private:
             else if (copy.json.contains ("mixSnapshots") || ! said ("Mix snapshots") || ! said ("Automation clip colours")
                      || std::any_of (back->automations.begin(), back->automations.end(), [] (const lynx::Automation& a) { return a.colour != 0; }))
                 rollup030Result = "ERROR view items";
+            else if (! wtEmpty || ! said ("Helix is not in this release"))
+                rollup030Result = "ERROR Helix channel";
+            else if (! said ("Echoform's echo voicings") || ! said ("Epoch Verb, Atrium, Foil Plate and Halo") || ! said ("Lattice Mod plays")
+                     || ! said ("LuxeVerb's Space ducking")
+                     || parsed["mixer"][4]["effects"][0]["params"].size() > lynx::echosuite::echoform::revision
+                     || parsed["mixer"][5]["effects"][0]["params"].size() > lynx::verbs::halo::revision
+                     || parsed["mixer"][6]["effects"][0]["params"].size() > lynx::echosuite::lattice::revision
+                     || parsed["mixer"][7]["effects"][0]["params"].size() > lynx::luxeVerbSpaceDucking)
+                rollup030Result = "ERROR step-3 effects";
+            else if (! loopKnob || ! said ("Texture and Complex Pro play") || ! said ("Complex Pro and Texture transpositions") || ! said ("Warped samples do not follow"))
+                rollup030Result = "ERROR warp engines";
+            else if (copy.json.contains ("\"inactive\"") || ! said ("{0} deactivated clip slot(s)"))
+                rollup030Result = "ERROR deactivated slots";
             else if (const auto plain = lynx::olderlynx::forRelease (lynx::Song::makeDefault(), "0.1.28");
                      ! plain.ok || std::any_of (plain.lost.begin(), plain.lost.end(), [] (const lynx::olderlynx::Loss& l) {
                          const auto t = juce::String (l.text);
                          return t.startsWith ("Tetra") || t.contains ("MPE") || t.contains ("Pattern Block") || t.contains ("Voice Shift")
-                                || t.contains ("Ridge") || t.contains ("Hush") || t.startsWith ("Automation clip colours") || t.startsWith ("Mix snapshots");
+                                || t.contains ("Ridge") || t.contains ("Hush") || t.startsWith ("Automation clip colours") || t.startsWith ("Mix snapshots")
+                                || t.startsWith ("Helix") || t.contains ("Echoform") || t.contains ("Halo") || t.contains ("Lattice") || t.contains ("LuxeVerb")
+                                || t.contains ("Texture") || t.contains ("Beats'") || t.startsWith ("Warped") || t.contains ("deactivated");
                      }))
                 rollup030Result = "ERROR a plain project reports a loss it does not have";
         }

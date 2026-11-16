@@ -3,6 +3,9 @@
 #include "engine/ProjectFile.h"
 
 #include "core/DirectWaveState.h"
+#include "core/EchoSuite.h"
+#include "core/LuxeVerb.h"
+#include "core/LynxVerbs.h"
 #include "core/MixSuite.h"
 #include "core/VoiceShift.h"
 
@@ -132,12 +135,12 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
     // (silent) keeps the channel, its notes and its routing; DirectWave states (rounds 190hz / 190ii) get their short zone
     // records completed as DirectWave reads them, since 0.1.28 skipped them (FL's version-36 programs lost their loops)
     {
-        juce::StringArray tetra;
+        juce::StringArray tetra, helix;
         forEachChannel (root, [&] (juce::DynamicObject& c, int i) {
             const auto instrument = c.getProperty ("instrument").toString();
-            if (instrument == "tetra")
+            if (instrument == "tetra" || instrument == "helix") // (rollup step 3: Helix, round 190ja, as Tetra)
             {
-                tetra.add (channelName (juce::var (&c), i));
+                (instrument == "tetra" ? tetra : helix).add (channelName (juce::var (&c), i));
                 c.setProperty ("instrument", "sampler");
                 drop (c, "modelParams");
                 drop (c, "pluginState");
@@ -159,6 +162,8 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
         });
         if (! tetra.isEmpty())
             lost.push_back ({ TR_NOOP ("Tetra is not in this release: its channels become empty Samplers and play nothing: {0}"), listOf (tetra), true });
+        if (! helix.isEmpty())
+            lost.push_back ({ TR_NOOP ("Helix is not in this release: its channels become empty Samplers and play nothing: {0}"), listOf (helix), true });
     }
 
     // notes: index 19 holds a note's MPE curves (round 190hy)
@@ -237,7 +242,7 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
     // effects (round 190ho): Voice Shift's Measured law revision 1, Ridge Strip's 4K Pink EQ; (round 190iq) Hush De-esser's
     // measured Allround timing (hidden parameters 0.1.28 ignores: it plays revision 0, Black, and the earlier timing)
     {
-        juce::StringArray thump, pink, hushTiming;
+        juce::StringArray thump, pink, hushTiming, echoVoicings, latticeTaps, luxeDucking, verbRevisions;
         forEachEffect (root, [&] (juce::DynamicObject& e, const juce::String& where) {
             auto* params = arrayOf (e.getProperty ("params"));
             if (params == nullptr) // (a slot written without parameters)
@@ -262,6 +267,40 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
                     addOnce (hushTiming, where);
                 params->removeRange (mixsuite::hush::timing, params->size() - mixsuite::hush::timing);
             }
+            // rollup step 3: round 190is's Echoform voicings revision (heard only with an echo voicing), round 190it's
+            // reverb revisions (the Measured law's: Law 1), Lattice Mod's tap network and LuxeVerb's Space ducking
+            else if (kind == "echoform" && params->size() > echosuite::echoform::revision)
+            {
+                if ((float) (double) (*params)[echosuite::echoform::revision] >= 0.5f && (float) (double) (*params)[echosuite::echoform::voicing] >= 0.5f)
+                    addOnce (echoVoicings, where);
+                params->removeRange (echosuite::echoform::revision, params->size() - echosuite::echoform::revision);
+            }
+            else if (kind == "latticeMod" && params->size() > echosuite::lattice::revision)
+            {
+                if ((float) (double) (*params)[echosuite::lattice::revision] >= 0.5f)
+                    addOnce (latticeTaps, where);
+                params->removeRange (echosuite::lattice::revision, params->size() - echosuite::lattice::revision);
+            }
+            else if (kind == "luxeVerb" && params->size() > luxeVerbSpaceDucking)
+            {
+                if ((float) (double) (*params)[luxeVerbSpaceDucking] > 0.0f)
+                    addOnce (luxeDucking, where);
+                params->removeRange (luxeVerbSpaceDucking, params->size() - luxeVerbSpaceDucking);
+            }
+            else
+            {
+                const auto verb = [&] (const char* id, int law, int revision) {
+                    if (kind != id || params->size() <= revision)
+                        return;
+                    if ((float) (double) (*params)[revision] >= 0.5f && (float) (double) (*params)[law] >= 0.5f)
+                        addOnce (verbRevisions, where);
+                    params->removeRange (revision, params->size() - revision);
+                };
+                verb ("epochVerb", verbs::epoch::engineLaw, verbs::epoch::revision);
+                verb ("atrium", verbs::atrium::engineLaw, verbs::atrium::revision);
+                verb ("foilPlate", verbs::foil::engineLaw, verbs::foil::revision);
+                verb ("halo", verbs::halo::engineLaw, verbs::halo::revision);
+            }
         });
         if (! thump.isEmpty())
             lost.push_back ({ TR_NOOP ("Voice Shift's Measured law plays its earlier version (a low thump at sung onsets): {0}"), listOf (thump), true });
@@ -269,6 +308,79 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
             lost.push_back ({ TR_NOOP ("Ridge Strip's 4K Pink EQ plays as the Black EQ: {0}"), listOf (pink), true });
         if (! hushTiming.isEmpty())
             lost.push_back ({ TR_NOOP ("Hush De-esser's Allround mode plays its earlier timing: {0}"), listOf (hushTiming), true });
+        if (! echoVoicings.isEmpty())
+            lost.push_back ({ TR_NOOP ("Echoform's echo voicings play their earlier loop: {0}"), listOf (echoVoicings), true });
+        if (! verbRevisions.isEmpty())
+            lost.push_back ({ TR_NOOP ("Epoch Verb, Atrium, Foil Plate and Halo play the 0.1.27 version of their Measured law: {0}"), listOf (verbRevisions), true });
+        if (! latticeTaps.isEmpty())
+            lost.push_back ({ TR_NOOP ("Lattice Mod plays its earlier tap network: {0}"), listOf (latticeTaps), true });
+        if (! luxeDucking.isEmpty())
+            lost.push_back ({ TR_NOOP ("LuxeVerb's Space ducking is not in this release: {0}"), listOf (luxeDucking), true });
+    }
+
+    // rollup step 3, round 190ik (warp engines): an 11-number warpModes list (the Texture / Complex Pro law), Beats'
+    // pitch-aware law (0.1.28 reads it as Measured), Complex Pro / Texture transpositions rendered offline (0.1.28
+    // renders a baked pitch only for Beats: it goes to the Pitch knob, as 0.1.28 itself moves it)
+    {
+        juce::StringArray pitchAware, newEngines, knobPitch;
+        bool warped = false;
+        // (a project saved by this build has the mark; a channel without its own list then plays the pitch-aware Beats
+        // and the Measured Texture / Complex Pro laws, which 0.1.28 reads as Measured Beats and its Classic engines)
+        const auto marked = (bool) o.getProperty ("warpLaw190ik", false);
+        forEachChannel (root, [&] (juce::DynamicObject& c, int i) {
+            auto* sampler = objectOf (c.getProperty ("sampler"));
+            if (sampler == nullptr)
+                return;
+            const auto method = (int) sampler->getProperty ("stretchMethod", 0); // (StretchMethod: 3 Beats, 5 Texture, 6 Complex)
+            const auto stretched = (double) sampler->getProperty ("stretchBeats", 0.0) > 0.0;
+            const auto keepsPitch = (bool) sampler->getProperty ("keepPitch", false);
+            warped = warped || stretched;
+            auto* list = arrayOf (sampler->getProperty ("warpModes"));
+            const auto listed = list != nullptr && list->size() >= 9;
+            const auto beatsLaw = listed && list->size() > 9 ? (double) (*list)[9] : 2.0;
+            const auto warpLaw = listed && list->size() > 10 ? (double) (*list)[10] : 1.0;
+            const auto complexPro = listed && (double) (*list)[8] != 0.0;
+            if (marked && stretched && keepsPitch && method == 3 && beatsLaw >= 1.5)
+                pitchAware.add (channelName (juce::var (&c), i));
+            if (marked && stretched && keepsPitch && warpLaw >= 0.5 && (method == 5 || (method == 6 && complexPro)))
+                newEngines.add (channelName (juce::var (&c), i));
+            if (list != nullptr && list->size() > 10)
+            {
+                if (beatsLaw >= 1.5)
+                    list->set (9, 1.0);
+                list->removeRange (10, list->size() - 10);
+            }
+            if (const auto baked = (double) sampler->getProperty ("stretchPitch", 0.0); baked != 0.0 && method != 3)
+            {
+                sampler->setProperty ("pitch", juce::jlimit (-24.0, 24.0, (double) sampler->getProperty ("pitch", 0.0) + baked));
+                sampler->removeProperty ("stretchPitch");
+                knobPitch.add (channelName (juce::var (&c), i));
+            }
+        });
+        if (! pitchAware.isEmpty())
+            lost.push_back ({ TR_NOOP ("Beats' pitch-aware cuts play as the Measured law: {0}"), listOf (pitchAware), true });
+        if (! newEngines.isEmpty())
+            lost.push_back ({ TR_NOOP ("Texture and Complex Pro play their earlier engine (no grains or formants): {0}"), listOf (newEngines), true });
+        if (! knobPitch.isEmpty())
+            lost.push_back ({ TR_NOOP ("Complex Pro and Texture transpositions play through the Pitch knob: {0}"), listOf (knobPitch), true });
+        // issue #187 (round 190ik): engine behaviour, nothing to drop; reported when warped samples meet tempo automation
+        bool tempoAutomation = false;
+        if (auto* automations = arrayOf (root["automations"]))
+            for (const auto& a : *automations)
+                tempoAutomation = tempoAutomation || a["target"][0].toString() == "tempo";
+        if (warped && tempoAutomation)
+            lost.push_back ({ TR_NOOP ("Warped samples do not follow tempo changes in this release: they keep the project tempo"), {}, true });
+    }
+
+    // rollup step 3, round 190im (R12): Live's deactivated clip slots ("inactive"); 0.1.28 plays them
+    {
+        int inactive = 0;
+        if (auto* slots = arrayOf (root["clipGrid"]["clips"]))
+            for (auto& slot : *slots)
+                if (auto* so = objectOf (slot))
+                    inactive += drop (*so, "inactive") ? 1 : 0;
+        if (inactive > 0)
+            lost.push_back ({ TR_NOOP ("{0} deactivated clip slot(s) play again"), juce::String (inactive), true });
     }
 
     // the view

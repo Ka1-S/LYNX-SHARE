@@ -10701,3 +10701,15 @@ countries: it ch sm
 "FX 2" = "FX 2"
 "Note PB" = "PB nota"
 "Helix" = "Helix"
+
+# --- rollup 0.1.30 step 3: Save a copy for 0.1.28 knows rounds 190ja / 190is / 190it / 190ik / 190im
+"Helix is not in this release: its channels become empty Samplers and play nothing: {0}" = "Helix non esiste in questa versione: i suoi canali diventano Sampler vuoti e non suonano nulla: {0}"
+"Echoform's echo voicings play their earlier loop: {0}" = "Le voci d'eco di Echoform suonano con il loop precedente: {0}"
+"Epoch Verb, Atrium, Foil Plate and Halo play the 0.1.27 version of their Measured law: {0}" = "Epoch Verb, Atrium, Foil Plate e Halo suonano la versione 0.1.27 della loro legge Measured: {0}"
+"Lattice Mod plays its earlier tap network: {0}" = "Lattice Mod suona con la rete di tap precedente: {0}"
+"LuxeVerb's Space ducking is not in this release: {0}" = "Il ducking Space di LuxeVerb non esiste in questa versione: {0}"
+"Beats' pitch-aware cuts play as the Measured law: {0}" = "I tagli di Beats che seguono l'intonazione suonano con la legge Measured: {0}"
+"Texture and Complex Pro play their earlier engine (no grains or formants): {0}" = "Texture e Complex Pro suonano con il motore precedente (senza grani né formanti): {0}"
+"Complex Pro and Texture transpositions play through the Pitch knob: {0}" = "Le trasposizioni di Complex Pro e Texture passano per la manopola Pitch: {0}"
+"Warped samples do not follow tempo changes in this release: they keep the project tempo" = "I campioni in warp non seguono i cambi di tempo in questa versione: mantengono il tempo del progetto"
+"{0} deactivated clip slot(s) play again" = "{0} slot di clip disattivati tornano a suonare"

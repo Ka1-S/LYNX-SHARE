@@ -10701,3 +10701,15 @@ countries: tr
 "FX 2" = "FX 2"
 "Note PB" = "Nota PB"
 "Helix" = "Helix"
+
+# --- rollup 0.1.30 step 3: Save a copy for 0.1.28 knows rounds 190ja / 190is / 190it / 190ik / 190im
+"Helix is not in this release: its channels become empty Samplers and play nothing: {0}" = "Helix bu sürümde yok: kanalları boş Sampler olur ve hiçbir şey çalmaz: {0}"
+"Echoform's echo voicings play their earlier loop: {0}" = "Echoform'un eko seslendirmeleri önceki döngüleriyle çalar: {0}"
+"Epoch Verb, Atrium, Foil Plate and Halo play the 0.1.27 version of their Measured law: {0}" = "Epoch Verb, Atrium, Foil Plate ve Halo, Measured yasalarının 0.1.27 sürümünü çalar: {0}"
+"Lattice Mod plays its earlier tap network: {0}" = "Lattice Mod önceki tap ağıyla çalar: {0}"
+"LuxeVerb's Space ducking is not in this release: {0}" = "LuxeVerb'ün Space ducking özelliği bu sürümde yok: {0}"
+"Beats' pitch-aware cuts play as the Measured law: {0}" = "Beats'in perdeyi izleyen kesimleri Measured yasasıyla çalar: {0}"
+"Texture and Complex Pro play their earlier engine (no grains or formants): {0}" = "Texture ve Complex Pro önceki motorlarıyla çalar (grain ve formant olmadan): {0}"
+"Complex Pro and Texture transpositions play through the Pitch knob: {0}" = "Complex Pro ve Texture transpozeleri Pitch düğmesiyle çalar: {0}"
+"Warped samples do not follow tempo changes in this release: they keep the project tempo" = "Bu sürümde warp edilmiş sample'lar tempo değişikliklerini izlemez: proje temposunda kalır"
+"{0} deactivated clip slot(s) play again" = "Devre dışı bırakılmış {0} klip yuvası yeniden çalar"

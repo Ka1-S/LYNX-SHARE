@@ -10701,3 +10701,15 @@ countries: id
 "FX 2" = "FX 2"
 "Note PB" = "PB not"
 "Helix" = "Helix"
+
+# --- rollup 0.1.30 step 3: Save a copy for 0.1.28 knows rounds 190ja / 190is / 190it / 190ik / 190im
+"Helix is not in this release: its channels become empty Samplers and play nothing: {0}" = "Helix tidak ada di rilis ini: salurannya menjadi Sampler kosong dan tidak memainkan apa pun: {0}"
+"Echoform's echo voicings play their earlier loop: {0}" = "Voicing echo Echoform diputar dengan loop sebelumnya: {0}"
+"Epoch Verb, Atrium, Foil Plate and Halo play the 0.1.27 version of their Measured law: {0}" = "Epoch Verb, Atrium, Foil Plate, dan Halo diputar dengan versi 0.1.27 dari hukum Measured-nya: {0}"
+"Lattice Mod plays its earlier tap network: {0}" = "Lattice Mod diputar dengan jaringan tap sebelumnya: {0}"
+"LuxeVerb's Space ducking is not in this release: {0}" = "Ducking Space LuxeVerb tidak ada di rilis ini: {0}"
+"Beats' pitch-aware cuts play as the Measured law: {0}" = "Potongan Beats yang mengikuti pitch diputar dengan hukum Measured: {0}"
+"Texture and Complex Pro play their earlier engine (no grains or formants): {0}" = "Texture dan Complex Pro diputar dengan engine sebelumnya (tanpa grain atau forman): {0}"
+"Complex Pro and Texture transpositions play through the Pitch knob: {0}" = "Transposisi Complex Pro dan Texture diputar lewat kenop Pitch: {0}"
+"Warped samples do not follow tempo changes in this release: they keep the project tempo" = "Sampel yang di-warp tidak mengikuti perubahan tempo di rilis ini: tetap pada tempo proyek"
+"{0} deactivated clip slot(s) play again" = "{0} slot klip yang dinonaktifkan berbunyi lagi"
