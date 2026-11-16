@@ -41,6 +41,8 @@ void open (std::shared_ptr<void> owner, juce::AudioPluginInstance& plugin, const
 void setDockWorkspace (Workspace* workspace);
 // FL's plugin menu › Detached for an open editor: it closes and opens again in the other host (saved in the project).
 void setDetached (juce::AudioPluginInstance& plugin, bool detached);
+// Round 190in (shots): FL's ▸ wrapper menu of the plugin's open window (nullopt: no window open).
+std::optional<juce::PopupMenu> wrapperMenuForSnapshot (juce::AudioPluginInstance& plugin);
 // FL's Tools › Macros › "Switch all plugin editors to" › Attached / Detached (round 190i): every hosted plugin of the
 // song, and the open editors move to the other host.
 void setAllDetached (AudioEngine& engine, bool detached);

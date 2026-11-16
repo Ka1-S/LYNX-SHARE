@@ -7604,6 +7604,28 @@ private:
                 const auto elapsedMs = (int) (juce::Time::getMillisecondCounter() - phaseStartMs);
                 if (phase == 1 && ticks == 20 && checked != nullptr)
                     step ("param_after_1s=" + juce::String (checked->getValue(), 4));
+                // round 190in: LYNX_PLUGWIN_MENU=<png>: FL's ▸ wrapper menu of the open window (two columns for a channel)
+                if (const auto menuShot = juce::SystemStats::getEnvironmentVariable ("LYNX_PLUGWIN_MENU", {}); phase == 1 && ticks == 10 && menuShot.isNotEmpty())
+                    if (const auto menu = lynx::PluginWindows::wrapperMenuForSnapshot (*instance))
+                    {
+                        juce::PopupMenu left, right;
+                        auto* to = &left;
+                        for (juce::PopupMenu::MenuItemIterator it (*menu); it.next();)
+                        {
+                            to->addItem (it.getItem());
+                            if (it.getItem().shouldBreakAfter)
+                                to = &right;
+                        }
+                        juce::StringArray names { "Plugin" };
+                        std::vector<juce::PopupMenu> menus { left };
+                        if (right.getNumItems() > 0)
+                        {
+                            names.add ("Channel");
+                            menus.push_back (right);
+                        }
+                        LynxApplication::saveMenus (names, menus, menuShot);
+                        step ("wrapper_menu_items=" + juce::String (left.getNumItems()) + "+" + juce::String (right.getNumItems()));
+                    }
                 // (3 s apart: time for screenshots of each state)
                 if (phase == 1 && workspace != nullptr && dockStep < dockSteps && elapsedMs >= (dockStep + 1) * stepMs)
                     dockCheck (dockStep++);
@@ -7642,6 +7664,9 @@ private:
             }
         };
 
+        // round 190in: LYNX_PLUGWIN_ZOOM=<percent>: LYNX's interface zoom for the run (the wrapper's header at 150 %)
+        if (const auto zoom = juce::SystemStats::getEnvironmentVariable ("LYNX_PLUGWIN_ZOOM", {}).getIntValue(); zoom >= 50 && zoom <= 300)
+            juce::Desktop::getInstance().setGlobalScaleFactor ((float) zoom / 100.0f);
         auto* test = new Test();
         test->reportPath = reportPath;
         test->seconds = seconds;
@@ -7664,9 +7689,6 @@ private:
         test->mainWindow = std::make_unique<juce::DocumentWindow> ("LYNX test main window", juce::Colours::darkgrey, 0);
         test->mainWindow->setBounds (20, 20, 300, 200);
         if (juce::SystemStats::getEnvironmentVariable ("LYNX_PLUGWIN_DOCK", {}) == "1" && lynx::nativechild::dockingEnabled())
-        // round 190in: LYNX_PLUGWIN_ZOOM=<percent>: LYNX's interface zoom for the run (the wrapper's header at 150 %)
-        if (const auto zoom = juce::SystemStats::getEnvironmentVariable ("LYNX_PLUGWIN_ZOOM", {}).getIntValue(); zoom >= 50 && zoom <= 300)
-            juce::Desktop::getInstance().setGlobalScaleFactor ((float) zoom / 100.0f);
         {
             // the real main window's contents (it docks plugin windows in its own desktop), so the panels are real
             juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
@@ -17291,28 +17313,6 @@ private:
         juce::File (prefix + "-report.txt").replaceWithText (report);
     }
 
-                    auto file = dir.getChildFile ("Default.fst");
-                    if (! file.existsAsFile()) // plugins without presets: their entry of FL's plugin database
-                        for (const auto& f : database.findChildFiles (juce::File::findFiles, true, juce::String::fromUTF8 (plugin.c_str()) + ".fst"))
-                            file = f;
-                    if (only.isNotEmpty() && onlyPreset.isNotEmpty())
-                        file = juce::File (onlyPreset);
-                    if (! file.existsAsFile())
-                    {
-                        auto files = dir.findChildFiles (juce::File::findFiles, true, "*.fst");
-                        std::sort (files.begin(), files.end(), [] (const juce::File& a, const juce::File& b) { return a.getFullPathName().compareNatural (b.getFullPathName()) < 0; });
-                        file = files.isEmpty() ? juce::File() : files[0];
-                    }
-                    juce::MemoryBlock data;
-                    if (file.existsAsFile() && file.loadFileAsData (data))
-                    {
-                        const auto* bytes = static_cast<const std::uint8_t*> (data.getData());
-                        if (auto loaded = lynx::effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), 130.0, lynx::natives::flDataReader (lynx::flStudioAccess())); loaded && loaded->kind == kind)
-                            fx = *loaded;
-                    }
-                    name = juce::String::fromUTF8 (plugin.c_str());
-                    break;
-                }
     void runPluginEditorSnapshots (const juce::String& folder)
     {
         juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
@@ -17349,6 +17349,34 @@ private:
                 for (const auto& plugin : lynx::flPluginsForEffect (kind))
                 {
                     const auto dir = presets.getChildFile (juce::String::fromUTF8 (plugin.c_str()));
+                    auto file = dir.getChildFile ("Default.fst");
+                    if (! file.existsAsFile()) // plugins without presets: their entry of FL's plugin database
+                        for (const auto& f : database.findChildFiles (juce::File::findFiles, true, juce::String::fromUTF8 (plugin.c_str()) + ".fst"))
+                            file = f;
+                    if (only.isNotEmpty() && onlyPreset.isNotEmpty())
+                        file = juce::File (onlyPreset);
+                    if (! file.existsAsFile())
+                    {
+                        auto files = dir.findChildFiles (juce::File::findFiles, true, "*.fst");
+                        std::sort (files.begin(), files.end(), [] (const juce::File& a, const juce::File& b) { return a.getFullPathName().compareNatural (b.getFullPathName()) < 0; });
+                        file = files.isEmpty() ? juce::File() : files[0];
+                    }
+                    juce::MemoryBlock data;
+                    if (file.existsAsFile() && file.loadFileAsData (data))
+                    {
+                        const auto* bytes = static_cast<const std::uint8_t*> (data.getData());
+                        if (auto loaded = lynx::effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), 130.0, lynx::natives::flDataReader (lynx::flStudioAccess())); loaded && loaded->kind == kind)
+                        {
+                            fx = *loaded;
+                            // round 190in (FW-8): a LYNX engine loaded with an FL plugin's preset stands in for that
+                            // plugin as an imported slot does (its header shows FL's name)
+                            if (fx.flOrigin.empty() && ! lynx::plugui::hasFlLayout (kind))
+                                fx.flOrigin.plugin = plugin;
+                        }
+                    }
+                    name = juce::String::fromUTF8 (plugin.c_str());
+                    break;
+                }
 
                 if (kind == lynx::EffectKind::maximus && ++maximusPasses == 2) // Soundgoodizer: preset A of the installation, Amount 60 %
                 {
@@ -17366,13 +17394,7 @@ private:
 
                 if (kind == lynx::EffectKind::ridgeStrip && ++ridgePasses == 2) // round 145: her Vocalstrip 2 setting
                 {
-                        {
                     for (const auto& [param, value] : { std::pair<const char*, float> { "Vocal strip", 1.0f }, { "Compander", 1.0f },
-                            // round 190in (FW-8): a LYNX engine loaded with an FL plugin's preset stands in for that
-                            // plugin as an imported slot does (its header shows FL's name)
-                            if (fx.flOrigin.empty() && ! lynx::plugui::hasFlLayout (kind))
-                                fx.flOrigin.plugin = plugin;
-                        }
                                                         { "Compander threshold", 0.3083f }, { "Compander ratio", 0.6929f }, { "Compander attack", 0.2543f },
                                                         { "Compander release", 0.5316f }, { "Make-up", 0.2917f }, { "Soft knee", 1.0f },
                                                         { "Expander threshold", 0.2198f }, { "Vocal input", 0.6792f }, { "Vocal output", 0.3938f },

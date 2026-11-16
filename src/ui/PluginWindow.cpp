@@ -48,6 +48,49 @@ namespace lynx
 {
 namespace
 {
+// FL's "Spare state" of a hosted plugin [PluginMenu Sparestate1] (the wrapper ▸ menu and the preset menu, round
+// 190in): the kept state belongs to this plugin instance and is only flipped into the same plugin
+std::map<const void*, juce::String>& spareKeptFor()
+{
+    static std::map<const void*, juce::String> kept;
+    return kept;
+}
+
+bool hasSpareState (juce::AudioPluginInstance& plugin)
+{
+    const auto id = plugin.getPluginDescription().createIdentifierString();
+    auto& kept = spareKeptFor();
+    if (const auto it = kept.find (&plugin); it != kept.end() && it->second != id)
+    {
+        sparestate::shared().forget (&plugin);
+        kept.erase (it);
+    }
+    return sparestate::shared().has (&plugin);
+}
+
+// (round 190gg: under the crash guard, callPluginFromUi; a crash switches the plugin off)
+void storeSpareState (juce::AudioPluginInstance& plugin)
+{
+    juce::MemoryBlock state;
+    if (! callPluginFromUi (plugin, "storing its spare state", [&] { plugin.getStateInformation (state); }))
+        return;
+    sparestate::shared().store (&plugin, { (const std::uint8_t*) state.getData(), (const std::uint8_t*) state.getData() + state.getSize() });
+    spareKeptFor()[&plugin] = plugin.getPluginDescription().createIdentifierString();
+}
+
+void flipSpareState (AudioEngine& engine, juce::AudioPluginInstance& plugin)
+{
+    juce::MemoryBlock state;
+    if (! callPluginFromUi (plugin, "storing its spare state", [&] { plugin.getStateInformation (state); }))
+        return;
+    if (const auto load = sparestate::shared().flip (&plugin, { (const std::uint8_t*) state.getData(),
+                                                                (const std::uint8_t*) state.getData() + state.getSize() }))
+    {
+        callPluginFromUi (plugin, "loading its spare state", [&] { plugin.setStateInformation (load->data(), (int) load->size()); });
+        engine.markModified();
+    }
+}
+
 void toggleWrapperOption (AudioEngine& engine, const std::function<PluginRef* (Song&)>& find, juce::AudioPluginInstance* instance,
                           bool PluginRef::*option, bool recreates);
 
@@ -1070,8 +1113,19 @@ public:
             b->setWantsKeyboardFocus (false);
             addAndMakeVisible (b);
         }
-        pluginTab.setTooltip (tr ("The plugin's own editor"));
-        settingsTab.setTooltip (tr ("Plugin wrapper settings: processing, bridging and MIDI options"));
+        pluginTab.setTooltip (tr ("Plugin") + ": " + tr ("The plugin's own editor"));
+        settingsTab.setTooltip (tr ("Wrapper settings") + ": " + tr ("Plugin wrapper settings: processing, bridging and MIDI options"));
+        // FL's ▸ wrapper menu (round 190in, R8): in the strip until a docked frame takes it into its title strip
+        addAndMakeVisible (menuArrow);
+        menuArrow.onClick = [this] {
+            if (onWrapperMenu)
+                onWrapperMenu (menuArrow);
+        };
+        // FW-7: a channel's plugin shows FL's ON / PAN / VOL / PITCH / RANGE / TRACK at the right, as FL's wrapper does
+        if (channel)
+            if (const auto index = page.channelIndex(); index >= 0)
+                if ((channelControls = makeChannelHeaderControls (engine, index)) != nullptr)
+                    addAndMakeVisible (*channelControls);
         pluginTab.onClick = [this] { show (false); };
         settingsTab.onClick = [this] { show (true); };
         addAndMakeVisible (editor.get());
@@ -1170,7 +1224,25 @@ public:
         // round 190in (FW-7): FL's 46 px strip, as the channel window's (bg3, a line under it, a line after each tab)
         g.setColour (theme::colour::bg3);
         g.fillRect (getLocalBounds().removeFromTop (headerHeight));
+        g.setColour (theme::colour::border);
+        g.fillRect (0, headerHeight - 1, getWidth(), 1);
+        for (auto* t : { &pluginTab, &settingsTab })
+            g.fillRect (t->getRight(), 0, 1, headerHeight - 1);
     }
+
+    // round 190in (FW-5 / R8): a docked frame shows the presets and the ▸ menu in its title strip
+    void movePresetsTo (juce::Component& titleOwner)
+    {
+        presetsInTitle = true;
+        menuArrow.setVisible (false);
+        presets.setTitleLook (true);
+        titleOwner.addAndMakeVisible (presets);
+        resized();
+    }
+    juce::Component& presetComponent() noexcept { return presets; }
+    pluginpresetui::PresetBar& presetBar() noexcept { return presets; }
+    std::function<void (juce::Component&)> onWrapperMenu;
+    int channelIndex() const { return page.channelIndex(); }
 
     void resized() override
     {
@@ -1235,20 +1307,6 @@ private:
     void fitEditor()
     {
         if (down) // (the notice: at least a readable size, the editor's when that is larger)
-        g.setColour (theme::colour::border);
-        g.fillRect (0, headerHeight - 1, getWidth(), 1);
-        for (auto* t : { &pluginTab, &settingsTab })
-            g.fillRect (t->getRight(), 0, 1, headerHeight - 1);
-    }
-
-    // round 190in (FW-5 / R8): a docked frame shows the presets and the ▸ menu in its title strip
-    void movePresetsTo (juce::Component& titleOwner)
-    {
-        presetsInTitle = true;
-        menuArrow.setVisible (false);
-        presets.setTitleLook (true);
-        titleOwner.addAndMakeVisible (presets);
-        resized();
             setSize (juce::jmax (minimumWidth(), getWidth()), juce::jmax (150 + headerHeight, getHeight()));
         else if (editor != nullptr)
             setSize (juce::jmax (minimumWidth(), editor->getWidth()), editor->getHeight() + headerHeight);
@@ -1364,6 +1422,7 @@ public:
                     addDetachedItem (menu);
                 addPinItem (menu);
             });
+            wrapped->onWrapperMenu = [this] (juce::Component& anchor) { showWrapperMenu (anchor); }; // (round 190in, R8)
             content.reset (wrapped);
         }
         else
@@ -1410,6 +1469,106 @@ public:
         menu.addItem (tr ("Detached"), true, detached, [p, detached] {
             juce::MessageManager::callAsync ([p, detached] { setDetachedAndReopen (*p, ! detached); });
         });
+    }
+
+    // FL's wrapper ▸ menu of a hosted plugin (round 190in, details190if R8: DF-120; FL manual Plugin wrapper › Plugin
+    // Menu): FL's items in FL's order (ui/WrapperMenu.h), the Channel column for a channel's plugin
+    void showWrapperMenu (juce::Component& anchor)
+    {
+        buildWrapperMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&anchor));
+    }
+
+    juce::PopupMenu buildWrapperMenu()
+    {
+        wrappermenu::Spec spec;
+        auto* wrapped = dynamic_cast<WrappedEditor*> (shownContent);
+        auto* engine = context.engine;
+        const auto channelIndex = wrapped != nullptr && context.channel ? wrapped->channelIndex() : -1;
+        if (engine != nullptr && channelIndex >= 0)
+        {
+            spec.channel = true;
+            if (channelWrapperItemsHandler())
+                channelWrapperItemsHandler() (channelIndex, spec);
+            spec.routeToFreeMixerTrack = [engine, channelIndex] {
+                engine->editSong ([channelIndex] (Song& s) {
+                    if (channelIndex < (int) s.channels.size())
+                        s.channels[(std::size_t) channelIndex].mixerTrack = s.claimFreeInsert();
+                });
+            };
+        }
+        if (wrapped != nullptr)
+        {
+            const juce::Component::SafePointer<WrappedEditor> safe (wrapped);
+            spec.presets = [safe] (juce::PopupMenu& m) {
+                if (safe != nullptr)
+                    m = safe->presetBar().presetsMenu();
+            };
+            spec.savePresetAs = [safe] {
+                if (safe != nullptr)
+                    safe->presetBar().saveAs();
+            };
+            if (locateInBrowserHandler())
+                spec.browsePresets = [folder = wrapped->presetBar().presetFolder()] {
+                    folder.createDirectory();
+                    if (locateInBrowserHandler())
+                        locateInBrowserHandler() (folder);
+                };
+        }
+        auto* p = &plugin;
+        if (engine != nullptr)
+        {
+            // FL's "Add to plugin database (flag as favorite)": LYNX's favourites (the picker's stars)
+            const auto id = plugin.getPluginDescription().createIdentifierString().toStdString();
+            spec.addToDatabase = [engine, id] {
+                auto& host = engine->getPluginHost();
+                host.setFavourite (id, host.favourites().count (id) == 0);
+            };
+            spec.storeSpare = [p] { storeSpareState (*p); };
+            if (hasSpareState (plugin))
+                spec.flipSpare = [engine, p] { flipSpareState (*engine, *p); };
+            const auto base = channelIndex >= 0 ? AutomationTarget { AutomationTargetKind::channelParam, channelIndex, 0, 0 }
+                              : context.track >= 0 && context.slot >= 0 ? AutomationTarget { AutomationTargetKind::effectParam, context.track, context.slot, 0 }
+                                                                        : AutomationTarget {};
+            if (const auto targets = allPluginParameterTargets (plugin, base); ! targets.empty())
+                spec.linkAll = [engine, targets] { openRemoteControlSettings (*engine, targets, false); };
+            if (context.find)
+                if (const auto* ref = context.find (const_cast<Song&> (engine->getSong())))
+                {
+                    spec.threaded = ref->threaded;
+                    spec.toggleThreaded = [engine, find = context.find] {
+                        engine->editSong ([find] (Song& song) {
+                            if (auto* r = find (song))
+                                r->threaded = ! r->threaded;
+                        });
+                    };
+                }
+            if (const auto& song = engine->getSong(); context.track >= 0 && context.track < (int) song.mixer.size() && context.slot >= 0
+                                                      && context.slot < (int) song.mixer[(std::size_t) context.track].effects.size())
+            {
+                spec.smartDisable = song.mixer[(std::size_t) context.track].effects[(std::size_t) context.slot].smartDisable;
+                spec.toggleSmartDisable = [engine, t = context.track, sl = context.slot] {
+                    engine->editSong ([t, sl] (Song& song) {
+                        if (t < (int) song.mixer.size() && sl < (int) song.mixer[(std::size_t) t].effects.size())
+                            song.mixer[(std::size_t) t].effects[(std::size_t) sl].smartDisable = ! song.mixer[(std::size_t) t].effects[(std::size_t) sl].smartDisable;
+                    });
+                };
+            }
+        }
+        // FL's "Make editor thumbnail": the Plugin picker's picture of this plugin, from its editor now
+        spec.thumbnail = [editor = shownEditor, key = thumbKey] {
+            if (editor != nullptr)
+                pluginthumbs::captureEditor (key, *editor);
+        };
+        if (canDock (plugin))
+        {
+            const auto detached = opensDetached (plugin, context);
+            spec.detached = detached;
+            spec.toggleDetached = [p, detached] { juce::MessageManager::callAsync ([p, detached] { setDetachedAndReopen (*p, ! detached); }); };
+        }
+        else
+            spec.detached = true;
+        spec.extra = [this] (juce::PopupMenu& m) { addPinItem (m); };
+        return wrappermenu::build (spec);
     }
 
 protected:
@@ -1661,8 +1820,9 @@ public:
             b->setMouseClickGrabsKeyboardFocus (false);
             addAndMakeVisible (b);
         }
-        menuButton.setTooltip (tr ("Plugin options"));
-        menuButton.onClick = [this] { showMenu(); };
+        // FL's ▸ wrapper menu at the title's left (round 190in, R8)
+        addAndMakeVisible (menuButton);
+        menuButton.onClick = [this] { showWrapperMenu (menuButton); };
         minimiseButton.setTooltip (tr ("Minimize"));
         minimiseButton.onClick = [this] { setMinimisedFrame (! minimised); };
         closeButton.setTooltip (tr ("Close"));
@@ -1671,6 +1831,12 @@ public:
         shownContent = content.get();
         addAndMakeVisible (*content);
         content->addMouseListener (this, true); // a click anywhere in it brings the frame in front
+        // round 190in (design190ia FW-5): FL's title strip holds the preset ◀ name ▶ (the strip under it gives them up)
+        if (auto* wrapped = dynamic_cast<WrappedEditor*> (content.get()))
+        {
+            wrapped->movePresetsTo (*this);
+            titlePresets = &wrapped->presetComponent();
+        }
         if (editorResizable)
         {
             corner = std::make_unique<juce::ResizableCornerComponent> (this, &limits);
@@ -1752,7 +1918,15 @@ public:
             return;
         if (e.mods.isPopupMenu() && e.y < titleHeight)
         {
-            showMenu();
+            // FL: a right-click on a channel window's title renames the channel (DF-119); else the wrapper menu
+            wrappermenu::Spec spec;
+            if (auto* wrapped = dynamic_cast<WrappedEditor*> (shownContent); wrapped != nullptr && getContext().channel && wrapped->channelIndex() >= 0
+                                                                            && channelWrapperItemsHandler())
+                channelWrapperItemsHandler() (wrapped->channelIndex(), spec);
+            if (spec.rename != nullptr)
+                spec.rename();
+            else
+                showWrapperMenu (menuButton);
             return;
         }
         dragging = e.y < titleHeight;
@@ -1799,6 +1973,13 @@ public:
         g.fillRect (strip);
         g.setColour (colour::border);
         g.fillRect (strip.removeFromBottom (1));
+        auto text = getLocalBounds().removeFromTop (titleHeight).withTrimmedLeft (menuButton.getRight() + 4).withTrimmedRight (2 * titleHeight + 6);
+        if (titlePresets != nullptr && titlePresets->getParentComponent() == this)
+            text.setRight (titlePresets->getX() - 6);
+        // FL's two tones (round 190in, FW-5): "Name" bright, " (target)" dim
+        const auto title = hostTitle();
+        const auto open = title.lastIndexOf (" (");
+        const auto head = open > 0 && title.endsWithChar (')') ? title.substring (0, open) : title;
         g.setColour (colour::textPrimary);
         g.setFont (font (type::body, true));
         const auto headW = juce::jmin (text.getWidth(), juce::GlyphArrangement::getStringWidthInt (g.getCurrentFont(), head) + 1);
@@ -1824,6 +2005,11 @@ public:
         closeButton.setBounds (strip.removeFromRight (strip.getHeight()));
         strip.removeFromRight (2);
         minimiseButton.setBounds (strip.removeFromRight (strip.getHeight()));
+        if (titlePresets != nullptr && titlePresets->getParentComponent() == this)
+        {
+            strip.removeFromRight (6);
+            titlePresets->setBounds (strip.removeFromRight (juce::jmin (190, juce::jmax (0, strip.getWidth() / 2))));
+        }
         if (shownContent != nullptr && ! minimised)
         {
             const juce::ScopedValueSetter<bool> guard (laying, true);
@@ -1837,12 +2023,6 @@ public:
     }
 
     // the editor resized itself (or its wrapper switched pages): the frame follows
-        // round 190in (design190ia FW-5): FL's title strip holds the preset ◀ name ▶ (the strip under it gives them up)
-        if (auto* wrapped = dynamic_cast<WrappedEditor*> (content.get()))
-        {
-            wrapped->movePresetsTo (*this);
-            titlePresets = &wrapped->presetComponent();
-        }
     void childBoundsChanged (juce::Component* child) override
     {
         if (child == shownContent && ! laying && ! minimised)
@@ -1971,13 +2151,6 @@ std::unique_ptr<EditorHost> makeHost (std::shared_ptr<void> owner, juce::AudioPl
 {
     if (! opensDetached (plugin, context))
         return std::make_unique<DockedPluginFrame> (std::move (owner), plugin, title, std::move (context), *dockWorkspace());
-        auto text = getLocalBounds().removeFromTop (titleHeight).withTrimmedLeft (menuButton.getRight() + 4).withTrimmedRight (2 * titleHeight + 6);
-        if (titlePresets != nullptr && titlePresets->getParentComponent() == this)
-            text.setRight (titlePresets->getX() - 6);
-        // FL's two tones (round 190in, FW-5): "Name" bright, " (target)" dim
-        const auto title = hostTitle();
-        const auto open = title.lastIndexOf (" (");
-        const auto head = open > 0 && title.endsWithChar (')') ? title.substring (0, open) : title;
     return std::make_unique<PluginWindow> (std::move (owner), plugin, title, std::move (context));
 }
 
@@ -1997,11 +2170,6 @@ void setDetachedAndReopen (juce::AudioPluginInstance& plugin, bool detached, boo
         context.engine->editSong ([find = context.find, detached] (Song& song) {
             if (auto* ref = find (song))
                 ref->detached = detached;
-        if (titlePresets != nullptr && titlePresets->getParentComponent() == this)
-        {
-            strip.removeFromRight (6);
-            titlePresets->setBounds (strip.removeFromRight (juce::jmin (190, juce::jmax (0, strip.getWidth() / 2))));
-        }
         });
     PluginWindows::open (std::move (keep), plugin, title, context);
 }
@@ -2186,6 +2354,13 @@ private:
 
 namespace PluginWindows
 {
+std::optional<juce::PopupMenu> wrapperMenuForSnapshot (juce::AudioPluginInstance& plugin)
+{
+    if (const auto it = windows().find (&plugin); it != windows().end())
+        return it->second->buildWrapperMenu();
+    return std::nullopt;
+}
+
 bool letsHostProcessKeys (juce::Component& window)
 {
     auto* w = dynamic_cast<PluginWindow*> (&window);
@@ -2694,36 +2869,11 @@ std::vector<AutomationTarget> allPluginParameterTargets (juce::AudioPluginInstan
 
 void addPluginWrapperItems (juce::PopupMenu& menu, AudioEngine& engine, juce::AudioPluginInstance& plugin, const AutomationTarget& base)
 {
-    // FL's "Spare state" section [PluginMenu Sparestate1], with FL's names (FL-native equivalents keep FL's names); the
-    // kept state belongs to this plugin instance
-    static std::map<const void*, juce::String> keptFor; // (a kept state is only flipped into the same plugin)
-    const auto id = plugin.getPluginDescription().createIdentifierString();
-    auto& spare = sparestate::shared();
-    if (const auto it = keptFor.find (&plugin); it != keptFor.end() && it->second != id)
-    {
-        spare.forget (&plugin);
-        keptFor.erase (it);
-    }
+    // FL's "Spare state" section [PluginMenu Sparestate1], with FL's names (FL-native equivalents keep FL's names)
+    const auto has = hasSpareState (plugin);
     menu.addSectionHeader (tr ("Spare state"));
-    // (round 190gg: under the crash guard, callPluginFromUi; a crash switches the plugin off)
-    menu.addItem (tr ("Store in spare state"), [&plugin, id] {
-        juce::MemoryBlock state;
-        if (! callPluginFromUi (plugin, "storing its spare state", [&] { plugin.getStateInformation (state); }))
-            return;
-        sparestate::shared().store (&plugin, { (const std::uint8_t*) state.getData(), (const std::uint8_t*) state.getData() + state.getSize() });
-        keptFor[&plugin] = id;
-    });
-    menu.addItem (tr ("Flip with spare state"), spare.has (&plugin), false, [&engine, &plugin] {
-        juce::MemoryBlock state;
-        if (! callPluginFromUi (plugin, "storing its spare state", [&] { plugin.getStateInformation (state); }))
-            return;
-        if (const auto load = sparestate::shared().flip (&plugin, { (const std::uint8_t*) state.getData(),
-                                                                    (const std::uint8_t*) state.getData() + state.getSize() }))
-        {
-            callPluginFromUi (plugin, "loading its spare state", [&] { plugin.setStateInformation (load->data(), (int) load->size()); });
-            engine.markModified();
-        }
-    });
+    menu.addItem (tr ("Store in spare state"), [&plugin] { storeSpareState (plugin); });
+    menu.addItem (tr ("Flip with spare state"), has, false, [&engine, &plugin] { flipSpareState (engine, plugin); });
     // FL's "Parameters" section [PluginMenu N51]: Link all parameters... (Browse parameters is left out: LYNX's
     // Browser does not list a plugin's parameters)
     const auto targets = allPluginParameterTargets (plugin, base);

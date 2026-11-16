@@ -613,6 +613,24 @@ void PresetBar::step (int delta)
 
 void PresetBar::apply (const Entry& entry)
 {
+    // round 190in (R8): FL's Hybridize — the parameters as they were, half of them put back after the preset loads
+    std::vector<float> before;
+    if (hybridize())
+        callPluginFromUi (plugin, "reading its parameters", [this, &before] {
+            for (auto* p : plugin.getParameters())
+                before.push_back (p->getValue());
+        });
+    const juce::ScopeGuard mix { [this, &before] {
+        if (before.empty())
+            return;
+        auto& random = juce::Random::getSystemRandom();
+        callPluginFromUi (plugin, "mixing a preset (Hybridize)", [this, &before, &random] {
+            const auto& params = plugin.getParameters();
+            for (int i = 0; i < params.size() && i < (int) before.size(); ++i)
+                if (params[i]->isAutomatable() && random.nextBool())
+                    params[i]->setValueNotifyingHost (before[(std::size_t) i]);
+        });
+    } };
     if (entry.program >= 0)
     {
         if (! callPluginFromUi (plugin, "loading a program", [this, &entry] { plugin.setCurrentProgram (entry.program); }))
@@ -645,7 +663,21 @@ void PresetBar::setName (const juce::String& name)
         onChanged();
 }
 
-void PresetBar::showMenu()
+void PresetBar::randomize()
+{
+    // FL's Presets › Randomize: random values to the published (automatable) parameters (round 190in, R8)
+    auto& random = juce::Random::getSystemRandom();
+    callPluginFromUi (plugin, "randomizing its parameters", [this, &random] {
+        for (auto* p : plugin.getParameters())
+            if (p->isAutomatable())
+                p->setValueNotifyingHost (random.nextFloat());
+    });
+    currentFile = juce::File();
+    currentProgram = -1;
+    setName ({});
+}
+
+juce::PopupMenu PresetBar::presetsMenu()
 {
     juce::PopupMenu menu;
     const auto list = entries();
@@ -698,6 +730,19 @@ void PresetBar::showMenu()
         menu.addSeparator();
         menu.addItem (tr ("Play a note when a preset loads"), true, auditionOnLoad(), [] { setAuditionOnLoad (! auditionOnLoad()); });
     }
+    // FL's Presets › Randomize / Hybridize (round 190in, R8: FL manual, Plugin wrapper › Presets)
+    menu.addSeparator();
+    menu.addItem (tr ("Randomize"), [safe = juce::Component::SafePointer<PresetBar> (this)] {
+        if (safe != nullptr)
+            safe->randomize();
+    });
+    menu.addItem (tr ("Hybridize"), true, hybridize(), [] { hybridize() = ! hybridize(); });
+    return menu;
+}
+
+void PresetBar::showMenu()
+{
+    auto menu = presetsMenu();
     if (extendMenu)
     {
         menu.addSeparator();

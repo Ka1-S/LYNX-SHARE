@@ -6412,6 +6412,132 @@ public:
             };
         }
 
+        for (auto& k : header)
+            k->headerLook = true;
+        header[1]->restArc = theme::colour::ledOn; // FL's green VOL ring
+        header[3]->joinLeft = true;                // RANGE, attached to the PITCH knob
+        refresh();
+        engine.addChangeListener (this);
+    }
+
+    ~ChannelHeaderControls() override { engine.removeChangeListener (this); }
+
+    void resized() override
+    {
+        // FL's places from the right edge (ref/fl-plugin-wrapper-flex.png: ON 214, PAN 180, VOL 145, PITCH 111 px to the
+        // centre; RANGE right of PITCH; TRACK 7 px in)
+        const auto w = getWidth(), h = getHeight();
+        on.setBounds (w - 229, 0, 30, h);
+        const int xs[] = { w - 197, w - 162, w - 128, w - 96, w - 52 };
+        const int ws[] = { 34, 34, 34, 32, 46 };
+        for (std::size_t i = 0; i < header.size() && i < 5; ++i)
+            header[i]->setBounds (xs[i], 0, ws[i], h);
+    }
+
+private:
+    void refresh()
+    {
+        if (channel < (int) engine.getSong().channels.size())
+            on.setToggleState (! engine.getSong().channels[(std::size_t) channel].muted, juce::dontSendNotification);
+        for (auto& k : header)
+            k->repaint();
+    }
+    void changeListenerCallback (juce::ChangeBroadcaster*) override { refresh(); }
+
+    AudioEngine& engine;
+    int channel;
+    OnLed on;
+    std::vector<std::unique_ptr<FrameKnob>> header;
+};
+
+// The frame: header strip (tabs on the left; ON, PAN, VOL, TRACK on the right) over the page of the selected tab.
+// Round 190in (design190ia FW-1, FW-5): FL's 46 px strip — the tabs are FL's 44 px icon tabs flush at the left (the
+// shown one raised, its icon green), the preset ◀ name ▶ and FL's ▸ menu go to the window's title bar when the window
+// has LYNX's own (docked), else they sit in the strip (▸ at the far left, the presets after the tabs).
+class ChannelFrame final : public juce::Component
+{
+public:
+    static constexpr int headerHeight = 46;
+
+    // c.index < 0 (a Patcher node, round 164f): the instrument's pages alone, without the channel's header and Misc tab
+    ChannelFrame (AudioEngine& e, ChannelRef c, std::unique_ptr<juce::Component> instrumentPage, std::unique_ptr<juce::Component> envelopePage)
+        : engine (e), channel (c.index), node (c.index < 0)
+    {
+        auto addPage = [this] (std::unique_ptr<juce::Component> page, const juce::String& title, const juce::String& tip, Icon icon) {
+            // FL's icon tab (FW-1): the caption is the tooltip and the hint
+            auto button = std::make_unique<IconButton> (title, icon);
+            button->setTooltip (title + ": " + tip);
+            button->setFlat (true);
+            button->setCorners (false, false);
+            button->setOnColour (theme::colour::bg5);
+            button->setIconColourWhenOn (theme::colour::ledOn);
+            button->setIconColour (theme::colour::textSecondary);
+            button->setIconSizing (0.5f, 22.0f);
+            button->setWantsKeyboardFocus (false);
+            button->setClickingTogglesState (true);
+            button->setRadioGroupId (1);
+            const auto index = (int) pages.size();
+            button->onClick = [this, index] { showTab (index); };
+            addAndMakeVisible (*button);
+            addChildComponent (*page);
+            sizes.push_back ({ juce::jmax (1, page->getWidth()), juce::jmax (1, page->getHeight()) });
+            tabs.push_back (std::move (button));
+            pages.push_back (std::move (page));
+        };
+        instrumentPageFirst = instrumentPage != nullptr;
+        if (instrumentPage != nullptr) // (none: a channel whose instrument has its own window, e.g. a hosted plugin)
+        {
+            // FL's channel window has one "Sample settings" sheet for the Sampler and for an audio clip's channel, and a
+            // "Plugin editor" sheet for every other generator (TPluginForm BtnHint "|Sample settings" / "|Plugin editor")
+            const auto kind = channel >= 0 && channel < (int) engine.getSong().channels.size()
+                                  ? engine.getSong().channels[(std::size_t) channel].instrument
+                                  : InstrumentKind::synth;
+            if (kind == InstrumentKind::sampler || kind == InstrumentKind::audioClip)
+                addPage (std::move (instrumentPage), tr ("Sample"), tr ("Sample settings"), Icon::audioFile);
+            else
+            {
+                // round 190in (FW-6): the engine's description ("Harmless — FL's additive engine…") is the tab's tooltip
+                auto tip = tr ("The instrument's own settings");
+                if (auto* model = dynamic_cast<ModelPanel*> (instrumentPage.get()))
+                    tip = model->description();
+                addPage (std::move (instrumentPage), tr ("Plugin"), tip, Icon::pluginPicker);
+            }
+        }
+        if (envelopePage != nullptr)
+            addPage (std::move (envelopePage), tr ("Envelope / instrument"), tr ("Envelope / instrument settings: the filter and pitch envelopes and the LFOs"),
+                     Icon::envelope);
+        if (node)
+        {
+            int width = 1, height = 1;
+            for (auto& p : pages)
+            {
+                width = juce::jmax (width, p->getWidth());
+                height = juce::jmax (height, p->getHeight());
+            }
+            setSize (width, headerHeight + height);
+            showTab (0);
+            return;
+        }
+        addPage (std::make_unique<MiscPanel> (engine, channel), tr ("Misc"), tr ("Miscellaneous functions: levels, polyphony, time, tracking, cut groups, arpeggiator, echo delay"),
+                 Icon::wrench);
+
+        controls = std::make_unique<ChannelHeaderControls> (engine, channel);
+        addAndMakeVisible (*controls);
+        // FL's ▸ wrapper menu (round 190in, R8): in the strip until the window takes it into its title bar
+        addAndMakeVisible (menuArrow);
+        menuArrow.onClick = [this] { showWrapperMenu (menuArrow); };
+        if (ChannelPresetBar::wanted (engine, channel))
+        {
+            presetBar = std::make_unique<ChannelPresetBar> (engine, channel);
+            presetBar->onLoaded = [this, hasPage = instrumentPageFirst] (const juce::String& oldName, const juce::String& newName) {
+                // the plugin page shows the new preset's settings, the window takes the channel's new name (as FL)
+                juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<ChannelFrame> (this), hasPage, oldName, newName] {
+                    if (safe != nullptr)
+                        safe->presetLoaded (hasPage, oldName, newName);
+                });
+            };
+            addAndMakeVisible (*presetBar);
+        }
         int width = MiscPanel::preferredWidth, height = MiscPanel::preferredHeight;
         for (auto& p : pages)
         {
@@ -6459,7 +6585,30 @@ public:
         g.fillRect (getLocalBounds().removeFromTop (headerHeight));
         g.setColour (theme::colour::border);
         g.drawHorizontalLine (headerHeight - 1, 0.0f, (float) getWidth());
+        for (auto& t : tabs) // FL's tabs sit side by side; a 1 px line closes each
+            g.fillRect (t->getRight(), 0, 1, headerHeight - 1);
     }
+
+    // Round 190in: the window's title bar shows the ▸ menu and the presets (docked: LYNX's own title bar); the strip
+    // gives them up. The window calls this once it knows.
+    void movePresetsToTitleBar (juce::Component& titleBarOwner)
+    {
+        presetsInTitle = true;
+        menuArrow.setVisible (false);
+        if (presetBar != nullptr)
+        {
+            presetBar->setTitleLook (true);
+            titleBarOwner.addAndMakeVisible (*presetBar);
+        }
+        resized();
+    }
+    juce::Component* presetComponent() const noexcept { return presetBar.get(); }
+    int channelIndex() const noexcept { return channel; }
+
+    // FL's ▸ wrapper menu of this channel (round 190in, details190if R8). `scaling` / `detached`: the window's items.
+    std::function<void (wrappermenu::Spec&)> windowItems;
+    void showWrapperMenu (juce::Component& anchor);
+    juce::PopupMenu buildWrapperMenu();
 
     void resized() override
     {
@@ -6531,6 +6680,50 @@ private:
     bool instrumentPageFirst = false, presetsInTitle = false;
 };
 
+void ChannelFrame::showWrapperMenu (juce::Component& anchor)
+{
+    buildWrapperMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&anchor));
+}
+
+juce::PopupMenu ChannelFrame::buildWrapperMenu()
+{
+    // FL's channel ▸ menu (FL manual, Channel Settings › Menu commands; Plugin wrapper › Plugin Menu; capture
+    // live190gu/genpreset/fl-wrapper-menu-slicex.png). The Channel rack's own items come from the main window.
+    wrappermenu::Spec spec;
+    spec.channel = true;
+    if (channelWrapperItemsHandler())
+        channelWrapperItemsHandler() (channel, spec);
+    if (auto* bar = presetBar.get())
+    {
+        const juce::Component::SafePointer<ChannelPresetBar> safe (bar);
+        spec.presets = [safe] (juce::PopupMenu& m) {
+            if (safe != nullptr)
+                m = safe->buildMenu();
+        };
+        spec.savePresetAs = [safe] {
+            if (safe != nullptr)
+                safe->saveAs();
+        };
+    }
+    if (const auto* d = channel >= 0 && channel < (int) engine.getSong().channels.size() ? &engine.getSong().channels[(std::size_t) channel] : nullptr;
+        d != nullptr && genpresets::canSave (d->instrument) && locateInBrowserHandler())
+        spec.browsePresets = [folder = genpresetui::folderFor (d->instrument)] {
+            folder.createDirectory();
+            if (locateInBrowserHandler())
+                locateInBrowserHandler() (folder);
+        };
+    // FL's Route to free mixer track (Ctrl+L): the channel to the first free insert
+    spec.routeToFreeMixerTrack = [this] {
+        engine.editSong ([ch = channel] (Song& s) {
+            if (ch >= 0 && ch < (int) s.channels.size())
+                s.channels[(std::size_t) ch].mixerTrack = s.claimFreeInsert();
+        });
+    };
+    if (windowItems)
+        windowItems (spec);
+    return wrappermenu::build (spec);
+}
+
 bool hasEnvelopeTab (InstrumentKind kind) noexcept
 {
     return kind == InstrumentKind::synth || kind == InstrumentKind::sampler;
@@ -6575,22 +6768,6 @@ std::unique_ptr<juce::Component> makeEnvelopePage (AudioEngine& engine, const Ch
                     fslicer::setVoiceSettings (*state, settings);
                     def.pluginState = fslicer::write (*state);
                 }
-        for (auto& t : tabs) // FL's tabs sit side by side; a 1 px line closes each
-            g.fillRect (t->getRight(), 0, 1, headerHeight - 1);
-    }
-
-    // Round 190in: the window's title bar shows the ▸ menu and the presets (docked: LYNX's own title bar); the strip
-    // gives them up. The window calls this once it knows.
-    void movePresetsToTitleBar (juce::Component& titleBarOwner)
-    {
-        presetsInTitle = true;
-        menuArrow.setVisible (false);
-        if (presetBar != nullptr)
-        {
-            presetBar->setTitleLook (true);
-            titleBarOwner.addAndMakeVisible (*presetBar);
-        }
-        resized();
             });
         });
 }
@@ -6807,13 +6984,67 @@ public:
         setConstrainer (&aspect);
         setResizable (true, false);
 
-        centreWithSize (getWidth(), getHeight());
-        if (! modulation)
-            if (const auto& at = alignedChannelEditorPosition(); at.has_value())
-                setTopLeftPosition (*at); // "Align all channel editors" set every channel's place (round 169k)
-        setVisible (true);
-        markLinkedWindow (*this, channel, -1); // FL's Auto select linked modules (round 187a)
-        dockOrKeepAbove (*this); // FL's docked plugin window (round 190ev)
+        auto docked = shot;
+        if (shot) // (as dockOrKeepAbove makes a docked window: LYNX's title bar, the close button alone)
+        {
+            setTitleBarButtonsRequired (juce::DocumentWindow::closeButton, false);
+            setTitleBarHeight (26);
+            setContentComponentSize (scaled->getWidth(), scaled->getHeight());
+        }
+        else
+        {
+            centreWithSize (getWidth(), getHeight());
+            if (! modulation)
+                if (const auto& at = alignedChannelEditorPosition(); at.has_value())
+                    setTopLeftPosition (*at); // "Align all channel editors" set every channel's place (round 169k)
+            setVisible (true);
+            markLinkedWindow (*this, channel, -1); // FL's Auto select linked modules (round 187a)
+            docked = dockOrKeepAbove (*this); // FL's docked plugin window (round 190ev)
+        }
+        // Round 190in (design190ia FW-5, details190if R8): FL's title bar — ▸ menu at the left, "Name (target)" in two
+        // tones, the preset ◀ name ▶ at the right. Only LYNX's own title bar (docked) can hold them; a system title bar
+        // leaves them in the frame's strip.
+        if (auto* frame = dynamic_cast<ChannelFrame*> (&scaled->page()))
+        {
+            frame->windowItems = [safe = juce::Component::SafePointer<SettingsWindow> (this), docked] (wrappermenu::Spec& spec) {
+                if (safe == nullptr)
+                    return;
+                spec.scaling = [safe] (juce::PopupMenu& m) {
+                    if (safe != nullptr)
+                        m = safe->scalingMenu();
+                };
+                spec.detached = ! docked; // (a window of the system's when docking is off: shown, not switched here)
+            };
+            if (docked)
+            {
+                setTitleBarTextCentred (false);
+                getProperties().set ("lynxTitleTwoTone", true);
+                getProperties().set ("lynxTitleLeft", 20);
+                titleMenu.onClick = [this, frame] { frame->showWrapperMenu (titleMenu); };
+                Component::addAndMakeVisible (titleMenu);
+                frame->movePresetsToTitleBar (*this);
+                titlePresets = frame->presetComponent();
+                getProperties().set ("lynxTitleRight", titlePresets != nullptr ? titlePresetsWidth + 6 : 0);
+                resized();
+            }
+        }
+    }
+
+    void resized() override
+    {
+        juce::DocumentWindow::resized();
+        const auto bar = getTitleBarArea();
+        if (titleMenu.isVisible())
+            titleMenu.setBounds (bar.getX() + 2, bar.getY(), 18, bar.getHeight());
+        if (titlePresets != nullptr && titlePresets->getParentComponent() == this)
+        {
+            auto right = bar.getRight();
+            if (auto* close = getCloseButton())
+                right = close->getX() - 6;
+            if (auto* min = getMinimiseButton(); min != nullptr && min->isVisible())
+                right = juce::jmin (right, min->getX() - 6);
+            titlePresets->setBounds (right - titlePresetsWidth, bar.getY() + 2, titlePresetsWidth, bar.getHeight() - 4);
+        }
     }
 
     int getChannel() const { return channel; }
@@ -6821,19 +7052,33 @@ public:
     juce::Component* page() const { return scaled != nullptr ? &scaled->page() : nullptr; }
     void closeButtonPressed() override;
 
-    // FL's plugin menu › Scaling (PluginScalingMenu: 100 % … 400 % of the plugin's size). LYNX's window has no wrapper
-    // menu, so a right-click on its title bar (docked: LYNX's own bar) shows it.
+    // FL's plugin menu › Scaling (PluginScalingMenu: 100 % … 400 % of the plugin's size): in the ▸ wrapper menu (round
+    // 190in, R8). A right-click on the title bar renames the channel, as in FL (DF-119: "the same can be done by
+    // Right-Clicking the title bar of the window"); without the Channel rack's rename (shots), it still shows Scaling.
     void mouseDown (const juce::MouseEvent& e) override
     {
         if (e.mods.isPopupMenu() && e.eventComponent == this && ! isUsingNativeTitleBar() && e.y < getTitleBarHeight())
         {
-            showScalingMenu();
+            wrappermenu::Spec spec;
+            if (channelWrapperItemsHandler())
+                channelWrapperItemsHandler() (channel, spec);
+            if (spec.rename != nullptr)
+                spec.rename();
+            else
+                showScalingMenu();
             return;
         }
         juce::DocumentWindow::mouseDown (e);
     }
 
     void showScalingMenu()
+    {
+        juce::PopupMenu menu;
+        menu.addSubMenu (tr ("Scaling"), scalingMenu());
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+    }
+
+    juce::PopupMenu scalingMenu()
     {
         juce::PopupMenu sizes;
         const auto stored = scaled->storedScale();
@@ -6876,6 +7121,9 @@ private:
     AudioEngine& engineRef;
     PageAspectConstrainer aspect;
     ScaledContent* scaled = nullptr; // (owned by the window: its content)
+    wrappermenu::MenuArrow titleMenu;               // FL's ▸ in LYNX's title bar (docked)
+    juce::Component* titlePresets = nullptr;        // the frame's preset bar, moved into the title bar (owned by the frame)
+    static constexpr int titlePresetsWidth = 190;
 };
 
 std::vector<std::unique_ptr<SettingsWindow>>& windows()
@@ -7057,6 +7305,38 @@ int channelFrameHeaderHeight() noexcept
     return ChannelFrame::headerHeight;
 }
 
+std::unique_ptr<juce::Component> makeChannelWindowForShot (AudioEngine& engine, int channel, int tab)
+{
+    if (channel < 0 || channel >= (int) engine.getSong().channels.size())
+        return nullptr;
+    auto window = std::make_unique<SettingsWindow> (engine, channel, false, true);
+    if (auto* frame = dynamic_cast<ChannelFrame*> (window->page()))
+        frame->showTab (tab < 0 ? frame->tabCount() - 1 : tab);
+    return window;
+}
+
+std::optional<juce::PopupMenu> channelWrapperMenu (juce::Component& root)
+{
+    if (auto* frame = dynamic_cast<ChannelFrame*> (&root))
+        return frame->buildWrapperMenu();
+    for (auto* child : root.getChildren())
+        if (auto menu = channelWrapperMenu (*child))
+            return menu;
+    return std::nullopt;
+}
+
+std::unique_ptr<juce::Component> makeChannelHeaderControls (AudioEngine& engine, int channel)
+{
+    if (channel < 0 || channel >= (int) engine.getSong().channels.size())
+        return nullptr;
+    return std::make_unique<ChannelHeaderControls> (engine, channel);
+}
+
+int channelHeaderControlsWidth() noexcept
+{
+    return ChannelHeaderControls::preferredWidth;
+}
+
 std::unique_ptr<juce::Component> makeChannelFrame (AudioEngine& engine, int channel, int tab)
 {
     const auto kind = engine.getSong().channels[(std::size_t) channel].instrument;
@@ -7121,9 +7401,6 @@ std::unique_ptr<juce::Component> makeChannelSettingsPanel (AudioEngine& engine, 
                  || kind == InstrumentKind::slayer || kind == InstrumentKind::fruitydance || kind == InstrumentKind::sytrus || kind == InstrumentKind::pocketSuperSaw)
         return std::make_unique<ModelPanel> (engine, ChannelRef::rack (channel));
 
-    wrappermenu::MenuArrow titleMenu;               // FL's ▸ in LYNX's title bar (docked)
-    juce::Component* titlePresets = nullptr;        // the frame's preset bar, moved into the title bar (owned by the frame)
-    static constexpr int titlePresetsWidth = 190;
     return std::make_unique<SettingsPanel> (engine, ChannelRef::rack (channel));
 }
 
@@ -7144,6 +7421,12 @@ std::unique_ptr<juce::Component> makeNodeChannelFrame (AudioEngine& engine, std:
     const auto kind = def->instrument;
     return std::make_unique<ChannelFrame> (engine, ref, std::move (page), makeEnvelopePage (engine, ref, kind));
 }
+std::function<void (int channel, wrappermenu::Spec&)>& channelWrapperItemsHandler()
+{
+    static std::function<void (int, wrappermenu::Spec&)> handler;
+    return handler;
+}
+
 std::function<void (int)>& openMixerInsertHandler()
 {
     static std::function<void (int)> handler;

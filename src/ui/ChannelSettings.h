@@ -7,6 +7,14 @@
 
 namespace lynx
 {
+namespace wrappermenu
+{
+struct Spec;
+}
+// Round 190in (details190if R8): the Channel rack's items of FL's channel ▸ wrapper menu (Piano roll, Replace ▸,
+// Delete..., Rename, color and icon..., Change color, Random color, Change icon...), for channel `channel`. The main
+// window sets it; the channel and plugin windows call it.
+std::function<void (int channel, wrappermenu::Spec&)>& channelWrapperItemsHandler();
 // Sampler settings window for a channel (pitch, attack, release, reverse,
 // "cut itself"), like FL's Channel settings. One window per channel.
 void openChannelSettings (AudioEngine& engine, int channel);
@@ -63,6 +71,14 @@ std::unique_ptr<juce::Component> makeChannelPrecomputePanel (AudioEngine& engine
 std::unique_ptr<juce::Component> makeChannelFrame (AudioEngine& engine, int channel, int tab = 0);
 // the height of that window's channel header (tabs, pan / volume / pitch...) above the instrument's pages
 int channelFrameHeaderHeight() noexcept;
+// Round 190in (design190ia FW-7): FL's ON / PAN / VOL / PITCH / RANGE / TRACK strip of channel `channel` (the right part
+// of the channel window's header), for a hosted instrument's wrapper header; `channelHeaderControlsWidth` wide.
+std::unique_ptr<juce::Component> makeChannelHeaderControls (AudioEngine& engine, int channel);
+// Round 190in (shots): the channel window as it shows docked (LYNX's title bar with FL's ▸, the two-tone title and the
+// presets), off the desktop, on tab `tab` (< 0 = Misc); and FL's ▸ wrapper menu of the channel window inside `root`.
+std::unique_ptr<juce::Component> makeChannelWindowForShot (AudioEngine& engine, int channel, int tab);
+std::optional<juce::PopupMenu> channelWrapperMenu (juce::Component& root);
+int channelHeaderControlsWidth() noexcept;
 // The designed plugin page inside a channel window shows page `page` (screenshots, round 169h); returns the page count
 // of its layout (0 = no pages)
 int showChannelLayoutPage (juce::Component& frame, int page);

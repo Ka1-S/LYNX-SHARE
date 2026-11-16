@@ -69,6 +69,18 @@ public:
     std::function<void()> onLoaded;
     void openMenu() { showMenu(); } // (tests / shots)
 
+    // Round 190in (details190if R8): FL's wrapper ▸ menu reuses the bar — its Presets ▸ submenu (the programs and the
+    // user's presets, then FL's Randomize and Hybridize), Save preset as... and the presets folder
+    juce::PopupMenu presetsMenu();
+    void saveAs();
+    juce::File presetFolder() const { return folderFor (plugin.getName()); }
+    // FL's Presets › Randomize ("gives random values to the published plugin settings": the plugin's automatable
+    // parameters) and Hybridize (a mode: a preset chosen while it is on brings a random half of those parameters)
+    void randomize();
+    static bool& hybridize() { static bool on = false; return on; }
+    // Round 190in (design190ia FW-5): in a window's title bar, FL's look — the name, dim, then ◀ ▶, no box
+    void setTitleLook (bool shouldBe);
+
 private:
     struct Entry
     {
@@ -91,6 +103,6 @@ private:
     juce::File currentFile;
     int currentProgram = -1;
     std::unique_ptr<juce::FileChooser> chooser;
+    bool titleLook = false;
 };
 } // namespace lynx::pluginpresetui
-    bool titleLook = false;
