@@ -134,6 +134,7 @@ std::optional<session::SlotClip> copiedSlot;
 std::uint64_t copiedSlotStamp = 0;
 
 class ClipGridComponent final : public juce::Component,
+                                public ui::HintSource,
                                 public mapmode::SpotSource,
                                 public juce::DragAndDropTarget,
                                 public juce::FileDragAndDropTarget,
@@ -401,7 +402,7 @@ public:
                 return;
             }
             if (e.x < cellArea().getRight() + launchZone)
-                engine.launcherCommand ({ launcher::Command::Type::launchScene, 0, hit.scene });
+                launchScene (hit.scene);
             repaint();
             return;
         }
@@ -695,8 +696,10 @@ public:
         }
         if (code == juce::KeyPress::returnKey)
         {
-            engine.launcherCommand (key.getModifiers().isCommandDown() ? launcher::Command { launcher::Command::Type::launchScene, 0, selectedScene }
-                                                                       : launcher::Command { launcher::Command::Type::launch, selectedTrack, selectedScene });
+            if (key.getModifiers().isCommandDown())
+                launchScene (selectedScene);
+            else
+                engine.launcherCommand ({ launcher::Command::Type::launch, selectedTrack, selectedScene });
             return true;
         }
         // round 190em: Del on a selected scene field is the reference's "Return to Default" (live check 190ei)
@@ -775,7 +778,108 @@ public:
         return false;
     }
 
+    // Round 190im (R6, DL-21): what the part under the mouse is and does, in the hint bar (Live's Info View names
+    // whatever is hovered: launch button, stop button, track status, scene, slot). Event-driven: the hint bar asks on a
+    // mouse move and repaints only when the text changes.
+    ui::Hint hintAt (juce::Point<int> p) override
+    {
+        ui::Hint hint;
+        const auto* grid = gridOf();
+        if (grid == nullptr)
+            return hint;
+        const auto& song = engine.getSong();
+        const auto cells = cellArea();
+        if (const auto t = headerTrackAt (p); t >= 0)
+        {
+            hint.text = tr ("Track title: [LMB] selects the track  [RMB] track menu  [Ctrl][R] renames it");
+            hint.value = t < (int) song.playlistTracks.size() && ! song.playlistTracks[(std::size_t) t].name.empty()
+                             ? utf8 (song.playlistTracks[(std::size_t) t].name) : tr ("Track {0}", { juce::String (t + 1) });
+            hint.hasMenu = true;
+            return hint;
+        }
+        if (const auto t = statusTrackAt (p); t >= 0)
+        {
+            const auto x = p.x - columnX (t);
+            if (x >= columnWidth - armWidth - 6 && ! mixer->armsShown())
+                hint.text = tr ("Arm Session Recording: [LMB] arms this track (the others disarm)  [Ctrl][LMB] keeps the others armed");
+            else if (x < launchZone)
+                hint.text = tr ("Clip Stop button: [LMB] stops the clip playing on this track (at the launch quantisation)");
+            else
+                hint.text = tr ("Track status: the playing clip's loop count, position and length (a one-shot clip: the time left)");
+            return hint;
+        }
+        const auto hit = hitTestCell (p);
+        if (hit.scene >= 0 && hit.track < 0 && p.x >= cells.getRight())
+        {
+            const auto& scenes = grid->scenes;
+            hint.text = p.x < cells.getRight() + launchZone
+                            ? tr ("Scene Launch button: [LMB] launches every clip in this row; the next scene is selected  [Ctrl][Enter] launches the selected scene")
+                            : tr ("Scene: [LMB] selects it  [RMB] scene menu (insert, duplicate, rename, tempo)  [Ctrl][R] renames it");
+            hint.value = hit.scene < (int) scenes.size() && ! scenes[(std::size_t) hit.scene].name.empty()
+                             ? utf8 (scenes[(std::size_t) hit.scene].name) : juce::String (hit.scene + 1);
+            hint.hasMenu = true;
+            return hint;
+        }
+        if (hit.scene >= 0 && hit.track >= 0)
+        {
+            const auto* clip = launcher::clipAt (*grid, hit.track, hit.scene);
+            const auto onButton = p.x - columnX (hit.track) < launchZone;
+            if (clip == nullptr)
+                hint.text = engine.isGridTrackArmed (hit.track) ? tr ("Clip Record button: [LMB] records a new clip into this slot")
+                            : onButton ? tr ("Clip Stop button: [LMB] stops the clip playing on this track (at the launch quantisation)")
+                                       : tr ("Empty slot: drop a clip, a pattern or a sample here  [2xLMB] puts the current pattern here  [RMB] slot menu");
+            else
+            {
+                hint.text = onButton ? tr ("Clip Launch button: [LMB] launches the clip (at the launch quantisation)  [Enter] launches the selected clip")
+                                     : tr ("Clip: [LMB] selects it, drag moves it ([Ctrl] copies)  [2xLMB] opens it  [RMB] clip menu");
+                hint.value = clipName (song, *grid, *clip);
+                if (clip->gridSlot >= 0 && clip->gridSlot < (int) grid->slots.size())
+                {
+                    const auto& slot = grid->slots[(std::size_t) clip->gridSlot];
+                    if (slot.follow.enabled && (slot.follow.a != FollowKind::none || slot.follow.b != FollowKind::none))
+                        hint.value << "  " << tr ("(Follow Action)");
+                }
+            }
+            hint.hasMenu = true;
+        }
+        return hint;
+    }
+
 private:
+    // Round 190im (R6): a scene launched from here (its launch button, Ctrl+Enter): its button pulses until its clips
+    // start (DL-5: Live's queued pulse, black ↔ #00D38D every 400 ms, filmed by round 190ig), and the scene below becomes
+    // the selected one (DL-6, Live's manual: "The scene below a launched scene will automatically be selected as the
+    // next to be launched"), so Ctrl+Enter steps down the scenes.
+    void launchScene (int scene)
+    {
+        engine.launcherCommand ({ launcher::Command::Type::launchScene, 0, scene });
+        if (queuedScene >= 0 && queuedScene != scene)
+            repaintScene (queuedScene);
+        queuedScene = scene;
+        queuedSeen = false;
+        queuedTicks = 0;
+        queuedBlink = blinkPhaseNow();
+        if (scene + 1 < rowCount())
+        {
+            selectedScene = scene + 1;
+            sceneSelected = true;
+            titleSelected = false;
+            selectedField = 0;
+            revealSelection();
+        }
+        repaint();
+    }
+    void repaintScene (int row)
+    {
+        const auto cells = cellArea();
+        if (row >= 0)
+            repaint (juce::Rectangle<int> (cells.getRight(), rowY (row), sceneWidthNow(), rowHeight).getIntersection (cells.withRight (getWidth())));
+    }
+    int queuedScene = -1;       // the scene launched here, until its clips start (−1: none)
+    bool queuedSeen = false;    // (one of its clips was seen waiting)
+    int queuedTicks = 0;        // (grid timer ticks since the launch)
+    std::uint32_t queuedBlink = 0;
+
     AudioEngine& engine;
     juce::TextButton stopAll, backToPlaylist, grooves, mixerButton;
     std::unique_ptr<SessionMixerComponent> mixer;
@@ -1279,6 +1383,17 @@ private:
         }
         // (a stop asked for: Live keeps the triangle green and pulses the track's stop square, paintStatusLive)
         juce::ignoreUnused (stopping);
+        // round 190im (DL-13, Live's manual 16.7: "Clips and scenes with assigned Follow Actions are indicated by a
+        // striped Clip/Scene Launch button"): diagonal stripes across the launch zone, in the clip colour's shade
+        if (clip != nullptr && clip->gridSlot >= 0 && clip->gridSlot < (int) grid.slots.size())
+            if (const auto& follow = grid.slots[(std::size_t) clip->gridSlot].follow; follow.enabled && (follow.a != FollowKind::none || follow.b != FollowKind::none))
+            {
+                const juce::Graphics::ScopedSaveState keep (g);
+                g.reduceClipRegion (zone);
+                g.setColour (active ? juce::Colour (0xff2c2c2c) : theme::liveShade (fill, 0.5f));
+                for (int k = -zone.getHeight(); k < zone.getWidth(); k += 4)
+                    g.drawLine ((float) (zone.getX() + k), (float) zone.getBottom(), (float) (zone.getX() + k + zone.getHeight()), (float) zone.getY(), 1.0f);
+            }
         const auto triangleColour = recording ? lv::arm
                                   : playing ? lv::playing
                                   : pending ? livePulsed (lv::playing)
@@ -1332,6 +1447,29 @@ private:
             const auto area = juce::Rectangle<int> (cell.getX() + 14, cell.getY(), right - cell.getX() - 14, cell.getHeight());
             const auto full = area.getWidth() >= 52;
             const auto pie = juce::Rectangle<float> (full ? (float) area.getX() + 21.0f : (float) area.getCentreX() - 6.0f, (float) cell.getCentreY() - 6.0f, 12.0f, 12.0f);
+            // round 190im (DL-9, Live's manual 7.3): a one-shot clip shows a progress bar and its time left as m:ss
+            // instead of the pie, the loop count and the length
+            if (const auto left = oneShotSecondsLeft (t, playing, progress); left >= 0.0)
+            {
+                const auto bar = juce::Rectangle<float> (pie.getX() - 4.0f, pie.getCentreY() - 3.5f, 16.0f, 7.0f);
+                g.setColour (juce::Colour (0xff262626));
+                g.fillRect (bar);
+                g.setColour (theme::liveShade (colour, 0.74f));
+                g.fillRect (bar.reduced (1.0f));
+                g.setColour (theme::liveShade (colour, 0.86f));
+                g.fillRect (bar.reduced (1.0f).withWidth ((bar.getWidth() - 2.0f) * progress));
+                if (full)
+                {
+                    const auto secs = (int) std::ceil (left);
+                    g.setColour (lv::text);
+                    g.setFont (liveFont());
+                    g.drawText (juce::String (secs / 60) + ":" + juce::String (secs % 60).paddedLeft ('0', 2),
+                                juce::Rectangle<float> (bar.getRight() + 5.0f, (float) cell.getY(), (float) right - bar.getRight() - 5.0f, (float) cell.getHeight()),
+                                juce::Justification::centredLeft, false);
+                }
+            }
+            else
+            {
             g.setColour (juce::Colour (0xff262626));
             g.fillEllipse (pie);
             g.setColour (theme::liveShade (colour, 0.74f));
@@ -1356,6 +1494,7 @@ private:
                 g.drawText (juce::String (whole) + (beats - whole > 1.0e-6 ? "+" : ""),
                             juce::Rectangle<float> (pie.getRight() + 5.0f, (float) cell.getY(), (float) right - pie.getRight() - 5.0f, (float) cell.getHeight()),
                             juce::Justification::centredLeft, false);
+            }
             }
         }
         if (! armShown)
@@ -1383,7 +1522,9 @@ private:
         const auto a = cell.withWidth (launchZone).toFloat().withSizeKeepingCentre (9.0f, 11.0f);
         // (round 190em: a scene with its own tempo or time signature has a coloured launch triangle, as Live's cyan one)
         // (a plain scene's triangle: Live's dark grey, measured in the 190ei shot live-scenes-tempo-sig-on.png)
-        theme::fillLaunchTriangle (g, a, scene.tempo > 0.0 || scene.beatsPerBar > 0 ? c::info
+        const auto queuedOn = row == queuedScene && (! ui::motion::enabled() || (juce::Time::getMillisecondCounter() / classicBlinkPhaseMs) % 2 == 0);
+        theme::fillLaunchTriangle (g, a, queuedOn ? c::ledOn
+                                         : scene.tempo > 0.0 || scene.beatsPerBar > 0 ? c::info
                                          : layoutstyle::current() == layoutstyle::Style::clipLaunch ? liveSceneTriangle : c::textPrimary);
         g.setFont (theme::font (theme::type::small));
         auto nameArea = cell.withTrimmedLeft (launchZone);
@@ -1432,7 +1573,8 @@ private:
         g.fillRect (cell);
         const auto ink = selected ? lv::ink : scene.colour != 0 ? theme::liveShade (juce::Colour (scene.colour), 0.24f) : lv::text;
         const auto a = juce::Rectangle<float> ((float) cell.getX() + 4.0f, (float) cell.getCentreY() - 4.5f, 7.0f, 9.0f);
-        theme::fillLaunchTriangle (g, a, scene.tempo > 0.0 || scene.beatsPerBar > 0 ? c::info : lv::well);
+        // (round 190im, DL-5: a launched scene's button pulses until its clips start, as a queued clip's does)
+        theme::fillLaunchTriangle (g, a, row == queuedScene ? livePulsed (lv::playing) : scene.tempo > 0.0 || scene.beatsPerBar > 0 ? c::info : lv::well);
         g.setFont (theme::font (theme::type::small));
         auto nameArea = cell.withTrimmedLeft (14);
         if (sceneFieldsOn)
@@ -2178,6 +2320,8 @@ private:
             if (! ui::paintSavings()) // (LYNX_PAINT_SAVINGS=0: the whole mixer every tick, as before)
                 mixer->repaint();
         }
+        // round 190im (R6): a launched scene's pulse and its end (before the paths below that return early)
+        stepQueuedScene (juce::jmax (0, juce::jmin (columnCount(), launcher::maxTracks)));
         // round 190ge: the whole grid was repainted 30 times a second, also with nothing playing. Now a change of what
         // all of it shows (the song, the transport, the layout, the selection) repaints it; otherwise only the columns
         // whose own state moved (a playing clip's progress, a blink, an arm) are repainted, header to status row
@@ -2280,7 +2424,37 @@ private:
                 const auto from = cell.getX() + (int) std::floor (juce::jmin (a, b)) - 1, to = cell.getX() + (int) std::ceil (juce::jmax (a, b)) + 1;
                 repaint (juce::Rectangle<int> (from, cell.getBottom() - 3, to - from, 3).getIntersection (cell).getIntersection (cells).getIntersection (visible));
             }
+            if (liveLook() && was.oneShotSecond != now.oneShotSecond) // (round 190im, DL-9: a one-shot's time left)
+                repaint (juce::Rectangle<int> (x, cells.getBottom(), columnWidth, statusHeight + 1).getIntersection (visible));
             was = now;
+        }
+    }
+
+    // Round 190im (R6, DL-5): the launched scene's pulse until its clips start: the scene cell alone, on each blink phase
+    // (none with Animations off: a still lit button), and once more when it ends.
+    void stepQueuedScene (int columns)
+    {
+        if (queuedScene < 0)
+            return;
+        const auto* state = engine.launcherState();
+        auto waiting = false;
+        if (state != nullptr)
+            for (int t = 0; t < columns && ! waiting; ++t)
+                waiting = state->tracks[(std::size_t) t].pending.load (std::memory_order_relaxed) == queuedScene;
+        queuedSeen = queuedSeen || waiting;
+        ++queuedTicks;
+        // (it ends once its clips started; a scene with nothing to start ends after a few ticks)
+        if (! waiting && (queuedSeen || queuedTicks > 6))
+        {
+            const auto row = queuedScene;
+            queuedScene = -1;
+            repaintScene (row);
+            return;
+        }
+        if (const auto phase = blinkPhaseNow(); phase != queuedBlink)
+        {
+            queuedBlink = phase;
+            repaintScene (queuedScene);
         }
     }
 
@@ -2293,6 +2467,7 @@ private:
         float progress = 0.0f;
         std::uint32_t blink = 0;      // the blink phase, while something in the column blinks
         std::uint64_t recordTick = 0; // while it records: the recording's start, the clock, a 33 ms tick
+        int oneShotSecond = -1;       // round 190im (DL-9): a playing one-shot clip's seconds left
     };
 
     ColumnView columnView (int t) const
@@ -2310,7 +2485,11 @@ private:
             c.stopping = v.stopping.load (std::memory_order_relaxed);
             c.taken = v.taken.load (std::memory_order_relaxed);
             if (c.playing >= 0)
+            {
                 c.progress = v.progress.load (std::memory_order_relaxed);
+                if (const auto left = oneShotSecondsLeft (t, c.playing, c.progress); left >= 0.0)
+                    c.oneShotSecond = (int) std::ceil (left);
+            }
             if (c.pending >= 0 || c.recordPending >= 0 || c.stopping)
                 c.blink = blinkPhaseNow();
             if (c.recording >= 0)
@@ -2321,6 +2500,17 @@ private:
         return c;
     }
     std::vector<ColumnView> columnViews; // [column] what the last tick saw
+
+    // round 190im (DL-9): a playing one-shot clip's (Loop off) time left in seconds at the song's tempo; −1: not one
+    double oneShotSecondsLeft (int t, int scene, float progress) const
+    {
+        const auto* grid = gridOf();
+        const auto* clip = grid != nullptr ? launcher::clipAt (*grid, t, scene) : nullptr;
+        if (clip == nullptr || clip->gridSlot < 0 || clip->gridSlot >= (int) grid->slots.size() || grid->slots[(std::size_t) clip->gridSlot].loop)
+            return -1.0;
+        const auto bpm = juce::jmax (1.0, engine.getSong().bpm);
+        return (1.0 - (double) juce::jlimit (0.0f, 1.0f, progress)) * (double) clip->length / (double) lynx::ppq * 60.0 / bpm;
+    }
 
     static std::uint64_t mixBits (std::uint64_t h, std::uint64_t v) noexcept { return (h ^ v) * 1099511628211ull; }
     template <typename T>
