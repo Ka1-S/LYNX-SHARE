@@ -168,6 +168,10 @@ public:
     void setParameterFromUi (int index, float value);
     void setRenderMode (bool offline);
     void resetForExport(); // UI thread, before an export (the audio is not running through it)
+    // Round 190jb: an export at another sample rate renders with this running instance (FL renders with the instances
+    // that play): the plugin is prepared again at `rate` (and back after the export). Message thread, while nothing
+    // processes it. False when it crashed or did not take the rate.
+    bool changeRate (double rate);
     bool usesFixedBlocks() const noexcept { return fixed != nullptr; }
     // The MIDI "parameters" (core/MidiControls.h): CC / aftertouch / pitch bend values last asked for.
     float midiControlValue (int index) const noexcept { return midiControls.value (index); }
@@ -294,6 +298,10 @@ public:
     void setParameterFromUi (int index, float value);
     void setRenderMode (bool offline);
     void resetForExport(); // UI thread, before an export (the audio is not running through it)
+    // Round 190jb: an export at another sample rate renders with this running instance (FL renders with the instances
+    // that play): the plugin is prepared again at `rate` (and back after the export). Message thread, while nothing
+    // processes it. False when it crashed or did not take the rate.
+    bool changeRate (double rate);
     bool usesFixedBlocks() const noexcept { return fixed != nullptr; }
     // Round 177b: a plugin with a second input bus (its sidechain input) gets the slot's sidechain there; a slot without
     // one (or a silent source) feeds it silence, as before.

@@ -232,6 +232,21 @@ public:
     void markCreatedNow(); // a new project: Project info › created = now (when it has no date yet)
     // Offline render mode for the hosted plugins (setNonRealtime), around renderOffline.
     void setPluginsRenderMode (bool offline);
+    // Round 190jb (owner decision: FL-exact; REA_rodada190jb): an export renders with the hosted plugin instances that
+    // play, as FL does, not with new copies (engine/Exporter.h, LiveExportHold). holdForExport (message thread) stops
+    // playback, makes the device callback output silence without touching the rack and halts render-ahead; it returns
+    // true once nothing of this engine runs the plugins any more (false, nothing held: a recording or a real-time
+    // bounce is running, or the device callback did not come back within `timeoutMs` — the export then makes its own
+    // instances, as before). releaseAfterExport (message thread) lets the engine play again and publishes the song
+    // (the units take this song's routes and side inputs back).
+    bool holdForExport (int timeoutMs = 3000);
+    void releaseAfterExport();
+    bool heldForExport() const noexcept { return exportHold.load (std::memory_order_acquire); }
+    // The export engine's side: its rack builds take the hosted plugins (and the Patchers that host plugins) these return
+    // instead of making new ones (nullptr: made new). Set before setSong; empty functions = none.
+    using LiveInstrumentSource = std::function<std::shared_ptr<Instrument> (const ChannelDef&, double sampleRate)>;
+    using LiveEffectSource = std::function<std::shared_ptr<Effect> (const EffectSlot&, double sampleRate)>;
+    void setLiveUnits (LiveInstrumentSource instrument, LiveEffectSource effect);
     // Every hosted plugin of the song that has not crashed (channels, inserts, inside Patchers); `notifyRender` is the
     // plugin's "Notify about rendering mode" option. Message thread or the render thread, while nothing else edits.
     void forEachHostedPlugin (const std::function<void (juce::AudioPluginInstance&, bool notifyRender)>& visit) const;
@@ -1107,6 +1122,11 @@ public:
     // length and adding up to the mix, group effects and multi-output inserts in "one per mixer insert", the delay
     // compensation's trim on and off. "OK (...)" or "ERROR ...". `log` receives a line per check.
     static juce::String exportParitySelfTest (const std::function<void (const juce::String&)>& log = {});
+    // Round 190jb: exports with the live engine's plugin instances (engine/Exporter.h LiveExportHold), on a stand-in device:
+    // LYNX's own units render the same with and without the hold; a hosted plugin whose sound depends on its instance
+    // (`plugins`: VST3 / CLAP files, e.g. the LYNX Test Synth with LYNX_TEST_SYNTH_SEED=1, Surge XT) exports what
+    // playback played; playback after the export plays as before it; the plugins get their state and rate back.
+    static juce::String exportLiveSelfTest (const std::function<void (const juce::String&)>& log = {}, const juce::StringArray& plugins = {});
     // Self-tests (round 190hn, engine/ShortExportTest.cpp): an engine made without a device plays through a stand-in one
     // (engine/StandInAudioDevice.h: callbacks of `blockSize` from its own thread, faster than real time). Message thread;
     // empty = opened.
@@ -1620,6 +1640,11 @@ private:
     void saveUndoStep();
     ProcessTimes* externalTimes = nullptr;
     std::function<std::shared_ptr<Effect>()> externalEffect;
+    // round 190jb: an export runs with this engine's plugins (holdForExport); the device callback is inside its block
+    std::atomic<bool> exportHold { false }, callbackBusy { false };
+    LiveInstrumentSource liveInstrumentSource; // (the export engine's side: setLiveUnits)
+    LiveEffectSource liveEffectSource;
+    std::vector<const void*> lentUnits; // the units the sources gave this engine (the export engine; warmUpPlugins)
     void capturePluginStatesInto (Song& target, bool requireAll);
     void syncRemotePluginStates (const Song& before);
     juce::String finishRemoteHistory (const std::optional<Song>& before);

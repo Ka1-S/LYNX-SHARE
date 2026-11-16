@@ -658,6 +658,27 @@ void PluginInstrument::setRenderMode (bool offline)
         setPluginRenderMode (*plugin, offline, plugin->getBlockSize() > 0 ? plugin->getBlockSize() : blockSize);
 }
 
+bool PluginInstrument::changeRate (double rate)
+{
+    if (hasCrashed() || rate <= 0.0)
+        return false;
+    if (plugin->getSampleRate() == rate)
+        return true;
+    // (round 190jb: an export at another rate with the running instance; nothing processes it now)
+    const juce::ScopedLock lock (plugin->getCallbackLock());
+    const auto block = plugin->getBlockSize() > 0 ? plugin->getBlockSize() : blockSize;
+    if (const auto code = crashguard::run ([this, rate, block] {
+            plugin->releaseResources();
+            preparePlugin (*plugin, rate, block, false);
+        });
+        code != 0)
+    {
+        failed (code);
+        return false;
+    }
+    return plugin->getSampleRate() == rate;
+}
+
 void PluginInstrument::resetForExport()
 {
     // FL's "Reset plugin when FL Studio resets" (on by default): an export starts without what the plugin still holds
@@ -1235,6 +1256,31 @@ void PluginEffect::setRenderMode (bool offline)
 {
     if (! hasCrashed())
         setPluginRenderMode (*plugin, offline, plugin->getBlockSize() > 0 ? plugin->getBlockSize() : blockSize);
+}
+
+bool PluginEffect::changeRate (double rate)
+{
+    if (hasCrashed() || rate <= 0.0)
+        return false;
+    if (plugin->getSampleRate() == rate)
+        return true;
+    // (round 190jb: an export at another rate with the running instance; nothing processes it now)
+    const std::lock_guard<std::mutex> layout (layoutLock);
+    const juce::ScopedLock lock (plugin->getCallbackLock());
+    const auto block = plugin->getBlockSize() > 0 ? plugin->getBlockSize() : blockSize;
+    const auto side = sideChannel >= 0;
+    if (const auto code = crashguard::run ([this, rate, block, side] {
+            plugin->releaseResources();
+            preparePlugin (*plugin, rate, block, side);
+        });
+        code != 0)
+    {
+        failed (code);
+        return false;
+    }
+    buffer.setSize (bufferChannels (*plugin), blockSize);
+    findSideChannel();
+    return plugin->getSampleRate() == rate;
 }
 
 void PluginEffect::resetForExport()

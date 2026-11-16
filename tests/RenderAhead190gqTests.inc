@@ -301,6 +301,57 @@ TEST (render_ahead_is_bit_exact_with_the_real_time_path)
         }
 }
 
+// Round 190jb: render-ahead switched on (its load probe, under load) or off in the middle of a song with an automated
+// fader, at a device block of 441 (the parity self-test's): the part rendered ahead must take the automation's grid
+// (round 190gh: pieces of 128 inside blocks of 512 counted from where playback started) from the live renderer. It
+// started a grid of its own where it engaged, so the fader moved at other samples than in the real-time path / the
+// export: the rare export_parity miss of 190hn / 190ip (-70 dBFS, "first apart at 3.56 s").
+TEST (render_ahead_engaging_mid_song_keeps_the_automation_grid)
+{
+    using namespace lynx;
+    auto song = ra190gq::makeSong (4);
+    Automation a;
+    a.name = "Insert 4 volume";
+    a.target = { AutomationTargetKind::mixerVolume, 4, 0, 0 };
+    a.points = { { 0, 0.2f, 0.0f }, { 16 * ppq, 1.0f, 0.0f } };
+    song.automations.push_back (a);
+    Clip lane;
+    lane.kind = ClipKind::automation;
+    lane.automation = 0;
+    lane.track = 7;
+    lane.length = 16 * ppq;
+    song.playlist.push_back (lane);
+    const int block = 441, blocks = 160; // (~1.6 s)
+    std::vector<float> l0, r0;
+    ra190gq::renderPlain (song, blocks, block, 0.0, 0, l0, r0);
+    for (const auto engage : { true, false })
+        for (const auto at : { 37, 101 })
+        {
+            ra190gq::AheadRig rig (song, 0, {});
+            rig.ahead.setAlwaysEngage (! engage); // (off until block `at` when it engages there; on until then otherwise)
+            ra190gq::Callback cb (song, block, 0.0);
+            cb.beforeBlock = [&] (int k) {
+                if (k == at)
+                    rig.ahead.setAlwaysEngage (engage);
+            };
+            std::vector<float> l1, r1;
+            cb.run (blocks, l1, r1, [&] (double start, int n, double tps, float* x, float* y, int) { rig.block (cb, start, n, tps, x, y); });
+            float worst = 0.0f;
+            std::size_t first = l0.size();
+            for (std::size_t i = 0; i < l0.size() && i < l1.size(); ++i)
+                if (const auto d = std::max (std::abs (l0[i] - l1[i]), std::abs (r0[i] - r1[i])); d > 0.0f)
+                {
+                    worst = std::max (worst, d);
+                    first = std::min (first, i);
+                }
+            CHECK (rig.ahead.stats().engagements.load() >= 1);
+            CHECK (ra190gq::same (l0, l1) && ra190gq::same (r0, r1));
+            if (worst > 0.0f)
+                std::printf ("  render-ahead %s at block %d: apart from sample %d (block %d), worst %.1f dBFS\n", engage ? "engaging" : "released", at,
+                             (int) first, (int) first / block, 20.0 * std::log10 ((double) worst));
+        }
+}
+
 TEST (render_ahead_meters_show_what_is_heard)
 {
     using namespace lynx;
