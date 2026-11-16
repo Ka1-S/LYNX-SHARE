@@ -121,7 +121,13 @@ enum Param
                    // the tape characters' measured tape stage (output and loop tone apart, hiss, the wow's mean lag)
     modClock,      // Clock: the LFO swings the echo time by a fraction of itself (0 … 50 % at Depth 100 %, linear), both
                    // sides in step — a clocked line's modulation (H-Delay's, measured); off (default) = the ms law
-    paramCount
+    paramCount,
+    // round 190is, hidden (not in the info: no control, no string; saved while non-zero): the echo voicings' revision.
+    // 1 = the loop measured on refcap030's EchoBoy captures (new instances, makeEffectSlot): the saturation's make-up
+    // heard once on the echoes instead of on every pass, the voicing's diffusion inside the echo time, the echoes'
+    // measured 1/6 ms behind the dry. 0 = rounds 147 / 150 (a project or preset saved before loads without it, so it
+    // keeps that sound bit for bit). Read only with an echo voicing
+    revision = paramCount
 };
 enum class Style { single, ratio, quad, dual, pingPong }; // the two-time styles last (the panel shows the right time for both)
 // in the panel's order: the modulation section shows wow / flutter (tape), rate / depth (lo-fi … phaser), shift / detune

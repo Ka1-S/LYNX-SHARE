@@ -242,16 +242,41 @@ lynx = Echoform
 preset = Mode=0.0415; Sync L=0.6248; Note L=0.4498; Feedback=0.125; Mix=0.25; Echo voicing=0.064516
 # [DATA] VST2 unique ID from real projects
 vst2 = StEB
-names = EchoBoy; EchoBoyJr; EchoBoy Jr
+names = EchoBoy
+translate = soundtoys-echoboy
+
+[soundtoys-echoboy-jr]
+product = EchoBoy Jr
+vendor = Soundtoys
+# round 190is: its own entry (it shared EchoBoy's): EchoBoy's fallback in the voicings' revision 0 (#108). Revision 1's echo
+# lag is EchoBoy's (8 samples at 48 kHz), EchoBoy Jr's ~3, and on its steady tones the lag moved the echo's phase against
+# the dry (refcap030: 5 mode / sr96 files a step lower). Its own measured default (Studio Tape, Wide, 100 ms, feedback
+# 0.30, mix 40 %) was tried as the fallback and kept out: its blocks (mostly mix 25 … 30 %) scored lower
+lynx = Echoform
+preset = Mode=0.0415; Sync L=0.6248; Note L=0.4498; Feedback=0.125; Mix=0.25; Echo voicing=0.064516; #108=0
+names = EchoBoyJr; EchoBoy Jr
 translate = soundtoys-echoboy
 
 [soundtoys-primaltap]
 product = PrimalTap
 vendor = Soundtoys
-# round 129: Echoform (as EchoBoy), a darker lo-fi tape echo
+# round 129: Echoform (as EchoBoy), a darker lo-fi tape echo. Round 190is: Little PrimalTap has its own entry now; the state
+# stays encoded (not decoded: a change of one control rewrites the payload from that point to its end). PrimalTap's own
+# measured default (two taps at 0.5 beat, no feedback, mix 50 %, band-limited) was tried as the fallback and kept out:
+# refcap030's mode / pairs blocks (95 / 120 ms, mix 30 %) scored lower with it (3.67 -> 3.04, 3.37 -> 3.00)
 lynx = Echoform
 preset = Mode=0.125; Sync L=0.6248; Note L=0.4498; Feedback=0.125; Mix=0.25
-names = PrimalTap; Little PrimalTap; LittlePrimalTap
+names = PrimalTap
+
+[soundtoys-little-primaltap]
+product = Little PrimalTap
+vendor = Soundtoys
+# round 190is: its own entry (it shared PrimalTap's). Any state plays Little PrimalTap's default as measured on refcap030:
+# 113 ms (the echo 6 samples later), no feedback, mix 50 % on a linear law (dry and echo −6 dB: Echoform's equal-power Mix
+# at 2/3 with the Output at −4.8 dB), a steep low-pass at 12.3 kHz (Age) and its droop (High cut), no LFO
+lynx = Echoform
+preset = Mix=0.666667; Output=0.367466; Time L=0.113125; Mode=0.541667; Mod depth=0; Age=0.221; High cut=0.45; Feedback=0
+names = Little PrimalTap; LittlePrimalTap
 
 # Valhalla delay / modulation plugins -> LYNX's delay / modulation suite (round 101). Their saved state is a JUCE
 # XML block holding every parameter as its normalised value [DATA, EXEC]; the LYNX effects use the same value laws,
@@ -3266,7 +3291,15 @@ std::vector<SubstituteEntry> parseSubstituteTable (std::string_view text, int* e
         {
             const auto eq = item.rfind ('=');
             float v = 0;
-            const auto index = eq == std::string::npos ? -1 : paramNamed (*kind, item.substr (0, eq));
+            auto index = eq == std::string::npos ? -1 : paramNamed (*kind, item.substr (0, eq));
+            // round 190is: "#<index>" names a hidden parameter (past the effect's info, e.g. Echoform's revision)
+            if (index < 0 && eq != std::string::npos && eq > 1 && item[0] == '#')
+            {
+                float at = -1.0f;
+                if (parseFloat (trim (item.substr (1, eq - 1)), at) && at == std::floor (at)
+                    && at >= (float) effectInfo (*kind).params.size() && at < (float) maxEffectParams)
+                    index = (int) at;
+            }
             if (index < 0 || ! parseFloat (trim (item.substr (eq + 1)), v))
             {
                 ++bad;
