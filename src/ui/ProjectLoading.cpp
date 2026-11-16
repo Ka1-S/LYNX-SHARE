@@ -7,6 +7,7 @@
 #include "core/LoadTrace.h"
 #include "flp/Flp.h"
 #include "core/AlsImport.h"
+#include "core/DawProject.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
 #include "ui/Toolbar.h"
@@ -127,6 +128,8 @@ private:
                     }
                     else if (file.hasFileExtension ("als")) // a Live set (round 175a)
                         uses = alsForeignPlugins (std::vector<std::uint8_t> (bytes, bytes + data.getSize()));
+                    else if (file.hasFileExtension ("dawproject")) // a DAWproject (round 190jf, B22)
+                        uses = dawProjectForeignPlugins (std::vector<std::uint8_t> (bytes, bytes + data.getSize()));
                     else
                         uses = flpForeignPlugins (flp::parseProject ({ bytes, data.getSize() }));
                 }

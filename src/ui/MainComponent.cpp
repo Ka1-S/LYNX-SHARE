@@ -114,6 +114,7 @@
 #include "ui/ExportDialog.h"
 #include "ui/AudioCheck.h"
 #include "ui/AlsExportDialog.h"
+#include "ui/DawProjectExport.h" // round 190jf (B22)
 #include "ui/OtherAppsExport.h"
 #include "ui/FlStudioExportDialog.h"
 #include "ui/FruitySlicerEditor.h"
@@ -2797,6 +2798,8 @@ void MainComponent::loadUiSettings()
             PlaylistComponent::showAudioTrackLevels = on;
         else if (key == "instrumentTrackLevels")
             PlaylistComponent::showInstrumentTrackLevels = on;
+        else if (key == "hideCollapsedGroups") // round 190jf: Playlist › View › Hide collapsed grouped tracks
+            PlaylistComponent::hideCollapsedGroups = on;
         else if (key == "automationLanes") // round 177b: Playlist › Automation lanes
             autolanes::setShown (on);
         else if (key == "trackInserts") // round 190ht (issue #154): Playlist › Edit › Show insert effects on linked tracks
@@ -3137,6 +3140,7 @@ void MainComponent::saveUiSettings()
                                       + "\naudioTrackControls=" + juce::String (PlaylistComponent::showAudioTrackControls ? 1 : 0)
                                       + "\naudioTrackLevels=" + juce::String (PlaylistComponent::showAudioTrackLevels ? 1 : 0)
                                       + "\ninstrumentTrackLevels=" + juce::String (PlaylistComponent::showInstrumentTrackLevels ? 1 : 0)
+                                      + "\nhideCollapsedGroups=" + juce::String (PlaylistComponent::hideCollapsedGroups ? 1 : 0)
                                       + "\nautomationLanes=" + juce::String (autolanes::shown() ? 1 : 0)
                                       + "\ntrackInserts=" + juce::String (PlaylistComponent::showTrackInserts ? 1 : 0)
                                       + workflowextras::uiOptionsText() // round 190iu
@@ -4357,6 +4361,34 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
                 option (tr ("Show controls on audio tracks"), PlaylistComponent::showAudioTrackControls);
                 option (tr ("Show levels on audio tracks"), PlaylistComponent::showAudioTrackLevels);
                 option (tr ("Show levels on instrument tracks"), PlaylistComponent::showInstrumentTrackLevels);
+                // FL's View › "Hide collapsed grouped tracks" (round 190jf, B17; EEHideCollapsedAction)
+                view.addSeparator();
+                view.addItem (tr ("Hide collapsed grouped tracks"), true, PlaylistComponent::hideCollapsedGroups, [this] {
+                    auto apply = [safe = juce::Component::SafePointer<MainComponent> (this)] {
+                        if (safe == nullptr)
+                            return;
+                        PlaylistComponent::hideCollapsedGroups = ! PlaylistComponent::hideCollapsedGroups;
+                        safe->playlist.headerOptionsChanged();
+                        safe->saveUiSettings();
+                    };
+                    if (PlaylistComponent::hideCollapsedGroups || platform::testMode())
+                    {
+                        apply();
+                        return;
+                    }
+                    // FL's question before switching it on (FLEngine string "Hiding collapsed tracks|This option hides...")
+                    auto options = juce::MessageBoxOptions()
+                                       .withIconType (juce::MessageBoxIconType::QuestionIcon)
+                                       .withTitle (tr ("Hiding collapsed tracks"))
+                                       .withMessage (tr ("This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?"))
+                                       .withButton (tr ("Yes"))
+                                       .withButton (tr ("No"))
+                                       .withAssociatedComponent (this);
+                    juce::AlertWindow::showAsync (options, [apply] (int result) {
+                        if (result == 1)
+                            apply();
+                    });
+                });
                 menu.addSubMenu (tr ("View"), view);
             }
             {
@@ -7776,7 +7808,7 @@ void MainComponent::chooseFileToOpenNow()
 {
     fileChooser = lynx::ui::makeFileChooser (tr ("Open project"), currentFile.getParentDirectory(),
                                                        juce::String ("*") + ProjectFile::extension
-                                                           + ";*.dawproj;*.flp;*.als;*.flm;*.band;projectData;ProjectData;*.zip;*.lynxpack;*.mid;*.midi");
+                                                           + ";*.dawproj;*.dawproject;*.flp;*.als;*.flm;*.band;projectData;ProjectData;*.zip;*.lynxpack;*.mid;*.midi");
 
     // (a GarageBand .band is a folder: macOS's dialog shows it as one file; elsewhere its "projectData" is picked)
     lynx::ui::launchChooser (fileChooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
@@ -7863,7 +7895,7 @@ void MainComponent::openFile (const juce::File& file)
 
     // (a Live set takes the .flp import's path, round 175a; an FL Studio Mobile project too, round 182c; a GarageBand
     // project too, round 190ic)
-    if (file.hasFileExtension ("flp;als;flm;songtmpl") || ProjectPackage::garageBandPackage (file) == file)
+    if (file.hasFileExtension ("flp;als;flm;songtmpl;dawproject") || ProjectPackage::garageBandPackage (file) == file)
     {
         if (! persistent) // (command-line modes open synchronously, without scanning)
         {
@@ -7913,6 +7945,7 @@ void MainComponent::flpImported (const juce::File& file)
         projectName = file.getFileNameWithoutExtension();
         rememberRecent (file);
         importedSuffix = " " + (file.hasFileExtension ("als")            ? tr ("(imported from .als)")
+                                : file.hasFileExtension ("dawproject")   ? tr ("(imported from DAWproject)")
                                 : file.hasFileExtension ("flm;songtmpl") ? tr ("(imported from FL Studio Mobile)")
                                 : file.hasFileExtension ("band")         ? tr ("(imported from GarageBand)")
                                                                          : tr ("(imported from FL Studio)"));
@@ -8984,6 +9017,13 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
                                                                  : juce::File::getSpecialLocation (juce::File::userDocumentsDirectory),
                                      projectStem (projectName));
             });
+            // DAWproject (round 190jf, B22): the open format of Bitwig Studio, Studio One, Cubase...
+            exports.addItem (tr ("DAWproject (.dawproject)..."), [this] {
+                showDawProjectExport (engine, this,
+                                      currentFile != juce::File() ? currentFile.getParentDirectory()
+                                                                  : juce::File::getSpecialLocation (juce::File::userDocumentsDirectory),
+                                      projectStem (projectName));
+            });
             // Export for other apps (round 184a, S9): stems, MIDI, a Live set, an FL Studio project, the mixdown and a README
             exports.addItem (tr ("For other apps..."), [this] { exportForOtherApps(); });
             // FL's "Project bones..." (FileExportProjectBonesAction; REA round 168e)
@@ -9384,7 +9424,7 @@ void MainComponent::showLanguageChoice (const juce::String& id)
 
 bool MainComponent::isProjectFile (const juce::File& file)
 {
-    return file.hasFileExtension (juce::String (ProjectFile::extension) + ";dawproj;flp;als;flm;zip;" + sessionpack::extension);
+    return file.hasFileExtension (juce::String (ProjectFile::extension) + ";dawproj;dawproject;flp;als;flm;zip;" + sessionpack::extension);
 }
 
 bool MainComponent::isInterestedInFileDrag (const juce::StringArray& files)

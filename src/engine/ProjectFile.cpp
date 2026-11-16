@@ -13,6 +13,7 @@
 
 #include "core/MixerOps.h"
 #include "core/PlaylistOps.h"
+#include "core/NoteEdit.h" // round 190jf: normalizeFolders
 
 #include <algorithm>
 #include <tuple>
@@ -3499,6 +3500,16 @@ juce::String toJson (const Song& song, bool stampVersion)
         if (! groups.isEmpty())
             root->setProperty ("playlistTrackGroups", groups);
 
+        // round 190jf (B17): nested folders, [index, nest] for the grouped tracks deeper than one level. Kept apart from
+        // the rows above so a LYNX before 0.1.30 still reads the groups (one level deep)
+        juce::Array<juce::var> nests;
+        for (std::size_t i = 0; i < song.playlistTracks.size(); ++i)
+            if (song.playlistTracks[i].grouped && song.playlistTracks[i].nest > 0)
+                nests.add (juce::Array<juce::var> { (int) i, song.playlistTracks[i].nest });
+
+        if (! nests.isEmpty())
+            root->setProperty ("playlistTrackNest", nests);
+
         // comp tracks (round 177c): their indexes; a project without any has no such property
         juce::Array<juce::var> compTracks;
         for (std::size_t i = 0; i < song.playlistTracks.size(); ++i)
@@ -4287,6 +4298,15 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
                 song.playlistTracks[index].collapsed = (int) t[2] != 0;
             }
 
+    if (auto* nests = root["playlistTrackNest"].getArray()) // round 190jf (B17)
+    {
+        for (const auto& t : *nests)
+            if (t.isArray() && t.size() >= 2 && (int) t[0] > 0 && (int) t[0] < (int) song.playlistTracks.size())
+                if (auto& track = song.playlistTracks[(std::size_t) (int) t[0]]; track.grouped)
+                    track.nest = juce::jlimit (0, 64, (int) t[1]);
+        noteedit::normalizeFolders (song);
+    }
+
     if (auto* compTracks = root["playlistCompTracks"].getArray())
         for (const auto& t : *compTracks)
             if ((int) t >= 0 && (int) t < 500)
@@ -4613,5 +4633,41 @@ void applyMixerTrackState (MixerTrack& target, const MixerTrack& state, bool tak
     target.effects = state.effects;
     target.chainBlend = state.chainBlend; // (round 190bu: a state is the whole chain, its Blend and its preset name too)
     target.chainPreset = state.chainPreset;
+}
+
+// Round 190jf (B22): one channel / effect slot as the project stores it, for a LYNX device inside a DAWproject file
+// (core/DawProject.h's nativeInstrumentState / nativeEffectState): LYNX → DAWproject → LYNX keeps every field
+std::vector<std::uint8_t> channelStateBytes (const ChannelDef& channel)
+{
+    auto* root = new juce::DynamicObject();
+    root->setProperty ("format", "lynx-channel");
+    root->setProperty ("channel", channelToVar (channel));
+    const auto json = juce::JSON::toString (juce::var (root), true).toStdString();
+    return std::vector<std::uint8_t> (json.begin(), json.end());
+}
+
+std::optional<ChannelDef> channelFromStateBytes (const std::vector<std::uint8_t>& bytes)
+{
+    const auto root = juce::JSON::parse (juce::String::fromUTF8 ((const char*) bytes.data(), (int) bytes.size()));
+    if (root["format"].toString() != "lynx-channel" || ! root["channel"].isObject())
+        return std::nullopt;
+    return channelFromVar (root["channel"], Song {});
+}
+
+std::vector<std::uint8_t> effectStateBytes (const EffectSlot& slot)
+{
+    auto* root = new juce::DynamicObject();
+    root->setProperty ("format", "lynx-effect");
+    root->setProperty ("effect", effectToVar (slot));
+    const auto json = juce::JSON::toString (juce::var (root), true).toStdString();
+    return std::vector<std::uint8_t> (json.begin(), json.end());
+}
+
+std::optional<EffectSlot> effectFromStateBytes (const std::vector<std::uint8_t>& bytes)
+{
+    const auto root = juce::JSON::parse (juce::String::fromUTF8 ((const char*) bytes.data(), (int) bytes.size()));
+    if (root["format"].toString() != "lynx-effect" || ! root["effect"].isObject())
+        return std::nullopt;
+    return effectFromVar (root["effect"]);
 }
 } // namespace lynx::ProjectFile

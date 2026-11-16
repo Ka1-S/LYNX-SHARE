@@ -43,6 +43,8 @@
 
 #include "core/FlpImport.h"
 #include "core/AlsImport.h"
+#include "core/DawProject.h" // round 190jf (B22)
+#include "core/GeneratorPresets.h"
 #include "core/FlmImport.h"
 #include "core/BandImport.h" // round 190ic: GarageBand projects
 #include "engine/ProjectPackage.h"
@@ -4305,8 +4307,10 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
         // an FL Studio Mobile project (.flm, .songtmpl; round 182c) too
         const auto mobileProject = file.hasFileExtension ("flm;songtmpl");
         const auto garageBand = bandFolder != juce::File();
+        // a DAWproject (.dawproject, round 190jf B22) too
+        const auto dawProject = file.hasFileExtension ("dawproject");
         std::optional<flp::Project> project;
-        if (! liveSet && ! mobileProject && ! garageBand)
+        if (! liveSet && ! mobileProject && ! garageBand && ! dawProject)
             project = flp::parseProject ({ fileBytes, data.getSize() });
         loadtrace::add ("parse", loadtrace::msSince (started));
 
@@ -4401,6 +4405,32 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
                 if (! song)
                 {
                     out.error = utf8 (bandError.empty() ? "not a readable GarageBand project" : bandError.c_str());
+                    return;
+                }
+                out.song = std::move (*song);
+            }
+            else if (dawProject)
+            {
+                DawProjectImportOptions dawOptions;
+                dawOptions.common = options;
+                // LYNX's own devices with every field (the project file's JSON); a file from the core writer still opens
+                dawOptions.nativeInstrument = [] (const std::string&, const std::vector<std::uint8_t>& bytes) -> std::optional<ChannelDef> {
+                    if (auto c = ProjectFile::channelFromStateBytes (bytes))
+                        return c;
+                    if (const auto preset = genpresets::fromText (std::string (bytes.begin(), bytes.end())))
+                        return genpresets::newChannel (*preset);
+                    return std::nullopt;
+                };
+                dawOptions.nativeEffect = [] (const std::string&, const std::vector<std::uint8_t>& bytes) -> std::optional<EffectSlot> {
+                    if (auto e = ProjectFile::effectFromStateBytes (bytes))
+                        return e;
+                    return dawproject::effectFromStateText (std::string (bytes.begin(), bytes.end()));
+                };
+                std::string dawError;
+                auto song = importDawProject (std::vector<std::uint8_t> (fileBytes, fileBytes + data.getSize()), dawOptions, &dawError);
+                if (! song)
+                {
+                    out.error = utf8 (dawError.empty() ? "not a readable DAWproject file" : dawError.c_str());
                     return;
                 }
                 out.song = std::move (*song);

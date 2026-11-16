@@ -10657,3 +10657,23 @@ countries: es mx ar co cl pe ve
 "MIDI file {0}: a clip of pattern \"{1}\"" = "Archivo MIDI {0}: un clip del pattern \"{1}\""
 "Delete (its clips and its channel)" = "Eliminar (con sus clips y su canal)"
 "Delete (with its {0} clips)" = "Eliminar (con sus {0} clips)"
+
+# --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
+"Hide collapsed grouped tracks" = "Ocultar pistas agrupadas contraídas"
+"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "Pista: [LMB] silenciar / reactivar  [Ctrl][LMB] o [RMB] solo  [Alt][LMB] silenciar el grupo  [Alt][RMB] solo del grupo"
+"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "Pista: [LMB] seleccionar  [Ctrl][LMB] añadir / quitar  [Ctrl] arrastrar: pistas con sus clips  [Shift][LMB] rango  [RMB] menú  [2xLMB] abrir el origen del clip  [Shift][Wheel] subir / bajar  [Alt] arrastrar: meter en / sacar de un grupo"
+"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "Moviendo la pista con su grupo  [Alt] arrastrar a la derecha / izquierda: más adentro / fuera del grupo"
+"In a group, level {0}" = "En un grupo, nivel {0}"
+"Not in a group" = "Fuera de grupo"
+"Nest under the track above (a group in the group)" = "Anidar bajo la pista de arriba (un grupo dentro del grupo)"
+"Move out of its group (one level up)" = "Sacar de su grupo (un nivel arriba)"
+"Hiding collapsed tracks" = "Ocultar pistas contraídas"
+"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "Esta opción oculta las pistas contraídas de la Playlist. La pista principal mostrará una flecha hacia abajo para abrir las pistas ocultas. ¿Continuar?"
+# --- Round 190jf: B22 DAWproject import / export
+"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
+"(imported from DAWproject)" = "(importado de DAWproject)"
+"Export DAWproject" = "Exportar DAWproject"
+"The DAWproject file could not be written" = "No se pudo escribir el archivo DAWproject"
+"Everything went over to the DAWproject file." = "Todo pasó al archivo DAWproject."
+"Not carried over or approximated:" = "No trasladado o aproximado:"
+"... and {0} more" = "... y {0} más"

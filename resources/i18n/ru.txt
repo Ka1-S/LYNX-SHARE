@@ -10657,3 +10657,23 @@ countries: ru by kz
 "MIDI file {0}: a clip of pattern \"{1}\"" = "MIDI-файл {0}: клип паттерна «{1}»"
 "Delete (its clips and its channel)" = "Удалить (вместе с клипами и каналом)"
 "Delete (with its {0} clips)" = "Удалить (вместе с клипами: {0})"
+
+# --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
+"Hide collapsed grouped tracks" = "Скрывать свёрнутые сгруппированные дорожки"
+"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "Дорожка: [LMB] заглушить / включить  [Ctrl][LMB] или [RMB] соло  [Alt][LMB] заглушить группу  [Alt][RMB] соло группы"
+"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "Дорожка: [LMB] выбрать  [Ctrl][LMB] добавить / убрать  [Ctrl] перетаскивание: дорожки с их клипами  [Shift][LMB] диапазон  [RMB] меню  [2xLMB] открыть источник клипа  [Shift][Wheel] вверх / вниз  [Alt] перетаскивание: в группу / из группы"
+"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "Перемещение дорожки вместе с её группой  [Alt] вправо / влево: глубже / из группы"
+"In a group, level {0}" = "В группе, уровень {0}"
+"Not in a group" = "Вне группы"
+"Nest under the track above (a group in the group)" = "Вложить под дорожку выше (группа в группе)"
+"Move out of its group (one level up)" = "Вынуть из группы (на уровень выше)"
+"Hiding collapsed tracks" = "Скрытие свёрнутых дорожек"
+"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "Этот параметр скрывает свёрнутые дорожки Playlist. На родительской дорожке появится стрелка вниз, чтобы открыть скрытые дорожки. Продолжить?"
+# --- Round 190jf: B22 DAWproject import / export
+"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
+"(imported from DAWproject)" = "(импортировано из DAWproject)"
+"Export DAWproject" = "Экспорт в DAWproject"
+"The DAWproject file could not be written" = "Не удалось записать файл DAWproject"
+"Everything went over to the DAWproject file." = "Всё перенесено в файл DAWproject."
+"Not carried over or approximated:" = "Не перенесено или передано приближённо:"
+"... and {0} more" = "... и ещё {0}"

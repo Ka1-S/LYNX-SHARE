@@ -10657,3 +10657,23 @@ countries: nl be
 "MIDI file {0}: a clip of pattern \"{1}\"" = "MIDI-bestand {0}: een clip van pattern \"{1}\""
 "Delete (its clips and its channel)" = "Verwijderen (met zijn clips en kanaal)"
 "Delete (with its {0} clips)" = "Verwijderen (met zijn {0} clips)"
+
+# --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
+"Hide collapsed grouped tracks" = "Ingeklapte gegroepeerde tracks verbergen"
+"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "Track: [LMB] mute / unmute  [Ctrl][LMB] of [RMB] solo  [Alt][LMB] groep muten  [Alt][RMB] groep solo"
+"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "Track: [LMB] selecteren  [Ctrl][LMB] toevoegen / weghalen  [Ctrl] slepen: tracks met hun clips  [Shift][LMB] bereik  [RMB] menu  [2xLMB] bron van de clip openen  [Shift][Wheel] omhoog / omlaag verplaatsen  [Alt] slepen: in / uit een groep"
+"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "Track wordt met zijn groep verplaatst  [Alt] naar rechts / links slepen: dieper / uit de groep"
+"In a group, level {0}" = "In een groep, niveau {0}"
+"Not in a group" = "Niet in een groep"
+"Nest under the track above (a group in the group)" = "Onder de track erboven nesten (een groep in de groep)"
+"Move out of its group (one level up)" = "Uit zijn groep halen (een niveau hoger)"
+"Hiding collapsed tracks" = "Ingeklapte tracks verbergen"
+"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "Deze optie verbergt ingeklapte Playlist-tracks. De bovenliggende track toont een pijl omlaag om de verborgen tracks te openen. Doorgaan?"
+# --- Round 190jf: B22 DAWproject import / export
+"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
+"(imported from DAWproject)" = "(geïmporteerd uit DAWproject)"
+"Export DAWproject" = "DAWproject exporteren"
+"The DAWproject file could not be written" = "Het DAWproject-bestand kon niet worden geschreven"
+"Everything went over to the DAWproject file." = "Alles is meegegaan naar het DAWproject-bestand."
+"Not carried over or approximated:" = "Niet meegenomen of benaderd:"
+"... and {0} more" = "... en nog {0}"

@@ -10657,3 +10657,23 @@ countries: jp
 "MIDI file {0}: a clip of pattern \"{1}\"" = "MIDI ファイル {0}：パターン「{1}」のクリップ"
 "Delete (its clips and its channel)" = "削除（クリップとチャンネルごと）"
 "Delete (with its {0} clips)" = "削除（{0} 個のクリップごと）"
+
+# --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
+"Hide collapsed grouped tracks" = "折りたたんだグループのトラックを隠す"
+"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "トラック: [LMB] ミュート / ミュート解除  [Ctrl][LMB] または [RMB] ソロ  [Alt][LMB] グループをミュート  [Alt][RMB] グループをソロ"
+"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "トラック: [LMB] 選択  [Ctrl][LMB] 追加 / 解除  [Ctrl] ドラッグ: トラックをクリップごと  [Shift][LMB] 範囲  [RMB] メニュー  [2xLMB] クリップのソースを開く  [Shift][Wheel] 上 / 下に移動  [Alt] ドラッグ: グループに入れる / グループから出す"
+"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "トラックをグループごと移動中  [Alt] 右 / 左へドラッグ: より深く / グループの外へ"
+"In a group, level {0}" = "グループ内、レベル {0}"
+"Not in a group" = "グループ外"
+"Nest under the track above (a group in the group)" = "上のトラックの下に入れ子にする (グループ内のグループ)"
+"Move out of its group (one level up)" = "グループから出す (1 レベル上へ)"
+"Hiding collapsed tracks" = "折りたたんだトラックを隠す"
+"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "このオプションは Playlist の折りたたんだトラックを隠します。親トラックには隠れたトラックを開く下向き矢印が表示されます。続けますか?"
+# --- Round 190jf: B22 DAWproject import / export
+"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
+"(imported from DAWproject)" = "(DAWproject から読み込み)"
+"Export DAWproject" = "DAWproject を書き出す"
+"The DAWproject file could not be written" = "DAWproject ファイルを書き込めませんでした"
+"Everything went over to the DAWproject file." = "すべて DAWproject ファイルに移りました。"
+"Not carried over or approximated:" = "移せなかったもの / 近似したもの:"
+"... and {0} more" = "... ほか {0} 件"

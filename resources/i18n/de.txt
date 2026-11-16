@@ -10657,3 +10657,23 @@ countries: de at ch li lu
 "MIDI file {0}: a clip of pattern \"{1}\"" = "MIDI-Datei {0}: ein Clip des Patterns „{1}“"
 "Delete (its clips and its channel)" = "Löschen (mit seinen Clips und seinem Kanal)"
 "Delete (with its {0} clips)" = "Löschen (mit seinen {0} Clips)"
+
+# --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
+"Hide collapsed grouped tracks" = "Eingeklappte gruppierte Spuren ausblenden"
+"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "Spur: [LMB] stumm / Stummschaltung aufheben  [Strg][LMB] oder [RMB] Solo  [Alt][LMB] Gruppe stumm  [Alt][RMB] Gruppe solo"
+"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "Spur: [LMB] auswählen  [Strg][LMB] hinzufügen / entfernen  [Strg] Ziehen: Spuren mit ihren Clips  [Shift][LMB] Bereich  [RMB] Menü  [2xLMB] Quelle des Clips öffnen  [Shift][Wheel] nach oben / unten verschieben  [Alt] Ziehen: in eine Gruppe / aus einer Gruppe"
+"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "Spur wird mit ihrer Gruppe verschoben  [Alt] nach rechts / links ziehen: tiefer / aus der Gruppe"
+"In a group, level {0}" = "In einer Gruppe, Ebene {0}"
+"Not in a group" = "In keiner Gruppe"
+"Nest under the track above (a group in the group)" = "Unter der Spur darüber verschachteln (eine Gruppe in der Gruppe)"
+"Move out of its group (one level up)" = "Aus ihrer Gruppe nehmen (eine Ebene höher)"
+"Hiding collapsed tracks" = "Eingeklappte Spuren ausblenden"
+"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "Diese Option blendet eingeklappte Playlist-Spuren aus. Die übergeordnete Spur zeigt einen Pfeil nach unten, um die ausgeblendeten Spuren zu öffnen. Fortfahren?"
+# --- Round 190jf: B22 DAWproject import / export
+"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
+"(imported from DAWproject)" = "(aus DAWproject importiert)"
+"Export DAWproject" = "DAWproject exportieren"
+"The DAWproject file could not be written" = "Die DAWproject-Datei konnte nicht geschrieben werden"
+"Everything went over to the DAWproject file." = "Alles ist in die DAWproject-Datei übernommen."
+"Not carried over or approximated:" = "Nicht übernommen oder angenähert:"
+"... and {0} more" = "... und {0} weitere"

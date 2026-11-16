@@ -41,5 +41,12 @@ juce::String mixerTrackStateToJson (const MixerTrack& track);
 std::optional<MixerTrack> mixerTrackStateFromJson (const juce::String& json, juce::String& error);
 // Puts a state on a track (its routing stays); `takeName` = also the state's name and colour ("Insert from state").
 void applyMixerTrackState (MixerTrack& target, const MixerTrack& state, bool takeName);
+
+// Round 190jf (B22): a channel / an effect slot as the project stores it (JSON bytes), for LYNX's own devices inside a
+// DAWproject file; nullopt when the bytes are not such a state
+std::vector<std::uint8_t> channelStateBytes (const ChannelDef& channel);
+std::optional<ChannelDef> channelFromStateBytes (const std::vector<std::uint8_t>& bytes);
+std::vector<std::uint8_t> effectStateBytes (const EffectSlot& slot);
+std::optional<EffectSlot> effectFromStateBytes (const std::vector<std::uint8_t>& bytes);
 } // namespace ProjectFile
 } // namespace lynx
