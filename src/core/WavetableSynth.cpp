@@ -818,8 +818,7 @@ struct Engine::Impl
         }
         const auto m = v.mip[(std::size_t) k];
         const auto len = mipLength (m);
-        const auto* base = tb->data[(std::size_t) m].data();
-        const auto stride = (std::size_t) (len + 1);
+        const auto& frames = tb->frames[(std::size_t) m]; // (a mip's frames; equal ones shared, WavetableTables.cpp)
         const auto shift = len == 4096 ? 20 : len == 2048 ? 21 : len == 1024 ? 22 : 23; // (lengths 512 … 4096)
         const auto fracScale = 1.0f / (float) (1u << shift);
         const auto fracMask = (1u << shift) - 1u;
@@ -845,14 +844,23 @@ struct Engine::Impl
             auto pos = o.pos + v.uPosOffset[(std::size_t) k][(std::size_t) u];
             const auto fmInc = (std::uint32_t) (std::int64_t) ((double) inc * fmR);
             const auto dt = (float) inc / 4294967296.0f;
+            // the frame pair at the position (found once when the position holds still over the step)
+            const float* a = nullptr;
+            const float* b = nullptr;
+            float w = 0.0f;
+            const auto findFrames = [&] (float at) noexcept {
+                const auto fpos = clamp01 (at) * (float) (frameCount - 1);
+                const auto f0 = std::min ((int) fpos, frameCount - 2);
+                w = fpos - (float) f0;
+                a = frames[(std::size_t) f0];
+                b = frames[(std::size_t) f0 + 1];
+            };
+            const bool moving = o.posStep != 0.0f;
+            findFrames (pos);
             for (int i = 0; i < n; ++i)
             {
-                // the frame pair at this position
-                const auto fpos = clamp01 (pos) * (float) (frameCount - 1);
-                const auto f0 = std::min ((int) fpos, frameCount - 2);
-                const auto w = fpos - (float) f0;
-                const auto* a = base + (std::size_t) f0 * stride;
-                const auto* b = a + stride;
+                if (moving)
+                    findFrames (pos);
                 auto read = [&] (std::uint32_t ph) noexcept {
                     const auto idx = ph >> shift;
                     const auto fr = (float) (ph & fracMask) * fracScale;
