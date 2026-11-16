@@ -213,4 +213,18 @@ blocks, 24-bit, floats, refused widths), Kontakt detection and the encrypted-con
 truncated `.gig`, `.dwp` and `.ncw` files (no crash, bounded output, a huge declared frame count refused).
 The env-gated `formats190ii_fl_shipped_programs` (LYNX_FL_DIR = the FL folder) imports FL's 32 shipped programs:
 1,101 zones, 0 samples missing, 897 forward loops (every mode-2 zone of the corpus). Round tests: 2,984 checks,
-0 failures.
+0 failures. Whole core suite (Linux, g++ 15, no LTO): 2,577,058 checks, the one failure (pt-BR coverage of the new
+strings) fixed by the translations commit; the translation tests then pass. `LYNX --selftest` (Linux build, private
+X server): 66 checks OK, exit 0. Windows cross build (zig / MinGW): OK.
+
+## 6. For the rollup with round 190hz
+
+- The hook is `dw::importChannel` (DirectWave.h, unchanged); no editor file is touched. After the merge the
+  editor opens these channels like any DirectWave channel (a one-program state; 190hz's document functions accept it).
+- 190hz's `readProgramFile` (the editor's "Open program") reads `.dwp` through `readZone`, which skips the 36-byte
+  sample format records of version-36 programs (§1.2): it can pass the file through `msimport::stateOfFile` first,
+  or `readZone` can accept 36 bytes (bits = 32).
+- Optional: build imported programs as FL's full 128-program bank (190hz's `freshDoc` + `loadProgram`) so a later
+  "Bank save as" writes what FL would.
+- Text lists of formats (README, site, app, FAQ, Store): add `.dwp`, `.dwb`, `.gig` (instruments) and `.ncw`
+  (samples).
