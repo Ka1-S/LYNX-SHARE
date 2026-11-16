@@ -17795,6 +17795,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Parity190hoTests.inc"
 #include "Parity190iqTests.inc"
 #include "Parity190itTests.inc"
+#include "Parity190jhTests.inc" // round 190jh: Facet's automatic threshold, Pro-Q 4 dynamic bands, Waves L2 / SuperTap / SSLComp / CLA-76
 #include "Sampler190dhTests.inc"
 #include "Fix190eaTests.inc"
 #include "Iss158Tests.inc"

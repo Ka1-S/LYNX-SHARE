@@ -577,8 +577,14 @@ int fromSaturn2 (const State& s, EffectSlot& slot)
 // 9 all pass), 6 slope (0 = 0, 1 … 9 = 6, 12, 18, 24, 30, 36, 48, 72, 96 dB/oct, 10 brickwall), 7 stereo placement
 // (0 left, 1 right, 2 stereo, 3 mid, 4 side), 9 dynamic range dB; 552 processing mode (0 zero latency, 1 natural,
 // 2 linear), 553 resolution, 554 character (round 144), 555 gain scale (1 = 100 %), 556 output level (level encoding). Facet EQ has eight stereo bands with the
-// same shapes, Q law and slopes: the first eight used, enabled, stereo-placed bands are taken; dynamic bands keep
-// their static curve (her states use none).
+// same shapes, Q law and slopes: the first eight used, enabled, stereo-placed bands are taken.
+// Round 190jh (refcap030's Pro-Q 4 captures, round 190hv; read back black-box through the trial's parameters): a band's
+// dynamics — 10 dynamics on, 9 range dB (−30 … +30, relative to the static gain), 11 automatic threshold (1 = Auto, the
+// default of a new dynamic band), 12 the manual threshold (the parameter's own 0 … 1: −90 / −66 / −45 dB at 0 / 0.125 /
+// 0.25, then linear to 0 dB at 1), 13 / 14 attack / release % — become Facet's range, threshold or automatic threshold
+// (facet::autoThreshold, measured on the same captures) and its attack / release: 50 % = 18 / 305 ms, the reference's
+// gain timing fitted on the captures (Facet's timing is one per EQ: the first dynamic band's) [model: other percentages
+// one decade per 50 %, not measured].
 int fromProQ4 (const State& s, EffectSlot& slot)
 {
     if (slot.kind != EffectKind::facetEq || s.named || s.count != 600 || ! finiteAll (s, 600))
@@ -595,6 +601,7 @@ int fromProQ4 (const State& s, EffectSlot& slot)
                                                facet::Shape::tiltShelf, facet::Shape::flatTilt, facet::Shape::allPass };
     static constexpr int slopes[11] { 6, 6, 12, 18, 24, 30, 36, 48, 72, 96, 96 };
     int band = 0;
+    bool dynamicTiming = false;
     for (int b = 0; b < 24 && band < facet::bands; ++b)
     {
         const auto base = (std::size_t) (23 * b);
@@ -608,6 +615,28 @@ int fromProQ4 (const State& s, EffectSlot& slot)
         set (facet::param (band, 2), facet::gainValue (s.at (base + 3)));
         set (facet::param (band, 3), clamp01 (s.at (base + 4)));
         set (facet::param (band, 4), facet::slopeValue (slopes[std::clamp (roundIndex (s.at (base + 6)), 0, 10)]));
+        // round 190jh: the band's dynamics
+        const double rangeDb = std::clamp ((double) s.at (base + 9), -30.0, 30.0);
+        if (s.at (base + 10) >= 0.5f && std::abs (rangeDb) > 0.01 && facet::hasGain (shape))
+        {
+            set (facet::rangeParam0 + band, facet::rangeValue (rangeDb));
+            if (s.at (base + 11) >= 0.5f)
+                set (facet::autoThresholdParam0 + band, 1.0f);
+            else
+            {
+                const double v = std::clamp ((double) s.at (base + 12), 0.0, 1.0);
+                const double db = v < 0.125 ? -90.0 + 24.0 * v / 0.125 : v < 0.25 ? -66.0 + 21.0 * (v - 0.125) / 0.125 : -45.0 + 60.0 * (v - 0.25);
+                set (facet::thresholdParam0 + band, facet::thresholdValue (db));
+            }
+            if (! dynamicTiming)
+            {
+                const auto pct = [&] (std::size_t i) { return std::pow (10.0, (std::clamp ((double) s.at (base + i), 0.0, 100.0) - 50.0) / 50.0); };
+                const auto msValue = [] (double ms, double lo) { return (float) (std::log (ms / lo) / std::log (200.0)); };
+                set (facet::attackParam, msValue (std::clamp (18.1 * pct (13), 0.25, 50.0), 0.25));
+                set (facet::releaseParam, msValue (std::clamp (305.0 * pct (14), 20.0, 4000.0), 20.0));
+                dynamicTiming = true;
+            }
+        }
         ++band;
     }
     for (int b = band; b < facet::bands; ++b)

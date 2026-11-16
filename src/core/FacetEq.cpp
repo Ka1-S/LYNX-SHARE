@@ -746,7 +746,7 @@ public:
         for (auto& band : state)
             for (auto& st : band)
                 st = {};
-        for (auto& d : det) { d.filter.clear(); d.ms = 0.0; d.gain = 0.0; }
+        for (auto& d : det) { d.filter.clear(); d.ms = 0.0; d.gain = 0.0; d.top = autoFloorDb; }
         solo.clear();
         conv.reset();
         firLoaded = false;
@@ -778,7 +778,7 @@ public:
     void process (float* left, float* right, int n, const EffectParams& params, double) noexcept override
     {
         bool changed = false;
-        for (int i = 0; i < paramCount; ++i)
+        for (int i = 0; i < storedParamCount; ++i)
             if (params[(std::size_t) i] != cached[(std::size_t) i]) { changed = true; break; }
         if (changed)
             update (params);
@@ -902,6 +902,10 @@ private:
         Biquad filter;
         double ms = 0.0, gain = 0.0, msCoef = 0.0, threshold = -20.0, range = 0.0;
         bool on = false;
+        // round 190jh: the automatic threshold (autoThreshold): its top level, the fall per sample, the gain limits that
+        // keep the band's total within +-30 dB
+        bool autoT = false;
+        double top = autoFloorDb, topFall = 0.0, lo = -60.0, hi = 60.0;
     };
 
     void configureMode (Phase p) noexcept
@@ -925,7 +929,7 @@ private:
 
     void update (const EffectParams& params) noexcept
     {
-        for (int i = 0; i < paramCount; ++i) cached[(std::size_t) i] = params[(std::size_t) i];
+        for (int i = 0; i < storedParamCount; ++i) cached[(std::size_t) i] = params[(std::size_t) i];
         current = params;
         seenParams = true;
         const auto newMode = phase (params[(std::size_t) phaseParam]);
@@ -943,6 +947,15 @@ private:
             d.on = isDynamic (params, b) && ! isSpectral (params, b); // round 152: a spectral band moves in the STFT stage
             d.threshold = thresholdDb (params[(std::size_t) (thresholdParam0 + b)]);
             d.range = rangeDb (params[(std::size_t) (rangeParam0 + b)]);
+            {
+                const bool wasAuto = d.autoT;
+                d.autoT = autoThreshold (params, b);
+                if (d.autoT && ! wasAuto) d.top = autoFloorDb;
+                d.topFall = autoDecayDbPerSecond / sampleRate;
+                const double g0 = gainDb (params[(std::size_t) param (b, 2)]);
+                d.lo = -30.0 - g0;
+                d.hi = 30.0 - g0;
+            }
             if (d.on)
             {
                 regionFilter (d.filter, params, b, sampleRate);
@@ -1025,7 +1038,14 @@ private:
                 const double y = d.filter.run (x, 0);
                 d.ms += d.msCoef * (y * y - d.ms);
                 const double level = 10.0 * std::log10 (2.0 * d.ms + 1e-20);
-                const double target = dynamicGainDb (level, d.threshold, d.range);
+                double target;
+                if (d.autoT) // round 190jh: the automatic threshold
+                {
+                    d.top = std::max ({ d.top - d.topFall, level, autoFloorDb });
+                    target = std::clamp (autoDynamicGainDb (level, d.top, d.range), d.lo, d.hi);
+                }
+                else
+                    target = dynamicGainDb (level, d.threshold, d.range);
                 d.gain += (std::abs (target) > std::abs (d.gain) ? attackCoef : releaseCoef) * (target - d.gain);
             }
             if (std::abs (d.ms) < 1e-30) d.ms = 0.0;
@@ -1220,7 +1240,7 @@ private:
     double sampleRate = 48000.0;
     Phase mode = Phase::zeroLatency;
     EffectParams current {};
-    std::array<float, paramCount> cached {};
+    std::array<float, storedParamCount> cached {};
     std::array<std::array<Section, maxSections>, bands> sections {};
     std::array<std::array<State, maxSections>, bands> state {};
     std::array<int, bands> counts {};
@@ -1669,6 +1689,19 @@ int matchEq (const EffectParams& params, const double* f, const double* cur, con
         for (const int prm : { param (b, 0), param (b, 1), param (b, 2), param (b, 3), param (b, 4), rangeParam0 + b, powerParam0 + b })
             changes.push_back ({ prm, work[(std::size_t) prm] });
     return (int) used.size();
+}
+
+bool autoThreshold (const EffectParams& p, int b) noexcept
+{
+    return b >= 0 && b < bands && p[(std::size_t) (autoThresholdParam0 + b)] >= 0.5f;
+}
+
+double autoDynamicGainDb (double level, double top, double range) noexcept
+{
+    const double x = level - (top - std::abs (range));
+    constexpr double knee = autoKneeDb;
+    const double over = x <= -0.5 * knee ? 0.0 : x < 0.5 * knee ? (x + 0.5 * knee) * (x + 0.5 * knee) / (2.0 * knee) : x;
+    return range < 0.0 ? -std::min (-range, over) : std::min (range, over);
 }
 
 double dynamicGainDb (double level, double threshold, double range) noexcept
