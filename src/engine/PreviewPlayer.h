@@ -24,6 +24,10 @@ public:
     // `onBeat` (the Browser's "Preview in time", round 190aq): while the transport plays, the sample starts when the
     // next beat is heard (setTransport, setSyncLatency); with the transport stopped it starts at once.
     void playBrowser (std::shared_ptr<const SampleData> sample, float gain = 0.8f, bool onBeat = false);
+    // Round 190iz (FL's preview length and Shift+Click, core/BrowserSend.h browserpreview::range): the part of the
+    // sample a Browser preview plays, in the sample's frames — from `startFrame` to `endFrame` (exclusive; <= 0: the
+    // end), with a 10 ms fade-out when `fadeOut` (it stops before the file does). Applies to the next playBrowser.
+    void setBrowserRange (std::int64_t startFrame, std::int64_t endFrame, bool fadeOut) noexcept;
     // The transport whose beats an `onBeat` preview waits for (nullptr: none, it starts at once), and how late the
     // song is heard against it (the PDC total, in samples). Set before the device runs / any thread.
     void setTransport (const Transport* t) noexcept { transport = t; }
@@ -67,6 +71,9 @@ private:
     std::atomic<int> syncLatency { 0 };
     std::atomic<int> beatStartCount { 0 };
     bool pendingEditor = false, editor = false;
+    std::int64_t pendingStart = 0, pendingEnd = 0, nextStart = 0, nextEnd = 0; // round 190iz: the Browser's range
+    bool pendingFade = false, nextFade = false, fading = false;
+    double endPosition = -1.0; // (audio thread) where the current Browser preview stops, -1 = the end
     std::atomic<float> volume { 1.0f }, editorVolume { 1.0f };
     std::atomic<double> playPosition { -1.0 };
     std::shared_ptr<const SampleData> current;  // touched only by the audio thread

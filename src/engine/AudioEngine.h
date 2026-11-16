@@ -417,6 +417,12 @@ public:
 
     // Preview of an audio file (browser). An invalid/empty file stops the preview.
     void previewFile (const juce::File& file);
+    // Round 190iz: the Browser's preview (FL's): from `startFraction` of the file (Shift+Click, a click on the preview
+    // strip's waveform) for 5 seconds (core/BrowserSend.h browserpreview), or to its end when `full` (Alt+Click, the
+    // strip's Play button, or the "Full sample preview" option). previewFile (file) plays the whole file from its start.
+    void previewFile (const juce::File& file, double startFraction, bool full);
+    void setFullSamplePreview (bool on) noexcept { fullSamplePreview = on; }
+    bool isFullSamplePreview() const noexcept { return fullSamplePreview; }
     // The Browser's "Preview in time" (LYNX extra, round 190aq, core/PreviewTempo.h; off by default): a previewed loop
     // plays stretched to the project's tempo and, while the transport plays, starts on the next beat. A file with no
     // usable tempo plays as it always did. The stretch is made on a worker thread: previewFile returns at once and the
@@ -1169,6 +1175,10 @@ private:
     double previewVolume = 1.0;
     // "Preview in time" (round 190aq)
     bool previewInTime = false;
+    bool fullSamplePreview = false;                 // round 190iz: FL's Browser menu "Full sample preview" (off)
+    double previewStartFraction = 0.0;              // round 190iz: the preview asked for now (previewFile)
+    bool previewFull = true;
+    void setPreviewRange (const SampleData* sample); // (before each playBrowser of a real sample)
     PreviewTiming previewTiming;
     std::uint64_t previewSerial = 0;                              // raised by every previewFile: a stale job's result is dropped
     double previewHandedAtMs = 0.0;                               // when the sample went to the player

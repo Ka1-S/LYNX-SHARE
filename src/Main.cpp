@@ -1756,6 +1756,14 @@ public:
             return;
         }
 
+        // --browsershot190iz <folder> (round 190iz: FL's tabs, tags, Live's browser): src/BrowserShot190iz.inc
+        if (args.contains ("--browsershot190iz"))
+        {
+            setApplicationReturnValue (runBrowserShot190iz (juce::File (args[args.indexOf ("--browsershot190iz") + 1].unquoted())) ? 0 : 1);
+            quit();
+            return;
+        }
+
         if (args.contains ("--rackshot"))
         {
             // LYNX.exe --rackshot <folder>: round 183c's Rack view drawn off-screen (no window), for the LYNX | Live pairs:
@@ -26979,6 +26987,8 @@ private:
 
     // --snapshot: 8 s of a synthetic stereo beat whose parts sit in different bands (kick = low, chord = mid,
     // hats and the noise riser = high), to show the spectral waveform colours
+#include "BrowserShot190iz.inc" // round 190iz
+
     static void writeWaveDemo (const juce::File& file, double bpm)
     {
         constexpr double rate = 44100.0;

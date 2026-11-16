@@ -3613,6 +3613,7 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
     if (! clipLaunch && getMapMode() != remotemap::Mode::off) // (round 190ef: the map modes belong to the Clip-launch layout)
         setMapMode (remotemap::Mode::off);
     browser.setLiveItemMenus (clipLaunch); // (round 190cy: Live's flat collection labels in the rows' menus)
+    browser.setLiveLayout (clipLaunch);    // (round 190iz: Live's sidebar + list; the other layouts keep FL's tabs and tree)
     EditorGlobals::get().clipLaunchWorkflow = clipLaunch; // (round 190db: the audio editor's beat-time view)
     EditorGlobals::get().sendChangeMessage(); // (round 190el: the Piano roll's Drum Rack pad rows follow the layout)
     if (clipGridView != nullptr || clipLaunch)
