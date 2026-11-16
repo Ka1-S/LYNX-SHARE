@@ -225,6 +225,13 @@
 #include "ui/StemExtract.h"
 #include "ui/AudioToMidi.h"
 #include "ui/ShotScale.h"
+#include "core/LaneView.h"       // round 190iu
+#include "core/PlaylistTrackOps.h"
+#include "core/MidiDrop.h"
+#include "core/TakeCleanup.h"
+#include "core/TrackOnly.h"
+#include "core/WheelZones.h"
+#include "ui/WorkflowExtras.h"
 #include "core/Links.h"
 
 #include <algorithm>
@@ -2280,6 +2287,14 @@ public:
         if (args.contains ("--hdrshot190ft"))
         {
             setApplicationReturnValue (runHdrShot190ft (args[args.indexOf ("--hdrshot190ft") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+
+        // --workflowshot190iu <prefix> (round 190iu, issues #186 and #191): src/WorkflowShot190iu.inc
+        if (args.contains ("--workflowshot190iu"))
+        {
+            setApplicationReturnValue (runWorkflowShot190iu (args[args.indexOf ("--workflowshot190iu") + 1].unquoted()) ? 0 : 1);
             quit();
             return;
         }
@@ -14151,6 +14166,7 @@ private:
         return allOk;
     }
 
+#include "WorkflowShot190iu.inc" // round 190iu
     // --trackautoshot190gz (round 190gz): see the dispatch above
     bool runTrackAutoShot190gz (const juce::String& prefix)
     {

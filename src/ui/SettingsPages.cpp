@@ -10,6 +10,7 @@
 #include "core/FlSettings.h"
 #include "core/LayoutStyle.h"
 #include "core/LynxExtras.h"
+#include "ui/WorkflowExtras.h" // round 190iu
 #include "core/PlaylistOps.h"
 #include "core/ToolbarLayout.h"
 #include "engine/AudioEngine.h"
@@ -2404,6 +2405,7 @@ std::unique_ptr<juce::Component> makeLinkPage (AudioEngine& engine, const Settin
 
 bool lynxExtraOn (AudioEngine& engine, const SettingsHooks& hooks, std::string_view id)
 {
+    if (const auto own = workflowextras::extraOn (id)) return *own; // round 190iu (ui/WorkflowExtras.h)
     if (id == "mixer.loudness") return MixerStrips::showLoudness;
     if (id == "mixer.usedOnly") return MixerStrips::showUsedOnly;
     if (id == "mixer.keepLostLinks") return MixerStrips::keepLostLinks;
@@ -2429,6 +2431,9 @@ void setLynxExtra (AudioEngine& engine, const SettingsHooks& hooks, std::string_
     };
     // a view option with an action: the action is what its menu item runs (it also refreshes the editor and saves)
     const auto toggledBy = [&hooks] (const char* action) { return hooks.runAction && hooks.runAction (action); };
+
+    if (workflowextras::setExtra (id, on)) // round 190iu (ui/WorkflowExtras.h): saves through its own hook
+        return;
 
     if (id == "mixer.loudness")
     {

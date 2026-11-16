@@ -283,6 +283,12 @@ std::vector<Action> makeActions()
         // FL's legacy Pattern Blocks (round 170f, issue #60)
         { "playlist.patternBlocks", TR_NOOP ("Pattern blocks (current project) on/off"), Context::playlist, {} },
         { "playlist.automationLanes", TR_NOOP ("Automation lanes on/off"), Context::playlist, {} },
+        // LYNX extra (round 190iu, issue #186): the wheel scrolls over the track headers and zooms over the arrangement
+        { "playlist.wheelZones", TR_NOOP ("Wheel: scroll over the track headers, zoom over the arrangement on/off"), Context::playlist, {} },
+        { "editing.tempTools", TR_NOOP ("Hold a tool key for a temporary tool on/off"), Context::playlist, {} },
+        { "playlist.midiDrop", TR_NOOP ("MIDI files dropped on the Playlist become pattern clips on/off"), Context::playlist, {} },
+        { "playlist.clipsToLanes", TR_NOOP ("Move automation clips into their tracks' lanes"), Context::playlist, {} },
+        { "layout.trackOnly", TR_NOOP ("Track-only mode on/off"), Context::playlist, {} },
         // FL's Playlist menu › Picker panel › Enable (EEPatternsShowMenu; FL's shortcut page: Alt+P, issue #175)
         { "playlist.pickerPanel", TR_NOOP ("Picker panel on / off"), Context::playlist, { chord ('P', alt) } },
         { "playlist.blocksToClips", TR_NOOP ("Turn pattern blocks into clips"), Context::playlist, {} },

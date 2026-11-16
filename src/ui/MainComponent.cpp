@@ -61,6 +61,7 @@
 #include "ui/PluginManager.h"
 #include "ui/ShortcutManager.h"
 #include "ui/WaveformView.h"
+#include "ui/WorkflowExtras.h" // round 190iu (issues #186, #191)
 #include "ui/QuickAddPalette.h"
 #include "ui/QuickPick.h"
 #include "core/FolderWatcher.h"
@@ -118,6 +119,7 @@
 #include "ui/I18n.h"
 #include "ui/Theme.h"
 #include "ui/WaveformView.h"
+#include "ui/WorkflowExtras.h" // round 190iu (issues #186, #191)
 
 #include "core/HintMarkup.h"
 #include "core/SongStats.h"
@@ -221,6 +223,16 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         {
             safe->saveUiSettings();
             safe->playlist.repaint();
+        }
+    };
+    workflowextras::bind (&engine);
+    workflowextras::onChanged = [safe = juce::Component::SafePointer<MainComponent> (this)] { // round 190iu
+        if (safe != nullptr)
+        {
+            safe->saveUiSettings();
+            safe->playlist.repaint();
+            if (trackonly::active())
+                safe->hidePanelForTrackOnly();
         }
     };
     mixeroptions::setShowUsedOnly = [safe = juce::Component::SafePointer<MainComponent> (this)] (bool on) {
@@ -973,6 +985,9 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 MainComponent::~MainComponent()
 {
     EffectsPanel::onHotSwapSlot = nullptr; // (round 190ce: it calls this window)
+    workflowextras::bind (nullptr); // (round 190iu)
+    workflowextras::onChanged = nullptr;
+    workflowextras::tempTools().toolKey (temptool::Editor::none, 0, EditTool::pencil, EditTool::pencil, nullptr, nullptr);
     engine.setControllerSurface (nullptr); // (the controllers get their closing messages)
     engine.selectedMixerTrackForLinks = nullptr;
     engine.onRemoteFire = nullptr;
@@ -1830,6 +1845,7 @@ bool MainComponent::shouldDropFilesWhenDraggedExternally (const juce::DragAndDro
 
 bool MainComponent::keyPressed (const juce::KeyPress& key)
 {
+    const workflowextras::TempToolHold::Scope toolKey (workflowextras::tempTools(), key.getKeyCode()); // round 190iu (issue #191.1)
     if (mapKeyPressed (key)) // round 190ef: the map modes' keys and the key mappings (Clip-launch layout only)
         return true;
     // round 190fo: while the Simple dock shows a Sampler track's pads, V B N M / F G H J / R T Y U / 4 5 6 7 play them
@@ -2015,8 +2031,32 @@ bool MainComponent::runAction (const std::string& id)
         rackFollowButton.setToggleState (g.isFollowingView (EditorGlobals::FollowView::channelRack), juce::dontSendNotification);
         return true;
     }
-    if (id.rfind ("pianoRoll.", 0) == 0 && pianoRoll.runKeyAction (id)) return true; // tools, slide, channel keys
-    if (id.rfind ("playlist.tool.", 0) == 0 && playlist.runKeyAction (id)) return true;
+    // round 190iu (issue #191.1, FL): a tool key held down is a temporary tool; letting go returns to the one before
+    const auto toolKey = [] (temptool::Editor editor, EditTool before, EditTool chosen, std::function<EditTool()> now, std::function<void (EditTool)> back) {
+        auto& hold = workflowextras::tempTools();
+        hold.toolKey (editor, hold.keyBeingHandled(), before, chosen, std::move (now), std::move (back));
+    };
+    if (id.rfind ("pianoRoll.", 0) == 0)
+    {
+        const auto before = pianoRoll.currentTool();
+        if (pianoRoll.runKeyAction (id)) // tools, slide, channel keys
+        {
+            if (id.rfind ("pianoRoll.tool.", 0) == 0)
+                toolKey (temptool::Editor::pianoRoll, before, pianoRoll.currentTool(), [this] { return pianoRoll.currentTool(); },
+                         [this] (EditTool t) { pianoRoll.setToolForSnapshot (t); });
+            return true;
+        }
+    }
+    if (id.rfind ("playlist.tool.", 0) == 0)
+    {
+        const auto before = playlist.currentTool();
+        if (playlist.runKeyAction (id))
+        {
+            toolKey (temptool::Editor::playlist, before, playlist.currentTool(), [this] { return playlist.currentTool(); },
+                     [this] (EditTool t) { playlist.setToolForSnapshot (t); });
+            return true;
+        }
+    }
 
     if (is ("transport.playStop")) playStop();
     else if (is ("transport.pause")) playPause();
@@ -2217,6 +2257,7 @@ bool MainComponent::runAction (const std::string& id)
     }
     else if (id.rfind ("pianoRoll.", 0) == 0) return pianoRoll.runAction (id);
     else if (is ("playlist.pickerPanel")) setPickerPanelOn (! pickerPanelOn);
+    else if (workflowextras::runAction (id)) return true; // round 190iu: its switches (Playlist menu)
     else if (id.rfind ("playlist.", 0) == 0) return playlist.runAction (id);
     else if (id.rfind ("mixer.", 0) == 0) return mixer.runAction (id);
     else if (is ("file.new")) newProject();
@@ -2648,6 +2689,9 @@ void MainComponent::loadUiSettings()
             PlaylistComponent::showInstrumentTrackLevels = on;
         else if (key == "automationLanes") // round 177b: Playlist › Automation lanes
             autolanes::setShown (on);
+        else if (workflowextras::readUiOption (key, on)) // round 190iu (issues #186, #191)
+        {
+        }
         else if (key == "pickerPanel") // issue #175: FL's Playlist menu › Picker panel › Enable
         {
             pickerPanelOn = on;
@@ -2971,6 +3015,7 @@ void MainComponent::saveUiSettings()
                                       + "\naudioTrackLevels=" + juce::String (PlaylistComponent::showAudioTrackLevels ? 1 : 0)
                                       + "\ninstrumentTrackLevels=" + juce::String (PlaylistComponent::showInstrumentTrackLevels ? 1 : 0)
                                       + "\nautomationLanes=" + juce::String (autolanes::shown() ? 1 : 0)
+                                      + workflowextras::uiOptionsText() // round 190iu
                                       + "\npickerPanel=" + juce::String (pickerPanelOn ? 1 : 0)
                                       + "\nalternateUndo=" + juce::String (alternateUndo ? 1 : 0)
                                       + "\neditPatternsIn="
@@ -3261,6 +3306,8 @@ void MainComponent::toggleMode()
 
 void MainComponent::togglePanel (Panel panel)
 {
+    if (panel == Panel::channelRack && workflowextras::refusesChannelRack()) // round 190iu: Track-only mode
+        return;
     workspace.toggle (panel);
     refreshPanelButtons();
 }
@@ -3282,6 +3329,8 @@ void MainComponent::fitChannelRack (bool width)
 
 void MainComponent::showPanel (Panel panel)
 {
+    if (panel == Panel::channelRack && workflowextras::refusesChannelRack()) // round 190iu: Track-only mode
+        return;
     workspace.show (panel);
     refreshPanelButtons();
 }
@@ -3650,6 +3699,14 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
         resized();
         repaint();
     }
+    if (trackonly::active()) // round 190iu: Track-only mode keeps the Channel rack hidden (core/TrackOnly.h)
+        hidePanelForTrackOnly();
+}
+
+void MainComponent::hidePanelForTrackOnly()
+{
+    workspace.hide (Panel::channelRack);
+    refreshPanelButtons();
 }
 
 void MainComponent::setPickerPanelOn (bool on)
@@ -3674,6 +3731,7 @@ void MainComponent::addLayoutStyleItems (juce::PopupMenu& menu)
     item (tr ("Pattern workflow (default)"), Style::pattern);
     item (tr ("Clip-launch workflow"), Style::clipLaunch);
     item (tr ("Simple workflow"), Style::simple);
+    workflowextras::addLayoutItems (styles, layoutStyle == Style::pattern); // round 190iu: Track-only mode
     menu.addSubMenu (tr ("Layout style"), styles);
     // round 183a: the detail view's items, only in Clip-launch workflow (the reference DAW's View menu [SHOT] d05)
     if (isClipLaunchWorkflow() && detailView != nullptr)
@@ -4083,6 +4141,7 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
             action (menu, "playlist.patternBlocks", tr ("Pattern blocks (current project)"), true, engine.getSong().patternBlocksOn);
             action (menu, "playlist.blocksToClips", tr ("Turn pattern blocks into clips"), ! engine.getSong().blocks.empty());
             action (menu, "playlist.automationLanes", tr ("Automation lanes"), true, autolanes::shown()); // round 177b
+            workflowextras::addPlaylistMenuItems ([&] (const char* id, const juce::String& text, bool enabled, bool ticked) { action (menu, id, text, enabled, ticked); });
             action (menu, "playlist.follow", tr ("Follow the playhead (auto scrolling)"), true, EditorGlobals::get().isFollowing (false));
             action (menu, "playlist.quantizeStarts", tr ("Quantize the clips' starts"));
             action (menu, "playlist.quantizeHalf", tr ("Quantize the clips' starts 50% (halfway to the grid)"));

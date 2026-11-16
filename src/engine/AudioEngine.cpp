@@ -1,4 +1,5 @@
 #include "engine/AudioEngine.h"
+#include "core/TrackOnly.h" // round 190iu
 #include "core/VideoPlayer.h"
 #include "engine/ProjectFile.h"
 #include "engine/RemoteError.h"
@@ -3624,8 +3625,11 @@ void AudioEngine::editSong (const std::function<void (Song&)>& edit, bool undoab
     const auto pluginsBefore = detachNewPluginsOn ? freshPluginCounts (song) : std::map<std::string, int>();
     // LYNX's "Link Playlist tracks to mixer tracks" (round 190gz): what each track's clips called for before the edit
     const auto contentBefore = song.linkTracksToMixer ? autolink::contentKinds (song) : std::vector<autolink::Plan::Kind>();
+    const auto channelsBefore = song.channels.size(); // (round 190iu: Track-only mode, core/TrackOnly.h)
     edit (song);
     song.keepOnePattern(); // (round 190ea: what follows, and every listener, may read the current pattern)
+    if (trackonly::active() && song.channels.size() > channelsBefore) // each new instrument gets its own instrument track
+        trackonly::follow (song, channelsBefore);
     if (song.linkTracksToMixer && ! contentBefore.empty()) // a track that just got its first clip (or notes) is linked
         autolink::followNewContent (song, contentBefore);
     if (detachNewPluginsOn)
