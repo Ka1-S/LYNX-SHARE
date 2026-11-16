@@ -1044,49 +1044,49 @@ void IconButton::paintButton (juce::Graphics& g, bool highlighted, bool down)
 
     // one state rule for every button kind (round 190je, core/ThemePalette.h buttonLook)
     const auto kind = ! flat ? themes::ButtonKind::secondary : isSwitch ? themes::ButtonKind::flatToggle : themes::ButtonKind::flatMomentary;
-    auto look = buttonColours (kind, on, h, down, enabled);
+    auto state = buttonColours (kind, on, h, down, enabled);
     const auto ownOn = onColour != colour::accent; // a button with "on" colours of its own (bg6 + a red icon, a wash)
     if (on && enabled && (ownOn || flat))
     {
-        look.fill = down ? colour::accentPressed : onColour.interpolatedWith (onColour.brighter (0.12f), h);
-        look.edge = {};
+        state.fill = down ? colour::accentPressed : onColour.interpolatedWith (onColour.brighter (0.12f), h);
+        state.edge = {};
     }
     else if (on && ! enabled && (ownOn || flat))
-        look.fill = onColour.withMultipliedAlpha (0.5f);
+        state.fill = onColour.withMultipliedAlpha (0.5f);
     else if (enabled && ! on && ! down && isSwitch && flat && ownOn)
     {
         // the preview of this switch's own "on" look (bg6 with a red icon, a wash)
-        look.fill = onColour.withMultipliedAlpha (0.7f * h);
-        look.edge = iconOnColour.withAlpha (0.5f * h);
+        state.fill = onColour.withMultipliedAlpha (0.7f * h);
+        state.edge = iconOnColour.withAlpha (0.5f * h);
     }
 
     // the icon / text: as at rest before (a light grey), towards white under the mouse, towards the "on" colour on a switch
     const auto idleFg = ! iconColour.isTransparent() ? iconColour : colour::textSecondary.brighter (0.25f);
     const auto hoverFg = isSwitch && flat ? (ownOn ? iconOnColour : colour::accentHover)
                                           : (! iconColour.isTransparent() ? iconColour.brighter (0.2f) : colour::textPrimary);
-    look.content = ! enabled ? colour::textDisabled : on ? iconOnColour : idleFg.interpolatedWith (down ? colour::textPrimary : hoverFg, down ? 1.0f : h);
+    state.content = ! enabled ? colour::textDisabled : on ? iconOnColour : idleFg.interpolatedWith (down ? colour::textPrimary : hoverFg, down ? 1.0f : h);
 
-    if (! look.fill.isTransparent() || ! look.edge.isTransparent())
+    if (! state.fill.isTransparent() || ! state.edge.isTransparent())
     {
         juce::Path p;
         p.addRoundedRectangle (bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight(), radius::md, radius::md,
                                roundLeft, roundRight, roundLeft, roundRight);
-        if (! look.fill.isTransparent())
+        if (! state.fill.isTransparent())
         {
-            g.setColour (look.fill);
+            g.setColour (state.fill);
             g.fillPath (p);
         }
-        if (! look.edge.isTransparent())
+        if (! state.edge.isTransparent())
         {
             juce::Path edge; // (on the pixel centres: `bounds` is inset by half a pixel, a crisp 1 px line)
             edge.addRoundedRectangle (bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight(), radius::md, radius::md,
                                       roundLeft, roundRight, roundLeft, roundRight);
-            g.setColour (look.edge);
+            g.setColour (state.edge);
             g.strokePath (edge, juce::PathStrokeType (1.0f));
         }
     }
 
-    const auto fg = look.content;
+    const auto fg = state.content;
 
     auto area = getLocalBounds().toFloat();
     const auto iconSize = juce::jmin (area.getHeight() * iconFraction, iconMax);
