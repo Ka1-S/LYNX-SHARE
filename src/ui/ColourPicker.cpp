@@ -18,10 +18,8 @@ public:
         const auto size = juce::jmin (getWidth(), getHeight());
         if (size <= 4)
             return;
-        if (image.getWidth() != size || imageBrightness != picker.brightness)
-            render (size);
         const auto origin = juce::Point<int> ((getWidth() - size) / 2, (getHeight() - size) / 2);
-        g.drawImageAt (image, origin.x, origin.y);
+        paintWheel (g, origin.toFloat(), size);
 
         // the marker
         const auto radius = (float) size * 0.5f - 1.0f;
@@ -52,32 +50,35 @@ private:
         picker.update (true, this);
     }
 
-    void render (int size)
+    // Issue #180 (round 190hx): the wheel is drawn with filled shapes, not with a picture. On Windows the "Custom color"
+    // box is a see-through window, and there Direct2D showed no picture at all (0.1.27 and 0.1.28: the Channel rack's and
+    // the Mixer's Change color › Custom color; the wheel worked but was invisible). Every hue is a thin wedge of the pure
+    // colour (each one also covers the next, so no gap or seam shows), and a grey of the same brightness fades out from
+    // the centre over them: for a fixed hue and brightness the colour is exactly the mix of that grey and the pure hue
+    // that HSV gives at that saturation (the distance from the centre), as the picture had it.
+    void paintWheel (juce::Graphics& g, juce::Point<float> origin, int size) const
     {
-        imageBrightness = picker.brightness;
-        image = juce::Image (juce::Image::ARGB, size, size, true);
-        juce::Image::BitmapData data (image, juce::Image::BitmapData::writeOnly);
         const auto radius = (float) size * 0.5f - 1.0f;
-        const auto c = (float) size * 0.5f;
-        for (int y = 0; y < size; ++y)
-            for (int x = 0; x < size; ++x)
-            {
-                const auto dx = (float) x + 0.5f - c, dy = (float) y + 0.5f - c;
-                const auto dist = std::sqrt (dx * dx + dy * dy);
-                if (dist > radius + 1.0f)
-                    continue;
-                auto angle = std::atan2 (-dy, dx);
-                if (angle < 0.0f)
-                    angle += juce::MathConstants<float>::twoPi;
-                const auto alpha = juce::jlimit (0.0f, 1.0f, radius + 1.0f - dist); // a soft edge
-                data.setPixelColour (x, y, juce::Colour::fromHSV (angle / juce::MathConstants<float>::twoPi, juce::jmin (1.0f, dist / radius),
-                                                                   imageBrightness, alpha));
-            }
+        const auto centre = origin + juce::Point<float> ((float) size * 0.5f, (float) size * 0.5f);
+        constexpr int wedges = 360;
+        for (int i = 0; i < wedges; ++i)
+        {
+            const auto a0 = juce::MathConstants<float>::twoPi * (float) i / (float) wedges;
+            const auto a1 = juce::MathConstants<float>::twoPi * (float) (i + 2) / (float) wedges;
+            juce::Path wedge;
+            wedge.startNewSubPath (centre);
+            wedge.lineTo (centre + juce::Point<float> (std::cos (a0), -std::sin (a0)) * (radius + 0.5f));
+            wedge.lineTo (centre + juce::Point<float> (std::cos (a1), -std::sin (a1)) * (radius + 0.5f));
+            wedge.closeSubPath();
+            g.setColour (juce::Colour::fromHSV (((float) i + 0.5f) / (float) wedges, 1.0f, picker.brightness, 1.0f));
+            g.fillPath (wedge);
+        }
+        const auto grey = juce::Colour::fromHSV (0.0f, 0.0f, picker.brightness, 1.0f);
+        g.setGradientFill (juce::ColourGradient (grey, centre, grey.withAlpha (0.0f), centre + juce::Point<float> (radius, 0.0f), true));
+        g.fillEllipse (juce::Rectangle<float> (radius * 2.0f + 1.0f, radius * 2.0f + 1.0f).withCentre (centre));
     }
 
     ColourPicker& picker;
-    juce::Image image;
-    float imageBrightness = -1.0f;
 };
 
 // --- the brightness strip ---------------------------------------------------------------------------------------------

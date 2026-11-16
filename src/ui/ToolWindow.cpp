@@ -54,9 +54,12 @@ public:
 
 juce::DocumentWindow* openToolWindow (std::unique_ptr<juce::Component> content, const juce::String& title, const juce::String& key)
 {
+    // (issue #179 audit: the old window goes away after this call, not during it. Its shortcut can arrive from inside the
+    // old window itself (the Tempo tapper's key pressed in the Tempo tapper), and deleting it there freed the window
+    // whose key handler was still running.)
     if (key.isNotEmpty())
         if (auto* old = dynamic_cast<ToolWindow*> (findToolWindow (key)))
-            delete old;
+            old->closeSoon();
 
     auto* window = new ToolWindow (title, key);
     window->setContentOwned (fitContentToScreen (std::move (content)).release(), true); // (scrolls when taller than the screen)

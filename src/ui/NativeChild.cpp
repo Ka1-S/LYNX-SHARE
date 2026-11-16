@@ -49,13 +49,18 @@ struct PeerScaleListeners : juce::ComponentPeer
 };
 
 // `bounds` (the component's bounds: in the main window's client area, LYNX's zoomed units) in the parent's physical
-// pixels (times the UI zoom = the peer's logical pixels, times the display's scale = physical)
+// pixels (times the UI zoom = the peer's logical pixels, times the display's scale = physical).
+// Issue #178 (round 190hx): the position and the size are rounded each on its own, as JUCE does for its own windows
+// (Rectangle::toNearestInt). Rounding the right and bottom EDGES made the size depend on the position at a scale that is
+// not a whole number (150 %: a 101-unit-wide window was 152 pixels at x = 0 and 151 at x = 1), so every step of a drag
+// also resized the native window: Windows then showed its Direct2D swap chain's new, undrawn buffers (other programs'
+// old pictures, white stripes) until the next frame, a rapid flicker while a panel or a docked window moved.
 #if JUCE_WINDOWS
 RECT physicalRect (const juce::Component& c, const juce::ComponentPeer& peer, juce::Rectangle<int> bounds)
 {
     const auto scale = peer.getPlatformScaleFactor() * (double) c.getDesktopScaleFactor();
-    const auto b = bounds.toDouble() * scale;
-    return { juce::roundToInt (b.getX()), juce::roundToInt (b.getY()), juce::roundToInt (b.getRight()), juce::roundToInt (b.getBottom()) };
+    const auto r = dockstack::physicalPlace (bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight(), scale);
+    return { r.x, r.y, r.x + r.w, r.y + r.h };
 }
 
 // LYNX's own exact placement is under way (placePhysically): the window procedure leaves its position alone

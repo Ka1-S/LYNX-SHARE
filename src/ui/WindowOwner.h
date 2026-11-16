@@ -38,6 +38,9 @@ void setWindowScreenPosition (juce::Component& window, juce::Point<int> screenTo
 // had the focus). keepAboveMainWindow installs the forwarding on the window; the main window sets the handler. A window
 // that handles every key itself (a detached panel) sets the property "lynxOwnKeys".
 void setSecondaryWindowKeyHandler (std::function<bool (const juce::KeyPress&)> handler);
+// Issue #179: a modal dialog (an alert, Rename..., Export...) is open: the app is blocked as FL is, so keys a window leaves
+// unused run no shortcut meanwhile.
+bool modalDialogOpen();
 
 // FL's "Auto select linked modules" (round 187a): a window kept above the main window that belongs to a channel or a
 // mixer insert says so with markLinkedWindow; when one of them is focused (activated, or a control in it gets the
