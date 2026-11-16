@@ -144,6 +144,7 @@
 #include "core/LiveEventQueue.h"
 #include "core/RackRenderer.h"
 #include "core/PerfProjects.h"
+#include "core/TempoMap.h"
 #include "core/PinOnTop.h"
 #include "core/MetronomeVoice.h"
 #include "engine/Transport.h"

@@ -71,6 +71,7 @@
 #include "core/AlsImport.h"
 #include "core/FlpImport.h"
 #include "core/LiveEventQueue.h"
+#include "core/LoadTrace.h"
 #include "core/Meters.h"
 #include "core/RackRenderer.h"
 #include "core/RenderAhead.h"
@@ -646,13 +647,20 @@ int main (int argc, char** argv)
     std::vector<double> editMs;
     {
         auto previous = RackState::build (song, nullptr, sampleRate, provider);
+        const auto trace = std::getenv ("PERFBENCH_TRACE_EDIT") != nullptr; // (the phases of the last edit snapshot)
         for (int k = 0; k < 5; ++k)
         {
+            if (trace)
+                loadtrace::begin ("edit");
             const auto t0 = std::chrono::steady_clock::now();
             auto next = RackState::build (song, previous.get(), sampleRate, provider);
             editMs.push_back (std::chrono::duration<double, std::milli> (std::chrono::steady_clock::now() - t0).count());
             previous = std::move (next);
+            if (trace)
+                loadtrace::end();
         }
+        if (trace)
+            std::printf ("%s", loadtrace::table().c_str());
     }
     const auto edit = median (editMs);
     std::printf ("project: import %.1f ms, first build %.1f ms, rebuild %.1f ms, edit snapshot %.1f ms (medians), peak memory %.0f MB; %zu channels, "

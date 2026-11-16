@@ -106,3 +106,30 @@ TEST (perfgate_projects_are_the_same_every_time_and_play)
         CHECK (peak > 1.0e-3f);
     }
 }
+
+TEST (perfgate_tempo_scan_reads_only_the_tempo_clips_and_gives_the_same_tempo)
+{
+    // the shifter plan scans the song's tempo every 16th; it now reads only the clips tempoAt can use
+    // (tempomap::tempoClips): the same tempo everywhere, with automation clips (two overlapping, one muted) and pattern
+    // Tempo events
+    using namespace lynx;
+    auto song = perfprojects::automation(); // (400 automation clips of other targets + one tempo clip)
+    AutomationTarget tempo;
+    tempo.kind = AutomationTargetKind::tempo;
+    const auto second = perfprojects::addAutomation (song, tempo, "Tempo 2", perfprojects::wavePoints (32.0, 0.5, valueFromTempo (118.0), valueFromTempo (140.0), 3));
+    perfprojects::addAutomationClip (song, second, 38, 8 * 4 * ppq, 8 * 4 * ppq);
+    perfprojects::addAutomationClip (song, second, 37, 20 * 4 * ppq, 4 * 4 * ppq);
+    song.playlist.back().muted = true;
+    PatternEvents lane;
+    lane.target.kind = AutomationTargetKind::tempo;
+    lane.events.push_back ({ 0, valueFromTempo (131.0) });
+    lane.events.push_back ({ 2 * ppq, valueFromTempo (127.0) });
+    song.patterns[3].events.push_back (lane);
+    const auto clips = tempomap::tempoClips (song);
+    CHECK (clips.size() < song.playlist.size() / 4);
+    bool same = true;
+    for (double t = 0.0; t <= (double) song.songLength() + ppq; t += ppq / 16.0)
+        same = same && tempomap::tempoAt (song, t) == tempomap::tempoAtIn (song, clips, t);
+    CHECK (same);
+    CHECK (tempomap::active (song));
+}
