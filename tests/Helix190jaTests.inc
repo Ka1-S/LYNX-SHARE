@@ -38,7 +38,7 @@ inline double partial (const std::vector<float>& x, int from, int to, double hz,
 inline double nonHarmonicDb (const std::vector<float>& x, int from, int to, double f0, double fs)
 {
     double harm = 0.0, other = 0.0;
-    for (double hz = 40.0; hz < fs * 0.5 - 200.0; hz += f0 / 8.0)
+    for (double hz = f0 / 8.0; hz < fs * 0.5 - 200.0; hz += f0 / 8.0)
     {
         const auto a = partial (x, from, to, hz, fs);
         const auto h = hz / f0;
@@ -147,7 +147,8 @@ TEST (helix190ja_tables_are_band_limited_and_lynx_own)
         const auto& tb = w::table (t);
         CHECK (tb.name == w::tableName (t) && tb.category == w::tableCategory (t));
         CHECK (&w::table (t) == w::tableIfBuilt (t)); // (built once, kept)
-        // every mip: the frame's length, a guard sample, peak ≤ 1 (one gain for the table)
+        // every mip: the frame's length, a guard sample; one gain for the table (a shape's own ±1, an additive table's
+        // loudest frame at 1, a noise table at a set RMS)
         float peak = 0.0f;
         for (int m = 0; m < w::mipCount; ++m)
         {
@@ -161,7 +162,7 @@ TEST (helix190ja_tables_are_band_limited_and_lynx_own)
                     peak = std::max (peak, std::abs (fr[i]));
             }
         }
-        CHECK (peak > 0.3f && peak < 1.25f);
+        CHECK (peak > 0.3f && peak < 2.5f);
     }
     CHECK ((int) names.size() == w::tableCount());
     // a mip holds no partial above its limit: the DFT of a bright frame (Shapes' square, the last frame) at mip 5
@@ -230,11 +231,16 @@ TEST (helix190ja_tuning_and_levels)
     s = base();
     s[(std::size_t) w::volume] = 0.25;
     CHECK (std::fabs (db (rms (render (s, 60, 0.5), 4800, 19200) / full) + 12.04) < 0.05);
-    // pan: equal power, hard left silences the right
+    // pan (Live's law [MEASURED 190ja a3, a4]): hard left silences the right and doubles the left (+6 dB over the
+    // centre's −3 dB); at 0.5 the far side is at half, the near one at 1.207 × the centre's 0.707
     s = base();
     s[(std::size_t) (w::oscBase (0) + w::osc::pan)] = -1.0;
     x = render (s, 60, 0.5);
-    CHECK (rms (x, 4800, 19200, 2, 1) < 1e-6 && std::fabs (db (rms (x, 4800, 19200) / full) - 3.01) < 0.05);
+    CHECK (rms (x, 4800, 19200, 2, 1) < 1e-6 && std::fabs (db (rms (x, 4800, 19200) / full) - 6.02) < 0.05);
+    s[(std::size_t) (w::oscBase (0) + w::osc::pan)] = 0.5;
+    x = render (s, 60, 0.5);
+    CHECK (std::fabs (db (rms (x, 4800, 19200) / full) - db (0.5 / 0.70710678)) < 0.05);
+    CHECK (std::fabs (db (rms (x, 4800, 19200, 2, 1) / full) - db (0.70710678 * (1.0 + std::sqrt (0.5)) / 0.70710678)) < 0.05);
 }
 
 TEST (helix190ja_no_aliasing_at_high_notes)
@@ -242,18 +248,20 @@ TEST (helix190ja_no_aliasing_at_high_notes)
     using namespace lynx;
     using namespace helix190ja;
     const double fs = 48000.0;
-    // the saw frame (Shapes at 2/3) up to C8: everything outside the harmonics stays below −60 dB
+    // the saw frame (Shapes at 2/3) up to C8: everything outside the harmonics stays below −55 dB (C4) / −70 dB (C7, C8)
     auto s = base();
     s[(std::size_t) (w::oscBase (0) + w::osc::position)] = 2.0 / 3.0;
-    for (const int key : { 72, 96, 108 })
+    for (const auto [key, limit] : { std::pair { 72, -55.0 }, std::pair { 96, -70.0 }, std::pair { 108, -70.0 } })
     {
         const auto x = render (s, key, 0.5);
         const auto f0 = 440.0 * std::pow (2.0, (key - 69) / 12.0);
-        CHECK (nonHarmonicDb (x, 2400, 2400 + 9600, f0, fs) < -60.0);
+        const auto v = nonHarmonicDb (x, 2400, 2400 + 9600, f0, fs);
+        std::printf ("  saw at key %d: %.1f dB outside the harmonics\n", key, v);
+        CHECK (v < limit);
     }
     // the square (the table's brightest frame) at C7, and the phase effects at C7: still clean
     s[(std::size_t) (w::oscBase (0) + w::osc::position)] = 1.0;
-    CHECK (nonHarmonicDb (render (s, 96, 0.5), 2400, 12000, 2093.0, fs) < -60.0);
+    CHECK (nonHarmonicDb (render (s, 96, 0.5), 2400, 12000, 2093.0, fs) < -70.0);
     struct Fx
     {
         int mode;

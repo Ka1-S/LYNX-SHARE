@@ -38,7 +38,6 @@ struct Laws
                                     // [MEASURED x3 fold0.25 / 0.5 / 1: exact]
     double warpCurve = 32.0;        // Warp w: the phase x / (x + c (1 − x)), c = 1 / (1 + 32 w²) (w < 0: mirrored) [MEASURED x3: exact]
     double unisonCents = 50.0;      // Classic unison, Amount 1: the outer voices ± cents [MEASURED u*]
-    double envTimeOctaves = 6.0;    // an envelope time row ← 1: × 2^this [MODEL]
     double lfoRateOctaves = 11.55;  // an LFO rate row ← 1: × 2^this (the 0.01 … 30 Hz knob) [MODEL]
     double slopeCurve = 7.6;        // envelope slope ±1: the exponential's steepness [MEASURED e0 / e1 / e2: slopes ±0.5 / ±1]
     double subLevel = 1.0;          // the sub at Gain 1 = an oscillator at Gain 1 [MEASURED s1]
@@ -645,7 +644,19 @@ struct Engine::Impl
             float times[3] { e.attack, e.decay, e.release };
             for (int j = 0; j < 3; ++j)
                 if (mod[row + j] != 0.0f)
-                    times[j] *= (float) std::pow (2.0, laws.envTimeOctaves * mod[row + j]);
+                {
+                    // an Attack / Decay row moves the time knob, whose travel is the cube root of the time over 20 s; a
+                    // Release row adds its share of the 20 s straight [MEASURED W4 t1 … t4: Amp Decay / Attack ← Velocity
+                    // or Env 2 0.25 makes 0.1 s ≥ 1.4 s, at velocity 64 unchanged, −0.25 makes it 0; t5: Amp Release ←
+                    // Note 0.25 makes 0.2 s last ≥ 2 s two octaves up]
+                    if (j == 2)
+                        times[j] = std::clamp (times[j] + 20.0f * mod[row + j], 0.0f, 20.0f);
+                    else
+                    {
+                        const auto x = std::cbrt (std::clamp (times[j], 0.0f, 20.0f) / 20.0f) + mod[row + j];
+                        times[j] = 20.0f * std::pow (std::clamp (x, 0.0f, 1.0f), 3.0f);
+                    }
+                }
             EnvParams ep = e;
             if (k == 0)
                 ep.sustain = clamp01 (e.sustain + mod[tgt::ampSustain]);
@@ -663,7 +674,8 @@ struct Engine::Impl
         // pitch: the note, its own offset (through Pitch ← Note PB), glide, the wheel, the Pitch row
         if (v.glidePos < 1.0f)
         {
-            const auto g = std::max (1.0e-4, p[(std::size_t) glide] * std::pow (2.0, laws.envTimeOctaves * mod[tgt::glide]));
+            // (the Glide row adds its share of the knob's 20 s, straight [MEASURED W4 t7: ← Velocity 0.5 at 127 = 10.1 s])
+            const auto g = std::max (1.0e-4, std::clamp (p[(std::size_t) glide] + 20.0 * mod[tgt::glide], 0.0, 20.0));
             v.glidePos = std::min (1.0f, v.glidePos + (float) (dt / g));
         }
         const auto glideNow = v.glideFrom * (1.0f - v.glidePos);
@@ -686,7 +698,7 @@ struct Engine::Impl
                 o.pos = pos;
             o.posStep = (pos - o.pos) / (float) n;
             v.mode[(std::size_t) k] = std::clamp (ip (b + osc::effectMode), 0, 3);
-            v.fx1[(std::size_t) k] = clampBi (fp (b + osc::effect1) + 2.0f * mod[row + tgt::oscFx1]); // (a bipolar knob's row: its whole range)
+            v.fx1[(std::size_t) k] = clampBi (fp (b + osc::effect1) + mod[row + tgt::oscFx1]); // [MEASURED W4 p2: PW ← Velocity 0.5 at 127 is not silent]
             v.fx2[(std::size_t) k] = clamp01 (fp (b + osc::effect2) + mod[row + tgt::oscFx2]);
             const auto pan = clampBi (fp (b + osc::pan) + 2.0f * mod[row + tgt::oscPan]); // [MEASURED m11: Pan ← LFO 1 reaches a side at 0.5]
             const auto semis = notePitch + fp (b + osc::transpose) + fp (b + osc::detune) + laws.oscPitchSemis * mod[row + tgt::oscPitch];
@@ -806,7 +818,9 @@ struct Engine::Impl
         }
         const auto m = v.mip[(std::size_t) k];
         const auto len = mipLength (m);
-        const auto shift = 32 - (int) std::lround (std::log2 ((double) len));
+        const auto* base = tb->data[(std::size_t) m].data();
+        const auto stride = (std::size_t) (len + 1);
+        const auto shift = len == 4096 ? 20 : len == 2048 ? 21 : len == 1024 ? 22 : 23; // (lengths 512 … 4096)
         const auto fracScale = 1.0f / (float) (1u << shift);
         const auto fracMask = (1u << shift) - 1u;
         const auto uMode = ip (unisonMode);
@@ -837,8 +851,8 @@ struct Engine::Impl
                 const auto fpos = clamp01 (pos) * (float) (frameCount - 1);
                 const auto f0 = std::min ((int) fpos, frameCount - 2);
                 const auto w = fpos - (float) f0;
-                const auto* a = tb->frame (m, f0);
-                const auto* b = tb->frame (m, f0 + 1);
+                const auto* a = base + (std::size_t) f0 * stride;
+                const auto* b = a + stride;
                 auto read = [&] (std::uint32_t ph) noexcept {
                     const auto idx = ph >> shift;
                     const auto fr = (float) (ph & fracMask) * fracScale;
@@ -898,7 +912,9 @@ struct Engine::Impl
                             px = px / (px + warpC * (1.0f - px));
                         if (folding)
                         {
-                            auto f = foldG * std::min (px, 1.0f - px);
+                            // (below 1/7 the plain fold, which the mirrored one equals at 1/7; Live's small folds are close to
+                            // it, 6 … 9 dB apart on W4 x3 fold 0.02 … 0.1; exact from 0.15 up)
+                            auto f = foldG < 2.0f ? foldG * px : foldG * std::min (px, 1.0f - px);
                             f -= 2.0f * std::floor (f * 0.5f);
                             px = f <= 1.0f ? f : 2.0f - f;
                         }
@@ -923,13 +939,38 @@ struct Engine::Impl
             v.subPhase += v.subInc * (std::uint32_t) n;
             return;
         }
-        // Tone: a sine that drives towards a rounded square [MEASURED s2*]
-        const auto drive = 1.0f + 6.0f * v.subTone;
-        const auto norm = 1.0f / std::tanh (drive);
+        // Tone: the sine crossfades into a 40 % pulse, all of it by Tone 0.4 [MEASURED s2, W4 s2: harmonics 2 / 3 / 4 at −10.5 /
+        // −13.6 / −12.4 dB and no 5th from 0.4 up]; the pulse's edges are smoothed (polyBLEP)
+        const auto mix = std::min (1.0f, v.subTone / 0.4f);
+        const auto dt = (float) v.subInc * (1.0f / 4294967296.0f);
+        constexpr float duty = 0.4f;
+        auto blep = [dt] (float t) noexcept {
+            if (t < dt)
+            {
+                t /= dt;
+                return t + t - t * t - 1.0f;
+            }
+            if (t > 1.0f - dt)
+            {
+                t = (t - 1.0f) / dt;
+                return t * t + t + t + 1.0f;
+            }
+            return 0.0f;
+        };
         for (int i = 0; i < n; ++i)
         {
-            const auto x = std::sin (2.0f * (float) pi * (float) v.subPhase * (1.0f / 4294967296.0f));
-            const auto y = (v.subTone > 0.0f ? std::tanh (drive * x) * norm : x) * v.subGain;
+            const auto ph = (float) v.subPhase * (1.0f / 4294967296.0f);
+            auto y = std::sin (2.0f * (float) pi * ph);
+            if (mix > 0.0f)
+            {
+                auto pulse = (ph < duty ? 1.0f : -1.0f) - (2.0f * duty - 1.0f);
+                pulse += blep (ph);
+                auto q = ph - duty;
+                q -= std::floor (q);
+                pulse -= blep (q);
+                y += (pulse * 0.92f - y) * mix;
+            }
+            y *= v.subGain;
             outL[i] += y;
             outR[i] += y;
             v.subPhase += v.subInc;

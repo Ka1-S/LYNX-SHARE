@@ -22847,7 +22847,7 @@ private:
             juce::MemoryBlock raw;
             juce::File (preset).loadFileAsData (raw);
             juce::MemoryInputStream in (raw, false);
-            juce::GZIPDecompressorInputStream gz (in);
+            juce::GZIPDecompressorInputStream gz (&in, false, juce::GZIPDecompressorInputStream::gzipFormat);
             const auto text = juce::File (preset).getFileExtension() == ".adv" ? gz.readEntireStreamAsString() : juce::String();
             lynx::xml::Document doc;
             lynx::alsdev::Notes notes;

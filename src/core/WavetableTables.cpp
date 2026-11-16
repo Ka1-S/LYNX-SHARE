@@ -604,14 +604,31 @@ std::vector<std::atomic<const Table*>>& built()
 // half an octave per mip: the partials kept are 1023 / 2^(m/2) (the oscillator reads the richest mip with nothing above
 // Nyquist, so its top partial is never more than half an octave below Nyquist); each frame at least 8 samples per cycle of
 // its top partial up to 4096 (linear interpolation: its images stay far below the partials)
-int mipPartials (int mip) noexcept { return std::max (1, (int) std::floor (maxPartials / std::pow (2.0, 0.5 * std::clamp (mip, 0, mipCount - 1)))); }
-int mipLength (int mip) noexcept
+namespace
 {
-    int len = 512;
-    while (len < 8 * mipPartials (mip) && len < 4096)
-        len *= 2;
-    return len;
+struct MipSizes
+{
+    std::array<int, mipCount> partials {}, length {};
+    MipSizes()
+    {
+        for (int m = 0; m < mipCount; ++m)
+        {
+            partials[(std::size_t) m] = std::max (1, (int) std::floor (maxPartials / std::pow (2.0, 0.5 * m)));
+            int len = 512;
+            while (len < 8 * partials[(std::size_t) m] && len < 4096)
+                len *= 2;
+            length[(std::size_t) m] = len;
+        }
+    }
+};
+const MipSizes& mipSizes() noexcept
+{
+    static const MipSizes s; // (made before any table: the first table() builds it, off the audio thread)
+    return s;
 }
+} // namespace
+int mipPartials (int mip) noexcept { return mipSizes().partials[(std::size_t) std::clamp (mip, 0, mipCount - 1)]; }
+int mipLength (int mip) noexcept { return mipSizes().length[(std::size_t) std::clamp (mip, 0, mipCount - 1)]; }
 
 int tableCount() noexcept { return (int) recipes().size(); }
 const char* tableName (int index) noexcept { return recipes()[(std::size_t) std::clamp (index, 0, tableCount() - 1)].name; }

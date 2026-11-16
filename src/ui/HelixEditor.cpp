@@ -209,7 +209,8 @@ public:
         const auto a1 = start + (end - start) * (float) position();
         juce::Path arc;
         arc.addCentredArc (c.x, c.y, size * 0.5f, size * 0.5f, 0.0f, std::min (a0, a1), std::max (a0, a1), true);
-        g.setColour (hot ? l.accent.brighter (0.2f) : l.accent);
+        const auto arcColour = page.live ? l.accent2 : l.accent; // (Live: cyan arcs [SHOT live-wt-preset-*])
+        g.setColour (hot ? arcColour.brighter (0.2f) : arcColour);
         g.strokePath (arc, juce::PathStrokeType (2.5f));
         const auto tip = c.getPointOnCircumference (size * 0.5f - 1.0f, a1);
         g.drawLine ({ c.getPointOnCircumference (size * 0.15f, a1), tip }, 1.6f);
@@ -327,10 +328,29 @@ public:
     {
         setRepaintsOnMouseActivity (true);
     }
+    bool switchStyle = false; // a switch (Sub, Poly, the octave): filled with the accent when on, as Live draws them
     void paint (juce::Graphics& g) override
     {
         const auto l = page.look();
         const auto on = isOn();
+        if (text.isEmpty()) // an on / off square (Live: lit in the accent colour when on)
+        {
+            const auto r = getLocalBounds().toFloat().reduced (1.5f);
+            g.setColour (on ? l.accent : l.dark);
+            g.fillRect (r);
+            g.setColour (on ? l.accent.brighter (0.2f) : l.dim);
+            g.drawRect (r, 1.0f);
+            return;
+        }
+        if (switchStyle)
+        {
+            g.setColour (on ? l.accent : l.dark);
+            g.fillRect (getLocalBounds().reduced (1));
+            g.setColour (on ? l.dark : l.text);
+            g.setFont (theme::font (10.5f));
+            g.drawFittedText (text, getLocalBounds(), juce::Justification::centred, 1, 0.7f);
+            return;
+        }
         g.setColour (on ? l.line : isMouseOver() ? l.bg.brighter (0.08f) : l.bg);
         g.fillRect (getLocalBounds().reduced (1));
         g.setColour (on ? l.accent : l.text);
@@ -771,6 +791,9 @@ public:
             octave[(std::size_t) o] = tab (o == 0 ? juce::String ("0") : "-" + juce::String (o), [this, o] { return (int) std::lround (page.value (w::subTranspose)) == o; },
                                            [this, o] { page.set (w::subTranspose, (double) o); });
         transpose = ctl (w::transpose, K::box, tr ("Transpose"));
+        subOn->switchStyle = true;
+        for (auto* o : octave)
+            o->switchStyle = true;
         // oscillator
         for (int k = 0; k < 2; ++k)
             oscTabs[(std::size_t) k] = tab ("Osc " + juce::String (k + 1), [this, k] { return page.osc == k; }, [this, k] { selectOsc (k); });
@@ -783,6 +806,7 @@ public:
         nextTable = tab (juce::String::fromUTF8 ("\xe2\x96\xb8"), [] { return false; }, [this] { stepTable (1); });
         addAndMakeVisible (wave);
         oscGain = ctl (w::oscBase (0) + w::osc::gain, K::vslider, {}, Curve::gain);
+        gainText = ctl (w::oscBase (0) + w::osc::gain, K::box, {}, Curve::gain);
         oscPan = ctl (w::oscBase (0) + w::osc::pan, K::box, {});
         oscPos = ctl (w::oscBase (0) + w::osc::position, K::vslider, {});
         posText = ctl (w::oscBase (0) + w::osc::position, K::box, {});
@@ -847,6 +871,7 @@ public:
         volume = ctl (w::volume, K::box, tr ("Volume"), Curve::gain);
         poly = tab (tr ("Poly"), [this] { return page.value (w::monoPoly) > 0.5; }, [this] { page.set (w::monoPoly, page.value (w::monoPoly) > 0.5 ? 0.0 : 1.0); });
         polyVoices = menu (Menu::of (page, [] { return w::polyVoices; }));
+        poly->switchStyle = true;
         glide = ctl (w::glide, K::box, tr ("Glide"), Curve::time);
         unison = menu (Menu::of (page, [] { return w::unisonMode; }));
         unisonVoices = ctl (w::unisonVoices, K::box, tr ("Voices"));
@@ -886,10 +911,10 @@ public:
         static const char* fxNames[4][2] { { "FX 1", "FX 2" }, { "Tune", "Amt" }, { "PW", "Sync" }, { "Warp", "Fold" } };
         g.setFont (theme::font (10.0f));
         g.setColour (l.text);
-        g.drawText (tr (fxNames[std::clamp (mode, 0, 3)][0]), fx1->getBounds().withX (fx1->getX() - 34).withWidth (32), juce::Justification::centredRight, false);
-        g.drawText (tr (fxNames[std::clamp (mode, 0, 3)][1]), fx2->getBounds().withX (fx2->getX() - 30).withWidth (28), juce::Justification::centredRight, false);
-        g.drawText (tr ("Semi"), semi->getBounds().withX (semi->getX() - 30).withWidth (28), juce::Justification::centredRight, false);
-        g.drawText (tr ("Det"), det->getBounds().withX (det->getX() - 24).withWidth (22), juce::Justification::centredRight, false);
+        g.drawText (tr (fxNames[std::clamp (mode, 0, 3)][0]), fx1->getBounds().withX (fx1->getX() - 30).withWidth (28), juce::Justification::centredRight, false);
+        g.drawText (tr (fxNames[std::clamp (mode, 0, 3)][1]), fx2->getBounds().withX (fx2->getX() - 26).withWidth (24), juce::Justification::centredRight, false);
+        g.drawText (tr ("Semi"), semi->getBounds().withX (semi->getX() - 26).withWidth (24), juce::Justification::centredRight, false);
+        g.drawText (tr ("Det"), det->getBounds().withX (det->getX() - 18).withWidth (17), juce::Justification::centredRight, false);
         if (page.modTab == 1)
         {
             caption (g, l, { modArea.getX() + 6, modArea.getBottom() - 16, 60, 14 }, tr ("Global"));
@@ -924,15 +949,16 @@ public:
         prevTable->setBounds (oscArea.getX() + 268, 3, 14, 16);
         nextTable->setBounds (oscArea.getX() + 283, 3, 14, 16);
         oscPan->setBounds (oscArea.getX() + 2, 22, 30, 14);
-        oscGain->setBounds (oscArea.getX() + 8, 38, 18, 108);
+        oscGain->setBounds (oscArea.getX() + 8, 38, 18, 92);
+        gainText->setBounds (oscArea.getX() + 2, 132, 32, 14);
         wave.setBounds (oscArea.getX() + 34, 22, 236, 124);
         posText->setBounds (oscArea.getX() + 266, 130, 34, 14);
         oscPos->setBounds (oscArea.getX() + 274, 24, 18, 104);
         effectMode->setBounds (oscArea.getX() + 2, h - 22, 62, 16);
-        fx1->setBounds (oscArea.getX() + 98, h - 22, 40, 16);
-        fx2->setBounds (oscArea.getX() + 170, h - 22, 40, 16);
-        semi->setBounds (oscArea.getX() + 212 + 26, h - 22, 22, 16);
-        det->setBounds (oscArea.getX() + 268, h - 22, 30, 16);
+        fx1->setBounds (oscArea.getX() + 96, h - 22, 34, 16);
+        fx2->setBounds (oscArea.getX() + 158, h - 22, 34, 16);
+        semi->setBounds (oscArea.getX() + 220, h - 22, 26, 16);
+        det->setBounds (oscArea.getX() + 266, h - 22, 32, 16);
         // filters
         for (int k = 0; k < 2; ++k)
         {
@@ -998,6 +1024,7 @@ private:
     {
         page.osc = k;
         oscGain->setIndex (page.oscParam (w::osc::gain));
+        gainText->setIndex (page.oscParam (w::osc::gain));
         oscPan->setIndex (page.oscParam (w::osc::pan));
         oscPos->setIndex (page.oscParam (w::osc::position));
         posText->setIndex (page.oscParam (w::osc::position));
@@ -1106,7 +1133,7 @@ private:
     std::array<Tab*, 4> modTab {};
     std::array<Tab*, 5> sourceTab {};
     std::array<Tab*, 3> envView {};
-    Ctl *subGain = nullptr, *subTone = nullptr, *transpose = nullptr, *oscGain = nullptr, *oscPan = nullptr, *oscPos = nullptr, *posText = nullptr,
+    Ctl *subGain = nullptr, *subTone = nullptr, *transpose = nullptr, *oscGain = nullptr, *gainText = nullptr, *oscPan = nullptr, *oscPos = nullptr, *posText = nullptr,
         *fx1 = nullptr, *fx2 = nullptr, *semi = nullptr, *det = nullptr, *lfoAttack = nullptr, *globalTime = nullptr, *globalAmount = nullptr,
         *volume = nullptr, *glide = nullptr, *unisonVoices = nullptr, *unisonAmount = nullptr;
     std::array<Ctl*, 2> fRes {}, fFreq {}, fDrive {}, fMorph {};
@@ -1142,8 +1169,15 @@ public:
     {
         addAndMakeVisible (panel);
     }
-    int preferredWidth (int) const override { return helixDeviceWidth; }
-    void resized() override { panel.setBounds (getLocalBounds()); }
+    // Live's device keeps its proportions: the body's height sets the scale (the Device View's body is a little lower
+    // than Live's), the card is as wide as that makes it
+    int preferredWidth (int bodyHeight) const override { return juce::roundToInt (helixDeviceWidth * (float) bodyHeight / (float) helixDeviceHeight); }
+    void resized() override
+    {
+        const auto scale = (float) getHeight() / (float) helixDeviceHeight;
+        panel.setBounds (0, 0, helixDeviceWidth, helixDeviceHeight);
+        panel.setTransform (juce::AffineTransform::scale (scale > 0.0f ? scale : 1.0f));
+    }
 
 private:
     HelixPanel panel;
