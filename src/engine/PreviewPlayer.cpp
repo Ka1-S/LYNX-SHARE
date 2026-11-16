@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include "core/BrowserSend.h"
 #include "core/PreviewTempo.h"
 #include "engine/Transport.h"
 
@@ -25,8 +26,17 @@ void PreviewPlayer::play (std::shared_ptr<const SampleData> sample, bool loop, f
         pendingBrowser = false;
         pendingOnBeat = false;
         pendingEditor = forEditor;
+        pendingStart = pendingEnd = 0;
+        pendingFade = false;
         hasPending = true;
     }
+}
+
+void PreviewPlayer::setBrowserRange (std::int64_t startFrame, std::int64_t endFrame, bool fadeOut) noexcept
+{
+    nextStart = startFrame;
+    nextEnd = endFrame;
+    nextFade = fadeOut;
 }
 
 void PreviewPlayer::playBrowser (std::shared_ptr<const SampleData> sample, float newGain, bool onBeat)
@@ -35,6 +45,9 @@ void PreviewPlayer::playBrowser (std::shared_ptr<const SampleData> sample, float
     {
         const juce::SpinLock::ScopedLockType sl (lock);
         old = std::move (retired);
+        pendingStart = std::exchange (nextStart, 0); // (round 190iz: a range set for this preview only)
+        pendingEnd = std::exchange (nextEnd, 0);
+        pendingFade = std::exchange (nextFade, false);
         pending = std::move (sample);
         pendingLoop = false;
         pendingGain = newGain;
@@ -63,6 +76,18 @@ void PreviewPlayer::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBu
             editor = pendingEditor;
             waitingForBeat = pendingOnBeat;
             position = 0.0;
+            endPosition = -1.0;
+            fading = false;
+            if (current != nullptr && current->frames() > 1) // round 190iz: the Browser's range (FL's 5-s preview, Shift+Click)
+            {
+                const auto frames = (std::int64_t) current->frames();
+                position = (double) std::clamp<std::int64_t> (pendingStart, 0, frames - 1);
+                if (pendingEnd > 0 && pendingEnd < frames)
+                {
+                    endPosition = (double) pendingEnd;
+                    fading = pendingFade;
+                }
+            }
         }
     }
 
@@ -97,7 +122,8 @@ void PreviewPlayer::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBu
 
     const auto* l = current->leftData();
     const auto* r = current->rightData();
-    const auto last = (double) (current->frames() - 1);
+    const auto fileLast = (double) (current->frames() - 1);
+    const auto last = endPosition > 0.0 && endPosition < fileLast ? endPosition : fileLast; // (round 190iz: a capped preview)
     const auto rate = current->sampleRate / deviceRate;
     auto* outL = buffer.getWritePointer (0);
     auto* outR = buffer.getWritePointer (1);
@@ -133,8 +159,11 @@ void PreviewPlayer::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBu
             }
             flrs::interpolate (kernel, tapL.data(), tapR.data(), frac, yl, yr);
         }
-        outL[i] = level * yl;
-        outR[i] = level * yr;
+        auto g = level;
+        if (fading) // round 190iz: a capped preview fades out over its last 10 ms (no click at the cut)
+            g *= browserpreview::fadeGain ((last - position) / rate, browserpreview::fadeSamples (deviceRate));
+        outL[i] = g * yl;
+        outR[i] = g * yr;
         position += rate;
 
         if (looping && position >= last)

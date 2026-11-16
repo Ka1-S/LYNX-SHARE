@@ -10,6 +10,9 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "core/BrowserCollections.h"
+#include "core/BrowserPlaces.h"
+#include "core/BrowserSend.h"
+#include "core/BrowserTags.h"
 #include "core/BrowserView.h"
 #include "core/HotSwap.h"
 #include "engine/AudioEngine.h"
@@ -140,15 +143,26 @@ public:
     // The project's file (.lynx, or the imported .flp): its folder shows as "Project folder".
     void setProjectFile (const juce::File& file);
 
+    // FL 2026's six tabs (round 190iz, core/BrowserPlaces.h): the numbers 0-2 are what they were; FL's left-to-right
+    // order is ALL, PROJECT, PLUGINS, PRESETS, SOUNDS, STARRED (browserplaces::tabOrder)
     enum Tab
     {
         allTab,
         projectTab,
         starredTab, // the files and folders the user starred (FL's STARRED)
+        pluginsTab, // the Plugin database alone, opened (FL's PLUGINS)
+        presetsTab, // the preset places (FL's PRESETS; FL Cloud's presets are not part of LYNX)
+        soundsTab,  // the sample places, audio only (FL's SOUNDS; FL Cloud's sounds are not part of LYNX)
         tabCount
     };
     void setTab (int tab);
     int getTab() const noexcept { return tab; }
+    // round 190iz: the tab the content acts as — in the Clip-launch layout (no tabs) PROJECT for Live's Current Project,
+    // else ALL
+    int shownTab() const noexcept
+    {
+        return ! liveLayout ? tab : liveSelection.category == browserplaces::Category::currentProject ? (int) projectTab : (int) allTab;
+    }
 
     void focusSearch();
     void addUserFolder(); // asks for a folder and adds it to the folder list
@@ -267,6 +281,51 @@ public:
     std::function<void (int channel, const juce::File&)> onHotSwapSample;  // a sample into the linked channel
     class HotSwapBar;
 
+    // --- Round 190iz: tags (FL's Browser tagging, core/BrowserTags.h), Live's browser in the Clip-launch layout,
+    // "Send to selected channel or focused plugin", FL's preview length ----------------------------------------------------
+    // One tag store for every Browser of the process (the user's, browser-tags.txt in the settings folder; not the project).
+    static browsertags::Store& tagStore();
+    // FL's "Tags" section of a row's menu: Tags ▸ (each tag ticked on / off), Add tag..., Edit tags...
+    void addTagItems (juce::PopupMenu& menu, const std::string& item);
+    void askAddTag (const std::string& item); // FL's "Add a tag": names separated by commas
+    void showEditTags();                      // FL's "Edit tags": rename / delete a tag everywhere
+    void setTagged (const std::string& item, const juce::String& tag, bool on);
+    // The search row's TAGS button (FL's) shows the tags panel; the tags picked there filter the list, Any or All.
+    void setTagsPanelShown (bool shown);
+    bool isTagsPanelShown() const noexcept { return tagsPanelShown; }
+    void setPickedTags (std::vector<std::string> tags);
+    const std::vector<std::string>& pickedTags() const noexcept { return picked; }
+    void setTagMatch (browsertags::Match match);
+    browsertags::Match tagMatch() const noexcept { return matchMode; }
+    // The Clip-launch layout's browser (Live 12's): Collections / Library / Places beside the list; the main window sets
+    // it with the layout. The Pattern and Simple layouts keep FL's tabs and tree.
+    void setLiveLayout (bool on);
+    bool isLiveLayout() const noexcept { return liveLayout; }
+    void showLiveEntry (const browserplaces::Entry& entry); // the sidebar picked an entry (also --shots)
+    const browserplaces::Entry& liveEntry() const noexcept { return liveSelection; }
+    // FL's "Send to selected channel or focused plugin" (file menu, Plugin database entries, the middle button): a file
+    // into the selected channel (or the focused plugin window's plugin), a generator replacing the selected channel's.
+    void sendToSelected (const juce::File& file);
+    void sendPluginToSelected (const std::function<std::optional<ChannelDef>()>& generator, const std::function<std::optional<EffectSlot>()>& effect);
+    browsersend::Channel selectedChannelKind() const;
+    // The next preview (fileSelected) plays from `startFraction` of the file, or to its end when `full` (Alt+Click,
+    // the strip's Play button); FL's "Full sample preview" option lives in the engine.
+    void askPreview (double startFraction, bool full) noexcept
+    {
+        previewStartAsked = startFraction;
+        previewFullAsked = full;
+    }
+    // A click on the hover star of a row (FL's favourite): the row's item in or out of Starred.
+    void toggleStarredItem (const std::string& item);
+    // --browsershot190iz: a row drawn as under the mouse (its hover star), the file menu, the strip with a played part
+    void hoverRowForSnapshot (const juce::String& label);
+    juce::PopupMenu buildFileMenu (const juce::File& file);
+    void showPreviewPlayedForSnapshot (const juce::File& file, double fromFraction);
+    // --shots: the Browser's prefs file is not read (a clean look)
+    static inline bool readPrefs = true;
+    class TagsPanel;
+    class LiveSidebar;
+
 private:
     void textEditorTextChanged (juce::TextEditor&) override;
     void textEditorEscapeKeyPressed (juce::TextEditor&) override;
@@ -284,6 +343,7 @@ private:
     juce::String statusLine; // under the search box: indexing progress / what the search found
     void showNote (const juce::String& text); // a short note there (files copied in), gone after a few seconds
     juce::Rectangle<int> statusArea;
+    juce::Rectangle<int> nameHeader; // round 190iz: Live's "Name" title over the list (Clip-launch layout)
     void rebuildRoots();
 public:
     // Where a file dialog for samples should start (round 190t, the Simple workflow's Sampler tile): FL's sample packs
@@ -350,6 +410,31 @@ private:
     std::unique_ptr<PreviewStrip> strip;
     std::unique_ptr<DetailsBox> details;
     std::unique_ptr<TabBar> tabs;
+    // round 190iz
+    std::unique_ptr<TagsPanel> tagsPanel;
+    std::unique_ptr<LiveSidebar> sidebar;
+    std::unique_ptr<juce::Viewport> sidebarView;
+    juce::String categoryQuery; // round 190iz: Live's Drums lists a search of the sample places
+    class TagsButton;
+    std::unique_ptr<TagsButton> tagsButton;
+    bool tagsPanelShown = false, liveLayout = false;
+    std::vector<std::string> picked;
+    browsertags::Match matchMode = browsertags::Match::any;
+    browserplaces::Entry liveSelection; // (Library › All at first)
+    double previewStartAsked = 0.0;
+    bool previewFullAsked = false;
+    static juce::File tagsFile();
+    static void loadTags();
+    static void saveTags();
+    void tagsChanged(); // every Browser draws its rows, its tags panel and its tag filter again
+    juce::File prefsFile() const;
+    void loadPrefs();
+    void savePrefs() const;
+    bool tagFilterActive() const;
+    juce::String effectiveQuery() const { const auto q = searchBox.getText().trim(); return q.isEmpty() ? categoryQuery : q; }
+    void runTagFilter();
+    browserview::ContentFilter activeFilter() const; // the tab's / Live entry's filter, else the view's
+    bool showsRoot (int rootIndex) const;            // a folder place the current tab / Live entry lists
     struct SearchShared; // the process's search worker (core/SearchService), shared by every Browser
     std::shared_ptr<SearchShared> searcher;
     std::uint64_t searchId = 0;

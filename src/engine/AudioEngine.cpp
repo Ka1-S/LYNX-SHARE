@@ -1,4 +1,5 @@
 #include "engine/AudioEngine.h"
+#include "core/BrowserSend.h" // round 190iz (FL's preview length)
 #include "core/LiveNote.h"
 #include "core/VideoPlayer.h"
 #include "core/TempoMap.h"
@@ -1398,6 +1399,26 @@ void AudioEngine::copyScope (float* destination, int count) const noexcept
 
 void AudioEngine::previewFile (const juce::File& file)
 {
+    previewFile (file, 0.0, true);
+}
+
+void AudioEngine::setPreviewRange (const SampleData* sample)
+{
+    if (preview == nullptr)
+        return;
+    if (sample == nullptr || (previewFull && previewStartFraction <= 0.0))
+    {
+        preview->setBrowserRange (0, 0, false);
+        return;
+    }
+    const auto r = browserpreview::range ((std::int64_t) sample->frames(), sample->sampleRate, previewStartFraction, previewFull);
+    preview->setBrowserRange (r.start, r.capped ? r.end : 0, r.capped);
+}
+
+void AudioEngine::previewFile (const juce::File& file, double startFraction, bool full)
+{
+    previewStartFraction = startFraction; // (round 190iz: kept for the in-time preview prepared on the worker)
+    previewFull = full || fullSamplePreview;
     ++previewSerial; // (a preview still being prepared is dropped)
     previewTiming = {};
     if (preview == nullptr)
@@ -1405,6 +1426,7 @@ void AudioEngine::previewFile (const juce::File& file)
     auto sample = file.existsAsFile() ? samples.load (file.getFullPathName()) : nullptr;
     if (! previewInTime || sample == nullptr)
     {
+        setPreviewRange (sample.get());
         preview->playBrowser (std::move (sample)); // FL's preview: the file as it is, at once
         return;
     }
@@ -1425,6 +1447,7 @@ void AudioEngine::previewFile (const juce::File& file)
         }
     if (! known && ! previewtempo::worthDetecting (*sample))
     {
+        setPreviewRange (sample.get());
         preview->playBrowser (std::move (sample));
         return;
     }
@@ -1440,6 +1463,7 @@ void AudioEngine::previewFile (const juce::File& file)
     {
         if (found.bpm <= 0.0) // (analysed before: no tempo)
         {
+            setPreviewRange (sample.get());
             preview->playBrowser (std::move (sample));
             return;
         }
@@ -1516,6 +1540,7 @@ void AudioEngine::takePreviewResults()
         if (! r.timing.inTime)
         {
             previewTiming = {};
+            setPreviewRange (r.out.get());
             preview->playBrowser (r.out); // no tempo found: as it is
             continue;
         }
@@ -1538,6 +1563,7 @@ void AudioEngine::startPreviewInTime (const juce::String& path, std::shared_ptr<
     previewTiming.frames = sample != nullptr ? sample->frames() : 0;
     previewHandedAtMs = juce::Time::getMillisecondCounterHiRes();
     preview->setSyncLatency (getLatencySamples());
+    setPreviewRange (sample.get());
     preview->playBrowser (std::move (sample), 0.8f, true);
 }
 
