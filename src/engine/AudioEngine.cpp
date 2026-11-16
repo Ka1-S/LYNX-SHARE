@@ -922,6 +922,18 @@ warmup::Result AudioEngine::warmUpPlugins (const warmup::Settings& settings, dou
     if (hosted.empty())
         return {}; // LYNX's own engines are ready as soon as they are created: nothing to wait for
 
+    // Issue #138 (round 190hn): a hosted instrument gets at least `hostedInstrumentSeconds` of audio. The export's
+    // instances are new ones (FL renders with the instances that have been playing since the project opened), and a
+    // hardware emulator boots its firmware in the audio it processes, not in wall time: gearmulator's JE-8086 holds MIDI
+    // back for its first ~0.8 s of emulated time ("the firmware drops what arrives while it boots") and then plays the
+    // restored patch in at MIDI speed. A second of warm-up left a short note at tick 0 meeting a synth still loading its
+    // patch: a silent export, the same note a bar later fine. (Plugins that are ready at once only cost the time it
+    // takes them to process the extra silence, a few ms for most.)
+    constexpr double hostedInstrumentSeconds = 3.0;
+    auto wait = settings;
+    if (std::any_of (song.channels.begin(), song.channels.end(), [] (const ChannelDef& c) { return c.instrument == InstrumentKind::plugin; }))
+        wait.minAudioSeconds = juce::jmax (wait.minAudioSeconds, hostedInstrumentSeconds);
+
     // keeps the units alive whatever the timer publishes during the warm-up
     std::vector<std::shared_ptr<Instrument>> keepInstruments;
     std::vector<std::shared_ptr<Effect>> keepEffects;
@@ -938,7 +950,7 @@ warmup::Result AudioEngine::warmUpPlugins (const warmup::Settings& settings, dou
     // transport stopped at the start position: no note plays, and the automation / pattern events at that position
     // reach the plugins (the rack evaluates them every block), so they settle on the values the song starts with
     const auto result = warmup::run (
-        settings, sampleRate,
+        wait, sampleRate,
         [&]() -> int {
             if (progress && ++blocks % 32 == 0 && ! progress (0.0))
                 return -1;

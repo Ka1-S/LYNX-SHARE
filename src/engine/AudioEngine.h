@@ -1093,6 +1093,11 @@ public:
     // length and adding up to the mix, group effects and multi-output inserts in "one per mixer insert", the delay
     // compensation's trim on and off. "OK (...)" or "ERROR ...". `log` receives a line per check.
     static juce::String exportParitySelfTest (const std::function<void (const juce::String&)>& log = {});
+    // Self-tests (round 190hn, engine/ShortExportTest.cpp): an engine made without a device plays through a stand-in one
+    // (engine/StandInAudioDevice.h: callbacks of `blockSize` from its own thread, faster than real time). Message thread;
+    // empty = opened.
+    juce::String openStandInDevice (double sampleRate, int blockSize);
+    void closeStandInDevice();
     // %APPDATA%\LYNX\audio-glitches.log: a line each time callbacks run over their deadline (at most every 2 s).
     static juce::File glitchLogFile();
 

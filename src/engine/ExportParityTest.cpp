@@ -323,6 +323,9 @@ juce::String AudioEngine::exportParitySelfTest (const std::function<void (const 
             return played;
         }
         live.deviceManager.addAudioCallback (&live);
+        // (diagnosis, round 190hn: LYNX_EXPORTPARITY_RENDERAHEAD=1 makes playback render ahead from its first block)
+        if (live.rackProcessor != nullptr && juce::SystemStats::getEnvironmentVariable ("LYNX_EXPORTPARITY_RENDERAHEAD", {}) == "1")
+            live.rackProcessor->setRenderAheadAlways (true);
         live.setSong (song);
         for (int i = 0; i < 20; ++i) // (the rack is built and published by the engine's timer)
         {
