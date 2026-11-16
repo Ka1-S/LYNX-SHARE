@@ -101,6 +101,18 @@ bool bandDrumKitName (const std::string& patchName)
     return has (n, { "drum", " kit", "drummer", "percussion", "beat", "808 kit", "trap kit" }) || n == "kit";
 }
 
+bool bandDrumTrack (const band::Track& track)
+{
+    if (track.audio)
+        return false;
+    // the patch's category / the instrument plugin when the project names them (GarageBand for iOS 2.3+: "808 Flex" and
+    // "Latin" are Drums patches), else the track's name
+    if (track.category == "Drums" || track.category == "Smart Drums" || track.category == "Drummer" || track.unit == "Drum Kit"
+        || track.unit == "Drum Kits")
+        return true;
+    return bandDrumKitName (track.name);
+}
+
 InstrumentKind bandDrumFor (int key) noexcept
 {
     switch (key)
@@ -177,13 +189,64 @@ Song importBand (const band::Project& project, const BandImportOptions& options)
     };
 
     std::map<std::string, int> missingSeen;
+    // a Sampler instrument the user made (GarageBand for iOS's Sampler: Media/Sampler/Sampler Instruments/<name>.exs and
+    // its recordings in Media/Sampler/Sampler Files): the zones whose samples are in the package
+    const auto samplerZones = [&] (const band::Track& track, const std::string& trackName) {
+        std::vector<SampleZone> out;
+        if (track.samplerInstrument.empty() || ! options.common.readFile)
+            return out;
+        const auto exs = band::readExs (options.common.readFile (joinPath (options.packageFolder, "Media/Sampler/Sampler Instruments/" + track.samplerInstrument)));
+        if (! exs)
+            return out; // (a library instrument: not in the package)
+        for (const auto& z : *exs)
+        {
+            const auto rel = "Media/Sampler/Sampler Files/" + z.sample;
+            auto path = joinPath (options.packageFolder, rel);
+            if (const auto r = options.common.relocations.find (path); r != options.common.relocations.end() && ! r->second.empty())
+                path = r->second;
+            else if (! options.common.fileExists || ! options.common.fileExists (path))
+            {
+                if (report != nullptr)
+                {
+                    if (missingSeen[path]++ == 0)
+                        ++report->missingSamples;
+                    addMissingFile (report->missingFiles, path, "Sampler: " + trackName);
+                }
+                continue;
+            }
+            SampleZone zone;
+            zone.path = path;
+            zone.rootKey = z.rootKey;
+            zone.lowKey = std::min (z.lowKey, z.highKey);
+            zone.highKey = std::max (z.lowKey, z.highKey);
+            zone.lowVelocity = std::min (z.lowVelocity, z.highVelocity);
+            zone.highVelocity = std::max (z.lowVelocity, z.highVelocity);
+            zone.tune = (float) z.fineTune / 100.0f;
+            out.push_back (std::move (zone));
+        }
+        return out;
+    };
+
     for (const auto& track : project.tracks)
     {
-        const auto drums = ! track.audio && bandDrumKitName (track.name);
+        auto zones = samplerZones (track, track.name);
+        const auto drums = zones.empty() && bandDrumTrack (track);
         simpletracks::Request q;
         q.name = track.name;
         if (track.audio)
             q.kind = simpletracks::Kind::audio;
+        else if (! zones.empty())
+        {
+            q.kind = simpletracks::Kind::sampler;
+            ChannelDef sampler;
+            sampler.instrument = InstrumentKind::sampler;
+            sampler.samplePath = zones.front().path;
+            sampler.zones = std::move (zones);
+            sampler.sampler.release = 0.1f; // (held notes, not one-shots: GarageBand's Sampler plays while a key is down)
+            q.channel = std::move (sampler);
+            note (report, &FlpImportReport::approximated,
+                  "GarageBand Sampler instrument \"" + track.name + "\" (its own samples, keys and tuning; the Sampler's envelope, loop and filter are not read)");
+        }
         else if (drums)
         {
             q.kind = simpletracks::Kind::drums;

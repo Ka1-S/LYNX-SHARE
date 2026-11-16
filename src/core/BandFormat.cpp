@@ -364,10 +364,19 @@ std::vector<Placement> placementsIn (const Record& r)
 }
 
 // A region's events (§36 of the format notes): notes (32 bytes, extended notes + 16 per extension word), 16-byte
-// controller / pressure / bend / lane events, the 16-byte tail (F1). Anything else: content this reader can't play.
+// controller / pressure / bend / lane events (extended ones + 16 per extension word, as GarageBand for iOS 2.3+ writes
+// them: byte +1 = 0x40), a 32-byte region-settings event (0x32, its second word marked 0x88 @+0x17: GarageBand for iOS
+// 2.3+, nothing to play), the 16-byte tail (F1). Anything else: content this reader can't play.
 void readEvents (const Record& r, Region& region)
 {
     const auto* b = r.pay();
+    // the extension words after an extended event (byte +1 = 0x40): their byte +7 is 0xA3 / 0xA4 / 0xA7
+    const auto extended = [b, &r] (std::size_t o, std::size_t size) {
+        if (b[o + 1] == 0x40)
+            while (o + size + 16 <= r.size && (b[o + size + 7] == 0xA3 || b[o + size + 7] == 0xA4 || b[o + size + 7] == 0xA7))
+                size += 16;
+        return size;
+    };
     std::size_t o = 0;
     while (o + 16 <= r.size)
     {
@@ -378,10 +387,6 @@ void readEvents (const Record& r, Region& region)
         {
             if (o + 32 > r.size)
                 return;
-            std::size_t size = 32;
-            if (b[o + 1] == 0x40)
-                while (o + size + 16 <= r.size && (b[o + size + 7] == 0xA3 || b[o + size + 7] == 0xA4 || b[o + size + 7] == 0xA7))
-                    size += 16;
             Note n;
             n.tick = (std::int64_t) u32 (b + o + 4) - eventOrigin;
             n.velocity = std::clamp ((int) b[o + 0x0B], 1, 127);
@@ -391,14 +396,19 @@ void readEvents (const Record& r, Region& region)
                 ++region.hiddenNotes;
             else
                 region.notes.push_back (n);
-            o += size;
+            o += extended (o, 32);
             continue;
         }
         const auto family = status & 0xF0;
         if (family == 0x80 || family == 0xA0 || family == 0xB0 || family == 0xD0 || family == 0xE0 || (status >= 0x50 && status <= 0x57))
         {
             ++region.controllerEvents;
-            o += 16;
+            o += extended (o, 16);
+            continue;
+        }
+        if (status == 0x32 && o + 32 <= r.size && b[o + 0x17] == 0x88)
+        {
+            o += 32;
             continue;
         }
         region.patternContent = true; // (Smart Drums and Drummer regions: their pattern events)
@@ -449,6 +459,60 @@ std::optional<Plist> readPlist (const std::vector<std::uint8_t>& bytes)
     if (bytes.size() >= 8 && std::memcmp (bytes.data(), "bplist00", 8) == 0)
         return readBinaryPlist (bytes);
     return readXmlPlist (bytes);
+}
+
+std::optional<std::vector<ExsZone>> readExs (const std::vector<std::uint8_t>& bytes)
+{
+    constexpr std::size_t chunkHeader = 84;
+    struct RawZone
+    {
+        ExsZone zone;
+        std::uint32_t sample = 0;
+    };
+    std::vector<RawZone> zones;
+    std::vector<std::string> samples;
+    std::size_t at = 0;
+    while (at + chunkHeader <= bytes.size())
+    {
+        const auto* c = bytes.data() + at;
+        if (c[0] != 0x01 || std::memcmp (c + 16, "TBOS", 4) != 0)
+            return std::nullopt; // (big-endian "SOBT" files and anything else)
+        const auto size = (std::size_t) u32 (c + 4);
+        if (size > bytes.size() - at - chunkHeader)
+            return std::nullopt;
+        const auto* d = c + chunkHeader;
+        const auto type = c[3];
+        if (type == 1 && size >= 0x60)
+        {
+            RawZone z;
+            z.zone.rootKey = d[1] & 0x7F;
+            z.zone.fineTune = (int) (std::int8_t) d[2];
+            z.zone.lowKey = d[6] & 0x7F;
+            z.zone.highKey = d[7] & 0x7F;
+            z.zone.lowVelocity = d[9] & 0x7F;
+            z.zone.highVelocity = d[10] & 0x7F;
+            z.sample = u32 (d + 0x5C);
+            zones.push_back (z);
+        }
+        else if (type == 3)
+        {
+            std::size_t n = 0;
+            while (n < 64 && c[20 + n] != 0)
+                ++n;
+            samples.push_back (std::string ((const char*) c + 20, n));
+        }
+        at += chunkHeader + size;
+    }
+    if (at != bytes.size())
+        return std::nullopt;
+    std::vector<ExsZone> out;
+    for (auto& z : zones)
+        if (z.sample < samples.size() && ! samples[z.sample].empty())
+        {
+            z.zone.sample = samples[z.sample];
+            out.push_back (z.zone);
+        }
+    return out;
 }
 
 int keyRootOf (const std::string& name) noexcept
@@ -657,6 +721,7 @@ std::optional<Project> parseSong (const std::vector<std::uint8_t>& song, std::st
                 stripNames[r.idx >> 16] = text (r.pay() + 0xA0, n);
     // mixer strips (OCuA, full strips: magic 0x1235 @pay+0x0A): name (16 bytes @pay+0x3C), fader @+0x55, pan @+0x59
     std::map<std::string, std::pair<int, int>> strips;
+    std::map<std::string, std::uint32_t> stripNumbers; // name → the strip's number (ordinal >> 16)
     for (const auto& r : records)
         if (r.is ("OCuA") && r.size > 0x78 && u16 (r.pay() + 0x0A) == 0x1235 && r.pay()[4] != 0xFF)
         {
@@ -664,7 +729,58 @@ std::optional<Project> parseSong (const std::vector<std::uint8_t>& song, std::st
             const auto first = name.find_first_not_of (" \xA5");
             name = first == std::string::npos ? std::string() : name.substr (first);
             strips.emplace (name, std::make_pair ((int) r.pay()[0x55], (int) r.pay()[0x59]));
+            stripNumbers.emplace (name, r.ordinal >> 16);
         }
+    // a strip's plugin records (UCuA, the strip's ordinal, magic 0x1235 @pay+0x0A; its slot u16 @raw+0x12). Found on
+    // GarageBand for iOS 2.3+ files (issue #184's project and Astronomia; older files keep other bytes there, which the
+    // checks below refuse): slot 2 = the instrument, its setting file @pay+0x0E ("Ring.exs" for a Sampler) and the plugin's
+    // name @raw+0x9C ("Sampler", "Alchemy", "Drum Kits"); slot 0x10 = the patch, its file @pay+0x10 ("808 Flex.patch")
+    // and its category @pay+0x50 ("Drums")
+    struct Plugins
+    {
+        std::string setting, unit, patch, category;
+    };
+    std::map<std::uint32_t, Plugins> pluginsOf;
+    {
+        // a NUL-terminated printable name of at most `max` bytes, else empty
+        const auto name = [] (const std::uint8_t* p, std::size_t max) {
+            std::size_t n = 0;
+            while (n < max && p[n] != 0)
+            {
+                if (p[n] < 0x20 || p[n] == 0x7F)
+                    return std::string();
+                ++n;
+            }
+            return n < max ? std::string ((const char*) p, n) : std::string();
+        };
+        const auto endsWith = [] (const std::string& s, const char* tail) {
+            const auto n = std::strlen (tail);
+            return s.size() > n && s.compare (s.size() - n, n, tail) == 0;
+        };
+        for (const auto& r : records)
+        {
+            if (! r.is ("UCuA") || r.size < 0x90 || u16 (r.pay() + 0x0A) != 0x1235)
+                continue;
+            auto& plugins = pluginsOf[r.ordinal >> 16];
+            const auto slot = u16 (r.raw + 0x12);
+            if (slot == 2 && r.size >= 0x9C + 32 - recordHeader)
+            {
+                if (const auto setting = name (r.pay() + 0x0E, 64); endsWith (setting, ".exs"))
+                    plugins.setting = setting;
+                plugins.unit = name (r.raw + 0x9C, 32);
+            }
+            else if (slot == 0x10)
+            {
+                auto patch = name (r.pay() + 0x10, 64);
+                for (const auto* ext : { ".cst", ".patch" })
+                    if (endsWith (patch, ext))
+                    {
+                        plugins.patch = patch.substr (0, patch.size() - std::strlen (ext));
+                        plugins.category = name (r.pay() + 0x50, 32);
+                    }
+            }
+        }
+    }
 
     // audio regions (gRuA by (file, region number)) and files (lFuA: UTF-16 name, u16 count @pay+0x08)
     std::map<std::pair<std::uint32_t, std::uint32_t>, const Record*> audioRegions;
@@ -830,12 +946,25 @@ std::optional<Project> parseSong (const std::vector<std::uint8_t>& song, std::st
     for (auto& [row, t] : tracks)
     {
         if (const auto s = stripOf.find (row->slot); s != stripOf.end())
+        {
             if (const auto m = strips.find (s->second); m != strips.end())
             {
                 t.volume = m->second.first;
                 t.pan = m->second.second;
                 t.volumeKnown = true;
             }
+            if (const auto n = stripNumbers.find (s->second); n != stripNumbers.end())
+                if (const auto pl = pluginsOf.find (n->second); pl != pluginsOf.end() && ! t.audio)
+                {
+                    t.patch = pl->second.patch;
+                    t.category = pl->second.category;
+                    t.unit = pl->second.unit;
+                    if (t.unit == "Sampler" || t.unit == "EXS24")
+                        t.samplerInstrument = pl->second.setting;
+                }
+        }
+        if (t.name.empty() && ! t.patch.empty())
+            t.name = t.patch; // (a track without regions or a name of its own: GarageBand shows its patch's name)
         if (t.name.empty())
             t.name = t.audio ? "Audio " + std::to_string (++audios) : "Instrument " + std::to_string (++instruments);
         p.tracks.push_back (std::move (t));

@@ -69,6 +69,11 @@ struct Track
     bool volumeKnown = false;
     bool muted = false;
     std::vector<Region> regions;
+    // the instrument, from the track's channel strip plugin records (GarageBand for iOS 2.3+; empty when not readable):
+    std::string patch;             // the patch's name ("Grand Piano", "808 Flex": its .cst / .patch file without the extension)
+    std::string category;          // the patch's category ("Drums", "Smart Drums", "Sampler", "Pianos and Keyboards"...)
+    std::string unit;              // the instrument plugin ("Sampler", "Alchemy", "Drum Kits"...)
+    std::string samplerInstrument; // the Sampler's instrument file ("Ring.exs"; Media/Sampler/Sampler Instruments holds the user's)
 };
 
 struct Project
@@ -109,6 +114,19 @@ struct Plist
     std::string value (const std::string& key) const;
 };
 std::optional<Plist> readPlist (const std::vector<std::uint8_t>& bytes);
+
+// A Sampler instrument file (.exs, little-endian as GarageBand for iOS writes it): its zones, each with its sample's file name.
+// Facts from public descriptions of the EXS24 format, checked on GarageBand for iOS files (issue #184's project): chunks of an
+// 84-byte header (type @+3, u32 data size @+4, "TBOS" @+16, name @+20) and their data; a zone's data holds the root key @+1,
+// the fine tune (cents, signed) @+2, the key range @+6..+7, the velocity range @+9..+10 and its sample's number @+0x5C;
+// sample chunks (type 3) are numbered in file order and named by their file. nullopt when the bytes are not such a file.
+struct ExsZone
+{
+    std::string sample;
+    int rootKey = 60, lowKey = 0, highKey = 127, lowVelocity = 0, highVelocity = 127;
+    int fineTune = 0; // cents
+};
+std::optional<std::vector<ExsZone>> readExs (const std::vector<std::uint8_t>& bytes);
 
 // "C", "F#", "Bb" → 0..11 (−1 when not a note name)
 int keyRootOf (const std::string& name) noexcept;
