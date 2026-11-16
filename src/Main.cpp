@@ -27343,6 +27343,18 @@ private:
             roll.scrollToNotes();
             write ("clip-mpe");
             checks << "clip MPE tab: mpe view " << (roll.isMpeView() ? 1 : 0) << ", lanes " << (int) roll.mpeLaneAreasForTests().size() << "\n";
+            // round 190jd (Live 12.4's MPE tab): the value ghost point on note 1's Pressure line, the "Show Lane:" menu,
+            // then all four lanes shown (Slide, Pressure, Velocity, Release Velocity)
+            checks << "ghost on the Pressure line: '" << roll.hoverMpeLineForSnapshot (lynx::PianoRollComponent::laneMpePressure, (double) lynx::ppq) << "'\n";
+            write ("clip-mpe-ghost190jd");
+            roll.hoverMpeLineForSnapshot (0, 0.0);
+            saveMenus (juce::StringArray { "MPE tab: Show Lane" }, std::vector<juce::PopupMenu> { roll.getMpeLaneMenuForSnapshot() },
+                       prefix + "-clip-mpe-showlane190jd.png");
+            roll.setMpeLanesForSnapshot (lynx::mpetab::allLanes);
+            offline.dispatchPendingMessages();
+            write ("clip-mpe-lanes4-190jd");
+            checks << "four lanes: " << (int) roll.mpeLaneAreasForTests().size() << "\n";
+            roll.setMpeLanesForSnapshot (lynx::mpetab::defaultLanes);
             detail->setClipTab (false);
             offline.dispatchPendingMessages();
             checks << "back to Notes: mpe view " << (roll.isMpeView() ? 1 : 0) << "\n";

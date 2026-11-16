@@ -4,6 +4,7 @@
 
 #include "core/EventPaneSplit.h"
 #include "core/LiveGrid.h"
+#include "core/MpeTab.h"
 #include "core/NoteTools.h"
 #include "core/PianoKeys.h"
 #include "core/ScaleSnap.h"
@@ -202,6 +203,12 @@ public:
     bool isMpeView() const noexcept { return mpeStacked; }
     // (tests / snapshots: the lane rectangles shown and the edit target at x)
     std::vector<std::pair<juce::Rectangle<int>, int>> mpeLaneAreasForTests() const { return mpeLaneAreas(); }
+    // round 190jd (Live 12.4's MPE tab): the lanes its "Show Lane:" menu shows (core/MpeTab.h; a session preference)
+    static inline mpetab::LaneSet mpeShownLanes = mpetab::defaultLanes;
+    void setMpeLanesForSnapshot (mpetab::LaneSet lanes);
+    juce::PopupMenu getMpeLaneMenuForSnapshot() { return mpeLaneMenu(); }
+    // hovers the line of lane `laneId` at `tick` as the mouse would (the value ghost point); returns its text ("" = none)
+    juce::String hoverMpeLineForSnapshot (int laneId, double tick);
     // the bottom lane's property (laneVelocity … laneVelocityRange; round 187c)
     void setLaneForSnapshot (int id) { laneBox.setSelectedId (id, juce::sendNotificationSync); }
     // The divider between the note grid and the event editor (round 190fz, FL's TQuickSplitter; core/EventPaneSplit.h):
@@ -261,7 +268,8 @@ private:
     enum class Drag { none, move, resize, resizeLeft, erase, keyboard, select, velocity, velocityLine, velocitySet, paint, muting, knife,
                       zoomRange, listen, pan, keyZoom, timeZoom, keySelect, rulerSelect, seek, drumPaint, stretch, eventDraw, eventErase,
                       eventPaneBar, eventPaneAlternate, // (round 190fz: dragging the divider; a right-click on it, swapped on release)
-                      mpePoint, mpeDraw, mpeErase }; // (round 190hy: a curve point moved, drawn, erased in an MPE lane)
+                      mpePoint, mpeDraw, mpeErase, // (round 190hy: a curve point moved, drawn, erased in an MPE lane)
+                      mpeBend, mpeValue }; // (round 190jd: a pitch point on a note dragged; a Velocity / Release Velocity lane set)
 
     // Channel selector: the wheel steps through the channels with notes (Ctrl+wheel: all channels).
     class ChannelBox final : public juce::ComboBox
@@ -489,6 +497,26 @@ private:
     bool mpeMouseDrag (const juce::MouseEvent& e);
     bool mpeDoubleClick (const juce::MouseEvent& e);
     void editNoteCurves (int note, const std::function<void (Note&)>& edit);
+    // round 190jd, the MPE tab as Live 12.4's (core/MpeTab.h): pitch on the notes, Slide / Pressure / Velocity / Release
+    // Velocity lanes from the "Show Lane:" menu, click-on-the-line points, a value ghost point on hover
+    int mpeFocusLane = laneMpePressure; // the footer names the lane edited last (Live: "Pressure", then "Slide")
+    float mpeBendStart = 0.0f;          // the pitch point's cents when its drag started
+    int mpeBendY0 = 0;
+    juce::Point<float> mpeGhost { -1.0f, -1.0f }; // the value ghost point under the mouse (x < 0: none)
+    juce::String mpeGhostText;
+    static int mpeLaneIdOf (mpetab::Lane lane) noexcept;
+    juce::Rectangle<int> mpeFooterArea() const;   // under the stacked lanes: ▾ "Show Lane" + the focused lane's name
+    juce::Rectangle<int> mpeGhostBounds() const;
+    juce::PopupMenu mpeLaneMenu();
+    mpetab::HitResult mpeLaneHit (int note, int lane, juce::Rectangle<int> area, juce::Point<int> p, float range) const;
+    std::pair<int, int> mpePitchPointAt (juce::Point<int> p) const; // (note, point) of a selected note's pitch curve
+    bool mpePitchMouseDown (const juce::MouseEvent& e, int hit, bool onEdge);
+    bool mpePitchDoubleClick (const juce::MouseEvent& e);
+    void updateMpeGhost (juce::Point<int> p);
+    void paintMpeValueLane (juce::Graphics& g, juce::Rectangle<int> area, int lane);
+    void paintMpeTabFrame (juce::Graphics& g);    // the stacked lanes' left column (icon, scale) and the footer
+    static float mpeValueLaneValue (int lane, const Note& n) noexcept;
+    static void setMpeValueLaneValue (int lane, Note& n, float v) noexcept;
     float laneSetValue = 0.0f;
     // pattern event lanes in the lane box (ids eventLaneIdBase + k; REA round 146)
     static constexpr int eventLaneIdBase = 100;
