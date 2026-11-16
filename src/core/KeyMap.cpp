@@ -97,6 +97,8 @@ std::vector<Action> makeActions()
         { "view.detailClip", TR_NOOP ("Clip-launch workflow: clip view"), Context::global, { chord ('3', ctrl | alt) } },
         { "view.detailDevices", TR_NOOP ("Clip-launch workflow: device view"), Context::global, { chord ('4', ctrl | alt) } },
         { "view.detailSwitch", TR_NOOP ("Clip-launch workflow: switch between clip view and device view"), Context::global, { chord (tab, shift) } },
+        // Round 190jn (design190ia CL-23, DL-64): Live's ? key (Shift+/) shows or hides its Info View
+        { "view.detailInfo", TR_NOOP ("Clip-launch workflow: show or hide the Info View"), Context::global, { chord ('/', shift) } },
         // Round 190ce: the reference DAW's hot-swap key (its lesson "Hot-Swapping Presets": Q links the Browser to the
         // selected device and Q again ends it; docs/analise/REA_rodada190ce.md §2). The typing keyboard keeps Q while on.
         { "view.hotSwap", TR_NOOP ("Hot-swap: link the Browser to the selected device, instrument or sample (again: end)"), Context::global, { chord ('Q') } },

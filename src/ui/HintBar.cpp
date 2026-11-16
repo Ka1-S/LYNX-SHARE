@@ -302,6 +302,50 @@ void HintBar::setHint (const Hint& hint, bool isLive)
     }
 }
 
+void InfoView::setHint (const Hint& hint)
+{
+    auto text = plainHint (withMarkup (hint.text)).trim();
+    juce::String t, b = text;
+    if (const auto colon = text.indexOfChar (':'); colon > 0 && colon <= 48 && ! text.substring (0, colon).containsChar ('\n'))
+    {
+        t = text.substring (0, colon).trim();
+        b = text.substring (colon + 1).trim();
+    }
+    if (hint.value.isNotEmpty())
+        b << (b.isEmpty() ? "" : "\n") << hint.value;
+    if (t == title && b == body)
+        return;
+    title = t;
+    body = b;
+    repaint();
+}
+
+void InfoView::paint (juce::Graphics& g)
+{
+    namespace ll = theme::livelook;
+    auto r = getLocalBounds();
+    g.setColour (ll::surface);
+    g.fillRect (r);
+    const auto bar = r.removeFromTop (17);
+    g.setColour (ll::raised);
+    g.fillRect (bar);
+    g.setColour (ll::text);
+    g.setFont (theme::font (theme::type::small, true));
+    g.drawText (title, bar.withTrimmedLeft (5).withTrimmedRight (4), juce::Justification::centredLeft, true);
+    g.setFont (theme::font (theme::type::small));
+    // Live: 15 px lines from 6 px in (its text 15..226 in a 231 px view)
+    juce::AttributedString text;
+    text.append (body, theme::font (theme::type::small), ll::text);
+    text.setLineSpacing (15.0f - theme::font (theme::type::small).getHeight());
+    text.setWordWrap (juce::AttributedString::byWord);
+    juce::TextLayout layout;
+    const auto area = r.withTrimmedTop (4).reduced (6, 0).toFloat();
+    layout.createLayout (text, area.getWidth());
+    juce::Graphics::ScopedSaveState save (g);
+    g.reduceClipRegion (area.toNearestInt());
+    layout.draw (g, area.withHeight (layout.getHeight()));
+}
+
 void HintBar::paint (juce::Graphics& g)
 {
     using namespace theme;

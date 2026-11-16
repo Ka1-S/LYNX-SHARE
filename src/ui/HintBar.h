@@ -81,6 +81,22 @@ private:
     Hint current;
     bool live = false;
 };
+// Ableton Live's Info View (round 190jn, design190ia CL-23) for the Clip-launch layout's Live look: the same hint as the
+// hint bar, as Live shows it at the bottom left — a 17 px #464646 title bar with the control's name, then the text in
+// #B5B5B5 on #363636, wrapped on a 15 px line pitch (live-session.png 9..239 × 807..994). The title is the hint's part
+// before its first colon ("Volume: drag ..."), else the hint has no title. Repaints only when the hint changes.
+class InfoView final : public juce::Component
+{
+public:
+    void setHint (const Hint& hint);
+    juce::String getTitleText() const { return title; }
+    juce::String getBodyText() const { return body; }
+    void paint (juce::Graphics& g) override;
+
+private:
+    juce::String title, body;
+};
+
 // FL's Tools › Last tweaked as a toolbar read-out (round 162d, issue #8): the name and value of the last moved
 // automatable control (a LYNX knob or a hosted plugin's own parameter); a click opens that parameter's menu (create
 // automation clip, link to controller, edit events, init song with this position, value). Handy when a plugin's own

@@ -256,6 +256,11 @@ public:
         repaint();
     }
     bool fitKeysToNotes = false;
+    // Round 190jn (design190ia CL-20b): docked in the Clip View in the Clip-launch layout's Live look, the notes take the
+    // clip's colour as Live 12.4 draws them (colour × 0.86, a 1 px black edge) on Live's note-editor grey #464F53
+    // (ableton190o live-01-clipview-notes.png); transparent = LYNX's note colours. Only the dock sets it.
+    juce::Colour liveNoteColour { juce::Colours::transparentBlack };
+    bool liveNotes() const;
     // Round 190hr (detail-055, miditools-098): docked in the Clip-launch detail view, the editor uses the reference's
     // grid (core/LiveGrid.h: adaptive / fixed, narrower / wider, triplet, snap; its value at the toolbar's grid place)
     // and its Quantize (Ctrl+U) / Quantize Settings (Ctrl+Shift+U), which the Clip View's MIDI Tools Quantize tool does

@@ -38,6 +38,8 @@
 #include "ui/MidiToolsPanel.h"
 #include "ui/MixerComponent.h"
 #include "ui/NumBox.h"
+#include "ui/LiveClipLook.h"
+#include "ui/LiveLook.h"
 #include "ui/PianoRollComponent.h"
 #include "ui/PlaylistComponent.h"
 #include "ui/PluginHeader.h"
@@ -56,8 +58,16 @@ namespace
 {
 juce::String utf8 (const std::string& s) { return juce::String::fromUTF8 (s.c_str()); }
 
-// card geometry (px at 100 %)
-constexpr int contextWidth = 132, meterWidth = 22, gap = 4, titleHeight = 20, foldedWidth = 22, addWidth = 44;
+// A size in LYNX's look and in Live's (round 190jn, design190ia CL-21: the Clip-launch layout's Live look); reads as an int.
+struct LookMetric
+{
+    int classic, live;
+    operator int() const noexcept { return theme::livelook::active() ? live : classic; }
+};
+
+// card geometry (px at 100 %); Live 12.4's device title bar is 17 px (live-session.png Utility y 807..823)
+constexpr int contextWidth = 132, meterWidth = 22, gap = 4, foldedWidth = 22, addWidth = 44;
+const LookMetric titleHeight { 20, 17 };
 constexpr int knobColumn = 62, knobRow = 70, knobSize = 30, instrumentWidth = 196, pluginWidth = 172;
 constexpr int maxEffectKnobs = 7; // + the slot's Mix
 
@@ -116,6 +126,42 @@ void drawSwapGlyph (juce::Graphics& g, juce::Rectangle<int> r, bool hot, bool li
     p.lineTo (cx - 3.0f, cy + 2.0f);
     p.lineTo (cx - 1.0f, cy + 4.0f);
     g.strokePath (p, juce::PathStrokeType (1.0f));
+}
+
+// Round 190jn (CL-21): Live's title-bar wells (theme::livelook::drawWell) and the LYNX vector glyphs drawn in them.
+void drawLiveWellGlyph (juce::Graphics& g, juce::Rectangle<int> r, int kind, bool hot, bool lit)
+{
+    namespace ll = theme::livelook;
+    const auto box = r.toFloat();
+    auto ink = ll::drawWell (g, box, lit);
+    if (hot && ! lit)
+        ink = colour::textPrimary;
+    g.setColour (ink);
+    const auto cx = box.getCentreX(), cy = box.getCentreY();
+    if (kind == 0) // window: a small frame with its title band
+    {
+        const auto f = juce::Rectangle<float> (7.0f, 6.0f).withCentre ({ cx, cy });
+        g.drawRect (f, 1.0f);
+        g.fillRect (f.withHeight (2.0f));
+    }
+    else if (kind == 1) // hot-swap: two arrows, one each way
+    {
+        juce::Path p;
+        p.startNewSubPath (cx - 3.0f, cy - 1.5f);
+        p.lineTo (cx + 3.0f, cy - 1.5f);
+        p.lineTo (cx + 1.0f, cy - 3.5f);
+        p.startNewSubPath (cx + 3.0f, cy + 1.5f);
+        p.lineTo (cx - 3.0f, cy + 1.5f);
+        p.lineTo (cx - 1.0f, cy + 3.5f);
+        g.strokePath (p, juce::PathStrokeType (1.2f));
+    }
+    else // save: a filled disk with its label slot
+    {
+        const auto d = juce::Rectangle<float> (7.0f, 7.0f).withCentre ({ cx, cy });
+        g.fillRoundedRectangle (d, 1.0f);
+        g.setColour (lit ? ll::on : ll::well);
+        g.fillRect (d.getX() + 2.0f, d.getY() + 1.0f, 3.0f, 2.0f);
+    }
 }
 
 // The save-preset button beside it (the reference's disk).
@@ -233,7 +279,7 @@ public:
 
     void paint (juce::Graphics& g) override
     {
-        g.fillAll (colour::bg1);
+        g.fillAll (theme::livelook::active() ? theme::livelook::window : colour::bg1); // (Live: the cards lie on #2A2A2A)
         paintContext (g);
 
         const auto area = chainArea();
@@ -1266,16 +1312,23 @@ private:
     // the title bar's buttons at the right: [hot-swap] [save] [window]
     int titleButtonsWidth (const Card& c) const
     {
-        return 18 + (c.kind == Card::add ? 0 : 18) + (c.kind == Card::effect && canSavePreset (c.index) ? 18 : 0);
+        const auto pitch = theme::livelook::active() ? 16 : 18;
+        return pitch + (c.kind == Card::add ? 0 : pitch) + (c.kind == Card::effect && canSavePreset (c.index) ? pitch : 0);
     }
     juce::Rectangle<int> saveBounds (const Card& c) const
     {
-        return c.kind == Card::effect && canSavePreset (c.index) ? juce::Rectangle<int> (c.bounds.getRight() - 38, c.bounds.getY() + 3, 16, 14) : juce::Rectangle<int>();
+        if (! (c.kind == Card::effect && canSavePreset (c.index)))
+            return {};
+        if (theme::livelook::active())
+            return { c.bounds.getRight() - 32, c.bounds.getY() + 2, 13, 13 };
+        return juce::Rectangle<int> (c.bounds.getRight() - 38, c.bounds.getY() + 3, 16, 14);
     }
     juce::Rectangle<int> swapBounds (const Card& c) const
     {
         if (c.kind == Card::add)
             return {};
+        if (theme::livelook::active())
+            return { c.bounds.getRight() - 32 - (saveBounds (c).isEmpty() ? 0 : 16), c.bounds.getY() + 2, 13, 13 };
         return { c.bounds.getRight() - 38 - (saveBounds (c).isEmpty() ? 0 : 18), c.bounds.getY() + 3, 16, 14 };
     }
     void showInsertMenu()
@@ -1371,8 +1424,20 @@ private:
     // --- hit testing ---------------------------------------------------------------------------------------------
     juce::Rectangle<int> pickerBounds() const { return { 8, 40, contextWidth - 16, 20 }; }
     static juce::Rectangle<int> titleBounds (const Card& c) { return c.bounds.withHeight (titleHeight); }
-    static juce::Rectangle<int> ledBounds (const Card& c) { return { c.bounds.getX() + 5, c.bounds.getY() + 5, 11, 11 }; }
-    static juce::Rectangle<int> windowBounds (const Card& c) { return { c.bounds.getRight() - 20, c.bounds.getY() + 3, 16, 14 }; }
+    // Live's look (round 190jn, CL-21): the 13 px power disc 3 px in, 2 px down; the title bar's round 13 px wells on a
+    // 16 px pitch, the last 3 px from the right edge (live-session.png Utility: disc x 1078..1090, wells 1166 / 1182 / 1198)
+    static juce::Rectangle<int> ledBounds (const Card& c)
+    {
+        if (theme::livelook::active())
+            return { c.bounds.getX() + 3, c.bounds.getY() + 2, 13, 13 };
+        return { c.bounds.getX() + 5, c.bounds.getY() + 5, 11, 11 };
+    }
+    static juce::Rectangle<int> windowBounds (const Card& c)
+    {
+        if (theme::livelook::active())
+            return { c.bounds.getRight() - 16, c.bounds.getY() + 2, 13, 13 };
+        return { c.bounds.getRight() - 20, c.bounds.getY() + 3, 16, 14 };
+    }
 
     Hit hitAt (juce::Point<int> p) const
     {
@@ -1424,12 +1489,13 @@ private:
     {
         const auto& song = engine.getSong();
         auto r = juce::Rectangle<int> (0, 0, contextWidth - 6, getHeight());
-        g.setColour (colour::bg2);
+        const auto live = theme::livelook::active(); // (round 190jn: Live's greys; Live has no such panel, LYNX keeps it)
+        g.setColour (live ? theme::livelook::surface : colour::bg2);
         g.fillRect (r);
-        g.setColour (colour::border);
+        g.setColour (live ? theme::livelook::separator : colour::border);
         g.fillRect (r.getRight(), 0, 1, getHeight());
         r = r.reduced (8, 6);
-        g.setColour (colour::textPrimary);
+        g.setColour (live ? theme::livelook::text : colour::textPrimary);
         g.setFont (font (type::body, true));
         g.drawText (track >= 0 ? trackName (song, track) : juce::String(), r.removeFromTop (18), juce::Justification::centredLeft, true);
         g.setColour (colour::textSecondary);
@@ -1439,7 +1505,7 @@ private:
         const bool choice = inserts.size() > 1;
         if (choice)
         {
-            g.setColour (hover.part == Part::picker ? colour::bg5 : colour::bg4);
+            g.setColour (live ? (hover.part == Part::picker ? theme::livelook::raised : theme::livelook::well) : hover.part == Part::picker ? colour::bg5 : colour::bg4);
             g.fillRoundedRectangle (box.toFloat(), 3.0f);
         }
         g.setColour (insert >= 0 ? colour::textPrimary : colour::textDisabled);
@@ -1470,6 +1536,11 @@ private:
         const auto& c = cards[(std::size_t) i];
         if (! c.bounds.intersects (chainArea()))
             return;
+        if (theme::livelook::active())
+        {
+            paintCardLive (g, i);
+            return;
+        }
         if (c.kind == Card::add)
         {
             const bool hot = hover.card == i;
@@ -1527,6 +1598,105 @@ private:
         }
         g.setColour (selected ? colour::accent : colour::border);
         g.drawRect (c.bounds, selected ? 2 : 1);
+    }
+
+    // Round 190jn (design190ia CL-21): a card in Live 12.4's device chrome (live-session.png Utility 1075..1213 × 807..995):
+    // body #363636 with 3 px corners on the #2A2A2A chain, a 17 px #464646 title bar (selected: #637E86 with #070707 text),
+    // the 13 px power disc (#FFAD56 on, #1E1E1E off), the name in #B5B5B5, round 13 px wells for hot-swap / save / window;
+    // no outline. A folded card is the title bar turned on its side. The body: Live's open-ring knobs (paintBodyLive).
+    void paintCardLive (juce::Graphics& g, int i)
+    {
+        namespace ll = theme::livelook;
+        const auto& c = cards[(std::size_t) i];
+        if (c.kind == Card::add)
+        {
+            const bool hot = hover.card == i;
+            g.setColour (hot ? ll::raised : ll::surface);
+            g.fillRoundedRectangle (c.bounds.reduced (0, 1).toFloat(), 3.0f);
+            g.setColour (hot ? colour::textPrimary : ll::text);
+            g.setFont (font (22.0f));
+            g.drawText ("+", c.bounds, juce::Justification::centred, false);
+            return;
+        }
+        const bool selected = i == selectedCard();
+        const bool on = cardOn (c);
+        const auto name = cardName (c);
+        const auto box = c.bounds.toFloat();
+        const auto bar = selected ? ll::selectionUnfocused : ll::raised;
+        g.setColour (c.folded ? bar : ll::surface);
+        g.fillRoundedRectangle (box, 3.0f);
+        if (! c.folded)
+        {
+            juce::Path title;
+            title.addRoundedRectangle (box.getX(), box.getY(), box.getWidth(), (float) (int) titleHeight, 3.0f, 3.0f, true, true, false, false);
+            g.setColour (bar);
+            g.fillPath (title);
+        }
+        ll::drawPower (g, ledBounds (c).toFloat(), on);
+        if (hover.card == i && hover.part == Part::led)
+        {
+            g.setColour (colour::textPrimary.withAlpha (0.6f));
+            g.drawEllipse (ledBounds (c).toFloat().expanded (1.0f), 1.0f);
+        }
+        g.setColour (selected ? ll::ink : ll::text);
+        g.setFont (font (type::small));
+        if (c.folded)
+            drawVerticalText (g, name, c.bounds.withTrimmedTop (titleHeight));
+        else
+        {
+            g.drawText (name, titleBounds (c).withTrimmedLeft (20).withTrimmedRight (4 + titleButtonsWidth (c) + (c.custom != nullptr ? c.custom->titleAccessoryWidth() : 0)),
+                        juce::Justification::centredLeft, true);
+            drawLiveWellGlyph (g, windowBounds (c), 0, hover.card == i && hover.part == Part::window, false);
+            drawLiveWellGlyph (g, swapBounds (c), 1, hover.card == i && hover.part == Part::swap, linkedTo (targetOf (c)));
+            if (const auto save = saveBounds (c); ! save.isEmpty())
+                drawLiveWellGlyph (g, save, 2, hover.card == i && hover.part == Part::save, false);
+            if (c.custom != nullptr)
+            {
+                // (its own component draws the body)
+            }
+            else if (on)
+                paintBodyLive (g, i);
+            else // switched off: its controls dim (Live 12.4: round 183a's d02-utility-off.png)
+            {
+                g.beginTransparencyLayer (0.45f);
+                paintBodyLive (g, i);
+                g.endTransparencyLayer();
+            }
+        }
+    }
+
+    // Live's body: label and value in #B5B5B5 (the UI font at 12 px: Live's cap height 7 px), the 25 px open-ring knob
+    void paintBodyLive (juce::Graphics& g, int i)
+    {
+        namespace ll = theme::livelook;
+        const auto& c = cards[(std::size_t) i];
+        const auto body = c.bounds.withTrimmedTop (titleHeight + 6).reduced (8, 0);
+        const auto* fx = c.kind == Card::effect ? effectAt (c.index) : nullptr;
+        if (c.kind == Card::instrument || (fx != nullptr && fx->kind == EffectKind::plugin))
+            paintPicture (g, c, body.withHeight (80));
+        for (int k = 0; k < (int) c.knobs.size(); ++k)
+        {
+            const auto r = knobBounds (c, k);
+            if (r.isEmpty())
+                continue;
+            const auto spec = knobSpec (c, k);
+            const auto value = knobValue (c, k);
+            const auto label = c.kind == Card::effect && c.knobs[(std::size_t) k] < 0 ? (fx != nullptr && hasOwnMix (fx->kind) ? tr ("Slot mix") : tr ("Mix"))
+                               : c.kind == Card::effect && fx != nullptr                ? utf8 (effectInfo (fx->kind).params[(std::size_t) c.knobs[(std::size_t) k]].name)
+                               : c.knobs[(std::size_t) k] == 1                          ? tr ("Pan")
+                                                                                        : tr ("Volume");
+            auto rr = r;
+            const auto hot = (hover.card == i && hover.knob == k) || (knobCard == i && knobDrag == k);
+            g.setColour (hot ? colour::textPrimary : ll::text);
+            g.setFont (font (type::small));
+            g.drawText (label, rr.removeFromTop (14), juce::Justification::centred, true);
+            const auto knob = rr.removeFromTop (knobSize).toFloat().withSizeKeepingCentre (27.0f, 27.0f);
+            const auto range = spec.maximum - spec.minimum;
+            const auto v01 = range > 0.0 ? (float) ((value - spec.minimum) / range) : 0.0f;
+            ll::drawKnob (g, knob, juce::jlimit (0.0f, 1.0f, v01), spec.minimum < 0.0);
+            g.setColour (hot ? colour::textPrimary : ll::text);
+            g.drawText (spec.text (value), rr.removeFromTop (14), juce::Justification::centred, true);
+        }
     }
 
     void paintBody (juce::Graphics& g, int i)
@@ -1600,7 +1770,7 @@ private:
         if (! key.empty())
             if (const auto file = pluginthumbs::fileFor (key, true); file.existsAsFile())
                 picture = juce::ImageCache::getFromFile (file);
-        g.setColour (colour::bg0);
+        g.setColour (theme::livelook::active() ? theme::livelook::well : colour::bg0);
         g.fillRect (area);
         if (picture.isValid())
         {
@@ -1615,7 +1785,7 @@ private:
     void paintMeter (juce::Graphics& g)
     {
         const auto r = meterBounds();
-        g.setColour (colour::bg0);
+        g.setColour (theme::livelook::active() ? theme::livelook::meterWell : colour::bg0);
         g.fillRect (r);
         for (int side = 0; side < 2; ++side)
         {
@@ -1691,6 +1861,15 @@ public:
     }
     void paint (juce::Graphics& g) override
     {
+        if (theme::livelook::active()) // (round 190jn: Live's activator in the clip-coloured title bar: a 9 px square, orange while on)
+        {
+            const auto sq = getLocalBounds().toFloat().withSizeKeepingCentre (9.0f, 9.0f);
+            g.setColour (isMouseOver() ? theme::livelook::ink : liveclip::rim);
+            g.fillRect (sq);
+            g.setColour (active ? theme::livelook::on : theme::livelook::well);
+            g.fillRect (sq.reduced (1.0f));
+            return;
+        }
         const auto r = getLocalBounds().toFloat().reduced (2.0f);
         g.setColour (fill);
         if (active)
@@ -2067,6 +2246,8 @@ public:
     static constexpr int foldedTools = 20;
     int preferredWidth() const
     {
+        if (theme::livelook::active()) // (round 190jn: Live's 170 px column + its 2 px separator; the MIDI Tools stay at its right)
+            return liveclip::columnWidth + 2 + (hasNotes ? gap + (toolsFolded ? foldedTools : MidiToolsPanel::panelWidth) + gap : 0);
         return gap + clipPanel + gap + clipPanel2 + gap + launchPanel + gap + followPanel + gap + (hasNotes ? notesPanel + gap + (toolsFolded ? foldedTools : MidiToolsPanel::panelWidth) + gap : 0);
     }
     // the docked Piano roll (nullptr while it is not docked here): the MIDI Tools work on its selection
@@ -2085,6 +2266,11 @@ public:
 
     void paint (juce::Graphics& g) override
     {
+        if (liveShown)
+        {
+            paintLive (g);
+            return;
+        }
         g.fillAll (colour::bg2);
         g.setColour (colour::border);
         g.fillRect (getWidth() - 1, 0, 1, getHeight());
@@ -2092,6 +2278,12 @@ public:
 
     void resized() override
     {
+        applyLook();
+        if (liveShown)
+        {
+            resizedLive();
+            return;
+        }
         auto r = getLocalBounds().reduced (gap, 4).withTrimmedRight (1);
         const auto take = [] (juce::Rectangle<int>& area, int h) { auto x = area.removeFromTop (h); area.removeFromTop (3); return x; };
         if (hasNotes)
@@ -2214,7 +2406,257 @@ public:
     }
     void reload() { load(); } // (the page docked an editor: it gets the column's hooks)
 
+    // --- round 190jn (design190ia CL-20a / CL-20b): Live 12.4's Clip View column ----------------------------------------
+    // A 170 px column (live-clipview-audio.png 249..418, live-01-clipview-notes.png 9..178): the 17 px title bar in the
+    // clip's colour (the activator square, the name in colour × 0.24) stays; under it Live's sections, each a 17 px #464646
+    // header (click: fold / unfold) over its rows — Clip; Launch (with LYNX's Follow Action, as Live 12 puts it there;
+    // folded at first, as Live shows it); for MIDI clips Pitch & Time (LYNX's note tools). Rows are 13 px fields and pills.
+    // When the open sections are taller than the view, the wheel scrolls them under the title bar (Live does the same).
+    // The fold states are UI state, not saved. The MIDI Tools (Transform / Generate) stay at the column's right.
+    static inline bool clipOpen = true, launchOpen = false, notesOpen = true;
+    bool isLive() const noexcept { return liveShown; }
+    void setScrollForSnapshot (int y)
+    {
+        scrollY = y;
+        resized();
+        repaint();
+    }
+
+    void mouseDown (const juce::MouseEvent& e) override
+    {
+        if (! liveShown || e.x >= liveclip::columnWidth)
+            return;
+        for (int k = 0; k < 3; ++k)
+            if (headerY[(std::size_t) k] >= liveclip::headerHeight && e.y >= headerY[(std::size_t) k] && e.y < headerY[(std::size_t) k] + liveclip::headerHeight)
+            {
+                auto& open = k == 0 ? clipOpen : k == 1 ? launchOpen : notesOpen;
+                open = ! open;
+                resized();
+                repaint();
+                return;
+            }
+    }
+    void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override
+    {
+        if (! liveShown || e.x >= liveclip::columnWidth)
+        {
+            juce::Component::mouseWheelMove (e, wheel);
+            return;
+        }
+        const auto before = scrollY;
+        scrollY = juce::jlimit (0, maxScroll(), scrollY - juce::roundToInt (wheel.deltaY * 120.0f));
+        if (scrollY != before)
+        {
+            resized();
+            repaint();
+        }
+    }
+
 private:
+    bool liveShown = false;
+    int scrollY = 0, contentHeight = 0;
+    std::array<int, 3> headerY {}; // the sections' header tops (Clip, Launch, Pitch & Time; < 17: not shown)
+    juce::Colour titleColour { colour::bg5 };
+    int maxScroll() const { return std::max (0, contentHeight - getHeight()); }
+
+    std::vector<juce::Component*> styledChildren()
+    {
+        return { &start, &end, &position, &length, &followTime, &setStart, &setEnd, &setPosition, &setLength, &followOn, &linked, &invert, &reverse,
+                 &makeLegato, &humanize, &duplicate, &quantize, &randomize, &timesTwo, &divideTwo, &fitScale, &addInterval, &scaleMode, &groove, &mode,
+                 &quant, &followA, &followB, &scaleRoot, &scaleName, &loop, &legato, &nameLabel, &startLabel, &endLabel, &lengthLabel,
+                 &positionLabel, &grooveLabel, &signatureLabel, &modeLabel, &quantLabel, &scaleLabel, &signature };
+    }
+    // the look follows the layout's switch (checked on every layout and load; nothing changes while it stays the same)
+    void applyLook()
+    {
+        const auto live = theme::livelook::active();
+        if (live == liveShown)
+            return;
+        liveShown = live;
+        for (auto* c : styledChildren())
+            liveclip::style (*c, live);
+        for (auto* l : { &clipTitle, &launchTitle, &notesTitle, &followTitle, &nameLabel })
+            l->setVisible (! live);
+        nameColours();
+        if (! live)
+            scrollY = 0;
+    }
+    // the name sits on the title bar in the clip's ink (Live: colour × 0.24)
+    void nameColours()
+    {
+        const auto ink = liveShade (titleColour, 0.24f).withAlpha (1.0f);
+        liveclip::swapColour (name, juce::TextEditor::backgroundColourId, juce::Colours::transparentBlack, liveShown);
+        liveclip::swapColour (name, juce::TextEditor::outlineColourId, juce::Colours::transparentBlack, liveShown);
+        liveclip::swapColour (name, juce::TextEditor::textColourId, ink, liveShown);
+        if (liveShown)
+            name.setColour (juce::TextEditor::textColourId, ink);
+        name.applyColourToAllText (name.findColour (juce::TextEditor::textColourId), true);
+    }
+
+    void paintLive (juce::Graphics& g)
+    {
+        namespace ll = theme::livelook;
+        const auto w = liveclip::columnWidth;
+        g.fillAll (ll::window);
+        g.setColour (ll::surface);
+        g.fillRect (0, 0, w, getHeight());
+        g.setColour (ll::separator);
+        g.fillRect (w, 0, 2, getHeight());
+        {
+            juce::Graphics::ScopedSaveState save (g);
+            g.reduceClipRegion (0, liveclip::headerHeight + 1, w, getHeight());
+            const char* titles[] { TR_NOOP ("Clip"), TR_NOOP ("Launch"), TR_NOOP ("Pitch & Time") };
+            const bool open[] { clipOpen, launchOpen, notesOpen };
+            for (int k = 0; k < 3; ++k)
+                if (k < 2 || hasNotes)
+                    liveclip::paintHeader (g, { 0, headerY[(std::size_t) k], w, liveclip::headerHeight }, tr (titles[k]), k == 2 ? 3 : k, open[k]);
+        }
+        g.setColour (titleColour);
+        g.fillRect (0, 0, w, liveclip::headerHeight);
+        g.setColour (ll::separator);
+        g.fillRect (0, liveclip::headerHeight, w, 1);
+    }
+
+    void resizedLive()
+    {
+        const auto w = liveclip::columnWidth;
+        const auto top = liveclip::headerHeight + 1;
+        const int row = liveclip::row, x0 = 11, inner = w - 22, half = (inner - 4) / 2;
+        // a child goes where the layout puts it while that is wholly under the title bar and in view; else it hides
+        const auto put = [this, top] (juce::Component& c, juce::Rectangle<int> r) {
+            c.setBounds (r.getY() >= top && r.getBottom() <= getHeight() ? r : juce::Rectangle<int>());
+        };
+        const auto hide = [] (std::initializer_list<juce::Component*> list) {
+            for (auto* c : list)
+                c->setBounds ({});
+        };
+        chip.setBounds (2, 2, 13, 13);
+        name.setBounds (17, 1, w - 21, 15);
+        for (auto* l : { &clipTitle, &launchTitle, &notesTitle, &followTitle, &nameLabel })
+            l->setBounds ({});
+        if (hasNotes)
+        {
+            auto t = getLocalBounds().withTrimmedLeft (w + 2 + gap).withTrimmedRight (gap).reduced (0, 4);
+            foldTools.setBounds (t.getRight() - 18, t.getY(), 18, 16);
+            tools.setBounds (t.withWidth (toolsFolded ? foldedTools : MidiToolsPanel::panelWidth).withRightX (t.getRight()));
+        }
+        int y = top - scrollY;
+        const auto labelRow = [&] (juce::Component& a, juce::Component* set, int x, int width) {
+            put (a, { x, y, width - (set != nullptr ? 24 : 0), row });
+            if (set != nullptr)
+                put (*set, { x + width - 22, y + 1, 22, row - 2 });
+        };
+        // Clip
+        headerY[0] = y;
+        y += liveclip::headerHeight + 1;
+        if (clipOpen)
+        {
+            y += 4;
+            labelRow (startLabel, &setStart, x0, half);
+            labelRow (endLabel, &setEnd, x0 + half + 4, half);
+            y += row + 1;
+            put (start, { x0, y, half, row });
+            put (end, { x0 + half + 4, y, half, row });
+            y += row + 5;
+            put (loop, { x0, y, inner, row });
+            y += row + 5;
+            labelRow (positionLabel, &setPosition, x0, half);
+            labelRow (lengthLabel, &setLength, x0 + half + 4, half);
+            y += row + 1;
+            put (position, { x0, y, half, row });
+            put (length, { x0 + half + 4, y, half, row });
+            y += row + 5;
+            put (signatureLabel, { x0, y, half, row });
+            put (grooveLabel, { x0 + half + 4, y, half, row });
+            y += row + 1;
+            put (signature, { x0, y, half, row });
+            put (groove, { x0 + half + 4, y, half, row });
+            y += row + 5;
+            put (scaleLabel, { x0, y, inner, row });
+            y += row + 1;
+            put (scaleMode, { x0, y, 18, row });
+            put (scaleRoot, { x0 + 21, y, 50, row });
+            put (scaleName, { x0 + 74, y, inner - 74, row });
+            y += row + 6;
+        }
+        else
+            hide ({ &startLabel, &setStart, &endLabel, &setEnd, &start, &end, &loop, &positionLabel, &setPosition, &lengthLabel, &setLength, &position,
+                    &length, &signatureLabel, &grooveLabel, &signature, &groove, &scaleLabel, &scaleMode, &scaleRoot, &scaleName });
+        // Launch (+ Follow Action)
+        headerY[1] = y;
+        y += liveclip::headerHeight + 1;
+        if (launchOpen)
+        {
+            y += 4;
+            put (modeLabel, { x0, y, inner, row });
+            y += row + 1;
+            put (mode, { x0, y, inner, row });
+            y += row + 5;
+            put (quantLabel, { x0, y, inner, row });
+            y += row + 1;
+            put (quant, { x0, y, inner, row });
+            y += row + 5;
+            put (legato, { x0, y, inner, row });
+            y += row + 5;
+            put (followOn, { x0, y, inner, row });
+            y += row + 4;
+            put (followA, { x0, y, half, row });
+            put (followB, { x0 + half + 4, y, half, row });
+            y += row + 4;
+            {
+                const auto jw = 26;
+                put (*jumpA, { x0 + half - (jumpA->isVisible() ? jw : 0), y, jumpA->isVisible() ? jw : 0, row });
+                put (*chanceA, { x0, y, half - (jumpA->isVisible() ? jw + 3 : 0), row });
+                put (*jumpB, { x0 + inner - (jumpB->isVisible() ? jw : 0), y, jumpB->isVisible() ? jw : 0, row });
+                put (*chanceB, { x0 + half + 4, y, half - (jumpB->isVisible() ? jw + 3 : 0), row });
+            }
+            y += row + 4;
+            put (linked, { x0, y, half, row });
+            put (*multiplier, { x0 + half + 4, y, half, row });
+            y += row + 4;
+            put (followTime, { x0, y, inner, row });
+            y += row + 6;
+        }
+        else
+            hide ({ &modeLabel, &mode, &quantLabel, &quant, &legato, &followOn, &followA, &followB, jumpA.get(), chanceA.get(), jumpB.get(), chanceB.get(),
+                    &linked, multiplier.get(), &followTime });
+        // Pitch & Time (MIDI clips): LYNX's note tools, two columns of 13 px pills
+        headerY[2] = hasNotes ? y : -1;
+        if (hasNotes)
+        {
+            y += liveclip::headerHeight + 1;
+            if (notesOpen)
+            {
+                y += 4;
+                const auto cell = [&] (int r, int c) { return juce::Rectangle<int> (x0 + c * (half + 4), y + r * (row + 4), half, row); };
+                put (*pitchRange, cell (0, 0));
+                put (invert, cell (0, 1));
+                put (reverse, cell (1, 0));
+                put (makeLegato, cell (1, 1));
+                put (humanize, cell (2, 0));
+                put (quantize, cell (2, 1));
+                const auto small = (half - 4) / 2;
+                put (timesTwo, cell (3, 0).withWidth (small));
+                put (divideTwo, cell (3, 0).withTrimmedLeft (small + 4));
+                put (fitScale, cell (3, 1));
+                put (*intervalSize, cell (4, 0));
+                put (addInterval, cell (4, 1));
+                put (duplicate, cell (5, 0));
+                put (randomize, cell (5, 1));
+                y += 6 * (row + 4) + 4;
+            }
+            else
+                hide ({ pitchRange.get(), &invert, &reverse, &makeLegato, &humanize, &quantize, &timesTwo, &divideTwo, &fitScale, intervalSize.get(),
+                        &addInterval, &duplicate, &randomize });
+        }
+        contentHeight = y + scrollY;
+        if (scrollY > maxScroll()) // (a section folded at the bottom: the column scrolls back)
+        {
+            scrollY = maxScroll();
+            resizedLive();
+        }
+    }
+
     void changeListenerCallback (juce::ChangeBroadcaster*) override { load(); }
 
     // the Set buttons are lit only while this clip plays
@@ -2390,6 +2832,16 @@ private:
         auto fill = slot != nullptr && slot->colour != 0 ? juce::Colour (slot->colour)
                     : c->kind == ClipKind::audio ? colour::audioClip : tame (PlaylistComponent::patternColour (song, c->pattern));
         chip.set (fill, ! c->muted);
+        applyLook();
+        if (fill != titleColour)
+        {
+            titleColour = fill;
+            if (liveShown)
+            {
+                nameColours();
+                repaint (0, 0, liveclip::columnWidth, liveclip::headerHeight);
+            }
+        }
         {
             const juce::ScopedValueSetter<bool> guard (loading, true);
             const auto shown = slot != nullptr ? projectkey::clipScale (*slot, song) : projectkey::get (song);
@@ -2695,6 +3147,13 @@ public:
         update();
     }
     MidiToolsPanel& midiTools() noexcept { return column.midiTools(); }
+    void sectionsForSnapshot (bool clipOpen, bool launchOpen, bool notesOpen, int scroll)
+    {
+        ClipColumn::clipOpen = clipOpen;
+        ClipColumn::launchOpen = launchOpen;
+        ClipColumn::notesOpen = notesOpen;
+        column.setScrollForSnapshot (scroll);
+    }
     void editorTakenBack()
     {
         if (editor != nullptr)
@@ -2717,7 +3176,25 @@ public:
     void applyMpeView()
     {
         if (auto* roll = dynamic_cast<PianoRollComponent*> (editor))
+        {
             roll->setMpeView (DetailView::mpeTab && ! DetailView::envelopesTab);
+            // round 190jn (CL-20b): in Live's look the docked notes take the clip's colour (PianoRollComponent::liveNotes)
+            const auto* clip = clipShown();
+            const auto colour = theme::livelook::active() && clip != nullptr ? clipColourOf (*clip) : juce::Colours::transparentBlack;
+            if (roll->liveNoteColour != colour)
+            {
+                roll->liveNoteColour = colour;
+                roll->repaint();
+            }
+        }
+    }
+    // the clip's colour as its title bar shows it (ClipColumn::load's rule)
+    juce::Colour clipColourOf (const Clip& c) const
+    {
+        const auto& song = engine.getSong();
+        const ClipGridSlot* slot = song.clipGrid && c.gridSlot >= 0 && c.gridSlot < (int) song.clipGrid->slots.size() ? &song.clipGrid->slots[(std::size_t) c.gridSlot] : nullptr;
+        return slot != nullptr && slot->colour != 0 ? juce::Colour (slot->colour)
+               : c.kind == ClipKind::audio ? colour::audioClip : tame (PlaylistComponent::patternColour (song, c.pattern));
     }
 
     // Round 190im (R13, DL-74): the docked clip's position in its pattern while it is launched from the grid (the
@@ -2742,6 +3219,8 @@ public:
     {
         dropEvents();
         dockedTrack = dockedScene = -1;
+        if (auto* roll = dynamic_cast<PianoRollComponent*> (editor)) // (round 190jn: its own colours again at home)
+            roll->liveNoteColour = juce::Colours::transparentBlack;
         if (editor != nullptr && hooks.undockPianoRoll != nullptr)
         {
             editor = nullptr;
@@ -2752,7 +3231,14 @@ public:
 
     void paint (juce::Graphics& g) override
     {
-        g.fillAll (colour::bg1);
+        g.fillAll (liveTabs ? theme::livelook::window : colour::bg1);
+        if (liveTabs && notesTab.isVisible()) // (round 190jn: Live's 17 px tab bar over the editor, #363636)
+        {
+            g.setColour (theme::livelook::surface);
+            g.fillRect (tabBar);
+            g.setColour (theme::livelook::separator);
+            g.fillRect (tabBar.getX(), tabBar.getBottom(), tabBar.getWidth(), 1);
+        }
         if (editor != nullptr || events != nullptr)
             return;
         g.setColour (colour::textSecondary);
@@ -2768,7 +3254,23 @@ public:
         open.setBounds (area.withSizeKeepingCentre (240, 26).translated (0, 16));
         if (audioPanel != nullptr) // round 190cg (ui/ClipAudioPanel)
             audioPanel->setBounds (area);
-        if (notesTab.isVisible())
+        applyLook();
+        tabBar = {};
+        if (notesTab.isVisible() && liveTabs)
+        {
+            // round 190jn (CL-20b): Live's tab bar — 17 px #363636 across the editor, the tabs (60 px, MPE 40 px) centred,
+            // the shown one #464646 (live-01-clipview-notes.png 691..873, live-clipview-audio.png 962..1082)
+            tabBar = area.removeFromTop (liveclip::headerHeight);
+            area.removeFromTop (1);
+            const auto total = 60 + 1 + 60 + 1 + 40;
+            auto bar = tabBar.withSizeKeepingCentre (total, liveclip::headerHeight);
+            notesTab.setBounds (bar.removeFromLeft (60));
+            bar.removeFromLeft (1);
+            envelopesTab.setBounds (bar.removeFromLeft (60));
+            bar.removeFromLeft (1);
+            mpeTab.setBounds (bar);
+        }
+        else if (notesTab.isVisible())
         {
             // the clip's tabs, top right, as the reference's Notes | Envelopes [SHOT d08] (| MPE: Live 11+, round 190hy)
             auto bar = area.removeFromTop (tabHeight).reduced (2, 2);
@@ -2791,6 +3293,26 @@ public:
 
 private:
     void changeListenerCallback (juce::ChangeBroadcaster*) override { update(); }
+
+    // round 190jn: the tabs in Live's colours (the shown one #464646, the others #363636, text #B5B5B5) and square, or
+    // LYNX's back; follows the layout's switch
+    bool liveTabs = false;
+    juce::Rectangle<int> tabBar;
+    void applyLook()
+    {
+        const auto live = theme::livelook::active();
+        if (live == liveTabs)
+            return;
+        liveTabs = live;
+        for (auto* b : { &notesTab, &envelopesTab, &mpeTab })
+        {
+            liveclip::swapColour (*b, juce::TextButton::buttonColourId, theme::livelook::surface, live);
+            liveclip::swapColour (*b, juce::TextButton::buttonOnColourId, liveclip::header, live);
+            liveclip::swapColour (*b, juce::TextButton::textColourOffId, theme::livelook::text, live);
+            liveclip::swapColour (*b, juce::TextButton::textColourOnId, theme::livelook::text, live);
+            b->setConnectedEdges (live ? juce::Button::ConnectedOnLeft | juce::Button::ConnectedOnRight : 0);
+        }
+    }
 
     // this page and every parent visible (not isShowing(): an off-screen --detailshot has no window, and a minimised
     // window keeps its dock)
@@ -2850,6 +3372,11 @@ private:
 
     void update()
     {
+        if (theme::livelook::active() != liveTabs)
+        {
+            applyLook();
+            resized();
+        }
         const auto& song = engine.getSong();
         const auto* clip = clipShown();
         if (column.isVisible() != (clip != nullptr))
@@ -2978,6 +3505,9 @@ private:
 DetailView::DetailView (AudioEngine& e, Hooks h) : engine (e), hooks (std::move (h))
 {
     setTitle (tr ("Detail view"));
+    info = std::make_unique<ui::InfoView>();
+    addChildComponent (*info);
+    info->setInterceptsMouseClicks (false, false);
     chain = std::make_unique<DeviceChain> (engine, hooks);
     clipPage = std::make_unique<ClipPage> (engine, hooks);
     addChildComponent (*chain);
@@ -3064,6 +3594,11 @@ void DetailView::showOptionsMenu()
 
 void DetailView::paint (juce::Graphics& g)
 {
+    if (theme::livelook::active())
+    {
+        paintLiveStrip (g);
+        return;
+    }
     g.fillAll (colour::bg1);
     // the top edge: drag to resize
     g.setColour (colour::bg3);
@@ -3096,6 +3631,24 @@ void DetailView::resized()
 {
     auto r = getLocalBounds();
     r.removeFromTop (edgeHeight);
+    const auto live = theme::livelook::active();
+    clipTab.setVisible (! live);
+    devicesTab.setVisible (! live);
+    info->setVisible (live && infoViewShown);
+    if (live)
+    {
+        // Live: the status strip under everything; the Info View 9..240 then the views from 249 (live-session.png)
+        r.removeFromBottom (stripHeight);
+        optionsButton.setBounds (getWidth() - 28, getHeight() - stripHeight + 2, 26, stripHeight - 4);
+        if (infoViewShown)
+        {
+            auto left = r.removeFromLeft (249);
+            info->setBounds (left.withTrimmedLeft (9).withTrimmedRight (9).withTrimmedTop (2).withTrimmedBottom (1));
+        }
+        chain->setBounds (r);
+        clipPage->setBounds (r);
+        return;
+    }
     auto strip = r.removeFromBottom (stripHeight).reduced (2, 2);
     optionsButton.setBounds (strip.removeFromRight (26));
     strip.removeFromRight (4);
@@ -3115,6 +3668,123 @@ void DetailView::mouseDown (const juce::MouseEvent& e)
 {
     resizing = e.y < edgeHeight;
     dragStartHeight = getHeight();
+    if (resizing || ! theme::livelook::active() || e.mods.isPopupMenu())
+        return;
+    if (infoButtonArea().expanded (2).contains (e.getPosition()))
+        toggleInfoView();
+    else if (pageGlyphArea (false).expanded (1).contains (e.getPosition()))
+        setPage (Page::clip);
+    else if (pageGlyphArea (true).expanded (1).contains (e.getPosition()))
+        setPage (Page::devices);
+}
+
+// --- round 190jn: Live's Info View and status strip (design190ia CL-23 / CL-24) -----------------------------------------
+void DetailView::setInfoHint (const ui::Hint& hint)
+{
+    if (info->isVisible())
+        info->setHint (hint);
+}
+
+void DetailView::toggleInfoView()
+{
+    infoViewShown = ! infoViewShown;
+    resized();
+    repaint();
+    if (hooks.layoutChanged != nullptr)
+        hooks.layoutChanged();
+}
+
+ui::InfoView& DetailView::infoViewForSnapshot() { return *info; }
+
+// Live 12.4's status bar (live-session.png y 1004..1022): the (i) button 15 px at x 11 (orange: the Info View shows),
+// the status text in a #363636 field from x 42; at the right the selected track's name and the view selector
+// (here: a Clip glyph and a Device glyph, 17 px, the shown one lit #FFAD56); LYNX's "..." options last.
+juce::Rectangle<int> DetailView::infoButtonArea() const
+{
+    return { 11, getHeight() - stripHeight + (stripHeight - 15) / 2, 15, 15 };
+}
+
+juce::Rectangle<int> DetailView::pageGlyphArea (bool devices) const
+{
+    const auto right = getWidth() - 34;
+    return { right - (devices ? 19 : 38), getHeight() - stripHeight + (stripHeight - 17) / 2, 17, 17 };
+}
+
+void DetailView::paintLiveStrip (juce::Graphics& g)
+{
+    namespace ll = theme::livelook;
+    g.fillAll (ll::window);
+    // the top edge: drag to resize (a 1 px #464646 line as Live's split, the grip in the middle)
+    g.setColour (ll::separator);
+    g.fillRect (0, edgeHeight - 1, getWidth(), 1);
+    g.setColour (ll::raised);
+    g.fillRect (getWidth() / 2 - 16, 2, 32, 1);
+    const auto strip = getLocalBounds().removeFromBottom (stripHeight);
+    // (i)
+    const auto ib = infoButtonArea().toFloat();
+    g.setColour (infoViewShown ? ll::on : ll::well);
+    g.fillEllipse (ib);
+    g.setColour (infoViewShown ? ll::ink : ll::text);
+    g.fillEllipse (juce::Rectangle<float> (2.0f, 2.0f).withCentre ({ ib.getCentreX(), ib.getY() + 4.0f }));
+    g.fillRect (juce::Rectangle<float> (ib.getCentreX() - 1.0f, ib.getY() + 6.0f, 2.0f, 6.0f));
+    // the status text field
+    const auto& song = engine.getSong();
+    const auto glyphs = pageGlyphArea (false).getX();
+    const auto name = track >= 0 ? trackName (song, track) : juce::String();
+    g.setFont (font (type::small));
+    const auto nameWidth = name.isEmpty() ? 0 : juce::jmin (180, juce::roundToInt (juce::TextLayout::getStringWidth (g.getCurrentFont(), name)) + 12);
+    auto field = juce::Rectangle<int> (42, strip.getY() + (stripHeight - 19) / 2, std::max (0, glyphs - nameWidth - 12 - 42), 19);
+    g.setColour (ll::surface);
+    g.fillRoundedRectangle (field.toFloat(), 3.0f);
+    juce::String what;
+    if (devicesPage)
+    {
+        what = track >= 0 ? tr ("Devices") + ": " + trackName (song, track) : tr ("Devices");
+        if (const auto i = chain->insertShown(); i >= 0)
+            what << juce::String::fromUTF8 (" \xc2\xb7 ") << insertName (song, i);
+    }
+    else
+        what = tr ("Clip");
+    what << "   (" << tr ("Shift+Tab: {0}", { devicesPage ? tr ("Clip") : tr ("Devices") }) << ")";
+    g.setColour (ll::text);
+    g.drawText (what, field.reduced (6, 0), juce::Justification::centredLeft, true);
+    if (nameWidth > 0)
+        g.drawText (name, juce::Rectangle<int> (glyphs - nameWidth - 6, strip.getY(), nameWidth, stripHeight), juce::Justification::centredLeft, true);
+    // the Clip glyph (a clip block with its waveform) and the Device glyph (Live's three bars)
+    for (const auto devices : { false, true })
+    {
+        const auto r = pageGlyphArea (devices).toFloat();
+        const auto lit = devicesPage == devices;
+        g.setColour (lit ? ll::on : ll::well);
+        g.fillRoundedRectangle (r, 2.0f);
+        g.setColour (lit ? ll::ink : ll::text);
+        if (devices)
+            for (int k = 0; k < 3; ++k)
+            {
+                const auto h = k == 1 ? 9.0f : 6.0f;
+                g.fillRect (juce::Rectangle<float> (r.getX() + 4.0f + (float) k * 3.5f, r.getBottom() - 4.0f - h, 2.0f, h));
+            }
+        else
+        {
+            const auto b = r.reduced (3.5f, 5.0f);
+            g.drawRect (b, 1.0f);
+            g.drawLine (b.getX() + 2.0f, b.getCentreY(), b.getRight() - 2.0f, b.getCentreY(), 1.0f);
+        }
+    }
+}
+
+juce::String DetailView::getTooltip()
+{
+    if (! theme::livelook::active())
+        return {};
+    const auto p = getMouseXYRelative();
+    if (infoButtonArea().expanded (2).contains (p))
+        return tr ("Info View: shows what the control under the mouse does. Click or press Shift+? to show or hide it");
+    if (pageGlyphArea (false).expanded (1).contains (p))
+        return clipTab.getTooltip();
+    if (pageGlyphArea (true).expanded (1).contains (p))
+        return devicesTab.getTooltip();
+    return {};
 }
 
 void DetailView::mouseDrag (const juce::MouseEvent& e)
@@ -3134,6 +3804,7 @@ void DetailView::mouseUp (const juce::MouseEvent&)
 }
 
 MidiToolsPanel& DetailView::midiToolsForSnapshot() { return clipPage->midiTools(); }
+void DetailView::clipSectionsForSnapshot (bool clipOpen, bool launchOpen, bool notesOpen, int scroll) { clipPage->sectionsForSnapshot (clipOpen, launchOpen, notesOpen, scroll); }
 hotswap::Target DetailView::selectedDeviceTarget() const { return devicesPage && isShowing() ? chain->selectedTarget() : hotswap::Target(); }
 void DetailView::hotSwapChanged() { chain->repaint(); }
 void DetailView::selectCardForCheck (int card) { chain->selectCard (card); }
