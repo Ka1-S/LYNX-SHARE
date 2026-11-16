@@ -10560,3 +10560,4 @@ countries: tr
 "Ridge Strip's 4K Pink EQ plays as the Black EQ: {0}" = "Ridge Strip'in 4K Pink EQ'su Black EQ olarak çalar: {0}"
 "Automation clip colours" = "Otomasyon klibi renkleri"
 "Mix snapshots (the Mixer menu)" = "Miks anlık görüntüleri (Mixer menüsü)"
+"Large controls (touch size)" = "Büyük denetimler (dokunmatik boyut)"

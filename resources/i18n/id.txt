@@ -10560,3 +10560,4 @@ countries: id
 "Ridge Strip's 4K Pink EQ plays as the Black EQ: {0}" = "EQ Pink 4K Ridge Strip diputar sebagai EQ Black: {0}"
 "Automation clip colours" = "Warna klip otomasi"
 "Mix snapshots (the Mixer menu)" = "Snapshot mix (menu Mixer)"
+"Large controls (touch size)" = "Kontrol besar (ukuran sentuh)"

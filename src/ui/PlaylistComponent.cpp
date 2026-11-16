@@ -7659,6 +7659,18 @@ juce::Rectangle<int> PlaylistComponent::dropLaneArea() const
     return juce::Rectangle<int> (grid.getX(), trackToY (lane), grid.getWidth(), heightOf (lane)).getIntersection (grid);
 }
 
+void PlaylistComponent::simpleLookChanged()
+{
+    if (! simpleHeaders)
+        return;
+    hover = {};
+    headerWidth = -1; // (laid out again: the Large controls width)
+    updateHeaderWidth();
+    refreshTrackLayout();
+    updateScrollBars();
+    repaint();
+}
+
 void PlaylistComponent::updateDropLaneProbe()
 {
     const auto area = simpleHeaders ? dropLaneArea().reduced (6, 4) : juce::Rectangle<int>();

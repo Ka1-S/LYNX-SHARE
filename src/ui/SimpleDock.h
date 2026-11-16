@@ -83,6 +83,7 @@ public:
     static constexpr int minHeight = 150, edgeHeight = 5;
     // the header strip (round 190jc, design190ia SG-7: 30 -> 36 px, BandLab's Track View header; Large controls 48)
     static int stripHeight();
+    void lookChanged(); // round 190jc: View › Large controls changed
 
     // The folder of the user's own chain presets (.lynxtrack files)
     static juce::File userPresetFolder();

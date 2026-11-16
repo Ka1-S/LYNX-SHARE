@@ -10560,3 +10560,4 @@ countries: nl be
 "Ridge Strip's 4K Pink EQ plays as the Black EQ: {0}" = "De 4K Pink EQ van Ridge Strip speelt als de Black EQ: {0}"
 "Automation clip colours" = "Kleuren van automatiseringsclips"
 "Mix snapshots (the Mixer menu)" = "Mix-snapshots (het Mixer-menu)"
+"Large controls (touch size)" = "Grote bedieningselementen (aanraakformaat)"

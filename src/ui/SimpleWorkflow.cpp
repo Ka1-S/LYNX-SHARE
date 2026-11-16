@@ -867,6 +867,12 @@ void SimpleWorkflow::updateDock()
     }
 }
 
+void SimpleWorkflow::lookChanged()
+{
+    if (dock != nullptr)
+        dock->lookChanged();
+}
+
 void SimpleWorkflow::trackSelected (int track)
 {
     if (! active || track == dockTrack)

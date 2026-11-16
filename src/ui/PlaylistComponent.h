@@ -297,6 +297,8 @@ public:
     std::function<void()> onSimpleAddTrack;
     juce::Rectangle<int> simpleAddButtonForSnapshot() const { return simpleAddButton(); }
     void setDropLaneHotForSnapshot (bool hot) { setDropLaneHot (hot); }
+    // round 190jc: View › Large controls changed (the Simple headers' sizes and row heights)
+    void simpleLookChanged();
     // round 190fo: the Simple workflow's track menu "Export this track" › As audio / As MIDI (nullptr: not offered)
     std::function<void (int track, bool asMidi)> onExportTrack;
 

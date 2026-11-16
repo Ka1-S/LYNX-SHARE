@@ -71,6 +71,8 @@ public:
     // The song changed (MainComponent's change callback, only while the style is on): a new or emptied project shows the
     // chooser again, unless it was closed for this project.
     void songChanged();
+    // round 190jc: View › Large controls changed (the dock grows or shrinks; the tracks are the Playlist's)
+    void lookChanged();
 
     void showChooser();
     void hideChooser();

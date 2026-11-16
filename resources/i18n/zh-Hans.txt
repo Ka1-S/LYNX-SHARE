@@ -10560,3 +10560,4 @@ countries: cn sg
 "Ridge Strip's 4K Pink EQ plays as the Black EQ: {0}" = "Ridge Strip 的 4K Pink EQ 按 Black EQ 播放：{0}"
 "Automation clip colours" = "自动化片段的颜色"
 "Mix snapshots (the Mixer menu)" = "混音快照（Mixer 菜单）"
+"Large controls (touch size)" = "大号控件（触控尺寸）"

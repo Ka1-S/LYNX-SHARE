@@ -2593,8 +2593,9 @@ void SimpleDock::setTab (Tab t)
     const auto padsBefore = tab == Tab::pads;
     tab = t;
     showPage();
-    if (padsBefore != (tab == Tab::pads) && hooks.layoutChanged) // (round 190jc: the Pads tab's least height)
-        hooks.layoutChanged();
+    if (padsBefore != (tab == Tab::pads)) // (round 190jc: the Pads tab's least height: the holder lays the dock out again)
+        if (auto* holder = getParentComponent())
+            holder->resized();
 }
 
 void SimpleDock::cycleTab()
@@ -2825,6 +2826,16 @@ void SimpleDock::paint (juce::Graphics& g)
 }
 
 int SimpleDock::stripHeight() { return ui::simplelook::px (36, 48); }
+
+void SimpleDock::lookChanged()
+{
+    refresh(); // (lays the strip and the pages out again)
+    padsPage->resized(); // (the pads' size floor; its bounds may stay the same)
+    if (keyboardPage != nullptr)
+        keyboardPage->resized();
+    if (auto* holder = getParentComponent())
+        holder->resized();
+}
 
 void SimpleDock::StripButton::paintButton (juce::Graphics& g, bool over, bool down)
 {

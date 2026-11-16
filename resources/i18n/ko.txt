@@ -10560,3 +10560,4 @@ countries: kr
 "Ridge Strip's 4K Pink EQ plays as the Black EQ: {0}" = "Ridge Strip의 4K Pink EQ는 Black EQ로 재생됩니다: {0}"
 "Automation clip colours" = "오토메이션 클립 색상"
 "Mix snapshots (the Mixer menu)" = "믹스 스냅샷 (Mixer 메뉴)"
+"Large controls (touch size)" = "큰 컨트롤 (터치 크기)"
