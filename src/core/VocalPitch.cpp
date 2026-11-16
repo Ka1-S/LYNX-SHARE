@@ -510,7 +510,8 @@ void Psola::placeMarks() noexcept
             markHead = (markHead + 1) % maxMarks;
             --markCount;
         }
-        marks[(std::size_t) ((markHead + markCount) % maxMarks)] = { pos, p, v, (float) ratio, (float) formant };
+        // round 190ho (setUnvoicedPlain): an unvoiced mark placed then keeps the source's own formants
+        marks[(std::size_t) ((markHead + markCount) % maxMarks)] = { pos, p, v, (float) ratio, ! v && unvoicedPlain ? 1.0f : (float) formant };
         ++markCount;
     };
 

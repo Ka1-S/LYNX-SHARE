@@ -48,7 +48,10 @@ TEST (ridge_channel_strip_2_state_translated_tp172c)
     p = tp172c::sslSlot ("SSL 4K G", "<PARAM id=\"LowMidEqFreq\" value=\"1.5\"/><PARAM id=\"LowMidEqDiv3\" value=\"1.0\"/>"
                                      "<PARAM id=\"HighMidEqFreq\" value=\"2.0\"/><PARAM id=\"HighMidEqMult3\" value=\"1.0\"/>").params;
     CHECK (r::k4Voicing (p) && r::k4ColourIndex (p[r::k4Colour]) == 1);
-    CHECK (std::abs (r::lmfHz (p[r::lmfFreq]) - 500.0) < 0.1 && std::abs (r::hmfHz (p[r::hmfFreq]) - 6000.0) < 1.0);
+    // round 190ho: in the 4K G's Black (no EQ Type in this state = Black) ÷3 / ×3 do nothing (K4G_ir: the renders with them
+    // equal the ones without), so the dials stay; the Pink EQ takes them (Parity190hoTests.inc)
+    CHECK (std::abs (r::lmfHz (p[r::lmfFreq]) - 1500.0) < 0.5 && std::abs (r::hmfHz (p[r::hmfFreq]) - 2000.0) < 1.0);
+    CHECK (p[r::k4Pink] == 0.0f && p[r::k4PinkDiv3] == 0.0f && p[r::k4PinkMult3] == 0.0f);
     p = tp172c::sslSlot ("SSL 4K B", "<PARAM id=\"LowEqGain\" value=\"6.0\"/><PARAM id=\"CompRatio\" value=\"3.0\"/>").params;
     CHECK (r::k4Voicing (p) && r::k4ColourIndex (p[r::k4Colour]) == 0);
     CHECK (std::abs (r::bandGainDb (p[r::lfGain], false) - 6.0) < 1e-4);

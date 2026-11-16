@@ -54,7 +54,7 @@ there.
 | Ridge Strip (Modern) | SSL Native Channel Strip 2 | 9 | 8 | 7 | 8 | tp172c | sound 3 → 7 (fxparity 2.6 → 7.1, 30 renders); look: the console's colour-coded caps on grey metal, three columns |
 | Ridge Strip (4K) | SSL 4K E | 9 | 8 | 6 | 8 | 148 | tp172c4: the 4K compressor blends its measured ratio nodes in log slope (10:1 acted like ~100:1; S4 6 dB too deep): fxparity 5.4 → 6.0 |
 | Ridge Strip (4K) | SSL 4K B | 8 | 8 | 5 | 8 | tp172c | tp172c4: its stepped compressor (out / 2 / 4 / 10 : 1 / ds, stepped releases) read as the 4K's near-limiting curve with the measured knee offsets, its threshold-only auto make-up, its gentler mic pre: fxparity 3.5 → 5.2 |
-| Ridge Strip (4K) | SSL 4K G | 8 | 8 | 5 | 8 | tp172c | tp172c4: its ±18 / ±20 / ±22 dB dials scaled onto the 4K's ±15 (same curves), its deeper slow compressor: fxparity 4.4 → 5.1; its Pink EQ type still plays as Black |
+| Ridge Strip (4K) | SSL 4K G | 8 | 8 | 5 | 8 | 190ho | tp172c4: its ±18 / ±20 / ±22 dB dials scaled onto the 4K's ±15 (same curves), its deeper slow compressor: fxparity 4.4 → 5.1; 190ho: its Pink EQ measured (hidden Pink of the 4K voicing, set by the translation; ÷3 / ×3 in Pink only): row 5.10 → 5.20, the 206 Pink impulse renders 4.07 → 6.50 |
 | Ridge Strip | Harrison 32Classic Channel Strip | 7 | 6 | 4 | 8 | tp172c | tp172c5: its state translated (was Ridge's defaults): EQ shelves / bells / filters fitted on the trial's impulse grid (a mid out of Ridge's band range moves to a free neighbour), the compressor's static line (the dial - 2 dB RMS, the Limiter ~1.8 dB lower, under -40 dBFS through the input trim), its auto make-up law, gate / expander: fxparity 3.0 → 4.5 (EQ bank 2.8 → 5.4, dynamics 3.8 → 5.5, make-up 3.6 → 6.6); tp172c6: its saturator on Ridge's new DRIVE section (Saturate model, the dial's -24 .. +24 dB shifting the measured clip curve): 32C 4.5 → 5.2 (saturator bank 5.3); tp172c10: its compressor's 27.5 dB reduction cap as a hidden Ridge parameter set by the translation (the original has no control for it): dynamics bank 5.5 → 6.2; tp172c11: its attack dial as a real time constant (hidden Ridge parameter), release time constants from the stair decay (0.25 / 0.35 / 1.6 s at 50 / 104 / 351.5 ms, half in Limiter mode): dynamics bank 6.2 → 6.7, make-up bank 6.7 → 6.6, 32C 5.2 = 5.2 |
 | Ridge Strip | Harrison MPC Channel Strip | 7 | 6 | 5 | 8 | tp172c | tp172c5: its 8 bands onto Ridge's 4 (shelves on LF / HF, the bells on the free slots), the 12 dB/oct filters on the 32C's laws, its compressor's measured line and knee: fxparity 4.6 → 5.5 (dynamics bank 3.8 → 6.6, EQ bank 1.9 → 3.2: band-pass / notch shapes, Q under 0.5 and ±19 dB gains are outside Ridge's bands; open for this release: no new Ridge bands or plugin) |
 | Kiln Channel (Console E / G / A / N / Y, Tube) | Slate VCC Channel | 7 | 7 | 7 | 8 | tp172c7 | tp172c7: its own plugin (was Ridge's DRIVE section): a compact dark single-channel console like the original (amber VU, console selector with the six models round it, Input / Output, Drive, Group, Noise reduction and Group bypass keys, main In / Out columns with meters), own art and emblem; the same measured drive stages; its noise floor per console (NR off: E / G -113.9, A -110.0, N -109.8, Y -101.6, Tube -101.9 dBFS RMS, uncorrelated L / R) and group bypass shared by the group's channels; state fully translated (console, drive, trims, NR, group, group bypass, main gains): fxparity 6.8 (drive bank 6.8, US A 6.3, group / NR sets 6.7 / 6.9) |
@@ -89,7 +89,7 @@ there.
 | Compressor (stand-in) | Renaissance Compressor (Waves) | 10 | 8 | 6 (ref expired) | 8 | 152 | 190fx: the FET references' maps and translators refitted on the pink stairs — FG-116 4.80 → 5.80, Modern 4.08 → 4.76, Vintage 5.00 → 5.56, all-buttons 4.28 → 4.48 — this pair unchanged |
 | LYNX Tune | Waves Tune Real-Time | 10 | 8 | 6 (ref expired) | 8 | 152b | 165j: sound only (measured; scores unchanged) |
 | Echoform | EchoBoy / PrimalTap | 10 | 8 | 6 | 6 | 150 |  |
-| Voice Shift | Little AlterBoy | 10 | 8 | 4 | 8 | trial187b | trial187b: dual mono like the original, the input itself at no shift, level laws: 2.8 → 3.1 |
+| Voice Shift | Little AlterBoy | 10 | 8 | 4 | 8 | 190ho | trial187b: dual mono like the original, the input itself at no shift, level laws: 2.8 → 3.1; 190ho: Measured law revision 1 (no low thump at sung onsets): trial187b 3.27 → 3.35, tp172d 3.17 → 3.17, prog182 3.80 → 3.80 |
 | Prism Multiband | Pro-MB | 10 | 10 | 8 | 6 | tp172b | tp172b: programme 5.9 → 7.6 (default state level fixed) |
 | LuxeVerb (Space engine) | Pro-R 2 | 7 | 7 | 8 | 8 | tp172b | new: Space engine page, verb score 7.4 → 8.9 (RT60 / EDC / early / stereo / modulation, measured) |
 
@@ -3624,3 +3624,77 @@ three are LYNX's own additions, off until used; FL's and the reference DAW's own
 | Strip silence from a clip | Edison: Trim side noise, Trim all noise & slice up (edit the sample; LYNX has both) | none | ✅ audio clip menu › LYNX extras › "Split at silence..." (`core/StripSilence.h`): threshold (dB, 5 ms peak windows), minimum silence, pre-roll, post-roll; the quiet parts go, the clips left play the same audio at the same time, the file is not touched; one undo step, several selected clips at once. ❌ clips with warp markers (greyed) |
 
 Tests: `tests/Community190hpTests.inc` (7 core tests); `LYNX --communityshot190hp <prefix>` (shots and checks).
+
+## Round 190ho: Voice Shift's onset thump, the SSL 4K G's Pink EQ (0.1.30 parity follow-ups)
+
+Follow-ups left by rounds 190fy and 190fx. Black-box only: every number comes from reference renders already recorded
+(trial187b, tp172d and refcap182 for Little AlterBoy; tp172c for the SSL 4K G, its `K4G_ir` grid of 412 impulse renders);
+nothing was captured again, no third-party binary was opened, no third-party code was used. Tools and logs:
+`/mnt/e/lynx-work/parity190ho/` (`lab/`, `runs/`, `gold/`, `cpu/`, `mini/`).
+
+**Voice Shift: Measured law, revision 1** (owner's call: fix the thump even if a file loses a point). LYNX's detector
+calls a note voiced some 20 ms after it starts, and until then the measured path read the note's own start as unvoiced, at the
+formant factor — at Formant −6 its 170 Hz fundamental came out near 120 Hz, a low thump under 130 Hz at each onset
+(−27.5 dB at the onsets of the trial187b line, the reference −38.7 dB). Normalising the overlap-add by the window sum
+(LYNX Tune's round-165j cure for other bumps) did not touch it (−27.6 dB) and cost ten pitch-down files (the window sum is
+not 1 there); keeping the unvoiced grains of the onset unshifted after the detector has decided came too late (the
+latency leaves ~10 ms). What works is the level, which rises at once: after a 12 dB rise (1 ms follower over a 30 ms one)
+out of near-silence (under −60 dBFS), the unvoiced grains placed for 60 ms keep the source's formants
+(`Psola::setUnvoicedPlain`, unused by LYNX Tune). Onsets of the line now −40.5 dB (V4, Formant −6; V3 / V5 −47.1 / −45.6,
+the reference −46.3 / −41.8).
+
+| Bank | Files | Before → after | Up / same / down | Down |
+|---|---|---|---|---|
+| trial187b Little AlterBoy | 78 | 3.27 → **3.35** | 6 / 71 / 1 | V12_stvocal 4 → 3 |
+| tp172d Little AlterBoy | 12 | 3.17 → 3.17 | 1 / 10 / 1 | S2_sweep 3 → 2 (the sweep starts out of silence) |
+| refcap182 programme (fitted map) | 20 | 3.80 → 3.80 | 1 / 18 / 1 | S2_drums 4 → 3 (drum hits out of silence) |
+
+No row went down; three files did, each by one step (the owner accepted a point for the fix). Variants measured and not
+kept: no quiet condition (rows 3.36 / 3.25 / 3.75: prog182 drums ×2 down), a 15 ms window (3.36 / 3.25 / 3.65), a low-band
+share condition (the drums still fire). The pitch-up thump of V1 (Pitch +12: −38.6 dB, the reference −50.0) is another
+mechanism and stays open.
+
+Old projects: the revision is a hidden parameter (index 8 = `count`, not in the info: no control, no string). A new
+instance starts at 1; a project or preset saved by 0.1.27 … 0.1.29 (Law, no revision) loads at 0 and renders bit for bit
+as before (4 of 4 fingerprints from the base commit's objects, `tests/Parity190hoTests.inc`); older ones keep Classic,
+which ignores the revision.
+
+**Ridge Strip: the SSL 4K G's Pink EQ.** The 4K G translation played its Pink EQ type as Black. Its 206 Pink impulse
+renders (every band at 5 frequencies × 6 gains, the mids at 3 Qs, ÷3 / ×3; tp172c `K4G_ir`) show another EQ: the shelves
+are a 2nd-order shelf with an overshoot on the far side (an −18 dB LF cut comes back +1.5 dB near 3 kHz; the HF shelf
+is wide, its corner a quarter to half of the dial), modelled as the shelf plus a bell of the opposite sign; the mids are
+one magnitude-matched bell each (fits 0.02 … 0.4 dB rms); the Bell switches do nothing in Pink; ÷3 / ×3 move the centre
+×0.24 / ×2.9. Measured on the way: the renders clip at +0.9 dBFS (1.111) at the reference's output — the large HF
+boosts of the 0.5 impulse — which round 190fy read as "a high shelf that tilts the lows down 11 dB"; the fits simulate
+the clip. And in the 4K G's **Black** ÷3 / ×3 do nothing (the renders with and without are identical), so the translation
+no longer divides / multiplies the dial there (6 Black renders up, none down).
+
+Pink is a hidden switch of the 4K voicing (`k4Pink`, `k4PinkDiv3`, `k4PinkMult3` after Ridge's other hidden parameters;
+saved only while on), set by the 4K G translation for EQ Type Pink; the colour selector then reads Black. Every project
+saved before has it off and renders as before (the selector's Brown / Black / Orange: 4 of 4 fingerprints = the base
+commit's). Tables: `src/core/Console4KPinkTables.inc` (generated by `lab/pinkinc.py`).
+
+| Bank | Files | Before → after | Up / same / down | Mean ESR | Down |
+|---|---|---|---|---|---|
+| tp172c SSL 4K G (the scoreboard row) | 20 | 5.10 → **5.20** | 3 / 16 / 1 | −15.2 → −15.1 dB | S1_stair 7 → 5 |
+| tp172c K4G_ir, Pink | 206 | 4.07 → **6.50** | 172 / 31 / 3 | −12.6 → −22.6 dB | three boosts the reference clips (HF +20 @ 1.5 k, HMF +22 Q 0.5 ×2) |
+| tp172c K4G_ir, Black | 206 | 5.94 → 6.10 | 6 / 200 / 0 | −19.5 → −20.2 dB | |
+
+The row's S1 setting (LF +6, LMF −4 @ 0.4 kHz, HMF +5, HF +4 — all under or near the grid's smallest gain, 5.4 … 6.6 dB)
+goes 5.2 → 5.6 per file, but its 1 kHz stairs come out 0.79 dB loud (base 0.24): small dial gains are not on the grid
+and are scaled from the smallest node; S1's sweep says LYNX cuts ~1 dB too little around 500 Hz (the LMF at −4) and boosts
+0.3 … 0.5 dB too much at the extremes. Changing the small-gain law alone (exponents 1.25 … 2) made S1 worse; a capture of
+small Pink gains would settle it. Coordinator's call: the file is down two steps while its setting and the row go up.
+
+**CPU** (thread time, 20 s at 48 kHz, blocks of 512, best of 5; base / revision 0 / revision 1, machine load ~23, the
+quietest of three interleaved runs): Voice Shift Formant −6 6.56 / 6.56 / 6.46 %, Pitch +5 6.83 / 6.58 / 6.81 %,
+−7 / +2 / Drive 3 6.82 / 6.81 / 6.84 % of one core — the same within noise (two followers per channel). Ridge 4K, four
+bands: Black 0.162 / 0.164 %, Pink 0.204 % (two more sections, for the shelves' overshoot; only with Pink). Latency and
+memory unchanged.
+
+**Dynamics rows re-checked (190fx left them), nothing shipped:** the Harrison MPC compressor and the VBC FG-MU on Crest
+have no translator and no captured state sweeps (trial190k recorded audio only; tp172c holds two MPC states, D and S1),
+so a Crest law fitted to them would only move a scoreboard row through its fitted map, never a project that loads the
+plugin missing — not a real gain. X-Limit on Apex (4.94, translated): on tp172c LYNX is louder on transients (bursts
++1.5 … +2.1 dB, drums +1.2 … +1.7 dB) while the stairs match (+0.2 … +0.4 dB): the reference's limiter keeps the reduction
+after a hit where Apex's levelling stage lets go — a release law of its own, not attempted in this round.
