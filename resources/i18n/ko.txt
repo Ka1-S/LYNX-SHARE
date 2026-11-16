@@ -10146,3 +10146,8 @@ countries: kr
 "Are you sure you want to load {0} plugins at once?" = "플러그인 {0}개를 한 번에 불러올까요?"
 "Sample settings" = "샘플 설정"
 "Classic LYNX look for the clip grid" = "클립 그리드에 클래식 LYNX 모양 사용"
+"Pattern: [LMB] paint it with the pencil  [drag] place it on the Playlist (Shift on drop: one after another)  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "패턴: [LMB] 연필로 칠하기  [드래그] 플레이리스트에 놓기 (놓을 때 Shift: 하나씩 이어서)  [Ctrl+LMB] / [Shift+LMB] 여러 개 선택  [2xLMB] 열기  [RMB] 메뉴"
+"Clip source: [LMB] paint it with the pencil  [drag] place it on the Playlist" = "클립 소스: [LMB] 연필로 칠하기  [드래그] 플레이리스트에 놓기"
+"Can't drop on an instrument track" = "악기 트랙에는 놓을 수 없습니다"
+"Instrument tracks are not for audio or automation clips." = "악기 트랙은 오디오 클립이나 오토메이션 클립용이 아닙니다."
+"Would you like to place the clip(s) on the next empty playlist track(s)?" = "클립을 다음 빈 플레이리스트 트랙에 놓을까요?"

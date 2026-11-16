@@ -10146,3 +10146,8 @@ countries: ru by kz
 "Are you sure you want to load {0} plugins at once?" = "Точно загрузить {0} плагинов за раз?"
 "Sample settings" = "Настройки сэмпла"
 "Classic LYNX look for the clip grid" = "Классический вид LYNX для сетки клипов"
+"Pattern: [LMB] paint it with the pencil  [drag] place it on the Playlist (Shift on drop: one after another)  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Паттерн: [LMB] рисовать им карандашом  [перетащить] поместить в Playlist (Shift при отпускании: один за другим)  [Ctrl+LMB] / [Shift+LMB] выбрать несколько  [2xLMB] открыть  [RMB] меню"
+"Clip source: [LMB] paint it with the pencil  [drag] place it on the Playlist" = "Источник клипа: [LMB] рисовать им карандашом  [перетащить] поместить в Playlist"
+"Can't drop on an instrument track" = "Нельзя бросить на дорожку инструмента"
+"Instrument tracks are not for audio or automation clips." = "Дорожки инструментов не для аудио- и автоматизационных клипов."
+"Would you like to place the clip(s) on the next empty playlist track(s)?" = "Поместить клип(ы) на следующую(ие) пустую(ые) дорожку(и) Playlist?"

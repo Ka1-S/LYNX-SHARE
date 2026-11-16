@@ -10146,3 +10146,8 @@ countries: jp
 "Are you sure you want to load {0} plugins at once?" = "{0} 個のプラグインを一度に読み込みますか?"
 "Sample settings" = "サンプル設定"
 "Classic LYNX look for the clip grid" = "クリップグリッドをクラシックな LYNX の外観にする"
+"Pattern: [LMB] paint it with the pencil  [drag] place it on the Playlist (Shift on drop: one after another)  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "パターン: [LMB] ペンシルでペイント  [ドラッグ] プレイリストに配置 (ドロップ時に Shift: 続けて並べる)  [Ctrl+LMB] / [Shift+LMB] 複数選択  [2xLMB] 開く  [RMB] メニュー"
+"Clip source: [LMB] paint it with the pencil  [drag] place it on the Playlist" = "クリップソース: [LMB] ペンシルでペイント  [ドラッグ] プレイリストに配置"
+"Can't drop on an instrument track" = "インストゥルメントトラックにはドロップできません"
+"Instrument tracks are not for audio or automation clips." = "インストゥルメントトラックはオーディオクリップやオートメーションクリップ用ではありません。"
+"Would you like to place the clip(s) on the next empty playlist track(s)?" = "クリップを次の空のプレイリストトラックに配置しますか?"

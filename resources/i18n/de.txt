@@ -10146,3 +10146,8 @@ countries: de at ch li lu
 "Are you sure you want to load {0} plugins at once?" = "Möchtest du wirklich {0} Plugins auf einmal laden?"
 "Sample settings" = "Sample-Einstellungen"
 "Classic LYNX look for the clip grid" = "Klassisches LYNX-Aussehen für das Clip-Raster"
+"Pattern: [LMB] paint it with the pencil  [drag] place it on the Playlist (Shift on drop: one after another)  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Pattern: [LMB] mit dem Stift malen  [ziehen] in die Playlist legen (Shift beim Loslassen: nacheinander)  [Ctrl+LMB] / [Shift+LMB] mehrere wählen  [2xLMB] öffnen  [RMB] Menü"
+"Clip source: [LMB] paint it with the pencil  [drag] place it on the Playlist" = "Clip-Quelle: [LMB] mit dem Stift malen  [ziehen] in die Playlist legen"
+"Can't drop on an instrument track" = "Ablegen auf einer Instrumentenspur nicht möglich"
+"Instrument tracks are not for audio or automation clips." = "Instrumentenspuren sind nicht für Audio- oder Automationsclips da."
+"Would you like to place the clip(s) on the next empty playlist track(s)?" = "Möchtest du den/die Clip(s) auf die nächste(n) leere(n) Playlist-Spur(en) legen?"

@@ -10146,3 +10146,8 @@ countries: tw hk mo
 "Are you sure you want to load {0} plugins at once?" = "確定要一次載入 {0} 個外掛嗎?"
 "Sample settings" = "取樣設定"
 "Classic LYNX look for the clip grid" = "片段網格使用經典 LYNX 外觀"
+"Pattern: [LMB] paint it with the pencil  [drag] place it on the Playlist (Shift on drop: one after another)  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "樣式：[LMB] 用鉛筆繪製  [拖曳] 放到播放清單上（放開時按 Shift：依序排列）  [Ctrl+LMB] / [Shift+LMB] 選擇多個  [2xLMB] 開啟  [RMB] 選單"
+"Clip source: [LMB] paint it with the pencil  [drag] place it on the Playlist" = "片段來源：[LMB] 用鉛筆繪製  [拖曳] 放到播放清單上"
+"Can't drop on an instrument track" = "無法放到樂器軌道上"
+"Instrument tracks are not for audio or automation clips." = "樂器軌道不用於音訊片段或自動化片段。"
+"Would you like to place the clip(s) on the next empty playlist track(s)?" = "要把片段放到下一個空的播放清單軌道上嗎？"

@@ -10146,3 +10146,8 @@ countries: nl be
 "Are you sure you want to load {0} plugins at once?" = "Weet je zeker dat je {0} plugins tegelijk wilt laden?"
 "Sample settings" = "Sample-instellingen"
 "Classic LYNX look for the clip grid" = "Klassieke LYNX-weergave voor het clipraster"
+"Pattern: [LMB] paint it with the pencil  [drag] place it on the Playlist (Shift on drop: one after another)  [Ctrl+LMB] / [Shift+LMB] pick several  [2xLMB] open  [RMB] menu" = "Pattern: [LMB] tekenen met het potlood  [slepen] in de Playlist plaatsen (Shift bij loslaten: na elkaar)  [Ctrl+LMB] / [Shift+LMB] meerdere kiezen  [2xLMB] openen  [RMB] menu"
+"Clip source: [LMB] paint it with the pencil  [drag] place it on the Playlist" = "Clipbron: [LMB] tekenen met het potlood  [slepen] in de Playlist plaatsen"
+"Can't drop on an instrument track" = "Kan niet op een instrumenttrack neerzetten"
+"Instrument tracks are not for audio or automation clips." = "Instrumenttracks zijn niet voor audio- of automatiseringsclips."
+"Would you like to place the clip(s) on the next empty playlist track(s)?" = "Wil je de clip(s) op de volgende lege Playlist-track(s) plaatsen?"
