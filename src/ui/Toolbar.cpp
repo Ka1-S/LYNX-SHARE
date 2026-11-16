@@ -314,9 +314,16 @@ void TimeDisplay::update()
     // (round 190jj: the Simple capsule's time is red while a take records or counts in)
     const auto nowRed = look == toolbarlayout::Look::simple && engine.isRecording()
                         && (engine.getTransport().playing.load() || engine.isCountingIn());
-    if (const auto t = text(); t != shown || nowRed != red)
+    // (round 190jo, perf: FL's B:S:T ticks run 24 to a step, at the timer's rate; a change of the ticks alone repaints at
+    // most every 100 ms, as often as bar : beat : step changed at 150 BPM; a new step or bar shows at once)
+    const auto t = text();
+    const auto now = juce::Time::getMillisecondCounter();
+    const auto ticksOnly = look == toolbarlayout::Look::fl && mode == Mode::bars && t.length() == shown.length() && t.length() > 3
+                           && t.dropLastCharacters (2) == shown.dropLastCharacters (2);
+    if ((t != shown && ! (ticksOnly && now - shownAt < 100u)) || nowRed != red)
     {
         shown = t;
+        shownAt = now;
         red = nowRed;
         repaint();
     }

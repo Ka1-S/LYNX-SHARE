@@ -50,18 +50,21 @@ bool isBlackKey (int key)
     return n == 1 || n == 3 || n == 6 || n == 8 || n == 10;
 }
 
-// Round 190jo (design190ia FM-15 / FM-16): FL's note, a vertical gradient (top +8 %, bottom -6 % of its colour) with a
-// 1 px edge at 72 % of it, radius 2 (a flat fill on rows under 8 px); `edge`: the state's outline (selected, hovered),
+// Round 190jo (design190ia FM-15 / FM-16): FL's note, lit from the top (its upper part +6 %, the rest -4 % of its colour,
+// after FL's top-to-bottom gradient) with a 1 px edge at 72 % of it, radius 2 (one flat fill on rows under 8 px); `edge`: the state's outline (selected, hovered),
 // transparent for the note's own edge. The label is dark on a light note and light on a dark one (≥ 4.5:1 on the
 // velocity range of LYNX's red), bold, at the small text size.
 void paintNoteBody (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour fill, juce::Colour edge)
 {
-    if (r.getHeight() >= 8.0f)
-        g.setGradientFill (juce::ColourGradient (fill.withMultipliedBrightness (1.08f), 0.0f, r.getY(), fill.withMultipliedBrightness (0.94f), 0.0f,
-                                                 r.getBottom(), false));
-    else
-        g.setColour (fill);
+    // (perf: two solid fills instead of a gradient, whose brush the Direct2D renderer makes again for every note; the
+    // upper half lighter reads as FL's top-lit note)
+    g.setColour (fill.withMultipliedBrightness (0.96f));
     g.fillRoundedRectangle (r, 2.0f);
+    if (r.getHeight() >= 8.0f)
+    {
+        g.setColour (fill.withMultipliedBrightness (1.06f));
+        g.fillRect (juce::Rectangle<float> (r.getX() + 1.0f, r.getY() + 1.0f, r.getWidth() - 2.0f, std::floor (r.getHeight() * 0.45f)));
+    }
     g.setColour (edge.isTransparent() ? fill.withMultipliedBrightness (0.72f) : edge);
     g.drawRoundedRectangle (r.reduced (0.5f), 2.0f, 1.0f);
 }
@@ -1479,6 +1482,13 @@ void PianoRollComponent::paint (juce::Graphics& g)
         g.fillRect (keys);
         const auto fontHeight = gesture::labelHeight (rowHeight);
         const auto blackWidth = blackKeyWidth;
+        // (round 190jo, perf: FL's white-key gradient is filled once over the column; the keys at rest draw nothing more)
+        if (! folded())
+        {
+            g.setGradientFill (juce::ColourGradient (keyWhite.withMultipliedBrightness (0.93f), 0.0f, 0.0f,
+                                                     keyWhite.interpolatedWith (juce::Colours::white, 0.33f), (float) keyboardWidth, 0.0f, false));
+            g.fillRect (keys.withWidth (keyboardWidth - 1));
+        }
         static const std::map<int, std::string> noLabels;
         const auto selectedChannel = engine.getSelectedChannel();
         const auto& ownLabels = selectedChannel >= 0 && selectedChannel < (int) song.channels.size()
@@ -1496,27 +1506,22 @@ void PianoRollComponent::paint (juce::Graphics& g)
         // folded to the scale (round 166d) the keys no longer alternate like a piano: one full-width named row each
         const auto list = folded();
         const auto piano = keyStyle == pianokeys::Style::piano && ! list;
-        // round 190jo (design190ia FM-17): FL's white keys shade from a light grey at the left to near-white at the right;
-        // its C keys are a step darker (FL: #B0B4BB against #D0D4DB-#E9EDF4); one gradient, set per white key at rest
-        const juce::ColourGradient whiteKeys (keyWhite.withMultipliedBrightness (0.93f), 0.0f, 0.0f, keyWhite.interpolatedWith (juce::Colours::white, 0.33f),
-                                              (float) keyboardWidth, 0.0f, false);
-        auto cKeys = whiteKeys;
-        for (int i = 0; i < cKeys.getNumColours(); ++i)
-            cKeys.setColour (i, cKeys.getColour (i).withMultipliedBrightness (0.9f));
+        // round 190jo (design190ia FM-17): FL's white keys shade from a light grey at the left to near-white at the right
+        // (the column's gradient above); its C keys are a step darker (FL: #B0B4BB against #D0D4DB-#E9EDF4)
         const auto fillKey = [&] (int key, juce::Colour colour, juce::Rectangle<int> r) {
+            const auto isC = key % 12 == 0 && ! (isBlackKey (key) && ! list);
             if (colour == keyWhite && ! list)
-                g.setGradientFill (key % 12 == 0 ? cKeys : whiteKeys);
+            {
+                if (! isC)
+                    return; // (the gradient is there)
+                g.setColour (juce::Colours::black.withAlpha (0.10f));
+            }
             else
-                g.setColour (key % 12 == 0 && ! (isBlackKey (key) && ! list) && colour != accent ? colour.withMultipliedBrightness (0.9f) : colour);
+                g.setColour (isC && colour != accent ? colour.withMultipliedBrightness (0.9f) : colour);
             g.fillRect (r);
         };
-        // (FL's black keys shade lighter towards their tip, the right: one gradient set per black key at rest)
-        const juce::ColourGradient blackKeys (keyBlack, 0.0f, 0.0f, keyBlack.interpolatedWith (keyWhite, 0.16f), (float) blackWidth, 0.0f, false);
         const auto fillBlack = [&] (juce::Colour colour, juce::Rectangle<int> r) {
-            if (colour == keyBlack)
-                g.setGradientFill (blackKeys);
-            else
-                g.setColour (colour);
+            g.setColour (colour);
             g.fillRect (r);
         };
         const auto keyColour = [&] (int key) {
@@ -1578,7 +1583,11 @@ void PianoRollComponent::paint (juce::Graphics& g)
             else
             {
                 if (black)
+                {
+                    g.setColour (bg0); // (the row right of the black key stays dark, over the column's white gradient)
+                    g.fillRect (width, y, keyboardWidth - 1 - width, rowHeight);
                     fillBlack (colour, { 0, y, width, rowHeight });
+                }
                 else
                     fillKey (key, colour, { 0, y, width, rowHeight });
                 g.setColour (black ? bg0 : keyWhite.darker (0.3f));

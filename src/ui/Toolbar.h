@@ -76,6 +76,7 @@ private:
     toolbarlayout::Look look = toolbarlayout::Look::fl;
     AudioEngine& engine;
     juce::String shown;
+    juce::uint32 shownAt = 0; // (round 190jo) when `shown` last changed: the B:S:T ticks repaint at most every 100 ms
     bool red = false;           // (round 190jj) the Simple capsule's recording / count-in time
     double linkProgress = -1.0; // (round 190gl) the Link session's progress bar while the transport waits / is stopped
     Mode mode = Mode::bars;
