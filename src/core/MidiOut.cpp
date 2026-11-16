@@ -5,7 +5,9 @@
 #include <cmath>
 #include <cstring>
 #include <limits>
+#include <utility>
 
+#include "core/HostNotePitch.h"
 #include "core/Instruments.h"
 
 namespace lynx::midiout
@@ -590,11 +592,74 @@ public:
     }
 
     void prepare (double) noexcept override {}
-    void noteOn (int, float) noexcept override {}
-    void noteOff (int) noexcept override {}
-    void allNotesOff() noexcept override {}
-    void render (float*, float*, int, float, float) noexcept override {}
+    // Round 190jl: its notes go to the hardware MIDI outputs on its port (FL's Options › MIDI › Output "Port") with its
+    // MIDI channel (or the note's colour with "Map note color to MIDI channel"); the plugins on its port get them from
+    // the rack's MIDI routes, not from here.
+    void noteOn (int key, float velocity) noexcept override
+    {
+        const auto source = noteSource;
+        const auto colour = std::exchange (nextColour, -1);
+        if (! hardware || key < 0 || key > 127)
+            return;
+        adopt();
+        const auto ch = (current != nullptr && current->state.mapNoteColour && colour >= 0 ? colour : channelNow()) & 15;
+        // (the velocity law of the plugins' notes: FL's wrapper law in a project with FL's levels, else round (127 v);
+        // a note on keeps velocity 1 or more, velocity 0 is a note off on the wire)
+        const auto v = flVelocity ? hostpitch::flWrapperVelocity (velocity)
+                                  : std::clamp ((int) std::lround ((double) std::clamp (velocity, 0.0f, 1.0f) * 127.0), 1, 127);
+        if ((hwHeld[(std::size_t) key] >> ch & 1u) != 0) // (the same key again on the same channel: the old one ends first)
+            hwPush (0x80 | ch, key, 0, source);
+        hwHeld[(std::size_t) key] = (std::uint16_t) (hwHeld[(std::size_t) key] | (1u << ch));
+        hwPush (0x90 | ch, key, v, source);
+    }
+    void noteOff (int key) noexcept override
+    {
+        const auto source = noteSource;
+        nextColour = -1;
+        if (key >= 0 && key < 128)
+            releaseKey (key, source);
+    }
+    void allNotesOff() noexcept override
+    {
+        for (int key = 0; key < 128; ++key)
+            releaseKey (key, 0);
+    }
+    // (the samples rendered since the chunk began: where the next note falls in it)
+    void beginChunk (int) noexcept override { hwPos = 0; }
+    void render (float*, float*, int n, float, float) noexcept override { hwPos += n; }
     bool idle() const noexcept override { return true; }
+    void setFlWrapperVelocity (bool on) noexcept override { flVelocity = on; }
+    void setNextNoteColour (int colour) noexcept override { nextColour = colour & 15; }
+    void setNoteSource (int source) noexcept override { noteSource = (std::uint8_t) std::clamp (source, 0, 255); }
+    void setHardwareMidi (bool on) noexcept override
+    {
+        if (hardware && ! on)
+            allNotesOff(); // (taken by the rack after this chunk: the device's notes end)
+        if (on && ! hardware)
+            hwPos = 0;
+        hardware = on;
+    }
+    // a controller, channel pressure or program change played into the channel (a MIDI input's knobs): to the
+    // hardware outputs too, on its MIDI channel. The pitch wheel goes out through the channel's pitch (setLivePitch).
+    void midiMessage (const std::uint8_t* bytes, int size) noexcept override
+    {
+        const auto source = noteSource;
+        if (! hardware || bytes == nullptr || size < 2)
+            return;
+        const auto status = bytes[0] & 0xF0;
+        if (status != 0xB0 && status != 0xD0 && status != 0xC0 && status != 0xA0)
+            return;
+        adopt();
+        hwPush (status | (channelNow() & 15), bytes[1] & 127, status == 0xD0 || status == 0xC0 ? -1 : (size > 2 ? bytes[2] & 127 : 0), source);
+    }
+    int takeHardwareMidi (HardwareMidi* out, int max) noexcept override
+    {
+        const auto count = std::min (max, hwCount);
+        std::copy (hw.begin(), hw.begin() + count, out);
+        hwCount = 0;
+        hwPos = 0;
+        return count;
+    }
 
     // (the build thread; the audio thread may run meanwhile: it only reads what is published atomically)
     void configure (const ChannelDef& channel, double) noexcept override
@@ -688,7 +753,12 @@ public:
     float controlOutput (int) const noexcept override { return 0.0f; }
 
     void transportStarted() noexcept override { resetPending.store (1, std::memory_order_release); dirty.store (true, std::memory_order_release); }
-    void transportStopped() noexcept override { cutPending.store (true, std::memory_order_release); dirty.store (true, std::memory_order_release); }
+    void transportStopped() noexcept override
+    {
+        allNotesOff(); // (the hardware outputs' notes; round 190jl)
+        cutPending.store (true, std::memory_order_release);
+        dirty.store (true, std::memory_order_release);
+    }
     void panic() noexcept override { transportStopped(); }
 
     void requestReset (bool allControllersFirst)
@@ -786,6 +856,27 @@ private:
         return s;
     }
 
+    int channelNow() const noexcept { return current != nullptr ? current->state.channel : 0; }
+
+    void hwPush (int status, int data1, int data2, std::uint8_t source) noexcept
+    {
+        if (hwCount >= (int) hw.size())
+            return; // (full until the rack takes them: dropped, never allocated)
+        auto& m = hw[(std::size_t) hwCount++];
+        m.sample = hwPos;
+        m.source = source;
+        m.bytes = { (std::uint8_t) status, (std::uint8_t) (data1 & 127), (std::uint8_t) (std::max (0, data2) & 127) };
+        m.size = data2 < 0 ? 2 : 3;
+    }
+
+    void releaseKey (int key, std::uint8_t source) noexcept
+    {
+        const auto mask = std::exchange (hwHeld[(std::size_t) key], std::uint16_t { 0 });
+        for (int ch = 0; mask != 0 && ch < 16; ++ch)
+            if ((mask >> ch & 1u) != 0)
+                hwPush (0x80 | ch, key, 0, source);
+    }
+
     std::pair<int, bool> takeLevel (std::atomic<int>& level) noexcept
     {
         const auto v = level.exchange (-1, std::memory_order_relaxed);
@@ -850,6 +941,12 @@ private:
     std::array<bool, controlCount> forced {};
     int automatedProgram = -1, lastBend = -1;
     int lastSentPan = -1, lastSentVolume = -1, lastSentBend = -1;
+    // the hardware outputs (round 190jl; audio thread, or the worker rendering the channel)
+    std::array<HardwareMidi, 512> hw {};
+    int hwCount = 0, hwPos = 0, nextColour = -1;
+    std::uint8_t noteSource = 0;
+    std::array<std::uint16_t, 128> hwHeld {}; // [key] the MIDI channels it sounds on at the device
+    bool hardware = false, flVelocity = false;
 
 public:
     ~MidiOutDevice() override

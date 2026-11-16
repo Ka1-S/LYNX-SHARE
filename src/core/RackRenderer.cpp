@@ -1683,6 +1683,14 @@ void RackState::buildMidiRoutes()
     hasMidiRoutes = false;
     midiOutTargets.assign (count, {});
     hasMidiOutputs = false;
+    hardwareMidiPort.assign (count, -1);
+    hardwareMidiChannels.clear();
+    for (std::size_t c = 0; c < count && c < (std::size_t) RackRenderer::maxChannels; ++c) // (round 190jl)
+        if (song.channels[c].instrument == InstrumentKind::plugin && song.channels[c].plugin.midiOutPort >= 0)
+        {
+            hardwareMidiPort[c] = std::min (song.channels[c].plugin.midiOutPort, 255);
+            hardwareMidiChannels.push_back ((int) c);
+        }
     for (std::size_t c = 0; c < count; ++c)
         if (song.channels[c].instrument == InstrumentKind::plugin && song.channels[c].plugin.midiOutPort >= 0)
             for (std::size_t t = 0; t < count; ++t)
@@ -1819,6 +1827,11 @@ void RackState::buildMidiRoutes()
         mapNoteColour[c] = settings.mapNoteColour ? 1 : 0;
         dashboardChannels.push_back ((int) c);
         send (c, settings.port, settings.channel, 0);
+        if (c < (std::size_t) RackRenderer::maxChannels) // the hardware outputs on its port (round 190jl)
+        {
+            hardwareMidiPort[c] = std::clamp (settings.port, 0, 255);
+            hardwareMidiChannels.push_back ((int) c);
+        }
     }
 }
 
@@ -3197,6 +3210,7 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
     // FL's Add to key (round 149): the root note moves the notes of instruments that are not samplers
     const auto keyShift = c.misc.addToKey && c.instrument != InstrumentKind::sampler ? 60 - c.misc.rootNote : 0;
 
+    auto sourceSet = false;
     for (int index = 0; index < listCount; ++index)
     {
         auto shifted = list[index];
@@ -3258,6 +3272,13 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
         {
             instrument.render (l + position, r + position, e.sampleOffset - position, gl, gr);
             position = e.sampleOffset;
+        }
+        // (round 190jl: a live note routed through the channel's note path keeps its MIDI input, so a MIDI Out does
+        // not send it back to that device)
+        if (e.source != 0 || sourceSet)
+        {
+            instrument.setNoteSource (e.source);
+            sourceSet = e.source != 0;
         }
 
         auto& held = heldNotes[(std::size_t) i];
@@ -3362,6 +3383,8 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
         }
     }
 
+    if (sourceSet)
+        instrument.setNoteSource (0);
     if (position < n)
         instrument.render (l + position, r + position, n - position, gl, gr);
 
@@ -4073,6 +4096,19 @@ void RackRenderer::process (const RackState* state,
                 continue;
 
             auto& instrument = *state->instruments[(std::size_t) e.channel];
+            // (round 190jl: a MIDI Out channel keeps a MIDI input's own notes from going back to that device)
+            struct SourceScope
+            {
+                Instrument& instrument;
+                bool set;
+                ~SourceScope()
+                {
+                    if (set)
+                        instrument.setNoteSource (0);
+                }
+            } sourceScope { instrument, e.source != 0 };
+            if (e.source != 0)
+                instrument.setNoteSource (e.source);
 
             // Round 190ey (live check 190ew PL-3): a Playlist audio clip previewed through its channel, so through the
             // channel's mixer insert as FL plays it: its key is a clip key (above the MIDI range, which nothing played live
@@ -4264,7 +4300,11 @@ void RackRenderer::process (const RackState* state,
             }
         }
         liveInputOffset = done;
+        if (! state->hardwareMidiChannels.empty()) // (round 190jl)
+            hardwareMidiBeforeChunk (*state);
         processChunk (*state, playing, startTick + done * tps, n, left + done, right + done, meters, continuing);
+        if (! state->hardwareMidiChannels.empty())
+            hardwareMidiAfterChunk (*state, n);
         resumeAudio = false;
         chaseNotes = false;
         done += n;
@@ -4283,6 +4323,83 @@ void RackRenderer::process (const RackState* state,
         times->wallNs.fetch_add (ProcessTimes::now() - wallStart, std::memory_order_relaxed);
         if (countsAudio)
             times->audioNs.fetch_add ((std::uint64_t) ((double) numSamples / sampleRate * 1.0e9), std::memory_order_relaxed);
+    }
+}
+
+// ---- Hardware MIDI outputs (round 190jl) ----------------------------------------------------------------------------
+
+void RackRenderer::setHardwareMidiPorts (const std::array<std::uint64_t, 4>& ports) noexcept
+{
+    for (std::size_t w = 0; w < ports.size(); ++w)
+        hwPorts[w].store (ports[w], std::memory_order_relaxed);
+    hwPortsAny.store ((ports[0] | ports[1] | ports[2] | ports[3]) != 0, std::memory_order_release);
+}
+
+int RackRenderer::takeHardwareMidi (HardwareMidiEvent* out, int max) noexcept
+{
+    const auto count = std::min (max, hwMidiCount);
+    std::copy (hwMidi.begin(), hwMidi.begin() + count, out);
+    hwMidiCount = 0;
+    return count;
+}
+
+void RackRenderer::addHardwareMidi (int sample, int port, const std::uint8_t* bytes, int size, int source) noexcept
+{
+    if (hwMidiCount >= hardwareMidiCapacity || port < 0 || port > 255 || size < 1 || size > 3)
+        return; // (nobody took the last blocks: dropped, never allocated)
+    auto& m = hwMidi[(std::size_t) hwMidiCount++];
+    m.sample = sample;
+    m.port = (std::uint8_t) port;
+    m.size = (std::uint8_t) size;
+    m.source = (std::uint8_t) std::clamp (source, 0, 255);
+    m.bytes = { bytes[0], size > 1 ? bytes[1] : std::uint8_t { 0 }, size > 2 ? bytes[2] : std::uint8_t { 0 } };
+}
+
+// Before a chunk: the capture of each MIDI Out channel / plugin whose port an output device has is on (bit 0); a
+// capture switched off this chunk is still taken once after it (bit 1: the notes it ended)
+void RackRenderer::hardwareMidiBeforeChunk (const RackState& state) noexcept
+{
+    const auto any = hwPortsAny.load (std::memory_order_acquire);
+    for (const auto c : state.hardwareMidiChannels)
+    {
+        if (c < 0 || c >= maxChannels || (std::size_t) c >= state.instruments.size() || state.instruments[(std::size_t) c] == nullptr)
+            continue;
+        auto& flags = hwMidiOn[(std::size_t) c];
+        const auto on = any && ! foreignChannel (c) && hardwareMidiPort (state.hardwareMidiPort[(std::size_t) c]);
+        if (on || (flags & 1) != 0)
+            state.instruments[(std::size_t) c]->setHardwareMidi (on);
+        flags = (char) ((on ? 1 : 0) | (on || (flags & 1) != 0 ? 2 : 0));
+    }
+}
+
+// After a chunk: what each capture kept, at its sample in the chunk, in time order
+void RackRenderer::hardwareMidiAfterChunk (const RackState& state, int n) noexcept
+{
+    const auto first = hwMidiCount;
+    for (const auto c : state.hardwareMidiChannels)
+    {
+        if (c < 0 || c >= maxChannels || (hwMidiOn[(std::size_t) c] & 2) == 0 || (std::size_t) c >= state.instruments.size()
+            || state.instruments[(std::size_t) c] == nullptr)
+            continue;
+        const auto count = state.instruments[(std::size_t) c]->takeHardwareMidi (hwMidiScratch.data(), (int) hwMidiScratch.size());
+        for (int k = 0; k < count; ++k)
+        {
+            const auto& h = hwMidiScratch[(std::size_t) k];
+            addHardwareMidi (liveInputOffset + std::clamp (h.sample, 0, std::max (0, n - 1)), state.hardwareMidiPort[(std::size_t) c], h.bytes.data(), h.size,
+                             h.source);
+        }
+    }
+    // (stable: each channel's own order stays; a few events, insertion sort)
+    for (int i = first + 1; i < hwMidiCount; ++i)
+    {
+        const auto m = hwMidi[(std::size_t) i];
+        auto j = i;
+        while (j > first && hwMidi[(std::size_t) j - 1].sample > m.sample)
+        {
+            hwMidi[(std::size_t) j] = hwMidi[(std::size_t) j - 1];
+            --j;
+        }
+        hwMidi[(std::size_t) j] = m;
     }
 }
 
@@ -4415,7 +4532,11 @@ void RackRenderer::applyLiveControl (const RackState& state, const NoteEvent& e)
     else
         return;
 
+    if (e.source != 0) // (round 190jl: a MIDI Out channel does not send a device's own knobs back to it)
+        instrument->setNoteSource (e.source);
     instrument->midiMessage (m, size);
+    if (e.source != 0)
+        instrument->setNoteSource (0);
     if (e.key == NoteEvent::controlPitchBend)
     {
         const auto range = (std::size_t) e.channel < state.song.channels.size() ? state.song.channels[(std::size_t) e.channel].misc.pitchRange : 2;
@@ -4845,6 +4966,14 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
             continue;
         std::array<std::uint32_t, midiout::maxResetMessages + 8> sent; // (a MIDI Out's reset: every active control at once)
         const auto count = state.instruments[(std::size_t) c]->takeMidiMessages (sent.data(), (int) sent.size());
+        // round 190jl: a MIDI Out's knobs, patch, bank, pan / volume / pitch to the hardware outputs on its port too
+        if (count > 0 && c < maxChannels && (hwMidiOn[(std::size_t) c] & 1) != 0 && (std::size_t) c < state.hardwareMidiPort.size())
+            for (int k = 0; k < count; ++k)
+            {
+                const auto m = sent[(std::size_t) k];
+                const std::uint8_t bytes[3] { (std::uint8_t) (m & 0xff), (std::uint8_t) ((m >> 8) & 127), (std::uint8_t) ((m >> 16) & 127) };
+                addHardwareMidi (liveInputOffset, state.hardwareMidiPort[(std::size_t) c], bytes, (bytes[0] & 0xE0) == 0xC0 ? 2 : 3, 0);
+            }
         if (count <= 0 || (std::size_t) c >= state.midiTargets.size())
             continue;
         for (int k = 0; k < count; ++k)

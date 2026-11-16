@@ -1587,12 +1587,14 @@ public:
 };
 
 // One output device (FL's Options › MIDI "Output" panel, round 165f): master sync (MIDI clock or MTC) with its
-// offset, and all notes off on init and after an export.
+// offset, all notes off on init and after an export, and (round 190jl) its port: the MIDI Out channels on that port
+// play the device.
 class MidiOutputRow final : public juce::Component
 {
 public:
-    MidiOutputRow (const juce::String& deviceName, const prefs::MidiOutputPrefs& p, std::function<void (const prefs::MidiOutputPrefs&)> changed)
-        : prefsNow (p), onChange (std::move (changed))
+    // `inheritedPort`: the port of the input that is the same device (FL: the output takes it while it has none of its own)
+    MidiOutputRow (const juce::String& deviceName, const prefs::MidiOutputPrefs& p, int inheritedPort, std::function<void (const prefs::MidiOutputPrefs&)> changed)
+        : prefsNow (p), inherited (inheritedPort), onChange (std::move (changed))
     {
         name.setText (deviceName, juce::dontSendNotification);
         name.setFont (theme::font (theme::type::body));
@@ -1636,7 +1638,30 @@ public:
             prefsNow.allNotesOff = notesOff.getToggleState();
             update();
         };
-        for (auto* c : std::initializer_list<juce::Component*> { &sync, &type, &offsetLabel, &offset, &notesOff })
+        // FL's output "Port" (OutPortSel "Output port number", a number wheel, none by default; round 190jl), as the
+        // input rows show theirs
+        portLabel.setText (tr ("Port"), juce::dontSendNotification);
+        portLabel.setFont (theme::font (theme::type::small));
+        portLabel.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+        portLabel.setJustificationType (juce::Justification::centredRight);
+        {
+            ui::ValueSpec spec;
+            spec.name = tr ("Output port number: the MIDI Out channels on this port send their notes and controllers to this device");
+            spec.minimum = -1.0;
+            spec.maximum = 255.0;
+            spec.defaultValue = -1.0;
+            spec.interval = 1.0;
+            spec.toText = [] (double v) { return v < 0.0 ? juce::String::fromUTF8 ("\xe2\x8b\xaf") : juce::String (juce::roundToInt (v)); };
+            port = std::make_unique<ui::NumBox> (ui::digitWheel (spec), [this] { return (double) (prefsNow.port >= 0 ? prefsNow.port : inherited); },
+                                                 [this] (double v) {
+                                                     const auto now = juce::jlimit (-1, 255, juce::roundToInt (v));
+                                                     if (now == prefsNow.port)
+                                                         return;
+                                                     prefsNow.port = now;
+                                                     update();
+                                                 });
+        }
+        for (auto* c : std::initializer_list<juce::Component*> { &sync, &type, &offsetLabel, &offset, &notesOff, &portLabel, port.get() })
             addAndMakeVisible (c);
         update (false);
     }
@@ -1655,6 +1680,9 @@ public:
         bottom.removeFromLeft (12);
         offsetLabel.setBounds (bottom.removeFromLeft (76));
         offset.setBounds (bottom.removeFromLeft (110));
+        bottom.removeFromLeft (10);
+        port->setBounds (bottom.removeFromRight (48).reduced (0, 2)); // (where the input rows have theirs)
+        portLabel.setBounds (bottom.removeFromRight (44));
     }
 
     void paint (juce::Graphics& g) override
@@ -1673,11 +1701,13 @@ private:
     }
 
     prefs::MidiOutputPrefs prefsNow;
+    int inherited = -1;
     std::function<void (const prefs::MidiOutputPrefs&)> onChange;
-    juce::Label name, offsetLabel;
+    juce::Label name, offsetLabel, portLabel;
     juce::ToggleButton sync, notesOff;
     juce::ComboBox type;
     juce::Slider offset;
+    std::unique_ptr<ui::NumBox> port;
 };
 
 class MidiPage final : public ScrollingPage,
@@ -1695,8 +1725,9 @@ public:
                                                                  &clockOffset, &clockStatusLabel, &clockStatus, &clockNote, &jumpLabel, &jumpBox,
                                                                  &jumpNote, &gamepadToggle, &gamepadNote })
             add (*c);
-        styleNote (outputsNote, tr ("Send master sync drives drum machines, synths and other software from LYNX SHARE's transport: MIDI clock "
-                                    "with Song Position Pointer, or MIDI Time Code."));
+        styleNote (outputsNote, tr ("Give a device a port number and the MIDI Out channels on that port play it: their notes, controllers, "
+                                    "program and bank changes and pitch bend. Send master sync drives drum machines, synths and other "
+                                    "software from LYNX SHARE's transport: MIDI clock with Song Position Pointer, or MIDI Time Code."));
         styleLabel (noOutputs, tr ("No MIDI output devices found."));
         styleLabel (clockLabel, tr ("External clock sync"));
         clockBox.setTooltip (tr ("LYNX SHARE follows the MIDI clock of this input: its tempo, Start / Continue / Stop and Song Position Pointer"));
@@ -1854,6 +1885,10 @@ public:
             drums.masterSync = true;
             drums.allNotesOff = true;
             p.setOutput (drums);
+            prefs::MidiOutputPrefs volca; // (round 190jl: a synth the MIDI Out channels on port 1 play)
+            volca.name = "Korg volca sample";
+            volca.port = 1;
+            p.setOutput (volca);
             p.clockInput = "Akai MPD218";
             engine.setMidiPrefs (p, false);
             engine.editSong ([] (Song& s) {
@@ -2058,7 +2093,8 @@ private:
             outputs = sampleOutputs;
         for (const auto& name : outputs)
         {
-            auto row = std::make_unique<MidiOutputRow> (name, engine.getMidiPrefs().output (name.toStdString()), [this] (const prefs::MidiOutputPrefs& out) {
+            auto row = std::make_unique<MidiOutputRow> (name, engine.getMidiPrefs().output (name.toStdString()),
+                                                         engine.getMidiPrefs().inheritedOutputPort (name.toStdString()), [this] (const prefs::MidiOutputPrefs& out) {
                 auto p = engine.getMidiPrefs();
                 p.setOutput (out);
                 set (p);

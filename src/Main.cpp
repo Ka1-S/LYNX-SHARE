@@ -778,6 +778,17 @@ public:
             return;
         }
 
+        if (args.contains ("--midiouttest"))
+        {
+            // LYNX --midiouttest report.txt (round 190jl): MIDI Out channels to the hardware MIDI outputs on their port
+            // (the sender's dry run and the live engine on a stand-in device). No window.
+            const auto i = args.indexOf ("--midiouttest");
+            const auto result = lynx::AudioEngine::midiOutPortSelfTest();
+            juce::File (args[i + 1].unquoted()).replaceWithText ("midi_out_ports=" + result + "\nresult=" + (result.startsWith ("OK") ? "OK" : "FAILED") + "\n");
+            setApplicationReturnValue (result.startsWith ("OK") ? 0 : 1);
+            quit();
+            return;
+        }
         if (args.contains ("--exportparitytest") || args.contains ("--midihotplugtest"))
         {
             // LYNX --exportparitytest report.txt (round 190gh, B7): the export against playback through a stand-in audio
@@ -2671,6 +2682,21 @@ public:
         if (args.contains ("--gamepadshot"))
         {
             runGamepadShot (args[args.indexOf ("--gamepadshot") + 1].unquoted());
+            return;
+        }
+        // --midioutshot <prefix> [--shot-scale 1.5] (round 190jl): Settings › MIDI with the output devices' Port boxes
+        // (the snapshot's sample devices: the volca on port 1 of its own, the drum machine with master sync), offscreen
+        if (args.contains ("--midioutshot"))
+        {
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            {
+                lynx::AudioEngine engine (false);
+                auto page = lynx::makeMidiPage (engine, {}, false);
+                page->setSize (1000, 1300);
+                savePng (lynx::shot::snapshot (*page), args[args.indexOf ("--midioutshot") + 1].unquoted() + "-settings-midi.png");
+            }
+            setApplicationReturnValue (0);
+            quit();
             return;
         }
 
@@ -5320,6 +5346,7 @@ private:
         // round 190gh: export parity (B7) and MIDI device hot-plug (B8)
         const auto exportParity = lynx::AudioEngine::exportParitySelfTest();
         const auto midiHotplug = lynx::AudioEngine::midiHotplugSelfTest();
+        const auto midiOutPorts = lynx::AudioEngine::midiOutPortSelfTest(); // round 190jl
 
         // Online Sessions P2 (round 169b): live sessions without a network (the JSON round trip of every entity, replicas
         // through it, the invite code's keys)
@@ -5923,7 +5950,7 @@ private:
         const auto ok = editorsResult.startsWith ("OK") && ! faultResult.startsWith ("ERROR") && stemsResult == "OK"
                         && mixerBasics == "OK" && fontsResult == "OK" && paintCachesResult.startsWith ("OK") && picturesResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && pluginLevelsOk && flp168jOk && clipFades180dOk && blocksOk && takeoverOk && compOk && polyOk && latencyOk && preSendOk && lowLatencyOk && previewInTimeOk && substituteOk && patcherOk && rackResult == "OK" && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
-                        && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && exportParity.startsWith ("OK") && midiHotplug.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
+                        && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && exportParity.startsWith ("OK") && midiHotplug.startsWith ("OK") && midiOutPorts.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK"
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
@@ -5978,6 +6005,7 @@ private:
                << "device_change=" << deviceChange << "\n"
                << "export_parity=" << exportParity << "\n"
                << "midi_hotplug=" << midiHotplug << "\n"
+               << "midi_out_ports=" << midiOutPorts.replace ("\n", " | ").trimCharactersAtEnd (" |") << "\n"
                << "plugin_art=" << artResult << "\n"
                << "plugin_sidechain=" << sidechainResult << "\n"
                << "versions_panel=" << versionsResult << "\n"

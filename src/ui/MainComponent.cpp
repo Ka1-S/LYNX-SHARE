@@ -3224,6 +3224,8 @@ void MainComponent::stopAndRewind (bool toStart)
     // (paused is not stopped: FL's Stop after a pause (transport state 2) still goes back to the seek mark, issue #169)
     const auto alreadyStopped = toStart || ! (transportPaused || engine.getTransport().playing.load() || engine.isWaitingForInput() || engine.isCountingIn() || engine.isLinkWaiting());
     const auto back = stopReturn (alreadyStopped, false); // (issue #169: FL's seek mark, Pattern mode too)
+    if (! (transportPaused || engine.getTransport().playing.load() || engine.isWaitingForInput() || engine.isCountingIn() || engine.isLinkWaiting()))
+        engine.stopWhileStopped(); // (round 190jl: FL's "Send all notes off" on a Stop while stopped)
     engine.stop();
     transportPaused = false;
     // FL: the transport's Stop also ends a Browser sample preview (issue #11)

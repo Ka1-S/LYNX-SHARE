@@ -345,7 +345,7 @@ public:
         channelType.addItem (tr ("LYNX SHARE synth"), 1);
         channelType.addItem (tr ("MIDI Out"), 2);
         channelType.setSelectedId (o.midiOut ? 2 : 1, juce::dontSendNotification);
-        channelType.setTooltip (tr ("MIDI Out channels play the plugins on their MIDI port, on the note's MIDI channel"));
+        channelType.setTooltip (tr ("MIDI Out channels play the plugins and the MIDI output devices on their port (Settings › MIDI › Output devices › Port), on their MIDI channel"));
 
         // Which controller to import? (the ones LYNX applies: 7 / 11 volume, 10 pan, when the file has them)
         controller.addItem (eventLane ? juce::String ("---") : tr ("None"), 1); // (FL's "---" in the Event editor: every controller)

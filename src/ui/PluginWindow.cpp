@@ -359,7 +359,7 @@ public:
         inPort.onChange = [this] { setPort (inPort.getSelectedId() - 2, false); };
         // FL's Output port: the notes the plugin sends out play the plugins on that input port (instruments in the
         // Channel rack that send MIDI)
-        outPort.setTooltip (tr ("MIDI output port number: the notes this plugin sends play the plugins whose input port it is"));
+        outPort.setTooltip (tr ("MIDI output port number: the notes this plugin sends play the plugins whose input port it is, and the MIDI output devices with this port (Settings › MIDI)"));
         outPort.onChange = [this] { setPort (outPort.getSelectedId() - 2, true); };
         outPort.setEnabled (channel && plugin.producesMidi());
         // FL's Info › Latency: what the plugin reports, or set by hand (menu: Reset, Set in ms / samples / beats)

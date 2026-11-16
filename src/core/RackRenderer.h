@@ -320,6 +320,10 @@ struct RackState
     std::vector<int> dashboardChannels;
     // [channel] a MIDI Out with "Map note color to MIDI channel" (round 167i): its notes go out on their colour's channel
     std::vector<char> mapNoteColour;
+    // Hardware MIDI outputs (round 190jl, FL's Options › MIDI › Output "Port"): [channel] the port a MIDI Out channel
+    // sends on, or a plugin's wrapper output port (−1 = none), and the channels that have one
+    std::vector<int> hardwareMidiPort;
+    std::vector<int> hardwareMidiChannels;
     void buildMidiRoutes();
 
     // Loads (or fetches from cache) a file's audio; nullptr on failure.
@@ -708,6 +712,26 @@ public:
     // > 0: the tempo of an external MIDI clock LYNX follows (round 165f), over the song's tempo and its automation
     void setTempoOverride (double b) noexcept { tempoOverride = b; }
 
+    // ---- Hardware MIDI outputs (round 190jl) ------------------------------------------------------------------------
+    // The ports the output devices have (FL's Options › MIDI › Output "Port"; a 256-bit set, any thread; none = off). A
+    // MIDI Out channel on one of them (or a plugin whose wrapper output port it is) sends what it plays: its notes, the
+    // MIDI its knobs, patch, bank, pan / volume / pitch send, and what a MIDI input plays into it. Only the renderer the
+    // engine plays live sets it (not an export's, not the one rendering ahead: core/RenderAhead.h keeps those channels live).
+    struct HardwareMidiEvent
+    {
+        std::int32_t sample = 0; // in the last process() block
+        std::uint8_t port = 0, size = 0, source = 0; // source: Instrument::HardwareMidi::source
+        std::array<std::uint8_t, 3> bytes {};
+    };
+    void setHardwareMidiPorts (const std::array<std::uint64_t, 4>& ports) noexcept;
+    bool hardwareMidiPort (int port) const noexcept
+    {
+        return port >= 0 && port < 256 && (hwPorts[(std::size_t) port >> 6].load (std::memory_order_relaxed) >> (port & 63) & 1u) != 0;
+    }
+    // audio thread, after process(): the messages of the block, in time order (they are then gone)
+    int takeHardwareMidi (HardwareMidiEvent* out, int max) noexcept;
+    static constexpr int hardwareMidiCapacity = 2048;
+
     // Events of the last block (for tests and diagnostics).
     const EventBuffer& lastEvents() const noexcept { return events; }
     // Song notes started and not ended yet (round 169d; tests and diagnostics)
@@ -898,6 +922,16 @@ private:
     std::vector<float> hwScratch; // 2 × blockCapacity
     void mixHardwareOutputs (const RackState& state, int n) noexcept;
     int liveInputOffset = 0; // of the chunk within the process() block
+    // hardware MIDI outputs (round 190jl)
+    std::array<std::atomic<std::uint64_t>, 4> hwPorts {};
+    std::atomic<bool> hwPortsAny { false };
+    std::array<HardwareMidiEvent, hardwareMidiCapacity> hwMidi {};
+    int hwMidiCount = 0;
+    std::array<Instrument::HardwareMidi, 512> hwMidiScratch {};
+    std::array<char, maxChannels> hwMidiOn {}; // [channel] its capture was on in the last chunk
+    void hardwareMidiBeforeChunk (const RackState& state) noexcept;
+    void hardwareMidiAfterChunk (const RackState& state, int n) noexcept;
+    void addHardwareMidi (int sample, int port, const std::uint8_t* bytes, int size, int source) noexcept;
     const float* clickLeft = nullptr;
     const float* clickRight = nullptr;
     int clickTrack = 0;

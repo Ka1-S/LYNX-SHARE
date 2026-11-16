@@ -287,7 +287,7 @@ public:
         number (port, 0, 255, [] (State& s, int v) { s.port = v; });
         ui::setHint (bankMsb, tr ("Bank MSB (CC 0), sent before the patch; - = not sent"));
         ui::setHint (bankLsb, tr ("Bank LSB (CC 32), sent before the patch; - = not sent"));
-        ui::setHint (port, tr ("MIDI output port: the plugins whose MIDI input port is this port play it"));
+        ui::setHint (port, tr ("MIDI output port: the plugins whose MIDI input port is this port play it, and so do the MIDI output devices with this port (Settings › MIDI)"));
         ui::setHint (patch, tr ("The patch (program change) this channel selects"));
         addAndMakeVisible (midiChannel);
         addAndMakeVisible (patch);

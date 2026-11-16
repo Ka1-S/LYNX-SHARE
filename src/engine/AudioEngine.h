@@ -242,6 +242,9 @@ public:
                                   const std::function<bool (double)>& progress, int& latency);
 
     void play() noexcept;
+    // FL's Stop pressed while already stopped (REA midiout190jl, FLEngine 0x11ca520 → 0x11c9de0): CC 123 on the 16
+    // channels of every MIDI output with "Send all notes off"
+    void stopWhileStopped() noexcept { midiSync.requestTransportNotesOff(); }
     // --cliplooptest (round 167q): the device callback, driven by hand with a stand-in device
     juce::AudioIODeviceCallback& deviceCallback() noexcept { return *this; }
 
@@ -762,6 +765,8 @@ public:
     // system's), then "OK (...)" or "ERROR ..." (engine/MidiHotplugTest.cpp)
     static std::function<juce::Array<juce::MidiDeviceInfo> (bool inputs)>& midiDeviceListOverride();
     static juce::String midiHotplugSelfTest();
+    // Round 190jl (engine/MidiOutPortTest.cpp): MIDI Out channels to the hardware outputs on their port, end to end
+    static juce::String midiOutPortSelfTest();
     const prefs::MidiPrefs& getMidiPrefs() const noexcept { return midiPrefs; }
     // Applies them (and saves them in %APPDATA%\LYNX\midi-settings.txt when `save`).
     void setMidiPrefs (const prefs::MidiPrefs& prefs, bool save = true);
@@ -1403,6 +1408,13 @@ private:
     prefs::MidiPrefs midiPrefs;                      // UI thread
     juce::SpinLock midiPrefsLock;                    // guards midiPrefsShared (UI writes, MIDI thread reads)
     prefs::MidiPrefs midiPrefsShared;
+    // Round 190jl: the MIDI inputs by source number (NoteEvent::source − 1; names only added, so a number stays its
+    // device's), under midiPrefsLock; and the hardware MIDI output ports (MidiSyncIo) the rack sends to
+    std::vector<std::string> midiSourceNames;
+    std::array<std::uint64_t, 4> hardwareMidiPorts {};
+    void configureMidiOutputs(); // message thread: MidiSyncIo's devices, the rack's ports
+    std::array<RackRenderer::HardwareMidiEvent, RackRenderer::hardwareMidiCapacity> hardwareMidiTaken {}; // audio thread
+    bool hardwareMidiWasPlaying = false; // audio thread
     // FL's "Receive notes from" (round 165f-rack): the channels locked to a MIDI input device (and MIDI channel, 0 = any),
     // rebuilt from the song on every publish; guarded by midiPrefsLock too
     struct NoteLock

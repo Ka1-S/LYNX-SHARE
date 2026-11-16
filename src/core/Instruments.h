@@ -201,6 +201,22 @@ public:
     // each one packed as status | data1 << 8 | data2 << 16 (a 0xC0 / 0xD0 status has no data 2). Fills `out` with up
     // to `max` and returns how many; the rest wait for the next call.
     virtual int takeMidiMessages (std::uint32_t* /*out*/, int /*max*/) noexcept { return 0; }
+    // Hardware MIDI outputs (round 190jl, FL's Options › MIDI › Output "Port"): a MIDI Out channel (and a plugin's MIDI
+    // output) whose port an output device has sends what it plays to that device. The rack switches the capture on for
+    // the chunk (audio thread, before the chunk's render), the instrument keeps each short message with its sample in the
+    // chunk (the samples it rendered before it) and the rack takes them after the chunk. `source` = the live MIDI input
+    // the message came from (0 = none: the song, the UI), so a device's own input is not sent back to it.
+    struct HardwareMidi
+    {
+        std::int32_t sample = 0;
+        std::uint8_t size = 0, source = 0;
+        std::array<std::uint8_t, 3> bytes {};
+    };
+    virtual void setHardwareMidi (bool /*on*/) noexcept {}
+    virtual int takeHardwareMidi (HardwareMidi* /*out*/, int /*max*/) noexcept { return 0; }
+    // the live MIDI input of the noteOn / noteOff / midiMessage calls that follow, until it is set again (NoteEvent::source,
+    // 0 = none; the rack sets it around a live event and puts it back to 0)
+    virtual void setNoteSource (int /*source*/) noexcept {}
     // Extra outputs to other mixer inserts (a generator Patcher's extra "To LYNX" outputs, REA_rodada141): the rack
     // calls beginChunk (n) before a chunk's render() calls, which then also add each extra output's audio (gains
     // applied) into auxOutputData (k, side) from the chunk's start; auxOutputTrack (k) = the insert it feeds.

@@ -677,7 +677,25 @@ void PluginInstrument::collectMidiOutput (const juce::MidiBuffer& buffer) noexce
         const auto m = event.getMessage();
         if ((m.isNoteOn() || m.isNoteOff()) && midiOutCount < (int) midiOut.size())
             midiOut[(std::size_t) midiOutCount++] = { m.getNoteNumber(), m.isNoteOn() ? m.getFloatVelocity() : 0.0f };
+        // round 190jl: the channel messages to the hardware outputs on the wrapper's output port
+        if (hardwareOut && event.numBytes >= 2 && event.numBytes <= 3 && event.data[0] >= 0x80 && event.data[0] < 0xF0
+            && hardwareMidiCount < (int) hardwareMidi.size())
+        {
+            auto& h = hardwareMidi[(std::size_t) hardwareMidiCount++];
+            h.sample = hardwareBlockAt + (hardwarePositions ? juce::jmax (0, event.samplePosition) : 0);
+            h.size = (std::uint8_t) event.numBytes;
+            h.source = 0;
+            h.bytes = { event.data[0], event.data[1], event.numBytes > 2 ? event.data[2] : (std::uint8_t) 0 };
+        }
     }
+}
+
+int PluginInstrument::takeHardwareMidi (HardwareMidi* out, int max) noexcept
+{
+    const auto count = juce::jmin (max, hardwareMidiCount);
+    std::copy (hardwareMidi.begin(), hardwareMidi.begin() + count, out);
+    hardwareMidiCount = 0;
+    return count;
 }
 
 int PluginInstrument::takeMidiOutput (MidiOutNote* out, int max) noexcept
@@ -1087,6 +1105,8 @@ void PluginInstrument::render (float* left, float* right, int n, float gl, float
         {
             const auto count = juce::jmin (blockSize, n - done);
             setHostBlockOffset (chunkOffset + done);
+            hardwareBlockAt = chunkOffset + done; // (round 190jl)
+            hardwarePositions = false;
             fixed->run (io.data(), count, false, process);
             mixOutputs (io.data(), juce::jmin (channels, (int) io.size()), done, count, gl, gr, left, right);
             done += count;
@@ -1101,6 +1121,8 @@ void PluginInstrument::render (float* left, float* right, int n, float gl, float
         view.clear();
         bendBlock (midi, 0, count);
         setHostBlockOffset (chunkOffset + done);
+        hardwareBlockAt = chunkOffset + done; // (round 190jl)
+        hardwarePositions = true;
         rememberMidi (midi);
         if (const auto code = runBlock (BlockCall { plugin.get(), &view, &midi }, crashed, name); code != 0)
         {
