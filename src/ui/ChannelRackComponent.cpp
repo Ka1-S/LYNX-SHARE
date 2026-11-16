@@ -1,4 +1,5 @@
 #include "core/FlSettings.h"
+#include <unordered_map>
 #include "ui/Motion.h"
 #include "core/RackLayout.h"
 #include "core/RackFilter.h"
@@ -15,6 +16,7 @@
 #include "ui/TextCache.h"
 #include "ui/ChannelRackComponent.h"
 #include "ui/PaintAB.h"
+#include "ui/ImageCaches.h"
 #include "ui/PluginOffTag.h"
 #include "ui/SpeechDialog.h"
 #include "core/Patcherize.h"
@@ -735,6 +737,66 @@ bool ChannelRackComponent::channelHitsNow (int row) const
     return p.hasStep (row, step) || cellHasNote (row, step);
 }
 
+// Eight idle step keycaps (two groups of four, `a` then `b`) on the row's own background `bg`, from one opaque cached
+// tile (round 190io): an opaque tile is copied, not blended, by the software renderer, so a row of idle steps costs about
+// what the old flat tiles did although twice as many rows show steps now (the audio clip channels, FM-12). Drawn straight
+// where the scale is not whole.
+static void drawIdleStepStrip (juce::Graphics& g, juce::Rectangle<int> firstCell, int pitch, juce::Colour a, juce::Colour b, juce::Colour bg)
+{
+    const auto bounds = firstCell.withWidth (7 * pitch + firstCell.getWidth());
+    if (! g.clipRegionIntersects (bounds))
+        return;
+    const auto paintInto = [&] (juce::Graphics& k, bool withBackground) {
+        if (withBackground)
+        {
+            k.setColour (bg);
+            k.fillRect (juce::Rectangle<int> (bounds.getWidth(), bounds.getHeight()));
+        }
+        for (int i = 0; i < 8; ++i)
+            theme::drawKeycap (k, juce::Rectangle<int> (i * pitch, 0, firstCell.getWidth(), firstCell.getHeight()), i < 4 ? a : b, false);
+    };
+    const auto s = g.getInternalContext().getPhysicalPixelScaleFactor();
+    const auto scale = (int) std::round (s);
+    if (! ui::paintCache() || scale < 1 || scale > 3 || std::abs (s - (float) scale) > 1.0e-4f || ! bg.isOpaque())
+    {
+        juce::Graphics::ScopedSaveState state (g);
+        g.setOrigin (bounds.getPosition());
+        paintInto (g, false);
+        return;
+    }
+    static std::unordered_map<std::uint64_t, juce::Image> cache;
+    static const bool registered = ui::registerImageCache ([] { cache.clear(); }); (void) registered;
+    std::uint64_t key = 0xcbf29ce484222325ull;
+    for (const std::uint64_t v : { (std::uint64_t) a.getARGB(), (std::uint64_t) b.getARGB(), (std::uint64_t) bg.getARGB(), (std::uint64_t) pitch,
+                                   (std::uint64_t) firstCell.getWidth(), (std::uint64_t) firstCell.getHeight(), (std::uint64_t) scale,
+                                   (std::uint64_t) theme::colour::bg0.getARGB(), (std::uint64_t) theme::colour::borderStrong.getARGB() })
+        key = (key ^ v) * 0x100000001b3ull;
+    auto it = cache.find (key);
+    if (it == cache.end())
+    {
+        if (cache.size() > 200)
+            cache.clear();
+        juce::Image image (juce::Image::RGB, bounds.getWidth() * scale, bounds.getHeight() * scale, false,
+                          #if JUCE_WINDOWS
+                           juce::NativeImageType()
+                          #else
+                           juce::SoftwareImageType()
+                          #endif
+                          );
+        {
+            juce::Graphics ig (image);
+            ig.addTransform (juce::AffineTransform::scale ((float) scale));
+            paintInto (ig, true);
+        }
+        it = cache.emplace (key, std::move (image)).first;
+    }
+    g.setColour (juce::Colours::black); // (an image is drawn with the current colour's alpha as its opacity)
+    if (scale == 1)
+        g.drawImageAt (it->second, bounds.getX(), bounds.getY());
+    else
+        g.drawImage (it->second, bounds.toFloat(), juce::RectanglePlacement::stretchToFit);
+}
+
 void ChannelRackComponent::paintStepHit (juce::Graphics& g, juce::Rectangle<float> r)
 {
     theme::fillRoundRect (g, r, keycapRadius, juce::Colours::white.withAlpha (0.55f));
@@ -843,13 +905,18 @@ void ChannelRackComponent::paint (juce::Graphics& g)
             const auto start = step / 8 * 8;
             return start + 8 <= idleLimit ? 1 : start >= realSteps && start + 8 <= steps ? 2 : 0;
         };
+        // (the strip under the playing column is drawn cell by cell: the column's soft tint shows between its steps)
+        const auto columnStrip = column ? playheadStep / 8 * 8 : -1;
         for (int start = 0; start + 8 <= steps; start += 8)
-            if (const auto kind = stripKind (start); kind != 0)
+            if (const auto kind = stripKind (start); kind != 0 && start != columnStrip)
             {
                 const auto first = stepBounds (row, start);
                 if (first.getX() + 8 * stepWidth < clip.getX() || first.getX() > clip.getRight())
                     continue;
-                theme::drawStepStrip (g, first, stepWidth, theme::stepOff (start), theme::stepOff (start + 4), kind == 2);
+                if (kind == 1)
+                    drawIdleStepStrip (g, first, stepWidth, theme::stepOff (start), theme::stepOff (start + 4), selected ? bg3 : bg2);
+                else
+                    theme::drawStepStrip (g, first, stepWidth, theme::stepOff (start), theme::stepOff (start + 4), true);
             }
 
         for (int step = 0; step < steps; ++step)
@@ -863,7 +930,7 @@ void ChannelRackComponent::paint (juce::Graphics& g)
             auto any = onGrid || hasNote (row, step);
 
             const auto hoverStepHere = hoverArea == Area::grid && hoverRow == row && hoverStep == step && paintMode == PaintMode::none;
-            if (! any && ! hoverStepHere && stripKind (step) != 0) // (drawn by its strip)
+            if (! any && ! hoverStepHere && stripKind (step) != 0 && step / 8 * 8 != columnStrip) // (drawn by its strip)
                 continue;
             if (loopSteps > 0 && step >= loopSteps && step < realSteps)
             {
