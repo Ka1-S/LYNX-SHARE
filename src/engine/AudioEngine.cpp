@@ -2240,7 +2240,33 @@ void AudioEngine::startAudioTake()
     }
 
     if (armedInserts.empty())
-        wanted.push_back ({ 0, 0, juce::jmin (2, deviceChannels) });
+    {
+        // Settings' / Options' "Record input audio" with no insert armed: the first two input channels. Round 190ir
+        // (Discord report 2026-11-15, "how do i stop it from creating new inserts every time i record"): each take used
+        // to get a new free insert (and so a new track). They now go through one insert: the first that listens to the
+        // device's first input already (the one an earlier take of this switch was given, or the user's), else a free
+        // insert that gets that input.
+        auto target = -1;
+        for (int t = 1; t < (int) song.mixer.size() && target < 0; ++t)
+            if (song.mixer[(std::size_t) t].inputChannel == 0 && ! song.mixer[(std::size_t) t].recordSafe)
+                target = t;
+        if (target < 0)
+            if (const auto free = song.nextFreeInsert(); free > 0 && free < (int) song.mixer.size())
+            {
+                setInsertInput (free, 0, deviceChannels > 1);
+                target = free;
+            }
+        if (target > 0)
+        {
+            // the device input itself, as before (the insert is not armed, so it may not be processing its input): the
+            // clip plays through that insert and its track becomes the insert's audio track, so the next take lands there
+            const auto [first, count] = inputChannelsOf (song.mixer[(std::size_t) target], deviceChannels);
+            if (count > 0)
+                wanted.push_back ({ target, first, count });
+        }
+        if (wanted.empty()) // (no insert could take it: the old way, a new insert for the take)
+            wanted.push_back ({ 0, 0, juce::jmin (2, deviceChannels) });
+    }
 
     if (wanted.empty())
     {
@@ -2512,6 +2538,13 @@ void AudioEngine::finishAudioTake()
 
     if (lostFrames > 0)
         notify (InputIssue::framesLost, 0, juce::String (lostFrames));
+
+    // round 190ir (Discord report: "it isnt picking up my audio input"): takes that hold nothing but digital silence
+    // (exact zeros: not a quiet room, which always has some noise) mean the input delivers nothing: another input
+    // channel than the one the microphone is on, a muted interface, or the OS's microphone privacy (Windows) /
+    // permission (macOS). Said once the take is placed, so the user knows why the clip is flat.
+    if (! kept.empty() && std::all_of (kept.begin(), kept.end(), [] (const std::shared_ptr<Take>& t) { return t->peaks == nullptr || t->peaks->maxPeak() <= 0.0f; }))
+        notify (InputIssue::silentTake, kept.front()->track);
 
     // what came into the interface corresponds to what was heard one latency earlier; the clip lands on that
     // song position to the sample (round 163: sub-tick rest in the source offset)

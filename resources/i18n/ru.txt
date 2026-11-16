@@ -10594,3 +10594,8 @@ countries: ru by kz
 "Browse channel states" = "Обзор состояний каналов"
 "Route to free mixer track" = "Направить на свободную дорожку микшера"
 "Plugin menu" = "Меню плагина"
+"A new interface font or text size is applied when LYNX SHARE restarts." = "Новый шрифт или размер текста интерфейса применится после перезапуска LYNX SHARE."
+"Text size" = "Размер текста"
+"The size of the interface's text, role by role (labels, menus, buttons, titles). The UI size scales everything." = "Размер текста интерфейса по ролям (подписи, меню, кнопки, заголовки). Размер интерфейса масштабирует всё."
+"The recording is silent: the audio input sent nothing but silence. Check that the insert's input is the channel your microphone or instrument is plugged into (the input box above its effect slots), that the interface's input is not muted, and that LYNX SHARE may use the microphone (Windows: Settings > Privacy > Microphone; macOS: System Settings > Privacy & Security > Microphone)." = "Запись беззвучна: аудиовход передал только тишину. Проверьте, что вход инсерта — это канал, к которому подключены микрофон или инструмент (поле входа над слотами эффектов), что вход интерфейса не заглушён и что LYNX SHARE разрешён доступ к микрофону (Windows: Параметры > Конфиденциальность > Микрофон; macOS: Системные настройки > Конфиденциальность и безопасность > Микрофон)."
+"Choose an input to record" = "Выберите вход для записи"

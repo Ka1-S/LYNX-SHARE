@@ -10594,3 +10594,8 @@ countries: tw hk mo
 "Browse channel states" = "瀏覽通道狀態"
 "Route to free mixer track" = "路由到空閒混音軌道"
 "Plugin menu" = "外掛選單"
+"A new interface font or text size is applied when LYNX SHARE restarts." = "新的介面字型或文字大小會在 LYNX SHARE 重新啟動後套用。"
+"Text size" = "文字大小"
+"The size of the interface's text, role by role (labels, menus, buttons, titles). The UI size scales everything." = "介面文字的大小，依角色調整（標籤、選單、按鈕、標題）。介面大小會縮放所有內容。"
+"The recording is silent: the audio input sent nothing but silence. Check that the insert's input is the channel your microphone or instrument is plugged into (the input box above its effect slots), that the interface's input is not muted, and that LYNX SHARE may use the microphone (Windows: Settings > Privacy > Microphone; macOS: System Settings > Privacy & Security > Microphone)." = "錄音是靜音的：音訊輸入只送來了靜音。請檢查插槽的輸入是否為麥克風或樂器所接的通道（效果槽上方的輸入框）、音訊介面的輸入是否被靜音，以及 LYNX SHARE 是否可以使用麥克風（Windows：設定 > 隱私權 > 麥克風；macOS：系統設定 > 隱私權與安全性 > 麥克風）。"
+"Choose an input to record" = "請選擇要錄製的輸入"

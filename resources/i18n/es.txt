@@ -10594,3 +10594,8 @@ countries: es mx ar co cl pe ve
 "Browse channel states" = "Explorar estados de canal"
 "Route to free mixer track" = "Enrutar a pista de mezclador libre"
 "Plugin menu" = "Menú del plugin"
+"A new interface font or text size is applied when LYNX SHARE restarts." = "Una nueva fuente o tamaño de texto de la interfaz se aplica al reiniciar LYNX SHARE."
+"Text size" = "Tamaño del texto"
+"The size of the interface's text, role by role (labels, menus, buttons, titles). The UI size scales everything." = "El tamaño del texto de la interfaz, por función (etiquetas, menús, botones, títulos). El tamaño de la interfaz escala todo."
+"The recording is silent: the audio input sent nothing but silence. Check that the insert's input is the channel your microphone or instrument is plugged into (the input box above its effect slots), that the interface's input is not muted, and that LYNX SHARE may use the microphone (Windows: Settings > Privacy > Microphone; macOS: System Settings > Privacy & Security > Microphone)." = "La grabación está en silencio: la entrada de audio solo envió silencio. Comprueba que la entrada del insert es el canal donde está conectado tu micrófono o instrumento (el cuadro de entrada sobre sus ranuras de efectos), que la entrada de la interfaz no está silenciada y que LYNX SHARE puede usar el micrófono (Windows: Configuración > Privacidad > Micrófono; macOS: Ajustes del Sistema > Privacidad y seguridad > Micrófono)."
+"Choose an input to record" = "Elige una entrada para grabar"

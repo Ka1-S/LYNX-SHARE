@@ -10594,3 +10594,8 @@ countries: tr
 "Browse channel states" = "Kanal durumlarına göz at"
 "Route to free mixer track" = "Boş mikser kanalına yönlendir"
 "Plugin menu" = "Eklenti menüsü"
+"A new interface font or text size is applied when LYNX SHARE restarts." = "Yeni arayüz yazı tipi veya metin boyutu LYNX SHARE yeniden başladığında uygulanır."
+"Text size" = "Metin boyutu"
+"The size of the interface's text, role by role (labels, menus, buttons, titles). The UI size scales everything." = "Arayüz metninin boyutu, role göre (etiketler, menüler, düğmeler, başlıklar). Arayüz boyutu her şeyi ölçekler."
+"The recording is silent: the audio input sent nothing but silence. Check that the insert's input is the channel your microphone or instrument is plugged into (the input box above its effect slots), that the interface's input is not muted, and that LYNX SHARE may use the microphone (Windows: Settings > Privacy > Microphone; macOS: System Settings > Privacy & Security > Microphone)." = "Kayıt sessiz: ses girişi yalnızca sessizlik gönderdi. Insert'ün girişinin mikrofonunuzun veya enstrümanınızın takılı olduğu kanal olduğunu (efekt yuvalarının üstündeki giriş kutusu), arayüzün girişinin sessize alınmadığını ve LYNX SHARE'in mikrofonu kullanabildiğini kontrol edin (Windows: Ayarlar > Gizlilik > Mikrofon; macOS: Sistem Ayarları > Gizlilik ve Güvenlik > Mikrofon)."
+"Choose an input to record" = "Kayıt için bir giriş seçin"

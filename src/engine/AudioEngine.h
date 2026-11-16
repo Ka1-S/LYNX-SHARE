@@ -610,6 +610,7 @@ public:
         noInputOpen,       // recording with no input open
         armedWithoutInput, // armed inserts, none with an input source
         insertWithoutInput,// one armed insert (track) has no input source
+        silentTake,        // round 190ir: every take of the pass is digital silence (a muted / wrong input, OS privacy)
         lowDisk,           // little room left on the recordings drive (detail = minutes)
         recordSafe,        // the insert (track) is record safe: not armed
         framesLost,        // the disk could not keep up: frames became silence (detail = how many)

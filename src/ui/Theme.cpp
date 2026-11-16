@@ -20,9 +20,11 @@
 #include <unordered_map>
 #include <vector>
 
+#include "core/FontMetrics.h"
 #include "core/MenuPlacement.h"
 #include "core/Song.h"
 #include "core/MiddleEllipsis.h"
+#include "core/TextSize.h"
 #include "core/UiFontChoice.h"
 #include "platform/Paths.h"
 #include "ui/Icons.h"
@@ -989,11 +991,29 @@ namespace
 
 #if LYNX_BUNDLED_FONT
 // Open Sans, regular and bold (resources/fonts, SIL OFL). (The name finds a memory face only while it lives.)
+// Issue #189 (round 190ir): with its own vertical metrics (ascent + descent 1.362 em) Open Sans drew its letters 15 %
+// smaller than DejaVu Sans did at the same JUCE height, the font Linux showed up to 0.1.23, and narrower: every text
+// looked much smaller after 0.1.25 at the same UI size. Its ascent + descent are set to DejaVu Sans's in memory
+// (core/FontMetrics.h), so the letters are as large as 0.1.23's again; Open Sans's own widths (8 % narrower than
+// DejaVu's at that size) leave the layouts more room than 0.1.23 had. The font file itself is unchanged (OFL: the
+// glyphs and names are the same; only the line metrics JUCE sizes by are read differently).
+juce::Typeface::Ptr bundledFace (const unsigned char* data, int size)
+{
+    // LYNX_FONT_METRICS=0 (diagnostics, A/B): Open Sans with its own metrics, as 0.1.25-0.1.29 drew it
+    if (juce::SystemStats::getEnvironmentVariable ("LYNX_FONT_METRICS", {}) == "0")
+        return juce::Typeface::createSystemTypefaceFor (data, (size_t) size);
+    const auto scaled = fontmetrics::withVerticalExtent (data, (std::size_t) size, fontmetrics::dejaVuSansExtent);
+    if (! scaled.empty())
+        if (auto face = juce::Typeface::createSystemTypefaceFor (scaled.data(), scaled.size()))
+            return face; // (JUCE keeps its own copy of the data)
+    return juce::Typeface::createSystemTypefaceFor (data, (size_t) size);
+}
+
 const std::array<juce::Typeface::Ptr, 2>& bundledFaces()
 {
     static const std::array<juce::Typeface::Ptr, 2> faces {
-        juce::Typeface::createSystemTypefaceFor (lynxfontdata::OpenSansRegular_ttf, (size_t) lynxfontdata::OpenSansRegular_ttfSize),
-        juce::Typeface::createSystemTypefaceFor (lynxfontdata::OpenSansBold_ttf, (size_t) lynxfontdata::OpenSansBold_ttfSize)
+        bundledFace ((const unsigned char*) lynxfontdata::OpenSansRegular_ttf, lynxfontdata::OpenSansRegular_ttfSize),
+        bundledFace ((const unsigned char*) lynxfontdata::OpenSansBold_ttf, lynxfontdata::OpenSansBold_ttfSize)
     };
     return faces;
 }
@@ -1199,6 +1219,37 @@ juce::StringArray installedUiFonts()
 }
 
 static juce::File uiFontFile() { return platform::settingsFile ("ui-font.txt"); }
+
+// --- Settings › General › Text size (issue #189) --------------------------------------------------------
+namespace
+{
+int textSizeInUse = textsize::standard;
+juce::File textSizeFile() { return platform::settingsFile ("ui-text-size.txt"); }
+} // namespace
+
+void setTextSize (int percent)
+{
+    using textsize::Role;
+    textSizeInUse = textsize::clamp (percent);
+    type::caption = textsize::scaled (type::base::caption, textSizeInUse, Role::caption);
+    type::small = textsize::scaled (type::base::small, textSizeInUse, Role::small);
+    type::body = textsize::scaled (type::base::body, textSizeInUse, Role::body);
+    type::title = textsize::scaled (type::base::title, textSizeInUse, Role::title);
+    type::display = textsize::scaled (type::base::display, textSizeInUse, Role::display);
+    clearFontCache();
+}
+
+int textSize() { return textSizeInUse; }
+
+int savedTextSize() { return textsize::parse (textSizeFile().loadFileAsString().toStdString()); }
+
+void saveTextSize (int percent)
+{
+    if (textsize::clamp (percent) == textsize::standard)
+        textSizeFile().deleteFile();
+    else
+        textSizeFile().replaceWithText (juce::String (textsize::clamp (percent)));
+}
 
 juce::String savedUiFont() { return uiFontFile().loadFileAsString().trim(); }
 

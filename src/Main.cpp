@@ -678,6 +678,9 @@ public:
         // interface font: saved in Settings › General; --uifont "Name" overrides it for this run
         const auto uiFontArg = args.indexOf ("--uifont");
         lookAndFeel.applyInterfaceFont (lynx::i18n::current(), uiFontArg >= 0 ? args[uiFontArg + 1].unquoted() : juce::String());
+        // text size (issue #189): saved in Settings › General; --textsize 125 overrides it for this run
+        const auto textSizeArg = args.indexOf ("--textsize");
+        lynx::theme::setTextSize (textSizeArg >= 0 ? args[textSizeArg + 1].getIntValue() : lynx::theme::savedTextSize());
 
         if (args.contains ("--showcase"))
         {
@@ -1566,6 +1569,16 @@ public:
             // over the main window and checks that each one stays in front, owned by the main window, with the
             // keyboard focus (issue #4). The windows appear on screen for a few seconds.
             runWindowTest (args[args.indexOf ("--windowtest") + 1].unquoted());
+            return;
+        }
+
+        if (args.contains ("--minimizeclicktest"))
+        {
+            // LYNX --minimizeclicktest report.txt (issue #188, round 190ir): a tool window over the main window is
+            // minimised (through the window manager), the main window comes to the front, and a click where the tool
+            // window was must reach the main window's component. Run it under a window manager (openbox on a private
+            // Xvfb); exit code 0 = OK.
+            runMinimizeClickTest (args[args.indexOf ("--minimizeclicktest") + 1].unquoted());
             return;
         }
 
@@ -9114,6 +9127,147 @@ private:
             });
         };
         test->startTimer (1500);
+    }
+
+    // --minimizeclicktest (issue #188): see the option. The main window holds a component that counts its mouse-downs.
+    void runMinimizeClickTest (const juce::String& reportPath)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+
+        struct ClickPad final : juce::Component
+        {
+            int downs = 0;
+            void paint (juce::Graphics& g) override { g.fillAll (juce::Colours::darkslategrey); }
+            void mouseDown (const juce::MouseEvent&) override { ++downs; }
+        };
+
+        struct MinimizeTest final : juce::Timer
+        {
+            juce::String reportPath, report;
+            bool ok = true;
+            int stepIndex = 0, waits = 0;
+            std::unique_ptr<juce::DocumentWindow> main;
+            ClickPad* pad = nullptr;
+            juce::DocumentWindow* tool = nullptr;
+            juce::Point<int> inside, outside; // screen points: where the tool window is, and beside it
+            std::function<void()> done;
+
+            void line (const juce::String& text)
+            {
+                report << text << "\n";
+                juce::File (reportPath).replaceWithText (report);
+            }
+
+            void check (const juce::String& what, bool passed)
+            {
+                line ((passed ? "ok   " : "FAIL ") + what);
+                ok = ok && passed;
+            }
+
+            // a left click at a screen point through the main window's peer: the path an X ButtonPress takes
+            bool clickReachesPad (juce::Point<int> screen)
+            {
+                auto* peer = main->getPeer();
+                if (peer == nullptr)
+                    return false;
+                const auto before = pad->downs;
+                const auto local = peer->globalToLocal (screen.toFloat());
+                const auto now = juce::Time::currentTimeMillis();
+                peer->handleMouseEvent (juce::MouseInputSource::InputSourceType::mouse, local, juce::ModifierKeys (juce::ModifierKeys::leftButtonModifier),
+                                        juce::MouseInputSource::defaultPressure, juce::MouseInputSource::defaultOrientation, now);
+                peer->handleMouseEvent (juce::MouseInputSource::InputSourceType::mouse, local, juce::ModifierKeys(),
+                                        juce::MouseInputSource::defaultPressure, juce::MouseInputSource::defaultOrientation, now + 1);
+                return pad->downs == before + 1;
+            }
+
+            bool toolMinimised() const { return tool != nullptr && tool->getPeer() != nullptr && tool->getPeer()->isMinimised(); }
+
+            void timerCallback() override
+            {
+                switch (stepIndex)
+                {
+                    case 0:
+                    {
+                        auto content = std::make_unique<juce::Component>();
+                        content->setSize (420, 300);
+                        tool = lynx::openToolWindow (std::move (content), "Tap tempo (test)", "minimizetest");
+                        ++stepIndex;
+                        return;
+                    }
+                    case 1:
+                    {
+                        check ("tool window open", tool != nullptr && tool->isShowing());
+                        if (tool == nullptr)
+                            break;
+                        const auto r = tool->getScreenBounds();
+                        inside = r.getCentre();
+                        outside = { main->getScreenBounds().getX() + 40, main->getScreenBounds().getBottom() - 40 };
+                        line ("main " + main->getScreenBounds().toString() + "  tool " + r.toString());
+                        lynx::matchWindowOrderToScreen();
+                        check ("a click beside the tool window reaches the main window", clickReachesPad (outside));
+                        check ("a click on the shown tool window does not reach the main window", ! clickReachesPad (inside));
+                        tool->setMinimised (true);
+                        ++stepIndex;
+                        return;
+                    }
+                    case 2:
+                        if (! toolMinimised() && ++waits < 20)
+                            return;
+                        check ("the window manager minimised the tool window", toolMinimised());
+                        check ("the tool window stays visible for JUCE (as in the report)", tool->isVisible());
+                        main->toFront (true); // a click on the main window: LYNX puts its secondary windows back above it in JUCE's list
+                        lynx::matchWindowOrderToScreen();
+                        ++stepIndex;
+                        return;
+                    case 3:
+                        check ("a click where the minimised tool window was reaches the main window", clickReachesPad (inside));
+                        check ("a click beside it still reaches the main window", clickReachesPad (outside));
+                        tool->setMinimised (false);
+                        waits = 0;
+                        ++stepIndex;
+                        return;
+                    case 4:
+                        if (toolMinimised() && ++waits < 20)
+                            return;
+                        tool->toFront (false);
+                        lynx::matchWindowOrderToScreen();
+                        ++stepIndex;
+                        return;
+                    case 5:
+                        check ("the tool window is back", ! toolMinimised());
+                        check ("a click on the restored tool window does not reach the main window", ! clickReachesPad (inside));
+                        break;
+                    default:
+                        return;
+                }
+                line (ok ? "result=OK" : "result=FAILED");
+                stopTimer();
+                done();
+            }
+        };
+
+        auto* test = new MinimizeTest();
+        test->reportPath = reportPath;
+        test->main = std::make_unique<juce::DocumentWindow> ("LYNX minimise test", lynx::theme::window, juce::DocumentWindow::allButtons);
+        test->main->setUsingNativeTitleBar (true);
+        test->pad = new ClickPad();
+        test->pad->setSize (1200, 760);
+        test->main->setContentOwned (test->pad, true);
+        test->main->setTopLeftPosition (60, 60);
+        test->main->setVisible (true);
+        lynx::setMainWindowForOwnership (test->main.get());
+        test->main->toFront (true);
+        test->done = [this, test] {
+            setApplicationReturnValue (test->ok ? 0 : 1);
+            juce::MessageManager::callAsync ([this, test] {
+                lynx::closeAllToolWindows();
+                lynx::setMainWindowForOwnership (nullptr);
+                test->main = nullptr;
+                delete test;
+                quit();
+            });
+        };
+        test->startTimer (700);
     }
 
     // LYNX.exe --plugintest plugin.vst3 report.txt ["name"]: loads the plugin (or the one named in a shell), plays notes if it is an
@@ -28332,6 +28486,26 @@ private:
                 offline.dispatchPendingMessages();
             }
             saveSnapshot (ui, prefix + "-mixer.png");
+            // round 190ir (Discord report, "it isnt picking up my audio input"): an armed insert without an input says so
+            // in its input box (record colour)
+            // (the first insert no channel plays into: armed without an input, it records silence)
+            {
+                const auto& song = offline.getSong();
+                auto target = -1;
+                for (int t = 1; t < (int) song.mixer.size() && target < 0; ++t)
+                    if (song.mixer[(std::size_t) t].inputChannel < 0
+                        && std::none_of (song.channels.begin(), song.channels.end(), [t] (const lynx::ChannelDef& c) { return c.mixerTrack == t; }))
+                        target = t;
+                if (target > 0)
+                {
+                    offline.setInsertArmed (target, true);
+                    ui.selectMixerTrackForSnapshot (target, -1);
+                    offline.dispatchPendingMessages();
+                    saveSnapshot (ui, prefix + "-mixer190ir-armed-noinput.png");
+                    offline.setInsertArmed (target, false);
+                    offline.dispatchPendingMessages();
+                }
+            }
             // round 190am: LYNX's two mixer extras, before and after (the demo project leaves most inserts unused). The
             // loudness panel shows a real measurement of 12 s of a test tone (a 1 kHz sine at -14 dBFS after a quieter
             // stretch, pushed through the Master's tap as the audio thread does)

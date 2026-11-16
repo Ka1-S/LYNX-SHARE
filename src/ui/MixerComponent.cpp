@@ -5879,8 +5879,12 @@ void EffectsPanel::paint (juce::Graphics& g)
         }
 
         auto box = inputBoxBounds().toFloat();
+        // round 190ir: armed without an input records nothing (FL arms anyway; at FL's default "Post EQ" the take is the
+        // insert's own output, silence when no channel plays into it): the box says so in the record colour
+        const auto armedNoInput = mt.inputChannel < 0 && engine.isInsertArmed (track)
+                                  && std::none_of (song.channels.begin(), song.channels.end(), [t = track] (const ChannelDef& c) { return c.mixerTrack == t; });
         theme::fillRoundRect (g, box, radius::sm, hoverInput == 2 ? colour::bg4 : colour::bg3);
-        g.setColour (hoverInput == 2 ? colour::borderStrong : colour::border);
+        g.setColour (armedNoInput ? colour::record : hoverInput == 2 ? colour::borderStrong : colour::border);
         g.drawRoundedRectangle (box.reduced (0.5f), radius::sm, 1.0f);
 
         // the level, as a thin bar along the bottom of the box (left over right)
@@ -5901,8 +5905,9 @@ void EffectsPanel::paint (juce::Graphics& g)
         icons::draw (g, Icon::mic, box.withWidth (18.0f).reduced (2.0f).translated (3.0f, -1.0f), mt.inputChannel >= 0 ? colour::textPrimary : colour::textDisabled);
         const auto names = engine.getInputChannelNames();
         const auto label = mt.inputChannel >= 0 ? juce::String::fromUTF8 (inputSourceName (mt.inputChannel, mt.inputStereo, names).c_str())
-                                                : tr ("No audio input");
-        g.setColour (mt.inputChannel >= 0 ? colour::textPrimary : colour::textSecondary);
+                           : armedNoInput         ? tr ("Choose an input to record")
+                                                  : tr ("No audio input");
+        g.setColour (mt.inputChannel >= 0 ? colour::textPrimary : armedNoInput ? colour::record : colour::textSecondary);
         g.setFont (font (type::body));
         textcache::drawText (g, label, box.withTrimmedLeft (24.0f).withTrimmedRight (18.0f).translated (0.0f, -1.0f).toNearestInt(), juce::Justification::centredLeft, true);
         icons::draw (g, Icon::chevronDown, box.removeFromRight (18.0f).reduced (4.0f).translated (-2.0f, -1.0f), colour::textSecondary);
@@ -7638,6 +7643,11 @@ juce::String issueText (const AudioEngine::RecordingNotice& notice)
         case I::armedWithoutInput:
             return tr ("Please select an audio input first: the armed insert has none. Click the input box above the insert's effect slots in the Mixer.");
         case I::insertWithoutInput: return tr ("Insert {0} is armed but has no audio input, so it records nothing.", { juce::String (notice.track) });
+        case I::silentTake:
+            return tr ("The recording is silent: the audio input sent nothing but silence. Check that the insert's input is the "
+                       "channel your microphone or instrument is plugged into (the input box above its effect slots), that the "
+                       "interface's input is not muted, and that LYNX SHARE may use the microphone (Windows: Settings > Privacy "
+                       "> Microphone; macOS: System Settings > Privacy & Security > Microphone).");
         case I::failed: return tr ("The audio input could not be used: {0}", { notice.detail });
         case I::lowDisk:
             return tr ("The recordings drive is almost full: about {0} minute(s) of recording left. Free some space or choose another project folder.",
@@ -7666,7 +7676,7 @@ void explain (const AudioEngine::RecordingNotice& notice)
         return;
 
     using I = AudioEngine::InputIssue;
-    const auto aboutRecording = notice.issue == I::lowDisk || notice.issue == I::recordSafe || notice.issue == I::framesLost;
+    const auto aboutRecording = notice.issue == I::lowDisk || notice.issue == I::recordSafe || notice.issue == I::framesLost || notice.issue == I::silentTake;
     auto options = juce::MessageBoxOptions()
                        .withIconType (juce::MessageBoxIconType::WarningIcon)
                        .withTitle (aboutRecording ? tr ("Recording") : tr ("Audio input needed"))

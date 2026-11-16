@@ -10594,3 +10594,8 @@ countries: id
 "Browse channel states" = "Jelajahi status kanal"
 "Route to free mixer track" = "Rutekan ke trek mixer kosong"
 "Plugin menu" = "Menu plugin"
+"A new interface font or text size is applied when LYNX SHARE restarts." = "Font atau ukuran teks antarmuka yang baru diterapkan saat LYNX SHARE dimulai ulang."
+"Text size" = "Ukuran teks"
+"The size of the interface's text, role by role (labels, menus, buttons, titles). The UI size scales everything." = "Ukuran teks antarmuka, per peran (label, menu, tombol, judul). Ukuran UI memperbesar semuanya."
+"The recording is silent: the audio input sent nothing but silence. Check that the insert's input is the channel your microphone or instrument is plugged into (the input box above its effect slots), that the interface's input is not muted, and that LYNX SHARE may use the microphone (Windows: Settings > Privacy > Microphone; macOS: System Settings > Privacy & Security > Microphone)." = "Rekaman hening: input audio hanya mengirim keheningan. Periksa bahwa input insert adalah kanal tempat mikrofon atau instrumen Anda tersambung (kotak input di atas slot efeknya), input interface tidak dibisukan, dan LYNX SHARE boleh memakai mikrofon (Windows: Pengaturan > Privasi > Mikrofon; macOS: Pengaturan Sistem > Privasi & Keamanan > Mikrofon)."
+"Choose an input to record" = "Pilih input untuk direkam"

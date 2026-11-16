@@ -1,6 +1,7 @@
 #include "ui/RemoteControl.h"
 #include "ui/NumBox.h"
 #include "ui/SettingsPages.h"
+#include "core/TextSize.h"
 #include "ui/RemoteControlSettings.h"
 #include "platform/Paths.h"
 #include "platform/FileTypes.h"
@@ -64,22 +65,27 @@ struct Rows
 
     explicit Rows (int width) : area (20, 14, width - 40, 100000), y (14) {}
 
+    // Settings › General › Text size (issue #189): above 100 % the rows and notes grow with the text, so a two-line note
+    // or a control's text is not cut (the page scrolls)
+    static int h (int height) { return juce::roundToInt ((float) height * juce::jmax (1.0f, (float) theme::textSize() / 100.0f)); }
+
     void section (juce::Component& title, bool first = false)
     {
         if (! first)
             y += 10;
-        title.setBounds (area.getX(), y, area.getWidth(), sectionHeight);
-        y += sectionHeight + rowGap;
+        title.setBounds (area.getX(), y, area.getWidth(), h (sectionHeight));
+        y += h (sectionHeight) + rowGap;
     }
 
     // label + control (control width 0 = to the right edge)
     // round 165o: a caption wider than the label column (a long translation) gets its own line above the control
     juce::Rectangle<int> row (juce::Label& label, int controlWidth = 260, int height = rowHeight)
     {
+        height = h (height);
         if (theme::labelColumnWidth ({ &label }, 0, 2000) > labelWidth + labelWidth / 10) // a slight squeeze is fine
         {
-            label.setBounds (area.getX(), y, area.getWidth(), 18);
-            y += 18;
+            label.setBounds (area.getX(), y, area.getWidth(), h (18));
+            y += h (18);
         }
         else
             label.setBounds (area.getX(), y, labelWidth, height);
@@ -90,6 +96,7 @@ struct Rows
 
     juce::Rectangle<int> full (int height = rowHeight)
     {
+        height = h (height);
         auto r = juce::Rectangle<int> (area.getX(), y, area.getWidth(), height);
         y += height + rowGap;
         return r;
@@ -97,8 +104,26 @@ struct Rows
 
     juce::Rectangle<int> indented (int height = rowHeight)
     {
+        height = h (height);
         auto r = juce::Rectangle<int> (area.getX() + labelWidth, y, area.getWidth() - labelWidth, height);
         y += height + rowGap;
+        return r;
+    }
+
+    // a note under a control: as tall as its text needs at the width it gets (wrapped), at least `minHeight` (issue #189:
+    // a larger Text size wraps a note into more lines than the fixed heights had room for)
+    juce::Rectangle<int> indentedNote (juce::Label& label, int minHeight)
+    {
+        if (theme::textSize() <= 100)
+            return indented (minHeight); // (the standard size keeps its layout to the pixel)
+        const auto width = area.getWidth() - labelWidth;
+        const auto border = label.getBorderSize();
+        juce::GlyphArrangement text;
+        text.addJustifiedText (label.getFont(), label.getText(), 0.0f, 0.0f, (float) juce::jmax (40, width - border.getLeftAndRight()),
+                               juce::Justification::topLeft);
+        const auto needed = (int) std::ceil (text.getBoundingBox (0, -1, true).getHeight()) + border.getTopAndBottom() + 2;
+        auto r = juce::Rectangle<int> (area.getX() + labelWidth, y, width, juce::jmax (h (minHeight), needed));
+        y += r.getHeight() + rowGap;
         return r;
     }
 
@@ -116,8 +141,11 @@ struct Rows
         text.setWordWrap (juce::AttributedString::byWord);
         juce::TextLayout layout;
         layout.createLayout (text, (float) juce::jmax (1, area.getWidth() - (indent ? labelWidth : 0) - border.getLeftAndRight()));
-        const auto height = juce::jmax (minHeight, (int) std::ceil (layout.getHeight()) + border.getTopAndBottom() + 1);
-        return (indent ? indented (height) : full (height)).translated (0, -lift);
+        const auto height = juce::jmax (h (minHeight), (int) std::ceil (layout.getHeight()) + border.getTopAndBottom() + 1);
+        const auto left = indent ? labelWidth : 0;
+        auto r = juce::Rectangle<int> (area.getX() + left, y, area.getWidth() - left, height); // (measured: not scaled again)
+        y += height + rowGap;
+        return r.translated (0, -lift);
     }
 };
 
@@ -482,7 +510,7 @@ public:
         for (auto* c : std::initializer_list<juce::Component*> { &updatesTitle, &checkUpdates, &checkNow, &updatesNote, &previousLabel, &goBack })
             c->setVisible (updater::offered());
 
-        for (auto* b : { &templateBox, &startupProjectBox, &longestWaitBox, &languageBox, &fontBox, &scaleBox, &menuBox, &wavesBox, &noteNamesBox, &blackNotesBox, &pluginStyleBox, &animationBox, &editInBox, &undoBox, &longestWaitBox, &autosaveBox, &keepBox, &crashBox })
+        for (auto* b : { &templateBox, &startupProjectBox, &longestWaitBox, &languageBox, &fontBox, &textSizeBox, &scaleBox, &menuBox, &wavesBox, &noteNamesBox, &blackNotesBox, &pluginStyleBox, &animationBox, &editInBox, &undoBox, &longestWaitBox, &autosaveBox, &keepBox, &crashBox })
             styleCombo (*b);
         juce::ignoreUnused (engine, persistent);
     }
@@ -497,19 +525,20 @@ private:
         alsSessionBox.setBounds (r.row (alsSessionLabel, 260));
         r.section (languageTitle);
         languageBox.setBounds (r.row (languageLabel, 220));
-        languageNote.setBounds (r.indented (languageNote.getText().length() > 60 ? 32 : 16).translated (0, -3));
+        languageNote.setBounds (r.indentedNote (languageNote, languageNote.getText().length() > 60 ? 32 : 16).translated (0, -3));
         if (translationLink.isVisible())
             translationLink.setBounds (r.indented (18).translated (0, -4).withWidth (juce::jmin (420, width - 40)));
         {
             // (the reset button as wide as its text: "Auf Standard zurücksetzen" wrapped at a fixed width)
-            const auto resetWidth = juce::jlimit (110, 240, juce::roundToInt (juce::GlyphArrangement::getStringWidth (
-                getLookAndFeel().getTextButtonFont (fontReset, 24), fontReset.getButtonText())) + 24);
+            const auto resetWidth = juce::jlimit (110, Rows::h (240), juce::roundToInt (juce::GlyphArrangement::getStringWidth (
+                getLookAndFeel().getTextButtonFont (fontReset, Rows::h (24)), fontReset.getButtonText())) + 24);
             auto row = r.row (fontLabel, 228 + resetWidth);
             fontBox.setBounds (row.removeFromLeft (220));
             fontReset.setBounds (row.withTrimmedLeft (8));
         }
         fontPreview.setBounds (r.indented (22).translated (0, -3));
-        fontNote.setBounds (r.indented (16).translated (0, -5));
+        fontNote.setBounds (r.indentedNote (fontNote, 16).translated (0, -5));
+        textSizeBox.setBounds (r.row (textSizeLabel, 120));
         scaleBox.setBounds (r.row (scaleLabel, 120));
         menuBox.setBounds (r.row (menuLabel, 160));
         wavesBox.setBounds (r.row (wavesLabel, 0));
@@ -648,10 +677,17 @@ private:
     // (Labels and caches hold the old font's shapes). The sample line shows the choice right away.
     void setupFontRow()
     {
-        for (auto* c : std::initializer_list<juce::Component*> { &fontLabel, &fontBox, &fontReset, &fontPreview, &fontNote })
+        for (auto* c : std::initializer_list<juce::Component*> { &fontLabel, &fontBox, &fontReset, &fontPreview, &fontNote, &textSizeLabel, &textSizeBox })
             add (*c);
         styleLabel (fontLabel, tr ("Interface font"));
-        styleNote (fontNote, tr ("A new interface font is applied when LYNX SHARE restarts."));
+        styleNote (fontNote, tr ("A new interface font or text size is applied when LYNX SHARE restarts."));
+        // issue #189: the text roles' size next to the font (core/TextSize.h), applied at the next start as the font is
+        styleLabel (textSizeLabel, tr ("Text size"));
+        for (const auto percent : textsize::choices)
+            textSizeBox.addItem (juce::String (percent) + " %", percent);
+        selectNearest (textSizeBox, options.textSize);
+        textSizeBox.setTooltip (tr ("The size of the interface's text, role by role (labels, menus, buttons, titles). The UI size scales everything."));
+        textSizeBox.onChange = [this] { change ([&] { options.textSize = textSizeBox.getSelectedId(); }); };
         const auto fallback = theme::defaultUiFont();
         fontBox.addItem (fallback.isNotEmpty() ? tr ("Default ({0})", { fallback }) : tr ("Default"), 1);
         fontBox.addSeparator();
@@ -712,8 +748,8 @@ private:
     SectionTitle languageTitle { tr ("Language and display") }, displayTitle, startupTitle { tr ("Startup") }, editingTitle { tr ("Editing") },
         backupTitle { tr ("Backup") }, hintsTitle { tr ("Hints and warnings") }, pluginsTitle { tr ("Plugins and shortcuts") }, reportsTitle { tr ("Crash reports") }, updatesTitle { tr ("Updates") }, remoteTitle { tr ("Remote control") };
     juce::Label longestWaitLabel, animationLabel, animationNote, languageLabel, languageNote, scaleLabel, menuLabel, wavesLabel, noteNamesLabel, blackNotesLabel, pluginStyleLabel, editInLabel, undoLabel, autosaveLabel, keepLabel, sandboxNote, substitutesNote, shortcutsNote, crashLabel, crashNote, updatesNote, previousLabel;
-    juce::Label fontLabel, fontPreview, fontNote;
-    juce::ComboBox fontBox;
+    juce::Label fontLabel, fontPreview, fontNote, textSizeLabel;
+    juce::ComboBox fontBox, textSizeBox;
     juce::Label templateLabel, templateNote, startupProjectLabel;
     juce::ComboBox templateBox, startupProjectBox;
     std::vector<TemplateChoice> templateChoices; // templateBox's item id - 1
