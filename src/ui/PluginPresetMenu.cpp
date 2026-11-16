@@ -5,6 +5,7 @@
 #include "ui/FileChoosers.h"
 #include "ui/HintBar.h"
 
+#include "engine/ClapFormat.h"
 #include "engine/PluginHost.h"
 #include "engine/Vst2Format.h"
 #include "platform/Paths.h"
@@ -225,6 +226,7 @@ bool loadUnguarded (juce::AudioPluginInstance& plugin, const juce::File& file, j
             error = tr ("This preset belongs to {0}.", { juce::String::fromUTF8 (preset->pluginName.c_str()) });
             return false;
         }
+        const ScopedClapStateContext forPreset (ClapStateContext::preset); // (round 190jg: a CLAP plugin's preset state)
         plugin.setStateInformation (preset->state.data(), (int) preset->state.size());
         return true;
     }
@@ -319,7 +321,10 @@ bool save (juce::AudioPluginInstance& plugin, const juce::File& file, const juce
     else
     {
         juce::MemoryBlock state;
-        plugin.getStateInformation (state);
+        {
+            const ScopedClapStateContext forPreset (ClapStateContext::preset); // (round 190jg: clap.state-context)
+            plugin.getStateInformation (state);
+        }
         pp::Preset p;
         p.name = presetName.toStdString();
         p.pluginName = plugin.getName().toStdString();

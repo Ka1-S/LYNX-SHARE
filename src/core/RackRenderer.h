@@ -787,6 +787,14 @@ private:
     static double ticksToNextEvent (const RackState& state, double tick) noexcept;
     // bindings from this automation slot on (andLive: and those of live controllers, the links)
     void applyPluginParams (const RackState& state, int firstSlot, bool andLive = false) noexcept;
+    // Round 190jg (sample-accurate automation): the automation's changes inside this chunk for hosted CLAP / VST3
+    // plugins (Instrument / Effect::setParameterAt), after the chunk's values. Clip automation and lanes (not pattern
+    // events: a chunk already ends at each of those). Checked every timedStep samples of the export grid (a ramp moves
+    // in steps that size instead of the chunk's 128), and a jump (Hold, Stairs, a step drawn) at its own sample.
+    void queueTimedPluginParams (const RackState& state, double startTick, int numSamples, bool continuing) noexcept;
+    static constexpr int timedStep = 16;
+    std::int64_t timedGridPos = -1;                                  // the chunk's place on the export grid (-1: no grid)
+    std::array<float, RackState::maxAutomations> timedLast {};       // the last value sent per automation slot
     double compensateTick = -1.0;          // the song position of this block's automation (song mode), −1 = none
     double compensateTicksPerSample = 0.0; // > 0: compensation on in this block
     float automated (int automation, float base) const noexcept;

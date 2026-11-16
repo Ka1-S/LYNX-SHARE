@@ -22,6 +22,7 @@
 #include "engine/Vst2Format.h"
 #include "engine/Vst3NoteTuning.h"
 #include "engine/PluginSandbox.h"
+#include "engine/TimedParameters.h"
 #include "engine/FlStudio.h"
 #include "platform/CrashGuard.h"
 #include "core/Denormals.h"
@@ -562,6 +563,7 @@ PluginInstrument::PluginInstrument (std::unique_ptr<juce::AudioPluginInstance> i
       blockSize (maxBlockSize),
       name (plugin->getName().toStdString())
 {
+    timedOk = TimedParameterQueue::supports (*plugin);
     buffer.setSize (bufferChannels (*plugin), blockSize);
     midi.ensureSize (32768); // 8 KiB normal queue, with room for all 16x128 recovery note-offs without allocation
     if (options.mpe)
@@ -991,6 +993,62 @@ void PluginInstrument::setParameter (int index, float value) noexcept
     audioParameter (*plugin, parameterChanges, crashed, name, index, value);
 }
 
+// --- round 190jg: sample-accurate automation (engine/TimedParameters.h) ---------------------------------------------
+bool TimedParameterQueue::supports (const juce::AudioPluginInstance& plugin)
+{
+    // (a plugin in a separate process gets them with its block: engine/SandboxShared.h; not the 32-bit bridge, whose
+    // VST2 / VST3 hosts take a block's values at its start)
+    if (isBridged32 (plugin))
+        return false;
+    const auto format = plugin.getPluginDescription().pluginFormatName;
+    return format == "CLAP" || format == "VST3";
+}
+
+void TimedParameterQueue::add (int index, float value, int offset) noexcept
+{
+    const auto now = hostTimeline().chunk.load (std::memory_order_relaxed);
+    if (now != chunk)
+    {
+        chunk = now;
+        count = 0;
+    }
+    if (count < capacity && index >= 0 && offset >= 0)
+    {
+        indices[(std::size_t) count] = index;
+        offsets[(std::size_t) count] = offset;
+        values[(std::size_t) count] = value;
+        ++count;
+    }
+}
+
+TimedParameterQueue::Scope::Scope (TimedParameterQueue& q, int from, int length) noexcept
+    : previousCount (juce::lynxTimedParamCount), previousIndices (juce::lynxTimedParamIndices),
+      previousOffsets (juce::lynxTimedParamOffsets), previousValues (juce::lynxTimedParamValues)
+{
+    auto n = 0;
+    if (q.count > 0 && q.chunk == hostTimeline().chunk.load (std::memory_order_relaxed))
+        for (int i = 0; i < q.count; ++i)
+            if (const auto at = q.offsets[(std::size_t) i] - from; at >= 0 && at < length)
+            {
+                q.blockIndices[(std::size_t) n] = q.indices[(std::size_t) i];
+                q.blockOffsets[(std::size_t) n] = at;
+                q.blockValues[(std::size_t) n] = q.values[(std::size_t) i];
+                ++n;
+            }
+    juce::lynxTimedParamCount = n;
+    juce::lynxTimedParamIndices = q.blockIndices.data();
+    juce::lynxTimedParamOffsets = q.blockOffsets.data();
+    juce::lynxTimedParamValues = q.blockValues.data();
+}
+
+TimedParameterQueue::Scope::~Scope()
+{
+    juce::lynxTimedParamCount = previousCount;
+    juce::lynxTimedParamIndices = previousIndices;
+    juce::lynxTimedParamOffsets = previousOffsets;
+    juce::lynxTimedParamValues = previousValues;
+}
+
 void PluginInstrument::render (float* left, float* right, int n, float gl, float gr) noexcept
 {
     // (the extra outputs' buffers hold the whole chunk: this render's part starts where the last one ended)
@@ -1102,6 +1160,7 @@ void PluginInstrument::render (float* left, float* right, int n, float gl, float
         bendBlock (midi, 0, count);
         setHostBlockOffset (chunkOffset + done);
         rememberMidi (midi);
+        const TimedParameterQueue::Scope timedChanges (timed, chunkOffset + done, count); // (round 190jg)
         if (const auto code = runBlock (BlockCall { plugin.get(), &view, &midi }, crashed, name); code != 0)
         {
             midi.clear();
@@ -1210,6 +1269,7 @@ PluginEffect::PluginEffect (std::unique_ptr<juce::AudioPluginInstance> instance,
       blockSize (maxBlockSize),
       name (plugin->getName().toStdString())
 {
+    timedOk = TimedParameterQueue::supports (*plugin);
     buffer.setSize (bufferChannels (*plugin), blockSize);
     midi.ensureSize (2048); // MIDI CC "parameters" (core/MidiControls.h)
     sideBus = hasSideBus (*plugin);
@@ -1961,6 +2021,7 @@ void PluginEffect::process (float* left, float* right, int n, const EffectParams
             view.copyFrom (1, 0, inR + done, count);
         }
         feedSide (view, done, count);
+        const TimedParameterQueue::Scope timedChanges (timed, done, count); // (round 190jg)
         if (const auto code = runBlock (BlockCall { plugin.get(), &view, &midi }, crashed, name); code != 0)
         {
             midi.clear();
@@ -3831,8 +3892,12 @@ std::unique_ptr<juce::AudioPluginInstance> PluginHost::createInstance (const Plu
     // a 32-bit plugin always runs in the 32-bit bridge (round 176a; FL bridges them the same way, whatever "Make bridged" says)
     if (bits32 || pluginSandboxEnabled() || ref.separateProcess || pluginAlwaysSeparate (description->name))
     {
-        // separate process (for every plugin, or this one only — FL's "Make bridged"): the child prepares the plugin and applies the state
-        if (auto remote = createSandboxedPlugin (*description, sampleRate, preparedBlock, ref.state, message))
+        // separate process (for every plugin, or this one only — FL's "Make bridged"): the child prepares the plugin and applies the state.
+        // Round 190jg: with the option's per-vendor / all-together modes the plugin joins its group's process; one the user
+        // separated by itself ("Make bridged", "Always run in a separate process") keeps a process of its own.
+        const auto own = ref.separateProcess || pluginAlwaysSeparate (description->name);
+        const auto group = own ? juce::String() : sandboxGroupFor (*description, pluginSandboxMode());
+        if (auto remote = createSandboxedPlugin (*description, sampleRate, preparedBlock, ref.state, message, group))
             return remote;
         if (error != nullptr)
             *error = juce::String::fromUTF8 (ref.name.c_str()) + ": " + message;

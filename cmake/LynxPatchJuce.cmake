@@ -249,6 +249,13 @@
 #    A window above now covers the point only while it is on the screen: mapped and viewable, and not minimised
 #    (_NET_WM_STATE_HIDDEN). The X round trips run only for a point inside such a window's bounds.
 #
+# 39. Every platform, juce_audio_processors/format_types/juce_VST3Common.h + juce_VST3PluginFormat.cpp (round 190jg,
+#    BUILD-LIST 18): sample-accurate automation. JUCE's VST3 host sends each parameter's value once per block, at offset
+#    0 (AudioProcessorParameter::setValue has no time). LYNX's renderer applies automation once per piece of up to 128
+#    samples; with this fix the changes inside a piece (a ramp every 16 samples, a jump at its own sample) reach the
+#    plugin's IParamValueQueue as points at their sample offsets, from four thread-local declarations LYNX sets while
+#    the plugin's block runs (engine/TimedParameters.h). Unset (another host, the option off): JUCE's behaviour.
+#
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
 
@@ -489,6 +496,9 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("VST3 MIDI-mapped parameter reaches the editor" "LYNX patch (issue #152): the editor and the host follow"
             "                    queue->append ({ (Steinberg::int32) time, (float) paramValue });|NL|"
             "                    queue->append ({ (Steinberg::int32) time, (float) paramValue });|NL||NL|                // LYNX patch (issue #152): the editor and the host follow the mapped change (the SDK leaves it to the|NL|                // host: the plugin's knob stayed still while its sound changed, e.g. Arturia's MIDI-learned controls)|NL|                if (auto* lynxParam = getParameterForID ((Vst::ParamID) controlID))|NL|                    lynxParam->lynxFollowMidiMapping ((float) paramValue);|NL|")
+        lynx_juce_fix("VST3 sample-accurate automation" "LYNX patch (round 190jg, fix 39): the automation's changes inside"
+            "        cachedParamValues.ifSet ([&] (Steinberg::int32 index, float value)|NL|        {|NL|            inputParameterChanges->set (cachedParamValues.getParamID (index), value, 0);|NL|        });|NL|"
+            "        cachedParamValues.ifSet ([&] (Steinberg::int32 index, float value)|NL|        {|NL|            inputParameterChanges->set (cachedParamValues.getParamID (index), value, 0);|NL|        });|NL||NL|        // LYNX patch (round 190jg, fix 39): the automation's changes inside this block, at their sample offsets (LYNX's|NL|        // engine/TimedParameters.h; indices as getParameters()). The last one is the parameter's value afterwards.|NL|        for (int k = 0; k < lynxTimedParamCount; ++k)|NL|        {|NL|            const auto& list = getParameters();|NL|            const auto index = lynxTimedParamIndices[k];|NL|            if (! isPositiveAndBelow (index, list.size()))|NL|                continue;|NL|            if (auto* p = dynamic_cast<VST3Parameter*> (list[index]))|NL|            {|NL|                const auto value = jlimit (0.0f, 1.0f, lynxTimedParamValues[k]);|NL|                inputParameterChanges->set (cachedParamValues.getParamID (p->vstParamIndex), value, jlimit (0, numSamples - 1, lynxTimedParamOffsets[k]));|NL|                cachedParamValues.exchangeWithoutNotifying (p->vstParamIndex, value);|NL|                parameterDispatcher.push (p->vstParamIndex, value);|NL|            }|NL|        }|NL|")
     elseif(file MATCHES "juce_Windowing_windows.cpp$")
         lynx_juce_fix("layered child window keeps its place when repainted" "LYNX patch (round 190cj): a child window's position"
             "        UpdateLayeredWindow (hwnd, nullptr, &pos, &size, sourceHdc, &p, 0, &bf, ULW_ALPHA);"
@@ -593,6 +603,9 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("VST3 note tags: storage" "LYNX patch (round 190fg): the LYNX note each id belongs to"
             "    struct LynxKey|NL|    {|NL|        std::array<Steinberg::int32, 4> ids {};|NL|        int count = 0;|NL|    };"
             "    struct LynxKey|NL|    {|NL|        std::array<Steinberg::int32, 4> ids {};|NL|        std::array<unsigned int, 4> tags {}; // LYNX patch (round 190fg): the LYNX note each id belongs to (0: none)|NL|        int count = 0;|NL|    };|NL||NL|    // LYNX patch (round 190fg): which LYNX note a converted note on / off belongs to (0 when LYNX has not set the hook)|NL|    static unsigned int lynxNoteTag (bool noteOn, int channel, int key) noexcept|NL|    {|NL|        return lynxNoteTagHook != nullptr && lynxNoteTuningContext != nullptr ? lynxNoteTagHook (lynxNoteTuningContext, noteOn, channel, key) : 0u;|NL|    }")
+        lynx_juce_fix("VST3 sample-accurate automation: declarations" "LYNX patch (round 190jg, fix 39): timed parameter changes"
+            "inline unsigned int (*lynxNoteTagHook) (void* context, bool noteOn, int channel, int key) = nullptr;"
+            "inline unsigned int (*lynxNoteTagHook) (void* context, bool noteOn, int channel, int key) = nullptr;|NL|// LYNX patch (round 190jg, fix 39): timed parameter changes for the block running on this thread (LYNX's|NL|// engine/TimedParameters.h has the same four declarations: keep them identical). juce_VST3PluginFormat.cpp adds them to|NL|// the block's parameter queues at their sample offsets.|NL|inline thread_local int lynxTimedParamCount = 0;|NL|inline thread_local const int* lynxTimedParamIndices = nullptr;|NL|inline thread_local const int* lynxTimedParamOffsets = nullptr;|NL|inline thread_local const float* lynxTimedParamValues = nullptr;")
     elseif(file MATCHES "juce_VBlank_windows.cpp$")
         lynx_juce_fix("vertical blanks only while needed: demands" "LYNX patch (round 190gv): a window listens to the vertical blanks only while"
             "namespace juce|NL|{|NL||NL|class VBlankThread : private Thread,"

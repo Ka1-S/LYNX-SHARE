@@ -124,6 +124,40 @@ struct HostedOptions
     }
 };
 
+// Round 190jg (sample-accurate automation, engine/TimedParameters.h): a hosted plugin's parameter changes inside the
+// chunk being rendered, kept by its adapter. The renderer adds them before the chunk's blocks (audio thread, the
+// renderer's); each block of the plugin then publishes its own on the thread while it runs (Scope).
+class TimedParameterQueue
+{
+public:
+    static constexpr int capacity = 512;
+    // whether this plugin can take them: CLAP or VST3, in LYNX's process or a separate one (not the 32-bit bridge)
+    static bool supports (const juce::AudioPluginInstance& plugin);
+    void add (int index, float value, int offset) noexcept;
+    // the changes in [from, from + count) of the current chunk (offsets made relative to `from`) published for one
+    // plugin block; the earlier ones are dropped. A new chunk (another chunk count) drops what is left of the last one.
+    class Scope
+    {
+    public:
+        Scope (TimedParameterQueue& queue, int from, int count) noexcept;
+        ~Scope();
+        Scope (const Scope&) = delete;
+        Scope& operator= (const Scope&) = delete;
+    private:
+        int previousCount;
+        const int *previousIndices, *previousOffsets;
+        const float* previousValues;
+    };
+
+private:
+    std::uint64_t chunk = 0;
+    int count = 0;
+    std::array<int, capacity> indices {}, offsets {};
+    std::array<float, capacity> values {};
+    std::array<int, capacity> blockIndices {}, blockOffsets {};
+    std::array<float, capacity> blockValues {};
+};
+
 class PluginInstrument final : public Instrument
 {
 public:
@@ -150,6 +184,8 @@ public:
     void transportReset() noexcept override { panic(); }
     void render (float* left, float* right, int n, float gainLeft, float gainRight) noexcept override;
     void setParameter (int index, float value) noexcept override;
+    bool takesTimedParameters() const noexcept override { return timedOk && fixed == nullptr && sampleAccurateAutomation(); }
+    void setParameterAt (int index, float value, int offset) noexcept override { timed.add (index, value, offset); }
     float parameterValue (int index) const noexcept override;
     int latencySamples() const noexcept override
     {
@@ -243,6 +279,8 @@ private:
     bool midiOverflow = false, recoveryMidi = false;
     HostBlockClock blockClock; // where each plugin block starts in the renderer's chunk (the play head's position)
 
+    TimedParameterQueue timed; // round 190jg
+    bool timedOk = false;
     std::unique_ptr<juce::AudioPluginInstance> plugin;
     mutable HostedParameterChanges parameterChanges;
     juce::AudioBuffer<float> buffer;
@@ -276,6 +314,8 @@ public:
     }
     void process (float* left, float* right, int n, const EffectParams& params, double bpm) noexcept override;
     void setParameter (int index, float value) noexcept override;
+    bool takesTimedParameters() const noexcept override { return timedOk && fixed == nullptr && sampleAccurateAutomation(); }
+    void setParameterAt (int index, float value, int offset) noexcept override { timed.add (index, value, offset); }
     float parameterValue (int index) const noexcept override;
     int latencySamples() const noexcept override
     {
@@ -334,6 +374,8 @@ private:
     void flushMidiControls() noexcept;
     void findSideChannel() noexcept;
 
+    TimedParameterQueue timed; // round 190jg
+    bool timedOk = false;
     std::unique_ptr<juce::AudioPluginInstance> plugin;
     mutable HostedParameterChanges parameterChanges;
     juce::AudioBuffer<float> buffer;

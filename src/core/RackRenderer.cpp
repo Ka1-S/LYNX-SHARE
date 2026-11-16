@@ -3068,6 +3068,118 @@ void RackRenderer::applyPluginParams (const RackState& state, int firstSlot, boo
     }
 }
 
+void RackRenderer::queueTimedPluginParams (const RackState& state, double startTick, int numSamples, bool continuing) noexcept
+{
+    const auto& song = state.song;
+    if (! sampleAccurateAutomation() || timedGridPos < 0 || ! chunkPlaying || song.mode != PlayMode::song || perfRunning
+        || state.pluginParams.empty() || numSamples < 2 || chunkTps <= 0.0)
+        return;
+    const auto length = (double) std::max<std::int64_t> (1, state.schedule.songLength);
+    const auto tps = chunkTps;
+
+    for (const auto& b : state.pluginParams)
+    {
+        const auto a = b.automation;
+        if (a < 0 || a >= RackState::maxAutomations || midictl::isMidiParam (b.param) || std::isnan (automationValues[(std::size_t) a]))
+            continue;
+        // the sources whose value follows the song position: an automation clip, or a lane without clips over it
+        const auto clip = (std::size_t) a < state.automationClips.size() && ! state.automationClips[(std::size_t) a].empty()
+                          && state.automationFollowers[(std::size_t) a] == 0;
+        const RackState::LanePlay* lane = nullptr;
+        if (! clip)
+            for (const auto& l : state.laneAutomations)
+                if (l.automation == a && l.clipPeers.empty())
+                    lane = &l;
+        if (! clip && lane == nullptr)
+            continue;
+
+        Instrument* instrument = nullptr;
+        Effect* effect = nullptr;
+        auto lagTicks = 0.0;
+        if (b.channel >= 0)
+        {
+            if (foreignChannel (b.channel) || b.channel >= (int) state.instruments.size() || state.instruments[(std::size_t) b.channel] == nullptr)
+                continue;
+            instrument = state.instruments[(std::size_t) b.channel].get();
+            if (! instrument->takesTimedParameters())
+                continue;
+        }
+        else
+        {
+            if (foreignTrack (b.track) || b.track < 0 || b.track >= (int) state.effects.size() || b.slot < 0
+                || b.slot >= (int) state.effects[(std::size_t) b.track].size() || state.effects[(std::size_t) b.track][(std::size_t) b.slot] == nullptr)
+                continue;
+            effect = state.effects[(std::size_t) b.track][(std::size_t) b.slot].get();
+            if (! effect->takesTimedParameters())
+                continue;
+            // (PDC of automation, compensatedAutomation: the value from as many samples earlier as the slot is delayed)
+            if (clip && compensateTicksPerSample > 0.0 && (std::size_t) b.track < state.pdc.slotInput.size()
+                && (std::size_t) b.slot < state.pdc.slotInput[(std::size_t) b.track].size())
+                lagTicks = std::max (0, state.pdc.slotInput[(std::size_t) b.track][(std::size_t) b.slot]) * compensateTicksPerSample;
+        }
+
+        const auto valueAt = [&] (int sample) noexcept {
+            const auto tick = linearSongTick (liveInput, startTick + sample * tps + 1.0e-6, length);
+            if (lane != nullptr)
+                return song.automations[(std::size_t) a].valueAt (tick);
+            const auto v = automationValueAt (state, a, std::max (0.0, tick - lagTicks));
+            return std::isnan (v) ? automationValues[(std::size_t) a] : v;
+        };
+        const auto send = [&] (int offset, float v) noexcept {
+            if (instrument != nullptr)
+                instrument->setParameterAt (b.param, v, offset);
+            else
+                effect->setParameterAt (b.param, v, offset);
+        };
+
+        // the value the plugin has: the chunk's own (applyPluginParams), or the last one sent in the piece's first part
+        auto previous = continuing ? timedLast[(std::size_t) a] : automationValues[(std::size_t) a];
+        if (std::isnan (previous))
+            previous = automationValues[(std::size_t) a];
+        // checkpoints: the export grid's timedStep samples, then the chunk's end (only a jump is placed before it)
+        auto from = continuing ? -1 : 0; // (the last sample whose value the plugin has)
+        const auto firstGrid = (int) ((timedStep - (timedGridPos % timedStep)) % timedStep);
+        for (auto k = firstGrid == 0 && ! continuing ? timedStep : firstGrid;; k += timedStep)
+        {
+            const auto atEnd = k >= numSamples;
+            const auto at = atEnd ? numSamples : k;
+            const auto v = valueAt (at);
+            if (v != previous)
+            {
+                // a jump: half way the value is still the old or already the new one. Its sample: the first that has
+                // the new side's value (a bisection between the last checkpoint and this one)
+                const auto lo0 = std::max (from, 0);
+                const auto mid = valueAt ((lo0 + at) / 2);
+                const auto jump = at - lo0 > 1 && (mid == previous || mid == v);
+                if (jump)
+                {
+                    auto lo = from, hi = at; // value(lo) is the old one, value(hi) the new one
+                    while (hi - lo > 1)
+                    {
+                        const auto m = lo + (hi - lo) / 2;
+                        (std::abs (valueAt (m) - previous) < std::abs (valueAt (m) - v) ? lo : hi) = m;
+                    }
+                    if (hi < numSamples && hi > 0)
+                    {
+                        const auto there = valueAt (hi);
+                        send (hi, there);
+                        previous = there;
+                    }
+                }
+                if (! atEnd && v != previous) // (a ramp: its value at the checkpoint)
+                {
+                    send (at, v);
+                    previous = v;
+                }
+            }
+            if (atEnd)
+                break;
+            from = at;
+        }
+        timedLast[(std::size_t) a] = previous;
+    }
+}
+
 void RackRenderer::deliverToEffects (const RackState& state, const NoteEvent& e) noexcept
 {
     if (e.channel < 0 || (std::size_t) e.channel >= state.effectMidiRoutes.size()
@@ -4395,6 +4507,7 @@ void RackRenderer::process (const RackState* state,
             }
         }
         liveInputOffset = done;
+        timedGridPos = grid ? pos : -1; // (round 190jg: sample-accurate automation keeps to the export's grid)
         processChunk (*state, playing, startTick + done * tps, n, left + done, right + done, meters, continuing);
         resumeAudio = false;
         chaseNotes = false;
@@ -4806,6 +4919,10 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         timeline.ticksPerSample.store (playing ? chunkTps : 0.0, std::memory_order_relaxed);
         timeline.chunk.fetch_add (1, std::memory_order_relaxed);
     }
+    // round 190jg: the automation's changes inside this chunk for hosted CLAP / VST3 plugins (after the chunk count moved:
+    // they belong to the blocks of this chunk)
+    if (state.hasAutomation && playing)
+        queueTimedPluginParams (state, startTick, numSamples, continuing);
 
     // every insert's buffer starts the chunk as zeros (round 190gp: marked, not stored: trackBuffer stores them when the
     // insert is first written or worked on; an insert nobody feeds, whose effects are smart-disabled, never is)

@@ -76,9 +76,9 @@ without a missed deadline or dropout (4–10 % of one CPU core).
 ## Plugins
 
 VST3, CLAP, LV2 and VST2 (`.so`) plugins are scanned from the standard folders (`~/.vst3`, `/usr/lib/vst3`, `~/.lv2`,
-`/usr/lib/lv2`, `~/.clap`, ...) and any folder added in *Options › Plugins*. **Run plugins in a separate process**
-(*Options › Plugins*) works on Linux too: a crashing or frozen plugin is muted and LYNX SHARE keeps running (round 161b,
-`docs/analise/REA_rodada161b.md`). Windows plugins work through [yabridge](https://github.com/robbert-vdh/yabridge) +
+`/usr/lib/lv2`, `~/.clap`, ...) and any folder added in *Options › Plugins*. **Plugin processes** (*Options › Plugins*;
+each plugin in its own process, one process per vendor, or all plugins in one process, round 190jg) works on Linux too:
+a crashing or frozen plugin is muted and LYNX SHARE keeps running (round 161b, `docs/analise/REA_rodada161b.md`). Windows plugins work through [yabridge](https://github.com/robbert-vdh/yabridge) +
 Wine (checked with yabridge 5.1.1 and Wine 10.0, also in the separate process); see `docs/PLATFORMS.md`.
 
 ```

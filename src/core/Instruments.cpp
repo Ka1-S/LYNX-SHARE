@@ -4191,6 +4191,13 @@ bool hqForAllPlugins() noexcept { return hqAllFlag.load (std::memory_order_relax
 
 namespace
 {
+std::atomic<bool> sampleAccurateFlag { true };
+}
+void setSampleAccurateAutomation (bool on) noexcept { sampleAccurateFlag.store (on); }
+bool sampleAccurateAutomation() noexcept { return sampleAccurateFlag.load (std::memory_order_relaxed); }
+
+namespace
+{
 thread_local HostTimeline* threadTimeline = nullptr; // (round 190gq)
 }
 

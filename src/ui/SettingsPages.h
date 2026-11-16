@@ -60,8 +60,9 @@ struct GeneralOptions
     int backupLongestWaitMinutes = prefs::defaultBackupLongestWaitMinutes; // ...and is written anyway after this long
     bool crossfadesInNewProjects = true; // FL's "Enable automatic crossfades in new projects" (Settings › Project; round 166e)
     bool linkTracksInNewProjects = false; // LYNX: "Link Playlist tracks to mixer tracks in new projects" (round 190gz, issue #170)
-    bool pluginSandbox = false;
+    int pluginSandbox = 0; // SandboxMode (engine/PluginSandbox.h): 0 in LYNX's process, 1 each instance, 2 per vendor, 3 all together, 4 per plugin
     bool pluginSubstitutes = true; // missing plugins play a LYNX equivalent (core/PluginSubstitutes.h)
+    bool sampleAccurateAutomation = true; // round 190jg: automation at its own sample for CLAP / VST3 plugins (core/Instruments.h)
     bool limitEditors = true; // FL's "Limit the number of open plugin editors" (round 189o, core/EditorLimit.h; on as FL)
     int crashReports = 0;          // crashreport::Consent: 0 ask, 1 always send, 2 never (round 159)
     bool checkUpdates = true;      // "Check for updates automatically" (ui/Updater.h, round 166b)

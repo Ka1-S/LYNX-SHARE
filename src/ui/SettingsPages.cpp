@@ -167,7 +167,7 @@ public:
                                                                  &wavesLabel, &wavesBox, &stereoWaves, &noteNamesLabel, &noteNamesBox, &blackNotesLabel, &blackNotesBox, &everyKeyNames, &rackColumn, &rackStepColour, &pluginStyleLabel, &pluginStyleBox, &artMotion, &reducedEffects, &uiAnimations, &animationLabel, &animationBox, &animationNote, &gpuRendering, &templateLabel, &templateBox, &templateNote, &startupProjectLabel, &startupProjectBox, &splash, &startupSound, &scanAtStart, &supportNoteBox, &menuEntry,
                                                                  &typingPiano, &keepEditors, &rememberSeek, &clipsLoop, &autoClipsAtPlayback, &firstChannel, &monoPaint, &autoSelectLinked, &noTypingPriority, &hoverValues, &editInLabel, &editInBox, &undoLabel,
                                                                  &undoBox, &alternateUndo, &hintsTitle, &manageMessages, &messagesNote, &autosaveLabel, &autosaveBox, &keepLabel, &keepBox, &openBackups, &backupQuiet, &longestWaitLabel, &longestWaitBox, &unusedTakes, &detachNew,
-                                                                 &sandbox, &sandboxNote, &substitutes, &substitutesNote, &limitEditors, &managePlugins, &manageShortcuts, &shortcutsNote,
+                                                                 &sandboxLabel, &sandboxBox, &sandboxNote, &substitutes, &substitutesNote, &sampleAccurate, &limitEditors, &managePlugins, &manageShortcuts, &shortcutsNote,
                                                                  &reportsTitle, &crashLabel, &crashBox, &crashNote, &updatesTitle, &checkUpdates, &checkNow, &updatesNote,
                                                                  &previousLabel, &goBack, &autoNameChannels, &restoreAfterSolo, &readSampleTempo, &historyNewestFirst })
             add (*c);
@@ -455,12 +455,23 @@ public:
         toggle (unusedTakes, tr ("When a project closes, offer to delete the recordings it no longer uses"), options.askUnusedRecordings,
                 [this] (bool on) { options.askUnusedRecordings = on; });
 
-        toggle (sandbox, tr ("Run plugins in a separate process (protects LYNX SHARE from crashes)"), options.pluginSandbox,
-                [this] (bool on) { options.pluginSandbox = on; });
-        styleNote (sandboxNote, tr ("Applies to plugins opened from now on; reopen the project to move the others."));
+        // round 190jg: Bitwig's plugin hosting modes (was the toggle "Run plugins in a separate process")
+        styleLabel (sandboxLabel, tr ("Plugin processes"));
+        // (ordered from the most isolated; the id is the mode + 1, engine/PluginSandbox.h SandboxMode)
+        sandboxBox.addItem (tr ("In LYNX SHARE's process (fastest)"), 1);
+        sandboxBox.addItem (tr ("Each plugin instance in its own process"), 2);
+        sandboxBox.addItem (tr ("One process per plugin (all its instances)"), 5);
+        sandboxBox.addItem (tr ("One process per plugin vendor"), 3);
+        sandboxBox.addItem (tr ("All plugins in one process"), 4);
+        sandboxBox.setSelectedId (juce::jlimit (0, 4, options.pluginSandbox) + 1, juce::dontSendNotification);
+        sandboxBox.onChange = [this] { change ([&] { options.pluginSandbox = sandboxBox.getSelectedId() - 1; }); };
+        styleNote (sandboxNote, tr ("A plugin that crashes takes down only its own process, never LYNX SHARE.") + " "
+                                    + tr ("Applies to plugins opened from now on; reopen the project to move the others."));
         toggle (substitutes, tr ("Substitute missing plugins with LYNX SHARE equivalents"), options.pluginSubstitutes,
                 [this] (bool on) { options.pluginSubstitutes = on; });
         styleNote (substitutesNote, tr ("A project keeps the original plugin and uses it again once it is installed."));
+        toggle (sampleAccurate, tr ("Sample-accurate automation for CLAP and VST3 plugins"), options.sampleAccurateAutomation,
+                [this] (bool on) { options.sampleAccurateAutomation = on; });
         // FL's General › Miscellaneous (round 189o): at most 25 plugin editors open, the oldest closes; FL warns before
         // turning it off (FUN_013559c0) and keeps it on with No
         toggle (limitEditors, tr ("Limit the number of open plugin editors"), options.limitEditors, [this] (bool on) {
@@ -517,7 +528,7 @@ public:
         for (auto* c : std::initializer_list<juce::Component*> { &updatesTitle, &checkUpdates, &checkNow, &updatesNote, &previousLabel, &goBack })
             c->setVisible (updater::offered());
 
-        for (auto* b : { &templateBox, &startupProjectBox, &longestWaitBox, &languageBox, &fontBox, &textSizeBox, &scaleBox, &menuBox, &wavesBox, &noteNamesBox, &blackNotesBox, &pluginStyleBox, &animationBox, &editInBox, &undoBox, &longestWaitBox, &autosaveBox, &keepBox, &crashBox })
+        for (auto* b : { &templateBox, &startupProjectBox, &longestWaitBox, &languageBox, &fontBox, &textSizeBox, &scaleBox, &menuBox, &wavesBox, &noteNamesBox, &blackNotesBox, &pluginStyleBox, &animationBox, &editInBox, &undoBox, &longestWaitBox, &autosaveBox, &keepBox, &crashBox, &sandboxBox })
             styleCombo (*b);
         juce::ignoreUnused (engine, persistent);
     }
@@ -604,10 +615,11 @@ private:
         unusedTakes.setBounds (r.full (24));
 
         r.section (pluginsTitle);
-        sandbox.setBounds (r.full (24));
-        sandboxNote.setBounds (r.full (16).translated (0, -3));
+        sandboxBox.setBounds (r.row (sandboxLabel, 300));
+        sandboxNote.setBounds (r.full (32).translated (0, -3));
         substitutes.setBounds (r.full (24));
         substitutesNote.setBounds (r.full (16).translated (0, -3));
+        sampleAccurate.setBounds (r.full (24));
         limitEditors.setBounds (r.full (24));
         {
             auto row = r.full();
@@ -754,7 +766,7 @@ private:
     juce::ComboBox alsSessionBox;
     SectionTitle languageTitle { tr ("Language and display") }, displayTitle, startupTitle { tr ("Startup") }, editingTitle { tr ("Editing") },
         backupTitle { tr ("Backup") }, hintsTitle { tr ("Hints and warnings") }, pluginsTitle { tr ("Plugins and shortcuts") }, reportsTitle { tr ("Crash reports") }, updatesTitle { tr ("Updates") }, remoteTitle { tr ("Remote control") };
-    juce::Label longestWaitLabel, animationLabel, animationNote, languageLabel, languageNote, scaleLabel, menuLabel, wavesLabel, noteNamesLabel, blackNotesLabel, pluginStyleLabel, editInLabel, undoLabel, autosaveLabel, keepLabel, sandboxNote, substitutesNote, shortcutsNote, crashLabel, crashNote, updatesNote, previousLabel;
+    juce::Label longestWaitLabel, animationLabel, animationNote, languageLabel, languageNote, scaleLabel, menuLabel, wavesLabel, noteNamesLabel, blackNotesLabel, pluginStyleLabel, editInLabel, undoLabel, autosaveLabel, keepLabel, sandboxLabel, sandboxNote, substitutesNote, shortcutsNote, crashLabel, crashNote, updatesNote, previousLabel;
     juce::Label fontLabel, fontPreview, fontNote, textSizeLabel;
     juce::ComboBox fontBox, textSizeBox;
     juce::Label templateLabel, templateNote, startupProjectLabel;
@@ -765,8 +777,8 @@ private:
     juce::ToggleButton remoteControl;
     juce::Label remoteStatus;
     juce::HyperlinkButton translationLink;
-    juce::ComboBox animationBox, crashBox, languageBox, scaleBox, menuBox, wavesBox, noteNamesBox, blackNotesBox, pluginStyleBox, editInBox, undoBox, autosaveBox, keepBox, longestWaitBox;
-    juce::ToggleButton detachNew, stereoWaves, everyKeyNames, rackColumn, rackStepColour, artMotion, reducedEffects, uiAnimations, gpuRendering, splash, startupSound, scanAtStart, supportNoteBox, menuEntry, typingPiano, keepEditors, rememberSeek, clipsLoop, autoClipsAtPlayback, firstChannel, monoPaint, hoverValues, alternateUndo, sandbox, substitutes, limitEditors, backupQuiet, unusedTakes, checkUpdates, noTypingPriority, autoSelectLinked;
+    juce::ComboBox animationBox, crashBox, languageBox, scaleBox, menuBox, wavesBox, noteNamesBox, blackNotesBox, pluginStyleBox, editInBox, undoBox, autosaveBox, keepBox, longestWaitBox, sandboxBox;
+    juce::ToggleButton detachNew, stereoWaves, everyKeyNames, rackColumn, rackStepColour, artMotion, reducedEffects, uiAnimations, gpuRendering, splash, startupSound, scanAtStart, supportNoteBox, menuEntry, typingPiano, keepEditors, rememberSeek, clipsLoop, autoClipsAtPlayback, firstChannel, monoPaint, hoverValues, alternateUndo, substitutes, sampleAccurate, limitEditors, backupQuiet, unusedTakes, checkUpdates, noTypingPriority, autoSelectLinked;
     juce::ToggleButton autoNameChannels, restoreAfterSolo, readSampleTempo, historyNewestFirst; // FL's options of round 190bx (core/FlSettings.h)
     juce::TextButton openBackups { tr ("Open backup folder") }, managePlugins { tr ("Plugin manager...") }, manageShortcuts { tr ("Manage shortcuts...") },
         checkNow { tr ("Check now") }, manageMessages { tr ("Manage messages") }, goBack;
