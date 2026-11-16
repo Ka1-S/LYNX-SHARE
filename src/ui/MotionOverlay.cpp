@@ -39,6 +39,19 @@ std::atomic<int>& MotionOverlay::picturesPainted()
 
 namespace
 {
+// the message-thread time show() takes (LYNX_OVERLAY_STATS), microseconds
+std::atomic<long long>& showMicros()
+{
+    static std::atomic<long long> us { 0 };
+    return us;
+}
+
+struct ScopedTime
+{
+    const double t0 = juce::Time::getMillisecondCounterHiRes();
+    ~ScopedTime() { showMicros() += (long long) (1000.0 * (juce::Time::getMillisecondCounterHiRes() - t0)); }
+};
+
 bool overlayWanted()
 {
     static const bool on = [] {
@@ -57,6 +70,7 @@ void writeStats()
         return;
     static double since = 0.0;
     static int shown0 = 0, fell0 = 0, pictures0 = 0;
+    static long long micros0 = 0;
     const auto now = juce::Time::getMillisecondCounterHiRes();
     if (since <= 0.0)
         since = now;
@@ -67,11 +81,13 @@ void writeStats()
                pictures = MotionOverlay::picturesPainted().load();
     juce::File (path).appendText (juce::String (now / 1000.0, 1) + " overlay frames/s " + juce::String ((shown - shown0) / s, 1)
                                   + " fallbacks/s " + juce::String ((fell - fell0) / s, 1) + " pictures " + juce::String (pictures - pictures0)
+                                  + " show_ms/s " + juce::String ((double) (showMicros().load() - micros0) / 1000.0 / s, 2)
                                   + juce::newLine);
     since = now;
     shown0 = shown;
     fell0 = fell;
     pictures0 = pictures;
+    micros0 = showMicros().load();
 }
 } // namespace
 
@@ -252,16 +268,19 @@ void releaseTarget (HWND hwnd)
 
 struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentListener
 {
-    // Sub-pixel positions of the mark's picture: 1/32 of a physical pixel. A playhead zoomed out moves a few pixels a
-    // second (Thief's whole song on screen: ~6 px/s, 0.04 px a frame at 144 Hz); with 1/8 its picture changed only ~47
-    // times a second (round 190ip, measured: 93 screen updates a second against 139-143 painted). Pictures are painted
-    // only for the phases used. LYNX_OVERLAY_PHASES=1..64 (A/B).
+    // Sub-pixel positions of the mark's picture. A playhead zoomed out moves a few pixels a second (Thief's whole song on
+    // screen: ~5 px/s, 0.035 px a frame at 144 Hz), and the painted playhead shows each such step (its anti-aliased
+    // edge). Measured (round 190ip, pixels that changed a second, Thief, Playlist in front): pictures cached at 1/8 px ->
+    // 93, at 1/32 px -> 125, painted 138-140. So by default (0) the one picture is painted again whenever the mark moves
+    // by 1/128 of a pixel or more (a software picture of the mark only, uploaded to the surface; timed in
+    // LYNX_OVERLAY_STATS). LYNX_OVERLAY_PHASES=1..64: pictures cached at that many phases instead (A/B).
     static constexpr int maxPhases = 64;
+    static constexpr int exactSteps = 128;
     static int phases()
     {
         static const int n = [] {
             const auto v = juce::SystemStats::getEnvironmentVariable ("LYNX_OVERLAY_PHASES", {});
-            return v.isEmpty() ? 32 : juce::jlimit (1, maxPhases, v.getIntValue());
+            return v.isEmpty() ? 0 : juce::jlimit (0, maxPhases, v.getIntValue());
         }();
         return n;
     }
@@ -282,6 +301,7 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
     bool show (const Mark& mark)
     {
         writeStats();
+        const ScopedTime timed;
         if (! place (mark))
         {
             ++fallbacks();
@@ -383,7 +403,9 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
         // the picture of this phase, painted once per look: the mark at the reference place + phase / 32 of a pixel
         const auto xWin = ownerPos.x + (double) mark.x * s;
         const auto whole = std::floor (xWin);
-        const auto phase = juce::jlimit (0, phases() - 1, (int) std::floor ((xWin - whole) * phases()));
+        const auto exact = phases() == 0;
+        const auto steps = exact ? exactSteps : phases();
+        const auto phase = juce::jlimit (0, steps - 1, (int) std::floor ((xWin - whole) * steps));
         const auto left = (int) std::floor ((double) mark.extent.getX() * s) - 1;
         const auto topY = (int) std::floor (ownerPos.y + (double) mark.extent.getY() * s) - 1;
         const auto w = (int) std::ceil ((double) mark.extent.getWidth() * s) + 3, h = (int) std::ceil ((double) mark.extent.getHeight() * s) + 3;
@@ -395,14 +417,17 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
             for (auto& p : pictures)
                 p.drawn = false;
         }
-        auto& picture = pictures[(std::size_t) phase];
+        auto& picture = pictures[exact ? 0 : (std::size_t) phase];
+        if (exact && picture.drawn && picture.phase != phase)
+            picture.drawn = false; // (one picture, painted again at the new phase)
         if (! picture.drawn)
         {
             const auto originX = reference + left;
             const auto at = juce::AffineTransform::scale ((float) s).translated ((float) (ownerPos.x - originX), (float) (ownerPos.y - topY));
-            const auto xAt = ((double) reference + (double) phase / phases() - ownerPos.x) / s;
+            const auto xAt = ((double) reference + (double) phase / steps - ownerPos.x) / s;
             if (! paintPicture (picture, w, h, at, (float) xAt))
                 return false;
+            picture.phase = phase;
         }
 
         // moved there: whole window pixels (the phase is in the picture), clipped to the visible clip
@@ -529,7 +554,7 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
     struct Picture
     {
         Com<IDCompositionSurface> surface;
-        int w = 0, h = 0;
+        int w = 0, h = 0, phase = -1;
         bool drawn = false;
     };
 
@@ -548,7 +573,11 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
             p.h = h;
         }
         // the view's own paint code draws the mark into a software picture whose pixel (0, 0) is the picture's corner
-        juce::Image image (juce::Image::ARGB, w, h, true, juce::SoftwareImageType());
+        if (scratch.isNull() || scratch.getWidth() != w || scratch.getHeight() != h)
+            scratch = juce::Image (juce::Image::ARGB, w, h, true, juce::SoftwareImageType());
+        else
+            scratch.clear (scratch.getBounds());
+        auto& image = scratch;
         {
             juce::Graphics g (image);
             g.addTransform (at);
@@ -603,6 +632,7 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
         for (auto& p : pictures)
             p = {};
         pictureKey = {};
+        scratch = {};
         if (target != nullptr && Devices::get().generation == generation)
             releaseTarget (attachedHwnd); // (a target of a lost device was dropped by useTarget already, or is now)
         else if (const auto found = targets().find (attachedHwnd); target != nullptr && found != targets().end() && found->second.generation == generation)
@@ -671,6 +701,7 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
         bool operator== (const PictureKey&) const = default;
     };
     PictureKey pictureKey;
+    juce::Image scratch; // (the software picture, kept: painted again at each 1/128 px the mark moves)
     bool showing = false, inTree = false;
     double lastShowMs = 0.0, hideAtMs = 0.0;
 };
