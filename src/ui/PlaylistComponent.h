@@ -105,6 +105,9 @@ public:
     // tracks, and a stereo level meter beside the header of audio tracks (their mixer track) and instrument tracks
     // (their channel's mixer track). Kept with the UI settings.
     static inline bool showAudioTrackControls = true, showAudioTrackLevels = true, showInstrumentTrackLevels = false;
+    // FL's Playlist menu › View › "Hide collapsed grouped tracks" (EEHideCollapsedAction, HideCollapsedSubTracks; FL manual:
+    // "Collapsed grouped tracks will be hidden"; round 190jf): the members of a collapsed group get no row at all
+    static inline bool hideCollapsedGroups = false;
     void headerOptionsChanged(); // repaints and saves
     std::function<void()> onViewOptionChanged; // an app-wide view option changed (round 177b: Automation lanes): save it
 
@@ -213,6 +216,7 @@ public:
     juce::Rectangle<int> trackRowForSnapshot (int track) const { return { 0, trackToY (track), getWidth(), heightOf (track) }; } // (round 190fc)
     std::vector<int> selectedTracksForSnapshot() const { return sortedTrackSelection(); } // (round 190ft)
     int numTracksForSnapshot() const { return numTracks(); } // (round 190gw)
+    juce::Rectangle<int> trackLedForSnapshot (int track) const { return trackLed (track); } // (round 190jf)
     int headerWidthForSnapshot() const noexcept { return headerWidth; }
     double xOfTickForSnapshot (double tick) const { return tickToX (tick); }
     juce::Rectangle<int> clipBoundsForSnapshot (int clip) const { return clipBounds (clip); } // (round 190gi)
@@ -258,6 +262,7 @@ public:
     int baseRowHeight() const;
     static constexpr int foldedHeight = 7; // a member of a collapsed group: a thin row of clip bars (as FL)
     static constexpr int groupIndent = 8;  // grouped tracks' headers are indented under their group header
+    static int headerIndent (const Song& song, int track); // round 190jf: groupIndent per folder level
     static constexpr int scrollBarSize = 12;
 
     static juce::Colour patternColour (const Song& song, int pattern);
@@ -322,7 +327,7 @@ public:
 private:
     enum class Drag { none, move, resize, trimLeft, slip, erase, seek, loop, select, fadeIn, fadeOut, paint, muting, knife, zoomRange, listen, pan, timeMove, timeShift, autoPoint, autoTension,
                       lanePoint, laneTension, laneDraw, trackResize, headerSelect, preview, trackZoom, heightZoom, timeZoom, perfLaunch, clipGain, swipe, warpMarker,
-                      tempoMarker };
+                      tempoMarker, headerMove };
     void swipeTimeSelectionToComp (int lane);
     // a swipe on a take lane (round 177c): the lane and the range so far
     int swipeLane = -1;
@@ -452,6 +457,10 @@ private:
     void followLinkedTrack (int track); // FL's select-only side effects (instrument channel, mixer track)
     int headerDragAnchor = -1;
     bool headerDragAdding = true, headerDragClips = false, headerCtrlPending = false;
+    // round 190jf (B17): Alt+drag of a header moves the track with its folder (core/FolderDrag.h); where it would land
+    int headerMoveTrack = -1, headerMoveStartX = 0;
+    int headerMoveBefore = -1, headerMoveDepth = 0; // (−1: no move yet)
+    void paintFolderDrop (juce::Graphics& g);
     std::vector<int> headerClipBase;
     // Alt+right-click on a clip: hear it while the button is held (pattern clips play their pattern)
     void startPreview (int clip, int x);

@@ -2876,7 +2876,7 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
         for (const auto& env : t.path ("AutomationEnvelopes/Envelopes").children ("AutomationEnvelope"))
             ctx.automated.insert (env.path ("EnvelopeTarget/PointeeId").attr ("Value"));
     std::vector<int> insertOf (tracks.size(), 0), rowOf (tracks.size(), -1);
-    std::map<std::string, int> groupInsert, groupRow;
+    std::map<std::string, int> groupInsert, groupRow, groupDepth;
     std::vector<int> returns;
     for (std::size_t i = 0; i < tracks.size(); ++i)
     {
@@ -2896,6 +2896,15 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
             row.name = song.mixer.back().name;
             row.colour = song.mixer.back().colour;
             row.grouped = tracks[i].value ("TrackGroupId", "-1") != "-1";
+            // round 190jf (B17): a group inside a group keeps its level (LYNX's nested folders; Live lists a group
+            // track before its members)
+            {
+                const auto parent = groupDepth.find (tracks[i].value ("TrackGroupId", "-1"));
+                const auto depth = row.grouped ? (parent != groupDepth.end() ? parent->second + 1 : 1) : 0;
+                row.nest = std::max (0, depth - 1);
+                if (kind == "GroupTrack")
+                    groupDepth[tracks[i].attr ("Id")] = depth;
+            }
             row.mixerTrack = insertOf[i];
             row.mode = kind == "AudioTrack" ? PlaylistTrackMode::audio : PlaylistTrackMode::unassigned;
             song.playlistTracks.push_back (row);

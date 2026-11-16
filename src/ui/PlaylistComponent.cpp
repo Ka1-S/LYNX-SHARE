@@ -53,6 +53,7 @@
 #include "core/PlaylistOps.h"
 #include "core/PlaylistTrackOps.h"
 #include "core/TrackHeaderGestures.h"
+#include "core/FolderDrag.h" // round 190jf (B17)
 #include "core/KeyFollow.h"
 #include "core/SimpleTracks.h"
 #include "core/QuickRender.h"
@@ -1425,11 +1426,18 @@ void PlaylistComponent::turnBlocksIntoClips()
 
 double PlaylistComponent::tickToX (double tick) const { return headerWidth + (tick - scrollTicks) * pixelsPerTick; }
 double PlaylistComponent::xToTick (int x) const { return (x - headerWidth) / pixelsPerTick + scrollTicks; }
+// Round 190jf (B17): a header's left edge, one step per folder level (FL's groups: 2 px for a header, 8 for a member)
+int PlaylistComponent::headerIndent (const Song& song, int track)
+{
+    const auto depth = noteedit::folderDepth (song, track);
+    return depth > 0 ? groupIndent * depth : 2;
+}
+
 int PlaylistComponent::heightOf (int track) const
 {
     const auto& tracks = engine.getSong().playlistTracks;
     if (noteedit::isFoldedAway (engine.getSong(), track))
-        return foldedHeight;
+        return hideCollapsedGroups ? 0 : foldedHeight; // FL's View › "Hide collapsed grouped tracks" (round 190jf)
     if (arrange::isFolded (engine.getSong(), track)) // round 190cg: a folded track is its title bar
         return liveFoldedHeight;
     const auto h = track >= 0 && track < (int) tracks.size() ? tracks[(std::size_t) track].height : 0;
@@ -1893,8 +1901,8 @@ void PlaylistComponent::paint (juce::Graphics& g)
             const auto y = (float) trackToY (c.track);
             const auto trackHeight = heightOf (c.track);
 
-            if (x1 < grid.getX() || x0 > grid.getRight() || y > grid.getBottom() || y + trackHeight < grid.getY())
-                continue;
+            if (x1 < grid.getX() || x0 > grid.getRight() || y > grid.getBottom() || y + trackHeight < grid.getY() || trackHeight <= 0)
+                continue; // (round 190jf: a hidden collapsed member has no row)
 
             const auto r = clipRectAt (x0, x1, y, trackHeight);
 
@@ -2216,15 +2224,17 @@ void PlaylistComponent::paint (juce::Graphics& g)
                 auto block = colour::bg3;
                 if (const auto c = colourOf (t); c != 0)
                     block = block.interpolatedWith (tame (juce::Colour (c)), 0.28f);
+                // round 190jf (B17): a nested folder's block starts at its header's indent, over its parent's block
+                const auto x0 = noteedit::folderDepth (song, t) > 0 ? (float) headerIndent (song, t) : 0.0f;
                 if (flHeaders()) // FL (round 190ig, FM-23): the group's own colour, its left side rounded (radius 6)
                 {
                     g.setColour (flHeaderFill (colourOf (t)));
-                    g.fillRoundedRectangle (juce::Rectangle<float> (0.0f, (float) top, (float) (headerWidth - rightColumn()), (float) (bottom - top) - 1.0f), 6.0f);
-                    g.fillRect (juce::Rectangle<float> (8.0f, (float) top, (float) (headerWidth - rightColumn()) - 8.0f, (float) (bottom - top) - 1.0f));
+                    g.fillRoundedRectangle (juce::Rectangle<float> (x0, (float) top, (float) (headerWidth - rightColumn()) - x0, (float) (bottom - top) - 1.0f), 6.0f);
+                    g.fillRect (juce::Rectangle<float> (x0 + 8.0f, (float) top, (float) (headerWidth - rightColumn()) - 8.0f - x0, (float) (bottom - top) - 1.0f));
                     continue;
                 }
                 g.setColour (block);
-                g.fillRoundedRectangle (juce::Rectangle<float> (1.0f, (float) top + 1.0f, (float) headerWidth - 2.0f, (float) (bottom - top) - 2.0f), radius::md);
+                g.fillRoundedRectangle (juce::Rectangle<float> (x0 + 1.0f, (float) top + 1.0f, (float) headerWidth - 2.0f - x0, (float) (bottom - top) - 2.0f), radius::md);
             }
 
             // issue #170 (round 190ib): with the tracks linked to the mixer, a track that only repeats a track above it
@@ -2245,9 +2255,8 @@ void PlaylistComponent::paint (juce::Graphics& g)
                 const auto muted = song.isTrackMuted (t);
                 const auto custom = t < (int) song.playlistTracks.size() && ! song.playlistTracks[(std::size_t) t].name.empty();
                 const auto hovered = hover.header && hover.track == t;
-                const auto member = noteedit::groupHeaderOf (song, t) >= 0 && ! noteedit::isGroupHeader (song, t);
                 const auto groupHead = noteedit::isGroupHeader (song, t);
-                const auto left = member ? (float) groupIndent : 2.0f;
+                const auto left = (float) headerIndent (song, t); // (round 190jf: one step per folder level)
                 auto plate = muted ? colour::bg2 : colour::bg3;
                 const auto trackColour = colourOf (t);
                 if (trackColour != 0) // the track's colour (FL projects colour their track headers by group)
@@ -2811,8 +2820,39 @@ void PlaylistComponent::swipeTimeSelectionToComp (int lane)
     sortClips();
 }
 
+// Round 190jf (B17): where an Alt+drag of a header drops the track: a line across the headers and the grid, starting at
+// the indent of the folder level it lands at, and a frame round the folder it joins
+void PlaylistComponent::paintFolderDrop (juce::Graphics& g)
+{
+    if (drag != Drag::headerMove || headerMoveBefore < 0)
+        return;
+    const auto& song = engine.getSong();
+    const auto count = numTracks();
+    const auto y = headerMoveBefore < count ? trackToY (headerMoveBefore) : trackToY (count - 1) + heightOf (count - 1);
+    const juce::Graphics::ScopedSaveState keep (g);
+    g.reduceClipRegion (juce::Rectangle<int> (0, tracksTop(), getWidth(), gridArea().getBottom() - tracksTop()));
+    const auto x = (float) (headerMoveDepth > 0 ? groupIndent * headerMoveDepth : 2);
+    g.setColour (theme::colour::accent);
+    g.fillRect (juce::Rectangle<float> (x, (float) y - 1.0f, (float) getWidth() - x, 2.0f));
+    g.fillEllipse (juce::Rectangle<float> (x - 3.0f, (float) y - 3.0f, 6.0f, 6.0f));
+    if (headerMoveDepth > 0)
+    {
+        // the folder: the nearest row above the place one level up
+        for (int t = headerMoveBefore - 1; t >= 0; --t)
+            if (noteedit::folderDepth (song, t) == headerMoveDepth - 1 && (t < headerMoveTrack || t > noteedit::folderEnd (song, headerMoveTrack)))
+            {
+                const auto top = trackToY (t);
+                const auto end = juce::jmax (noteedit::folderEnd (song, t), headerMoveBefore - 1);
+                const auto bottom = juce::jmax (y, trackToY (end) + heightOf (end));
+                g.drawRect (juce::Rectangle<float> ((float) headerIndent (song, t), (float) top, (float) (headerWidth - headerIndent (song, t)), (float) (bottom - top)), 1.5f);
+                break;
+            }
+    }
+}
+
 void PlaylistComponent::paintOverChildren (juce::Graphics& g)
 {
+    paintFolderDrop (g); // round 190jf (B17)
     if (drag == Drag::swipe && swipeLane >= 0 && swipeEnd != swipeAnchor)
     {
         const auto x0 = (float) tickToX ((double) juce::jmin (swipeAnchor, swipeEnd));
@@ -3477,8 +3517,7 @@ juce::Rectangle<int> PlaylistComponent::trackLaneArrow (int track) const
     if (! autolanes::shown() || track < 0 || track >= (int) song.playlistTracks.size() || song.playlistTracks[(std::size_t) track].lanes.empty()
         || noteedit::isFoldedAway (song, track))
         return {};
-    const auto member = noteedit::groupHeaderOf (song, track) >= 0 && ! noteedit::isGroupHeader (song, track);
-    const auto left = member ? groupIndent : 2;
+    const auto left = headerIndent (song, track);
     // (the Simple headers: in the first row, beside the M and S buttons, clear of the volume row)
     const auto centreY = simpleHeaders || ! trackVolume (track).isEmpty() ? trackLed (track).getCentreY() : trackToY (track) + heightOf (track) / 2;
     return { left + 4, centreY - 6, 12, 12 };
@@ -3599,8 +3638,7 @@ void PlaylistComponent::paintLaneHeaders (juce::Graphics& g, juce::Rectangle<int
     {
         if (laneBlockHeight (t) <= 0)
             continue;
-        const auto member = noteedit::groupHeaderOf (song, t) >= 0 && ! noteedit::isGroupHeader (song, t);
-        const auto left = (float) (member ? groupIndent : 2) + 10.0f; // indented under the track
+        const auto left = (float) headerIndent (song, t) + 10.0f; // indented under the track
         for (int i = 0; i < (int) song.playlistTracks[(std::size_t) t].lanes.size(); ++i)
         {
             const auto row = laneRow (t, i);
@@ -4781,6 +4819,19 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
             repaint (0, headerHeight, headerWidth, getHeight() - headerHeight);
             return;
         }
+        // FL's group mute / solo (manual › Playlist › Mute / Solo, round 190jf B17): Alt+click on the mute LED of any track
+        // of a group mutes / unmutes the whole group, Alt+right-click solos it (core/NoteEdit.h › muteGroup / soloGroup)
+        if (onLed && e.mods.isAltDown() && ! noteedit::groupMuteSet (engine.getSong(), track).empty())
+        {
+            if (flmods::popup (e.mods))
+                engine.editSong ([track, count = numTracks()] (Song& s) {
+                    noteedit::soloGroup (s, track, count, &flsettings::trackSoloMemory(), flsettings::options().restoreStateAfterSolo.load());
+                });
+            else
+                engine.editSong ([track] (Song& s) { noteedit::muteGroup (s, track); });
+            return;
+        }
+
         // the Simple headers (round 184a), and the linked ones (round 190gz): M, S, volume, pan and "+FX" act on the
         // track's mixer insert
         if (const auto insert = simpleInsert (track); insert > 0 && ! flmods::popup (e.mods) && ! (! simpleHeaders && onLed && flmods::ctrl (e.mods)))
@@ -4876,6 +4927,8 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
             // their clips); Ctrl+Shift+click adds / removes the track (and a drag adds / removes the tracks crossed).
             // LYNX keeps its Shift+click: the tracks from the last clicked one (round 165m).
             const auto plan = trackhdr::planPress (flmods::ctrl (e.mods), e.mods.isShiftDown(), e.mods.isAltDown());
+            // round 190jf (B17, LYNX): Alt+drag moves the track with its folder; the press selects it alone, as FL's Alt+click
+            const auto altMove = e.mods.isAltDown() && ! flmods::ctrl (e.mods) && ! e.mods.isShiftDown() && ! simpleHeaders;
             if (plan.lynxShiftRange && currentTrack >= 0)
             {
                 selectedTracks.clear();
@@ -4912,6 +4965,13 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
                 }
                 if (plan.mode == trackhdr::SelMode::only && ! simpleHeaders)
                     followLinkedTrack (track);
+                if (altMove)
+                {
+                    drag = Drag::headerMove;
+                    headerMoveTrack = track;
+                    headerMoveStartX = e.x;
+                    headerMoveBefore = -1;
+                }
             }
             currentTrack = selectedTracks.empty() ? -1 : track; // (the last track removed: nothing is selected)
             if (simpleHeaders)
@@ -5643,6 +5703,26 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
         return;
     }
 
+    if (drag == Drag::headerMove) // round 190jf (B17)
+    {
+        const auto& song = engine.getSong();
+        const auto row = yToTrack (e.y);
+        const auto lower = e.y - trackToY (row) >= heightOf (row) / 2;
+        const auto drop = folderdrag::dropAt (song, headerMoveTrack, row, lower, e.x - headerMoveStartX, numTracks());
+        const auto moved = std::abs (e.getDistanceFromDragStartY()) > 3 || std::abs (e.getDistanceFromDragStartX()) >= folderdrag::stepPx;
+        const auto before = moved && folderdrag::changes (song, headerMoveTrack, drop) ? drop.before : -1;
+        if (before != headerMoveBefore || drop.depth != headerMoveDepth)
+        {
+            headerMoveBefore = before;
+            headerMoveDepth = drop.depth;
+            repaint();
+        }
+        ui::postHint ({ tr ("Moving the track with its group  [Alt] drag right / left: deeper / out of a group"),
+                        before < 0 ? juce::String() : (drop.depth > 0 ? tr ("In a group, level {0}", { juce::String (drop.depth) }) : tr ("Not in a group")),
+                        false, false });
+        return;
+    }
+
     if (drag == Drag::headerSelect)
     {
         // FL FUN_012e8740 on every move: the tracks from the press to the mouse are added (or removed); the range only grows
@@ -5686,6 +5766,7 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
         case Drag::none:
         case Drag::trackResize:
         case Drag::headerSelect:
+        case Drag::headerMove:
         case Drag::trackZoom:
         case Drag::heightZoom:
         case Drag::timeZoom:
@@ -6223,6 +6304,7 @@ void PlaylistComponent::postDragHint()
         case Drag::zoomRange:
         case Drag::trackResize:
         case Drag::headerSelect:
+        case Drag::headerMove:
         case Drag::trackZoom:
         case Drag::heightZoom:
         case Drag::timeZoom:
@@ -6261,6 +6343,26 @@ void PlaylistComponent::mouseUp (const juce::MouseEvent& e)
         return;
     }
     headerCtrlPending = false;
+    if (drag == Drag::headerMove) // round 190jf (B17): the move, one undo step
+    {
+        drag = Drag::none;
+        const auto track = headerMoveTrack, before = headerMoveBefore, depth = headerMoveDepth;
+        headerMoveTrack = headerMoveBefore = -1;
+        if (before >= 0)
+        {
+            int at = -1;
+            engine.editSong ([track, before, depth, &at] (Song& s) { at = noteedit::moveFolder (s, track, before, depth); });
+            if (at >= 0)
+            {
+                selectedTracks = { at };
+                currentTrack = at;
+            }
+            refreshTrackLayout();
+            updateScrollBars();
+        }
+        repaint();
+        return;
+    }
     if (drag == Drag::swipe)
     {
         drag = Drag::none;
@@ -7078,7 +7180,7 @@ juce::Rectangle<int> PlaylistComponent::trackVolume (int track) const
         return { 12, trackToY (track) + h - 20, headerWidth - 122, 12 };
     // a linked header (round 190gz): the bar under the first row, the pan knob at its right (Logic / Bitwig's compact row)
     const auto& song = engine.getSong();
-    const auto left = noteedit::groupHeaderOf (song, track) >= 0 && ! noteedit::isGroupHeader (song, track) ? groupIndent : 2;
+    const auto left = headerIndent (song, track);
     // (rollup 0.1.28: between 190gw's lock strip, the header's first 10 px, and its selection strip at the right edge)
     const auto x = juce::jmax (left + 6, trackhdr::lockStripWidth + 1);
     return { x, trackToY (track) + 20, headerWidth - rightColumn() - insertsColumn() - x - 26, 12 };
@@ -7809,7 +7911,8 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
                 engine.editSong ([track] (Song& s) { noteedit::groupWithAbove (s, track); });
         });
         // the same for a group made in another layout; ticked while the group plays through its header's mixer track
-        if (const auto group = arrange::groupOf (song, track); group.valid() && (liveStyle || arrange::groupBus (song, track) >= 0))
+        // (round 190jf, B17: offered for every group, a folder's bus "if the user wants"; the innermost folder of the track)
+        if (const auto group = arrange::groupOf (song, track); group.valid())
             menu.addItem (tr ("Group plays through its own mixer track"), arrange::groupBus (song, track) < 0, arrange::groupBus (song, track) >= 0,
                           [this, track] { engine.editSongStructural ([track] (Song& s) { arrange::makeGroupBus (s, track); }); });
         // round 190cg: Live's track fold [live-exe-strings.txt:1645415…1645430 sMenuFoldSelectedTrack(s) / sMenuUnfoldAllTracks]
@@ -7832,6 +7935,18 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
             }
         }
         menu.addItem (theme::mnemonic (tr ("Ungroup"), 'n'), member, false, [this, track] { engine.editSong ([track] (Song& s) { noteedit::ungroupTrack (s, track); }); });
+        // round 190jf (B17, LYNX's nested folders; FL's groups have one level): shown for grouped tracks only
+        if (member)
+        {
+            const auto depth = noteedit::folderDepth (song, track);
+            menu.addItem (tr ("Nest under the track above (a group in the group)"), depth <= noteedit::folderDepth (song, track - 1), false,
+                          [this, track] { engine.editSong ([track] (Song& s) { noteedit::nestTrack (s, track); }); });
+            if (depth > 1)
+                menu.addItem (tr ("Move out of its group (one level up)"), [this, track] {
+                    engine.editSong ([track] (Song& s) { noteedit::unnestTrack (s, track); });
+                    refreshTrackLayout();
+                });
+        }
         menu.addItem (tr ("Auto color group"), header >= 0, false, [this, track] { engine.editSong ([track] (Song& s) { noteedit::colourGroup (s, track); }); });
         menu.addItem (tr ("Collapse grouped tracks"), header >= 0, folded, [this, track, folded] {
             engine.editSong ([track, folded] (Song& s) { noteedit::setGroupCollapsed (s, track, ! folded); });
@@ -11127,9 +11242,11 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
     {
         hint.text = h.arm     ? tr ("Audio track: [LMB] arm / disarm recording (its mixer track)")
                     : h.input ? tr ("Audio track: [LMB] audio input source and monitoring (its mixer track)")
+                    : h.led && ! noteedit::groupMuteSet (song, h.track).empty() // round 190jf: FL's group mute / solo
+                        ? tr ("Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group")
                     : h.led   ? tr ("Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo")
                     : h.arrow ? tr ("Track group: [LMB] collapse / expand the grouped tracks")
-                              : tr ("Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down");
+                              : tr ("Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group");
         hint.value = trackName (h.track);
         if (const auto mode = trackmodes::describe (song, h.track); ! mode.empty()) // FL's "(Instrument track)" / "(Audio track, ...)"
             hint.value += " " + (mode.rfind ("(Audio", 0) == 0 ? tr ("(Audio track, linked to mixer track {0})", { juce::String (song.playlistTracks[(std::size_t) h.track].mixerTrack) })
@@ -11914,6 +12031,8 @@ bool PlaylistComponent::stepHeaderMeters (double nowMs)
 void PlaylistComponent::headerOptionsChanged()
 {
     updateMeterColumn();
+    refreshTrackLayout(); // (round 190jf: "Hide collapsed grouped tracks" changes the rows' heights)
+    updateScrollBars();
     repaint();
     if (onViewOptionChanged)
         onViewOptionChanged();

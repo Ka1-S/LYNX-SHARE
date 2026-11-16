@@ -371,7 +371,8 @@ inline int carryLaneAutomation (Song& song, int track, std::int64_t from, std::i
 
 // --- A track group as a bus -------------------------------------------------------------------------------------------
 
-// The header of the group `track` belongs to, and its last member; {-1, -1} when the track is in no group.
+// The header of the group `track` belongs to, and its last member; {-1, -1} when the track is in no group. Round 190jf:
+// the innermost folder (a header's own folder, else its parent's); with one level of groups the same as FL's group.
 struct Group
 {
     int header = -1, last = -1;
@@ -379,15 +380,12 @@ struct Group
 };
 inline Group groupOf (const Song& song, int track)
 {
-    const auto& tracks = song.playlistTracks;
-    if (track < 0 || track >= (int) tracks.size())
+    if (track < 0 || track >= (int) song.playlistTracks.size())
         return {};
-    auto header = track;
-    while (header > 0 && tracks[(std::size_t) header].grouped)
-        --header;
-    auto last = header;
-    while (last + 1 < (int) tracks.size() && tracks[(std::size_t) last + 1].grouped)
-        ++last;
+    const auto header = noteedit::groupHeaderOf (song, track);
+    if (header < 0)
+        return {};
+    const auto last = noteedit::folderEnd (song, header);
     return last > header ? Group { header, last } : Group {};
 }
 
@@ -405,6 +403,18 @@ inline int insertOf (const Song& song, int track)
     return insert > 0 && insert < (int) song.mixer.size() ? insert : -1;
 }
 
+// Round 190jf: the tracks whose inserts sum into a folder's bus: its direct members, and the members of a sub-folder
+// whose header has no insert of its own (a sub-folder with one plays into the bus through it).
+inline void busMembers (const Song& song, int header, std::vector<int>& out)
+{
+    for (const auto c : noteedit::folderChildren (song, header))
+    {
+        out.push_back (c);
+        if (noteedit::isGroupHeader (song, c) && insertOf (song, c) <= 0)
+            busMembers (song, c, out);
+    }
+}
+
 // The bus of the group `track` belongs to: the header's insert, when every member insert plays only into it. -1 = none.
 inline int groupBus (const Song& song, int track)
 {
@@ -415,7 +425,9 @@ inline int groupBus (const Song& song, int track)
     if (bus <= 0)
         return -1;
     int members = 0;
-    for (int t = g.header + 1; t <= g.last; ++t)
+    std::vector<int> tracks;
+    busMembers (song, g.header, tracks);
+    for (const auto t : tracks)
         if (const auto i = insertOf (song, t); i > 0 && i != bus)
         {
             const auto& m = song.mixer[(std::size_t) i];
@@ -435,8 +447,9 @@ inline int makeGroupBus (Song& song, int track)
     const auto g = groupOf (song, track);
     if (! g.valid())
         return -1;
-    std::vector<int> members;
-    for (int t = g.header + 1; t <= g.last; ++t)
+    std::vector<int> members, tracks;
+    busMembers (song, g.header, tracks);
+    for (const auto t : tracks)
         if (const auto i = insertOf (song, t); i > 0 && std::find (members.begin(), members.end(), i) == members.end())
             members.push_back (i);
     if (members.empty())
