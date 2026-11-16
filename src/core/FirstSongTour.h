@@ -111,8 +111,9 @@ struct Placement
 };
 
 // The card (w x h) beside `ring`, `gap` px from it: below it and left-aligned with it first, then right of it, above it,
-// left of it; slid along that side to stay inside `area`; never over the ring or `keepClear` (the Finish dock).
-inline Placement placeCard (Box ring, Box area, int w, int h, int gap, Box keepClear = {})
+// left of it; slid along that side to stay inside `area`; never over the ring, `keepClear` (the Finish dock) or `avoid`
+// (round 190jp: the bottom dock when the ring is in it — step 4's card went below the Chord pad button, over the keys).
+inline Placement placeCard (Box ring, Box area, int w, int h, int gap, Box keepClear = {}, Box avoid = {})
 {
     if (ring.empty() || w > area.w || h > area.h)
         return {};
@@ -121,12 +122,12 @@ inline Placement placeCard (Box ring, Box area, int w, int h, int gap, Box keepC
     const Placement tries[] {
         { { clampX (ring.x), ring.bottom() + gap, w, h }, Side::below },
         { { ring.right() + gap, clampY (ring.y), w, h }, Side::right },
-        { { clampX (ring.x), ring.y - gap - h, w, h }, Side::above },
+        { { clampX (ring.x), (ring.intersects (avoid) ? std::min (ring.y, avoid.y) : ring.y) - gap - h, w, h }, Side::above }, // (above the dock)
         { { ring.x - gap - w, clampY (ring.y), w, h }, Side::left },
     };
     const Box halo { ring.x - gap / 2, ring.y - gap / 2, ring.w + gap, ring.h + gap };
     for (const auto& t : tries)
-        if (t.card.inside (area) && ! t.card.intersects (halo) && ! t.card.intersects (keepClear))
+        if (t.card.inside (area) && ! t.card.intersects (halo) && ! t.card.intersects (keepClear) && ! t.card.intersects (avoid))
             return t;
     return {};
 }

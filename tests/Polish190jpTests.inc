@@ -89,3 +89,21 @@ TEST (polish190jp_bold_text_per_role)
         large[(std::size_t) i] = scaled (standard[(std::size_t) i], 150, (Role) i);
     CHECK (roleOf (large[2], large) == Role::body && roleOf (large[3], large) == Role::title);
 }
+
+#include "core/FirstSongTour.h"
+
+TEST (polish190jp_tour_card_stays_off_the_dock_its_ring_is_in)
+{
+    using namespace lynx::tour;
+    // step 4 (190jc follow-up): the Chord pad button in the bottom dock; below it the card covered the keys
+    const Box window { 0, 0, 1920, 1080 };
+    const Box dock { 0, 760, 1920, 320 };
+    const Box chordPad { 300, 790, 90, 26 };
+    const auto before = placeCard (chordPad, window, 380, 184, 14);
+    CHECK (before.side == Side::below && before.card.intersects (dock)); // (what 190jc did)
+    const auto p = placeCard (chordPad, window, 380, 184, 14, {}, dock);
+    CHECK (p.side == Side::above && ! p.card.intersects (dock) && p.card.bottom() == dock.y - 14 && p.card.inside (window)); // (above the dock, 14 px off)
+    // nothing to avoid: as before
+    const Box addTrack { 71, 69, 122, 42 };
+    CHECK (placeCard (addTrack, window, 380, 184, 14, {}, {}).side == Side::below);
+}

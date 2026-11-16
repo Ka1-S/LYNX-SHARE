@@ -2551,6 +2551,7 @@ SimpleDock::SimpleDock (AudioEngine& e, Hooks h) : engine (e), hooks (std::move 
     padsButton.setTooltip (tr ("The Sampler track's 16 pads: their sounds and how they play"));
     padsButton.setComponentID ("simple.dock.pads");
     // round 190dv: what the first-song tour's ring finds
+    setComponentID ("simple.dock"); // (round 190jp: the tour keeps its card off the dock)
     keyboardButton.setComponentID ("simple.dock.keyboard");
     editorButton.setComponentID ("simple.dock.editor");
     effectsButton.setComponentID ("simple.dock.effects");

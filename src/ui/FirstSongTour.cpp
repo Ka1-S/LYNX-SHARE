@@ -769,7 +769,12 @@ void FirstSongTour::update()
     // round 190jc (design190ia SG-18): beside the ring first (BandLab's coachmark, 12 px from its target with a notch); a
     // corner only when there is no room beside it
     const auto box = [] (juce::Rectangle<int> r) { return tour::Box { r.getX(), r.getY(), r.getWidth(), r.getHeight() }; };
-    const auto beside = tour::placeCard (box (ring.expanded (6)), box (window->getLocalBounds().reduced (12)), w, h, 14, box (keepClear));
+    // (round 190jp: a ring inside the Simple dock keeps the card off the dock, so the keys it points at stay in view)
+    juce::Rectangle<int> dockArea;
+    if (auto* dock = findShowing (*window, "simple.dock"))
+        if (const auto area = areaIn (*window, *dock); area.contains (ring))
+            dockArea = area;
+    const auto beside = tour::placeCard (box (ring.expanded (6)), box (window->getLocalBounds().reduced (12)), w, h, 14, box (keepClear), box (dockArea));
     if (beside.side != tour::Side::none)
         place = { beside.card.x, beside.card.y, beside.card.w, beside.card.h };
     layer->setCard (place, beside.side);

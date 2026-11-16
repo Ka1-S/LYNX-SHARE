@@ -7,6 +7,7 @@
 #include "engine/Exporter.h"
 #include "ui/DialogFrame.h"
 #include "ui/I18n.h"
+#include "ui/Icons.h"
 #include "ui/NewProjectDialog.h"
 #include "ui/Theme.h"
 
@@ -105,6 +106,7 @@ public:
     {
         setWantsKeyboardFocus (false);
         play.setTooltip (tr ("Plays the first bars without opening it"));
+        play.setIconSizing (0.5f, 16.0f);
         play.onClick = [this] { owner.togglePreview (index); };
         addAndMakeVisible (play);
     }
@@ -113,8 +115,11 @@ public:
     {
         const auto& e = owner.list[(std::size_t) index];
         const auto known = e.bpm > 0.0;
-        play.setEnabled (! known || e.playable);
-        play.setButtonText (owner.previewing == index ? tr ("Stop") : owner.rendering == index ? juce::String ("...") : tr ("Play"));
+        // round 190jp (design190ia SG-19, BandLab's square play buttons): a ▶ icon (■ while it plays, … while it renders);
+        // a row with nothing to play shows none
+        play.setVisible (! known || e.playable);
+        play.setIcon (owner.previewing == index ? Icon::stop : owner.rendering == index ? Icon::more : Icon::play);
+        play.setTitle (owner.previewing == index ? tr ("Stop") : tr ("Play"));
         repaint();
     }
 
@@ -128,7 +133,7 @@ public:
         g.setColour (sel ? theme::colour::accent : theme::colour::border);
         g.drawRoundedRectangle (r.reduced (0.5f), theme::radius::md, sel ? 1.5f : 1.0f);
         auto text = getLocalBounds().reduced (12, 6);
-        text.removeFromRight (84);
+        text.removeFromLeft (playSize + 12);
         g.setColour (theme::colour::textPrimary);
         g.setFont (theme::font (theme::type::body, true));
         g.drawFittedText (e.name, text.removeFromTop (text.getHeight() / 2), juce::Justification::centredLeft, 1, 0.8f);
@@ -147,7 +152,8 @@ public:
         g.drawFittedText (line, text, juce::Justification::centredLeft, 1, 0.8f);
     }
 
-    void resized() override { play.setBounds (getLocalBounds().removeFromRight (84).reduced (10, 11)); }
+    static constexpr int playSize = 32;
+    void resized() override { play.setBounds (getLocalBounds().withTrimmedLeft (12).removeFromLeft (playSize).withSizeKeepingCentre (playSize, playSize)); }
     void mouseEnter (const juce::MouseEvent&) override { repaint(); }
     void mouseExit (const juce::MouseEvent&) override { repaint(); }
     void mouseDown (const juce::MouseEvent&) override { owner.select (index); }
@@ -156,7 +162,7 @@ public:
 private:
     StartFromPanel& owner;
     int index;
-    juce::TextButton play;
+    IconButton play { "play", Icon::play };
 };
 
 StartFromPanel::StartFromPanel (AudioEngine& e, Hooks h) : engine (e), hooks (std::move (h)), shared (std::make_shared<Shared>())
@@ -180,6 +186,7 @@ StartFromPanel::StartFromPanel (AudioEngine& e, Hooks h) : engine (e), hooks (st
     hint.setColour (juce::Label::textColourId, theme::colour::textSecondary);
     addAndMakeVisible (hint);
     openButton.setButtonText (tr ("Open"));
+    ui::dialog::styleButton (openButton, true); // (SG-19 / SG-21: the Return default is the dialog's one accent button)
     openButton.onClick = [this] { open (selected); };
     addAndMakeVisible (openButton);
 
