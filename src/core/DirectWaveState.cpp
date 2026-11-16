@@ -435,6 +435,25 @@ std::vector<std::uint8_t> writeDoc (const Doc& doc)
     return out;
 }
 
+int completeShortZoneRecords (Doc& doc)
+{
+    int completed = 0;
+    for (auto& program : doc.top)
+        if (program.id == 1 && program.container)
+            for (auto& zone : program.kids)
+                if (zone.id == 3 && zone.container)
+                    for (auto& record : zone.kids)
+                        if (const auto want = zoneRecordSize (record.id); ! record.container && record.body.size() < want)
+                        {
+                            const auto had = record.body.size();
+                            record.body.resize (want, 0);
+                            if (record.id == 0x1F7 && had <= 36)
+                                put (record.body, 36, (std::int32_t) 32);
+                            ++completed;
+                        }
+    return completed;
+}
+
 Doc freshDoc()
 {
     Doc doc;

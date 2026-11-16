@@ -2,6 +2,11 @@
 
 #include "engine/ProjectFile.h"
 
+#include "core/DirectWaveState.h"
+#include "core/MixSuite.h"
+#include "core/VoiceShift.h"
+
+#include <cmath>
 #include <functional>
 
 // TR_NOOP marks the loss texts for translation (tools/i18n_keys.py); the UI translates them
@@ -74,6 +79,201 @@ void forEachClip (const juce::var& root, const std::function<void (juce::Array<j
             list (s["clip"]);
 }
 
+// Every effect object below `v` (the mixer's slots, a Patcher's nodes, a rack's branches): `fn (effect, where)`, `where`
+// the insert ("#3 \"Vox\"") of a mixer slot, else "Patcher"
+void forEachEffect (const juce::var& root, const std::function<void (juce::DynamicObject&, const juce::String&)>& fn)
+{
+    std::function<void (const juce::var&, const juce::String&)> walk = [&] (const juce::var& v, const juce::String& where) {
+        if (auto* a = arrayOf (v))
+        {
+            for (auto& item : *a)
+                walk (item, where);
+            return;
+        }
+        auto* o = objectOf (v);
+        if (o == nullptr)
+            return;
+        if (o->getProperty ("kind").isString() && o->getProperty ("params").isArray())
+            fn (*o, where);
+        for (auto& p : o->getProperties())
+            walk (p.value, "Patcher");
+    };
+    if (auto* mixer = arrayOf (root["mixer"]))
+        for (int t = 0; t < mixer->size(); ++t)
+            if (auto* fx = arrayOf ((*mixer)[t]["effects"]))
+                for (auto& e : *fx)
+                {
+                    if (auto* o = objectOf (e); o != nullptr && o->getProperty ("kind").isString() && o->getProperty ("params").isArray())
+                        fn (*o, insertName (root["mixer"], t));
+                    if (auto* o = objectOf (e))
+                        for (auto& p : o->getProperties())
+                            walk (p.value, "Patcher");
+                }
+    if (auto* channels = arrayOf (root["channels"]))
+        for (auto& c : *channels)
+            if (auto* o = objectOf (c))
+                for (auto& p : o->getProperties())
+                    walk (p.value, "Patcher");
+}
+
+void addOnce (juce::StringArray& list, const juce::String& item)
+{
+    if (! list.contains (item))
+        list.add (item);
+}
+
+// Rollup 0.1.30 (round 190il): what the other 0.1.30 rounds save that 0.1.28 cannot hold (round 190hq's step above
+// knew only its own). Each loss is reported only when the project has it.
+void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
+{
+    auto& o = *objectOf (root);
+
+    // channels: Tetra (round 190hs) is not in 0.1.28, which would play its channels as its basic synth: an empty Sampler
+    // (silent) keeps the channel, its notes and its routing; DirectWave states (rounds 190hz / 190ii) get their short zone
+    // records completed as DirectWave reads them, since 0.1.28 skipped them (FL's version-36 programs lost their loops)
+    {
+        juce::StringArray tetra;
+        forEachChannel (root, [&] (juce::DynamicObject& c, int i) {
+            const auto instrument = c.getProperty ("instrument").toString();
+            if (instrument == "tetra")
+            {
+                tetra.add (channelName (juce::var (&c), i));
+                c.setProperty ("instrument", "sampler");
+                drop (c, "modelParams");
+                drop (c, "pluginState");
+                drop (c, "samplePath");
+            }
+            else if (instrument == "directwave")
+            {
+                juce::MemoryOutputStream decoded;
+                if (! juce::Base64::convertFromBase64 (decoded, c.getProperty ("pluginState").toString()))
+                    return;
+                const auto* bytes = static_cast<const std::uint8_t*> (decoded.getData());
+                auto doc = dw::readDoc (std::vector<std::uint8_t> (bytes, bytes + decoded.getDataSize()));
+                if (doc && dw::completeShortZoneRecords (*doc) > 0)
+                {
+                    const auto state = dw::writeDoc (*doc);
+                    c.setProperty ("pluginState", juce::Base64::toBase64 (state.data(), state.size()));
+                }
+            }
+        });
+        if (! tetra.isEmpty())
+            lost.push_back ({ TR_NOOP ("Tetra is not in this release: its channels become empty Samplers and play nothing: {0}"), listOf (tetra), true });
+    }
+
+    // notes: index 19 holds a note's MPE curves (round 190hy)
+    {
+        int curved = 0;
+        if (auto* patterns = arrayOf (root["patterns"]))
+            for (auto& p : *patterns)
+                if (auto* notes = arrayOf (p["notes"]))
+                    for (auto& n : *notes)
+                        if (auto* fields = arrayOf (n); fields != nullptr && fields->size() > 19)
+                        {
+                            ++curved;
+                            fields->removeRange (19, fields->size() - 19);
+                        }
+        if (curved > 0)
+            lost.push_back ({ TR_NOOP ("{0} note(s) lose their MPE curves (pitch bend, slide, pressure)"), juce::String (curved), true });
+    }
+
+    // Pattern Blocks: a third element marks a muted block (round 190ht); 0.1.28 reads only [pattern, start] and drops
+    // any other block. A muted block plays nothing, so it is left out (the sound stays); the rest keep their two.
+    {
+        int muted = 0;
+        auto blocks = [&muted] (const juce::var& list) {
+            if (auto* a = arrayOf (list))
+                for (int i = a->size(); --i >= 0;)
+                    if (auto* b = arrayOf ((*a)[i]); b != nullptr && b->size() > 2)
+                    {
+                        if ((int) (*b)[2] != 0)
+                        {
+                            a->remove (i);
+                            ++muted;
+                        }
+                        else
+                            b->removeRange (2, b->size() - 2);
+                    }
+        };
+        blocks (root["blocks"]);
+        if (auto* arrangements = arrayOf (root["arrangements"]))
+            for (const auto& a : *arrangements)
+                blocks (a["blocks"]);
+        if (muted > 0)
+            lost.push_back ({ TR_NOOP ("{0} muted Pattern Block(s) are left out (they play nothing)"), juce::String (muted), false });
+    }
+
+    // clips: index 13 is the clip's pitch, ±48 semitones since round 190hr (0.1.28 holds ±12)
+    {
+        int transposed = 0;
+        forEachClip (root, [&] (juce::Array<juce::var>& clip) {
+            if (clip.size() > 13)
+                if (const auto pitch = (double) clip[13]; std::abs (pitch) > 12.0)
+                {
+                    clip.set (13, juce::jlimit (-12.0, 12.0, pitch));
+                    ++transposed;
+                }
+        });
+        if (transposed > 0)
+            lost.push_back ({ TR_NOOP ("{0} clip(s) transposed by more than 12 semitones play at ±12"), juce::String (transposed), true });
+    }
+
+    // clip slots (round 190hr): the Start marker inside the loop, the clip's own scale
+    {
+        int markers = 0, scales = 0;
+        if (auto* slots = arrayOf (root["clipGrid"]["clips"]))
+            for (auto& slot : *slots)
+                if (auto* so = objectOf (slot))
+                {
+                    markers += drop (*so, "startMarker") ? 1 : 0;
+                    scales += drop (*so, "clipScale") ? 1 : 0;
+                }
+        if (markers > 0)
+            lost.push_back ({ TR_NOOP ("{0} clip slot(s) launch from their loop start (the Start marker inside the loop)"), juce::String (markers), true });
+        if (scales > 0)
+            lost.push_back ({ TR_NOOP ("Clip scales (Scale Mode) of {0} clip slot(s)"), juce::String (scales), false });
+    }
+
+    // effects (round 190ho): Voice Shift's Measured law revision 1, Ridge Strip's 4K Pink EQ (hidden parameters 0.1.28
+    // ignores: it plays revision 0, and Black)
+    {
+        juce::StringArray thump, pink;
+        forEachEffect (root, [&] (juce::DynamicObject& e, const juce::String& where) {
+            auto* params = arrayOf (e.getProperty ("params"));
+            const auto kind = e.getProperty ("kind").toString();
+            if (kind == "voiceShift" && params->size() > voiceshift::revision)
+            {
+                if ((float) (double) (*params)[voiceshift::law] >= 0.5f && (float) (double) (*params)[voiceshift::revision] >= 0.5f)
+                    addOnce (thump, where);
+                params->removeRange (voiceshift::revision, params->size() - voiceshift::revision);
+            }
+            else if (kind == "ridgeStrip" && params->size() > ridge::k4Pink)
+            {
+                if ((float) (double) (*params)[ridge::k4Pink] >= 0.5f)
+                    addOnce (pink, where);
+                params->removeRange (ridge::k4Pink, params->size() - ridge::k4Pink);
+            }
+        });
+        if (! thump.isEmpty())
+            lost.push_back ({ TR_NOOP ("Voice Shift's Measured law plays its earlier version (a low thump at sung onsets): {0}"), listOf (thump), true });
+        if (! pink.isEmpty())
+            lost.push_back ({ TR_NOOP ("Ridge Strip's 4K Pink EQ plays as the Black EQ: {0}"), listOf (pink), true });
+    }
+
+    // the view
+    {
+        bool colours = false;
+        if (auto* automations = arrayOf (root["automations"]))
+            for (auto& a : *automations)
+                if (auto* ao = objectOf (a))
+                    colours = drop (*ao, "colour") || colours;
+        if (colours)
+            lost.push_back ({ TR_NOOP ("Automation clip colours"), {}, false });
+        if (drop (o, "mixSnapshots"))
+            lost.push_back ({ TR_NOOP ("Mix snapshots (the Mixer menu)"), {}, false });
+    }
+}
+
 // --- 0.1.29 / 0.1.30 → 0.1.28 ------------------------------------------------------------------------------------------
 void toRelease0128 (juce::var& root, Losses& lost)
 {
@@ -105,6 +305,8 @@ void toRelease0128 (juce::var& root, Losses& lost)
                     sidechain = sidechain || (int) e.getProperty ("sidechain", -1) > 0 || (int) e.getProperty ("sidechain2", -1) > 0;
     if (sidechain)
         lost.push_back ({ TR_NOOP ("Side-chains are not lined up with plugin delay compensation in this release: behind plugins with latency, ducking may be a few milliseconds off"), {}, true });
+
+    toRelease0128FromRollup030 (root, lost);
 }
 
 // --- 0.1.28 → 0.1.27 -----------------------------------------------------------------------------------------------------

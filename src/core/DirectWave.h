@@ -171,6 +171,9 @@ const Program* playedProgram (const State& state);
 // One program record (the body of chunk 1) / zone record (chunk 3), as parseState reads them (round 190hz: the editor)
 Program parseProgram (const std::uint8_t* body, std::size_t size);
 Zone parseZone (const std::uint8_t* body, std::size_t size);
+// The bytes LYNX reads of zone record `id` (0x1F4…0x204; 0 = none it reads by size). A shorter record is read as
+// DirectWave reads it: over zeros, the sample format record's (0x1F7) bit depth 32 (rollup 0.1.30, REA round 190ii).
+std::size_t zoneRecordSize (std::uint32_t id) noexcept;
 
 // modelParams of an imported channel: { 1, zone count, then per zone 1 when DirectWave holds it as 16-bit
 // integers (16-bit PCM file or 16-bit embedded audio), else 0 }

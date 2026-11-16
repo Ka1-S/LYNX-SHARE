@@ -34,6 +34,10 @@ struct Doc
 
 std::optional<Doc> readDoc (const std::vector<std::uint8_t>& state);
 std::vector<std::uint8_t> writeDoc (const Doc& doc);
+// Gives every zone record shorter than LYNX reads its full size, as DirectWave reads it (zeros; the sample format
+// record's bit depth 32; zoneRecordSize), e.g. the 36-byte sample format records of FL's version-36 programs, for a
+// release whose reader skipped such records (File › "Save a copy for an older LYNX", rollup 0.1.30). Returns how many.
+int completeShortZoneRecords (Doc& doc);
 
 // A new DirectWave's state: no flags, 16 MIDI slots on programs 0…15, 128 empty programs named "---"
 Doc freshDoc();

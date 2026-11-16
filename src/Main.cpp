@@ -65,6 +65,10 @@
 #include "core/FlWrapper.h"
 #include "engine/AudioEngine.h"
 #include "engine/ProjectDowngrade.h"
+#include "core/ClipLauncher.h"
+#include "core/DirectWaveState.h"
+#include "core/MixSnapshots.h"
+#include "core/VoiceShift.h"
 #include "core/TempoMarkers.h"
 #include "engine/RemoteControl.h"
 #include "engine/RemoteError.h"
@@ -5925,6 +5929,144 @@ private:
                 community190hqResult = "ERROR unknown release accepted";
         }
 
+        // rollup 0.1.30 (round 190il): the copy for 0.1.28 knows what the other 0.1.30 rounds save: a Tetra channel becomes
+        // an empty Sampler, MPE note curves, muted Pattern Blocks, clips transposed past ±12, clip slots' Start markers and
+        // scales, Voice Shift's revision 1, Ridge's Pink EQ, automation colours and mix snapshots are reported and taken
+        // out; a DirectWave state's 36-byte sample format record is completed (0.1.28 skipped it, and the loop with it)
+        juce::String rollup030Result = "OK";
+        {
+            auto song = lynx::Song::makeDefault();
+            lynx::ChannelDef tetra;
+            tetra.name = "FM";
+            tetra.instrument = lynx::InstrumentKind::tetra;
+            tetra.modelParams = { 0.5f, 0.25f };
+            song.channels.push_back (tetra);
+            lynx::ChannelDef wave;
+            wave.name = "Piano";
+            wave.instrument = lynx::InstrumentKind::directwave;
+            {
+                auto doc = lynx::dw::freshDoc();
+                lynx::dw::Node zone;
+                zone.id = 3;
+                zone.container = true;
+                lynx::dw::Node format;
+                format.id = 0x1F7;
+                format.body.assign (36, 0);
+                format.body[20] = 2; // loop mode
+                format.body[24] = 44; // loop A
+                format.body[28] = 200; // loop B
+                zone.kids.push_back (format);
+                for (auto& n : doc.top)
+                    if (n.id == 1 && n.container)
+                    {
+                        n.kids.push_back (zone);
+                        break;
+                    }
+                wave.pluginState = lynx::dw::writeDoc (doc);
+            }
+            song.channels.push_back (wave);
+            lynx::Note curved;
+            curved.key = 60;
+            curved.length = lynx::ppq;
+            lynx::NoteCurves curves;
+            curves.lane (lynx::NoteCurveLane::pitch) = { { 0.0f, 0.0f }, { 96.0f, 200.0f } };
+            curved.curves = curves;
+            song.patterns[0].notes.push_back (curved);
+            song.patternBlocksOn = true;
+            lynx::patternblocks::place (song, 0, 0);
+            lynx::patternblocks::place (song, 0, 4 * lynx::ppq);
+            lynx::patternblocks::setMuted (song, 1, true);
+            lynx::Clip up;
+            up.track = 1;
+            up.length = 4 * lynx::ppq;
+            up.pitch = 24.0f;
+            song.playlist.push_back (up);
+            lynx::Clip slotClip;
+            slotClip.length = 4 * lynx::ppq;
+            if (const auto id = lynx::launcher::setClip (song, 0, 0, slotClip); id >= 0)
+            {
+                song.clipGrid->slots[(std::size_t) id].startMarker = lynx::ppq;
+                song.clipGrid->slots[(std::size_t) id].ownScale = true;
+            }
+            song.mixer[1].effects.push_back (lynx::makeEffectSlot (lynx::EffectKind::voiceShift)); // (a new one: revision 1)
+            auto ridgeSlot = lynx::makeEffectSlot (lynx::EffectKind::ridgeStrip);
+            ridgeSlot.params[(std::size_t) lynx::ridge::k4Pink] = 1.0f;
+            song.mixer[2].effects.push_back (ridgeSlot);
+            lynx::Automation coloured;
+            coloured.name = "Cutoff";
+            coloured.colour = 0xFFC03030u;
+            coloured.points = { { 0, 0.2f }, { 1920, 0.8f } };
+            song.automations.push_back (coloured);
+            lynx::mixsnap::take (song);
+
+            const auto copy = lynx::olderlynx::forRelease (song, "0.1.28");
+            juce::String why;
+            const auto back = copy.ok ? lynx::ProjectFile::fromJson (copy.json, why) : std::optional<lynx::Song> {};
+            const auto said = [&copy] (const char* start) {
+                return std::any_of (copy.lost.begin(), copy.lost.end(), [start] (const lynx::olderlynx::Loss& l) { return juce::String (l.text).startsWith (start); });
+            };
+            const auto parsed = juce::JSON::parse (copy.json);
+            const auto* channels = parsed["channels"].getArray();
+            bool fmEmpty = false, notesCut = true, waveDone = false;
+            if (channels != nullptr)
+                for (const auto& c : *channels)
+                {
+                    if (c["name"].toString() == "FM")
+                        fmEmpty = c["instrument"].toString() == "sampler" && ! c.hasProperty ("modelParams");
+                    if (c["name"].toString() == "Piano")
+                    {
+                        juce::MemoryOutputStream bytes;
+                        if (juce::Base64::convertFromBase64 (bytes, c["pluginState"].toString()))
+                        {
+                            const auto* b = static_cast<const std::uint8_t*> (bytes.getData());
+                            if (const auto st = lynx::dw::parseState (std::vector<std::uint8_t> (b, b + bytes.getDataSize())))
+                                for (const auto& prog : st->programs)
+                                    for (const auto& z : prog.zones)
+                                        waveDone = waveDone || (z.loopMode == 2 && z.loopA == 44 && z.loopB == 200 && z.bits == 32);
+                            if (const auto doc = lynx::dw::readDoc (std::vector<std::uint8_t> (b, b + bytes.getDataSize())))
+                                for (const auto& n : doc->top)
+                                    for (const auto& z : n.kids)
+                                        for (const auto& r : z.kids)
+                                            if (r.id == 0x1F7)
+                                                waveDone = waveDone && r.body.size() == 40;
+                        }
+                    }
+                }
+            if (const auto* patterns = parsed["patterns"].getArray())
+                for (const auto& pt : *patterns)
+                    if (const auto* notes = pt["notes"].getArray())
+                        for (const auto& n : *notes)
+                            notesCut = notesCut && n.size() <= 19;
+            if (! copy.ok || ! back)
+                rollup030Result = "ERROR copy " + why;
+            else if (! fmEmpty || ! said ("Tetra is not in this release"))
+                rollup030Result = "ERROR Tetra channel";
+            else if (! waveDone)
+                rollup030Result = "ERROR DirectWave short record";
+            else if (! notesCut || ! said ("{0} note(s) lose their MPE curves"))
+                rollup030Result = "ERROR note curves";
+            else if (back->blocks.size() != 1 || back->blocks[0].start != 0 || ! said ("{0} muted Pattern Block(s)"))
+                rollup030Result = "ERROR muted blocks";
+            else if (std::none_of (back->playlist.begin(), back->playlist.end(), [] (const lynx::Clip& c) { return c.pitch == 12.0f; })
+                     || ! said ("{0} clip(s) transposed"))
+                rollup030Result = "ERROR clip pitch";
+            else if (copy.json.contains ("startMarker") || copy.json.contains ("clipScale") || ! said ("{0} clip slot(s) launch") || ! said ("Clip scales"))
+                rollup030Result = "ERROR clip slots";
+            else if (! said ("Voice Shift's Measured law") || ! said ("Ridge Strip's 4K Pink EQ")
+                     || parsed["mixer"][1]["effects"][0]["params"].size() > lynx::voiceshift::revision)
+                rollup030Result = "ERROR effects";
+            else if (copy.json.contains ("mixSnapshots") || ! said ("Mix snapshots") || ! said ("Automation clip colours")
+                     || std::any_of (back->automations.begin(), back->automations.end(), [] (const lynx::Automation& a) { return a.colour != 0; }))
+                rollup030Result = "ERROR view items";
+            else if (const auto plain = lynx::olderlynx::forRelease (lynx::Song::makeDefault(), "0.1.28");
+                     ! plain.ok || std::any_of (plain.lost.begin(), plain.lost.end(), [] (const lynx::olderlynx::Loss& l) {
+                         const auto t = juce::String (l.text);
+                         return t.startsWith ("Tetra") || t.contains ("MPE") || t.contains ("Pattern Block") || t.contains ("Voice Shift")
+                                || t.contains ("Ridge") || t.startsWith ("Automation clip colours") || t.startsWith ("Mix snapshots");
+                     }))
+                rollup030Result = "ERROR a plain project reports a loss it does not have";
+        }
+
         // round 190dr: the Session mixer's sections come back from a project (a project without them: Live's defaults);
         // a device dragged to another track and a Warp switch are one undo step each in a real engine
         juce::String livescr190drResult = "OK";
@@ -6209,7 +6351,7 @@ private:
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && exportParity.startsWith ("OK") && midiHotplug.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
-                        && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK"
+                        && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK"
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
                         && hostedStateContentionResult.startsWith ("OK")
                         && danceWindowResult == "OK" && clickActivationResult == "OK";
@@ -6282,6 +6424,7 @@ private:
                << "editor_scale190he_saved=" << editorScale190heResult << "\n"
                << "sf_mod_base190he=" << sfModBase190heResult << "\n"
                << "community190hq_saved=" << community190hqResult << "\n"
+               << "rollup030_copy_for_0128=" << rollup030Result << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
                << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n";
 

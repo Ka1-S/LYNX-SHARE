@@ -126,3 +126,30 @@ TEST (rollup030_directwave_v36_state_loops_on_every_path)
         if (const auto again = lynx::dw::parseState (*imported); again && lynx::dw::playedProgram (*again) != nullptr)
             CHECK (loopKept (lynx::dw::playedProgram (*again)->zones.at (0)));
 }
+
+TEST (rollup030_directwave_copy_for_an_older_release_completes_short_records)
+{
+    // File › "Save a copy for an older LYNX" (0.1.28, whose readZone skipped a short record): the document's short zone
+    // records get their full size as DirectWave reads them; nothing else changes
+    using namespace rollup030;
+    const auto state = stateWith (36, zoneBody (formatRecord (36, 2, 300, 800)));
+    auto doc = lynx::dw::readDoc (state);
+    CHECK (doc.has_value());
+    if (! doc)
+        return;
+    CHECK (lynx::dw::completeShortZoneRecords (*doc) == 1);
+    CHECK (lynx::dw::completeShortZoneRecords (*doc) == 0);
+    const auto written = lynx::dw::writeDoc (*doc);
+    CHECK (written.size() == state.size() + 4);
+    const auto st = lynx::dw::parseState (written);
+    CHECK (st && lynx::dw::playedProgram (*st) != nullptr);
+    if (st && lynx::dw::playedProgram (*st) != nullptr)
+    {
+        const auto& z = lynx::dw::playedProgram (*st)->zones.at (0);
+        CHECK (z.loopMode == 2 && z.loopA == 300 && z.loopB == 800 && z.bits == 32 && z.root == 45);
+    }
+    // a state with full records is written back byte for byte
+    const auto full = stateWith (38, zoneBody (formatRecord (40, 1, 10, 900)));
+    auto fullDoc = lynx::dw::readDoc (full);
+    CHECK (fullDoc && lynx::dw::completeShortZoneRecords (*fullDoc) == 0 && lynx::dw::writeDoc (*fullDoc) == full);
+}

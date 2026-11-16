@@ -66,7 +66,7 @@ std::int32_t ri (const std::uint8_t* p) { std::int32_t v; std::memcpy (&v, p, 4)
 std::uint16_t ru16 (const std::uint8_t* p) { std::uint16_t v; std::memcpy (&v, p, 2); return v; }
 
 // The bytes LYNX reads of a zone record (0 = a record it reads whole, or none it knows).
-std::size_t zoneRecordSize (std::uint32_t id) noexcept
+std::size_t zoneRecordSizeOf (std::uint32_t id) noexcept
 {
     switch (id)
     {
@@ -94,7 +94,7 @@ void readZone (const Chunk& z, Zone& zone)
         // their loops are read, bits = 32 (round 190il; before, the whole record was skipped and with it the loop).
         std::uint8_t completed[40] {};
         auto c = chunk;
-        if (const auto want = zoneRecordSize (chunk.id); want != 0 && chunk.size < want)
+        if (const auto want = zoneRecordSizeOf (chunk.id); want != 0 && chunk.size < want)
         {
             std::memcpy (completed, chunk.data, chunk.size);
             if (chunk.id == 0x1F7 && chunk.size <= 36)
@@ -2059,6 +2059,11 @@ Program parseProgram (const std::uint8_t* body, std::size_t size)
     Program p;
     readProgram (Chunk { 1, body, size }, p);
     return p;
+}
+
+std::size_t zoneRecordSize (std::uint32_t id) noexcept
+{
+    return zoneRecordSizeOf (id);
 }
 
 Zone parseZone (const std::uint8_t* body, std::size_t size)
