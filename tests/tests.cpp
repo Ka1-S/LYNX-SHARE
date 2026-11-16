@@ -17840,3 +17840,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Bugs190irTests.inc" // round 190ir: issue #189 text size, takes on the tracks FL picks (Discord report)
 #include "Parity190isTests.inc" // round 190is: Echoform voicings revision 1, the Soundtoys echoes' own defaults
 #include "Warp190ikTests.inc" // round 190ik: Complex Pro, granular Texture, the pitch-aware Beats detector
+#include "Details190imTests.inc" // round 190im: activity meter reader, deactivated grid clips, Live keys 0 / Ctrl+E

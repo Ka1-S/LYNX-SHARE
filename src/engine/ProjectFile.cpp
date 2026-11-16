@@ -1768,6 +1768,8 @@ juce::var clipGridToVar (const ClipGrid& grid, const std::vector<int>* envelopes
             o->setProperty ("noStop", true);
         if (slot.blankName) // (round 190em)
             o->setProperty ("blankName", true);
+        if (! slot.active) // (round 190im: a deactivated clip)
+            o->setProperty ("inactive", true);
         if (slot.groove != 0)
             o->setProperty ("groove", (juce::int64) slot.groove);
         if (slot.startMarker != 0) // (round 190hr: Live's Start marker inside the loop)
@@ -1827,6 +1829,7 @@ std::optional<ClipGrid> clipGridFromVar (const juce::var& v, const Song& song)
             slot.loop = (bool) o.getProperty ("loop", true);
             slot.noStop = (bool) o.getProperty ("noStop", false);
             slot.blankName = (bool) o.getProperty ("blankName", false);
+            slot.active = ! (bool) o.getProperty ("inactive", false);
             slot.groove = (std::uint32_t) (juce::int64) o.getProperty ("groove", 0);
             slot.startMarker = juce::jmax<juce::int64> (0, (juce::int64) o.getProperty ("startMarker", 0));
             if (const auto sc = o["clipScale"]; sc.isArray() && sc.size() >= 4)

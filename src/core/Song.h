@@ -2422,6 +2422,9 @@ struct ClipGridSlot
     bool ownScale = false, scaleOn = true;
     std::int8_t scaleRoot = 0;
     std::int16_t scaleIndex = 0;
+    // round 190im (R12, DL-15): Live's deactivated clip (the 0 key, "Deactivate Selected Clip"): drawn greyed, a launch
+    // (its own, a scene's, a follow action's) leaves it silent. Saved in .lynx only when off ("inactive")
+    bool active = true;
     bool operator== (const ClipGridSlot&) const = default;
 };
 

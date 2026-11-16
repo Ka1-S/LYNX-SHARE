@@ -3279,6 +3279,22 @@ public:
             if (menu.getNumItems() > 0)
                 menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&wave).withMousePosition());
         };
+        // round 190im (R11, DF-113): FL's handles dragged on the waveform — the "Start" marker turns the Start offset knob,
+        // the loop lines the loop Start / End knobs (Shift: the whole loop moves, as Shift on the knobs; FL)
+        wave.setHandlesEditable (true);
+        wave.onHandleDrag = [this] (ui::WaveformDisplay::Handle h, double v, bool shift) {
+            using H = ui::WaveformDisplay::Handle;
+            if (h == H::start)
+            {
+                startOffsetKnob.setValue (v, juce::sendNotificationSync);
+                return;
+            }
+            if (shownFrames <= 1 || ! loopStartKnob.isEnabled())
+                return;
+            const juce::ScopedValueSetter<bool> shiftNow (shiftHeld, shift);
+            auto& knob = h == H::loopStart ? loopStartKnob : loopEndKnob;
+            knob.setValue (std::round (v * (double) (shownFrames - 1)), juce::sendNotificationSync);
+        };
         addAndMakeVisible (wave);
         // round 190ih (PLAN R11 part, DF-115), FL's manual (Sampler › Drag and Drop): the sample is dragged out of the
         // waveform onto the Playlist, a channel, the Browser's targets... (as a Browser file drag; an OS file drag from
@@ -3611,11 +3627,29 @@ public:
         else if (what == "declick") { declick.setSelectedId ((int) value + 1, juce::sendNotificationSync); done = true; }
         else if (what == "legacy") { effectsTarget.setIndex ((int) value); showLegacy(); done = true; }
         else if (what == "zoom") { wave.setView (0.25, 0.25 + value); done = true; }
+        // round 190im (R11): a handle dragged on the waveform to `value` (start: region fraction; loop: file fraction)
+        else if (what.startsWith ("drag") && wave.onHandleDrag != nullptr)
+        {
+            using H = ui::WaveformDisplay::Handle;
+            const auto h = what == "dragStart" ? H::start : what == "dragLoopStart" ? H::loopStart : H::loopEnd;
+            wave.onHandleDrag (h, value, shift);
+            done = true;
+        }
         shiftHeld = false;
         refresh();
         return done;
     }
     bool shotLegacyShown() const { return boost.isVisible() && ! removeDc.isVisible(); }
+    juce::String handleProbeForShot (const juce::String& name) const
+    {
+        using H = ui::WaveformDisplay::Handle;
+        const auto h = name == "Start" ? H::start : name == "LoopStart" ? H::loopStart : H::loopEnd;
+        const auto x = wave.handleXForSnapshot (h);
+        if (x < 0.0f)
+            return "none";
+        const auto got = wave.handleAt ({ x + 1.0f, (float) wave.getHeight() * 0.25f });
+        return got == H::start ? "start" : got == H::loopStart ? "loopStart" : got == H::loopEnd ? "loopEnd" : "none";
+    }
     bool shotEnabled (const juce::String& what) const
     {
         return what == "keepOnDisk"    ? keepOnDisk.isEnabled()
@@ -7520,6 +7554,8 @@ juce::String samplerPageQuery (juce::Component& root, const juce::String& what)
     auto* p = findSamplerPage (root);
     if (p == nullptr)
         return {};
+    if (what.startsWith ("handleAt")) // round 190im: the handle a press at a handle's drawn place takes ("start", "loopStart", "loopEnd")
+        return p->handleProbeForShot (what.fromFirstOccurrenceOf ("handleAt", false, false));
     if (what == "legacy")
         return p->shotLegacyShown() ? "1" : "0";
     if (what == "mode")
