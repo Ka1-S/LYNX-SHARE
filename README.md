@@ -245,7 +245,8 @@ Projects saved by GarageBand 10 for Mac or GarageBand for iOS open as Simple-wor
 key, song sections (as markers), each track's level, pan and mute, MIDI regions with their notes, and audio regions
 from the project's Media folder (with their trim). Open the `.band` package itself, the `projectData` file inside it,
 or a zip of it. GarageBand's instruments and effects are not stored in a readable form: instrument tracks play
-LYNX SHARE's built-in synth (a preset chosen by the patch name) and drum kits its built-in drums; Smart Drums, Drummer
+LYNX SHARE's built-in synth (a preset chosen by the patch name) and drum kits its built-in drums, except Sampler
+instruments you made in GarageBand for iOS: their recordings are inside the project and play on a Sampler track. Smart Drums, Drummer
 and pattern regions, take folders, tempo changes and Apple Loops that are not inside the project are listed in the
 import report. Projects from GarageBand 6–11 (2013 and older) are not readable: save them again in GarageBand 10, or
 export the tracks as audio (or MIDI) and bring the folder in with the Simple workflow's *Folder...* import.
