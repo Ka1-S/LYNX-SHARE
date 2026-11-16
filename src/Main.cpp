@@ -51,6 +51,7 @@
 #include "core/FlEffects.h"
 #include "core/FlpImport.h"
 #include "core/NoteEdit.h"
+#include "core/NoteNames.h"
 #include "core/MaximusFx.h"
 #include "core/ChainPresets.h"
 #include "core/GoalKnobs.h"
@@ -2256,6 +2257,18 @@ public:
             const auto i = args.indexOf ("--toolbarshot190iv");
             const auto project = i + 2 < args.size() && ! args[i + 2].startsWith ("--") ? args[i + 2].unquoted() : juce::String();
             runToolbarShot190iv (args[i + 1].unquoted(), project);
+            quit();
+            return;
+        }
+
+        if (args.contains ("--fllook190joshot"))
+        {
+            // LYNX --fllook190joshot prefix project.flp: round 190jo off screen (design190ia slices 12, 21, 23): the Pattern
+            // toolbar's tiles in every state, time / tempo / hint / menu bar, at 1920 / 1600 / 1366 / 1280; the Piano roll
+            // (FL's rows, notes, keys, grid, ghosts); the audio editor in Edison's layout with FL's "DL Breaker.wav";
+            // prefix-checks.txt (note label contrast)
+            const auto i = args.indexOf ("--fllook190joshot");
+            runFllook190joShot (args[i + 1].unquoted(), i + 2 < args.size() && ! args[i + 2].startsWith ("--") ? args[i + 2].unquoted() : juce::String());
             quit();
             return;
         }
@@ -26999,6 +27012,217 @@ private:
         offline.dispatchPendingMessages();
         check ("05 Complex panel (no settings row)", shoot ("05-complex"));
         juce::File (prefix + "-checks.txt").replaceWithText (checks);
+    }
+
+    // LYNX --fllook190joshot prefix project.flp: round 190jo off screen (design190ia slices 12 FM-S6, 21 FM-S4, 23 FW-S4)
+    void runFllook190joShot (const juce::String& prefix, const juce::String& project)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        const juce::ScopedValueSetter<bool> shown (lynx::ui::showingForShots(), true);
+        lynx::ui::motion::enabled() = false; // (hover states drawn at once, no fade)
+        juce::String checks;
+        const auto flush = [&] { juce::File (lynx::shot::file (juce::File (prefix + "-checks.txt"))).replaceWithText (checks); };
+        const auto check = [&] (const juce::String& what, bool ok) { checks << (ok ? "ok   " : "FAIL ") << what << "\n"; flush(); };
+        const auto line = [&] (const juce::String& what) { checks << "     " << what << "\n"; flush(); };
+        lynx::AudioEngine offline (false);
+        lynx::MainComponent ui (offline, false);
+        ui.setSize (1920, 1080);
+        const auto settle = [&] {
+            for (int k = 0; k < 3; ++k)
+                offline.dispatchPendingMessages();
+        };
+        const auto area = [&] (juce::Rectangle<int> r, const juce::String& name) { saveArea (ui, r, prefix + "-" + name + ".png"); };
+        ui.selectTabForSnapshot (2);
+        if (project.isNotEmpty())
+        {
+            ui.openFile (juce::File (project));
+            settle();
+        }
+        check ("the project opened", ! offline.getSong().channels.empty());
+        const auto bar = [&ui] { return ui.getLocalBounds().withHeight (juce::jmin (ui.getHeight(), 90)); };
+        const std::pair<int, int> sizes[] { { 1920, 1080 }, { 1600, 900 }, { 1366, 768 }, { 1280, 800 } };
+
+        // ---- slice 12: the Pattern toolbar ------------------------------------------------------------------------------
+        for (const auto& [w, h] : sizes)
+        {
+            ui.setSize (w, h);
+            settle();
+            area (bar(), "tb-" + juce::String (w));
+            int tiles = 0;
+            for (auto* c : ui.getChildren())
+                if (auto* b = dynamic_cast<lynx::IconButton*> (c); b != nullptr && b->isVisible() && b->getLook() == lynx::IconButton::Look::flTile)
+                    ++tiles;
+            line ("toolbar " + juce::String (w) + ": " + juce::String (tiles) + " tiled buttons");
+        }
+        ui.setSize (1920, 1080);
+        settle();
+        std::vector<lynx::IconButton*> tiled;
+        for (auto* c : ui.getChildren())
+            if (auto* b = dynamic_cast<lynx::IconButton*> (c); b != nullptr && b->isVisible() && b->getLook() == lynx::IconButton::Look::flTile)
+                tiled.push_back (b);
+        check ("the Pattern toolbar's buttons are FL tiles (" + juce::String ((int) tiled.size()) + ")", tiled.size() >= 25);
+        std::vector<bool> lit;
+        for (auto* b : tiled)
+            lit.push_back (b->getToggleState());
+        area (bar(), "tb-states-idle");
+        for (const auto& [state, name] : { std::pair<juce::Button::ButtonState, const char*> { juce::Button::buttonOver, "hover" }, { juce::Button::buttonDown, "pressed" } })
+        {
+            for (auto* b : tiled)
+                b->setState (state);
+            area (bar(), juce::String ("tb-states-") + name);
+            for (auto* b : tiled)
+                b->setState (juce::Button::buttonNormal);
+        }
+        for (auto* b : tiled)
+            b->setToggleState (true, juce::dontSendNotification);
+        area (bar(), "tb-states-on");
+        for (auto* b : tiled)
+            b->setState (juce::Button::buttonOver);
+        area (bar(), "tb-states-on-hover");
+        for (std::size_t k = 0; k < tiled.size(); ++k)
+        {
+            tiled[k]->setState (juce::Button::buttonNormal);
+            tiled[k]->setToggleState (lit[k], juce::dontSendNotification);
+            tiled[k]->setEnabled (false);
+        }
+        area (bar(), "tb-states-disabled");
+        for (auto* b : tiled)
+            b->setEnabled (true);
+        // one switch and one plain button under the mouse, as FL's capture (its audio editor button lit)
+        if (auto* metronome = dynamic_cast<lynx::IconButton*> (ui.toolbarPartForSnapshot ("metronome")))
+        {
+            metronome->setState (juce::Button::buttonOver);
+            area (bar(), "tb-hover-switch");
+            metronome->setState (juce::Button::buttonNormal);
+        }
+        // the time panel in B:S:T at bar 3, step 05, tick 12 (FL: "3:05:12"), the tempo, and the hint bar
+        {
+            auto& transport = offline.getTransport();
+            const auto& song = offline.getSong();
+            transport.positionTicks.store ((double) (2 * song.barTicks()) + 4.0 * lynx::ticksPerStep + lynx::ticksPerStep / 2.0);
+            ui.transportTickForSnapshot();
+            auto* time = ui.toolbarPartForSnapshot ("position");
+            auto* tempo = ui.toolbarPartForSnapshot ("tempo");
+            if (time != nullptr && tempo != nullptr)
+            {
+                area (time->getBounds().getUnion (tempo->getBounds()).expanded (8, 6), "tb-time");
+                if (auto* hs = dynamic_cast<lynx::ui::HintSource*> (time))
+                    line ("time panel: " + hs->hintAt ({}).value);
+                check ("the time panel reads FL's B:S:T (3:05:12)", dynamic_cast<lynx::ui::HintSource*> (time) != nullptr
+                                                                     && dynamic_cast<lynx::ui::HintSource*> (time)->hintAt ({}).value == "3:05:12");
+            }
+            transport.positionTicks.store (0.0);
+            ui.transportTickForSnapshot();
+        }
+        const auto hintColumn = juce::Rectangle<int> (0, 0, 360, 80);
+        if (auto* knob = dynamic_cast<lynx::ui::HintSource*> (ui.toolbarPartForSnapshot ("masterVolume")))
+        {
+            ui.setHintForSnapshot (knob->hintAt ({}));
+            area (hintColumn, "tb-hint-knob");
+        }
+        if (auto* rec = dynamic_cast<juce::Button*> (ui.toolbarPartForSnapshot ("record")))
+        {
+            ui.setHintForSnapshot ({ rec->getTooltip().upToFirstOccurrenceOf ("\n", false, false), {}, false, true });
+            area (hintColumn, "tb-hint-button");
+        }
+        ui.setHintForSnapshot ({});
+        area (hintColumn, "tb-menu");
+
+        // ---- slice 21: the Piano roll ----------------------------------------------------------------------------------
+        ui.selectTabForSnapshot (1);
+        settle();
+        saveSnapshot (ui, prefix + "-pr.png");
+        auto& roll = ui.getPianoRollForSnapshot();
+        line ("piano roll rows: " + juce::String (roll.rowHeight) + " px");
+        check ("FL's 18 px rows by default", roll.rowHeight == 18);
+        lynx::PianoRollComponent::keyStyle = lynx::pianokeys::Style::piano;
+        roll.repaint();
+        saveSnapshot (ui, prefix + "-pr-pianokeys.png");
+        lynx::PianoRollComponent::keyStyle = lynx::pianokeys::Style::flat;
+        lynx::notenames::everyKey.store (true);
+        roll.repaint();
+        saveSnapshot (ui, prefix + "-pr-allnames.png");
+        lynx::notenames::everyKey.store (false);
+        roll.repaint();
+        ui.setHintForSnapshot (roll.hoverForSnapshot());
+        saveSnapshot (ui, prefix + "-pr-hover.png");
+        ui.setHintForSnapshot ({});
+        {
+            // FL's ghost capture: "Synth Bass" (no notes of its own in this pattern) over the other channels' notes
+            const auto& song = offline.getSong();
+            int bass = -1;
+            for (int c = 0; c < (int) song.channels.size() && bass < 0; ++c)
+                if (juce::String (song.channels[(std::size_t) c].name).equalsIgnoreCase ("Synth Bass"))
+                    bass = c;
+            const auto kept = offline.getSelectedChannel();
+            if (bass >= 0)
+            {
+                offline.setSelectedChannel (bass);
+                settle();
+                roll.rowHeight = 18;
+                roll.repaint();
+                saveSnapshot (ui, prefix + "-pr-ghosts.png");
+                offline.setSelectedChannel (kept);
+                settle();
+            }
+            check ("Synth Bass found for the ghosts", bass >= 0);
+        }
+        {
+            // the note label against the note over the velocity range of each note colour group (WCAG)
+            float worst = 99.0f;
+            for (int group = 0; group < 16; ++group)
+                for (float v = 0.0f; v <= 1.0001f; v += 0.05f)
+                {
+                    const auto fill = lynx::theme::noteGroupColour (group, v);
+                    const auto label = fill.getPerceivedBrightness() > 0.5f ? lynx::theme::colour::bg0 : lynx::theme::colour::textPrimary;
+                    worst = juce::jmin (worst, lynx::theme::contrast (label, fill));
+                }
+            line ("note label contrast, worst of 16 colour groups x velocity 0..1: " + juce::String (worst, 2) + ":1");
+            const auto red = lynx::theme::noteGroupColour (0, 0.78f);
+            line ("default note " + red.toDisplayString (false) + " label " + juce::String (lynx::theme::contrast (lynx::theme::colour::bg0, red), 2) + ":1");
+            check ("note labels >= 4.5:1 on the default red notes", lynx::theme::contrast (lynx::theme::colour::bg0, red) >= 4.5f);
+        }
+        ui.selectTabForSnapshot (2);
+        settle();
+
+        // ---- slice 23: the audio editor in Edison's layout -------------------------------------------------------------
+        {
+            const juce::File breaker ("C:\\Program Files\\Image-Line\\FL Studio 2026\\Data\\Patches\\Packs\\Loops\\DL Breaker.wav");
+            const auto wav = breaker.existsAsFile() ? breaker : juce::File (juce::SystemStats::getEnvironmentVariable ("LYNX_190JO_WAV", ""));
+            check ("FL's DL Breaker.wav", wav.existsAsFile());
+            if (wav.existsAsFile())
+                if (auto editor = lynx::makeAudioEditorForFileSnapshot (offline, wav))
+                {
+                    for (const auto& [w, h] : { std::pair { 1120, 600 }, std::pair { 960, 520 } })
+                    {
+                        editor->setSize (w, h);
+                        saveSnapshot (*editor, prefix + "-ed-breaker-" + juce::String (w) + ".png");
+                    }
+                    editor->setSize (760, 320); // (the compact form: a short dock)
+                    saveSnapshot (*editor, prefix + "-ed-compact.png");
+                }
+            const auto at = lynx::addEdisonSlot (offline, 1);
+            settle();
+            if (at >= 0)
+                if (auto slot = lynx::makeEdisonSlotEditor (offline, 1, at))
+                {
+                    slot->setSize (1120, 630);
+                    saveSnapshot (*slot, prefix + "-ed-slot.png");
+                }
+            check ("an Edison slot editor", at >= 0);
+            const auto& song = offline.getSong();
+            int sampled = -1;
+            for (int c = 0; c < (int) song.channels.size() && sampled < 0; ++c)
+                if (! song.channels[(std::size_t) c].samplePath.empty())
+                    sampled = c;
+            if (sampled >= 0)
+                if (auto panel = lynx::makeAudioEditorPanel (offline, sampled, -1))
+                {
+                    panel->setSize (1100, 300);
+                    saveSnapshot (*panel, prefix + "-ed-panel.png");
+                }
+        }
+        lynx::ui::motion::enabled() = true;
     }
 
     // LYNX --capfix190jjshot prefix project.flp set.als: round 190jj off screen (capture190ji's "Change in LYNX" lines) —
