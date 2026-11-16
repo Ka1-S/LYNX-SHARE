@@ -10145,3 +10145,13 @@ countries: tr
 "Potentially slow operation" = "İşlem yavaş olabilir"
 "Are you sure you want to load {0} plugins at once?" = "{0} eklentiyi aynı anda yüklemek istediğinden emin misin?"
 "Sample settings" = "Sample ayarları"
+
+# round 190iv: the toolbar per layout style
+"Nothing to save yet" = "Henüz kaydedilecek bir şey yok"
+"LYNX backs your work up by itself. Click to save the project (Ctrl+S)" = "LYNX çalışmanızı kendisi yedekler. Projeyi kaydetmek için tıklayın (Ctrl+S)"
+"More: the panels and options this toolbar leaves out" = "Daha fazla: bu çubuğun dışarıda bıraktığı paneller ve seçenekler"
+"Session view: the clip grid (Tab)" = "Session görünümü: klip ızgarası (Tab)"
+"Arrangement view: the Playlist (Tab)" = "Arrangement görünümü: Playlist (Tab)"
+"Control bar" = "Kontrol çubuğu"
+"Punch in / out" = "Punch in / out"
+"Show the Session button row" = "Session düğme satırını göster"

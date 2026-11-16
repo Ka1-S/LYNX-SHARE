@@ -10145,3 +10145,13 @@ countries: kr
 "Potentially slow operation" = "시간이 걸릴 수 있는 작업"
 "Are you sure you want to load {0} plugins at once?" = "플러그인 {0}개를 한 번에 불러올까요?"
 "Sample settings" = "샘플 설정"
+
+# round 190iv: the toolbar per layout style
+"Nothing to save yet" = "아직 저장할 내용이 없습니다"
+"LYNX backs your work up by itself. Click to save the project (Ctrl+S)" = "LYNX는 작업을 스스로 백업합니다. 클릭하면 프로젝트를 저장합니다 (Ctrl+S)"
+"More: the panels and options this toolbar leaves out" = "더 보기: 이 바에서 빠진 패널과 옵션"
+"Session view: the clip grid (Tab)" = "Session 보기: 클립 그리드 (Tab)"
+"Arrangement view: the Playlist (Tab)" = "Arrangement 보기: 플레이리스트 (Tab)"
+"Control bar" = "컨트롤 바"
+"Punch in / out" = "펀치 인 / 아웃"
+"Show the Session button row" = "Session 버튼 줄 표시"

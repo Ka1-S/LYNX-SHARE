@@ -507,6 +507,7 @@ if(LYNX_BUILD_APP)
         src/engine/ControllerIo.cpp
         src/engine/PreviewPlayer.cpp
         src/ui/MainComponent.cpp
+        src/ui/ToolbarLooks.cpp
         src/ui/ChannelRackComponent.cpp
         src/ui/PianoRollComponent.cpp
         src/ui/PlaylistComponent.cpp

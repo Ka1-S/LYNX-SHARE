@@ -10145,3 +10145,13 @@ countries: id
 "Potentially slow operation" = "Operasi mungkin lambat"
 "Are you sure you want to load {0} plugins at once?" = "Yakin ingin memuat {0} plugin sekaligus?"
 "Sample settings" = "Pengaturan sample"
+
+# round 190iv: the toolbar per layout style
+"Nothing to save yet" = "Belum ada yang perlu disimpan"
+"LYNX backs your work up by itself. Click to save the project (Ctrl+S)" = "LYNX mencadangkan pekerjaan Anda sendiri. Klik untuk menyimpan proyek (Ctrl+S)"
+"More: the panels and options this toolbar leaves out" = "Lainnya: panel dan opsi yang tidak ada di bilah ini"
+"Session view: the clip grid (Tab)" = "Tampilan Session: grid klip (Tab)"
+"Arrangement view: the Playlist (Tab)" = "Tampilan Arrangement: Playlist (Tab)"
+"Control bar" = "Bilah kontrol"
+"Punch in / out" = "Punch in / out"
+"Show the Session button row" = "Tampilkan baris tombol Session"

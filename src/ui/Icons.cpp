@@ -706,6 +706,58 @@ Shape make (Icon icon)
             polyline (st, { { 17.0f, 4.5f }, { 20.0f, 4.5f }, { 20.0f, 19.5f }, { 17.0f, 19.5f } });
             fi.addEllipse (8.0f, 8.0f, 8.0f, 8.0f);
             break;
+
+        // --- round 190iv: the Simple top bar's save status, the Clip-launch control bar ---
+        case Icon::cloud: // a cloud: two bumps on a flat base
+        case Icon::cloudCheck: // the cloud with a check mark in it
+        {
+            juce::Path c;
+            c.startNewSubPath (7.0f, 18.5f);
+            c.lineTo (17.5f, 18.5f);
+            c.addCentredArc (17.5f, 14.75f, 3.75f, 3.75f, 0.0f, pi, pi * 0.05f, false);
+            c.addCentredArc (12.5f, 10.5f, 5.5f, 5.5f, 0.0f, pi * 0.42f, -pi * 0.55f, false);
+            c.addCentredArc (7.0f, 14.5f, 4.0f, 4.0f, 0.0f, pi * 0.05f, -pi, false);
+            c.closeSubPath();
+            st.addPath (c);
+            if (icon == Icon::cloudCheck)
+                polyline (st, { { 9.5f, 14.0f }, { 11.5f, 16.0f }, { 15.0f, 12.0f } });
+            break;
+        }
+        case Icon::sessionView: // three columns
+            for (float x : { 6.0f, 11.0f, 16.0f })
+                fi.addRectangle (x, 5.0f, 2.5f, 14.0f);
+            break;
+        case Icon::arrangementView: // three rows
+            for (float y : { 6.0f, 11.0f, 16.0f })
+                fi.addRectangle (5.0f, y, 14.0f, 2.5f);
+            break;
+        case Icon::backToArrangement: // an arrow into a dashed line (the clips give the Playlist back)
+        {
+            juce::Path head;
+            head.addTriangle (8.0f, 8.0f, 8.0f, 16.0f, 12.5f, 12.0f);
+            fi.addPath (head);
+            fi.addRectangle (3.0f, 11.0f, 5.5f, 2.0f);
+            for (float x : { 14.0f, 18.0f })
+                fi.addRectangle (x, 11.0f, 2.5f, 2.0f);
+            break;
+        }
+        case Icon::capture: // a dashed square
+            polyline (st, { { 5.0f, 9.0f }, { 5.0f, 5.0f }, { 9.0f, 5.0f } });
+            polyline (st, { { 15.0f, 5.0f }, { 19.0f, 5.0f }, { 19.0f, 9.0f } });
+            polyline (st, { { 19.0f, 15.0f }, { 19.0f, 19.0f }, { 15.0f, 19.0f } });
+            polyline (st, { { 9.0f, 19.0f }, { 5.0f, 19.0f }, { 5.0f, 15.0f } });
+            break;
+        case Icon::sessionRecord: // a ring
+            st.addEllipse (6.0f, 6.0f, 12.0f, 12.0f);
+            break;
+        case Icon::browserPanel: // a narrow panel beside a wide one
+            fi.addRectangle (3.5f, 5.0f, 5.5f, 14.0f);
+            fi.addRectangle (10.5f, 5.0f, 10.0f, 14.0f);
+            break;
+        case Icon::metronomeDots: // a ring and a dot (the beat and the accent)
+            st.addEllipse (3.5f, 8.0f, 8.0f, 8.0f);
+            fi.addEllipse (13.0f, 8.0f, 8.0f, 8.0f);
+            break;
     }
 
     return s;
@@ -862,9 +914,99 @@ void IconButton::timerCallback()
     repaint();
 }
 
+void IconButton::setLook (Look newLook, float iconBoxPx)
+{
+    if (newLook == look && iconBoxPx == lookIconBox)
+        return;
+    look = newLook;
+    lookIconBox = iconBoxPx;
+    repaint();
+}
+
+// Round 190iv: the Simple capsule segment and Live's control-bar boxes (Icons.h, IconButton::Look)
+void IconButton::paintLook (juce::Graphics& g, bool highlighted, bool down)
+{
+    using namespace theme;
+    const auto on = getToggleState();
+    const auto enabled = isEnabled();
+    const auto area = getLocalBounds().toFloat();
+    const auto h = isTimerRunning() ? hover : (highlighted ? 1.0f : 0.0f);
+    juce::Colour fg;
+
+    if (look == Look::capsule)
+    {
+        // the capsule (drawn behind) is bg4; a segment shows hover and press only (SG-1: hover bg5, pressed bg6;
+        // recording: the Record segment filled accentMuted)
+        juce::Colour bg;
+        if (down)
+            bg = colour::bg6;
+        else if (on && icon == Icon::record)
+            bg = colour::accentMuted;
+        else if (h > 0.0f)
+            bg = colour::bg5.withAlpha (h);
+        if (! bg.isTransparent())
+        {
+            // (the capsule's round ends: the first segment rounds its left, the last its right; setCorners)
+            const auto r = area.getHeight() / 2.0f;
+            juce::Path p;
+            p.addRoundedRectangle (area.getX(), area.getY(), area.getWidth(), area.getHeight(), r, r, roundLeft, roundRight, roundLeft, roundRight);
+            g.setColour (bg);
+            g.fillPath (p);
+        }
+        fg = icon == Icon::record ? colour::record : (on ? colour::accent : colour::textPrimary);
+    }
+    else if (look == Look::liveBox)
+    {
+        // Live 12.4 (CL-2, ref/live-session.png): #363636 boxes, hover #464646, pressed #1e1e1e, lit #ffad56
+        const juce::Colour rest { 0xff363636 }, over { 0xff464646 }, pressed { 0xff1e1e1e }, lit { 0xffffad56 };
+        g.setColour (down ? pressed : on ? lit : rest.interpolatedWith (over, h));
+        g.fillRect (area);
+        fg = on && ! down ? juce::Colour (0xff070707) : juce::Colour (0xffb5b5b5).interpolatedWith (juce::Colours::white, h * 0.35f);
+    }
+    else if (look == Look::liveSelector)
+    {
+        // (ref/live-session.png x 1870..1900: the shown view's glyph #ffad56; Live's other glyph is #464646, 1.5:1 on the
+        // band; LYNX keeps it at 3.4:1, the contrast floor of design190ia G1)
+        fg = on ? juce::Colour (0xffffad56) : juce::Colour (0xff7a7a7a).interpolatedWith (juce::Colour (0xffb5b5b5), h);
+    }
+    else // liveGlyph: the bare transport glyphs on the band
+    {
+        const juce::Colour glyph { 0xffb5b5b5 };
+        fg = on ? (icon == Icon::record ? colour::record : juce::Colour (0xff00d38d)) // (Live's playing green, CL token table)
+                : glyph.interpolatedWith (juce::Colours::white, h * 0.35f);
+        if (down)
+            fg = fg.darker (0.3f);
+    }
+    if (! enabled)
+        fg = juce::Colour (0xff696969);
+
+    const auto box = lookIconBox > 0.0f ? lookIconBox : juce::jmin (area.getHeight() * iconFraction, iconMax);
+    if (text.isEmpty())
+    {
+        icons::draw (g, icon, area.withSizeKeepingCentre (box, box), fg);
+        return;
+    }
+    // a text box (Live's "Tap", "Key", "MIDI"): the small type, centred, the icon (if any) before it
+    const auto f = theme::font (type::caption);
+    auto content = area.reduced (3.0f, 0.0f);
+    if (icon != Icon::none)
+    {
+        icons::draw (g, icon, content.removeFromLeft (box).withSizeKeepingCentre (box, box), fg);
+        content.removeFromLeft (3.0f);
+    }
+    g.setColour (fg);
+    g.setFont (f);
+    g.drawFittedText (text, content.toNearestInt(), icon == Icon::none ? juce::Justification::centred : juce::Justification::centredLeft, 1, 0.8f);
+}
+
 void IconButton::paintButton (juce::Graphics& g, bool highlighted, bool down)
 {
     using namespace theme;
+    if (look != Look::standard)
+    {
+        paintLook (g, highlighted, down);
+        return;
+    }
     const auto bounds = getLocalBounds().toFloat().reduced (0.5f);
     const auto on = getToggleState();
     const auto enabled = isEnabled();

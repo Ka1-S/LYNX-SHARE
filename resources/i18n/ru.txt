@@ -10145,3 +10145,13 @@ countries: ru by kz
 "Potentially slow operation" = "Операция может быть медленной"
 "Are you sure you want to load {0} plugins at once?" = "Точно загрузить {0} плагинов за раз?"
 "Sample settings" = "Настройки сэмпла"
+
+# round 190iv: the toolbar per layout style
+"Nothing to save yet" = "Пока нечего сохранять"
+"LYNX backs your work up by itself. Click to save the project (Ctrl+S)" = "LYNX сам делает резервные копии вашей работы. Нажмите, чтобы сохранить проект (Ctrl+S)"
+"More: the panels and options this toolbar leaves out" = "Ещё: панели и параметры, которых нет на этой панели"
+"Session view: the clip grid (Tab)" = "Вид Session: сетка клипов (Tab)"
+"Arrangement view: the Playlist (Tab)" = "Вид Arrangement: плейлист (Tab)"
+"Control bar" = "Панель управления"
+"Punch in / out" = "Punch in / out"
+"Show the Session button row" = "Показать ряд кнопок Session"

@@ -466,61 +466,29 @@ public:
 };
 } // namespace
 
-// the Playlist title bar's tools: "+ Add track" and "Finish" side by side
-class SimpleTitleTools final : public juce::Component,
-                               private juce::Timer
+// the Playlist title bar's tools: "+ Add track" and "Lyrics" side by side. Round 190iv: Finish and the save status moved to
+// the Simple top bar (design190ia SG-A: BandLab's "Last saved" and its Mastering / Publish at the top right; the main
+// window places SimpleWorkflow::finishComponent() there and draws the status as a pill)
+class SimpleTitleTools final : public juce::Component
 {
 public:
-    SimpleTitleTools (juce::Component& a, juce::Component& b, juce::Component& c, std::function<juce::String()> statusText)
-        : add (a), finish (b), lyrics (c), text (std::move (statusText))
+    SimpleTitleTools (juce::Component& a, juce::Component& c) : add (a), lyrics (c)
     {
         addAndMakeVisible (add);
-        addAndMakeVisible (finish);
         addAndMakeVisible (lyrics);
-        // round 190t: LYNX backs the work up by itself; a beginner should see it ("Backed up 2 min ago")
-        status.setFont (theme::font (theme::type::small));
-        status.setColour (juce::Label::textColourId, theme::colour::textSecondary);
-        status.setJustificationType (juce::Justification::centredLeft);
-        status.setMinimumHorizontalScale (0.8f);
-        status.setInterceptsMouseClicks (false, false);
-        addAndMakeVisible (status);
-        refresh();
-        startTimer (2000);
     }
-    static constexpr int statusWidth = 150;
-    static constexpr int width = 110 + 6 + 80 + 6 + 80 + 10 + statusWidth; // (round 190ch: + Lyrics)
+    static constexpr int width = 110 + 6 + 80 + 10;
     void resized() override
     {
         auto r = getLocalBounds();
         add.setBounds (r.removeFromLeft (110));
         r.removeFromLeft (6);
-        finish.setBounds (r.removeFromLeft (80));
-        r.removeFromLeft (6);
         lyrics.setBounds (r.removeFromLeft (80));
-        r.removeFromLeft (10);
-        status.setBounds (r);
-    }
-    void showForSnapshot (const juce::String& fixed)
-    {
-        stopTimer();
-        text = [fixed] { return fixed; };
-        refresh();
-    }
-    void refresh()
-    {
-        const auto now = text ? text() : juce::String();
-        if (now != status.getText())
-            status.setText (now, juce::dontSendNotification);
     }
 
 private:
-    void timerCallback() override { refresh(); }
-
     juce::Component& add;
-    juce::Component& finish;
     juce::Component& lyrics;
-    std::function<juce::String()> text;
-    juce::Label status;
 };
 
 SimpleWorkflow::SimpleWorkflow (AudioEngine& e, Host h) : engine (e), host (std::move (h))
@@ -550,7 +518,7 @@ SimpleWorkflow::SimpleWorkflow (AudioEngine& e, Host h) : engine (e), host (std:
             host.toggleLyrics();
     };
     lyricsButton = std::move (lyrics);
-    titleTools = std::make_unique<SimpleTitleTools> (*addButton, *finishButton, *lyricsButton, host.saveStatus);
+    titleTools = std::make_unique<SimpleTitleTools> (*addButton, *lyricsButton);
 
     // round 190dv: the Welcome screen and the first-song tour
     FirstSongTour::Host t;
@@ -879,7 +847,8 @@ void SimpleWorkflow::songChanged()
         return;
     if (isFinishShowing())
         static_cast<FinishDock&> (*finishDock).refresh();
-    static_cast<SimpleTitleTools&> (*titleTools).refresh();
+    if (host.saveStatusChanged) // (round 190iv: the top bar's "Last saved")
+        host.saveStatusChanged();
     updateDock();
     if (tour != nullptr)
         tour->songChanged(); // (round 190dv: a step the song shows done moves the tour on)
@@ -948,7 +917,8 @@ void SimpleWorkflow::clickStarterForSnapshot (int index)
 
 void SimpleWorkflow::setStatusForSnapshot (const juce::String& text)
 {
-    static_cast<SimpleTitleTools&> (*titleTools).showForSnapshot (text);
+    if (host.statusForSnapshot) // (round 190iv: the status is the top bar's now)
+        host.statusForSnapshot (text);
 }
 
 bool SimpleWorkflow::add (simpletracks::Request request)

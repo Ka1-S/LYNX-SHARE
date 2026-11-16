@@ -1050,6 +1050,11 @@ void MainComponent::paint (juce::Graphics& g)
     const uitrace::Scope trace ("MainComponent paint", true, g.getClipBounds());
     using namespace theme;
     g.fillAll (colour::bg1);
+    if (toolbarLook != toolbarlayout::Look::fl) // round 190iv: the Simple and Clip-launch toolbars
+    {
+        paintLookToolbar (g);
+        return;
+    }
 
     // the toolbar: one band, its panels separated by hairlines
     const auto bar = juce::Rectangle<int> (0, 0, getWidth(), toolbarHeight);
@@ -1161,6 +1166,17 @@ void MainComponent::resized()
     {
         menuBar.getProperties().set ("lynxTightMenuBar", true);
         menuWidth = measureMenu();
+    }
+
+    // round 190iv: the Simple and Clip-launch layouts lay their own toolbar out (core/ToolbarLayout.h Look); FL's below
+    if (toolbarLook != toolbarlayout::Look::fl)
+    {
+        if (toolbarLook == toolbarlayout::Look::simple)
+            layoutSimpleToolbar (bar, menuWidth);
+        else
+            layoutLiveControlBar (bar, menuWidth);
+        layoutUnderToolbar();
+        return;
     }
 
     const auto modeWidth = juce::jmax (patternModeButton.getIdealWidth (h - 2), songModeButton.getIdealWidth (h - 2));
@@ -1481,7 +1497,11 @@ void MainComponent::resized()
             case Group::count_: break;
         }
     }
+    layoutUnderToolbar();
+}
 
+void MainComponent::layoutUnderToolbar()
+{
     // the toolbar's edit mode: its overlay over the toolbar, and its tray between the toolbar and the windows
     const auto tray = toolbarEditor != nullptr ? toolbar::EditOverlay::trayHeight : 0;
     if (toolbarEditor != nullptr)
@@ -1535,6 +1555,8 @@ void MainComponent::applyIconSizing (toolbarlayout::IconSize size)
     appliedIconSize = size;
     rowHeight = toolbarlayout::rowHeight (size);
     toolbarHeight = toolbarLayout.visible ? 2 * rowHeight + 12 : rowHeight + 6; // (round 170e3: room for the panel wells)
+    if (toolbarLook == toolbarlayout::Look::live) // round 190iv: Live's menu row over its 38 px control bar
+        toolbarHeight = toolbarlayout::livebar::menuRow + (toolbarLayout.visible ? toolbarlayout::livebar::band : 2);
 
     const auto fraction = toolbarlayout::iconFraction (size), maxPx = toolbarlayout::iconMaxPx (size);
     for (auto* b : { &newButton, &openButton, &saveButton, &exportButton, &undoButton, &redoButton, &recordMenuButton, &newPatternButton,
@@ -1592,7 +1614,7 @@ juce::PopupMenu MainComponent::makeToolbarMenu()
     juce::PopupMenu menu;
     // FL's toolbar menu (Edit, Separators, Hide, Presets), then LYNX's direct switches per panel
     menu.addSectionHeader (tr ("Toolbar"));
-    menu.addItem (tr ("Edit toolbar (drag panels to move, add or remove them)"), true, toolbarEditor != nullptr,
+    menu.addItem (tr ("Edit toolbar (drag panels to move, add or remove them)"), toolbarLook == toolbarlayout::Look::fl, toolbarEditor != nullptr,
                   [this] { setToolbarEditing (toolbarEditor == nullptr); });
     menu.addItem (tr ("Separators"), true, toolbarLayout.separators, [this] {
         auto layout = toolbarLayout;
@@ -1664,6 +1686,8 @@ juce::PopupMenu MainComponent::makeToolbarMenu()
 void MainComponent::setToolbarEditing (bool editing)
 {
     if (editing == (toolbarEditor != nullptr))
+        return;
+    if (editing && toolbarLook != toolbarlayout::Look::fl) // (round 190iv: the panels are FL's toolbar's; the other looks set theirs)
         return;
 
     if (! editing)
@@ -1906,6 +1930,15 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
             drawmode::toggle();
             return true;
         }
+
+    // round 190iv: Tab = Live's Session ↔ Arrangement in the Clip-launch layout (the control bar's view selector; from
+    // "Both", the Session view). Round 190ih's core/LiveKeys.h does the same; whichever lands first answers
+    if (toolbarLook == toolbarlayout::Look::live && key.getKeyCode() == juce::KeyPress::tabKey && isPlainKey (chord) && clipGridView != nullptr
+        && dynamic_cast<juce::TextEditor*> (juce::Component::getCurrentlyFocusedComponent()) == nullptr)
+    {
+        setClipGridView (playlistArea.getGridView() == PlaylistArea::GridView::grid ? PlaylistArea::GridView::song : PlaylistArea::GridView::grid);
+        return true;
+    }
 
     // 3. the focused panel's own keys
     const auto focused = workspace.getFocused();
@@ -2767,6 +2800,8 @@ void MainComponent::loadUiSettings()
             DetailView::preferredHeight = juce::jlimit (DetailView::minHeight, 2000, line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
         else if (key == "detailShown")
             DetailView::shownSetting = on;
+        else if (key == "sessionButtonRow") // round 190iv: the clip grid's footer row in the Clip-launch layout (an option)
+            sessionButtonRowShown = on;
         else if (key == "sceneTempoShown") // round 190ef: the clip grid's scene tempo / time signature fields
             clipGridSceneTempoShown() = on;
         else if (key == "simpleDockHeight") // round 190bu: the Simple workflow's track dock
@@ -3025,6 +3060,7 @@ void MainComponent::saveUiSettings()
                                       + "\ndetailHeight=" + juce::String (DetailView::preferredHeight)
                                       + "\ndetailShown=" + juce::String (DetailView::shownSetting ? 1 : 0)
                                       + "\nsceneTempoShown=" + juce::String (clipGridSceneTempoShown() ? 1 : 0)
+                                      + "\nsessionButtonRow=" + juce::String (sessionButtonRowShown ? 1 : 0)
                                       + "\nsimpleDockHeight=" + juce::String (SimpleDock::preferredHeight)
                                       + "\nsimpleDockShown=" + juce::String (SimpleDock::shownSetting ? 1 : 0)
                                       + "\nkeyboardMode=" + juce::String ((int) scalekeys::current().mode)
@@ -3362,6 +3398,8 @@ class ClipGridSwitch final : public juce::Component
 {
 public:
     static constexpr int width = 132 + 8 + 26 + 4 + 40 + 4 + 44;
+    // round 190iv: Draw Mode, Key and MIDI moved to Live's control bar (the Clip-launch toolbar); Both | Grid | Song stay here
+    static constexpr int compactWidth = 132;
 
     std::function<void()> onDraw, onKey, onMidi;
     void setStates (bool drawOn, remotemap::Mode mode)
@@ -3414,8 +3452,12 @@ public:
     void resized() override
     {
         auto r = getLocalBounds().reduced (0, 4);
-        auto switches = r.removeFromRight (26 + 4 + 40 + 4 + 44);
-        r.removeFromRight (8);
+        const auto withSwitches = r.getWidth() >= width;
+        for (juce::Component* c : { (juce::Component*) &draw, (juce::Component*) &key, (juce::Component*) &midi })
+            c->setVisible (withSwitches);
+        auto switches = withSwitches ? r.removeFromRight (26 + 4 + 40 + 4 + 44) : juce::Rectangle<int>();
+        if (withSwitches)
+            r.removeFromRight (8);
         const auto w = r.getWidth() / 3;
         both.setBounds (r.removeFromLeft (w));
         grid.setBounds (r.removeFromLeft (w));
@@ -3438,6 +3480,10 @@ void MainComponent::syncClipLaunchSwitches()
 {
     if (auto* flip = dynamic_cast<ClipGridSwitch*> (clipGridSwitch.get()))
         flip->setStates (drawmode::isOn(), getMapMode());
+    // round 190iv: the same switches in Live's control bar
+    drawModeButton.setToggleState (drawmode::isOn(), juce::dontSendNotification);
+    keyMapButton.setToggleState (getMapMode() == remotemap::Mode::key, juce::dontSendNotification);
+    midiMapButton.setToggleState (getMapMode() == remotemap::Mode::midi, juce::dontSendNotification);
 }
 
 
@@ -3503,6 +3549,13 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
         host.exportAudio = [this] (int format) { exportAudio (format); };
         host.exportOtherApps = [this] { exportForOtherApps(); };
         host.saveStatus = [this] { return simpleSaveStatus(); };
+        host.saveStatusChanged = [this] { refreshSaveStatus(); }; // (round 190iv: the top bar's "Last saved")
+        host.statusForSnapshot = [this] (const juce::String& text) {
+            using S = toolbarlayout::SaveState;
+            saveStatusFrozen = true;
+            const auto state = text.isEmpty() ? S::fresh : text == tr ("All changes saved") ? S::saved : text == tr ("Not saved yet") ? S::unsaved : S::backedUp;
+            saveStatus.set (state, text.isEmpty() ? tr ("Nothing to save yet") : text);
+        };
         // round 190bu: the dock for the selected track sits where Clip-launch's detail view does (never both)
         host.setBottomDock = [this] (juce::Component* c, std::function<int (int)> heightFor) { playlistArea.setDetailView (c, std::move (heightFor)); };
         host.toggleChannelWindow = [this] (int channel) { rack.toggleEditor (channel, true); };
@@ -3625,7 +3678,7 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
                                     [this] (int available) { return detailView != nullptr ? detailView->heightFor (available) : 0; });
         if (auto* flip = dynamic_cast<ClipGridSwitch*> (clipGridSwitch.get()))
             flip->show (PlaylistArea::GridView::beside);
-        workspace.setTitleAccessory (Panel::playlist, clipLaunch ? clipGridSwitch.get() : nullptr, clipLaunch ? ClipGridSwitch::width : 0);
+        workspace.setTitleAccessory (Panel::playlist, clipLaunch ? clipGridSwitch.get() : nullptr, clipLaunch ? ClipGridSwitch::compactWidth : 0); // (round 190iv)
     }
     // the Simple workflow's track headers and no pattern picker (no-ops for the other two styles: nothing changes there)
     playlist.setSimpleHeaders (style == Style::simple);
@@ -3650,6 +3703,7 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
         resized();
         repaint();
     }
+    applyToolbarLook(); // round 190iv: the toolbar of this layout style (Pattern: FL's, as it was)
 }
 
 void MainComponent::setPickerPanelOn (bool on)
@@ -5437,6 +5491,42 @@ bool MainComponent::TempoDisplay::isOnDecimals (int x) const
 void MainComponent::TempoDisplay::paint (juce::Graphics& g)
 {
     using namespace theme;
+    if (look != toolbarlayout::Look::fl)
+    {
+        // round 190iv: BandLab's "120 bpm" segment of the tempo capsule (the capsule is drawn behind) / Live's "167.00" box
+        const auto box = getLocalBounds();
+        const auto tempo = linksync::displayTempo (engine.shownTempo());
+        const auto rounded = std::round (tempo * 100.0) / 100.0;
+        if (look == toolbarlayout::Look::live)
+        {
+            g.setColour (dragging ? juce::Colour (0xff1e1e1e) : isMouseOver() ? juce::Colour (0xff464646) : juce::Colour (0xff363636));
+            g.fillRect (box);
+            g.setColour (juce::Colour (0xffb5b5b5));
+            g.setFont (font (type::caption));
+            g.drawText (juce::String (rounded, 2), box.reduced (3, 0), juce::Justification::centred, false);
+            decimalX = box.getCentreX() + 6;
+            return;
+        }
+        if (isMouseOver() || dragging)
+        {
+            g.setColour (dragging ? colour::bg6 : colour::bg5);
+            g.fillRect (box);
+        }
+        const auto number = std::abs (rounded - std::round (rounded)) < 0.005 ? juce::String ((int) std::round (rounded)) : juce::String (rounded, 2);
+        const juce::Font big (font (15.0f, true)), unit (font (type::small));
+        const auto w1 = juce::GlyphArrangement::getStringWidth (big, number), w2 = juce::GlyphArrangement::getStringWidth (unit, "bpm");
+        auto x = (float) box.getCentreX() - (w1 + 4.0f + w2) / 2.0f;
+        const auto baseline = (float) box.getCentreY() + 5.0f;
+        g.setColour (colour::textPrimary);
+        g.setFont (big);
+        g.drawSingleLineText (number, juce::roundToInt (x), juce::roundToInt (baseline));
+        x += w1 + 4.0f;
+        decimalX = juce::roundToInt (x);
+        g.setColour (colour::textSecondary);
+        g.setFont (unit);
+        g.drawSingleLineText ("bpm", juce::roundToInt (x), juce::roundToInt (baseline));
+        return;
+    }
     const auto area = getLocalBounds().toFloat();
     g.setColour (colour::bg1);
     g.fillRoundedRectangle (area, radius::md);
@@ -6299,6 +6389,8 @@ void MainComponent::timerCallback()
     // Ableton Link (round 190gl): the toggle's peers, the tempo the session plays, and Start Stop Sync from a peer
     // (Play / Stop pressed as the user would)
     linkToggle.update();
+    if (toolbarLook != toolbarlayout::Look::fl)
+        updateLookFields(); // (round 190iv: the Simple / Clip-launch toolbar's own fields; each repaints only on a change)
     if (const auto linkTempo = engine.getLink().isEnabled() ? engine.getLink().sessionTempo() : 0.0; linkTempo != shownLinkTempo)
     {
         shownLinkTempo = linkTempo;

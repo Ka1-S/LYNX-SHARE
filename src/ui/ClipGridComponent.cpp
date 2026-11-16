@@ -151,7 +151,9 @@ public:
 
     void resized() override
     {
-        auto foot = getLocalBounds().removeFromBottom (footerHeight).withTrimmedRight (0).reduced (4, 3);
+        for (auto* c : std::initializer_list<juce::Component*> { &stopAll, &backToPlaylist, &sessionRecord, &grooves, &mixerButton, &globalQuant })
+            c->setVisible (buttonRow); // (round 190iv: Live's places instead, unless the row is asked for)
+        auto foot = getLocalBounds().removeFromBottom (footerNow()).withTrimmedRight (0).reduced (4, 3);
         auto right = foot.removeFromRight (sceneWidthNow() - 8);
         globalQuant.setBounds (right);
         foot.removeFromRight (6);
@@ -166,7 +168,7 @@ public:
         foot.removeFromLeft (6);
         mixerButton.setBounds (foot.removeFromLeft (juce::jmin (64, juce::jmax (0, foot.getWidth()))));
         if (groovePool != nullptr && groovePool->isVisible())
-            groovePool->setBounds (0, getHeight() - footerHeight - poolHeight(), getWidth(), poolHeight());
+            groovePool->setBounds (0, getHeight() - footerNow() - poolHeight(), getWidth(), poolHeight());
         const auto cells = cellArea();
         mixer->setBounds (0, cells.getBottom() + statusHeight, getWidth(), mixerHeight());
         clampScroll();
@@ -247,6 +249,20 @@ public:
             g.drawRect (juce::Rectangle<int> (columnX (deviceDropTrack), 0, columnWidth, cells.getBottom() + statusHeight).reduced (1), 2);
         }
 
+        // round 190iv: without the button row, Stop All Clips is the Main column's status cell (Live: a 9 x 9 square there,
+        // design190ia CL-25, ref/live-session.png x 1550 y 566)
+        if (! buttonRow)
+        {
+            const auto stop = stopAllBox();
+            g.setColour (c::textSecondary);
+            g.setFont (theme::font (theme::type::caption));
+            g.drawText (tr ("Stop all clips"), stop.withX (stop.getRight() + 6).withWidth (sceneWidthNow() - 30), juce::Justification::centredLeft, true);
+            g.setColour (stopAllDown ? c::bg6 : juce::Colour (0xff1e1e1e));
+            g.fillRect (stop.withSizeKeepingCentre (9, 9));
+            g.setColour (c::textSecondary);
+            g.drawRect (stop.withSizeKeepingCentre (9, 9), 1);
+            return;
+        }
         // the footer: controls on the scene side and the buttons, on a band
         const auto foot = getLocalBounds().removeFromBottom (footerHeight);
         g.setColour (c::bg3);
@@ -259,6 +275,13 @@ public:
     {
         grabKeyboardFocus();
         dragTrack = dragScene = -1;
+        if (! buttonRow && stopAllBox().expanded (3).contains (e.getPosition()) && e.mods.isLeftButtonDown()) // (round 190iv)
+        {
+            stopAllDown = true;
+            repaint (stopAllBox().expanded (4));
+            engine.launcherCommand ({ launcher::Command::Type::stopAll });
+            return;
+        }
         const auto hit = hitTestCell (e.getPosition());
         // the status row (round 190bv): a track's stop button and its arm button (Ctrl: without disarming the others)
         if (const auto t = statusTrackAt (e.getPosition()); t >= 0)
@@ -503,6 +526,24 @@ public:
         repaint();
     }
 
+    // Round 190iv: the footer row of buttons (Stop all clips, Back to Playlist, Session Record, Grooves, Mixer, the launch
+    // quantisation). In Live's look they sit in the control bar and the Main column; the row stays as an option.
+    void setButtonRow (bool shown)
+    {
+        if (shown == buttonRow)
+            return;
+        buttonRow = shown;
+        resized();
+        repaint();
+    }
+    bool groovePoolShown() const noexcept { return groovePool != nullptr && groovePool->isVisible(); }
+    void addMixerViewItems (juce::PopupMenu& menu)
+    {
+        if (mixer != nullptr)
+            mixer->addViewItems (menu);
+    }
+    int selectedSceneNow() const noexcept { return selectedScene; }
+
     // The Groove Pool under the grid (made the first time it is shown).
     void showGroovePool (bool show)
     {
@@ -520,6 +561,11 @@ public:
 
     void mouseUp (const juce::MouseEvent&) override
     {
+        if (stopAllDown) // (round 190iv)
+        {
+            stopAllDown = false;
+            repaint (stopAllBox().expanded (4));
+        }
         fieldScene = -1;
         if (pressedTrack >= 0)
             engine.launcherCommand ({ launcher::Command::Type::release, pressedTrack, pressedScene });
@@ -693,6 +739,7 @@ private:
     std::unique_ptr<SessionMixerComponent> mixer;
     RingButton sessionRecord;
     juce::ComboBox globalQuant;
+    bool buttonRow = true, stopAllDown = false; // (round 190iv)
     std::unique_ptr<juce::Component> groovePool;
     int scrollX = 0, scrollY = 0;
     int selectedTrack = 0, selectedScene = 0;
@@ -733,15 +780,22 @@ private:
                 n = std::max (n, c.track + 1);
         return std::min (n, launcher::maxTracks);
     }
+    int footerNow() const noexcept { return buttonRow ? footerHeight : 0; }
+    // (round 190iv) Stop All Clips in the scene column's status cell while the button row is hidden
+    juce::Rectangle<int> stopAllBox() const
+    {
+        const auto cells = cellArea();
+        return { cells.getRight() + 6, cells.getBottom() + 3, statusHeight - 6, statusHeight - 6 };
+    }
     juce::Rectangle<int> cellArea() const
     {
         return { 0, headerHeight, juce::jmax (0, getWidth() - sceneWidthNow()),
-                 juce::jmax (0, getHeight() - headerHeight - footerHeight - statusHeight - poolHeight() - mixerHeight()) };
+                 juce::jmax (0, getHeight() - headerHeight - footerNow() - statusHeight - poolHeight() - mixerHeight()) };
     }
     // the Session mixer's height (round 190dr): its shown sections, leaving the slots at least two rows
     int mixerHeight() const
     {
-        return mixer == nullptr ? 0 : mixer->wantedHeight (getHeight() - headerHeight - footerHeight - statusHeight - poolHeight() - 2 * rowHeight);
+        return mixer == nullptr ? 0 : mixer->wantedHeight (getHeight() - headerHeight - footerNow() - statusHeight - poolHeight() - 2 * rowHeight);
     }
     void syncMixer()
     {
@@ -752,7 +806,7 @@ private:
     {
         if (groovePool == nullptr || ! groovePool->isVisible())
             return 0;
-        return juce::jmin (groovePoolHeight (engine), juce::jmax (0, getHeight() - headerHeight - footerHeight - statusHeight - 3 * rowHeight));
+        return juce::jmin (groovePoolHeight (engine), juce::jmax (0, getHeight() - headerHeight - footerNow() - statusHeight - 3 * rowHeight));
     }
     // the track whose status cell (stop and arm buttons) is at p, or -1
     int statusTrackAt (juce::Point<int> p) const
@@ -2014,6 +2068,24 @@ void setClipGridGroovePoolShown (juce::Component& grid, bool shown)
 {
     if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
         g->showGroovePool (shown);
+}
+
+void setClipGridButtonRowShown (juce::Component& grid, bool shown)
+{
+    if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
+        g->setButtonRow (shown);
+}
+
+bool clipGridGroovePoolShown (juce::Component& grid)
+{
+    auto* g = dynamic_cast<ClipGridComponent*> (&grid);
+    return g != nullptr && g->groovePoolShown();
+}
+
+void addClipGridMixerViewItems (juce::Component& grid, juce::PopupMenu& menu)
+{
+    if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
+        g->addMixerViewItems (menu);
 }
 
 juce::PopupMenu clipGridSlotMenu (juce::Component& grid, int track, int scene)

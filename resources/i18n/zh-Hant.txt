@@ -10145,3 +10145,13 @@ countries: tw hk mo
 "Potentially slow operation" = "操作可能較慢"
 "Are you sure you want to load {0} plugins at once?" = "確定要一次載入 {0} 個外掛嗎?"
 "Sample settings" = "取樣設定"
+
+# round 190iv: the toolbar per layout style
+"Nothing to save yet" = "尚無需要儲存的內容"
+"LYNX backs your work up by itself. Click to save the project (Ctrl+S)" = "LYNX 會自動備份你的工作。點擊以儲存專案 (Ctrl+S)"
+"More: the panels and options this toolbar leaves out" = "更多：此工具列未顯示的面板與選項"
+"Session view: the clip grid (Tab)" = "Session 檢視：片段格線 (Tab)"
+"Arrangement view: the Playlist (Tab)" = "Arrangement 檢視：播放清單 (Tab)"
+"Control bar" = "控制列"
+"Punch in / out" = "穿插錄音入 / 出"
+"Show the Session button row" = "顯示 Session 按鈕列"

@@ -10145,3 +10145,13 @@ countries: de at ch li lu
 "Potentially slow operation" = "Möglicherweise langsamer Vorgang"
 "Are you sure you want to load {0} plugins at once?" = "Möchtest du wirklich {0} Plugins auf einmal laden?"
 "Sample settings" = "Sample-Einstellungen"
+
+# round 190iv: the toolbar per layout style
+"Nothing to save yet" = "Noch nichts zu speichern"
+"LYNX backs your work up by itself. Click to save the project (Ctrl+S)" = "LYNX sichert deine Arbeit von selbst. Klicken, um das Projekt zu speichern (Strg+S)"
+"More: the panels and options this toolbar leaves out" = "Mehr: die Panels und Optionen, die diese Leiste weglässt"
+"Session view: the clip grid (Tab)" = "Session-Ansicht: das Clip-Raster (Tab)"
+"Arrangement view: the Playlist (Tab)" = "Arrangement-Ansicht: die Playlist (Tab)"
+"Control bar" = "Steuerleiste"
+"Punch in / out" = "Punch-in / -out"
+"Show the Session button row" = "Session-Tastenreihe anzeigen"

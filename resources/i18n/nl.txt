@@ -10145,3 +10145,13 @@ countries: nl be
 "Potentially slow operation" = "Mogelijk trage bewerking"
 "Are you sure you want to load {0} plugins at once?" = "Weet je zeker dat je {0} plugins tegelijk wilt laden?"
 "Sample settings" = "Sample-instellingen"
+
+# round 190iv: the toolbar per layout style
+"Nothing to save yet" = "Nog niets om op te slaan"
+"LYNX backs your work up by itself. Click to save the project (Ctrl+S)" = "LYNX maakt zelf back-ups van je werk. Klik om het project op te slaan (Ctrl+S)"
+"More: the panels and options this toolbar leaves out" = "Meer: de panelen en opties die deze balk weglaat"
+"Session view: the clip grid (Tab)" = "Session-weergave: het clipraster (Tab)"
+"Arrangement view: the Playlist (Tab)" = "Arrangement-weergave: de Playlist (Tab)"
+"Control bar" = "Bedieningsbalk"
+"Punch in / out" = "Punch in / out"
+"Show the Session button row" = "Session-knoppenrij tonen"

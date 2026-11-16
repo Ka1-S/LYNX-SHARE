@@ -41,9 +41,20 @@ enum class Icon
     loopRecord, // recording: loop record (a loop arrow around a record dot; round 170e3)
     stepEdit,   // recording: step edit (steps typed one after another, an arrow to the next; round 170e3)
     punch,      // recording: punch in/out on the loop region (a record dot between two brackets; round 170e3)
-    note        // the Browser's Scores folder: an eighth note (round 178a)
+    note,       // the Browser's Scores folder: an eighth note (round 178a)
+    // round 190iv: the Simple top bar's save status and the Clip-launch layout's control bar (LYNX vectors drawn to read
+    // like BandLab's and Live's)
+    cloud,             // saved by LYNX's backup
+    cloudCheck,        // all changes saved
+    sessionView,       // Live's view selector: three columns (the clip grid)
+    arrangementView,   // three rows (the Playlist)
+    backToArrangement, // an arrow into a dashed line
+    capture,           // a dashed square (Capture MIDI)
+    sessionRecord,     // a ring
+    browserPanel,      // a left panel beside a page (show / hide the Browser)
+    metronomeDots      // Live's metronome: a ring and a dot
 };
-constexpr int iconCount = (int) Icon::note + 1;
+constexpr int iconCount = (int) Icon::metronomeDots + 1;
 
 namespace icons
 {
@@ -85,6 +96,18 @@ public:
     // drawn on whole pixels, so 16, 20 and 24 px boxes stay crisp.
     void setIconSizing (float fraction, float maxPx);
 
+    // Round 190iv: how the button draws itself per toolbar look (core/ToolbarLayout.h Look). `standard` is every LYNX
+    // button as before; the others are used only by the Simple and Clip-launch toolbars:
+    //  - capsule: a segment of a BandLab capsule (the capsule's fill is drawn behind it): a hover / pressed fill only,
+    //    the glyph in `iconBoxPx`; on = the accent glyph (Record: a muted-red fill)
+    //  - liveBox: one of Live's 17 px control-bar boxes (#363636; hover #464646, pressed #1e1e1e, on #ffad56 with a
+    //    #070707 glyph)
+    //  - liveGlyph: Live's bare transport glyphs (#b5b5b5 on the band; on = playing green / recording red)
+    //  - liveSelector: Live's view selector glyphs (on = #ffad56, off = a grey that keeps 3:1 on the band)
+    enum class Look { standard, capsule, liveBox, liveGlyph, liveSelector };
+    void setLook (Look newLook, float iconBoxPx = 0.0f);
+    Look getLook() const noexcept { return look; }
+
     // Optional extra gestures: when set, a right-click calls onRightClick instead of clicking the button,
     // and a double-click calls onDoubleClick (after the two single clicks).
     std::function<void()> onRightClick, onDoubleClick;
@@ -98,6 +121,9 @@ public:
 
 private:
     void timerCallback() override;
+    void paintLook (juce::Graphics&, bool highlighted, bool down);
+    Look look = Look::standard;
+    float lookIconBox = 0.0f;
     float hover = 0.0f; // 0 = at rest, 1 = under the mouse (animated)
     Icon icon;
     juce::String text;

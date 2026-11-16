@@ -115,6 +115,13 @@ public:
     void setClipLaunchWorkflow (bool on, bool swapLayout = true) { setLayoutStyle (on ? layoutstyle::Style::clipLaunch : layoutstyle::Style::pattern, swapLayout); }
     void setClipGridView (PlaylistArea::GridView view);
     bool isClipLaunchWorkflow() const noexcept { return layoutStyle == layoutstyle::Style::clipLaunch; }
+    // Round 190iv (--toolbarshot190iv): the toolbar's look, its "⋯" menu, the Simple status in a state, a control-bar
+    // button by name (hover / pressed / lit shots), the Session button row
+    toolbarlayout::Look getToolbarLook() const noexcept { return toolbarLook; }
+    juce::PopupMenu makeToolbarMoreMenuForSnapshot() { return makeToolbarMoreMenu(); }
+    void setSaveStatusForSnapshot (toolbarlayout::SaveState state);
+    juce::Component* toolbarPartForSnapshot (const juce::String& name);
+    void setSessionButtonRowShown (bool shown);
     // Round 190ef: the reference's MIDI Map Mode / Key Map Mode (ui/MapMode.h; Ctrl+M / Ctrl+K and the MIDI / Key
     // switches), in the Clip-launch layout only (elsewhere it stays off).
     void setMapMode (remotemap::Mode mode);
@@ -528,6 +535,8 @@ private:
     {
     public:
         explicit TempoDisplay (AudioEngine& e) : engine (e) {}
+        // round 190iv: BandLab's tempo segment ("120 bpm") in Simple, Live's 17 px box ("167.00") in Clip-launch
+        toolbarlayout::Look look = toolbarlayout::Look::fl;
         void paint (juce::Graphics& g) override;
         void mouseDown (const juce::MouseEvent& e) override;
         void mouseDrag (const juce::MouseEvent& e) override;
@@ -684,6 +693,45 @@ private:
     // DAW's "Show Link Toggle"), until the user shows or hides it
     toolbar::LinkToggle linkToggle { engine };
     bool linkToggleFollowsStyle = true;
+
+    // --- round 190iv: the toolbar per layout style (core/ToolbarLayout.h Look; design190ia slices SG-A and CL-G) ---
+    // Pattern: FL's toolbar, untouched. Simple: BandLab's capsules in FL's frame, "Last saved" and Finish at the right.
+    // Clip-launch: the menus on a 23 px row over Live's one-row control bar; LYNX's own panels in its "⋯" menu.
+    // The same widgets are reused in each look (their setLook / IconButton::setLook); the parts only one look has are
+    // below. Nothing here runs a timer: the main window's timer updates them and each repaints only on a change.
+    toolbarlayout::Look toolbarLook = toolbarlayout::Look::fl;
+    void applyToolbarLook();                                // the widgets' looks for the layout style now shown
+    void layoutSimpleToolbar (juce::Rectangle<int> bar, int menuWidth);
+    void layoutLiveControlBar (juce::Rectangle<int> bar, int menuWidth);
+    void layoutUnderToolbar();                              // the edit tray, the update bar and the workspace
+    void paintLookToolbar (juce::Graphics& g);              // the Simple / Live band and capsules
+    juce::PopupMenu makeToolbarMoreMenu();                  // "⋯": what the look leaves off its bar
+    void updateLookFields();                                // the main window's timer: signature, quantisation, states
+    void refreshSaveStatus();
+    std::vector<juce::Component*> lookOnlyParts();          // the parts the FL look never shows
+    toolbar::SignatureBox signatureBox { engine };
+    toolbar::QuantBox quantBox { engine };
+    toolbar::SaveStatus saveStatus;
+    IconButton moreButton { "toolbarMore", Icon::more };
+    IconButton browserToggleButton { "liveBrowser", Icon::browserPanel };
+    IconButton backToArrangementButton { "backToArrangement", Icon::backToArrangement };
+    IconButton captureButton { "captureMidi", Icon::capture };
+    IconButton sessionRecordButton { "sessionRecord", Icon::sessionRecord };
+    IconButton drawModeButton { "drawMode", Icon::draw };
+    IconButton keyMapButton { "keyMap", Icon::none };
+    IconButton midiMapButton { "midiMap", Icon::none };
+    IconButton sessionViewButton { "sessionView", Icon::sessionView };
+    IconButton arrangementViewButton { "arrangementView", Icon::arrangementView };
+    std::array<bool, toolbarlayout::livebar::itemCount> liveShown {}; // the control-bar items that fit (the rest: "⋯")
+    std::vector<juce::Rectangle<int>> lookCapsules;         // Simple: the capsules' outlines
+    std::vector<juce::Rectangle<int>> lookDividers;         // Simple: the 1 px lines between capsule segments
+    juce::Rectangle<int> lookMenuRow, lookBand;             // Clip-launch: the menu row and the control-bar band
+    int saveStatusTicks = 0;
+    bool saveStatusFrozen = false;                          // (snapshots)
+    bool sessionButtonRowShown = false;                     // Clip-launch: the clip grid's old footer row (an option)
+    bool lookPartsReady = false;                            // the parts above are made children on the first look change
+    void setUpLookParts();
+    void hideToolbarParts();                                // every toolbar widget hidden (a look then shows its own)
     void showKeyMenu();
     juce::PopupMenu makeKeyMenu();
     void refreshKeyPanel();

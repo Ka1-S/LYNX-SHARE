@@ -10145,3 +10145,13 @@ countries: jp
 "Potentially slow operation" = "時間がかかる可能性のある操作"
 "Are you sure you want to load {0} plugins at once?" = "{0} 個のプラグインを一度に読み込みますか?"
 "Sample settings" = "サンプル設定"
+
+# round 190iv: the toolbar per layout style
+"Nothing to save yet" = "まだ保存するものはありません"
+"LYNX backs your work up by itself. Click to save the project (Ctrl+S)" = "LYNX は作業を自動でバックアップします。クリックでプロジェクトを保存 (Ctrl+S)"
+"More: the panels and options this toolbar leaves out" = "その他: このバーに表示されないパネルとオプション"
+"Session view: the clip grid (Tab)" = "Session ビュー: クリップグリッド (Tab)"
+"Arrangement view: the Playlist (Tab)" = "Arrangement ビュー: プレイリスト (Tab)"
+"Control bar" = "コントロールバー"
+"Punch in / out" = "パンチイン / アウト"
+"Show the Session button row" = "Session のボタン列を表示"
