@@ -10822,6 +10822,8 @@ private:
             double paintedPixels = 0.0;          // round 190ge: the dirty area of those frames, summed (overdraw / repaint storms)
             double setupMs = 0.0, wallStart = 0.0;
             double cpuStart = 0.0; // process CPU seconds (std::clock is wall time on Windows)
+            bool threadsWanted = juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_THREADS", {}) == "1";
+            std::vector<lynx::ThreadCpu> threadsStart;
             double messageCpuStart = 0.0; // the message thread's CPU seconds
             double audioLoadSum = 0.0;    // the device's CPU use (AudioDeviceManager::getCpuUsage), summed per tick
             int audioLoadTicks = 0;
@@ -10861,6 +10863,9 @@ private:
                     wallStart = juce::Time::getMillisecondCounterHiRes();
                     cpuStart = lynx::processCpuSeconds();
                     messageCpuStart = lynx::threadCpuSeconds();
+                    if (threadsWanted) // round 190ih: LYNX_UIPERF_THREADS=1, the CPU of every thread over the step
+                        threadsStart = lynx::threadCpuList();
+                    lynx::grossBeatPaintStats (true);
                     audioLoadSum = 0.0;
                     audioLoadTicks = 0;
                     frame = 0;
@@ -10887,6 +10892,26 @@ private:
                      << "\n    CPU " << juce::String (wall > 0.0 ? 100.0 * cpu / wall : 0.0, 0) << "% (process, " << juce::String (wall / 1000.0, 1) << " s), message thread "
                      << juce::String (wall > 0.0 ? 100.0 * messageCpu / wall : 0.0, 1) << "%, audio device "
                      << juce::String (audioLoadTicks > 0 ? 100.0 * audioLoadSum / audioLoadTicks : 0.0, 1) << "%\n";
+                if (threadsWanted && wall > 0.0)
+                {
+                    std::vector<std::pair<double, juce::String>> rows;
+                    for (const auto& t : lynx::threadCpuList())
+                    {
+                        auto before = 0.0;
+                        for (const auto& b : threadsStart)
+                            if (b.id == t.id)
+                                before = b.seconds;
+                        if (const auto used = t.seconds - before; used > 0.0005)
+                            rows.push_back ({ 100.0 * 1000.0 * used / wall, juce::String (t.id) + " " + (t.name.empty() ? juce::String ("(unnamed)") : juce::String (t.name)) });
+                    }
+                    std::sort (rows.begin(), rows.end(), [] (const auto& a, const auto& b) { return a.first > b.first; });
+                    text << "    threads:";
+                    for (std::size_t k = 0; k < rows.size() && k < 10; ++k)
+                        text << " " << rows[k].second << " " << juce::String (rows[k].first, 1) << "%;";
+                    text << "\n";
+                }
+                if (const auto gb = lynx::grossBeatPaintStats (false); gb.isNotEmpty())
+                    text << "    " << gb << "\n";
                 if (s.finish)
                     text << s.finish();
                 juce::File (report).replaceWithText (text);
@@ -11107,12 +11132,36 @@ private:
                                        s.channels.push_back (env);
                                    }, false);
                                    engine->dispatchPendingMessages();
-                                   if (gbTrack >= 0)
+                                   // LYNX_UIPERF_WINDOWS: which of them (G Gross Beat, F Formula, E Envelope Controller; default all)
+                                   const auto which = juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_WINDOWS", "GFE");
+                                   if (gbTrack >= 0 && which.containsChar ('G'))
                                        lynx::NativeEffectWindows::open (*engine, gbTrack, gbSlot);
-                                   if (formulaSlot >= 0)
+                                   if (formulaSlot >= 0 && which.containsChar ('F'))
                                        lynx::FormulaControllerWindows::open (*engine, last, formulaSlot);
-                                   lynx::openChannelSettings (*engine, (int) engine->getSong().channels.size() - 1);
+                                   if (which.containsChar ('E'))
+                                       lynx::openChannelSettings (*engine, (int) engine->getSong().channels.size() - 1);
                                }, {}, 3000 });
+        // round 190ih: LYNX_UIPERF_GBAB=n — n cycles over Gross Beat's live-display variants, playing, 2.5 s each, in one
+        // process (other load hits every variant alike): the names carry the LYNX_GB_DIAG mask
+        if (const auto cycles = juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_GBAB", "0").getIntValue(); cycles > 0)
+        {
+            run->steps.push_back ({ "Gross Beat A/B start", [this] {
+                                       engine->getTransport().songMode = true;
+                                       engine->rewind();
+                                       engine->play();
+                                   }, {}, 1500 });
+            for (int c = 0; c < cycles; ++c)
+                for (const int mask : { 1, 0, 30 << 8, 1, 10 << 8 }) // (off, the default, 30 / s, off, 10 / s)
+                    run->steps.push_back ({ "Gross Beat A/B mask " + juce::String (mask) + " cycle " + juce::String (c + 1),
+                                            [this, mask] {
+                                                lynx::setGrossBeatDiagnostics (mask);
+                                                if (! engine->getTransport().playing.load()) // (the song ended: again)
+                                                {
+                                                    engine->rewind();
+                                                    engine->play();
+                                                }
+                                            }, {}, 2500 });
+        }
         run->steps.push_back ({ "Gross Beat window, song playing", [this] {
                                    engine->getTransport().songMode = true;
                                    engine->rewind();

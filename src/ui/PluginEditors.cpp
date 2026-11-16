@@ -85,6 +85,49 @@ bool isVertical (const LayoutItem& item) noexcept
 
 // --- the editor ----------------------------------------------------------------------------------
 
+// round 190ih: what Gross Beat's editor paints while its live parts move (--uiperf), and the measurement switches
+// (LYNX_GB_DIAG, also set by --uiperf's A/B steps: 1 no live repaints, 64 JUCE's software renderer for the window,
+// bits 8-15 the live display's frames per second). The trail, an opaque editor, the cells alone and the locator alone
+// were measured the same way and changed nothing (details190ih/HANDOFF.md); only the frame rate did.
+struct GbPaintStats
+{
+    long count = 0;
+    double pixels = 0.0, ms = 0.0;
+};
+inline GbPaintStats& gbPaintStats()
+{
+    static GbPaintStats stats;
+    return stats;
+}
+inline int& gbDiagMask()
+{
+    static int mask = juce::SystemStats::getEnvironmentVariable ("LYNX_GB_DIAG", "0").getIntValue();
+    return mask;
+}
+inline int gbDiag() { return gbDiagMask(); }
+struct PaintCount
+{
+    PaintCount (bool on, juce::Graphics& g) : active (on)
+    {
+        if (active)
+        {
+            const auto clip = g.getClipBounds();
+            gbPaintStats().pixels += (double) clip.getWidth() * (double) clip.getHeight();
+            start = juce::Time::getMillisecondCounterHiRes();
+        }
+    }
+    ~PaintCount()
+    {
+        if (active)
+        {
+            ++gbPaintStats().count;
+            gbPaintStats().ms += juce::Time::getMillisecondCounterHiRes() - start;
+        }
+    }
+    bool active;
+    double start = 0.0;
+};
+
 class NativeEffectEditor final : public juce::Component,
                                  public ui::HintSource,
                                  private juce::ChangeListener,
@@ -623,6 +666,7 @@ public:
 
     void paint (juce::Graphics& g) override
     {
+        const PaintCount counted (kind == EffectKind::grossBeat, g);
         using namespace theme;
         const skin::StyleScope styleScope (editorStyle(), artNow());
         accent = editorStyle() == skin::Style::themed ? skin::artAccent (artNow()) : familyAccent;
@@ -5587,6 +5631,7 @@ private:
 
 public:
     // round 166f: the analyser part of the timer, for off-screen pictures (--eq166fshot)
+    bool isGrossBeat() const noexcept { return kind == EffectKind::grossBeat; } // (round 190ih diagnostics)
     void tickDisplaysForSnapshot()
     {
         if (kind == EffectKind::grossBeat) // round 190ih: the locator and slot states from the published meters
@@ -5921,6 +5966,43 @@ juce::Point<int> nativeEditorMinimumSize (juce::Component& editor)
     if (native == nullptr) return {};
     const auto design = native->designSize();
     return { juce::jmax (design.x / 2, native->minimumWidth()), design.y / 2 };
+}
+
+void setGrossBeatDiagnostics (int mask)
+{
+    gbDiagMask() = mask;
+   #if JUCE_WINDOWS
+    if ((mask & 64) == 0) // (back on Direct2D)
+        for (int i = 0; i < juce::ComponentPeer::getNumPeers(); ++i)
+            if (auto* peer = juce::ComponentPeer::getPeer (i); peer != nullptr && peer->getAvailableRenderingEngines().size() > 1
+                                                               && peer->getCurrentRenderingEngine() == 0
+                                                               && dynamic_cast<juce::DocumentWindow*> (&peer->getComponent()) != nullptr
+                                                               && ! peer->getComponent().getProperties().contains ("lynxGdi"))
+            {
+                std::function<bool (juce::Component&)> hasGb = [&] (juce::Component& c) {
+                    if (auto* e = dynamic_cast<NativeEffectEditor*> (&c); e != nullptr && e->isGrossBeat())
+                        return true;
+                    for (auto* child : c.getChildren())
+                        if (hasGb (*child))
+                            return true;
+                    return false;
+                };
+                if (hasGb (peer->getComponent()))
+                    peer->setCurrentRenderingEngine (1);
+            }
+   #endif
+}
+
+juce::String grossBeatPaintStats (bool reset)
+{
+    auto& st = gbPaintStats();
+    juce::String text;
+    if (st.count > 0)
+        text << "Gross Beat editor paints: " << st.count << ", " << juce::String (st.pixels / 1.0e6, 2) << " Mpx, "
+             << juce::String (st.ms, 1) << " ms on the message thread";
+    if (reset)
+        st = {};
+    return text;
 }
 
 bool showGrossBeatEnvelopeForSnapshot (juce::Component& editor, int envelopeKind)

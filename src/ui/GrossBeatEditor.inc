@@ -68,20 +68,58 @@
         return juce::Rectangle<float> (x - trail - 2.0f, inner.getY(), trail + 5.0f, inner.getHeight()).getSmallestIntegerContainer();
     }
     float gbTrailWidth() const { return ui::motion::enabled() ? 6.0f * scale() : 0.0f; } // a fade: Settings › Animations
+    double gbLastFrameMs = 0.0;
+    // 15 a second by default: measured in one process against the static window (round 190ih, Thief, interleaved
+    // 2.5 s steps), 30 a second cost +5 … +13 points of process CPU, 15 or fewer stayed inside the measurement's own
+    // noise; LYNX_GB_DIAG's high byte overrides it for measurements
+    static double gbMaxHz() { const auto hz = gbDiag() >> 8; return hz > 0 ? (double) hz : 15.0; }
 
+    // the drawn width of the playing cell's fill, in px
+    int gbFillPx (const LayoutItem& item, int kind, const GbLive& v) const
+    {
+        const auto cell = v.slot[(std::size_t) kind];
+        if (! v.playing || cell < 0 || cell >= grossbeat::slotsPerKind)
+            return -1;
+        const auto r = gbGridCell (item, cell).reduced (1.0f * scale());
+        return (int) std::floor (r.getX() + r.getWidth() * v.position[(std::size_t) kind]);
+    }
+
+    // round 190ih: what changed since the last tick is repainted, nothing else: the locator's old and new columns when its
+    // pixel moved, the fill's new strip when its pixel moved, whole cells only when the playing / queued slot changed
     void gbLiveTick()
     {
+       #if JUCE_WINDOWS
+        if ((gbDiag() & 64) != 0) // (diagnostics: the window on JUCE's software renderer, as hosted plugin windows are)
+            if (auto* peer = getPeer(); peer != nullptr && peer->getAvailableRenderingEngines().size() > 1 && peer->getCurrentRenderingEngine() != 0)
+                peer->setCurrentRenderingEngine (0);
+       #endif
+        if ((gbDiag() & 1) != 0)
+            return;
+        if (auto* peer = getPeer(); peer != nullptr && peer->isMinimised()) // (nothing to see: no frames)
+            return;
+        // the frame budget: the editor's window pays a fixed cost for every frame it shows (measured, round 190ih:
+        // ≈ 2.5 ms of the message thread per frame plus the GPU driver's work, whatever the size of the repaint; the
+        // trail, an opaque editor or the software renderer changed nothing), so the locator and the fills move
+        // together, at most gbMaxHz() times a second, and only when one of them moved a pixel
+        const auto nowMs = juce::Time::getMillisecondCounterHiRes();
+        if (gbLive.playing && nowMs - gbLastFrameMs < 1000.0 / gbMaxHz() - 4.0)
+            return;
         const auto now = gbReadLive();
         if (now == gbLive)
             return;
         const auto before = gbLive;
         gbLive = now;
+        gbLastFrameMs = nowMs;
         for (const auto& item : activeLayout().items)
         {
             if (! visible (item))
                 continue;
             if (isGbItem (item, "grossbeat"))
             {
+                const auto xBefore = before.playing ? (int) std::floor (gbLocatorX (item, before)) : -1;
+                const auto xNow = now.playing ? (int) std::floor (gbLocatorX (item, now)) : -1;
+                if (xBefore == xNow)
+                    continue; // (the same pixel: nothing to draw)
                 if (before.playing)
                     repaint (gbLocatorBounds (item, before));
                 if (now.playing)
@@ -90,11 +128,21 @@
             else if (const auto k = gbGridKind (item); k >= 0)
             {
                 const auto kk = (std::size_t) k;
-                for (const auto cell : { before.slot[kk], now.slot[kk], before.queued[kk], now.queued[kk] })
-                    if (cell >= 0 && cell < grossbeat::slotsPerKind
-                        && (before.playing != now.playing || before.slot[kk] != now.slot[kk] || before.queued[kk] != now.queued[kk]
-                            || before.position[kk] != now.position[kk]))
-                        repaint (gbGridCell (item, cell).getSmallestIntegerContainer().expanded (1));
+                if (before.playing != now.playing || before.slot[kk] != now.slot[kk] || before.queued[kk] != now.queued[kk])
+                {
+                    for (const auto cell : { before.slot[kk], now.slot[kk], before.queued[kk], now.queued[kk] })
+                        if (cell >= 0 && cell < grossbeat::slotsPerKind)
+                            repaint (gbGridCell (item, cell).getSmallestIntegerContainer().expanded (1));
+                    continue;
+                }
+                const auto a = gbFillPx (item, k, before), b = gbFillPx (item, k, now);
+                if (a == b || a < 0 || b < 0)
+                    continue;
+                const auto cell = gbGridCell (item, now.slot[kk]).getSmallestIntegerContainer();
+                if (b > a) // (the fill grew: its new strip)
+                    repaint (juce::Rectangle<int> (a - 1, cell.getY(), b - a + 3, cell.getHeight()));
+                else // (it wrapped round: the cell)
+                    repaint (cell.expanded (1));
             }
         }
     }

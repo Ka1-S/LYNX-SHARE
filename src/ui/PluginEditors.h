@@ -40,6 +40,10 @@ void setNativeEditorDemo (bool on);
 bool tickNativeEffectEditor (juce::Component& editor);
 // round 190ih (--details190ihshot): Gross Beat's editor on its time (0) or volume (1) envelope
 bool showGrossBeatEnvelopeForSnapshot (juce::Component& editor, int envelopeKind);
+// round 190ih (--uiperf): Gross Beat editors' paints since the last reset ("" when none): count, area, time
+juce::String grossBeatPaintStats (bool reset);
+// round 190ih (--uiperf A/B): Gross Beat's diagnostic switches at run time (the LYNX_GB_DIAG bits)
+void setGrossBeatDiagnostics (int mask);
 // round 170k2: the smallest size its window allows (the header still shows the whole name); {} for another component
 juce::Point<int> nativeEditorMinimumSize (juce::Component& editor);
 } // namespace lynx
