@@ -205,7 +205,9 @@ inline float titleText (juce::Graphics& g, Rectangle<float> a, const juce::Strin
         const auto text = name.toUpperCase();
         const auto tw = juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), text);
         const auto w = juce::jmin (a.getWidth(), tw + 16.0f);
-        const auto plate = Rectangle<float> (a.getX(), a.getCentreY() - size * 0.8f, w, size * 1.6f);
+        // round 190in (design190ia FW-10): one badge form, 18 px high (less only in a header too low for it)
+        const auto plateH = juce::jmin (18.0f, a.getHeight() - 4.0f);
+        const auto plate = Rectangle<float> (a.getX(), a.getCentreY() - plateH * 0.5f, w, plateH);
         g.setColour (Colours::black.withAlpha (0.6f));
         g.fillRoundedRectangle (plate.translated (0.0f, 1.0f), 2.5f);
         g.setGradientFill (ColourGradient (Colour (0xffe4e6ea), 0.0f, plate.getY(), Colour (0xff9a9ea6), 0.0f, plate.getBottom(), false));

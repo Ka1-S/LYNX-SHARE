@@ -183,15 +183,30 @@ public:
 
     // the design size (for the window's aspect ratio)
     juce::Point<int> designSize() const { return { activeLayout().width, activeLayout().height }; }
-    juce::String headerName() const { return layout == &plugui::soundgoodizerLayout() ? juce::String ("Soundgoodizer") : utf8 (effectInfo (kind).name); }
+    // round 190in (design190ia FW-8, owner rule "names stay"): an editor that follows an FL plugin is titled with FL's
+    // name ("Fruity Delay 3", not LYNX's "Delay"; "Fruity Stereo Shaper", not "Utility"); LYNX's own engines keep theirs
+    juce::String headerName() const
+    {
+        if (layout == &plugui::soundgoodizerLayout())
+            return "Soundgoodizer";
+        if (layout != nullptr && layout->fl != nullptr && *layout->fl != 0)
+            return utf8 (layout->fl);
+        // a LYNX engine standing in for an FL plugin of an imported project (Fruity Limiter → LYNX's Limiter engine,
+        // Fruity Stereo Shaper → Utility...): the FL plugin's name, as FL shows it
+        if (const auto* fx = stored(); fx != nullptr && fx->kind != EffectKind::plugin && ! fx->flOrigin.plugin.empty())
+            return utf8 (fx->flOrigin.plugin.c_str());
+        return utf8 (effectInfo (kind).name);
+    }
 
     // round 170k2: the narrowest window whose header still shows the plugin's whole name (the bar at its narrowest)
     int minimumWidth() const
     {
-        const auto name = headerName();
-        const auto left = menuButton().getRight() + 40.0f; // the arrow, LYNX's mark and the LED
-        const auto right = usesBar() ? pluginheader::PresetBar::narrowWidth() : 22.0f + 26.0f + 90.0f + 4.0f + 6.0f; // prev, next, preset box
-        return juce::roundToInt (std::ceil (left + skin::titleMinWidth (name, headerHeight) + right));
+        // round 190in (FW-9): the fixed slot grid takes the same room at any width of its kind (compact below 520 px)
+        const auto need = skin::titleMinWidth (headerName(), headerHeight);
+        const auto fixed = [] (float w) { return w - pluginheader::headerSlots ({ 0.0f, 0.0f, w, headerHeight }).title.getWidth(); };
+        const auto compact = need + fixed (pluginheader::compactBelow - 1.0f);
+        return juce::roundToInt (std::ceil (compact < pluginheader::compactBelow ? compact
+                                                                                 : juce::jmax (pluginheader::compactBelow, need + fixed (pluginheader::compactBelow + 400.0f))));
     }
 
     // The slot as shown: while the song plays, its automated parameters at their automation's value (issue #11 comment 4:
@@ -655,43 +670,40 @@ public:
     }
 
     juce::Rectangle<float> headerArea() const { return { 0.0f, 0.0f, (float) getWidth(), headerHeight }; }
-    juce::Rectangle<float> menuButton() const { return { 4.0f, 3.0f, 22.0f, 20.0f }; }
-    juce::Rectangle<float> nextButton() const { return { (float) getWidth() - 26.0f, 3.0f, 20.0f, 20.0f }; }
-    juce::Rectangle<float> prevButton() const { return nextButton().translated (-22.0f, 0.0f); }
-    juce::Rectangle<float> presetBox() const
-    {
-        // round 170k2: the box gives way to the title (never below 90 px)
-        const auto name = headerName();
-        const auto room = prevButton().getX() - 4.0f - 6.0f - (menuButton().getRight() + 40.0f) - skin::titleMinWidth (name, headerHeight);
-        const auto w = juce::jlimit (90.0f, juce::jmax (90.0f, room), juce::jlimit (90.0f, 220.0f, (float) getWidth() * 0.32f));
-        return { prevButton().getX() - w - 4.0f, 3.0f, w, 20.0f };
-    }
+    // round 190in (design190ia FW-9): the header's slots come from the one grid every native editor shares
+    pluginheader::HeaderSlots slots() const { return pluginheader::headerSlots (headerArea()); }
+    juce::Rectangle<float> menuButton() const { return slots().menu; }
+    juce::Rectangle<float> nextButton() const { return slots().next; }
+    juce::Rectangle<float> prevButton() const { return slots().prev; }
+    juce::Rectangle<float> presetBox() const { return slots().preset; }
 
     void paintHeader (juce::Graphics& g, const EffectSlot& fx)
     {
         using namespace theme;
         const auto area = headerArea();
+        const auto grid = slots();
         skin::headerBar (g, area, accent);
 
         // options menu (FL's arrow at the left of the plugin's title)
-        drawArrow (g, menuButton(), 0.0f, hoverHeader == 1 ? accent : colour::textSecondary);
+        drawArrow (g, grid.menu, 0.0f, hoverHeader == 1 ? accent : colour::textSecondary);
 
-        // LYNX's mark, bypass LED, name, where it is
-        skin::brandMark (g, juce::Rectangle<float> (menuButton().getRight() + 2.0f, 0.0f, 18.0f, area.getHeight()));
-        const auto ledC = juce::Point<float> (menuButton().getRight() + 30.0f, area.getCentreY());
-        skin::powerLed (g, ledC, 7.0f, fx.enabled);
+        // LYNX's mark (not in the compact grid), bypass LED, name, where it is
+        if (! grid.logo.isEmpty())
+            skin::brandMark (g, grid.logo);
+        skin::powerLed (g, grid.led, pluginheader::ledDiameter, fx.enabled);
         const auto name = headerName();
-        auto text = area.withLeft (ledC.x + 10.0f).withRight (presetBox().getX() - 6.0f);
+        auto text = grid.title;
         if (usesBar())
-            text = bar.place (area, true, ledC.x + 10.0f - area.getX() + skin::titleMinWidth (name, area.getHeight())).withLeft (ledC.x + 10.0f);
+            bar.placeInGrid (area, true);
         const auto nameWidth = skin::titleText (g, text.withHeight (area.getHeight()), name, accent);
         text.removeFromLeft (nameWidth);
-        // round 177b: the "Sidechain from" picker at the right end of the title space (when it fits)
+        // round 177b: the "Sidechain from" picker at the right end of the title space (when it fits; round 190in: the
+        // editor's own extras sit left of the undo slot)
         sidechainChip = {};
         if (showsSidechain())
             if (constexpr float w = 118.0f; text.getWidth() >= w + 14.0f)
             {
-                sidechainChip = { text.getRight() - w, 3.0f, w, 20.0f };
+                sidechainChip = { text.getRight() - w, grid.preset.getY(), w, grid.preset.getHeight() };
                 text.setRight (sidechainChip.getX() - 4.0f);
                 paintSidechainChip (g, fx);
             }
@@ -707,8 +719,10 @@ public:
             return;
         }
 
+        // round 190in (FW-9): an editor whose setting is not its parameters keeps the undo / A-B slots, disabled
+        pluginheader::paintDisabledSlots (g, grid);
         // presets: name, previous, next
-        const auto box = presetBox();
+        const auto box = grid.preset;
         skin::valuePlate (g, box, radius::md);
         if (hoverHeader == 2)
         {
@@ -718,8 +732,8 @@ public:
         g.setColour (presetName.isNotEmpty() ? colour::textPrimary : colour::textSecondary);
         ui::drawFittingText (g, presetName.isNotEmpty() ? presetName : tr ("(no preset)"), box.reduced (8.0f, 0.0f), juce::Justification::centredRight,
                              font (type::small, presetName.isNotEmpty()), 8.0f, 0.0f, 0.75f);
-        drawArrow (g, prevButton(), juce::MathConstants<float>::pi, hoverHeader == 3 ? accent : colour::textSecondary);
-        drawArrow (g, nextButton(), 0.0f, hoverHeader == 4 ? accent : colour::textSecondary);
+        drawArrow (g, grid.prev, juce::MathConstants<float>::pi, hoverHeader == 3 ? accent : colour::textSecondary);
+        drawArrow (g, grid.next, 0.0f, hoverHeader == 4 ? accent : colour::textSecondary);
     }
 
     // round 177b: a mixer slot's effect with a side input shows its "Sidechain from" picker in the header
@@ -5467,6 +5481,9 @@ private:
                     fx.state = bytes;
             });
         });
+        // round 190in (FW-9): the compact header grid has no A→B slot; its action is here
+        if (usesBar() && slots().compact)
+            menu.addItem (bar.hintFor (pluginheader::Part::copy), [this] { bar.click (pluginheader::Part::copy, *this); });
         // switches that FL keeps out of the panel (in its own menus): on / off here
         if (! activeLayout().menuSwitches.empty())
         {
@@ -5952,7 +5969,13 @@ void open (AudioEngine& engine, int track, int slot)
     }
 
     const auto name = track == 0 ? tr ("Master") : juce::String::fromUTF8 (mixer[(std::size_t) track].name.c_str());
-    const auto title = utf8 (isSoundgoodizerApprox (fxSlot) ? "Soundgoodizer" : effectInfo (kind).name) + " - " + (name.isNotEmpty() ? name : tr ("Insert {0}", { juce::String (track) })) + " ("
+    // round 190in (FW-8): the FL name of an editor that follows an FL plugin, as its header shows it
+    const auto* flName = plugui::hasFlLayout (kind) ? plugui::layoutFor (kind).fl : nullptr;
+    const auto* shown = isSoundgoodizerApprox (fxSlot) ? "Soundgoodizer"
+                        : flName != nullptr && *flName != 0 ? flName
+                        : fxSlot.kind != EffectKind::plugin && ! fxSlot.flOrigin.plugin.empty() ? fxSlot.flOrigin.plugin.c_str() // (an FL import's stand-in)
+                                                                                                 : effectInfo (kind).name;
+    const auto title = utf8 (shown) + " - " + (name.isNotEmpty() ? name : tr ("Insert {0}", { juce::String (track) })) + " ("
                        + tr ("slot {0}", { juce::String (slot + 1) }) + ")";
     open[key] = std::make_unique<NativeEffectWindow> (engine, track, slot, title);
     // FL's "Limit the number of open plugin editors" (round 189o, core/EditorLimit.h): LYNX's own effect windows count too

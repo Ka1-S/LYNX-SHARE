@@ -599,7 +599,7 @@ float titleMinWidth (const juce::String& name, float height)
     auto most = 0.0f;
     for (const auto st : { Style::glow, Style::neon, Style::hardware, Style::vivid })
     {
-        if (const auto n = titlePrefixLength (name); n > 0 && height >= 20.0f)
+        if (const auto n = titlePrefixLength (name); n > 0 && height >= 20.0f && st != Style::hardware) // (round 190in: one-line badge)
         {
             const auto low = titleLook (st, height * 0.7f);
             most = juce::jmax (most, titleWidth (low, name.substring (n), titleMinSize));
@@ -621,8 +621,9 @@ float titleText (juce::Graphics& g, juce::Rectangle<float> a, const juce::String
         lastFit.size = size;
         return drawTitleLine (g, a, name, accent, underline, size);
     }
-    // 2. a known prefix ("Fruity") on a small line above, the rest of the name below it
-    if (const auto n = titlePrefixLength (name); n > 0 && a.getHeight() >= 20.0f)
+    // 2. a known prefix ("Fruity") on a small line above, the rest of the name below it (round 190in, design190ia FW-10:
+    // not for the Hardware style, whose badge has one form: one line, the whole FL name)
+    if (const auto n = titlePrefixLength (name); n > 0 && a.getHeight() >= 20.0f && currentStyle != Style::hardware)
     {
         const auto rest = name.substring (n);
         const auto top = a.withHeight (a.getHeight() * 0.36f).translated (0.0f, 1.0f);

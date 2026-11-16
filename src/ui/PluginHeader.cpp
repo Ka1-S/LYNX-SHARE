@@ -213,6 +213,91 @@ juce::Rectangle<float> PresetBar::place (juce::Rectangle<float> area, bool withP
     return area.withRight (juce::jmax (area.getX(), x));
 }
 
+HeaderSlots headerSlots (juce::Rectangle<float> header)
+{
+    HeaderSlots s;
+    s.compact = header.getWidth() < compactBelow;
+    const auto h = juce::jmin (20.0f, header.getHeight() - 4.0f);
+    const auto y = header.getCentreY() - h * 0.5f;
+    const auto x0 = header.getX(), right = header.getRight();
+    s.menu = { x0 + 4.0f, y, 16.0f, h };
+    float titleX;
+    if (s.compact)
+    {
+        s.led = { x0 + 28.0f, header.getCentreY() };
+        titleX = x0 + 36.0f;
+    }
+    else
+    {
+        s.logo = { x0 + 22.0f, header.getY(), 18.0f, header.getHeight() };
+        s.led = { x0 + 48.0f, header.getCentreY() };
+        titleX = x0 + 56.0f;
+    }
+    auto x = right;
+    auto take = [&] (float gap, float w) {
+        x -= gap + w;
+        return juce::Rectangle<float> (x, y, w, h);
+    };
+    const auto c = s.compact;
+    s.next = take (4.0f, c ? 14.0f : 16.0f);
+    s.prev = take (0.0f, c ? 14.0f : 16.0f);
+    s.preset = take (2.0f, c ? 70.0f : 160.0f);
+    if (! c)
+        s.copy = take (8.0f, 30.0f);
+    s.b = take (c ? 6.0f : 2.0f, c ? 16.0f : 18.0f);
+    s.a = take (2.0f, c ? 16.0f : 18.0f);
+    s.redo = take (c ? 6.0f : 8.0f, c ? 16.0f : 18.0f);
+    s.undo = take (0.0f, c ? 16.0f : 18.0f);
+    x -= c ? 4.0f : 6.0f;
+    s.title = { titleX, header.getY(), juce::jmax (0.0f, x - titleX), header.getHeight() };
+    return s;
+}
+
+void paintDisabledSlots (juce::Graphics& g, const HeaderSlots& slots)
+{
+    using namespace theme;
+    const auto tone = colour::textSecondary.withAlpha (0.35f);
+    drawTurn (g, slots.undo, false, tone);
+    drawTurn (g, slots.redo, true, tone);
+    g.setFont (font (type::small, true));
+    for (const auto side : { 0, 1 })
+    {
+        const auto r = side == 0 ? slots.a : slots.b;
+        g.setColour (colour::bg3.withAlpha (0.35f));
+        g.fillRoundedRectangle (r, radius::sm);
+        g.setColour (tone);
+        g.drawText (side == 0 ? "A" : "B", r, juce::Justification::centred, false);
+    }
+    if (! slots.copy.isEmpty())
+    {
+        g.setColour (colour::bg3.withAlpha (0.35f));
+        g.fillRoundedRectangle (slots.copy, radius::sm);
+        g.setColour (tone);
+        g.setFont (font (type::caption, true));
+        g.drawText (juce::String::fromUTF8 ("A\xe2\x86\x92" "B"), slots.copy, juce::Justification::centred, false);
+    }
+}
+
+juce::Rectangle<float> PresetBar::placeInGrid (juce::Rectangle<float> header, bool withPresets)
+{
+    presetsShown = withPresets;
+    const auto s = headerSlots (header);
+    rUndo = s.undo;
+    rRedo = s.redo;
+    rA = s.a;
+    rB = s.b;
+    rCopy = s.copy;
+    if (withPresets)
+    {
+        rPreset = s.preset;
+        rPrev = s.prev;
+        rNext = s.next;
+    }
+    else
+        rNext = rPrev = rPreset = {};
+    return s.title;
+}
+
 float PresetBar::narrowWidth (bool withPresets)
 {
     // as place() lays it out below 420 px: (next, prev, gap, preset box, gap) + B, A, gap + redo, undo, gap + margin

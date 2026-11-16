@@ -771,13 +771,17 @@ public:
             return;
         }
         bar.beginGesture();
-        if (e.mods.isPopupMenu() && headerArea().contains (p)) // round 126: the editor's style
+        // round 126: the editor's style; round 190in (FW-9): also from the header's ▸ slot, as in every native editor
+        const auto menuSlot = pluginheader::headerSlots (headerArea()).menu;
+        if ((e.mods.isPopupMenu() && headerArea().contains (p)) || menuSlot.expanded (2.0f).contains (p))
         {
             juce::PopupMenu m;
             skin::addStyleMenu (m, skin::styleKey (EffectKind::facetEq), [safe = juce::Component::SafePointer<juce::Component> (this)] {
                 if (safe != nullptr) safe->repaint();
             });
-            m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+            auto options = juce::PopupMenu::Options().withTargetComponent (this);
+            m.showMenuAsync (menuSlot.expanded (2.0f).contains (p) ? options.withTargetScreenArea (localAreaToGlobal (menuSlot.toNearestInt()))
+                                                                   : options.withMousePosition());
             return;
         }
         std::vector<Control> all;
@@ -1094,21 +1098,36 @@ public:
         using namespace theme;
         const auto h = headerArea();
         skin::headerBar (g, h, colour::accent);
-        skin::brandMark (g, juce::Rectangle<float> (8.0f, 0.0f, 20.0f, h.getHeight()));
-        skin::powerLed (g, { 36.0f, h.getCentreY() }, 7.0f, fx.enabled);
-        const auto w = skin::titleText (g, juce::Rectangle<float> (46.0f, 0.0f, 120.0f, h.getHeight()), "Facet EQ", colour::accent);
+        // round 190in (design190ia FW-9): the slot grid every native editor shares
+        const auto grid = pluginheader::headerSlots (h);
+        {
+            juce::Path arrow; // FL's ▸ (the editor's menu)
+            arrow.addTriangle (-3.0f, -5.0f, -3.0f, 5.0f, 4.0f, 0.0f);
+            arrow.applyTransform (juce::AffineTransform::translation (grid.menu.getCentreX(), grid.menu.getCentreY()));
+            g.setColour (colour::textSecondary);
+            g.fillPath (arrow);
+        }
+        if (! grid.logo.isEmpty())
+            skin::brandMark (g, grid.logo);
+        skin::powerLed (g, grid.led, pluginheader::ledDiameter, fx.enabled);
+        auto text = grid.title;
+        const auto w = skin::titleText (g, text, "Facet EQ", colour::accent);
+        text.removeFromLeft (w + 12.0f);
         g.setColour (colour::textSecondary);
         g.setFont (font (type::small));
-        if (! plugui::hostedElsewhere) // (no mixer around a plugin in another host, round 180b)
-            g.drawText (trackName() + "  -  " + tr ("slot {0}", { juce::String (slot + 1) }), juce::Rectangle<float> (58.0f + w, 0.0f, 300.0f, h.getHeight()),
-                        juce::Justification::centredLeft, true);
+        const auto where = trackName() + "  -  " + tr ("slot {0}", { juce::String (slot + 1) });
+        if (! plugui::hostedElsewhere && juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), where) <= text.getWidth()) // (round 180b)
+        {
+            g.drawText (where, text, juce::Justification::centredLeft, true);
+            text.removeFromLeft (juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), where) + 12.0f);
+        }
         // the preset bar (undo / redo, A / B, presets) on the right, the graph's gestures between
-        const auto left = bar.place (h.withTrimmedLeft (w + 300.0f));
+        bar.placeInGrid (h);
         bar.paint (g, colour::accent);
         g.setColour (colour::textDisabled);
         g.setFont (font (type::caption));
         g.drawText (tr ("Double-click: new band  -  drag: frequency / gain  -  wheel: Q  -  right-click: menu"),
-                    left.withTrimmedRight (8.0f), juce::Justification::centredRight, true);
+                    text.withTrimmedRight (8.0f), juce::Justification::centredRight, true);
     }
 
     void paintBar (juce::Graphics& g, const EffectSlot& fx, const std::vector<Control>& all)
