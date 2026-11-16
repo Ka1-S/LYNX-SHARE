@@ -326,14 +326,15 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
         bool warped = false;
         // (a project saved by this build has the mark; a channel without its own list then plays the pitch-aware Beats
         // and the Measured Texture / Complex Pro laws, which 0.1.28 reads as Measured Beats and its Classic engines)
-        const auto marked = (bool) o.getProperty ("warpLaw190ik", false);
+        const auto marked = (bool) root.getProperty ("warpLaw190ik", false);
         forEachChannel (root, [&] (juce::DynamicObject& c, int i) {
             auto* sampler = objectOf (c.getProperty ("sampler"));
             if (sampler == nullptr)
                 return;
-            const auto method = (int) sampler->getProperty ("stretchMethod", 0); // (StretchMethod: 3 Beats, 5 Texture, 6 Complex)
-            const auto stretched = (double) sampler->getProperty ("stretchBeats", 0.0) > 0.0;
-            const auto keepsPitch = (bool) sampler->getProperty ("keepPitch", false);
+            const juce::var sv (sampler);
+            const auto method = (int) sv.getProperty ("stretchMethod", 0); // (StretchMethod: 3 Beats, 5 Texture, 6 Complex)
+            const auto stretched = (double) sv.getProperty ("stretchBeats", 0.0) > 0.0;
+            const auto keepsPitch = (bool) sv.getProperty ("keepPitch", false);
             warped = warped || stretched;
             auto* list = arrayOf (sampler->getProperty ("warpModes"));
             const auto listed = list != nullptr && list->size() >= 9;
@@ -350,9 +351,9 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
                     list->set (9, 1.0);
                 list->removeRange (10, list->size() - 10);
             }
-            if (const auto baked = (double) sampler->getProperty ("stretchPitch", 0.0); baked != 0.0 && method != 3)
+            if (const auto baked = (double) sv.getProperty ("stretchPitch", 0.0); baked != 0.0 && method != 3)
             {
-                sampler->setProperty ("pitch", juce::jlimit (-24.0, 24.0, (double) sampler->getProperty ("pitch", 0.0) + baked));
+                sampler->setProperty ("pitch", juce::jlimit (-24.0, 24.0, (double) sv.getProperty ("pitch", 0.0) + baked));
                 sampler->removeProperty ("stretchPitch");
                 knobPitch.add (channelName (juce::var (&c), i));
             }
