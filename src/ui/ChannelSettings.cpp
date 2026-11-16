@@ -78,6 +78,7 @@
 #include "ui/VfxEditors.h"
 #include "ui/VideoPlayerView.h"
 #include "ui/WaveTravellerEditor.h"
+#include "ui/DirectWaveEditor.h"
 #include "ui/FpcEditor.h"
 #include "ui/TetraEditor.h"
 #include "ui/FruitySlicerEditor.h"
@@ -6541,6 +6542,8 @@ std::unique_ptr<juce::Component> makeInstrumentPage (AudioEngine& engine, const 
         return makeFpcEditor (engine, ref.locate, ref.index); // round 190q
     if (kind == InstrumentKind::tetra)
         return makeTetraEditor (engine, ref.locate, ref.index); // round 190hs
+    if (kind == InstrumentKind::directwave)
+        return makeDirectWaveEditor (engine, ref.locate, ref.index); // round 190hz
     if (kind == InstrumentKind::synth)
         return std::make_unique<SynthPanel> (engine, ref);
     if (isModelKind (kind))
@@ -7015,6 +7018,10 @@ std::unique_ptr<juce::Component> makeChannelSettingsPanel (AudioEngine& engine, 
         return makeTetraEditor (engine, [channel] (Song& s) -> ChannelDef* {
             return channel >= 0 && channel < (int) s.channels.size() ? &s.channels[(std::size_t) channel] : nullptr;
         }, channel); // round 190hs
+    if (engine.getSong().channels[(std::size_t) channel].instrument == InstrumentKind::directwave)
+        return makeDirectWaveEditor (engine, [channel] (Song& s) -> ChannelDef* {
+            return channel >= 0 && channel < (int) s.channels.size() ? &s.channels[(std::size_t) channel] : nullptr;
+        }, channel); // round 190hz
     if (const auto kind = engine.getSong().channels[(std::size_t) channel].instrument;
         kind == InstrumentKind::sakura || kind == InstrumentKind::drumpad || kind == InstrumentKind::boobass
                  || kind == InstrumentKind::drumsynth || kind == InstrumentKind::harmless || kind == InstrumentKind::harmor

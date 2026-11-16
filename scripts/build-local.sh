@@ -87,6 +87,7 @@ CORE="$CORE src/core/FlResampler.cpp src/core/FlKeys.cpp"
 CORE="$CORE src/core/HardcoreFx.cpp"
 # FL's DirectWave (REA round 72)
 CORE="$CORE src/core/DirectWave.cpp"
+CORE="$CORE src/core/DirectWaveState.cpp"
 # LYNX Soundfont: SF2 / SF3 player (round 158; TinySoundFont + stb_vorbis in third_party)
 CORE="$CORE src/core/SoundFont.cpp src/core/SoundFontLoad.cpp src/core/SoundFontIndex.cpp"
 # Ogg Vorbis decoding as FL does (REA round 77)

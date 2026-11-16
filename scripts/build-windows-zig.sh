@@ -220,6 +220,7 @@ APP_SOURCES+=(src/core/SlicexInstrument.cpp)
 APP_SOURCES+=(src/ui/SlicexEditor.cpp)
 APP_SOURCES+=(src/ui/FpcEditor.cpp) # round 190q
 APP_SOURCES+=(src/ui/TetraEditor.cpp) # round 190hs
+APP_SOURCES+=(src/ui/DirectWaveEditor.cpp) # round 190hz
 # Windows file association (.lynx) and its icon
 APP_SOURCES+=(src/platform/FileTypes.cpp src/platform/Paths.cpp src/platform/Package.cpp src/platform/NativeEmbed.cpp)
 # SEH guard around calls into hosted plugins (round 111): the only unit built with -fms-extensions (__try / __except)
@@ -305,6 +306,7 @@ APP_SOURCES+=(src/core/XyController.cpp src/core/FlCurve.cpp src/core/ControlSur
 APP_SOURCES+=(src/core/VoltageController.cpp src/ui/VoltageEditor.cpp) # Voltage Controller (round 164)
 # FL's DirectWave (REA round 72)
 APP_SOURCES+=(src/core/DirectWave.cpp)
+APP_SOURCES+=(src/core/DirectWaveState.cpp)
 # Ogg Vorbis decoding as FL does (REA round 77)
 APP_SOURCES+=(src/core/OggVorbis.cpp)
 # export options + MP3, plugin performance monitor, clip properties / arrangements, new project, touch keyboard (round 84)

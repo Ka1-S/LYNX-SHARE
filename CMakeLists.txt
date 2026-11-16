@@ -258,6 +258,7 @@ add_library(lynx_core STATIC
     src/core/FlResampler.cpp
     src/core/FlKeys.cpp
     src/core/DirectWave.cpp
+    src/core/DirectWaveState.cpp
     src/core/OggVorbis.cpp
     src/core/BeepMap.cpp
     src/core/Sawer.cpp
@@ -555,6 +556,7 @@ if(LYNX_BUILD_APP)
         src/ui/WaveTravellerEditor.cpp
         src/ui/FpcEditor.cpp
         src/ui/TetraEditor.cpp
+        src/ui/DirectWaveEditor.cpp
         src/ui/FruitySlicerEditor.cpp
         src/ui/FlVoicePanel.cpp
         src/ui/SlicexEditor.cpp

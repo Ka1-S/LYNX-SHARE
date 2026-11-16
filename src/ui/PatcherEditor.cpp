@@ -1,6 +1,7 @@
 #include "ui/VideoPlayerView.h"
 #include "ui/FileChoosers.h"
 #include "ui/WaveTravellerEditor.h"
+#include "ui/DirectWaveEditor.h"
 #include "ui/FpcEditor.h"
 #include "ui/FruitySlicerEditor.h"
 #include "ui/SlicexEditor.h"
@@ -2266,6 +2267,11 @@ private:
         if (node.generator && node.channel.instrument == InstrumentKind::fpc) // round 190q
         {
             openToolWindow (makeFpcEditor (engine, locate, -1), title + " - " + tr ("Patcher"), target.key() + "-node-" + juce::String (n));
+            return;
+        }
+        if (node.generator && node.channel.instrument == InstrumentKind::directwave) // round 190hz
+        {
+            openToolWindow (makeDirectWaveEditor (engine, locate, -1), title + " - " + tr ("Patcher"), target.key() + "-node-" + juce::String (n));
             return;
         }
         if (node.generator && node.channel.instrument == InstrumentKind::midiOut)
