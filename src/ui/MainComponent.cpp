@@ -2736,10 +2736,10 @@ void MainComponent::loadUiSettings()
             skin::overridesFromString (line.fromFirstOccurrenceOf ("=", false, false).trim());
         else if (key == "reducedEffects")
             skin::setReducedEffects (on);
-        else if (key == "animationRate") // round 174e2: 0 = the display's refresh, else 60 / 30
+        else if (key == "animationRate") // round 174e2: 0 = the display's refresh, else 60 / 30; -1 = Balanced (round 190ip)
         {
             const auto hz = line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue();
-            ui::FrameTicker::rateLimit() = hz == 30 || hz == 60 ? hz : 0;
+            ui::FrameTicker::rateLimit() = hz == 30 || hz == 60 || hz == -1 ? hz : 0;
         }
         else if (key == "uiAnimations") // round 179a (ui/Motion.h)
             ui::motion::enabled() = on;

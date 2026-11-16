@@ -184,6 +184,7 @@
 #include "core/SoundLibrary.h"
 #include "ui/MidiToolsPanel.h"
 #include "ui/FrameProbe.h"
+#include "ui/MotionOverlay.h"
 #include "ui/UiTrace.h"
 #include "core/MixerOps.h"
 #include "ui/QuickPick.h"
@@ -6360,6 +6361,7 @@ private:
         juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
         const auto fontsResult = lynx::theme::fontSelfTest();
         const auto paintCachesResult = lynx::theme::paintCacheSelfTest(); // (round 190gr)
+        const auto motionOverlayResult = lynx::ui::MotionOverlay::selfTest(); // (round 190ip)
         // round 190bm (0.1.25 showed the Mixer and the Playlist black): their cached pictures shown on native and
         // software targets against straight paints (ui/PictureCheck.h; --picturetest runs more sizes and scales)
         juce::String picturesResult = "OK";
@@ -6401,7 +6403,7 @@ private:
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK"
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
                         && hostedStateContentionResult.startsWith ("OK")
-                        && danceWindowResult == "OK" && clickActivationResult == "OK";
+                        && danceWindowResult == "OK" && clickActivationResult == "OK" && motionOverlayResult.startsWith ("OK");
 
         juce::String report;
         report << "connections=" << offline.getNumGraphConnections() << "\n"
@@ -6434,6 +6436,7 @@ private:
                << "hosted_state_contention=" << hostedStateContentionResult << "\n"
                << "fonts=" << fontsResult << "\n"
                << "paint_caches=" << paintCachesResult << "\n"
+               << "motion_overlay=" << motionOverlayResult << "\n"
                << "cached_pictures=" << picturesResult << "\n"
                << "plugin_editors=" << editorsResult << "\n"
                << "fault_report=" << faultResult << "\n"
@@ -30256,6 +30259,7 @@ private:
         MainWindow (const juce::String& name, lynx::AudioEngine& engine)
             : DocumentWindow (name, lynx::theme::window, DocumentWindow::allButtons, false)
         {
+            probeEngine = &engine;
             // (round 190hd) one desktop window, made with the native title bar: before, JUCE made one with its own title
             // bar and setUsingNativeTitleBar made it again (~20-35 ms each, the Direct2D context included)
             setUsingNativeTitleBar (true);
@@ -30297,6 +30301,15 @@ private:
             if (lynx::uitrace::enabled()) // LYNX_TRACE_UI: the frames per second and the longest gap in ui.log (round 173f)
                 watchFrames ({});
             setVisible (true);
+            // LYNX_LOCATOR_PROBE=1 (round 190ip, measurements): a floating window with a locator moving 30 times a second
+            if (juce::SystemStats::getEnvironmentVariable ("LYNX_LOCATOR_PROBE", {}) == "1")
+                juce::Timer::callAfterDelay (1500, [e = probeEngine] {
+                    lynx::ui::openLocatorProbe ([e] {
+                        const auto& transport = e->getTransport();
+                        const auto bar = (double) juce::jmax<std::int64_t> (1, e->getSong().barTicks());
+                        return transport.playing.load() ? std::fmod (transport.positionTicks.load(), bar) / bar : -1.0;
+                    });
+                });
             lynx::applyWindowChrome (*this);
             lynx::fitWindowOnScreen (*this); // a size saved at another UI zoom still fits (round 163)
             if (maximiseOnReveal)
@@ -30391,6 +30404,7 @@ private:
         double frameStart = 0.0;
         bool maximiseOnReveal = false;
         std::function<void()> afterPaint; // (whenPainted)
+        lynx::AudioEngine* probeEngine = nullptr; // (LYNX_LOCATOR_PROBE)
         bool afterPaintPosted = false;
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainWindow)

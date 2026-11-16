@@ -11,6 +11,7 @@
 #include "ui/TimerWhileShowing.h"
 #include "ui/EditorTools.h"
 #include "ui/FrameTicker.h"
+#include "ui/MotionOverlay.h"
 #include "ui/FlMods.h"
 #include "ui/NoteToolDialogs.h"
 #include "ui/ValueControl.h"
@@ -514,6 +515,12 @@ private:
     void glideFrame();
     ui::OnDemandVBlank vblank { *this, [this] { glideFrame(); return gliding; } }; // (attached only while gliding)
     ui::FrameTicker frames { *this, [this] (double ms) { return playheadFrame (ms); } };
+    // round 190ip: while playing, the GPU moves the playhead over the view (ui/MotionOverlay.h) instead of repainting its
+    // column every frame; stopped (or when the overlay cannot) it is painted as before
+    void paintPlayheadAt (juce::Graphics& g, float x);
+    ui::MotionOverlay gpuPlayhead { *this, [this] (juce::Graphics& g, float x) { paintPlayheadAt (g, x); } };
+    ui::MotionOverlay::Mark playheadMark() const;
+    juce::Rectangle<int> playheadColumn (double tick) const;
 
     double pixelsPerTick = 24.0 / ticksPerStep; // 24 px per step
     double scrollTicks = 0.0;

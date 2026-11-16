@@ -24,6 +24,7 @@ public:
         setWantsKeyboardFocus (false);
         setOpaque (false);
         setAlwaysOnTop (true);
+        getProperties().set ("lynxOverlayIgnores", true); // (round 190ip: never drawn, so it covers no GPU playhead)
         setAccessible (false);
     }
 

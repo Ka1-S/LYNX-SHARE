@@ -699,7 +699,8 @@ public:
                                                               (float) bounds.getHeight() / (float) imageBounds.getHeight()),
                                 false);
         owner.paintStickyTitles (g);
-        owner.paintPlayhead (g);
+        if (! owner.gpuPlayhead.isShowing()) // (round 190ip: the GPU moves it while playing)
+            owner.paintPlayhead (g);
         if (ui::pictureLostMeanwhile (lossesSeen, lossRetries))
             owner.repaint();
     }
@@ -1149,6 +1150,7 @@ PlaylistComponent::PlaylistComponent (AudioEngine& e)
         setCachedComponentImage (new PlayheadCache (*this)); // (owned by the component)
         playheadOverlay = true;
     }
+    gpuPlayhead.onHidden = [this] { repaintPlayheadColumn (playheadTick); }; // (round 190ip: painted again)
     addAndMakeVisible (tools);
 
     // Follow (FL: "Auto scrolling"): the view pages along with the playhead in Song mode; off, it stays put
@@ -2074,7 +2076,7 @@ void PlaylistComponent::paint (juce::Graphics& g)
         if (! cachePainting) // round 190ig: FL's held clip titles, last before the playhead (as over the cached picture)
             paintStickyTitles (g);
 
-        if (playheadTick >= 0.0 && ! cachePainting)
+        if (playheadTick >= 0.0 && ! cachePainting && ! gpuPlayhead.isShowing())
         {
             g.setColour (colour::playhead);
             g.fillRect (juce::Rectangle<float> ((float) tickToX (playheadTick) - 0.5f, (float) grid.getY(), 1.5f, (float) grid.getHeight()));
@@ -2173,7 +2175,7 @@ void PlaylistComponent::paint (juce::Graphics& g)
             }
         }
 
-        if (playheadTick >= 0.0 && ! cachePainting)
+        if (playheadTick >= 0.0 && ! cachePainting && ! gpuPlayhead.isShowing())
         {
             const auto x = (float) tickToX (playheadTick);
             juce::Path tri;
@@ -2739,11 +2741,14 @@ void PlaylistComponent::paintStickyTitles (juce::Graphics& g)
 
 void PlaylistComponent::paintPlayhead (juce::Graphics& g)
 {
-    if (playheadTick < 0.0)
-        return;
+    if (playheadTick >= 0.0)
+        paintPlayheadAt (g, (float) tickToX (playheadTick));
+}
+
+void PlaylistComponent::paintPlayheadAt (juce::Graphics& g, float x)
+{
     using namespace theme;
     const auto grid = gridArea();
-    const auto x = (float) tickToX (playheadTick);
     {
         juce::Graphics::ScopedSaveState state (g);
         if (g.reduceClipRegion (grid))
@@ -2759,6 +2764,36 @@ void PlaylistComponent::paintPlayhead (juce::Graphics& g)
         tri.addTriangle (x - 6, (float) rulerTop, x + 6, (float) rulerTop, x, (float) rulerTop + 9.0f);
         g.setColour (colour::playhead);
         g.fillPath (tri);
+    }
+}
+
+// round 190ip: the playhead as the GPU overlay draws it (paintPlayheadAt), over the ruler and the lanes
+ui::MotionOverlay::Mark PlaylistComponent::playheadMark() const
+{
+    const auto grid = gridArea();
+    ui::MotionOverlay::Mark m;
+    m.x = (float) tickToX (playheadTick);
+    m.extent = juce::Rectangle<int>::leftTopRightBottom (-8, rulerTop, 8, grid.getBottom());
+    m.clip = juce::Rectangle<int>::leftTopRightBottom (grid.getX(), rulerTop, grid.getRight(), grid.getBottom());
+    m.look = ((std::uint64_t) (std::uint32_t) theme::colour::playhead.getARGB() << 32)
+             ^ ((std::uint64_t) (std::uint32_t) rulerTop << 24) ^ ((std::uint64_t) (std::uint32_t) timelineHeight << 16)
+             ^ ((std::uint64_t) (std::uint32_t) grid.getY() * 65537u) ^ (std::uint64_t) (std::uint32_t) grid.getHeight()
+             ^ ((std::uint64_t) (std::uint32_t) headerWidth << 40);
+    return m;
+}
+
+juce::Rectangle<int> PlaylistComponent::playheadColumn (double tick) const
+{
+    return tick >= 0.0 ? juce::Rectangle<int> ((int) tickToX (tick) - 8, 0, 16, getHeight()) : juce::Rectangle<int>();
+}
+
+void PlaylistComponent::repaintPlayheadColumn (double tick)
+{
+    if (const auto r = playheadColumn (tick); ! r.isEmpty())
+    {
+        playheadRepaintOnly = playheadOverlay; // (the cached image under it stays valid)
+        repaint (r);
+        playheadRepaintOnly = false;
     }
 }
 
@@ -11660,13 +11695,18 @@ bool PlaylistComponent::liveFrame (double nowMs)
     // whenever it moved: the line is anti-aliased, so even a fraction of a pixel shows (zoomed out, a playhead crossing
     // a few pixels a second glides at the display's rate instead of stepping, as FL's does)
     const auto moved = (tick < 0.0) != (playheadTick < 0.0) || std::abs ((tick - playheadTick) * pixelsPerTick) >= 0.002;
+    // round 190ip: stopped, the playhead is painted again (pixel-identical when nothing moves); the overlay goes a few
+    // frames later, once that paint is on screen
+    if (gpuPlayhead.isShowing() && (! playing || ! isShowing()))
+    {
+        gpuPlayhead.hide (isShowing()); // (no longer shown: at once)
+        repaintPlayheadColumn (playheadTick);
+    }
     if (moved && isShowing())
     {
         // only the cursor column (old and new) is repainted: large projects stay cheap. One rectangle for both: the
         // two strips overlap (a frame moves the line by a pixel or less), and each rectangle of a repaint is a paint
-        auto column = [this] (double t) {
-            return t >= 0.0 ? juce::Rectangle<int> ((int) tickToX (t) - 8, 0, 16, getHeight()) : juce::Rectangle<int>();
-        };
+        auto column = [this] (double t) { return playheadColumn (t); };
         auto dirty = [this] (juce::Rectangle<int> r) {
             if (r.isEmpty())
                 return;
@@ -11677,6 +11717,9 @@ bool PlaylistComponent::liveFrame (double nowMs)
 
         const auto before = column (playheadTick);
         playheadTick = tick;
+        // while playing the GPU moves it (nothing under it is painted); the frame it starts or stops doing so, the
+        // columns are painted once (the painted line goes, or comes back)
+        const auto gpu = ui::stepMark (gpuPlayhead, playing && tick >= 0.0, playheadMark(), tick >= 0.0);
 
         // Follow: if the cursor leaves the screen while playing, scrolls one page (off: the view stays put)
         const auto grid = gridArea();
@@ -11688,6 +11731,12 @@ bool PlaylistComponent::liveFrame (double nowMs)
             scrollTicks = newStart;
             updateScrollBars();
             repaint();
+            if (gpuPlayhead.isShowing())
+                gpuPlayhead.show (playheadMark()); // (at its place in the new page)
+        }
+        else if (gpu.onOverlay && ! gpu.flipped)
+        {
+            // (the GPU moved it: nothing under it is painted)
         }
         else if (const auto after = column (tick); ! before.isEmpty() && ! after.isEmpty() && std::abs (after.getX() - before.getX()) <= 16)
             dirty (before.getUnion (after));

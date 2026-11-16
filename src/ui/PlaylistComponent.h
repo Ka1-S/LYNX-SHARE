@@ -20,6 +20,7 @@
 #include "engine/AudioEngine.h"
 #include "ui/EditorTools.h"
 #include "ui/FrameTicker.h"
+#include "ui/MotionOverlay.h"
 #include "ui/Theme.h"
 #include "ui/ValueControl.h"
 
@@ -403,6 +404,13 @@ private:
     } heldTitlesKey;
     std::vector<int> heldTitles;
     void paintPlayhead (juce::Graphics& g);
+    void paintPlayheadAt (juce::Graphics& g, float x);
+    // round 190ip: while the song plays, the playhead is moved by the GPU over the view (ui/MotionOverlay.h) instead of
+    // repainting its column every frame; stopped (or when the overlay cannot show it) it is painted as before
+    ui::MotionOverlay gpuPlayhead { *this, [this] (juce::Graphics& g, float x) { paintPlayheadAt (g, x); }, true };
+    ui::MotionOverlay::Mark playheadMark() const;
+    juce::Rectangle<int> playheadColumn (double tick) const;
+    void repaintPlayheadColumn (double tick);
     void scrollBarMoved (juce::ScrollBar*, double) override;
 
     juce::Rectangle<int> gridArea() const;

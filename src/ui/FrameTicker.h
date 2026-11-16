@@ -5,7 +5,8 @@
 // view's frame step at the display's refresh instead (juce::VBlankAttachment: one per window, on the display that
 // window is on), and only while the view animates:
 //  - attached: one step per vertical blank (at most `maxHz`, 170 by default: a 240 Hz display gets every other one;
-//    capped tickers all run on the same frames; Settings › General › Animation rate caps them all at 60 or 30);
+//    capped tickers all run on the same frames; Settings › General › Animation rate caps them all at Balanced / 60 /
+//    30, on every n-th frame);
 //  - after ~0.3 s of steps that changed nothing (transport stopped, meters fallen) it detaches; a light idle poll
 //    (20 Hz, the same step; one timer for every ticker since round 190gd) brings it back as soon as something moves,
 //    so an idle view costs no repaint at all;
@@ -63,7 +64,8 @@ public:
     }
 
     // Settings › General › Animation rate (round 174e2): 0 = the display's refresh, else at most this many frames a
-    // second (60, 30) for every ticker, still on the display's vertical blanks (message thread)
+    // second (60, 30) for every ticker, still on the display's vertical blanks; -1 = Balanced (round 190ip: the refresh
+    // halved until it is at most 100 Hz). Evenly paced: every n-th frame (message thread)
     static int& rateLimit()
     {
         static int hz = 0;
@@ -121,10 +123,19 @@ private:
         lastFrameMs = frameMs;
         if (period > 0.0)
         {
+            // Settings › General › Animation rate (round 190ip): every n-th frame, evenly (core/FramePacing.h), the same
+            // frames for every ticker; a ticker's own lower cap (maxHz) still holds
+            const auto n = rateLimit() != 0 ? framepace::evenDivisor (1000.0 / period, rateLimit() < 0 ? framepace::balancedCap : (double) rateLimit()) : 1;
+            // (2 % slack: the toolbar's own 72 Hz cap on a 144 Hz display is the same rate as Balanced, and must run on the
+            // same frames, not on the other half: round 190ip measured 141 updates a second for that, 72 with it)
+            if (n > 1 && maxHz >= 0.98 * 1000.0 / period / n)
+            {
+                if (! dividerFor (n).runs (frameMs, period, n))
+                    return;
+            }
             // below the refresh, the frames where this cap's next one is due (core/FramePacing.h): 72 Hz on a 144 Hz
-            // display = every other frame, 60 Hz = every 2nd / 3rd, the same frames for every ticker with that cap
-            const auto cap = rateLimit() > 0 ? juce::jmin (maxHz, (double) rateLimit()) : maxHz;
-            if (! pacerFor (cap).runs (frameMs, period, cap))
+            // display = every other frame, the same frames for every ticker with that cap
+            else if (! pacerFor (maxHz).runs (frameMs, period, maxHz))
                 return;
         }
 
@@ -139,6 +150,12 @@ private:
     {
         static std::map<int, framepace::Pacer> pacers;
         return pacers[juce::roundToInt (capHz * 10.0)];
+    }
+
+    static framepace::Divider& dividerFor (int n)
+    {
+        static std::map<int, framepace::Divider> dividers;
+        return dividers[n];
     }
 
     static double& framePeriodMs()
