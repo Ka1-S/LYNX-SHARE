@@ -338,9 +338,25 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
                 hideNow (false);
             return true;
         }
-        if (covered (top, markArea, hwnd, topScale))
+        // A docked panel is a native child of the main window, and the system shows a child window's new composition only
+        // when its top-level window presents too (as for its Direct2D frames, cmake/LynxPatchJuce.cmake fix 34: measured
+        // 74 screen updates a second with the visual in the child's own target). So the visual goes in the top-level
+        // window's topmost target, shifted to the child's place, and the sibling windows above the child (other panels,
+        // docked plugin windows, floaters) make it fall back where they cover the mark. LYNX_OVERLAY_TARGET=child: the
+        // child's own target (A/B).
+        static const bool inRoot = juce::SystemStats::getEnvironmentVariable ("LYNX_OVERLAY_TARGET", {}) != "child";
+        auto targetHwnd = hwnd;
+        POINT shift { 0, 0 };
+        if (inRoot && (GetWindowLongPtr (hwnd, GWL_STYLE) & WS_CHILD) != 0)
+        {
+            targetHwnd = GetAncestor (hwnd, GA_ROOT);
+            if (targetHwnd == nullptr)
+                return false;
+            MapWindowPoints (hwnd, targetHwnd, &shift, 1);
+        }
+        if (covered (top, markArea, hwnd, targetHwnd, topScale))
             return false;
-        if (! attachTo (peer, hwnd))
+        if (! attachTo (peer, targetHwnd))
             return false;
 
         // the picture of this phase, painted once per look: the mark at the reference place + phase / 8 of a pixel
@@ -369,8 +385,8 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
         }
 
         // moved there: whole window pixels (the phase is in the picture), clipped to the visible clip
-        const auto offsetX = (float) (whole + left), offsetY = (float) topY;
-        const auto clipWin = (clipTop.toDouble() * topScale);
+        const auto offsetX = (float) (whole + left + shift.x), offsetY = (float) (topY + shift.y);
+        const auto clipWin = (clipTop.toDouble() * topScale).translated ((double) shift.x, (double) shift.y);
         const D2D_RECT_F local { (float) std::round (clipWin.getX()) - offsetX, (float) std::round (clipWin.getY()) - offsetY,
                                  (float) std::round (clipWin.getRight()) - offsetX, (float) std::round (clipWin.getBottom()) - offsetY };
         auto ok = SUCCEEDED (visual->SetContent (picture.surface.p)) && SUCCEEDED (visual->SetOffsetX (offsetX))
@@ -384,7 +400,8 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
             deviceLost();
             return false;
         }
-        nudgeTopLevel (hwnd);
+        if (targetHwnd == hwnd)
+            nudgeTopLevel (hwnd);
         return true;
     }
 
@@ -409,7 +426,7 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
 
     // Something in the view's window over the mark: a later sibling of the view or of one of its parents, the view's own
     // children (when the mark is under them), or a native child window (a topmost target is drawn over them).
-    bool covered (juce::Component& top, juce::Rectangle<int> area, HWND hwnd, double topScale) const
+    bool covered (juce::Component& top, juce::Rectangle<int> area, HWND hwnd, HWND targetHwnd, double topScale) const
     {
         const auto covers = [&] (const juce::Component& c, const juce::Component& parent) {
             if (! c.isVisible() || c.getAlpha() <= 0.0f || (bool) c.getProperties().getWithDefault ("lynxOverlayIgnores", false))
@@ -438,6 +455,23 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
             MapWindowPoints (nullptr, hwnd, corners, 2);
             if (juce::Rectangle<int>::leftTopRightBottom (corners[0].x, corners[0].y, corners[1].x, corners[1].y).intersects (areaPhys))
                 return true;
+        }
+        // in the top-level window's target: the windows above the view's window (and above each of its parents) up to it
+        if (targetHwnd != hwnd)
+        {
+            POINT corners[2] { { areaPhys.getX(), areaPhys.getY() }, { areaPhys.getRight(), areaPhys.getBottom() } };
+            MapWindowPoints (hwnd, nullptr, corners, 2);
+            const auto onScreen = juce::Rectangle<int>::leftTopRightBottom (corners[0].x, corners[0].y, corners[1].x, corners[1].y);
+            for (auto w = hwnd; w != nullptr && w != targetHwnd; w = GetParent (w))
+                for (auto above = GetWindow (w, GW_HWNDPREV); above != nullptr; above = GetWindow (above, GW_HWNDPREV))
+                {
+                    if (! IsWindowVisible (above))
+                        continue;
+                    RECT r {};
+                    GetWindowRect (above, &r);
+                    if (juce::Rectangle<int>::leftTopRightBottom (r.left, r.top, r.right, r.bottom).intersects (onScreen))
+                        return true;
+                }
         }
         return false;
     }
