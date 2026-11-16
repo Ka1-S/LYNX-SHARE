@@ -63,6 +63,9 @@
 #include "core/Comping.h"
 #include "core/ExportOptions.h"
 #include "core/TakeRecording.h"
+#include "core/WheelZones.h" // round 190iu (issue #186)
+#include "ui/WorkflowExtras.h" // round 190iu (issue #191)
+#include "core/MidiDrop.h"
 #include "ui/ExportDialog.h"
 #include "ui/MixerComponent.h"
 #include "engine/Text.h"
@@ -11820,7 +11823,8 @@ bool PlaylistComponent::isInterestedInFileDrag (const juce::StringArray& files)
 {
     for (const auto& f : files)
         if (SampleLibrary::isSampleFile (juce::File (f)) || videotracks::isVideoFile (juce::File (f))
-            || (simpleHeaders && onSimpleFilesDropped && (juce::File (f).hasFileExtension ("mid;midi") || juce::File (f).isDirectory())))
+            || (simpleHeaders && onSimpleFilesDropped && (juce::File (f).hasFileExtension ("mid;midi") || juce::File (f).isDirectory()))
+            || (! simpleHeaders && workflowextras::isMidiFile (f) && mididrop::playlistTakes (layoutstyle::current() == layoutstyle::Style::clipLaunch)))
             return true; // (round 190fo: a folder of stems and MIDI files, Simple workflow)
 
     return false;
@@ -11896,6 +11900,22 @@ void PlaylistComponent::filesDropped (const juce::StringArray& files, int x, int
 {
     setDropLaneHot (false);
     clearDropGhost();
+    // round 190iu (issue #191.2, ui/WorkflowExtras.h): MIDI files become pattern clips where they are dropped (on a header:
+    // at the song start); the other files go on as below
+    if (! simpleHeaders && workflowextras::anyMidiFile (files) && y >= tracksTop() && y < gridArea().getBottom()
+        && mididrop::playlistTakes (layoutstyle::current() == layoutstyle::Style::clipLaunch))
+    {
+        const auto at = x < headerWidth ? std::int64_t (0) : juce::jmax<std::int64_t> (0, snap (xToTick (x), true));
+        workflowextras::dropMidiOnPlaylist (engine, files, juce::jmax (0, yToTrack (y)), at, layoutstyle::current() == layoutstyle::Style::clipLaunch);
+        juce::StringArray rest;
+        for (const auto& f : files)
+            if (! workflowextras::isMidiFile (f))
+                rest.add (f);
+        if (rest.isEmpty())
+            return;
+        filesDropped (rest, x, y);
+        return;
+    }
     // on a track header (round 189e): FL's Edit › Drop audio on track headers, on an unassigned track
     if (x < headerWidth && y >= tracksTop() && y < gridArea().getBottom())
         if (const auto track = yToTrack (y); track >= 0 && (track >= (int) engine.getSong().playlistTracks.size()
@@ -12083,7 +12103,9 @@ void PlaylistComponent::mouseWheelMove (const juce::MouseEvent& e, const juce::M
         return;
     }
 
-    if (ctrl)
+    // issue #186 (core/WheelZones.h, a LYNX extra, off by default): the plain wheel zooms over the arrangement and
+    // scrolls over the track headers; Ctrl does the other one. Off: Ctrl zooms, as in FL
+    if (wheelzones::zoomsHere (e.x < headerWidth, ctrl, wheel.deltaY != 0.0f))
     {
         gliding = false;
         const auto anchorPixels = (double) juce::jmax (0, e.x - headerWidth);
@@ -13555,6 +13577,11 @@ void PatternPicker::mouseDown (const juce::MouseEvent& e)
 
     if (flmods::popup (e.mods) && row.kind == ClipKind::pattern && onPatternMenu)
         onPatternMenu();
+    else if (flmods::popup (e.mods)) // round 190iu (issue #191.6): a take / a recorded envelope can be deleted from here
+        workflowextras::showPickerItemMenu (engine, row.kind, row.index, [safe = juce::Component::SafePointer<PatternPicker> (this)] {
+            if (safe != nullptr)
+                safe->repaint();
+        });
 
     repaint();
 }
@@ -13608,6 +13635,7 @@ juce::PopupMenu PatternPicker::pickerMenu()
         engine.editSong ([] (Song& s) { mergeIdenticalPatterns (s); });
         edited();
     });
+    workflowextras::addPickerCleanupItems (menu, engine, edited); // round 190iu (issue #191.6): unused takes and envelopes
     return menu;
 }
 

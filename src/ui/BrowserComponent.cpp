@@ -72,6 +72,7 @@
 #include "ui/SoundFontEditor.h"
 #include "ui/SamplerImportUi.h"
 #include "ui/ToolWindow.h"
+#include "ui/WorkflowExtras.h" // round 190iu (issue #191.6)
 
 namespace lynx
 {
@@ -2516,6 +2517,7 @@ private:
                     });
                 menu.addSeparator();
                 menu.addItem (tr ("Show in the file manager"), ok, false, [file] { file.revealToUser(); });
+                workflowextras::addBrowserDeleteItem (menu, engine, false, item.index); // round 190iu (issue #191.6): a take
                 break;
             }
             case projectcontents::Kind::generator:
@@ -2547,6 +2549,7 @@ private:
                     if (safe != nullptr && safe->browser.onOpenAutomation)
                         safe->browser.onOpenAutomation (index);
                 });
+                workflowextras::addBrowserDeleteItem (menu, engine, true, item.index); // round 190iu (issue #191.6)
                 break;
         }
 
