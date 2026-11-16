@@ -9267,6 +9267,10 @@ std::unique_ptr<juce::AlertWindow> MainComponent::makeAboutWindow()
     static constexpr int width = 432, logoSize = 128; // (a local class can't have static members)
     struct Body final : juce::Component
     {
+        struct Block
+        {
+            std::vector<juce::TextLayout> lines;
+        };
         Body()
         {
             const auto quiet = theme::colour::textSecondary;
@@ -9284,23 +9288,38 @@ std::unique_ptr<juce::AlertWindow> MainComponent::makeAboutWindow()
             add (support, tr ("LYNX SHARE is free and open source. Donations are optional and help it keep going."), theme::font (theme::type::body), quiet);
             setSize (width, top (version) + 14 + logoSize + 14 + height (about) + 10 + height (credits) + 14 + height (support));
         }
-        void add (juce::TextLayout& l, const juce::String& text, const juce::Font& font, juce::Colour colour)
+        // (each paragraph in lines of balanced length: no lone word on a line of its own)
+        void add (Block& b, const juce::String& text, const juce::Font& font, juce::Colour colour)
         {
-            juce::AttributedString s;
-            s.append (text, font, colour);
-            s.setJustification (juce::Justification::centredTop);
-            s.setWordWrap (juce::AttributedString::byWord);
-            s.setLineSpacing (2.0f);
-            l.createLayoutWithBalancedLineLengths (s, (float) width);
+            for (const auto& paragraph : juce::StringArray::fromLines (text))
+            {
+                juce::AttributedString s;
+                s.append (paragraph, font, colour);
+                s.setJustification (juce::Justification::centredTop);
+                s.setWordWrap (juce::AttributedString::byWord);
+                s.setLineSpacing (2.0f);
+                b.lines.emplace_back();
+                b.lines.back().createLayoutWithBalancedLineLengths (s, (float) width);
+            }
         }
-        static int height (const juce::TextLayout& l) { return (int) std::ceil (l.getHeight()); }
-        static int top (const juce::TextLayout& l) { return height (l); }
+        static int height (const Block& b)
+        {
+            auto h = 0;
+            for (const auto& l : b.lines)
+                h += (int) std::ceil (l.getHeight()) + 2;
+            return h;
+        }
+        static int top (const Block& b) { return height (b); }
         void paint (juce::Graphics& g) override
         {
             auto y = 0.0f;
-            const auto block = [&] (const juce::TextLayout& l, float gapAfter) {
-                l.draw (g, { 0.0f, y, (float) width, l.getHeight() });
-                y += (float) height (l) + gapAfter;
+            const auto block = [&] (const Block& b, float gapAfter) {
+                for (const auto& l : b.lines)
+                {
+                    l.draw (g, { 0.0f, y, (float) width, l.getHeight() });
+                    y += std::ceil (l.getHeight()) + 2.0f;
+                }
+                y += gapAfter;
             };
             block (version, 14.0f);
             g.drawImageWithin (logoImage(), (width - logoSize) / 2, (int) y, logoSize, logoSize, juce::RectanglePlacement::centred);
@@ -9309,7 +9328,7 @@ std::unique_ptr<juce::AlertWindow> MainComponent::makeAboutWindow()
             block (credits, 14.0f);
             block (support, 0.0f);
         }
-        juce::TextLayout version, about, credits, support;
+        Block version, about, credits, support;
     };
     struct About final : ui::dialog::Dialog
     {
