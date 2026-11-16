@@ -2702,8 +2702,9 @@ void PlaylistComponent::paint (juce::Graphics& g)
         }
     }
 
-    // the Simple workflow's drop lane (round 184a): the first empty row invites files
-    if (const auto laneTrack = dropLaneTrack(); laneTrack >= 0)
+    // the Simple workflow's drop lane (round 184a): the first empty row invites files. Round 190jj (BandLab): while the
+    // drag's ghost is on it, the lane is an empty track row (the ghost and its tag are drawn later)
+    if (const auto laneTrack = dropLaneTrack(); laneTrack >= 0 && ! (dropLaneHot && ! dropGhost.empty() && dropGhost.front().track == laneTrack))
     {
         juce::Graphics::ScopedSaveState state (g);
         const auto y = trackToY (laneTrack), h = heightOf (laneTrack);
@@ -7876,8 +7877,16 @@ void PlaylistComponent::setDropLaneHot (bool hot)
     repaint (dropLaneArea()); // (only the lane: no timer, a repaint on enter and exit)
 }
 
-void PlaylistComponent::fileDragMove (const juce::StringArray&, int x, int y) { setDropLaneHot (simpleHeaders && dropLaneArea().contains (x, y)); }
-void PlaylistComponent::fileDragExit (const juce::StringArray&) { setDropLaneHot (false); }
+void PlaylistComponent::fileDragMove (const juce::StringArray& files, int x, int y)
+{
+    setDropLaneHot (simpleHeaders && dropLaneArea().contains (x, y));
+    updateDropGhostForFiles (files, { x, y }); // (round 190jj: files from outside show the ghost too)
+}
+void PlaylistComponent::fileDragExit (const juce::StringArray&)
+{
+    setDropLaneHot (false);
+    clearDropGhost();
+}
 void PlaylistComponent::itemDragEnter (const SourceDetails& details) { itemDragMove (details); }
 void PlaylistComponent::itemDragMove (const SourceDetails& details)
 {
@@ -11886,6 +11895,7 @@ bool addAudioClip (AudioEngine& engine, const juce::File& file, std::int64_t sta
 void PlaylistComponent::filesDropped (const juce::StringArray& files, int x, int y)
 {
     setDropLaneHot (false);
+    clearDropGhost();
     // on a track header (round 189e): FL's Edit › Drop audio on track headers, on an unassigned track
     if (x < headerWidth && y >= tracksTop() && y < gridArea().getBottom())
         if (const auto track = yToTrack (y); track >= 0 && (track >= (int) engine.getSong().playlistTracks.size()
@@ -11910,6 +11920,10 @@ void PlaylistComponent::filesDropped (const juce::StringArray& files, int x, int
             onSimpleFilesDropped (files, x >= headerWidth ? start : 0);
             return;
         }
+        // round 190jj (BandLab): audio on a track of notes is refused, as its red ghost said ("Region not supported by
+        // this track"); it was placed there as an audio clip the track's instrument never plays
+        if (x >= headerWidth && simpleDropRefusal (track, ClipKind::audio).isNotEmpty())
+            return;
     }
 
     for (const auto& f : files)
@@ -12913,6 +12927,7 @@ void PlaylistComponent::dropFromPicker (ClipKind kind, const std::vector<int>& e
 void PlaylistComponent::updateDropGhost (const SourceDetails& details)
 {
     std::vector<Clip> ghost;
+    juce::String name; // (round 190jj: the Simple ghost's name tag)
     const auto& song = engine.getSong();
     const auto grid = gridArea();
     const auto p = details.localPosition;
@@ -12957,6 +12972,12 @@ void PlaylistComponent::updateDropGhost (const SourceDetails& details)
             for (const auto& e : juce::StringArray::fromTokens (parts[2], ",", ""))
             {
                 const auto index = e.getIntValue();
+                if (name.isEmpty())
+                    name = kind == ClipKind::pattern && index >= 0 && index < (int) song.patterns.size()
+                               ? juce::String::fromUTF8 (song.patterns[(std::size_t) index].name.c_str())
+                           : kind == ClipKind::audio && index >= 0 && index < (int) song.channels.size()
+                               ? juce::String::fromUTF8 (song.channels[(std::size_t) index].name.c_str())
+                               : juce::String();
                 const auto length = kind == ClipKind::pattern ? patternTicks (index)
                                     : kind == ClipKind::audio  ? channelTicks (index)
                                                                : (index >= 0 && index < (int) song.automations.size() ? song.barTicks() * 4 : 0);
@@ -12972,33 +12993,104 @@ void PlaylistComponent::updateDropGhost (const SourceDetails& details)
                 add (c->kind, c->kind == ClipKind::audio ? c->channel : c->kind == ClipKind::automation ? c->automation : c->pattern, track, snapped, c->length);
         }
         else if (const auto pattern = BrowserComponent::draggedPattern (details); pattern >= 0)
+        {
             add (ClipKind::pattern, pattern, track, snapped, patternTicks (pattern));
+            if (pattern < (int) song.patterns.size())
+                name = juce::String::fromUTF8 (song.patterns[(std::size_t) pattern].name.c_str());
+        }
         else if (const auto file = BrowserComponent::draggedFile (details); file.existsAsFile() && p.x >= headerWidth)
         {
-            if (file.getFullPathName() != dropGhostFile)
-            {
-                dropGhostFile = file.getFullPathName();
-                dropGhostFileTicks = 0;
-                if (auto data = engine.getSampleLibrary().findLoaded (dropGhostFile))
-                    dropGhostFileTicks = ticksOfSeconds ((double) data->frames() / data->sampleRate);
-                else
-                {
-                    static juce::AudioFormatManager formats; // (the header only: its length)
-                    if (formats.getNumKnownFormats() == 0)
-                        formats.registerBasicFormats();
-                    if (std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (file)); reader != nullptr && reader->sampleRate > 0.0)
-                        dropGhostFileTicks = ticksOfSeconds ((double) reader->lengthInSamples / reader->sampleRate);
-                }
-            }
-            add (ClipKind::audio, -1, track, snapped, dropGhostFileTicks);
+            add (ClipKind::audio, -1, track, snapped, dropGhostAudioTicks (file));
+            name = file.getFileNameWithoutExtension();
         }
     }
-    if (ghost.size() == dropGhost.size()
-        && std::equal (ghost.begin(), ghost.end(), dropGhost.begin(), [] (const Clip& a, const Clip& b) {
-               return a.track == b.track && a.start == b.start && a.length == b.length && a.kind == b.kind;
-           }))
+    finishDropGhost (std::move (ghost), p, name);
+}
+
+// (an audio file's length in ticks at the song's tempo, read once per drag: the loaded sample, else the file's header)
+std::int64_t PlaylistComponent::dropGhostAudioTicks (const juce::File& file)
+{
+    if (file.getFullPathName() != dropGhostFile)
+    {
+        const auto& song = engine.getSong();
+        const auto ticksOfSeconds = [&song] (double seconds) { return juce::jmax<std::int64_t> (ppq / 4, (std::int64_t) (seconds * song.bpm / 60.0 * ppq)); };
+        dropGhostFile = file.getFullPathName();
+        dropGhostFileTicks = 0;
+        if (auto data = engine.getSampleLibrary().findLoaded (dropGhostFile))
+            dropGhostFileTicks = ticksOfSeconds ((double) data->frames() / data->sampleRate);
+        else
+        {
+            static juce::AudioFormatManager formats; // (the header only: its length)
+            if (formats.getNumKnownFormats() == 0)
+                formats.registerBasicFormats();
+            if (std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (file)); reader != nullptr && reader->sampleRate > 0.0)
+                dropGhostFileTicks = ticksOfSeconds ((double) reader->lengthInSamples / reader->sampleRate);
+        }
+    }
+    return dropGhostFileTicks;
+}
+
+// Round 190jj: files dragged from outside LYNX (Explorer) show the same ghost as the Browser's: the first audio file's
+// length on the track under the mouse
+void PlaylistComponent::updateDropGhostForFiles (const juce::StringArray& files, juce::Point<int> p)
+{
+    std::vector<Clip> ghost;
+    juce::String name;
+    const auto grid = gridArea();
+    if (! files.isEmpty() && p.y >= tracksTop() && p.y < grid.getBottom() && p.x >= headerWidth && p.x < grid.getRight())
+    {
+        const juce::File file (files[0]);
+        name = file.getFileNameWithoutExtension();
+        if (file.existsAsFile() && ! file.hasFileExtension ("mid;midi") && ! videotracks::isVideoFile (file))
+            if (const auto length = dropGhostAudioTicks (file); length > 0)
+            {
+                Clip c;
+                c.kind = ClipKind::audio;
+                c.channel = c.automation = -1;
+                c.track = juce::jmax (0, yToTrack (p.y));
+                c.start = juce::jmax<std::int64_t> (0, snap (xToTick (p.x), true));
+                c.length = length;
+                ghost.push_back (c);
+            }
+    }
+    finishDropGhost (std::move (ghost), p, name);
+}
+
+juce::String PlaylistComponent::simpleDropRefusal (int track, ClipKind kind) const
+{
+    using K = simpletracks::Kind;
+    if (! simpleHeaders || kind != ClipKind::audio)
+        return {};
+    const auto k = simpletracks::kindOf (engine.getSong(), track);
+    return k && (*k == K::instrument || *k == K::drums || *k == K::sampler || *k == K::pads) ? tr ("Region not supported by this track") : juce::String();
+}
+
+// The ghost the drag shows now; only the old and the new ghost (and the Simple tag) are repainted, on drag moves only
+void PlaylistComponent::finishDropGhost (std::vector<Clip> ghost, juce::Point<int> mouse, const juce::String& name)
+{
+    auto tagOnly = false;
+    juce::String reason;
+    if (simpleHeaders)
+    {
+        // BandLab: below the drop lane only the name tag follows the mouse (the lane keeps its placeholder)
+        const auto lane = dropLaneTrack();
+        if (! ghost.empty() && lane >= 0 && ghost.front().track > lane)
+            ghost.clear();
+        tagOnly = ghost.empty() && name.isNotEmpty() && gridArea().contains (mouse);
+        if (! ghost.empty())
+            reason = simpleDropRefusal (ghost.front().track, ghost.front().kind);
+    }
+    const auto sameGhost = ghost.size() == dropGhost.size()
+                           && std::equal (ghost.begin(), ghost.end(), dropGhost.begin(), [] (const Clip& a, const Clip& b) {
+                                  return a.track == b.track && a.start == b.start && a.length == b.length && a.kind == b.kind;
+                              });
+    if (sameGhost && tagOnly == dropGhostTagOnly && reason == dropGhostReason && name == dropGhostName && (! tagOnly || mouse == dropGhostMouse))
         return;
     dropGhost = std::move (ghost);
+    dropGhostName = simpleHeaders ? name : juce::String();
+    dropGhostReason = reason;
+    dropGhostTagOnly = tagOnly;
+    dropGhostMouse = mouse;
     const auto now = dropGhostBounds();
     if (! dropGhostArea.isEmpty())
         repaint (dropGhostArea);
@@ -13011,9 +13103,27 @@ void PlaylistComponent::clearDropGhost()
 {
     dropGhost.clear();
     dropGhostFile.clear();
+    dropGhostName.clear();
+    dropGhostReason.clear();
+    dropGhostTagOnly = false;
     if (! dropGhostArea.isEmpty())
         repaint (dropGhostArea);
     dropGhostArea = {};
+}
+
+// Simple: the name tag, at the ghost's lower left (BandLab), or under the mouse when there is no ghost
+juce::Rectangle<int> PlaylistComponent::dropGhostTag() const
+{
+    if (! simpleHeaders || dropGhostName.isEmpty() || (dropGhost.empty() && ! dropGhostTagOnly))
+        return {};
+    const auto w = juce::jlimit (60, 190, juce::roundToInt (juce::GlyphArrangement::getStringWidth (theme::font (theme::type::small, true), dropGhostName)) + 20);
+    constexpr int h = 24;
+    if (dropGhost.empty())
+        return { dropGhostMouse.x - w / 2, dropGhostMouse.y + 8, w, h };
+    const auto& c = dropGhost.front();
+    const auto x0 = (int) std::floor (tickToX ((double) c.start));
+    const auto bottom = trackToY (c.track) + heightOf (c.track) - 3;
+    return { x0 + 3, bottom - h - 2, w, h };
 }
 
 juce::Rectangle<int> PlaylistComponent::dropGhostBounds() const
@@ -13027,16 +13137,72 @@ juce::Rectangle<int> PlaylistComponent::dropGhostBounds() const
         const auto x0 = (int) std::floor (tickToX ((double) c.start)), x1 = (int) std::ceil (tickToX ((double) c.end()));
         area = area.getUnion (juce::Rectangle<int> (x0, trackToY (c.track), juce::jmax (2, x1 - x0), heightOf (c.track)).expanded (2).getIntersection (grid));
     }
+    if (const auto tag = dropGhostTag(); ! tag.isEmpty())
+        area = area.getUnion (tag.expanded (2).getIntersection (grid));
     return area;
 }
 
 void PlaylistComponent::paintDropGhost (juce::Graphics& g)
 {
-    if (dropGhost.empty())
+    if (dropGhost.empty() && ! dropGhostTagOnly)
         return;
+    using namespace theme;
     const auto& song = engine.getSong();
     const juce::Graphics::ScopedSaveState keep (g);
     g.reduceClipRegion (gridArea());
+    // Round 190jj (capture190ji §3, C-11, shots/fl-c11-ghost-z3.png): FL 2026's drop ghost in the Pattern layout — a
+    // borderless white block at ~13 % (about +34 RGB over the grid), as long as the clip, inside the row's grid lines
+    // (24 px of a 26 px row), its left edge on the snapped line. No outline, no track highlight, no text.
+    if (flHeaders())
+    {
+        for (const auto& c : dropGhost)
+            if (c.track < numTracks())
+            {
+                const auto x0 = (float) tickToX ((double) c.start), x1 = (float) tickToX ((double) c.end());
+                g.setColour (juce::Colours::white.withAlpha (0.13f));
+                g.fillRect (juce::Rectangle<float> (std::round (x0), (float) trackToY (c.track) + 1.0f, juce::jmax (2.0f, std::round (x1) - std::round (x0)),
+                                                    (float) heightOf (c.track) - 2.0f));
+            }
+        return;
+    }
+    // Round 190jj (capture190ji §1e, shots/bl-e-drop-lane-drag.png): BandLab's ghost in the Simple layout — a region
+    // inset in the row, white at ~18 % with a 2 px grey dashed outline (#7c7c7c), or red with the reason over a track that
+    // can't take it; the name tag (#1d2021, light text) at its lower left
+    if (simpleHeaders)
+    {
+        for (const auto& c : dropGhost)
+        {
+            if (c.track >= numTracks())
+                continue;
+            const auto x0 = (float) tickToX ((double) c.start), x1 = (float) tickToX ((double) c.end());
+            const auto r = juce::Rectangle<float> (std::round (x0) + 0.5f, (float) trackToY (c.track) + 3.5f, juce::jmax (8.0f, std::round (x1) - std::round (x0) - 1.0f),
+                                                   (float) heightOf (c.track) - 7.0f);
+            const auto refused = dropGhostReason.isNotEmpty();
+            g.setColour (refused ? juce::Colour (0xffe5484d).withAlpha (0.30f) : juce::Colours::white.withAlpha (0.18f));
+            g.fillRoundedRectangle (r, 3.0f);
+            juce::Path outline, dashed;
+            outline.addRoundedRectangle (r, 3.0f);
+            const float dashes[] { 4.0f, 3.0f };
+            juce::PathStrokeType (1.5f).createDashedStroke (dashed, outline, dashes, 2);
+            g.setColour (refused ? juce::Colour (0xffb0646a) : juce::Colour (0xff7c7c7c));
+            g.fillPath (dashed);
+            if (refused)
+            {
+                g.setColour (colour::textPrimary);
+                g.setFont (font (type::small, true));
+                g.drawFittedText (dropGhostReason, r.reduced (8.0f, 4.0f).withTrimmedBottom (r.getHeight() * 0.4f).toNearestInt(), juce::Justification::centred, 2, 0.85f);
+            }
+        }
+        if (const auto tag = dropGhostTag(); ! tag.isEmpty())
+        {
+            g.setColour (juce::Colour (0xff1d2021));
+            g.fillRoundedRectangle (tag.toFloat(), 4.0f);
+            g.setColour (juce::Colour (0xffcecfcf));
+            g.setFont (font (type::small, true));
+            g.drawText (dropGhostName, tag.reduced (10, 0), juce::Justification::centredLeft, true);
+        }
+        return;
+    }
     for (const auto& c : dropGhost)
     {
         if (c.track >= numTracks())
@@ -13062,10 +13228,10 @@ void PlaylistComponent::dragOverForSnapshot (const juce::var& description, juce:
 {
     if (description.isVoid())
     {
-        clearDropGhost();
+        itemDragExit (SourceDetails ({}, nullptr, at));
         return;
     }
-    updateDropGhost (SourceDetails (description, nullptr, at));
+    itemDragMove (SourceDetails (description, nullptr, at)); // (round 190jj: the Simple drop lane lights as for a real drag)
 }
 
 void PlaylistComponent::itemDropped (const SourceDetails& details)
@@ -13306,12 +13472,13 @@ void PatternPicker::paint (juce::Graphics& g)
                 g.fillRoundedRectangle (box.withWidth (3.0f), 1.5f);
             }
 
-            // round 190im (R5, DC-3): a pattern that plays now — FL's light-blue bar at the entry's right edge (#A2E7FF,
-            // 4 px wide, the entry's whole height: shots/fl-picker-stopped-vs-playing.png); LYNX's looks: the playhead colour
+            // round 190im (R5, DC-3): a pattern that plays now — FL's bar at the entry's right edge, steady, following the
+            // pattern that plays (not the selection). Round 190jj (capture190ji, shots/fl-picker-playing-mark-z2.png): FL
+            // 2026 draws it 3 px wide in #597FFF inside the row, one pixel in from its edges; LYNX's looks: the playhead colour
             if (row.kind == ClipKind::pattern && std::binary_search (playingPatterns.begin(), playingPatterns.end(), row.index))
             {
-                g.setColour (flClipLook() ? juce::Colour (0xffa2e7ff) : colour::playhead);
-                g.fillRect (box.withLeft (box.getRight() - 4.0f));
+                g.setColour (flClipLook() ? juce::Colour (0xff597fff) : colour::playhead);
+                g.fillRect (box.reduced (0.0f, 1.0f).withLeft (box.getRight() - 4.0f).withWidth (3.0f));
             }
 
             g.setColour (flClipLook() ? flHeaderInk (fill) : clipTitleText (fill));
@@ -13473,13 +13640,32 @@ void PatternPicker::mouseDrag (const juce::MouseEvent& e)
     pressedRow = -1; // (no selection change on the release)
     deselectOnUp = false;
 
-    // the entry's own picture, centred on the mouse (FL's drag image hotspot is the middle of the item)
-    const auto bounds = juce::Rectangle<int> (4, headerHeight + (dragRow - scroll) * rowHeight + 2, getWidth() - 8, rowHeight - 4)
-                            .getIntersection (getLocalBounds());
-    auto image = bounds.isEmpty() ? juce::Image (juce::Image::ARGB, 1, 1, true) : createComponentSnapshot (bounds, true);
-    const juce::Point<int> offset (-image.getWidth() / 2, -image.getHeight() / 2);
+    auto image = dragImageOf (dragRow);
+    const auto offset = dragImageOffset();
     repaint();
     container->startDragging (PlaylistComponent::pickerDragDescription (row.kind, entries), this, juce::ScaledImage (image), false, &offset);
+}
+
+// the entry's own picture, semi-transparent, below the mouse and to its right (round 190jj, capture190ji C-11,
+// shots/fl-c11-ghost-z3.png: FL 2026 draws it at 70 %-ish with its left edge ~34 px left of the mouse and its top ~40 px
+// below, so the drop ghost in the row under the mouse stays visible; it was centred on the mouse)
+juce::Image PatternPicker::dragImageOf (int listRow)
+{
+    const auto bounds = juce::Rectangle<int> (4, headerHeight + (listRow - scroll) * rowHeight + 2, getWidth() - 8, rowHeight - 4)
+                            .getIntersection (getLocalBounds());
+    auto image = bounds.isEmpty() ? juce::Image (juce::Image::ARGB, 1, 1, true) : createComponentSnapshot (bounds, true);
+    image = image.convertedToFormat (juce::Image::ARGB);
+    image.multiplyAllAlphas (0.7f);
+    return image;
+}
+
+int PatternPicker::listRowOfPattern (int pattern) const
+{
+    const auto list = rows();
+    for (int i = 0; i < (int) list.size(); ++i)
+        if (list[(std::size_t) i].kind == ClipKind::pattern && list[(std::size_t) i].index == pattern)
+            return i;
+    return -1;
 }
 
 void PatternPicker::mouseUp (const juce::MouseEvent& e)

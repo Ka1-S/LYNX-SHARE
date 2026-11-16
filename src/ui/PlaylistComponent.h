@@ -191,6 +191,11 @@ public:
     void itemDragExit (const SourceDetails& details) override;
     // --details190imshot: a drag of `description` held over `at` (the ghost drawn), then let go (cleared)
     void dragOverForSnapshot (const juce::var& description, juce::Point<int> at);
+    void dropForSnapshot (const juce::var& description, juce::Point<int> at) { itemDropped (SourceDetails (description, nullptr, at)); } // (round 190jj)
+    juce::String dropGhostReasonForCheck() const { return dropGhostReason; }
+    bool dropGhostTagOnlyForCheck() const noexcept { return dropGhostTagOnly; }
+    juce::Rectangle<int> dropGhostAreaForCheck() const { return dropGhostArea; }
+    bool isClipSelectedForCheck (int clip) const { return isSelected (clip); }
     // --details190imshot: the hint an automation clip's point (or its segment's tension) drag shows, as the drag makes it
     ui::Hint dragHintForSnapshot (int clip, int point, bool tension);
     bool followPausedForSnapshot() const { return EditorGlobals::get().isFollowPaused (EditorGlobals::FollowView::playlist); }
@@ -289,6 +294,20 @@ public:
     juce::Rectangle<int> dropGhostBounds() const;
     juce::String dropGhostFile; // (an audio file's length, read once per drag)
     std::int64_t dropGhostFileTicks = 0;
+    // Round 190jj (capture190ji): the ghost per layout. Pattern (FL, C-11): a borderless white block at ~13 % in the row,
+    // as long as the clip. Simple (BandLab): a grey dashed region with the item's name tag at its lower left; over a track
+    // that can't take it, a red region with the reason (and the drop does nothing there); below the drop lane only the
+    // tag follows the mouse. Clip-launch keeps 190im's coloured ghost.
+    juce::String dropGhostName, dropGhostReason;
+    juce::Point<int> dropGhostMouse;
+    bool dropGhostTagOnly = false;
+    void finishDropGhost (std::vector<Clip> ghost, juce::Point<int> mouse, const juce::String& name);
+    void updateDropGhostForFiles (const juce::StringArray& files, juce::Point<int> p);
+    std::int64_t dropGhostAudioTicks (const juce::File& file);
+    juce::Rectangle<int> dropGhostTag() const;
+    // Simple: why a track refuses what is dropped on it (empty: it takes it); BandLab's "Region not supported by this
+    // track" for audio on a track of notes (instrument, drums, sampler, pads)
+    juce::String simpleDropRefusal (int track, ClipKind kind) const;
     int headerWidth = flHeaderWidth;
     static constexpr int toolbarHeight = 32; // the panel title row (Workspace::titleHeight)
     static constexpr int overviewHeight = 16; // the overview strip under the toolbar (round 90)
@@ -924,6 +943,13 @@ public:
     // round 190im (R5, DC-3): the patterns playing now, marked as FL marks them (a light-blue bar at the entry's right
     // edge, shots/fl-picker-stopped-vs-playing.png); only the entries that change are repainted
     void setPlayingPatterns (std::vector<int> now);
+
+    // Round 190jj (C-11): the drag image of list row `listRow` (the entry, semi-transparent) and where it sits from the
+    // mouse (FL 2026: below and to the right); --capfix190jjshot draws it as the drag would
+    juce::Image dragImageOf (int listRow);
+    static juce::Point<int> dragImageOffset() noexcept { return { -34, 40 }; }
+    int listRowOfPattern (int pattern) const;
+    const std::vector<int>& playingForCheck() const noexcept { return playingPatterns; }
 
     // the kind listed: 0 = patterns, 1 = audio clips, 2 = automation clips
     void setView (int newView);
