@@ -131,6 +131,7 @@ public:
     // View › Layout style (round 184a: Pattern, Clip-launch or Simple workflow; core/LayoutStyle.h). Moves panels only;
     // each style keeps its own workspace layout. The Simple workflow's parts are made when it is first chosen.
     void setLayoutStyle (layoutstyle::Style style, bool swapLayout = true);
+    void setSimpleLargeControls (bool on); // round 190jc: View › Large controls (touch size), Simple layout
     layoutstyle::Style getLayoutStyle() const noexcept { return layoutStyle; }
     SimpleWorkflow* getSimpleWorkflowForSnapshot() noexcept { return simpleWorkflow.get(); } // --simpleshot
     // round 190fc (B1): how many Simple workflow objects were still alive when the last MainComponent's destructor body

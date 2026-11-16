@@ -10675,3 +10675,4 @@ countries: pl
 "User Library" = "Biblioteka użytkownika"
 "Current Project" = "Bieżący projekt"
 "Add Folder..." = "Dodaj folder..."
+"Large controls (touch size)" = "Duże kontrolki (rozmiar dotykowy)"

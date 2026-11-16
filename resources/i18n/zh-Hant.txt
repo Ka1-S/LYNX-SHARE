@@ -10675,3 +10675,4 @@ countries: tw hk mo
 "User Library" = "使用者資料庫"
 "Current Project" = "目前的專案"
 "Add Folder..." = "新增資料夾..."
+"Large controls (touch size)" = "大型控制項（觸控尺寸）"

@@ -10675,3 +10675,4 @@ countries: tr
 "User Library" = "Kullanıcı kitaplığı"
 "Current Project" = "Geçerli proje"
 "Add Folder..." = "Klasör ekle..."
+"Large controls (touch size)" = "Büyük denetimler (dokunmatik boyut)"

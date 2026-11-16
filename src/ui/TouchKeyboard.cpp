@@ -13,6 +13,7 @@
 #include "engine/AudioEngine.h"
 #include "ui/I18n.h"
 #include "ui/SettingsPages.h"
+#include "ui/SimpleLook.h"
 #include "ui/Theme.h"
 #include "ui/ToolWindow.h"
 
@@ -139,6 +140,10 @@ public:
     std::function<int()> channel;              // the channel to play (-1: none)
     std::function<float (float)> fixedVelocity; // returns < 0 when the position decides
     bool labels = true;
+    // round 190jc (design190ia SG-12, the Simple dock's keyboard): the typing letters in 16 px keycaps (#2c2f37 on #eceef2,
+    // about 11:1; they were #8a8f99 on the white key, 2.34:1) and darker note names (#4a4e57, 6:1). FL's Touch keyboard
+    // window keeps its look.
+    bool keycaps = false;
     touchkb::Layout layout;
     std::map<int, float>& shown;               // key → velocity, for drawing (also the snapshot's pressed keys)
 
@@ -216,15 +221,30 @@ public:
                     g.fillRoundedRectangle (box, 3.0f);
                     if (labels && (key % 12 == 0 || held != pressed.end()))
                     {
-                        g.setColour (held != pressed.end() ? theme::colour::onAccent : juce::Colour (0xff6b707a));
+                        g.setColour (held != pressed.end() ? theme::colour::onAccent : juce::Colour (keycaps ? 0xff4a4e57 : 0xff6b707a));
                         g.setFont (theme::font (theme::type::caption, key % 12 == 0));
                         g.drawText (keyName (key), box.withTrimmedBottom (6.0f).toNearestInt(), juce::Justification::centredBottom);
                     }
                     if (const auto letter = typingLetter (key); ! letter.empty()) // the typing key that plays it (round 190ds)
                     {
-                        g.setColour (juce::Colour (0xff8a8f99));
-                        g.setFont (theme::monoFont (theme::type::caption));
-                        g.drawText (letter, box.withTrimmedTop (box.getHeight() * 0.64f).withHeight (16.0f).toNearestInt(), juce::Justification::centred);
+                        const auto place = box.withTrimmedTop (box.getHeight() * 0.64f).withHeight (16.0f);
+                        if (keycaps && box.getWidth() >= 18.0f)
+                        {
+                            const auto cap = place.withSizeKeepingCentre (16.0f, 16.0f);
+                            g.setColour (juce::Colour (0xffeceef2));
+                            g.fillRoundedRectangle (cap, 3.0f);
+                            g.setColour (juce::Colour (0xffa1a6b0));
+                            g.drawRoundedRectangle (cap.reduced (0.5f), 3.0f, 1.0f);
+                            g.setColour (juce::Colour (0xff2c2f37));
+                            g.setFont (theme::font (theme::type::caption, true));
+                            g.drawText (letter, cap.toNearestInt(), juce::Justification::centred);
+                        }
+                        else
+                        {
+                            g.setColour (juce::Colour (0xff8a8f99));
+                            g.setFont (theme::monoFont (theme::type::caption));
+                            g.drawText (letter, place.toNearestInt(), juce::Justification::centred);
+                        }
                     }
                 }
                 else
@@ -683,6 +703,32 @@ private:
     std::map<int, int> pressedPad; // tag → pad
 };
 
+// The octave − / + (round 190jc, design190ia SG-12): in the Simple dock one capsule [− | C4 - B7 | +] with vector glyphs;
+// FL's Touch keyboard window keeps its text buttons
+class OctaveButton final : public juce::TextButton
+{
+public:
+    using juce::TextButton::TextButton;
+    bool capsule = false;
+    void paintButton (juce::Graphics& g, bool over, bool down) override
+    {
+        if (! capsule)
+        {
+            juce::TextButton::paintButton (g, over, down);
+            return;
+        }
+        const auto r = getLocalBounds().toFloat();
+        if (isEnabled() && (over || down))
+        {
+            g.setColour (down ? theme::colour::bg6 : theme::colour::bg5);
+            g.fillRoundedRectangle (r.reduced (1.0f), r.getHeight() * 0.5f - 1.0f);
+        }
+        const auto minus = getButtonText() == "-";
+        ui::simplelook::drawGlyph (g, minus ? ui::simplelook::Glyph::minus : ui::simplelook::Glyph::plus, r.withSizeKeepingCentre (10.0f, 10.0f),
+                                   isEnabled() ? theme::colour::textPrimary : theme::colour::textDisabled, 1.5f);
+    }
+};
+
 class TouchKeyboardPanel final : public juce::Component,
                                  private juce::Timer
 {
@@ -866,7 +912,16 @@ public:
     juce::PopupMenu chordMenuForSnapshot (int pad) { return pads.editMenuForSnapshot (pad); }
     void refreshForSnapshot() { timerCallback(); }
 
-    void paint (juce::Graphics& g) override { g.fillAll (theme::colour::bg3); }
+    void paint (juce::Graphics& g) override
+    {
+        g.fillAll (theme::colour::bg3);
+        if (simpleLook) // the octave capsule behind − range +
+        {
+            const auto capsule = octaveDown.getBounds().getUnion (octaveUp.getBounds()).toFloat();
+            g.setColour (theme::colour::bg4);
+            g.fillRoundedRectangle (capsule, capsule.getHeight() * 0.5f);
+        }
+    }
 
     void resized() override
     {
@@ -877,9 +932,10 @@ public:
         bar.removeFromLeft (8);
         keyButton.setBounds (bar.removeFromLeft (150));
         bar.removeFromLeft (12);
-        octaveDown.setBounds (bar.removeFromLeft (28));
-        range.setBounds (bar.removeFromLeft (92));
-        octaveUp.setBounds (bar.removeFromLeft (28));
+        const auto octaveSide = simpleLook ? ui::simplelook::px (28, 40) : 28;
+        octaveDown.setBounds (bar.removeFromLeft (octaveSide));
+        range.setBounds (bar.removeFromLeft (simpleLook ? 94 : 92));
+        octaveUp.setBounds (bar.removeFromLeft (octaveSide));
         bar.removeFromLeft (10);
         sustain.setBounds (bar.removeFromLeft (100));
         bar.removeFromLeft (8);
@@ -1057,7 +1113,20 @@ private:
     std::vector<KeyboardChord> shownChords;
     bool chordSetHad = false;
     std::array<juce::TextButton, 3> modeButtons;
-    juce::TextButton keyButton, octaveDown { "-" }, octaveUp { "+" };
+    juce::TextButton keyButton;
+    OctaveButton octaveDown { "-" }, octaveUp { "+" };
+    bool simpleLook = false;
+
+public:
+    // round 190jc: the Simple dock's look (keycap letters, the octave capsule); FL's Touch keyboard window keeps its own
+    void setSimpleLook (bool on)
+    {
+        simpleLook = keys.keycaps = octaveDown.capsule = octaveUp.capsule = on;
+        resized();
+        repaint();
+    }
+
+private:
     juce::Label range, target, strumLabel;
     juce::ComboBox sizeBox, velocityMode, complexity, spread, chordSet;
     juce::Slider fixedVelocity, strum;
@@ -1096,12 +1165,15 @@ std::unique_ptr<juce::Component> makeTouchKeyboardPanel (AudioEngine& engine)
 
 std::unique_ptr<juce::Component> makeKeyboardPanel (AudioEngine& engine, std::function<int()> channel)
 {
-    return std::make_unique<TouchKeyboardPanel> (engine, true, std::move (channel));
+    auto panel = std::make_unique<TouchKeyboardPanel> (engine, true, std::move (channel));
+    panel->setSimpleLook (true); // (the Simple dock's Keyboard tab)
+    return panel;
 }
 
 std::unique_ptr<juce::Component> makeKeyboardPanelForSnapshot (AudioEngine& engine, scalekeys::Mode mode, int pressed, std::function<int()> channel)
 {
     auto panel = std::make_unique<TouchKeyboardPanel> (engine, false, std::move (channel));
+    panel->setSimpleLook (true); // (the Simple dock's Keyboard tab)
     panel->showModeForSnapshot (mode, pressed);
     return panel;
 }

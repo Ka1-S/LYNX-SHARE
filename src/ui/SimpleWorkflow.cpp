@@ -17,6 +17,7 @@
 #include "ui/QuickPick.h"
 #include "ui/SimpleDock.h"
 #include "ui/StartFromPanel.h"
+#include "ui/SimpleLook.h"
 #include "ui/Theme.h"
 
 namespace lynx
@@ -103,17 +104,19 @@ juce::Path glyphPath (Glyph glyph)
     return p;
 }
 
+// Round 190jc (design190ia SG-14, BandLab's New Track: 64 px squares in saturated colours, white glyphs): the square filled
+// with the kind's own colour at full strength (the colour its track then takes), the glyph white where it reads at 3:1,
+// else near-black
 void drawGlyph (juce::Graphics& g, Glyph glyph, juce::Rectangle<float> box, juce::Colour tint)
 {
-    g.setColour (tint.withAlpha (0.2f));
-    g.fillRoundedRectangle (box, theme::radius::lg);
-    g.setColour (tint.withAlpha (0.55f));
-    g.drawRoundedRectangle (box.reduced (0.5f), theme::radius::lg, 1.0f);
-    const auto inner = box.reduced (box.getWidth() * 0.18f);
+    g.setColour (tint);
+    g.fillRoundedRectangle (box, box.getWidth() * 0.19f);
+    const auto inner = box.reduced (box.getWidth() * 0.22f);
     auto path = glyphPath (glyph);
     path.applyTransform (juce::AffineTransform::scale (inner.getWidth(), inner.getHeight()).translated (inner.getX(), inner.getY()));
-    g.setColour (theme::colour::textPrimary);
-    g.strokePath (path, juce::PathStrokeType (1.6f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    const auto white = ui::simplelook::contrast (juce::Colours::white, tint) >= 3.0f;
+    g.setColour (white ? juce::Colours::white : juce::Colour (0xff0e0f12));
+    g.strokePath (path, juce::PathStrokeType (juce::jmax (1.6f, box.getWidth() / 28.0f), juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 }
 
 // A tile: picture, name, one line of help. Clicking anywhere on it runs `onClick`.
@@ -142,15 +145,16 @@ public:
         g.fillRoundedRectangle (r, theme::radius::lg);
         g.setColour (hasKeyboardFocus (false) ? theme::colour::accent : hover ? theme::colour::borderStrong : theme::colour::border);
         g.drawRoundedRectangle (r.reduced (0.5f), theme::radius::lg, 1.0f);
-        const auto side = juce::jmin (44.0f, r.getHeight() - 16.0f);
-        drawGlyph (g, glyph, { r.getX() + 10.0f, r.getCentreY() - side / 2.0f, side, side }, tint);
+        const auto side = juce::jmin (64.0f, r.getHeight() - 12.0f);
+        drawGlyph (g, glyph, { r.getX() + 8.0f, r.getCentreY() - side / 2.0f, side, side }, tint);
         auto text = getLocalBounds().withTrimmedLeft ((int) side + 22).withTrimmedRight (8 + rightReserve).reduced (0, 8);
+        text = text.withSizeKeepingCentre (text.getWidth(), juce::jmin (text.getHeight(), 56));
         g.setColour (theme::colour::textPrimary);
         g.setFont (theme::font (theme::type::title, true));
         g.drawFittedText (name, text.removeFromTop (20), juce::Justification::centredLeft, 1, 0.85f);
         g.setColour (theme::colour::textSecondary);
-        g.setFont (theme::font (theme::type::small));
-        g.drawFittedText (help, text, juce::Justification::topLeft, 2, 0.9f);
+        g.setFont (theme::font (theme::type::body));
+        g.drawFittedText (help, text, juce::Justification::topLeft, 2, 0.75f);
     }
 
     void mouseEnter (const juce::MouseEvent&) override { repaint(); }
@@ -211,8 +215,8 @@ public:
           drums (Glyph::drums, kindColour (Kind::drums), tr ("Drums"), tr ("Make a beat on a step grid, or start from a starter beat.")),
           sampler (Glyph::sampler, kindColour (Kind::sampler), tr ("Sampler"), tr ("16 pads: put a sound on each and play them with the keys.")),
           guitar (Glyph::guitar, kindColour (Kind::guitar), tr ("Guitar / bass"), tr ("Plug in a guitar or a bass and play it through the track's effects.")),
-          import (Glyph::import, kindColour (Kind::audio), tr ("Import"), tr ("Bring in audio or MIDI files: one track each.")),
-          loops (Glyph::loops, kindColour (Kind::audio), tr ("Loops"), tr ("Browse loops and drag them onto the timeline."))
+          import (Glyph::import, theme::colour::bg6, tr ("Import"), tr ("Bring in audio or MIDI files: one track each.")),
+          loops (Glyph::loops, theme::colour::bg6, tr ("Loops"), tr ("Browse loops and drag them onto the timeline."))
     {
         setWantsKeyboardFocus (true);
         getProperties().set ("lynxKeepsKeys", true); // (round 190fc: its tiles' keys while it is up)
@@ -273,6 +277,9 @@ public:
         bassButton.setButtonText (trc ("@instrument: Bass"));
         for (auto* b : { &guitarButton, &bassButton })
         {
+            // (round 190jc, SG-14: a secondary choice, not the accent: the chosen one lifted in bg6)
+            b->setColour (juce::TextButton::buttonOnColourId, theme::colour::bg6);
+            b->setColour (juce::TextButton::textColourOnId, theme::colour::textPrimary);
             b->setClickingTogglesState (true);
             b->setRadioGroupId (1184);
             guitar.addAndMakeVisible (*b);
@@ -300,13 +307,13 @@ public:
         {
             // Empty, then Loop Starter's genres (FL's when installed, else LYNX's own) with their suggested tempo
             genreIds.push_back ({});
-            genreButtons.push_back (std::make_unique<juce::TextButton> (tr ("Empty grid")));
+            genreButtons.push_back (std::make_unique<StarterRow> (tr ("Empty grid"), juce::String()));
             if (const auto* config = loopstarterui::sources().config)
                 for (const auto* genre : config->listed())
                 {
                     genreIds.push_back (genre->id);
-                    genreButtons.push_back (std::make_unique<juce::TextButton> (juce::String::fromUTF8 (genre->label.c_str()) + "  "
-                                                                                + tr ("{0} BPM", { juce::String (loopstarter::suggestedTempo (*genre)) })));
+                    genreButtons.push_back (std::make_unique<StarterRow> (juce::String::fromUTF8 (genre->label.c_str()),
+                                                                          tr ("{0} BPM", { juce::String (loopstarter::suggestedTempo (*genre)) })));
                 }
             // one click on a starter adds it (round 190t): nothing to pick first, nothing to confirm
             for (std::size_t i = 0; i < genreButtons.size(); ++i)
@@ -317,8 +324,9 @@ public:
                 addChildComponent (*genreButtons[i]);
             }
         }
-        // the starter's tempo is for a project that has nothing yet: with tracks in it the tempo stays, unless asked
-        useTempo.setToggleState (simpletracks::isEmptySong (owner.engine.getSong()), juce::dontSendNotification);
+        // round 190jc (owner decision, design190ia SG-15, BandLab's "recommended tempo included"): the starter's suggested
+        // tempo is used by default, in a new or a busy project alike (one click on the switch keeps the project's)
+        useTempo.setToggleState (true, juce::dontSendNotification);
         starterPage = true;
         updatePage();
     }
@@ -367,7 +375,7 @@ public:
 
         // tiles: two columns, then Guitar / bass across, then Import and Loops
         const auto gap = 10;
-        const auto rowH = juce::jlimit (50, 78, (c.getHeight() - 4 * gap) / 5);
+        const auto rowH = juce::jlimit (50, 84, (c.getHeight() - 3 * gap) / 4); // (four rows: two pairs, Guitar / bass, a pair)
         auto tiles = c;
         auto row = [&] { auto r = tiles.removeFromTop (rowH); tiles.removeFromTop (gap); return r; };
         auto pair = [&] (juce::Component& a, juce::Component& b) {
@@ -392,7 +400,7 @@ public:
         auto s = card().reduced (20, 14).withTrimmedTop (50);
         useTempo.setBounds (s.removeFromTop (28));
         s.removeFromTop (10);
-        const auto columns = 3, buttonH = 32;
+        const auto columns = 3, buttonH = starterRowHeight;
         const auto w = (s.getWidth() - (columns - 1) * gap) / columns;
         for (int i = 0; i < (int) genreButtons.size(); ++i)
             genreButtons[(std::size_t) i]->setBounds (s.getX() + (i % columns) * (w + gap), s.getY() + (i / columns) * (buttonH + 8), w, buttonH);
@@ -421,7 +429,10 @@ public:
 private:
     juce::Rectangle<int> card() const
     {
-        const auto w = juce::jmin (680, getWidth() - 24), h = juce::jmin (520, getHeight() - 24);
+        // round 190jc: the tiles page's four rows up to 84 px (64 px icons); the starter page as tall as its rows
+        const auto starterRows = ((int) genreButtons.size() + 2) / 3;
+        const auto wanted = starterPage ? 14 + 50 + 28 + 10 + starterRows * (starterRowHeight + 8) + 14 : 520;
+        const auto w = juce::jmin (680, getWidth() - 24), h = juce::jmin (wanted, getHeight() - 24);
         return getLocalBounds().withSizeKeepingCentre (juce::jmax (320, w), juce::jmax (300, h));
     }
 
@@ -444,7 +455,44 @@ private:
     juce::TextButton close, back, guitarButton, bassButton, moreInstruments, samplerKeys, importFolder, startFrom, tourButton;
     juce::ToggleButton useTempo;
     Tile voice, instrument, drums, sampler, guitar, import, loops;
-    std::vector<std::unique_ptr<juce::TextButton>> genreButtons;
+    // A starter beat (round 190jc, SG-15, BandLab's Beat Starters): the genre on the first line, its tempo on the second,
+    // a drum glyph in the Drums colour
+    class StarterRow final : public juce::Button
+    {
+    public:
+        StarterRow (const juce::String& n, const juce::String& t) : juce::Button (n), tempo (t) { setTitle (n); }
+        void paintButton (juce::Graphics& g, bool over, bool down) override
+        {
+            const auto r = getLocalBounds().toFloat().reduced (0.5f);
+            g.setColour (down ? theme::colour::bg5 : over ? theme::colour::bg4 : theme::colour::bg3);
+            g.fillRoundedRectangle (r, theme::radius::lg);
+            g.setColour (hasKeyboardFocus (false) ? theme::colour::accent : over ? theme::colour::borderStrong : theme::colour::border);
+            g.drawRoundedRectangle (r.reduced (0.5f), theme::radius::lg, 1.0f);
+            auto text = getLocalBounds().reduced (10, 6);
+            auto icon = glyphPath (Glyph::drums);
+            const auto box = text.removeFromLeft (18).toFloat().withSizeKeepingCentre (18.0f, 18.0f);
+            icon.applyTransform (juce::AffineTransform::scale (box.getWidth(), box.getHeight()).translated (box.getX(), box.getY()));
+            g.setColour (kindColour (Kind::drums));
+            g.strokePath (icon, juce::PathStrokeType (1.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            text.removeFromLeft (10);
+            g.setColour (theme::colour::textPrimary);
+            g.setFont (theme::font (theme::type::body, true));
+            if (tempo.isEmpty())
+            {
+                g.drawFittedText (getName(), text, juce::Justification::centredLeft, 1, 0.85f);
+                return;
+            }
+            g.drawFittedText (getName(), text.removeFromTop (text.getHeight() / 2 + 1), juce::Justification::bottomLeft, 1, 0.85f);
+            g.setColour (theme::colour::textSecondary);
+            g.setFont (theme::font (theme::type::small));
+            g.drawFittedText (tempo, text, juce::Justification::topLeft, 1, 0.9f);
+        }
+
+    private:
+        juce::String tempo;
+    };
+    static constexpr int starterRowHeight = 48;
+    std::vector<std::unique_ptr<StarterRow>> genreButtons;
     std::vector<std::string> genreIds;
     bool starterPage = false;
 
@@ -823,6 +871,12 @@ void SimpleWorkflow::updateDock()
         dock->setVisible (true);
         host.setBottomDock (dock.get(), [this] (int available) { return dock != nullptr ? dock->heightFor (available) : 0; });
     }
+}
+
+void SimpleWorkflow::lookChanged()
+{
+    if (dock != nullptr)
+        dock->lookChanged();
 }
 
 void SimpleWorkflow::trackSelected (int track)

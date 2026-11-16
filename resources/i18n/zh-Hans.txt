@@ -10675,3 +10675,4 @@ countries: cn sg
 "User Library" = "用户库"
 "Current Project" = "当前项目"
 "Add Folder..." = "添加文件夹..."
+"Large controls (touch size)" = "大号控件（触控尺寸）"

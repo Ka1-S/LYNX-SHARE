@@ -10675,3 +10675,4 @@ countries: de at ch li lu
 "User Library" = "User Library"
 "Current Project" = "Aktuelles Projekt"
 "Add Folder..." = "Ordner hinzufügen..."
+"Large controls (touch size)" = "Große Bedienelemente (Touch-Größe)"

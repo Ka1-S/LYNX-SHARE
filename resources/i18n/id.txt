@@ -10675,3 +10675,4 @@ countries: id
 "User Library" = "Pustaka pengguna"
 "Current Project" = "Proyek saat ini"
 "Add Folder..." = "Tambah folder..."
+"Large controls (touch size)" = "Kontrol besar (ukuran sentuh)"

@@ -10675,3 +10675,4 @@ countries: kr
 "User Library" = "사용자 라이브러리"
 "Current Project" = "현재 프로젝트"
 "Add Folder..." = "폴더 추가..."
+"Large controls (touch size)" = "큰 컨트롤 (터치 크기)"

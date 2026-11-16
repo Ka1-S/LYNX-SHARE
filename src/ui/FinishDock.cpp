@@ -105,7 +105,7 @@ public:
         g.fillRoundedRectangle (r, theme::radius::lg);
         g.setColour (selected || hasKeyboardFocus (false) ? theme::colour::accent : hover ? theme::colour::borderStrong : theme::colour::border);
         g.drawRoundedRectangle (r.reduced (0.5f), theme::radius::lg, selected ? 1.5f : 1.0f);
-        const auto side = juce::jmin (28.0f, r.getHeight() - 26.0f);
+        const auto side = juce::jmin (32.0f, r.getHeight() - 30.0f); // (round 190jc, SG-16: a larger glyph on taller tiles)
         const juce::Rectangle<float> box (r.getCentreX() - side / 2.0f, r.getY() + 8.0f, side, side);
         auto glyph = lookGlyph (id);
         glyph.applyTransform (juce::AffineTransform::scale (side).translated (box.getX(), box.getY()));
@@ -213,7 +213,7 @@ FinishDock::FinishDock (AudioEngine& e, std::function<void()> close, Saving s)
     setComponentID ("simple.finishDock"); // (round 190dv: the first-song tour keeps its card off it)
     setTitle (tr ("Master looks"));
     title.setText (tr ("Master looks"), juce::dontSendNotification);
-    title.setFont (theme::font (theme::type::title, true));
+    title.setFont (theme::font (theme::type::display, true)); // (round 190jc, SG-16: BandLab's "Mastering" title size)
     addAndMakeVisible (title);
     status.setFont (theme::font (theme::type::small));
     status.setColour (juce::Label::textColourId, theme::colour::textSecondary);
@@ -503,7 +503,8 @@ void FinishDock::paint (juce::Graphics& g)
 void FinishDock::resized()
 {
     auto r = getLocalBounds().reduced (12, 10);
-    auto head = r.removeFromTop (28);
+    r.removeFromTop (4);
+    auto head = r.removeFromTop (32);
     closeButton.setBounds (head.removeFromRight (28));
     title.setBounds (head);
     status.setBounds (r.removeFromTop (34));
@@ -511,7 +512,7 @@ void FinishDock::resized()
     // (a short window: the look tiles give way so that the Save rows stay in view)
     const auto saveH = (saveRows[0] != nullptr ? 22 + 2 * 36 + (otherApps.isVisible() ? 34 : 0) + 10 : 0) + (matchButton.isVisible() ? 34 : 0);
     const auto gap = 6;
-    const auto tileH = juce::jlimit (46, 64, (r.getHeight() - 306 - saveH) / 4 - gap);
+    const auto tileH = juce::jlimit (46, 76, (r.getHeight() - 306 - saveH) / 4 - gap); // (round 190jc, SG-16: up to 76 px)
     const auto colW = (r.getWidth() - gap) / 2;
     for (int i = 0; i < looks::count; ++i)
     {

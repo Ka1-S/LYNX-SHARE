@@ -10675,3 +10675,4 @@ countries: it ch sm
 "User Library" = "Libreria utente"
 "Current Project" = "Progetto attuale"
 "Add Folder..." = "Aggiungi cartella..."
+"Large controls (touch size)" = "Controlli grandi (dimensione touch)"
