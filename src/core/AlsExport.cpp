@@ -14,12 +14,14 @@
 #include <sstream>
 #include <utility>
 
+#include "core/AlsDevices.h"
 #include "core/AlsImport.h"
 #include "core/AlsSkeleton.h"
 #include "core/ClipLauncher.h"
 #include "core/Effects.h"
 #include "core/FlWrapper.h"
 #include "core/Groove.h"
+#include "core/WavetableSynth.h"
 #include "core/Gzip.h"
 #include "core/Inflate.h"
 #include "core/LiveScales.h"
@@ -464,6 +466,56 @@ struct Exporter
                 }
             list->add (std::move (b));
         }
+    }
+
+    // A Helix channel → Live's Wavetable (round 190ja): the import backwards — Helix keeps Wavetable's units, so every value
+    // goes out as it is; the tables go out as the Live table that maps onto each (Live's own content), and their LYNX
+    // names in the device's info text so LYNX reads them back exactly [MODEL]
+    bool helixDevice (const ChannelDef& ch, Node& out)
+    {
+        out = sk["InstrumentVector"];
+        if (out.name.empty())
+            return false;
+        const auto s = helixState (ch);
+        const auto& names = alsdev::helixLiveNames();
+        for (int i = 0; i < wt::paramCount && i < (int) names.size(); ++i)
+            if (auto* e = out.at (names[(std::size_t) i]))
+            {
+                auto* target = e->child ("Manual") != nullptr ? e->child ("Manual") : e;
+                const auto old = target->get ("Value");
+                const auto v = s[(std::size_t) i];
+                target->set ("Value", old == "true" || old == "false" ? std::string (v > 0.5 ? "true" : "false")
+                                                                    : (e->child ("Manual") != nullptr ? num (v) : num ((int) std::lround (v))));
+            }
+        const auto mode1 = (int) std::lround (s[(std::size_t) (wt::oscBase (0) + wt::osc::effectMode)]);
+        const auto mode2 = (int) std::lround (s[(std::size_t) (wt::oscBase (1) + wt::osc::effectMode)]);
+        if (auto* mc = out.at ("ModulationConnections"))
+        {
+            int row = 0;
+            for (auto& r : mc->kids)
+            {
+                if (row >= wt::targetCount)
+                    break;
+                r.value ("TargetName", wt::targetName (row, mode1, mode2));
+                for (int k = 0; k < wt::sourceCount; ++k)
+                    r.value ("ModulationAmounts." + std::to_string (k), num (s[(std::size_t) wt::matrixIndex (row, k)]));
+                ++row;
+            }
+        }
+        // the wheel's range is the channel's (Pitch ← Pitch Bend: 1 = 48 semitones)
+        if (auto* mc = out.at ("ModulationConnections"); mc != nullptr && (int) mc->kids.size() > wt::tgt::pitch)
+            mc->kids[(std::size_t) wt::tgt::pitch].value ("ModulationAmounts." + std::to_string (wt::src::pitchBend),
+                                                         num (std::clamp (ch.misc.pitchRange, 0, 48) / 48.0));
+        std::string tables;
+        for (int k = 0; k < 2; ++k)
+        {
+            const auto t = (int) std::lround (s[(std::size_t) wt::tableBase + (std::size_t) k]);
+            out.value ("SpriteName" + std::to_string (k + 1), wt::liveTableFor (t));
+            tables += (k ? " | " : "") + std::string (wt::tableName (t));
+        }
+        out.value ("Annotation", "LYNX Helix tables: " + tables);
+        out.value ("UserName", "");
+        return true;
     }
 
     // A LYNX Sampler on a pad → Live's Simpler [DATA: Live's default pad Simpler; the import's laws backwards
@@ -1490,7 +1542,8 @@ struct Exporter
                 continue;
             // (a plugin or an Instrument Rack (round 183c) is a device of its own: its track goes out even with no notes)
             const auto plugin = ch.instrument == InstrumentKind::plugin || rack::isRack (ch);
-            if (! plays[i] && ! plugin)
+            const auto native = ch.instrument == InstrumentKind::helix; // (a LYNX engine with a Live twin, round 190ja)
+            if (! plays[i] && ! plugin && ! native)
                 continue;
             LiveTrack t;
             t.kind = LiveTrack::Kind::midi;
@@ -1502,7 +1555,7 @@ struct Exporter
             t.gain = channelGain (ch.volume) * (plugin && song.flPluginLevels ? 1.41421356f : 1.0f) * levelAdjustGain (ch.misc.levels.volume);
             t.pan = adjustedPan (ch.pan, ch.misc.levels.pan); // (with the Misc tab's Levels adjustment, round 190dz)
             tracks.push_back (t);
-            if (! plugin && ch.instrument != InstrumentKind::plugin)
+            if (! plugin && ! native && ch.instrument != InstrumentKind::plugin)
                 note ("Instrument not exported (LYNX built-in, notes kept): " + ch.name);
         }
         std::map<int, std::vector<const Clip*>> rows;
@@ -1690,6 +1743,14 @@ struct Exporter
                         addDevice (n, std::move (d));
                     else
                         note ("Plugin not exported (not VST2 or VST3, or not found): " + ch.name);
+                }
+                else if (ch.instrument == InstrumentKind::helix) // (round 190ja: Helix → Wavetable)
+                {
+                    Node d;
+                    if (helixDevice (ch, d))
+                        addDevice (n, std::move (d));
+                    else
+                        note ("Helix not exported (this Live version's set has no Wavetable skeleton): " + ch.name);
                 }
                 else if (rack::isRack (ch)) // (round 183c: an Instrument Rack)
                 {

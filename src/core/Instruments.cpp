@@ -30,6 +30,7 @@
 #include "core/MiniSynth.h"
 #include "core/PocketSuperSaw.h"
 #include "core/FmSynth.h"
+#include "core/WavetableSynth.h"
 #include "core/SimSynth.h"
 #include "core/Wasp.h"
 #include "core/Plucked.h"
@@ -331,6 +332,7 @@ private:
             case InstrumentKind::fpc:
             case InstrumentKind::pocketSuperSaw:
             case InstrumentKind::tetra:
+            case InstrumentKind::helix:
             case InstrumentKind::drumaxx:
             case InstrumentKind::slayer:
             case InstrumentKind::fruitydance:
@@ -4364,6 +4366,8 @@ std::unique_ptr<Instrument> makeInstrument (InstrumentKind kind, std::shared_ptr
         return makePocketSuperSawInstrument();
     if (kind == InstrumentKind::tetra) // round 190hs
         return makeTetraInstrument();
+    if (kind == InstrumentKind::helix) // round 190ja
+        return makeHelixInstrument();
     if (kind == InstrumentKind::drumaxx)
         return makeDrumaxxInstrument();
     if (kind == InstrumentKind::slayer)

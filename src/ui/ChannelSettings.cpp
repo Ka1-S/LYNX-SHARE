@@ -80,6 +80,7 @@
 #include "ui/WaveTravellerEditor.h"
 #include "ui/FpcEditor.h"
 #include "ui/TetraEditor.h"
+#include "ui/HelixEditor.h"
 #include "ui/FruitySlicerEditor.h"
 #include "ui/FlVoicePanel.h"
 #include "core/FruitySlicer.h"
@@ -6541,6 +6542,8 @@ std::unique_ptr<juce::Component> makeInstrumentPage (AudioEngine& engine, const 
         return makeFpcEditor (engine, ref.locate, ref.index); // round 190q
     if (kind == InstrumentKind::tetra)
         return makeTetraEditor (engine, ref.locate, ref.index); // round 190hs
+    if (kind == InstrumentKind::helix)
+        return makeHelixEditor (engine, ref.locate, ref.index); // round 190ja
     if (kind == InstrumentKind::synth)
         return std::make_unique<SynthPanel> (engine, ref);
     if (isModelKind (kind))
@@ -6914,6 +6917,7 @@ bool hasChannelSettings (InstrumentKind kind) noexcept
         case InstrumentKind::fpc:
         case InstrumentKind::pocketSuperSaw:
         case InstrumentKind::tetra:
+        case InstrumentKind::helix:
             return true;
         default:
             return false;
@@ -7015,6 +7019,10 @@ std::unique_ptr<juce::Component> makeChannelSettingsPanel (AudioEngine& engine, 
         return makeTetraEditor (engine, [channel] (Song& s) -> ChannelDef* {
             return channel >= 0 && channel < (int) s.channels.size() ? &s.channels[(std::size_t) channel] : nullptr;
         }, channel); // round 190hs
+    if (engine.getSong().channels[(std::size_t) channel].instrument == InstrumentKind::helix)
+        return makeHelixEditor (engine, [channel] (Song& s) -> ChannelDef* {
+            return channel >= 0 && channel < (int) s.channels.size() ? &s.channels[(std::size_t) channel] : nullptr;
+        }, channel); // round 190ja
     if (const auto kind = engine.getSong().channels[(std::size_t) channel].instrument;
         kind == InstrumentKind::sakura || kind == InstrumentKind::drumpad || kind == InstrumentKind::boobass
                  || kind == InstrumentKind::drumsynth || kind == InstrumentKind::harmless || kind == InstrumentKind::harmor
@@ -7036,7 +7044,7 @@ std::unique_ptr<juce::Component> makeChannelSettingsPanel (AudioEngine& engine, 
 bool hasNodeEditor (const ChannelDef& channel) noexcept
 {
     return channel.instrument == InstrumentKind::synth || channel.instrument == InstrumentKind::sampler || isModelKind (channel.instrument)
-           || channel.instrument == InstrumentKind::tetra; // round 190hs
+           || channel.instrument == InstrumentKind::tetra || channel.instrument == InstrumentKind::helix; // rounds 190hs, 190ja
 }
 
 std::unique_ptr<juce::Component> makeNodeChannelFrame (AudioEngine& engine, std::function<ChannelDef* (Song&)> locate)

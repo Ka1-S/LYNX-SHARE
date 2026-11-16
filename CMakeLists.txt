@@ -129,6 +129,9 @@ add_library(lynx_core STATIC
     src/core/PocketSuperSaw.cpp
     src/core/FmSynth.cpp
     src/core/AlsDevicesFm.cpp
+    src/core/WavetableSynth.cpp
+    src/core/WavetableTables.cpp
+    src/core/AlsDevicesWt.cpp
     src/core/Morphine.cpp
     src/core/FruitKick.cpp
     src/core/BassDrum.cpp
@@ -554,6 +557,7 @@ if(LYNX_BUILD_APP)
         src/ui/WaveTravellerEditor.cpp
         src/ui/FpcEditor.cpp
         src/ui/TetraEditor.cpp
+        src/ui/HelixEditor.cpp
         src/ui/FruitySlicerEditor.cpp
         src/ui/FlVoicePanel.cpp
         src/ui/SlicexEditor.cpp
