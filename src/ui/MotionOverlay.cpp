@@ -268,27 +268,21 @@ void releaseTarget (HWND hwnd)
 
 struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentListener
 {
-    // Sub-pixel positions of the mark. A playhead zoomed out moves a few pixels a second (Thief's whole song on screen:
-    // ~5 px/s, 0.035 px a frame at 144 Hz), and the painted playhead shows each such step (its anti-aliased edge).
-    // Measured (round 190ip, pixels that changed a second, Thief, Playlist in front, painted: 134-140): pictures cached at
-    // 1/8 px -> 93, at 1/32 px -> 115-125; one picture painted again at each 1/128 px -> 0.7 ms a frame on the message
-    // thread (10 % of a core: rejected). So the pictures are cached at 1/8 px and the rest of the way (< 1/8 px) is a
-    // translation of the visual that the compositor samples linearly: the mark moves on every frame, nothing is painted.
-    // LYNX_OVERLAY_PHASES=0: painted again at each 1/128 px; 1..64: that many cached phases (A/B).
-    // LYNX_OVERLAY_SUBPIXEL=0: no translation (the cached phases only).
+    // Sub-pixel positions of the mark: pictures cached at 1/32 of a physical pixel, painted on first use. A playhead
+    // zoomed out moves a few pixels a second (Thief's whole song on screen: ~5 px/s, 0.035 px a frame at 144 Hz) and the
+    // painted playhead shows each such step (its anti-aliased edge). Measured (round 190ip, frames whose pixels changed,
+    // Thief, Playlist in front; painted: 134-140 a second): 1/8 px -> 93; 1/32 px -> 115-125; one picture painted again
+    // at each 1/128 px -> 0.7 ms a frame on the message thread (rejected); 1/8 px plus a fractional translation of the
+    // visual -> 93 (the compositor snaps it to whole pixels: removed). Memory: 32 pictures of the mark only (Playlist at
+    // 1080p: 19 x ~900 px, 2.2 MB of GPU memory at most). LYNX_OVERLAY_PHASES=0: painted again at each 1/128 px;
+    // 1..64: that many cached phases (A/B).
     static constexpr int maxPhases = 64;
     static constexpr int exactSteps = 128;
-    static bool subPixel()
-    {
-        static const bool on = juce::SystemStats::getEnvironmentVariable ("LYNX_OVERLAY_SUBPIXEL", {}) != "0";
-        return on;
-    }
-
     static int phases()
     {
         static const int n = [] {
             const auto v = juce::SystemStats::getEnvironmentVariable ("LYNX_OVERLAY_PHASES", {});
-            return v.isEmpty() ? 8 : juce::jlimit (0, maxPhases, v.getIntValue());
+            return v.isEmpty() ? 32 : juce::jlimit (0, maxPhases, v.getIntValue());
         }();
         return n;
     }
@@ -408,7 +402,7 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
         if (! attachTo (peer, targetHwnd))
             return false;
 
-        // the picture of this phase, painted once per look: the mark at the reference place + phase / 8 of a pixel
+        // the picture of this phase, painted once per look: the mark at the reference place + phase / 32 of a pixel
         const auto xWin = ownerPos.x + (double) mark.x * s;
         const auto whole = std::floor (xWin);
         const auto exact = phases() == 0;
@@ -443,15 +437,8 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
         const auto clipWin = (clipTop.toDouble() * topScale).translated ((double) shift.x, (double) shift.y);
         const D2D_RECT_F local { (float) std::round (clipWin.getX()) - offsetX, (float) std::round (clipWin.getY()) - offsetY,
                                  (float) std::round (clipWin.getRight()) - offsetX, (float) std::round (clipWin.getBottom()) - offsetY };
-        // the rest of the way, under one phase step, as a translation the compositor samples linearly
-        const auto rest = exact || ! subPixel() ? 0.0 : (xWin - whole) - (double) phase / steps;
-        D2D_MATRIX_3X2_F shiftRest {};
-        shiftRest._11 = 1.0f;
-        shiftRest._22 = 1.0f;
-        shiftRest._31 = (float) rest;
         auto ok = SUCCEEDED (visual->SetContent (picture.surface.p)) && SUCCEEDED (visual->SetOffsetX (offsetX))
-                  && SUCCEEDED (visual->SetOffsetY (offsetY)) && SUCCEEDED (visual->SetClip (local))
-                  && SUCCEEDED (visual->SetTransform (shiftRest));
+                  && SUCCEEDED (visual->SetOffsetY (offsetY)) && SUCCEEDED (visual->SetClip (local));
         if (ok && ! inTree)
             ok = inTree = SUCCEEDED (target->root->AddVisual (visual.p, TRUE, nullptr));
         if (ok)
@@ -557,8 +544,7 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
             attachedPeer = peer;
             attachedHwnd = hwnd;
             generation = dev.generation;
-            if (FAILED (dev.dcomp->CreateVisual (visual.put()))
-                || FAILED (visual->SetBitmapInterpolationMode (DCOMPOSITION_BITMAP_INTERPOLATION_MODE_LINEAR)))
+            if (FAILED (dev.dcomp->CreateVisual (visual.put())))
             {
                 drop();
                 return false;

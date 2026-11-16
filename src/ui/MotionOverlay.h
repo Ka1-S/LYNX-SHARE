@@ -10,8 +10,9 @@
 //
 // Windows: a DirectComposition visual in a topmost composition target of the view's window (above the window's own
 // Direct2D swap chain; the system keeps it under the sibling windows that cover that window). Its picture is painted once
-// per look (by the view's own paint code, at 8 sub-pixel phases) and only moved afterwards; a frame = an offset and a
-// clip, and one Commit. Linux / macOS: not available yet; show() returns false and the view paints the mark as before.
+// per look (by the view's own paint code, at 1/32-pixel phases, on first use) and only moved afterwards; a frame = an
+// offset and a clip, and one Commit. Linux / macOS: not available yet; show() returns false and the view paints the mark
+// as before.
 //
 // The view's own path stays the automatic fallback: show() returns false whenever the overlay cannot show the mark
 // exactly where the view would draw it (another platform, LYNX_OVERLAY=0, the window drawn by the CPU (Settings ›
