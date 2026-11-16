@@ -126,7 +126,9 @@ private:
             // Settings › General › Animation rate (round 190ip): every n-th frame, evenly (core/FramePacing.h), the same
             // frames for every ticker; a ticker's own lower cap (maxHz) still holds
             const auto n = rateLimit() != 0 ? framepace::evenDivisor (1000.0 / period, rateLimit() < 0 ? framepace::balancedCap : (double) rateLimit()) : 1;
-            if (n > 1 && maxHz >= 1000.0 / period / n)
+            // (2 % slack: the toolbar's own 72 Hz cap on a 144 Hz display is the same rate as Balanced, and must run on the
+            // same frames, not on the other half: round 190ip measured 141 updates a second for that, 72 with it)
+            if (n > 1 && maxHz >= 0.98 * 1000.0 / period / n)
             {
                 if (! dividerFor (n).runs (frameMs, period, n))
                     return;
