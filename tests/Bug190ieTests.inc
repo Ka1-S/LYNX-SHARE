@@ -340,12 +340,11 @@ TEST (bug190ie_delay_tempo_ramp_has_no_clicks)
             }
 }
 
-// At a steady tempo the basic Delay renders exactly what 0.1.28 rendered: against 0.1.28's loop (OldDelay), across rates,
-// tempos, block sizes and every switch. Bit for bit with GCC. With clang, core/PitcherDsp.h ends on
-// `#pragma clang fp contract(on)`, so the rest of core/Effects.cpp (this Delay, then and now) fuses multiply-adds the
-// test's copy does not: within 1e-6 there (measured 3…6e-8). The 0.1.28 objects of origin/main baaa2dae7 and this
-// round's give the same hashes with both compilers: g++ 0x5e06c6510f0a515b 0x5500a6eb0c9d8b30 0x0fa965b2708500a3
-// 0xc15f652d2dc1a417, zig (clang 18) 0x282cbd4f4be53b0b 0x287a4610eb2b0768 0x6eaf8f21505c0c83 0x1db822398e4eb1ff.
+// At a steady tempo the basic Delay renders exactly what 0.1.28 rendered: bit for bit against 0.1.28's loop (OldDelay),
+// across rates, tempos, block sizes and every switch, with GCC and clang alike. (Until round 190ie's follow-up,
+// core/PitcherDsp.h ended on "#pragma clang fp contract(on)" and clang fused multiply-adds in the rest of
+// core/Effects.cpp, this Delay included, on FMA targets; the header now restores the includer's state.) Hashes with
+// both compilers: 0x5e06c6510f0a515b 0x5500a6eb0c9d8b30 0x0fa965b2708500a3 0xc15f652d2dc1a417.
 TEST (bug190ie_delay_steady_tempo_bit_identical)
 {
     using namespace bug190ie;
@@ -371,14 +370,7 @@ TEST (bug190ie_delay_steady_tempo_bit_identical)
             old.process (ref.l.data() + at, ref.r.data() + at, std::min (c.block, (int) in.size() - at), c.slot.params, c.bpm);
         std::printf ("  basic Delay steady %.1f BPM %.0f Hz block %d: hash 0x%016llx, 0.1.28's loop 0x%016llx\n", c.bpm, c.rate, c.block,
                      (unsigned long long) hashOf (r), (unsigned long long) hashOf (ref));
-#if defined(__clang__)
-        double worst = 0.0;
-        for (std::size_t i = 0; i < r.l.size(); ++i)
-            worst = std::max ({ worst, (double) std::abs (r.l[i] - ref.l[i]), (double) std::abs (r.r[i] - ref.r[i]) });
-        CHECK (worst < 1e-6);
-#else
         CHECK (r.l == ref.l && r.r == ref.r);
-#endif
     }
 }
 
