@@ -747,19 +747,7 @@ void ChannelRackComponent::paintStepHit (juce::Graphics& g, juce::Rectangle<floa
 // line, which turns light on a lit step. Plain rectangles, so a playhead frame costs what the flat tiles did.
 void ChannelRackComponent::paintKeycap (juce::Graphics& g, juce::Rectangle<int> r, juce::Colour fill, bool lit)
 {
-    using namespace theme::colour;
-    theme::fillRoundRect (g, r.toFloat(), keycapRadius, fill);
-    const auto inner = r.reduced (1, 0);
-    const auto slotY = r.getY() + juce::roundToInt ((float) r.getHeight() * 0.25f);
-    // the bevel: the cap's upper part a step lighter down to the slot (FL: #767C80 over a #63696D body)
-    g.setColour (fill.brighter (lit ? 0.12f : 0.18f));
-    g.fillRect (inner.getX(), r.getY() + 1, inner.getWidth(), slotY - r.getY() - 1);
-    g.setColour (lit ? fill.brighter (0.4f) : borderStrong.brighter (0.25f));
-    g.fillRect (inner.withHeight (1));
-    g.setColour (lit ? fill.darker (0.45f) : bg0);
-    g.fillRect (inner.withTop (r.getBottom() - 1).withHeight (1));
-    g.setColour (lit ? onAccent.withAlpha (0.6f) : bg0.withAlpha (0.85f));
-    g.fillRect (r.getX() + 3, slotY, r.getWidth() - 6, 1);
+    theme::drawKeycap (g, r, fill, lit);
 }
 
 void ChannelRackComponent::paint (juce::Graphics& g)
@@ -848,6 +836,22 @@ void ChannelRackComponent::paint (juce::Graphics& g)
             continue;
         }
 
+        // round 190io: the idle keycaps (and the faint steps past the pattern's end) come eight at a time from one tile;
+        // the steps that differ (lit, hovered, playing, loop repeats) are drawn over them one by one below
+        const auto idleLimit = loopSteps > 0 ? juce::jmin (loopSteps, realSteps) : realSteps;
+        const auto stripKind = [&] (int step) { // 1: a keycap strip covers it, 2: a ghost strip, 0: drawn alone
+            const auto start = step / 8 * 8;
+            return start + 8 <= idleLimit ? 1 : start >= realSteps && start + 8 <= steps ? 2 : 0;
+        };
+        for (int start = 0; start + 8 <= steps; start += 8)
+            if (const auto kind = stripKind (start); kind != 0)
+            {
+                const auto first = stepBounds (row, start);
+                if (first.getX() + 8 * stepWidth < clip.getX() || first.getX() > clip.getRight())
+                    continue;
+                theme::drawStepStrip (g, first, stepWidth, theme::stepOff (start), theme::stepOff (start + 4), kind == 2);
+            }
+
         for (int step = 0; step < steps; ++step)
         {
             const auto r = stepBounds (row, step);
@@ -859,6 +863,8 @@ void ChannelRackComponent::paint (juce::Graphics& g)
             auto any = onGrid || hasNote (row, step);
 
             const auto hoverStepHere = hoverArea == Area::grid && hoverRow == row && hoverStep == step && paintMode == PaintMode::none;
+            if (! any && ! hoverStepHere && stripKind (step) != 0) // (drawn by its strip)
+                continue;
             if (loopSteps > 0 && step >= loopSteps && step < realSteps)
             {
                 // FL's loop ghosts: what the loop repeats here, faint; a step of its own past the loop point doesn't play
@@ -1004,9 +1010,7 @@ void ChannelRackComponent::paint (juce::Graphics& g)
                         fill = fill.withMultipliedSaturation (0.45f).withMultipliedBrightness (0.7f);
                     if (hovered (Area::name))
                         fill = fill.brighter (0.12f);
-                    g.setGradientFill (juce::ColourGradient::vertical (fill.withMultipliedBrightness (1.06f), nameArea.getY(),
-                                                                       fill.withMultipliedBrightness (0.94f), nameArea.getBottom()));
-                    g.fillRoundedRectangle (nameArea, theme::radius::sm);
+                    theme::fillPlate (g, nameArea, theme::radius::sm, fill.withMultipliedBrightness (1.06f), fill.withMultipliedBrightness (0.94f));
                 }
 
                 if (row == primary) // the focused channel: a light outline (the selector beside it shows the selection)
@@ -1078,9 +1082,9 @@ void ChannelRackComponent::paint (juce::Graphics& g)
             // selector: FL's tall slot (round 190io, design190ia FM-13: 12 x 27 with a 2 px outline when selected), here
             // 10 x 24 in the inset colour with a hairline, outlined 2 px in the accent while its channel is selected
             const auto slot = juce::Rectangle<float> ((float) selectLeft() + 1.0f, (float) y + 3.0f, (float) selectWidth - 2.0f, (float) rowHeight - 6.0f);
-            theme::fillRoundRect (g, slot, 2.0f, bg1);
-            g.setColour (selected ? (hovered (Area::select) ? accentHover : accent) : hovered (Area::select) ? textDisabled : border);
-            g.drawRoundedRectangle (selected ? slot.reduced (1.0f) : slot.reduced (0.5f), 2.0f, selected ? 2.0f : 1.0f);
+            // (two filled plates, the rim and the well, from the rounded-rectangle tiles: no stroked path per row)
+            theme::fillRoundRect (g, slot, 2.0f, selected ? (hovered (Area::select) ? accentHover : accent) : hovered (Area::select) ? textDisabled : border);
+            theme::fillRoundRect (g, slot.reduced (selected ? 2.0f : 1.0f), selected ? 1.0f : 1.5f, bg1);
             const auto pill = slot.reduced (selected ? 3.0f : 2.0f);
             // FL flashes the channel's selector as its note plays (round 170a [SHOT]): the "sound lighting up when it hits"
             // round 190ih: and with every note the channel plays (typing keyboard, MIDI, Piano roll, off-grid notes), bright

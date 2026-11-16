@@ -1640,12 +1640,7 @@ void MixerStrips::paint (juce::Graphics& g)
                               .withMultipliedAlpha (track.muted ? 0.55f : 1.0f);
         const auto bandArea = juce::Rectangle<float> ((float) x, 2.0f, (float) plateWidth, (float) rows().header - 2.0f);
         if (needs (bandArea.getSmallestIntegerContainer()))
-        {
-            juce::Path top;
-            top.addRoundedRectangle (bandArea.getX(), bandArea.getY(), bandArea.getWidth(), bandArea.getHeight(), radius::md, radius::md, true, true, false, false);
-            g.setColour (band);
-            g.fillPath (top);
-        }
+            fillPlate (g, bandArea, radius::md, band, band, true);
         // the band's marks: FL's dark number (the colour × 0.3) where it reads, else white; the icon in a light tint
         const auto bandInk = [&band] {
             const auto dark = juce::Colour ((juce::uint8) (band.getRed() * 0.3f), (juce::uint8) (band.getGreen() * 0.3f), (juce::uint8) (band.getBlue() * 0.3f));
