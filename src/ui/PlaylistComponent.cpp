@@ -220,7 +220,9 @@ juce::Rectangle<float> clipRectAt (float x0, float x1, float y, int trackHeight)
 // end of a name (a number, "#2") stays readable. The text itself when it fits.
 juce::String fitMiddleUncached (const juce::String& text, const juce::Font& font, float width);
 // (cached: a paint asks for the same few names again and again; the cache empties itself when it grows)
-juce::String fitMiddle (const juce::String& text, const juce::Font& font, float width)
+// (rollup 0.1.30: named apart from round 190io's theme::fitMiddle, which splits the room half / half: the two rounds
+// measured FM-14 differently; both looks kept as each round checked them)
+juce::String playlistFitMiddle (const juce::String& text, const juce::Font& font, float width)
 {
     if (text.isEmpty())
         return text;
@@ -381,7 +383,7 @@ void paintFlClipTitle (juce::Graphics& g, juce::Rectangle<float> r, const theme:
     g.setColour (look.ink);
     g.setFont (f);
     const auto box = text.withTrimmedLeft (2.0f);
-    textcache::drawText (g, fitMiddle (name, f, box.getWidth()), box.toNearestInt(), juce::Justification::centredLeft, false);
+    textcache::drawText (g, playlistFitMiddle (name, f, box.getWidth()), box.toNearestInt(), juce::Justification::centredLeft, false);
 }
 
 // The header's glyph place. A muted clip shows its X there, as FL Studio does, however narrow the clip (round 177c).
@@ -2563,7 +2565,7 @@ void PlaylistComponent::paint (juce::Graphics& g)
                     const auto nameRight = flTall ? (int) plateArea.getRight() - 4 : (int) textRight - 2;
                     const auto nameBox = flTall ? juce::Rectangle<int> (nameLeft, y + 3, juce::jmax (8, nameRight - nameLeft), 16)
                                                 : juce::Rectangle<int> (nameLeft, y, juce::jmax (8, nameRight - nameLeft), trackHeight - 1);
-                    textcache::drawText (g, fitMiddle (name, nameFont, (float) nameBox.getWidth()), nameBox, juce::Justification::centredLeft, false);
+                    textcache::drawText (g, playlistFitMiddle (name, nameFont, (float) nameBox.getWidth()), nameBox, juce::Justification::centredLeft, false);
                 }
                 else if (const auto icon = trackicons::iconFor (t < (int) song.playlistTracks.size() ? song.playlistTracks[(std::size_t) t].icon : 0);
                     icon != trackicons::Icon::none && trackHeight >= 14)
