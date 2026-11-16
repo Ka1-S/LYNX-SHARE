@@ -114,7 +114,10 @@ juce::File extractZip (const juce::File& zipFile, const juce::File& destinationR
     bool hasProject = false;
     for (int i = 0; i < zip.getNumEntries(); ++i)
         if (const auto* e = zip.getEntry (i); e != nullptr && (e->filename.endsWithIgnoreCase (ProjectFile::extension) || e->filename.endsWithIgnoreCase (".flp")
-                                                         || e->filename.endsWithIgnoreCase (".flm")))
+                                                         || e->filename.endsWithIgnoreCase (".flm")
+                                                         || e->filename.containsIgnoreCase (".band/projectData")
+                                                         || e->filename.containsIgnoreCase (".band/Alternatives/000/ProjectData")
+                                                         || (zipFile.hasFileExtension ("band") && (e->filename == "projectData" || e->filename == "Alternatives/000/ProjectData"))))
             hasProject = true;
     if (! hasProject)
     {
@@ -123,7 +126,10 @@ juce::File extractZip (const juce::File& zipFile, const juce::File& destinationR
     }
 
     destinationRoot.createDirectory();
-    const auto folder = destinationRoot.getNonexistentChildFile (juce::File::createLegalFileName (zipFile.getFileNameWithoutExtension()), {}, false);
+    // (round 190ic: a GarageBand song that arrived as one zipped file, "Song.band", unpacks into a "Song.band" folder)
+    const auto zippedBand = zipFile.hasFileExtension ("band");
+    const auto folder = destinationRoot.getNonexistentChildFile (juce::File::createLegalFileName (zipFile.getFileNameWithoutExtension()),
+                                                                 zippedBand ? ".band" : "", false);
     if (! folder.createDirectory())
     {
         error = "could not create " + folder.getFullPathName();
@@ -143,7 +149,24 @@ juce::File extractZip (const juce::File& zipFile, const juce::File& destinationR
         if (! found.isEmpty())
             return found.getFirst();
     }
+    // (round 190ic: a GarageBand song, shared from GarageBand for iOS as a zip of its .band folder, or zipped itself)
+    if (zippedBand && garageBandPackage (folder) == folder)
+        return folder;
+    auto bands = folder.findChildFiles (juce::File::findDirectories, true, "*.band");
+    bands.sort();
+    for (const auto& band : bands)
+        if (garageBandPackage (band) == band)
+            return band;
     error = "the package has no project file (.lynx, .flp or .flm)";
+    return {};
+}
+
+juce::File garageBandPackage (const juce::File& file)
+{
+    for (auto f = file; f != juce::File() && f.getParentDirectory() != f; f = f.getParentDirectory())
+        if (f.isDirectory() && f.hasFileExtension ("band")
+            && (f.getChildFile ("projectData").existsAsFile() || f.getChildFile ("Alternatives/000/ProjectData").existsAsFile()))
+            return f;
     return {};
 }
 

@@ -54,6 +54,7 @@ countries: jp
 "(imported from FL Studio)" = "(FL Studioからインポート)"
 "(imported from .als)" = "(.als から読み込み)"
 "(imported from FL Studio Mobile)" = "(FL Studio Mobile から読み込み)"
+"(imported from GarageBand)" = "(GarageBand から読み込み)"
 "Could not save" = "保存できませんでした"
 "File" = "ファイル"
 "Edit" = "編集"

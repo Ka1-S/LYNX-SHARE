@@ -54,6 +54,7 @@ countries: tw hk mo
 "(imported from FL Studio)" = "（從FL Studio匯入）"
 "(imported from .als)" = "(從 .als 匯入)"
 "(imported from FL Studio Mobile)" = "(從 FL Studio Mobile 匯入)"
+"(imported from GarageBand)" = "(從 GarageBand 匯入)"
 "Could not save" = "無法儲存"
 "File" = "檔案"
 "Edit" = "編輯"

@@ -54,6 +54,7 @@ countries: ru by kz
 "(imported from FL Studio)" = "(импорт из FL Studio)"
 "(imported from .als)" = "(импортировано из .als)"
 "(imported from FL Studio Mobile)" = "(импортировано из FL Studio Mobile)"
+"(imported from GarageBand)" = "(импортировано из GarageBand)"
 "Could not save" = "Не удалось сохранить"
 "File" = "Файл"
 "Edit" = "Правка"

@@ -7441,12 +7441,15 @@ void MainComponent::chooseFileToOpen()
 void MainComponent::chooseFileToOpenNow()
 {
     fileChooser = lynx::ui::makeFileChooser (tr ("Open project"), currentFile.getParentDirectory(),
-                                                       juce::String ("*") + ProjectFile::extension + ";*.dawproj;*.flp;*.als;*.flm;*.zip;*.lynxpack;*.mid;*.midi");
+                                                       juce::String ("*") + ProjectFile::extension
+                                                           + ";*.dawproj;*.flp;*.als;*.flm;*.band;projectData;ProjectData;*.zip;*.lynxpack;*.mid;*.midi");
 
+    // (a GarageBand .band is a folder: macOS's dialog shows it as one file; elsewhere its "projectData" is picked)
     lynx::ui::launchChooser (fileChooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                               [this] (const juce::FileChooser& chooser) {
-                                  if (chooser.getResult().existsAsFile())
-                                      openFile (chooser.getResult());
+                                  const auto result = chooser.getResult();
+                                  if (result.existsAsFile() || ProjectPackage::garageBandPackage (result) != juce::File())
+                                      openFile (result);
                               });
 }
 
@@ -7473,7 +7476,8 @@ void MainComponent::openFile (const juce::File& file)
     juce::String error;
     crashguard::note (("opening project " + file.getFileName()).toStdString()); // session breadcrumb (round 111)
 
-    if (file.hasFileExtension ("zip"))
+    // (round 190ic: a GarageBand song that arrived as one zipped file keeps its ".band" name: unpacked as a package)
+    if (file.hasFileExtension ("zip") || (file.hasFileExtension ("band") && file.existsAsFile()))
     {
         // a project package (File › Export project with samples, or FL's zipped loop package): extracted into a
         // folder of its own, then the project inside is opened (its samples are found next to it)
@@ -7516,8 +7520,16 @@ void MainComponent::openFile (const juce::File& file)
         return;
     }
 
-    // (a Live set takes the .flp import's path, round 175a; an FL Studio Mobile project too, round 182c)
-    if (file.hasFileExtension ("flp;als;flm;songtmpl"))
+    // a GarageBand project (round 190ic): the .band folder, also when a file inside it was picked
+    if (const auto band = ProjectPackage::garageBandPackage (file); band != juce::File() && band != file)
+    {
+        openFile (band);
+        return;
+    }
+
+    // (a Live set takes the .flp import's path, round 175a; an FL Studio Mobile project too, round 182c; a GarageBand
+    // project too, round 190ic)
+    if (file.hasFileExtension ("flp;als;flm;songtmpl") || ProjectPackage::garageBandPackage (file) == file)
     {
         if (! persistent) // (command-line modes open synchronously, without scanning)
         {
@@ -7568,6 +7580,7 @@ void MainComponent::flpImported (const juce::File& file)
         rememberRecent (file);
         importedSuffix = " " + (file.hasFileExtension ("als")            ? tr ("(imported from .als)")
                                 : file.hasFileExtension ("flm;songtmpl") ? tr ("(imported from FL Studio Mobile)")
+                                : file.hasFileExtension ("band")         ? tr ("(imported from GarageBand)")
                                                                          : tr ("(imported from FL Studio)"));
         updateTitle();
         playlist.showSongAfterOpen();

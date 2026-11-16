@@ -11139,7 +11139,7 @@ private:
         juce::String error;
         auto ok = false;
         const auto loadStart = juce::Time::getMillisecondCounterHiRes();
-        if (project.hasFileExtension ("flp;als;flm")) // (round 190gr: a Live set, its Session clips in the grid)
+        if (project.hasFileExtension ("flp;als;flm;band")) // (round 190gr: a Live set, its Session clips in the grid)
             ok = engine->importFlpFile (project, error);
         else if (auto song = lynx::ProjectFile::load (project, error))
         {
@@ -13440,7 +13440,7 @@ private:
         juce::String error, report;
         bool ok = false;
 
-        if (input.hasFileExtension ("flp;als;flm;songtmpl"))
+        if (input.hasFileExtension ("flp;als;flm;songtmpl;band")) // (round 190ic: a GarageBand .band folder too)
             ok = offline.importFlpFile (input, error);
         else if (auto song = lynx::ProjectFile::load (input, error))
         {
@@ -13517,7 +13517,7 @@ private:
                     }
                 }
             }
-            if (input.hasFileExtension ("flp;als;flm;songtmpl"))
+            if (input.hasFileExtension ("flp;als;flm;songtmpl;band"))
                 ok = loader.importFlpFile (input, error);
             else if (auto song = lynx::ProjectFile::load (input, error))
             {
