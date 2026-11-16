@@ -519,6 +519,9 @@ namespace livebar
 // Live 12.4's control bar (design190ia CL-2, ref/live-session.png 0,48,1920,82): the menus on their own 23 px row, then
 // one 38 px band; every control a 17 px box with 2 px gaps.
 inline constexpr int menuRow = 23, band = 38, box = 17, gap = 2, sectionGap = 14;
+// Live's loop / punch group (loop start, punch-in, loop switch, punch-out, loop length: x 1033..1267 at 1920 px); its
+// transport group is centred together with it
+inline constexpr int loopSectionWidth = 234;
 
 enum class Item
 {

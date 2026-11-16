@@ -454,8 +454,9 @@ void MainComponent::layoutLiveControlBar (juce::Rectangle<int> bar, int menuWidt
     const auto centreW = runWidth (I::backToArrangement, I::sessionRecord);
     const auto punchW = width (I::punch);
     const auto tail = punchW > 0 ? lb::sectionGap + punchW : 0;
-    // the transport in the middle of the window, as Live's; pushed aside when the left part reaches it
-    auto centreX = bar.getCentreX() - centreW / 2;
+    // the transport where Live's is: Live centres its transport group together with the loop / punch group after it
+    // (CL-2: 716..1011 and 1033..1267 at 1920 px); LYNX has only punch there, so the group keeps Live's loop width
+    auto centreX = bar.getCentreX() - (centreW + lb::sectionGap + lb::loopSectionWidth) / 2;
     centreX = juce::jmin (centreX, rightEnd - rightW - lb::sectionGap - centreW - tail);
     centreX = juce::jmax (centreX, leftEnd + lb::sectionGap);
     const auto centreEnd = placeRun (I::backToArrangement, I::sessionRecord, centreX);
