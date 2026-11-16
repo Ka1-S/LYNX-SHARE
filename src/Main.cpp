@@ -6203,6 +6203,7 @@ private:
             song.channels.push_back (helix);
             lynx::ChannelDef loop;
             loop.name = "Loop";
+            loop.instrument = lynx::InstrumentKind::sampler;
             loop.sampler.stretchBeats = 8.0f;
             loop.sampler.keepPitch = true;
             loop.sampler.stretchMethod = lynx::StretchMethod::texture;
@@ -6244,8 +6245,8 @@ private:
                     if (c["name"].toString() == "WT")
                         wtEmpty = c["instrument"].toString() == "sampler" && ! c.hasProperty ("modelParams");
                     if (c["name"].toString() == "Loop")
-                        loopKnob = std::abs ((double) c["sampler"]["pitch"] - 5.0) < 1.0e-6 && ! c["sampler"].hasProperty ("stretchPitch")
-                                   && (! c["sampler"]["warpModes"].isArray() || c["sampler"]["warpModes"].size() <= 10);
+                        loopKnob = std::abs ((double) c["samplerSettings"]["pitch"] - 5.0) < 1.0e-6 && ! c["samplerSettings"].hasProperty ("stretchPitch")
+                                   && (! c["samplerSettings"]["warpModes"].isArray() || c["samplerSettings"]["warpModes"].size() <= 10);
                     if (c["name"].toString() == "Piano")
                     {
                         juce::MemoryOutputStream bytes;
@@ -6302,7 +6303,8 @@ private:
                      || parsed["mixer"][7]["effects"][0]["params"].size() > lynx::luxeVerbSpaceDucking)
                 rollup030Result = "ERROR step-3 effects";
             else if (! loopKnob || ! said ("Texture and Complex Pro play") || ! said ("Complex Pro and Texture transpositions") || ! said ("Warped samples do not follow"))
-                rollup030Result = "ERROR warp engines";
+                rollup030Result = juce::String ("ERROR warp engines ") + (loopKnob ? "" : "knob ") + (said ("Texture and Complex Pro play") ? "" : "engines ")
+                                  + (said ("Complex Pro and Texture transpositions") ? "" : "transpose ") + (said ("Warped samples do not follow") ? "" : "tempo");
             else if (copy.json.contains ("\"inactive\"") || ! said ("{0} deactivated clip slot(s)"))
                 rollup030Result = "ERROR deactivated slots";
             else if (const auto plain = lynx::olderlynx::forRelease (lynx::Song::makeDefault(), "0.1.28");

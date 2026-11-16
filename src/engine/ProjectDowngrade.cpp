@@ -328,7 +328,7 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
         // and the Measured Texture / Complex Pro laws, which 0.1.28 reads as Measured Beats and its Classic engines)
         const auto marked = (bool) root.getProperty ("warpLaw190ik", false);
         forEachChannel (root, [&] (juce::DynamicObject& c, int i) {
-            auto* sampler = objectOf (c.getProperty ("sampler"));
+            auto* sampler = objectOf (c.getProperty ("samplerSettings"));
             if (sampler == nullptr)
                 return;
             const juce::var sv (sampler);
