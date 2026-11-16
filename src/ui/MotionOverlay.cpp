@@ -354,8 +354,15 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
                 return false;
             MapWindowPoints (hwnd, targetHwnd, &shift, 1);
         }
-        if (covered (top, markArea, hwnd, targetHwnd, topScale))
+        const auto cover = covered (top, markArea, hwnd, targetHwnd, topScale);
+        if (cover == Cover::part)
             return false;
+        if (cover == Cover::whole)
+        {
+            if (inTree) // (another panel's window is in front of all of it: nothing to show, nothing for the view to paint)
+                hideNow (false);
+            return true;
+        }
         if (! attachTo (peer, targetHwnd))
             return false;
 
@@ -426,7 +433,11 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
 
     // Something in the view's window over the mark: a later sibling of the view or of one of its parents, the view's own
     // children (when the mark is under them), or a native child window (a topmost target is drawn over them).
-    bool covered (juce::Component& top, juce::Rectangle<int> area, HWND hwnd, HWND targetHwnd, double topScale) const
+    // part: something covers the mark (the view paints it); whole: an opaque window in front of all of it (nobody needs to
+    // draw it: the Playlist behind a maximised Channel rack)
+    enum class Cover { none, part, whole };
+
+    Cover covered (juce::Component& top, juce::Rectangle<int> area, HWND hwnd, HWND targetHwnd, double topScale) const
     {
         const auto covers = [&] (const juce::Component& c, const juce::Component& parent) {
             if (! c.isVisible() || c.getAlpha() <= 0.0f || (bool) c.getProperties().getWithDefault ("lynxOverlayIgnores", false))
@@ -436,13 +447,13 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
         if (! overChildren)
             for (auto* child : owner.getChildren())
                 if (covers (*child, owner))
-                    return true;
+                    return Cover::part;
         for (auto* c = &owner; c != &top && c->getParentComponent() != nullptr; c = c->getParentComponent())
         {
             auto* parent = c->getParentComponent();
             for (int i = parent->getIndexOfChildComponent (c) + 1; i < parent->getNumChildComponents(); ++i)
                 if (covers (*parent->getChildComponent (i), *parent))
-                    return true;
+                    return Cover::part;
         }
         const auto areaPhys = (top.getLocalArea (&owner, area).toDouble() * topScale).getSmallestIntegerContainer();
         for (auto child = GetWindow (hwnd, GW_CHILD); child != nullptr; child = GetWindow (child, GW_HWNDNEXT))
@@ -454,7 +465,7 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
             POINT corners[2] { { r.left, r.top }, { r.right, r.bottom } };
             MapWindowPoints (nullptr, hwnd, corners, 2);
             if (juce::Rectangle<int>::leftTopRightBottom (corners[0].x, corners[0].y, corners[1].x, corners[1].y).intersects (areaPhys))
-                return true;
+                return Cover::part;
         }
         // in the top-level window's target: the windows above the view's window (and above each of its parents) up to it
         if (targetHwnd != hwnd)
@@ -469,11 +480,14 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
                         continue;
                     RECT r {};
                     GetWindowRect (above, &r);
-                    if (juce::Rectangle<int>::leftTopRightBottom (r.left, r.top, r.right, r.bottom).intersects (onScreen))
-                        return true;
+                    const auto rect = juce::Rectangle<int>::leftTopRightBottom (r.left, r.top, r.right, r.bottom);
+                    if (rect.contains (onScreen) && (GetWindowLongPtr (above, GWL_EXSTYLE) & WS_EX_LAYERED) == 0)
+                        return Cover::whole;
+                    if (rect.intersects (onScreen))
+                        return Cover::part;
                 }
         }
-        return false;
+        return Cover::none;
     }
 
     bool attachTo (juce::ComponentPeer* peer, HWND hwnd)
