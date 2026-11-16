@@ -383,6 +383,9 @@ private:
     {
         juce::Rectangle<int> area, alsoChanged;
         juce::RectangleList<int> stickyTitles; // round 190ig: FL's clip titles at the left edge (header bands) to paint again
+        // round 190im (perf): the same bands where the clip alone covers them (its header is opaque): repaired by painting
+        // that one clip in its band, not by a whole exact paint pass (clip index, band)
+        std::vector<std::pair<int, juce::Rectangle<int>>> heldBands;
         int dx = 0, dy = 0;
     };
     CacheView cacheView() const;
@@ -398,6 +401,7 @@ private:
     double zoomEndMs = -1.0e9;
     juce::TimedCallback zoomSettle { [this] { settleZoom(); } };
     void paintStickyTitles (juce::Graphics& g);
+    void paintHeldClip (juce::Graphics& g, int index); // round 190im: one audio / automation clip as paint() draws it
     struct HeldTitlesKey // round 190ig: what the held clip titles were last found for
     {
         double scrollTicks = -1.0, pixelsPerTick = 0.0;

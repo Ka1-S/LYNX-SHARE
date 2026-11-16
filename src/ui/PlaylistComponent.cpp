@@ -671,6 +671,17 @@ public:
                     imageGraphics.drawImageTransformed (image, juce::AffineTransform ((float) zoom.a, 0.0f, (float) zoom.b * scale, 0.0f, 1.0f, 0.0f), false);
                 }
             }
+            if (! shift.heldBands.empty()) // (round 190im: the held titles' bands, each by its own clip)
+            {
+                const juce::Graphics::ScopedSaveState bands (imageGraphics);
+                imageGraphics.addTransform (juce::AffineTransform::scale (scale));
+                for (const auto& [index, band] : shift.heldBands)
+                {
+                    const juce::Graphics::ScopedSaveState one (imageGraphics);
+                    if (imageGraphics.reduceClipRegion (band))
+                        owner.paintHeldClip (imageGraphics, index);
+                }
+            }
             if (! invalid.isEmpty())
             {
                 imageGraphics.addTransform (juce::AffineTransform::scale (scale));
@@ -858,7 +869,24 @@ PlaylistComponent::CacheShift PlaylistComponent::cacheShift (const CacheView& fr
                 const auto reach = 22.0f + (float) std::abs (dx) + juce::GlyphArrangement::getStringWidth (titleFont, juce::String::fromUTF8 (name->c_str()));
                 const auto r = clipRectAt (x0, x1, (float) y, h);
                 const auto bandHeight = r.getHeight() + 1.0f < (float) flBandBelow ? juce::jmin (r.getHeight(), 15.0f) : flHeaderHeight (r);
-                titles = titles.getUnion (juce::Rectangle<float> (left, r.getY(), reach, bandHeight).getSmallestIntegerContainer().getIntersection (grid));
+                const auto bandArea = juce::Rectangle<float> (left, r.getY(), reach, bandHeight).getSmallestIntegerContainer().getIntersection (grid);
+                // round 190im (perf, the scroll frames where a start crosses the edge: 9.4 → 11.0 ms in round 190ig): the band
+                // is the clip's own opaque header, so painting that one clip there gives the exact pixels, without a whole
+                // paint pass for the union of the bands. Only when nothing else is drawn there: no other clip of the track
+                // reaching the band, no hover / drag / rubber band / Performance / recording overlay
+                const auto band = bandArea.getIntersection (r.withRight (juce::jmin (r.getRight(), x1)).getSmallestIntegerContainer());
+                const auto& index = song.playlist;
+                const auto i = (int) (&c - index.data());
+                auto alone = ! band.isEmpty() && r.getWidth() >= SmallClips::maxWidth && drag == Drag::none && hover.clip != i && rubberBand.isEmpty()
+                             && song.performanceZoneEnd() <= 0 && ! engine.isLiveRecording();
+                for (int k = 0; alone && k < (int) index.size(); ++k)
+                    if (const auto& o = index[(std::size_t) k]; k != i && o.track == c.track
+                        && tickToX ((double) o.start) < (double) band.getRight() && tickToX ((double) o.end()) > (double) band.getX())
+                        alone = false;
+                if (alone)
+                    shift.heldBands.push_back ({ i, band });
+                else
+                    titles = titles.getUnion (bandArea);
             }
             // (one rectangle: a few separate ones would make the picture's repaint a masked clip region, slower than this)
             if (! titles.isEmpty())
@@ -2701,6 +2729,30 @@ void PlaylistComponent::paintStickyTitles (juce::Graphics& g)
             const auto look = theme::clipBody (juce::Colour (automation.colour), trackColourIn (song, c.track), ClipKind::automation, theme::ClipStyle::flTint);
             paintFlClipTitle (g, r, look, juce::String::fromUTF8 (automation.name.c_str()), ClipGlyph::automation, false, band, left, true);
         }
+    }
+}
+
+// Round 190im (perf): one audio or automation clip exactly as paint()'s clip loop draws it (frame, content, title, the
+// selection outline), for the cache's repair of a held title's band (cacheShift: only where the clip alone is drawn)
+void PlaylistComponent::paintHeldClip (juce::Graphics& g, int index)
+{
+    const auto& song = engine.getSong();
+    if (index < 0 || index >= (int) song.playlist.size())
+        return;
+    const juce::ScopedValueSetter<bool> noPlayhead (cachePainting, true);
+    const auto& c = song.playlist[(std::size_t) index];
+    const auto r = clipRectAt ((float) tickToX ((double) c.start), (float) tickToX ((double) c.end()), (float) trackToY (c.track), heightOf (c.track));
+    if (c.kind == ClipKind::automation)
+    {
+        paintAutomationClip (g, c, r);
+        if (isSelected (index))
+            paintClipOutline (g, r, theme::colour::automation, true, false);
+    }
+    else if (c.kind == ClipKind::audio)
+    {
+        paintAudioClip (g, c, r);
+        if (isSelected (index))
+            paintClipOutline (g, r, theme::colour::audioClip, true, false);
     }
 }
 
