@@ -1,3 +1,4 @@
+#include "ui/TextCache.h"
 #include "ui/ClipGridComponent.h"
 #include "ui/PaintAB.h"
 #include "ui/PlaylistComponent.h"
@@ -297,7 +298,7 @@ public:
             g.fillRect (head);
             g.setColour (lv::text);
             g.setFont (liveFont());
-            g.drawText (tr ("Main"), head.withTrimmedLeft (8), juce::Justification::centredLeft, true);
+            textcache::drawText (g, tr ("Main"), head.withTrimmedLeft (8), juce::Justification::centredLeft, true);
         }
         else
         {
@@ -307,7 +308,7 @@ public:
             g.fillRect (sceneColumn.getX(), 0, 1, sceneColumn.getHeight());
             g.setColour (c::textSecondary);
             g.setFont (theme::font (theme::type::small, true));
-            g.drawText (tr ("Scenes"), sceneColumn.withHeight (headerHeight).withTrimmedLeft (8), juce::Justification::centredLeft);
+            textcache::drawText (g, tr ("Scenes"), sceneColumn.withHeight (headerHeight).withTrimmedLeft (8), juce::Justification::centredLeft);
         }
         if (! ui::paintCache() || g.clipRegionIntersects (sceneColumn.withTrimmedTop (headerHeight)))
         {
@@ -1106,7 +1107,7 @@ private:
             theme::drawFrozenTag (g, juce::Rectangle<float> ((float) r.getRight() - (taken ? 40.0f : 20.0f), (float) r.getCentreY() - 6.5f, 14.0f, 13.0f),
                                   c::info.withAlpha (0.85f), c::bg1);
         }
-        g.drawText (name, r.reduced (6, 0).withTrimmedRight ((taken ? 18 : 0) + (frozen ? 18 : 0)), juce::Justification::centredLeft, true);
+        textcache::drawText (g, name, r.reduced (6, 0).withTrimmedRight ((taken ? 18 : 0) + (frozen ? 18 : 0)), juce::Justification::centredLeft, true);
         if (taken)
         {
             // the Playlist's clips on this track are silent: a struck-out timeline mark
@@ -1149,7 +1150,7 @@ private:
             g.setColour (ink);
             g.setFont (theme::font (theme::type::small));
             // (an audio take is named after its file, known only when it closes)
-            g.drawText (clip != nullptr ? clipName (song, grid, *clip)
+            textcache::drawText (g, clip != nullptr ? clipName (song, grid, *clip)
                         : engine.gridTrackInput (t) == AudioEngine::GridInput::midi ? utf8 (engine.slotRecordingName (t)) : juce::String(),
                         cell.withTrimmedLeft (launchZone).withTrimmedRight (3), juce::Justification::centredLeft, true);
         }
@@ -1209,7 +1210,7 @@ private:
             }
             g.setColour (ink);
             g.setFont (theme::font (theme::type::small));
-            g.drawText (clipName (song, grid, *clip), cell.withTrimmedLeft (launchZone).withTrimmedRight (3), juce::Justification::centredLeft, true);
+            textcache::drawText (g, clipName (song, grid, *clip), cell.withTrimmedLeft (launchZone).withTrimmedRight (3), juce::Justification::centredLeft, true);
             if (! slot.active) // (round 190im: a deactivated clip, greyed)
             {
                 g.setColour (c::bg1.withAlpha (0.6f));
@@ -1250,7 +1251,7 @@ private:
             theme::fillRoundRect (g, box, 2.0f, c::ledOn);
             g.setColour (c::bg0);
             g.setFont (theme::font (theme::type::small));
-            g.drawText (juce::String (session::lengthCounter (elapsed, song.meter())), box, juce::Justification::centred, false);
+            textcache::drawText (g, juce::String (session::lengthCounter (elapsed, song.meter())), box, juce::Justification::centred, false);
         }
         if (mixer->armsShown()) // (round 190dr: the arm button is in the mixer's Volume section, as in Live)
             return;
@@ -1314,7 +1315,7 @@ private:
             theme::drawFrozenTag (g, juce::Rectangle<float> ((float) box.getRight() - (taken ? 38.0f : 18.0f), (float) box.getCentreY() - 6.5f, 14.0f, 13.0f),
                                   ink, fill);
         g.setColour (ink);
-        g.drawText (name, box.withTrimmedLeft (4).withTrimmedRight ((taken ? 18 : 0) + (frozen ? 18 : 0)), juce::Justification::centredLeft, false);
+        textcache::drawText (g, name, box.withTrimmedLeft (4).withTrimmedRight ((taken ? 18 : 0) + (frozen ? 18 : 0)), juce::Justification::centredLeft, false);
         if (taken)
         {
             const auto mark = box.withTrimmedLeft (box.getWidth() - 20).withSizeKeepingCentre (14, 11).toFloat();
@@ -1430,7 +1431,7 @@ private:
         g.setFont (liveFont());
         const auto name = clip != nullptr ? clipName (song, grid, *clip)
                           : engine.gridTrackInput (t) == AudioEngine::GridInput::midi ? utf8 (engine.slotRecordingName (t)) : juce::String();
-        g.drawText (name, cell.withTrimmedLeft (20).withTrimmedRight (2), juce::Justification::centredLeft, false);
+        textcache::drawText (g, name, cell.withTrimmedLeft (20).withTrimmedRight (2), juce::Justification::centredLeft, false);
     }
 
     // The track status cell (CL-15): a 17 px #363636 cell under a 2 px separator with the 9 x 9 stop square; while a clip
@@ -1462,7 +1463,7 @@ private:
             g.fillRect (box.reduced (1.0f));
             g.setColour (liveInk (trackColour));
             g.setFont (liveFont());
-            g.drawText (juce::String (session::lengthCounter (elapsed, song.meter())), box, juce::Justification::centred, false);
+            textcache::drawText (g, juce::String (session::lengthCounter (elapsed, song.meter())), box, juce::Justification::centred, false);
         }
         else if (const auto playing = view != nullptr ? view->playing.load (std::memory_order_relaxed) : -1; playing >= 0)
         {
@@ -1489,7 +1490,7 @@ private:
                     const auto secs = (int) std::ceil (left);
                     g.setColour (lv::text);
                     g.setFont (liveFont());
-                    g.drawText (juce::String (secs / 60) + ":" + juce::String (secs % 60).paddedLeft ('0', 2),
+                    textcache::drawText (g, juce::String (secs / 60) + ":" + juce::String (secs % 60).paddedLeft ('0', 2),
                                 juce::Rectangle<float> (bar.getRight() + 5.0f, (float) cell.getY(), (float) right - bar.getRight() - 5.0f, (float) cell.getHeight()),
                                 juce::Justification::centredLeft, false);
                 }
@@ -1515,9 +1516,9 @@ private:
                 const auto whole = (int) std::floor (beats + 1.0e-9);
                 g.setColour (lv::text);
                 g.setFont (liveFont());
-                g.drawText (juce::String (loops), juce::Rectangle<float> ((float) area.getX(), (float) cell.getY(), pie.getX() - 4.0f - (float) area.getX(), (float) cell.getHeight()),
+                textcache::drawText (g, juce::String (loops), juce::Rectangle<float> ((float) area.getX(), (float) cell.getY(), pie.getX() - 4.0f - (float) area.getX(), (float) cell.getHeight()),
                             juce::Justification::centredRight, false);
-                g.drawText (juce::String (whole) + (beats - whole > 1.0e-6 ? "+" : ""),
+                textcache::drawText (g, juce::String (whole) + (beats - whole > 1.0e-6 ? "+" : ""),
                             juce::Rectangle<float> (pie.getRight() + 5.0f, (float) cell.getY(), (float) right - pie.getRight() - 5.0f, (float) cell.getHeight()),
                             juce::Justification::centredLeft, false);
             }
@@ -1562,7 +1563,7 @@ private:
             const auto field = [&] (juce::Rectangle<int> box, const juce::String& text, bool on) {
                 theme::fillRoundRect (g, box.toFloat().reduced (0.5f, 3.0f), 2.0f, on ? c::bg1 : c::bg2);
                 g.setColour (on ? c::textPrimary : c::textDisabled);
-                g.drawText (text, box, juce::Justification::centred, false);
+                textcache::drawText (g, text, box, juce::Justification::centred, false);
             };
             // (off: the default drawn dim, as the reference does; round 190em: the signature as "n / d")
             field (sceneFieldBox (r, 1), utf8 (session::sceneTempoText (scene.tempo > 0.0 ? scene.tempo : song.bpm)), scene.tempo > 0.0);
@@ -1576,7 +1577,7 @@ private:
         }
         // (round 190ig, CL-14a: the name's own colour; it took the launch triangle's, Live's #1E1E1E on #23262C = 1.1:1)
         g.setColour (c::textPrimary);
-        g.drawText (! scene.name.empty() ? utf8 (scene.name) : juce::String (row + 1), nameArea, juce::Justification::centredLeft, true);
+        textcache::drawText (g, ! scene.name.empty() ? utf8 (scene.name) : juce::String (row + 1), nameArea, juce::Justification::centredLeft, true);
         if (sceneSelected && row == selectedScene) // (round 190ef: a selected scene, as a selected slot)
         {
             g.setColour (c::accent);
@@ -1611,7 +1612,7 @@ private:
             const auto field = [&] (juce::Rectangle<int> box, const juce::String& text, bool on) {
                 theme::fillRoundRect (g, box.toFloat().reduced (0.5f, 3.0f), 2.0f, on ? lv::well : lv::raised);
                 g.setColour (on ? lv::text : lv::text.withAlpha (0.55f));
-                g.drawText (text, box, juce::Justification::centred, false);
+                textcache::drawText (g, text, box, juce::Justification::centred, false);
             };
             field (sceneFieldBox (r, 1), utf8 (session::sceneTempoText (scene.tempo > 0.0 ? scene.tempo : song.bpm)), scene.tempo > 0.0);
             field (sceneFieldBox (r, 2), utf8 (scene.beatsPerBar > 0 ? session::sceneSignatureText (scene.beatsPerBar, scene.beatUnit)
@@ -1625,10 +1626,10 @@ private:
         else
         {
             g.setColour (ink);
-            g.drawText (juce::String (row + 1), nameArea.removeFromRight (24).withTrimmedRight (4), juce::Justification::centred, false);
+            textcache::drawText (g, juce::String (row + 1), nameArea.removeFromRight (24).withTrimmedRight (4), juce::Justification::centred, false);
         }
         g.setColour (ink);
-        g.drawText (utf8 (scene.name), nameArea, juce::Justification::centred, false);
+        textcache::drawText (g, utf8 (scene.name), nameArea, juce::Justification::centred, false);
     }
 
     // round 190ef: the scene cell's fields: 1 tempo, 2 / 3 the time signature (in the cell `r`; both parts share one box)
