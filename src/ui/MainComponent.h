@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/LiveKeys.h" // (round 190ih)
+
 #include "core/ProjectKey.h"
 #include "core/Preferences.h"
 #include "core/ChordReadout.h"
@@ -57,6 +59,7 @@ class LyricsPanel;
 
 class MainComponent final : public juce::Component,
                             public juce::DragAndDropContainer,
+                            public juce::FileDragAndDropTarget, // (round 190ih: a project file dropped on the window opens)
                             public ui::HintSource,
                             private juce::MenuBarModel,
                             private juce::Timer,
@@ -169,6 +172,30 @@ public:
         juce::PopupMenu menu;
         addRecordOptions (menu);
         return menu;
+    }
+    // round 190ih (--details190ihshot): the transport's live states with Record's blink phase fixed, the "Note on" hint
+    // of the last live note, the save reminder as it shows after ten minutes
+    void transportForSnapshot (bool playing, bool recordLit)
+    {
+        recordLitForSnapshot = recordLit;
+        playButton.setToggleState (playing, juce::dontSendNotification); // (the main timer's part)
+        refreshModeButton();
+        updateTransportStates (playing);
+    }
+    juce::String liveNoteHintForSnapshot()
+    {
+        updateLiveNoteHint();
+        const auto posted = ui::postedHint();
+        return posted ? posted->text : juce::String();
+    }
+    juce::String saveReminderForSnapshot()
+    {
+        autosaveMinutes = 0;
+        saveReminderTicks = 30 * 60 * 10 - 1;
+        updateSaveReminder();
+        saveButton.setToggleState (true, juce::dontSendNotification); // (the blink's lit phase)
+        const auto posted = ui::postedHint();
+        return posted ? posted->text : juce::String();
     }
     void setHintForSnapshot (const ui::Hint& hint, bool live = false)
     {
@@ -475,6 +502,23 @@ private:
     std::uint32_t backupMidiSeen = 0;
     double backupMidiMs = -1.0e9;
     bool lastModified = false;
+    void updateTransportStates (bool playing); // round 190ih: Play → Pause, Record blink (Pattern layout)
+    bool shownPause = false, recordBlinkDark = false;
+    std::optional<bool> recordLitForSnapshot;
+    void updateLiveNoteHint(); // round 190ih: "Note on: C4 / velocity: 100"
+    void openRecent (int index); // round 190ih: Alt+1 … Alt+0
+    bool runLiveKey (livekeys::Command command); // round 190ih: Live's keys in the Clip-launch layout
+    PlaylistArea::GridView shownGridView = PlaylistArea::GridView::beside;
+    void updateSaveReminder();   // round 190ih: backups off = a reminder every 10 min, Save blinks
+    int saveReminderTicks = 0;
+public:
+    // round 190ih (DF-139): a project file dropped anywhere on the window that no panel takes (the Playlist and the rack
+    // take samples) opens, as File › Open would (FL: ".flp ... drag-n-drop on the FL Studio desktop")
+    static bool isProjectFile (const juce::File& file);
+    bool isInterestedInFileDrag (const juce::StringArray& files) override;
+    void filesDropped (const juce::StringArray& files, int x, int y) override;
+private:
+    std::uint32_t shownLiveNote = 0;
     void openPianoRoll();
     void toggleMode();
     void refreshModeButton();

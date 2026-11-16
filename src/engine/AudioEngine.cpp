@@ -1,4 +1,5 @@
 #include "engine/AudioEngine.h"
+#include "core/LiveNote.h"
 #include "core/VideoPlayer.h"
 #include "core/TempoMap.h"
 #include "engine/ProjectFile.h"
@@ -1610,6 +1611,16 @@ void AudioEngine::markHeldKey (int midiChannel, int key, bool on) noexcept
         heldKeyBits[midiChannel][key >> 6].fetch_and (~bit);
 }
 
+void AudioEngine::markLiveNote (int key, int velocity127, bool on) noexcept
+{
+    if (key < 0 || key > 127)
+        return;
+    auto& v = liveNoteVelocities[(std::size_t) key];
+    if (on)
+        v.store ((std::uint8_t) std::clamp (velocity127, 0, 127), std::memory_order_relaxed);
+    liveNote.store (livenote::pack (liveNote.load (std::memory_order_relaxed), key, (int) v.load (std::memory_order_relaxed), on), std::memory_order_relaxed);
+}
+
 void AudioEngine::logPlayedNote (int channel, int key, float velocity, bool on, double tick, bool recorded)
 {
     if (channel < 0)
@@ -1671,6 +1682,11 @@ NoteMask AudioEngine::soundingKeys (int channel) const noexcept
     return rackProcessor != nullptr ? rackProcessor->soundingKeys (channel) : NoteMask {};
 }
 
+std::uint32_t AudioEngine::noteStrikes (int channel) const noexcept
+{
+    return rackProcessor != nullptr ? rackProcessor->noteStrikes (channel) : 0u;
+}
+
 std::vector<int> AudioEngine::heldInputKeys() const
 {
     std::vector<int> keys;
@@ -1702,6 +1718,7 @@ void AudioEngine::sendLiveNote (int channel, int key, float velocity, bool on, b
     if (record) // played notes (the PC keyboard) follow the scale snap; previews don't
     {
         markHeldKey (0, key, on); // (FL sends the typing keyboard as MIDI channel 1)
+        markLiveNote (key, juce::roundToInt (velocity * 127.0f), on); // (the hint bar's "Note on", round 190ih)
         // the note-off stops the key its note-on started, even if the snap changed in between
         const auto requested = key;
         if (on)
@@ -3013,6 +3030,7 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
 
     const auto on = m.isNoteOn();
     markHeldKey (m.getChannel() - 1, m.getNoteNumber(), on);
+    markLiveNote (m.getNoteNumber(), (int) m.getVelocity(), on);
 
     if (on)
         startOnInput();

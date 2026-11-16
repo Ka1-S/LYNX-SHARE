@@ -738,6 +738,12 @@ void SimpleWorkflow::entered()
     songChanged();
 }
 
+void SimpleWorkflow::tick()
+{
+    if (dock != nullptr)
+        dock->tickInputMeter();
+}
+
 void SimpleWorkflow::left()
 {
     active = false;

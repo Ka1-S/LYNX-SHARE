@@ -145,6 +145,10 @@
 #include "core/RackRenderer.h"
 #include "core/PerfProjects.h"
 #include "core/TempoMap.h"
+#include "core/ActivityLight.h" // round 190ih
+#include "core/LiveNote.h"
+#include "core/LiveKeys.h"
+#include "core/PresetMix.h"
 #include "core/PinOnTop.h"
 #include "core/MetronomeVoice.h"
 #include "engine/Transport.h"
@@ -17829,3 +17833,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Rollup030Tests.inc" // round 190il: semantic interactions of the 0.1.30 rollup (keep last)
 #include "Bug190ieTests.inc" // round 190ie (issue #185: tempo automation through the basic Delay)
 #include "PerfGate190idTests.inc" // round perfgate190id: the performance gate's synthetic projects (community slice B12)
+#include "Details190ihTests.inc" // round 190ih: DETAILS slices R2, R3, R4, R7, R9, R12, R14

@@ -4017,6 +4017,8 @@ public:
     void noteOn (int key, float velocity) noexcept override
     {
         mailbox.read (data);
+        lastKey.store ((float) key, std::memory_order_relaxed);
+        lastVelocity.store (velocity, std::memory_order_relaxed);
         if (data.keyboard) // Keyboard Controller: output 0 is the key's value
         {
             heldKey = key;
@@ -4111,12 +4113,20 @@ public:
         }
     }
 
+    // outputs 0 … 7 drive the links; 8 and 9 are the last key (0 … 127) and velocity (0 … 1) received, -1 before the
+    // first note, for the editor's Keyboard / Velocity mapping line (round 190ih, FL's manual)
     float controlOutput (int output) const noexcept override
     {
+        if (output == lastKeyOutput)
+            return lastKey.load (std::memory_order_relaxed);
+        if (output == lastVelocityOutput)
+            return lastVelocity.load (std::memory_order_relaxed);
         return output >= 0 && output < (int) values.size() ? values[(std::size_t) output] : 0.0f;
     }
+    static constexpr int lastKeyOutput = 8, lastVelocityOutput = 9;
 
 private:
+    std::atomic<float> lastKey { -1.0f }, lastVelocity { -1.0f };
     struct Data
     {
         EnvelopeControllerData articulators {};

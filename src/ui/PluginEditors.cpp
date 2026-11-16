@@ -46,6 +46,8 @@
 #include "ui/DynamicsDisplays.h"
 #include "ui/HintBar.h"
 #include "ui/I18n.h"
+#include "ui/Motion.h"
+#include "core/PresetMix.h"
 #include "ui/Icons.h"
 #include "ui/FacetEqEditor.h"
 #include "ui/ProEditors.h"
@@ -82,6 +84,49 @@ bool isVertical (const LayoutItem& item) noexcept
 }
 
 // --- the editor ----------------------------------------------------------------------------------
+
+// round 190ih: what Gross Beat's editor paints while its live parts move (--uiperf), and the measurement switches
+// (LYNX_GB_DIAG, also set by --uiperf's A/B steps: 1 no live repaints, 64 JUCE's software renderer for the window,
+// bits 8-15 the live display's frames per second). The trail, an opaque editor, the cells alone and the locator alone
+// were measured the same way and changed nothing (details190ih/HANDOFF.md); only the frame rate did.
+struct GbPaintStats
+{
+    long count = 0;
+    double pixels = 0.0, ms = 0.0;
+};
+inline GbPaintStats& gbPaintStats()
+{
+    static GbPaintStats stats;
+    return stats;
+}
+inline int& gbDiagMask()
+{
+    static int mask = juce::SystemStats::getEnvironmentVariable ("LYNX_GB_DIAG", "0").getIntValue();
+    return mask;
+}
+inline int gbDiag() { return gbDiagMask(); }
+struct PaintCount
+{
+    PaintCount (bool on, juce::Graphics& g) : active (on)
+    {
+        if (active)
+        {
+            const auto clip = g.getClipBounds();
+            gbPaintStats().pixels += (double) clip.getWidth() * (double) clip.getHeight();
+            start = juce::Time::getMillisecondCounterHiRes();
+        }
+    }
+    ~PaintCount()
+    {
+        if (active)
+        {
+            ++gbPaintStats().count;
+            gbPaintStats().ms += juce::Time::getMillisecondCounterHiRes() - start;
+        }
+    }
+    bool active;
+    double start = 0.0;
+};
 
 class NativeEffectEditor final : public juce::Component,
                                  public ui::HintSource,
@@ -164,7 +209,7 @@ public:
                 times->levelWanted[levelKey()].fetch_add (1, std::memory_order_relaxed);
         if (! node.locate)
             startTimerHz (30); // live displays, and the controls following their automation (cheap while nothing moves)
-        else if (liveDisplays)
+        else if (liveDisplays || kind == EffectKind::grossBeat) // (round 190ih: Gross Beat's locator, in a Patcher too)
             startTimerHz (30);
         // round 170k2: never narrower than its header needs to show the whole name (the body keeps its scale)
         setSize (juce::jmax ((int) std::ceil ((float) l.width * initialScale), minimumWidth()),
@@ -621,6 +666,7 @@ public:
 
     void paint (juce::Graphics& g) override
     {
+        const PaintCount counted (kind == EffectKind::grossBeat, g);
         using namespace theme;
         const skin::StyleScope styleScope (editorStyle(), artNow());
         accent = editorStyle() == skin::Style::themed ? skin::artAccent (artNow()) : familyAccent;
@@ -635,12 +681,16 @@ public:
             return;
         }
 
-        paintHeader (g, *fx);
+        // round 190ih: Gross Beat's live parts (the locator, the playing cells) repaint small areas 30 times a second
+        // while the song plays: only the items they touch are drawn then (its 72 slot thumbnails are not cheap)
+        const auto cull = artLayer != nullptr || kind == EffectKind::grossBeat;
+        if (! cull || g.clipRegionIntersects (headerArea().getSmallestIntegerContainer()))
+            paintHeader (g, *fx);
 
         const auto& items = activeLayout().items;
         for (int i = 0; i < (int) items.size(); ++i)
             if (visible (items[(std::size_t) i])
-                && (artLayer == nullptr || g.clipRegionIntersects (rectOf (items[(std::size_t) i]).expanded (40.0f, 24.0f).getSmallestIntegerContainer())))
+                && (! cull || g.clipRegionIntersects (rectOf (items[(std::size_t) i]).expanded (40.0f, 24.0f).getSmallestIntegerContainer())))
             {
                 // round 170j: a partial repaint of the art draws only what it touches; round 170c: a control another mode bypasses is drawn dimmed
                 const auto idle = plugui::isIdle (kind, items[(std::size_t) i], fx->params);
@@ -2982,7 +3032,7 @@ public:
             else
             {
                 g.setColour (colour::textSecondary);
-                g.drawFittedText (tr ("Drag a handle (frequency and gain); mouse wheel = Q; right-click = type; double-click = 0 dB"),
+                g.drawFittedText (tr ("Drag a handle (frequency and gain); mouse wheel = Q; right-click = type and key; double-click = 0 dB; Alt+click = reset; Ctrl = fine; Shift+click = solo while held (drag up / down: width)"),
                                   r.reduced (4.0f * s, 0.0f).toNearestInt(), juce::Justification::centredLeft, 2, 0.8f);
             }
             return;
@@ -3682,7 +3732,32 @@ public:
             peqview::showBandMenu (*this, fx->params, band, [this] (std::vector<std::pair<int, float>> changes) { setParams (changes); });
             return true;
         }
+        // round 190ih (PLAN R9), FL's manual (Parametric EQ 2, Band Token): "Alt+Click a Band to reset a Band"
+        if (e.mods.isAltDown())
+        {
+            setParams (peqview::bandReset (fx->params, band));
+            return true;
+        }
         eqDragOffset = peqview::handlePosition (graph, fx->params, band, eqRange) - e.position;
+        eqDownPos = e.position;
+        eqDownWidth = fx->params[(std::size_t) peq::param (band, 3)];
+        eqFine = e.mods.isCtrlDown(); // "Ctrl+Click a Band to make fine adjustments"
+        // "Shift+Click and move mouse left/right on Bands" (or the middle button) = bandwidth; with "Solo on Shift"
+        // (FL's option, on: owner decision PL5) Shift+click "will momentarily solo the Band" and vertical moves set the
+        // bandwidth "while in this mode"
+        eqWidthDrag = 0;
+        if (e.mods.isMiddleButtonDown())
+            eqWidthDrag = 1;
+        else if (e.mods.isShiftDown())
+        {
+            eqWidthDrag = peqview::displaySettings().soloOnShift ? 2 : 1;
+            if (eqWidthDrag == 2)
+            {
+                peq::setSoloBand (runningEffect().get(), band);
+                eqSoloing = true;
+                repaint();
+            }
+        }
         eqDragging = true;
         return true;
     }
@@ -3693,7 +3768,16 @@ public:
         if (fx == nullptr || eqSelected < 0 || dragItem < 0)
             return;
         const auto graph = eqGraph (rectOf (activeLayout().items[(std::size_t) dragItem]));
-        const auto p = e.position + eqDragOffset;
+        const auto scale = eqFine ? 0.2f : 1.0f;
+        if (eqWidthDrag > 0) // the bandwidth: right (or up while soloing) = wider
+        {
+            const auto moved = (eqWidthDrag == 1 ? e.position.x - eqDownPos.x : eqDownPos.y - e.position.y) * 0.004f * scale;
+            const auto wider = peq::flLaw (fx->params) ? moved : -moved; // (FL's width grows with the value, LYNX's Q shrinks)
+            setParams ({ { peq::param (eqSelected, 3), eqDownWidth + wider } });
+            ui::showValueTip (*this, juce::Rectangle<int> (6, 6).withCentre (e.getPosition()), peqview::bandText (fx->params, eqSelected));
+            return;
+        }
+        const auto p = eqDownPos + (e.position - eqDownPos) * scale + eqDragOffset;
         std::vector<std::pair<int, float>> changes { { peq::param (eqSelected, 1), peq::hzValue (peqview::hzForX (graph, p.x)) } };
         if (peqview::hasGain (fx->params, eqSelected))
             changes.push_back ({ peq::param (eqSelected, 2), peq::gainValue (peqview::dbForY (graph, p.y, eqRange)) });
@@ -4860,6 +4944,12 @@ public:
     void mouseUp (const juce::MouseEvent& e) override
     {
         eqDragging = false;
+        if (eqSoloing) // round 190ih: the momentary band solo ends with the click
+        {
+            eqSoloing = false;
+            peq::setSoloBand (runningEffect().get(), -1);
+            repaint();
+        }
         if (portDragStart >= -1) // round 190ez
         {
             portDragStart = -2;
@@ -5320,7 +5410,7 @@ private:
         if (isGbAny (item)) // round 168m
             return { gbHint (item, p), {}, false, true };
         if (item.type == Item::display)
-            return { tr ("Drag a handle (frequency and gain); mouse wheel = Q; right-click = type; double-click = 0 dB"), {}, false, true };
+            return { tr ("Drag a handle (frequency and gain); mouse wheel = Q; right-click = type and key; double-click = 0 dB; Alt+click = reset; Ctrl = fine; Shift+click = solo while held (drag up / down: width)"), {}, false, true };
         if (hasStyle (item, plugui::pageTabs))
             return { tr ("Page: switch the controls shown"), {}, false, false };
         if (isMixItem (item) && captionArea (item).contains (p))
@@ -5365,16 +5455,45 @@ private:
             bar.willEdit();
             fx->presetName = presetName.toStdString();
         }
-        engine.editSong ([t = track, s = slot, fx = *fx] (Song& song) {
+        // round 190ih: FL's Presets › Hybridize: a random half of the published settings come from the preset
+        const auto hybrid = hybridizePresets && current() != nullptr;
+        const auto published = (int) effectInfo (kind).params.size();
+        const auto seed = (std::uint32_t) juce::Random::getSystemRandom().nextInt();
+        engine.editSong ([t = track, s = slot, fx = *fx, hybrid, published, seed] (Song& song) {
             auto& target = song.mixer[(std::size_t) t].effects[(std::size_t) s];
             const auto enabled = target.enabled;
             const auto mix = target.mix;
+            const auto before = target.params;
             target = fx;
             target.enabled = enabled;
             target.mix = mix;
+            if (hybrid)
+                target.params = presetmix::hybridize (before, fx.params, published, seed);
         });
         repaint();
     }
+
+    // round 190ih (PLAN R8 part, owner decision PL4): FL's Presets › Randomize — random values for the published
+    // parameters, one undo step
+    void randomizeParams()
+    {
+        if (current() == nullptr)
+            return;
+        presetName = {};
+        if (usesBar())
+        {
+            bar.beginGesture();
+            bar.willEdit();
+        }
+        const auto published = (int) effectInfo (kind).params.size();
+        const auto seed = (std::uint32_t) juce::Random::getSystemRandom().nextInt();
+        editSlot ([published, seed] (EffectSlot& target) {
+            presetmix::randomize (target.params, published, seed);
+            target.presetName.clear();
+        });
+        repaint();
+    }
+    static inline bool hybridizePresets = false; // FL's Presets › Hybridize (a mode, as FL's)
 
     void stepPreset (int delta)
     {
@@ -5432,8 +5551,12 @@ private:
         }
 
         juce::PopupMenu menu;
+        // round 190ih: FL's Presets submenu also holds Randomize and Hybridize (FL manual, Plugin wrapper › Presets)
         if (presets.getNumItems() > 0)
-            menu.addSubMenu (tr ("Presets"), presets);
+            presets.addSeparator();
+        presets.addItem (tr ("Randomize"), [this] { randomizeParams(); });
+        presets.addItem (tr ("Hybridize"), true, hybridizePresets, [] { hybridizePresets = ! hybridizePresets; });
+        menu.addSubMenu (tr ("Presets"), presets);
         if (showsSidechain()) // round 177b
         {
             juce::PopupMenu side;
@@ -5508,8 +5631,11 @@ private:
 
 public:
     // round 166f: the analyser part of the timer, for off-screen pictures (--eq166fshot)
+    bool isGrossBeat() const noexcept { return kind == EffectKind::grossBeat; } // (round 190ih diagnostics)
     void tickDisplaysForSnapshot()
     {
+        if (kind == EffectKind::grossBeat) // round 190ih: the locator and slot states from the published meters
+            gbLiveTick();
         if (kind == EffectKind::parametricEq && ! node.locate)
             for (const auto& item : activeLayout().items)
                 if (item.type == Item::display && item.display != nullptr && std::strcmp (item.display, "eq") == 0)
@@ -5535,6 +5661,8 @@ private:
                     if (eqAnalyser.update (engine, track, slot, isMouseOver (true) || hasKeyboardFocus (true), graph))
                         repaint (graph.getSmallestIntegerContainer().expanded (2));
                 }
+        if (kind == EffectKind::grossBeat) // round 190ih: the playback locator and the playing / queued slots
+            gbLiveTick();
         if (! liveDisplays) return;
         learnScaleFromMidi();
         if (kind == EffectKind::hardwareInsert)
@@ -5696,6 +5824,12 @@ private:
     std::array<std::vector<std::uint8_t>, 4> sgPresets {}; // the installation's preset files A–D (read on demand)
     bool sgApprox = false; // a Soundgoodizer approximation container (no FL preset files) shown on the Soundgoodizer page
     juce::Point<float> eqDragOffset;
+    // round 190ih (R9): FL's band-token gestures — the click's place and the band's width then, Ctrl fine, the width
+    // drag (0 none, 1 Shift / middle button left-right, 2 Shift with "Solo on Shift": up-down), a held solo
+    juce::Point<float> eqDownPos;
+    float eqDownWidth = 0.0f;
+    bool eqFine = false, eqSoloing = false;
+    int eqWidthDrag = 0;
     dynui::History dynHistory; // the dynamics suite's scrolling gain-reduction graph
     int crossoverDrag = -1;    // the crossover parameter being dragged on a band display
     float vuNeedle = 0.0f;     // the VU display's needle (dB below 0 VU, with inertia)
@@ -5832,6 +5966,52 @@ juce::Point<int> nativeEditorMinimumSize (juce::Component& editor)
     if (native == nullptr) return {};
     const auto design = native->designSize();
     return { juce::jmax (design.x / 2, native->minimumWidth()), design.y / 2 };
+}
+
+void setGrossBeatDiagnostics (int mask)
+{
+    gbDiagMask() = mask;
+   #if JUCE_WINDOWS
+    if ((mask & 64) == 0) // (back on Direct2D)
+        for (int i = 0; i < juce::ComponentPeer::getNumPeers(); ++i)
+            if (auto* peer = juce::ComponentPeer::getPeer (i); peer != nullptr && peer->getAvailableRenderingEngines().size() > 1
+                                                               && peer->getCurrentRenderingEngine() == 0
+                                                               && dynamic_cast<juce::DocumentWindow*> (&peer->getComponent()) != nullptr
+                                                               && ! peer->getComponent().getProperties().contains ("lynxGdi"))
+            {
+                std::function<bool (juce::Component&)> hasGb = [&] (juce::Component& c) {
+                    if (auto* e = dynamic_cast<NativeEffectEditor*> (&c); e != nullptr && e->isGrossBeat())
+                        return true;
+                    for (auto* child : c.getChildren())
+                        if (hasGb (*child))
+                            return true;
+                    return false;
+                };
+                if (hasGb (peer->getComponent()))
+                    peer->setCurrentRenderingEngine (1);
+            }
+   #endif
+}
+
+juce::String grossBeatPaintStats (bool reset)
+{
+    auto& st = gbPaintStats();
+    juce::String text;
+    if (st.count > 0)
+        text << "Gross Beat editor paints: " << st.count << ", " << juce::String (st.pixels / 1.0e6, 2) << " Mpx, "
+             << juce::String (st.ms, 1) << " ms on the message thread";
+    if (reset)
+        st = {};
+    return text;
+}
+
+bool showGrossBeatEnvelopeForSnapshot (juce::Component& editor, int envelopeKind)
+{
+    auto* native = dynamic_cast<NativeEffectEditor*> (&editor);
+    if (native == nullptr) return false;
+    native->gbEditKind = juce::jlimit (0, 1, envelopeKind);
+    native->repaint();
+    return true;
 }
 
 bool tickNativeEffectEditor (juce::Component& editor)

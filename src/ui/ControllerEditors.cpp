@@ -33,10 +33,16 @@ class Monitor final : public juce::Component
 public:
     void push (float v)
     {
+        // round 190ih (DP-67): a constant value repaints only until the trace has scrolled flat, and never while hidden
+        flatRun = v == history[(std::size_t) ((head + (int) history.size() - 1) % (int) history.size())] ? flatRun + 1 : 0;
         history[(std::size_t) head] = v;
         head = (head + 1) % (int) history.size();
-        repaint();
+        if (needsRepaint (flatRun, (int) history.size()) && isShowing())
+            repaint();
     }
+
+    // a trace whose every sample equals the last one looks the same after one more equal sample
+    static bool needsRepaint (int equalPushes, int length) noexcept { return equalPushes < length; }
 
     void paint (juce::Graphics& g) override
     {
@@ -68,7 +74,7 @@ public:
 
 private:
     std::array<float, 240> history {};
-    int head = 0;
+    int head = 0, flatRun = 0;
 };
 
 // ===================================================================================================
@@ -338,6 +344,9 @@ public:
     bool sustainable = true; // the point menu offers the sustain point
     float neutral = -1.0f;   // a map's neutral level (dashed line), < 0 = none
     std::function<float (float)> preview; // a faint wave behind the curve (the LFO page: -1 … 1 at time t)
+    // FL's Keyboard / Velocity mapping (manual, Fruity Envelope Controller): "the vertical white line on the graph shows
+    // the value of the last note/key received", in the axis' units (key / 120 or velocity 0 … 1); < 0 = none
+    std::function<float()> marker;
     float minSpan = 1.0f;                 // the time axis shows at least this much (one LFO cycle)
     bool showPreview = false;
 
@@ -456,6 +465,30 @@ public:
             g.setColour (theme::colour::accent.withAlpha (0.7f));
             g.drawHorizontalLine ((int) toY (live()), area.getRight() - 14.0f, area.getRight());
         }
+        if (const auto x = markerX(); x >= 0)
+        {
+            g.setColour (juce::Colours::white.withAlpha (0.9f));
+            g.drawVerticalLine (x, area.getY(), area.getBottom());
+        }
+    }
+
+    // the marker's pixel column, -1 = none (round 190ih, DP-68)
+    int markerX() const
+    {
+        if (! marker || axis == Axis::time)
+            return -1;
+        const auto v = marker();
+        if (v < 0.0f)
+            return -1;
+        const auto c = get();
+        return (int) std::floor (toX (c, juce::jlimit (0.0f, axis == Axis::keys ? 127.0f / 120.0f : 1.0f, v)));
+    }
+    // round 190ih (DP-70): the live parts repaint alone — the output tick at the right edge, or a marker column
+    void repaintLiveTick() { repaint (juce::Rectangle<int> (getWidth() - 26, 0, 26, getHeight())); }
+    void repaintColumn (int x)
+    {
+        if (x >= 0)
+            repaint (juce::Rectangle<int> (x - 1, 0, 3, getHeight()));
     }
 
     void mouseDown (const juce::MouseEvent& e) override
@@ -825,6 +858,14 @@ public:
         graph.live = [this] { return outputs[(std::size_t) shown]; };
         graph.active = [this] { return partActive(); };
         graph.emptyText = [this] { return emptyText(); };
+        graph.marker = [this] {
+            const auto [key, velocity] = lastNote();
+            if (shownPart == 2)
+                return key < 0.0f ? -1.0f : key / 120.0f; // (the keys axis: x = key / 120)
+            if (shownPart == 3)
+                return velocity;
+            return -1.0f;
+        };
         graph.preview = [this] (float t) -> float {
             const auto a = data()[(std::size_t) shown];
             const auto amp = controllerCurveAt (a.lfoAmp, t, 1.0f);
@@ -1056,6 +1097,7 @@ public:
             k->setBounds (pageKnobs.removeFromLeft (64));
         bottom.removeFromLeft (10);
         partInfo.setBounds (bottom);
+        markerShown = graph.markerX(); // (round 190ih: the graph is repainted whole at its new size)
     }
 
 private:
@@ -1199,6 +1241,7 @@ private:
         graph.sustainable = shownPart <= 1;
         refresh();
         resized();
+        markerShown = graph.markerX(); // (the whole graph repaints with the page)
     }
 
     void select (int k)
@@ -1270,10 +1313,35 @@ private:
 
     void timerCallback() override
     {
+        // round 190ih (DP-70): nothing repaints while hidden or while the outputs hold still (it was a full header +
+        // graph repaint at 30 Hz, idle or not)
+        if (! isShowing())
+            return;
+        auto changed = false;
         for (int k = 0; k < 8; ++k)
-            outputs[(std::size_t) k] = outputOf ? outputOf (k) : 0.0f;
-        repaint (getLocalBounds().withHeight (130));
-        graph.repaint();
+        {
+            const auto v = outputOf ? outputOf (k) : 0.0f;
+            changed = changed || v != outputs[(std::size_t) k];
+            outputs[(std::size_t) k] = v;
+        }
+        if (changed)
+        {
+            for (auto& t : tabs) // the meter under each tab
+                repaint (t.getBounds().withY (t.getBottom()).withHeight (8));
+            graph.repaintLiveTick();
+        }
+        // the last key / velocity received (outputs 8 / 9 of the controller): the white line on the mapping pages
+        if (const auto [key, velocity] = lastNote(); key != lastKey || velocity != lastVelocity)
+        {
+            lastKey = key;
+            lastVelocity = velocity;
+            if (const auto after = graph.markerX(); after != markerShown)
+            {
+                graph.repaintColumn (markerShown);
+                graph.repaintColumn (after);
+                markerShown = after;
+            }
+        }
         if (const auto held = engine.heldInputKeys(); held != heldKeys)
         {
             heldKeys = held;
@@ -1301,6 +1369,16 @@ private:
     juce::Slider lowKey, highKey;
     juce::Label keysLabel, links, partInfo;
     std::array<float, 8> outputs {};
+    float lastKey = -1.0f, lastVelocity = -1.0f;
+    int markerShown = -1;
+    // the last key / velocity the controller received (its outputs 8 / 9), -1 / -1 before a note
+    std::pair<float, float> lastNote() const
+    {
+        const auto key = outputOf ? outputOf (8) : -1.0f, velocity = outputOf ? outputOf (9) : -1.0f;
+        if (! (velocity > 0.0f)) // (no note yet, or no running controller: its outputs read 0)
+            return { -1.0f, -1.0f };
+        return { key, velocity };
+    }
 };
 
 // ===================================================================================================

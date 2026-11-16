@@ -71,6 +71,7 @@ public:
     // channel (whichever renderer renders it), the controls both renderers follow, the workers' parking
     void setRenderAheadTargets (const renderahead::Targets* targets) noexcept { ahead->setTargets (targets); }
     NoteMask soundingKeys (int channel) const noexcept { return ahead->rendererOf (channel).soundingKeys (channel); }
+    std::uint32_t noteStrikes (int channel) const noexcept { return ahead->rendererOf (channel).noteStrikes (channel); }
     void setOverriddenSlots (const std::vector<int>& slots) noexcept { ahead->setOverriddenSlots (slots); }
     void setReleasedSlots (const std::vector<int>& slots) noexcept { ahead->setReleasedSlots (slots); }
     void setProfiling (bool on) noexcept { ahead->setProfiling (on); }

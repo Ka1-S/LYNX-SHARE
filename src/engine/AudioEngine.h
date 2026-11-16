@@ -462,6 +462,11 @@ public:
     std::vector<int> heldInputKeys() const;
     // Round 190ee: the key played last on a MIDI input or the typing piano (C5 = 60 before any): Edison's "Last hit"
     int lastPlayedKey() const noexcept { return lastHitKey.load (std::memory_order_relaxed); }
+    // Round 190ih (FL's hint bar "Note on: C4 / velocity: 100", PLAN R3 DC-9): the last note of the typing keyboard or a
+    // MIDI input (core/LiveNote.h); 0 = none yet. A note-off carries its note-on's velocity (as FL's hint shows it).
+    // (unpacked with core/LiveNote.h)
+    std::uint32_t lastLiveNote() const noexcept { return liveNote.load (std::memory_order_relaxed); }
+    void markLiveNote (int key, int velocity127, bool on) noexcept;
     // The same for one MIDI channel (0-15; the typing keyboard plays on 0), as two 64-bit masks: the chord panel (round
     // 181b) counts each channel's keys on its own, as FL does.
     std::array<std::uint64_t, 2> heldInputKeyBits (int midiChannel) const noexcept;
@@ -470,6 +475,8 @@ public:
     // The keys sounding on a channel right now (song / pattern notes, keyboard, MIDI): the Piano roll's keyboard lights
     // them (issue #14). Any thread.
     NoteMask soundingKeys (int channel) const noexcept;
+    // round 190ih: a counter that moves with every block that struck a note on the channel (the rack's activity light)
+    std::uint32_t noteStrikes (int channel) const noexcept;
 
     // FL's score logger (REA round 165f): every note played on a MIDI input or the typing keyboard, recording or
     // not, for Tools › Dump score log to selected pattern. Any thread (a short spin lock; never the audio thread).
@@ -1233,6 +1240,8 @@ private:
     std::atomic<std::uint8_t> heldKeyCount[16][128] {};
     void markHeldKey (int midiChannel, int key, bool on) noexcept;
     std::atomic<int> lastHitKey { 60 };
+    std::atomic<std::uint32_t> liveNote { 0 };                  // (lastLiveNote)
+    std::array<std::atomic<std::uint8_t>, 128> liveNoteVelocities {}; // each key's last note-on velocity
     KeyLedger playedKeys;        // UI thread: the keys the typing piano started (after the scale snap)
     SpscQueue<RecordedEvent, 4096> midiRecordQueue; // MIDI thread -> UI (recording)
     // a controller's pitch wheel while recording (MIDI thread -> UI): key = its MIDI channel 0…15, velocity = 0..1;

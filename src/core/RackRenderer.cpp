@@ -3515,7 +3515,8 @@ static bool hasLiveMeters (EffectKind kind) noexcept
            || kind == EffectKind::autoPan || kind == EffectKind::voiceShift // round 135: the pan position, the shifter's notes
            || kind == EffectKind::hardwareInsert // round 164d: send / return levels, the ping
            || kind == EffectKind::xyController || kind == EffectKind::xyzController // round 164: the pad's target and outputs
-           || kind == EffectKind::peakController; // issue #66: its display's Peak + LFO, Peak and LFO lines
+           || kind == EffectKind::peakController // issue #66: its display's Peak + LFO, Peak and LFO lines
+           || kind == EffectKind::grossBeat; // round 190ih: its playback locator and the playing / queued slots
 }
 
 RackState::SlotPlan RackState::planSlot (const RackState& state, int track, std::size_t i) noexcept
@@ -4430,6 +4431,8 @@ void RackRenderer::publishSoundingKeys (int channels) noexcept
             const auto& held = heldNotes[(std::size_t) i];
             auto& struck = struckNotes[(std::size_t) i];
             now = { held[0] | struck[0], held[1] | struck[1] };
+            if ((struck[0] | struck[1]) != 0) // round 190ih: a note started in this block (the rack's activity light)
+                strikes[(std::size_t) i].store (strikes[(std::size_t) i].load (std::memory_order_relaxed) + 1u, std::memory_order_relaxed);
             struck = {};
         }
         if (now[0] != 0 || now[1] != 0)

@@ -22,6 +22,8 @@
 #include "core/CountIn.h"
 #include "core/MixerOps.h"
 #include "core/NoteNames.h"
+#include "core/LiveNote.h"
+#include "core/LiveKeys.h"
 #include "core/KeyGuess.h"
 #include "core/ProjectKey.h"
 #include "core/ScaleKeys.h"
@@ -33,6 +35,7 @@
 #include "ui/UiTrace.h"
 #include "core/LoadTrace.h"
 #include "ui/MainComponent.h"
+#include "ui/Motion.h"
 #include "ui/RemoteControlSettings.h"
 #include "ui/NativeChild.h"
 #include "core/PlaylistOps.h"
@@ -671,7 +674,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     ui::setHint (playlist, tr ("Playlist: [LMB] paint the current pattern  [RMB] delete  [Ctrl][LMB] drag to select  [Ctrl][Wheel] zoom"));
 
     // recent files (stored in %APPDATA%\LYNX)
-    recent.setMaxNumberOfItems (12);
+    recent.setMaxNumberOfItems (50); // (FL keeps up to 50: File › Recent projects › More; round 190ih)
     recent.restoreFromString (PluginHost::settingsFolder().getChildFile ("recentes.txt").loadFileAsString());
     addAndMakeVisible (menuBar);
 
@@ -716,6 +719,8 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         playButton.setIconColourWhenOn (onIcon);
         recordButton.setOnColour (colour::record.withAlpha (0.2f));
         recordButton.setIconColourWhenOn (colour::record);
+        saveButton.setOnColour (onWash); // (round 190ih: the save reminder's blink)
+        saveButton.setIconColourWhenOn (onIcon);
         for (auto* b : { &metronomeButton, &typingPianoButton, &countInButton, &waitInputButton, &blendButton, &loopRecordButton, &stepEditButton, &punchButton,
                           &patternModeButton, &songModeButton, &multilinkButton })
         {
@@ -1900,6 +1905,11 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
     if (const auto own = keyMap.findUserBound (chord, focusContext(), pianoKeys); ! own.empty() && runAction (own))
         return true;
 
+    // round 190ih: Live's keys in the Clip-launch layout (core/LiveKeys.h); in the other layouts none is taken
+    if (const auto live = livekeys::commandFor (chord, layoutStyle); live != livekeys::Command::none
+        && dynamic_cast<juce::TextEditor*> (juce::Component::getCurrentlyFocusedComponent()) == nullptr && runLiveKey (live))
+        return true;
+
     // round 190ef: B is the reference's Draw Mode switch in the Clip-launch layout (core/SessionKeys.h); in the other
     // layouts it stays the Playlist's and Piano roll's brush tool
     if (key.getKeyCode() == 'B' || key.getKeyCode() == 'b')
@@ -1927,6 +1937,35 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
     // 5. issue #182: in the Browser, a typed character no key above took jumps to the row that starts with it (the
     // typing piano, FL's L / R and the hot-swap Q keep their keys)
     return panelShown && focused == Panel::browser && browser.typeToJump (key);
+}
+
+bool MainComponent::runLiveKey (livekeys::Command command)
+{
+    using C = livekeys::Command;
+    switch (command)
+    {
+        case C::toggleView: // Session ↔ Arrangement (from "Both": the Session view)
+            if (clipGridView == nullptr)
+                return false;
+            setClipGridView (shownGridView == PlaylistArea::GridView::grid ? PlaylistArea::GridView::song : PlaylistArea::GridView::grid);
+            return true;
+        case C::metronome: return runAction ("transport.metronome");
+        case C::arrangementRecord: return runAction ("transport.record");
+        case C::sessionRecord:
+            if (clipGridView == nullptr)
+                return false;
+            engine.toggleSessionRecord (clipGridSelection (*clipGridView).second);
+            return true;
+        case C::backToArrangement:
+            engine.launcherCommand ({ launcher::Command::Type::backToArrangement });
+            return true;
+        case C::computerKeyboard: return runAction ("view.typingPiano");
+        case C::browser: return runAction ("panel.browser");
+        case C::follow: return runAction ("playlist.follow");
+        case C::consolidate: return runAction ("tools.consolidateSelection");
+        case C::none: break;
+    }
+    return false;
 }
 
 bool MainComponent::isPlainKey (const keys::Chord& chord) noexcept
@@ -2244,6 +2283,7 @@ bool MainComponent::runAction (const std::string& id)
     else if (is ("file.save")) save (false);
     else if (is ("file.saveAs")) save (true);
     else if (is ("file.saveNewVersion")) saveNewVersion();
+    else if (id.rfind ("file.recent", 0) == 0) openRecent (std::atoi (id.c_str() + 11) - 1);
     else if (is ("file.export")) exportAudio();
     else if (is ("file.exportMaster")) showMasterDialog (engine, currentFile.getParentDirectory(), projectName);
     else if (is ("file.exportMp3")) exportAudio (1);
@@ -3647,6 +3687,7 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
     if (clipGridView != nullptr || clipLaunch)
     {
         playlistArea.setClipGrid (clipLaunch ? clipGridView.get() : nullptr, PlaylistArea::GridView::beside);
+        shownGridView = PlaylistArea::GridView::beside;
         // the detail view docks under the grid and the Playlist (round 183a); other workflows: nothing docked
         if (detailView != nullptr)
             detailView->setVisible (clipLaunch && DetailView::shownSetting);
@@ -3946,6 +3987,7 @@ void MainComponent::openGridClip (int track, int scene)
 
 void MainComponent::setClipGridView (PlaylistArea::GridView view)
 {
+    shownGridView = view;
     if (clipGridView != nullptr)
         playlistArea.setClipGrid (clipGridView.get(), view);
     if (auto* flip = dynamic_cast<ClipGridSwitch*> (clipGridSwitch.get()))
@@ -5336,6 +5378,51 @@ void MainComponent::showPatternMenu()
     makePatternMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&patternMenuButton));
 }
 
+// Round 190ih (PLAN R3), FL's transport while it runs, in the Pattern (FL) layout only (the Clip-launch and Simple
+// layouts keep theirs): Play shows a green Pause glyph while playing (DC-10 / DF-1, details190if
+// shots/fl-transport-stopped-vs-playing.png), and Record blinks while it records (DC-11: lit disc and dark disc
+// alternate, shots/fl-record-armed-playing-transport.png); armed and stopped it stays lit. With Settings › Animations
+// off the blink is a steady lit button (owner decision F6). On the existing 30 Hz timer; each change repaints only
+// its button.
+void MainComponent::updateTransportStates (bool playing)
+{
+    const auto fl = layoutStyle == layoutstyle::Style::pattern;
+    const auto pause = fl && playing;
+    if (pause != shownPause)
+    {
+        shownPause = pause;
+        playButton.setIcon (pause ? Icon::pause : Icon::play);
+        playButton.setIconColourWhenOn (pause ? theme::colour::ledOn : theme::colour::accentHover);
+        playButton.setOnColour (pause ? juce::Colours::black.withAlpha (0.22f) : theme::colour::accent.withAlpha (0.24f)); // (FL: a dark pressed fill)
+    }
+    const auto recording = engine.isRecording();
+    auto lit = recording;
+    if (fl && recording && engine.getTransport().playing.load() && ui::motion::enabled())
+        lit = recordLitForSnapshot ? *recordLitForSnapshot : (juce::Time::getMillisecondCounter() / 250u) % 2u == 0u; // 2 blinks a second
+    if (recording || recordBlinkDark)
+    {
+        recordBlinkDark = recording && ! lit;
+        recordButton.setToggleState (lit, juce::dontSendNotification);
+    }
+}
+
+// Round 190ih (PLAN R3, DC-9): FL's hint bar names each typing-keyboard / MIDI note as it is played and released
+// ("Note on: C4 / velocity: 100", "Note off: ...", details190if shots/fl-hint-noteon.png); Pattern layout only.
+void MainComponent::updateLiveNoteHint()
+{
+    const auto note = engine.lastLiveNote();
+    if (note == shownLiveNote)
+        return;
+    shownLiveNote = note;
+    if (note == 0 || layoutStyle != layoutstyle::Style::pattern)
+        return;
+    const auto key = juce::String (notenames::keyName (livenote::key (note)));
+    const auto velocity = juce::String (livenote::velocity (note));
+    ui::postHint ({ livenote::on (note) ? tr ("Note on: {0} / velocity: {1}", { key, velocity })
+                                                   : tr ("Note off: {0} / velocity: {1}", { key, velocity }), {}, false, false },
+                  2500);
+}
+
 void MainComponent::refreshModeButton()
 {
     const auto recording = engine.isRecording();
@@ -6191,6 +6278,7 @@ void MainComponent::timerCallback()
         if (engine.isModified())
             autosave();
     }
+    updateSaveReminder();
 
     if (const auto scan = engine.getPluginHost().backgroundScan(); scan.finished != scansSeen)
     {
@@ -6348,6 +6436,10 @@ void MainComponent::timerCallback()
 
     const auto playing = transport.playing.load() || engine.isLinkWaiting(); // (lit while the start waits for Link)
     playButton.setToggleState (playing, juce::dontSendNotification);
+    updateTransportStates (playing);
+    updateLiveNoteHint();
+    if (simpleWorkflow != nullptr && layoutStyle == layoutstyle::Style::simple) // round 190ih: the dock's input level
+        simpleWorkflow->tick();
 
     updateChordPanel();
 
@@ -9033,6 +9125,55 @@ void MainComponent::showLanguageChoice (const juce::String& id)
                                      restart();
                              }),
                              true);
+}
+
+bool MainComponent::isProjectFile (const juce::File& file)
+{
+    return file.hasFileExtension (juce::String (ProjectFile::extension) + ";dawproj;flp;als;flm;zip;" + sessionpack::extension);
+}
+
+bool MainComponent::isInterestedInFileDrag (const juce::StringArray& files)
+{
+    return files.size() == 1 && isProjectFile (juce::File (files[0])) && ! projectLoadRunning();
+}
+
+void MainComponent::filesDropped (const juce::StringArray& files, int, int)
+{
+    if (files.size() == 1 && isProjectFile (juce::File (files[0])))
+        openFileRequest (juce::File (files[0]));
+}
+
+// Round 190ih (PLAN R3, DF-51 / DF-37): with backups off, FL's "Never (just remind every 10 min)" puts a reminder in
+// the hint bar (FL manual, File settings › Backup) and its Save As button "flashes as a save reminder" (Toolbar
+// shortcut icons): after ten minutes of unsaved changes the bar says so and the toolbar's Save button blinks until the
+// project is saved (steady lit with Settings › Animations off). Nothing runs while backups are on or nothing changed.
+void MainComponent::updateSaveReminder()
+{
+    const auto due = autosaveMinutes == 0 && engine.isModified();
+    if (! due)
+    {
+        saveReminderTicks = 0;
+        if (saveButton.getToggleState())
+            saveButton.setToggleState (false, juce::dontSendNotification);
+        return;
+    }
+    if (++saveReminderTicks % (30 * 60 * 10) == 0) // every 10 minutes at the 30 Hz timer
+        ui::postNotice ({ tr ("Reminder: this project has unsaved changes (backups are off: Settings > General > Save a backup copy)"), {}, false, false }, 8000);
+    if (saveReminderTicks >= 30 * 60 * 10)
+    {
+        const auto lit = ! ui::motion::enabled() || (juce::Time::getMillisecondCounter() / 500u) % 2u == 0u;
+        saveButton.setToggleState (lit, juce::dontSendNotification);
+    }
+}
+
+// round 190ih: Alt+1 … Alt+0, FL's keys for the ten most recent projects (asks to save the current one first)
+void MainComponent::openRecent (int index)
+{
+    if (index < 0 || index >= juce::jmin (10, recent.getNumFiles()))
+        return;
+    const auto file = recent.getFile (index);
+    if (file.existsAsFile())
+        openFileRequest (file);
 }
 
 void MainComponent::rememberRecent (const juce::File& file)

@@ -1,5 +1,8 @@
 #pragma once
 
+#include <string>
+#include <vector>
+
 #include <functional>
 
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -144,4 +147,13 @@ juce::Image logoAt (int px);
 double processCpuSeconds();
 // The CPU time the calling thread has used so far, in seconds (user + kernel; --uiperf: the message thread's share).
 double threadCpuSeconds();
+// Round 190ih (--uiperf with LYNX_UIPERF_THREADS=1): every thread of this process with its name (Windows 10+: the
+// thread description, else empty) and the CPU seconds it has used so far; empty where the platform can't list them.
+struct ThreadCpu
+{
+    unsigned id = 0;
+    std::string name;
+    double seconds = 0.0;
+};
+std::vector<ThreadCpu> threadCpuList();
 } // namespace lynx

@@ -1,4 +1,5 @@
 #include "core/FlSettings.h"
+#include "ui/Motion.h"
 #include "core/RackLayout.h"
 #include "core/RackFilter.h"
 #include "ui/FlMods.h"
@@ -1056,8 +1057,17 @@ void ChannelRackComponent::paint (juce::Graphics& g)
             const auto pill = juce::Rectangle<float> ((float) selectLeft() + 3.0f, (float) y + 7.0f, (float) selectWidth - 6.0f, (float) rowHeight - 14.0f);
             theme::fillRoundRect (g, pill, 3.0f, selected ? (hovered (Area::select) ? accentHover : accent) : hovered (Area::select) ? textDisabled : ledOff);
             // FL flashes the channel's selector as its note plays (round 170a [SHOT]): the "sound lighting up when it hits"
-            if (! channel.muted && channelHitsNow (row))
-                theme::fillRoundRect (g, pill.expanded (1.0f, 0.0f), 3.0f, juce::Colours::white.withAlpha (selected ? 0.75f : 0.9f));
+            // round 190ih: and with every note the channel plays (typing keyboard, MIDI, Piano roll, off-grid notes), bright
+            // at note-on, dimmer while held, fading out after the release (FL capture, details190if); orange for a
+            // channel locked to a controller ("Receive notes from"; FL's manual: "Orange for locked Channels")
+            const auto lit = row < (int) activityLights.size() ? activityLights[(std::size_t) row].level : 0.0f;
+            const auto hit = ! channel.muted && channelHitsNow (row);
+            if (hit || (! channel.muted && lit > 0.0f))
+            {
+                const auto top = selected ? 0.75f : 0.9f;
+                const auto colour = ! channel.receiveFrom.empty() ? warning : juce::Colours::white;
+                theme::fillRoundRect (g, pill.expanded (1.0f, 0.0f), 3.0f, colour.withAlpha (juce::jmax (hit ? top : 0.0f, lit * top)));
+            }
         }
 
         paintLane (g);
@@ -1419,6 +1429,12 @@ void ChannelRackComponent::toggleMute (int channel)
 {
     if (channel >= 0 && channel < (int) engine.getSong().channels.size())
         engine.editSong ([channel] (Song& s) { s.channels[(std::size_t) channel].muted = ! s.channels[(std::size_t) channel].muted; });
+}
+
+void ChannelRackComponent::toggleSoloLock (int channel)
+{
+    if (channel >= 0 && channel < (int) engine.getSong().channels.size())
+        engine.editSong ([channel] (Song& s) { s.channels[(std::size_t) channel].soloLock = ! s.channels[(std::size_t) channel].soloLock; });
 }
 
 void ChannelRackComponent::solo (int row)
@@ -2039,6 +2055,8 @@ void ChannelRackComponent::mouseDown (const juce::MouseEvent& e)
         case Area::mute:
             if (flmods::popup (e.mods) || flmods::ctrl (e.mods))
                 solo (row);
+            else if (e.mods.isShiftDown()) // round 190ih (DE-11), FL's manual: "Lock state - (Shift+Click) a Mute icon"
+                toggleSoloLock (row);
             else
                 toggleMute (row);
             return;
@@ -2373,7 +2391,7 @@ ui::Hint ChannelRackComponent::hintAt (juce::Point<int> p)
     switch (area)
     {
         case Area::mute:
-            h.text = name + " - " + tr ("Click: mute.  Ctrl+click or right-click: solo");
+            h.text = name + " - " + tr ("Click: mute.  Ctrl+click or right-click: solo.  Shift+click: lock the mute state");
             break;
         case Area::name:
             h.text = name + " - " + tr ("[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [LMB] drag up/down reorders  [RMB] channel menu");
@@ -2527,10 +2545,7 @@ juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
         });
     });
     // FL's "Lock active/mute state" (the mute switch's menu, round 167l): soloing another channel leaves this one alone
-    menu.addItem (tr ("Lock active/mute state"), true, c.soloLock, [this, channel] {
-        if (channel < (int) engine.getSong().channels.size())
-            engine.editSong ([channel] (Song& s) { s.channels[(std::size_t) channel].soloLock = ! s.channels[(std::size_t) channel].soloLock; });
-    });
+    menu.addItem (tr ("Lock active/mute state") + "\t" + tr ("Shift+click"), true, c.soloLock, [this, channel] { toggleSoloLock (channel); });
     menu.addSeparator();
     menu.addItem (theme::mnemonic (tr ("Load sample..."), 'L'), c.instrument != InstrumentKind::audioClip, false, [this, channel] { chooseSample (channel); });
     {
@@ -3178,8 +3193,36 @@ void ChannelRackComponent::changeListenerCallback (juce::ChangeBroadcaster* sour
     repaint();
 }
 
+juce::Rectangle<int> ChannelRackComponent::selectorBounds (int row) const
+{
+    return { stickyX + selectLeft() + 2, rowY (row) + 6, selectWidth - 4, rowHeight - 12 };
+}
+
+// round 190ih (PLAN R4, DC-8 / DE-6): one step of every channel's activity light; only the selectors whose shade
+// changed repaint, so a rack where nothing sounds costs one counter read per channel and no paint
+void ChannelRackComponent::updateActivityLights()
+{
+    const auto& song = engine.getSong();
+    const auto count = (int) song.channels.size();
+    if ((int) activityLights.size() != count)
+        activityLights.resize ((std::size_t) count);
+    const auto fade = ui::motion::enabled();
+    for (int row = 0; row < count; ++row)
+    {
+        auto& light = activityLights[(std::size_t) row];
+        const auto before = activity::shade (light.level);
+        const auto keys = engine.soundingKeys (row);
+        activity::step (light, engine.noteStrikes (row), (keys[0] | keys[1]) != 0, fade);
+        if (activity::shade (light.level) != before && isShown (row))
+            repaint (selectorBounds (row));
+    }
+}
+
 void ChannelRackComponent::timerCallback()
 {
+    if (isShowing())
+        updateActivityLights();
+
     // the channels' volume / pan knobs follow their automation (issue #12): only the automated knobs repaint
     if (const auto& shown = engine.getAutomationDisplay(); shown.getGeneration() != shownAutomation)
     {

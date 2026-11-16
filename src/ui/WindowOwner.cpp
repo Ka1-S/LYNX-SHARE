@@ -25,6 +25,7 @@
 
 #if JUCE_WINDOWS
  #include <windows.h>
+ #include <tlhelp32.h>
 #endif
 #if JUCE_LINUX || JUCE_BSD || JUCE_MAC
  #include <dlfcn.h>
@@ -110,6 +111,47 @@ double threadCpuSeconds()
    #else
     return 0.0;
    #endif
+}
+
+std::vector<ThreadCpu> threadCpuList()
+{
+    std::vector<ThreadCpu> out;
+   #if JUCE_WINDOWS
+    using GetDescription = HRESULT (WINAPI*) (HANDLE, PWSTR*);
+    static const auto getDescription = (GetDescription) (void*) GetProcAddress (GetModuleHandleW (L"kernel32.dll"), "GetThreadDescription");
+    const auto snapshot = CreateToolhelp32Snapshot (TH32CS_SNAPTHREAD, 0);
+    if (snapshot == INVALID_HANDLE_VALUE)
+        return out;
+    THREADENTRY32 entry {};
+    entry.dwSize = sizeof (entry);
+    const auto self = GetCurrentProcessId();
+    for (auto ok = Thread32First (snapshot, &entry); ok; ok = Thread32Next (snapshot, &entry))
+    {
+        if (entry.th32OwnerProcessID != self)
+            continue;
+        const auto thread = OpenThread (THREAD_QUERY_LIMITED_INFORMATION, FALSE, entry.th32ThreadID);
+        if (thread == nullptr)
+            continue;
+        ThreadCpu t;
+        t.id = entry.th32ThreadID;
+        FILETIME created {}, exited {}, kernel {}, user {};
+        if (GetThreadTimes (thread, &created, &exited, &kernel, &user))
+            t.seconds = (double) ((((std::uint64_t) kernel.dwHighDateTime << 32) | kernel.dwLowDateTime) + (((std::uint64_t) user.dwHighDateTime << 32) | user.dwLowDateTime)) * 1e-7;
+        if (getDescription != nullptr)
+        {
+            PWSTR text = nullptr;
+            if (SUCCEEDED (getDescription (thread, &text)) && text != nullptr)
+            {
+                t.name = juce::String (text).toStdString();
+                LocalFree (text);
+            }
+        }
+        CloseHandle (thread);
+        out.push_back (std::move (t));
+    }
+    CloseHandle (snapshot);
+   #endif
+    return out;
 }
 
 juce::TextEditor* firstTextField (juce::Component& dialog)
