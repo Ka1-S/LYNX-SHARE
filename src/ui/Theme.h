@@ -225,6 +225,14 @@ inline const juce::Colour queuedOn { 0xff008a5c };   // a queued launch's blink,
 inline const juce::Colour queuedOff { 0xff002217 };  // and its dark phase
 inline const juce::Colour stateBox { 0xff181818 };   // the launch zone of a playing / queued / recording clip
 inline const juce::Colour arm { 0xffff5559 };
+inline const juce::Colour on { 0xffffad56 };         // Live's "on" orange: activators, power, Warp, Detail toggles
+inline const juce::Colour meterWell { 0xff181818 };  // the wells of the level meters
+inline const juce::Colour knobRing { 0xff111111 };   // a knob's open ring and its needle (#181818)
+inline const juce::Colour focusOutline { 0xff757575 }; // the focused view's 2 px outline
+// Round 190jn: whether the Clip-launch layout shows Live's look now (the Clip-launch layout without View › "Classic LYNX
+// look", round 190ig's switch). Every Live-look painter (grid, Session mixer, Arrangement, Clip / Device View, Info View,
+// status bar) asks this one switch, so the Pattern and Simple layouts never change.
+bool active() noexcept;
 } // namespace livelook
 
 // Live derives every shade of a clip from its colour by multiplying the RGB channels (round 190ia: name ×0.24, idle
