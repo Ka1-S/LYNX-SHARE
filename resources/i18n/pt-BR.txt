@@ -10862,3 +10862,4 @@ countries: br
 "Grid line intensity: the bar, beat and step lines of the Piano roll, Playlist and Channel rack (100 % = the theme's own; double-click resets)." = "Intensidade das linhas da grade: as linhas de compasso, tempo e passo do Piano roll, da Playlist e do Channel rack (100 % = as do tema; clique duplo restaura)."
 "Condensed labels (FL style)" = "Rótulos condensados (estilo FL)"
 "Menus, the menu bar, the Browser, Playlist track names and Mixer strip names in a condensed face, a step larger, as FL Studio draws them (Open Sans Condensed). Applied when LYNX SHARE restarts." = "Menus, a barra de menus, o Browser, os nomes das trilhas da Playlist e os nomes dos canais do Mixer em uma fonte condensada, um passo maior, como o FL Studio desenha (Open Sans Condensed). Aplicado quando o LYNX SHARE reiniciar."
+"Region not supported by this track" = "Região não suportada por esta faixa"

@@ -424,14 +424,18 @@ constexpr const char* lookId (Look l) noexcept { return l == Look::simple ? "sim
 // while it records) a look shows. R3 found them in FL 2026 only; BandLab's and Live's captures keep their own (Play
 // lit, Record lit), so the Simple capsule and the Live bar draw "lit" from the same buttons' states. R3's code asks here
 // instead of testing for the Pattern layout (its merge note in /mnt/e/lynx-work/toolbar190iv/HANDOFF.md).
+// Round 190jj (capture190ji §1d, shots/bl-d-transport-states.png): BandLab's capsule also turns Play into Pause while
+// it plays or counts in, and Back-to-start into Stop; its Record is steady (a red square in a dark-red disc while it
+// records), as Live's (§2). So Simple has the Pause and the Stop swap, and only FL blinks.
 struct TransportStates
 {
     bool pauseWhilePlaying = false;
     bool recordBlinks = false;
+    bool stopWhilePlaying = false; // the second button shows Back-to-start while stopped, Stop while it runs (BandLab)
 };
 constexpr TransportStates transportStates (Look l) noexcept
 {
-    return l == Look::fl ? TransportStates { true, true } : TransportStates {};
+    return l == Look::fl ? TransportStates { true, true, false } : l == Look::simple ? TransportStates { true, false, true } : TransportStates {};
 }
 
 // The Simple top bar (SG-1). The groups it shows when the user's layout shows them; the others are one click away in
@@ -451,7 +455,7 @@ inline constexpr int timeWidth = 112, tempoWidth = 92, signatureWidth = 56, keyW
 inline constexpr int statusWidth = 172, statusHeight = 24, finishWidth = 92, moreWidth = 32;
 inline constexpr int gap = 12; // between capsules
 // glyphs (SG-1): play 14 x 16, stop 12 x 12, record ⌀ 14 (as icon boxes on LYNX's 24-unit grid)
-inline constexpr float playBox = 25.0f, stopBox = 22.0f, recordBox = 24.0f;
+inline constexpr float playBox = 25.0f, stopBox = 22.0f, recordBox = 24.0f; // (round 190jj: Back-to-start in the stop box)
 
 enum class Part
 {

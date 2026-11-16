@@ -75,6 +75,7 @@ private:
     toolbarlayout::Look look = toolbarlayout::Look::fl;
     AudioEngine& engine;
     juce::String shown;
+    bool red = false;           // (round 190jj) the Simple capsule's recording / count-in time
     double linkProgress = -1.0; // (round 190gl) the Link session's progress bar while the transport waits / is stopped
     Mode mode = Mode::bars;
     int smpteRate = 5; // timecode::rates index (30 fps)
@@ -94,6 +95,16 @@ public:
 
     MasterKnob (AudioEngine& e, Kind k);
     void update(); // repaints when the song's value changed
+    // Round 190jj (capture190ji §1c, shots/bl-c-headers-and-master-meter.png): in the Simple top bar the master volume is
+    // BandLab's: a speaker, a slider whose rail is the master meter (two thin bars, left over right, green to yellow,
+    // falling in ~0.6 s with no peak hold, a short stub at rest) and the value in dB. Other looks keep the knob.
+    void setLook (toolbarlayout::Look l);
+    bool isSlider() const noexcept { return look == toolbarlayout::Look::simple && kind == Kind::volume; }
+    // one frame of the meter (the main window's 30 Hz timer, Simple only): repaints the rail when a bar moved a pixel
+    void tickMeter (double nowMs);
+    static constexpr int sliderWidth = 196; // speaker 20 + rail 112 + value 64
+    juce::Rectangle<float> sliderRail() const;
+    std::array<float, 2> meterForSnapshot (std::array<float, 2> levels) { meter = levels; repaint(); return meter; }
     void paint (juce::Graphics& g) override;
     void mouseEnter (const juce::MouseEvent&) override { repaint(); }
     void mouseExit (const juce::MouseEvent&) override { repaint(); }
@@ -113,6 +124,13 @@ private:
     Kind kind;
     ui::ValueDrag drag;
     double shown = -1.0;
+    toolbarlayout::Look look = toolbarlayout::Look::fl;
+    std::array<float, 2> meter {};        // the bars shown, as rail fractions (the fader law: 0 dBFS at the 0 dB mark)
+    std::array<int, 2> meterPixels { -1, -1 };
+    double meterMs = -1.0;
+    bool sliderDrag = false;
+    void paintSlider (juce::Graphics& g);
+    void setFromRail (float x);
 };
 
 // A small light that blinks while MIDI arrives from the enabled input devices (like FL's MIDI activity light).

@@ -26,12 +26,15 @@ std::unique_ptr<juce::Component> makeTouchKeyboardPanel (AudioEngine& engine);
 
 // Round 190ds: the same keyboard with its modes Keys | Scale keys | Chord pad (core/ScaleKeys.h), live, playing
 // `channel` (empty: the selected channel): the Simple dock's Keyboard tab
-std::unique_ptr<juce::Component> makeKeyboardPanel (AudioEngine& engine, std::function<int()> channel = {});
+// (round 190jj: `heldColour`, the track's colour a held key fills with, as BandLab's; empty: the accent)
+std::unique_ptr<juce::Component> makeKeyboardPanel (AudioEngine& engine, std::function<int()> channel = {}, std::function<juce::Colour()> heldColour = {});
 // --snapshot: a panel in `mode` with degree / pad `pressed` drawn held (-1: none), nothing played
 std::unique_ptr<juce::Component> makeKeyboardPanelForSnapshot (AudioEngine& engine, scalekeys::Mode mode, int pressed,
-                                                               std::function<int()> channel = {});
+                                                               std::function<int()> channel = {}, std::function<juce::Colour()> heldColour = {});
 // --snapshot: the Chord pad's right-click menu of pad `pad` (panel = one made above)
 juce::PopupMenu chordPadMenuForSnapshot (juce::Component& panel, int pad);
+// round 190jj: a panel made above (or the Simple dock's) with C, E, G and B♭ drawn held
+void keyboardPressForSnapshot (juce::Component& panel);
 // --snapshot: a panel shows the shared settings and the project key as they are now (its timer does it while live)
 void refreshKeyboardPanel (juce::Component& panel);
 // The typing key that plays a MIDI key now ("" none / typing keyboard off): the Keys mode labels its keys with it

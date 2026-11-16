@@ -142,6 +142,10 @@ public:
     void padsRegionForCheck (float start, float end);
     void padsNormalizeForCheck();
     void padsHitForCheck (int pad);
+    void padsPressForSnapshot (int pad, float amount); // round 190jj: a pad drawn pressed (0 = at rest, 1 = darkest)
+    void padsWatchForCheck();                           // round 190jj: one look at the song's notes (the 30 Hz tick)
+    float padsPressForCheck (int pad) const;            // ... and the press a pad shows now
+    juce::Component* keyboardForSnapshot() { return keyboardPage.get(); }
     void padsDragForCheck (int from, int to, bool copy);
     void padsUpdateForCheck();
     juce::PopupMenu padMenuForSnapshot (int pad);
@@ -194,6 +198,7 @@ private:
     bool playTabs = false;      // the track plays notes (Instrument / Sampler): Keyboard and Editor
     bool padsTab = false;       // round 190fo: a Sampler track's pads
     int track = -1, insert = -1, channel = -1;
+    juce::Colour trackColourNow() const; // round 190jj: the shown track's colour (its own, else its kind's), for held keys
     // round 190ih (DS-9): the record dock's input level
     bool inputMeterShown() const;
     juce::Rectangle<int> inputMeterArea() const, inputMeterBar() const;

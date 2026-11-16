@@ -260,6 +260,15 @@ juce::String TimeDisplay::text() const
     const auto& song = engine.getSong();
     const auto ticks = playheadTicks (engine);
 
+    // round 190jj (Simple, capture190ji §1d): BandLab shows its count-in only as negative time counting up to zero
+    // ("-00:01.7" … "-00:00.2"), in minutes : seconds : hundredths whatever the display's mode
+    if (look == toolbarlayout::Look::simple && engine.isCountingIn())
+    {
+        const auto left = juce::jmax (0.0, engine.getTransport().countIn.load()) * 60.0 / (juce::jmax (1.0, song.bpm) * ppq);
+        const auto whole = (int) left;
+        return juce::String::formatted ("-%d : %02d : %02d", whole / 60, whole % 60, juce::jmin (99, (int) ((left - whole) * 100.0)));
+    }
+
     if (mode == Mode::bars)
         return barBeatStep (song, ticks, song.meter());
 
@@ -272,9 +281,13 @@ juce::String TimeDisplay::text() const
 
 void TimeDisplay::update()
 {
-    if (const auto t = text(); t != shown)
+    // (round 190jj: the Simple capsule's time is red while a take records or counts in)
+    const auto nowRed = look == toolbarlayout::Look::simple && engine.isRecording()
+                        && (engine.getTransport().playing.load() || engine.isCountingIn());
+    if (const auto t = text(); t != shown || nowRed != red)
     {
         shown = t;
+        red = nowRed;
         repaint();
     }
     // (round 190gl) the reference DAW's position display with Link: a progress bar of the session through the quantum
@@ -326,7 +339,7 @@ void TimeDisplay::paintLook (juce::Graphics& g)
     for (int i = 0; i < 8 && juce::GlyphArrangement::getStringWidth (f, readout) > (float) area.getWidth() - 10.0f; ++i)
         f = f.withHeight (f.getHeight() * 0.92f);
     g.setFont (f);
-    g.setColour (colour::textPrimary);
+    g.setColour (red ? colour::record : colour::textPrimary);
     g.drawText (readout, area, juce::Justification::centred, false);
 }
 
@@ -495,9 +508,130 @@ void MasterKnob::update()
     }
 }
 
+void MasterKnob::setLook (toolbarlayout::Look l)
+{
+    if (l == look)
+        return;
+    look = l;
+    meter = {};
+    meterPixels = { -1, -1 };
+    meterMs = -1.0;
+    repaint();
+}
+
+juce::Rectangle<float> MasterKnob::sliderRail() const
+{
+    auto area = getLocalBounds().toFloat();
+    area.removeFromLeft (26.0f);  // the speaker
+    area.removeFromRight (66.0f); // the value
+    return area.withSizeKeepingCentre (area.getWidth(), 11.0f);
+}
+
+void MasterKnob::tickMeter (double nowMs)
+{
+    if (! isSlider() || ! isShowing())
+    {
+        meterMs = -1.0;
+        return;
+    }
+    // (BandLab: ~0.6 s from full to the rest stub, no peak hold; a peak rises at once)
+    const auto dt = meterMs < 0.0 ? 1.0 / 30.0 : juce::jlimit (0.0, 0.25, (nowMs - meterMs) / 1000.0);
+    meterMs = nowMs;
+    const auto rail = sliderRail();
+    auto& meters = engine.getMeters();
+    auto moved = false;
+    for (int ch = 0; ch < 2; ++ch)
+    {
+        const auto target = juce::jlimit (0.0f, 1.0f, faderPosition (meters.takeMasterBarPeak (ch)));
+        auto& m = meter[(std::size_t) ch];
+        m = target >= m ? target : juce::jmax (target, m - (float) (dt / 0.6));
+        const auto px = juce::roundToInt (m * rail.getWidth());
+        moved = moved || px != meterPixels[(std::size_t) ch];
+        meterPixels[(std::size_t) ch] = px;
+    }
+    if (moved)
+        repaint (rail.toNearestInt().expanded (1, 3)); // (the rail only; the thumb sits on it and is painted with it)
+}
+
+void MasterKnob::paintSlider (juce::Graphics& g)
+{
+    using namespace theme;
+    const auto area = getLocalBounds().toFloat();
+    const auto rail = sliderRail();
+    const auto ink = available() ? (isMouseOver() || drag.isActive() || sliderDrag ? colour::textPrimary : colour::textSecondary) : colour::textDisabled;
+
+    // the speaker (a LYNX vector: a box, a cone and two waves)
+    {
+        const auto s = juce::Rectangle<float> (area.getX() + 3.0f, area.getCentreY() - 8.0f, 16.0f, 16.0f);
+        juce::Path body;
+        body.startNewSubPath (s.getX() + 1.0f, s.getY() + 6.0f);
+        body.lineTo (s.getX() + 4.0f, s.getY() + 6.0f);
+        body.lineTo (s.getX() + 8.0f, s.getY() + 2.5f);
+        body.lineTo (s.getX() + 8.0f, s.getBottom() - 2.5f);
+        body.lineTo (s.getX() + 4.0f, s.getBottom() - 6.0f);
+        body.lineTo (s.getX() + 1.0f, s.getBottom() - 6.0f);
+        body.closeSubPath();
+        juce::Path waves;
+        waves.addCentredArc (s.getX() + 8.5f, s.getCentreY(), 3.5f, 3.5f, 0.0f, 0.75f, 2.39f, true);
+        waves.addCentredArc (s.getX() + 8.5f, s.getCentreY(), 6.5f, 6.5f, 0.0f, 0.75f, 2.39f, true);
+        g.setColour (ink);
+        g.strokePath (body, juce::PathStrokeType (1.3f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        g.strokePath (waves, juce::PathStrokeType (1.3f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    }
+
+    // the rail: two 4 px bars with a 3 px gap (BandLab's stereo master meter), the meter filled green to yellow along
+    // the rail (#4baa69 at the left, #a9c423 at the slider's thumb), a short green stub at rest
+    const auto value01 = (float) juce::jlimit (0.0, 1.0, value());
+    const auto cx = rail.getX() + value01 * rail.getWidth();
+    const juce::Colour railColour { 0xff2e3138 }, low { 0xff4baa69 }, high { 0xffa9c423 };
+    for (int ch = 0; ch < 2; ++ch)
+    {
+        const auto bar = juce::Rectangle<float> (rail.getX(), rail.getY() + (float) ch * 7.0f, rail.getWidth(), 4.0f);
+        g.setColour (railColour);
+        g.fillRoundedRectangle (bar, 2.0f);
+        const auto w = juce::jmax (5.0f, meter[(std::size_t) ch] * rail.getWidth());
+        juce::ColourGradient fill (low, rail.getX(), 0.0f, high, juce::jmax (rail.getX() + 8.0f, cx), 0.0f, false);
+        g.setGradientFill (fill);
+        g.fillRoundedRectangle (bar.withWidth (w), 2.0f);
+    }
+    // the thumb: a dark disc in a white ring on the value
+    const auto thumb = juce::Rectangle<float> (16.0f, 16.0f).withCentre ({ cx, rail.getCentreY() });
+    g.setColour (colour::bg2);
+    g.fillEllipse (thumb);
+    g.setColour (available() ? juce::Colours::white : colour::textDisabled);
+    g.drawEllipse (thumb.reduced (1.0f), 2.0f);
+
+    // the value ("+0.0 dB"), right of the rail
+    g.setColour (ink == colour::textDisabled ? ink : colour::textPrimary);
+    g.setFont (font (type::small, true));
+    const auto db = juce::Decibels::gainToDecibels (faderGain (value01), -100.0f);
+    juce::String text;
+    if (! available())
+        text = tr ("no mixer");
+    else if (db <= -99.0f)
+        text = "-inf dB";
+    else
+    {
+        const auto r = std::round (db * 10.0f) / 10.0f;
+        text = (r >= 0.0f ? "+" : "") + juce::String (r == 0.0f ? 0.0f : r, 1) + " dB";
+    }
+    g.drawText (text, area.withLeft (rail.getRight() + 10.0f), juce::Justification::centredLeft, false);
+}
+
+void MasterKnob::setFromRail (float x)
+{
+    const auto rail = sliderRail();
+    setValue ((double) juce::jlimit (0.0f, 1.0f, (x - rail.getX()) / juce::jmax (1.0f, rail.getWidth())));
+}
+
 void MasterKnob::paint (juce::Graphics& g)
 {
     using namespace theme;
+    if (isSlider())
+    {
+        paintSlider (g);
+        return;
+    }
     auto area = getLocalBounds().toFloat();
     const auto s = spec();
     const auto v = value();
@@ -548,12 +682,25 @@ void MasterKnob::mouseDown (const juce::MouseEvent& e)
         return;
     }
 
+    if (isSlider() && sliderRail().expanded (8.0f, 6.0f).contains (e.position)) // (round 190jj: BandLab's slider follows the mouse)
+    {
+        sliderDrag = true;
+        setFromRail (e.position.x);
+        repaint();
+        return;
+    }
+
     drag.begin (e, value());
     repaint();
 }
 
 void MasterKnob::mouseDrag (const juce::MouseEvent& e)
 {
+    if (sliderDrag)
+    {
+        setFromRail (e.position.x);
+        return;
+    }
     if (! drag.isActive())
         return;
 
@@ -567,6 +714,7 @@ void MasterKnob::mouseDrag (const juce::MouseEvent& e)
 
 void MasterKnob::mouseUp (const juce::MouseEvent&)
 {
+    sliderDrag = false;
     drag.end();
     repaint();
 }
@@ -2005,9 +2153,9 @@ void SignatureBox::paint (juce::Graphics& g)
         paintLiveText (g, t, getLocalBounds());
         return;
     }
-    paintCapsuleHover (g, getLocalBounds(), isMouseOver(), true); // (the tempo capsule's last segment)
+    paintCapsuleHover (g, getLocalBounds(), isMouseOver() && isEnabled(), true); // (the tempo capsule's last segment)
     g.setFont (theme::font (15.0f, true));
-    g.setColour (theme::colour::textPrimary);
+    g.setColour (isEnabled() ? theme::colour::textPrimary : theme::colour::textDisabled); // (round 190jj: greyed while recording)
     g.drawText (t, getLocalBounds(), juce::Justification::centred, false);
 }
 

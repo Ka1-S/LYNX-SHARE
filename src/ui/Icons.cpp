@@ -780,6 +780,14 @@ Shape make (Icon icon)
             st.addEllipse (3.5f, 8.0f, 8.0f, 8.0f);
             fi.addEllipse (13.0f, 8.0f, 8.0f, 8.0f);
             break;
+        case Icon::toStart: // a bar, then a triangle pointing at it (LYNX vector; reads like BandLab's ⏮)
+        {
+            fi.addRoundedRectangle (5.5f, 5.0f, 3.0f, 14.0f, 1.0f);
+            juce::Path tri;
+            tri.addTriangle (19.0f, 5.0f, 19.0f, 19.0f, 8.5f, 12.0f);
+            fi.addPath (tri.createPathWithRoundedCorners (1.5f));
+            break;
+        }
     }
 
     return s;
@@ -965,11 +973,10 @@ void IconButton::paintLook (juce::Graphics& g, bool highlighted, bool down)
     {
         // the capsule (drawn behind) is bg4; a segment shows hover and press only (SG-1: hover bg5, pressed bg6;
         // recording: the Record segment filled accentMuted)
+        // (round 190jj, capture190ji: BandLab fills no segment while it records; its Record glyph changes instead)
         juce::Colour bg;
         if (down)
             bg = colour::bg6;
-        else if (on && icon == Icon::record)
-            bg = colour::accentMuted;
         else if (h > 0.0f)
             bg = colour::bg5.withAlpha (h);
         if (! bg.isTransparent())
@@ -981,7 +988,21 @@ void IconButton::paintLook (juce::Graphics& g, bool highlighted, bool down)
             g.setColour (bg);
             g.fillPath (p);
         }
-        fg = icon == Icon::record ? colour::record : (on ? colour::accent : colour::textPrimary);
+        // round 190jj (capture190ji §1d): Play / Pause and Stop stay white while they run (BandLab), Record is red; while it
+        // records, Record is a red rounded square in a dark-red disc, steady (no blink: BandLab and Live; FL's blink is the
+        // FL look's only). BandLab's disc is as wide as its idle dot (18 px) and the square 8 px of it (measured at 100 %).
+        fg = icon == Icon::record ? colour::record : colour::textPrimary;
+        if (icon == Icon::record && on && enabled && text.isEmpty())
+        {
+            const auto box = lookIconBox > 0.0f ? lookIconBox : juce::jmin (area.getHeight() * iconFraction, iconMax);
+            const auto d = std::round (box * 14.0f / 24.0f); // (as wide as the idle dot: 14 / 24 of the icon box)
+            const auto disc = area.withSizeKeepingCentre (d, d);
+            g.setColour (colour::bg4.overlaidWith (colour::record.withAlpha (0.24f)));
+            g.fillEllipse (disc);
+            g.setColour (down ? colour::record.darker (0.3f) : colour::record);
+            g.fillRoundedRectangle (disc.withSizeKeepingCentre (disc.getWidth() * 0.44f, disc.getWidth() * 0.44f), disc.getWidth() * 0.06f);
+            return;
+        }
     }
     else if (look == Look::liveBox)
     {
@@ -1000,7 +1021,9 @@ void IconButton::paintLook (juce::Graphics& g, bool highlighted, bool down)
     else // liveGlyph: the bare transport glyphs on the band
     {
         const juce::Colour glyph { 0xffb5b5b5 };
-        fg = on ? (icon == Icon::record ? colour::record : juce::Colour (0xff00d38d)) // (Live's playing green, CL token table)
+        // (Live 12.4, capture190ji: playing = the Play glyph #00d38d, recording = the Record glyph #ff5559, both steady
+        // with no plate; Stop stays #b5b5b5)
+        fg = on ? (icon == Icon::record ? juce::Colour (0xffff5559) : juce::Colour (0xff00d38d)) // (Live's playing green, CL token table)
                 : glyph.interpolatedWith (juce::Colours::white, h * 0.35f);
         if (down)
             fg = fg.darker (0.3f);

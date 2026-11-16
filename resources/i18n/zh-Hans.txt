@@ -10732,3 +10732,4 @@ countries: cn sg
 "Grid line intensity: the bar, beat and step lines of the Piano roll, Playlist and Channel rack (100 % = the theme's own; double-click resets)." = "网格线强度：钢琴卷帘、播放列表和通道机架中的小节线、拍线和步进线（100 % = 主题自带；双击复原）。"
 "Condensed labels (FL style)" = "窄体标签（FL 风格）"
 "Menus, the menu bar, the Browser, Playlist track names and Mixer strip names in a condensed face, a step larger, as FL Studio draws them (Open Sans Condensed). Applied when LYNX SHARE restarts." = "菜单、菜单栏、浏览器、播放列表轨道名和混音器通道名使用窄体字，大一号，与 FL Studio 一致（Open Sans Condensed）。重新启动 LYNX SHARE 后生效。"
+"Region not supported by this track" = "此轨道不支持该区域"

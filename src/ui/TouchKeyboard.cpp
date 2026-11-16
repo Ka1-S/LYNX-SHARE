@@ -144,6 +144,10 @@ public:
     // about 11:1; they were #8a8f99 on the white key, 2.34:1) and darker note names (#4a4e57, 6:1). FL's Touch keyboard
     // window keeps its look.
     bool keycaps = false;
+    // round 190jj (capture190ji §1b, shots/bl-b-keys-held-vs-playback.png): BandLab fills a held key with the track's
+    // colour and turns its label white; the song's playback lights no key (only held keys: here, the computer keys or a
+    // MIDI keyboard). Empty: FL's Touch keyboard look (the accent, by velocity).
+    std::function<juce::Colour()> heldColour;
     touchkb::Layout layout;
     std::map<int, float>& shown;               // key → velocity, for drawing (also the snapshot's pressed keys)
 
@@ -198,6 +202,7 @@ public:
         const auto top = layout.lowest, last = layout.highest();
         // the keys held here, and those held elsewhere: the computer keys or a MIDI keyboard (round 190t)
         auto pressed = shown;
+        const auto trackColour = heldColour ? heldColour() : juce::Colour();
         for (int key = 0; key < 128; ++key)
             if ((elsewhere[(std::size_t) (key >> 6)] >> (key & 63) & 1u) != 0)
                 pressed.emplace (key, 0.8f);
@@ -215,13 +220,15 @@ public:
                 if (! black)
                 {
                     box = box.reduced (1.0f, 0.0f).withTrimmedBottom (1.0f);
-                    auto fill = held != pressed.end() ? theme::colour::keyWhite.interpolatedWith (theme::colour::accent, 0.35f + 0.5f * held->second)
-                                                      : theme::colour::keyWhite;
+                    auto fill = held == pressed.end()             ? theme::colour::keyWhite
+                                : ! trackColour.isTransparent() ? trackColour
+                                                                : theme::colour::keyWhite.interpolatedWith (theme::colour::accent, 0.35f + 0.5f * held->second);
                     g.setColour (off ? fill.withMultipliedBrightness (0.45f) : fill);
                     g.fillRoundedRectangle (box, 3.0f);
                     if (labels && (key % 12 == 0 || held != pressed.end()))
                     {
-                        g.setColour (held != pressed.end() ? theme::colour::onAccent : juce::Colour (keycaps ? 0xff4a4e57 : 0xff6b707a));
+                        g.setColour (held != pressed.end() ? (trackColour.isTransparent() ? theme::colour::onAccent : juce::Colours::white)
+                                                           : juce::Colour (keycaps ? 0xff4a4e57 : 0xff6b707a));
                         g.setFont (theme::font (theme::type::caption, key % 12 == 0));
                         g.drawText (keyName (key), box.withTrimmedBottom (6.0f).toNearestInt(), juce::Justification::centredBottom);
                     }
@@ -249,7 +256,7 @@ public:
                 }
                 else
                 {
-                    g.setColour (held != pressed.end() ? theme::colour::accent.withMultipliedBrightness (0.6f + 0.4f * held->second)
+                    g.setColour (held != pressed.end() ? (trackColour.isTransparent() ? theme::colour::accent.withMultipliedBrightness (0.6f + 0.4f * held->second) : trackColour)
                                                        : off ? theme::colour::bg4 : theme::colour::keyBlack); // (locked out: a flat grey)
                     g.fillRoundedRectangle (box.withTrimmedTop (-3.0f), 3.0f);
                     g.setColour (juce::Colours::white.withAlpha (off ? 0.02f : 0.07f));
@@ -1119,6 +1126,7 @@ private:
 
 public:
     // round 190jc: the Simple dock's look (keycap letters, the octave capsule); FL's Touch keyboard window keeps its own
+    void setHeldColour (std::function<juce::Colour()> colour) { keys.heldColour = std::move (colour); } // (round 190jj)
     void setSimpleLook (bool on)
     {
         simpleLook = keys.keycaps = octaveDown.capsule = octaveUp.capsule = on;
@@ -1163,19 +1171,29 @@ std::unique_ptr<juce::Component> makeTouchKeyboardPanel (AudioEngine& engine)
     return panel;
 }
 
-std::unique_ptr<juce::Component> makeKeyboardPanel (AudioEngine& engine, std::function<int()> channel)
+std::unique_ptr<juce::Component> makeKeyboardPanel (AudioEngine& engine, std::function<int()> channel, std::function<juce::Colour()> heldColour)
 {
     auto panel = std::make_unique<TouchKeyboardPanel> (engine, true, std::move (channel));
     panel->setSimpleLook (true); // (the Simple dock's Keyboard tab)
+    panel->setHeldColour (std::move (heldColour));
     return panel;
 }
 
-std::unique_ptr<juce::Component> makeKeyboardPanelForSnapshot (AudioEngine& engine, scalekeys::Mode mode, int pressed, std::function<int()> channel)
+std::unique_ptr<juce::Component> makeKeyboardPanelForSnapshot (AudioEngine& engine, scalekeys::Mode mode, int pressed, std::function<int()> channel,
+                                                               std::function<juce::Colour()> heldColour)
 {
     auto panel = std::make_unique<TouchKeyboardPanel> (engine, false, std::move (channel));
     panel->setSimpleLook (true); // (the Simple dock's Keyboard tab)
+    panel->setHeldColour (std::move (heldColour));
     panel->showModeForSnapshot (mode, pressed);
     return panel;
+}
+
+void keyboardPressForSnapshot (juce::Component& panel)
+{
+    if (auto* p = dynamic_cast<TouchKeyboardPanel*> (&panel))
+        p->showPressedForSnapshot();
+    panel.repaint();
 }
 
 juce::PopupMenu chordPadMenuForSnapshot (juce::Component& panel, int pad)

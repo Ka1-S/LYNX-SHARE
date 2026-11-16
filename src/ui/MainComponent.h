@@ -127,6 +127,11 @@ public:
     juce::PopupMenu makeToolbarMoreMenuForSnapshot() { return makeToolbarMoreMenu(); }
     void setSaveStatusForSnapshot (toolbarlayout::SaveState state);
     juce::Component* toolbarPartForSnapshot (const juce::String& name);
+    // round 190jj: one timer tick of the transport's shown states (Play / Pause, Stop, Record, the time, the Simple
+    // capsule's lock, the master meter), for shots and tests with an offline engine
+    void transportTickForSnapshot();
+    double simpleRecordStartForCheck() const noexcept { return simpleRecordStart; }
+    void stopForCheck() { stopAndRewind(); }
     void setSessionButtonRowShown (bool shown);
     // Round 190ef: the reference's MIDI Map Mode / Key Map Mode (ui/MapMode.h; Ctrl+M / Ctrl+K and the MIDI / Key
     // switches), in the Clip-launch layout only (elsewhere it stays off).
@@ -511,7 +516,13 @@ private:
     double backupMidiMs = -1.0e9;
     bool lastModified = false;
     void updateTransportStates (bool playing); // round 190ih: Play → Pause, Record blink (Pattern layout)
+    void updateSimpleTransport (bool playing, bool recording, bool countingIn); // round 190jj: BandLab's capsule states
     bool shownPause = false, recordBlinkDark = false;
+    // round 190jj (Simple, BandLab's capsule): the second button shows Stop while the song runs, the tempo capsule greys
+    // out while it records or counts in, and Stop goes back to where the recording started (-1: no recording since the
+    // last Stop)
+    bool shownStopGlyph = true, shownRecordLock = false, shownRecordingRuns = false;
+    double simpleRecordStart = -1.0;
     std::optional<bool> recordLitForSnapshot;
     void updateLiveNoteHint(); // round 190ih: "Note on: C4 / velocity: 100"
     void openRecent (int index); // round 190ih: Alt+1 … Alt+0

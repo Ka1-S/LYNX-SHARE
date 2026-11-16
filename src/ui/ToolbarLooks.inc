@@ -160,6 +160,8 @@ void MainComponent::applyToolbarLook()
     tempoDisplay.repaint();
     timeDisplay.setLook (look);
     keyPanel.setLook (look);
+    masterVolume.setLook (look); // (round 190jj: BandLab's slider with the master meter in Simple)
+    masterPitch.setLook (look);
     perfMeter.setLook (look);
     linkToggle.setLook (look);
     signatureBox.setLook (look);
@@ -235,7 +237,8 @@ void MainComponent::layoutSimpleToolbar (juce::Rectangle<int> bar, int menuWidth
     widths[(std::size_t) P::transport] = 3 * sb::segment + sb::timeWidth;
     widths[(std::size_t) P::tempo] = sb::segment + sb::tempoWidth + sb::signatureWidth;
     widths[(std::size_t) P::key] = toolbarLayout.isShown (Group::key) ? sb::keyWidth : 0;
-    widths[(std::size_t) P::master] = toolbarLayout.isShown (Group::master) ? 2 * (h + 26) + 4 : 0;
+    // (round 190jj: BandLab's master volume slider with its meter, then LYNX's master pitch knob)
+    widths[(std::size_t) P::master] = toolbarLayout.isShown (Group::master) ? toolbar::MasterKnob::sliderWidth + 8 + h + 26 : 0;
     widths[(std::size_t) P::file] = toolbarLayout.isShown (Group::file) ? 3 * h + 4 : 0;
     widths[(std::size_t) P::link] = toolbarLayout.isShown (Group::link) ? toolbar::LinkToggle::idealWidth (h) : 0;
     widths[(std::size_t) P::more] = sb::moreWidth;
@@ -304,8 +307,8 @@ void MainComponent::layoutSimpleToolbar (juce::Rectangle<int> bar, int menuWidth
             case P::master:
             {
                 const auto both = r.withY (row1).withHeight (2 * h + 2);
-                put (masterVolume, both.withWidth (both.getWidth() / 2 - 2));
-                put (masterPitch, both.withTrimmedLeft (both.getWidth() / 2 + 2));
+                put (masterVolume, capsuleRow (r.getX(), toolbar::MasterKnob::sliderWidth));
+                put (masterPitch, both.withTrimmedLeft (toolbar::MasterKnob::sliderWidth + 8));
                 break;
             }
             case P::file:
@@ -523,6 +526,9 @@ void MainComponent::updateLookFields()
     signatureBox.update();
     if (toolbarLook == Look::simple)
     {
+        // round 190jj: BandLab's master meter behind the master volume (its rail repaints only when a bar moved a pixel)
+        if (masterVolume.isVisible())
+            masterVolume.tickMeter (juce::Time::getMillisecondCounterHiRes());
         if (++saveStatusTicks >= 60) // every 2 s at the 30 Hz timer (the minutes in "Backed up 2 min ago")
         {
             saveStatusTicks = 0;
@@ -580,7 +586,7 @@ juce::Component* MainComponent::toolbarPartForSnapshot (const juce::String& name
         { "overdub", &blendButton }, { "capture", &captureButton }, { "sessionRecord", &sessionRecordButton }, { "punch", &punchButton },
         { "draw", &drawModeButton }, { "computerKeys", &typingPianoButton }, { "keyMap", &keyMapButton }, { "midiMap", &midiMapButton },
         { "cpu", &perfMeter }, { "more", &moreButton }, { "sessionView", &sessionViewButton }, { "arrangementView", &arrangementViewButton },
-        { "status", &saveStatus }
+        { "status", &saveStatus }, { "masterVolume", &masterVolume }, { "masterPitch", &masterPitch }
     };
     if (name == "finish")
         return simpleWorkflow != nullptr ? simpleWorkflow->finishComponent() : nullptr;
@@ -588,6 +594,17 @@ juce::Component* MainComponent::toolbarPartForSnapshot (const juce::String& name
         if (name == id)
             return c;
     return nullptr;
+}
+
+void MainComponent::transportTickForSnapshot()
+{
+    const auto playing = engine.getTransport().playing.load() || engine.isLinkWaiting();
+    playButton.setToggleState (playing, juce::dontSendNotification);
+    refreshModeButton();
+    updateTransportStates (playing);
+    timeDisplay.update();
+    if (toolbarLook != Look::fl)
+        updateLookFields();
 }
 
 void MainComponent::setSessionButtonRowShown (bool shown)
