@@ -68,8 +68,13 @@ public:
         intro.setMinimumHorizontalScale (1.0f);
         for (auto* c : std::initializer_list<juce::Component*> { &title, &intro, &languageLabel, &languageBox, &audioLabel, &devices, &flLabel,
                                                                  &flStatus, &foldersLabel, &folders, &addFolder, &removeFolder, &resetFolders,
-                                                                 &scanNow, &progressBar, &scanStatus, &scanAtStart, &workflowLabel })
+                                                                 &scanNow, &progressBar, &scanStatus, &scanAtStart, &workflowLabel, &workflowIntro })
             body.addAndMakeVisible (c);
+        // round 190hw: one line on what the three styles are for, above the choices
+        workflowIntro.setText (tr ("Three workflows in one program. Switch any time in View › Layout style: the project stays the same, only the windows change."), juce::dontSendNotification);
+        workflowIntro.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+        workflowIntro.setJustificationType (juce::Justification::topLeft);
+        workflowIntro.setMinimumHorizontalScale (1.0f);
         // round 184a S17: the three layout styles, the current one (Pattern workflow on a first start) selected
         for (int i = 0; i < layoutstyle::count; ++i)
         {
@@ -79,7 +84,7 @@ public:
             choice.setToggleState (i == initialStyle, juce::dontSendNotification);
             body.addAndMakeVisible (choice);
             auto& note = styleNotes[(std::size_t) i];
-            // the Settings page's explanation starts with the style's name ("Simple workflow: one window..."); here the
+            // the Settings page's explanation starts with the style's name ("Simple workflow: BandLab's..."); here the
             // name is the button just above it, so the line keeps only what follows the colon
             auto text = note.getText();
             for (const auto* colon : { ":", "\xef\xbc\x9a" }) // (an ASCII or a full-width colon, as the translations use)
@@ -279,6 +284,8 @@ private:
         r.removeFromTop (10);
 
         workflowLabel.setBounds (r.removeFromTop (24));
+        workflowIntro.setBounds (r.removeFromTop (textHeight (workflowIntro, w, 18)));
+        r.removeFromTop (4);
         for (int i = 0; i < layoutstyle::count; ++i)
         {
             styleChoices[(std::size_t) i].setBounds (r.removeFromTop (22));
@@ -433,15 +440,15 @@ private:
     juce::Component body; // the scrolling content
     juce::Viewport viewport;
     bool layingOut = false;
-    juce::Label title, intro, flStatus, scanStatus;
+    juce::Label title, intro, flStatus, scanStatus, workflowIntro;
     SectionLabel workflowLabel { tr ("Workflow") };
     std::array<juce::ToggleButton, layoutstyle::count> styleChoices { juce::ToggleButton (tr ("Pattern workflow (default)")),
                                                                       juce::ToggleButton (tr ("Clip-launch workflow")),
                                                                       juce::ToggleButton (tr ("Simple workflow")) };
     std::array<juce::Label, layoutstyle::count> styleNotes {
-        juce::Label ({}, tr ("Pattern workflow: channel rack, patterns and a Playlist.")),
-        juce::Label ({}, tr ("Clip-launch workflow: a clip grid with scenes beside the Playlist; patterns and the channel rack stay one click away.")),
-        juce::Label ({}, tr ("Simple workflow: one window with the tracks and the timeline; the other windows stay one click away."))
+        juce::Label ({}, tr ("Pattern workflow: works the way FL Studio does, with the Channel Rack, Piano Roll, Playlist and Mixer.")),
+        juce::Label ({}, tr ("Clip-launch workflow: clips and scenes launched from a grid, in the style of Ableton Live, with a Session mixer and the clip and device views; patterns and the Channel Rack stay one click away.")),
+        juce::Label ({}, tr ("Simple workflow: BandLab's approachable one-window style mixed with FL Studio Mobile's way of working, with tracks and a timeline, loops, pads and quick recording; FL Studio Mobile projects (.flm) open too."))
     };
     SectionLabel languageLabel { tr ("Language") }, audioLabel { tr ("Audio output") }, flLabel { "FL Studio" },
         foldersLabel { tr ("Plugin folders ({0})", { platform::pluginFormatNames() }) };

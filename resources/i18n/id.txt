@@ -7774,8 +7774,9 @@ countries: id
 "Layout style" = "Gaya tata letak"
 "Pattern workflow (default)" = "Alur kerja pattern (bawaan)"
 "Clip-launch workflow" = "Alur kerja peluncuran klip"
-"Pattern workflow: channel rack, patterns and a Playlist." = "Alur kerja pattern: Channel Rack, pattern, dan Playlist."
-"Clip-launch workflow: a clip grid with scenes beside the Playlist; patterns and the channel rack stay one click away." = "Alur kerja peluncuran klip: kisi klip dengan adegan di samping Playlist; pattern dan Channel Rack tetap sejauh satu klik."
+"Three workflows in one program. Switch any time in View › Layout style: the project stays the same, only the windows change." = "Tiga alur kerja dalam satu program. Ganti kapan saja di Tampilan › Gaya tata letak: proyeknya tetap sama, hanya jendelanya yang berubah."
+"Pattern workflow: works the way FL Studio does, with the Channel Rack, Piano Roll, Playlist and Mixer." = "Alur kerja pattern: bekerja seperti FL Studio, dengan Channel Rack, Piano Roll, Playlist, dan Mixer."
+"Clip-launch workflow: clips and scenes launched from a grid, in the style of Ableton Live, with a Session mixer and the clip and device views; patterns and the Channel Rack stay one click away." = "Alur kerja peluncuran klip: klip dan adegan yang diluncurkan dari kisi, bergaya Ableton Live, dengan mixer sesi serta tampilan klip dan perangkat; pattern dan Channel Rack tetap sejauh satu klik."
 "Toggle" = "Alih"
 "Launch mode" = "Mode peluncuran"
 "Follow action" = "Aksi lanjutan"
@@ -7990,7 +7991,7 @@ countries: id
 
 # --- Simple workflow layout style (round 184a)
 "Simple workflow" = "Alur kerja sederhana"
-"Simple workflow: one window with the tracks and the timeline; the other windows stay one click away." = "Alur kerja sederhana: satu jendela berisi trek dan linimasa; jendela lain tetap sekali klik."
+"Simple workflow: BandLab's approachable one-window style mixed with FL Studio Mobile's way of working, with tracks and a timeline, loops, pads and quick recording; FL Studio Mobile projects (.flm) open too." = "Alur kerja sederhana: gaya satu jendela BandLab yang mudah dipadukan dengan cara kerja FL Studio Mobile, dengan trek dan linimasa, loop, pad, dan perekaman cepat; proyek FL Studio Mobile (.flm) juga bisa dibuka."
 
 # --- Simple workflow: New track chooser (round 184a)
 "@instrument: Bass" = "Bass"
@@ -9620,7 +9621,7 @@ countries: id
 "Start empty" = "Mulai kosong"
 "Go straight to the tracks." = "Langsung ke trek."
 "Welcome to LYNX" = "Selamat datang di LYNX"
-"What would you like to do?" = "Apa yang ingin kamu lakukan?"
+"The Simple workflow: tracks and a timeline, loops, pads and quick recording, all in one window. What would you like to do?" = "Alur kerja sederhana: trek dan linimasa, loop, pad, dan perekaman cepat, semuanya dalam satu jendela. Apa yang ingin kamu lakukan?"
 "You can open this screen again from Help." = "Kamu bisa membuka layar ini lagi dari Bantuan."
 "First-song tour" = "Tur lagu pertama"
 "The tour builds a song from the start. Start it in a new project?" = "Tur menyusun lagu dari awal. Mulai di proyek baru?"

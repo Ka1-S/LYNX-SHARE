@@ -7774,8 +7774,9 @@ countries: kr
 "Layout style" = "레이아웃 스타일"
 "Pattern workflow (default)" = "패턴 워크플로 (기본)"
 "Clip-launch workflow" = "클립 실행 워크플로"
-"Pattern workflow: channel rack, patterns and a Playlist." = "패턴 워크플로: 채널 랙, 패턴, 플레이리스트."
-"Clip-launch workflow: a clip grid with scenes beside the Playlist; patterns and the channel rack stay one click away." = "클립 실행 워크플로: 플레이리스트 옆에 씬이 있는 클립 그리드. 패턴과 채널 랙은 클릭 한 번으로 열 수 있습니다."
+"Three workflows in one program. Switch any time in View › Layout style: the project stays the same, only the windows change." = "한 프로그램에 세 가지 워크플로. 보기 › 레이아웃 스타일에서 언제든지 바꿀 수 있으며, 프로젝트는 그대로이고 창만 바뀝니다."
+"Pattern workflow: works the way FL Studio does, with the Channel Rack, Piano Roll, Playlist and Mixer." = "패턴 워크플로: FL Studio처럼 채널 랙, 피아노 롤, 플레이리스트, 믹서로 작업합니다."
+"Clip-launch workflow: clips and scenes launched from a grid, in the style of Ableton Live, with a Session mixer and the clip and device views; patterns and the Channel Rack stay one click away." = "클립 실행 워크플로: Ableton Live 스타일로 그리드에서 클립과 씬을 실행하며, 세션 믹서와 클립·장치 보기가 있습니다. 패턴과 채널 랙은 클릭 한 번으로 열 수 있습니다."
 "Toggle" = "토글"
 "Launch mode" = "실행 모드"
 "Follow action" = "팔로우 액션"
@@ -7990,7 +7991,7 @@ countries: kr
 
 # --- Simple workflow layout style (round 184a)
 "Simple workflow" = "간단한 워크플로"
-"Simple workflow: one window with the tracks and the timeline; the other windows stay one click away." = "간단한 워크플로: 트랙과 타임라인을 한 창에 표시하며, 다른 창은 한 번의 클릭으로 열 수 있습니다."
+"Simple workflow: BandLab's approachable one-window style mixed with FL Studio Mobile's way of working, with tracks and a timeline, loops, pads and quick recording; FL Studio Mobile projects (.flm) open too." = "간단한 워크플로: BandLab의 쉬운 단일 창 스타일과 FL Studio Mobile의 작업 방식을 섞었습니다. 트랙과 타임라인, 루프, 패드, 빠른 녹음이 있고 FL Studio Mobile 프로젝트(.flm)도 열립니다."
 
 # --- Simple workflow: New track chooser (round 184a)
 "@instrument: Bass" = "베이스"
@@ -9620,7 +9621,7 @@ countries: kr
 "Start empty" = "빈 프로젝트로 시작"
 "Go straight to the tracks." = "바로 트랙으로 이동합니다."
 "Welcome to LYNX" = "LYNX에 오신 것을 환영합니다"
-"What would you like to do?" = "무엇을 하고 싶으세요?"
+"The Simple workflow: tracks and a timeline, loops, pads and quick recording, all in one window. What would you like to do?" = "간단한 워크플로: 트랙과 타임라인, 루프, 패드, 빠른 녹음을 한 창에서. 무엇을 하고 싶으세요?"
 "You can open this screen again from Help." = "이 화면은 도움말에서 다시 열 수 있어요."
 "First-song tour" = "첫 곡 투어"
 "The tour builds a song from the start. Start it in a new project?" = "투어는 곡을 처음부터 만들어요. 새 프로젝트에서 시작할까요?"

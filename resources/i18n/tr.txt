@@ -7774,8 +7774,9 @@ countries: tr
 "Layout style" = "Yerleşim stili"
 "Pattern workflow (default)" = "Pattern iş akışı (varsayılan)"
 "Clip-launch workflow" = "Klip başlatma iş akışı"
-"Pattern workflow: channel rack, patterns and a Playlist." = "Pattern iş akışı: Channel Rack, pattern'ler ve bir Playlist."
-"Clip-launch workflow: a clip grid with scenes beside the Playlist; patterns and the channel rack stay one click away." = "Klip başlatma iş akışı: Playlist'in yanında sahneli bir klip ızgarası; pattern'ler ve Channel Rack bir tık uzakta."
+"Three workflows in one program. Switch any time in View › Layout style: the project stays the same, only the windows change." = "Tek programda üç iş akışı. İstediğin zaman Görünüm › Yerleşim stili menüsünden değiştir: proje aynı kalır, yalnızca pencereler değişir."
+"Pattern workflow: works the way FL Studio does, with the Channel Rack, Piano Roll, Playlist and Mixer." = "Pattern iş akışı: Channel Rack, Piano Roll, Playlist ve Mixer ile FL Studio gibi çalışır."
+"Clip-launch workflow: clips and scenes launched from a grid, in the style of Ableton Live, with a Session mixer and the clip and device views; patterns and the Channel Rack stay one click away." = "Klip başlatma iş akışı: Ableton Live tarzında bir ızgaradan başlatılan klipler ve sahneler, oturum mikseri ve klip ile cihaz görünümleri; pattern'ler ve Channel Rack bir tık uzakta."
 "Toggle" = "Aç/kapa"
 "Launch mode" = "Başlatma modu"
 "Follow action" = "Takip eylemi"
@@ -7990,7 +7991,7 @@ countries: tr
 
 # --- Simple workflow layout style (round 184a)
 "Simple workflow" = "Basit iş akışı"
-"Simple workflow: one window with the tracks and the timeline; the other windows stay one click away." = "Basit iş akışı: parçalar ve zaman çizelgesi tek pencerede; diğer pencereler bir tık uzakta."
+"Simple workflow: BandLab's approachable one-window style mixed with FL Studio Mobile's way of working, with tracks and a timeline, loops, pads and quick recording; FL Studio Mobile projects (.flm) open too." = "Basit iş akışı: BandLab'in kolay tek pencereli tarzıyla FL Studio Mobile'ın çalışma biçiminin karışımı; parçalar ve zaman çizelgesi, loop'lar, pad'ler ve hızlı kayıt; FL Studio Mobile projeleri (.flm) de açılır."
 
 # --- Simple workflow: New track chooser (round 184a)
 "@instrument: Bass" = "Bas"
@@ -9620,7 +9621,7 @@ countries: tr
 "Start empty" = "Boş başla"
 "Go straight to the tracks." = "Doğrudan parçalara git."
 "Welcome to LYNX" = "LYNX'e hoş geldin"
-"What would you like to do?" = "Ne yapmak istersin?"
+"The Simple workflow: tracks and a timeline, loops, pads and quick recording, all in one window. What would you like to do?" = "Basit iş akışı: parçalar ve zaman çizelgesi, loop'lar, pad'ler ve hızlı kayıt, hepsi tek pencerede. Ne yapmak istersin?"
 "You can open this screen again from Help." = "Bu ekranı Yardım'dan yeniden açabilirsin."
 "First-song tour" = "İlk şarkı turu"
 "The tour builds a song from the start. Start it in a new project?" = "Tur, bir şarkıyı baştan kurar. Yeni bir projede başlansın mı?"

@@ -7774,8 +7774,9 @@ countries: nl be
 "Layout style" = "Lay-outstijl"
 "Pattern workflow (default)" = "Patroonwerkwijze (standaard)"
 "Clip-launch workflow" = "Clipstart-werkwijze"
-"Pattern workflow: channel rack, patterns and a Playlist." = "Patroonwerkwijze: Channel Rack, patronen en een Playlist."
-"Clip-launch workflow: a clip grid with scenes beside the Playlist; patterns and the channel rack stay one click away." = "Clipstart-werkwijze: een clipraster met scènes naast de Playlist; patronen en Channel Rack blijven één klik verwijderd."
+"Three workflows in one program. Switch any time in View › Layout style: the project stays the same, only the windows change." = "Drie werkwijzen in één programma. Wissel wanneer je wilt via Beeld › Lay-outstijl: het project blijft hetzelfde, alleen de vensters veranderen."
+"Pattern workflow: works the way FL Studio does, with the Channel Rack, Piano Roll, Playlist and Mixer." = "Patroonwerkwijze: werkt zoals FL Studio, met Channel Rack, Piano Roll, Playlist en Mixer."
+"Clip-launch workflow: clips and scenes launched from a grid, in the style of Ableton Live, with a Session mixer and the clip and device views; patterns and the Channel Rack stay one click away." = "Clipstart-werkwijze: clips en scènes die je vanuit een raster start, in de stijl van Ableton Live, met een sessiemixer en de clip- en apparaatweergave; patronen en Channel Rack blijven één klik verwijderd."
 "Toggle" = "Wisselen"
 "Launch mode" = "Startmodus"
 "Follow action" = "Vervolgactie"
@@ -7990,7 +7991,7 @@ countries: nl be
 
 # --- Simple workflow layout style (round 184a)
 "Simple workflow" = "Eenvoudige werkwijze"
-"Simple workflow: one window with the tracks and the timeline; the other windows stay one click away." = "Eenvoudige werkwijze: één venster met de sporen en de tijdlijn; de andere vensters zijn één klik verwijderd."
+"Simple workflow: BandLab's approachable one-window style mixed with FL Studio Mobile's way of working, with tracks and a timeline, loops, pads and quick recording; FL Studio Mobile projects (.flm) open too." = "Eenvoudige werkwijze: de toegankelijke stijl met één venster van BandLab, gemengd met de werkwijze van FL Studio Mobile, met sporen en een tijdlijn, loops, pads en snel opnemen; FL Studio Mobile-projecten (.flm) gaan ook open."
 
 # --- Simple workflow: New track chooser (round 184a)
 "@instrument: Bass" = "Bas"
@@ -9620,7 +9621,7 @@ countries: nl be
 "Start empty" = "Leeg beginnen"
 "Go straight to the tracks." = "Ga direct naar de sporen."
 "Welcome to LYNX" = "Welkom bij LYNX"
-"What would you like to do?" = "Wat wil je doen?"
+"The Simple workflow: tracks and a timeline, loops, pads and quick recording, all in one window. What would you like to do?" = "De eenvoudige werkwijze: sporen en een tijdlijn, loops, pads en snel opnemen, alles in één venster. Wat wil je doen?"
 "You can open this screen again from Help." = "Je kunt dit scherm opnieuw openen via Help."
 "First-song tour" = "Tour van het eerste nummer"
 "The tour builds a song from the start. Start it in a new project?" = "De tour bouwt een nummer vanaf nul. Starten in een nieuw project?"
