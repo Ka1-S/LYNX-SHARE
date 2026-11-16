@@ -26,6 +26,9 @@ constexpr int luxeVerbParamCount = luxeVerbControlCount + 4; // + sync of predel
 constexpr int luxeVerbSpaceFirst = luxeVerbParamCount;
 constexpr int luxeVerbSpaceCount = 15;
 constexpr int luxeVerbAllParamCount = luxeVerbSpaceFirst + luxeVerbSpaceCount;
+// round 190it, hidden (not in the info: no control, no text; saved while non-zero; 0 by default, so every project saved
+// before plays as it did): the Space engine's ducking, 0 … 1 = the reference's 0 … 48 dB, set by the Pro-R 2 translator
+constexpr int luxeVerbSpaceDucking = luxeVerbAllParamCount;
 
 std::unique_ptr<Effect> makeLuxeVerb();
 

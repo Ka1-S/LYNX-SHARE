@@ -497,6 +497,8 @@ TEST (reverb190bz_fitted_voicings_wet_level_and_the_plate_decay_blend)
     {
         auto slot = makeEffectSlot (kind);
         slot.params[0] = 1.0f;
+        // (round 190it: the 0.1.27 law's own fit, so its revision 0; revision 1 is checked by tests/Parity190itTests.inc)
+        slot.params[(std::size_t) (kind == EffectKind::halo ? verbs::halo::revision : verbs::epoch::revision)] = 0.0f;
         const auto law = (std::size_t) lawIndex (kind);
         const auto measured = impulse (slot, 8.0);
         slot.params[law] = 0.0f;

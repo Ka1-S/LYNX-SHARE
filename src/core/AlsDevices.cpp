@@ -531,6 +531,7 @@ bool reverbToAtrium (const Element& device, EffectSlot& slot, Notes& notes)
         return false;
     slot = makeEffectSlot (EffectKind::atrium);
     auto& p = slot.params;
+    p[(std::size_t) verbs::atrium::revision] = 0.0f; // round 190it: this map was measured on the 0.1.27 law (round 190cz)
     p[0] = unit (manual (device, "MixDirect", 0.55));                      // Dry/Wet
     p[1] = linValue (manual (device, "PreDelay", 2.5), 0.0, 500.0);        // ms [DATA: 0.5 … 250]
     // Decay [DATA: 200 … 60000 ms; MEASURED 190cz r00–r04: Live's 1 kHz T30 ≈ 0.91 × the setting] → Atrium's decay

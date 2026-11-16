@@ -284,7 +284,12 @@ enum Param
                // floor (17 v): 0–1 free, 2–7 1/16 … 2/1, 8–12 1/16. … 1/1., 13–17 1/16T … 1/1T; the synced delay is capped
                // at 2750 ms. Free (0, the default) leaves the older `sync` law in charge
     law, // round 190do (appended): 0 = the classic detune depth (projects saved before), 1 = the measured one
-    paramCount
+    paramCount,
+    // round 190it, hidden (not in the info: no control, no text; saved while non-zero): revision 1 of the tap network,
+    // measured on refcap030's type sweep of the reference: the loop is fed by the longest tap at the feedback's own gain
+    // (the sum of 8 / 16 taps fed back piled up 20 … 30 dB below 200 Hz), and the type values past the tenth step play
+    // the dry signal alone, at unity. A new Lattice Mod and a translated state get 1; projects saved before keep 0
+    revision = paramCount
 };
 int inputPanOf (float v) noexcept;  // 0 … 8
 int delaySyncIndex (float v) noexcept;      // 0 … 17 (round 144)

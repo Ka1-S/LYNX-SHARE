@@ -4349,6 +4349,13 @@ EffectSlot makeEffectSlot (EffectKind kind)
         slot.state = grossbeat::factoryContainer();
     if (kind == EffectKind::spiralEcho) // round 190fy: a new Spiral Echo runs the measured loop's revision 1 (hidden parameter)
         slot.params[(std::size_t) echosuite::spiral::revision] = 1.0f;
+    // round 190it: a new Epoch Verb / Atrium / Foil Plate / Halo runs the 0.1.30 revision of the Measured law (hidden)
+    if (kind == EffectKind::epochVerb) slot.params[(std::size_t) verbs::epoch::revision] = 1.0f;
+    if (kind == EffectKind::atrium) slot.params[(std::size_t) verbs::atrium::revision] = 1.0f;
+    if (kind == EffectKind::foilPlate) slot.params[(std::size_t) verbs::foil::revision] = 1.0f;
+    if (kind == EffectKind::halo) slot.params[(std::size_t) verbs::halo::revision] = 1.0f;
+    if (kind == EffectKind::latticeMod) // round 190it: … and a new Lattice Mod its tap network's revision 1 (hidden)
+        slot.params[(std::size_t) echosuite::lattice::revision] = 1.0f;
 
     return slot;
 }
@@ -4486,6 +4493,18 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
         }
         if (law >= 0 && savedCount <= (std::size_t) law)
             slot.params[(std::size_t) law] = 0.0f;
+        // round 190it: one saved before the 0.1.30 revision keeps the 0.1.27 Measured law, bit for bit
+        int rev = -1;
+        switch (slot.kind)
+        {
+            case EffectKind::epochVerb: rev = verbs::epoch::revision; break;
+            case EffectKind::atrium: rev = verbs::atrium::revision; break;
+            case EffectKind::foilPlate: rev = verbs::foil::revision; break;
+            case EffectKind::halo: rev = verbs::halo::revision; break;
+            default: break;
+        }
+        if (rev >= 0 && savedCount <= (std::size_t) rev)
+            slot.params[(std::size_t) rev] = 0.0f;
     }
     // round 152: a Compressor saved before the measured vintage curve keeps the round-150 curve
     if (slot.kind == EffectKind::compressor && savedCount <= 18 && slot.params.size() > 18)
@@ -4499,6 +4518,9 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     // round 190do: a Lattice Mod saved before the measured detune depth keeps the classic one
     if (slot.kind == EffectKind::latticeMod && savedCount <= (std::size_t) echosuite::lattice::law)
         slot.params[(std::size_t) echosuite::lattice::law] = 0.0f;
+    // round 190it: … and one saved before the tap network's revision keeps the summed loop
+    if (slot.kind == EffectKind::latticeMod && savedCount <= (std::size_t) echosuite::lattice::revision)
+        slot.params[(std::size_t) echosuite::lattice::revision] = 0.0f;
     // round 190do: a Spiral Echo saved before the measured loop keeps the classic one
     if (slot.kind == EffectKind::spiralEcho && savedCount <= (std::size_t) echosuite::spiral::law)
         slot.params[(std::size_t) echosuite::spiral::law] = 0.0f;
