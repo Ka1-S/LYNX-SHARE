@@ -4,6 +4,10 @@
 // ".." between them ("Titey..m #2", "WA_..6BPM", "CUTLAY..idated)"), so the numbers, BPM and "#2" at the end stay
 // readable. Measured in FL Studio 2026 (fl-channelrack.png, fl-mixer.png): the two parts take about half of the box
 // each, by width, not by letters. No JUCE: the caller measures (ui/Theme.cpp fitMiddle).
+// Rollup 0.1.30: the one rule for every name (Channel rack, Mixer, the Playlist's clip titles and track headers). Round
+// 190ig's Playlist kept the end first at 40 % of the room, so the start took up to 60 %; FL's Playlist shows the same
+// split as its rack (design190ia shots/ref fl-channelrack.png, the Playlist beside it: "VOC..CHED" keeps more of the end
+// than of the start, as "Titey..m #2", "Grv C..sh 01", "GROSS..w Bass" in the rack), which 40 % / 60 % cannot give.
 
 #include <algorithm>
 #include <utility>

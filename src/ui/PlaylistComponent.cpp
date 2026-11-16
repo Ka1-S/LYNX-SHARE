@@ -245,49 +245,6 @@ juce::Rectangle<float> clipRectAt (float x0, float x1, float y, int trackHeight)
     return { x0, y + 1.0f, juce::jmax (3.0f, x1 - x0 - 1.0f), (float) trackHeight - 3.0f };
 }
 
-// FL's middle ellipsis (FM-14, "Titey..m #2", "VOC..CHED"): the head, "..", the tail (at least 40 % of what fits), so the
-// end of a name (a number, "#2") stays readable. The text itself when it fits.
-juce::String fitMiddleUncached (const juce::String& text, const juce::Font& font, float width);
-// (cached: a paint asks for the same few names again and again; the cache empties itself when it grows)
-// (rollup 0.1.30: named apart from round 190io's theme::fitMiddle, which splits the room half / half: the two rounds
-// measured FM-14 differently; both looks kept as each round checked them)
-juce::String playlistFitMiddle (const juce::String& text, const juce::Font& font, float width)
-{
-    if (text.isEmpty())
-        return text;
-    static std::unordered_map<juce::String, juce::String> cache;
-    const auto key = text + "\x01" + font.getTypefaceName() + juce::String (font.getHeight(), 2) + (font.isBold() ? "b" : "") + "\x01"
-                     + juce::String ((int) width);
-    if (const auto found = cache.find (key); found != cache.end())
-        return found->second;
-    if (cache.size() > 4096)
-        cache.clear();
-    return cache[key] = fitMiddleUncached (text, font, width);
-}
-
-juce::String fitMiddleUncached (const juce::String& text, const juce::Font& font, float width)
-{
-    const auto widthOf = [&font] (const juce::String& t) { return juce::GlyphArrangement::getStringWidth (font, t); };
-    if (text.isEmpty() || widthOf (text) <= width)
-        return text;
-    const auto dots = juce::String ("..");
-    const auto room = width - widthOf (dots);
-    if (room <= 0.0f)
-        return {};
-    int head = 0, tail = 0;
-    const auto n = text.length();
-    // grow the tail to 40 % of the room, then the head, then the tail again
-    while (tail < n && widthOf (text.substring (n - tail - 1)) <= room * 0.4f)
-        ++tail;
-    while (head + tail < n && widthOf (text.substring (0, head + 1)) + widthOf (text.substring (n - tail)) <= room)
-        ++head;
-    while (head + tail < n && widthOf (text.substring (0, head)) + widthOf (text.substring (n - tail - 1)) <= room)
-        ++tail;
-    if (head == 0 && tail == 0)
-        return {};
-    return text.substring (0, head).trimEnd() + dots + text.substring (n - tail).trimStart();
-}
-
 // an audio clip's gain as FL's gain handle shows it (round 166e): "-INF" at the bottom of the range
 juce::String gainText (float gain)
 {
@@ -412,7 +369,7 @@ void paintFlClipTitle (juce::Graphics& g, juce::Rectangle<float> r, const theme:
     g.setColour (look.ink);
     g.setFont (f);
     const auto box = text.withTrimmedLeft (2.0f);
-    textcache::drawText (g, playlistFitMiddle (name, f, box.getWidth()), box.toNearestInt(), juce::Justification::centredLeft, false);
+    textcache::drawText (g, theme::fitMiddle (name, f, box.getWidth()), box.toNearestInt(), juce::Justification::centredLeft, false);
 }
 
 // The header's glyph place. A muted clip shows its X there, as FL Studio does, however narrow the clip (round 177c).
@@ -2678,7 +2635,7 @@ void PlaylistComponent::paint (juce::Graphics& g)
                     const auto nameRight = flTall ? (int) plateArea.getRight() - 4 : (int) textRight - 2;
                     const auto nameBox = flTall ? juce::Rectangle<int> (nameLeft, y + 3, juce::jmax (8, nameRight - nameLeft), 16)
                                                 : juce::Rectangle<int> (nameLeft, y, juce::jmax (8, nameRight - nameLeft), trackHeight - 1);
-                    textcache::drawText (g, playlistFitMiddle (name, nameFont, (float) nameBox.getWidth()), nameBox, juce::Justification::centredLeft, false);
+                    textcache::drawText (g, theme::fitMiddle (name, nameFont, (float) nameBox.getWidth()), nameBox, juce::Justification::centredLeft, false);
                 }
                 else if (const auto icon = simpleHeaders ? simpleTrackIcon (song, t)
                                                          : trackicons::iconFor (t < (int) song.playlistTracks.size() ? song.playlistTracks[(std::size_t) t].icon : 0);
@@ -12225,6 +12182,14 @@ float PlaylistComponent::activityLevelOf (const Song& song, const Clip& c)
     return level;
 }
 
+// Rollup 0.1.30 (190im's perf question, its option (b)): the activity strips' level steps (DC-7) on, or the strips lit /
+// dark only (round 190ig's look: a lit strip at step 4). LYNX_ACTIVITY_STEPS=0 / 1 picks one for an A/B measure.
+static bool activityLevelSteps()
+{
+    static const bool on = juce::SystemStats::getEnvironmentVariable ("LYNX_ACTIVITY_STEPS", "1") != "0";
+    return on;
+}
+
 // the strip's brightness step 1..4 for a level (-1: no audio, full)
 static char activityStepOf (float level)
 {
@@ -12347,7 +12312,7 @@ bool PlaylistComponent::liveFrame (double nowMs)
             }
             now.assign ((std::size_t) numTracks(), 0);
             std::vector<float> levels (now.size(), -2.0f); // (-2: dark; -1: lit by a clip without audio)
-            const auto strips = flHeaders();
+            const auto strips = flHeaders() && activityLevelSteps(); // (off: lit / dark only, no level reads)
             for (const auto& c : song.playlist)
                 if (! c.muted && c.track >= 0 && c.track < (int) now.size() && (double) c.start <= tick && tick < (double) c.end())
                 {
