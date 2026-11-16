@@ -10146,3 +10146,4 @@ countries: tr
 "Are you sure you want to load {0} plugins at once?" = "{0} eklentiyi aynı anda yüklemek istediğinden emin misin?"
 "Sample settings" = "Sample ayarları"
 "Classic LYNX look for the clip grid" = "Klip ızgarası için klasik LYNX görünümü"
+"Tension: {0}" = "Gerilim: {0}"

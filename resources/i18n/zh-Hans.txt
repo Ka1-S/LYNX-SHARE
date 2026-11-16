@@ -10146,3 +10146,4 @@ countries: cn sg
 "Are you sure you want to load {0} plugins at once?" = "确定要一次加载 {0} 个插件吗?"
 "Sample settings" = "采样设置"
 "Classic LYNX look for the clip grid" = "片段网格使用经典 LYNX 外观"
+"Tension: {0}" = "张力：{0}"

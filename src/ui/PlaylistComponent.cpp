@@ -3859,6 +3859,13 @@ juce::String PlaylistComponent::curveValueText (int clip, float value) const
     return gain <= 0.0f ? juce::String ("-inf dB") : juce::String (juce::Decibels::gainToDecibels (gain), 1) + " dB";
 }
 
+// round 190im (DE-118): a segment's tension as the hint shows it, in FL's sign (LYNX keeps the opposite one, core/Song.h)
+juce::String PlaylistComponent::tensionText (float tension)
+{
+    const auto percent = juce::roundToInt (-tension * 100.0f);
+    return tr ("Tension: {0}", { juce::String (percent) + "%" });
+}
+
 int PlaylistComponent::automationPointAt (int clip, juce::Point<int> pos) const
 {
     const auto& song = engine.getSong();
@@ -6059,10 +6066,21 @@ void PlaylistComponent::postDragHint()
         case Drag::warpMarker: hint.text = tr ("Moving the warp marker: the audio around it stretches  [Alt] no snap"); break;
         case Drag::autoPoint:
             hint.text = tr ("Moving the point: then [Shift] keeps time  [Ctrl] keeps value");
-            if (const auto curve = curveOf (autoClip); curve.lane != 0 && autoPoint >= 0 && autoPoint < (int) curve.points->size())
-                hint.value = curveValueText (autoClip, (*curve.points)[(std::size_t) autoPoint].value); // (an envelope's dB / pan)
+            // round 190im (DE-117): an automation clip's point too (its curve has no envelope lane: lane 0), as FL's manual
+            // says ("Control point and tension handle values appear in the hint bar when they are moved"); with its
+            // place in the song, as the automation lanes show it
+            if (const auto curve = curveOf (autoClip); curve.points != nullptr && autoPoint >= 0 && autoPoint < (int) curve.points->size())
+            {
+                const auto& owner = song.playlist[(std::size_t) autoClip]; // (curveOf: a valid clip)
+                const auto& point = (*curve.points)[(std::size_t) autoPoint];
+                hint.value = curveValueText (autoClip, point.value) + "  " + position (owner.start + point.tick - owner.offset);
+            }
             break;
-        case Drag::autoTension: hint.text = tr ("Bending the segment: drag up / down  [Ctrl] fine"); break;
+        case Drag::autoTension:
+            hint.text = tr ("Bending the segment: drag up / down  [Ctrl] fine");
+            if (const auto curve = curveOf (autoClip); curve.points != nullptr && autoPoint >= 0 && autoPoint + 1 < (int) curve.points->size())
+                hint.value = tensionText ((*curve.points)[(std::size_t) autoPoint].tension); // (DE-118)
+            break;
         case Drag::laneDraw:
             hint.text = drawFreehand ? tr ("Draw Mode: drawing freehand") : tr ("Draw Mode: drawing steps at the grid width  [Alt] freehand");
             break;
@@ -6075,8 +6093,11 @@ void PlaylistComponent::postDragHint()
             const auto& automation = song.automations[(std::size_t) a];
             hint.text = drag == Drag::lanePoint ? tr ("Moving the point: then [Shift] keeps time  [Ctrl] keeps value")
                                                 : tr ("Bending the segment: drag up / down  [Ctrl] fine");
-            hint.value = automationPointValueText (automation.target, automation.points[(std::size_t) autoPoint].value) + "  "
-                         + position (automation.points[(std::size_t) autoPoint].tick);
+            if (drag == Drag::laneTension && autoPoint + 1 < (int) automation.points.size()) // (round 190im, DE-118: the segment's tension)
+                hint.value = tensionText (automation.points[(std::size_t) autoPoint].tension);
+            else
+                hint.value = automationPointValueText (automation.target, automation.points[(std::size_t) autoPoint].value) + "  "
+                             + position (automation.points[(std::size_t) autoPoint].tick);
             break;
         }
         case Drag::select:
@@ -10433,7 +10454,13 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
             hint.value = h.target == gesture::Target::gainHandle ? tr ("Gain: {0}", { gainText (c.gain) })
                                                                  : juce::String::fromUTF8 (song.channels[(std::size_t) c.channel].name.c_str());
         else if (c.kind == ClipKind::automation && c.automation >= 0 && c.automation < (int) song.automations.size())
-            hint.value = juce::String::fromUTF8 (song.automations[(std::size_t) c.automation].name.c_str());
+        {
+            const auto& automation = song.automations[(std::size_t) c.automation];
+            hint.value = juce::String::fromUTF8 (automation.name.c_str());
+            // round 190im (DE-119): over the curve the value at the mouse, as the automation lanes show it
+            if (automationEditable (h.clip) && automationBody (c).contains (p.toFloat()))
+                hint.value << "  " << curveValueText (h.clip, curveValueAt (h.clip, (double) c.offset + xToTick (p.x) - (double) c.start));
+        }
     }
     else
         hint.value = trackName (h.track);

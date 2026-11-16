@@ -10146,3 +10146,4 @@ countries: kr
 "Are you sure you want to load {0} plugins at once?" = "플러그인 {0}개를 한 번에 불러올까요?"
 "Sample settings" = "샘플 설정"
 "Classic LYNX look for the clip grid" = "클립 그리드에 클래식 LYNX 모양 사용"
+"Tension: {0}" = "텐션: {0}"

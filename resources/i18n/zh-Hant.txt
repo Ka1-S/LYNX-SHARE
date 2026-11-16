@@ -10146,3 +10146,4 @@ countries: tw hk mo
 "Are you sure you want to load {0} plugins at once?" = "確定要一次載入 {0} 個外掛嗎?"
 "Sample settings" = "取樣設定"
 "Classic LYNX look for the clip grid" = "片段網格使用經典 LYNX 外觀"
+"Tension: {0}" = "張力：{0}"

@@ -646,6 +646,7 @@ private:
     void editCurve (int clip, const std::function<void (std::vector<AutomationPoint>&)>& fn);
     float curveValueAt (int clip, double clipTick) const;
     juce::String curveValueText (int clip, float value) const;
+    static juce::String tensionText (float tension); // round 190im: "Tension: 40%" (FL's sign)
     void paintClipEnvelope (juce::Graphics& g, const Clip& c, const ClipEnvelope& envelope);
     int automationPointAt (int clip, juce::Point<int> p) const;
     bool isOnAutomationCurve (int clip, juce::Point<int> p) const;

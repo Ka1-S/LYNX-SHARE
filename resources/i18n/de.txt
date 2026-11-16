@@ -10146,3 +10146,4 @@ countries: de at ch li lu
 "Are you sure you want to load {0} plugins at once?" = "Möchtest du wirklich {0} Plugins auf einmal laden?"
 "Sample settings" = "Sample-Einstellungen"
 "Classic LYNX look for the clip grid" = "Klassisches LYNX-Aussehen für das Clip-Raster"
+"Tension: {0}" = "Spannung: {0}"

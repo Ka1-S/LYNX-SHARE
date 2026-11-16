@@ -19,6 +19,7 @@
 #include "engine/Text.h"
 #include "core/EditorGestures.h"
 #include "ui/EditorTools.h"
+#include "ui/FrameTicker.h"
 #include "ui/EventEditor.h"
 #include "ui/I18n.h"
 #include "ui/HintBar.h"
@@ -96,8 +97,7 @@ public:
 
 class AutomationEditor final : public juce::Component,
                                public ui::HintSource,
-                               private juce::ChangeListener,
-                               private juce::Timer
+                               private juce::ChangeListener
 {
 public:
     AutomationEditor (AudioEngine& e, int index)
@@ -108,7 +108,6 @@ public:
         buildLfoPanel();
         refreshLfoPanel();
         setSize (760, 330);
-        startTimerHz (30);
     }
 
     // round 177b: FL's LFO mode (REA FUN_00f62690 / FUN_00f6b6a0): with the LFO on, the editor edits the LFO's own points
@@ -810,26 +809,45 @@ private:
         repaint();
     }
 
-    void timerCallback() override
+    // Round 190im (DE-124): the playhead moves on the shared display-rate ticker (ui/FrameTicker.h) instead of the editor's
+    // own 30 Hz timer, which ran with the window open even while stopped and repainted the whole editor on every change.
+    // Stopped, the ticker's shared idle poll asks this step (one atomic load) and nothing repaints; playing, only the
+    // playhead's old and new columns are repainted.
+    bool playheadStep()
     {
         // position within the automation, if one of its clips is under the cursor
         auto tick = -1.0;
         const auto& song = engine.getSong();
+        const auto playing = engine.getTransport().playing.load (std::memory_order_relaxed);
 
-        if (song.mode == PlayMode::song && engine.getTransport().playing.load())
+        if (playing && song.mode == PlayMode::song && isShowing())
         {
-            const auto position = engine.songPlayheadTicks();
+            const auto position = engine.songPlayheadTicks() + engine.playheadAdvanceTicks();
 
             for (const auto& c : song.playlist)
                 if (c.kind == ClipKind::automation && c.automation == automation && position >= (double) c.start && position < (double) c.end())
                     tick = position - (double) c.start + (double) c.offset;
         }
 
-        if (tick != playhead)
+        if (tick == playhead)
+            return playing;
+        const auto column = [this] (double t) {
+            return t >= 0.0 ? juce::Rectangle<int> ((int) tickToX (t) - 2, 0, 5, getHeight()).getIntersection (plotArea().expanded (1))
+                            : juce::Rectangle<int>();
+        };
+        const auto before = column (playhead);
+        playhead = tick;
+        const auto after = column (playhead);
+        if (! before.isEmpty() && ! after.isEmpty() && std::abs (before.getX() - after.getX()) <= 5)
+            repaint (before.getUnion (after));
+        else
         {
-            playhead = tick;
-            repaint();
+            if (! before.isEmpty())
+                repaint (before);
+            if (! after.isEmpty())
+                repaint (after);
         }
+        return true;
     }
 
     AudioEngine& engine;
@@ -841,6 +859,7 @@ private:
     double panStart = 0.0;
     float tensionStart = 0.0f, tensionSign = 1.0f;
     double playhead = -1.0;
+    ui::FrameTicker frames { *this, [this] (double) { return playheadStep(); } };
 };
 
 class AutomationWindow final : public juce::DocumentWindow
