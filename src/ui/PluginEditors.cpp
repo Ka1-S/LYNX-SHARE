@@ -427,7 +427,8 @@ public:
             if (item.type == Item::display && rectOf (item).contains (p)
                 && (plugui::displayTakesMouse (item.display) // round 168x: the list lives in PluginLayout (Maximus' curve added)
                     || isBars (item) || isRhythmEdit (item) || isRhythmPatterns (item)
-                    || isGbAny (item))) // round 168m: Gross Beat's editor parts
+                    || isGbAny (item) // round 168m: Gross Beat's editor parts
+                    || (limiterViewItem (item) && limiterViewPartAt (item, p) >= 0))) // round 190jd: the Limiter's view switch
                 return i;
             if (item.type == Item::display || (item.param == nullptr && ! hasStyle (item, plugui::pageTabs)))
                 continue;

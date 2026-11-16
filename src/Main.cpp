@@ -17940,6 +17940,7 @@ private:
             }
             target->mouseUp (event (local, {}, false));
             target->mouseExit (event ({ -1000.0f, -1000.0f }, {}, false));
+            offline.dispatchPendingMessages(); // (round 190jd: an edit the click made, e.g. a display view, reaches the slot)
         }
         // round tp172b6: LYNX_PARITYSHOT_SHOW=1 puts the same editor in a real window and keeps it open (for a guarded GUI check
         // of its pop-up menus, which the offscreen picture cannot hold); closing the window quits
