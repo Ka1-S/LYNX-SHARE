@@ -192,11 +192,7 @@ public:
         alsSessionBox.addItem (tr ("Clip grid (default)"), 1);
         alsSessionBox.addItem (tr ("Playlist, after the arrangement"), 2);
         alsSessionBox.setSelectedId (options.alsSessionOnPlaylist ? 2 : 1, juce::dontSendNotification);
-        alsSessionBox.onChange = [this] {
-            options.alsSessionOnPlaylist = alsSessionBox.getSelectedId() == 2;
-            if (hooks.setGeneral)
-                hooks.setGeneral (options);
-        };
+        alsSessionBox.onChange = [this] { change ([&] { options.alsSessionOnPlaylist = alsSessionBox.getSelectedId() == 2; }); };
         add (remoteTitle);
         add (remoteControl);
         add (remoteStatus);
@@ -648,6 +644,7 @@ private:
 
     void timerCallback() override
     {
+        followLayoutStyle();
         remoteControl.setToggleState (remoteui::enabled(), juce::dontSendNotification);
         const auto historyError = engine.getRemoteHistoryError();
         remoteStatus.setText (historyError.isNotEmpty() ? historyError : tr (remoteui::status()), juce::dontSendNotification);
@@ -664,6 +661,7 @@ private:
     // the LYNX extras page switches this one too (round 190am): the copy kept here follows when the page comes back
     void visibilityChanged() override
     {
+        followLayoutStyle();
         if (isVisible() && hooks.getGeneral)
         {
             options.hoverValues = hooks.getGeneral().hoverValues;
@@ -682,9 +680,25 @@ private:
 
     void change (const std::function<void()>& fn)
     {
+        followLayoutStyle(); // (round 190jp: never hand back a layout style the user has left since)
         fn();
         if (hooks.setGeneral)
             hooks.setGeneral (options);
+    }
+
+    // Round 190jp (Discord, 0.1.29: "switching Layout style doesn't work"): the page kept the layout style it was opened
+    // with. Switched meanwhile from View › Layout style, the Welcome screen or the Setup wizard, the box still showed the
+    // old style, so picking the style the window really had changed nothing, and any other option changed on this page
+    // put the old style back. The box and the page's copy now follow the window's style (the page's 2 Hz timer, which
+    // runs only while Settings › General is open, and before every change it hands back).
+    void followLayoutStyle()
+    {
+        if (hooks.getGeneral == nullptr) // (--snapshot: no window behind the page)
+            return;
+        const auto now = layoutstyle::current();
+        options.layoutStyle = (int) now;
+        if (layoutStyleBox.getSelectedId() != layoutstyle::comboId (now))
+            layoutStyleBox.setSelectedId (layoutstyle::comboId (now), juce::dontSendNotification);
     }
 
     // The interface font: the platform's default or any installed family, saved at once, applied by the next start
