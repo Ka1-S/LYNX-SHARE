@@ -22,6 +22,7 @@
 #include "core/VoiceShift.h"
 #include "core/VoxStrip.h"
 #include "core/EchoSuite.h"
+#include "core/Reeverb2.h"
 #include "core/DynamicsSuite.h"
 
 namespace lynx
@@ -209,6 +210,10 @@ product = Waves reverb (RVerb / H-Reverb / TrueVerb)
 vendor = Waves
 lynx = Reeverb 2
 waves = RVerb; H-Reverb; TrueVerb
+# round 190js: their states are translated (decay, pre-delay, the wet level by the decay, each reverb's measured tone,
+# H-Reverb's ducking, TrueVerb's direct path and levels; docs/PARITY.md "Round 190js"), the slot at 100 %. Without a
+# readable state: Reeverb 2 wet at the slot's dry / wet 25 % as before
+translate = waves-reverb
 preset = Dry=0; Wet=0.8
 mix = 0.25
 
@@ -1629,6 +1634,75 @@ int translateWavesSuperTap (const std::vector<std::uint8_t>& state, EffectSlot& 
     if (lp < 20000.0)
         p[e::highCut] = linNorm (lp, 200.0, 20000.0);
     return (int) taps.size() * 4 + 2;
+}
+
+// round 190js: the Waves reverbs on Reeverb 2 (the stand-in since round 129, now with their states translated). Black-box on
+// refcap182's programme (D, X1 … X4 x drums, bass, guitar, vocal, mix; the RealWorld lists read against the settings set
+// through the trials' own parameters): each reverb's decay, pre-delay and wet level are read from its state; its tone (the
+// band gain of the reverb, out / in per third octave) was measured by deconvolving the programme renders and matched by
+// Reeverb 2's own controls, fitted on a model of the parity score (the input's spectrum times Reeverb's impulse
+// response against the reference render, every setting at once). The wet level follows the decay (energy kept about
+// level as the decay grows: tc dB per decade of the decay), as the references do. Raw values are Reeverb 2's (FL's units).
+// RVerb: 2 decay s, 17 pre-delay ms. H-Reverb: 5 reverb time (the tail's, x 1.45 = the measured RT), 16 pre-delay ms,
+// 59 dynamics range dB, 249 dynamics on (ducking: [model] a fixed share of the range off the wet level, fitted on X4).
+// TrueVerb: 0 decay s, 5 distance, 24 pre-delay ms, 29 direct off, 42 reverb level dB, 43 early reflections level dB;
+// the direct path is −0.7 − 0.135 x distance dB (measured: −4.8 … −6.2 dB at distance 2.6 … 13 through deconvolution).
+struct WavesVerbFit
+{
+    const char* name;
+    int lowCut, highCut, size, diffusion, highDamping, bassMult, crossover, early; // Reeverb 2's raw controls
+    double wet0, tcDb, decayScale;
+};
+constexpr WavesVerbFit wavesVerbFits[] {
+    { "RVerb", 19, 96, 13, 100, 29, 233, 2000, 160, 0.54, -8.25, 1.0 },
+    { "H-Reverb", 19, 44, 1, 44, 61, 42, 104, 160, 0.60, -7.5, 1.45 },
+    { "TrueVerb", 19, 221, 9, 100, 126, 266, 2000, 160, 0.54, -5.25, 1.0 },
+};
+constexpr double hReverbDuckShare = 0.25, trueVerbEarly = 0.36, trueVerbDirectDb = -0.7, trueVerbDirectPerDistance = -0.135;
+int translateWavesReverb (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    if (slot.kind != EffectKind::reeverb2)
+        return 0;
+    const auto name = wavesPluginName (state);
+    const WavesVerbFit* fit = nullptr;
+    for (const auto& f : wavesVerbFits)
+        if (name == f.name)
+            fit = &f;
+    const auto rw = wavesRealWorldParams (state);
+    const bool rverb = fit != nullptr && name == "RVerb", hReverb = fit != nullptr && name == "H-Reverb";
+    const std::size_t decayAt = rverb ? 2 : hReverb ? 5 : 0, predelayAt = rverb ? 17 : hReverb ? 16 : 24;
+    const auto decay = wavesValue (rw, decayAt);
+    if (fit == nullptr || ! decay || *decay <= 0.0)
+        return 0;
+    auto s = reeverb2::fromParams (slot.params);
+    s.p[0] = fit->lowCut;
+    s.p[1] = fit->highCut;
+    s.p[3] = fit->size;
+    s.p[4] = fit->diffusion;
+    s.p[6] = fit->highDamping;
+    s.p[7] = fit->bassMult;
+    s.p[8] = fit->crossover;
+    s.p[5] = std::clamp ((int) std::lround (*decay * fit->decayScale * 10.0), 1, 200);
+    s.p[2] = std::clamp ((int) std::lround (wavesValue (rw, predelayAt).value_or (0.0) * 0.384), 0, 384);
+    double levelDb = 0.0, early = 1.0, dry = 0.0;
+    if (hReverb && wavesValue (rw, 249).value_or (0.0) >= 0.5)
+        levelDb += hReverbDuckShare * wavesValue (rw, 59).value_or (0.0);
+    if (! rverb && ! hReverb) // TrueVerb
+    {
+        levelDb += wavesValue (rw, 42).value_or (0.0);
+        early = trueVerbEarly * std::pow (10.0, wavesValue (rw, 43).value_or (0.0) / 20.0);
+        if (wavesValue (rw, 29).value_or (0.0) < 0.5)
+            dry = 0.8 * std::pow (10.0, (trueVerbDirectDb + trueVerbDirectPerDistance * wavesValue (rw, 5).value_or (0.0)) / 20.0);
+    }
+    else
+        early = (double) fit->early / 160.0;
+    const double wet = std::clamp (fit->wet0 * std::pow (10.0, (fit->tcDb * std::log10 (*decay / 1.5) + levelDb) / 20.0), 0.0, 1.0);
+    s.p[12] = (int) std::lround (wet * 160.0);
+    s.p[11] = (int) std::lround (std::min (1.0, early) * 160.0);
+    s.p[10] = (int) std::lround (dry * 160.0);
+    reeverb2::toParams (s, slot.params);
+    slot.mix = 1.0f; // the dry path is Reeverb's own (TrueVerb's direct sound); the slot plays the whole output
+    return 10;
 }
 
 // DeEsser (15 values): 0 frequency Hz, 2 threshold dB, 10 monitor (1 = side chain), 13 side chain (1 = high pass,
@@ -3072,6 +3146,8 @@ RawTranslator rawTranslatorNamed (std::string_view name)
         return translateWavesSuperTap;
     if (name == "waves-sslcomp")
         return translateWavesSslComp;
+    if (name == "waves-reverb")
+        return translateWavesReverb;
     return nullptr;
 }
 

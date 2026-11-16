@@ -80,7 +80,8 @@ TEST (parity190iq_hush_timing_is_hidden_new_instances_run_it_old_projects_do_not
     CHECK (info.params.size() == (std::size_t) hu::timing); // hidden: not in the info, so no new control or string
     auto s = makeEffectSlot (EffectKind::hushDeEsser);
     CHECK (s.params[(std::size_t) hu::timing] == 1.0f);
-    CHECK (savedEffectParamCount (s) == (std::size_t) hu::timing + 1); // saved, since it is not zero
+    CHECK (savedEffectParamCount (s) == (std::size_t) hu::vocalRevision + 1); // saved, since it is not zero (round 190js: and the
+                                                                                // Single Vocal revision after it)
     auto now = s;
     upgradeLoadedEffectParams (now, (std::size_t) hu::timing + 1);
     CHECK (now.params[(std::size_t) hu::timing] == 1.0f);
@@ -88,7 +89,7 @@ TEST (parity190iq_hush_timing_is_hidden_new_instances_run_it_old_projects_do_not
     auto old = s;
     upgradeLoadedEffectParams (old, (std::size_t) hu::timing);
     CHECK (old.params[(std::size_t) hu::timing] == 0.0f);
-    CHECK (savedEffectParamCount (old) == (std::size_t) hu::timing);
+    CHECK (old.params[(std::size_t) hu::vocalRevision] == 0.0f && savedEffectParamCount (old) == (std::size_t) hu::timing);
 }
 
 TEST (parity190iq_pro_ds_translation_runs_the_measured_timing)
@@ -134,6 +135,7 @@ TEST (parity190iq_hush_timing0_renders_as_the_base_commit_did)
     {
         auto s = parity190iq::slot (c.voc != 0);
         s.params[(std::size_t) hu::timing] = 0.0f;
+        s.params[(std::size_t) hu::vocalRevision] = 0.0f; // round 190js: a project saved before has Single Vocal's revision off too
         if (c.idx >= 0) s.params[(std::size_t) c.idx] = c.val;
         if (c.idx2 >= 0) s.params[(std::size_t) c.idx2] = c.val2;
         const int n = (int) (1.6 * c.sr);

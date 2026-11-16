@@ -582,8 +582,8 @@ int fromSaturn2 (const State& s, EffectSlot& slot)
 // dynamics — 10 dynamics on, 9 range dB (−30 … +30, relative to the static gain), 11 automatic threshold (1 = Auto, the
 // default of a new dynamic band), 12 the manual threshold (the parameter's own 0 … 1: −90 / −66 / −45 dB at 0 / 0.125 /
 // 0.25, then linear to 0 dB at 1), 13 / 14 attack / release % — become Facet's range, threshold or automatic threshold
-// (facet::autoThreshold, measured on the same captures) and its attack / release: 50 % = 18 / 305 ms, the reference's
-// gain timing fitted on the captures (Facet's timing is one per EQ: the first dynamic band's) [model: other percentages
+// (facet::autoThreshold, measured on the same captures) and its attack / release: 50 % = 9.2 / 268 ms (round 190js; round
+// 190jh's 10 ms windows had 18 / 305), the reference's gain timing fitted on the captures (Facet's timing is one per EQ: the first dynamic band's) [model: other percentages
 // one decade per 50 %, not measured].
 int fromProQ4 (const State& s, EffectSlot& slot)
 {
@@ -632,8 +632,8 @@ int fromProQ4 (const State& s, EffectSlot& slot)
             {
                 const auto pct = [&] (std::size_t i) { return std::pow (10.0, (std::clamp ((double) s.at (base + i), 0.0, 100.0) - 50.0) / 50.0); };
                 const auto msValue = [] (double ms, double lo) { return (float) (std::log (ms / lo) / std::log (200.0)); };
-                set (facet::attackParam, msValue (std::clamp (18.1 * pct (13), 0.25, 50.0), 0.25));
-                set (facet::releaseParam, msValue (std::clamp (305.0 * pct (14), 20.0, 4000.0), 20.0));
+                set (facet::attackParam, msValue (std::clamp (9.22 * pct (13), 0.25, 50.0), 0.25));   // round 190js: 9.2 / 268 ms
+                set (facet::releaseParam, msValue (std::clamp (268.0 * pct (14), 20.0, 4000.0), 20.0)); // (was 18.1 / 305)
                 dynamicTiming = true;
             }
         }
@@ -700,6 +700,7 @@ int fromProDS (const State& s, EffectSlot& slot)
     p[outputPan] = linValue (std::clamp ((double) s.at (18), -1.0, 1.0), -1.0, 1.0);
     p[oversampling] = (float) std::clamp (roundIndex (s.at (14)), 0, 2) / 3.0f;
     p[timing] = 1.0f; // round 190iq: the Allround law's measured timing (refcap030's ess probes)
+    p[vocalRevision] = 1.0f; // round 190js: Single Vocal's "stands out" revision (refcap030's ess probes)
     if (s.at (19) >= 0.5f)
         slot.enabled = false;
     return 20;

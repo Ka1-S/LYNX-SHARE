@@ -29,6 +29,8 @@ inline Render render (const Case& c)
     auto slot = lynx::makeEffectSlot (c.kind);
     for (const auto& [k, v] : c.set)
         slot.params[(std::size_t) k] = v;
+    if (c.kind == lynx::EffectKind::hushDeEsser) // round 190js: a new Hush runs Single Vocal's revision; the base commit had none
+        slot.params[(std::size_t) lynx::mixsuite::hush::vocalRevision] = 0.0f;
     auto fx = lynx::makeEffect (slot);
     fx->prepare (sr);
     const int n = (int) (1.5 * sr), block = 256;

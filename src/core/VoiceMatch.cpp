@@ -915,6 +915,30 @@ struct Timing190iq
  #define TIMING_190IQ_CONSTEXPR constexpr
 #endif
 TIMING_190IQ_CONSTEXPR Timing190iq timingAll190iq { 0.0084, 1.4611, 2.9413, 5.8197, 1.0945, -4.8461 };
+// round 190js [EXEC] (refcap030's `ess` probe, Single Vocal: a 500 Hz body at -14 dBFS under 5 … 9 kHz bursts of rising
+// level, a sweep of band tones and a long burst alone): Single Vocal's revision 1. The reference leaves a burst alone until
+// it stands out from the body by a margin (+5 dB: nothing; +11 dB: the whole range at every threshold), ignores band
+// tones at the body's level, decides late (the reduction starts ~20 ms after the burst minus the look-ahead) and then
+// holds a steady reduction; alone, a burst follows a level law steeper than round 148's. The stand-out test compares the
+// signal above a split (0.567 x the band's high-pass, 4th-order) with the body below it from 200 Hz up — round 148's test
+// (the band against everything under the high-pass) counted a burst's own lower half as the body, and a kick drum's low
+// end hid the cymbals (tp172b's drums). Fitted by Nelder-Mead on the 27 Single Vocal ess renders (5 ms windows, full
+// band and above 4 kHz; /mnt/e/lynx-work/parity190js/hush/fitsv.py): 3.05 → 0.50 dB rms; the body's 200 Hz high-pass and
+// the law offset (9.65 → 9.0) then chosen on the parity score of tp172b's drums / vocal and refcap030's mix / stim
+// renders (hush/svscore.py). Fields: ratio ms, open / close dB, gate delay ms, gain attack / release ms, law offset dB,
+// span scale, detector release ms, split, body high-pass Hz.
+struct Vocal190js
+{
+    double ratioMs, openRatioDb, closeRatioDb, gateDelayMs, gainAttackMs, gainReleaseMs, lawOffsetDb, spanScale, detReleaseMs;
+    double splitRatio; // the stand-out test's split: the band's high-pass x this (the signal above it against the signal below)
+    double bodyLowHz;  // the body (the signal below the split) starts here (2nd-order high-pass; 0 = from DC)
+};
+#ifdef LYNX_LAB190JS
+ #define VOCAL_190JS_CONSTEXPR static
+#else
+ #define VOCAL_190JS_CONSTEXPR constexpr
+#endif
+VOCAL_190JS_CONSTEXPR Vocal190js vocal190js { 4.85, 8.19, 7.57, 1.57, 6.21, 20.4, 9.0, 1.11, 0.50, 0.567, 200.0 };
 } // namespace
 
 void DeEsser::prepare (double sampleRate) noexcept
@@ -924,15 +948,22 @@ void DeEsser::prepare (double sampleRate) noexcept
         std::sscanf (e, "%lf,%lf,%lf,%lf,%lf,%lf", &timingAll190iq.detAttackMs, &timingAll190iq.detReleaseMs, &timingAll190iq.gainAttackMs,
                      &timingAll190iq.gainReleaseMs, &timingAll190iq.aheadScale, &timingAll190iq.aheadOffsetMs);
 #endif
+#ifdef LYNX_LAB190JS
+    if (const char* e = std::getenv ("LYNX_LAB_SV"))
+        std::sscanf (e, "%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf", &vocal190js.ratioMs, &vocal190js.openRatioDb, &vocal190js.closeRatioDb,
+                     &vocal190js.gateDelayMs, &vocal190js.gainAttackMs, &vocal190js.gainReleaseMs, &vocal190js.lawOffsetDb,
+                     &vocal190js.spanScale, &vocal190js.detReleaseMs, &vocal190js.splitRatio, &vocal190js.bodyLowHz);
+#endif
     sr = sampleRate > 0.0 ? sampleRate : 48000.0;
     latency = std::clamp ((int) std::lround (0.015 * sr), 1, ring / 2);
-    designedHp = designedLp = -1.0;
+    designedHp = designedLp = designedSplit = -1.0;
     reset();
 }
 
 void DeEsser::reset() noexcept
 {
-    for (auto* b : { &hp1, &hp2, &lp1, &lp2, &low1, &low2, &split1, &split2, &bhp1, &bhp2, &blp1, &blp2, &blow1, &blow2 })
+    for (auto* b : { &hp1, &hp2, &lp1, &lp2, &low1, &low2, &split1, &split2, &bhp1, &bhp2, &blp1, &blp2, &blow1, &blow2,
+                     &shi1, &shi2, &slo1, &slo2, &bshi1, &bshi2, &bslo1, &bslo2 })
         b->reset();
     eh = qh = ql = sm = 0.0;
     beh = bqh = bql = bsm = 0.0;
@@ -967,18 +998,40 @@ void DeEsser::design (const Settings& s) noexcept
 void DeEsser::process (float* l, float* r, int n, const Settings& s) noexcept
 {
     design (s);
+    if (s.vocalRevision >= 1 && s.gate) // round 190js: the stand-out test's split (4th-order Butterworth both ways)
+    {
+        const double f = std::clamp (designedHp * vocal190js.splitRatio, 200.0, sr * 0.45);
+        if (f != designedSplit)
+        {
+            designedSplit = f;
+            shi1.filter (sr, 1, f, 0.54119610); shi2.filter (sr, 1, f, 1.30656296);
+            slo1.filter (sr, 0, f, 0.54119610); slo2.filter (sr, 0, f, 1.30656296);
+            sbody.filter (sr, 1, std::clamp (vocal190js.bodyLowHz, 10.0, f), 0.70710678);
+            bshi1 = shi1; bshi2 = shi2; bslo1 = slo1; bslo2 = slo2; bsbody = sbody;
+            for (auto* b : { &shi1, &shi2, &slo1, &slo2, &bshi1, &bshi2, &bslo1, &bslo2, &sbody, &bsbody })
+                b->reset();
+        }
+    }
     const bool t1 = s.timing >= 1 && ! s.gate; // round 190iq: timing revision 1 (the Allround law only)
+    const bool v1 = s.vocalRevision >= 1 && s.gate; // round 190js: Single Vocal's revision 1
     const auto& T = timingAll190iq;
-    const double ca = pole (t1 ? T.detAttackMs : detAttackMs, sr), cr = pole (t1 ? T.detReleaseMs : s.gate ? sDetReleaseMs : detReleaseMs, sr);
-    const double ga = pole (t1 ? T.gainAttackMs : s.gate ? sGainAttackMs : gainAttackMs, sr);
-    const double gr = pole (t1 ? T.gainReleaseMs : s.gate ? sGainReleaseMs : gainReleaseMs, sr);
-    const double cq = pole (ratioMs, sr);
+    const auto& V = vocal190js;
+    const double ca = pole (t1 ? T.detAttackMs : detAttackMs, sr);
+    const double cr = pole (t1 ? T.detReleaseMs : v1 ? V.detReleaseMs : s.gate ? sDetReleaseMs : detReleaseMs, sr);
+    const double ga = pole (t1 ? T.gainAttackMs : v1 ? V.gainAttackMs : s.gate ? sGainAttackMs : gainAttackMs, sr);
+    const double gr = pole (t1 ? T.gainReleaseMs : v1 ? V.gainReleaseMs : s.gate ? sGainReleaseMs : gainReleaseMs, sr);
+    const double cq = pole (v1 ? V.ratioMs : ratioMs, sr);
+    const double openR = v1 ? V.openRatioDb : openRatioDb, closeR = v1 ? V.closeRatioDb : closeRatioDb;
     const double thr = std::clamp (s.thresholdDb, -60.0, 0.0), range = std::clamp (s.rangeDb, 0.0, 24.0);
-    const double span = s.gate ? std::max (1.0, spanDb + spanScale * (0.1 - thr)) : 0.1 - thr;
-    const double laAdj = s.gate ? lawOffsetDb : allroundOffsetDb + allroundBw * 10.0 * std::log10 (7000.0 / std::max (100.0, designedLp - designedHp));
+    const double span = s.gate ? std::max (1.0, spanDb + (v1 ? V.spanScale : spanScale) * (0.1 - thr)) : 0.1 - thr;
+    const double laAdj = s.gate ? (v1 ? V.lawOffsetDb : lawOffsetDb)
+                                : allroundOffsetDb + allroundBw * 10.0 * std::log10 (7000.0 / std::max (100.0, designedLp - designedHp));
     const double aheadMs = t1 ? T.aheadScale * (s.lookahead ? std::clamp (s.lookaheadMs, 0.0, 15.0) : 0.0) + T.aheadOffsetMs
                               : (s.lookahead ? std::clamp (s.lookaheadMs, 0.0, 15.0) + extraAheadMs : 0.0);
     const int ahead = std::clamp ((int) std::lround (aheadMs * 0.001 * sr), 0, latency);
+    // round 190js: Single Vocal's revision decides on the stand-out test this many samples after the sample played now
+    // (its ratio is read at now + ahead − gateDelay, never older than the ring holds)
+    const int gateShift = v1 ? std::clamp (ahead - (int) std::lround (V.gateDelayMs * 0.001 * sr), -(ring - latency - 64), latency) : 0;
     constexpr std::int64_t m = ring - 1;
     float maxGr = 0.0f, maxDet = -300.0f;
     // round 165x: the reference's link (two lanes when the channels hear different signals)
@@ -1005,8 +1058,19 @@ void DeEsser::process (float* l, float* r, int n, const Settings& s) noexcept
         const double lw = low2.process (low1.process ((float) x, 0), 0);
         const double ph = h * h, pl = lw * lw;
         eh = ph > eh ? ca * eh + (1.0 - ca) * ph : cr * eh + (1.0 - cr) * ph;
-        qh = cq * qh + (1.0 - cq) * ph;
-        ql = cq * ql + (1.0 - cq) * pl;
+        if (v1) // round 190js: above the split against below it
+        {
+            const double a1 = shi2.process (shi1.process ((float) x, 0), 0);
+            double b1 = slo2.process (slo1.process ((float) x, 0), 0);
+            if (vocal190js.bodyLowHz > 0.0) b1 = sbody.process ((float) b1, 0);
+            qh = cq * qh + (1.0 - cq) * a1 * a1;
+            ql = cq * ql + (1.0 - cq) * b1 * b1;
+        }
+        else
+        {
+            qh = cq * qh + (1.0 - cq) * ph;
+            ql = cq * ql + (1.0 - cq) * pl;
+        }
         const auto w = (std::size_t) (pos & m);
         level[w] = (float) (10.0 * std::log10 (2.0 * eh + 1e-30));
         ratio[w] = (float) (10.0 * std::log10 ((qh + 1e-30) / (ql + 1e-30)));
@@ -1016,8 +1080,19 @@ void DeEsser::process (float* l, float* r, int n, const Settings& s) noexcept
             const double lb = blow2.process (blow1.process ((float) xb, 0), 0);
             const double pbh = hb * hb, pbl = lb * lb;
             beh = pbh > beh ? ca * beh + (1.0 - ca) * pbh : cr * beh + (1.0 - cr) * pbh;
-            bqh = cq * bqh + (1.0 - cq) * pbh;
-            bql = cq * bql + (1.0 - cq) * pbl;
+            if (v1)
+            {
+                const double a1 = bshi2.process (bshi1.process ((float) xb, 0), 0);
+                double b1 = bslo2.process (bslo1.process ((float) xb, 0), 0);
+                if (vocal190js.bodyLowHz > 0.0) b1 = bsbody.process ((float) b1, 0);
+                bqh = cq * bqh + (1.0 - cq) * a1 * a1;
+                bql = cq * bql + (1.0 - cq) * b1 * b1;
+            }
+            else
+            {
+                bqh = cq * bqh + (1.0 - cq) * pbh;
+                bql = cq * bql + (1.0 - cq) * pbl;
+            }
             blevel[w] = (float) (10.0 * std::log10 (2.0 * beh + 1e-30));
             bratio[w] = (float) (10.0 * std::log10 ((bqh + 1e-30) / (bql + 1e-30)));
         }
@@ -1028,12 +1103,12 @@ void DeEsser::process (float* l, float* r, int n, const Settings& s) noexcept
         double gainDb = 0.0;
         if (now >= 0)
         {
-            const double la = level[(std::size_t) ((now + ahead) & m)], rr = ratio[(std::size_t) (now & m)];
+            const double la = level[(std::size_t) ((now + ahead) & m)], rr = ratio[(std::size_t) ((now + gateShift) & m)];
             if (! s.gate)
                 open = true;
-            else if (! open && la >= thr + openDb && rr >= openRatioDb)
+            else if (! open && la >= thr + openDb && rr >= openR)
                 open = true;
-            else if (open && (la < thr + closeDb || rr < closeRatioDb))
+            else if (open && (la < thr + closeDb || rr < closeR))
                 open = false;
             const double t = open ? std::clamp (range * (la + laAdj - thr) / span, 0.0, range) : 0.0;
             sm = t > sm ? ga * sm + (1.0 - ga) * t : gr * sm + (1.0 - gr) * t;
@@ -1041,12 +1116,12 @@ void DeEsser::process (float* l, float* r, int n, const Settings& s) noexcept
             maxDet = std::max (maxDet, (float) la);
             if (two)
             {
-                const double lb = blevel[(std::size_t) ((now + ahead) & m)], rb = bratio[(std::size_t) (now & m)];
+                const double lb = blevel[(std::size_t) ((now + ahead) & m)], rb = bratio[(std::size_t) ((now + gateShift) & m)];
                 if (! s.gate)
                     bopen = true;
-                else if (! bopen && lb >= thr + openDb && rb >= openRatioDb)
+                else if (! bopen && lb >= thr + openDb && rb >= openR)
                     bopen = true;
-                else if (bopen && (lb < thr + closeDb || rb < closeRatioDb))
+                else if (bopen && (lb < thr + closeDb || rb < closeR))
                     bopen = false;
                 const double tb = bopen ? std::clamp (range * (lb + laAdj - thr) / span, 0.0, range) : 0.0;
                 bsm = tb > bsm ? ga * bsm + (1.0 - ga) * tb : gr * bsm + (1.0 - gr) * tb;

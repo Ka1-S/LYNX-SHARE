@@ -5,6 +5,7 @@
 #include <cmath>
 #include <complex>
 #include <cstdio>
+#include <cstdlib>
 #include <vector>
 
 namespace lynx::facet
@@ -746,7 +747,7 @@ public:
         for (auto& band : state)
             for (auto& st : band)
                 st = {};
-        for (auto& d : det) { d.filter.clear(); d.ms = 0.0; d.gain = 0.0; d.top = autoFloorDb; }
+        for (auto& d : det) { d.filter.clear(); d.ms = 0.0; d.gain = 0.0; d.top = autoLaw().floorDb; }
         solo.clear();
         conv.reset();
         firLoaded = false;
@@ -905,7 +906,7 @@ private:
         // round 190jh: the automatic threshold (autoThreshold): its top level, the fall per sample, the gain limits that
         // keep the band's total within +-30 dB
         bool autoT = false;
-        double top = autoFloorDb, topFall = 0.0, lo = -60.0, hi = 60.0;
+        double top = autoFloorDb, topFall = 0.0, topRise = 1.0, lo = -60.0, hi = 60.0;
     };
 
     void configureMode (Phase p) noexcept
@@ -950,8 +951,10 @@ private:
             {
                 const bool wasAuto = d.autoT;
                 d.autoT = autoThreshold (params, b);
-                if (d.autoT && ! wasAuto) d.top = autoFloorDb;
-                d.topFall = autoDecayDbPerSecond / sampleRate;
+                const auto& A = autoLaw();
+                if (d.autoT && ! wasAuto) d.top = A.floorDb;
+                d.topFall = A.decayDbPerSecond / sampleRate;
+                d.topRise = A.topRiseMs > 0.0 ? 1.0 - std::exp (-1.0 / (A.topRiseMs * 0.001 * sampleRate)) : 1.0;
                 const double g0 = gainDb (params[(std::size_t) param (b, 2)]);
                 d.lo = -30.0 - g0;
                 d.hi = 30.0 - g0;
@@ -986,6 +989,13 @@ private:
         }
         attackCoef = 1.0 - std::exp (-1.0 / (attackMs (params[(std::size_t) attackParam]) * 0.001 * sampleRate));
         releaseCoef = 1.0 - std::exp (-1.0 / (releaseMs (params[(std::size_t) releaseParam]) * 0.001 * sampleRate));
+        {
+            const auto& A = autoLaw();
+            autoAttackCoef = A.attackMs > 0.0 ? 1.0 - std::exp (-1.0 / (A.attackMs * 0.001 * sampleRate)) : attackCoef;
+            autoReleaseCoef = A.releaseMs > 0.0 ? 1.0 - std::exp (-1.0 / (A.releaseMs * 0.001 * sampleRate)) : releaseCoef;
+            autoTopOffset = A.topOffsetDb;
+            autoFloor = A.floorDb;
+        }
         outGain = (float) std::pow (10.0, outputDb (params[(std::size_t) outputParam]) / 20.0);
         anyPlaced = anyMidSide = false;
         for (int b = 0; b < bands; ++b)
@@ -1039,13 +1049,15 @@ private:
                 d.ms += d.msCoef * (y * y - d.ms);
                 const double level = 10.0 * std::log10 (2.0 * d.ms + 1e-20);
                 double target;
-                if (d.autoT) // round 190jh: the automatic threshold
+                if (d.autoT) // round 190jh: the automatic threshold (round 190js: its rise and own timing)
                 {
-                    d.top = std::max ({ d.top - d.topFall, level, autoFloorDb });
+                    const double t = level + autoTopOffset;
+                    d.top = std::max ({ d.top - d.topFall, d.topRise >= 1.0 ? t : d.top + d.topRise * (t - d.top), autoFloor });
                     target = std::clamp (autoDynamicGainDb (level, d.top, d.range), d.lo, d.hi);
+                    d.gain += (std::abs (target) > std::abs (d.gain) ? autoAttackCoef : autoReleaseCoef) * (target - d.gain);
+                    continue;
                 }
-                else
-                    target = dynamicGainDb (level, d.threshold, d.range);
+                target = dynamicGainDb (level, d.threshold, d.range);
                 d.gain += (std::abs (target) > std::abs (d.gain) ? attackCoef : releaseCoef) * (target - d.gain);
             }
             if (std::abs (d.ms) < 1e-30) d.ms = 0.0;
@@ -1248,6 +1260,7 @@ private:
     std::array<double, bands> dynUsed {};
     std::array<std::atomic<float>, bands> meters {};
     double attackCoef = 0.1, releaseCoef = 0.001;
+    double autoAttackCoef = 0.1, autoReleaseCoef = 0.001, autoTopOffset = 0.0, autoFloor = autoFloorDb; // round 190js
     float outGain = 1.0f, outL = 1.0f, outR = 1.0f;
     int characterNow = 0;
     std::array<Placement, bands> placed {};
@@ -1691,6 +1704,31 @@ int matchEq (const EffectParams& params, const double* f, const double* cur, con
     return (int) used.size();
 }
 
+namespace
+{
+#ifdef LYNX_LAB190JS
+AutoLaw autoLaw190js { autoFloorDb, autoDecayDbPerSecond, autoKneeDb, 0.0, 0.0, 0.0, 0.0, 0.0 };
+struct AutoLawLab
+{
+    AutoLawLab()
+    {
+        if (const char* e = std::getenv ("LYNX_LAB_FA"))
+            std::sscanf (e, "%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf", &autoLaw190js.floorDb, &autoLaw190js.decayDbPerSecond, &autoLaw190js.kneeDb,
+                         &autoLaw190js.topOffsetDb, &autoLaw190js.topRiseMs, &autoLaw190js.attackMs, &autoLaw190js.releaseMs,
+                         &autoLaw190js.kneePerRange);
+    }
+} autoLawLab;
+#else
+// round 190js [EXEC] (Nelder-Mead on the C++ renders, 5 ms windows of refcap030 grid2's tc + stairs at ranges -30 / -15 /
+// +15: 1.067 → 0.67 dB rms): the knee is 1.53 x the range (the band starts moving 1.53 x |range| / 2 under the threshold),
+// the top rises at once (the fitted rise and offset came out at 0) and falls 1.70 dB/s as before (the fit's 1.58 cost the
+// -15 dB stairs a parity step); the gain timing at Pro-Q's 50 % is 9.2 / 268 ms (the translator's attack / release)
+constexpr AutoLaw autoLaw190js { autoFloorDb, autoDecayDbPerSecond, autoKneeDb, 0.0, 0.0, 0.0, 0.0, 1.53 };
+#endif
+} // namespace
+
+const AutoLaw& autoLaw() noexcept { return autoLaw190js; }
+
 bool autoThreshold (const EffectParams& p, int b) noexcept
 {
     return b >= 0 && b < bands && p[(std::size_t) (autoThresholdParam0 + b)] >= 0.5f;
@@ -1699,7 +1737,8 @@ bool autoThreshold (const EffectParams& p, int b) noexcept
 double autoDynamicGainDb (double level, double top, double range) noexcept
 {
     const double x = level - (top - std::abs (range));
-    constexpr double knee = autoKneeDb;
+    const auto& A = autoLaw();
+    const double knee = std::max (0.01, A.kneePerRange > 0.0 ? A.kneePerRange * std::abs (range) : A.kneeDb);
     const double over = x <= -0.5 * knee ? 0.0 : x < 0.5 * knee ? (x + 0.5 * knee) * (x + 0.5 * knee) / (2.0 * knee) : x;
     return range < 0.0 ? -std::min (-range, over) : std::min (range, over);
 }
