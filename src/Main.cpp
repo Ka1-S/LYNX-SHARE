@@ -27284,6 +27284,7 @@ private:
             ui.setSize (w, h);
             ui.openFile (juce::File (project));
             offline.dispatchPendingMessages();
+            ui.setLayoutStyle (lynx::layoutstyle::Style::pattern, false); // (the style is global: A and B changed it)
             ui.selectTabForSnapshot (2);
             offline.dispatchPendingMessages();
             auto& playlist = ui.getPlaylistForSnapshot();
@@ -27301,17 +27302,17 @@ private:
                     break;
                 }
             // an empty track low in the view (FL's capture: Track 43 / 47, past the song's tracks)
-            int target = (int) song.playlistTracks.size();
-            for (int t = 0; t < (int) song.playlistTracks.size(); ++t)
-                if (std::none_of (song.playlist.begin(), song.playlist.end(), [t] (const lynx::Clip& c) { return c.track == t; }) && t > 30)
-                {
-                    target = t;
+            // (an unnamed track past the song's own, as FL's Track 43 / 47)
+            const auto target = (int) song.playlistTracks.size() + 2;
+            for (int first = juce::jmax (0, target - 30); first <= target; ++first) // (the row in the lower part of the view)
+            {
+                playlist.setViewForSnapshot (15.6, 0, first);
+                if (playlist.trackRowForSnapshot (target).getBottom() < playlist.getHeight() - 40)
                     break;
-                }
-            playlist.setViewForSnapshot (15.6, 0, juce::jmax (0, target - 16));
+            }
             offline.dispatchPendingMessages();
             const auto row = playlist.trackRowForSnapshot (target);
-            const auto mouse = juce::Point<int> ((int) playlist.xOfTickForSnapshot (5.1 * (double) song.barTicks()), row.getCentreY());
+            const auto mouse = juce::Point<int> ((int) playlist.xOfTickForSnapshot (9.1 * (double) song.barTicks()), row.getCentreY());
             const juce::var drag (lynx::PlaylistComponent::pickerDragDescription (lynx::ClipKind::pattern, { synthBass }));
             playlist.dragOverForSnapshot (drag, mouse);
             {
