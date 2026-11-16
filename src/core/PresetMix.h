@@ -13,6 +13,15 @@
 
 namespace lynx::presetmix
 {
+// FL's Hybridize is one mode of the wrapper's Presets menu: LYNX's native editors (round 190ih) and the hosted plugins'
+// wrapper (round 190in) share it, so switching it in one window shows ticked in the other (rollup 0.1.30, round 190iy).
+// Message thread; not saved (a mode of the session, off at start-up).
+inline bool& hybridizeMode() noexcept
+{
+    static bool on = false;
+    return on;
+}
+
 // a small LCG (no allocation, the same on every platform)
 inline float next (std::uint32_t& seed) noexcept
 {

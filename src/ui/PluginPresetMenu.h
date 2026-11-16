@@ -6,6 +6,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 
 #include "core/PluginPresets.h"
+#include "core/PresetMix.h"
 #include "engine/AudioEngine.h"
 
 // Presets of hosted plugins from the plugin window (round 162d, issue #8; FL's wrapper: the presets menu and ◀ ▶):
@@ -77,7 +78,7 @@ public:
     // FL's Presets › Randomize ("gives random values to the published plugin settings": the plugin's automatable
     // parameters) and Hybridize (a mode: a preset chosen while it is on brings a random half of those parameters)
     void randomize();
-    static bool& hybridize() { static bool on = false; return on; }
+    static bool& hybridize() { return presetmix::hybridizeMode(); } // (one mode with the native editors' Hybridize)
     // Round 190in (design190ia FW-5): in a window's title bar, FL's look — the name, dim, then ◀ ▶, no box
     void setTitleLook (bool shouldBe);
 

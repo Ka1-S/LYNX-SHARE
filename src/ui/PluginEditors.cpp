@@ -5471,7 +5471,7 @@ private:
             fx->presetName = presetName.toStdString();
         }
         // round 190ih: FL's Presets › Hybridize: a random half of the published settings come from the preset
-        const auto hybrid = hybridizePresets && current() != nullptr;
+        const auto hybrid = presetmix::hybridizeMode() && current() != nullptr;
         const auto published = (int) effectInfo (kind).params.size();
         const auto seed = (std::uint32_t) juce::Random::getSystemRandom().nextInt();
         engine.editSong ([t = track, s = slot, fx = *fx, hybrid, published, seed] (Song& song) {
@@ -5508,7 +5508,6 @@ private:
         });
         repaint();
     }
-    static inline bool hybridizePresets = false; // FL's Presets › Hybridize (a mode, as FL's)
 
     void stepPreset (int delta)
     {
@@ -5570,7 +5569,7 @@ private:
         if (presets.getNumItems() > 0)
             presets.addSeparator();
         presets.addItem (tr ("Randomize"), [this] { randomizeParams(); });
-        presets.addItem (tr ("Hybridize"), true, hybridizePresets, [] { hybridizePresets = ! hybridizePresets; });
+        presets.addItem (tr ("Hybridize"), true, presetmix::hybridizeMode(), [] { presetmix::hybridizeMode() = ! presetmix::hybridizeMode(); }); // (one mode with the hosted plugins' wrapper)
         menu.addSubMenu (tr ("Presets"), presets);
         if (showsSidechain()) // round 177b
         {
