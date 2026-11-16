@@ -953,6 +953,15 @@ std::unique_ptr<const RackState> RackState::build (Song song,
             continue;
         }
 
+        // round 190jb: an export renders with the live engine's running plugin (or the Patcher that hosts plugins)
+        if (factories.liveInstrument && (kind == InstrumentKind::plugin || kind == InstrumentKind::patcher))
+            if (auto lent = factories.liveInstrument (channel, sampleRate); lent != nullptr)
+            {
+                state->instruments.push_back (std::move (lent));
+                state->instruments.back()->configure (channel, song.bpm);
+                continue;
+            }
+
         // FL's Patcher as a generator (REA_rodada141): same structure keeps the running graph (it takes the values)
         if (kind == InstrumentKind::patcher)
         {
@@ -1107,6 +1116,14 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                 state->effects[t].push_back (previous->effects[pt][pi]);
                 continue;
             }
+
+            // round 190jb: an export renders with the live engine's running plugin (or the Patcher that hosts plugins)
+            if (factories.liveEffect && (kind == EffectKind::plugin || kind == EffectKind::patcher))
+                if (auto lent = factories.liveEffect (slots[i], sampleRate); lent != nullptr)
+                {
+                    state->effects[t].push_back (std::move (lent));
+                    continue;
+                }
 
             // FL's Patcher (REA_rodada141): same structure keeps the running graph (it takes the values)
             if (kind == EffectKind::patcher)

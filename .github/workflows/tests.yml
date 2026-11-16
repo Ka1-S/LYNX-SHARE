@@ -229,6 +229,18 @@ jobs:
           grep -E 'hosted|^short_export=|^result=' boot.txt
           grep -q '^result=OK' boot.txt
 
+      # Round 190jb (FL renders with the plugin instances that play): an export made with the Export window's hold renders
+      # with the live engine's instance. The test synth's seeded mode gives every instance its own pitches: the export
+      # must equal playback (a new instance can't), playback after it must equal playback before it, the plugin back at
+      # its rate in real-time mode (the synth built by the step above)
+      - name: Export with the live plugin instances (VST3)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          LYNX_TEST_SYNTH_SEED=1 LYNX_PROFILE_DIR="$PWD/live-profile" xvfb-run -a build/LYNX_artefacts/Release/LYNX --exportlivetest "$PWD/live.txt" --plugin "$PWD/boot-plugin/LYNX Test Synth.vst3" || true
+          cat live.txt
+          grep -q '^result=OK' live.txt
+
       # Round 190dt: a hosted plugin that crashes in its audio processing (a null write, and a memcpy from null as in
       # issue #155) is switched off and LYNX keeps playing, saves and reloads it; a plugin that crashes on its saved state
       # is left out as the project opens; LYNX's own faults inside a plugin call still end in the crash handler.

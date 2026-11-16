@@ -786,6 +786,25 @@ public:
             return;
         }
 
+        if (args.contains ("--exportlivetest"))
+        {
+            // LYNX --exportlivetest report.txt [--plugin file]... (round 190jb): exports with the live plugin instances (as
+            // FL renders) against playback on a stand-in device, the plugins given back afterwards. No window.
+            const auto i = args.indexOf ("--exportlivetest");
+            const juce::File report (args[i + 1].unquoted());
+            juce::StringArray files;
+            for (int k = 0; k + 1 < args.size(); ++k)
+                if (args[k] == "--plugin")
+                    files.add (args[k + 1].unquoted());
+            juce::String text;
+            const auto result = lynx::AudioEngine::exportLiveSelfTest ([&text] (const juce::String& line) { text << line << "\n"; }, files);
+            text << "export_live=" << result << "\nresult=" << (result.startsWith ("OK") ? "OK" : "FAILED") << "\n";
+            report.replaceWithText (text);
+            setApplicationReturnValue (result.startsWith ("OK") ? 0 : 1);
+            quit();
+            return;
+        }
+
         if (args.contains ("--exportparitytest") || args.contains ("--midihotplugtest"))
         {
             // LYNX --exportparitytest report.txt (round 190gh, B7): the export against playback through a stand-in audio
@@ -5533,6 +5552,16 @@ private:
         const auto deviceChange = lynx::AudioEngine::deviceChangeSelfTest (10, false);
         // round 190gh: export parity (B7) and MIDI device hot-plug (B8)
         const auto exportParity = lynx::AudioEngine::exportParitySelfTest();
+        // round 190jb: exports with the live plugin instances (Surge XT when it is installed here; otherwise only noted)
+        juce::StringArray livePlugins;
+       #if JUCE_WINDOWS
+        livePlugins.add ("C:\\Program Files\\Common Files\\VST3\\Surge Synth Team\\Surge XT.vst3");
+       #elif JUCE_MAC
+        livePlugins.add ("/Library/Audio/Plug-Ins/VST3/Surge XT.vst3");
+       #else
+        livePlugins.add (juce::File::getSpecialLocation (juce::File::userHomeDirectory).getChildFile (".vst3/Surge XT.vst3").getFullPathName());
+       #endif
+        const auto exportLive = lynx::AudioEngine::exportLiveSelfTest ({}, livePlugins);
         const auto midiHotplug = lynx::AudioEngine::midiHotplugSelfTest();
 
         // Online Sessions P2 (round 169b): live sessions without a network (the JSON round trip of every entity, replicas
@@ -6349,7 +6378,7 @@ private:
         const auto ok = editorsResult.startsWith ("OK") && ! faultResult.startsWith ("ERROR") && stemsResult == "OK"
                         && mixerBasics == "OK" && fontsResult == "OK" && paintCachesResult.startsWith ("OK") && picturesResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && pluginLevelsOk && flp168jOk && clipFades180dOk && blocksOk && takeoverOk && compOk && polyOk && latencyOk && preSendOk && lowLatencyOk && previewInTimeOk && substituteOk && patcherOk && rackResult == "OK" && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
-                        && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && exportParity.startsWith ("OK") && midiHotplug.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
+                        && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && exportParity.startsWith ("OK") && exportLive.startsWith ("OK") && midiHotplug.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK"
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
@@ -6403,6 +6432,7 @@ private:
                << "driver_panel=" << driverPanel << "\n"
                << "device_change=" << deviceChange << "\n"
                << "export_parity=" << exportParity << "\n"
+               << "export_live=" << exportLive << "\n"
                << "midi_hotplug=" << midiHotplug << "\n"
                << "plugin_art=" << artResult << "\n"
                << "plugin_sidechain=" << sidechainResult << "\n"

@@ -132,6 +132,8 @@ private:
 public:
     bool reveal = false;
     std::function<void()> then; // after a successful export (round 174d: the video with the mix)
+    // round 190jb: the live engine's plugins render this export (FL); given back when the thread is deleted
+    std::shared_ptr<LiveExportHold> liveHold;
 private:
     juce::String error;
     bool ok = false;
@@ -193,6 +195,10 @@ public:
 
         juce::MessageManager::callAsync ([this] { delete this; });
     }
+
+public:
+    // round 190jb: the live engine's plugins render these files (FL); given back when the thread is deleted
+    std::shared_ptr<LiveExportHold> liveHold;
 
 private:
     std::function<void (const std::vector<juce::File>&)> afterRender;
@@ -1184,7 +1190,9 @@ private:
                 const auto tracks = onlyTracks;
                 const auto after = afterRender;
                 close(); // deletes this panel: no `this` after this point
-                (new StemsThread (engineRef, o, base, tracks, after))->launchThread();
+                auto* stems = new StemsThread (engineRef, o, base, tracks, after);
+                stems->liveHold = LiveExportHold::open (engineRef); // (round 190jb: FL renders with the plugins that play)
+                stems->launchThread();
                 return;
             }
         }
@@ -1235,15 +1243,20 @@ private:
         if (o.stems != exportopts::Stems::none || exportopts::exportsSections (engineRef.getSong(), o))
         {
             close();
-            (new StemsThread (engineRef, o, file, tracks, after))->launchThread();
+            auto* stems = new StemsThread (engineRef, o, file, tracks, after);
+            stems->liveHold = LiveExportHold::open (engineRef); // (round 190jb: FL renders with the plugins that play)
+            stems->launchThread();
             return;
         }
 
+        // round 190jb: FL renders with the plugin instances that play, playback stopped (the hold, before the job)
+        auto liveHold = LiveExportHold::open (engineRef);
         auto job = std::make_unique<ExportJob> (engineRef.getSong(), o, file);
         job->setExtraData (true);
         const auto withVideo = videoToggle.isVisible() && videoToggle.getToggleState() && o.range != exportopts::Range::pattern;
         close(); // deletes this panel: no `this` after this point
         auto* thread = new ExportThread (std::move (job), file);
+        thread->liveHold = std::move (liveHold);
         thread->reveal = o.showWhenDone;
         if (withVideo)
             thread->then = [song = engineRef.getSong(), o, file] { writeVideoWithMix (song, o, file); };

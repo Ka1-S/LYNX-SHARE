@@ -192,6 +192,9 @@ public:
     // The render-ahead thread renders nothing more (the engine is going away: its snapshots are about to be freed);
     // returns once it is idle. prepare() lets it work again.
     void halt() noexcept;
+    // Round 190jb: after a halt() while the engine lives on (an export rendered with its plugins): the thread may
+    // render again. The device callback must not be running (the engine's export hold keeps it out).
+    void resume() noexcept { halted.store (false, std::memory_order_seq_cst); }
 
     // the partition of a state (tests): [channel] / [track] 1 = rendered ahead; false = nothing to render ahead.
     // `editors` (optional): the open editors' wants (levelWanted, metersWanted, the analyser's key) to partition with

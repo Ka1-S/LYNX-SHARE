@@ -21,6 +21,9 @@
 
 #include "engine/ChannelRackProcessor.h"
 #include "engine/Exporter.h"
+#include "engine/PluginHost.h"
+
+#include <cstdlib>
 
 namespace lynx
 {
@@ -34,6 +37,8 @@ struct ParityDevice final : juce::AudioIODevice, private juce::Thread
 
     static constexpr double rate = 48000.0;
     static inline int block = 441; // (the test sets it before opening)
+    // (round 190jb) called on the device thread before each callback while it runs: the callbacks so far
+    static inline std::function<void (int)> beforeBlock;
 
     juce::StringArray getOutputChannelNames() override { return { "Out 1", "Out 2" }; }
     juce::StringArray getInputChannelNames() override { return {}; }
@@ -93,13 +98,19 @@ private:
             {
                 const juce::ScopedLock sl (callbackLock);
                 if (callback != nullptr)
+                {
+                    if (beforeBlock)
+                        beforeBlock (blocks);
+                    ++blocks;
                     callback->audioDeviceIOCallbackWithContext (nullptr, 0, data.getArrayOfWritePointers(), data.getNumChannels(), block, {});
+                }
             }
             juce::Thread::sleep (2); // (a block is 9.2 ms: ~4× real time, well within the bounce tap's 5 s)
         }
     }
 
     juce::BigInteger outsNow;
+    int blocks = 0;
     juce::AudioBuffer<float> data;
     juce::CriticalSection callbackLock;
     juce::AudioIODeviceCallback* callback = nullptr;
@@ -311,12 +322,29 @@ juce::String AudioEngine::exportParitySelfTest (const std::function<void (const 
     // playback through a stand-in device with callbacks of `block` samples: what the real-time bounce's tap records (as
     // Export › "Render through the hardware in real time"), the message thread doing its part (the engine's timer)
     // `raced` (round 190hn): the start lands inside a callback, after it took the position requests (StartRace)
-    auto playback = [&] (int block, juce::String& error, bool raced) {
+    // `switchAt` (round 190jb, seconds of the song, < 0 = none): render-ahead is switched on (`engage`) or off there, as
+    // its load probe switches it in the middle of a song under load (the rare mid-song miss of 190hn / 190ip)
+    auto playback = [&] (int block, juce::String& error, bool raced, double switchAt = -1.0, bool engage = true) {
         Audio played;
         ParityDevice::block = block;
         AudioEngine live (false);
         live.player.setProcessor (&live.graph);
         live.deviceManager.addAudioDeviceType (std::make_unique<ParityType>());
+        int playingBlocks = 0;
+        const auto switchBlock = switchAt >= 0.0 ? (int) std::lround (switchAt * ParityDevice::rate / block) : -1;
+        // (set before the device runs, cleared after it is closed: only the device thread calls it)
+        ParityDevice::beforeBlock = nullptr;
+        if (switchBlock >= 0)
+        {
+            if (! engage && live.rackProcessor != nullptr)
+                live.rackProcessor->setRenderAheadAlways (true);
+            ParityDevice::beforeBlock = [&live, &playingBlocks, switchBlock, engage] (int) {
+                if (live.rackProcessor == nullptr || ! live.transport.playing.load())
+                    return;
+                if (playingBlocks++ == switchBlock)
+                    live.rackProcessor->setRenderAheadAlways (engage);
+            };
+        }
         if (const auto e = live.deviceManager.initialise (0, 2, nullptr, true); e.isNotEmpty())
         {
             error = "open the stand-in device: " + e;
@@ -346,6 +374,8 @@ juce::String AudioEngine::exportParitySelfTest (const std::function<void (const 
         if (started.isNotEmpty())
         {
             live.afterPositionRequests.store (nullptr);
+            live.deviceManager.closeAudioDevice();
+            ParityDevice::beforeBlock = nullptr;
             error = "playback (real-time bounce): " + started;
             return played;
         }
@@ -363,6 +393,15 @@ juce::String AudioEngine::exportParitySelfTest (const std::function<void (const 
         live.afterPositionRequests.store (nullptr);
         live.deviceManager.removeAudioCallback (&live);
         live.deviceManager.closeAudioDevice();
+        ParityDevice::beforeBlock = nullptr;
+        if (switchBlock >= 0)
+        {
+            const auto engagements = live.rackProcessor != nullptr ? (int) live.rackProcessor->renderAheadStats().engagements.load() : -1;
+            say ("  render-ahead " + juce::String (engage ? "engaged" : "released") + " at block " + juce::String (switchBlock) + " ("
+                 + juce::String (switchAt, 2) + " s): " + juce::String (engagements) + " engagement(s)");
+            if (engage && engagements < 1)
+                notes.add ("render-ahead did not engage at " + juce::String (switchAt, 2) + " s");
+        }
         if (dropouts > 0)
             notes.add (juce::String (dropouts) + " dropout(s) during playback");
         if ((std::int64_t) played.l.size() < wanted)
@@ -407,10 +446,13 @@ juce::String AudioEngine::exportParitySelfTest (const std::function<void (const 
         return juce::String ("never apart");
     };
     // the playback (in blocks of 441) against the export; `how` names the variant in the error
-    auto checkPlayback = [&] (bool raced) {
-        const juce::String how = raced ? "playback started inside a callback" : "playback";
+    auto checkPlayback = [&] (bool raced, double switchAt = -1.0, bool engage = true) {
+        const juce::String how = switchAt >= 0.0 ? "playback with render-ahead " + juce::String (engage ? "engaging" : "released") + " at "
+                                                       + juce::String (switchAt, 2) + " s"
+                                 : raced ? "playback started inside a callback"
+                                         : "playback";
         juce::String playError;
-        const auto played = playback (441, playError, raced);
+        const auto played = playback (441, playError, raced, switchAt, engage);
         if (playError.isNotEmpty())
         {
             errors.add (playError);
@@ -439,7 +481,7 @@ juce::String AudioEngine::exportParitySelfTest (const std::function<void (const 
                     worst = i;
             say ("  best lag " + juce::String (bestLag) + " (" + db (best) + "), the largest difference at frame " + juce::String ((int) worst));
             juce::String e512;
-            const auto same = playback (512, e512, raced);
+            const auto same = playback (512, e512, raced, switchAt, engage);
             errors.add (how + " differs from the export by " + db (d) + " (best lag " + juce::String (bestLag) + ": " + db (best) + ", worst at frame "
                         + juce::String ((int) worst) + ", " + where (mix, played) + ", first sound at " + juce::String (firstSound (mix)) + " / "
                         + juce::String (firstSound (played)) + "; in blocks of 512: " + (e512.isNotEmpty() ? e512 : db (maxDiff (mix, same, n)) + ", " + where (mix, same))
@@ -448,6 +490,19 @@ juce::String AudioEngine::exportParitySelfTest (const std::function<void (const 
     };
     checkPlayback (false);
     checkPlayback (true);
+    // Round 190jb: render-ahead switched on, and off, in the middle of the song, as its load probe does under load (the rare
+    // mid-song miss: 1 in ~100 runs under load, "first apart at 3.56 s"). LYNX_EXPORTPARITY_ENGAGE_AT / _RELEASE_AT =
+    // seconds (the stress script draws them) replace the self-test's fixed points.
+    {
+        auto at = [] (const char* name, double fallback) {
+            const auto v = juce::SystemStats::getEnvironmentVariable (name, {});
+            return v.isNotEmpty() ? v.getDoubleValue() : fallback;
+        };
+        if (const auto engageAt = at ("LYNX_EXPORTPARITY_ENGAGE_AT", 3.5); engageAt >= 0.0)
+            checkPlayback (false, engageAt, true);
+        if (const auto releaseAt = at ("LYNX_EXPORTPARITY_RELEASE_AT", 2.0); releaseAt >= 0.0)
+            checkPlayback (false, releaseAt, false);
+    }
 
     // --- 2. stems ---------------------------------------------------------------------------------------------------
     auto checkSum = [&] (const juce::String& what, const std::vector<Audio>& parts) {
@@ -556,6 +611,262 @@ juce::String AudioEngine::exportParitySelfTest (const std::function<void (const 
 
     if (! errors.isEmpty())
         return "ERROR " + errors.joinIntoString ("; ");
-    return "OK (export = playback, also started inside a callback, stems of 2 modes add up to the mix, side-chained stems ducked" + (notes.isEmpty() ? juce::String() : ", " + notes.joinIntoString (", ")) + ")";
+    return "OK (export = playback, also started inside a callback and with render-ahead switched mid-song, stems of 2 modes add up to the mix, side-chained stems ducked" + (notes.isEmpty() ? juce::String() : ", " + notes.joinIntoString (", ")) + ")";
+}
+
+// --- Round 190jb: exports with the live plugin instances ---------------------------------------------------------------
+// The parity project plus a hosted instrument (each of `pluginFiles`' first instrument) on insert 5, played on the
+// stand-in device by one live engine that stays open (its plugins keep running, as in the app):
+//  1. an export without a hold: new instances, as before (its length is the playback's);
+//  2. playback, recorded by the real-time bounce's tap;
+//  3. an export with the Export window's hold (LiveExportHold): it must render with the live instance and equal the
+//     playback, below -90 dBFS or within what two playbacks of the plugin differ by (a plugin may not repeat itself);
+//  4. the hold given back: the engine plays again, the plugin at the device's rate in real-time mode;
+//  5. playback again: the same as the first (the export changed nothing that is heard afterwards);
+//  6. LYNX's own units with a plugin lent: insert 4's stem (sampler, EQ, automated fader) bit-identical with and without;
+//  7. an export at 44.1 kHz with the hold: the plugin prepared at that rate and back at 48 kHz afterwards.
+// With the LYNX Test Synth in its seeded mode (LYNX_TEST_SYNTH_SEED=1: a pitch per instance) the export without the
+// hold must differ from the playback: proof that the instance, not just the plugin, is what renders.
+juce::String AudioEngine::exportLiveSelfTest (const std::function<void (const juce::String&)>& log, const juce::StringArray& pluginFiles)
+{
+    auto say = [&log] (const juce::String& line) {
+        if (log)
+            log (line);
+    };
+    const auto folder = juce::File::getSpecialLocation (juce::File::tempDirectory)
+                            .getChildFile ("lynx-exportlive-" + juce::String::toHexString (juce::Random::getSystemRandom().nextInt64()));
+    folder.createDirectory();
+    struct Cleanup
+    {
+        juce::File f;
+        ~Cleanup() { f.deleteRecursively(); }
+    } cleanup { folder };
+    for (int k = 0; k < 3; ++k)
+        if (! writeSample (folder.getChildFile ("parity-" + juce::String (k) + ".wav"), k))
+            return "ERROR can't write the test samples in " + folder.getFullPathName();
+
+    juce::StringArray errors, notes, checked;
+    // the hosted instruments: each file's first instrument
+    std::vector<std::pair<juce::String, ChannelDef>> hosted;
+    {
+        AudioEngine scanner (false);
+        for (const auto& path : pluginFiles)
+        {
+            const juce::File file (path);
+            if (! file.exists())
+            {
+                notes.add ("not installed: " + file.getFileName());
+                continue;
+            }
+            scanner.getPluginHost().addPluginFile (file);
+            auto found = false;
+            for (const auto& t : scanner.getPluginHost().getKnownPlugins().getTypes())
+                if (t.isInstrument && juce::File (t.fileOrIdentifier).getFileName() == file.getFileName())
+                {
+                    ChannelDef c;
+                    c.instrument = InstrumentKind::plugin;
+                    c.plugin.id = t.createIdentifierString().toStdString();
+                    c.plugin.name = t.name.toStdString();
+                    hosted.push_back ({ t.name + " (" + t.pluginFormatName + ")", c });
+                    found = true;
+                    break;
+                }
+            if (! found)
+                errors.add ("no instrument in " + file.getFileName());
+        }
+    }
+    if (hosted.empty())
+        return errors.isEmpty() ? "OK (no hosted instrument to check" + (notes.isEmpty() ? juce::String() : ": " + notes.joinIntoString (", ")) + ")"
+                                : "ERROR " + errors.joinIntoString ("; ");
+
+    auto options = parityOptions();
+    auto exportSong = [&] (const Song& s, const exportopts::Options& o, const juce::String& name, int* lent) {
+        const auto file = folder.getChildFile (name + ".wav");
+        Audio a;
+        {
+            ExportJob job (s, o, file); // (made on this thread, the message thread: it may take the hold)
+            if (lent != nullptr)
+                *lent = job.livePlugins();
+            juce::String error;
+            if (! job.run ({}, error))
+            {
+                errors.add (name + ": " + error);
+                return a;
+            }
+        }
+        a = readWav (file);
+        if (a.error.isNotEmpty())
+            errors.add (a.error);
+        return a;
+    };
+    auto peakOf = [] (const Audio& a) {
+        float p = 0.0f;
+        for (std::size_t i = 0; i < a.l.size(); ++i)
+            p = juce::jmax (p, std::abs (a.l[i]), std::abs (a.r[i]));
+        return p;
+    };
+
+    for (const auto& [name, plugin] : hosted)
+    {
+        auto song = paritySong (folder);
+        auto c = plugin;
+        c.name = "Hosted";
+        c.volume = 0.8f;
+        c.mixerTrack = 5;
+        song.channels.push_back (c);
+        song.mixer[5].name = "Hosted";
+        for (int k = 0; k < 8; ++k)
+            song.patterns[0].notes.push_back ({ (std::int64_t) k * ppq / 2 + 11, ppq / 3, 3, 57 + (k % 4) * 3, 0.8f });
+        song.patterns[0].sortNotes();
+        const auto errorsBefore = errors.size();
+
+        // 1. new instances (the old way); its length is what playback records
+        const auto fresh = exportSong (song, options, "fresh", nullptr);
+        if (fresh.l.empty())
+            continue;
+
+        ParityDevice::block = 441;
+        ParityDevice::beforeBlock = nullptr;
+        AudioEngine live (false);
+        live.player.setProcessor (&live.graph);
+        live.deviceManager.addAudioDeviceType (std::make_unique<ParityType>());
+        if (const auto e = live.deviceManager.initialise (0, 2, nullptr, true); e.isNotEmpty())
+            return "ERROR open the stand-in device: " + e;
+        live.deviceManager.addAudioCallback (&live);
+        live.setSong (song);
+        for (int i = 0; i < 20; ++i)
+        {
+            live.timerCallback();
+            juce::Thread::sleep (10);
+        }
+        auto playOnce = [&] (const juce::String& what) {
+            Audio played;
+            const auto started = live.startRealtimeBounce (0.0);
+            if (started.isNotEmpty())
+            {
+                errors.add (name + ", " + what + ": " + started);
+                return played;
+            }
+            const auto latency = (std::int64_t) live.bounceLatency();
+            const auto wanted = latency + (std::int64_t) fresh.l.size();
+            const auto since = juce::Time::getMillisecondCounter();
+            while ((std::int64_t) played.l.size() < wanted && juce::Time::getMillisecondCounter() - since < 60000 && live.bounceStillPlaying())
+            {
+                live.timerCallback();
+                juce::Thread::sleep (20);
+                live.pullRealtimeBounce (played.l, played.r);
+            }
+            live.finishRealtimeBounce();
+            for (int i = 0; i < 10; ++i) // (the engine's timer after a stop)
+            {
+                live.timerCallback();
+                juce::Thread::sleep (5);
+            }
+            if ((std::int64_t) played.l.size() < wanted)
+            {
+                errors.add (name + ", " + what + ": " + juce::String ((int) played.l.size()) + " frames recorded of " + juce::String ((int) wanted));
+                return Audio {};
+            }
+            played.l.erase (played.l.begin(), played.l.begin() + latency);
+            played.r.erase (played.r.begin(), played.r.begin() + latency);
+            played.l.resize (fresh.l.size());
+            played.r.resize (fresh.r.size());
+            return played;
+        };
+        auto hostedNow = [&]() -> juce::AudioPluginInstance* {
+            auto* p = dynamic_cast<PluginInstrument*> (live.getChannelInstrument (3).get());
+            return p != nullptr ? &p->getInstance() : nullptr;
+        };
+
+        // 2. playback
+        const auto first = playOnce ("first playback");
+        if (hostedNow() == nullptr)
+            errors.add (name + ": the plugin did not load in the live engine");
+
+        // 3. the export with the hold (the Export window's)
+        int lent = 0;
+        Audio held;
+        {
+            auto hold = LiveExportHold::open (live);
+            if (hold == nullptr)
+                errors.add (name + ": the live engine could not be held");
+            else if (! live.heldForExport())
+                errors.add (name + ": the hold is open but the engine is not held");
+            held = exportSong (song, options, "held", &lent);
+            if (hold != nullptr && lent < 1)
+                errors.add (name + ": the export did not take the live plugin (" + hold->lastRefusal() + ")");
+        } // (4. the hold given back)
+        if (live.heldForExport())
+            errors.add (name + ": the engine is still held after the export");
+        if (auto* p = hostedNow(); p != nullptr && (p->getSampleRate() != ParityDevice::rate || p->isNonRealtime()))
+            errors.add (name + ": after the export the plugin runs at " + juce::String (p->getSampleRate()) + " Hz"
+                        + (p->isNonRealtime() ? ", in offline mode" : ""));
+
+        // 5. playback again
+        const auto second = playOnce ("second playback");
+
+        // 6. LYNX's own units with the plugin lent: insert 4's stem
+        auto stemOptions = options;
+        stemOptions.stems = exportopts::Stems::mixerTracks;
+        const auto stemFresh = exportSong (makeBounceSong (song, 4), stemOptions, "stem-fresh", nullptr);
+        Audio stemHeld;
+        int stemLent = 0;
+        {
+            auto hold = LiveExportHold::open (live);
+            stemHeld = exportSong (makeBounceSong (song, 4), stemOptions, "stem-held", &stemLent);
+        }
+
+        // 7. another sample rate
+        auto at441 = options;
+        at441.sampleRate = 44100.0;
+        Audio other;
+        int otherLent = 0;
+        double rateDuring = 0.0;
+        {
+            auto hold = LiveExportHold::open (live);
+            other = exportSong (song, at441, "at44100", &otherLent);
+            if (auto* p = hostedNow())
+                rateDuring = p->getSampleRate();
+        }
+        const auto rateAfter = hostedNow() != nullptr ? hostedNow()->getSampleRate() : 0.0;
+
+        live.deviceManager.removeAudioCallback (&live);
+        live.deviceManager.closeAudioDevice();
+        if (errors.size() > errorsBefore || first.l.empty() || second.l.empty() || held.l.empty())
+            continue;
+
+        const auto n = fresh.l.size();
+        const auto heldVsPlay = maxDiff (held, first, n);
+        const auto playVsPlay = maxDiff (second, first, n);
+        const auto freshVsPlay = maxDiff (fresh, first, n);
+        const auto stemSame = maxDiff (stemHeld, stemFresh, juce::jmax (stemHeld.l.size(), stemFresh.l.size()));
+        // (a plugin that does not repeat itself from one playback to the next is held to that much)
+        const auto allowed = juce::jmax (3.16e-5f, playVsPlay * 2.0f);
+        say (name + ": export with the live instance vs playback " + db (heldVsPlay) + " (" + juce::String (lent) + " plugin(s) lent), playback after it vs before "
+             + db (playVsPlay) + ", export with a new instance vs playback " + db (freshVsPlay) + "; insert 4's stem with / without the hold "
+             + db (stemSame) + " (" + juce::String (stemLent) + " lent); at 44.1 kHz: " + juce::String (otherLent) + " lent, the plugin at "
+             + juce::String (rateDuring) + " Hz during the export's hold, " + juce::String (rateAfter) + " Hz after, peak " + db (peakOf (other)));
+        if (heldVsPlay >= allowed)
+            errors.add (name + ": the export with the live instance differs from playback by " + db (heldVsPlay));
+        if (playVsPlay >= 3.16e-5f && heldVsPlay >= 3.16e-5f)
+            notes.add (name + " does not repeat itself (two playbacks differ by " + db (playVsPlay) + ")");
+        if (stemHeld.l.size() != stemFresh.l.size() || stemSame > 0.0f)
+            errors.add (name + ": LYNX's own units render differently with a plugin lent (" + db (stemSame) + ", "
+                        + juce::String ((int) stemHeld.l.size()) + " / " + juce::String ((int) stemFresh.l.size()) + " frames)");
+        if (stemLent < 1)
+            errors.add (name + ": the stem's export did not take the live plugin");
+        if (otherLent < 1 || rateAfter != ParityDevice::rate || peakOf (other) < 1.0e-3f)
+            errors.add (name + ": the export at 44.1 kHz (" + juce::String (otherLent) + " lent, the plugin back at " + juce::String (rateAfter)
+                        + " Hz, peak " + db (peakOf (other)) + ")");
+        // the seeded test synth: a new instance plays other pitches, so the old way can't match playback
+        if (std::getenv ("LYNX_TEST_SYNTH_SEED") != nullptr && name.startsWith ("LYNX Test Synth") && freshVsPlay < 1.0e-2f)
+            errors.add (name + ": a new instance renders the same as the live one (" + db (freshVsPlay) + "): the seed is not per instance");
+        checked.add (name + " " + db (heldVsPlay));
+    }
+    ParityDevice::beforeBlock = nullptr;
+    if (! errors.isEmpty())
+        return "ERROR " + errors.joinIntoString ("; ");
+    return "OK (export with the live instances = playback: " + checked.joinIntoString (", ") + "; restored after"
+           + (notes.isEmpty() ? juce::String() : "; " + notes.joinIntoString (", ")) + ")";
 }
 } // namespace lynx

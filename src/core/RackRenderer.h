@@ -369,6 +369,11 @@ struct RackState
         std::unordered_set<std::uint64_t> freshInstances;
         // round 190aq: the inserts whose latency-adding slots are bypassed (lowlatency::bypassTracks); empty = none
         std::vector<char> lowLatencyTracks;
+        // Round 190jb (FL renders with the instances that play): an export's hosted plugin channels / slots and its
+        // Patchers that host plugins take the unit these return (the live engine's running one); nullptr or unset: built
+        // new as usual
+        std::function<std::shared_ptr<Instrument> (const ChannelDef&, double sampleRate)> liveInstrument;
+        std::function<std::shared_ptr<Effect> (const EffectSlot&, double sampleRate)> liveEffect;
     };
 
     // Round 190gp: what the renderer's effect loop needs of each slot, worked out once per snapshot ([track][slot], one

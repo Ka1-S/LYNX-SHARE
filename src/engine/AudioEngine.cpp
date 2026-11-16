@@ -931,7 +931,25 @@ warmup::Result AudioEngine::warmUpPlugins (const warmup::Settings& settings, dou
     // takes them to process the extra silence, a few ms for most.)
     constexpr double hostedInstrumentSeconds = 3.0;
     auto wait = settings;
-    if (std::any_of (song.channels.begin(), song.channels.end(), [] (const ChannelDef& c) { return c.instrument == InstrumentKind::plugin; }))
+    // Round 190jb: a unit lent by the live engine (it renders with the instances that play, as FL) has booted long ago;
+    // when every hosted plugin of the render is one, the warm-up only lets the start's values settle (FL has none)
+    auto lent = [this] (const void* unit) { return std::find (lentUnits.begin(), lentUnits.end(), unit) != lentUnits.end(); };
+    auto allLent = true;
+    for (std::size_t i = 0; i < song.channels.size(); ++i)
+        if (const auto kind = song.channels[i].instrument; kind == InstrumentKind::plugin || kind == InstrumentKind::patcher)
+            allLent = allLent && lent (getChannelInstrument ((int) i).get());
+    for (std::size_t t = 0; t < song.mixer.size(); ++t)
+        for (std::size_t s = 0; s < song.mixer[t].effects.size(); ++s)
+            if (const auto kind = song.mixer[t].effects[s].kind; kind == EffectKind::plugin || kind == EffectKind::patcher)
+                allLent = allLent && lent (getEffect ((int) t, (int) s).get());
+    if (allLent)
+    {
+        wait.minAudioSeconds = 0.0;
+        wait.minWallSeconds = 0.0;
+        wait.stableWallSeconds = juce::jmin (wait.stableWallSeconds, 0.05);
+        wait.maxWallSeconds = juce::jmin (wait.maxWallSeconds, 2.0);
+    }
+    else if (std::any_of (song.channels.begin(), song.channels.end(), [] (const ChannelDef& c) { return c.instrument == InstrumentKind::plugin; }))
         wait.minAudioSeconds = juce::jmax (wait.minAudioSeconds, hostedInstrumentSeconds);
 
     // keeps the units alive whatever the timer publishes during the warm-up
@@ -4806,6 +4824,8 @@ void AudioEngine::publishSong()
         return plugins.makeEffect (ref, sr);
     };
     factories.freshInstances = std::exchange (remoteFreshInstances, {});
+    factories.liveInstrument = liveInstrumentSource; // (round 190jb: an export engine renders with the live plugins)
+    factories.liveEffect = liveEffectSource;
     if (rebuildPlugins) // round 190ap: a plugin switched back on (switchPluginOn)
         factories.rebuildPlugin = [this] (const PluginRef& ref) { return rebuildPluginId.empty() || ref.id == rebuildPluginId; };
 
@@ -6218,6 +6238,69 @@ std::shared_ptr<Effect> AudioEngine::getEffect (int track, int slot) const
     return effects[(std::size_t) track][(std::size_t) slot];
 }
 
+bool AudioEngine::holdForExport (int timeoutMs)
+{
+    if (exportHold.load (std::memory_order_acquire))
+        return true;
+    // (a recording or a real-time export plays on through the device: their plugins can't be lent)
+    if (transport.recording.load() || bouncing || isCountingIn())
+        return false;
+    // FL stops playback for its render (REA_rodada155 / 190jb)
+    if (transport.playing.load())
+        stop();
+    exportHold.store (true, std::memory_order_seq_cst);
+    // the block in progress ends; every later one outputs silence without the rack
+    const auto until = juce::Time::getMillisecondCounterHiRes() + juce::jmax (0, timeoutMs);
+    while (callbackBusy.load (std::memory_order_seq_cst))
+    {
+        if (juce::Time::getMillisecondCounterHiRes() > until)
+        {
+            exportHold.store (false, std::memory_order_seq_cst);
+            return false;
+        }
+        juce::Thread::sleep (1);
+    }
+    // the part rendered ahead stops too (its thread may be in a block of its own)
+    if (rackProcessor != nullptr)
+        rackProcessor->haltRenderAhead();
+    return true;
+}
+
+void AudioEngine::releaseAfterExport()
+{
+    if (! exportHold.load (std::memory_order_acquire))
+        return;
+    if (rackProcessor != nullptr)
+        rackProcessor->resumeRenderAhead();
+    exportHold.store (false, std::memory_order_seq_cst);
+    // the export's rack gave the lent units its own routes (a plugin's outputs, Connections, its side input): this
+    // song's come back with a build of it
+    publishSong();
+}
+
+void AudioEngine::setLiveUnits (LiveInstrumentSource instrument, LiveEffectSource effect)
+{
+    lentUnits.clear();
+    if (instrument)
+        liveInstrumentSource = [this, instrument = std::move (instrument)] (const ChannelDef& c, double rate) {
+            auto unit = instrument (c, rate);
+            if (unit != nullptr)
+                lentUnits.push_back (unit.get());
+            return unit;
+        };
+    else
+        liveInstrumentSource = nullptr;
+    if (effect)
+        liveEffectSource = [this, effect = std::move (effect)] (const EffectSlot& e, double rate) {
+            auto unit = effect (e, rate);
+            if (unit != nullptr)
+                lentUnits.push_back (unit.get());
+            return unit;
+        };
+    else
+        liveEffectSource = nullptr;
+}
+
 void AudioEngine::setPluginsRenderMode (bool offline)
 {
     vfx::script::setRealtime (! offline); // (an export waits for every VFX Script answer: exact and repeatable)
@@ -6929,8 +7012,20 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
         int samples;
     } measure { *this, callbackStart, numSamples };
 
-    // an export renders (round 168s): playback stops and nothing is processed until it ends (not while recording)
-    if (offlineRendersRunning().load (std::memory_order_acquire) > 0 && ! transport.recording.load (std::memory_order_relaxed))
+    // round 190jb: an export may hold this engine (holdForExport: it renders with these plugins). The flag below says the
+    // callback is inside its block; the hold is read after it is set (both sequentially consistent), so holdForExport,
+    // which sets the hold and then waits for the flag to drop, knows no block of this engine runs the rack any more.
+    callbackBusy.store (true, std::memory_order_seq_cst);
+    struct LeaveBlock
+    {
+        std::atomic<bool>& busy;
+        ~LeaveBlock() { busy.store (false, std::memory_order_seq_cst); }
+    } leaveBlock { callbackBusy };
+
+    // an export renders (round 168s): playback stops and nothing is processed until it ends (not while recording; with
+    // the export hold of round 190jb, whatever happens)
+    if (exportHold.load (std::memory_order_seq_cst)
+        || (offlineRendersRunning().load (std::memory_order_acquire) > 0 && ! transport.recording.load (std::memory_order_relaxed)))
     {
         if (transport.playing.load (std::memory_order_relaxed))
             stop();
