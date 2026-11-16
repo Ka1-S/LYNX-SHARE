@@ -95,6 +95,7 @@
 #include "engine/Bridge32Test.h"
 #include "engine/ClapFormat.h"
 #include "engine/ClapTeardownTest.h"
+#include "engine/HostingTests.h"
 #include "core/EdisonFx.h"
 #include "engine/ProjectFile.h"
 #include "ui/RemoteControl.h"
@@ -722,6 +723,29 @@ public:
         {
             const auto i = args.indexOf ("--sandboxtest");
             runSandboxTest (args[i + 1].unquoted(), args[i + 2].unquoted());
+            return;
+        }
+
+        // round 190jg (BUILD-LIST 11 + 18, engine/HostingTests.h): grouped plugin processes, CLAP extensions, timing
+        if (args.contains ("--sandboxgrouptest") || args.contains ("--sandboxbench") || args.contains ("--clapext")
+            || args.contains ("--automationtimingtest"))
+        {
+            const auto value = [&args] (const char* name, int fallback) {
+                return args.contains (name) ? args[args.indexOf (name) + 1].getIntValue() : fallback;
+            };
+            auto code = 1;
+            if (const auto i = args.indexOf ("--sandboxgrouptest"); i >= 0)
+                code = lynx::runSandboxGroupTest (args[i + 1].unquoted(), args[i + 2].unquoted(),
+                                                  args.contains ("--crash") ? args[args.indexOf ("--crash") + 1].unquoted() : juce::String());
+            else if (const auto b = args.indexOf ("--sandboxbench"); b >= 0)
+                code = lynx::runSandboxBench (args[b + 1].unquoted(), args[b + 2].unquoted(), value ("--plugins", 8), value ("--block", 256),
+                                              args.contains ("--seconds") ? args[args.indexOf ("--seconds") + 1].getDoubleValue() : 5.0);
+            else if (const auto c = args.indexOf ("--clapext"); c >= 0)
+                code = lynx::runClapExtTest (args[c + 1].unquoted(), args[c + 2].unquoted());
+            else if (const auto t = args.indexOf ("--automationtimingtest"); t >= 0)
+                code = lynx::runAutomationTimingTest (args[t + 1].unquoted(), args[t + 2].unquoted());
+            setApplicationReturnValue (code);
+            quit();
             return;
         }
 

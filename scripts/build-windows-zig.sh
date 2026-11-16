@@ -260,6 +260,7 @@ APP_SOURCES+=(src/engine/DeviceChangeTest.cpp src/engine/ShortExportTest.cpp)
 APP_SOURCES+=(src/engine/ExportParityTest.cpp src/engine/MidiHotplugTest.cpp src/engine/MidiOutPortTest.cpp)
 # round 190az: a CLAP plugin deleted on another thread while the message thread is blocked
 APP_SOURCES+=(src/engine/ClapTeardownTest.cpp)
+APP_SOURCES+=(src/engine/HostingTests.cpp) # (round 190jg: --sandboxgrouptest, --sandboxbench, --clapext, --automationtimingtest)
 # LYNX substitutes for missing third-party plugins (round 98)
 APP_SOURCES+=(src/core/PluginSubstitutes.cpp)
 # settings pages (General/Audio/MIDI), plugin manager, shortcut manager (round 82)

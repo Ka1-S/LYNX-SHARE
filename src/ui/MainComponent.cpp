@@ -2730,6 +2730,8 @@ void MainComponent::loadUiSettings()
             PianoRollComponent::previewWhilePlaying = on;
         else if (key == "limitEditors") // FL's LimitEditors (round 189o; on unless saved off)
             editorlimit::enabled() = on;
+        else if (key == "sampleAccurateAutomation") // round 190jg (core/Instruments.h; on unless saved off)
+            setSampleAccurateAutomation (on);
         else if (key == "detachNewPlugins") // FL's General › "Detach all new plugins" (issue #116)
         {
             engine.setDetachNewPlugins (on);
@@ -3076,6 +3078,7 @@ void MainComponent::saveUiSettings()
                                       + "\nprPaintMode=" + juce::String (PianoRollComponent::monophonicPainting ? 1 : 0)
                                       + "\nprPreviewPlaying=" + juce::String (PianoRollComponent::previewWhilePlaying ? 1 : 0)
                                       + "\nlimitEditors=" + juce::String (editorlimit::enabled() ? 1 : 0)
+                                      + "\nsampleAccurateAutomation=" + juce::String (sampleAccurateAutomation() ? 1 : 0)
                                       + "\ndetachNewPlugins=" + juce::String (engine.detachesNewPlugins() ? 1 : 0)
                                       + "\nautoSelectLinked=" + juce::String (ChannelRackComponent::autoSelectLinked ? 1 : 0)
                                       + "\nmuteRemovedSteps=" + juce::String (ChannelRackComponent::muteRemovedSteps ? 1 : 0)
@@ -6457,15 +6460,22 @@ void MainComponent::timerCallback()
     // only that process went; the plugin is muted. Round 174a's prompt, logged like the other plugin crashes.
     if (const auto deaths = pluginSandboxDeathCount(); deaths != sandboxDeathsSeen)
     {
+        const auto fresh = juce::jmax (1, deaths - sandboxDeathsSeen);
         sandboxDeathsSeen = deaths;
         const auto all = pluginSandboxDeaths();
         if (! all.empty())
         {
             const auto& d = all.back();
+            // round 190jg: a group's process (per vendor / all plugins together) took the other plugins in it along
+            juce::StringArray withIt;
+            for (int i = juce::jmax (0, (int) all.size() - fresh); i + 1 < (int) all.size(); ++i)
+                if (! d.alone && all[(std::size_t) i].group == d.group && all[(std::size_t) i].plugin != d.plugin)
+                    withIt.addIfNotAlreadyThere (all[(std::size_t) i].plugin);
             PluginHost::settingsFolder().getChildFile ("plugin-crashes.log").appendText (
                 juce::Time::getCurrentTime().toISO8601 (true) + "  " + d.plugin + "  " + (d.crashed ? "crashed" : "stopped responding")
-                + (d.bits32 ? " (32-bit bridge)" : " (separate process)") + "\n");
-            announceSeparateProcessCrash (d.plugin, d.crashed, d.bits32);
+                + (d.bits32 ? " (32-bit bridge)" : d.group.isNotEmpty() ? " (process group " + d.group + ")" : " (separate process)")
+                + (withIt.isEmpty() ? juce::String() : ", with " + withIt.joinIntoString (", ")) + "\n");
+            announceSeparateProcessCrash (d.plugin, d.crashed, d.bits32, withIt);
         }
     }
 
@@ -7535,24 +7545,32 @@ void MainComponent::reloadCrashedPlugins (const juce::String& plugin)
 
 // Round 176a: round 174a's "Plugin crashed" prompt for a plugin whose separate process died. LYNX itself is unharmed
 // (the plugin ran in its own process), so it offers the save and says how to get the plugin back.
-void MainComponent::announceSeparateProcessCrash (const juce::String& plugin, bool crashed, bool bits32)
+void MainComponent::announceSeparateProcessCrash (const juce::String& plugin, bool crashed, bool bits32, const juce::StringArray& withIt)
 {
     const auto name = plugin.isNotEmpty() ? plugin : tr ("A plugin");
     const auto where = bits32 ? tr ("{0} crashed in the 32-bit bridge.", { name }) : tr ("{0} crashed in its separate process.", { name });
+    // round 190jg: the other plugins of its process group (per vendor / all together) stopped with it; Reload brings all back
+    const auto group = withIt.isEmpty() ? juce::String()
+                                        : "\n" + tr ("The other plugins in the same process stopped with it: {0}.", { withIt.joinIntoString (", ") });
     auto options = juce::MessageBoxOptions()
                        .withIconType (juce::MessageBoxIconType::WarningIcon)
                        .withTitle (tr ("Plugin crashed"))
-                       .withMessage ((crashed ? where : tr ("{0} stopped responding (separate process).", { name })) + "\n\n"
+                       .withMessage ((crashed ? where : tr ("{0} stopped responding (separate process).", { name })) + group + "\n\n"
                                      + tr ("Only its process was affected: LYNX SHARE and your project kept running, and the plugin "
                                            "was muted. Save your project.")
                                      + " " + tr ("Reload starts it again with the settings from the last save or backup."))
                        .withButton (tr ("Reload")) // (round 190ao: without reopening the project; only on request)
                        .withButton (tr ("Save as..."))
                        .withButton (tr ("Close"));
-    juce::AlertWindow::showAsync (options, [safe = juce::Component::SafePointer<MainComponent> (this), plugin] (int result) {
+    juce::AlertWindow::showAsync (options, [safe = juce::Component::SafePointer<MainComponent> (this), plugin, everyDown = ! withIt.isEmpty()] (int result) {
         if (safe == nullptr)
             return;
-        if (result == 1)
+        if (result == 1 && everyDown) // (round 190jg: the whole group came down; all of it comes back)
+        {
+            if (const auto which = safe->engine.downHostedPlugins(); ! which.empty())
+                PluginWindows::reload (safe->engine, which);
+        }
+        else if (result == 1)
             safe->reloadCrashedPlugins (plugin);
         else if (result == 2)
             safe->save (true);
@@ -7963,9 +7981,10 @@ void MainComponent::openSettings (int page)
         o.hoverValues = safe->hoverValues;
         o.crossfadesInNewProjects = newProjectDefaults().autoCrossfades;
         o.linkTracksInNewProjects = newProjectDefaults().linkTracks;
-        o.pluginSandbox = pluginSandboxEnabled();
+        o.pluginSandbox = (int) pluginSandboxMode();
         o.menuEntry = appImageMenuEntryInstalled();
         o.pluginSubstitutes = pluginSubstitutesEnabled();
+        o.sampleAccurateAutomation = sampleAccurateAutomation();
         o.limitEditors = editorlimit::enabled();
         o.crashReports = (int) crashreporter::consent();
         o.checkUpdates = updater::automatic();
@@ -8025,11 +8044,12 @@ void MainComponent::openSettings (int page)
             setDefaultTemplate (TemplateChoice::parse (o.defaultTemplate.toStdString()));
         if (o.startupProject != (int) startupProject())
             setStartupProject ((StartupProject) juce::jlimit (0, 2, o.startupProject));
-        if (o.pluginSandbox != pluginSandboxEnabled())
-            setPluginSandboxEnabled (o.pluginSandbox);
+        if (o.pluginSandbox != (int) pluginSandboxMode())
+            setPluginSandboxMode ((SandboxMode) juce::jlimit (0, 4, o.pluginSandbox));
         if (runningAsAppImage() && o.menuEntry != appImageMenuEntryInstalled())
             setAppImageMenuEntry (o.menuEntry);
         editorlimit::enabled() = o.limitEditors;
+        setSampleAccurateAutomation (o.sampleAccurateAutomation);
         if (o.pluginSubstitutes != pluginSubstitutesEnabled())
             setPluginSubstitutesEnabled (o.pluginSubstitutes);
         if (o.crashReports != (int) crashreporter::consent())

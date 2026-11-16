@@ -17848,3 +17848,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Details190imTests.inc" // round 190im: activity meter reader, deactivated grid clips, Live keys 0 / Ctrl+E
 #include "Toolbar190ivTests.inc" // round 190iv: the toolbar per layout style (Simple capsules, Live control bar)
 #include "MidiOutHw190jlTests.inc" // round 190jl: MIDI Out channels to hardware MIDI outputs (Discord #help)
+#include "Hosting190jgTests.inc" // round 190jg: sample-accurate automation for hosted plugins (BUILD-LIST 18)

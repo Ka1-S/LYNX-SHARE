@@ -93,7 +93,10 @@ Core Audio / ALSA + JACK (PipeWire).
   envelope, auto-pan, Linkwitz-Riley crossover, pitch shift, frequency shifter, utility and a nestable
   parallel container.
 - **Plugins:** VST3 and CLAP (own CLAP host on top of JUCE); scanning always runs in separate processes with a
-  blacklist; optionally every plugin runs in a separate process (*Options → Run plugins in a separate process*). A hosted plugin
+  blacklist; optionally plugins run out of process (*Options → Plugin processes*: each plugin alone, one process per vendor or
+  all together, round 190jg; a crash takes down only that process). CLAP: thread-pool, tail, render, voice-info,
+  state-context, remote-controls (controller knob pages), preset discovery + preset-load (the preset bar), note
+  expressions; CLAP and VST3 automation is sample-accurate (round 190jg, JUCE fix 39 for VST3). A hosted plugin
   that crashes inside an audio / parameter / state call is caught, switched off (bypassed / silent) and reported, and
   LYNX keeps running; scan children end without unloading plugins whose teardown crashes (REA round 111).
 - **Missing plugins:** a project effect whose third-party plugin isn't installed plays a LYNX substitute (reverb →

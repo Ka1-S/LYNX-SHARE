@@ -35,9 +35,12 @@ What the automated tests don't cover: hearing the sound on a real audio device a
 ## 4. Third-party plugins
 - *Options → Scan for plugins*, then open an `.flp` that uses VST3/CLAP through the Fruity Wrapper: the plugin
   should load with the same preset as in FL. Missing plugins are listed in a notice.
-- *Options → Run plugins in a separate process*: turn it on, reopen the project and play. Each plugin becomes a
+- *Options → Plugin processes*: pick "Each plugin in its own process", reopen the project and play. Each plugin becomes a
   child `LYNX.exe` in Task Manager; the plugin window opens separately. Compare CPU/clicks with the option off.
-  If a plugin hangs, it goes silent with a notice and LYNX keeps playing.
+  If a plugin hangs, it goes silent with a notice and LYNX keeps playing. "One process per plugin vendor" / "All plugins
+  in one process" (round 190jg): fewer child processes; a crash mutes every plugin of that process (the notice names
+  them) and Reload brings them all back. Measure with `LYNX --sandboxbench <plugin> report.txt` and
+  `LYNX --sandboxgrouptest <plugin> report.txt --crash "LYNX Test Crash.clap"`.
 
 ## 5. Audio
 - *Audio…*: "Windows Audio", "Windows Audio (Exclusive Mode)" and "Low Latency Mode" are listed; check latency

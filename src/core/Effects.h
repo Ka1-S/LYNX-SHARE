@@ -127,6 +127,9 @@ public:
     virtual void process (float* left, float* right, int n, const EffectParams& params, double bpm) noexcept = 0;
     // Automated plugin parameter (built-in effects receive their parameters in process()). 0..1.
     virtual void setParameter (int /*index*/, float /*value*/) noexcept {}
+    // Round 190jg: a change inside the next process() call (see Instrument::setParameterAt); hosted CLAP / VST3 only.
+    virtual bool takesTimedParameters() const noexcept { return false; }
+    virtual void setParameterAt (int /*index*/, float /*value*/, int /*offset*/) noexcept {}
     // A hosted plugin's parameter value now (0..1; −1 = unknown), for a Patcher parameter output (round 171b). Audio thread.
     virtual float parameterValue (int /*index*/) const noexcept { return -1.0f; }
     // Control output ("controller" effects such as the Peak Controller), 0..1. Read every block.

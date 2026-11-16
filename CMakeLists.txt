@@ -508,6 +508,7 @@ if(LYNX_BUILD_APP)
         src/engine/SandboxWorker.cpp
         src/engine/Bridge32Test.cpp
         src/engine/ClapTeardownTest.cpp
+        src/engine/HostingTests.cpp
         src/engine/Exporter.cpp
         src/engine/FlStudioExport.cpp
         src/engine/StreamPrefetcher.cpp

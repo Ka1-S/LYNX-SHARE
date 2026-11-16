@@ -119,6 +119,11 @@ public:
     virtual void render (float* left, float* right, int n, float gainLeft, float gainRight) noexcept = 0;
     // Automated parameter (plugins). 0..1. Audio thread.
     virtual void setParameter (int /*index*/, float /*value*/) noexcept {}
+    // Round 190jg (sample-accurate automation): whether the instrument takes parameter changes inside a chunk (a hosted
+    // CLAP or VST3 plugin), and one such change, `offset` samples into the chunk the renderer is about to render (after
+    // the chunk's setParameter values; offsets ascending per parameter). Audio thread.
+    virtual bool takesTimedParameters() const noexcept { return false; }
+    virtual void setParameterAt (int /*index*/, float /*value*/, int /*offset*/) noexcept {}
     // A hosted plugin's parameter value now (0..1; −1 = unknown), for a Patcher parameter output (round 171b). Audio thread.
     virtual float parameterValue (int /*index*/) const noexcept { return -1.0f; }
     // Latency the instrument introduces (plugins), in samples. For PDC.
@@ -363,6 +368,10 @@ bool renderInProgress() noexcept;
 // FL's "HQ for all plugins" during an export (REA round 134): effects with an HQ switch use HQ whatever it is set to.
 void setHqForAllPlugins (bool on) noexcept;
 bool hqForAllPlugins() noexcept;
+// Round 190jg: automation reaches hosted CLAP / VST3 plugins at its own sample inside a chunk (Settings › Plugins; on by
+// default). Off: once per chunk (up to 128 samples while automation plays), as before.
+void setSampleAccurateAutomation (bool on) noexcept;
+bool sampleAccurateAutomation() noexcept;
 // The built-in synth renders up to four voices side by side (round 190gp; the same samples as one voice at a time,
 // which `false` restores: for tests and A/B runs).
 void setSynthVoiceLanes (bool on) noexcept;

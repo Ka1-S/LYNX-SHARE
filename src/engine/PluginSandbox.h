@@ -19,6 +19,16 @@ constexpr const char* pluginSandboxId = "lynx-plugin-host";
 bool pluginSandboxEnabled();
 void setPluginSandboxEnabled (bool enabled);
 
+// Round 190jg: how plugins run when the option is on, as Bitwig's plugin hosting modes ("Individually", "By plug-in",
+// "By manufacturer", "Together"). A crash takes down only the process it happened in: the instance alone (perPlugin),
+// every instance of that plugin (perPluginType), its vendor's plugins (perVendor) or every sandboxed plugin
+// (allTogether), never LYNX. More plugins per process = fewer processes (memory, start-up), less isolation.
+enum class SandboxMode { inProcess = 0, perPlugin = 1, perVendor = 2, allTogether = 3, perPluginType = 4 };
+SandboxMode pluginSandboxMode();
+void setPluginSandboxMode (SandboxMode mode);
+// The group a plugin joins under `mode` (the key of its process; empty = a process of its own)
+juce::String sandboxGroupFor (const juce::PluginDescription& description, SandboxMode mode);
+
 // Plugins that always run in a separate process, by name (round 157a): e.g. one whose editor crashed LYNX (a GPU
 // driver failing inside the plugin's OpenGL window takes the host down with it; in its own process only the plugin
 // goes). File separate-process.txt in the settings folder, one name per line.
@@ -41,9 +51,14 @@ bool isBridged32 (const juce::AudioPluginInstance& plugin);
 bool isSandboxedPlugin (const juce::AudioPluginInstance& plugin);
 
 // Opens the plugin in a child process, already prepared (rate, block, base64 state). nullptr + `error` on
-// failure (child didn't start, plugin didn't load, timeout).
+// failure (child didn't start, plugin didn't load, timeout). `group` (round 190jg, sandboxGroupFor): the plugin joins
+// the running process of that group, else starts it; empty = a process of its own.
 std::unique_ptr<juce::AudioPluginInstance> createSandboxedPlugin (const juce::PluginDescription& description, double sampleRate,
-                                                                  int blockSize, const std::string& stateBase64, juce::String& error);
+                                                                  int blockSize, const std::string& stateBase64, juce::String& error,
+                                                                  const juce::String& group = {});
+// Running group processes (tests), and a proxy's group ("" for a process of its own; for the 32-bit bridge "32|"...)
+int sandboxProcessCount();
+juce::String sandboxGroupOf (const juce::AudioPluginInstance& plugin);
 
 // Separate-process plugins whose process died this session (round 176a; newest last; UI thread): the plugin's name, and
 // whether it crashed (else it stopped responding) and ran in the 32-bit bridge. `count` only grows, so the UI notices a
@@ -52,6 +67,8 @@ struct SandboxDeath
 {
     juce::String plugin;
     bool crashed = false, bits32 = false;
+    juce::String group; // round 190jg: the group of its process ("" = a process of its own)
+    bool alone = true;  // the only plugin in its process when it died (else the others in it died with it)
 };
 int pluginSandboxDeathCount() noexcept;
 std::vector<SandboxDeath> pluginSandboxDeaths();
