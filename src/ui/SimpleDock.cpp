@@ -2678,7 +2678,7 @@ bool SimpleDock::inputMeterShown() const
 juce::Rectangle<int> SimpleDock::inputMeterArea() const
 {
     const auto right = followButton.isVisible() ? followButton.getX() - 10 : getWidth() - 10; // (round 190jj merge: 190jc moved the hide button to the left)
-    return { right - 190, 0, 190, stripHeight };
+    return { right - 190, 0, 190, stripHeight() };
 }
 
 juce::Rectangle<int> SimpleDock::inputMeterBar() const
@@ -2705,7 +2705,7 @@ void SimpleDock::tickInputMeter()
     if (shown != inputMeterWasShown)
     {
         inputMeterWasShown = shown;
-        repaint (getLocalBounds().withHeight (stripHeight)); // (the record hint moves left of it)
+        repaint (getLocalBounds().withHeight (stripHeight())); // (the record hint moves left of it)
     }
     else if (width != juce::roundToInt (inputLevel * (float) inputMeterBar().getWidth()))
         repaint (inputMeterBar().expanded (1));
