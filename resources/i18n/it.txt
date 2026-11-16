@@ -10676,3 +10676,13 @@ countries: it ch sm
 "Current Project" = "Progetto attuale"
 "Add Folder..." = "Aggiungi cartella..."
 "Large controls (touch size)" = "Controlli grandi (dimensione touch)"
+
+# round 190iv: the toolbar per layout style
+"Nothing to save yet" = "Ancora niente da salvare"
+"LYNX backs your work up by itself. Click to save the project (Ctrl+S)" = "LYNX fa il backup del tuo lavoro da solo. Clicca per salvare il progetto (Ctrl+S)"
+"More: the panels and options this toolbar leaves out" = "Altro: i pannelli e le opzioni che questa barra lascia fuori"
+"Session view: the clip grid (Tab)" = "Vista Session: la griglia dei clip (Tab)"
+"Arrangement view: the Playlist (Tab)" = "Vista Arrangement: la Playlist (Tab)"
+"Control bar" = "Barra di controllo"
+"Punch in / out" = "Punch in / out"
+"Show the Session button row" = "Mostra la fila di pulsanti della Session"

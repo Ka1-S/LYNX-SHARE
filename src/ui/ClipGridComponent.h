@@ -22,6 +22,12 @@ enum class GridPick { select, openClip, openTrack };
 void setClipGridPickListener (juce::Component& grid, std::function<void (int track, int scene, GridPick pick)> listener);
 // Round 190bv: shows or hides the Groove Pool under the grid (ui/GroovePoolComponent.h).
 void setClipGridGroovePoolShown (juce::Component& grid, bool shown);
+// Round 190iv (design190ia CL-25): the footer row of buttons. Live's look (the Clip-launch control bar) hides it: Back to
+// Arrangement, Session Record and the launch quantisation are in the control bar, Stop All Clips in the Main column's
+// status cell, the Groove Pool and the mixer sections in the View and "⋯" menus. Shown again as an option.
+void setClipGridButtonRowShown (juce::Component& grid, bool shown);
+bool clipGridGroovePoolShown (juce::Component& grid);
+void addClipGridMixerViewItems (juce::Component& grid, juce::PopupMenu& menu);
 // The menu of a slot (the right-click menu; --gridshot draws it).
 juce::PopupMenu clipGridSlotMenu (juce::Component& grid, int track, int scene);
 // A clip dragged out of a slot (the Playlist takes it as a clip of its own): true and its slot when `description` is one.

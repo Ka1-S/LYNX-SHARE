@@ -2,6 +2,7 @@
 
 #include <juce_dsp/juce_dsp.h>
 
+#include "core/ClipLauncher.h"
 #include "core/MarkerPlan.h"
 #include "core/Timecode.h"
 #include "core/TempoMap.h"
@@ -16,6 +17,45 @@ namespace lynx::toolbar
 {
 namespace
 {
+// --- round 190iv: Live's control-bar boxes and BandLab's capsule text (shared by the fields below) ---
+namespace live
+{
+const juce::Colour band { 0xff2a2a2a }, box { 0xff363636 }, boxHover { 0xff464646 }, text { 0xffb5b5b5 }, lit { 0xffffad56 }, onLit { 0xff070707 };
+}
+void paintLiveBox (juce::Graphics& g, juce::Rectangle<int> r, bool hover, bool lit = false)
+{
+    g.setColour (lit ? live::lit : hover ? live::boxHover : live::box);
+    g.fillRect (r);
+}
+void paintLiveText (juce::Graphics& g, const juce::String& t, juce::Rectangle<int> r, bool lit = false,
+                    juce::Justification j = juce::Justification::centred)
+{
+    g.setColour (lit ? live::onLit : live::text);
+    g.setFont (theme::font (theme::type::caption));
+    g.drawFittedText (t, r.reduced (3, 0), j, 1, 0.75f);
+}
+// a small "▾" at the right of a box
+void paintLiveArrow (juce::Graphics& g, juce::Rectangle<int> r, juce::Colour c)
+{
+    const auto a = r.toFloat().removeFromRight (10.0f).withSizeKeepingCentre (6.0f, 3.5f);
+    juce::Path tri;
+    tri.addTriangle (a.getX(), a.getY(), a.getRight(), a.getY(), a.getCentreX(), a.getBottom());
+    g.setColour (c);
+    g.fillPath (tri);
+}
+// the hover wash of a capsule segment (the capsule's fill is drawn behind by the main window)
+void paintCapsuleHover (juce::Graphics& g, juce::Rectangle<int> r, bool hover, bool roundRight = false)
+{
+    if (hover)
+    {
+        const auto f = r.toFloat();
+        const auto radius = f.getHeight() / 2.0f;
+        juce::Path p;
+        p.addRoundedRectangle (f.getX(), f.getY(), f.getWidth(), f.getHeight(), radius, radius, false, roundRight, false, roundRight);
+        g.setColour (theme::colour::bg5);
+        g.fillPath (p);
+    }
+}
 juce::String barBeatStep (const Song& song, double ticks, Meter meter)
 {
     // (round 190fg: beats of the meter in force, eighths in 6/8; the steps are sixteenths into the beat)
@@ -248,9 +288,56 @@ void TimeDisplay::update()
     }
 }
 
+void TimeDisplay::setLook (toolbarlayout::Look l)
+{
+    if (l != look)
+    {
+        look = l;
+        repaint();
+    }
+}
+
+// round 190iv: BandLab's time segment (the last segment of the transport capsule, 15 px digits) and Live's position box
+// ("1. 1. 1": bar, beat, sixteenth with Live's dotted separators)
+void TimeDisplay::paintLook (juce::Graphics& g)
+{
+    using namespace theme;
+    const auto area = getLocalBounds();
+    const auto readout = shown.isEmpty() ? text() : shown;
+    if (look == toolbarlayout::Look::live)
+    {
+        paintLiveBox (g, area, false);
+        if (linkProgress >= 0.0)
+        {
+            g.setColour (live::lit.withAlpha (0.45f));
+            g.fillRect (area.withWidth (juce::roundToInt (area.getWidth() * juce::jlimit (0.0, 1.0, linkProgress))));
+        }
+        paintLiveText (g, mode == Mode::bars ? readout.replace (" : ", ". ") : readout.replace (" ", ""), area.withTrimmedRight (4), false,
+                       juce::Justification::centredRight);
+        return;
+    }
+    paintCapsuleHover (g, area, isMouseOver(), true); // (the transport capsule's last segment)
+    if (linkProgress >= 0.0)
+    {
+        g.setColour (colour::accent.withAlpha (0.42f));
+        g.fillRect (area.withWidth (juce::roundToInt (area.getWidth() * juce::jlimit (0.0, 1.0, linkProgress))));
+    }
+    auto f = monoFont (15.0f);
+    for (int i = 0; i < 8 && juce::GlyphArrangement::getStringWidth (f, readout) > (float) area.getWidth() - 10.0f; ++i)
+        f = f.withHeight (f.getHeight() * 0.92f);
+    g.setFont (f);
+    g.setColour (colour::textPrimary);
+    g.drawText (readout, area, juce::Justification::centred, false);
+}
+
 void TimeDisplay::paint (juce::Graphics& g)
 {
     using namespace theme;
+    if (look != toolbarlayout::Look::fl)
+    {
+        paintLook (g);
+        return;
+    }
     const auto area = getLocalBounds();
     g.setColour (colour::bg1);
     g.fillRoundedRectangle (area.toFloat(), radius::md);
@@ -544,9 +631,36 @@ void PerformanceMeter::setRealtime (std::uint64_t over, std::uint64_t late, doub
     repaint();
 }
 
+void PerformanceMeter::setLook (toolbarlayout::Look l)
+{
+    if (l != look)
+    {
+        look = l;
+        repaint();
+    }
+}
+
 void PerformanceMeter::paint (juce::Graphics& g)
 {
     using namespace theme;
+    if (look == toolbarlayout::Look::live) // round 190iv: Live's CPU box (CL-2: "26 %" over its orange load bar)
+    {
+        const auto area = getLocalBounds();
+        paintLiveBox (g, area, false);
+        const auto load = (float) juce::jlimit (0.0, 1.0, cpuSmoothed);
+        if (load > 0.0f)
+        {
+            g.setColour (live::lit);
+            g.fillRect (area.withWidth (juce::jmax (1, juce::roundToInt ((float) area.getWidth() * load))));
+        }
+        if (lastGlitchAt != 0 && juce::Time::getMillisecondCounter() - lastGlitchAt < 5000)
+        {
+            g.setColour (colour::meterClip);
+            g.drawRect (area, 1);
+        }
+        paintLiveText (g, juce::String (juce::roundToInt (cpuSmoothed * 100.0)) + " %", area);
+        return;
+    }
     auto area = getLocalBounds();
     auto row1 = area.removeFromTop (area.getHeight() / 2).reduced (0, 4);
     auto row2 = area.reduced (0, 4);
@@ -694,9 +808,29 @@ void LinkToggle::update()
     }
 }
 
+void LinkToggle::setLook (toolbarlayout::Look l)
+{
+    if (l != look)
+    {
+        look = l;
+        repaint();
+    }
+}
+
 void LinkToggle::paint (juce::Graphics& g)
 {
     using namespace theme;
+    if (look == toolbarlayout::Look::live) // round 190iv: Live's toggle box, lit orange while on
+    {
+        const auto arrowBox = arrowArea();
+        const auto main = boxArea().withTrimmedRight (arrowBox.getWidth() + 2);
+        const auto over = isMouseOver (true);
+        paintLiveBox (g, main, over, on);
+        paintLiveText (g, text(), main, on);
+        paintLiveBox (g, arrowBox, over);
+        paintLiveArrow (g, arrowBox, live::text);
+        return;
+    }
     const auto arrow = arrowArea();
     const auto main = boxArea().withTrimmedRight (arrow.getWidth() + 2);
     const auto over = isMouseOver (true);
@@ -785,9 +919,41 @@ void KeyPanel::setText (const juce::String& keyName)
     }
 }
 
+void KeyPanel::setLook (toolbarlayout::Look l)
+{
+    if (l != look)
+    {
+        look = l;
+        repaint();
+    }
+}
+
 void KeyPanel::paint (juce::Graphics& g)
 {
     using namespace theme;
+    if (look == toolbarlayout::Look::live) // round 190iv: Live's key / scale box ("C# minor ▾")
+    {
+        const auto area = getLocalBounds();
+        paintLiveBox (g, area, isMouseOver (true));
+        paintLiveText (g, text.isEmpty() ? tr ("none") : text, area.withTrimmedRight (10), false, juce::Justification::centredLeft);
+        paintLiveArrow (g, area, live::text);
+        return;
+    }
+    if (look == toolbarlayout::Look::simple) // round 190iv: BandLab's Key capsule ("D min"; "Key" while there is none)
+    {
+        const auto area = getLocalBounds().toFloat();
+        g.setColour (isMouseOver (true) ? colour::bg5 : colour::bg4);
+        g.fillRoundedRectangle (area, area.getHeight() / 2.0f);
+        const auto none = text.isEmpty();
+        auto f = font (15.0f, ! none);
+        const auto shown = none ? tr ("Key") : text;
+        for (int i = 0; i < 8 && juce::GlyphArrangement::getStringWidth (f, shown) > area.getWidth() - 20.0f; ++i)
+            f = f.withHeight (f.getHeight() * 0.92f);
+        g.setFont (f);
+        g.setColour (none ? colour::textSecondary : colour::textPrimary);
+        g.drawText (shown, area, juce::Justification::centred, false);
+        return;
+    }
     auto area = getLocalBounds();
     g.setColour (isMouseOver (true) ? colour::bg2 : colour::bg1);
     g.fillRoundedRectangle (area.toFloat(), radius::md);
@@ -1799,6 +1965,192 @@ ui::Hint EditOverlay::hintAt (juce::Point<int> p)
         h.text = tr ("Edit toolbar: drag panels to and from the toolbar  [Esc] done");
     h.hasMenu = false;
     return h;
+}
+
+// --- round 190iv: SignatureBox, QuantBox, SaveStatus ------------------------------------------------------------------
+
+void SignatureBox::setLook (toolbarlayout::Look l)
+{
+    if (l != look)
+    {
+        look = l;
+        repaint();
+    }
+}
+
+juce::String SignatureBox::text() const
+{
+    const auto& song = engine.getSong();
+    return juce::String (song.beatsPerBar) + " / " + juce::String (song.beatUnit);
+}
+
+void SignatureBox::update()
+{
+    // (the timer's check compares two numbers; the text is made only when they changed)
+    const auto& song = engine.getSong();
+    if (const auto now = song.beatsPerBar * 1000 + song.beatUnit; now != shownSignature)
+    {
+        shownSignature = now;
+        shown = text();
+        repaint();
+    }
+}
+
+void SignatureBox::paint (juce::Graphics& g)
+{
+    const auto t = shown.isEmpty() ? text() : shown;
+    if (look == toolbarlayout::Look::live)
+    {
+        paintLiveBox (g, getLocalBounds(), isMouseOver());
+        paintLiveText (g, t, getLocalBounds());
+        return;
+    }
+    paintCapsuleHover (g, getLocalBounds(), isMouseOver(), true); // (the tempo capsule's last segment)
+    g.setFont (theme::font (15.0f, true));
+    g.setColour (theme::colour::textPrimary);
+    g.drawText (t, getLocalBounds(), juce::Justification::centred, false);
+}
+
+juce::PopupMenu SignatureBox::makeMenu()
+{
+    // (the Pattern menu's "Song time signature" list)
+    juce::PopupMenu menu;
+    const auto& song = engine.getSong();
+    for (int beats : { 2, 3, 4, 5, 6, 7, 8, 9, 12 })
+        menu.addItem (juce::String (beats) + "/4", true, song.beatsPerBar == beats && song.beatUnit == 4, [this, beats] {
+            engine.editSong ([beats] (Song& s) {
+                s.beatsPerBar = beats;
+                s.beatUnit = 4;
+            });
+            update();
+        });
+    return menu;
+}
+
+void SignatureBox::mouseDown (const juce::MouseEvent& e)
+{
+    if (e.mods.isLeftButtonDown() || e.mods.isPopupMenu())
+        makeMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this));
+}
+
+ui::Hint SignatureBox::hintAt (juce::Point<int>)
+{
+    return { tr ("Song time signature"), {}, false, true };
+}
+
+namespace
+{
+// the launch quantisations, as the clip grid's footer box lists them (ClipGridComponent.cpp quantNames, Global left out)
+const std::pair<LaunchQuant, const char*> globalQuantNames[] = {
+    { LaunchQuant::none, TR_NOOP ("None") }, { LaunchQuant::bars8, TR_NOOP ("8 bars") }, { LaunchQuant::bars4, TR_NOOP ("4 bars") },
+    { LaunchQuant::bars2, TR_NOOP ("2 bars") }, { LaunchQuant::bar, TR_NOOP ("1 bar") }, { LaunchQuant::half, "1/2" },
+    { LaunchQuant::halfTriplet, "1/2T" }, { LaunchQuant::quarter, "1/4" }, { LaunchQuant::quarterTriplet, "1/4T" },
+    { LaunchQuant::eighth, "1/8" }, { LaunchQuant::eighthTriplet, "1/8T" }, { LaunchQuant::sixteenth, "1/16" },
+    { LaunchQuant::sixteenthTriplet, "1/16T" }, { LaunchQuant::thirtySecond, "1/32" }
+};
+juce::String quantName (LaunchQuant q)
+{
+    for (const auto& [value, name] : globalQuantNames)
+        if (value == q)
+            return value == LaunchQuant::none || value <= LaunchQuant::bar ? tr (name) : juce::String (name);
+    return {};
+}
+LaunchQuant globalQuantOf (const Song& song)
+{
+    return song.clipGrid ? song.clipGrid->globalQuant : ClipGrid {}.globalQuant;
+}
+} // namespace
+
+juce::String QuantBox::text() const { return quantName (globalQuantOf (engine.getSong())); }
+
+void QuantBox::update()
+{
+    if (const auto now = (int) globalQuantOf (engine.getSong()); now != shownQuant)
+    {
+        shownQuant = now;
+        shown = text();
+        repaint();
+    }
+}
+
+void QuantBox::paint (juce::Graphics& g)
+{
+    const auto area = getLocalBounds();
+    paintLiveBox (g, area, isMouseOver());
+    paintLiveText (g, shown.isEmpty() ? text() : shown, area.withTrimmedRight (9), false, juce::Justification::centredLeft);
+    paintLiveArrow (g, area, live::text);
+}
+
+juce::PopupMenu QuantBox::makeMenu()
+{
+    juce::PopupMenu menu;
+    const auto now = globalQuantOf (engine.getSong());
+    for (const auto& [q, name] : globalQuantNames)
+        menu.addItem (quantName (q), true, q == now, [this, q = q] {
+            engine.editSong ([q] (Song& s) { launcher::ensureGrid (s).globalQuant = q; }, false);
+            update();
+        });
+    return menu;
+}
+
+void QuantBox::mouseDown (const juce::MouseEvent& e)
+{
+    if (e.mods.isLeftButtonDown() || e.mods.isPopupMenu())
+        makeMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this));
+}
+
+ui::Hint QuantBox::hintAt (juce::Point<int>)
+{
+    return { tr ("Launch quantisation: when a launched clip starts"), {}, false, true };
+}
+
+void SaveStatus::set (toolbarlayout::SaveState newState, const juce::String& newText)
+{
+    if (known && newState == state && newText == text)
+        return;
+    known = true;
+    state = newState;
+    text = newText;
+    repaint();
+}
+
+void SaveStatus::paint (juce::Graphics& g)
+{
+    using namespace theme;
+    using toolbarlayout::SaveState;
+    const auto pill = getLocalBounds().toFloat().withSizeKeepingCentre ((float) getWidth(), (float) toolbarlayout::simplebar::statusHeight);
+    if (isMouseOver())
+    {
+        g.setColour (colour::bg4);
+        g.fillRoundedRectangle (pill, pill.getHeight() / 2.0f);
+    }
+    auto content = pill.reduced (10.0f, 0.0f);
+    const auto iconBox = content.removeFromLeft (14.0f).withSizeKeepingCentre (14.0f, 14.0f);
+    switch (state)
+    {
+        case SaveState::saved: icons::draw (g, Icon::cloudCheck, iconBox.withSizeKeepingCentre (18.0f, 18.0f), colour::ledOn); break;
+        case SaveState::backedUp: icons::draw (g, Icon::cloud, iconBox.withSizeKeepingCentre (18.0f, 18.0f), colour::textSecondary); break;
+        case SaveState::unsaved:
+            g.setColour (colour::warning);
+            g.fillEllipse (iconBox.withSizeKeepingCentre (8.0f, 8.0f));
+            break;
+        case SaveState::fresh: icons::draw (g, Icon::cloud, iconBox.withSizeKeepingCentre (18.0f, 18.0f), colour::textDisabled); break;
+    }
+    content.removeFromLeft (6.0f);
+    g.setFont (font (type::small));
+    g.setColour (state == SaveState::fresh ? colour::textSecondary : colour::textPrimary);
+    g.drawFittedText (text, content.toNearestInt(), juce::Justification::centredLeft, 1, 0.8f);
+}
+
+void SaveStatus::mouseUp (const juce::MouseEvent& e)
+{
+    if (getLocalBounds().contains (e.getPosition()) && ! e.mods.isPopupMenu() && onSave)
+        onSave();
+}
+
+ui::Hint SaveStatus::hintAt (juce::Point<int>)
+{
+    return { tr ("LYNX backs your work up by itself. Click to save the project (Ctrl+S)"), {}, false, false };
 }
 } // namespace lynx::toolbar
 

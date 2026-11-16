@@ -991,6 +991,7 @@ public:
     // The clip grid (Clip-launch workflow, round 181a): not owned, nullptr in Pattern workflow. Beside the Playlist, or
     // alone, or hidden while only the Playlist shows. Small windows give the grid at least what it needs to be usable.
     enum class GridView { beside, grid, song };
+    GridView getGridView() const noexcept { return gridView; } // (round 190iv: the Live control bar's view selector)
     void setClipGrid (juce::Component* grid, GridView view)
     {
         if (clipGrid != nullptr && clipGrid != grid)

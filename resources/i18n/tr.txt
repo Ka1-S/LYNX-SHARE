@@ -10676,3 +10676,13 @@ countries: tr
 "Current Project" = "Geçerli proje"
 "Add Folder..." = "Klasör ekle..."
 "Large controls (touch size)" = "Büyük denetimler (dokunmatik boyut)"
+
+# round 190iv: the toolbar per layout style
+"Nothing to save yet" = "Henüz kaydedilecek bir şey yok"
+"LYNX backs your work up by itself. Click to save the project (Ctrl+S)" = "LYNX çalışmanızı kendisi yedekler. Projeyi kaydetmek için tıklayın (Ctrl+S)"
+"More: the panels and options this toolbar leaves out" = "Daha fazla: bu çubuğun dışarıda bıraktığı paneller ve seçenekler"
+"Session view: the clip grid (Tab)" = "Session görünümü: klip ızgarası (Tab)"
+"Arrangement view: the Playlist (Tab)" = "Arrangement görünümü: Playlist (Tab)"
+"Control bar" = "Kontrol çubuğu"
+"Punch in / out" = "Punch in / out"
+"Show the Session button row" = "Session düğme satırını göster"

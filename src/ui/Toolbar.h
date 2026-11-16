@@ -58,6 +58,8 @@ public:
     void mouseUp (const juce::MouseEvent& e) override;
     ui::Hint hintAt (juce::Point<int> position) override;
     bool showsTime() const noexcept { return mode != Mode::bars; }
+    // round 190iv: the Simple capsule's time segment, or Live's 17 px position box ("1. 1. 1"); FL's look is unchanged
+    void setLook (toolbarlayout::Look l);
 
     enum class Mode
     {
@@ -69,6 +71,8 @@ public:
 private:
     juce::String text() const;
     void showMenu();
+    void paintLook (juce::Graphics& g);
+    toolbarlayout::Look look = toolbarlayout::Look::fl;
     AudioEngine& engine;
     juce::String shown;
     double linkProgress = -1.0; // (round 190gl) the Link session's progress bar while the transport waits / is stopped
@@ -150,6 +154,8 @@ public:
     // Round 190gg (B5): the dropouts since the start, the last one's time and cause (ui/PluginMonitorWindow.h
     // describeDropouts), at the end of the CPU hint
     void setDropouts (const juce::String& text) { dropoutText = text; }
+    // round 190iv: Live's CPU box ("26 %" over an orange load bar, 54 x 17); FL's look is unchanged
+    void setLook (toolbarlayout::Look l);
     void paint (juce::Graphics& g) override;
     ui::Hint hintAt (juce::Point<int> position) override;
 
@@ -164,6 +170,7 @@ private:
     juce::StringArray heaviest;
     juce::uint32 lastGlitchAt = 0; // ms counter of the last new over-deadline callback (0 = none)
     double cpu = 0.0, cpuSmoothed = 0.0;
+    toolbarlayout::Look look = toolbarlayout::Look::fl;
     std::int64_t memory = 0;
     int voices = 0, peakVoices = 0;
 };
@@ -199,6 +206,8 @@ public:
     void setText (const juce::String& keyName); // "" = no key
     const juce::String& getText() const { return text; }
     std::function<void()> onClick;
+    // round 190iv: BandLab's Key capsule ("D min"; "Key" while none) in Simple, Live's key box in Clip-launch
+    void setLook (toolbarlayout::Look l);
 
     void paint (juce::Graphics& g) override;
     void mouseDown (const juce::MouseEvent& e) override;
@@ -208,6 +217,7 @@ public:
 
 private:
     juce::String text;
+    toolbarlayout::Look look = toolbarlayout::Look::fl;
 };
 
 // Ableton Link's switch (round 190gl), as the reference DAW's control bar has it (its manual's "The Link Toggle in the
@@ -229,6 +239,7 @@ public:
     static int idealWidth (int height);
     juce::String text() const;         // what the switch shows now (tests)
     juce::PopupMenu makeMenu();        // the drop-down (shots)
+    void setLook (toolbarlayout::Look l); // round 190iv: Live's 17 px box in the Clip-launch control bar
 
 private:
     static constexpr int arrowWidth = 12;
@@ -239,6 +250,7 @@ private:
     AudioEngine& engine;
     bool on = false;
     int peers = 0;
+    toolbarlayout::Look look = toolbarlayout::Look::fl;
 };
 
 // The chord near the hint bar (View › Toolbars): outlined text with no box, over whatever is below the bar, as in FL.
@@ -288,6 +300,76 @@ private:
     float column = 0.0f;                   // the long view's next column: the loudest frame since the last one
     double holdMs = 0.0, clipMs = 0.0, columnMs = 0.0, lastMs = 0.0;
     double silentMs = 0.0; // how long the output has been silent: once everything has decayed, no more repaints
+};
+
+// --- round 190iv: the Simple top bar's and the Clip-launch control bar's own fields ------------------------------------
+// The song's time signature ("4 / 4"): a segment of the Simple tempo capsule (BandLab) or Live's 17 px box. A click opens
+// the signatures (the Pattern menu's "Song time signature" list). update() from the main window's timer repaints only
+// when the signature changed.
+class SignatureBox final : public juce::Component,
+                           public ui::HintSource
+{
+public:
+    explicit SignatureBox (AudioEngine& e) : engine (e) { setMouseCursor (juce::MouseCursor::PointingHandCursor); }
+    void setLook (toolbarlayout::Look l);
+    void update();
+    juce::String text() const;
+    juce::PopupMenu makeMenu();
+    void paint (juce::Graphics& g) override;
+    void mouseDown (const juce::MouseEvent& e) override;
+    void mouseEnter (const juce::MouseEvent&) override { repaint(); }
+    void mouseExit (const juce::MouseEvent&) override { repaint(); }
+    ui::Hint hintAt (juce::Point<int> position) override;
+
+private:
+    AudioEngine& engine;
+    juce::String shown;
+    int shownSignature = -1;
+    toolbarlayout::Look look = toolbarlayout::Look::live;
+};
+
+// Live's global launch quantisation ("1 Bar ▾") in the control bar (it was the clip grid's footer box, design190ia CL-25).
+class QuantBox final : public juce::Component,
+                       public ui::HintSource
+{
+public:
+    explicit QuantBox (AudioEngine& e) : engine (e) { setMouseCursor (juce::MouseCursor::PointingHandCursor); }
+    void update();
+    juce::String text() const;
+    juce::PopupMenu makeMenu();
+    void paint (juce::Graphics& g) override;
+    void mouseDown (const juce::MouseEvent& e) override;
+    void mouseEnter (const juce::MouseEvent&) override { repaint(); }
+    void mouseExit (const juce::MouseEvent&) override { repaint(); }
+    ui::Hint hintAt (juce::Point<int> position) override;
+
+private:
+    AudioEngine& engine;
+    juce::String shown;
+    int shownQuant = -1;
+};
+
+// The Simple top bar's "Last saved" status (design190ia SG-17; BandLab's "Last Saved" at its top right): a 14 px icon
+// before the text, the whole item a 24 px pill that saves (Ctrl+S). Four states (toolbarlayout::SaveState).
+class SaveStatus final : public juce::Component,
+                         public ui::HintSource
+{
+public:
+    SaveStatus() { setMouseCursor (juce::MouseCursor::PointingHandCursor); }
+    void set (toolbarlayout::SaveState state, const juce::String& text); // repaints only on a change
+    toolbarlayout::SaveState getState() const noexcept { return state; }
+    const juce::String& getText() const noexcept { return text; }
+    std::function<void()> onSave;
+    void paint (juce::Graphics& g) override;
+    void mouseUp (const juce::MouseEvent& e) override;
+    void mouseEnter (const juce::MouseEvent&) override { repaint(); }
+    void mouseExit (const juce::MouseEvent&) override { repaint(); }
+    ui::Hint hintAt (juce::Point<int> position) override;
+
+private:
+    toolbarlayout::SaveState state = toolbarlayout::SaveState::fresh;
+    juce::String text;
+    bool known = false;
 };
 
 // "Customize toolbar": the groups in toolbar order, each with a check box (shown / hidden), Move up / Move

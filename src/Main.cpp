@@ -2287,6 +2287,19 @@ public:
             return;
         }
 
+        if (args.contains ("--toolbarshot190iv"))
+        {
+            // LYNX --toolbarshot190iv prefix [project.als]: round 190iv off screen — the toolbar of each layout style (Pattern,
+            // Simple, Clip-launch) at 1920 / 1366 / 1280, the Simple transport capsule idle / hover / pressed / playing /
+            // recording, the "Last saved" status in its four states, Live's control bar with every button idle / hover /
+            // pressed / lit, the "⋯" menus, and a report of the parts' bounds
+            const auto i = args.indexOf ("--toolbarshot190iv");
+            const auto project = i + 2 < args.size() && ! args[i + 2].startsWith ("--") ? args[i + 2].unquoted() : juce::String();
+            runToolbarShot190iv (args[i + 1].unquoted(), project);
+            quit();
+            return;
+        }
+
         if (args.contains ("--gridshot"))
         {
             // LYNX.exe --gridshot prefix [project]: the Clip-launch workflow's layout off-screen, with a grid of sample
@@ -12154,6 +12167,20 @@ private:
                                    engine->stop();
                                    lynx::NativeEffectWindows::closeAll();
                                    lynx::FormulaControllerWindows::closeAll();
+                                   return juce::String();
+                               } });
+        // round 190iv: the Simple layout (its toolbar) idle and while the song plays
+        run->steps.push_back ({ "idle: simple layout, stopped", [this, ui] {
+                                   engine->stop();
+                                   ui->setLayoutStyle (lynx::layoutstyle::Style::simple, false);
+                               }, {}, 3000 });
+        run->steps.push_back ({ "simple layout, song playing", [this] {
+                                   engine->getTransport().songMode = true;
+                                   engine->rewind();
+                                   engine->play();
+                               }, {}, 3000, [this, ui] {
+                                   engine->stop();
+                                   ui->setLayoutStyle (lynx::layoutstyle::Style::pattern, false);
                                    return juce::String();
                                } });
         // LYNX_UIPERF_ONLY=text: only the steps whose name has that text
@@ -22396,6 +22423,187 @@ private:
         report.replaceWithText (text);
         if (profile.isNotEmpty())
             lynx::crashguard::stopMainProfiler();
+    }
+
+    // Round 190iv: the toolbar per layout style (see --toolbarshot190iv above)
+    void runToolbarShot190iv (const juce::String& prefix, const juce::String& projectPath)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::ui::motion::enabled() = false; // (hover states drawn at once, no fade)
+        lynx::AudioEngine offline (false);
+        lynx::MainComponent ui (offline, false);
+        ui.setSize (1920, 1080);
+        juce::String report;
+        const auto write = [&prefix] (const juce::Image& image, const juce::String& name) {
+            const auto file = lynx::shot::file (juce::File (prefix + "-" + name + ".png"));
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (image, out);
+        };
+        const auto bar = [&ui] { return ui.getLocalBounds().withHeight (juce::jmin (ui.getHeight(), 90)); };
+        const auto describe = [&ui, &report] (const juce::String& title) {
+            report << "== " << title << " (" << ui.getWidth() << "x" << ui.getHeight() << ")\n";
+            for (const auto* name : { "play", "stop", "record", "metronome", "tap", "tempo", "signature", "quantisation", "key", "link", "browser",
+                                      "backToArrangement", "position", "overdub", "capture", "sessionRecord", "punch", "draw", "computerKeys",
+                                      "keyMap", "midiMap", "cpu", "more", "sessionView", "arrangementView", "status", "finish" })
+                if (auto* c = ui.toolbarPartForSnapshot (name); c != nullptr && c->isVisible() && c->getParentComponent() == &ui)
+                    report << "  " << name << " " << c->getBounds().toString() << "\n";
+        };
+        const std::pair<int, int> sizes[] { { 1920, 1080 }, { 1366, 768 }, { 1280, 800 } };
+
+        // a song with a few tracks for the Simple layout (voice, instrument, drums), as --simpleshot makes them
+        offline.editSong ([] (lynx::Song& s) {
+            namespace st = lynx::simpletracks;
+            st::Request q;
+            q.kind = st::Kind::voice;
+            q.name = "Lead vocal";
+            st::addTrack (s, q);
+            q = {};
+            q.kind = st::Kind::instrument;
+            q.name = "Keys";
+            lynx::ChannelDef keys;
+            keys.instrument = lynx::InstrumentKind::synth;
+            q.channel = keys;
+            st::addTrack (s, q);
+            q = {};
+            q.kind = st::Kind::drums;
+            q.name = "Drums";
+            st::addTrack (s, q);
+            s.bpm = 120.0;
+        }, false);
+        offline.dispatchPendingMessages();
+
+        // 1. Pattern: FL's toolbar (it must stay as it was: compare with the base build's)
+        ui.selectTabForSnapshot (2);
+        for (const auto& [w, h] : sizes)
+        {
+            ui.setSize (w, h);
+            write (lynx::shot::snapshot (ui, bar()), "pattern-bar-" + juce::String (w));
+        }
+        ui.setSize (1920, 1080);
+
+        // 2. Simple
+        ui.setLayoutStyle (lynx::layoutstyle::Style::simple, false);
+        offline.dispatchPendingMessages();
+        for (const auto& [w, h] : sizes)
+        {
+            ui.setSize (w, h);
+            offline.dispatchPendingMessages();
+            write (lynx::shot::snapshot (ui), "simple-" + juce::String (w));
+            write (lynx::shot::snapshot (ui, bar()), "simple-bar-" + juce::String (w));
+            describe ("simple " + juce::String (w));
+        }
+        ui.setSize (1920, 1080);
+        auto* play = dynamic_cast<juce::Button*> (ui.toolbarPartForSnapshot ("play"));
+        auto* stop = dynamic_cast<juce::Button*> (ui.toolbarPartForSnapshot ("stop"));
+        auto* rec = dynamic_cast<juce::Button*> (ui.toolbarPartForSnapshot ("record"));
+        const auto capsuleArea = [&] {
+            juce::Rectangle<int> r;
+            for (const auto* name : { "play", "stop", "record", "position", "metronome", "tempo", "signature", "key" })
+                if (auto* c = ui.toolbarPartForSnapshot (name); c != nullptr && c->isVisible())
+                    r = r.isEmpty() ? c->getBounds() : r.getUnion (c->getBounds());
+            return r.expanded (8, 10);
+        };
+        if (play != nullptr && stop != nullptr && rec != nullptr)
+        {
+            write (lynx::shot::snapshot (ui, capsuleArea()), "simple-transport-idle");
+            play->setState (juce::Button::buttonOver);
+            write (lynx::shot::snapshot (ui, capsuleArea()), "simple-transport-hover");
+            play->setState (juce::Button::buttonDown);
+            write (lynx::shot::snapshot (ui, capsuleArea()), "simple-transport-pressed");
+            play->setState (juce::Button::buttonNormal);
+            play->setToggleState (true, juce::dontSendNotification);
+            write (lynx::shot::snapshot (ui, capsuleArea()), "simple-transport-playing");
+            rec->setToggleState (true, juce::dontSendNotification);
+            write (lynx::shot::snapshot (ui, capsuleArea()), "simple-transport-recording");
+            play->setToggleState (false, juce::dontSendNotification);
+            rec->setToggleState (false, juce::dontSendNotification);
+        }
+        if (auto* status = ui.toolbarPartForSnapshot ("status"))
+        {
+            using S = lynx::toolbarlayout::SaveState;
+            int n = 0;
+            for (const auto state : { S::fresh, S::unsaved, S::backedUp, S::saved })
+            {
+                ui.setSaveStatusForSnapshot (state);
+                auto r = status->getBounds();
+                if (auto* finish = ui.toolbarPartForSnapshot ("finish"); finish != nullptr && finish->isVisible())
+                    r = r.getUnion (finish->getBounds());
+                write (lynx::shot::snapshot (ui, r.expanded (8, 10)), "simple-status-" + juce::String (n++));
+            }
+        }
+        {
+            auto more = ui.makeToolbarMoreMenuForSnapshot();
+            saveMenus (juce::StringArray { "More" }, std::vector<juce::PopupMenu> { more }, prefix + "-simple-more-menu.png");
+        }
+
+        // 3. Clip-launch: Live's control bar (the Live demo set when given, else an empty grid)
+        if (projectPath.isNotEmpty())
+        {
+            ui.openFile (juce::File (projectPath));
+            offline.dispatchPendingMessages();
+        }
+        ui.setLayoutStyle (lynx::layoutstyle::Style::clipLaunch, false);
+        offline.dispatchPendingMessages();
+        ui.setClipGridView (lynx::PlaylistArea::GridView::grid);
+        for (const auto& [w, h] : sizes)
+        {
+            ui.setSize (w, h);
+            offline.dispatchPendingMessages();
+            write (lynx::shot::snapshot (ui), "live-" + juce::String (w));
+            write (lynx::shot::snapshot (ui, bar()), "live-bar-" + juce::String (w));
+            describe ("clip-launch " + juce::String (w));
+        }
+        ui.setSize (1920, 1080);
+        ui.setClipGridView (lynx::PlaylistArea::GridView::song);
+        write (lynx::shot::snapshot (ui), "live-arrangement-1920");
+        ui.setClipGridView (lynx::PlaylistArea::GridView::beside);
+        write (lynx::shot::snapshot (ui), "live-both-1920");
+        ui.setClipGridView (lynx::PlaylistArea::GridView::grid);
+        // every control-bar button idle / hover / pressed / lit, all at once per picture
+        std::vector<juce::Button*> buttons;
+        for (const auto* name : { "play", "stop", "record", "metronome", "tap", "browser", "backToArrangement", "overdub", "capture", "sessionRecord", "punch",
+                                  "draw", "computerKeys", "keyMap", "midiMap", "more", "sessionView", "arrangementView" })
+            if (auto* b = dynamic_cast<juce::Button*> (ui.toolbarPartForSnapshot (name)); b != nullptr && b->isVisible())
+                buttons.push_back (b);
+        std::vector<bool> lit;
+        for (auto* b : buttons)
+            lit.push_back (b->getToggleState());
+        const auto controlBar = ui.getLocalBounds().withTrimmedTop (lynx::toolbarlayout::livebar::menuRow).withHeight (lynx::toolbarlayout::livebar::band);
+        write (lynx::shot::snapshot (ui, controlBar), "live-states-idle");
+        for (const auto& [state, name] : { std::pair<juce::Button::ButtonState, const char*> { juce::Button::buttonOver, "hover" }, { juce::Button::buttonDown, "pressed" } })
+        {
+            for (auto* b : buttons)
+                b->setState (state);
+            write (lynx::shot::snapshot (ui, controlBar), juce::String ("live-states-") + name);
+        }
+        for (auto* b : buttons)
+        {
+            b->setState (juce::Button::buttonNormal);
+            b->setToggleState (true, juce::dontSendNotification);
+        }
+        write (lynx::shot::snapshot (ui, controlBar), "live-states-lit");
+        for (std::size_t k = 0; k < buttons.size(); ++k)
+            buttons[k]->setToggleState (lit[k], juce::dontSendNotification);
+        {
+            auto more = ui.makeToolbarMoreMenuForSnapshot();
+            saveMenus (juce::StringArray { "More" }, std::vector<juce::PopupMenu> { more }, prefix + "-live-more-menu.png");
+        }
+        // the Session button row kept as an option
+        ui.setSessionButtonRowShown (true);
+        write (lynx::shot::snapshot (ui), "live-buttonrow-1920");
+        ui.setSessionButtonRowShown (false);
+
+        // 4. back to Pattern: FL's toolbar again, as it was
+        ui.setLayoutStyle (lynx::layoutstyle::Style::pattern, false);
+        offline.dispatchPendingMessages();
+        for (const auto& [w, h] : sizes)
+        {
+            ui.setSize (w, h);
+            write (lynx::shot::snapshot (ui, bar()), "pattern-after-bar-" + juce::String (w));
+        }
+        juce::File (prefix + "-report.txt").replaceWithText (report);
+        lynx::ui::motion::enabled() = true;
     }
 
     void runGridShot (const juce::String& prefix, const juce::String& projectPath = {})
