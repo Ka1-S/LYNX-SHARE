@@ -47,6 +47,7 @@
 #include "ui/HintBar.h"
 #include "ui/I18n.h"
 #include "ui/Motion.h"
+#include "ui/MotionOverlay.h"
 #include "core/PresetMix.h"
 #include "ui/Icons.h"
 #include "ui/FacetEqEditor.h"

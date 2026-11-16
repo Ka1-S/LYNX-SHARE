@@ -69,6 +69,70 @@
     }
     float gbTrailWidth() const { return ui::motion::enabled() ? 6.0f * scale() : 0.0f; } // a fade: Settings › Animations
     double gbLastFrameMs = 0.0;
+
+    // Rollup 0.1.30 (round 190iy): the locator on round 190ip's GPU overlay (ui/MotionOverlay.h) while the song plays. It
+    // then moves at every tick of the editor's 30 Hz timer and the window presents no frame for it (round 190ih measured a
+    // fixed cost per frame the window presents, whatever is drawn). The slot fills stay on the frame budget below: they are
+    // drawn under each slot's thumbnail and name (a picture over them would cover both) and grow from the cell's left edge
+    // (not a picture that moves). Fallback (Linux / macOS, LYNX_OVERLAY=0, Draw with the GPU off, a window over the mark):
+    // the locator moves with the fills, as before. LYNX_GB_DIAG bit 2: never on the overlay (A/B measurements).
+    std::unique_ptr<ui::MotionOverlay> gbOverlay;
+    bool gbLocatorOnGpu() const noexcept { return gbOverlay != nullptr && gbOverlay->isShowing(); }
+    const LayoutItem* gbEditorItem() const
+    {
+        for (const auto& item : activeLayout().items)
+            if (isGbItem (item, "grossbeat") && visible (item))
+                return &item;
+        return nullptr;
+    }
+    // the locator and its trail at x (paint() and the overlay's picture: the same code)
+    void gbPaintLocator (juce::Graphics& g, juce::Rectangle<float> inner, float x) const
+    {
+        using namespace theme;
+        const auto lineW = juce::jmax (1.0f, std::floor (scale()));
+        if (const auto trail = gbTrailWidth(); trail > 0.0f)
+        {
+            const auto t = juce::Rectangle<float> (x - trail, inner.getY(), trail, inner.getHeight()).getIntersection (inner);
+            g.setGradientFill (juce::ColourGradient (colour::playhead.withAlpha (0.0f), x - trail, 0.0f, colour::playhead.withAlpha (0.45f), x, 0.0f, false));
+            g.fillRect (t);
+        }
+        g.setColour (colour::playhead);
+        g.fillRect (juce::Rectangle<float> (x, inner.getY(), lineW, inner.getHeight()).getIntersection (inner));
+    }
+    // moves the overlay to `now` (every tick); the locator's painted columns are repainted the tick it goes on or off it
+    void gbStepOverlay (const GbLive& now)
+    {
+        const auto* item = gbEditorItem();
+        const auto wanted = item != nullptr && now.playing && (gbDiag() & 2) == 0;
+        if (gbOverlay == nullptr)
+        {
+            if (! wanted)
+                return;
+            gbOverlay = std::make_unique<ui::MotionOverlay> (*this, [this] (juce::Graphics& g, float x) {
+                if (const auto* it = gbEditorItem())
+                    gbPaintLocator (g, gbArea (*it), x);
+            });
+            gbOverlay->onHidden = [this] { // (it hid itself: the locator is painted again, where the fills' frame has it)
+                if (const auto* it = gbEditorItem(); it != nullptr && gbLive.playing)
+                    repaint (gbLocatorBounds (*it, gbLive));
+            };
+        }
+        ui::MotionOverlay::Mark mark;
+        if (item != nullptr)
+        {
+            const auto inner = gbArea (*item);
+            const auto trail = gbTrailWidth();
+            const auto lineW = juce::jmax (1.0f, std::floor (scale()));
+            mark.x = gbLocatorX (*item, now);
+            mark.extent = juce::Rectangle<float> (-trail - 1.0f, inner.getY(), trail + lineW + 2.0f, inner.getHeight()).getSmallestIntegerContainer();
+            mark.clip = inner.getSmallestIntegerContainer();
+            mark.look = ((std::uint64_t) theme::colour::playhead.getARGB() << 32) ^ ((std::uint64_t) juce::roundToInt (trail * 64.0f) << 16)
+                        ^ ((std::uint64_t) juce::roundToInt (lineW) << 12) ^ (std::uint64_t) mark.clip.getHeight();
+        }
+        const auto gpu = ui::stepMark (*gbOverlay, wanted, mark, false);
+        if (gpu.flipped && item != nullptr && gbLive.playing) // (the painted locator goes, or comes back)
+            repaint (gbLocatorBounds (*item, gbLive));
+    }
     // 15 a second by default: measured in one process against the static window (round 190ih, Thief, interleaved
     // 2.5 s steps), 30 a second cost +5 … +13 points of process CPU, 15 or fewer stayed inside the measurement's own
     // noise; LYNX_GB_DIAG's high byte overrides it for measurements
@@ -102,9 +166,10 @@
         // trail, an opaque editor or the software renderer changed nothing), so the locator and the fills move
         // together, at most gbMaxHz() times a second, and only when one of them moved a pixel
         const auto nowMs = juce::Time::getMillisecondCounterHiRes();
-        if (gbLive.playing && nowMs - gbLastFrameMs < 1000.0 / gbMaxHz() - 4.0)
-            return;
         const auto now = gbReadLive();
+        gbStepOverlay (now); // round 190iy: the locator on the GPU, at every tick
+        if (gbLive.playing && now.playing && nowMs - gbLastFrameMs < 1000.0 / gbMaxHz() - 4.0) // (a stop shows at once)
+            return;
         if (now == gbLive)
             return;
         const auto before = gbLive;
@@ -116,6 +181,8 @@
                 continue;
             if (isGbItem (item, "grossbeat"))
             {
+                if (gbLocatorOnGpu()) // (round 190iy: the overlay moves it; nothing under it is painted)
+                    continue;
                 const auto xBefore = before.playing ? (int) std::floor (gbLocatorX (item, before)) : -1;
                 const auto xNow = now.playing ? (int) std::floor (gbLocatorX (item, now)) : -1;
                 if (xBefore == xNow)
@@ -1149,17 +1216,8 @@
         g.setFont (font (juce::jmax (8.0f, 10.0f * s), true));
         g.drawText (gbEditKind == 0 ? tr ("time travel") : tr ("volume"), inner.reduced (6.0f * s).toNearestInt(), juce::Justification::topRight, false);
 
-        if (gbLive.playing) // round 190ih: the playback locator with its short fading trail (FL, raw/c24)
-        {
-            const auto x = std::floor (gbLocatorX (item, gbLive));
-            const auto lineW = juce::jmax (1.0f, std::floor (s));
-            if (const auto trail = gbTrailWidth(); trail > 0.0f)
-            {
-                const auto t = juce::Rectangle<float> (x - trail, inner.getY(), trail, inner.getHeight()).getIntersection (inner);
-                g.setGradientFill (juce::ColourGradient (colour::playhead.withAlpha (0.0f), x - trail, 0.0f, colour::playhead.withAlpha (0.45f), x, 0.0f, false));
-                g.fillRect (t);
-            }
-            g.setColour (colour::playhead);
-            g.fillRect (juce::Rectangle<float> (x, inner.getY(), lineW, inner.getHeight()).getIntersection (inner));
-        }
+        // round 190ih: the playback locator with its short fading trail (FL, raw/c24); round 190iy: unless the GPU overlay
+        // shows it
+        if (gbLive.playing && ! gbLocatorOnGpu())
+            gbPaintLocator (g, inner, std::floor (gbLocatorX (item, gbLive)));
     }

@@ -11975,8 +11975,17 @@ private:
                                        engine->rewind();
                                        engine->play();
                                    }, {}, 1500 });
+            // (off, the default, 30 / s, off, 10 / s; LYNX_UIPERF_GBAB_MASKS="1,2,0" picks others, e.g. round 190iy's
+            // locator on the GPU overlay (0) against the repaint path (2))
+            std::vector<int> masks { 1, 0, 30 << 8, 1, 10 << 8 };
+            if (const auto list = juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_GBAB_MASKS", {}); list.isNotEmpty())
+            {
+                masks.clear();
+                for (const auto& m : juce::StringArray::fromTokens (list, ",", {}))
+                    masks.push_back (m.trim().getIntValue());
+            }
             for (int c = 0; c < cycles; ++c)
-                for (const int mask : { 1, 0, 30 << 8, 1, 10 << 8 }) // (off, the default, 30 / s, off, 10 / s)
+                for (const int mask : masks)
                     run->steps.push_back ({ "Gross Beat A/B mask " + juce::String (mask) + " cycle " + juce::String (c + 1),
                                             [this, mask] {
                                                 lynx::setGrossBeatDiagnostics (mask);
