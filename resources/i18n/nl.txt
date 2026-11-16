@@ -10602,3 +10602,13 @@ countries: nl be
 "Choose an input to record" = "Kies een ingang om op te nemen"
 "How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); Balanced halves it on fast screens (72 Hz on a 144 Hz screen); 60 Hz or 30 Hz use the least CPU (laptops, slower computers)." = "Hoe vaak de afspeelkop, meters en scopes bewegen. Scherm volgt de verversingsfrequentie van je monitor (het vloeiendst); Gebalanceerd halveert die op snelle schermen (72 Hz op een 144 Hz-scherm); 60 Hz of 30 Hz gebruiken de minste CPU (laptops, tragere computers)."
 "Large controls (touch size)" = "Grote bedieningselementen (aanraakformaat)"
+
+# round 190iv: the toolbar per layout style
+"Nothing to save yet" = "Nog niets om op te slaan"
+"LYNX backs your work up by itself. Click to save the project (Ctrl+S)" = "LYNX maakt zelf back-ups van je werk. Klik om het project op te slaan (Ctrl+S)"
+"More: the panels and options this toolbar leaves out" = "Meer: de panelen en opties die deze balk weglaat"
+"Session view: the clip grid (Tab)" = "Session-weergave: het clipraster (Tab)"
+"Arrangement view: the Playlist (Tab)" = "Arrangement-weergave: de Playlist (Tab)"
+"Control bar" = "Bedieningsbalk"
+"Punch in / out" = "Punch in / out"
+"Show the Session button row" = "Session-knoppenrij tonen"

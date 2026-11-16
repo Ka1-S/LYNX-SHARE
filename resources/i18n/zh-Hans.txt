@@ -10602,3 +10602,13 @@ countries: cn sg
 "Choose an input to record" = "请选择要录制的输入"
 "How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); Balanced halves it on fast screens (72 Hz on a 144 Hz screen); 60 Hz or 30 Hz use the least CPU (laptops, slower computers)." = "播放头、电平表和示波器的移动频率。显示器跟随屏幕的刷新率（最流畅）；均衡在高刷新率屏幕上将其减半（144 Hz 屏幕上为 72 Hz）；60 Hz 或 30 Hz 占用的 CPU 最少（笔记本电脑、较慢的电脑）。"
 "Large controls (touch size)" = "大号控件（触控尺寸）"
+
+# round 190iv: the toolbar per layout style
+"Nothing to save yet" = "暂无需要保存的内容"
+"LYNX backs your work up by itself. Click to save the project (Ctrl+S)" = "LYNX 会自动备份你的工作。点击保存项目 (Ctrl+S)"
+"More: the panels and options this toolbar leaves out" = "更多：此工具栏未显示的面板和选项"
+"Session view: the clip grid (Tab)" = "Session 视图：片段网格 (Tab)"
+"Arrangement view: the Playlist (Tab)" = "Arrangement 视图：播放列表 (Tab)"
+"Control bar" = "控制栏"
+"Punch in / out" = "穿插录音入 / 出"
+"Show the Session button row" = "显示 Session 按钮行"

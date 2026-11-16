@@ -10602,3 +10602,13 @@ countries: es mx ar co cl pe ve
 "Choose an input to record" = "Elige una entrada para grabar"
 "How often the playhead, meters and scopes move. Display follows your screen's refresh rate (smoothest); Balanced halves it on fast screens (72 Hz on a 144 Hz screen); 60 Hz or 30 Hz use the least CPU (laptops, slower computers)." = "Con qué frecuencia se mueven el cursor de reproducción, los medidores y los osciloscopios. Pantalla sigue la frecuencia de actualización de tu monitor (lo más fluido); Equilibrado la reduce a la mitad en pantallas rápidas (72 Hz en una pantalla de 144 Hz); 60 Hz o 30 Hz usan la menor CPU (portátiles, equipos más lentos)."
 "Large controls (touch size)" = "Controles grandes (tamaño táctil)"
+
+# round 190iv: the toolbar per layout style
+"Nothing to save yet" = "Nada que guardar todavía"
+"LYNX backs your work up by itself. Click to save the project (Ctrl+S)" = "LYNX hace copias de seguridad de tu trabajo por sí solo. Haz clic para guardar el proyecto (Ctrl+S)"
+"More: the panels and options this toolbar leaves out" = "Más: los paneles y opciones que esta barra deja fuera"
+"Session view: the clip grid (Tab)" = "Vista Session: la cuadrícula de clips (Tab)"
+"Arrangement view: the Playlist (Tab)" = "Vista Arrangement: la Playlist (Tab)"
+"Control bar" = "Barra de control"
+"Punch in / out" = "Punch in / out"
+"Show the Session button row" = "Mostrar la fila de botones de Session"
