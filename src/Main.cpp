@@ -12705,6 +12705,13 @@ private:
                         lines.add (command + " -> " + file.getFileName());
                         continue;
                     }
+                    if (command.startsWith ("menushot ")) // round 190jd: the deck's Snap menu as a picture
+                    {
+                        const auto file = prefix + command.fromFirstOccurrenceOf (" ", false, false).trim() + ".png";
+                        saveMenus (juce::StringArray { "Slicex deck: Snap" }, std::vector<juce::PopupMenu> { lynx::slicexSnapMenuForSnapshot (*panel) }, file);
+                        lines.add (command + " -> " + juce::File (file).getFileName());
+                        continue;
+                    }
                     const auto result = lynx::slicexEditorTest (*panel, command);
                     offline.dispatchPendingMessages();
                     lines.add (command + " -> " + result);
@@ -26482,23 +26489,48 @@ private:
         // (#8C5F5F, #7F8C5E; shots/q4-fl-new-automation-clip-zoom2.png); the editor windows they open are closed again
         if (! offline.getSong().channels.empty())
         {
+            // (the channels of FL's capture: Synth Bass pan + volume, Grv Kick 27 volume + pan; else the first channel)
+            const auto channelNamed = [&offline] (const char* name) {
+                const auto& channels = offline.getSong().channels;
+                for (int c = 0; c < (int) channels.size(); ++c)
+                    if (juce::String (channels[(std::size_t) c].name).startsWithIgnoreCase (name))
+                        return c;
+                return 0;
+            };
+            juce::String report;
             offline.editSong ([] (lynx::Song& s) { s.loopStart = s.loopEnd = 0; }, false);
-            for (const auto kind : { lynx::AutomationTargetKind::channelVolume, lynx::AutomationTargetKind::channelPan })
+            offline.getTransport().positionTicks.store (0.0);
+            const auto before = offline.getSong().automations.size();
+            for (const auto& [name, kind] : { std::pair { "Synth Bass", lynx::AutomationTargetKind::channelPan },
+                                              std::pair { "Grv Kick", lynx::AutomationTargetKind::channelVolume },
+                                              std::pair { "Synth Bass", lynx::AutomationTargetKind::channelVolume },
+                                              std::pair { "Grv Kick", lynx::AutomationTargetKind::channelPan } })
             {
                 lynx::AutomationTarget t;
                 t.kind = kind;
-                t.index = 0;
+                t.index = channelNamed (name);
                 lynx::createAutomationClip (offline, t);
+                offline.dispatchPendingMessages();
             }
             lynx::closeAutomationEditors();
             offline.dispatchPendingMessages();
+            int first = -1;
+            for (std::size_t a = before; a < offline.getSong().automations.size(); ++a)
+            {
+                const auto& au = offline.getSong().automations[a];
+                for (const auto& c : offline.getSong().playlist)
+                    if (c.kind == lynx::ClipKind::automation && c.automation == (int) a)
+                    {
+                        first = first < 0 ? c.track : std::min (first, c.track);
+                        report << "new clip '" << au.name << "' track " << (c.track + 1) << " colour #"
+                               << juce::String::toHexString ((int) (au.colour & 0xFFFFFF)).paddedLeft ('0', 6).toUpperCase() << "\n";
+                    }
+            }
+            report << "automations " << (int) before << " -> " << (int) offline.getSong().automations.size() << "\n";
+            juce::File (prefix + "-190jd-automation.txt").replaceWithText (report);
             heights (50);
             playlist.setViewForSnapshot (39.75, 0, 0);
-            int first = 0;
-            for (const auto& c : offline.getSong().playlist)
-                if (c.kind == lynx::ClipKind::automation)
-                    first = std::max (first, c.track);
-            playlist.setScrollYForSnapshot (std::max (0, first - 3) * 50);
+            playlist.setScrollYForSnapshot (std::max (0, first - 1) * 50);
             write (playlist, "06-new-automation-clips");
         }
         // round 190jd (live check 190iw Q7, shots/q7-fl-countin-sheet.png): a 1-bar count-in — the time display reads

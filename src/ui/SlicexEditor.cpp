@@ -2917,12 +2917,20 @@ private:
         ui::setHint (snapButton, tr ("Snap") + ": " + snapCaption ((int) deckSnap), true);
     }
 
-    void snapMenu()
+public:
+    juce::PopupMenu makeSnapMenu() // (public: slicexSnapMenuForSnapshot)
     {
         static const char* const keys[] { "1", "2", "3", "4", "5" };
         juce::PopupMenu m;
         for (int i = 0; i < slicex::deckSnapCount; ++i)
             entry (m, i + 1, snapCaption (i), true, keys[i], (int) deckSnap == i);
+        return m;
+    }
+
+private:
+    void snapMenu()
+    {
+        auto m = makeSnapMenu();
         juce::Component::SafePointer<SlicexEditor> self (this);
         m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&snapButton), [self] (int r) {
             if (self != nullptr && r > 0)
@@ -3859,6 +3867,21 @@ private:
     ui::FrameTicker playTicker { *this, [this] (double) { return followPlay(); }, 30.0 };
 };
 } // namespace
+
+// round 190jd: the deck's Snap menu as it opens, for --slicexedittest's "menushot" (the picture of FL's radio list)
+juce::PopupMenu slicexSnapMenuForSnapshot (juce::Component& root)
+{
+    std::function<SlicexEditor* (juce::Component&)> find = [&find] (juce::Component& c) -> SlicexEditor* {
+        if (auto* e = dynamic_cast<SlicexEditor*> (&c))
+            return e;
+        for (auto* child : c.getChildren())
+            if (auto* e = find (*child))
+                return e;
+        return nullptr;
+    };
+    auto* editor = find (root);
+    return editor != nullptr ? editor->makeSnapMenu() : juce::PopupMenu();
+}
 
 juce::String slicexEditorTest (juce::Component& root, const juce::String& command)
 {
