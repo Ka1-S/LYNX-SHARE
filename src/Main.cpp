@@ -20798,6 +20798,22 @@ private:
             }
             shoot (lynx::SettingsPage::audio, "audio-whole", 680, 1500);
             shoot (lynx::SettingsPage::general, "general-whole", 680, 2400); // (round 190gh: + the Updates section's previous-version row)
+            // round 190jp (design190ia FW-20): the whole Theme page (thumbnails, Adjustments, dots, A | B), then with
+            // Adjustments and two dots set, in that theme
+            shoot (lynx::SettingsPage::theme, "theme-whole", 680, 1900);
+            {
+                const auto before = lynx::themeui::current();
+                auto adjusted = before;
+                adjusted.hue = 40.0f;
+                adjusted.saturation = 0.45f;
+                adjusted.contrast = 0.3f;
+                adjusted.text = 0.4f;
+                adjusted.dots[(std::size_t) lynx::themes::Dot::steps] = 0xffffa040;
+                adjusted.dots[(std::size_t) lynx::themes::Dot::highlight] = 0xff30a5ff;
+                lynx::themeui::apply (adjusted, false);
+                shoot (lynx::SettingsPage::theme, "theme-adjusted", 680, 1900);
+                lynx::themeui::apply (before, false);
+            }
         }
         juce::LookAndFeel::setDefaultLookAndFeel (nullptr);
     }
