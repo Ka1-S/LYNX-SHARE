@@ -112,6 +112,12 @@
                 if (const auto* it = gbEditorItem())
                     gbPaintLocator (g, gbArea (*it), x);
             });
+            // the Themed style's art layer spans the whole editor in front of it (Gross Beat's layout has no menu, so the
+            // art's stage is the whole editor): the overlay took it for a cover and fell back at every tick (Windows
+            // --uiperf: 25-30 fallbacks a second, no overlay frame). It is ignored now: a mote of the art that drifts
+            // across the envelope editor shows under the locator instead of over it (rollup 0.1.30, recommended)
+            if (artLayer != nullptr)
+                artLayer->getProperties().set ("lynxOverlayIgnores", true);
             gbOverlay->onHidden = [this] { // (it hid itself: the locator is painted again, where the fills' frame has it)
                 if (const auto* it = gbEditorItem(); it != nullptr && gbLive.playing)
                     repaint (gbLocatorBounds (*it, gbLive));
