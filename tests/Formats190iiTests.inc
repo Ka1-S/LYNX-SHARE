@@ -439,7 +439,7 @@ TEST (formats190ii_dwp_imports_as_directwave_channel)
     CHECK (c->instrument == InstrumentKind::directwave && c->zones.size() == 1 && c->zones[0].path == "/packs/Piano 2/a.wav");
     CHECK (c->name == "Piano" && r.zones == 1 && r.missingSamples == 0 && r.skipped.empty());
     CHECK (dw::decodeFormats (c->modelParams) == std::vector<bool> { true }); // a 16-bit PCM file: held as integers
-    // the channel's state is the completed one (the loop survives)
+    // the channel keeps the program's state as stored; readZone completes its 36-byte record, so the loop survives
     const auto st = dw::parseState (c->pluginState);
     CHECK (st && dw::playedProgram (*st)->zones.at (0).loopB == 800);
     // a missing sample: reported; all missing: no channel
