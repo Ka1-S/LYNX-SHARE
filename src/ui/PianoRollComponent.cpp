@@ -50,6 +50,32 @@ bool isBlackKey (int key)
     return n == 1 || n == 3 || n == 6 || n == 8 || n == 10;
 }
 
+// Round 190jo (design190ia FM-15 / FM-16): FL's note, a vertical gradient (top +8 %, bottom -6 % of its colour) with a
+// 1 px edge at 72 % of it, radius 2 (a flat fill on rows under 8 px); `edge`: the state's outline (selected, hovered),
+// transparent for the note's own edge. The label is dark on a light note and light on a dark one (≥ 4.5:1 on the
+// velocity range of LYNX's red), bold, at the small text size.
+void paintNoteBody (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour fill, juce::Colour edge)
+{
+    if (r.getHeight() >= 8.0f)
+        g.setGradientFill (juce::ColourGradient (fill.withMultipliedBrightness (1.08f), 0.0f, r.getY(), fill.withMultipliedBrightness (0.94f), 0.0f,
+                                                 r.getBottom(), false));
+    else
+        g.setColour (fill);
+    g.fillRoundedRectangle (r, 2.0f);
+    g.setColour (edge.isTransparent() ? fill.withMultipliedBrightness (0.72f) : edge);
+    g.drawRoundedRectangle (r.reduced (0.5f), 2.0f, 1.0f);
+}
+
+juce::Colour noteLabelColour (juce::Colour fill)
+{
+    return fill.getPerceivedBrightness() > 0.5f ? theme::colour::bg0 : theme::colour::textPrimary;
+}
+
+juce::Font noteLabelFont (int rowHeight)
+{
+    return theme::font (juce::jmin (theme::type::small, gesture::labelHeight (rowHeight) - 1.0f), true);
+}
+
 // FL-style name: key 60 = C5.
 juce::String keyName (int key)
 {
@@ -536,7 +562,7 @@ int PianoRollComponent::keyboardKeyAt (int x, int y) const
     if (keyStyle != pianokeys::Style::piano || folded())
         return key;
     // "Piano keys": right of a black key the white keys above and below it meet in the middle of its row
-    const auto next = pianokeys::keyAt (keyStyle, key, y - keyToY (key), rowHeight, x, keyboardWidth * 3 / 5);
+    const auto next = pianokeys::keyAt (keyStyle, key, y - keyToY (key), rowHeight, x, blackKeyWidth);
     return juce::isPositiveAndBelow (next, 128) && rows.shown (next) ? next : key;
 }
 
@@ -995,6 +1021,12 @@ void PianoRollComponent::paint (juce::Graphics& g)
     g.setColour (border);
     g.fillRect (0, toolbarHeight - 1, getWidth(), 1);
 
+    // round 190jo (design190ia FM-18): the grid a step clearer (rows 1.07:1 and beat lines 1.15:1 before; FL's and Live's
+    // users ask for a readable grid), derived from the theme's tokens so a theme still applies; the Playlist keeps its own
+    const auto lift = [] (juce::Colour c, float amount) { return c.interpolatedWith (textPrimary, amount); };
+    const auto prBar = lift (gridBar, 0.06f), prBeat = lift (gridBeat, 0.05f), prStep = lift (gridStep, 0.035f);
+    const auto prRowBlack = rowBlack.interpolatedWith (juce::Colours::black, 0.1f);
+
     auto drawVerticalGrid = [&] (juce::Rectangle<int> area) {
         // grid lines: bar > beat > snap (unless too dense)
         const auto step = snapGrid * pixelsPerTick >= 6.0 ? snapGrid : (std::int64_t) ppq;
@@ -1005,7 +1037,7 @@ void PianoRollComponent::paint (juce::Graphics& g)
         {
             const auto tick = i * step;
             const auto x = (float) tickToX ((double) tick);
-            g.setColour (tick % bar == 0 ? gridBar : tick % ppq == 0 ? gridBeat : gridStep);
+            g.setColour (tick % bar == 0 ? prBar : tick % ppq == 0 ? prBeat : prStep);
             g.drawVerticalLine ((int) x, (float) area.getY(), (float) area.getBottom());
         }
     };
@@ -1032,17 +1064,22 @@ void PianoRollComponent::paint (juce::Graphics& g)
                 continue;
 
             // Note grid highlights (Alt+B, round 168g): off, every row looks the same (FL's "BlackKeys" option)
-            auto row = gridHighlights && isBlackKey (key) ? rowBlack : rowWhite;
+            auto row = gridHighlights && isBlackKey (key) ? prRowBlack : rowWhite;
             if (gridHighlights && inScale (key))
                 row = row.interpolatedWith (info, 0.10f);
             if (key == hover.key && drag == Drag::none)
                 row = row.interpolatedWith (textPrimary, 0.04f); // the row under the mouse
             g.setColour (row);
             g.fillRect (grid.getX(), y, grid.getWidth(), rowHeight);
+            if (rowHeight >= 10) // (round 190jo FM-15: FL's 1 px line under every row, the note sits above it)
+            {
+                g.setColour (prStep);
+                g.drawHorizontalLine (y + rowHeight - 1, (float) grid.getX(), (float) grid.getRight());
+            }
 
             if (! padRows.empty() || key % 12 == (folded() ? scaleRoot() : 0)) // folded: the octave line under each root (pads: each row)
             {
-                g.setColour (gridBeat);
+                g.setColour (prBeat);
                 g.drawHorizontalLine (y + rowHeight - 1, (float) grid.getX(), (float) grid.getRight());
             }
         }
@@ -1072,8 +1109,7 @@ void PianoRollComponent::paint (juce::Graphics& g)
             {
                 if (! rows.shown (n.key))
                     continue;
-                const auto r = juce::Rectangle<float> ((float) tickToX ((double) n.start), (float) keyToY (n.key) + 1,
-                                                       juce::jmax (4.0f, (float) (n.length * pixelsPerTick) - 1.0f), (float) rowHeight - 2);
+                const auto r = noteRect (n.start, n.length, n.key);
                 if (r.getRight() < (float) grid.getX() || r.getX() > (float) grid.getRight() || outside (r, 2.0f))
                     continue;
                 g.setColour (textPrimary.withAlpha (0.30f));
@@ -1086,15 +1122,16 @@ void PianoRollComponent::paint (juce::Graphics& g)
             if (edits (n) || ! showGhosts || ! ghostShown (n.channel) || ! rows.shown (n.key))
                 continue;
 
-            const auto r = juce::Rectangle<float> ((float) tickToX ((double) n.start), (float) keyToY (n.key) + 1,
-                                                   (float) (n.length * pixelsPerTick), (float) rowHeight - 2);
+            const auto r = noteRect (n.start, n.length, n.key);
             if (outside (r, 2.0f))
                 continue;
             const auto hovered = &n - pattern.notes.data() == hover.ghost;
-            g.setColour (textPrimary.withAlpha (hovered ? 0.16f : editGhosts ? 0.12f : 0.09f));
+            // (round 190jo FM-20: FL's ghosts are full-row bars, 1.48:1 over the field with a 1 px edge, no label: the
+            // light text at 14 % with a 22 % edge reads the same on LYNX's dark rows)
+            g.setColour (textPrimary.withAlpha (hovered ? 0.20f : editGhosts ? 0.17f : 0.14f));
             g.fillRoundedRectangle (r, 2.0f);
-            g.setColour (textPrimary.withAlpha (hovered ? 0.35f : editGhosts ? 0.22f : 0.12f));
-            g.drawRoundedRectangle (r, 2.0f, 1.0f);
+            g.setColour (textPrimary.withAlpha (hovered ? 0.40f : editGhosts ? 0.30f : 0.22f));
+            g.drawRoundedRectangle (r.reduced (0.5f), 2.0f, 1.0f);
 
             if (editGhosts && n.channel >= 0 && n.channel < (int) song.channels.size() && song.channels[(std::size_t) n.channel].colour != 0)
             {
@@ -1110,8 +1147,7 @@ void PianoRollComponent::paint (juce::Graphics& g)
             if (! edits (n) || ! rows.shown (n.key))
                 continue;
 
-            const auto r = juce::Rectangle<float> ((float) tickToX ((double) n.start), (float) keyToY (n.key) + 1,
-                                                   juce::jmax (4.0f, (float) (n.length * pixelsPerTick) - 1.0f), (float) rowHeight - 2);
+            const auto r = noteRect (n.start, n.length, n.key);
             if (outside (r, 2.0f)) // (its outline, grips, marks and label all lie inside r)
                 continue;
             const auto selected = isSelected (i);
@@ -1121,10 +1157,7 @@ void PianoRollComponent::paint (juce::Graphics& g)
                                  : n.muted ? noteMuted : theme::noteGroupColour (n.colour, n.velocity);
             if (hovered)
                 fill = fill.brighter (0.18f);
-            g.setColour (fill);
-            g.fillRoundedRectangle (r, 2.5f);
-            g.setColour (selected ? textPrimary : hovered ? textPrimary.withAlpha (0.75f) : bg0.withAlpha (0.6f));
-            g.drawRoundedRectangle (r, 2.5f, 1.0f);
+            paintNoteBody (g, r, fill, selected ? textPrimary : hovered ? textPrimary.withAlpha (0.75f) : juce::Colour());
 
             // "All" channels: whose note it is, by the channel's colour on its left edge (issue #12)
             if (allChannels && n.channel >= 0 && n.channel < (int) song.channels.size() && r.getWidth() > 5.0f)
@@ -1175,9 +1208,11 @@ void PianoRollComponent::paint (juce::Graphics& g)
 
             if (gesture::noteLabelFits (r.getWidth(), rowHeight)) // the note's name, readable on its colour
             {
-                g.setColour (fill.getPerceivedBrightness() > 0.55f ? bg0.withAlpha (0.85f) : textPrimary.withAlpha (0.9f));
-                g.setFont (theme::font (gesture::labelHeight (rowHeight) - 1.0f));
-                textcache::drawText (g, keyName (n.key), r.reduced (n.slide || n.porta ? 11.0f : 4.0f, 0.0f), juce::Justification::centredLeft, true);
+                // (round 190jo FM-16: a dark label on a light note, as FL's: bg0 on LYNX red is 5.3:1, the light label was
+                // 2.3:1; bold, 3 px in from the left as FL's)
+                g.setColour (noteLabelColour (fill));
+                g.setFont (noteLabelFont (rowHeight));
+                textcache::drawText (g, keyName (n.key), r.reduced (n.slide || n.porta ? 11.0f : 3.0f, 0.0f), juce::Justification::centredLeft, true);
             }
         }
 
@@ -1188,18 +1223,14 @@ void PianoRollComponent::paint (juce::Graphics& g)
             {
                 if (! edits (n) || ! rows.shown (n.key))
                     continue;
-                const auto r = juce::Rectangle<float> ((float) tickToX ((double) n.start), (float) keyToY (n.key) + 1,
-                                                       juce::jmax (4.0f, (float) (n.length * pixelsPerTick) - 1.0f), (float) rowHeight - 2);
+                const auto r = noteRect (n.start, n.length, n.key);
                 const auto fill = theme::noteGroupColour (n.colour, n.velocity);
-                g.setColour (fill);
-                g.fillRoundedRectangle (r, 2.5f);
-                g.setColour (bg0.withAlpha (0.6f));
-                g.drawRoundedRectangle (r, 2.5f, 1.0f);
+                paintNoteBody (g, r, fill, {});
                 if (gesture::noteLabelFits (r.getWidth(), rowHeight))
                 {
-                    g.setColour (fill.getPerceivedBrightness() > 0.55f ? bg0.withAlpha (0.85f) : textPrimary.withAlpha (0.9f));
-                    g.setFont (theme::font (gesture::labelHeight (rowHeight) - 1.0f));
-                    textcache::drawText (g, keyName (n.key), r.reduced (4.0f, 0.0f), juce::Justification::centredLeft, true);
+                    g.setColour (noteLabelColour (fill));
+                    g.setFont (noteLabelFont (rowHeight));
+                    textcache::drawText (g, keyName (n.key), r.reduced (3.0f, 0.0f), juce::Justification::centredLeft, true);
                 }
             }
 
@@ -1256,7 +1287,7 @@ void PianoRollComponent::paint (juce::Graphics& g)
     // --- velocity lane -----------------------------------------------------
     {
         const auto lane = velocityArea();
-        g.setColour (bg0);
+        g.setColour (rowWhite); // (round 190jo FM-19: FL's lane is the roll's field with its beat lines, not a darker well)
         g.fillRect (lane);
         juce::Graphics::ScopedSaveState state (g);
         g.reduceClipRegion (lane);
@@ -1447,7 +1478,7 @@ void PianoRollComponent::paint (juce::Graphics& g)
         g.setColour (bg0);
         g.fillRect (keys);
         const auto fontHeight = gesture::labelHeight (rowHeight);
-        const auto blackWidth = keyboardWidth * 3 / 5;
+        const auto blackWidth = blackKeyWidth;
         static const std::map<int, std::string> noLabels;
         const auto selectedChannel = engine.getSelectedChannel();
         const auto& ownLabels = selectedChannel >= 0 && selectedChannel < (int) song.channels.size()
@@ -1465,6 +1496,20 @@ void PianoRollComponent::paint (juce::Graphics& g)
         // folded to the scale (round 166d) the keys no longer alternate like a piano: one full-width named row each
         const auto list = folded();
         const auto piano = keyStyle == pianokeys::Style::piano && ! list;
+        // round 190jo (design190ia FM-17): FL's white keys shade from a light grey at the left to near-white at the right;
+        // its C keys are a step darker (FL: #B0B4BB against #D0D4DB-#E9EDF4); one gradient, set per white key at rest
+        const juce::ColourGradient whiteKeys (keyWhite.withMultipliedBrightness (0.93f), 0.0f, 0.0f, keyWhite.interpolatedWith (juce::Colours::white, 0.33f),
+                                              (float) keyboardWidth, 0.0f, false);
+        auto cKeys = whiteKeys;
+        for (int i = 0; i < cKeys.getNumColours(); ++i)
+            cKeys.setColour (i, cKeys.getColour (i).withMultipliedBrightness (0.9f));
+        const auto fillKey = [&] (int key, juce::Colour colour, juce::Rectangle<int> r) {
+            if (colour == keyWhite && ! list)
+                g.setGradientFill (key % 12 == 0 ? cKeys : whiteKeys);
+            else
+                g.setColour (key % 12 == 0 && ! (isBlackKey (key) && ! list) && colour != accent ? colour.withMultipliedBrightness (0.9f) : colour);
+            g.fillRect (r);
+        };
         const auto keyColour = [&] (int key) {
             const auto black = isBlackKey (key) && ! list;
             const auto pressed = key == previewKey || isLit (key);
@@ -1496,10 +1541,8 @@ void PianoRollComponent::paint (juce::Graphics& g)
                 if (black)
                 {
                     const auto upper = pianokeys::upperPart (rowHeight);
-                    g.setColour (keyColour (juce::jmin (127, key + 1)));
-                    g.fillRect (0, y, keyboardWidth - 1, upper);
-                    g.setColour (keyColour (juce::jmax (0, key - 1)));
-                    g.fillRect (0, y + upper, keyboardWidth - 1, rowHeight - upper);
+                    fillKey (juce::jmin (127, key + 1), keyColour (juce::jmin (127, key + 1)), { 0, y, keyboardWidth - 1, upper });
+                    fillKey (juce::jmax (0, key - 1), keyColour (juce::jmax (0, key - 1)), { 0, y + upper, keyboardWidth - 1, rowHeight - upper });
                     g.setColour (line);
                     g.drawHorizontalLine (y + upper, (float) blackWidth, (float) (keyboardWidth - 1));
                     // the black key: a little shorter than its row when there is room, so the white shows around it
@@ -1516,8 +1559,7 @@ void PianoRollComponent::paint (juce::Graphics& g)
                 }
                 else
                 {
-                    g.setColour (colour);
-                    g.fillRect (0, y, width, rowHeight);
+                    fillKey (key, colour, { 0, y, width, rowHeight });
                     if (pianokeys::lineBelow (key))
                     {
                         g.setColour (line);
@@ -1527,8 +1569,13 @@ void PianoRollComponent::paint (juce::Graphics& g)
             }
             else
             {
-                g.setColour (colour);
-                g.fillRect (0, y, width, rowHeight);
+                if (black)
+                {
+                    g.setColour (colour);
+                    g.fillRect (0, y, width, rowHeight);
+                }
+                else
+                    fillKey (key, colour, { 0, y, width, rowHeight });
                 g.setColour (black ? bg0 : keyWhite.darker (0.3f));
                 g.drawHorizontalLine (y + rowHeight - 1, 0.0f, (float) width);
             }
@@ -1537,12 +1584,15 @@ void PianoRollComponent::paint (juce::Graphics& g)
 
             // every key named (LYNX, on by default: notenames::everyKey) once the rows are tall enough to read
             const auto everyKey = notenames::everyKey.load (std::memory_order_relaxed) && rowHeight >= 8;
-            if (isC || hovered || pressed || everyKey || (! black && rowHeight >= (list ? 8 : 16)))
+            // (round 190jo FM-17: as FL, only the Cs are named on the piano by default, larger and bold; "Note names on
+            // every key" names the others; a folded list names each row)
+            if (isC || hovered || pressed || everyKey || (list && rowHeight >= 8))
             {
-                g.setFont (theme::font (fontHeight, isC));
+                g.setFont (isC && ! list ? theme::font (juce::jmin (theme::type::body, fontHeight + 1.0f), true) : theme::font (fontHeight, isC));
                 g.setColour (pressed ? onAccent : black ? textPrimary.withAlpha (hovered ? 1.0f : 0.85f) : isC ? bg0 : bg0.withAlpha (everyKey ? 0.72f : 0.55f));
                 const auto area = black ? juce::Rectangle<int> (2, y, blackWidth - 4, rowHeight)
-                                        : juce::Rectangle<int> (blackWidth, y, keyboardWidth - blackWidth - 5, rowHeight);
+                                  : isC  ? juce::Rectangle<int> (8, y, keyboardWidth - 13, rowHeight)
+                                         : juce::Rectangle<int> (blackWidth, y, keyboardWidth - blackWidth - 5, rowHeight);
                 textcache::drawText (g, keyName (key), area, black ? juce::Justification::centredLeft : juce::Justification::centredRight, false);
             }
 
