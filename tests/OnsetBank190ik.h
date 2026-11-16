@@ -158,7 +158,12 @@ inline std::vector<Case> bank()
             Case c { "plucks" + tag, "plucks", sr, std::vector<float> (n, 0.0f), {} };
             for (double t = 0.1; t < seconds - 0.8; t += rnd.range (0.15, 0.5))
             {
-                addPluck (c.signal, sr, t, 220.0 * std::pow (2.0, (double) (int) rnd.range (-7.0, 12.0) / 12.0), rnd.range (0.15, 0.4), rnd.range (0.2, 0.6));
+                // (rollup 0.1.30: the draws in a fixed order — g++'s, which made the round's bank: as function arguments their
+                // order was the compiler's, and clang's bank differed, failing the gate on CI's clang job)
+                const auto decay = rnd.range (0.2, 0.6);
+                const auto level = rnd.range (0.15, 0.4);
+                const auto hz = 220.0 * std::pow (2.0, (double) (int) rnd.range (-7.0, 12.0) / 12.0);
+                addPluck (c.signal, sr, t, hz, level, decay);
                 c.onsets.push_back (t);
             }
             cases.push_back (std::move (c));
@@ -174,7 +179,10 @@ inline std::vector<Case> bank()
                 if (ti >= next && next < seconds - 0.4)
                 {
                     from = to;
-                    to = from + (from > 5.0 ? -1.0 : from < -7.0 ? 1.0 : rnd.next() < 0.5 ? -1.0 : 1.0) * (double) (int) rnd.range (1.0, 8.0);
+                    {
+                        const auto dir = (from > 5.0 ? -1.0 : from < -7.0 ? 1.0 : rnd.next() < 0.5 ? -1.0 : 1.0); // (rollup 0.1.30: drawn before the step, in one order on every compiler)
+                        to = from + dir * (double) (int) rnd.range (1.0, 8.0);
+                    }
                     moveStart = ti;
                     moveLen = rnd.range (0.005, 0.020);
                     c.onsets.push_back (ti + 0.5 * moveLen);
@@ -198,7 +206,10 @@ inline std::vector<Case> bank()
                 if (ti >= next && next < seconds - 1.0)
                 {
                     from = to;
-                    to = from + (from > 2.0 ? -1.0 : from < -2.0 ? 1.0 : rnd.next() < 0.5 ? -1.0 : 1.0) * rnd.range (2.0, 9.0);
+                    {
+                        const auto dir = (from > 2.0 ? -1.0 : from < -2.0 ? 1.0 : rnd.next() < 0.5 ? -1.0 : 1.0); // (rollup 0.1.30: drawn before the step, in one order on every compiler)
+                        to = from + dir * rnd.range (2.0, 9.0);
+                    }
                     moveStart = ti;
                     moveLen = rnd.range (0.15, 0.5);
                     next = ti + moveLen + rnd.range (0.4, 0.9);
@@ -223,7 +234,10 @@ inline std::vector<Case> bank()
                 if (ti >= next && next < seconds - 1.0)
                 {
                     from = to;
-                    to = from + (from > 2.0 ? -1.0 : from < -2.0 ? 1.0 : rnd.next() < 0.5 ? -1.0 : 1.0) * rnd.range (2.0, 7.0);
+                    {
+                        const auto dir = (from > 2.0 ? -1.0 : from < -2.0 ? 1.0 : rnd.next() < 0.5 ? -1.0 : 1.0); // (rollup 0.1.30: drawn before the step, in one order on every compiler)
+                        to = from + dir * rnd.range (2.0, 7.0);
+                    }
                     moveStart = ti;
                     moveLen = rnd.range (0.15, 0.5);
                     next = ti + moveLen + rnd.range (0.4, 0.9);
@@ -250,14 +264,20 @@ inline std::vector<Case> bank()
                     from = to;
                     if (kind == 0) // step
                     {
-                        to = from + (from > 3.0 ? -1.0 : from < -3.0 ? 1.0 : rnd.next() < 0.5 ? -1.0 : 1.0) * (double) (int) rnd.range (1.0, 6.0);
+                        {
+                            const auto dir = (from > 3.0 ? -1.0 : from < -3.0 ? 1.0 : rnd.next() < 0.5 ? -1.0 : 1.0); // (rollup 0.1.30: drawn before the step, in one order on every compiler)
+                            to = from + dir * (double) (int) rnd.range (1.0, 6.0);
+                        }
                         moveStart = ti;
                         moveLen = rnd.range (0.006, 0.02);
                         c.onsets.push_back (ti + 0.5 * moveLen);
                     }
                     else if (kind == 1) // glide
                     {
-                        to = from + (from > 3.0 ? -1.0 : from < -3.0 ? 1.0 : rnd.next() < 0.5 ? -1.0 : 1.0) * rnd.range (2.0, 7.0);
+                        {
+                            const auto dir = (from > 3.0 ? -1.0 : from < -3.0 ? 1.0 : rnd.next() < 0.5 ? -1.0 : 1.0); // (rollup 0.1.30: drawn before the step, in one order on every compiler)
+                            to = from + dir * rnd.range (2.0, 7.0);
+                        }
                         moveStart = ti;
                         moveLen = rnd.range (0.15, 0.35);
                     }
