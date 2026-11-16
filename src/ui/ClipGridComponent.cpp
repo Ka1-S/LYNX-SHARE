@@ -26,6 +26,7 @@
 #include "ui/ExportDialog.h"
 #include "engine/AudioEngine.h"
 #include "ui/I18n.h"
+#include "ui/WorkflowExtras.h" // round 190iu (issue #191.2)
 #include "ui/Theme.h"
 
 #ifndef TR_NOOP
@@ -489,7 +490,8 @@ public:
         return clipGridDrag (details.description, t, r) || detailDeviceDrag (details.description, t, r) || playlistClipDrag (details.description, t)
                || BrowserComponent::isGeneratorDrag (details) || BrowserComponent::isEffectDrag (details) // (issue #152 point 6)
                || BrowserComponent::draggedPattern (details) >= 0
-               || SampleLibrary::isSampleFile (BrowserComponent::draggedFile (details));
+               || SampleLibrary::isSampleFile (BrowserComponent::draggedFile (details))
+               || workflowextras::isMidiFile (BrowserComponent::draggedFile (details).getFullPathName()); // (round 190iu)
     }
     void itemDragEnter (const SourceDetails& details) override { itemDragMove (details); }
     void itemDragMove (const SourceDetails& details) override
@@ -559,7 +561,9 @@ public:
         }
         else if (const auto pattern = BrowserComponent::draggedPattern (details); pattern >= 0)
             putPattern (hit.track, hit.scene, pattern);
-        else if (const auto file = BrowserComponent::draggedFile (details); file.existsAsFile())
+        else if (const auto file = BrowserComponent::draggedFile (details); file.existsAsFile() && workflowextras::isMidiFile (file.getFullPathName()))
+            workflowextras::dropMidiOnSlot (engine, { file.getFullPathName() }, hit.track, hit.scene); // (round 190iu, issue #191.2)
+        else if (file.existsAsFile())
             putAudioFile (file, hit.track, hit.scene);
         selectedTrack = hit.track;
         selectedScene = hit.scene;
@@ -598,7 +602,8 @@ public:
 
     bool isInterestedInFileDrag (const juce::StringArray& files) override
     {
-        return std::any_of (files.begin(), files.end(), [] (const juce::String& f) { return SampleLibrary::isSampleFile (juce::File (f)); });
+        return std::any_of (files.begin(), files.end(), [] (const juce::String& f) { return SampleLibrary::isSampleFile (juce::File (f)); })
+               || workflowextras::anyMidiFile (files); // (round 190iu, issue #191.2: .mid files and plugins' MIDI drags)
     }
     void fileDragEnter (const juce::StringArray&, int x, int y) override { setDropCell ({ x, y }); }
     void fileDragMove (const juce::StringArray&, int x, int y) override { setDropCell ({ x, y }); }
@@ -610,8 +615,19 @@ public:
         if (hit.track < 0 || hit.scene < 0)
             return;
         auto scene = hit.scene; // (several files: one below the other in the track)
+        if (workflowextras::anyMidiFile (files)) // round 190iu (issue #191.2): MIDI files first, each in the next slot down
+        {
+            juce::StringArray midi;
+            for (const auto& f : files)
+                if (workflowextras::isMidiFile (f))
+                    midi.add (f);
+            workflowextras::dropMidiOnSlot (engine, midi, hit.track, scene);
+            if (const auto* grid = gridOf(); grid != nullptr)
+                while (scene < launcher::maxScenes && launcher::clipAt (*grid, hit.track, scene) != nullptr)
+                    ++scene;
+        }
         for (const auto& f : files)
-            if (scene < launcher::maxScenes && putAudioFile (juce::File (f), hit.track, scene))
+            if (scene < launcher::maxScenes && ! workflowextras::isMidiFile (f) && putAudioFile (juce::File (f), hit.track, scene))
                 ++scene;
         repaint();
     }

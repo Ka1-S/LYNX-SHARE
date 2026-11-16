@@ -352,6 +352,7 @@ private:
     void insertPatternHere();
     void deleteCurrentPattern();
     void splitPatternByChannelNow();
+    void hidePanelForTrackOnly(); // round 190iu: Track-only mode (core/TrackOnly.h)
     void clonePatternNow();
     void movePatternNow (int delta);
 

@@ -17709,6 +17709,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Loudness190amTests.inc"
 #include "UsedOnly190amTests.inc"
 #include "Extras190amTests.inc"
+#include "Workflow190iuTests.inc" // round 190iu: issues #186 and #191
 #include "Reload190aoTests.inc"
 #include "Pin190aoTests.inc"
 #include "Velocity190aoTests.inc"

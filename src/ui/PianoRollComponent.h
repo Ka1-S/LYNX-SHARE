@@ -190,6 +190,7 @@ public:
     // --details190imshot (round 190im): one display-rate frame step, and where the playhead is (−1: none)
     void frameStepForSnapshot() { playheadFrame (0.0); }
     double playheadForSnapshot() const noexcept { return playheadTick; }
+    EditTool currentTool() const noexcept { return tools.getTool(); } // (round 190iu: temporary tools)
     void setScaleForSnapshot (int root, int scale) { setScale (root, scale); }
     // The scale the rows show (LYNX's scale list index, 0 = none) on `root` (round 190ds: the Simple dock's "Only notes
     // in key" sets the project key here before folding)

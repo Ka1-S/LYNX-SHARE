@@ -21,7 +21,7 @@ TEST (extras190am_extras_list)
         CHECK (item.note.back() == '.'); // one line of explanation, a sentence
         CHECK (item.note.find ("Also ") != std::string_view::npos); // ... that names the switch's own place
     }
-    CHECK (count == 14); // (round 190gz: project.linkTracks; round 190ht: playlist.trackInserts; round 190io: mixer.stripInserts)
+    CHECK (count == 18); // (round 190gz: project.linkTracks; round 190ht: playlist.trackInserts; round 190io: mixer.stripInserts; round 190iu: wheel zones, temporary tools, MIDI drop, Track-only)
     for (const auto* id : { "mixer.loudness", "mixer.usedOnly", "mixer.keepLostLinks", "mixer.followPlaylist", "playlist.automationLanes",
                             "pianoRoll.songBarsRuler", "general.hoverValues", "playlist.trackInserts", "mixer.stripInserts" })
         CHECK (ids.count (id) == 1);
