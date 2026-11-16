@@ -17757,6 +17757,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Link190csTests.inc"
 #include "TrackLinkTests.inc"
 #include "TrackAuto190gzTests.inc"
+#include "Issues190htTests.inc"
 #include "Warp190dbTests.inc"
 #include "WarpModes190fmTests.inc" // round 190fm
 #include "WarpLive190gxTests.inc" // round 190gx

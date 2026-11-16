@@ -67,6 +67,7 @@
 #include "ui/ClipGridComponent.h"
 #include "core/SessionOps.h"
 #include "core/DetailChain.h"
+#include "core/TrackInserts.h"
 #include "core/StandIns.h"
 #include "core/Groove.h"
 #include "ui/GroovePoolComponent.h"
@@ -2388,6 +2389,8 @@ void PlaylistComponent::paint (juce::Graphics& g)
                     }
                 }
 
+                paintInserts (g, t, hovered); // issue #154: the insert effects column (LYNX extra)
+
                 // a take lane's audition button (round 177c): a small speaker, lit while this lane plays instead of the comp
                 if (const auto box = trackAudition (t); ! box.isEmpty())
                 {
@@ -4635,6 +4638,10 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
         }
     }
 
+    // issue #154 (round 190ht, LYNX extra): the linked header's insert effects column
+    if (! e.mods.isMiddleButtonDown() && insertsMouseDown (e))
+        return;
+
     // the resize band at the bottom of a header (FL AUTracksPanelMouseDown, round 190ft): drag resizes the track (and
     // every selected track when it is one of them; LYNX's Shift: every track); Alt+click or a middle click = 100 %
     // and unlocked; a double click or a click on a locked row flips "Lock to this size"
@@ -5419,6 +5426,8 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
 
 void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
 {
+    if (insertsMouseDrag (e)) // issue #154: an effect dragged from a linked header's list
+        return;
     if (levelDrag != 0 && levelInsert > 0 && levelInsert < (int) engine.getSong().mixer.size())
     {
         // a Simple header's volume (along the bar) or pan (up / down, as a knob); Shift: fine
@@ -6129,6 +6138,11 @@ void PlaylistComponent::postDragHint()
 
 void PlaylistComponent::mouseUp (const juce::MouseEvent& e)
 {
+    if (insertsMouseUp (e)) // issue #154: a click or a drag in a linked header's effects list
+    {
+        drag = Drag::none;
+        return;
+    }
     if (drag == Drag::headerSelect && headerCtrlPending)
     {
         // LYNX extra (issue #163; FL has no Ctrl+click toggle): Ctrl+click adds / removes the track, its clips follow
@@ -6776,6 +6790,8 @@ juce::PopupMenu PlaylistComponent::editMenu()
     m.addItem (tr ("Automatic crossfades (current project)"), true, song.autoCrossfades, [this] { runAction ("playlist.autoCrossfades"); });
     m.addItem (tr ("Link Playlist tracks to mixer tracks (current project)") + key ("playlist.linkTracks"), true, song.linkTracksToMixer,
                [this] { runAction ("playlist.linkTracks"); }); // round 190gz (issue #170), LYNX extra
+    m.addItem (tr ("Show insert effects on linked tracks") + key ("playlist.trackInserts"), ! simpleHeaders, showTrackInserts,
+               [this] { runAction ("playlist.trackInserts"); }); // round 190ht (issue #154), LYNX extra
     m.addItem (tr ("Create new clips with manual fades") + key ("playlist.manualFades"), true, EditorGlobals::get().manualFades,
                [this] { runAction ("playlist.manualFades"); });
     m.addItem (tr ("Snap fade handles") + key ("playlist.snapFadeHandles"), true, EditorGlobals::get().snapFadeHandles,
@@ -6821,7 +6837,8 @@ juce::Rectangle<int> PlaylistComponent::trackLed (int track) const
     if (simpleHeaders) // the M button, in the first row (round 184a)
         return { headerWidth - 28 - rightColumn(), trackToY (track) + juce::jmin (5, juce::jmax (0, h / 2 - 8)), 22, juce::jmin (15, h - 2) };
     if (simpleInsert (track) > 0) // a linked header's M button (round 190gz): the first row, or centred on a short row
-        return { headerWidth - 22 - rightColumn(), trackToY (track) + (h >= linkedTwoRows ? 4 : juce::jmax (1, (h - 14) / 2)), 18, juce::jmin (14, h - 2) };
+        return { headerWidth - 22 - rightColumn() - insertsColumn(), trackToY (track) + (h >= linkedTwoRows ? 4 : juce::jmax (1, (h - 14) / 2)), 18,
+                 juce::jmin (14, h - 2) };
     if (flHeaders() && h >= flTallHeader) // FL's tall track (round 190ig, FM-23): the LED at the bottom right
         return { headerWidth - 16 - rightColumn(), trackToY (track) + h - 18, 12, 12 };
     return { headerWidth - 17 - rightColumn(), trackToY (track) + h / 2 - 6, 12, 12 };
@@ -6842,8 +6859,9 @@ bool PlaylistComponent::linkedHeaders() const
 
 void PlaylistComponent::updateHeaderWidth()
 {
-    // (round 190ig, FM-23: FL's 98 px header plates + the 8 px selection / activity column in the Pattern layout)
-    const auto width = simpleHeaders ? simpleHeaderWidth : linkedHeaders() ? linkedHeaderWidth : flHeaderWidthNow();
+    // (round 190ig, FM-23: FL's 98 px header plates + the 8 px selection / activity column in the Pattern layout;
+    // round 190ht, issue #154: the linked headers' inserts column)
+    const auto width = simpleHeaders ? simpleHeaderWidth : linkedHeaders() ? linkedHeaderWidth + insertsColumn() : flHeaderWidthNow();
     if (width == headerWidth)
         return;
     headerWidth = width;
@@ -6871,7 +6889,7 @@ juce::Rectangle<int> PlaylistComponent::trackVolume (int track) const
     const auto left = noteedit::groupHeaderOf (song, track) >= 0 && ! noteedit::isGroupHeader (song, track) ? groupIndent : 2;
     // (rollup 0.1.28: between 190gw's lock strip, the header's first 10 px, and its selection strip at the right edge)
     const auto x = juce::jmax (left + 6, trackhdr::lockStripWidth + 1);
-    return { x, trackToY (track) + 20, headerWidth - rightColumn() - x - 26, 12 };
+    return { x, trackToY (track) + 20, headerWidth - rightColumn() - insertsColumn() - x - 26, 12 };
 }
 
 juce::Rectangle<int> PlaylistComponent::trackPan (int track) const
@@ -6886,6 +6904,278 @@ juce::Rectangle<int> PlaylistComponent::trackFx (int track) const
 {
     const auto v = trackVolume (track);
     return v.isEmpty() || ! simpleHeaders ? juce::Rectangle<int>() : juce::Rectangle<int> (v.getRight() + 34, v.getCentreY() - 8, 44, 16);
+}
+
+// --- issue #154 (round 190ht): the insert effects column of the linked headers -------------------------------------
+int PlaylistComponent::insertsColumn() const
+{
+    return showTrackInserts && linkedHeaders() ? insertsColumnWidth : 0;
+}
+
+juce::Rectangle<int> PlaylistComponent::trackInserts (int track) const
+{
+    if (insertsColumn() == 0 || simpleInsert (track) <= 0 || noteedit::isFoldedAway (engine.getSong(), track))
+        return {};
+    const auto h = heightOf (track) - 5;
+    if (trackinserts::rowsThatFit (h) == 0)
+        return {};
+    return { headerWidth - rightColumn() - insertsColumnWidth + 1, trackToY (track) + 2, insertsColumnWidth - 4, h };
+}
+
+int PlaylistComponent::insertsFirst (int track) const
+{
+    const auto insert = simpleInsert (track);
+    const auto found = insertsScroll.find (insert);
+    const auto effects = insert > 0 ? (int) engine.getSong().mixer[(std::size_t) insert].effects.size() : 0;
+    return trackinserts::clampFirst (found == insertsScroll.end() ? 0 : found->second, effects, trackinserts::rowsThatFit (trackInserts (track).getHeight()));
+}
+
+int PlaylistComponent::insertsItemAt (int track, juce::Point<int> p) const
+{
+    const auto box = trackInserts (track);
+    if (! box.contains (p))
+        return -1;
+    const auto effects = (int) engine.getSong().mixer[(std::size_t) simpleInsert (track)].effects.size();
+    return trackinserts::itemAt (effects, insertsFirst (track), trackinserts::rowsThatFit (box.getHeight()), p.y - box.getY());
+}
+
+void PlaylistComponent::paintInserts (juce::Graphics& g, int track, bool hovered)
+{
+    using namespace theme;
+    const auto box = trackInserts (track);
+    if (box.isEmpty())
+        return;
+    const auto& song = engine.getSong();
+    const auto insert = simpleInsert (track);
+    const auto& fx = song.mixer[(std::size_t) insert].effects;
+    const auto effects = (int) fx.size();
+    const auto rows = trackinserts::rowsThatFit (box.getHeight());
+    const auto first = insertsFirst (track);
+
+    // a recessed well, as the Mixer's slot list; one row per effect in chain order, then "+" while a slot is free
+    g.setColour (colour::bg1.withAlpha (0.85f));
+    g.fillRoundedRectangle (box.toFloat(), radius::sm);
+    g.setFont (font (type::caption));
+    for (int r = 0; r < rows; ++r)
+    {
+        const auto item = first + r;
+        if (item > effects || (item == effects && effects >= maxEffectSlots))
+            break;
+        const auto row = juce::Rectangle<int> (box.getX() + 1, box.getY() + r * trackinserts::rowHeight, box.getWidth() - 2, trackinserts::rowHeight);
+        const auto isAdd = item == effects;
+        const auto under = hovered && hover.insertItem == (isAdd ? trackinserts::addRow : item);
+        const auto dragged = insertsDragging && insertsPressTrack == track && insertsPressItem == item;
+        if (under || dragged)
+        {
+            g.setColour (colour::bg5.withAlpha (dragged ? 0.9f : 0.6f));
+            g.fillRoundedRectangle (row.toFloat().reduced (0.0f, 0.5f), 2.0f);
+        }
+        if (isAdd)
+        {
+            g.setColour (under ? colour::textPrimary : colour::textSecondary.withAlpha (0.8f));
+            g.drawText ("+", row.withWidth (trackinserts::ledWidth), juce::Justification::centred, false);
+            g.drawText (tr ("Add"), row.withTrimmedLeft (trackinserts::ledWidth + 1), juce::Justification::centredLeft, false);
+            continue;
+        }
+        const auto& slot = fx[(std::size_t) item];
+        // the on/off dot (the Mixer slot's LED): filled while on, a ring while bypassed
+        const auto dot = row.withWidth (trackinserts::ledWidth).toFloat().withSizeKeepingCentre (6.0f, 6.0f);
+        if (slot.enabled)
+        {
+            g.setColour (hovered && hover.insertItem == item && hover.insertLed ? colour::accentHover : colour::accent);
+            g.fillEllipse (dot);
+        }
+        else
+        {
+            g.setColour (hovered && hover.insertItem == item && hover.insertLed ? colour::textPrimary : colour::textSecondary.withAlpha (0.7f));
+            g.drawEllipse (dot.reduced (0.5f), 1.0f);
+        }
+        g.setColour (slot.enabled ? colour::textPrimary : colour::textSecondary.withAlpha (0.6f));
+        textcache::drawText (g, quickpick::slotName (engine, slot), row.withTrimmedLeft (trackinserts::ledWidth + 1).withTrimmedRight (2),
+                             juce::Justification::centredLeft, true);
+    }
+    // more rows than fit: a thin scroll mark at the right edge
+    if (const auto items = trackinserts::itemCount (effects); items > rows)
+    {
+        const auto h = juce::jmax (4.0f, (float) box.getHeight() * (float) rows / (float) items);
+        const auto y = (float) box.getY() + ((float) box.getHeight() - h) * (float) first / (float) juce::jmax (1, items - rows);
+        g.setColour (colour::textSecondary.withAlpha (0.5f));
+        g.fillRoundedRectangle (juce::Rectangle<float> ((float) box.getRight() - 2.5f, y, 2.0f, h), 1.0f);
+    }
+    // a drag in progress: where the effect lands
+    if (insertsDragging && insertsDropTrack == track && insertsDropAt >= 0)
+    {
+        const auto y = box.getY() + (insertsDropAt - first) * trackinserts::rowHeight;
+        if (y >= box.getY() - 1 && y <= box.getBottom() + 1)
+        {
+            g.setColour (colour::accent);
+            g.fillRect (box.getX() + 2, juce::jlimit (box.getY(), box.getBottom() - 2, y - 1), box.getWidth() - 4, 2);
+        }
+    }
+}
+
+EffectsPanel& PlaylistComponent::insertActions (int insert)
+{
+    if (insertActionsPanel == nullptr)
+    {
+        insertActionsPanel = std::make_unique<EffectsPanel> (engine); // never shown: the Mixer slot's own code
+        insertActionsPanel->setMenuTarget (this);
+    }
+    insertActionsPanel->setTrack (insert);
+    return *insertActionsPanel;
+}
+
+bool PlaylistComponent::insertsMouseDown (const juce::MouseEvent& e)
+{
+    if (e.x >= headerWidth || e.y < tracksTop() || e.y >= gridArea().getBottom())
+        return false;
+    const auto track = yToTrack (e.y);
+    if (! trackInserts (track).contains (e.getPosition()))
+        return false;
+    const auto insert = simpleInsert (track);
+    const auto item = insertsItemAt (track, e.getPosition());
+    insertsPressTrack = insertsPressItem = insertsDropTrack = insertsDropAt = -1;
+    insertsDragging = false;
+    if (flmods::popup (e.mods))
+    {
+        // the Mixer slot's own menu; on "+" or below the list, the slot's add menu
+        auto& actions = insertActions (insert);
+        if (item >= 0)
+            actions.showSlotMenuFor (item);
+        else if (engine.getSong().mixer[(std::size_t) insert].effects.size() < (std::size_t) maxEffectSlots)
+            actions.showAddMenuFor (trackinserts::nextFreeRow (engine.getSong().mixer[(std::size_t) insert].effects));
+        return true;
+    }
+    if (e.getNumberOfClicks() > 1)
+        return true; // (a double click opens nothing twice)
+    insertsPressTrack = track;
+    insertsPressItem = item;
+    return true;
+}
+
+bool PlaylistComponent::insertsMouseDrag (const juce::MouseEvent& e)
+{
+    if (insertsPressTrack < 0)
+        return false;
+    if (insertsPressItem >= 0 && (insertsDragging || e.getDistanceFromDragStart() > 4))
+    {
+        // drag an effect: up / down in its list reorders it, onto another linked track's list moves it there (Ctrl: a copy)
+        insertsDragging = true;
+        const auto over = e.y >= tracksTop() && e.y < gridArea().getBottom() ? yToTrack (e.y) : -1;
+        const auto box = over >= 0 ? trackInserts (over) : juce::Rectangle<int>();
+        if (! box.isEmpty() && e.x < headerWidth && e.y >= box.getY() - trackinserts::rowHeight && e.y < box.getBottom() + trackinserts::rowHeight)
+        {
+            const auto effects = (int) engine.getSong().mixer[(std::size_t) simpleInsert (over)].effects.size();
+            insertsDropTrack = over;
+            insertsDropAt = over == insertsPressTrack
+                                ? trackinserts::dropPosition (effects, insertsFirst (over), trackinserts::rowsThatFit (box.getHeight()), e.y - box.getY())
+                                : effects;
+        }
+        else
+            insertsDropTrack = insertsDropAt = -1;
+        repaint (0, tracksTop(), headerWidth, getHeight() - tracksTop());
+    }
+    return true;
+}
+
+bool PlaylistComponent::insertsMouseUp (const juce::MouseEvent& e)
+{
+    if (insertsPressTrack < 0)
+        return false;
+    const auto track = insertsPressTrack, item = insertsPressItem, dropTrack = insertsDropTrack, dropAt = insertsDropAt;
+    const auto dragged = insertsDragging;
+    insertsPressTrack = insertsPressItem = insertsDropTrack = insertsDropAt = -1;
+    insertsDragging = false;
+    const auto insert = simpleInsert (track);
+    if (insert <= 0)
+        return true;
+    const auto copy = flmods::ctrl (e.mods);
+    if (dragged)
+    {
+        const auto target = dropTrack >= 0 && item >= 0 ? simpleInsert (dropTrack) : -1; // (outside a list: nothing changes)
+        if (target > 0 && target != insert)
+        {
+            auto moved = -1;
+            engine.editSongStructural ([insert, item, target, copy, &moved] (Song& s) { moved = detailchain::moveEffectToInsert (s, insert, item, target, copy); });
+            if (moved < 0)
+                ui::postHint ({ tr ("This insert has no free slot (10 effects)"), {} }, 3000);
+        }
+        else if (target == insert && copy)
+        {
+            if (engine.getSong().mixer[(std::size_t) insert].effects.size() >= (std::size_t) maxEffectSlots)
+                ui::postHint ({ tr ("This insert has no free slot (10 effects)"), {} }, 3000);
+            else
+                engine.editSong ([insert, item, dropAt] (Song& s) { detailchain::duplicateEffect (s, insert, item, dropAt); });
+        }
+        else if (target == insert)
+            engine.editSongStructural ([insert, item, dropAt] (Song& s) { detailchain::moveEffectBefore (s, insert, item, dropAt); });
+        repaint (0, tracksTop(), headerWidth, getHeight() - tracksTop());
+        return true;
+    }
+    if (item == trackinserts::addRow)
+    {
+        insertActions (insert).showAddMenuFor (trackinserts::nextFreeRow (engine.getSong().mixer[(std::size_t) insert].effects));
+        return true;
+    }
+    if (item < 0)
+        return true;
+    const auto row = trackInserts (track);
+    if (e.getMouseDownX() < row.getX() + trackinserts::ledWidth + 1)
+    {
+        // the dot: the effect on / off (the Mixer slot LED's edit)
+        engine.editSong ([insert, item] (Song& s) {
+            auto& fx = s.mixer[(std::size_t) insert].effects;
+            if (item < (int) fx.size())
+                fx[(std::size_t) item].enabled = ! fx[(std::size_t) item].enabled;
+        });
+        return true;
+    }
+    insertActions (insert).toggleSlotEditor (item); // the name: its window (as a click on a Mixer slot)
+    return true;
+}
+
+bool PlaylistComponent::insertsWheel (const juce::MouseEvent& e, float deltaY)
+{
+    if (e.x >= headerWidth || e.y < tracksTop() || deltaY == 0.0f)
+        return false;
+    const auto track = yToTrack (e.y);
+    const auto box = trackInserts (track);
+    if (! box.contains (e.getPosition()))
+        return false;
+    const auto insert = simpleInsert (track);
+    const auto effects = (int) engine.getSong().mixer[(std::size_t) insert].effects.size();
+    const auto rows = trackinserts::rowsThatFit (box.getHeight());
+    if (trackinserts::itemCount (effects) <= rows)
+        return false; // everything shows: the wheel scrolls the Playlist as usual
+    insertsScroll[insert] = trackinserts::clampFirst (insertsFirst (track) + (deltaY > 0 ? -1 : 1), effects, rows);
+    repaint (box);
+    return true;
+}
+
+bool PlaylistComponent::insertsDrop (int track, juce::Point<int> p, EffectSlot fx)
+{
+    const auto box = trackInserts (track);
+    if (! box.contains (p))
+        return false;
+    const auto insert = simpleInsert (track);
+    const auto effects = (int) engine.getSong().mixer[(std::size_t) insert].effects.size();
+    if (effects >= maxEffectSlots)
+    {
+        ui::postHint ({ tr ("This insert has no free slot (10 effects)"), {} }, 3000);
+        return true;
+    }
+    // between the rows it is dropped on (the Device View's drop), not in place of one
+    const auto position = trackinserts::dropPosition (effects, insertsFirst (track), trackinserts::rowsThatFit (box.getHeight()), p.y - box.getY());
+    auto added = -1;
+    engine.editSong ([insert, position, &added, fx = std::move (fx)] (Song& s) mutable {
+        added = detailchain::insertEffectAt (s, insert, std::move (fx), position);
+        if (added >= 0)
+            mixerops::linkAddedSidechain (s, insert, added); // (as the Mixer's add)
+    });
+    if (added >= 0)
+        if (const auto& list = engine.getSong().mixer[(std::size_t) insert].effects; added < (int) list.size() && list[(std::size_t) added].kind == EffectKind::plugin)
+            insertActions (insert).toggleSlotEditor (added); // (a plugin opens its window when added, as in the Mixer)
+    return true;
 }
 
 void PlaylistComponent::setSimpleHeaders (bool on)
@@ -9181,6 +9471,14 @@ bool PlaylistComponent::runAction (const std::string& id)
     else if (is ("playlist.ripple")) setRipple (! ripple);
     else if (is ("playlist.autoCrossfades")) engine.editSong ([] (Song& s) { s.autoCrossfades = ! s.autoCrossfades; });
     else if (is ("playlist.linkTracks")) engine.editSong ([] (Song& s) { autolink::setOn (s, ! s.linkTracksToMixer); }); // round 190gz
+    else if (is ("playlist.trackInserts")) // round 190ht (issue #154): a view option, not the project's
+    {
+        showTrackInserts = ! showTrackInserts;
+        updateHeaderWidth();
+        repaint();
+        if (onViewOptionChanged)
+            onViewOptionChanged();
+    }
     else if (is ("playlist.patternBlocks")) togglePatternBlocks();
     else if (is ("playlist.automationLanes")) toggleAutomationLanes();
     else if (is ("playlist.blocksToClips")) turnBlocksIntoClips();
@@ -10201,6 +10499,8 @@ PlaylistComponent::Hover PlaylistComponent::hoverAt (juce::Point<int> p) const
             h.volume = trackVolume (h.track).expanded (0, 4).contains (p);
             h.pan = trackPan (h.track).expanded (2).contains (p);
             h.fx = trackFx (h.track).contains (p);
+            h.insertItem = insertsItemAt (h.track, p); // issue #154
+            h.insertLed = h.insertItem >= 0 && p.x < trackInserts (h.track).getX() + trackinserts::ledWidth + 1;
         }
         h.audition = ! folded && h.divider < 0 && trackAudition (h.track).expanded (2).contains (p);
         return h;
@@ -10358,6 +10658,24 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
         return hint;
     }
 
+    if (h.header && h.insertItem != -1) // issue #154: the linked header's insert effects list
+    {
+        const auto& m = song.mixer[(std::size_t) simpleInsert (h.track)];
+        if (h.insertItem == trackinserts::addRow)
+        {
+            hint.text = tr ("Track effects: [LMB] add an effect to its mixer track  (drop one from the Browser here too)");
+            hint.value = m.name.empty() ? tr ("Insert {0}", { juce::String (simpleInsert (h.track)) }) : juce::String::fromUTF8 (m.name.c_str());
+        }
+        else
+        {
+            hint.text = h.insertLed ? tr ("Track effect: [LMB] on / off (bypass)")
+                                    : tr ("Track effect: [LMB] open / close its window  drag: move it ([Ctrl] copy; onto another track: move it there)  [RMB] its menu");
+            hint.value = quickpick::slotName (engine, m.effects[(std::size_t) h.insertItem]);
+            hint.hasMenu = ! h.insertLed;
+        }
+        return hint;
+    }
+
     if (h.header && simpleInsert (h.track) > 0 && (h.led || h.solo || h.volume || h.pan || h.fx))
     {
         // the Simple headers (round 184a): their controls are the track's mixer track's
@@ -10467,6 +10785,8 @@ void PlaylistComponent::mouseDoubleClick (const juce::MouseEvent& e)
     // a double click on a header's resize band flips "Lock to this size" (FL; done by the second press in mouseDown)
     if (dividerAt (e.getPosition()) >= 0)
         return;
+    if (e.x < headerWidth && e.y >= tracksTop() && trackInserts (yToTrack (e.y)).contains (e.getPosition()))
+        return; // (issue #154: the effects list takes single clicks only)
 
     // double-click a track header: open the source of the track's first clip (FL); empty tracks: rename
     if (e.x < headerWidth && e.y >= tracksTop() && e.y < gridArea().getBottom() && e.mods.isLeftButtonDown())
@@ -10788,6 +11108,10 @@ void PlaylistComponent::mouseWheelMove (const juce::MouseEvent& e, const juce::M
 {
     const auto wheel = flmods::normalisedWheel (rawWheel); // Windows touchpads: pieces of a notch (round 170e)
     const auto ctrl = flmods::ctrl (e.mods), alt = e.mods.isAltDown(), shift = e.mods.isShiftDown();
+
+    // issue #154: the wheel scrolls a linked header's effects list when it has more rows than fit
+    if (! shift && ! ctrl && ! alt && insertsWheel (e, wheel.deltaY))
+        return;
 
     // Shift+wheel over a track header: moves the track up / down
     if (shift && ! ctrl && e.x < headerWidth && e.y >= tracksTop() && wheel.deltaY != 0.0f)
@@ -11365,6 +11689,12 @@ void PlaylistComponent::pluginDropped (const SourceDetails& details)
     const auto track = yToTrack (p.y);
     if (track < 0)
         return;
+    // issue #154 (LYNX extra): an effect dropped on a linked header's effects list goes in where it is dropped
+    if (fx && insertsDrop (track, p, *fx))
+    {
+        repaint();
+        return;
+    }
     const auto shift = juce::ModifierKeys::currentModifiers.isShiftDown();
 
     if (generator)

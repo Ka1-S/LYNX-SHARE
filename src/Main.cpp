@@ -2305,6 +2305,16 @@ public:
             return;
         }
 
+        // --issuesshot190ht <prefix> (round 190ht): issue #127's other tools on Pattern Blocks (Mute, Select + group move,
+        // Slice, Zoom) and issue #154's insert effects list on linked headers, driven with synthetic mouse events,
+        // offscreen; prefix-checks.txt and pictures
+        if (args.contains ("--issuesshot190ht"))
+        {
+            setApplicationReturnValue (runIssuesShot190ht (args[args.indexOf ("--issuesshot190ht") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+
         // --trackautoshot190gz <prefix> (round 190gz, issue #170): LYNX's "Link Playlist tracks to mixer tracks" — the
         // switch, the linked headers' M / S / volume / pan driven with synthetic mouse events, row sizes, undo and the
         // .lynx round trip, offscreen; prefix-checks.txt
@@ -4056,12 +4066,13 @@ private:
             song.patternBlocksOn = true;
             lynx::patternblocks::place (song, 0, 0);
             lynx::patternblocks::place (song, 0, 4 * 4 * lynx::ppq);
+            lynx::patternblocks::setMuted (song, 1, true); // (round 190ht, issue #127: a muted block keeps its mute)
             song.addArrangement ("Second");
             lynx::patternblocks::place (song, 0, 2 * 4 * lynx::ppq);
             song.selectArrangement (0);
             const auto back = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (song), error);
             const auto plainBack = lynx::ProjectFile::fromJson (plain, error);
-            blocksOk = back && back->patternBlocksOn && back->blocks == song.blocks && song.blocks.size() == 2
+            blocksOk = back && back->patternBlocksOn && back->blocks == song.blocks && song.blocks.size() == 2 && back->blocks[1].muted
                        && back->arrangements.size() == 2 && back->arrangements[1].blocks == song.arrangements[1].blocks
                        && song.arrangements[1].blocks.size() == 1 && back->songLength() == song.songLength() && plainBack
                        && ! plainBack->patternBlocksOn && plainBack->blocks.empty() && ! plain.contains ("blocks")
@@ -14180,6 +14191,349 @@ private:
                     savePng (box->createComponentSnapshot (box->getLocalBounds()), prefix + (adding ? "-gw-add-multiple-box.png" : "-gw-insert-multiple-box.png"));
             }
         }
+
+        juce::File (prefix + "-checks.txt").replaceWithText (report.joinIntoString ("\n") + "\nresult=" + (allOk ? "OK" : "FAIL") + "\n");
+        return allOk;
+    }
+
+    // --issuesshot190ht (round 190ht): see the dispatch above
+    bool runIssuesShot190ht (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        juce::StringArray report;
+        bool allOk = true;
+        const auto check = [&report, &allOk] (const char* name, bool ok, const juce::String& detail = {}) {
+            report.add (juce::String (name) + "=" + (ok ? "OK" : "FAIL") + (detail.isEmpty() ? juce::String() : " " + detail));
+            allOk = allOk && ok;
+        };
+        using namespace lynx;
+        AudioEngine engine (false);
+        MainComponent ui (engine, false);
+        ui.setSize (1600, 900);
+        const auto bar = (std::int64_t) 4 * ppq;
+        {
+            // Kick (1 bar), Bass (2 bars, a long note across its second bar), Lead (1 bar), Pad (1 bar): blocks in rows
+            auto song = Song::makeDefault();
+            song.playlist.clear();
+            song.patterns.clear();
+            const auto pattern = [&song] (const char* name, std::uint32_t colour, int channel, std::int64_t length) {
+                auto& p = song.patterns.emplace_back();
+                p.name = name;
+                p.colour = colour;
+                for (int step : { 0, 4, 8, 12 })
+                    p.toggleStep (channel, step);
+                p.lengthTicks = length;
+                return (int) song.patterns.size() - 1;
+            };
+            pattern ("Kick", 0xFFD85A3C, 0, bar);
+            const auto bass = pattern ("Bass", 0xFF3C8DD8, 1, 0);
+            Note longNote;
+            longNote.channel = 1;
+            longNote.start = 6 * ppq;
+            longNote.length = 2 * ppq;
+            song.patterns[(std::size_t) bass].notes.push_back (longNote);
+            song.patterns[(std::size_t) bass].sortNotes();
+            pattern ("Lead", 0xFF8A5CD8, 2, bar);
+            pattern ("Pad", 0xFF5CB85C, 3, bar);
+            song.patternBlocksOn = true;
+            for (int b = 0; b < 8; ++b)
+                patternblocks::place (song, 0, b * bar);
+            patternblocks::place (song, 1, 0);
+            patternblocks::place (song, 1, 4 * bar);
+            for (int b = 2; b < 6; ++b)
+                patternblocks::place (song, 2, b * bar);
+            patternblocks::place (song, 3, 0);
+            engine.setSong (std::move (song));
+        }
+        engine.dispatchPendingMessages();
+        ui.selectTabForSnapshot (2);
+        engine.dispatchPendingMessages();
+        auto& pl = ui.getPlaylistForSnapshot();
+        pl.setSize (juce::jmax (pl.getWidth(), 1000), juce::jmax (pl.getHeight(), 640));
+        pl.setViewForSnapshot (90.0, 0, 0); // (bar 1 at the left edge)
+        pl.setBlocksHeight (6 + 5 * 18 + 6);
+        engine.dispatchPendingMessages();
+        const auto& song = [&]() -> const Song& { return engine.getSong(); };
+        auto* blocks = pl.getBlocksViewForSnapshot();
+        check ("blocks_view", blocks != nullptr && blocks->isVisible());
+        if (blocks == nullptr)
+        {
+            juce::File (prefix + "-checks.txt").replaceWithText (report.joinIntoString ("\n") + "\nresult=FAIL\n");
+            return false;
+        }
+        const auto shotBlocks = [&] (const juce::String& name) {
+            engine.dispatchPendingMessages();
+            const auto area = blocks->getBoundsInParent().withWidth (juce::jmin (pl.getWidth(), 900)).expanded (0, 2).getIntersection (pl.getLocalBounds());
+            savePng (pl.createComponentSnapshot (area), prefix + name);
+        };
+        auto source = juce::Desktop::getInstance().getMainMouseSource();
+        const juce::ModifierKeys left (juce::ModifierKeys::leftButtonModifier), right (juce::ModifierKeys::rightButtonModifier);
+        juce::Point<float> pressedAt;
+        const auto bEvent = [&] (int row, std::int64_t tick, juce::ModifierKeys mods, int clicks = 1) {
+            const auto at = blocks->pointForSnapshot (row, tick).toFloat();
+            const auto now = juce::Time::getCurrentTime();
+            return juce::MouseEvent (source, at, mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, blocks, blocks, now, pressedAt, now, clicks, at != pressedAt);
+        };
+        const auto bPress = [&] (int row, std::int64_t tick, juce::ModifierKeys mods) {
+            pressedAt = blocks->pointForSnapshot (row, tick).toFloat();
+            blocks->mouseDown (bEvent (row, tick, mods));
+        };
+        const auto bDrag = [&] (int row, std::int64_t tick, juce::ModifierKeys mods) { blocks->mouseDrag (bEvent (row, tick, mods)); };
+        const auto bRelease = [&] (int row, std::int64_t tick, juce::ModifierKeys mods = {}) {
+            blocks->mouseUp (bEvent (row, tick, mods));
+            engine.dispatchPendingMessages();
+        };
+        const auto blockOf = [&] (int row, std::int64_t start) -> const PatternBlock* {
+            const auto i = patternblocks::indexOf (song(), { row, start });
+            return i < 0 ? nullptr : &song().blocks[(std::size_t) i];
+        };
+        const auto mutedAt = [&] (int row, std::int64_t start) { const auto* x = blockOf (row, start); return x != nullptr && x->muted; };
+        const auto playingAt = [&] (int row, std::int64_t start) { const auto* x = blockOf (row, start); return x != nullptr && ! x->muted; };
+        const auto mutedCount = [&] {
+            int n = 0;
+            for (const auto& b : song().blocks)
+                n += b.muted ? 1 : 0;
+            return n;
+        };
+        shotBlocks ("-blocks-before.png");
+
+        // ---- #127 Mute: a click mutes the block, a drag down across rows mutes the blocks it crosses (any row)
+        pl.setToolForSnapshot (EditTool::mute);
+        bPress (0, 2 * bar + 40, left);
+        bRelease (0, 2 * bar + 40);
+        check ("mute_click", blockOf (0, 2 * bar) != nullptr && mutedAt (0, 2 * bar) && mutedCount() == 1);
+        bPress (0, 4 * bar + 40, left);
+        bDrag (1, 4 * bar + 60, left);
+        bDrag (2, 4 * bar + 80, left);
+        bRelease (2, 4 * bar + 80);
+        check ("mute_drag_across_rows", mutedAt (0, 4 * bar) && blockOf (1, 4 * bar) != nullptr && mutedAt (1, 4 * bar)
+                                            && mutedAt (2, 4 * bar) && playingAt (3, 0) && mutedCount() == 4,
+               juce::String (mutedCount()));
+        shotBlocks ("-blocks-mute.png");
+        // a sweep that starts on a muted block unmutes
+        bPress (0, 2 * bar + 40, left);
+        bDrag (0, 3 * bar + 40, left);
+        bRelease (0, 3 * bar + 40);
+        check ("mute_sweep_from_muted_unmutes", playingAt (0, 2 * bar) && playingAt (0, 3 * bar) && mutedCount() == 3,
+               juce::String (mutedCount()));
+        // the right button erases, as with every tool but Select / Slice / Zoom
+        bPress (3, 40, right);
+        bRelease (3, 40);
+        check ("mute_right_click_erases", blockOf (3, 0) == nullptr);
+        engine.undo();
+        engine.dispatchPendingMessages();
+        check ("undo_erase", blockOf (3, 0) != nullptr);
+        // the muted blocks play nothing: their clips in the playback copy are muted
+        {
+            auto copy = song();
+            patternblocks::expandSong (copy);
+            int mutedClips = 0;
+            for (const auto& c : copy.playlist)
+                mutedClips += c.muted ? 1 : 0;
+            check ("muted_blocks_play_muted_clips", mutedClips == 3, juce::String (mutedClips));
+            juce::String error;
+            const auto back = ProjectFile::fromJson (ProjectFile::toJson (song()), error);
+            check ("muted_blocks_saved", back && back->blocks == song().blocks, error);
+        }
+
+        // ---- #127 Select: a box over rows 0-2, bars 5-6 selects every block it meets; Pencil moves them together
+        pl.setToolForSnapshot (EditTool::lasso);
+        bPress (0, 4 * bar + 40, left);
+        bDrag (2, 5 * bar + 40, left);
+        shotBlocks ("-blocks-select-box.png");
+        bRelease (2, 5 * bar + 40);
+        const auto selection = blocks->selectionForSnapshot();
+        check ("select_box_any_row", selection.size() == 5 && patternblocks::contains (selection, { 0, 4 * bar }) && patternblocks::contains (selection, { 1, 4 * bar })
+                                         && patternblocks::contains (selection, { 2, 5 * bar }),
+               juce::String ((int) selection.size()));
+        pl.setToolForSnapshot (EditTool::pencil);
+        // (Kick's bars 7 and 8 are in the way of a 2-bar move: move the group by 1 bar after clearing them)
+        engine.editSong ([bar] (Song& s) { patternblocks::eraseRange (s, 0, 6 * bar, 8 * bar); });
+        engine.dispatchPendingMessages();
+        bPress (1, 4 * bar + 40, left);
+        bDrag (1, 6 * bar + 40, left);
+        bRelease (1, 6 * bar + 40);
+        check ("pencil_moves_the_selection", blockOf (1, 6 * bar) != nullptr && blockOf (0, 6 * bar) != nullptr && blockOf (0, 7 * bar) != nullptr
+                                                  && blockOf (2, 6 * bar) != nullptr && blockOf (2, 7 * bar) != nullptr && blockOf (1, 4 * bar) == nullptr
+                                                  && blocks->selectionForSnapshot().size() == 5);
+        shotBlocks ("-blocks-select-moved.png");
+        // a press on a block outside the selection moves that block alone and drops the selection
+        bPress (3, 40, left);
+        bDrag (3, bar + 40, left);
+        bRelease (3, bar + 40);
+        check ("pencil_unselected_block_alone", blockOf (3, bar) != nullptr && blockOf (0, 6 * bar) != nullptr && blocks->selectionForSnapshot().empty());
+        // the right button selects too (FL 10: either button)
+        pl.setToolForSnapshot (EditTool::lasso);
+        bPress (3, bar + 40, right);
+        bRelease (3, bar + 40);
+        check ("select_click_right_button", blocks->selectionForSnapshot().size() == 1 && blockOf (3, bar) != nullptr);
+
+        // ---- #127 Slice: a click on Bass's first block at bar 2 beat 4 cuts the pattern; a new pattern takes the rest
+        pl.setToolForSnapshot (EditTool::knife);
+        const auto patternsBefore = song().patterns.size();
+        const juce::ModifierKeys freeLeft (juce::ModifierKeys::leftButtonModifier | juce::ModifierKeys::altModifier); // (Alt: no snap)
+        bPress (1, bar + 3 * ppq, freeLeft);
+        bDrag (2, bar + 3 * ppq, freeLeft); // (a vertical drag: the row under the mouse when released is cut)
+        bRelease (1, bar + 3 * ppq);
+        check ("slice_adds_a_pattern", song().patterns.size() == patternsBefore + 1 && song().patterns[2].name == "Bass #2",
+               juce::String ((int) song().patterns.size()));
+        check ("slice_trims_the_long_note", song().patterns[1].notes.back().start == 6 * ppq && song().patterns[1].notes.back().length >= ppq
+                                                && song().patterns[1].notes.back().length < ppq + ppq / 4 && song().patterns[2].notes.empty(),
+               juce::String (song().patterns[1].notes.back().length));
+        check ("slice_new_blocks_where_bass_ends", blockOf (2, 2 * bar) != nullptr && blockOf (2, 8 * bar) != nullptr);
+        shotBlocks ("-blocks-slice.png");
+        engine.undo();
+        engine.dispatchPendingMessages();
+        check ("undo_slice", song().patterns.size() == patternsBefore && song().patterns[2].name == "Lead");
+
+        // ---- #127 Zoom: a drag zooms to the range, a click goes back
+        pl.setToolForSnapshot (EditTool::zoom);
+        const auto zoomBefore = pl.xOfTickForSnapshot ((double) (4 * bar)) - pl.xOfTickForSnapshot (0.0);
+        bPress (0, 2 * bar, left);
+        bDrag (0, 4 * bar, left);
+        bRelease (0, 4 * bar);
+        const auto zoomed = pl.xOfTickForSnapshot ((double) (4 * bar)) - pl.xOfTickForSnapshot (0.0);
+        check ("zoom_drag_zooms_in", zoomed > zoomBefore * 1.5, juce::String (zoomed) + " vs " + juce::String (zoomBefore));
+        pressedAt = blocks->pointForSnapshot (0, 3 * bar).toFloat();
+        blocks->mouseDown (bEvent (0, 3 * bar, right));
+        blocks->mouseUp (bEvent (0, 3 * bar, {}));
+        const auto back = pl.xOfTickForSnapshot ((double) (4 * bar)) - pl.xOfTickForSnapshot (0.0);
+        check ("zoom_click_goes_back", std::abs (back - zoomBefore) < 0.5, juce::String (back));
+        // hints name each tool's gesture
+        pl.setToolForSnapshot (EditTool::mute);
+        check ("hint_mute", blocks->hintAt (blocks->pointForSnapshot (0, 40)).text.contains ("mutes"));
+        pl.setToolForSnapshot (EditTool::pencil);
+
+        // ---- #154: linked tracks, then the insert effects list on their headers
+        engine.editSong ([bar] (Song& s) {
+            s.patternBlocksOn = false;
+            s.blocks.clear();
+            s.playlist.clear();
+            ChannelDef vox;
+            vox.name = "Lead vocal";
+            vox.instrument = InstrumentKind::audioClip;
+            vox.samplePath = "/shots/Lead vocal.wav";
+            vox.mixerTrack = 12;
+            s.channels.push_back (vox);
+            const auto voxChannel = (int) s.channels.size() - 1;
+            s.mixer[12].name = "Vox chain";
+            for (auto k : { EffectKind::parametricEq, EffectKind::compressor, EffectKind::delay, EffectKind::reverb })
+                s.mixer[12].effects.push_back (makeEffectSlot (k));
+            s.mixer[12].effects[2].enabled = false;
+            s.channels[0].mixerTrack = 3;
+            s.mixer[3].name = "Kick";
+            s.mixer[3].effects.push_back (makeEffectSlot (EffectKind::compressor));
+            const auto clip = [&s, bar] (int track, ClipKind kind, int source, int at, int bars) {
+                Clip c;
+                c.kind = kind;
+                c.track = track;
+                c.start = at * bar;
+                c.length = bars * bar;
+                (kind == ClipKind::pattern ? c.pattern : c.channel) = source;
+                s.playlist.push_back (c);
+            };
+            clip (0, ClipKind::pattern, 0, 0, 4);
+            clip (1, ClipKind::audio, voxChannel, 0, 8);
+            s.playlistTracks.resize (4);
+            s.playlistTracks[1].height = 70;
+        });
+        engine.dispatchPendingMessages();
+        pl.runAction ("playlist.linkTracks");
+        engine.dispatchPendingMessages();
+        check ("linked", song().linkTracksToMixer && song().playlistTracks[1].mixerTrack == 12 && pl.headerWidthForSnapshot() == PlaylistComponent::linkedHeaderWidth,
+               juce::String (pl.headerWidthForSnapshot()));
+        check ("inserts_off_by_default", ! PlaylistComponent::showTrackInserts && pl.insertsListForSnapshot (1).isEmpty());
+        const auto shotRows = [&] (const juce::String& name, int rows) {
+            engine.dispatchPendingMessages();
+            const auto bottom = pl.trackRowForSnapshot (rows).getY();
+            savePng (pl.createComponentSnapshot ({ 0, 0, juce::jmin (pl.getWidth(), 820), juce::jmin (pl.getHeight(), bottom + 12) }), prefix + name);
+        };
+        shotRows ("-inserts-off.png", 3);
+        pl.runAction ("playlist.trackInserts");
+        engine.dispatchPendingMessages();
+        check ("inserts_on_widens_linked_headers", PlaylistComponent::showTrackInserts
+                                                     && pl.headerWidthForSnapshot() == PlaylistComponent::linkedHeaderWidth + PlaylistComponent::insertsColumnWidth,
+               juce::String (pl.headerWidthForSnapshot()));
+        const auto list = [&] (int t) { return pl.insertsListForSnapshot (t); };
+        check ("list_on_linked_tracks_only", ! list (0).isEmpty() && ! list (1).isEmpty() && list (2).isEmpty(),
+               list (0).toString() + " / " + list (1).toString());
+        shotRows ("-inserts-on.png", 3);
+        // a row's hint names the effect
+        const auto rowPoint = [&] (int t, int row, bool dot) {
+            const auto r = list (t);
+            return juce::Point<int> (dot ? r.getX() + 5 : r.getX() + 40, r.getY() + row * 13 + 6);
+        };
+        const auto hintOf = [&] (juce::Point<int> p) { return pl.hintAt (p); };
+        check ("hint_names_the_effect", hintOf (rowPoint (1, 1, false)).value == quickpick::slotName (engine, song().mixer[12].effects[1]),
+               hintOf (rowPoint (1, 1, false)).value);
+        check ("hint_add_row", hintOf (rowPoint (0, 1, false)).text.contains ("add an effect"));
+
+        const auto now = juce::Time::getCurrentTime();
+        const int ctrl = juce::ModifierKeys::commandModifier;
+        const auto event = [&] (juce::Point<int> p, juce::ModifierKeys mods, juce::Point<int> down, int clicks, bool dragged) {
+            return juce::MouseEvent (source, p.toFloat(), mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, &pl, &pl, now, down.toFloat(), now, clicks, dragged);
+        };
+        const auto press = [&] (juce::Point<int> p, juce::ModifierKeys mods, std::optional<juce::Point<int>> to = {}) {
+            const auto down = mods.withFlags (juce::ModifierKeys::leftButtonModifier);
+            pl.mouseMove (event (p, mods, p, 1, false));
+            pl.mouseDown (event (p, down, p, 1, false));
+            if (to)
+            {
+                pl.mouseDrag (event ((p + *to) / 2, down, p, 1, true));
+                pl.mouseDrag (event (*to, down, p, 1, true));
+            }
+            pl.mouseUp (event (to ? *to : p, mods, p, 1, to.has_value()));
+            engine.dispatchPendingMessages();
+        };
+        const auto kinds = [&] (int insert) {
+            juce::StringArray k;
+            for (const auto& fx : song().mixer[(std::size_t) insert].effects)
+                k.add (juce::String ((int) fx.kind) + (fx.enabled ? "" : "-"));
+            return k.joinIntoString (",");
+        };
+        const auto eq = juce::String ((int) EffectKind::parametricEq), comp = juce::String ((int) EffectKind::compressor),
+                   delay = juce::String ((int) EffectKind::delay), verb = juce::String ((int) EffectKind::reverb);
+        // the dot bypasses / un-bypasses, as the Mixer slot's LED (one undo step each)
+        press (rowPoint (1, 0, true), {});
+        check ("dot_bypasses", ! song().mixer[12].effects[0].enabled);
+        press (rowPoint (1, 2, true), {});
+        check ("dot_switches_on", song().mixer[12].effects[2].enabled);
+        engine.undo();
+        engine.dispatchPendingMessages();
+        check ("undo_dot", ! song().mixer[12].effects[2].enabled && ! song().mixer[12].effects[0].enabled);
+        press (rowPoint (1, 0, true), {});
+        shotRows ("-inserts-bypass.png", 3);
+        // drag the reverb (row 4) above the EQ: the chain order changes, as the Device View's drag
+        const auto before = kinds (12);
+        press (rowPoint (1, 3, false), {}, rowPoint (1, 0, false) - juce::Point<int> (0, 4));
+        check ("drag_reorders", kinds (12) == verb + "," + eq + "," + comp + "," + delay + "-", before + " -> " + kinds (12));
+        // Ctrl + drag copies (the compressor, under the delay)
+        press (rowPoint (1, 2, false), juce::ModifierKeys (ctrl), rowPoint (1, 4, false) - juce::Point<int> (0, 4));
+        check ("ctrl_drag_copies", kinds (12) == verb + "," + eq + "," + comp + "," + delay + "-," + comp, kinds (12));
+        // onto another linked track's list: it moves to that insert (the Kick's)
+        press (rowPoint (1, 1, false), {}, rowPoint (0, 0, false));
+        check ("drag_to_another_track_moves", kinds (3) == comp + "," + eq && kinds (12) == verb + "," + comp + "," + delay + "-," + comp,
+               kinds (3) + " | " + kinds (12));
+        // the wheel scrolls a list longer than its track (Kick's 4 effects + "add" in a 3-row header)
+        engine.editSong ([] (Song& s) {
+            s.mixer[3].effects.push_back (makeEffectSlot (EffectKind::delay));
+            s.mixer[3].effects.push_back (makeEffectSlot (EffectKind::reverb));
+        });
+        engine.dispatchPendingMessages();
+        const auto firstName = hintOf (rowPoint (0, 0, false)).value;
+        const auto rowsShown = list (0).getHeight() / 13;
+        pl.mouseWheelMove (event (rowPoint (0, 0, false), {}, rowPoint (0, 0, false), 0, false), juce::MouseWheelDetails { 0.0f, -0.5f, false, false, false });
+        const auto afterWheel = hintOf (rowPoint (0, 0, false));
+        check ("wheel_scrolls_a_long_list", rowsShown < 5 && afterWheel.value != firstName
+                                                && afterWheel.value == quickpick::slotName (engine, song().mixer[3].effects[1]),
+               juce::String (rowsShown) + " rows, " + firstName + " -> " + afterWheel.value);
+        shotRows ("-inserts-edited.png", 3);
+        // a view option: not saved with the project
+        check ("option_not_in_project", ! ProjectFile::toJson (song()).contains ("trackInserts"));
+        // off again: the linked headers' own width
+        pl.runAction ("playlist.trackInserts");
+        engine.dispatchPendingMessages();
+        check ("inserts_off_again", ! PlaylistComponent::showTrackInserts && pl.headerWidthForSnapshot() == PlaylistComponent::linkedHeaderWidth);
 
         juce::File (prefix + "-checks.txt").replaceWithText (report.joinIntoString ("\n") + "\nresult=" + (allOk ? "OK" : "FAIL") + "\n");
         return allOk;
