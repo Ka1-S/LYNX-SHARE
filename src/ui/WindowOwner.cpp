@@ -45,6 +45,11 @@ juce::Component::SafePointer<juce::Component>& mainWindow()
 }
 } // namespace
 
+juce::Component* mainWindowComponent()
+{
+    return mainWindow().getComponent();
+}
+
 void* mainWindowHandle()
 {
     auto* main = mainWindow().getComponent();
