@@ -296,7 +296,7 @@ public:
             g.setColour (lv::mainHeader);
             g.fillRect (head);
             g.setColour (lv::text);
-            g.setFont (theme::font (theme::type::small));
+            g.setFont (liveFont());
             g.drawText (tr ("Main"), head.withTrimmedLeft (8), juce::Justification::centredLeft, true);
         }
         else
@@ -727,6 +727,14 @@ public:
             toggleTrackFreeze (selectedTrack);
             return true;
         }
+        // round 190im (R12, DL-15): 0 deactivates / activates the selected clip (Live's "Deactivate Selected Clip 0"), only
+        // in the Clip-launch layout (core/SessionKeys.h); elsewhere the key goes on to the key map
+        if (code == '0' && ! key.getModifiers().isAnyModifierKeyDown() && ! sceneSelected && ! titleSelected
+            && sessionkeys::defaultKeyActs (sessionkeys::Command::gridDeactivateClip) && launcher::clipAt (*grid, selectedTrack, selectedScene) != nullptr)
+        {
+            toggleClipActive (selectedTrack, selectedScene);
+            return true;
+        }
         // round 190bv: the clipboard, duplicate and a new empty MIDI clip
         if (key.getModifiers().isCommandDown() && ! key.getModifiers().isAltDown())
         {
@@ -832,6 +840,8 @@ public:
             {
                 hint.text = onButton ? tr ("Clip Launch button: [LMB] launches the clip (at the launch quantisation)  [Enter] launches the selected clip")
                                      : tr ("Clip: [LMB] selects it, drag moves it ([Ctrl] copies)  [2xLMB] opens it  [RMB] clip menu");
+                if (! onButton && sessionkeys::defaultKeyActs (sessionkeys::Command::gridDeactivateClip)) // (round 190im, R12)
+                    hint.text << "  " << tr ("[0] deactivates / activates it");
                 hint.value = clipName (song, *grid, *clip);
                 if (clip->gridSlot >= 0 && clip->gridSlot < (int) grid->slots.size())
                 {
@@ -846,6 +856,13 @@ public:
     }
 
 private:
+    // round 190im (R12): one undo step; a deactivated clip that plays goes on until it is launched again (Live)
+    void toggleClipActive (int track, int scene)
+    {
+        editSlot (track, scene, [] (ClipGridSlot& s) { s.active = ! s.active; });
+        repaint();
+    }
+
     // Round 190im (R6): a scene launched from here (its launch button, Ctrl+Enter): its button pulses until its clips
     // start (DL-5: Live's queued pulse, black ↔ #00D38D every 400 ms, filmed by round 190ig), and the scene below becomes
     // the selected one (DL-6, Live's manual: "The scene below a launched scene will automatically be selected as the
@@ -1193,6 +1210,11 @@ private:
             g.setColour (ink);
             g.setFont (theme::font (theme::type::small));
             g.drawText (clipName (song, grid, *clip), cell.withTrimmedLeft (launchZone).withTrimmedRight (3), juce::Justification::centredLeft, true);
+            if (! slot.active) // (round 190im: a deactivated clip, greyed)
+            {
+                g.setColour (c::bg1.withAlpha (0.6f));
+                g.fillRect (cell);
+            }
         }
         if (t == selectedTrack && row == selectedScene)
         {
@@ -1353,16 +1375,20 @@ private:
         const auto fill = clip != nullptr ? liveClipFill (song, grid, *clip, t)
                           : trackColour != 0 ? juce::Colour (trackColour)
                                              : theme::tame (PlaylistComponent::patternColour (song, (int) song.patterns.size()));
-        const auto ink = liveInk (fill);
-        g.setColour (fill);
+        // round 190im (R12, DL-15): a deactivated clip is drawn greyed (Live's look not captured: LYNX's grey of the clip's
+        // own brightness, its name dimmed)
+        const auto inactive = clip != nullptr && clip->gridSlot >= 0 && clip->gridSlot < (int) grid.slots.size() && ! grid.slots[(std::size_t) clip->gridSlot].active;
+        const auto shown = inactive ? juce::Colour::greyLevel (0.22f + 0.18f * fill.getPerceivedBrightness()) : fill;
+        const auto ink = inactive ? lv::text.withAlpha (0.55f) : liveInk (fill);
+        g.setColour (shown);
         g.fillRect (cell);
         // two clips one above the other: Live's dark tinted 1 px between them (instead of the #242424 separator)
         if (row + 1 < rowCount() && launcher::clipAt (grid, t, row + 1) != nullptr)
         {
-            g.setColour (theme::liveShade (fill, 0.06f));
+            g.setColour (theme::liveShade (shown, 0.06f));
             g.fillRect (cell.getX(), cell.getBottom(), cell.getWidth(), 1);
         }
-        g.setColour (theme::liveShade (fill, 0.6f));
+        g.setColour (theme::liveShade (shown, 0.6f));
         g.fillRect (cell.getX() + 16, cell.getY(), 1, cell.getHeight());
         // the launch zone: a #181818 box while the clip plays, waits for its start or its stop, or records (CL-10..13)
         const auto active = playing || pending || recording;
@@ -1390,7 +1416,7 @@ private:
             {
                 const juce::Graphics::ScopedSaveState keep (g);
                 g.reduceClipRegion (zone);
-                g.setColour (active ? juce::Colour (0xff2c2c2c) : theme::liveShade (fill, 0.5f));
+                g.setColour (active ? juce::Colour (0xff2c2c2c) : theme::liveShade (shown, 0.5f));
                 for (int k = -zone.getHeight(); k < zone.getWidth(); k += 4)
                     g.drawLine ((float) (zone.getX() + k), (float) zone.getBottom(), (float) (zone.getX() + k + zone.getHeight()), (float) zone.getY(), 1.0f);
             }
@@ -1398,7 +1424,7 @@ private:
                                   : playing ? lv::playing
                                   : pending ? livePulsed (lv::playing)
                                   : selected ? lv::well
-                                  : theme::liveShade (fill, 0.4f);
+                                  : theme::liveShade (shown, 0.4f);
         theme::fillLaunchTriangle (g, triangle, triangleColour);
         g.setColour (ink);
         g.setFont (liveFont());
@@ -1575,7 +1601,7 @@ private:
         const auto a = juce::Rectangle<float> ((float) cell.getX() + 4.0f, (float) cell.getCentreY() - 4.5f, 7.0f, 9.0f);
         // (round 190im, DL-5: a launched scene's button pulses until its clips start, as a queued clip's does)
         theme::fillLaunchTriangle (g, a, row == queuedScene ? livePulsed (lv::playing) : scene.tempo > 0.0 || scene.beatsPerBar > 0 ? c::info : lv::well);
-        g.setFont (theme::font (theme::type::small));
+        g.setFont (liveFont()); // (round 190im: the grid's wider Live text, as the slots and headers: round 190ig's follow-up)
         auto nameArea = cell.withTrimmedLeft (14);
         if (sceneFieldsOn)
         {
@@ -1792,6 +1818,9 @@ public:
             menu.addItem (tr ("Loop"), true, slot->loop, [this, track, scene, on = slot->loop] {
                 editSlot (track, scene, [on] (ClipGridSlot& s) { s.loop = ! on; });
             });
+            // round 190im (R12, DL-15): Live's Deactivate / Activate Clip (key 0 in the Clip-launch layout)
+            menu.addItem ((slot->active ? tr ("Deactivate Clip") : tr ("Activate Clip")) + sessionkeys::menuKey (sessionkeys::Command::gridDeactivateClip),
+                          [this, track, scene] { toggleClipActive (track, scene); });
             menu.addSubMenu (tr ("Follow action"), followMenu (track, scene, slot->follow));
             // grooves play on the notes of MIDI clips (round 190bv)
             if (const auto* clip = launcher::clipAt (*grid, track, scene); clip != nullptr && clip->kind == ClipKind::pattern)

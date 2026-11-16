@@ -10159,3 +10159,6 @@ countries: tr
 "Clip: [LMB] selects it, drag moves it ([Ctrl] copies)  [2xLMB] opens it  [RMB] clip menu" = "Klip: [LMB] seçer, sürükleme taşır ([Ctrl] kopyalar)  [2xLMB] açar  [RMB] klip menüsü"
 "(Follow Action)" = "(Takip eylemi)"
 "Auto scrolling pauses on a scroll or an edit" = "Otomatik kaydırma, kaydırma ya da düzenlemede duraklar"
+"Deactivate Clip" = "Klibi devre dışı bırak"
+"Activate Clip" = "Klibi etkinleştir"
+"[0] deactivates / activates it" = "[0] devre dışı bırakır / etkinleştirir"

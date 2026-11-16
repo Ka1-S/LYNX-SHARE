@@ -2358,6 +2358,9 @@ struct ClipGridSlot
     bool blankName = false;
     ClipFollow follow;
     std::uint32_t groove = 0;       // the groove of the project's pool this clip plays through (Groove::id; 0 = none; core/Groove.h)
+    // round 190im (R12, DL-15): Live's deactivated clip (the 0 key, "Deactivate Selected Clip"): drawn greyed, a launch
+    // (its own, a scene's, a follow action's) leaves it silent. Saved in .lynx only when off ("inactive")
+    bool active = true;
     bool operator== (const ClipGridSlot&) const = default;
 };
 

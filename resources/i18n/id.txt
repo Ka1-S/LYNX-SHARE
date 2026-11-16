@@ -10159,3 +10159,6 @@ countries: id
 "Clip: [LMB] selects it, drag moves it ([Ctrl] copies)  [2xLMB] opens it  [RMB] clip menu" = "Klip: [LMB] memilihnya, seret untuk memindahkan ([Ctrl] menyalin)  [2xLMB] membukanya  [RMB] menu klip"
 "(Follow Action)" = "(Aksi lanjutan)"
 "Auto scrolling pauses on a scroll or an edit" = "Gulir otomatis berhenti sejenak saat menggulir atau mengedit"
+"Deactivate Clip" = "Nonaktifkan Klip"
+"Activate Clip" = "Aktifkan Klip"
+"[0] deactivates / activates it" = "[0] menonaktifkan / mengaktifkannya"

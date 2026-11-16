@@ -10159,3 +10159,6 @@ countries: ru by kz
 "Clip: [LMB] selects it, drag moves it ([Ctrl] copies)  [2xLMB] opens it  [RMB] clip menu" = "Клип: [LMB] выбирает его, перетаскивание перемещает ([Ctrl] копирует)  [2xLMB] открывает  [RMB] меню клипа"
 "(Follow Action)" = "(Следующее действие)"
 "Auto scrolling pauses on a scroll or an edit" = "Автопрокрутка приостанавливается при прокрутке или правке"
+"Deactivate Clip" = "Отключить клип"
+"Activate Clip" = "Включить клип"
+"[0] deactivates / activates it" = "[0] отключает / включает его"

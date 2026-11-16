@@ -384,7 +384,7 @@ void Player::endRecording (const Song& song, const ClipGrid& grid, TrackState& t
 void Player::launch (const Song& song, const ClipGrid& grid, const GridIndex& index, TrackState& t, int slot, double now) noexcept
 {
     const auto* clip = clipOfSlot (grid, index, slot);
-    if (clip == nullptr)
+    if (clip == nullptr || ! grid.slots[(std::size_t) slot].active) // (round 190im: a deactivated clip stays silent)
         return;
     const auto& settings = grid.slots[(std::size_t) slot];
     const auto from = nextGrid (now, slotQuant (song, grid, slot));

@@ -10159,3 +10159,6 @@ countries: de at ch li lu
 "Clip: [LMB] selects it, drag moves it ([Ctrl] copies)  [2xLMB] opens it  [RMB] clip menu" = "Clip: [LMB] wählt ihn, Ziehen verschiebt ihn ([Ctrl] kopiert)  [2xLMB] öffnet ihn  [RMB] Clip-Menü"
 "(Follow Action)" = "(Folgeaktion)"
 "Auto scrolling pauses on a scroll or an edit" = "Auto-Scrollen pausiert beim Scrollen oder Bearbeiten"
+"Deactivate Clip" = "Clip deaktivieren"
+"Activate Clip" = "Clip aktivieren"
+"[0] deactivates / activates it" = "[0] deaktiviert / aktiviert ihn"

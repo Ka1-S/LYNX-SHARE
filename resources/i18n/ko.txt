@@ -10159,3 +10159,6 @@ countries: kr
 "Clip: [LMB] selects it, drag moves it ([Ctrl] copies)  [2xLMB] opens it  [RMB] clip menu" = "클립: [LMB] 선택, 드래그로 이동 ([Ctrl] 복사)  [2xLMB] 열기  [RMB] 클립 메뉴"
 "(Follow Action)" = "(팔로우 액션)"
 "Auto scrolling pauses on a scroll or an edit" = "스크롤하거나 편집하면 자동 스크롤 일시 정지"
+"Deactivate Clip" = "클립 비활성화"
+"Activate Clip" = "클립 활성화"
+"[0] deactivates / activates it" = "[0] 비활성화 / 활성화"

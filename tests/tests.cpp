@@ -17805,3 +17805,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "PluginDrop190hfTests.inc" // issue #152 point 6: plugins dropped on the tracks (FL and Live layouts)
 #include "Rollup028Tests.inc" // round 190fv: semantic interactions of the 0.1.28 rollup
 #include "Design190igTests.inc" // round 190ig: automation clip colours (design190ia slice 3)
+#include "Details190imTests.inc" // round 190im: activity meter reader, deactivated grid clips, Live keys 0 / Ctrl+E

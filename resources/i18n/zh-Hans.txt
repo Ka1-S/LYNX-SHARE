@@ -10159,3 +10159,6 @@ countries: cn sg
 "Clip: [LMB] selects it, drag moves it ([Ctrl] copies)  [2xLMB] opens it  [RMB] clip menu" = "片段：[LMB] 选中，拖动可移动（[Ctrl] 复制）  [2xLMB] 打开  [RMB] 片段菜单"
 "(Follow Action)" = "（跟随动作）"
 "Auto scrolling pauses on a scroll or an edit" = "滚动或编辑时暂停自动滚动"
+"Deactivate Clip" = "停用片段"
+"Activate Clip" = "启用片段"
+"[0] deactivates / activates it" = "[0] 停用 / 启用"

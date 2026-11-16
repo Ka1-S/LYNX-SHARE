@@ -23,6 +23,7 @@
 #include "core/PaintTemplate.h"
 #include "core/ChainPresets.h"
 #include "core/ClipLauncher.h"
+#include "core/SessionKeys.h"
 
 #include "core/EventEdit.h"
 #include "ui/EventEditor.h"
@@ -6348,6 +6349,40 @@ void PlaylistComponent::mouseUp (const juce::MouseEvent& e)
     repaint();
 }
 
+// Round 190im (R12): Live's Split (Ctrl+E, its manual 6.6: "split a clip at the insert marker or at the boundaries of a
+// selection"): every selected clip is cut at the time selection's start and end that fall inside it, or at the playhead
+// when there is no time selection. One undo step; the pieces stay selected.
+void PlaylistComponent::splitSelectionForLive()
+{
+    const auto& song = engine.getSong();
+    std::vector<std::int64_t> at;
+    if (song.loopEnd > song.loopStart && song.loopStart >= 0)
+        at = { song.loopStart, song.loopEnd };
+    else
+        at = { (std::int64_t) std::llround (juce::jmax (0.0, playheadTick >= 0.0 ? playheadTick : engine.getTransport().positionTicks.load())) };
+    const auto targets = selection;
+    std::vector<int> pieces;
+    engine.editSong ([&targets, &at, &pieces] (Song& s) {
+        for (const auto index : targets)
+        {
+            if (index < 0 || index >= (int) s.playlist.size())
+                continue;
+            pieces.push_back (index);
+            auto part = index;
+            for (const auto tick : at)
+                if (tick > s.playlist[(std::size_t) part].start && tick < s.playlist[(std::size_t) part].end())
+                {
+                    s.playlist.push_back (splitClip (s.playlist[(std::size_t) part], tick)); // (the piece after the cut)
+                    part = (int) s.playlist.size() - 1;
+                    pieces.push_back (part);
+                }
+        }
+    });
+    setSelection ({});
+    setSelection (pieces);
+    sortClips();
+}
+
 void PlaylistComponent::cutWithKnife (juce::Point<int> from, juce::Point<int> to, bool snapOn)
 {
     const auto& playlist = engine.getSong().playlist;
@@ -10029,6 +10064,15 @@ bool PlaylistComponent::handleKey (const juce::KeyPress& key)
     if (code == juce::KeyPress::backspaceKey)
     {
         EditorGlobals::get().toggleGrid();
+        return true;
+    }
+
+    // round 190im (R12): Live's Split (Ctrl+E), only in the Clip-launch layout (core/SessionKeys.h; elsewhere Ctrl+E
+    // stays FL's Step edit): the selected clips are cut at the time selection's edges, or at the playhead without one
+    if (cmd && ! mods.isShiftDown() && ! mods.isAltDown() && letter == 'E' && sessionkeys::defaultKeyActs (sessionkeys::Command::splitClips)
+        && ! selection.empty())
+    {
+        splitSelectionForLive();
         return true;
     }
 

@@ -132,6 +132,7 @@ public:
 
     // Editing shortcuts; the main window forwards keys when the Playlist is visible.
     bool handleKey (const juce::KeyPress& key);
+    void splitSelectionForLive(); // round 190im (R12): Live's Ctrl+E Split of the selected clips
     // The key map's actions of this editor (its tools and single letters: "pianoRoll.tool.knife"...); false if not one.
     bool runKeyAction (const std::string& id);
     // The tool buttons' tooltips show the keys the key map gives them (`keyOf`: action id -> key text, "" = none).
