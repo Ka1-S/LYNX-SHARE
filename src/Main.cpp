@@ -27189,14 +27189,32 @@ private:
                     for (int k = 0; k < 6; ++k)
                     {
                         lynx::Note n;
-                        n.channel = p == 1 ? 0 : channels + p; // (Bassline: the selected channel, the docked Piano roll's)
-                        n.key = (p == 0 ? 36 : p == 1 ? 86 : 48) + (k * 5) % 12 + p * 2;
+                        n.channel = channels + p;
+                        n.key = (p == 0 ? 36 : 48) + (k * 5) % 12 + p * 2;
                         n.start = (std::int64_t) k * lynx::ppq / 2;
                         n.length = lynx::ppq / 2;
                         n.velocity = 0.55f + 0.07f * (float) k;
                         pattern.notes.push_back (n);
                     }
                     pattern.lengthTicks = 4 * lynx::ppq;
+                }
+                // a "Lead" clip on the FX track for the Clip View's MIDI shot: notes of the first channel (the rack's selected
+                // one, which the docked Piano roll shows) in the Piano roll's opening rows
+                {
+                    lynx::Pattern lead;
+                    lead.name = "Lead";
+                    for (int k = 0; k < 6; ++k)
+                    {
+                        lynx::Note n;
+                        n.channel = 0;
+                        n.key = 86 + (k * 5) % 12;
+                        n.start = (std::int64_t) k * lynx::ppq / 2;
+                        n.length = lynx::ppq / 2;
+                        n.velocity = 0.55f + 0.07f * (float) k;
+                        lead.notes.push_back (n);
+                    }
+                    lead.lengthTicks = 4 * lynx::ppq;
+                    s.patterns.push_back (lead);
                 }
                 s.playlistTracks.resize (std::max<std::size_t> (s.playlistTracks.size(), 8));
                 const char* tracks[] { "Drums", "Bass", "Keys", "Vox", "Loop", "FX" };
@@ -27217,6 +27235,12 @@ private:
                             clip.length = 4 * lynx::ppq;
                             lynx::launcher::setClip (s, t, r, clip);
                         }
+                {
+                    lynx::Clip lead;
+                    lead.pattern = (int) s.patterns.size() - 1;
+                    lead.length = 4 * lynx::ppq;
+                    lynx::launcher::setClip (s, 5, 0, lead);
+                }
                 if (audioChannel >= 0)
                 {
                     lynx::clipsample::setWarp (s, audioChannel, true, 4.0);
@@ -27337,7 +27361,7 @@ private:
             detail->toggleInfoView();
 
             // ---- 17: the Clip View: a MIDI clip, then the audio clip at three detail heights --------------------------
-            detail->showSelection (1, 1);
+            detail->showSelection (5, 0); // (the FX track's Lead clip)
             detail->setPage (lynx::DetailView::Page::clip);
             settle();
             ui.resized();
