@@ -12628,13 +12628,9 @@ private:
                     if (command.startsWith ("shot "))
                     {
                         frame.setSize (panel->getWidth(), panel->getHeight());
-                        juce::Image image (juce::Image::ARGB, frame.getWidth(), frame.getHeight(), true);
-                        {
-                            juce::Graphics g (image);
-                            g.fillAll (lynx::theme::panel);
-                            frame.paintEntireComponent (g, false);
-                        }
-                        const juce::File file (prefix + command.fromFirstOccurrenceOf (" ", false, false).trim() + ".png");
+                        // (round 190jd: at the shot scale, --shot-scale / LYNX_SHOT_SCALE, with its suffix; scale 1 = the same pixels)
+                        const auto image = lynx::shot::paint (frame, lynx::theme::panel);
+                        const auto file = lynx::shot::file (juce::File (prefix + command.fromFirstOccurrenceOf (" ", false, false).trim() + ".png"));
                         file.deleteFile();
                         juce::PNGImageFormat png;
                         if (auto out = file.createOutputStream())

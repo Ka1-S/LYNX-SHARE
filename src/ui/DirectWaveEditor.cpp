@@ -6,6 +6,7 @@
 
 #include "core/DirectWave.h"
 #include "core/DirectWaveState.h"
+#include "core/DirectWaveZoneDrag.h"
 #include "core/FlpImport.h"
 #include "core/Instruments.h"
 #include "core/Song.h"
@@ -371,7 +372,8 @@ public:
     // ---- the editor test (LYNX --dwedittest): "page zone|sample|program", "tab main|time|trigger|filter1|filter2|amp|
     // env1|env2|lfo1|lfo2|matrix1…4", "side browser|options", "select <i>", "add <file>", "automap", "drumkit",
     // "delete", "duplicate", "set <field> <value>" (root, low, high, lowvel, highvel, gain, pan, pitch, loop), "program
-    // <next|prev|n>", "name <text>", "save <file.dwp>", "open <file>", "state" (what the state holds)
+    // <next|prev|n>", "name <text>", "save <file.dwp>", "open <file>", "state" (what the state holds), "mapdrag <key> <vel>
+    // <dkeys> <dvel> [alt|ctrl|ctrlalt]" (a drag in the zone map from that key / velocity; round 190jd)
     juce::String test (const juce::String& command)
     {
         const auto word = command.upToFirstOccurrenceOf (" ", false, false).trim();
@@ -450,6 +452,25 @@ public:
             return openFile (juce::File (arg)) ? "OK" : "FAILED";
         if (word == "state")
             return zonesText();
+        if (word == "mapdrag") // (round 190jd) mapdrag <key> <vel> <dkeys> <dvel> [alt|ctrl|ctrlalt]: a left drag in the zone map
+        {
+            const auto a = juce::StringArray::fromTokens (arg, " ", "");
+            const auto from = juce::Point<float> (keyMap.keyX (a[0].getIntValue()) + 0.5f * (keyMap.keyX (1) - keyMap.keyX (0)),
+                                                  keyMap.velY (a[1].getIntValue()) + 0.5f * keyMap.velY (1));
+            const auto to = from + juce::Point<float> (keyMap.keyX (a[2].getIntValue()) - keyMap.keyX (0), keyMap.velY (a[3].getIntValue()) - keyMap.velY (0));
+            const auto mods = juce::ModifierKeys::leftButtonModifier | (a[4].contains ("alt") ? juce::ModifierKeys::altModifier : 0)
+                              | (a[4].startsWith ("ctrl") ? juce::ModifierKeys::ctrlModifier : 0);
+            auto ev = [&] (juce::Point<float> p, bool dragged) {
+                const auto now = juce::Time::getCurrentTime();
+                return juce::MouseEvent (juce::Desktop::getInstance().getMainMouseSource(), p, juce::ModifierKeys (mods), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, &keyMap,
+                                         &keyMap, now, from, now, 1, dragged);
+            };
+            keyMap.mouseDown (ev (from, false));
+            for (int i = 1; i <= 4; ++i)
+                keyMap.mouseDrag (ev (from + (to - from) * ((float) i / 4.0f), true));
+            keyMap.mouseUp (ev (to, true));
+            return zonesText();
+        }
         return "unknown command";
     }
 
@@ -619,7 +640,7 @@ private:
         grid.owner = this;
         addAndMakeVisible (keyMap);
         keyMap.owner = this;
-        ui::setHint (keyMap, tr ("Zone map: drag a zone to move it, its edges to change its keys and velocities"));
+        ui::setHint (keyMap, tr ("Zone map: drag a zone to move its keys and velocities (Alt: the root too), its corner squares to resize it"));
         button (toggleKeyMap, juce::String::fromUTF8 ("\xe2\x86\x95"), tr ("Maximize/Minimize zone editor"), [this] {
             zoneEditorBig = ! zoneEditorBig;
             resized();
@@ -2202,7 +2223,8 @@ private:
     struct KeyMap final : public juce::Component
     {
         DirectWaveEditor* owner = nullptr;
-        int dragZone = -1, dragEdge = 0; // 0 body, 1 low key, 2 high key, 3 low vel, 4 high vel
+        int dragZone = -1;
+        dw::ZoneHandle dragHandle = dw::ZoneHandle::body; // FL: the box moves the zone, two corner squares resize
         dw::Zone before;
         juce::Point<int> from;
 
@@ -2250,6 +2272,13 @@ private:
                 g.drawRect (r, i == owner->currentZone ? 2.0f : 1.0f);
                 // the root key mark
                 g.fillRect (juce::Rectangle<float>::leftTopRightBottom (keyX (z.root), r.getY(), keyX (z.root + 1), r.getY() + 4.0f));
+                // FL's two resize squares on the current zone: upper-left = L-Key + L-Vel, lower-right = H-Key + H-Vel
+                if (i == owner->currentZone)
+                {
+                    g.setColour (theme::colour::textPrimary);
+                    g.fillRect (cornerSquare (r.getTopLeft()));
+                    g.fillRect (cornerSquare (r.getBottomRight()));
+                }
                 // the name runs upwards through the box, in lower case (as FL draws it)
                 if (r.getWidth() > 10.0f)
                 {
@@ -2264,16 +2293,23 @@ private:
             }
         }
 
-        int edgeAt (const dw::Zone& z, juce::Point<int> p) const
+        juce::Rectangle<float> cornerSquare (juce::Point<float> c) const
         {
+            const auto side = std::max (4.0f, std::round (4.0f * scale));
+            return juce::Rectangle<float> (side, side).withCentre (c);
+        }
+
+        // -1 = not on this zone; otherwise the handle under p (the corner squares exist on the current zone only)
+        int handleAt (int index, juce::Point<int> p) const
+        {
+            const auto& z = owner->prog.zones[(std::size_t) index];
             const auto r = box (z);
-            if (! r.expanded (3.0f).contains (p.toFloat()))
-                return -1;
-            if (std::abs ((float) p.x - r.getX()) < 4.0f) return 1;
-            if (std::abs ((float) p.x - r.getRight()) < 4.0f) return 2;
-            if (std::abs ((float) p.y - r.getY()) < 4.0f) return 3;
-            if (std::abs ((float) p.y - r.getBottom()) < 4.0f) return 4;
-            return 0;
+            if (index == owner->currentZone)
+            {
+                if (cornerSquare (r.getTopLeft()).expanded (2.0f).contains (p.toFloat())) return (int) dw::ZoneHandle::lowCorner;
+                if (cornerSquare (r.getBottomRight()).expanded (2.0f).contains (p.toFloat())) return (int) dw::ZoneHandle::highCorner;
+            }
+            return r.expanded (1.0f).contains (p.toFloat()) ? (int) dw::ZoneHandle::body : -1;
         }
 
         void mouseDown (const juce::MouseEvent& e) override
@@ -2289,14 +2325,20 @@ private:
                     order.push_back (i);
             for (const auto i : order)
             {
-                const auto edge = edgeAt (zones[(std::size_t) i], e.getPosition());
-                if (edge >= 0)
+                const auto handle = handleAt (i, e.getPosition());
+                if (handle >= 0)
                 {
                     dragZone = i;
-                    dragEdge = edge;
+                    dragHandle = (dw::ZoneHandle) handle;
                     before = zones[(std::size_t) i];
                     from = e.getPosition();
-                    owner->selectZone (i, e.mods.isCtrlDown(), e.mods.isShiftDown());
+                    // FL: Shift+click adds a zone to the selection; Ctrl / Alt are drag modifiers, not selection ones;
+                    // a plain click on a zone of a multi-selection keeps the selection
+                    const auto keep = i < (int) owner->selected.size() && owner->selected[(std::size_t) i] && ! e.mods.isShiftDown();
+                    if (keep)
+                        owner->currentZone = i, owner->refresh();
+                    else
+                        owner->selectZone (i, e.mods.isShiftDown(), false);
                     break;
                 }
             }
@@ -2311,21 +2353,8 @@ private:
             auto& z = owner->prog.zones[(std::size_t) dragZone];
             const auto dk = juce::roundToInt ((float) (e.x - from.x) / (float) getWidth() * 128.0f);
             const auto dv = juce::roundToInt ((float) (e.y - from.y) / (float) getHeight() * 128.0f);
-            z = before;
-            switch (dragEdge)
-            {
-                case 0:
-                {
-                    const auto k = std::clamp (dk, -before.lowKey, 127 - before.highKey);
-                    z.lowKey += k; z.highKey += k; z.root = std::clamp (z.root + k, 0, 127);
-                    break;
-                }
-                case 1: z.lowKey = std::clamp (before.lowKey + dk, 0, z.highKey); break;
-                case 2: z.highKey = std::clamp (before.highKey + dk, z.lowKey, 127); break;
-                case 3: z.lowVel = std::clamp (before.lowVel + dv, 0, z.highVel); break;
-                case 4: z.highVel = std::clamp (before.highVel + dv, z.lowVel, 127); break;
-                default: break;
-            }
+            // FL: Alt and Ctrl+Alt move the root with the keys; a plain or Ctrl drag moves the keys only
+            z = dw::dragZone (before, dragHandle, dk, dv, e.mods.isAltDown());
             repaint();
             owner->grid.repaint();
         }
@@ -2339,13 +2368,15 @@ private:
 
         void mouseMove (const juce::MouseEvent& e) override
         {
-            int edge = -1;
-            for (const auto& z : owner->prog.zones)
-                if ((edge = edgeAt (z, e.getPosition())) >= 0)
-                    break;
-            setMouseCursor (edge == 1 || edge == 2 ? juce::MouseCursor::LeftRightResizeCursor
-                            : edge == 3 || edge == 4 ? juce::MouseCursor::UpDownResizeCursor
-                            : edge == 0 ? juce::MouseCursor::DraggingHandCursor : juce::MouseCursor::NormalCursor);
+            int handle = -1;
+            const auto n = (int) owner->prog.zones.size();
+            if (owner->currentZone >= 0 && owner->currentZone < n)
+                handle = handleAt (owner->currentZone, e.getPosition());
+            for (int i = n - 1; handle < 0 && i >= 0; --i)
+                handle = handleAt (i, e.getPosition());
+            setMouseCursor (handle == (int) dw::ZoneHandle::lowCorner ? juce::MouseCursor::TopLeftCornerResizeCursor
+                            : handle == (int) dw::ZoneHandle::highCorner ? juce::MouseCursor::BottomRightCornerResizeCursor
+                            : handle == (int) dw::ZoneHandle::body ? juce::MouseCursor::DraggingHandCursor : juce::MouseCursor::NormalCursor);
         }
     };
 
