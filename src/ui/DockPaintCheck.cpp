@@ -184,7 +184,7 @@ Check::~Check() = default;
 
 int Check::count()
 {
-    return 15;
+    return 17;
 }
 
 juce::String Check::step (int index)
@@ -199,7 +199,7 @@ juce::String Check::step (int index)
         out << s.expect ("setup", false, why);
         return out;
     };
-    if (index > 0 && index < 14 && s.gb == nullptr)
+    if (index > 0 && index < 16 && s.gb == nullptr)
         return index == 1 ? bail ("no Gross Beat window") : juce::String();
     if (index >= 5 && index < 13 && s.anchor() == nullptr)
         return s.expect ("still_in_main_window_at_step_" + juce::String (index), false);
@@ -425,10 +425,37 @@ juce::String Check::step (int index)
         }
         case 13:
         {
-            s.gb->closeButtonPressed();
+            // the editor in front of the Playlist while the song plays: the Playlist's playhead (on the GPU overlay of the
+            // Playlist's own window) must not show inside the editor (the hole clips the overlay as it clips the frames)
+            ws.show (workspace::Panel::playlist);
+            s.gb->toFront (true);
+            s.engine.getTransport().songMode = true;
+            s.engine.play();
             break;
         }
         case 14:
+        {
+            juce::Image last;
+            int moving = 0;
+            for (int i = 0; i < 4; ++i)
+            {
+                auto now = s.capture();
+                if (last.isValid())
+                    moving += State::differingPixels (last, now);
+                last = now;
+                juce::Thread::sleep (40);
+            }
+            s.save (last, "gb-over-playlist-playing.png");
+            out << "dockcheck_over_playlist_playing_shot=" << (last.isValid() ? "saved" : "none") << " (changing px across 4 shots: " << moving << ")\n";
+            s.engine.stop();
+            break;
+        }
+        case 15:
+        {
+            s.gb->closeButtonPressed();
+            break;
+        }
+        case 16:
         {
             bool cleared = ws.editorWindows().empty();
             for (auto* c : nativechild::attachedChildren (s.mainHandle()))

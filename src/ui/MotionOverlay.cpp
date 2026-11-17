@@ -511,9 +511,9 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
                     return Cover::part;
         }
         const auto areaPhys = (top.getLocalArea (&owner, area).toDouble() * topScale).getSmallestIntegerContainer();
-        // round 190jy: the view's window has a hole there (a docked editor drawn by the main window is in front of it)
-        if (nativechild::cutsInto (hwnd, areaPhys))
-            return Cover::part;
+        // (round 190jy: a hole in the view's own window — a docked editor the main window draws is in front of it — needs
+        // nothing here: the window's region clips its topmost target as it clips its frames. Falling back to the repaint
+        // path there made a Playlist behind the maximised Channel rack repaint its playhead at the display's rate.)
         for (auto child = GetWindow (hwnd, GW_CHILD); child != nullptr; child = GetWindow (child, GW_HWNDNEXT))
         {
             if (! IsWindowVisible (child))
