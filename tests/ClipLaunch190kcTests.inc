@@ -4,6 +4,7 @@
 #include "core/Crossfader.h"
 #include "core/SessionMixer.h"
 #include "core/RemoteMap.h"
+#include "core/SessionRing.h"
 
 namespace kc190
 {
@@ -279,4 +280,20 @@ TEST (cliplaunch190kc_cancel_launch_drops_waiting_launches)
     using namespace lynx;
     // the command exists after every older one (saved nowhere, but the enum's order stays)
     CHECK ((int) launcher::Command::Type::cancelLaunch > (int) launcher::Command::Type::recordEnd);
+}
+
+TEST (cliplaunch190kc_session_ring_model)
+{
+    using namespace lynx::sessionring;
+    Ring r; // 8 x 5 at the top left
+    CHECK (contains (r, 0, 0) && contains (r, 7, 4) && ! contains (r, 8, 0) && ! contains (r, 0, 5));
+    // kept inside a 15-track, 13-scene grid (the Patience set)
+    CHECK (moved (r, 100, 100, 15, 13) == Ring ({ 7, 8, 8, 5 }));
+    CHECK (moved (r, -3, -3, 15, 13) == Ring ({ 0, 0, 8, 5 }));
+    CHECK (paged (r, 1, 1, 15, 13) == Ring ({ 7, 5, 8, 5 }));
+    int t = -1, sc = -1;
+    CHECK (slotOf (Ring ({ 2, 3, 8, 5 }), 1, 4, t, sc) && t == 3 && sc == 7);
+    CHECK (! slotOf (r, 8, 0, t, sc));
+    CHECK (reveal (r, 10, 6, 15, 13) == Ring ({ 3, 2, 8, 5 }));
+    CHECK (clamped (Ring ({ 4, 4, 8, 5 }), 3, 2) == Ring ({ 0, 0, 8, 5 })); // (a grid smaller than the ring)
 }
