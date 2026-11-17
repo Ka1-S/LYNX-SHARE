@@ -10769,26 +10769,6 @@ countries: tr
 "CURVE" = "EĞRİ"
 "Display: FL's scrolling graph or LYNX's transfer curve  [LMB] switch (kept for this effect)" = "Ekran: FL'in kayan grafiği ya da LYNX'in aktarım eğrisi  [LMB] değiştir (bu efekt için saklanır)"
 
-# --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
-"Hide collapsed grouped tracks" = "Daraltılmış gruplanmış izleri gizle"
-"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "İz: [LMB] sustur / sesi aç  [Ctrl][LMB] veya [RMB] solo  [Alt][LMB] grubu sustur  [Alt][RMB] grubu solo"
-"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "İz: [LMB] seç  [Ctrl][LMB] ekle / çıkar  [Ctrl] sürükle: klipleriyle birlikte izler  [Shift][LMB] aralık  [RMB] menü  [2xLMB] klibin kaynağını aç  [Shift][Wheel] yukarı / aşağı taşı  [Alt] sürükle: bir gruba sok / gruptan çıkar"
-"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "İz grubuyla birlikte taşınıyor  [Alt] sağa / sola sürükle: daha içe / grubun dışına"
-"In a group, level {0}" = "Bir grupta, seviye {0}"
-"Not in a group" = "Grupta değil"
-"Nest under the track above (a group in the group)" = "Üstteki izin altına yerleştir (grup içinde grup)"
-"Move out of its group (one level up)" = "Grubundan çıkar (bir seviye yukarı)"
-"Hiding collapsed tracks" = "Daraltılmış izleri gizleme"
-"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "Bu seçenek Playlist'teki daraltılmış izleri gizler. Üst iz, gizli izleri açmak için aşağı ok simgesi gösterir. Devam edilsin mi?"
-# --- Round 190jf: B22 DAWproject import / export
-"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
-"(imported from DAWproject)" = "(DAWproject'ten içe aktarıldı)"
-"Export DAWproject" = "DAWproject olarak dışa aktar"
-"The DAWproject file could not be written" = "DAWproject dosyası yazılamadı"
-"Everything went over to the DAWproject file." = "Her şey DAWproject dosyasına aktarıldı."
-"Not carried over or approximated:" = "Aktarılmayan veya yaklaşık aktarılan:"
-"... and {0} more" = "... ve {0} tane daha"
-
 # --- Round 190iu: issues #186 (wheel zones) and #191 (temporary tools, MIDI drops, lanes, Track-only mode, takes)
 "Wheel: scroll over the track headers, zoom over the arrangement" = "Tekerlek: iz başlıkları üzerinde kaydır, aranjman üzerinde yakınlaştır"
 "Hold a tool key for a temporary tool" = "Geçici araç için bir araç tuşunu basılı tut"
@@ -10816,6 +10796,28 @@ countries: tr
 "MIDI file {0}: a clip of pattern \"{1}\"" = "MIDI dosyası {0}: \"{1}\" pattern'inin bir klibi"
 "Delete (its clips and its channel)" = "Sil (klipleri ve kanalıyla)"
 "Delete (with its {0} clips)" = "Sil ({0} klibiyle)"
+
+# --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
+"Hide collapsed grouped tracks" = "Daraltılmış gruplanmış izleri gizle"
+"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "İz: [LMB] sustur / sesi aç  [Ctrl][LMB] veya [RMB] solo  [Alt][LMB] grubu sustur  [Alt][RMB] grubu solo"
+"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "İz: [LMB] seç  [Ctrl][LMB] ekle / çıkar  [Ctrl] sürükle: klipleriyle birlikte izler  [Shift][LMB] aralık  [RMB] menü  [2xLMB] klibin kaynağını aç  [Shift][Wheel] yukarı / aşağı taşı  [Alt] sürükle: bir gruba sok / gruptan çıkar"
+"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "İz grubuyla birlikte taşınıyor  [Alt] sağa / sola sürükle: daha içe / grubun dışına"
+"In a group, level {0}" = "Bir grupta, seviye {0}"
+"Not in a group" = "Grupta değil"
+"Nest under the track above (a group in the group)" = "Üstteki izin altına yerleştir (grup içinde grup)"
+"Move out of its group (one level up)" = "Grubundan çıkar (bir seviye yukarı)"
+"Hiding collapsed tracks" = "Daraltılmış izleri gizleme"
+"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "Bu seçenek Playlist'teki daraltılmış izleri gizler. Üst iz, gizli izleri açmak için aşağı ok simgesi gösterir. Devam edilsin mi?"
+# --- Round 190jf: B22 DAWproject import / export
+"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
+"(imported from DAWproject)" = "(DAWproject'ten içe aktarıldı)"
+"Export DAWproject" = "DAWproject olarak dışa aktar"
+"The DAWproject file could not be written" = "DAWproject dosyası yazılamadı"
+"Everything went over to the DAWproject file." = "Her şey DAWproject dosyasına aktarıldı."
+"Not carried over or approximated:" = "Aktarılmayan veya yaklaşık aktarılan:"
+"... and {0} more" = "... ve {0} tane daha"
+
+# --- Round 190iu: issues #186 (wheel zones) and #191 (temporary tools, MIDI drops, lanes, Track-only mode, takes)
 
 # --- rollup 0.1.30 step 4: Save a copy for 0.1.28 knows rounds 190jh / 190jl / 190jg / 190jf / 190jd
 "Facet EQ's automatic dynamic thresholds play with the bands' manual threshold: {0}" = "Facet EQ'nun otomatik dinamik eşikleri bantların elle ayarlanan eşiğiyle çalar: {0}"
@@ -10869,3 +10871,19 @@ countries: tr
 "Pitch & Time" = "Perde ve Zaman"
 "Bar : Step : Tick" = "Ölçü : Step : Tik"
 "Time: bar : step : tick" = "Zaman: ölçü : step : tik"
+# --- round 190jq: Playlist header width (#164), pointer click (#191), automation clip lanes (#191.3)
+"Pointer click: a click on an empty spot selects and moves the song position; a double click places the clip (LYNX)" = "İşaretçi tıklaması: boş bir yere tıklamak seçer ve şarkı konumunu taşır; çift tıklama klibi yerleştirir (LYNX)"
+"Click on an empty spot selects and moves the song position (pointer click)" = "Boş bir yere tıklamak seçer ve şarkı konumunu taşır (işaretçi tıklaması)"
+"Track header width" = "Parça başlıklarının genişliği"
+"Track header width: [LMB] drag  [2xLMB] FL's width" = "Parça başlıklarının genişliği: [LMB] sürükle  [2xLMB] FL genişliği"
+"Automation lane: [LMB] song position  [LMB] drag: select  (its clips: drag left / right)" = "Otomasyon şeridi: [LMB] şarkı konumu  [LMB] sürükle: seç  (klipleri: sola / sağa sürükle)"
+"Pointer click: [LMB] song position and deselect  [LMB] drag: select  [2xLMB] place the clip" = "İşaretçi tıklaması: [LMB] şarkı konumu ve seçimi kaldır  [LMB] sürükle: seç  [2xLMB] klibi yerleştir"
+"Automation clips as lanes under their tracks" = "Otomasyon klipleri parçalarının altında şerit olarak"
+"Drag the track header column's right edge to widen it" = "Genişletmek için parça başlığı sütununun sağ kenarını sürükle"
+"Pointer click (a click on an empty spot selects and moves the song position) on/off" = "İşaretçi tıklaması (boş bir yere tıklamak seçer ve şarkı konumunu taşır) aç/kapat"
+"Automation clips as lanes under their tracks on/off" = "Otomasyon klipleri parçalarının altında şerit olarak aç/kapat"
+"Drag the track header column's right edge to widen it on/off" = "Genişletmek için parça başlığı sütununun sağ kenarını sürükle aç/kapat"
+"Pointer click switch in the Playlist toolbar" = "Playlist araç çubuğunda işaretçi tıklaması anahtarı"
+"FL keeps the track header column at a fixed width. With this on, drag the column's right edge to make the headers wider (a double click there goes back to FL's width); the width is kept for every project. Also in the Playlist menu." = "FL parça başlığı sütununu sabit genişlikte tutar. Bu açıkken başlıkları genişletmek için sütunun sağ kenarını sürükleyin (orada çift tıklama FL genişliğine döner); genişlik tüm projeler için saklanır. Ayrıca Playlist menüsünde."
+"A switch beside Stretch: while it is lit, a click on an empty spot with the Pencil or the Brush deselects and moves the song position there, a drag draws a selection box (as FL's Select tool), and a double click places the clip. Also in the Playlist menu." = "Esnet'in yanında bir anahtar: yanarken, Kalem veya Fırça ile boş bir yere tıklamak seçimi kaldırır ve şarkı konumunu oraya taşır, sürüklemek bir seçim kutusu çizer (FL'nin Seç aracı gibi) ve çift tıklama klibi yerleştirir. Ayrıca Playlist menüsünde."
+"A track that holds only automation clips of one instrument (or of a linked mixer track) is drawn right under that instrument's track, as a lane that folds with the track's arrow; the clips stay clips on their own tracks. On by default in the Clip-launch layout, as Live's lanes. Also in the Playlist menu." = "Yalnızca bir enstrümanın (veya bağlı bir mikser parçasının) otomasyon kliplerini içeren bir parça, o enstrümanın parçasının hemen altında, parçanın okuyla katlanan bir şerit olarak çizilir; klipler kendi parçalarında klip olarak kalır. Live'ın şeritleri gibi Clip-launch düzeninde varsayılan olarak açık. Ayrıca Playlist menüsünde."

@@ -312,6 +312,10 @@ std::vector<Action> makeActions()
         // LYNX extra (round 190iu, issue #186): the wheel scrolls over the track headers and zooms over the arrangement
         { "playlist.wheelZones", TR_NOOP ("Wheel: scroll over the track headers, zoom over the arrangement on/off"), Context::playlist, {} },
         { "editing.tempTools", TR_NOOP ("Hold a tool key for a temporary tool on/off"), Context::playlist, {} },
+        // LYNX extras (round 190jq: issues #191, #191.3, #164)
+        { "playlist.pointerClick", TR_NOOP ("Pointer click (a click on an empty spot selects and moves the song position) on/off"), Context::playlist, {} },
+        { "playlist.clipLanes", TR_NOOP ("Automation clips as lanes under their tracks on/off"), Context::playlist, {} },
+        { "playlist.headerWidth", TR_NOOP ("Drag the track header column's right edge to widen it on/off"), Context::playlist, {} },
         { "playlist.midiDrop", TR_NOOP ("MIDI files dropped on the Playlist become pattern clips on/off"), Context::playlist, {} },
         { "playlist.clipsToLanes", TR_NOOP ("Move automation clips into their tracks' lanes"), Context::playlist, {} },
         { "layout.trackOnly", TR_NOOP ("Track-only mode on/off"), Context::playlist, {} },

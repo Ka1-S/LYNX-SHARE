@@ -10769,26 +10769,6 @@ countries: nl be
 "CURVE" = "CURVE"
 "Display: FL's scrolling graph or LYNX's transfer curve  [LMB] switch (kept for this effect)" = "Weergave: de scrollende grafiek van FL of de overdrachtscurve van LYNX  [LMB] wisselen (bewaard voor dit effect)"
 
-# --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
-"Hide collapsed grouped tracks" = "Ingeklapte gegroepeerde tracks verbergen"
-"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "Track: [LMB] mute / unmute  [Ctrl][LMB] of [RMB] solo  [Alt][LMB] groep muten  [Alt][RMB] groep solo"
-"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "Track: [LMB] selecteren  [Ctrl][LMB] toevoegen / weghalen  [Ctrl] slepen: tracks met hun clips  [Shift][LMB] bereik  [RMB] menu  [2xLMB] bron van de clip openen  [Shift][Wheel] omhoog / omlaag verplaatsen  [Alt] slepen: in / uit een groep"
-"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "Track wordt met zijn groep verplaatst  [Alt] naar rechts / links slepen: dieper / uit de groep"
-"In a group, level {0}" = "In een groep, niveau {0}"
-"Not in a group" = "Niet in een groep"
-"Nest under the track above (a group in the group)" = "Onder de track erboven nesten (een groep in de groep)"
-"Move out of its group (one level up)" = "Uit zijn groep halen (een niveau hoger)"
-"Hiding collapsed tracks" = "Ingeklapte tracks verbergen"
-"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "Deze optie verbergt ingeklapte Playlist-tracks. De bovenliggende track toont een pijl omlaag om de verborgen tracks te openen. Doorgaan?"
-# --- Round 190jf: B22 DAWproject import / export
-"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
-"(imported from DAWproject)" = "(geïmporteerd uit DAWproject)"
-"Export DAWproject" = "DAWproject exporteren"
-"The DAWproject file could not be written" = "Het DAWproject-bestand kon niet worden geschreven"
-"Everything went over to the DAWproject file." = "Alles is meegegaan naar het DAWproject-bestand."
-"Not carried over or approximated:" = "Niet meegenomen of benaderd:"
-"... and {0} more" = "... en nog {0}"
-
 # --- Round 190iu: issues #186 (wheel zones) and #191 (temporary tools, MIDI drops, lanes, Track-only mode, takes)
 "Wheel: scroll over the track headers, zoom over the arrangement" = "Muiswiel: scrollen boven de trackkoppen, zoomen boven het arrangement"
 "Hold a tool key for a temporary tool" = "Houd de toets van een gereedschap ingedrukt voor tijdelijk gebruik"
@@ -10816,6 +10796,28 @@ countries: nl be
 "MIDI file {0}: a clip of pattern \"{1}\"" = "MIDI-bestand {0}: een clip van pattern \"{1}\""
 "Delete (its clips and its channel)" = "Verwijderen (met zijn clips en kanaal)"
 "Delete (with its {0} clips)" = "Verwijderen (met zijn {0} clips)"
+
+# --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
+"Hide collapsed grouped tracks" = "Ingeklapte gegroepeerde tracks verbergen"
+"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "Track: [LMB] mute / unmute  [Ctrl][LMB] of [RMB] solo  [Alt][LMB] groep muten  [Alt][RMB] groep solo"
+"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "Track: [LMB] selecteren  [Ctrl][LMB] toevoegen / weghalen  [Ctrl] slepen: tracks met hun clips  [Shift][LMB] bereik  [RMB] menu  [2xLMB] bron van de clip openen  [Shift][Wheel] omhoog / omlaag verplaatsen  [Alt] slepen: in / uit een groep"
+"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "Track wordt met zijn groep verplaatst  [Alt] naar rechts / links slepen: dieper / uit de groep"
+"In a group, level {0}" = "In een groep, niveau {0}"
+"Not in a group" = "Niet in een groep"
+"Nest under the track above (a group in the group)" = "Onder de track erboven nesten (een groep in de groep)"
+"Move out of its group (one level up)" = "Uit zijn groep halen (een niveau hoger)"
+"Hiding collapsed tracks" = "Ingeklapte tracks verbergen"
+"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "Deze optie verbergt ingeklapte Playlist-tracks. De bovenliggende track toont een pijl omlaag om de verborgen tracks te openen. Doorgaan?"
+# --- Round 190jf: B22 DAWproject import / export
+"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
+"(imported from DAWproject)" = "(geïmporteerd uit DAWproject)"
+"Export DAWproject" = "DAWproject exporteren"
+"The DAWproject file could not be written" = "Het DAWproject-bestand kon niet worden geschreven"
+"Everything went over to the DAWproject file." = "Alles is meegegaan naar het DAWproject-bestand."
+"Not carried over or approximated:" = "Niet meegenomen of benaderd:"
+"... and {0} more" = "... en nog {0}"
+
+# --- Round 190iu: issues #186 (wheel zones) and #191 (temporary tools, MIDI drops, lanes, Track-only mode, takes)
 
 # --- rollup 0.1.30 step 4: Save a copy for 0.1.28 knows rounds 190jh / 190jl / 190jg / 190jf / 190jd
 "Facet EQ's automatic dynamic thresholds play with the bands' manual threshold: {0}" = "De automatische dynamische drempels van Facet EQ spelen met de handmatige drempel van de banden: {0}"
@@ -10869,3 +10871,19 @@ countries: nl be
 "Pitch & Time" = "Toonhoogte & tijd"
 "Bar : Step : Tick" = "Maat : Step : Tik"
 "Time: bar : step : tick" = "Tijd: maat : step : tik"
+# --- round 190jq: Playlist header width (#164), pointer click (#191), automation clip lanes (#191.3)
+"Pointer click: a click on an empty spot selects and moves the song position; a double click places the clip (LYNX)" = "Aanwijzerklik: een klik op een lege plek selecteert en verplaatst de songpositie; een dubbelklik plaatst de clip (LYNX)"
+"Click on an empty spot selects and moves the song position (pointer click)" = "Klik op een lege plek selecteert en verplaatst de songpositie (aanwijzerklik)"
+"Track header width" = "Breedte van de trackkoppen"
+"Track header width: [LMB] drag  [2xLMB] FL's width" = "Breedte van de trackkoppen: [LMB] slepen  [2xLMB] FL-breedte"
+"Automation lane: [LMB] song position  [LMB] drag: select  (its clips: drag left / right)" = "Automatiseringsbaan: [LMB] songpositie  [LMB] slepen: selecteren  (de clips: naar links / rechts slepen)"
+"Pointer click: [LMB] song position and deselect  [LMB] drag: select  [2xLMB] place the clip" = "Aanwijzerklik: [LMB] songpositie en deselecteren  [LMB] slepen: selecteren  [2xLMB] clip plaatsen"
+"Automation clips as lanes under their tracks" = "Automatiseringsclips als banen onder hun tracks"
+"Drag the track header column's right edge to widen it" = "Sleep de rechterrand van de kolom met trackkoppen om die breder te maken"
+"Pointer click (a click on an empty spot selects and moves the song position) on/off" = "Aanwijzerklik (een klik op een lege plek selecteert en verplaatst de songpositie) aan/uit"
+"Automation clips as lanes under their tracks on/off" = "Automatiseringsclips als banen onder hun tracks aan/uit"
+"Drag the track header column's right edge to widen it on/off" = "Sleep de rechterrand van de kolom met trackkoppen om die breder te maken aan/uit"
+"Pointer click switch in the Playlist toolbar" = "Aanwijzerklik-schakelaar in de Playlist-werkbalk"
+"FL keeps the track header column at a fixed width. With this on, drag the column's right edge to make the headers wider (a double click there goes back to FL's width); the width is kept for every project. Also in the Playlist menu." = "FL houdt de kolom met trackkoppen op een vaste breedte. Met deze optie aan sleep je de rechterrand van de kolom om de koppen breder te maken (een dubbelklik daar gaat terug naar de breedte van FL); de breedte geldt voor elk project. Ook in het Playlist-menu."
+"A switch beside Stretch: while it is lit, a click on an empty spot with the Pencil or the Brush deselects and moves the song position there, a drag draws a selection box (as FL's Select tool), and a double click places the clip. Also in the Playlist menu." = "Een schakelaar naast Stretch: zolang die brandt, deselecteert een klik op een lege plek met het Potlood of de Kwast en zet de songpositie daar, slepen tekent een selectiekader (zoals FL's Selecteer-gereedschap) en een dubbelklik plaatst de clip. Ook in het Playlist-menu."
+"A track that holds only automation clips of one instrument (or of a linked mixer track) is drawn right under that instrument's track, as a lane that folds with the track's arrow; the clips stay clips on their own tracks. On by default in the Clip-launch layout, as Live's lanes. Also in the Playlist menu." = "Een track met alleen automatiseringsclips van één instrument (of van een gekoppelde mixertrack) wordt direct onder de track van dat instrument getekend, als een baan die met de pijl van de track inklapt; de clips blijven clips op hun eigen tracks. Standaard aan in de Clip-launch-indeling, zoals de banen van Live. Ook in het Playlist-menu."

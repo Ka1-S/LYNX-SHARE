@@ -10769,26 +10769,6 @@ countries: id
 "CURVE" = "KURVA"
 "Display: FL's scrolling graph or LYNX's transfer curve  [LMB] switch (kept for this effect)" = "Tampilan: grafik bergulir FL atau kurva transfer LYNX  [LMB] ganti (disimpan untuk efek ini)"
 
-# --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
-"Hide collapsed grouped tracks" = "Sembunyikan track grup yang diciutkan"
-"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "Track: [LMB] mute / bunyikan lagi  [Ctrl][LMB] atau [RMB] solo  [Alt][LMB] mute grupnya  [Alt][RMB] solo grupnya"
-"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "Track: [LMB] pilih  [Ctrl][LMB] tambah / buang  [Ctrl] seret: track beserta clip-nya  [Shift][LMB] rentang  [RMB] menu  [2xLMB] buka sumber clip  [Shift][Wheel] pindah ke atas / bawah  [Alt] seret: masuk ke / keluar dari grup"
-"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "Memindahkan track bersama grupnya  [Alt] seret ke kanan / kiri: lebih dalam / keluar dari grup"
-"In a group, level {0}" = "Dalam grup, level {0}"
-"Not in a group" = "Tidak dalam grup"
-"Nest under the track above (a group in the group)" = "Sarangkan di bawah track di atas (grup di dalam grup)"
-"Move out of its group (one level up)" = "Keluarkan dari grupnya (naik satu level)"
-"Hiding collapsed tracks" = "Menyembunyikan track yang diciutkan"
-"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "Opsi ini menyembunyikan track Playlist yang diciutkan. Track induk akan menampilkan ikon panah bawah untuk membuka track yang tersembunyi. Lanjutkan?"
-# --- Round 190jf: B22 DAWproject import / export
-"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
-"(imported from DAWproject)" = "(diimpor dari DAWproject)"
-"Export DAWproject" = "Ekspor DAWproject"
-"The DAWproject file could not be written" = "File DAWproject tidak dapat ditulis"
-"Everything went over to the DAWproject file." = "Semuanya masuk ke file DAWproject."
-"Not carried over or approximated:" = "Tidak terbawa atau didekati:"
-"... and {0} more" = "... dan {0} lagi"
-
 # --- Round 190iu: issues #186 (wheel zones) and #191 (temporary tools, MIDI drops, lanes, Track-only mode, takes)
 "Wheel: scroll over the track headers, zoom over the arrangement" = "Roda: gulir di atas kepala track, zoom di atas aransemen"
 "Hold a tool key for a temporary tool" = "Tahan tombol alat untuk alat sementara"
@@ -10816,6 +10796,28 @@ countries: id
 "MIDI file {0}: a clip of pattern \"{1}\"" = "File MIDI {0}: klip dari pattern \"{1}\""
 "Delete (its clips and its channel)" = "Hapus (beserta klip dan channel-nya)"
 "Delete (with its {0} clips)" = "Hapus (beserta {0} klipnya)"
+
+# --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
+"Hide collapsed grouped tracks" = "Sembunyikan track grup yang diciutkan"
+"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "Track: [LMB] mute / bunyikan lagi  [Ctrl][LMB] atau [RMB] solo  [Alt][LMB] mute grupnya  [Alt][RMB] solo grupnya"
+"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "Track: [LMB] pilih  [Ctrl][LMB] tambah / buang  [Ctrl] seret: track beserta clip-nya  [Shift][LMB] rentang  [RMB] menu  [2xLMB] buka sumber clip  [Shift][Wheel] pindah ke atas / bawah  [Alt] seret: masuk ke / keluar dari grup"
+"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "Memindahkan track bersama grupnya  [Alt] seret ke kanan / kiri: lebih dalam / keluar dari grup"
+"In a group, level {0}" = "Dalam grup, level {0}"
+"Not in a group" = "Tidak dalam grup"
+"Nest under the track above (a group in the group)" = "Sarangkan di bawah track di atas (grup di dalam grup)"
+"Move out of its group (one level up)" = "Keluarkan dari grupnya (naik satu level)"
+"Hiding collapsed tracks" = "Menyembunyikan track yang diciutkan"
+"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "Opsi ini menyembunyikan track Playlist yang diciutkan. Track induk akan menampilkan ikon panah bawah untuk membuka track yang tersembunyi. Lanjutkan?"
+# --- Round 190jf: B22 DAWproject import / export
+"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
+"(imported from DAWproject)" = "(diimpor dari DAWproject)"
+"Export DAWproject" = "Ekspor DAWproject"
+"The DAWproject file could not be written" = "File DAWproject tidak dapat ditulis"
+"Everything went over to the DAWproject file." = "Semuanya masuk ke file DAWproject."
+"Not carried over or approximated:" = "Tidak terbawa atau didekati:"
+"... and {0} more" = "... dan {0} lagi"
+
+# --- Round 190iu: issues #186 (wheel zones) and #191 (temporary tools, MIDI drops, lanes, Track-only mode, takes)
 
 # --- rollup 0.1.30 step 4: Save a copy for 0.1.28 knows rounds 190jh / 190jl / 190jg / 190jf / 190jd
 "Facet EQ's automatic dynamic thresholds play with the bands' manual threshold: {0}" = "Ambang dinamis otomatis Facet EQ diputar dengan ambang manual band: {0}"
@@ -10869,3 +10871,19 @@ countries: id
 "Pitch & Time" = "Nada & Waktu"
 "Bar : Step : Tick" = "Bar : Step : Tick"
 "Time: bar : step : tick" = "Waktu: bar : step : tick"
+# --- round 190jq: Playlist header width (#164), pointer click (#191), automation clip lanes (#191.3)
+"Pointer click: a click on an empty spot selects and moves the song position; a double click places the clip (LYNX)" = "Klik penunjuk: klik di tempat kosong memilih dan memindahkan posisi lagu; klik ganda menaruh klip (LYNX)"
+"Click on an empty spot selects and moves the song position (pointer click)" = "Klik di tempat kosong memilih dan memindahkan posisi lagu (klik penunjuk)"
+"Track header width" = "Lebar kepala trek"
+"Track header width: [LMB] drag  [2xLMB] FL's width" = "Lebar kepala trek: [LMB] seret  [2xLMB] lebar FL"
+"Automation lane: [LMB] song position  [LMB] drag: select  (its clips: drag left / right)" = "Jalur otomasi: [LMB] posisi lagu  [LMB] seret: pilih  (klipnya: seret ke kiri / kanan)"
+"Pointer click: [LMB] song position and deselect  [LMB] drag: select  [2xLMB] place the clip" = "Klik penunjuk: [LMB] posisi lagu dan batalkan pilihan  [LMB] seret: pilih  [2xLMB] taruh klip"
+"Automation clips as lanes under their tracks" = "Klip otomasi sebagai jalur di bawah treknya"
+"Drag the track header column's right edge to widen it" = "Seret tepi kanan kolom kepala trek untuk melebarkannya"
+"Pointer click (a click on an empty spot selects and moves the song position) on/off" = "Klik penunjuk (klik di tempat kosong memilih dan memindahkan posisi lagu) aktif/nonaktif"
+"Automation clips as lanes under their tracks on/off" = "Klip otomasi sebagai jalur di bawah treknya aktif/nonaktif"
+"Drag the track header column's right edge to widen it on/off" = "Seret tepi kanan kolom kepala trek untuk melebarkannya aktif/nonaktif"
+"Pointer click switch in the Playlist toolbar" = "Sakelar klik penunjuk di bilah alat Playlist"
+"FL keeps the track header column at a fixed width. With this on, drag the column's right edge to make the headers wider (a double click there goes back to FL's width); the width is kept for every project. Also in the Playlist menu." = "FL menjaga kolom kepala trek pada lebar tetap. Bila ini aktif, seret tepi kanan kolom untuk melebarkan kepala trek (klik ganda di sana kembali ke lebar FL); lebarnya disimpan untuk semua proyek. Juga di menu Playlist."
+"A switch beside Stretch: while it is lit, a click on an empty spot with the Pencil or the Brush deselects and moves the song position there, a drag draws a selection box (as FL's Select tool), and a double click places the clip. Also in the Playlist menu." = "Sakelar di samping Stretch: selama menyala, klik di tempat kosong dengan Pensil atau Kuas membatalkan pilihan dan memindahkan posisi lagu ke sana, menyeret menggambar kotak pilihan (seperti alat Pilih FL), dan klik ganda menaruh klip. Juga di menu Playlist."
+"A track that holds only automation clips of one instrument (or of a linked mixer track) is drawn right under that instrument's track, as a lane that folds with the track's arrow; the clips stay clips on their own tracks. On by default in the Clip-launch layout, as Live's lanes. Also in the Playlist menu." = "Trek yang hanya berisi klip otomasi dari satu instrumen (atau trek mixer yang ditautkan) digambar tepat di bawah trek instrumen itu, sebagai jalur yang dilipat dengan panah trek; klip tetap klip di treknya sendiri. Aktif secara bawaan di tata letak Clip-launch, seperti jalur Live. Juga di menu Playlist."

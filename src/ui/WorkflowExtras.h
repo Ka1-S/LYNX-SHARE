@@ -30,6 +30,8 @@ namespace workflowextras
 // --- the settings: ui-options.txt keys and the Settings › LYNX extras switches ------------------------------------------
 // The main window's loader hands every key here first: true when it is one of these (and it was applied).
 bool readUiOption (const juce::String& key, bool on);
+// The keys with a number (round 190jq: headerWidthExtra); true when it is one of them.
+bool readUiValue (const juce::String& key, const juce::String& value);
 // The lines the main window appends to ui-options.txt ("\nkey=1"...).
 juce::String uiOptionsText();
 // Settings › LYNX extras: the switches these own (nullopt: not one of them).

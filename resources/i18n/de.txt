@@ -10769,26 +10769,6 @@ countries: de at ch li lu
 "CURVE" = "KURVE"
 "Display: FL's scrolling graph or LYNX's transfer curve  [LMB] switch (kept for this effect)" = "Anzeige: die laufende Grafik von FL oder die Übertragungskurve von LYNX  [LMB] umschalten (für diesen Effekt gemerkt)"
 
-# --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
-"Hide collapsed grouped tracks" = "Eingeklappte gruppierte Spuren ausblenden"
-"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "Spur: [LMB] stumm / Stummschaltung aufheben  [Strg][LMB] oder [RMB] Solo  [Alt][LMB] Gruppe stumm  [Alt][RMB] Gruppe solo"
-"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "Spur: [LMB] auswählen  [Strg][LMB] hinzufügen / entfernen  [Strg] Ziehen: Spuren mit ihren Clips  [Shift][LMB] Bereich  [RMB] Menü  [2xLMB] Quelle des Clips öffnen  [Shift][Wheel] nach oben / unten verschieben  [Alt] Ziehen: in eine Gruppe / aus einer Gruppe"
-"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "Spur wird mit ihrer Gruppe verschoben  [Alt] nach rechts / links ziehen: tiefer / aus der Gruppe"
-"In a group, level {0}" = "In einer Gruppe, Ebene {0}"
-"Not in a group" = "In keiner Gruppe"
-"Nest under the track above (a group in the group)" = "Unter der Spur darüber verschachteln (eine Gruppe in der Gruppe)"
-"Move out of its group (one level up)" = "Aus ihrer Gruppe nehmen (eine Ebene höher)"
-"Hiding collapsed tracks" = "Eingeklappte Spuren ausblenden"
-"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "Diese Option blendet eingeklappte Playlist-Spuren aus. Die übergeordnete Spur zeigt einen Pfeil nach unten, um die ausgeblendeten Spuren zu öffnen. Fortfahren?"
-# --- Round 190jf: B22 DAWproject import / export
-"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
-"(imported from DAWproject)" = "(aus DAWproject importiert)"
-"Export DAWproject" = "DAWproject exportieren"
-"The DAWproject file could not be written" = "Die DAWproject-Datei konnte nicht geschrieben werden"
-"Everything went over to the DAWproject file." = "Alles ist in die DAWproject-Datei übernommen."
-"Not carried over or approximated:" = "Nicht übernommen oder angenähert:"
-"... and {0} more" = "... und {0} weitere"
-
 # --- Round 190iu: issues #186 (wheel zones) and #191 (temporary tools, MIDI drops, lanes, Track-only mode, takes)
 "Wheel: scroll over the track headers, zoom over the arrangement" = "Mausrad: über den Spurköpfen scrollen, über dem Arrangement zoomen"
 "Hold a tool key for a temporary tool" = "Werkzeugtaste gedrückt halten für ein vorübergehendes Werkzeug"
@@ -10816,6 +10796,28 @@ countries: de at ch li lu
 "MIDI file {0}: a clip of pattern \"{1}\"" = "MIDI-Datei {0}: ein Clip des Patterns „{1}“"
 "Delete (its clips and its channel)" = "Löschen (mit seinen Clips und seinem Kanal)"
 "Delete (with its {0} clips)" = "Löschen (mit seinen {0} Clips)"
+
+# --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
+"Hide collapsed grouped tracks" = "Eingeklappte gruppierte Spuren ausblenden"
+"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "Spur: [LMB] stumm / Stummschaltung aufheben  [Strg][LMB] oder [RMB] Solo  [Alt][LMB] Gruppe stumm  [Alt][RMB] Gruppe solo"
+"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "Spur: [LMB] auswählen  [Strg][LMB] hinzufügen / entfernen  [Strg] Ziehen: Spuren mit ihren Clips  [Shift][LMB] Bereich  [RMB] Menü  [2xLMB] Quelle des Clips öffnen  [Shift][Wheel] nach oben / unten verschieben  [Alt] Ziehen: in eine Gruppe / aus einer Gruppe"
+"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "Spur wird mit ihrer Gruppe verschoben  [Alt] nach rechts / links ziehen: tiefer / aus der Gruppe"
+"In a group, level {0}" = "In einer Gruppe, Ebene {0}"
+"Not in a group" = "In keiner Gruppe"
+"Nest under the track above (a group in the group)" = "Unter der Spur darüber verschachteln (eine Gruppe in der Gruppe)"
+"Move out of its group (one level up)" = "Aus ihrer Gruppe nehmen (eine Ebene höher)"
+"Hiding collapsed tracks" = "Eingeklappte Spuren ausblenden"
+"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "Diese Option blendet eingeklappte Playlist-Spuren aus. Die übergeordnete Spur zeigt einen Pfeil nach unten, um die ausgeblendeten Spuren zu öffnen. Fortfahren?"
+# --- Round 190jf: B22 DAWproject import / export
+"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
+"(imported from DAWproject)" = "(aus DAWproject importiert)"
+"Export DAWproject" = "DAWproject exportieren"
+"The DAWproject file could not be written" = "Die DAWproject-Datei konnte nicht geschrieben werden"
+"Everything went over to the DAWproject file." = "Alles ist in die DAWproject-Datei übernommen."
+"Not carried over or approximated:" = "Nicht übernommen oder angenähert:"
+"... and {0} more" = "... und {0} weitere"
+
+# --- Round 190iu: issues #186 (wheel zones) and #191 (temporary tools, MIDI drops, lanes, Track-only mode, takes)
 
 # --- rollup 0.1.30 step 4: Save a copy for 0.1.28 knows rounds 190jh / 190jl / 190jg / 190jf / 190jd
 "Facet EQ's automatic dynamic thresholds play with the bands' manual threshold: {0}" = "Die automatischen dynamischen Schwellen von Facet EQ spielen mit der manuellen Schwelle der Bänder: {0}"
@@ -10869,3 +10871,19 @@ countries: de at ch li lu
 "Pitch & Time" = "Tonhöhe & Zeit"
 "Bar : Step : Tick" = "Takt : Step : Tick"
 "Time: bar : step : tick" = "Zeit: Takt : Step : Tick"
+# --- round 190jq: Playlist header width (#164), pointer click (#191), automation clip lanes (#191.3)
+"Pointer click: a click on an empty spot selects and moves the song position; a double click places the clip (LYNX)" = "Zeigerklick: Ein Klick auf eine leere Stelle wählt aus und setzt die Song-Position; ein Doppelklick setzt den Clip (LYNX)"
+"Click on an empty spot selects and moves the song position (pointer click)" = "Klick auf eine leere Stelle wählt aus und setzt die Song-Position (Zeigerklick)"
+"Track header width" = "Breite der Spurköpfe"
+"Track header width: [LMB] drag  [2xLMB] FL's width" = "Breite der Spurköpfe: [LMB] ziehen  [2xLMB] FL-Breite"
+"Automation lane: [LMB] song position  [LMB] drag: select  (its clips: drag left / right)" = "Automationsspur: [LMB] Song-Position  [LMB] Ziehen: auswählen  (ihre Clips: nach links / rechts ziehen)"
+"Pointer click: [LMB] song position and deselect  [LMB] drag: select  [2xLMB] place the clip" = "Zeigerklick: [LMB] Song-Position und Auswahl aufheben  [LMB] Ziehen: auswählen  [2xLMB] Clip setzen"
+"Automation clips as lanes under their tracks" = "Automationsclips als Spuren unter ihren Tracks"
+"Drag the track header column's right edge to widen it" = "Rechten Rand der Spurkopf-Spalte ziehen, um sie zu verbreitern"
+"Pointer click (a click on an empty spot selects and moves the song position) on/off" = "Zeigerklick (ein Klick auf eine leere Stelle wählt aus und setzt die Song-Position) ein/aus"
+"Automation clips as lanes under their tracks on/off" = "Automationsclips als Spuren unter ihren Tracks ein/aus"
+"Drag the track header column's right edge to widen it on/off" = "Rechten Rand der Spurkopf-Spalte ziehen, um sie zu verbreitern ein/aus"
+"Pointer click switch in the Playlist toolbar" = "Zeigerklick-Schalter in der Playlist-Leiste"
+"FL keeps the track header column at a fixed width. With this on, drag the column's right edge to make the headers wider (a double click there goes back to FL's width); the width is kept for every project. Also in the Playlist menu." = "FL hält die Spalte der Spurköpfe auf fester Breite. Ist dies an, zieh den rechten Rand der Spalte, um die Spurköpfe zu verbreitern (ein Doppelklick dort stellt FLs Breite wieder her); die Breite gilt für jedes Projekt. Auch im Playlist-Menü."
+"A switch beside Stretch: while it is lit, a click on an empty spot with the Pencil or the Brush deselects and moves the song position there, a drag draws a selection box (as FL's Select tool), and a double click places the clip. Also in the Playlist menu." = "Ein Schalter neben Strecken: Solange er leuchtet, hebt ein Klick auf eine leere Stelle mit dem Stift oder dem Pinsel die Auswahl auf und setzt dort die Song-Position, Ziehen zieht einen Auswahlrahmen (wie FLs Auswahlwerkzeug) und ein Doppelklick setzt den Clip. Auch im Playlist-Menü."
+"A track that holds only automation clips of one instrument (or of a linked mixer track) is drawn right under that instrument's track, as a lane that folds with the track's arrow; the clips stay clips on their own tracks. On by default in the Clip-launch layout, as Live's lanes. Also in the Playlist menu." = "Eine Spur, die nur Automationsclips eines Instruments (oder einer verknüpften Mixer-Spur) enthält, wird direkt unter der Spur dieses Instruments gezeichnet, als Unterspur, die mit dem Pfeil der Spur eingeklappt wird; die Clips bleiben Clips auf ihren eigenen Spuren. Im Clip-launch-Layout standardmäßig an, wie Lives Spuren. Auch im Playlist-Menü."

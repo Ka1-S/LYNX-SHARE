@@ -10769,26 +10769,6 @@ countries: ru by kz
 "CURVE" = "КРИВАЯ"
 "Display: FL's scrolling graph or LYNX's transfer curve  [LMB] switch (kept for this effect)" = "Дисплей: бегущий график FL или передаточная кривая LYNX  [LMB] переключить (сохраняется для этого эффекта)"
 
-# --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
-"Hide collapsed grouped tracks" = "Скрывать свёрнутые сгруппированные дорожки"
-"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "Дорожка: [LMB] заглушить / включить  [Ctrl][LMB] или [RMB] соло  [Alt][LMB] заглушить группу  [Alt][RMB] соло группы"
-"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "Дорожка: [LMB] выбрать  [Ctrl][LMB] добавить / убрать  [Ctrl] перетаскивание: дорожки с их клипами  [Shift][LMB] диапазон  [RMB] меню  [2xLMB] открыть источник клипа  [Shift][Wheel] вверх / вниз  [Alt] перетаскивание: в группу / из группы"
-"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "Перемещение дорожки вместе с её группой  [Alt] вправо / влево: глубже / из группы"
-"In a group, level {0}" = "В группе, уровень {0}"
-"Not in a group" = "Вне группы"
-"Nest under the track above (a group in the group)" = "Вложить под дорожку выше (группа в группе)"
-"Move out of its group (one level up)" = "Вынуть из группы (на уровень выше)"
-"Hiding collapsed tracks" = "Скрытие свёрнутых дорожек"
-"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "Этот параметр скрывает свёрнутые дорожки Playlist. На родительской дорожке появится стрелка вниз, чтобы открыть скрытые дорожки. Продолжить?"
-# --- Round 190jf: B22 DAWproject import / export
-"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
-"(imported from DAWproject)" = "(импортировано из DAWproject)"
-"Export DAWproject" = "Экспорт в DAWproject"
-"The DAWproject file could not be written" = "Не удалось записать файл DAWproject"
-"Everything went over to the DAWproject file." = "Всё перенесено в файл DAWproject."
-"Not carried over or approximated:" = "Не перенесено или передано приближённо:"
-"... and {0} more" = "... и ещё {0}"
-
 # --- Round 190iu: issues #186 (wheel zones) and #191 (temporary tools, MIDI drops, lanes, Track-only mode, takes)
 "Wheel: scroll over the track headers, zoom over the arrangement" = "Колесо: прокрутка над заголовками дорожек, масштаб над аранжировкой"
 "Hold a tool key for a temporary tool" = "Удерживать клавишу инструмента для временного инструмента"
@@ -10816,6 +10796,28 @@ countries: ru by kz
 "MIDI file {0}: a clip of pattern \"{1}\"" = "MIDI-файл {0}: клип паттерна «{1}»"
 "Delete (its clips and its channel)" = "Удалить (вместе с клипами и каналом)"
 "Delete (with its {0} clips)" = "Удалить (вместе с клипами: {0})"
+
+# --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
+"Hide collapsed grouped tracks" = "Скрывать свёрнутые сгруппированные дорожки"
+"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "Дорожка: [LMB] заглушить / включить  [Ctrl][LMB] или [RMB] соло  [Alt][LMB] заглушить группу  [Alt][RMB] соло группы"
+"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "Дорожка: [LMB] выбрать  [Ctrl][LMB] добавить / убрать  [Ctrl] перетаскивание: дорожки с их клипами  [Shift][LMB] диапазон  [RMB] меню  [2xLMB] открыть источник клипа  [Shift][Wheel] вверх / вниз  [Alt] перетаскивание: в группу / из группы"
+"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "Перемещение дорожки вместе с её группой  [Alt] вправо / влево: глубже / из группы"
+"In a group, level {0}" = "В группе, уровень {0}"
+"Not in a group" = "Вне группы"
+"Nest under the track above (a group in the group)" = "Вложить под дорожку выше (группа в группе)"
+"Move out of its group (one level up)" = "Вынуть из группы (на уровень выше)"
+"Hiding collapsed tracks" = "Скрытие свёрнутых дорожек"
+"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "Этот параметр скрывает свёрнутые дорожки Playlist. На родительской дорожке появится стрелка вниз, чтобы открыть скрытые дорожки. Продолжить?"
+# --- Round 190jf: B22 DAWproject import / export
+"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
+"(imported from DAWproject)" = "(импортировано из DAWproject)"
+"Export DAWproject" = "Экспорт в DAWproject"
+"The DAWproject file could not be written" = "Не удалось записать файл DAWproject"
+"Everything went over to the DAWproject file." = "Всё перенесено в файл DAWproject."
+"Not carried over or approximated:" = "Не перенесено или передано приближённо:"
+"... and {0} more" = "... и ещё {0}"
+
+# --- Round 190iu: issues #186 (wheel zones) and #191 (temporary tools, MIDI drops, lanes, Track-only mode, takes)
 
 # --- rollup 0.1.30 step 4: Save a copy for 0.1.28 knows rounds 190jh / 190jl / 190jg / 190jf / 190jd
 "Facet EQ's automatic dynamic thresholds play with the bands' manual threshold: {0}" = "Автоматические динамические пороги Facet EQ играют с ручным порогом полос: {0}"
@@ -10869,3 +10871,19 @@ countries: ru by kz
 "Pitch & Time" = "Высота и время"
 "Bar : Step : Tick" = "Такт : Шаг : Тик"
 "Time: bar : step : tick" = "Время: такт : шаг : тик"
+# --- round 190jq: Playlist header width (#164), pointer click (#191), automation clip lanes (#191.3)
+"Pointer click: a click on an empty spot selects and moves the song position; a double click places the clip (LYNX)" = "Клик указателем: клик по пустому месту выделяет и переносит позицию песни; двойной клик ставит клип (LYNX)"
+"Click on an empty spot selects and moves the song position (pointer click)" = "Клик по пустому месту выделяет и переносит позицию песни (клик указателем)"
+"Track header width" = "Ширина заголовков дорожек"
+"Track header width: [LMB] drag  [2xLMB] FL's width" = "Ширина заголовков дорожек: [LMB] перетащить  [2xLMB] ширина FL"
+"Automation lane: [LMB] song position  [LMB] drag: select  (its clips: drag left / right)" = "Дорожка автоматизации: [LMB] позиция песни  [LMB] перетаскивание: выделить  (её клипы: перетаскивать влево / вправо)"
+"Pointer click: [LMB] song position and deselect  [LMB] drag: select  [2xLMB] place the clip" = "Клик указателем: [LMB] позиция песни и снять выделение  [LMB] перетаскивание: выделить  [2xLMB] поставить клип"
+"Automation clips as lanes under their tracks" = "Клипы автоматизации как полосы под их дорожками"
+"Drag the track header column's right edge to widen it" = "Перетаскивать правый край колонки заголовков, чтобы расширить её"
+"Pointer click (a click on an empty spot selects and moves the song position) on/off" = "Клик указателем (клик по пустому месту выделяет и переносит позицию песни) вкл/выкл"
+"Automation clips as lanes under their tracks on/off" = "Клипы автоматизации как полосы под их дорожками вкл/выкл"
+"Drag the track header column's right edge to widen it on/off" = "Перетаскивать правый край колонки заголовков, чтобы расширить её вкл/выкл"
+"Pointer click switch in the Playlist toolbar" = "Переключатель клика указателем на панели Playlist"
+"FL keeps the track header column at a fixed width. With this on, drag the column's right edge to make the headers wider (a double click there goes back to FL's width); the width is kept for every project. Also in the Playlist menu." = "В FL колонка заголовков дорожек имеет постоянную ширину. Если это включено, перетащите правый край колонки, чтобы расширить заголовки (двойной клик там возвращает ширину FL); ширина сохраняется для всех проектов. Также в меню Playlist."
+"A switch beside Stretch: while it is lit, a click on an empty spot with the Pencil or the Brush deselects and moves the song position there, a drag draws a selection box (as FL's Select tool), and a double click places the clip. Also in the Playlist menu." = "Переключатель рядом с «Растянуть»: пока он горит, клик по пустому месту Карандашом или Кистью снимает выделение и переносит туда позицию песни, перетаскивание рисует рамку выделения (как инструмент выделения FL), а двойной клик ставит клип. Также в меню Playlist."
+"A track that holds only automation clips of one instrument (or of a linked mixer track) is drawn right under that instrument's track, as a lane that folds with the track's arrow; the clips stay clips on their own tracks. On by default in the Clip-launch layout, as Live's lanes. Also in the Playlist menu." = "Дорожка, на которой только клипы автоматизации одного инструмента (или связанной дорожки микшера), рисуется сразу под дорожкой этого инструмента как полоса, которая сворачивается стрелкой дорожки; клипы остаются клипами на своих дорожках. По умолчанию включено в раскладке Clip-launch, как полосы Live. Также в меню Playlist."

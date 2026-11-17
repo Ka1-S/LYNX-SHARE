@@ -1,7 +1,9 @@
 #include "ui/WorkflowExtras.h"
 
 #include "core/LaneView.h"
+#include "core/LayoutStyle.h"
 #include "core/MidiDrop.h"
+#include "core/PlaylistViewOptions.h"
 #include "core/PlaylistTrackOps.h"
 #include "core/TakeCleanup.h"
 #include "core/TrackOnly.h"
@@ -63,15 +65,37 @@ bool readUiOption (const juce::String& key, bool on)
         mididrop::setPlaylistDrop (on);
     else if (key == "trackOnly")
         trackonly::setEnabled (on);
+    else if (key == "headerWidthDrag") // round 190jq (issue #164)
+        headerwidth::draggable = on;
+    else if (key == "pointerClickButton") // round 190jq (issue #191): the switch's button, then the switch
+        pointerclick::buttonShown = on;
+    else if (key == "pointerClick")
+        pointerclick::on = on && pointerclick::buttonShown;
+    else if (key == "clipLanesPattern") // round 190jq (issue #191.3)
+        cliplanes::patternOn = on;
+    else if (key == "clipLanesLive")
+        cliplanes::liveOn = on;
     else
         return false;
+    return true;
+}
+
+bool readUiValue (const juce::String& key, const juce::String& value)
+{
+    if (key != "headerWidthExtra") // round 190jq (issue #164): px added to the header column's own width
+        return false;
+    headerwidth::extra = headerwidth::clampExtra (value.getIntValue());
     return true;
 }
 
 juce::String uiOptionsText()
 {
     return "\nwheelZones=" + juce::String (wheelzones::enabled() ? 1 : 0) + "\ntempTools=" + juce::String (temptool::enabled() ? 1 : 0)
-           + "\nmidiDrop=" + juce::String (mididrop::playlistDrop() ? 1 : 0) + "\ntrackOnly=" + juce::String (trackonly::enabled() ? 1 : 0);
+           + "\nmidiDrop=" + juce::String (mididrop::playlistDrop() ? 1 : 0) + "\ntrackOnly=" + juce::String (trackonly::enabled() ? 1 : 0)
+           // round 190jq (the button before its switch: the loader reads them in this order)
+           + "\nheaderWidthDrag=" + juce::String (headerwidth::draggable ? 1 : 0) + "\nheaderWidthExtra=" + juce::String (headerwidth::clampExtra (headerwidth::extra))
+           + "\npointerClickButton=" + juce::String (pointerclick::buttonShown ? 1 : 0) + "\npointerClick=" + juce::String (pointerclick::on ? 1 : 0)
+           + "\nclipLanesPattern=" + juce::String (cliplanes::patternOn ? 1 : 0) + "\nclipLanesLive=" + juce::String (cliplanes::liveOn ? 1 : 0);
 }
 
 std::optional<bool> extraOn (std::string_view id)
@@ -84,6 +108,12 @@ std::optional<bool> extraOn (std::string_view id)
         return mididrop::playlistDrop();
     if (id == "layout.trackOnly")
         return trackonly::enabled();
+    if (id == "playlist.headerWidth") // round 190jq
+        return headerwidth::draggable;
+    if (id == "playlist.pointerClick")
+        return pointerclick::buttonShown;
+    if (id == "playlist.clipLanes") // (the Pattern layout's switch; the Clip-launch layout has its own, on by default)
+        return cliplanes::patternOn;
     return std::nullopt;
 }
 
@@ -101,6 +131,12 @@ bool setExtra (std::string_view id, bool on)
         mididrop::setPlaylistDrop (on);
     else if (id == "layout.trackOnly")
         trackonly::setEnabled (on);
+    else if (id == "playlist.headerWidth") // round 190jq (issue #164; the dragged width is kept for when it is on again)
+        headerwidth::draggable = on;
+    else if (id == "playlist.pointerClick") // (issue #191: the toolbar switch, lit when shown)
+        pointerclick::setButtonShown (on);
+    else if (id == "playlist.clipLanes") // (issue #191.3)
+        cliplanes::patternOn = on;
     else
         return false;
     if (onChanged)
@@ -112,8 +148,26 @@ bool setExtra (std::string_view id, bool on)
 
 bool runAction (const std::string& id)
 {
-    if (id == "playlist.wheelZones" || id == "editing.tempTools" || id == "playlist.midiDrop" || id == "layout.trackOnly")
+    if (id == "playlist.wheelZones" || id == "editing.tempTools" || id == "playlist.midiDrop" || id == "layout.trackOnly" || id == "playlist.headerWidth")
         return setExtra (id, ! extraOn (id).value_or (true));
+    // round 190jq: the pointer-click switch itself (toolbar button, menu, key); on also shows its button
+    if (id == "playlist.pointerClick")
+    {
+        pointerclick::setOn (! pointerclick::on);
+        ui::postHint ({ tr ("Click on an empty spot selects and moves the song position (pointer click)"), pointerclick::on ? tr ("On") : tr ("Off"), false, false });
+        if (onChanged)
+            onChanged();
+        return true;
+    }
+    // automation clips as lanes: the switch of the layout shown (Pattern / Clip-launch)
+    if (id == "playlist.clipLanes")
+    {
+        const auto clipLaunch = layoutstyle::current() == layoutstyle::Style::clipLaunch;
+        cliplanes::setShownIn (clipLaunch, ! cliplanes::shownIn (clipLaunch, false));
+        if (onChanged)
+            onChanged();
+        return true;
+    }
     if (id == "playlist.clipsToLanes") // #191.3
     {
         if (boundEngine == nullptr || ! autolanes::shown() || laneview::movableClips (boundEngine->getSong()).empty())
@@ -135,6 +189,14 @@ void addPlaylistMenuItems (const std::function<void (const char*, const juce::St
     {
         const auto movable = boundEngine != nullptr ? (int) laneview::movableClips (boundEngine->getSong()).size() : 0;
         add ("playlist.clipsToLanes", tr ("Move automation clips into their tracks' lanes ({0})", { juce::String (movable) }), movable > 0, false);
+    }
+    // round 190jq (issues #191.3, #191, #164)
+    {
+        const auto style = layoutstyle::current();
+        add ("playlist.clipLanes", tr ("Automation clips as lanes under their tracks"), style != layoutstyle::Style::simple,
+             cliplanes::shownIn (style == layoutstyle::Style::clipLaunch, style == layoutstyle::Style::simple));
+        add ("playlist.pointerClick", tr ("Click on an empty spot selects and moves the song position (pointer click)"), style != layoutstyle::Style::simple, pointerclick::on);
+        add ("playlist.headerWidth", tr ("Drag the track header column's right edge to widen it"), style != layoutstyle::Style::simple, headerwidth::draggable);
     }
     add ("playlist.wheelZones", tr ("Wheel: scroll over the track headers, zoom over the arrangement"), true, wheelzones::enabled());
     add ("editing.tempTools", tr ("Hold a tool key for a temporary tool"), true, temptool::enabled());

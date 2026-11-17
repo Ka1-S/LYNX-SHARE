@@ -60,9 +60,10 @@ enum class Icon
     toStart,           // round 190jj: BandLab's Back-to-start (a bar and a triangle pointing left), the Simple capsule's idle Stop
     // round 190jo (design190ia FW-22): the audio editor's tool grid and small icon row, LYNX vectors with Edison's metaphors
     copy, paste, trash, trim, silence, fadeIn, fadeOut, fadeCurve, normalize, amp, reverse, invert, dcCenter, resample,
-    marker, region, setLoop, equalizer, denoise, reverb, spectrogram
+    marker, region, setLoop, equalizer, denoise, reverb, spectrogram,
+    pointer            // round 190jq: the Playlist's pointer-click switch, a mouse pointer (issue #191)
 };
-constexpr int iconCount = (int) Icon::spectrogram + 1;
+constexpr int iconCount = (int) Icon::pointer + 1;
 
 namespace icons
 {

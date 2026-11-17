@@ -60,6 +60,18 @@ inline constexpr Item items[] = {
     { "playlist.trackInserts", TR_NOOP ("Playlist"), TR_NOOP ("Show insert effects on linked tracks"),
       TR_NOOP ("While Playlist tracks are linked to mixer tracks, each linked track header lists its mixer track's effects: click one to open it, its dot to bypass it, drag to reorder or onto another track. Also in Playlist › Edit."),
       "ui-options.txt:trackInserts" },
+    // round 190jq (issue #164): FL's header column has a fixed width
+    { "playlist.headerWidth", TR_NOOP ("Playlist"), TR_NOOP ("Drag the track header column's right edge to widen it"),
+      TR_NOOP ("FL keeps the track header column at a fixed width. With this on, drag the column's right edge to make the headers wider (a double click there goes back to FL's width); the width is kept for every project. Also in the Playlist menu."),
+      "ui-options.txt:headerWidthDrag" },
+    // round 190jq (issue #191): FL's Pencil places the last pattern or clip with a single click
+    { "playlist.pointerClick", TR_NOOP ("Playlist"), TR_NOOP ("Pointer click switch in the Playlist toolbar"),
+      TR_NOOP ("A switch beside Stretch: while it is lit, a click on an empty spot with the Pencil or the Brush deselects and moves the song position there, a drag draws a selection box (as FL's Select tool), and a double click places the clip. Also in the Playlist menu."),
+      "ui-options.txt:pointerClickButton" },
+    // round 190jq (issue #191.3): FL draws automation clips on tracks of their own; Live draws lanes under each track
+    { "playlist.clipLanes", TR_NOOP ("Playlist"), TR_NOOP ("Automation clips as lanes under their tracks"),
+      TR_NOOP ("A track that holds only automation clips of one instrument (or of a linked mixer track) is drawn right under that instrument's track, as a lane that folds with the track's arrow; the clips stay clips on their own tracks. On by default in the Clip-launch layout, as Live's lanes. Also in the Playlist menu."),
+      "ui-options.txt:clipLanesPattern" },
     // round 190iu (issue #191.5): FL's instrument tracks, every instrument on one, the Channel rack hidden
     { "layout.trackOnly", TR_NOOP ("Playlist"), TR_NOOP ("Track-only mode (no Channel rack: 1 track = 1 instrument)"),
       TR_NOOP ("In the Pattern layout the Channel rack stays hidden and every instrument you add gets its own instrument track, whose pencil places that instrument's own pattern. Also in View › Layout style."),

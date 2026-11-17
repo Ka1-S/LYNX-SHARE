@@ -17863,3 +17863,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "DawProject190jfTests.inc" // round 190jf B22: DAWproject import / export (core/DawProject.h, core/ZipLite.h)
 #include "Polish190jpTests.inc" // round 190jp: Theme Adjustments and colour dots, bold interface text, Simple follow-ups
 #include "LiveLook190jnTests.inc" // round 190jn: the Clip-launch layout in Live's look (the Info View key)
+#include "Playlist190jqTests.inc" // round 190jq: Playlist header width (#164), pointer click (#191), automation clip lanes (#191.3)

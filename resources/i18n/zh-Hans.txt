@@ -10769,26 +10769,6 @@ countries: cn sg
 "CURVE" = "曲线"
 "Display: FL's scrolling graph or LYNX's transfer curve  [LMB] switch (kept for this effect)" = "显示：FL 的滚动图形或 LYNX 的传输曲线  [LMB] 切换（为此效果保存）"
 
-# --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
-"Hide collapsed grouped tracks" = "隐藏已折叠的编组轨道"
-"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "轨道：[LMB] 静音/取消静音  [Ctrl][LMB] 或 [RMB] 独奏  [Alt][LMB] 静音整个编组  [Alt][RMB] 独奏整个编组"
-"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "轨道：[LMB] 选择  [Ctrl][LMB] 添加 / 移除  [Ctrl] 拖动：连同片段选择轨道  [Shift][LMB] 范围  [RMB] 菜单  [2xLMB] 打开片段来源  [Shift][Wheel] 向上 / 向下移动  [Alt] 拖动：移入 / 移出编组"
-"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "正在连同编组移动轨道  [Alt] 向右 / 向左拖动：更深一层 / 移出编组"
-"In a group, level {0}" = "在编组中，第 {0} 层"
-"Not in a group" = "不在编组中"
-"Nest under the track above (a group in the group)" = "嵌套到上方轨道之下（编组中的编组）"
-"Move out of its group (one level up)" = "移出所在编组（上移一层）"
-"Hiding collapsed tracks" = "隐藏已折叠的轨道"
-"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "此选项会隐藏 Playlist 中已折叠的轨道。父轨道会显示一个向下箭头，用来展开隐藏的轨道。继续吗？"
-# --- Round 190jf: B22 DAWproject import / export
-"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
-"(imported from DAWproject)" = "（从 DAWproject 导入）"
-"Export DAWproject" = "导出 DAWproject"
-"The DAWproject file could not be written" = "无法写入 DAWproject 文件"
-"Everything went over to the DAWproject file." = "所有内容都已写入 DAWproject 文件。"
-"Not carried over or approximated:" = "未带过去或近似处理的内容："
-"... and {0} more" = "……还有 {0} 项"
-
 # --- Round 190iu: issues #186 (wheel zones) and #191 (temporary tools, MIDI drops, lanes, Track-only mode, takes)
 "Wheel: scroll over the track headers, zoom over the arrangement" = "滚轮：在轨道标题上滚动，在编排区上缩放"
 "Hold a tool key for a temporary tool" = "按住工具键临时使用该工具"
@@ -10816,6 +10796,28 @@ countries: cn sg
 "MIDI file {0}: a clip of pattern \"{1}\"" = "MIDI 文件 {0}：样式“{1}”的剪辑"
 "Delete (its clips and its channel)" = "删除（连同其剪辑和通道）"
 "Delete (with its {0} clips)" = "删除（连同其 {0} 个剪辑）"
+
+# --- Round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Hide collapsed grouped tracks, Alt+drag)
+"Hide collapsed grouped tracks" = "隐藏已折叠的编组轨道"
+"Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group" = "轨道：[LMB] 静音/取消静音  [Ctrl][LMB] 或 [RMB] 独奏  [Alt][LMB] 静音整个编组  [Alt][RMB] 独奏整个编组"
+"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group" = "轨道：[LMB] 选择  [Ctrl][LMB] 添加 / 移除  [Ctrl] 拖动：连同片段选择轨道  [Shift][LMB] 范围  [RMB] 菜单  [2xLMB] 打开片段来源  [Shift][Wheel] 向上 / 向下移动  [Alt] 拖动：移入 / 移出编组"
+"Moving the track with its group  [Alt] drag right / left: deeper / out of a group" = "正在连同编组移动轨道  [Alt] 向右 / 向左拖动：更深一层 / 移出编组"
+"In a group, level {0}" = "在编组中，第 {0} 层"
+"Not in a group" = "不在编组中"
+"Nest under the track above (a group in the group)" = "嵌套到上方轨道之下（编组中的编组）"
+"Move out of its group (one level up)" = "移出所在编组（上移一层）"
+"Hiding collapsed tracks" = "隐藏已折叠的轨道"
+"This option hides collapsed Playlist tracks. The parent track will show a down arrow icon to open hidden tracks. Proceed?" = "此选项会隐藏 Playlist 中已折叠的轨道。父轨道会显示一个向下箭头，用来展开隐藏的轨道。继续吗？"
+# --- Round 190jf: B22 DAWproject import / export
+"DAWproject (.dawproject)..." = "DAWproject (.dawproject)..."
+"(imported from DAWproject)" = "（从 DAWproject 导入）"
+"Export DAWproject" = "导出 DAWproject"
+"The DAWproject file could not be written" = "无法写入 DAWproject 文件"
+"Everything went over to the DAWproject file." = "所有内容都已写入 DAWproject 文件。"
+"Not carried over or approximated:" = "未带过去或近似处理的内容："
+"... and {0} more" = "……还有 {0} 项"
+
+# --- Round 190iu: issues #186 (wheel zones) and #191 (temporary tools, MIDI drops, lanes, Track-only mode, takes)
 
 # --- rollup 0.1.30 step 4: Save a copy for 0.1.28 knows rounds 190jh / 190jl / 190jg / 190jf / 190jd
 "Facet EQ's automatic dynamic thresholds play with the bands' manual threshold: {0}" = "Facet EQ 的自动动态阈值将以各频段的手动阈值播放：{0}"
@@ -10869,3 +10871,19 @@ countries: cn sg
 "Pitch & Time" = "音高与时间"
 "Bar : Step : Tick" = "小节 : 步 : 滴答"
 "Time: bar : step : tick" = "时间：小节 : 步 : 滴答"
+# --- round 190jq: Playlist header width (#164), pointer click (#191), automation clip lanes (#191.3)
+"Pointer click: a click on an empty spot selects and moves the song position; a double click places the clip (LYNX)" = "指针点击：点击空白处会选择并移动歌曲位置；双击放置剪辑 (LYNX)"
+"Click on an empty spot selects and moves the song position (pointer click)" = "点击空白处选择并移动歌曲位置（指针点击）"
+"Track header width" = "轨道标题宽度"
+"Track header width: [LMB] drag  [2xLMB] FL's width" = "轨道标题宽度：[LMB] 拖动  [2xLMB] FL 的宽度"
+"Automation lane: [LMB] song position  [LMB] drag: select  (its clips: drag left / right)" = "自动化轨道：[LMB] 歌曲位置  [LMB] 拖动：选择  （其剪辑：向左 / 右拖动）"
+"Pointer click: [LMB] song position and deselect  [LMB] drag: select  [2xLMB] place the clip" = "指针点击：[LMB] 歌曲位置并取消选择  [LMB] 拖动：选择  [2xLMB] 放置剪辑"
+"Automation clips as lanes under their tracks" = "将自动化剪辑显示为其轨道下的子轨道"
+"Drag the track header column's right edge to widen it" = "拖动轨道标题列的右边缘以加宽"
+"Pointer click (a click on an empty spot selects and moves the song position) on/off" = "指针点击（点击空白处选择并移动歌曲位置） 开/关"
+"Automation clips as lanes under their tracks on/off" = "将自动化剪辑显示为其轨道下的子轨道 开/关"
+"Drag the track header column's right edge to widen it on/off" = "拖动轨道标题列的右边缘以加宽 开/关"
+"Pointer click switch in the Playlist toolbar" = "Playlist 工具栏中的指针点击开关"
+"FL keeps the track header column at a fixed width. With this on, drag the column's right edge to make the headers wider (a double click there goes back to FL's width); the width is kept for every project. Also in the Playlist menu." = "FL 的轨道标题列宽度是固定的。开启后，拖动该列的右边缘可加宽标题（在那里双击恢复 FL 的宽度）；宽度对所有工程生效。也在 Playlist 菜单中。"
+"A switch beside Stretch: while it is lit, a click on an empty spot with the Pencil or the Brush deselects and moves the song position there, a drag draws a selection box (as FL's Select tool), and a double click places the clip. Also in the Playlist menu." = "“拉伸”旁边的开关：亮起时，用铅笔或画笔点击空白处会取消选择并把歌曲位置移到那里，拖动会画出选择框（如 FL 的选择工具），双击放置剪辑。也在 Playlist 菜单中。"
+"A track that holds only automation clips of one instrument (or of a linked mixer track) is drawn right under that instrument's track, as a lane that folds with the track's arrow; the clips stay clips on their own tracks. On by default in the Clip-launch layout, as Live's lanes. Also in the Playlist menu." = "只包含某个乐器（或已链接的混音器轨道）的自动化剪辑的轨道，会画在该乐器轨道的正下方，作为可用轨道箭头折叠的子轨道；剪辑仍是其自身轨道上的剪辑。与 Live 的子轨道一样，在 Clip-launch 布局中默认开启。也在 Playlist 菜单中。"
