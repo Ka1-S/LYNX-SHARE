@@ -750,6 +750,9 @@ public:
     std::vector<WarpPoint> warpMarkers() const
     {
         const auto* c = warpChannel();
+        // (round gaps190kf: an unwarped clip's Clip View shows no warp markers, as Live's — they are kept for Warp on)
+        if (clipRulerBelow())
+            return {};
         return c != nullptr && c->sampler.keepPitch && c->sampler.warp.size() >= 2 ? c->sampler.warp : std::vector<WarpPoint> {};
     }
     void setWarpModeForPanel (bool on) { setWarpMode (on); }
@@ -4571,23 +4574,23 @@ private:
         g.setColour (m.loop || braceSelected ? livelook::braceOn : livelook::braceOff);
         const auto cy = (box.getY() + box.getBottom()) * 0.5f;
         juce::Path chevrons;
-        chevrons.startNewSubPath (box.getX() + 2.5f, cy - 3.0f);
-        chevrons.lineTo (box.getX() + 5.5f, cy);
-        chevrons.lineTo (box.getX() + 2.5f, cy + 3.0f);
-        chevrons.startNewSubPath (box.getRight() - 2.5f, cy - 3.0f);
-        chevrons.lineTo (box.getRight() - 5.5f, cy);
-        chevrons.lineTo (box.getRight() - 2.5f, cy + 3.0f);
-        g.strokePath (chevrons, juce::PathStrokeType (1.2f));
+        chevrons.startNewSubPath (box.getX() + 1.5f, cy - 4.0f);
+        chevrons.lineTo (box.getX() + 6.0f, cy);
+        chevrons.lineTo (box.getX() + 1.5f, cy + 4.0f);
+        chevrons.startNewSubPath (box.getRight() - 1.5f, cy - 4.0f);
+        chevrons.lineTo (box.getRight() - 6.0f, cy);
+        chevrons.lineTo (box.getRight() - 1.5f, cy + 4.0f);
+        g.strokePath (chevrons, juce::PathStrokeType (1.5f));
         // the Start marker (right of its place) and, with Loop off, the End marker (left of its place): grey while the loop
         // brace is on (the brace carries the colour), teal with Loop off
         g.setColour (m.loop ? livelook::braceOn : livelook::clipMarker);
         const auto xs = std::floor (braceTickToX ((double) m.start)) + 0.5f;
         juce::Path marks;
-        marks.addTriangle (xs, mid + 2.0f, xs + 5.0f, mid + 5.5f, xs, mid + 9.0f);
+        marks.addTriangle (xs, mid + 1.5f, xs + 6.0f, mid + 5.5f, xs, mid + 9.5f); // (Live: about 6 × 8 px)
         if (! m.loop)
         {
             const auto xe = std::floor (braceTickToX ((double) m.end)) + 0.5f;
-            marks.addTriangle (xe, mid + 2.0f, xe - 5.0f, mid + 5.5f, xe, mid + 9.0f);
+            marks.addTriangle (xe, mid + 1.5f, xe - 6.0f, mid + 5.5f, xe, mid + 9.5f);
         }
         g.fillPath (marks);
     }

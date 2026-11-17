@@ -27133,6 +27133,8 @@ private:
             if (panel == nullptr)
                 return;
             panel->setSize (1390, 670);
+            if (auto* e = editorOf (*panel)) // (the Clip-launch layout's beat-time view; off-screen there is no layout)
+                lynx::setAudioEditorBeatTimeForSnapshot (*e, 1);
             write (*panel, "01-loop-on-start-marker");
             // perf (round gaps190kf): the sample editor painted 40 times with the warp time line (a grid clip's editor)
             // and without it (the same channel's editor panel, no grid clip) — ms per full paint
@@ -27151,6 +27153,7 @@ private:
                 {
                     auto plain = lynx::makeAudioEditorPanel (offline, (int) offline.getSong().channels.size() - 1, -1, true);
                     plain->setSize (withLane->getWidth(), withLane->getHeight());
+                    lynx::setAudioEditorBeatTimeForSnapshot (*plain, 1);
                     offline.dispatchPendingMessages();
                     timeIt (*withLane);
                     timeIt (*plain);
@@ -27186,6 +27189,8 @@ private:
             if (panel != nullptr)
             {
                 panel->setSize (1390, 670);
+                if (auto* e = editorOf (*panel))
+                    lynx::setAudioEditorBeatTimeForSnapshot (*e, 1);
                 write (*panel, "04-loop-off-start-end");
             }
         }
@@ -27196,6 +27201,8 @@ private:
             if (panel != nullptr)
             {
                 panel->setSize (1390, 670);
+                if (auto* e = editorOf (*panel))
+                    lynx::setAudioEditorBeatTimeForSnapshot (*e, 1);
                 write (*panel, "05-unwarped-seconds");
             }
         }

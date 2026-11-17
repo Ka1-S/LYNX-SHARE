@@ -2595,6 +2595,7 @@ public:
         double factor = 1.0, glideRatio = 1.0;      // the note's transposition and its portamento / slide
         // the factor's range: ±2 octaves, or (round gaps190kf) ±4 for a clip transposed beyond ±24 st, Live's ±48 Transpose
         double lowest = VoicePitchShifter::minFactor, highest = VoicePitchShifter::maxFactor;
+        float gain = 1.0f; // round gaps190kf: the level law of a clip transposed above +24 st (1 = none)
         int glideLeft = 0;
         std::array<float, keyShiftBlock * 4 + 2> inL {}, inR {}; // the source read `factor` times faster
         std::array<float, keyShiftBlock> outL {}, outR {};
@@ -2665,6 +2666,18 @@ public:
         }
 
         ks.ahead = v;
+        // (round gaps190kf: above +24 st the source is read 8–16 times as fast; the voice's 24-point sinc then spans one
+        // or two lobes of its lowered cutoff and dulls the sound — W3 vs Live: −4 dB at +36, −9 dB at +48. Such a clip
+        // reads through FL's 512-point sinc instead: few input frames a block, so it costs little)
+        // The stretch back by 8–16 times still loses level against Live: W3 (tone, voice, chords; Complex and Tones) +36 st
+        // −2.4 dB, +48 st −4.1 dB beyond the ±24 path's own difference: 0.3 dB + 2.1 dB per octave above +24, made up here
+        // (fitted on those renders: mean |level| vs Live 0.75 dB as ±24 played them, 0.92 with 2.1 dB / octave alone).
+        ks.gain = 1.0f;
+        if (wide && std::exp2 (semitones / 12.0) > VoicePitchShifter::maxFactor)
+        {
+            ks.ahead.kernel.setQuality (9);
+            ks.gain = (float) std::pow (10.0, (0.3 + 2.1 * std::log2 (std::exp2 (semitones / 12.0) / VoicePitchShifter::maxFactor)) / 20.0);
+        }
         ks.ahead.pitchMul = 1.0;
         ks.primed = false;
         ks.pos = ks.count = 0;
@@ -2761,6 +2774,11 @@ public:
         }
         outL = ks.outL[(std::size_t) ks.pos];
         outR = ks.outR[(std::size_t) ks.pos];
+        if (ks.gain != 1.0f) // (round gaps190kf: a clip transposed above +24 st, see startKeyShift)
+        {
+            outL *= ks.gain;
+            outR *= ks.gain;
+        }
         ++ks.pos;
     }
 
