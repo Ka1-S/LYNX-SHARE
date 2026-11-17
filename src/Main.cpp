@@ -12282,6 +12282,9 @@ private:
                 const auto name = set.trim();
                 run->steps.push_back ({ "dock A/B " + name + " open", [this, name, shown, keepPlaying] {
                                            lynx::NativeEffectWindows::closeAll();
+                                           for (auto* w : lynx::dockedEditorWindows()) // (a channel's settings window of the set before)
+                                               if (w != nullptr)
+                                                   w->closeButtonPressed();
                                            shown->clear();
                                            auto& song = engine->getSong();
                                            auto openKind = [this] (lynx::EffectKind kind) {
@@ -12308,6 +12311,64 @@ private:
                                                openKind (lynx::EffectKind::fruityLimiter);
                                            if (name.containsChar ('M'))
                                                openKind (lynx::EffectKind::maximus);
+                                           // S: a Slicex channel (a 2 s tone in 4 regions) that plays the notes of the project's busiest
+                                           // channel, its settings window open (its deck's play line moves while it sounds)
+                                           if (name.containsChar ('S'))
+                                           {
+                                               const auto wav = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("lynx-uiperf-slicex.wav");
+                                               {
+                                                   juce::AudioBuffer<float> tone (2, 96000);
+                                                   for (int i = 0; i < tone.getNumSamples(); ++i)
+                                                       tone.setSample (0, i, 0.3f * (float) std::sin (juce::MathConstants<double>::twoPi * (200.0 + 200.0 * (i / 24000)) * i / 48000.0));
+                                                   tone.copyFrom (1, 0, tone, 0, 0, tone.getNumSamples());
+                                                   wav.deleteFile();
+                                                   if (auto out = std::unique_ptr<juce::OutputStream> (wav.createOutputStream()))
+                                                       if (auto writer = std::unique_ptr<juce::AudioFormatWriter> (juce::WavAudioFormat().createWriterFor (out.get(), 48000.0, 2, 16, {}, 0)))
+                                                       {
+                                                           out.release();
+                                                           writer->writeFromAudioSampleBuffer (tone, 0, tone.getNumSamples());
+                                                       }
+                                               }
+                                               int busiest = -1;
+                                               {
+                                                   std::map<int, int> count;
+                                                   for (const auto& pat : engine->getSong().patterns)
+                                                       for (const auto& n : pat.notes)
+                                                           ++count[n.channel];
+                                                   int best = 0;
+                                                   for (const auto& [ch, n] : count)
+                                                       if (n > best)
+                                                           best = n, busiest = ch;
+                                               }
+                                               const auto index = (int) engine->getSong().channels.size();
+                                               engine->editSong ([&wav, busiest, index] (lynx::Song& s2) {
+                                                   lynx::ChannelDef ch;
+                                                   ch.name = "Slicex (uiperf)";
+                                                   ch.instrument = lynx::InstrumentKind::slicex;
+                                                   ch.samplePath = wav.getFullPathName().toStdString();
+                                                   auto state = lynx::slicex::fresh();
+                                                   lynx::slicex::setDeckFile (state, 0, ch.samplePath, 4);
+                                                   lynx::slicex::setDeckBeats (state, 0, 0.0, 4.0);
+                                                   ch.pluginState = lynx::slicex::write (state);
+                                                   s2.channels.push_back (ch);
+                                                   for (auto& pat : s2.patterns)
+                                                   {
+                                                       std::vector<lynx::Note> copies;
+                                                       for (const auto& n : pat.notes)
+                                                           if (n.channel == busiest)
+                                                           {
+                                                               auto c = n;
+                                                               c.channel = index;
+                                                               c.key = 60 + (int) (copies.size() % 4); // (the four slices in turn)
+                                                               copies.push_back (c);
+                                                           }
+                                                       pat.notes.insert (pat.notes.end(), copies.begin(), copies.end());
+                                                       pat.sortNotes();
+                                                   }
+                                               }, false);
+                                               engine->dispatchPendingMessages();
+                                               lynx::openChannelSettings (*engine, index);
+                                           }
                                            for (auto* w : lynx::dockedEditorWindows())
                                                shown->emplace_back (w);
                                            keepPlaying();
@@ -12328,6 +12389,9 @@ private:
                                        engine->stop();
                                        shown->clear();
                                        lynx::NativeEffectWindows::closeAll();
+                                       for (auto* w : lynx::dockedEditorWindows())
+                                           if (w != nullptr)
+                                               w->closeButtonPressed();
                                    }, {}, 500 });
         }
         // round 190jy: LYNX_UIPERF_DOCKCHECK=1 — the checks of a docked editor drawn by the main window (ui/DockPaintCheck.h),
