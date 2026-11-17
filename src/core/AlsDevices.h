@@ -52,6 +52,10 @@
 //   Looper                         → an empty Edison (the slot recorder) or, when Live's empty Looper is silent, a muted Utility
 //   MIDI Effect Rack               → its chains, zones and macro values written into the notes (or, one plain chain, its
 //                                    devices one by one as on the track)
+// Lot 6 (round 190ko, AlsDevicesLot6.cpp), each fitted to Live 12.4's own renders:
+//   Meld (an instrument)           → Braid (LYNX's own two-engine macro synth; AlsImport places it)
+//   Spectral Time                  → Timeprism (LYNX's own spectral freezer / delay)
+//   Spectral Resonator             → Harmonia (LYNX's own spectral resonator)
 
 #include <array>
 #include <functional>
@@ -397,6 +401,14 @@ bool corpusToSoundboard (const xml::Element& device, Translated& out);
 bool vinylToPlatter (const xml::Element& device, Translated& out);
 // Looper → an empty Edison slot (Monitor 0 / 3: the input passes) or a muted Utility (Monitor 1 / 2) [MEASURED]
 bool looperToSlot (const xml::Element& device, Translated& out);
+// ================================================================================================ lot 6 (190ko)
+// Meld → Braid (core/Braid.h keeps Meld's units: every value and the 50 × 19 matrix copied as Live stores them)
+bool meldToBraid (const xml::Element& device, ChannelDef& channel, Notes& notes);
+// Meld's automatable parameters: (AutomationTarget Id, Braid's parameter index) — Live's values are Braid's own units
+std::vector<std::pair<std::string, int>> braidAutomatable (const xml::Element& device);
+// Spectral Time → Timeprism, Spectral Resonator → Harmonia (core/Timeprism.h, core/Harmonia.h have the measured laws)
+bool spectralTimeToTimeprism (const xml::Element& device, Translated& out);
+bool spectralResonatorToHarmonia (const xml::Element& device, Translated& out);
 
 // nullopt: not one of the devices above, or its element lacks the parameters (then the importer does what it did
 // before: the device is dropped and listed)

@@ -1,6 +1,7 @@
 #include "core/AlsImport.h"
 #include "core/ClipEnvelope.h"
 #include "core/AlsDevices.h"
+#include "core/Braid.h"
 #include "core/Effects.h"
 #include "core/Rack.h"
 #include "core/LayoutStyle.h"
@@ -1357,6 +1358,34 @@ bool instrumentFrom (Ctx& ctx, const Element& device, ChannelDef& channel, std::
                 ctx.note (&FlpImportReport::partialEffects, "Wavetable: " + n);
             for (const auto& n : notes.dropped)
                 ctx.note (&FlpImportReport::partialEffects, "Wavetable: " + n + " (not applied)");
+            return true;
+        }
+    }
+    // (round 190ko) Meld: Braid, LYNX's own two-engine macro synth, with Meld's values as they are (core/AlsDevicesLot6.cpp);
+    // envelopes on its parameters move Braid's (Live's units are Braid's: the 0..1 automation value is (v − low) / span)
+    if (tag == "InstrumentMeld")
+    {
+        alsdev::Notes notes;
+        ChannelDef meld = channel;
+        if (alsdev::meldToBraid (device, meld, notes))
+        {
+            channel = std::move (meld);
+            ctx.note (&FlpImportReport::converted, "Meld -> Braid (LYNX's two-engine synth)");
+            for (const auto& n : notes.approximated)
+                ctx.note (&FlpImportReport::partialEffects, "Meld: " + n);
+            for (const auto& n : notes.dropped)
+                ctx.note (&FlpImportReport::partialEffects, "Meld: " + n + " (not applied)");
+            if (depth == 0 && ! ctx.inDrumPad)
+                for (const auto& [id, param] : alsdev::braidAutomatable (device))
+                {
+                    if (ctx.automated.count (id) == 0)
+                        continue;
+                    const auto& ep = braidEngineParams()[(std::size_t) param];
+                    const auto lo = (double) ep.low, span = (double) (ep.high - ep.low);
+                    ctx.channelTargets.push_back ({ id, Target { AutomationTarget { AutomationTargetKind::channelParam, -1, 0, param }, ValueMap::plain,
+                                                                 "Meld " + ep.name,
+                                                                 [lo, span] (double v) { return (float) std::clamp ((v - lo) / span, 0.0, 1.0); } } });
+                }
             return true;
         }
     }

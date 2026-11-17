@@ -9,6 +9,7 @@
 #include <set>
 
 #include "core/AlsImport.h"
+#include "core/Braid.h"
 #include "core/ClipLauncher.h"
 #include "core/ClipSample.h"
 #include "core/DetailChain.h"
@@ -60,6 +61,24 @@ juce::String utf8 (const std::string& s) { return juce::String::fromUTF8 (s.c_st
 constexpr int contextWidth = 132, meterWidth = 22, gap = 4, titleHeight = 20, foldedWidth = 22, addWidth = 44;
 constexpr int knobColumn = 62, knobRow = 70, knobSize = 30, instrumentWidth = 196, pluginWidth = 172;
 constexpr int maxEffectKnobs = 7; // + the slot's Mix
+// Round 190ko: an instrument card can show its engine's main parameters as knobs (Live's generic device look: knob
+// columns, two rows), as an effect card does. Knob id = engineKnobBase + the engine's parameter index.
+constexpr int engineKnobBase = 100;
+const std::vector<int>& engineCardParams (InstrumentKind kind)
+{
+    namespace b = braid;
+    // Braid (Live's Meld): engine A on the top row, B below — oscillator type and macros, filter frequency and macros, volume
+    static const std::vector<int> braidKnobs = [] {
+        std::vector<int> v;
+        for (const int p : { b::eng::oscType, b::eng::oscMacro1, b::eng::oscMacro2, b::eng::filterFreq, b::eng::filterMacro1, b::eng::filterMacro2,
+                             b::eng::volume })
+            for (int k = 0; k < 2; ++k)
+                v.push_back (b::engineBase (k) + p);
+        return v;
+    }();
+    static const std::vector<int> none;
+    return kind == InstrumentKind::braid ? braidKnobs : none;
+}
 
 juce::String insertName (const Song& song, int insert)
 {
@@ -820,6 +839,8 @@ private:
             c.index = channel;
             c.folded = folded.count (keyOf (c)) > 0;
             c.knobs = { 0, 1 };
+            for (const auto p : engineCardParams (engine.getSong().channels[(std::size_t) channel].instrument))
+                c.knobs.push_back (engineKnobBase + p);
             c.custom = customFor (keyOf (c), (int) engine.getSong().channels[(std::size_t) channel].instrument, [&] {
                 return DetailView::instrumentCardFactory != nullptr
                            ? DetailView::instrumentCardFactory (engine, channel, engine.getSong().channels[(std::size_t) channel])
@@ -827,7 +848,10 @@ private:
             });
             if (c.custom != nullptr)
                 c.knobs.clear();
-            const auto w = c.folded ? foldedWidth : c.custom != nullptr ? customWidth (*c.custom, height, x) : instrumentWidth;
+            const auto w = c.folded              ? foldedWidth
+                           : c.custom != nullptr   ? customWidth (*c.custom, height, x)
+                           : c.knobs.size() > 2u ? std::max (instrumentWidth, 16 + (((int) c.knobs.size() + 1) / 2) * knobColumn)
+                                                   : instrumentWidth;
             c.bounds = { x, top, w, height };
             x += w + gap;
             cards.push_back (std::move (c));
@@ -1311,10 +1335,77 @@ private:
     }
 
     // --- knobs ---------------------------------------------------------------------------------------------------
+    // --- an engine parameter on the instrument card (round 190ko): the knob moves the parameter's 0..1 (its automation
+    // value), shown in the engine's own units
+    const EngineParam* engineParamOf (const Card& c, int param) const
+    {
+        const auto& song = engine.getSong();
+        if (c.index < 0 || c.index >= (int) song.channels.size() || song.channels[(std::size_t) c.index].instrument != InstrumentKind::braid)
+            return nullptr;
+        const auto& list = braidEngineParams();
+        return param >= 0 && param < (int) list.size() ? &list[(std::size_t) param] : nullptr;
+    }
+    juce::String engineKnobLabel (const Card& c, int param) const
+    {
+        const auto* p = engineParamOf (c, param);
+        return p != nullptr ? utf8 (p->name) : juce::String();
+    }
+    ui::ValueSpec engineKnobSpec (const Card& c, int param) const
+    {
+        ui::ValueSpec spec;
+        const auto* p = engineParamOf (c, param);
+        if (p == nullptr)
+            return spec;
+        spec.name = cardName (c) + " - " + utf8 (p->name);
+        spec.minimum = 0.0, spec.maximum = 1.0;
+        const auto span = (double) (p->high - p->low);
+        spec.defaultValue = span > 0.0 ? (braid::defaults()[(std::size_t) param] - p->low) / span : 0.0;
+        if (p->stepped && span > 0.0)
+            spec.interval = 1.0 / span;
+        spec.toText = [param, lo = (double) p->low, span] (double v) { return utf8 (braid::paramText (param, lo + v * span)); };
+        spec.target = AutomationTarget { AutomationTargetKind::channelParam, c.index, 0, param };
+        return spec;
+    }
+    double engineKnobValue (const Card& c, int param) const
+    {
+        const auto* p = engineParamOf (c, param);
+        if (p == nullptr)
+            return 0.0;
+        const auto& ch = engine.getSong().channels[(std::size_t) c.index];
+        const auto raw = param < (int) ch.modelParams.size() ? (double) ch.modelParams[(std::size_t) param] : braid::defaults()[(std::size_t) param];
+        const auto span = (double) (p->high - p->low);
+        return span > 0.0 ? juce::jlimit (0.0, 1.0, (raw - p->low) / span) : 0.0;
+    }
+    void setEngineKnob (const Card& c, int param, double v)
+    {
+        const auto* p = engineParamOf (c, param);
+        if (p == nullptr)
+            return;
+        auto raw = (double) p->low + juce::jlimit (0.0, 1.0, v) * (double) (p->high - p->low);
+        if (p->stepped)
+            raw = std::round (raw);
+        engine.editSong ([ch = c.index, param, raw] (Song& s) {
+            if (ch < 0 || ch >= (int) s.channels.size() || s.channels[(std::size_t) ch].instrument != InstrumentKind::braid)
+                return;
+            auto& mp = s.channels[(std::size_t) ch].modelParams;
+            if ((int) mp.size() < braid::stateSize)
+            {
+                const auto d = braidDefaults();
+                const auto have = mp.size();
+                mp.resize ((std::size_t) braid::stateSize);
+                std::copy (d.begin() + (std::ptrdiff_t) have, d.end(), mp.begin() + (std::ptrdiff_t) have);
+            }
+            mp[(std::size_t) param] = (float) raw;
+        });
+        repaint();
+    }
+
     ui::ValueSpec knobSpec (const Card& c, int knob) const
     {
         if (c.kind == Card::effect)
             return slotActions.slotParamSpec (c.knobs[(std::size_t) knob], c.index);
+        if (c.knobs[(std::size_t) knob] >= engineKnobBase)
+            return engineKnobSpec (c, c.knobs[(std::size_t) knob] - engineKnobBase);
         const auto name = cardName (c);
         if (c.knobs[(std::size_t) knob] == 1)
         {
@@ -1330,6 +1421,8 @@ private:
     {
         if (c.kind == Card::effect)
             return slotActions.slotParamValue (c.knobs[(std::size_t) knob], c.index);
+        if (c.knobs[(std::size_t) knob] >= engineKnobBase)
+            return engineKnobValue (c, c.knobs[(std::size_t) knob] - engineKnobBase);
         const auto& song = engine.getSong();
         if (c.index < 0 || c.index >= (int) song.channels.size())
             return 0.0;
@@ -1341,6 +1434,11 @@ private:
         if (c.kind == Card::effect)
         {
             slotActions.setSlotParam (c.knobs[(std::size_t) knob], c.index, v);
+            return;
+        }
+        if (c.knobs[(std::size_t) knob] >= engineKnobBase)
+        {
+            setEngineKnob (c, c.knobs[(std::size_t) knob] - engineKnobBase, v);
             return;
         }
         const auto pan = c.knobs[(std::size_t) knob] == 1;
@@ -1359,7 +1457,7 @@ private:
         if (c.folded || knob < 0 || knob >= (int) c.knobs.size())
             return {};
         const auto body = c.bounds.withTrimmedTop (titleHeight + 6);
-        if (c.kind == Card::instrument)
+        if (c.kind == Card::instrument && c.knobs.size() <= 2u)
             return { c.bounds.getX() + 16 + knob * knobColumn, body.getY() + 92, knobColumn - 8, knobRow - 6 };
         if (c.kind == Card::effect)
             if (const auto* fx = effectAt (c.index); fx != nullptr && fx->kind == EffectKind::plugin)
@@ -1534,7 +1632,7 @@ private:
         const auto& c = cards[(std::size_t) i];
         const auto body = c.bounds.withTrimmedTop (titleHeight + 6).reduced (8, 0);
         const auto* fx = c.kind == Card::effect ? effectAt (c.index) : nullptr;
-        if (c.kind == Card::instrument || (fx != nullptr && fx->kind == EffectKind::plugin))
+        if ((c.kind == Card::instrument && c.knobs.size() <= 2u) || (fx != nullptr && fx->kind == EffectKind::plugin))
             paintPicture (g, c, body.withHeight (80));
         for (int k = 0; k < (int) c.knobs.size(); ++k)
         {
@@ -1545,6 +1643,7 @@ private:
             const auto value = knobValue (c, k);
             const auto label = c.kind == Card::effect && c.knobs[(std::size_t) k] < 0 ? (fx != nullptr && hasOwnMix (fx->kind) ? tr ("Slot mix") : tr ("Mix"))
                                : c.kind == Card::effect && fx != nullptr                ? utf8 (effectInfo (fx->kind).params[(std::size_t) c.knobs[(std::size_t) k]].name)
+                               : c.knobs[(std::size_t) k] >= engineKnobBase             ? engineKnobLabel (c, c.knobs[(std::size_t) k] - engineKnobBase)
                                : c.knobs[(std::size_t) k] == 1                          ? tr ("Pan")
                                                                                         : tr ("Volume");
             auto rr = r;
