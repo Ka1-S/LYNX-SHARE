@@ -1,4 +1,6 @@
 #include "engine/AudioEngine.h"
+#include "core/FlPluginDb.h"
+#include "core/HarmorResynth.h"
 #include "core/BrowserSend.h" // round 190iz (FL's preview length)
 #include "core/LiveNote.h"
 #include "core/TrackOnly.h" // round 190iu
@@ -545,6 +547,13 @@ AudioEngine::AudioEngine (bool openAudioDevice, int workerThreads, bool userPlug
       plugins (userPluginList),
       song (Song::makeDefault())
 {
+    // Harmor's resynthesis (round natives190kj): the sample a part names, found as FL finds it (path variables, then the
+    // file re-rooted to this PC's FL folders) and decoded by the core (WAV, FL's Ogg-in-WAV, Ogg Vorbis, WavPack)
+    harmor::setSampleLoader ([] (const std::string& saved, harmor::SampleData& out) {
+        const auto& fl = flStudioAccess();
+        const auto path = locateFlSample (saved, fl.roots, {}, fl.fileExists);
+        return ! path.empty() && fl.readFile && harmor::readWavMono (fl.readFile (path), out);
+    });
     boostDeviceThread = juce::SystemStats::getEnvironmentVariable ("LYNX_DEVICE_BOOST", {}) != "0";
     inputSlot.fill (-1);
     outputSlot.fill (-1);

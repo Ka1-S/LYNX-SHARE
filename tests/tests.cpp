@@ -9224,7 +9224,7 @@ namespace
 // velocity map — and the global block. Every other curve is neutral.
 // features (REA_rodada75): 1 arpeggio markers on the volume envelope, 2 noise resonance on filter 1, 4 "pluck replaces
 // blur decay", 8 pluck blend, 16 harmonic randomness, 32 phaser + harmonizer masks
-std::vector<std::uint8_t> harmorTestState (bool panLfo = true, bool image = false, int features = 0)
+std::vector<std::uint8_t> harmorTestState (bool panLfo = true, bool image = false, int features = 0, const std::string& resynthPath = {})
 {
     std::vector<std::uint8_t> b;
     auto i32 = [&] (std::int32_t v) { for (int k = 0; k < 4; ++k) b.push_back ((std::uint8_t) ((std::uint32_t) v >> (8 * k))); };
@@ -9270,6 +9270,10 @@ std::vector<std::uint8_t> harmorTestState (bool panLfo = true, bool image = fals
         for (const auto& [i, v] : std::initializer_list<std::pair<int, int>> { { 82, 200 }, { 83, 100000 }, { 84, 10000 }, { 85, 20000 },
                  { 86, 750 }, { 87, 4 }, { 88, 600 }, { 89, 900 }, { 90, 1 }, { 91, 3 }, { 92, 1500 }, { 93, -300 }, { 94, 800 } })
             p[(std::size_t) i] = v;
+    if (! resynthPath.empty()) // resynthesis: speed 1, linear interpolation, Hz frequency mode, sharpening 750
+        for (const auto& [i, v] : std::initializer_list<std::pair<int, int>> { { 82, 500 }, { 84, 10000 }, { 86, 750 }, { 87, 3 },
+                 { 88, 500 }, { 89, 1000 }, { 90, 1 }, { 91, 3 }, { 92, 1000 } })
+            p[(std::size_t) i] = v;
     for (auto v : p)
         i32 (v);
     for (int i = 0; i < 12; ++i)
@@ -9282,6 +9286,8 @@ std::vector<std::uint8_t> harmorTestState (bool panLfo = true, bool image = fals
     if ((features & 8) != 0)
         put (0x00, 5);
     misc[0x44] = 1;
+    if (! resynthPath.empty())
+        put (0x24, 250); // resynthesis soft knee (part +0x244)
     if ((features & 4) != 0)
         misc[0x46] = 1;
     b.insert (b.end(), misc.begin(), misc.end());
@@ -9359,6 +9365,15 @@ std::vector<std::uint8_t> harmorTestState (bool panLfo = true, bool image = fals
             }
         i32 (0);
         b.push_back (0); // (file name: empty)
+    }
+    if (! image && ! resynthPath.empty())
+    {
+        // a resynthesis image object (round natives190kj): mode 1, ping-pong, no planes, then the sample's path
+        i32 (0), i32 (1), i32 (2), i32 (0);
+        f64 (-1.0), f64 (-1.0), f64 (0.0);
+        i32 (0), i32 (0);
+        b.push_back ((std::uint8_t) resynthPath.size());
+        b.insert (b.end(), resynthPath.begin(), resynthPath.end());
     }
     std::swap (b, part);
     i32 ((std::int32_t) part.size());
@@ -17863,3 +17878,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Gaps190kfNativesTests.inc" // round gaps190kf: FL Edison's Sample properties (form, Accept, WAV chunks)
 #include "Natives190kjNewtoneTests.inc" // round natives190kj: Newtone note analysis as FL's (tiling, whole-sample pitch, fades), editor commands
 #include "Natives190kjEdisonTests.inc" // round natives190kj: FL Edison Dual view, grid step, pitch-period snap, grid-slicing, scrub, pitch regions
+#include "Natives190kjHarmorTests.inc" // round natives190kj: Harmor resynthesis (analysis, voice, engine revision)

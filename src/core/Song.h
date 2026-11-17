@@ -1023,6 +1023,10 @@ struct ChannelDef
     std::vector<float> modelParams; // instrument == sakura / drumpad / boobass / drumsynth / harmless: FL's raw state parameters
                                     // instrument == minisynth: { 1 } = FL Studio Mobile's build of the engine (core/MiniSynth.h)
     std::vector<std::uint8_t> pluginState; // instrument == sytrus / harmor / ogun / gms / morphine / fruitkick / bassdrum: the FL plugin's saved state (record 0xD5)
+    // The native engine's revision for this channel (round natives190kj): a project saved before it loads with 0 and
+    // plays as it did; new channels and FL imports get the current one. Harmor: 1 = resynthesis (a sample in the IMG
+    // section) played as FL plays it (0: such a part plays its timbres, as LYNX did before).
+    int engineRev = 1;
     SamplerSettings sampler; // used when instrument == sampler
     SynthSettings synth;     // used when instrument == synth
     float swingMix = 1.0f;   // how much of the global swing applies to this channel (0..1), as in FL

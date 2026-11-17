@@ -181,7 +181,7 @@ instruments (built-in synth, sampler, drums) or any VST3/CLAP plugin.
 | DrumSynth engine † | Fruity DrumSynth Live | Near-exact | all 120 patches; recorded waves need the exact engine DLL build; sends and Mod X/Y not modelled |
 | BooBass engine † | BooBass | Near-exact | needs the exact engine DLL build (otherwise a saw approximation) |
 | Sytrus engine | Sytrus | Close | plays imported projects and presets; a new instance starts from FL's Default preset (FL installed); median −117 dB on 268 demo channels, 265 within −60 dB; chaotic FM patches can't be sample-exact; states older than v17 use the synth conversion |
-| Harmor engine † | Harmor | Close | 97/99 demo channels within −60 dB (median −80 dB) incl. image synthesis and the effects rack; resynthesis images and some filter shapes missing |
+| Harmor engine † | Harmor | Close | 97/99 demo channels within −60 dB (median −80 dB) incl. image synthesis and the effects rack; resynthesis (a sample in the IMG section) since round natives190kj: 18 of the 24 factory resynthesis presets null below −50 dB against FL's DLL, LYNX-made test samples −78…−80 dB; every filter / resonance shape of the factory presets is modelled |
 | Harmless engine † | Harmless | Close | 135/139 demo channels within −60 dB with the effects rack |
 | Ogun engine | Ogun | Close | 20/20 demo channels within −60 dB; Random spectra are deterministic |
 | GMS engine † | GMS | Close | model within −60 dB on 9/9 demo channels; FL's shared random generator makes noise/phases differ by design |
