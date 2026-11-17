@@ -58,6 +58,7 @@ public:
     void mouseUp (const juce::MouseEvent& e) override;
     ui::Hint hintAt (juce::Point<int> position) override;
     bool showsTime() const noexcept { return mode == Mode::clock || mode == Mode::smpte; }
+    juce::String textForSnapshot() const { return text(); } // round 190kn (--details190knshot)
     // round 190iv: the Simple capsule's time segment, or Live's 17 px position box ("1. 1. 1"); FL's look is unchanged
     void setLook (toolbarlayout::Look l);
 

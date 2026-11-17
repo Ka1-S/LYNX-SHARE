@@ -237,6 +237,25 @@
                     grid.repaint();
                     saveArea (grid, clipGridCellForSnapshot (grid, 0, t0, s0).expanded (40, 10), prefix + "-grid-clip-renamed.png");
                 }
+                // Live's count-in in the control bar's position field (DL-44): 2 bars of 4/4, a beat and an eighth in
+                {
+                    const auto bar = (double) song.barTicks();
+                    offline.getTransport().countIn.store (2.0 * bar - 1.5 * (double) lynx::ppq);
+                    ui.transportTickForSnapshot();
+                    auto* position = ui.toolbarPartForSnapshot ("position");
+                    if (position != nullptr)
+                    {
+                        position->repaint();
+                        saveArea (ui, position->getBounds().expanded (60, 4), prefix + "-live-countin.png");
+                        saveArea (ui, ui.getToolbarBoundsForSnapshot(), prefix + "-live-countin-bar.png");
+                    }
+                    const auto shown = position != nullptr ? dynamic_cast<toolbar::TimeDisplay*> (position) : nullptr;
+                    const auto text = shown != nullptr ? shown->textForSnapshot() : juce::String();
+                    line ("count-in position: " + text);
+                    check ("Live count-in: the position field counts -2. 2. 3 (" + text + ")", text == "-2 : 2 : 3");
+                    offline.getTransport().countIn.store (0.0);
+                    ui.transportTickForSnapshot();
+                }
                 // a scene launched and waiting: Cancel Scene Launch is enabled and ends the wait
                 const auto scene = juce::jmax (0, s0);
                 launchClipGridSceneForSnapshot (grid, scene);
