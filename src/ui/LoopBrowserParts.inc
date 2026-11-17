@@ -177,6 +177,14 @@ juce::PopupMenu BrowserComponent::buildLoopTypesMenu()
     return menu;
 }
 
+// Rollup 0.1.30 step 6 (the owner's yes to gaps190kf's question): LYNX's own beats and sounds (round 190ke,
+// core/FactoryLoops.h) are listed with the places' loops under Show All, where the Browser shows LYNX content (the Simple
+// layout, round 190ke's rule) — also when no sample folder is there yet.
+static bool factoryLoopsShown (int placeIndex)
+{
+    return placeIndex < 0 && layoutstyle::current() == layoutstyle::Style::simple;
+}
+
 // Each listed file that is a loop (core/LoopKeywords typeOf), described with the words below the place it is in (the
 // user's own folder names above it don't count). Any thread: it touches nothing of the Browser.
 static std::vector<loopkeys::LoopInfo> describeLoops (const std::vector<std::string>& paths, const std::vector<std::string>& rootPaths)
@@ -214,9 +222,7 @@ void BrowserComponent::runLoopSearch()
     scope = withMerged (scope);
     if (scope.isEmpty())
     {
-        loopInfos.clear();
-        loopsAnswer = true;
-        applyLoopFilter();
+        loopsAnswered (loopSearchId, {}, false, false); // (no place: LYNX's own loops only, where shown)
         return;
     }
     if (loopInfos.empty())
@@ -266,6 +272,11 @@ void BrowserComponent::loopsAnswered (std::uint64_t id, std::vector<loopkeys::Lo
 {
     if (id != loopSearchId || ! loopsShown)
         return;
+    if (factoryLoopsShown (loopPlaceIndex)) // (rollup step 6: LYNX's own beats and sounds, round 190ke)
+    {
+        auto own = factoryloops::loops();
+        infos.insert (infos.end(), std::make_move_iterator (own.begin()), std::make_move_iterator (own.end()));
+    }
     // the user's tags that name a keyword give it (round 190iz's tags)
     const auto& store = tagStore();
     for (auto& info : infos)
@@ -305,12 +316,22 @@ void BrowserComponent::applyLoopFilter()
         const auto& info = loopInfos[i];
         if (! loopkeys::matches (info, f, favourite (i)))
             continue;
-        auto n = std::make_unique<FileTree::Node>();
-        n->file = juce::File (juce::String::fromUTF8 (info.path.c_str()));
+        std::unique_ptr<FileTree::Node> n;
+        if (const auto* own = factoryloops::itemOf (info.path)) // (rollup step 6: a LYNX beat or sound, 190ke's row)
+        {
+            if ((n = FileTree::makeFactoryItem (*this, own->key)) == nullptr)
+                continue;
+        }
+        else
+        {
+            n = std::make_unique<FileTree::Node>();
+            n->file = juce::File (juce::String::fromUTF8 (info.path.c_str()));
+        }
         // GarageBand's Tempo and Key columns ("Display original tempo and key"), on the row's right
         const auto tempo = loopkeys::tempoText (info), key = loopkeys::keyText (info);
-        n->detail = tempo.empty() && key.empty() ? juce::String (" ")
-                                                  : juce::String (tempo) + (tempo.empty() || key.empty() ? "" : juce::String::fromUTF8 ("  \xc2\xb7  ")) + juce::String (key);
+        if (! tempo.empty() || ! key.empty() || n->file != juce::File())
+            n->detail = tempo.empty() && key.empty() ? juce::String (" ")
+                                                      : juce::String (tempo) + (tempo.empty() || key.empty() ? "" : juce::String::fromUTF8 ("  \xc2\xb7  ")) + juce::String (key);
         nodes.push_back (std::move (n));
     }
     const auto count = (int) nodes.size();

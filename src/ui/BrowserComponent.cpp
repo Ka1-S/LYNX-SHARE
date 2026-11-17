@@ -23,6 +23,7 @@
 #include "core/FlpImport.h"
 #include "core/ProjectContents.h"
 #include "core/FactoryContent.h"
+#include "core/FactoryLoops.h" // (rollup 0.1.30 step 6: LYNX content in the Loop Browser)
 #include "core/LayoutStyle.h"
 #include "core/SoundLibrary.h"
 #include "core/SearchIndex.h"

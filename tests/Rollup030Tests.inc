@@ -265,3 +265,57 @@ TEST (rollup030_group_mute_on_linked_tracks)
     CHECK (noteedit::muteGroup (s, 0));
     CHECK (s.playlistTracks[0].muted && s.mixer[1].muted);
 }
+
+// Rollup 0.1.30 step 6 (round 190km): the Loop Browser (gaps190kf) lists LYNX's own beats and sounds (190ke's tagged
+// content, core/FactoryLoops.h): a beat is a pattern loop at its genre's tempo with the genre keyword, a sound a MIDI
+// loop's instrument; effect chains are not listed; the row's path is the tag store's item and finds its item again.
+#include "core/FactoryLoops.h"
+
+TEST (rollup030_loop_browser_lists_lynx_content)
+{
+    using namespace lynx;
+    const auto all = factoryloops::loops();
+    int beats = 0, sounds = 0, trapBeats = 0, bassSounds = 0;
+    for (const auto& info : all)
+    {
+        const auto* item = factoryloops::itemOf (info.path);
+        CHECK (item != nullptr);
+        if (item == nullptr)
+            continue;
+        CHECK (item->kind != factorycontent::Kind::chain);
+        CHECK (info.name == item->name);
+        if (item->kind == factorycontent::Kind::beat)
+        {
+            ++beats;
+            CHECK (info.type == loopkeys::pattern);
+            CHECK (info.tempo >= 60.0 && info.tempo <= 200.0);
+            CHECK (info.scale == loopkeys::Scale::neither);
+            CHECK (info.keywords.count ("all drums") == 1); // (190ke's "Drums" / "Beat" tags)
+            if (item->genre == "trap")
+            {
+                ++trapBeats;
+                CHECK (info.keywords.count ("trap") == 1);
+                CHECK (std::abs (info.tempo - 140.0) < 0.5); // (Loop Starter's suggested Trap tempo)
+            }
+        }
+        else
+        {
+            ++sounds;
+            CHECK (info.type == loopkeys::midi);
+            if (info.keywords.count ("bass") != 0)
+                ++bassSounds;
+        }
+    }
+    CHECK (beats > 0 && sounds > 0 && trapBeats > 0 && bassSounds > 0);
+    CHECK ((int) all.size() == beats + sounds);
+    // the Loop Browser's own filter: Trap + Loop Type pattern gives exactly the trap beats; a plain file path is not LYNX's
+    loopkeys::Filter f;
+    f.keywords = { "trap" };
+    f.types = loopkeys::pattern;
+    int passed = 0;
+    for (const auto& info : all)
+        passed += loopkeys::matches (info, f, false) ? 1 : 0;
+    CHECK (passed == trapBeats);
+    CHECK (factoryloops::itemOf ("/home/user/Samples/Trap beat 1.wav") == nullptr);
+    CHECK (factoryloops::itemOf (collections::pluginItem ("some.vst3")) == nullptr);
+}
