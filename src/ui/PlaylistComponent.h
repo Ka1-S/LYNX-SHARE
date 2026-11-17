@@ -651,8 +651,8 @@ private:
     theme::ClipLook liveClipLook (const Clip& clip) const;
     void paintLiveGrid (juce::Graphics& g, juce::Rectangle<int> grid) const;
     // Round 190jn (the coordinator's follow-up): Live's lane backgrounds, grid and separators from one cached image, made
-    // again only when the view's size, scroll, zoom, rows or bars change (false: draw them straight). LYNX_LIVEGRID_CACHE=0
-    // turns it off (A/B checks).
+    // again only when the view's size, scroll, zoom, rows or bars change (false: draw them straight). Off unless
+    // LYNX_LIVEGRID_CACHE=1 (measured: no gain on a whole frame, see the .cpp).
     bool paintLiveLanesCached (juce::Graphics& g, juce::Rectangle<int> grid, int rows);
     juce::Image liveLaneImage;
     std::uint64_t liveLaneKey = 0;
