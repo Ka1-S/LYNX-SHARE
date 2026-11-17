@@ -55,7 +55,7 @@ docks by being dragged onto the main window's edge (LYNX: the dock button or Win
   to snap" (manual); dragging "Fade in: 0'15.750''  Hold Alt to snap"; the circle "Tension: 0%", dragged "Tension: 15%".
 - Dragging a handle turns the side manual: FL's saved item had fade flags 0x1 after the fade-in drag.
 - Tension: FL's Type in value field reads "Tension ±0-1 or %". Values typed in and saved (item +0x24 fade-in ms, +0x28 its
-  tension): v 0.25 → 7.0899, 0.5 → 516.8467, 1.0 → 2672339.25, which is raw = 0.1·(e^(17.10115·v) − 1) to 5 digits
+  tension): v 0.25 → 7.0899, 0.5 → 516.8467, 1.0 → 2672339.25, which is raw = 0.1·(e^(17.10105·v) − 1) to 5 digits
   (Thief's −812.933 = v −0.527, FL's "−53 %"). A drag moves v by about 1/174 per pixel (156 px up: 0 → 90 %, limited at
   100 %); up raises the curve's middle. The voice's curve is round 180d's model (`clipops::fadeTensionCurve`).
 - The circle's menu (`fl-194-tension-menu.png`): Reset fade in tension, Create crossfade (greyed alone), Copy value, Paste

@@ -348,9 +348,9 @@ inline float fadeTensionCurve (float y, float tension) noexcept
 
 // FL 2026's fade tension handle (round 190jz, issue #194; FL GUI and FL's saved files): the circle on a fade's curve holds
 // a value v of -1..1 (FL's hint "Tension: 15%", its Type in value "Tension ±0-1 or %"), kept in the file as the raw value
-// above: raw = ±0.1·(e^(17.10115·|v|) − 1). Measured: v 0.25 → 7.0899, 0.5 → 516.8467, 1 → 2672339.25 (Thief's −812.933 is
+// above: raw = ±0.1·(e^(17.10105·|v|) − 1). Measured: v 0.25 → 7.0899, 0.5 → 516.8467, 1 → 2672339.25 (Thief's −812.933 is
 // v −0.527). A drag of 1 px moves v by 1/174 (FL: 156 px up took the hint from 0 % to 90 %); up raises the curve's middle.
-constexpr double fadeTensionSlope = 17.10115, fadeTensionPerPixel = 1.0 / 174.0;
+constexpr double fadeTensionSlope = 17.10105, fadeTensionPerPixel = 1.0 / 174.0;
 inline float fadeTensionFromHandle (double v) noexcept
 {
     v = std::clamp (v, -1.0, 1.0);
