@@ -122,7 +122,7 @@ public:
     // diagnostics (round 190kr, LYNX_UIPERF_TICKERS=1): per view type, the steps run and the steps that moved (message thread)
     static bool perOwnerWanted()
     {
-        static const bool on = std::getenv ("LYNX_UIPERF_TICKERS") != nullptr;
+        static const bool on = std::getenv ("LYNX_UIPERF_TICKERS") != nullptr || std::getenv ("LYNX_TICKER_LOG") != nullptr;
         return on;
     }
     static std::map<std::string, std::pair<long long, long long>>& perOwner()
@@ -228,6 +228,7 @@ private:
         }
         void timerCallback() override
         {
+            writeLog();
             polling = true;
             const auto list = tickers; // (a step may delete views, and their tickers with them)
             for (auto* t : list)
@@ -237,6 +238,46 @@ private:
             if (orphaned)
                 delete this;
         }
+
+        // round 190kr: LYNX_TICKER_LOG=<file>, every 2 s: each view type's frame steps per second (run / moved), the
+        // steps left out because the view was covered, and for every ticker whose view is showing how the cover check
+        // sees its window (ui/NativeChild.h describeCover)
+        void writeLog()
+        {
+            static const auto path = juce::SystemStats::getEnvironmentVariable ("LYNX_TICKER_LOG", {});
+            if (path.isEmpty())
+                return;
+            const auto now = juce::Time::getMillisecondCounterHiRes();
+            if (logSince <= 0.0)
+            {
+                logSince = now;
+                logStart = perOwner();
+                logCovered = nativechild::coveredSkips().load();
+                return;
+            }
+            if (now - logSince < 2000.0)
+                return;
+            const auto s = (now - logSince) / 1000.0;
+            juce::String text;
+            text << juce::String (now / 1000.0, 1) << " tickers attached " << attachedNow().load() << ":";
+            for (const auto& [name, counts] : perOwner())
+            {
+                const auto before = logStart.count (name) != 0 ? logStart.at (name) : std::pair<long long, long long> {};
+                text << " " << juce::String (name).fromLastOccurrenceOf ("::", false, false).retainCharacters ("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_")
+                     << " " << juce::String ((double) (counts.first - before.first) / s, 0) << "/" << juce::String ((double) (counts.second - before.second) / s, 0);
+            }
+            text << "; covered skips " << juce::String ((double) (nativechild::coveredSkips().load() - logCovered) / s, 0) << "/s\n";
+            for (auto* t : tickers)
+                if (t->owner.isShowing())
+                    text << "    " << juce::String (typeid (t->owner).name()) << ": " << nativechild::describeCover (t->owner) << "\n";
+            juce::File (path).appendText (text);
+            logSince = now;
+            logStart = perOwner();
+            logCovered = nativechild::coveredSkips().load();
+        }
+        double logSince = 0.0;
+        std::map<std::string, std::pair<long long, long long>> logStart;
+        int logCovered = 0;
     };
 
     void poll()

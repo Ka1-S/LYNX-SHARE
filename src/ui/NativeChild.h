@@ -94,6 +94,9 @@ bool coveredBySiblingWindows (const juce::Component& c);
 bool showsOnScreen (const juce::Component& c);
 // diagnostics (--uiperf): steps the frame tickers left out because their view was covered
 std::atomic<int>& coveredSkips();
+// diagnostics (LYNX_OVERLAY_STATS, LYNX_TICKER_LOG): how coveredBySiblingWindows decided for `c` — its window, what of
+// it can show, and every visible sibling window above it (and above its parents) with its rectangle and flags
+juce::String describeCover (const juce::Component& c);
 // The attached children of a native window (the main window's handle), from the bottom of their stacking order up.
 std::vector<juce::Component*> attachedChildren (void* parentWindow);
 

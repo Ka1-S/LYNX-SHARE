@@ -61,6 +61,13 @@ std::atomic<long long>& showMicros()
     return us;
 }
 
+// round 190kr: the view of the last show() (LYNX_OVERLAY_STATS; message thread)
+juce::Component::SafePointer<juce::Component>& lastOwner()
+{
+    static juce::Component::SafePointer<juce::Component> c;
+    return c;
+}
+
 // round 190kr: show() calls whose view's window was wholly covered (nothing shown, nothing committed)
 std::atomic<int>& coveredFrames()
 {
@@ -128,6 +135,8 @@ void writeStats()
     const auto covered = coveredFrames().load();
     extra << " covered/s " << juce::String ((covered - covered0) / s, 1);
     covered0 = covered;
+    if (lastOwner() != nullptr) // (round 190kr: the last view that asked, and how the cover check saw its window)
+        extra << " last view " << juce::String (typeid (*lastOwner()).name()) << ": " << nativechild::describeCover (*lastOwner());
     if (fell != fell0 && lastFallback().isNotEmpty())
         extra << " last fallback: " << lastFallback();
     juce::File (path).appendText (juce::String (now / 1000.0, 1) + " overlay frames/s " + juce::String ((shown - shown0) / s, 1)
@@ -359,6 +368,7 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
 
     bool show (const Mark& mark)
     {
+        lastOwner() = &owner;
         writeStats();
         const ScopedTime timed;
         if (! place (mark))
@@ -952,6 +962,7 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
 
     bool show (const Mark& mark)
     {
+        lastOwner() = &owner;
         writeStats();
         const ScopedTime timed;
         if (! place (mark))

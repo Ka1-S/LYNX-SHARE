@@ -817,7 +817,16 @@ private:
     // the toolbar's live displays (output monitor, song position, time), at the display's refresh up to 72 Hz (round
     // 174e: the oscilloscope is a 1024-point path; at 72 Hz it already moves fluidly and costs half of 144)
     bool toolbarFrame (double nowMs);
-    ui::FrameTicker toolbarFrames { *this, [this] (double ms) { return toolbarFrame (ms); }, 72.0 };
+    // (round 190kr: LYNX_TOOLBAR_HZ=<n> another cap, for A/B measurements: 170 = the display's refresh, as FL's toolbar)
+    static double toolbarHz()
+    {
+        static const double hz = [] {
+            const auto v = juce::SystemStats::getEnvironmentVariable ("LYNX_TOOLBAR_HZ", {}).getDoubleValue();
+            return v >= 10.0 ? juce::jmin (v, 1000.0) : 72.0;
+        }();
+        return hz;
+    }
+    ui::FrameTicker toolbarFrames { *this, [this] (double ms) { return toolbarFrame (ms); }, toolbarHz() };
     int meterTicks = 0;
     juce::String driverTipType; // the device type the ASIO suggestion was worked out for
 

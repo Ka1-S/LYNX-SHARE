@@ -110,7 +110,10 @@ public:
         // work is W wakes ceil(W / (help% x chunk)) - 1 sleeping workers (0: every one that is needed, as before).
         // Thief at 480 samples had all 5 workers woken for ~1 ms of work per 2.9 ms chunk: ~1,900 sleeps and wake-ups a
         // second and their spins. Who computes what changes no sample (the task graph is exact on any thread count).
-        std::atomic<int> helpPercent { 0 };
+        // Measured on Windows (Thief at 480 samples, --uiperf exact cycles, 2 runs x 3 cycles, ~1,150 callbacks per
+        // cell): 0 = 89-90 % of a core for the process, 25 = 76-81 %, 35 = 78-80 %, 50 = 76-79 %; callbacks over the
+        // deadline 0 / 0 / 5 / 15. Default 25; LYNX_POOL="help=0" = every needed sleeper woken (before round 190kr).
+        std::atomic<int> helpPercent { 25 };
         void apply (const char* spec) noexcept; // "spin=60,dry=4,adaptive=1,wait=1,waitspin=30,help=0" (missing keys: unchanged)
     };
     static Tuning& tuning() noexcept;
