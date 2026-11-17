@@ -1663,6 +1663,7 @@ private:
             case EffectKind::distortion: case EffectKind::lofi: case EffectKind::fruityWaveShaper: case EffectKind::fruitySoftClipper:
             case EffectKind::fruityBloodOverdrive: case EffectKind::fruityFastDist: case EffectKind::hardcore: case EffectKind::distructor: case EffectKind::pocketDistortion: case EffectKind::pocketWaveshaper:
             case EffectKind::ember: case EffectKind::kilnChannel: case EffectKind::fretChannel:
+            case EffectKind::corrode: case EffectKind::platter: // round 190kk
                 return "Distortion";
             case EffectKind::compressor: case EffectKind::limiter: case EffectKind::apexLimiter: case EffectKind::volumeGate:
             case EffectKind::crestCompressor: case EffectKind::prismMultiband: case EffectKind::sentryGate: case EffectKind::pocketLimiterClassic: case EffectKind::pocketLimiter: case EffectKind::pocketLeveller: case EffectKind::pocketGate: case EffectKind::pocketCompressor: case EffectKind::pocketMultiband: case EffectKind::pocketAutoduck: case EffectKind::shellChannel: case EffectKind::strikeShaper: case EffectKind::anvilBus: case EffectKind::fruityLimiter:
@@ -1674,6 +1675,7 @@ private:
             case EffectKind::fruityFreeFilter: case EffectKind::fruityFilter: case EffectKind::equo: case EffectKind::lovePhilter:
             case EffectKind::vocoder: case EffectKind::vocodex: case EffectKind::aether: case EffectKind::flLowLifter:
             case EffectKind::flCenter: case EffectKind::flBassBoost: case EffectKind::fl7BandEq:
+            case EffectKind::soundboard: // round 190kk (a resonator)
                 return "Filter";
             case EffectKind::chorus: case EffectKind::fruityChorus: case EffectKind::hyperChorus: case EffectKind::vintageChorus:
             case EffectKind::fruityFlangus: case EffectKind::fruityFlanger: case EffectKind::fruityPhaser: case EffectKind::vintagePhaser:

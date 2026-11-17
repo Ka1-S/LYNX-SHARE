@@ -1247,10 +1247,13 @@ enum class EffectKind : std::uint8_t
     // --- end of round 190dw
     rackMixer,       // a rack chain's mixer (round 183c, core/Rack.h): volume (Live's chain taper), pan, chain-select gain; inside racks only
     edison,          // FL's Edison (round 190cd, core/EdisonFx.h): an audio editor in the slot — records the slot's input, plays into it; its audio in samplePath
-    anvilBus         // LYNX's drum-bus processor (round 190fk, core/AnvilBus.h): drive (3 types), crunch, damp, transients, boom, comp; Live's Drum Buss imports onto it
+    anvilBus,        // LYNX's drum-bus processor (round 190fk, core/AnvilBus.h): drive (3 types), crunch, damp, transients, boom, comp; Live's Drum Buss imports onto it
+    corrode,         // LYNX's degrader (round 190kk, core/Corrode.h): a short delay moved by a sine or band-passed noise; Live's Erosion imports onto it
+    soundboard,      // LYNX's resonant body (round 190kk, core/Soundboard.h): a bank of tuned modes laid out as 7 objects; Live's Corpus imports onto it
+    platter          // LYNX's record-wear effect (round 190kk, core/Platter.h): tracing / pinch distortion on a band, crackle; Live's Vinyl Distortion imports onto it
 };
 // the last EffectKind (loops over every kind; update when one is appended)
-constexpr EffectKind lastEffectKind = EffectKind::anvilBus;
+constexpr EffectKind lastEffectKind = EffectKind::platter;
 
 // round 165x: 160 → 192 (Ember had reached 160; a slot's parameters are 768 bytes, project files store only an engine's
 // own count, so older projects load unchanged). Round 150: 128 → 160 (Prism Multiband 155, Ember 133).

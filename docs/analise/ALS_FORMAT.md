@@ -709,3 +709,28 @@ envelope sets the tempo or the mixer control. Video clips go to a video track wi
 length in song seconds), and the sound stays an audio clip that the sample library decodes from the video. Take lanes
 become muted lanes folded under the track, which becomes the comp track (core/Comping.h). The export writes send
 envelopes and cuts LYNX's curves into pieces that Live's fader reproduces within 0.1 dB.
+
+## 28. Live's still-dropped devices, lot 5 (round 190kk, 2026-11-17) [LIVE renders, DATA]
+Probe sets rendered in Live 12.4.16 Trial (k1: 151 tracks, k3: 34 tracks; the round's folder `/mnt/e/lynx-work/livedev190kk`,
+`RESULTS.md` holds every law). Clean-room: renders and saved sets only. Code: `core/AlsDevicesLot5.cpp`, engines
+`core/Corrode.h`, `core/Platter.h`, `core/Soundboard.h` (wrappers `core/LiveFxSuite.inc`).
+
+| Live device (tag) | LYNX | Quality gate on Live's renders (rms dB of the metric differences: before = device dropped → after) |
+|---|---|---|
+| Erosion2 (Live 12), Erosion (legacy: Mode 0 noise, 1 wide noise, 2 sine) | Corrode (new engine) | 32 cases 23.98 → 0.42, none worse |
+| Vinyl (Vinyl Distortion) | Platter (new engine) | 60 cases 21.49 → 2.42, none worse (Drive 0 = bit-exact pass) |
+| Corpus | Soundboard (new engine) | 62 cases 17.89 → 8.95, none worse; a pipe / tube with Opening < 95 % stays dropped (it scored worse) |
+| Looper | an empty Edison (Monitor 0 / 3) or a muted Utility (Monitor 1 / 2) | 5 cases bit-exact (no set saves a loop) |
+| MidiEffectGroupDevice | one plain chain: its devices as on the track (Arpeggiator → the channel's); else chains, zones, selector, macros written into the notes | not rendered (Live crashed on every generated MIDI rack); core/Rack.h's measured zone laws |
+
+Members read: Erosion2 Amount / Frequency / FilterWidth / NoiseBlend / StereoWidth; Erosion Mode / Freq / Amplitude / BandQ;
+Vinyl Band1On / Gain1 / BandFreq1 / BandQ1 (Tracing), Band2On / Gain2 / BandFreq2 / BandQ2 (Pinch), Drive, SoftHard,
+NormalMono (Tracing's sign on the right channel), CracleDensity / CracleVolume; Corpus ResonanceType (0 beam … 6 tube),
+ResonatorQuality, Frequency (0…1), Decay, FreqDamping (Material), AmpFreq (Brightness), Inharmonics, Radius, TubeOpening,
+Ratio, ExcitationX, ListeningXL / XR, Detune (Spread), Drive (Gain), Bleed, DryWet, StereoWidth, FilterOn / FilterMidFreq /
+FilterBandWidth (LFO, MIDI frequency / gate listed); Looper Monitor / State (the rest listed). Every mapped member is a
+ParamLink (automation, rack macros).
+MIDI Effect Racks: Branches/MidiEffectBranch {DeviceChain/MidiToMidiDeviceChain/Devices, BranchSelectorRange,
+ZoneSettings/KeyRange + VelocityRange (Min, Max, CrossfadeMin, CrossfadeMax), MixerDevice/Speaker}, ChainSelector,
+MacroControls.k; a parameter mapped to a macro carries KeyMidi (Channel 16, NoteOrController = k) and its range in
+MidiControllerRange (linear).

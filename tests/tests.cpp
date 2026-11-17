@@ -17615,6 +17615,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "AlsDevices190bqTests.inc"
 #include "AlsDevices190cfTests.inc"
 #include "AlsDevices190edTests.inc"
+#include "LiveDev190kkTests.inc" // round 190kk: Erosion → Corrode, Vinyl → Platter, Corpus → Soundboard, Looper, MIDI Effect Racks (uses als190cf::)
 #include "AlsDevices190ekTests.inc"
 #include "Tetra190hsTests.inc" // round 190hs
 #include "Tetra190ixTests.inc" // round 190ix

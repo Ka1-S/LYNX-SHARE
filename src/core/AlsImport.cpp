@@ -141,6 +141,8 @@ struct Ctx
     // MIDI effects of the next rack read were already taken by the track's channel (a one-chain Instrument Rack)
     std::map<int, std::vector<alsdev::NoteEffect>> noteEffects;
     int skipLeadingMidi = 0;
+    // (round 190kk) the macros of the plain MIDI Effect Rack whose devices are being taken one by one (alsdev::Context)
+    const std::array<double, 16>* midiMacros = nullptr;
     std::string signatureTarget; // the main track's TimeSignature AutomationTarget Id (round 190cg)
     // round 190ed: every AutomationTarget Id an arrangement envelope points at; where the rack being read collects its
     // automated parameters; targets on the channel being read (their index is set when the channel is placed)
@@ -1380,6 +1382,91 @@ bool instrumentFrom (Ctx& ctx, const Element& device, ChannelDef& channel, std::
     return false;
 }
 
+bool midiEffectFrom (Ctx& ctx, const Element& d, ChannelDef& channel, std::vector<alsdev::NoteEffect>& effects);
+
+// (round 190kk) whether an envelope moves one of the rack's macros (each such envelope is then listed by the caller's
+// line, not again as an unknown target)
+bool rackMacroAutomated (Ctx& ctx, const Element& rack)
+{
+    bool any = false;
+    for (int k = 0; k < rackMacroCount; ++k)
+        if (const auto id = targetId (rack.child ("MacroControls." + std::to_string (k))); ! id.empty() && ctx.automated.count (id) != 0)
+        {
+            ctx.explained.insert (id);
+            any = true;
+        }
+    return any;
+}
+
+// (round 190kk) Live's MIDI Effect Rack in front of the instrument (core/AlsDevices.h midiRackNotes). False = a device
+// inside has no counterpart: the caller lists the rack as unsupported, as before (with the device that stopped it).
+bool midiRackFrom (Ctx& ctx, const Element& d, ChannelDef& channel, std::vector<alsdev::NoteEffect>& effects)
+{
+    const auto chains = d.path ("Branches").children().size();
+    if (! d.boolean ("On/Manual", true))
+    {
+        ctx.note (&FlpImportReport::approximated, "MIDI Effect Rack (switched off in the set: its notes pass unchanged)");
+        return true;
+    }
+    if (alsdev::midiRackIsPlain (d))
+    {
+        // the devices one by one, under the rack's macros; all or nothing (a failed device leaves the earlier ones taken)
+        const auto macros = alsdev::rackMacroValues (d);
+        const auto outer = std::exchange (ctx.midiMacros, &macros);
+        const auto arpBefore = channel.arp;
+        const auto effectsBefore = effects.size();
+        bool ok = true;
+        std::string stopped;
+        for (const auto& inner : d.path ("Branches").children().front().path ("DeviceChain/MidiToMidiDeviceChain/Devices").children())
+            if (! midiEffectFrom (ctx, inner, channel, effects))
+            {
+                ok = false;
+                stopped = deviceName (inner);
+                break;
+            }
+        ctx.midiMacros = outer;
+        if (! ok)
+        {
+            channel.arp = arpBefore;
+            effects.resize (effectsBefore);
+            ctx.note (&FlpImportReport::unsupported, "MIDI Effect Rack: " + stopped + " inside (no LYNX counterpart)");
+            return false;
+        }
+        ctx.note (&FlpImportReport::converted, "MIDI Effect Rack (one chain) -> its devices in front of the instrument");
+        if (rackMacroAutomated (ctx, d))
+            ctx.note (&FlpImportReport::approximated, "MIDI Effect Rack: macro automation (the devices keep the macros' values in the set)");
+        return true;
+    }
+    if (channel.arp.enabled())
+    {
+        // behind an arpeggiator the rack's split would see the arpeggiated notes
+        ctx.note (&FlpImportReport::unsupported, "MIDI Effect Rack (" + std::to_string (chains) + " chains) behind an Arpeggiator");
+        return false;
+    }
+    alsdev::Context context;
+    context.bpm = ctx.song.bpm;
+    context.macros = ctx.midiMacros;
+    alsdev::Notes notes;
+    std::string stopped;
+    auto e = alsdev::midiRackNotes (d, context, notes, stopped);
+    if (! e)
+    {
+        ctx.note (&FlpImportReport::unsupported, "MIDI Effect Rack (" + std::to_string (chains) + " chains): " + stopped
+                                                     + " inside cannot be written into notes");
+        return false;
+    }
+    effects.push_back (std::move (*e));
+    ctx.note (&FlpImportReport::approximated, "MIDI Effect Rack (" + std::to_string (chains)
+                                                  + " chains): its chains, zones and macro values written into the notes of the track's clips; notes played live are not changed");
+    if (rackMacroAutomated (ctx, d))
+        ctx.note (&FlpImportReport::approximated, "MIDI Effect Rack: macro automation (the notes keep the macros' values in the set)");
+    for (const auto& n : notes.approximated)
+        ctx.note (&FlpImportReport::approximated, "MIDI Effect Rack: " + n);
+    for (const auto& n : notes.dropped)
+        ctx.note (&FlpImportReport::approximated, "MIDI Effect Rack: " + n + " (not applied)");
+    return true;
+}
+
 // One of Live's MIDI effects in front of a track's instrument (round 190cf, core/AlsDevices.h): the Arpeggiator becomes
 // the channel's arpeggiator; Pitch, Velocity, Chord and Note Length are written into the notes of the track's clips
 // (LYNX has no live note processor inside a channel for them), in the chain's order. False = no counterpart, or a
@@ -1387,10 +1474,15 @@ bool instrumentFrom (Ctx& ctx, const Element& device, ChannelDef& channel, std::
 bool midiEffectFrom (Ctx& ctx, const Element& d, ChannelDef& channel, std::vector<alsdev::NoteEffect>& effects)
 {
     const auto tag = d.name();
+    // (round 190kk) a MIDI Effect Rack: one chain over every note = its devices one by one, as on the track (an
+    // Arpeggiator inside becomes the channel's); split / layered chains = the whole rack written into the notes
+    if (tag == "MidiEffectGroupDevice")
+        return midiRackFrom (ctx, d, channel, effects);
     if (tag != "MidiArpeggiator" && tag != "MidiPitcher" && tag != "MidiVelocity" && tag != "MidiChord" && tag != "MidiNoteLength")
         return false;
     alsdev::Context context;
     context.bpm = ctx.song.bpm;
+    context.macros = ctx.midiMacros;
     alsdev::Notes notes;
     std::string name;
     if (tag == "MidiArpeggiator")
@@ -3289,7 +3381,7 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
                 const auto tag = devices[d].name();
                 if (isMidiEffect (tag))
                 {
-                    if (! midiEffectFrom (ctx, devices[d], c, noteEffects))
+                    if (! midiEffectFrom (ctx, devices[d], c, noteEffects) && tag != "MidiEffectGroupDevice") // (190kk: a rack lists its own reason)
                         ctx.note (&FlpImportReport::unsupported, deviceName (devices[d]));
                     firstEffect = d + 1;
                     continue;

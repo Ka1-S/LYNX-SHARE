@@ -128,11 +128,24 @@ void addOnce (juce::StringArray& list, const juce::String& item)
         list.add (item);
 }
 
+void flattenEffects (juce::var& root, const juce::StringArray& kinds, const char* loss, Losses& lost);
+
 // Rollup 0.1.30 (round 190il): what the other 0.1.30 rounds save that 0.1.28 cannot hold (round 190hq's step above
 // knew only its own). Each loss is reported only when the project has it.
 void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
 {
     auto& o = *objectOf (root);
+
+    // round 190kk: the engines Live's Erosion (and the next lot) open on are not in 0.1.28
+    flattenEffects (root, { "corrode" },
+                    TR_NOOP ("Corrode (an imported Live Erosion) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})"),
+                    lost);
+    flattenEffects (root, { "platter" },
+                    TR_NOOP ("Platter (an imported Live Vinyl Distortion) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})"),
+                    lost);
+    flattenEffects (root, { "soundboard" },
+                    TR_NOOP ("Soundboard (an imported Live Corpus) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})"),
+                    lost);
 
     // channels: Tetra (round 190hs) is not in 0.1.28, which would play its channels as its basic synth: an empty Sampler
     // (silent) keeps the channel, its notes and its routing; DirectWave states (rounds 190hz / 190ii) get their short zone
@@ -553,10 +566,10 @@ void toRelease0128 (juce::var& root, Losses& lost)
 
 // --- 0.1.28 → 0.1.27 -----------------------------------------------------------------------------------------------------
 // A slot 0.1.27 does not know (it would drop it, moving every later slot): a switched-off Utility in its place.
-bool flattenUnknownEffect (juce::var& e)
+bool flattenUnknownEffect (juce::var& e, const juce::StringArray& kinds)
 {
     auto* o = objectOf (e);
-    if (o == nullptr || e["kind"].toString() != "anvilBus")
+    if (o == nullptr || ! kinds.contains (e["kind"].toString()))
         return false;
     auto replacement = std::make_unique<juce::DynamicObject>();
     replacement->setProperty ("kind", "utility");
@@ -569,12 +582,12 @@ bool flattenUnknownEffect (juce::var& e)
 }
 
 // nested chains (a Patcher's nodes, a rack's branches): every effect object below `v`
-void flattenNested (juce::var& v, int& count)
+void flattenNested (juce::var& v, int& count, const juce::StringArray& kinds)
 {
     if (auto* a = arrayOf (v))
     {
         for (auto& item : *a)
-            flattenNested (item, count);
+            flattenNested (item, count, kinds);
         return;
     }
     auto* o = objectOf (v);
@@ -583,9 +596,9 @@ void flattenNested (juce::var& v, int& count)
     for (auto& p : o->getProperties())
     {
         auto value = p.value;
-        if (value.isObject() && value["kind"].toString() == "anvilBus" && (p.name.toString() == "effect" || p.name.toString() == "head"))
+        if (value.isObject() && kinds.contains (value["kind"].toString()) && (p.name.toString() == "effect" || p.name.toString() == "head"))
         {
-            if (flattenUnknownEffect (value))
+            if (flattenUnknownEffect (value, kinds))
             {
                 o->setProperty (p.name, value);
                 ++count;
@@ -594,9 +607,9 @@ void flattenNested (juce::var& v, int& count)
         }
         if (auto* list = arrayOf (value); list != nullptr && (p.name.toString() == "chain" || p.name.toString() == "effects"))
             for (auto& item : *list)
-                if (flattenUnknownEffect (item))
+                if (flattenUnknownEffect (item, kinds))
                     ++count;
-        flattenNested (value, count);
+        flattenNested (value, count, kinds);
     }
 }
 
@@ -634,36 +647,42 @@ void detachTargets (juce::var& v, int track, int slot)
     }
 }
 
+// Every slot of `kinds` (mixer inserts, Patchers, racks) becomes a switched-off Utility; their automation is detached and one
+// loss line names where they were
+void flattenEffects (juce::var& root, const juce::StringArray& kinds, const char* loss, Losses& lost)
+{
+    auto& o = *objectOf (root);
+    juce::StringArray where;
+    if (auto* mixer = arrayOf (root["mixer"]))
+        for (int t = 0; t < mixer->size(); ++t)
+            if (auto* fx = arrayOf ((*mixer)[t]["effects"]))
+                for (int s = 0; s < fx->size(); ++s)
+                    if (flattenUnknownEffect (fx->getReference (s), kinds))
+                    {
+                        where.add (insertName (o.getProperty ("mixer"), t) + juce::String::fromUTF8 (" \u203a ") + juce::String (s + 1));
+                        detachTargets (root, t, s);
+                    }
+    int nested = 0;
+    if (auto* mixer = arrayOf (root["mixer"]))
+        for (auto& t : *mixer)
+            if (auto* fx = arrayOf (t["effects"]))
+                for (auto& e : *fx)
+                    flattenNested (e, nested, kinds);
+    if (auto* channels = arrayOf (root["channels"]))
+        for (auto& c : *channels)
+            flattenNested (c, nested, kinds);
+    if (nested > 0)
+        where.add (juce::String (nested) + juce::String::fromUTF8 (" \u00d7 Patcher"));
+    if (! where.isEmpty())
+        lost.push_back ({ loss, listOf (where), true });
+}
+
 void toRelease0127 (juce::var& root, Losses& lost)
 {
     auto& o = *objectOf (root);
 
     // the effect 0.1.28 added (Anvil Bus, round 190fk)
-    {
-        juce::StringArray where;
-        if (auto* mixer = arrayOf (root["mixer"]))
-            for (int t = 0; t < mixer->size(); ++t)
-                if (auto* fx = arrayOf ((*mixer)[t]["effects"]))
-                    for (int s = 0; s < fx->size(); ++s)
-                        if (flattenUnknownEffect (fx->getReference (s)))
-                        {
-                            where.add (insertName (o.getProperty ("mixer"), t) + juce::String::fromUTF8 (" \u203a ") + juce::String (s + 1));
-                            detachTargets (root, t, s);
-                        }
-        int nested = 0;
-        if (auto* mixer = arrayOf (root["mixer"]))
-            for (auto& t : *mixer)
-                if (auto* fx = arrayOf (t["effects"]))
-                    for (auto& e : *fx)
-                        flattenNested (e, nested);
-        if (auto* channels = arrayOf (root["channels"]))
-            for (auto& c : *channels)
-                flattenNested (c, nested);
-        if (nested > 0)
-            where.add (juce::String (nested) + juce::String::fromUTF8 (" \u00d7 Patcher"));
-        if (! where.isEmpty())
-            lost.push_back ({ TR_NOOP ("Anvil Bus is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})"), listOf (where), true });
-    }
+    flattenEffects (root, { "anvilBus" }, TR_NOOP ("Anvil Bus is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})"), lost);
 
     // channels
     {

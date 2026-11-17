@@ -17,6 +17,9 @@
 #include "core/ParametricEqLinear.h"
 #include "core/StrikeShaper.h"
 #include "core/AnvilBus.h"
+#include "core/Corrode.h"
+#include "core/Soundboard.h"
+#include "core/Platter.h"
 #include "core/VoiceMatch.h"
 #include "core/VoxStrip.h"
 
@@ -4058,12 +4061,16 @@ std::unique_ptr<Effect> makeFret();  // round tp172c8 (core/StripSuite.inc)
 std::unique_ptr<Effect> makeShell();
 std::unique_ptr<Effect> makeStrike(); // round trans189d (core/StrikeSuite.inc)
 std::unique_ptr<Effect> makeAnvil(); // round 190fk (core/AnvilSuite.inc)
+std::unique_ptr<Effect> makeCorrode(); // round 190kk (core/LiveFxSuite.inc)
+std::unique_ptr<Effect> makeSoundboard();
+std::unique_ptr<Effect> makePlatter();
 bool isSuiteKind (EffectKind kind) noexcept
 {
     return kind == EffectKind::ridgeStrip || kind == EffectKind::glowLeveler || kind == EffectKind::hushDeEsser
            || kind == EffectKind::aether || kind == EffectKind::ember || kind == EffectKind::kilnChannel
            || kind == EffectKind::fretChannel || kind == EffectKind::shellChannel || kind == EffectKind::strikeShaper
-           || kind == EffectKind::anvilBus;
+           || kind == EffectKind::anvilBus || kind == EffectKind::corrode || kind == EffectKind::soundboard
+           || kind == EffectKind::platter;
 }
 
 std::unique_ptr<Effect> make (EffectKind kind)
@@ -4080,6 +4087,9 @@ std::unique_ptr<Effect> make (EffectKind kind)
         case EffectKind::shellChannel: return makeShell();
         case EffectKind::strikeShaper: return makeStrike();
         case EffectKind::anvilBus: return makeAnvil();
+        case EffectKind::corrode: return makeCorrode();
+        case EffectKind::soundboard: return makeSoundboard();
+        case EffectKind::platter: return makePlatter();
         default: return nullptr;
     }
 }
@@ -4113,6 +4123,7 @@ std::string onOff (float v) { return on (v) ? "on" : "off"; }
 #include "core/StripSuite.inc" // round tp172c8: Fret Channel, Shell Channel
 #include "core/StrikeSuite.inc" // round trans189d: Strike Shaper
 #include "core/AnvilSuite.inc" // round 190fk: Anvil Bus
+#include "core/LiveFxSuite.inc" // round 190kk: Corrode, Soundboard, Platter
 
 namespace glow
 {
@@ -4245,6 +4256,12 @@ std::string paramText (EffectKind kind, int param, float v)
         return strikeParamText (param, v);
     if (kind == EffectKind::anvilBus)
         return anvilParamText (param, v);
+    if (kind == EffectKind::corrode)
+        return corrodeParamText (param, v);
+    if (kind == EffectKind::soundboard)
+        return soundboardParamText (param, v);
+    if (kind == EffectKind::platter)
+        return platterParamText (param, v);
     if (kind == EffectKind::kilnChannel)
     {
         namespace k = kiln;

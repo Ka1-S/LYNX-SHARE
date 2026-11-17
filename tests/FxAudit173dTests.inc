@@ -92,6 +92,7 @@ const std::vector<Allowed>& allowed()
         { "Transmitter", "", "clip", "behaviour: FL's Transmitter, Bounce sums 32 taps and the delay its feedback (exact engine)" },
         { "Transmitter", "", "click", "behaviour: FL's Transmitter, a new section effect starts on the running part (exact engine)" },
         { "Transmitter", "", "dc", "behaviour: FL's Transmitter, Bounce's 32 taps of the kicks' tails (exact engine)" },
+        { "Platter", "", "dc", "behaviour: Live's Vinyl Distortion adds the rectified band's DC and keeps it (measured, round 190kk); Platter imports it" },
         { "Fruity Love Philter", "Unit 1 on", "silent", "behaviour: FL's Love Philter outputs the sum of its units; its default has unit 1 on only, so unit 1 off is silence (exact engine)" },
         // round 190g: FL Studio Mobile's own behaviours, kept by the Pocket engines (REA specs of round 189h)
         { "Pocket Compressor", "RMS", "inert", "fl-inert: FLM's setter always clears the RMS flag (its RMS mode is unreachable), so the control does nothing there either" },
