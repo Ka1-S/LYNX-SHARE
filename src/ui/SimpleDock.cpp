@@ -470,9 +470,9 @@ public:
         auto side = r.removeFromLeft (sideWidth - pad);
         presetCaption.setBounds (side.removeFromTop (16));
         auto row = side.removeFromTop (26);
-        previousPreset.setBounds (row.removeFromLeft (22));
-        nextPreset.setBounds (row.removeFromRight (22));
-        presetButton.setBounds (row);
+        presetButton.setBounds (row); // (BandLab: "‹ Bass Boost ›", the arrows inside the preset's capsule)
+        previousPreset.setBounds (row.removeFromLeft (22).reduced (0, 2));
+        nextPreset.setBounds (row.removeFromRight (22).reduced (0, 2));
         side.removeFromTop (6);
         auto second = side.removeFromTop (26); // BandLab: Save and the chain bypass under the preset
         saveButton.setBounds (second.removeFromLeft (58));
