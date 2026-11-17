@@ -70,6 +70,8 @@ struct GeneralOptions
     bool uiAnimations = true;      // round 179a: panel fades, hover fades, wheel glide (ui/Motion.h)
     bool artMotion = true;         // round 170j: the Themed plugins' art moves (falling petals, glows...)
     int animationRate = 0;         // round 174e2: playhead / meters / scopes at the display's refresh (0), or at most 60 / 30 Hz; -1 Balanced (190ip)
+    // round 190jy (queue item 44; Windows): docked LYNX editors drawn by the main window (ui/WindowOwner.h), off by default
+    bool editorsInMainWindow = false;
     bool gpuRendering = true;      // Windows: Direct2D (JUCE 8's default) or GDI for every LYNX window (round 157a)
     int pluginStyle = -1;          // −1 automatic (each plugin its own style), else a skin::Style forced everywhere   // plugin editors without glows, blooms or the open animation (ui/PluginSkin.h)
 

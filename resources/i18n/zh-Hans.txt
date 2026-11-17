@@ -10713,3 +10713,5 @@ countries: cn sg
 "Complex Pro and Texture transpositions play through the Pitch knob: {0}" = "Complex Pro 和 Texture 的移调通过 Pitch 旋钮播放：{0}"
 "Warped samples do not follow tempo changes in this release: they keep the project tempo" = "此版本中经过变速的采样不跟随速度变化：保持项目速度"
 "{0} deactivated clip slot(s) play again" = "{0} 个已停用的片段槽会重新发声"
+"Draw docked LYNX editors in the main window (lighter live displays)" = "在主窗口中绘制停靠的 LYNX 编辑器（实时显示更轻量）"
+"On: a docked LYNX editor (Gross Beat, Fruity Limiter, Maximus...) is drawn by the main window: its moving displays use less CPU. Hosted plugins and detached windows keep windows of their own" = "开启：停靠的 LYNX 编辑器（Gross Beat、Fruity Limiter、Maximus 等）由主窗口绘制，其动态显示占用更少 CPU。托管插件和分离的窗口保留各自的窗口"

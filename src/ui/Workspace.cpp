@@ -11,6 +11,7 @@
 #include "ui/ValueControl.h"
 #include "ui/WindowOwner.h"
 
+#include <algorithm>
 #include <vector>
 #include "core/DockStack.h"
 
@@ -669,6 +670,56 @@ struct Workspace::PeerWatch final : juce::ComponentMovementWatcher, juce::Compon
     juce::ComponentPeer* peer = nullptr;
 };
 
+// --- round 190jy: docked LYNX editors drawn by the main window (queue item 44) ------------------------------------
+namespace
+{
+// stands for an editor drawn here in the native stacking order of the main window's children: never shown
+struct EditorAnchor final : juce::Component
+{
+    EditorAnchor()
+    {
+        setOpaque (true);
+        setInterceptsMouseClicks (false, false);
+        setSize (1, 1);
+        getProperties().set ("lynxEditorAnchor", true);
+    }
+    void paint (juce::Graphics&) override {}
+};
+} // namespace
+
+struct Workspace::EditorWindow
+{
+    juce::Component::SafePointer<juce::Component> window;
+    std::unique_ptr<juce::Component> anchor;
+};
+
+struct Workspace::EditorWatch final : juce::ComponentListener
+{
+    explicit EditorWatch (Workspace& w) : owner (w) {}
+    void componentMovedOrResized (juce::Component&, bool, bool) override { owner.updateEditorHoles(); }
+    void componentVisibilityChanged (juce::Component&) override { owner.updateEditorHoles(); }
+    void componentBroughtToFront (juce::Component& c) override { owner.raiseEditorWindow (c); }
+    void componentBeingDeleted (juce::Component& c) override
+    {
+        c.removeComponentListener (this);
+        auto& list = owner.editorWindowList;
+        for (auto it = list.begin(); it != list.end(); ++it)
+            if ((*it)->window.getComponent() == &c)
+            {
+                if ((*it)->anchor != nullptr)
+                    nativechild::detach (*(*it)->anchor);
+                list.erase (it);
+                break;
+            }
+        // (after it is gone: the holes it made are closed)
+        juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<Workspace> (&owner)] {
+            if (safe != nullptr)
+                safe->updateEditorHoles();
+        });
+    }
+    Workspace& owner;
+};
+
 Workspace::Workspace()
 {
     for (int i = 0; i < workspace::panelCount; ++i)
@@ -694,6 +745,22 @@ Workspace::~Workspace()
     for (auto& f : dockedFrames)
         if (f != nullptr)
             nativechild::detach (*f);
+    // round 190jy: the editors drawn here go back to their owners (no parent), their anchors before the main window's
+    // native window goes
+    if (! editorWindowList.empty())
+        nativechild::setStackingListener (nullptr);
+    for (auto& e : editorWindowList)
+    {
+        if (auto* w = e->window.getComponent())
+        {
+            w->removeComponentListener (editorWatch.get());
+            if (w->getParentComponent() == this)
+                removeChildComponent (w);
+        }
+        if (e->anchor != nullptr)
+            nativechild::detach (*e->anchor);
+    }
+    editorWindowList.clear();
 
     for (auto& w : windows)
         if (w != nullptr)
@@ -922,6 +989,10 @@ void Workspace::rehostNativeFrames()
     for (auto& f : dockedFrames)
         if (f != nullptr)
             nativechild::refresh (*f, *this);
+    for (auto& e : editorWindowList) // (round 190jy: the anchors of the editors drawn here)
+        if (e->anchor != nullptr)
+            nativechild::refresh (*e->anchor, *this);
+    updateEditorHoles();
 }
 
 void Workspace::addDockedFrame (juce::Component& frame)
@@ -946,11 +1017,168 @@ juce::Rectangle<int> Workspace::placeForDockedFrame (int width, int height) cons
     for (const auto& f : dockedFrames)
         if (f != nullptr && f->isVisible())
             ++open;
+    for (const auto& e : editorWindowList) // (round 190jy)
+        if (e->window != nullptr && e->window->isVisible())
+            ++open;
     const auto step = 24 * (open % 8);
     auto r = juce::Rectangle<int> (60 + step, 40 + step, width, height);
     r.setX (juce::jlimit (0, juce::jmax (0, getWidth() - width), r.getX()));
     r.setY (juce::jlimit (0, juce::jmax (0, getHeight() - height), r.getY()));
     return r;
+}
+
+// --- round 190jy: docked LYNX editors drawn by the main window (queue item 44) ------------------------------------
+
+bool Workspace::addEditorWindow (juce::Component& window, juce::Rectangle<int> bounds)
+{
+   #if JUCE_WINDOWS
+    if (window.getParentComponent() != nullptr || window.isOnDesktop() || hasEditorWindow (window) || getPeer() == nullptr)
+        return false;
+    auto entry = std::make_unique<EditorWindow>();
+    entry->window = &window;
+    entry->anchor = std::make_unique<EditorAnchor>();
+    if (! nativechild::attach (*entry->anchor, *this, 0))
+        return false;
+    if (editorWatch == nullptr)
+        editorWatch = std::make_unique<EditorWatch> (*this);
+    window.setBounds (bounds);
+    addChildComponent (window); // (its own visibility stays as it is)
+    window.getProperties().set ("lynxEditorInMainWindow", true);
+    editorWindowList.push_back (std::move (entry));
+    window.addComponentListener (editorWatch.get());
+    nativechild::setStackingListener ([safe = juce::Component::SafePointer<Workspace> (this)] {
+        if (safe != nullptr)
+            safe->updateEditorHoles();
+    });
+    if (peerWatch == nullptr)
+        peerWatch = std::make_unique<PeerWatch> (*this);
+    return true; // (the caller puts it in the stacking order: raiseEditorWindow, or where it was)
+   #else
+    juce::ignoreUnused (window, bounds);
+    return false;
+   #endif
+}
+
+void Workspace::removeEditorWindow (juce::Component& window)
+{
+    for (auto it = editorWindowList.begin(); it != editorWindowList.end(); ++it)
+        if ((*it)->window.getComponent() == &window)
+        {
+            if (editorWatch != nullptr)
+                window.removeComponentListener (editorWatch.get());
+            if (window.getParentComponent() == this)
+                removeChildComponent (&window);
+            window.getProperties().remove ("lynxEditorInMainWindow");
+            if ((*it)->anchor != nullptr)
+                nativechild::detach (*(*it)->anchor);
+            editorWindowList.erase (it);
+            break;
+        }
+    updateEditorHoles();
+    if (editorWindowList.empty())
+        nativechild::setStackingListener (nullptr);
+}
+
+bool Workspace::hasEditorWindow (const juce::Component& window) const
+{
+    return std::any_of (editorWindowList.begin(), editorWindowList.end(), [&window] (const auto& e) { return e->window.getComponent() == &window; });
+}
+
+std::vector<juce::Component*> Workspace::editorWindows() const
+{
+    std::vector<juce::Component*> out;
+    for (const auto& e : editorWindowList)
+        if (auto* w = e->window.getComponent())
+            out.push_back (w);
+    return out;
+}
+
+juce::Component* Workspace::editorAnchorForTest (const juce::Component& window) const
+{
+    for (const auto& e : editorWindowList)
+        if (e->window.getComponent() == &window)
+            return e->anchor.get();
+    return nullptr;
+}
+
+void Workspace::raiseEditorWindow (juce::Component& window)
+{
+    if (raisingEditor)
+        return;
+    for (const auto& e : editorWindowList)
+        if (e->window.getComponent() == &window)
+        {
+            const juce::ScopedValueSetter<bool> guard (raisingEditor, true);
+            if (e->anchor != nullptr && nativechild::isAttached (*e->anchor))
+                e->anchor->toFront (false); // (its native window to the top of the main window's children)
+            window.toFront (false);         // (and in front of the other editors drawn here)
+            nativechild::raiseOverlays();   // (the floaters and overlays stay in front; the holes follow)
+            break;
+        }
+    updateEditorHoles();
+}
+
+void Workspace::keepEditorWindowsOnTop()
+{
+    if (editorWindowList.empty())
+        return;
+    const juce::ScopedValueSetter<bool> guard (raisingEditor, true);
+    // in the anchors' stacking order, so the editors drawn here overlap each other as their anchors say
+    auto ordered = editorWindows();
+   #if JUCE_WINDOWS
+    std::stable_sort (ordered.begin(), ordered.end(), [this] (juce::Component* a, juce::Component* b) {
+        auto* aa = editorAnchorForTest (*a);
+        auto* ab = editorAnchorForTest (*b);
+        return aa != nullptr && ab != nullptr && nativechild::isAbove (ab->getWindowHandle(), aa->getWindowHandle());
+    });
+   #endif
+    for (auto* w : ordered)
+        if (w->getParentComponent() == this)
+            w->toFront (false);
+}
+
+void Workspace::updateEditorHoles()
+{
+   #if JUCE_WINDOWS
+    if (updatingHoles)
+        return;
+    const juce::ScopedValueSetter<bool> guard (updatingHoles, true);
+    auto* top = getTopLevelComponent();
+    auto* peer = top != nullptr ? top->getPeer() : nullptr;
+    if (peer == nullptr)
+        return;
+    editorWindowList.erase (std::remove_if (editorWindowList.begin(), editorWindowList.end(), [] (const auto& e) { return e->window == nullptr; }),
+                            editorWindowList.end());
+    const auto children = nativechild::attachedChildren (peer->getNativeHandle()); // (bottom up)
+    std::vector<dockstack::PhysicalRect> rects (editorWindowList.size());
+    for (std::size_t i = 0; i < editorWindowList.size(); ++i)
+        if (auto* w = editorWindowList[i]->window.getComponent(); w != nullptr && w->isVisible() && w->getParentComponent() == this)
+        {
+            const auto r = nativechild::physicalInTop (*this, w->getBounds());
+            rects[i] = { r.getX(), r.getY(), r.getWidth(), r.getHeight() };
+        }
+    const auto anchorOf = [this] (juce::Component* c) {
+        for (std::size_t i = 0; i < editorWindowList.size(); ++i)
+            if (editorWindowList[i]->anchor.get() == c)
+                return (int) i;
+        return -1;
+    };
+    const auto above = dockstack::editorsAbove (children, anchorOf, [&rects] (int i) { return rects[(std::size_t) i].w > 0 && rects[(std::size_t) i].h > 0; });
+    for (std::size_t k = 0; k < children.size(); ++k)
+    {
+        auto* c = children[k];
+        if (anchorOf (c) >= 0 || ! c->isVisible())
+            continue;
+        const auto wr = nativechild::rectInParentWindow (*c);
+        std::vector<dockstack::PhysicalRect> editors;
+        for (const auto i : above[k])
+            editors.push_back (rects[(std::size_t) i]);
+        std::vector<juce::Rectangle<int>> holes;
+        for (const auto& h : dockstack::holesIn ({ wr.getX(), wr.getY(), wr.getWidth(), wr.getHeight() }, editors))
+            holes.push_back ({ h.x, h.y, h.w, h.h });
+        nativechild::setHoles (*c, holes);
+    }
+   #endif
 }
 
 void Workspace::restoreDetachedWindows()
@@ -1210,6 +1438,7 @@ void Workspace::applyLayout (bool fadePanels)
         });
     }
 
+    keepEditorWindowsOnTop(); // (round 190jy: above a plain frame added again)
     nativechild::raiseOverlays();
     setFocusedPanel (layout.focused);
     repaint();

@@ -3,6 +3,7 @@
 #include "ui/MotionOverlay.h"
 
 #include "ui/ImageReadback.h"
+#include "ui/NativeChild.h"
 #include "ui/Theme.h"
 #include "ui/ToolWindow.h"
 
@@ -510,6 +511,9 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
                     return Cover::part;
         }
         const auto areaPhys = (top.getLocalArea (&owner, area).toDouble() * topScale).getSmallestIntegerContainer();
+        // round 190jy: the view's window has a hole there (a docked editor drawn by the main window is in front of it)
+        if (nativechild::cutsInto (hwnd, areaPhys))
+            return Cover::part;
         for (auto child = GetWindow (hwnd, GW_CHILD); child != nullptr; child = GetWindow (child, GW_HWNDNEXT))
         {
             if (! IsWindowVisible (child))
@@ -518,8 +522,22 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
             GetWindowRect (child, &r);
             POINT corners[2] { { r.left, r.top }, { r.right, r.bottom } };
             MapWindowPoints (nullptr, hwnd, corners, 2);
-            if (juce::Rectangle<int>::leftTopRightBottom (corners[0].x, corners[0].y, corners[1].x, corners[1].y).intersects (areaPhys))
-                return Cover::part;
+            const auto childRect = juce::Rectangle<int>::leftTopRightBottom (corners[0].x, corners[0].y, corners[1].x, corners[1].y);
+            if (! childRect.intersects (areaPhys))
+                continue;
+            // round 190jy: a child window below a docked editor the main window draws (the view: that editor) has a
+            // hole where the editor is; where its region leaves the mark free it covers nothing of it
+            if (auto* region = CreateRectRgn (0, 0, 0, 0))
+            {
+                const auto type = GetWindowRgn (child, region);
+                const auto inChild = areaPhys.getIntersection (childRect) - childRect.getPosition();
+                const RECT probe { inChild.getX(), inChild.getY(), inChild.getRight(), inChild.getBottom() };
+                const auto free = type != ERROR && type != NULLREGION && RectInRegion (region, &probe) == FALSE;
+                DeleteObject (region);
+                if (free)
+                    continue;
+            }
+            return Cover::part;
         }
         // in the top-level window's target: the windows above the view's window (and above each of its parents) up to it
         if (targetHwnd != hwnd)

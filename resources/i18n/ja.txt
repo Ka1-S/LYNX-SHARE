@@ -10713,3 +10713,5 @@ countries: jp
 "Complex Pro and Texture transpositions play through the Pitch knob: {0}" = "Complex Pro と Texture のトランスポーズは Pitch ノブで再生されます: {0}"
 "Warped samples do not follow tempo changes in this release: they keep the project tempo" = "このリリースではワープしたサンプルはテンポの変化に従いません: プロジェクトのテンポのままです"
 "{0} deactivated clip slot(s) play again" = "無効化した {0}個のクリップスロットが再び鳴ります"
+"Draw docked LYNX editors in the main window (lighter live displays)" = "ドッキングした LYNX エディターをメインウィンドウで描画する（ライブ表示が軽くなります）"
+"On: a docked LYNX editor (Gross Beat, Fruity Limiter, Maximus...) is drawn by the main window: its moving displays use less CPU. Hosted plugins and detached windows keep windows of their own" = "オン：ドッキングした LYNX エディター（Gross Beat、Fruity Limiter、Maximus など）をメインウィンドウが描画し、動く表示の CPU 使用量が減ります。ホストされたプラグインと切り離したウィンドウは独自のウィンドウのままです"

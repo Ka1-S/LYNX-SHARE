@@ -10713,3 +10713,5 @@ countries: kr
 "Complex Pro and Texture transpositions play through the Pitch knob: {0}" = "Complex Pro와 Texture의 트랜스포즈는 Pitch 노브로 재생됩니다: {0}"
 "Warped samples do not follow tempo changes in this release: they keep the project tempo" = "이 릴리스에서는 워프된 샘플이 템포 변화를 따르지 않습니다: 프로젝트 템포를 유지합니다"
 "{0} deactivated clip slot(s) play again" = "비활성화한 클립 슬롯 {0}개가 다시 재생됩니다"
+"Draw docked LYNX editors in the main window (lighter live displays)" = "도킹된 LYNX 편집기를 메인 창에서 그리기 (더 가벼운 실시간 표시)"
+"On: a docked LYNX editor (Gross Beat, Fruity Limiter, Maximus...) is drawn by the main window: its moving displays use less CPU. Hosted plugins and detached windows keep windows of their own" = "켜짐: 도킹된 LYNX 편집기(Gross Beat, Fruity Limiter, Maximus...)를 메인 창이 그려서 움직이는 표시가 CPU를 덜 사용합니다. 호스팅된 플러그인과 분리된 창은 자체 창을 유지합니다"

@@ -10713,3 +10713,5 @@ countries: id
 "Complex Pro and Texture transpositions play through the Pitch knob: {0}" = "Transposisi Complex Pro dan Texture diputar lewat kenop Pitch: {0}"
 "Warped samples do not follow tempo changes in this release: they keep the project tempo" = "Sampel yang di-warp tidak mengikuti perubahan tempo di rilis ini: tetap pada tempo proyek"
 "{0} deactivated clip slot(s) play again" = "{0} slot klip yang dinonaktifkan berbunyi lagi"
+"Draw docked LYNX editors in the main window (lighter live displays)" = "Gambar editor LYNX yang tertambat di jendela utama (tampilan langsung lebih ringan)"
+"On: a docked LYNX editor (Gross Beat, Fruity Limiter, Maximus...) is drawn by the main window: its moving displays use less CPU. Hosted plugins and detached windows keep windows of their own" = "Aktif: editor LYNX yang tertambat (Gross Beat, Fruity Limiter, Maximus...) digambar oleh jendela utama: tampilan bergeraknya memakai lebih sedikit CPU. Plugin yang di-host dan jendela terlepas tetap memiliki jendela sendiri"

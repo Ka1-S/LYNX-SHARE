@@ -17789,6 +17789,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Win190evTests.inc"
 #include "U190heTests.inc"
 #include "U190hxTests.inc"
+#include "D190jyTests.inc"
 #include "Mod190doTests.inc"
 #include "Parity190fyTests.inc"
 #include "Parity190hoTests.inc"

@@ -593,6 +593,7 @@ if(LYNX_BUILD_APP)
     list(APPEND LYNX_APP_SOURCES
         src/ui/Workspace.cpp
         src/ui/NativeChild.cpp
+        src/ui/DockPaintCheck.cpp
         src/ui/MotionOverlay.cpp
         src/ui/ExternalDrag.cpp
         src/ui/ExternalDragX11.cpp

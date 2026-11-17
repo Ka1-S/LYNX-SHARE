@@ -10713,3 +10713,5 @@ countries: ru by kz
 "Complex Pro and Texture transpositions play through the Pitch knob: {0}" = "Транспонирование Complex Pro и Texture играет через ручку Pitch: {0}"
 "Warped samples do not follow tempo changes in this release: they keep the project tempo" = "В этой версии варпнутые сэмплы не следуют за сменой темпа: они сохраняют темп проекта"
 "{0} deactivated clip slot(s) play again" = "Отключённых слотов клипов, которые снова играют: {0}"
+"Draw docked LYNX editors in the main window (lighter live displays)" = "Рисовать пристыкованные редакторы LYNX в главном окне (более лёгкие живые дисплеи)"
+"On: a docked LYNX editor (Gross Beat, Fruity Limiter, Maximus...) is drawn by the main window: its moving displays use less CPU. Hosted plugins and detached windows keep windows of their own" = "Вкл.: пристыкованный редактор LYNX (Gross Beat, Fruity Limiter, Maximus...) рисуется главным окном: его движущиеся дисплеи нагружают процессор меньше. Размещённые плагины и откреплённые окна остаются в своих окнах"

@@ -123,7 +123,29 @@ public:
     // A place for a new docked frame of that size: cascading from the top-left of the desktop's free area.
     juce::Rectangle<int> placeForDockedFrame (int width, int height) const;
 
+    // Round 190jy (queue item 44; core/DockStack.h editorsAbove): a docked LYNX editor window drawn by the main window
+    // itself, a child component of the desktop at `bounds`, kept in the stacking order of the native panels and docked
+    // windows by a hidden native anchor; the native windows below it get a hole where it is. `window` has no parent and
+    // is not on the desktop. Not owned: removeEditorWindow gives it back (no parent), and a deleted window goes by itself.
+    bool addEditorWindow (juce::Component& window, juce::Rectangle<int> bounds);
+    void removeEditorWindow (juce::Component& window);
+    bool hasEditorWindow (const juce::Component& window) const;
+    std::vector<juce::Component*> editorWindows() const;
+    // In front of the native panels and docked windows (a click in it, toFront, opened again)
+    void raiseEditorWindow (juce::Component& window);
+    // The holes again (the stacking order, a window's place or visibility changed); cheap when nothing changed
+    void updateEditorHoles();
+    // (tests) the anchor that stands for the window in the native stacking order
+    juce::Component* editorAnchorForTest (const juce::Component& window) const;
+
 private:
+    struct EditorWindow;
+    struct EditorWatch;
+    std::vector<std::unique_ptr<EditorWindow>> editorWindowList;
+    std::unique_ptr<EditorWatch> editorWatch;
+    bool updatingHoles = false, raisingEditor = false;
+    void keepEditorWindowsOnTop(); // (above the plain frames: the Browser)
+
     struct PeerWatch;
     std::unique_ptr<PeerWatch> peerWatch;
     std::vector<juce::Component::SafePointer<juce::Component>> dockedFrames;

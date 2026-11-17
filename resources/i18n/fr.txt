@@ -10713,3 +10713,5 @@ countries: fr be ch ca lu
 "Complex Pro and Texture transpositions play through the Pitch knob: {0}" = "Les transpositions de Complex Pro et Texture passent par le bouton Pitch : {0}"
 "Warped samples do not follow tempo changes in this release: they keep the project tempo" = "Les samples en warp ne suivent pas les changements de tempo dans cette version : ils gardent le tempo du projet"
 "{0} deactivated clip slot(s) play again" = "{0} emplacement(s) de clip désactivés jouent de nouveau"
+"Draw docked LYNX editors in the main window (lighter live displays)" = "Dessiner les éditeurs LYNX ancrés dans la fenêtre principale (affichages en direct plus légers)"
+"On: a docked LYNX editor (Gross Beat, Fruity Limiter, Maximus...) is drawn by the main window: its moving displays use less CPU. Hosted plugins and detached windows keep windows of their own" = "Activé : un éditeur LYNX ancré (Gross Beat, Fruity Limiter, Maximus...) est dessiné par la fenêtre principale : ses affichages animés utilisent moins de CPU. Les plugins hébergés et les fenêtres détachées gardent leurs propres fenêtres"
