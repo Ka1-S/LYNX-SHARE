@@ -1,1 +1,5 @@
-{}
+{
+"u.0.1.29.t": "0.1.28 için düzeltme sürümü: Önceki sürüme geri dön çalışıyor",
+"u.0.1.29.s": "0.1.28 için küçük bir düzeltme sürümü. Yardım › Önceki sürüme geri dön artık daha önce kullandığınız sürümü kuruyor ve geri döndüğünüz eski sürüm size yeni sürümü hemen yeniden önermiyor.",
+"u.0.1.29.b0": "<strong>Yardım › Önceki sürüme geri dön</strong> (0.1.28'de yeni) 0.1.28'in kendisini öneriyordu. Artık daha önce kullandığınız sürümü, bir güncellemeyle aynı sağlama toplamı denetimiyle kuruyor ve bıraktığınız sürüm otomatik denetimde atlanıyor."
+}

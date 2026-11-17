@@ -6545,7 +6545,7 @@
 "intro": "Transporter es un looper de transitorios: un detector de ocho bandas dispara los bucles A y B que repiten la entrada. Añádelo a un insert para stutters y repeticiones glitch.",
 "controls": [
 [
-"Dry level",
+"Nivel dry",
 "Nivel de la señal sin procesar."
 ],
 [
@@ -8667,7 +8667,7 @@
 "Escala de una salida."
 ],
 [
-"Polarity",
+"Polaridad",
 "Desplazamiento bipolar o unipolar."
 ],
 [
@@ -8897,7 +8897,7 @@
 "Silencia el sonido del vídeo."
 ],
 [
-"Seguir la reproducción del host",
+"Sincronizar la reproducción con el host",
 "La posición de la canción mueve el vídeo; con la opción desactivada se usan los botones Reproducir y Detener del propio reproductor."
 ],
 [

@@ -62,7 +62,7 @@ Por padrão, um plugin roda dentro do LYNX SHARE, então um plugin que trava pod
 
 Se um plugin assim trava ou para de responder, ele é silenciado, uma mensagem aparece e o LYNX SHARE continua rodando. `Recarregar` nessa mensagem inicia o plugin de novo com as configurações do último salvamento ou backup, sem reabrir o projeto. O editor do plugin abre em uma janela própria e não pode ser acoplado nem fixado.
 
-Para fazer isso com um plugin só, use `Rodar em um processo separado` ou `Always run <plugin> in a separate process` no menu wrapper da janela do plugin. Quando o editor de um plugin trava, a mensagem que aparece oferece também a segunda opção.
+Para fazer isso com um plugin só, use `Rodar em um processo separado` ou `Sempre rodar <plugin> em um processo separado` no menu wrapper da janela do plugin. Quando o editor de um plugin trava, a mensagem que aparece oferece também a segunda opção.
 
 Isso funciona no Windows e no Linux, e no macOS desde a 0.1.25.
 

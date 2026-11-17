@@ -578,7 +578,7 @@
 "faq.q10": "為什麼開啟時 Windows 或 macOS 會顯示警告？",
 "faq.a10": "<p>Windows 執行檔尚未程式碼簽署，所以 SmartScreen 可能會顯示警告：請按<code>其他資訊</code>，再按<code>仍要執行</code>。macOS 版 App 尚未經過 Apple 公證：第一次請按右鍵點它並選擇<code>打開</code>。步驟在<a href=\"/wiki/troubleshooting/\">疑難排解</a>頁面。</p>",
 "faq.q11": "會傳送任何資料嗎？",
-"faq.a11": "<p>沒有遙測、分析、帳號或授權檢查。它會向 GitHub 檢查是否有新版本（可在<code>設定 › 一般 › Updates</code>關閉），只有在你每次同意或設為始終傳送時，才會傳送崩潰報告。當你要求下載分軌模型，或參加即時線上協作時，它也會連線。詳情請看<a href=\"https://github.com/Ka1-S/LYNX-SHARE/blob/main/PRIVACY.md\">隱私權政策</a>。</p>",
+"faq.a11": "<p>沒有遙測、分析、帳號或授權檢查。它會向 GitHub 檢查是否有新版本（可在<code>設定 › 一般 › 更新</code>關閉），只有在你每次同意或設為始終傳送時，才會傳送崩潰報告。當你要求下載分軌模型，或參加即時線上協作時，它也會連線。詳情請看<a href=\"https://github.com/Ka1-S/LYNX-SHARE/blob/main/PRIVACY.md\">隱私權政策</a>。</p>",
 "faq.q12": "更新是怎麼送達的？",
 "faq.a12": "<p>有較新的版本時，工具列下方的列會提供<code>更新</code>。Windows 安裝程式版本會直接覆蓋安裝。免安裝版和 macOS 版會把新檔案存到你的「下載」資料夾。Linux 的 AppImage 透過 AppImageUpdate 或 Gear Lever 更新。Microsoft Store 版本由 Store 更新，沒有<code>更新</code>按鈕。版本說明在<a href=\"/updates/\">更新頁面</a>。</p>",
 "faq.q13": "介面有哪些語言？",

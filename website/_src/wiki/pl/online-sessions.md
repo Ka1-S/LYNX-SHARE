@@ -89,7 +89,7 @@ Gospodarz robi tak:
 
 Gość robi tak:
 
-1. Otwórz menu pluginów jednego ze swoich kanałów lub slotów efektów. Udostępnione pluginy są na początku, pod `On <host>'s computer`.
+1. Otwórz menu pluginów jednego ze swoich kanałów lub slotów efektów. Udostępnione pluginy są na początku, pod `Na komputerze użytkownika: <host>`.
 2. Wybierz jeden. Jego okno wylicza parametry pluginu jako suwaki, z `Szukaj parametrów`.
 3. Dodawaj nuty i poruszaj suwakami. Okno pokazuje `Updating...`, gdy komputer gospodarza renderuje, a potem `Aktualne`.
 

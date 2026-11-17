@@ -37,7 +37,7 @@ Quando scegli un ingresso per un insert che registra più di quell'ingresso (ven
 | `Tutto` | Note, automazione e audio dagli insert armati |
 | `Audio, nell'editor audio` | Registra l'ingresso in un nuovo editor audio mentre il brano suona |
 
-Spunta `Non chiedere più` per mantenere la scelta. Dopo, clic destro sul pulsante di registrazione per il filtro di registrazione: `Automazione`, `Nota`, `Audio`, `Clip` e `Chiedi cosa registrare all'avvio della registrazione` per riportare la finestra.
+Spunta `Non chiedere più` per mantenere la scelta. Dopo, clic destro sul pulsante di registrazione per il filtro di registrazione: `Automazione`, `Note`, `Audio`, `Clip` e `Chiedi cosa registrare all'avvio della registrazione` per riportare la finestra.
 
 ## Il riquadro di ingresso di un insert
 

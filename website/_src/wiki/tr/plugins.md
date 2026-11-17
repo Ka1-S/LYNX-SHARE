@@ -62,7 +62,7 @@ Varsayılan olarak bir plugin LYNX SHARE'in içinde çalışır; bu yüzden çö
 
 Böyle bir plugin çökerse veya yanıt vermeyi bırakırsa susturulur, bir ileti görünür ve LYNX SHARE çalışmaya devam eder. O iletideki `Yeniden yükle`, plugin'i projeyi yeniden açmadan, son kayıttaki veya yedekteki ayarlarla yeniden başlatır. Plugin'in editörü kendi penceresinde açılır; yerleştirilemez ve üste sabitlenemez.
 
-Bunu yalnızca tek bir plugin için yapmak üzere, plugin penceresinin wrapper menüsünde `Ayrı süreçte çalıştır` veya `Always run <plugin> in a separate process` seçeneğini kullanın. Bir plugin'in editörü çöktüğünde görünen ileti ikincisini de sunar.
+Bunu yalnızca tek bir plugin için yapmak üzere, plugin penceresinin wrapper menüsünde `Ayrı süreçte çalıştır` veya `Her zaman ayrı süreçte çalıştır: <plugin>` seçeneğini kullanın. Bir plugin'in editörü çöktüğünde görünen ileti ikincisini de sunar.
 
 Bu Windows ve Linux'ta çalışır, macOS'ta ise 0.1.25'ten beri.
 

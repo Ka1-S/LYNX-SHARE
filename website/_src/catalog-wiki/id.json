@@ -1496,7 +1496,7 @@
 "intro": "Drum Rack adalah Instrument Rack yang rantainya berupa pad. Tiap pad menerima satu not dan memainkan instrumen dan efek dari rantainya. Tambahkan dari pemilih plugin sebagai Drum Rack. Drum Rack baru hanya menampilkan pad dan panel perangkat, dengan C1 terpilih. Jatuhkan sample ke pad, atau klik kanan pad kosong untuk memuat sample atau instrumen. Drum Rack di set Ableton Live (.als) terbuka sebagai satu Drum Rack lengkap dengan pad, send, dan rantai return-nya, dan Drum Rack ditulis saat kamu mengekspor set Live.",
 "controls": [
 [
-"Pads",
+"Pad",
 "Tampilan pad 4 x 4, dengan strip ikhtisar semua 128 pad di atasnya: klik, seret, atau gulir untuk menggeser tampilan. Pad yang terisi menampilkan namanya dengan M (mute), tombol play, dan S (solo). Seret sebuah pad ke pad lain untuk menukarnya. Menjatuhkan beberapa sample mengisi pad berurutan."
 ],
 [
@@ -1615,7 +1615,7 @@
 "intro": "FPC adalah sampler drum dengan 32 pad dalam dua bank berisi 16, BANK A dan BANK B. Tiap pad menyimpan satu layer sample atau lebih, yang dipilih berdasarkan velocity. Satu channel menampung seluruh kit. Ia membuka channel FPC dari sebuah .flp, dan preset kit .fst milik FL dimuat ke sebuah channel. Tanpa FL Studio, FPC baru adalah kit kosong FL: 32 pad pada not bawaan FL tanpa sample.",
 "controls": [
 [
-"Pads",
+"Pad",
 "Klik sebuah pad untuk memilih dan memainkannya. Jatuhkan sample ke pad untuk memuatnya."
 ],
 [
@@ -6545,7 +6545,7 @@
 "intro": "Transporter adalah looper transien: detektor delapan band memicu loop A dan B yang memutar ulang input. Tambahkan ke insert untuk stutter dan pengulangan glitch.",
 "controls": [
 [
-"Dry level",
+"Level dry",
 "Level sinyal yang tidak diproses."
 ],
 [
@@ -8667,7 +8667,7 @@
 "Skala sebuah output."
 ],
 [
-"Polarity",
+"Polaritas",
 "Offset bipolar atau unipolar."
 ],
 [
@@ -8897,7 +8897,7 @@
 "Me-mute suara video."
 ],
 [
-"Pemutaran mengikuti host",
+"Sinkronkan pemutaran ke host",
 "Posisi song menggerakkan video; saat mati, Putar dan Stop milik player sendiri yang dipakai."
 ],
 [

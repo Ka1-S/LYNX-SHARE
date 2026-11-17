@@ -62,7 +62,7 @@ Standaard draait een plugin binnen LYNX SHARE, dus een plugin die crasht kan het
 
 Als zo'n plugin crasht of niet meer reageert, wordt hij gemute, verschijnt er een melding en blijft LYNX SHARE draaien. Met `Herladen` in die melding start de plugin opnieuw met de instellingen van de laatste save of back-up, zonder het project opnieuw te openen. De editor van de plugin opent in een eigen venster en kan niet worden vastgemaakt of vastgezet.
 
-Om dit voor één plugin te doen, gebruik je `In een apart proces draaien` of `Always run <plugin> in a separate process` in het wrappermenu van het pluginvenster. Als de editor van een plugin crasht, biedt de melding die verschijnt ook de tweede aan.
+Om dit voor één plugin te doen, gebruik je `In een apart proces draaien` of `<plugin> altijd in een apart proces draaien` in het wrappermenu van het pluginvenster. Als de editor van een plugin crasht, biedt de melding die verschijnt ook de tweede aan.
 
 Dit werkt op Windows en Linux, en sinds 0.1.25 op macOS.
 

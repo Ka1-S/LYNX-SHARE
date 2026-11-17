@@ -89,7 +89,7 @@ L'hôte fait ceci :
 
 Un invité fait ceci :
 
-1. Ouvrez le menu de plugins d'un de vos canaux ou emplacements d'effet. Les plugins partagés viennent en premier, sous `On <host>'s computer`.
+1. Ouvrez le menu de plugins d'un de vos canaux ou emplacements d'effet. Les plugins partagés viennent en premier, sous `Sur l'ordinateur de <host>`.
 2. Choisissez-en un. Sa fenêtre liste les paramètres du plugin sous forme de curseurs, avec `Rechercher des paramètres`.
 3. Ajoutez des notes et bougez les curseurs. La fenêtre affiche `Updating...` pendant que l'ordinateur de l'hôte fait le rendu, puis `À jour`.
 

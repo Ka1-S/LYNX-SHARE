@@ -1496,7 +1496,7 @@
 "intro": "Drum Rack è un Instrument Rack le cui catene sono pad. Ogni pad riceve una nota e suona lo strumento e gli effetti della sua catena. Aggiungilo dal selettore plugin come Drum Rack. Un nuovo Drum Rack mostra solo i pad e il pannello dei dispositivi, con C1 selezionato. Trascina dei sample sui pad, oppure fai clic destro su un pad vuoto per caricare un sample o uno strumento. Un Drum Rack in un set di Ableton Live (.als) si apre come un solo Drum Rack con i suoi pad, le mandate e le catene di ritorno, e i Drum Rack vengono scritti quando esporti un set di Live.",
 "controls": [
 [
-"Pads",
+"Pad",
 "Una vista 4 x 4 dei pad, con sopra una striscia di panoramica di tutti i 128: fai clic, trascina o scorri su di essa per spostare la vista. Un pad pieno mostra il suo nome con M (mute), un pulsante di riproduzione e S (solo). Trascina un pad su un altro per scambiarli. Rilasciando più sample si riempiono pad consecutivi."
 ],
 [
@@ -1615,7 +1615,7 @@
 "intro": "FPC è un sampler di batteria con 32 pad in due banchi da 16, BANK A e BANK B. Ogni pad contiene uno o più layer di sample, scelti dalla velocity. Un solo canale contiene l'intero kit. Apre i canali FPC di un .flp, e i preset di kit .fst di FL si caricano su un canale. Senza FL Studio un nuovo FPC è il kit vuoto di FL: 32 pad sulle note predefinite di FL senza sample.",
 "controls": [
 [
-"Pads",
+"Pad",
 "Clicca un pad per selezionarlo e suonarlo. Trascina un sample su un pad per caricarlo."
 ],
 [
@@ -6545,7 +6545,7 @@
 "intro": "Transporter è un looper di transienti: un rilevatore a otto bande fa scattare i loop A e B che riproducono di nuovo l'ingresso. Aggiungilo a un insert per stutter e ripetizioni glitch.",
 "controls": [
 [
-"Dry level",
+"Livello dry",
 "Livello del segnale non elaborato."
 ],
 [
@@ -8667,7 +8667,7 @@
 "Scala di un'uscita."
 ],
 [
-"Polarity",
+"Polarità",
 "Offset bipolare o unipolare."
 ],
 [
@@ -8897,7 +8897,7 @@
 "Silenzia il suono del video."
 ],
 [
-"Segui la riproduzione dell'host",
+"Sincronizza la riproduzione con l'host",
 "La posizione nel brano guida il video; da spento si usano Play e Stop del player."
 ],
 [

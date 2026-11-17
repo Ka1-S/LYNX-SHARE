@@ -1,1 +1,5 @@
-{}
+{
+"u.0.1.29.t": "Rilis perbaikan untuk 0.1.28: Kembali ke versi sebelumnya kini berfungsi",
+"u.0.1.29.s": "Rilis perbaikan kecil untuk 0.1.28. Bantuan › Kembali ke versi sebelumnya kini memasang versi yang Anda miliki sebelumnya, dan versi lama yang Anda pilih tidak langsung menawarkan versi yang lebih baru lagi.",
+"u.0.1.29.b0": "<strong>Bantuan › Kembali ke versi sebelumnya</strong> (baru di 0.1.28) malah menawarkan 0.1.28 itu sendiri. Kini perintah ini memasang versi yang Anda miliki sebelumnya, dengan pemeriksaan checksum yang sama seperti pembaruan, dan versi yang Anda tinggalkan dilewati oleh pemeriksaan otomatis."
+}

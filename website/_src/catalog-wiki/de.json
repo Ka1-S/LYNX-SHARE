@@ -6545,7 +6545,7 @@
 "intro": "Transporter ist ein Transienten-Looper: Ein Achtband-Detektor löst die Loops A und B aus, die den Eingang wiederholen. Füge ihn zu einem Insert hinzu für Stutter und Glitch-Wiederholungen.",
 "controls": [
 [
-"Dry level",
+"Dry-Pegel",
 "Pegel des unbearbeiteten Signals."
 ],
 [
@@ -8667,7 +8667,7 @@
 "Skalierung eines Ausgangs."
 ],
 [
-"Polarity",
+"Polarität",
 "Bipolarer oder unipolarer Offset."
 ],
 [
@@ -8897,7 +8897,7 @@
 "Schaltet den Ton des Videos stumm."
 ],
 [
-"Wiedergabe an den Host koppeln",
+"Wiedergabe an Host koppeln",
 "Die Song-Position steuert das Video. Bei ausgeschaltetem Schalter werden Play und Stop des Players selbst genutzt."
 ],
 [
