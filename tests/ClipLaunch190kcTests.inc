@@ -69,7 +69,7 @@ TEST (cliplaunch190kc_als_returns_sends_and_crossfader_import)
 {
     using namespace lynx;
     FlpImportReport report;
-    const auto song = importAls (als175a::bytesOf (kc190::returnsSet()), als175a::options (&report));
+    const auto song = importAls (als175a::bytesOf (kc190::returnsSet()), als181c::options (&report));
     CHECK (song.has_value());
     if (! song)
         return;
@@ -115,7 +115,7 @@ TEST (cliplaunch190kc_als_returns_sends_and_crossfader_import)
 TEST (cliplaunch190kc_als_returns_and_crossfader_round_trip)
 {
     using namespace lynx;
-    auto song = importAls (als175a::bytesOf (kc190::returnsSet()), als175a::options (nullptr));
+    auto song = importAls (als175a::bytesOf (kc190::returnsSet()), als181c::options (nullptr));
     CHECK (song.has_value());
     if (! song)
         return;
@@ -123,7 +123,7 @@ TEST (cliplaunch190kc_als_returns_and_crossfader_round_trip)
     const auto out = exportAls (*song, o);
     CHECK (out.xml.find ("<CrossfadeCurve Value=\"4\"") != std::string::npos);
     CHECK (out.xml.find ("<SessionCrossFade Value=\"1\"") != std::string::npos);
-    const auto back = importAls (out.bytes, als175a::options (nullptr));
+    const auto back = importAls (out.bytes, als181c::options (nullptr));
     CHECK (back.has_value());
     if (! back)
         return;
