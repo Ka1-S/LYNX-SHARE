@@ -10867,3 +10867,5 @@ countries: fr be ch ca lu
 "Peak level: the loudest peak since the last reset. Click to reset it" = "Niveau crête : la crête la plus forte depuis la dernière remise à zéro. Cliquez pour la remettre à zéro"
 "Send {0} to {1}. Turning it up from zero makes the send" = "Départ {0} vers {1}. Le monter depuis zéro crée le départ"
 "Pitch & Time" = "Hauteur et temps"
+"Bar : Step : Tick" = "Mesure : Step : Tique"
+"Time: bar : step : tick" = "Temps : mesure : step : tique"

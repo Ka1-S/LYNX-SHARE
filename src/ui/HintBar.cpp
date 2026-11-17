@@ -181,7 +181,7 @@ bool layOut (const std::vector<Item>& items, float width, int maxLines, std::vec
 }
 
 void drawLine (juce::Graphics& g, const std::vector<Item>& line, juce::Rectangle<float> area, const juce::Font& font,
-               const juce::Font& keyFont, float glyph)
+               const juce::Font& keyFont, float glyph, juce::Colour plain = theme::colour::textSecondary)
 {
     using namespace theme;
     auto x = area.getX();
@@ -200,7 +200,7 @@ void drawLine (juce::Graphics& g, const std::vector<Item>& line, juce::Rectangle
         {
             case Item::Kind::word:
                 g.setFont (font);
-                g.setColour (item.title ? colour::textPrimary : colour::textSecondary);
+                g.setColour (item.title ? colour::textPrimary : plain);
                 g.drawText (item.text, box, juce::Justification::centredLeft, true);
                 break;
 
@@ -393,21 +393,25 @@ void HintBar::paint (juce::Graphics& g)
     const auto text = withMarkup (current.text);
     std::vector<std::vector<Item>> lines;
 
-    const juce::Font big (font (type::small)), bigKey (font (type::caption - 1.0f, true));
-    if (auto items = makeItems (text, big, bigKey, 15.0f); layOut (items, r.getWidth(), 1, lines))
+    // (round 190jo FM-7: the Pattern toolbar's hint one step larger, its words in the primary text colour)
+    const auto plain = larger ? colour::textPrimary.withAlpha (0.88f) : colour::textSecondary;
+    const juce::Font big (font (larger ? type::body + 1.0f : type::small)), bigKey (font (larger ? type::caption : type::caption - 1.0f, true));
+    const auto bigGlyph = larger ? 16.0f : 15.0f;
+    if (auto items = makeItems (text, big, bigKey, bigGlyph); layOut (items, r.getWidth(), 1, lines))
     {
-        drawLine (g, lines.front(), r.withSizeKeepingCentre (r.getWidth(), 17.0f), big, bigKey, 15.0f);
+        drawLine (g, lines.front(), r.withSizeKeepingCentre (r.getWidth(), larger ? 19.0f : 17.0f), big, bigKey, bigGlyph, plain);
         return;
     }
 
-    const juce::Font smallFont (font (type::caption)), smallKey (font (type::caption - 2.0f, true));
-    const auto items = makeItems (text, smallFont, smallKey, 12.0f);
+    const juce::Font smallFont (font (larger ? type::small : type::caption)), smallKey (font (larger ? type::caption - 1.0f : type::caption - 2.0f, true));
+    const auto smallGlyph = larger ? 13.0f : 12.0f;
+    const auto items = makeItems (text, smallFont, smallKey, smallGlyph);
     const auto fits = layOut (items, r.getWidth(), 2, lines);
-    const auto lineHeight = juce::jmin (13.0f, r.getHeight() / 2.0f);
+    const auto lineHeight = juce::jmin (larger ? 14.0f : 13.0f, r.getHeight() / 2.0f);
     auto area = r.withSizeKeepingCentre (r.getWidth(), lineHeight * 2.0f);
 
     for (std::size_t i = 0; i < lines.size() && i < 2; ++i)
-        drawLine (g, lines[i], area.removeFromTop (lineHeight), smallFont, smallKey, 12.0f);
+        drawLine (g, lines[i], area.removeFromTop (lineHeight), smallFont, smallKey, smallGlyph, plain);
 
     if (! fits) // the rest did not fit: a fade at the end of the second line says so
     {

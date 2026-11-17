@@ -10867,3 +10867,5 @@ countries: de at ch li lu
 "Peak level: the loudest peak since the last reset. Click to reset it" = "Spitzenpegel: der lauteste Spitzenwert seit dem letzten Zurücksetzen. Klicken setzt ihn zurück"
 "Send {0} to {1}. Turning it up from zero makes the send" = "Send {0} an {1}. Vom Nullwert aufgedreht entsteht der Send"
 "Pitch & Time" = "Tonhöhe & Zeit"
+"Bar : Step : Tick" = "Takt : Step : Tick"
+"Time: bar : step : tick" = "Zeit: Takt : Step : Tick"

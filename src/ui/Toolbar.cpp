@@ -58,6 +58,32 @@ void paintCapsuleHover (juce::Graphics& g, juce::Rectangle<int> r, bool hover, b
         g.fillPath (p);
     }
 }
+// Round 190jo (design190ia FM-6, details190if DF-18): FL's time panel in B:S:T, "1:01:00" = bar 1, step 01, tick 00. The
+// steps are the sixteenths of the bar (01-16 in 4/4, with the Playlist's time signatures in Song mode) and the ticks are
+// FL's at its default 96 PPQ: 24 per step (00-23).
+juce::String barStepTick (const Song& song, double ticks, Meter meter)
+{
+    int bar = 0;
+    double intoBar = 0.0;
+    if (song.mode == PlayMode::song)
+    {
+        const auto current = song.barAt ((std::int64_t) ticks);
+        bar = current.number;
+        intoBar = ticks - (double) current.tick;
+    }
+    else
+    {
+        const auto perBar = (double) meter.bar();
+        bar = (int) (ticks / perBar) + 1;
+        intoBar = std::fmod (ticks, perBar);
+    }
+    intoBar = juce::jmax (0.0, intoBar);
+    const auto step = (int) (intoBar / ticksPerStep) + 1;
+    constexpr int flTicksPerStep = 24; // (FL: 96 PPQ / 4 steps a beat)
+    const auto tick = juce::jlimit (0, flTicksPerStep - 1, (int) (std::fmod (intoBar, (double) ticksPerStep) * flTicksPerStep / ticksPerStep));
+    return juce::String::formatted ("%d:%02d:%02d", bar, step, tick);
+}
+
 juce::String barBeatStep (const Song& song, double ticks, Meter meter)
 {
     // (round 190fg: beats of the meter in force, eighths in 6/8; the steps are sixteenths into the beat)
@@ -277,14 +303,18 @@ juce::String TimeDisplay::text() const
         return juce::String::formatted ("-%d : %02d : %02d", whole / 60, whole % 60, juce::jmin (99, (int) ((left - whole) * 100.0)));
     }
 
-    if (mode == Mode::bars)
+    const auto fl = look == toolbarlayout::Look::fl;
+    if (mode == Mode::bars && fl)
+        return barStepTick (song, ticks, song.meter());
+    if (mode == Mode::bars || mode == Mode::beats)
         return barBeatStep (song, ticks, song.meter());
 
     const auto seconds = secondsForTicksCached (song, engine.getSongStamp(), (std::int64_t) ticks);
     if (mode == Mode::smpte)
         return juce::String (timecode::format (seconds, smpteRate));
     const auto whole = (int) seconds;
-    return juce::String::formatted ("%d : %02d : %02d", whole / 60, whole % 60, (int) ((seconds - whole) * 100.0));
+    // (round 190jo FM-6: FL's "M:S:CS" without the spaces in the Pattern toolbar)
+    return juce::String::formatted (fl ? "%d:%02d:%02d" : "%d : %02d : %02d", whole / 60, whole % 60, (int) ((seconds - whole) * 100.0));
 }
 
 void TimeDisplay::update()
@@ -292,9 +322,16 @@ void TimeDisplay::update()
     // (round 190jj: the Simple capsule's time is red while a take records or counts in)
     const auto nowRed = look == toolbarlayout::Look::simple && engine.isRecording()
                         && (engine.getTransport().playing.load() || engine.isCountingIn());
-    if (const auto t = text(); t != shown || nowRed != red)
+    // (round 190jo, perf: FL's B:S:T ticks run 24 to a step, at the timer's rate; a change of the ticks alone repaints at
+    // most every 100 ms, as often as bar : beat : step changed at 150 BPM; a new step or bar shows at once)
+    const auto t = text();
+    const auto now = juce::Time::getMillisecondCounter();
+    const auto ticksOnly = look == toolbarlayout::Look::fl && mode == Mode::bars && t.length() == shown.length() && t.length() > 3
+                           && t.dropLastCharacters (2) == shown.dropLastCharacters (2);
+    if ((t != shown && ! (ticksOnly && now - shownAt < 100u)) || nowRed != red)
     {
         shown = t;
+        shownAt = now;
         red = nowRed;
         repaint();
     }
@@ -314,6 +351,7 @@ void TimeDisplay::setLook (toolbarlayout::Look l)
     if (l != look)
     {
         look = l;
+        shown = {}; // (round 190jo: the Pattern toolbar's B:S:T reads differently from the other looks' bar : beat : step)
         repaint();
     }
 }
@@ -380,6 +418,26 @@ void TimeDisplay::paint (juce::Graphics& g)
     g.setColour (colour::textPrimary);
     // round 170e3: the song position is the toolbar's centre (FL users look there first): a larger readout
     const auto readout = shown.isEmpty() ? text() : shown;
+    // round 190jo (design190ia FM-6): FL's digits are 26 px tall (cap) in its 33 px panel; LYNX's cap 12 becomes cap 20
+    // (font 40 in the 46 px box) with FL's mode caption at the top right ("B:S:T", "M:S:CS") instead of the line under it
+    if (mode != Mode::beats)
+    {
+        auto big = monoFont (juce::jmin (40.0f, (float) area.getHeight() * 0.87f));
+        const auto caption = mode == Mode::clock ? juce::String ("M:S:CS") : mode == Mode::smpte ? "SMPTE " + juce::String (timecode::rates[smpteRate].name)
+                                                                                                 : juce::String ("B:S:T");
+        const auto captionFont = font (9.0f, true);
+        const auto captionWidth = juce::GlyphArrangement::getStringWidth (captionFont, caption);
+        const auto room = (float) area.getWidth() - 8.0f;
+        for (int i = 0; i < 16 && juce::GlyphArrangement::getStringWidth (big, readout) > room; ++i)
+            big = big.withHeight (big.getHeight() * 0.94f);
+        g.setFont (big);
+        g.drawText (readout, area.withTrimmedTop (2), juce::Justification::centred, false);
+        g.setColour (colour::textSecondary);
+        g.setFont (captionFont);
+        g.drawText (caption, area.withTrimmedRight (4).withTrimmedTop (2).withHeight (10).withLeft (area.getRight() - 4 - (int) std::ceil (captionWidth) - 1),
+                    juce::Justification::topRight, false);
+        return;
+    }
     auto readoutFont = monoFont (juce::jmin (26.0f, (float) area.getHeight() * 0.52f));
     // a narrow display (the compact toolbar) shrinks the digits instead of cutting them off
     for (int i = 0; i < 12 && juce::GlyphArrangement::getStringWidth (readoutFont, readout) > (float) area.getWidth() - 8.0f; ++i)
@@ -405,7 +463,7 @@ void TimeDisplay::mouseUp (const juce::MouseEvent& e)
         return;
     }
 
-    mode = mode == Mode::bars ? Mode::clock : mode == Mode::clock ? Mode::smpte : Mode::bars;
+    mode = mode == Mode::bars || mode == Mode::beats ? Mode::clock : mode == Mode::clock ? Mode::smpte : Mode::bars;
     shown = {};
     update();
     repaint();
@@ -423,7 +481,13 @@ void TimeDisplay::showMenu()
         update();
         repaint();
     };
-    menu.addItem (tr ("Bar : Beat : Step"), true, mode == Mode::bars, [set] { set (Mode::bars, -1); });
+    if (look == toolbarlayout::Look::fl) // (round 190jo: FL's B:S:T first, LYNX's bar : beat : step kept)
+    {
+        menu.addItem (tr ("Bar : Step : Tick"), true, mode == Mode::bars, [set] { set (Mode::bars, -1); });
+        menu.addItem (tr ("Bar : Beat : Step"), true, mode == Mode::beats, [set] { set (Mode::beats, -1); });
+    }
+    else
+        menu.addItem (tr ("Bar : Beat : Step"), true, mode == Mode::bars || mode == Mode::beats, [set] { set (Mode::bars, -1); });
     menu.addItem (tr ("Minute : Second : Centisecond"), true, mode == Mode::clock, [set] { set (Mode::clock, -1); });
     for (int i = 0; i < timecode::rateCount; ++i)
         menu.addItem ("SMPTE " + juce::String (timecode::rates[i].name) + " fps", true, mode == Mode::smpte && smpteRate == i, [set, i] { set (Mode::smpte, i); });
@@ -435,6 +499,7 @@ ui::Hint TimeDisplay::hintAt (juce::Point<int>)
     ui::Hint h;
     h.text = (mode == Mode::clock   ? tr ("Time: minutes : seconds : hundredths")
               : mode == Mode::smpte ? tr ("Time: SMPTE time code (hours : minutes : seconds : frames)")
+              : mode == Mode::bars && look == toolbarlayout::Look::fl ? tr ("Time: bar : step : tick")
                                     : tr ("Time: bar : beat : step"))
              + "  " + tr ("[LMB] next mode (bars, minutes, SMPTE)  [RMB] mode and frame rate");
     h.value = text();

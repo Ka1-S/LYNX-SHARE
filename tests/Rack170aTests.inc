@@ -142,8 +142,8 @@ TEST (rack170a_playhead_in_song_mode_and_note_names)
     CHECK (transportedit::patternPlayhead (s, 1, 5.0 * ppq) == 1.0 * ppq);
     CHECK (transportedit::patternPlayhead (s, 1, 1.0 * ppq) < 0.0);
     CHECK (transportedit::patternPlayhead (s, 0, 5.0 * ppq) < 0.0);
-    // every Piano roll key is named by default (LYNX)
-    CHECK (notenames::everyKey.load());
+    // round 190jo (design190ia FM-17): as FL, only the Cs are named by default; every key is an option
+    CHECK (! notenames::everyKey.load());
 }
 
 TEST (rack170a_step_groups_clearly_apart)

@@ -788,6 +788,173 @@ Shape make (Icon icon)
             fi.addPath (tri.createPathWithRoundedCorners (1.5f));
             break;
         }
+
+        // --- round 190jo (design190ia FW-22): the audio editor's tools, LYNX shapes on Edison's metaphors ---
+        case Icon::copy: // two sheets, one over the other
+            polyline (st, { { 9.0f, 6.5f }, { 9.0f, 3.5f }, { 20.0f, 3.5f }, { 20.0f, 15.5f }, { 17.0f, 15.5f } });
+            roundRect (st, 4.0f, 8.0f, 11.5f, 12.5f, 1.5f);
+            break;
+        case Icon::paste: // a clipboard with its clip
+            roundRect (st, 5.0f, 5.5f, 14.0f, 15.0f, 1.5f);
+            fi.addRoundedRectangle (9.0f, 3.0f, 6.0f, 4.0f, 1.0f);
+            line (st, 8.5f, 11.5f, 15.5f, 11.5f);
+            line (st, 8.5f, 15.5f, 13.5f, 15.5f);
+            break;
+        case Icon::trash: // a bin with its lid
+            line (st, 4.0f, 6.5f, 20.0f, 6.5f);
+            polyline (st, { { 9.5f, 6.5f }, { 9.5f, 4.0f }, { 14.5f, 4.0f }, { 14.5f, 6.5f } });
+            polyline (st, { { 6.5f, 6.5f }, { 7.5f, 20.5f }, { 16.5f, 20.5f }, { 17.5f, 6.5f } });
+            line (st, 10.5f, 10.0f, 10.5f, 17.0f);
+            line (st, 13.5f, 10.0f, 13.5f, 17.0f);
+            break;
+        case Icon::trim: // the selection's brackets keep a piece of wave; the rest is cut off
+            polyline (st, { { 9.0f, 5.0f }, { 7.0f, 5.0f }, { 7.0f, 19.0f }, { 9.0f, 19.0f } });
+            polyline (st, { { 15.0f, 5.0f }, { 17.0f, 5.0f }, { 17.0f, 19.0f }, { 15.0f, 19.0f } });
+            polyline (st, { { 9.5f, 12.0f }, { 10.5f, 8.5f }, { 12.0f, 15.5f }, { 13.5f, 9.5f }, { 14.5f, 12.0f } });
+            line (st, 3.0f, 12.0f, 4.5f, 12.0f);
+            line (st, 19.5f, 12.0f, 21.0f, 12.0f);
+            break;
+        case Icon::silence: // a wave, flat in the middle
+            polyline (st, { { 3.0f, 12.0f }, { 4.0f, 7.5f }, { 5.5f, 16.5f }, { 7.0f, 12.0f }, { 17.0f, 12.0f }, { 18.5f, 8.0f }, { 20.0f, 16.0f }, { 21.0f, 12.0f } });
+            line (st, 9.5f, 8.5f, 14.5f, 8.5f);
+            line (st, 9.5f, 15.5f, 14.5f, 15.5f);
+            break;
+        case Icon::fadeIn: // a ramp up
+        {
+            juce::Path p;
+            polyline (p, { { 3.5f, 19.5f }, { 20.5f, 5.0f }, { 20.5f, 19.5f } }, true);
+            st.addPath (p.createPathWithRoundedCorners (1.0f));
+            fi.addTriangle (12.0f, 19.5f, 20.5f, 12.25f, 20.5f, 19.5f);
+            break;
+        }
+        case Icon::fadeOut: // a ramp down
+        {
+            juce::Path p;
+            polyline (p, { { 3.5f, 19.5f }, { 3.5f, 5.0f }, { 20.5f, 19.5f } }, true);
+            st.addPath (p.createPathWithRoundedCorners (1.0f));
+            fi.addTriangle (3.5f, 12.25f, 12.0f, 19.5f, 3.5f, 19.5f);
+            break;
+        }
+        case Icon::fadeCurve: // a bent ramp with a small menu arrow
+        {
+            juce::Path c;
+            c.startNewSubPath (3.5f, 19.5f);
+            c.quadraticTo (14.0f, 19.0f, 17.0f, 4.5f);
+            st.addPath (c);
+            line (st, 3.5f, 19.5f, 17.0f, 19.5f);
+            fi.addTriangle (17.5f, 13.0f, 21.0f, 13.0f, 19.25f, 15.5f);
+            break;
+        }
+        case Icon::normalize: // a wave whose peaks are taken to the two edges
+            line (st, 3.5f, 3.5f, 20.5f, 3.5f);
+            line (st, 3.5f, 20.5f, 20.5f, 20.5f);
+            polyline (st, { { 12.0f, 10.0f }, { 12.0f, 6.0f } });
+            polyline (st, { { 10.0f, 8.0f }, { 12.0f, 6.0f }, { 14.0f, 8.0f } });
+            polyline (st, { { 12.0f, 14.0f }, { 12.0f, 18.0f } });
+            polyline (st, { { 10.0f, 16.0f }, { 12.0f, 18.0f }, { 14.0f, 16.0f } });
+            polyline (st, { { 4.0f, 12.0f }, { 6.0f, 9.5f }, { 8.0f, 14.5f }, { 9.5f, 12.0f } });
+            polyline (st, { { 14.5f, 12.0f }, { 16.0f, 9.5f }, { 18.0f, 14.5f }, { 20.0f, 12.0f } });
+            break;
+        case Icon::amp: // up and down beside a level
+            line (st, 7.0f, 4.0f, 7.0f, 20.0f);
+            polyline (st, { { 4.0f, 7.0f }, { 7.0f, 4.0f }, { 10.0f, 7.0f } });
+            polyline (st, { { 4.0f, 17.0f }, { 7.0f, 20.0f }, { 10.0f, 17.0f } });
+            fi.addRoundedRectangle (13.0f, 13.0f, 2.5f, 7.0f, 0.75f);
+            fi.addRoundedRectangle (17.5f, 8.0f, 2.5f, 12.0f, 0.75f);
+            break;
+        case Icon::reverse: // an arrow back over a hit whose tail now comes first
+            line (st, 4.0f, 5.5f, 20.0f, 5.5f);
+            polyline (st, { { 7.0f, 3.0f }, { 4.0f, 5.5f }, { 7.0f, 8.0f } });
+            polyline (st, { { 3.5f, 15.0f }, { 6.0f, 14.0f }, { 8.5f, 16.0f }, { 11.0f, 13.0f }, { 13.5f, 17.5f }, { 16.0f, 11.5f }, { 18.0f, 19.5f }, { 20.0f, 10.0f }, { 20.5f, 15.0f } });
+            break;
+        case Icon::invert: // a wave and its mirror image
+        {
+            juce::Path a, b;
+            a.startNewSubPath (3.5f, 12.0f);
+            a.cubicTo (6.0f, 3.0f, 9.5f, 3.0f, 12.0f, 12.0f);
+            a.cubicTo (14.5f, 21.0f, 18.0f, 21.0f, 20.5f, 12.0f);
+            b.startNewSubPath (3.5f, 12.0f);
+            b.cubicTo (6.0f, 21.0f, 9.5f, 21.0f, 12.0f, 12.0f);
+            b.cubicTo (14.5f, 3.0f, 18.0f, 3.0f, 20.5f, 12.0f);
+            st.addPath (a);
+            const float dash[] = { 1.6f, 1.6f };
+            juce::Path dashed;
+            juce::PathStrokeType (1.0f).createDashedStroke (dashed, b, dash, 2);
+            fi.addPath (dashed);
+            break;
+        }
+        case Icon::dcCenter: // a wave that sits too high, brought down onto the middle line
+            line (st, 3.5f, 16.5f, 20.5f, 16.5f);
+            polyline (st, { { 3.5f, 7.0f }, { 6.0f, 4.0f }, { 8.5f, 10.0f }, { 11.0f, 4.0f }, { 13.5f, 10.0f }, { 16.0f, 4.0f }, { 18.5f, 10.0f }, { 20.5f, 7.0f } });
+            line (st, 12.0f, 11.5f, 12.0f, 14.0f);
+            fi.addTriangle (9.5f, 12.5f, 14.5f, 12.5f, 12.0f, 15.0f);
+            break;
+        case Icon::resample: // a wave read at points
+        {
+            juce::Path c;
+            c.startNewSubPath (3.5f, 12.0f);
+            c.cubicTo (6.5f, 2.5f, 10.0f, 2.5f, 12.0f, 12.0f);
+            c.cubicTo (14.0f, 21.5f, 17.5f, 21.5f, 20.5f, 12.0f);
+            st.addPath (c);
+            for (auto pt : { juce::Point<float> (3.5f, 12.0f), { 7.75f, 5.4f }, { 12.0f, 12.0f }, { 16.25f, 18.6f }, { 20.5f, 12.0f } })
+                fi.addEllipse (pt.x - 1.75f, pt.y - 1.75f, 3.5f, 3.5f);
+            break;
+        }
+        case Icon::marker: // a flag on its pole
+            line (st, 6.5f, 3.5f, 6.5f, 20.5f);
+            fi.addTriangle (6.5f, 3.5f, 18.5f, 7.5f, 6.5f, 11.5f);
+            break;
+        case Icon::region: // two flags and the span between them
+            line (st, 4.5f, 3.5f, 4.5f, 20.5f);
+            line (st, 19.5f, 3.5f, 19.5f, 20.5f);
+            fi.addTriangle (4.5f, 3.5f, 10.0f, 5.75f, 4.5f, 8.0f);
+            fi.addTriangle (19.5f, 3.5f, 14.0f, 5.75f, 19.5f, 8.0f);
+            fi.addRectangle (4.5f, 14.0f, 15.0f, 4.0f);
+            break;
+        case Icon::setLoop: // the loop bar over a span, with a turning arrow
+        {
+            fi.addRectangle (3.5f, 3.5f, 17.0f, 3.0f);
+            line (st, 4.25f, 6.5f, 4.25f, 20.5f);
+            line (st, 19.75f, 6.5f, 19.75f, 20.5f);
+            juce::Path arc;
+            arc.addCentredArc (12.0f, 14.0f, 4.5f, 4.5f, 0.0f, pi * 0.15f, pi * 1.75f, true);
+            st.addPath (arc);
+            fi.addTriangle (12.2f, 7.4f, 12.2f, 11.6f, 15.4f, 9.5f);
+            break;
+        }
+        case Icon::equalizer: // three faders at different heights
+            for (float x : { 6.0f, 12.0f, 18.0f })
+                line (st, x, 4.0f, x, 20.0f);
+            fi.addRoundedRectangle (3.5f, 13.0f, 5.0f, 3.0f, 1.0f);
+            fi.addRoundedRectangle (9.5f, 6.5f, 5.0f, 3.0f, 1.0f);
+            fi.addRoundedRectangle (15.5f, 10.5f, 5.0f, 3.0f, 1.0f);
+            break;
+        case Icon::denoise: // a noisy line that comes out smooth
+        {
+            polyline (st, { { 3.0f, 12.0f }, { 4.0f, 9.5f }, { 5.0f, 14.0f }, { 6.0f, 10.0f }, { 7.0f, 14.5f }, { 8.0f, 9.0f }, { 9.0f, 13.5f }, { 10.0f, 12.0f } });
+            juce::Path c;
+            c.startNewSubPath (10.0f, 12.0f);
+            c.cubicTo (12.5f, 4.5f, 15.0f, 4.5f, 16.5f, 12.0f);
+            c.cubicTo (18.0f, 19.5f, 20.0f, 19.5f, 21.0f, 12.0f);
+            st.addPath (c);
+            break;
+        }
+        case Icon::reverb: // a hit and its fading echoes
+        {
+            const float xs[] = { 4.5f, 8.5f, 12.5f, 16.5f, 20.0f };
+            const float hs[] = { 16.0f, 12.0f, 8.5f, 5.5f, 3.0f };
+            for (int i = 0; i < 5; ++i)
+                line (st, xs[i], 12.0f - hs[i] * 0.5f, xs[i], 12.0f + hs[i] * 0.5f);
+            break;
+        }
+        case Icon::spectrogram: // bars of a spectrum, low to high
+        {
+            const float xs[] = { 3.5f, 7.0f, 10.5f, 14.0f, 17.5f };
+            const float hs[] = { 9.0f, 15.0f, 11.0f, 7.0f, 4.0f };
+            for (int i = 0; i < 5; ++i)
+                fi.addRoundedRectangle (xs[i], 20.5f - hs[i], 2.5f, hs[i], 0.75f);
+            break;
+        }
     }
 
     return s;
@@ -1050,9 +1217,74 @@ void IconButton::paintLook (juce::Graphics& g, bool highlighted, bool down)
     g.drawFittedText (text, content.toNearestInt(), icon == Icon::none ? juce::Justification::centred : juce::Justification::centredLeft, 1, 0.8f);
 }
 
+// Round 190jo (design190ia FM-1/FM-2/FM-3, decision (d) with FL's metrics; the Pattern toolbar only): FL's tile. FL's
+// buttons are 30x33 tiles at a 33 px pitch with a 1 px dark edge (ref/fl-toolbar-hover-hint.png 1184,4,1214,37); LYNX's
+// 31 px buttons give a 30x30 tile at the same pitch. The edge and the tile sit on whole device pixels at any scale.
+void IconButton::paintFlTile (juce::Graphics& g, bool highlighted, bool down)
+{
+    using namespace theme;
+    const auto on = getToggleState() || primary;
+    const auto enabled = isEnabled();
+    const auto h = ! enabled ? 0.0f : isTimerRunning() ? hover : (highlighted ? 1.0f : 0.0f);
+    const auto scale = juce::jmax (1.0f, g.getInternalContext().getPhysicalPixelScaleFactor());
+    const auto snap = [scale] (float v) { return std::round (v * scale) / scale; };
+    const auto b = getLocalBounds().toFloat();
+    const auto tile = juce::Rectangle<float>::leftTopRightBottom (snap (b.getX() + 0.5f), snap (b.getY() + 0.5f), snap (b.getRight() - 0.5f),
+                                                                  snap (b.getBottom() - 0.5f));
+    const auto line = std::round (scale) / scale; // one device pixel or more: never a blend
+    const auto r = 4.0f;
+
+    // the fill: the tile at rest, then the state over it
+    auto fill = colour::bg3;
+    auto edge = colour::border;
+    if (down && enabled)
+    {
+        fill = colour::bg0;
+        edge = colour::borderStrong;
+    }
+    else if (on)
+    {
+        fill = fill.overlaidWith (onColour).interpolatedWith (fill.overlaidWith (onColour.brighter (0.12f)), h);
+        edge = colour::accent.withAlpha (0.5f);
+    }
+    else if (h > 0.0f)
+    {
+        if (hoverShowsOn) // a switch: its "on" look, a little lighter
+        {
+            fill = fill.interpolatedWith (colour::accentMuted, 0.7f * h);
+            edge = edge.interpolatedWith (fill.overlaidWith (colour::accent.withAlpha (0.5f)), h);
+        }
+        else
+        {
+            fill = fill.interpolatedWith (colour::bg5, h);
+            edge = edge.interpolatedWith (colour::borderStrong, h);
+        }
+    }
+    g.setColour (fill);
+    g.fillRoundedRectangle (tile, r);
+    g.setColour (edge);
+    g.drawRoundedRectangle (tile.reduced (line * 0.5f), r - line * 0.5f, line);
+
+    // the glyph
+    auto fg = on ? iconOnColour
+                 : (! iconColour.isTransparent() ? iconColour : colour::textSecondary.brighter (0.25f));
+    if (! on && h > 0.0f)
+        fg = fg.interpolatedWith (hoverShowsOn ? colour::accentHover : colour::textPrimary, h);
+    if (! enabled)
+        fg = fg.withMultipliedAlpha (0.35f);
+    const auto area = getLocalBounds().toFloat();
+    const auto box = lookIconBox > 0.0f ? lookIconBox : juce::jmin (area.getHeight() * iconFraction, iconMax);
+    icons::draw (g, icon, area.withSizeKeepingCentre (box, box), fg);
+}
+
 void IconButton::paintButton (juce::Graphics& g, bool highlighted, bool down)
 {
     using namespace theme;
+    if (look == Look::flTile)
+    {
+        paintFlTile (g, highlighted, down);
+        return;
+    }
     if (look != Look::standard)
     {
         paintLook (g, highlighted, down);

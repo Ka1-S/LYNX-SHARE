@@ -10867,3 +10867,5 @@ countries: id
 "Peak level: the loudest peak since the last reset. Click to reset it" = "Level puncak: puncak terkeras sejak reset terakhir. Klik untuk meresetnya"
 "Send {0} to {1}. Turning it up from zero makes the send" = "Kirim {0} ke {1}. Menaikkannya dari nol membuat kiriman"
 "Pitch & Time" = "Nada & Waktu"
+"Bar : Step : Tick" = "Bar : Step : Tick"
+"Time: bar : step : tick" = "Waktu: bar : step : tick"

@@ -57,15 +57,16 @@ public:
     void paint (juce::Graphics& g) override;
     void mouseUp (const juce::MouseEvent& e) override;
     ui::Hint hintAt (juce::Point<int> position) override;
-    bool showsTime() const noexcept { return mode != Mode::bars; }
+    bool showsTime() const noexcept { return mode == Mode::clock || mode == Mode::smpte; }
     // round 190iv: the Simple capsule's time segment, or Live's 17 px position box ("1. 1. 1"); FL's look is unchanged
     void setLook (toolbarlayout::Look l);
 
     enum class Mode
     {
-        bars,
+        bars,  // the Pattern toolbar: FL's B:S:T ("1:01:00", round 190jo FM-6); the other looks: bar : beat : step
         clock,
-        smpte
+        smpte,
+        beats  // round 190jo: LYNX's "1 : 1 : 1" (bar : beat : step) kept in the Pattern toolbar's menu
     };
 
 private:
@@ -75,6 +76,7 @@ private:
     toolbarlayout::Look look = toolbarlayout::Look::fl;
     AudioEngine& engine;
     juce::String shown;
+    juce::uint32 shownAt = 0; // (round 190jo) when `shown` last changed: the B:S:T ticks repaint at most every 100 ms
     bool red = false;           // (round 190jj) the Simple capsule's recording / count-in time
     double linkProgress = -1.0; // (round 190gl) the Link session's progress bar while the transport waits / is stopped
     Mode mode = Mode::bars;

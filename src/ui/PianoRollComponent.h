@@ -238,6 +238,7 @@ public:
     int eventPaneBarTopForTests() const noexcept { return eventPaneBarTop; }
 
     static constexpr int keyboardWidth = 72;
+    static constexpr int blackKeyWidth = keyboardWidth * 16 / 25; // FL's black keys: 64 % of the keyboard (round 190jo FM-17; was 3 / 5)
     static constexpr int toolbarHeight = 32; // the panel title row (Workspace::titleHeight)
     static constexpr int overviewHeight = 16; // the overview strip under the toolbar (round 90)
     static constexpr int timelineHeight = 22;
@@ -280,8 +281,9 @@ public:
     juce::PopupMenu liveGridMenu();
     std::int64_t gridStepForCheck() const { return gridTicks(); }
     juce::String liveGridTextForCheck() const { return liveGridButton.getButtonText(); }
-    int undockedRowHeight = 14;
-    int rowHeight = 14; // vertical zoom (Ctrl+middle-drag, Ctrl+Alt+wheel): gesture::minKeyHeight..maxKeyHeight px per key
+    // round 190jo (design190ia FM-15): FL's 18 px rows by default (was 14), notes 17 px with a 1 px row line under them
+    int undockedRowHeight = 18;
+    int rowHeight = 18; // vertical zoom (Ctrl+middle-drag, Ctrl+Alt+wheel): gesture::minKeyHeight..maxKeyHeight px per key
     static constexpr int scrollBarSize = 12;
 
 private:
@@ -333,6 +335,13 @@ private:
     std::int64_t snap (double tick, bool enabled) const;
     std::int64_t viewLengthTicks() const;
     std::int64_t newNoteLength() const;
+    // round 190jo (FM-15): a note's box, FL's anatomy: the whole row but the 1 px line under it, from its start to 1 px
+    // before its end (at least 4 px wide)
+    juce::Rectangle<float> noteRect (std::int64_t start, std::int64_t length, int key) const
+    {
+        return { (float) tickToX ((double) start), (float) keyToY (key), juce::jmax (4.0f, (float) (length * pixelsPerTick) - 1.0f),
+                 (float) juce::jmax (2, rowHeight - 1) };
+    }
     int noteAt (int x, int y, bool& onRightEdge) const;
     int noteAt (int x, int y, bool& onRightEdge, bool& onLeftEdge) const;
     int ghostAt (int x, int y) const;      // index of a ghost note (another channel) under the point

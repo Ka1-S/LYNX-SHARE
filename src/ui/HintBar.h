@@ -76,10 +76,21 @@ public:
     void setHint (const Hint& hint, bool live = false);
     const Hint& getHint() const noexcept { return current; }
     void paint (juce::Graphics& g) override;
+    // Round 190jo (design190ia FM-7, the Pattern toolbar only): the hint a step larger and brighter, as FL's (cap 8 on one
+    // line, cap 7 on two; FL cap 11 / 9); the other toolbars and windows keep the smaller text
+    void setLarger (bool shouldBeLarger)
+    {
+        if (larger != shouldBeLarger)
+        {
+            larger = shouldBeLarger;
+            repaint();
+        }
+    }
 
 private:
     Hint current;
     bool live = false;
+    bool larger = false;
 };
 // Ableton Live's Info View (round 190jn, design190ia CL-23) for the Clip-launch layout's Live look: the same hint as the
 // hint bar, as Live shows it at the bottom left — a 17 px #464646 title bar with the control's name, then the text in

@@ -10867,3 +10867,5 @@ countries: cn sg
 "Peak level: the loudest peak since the last reset. Click to reset it" = "峰值电平：上次重置以来的最高峰值。单击可重置"
 "Send {0} to {1}. Turning it up from zero makes the send" = "发送 {0} 到 {1}。从零调高即创建发送"
 "Pitch & Time" = "音高与时间"
+"Bar : Step : Tick" = "小节 : 步 : 滴答"
+"Time: bar : step : tick" = "时间：小节 : 步 : 滴答"

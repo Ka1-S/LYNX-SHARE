@@ -10867,3 +10867,5 @@ countries: kr
 "Peak level: the loudest peak since the last reset. Click to reset it" = "피크 레벨: 마지막 초기화 이후 가장 큰 피크. 클릭하면 초기화합니다"
 "Send {0} to {1}. Turning it up from zero makes the send" = "센드 {0} → {1}. 0에서 올리면 센드가 만들어집니다"
 "Pitch & Time" = "피치 & 타임"
+"Bar : Step : Tick" = "마디 : 스텝 : 틱"
+"Time: bar : step : tick" = "시간: 마디 : 스텝 : 틱"

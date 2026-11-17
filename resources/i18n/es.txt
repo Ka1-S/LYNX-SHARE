@@ -10867,3 +10867,5 @@ countries: es mx ar co cl pe ve
 "Peak level: the loudest peak since the last reset. Click to reset it" = "Nivel de pico: el pico más alto desde el último reinicio. Haz clic para reiniciarlo"
 "Send {0} to {1}. Turning it up from zero makes the send" = "Envío {0} a {1}. Subirlo desde cero crea el envío"
 "Pitch & Time" = "Tono y tiempo"
+"Bar : Step : Tick" = "Compás : Paso : Tic"
+"Time: bar : step : tick" = "Tiempo: compás : paso : tic"
