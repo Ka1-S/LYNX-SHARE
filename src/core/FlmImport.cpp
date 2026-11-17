@@ -432,7 +432,7 @@ int addPattern (Ctx& ctx, const flm::Clip& clip, const std::string& name, bool d
     count (shifted, "FL Studio Mobile: drum pad time shift");
     count (held_back, "FL Studio Mobile: notes a note effect holds back (silent in FLM too)");
     if (orphans > 0 && ctx.report != nullptr)
-        ctx.report->unsupported["FL Studio Mobile: slide note without a held note (FLM plays nothing)"] += orphans;
+        ctx.report->notReproduced["FL Studio Mobile: slide note without a held note (FLM plays nothing)"] += orphans;
     return (int) ctx.song.patterns.size() - 1;
 }
 
@@ -1041,7 +1041,7 @@ bool threeOscState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
     partial = partial || 2.0 * v (114) * threeOscFlmLevel > 4.0;
     ctx.note (&FlpImportReport::converted, "FL Studio Mobile: 3x Osc");
     if (partial)
-        ctx.note (&FlpImportReport::unsupported, "FL Studio Mobile: 3x Osc (custom shape, Free Run, arpeggiator chord, Hold or range not converted)");
+        ctx.note (&FlpImportReport::notReproduced, "FL Studio Mobile: 3x Osc (custom shape, Free Run, arpeggiator chord, Hold or range not converted)");
     return true;
 }
 
@@ -1726,7 +1726,7 @@ void addAudioClip (Ctx& ctx, const flm::Clip& clip, int row, int insert, const s
     if (speedMoves)
         ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: audio clip Speed automation (the first value is used)");
     if (others)
-        ctx.note (&FlpImportReport::unsupported, "FL Studio Mobile: audio clip automation of other sample settings (not imported)");
+        ctx.note (&FlpImportReport::notReproduced, "FL Studio Mobile: audio clip automation of other sample settings (not imported)");
     if (slotParam (s, sp::solo) > 0.5f)
         ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: audio clip Solo (not imported)");
 }
@@ -2322,7 +2322,7 @@ std::optional<FlmRackChannel> importFlmRackState (const std::vector<std::uint8_t
     if (auto* r = options.common.report; r != nullptr)
     {
         for (const auto list : { &FlpImportReport::converted, &FlpImportReport::approximated, &FlpImportReport::unsupported,
-                                 &FlpImportReport::droppedEffects, &FlpImportReport::partialEffects })
+                                 &FlpImportReport::notReproduced, &FlpImportReport::droppedEffects, &FlpImportReport::partialEffects })
             for (const auto& [what, n] : own.*list)
                 if (what.rfind ("FL Studio Mobile factory content", 0) != 0 || (r->*list).count (what) == 0)
                     (r->*list)[what] += n;
@@ -2355,7 +2355,7 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
     // HEAD's app version (format-0018): FLM warns about a song from a newer app; LYNX's reader was last checked against
     // the files of FLM 5.0.4, so a newer one is named in the report (its new fields, if any, are not read)
     if (flmVersionNewer (project.appVersion, "5.0.4"))
-        ctx.note (&FlpImportReport::unsupported, "FL Studio Mobile " + project.appVersion + " (newer than this import knows: new settings may be missing)");
+        ctx.note (&FlpImportReport::notReproduced, "FL Studio Mobile " + project.appVersion + " (newer than this import knows: new settings may be missing)");
     song.bpm = std::clamp (project.tempo > 0.0 ? project.tempo : 120.0, minTempo, maxTempo);
     // KEYB: the keyboard's chord set becomes the project's chord set for LYNX's Chord pad (round 190ds, core/ScaleKeys.h)
     if (! project.chordSetJson.empty())
@@ -2363,7 +2363,7 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
         int dropped = 0;
         song.keyboardChords = scalekeys::parseFlmChordSet (project.chordSetJson, &dropped);
         if (dropped > 0)
-            ctx.note (&FlpImportReport::unsupported, "FL Studio Mobile: chord set extensions outside two octaves");
+            ctx.note (&FlpImportReport::notReproduced, "FL Studio Mobile: chord set extensions outside two octaves");
     }
     // HEAD's key locker: the project key (round 190ds; Chromatic / a scale FL's list lacks: no key)
     if (const auto key = scalekeys::flmKeyLocker (project.root, project.scale))
@@ -2876,10 +2876,10 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
                             std::string why;
                             if (module != nullptr && addGeneratorLane (ctx, lane, *module, gc->second, name, why))
                                 continue;
-                            ctx.note (&FlpImportReport::unsupported, why.empty() ? skippedLaneLabel (lane) : why);
+                            ctx.note (&FlpImportReport::notReproduced, why.empty() ? skippedLaneLabel (lane) : why);
                             continue;
                         }
-                        ctx.note (&FlpImportReport::unsupported, skippedLaneLabel (lane));
+                        ctx.note (&FlpImportReport::notReproduced, skippedLaneLabel (lane));
                         continue;
                     }
                     PlaylistTrack row;
@@ -2890,7 +2890,7 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
                     else
                     {
                         song.playlistTracks.pop_back();
-                        ctx.note (&FlpImportReport::unsupported, "FL Studio Mobile: automation of an effect switch or layout (not imported)");
+                        ctx.note (&FlpImportReport::notReproduced, "FL Studio Mobile: automation of an effect switch or layout (not imported)");
                     }
                     continue;
                 }
@@ -2898,7 +2898,7 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
                 {
                     std::string why;
                     if (! addBendLane (ctx, lane, bendChannels, name, why))
-                        ctx.note (&FlpImportReport::unsupported, why.empty() ? skippedLaneLabel (lane) : why);
+                        ctx.note (&FlpImportReport::notReproduced, why.empty() ? skippedLaneLabel (lane) : why);
                     continue;
                 }
                 // --- round 190dw item 4: Aftertouch and the mod wheel (FLM_FORMAT §7.4)
@@ -2917,7 +2917,7 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
                                     wheels.push_back (k);
                     std::string why;
                     if (! addWheelLane (ctx, lane, wheels, name, why))
-                        ctx.note (why.empty() ? &FlpImportReport::converted : &FlpImportReport::unsupported,
+                        ctx.note (why.empty() ? &FlpImportReport::converted : &FlpImportReport::notReproduced,
                                   why.empty() ? "FL Studio Mobile: mod-wheel automation on instruments that ignore the wheel (nothing to play)" : why);
                     continue;
                 }
@@ -2933,7 +2933,7 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
                             ctx.note (&FlpImportReport::converted, skippedLaneLabel (lane));
                         continue;
                     }
-                    ctx.note (&FlpImportReport::unsupported, skippedLaneLabel (lane));
+                    ctx.note (&FlpImportReport::notReproduced, skippedLaneLabel (lane));
                     continue;
                 }
                 // its row now (FLM's lane order); its clips once every insert and route exists
@@ -3098,7 +3098,7 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
             destination = it->second;
         if (insert <= 0 || destination < 0 || destination == insert || ! song.routes (insert, destination))
         {
-            ctx.note (&FlpImportReport::unsupported, skippedLaneLabel (*lane));
+            ctx.note (&FlpImportReport::notReproduced, skippedLaneLabel (*lane));
             continue;
         }
         addAutomationClips (ctx, *lane, AutomationTarget { AutomationTargetKind::mixerSend, insert, destination, 0 }, true, row, rowName);
@@ -3115,7 +3115,7 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
     song.currentPattern = 0;
     // round 190fn (O1): factory files missing → say where LYNX looks for them (it never ships Image-Line content)
     if (ctx.resourceMissing)
-        ctx.note (&FlpImportReport::unsupported, ctx.options.userResourceRoots.empty()
+        ctx.note (&FlpImportReport::notReproduced, ctx.options.userResourceRoots.empty()
                                                      ? "FL Studio Mobile factory content not found: add the app's Resources folder in Settings > Files"
                                                      : "FL Studio Mobile factory content not found in the Resources folders of Settings > Files");
     return std::move (ctx.song);

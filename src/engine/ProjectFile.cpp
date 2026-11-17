@@ -3568,6 +3568,15 @@ juce::String toJson (const Song& song, bool stampVersion)
         if (! compTracks.isEmpty())
             root->setProperty ("playlistCompTracks", compTracks);
 
+        // imported take lanes (round qafix190kq): their indexes; a project without any has no such property
+        juce::Array<juce::var> takeLanes;
+        for (std::size_t i = 0; i < song.playlistTracks.size(); ++i)
+            if (song.playlistTracks[i].takeLane)
+                takeLanes.add ((int) i);
+
+        if (! takeLanes.isEmpty())
+            root->setProperty ("playlistTakeLanes", takeLanes);
+
         // FL's track locks (round 168f): [index, lock to content 0/1, locked height (px; <= 0 = not locked)]
         juce::Array<juce::var> locks;
         for (std::size_t i = 0; i < song.playlistTracks.size(); ++i)
@@ -4357,6 +4366,11 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
                     track.nest = juce::jlimit (0, 64, (int) t[1]);
         noteedit::normalizeFolders (song);
     }
+
+    if (auto* takeLanes = root["playlistTakeLanes"].getArray()) // (round qafix190kq)
+        for (const auto& t : *takeLanes)
+            if ((int) t >= 0 && (int) t < (int) song.playlistTracks.size())
+                song.playlistTracks[(std::size_t) (int) t].takeLane = true;
 
     if (auto* compTracks = root["playlistCompTracks"].getArray())
         for (const auto& t : *compTracks)

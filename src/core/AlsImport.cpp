@@ -534,7 +534,7 @@ void pluginAutos (Ctx& ctx, const Element& device, const std::string& plugin,
         }
         if (inRack || vst3Slots == nullptr || mySlot < 0)
         {
-            ctx.note (&FlpImportReport::unsupported, "Automation of a VST3 plugin's parameter inside a rack (" + plugin + ": LYNX maps a VST3's own parameter ids on inserts and channels)");
+            ctx.note (&FlpImportReport::notReproduced, "Automation of a VST3 plugin's parameter inside a rack (" + plugin + ": LYNX maps a VST3's own parameter ids on inserts and channels)");
             ctx.explained.insert (id);
             continue;
         }
@@ -652,7 +652,7 @@ void placeRackAutos (Ctx& ctx, PatcherDoc& doc, const std::vector<RackAuto>& aut
         const auto k = bindMacro (doc, autos, a, 0);
         if (k < 0)
         {
-            ctx.note (&FlpImportReport::unsupported, "Automation inside a rack whose macros are all in use (" + a.name + ")");
+            ctx.note (&FlpImportReport::notReproduced, "Automation inside a rack whose macros are all in use (" + a.name + ")");
             ctx.explained.insert (a.id);
             continue;
         }
@@ -843,7 +843,7 @@ int rackDeviceFrom (Ctx& ctx, const Element& d, PatcherDoc& doc, int chain, bool
     }
     if (isMidiEffect (tag))
     {
-        ctx.note (&FlpImportReport::unsupported, deviceName (d));
+        ctx.note (&FlpImportReport::notReproduced, deviceName (d));
         return -1;
     }
     // (round 190bq) Live's own effects LYNX has an engine for: the LYNX effect in the chain
@@ -1429,7 +1429,7 @@ bool midiRackFrom (Ctx& ctx, const Element& d, ChannelDef& channel, std::vector<
         {
             channel.arp = arpBefore;
             effects.resize (effectsBefore);
-            ctx.note (&FlpImportReport::unsupported, "MIDI Effect Rack: " + stopped + " inside (no LYNX counterpart)");
+            ctx.note (&FlpImportReport::notReproduced, "MIDI Effect Rack: " + stopped + " inside (no LYNX counterpart)");
             return false;
         }
         ctx.note (&FlpImportReport::converted, "MIDI Effect Rack (one chain) -> its devices in front of the instrument");
@@ -1440,7 +1440,7 @@ bool midiRackFrom (Ctx& ctx, const Element& d, ChannelDef& channel, std::vector<
     if (channel.arp.enabled())
     {
         // behind an arpeggiator the rack's split would see the arpeggiated notes
-        ctx.note (&FlpImportReport::unsupported, "MIDI Effect Rack (" + std::to_string (chains) + " chains) behind an Arpeggiator");
+        ctx.note (&FlpImportReport::notReproduced, "MIDI Effect Rack (" + std::to_string (chains) + " chains) behind an Arpeggiator");
         return false;
     }
     alsdev::Context context;
@@ -1451,7 +1451,7 @@ bool midiRackFrom (Ctx& ctx, const Element& d, ChannelDef& channel, std::vector<
     auto e = alsdev::midiRackNotes (d, context, notes, stopped);
     if (! e)
     {
-        ctx.note (&FlpImportReport::unsupported, "MIDI Effect Rack (" + std::to_string (chains) + " chains): " + stopped
+        ctx.note (&FlpImportReport::notReproduced, "MIDI Effect Rack (" + std::to_string (chains) + " chains): " + stopped
                                                      + " inside cannot be written into notes");
         return false;
     }
@@ -1672,7 +1672,7 @@ void effectsFrom (Ctx& ctx, const std::vector<Element>& devices, MixerTrack& ins
         }
         if (isMidiEffect (tag))
         {
-            ctx.note (&FlpImportReport::unsupported, deviceName (d));
+            ctx.note (&FlpImportReport::notReproduced, deviceName (d));
             continue;
         }
         // (round 190bq) Live's own effects LYNX has an engine for: the LYNX effect, settings translated
@@ -2010,14 +2010,14 @@ int clipEnvelopeOf (Ctx& ctx, const Element& clip, const ToTicks& contentTicks)
         {
             if (! clipenv::laneOf (e, clipenv::volumeLane).empty())
             {
-                ctx.note (&FlpImportReport::unsupported, "Track Volume clip envelope together with a Clip Gain envelope (the Clip Gain one is kept)");
+                ctx.note (&FlpImportReport::notReproduced, "Track Volume clip envelope together with a Clip Gain envelope (the Clip Gain one is kept)");
                 continue;
             }
             ctx.note (&FlpImportReport::approximated, "Track Volume clip envelope (on the clip's volume; Live's law measured with the fader at 0 dB)");
         }
         if (lane == 0)
         {
-            ctx.note (&FlpImportReport::unsupported, "Clip envelopes of devices and of other mixer controls (left out; Clip Gain, Track Volume and Track Panning are kept)");
+            ctx.note (&FlpImportReport::notReproduced, "Clip envelopes of devices and of other mixer controls (left out; Clip Gain, Track Volume and Track Panning are kept)");
             continue;
         }
         std::vector<AutomationPoint> points;
@@ -2084,7 +2084,7 @@ void addAudioClip (Ctx& ctx, const Element& clip, int row, int mixerTrack, doubl
     if (path.empty() || length <= 0)
         return;
     if (intOf (clip.value ("GrooveSettings/GrooveId", "-1"), -1) >= 0) // (round 190fm)
-        ctx.note (&FlpImportReport::unsupported, "Groove on an audio clip (LYNX's grooves play on MIDI clips; the clip plays straight)");
+        ctx.note (&FlpImportReport::notReproduced, "Groove on an audio clip (LYNX's grooves play on MIDI clips; the clip plays straight)");
     const auto warped = clip.boolean ("IsWarped", true);
     const auto mode = (int) clip.number ("WarpMode", 0);
     const auto bpm = ctx.song.bpm;
@@ -2215,7 +2215,7 @@ void addAudioClip (Ctx& ctx, const Element& clip, int row, int mixerTrack, doubl
     if (! warped)
     {
         if (clip.path ("Envelopes/Envelopes").children ("ClipEnvelope").size() > 0)
-            ctx.note (&FlpImportReport::unsupported, "Clip envelopes of unwarped audio clips (left out: Live does not play them)");
+            ctx.note (&FlpImportReport::notReproduced, "Clip envelopes of unwarped audio clips (left out: Live does not play them)");
     }
     else if (const auto envelope = clipEnvelopeOf (ctx, clip, contentTicks); envelope >= 0)
     {
@@ -2241,14 +2241,14 @@ void readGroovePool (Ctx& ctx, const Element& set, const Element& mainMixer)
         std::string why;
         if (! groove::fromGrooveElement (node, g, &why))
         {
-            ctx.note (&FlpImportReport::unsupported, "Groove without a usable template (left out): " + node.value ("Name"));
+            ctx.note (&FlpImportReport::notReproduced, "Groove without a usable template (left out): " + node.value ("Name"));
             continue;
         }
         ctx.grooveIds[intOf (node.attr ("Id"), -1)] = groove::add (ctx.song.grooves, std::move (g));
         // Live's groove law is not measured: LYNX's own (docs/analise/REA_rodada190bv.md U2) plays the same template
         ctx.note (&FlpImportReport::approximated, "Grooves (LYNX's groove timing and accents; Live's exact law needs a live check)");
         if (! node.value ("Annotation").empty())
-            ctx.note (&FlpImportReport::unsupported, "Groove info text (Annotation)");
+            ctx.note (&FlpImportReport::notReproduced, "Groove info text (Annotation)");
     }
     if (const auto amount = mainMixer.child ("GlobalGrooveAmount"); amount)
     {
@@ -2259,7 +2259,7 @@ void readGroovePool (Ctx& ctx, const Element& set, const Element& mainMixer)
     }
     // the pool's default groove for new clips: LYNX has none (groove-023)
     if (const auto def = intOf (pool.value ("DefaultGrooveId", "-1"), -1); def >= 0 && ctx.grooveIds.count (def) != 0)
-        ctx.note (&FlpImportReport::unsupported, "Default groove for new clips (LYNX's new clips start without a groove)");
+        ctx.note (&FlpImportReport::notReproduced, "Default groove for new clips (LYNX's new clips start without a groove)");
 }
 
 // A clip's GrooveSettings/GrooveId → LYNX's id (0: none, −1 in the set, or not in the pool)
@@ -2271,7 +2271,7 @@ std::uint32_t grooveOfClip (Ctx& ctx, const Element& clip)
     const auto it = ctx.grooveIds.find (id);
     if (it == ctx.grooveIds.end())
     {
-        ctx.note (&FlpImportReport::unsupported, "Clip groove that is not in the set's Groove Pool (left out)");
+        ctx.note (&FlpImportReport::notReproduced, "Clip groove that is not in the set's Groove Pool (left out)");
         return 0;
     }
     return it->second;
@@ -2455,7 +2455,7 @@ void addAutomation (Ctx& ctx, const Element& envelopes, const std::string& owner
         if (it == ctx.targets.end())
         {
             if (ctx.explained.count (id) == 0)
-                ctx.note (&FlpImportReport::unsupported, "Automation of a device parameter (" + owner + ")");
+                ctx.note (&FlpImportReport::notReproduced, "Automation of a device parameter (" + owner + ")");
             continue;
         }
         bool stepped = false;
@@ -2551,7 +2551,7 @@ void registerMixerTargets (Ctx& ctx, const Element& mixer, int insert, const std
     // (issue #193) the track's on / off switch: LYNX's mixer mute has no automation, so it is named on its own
     if (const auto id = targetId (mixer.child ("Speaker")); ! id.empty() && ctx.automated.count (id) != 0)
     {
-        ctx.note (&FlpImportReport::unsupported, "Track on / off automation (" + name + ": LYNX's mute is not automated; the track stays as saved)");
+        ctx.note (&FlpImportReport::notReproduced, "Track on / off automation (" + name + ": LYNX's mute is not automated; the track stays as saved)");
         ctx.explained.insert (id);
     }
 }
@@ -2575,7 +2575,7 @@ void sessionToGrid (Ctx& ctx, const Element& set, const std::vector<Element>& tr
         {
             if ((int) s >= launcher::maxScenes)
             {
-                ctx.note (&FlpImportReport::unsupported, "Session scenes past LYNX's grid limit");
+                ctx.note (&FlpImportReport::notReproduced, "Session scenes past LYNX's grid limit");
                 break;
             }
             bool placed = false;
@@ -2617,7 +2617,7 @@ void sessionToGrid (Ctx& ctx, const Element& set, const std::vector<Element>& tr
                 const auto id = launcher::setClip (song, rowOf[i], (int) s, made.front());
                 if (id < 0)
                 {
-                    ctx.note (&FlpImportReport::unsupported, "Session clips past LYNX's grid limits");
+                    ctx.note (&FlpImportReport::notReproduced, "Session clips past LYNX's grid limits");
                     continue;
                 }
                 auto& slot = song.clipGrid->slots[(std::size_t) id];
@@ -2674,7 +2674,7 @@ void sessionToGrid (Ctx& ctx, const Element& set, const std::vector<Element>& tr
             sc.beatUnit = session::sceneBeatUnit (d); // (round 190em: the scene keeps its denominator)
         }
         if (scenes[s].boolean ("FollowAction/FollowActionEnabled", false))
-            ctx.note (&FlpImportReport::unsupported, "Scene follow actions");
+            ctx.note (&FlpImportReport::notReproduced, "Scene follow actions");
     }
     // the set-wide value has no Global entry: a clip's number is that + 1 [LIVE: 9 = 1/8 = clip 10]
     grid.globalQuant = (LaunchQuant) std::clamp ((int) set.number ("GlobalQuantisation", 4) + 1, 1, 14);
@@ -3306,6 +3306,7 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
                     lane.grouped = true;
                     lane.nest = depth;
                     lane.muted = true;
+                    lane.takeLane = true; // (round qafix190kq: no clip-grid / Session-mixer column)
                     lane.mixerTrack = row.mixerTrack;
                     lane.mode = row.mode;
                     song.playlistTracks.push_back (lane);
@@ -3406,7 +3407,7 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
                 if (isMidiEffect (tag))
                 {
                     if (! midiEffectFrom (ctx, devices[d], c, noteEffects) && tag != "MidiEffectGroupDevice") // (190kk: a rack lists its own reason)
-                        ctx.note (&FlpImportReport::unsupported, deviceName (devices[d]));
+                        ctx.note (&FlpImportReport::notReproduced, deviceName (devices[d]));
                     firstEffect = d + 1;
                     continue;
                 }

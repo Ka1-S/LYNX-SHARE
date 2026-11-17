@@ -9071,6 +9071,12 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
     // the bar's position → the menu built below (0 File, 1 Edit, 2 View, 3 Patterns, 4 Options, 5 Help, 10 Add, 11 Tools)
     static constexpr int menus[] = { 0, 1, 10, 3, 2, 4, 11, 5 };
     const auto index = juce::isPositiveAndBelow (barIndex, (int) std::size (menus)) ? menus[barIndex] : 5;
+    // round qafix190kq (QA-8): in the Clip-launch / Simple layouts the View menu is not split into the two columns of a
+    // menu taller than 70 % of the screen (JUCE fix 40, FL's split): "Layout style" landed in the first column, and its
+    // submenu opened beside the menu's outer edge (issue #18, core/MenuPlacement.h), beyond the second column. Live's and
+    // BandLab's View menus are one column; it stays one column while it fits on the screen (JUCE fix 190kq reads this
+    // property of the menu's target: the menu bar opens the menu built here right away). The Pattern layout keeps FL's split.
+    menuBar.getProperties().set ("lynxOneColumnMenu", index == 2 && layoutStyle != layoutstyle::Style::pattern);
 
     if (index == 10)
     {
@@ -9568,7 +9574,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         menu.addItem (tr ("Missing files..."), [this] { showMissingFiles (false); });
         menu.addItem (tr ("Last project import report"), [this] {
             const auto& r = engine.getImportReport();
-            if (r.converted.empty() && r.approximated.empty() && r.unsupported.empty() && r.droppedEffects.empty() && r.partialEffects.empty() && r.missingSamples == 0
+            if (r.converted.empty() && r.approximated.empty() && r.unsupported.empty() && r.notReproduced.empty() && r.droppedEffects.empty() && r.partialEffects.empty() && r.missingSamples == 0
                 && engine.getMissingPlugins().isEmpty() && engine.getMatchedPlugins().isEmpty() && engine.getPluginsWithoutState().isEmpty()
                 && engine.getPluginHost().getLoadFailures().isEmpty())
                 juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Project import"),
@@ -10064,6 +10070,10 @@ void MainComponent::showImportReport()
         text << tr ("Approximated by the built-in synth:") << "\n" << list (r.approximated) << "\n\n";
     if (! r.unsupported.empty())
         text << tr ("No equivalent (played with a synth preset):") << "\n" << list (r.unsupported) << "\n\n";
+    // round qafix190kq (QA of 0.1.30): automation, clip data, grooves, scenes, MIDI / note effects... are not instruments
+    // played with a synth preset; they have a heading of their own
+    if (! r.notReproduced.empty())
+        text << tr ("Not reproduced (left out or played differently):") << "\n" << list (r.notReproduced) << "\n\n";
     if (const auto& matched = engine.getMatchedPlugins(); ! matched.isEmpty())
         text << tr ("Plugins found on this PC:") << "\n  " << matched.joinIntoString ("\n  ") << "\n\n";
     if (! missing.isEmpty())

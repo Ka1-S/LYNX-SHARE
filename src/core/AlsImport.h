@@ -12,7 +12,7 @@
 //    `sessionOnPlaylist`, the Playlist after the arrangement, one section per scene (a marker per scene);
 //  - third-party VST2 / VST3 plugins → PluginRef::foreign (resolved like an .flp's, state carried over);
 //  - Live's own devices → the closest LYNX instrument (Simpler / Sampler / Drum rack / Instrument rack); the rest is
-//    listed in the report (unsupported / droppedEffects), as for an .flp.
+//    listed in the report (unsupported / notReproduced / droppedEffects), as for an .flp.
 
 #include <array>
 #include <cstdint>

@@ -247,12 +247,14 @@ int SessionMixerComponent::returnColumnsFor (const Song& song)
     return (int) sessionmixer::returnsOf (song).size();
 }
 
-void SessionMixerComponent::setColumns (int count, int width, int scrollX, int tracks, int main, int returns)
+void SessionMixerComponent::setColumns (int count, int width, int scrollX, int tracks, int main, int returns, const std::vector<int>& trackOfColumn)
 {
-    if (count == columns && width == columnWidth && scrollX == scroll && tracks == tracksWidth && main == mainWidth && returns == returnColumns)
+    if (count == columns && width == columnWidth && scrollX == scroll && tracks == tracksWidth && main == mainWidth && returns == returnColumns
+        && trackOfColumn == columnTracks)
         return;
-    if (count != columns || returns != returnColumns)
+    if (count != columns || returns != returnColumns || trackOfColumn != columnTracks)
         cacheStamp = ~std::uint64_t (0);
+    columnTracks = trackOfColumn;
     returnColumns = returns;
     columns = count;
     columnWidth = width;
@@ -276,7 +278,7 @@ void SessionMixerComponent::refreshCache() const
     std::vector<int> inserts;
     for (int t = 0; t < columns; ++t)
     {
-        strips.push_back (sessionmixer::stripOf (song, t));
+        strips.push_back (sessionmixer::stripOf (song, trackOf (t)));
         inserts.push_back (strips.back().insert);
     }
     returnInserts = sessionmixer::returnsOf (song); // (round 190kc)
@@ -302,6 +304,14 @@ sessionmixer::Strip SessionMixerComponent::stripFor (int column) const
         return r;
     }
     return column >= 0 && column < (int) strips.size() ? strips[(std::size_t) column] : sessionmixer::Strip {};
+}
+
+int SessionMixerComponent::columnOf (int track) const noexcept
+{
+    if (columnTracks.empty())
+        return track;
+    const auto at = std::find (columnTracks.begin(), columnTracks.end(), track);
+    return at != columnTracks.end() ? (int) (at - columnTracks.begin()) : -1;
 }
 
 int SessionMixerComponent::insertFor (int column) const
@@ -421,7 +431,7 @@ bool SessionMixerComponent::tick()
     {
         std::uint64_t arms = 1469598103934665603ull;
         for (int t = std::max (0, scroll / std::max (1, columnWidth)); t < columns && stripX (t) < tracksWidth; ++t)
-            arms = (arms ^ (engine.isGridTrackArmed (t) ? 2u : 1u)) * 1099511628211ull;
+            arms = (arms ^ (engine.isGridTrackArmed (trackOf (t)) ? 2u : 1u)) * 1099511628211ull;
         if (arms != armsShownState)
         {
             armsShownState = arms;
@@ -433,8 +443,8 @@ bool SessionMixerComponent::tick()
         if (auto* parent = getParentComponent())
             if (const auto selected = clipGridSelection (*parent).first; selected != selectedShown)
             {
-                for (const auto t : { selectedShown, selected })
-                    if (t >= 0 && t < columns)
+                for (const auto track : { selectedShown, selected })
+                    if (const auto t = columnOf (track); t >= 0 && t < columns)
                         repaint (stripX (t), 0, columnWidth, getHeight());
                 selectedShown = selected;
             }
@@ -973,7 +983,7 @@ void SessionMixerComponent::paintStrip (juce::Graphics& g, int column)
         if (! main && ! ret)
         {
             const auto arm = partBounds (column, Part::arm).toFloat();
-            const auto armed = engine.isGridTrackArmed (column);
+            const auto armed = engine.isGridTrackArmed (trackOf (column));
             theme::fillRoundRect (g, arm, 2.0f, armed ? c::record : hot (Part::arm) ? c::bg5 : c::bg4);
             if (! armed)
             {
@@ -1118,7 +1128,7 @@ void SessionMixerComponent::paintStripLive (juce::Graphics& g, int column, int s
     const auto* m = strip.insert >= 0 && strip.insert < (int) song.mixer.size() ? &song.mixer[(std::size_t) strip.insert] : nullptr;
 
     // the strip (selected track #464646), each section's 2 px separator under it, the track-colour stripe at the foot
-    g.setColour (! main && column == selected ? lv::raised : lv::surface);
+    g.setColour (! main && trackOf (column) == selected ? lv::raised : lv::surface);
     g.fillRect (content);
     g.setColour (lv::separator);
     {
@@ -1127,7 +1137,7 @@ void SessionMixerComponent::paintStripLive (juce::Graphics& g, int column, int s
             if (h > 0)
                 g.fillRect (content.getX(), (y += h) - liveSeparator, content.getWidth(), liveSeparator);
     }
-    const auto* info = ! main && ! ret && column >= 0 && column < (int) song.playlistTracks.size() ? &song.playlistTracks[(std::size_t) column] : nullptr;
+    const auto* info = ! main && ! ret && trackOf (column) >= 0 && trackOf (column) < (int) song.playlistTracks.size() ? &song.playlistTracks[(std::size_t) trackOf (column)] : nullptr;
     const auto stripeColour = ret ? (m != nullptr && m->colour != 0 ? juce::Colour (m->colour) : lv::raised) // (a return: its own colour)
                                   : info != nullptr && info->colour != 0 ? juce::Colour (info->colour) : lv::raised;
     g.setColour (main ? lv::mainHeader : stripeColour);
@@ -1293,7 +1303,7 @@ void SessionMixerComponent::paintStripLive (juce::Graphics& g, int column, int s
         // Arm (x 406..428 y 771..783): a 7 px disc; a track of notes has Live's notch in it (live-session.png strips
         // 1..3; the audio track 14 a plain disc); armed: #FF5559 with the glyph #070707
         const auto arm = partBounds (column, Part::arm);
-        const auto armed = engine.isGridTrackArmed (column);
+        const auto armed = engine.isGridTrackArmed (trackOf (column));
         const auto fill = armed ? lv::arm : hot (Part::arm) ? lv::raised : lv::well;
         liveWell (g, arm, fill);
         const auto disc = arm.toFloat().withSizeKeepingCentre (7.0f, 7.0f);
@@ -1442,7 +1452,7 @@ void SessionMixerComponent::mouseDown (const juce::MouseEvent& e)
             break;
         case Part::arm:
             if (! popup)
-                engine.setGridTrackArmed (hit.column, ! engine.isGridTrackArmed (hit.column), ! e.mods.isCommandDown());
+                engine.setGridTrackArmed (trackOf (hit.column), ! engine.isGridTrackArmed (trackOf (hit.column)), ! e.mods.isCommandDown());
             break;
         case Part::post: // round 190kc: a return's Pre / Post toggle
             if (! popup && hit.row < (int) rows.size())

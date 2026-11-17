@@ -174,7 +174,7 @@ TEST (livedev190kk_midi_effect_rack_chains_are_written_into_the_notes)
     for (const auto& p : song->patterns)
         if (p.notes.size() == 2)
             found = p.notes[0].key == 60 && p.notes[1].key == 60;
-    CHECK (found && als190cf::reportHas (report.approximated, "MIDI Effect Rack (2 chains)") && report.unsupported.empty());
+    CHECK (found && als190cf::reportHas (report.approximated, "MIDI Effect Rack (2 chains)") && report.unsupported.empty() && report.notReproduced.empty());
 }
 
 TEST (livedev190kk_vinyl_distortion_imports_onto_platter)

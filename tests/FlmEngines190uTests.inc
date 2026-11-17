@@ -301,7 +301,7 @@ TEST (flm190u_three_osc_maps_the_parameters)
             return;
         const auto* c = flm182c::channelNamed (*song, "Bass");
         CHECK (c != nullptr && c->instrument == InstrumentKind::threeosc && threeOscIsFlm (*c) && threeOscStateUsable (c->pluginState));
-        CHECK (report.converted.count ("FL Studio Mobile: 3x Osc") == 1 && report.unsupported.empty());
+        CHECK (report.converted.count ("FL Studio Mobile: 3x Osc") == 1 && report.unsupported.empty() && report.notReproduced.empty());
         if (c == nullptr)
             return;
         const int expected[21] = { 0, 0, 0, 0, 0, 0, 64, 0, 0, -12, 0, 0, 0, 32, 0, 0, -24, 0, 0, 0, 0 };
@@ -365,12 +365,12 @@ TEST (flm190u_three_osc_maps_the_parameters)
                && std::abs (c->misc.echo.pan - 0.8f) < 1e-5f && std::abs (c->misc.echo.pitch - 200.0f) < 1e-3f && c->misc.echo.pingPong && ! c->misc.echo.fat);
         CHECK (c->arp.direction == 5 && c->arp.range == 2 && std::abs (c->arp.gate - 0.6f) < 1e-6f && c->arp.octaveRepeat == 3 && c->arp.slide
                && c->arp.chord == std::vector<int> { 0 } && c->arp.chordSustain && c->arp.stepBeats > 0.0f && c->arp.stepBeats < 0.25f);
-        CHECK (report.unsupported.empty());
+        CHECK (report.unsupported.empty() && report.notReproduced.empty());
 
         // what LYNX lacks is listed: Free Run
         p[146] = 1.0f;
         FlpImportReport listed;
-        CHECK (import (p, listed).has_value() && listed.unsupported.size() == 1);
+        CHECK (import (p, listed).has_value() && listed.notReproduced.size() == 1 && listed.unsupported.empty());
     }
 
     // a channel from a .flm: the level is linear in the velocity (the desktop's Init.Vol curve is not applied)

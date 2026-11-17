@@ -122,6 +122,19 @@ Group groupOf (const Song& song, int track)
     return g;
 }
 
+bool isTakeLane (const Song& song, int track)
+{
+    if (track < 0 || track >= (int) song.playlistTracks.size())
+        return false;
+    const auto& t = song.playlistTracks[(std::size_t) track];
+    if (! t.grouped)
+        return false;
+    if (t.takeLane)
+        return true;
+    const auto g = groupOf (song, track);
+    return g.isLane (track) && song.playlistTracks[(std::size_t) g.comp].compTrack;
+}
+
 std::int64_t crossfadeTicks (const Song& song)
 {
     const auto ms = std::clamp ((double) song.compCrossfadeMs, 0.0, 100.0);

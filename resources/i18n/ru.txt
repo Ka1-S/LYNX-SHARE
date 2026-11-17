@@ -11230,3 +11230,4 @@ countries: ru by kz
 "The Simple Controls tab's own knob mappings: {0}" = "Собственные назначения ручек вкладки Controls в Simple: {0}"
 "Harmor parts with a sample in the IMG section play their timbres instead of the resynthesis: {0}" = "Партии Harmor с сэмплом в секции IMG играют своими тембрами вместо ресинтеза: {0}"
 "Newtone's detected key and note velocities are left out: {0}" = "Найденная Newtone тональность и velocity нот не сохраняются: {0}"
+"Not reproduced (left out or played differently):" = "Не воспроизводится (пропущено или звучит иначе):"

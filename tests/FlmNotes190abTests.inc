@@ -84,5 +84,5 @@ TEST (flm190ab_note_pan_pitch_repeat_slide)
     }
     CHECK (report.converted["FL Studio Mobile: slide note"] == 1 && report.converted["FL Studio Mobile: note repeat (extra hits)"] == 4
            && report.converted["FL Studio Mobile: drum note pitch"] == 3 && report.converted["FL Studio Mobile: note pan"] == 3
-           && report.unsupported["FL Studio Mobile: slide note without a held note (FLM plays nothing)"] == 1);
+           && report.notReproduced["FL Studio Mobile: slide note without a held note (FLM plays nothing)"] == 1);
 }

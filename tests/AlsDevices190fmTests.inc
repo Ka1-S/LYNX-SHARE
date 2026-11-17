@@ -375,8 +375,10 @@ TEST (als190fm_roar_becomes_a_rack)
         CHECK (near (s1.params[em::output], (float) ((-6.0206 + 18.0) / 36.0), 1.0e-4) && s1.params[em::autoGain] == 0.0f);
         CHECK (f1.kind == EffectKind::filter && near (f1.params[1], filterCutoffValue (4000.0), 1.0e-6) && f1.params[0] == filterTypeValue (0));
         CHECK (s2.kind == EffectKind::lofi && near (s2.params[1], lofiBitsValue (16.0 - 15.0 * 0.4), 1.0e-6));
-        CHECK (comp.kind == EffectKind::crestCompressor && near (comp.params[dyn::crest::threshold], (float) ((-9.0 + 60.0) / 60.0), 1.0e-5));
-        CHECK (outGain.kind == EffectKind::utility && near (outGain.params[0], (float) ((-6.0206 + 24.0) / 48.0), 1.0e-4));
+        // (round qafix190kq: Live's measured compression law and the neutral +1.55 dB on the output)
+        CHECK (comp.kind == EffectKind::crestCompressor && near (comp.params[dyn::crest::threshold], (float) ((roarCompThresholdDb (0.25) + 60.0) / 60.0), 1.0e-5));
+        CHECK (near (dyn::crest::ratioOf (comp.params[dyn::crest::ratio]), roarCompRatio (0.25), 0.05));
+        CHECK (outGain.kind == EffectKind::utility && near (outGain.params[0], (float) ((-6.0206 + roarNeutralDb + 24.0) / 48.0), 1.0e-4));
     }
     CHECK (near (r->chains[0].volume, 0.8, 1.0e-6) && near (r->chains[1].volume, 0.2, 1.0e-6));
     CHECK (r->macros[rrDrive1].name == "Drive 1" && r->macros[rrDrive1].mappings.size() == 1 && r->macros[rrDrive2].mappings.empty());

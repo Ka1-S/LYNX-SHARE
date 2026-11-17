@@ -253,7 +253,7 @@ TEST (warp190cg_als_keeps_signature_changes_loop_range_and_tempo_view)
     }
     // the bars follow: four bars of 3/4 (12 beats), four of 7/8 (14 beats), then 4/4
     CHECK (song->barAt (12 * ppq).number == 5 && song->barAt (12 * ppq).length == ppq * 7 / 2 && song->barAt (26 * ppq).number == 9);
-    CHECK (report.unsupported.count ("Automation of a device parameter (Main)") == 0);
+    CHECK (report.notReproduced.count ("Automation of a device parameter (Main)") == 0);
     // the brace keeps its place with the switch off: the range is there, playback does not loop it
     CHECK (song->hasLoop() && song->loopOff && ! song->loopPlays() && song->loopStart == 4 * ppq && song->loopEnd == 12 * ppq);
     CHECK (song->tempoViewLow == 80.0 && song->tempoViewHigh == 160.0);

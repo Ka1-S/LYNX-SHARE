@@ -478,7 +478,7 @@ TEST (flm190bs_audio_clips_take_their_slot_settings)
     // Speed that moves and other parameters: listed
     CHECK (channelOf (one ("Bend")).sampler.pitch == 24.0f);
     CHECK (report.partialEffects.count ("FL Studio Mobile: audio clip Speed automation (the first value is used)") == 1
-           && report.unsupported.count ("FL Studio Mobile: audio clip automation of other sample settings (not imported)") == 1
+           && report.notReproduced.count ("FL Studio Mobile: audio clip automation of other sample settings (not imported)") == 1
            && report.partialEffects.count ("FL Studio Mobile: audio clip time-stretch (LYNX's stretcher, approximated)") == 1
            && report.partialEffects.count ("FL Studio Mobile: audio clip time-stretch (played unstretched)") == 0);
     CHECK (report.converted.count ("FL Studio Mobile: looped audio clip") == 1 && report.converted.count ("FL Studio Mobile: audio clip level") == 1
@@ -668,8 +668,9 @@ TEST (flm190bs_rack_with_several_instruments_is_a_layer)
     for (const auto& n : song->patterns[0].notes)
         CHECK (&song->channels[(std::size_t) n.channel] == layer);
     CHECK (report.converted.count ("FL Studio Mobile: rack with several instruments (Layer)") == 1);
-    for (const auto& [what, count] : report.unsupported)
-        CHECK (what.find ("second instrument") == std::string::npos);
+    for (const auto* list : { &report.unsupported, &report.notReproduced }) // (round qafix190kq: both lists)
+        for (const auto& [what, count] : *list)
+            CHECK (what.find ("second instrument") == std::string::npos);
     // heard: key 48 plays only the low sample, key 72 the high one and nothing else from the samplers
     auto quiet = *song;
     quiet.channels[(std::size_t) layer->layer.children[2]].muted = true; // (the synth stand-in)

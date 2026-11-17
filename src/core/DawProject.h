@@ -26,7 +26,7 @@
 //    an effect return), an automation clip on a row of its own; tempo → tempo markers (core/TempoMarkers.h); time
 //    signature changes → time signature markers; Markers → Playlist markers; metadata.xml → Song::info;
 //  - Scenes (the clip launcher's ClipSlots) → the clip grid, as the .als import's Session view (the export leaves the grid out).
-// Everything else is listed in the report (FlpImportReport: unsupported / approximated / droppedEffects), never dropped
+// Everything else is listed in the report (FlpImportReport: unsupported / notReproduced / approximated / droppedEffects), never dropped
 // silently. The export writes the inverse; what it leaves out is listed in DawProjectExportResult::notes.
 
 #include <array>

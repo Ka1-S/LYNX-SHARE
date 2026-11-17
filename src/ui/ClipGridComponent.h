@@ -64,6 +64,9 @@ void selectClipGridSlotForSnapshot (juce::Component& grid, int track, int scene)
 std::pair<juce::String, juce::String> clipGridHintForSnapshot (juce::Component& grid, juce::Point<int> p);
 bool clipGridKeyForSnapshot (juce::Component& grid, const juce::KeyPress& key);
 void refreshClipGrid (juce::Component& grid);
+// Round qafix190kq (QA-2): the Playlist track of each grid column, left to right (take lanes have none); --gridshot
+// lists them.
+std::vector<int> clipGridColumnTracks (juce::Component& grid);
 void setClipGridSceneFieldsListener (juce::Component& grid, std::function<void()> listener);
 // The menus of a scene, a column title and a scene field (1 tempo, 2 time signature), as a right-click opens them
 // (--sceneshot190ef draws them).

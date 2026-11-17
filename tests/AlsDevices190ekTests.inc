@@ -239,7 +239,7 @@ TEST (als190ek_vst3_automation_follows_the_plugin_s_own_ids)
     CHECK (flVst3SlotPositions (flVst3ParamSlots (foreign.state), { 414u, 1u, 7u }) == (std::vector<int> { 1, 0, 2 })); // (7: the next free slot)
     std::vector<std::uint8_t> component, controller;
     CHECK (splitFlVst3State (foreign.state, component, controller) && component.size() == 1);
-    CHECK (report.unsupported.count ("Automation of a VST3 plugin's parameter (kHs Gain: Live keeps the plugin's own id, not its index)") == 0);
+    CHECK (report.notReproduced.count ("Automation of a VST3 plugin's parameter (kHs Gain: Live keeps the plugin's own id, not its index)") == 0);
     CHECK (report.approximated.count ("Automation of a VST3 parameter with its own range (kHs Gain Gain: Live's plain values mapped linearly between the range's ends)") == 1);
     CHECK (report.approximated.count ("Automation of a VST3 parameter with its own range (kHs Gain mode: Live's plain values mapped linearly between the range's ends)") == 0);
 }

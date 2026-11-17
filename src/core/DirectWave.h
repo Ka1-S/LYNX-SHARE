@@ -185,6 +185,10 @@ bool isPcm16Wav (const std::vector<std::uint8_t>& file);
 
 // a decoded sample as the plugin holds it (16-bit sources back to their integers)
 std::shared_ptr<const ZoneSamples> zoneSamples (const SampleData& sample, bool int16);
+// Round qafix190kq (QA-10 of 0.1.30): the same, shared while any instrument holds it — a rebuild of the rack (every
+// published edit; the export's own engine beside the project's) takes the zones already made instead of copying every
+// sample again (Secret Agent Rendezvous: 2 × 422 MB of zones at an --export's peak). Keyed on the SampleData itself.
+std::shared_ptr<const ZoneSamples> zoneSamplesShared (const std::shared_ptr<const SampleData>& sample, bool int16);
 
 // Fills an imported channel (FlpImport): the state, the zones' files (resolved with `existing`, or the audio
 // the project embeds, stored with `saveEmbedded`) and their formats (read with `readFile`). False: not usable.

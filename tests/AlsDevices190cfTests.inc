@@ -600,7 +600,7 @@ TEST (als190cf_midi_effects)
     CHECK (found);
     CHECK (report.converted.count ("Arpeggiator -> channel arpeggiator") == 1 && als190cf::reportHas (report.approximated, "Pitch (MIDI effect): written into the notes") &&
            als190cf::reportHas (report.approximated, "Velocity (MIDI effect): written into the notes") && als190cf::reportHas (report.approximated, "Velocity: Drive / Compand"));
-    CHECK (report.unsupported.count ("MidiScale") == 1 && report.unsupported.size() == 1 && report.converted.count ("Simpler") == 1);
+    CHECK (report.notReproduced.count ("MidiScale") == 1 && report.notReproduced.size() == 1 && report.unsupported.empty() && report.converted.count ("Simpler") == 1);
 
     // the same effects at the head of a one-chain Instrument Rack's chain reach the channel too; a Chord behind the
     // Arpeggiator cannot be written into the notes and stays unsupported
@@ -626,8 +626,8 @@ TEST (als190cf_midi_effects)
         for (const auto& p : racked->patterns)
             if (p.notes.size() == 2)
                 moved = p.notes[0].key == 48 && p.notes[1].key == 52;
-        CHECK (moved && rackReport.converted.count ("Arpeggiator -> channel arpeggiator") == 1 && rackReport.unsupported.count ("MidiChord") == 1 &&
-               rackReport.unsupported.count ("MidiPitcher") == 0 && rackReport.unsupported.count ("MidiArpeggiator") == 0);
+        CHECK (moved && rackReport.converted.count ("Arpeggiator -> channel arpeggiator") == 1 && rackReport.notReproduced.count ("MidiChord") == 1 &&
+               rackReport.notReproduced.count ("MidiPitcher") == 0 && rackReport.notReproduced.count ("MidiArpeggiator") == 0);
     }
 }
 
@@ -688,7 +688,7 @@ TEST (als190cf_automation_and_macros_follow_the_translated_device)
     }
     CHECK (feedbackSeen && gainSeen);
     // the envelope with no translated target is still listed
-    CHECK (report.unsupported.count ("Automation of a device parameter (Bus)") == 1);
+    CHECK (report.notReproduced.count ("Automation of a device parameter (Bus)") == 1);
     // the rack: macro 1 → Ember's mix over 20 … 80 %, macro 2 → its drive over 0 … 18 dB; the mapped values follow the macros
     const auto* r = rack::rackOf (fx[2].patcher);
     CHECK (r != nullptr);

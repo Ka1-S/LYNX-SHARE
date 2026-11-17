@@ -11230,3 +11230,4 @@ countries: kr
 "The Simple Controls tab's own knob mappings: {0}" = "Simple Controls 탭의 사용자 노브 매핑: {0}"
 "Harmor parts with a sample in the IMG section play their timbres instead of the resynthesis: {0}" = "IMG 섹션에 샘플이 있는 Harmor 파트는 리신시스 대신 음색으로 재생됩니다: {0}"
 "Newtone's detected key and note velocities are left out: {0}" = "Newtone이 감지한 키와 노트 벨로시티는 제외됩니다: {0}"
+"Not reproduced (left out or played differently):" = "재현되지 않음(제외되거나 다르게 재생):"

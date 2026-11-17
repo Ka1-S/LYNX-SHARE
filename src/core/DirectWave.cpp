@@ -1,4 +1,8 @@
 #include "core/DirectWave.h"
+
+#include <map>
+
+#include <mutex>
 #include "core/HostSlide.h"
 
 #include "core/BassDrum.h"
@@ -2129,6 +2133,31 @@ std::shared_ptr<const ZoneSamples> zoneSamples (const SampleData& sample, bool i
         }
     }
     return z;
+}
+
+std::shared_ptr<const ZoneSamples> zoneSamplesShared (const std::shared_ptr<const SampleData>& sample, bool int16)
+{
+    if (sample == nullptr)
+        return nullptr;
+    struct Entry
+    {
+        std::weak_ptr<const SampleData> sample;
+        std::weak_ptr<const ZoneSamples> zones;
+    };
+    static std::mutex lock;
+    static std::map<std::pair<const SampleData*, bool>, Entry> cache;
+    const std::lock_guard<std::mutex> hold (lock);
+    const auto key = std::make_pair (sample.get(), int16);
+    if (const auto at = cache.find (key); at != cache.end())
+        if (const auto held = at->second.sample.lock(); held == sample) // (the same sample, not a new one at a freed address)
+            if (auto zones = at->second.zones.lock())
+                return zones;
+    for (auto it = cache.begin(); it != cache.end();) // (entries nobody holds any more)
+        it = it->second.zones.expired() || it->second.sample.expired() ? cache.erase (it) : std::next (it);
+    auto zones = zoneSamples (*sample, int16);
+    if (zones != nullptr)
+        cache[key] = { sample, zones };
+    return zones;
 }
 
 // a WAV whose audio is 16-bit PCM (format 1, or extensible with the PCM sub-format)

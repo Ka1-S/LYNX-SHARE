@@ -17901,3 +17901,5 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Natives190kjEdisonTests.inc" // round natives190kj: FL Edison Dual view, grid step, pitch-period snap, grid-slicing, scrub, pitch regions
 #include "Natives190kjHarmorTests.inc" // round natives190kj: Harmor resynthesis (analysis, voice, engine revision)
 #include "Qa190kpTests.inc" // round qa190kp: Follow pause after a layout switch during playback
+#include "QaFix190kqTests.inc" // round qafix190kq: QA-1/2/6/9/10 release blockers of 0.1.30
+#include "QaFix190kqReportTests.inc" // round qafix190kq: the import report's "not reproduced" list apart from the synth-preset instruments

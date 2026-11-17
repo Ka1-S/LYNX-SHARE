@@ -141,8 +141,8 @@ TEST (flm190de_instrument_wrapper_and_parameter_lanes)
     CHECK (report.partialEffects.count ("FL Studio Mobile: instrument Enable automation (the channel's volume on or off)") == 1);
     // (round 190dw: the aftertouch lane reaches no FLM module, so there is nothing to import)
     CHECK (report.converted.count ("FL Studio Mobile: Aftertouch automation (no FL Studio Mobile instrument responds to it)") == 1
-           && report.unsupported.count ("FL Studio Mobile: Pitch Bend/Aftertouch automation (not imported)") == 0);
-    CHECK (report.unsupported.count ("FL Studio Mobile: automation of module parameters (not imported yet)") == 0);
+           && report.notReproduced.count ("FL Studio Mobile: Pitch Bend/Aftertouch automation (not imported)") == 0);
+    CHECK (report.notReproduced.count ("FL Studio Mobile: automation of module parameters (not imported yet)") == 0);
     // rows: the cutoff and enable lanes on the Saw, one row per bent child
     int rows = 0;
     for (const auto& r : s->playlistTracks)

@@ -391,7 +391,7 @@ TEST (als175a_real_sets)
                      "%zu markers, %d plugins, %d samples missing, %zu dropped devices, %zu unsupported\n",
                      entry.path().filename().string().c_str(), ms, song->bpm, song->beatsPerBar, song->mixer.size(), song->channels.size(),
                      song->patterns.size(), notes, song->playlist.size(), song->automations.size(), song->markers().size(), plugins,
-                     report.missingSamples, report.droppedEffects.size(), report.unsupported.size());
+                     report.missingSamples, report.droppedEffects.size(), report.unsupported.size() + report.notReproduced.size());
     }
 }
 

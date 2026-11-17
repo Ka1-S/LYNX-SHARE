@@ -890,7 +890,7 @@ Song importBlx (const blx::Project& project, const BlxImportOptions& options)
     if (! project.mastering.empty())
         note (report, &FlpImportReport::droppedEffects, "BandLab: Mastering preset \"" + project.mastering + "\" (use the Master's own effects)");
     if (project.hasLyrics)
-        note (report, &FlpImportReport::unsupported, "BandLab: lyrics / notes");
+        note (report, &FlpImportReport::notReproduced, "BandLab: lyrics / notes");
 
     // seconds and quarter notes → LYNX ticks (BandLab's tempo is in quarter notes, as LYNX's)
     const auto ticksPerSecond = song.bpm / 60.0 * ppq;
@@ -960,7 +960,7 @@ Song importBlx (const blx::Project& project, const BlxImportOptions& options)
         const auto made = simpletracks::addTrack (song, q);
         if (! made.ok())
         {
-            note (report, &FlpImportReport::unsupported, "BandLab: tracks past LYNX's track or insert count");
+            note (report, &FlpImportReport::notReproduced, "BandLab: tracks past LYNX's track or insert count");
             continue;
         }
         if (drums) // (a Drums track starts with an empty one-bar pattern clip: the regions take its place)
@@ -985,7 +985,7 @@ Song importBlx (const blx::Project& project, const BlxImportOptions& options)
         if (track.muted)
             song.playlistTracks[(std::size_t) made.track].muted = true;
         if (track.solo)
-            note (report, &FlpImportReport::unsupported, "BandLab: track solo (all tracks play)");
+            note (report, &FlpImportReport::notReproduced, "BandLab: track solo (all tracks play)");
         if (track.frozen)
             note (report, &FlpImportReport::converted, "BandLab: frozen track (imported unfrozen)");
 
@@ -1005,7 +1005,7 @@ Song importBlx (const blx::Project& project, const BlxImportOptions& options)
                         effects.push_back (s);
                 note (report, mapped.partial ? &FlpImportReport::partialEffects : &FlpImportReport::converted, "BandLab effect \"" + fx.slug + "\"");
                 if (fx.automated)
-                    note (report, &FlpImportReport::unsupported, "BandLab: effect automation");
+                    note (report, &FlpImportReport::notReproduced, "BandLab: effect automation");
             }
         if (track.reverbSend > 0.0 && made.insert > 0)
         {
@@ -1054,7 +1054,7 @@ Song importBlx (const blx::Project& project, const BlxImportOptions& options)
             {
                 if (q.kind != simpletracks::Kind::audio)
                 {
-                    note (report, &FlpImportReport::unsupported, "BandLab: an audio region on a MIDI track");
+                    note (report, &FlpImportReport::notReproduced, "BandLab: an audio region on a MIDI track");
                     continue;
                 }
                 const auto path = blxSampleFile (sample, region.sampleId, region.name, false, options);
@@ -1090,7 +1090,7 @@ Song importBlx (const blx::Project& project, const BlxImportOptions& options)
                             note (report, &FlpImportReport::converted, "BandLab: region playback rate (time stretch)");
                         }
                         else
-                            note (report, &FlpImportReport::unsupported, "BandLab: region playback rate (the sample's length is unknown)");
+                            note (report, &FlpImportReport::notReproduced, "BandLab: region playback rate (the sample's length is unknown)");
                     }
                     song.channels.push_back (std::move (c));
                     channel = audioChannels.emplace (key, (int) song.channels.size() - 1).first;
@@ -1126,7 +1126,7 @@ Song importBlx (const blx::Project& project, const BlxImportOptions& options)
             // a MIDI region: the notes of its MIDI sample
             if (q.kind == simpletracks::Kind::audio)
             {
-                note (report, &FlpImportReport::unsupported, "BandLab: a MIDI region on an audio track");
+                note (report, &FlpImportReport::notReproduced, "BandLab: a MIDI region on an audio track");
                 continue;
             }
             const auto path = blxSampleFile (sample, region.sampleId, region.name, true, options);
@@ -1140,7 +1140,7 @@ Song importBlx (const blx::Project& project, const BlxImportOptions& options)
                 notes = blx::readMidi (options.common.readFile (path));
             if (! notes.has_value())
             {
-                note (report, &FlpImportReport::unsupported, "BandLab: unreadable MIDI file \"" + baseName (path) + "\"");
+                note (report, &FlpImportReport::notReproduced, "BandLab: unreadable MIDI file \"" + baseName (path) + "\"");
                 continue;
             }
             Pattern p;
@@ -1195,17 +1195,17 @@ Song importBlx (const blx::Project& project, const BlxImportOptions& options)
             }
             note (report, &FlpImportReport::converted, region.loopLength > 0.0 ? "BandLab: looped MIDI region" : "BandLab: MIDI region");
             if (std::abs (region.playbackRate - 1.0) > 1.0e-4 || std::abs (region.pitchShift) > 1.0e-4)
-                note (report, &FlpImportReport::unsupported, "BandLab: MIDI region speed / pitch");
+                note (report, &FlpImportReport::notReproduced, "BandLab: MIDI region speed / pitch");
         }
         if (track.hasPatterns)
-            note (report, &FlpImportReport::unsupported, "BandLab: Drum Machine patterns (their regions' MIDI is imported)");
+            note (report, &FlpImportReport::notReproduced, "BandLab: Drum Machine patterns (their regions' MIDI is imported)");
         if (track.hasSamplerKit)
-            note (report, &FlpImportReport::unsupported, "BandLab: sampler kit sounds (not stored in the project)");
+            note (report, &FlpImportReport::notReproduced, "BandLab: sampler kit sounds (not stored in the project)");
     }
     if (reverbSends > 0)
         note (report, &FlpImportReport::converted, "BandLab: shared reverb send (the Simple layout's Reverb)", reverbSends);
     if (project.auxChannels > 1)
-        note (report, &FlpImportReport::unsupported, "BandLab: aux channels after the first", project.auxChannels - 1);
+        note (report, &FlpImportReport::notReproduced, "BandLab: aux channels after the first", project.auxChannels - 1);
     std::stable_sort (song.playlist.begin(), song.playlist.end(), [] (const Clip& a, const Clip& b) { return a.start < b.start; });
     if (song.patterns.empty())
         song.patterns.push_back (Pattern {}); // (a song keeps at least one pattern)

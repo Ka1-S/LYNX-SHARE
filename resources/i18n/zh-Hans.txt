@@ -11230,3 +11230,4 @@ countries: cn sg
 "The Simple Controls tab's own knob mappings: {0}" = "Simple 的 Controls 标签页的自定义旋钮映射: {0}"
 "Harmor parts with a sample in the IMG section play their timbres instead of the resynthesis: {0}" = "IMG 部分带有采样的 Harmor 声部改为播放其音色，而不是重合成: {0}"
 "Newtone's detected key and note velocities are left out: {0}" = "Newtone 检测到的调性和音符力度被省略: {0}"
+"Not reproduced (left out or played differently):" = "未还原（已省略或以不同方式播放）："

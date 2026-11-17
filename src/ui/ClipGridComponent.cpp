@@ -8,6 +8,7 @@
 #include <cstring>
 
 #include "core/ClipLauncher.h"
+#include "core/Comping.h"
 #include "core/SessionMixer.h"
 #include "core/DetailChain.h"
 #include "core/PlaylistOps.h"
@@ -265,7 +266,7 @@ public:
             // each part draws inside its own box, so the pixels are the same
             const auto cull = ui::paintCache();
             const auto reaches = [&g, cull] (juce::Rectangle<int> box) { return ! cull || g.clipRegionIntersects (box); };
-            for (int t = firstColumn(); t < columns && columnX (t) < cells.getRight(); ++t)
+            for (int t = firstColumn(); t < columns && columnX (t) < cells.getRight(); t = nextShown (t))
             {
                 const auto x = columnX (t);
                 if (! reaches ({ x, 0, columnWidth, cells.getBottom() + statusHeight }))
@@ -722,7 +723,7 @@ public:
     {
         const auto cells = cellArea();
         const auto columns = columnCount(), scenes = rowCount();
-        for (int t = firstColumn(); t < columns && columnX (t) < cells.getRight(); ++t)
+        for (int t = firstColumn(); t < columns && columnX (t) < cells.getRight(); t = nextShown (t))
         {
             for (int r = firstRow(); r < scenes && rowY (r) < cells.getBottom(); ++r)
                 out.push_back ({ juce::Rectangle<int> (columnX (t), rowY (r), columnWidth, rowHeight).getIntersection (cells),
@@ -736,7 +737,7 @@ public:
         // round 190kc: the Relative Session Mapping Strip
         if (mapStrip)
         {
-            for (int t = firstColumn(); t < columns && columnX (t) < cells.getRight(); ++t)
+            for (int t = firstColumn(); t < columns && columnX (t) < cells.getRight(); t = nextShown (t))
                 out.push_back ({ mapStripTrackBox (t).getIntersection (cells.withY (0).withHeight (getHeight())), remotemap::Target::selectedClip (t) });
             const RemoteAction main[] { RemoteAction::launchSelectedScene, RemoteAction::cancelLaunch, RemoteAction::sceneUp, RemoteAction::sceneDown };
             for (int k = 0; k < 4; ++k)
@@ -763,7 +764,7 @@ public:
         const auto code = key.getKeyCode();
         if (code == juce::KeyPress::leftKey || code == juce::KeyPress::rightKey || code == juce::KeyPress::upKey || code == juce::KeyPress::downKey)
         {
-            selectedTrack = juce::jlimit (0, columnCount() - 1, selectedTrack + (code == juce::KeyPress::leftKey ? -1 : code == juce::KeyPress::rightKey ? 1 : 0));
+            selectedTrack = stepTrack (selectedTrack, code == juce::KeyPress::leftKey ? -1 : code == juce::KeyPress::rightKey ? 1 : 0); // (round qafix190kq: past the lanes)
             selectedScene = juce::jlimit (0, rowCount() - 1, selectedScene + (code == juce::KeyPress::upKey ? -1 : code == juce::KeyPress::downKey ? 1 : 0));
             revealSelection();
             repaint();
@@ -1050,7 +1051,7 @@ private:
         {
             juce::Graphics::ScopedSaveState save (g);
             g.reduceClipRegion (row.withRight (cellArea().getRight()));
-            for (int t = firstColumn(); t < columnCount() && columnX (t) < cellArea().getRight(); ++t)
+            for (int t = firstColumn(); t < columnCount() && columnX (t) < cellArea().getRight(); t = nextShown (t))
             {
                 const auto r = mapStripTrackBox (t);
                 box (r, false);
@@ -1111,14 +1112,71 @@ public:
         return g ? &*g : &none;
     }
     int rowCount() const noexcept { return std::max (minRows, (int) gridOf()->scenes.size()); }
-    int columnCount() const
+    // Round qafix190kq (QA-2): the grid's columns skip take lanes (comp::isTakeLane: Live shows them only in the
+    // Arrangement, under their track; an imported set's lanes had pushed its tracks off the grid). `t` stays a Playlist
+    // track everywhere; a column is a place on screen: columnTracks[c] is the track of column c, trackColumns[t] the column
+    // of track t (−1: a lane, no column). Worked out again when the song changes (its stamp) or the grid's clips do.
+    struct ColumnMap
+    {
+        std::vector<int> columnTracks, trackColumns;
+        std::uint64_t stamp = ~std::uint64_t (0);
+        std::size_t tracks = 0, clips = 0;
+        const ClipGrid* grid = nullptr;
+    };
+    mutable ColumnMap columns_;
+    const ColumnMap& columnMap() const
     {
         const auto& song = engine.getSong();
-        auto n = std::max (minColumns, (int) song.playlistTracks.size());
-        if (const auto* grid = gridOf())
-            for (const auto& c : grid->clips)
-                n = std::max (n, c.track + 1);
-        return std::min (n, launcher::maxTracks);
+        const auto* grid = gridOf();
+        auto& m = columns_;
+        if (m.stamp == engine.getSongStamp() && m.tracks == song.playlistTracks.size() && m.grid == grid && m.clips == grid->clips.size())
+            return m;
+        m.stamp = engine.getSongStamp();
+        m.tracks = song.playlistTracks.size();
+        m.grid = grid;
+        m.clips = grid->clips.size();
+        auto bound = (int) song.playlistTracks.size();
+        std::vector<char> holdsClips ((std::size_t) launcher::maxTracks, 0);
+        for (const auto& c : grid->clips)
+            if (c.track >= 0 && c.track < launcher::maxTracks)
+            {
+                bound = std::max (bound, c.track + 1);
+                holdsClips[(std::size_t) c.track] = 1;
+            }
+        m.columnTracks.clear();
+        m.trackColumns.clear();
+        for (int t = 0; t < launcher::maxTracks && (t < bound || (int) m.columnTracks.size() < minColumns); ++t)
+        {
+            // (a lane that holds grid clips keeps its column: nothing in the grid is ever out of reach)
+            const auto lane = ! holdsClips[(std::size_t) t] && comp::isTakeLane (song, t);
+            m.trackColumns.push_back (lane ? -1 : (int) m.columnTracks.size());
+            if (! lane)
+                m.columnTracks.push_back (t);
+        }
+        return m;
+    }
+    // the tracks the grid covers, [0, columnCount()) (lanes included: they have no column)
+    int columnCount() const { return (int) columnMap().trackColumns.size(); }
+    // the columns on screen (the tracks without the lanes)
+    int shownColumns() const { return (int) columnMap().columnTracks.size(); }
+    int trackOfColumn (int c) const
+    {
+        const auto& m = columnMap();
+        return c >= 0 && c < (int) m.columnTracks.size() ? m.columnTracks[(std::size_t) c] : -1;
+    }
+    int columnOfTrack (int t) const
+    {
+        const auto& m = columnMap();
+        return t >= 0 && t < (int) m.trackColumns.size() ? m.trackColumns[(std::size_t) t] : -1;
+    }
+    // the shown track next to `t` (step −1 / +1), or `t` at an end
+    int stepTrack (int t, int step) const
+    {
+        const auto c = columnOfTrack (t);
+        if (c < 0)
+            return trackOfColumn (0) >= 0 ? trackOfColumn (0) : t;
+        const auto next = trackOfColumn (juce::jlimit (0, shownColumns() - 1, c + step));
+        return next >= 0 ? next : t;
     }
     int footerNow() const noexcept { return buttonRow ? footerHeight : 0; }
     // (round 190iv) Stop All Clips in the scene column's status cell while the button row is hidden
@@ -1145,7 +1203,7 @@ public:
     void syncMixer()
     {
         if (mixer != nullptr)
-            mixer->setColumns (columnCount(), columnWidth, scrollX, cellArea().getRight(), sceneWidthNow(), returnColumnsNow());
+            mixer->setColumns (shownColumns(), columnWidth, scrollX, cellArea().getRight(), sceneWidthNow(), returnColumnsNow(), columnMap().columnTracks);
     }
     int poolHeight() const
     {
@@ -1159,8 +1217,7 @@ public:
         const auto cells = cellArea();
         if (p.y < cells.getBottom() || p.y >= cells.getBottom() + statusHeight || p.x < 0 || p.x >= cells.getRight())
             return -1;
-        const auto t = (p.x + scrollX) / columnWidth;
-        return t >= 0 && t < columnCount() ? t : -1;
+        return trackOfColumn ((p.x + scrollX) / columnWidth);
     }
     // the scene the track records into, or waits to (-1: none)
     int recordingScene (int track) const
@@ -1183,14 +1240,19 @@ public:
             repaint();
         }
     }
-    int columnX (int t) const noexcept { return t * columnWidth - scrollX; }
+    // the left of track t's column (round qafix190kq: a lane, which has none, far left of the screen)
+    int columnX (int t) const
+    {
+        const auto c = columnOfTrack (t);
+        return c >= 0 ? c * columnWidth - scrollX : (t >= 0 && t >= columnCount() ? (shownColumns() + t - columnCount()) * columnWidth - scrollX : -(1 << 24));
+    }
+    int xOfColumn (int c) const noexcept { return c * columnWidth - scrollX; }
     // the track whose column is at x (any height), or -1
     int trackAtX (int x) const
     {
         if (x < 0 || x >= cellArea().getRight())
             return -1;
-        const auto t = (x + scrollX) / columnWidth;
-        return t >= 0 && t < columnCount() ? t : -1;
+        return trackOfColumn ((x + scrollX) / columnWidth);
     }
     void setDeviceDropTrack (int t)
     {
@@ -1201,23 +1263,39 @@ public:
         }
     }
     int rowY (int r) const noexcept { return headerHeight + r * rowHeight - scrollY; }
-    int firstColumn() const noexcept { return juce::jmax (0, scrollX / columnWidth); }
+    // the first track shown at the grid's left edge, and the shown track after `t` (round qafix190kq: lanes skipped;
+    // columnCount() past the last)
+    int firstColumn() const
+    {
+        const auto t = trackOfColumn (juce::jmax (0, scrollX / columnWidth));
+        return t >= 0 ? t : columnCount();
+    }
+    int nextShown (int t) const
+    {
+        const auto c = columnOfTrack (t);
+        if (c < 0)
+            return t + 1;
+        const auto next = trackOfColumn (c + 1);
+        return next >= 0 ? next : columnCount();
+    }
     int firstRow() const noexcept { return juce::jmax (0, scrollY / rowHeight); }
 
     void clampScroll()
     {
         const auto cells = cellArea();
-        scrollX = juce::jlimit (0, juce::jmax (0, columnCount() * columnWidth - cells.getWidth()), scrollX);
+        scrollX = juce::jlimit (0, juce::jmax (0, shownColumns() * columnWidth - cells.getWidth()), scrollX);
         scrollY = juce::jlimit (0, juce::jmax (0, rowCount() * rowHeight - cells.getHeight()), scrollY);
         syncMixer();
     }
     void revealSelection()
     {
         const auto cells = cellArea();
-        if (columnX (selectedTrack) < 0)
-            scrollX = selectedTrack * columnWidth;
-        else if (columnX (selectedTrack) + columnWidth > cells.getRight())
-            scrollX = (selectedTrack + 1) * columnWidth - cells.getWidth();
+        if (const auto c = columnOfTrack (selectedTrack); c < 0)
+            ; // (a lane: no column to reveal)
+        else if (xOfColumn (c) < 0)
+            scrollX = c * columnWidth;
+        else if (xOfColumn (c) + columnWidth > cells.getRight())
+            scrollX = (c + 1) * columnWidth - cells.getWidth();
         if (rowY (selectedScene) < headerHeight)
             scrollY = selectedScene * rowHeight;
         else if (rowY (selectedScene) + rowHeight > cells.getBottom())
@@ -1234,8 +1312,7 @@ public:
     {
         if (p.y < 0 || p.y >= headerHeight || p.x < 0 || p.x >= cellArea().getRight())
             return -1;
-        const auto t = (p.x + scrollX) / columnWidth;
-        return t >= 0 && t < columnCount() ? t : -1;
+        return trackOfColumn ((p.x + scrollX) / columnWidth);
     }
     Cell hitTestCell (juce::Point<int> p) const
     {
@@ -1249,7 +1326,7 @@ public:
         if (p.x >= cells.getRight() && p.x < sceneX()) // (round 190kc: the return columns hold no slots)
             out.scene = -1;
         if (p.x < cells.getRight())
-            if (const auto t = (p.x + scrollX) / columnWidth; t >= 0 && t < columnCount())
+            if (const auto t = trackOfColumn ((p.x + scrollX) / columnWidth); t >= 0)
                 out.track = t;
         return out;
     }
@@ -2352,6 +2429,7 @@ public:
         }
     }
     void tickForSnapshot() { timerCallback(); }
+    std::vector<int> columnTracksForSnapshot() const { return columnMap().columnTracks; }
     juce::Rectangle<int> cellForSnapshot (int kind, int track, int scene) const
     {
         const auto cells = cellArea();
@@ -2691,7 +2769,7 @@ private:
             lastDrawnState = now;
             columnStates.assign ((std::size_t) columns, 0);
             columnViews.assign ((std::size_t) columns, {});
-            for (int t = firstColumn(); t < columns && columnX (t) < cells.getRight(); ++t)
+            for (int t = firstColumn(); t < columns && columnX (t) < cells.getRight(); t = nextShown (t))
             {
                 columnStates[(std::size_t) t] = columnState (t); // (what this repaint shows)
                 columnViews[(std::size_t) t] = columnView (t);
@@ -2702,7 +2780,7 @@ private:
         const auto visible = juce::Rectangle<int> (0, 0, cells.getRight(), getHeight());
         if (! ui::paintCache()) // (LYNX_PAINT_CACHE=0: a changed column is repainted whole, as round 190ge did)
         {
-            for (int t = firstColumn(); t < columns && columnX (t) < cells.getRight(); ++t)
+            for (int t = firstColumn(); t < columns && columnX (t) < cells.getRight(); t = nextShown (t))
                 if (const auto now = columnState (t); now != columnStates[(std::size_t) t])
                 {
                     columnStates[(std::size_t) t] = now;
@@ -2715,7 +2793,7 @@ private:
         // status cell for the recording counter; an arm repaints the whole column (its empty slots show it)
         if (columnViews.size() != (std::size_t) columns)
             columnViews.assign ((std::size_t) columns, {});
-        for (int t = firstColumn(); t < columns && columnX (t) < cells.getRight(); ++t)
+        for (int t = firstColumn(); t < columns && columnX (t) < cells.getRight(); t = nextShown (t))
         {
             const auto now = columnView (t);
             auto& was = columnViews[(std::size_t) t];
@@ -3094,6 +3172,13 @@ void refreshClipGrid (juce::Component& grid)
 {
     grid.resized();
     grid.repaint();
+}
+
+std::vector<int> clipGridColumnTracks (juce::Component& grid)
+{
+    if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
+        return g->columnTracksForSnapshot();
+    return {};
 }
 
 void setClipGridSceneFieldsListener (juce::Component& grid, std::function<void()> listener)

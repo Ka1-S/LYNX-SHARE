@@ -11230,3 +11230,4 @@ countries: jp
 "The Simple Controls tab's own knob mappings: {0}" = "Simple の Controls タブ独自のノブ割り当て: {0}"
 "Harmor parts with a sample in the IMG section play their timbres instead of the resynthesis: {0}" = "IMG セクションにサンプルがある Harmor のパートは、リシンセシスではなく音色で再生されます: {0}"
 "Newtone's detected key and note velocities are left out: {0}" = "Newtone が検出したキーとノートのベロシティは省かれます: {0}"
+"Not reproduced (left out or played differently):" = "再現なし (省略、または別の形で再生):"
