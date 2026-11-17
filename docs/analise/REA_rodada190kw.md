@@ -110,7 +110,9 @@ sample (the signed sample scored 6.73 → 6.73 on its 26 files, the magnitude 6.
 - Clean / Classic / Opto with Auto release on keep the fitted law (the reference's per-style auto-release table was not
   rebuilt). Versatile (Allround), Smooth, Upward, TTM (Two-way), Op-El and Vari-Mu are generated graph classes
   (`VersatileCompressor_MainCompressorAlgorithm`, `SmoothCompressor_MainCompressorAlgorithm_FeedbackAlgorithm`, …; their
-  constructors are 2.7 … 7.4 KB of wiring): not rebuilt this round; they keep their fitted laws.
+  constructors are 2.7 … 9.5 KB of wiring): not rebuilt this round; they keep their fitted laws. Versatile is the
+  reference's DEFAULT style (tp172b's D setting): rebuilding `VersatileCompressor_MainCompressorAlgorithm` (constructor
+  0x180164ae0, 9.5 KB of node wiring; parameter update 0x1801673c0) is the next round's best Crest target.
 
 ## 4. Other targets: findings this round did not build
 
@@ -118,7 +120,9 @@ sample (the signed sample scored 6.73 → 6.73 on its 26 files, the magnitude 6.
   48 kHz), Clean 1 033. Apex has one constant latency (329 samples at 48 kHz), so the reference's output lags LYNX's by
   5 476 samples at 96 kHz — more than `scripts/flref_compare.py`'s ±4 096-sample alignment search (`find_lag`), which is
   why those files score 3 … 5 at 96 kHz while the same settings at 44.1 / 48 kHz are bit-for-bit or 8+. The sound is not
-  the cause; the window is in samples, not in time. Not changed (a scorer change re-scores every bank: owner decision).
+  the cause; the window is in samples, not in time. [EXEC] The same base binary with the window at ±8 192 samples (85 ms
+  at 96 kHz; lab copy of the scorer only) scores the sr96 block 6.21 → 7.54 (10 files up, 0 down). Not changed (a scorer
+  change re-scores every bank: owner decision).
 - **Pro-Q 4's dynamic auto threshold** [STATIC, read, not built]: `BandCompander` (vtable 0x1802403c0, process
   0x18014e820) with auto threshold on runs an object at +0x3f8 (0x180116530): the band signal's magnitude feeds a follower
   (and a second one while a start-up count runs); the detector then reads the band level RELATIVE to that follower
