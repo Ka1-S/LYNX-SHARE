@@ -4300,7 +4300,7 @@ public:
             if (v.slide.moving()) // a slide note moves the voice's pitch (issue #14)
             {
                 const auto was = v.slide.cents;
-                v.fpitch += (double) (v.slide.advance ((float) n) - was);
+                v.fpitch += (double) (v.slide.advanceFirst ((float) n) - was);
             }
             renderRecord (v, n);
         }

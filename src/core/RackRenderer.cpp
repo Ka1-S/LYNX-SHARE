@@ -3179,6 +3179,33 @@ void RackRenderer::clearPolyLayers() noexcept
         layer.clear();
 }
 
+namespace
+{
+constexpr double flTickTicks = ppq / 96.0; // one tick of FL's default PPQ, in song ticks
+} // namespace
+
+// FL's native generators: the host steps their voices' pitch for a slide note (round 190jv, REA_rodada190jv §3). LYNX's
+// own generators (the drum and synth kinds, Tetra, Helix), FL Studio Mobile's SuperSaw and hosted plugins keep the glide.
+bool RackRenderer::stepsSlides (InstrumentKind k) noexcept
+{
+    switch (k)
+    {
+        case InstrumentKind::sampler: case InstrumentKind::sakura: case InstrumentKind::drumpad: case InstrumentKind::boobass:
+        case InstrumentKind::drumsynth: case InstrumentKind::harmless: case InstrumentKind::sytrus: case InstrumentKind::harmor:
+        case InstrumentKind::gms: case InstrumentKind::morphine: case InstrumentKind::ogun: case InstrumentKind::minisynth:
+        case InstrumentKind::dx10: case InstrumentKind::kepler: case InstrumentKind::poizone: case InstrumentKind::fruitkick:
+        case InstrumentKind::bassdrum: case InstrumentKind::toxic: case InstrumentKind::threeosc: case InstrumentKind::autogun:
+        case InstrumentKind::transistorbass: case InstrumentKind::simsynth: case InstrumentKind::plucked: case InstrumentKind::beepmap:
+        case InstrumentKind::sawer: case InstrumentKind::flkeys: case InstrumentKind::granulizer: case InstrumentKind::drumaxx:
+        case InstrumentKind::slayer: case InstrumentKind::directwave: case InstrumentKind::patcher: case InstrumentKind::soundfont:
+        case InstrumentKind::keplerExo: case InstrumentKind::wavetraveller: case InstrumentKind::fruityslicer: case InstrumentKind::slicex:
+        case InstrumentKind::fpc:
+            return true;
+        default:
+            return false;
+    }
+}
+
 void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
 {
     if (foreignChannel (i)) // (render-ahead: the other renderer renders it; the boundary brings it here)
@@ -3256,6 +3283,30 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
     std::memset (l, 0, sizeof (float) * (std::size_t) n);
     std::memset (r, 0, sizeof (float) * (std::size_t) n);
     int position = 0;
+    // the render calls up to `end`, split on the ticks of a stepped slide note (round 190jv): an engine moves a voice's
+    // pitch between two calls, so each step lands on its tick, and the first one a sample after the slide's start
+    auto& ticks = slideTicks[(std::size_t) i];
+    const auto renderUntil = [&] (int end) noexcept {
+        while (ticks.k <= ticks.n && ticks.n > 0)
+        {
+            const auto at = ticks.k == 0 ? (ticks.start - chunkStartTick) / chunkTps + 1.0
+                                         : (ticks.start + ticks.k * flTickTicks - chunkStartTick) / chunkTps;
+            if (! std::isfinite (at) || at >= (double) end)
+                break;
+            ++ticks.k;
+            const auto split = (int) std::lround (at);
+            if (split > position && split < end)
+            {
+                instrument.render (l + position, r + position, split - position, gl, gr);
+                position = split;
+            }
+        }
+        if (end > position)
+        {
+            instrument.render (l + position, r + position, end - position, gl, gr);
+            position = end;
+        }
+    };
 
     // arpeggiator: the channel's notes become the arpeggio sequence
     const NoteEvent* list = events.begin();
@@ -3321,10 +3372,7 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
             if (e.port == -2) // (a VFX channel's own note: its processor's output goes out instead)
                 continue;
             if (e.sampleOffset > position)
-            {
-                instrument.render (l + position, r + position, e.sampleOffset - position, gl, gr);
-                position = e.sampleOffset;
-            }
+                renderUntil (e.sampleOffset);
             // (each route from that channel: its port and MIDI channel, round 162)
             for (const auto& route : state.midiRoutesIn[(std::size_t) i])
             {
@@ -3364,10 +3412,7 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
             // MPE stage 2 (issue #108, core/NoteCurves.h): a song note's pitch / timbre / pressure curve moving while it
             // sounds, as a played MPE note's (the live queue): the channel's tuning on top of its own cents
             if (e.sampleOffset > position)
-            {
-                instrument.render (l + position, r + position, e.sampleOffset - position, gl, gr);
-                position = e.sampleOffset;
-            }
+                renderUntil (e.sampleOffset);
             if (! c.muted)
                 instrument.noteExpression (e.key, e.prop, e.velocity,
                                            c.misc.fineTune + instrument.wheelCents()
@@ -3378,10 +3423,7 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
             continue;
 
         if (e.sampleOffset > position)
-        {
-            instrument.render (l + position, r + position, e.sampleOffset - position, gl, gr);
-            position = e.sampleOffset;
-        }
+            renderUntil (e.sampleOffset);
 
         auto& held = heldNotes[(std::size_t) i];
         const auto bit = std::uint64_t { 1 } << (e.key & 63);
@@ -3454,7 +3496,15 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
         }
         else if (e.type == NoteEvent::Type::slide)
         {
+            // FL's native generators: the slide moves in steps on FL's ticks (round 190jv, core/HostSlide.h Steps)
+            const auto flTicks = stepsSlides (c.instrument) ? (int) std::lround ((double) e.slideSamples * chunkTps / flTickTicks) : 0;
+            if (flTicks > 0)
+            {
+                HostSlide::pendingSteps() = { flTicks, (float) (flTickTicks / chunkTps / std::max (1.0, (double) e.slideSamples)) };
+                ticks = { chunkStartTick + (double) e.sampleOffset * chunkTps, 0, flTicks };
+            }
             instrument.slideTo (e.key, e.cents + c.misc.fineTune + (c.misc.mainPitch ? state.song.masterPitch : 0.0f), e.slideSamples);
+            HostSlide::pendingSteps() = {};
         }
         else if (e.type == NoteEvent::Type::choke)
         {
@@ -3485,8 +3535,7 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
         }
     }
 
-    if (position < n)
-        instrument.render (l + position, r + position, n - position, gl, gr);
+    renderUntil (n);
 
     // PDC: this channel arrives before the track's others; delay until aligned
     if ((std::size_t) i < state.channelDelays.size() && state.channelDelays[(std::size_t) i] != nullptr)

@@ -1,6 +1,7 @@
 #include "core/FruityDance.h"
 #include "core/FruitySlicer.h"
 #include "core/Instruments.h"
+#include "core/HostSlide.h"
 #include "core/HostTimelineScope.h"
 #include "core/SynthParams.h"
 #include "core/FpcInstrument.h"
@@ -2053,6 +2054,10 @@ struct SamplerVoice
     float panL = 1.0f, panR = 1.0f;
     double glideRatio = 1.0;
     int glideLeft = 0;
+    // FL's stepped slide note (round 190jv, core/HostSlide.h Steps): the speed (or a shifted voice's transposition) times
+    // stepRatio at the start of the render call where stepDue reaches 0; the rack starts those calls on the ticks
+    double stepRatio = 1.0, stepDue = 0.0, stepEvery = 0.0;
+    int stepsLeft = 0;
     float lowL = 0.0f, bandL = 0.0f, lowR = 0.0f, bandR = 0.0f; // channel filter
     std::array<ModState, 2> mod {}; // cutoff and pitch envelopes
     std::array<LfoState, lfoTargets> lfo {};
@@ -2944,6 +2949,42 @@ public:
         return true;
     }
 
+    // FL's stepped slide (round 190jv): n + 1 equal steps of the whole move `ratio`, the first at once
+    void startSteps (SamplerVoice& v, double ratio, const HostSlide::Steps& stepped, float samples) noexcept
+    {
+        v.stepsLeft = stepped.ticks + 1;
+        v.stepRatio = std::pow (ratio, 1.0 / (double) v.stepsLeft);
+        v.stepEvery = (double) std::max (1.0f, samples) * (double) stepped.fraction;
+        v.stepDue = 0.0;
+        anyStepping = true;
+    }
+    // at the start of a render call: the steps that are due (a shifted voice steps its transposition)
+    void applySteps (int n) noexcept
+    {
+        for (auto& v : voices)
+            if (v.stepsLeft > 0)
+            {
+                if (! v.active || v.stolen)
+                {
+                    v.stepsLeft = 0;
+                    continue;
+                }
+                const auto tolerance = 1.0e-3 * v.stepEvery + 1.0e-6;
+                auto& ks = shifts[(std::size_t) (&v - voices.data())];
+                while (v.stepsLeft > 0 && v.stepDue <= tolerance)
+                {
+                    if (ks.on)
+                        ks.factor *= v.stepRatio;
+                    else
+                        v.rate *= v.stepRatio;
+                    --v.stepsLeft;
+                    v.stepDue += v.stepEvery;
+                }
+                v.stepDue -= (double) n;
+            }
+    }
+    bool anyStepping = false;
+
     bool followsSlides() const noexcept override { return true; } // (round 168l: a Mono channel's notes)
     void slideTo (int key, float cents, float samples) noexcept override
     {
@@ -2952,6 +2993,7 @@ public:
 
         const auto semitones = (key - 60) + (double) pitch.load() + cents / 100.0;
         const auto steps = std::max (1, (int) samples);
+        const auto stepped = HostSlide::pendingSteps(); // (round 190jv: FL's steps on its ticks)
 
         for (auto& v : voices)
             if (v.active && ! v.stolen && v.rate != 0.0 && v.data != nullptr)
@@ -2959,12 +3001,26 @@ public:
                 // a shifted voice (stretch keeping pitch) glides its transposition, not its speed (round 162)
                 if (auto& ks = shifts[(std::size_t) (&v - voices.data())]; ks.on)
                 {
+                    if (stepped.ticks > 0)
+                    {
+                        ks.glideLeft = 0;
+                        startSteps (v, std::exp2 (semitones / 12.0) / ks.factor, stepped, samples);
+                        continue;
+                    }
+                    v.stepsLeft = 0;
                     ks.glideRatio = std::pow (std::exp2 (semitones / 12.0) / ks.factor, 1.0 / steps);
                     ks.glideLeft = steps;
                     continue;
                 }
                 // (with stretch in Resample mode the speed is relative to the stretched one)
                 const auto target = flrs::speedFor ((float) (semitones * 100.0), baseRate (*v.data));
+                if (stepped.ticks > 0)
+                {
+                    v.glideLeft = 0;
+                    startSteps (v, target / v.rate, stepped, samples);
+                    continue;
+                }
+                v.stepsLeft = 0;
                 v.glideRatio = std::pow (target / v.rate, 1.0 / steps);
                 v.glideLeft = steps;
             }
@@ -3201,6 +3257,11 @@ public:
             int n;
             ~Advance() { at += n; }
         } advance { songSample, n };
+        if (anyStepping) // (round 190jv: FL's stepped slide note)
+        {
+            applySteps (n);
+            anyStepping = std::any_of (voices.begin(), voices.end(), [] (const SamplerVoice& v) { return v.stepsLeft > 0; });
+        }
         // round 190w: the newest voice's place in its region, for the channel settings' locator, after every block
         const struct Publish
         {

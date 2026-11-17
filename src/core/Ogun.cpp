@@ -2182,7 +2182,7 @@ public:
             if (v->slide.moving())
             {
                 const auto was = v->slide.cents;
-                v->FP += (double) (v->slide.advance ((float) n) - was);
+                v->FP += (double) (v->slide.advanceFirst ((float) n) - was);
             }
         const auto& p = *pt;
         const int m = n * p.osf;

@@ -2520,7 +2520,7 @@ public:
             if (slide.moving()) // a slide's bend moves in steps of 64 samples
             {
                 m = std::min (m, 64);
-                slide.advance ((float) m);
+                slide.advanceFirst ((float) m); // (round 190jv: moved before it renders; FL's steps, core/HostSlide.h)
                 sendBend();
             }
             std::fill (scratchL.begin(), scratchL.begin() + m, 0.0f);

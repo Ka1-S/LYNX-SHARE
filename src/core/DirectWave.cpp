@@ -2352,7 +2352,7 @@ public:
             for (auto& nt : notes) // a slide note moves the voices' Final.Pitch (issue #14)
                 if (nt.slide.moving())
                 {
-                    nt.slide.advance ((float) len);
+                    nt.slide.advanceFirst ((float) len); // (round 190jv: moved before it renders; FL's steps, core/HostSlide.h)
                     engine.setLevels (nt.id, channelVol * nt.initVol, std::clamp ((double) nt.pan + channelPan, -1.0, 1.0),
                                       nt.cents + (double) nt.slide.cents);
                 }

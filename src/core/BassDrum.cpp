@@ -792,7 +792,7 @@ public:
         bool first = true;
         for (auto& h : held)
             if (h.slide.moving())
-                h.slide.advance ((float) n);
+                h.slide.advanceFirst ((float) n); // (round 190jv: moved before it renders; FL's steps, core/HostSlide.h)
         for (int i = 0; i < 128; ++i)
         {
             if (held[i].on)
