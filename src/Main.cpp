@@ -12468,18 +12468,22 @@ private:
                 if (v.containsChar (':'))
                     variants.push_back ({ v.upToFirstOccurrenceOf (":", false, false).trim(), v.fromFirstOccurrenceOf (":", false, false).trim() });
             auto shown = std::make_shared<std::vector<juce::Component::SafePointer<juce::Component>>>();
-            auto keepPlaying = [this] {
+            // every step plays the same part of the song (LYNX_UIPERF_SPINAB_AT: a fraction of the song, default 0.4): the
+            // audio work differs from part to part far more than between the variants (a first run without this put the
+            // variants of one cycle in different parts and read the parts)
+            auto at = std::make_shared<double> (0.0);
+            const auto atFraction = juce::jlimit (0.0, 0.95, juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_SPINAB_AT", "0.4").getDoubleValue());
+            auto keepPlaying = [this, at] {
                 engine->getTransport().songMode = true;
-                if (! engine->getTransport().playing.load()) // (the song ended: again)
-                {
-                    engine->rewind();
+                engine->seek (*at);
+                if (! engine->getTransport().playing.load())
                     engine->play();
-                }
             };
             for (const auto& set : sets)
             {
                 const auto name = set.trim();
-                run->steps.push_back ({ "spin A/B " + name + " open", [this, name, shown, keepPlaying] {
+                run->steps.push_back ({ "spin A/B " + name + " open", [this, name, shown, keepPlaying, at, atFraction] {
+                                           *at = atFraction * engine->getTransport().songEnd.load();
                                            lynx::NativeEffectWindows::closeAll();
                                            shown->clear();
                                            std::vector<juce::Component*> before;
@@ -12513,7 +12517,7 @@ private:
                                                if (auto* c = desktop.getComponent (i); std::find (before.begin(), before.end(), c) == before.end())
                                                    shown->emplace_back (c);
                                            keepPlaying();
-                                       }, {}, 1500, [shown] { return "    windows of the set: " + juce::String ((int) shown->size()) + "\n"; } });
+                                       }, {}, 1500, [shown, at] { return "    windows of the set: " + juce::String ((int) shown->size()) + ", every step from tick " + juce::String (*at, 0) + "\n"; } });
                 for (int c = 0; c < cycles; ++c)
                     for (int k = 0; k < (int) variants.size() * 2; ++k)
                     {
