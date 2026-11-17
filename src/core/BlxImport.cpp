@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstring>
 #include <limits>
+#include <span>
 
 #include "core/BandImport.h"
 #include "core/Effects.h"
@@ -847,11 +848,15 @@ std::string blxSampleFile (const blx::Sample* sample, const std::string& sampleI
                 if (auto path = found (joinPath (options.folder, rel)); ! path.empty())
                     return path;
     // without a listing: the direct names next to the .blx and in its Audio / MIDI / Samples folders
+    // (two arrays of their own, not a conditional between two braced initializer lists: g++ 13 ends their backing
+    // arrays with the conditional and the loop read freed stack — CI's core build crashed here, rollup step 5)
+    static constexpr const char* midiExts[] { ".mid", ".midi" };
+    static constexpr const char* audioExts[] { ".wav", ".flac", ".mp3", ".m4a", ".ogg", ".aif" };
+    const auto exts = midi ? std::span<const char* const> (midiExts) : std::span<const char* const> (audioExts);
     if (options.files.empty())
         for (const auto& w : wanted)
             for (const auto* sub : { "", "Audio/", "MIDI/", "Samples/" })
-                for (const auto* ext : midi ? std::initializer_list<const char*> { ".mid", ".midi" }
-                                            : std::initializer_list<const char*> { ".wav", ".flac", ".mp3", ".m4a", ".ogg", ".aif" })
+                for (const auto* ext : exts)
                     if (auto path = found (joinPath (options.folder, std::string (sub) + w + ext)); ! path.empty())
                         return path;
     if (sample != nullptr && ! sample->file.empty() && sample->file.find ("://") == std::string::npos)
