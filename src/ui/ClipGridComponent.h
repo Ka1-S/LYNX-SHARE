@@ -58,6 +58,9 @@ void launchClipGridSceneForSnapshot (juce::Component& grid, int scene);
 void clipGridRelativeSession (juce::Component& grid, RemoteAction action, int track, bool press);
 void setClipGridMapStrip (juce::Component& grid, bool on); // (shown while a map mode is on)
 void tickClipGridForSnapshot (juce::Component& grid);
+// Round 190kn (DL-7): Live's Cancel Scene Launch (the scene menu's item) and whether a launched scene still waits.
+void cancelClipGridSceneLaunch (juce::Component& grid);
+bool clipGridSceneLaunchQueued (juce::Component& grid);
 juce::Rectangle<int> clipGridCellForSnapshot (juce::Component& grid, int kind, int track, int scene);
 std::pair<int, bool> clipGridSceneSelectionForSnapshot (juce::Component& grid);
 void selectClipGridSlotForSnapshot (juce::Component& grid, int track, int scene);
