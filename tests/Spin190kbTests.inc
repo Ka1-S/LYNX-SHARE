@@ -149,6 +149,14 @@ TEST (spin190kb_task_graph_renders_the_same_in_every_wait_mode)
 {
     // the renderer's task graph with the old wait, the new one (sleeping at once too) and without a pool: bit for bit
     const spin190kb::TuningGuard guard;
+    // (round 190kr: every needed worker woken, as before the wake limit: this tiny graph's work would wake none, and the
+    // waits and hand-offs this test checks would not happen)
+    struct Help
+    {
+        int before = lynx::WorkerPool::tuning().helpPercent.load();
+        Help() { lynx::WorkerPool::tuning().helpPercent = 0; }
+        ~Help() { lynx::WorkerPool::tuning().helpPercent = before; }
+    } help;
     auto song = lynx::Song::makeDefault();
     song.mixer = lynx::Song::defaultMixer (16);
     for (int i = 5; i < 40; ++i)
