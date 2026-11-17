@@ -4,6 +4,7 @@
 #include "core/MidiDrop.h"
 #include "core/PlaylistTrackOps.h"
 #include "core/TakeCleanup.h"
+#include "core/TransportEdit.h"
 #include "core/TrackOnly.h"
 #include "core/WheelZones.h"
 #include "engine/AudioEngine.h"
@@ -63,6 +64,8 @@ bool readUiOption (const juce::String& key, bool on)
         mididrop::setPlaylistDrop (on);
     else if (key == "trackOnly")
         trackonly::setEnabled (on);
+    else if (key == "wToStart") // issue #195: REAPER's W goes to the start (LYNX extra)
+        transportedit::setWGoesToStart (on);
     else
         return false;
     return true;
@@ -71,7 +74,8 @@ bool readUiOption (const juce::String& key, bool on)
 juce::String uiOptionsText()
 {
     return "\nwheelZones=" + juce::String (wheelzones::enabled() ? 1 : 0) + "\ntempTools=" + juce::String (temptool::enabled() ? 1 : 0)
-           + "\nmidiDrop=" + juce::String (mididrop::playlistDrop() ? 1 : 0) + "\ntrackOnly=" + juce::String (trackonly::enabled() ? 1 : 0);
+           + "\nmidiDrop=" + juce::String (mididrop::playlistDrop() ? 1 : 0) + "\ntrackOnly=" + juce::String (trackonly::enabled() ? 1 : 0)
+           + "\nwToStart=" + juce::String (transportedit::wGoesToStart() ? 1 : 0);
 }
 
 std::optional<bool> extraOn (std::string_view id)
@@ -84,6 +88,8 @@ std::optional<bool> extraOn (std::string_view id)
         return mididrop::playlistDrop();
     if (id == "layout.trackOnly")
         return trackonly::enabled();
+    if (id == "transport.wToStart")
+        return transportedit::wGoesToStart();
     return std::nullopt;
 }
 
@@ -101,6 +107,8 @@ bool setExtra (std::string_view id, bool on)
         mididrop::setPlaylistDrop (on);
     else if (id == "layout.trackOnly")
         trackonly::setEnabled (on);
+    else if (id == "transport.wToStart")
+        transportedit::setWGoesToStart (on);
     else
         return false;
     if (onChanged)

@@ -133,13 +133,15 @@ struct ParityType final : juce::AudioIODeviceType
 
 bool writeSample (const juce::File& file, int kind)
 {
-    juce::AudioBuffer<float> b (1, 24000);
-    const double f = kind == 0 ? 220.0 : kind == 1 ? 331.0 : 0.0;
+    // kind 3 (round 190jz, issue #194): a steady 440 Hz tone of 2 s for the faded audio clip
+    juce::AudioBuffer<float> b (1, kind == 3 ? 96000 : 24000);
+    const double f = kind == 0 ? 220.0 : kind == 1 ? 331.0 : kind == 3 ? 440.0 : 0.0;
     for (int i = 0; i < b.getNumSamples(); ++i)
     {
         const double t = i / 48000.0;
-        b.setSample (0, i, f > 0.0 ? (float) (0.3 * std::sin (2.0 * juce::MathConstants<double>::pi * f * t) * std::exp (-3.0 * t))
-                                   : (i % 2400 < 24 ? 0.25f : 0.0f));
+        b.setSample (0, i, kind == 3 ? (float) (0.2 * std::sin (2.0 * juce::MathConstants<double>::pi * f * t))
+                           : f > 0.0 ? (float) (0.3 * std::sin (2.0 * juce::MathConstants<double>::pi * f * t) * std::exp (-3.0 * t))
+                                     : (i % 2400 < 24 ? 0.25f : 0.0f));
     }
     file.deleteFile();
     juce::WavAudioFormat wav;
@@ -184,6 +186,27 @@ Song paritySong (const juce::File& folder)
     Clip clip;
     clip.length = 8 * ppq;
     s.playlist.push_back (clip);
+    // round 190jz (issue #194): an audio clip with both fades, each with its tension (FL's S curve bent, round 180d), on
+    // insert 4: the Playlist's fade handles must sound the same in the export and in playback
+    {
+        ChannelDef audio;
+        audio.instrument = InstrumentKind::audioClip;
+        audio.samplePath = folder.getChildFile ("parity-3.wav").getFullPathName().toStdString();
+        audio.name = "Faded clip";
+        audio.mixerTrack = 4;
+        s.channels.push_back (audio);
+        Clip faded;
+        faded.kind = ClipKind::audio;
+        faded.channel = (int) s.channels.size() - 1;
+        faded.track = 2;
+        faded.start = 2 * ppq;
+        faded.length = 4 * ppq;
+        faded.fadeIn = ppq;
+        faded.fadeInTension = 25.0f;
+        faded.fadeOut = ppq + ppq / 2;
+        faded.fadeOutTension = -40.0f;
+        s.playlist.push_back (faded);
+    }
     Clip lane;
     lane.kind = ClipKind::automation;
     lane.automation = 0;
@@ -280,7 +303,7 @@ juce::String AudioEngine::exportParitySelfTest (const std::function<void (const 
         juce::File f;
         ~Cleanup() { f.deleteRecursively(); }
     } cleanup { folder };
-    for (int k = 0; k < 3; ++k)
+    for (int k = 0; k < 4; ++k)
         if (! writeSample (folder.getChildFile ("parity-" + juce::String (k) + ".wav"), k))
             return "ERROR can't write the test samples in " + folder.getFullPathName();
     auto song = paritySong (folder);

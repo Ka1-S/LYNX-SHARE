@@ -54,6 +54,12 @@ std::vector<Action> makeActions()
         // FL 2026 (checked in FL, round 165s): Shift+Space stops and goes back to the start of the song / pattern, or
         // plays from there when stopped; the position clicked on a ruler is ignored (issue #11)
         { "transport.playFromStart", TR_NOOP ("Play, or stop at the start of the song or pattern"), Context::global, { chord (space, shift) } },
+        // issue #195: FL's Home, "Move playback marker to start" (FL 2026 manual, Keyboard shortcuts › Playlist). Checked in
+        // FL 2026 in round 190jz (shots fl-195-*): the Playlist and the Piano roll take Home, also while playing (the song
+        // goes on from its start); with the Mixer or the Channel rack focused it does nothing. FL's ShortcutsModule has no
+        // action for it: those two windows take the key themselves. The global action has no key of its own (bind one in
+        // the shortcut editor; LYNX's W extra runs it).
+        { "transport.toStart", TR_NOOP ("Move the playback marker to the start of the song or pattern"), Context::global, {} },
         { "transport.toggleMode", TR_NOOP ("Pattern / song mode"), Context::global, { chord ('L') }, true },
         { "transport.nextMarker", TR_NOOP ("Jump to the next song marker (Quantize song jumps while playing)"), Context::global, { chord (numpadMultiply, alt) } },
         { "transport.previousMarker", TR_NOOP ("Jump to the previous song marker"), Context::global, { chord (numpadDivide, alt) } },
@@ -194,6 +200,7 @@ std::vector<Action> makeActions()
         { "rack.rotateRight", TR_NOOP ("Rotate the selected channels' steps right"), Context::channelRack, { chord (right, ctrl | shift) } },
 
         // Piano Roll (focused): tool dialogs and zoom
+        { "pianoRoll.toStart", TR_NOOP ("Move the playback marker to start"), Context::pianoRoll, { chord (home) } }, // (issue #195)
         { "pianoRoll.arpeggiate", TR_NOOP ("Arpeggiate..."), Context::pianoRoll, { chord ('A', alt) } },
         { "pianoRoll.strum", TR_NOOP ("Strum..."), Context::pianoRoll, { chord ('S', alt) } },
         { "pianoRoll.flip", TR_NOOP ("Flip..."), Context::pianoRoll, { chord ('Y', alt) } },
@@ -396,6 +403,7 @@ std::vector<Action> makeActions()
         // ShortCut 49188 = Ctrl+Alt+Home, EEShiftMouseWheelNudgeAction, EECreateNewClipsWithManualFadesAction,
         // EESnapFadeHandlesAction, EESelMagicAction)
         { "playlist.makeUniqueAsSample", TR_NOOP ("Make the selected audio clips unique as samples"), Context::playlist, {} },
+        { "playlist.toStart", TR_NOOP ("Move the playback marker to start"), Context::playlist, { chord (home) } }, // (issue #195)
         { "playlist.leftResizing", TR_NOOP ("Allow resizing clips from the left on/off"), Context::playlist, { chord (home, ctrl | alt) } },
         { "playlist.wheelNudging", TR_NOOP ("Nudge clips with Shift+mouse wheel on/off"), Context::playlist, {} },
         { "playlist.manualFades", TR_NOOP ("Create new clips with manual fades on/off"), Context::playlist, {} },

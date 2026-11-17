@@ -74,6 +74,10 @@ inline constexpr Item items[] = {
     { "general.hoverValues", TR_NOOP ("Editing"), TR_NOOP ("Show a control's value next to the mouse when hovering over it (LYNX)"),
       TR_NOOP ("The value of the knob or fader under the mouse shows beside the cursor, not only in the hint bar. Also on the General page."),
       "ui-options.txt:hoverValues" },
+    // round 190jz (issue #195): REAPER's key for FL's Home; FL leaves plain W free in its main windows
+    { "transport.wToStart", TR_NOOP ("Transport"), TR_NOOP ("W moves the playback marker to the start (as Home)"),
+      TR_NOOP ("The REAPER key for going back to the start of the song or pattern, beside FL's Home; the typing keyboard keeps W while it is on. Also in the Stop button's right-click menu."),
+      "ui-options.txt:wToStart" },
     { "record.lastLoopPassPlays", TR_NOOP ("Recording"), TR_NOOP ("After loop recording, only the last pass plays"),
       TR_NOOP ("The earlier passes stay under it, muted, to pick from. Also in the recording options menu."),
       "ui-options.txt:recordLastPassPlays" },

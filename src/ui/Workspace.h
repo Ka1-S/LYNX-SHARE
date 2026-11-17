@@ -44,6 +44,16 @@ public:
     void toggleMaximised (Panel panel);
     void setDetached (Panel panel, bool detached);
 
+    // Issue #192: the Browser docked at the left or right side of the main window, as FL's: a maximized panel fills what
+    // it leaves (the whole desktop while it is closed or detached), the other panels keep out of its column, its title
+    // dragged docks it at the side it is let go on (off the main window: detached there), its inner edge sets its width.
+    void dockBrowser (workspace::Dock side);
+    workspace::Dock getBrowserDock() const;
+    bool isBrowserDockedPanel (Panel panel) const; // the Browser, docked and shown now
+    juce::Rectangle<int> dockedBrowserBoundsForWidth (int width) const;
+    juce::Rectangle<int> getMaximisedArea (Panel panel) const; // where a maximized panel goes now
+    void browserTitleDropped (juce::Point<int> screenPosition, bool moved);
+
     bool isPanelVisible (Panel panel) const;
     bool isMaximised (Panel panel) const;
     bool isDetached (Panel panel) const;

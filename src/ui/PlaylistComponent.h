@@ -152,6 +152,15 @@ public:
     // FL's fade handle menu for an audio clip's fade in (side 0) / out (1) (round 189i; shown by a right-click on the handle)
     // `clipMenu` (round 190ey): the clip menu's "Fade in / out curve" submenu (core flclipmenu::fadeCurve)
     juce::PopupMenu fadeHandleMenu (int index, int side, bool clipMenu = false);
+    // FL 2026's fade tension handle menu (round 190jz, issue #194; FL's right-click on the circle of a fade): Reset fade
+    // in / out tension, Create crossfade, Copy value, Paste value, Type in value... (-1..1 or %), Curve shape
+    juce::PopupMenu fadeTensionMenu (int index, int side);
+    // --issueshot190jz: the fade handles as the mouse shows them (hover over clip `index`, `target` 0 = the clip, 1 / 2 = the
+    // fade in / out handle, 3 / 4 = the fade in / out tension handle), and the hint a drag of one of them posts
+    void hoverFadeForSnapshot (int index, int target);
+    ui::Hint fadeDragHintForSnapshot (int index, int target);
+    juce::Point<float> fadeHandlePointForSnapshot (int index, int side) const { return fadeHandlePoint (index, side); }
+    juce::Point<float> fadeTensionPointForSnapshot (int index, int side) const { return fadeTensionPoint (index, side).value_or (juce::Point<float> { -1.0f, -1.0f }); }
     // FL's gain handle menu of clip `index` (round 166e; Normalize items round 189n): what showGainMenu opens; public for
     // --snapshot, which also sets the selection it reads (selectForSnapshot)
     juce::PopupMenu gainMenu (int index);
@@ -398,7 +407,7 @@ public:
 private:
     enum class Drag { none, move, resize, trimLeft, slip, erase, seek, loop, select, fadeIn, fadeOut, paint, muting, knife, zoomRange, listen, pan, timeMove, timeShift, autoPoint, autoTension,
                       lanePoint, laneTension, laneDraw, trackResize, headerSelect, preview, trackZoom, heightZoom, timeZoom, perfLaunch, clipGain, swipe, warpMarker,
-                      tempoMarker, headerMove };
+                      tempoMarker, headerMove, fadeTension };
     void swipeTimeSelectionToComp (int lane);
     // a swipe on a take lane (round 177c): the lane and the range so far
     int swipeLane = -1;
@@ -575,6 +584,18 @@ private:
     void dropOnTrackHeaderAs (const juce::StringArray& files, int track, trackmodes::HeaderDrop how);
     // fade handle of an audio clip under the mouse: 1 = fade-in, 2 = fade-out, 0 = none
     int fadeHandleAt (int clip, juce::Point<int> p) const;
+    // Round 190jz (issue #194, FL 2026 GUI): where an audio clip's content sits (under its header, as paintAudioClip draws
+    // it), the fade handles' corners there and the fades' tension handles (the circle at the middle of a fade's curve)
+    juce::Rectangle<float> audioClipBody (int clip) const;
+    juce::Point<float> fadeHandlePoint (int clip, int side) const;  // the body's top corner at the end of the fade
+    std::optional<juce::Point<float>> fadeTensionPoint (int clip, int side) const; // none: no fade, or a crossfade
+    int fadeTensionAt (int clip, juce::Point<int> p) const; // 1 = fade-in's, 2 = fade-out's, 0 = none
+    juce::Colour fadeInk (int clip) const; // the waveform's colour (FL draws the handles and curves in it)
+    void paintFadeHandles (juce::Graphics& g, int clip);
+    juce::String fadeLengthText (std::int64_t ticks) const; // FL's "0'15.750''"
+    int fadeSide = 0;                 // Drag::fadeTension: 0 = the fade in, 1 = the fade out
+    double fadeTensionStart = 0.0;    // its handle value (-1..1) when the drag started
+    int fadeTensionStartY = 0;
     // warp markers (round 175a, M3; a LYNX extra, the user's choice: Live edits them only in its Clip View): an audio
     // clip whose channel has markers that bend the tempo shows them as small flags on its top edge, to drag sideways
     std::vector<WarpPoint> clipWarpMarkers (int clip) const; // as played (warpedit::playedMarkers); empty: none
@@ -787,6 +808,8 @@ private:
     static inline bool hasCopiedGain = false;
     static inline double copiedFadeMs = 0.0; // the fade handle menu's Copy value (round 189i)
     static inline bool hasCopiedFade = false;
+    static inline double copiedFadeTension = 0.0; // the tension handle menu's Copy value (round 190jz)
+    static inline bool hasCopiedFadeTension = false;
     // FL: a double click held on the ruler drags a time selection (as Ctrl+drag); released without moving it clears
     bool rulerDoubleDrag = false;
     bool rulerMenuOnClick = false; // a right press on the ruler: the ruler menu if released in place (round 168t)
@@ -855,9 +878,10 @@ private:
         int divider = -1; // the track whose bottom edge in the headers is under the mouse (resizes it)
         int insertItem = -1; // issue #154: the insert effects column's row (an effect, trackinserts::addRow; -1 none)
         bool insertLed = false; // ... and its on/off dot
+        int fade = 0; // round 190jz: the fade handle (1 in, 2 out) or tension circle (3 in, 4 out) under the mouse
         bool operator== (const Hover& o) const
         {
-            return clip == o.clip && track == o.track && target == o.target && header == o.header && led == o.led && arrow == o.arrow
+            return fade == o.fade && clip == o.clip && track == o.track && target == o.target && header == o.header && led == o.led && arrow == o.arrow
                    && arm == o.arm && input == o.input && audition == o.audition && solo == o.solo && volume == o.volume && pan == o.pan && fx == o.fx
                    && divider == o.divider && insertItem == o.insertItem && insertLed == o.insertLed && addTrack == o.addTrack;
         }

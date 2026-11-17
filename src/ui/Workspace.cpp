@@ -151,7 +151,8 @@ public:
     {
         const auto detached = owner.isDetached (panel);
         dockButton.setVisible (detached);
-        maximiseButton.setVisible (! detached);
+        // issue #192: a docked Browser takes its side of the main window, as FL's: nothing to maximize
+        maximiseButton.setVisible (! detached && ! owner.isBrowserDockedPanel (panel));
         maximiseButton.setIcon (owner.isMaximised (panel) ? Icon::restore : Icon::maximise);
         maximiseButton.setTooltip (owner.isMaximised (panel) ? tr ("Restore the panel size (double-click the title)")
                                                               : tr ("Maximize the panel (double-click the title)"));
@@ -178,8 +179,15 @@ public:
         }
 
         const auto detached = owner.isDetached (panel);
+        if (panel == Panel::browser) // issue #192: FL's two dock sites (its Browser docks by a drag of its title, as here too)
+        {
+            const auto side = owner.getBrowserDock();
+            menu.addItem (tr ("Docked left"), true, ! detached && side == workspace::Dock::left, [this] { owner.dockBrowser (workspace::Dock::left); });
+            menu.addItem (tr ("Docked right"), true, ! detached && side == workspace::Dock::right, [this] { owner.dockBrowser (workspace::Dock::right); });
+        }
         menu.addItem (tr ("Detached (own window)"), true, detached, [this, detached] { owner.setDetached (panel, ! detached); });
-        menu.addItem (tr ("Maximized"), ! detached, owner.isMaximised (panel), [this] { owner.toggleMaximised (panel); });
+        if (! owner.isBrowserDockedPanel (panel))
+            menu.addItem (tr ("Maximized"), ! detached, owner.isMaximised (panel), [this] { owner.toggleMaximised (panel); });
         menu.addItem (tr ("Close"), [this] { owner.hide (panel); });
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&menuButton));
     }
@@ -266,6 +274,13 @@ public:
     {
         if (owner.isDetached (panel) || owner.isMaximised (panel))
             return 0;
+
+        if (owner.isBrowserDockedPanel (panel)) // issue #192: its inner edge only (the width of its column)
+        {
+            if (owner.getBrowserDock() == workspace::Dock::left)
+                return p.x >= getWidth() - edge ? (int) workspace::right : 0;
+            return p.x < edge ? (int) workspace::left : 0;
+        }
 
         int edges = 0;
         if (p.x < edge)
@@ -363,6 +378,21 @@ public:
         const auto parent = owner.getLocalBounds();
         r.setY (juce::jlimit (0, juce::jmax (0, parent.getHeight() - Workspace::titleHeight), r.getY()));
 
+        if (panel == Panel::browser && dragEdges != 0 && owner.isBrowserDockedPanel (panel))
+        {
+            // issue #192: the docked column's width, as the layout keeps it (full height, at its edge); the maximized
+            // panels and the others follow at once, as FL's desktop does
+            owner.frameMoved (panel, owner.dockedBrowserBoundsForWidth (r.getWidth()));
+            return;
+        }
+        if (panel == Panel::browser && dragEdges == 0 && (owner.isBrowserDockedPanel (panel) || owner.getBrowserDock() == workspace::Dock::none))
+        {
+            // the title: the Browser follows the mouse, and docks at the side it is let go on (mouseUp); off the main
+            // window it detaches into its own window there (FL: "drop it anywhere on the screen")
+            owner.placeFrame (*this, r);
+            return;
+        }
+
         if (! e.mods.isAltDown()) // Alt: no snapping
         {
             std::vector<workspace::Rect> others;
@@ -371,11 +401,30 @@ public:
             r = toJuce (workspace::snap (toRect (r), others, parent.getWidth(), parent.getHeight(), 8, dragEdges));
         }
 
+        // issue #192: the docked Browser's column is not part of the desktop the panels move in (FL's windows stay beside
+        // its dock site); they can still go past the other edges
+        if (panel != Panel::browser && owner.isBrowserDockedPanel (Panel::browser))
+        {
+            const auto area = owner.getMaximisedArea (panel);
+            if (owner.getBrowserDock() == workspace::Dock::left && r.getX() < area.getX())
+                r = dragEdges == 0 ? r.withX (area.getX()) : r.withLeft (area.getX());
+            else if (owner.getBrowserDock() == workspace::Dock::right && r.getRight() > area.getRight())
+                r = dragEdges == 0 ? r.withX (area.getRight() - r.getWidth()) : r.withRight (area.getRight());
+        }
+
         owner.placeFrame (*this, r);
     }
 
-    void mouseUp (const juce::MouseEvent&) override
+    void mouseUp (const juce::MouseEvent& e) override
     {
+        if (dragging && panel == Panel::browser && dragEdges == 0
+            && (owner.isBrowserDockedPanel (panel) || owner.getBrowserDock() == workspace::Dock::none))
+        {
+            dragging = false;
+            owner.browserTitleDropped (e.getScreenPosition(), e.getDistanceFromDragStart() >= 4);
+            return;
+        }
+
         if (dragging)
             owner.frameMoved (panel, owner.frameBounds (*this));
 
@@ -384,7 +433,7 @@ public:
 
     void mouseDoubleClick (const juce::MouseEvent& e) override
     {
-        if (isOnTitleBar (e) && ! owner.isDetached (panel))
+        if (isOnTitleBar (e) && ! owner.isDetached (panel) && ! owner.isBrowserDockedPanel (panel))
             owner.toggleMaximised (panel);
     }
 
@@ -403,7 +452,9 @@ public:
         else if (p.y < Workspace::titleHeight)
             h.text = title + ": " + (titleTooltip.isNotEmpty() ? titleTooltip + "   " : juce::String())
                      + (owner.isDetached (panel) ? tr ("Docks back with the button on the right")
-                                                 : tr ("Drag to move (Alt: no snapping), double-click to maximize"));
+                        : owner.isBrowserDockedPanel (panel) || panel == Panel::browser
+                            ? tr ("Drag to dock it at the left or right side, or off the window to detach it")
+                            : tr ("Drag to move (Alt: no snapping), double-click to maximize"));
         return h;
     }
 
@@ -737,7 +788,10 @@ bool Workspace::isDetached (Panel panel) const { return layout[panel].detached; 
 
 bool Workspace::toggle (Panel panel)
 {
+    const auto before = layout.freeArea();
     const auto visible = layout.toggle (panel);
+    if (panel == Panel::browser) // issue #192 (Alt+F8): the panels follow the free area, as FL's windows do
+        layout.followFreeArea (before);
     applyLayout (true);
     if (visible)
         nativeToFront (panel);
@@ -746,7 +800,10 @@ bool Workspace::toggle (Panel panel)
 
 void Workspace::show (Panel panel)
 {
+    const auto before = layout.freeArea();
     layout.show (panel);
+    if (panel == Panel::browser) // issue #192
+        layout.followFreeArea (before);
     applyLayout (true);
     nativeToFront (panel);
 }
@@ -762,7 +819,10 @@ void Workspace::nativeToFront (Panel panel)
 
 void Workspace::hide (Panel panel)
 {
+    const auto before = layout.freeArea();
     layout.hide (panel);
+    if (panel == Panel::browser) // issue #192: the closed Browser leaves the whole desktop to the others
+        layout.followFreeArea (before);
     applyLayout (true);
 }
 
@@ -777,6 +837,7 @@ void Workspace::setDetached (Panel panel, bool detached)
 {
     pristine = false;
     restoredState.clear();
+    const auto freeBefore = layout.freeArea(); // (issue #192: a Browser that detaches or docks again moves the free area)
     layout[panel].detached = detached;
 
     if (detached)
@@ -791,6 +852,11 @@ void Workspace::setDetached (Panel panel, bool detached)
     }
 
     layout.show (panel);
+    if (panel == Panel::browser) // issue #192: back at its side, or gone from it
+    {
+        layout.placeDockedBrowser();
+        layout.followFreeArea (freeBefore);
+    }
     applyLayout();
     saveState(); // issue #62: remembered at once (a session that does not close cleanly keeps it too)
 }
@@ -829,8 +895,9 @@ void Workspace::fitPanelContent (Panel panel, int contentWidth, int contentHeigh
     if (contentHeight > 0)
         r.h = contentHeight + titleHeight + edge;
 
-    // grows to the left (or up) rather than past the desktop's edge
-    r.x = juce::jlimit (0, juce::jmax (0, getWidth() - r.w), r.x);
+    // grows to the left (or up) rather than past the desktop's edge (issue #192: or into a docked Browser's column)
+    const auto area = layout.freeArea();
+    r.x = juce::jlimit (area.x, juce::jmax (area.x, area.right() - r.w), r.x);
     r.y = juce::jlimit (0, juce::jmax (0, getHeight() - r.h), r.y);
 
     r.w = juce::jlimit (workspace::minWidth, juce::jmax (workspace::minWidth, getWidth() - r.x), r.w);
@@ -859,7 +926,82 @@ void Workspace::frameMoved (Panel panel, juce::Rectangle<int> bounds)
         restoredState.clear();
     }
 
+    const auto freeBefore = layout.freeArea();
     layout[panel].bounds = toRect (bounds);
+
+    // issue #192: a docked Browser's new width moves the free area's edge: the maximized panels fill the new free area
+    // and the others move with its edge (as FL's windows do)
+    if (panel == Panel::browser && layout.browserDocked())
+    {
+        layout.placeDockedBrowser();
+        layout.followFreeArea (freeBefore);
+        applyLayout();
+    }
+}
+
+bool Workspace::isBrowserDockedPanel (Panel panel) const
+{
+    return panel == Panel::browser && layout.browserDocked();
+}
+
+workspace::Dock Workspace::getBrowserDock() const
+{
+    return layout.browserDock;
+}
+
+juce::Rectangle<int> Workspace::dockedBrowserBoundsForWidth (int width) const
+{
+    auto l = layout;
+    l[Panel::browser].bounds.w = width;
+    if (l.browserDock == workspace::Dock::none)
+        l.browserDock = workspace::Dock::left;
+    l.placeDockedBrowser();
+    return toJuce (l[Panel::browser].bounds);
+}
+
+juce::Rectangle<int> Workspace::getMaximisedArea (Panel panel) const
+{
+    return toJuce (layout.maximisedArea (panel));
+}
+
+void Workspace::dockBrowser (workspace::Dock side)
+{
+    pristine = false;
+    restoredState.clear();
+    const auto before = layout.freeArea();
+    if (layout[Panel::browser].detached)
+    {
+        if (auto& w = windows[(std::size_t) Panel::browser]; w != nullptr) // (the window's place, for a later detach)
+            layout[Panel::browser].windowBounds = toRect (w->getBounds());
+        layout[Panel::browser].detached = false;
+    }
+    layout.show (Panel::browser);
+    layout.browserDock = side;
+    layout.placeDockedBrowser();
+    layout.followFreeArea (before);
+    applyLayout();
+    saveState();
+}
+
+void Workspace::browserTitleDropped (juce::Point<int> screenPosition, bool moved)
+{
+    if (! moved) // a click on the title: the Browser stays where it was
+    {
+        applyLayout();
+        return;
+    }
+    // let go off the main window: FL's undocked Browser, a window of its own where it was dropped
+    if (isShowing() && ! getScreenBounds().contains (screenPosition))
+    {
+        const auto& b = layout[Panel::browser].bounds;
+        const auto size = localAreaToGlobal (juce::Rectangle<int> (0, 0, b.w, juce::jmin (b.h, juce::jmax (300, getHeight() * 3 / 4))));
+        layout[Panel::browser].windowBounds = toRect (size.withPosition (screenPosition - juce::Point<int> (60, 12)));
+        setDetached (Panel::browser, true);
+        return;
+    }
+    // inside: docked at the side of the window it was let go on
+    const auto local = getLocalPoint (nullptr, screenPosition);
+    dockBrowser (local.x >= getWidth() / 2 ? workspace::Dock::right : workspace::Dock::left);
 }
 
 std::vector<juce::Rectangle<int>> Workspace::otherWindowScreenBounds (Panel panel) const
@@ -947,8 +1089,10 @@ juce::Rectangle<int> Workspace::placeForDockedFrame (int width, int height) cons
         if (f != nullptr && f->isVisible())
             ++open;
     const auto step = 24 * (open % 8);
-    auto r = juce::Rectangle<int> (60 + step, 40 + step, width, height);
-    r.setX (juce::jlimit (0, juce::jmax (0, getWidth() - width), r.getX()));
+    // (issue #192: from the free area's left edge, beside a Browser docked at the left)
+    const auto area = toJuce (layout.freeArea());
+    auto r = juce::Rectangle<int> (area.getX() + 60 + step, 40 + step, width, height);
+    r.setX (juce::jlimit (area.getX(), juce::jmax (area.getX(), area.getRight() - width), r.getX()));
     r.setY (juce::jlimit (0, juce::jmax (0, getHeight() - height), r.getY()));
     return r;
 }
@@ -1137,7 +1281,8 @@ void Workspace::applyLayout (bool fadePanels)
                 addChildComponent (frame);
             }
 
-            placeFrame (frame, state.maximised ? getLocalBounds() : toJuce (state.bounds));
+            // issue #192: a maximized panel fills what a docked Browser leaves (FL's desktop beside its dock site)
+            placeFrame (frame, state.maximised ? toJuce (layout.maximisedArea (panel)) : toJuce (state.bounds));
             if (nativechild::isAttached (frame))
             {
                 // a panel the user opens or closes fades as the plain ones below do, by its window's alpha (round 190i)
@@ -1260,6 +1405,7 @@ void Workspace::resized()
                 layout.panels[(std::size_t) i].bounds = saved->panels[(std::size_t) i].bounds;
             layout.width = saved->width;
             layout.height = saved->height;
+            layout.placeDockedBrowser(); // (issue #192)
             applyLayout();
             return;
         }

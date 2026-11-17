@@ -166,6 +166,8 @@ public:
     void showPanelsForSnapshot (std::initializer_list<workspace::Panel> panels);
     void openQuickAddForTest() { showQuickAdd(); } // --windowtest
     Workspace& workspaceForTest() { return workspace; } // --plugwintest dock mode (issue #116)
+    bool runActionForSnapshot (const std::string& id) { return runAction (id); } // --issueshot190jz
+    const keys::KeyMap& getKeyMapForSnapshot() const { return keyMap; }
     juce::Component* setupOverlayForTest() const { return setupOverlay.get(); }
     juce::Component* danceStageForTest() const { return danceStage.get(); } // (a DanceStage, ui/DanceView.h)
     void waitForBrowserForSnapshot() { browser.waitForListing (5000); }
@@ -297,6 +299,7 @@ private:
     void playStop();     // Space: play, or stop and go back to where playback started
     void playPause();    // Ctrl+Space: pause / resume where it is
     void playFromStart(); // Shift+Space (FL): play; while playing, stop at the start of the time selection / song / pattern
+    void moveToStart();  // Home (FL, issue #195): the playback marker to the start of the song or pattern
     void stopAndRewind (bool toStart = false); // toStart: the very start, ignoring "Remember seek time"
     void showStopMenu(); // right-click on Stop: "remember seek time", panic // the Stop button
     double playStartTicks = 0.0;

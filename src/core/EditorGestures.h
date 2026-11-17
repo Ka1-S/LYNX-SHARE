@@ -82,6 +82,7 @@ enum class Target
     leftEdge,    // left edge of a note / clip
     rightEdge,   // right edge of a note / clip
     fadeHandle,  // Playlist: fade handle of an audio clip
+    fadeTension, // Playlist: the tension handle (circle) on an audio clip's fade (FL 2026, round 190jz)
     gainHandle,  // Playlist: an audio clip's gain handle (bottom centre, FL 2026; round 166e)
     autoPoint,   // Playlist: a point of an inline automation curve
     autoCurve,   // Playlist: on an automation curve (a click adds a point)
@@ -119,6 +120,7 @@ enum class Action
     zoomRange,
     listen,
     fade,         // drags an audio fade
+    fadeTension,  // drags an audio fade's tension up / down (round 190jz)
     clipGain,     // drags an audio clip's gain up / down
     movePoint,    // drags an automation point
     addPoint,     // adds an automation point on the curve
@@ -168,6 +170,8 @@ inline Action leftAction (EditTool tool, Target target, Mods mods, bool playlist
             return Action::addPoint;
         if (target == Target::fadeHandle)
             return Action::fade;
+        if (target == Target::fadeTension)
+            return Action::fadeTension;
         if (target == Target::gainHandle)
             return Action::clipGain;
         if (mods.alt && mods.shift && target == Target::item)
@@ -181,6 +185,7 @@ inline Action leftAction (EditTool tool, Target target, Mods mods, bool playlist
         case Target::autoCurve:
         case Target::autoTension:
         case Target::fadeHandle:
+        case Target::fadeTension:
         case Target::gainHandle: return mods.shift ? Action::copyMove : Action::move;
         case Target::rightEdge: return Action::resizeRight;
         case Target::leftEdge: return Action::resizeLeft;
@@ -224,7 +229,8 @@ inline Cursor cursorFor (Action action, EditTool tool)
         case Action::resizeRight:
         case Action::resizeLeft:
         case Action::fade: return Cursor::resizeH;
-        case Action::clipGain: return Cursor::resizeV;
+        case Action::clipGain:
+        case Action::fadeTension: return Cursor::resizeV;
         case Action::slipContent: return Cursor::slip;
         case Action::toggleSelect:
         case Action::boxSelect: return Cursor::select;
