@@ -245,6 +245,7 @@
 #include "ui/Updater.h"
 #include "ui/AudioCheck.h"
 #include "ui/StemExtract.h"
+#include "core/RegionLoop.h" // round 190jr: --bandlab190jrshot
 #include "ui/AudioToMidi.h"
 #include "ui/ShotScale.h"
 #include "core/LaneView.h"       // round 190iu
@@ -2647,6 +2648,15 @@ public:
             return;
         }
 
+        // --bandlab190jrshot <prefix> (round 190jr): a .blx imported as Simple tracks, the region loop handle, the Simple
+        // automation view and its menu, the Extract stems form; <prefix>-report.txt with ok / FAIL lines
+        if (args.contains ("--bandlab190jrshot"))
+        {
+            runBandlab190jrShot (args[args.indexOf ("--bandlab190jrshot") + 1].unquoted());
+            quit();
+            return;
+        }
+
         // --bandlabshot <prefix> (round 190ch): Lyrics / Notes, Reference match, Start from and Clean voice, offscreen
         if (args.contains ("--bandlabshot"))
         {
@@ -2932,10 +2942,15 @@ public:
 
         if (args.contains ("--stemsplit"))
         {
-            // LYNX.exe --stemsplit input.wav folder: the stem separation of the clip menu, without the window
+            // LYNX.exe --stemsplit input.wav folder ["stems=111100 model=2 ..."]: the stem separation of the clip menu,
+            // without the window (round 190jr: the options as the settings file writes them; none = every stem, Standard)
             const auto i = args.indexOf ("--stemsplit");
             lynx::AudioEngine loader (false);
-            const auto error = lynx::extractStemsToFolder (loader, juce::File (args[i + 1].unquoted()), juce::File (args[i + 2].unquoted()));
+            const auto options = i + 3 < args.size() && args[i + 3].unquoted().containsChar ('=') ? lynx::stemsplit::optionsFromText (args[i + 3].unquoted().toStdString())
+                                                                                                 : lynx::stemsplit::Options {};
+            const auto started = juce::Time::getMillisecondCounterHiRes();
+            const auto error = lynx::extractStemsToFolder (loader, juce::File (args[i + 1].unquoted()), juce::File (args[i + 2].unquoted()), options);
+            std::fprintf (stderr, "stemsplit: %.0f ms\n", juce::Time::getMillisecondCounterHiRes() - started);
             juce::File (args[i + 2].unquoted()).getSiblingFile ("stemsplit.txt").replaceWithText (error.isEmpty() ? "result=OK\n" : "result=FAIL " + error + "\n");
             setApplicationReturnValue (error.isEmpty() ? 0 : 1);
             quit();
@@ -11960,7 +11975,7 @@ private:
         juce::String error;
         auto ok = false;
         const auto loadStart = juce::Time::getMillisecondCounterHiRes();
-        if (project.hasFileExtension ("flp;als;flm;band")) // (round 190gr: a Live set, its Session clips in the grid)
+        if (project.hasFileExtension ("flp;als;flm;band;blx")) // (round 190gr: a Live set, its Session clips in the grid)
             ok = engine->importFlpFile (project, error);
         else if (auto song = lynx::ProjectFile::load (project, error))
         {
@@ -14403,7 +14418,7 @@ private:
         juce::String error, report;
         bool ok = false;
 
-        if (input.hasFileExtension ("flp;als;flm;songtmpl;band")) // (round 190ic: a GarageBand .band folder too)
+        if (input.hasFileExtension ("flp;als;flm;songtmpl;band;blx")) // (round 190ic: a GarageBand .band folder too)
             ok = offline.importFlpFile (input, error);
         else if (auto song = lynx::ProjectFile::load (input, error))
         {
@@ -14480,7 +14495,7 @@ private:
                     }
                 }
             }
-            if (input.hasFileExtension ("flp;als;flm;songtmpl;band"))
+            if (input.hasFileExtension ("flp;als;flm;songtmpl;band;blx"))
                 ok = loader.importFlpFile (input, error);
             else if (auto song = lynx::ProjectFile::load (input, error))
             {
@@ -17402,6 +17417,168 @@ private:
 
         juce::File (prefix + "-checks.txt").replaceWithText (report.joinIntoString ("\n") + "\nresult=" + (allOk ? "OK" : "FAIL") + "\n");
         return allOk;
+    }
+
+    // --bandlab190jrshot <prefix> (round 190jr; B15, BUILD-LIST 13 / 14): a synthetic BandLab project (.blx: the revision
+    // JSON, a MIDI file, a WAV) opened through the real import, shown in the Simple layout; its looped regions and their
+    // loop handles; a loop dragged longer; the automation view with and without points and its parameter menu; the clip
+    // menu's loop items; the Extract stems form (Standard and 6 stems). Pictures at the --shot-scale asked for.
+    void runBandlab190jrShot (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        lynx::MainComponent ui (offline, false);
+        ui.setSize (1600, 900);
+        const auto note = [] (const juce::String& what) { std::fprintf (stderr, "bandlab190jrshot: %s\n", what.toRawUTF8()); };
+        const auto writeImage = [&prefix, &note] (const juce::Image& image, const char* name) {
+            note (name);
+            const auto file = lynx::shot::file (juce::File (prefix + "-" + name + ".png"));
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (image, out);
+        };
+        juce::String report;
+        const auto check = [&report, &note] (const juce::String& what, bool ok) {
+            note ((ok ? "ok    " : "FAIL  ") + what);
+            report << (ok ? "ok    " : "FAIL  ") << what << "\n";
+        };
+
+        // ---- 1. the project: a revision with a looped piano region, a voice take and a drum machine
+        const auto folder = juce::File (prefix + "-blx");
+        folder.deleteRecursively();
+        folder.getChildFile ("Audio").createDirectory();
+        folder.getChildFile ("MIDI").createDirectory();
+        {
+            // a 4-beat MIDI part (100 BPM: 2.4 s) and a drum beat, 480 ticks per quarter
+            const auto midi = [] (const std::vector<std::array<int, 4>>& notes) {
+                juce::MidiMessageSequence seq;
+                for (const auto& n : notes)
+                {
+                    seq.addEvent (juce::MidiMessage::noteOn (1, n[2], (juce::uint8) n[3]), n[0]);
+                    seq.addEvent (juce::MidiMessage::noteOff (1, n[2]), n[0] + n[1]);
+                }
+                seq.updateMatchedPairs();
+                juce::MidiFile file;
+                file.setTicksPerQuarterNote (480);
+                file.addTrack (seq);
+                juce::MemoryOutputStream out;
+                file.writeTo (out);
+                return out.getMemoryBlock();
+            };
+            const auto keysBlock = midi ({ { 0, 480, 62, 100 }, { 0, 480, 65, 90 }, { 0, 480, 69, 90 }, { 480, 240, 64, 80 },
+                                           { 960, 480, 60, 100 }, { 960, 480, 64, 90 }, { 1440, 480, 67, 90 } });
+            folder.getChildFile ("MIDI/s-keys.mid").replaceWithData (keysBlock.getData(), keysBlock.getSize());
+            const auto beat = midi ({ { 0, 120, 36, 120 }, { 480, 120, 38, 110 }, { 960, 120, 36, 120 }, { 1440, 120, 38, 110 }, { 240, 60, 42, 80 },
+                                      { 720, 60, 42, 80 }, { 1200, 60, 42, 80 }, { 1680, 60, 42, 80 } });
+            folder.getChildFile ("MIDI/s-beat.mid").replaceWithData (beat.getData(), beat.getSize());
+            // a 4.8 s "voice" (a sine with a slow swell), 44.1 kHz
+            juce::AudioBuffer<float> wave (1, 44100 * 48 / 10);
+            for (int i = 0; i < wave.getNumSamples(); ++i)
+                wave.setSample (0, i, 0.4f * std::sin ((float) i * 0.0627f) * (0.5f + 0.5f * std::sin ((float) i * 0.00012f)));
+            juce::WavAudioFormat wav;
+            const auto out = folder.getChildFile ("Audio/s-vox.wav");
+            if (auto stream = out.createOutputStream())
+                if (std::unique_ptr<juce::AudioFormatWriter> writer (wav.createWriterFor (stream.get(), 44100.0, 1, 16, {}, 0)); writer != nullptr)
+                {
+                    stream.release();
+                    writer->writeFromAudioSampleBuffer (wave, 0, wave.getNumSamples());
+                }
+            folder.getChildFile ("Scratch Song.blx").replaceWithText (R"({ "revision": {
+  "key": "D min", "volume": 1, "song": { "name": "Scratch Song" },
+  "metronome": { "bpm": 100, "signature": { "notesCount": 4, "noteValue": 4 } },
+  "auxChannels": [ { "id": "aux1", "preset": "sharedReverb", "returnLevel": 1 } ],
+  "samples": [ { "id": "s-keys", "isMidi": true, "duration": 2.4 }, { "id": "s-vox", "isMidi": false, "duration": 4.8 }, { "id": "s-beat", "isMidi": true } ],
+  "tracks": [
+    { "id": "t1", "order": 0, "name": "Keys", "type": "instrument", "soundbank": "studio-grand", "volume": 0.9, "colorName": "Red",
+      "regions": [ { "id": "r1", "sampleId": "s-keys", "name": "Chords", "startPosition": 0, "endPosition": 9.6, "loopLength": 2.4 } ] },
+    { "id": "t2", "order": 1, "name": "Vocal", "type": "voice", "volume": 1, "pan": -0.2, "colorName": "Blue",
+      "effects": [ { "slug": "compressor", "params": { "attack": 0.003, "ratio": 3, "release": 0.12, "threshold": -18 } },
+                   { "slug": "threeBandEq", "params": { "lowGain": -2, "midGain": 1, "highGain": 3, "midFreq": 2500 } },
+                   { "slug": "chorusPedal", "params": {} } ],
+      "auxSends": [ { "id": "aux1", "sendLevel": 0.3 } ],
+      "automation": { "volume": [ { "position": 0, "value": 0.2 }, { "position": 8, "value": 1 }, { "position": 16, "value": 0.7 } ] },
+      "regions": [ { "id": "r2", "sampleId": "s-vox", "name": "Take 1", "startPosition": 2.4, "endPosition": 7.2, "fadeIn": 0.2, "fadeOut": 0.5 } ] },
+    { "id": "t3", "order": 2, "name": "Drum Machine", "type": "drum-machine", "volume": 1, "colorName": "Violet",
+      "regions": [ { "id": "r3", "sampleId": "s-beat", "name": "Beat", "startPosition": 0, "endPosition": 4.8, "loopLength": 2.4 } ] }
+  ] } })");
+        }
+        juce::String error;
+        const auto blx = folder.getChildFile ("Scratch Song.blx");
+        const auto imported = offline.importFlpFile (blx, error);
+        check ("the .blx opens through the import (" + error + ")", imported);
+        offline.dispatchPendingMessages();
+        const auto& song = offline.getSong();
+        check ("three Simple tracks: Keys (instrument), Vocal (audio), Drum Machine (drums)",
+               lynx::simpletracks::kindOf (song, 0) == lynx::simpletracks::Kind::instrument && lynx::simpletracks::kindOf (song, 1) == lynx::simpletracks::Kind::audio
+                   && lynx::simpletracks::kindOf (song, 2) == lynx::simpletracks::Kind::drums);
+        check ("tempo 100, key D minor", std::abs (song.bpm - 100.0) < 1e-6 && lynx::projectkey::get (song).has_value());
+        int keysClips = 0, beatClips = 0, voxClips = 0;
+        for (const auto& c : song.playlist)
+        {
+            keysClips += c.track == 0;
+            voxClips += c.track == 1 && c.kind == lynx::ClipKind::audio;
+            beatClips += c.track == 2;
+        }
+        check ("the looped Keys region: 4 passes; the beat: 2; the take: 1 audio clip", keysClips == 4 && beatClips == 2 && voxClips == 1);
+        const auto voxInsert = lynx::simpletracks::insertOf (song, 1);
+        check ("the vocal's compressor, EQ and chorus on its insert",
+               voxInsert > 0 && song.mixer[(std::size_t) voxInsert].effects.size() == 3);
+        check ("the vocal's volume automation: a lane under its track", ! song.playlistTracks[1].lanes.empty());
+
+        ui.setLayoutStyle (lynx::layoutstyle::Style::simple);
+        offline.dispatchPendingMessages();
+        ui.selectTabForSnapshot (2);
+        if (auto* simple = ui.getSimpleWorkflowForSnapshot())
+            simple->hideChooser();
+        auto& playlist = ui.getPlaylistForSnapshot();
+        playlist.setViewForSnapshot (96.0, 0, 0);
+        offline.dispatchPendingMessages();
+        writeImage (lynx::shot::snapshot (ui), "blx-simple");
+        writeImage (lynx::shot::snapshot (playlist), "loop-handles");
+
+        // ---- 2. a loop dragged longer: the take repeated to bar 9 (as the handle's drag does it)
+        {
+            int take = -1;
+            for (int i = 0; i < (int) song.playlist.size(); ++i)
+                if (song.playlist[(std::size_t) i].track == 1 && song.playlist[(std::size_t) i].kind == lynx::ClipKind::audio)
+                    take = i;
+            const auto end = (std::int64_t) lynx::ppq * 4 * 8;
+            offline.editSong ([take, end] (lynx::Song& s) { lynx::regionloop::loopTo (s, take, end); });
+            offline.dispatchPendingMessages();
+            const auto run = lynx::regionloop::runOf (offline.getSong(), lynx::regionloop::regionAt (offline.getSong(), 1, (std::int64_t) lynx::ppq * 4, offline.getSong().playlist[(std::size_t) take]));
+            check ("the take loops to bar 9 in passes of its length", run.passes() >= 3 && run.end == end);
+            writeImage (lynx::shot::snapshot (playlist), "loop-dragged");
+            auto menu = playlist.getClipMenuForSnapshot (run.clips.empty() ? take : run.clips.back());
+            bool hasLoop = false;
+            for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+                hasLoop = hasLoop || it.getItem().text == lynx::tr ("Unloop");
+            check ("the Simple clip menu has Loop until next / Unloop", hasLoop);
+            saveMenus (juce::StringArray { "Clip" }, std::vector<juce::PopupMenu> { menu }, prefix + "-clip-menu.png");
+        }
+
+        // ---- 3. the automation view: the vocal's lane on its row, the others' dashed line at their level
+        playlist.setSimpleAutomation (true);
+        offline.dispatchPendingMessages();
+        writeImage (lynx::shot::snapshot (playlist), "automation-view");
+        check ("the view changes nothing in the song", offline.getSong().playlistTracks[0].lanes.empty());
+        playlist.setSimpleAutoTargetForSnapshot (1, { lynx::AutomationTargetKind::effectParam, voxInsert, 0, 0 }); // the compressor's threshold
+        writeImage (lynx::shot::snapshot (playlist), "automation-param");
+        playlist.setSimpleAutoTargetForSnapshot (1, { lynx::AutomationTargetKind::mixerVolume, voxInsert, 0, 0 });
+        saveMenus (juce::StringArray { "Volume" }, std::vector<juce::PopupMenu> { playlist.getSimpleAutoMenuForSnapshot (1) }, prefix + "-automation-menu.png");
+        playlist.setSimpleAutomation (false);
+        offline.dispatchPendingMessages();
+
+        // ---- 4. the Extract stems form
+        {
+            auto panel = lynx::makeStemOptionsPanel (lynx::stemsplit::Options {}, [] (lynx::stemsplit::Options) {});
+            writeImage (lynx::shot::paint (*panel, lynx::theme::colour::bg2), "stem-options");
+            lynx::stemsplit::Options six;
+            six.model = lynx::stemsplit::Model::sixStems;
+            six.stems = { true, true, false, true, true, true };
+            auto panel6 = lynx::makeStemOptionsPanel (six, [] (lynx::stemsplit::Options) {});
+            writeImage (lynx::shot::paint (*panel6, lynx::theme::colour::bg2), "stem-options-six");
+        }
+        juce::File (lynx::shot::fileName (prefix + "-report.txt")).replaceWithText (report);
     }
 
     // --bandlabshot <prefix> (round 190ch): the Lyrics / Notes panel (Pattern and Simple layouts, and on its own), the
