@@ -54,6 +54,7 @@
 #include "core/PoiZone.h"
 #include "core/Toxic.h"
 #include "core/ThreeOsc.h"
+#include "core/FlmNoteFx.h" // round 190jv: an FL Studio Mobile Rack's note effects on FL's notes
 #include "core/TimeStretch.h"
 #include "core/HarmlessFx.h"
 #include "core/SytrusEngine.h"
@@ -1026,6 +1027,19 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
 
     // round 190fn: the FL Studio Mobile Racks' own inserts (LYNX channel → the rack's level, pan and effects)
     std::vector<std::pair<int, MixerTrack>> flmRackInserts;
+    // round 190jv: the FL Studio Mobile Racks with several instruments (a Layer, its instruments right after it as LYNX
+    // channels, the rack's insert and parts placed once the mixer exists)
+    struct FlmRackLayer
+    {
+        int layer = 0;
+        std::vector<int> children, childPart;
+        std::vector<FlmRackChannel::Part> parts;
+        MixerTrack insert;
+        bool insertUsed = false;
+    };
+    std::vector<FlmRackLayer> flmRackLayers;
+    // round 190jv: the racks' note effects (LYNX channel → the modules in the rack's order), run over FL's notes below
+    std::vector<std::pair<int, std::vector<std::pair<std::uint32_t, std::vector<float>>>>> flmRackNoteFx;
 
     for (const auto& c : project.channels)
     {
@@ -2236,6 +2250,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
         // rack's level, pan and effects on an insert of their own in front of the channel's FL insert (placed below,
         // once the mixer exists). FL's channel settings stay FL's. What LYNX cannot rebuild keeps the stand-in (listed).
         const auto flmRack = c.type == flp::ChannelType::instrument && c.pluginName == "FL Studio Mobile Rack" && ! c.pluginState.empty();
+        std::vector<ChannelDef> flmRackChildren; // round 190jv: a rack's instruments, pushed right after this channel
         if (flmRack)
         {
             FlmImportOptions flmOptions;
@@ -2243,52 +2258,104 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
             flmOptions.resourceRoot = flmResourceRootIn (options.roots.factoryData);
             flmOptions.userResourceRoots = options.flmResourceRoots;
             std::string why;
-            if (auto rack = importFlmRackState (c.pluginState, flmOptions, song.bpm, def.name, &why))
-            {
-                const auto& r = rack->channel;
-                def.instrument = r.instrument;
-                def.pluginState = r.pluginState;
-                def.modelParams = r.modelParams;
-                def.samplePath = r.samplePath;
-                def.zones = r.zones;
+            // the rack's instrument on FL's channel: the engine and its settings, FL's channel settings on top
+            // (round 190jv: also each instrument of a rack with several, on a copy of FL's channel)
+            const auto onFlChannel = [] (ChannelDef& to, const ChannelDef& r) {
+                to.instrument = r.instrument;
+                to.pluginState = r.pluginState;
+                to.modelParams = r.modelParams;
+                to.samplePath = r.samplePath;
+                to.zones = r.zones;
                 {
                     // the engine's sampler settings, with FL's channel pitch and porta on top
-                    const auto porta = def.sampler.porta;
-                    const auto portaBeats = def.sampler.portaBeats;
-                    const auto pitch = def.sampler.pitch;
-                    def.sampler = r.sampler;
-                    def.sampler.porta = def.sampler.porta || porta;
-                    def.sampler.portaBeats = portaBeats;
-                    def.sampler.pitch = std::clamp (def.sampler.pitch + pitch, -24.0f, 24.0f);
+                    const auto porta = to.sampler.porta;
+                    const auto portaBeats = to.sampler.portaBeats;
+                    const auto pitch = to.sampler.pitch;
+                    to.sampler = r.sampler;
+                    to.sampler.porta = to.sampler.porta || porta;
+                    to.sampler.portaBeats = portaBeats;
+                    to.sampler.pitch = std::clamp (to.sampler.pitch + pitch, -24.0f, 24.0f);
                 }
-                def.synth.porta = def.synth.porta || r.synth.porta;
+                to.synth.porta = to.synth.porta || r.synth.porta;
                 if (r.synth.porta)
-                    def.synth.portaBeats = r.synth.portaBeats;
-                def.misc.pitchRange = r.misc.pitchRange;
+                    to.synth.portaBeats = r.synth.portaBeats;
+                to.misc.pitchRange = r.misc.pitchRange;
                 // round 190gw (live check 190gu B6): the module's own Gate (3x Osc MISC › Poly › Gate, a .flm import's
                 // Time › Gate) shortens the notes it plays inside FL as well: the shorter of it and FL's channel gate.
                 // (FL's render of 190fe's all-0.5 rack: notes ~70 ms long; without this LYNX held the whole beat, ~10 dB louder)
                 if (r.misc.gateBeats > 0.0f)
-                    def.misc.gateBeats = def.misc.gateBeats > 0.0f ? std::min (def.misc.gateBeats, r.misc.gateBeats) : r.misc.gateBeats;
-                if (r.maxPolyphony > 0 && (def.maxPolyphony == 0 || r.maxPolyphony < def.maxPolyphony))
-                    def.maxPolyphony = r.maxPolyphony;
+                    to.misc.gateBeats = to.misc.gateBeats > 0.0f ? std::min (to.misc.gateBeats, r.misc.gateBeats) : r.misc.gateBeats;
+                if (r.maxPolyphony > 0 && (to.maxPolyphony == 0 || r.maxPolyphony < to.maxPolyphony))
+                    to.maxPolyphony = r.maxPolyphony;
                 // the module's key range inside FL's key region
-                def.keyLow = std::max (def.keyLow, r.keyLow);
-                def.keyHigh = std::max (def.keyLow, std::min (def.keyHigh, r.keyHigh));
+                to.keyLow = std::max (to.keyLow, r.keyLow);
+                to.keyHigh = std::max (to.keyLow, std::min (to.keyHigh, r.keyHigh));
                 // the instrument's wrapper (Enable, Post Gain, Mix, Wet Pan; FLM_FORMAT §7.4): on FL's channel knobs
-                def.muted = def.muted || r.muted;
+                to.muted = to.muted || r.muted;
                 if (std::abs (r.volume - 1.0f) > 1.0e-4f)
                 {
                     // (LYNX's channel curve gain = (11^v − 1) / 10; its inverse)
-                    const auto gain = (double) channelGain (def.volume) * channelGain (r.volume) / channelGain (1.0f);
-                    def.volume = (float) std::clamp (std::log (10.0 * std::max (0.0, gain) + 1.0) / std::log (11.0), 0.0, 1.0);
+                    const auto gain = (double) channelGain (to.volume) * channelGain (r.volume) / channelGain (1.0f);
+                    to.volume = (float) std::clamp (std::log (10.0 * std::max (0.0, gain) + 1.0) / std::log (11.0), 0.0, 1.0);
                 }
-                def.pan = std::clamp (def.pan + r.pan, -1.0f, 1.0f);
+                to.pan = std::clamp (to.pan + r.pan, -1.0f, 1.0f);
+            };
+            if (auto rack = importFlmRackState (c.pluginState, flmOptions, song.bpm, def.name, &why); rack && ! rack->children.empty())
+            {
+                // round 190jv (FLM_FORMAT §8.2): several instruments. Every one of them plays every note inside its key
+                // range, as in a .flm: the channel becomes a Layer at 0 dB, centred, unpitched (it only hands its notes
+                // on), and each child is the rack's instrument on FL's channel exactly as a one-instrument rack would be
+                // (FL's volume, pan, pitch, porta, gate, polyphony and key region with the module's own on top), named
+                // after the module
+                FlmRackLayer group;
+                group.layer = (int) song.channels.size();
+                for (std::size_t k = 0; k < rack->children.size(); ++k)
+                {
+                    auto child = def;
+                    onFlChannel (child, rack->children[k]);
+                    child.name = rack->children[k].name;
+                    child.layer = {};
+                    child.flOrigin = {};
+                    child.mixerTrack = def.mixerTrack; // (its part of the rack: placed below, once the mixer exists)
+                    flmRackChildren.push_back (std::move (child));
+                }
+                def.instrument = InstrumentKind::layer;
+                def.layer = {};
+                def.plugin = {};
+                def.pluginState.clear();
+                def.modelParams = {};
+                def.samplePath.clear();
+                def.zones.clear();
+                def.volume = 1.0f;
+                def.pan = 0.0f;
+                def.sampler.pitch = 0.0f;
+                def.misc.rootNote = 60;
+                def.misc.levels = {};
+                // (a note's Time › Gate is the Layer's: the instruments' common gate, the shorter of it and FL's)
+                if (const auto gate = rack->channel.misc.gateBeats; gate > 0.0f)
+                    def.misc.gateBeats = def.misc.gateBeats > 0.0f ? std::min (def.misc.gateBeats, gate) : gate;
+                def.muted = def.muted || rack->channel.muted;
+                group.childPart = std::move (rack->childPart);
+                group.parts = std::move (rack->parts);
+                group.insertUsed = rack->insertUsed || ! group.parts.empty();
+                group.insert = std::move (rack->insert);
+                group.insert.name = def.name + " (FL Studio Mobile Rack)";
+                flmRackLayers.push_back (std::move (group));
+                if (! rack->noteEffects.empty())
+                    flmRackNoteFx.push_back ({ (int) song.channels.size(), std::move (rack->noteEffects) });
+                if (options.report != nullptr)
+                    ++options.report->converted["FL Studio Mobile Rack"];
+            }
+            else if (rack)
+            {
+                onFlChannel (def, rack->channel);
                 if (rack->insertUsed)
                 {
                     rack->insert.name = def.name + " (FL Studio Mobile Rack)";
                     flmRackInserts.push_back ({ (int) song.channels.size(), std::move (rack->insert) });
                 }
+                if (! rack->noteEffects.empty()) // round 190jv
+                    flmRackNoteFx.push_back ({ (int) song.channels.size(), std::move (rack->noteEffects) });
                 if (options.report != nullptr)
                     ++options.report->converted["FL Studio Mobile Rack"];
             }
@@ -2358,7 +2425,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
 
         // Export to FL Studio (round 171e): the original generator, written back while LYNX leaves it as imported (an FPC
         // becomes several channels and a wrapped plugin travels as its plugin reference: neither keeps one)
-        if (c.type == flp::ChannelType::instrument && ! c.pluginName.empty() && c.pluginName != "Fruity Wrapper" && c.pluginName != "FPC")
+        if (c.type == flp::ChannelType::instrument && ! c.pluginName.empty() && c.pluginName != "Fruity Wrapper" && c.pluginName != "FPC"
+            && flmRackChildren.empty()) // (round 190jv: a FL Studio Mobile Rack that became a Layer and its instruments)
         {
             def.flOrigin.plugin = c.pluginName;
             if (def.pluginState != c.pluginState)
@@ -2366,11 +2434,17 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
         }
 
         song.channels.push_back (std::move (def));
+        for (auto& child : flmRackChildren) // round 190jv
+        {
+            flmRackLayers.back().children.push_back ((int) song.channels.size());
+            song.channels.push_back (std::move (child));
+        }
     }
 
     // Layer children: FL's channel indices → LYNX's (children that did not become channels are dropped)
     for (auto& def : song.channels)
-        if (def.instrument == InstrumentKind::layer)
+        if (def.instrument == InstrumentKind::layer
+            && std::none_of (flmRackLayers.begin(), flmRackLayers.end(), [&] (const FlmRackLayer& g) { return &song.channels[(std::size_t) g.layer] == &def; }))
         {
             std::vector<int> mapped;
             for (const auto k : def.layer.children)
@@ -3406,6 +3480,42 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
         else if (options.report != nullptr)
             ++options.report->droppedEffects["FL Studio Mobile Rack: the rack's effects and level (the mixer is full)"];
     }
+    // round 190jv: each FL Studio Mobile Rack with several instruments: the Layer's children linked; the rack's insert
+    // after FL's as for one instrument (also when only its parts need it); the rack's parts in front of it, each sending
+    // into the next part or into the rack's insert at the level the .flm import gives it; each instrument on its part.
+    // When the mixer has no room, every instrument plays into the channel's FL insert (listed).
+    for (auto& g : flmRackLayers)
+    {
+        auto& layer = song.channels[(std::size_t) g.layer];
+        layer.layer.children = g.children;
+        const auto target = layer.mixerTrack;
+        if ((int) song.mixer.size() + (g.insertUsed ? 1 : 0) + (int) g.parts.size() > maxMixerTracks)
+        {
+            if (options.report != nullptr && g.insertUsed)
+                ++options.report->droppedEffects["FL Studio Mobile Rack: the rack's effects and level (the mixer is full)"];
+            continue;
+        }
+        auto rackInsert = target;
+        if (g.insertUsed)
+        {
+            g.insert.toMaster = target == 0;
+            song.mixer.push_back (std::move (g.insert));
+            rackInsert = (int) song.mixer.size() - 1;
+            if (target > 0)
+                song.setRoute (rackInsert, target, true, 1.0f);
+            layer.mixerTrack = rackInsert;
+        }
+        const auto first = (int) song.mixer.size();
+        for (auto& p : g.parts)
+        {
+            p.insert.toMaster = false;
+            song.mixer.push_back (std::move (p.insert));
+        }
+        for (std::size_t k = 0; k < g.parts.size(); ++k)
+            song.setRoute (first + (int) k, g.parts[k].into < 0 ? rackInsert : first + g.parts[k].into, true, g.parts[k].level);
+        for (std::size_t k = 0; k < g.children.size() && k < g.childPart.size(); ++k)
+            song.channels[(std::size_t) g.children[k]].mixerTrack = g.childPart[k] < 0 ? rackInsert : first + g.childPart[k];
+    }
 
     // the FL template routes every insert to the send tracks at level 0; that makes no sound, only wastes CPU
     for (auto& t : song.mixer)
@@ -3486,6 +3596,49 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
         {
             patternMap[src.index] = (int) song.patterns.size();
             song.patterns.push_back (std::move (p));
+        }
+    }
+
+    // round 190jv (FLM_FORMAT §7.2, §8.2): an FL Studio Mobile Rack's Transpose, Scale and Randomizer act on every note
+    // FL sends it, before its instruments: the same chain the .flm import runs over a lane's notes (core/FlmNoteFx.h),
+    // here over the channel's notes in every pattern (a Scale without Snap drops the notes it does not play, as FLM
+    // does; the Randomizer draws once, in pattern order)
+    for (const auto& [channel, modules] : flmRackNoteFx)
+    {
+        flmnotefx::Chain chain;
+        for (const auto& [type, params] : modules)
+            chain.add (type, params);
+        int dropped = 0;
+        for (auto& p : song.patterns)
+        {
+            std::vector<Note> kept;
+            kept.reserve (p.notes.size());
+            for (auto n : p.notes)
+            {
+                if (n.channel == channel)
+                {
+                    flmnotefx::Note played { n.key, n.velocity, 0.5f * (n.pan + 1.0f) };
+                    if (! chain.apply (played))
+                    {
+                        ++dropped;
+                        continue;
+                    }
+                    n.key = std::clamp (played.key, 0, 127);
+                    n.velocity = std::clamp (played.velocity, 0.0f, 1.0f);
+                    n.pan = std::clamp (2.0f * played.pan - 1.0f, -1.0f, 1.0f);
+                }
+                kept.push_back (n);
+            }
+            p.notes = std::move (kept);
+            p.sortNotes();
+        }
+        if (options.report != nullptr)
+        {
+            ++options.report->converted["FL Studio Mobile Rack: note effects (on the channel's notes)"];
+            if (dropped > 0)
+                options.report->converted["FL Studio Mobile: notes a note effect holds back (silent in FLM too)"] += dropped;
+            if (chain.random())
+                ++options.report->partialEffects["FL Studio Mobile: Randomizer (drawn once at import; FLM draws at every playback)"];
         }
     }
 

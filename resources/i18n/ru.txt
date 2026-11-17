@@ -10817,7 +10817,6 @@ countries: ru by kz
 "Not carried over or approximated:" = "Не перенесено или передано приближённо:"
 "... and {0} more" = "... и ещё {0}"
 
-# --- Round 190iu: issues #186 (wheel zones) and #191 (temporary tools, MIDI drops, lanes, Track-only mode, takes)
 
 # --- rollup 0.1.30 step 4: Save a copy for 0.1.28 knows rounds 190jh / 190jl / 190jg / 190jf / 190jd
 "Facet EQ's automatic dynamic thresholds play with the bands' manual threshold: {0}" = "Автоматические динамические пороги Facet EQ играют с ручным порогом полос: {0}"
@@ -10887,3 +10886,25 @@ countries: ru by kz
 "FL keeps the track header column at a fixed width. With this on, drag the column's right edge to make the headers wider (a double click there goes back to FL's width); the width is kept for every project. Also in the Playlist menu." = "В FL колонка заголовков дорожек имеет постоянную ширину. Если это включено, перетащите правый край колонки, чтобы расширить заголовки (двойной клик там возвращает ширину FL); ширина сохраняется для всех проектов. Также в меню Playlist."
 "A switch beside Stretch: while it is lit, a click on an empty spot with the Pencil or the Brush deselects and moves the song position there, a drag draws a selection box (as FL's Select tool), and a double click places the clip. Also in the Playlist menu." = "Переключатель рядом с «Растянуть»: пока он горит, клик по пустому месту Карандашом или Кистью снимает выделение и переносит туда позицию песни, перетаскивание рисует рамку выделения (как инструмент выделения FL), а двойной клик ставит клип. Также в меню Playlist."
 "A track that holds only automation clips of one instrument (or of a linked mixer track) is drawn right under that instrument's track, as a lane that folds with the track's arrow; the clips stay clips on their own tracks. On by default in the Clip-launch layout, as Live's lanes. Also in the Playlist menu." = "Дорожка, на которой только клипы автоматизации одного инструмента (или связанной дорожки микшера), рисуется сразу под дорожкой этого инструмента как полоса, которая сворачивается стрелкой дорожки; клипы остаются клипами на своих дорожках. По умолчанию включено в раскладке Clip-launch, как полосы Live. Также в меню Playlist."
+
+# --- round 190jv: Mixer menu › Trim unused tracks (FL's Remove unused tracks question)
+"Trim unused tracks" = "Убрать неиспользуемые дорожки"
+"Remove unused tracks" = "Удаление неиспользуемых дорожек"
+"Select the mixer track types to be removed." = "Выберите, какие дорожки микшера удалить."
+"Unlinked tracks only" = "Только несвязанные дорожки"
+"Unlinked and non-empty tracks" = "Несвязанные и непустые дорожки"
+"This will |delete| {0} unused mixer track(s). Are you sure?" = "Будет |удалено| неиспользуемых дорожек микшера: {0}. Продолжить?"
+"Trim unused mixer tracks" = "Удаление неиспользуемых дорожек микшера"
+"No unused mixer tracks" = "Нет неиспользуемых дорожек микшера"
+
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183)
+"Scale highlighting" = "Подсветка гаммы"
+
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183), FL arpeggiator patterns (prtools-0003)
+"FL arpeggiator pattern" = "Паттерн арпеджиатора FL"
+"None (the arpeggiator above)" = "Нет (арпеджиатор выше)"
+"Range (octaves)" = "Диапазон (октавы)"
+"Range mode" = "Режим диапазона"
+"Block" = "Блок"
+"Group notes" = "Группировать ноты"
+"The pattern could not be read." = "Не удалось прочитать паттерн."

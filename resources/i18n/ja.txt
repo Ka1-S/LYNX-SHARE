@@ -10817,7 +10817,6 @@ countries: jp
 "Not carried over or approximated:" = "移せなかったもの / 近似したもの:"
 "... and {0} more" = "... ほか {0} 件"
 
-# --- Round 190iu: issues #186 (wheel zones) and #191 (temporary tools, MIDI drops, lanes, Track-only mode, takes)
 
 # --- rollup 0.1.30 step 4: Save a copy for 0.1.28 knows rounds 190jh / 190jl / 190jg / 190jf / 190jd
 "Facet EQ's automatic dynamic thresholds play with the bands' manual threshold: {0}" = "Facet EQ の自動ダイナミックしきい値は、各バンドの手動しきい値で再生されます: {0}"
@@ -10887,3 +10886,25 @@ countries: jp
 "FL keeps the track header column at a fixed width. With this on, drag the column's right edge to make the headers wider (a double click there goes back to FL's width); the width is kept for every project. Also in the Playlist menu." = "FL ではトラックヘッダー列の幅は固定です。これをオンにすると、列の右端をドラッグしてヘッダーを広げられます（そこをダブルクリックすると FL の幅に戻ります）。幅はすべてのプロジェクトで使われます。Playlist メニューにもあります。"
 "A switch beside Stretch: while it is lit, a click on an empty spot with the Pencil or the Brush deselects and moves the song position there, a drag draws a selection box (as FL's Select tool), and a double click places the clip. Also in the Playlist menu." = "Stretch の隣のスイッチ：点灯中は、鉛筆またはブラシで空いている場所をクリックすると選択を解除してソング位置をそこへ移動し、ドラッグで選択枠を描き（FL の選択ツールと同じ）、ダブルクリックでクリップを配置します。Playlist メニューにもあります。"
 "A track that holds only automation clips of one instrument (or of a linked mixer track) is drawn right under that instrument's track, as a lane that folds with the track's arrow; the clips stay clips on their own tracks. On by default in the Clip-launch layout, as Live's lanes. Also in the Playlist menu." = "1 つのインストゥルメント（またはリンクされたミキサートラック）のオートメーションクリップだけを含むトラックは、そのインストゥルメントのトラックのすぐ下に、トラックの矢印で折りたためるレーンとして表示されます。クリップは自分のトラック上のクリップのままです。Live のレーンと同じく Clip-launch レイアウトでは既定でオン。Playlist メニューにもあります。"
+
+# --- round 190jv: Mixer menu › Trim unused tracks (FL's Remove unused tracks question)
+"Trim unused tracks" = "未使用トラックを整理"
+"Remove unused tracks" = "未使用トラックの削除"
+"Select the mixer track types to be removed." = "削除するミキサートラックの種類を選択してください。"
+"Unlinked tracks only" = "リンクのないトラックのみ"
+"Unlinked and non-empty tracks" = "リンクのないトラックと空でないトラック"
+"This will |delete| {0} unused mixer track(s). Are you sure?" = "未使用のミキサートラック {0} 個を|削除|します。よろしいですか？"
+"Trim unused mixer tracks" = "未使用ミキサートラックの整理"
+"No unused mixer tracks" = "未使用のミキサートラックはありません"
+
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183)
+"Scale highlighting" = "スケールのハイライト"
+
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183), FL arpeggiator patterns (prtools-0003)
+"FL arpeggiator pattern" = "FL アルペジエーターのパターン"
+"None (the arpeggiator above)" = "なし (上のアルペジエーター)"
+"Range (octaves)" = "レンジ (オクターブ)"
+"Range mode" = "レンジモード"
+"Block" = "ブロック"
+"Group notes" = "ノートをグループ化"
+"The pattern could not be read." = "パターンを読み込めませんでした。"

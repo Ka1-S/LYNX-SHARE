@@ -10817,7 +10817,6 @@ countries: fr be ch ca lu
 "Not carried over or approximated:" = "Non repris ou approché :"
 "... and {0} more" = "... et {0} de plus"
 
-# --- Round 190iu: issues #186 (wheel zones) and #191 (temporary tools, MIDI drops, lanes, Track-only mode, takes)
 
 # --- rollup 0.1.30 step 4: Save a copy for 0.1.28 knows rounds 190jh / 190jl / 190jg / 190jf / 190jd
 "Facet EQ's automatic dynamic thresholds play with the bands' manual threshold: {0}" = "Les seuils dynamiques automatiques de Facet EQ jouent avec le seuil manuel des bandes : {0}"
@@ -10887,3 +10886,25 @@ countries: fr be ch ca lu
 "FL keeps the track header column at a fixed width. With this on, drag the column's right edge to make the headers wider (a double click there goes back to FL's width); the width is kept for every project. Also in the Playlist menu." = "FL garde la colonne des en-têtes de piste à une largeur fixe. Avec ceci activé, glissez le bord droit de la colonne pour élargir les en-têtes (un double clic à cet endroit revient à la largeur de FL) ; la largeur est gardée pour tous les projets. Aussi dans le menu de la Playlist."
 "A switch beside Stretch: while it is lit, a click on an empty spot with the Pencil or the Brush deselects and moves the song position there, a drag draws a selection box (as FL's Select tool), and a double click places the clip. Also in the Playlist menu." = "Un bouton à côté d'Étirer : tant qu'il est allumé, un clic sur un emplacement vide avec le Crayon ou le Pinceau désélectionne et y place la position du morceau, un glisser trace un cadre de sélection (comme l'outil Sélection de FL) et un double clic place le clip. Aussi dans le menu de la Playlist."
 "A track that holds only automation clips of one instrument (or of a linked mixer track) is drawn right under that instrument's track, as a lane that folds with the track's arrow; the clips stay clips on their own tracks. On by default in the Clip-launch layout, as Live's lanes. Also in the Playlist menu." = "Une piste qui ne contient que des clips d'automation d'un instrument (ou d'une piste de mixage liée) est dessinée juste sous la piste de cet instrument, comme un couloir qui se replie avec la flèche de la piste ; les clips restent des clips sur leurs propres pistes. Activé par défaut dans la disposition Clip-launch, comme les couloirs de Live. Aussi dans le menu de la Playlist."
+
+# --- round 190jv: Mixer menu › Trim unused tracks (FL's Remove unused tracks question)
+"Trim unused tracks" = "Retirer les pistes inutilisées"
+"Remove unused tracks" = "Retirer les pistes inutilisées"
+"Select the mixer track types to be removed." = "Choisissez les types de pistes de Mixer à retirer."
+"Unlinked tracks only" = "Pistes non liées seulement"
+"Unlinked and non-empty tracks" = "Pistes non liées et non vides"
+"This will |delete| {0} unused mixer track(s). Are you sure?" = "Cela va |supprimer| {0} piste(s) de Mixer inutilisée(s). Continuer ?"
+"Trim unused mixer tracks" = "Retirer les pistes de Mixer inutilisées"
+"No unused mixer tracks" = "Aucune piste de Mixer inutilisée"
+
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183)
+"Scale highlighting" = "Surlignage de la gamme"
+
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183), FL arpeggiator patterns (prtools-0003)
+"FL arpeggiator pattern" = "Motif de l'arpégiateur de FL"
+"None (the arpeggiator above)" = "Aucun (l'arpégiateur ci-dessus)"
+"Range (octaves)" = "Étendue (octaves)"
+"Range mode" = "Mode d'étendue"
+"Block" = "Bloc"
+"Group notes" = "Grouper les notes"
+"The pattern could not be read." = "Le motif n'a pas pu être lu."

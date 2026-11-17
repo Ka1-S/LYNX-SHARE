@@ -3831,8 +3831,17 @@ void AudioEngine::saveUndoStep()
     nextRemoteHistoryStep = false;
     // Dozens of edits arrive during a drag; only the first one of the click saves the state.
     bool samePress = false;
+    const auto buttonDown = juce::ModifierKeys::currentModifiers.isAnyMouseButtonDown();
+    if (gestureOpen && gestureRealMouse && ! buttonDown && ! gestureEnding)
+        gestureOpen = false; // (its mouseUp never came: the gesture is over)
 
-    if (juce::ModifierKeys::currentModifiers.isAnyMouseButtonDown())
+    if (gestureOpen) // (round 190jv: one step per gesture, whatever input source drives it)
+    {
+        samePress = gestureSaved;
+        gestureSaved = true;
+        lastUndoPress = buttonDown ? juce::Desktop::getInstance().getMainMouseSource().getLastMouseDownTime() : juce::Time();
+    }
+    else if (buttonDown)
     {
         const auto press = juce::Desktop::getInstance().getMainMouseSource().getLastMouseDownTime();
         samePress = press == lastUndoPress;
@@ -3841,6 +3850,7 @@ void AudioEngine::saveUndoStep()
     else
     {
         lastUndoPress = {};
+        gestureSaved = false;
     }
 
     if (! samePress)
@@ -3865,6 +3875,22 @@ void AudioEngine::saveUndoStep()
     }
     if (sessionHistory)
         sessionAfterOpen = true;
+}
+
+void AudioEngine::beginUndoGesture() noexcept
+{
+    // (a gesture that is still open lost its mouseUp: this press starts a new one)
+    gestureOpen = true;
+    gestureSaved = false;
+    gestureEnding = false;
+    gestureRealMouse = juce::ModifierKeys::currentModifiers.isAnyMouseButtonDown();
+}
+
+void AudioEngine::endUndoGesture() noexcept
+{
+    gestureOpen = false;
+    gestureSaved = false;
+    gestureEnding = false;
 }
 
 void AudioEngine::editSong (const std::function<void (Song&)>& edit, bool undoable)
@@ -4010,6 +4036,7 @@ void AudioEngine::sessionStep (bool redo)
         song = std::move (next);
         modified = true;
         lastUndoPress = {};
+        gestureSaved = false;
         clipops::updateCrossfades (song);
         levelsPending = false;
         publishSong();
@@ -4042,6 +4069,7 @@ void AudioEngine::applyRemote (Song remote)
 {
     closeSessionStep();
     lastUndoPress = {}; // (a drag that goes on after this is a new step: its "before" has the remote change)
+    gestureSaved = false;
     song = std::move (remote);
     clipops::updateCrossfades (song);
     publishSong();
@@ -4086,6 +4114,7 @@ void AudioEngine::historyStep (bool redo)
         modified = true;
         levelsPending = false;
         lastUndoPress = {};
+        gestureSaved = false;
         publishSong();
         const auto fence = finishRemoteHistory (before);
         if (remote && ! remoteHistoryFailed)
@@ -4200,6 +4229,7 @@ void AudioEngine::jumpToHistory (int index)
 
     modified = true;
     lastUndoPress = {};
+    gestureSaved = false;
     levelsPending = false;
     publishSong();
 }
@@ -7132,6 +7162,7 @@ bool AudioEngine::editSongRemoteTransaction (const std::function<void (Song&)>& 
         song = std::move (before); // capture live state in the owned undo step, without adding a separate step
         remote_history::mirrorCapturedHostedStates (song, lastPublishedShape.song);
         lastUndoPress = {};
+        gestureSaved = false;
         levelsPending = false;
         const juce::ScopedValueSetter<bool> remoteStep (nextRemoteHistoryStep, true);
         const juce::ScopedValueSetter<std::unordered_set<std::uint64_t>> freshPolicy (remoteFreshInstances, fresh);

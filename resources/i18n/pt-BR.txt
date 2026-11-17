@@ -10947,7 +10947,6 @@ countries: br
 "Not carried over or approximated:" = "Não levado ou aproximado:"
 "... and {0} more" = "... e mais {0}"
 
-# --- Round 190iu: issues #186 (wheel zones) and #191 (temporary tools, MIDI drops, lanes, Track-only mode, takes)
 
 # --- rollup 0.1.30 step 4: Save a copy for 0.1.28 knows rounds 190jh / 190jl / 190jg / 190jf / 190jd
 "Facet EQ's automatic dynamic thresholds play with the bands' manual threshold: {0}" = "Os limiares dinâmicos automáticos do Facet EQ tocam com o limiar manual das bandas: {0}"
@@ -11017,3 +11016,25 @@ countries: br
 "FL keeps the track header column at a fixed width. With this on, drag the column's right edge to make the headers wider (a double click there goes back to FL's width); the width is kept for every project. Also in the Playlist menu." = "O FL mantém a coluna de cabeçalhos das trilhas com largura fixa. Com isto ligado, arraste a borda direita da coluna para alargar os cabeçalhos (um clique duplo ali volta à largura do FL); a largura vale para todos os projetos. Também no menu da Playlist."
 "A switch beside Stretch: while it is lit, a click on an empty spot with the Pencil or the Brush deselects and moves the song position there, a drag draws a selection box (as FL's Select tool), and a double click places the clip. Also in the Playlist menu." = "Um botão ao lado de Esticar: enquanto aceso, um clique num espaço vazio com o Lápis ou o Pincel desmarca e move a posição da música até ali, arrastar desenha uma caixa de seleção (como a ferramenta Selecionar do FL) e um clique duplo coloca o clipe. Também no menu da Playlist."
 "A track that holds only automation clips of one instrument (or of a linked mixer track) is drawn right under that instrument's track, as a lane that folds with the track's arrow; the clips stay clips on their own tracks. On by default in the Clip-launch layout, as Live's lanes. Also in the Playlist menu." = "Uma trilha que só tem clipes de automação de um instrumento (ou de uma trilha de mixer vinculada) é desenhada logo abaixo da trilha desse instrumento, como uma faixa que se recolhe com a seta da trilha; os clipes continuam clipes nas suas próprias trilhas. Ligado por padrão no layout Clip-launch, como as faixas do Live. Também no menu da Playlist."
+
+# --- round 190jv: Mixer menu › Trim unused tracks (FL's Remove unused tracks question)
+"Trim unused tracks" = "Aparar faixas sem uso"
+"Remove unused tracks" = "Remover faixas sem uso"
+"Select the mixer track types to be removed." = "Escolha os tipos de faixas do Mixer que serão removidas."
+"Unlinked tracks only" = "Só faixas sem vínculo"
+"Unlinked and non-empty tracks" = "Faixas sem vínculo e não vazias"
+"This will |delete| {0} unused mixer track(s). Are you sure?" = "Isto vai |excluir| {0} faixa(s) do Mixer sem uso. Tem certeza?"
+"Trim unused mixer tracks" = "Aparar faixas do Mixer sem uso"
+"No unused mixer tracks" = "Nenhuma faixa do Mixer sem uso"
+
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183)
+"Scale highlighting" = "Destaque da escala"
+
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183), FL arpeggiator patterns (prtools-0003)
+"FL arpeggiator pattern" = "Padrão do arpejador do FL"
+"None (the arpeggiator above)" = "Nenhum (o arpejador acima)"
+"Range (octaves)" = "Extensão (oitavas)"
+"Range mode" = "Modo da extensão"
+"Block" = "Bloco"
+"Group notes" = "Agrupar notas"
+"The pattern could not be read." = "Não foi possível ler o padrão."

@@ -63,6 +63,34 @@ std::vector<int> linkChannels (Song& song, const std::vector<int>& channels, int
 // Mixer › "Remove unused inserts at the end"). Returns how many were removed.
 int removeUnusedTrailingInserts (Song& song, int keep = 0);
 
+// --- FL's Mixer menu › Options › "Trim unused tracks" (round 190jv; REA FUN_012a6920 / FUN_012a65c0 / FUN_0127bcc0 /
+// FUN_012a5280 in FLEngine_x64.dll, docs/analise/REA_rodada190jv.md) ---------------------------------------------------
+// FL asks "Select the mixer track types to be removed." with two exclusive choices:
+enum class TrimUnused
+{
+    unlinkedOnly,       // "Unlinked tracks only" (the default): unlinked, no effect and no name of its own
+    unlinkedAndNonEmpty // "Unlinked and non-empty tracks": every unlinked track, also with effects or a name
+};
+// FL's "linked" test of insert `t` (FUN_0127bcc0): a channel plays into it, a Playlist audio track is linked to it, or a
+// route goes from another insert into it or from it to another insert (a level-0 sidechain route too; the route to the
+// Master does not count). FL ignores a fader, pan, mute, colour, audio input or automation (a track in that state is
+// trimmed). LYNX adds the plugins' own references to an insert (a side-chain source, Fruity Send / Patcher / Transmitter /
+// EQUO / Transporter sends, a hosted plugin's routed outputs, Soundfont reverb / chorus, Voltage Controller outputs):
+// FL refuses the whole trim while any plugin has such "side routing" (it cannot renumber them), LYNX renumbers them, so
+// such an insert just counts as linked. The Master is always linked.
+bool insertLinked (const Song& song, int t);
+// FL's "non-empty" insert (FUN_0127c030 / record +0x0C): an effect in a slot, or a name of its own.
+bool insertNonEmpty (const Song& song, int t);
+// The inserts "Trim unused tracks" removes in `mode`, ascending (never the Master).
+std::vector<int> unusedTracks (const Song& song, TrimUnused mode);
+// Removes `tracks` (FL's trim, FUN_012a5280 with flags 0x11: no rerouting of feeders, one undo step "trim unused mixer
+// tracks"): the inserts above move down, every reference follows (channels, Playlist tracks, sends, side-chains, slot
+// sends, automation, links, VCAs, snapshots), default names follow their new number, and the mixer gets shorter by
+// that many — it does not keep its count as Delete does. Returns how many were removed.
+int trimTracks (Song& song, std::vector<int> tracks);
+// unusedTracks + trimTracks in one call (what the menu item does after "Yes").
+int trimUnusedTracks (Song& song, TrimUnused mode);
+
 // Mixer menu › "Show only used inserts" (round 163; the rule made exact in round 190am): which strips take no room.
 // An insert is hidden only when ALL of these hold:
 //  - it is not the Master;

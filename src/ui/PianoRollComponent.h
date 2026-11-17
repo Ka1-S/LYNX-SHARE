@@ -192,6 +192,12 @@ public:
     double playheadForSnapshot() const noexcept { return playheadTick; }
     EditTool currentTool() const noexcept { return tools.getTool(); } // (round 190iu: temporary tools)
     void setScaleForSnapshot (int root, int scale) { setScale (root, scale); }
+    // round 190jv: View › Scale highlighting › Automatic on / off, and the key it guessed (scaledetect; -1 none)
+    void setAutoScale (bool on) { scaleBox.setSelectedId (on ? autoScaleId : 1, juce::sendNotificationSync); }
+    bool isAutoScaleForTests() const { return isAutoScale(); }
+    int autoScaleKeyForTests() { updateAutoKey(); return isAutoScale() ? autoKey : -1; }
+    juce::PopupMenu getViewMenuForSnapshot() { return viewMenu(); }
+    juce::PopupMenu getScaleHighlightMenuForSnapshot() { return scaleHighlightMenu(); }
     // The scale the rows show (LYNX's scale list index, 0 = none) on `root` (round 190ds: the Simple dock's "Only notes
     // in key" sets the project key here before folding)
     void setScale (int root, int scale) { scaleBox.setSelectedId (scale <= 0 ? 1 : scale * 100 + root + 1, juce::sendNotificationSync); }
@@ -236,6 +242,8 @@ public:
     void toggleEventPaneAlternate();
     void resetEventPane();
     int eventPaneBarTopForTests() const noexcept { return eventPaneBarTop; }
+    // --undogesture190jv (round 190jv): the middle of the row of `key` at `tick`, in this component's coordinates
+    juce::Point<int> pointForTests (std::int64_t tick, int key) const { return { (int) tickToX ((double) tick), (keyToY (key) + keyToY (key - 1)) / 2 }; }
 
     static constexpr int keyboardWidth = 72;
     static constexpr int blackKeyWidth = keyboardWidth * 16 / 25; // FL's black keys: 64 % of the keyboard (round 190jo FM-17; was 3 / 5)
@@ -440,7 +448,18 @@ private:
     bool chordTopDown = false; // the chord stamp puts the clicked key on top (FL 2026's top-down mode)
     bool inScale (int key) const;
     int scaleRoot() const;  // 0..11
-    int scaleIndex() const; // index into notetools::scales(), 0 = none
+    int scaleIndex() const; // index into notetools::scales(), 0 = none (also Automatic)
+    // FL's View › Scale highlighting › Automatic (round 190jv, core/ScaleDetect.h): the scale box's item, the key guessed
+    // from the edited notes (scaledetect: 0..11 major, 12..23 minor, -1 none) and what it was guessed from
+    static constexpr int autoScaleId = 2; // (between "No scale" = 1 and the scales, s * 100 + root + 1)
+    bool isAutoScale() const { return scaleBox.getSelectedId() == autoScaleId; }
+    void updateAutoKey();
+    int autoKey = -1;
+    bool autoKeyValid = false, autoKeyAllChannels = false;
+    std::uint64_t autoKeyStamp = 0;
+    int autoKeyPattern = -1, autoKeyChannel = -1;
+    std::vector<int> autoKeySelection;
+    juce::PopupMenu scaleHighlightMenu(); // View › Scale highlighting
     int snapKey (int key) const; // the key itself, or the nearest in-scale key while scale snap is on
     scalesnap::Scale snapScale() const; // the chosen scale and the Snap to scale switch (core/ScaleSnap.h)
     void publishScale();

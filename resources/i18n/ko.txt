@@ -10817,7 +10817,6 @@ countries: kr
 "Not carried over or approximated:" = "옮기지 못했거나 근사한 항목:"
 "... and {0} more" = "... 외 {0}개"
 
-# --- Round 190iu: issues #186 (wheel zones) and #191 (temporary tools, MIDI drops, lanes, Track-only mode, takes)
 
 # --- rollup 0.1.30 step 4: Save a copy for 0.1.28 knows rounds 190jh / 190jl / 190jg / 190jf / 190jd
 "Facet EQ's automatic dynamic thresholds play with the bands' manual threshold: {0}" = "Facet EQ의 자동 다이내믹 임계값은 밴드의 수동 임계값으로 재생됩니다: {0}"
@@ -10887,3 +10886,25 @@ countries: kr
 "FL keeps the track header column at a fixed width. With this on, drag the column's right edge to make the headers wider (a double click there goes back to FL's width); the width is kept for every project. Also in the Playlist menu." = "FL은 트랙 헤더 열의 너비를 고정합니다. 이 옵션을 켜면 열의 오른쪽 가장자리를 드래그해 헤더를 넓힐 수 있습니다(그곳을 더블 클릭하면 FL 너비로 돌아갑니다). 너비는 모든 프로젝트에 유지됩니다. Playlist 메뉴에도 있습니다."
 "A switch beside Stretch: while it is lit, a click on an empty spot with the Pencil or the Brush deselects and moves the song position there, a drag draws a selection box (as FL's Select tool), and a double click places the clip. Also in the Playlist menu." = "Stretch 옆의 스위치: 켜져 있는 동안 연필이나 브러시로 빈 곳을 클릭하면 선택을 해제하고 곡 위치를 그곳으로 옮기며, 드래그하면 선택 상자를 그리고(FL의 선택 도구처럼), 더블 클릭하면 클립을 놓습니다. Playlist 메뉴에도 있습니다."
 "A track that holds only automation clips of one instrument (or of a linked mixer track) is drawn right under that instrument's track, as a lane that folds with the track's arrow; the clips stay clips on their own tracks. On by default in the Clip-launch layout, as Live's lanes. Also in the Playlist menu." = "한 악기(또는 연결된 믹서 트랙)의 오토메이션 클립만 있는 트랙은 그 악기 트랙 바로 아래에 트랙의 화살표로 접히는 레인으로 그려집니다. 클립은 자기 트랙의 클립 그대로입니다. Live의 레인처럼 Clip-launch 레이아웃에서는 기본으로 켜져 있습니다. Playlist 메뉴에도 있습니다."
+
+# --- round 190jv: Mixer menu › Trim unused tracks (FL's Remove unused tracks question)
+"Trim unused tracks" = "사용하지 않는 트랙 정리"
+"Remove unused tracks" = "사용하지 않는 트랙 제거"
+"Select the mixer track types to be removed." = "제거할 믹서 트랙 종류를 선택하세요."
+"Unlinked tracks only" = "연결되지 않은 트랙만"
+"Unlinked and non-empty tracks" = "연결되지 않은 트랙과 비어 있지 않은 트랙"
+"This will |delete| {0} unused mixer track(s). Are you sure?" = "사용하지 않는 믹서 트랙 {0}개를 |삭제|합니다. 계속할까요?"
+"Trim unused mixer tracks" = "사용하지 않는 믹서 트랙 정리"
+"No unused mixer tracks" = "사용하지 않는 믹서 트랙이 없습니다"
+
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183)
+"Scale highlighting" = "스케일 하이라이트"
+
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183), FL arpeggiator patterns (prtools-0003)
+"FL arpeggiator pattern" = "FL 아르페지에이터 패턴"
+"None (the arpeggiator above)" = "없음 (위의 아르페지에이터)"
+"Range (octaves)" = "범위 (옥타브)"
+"Range mode" = "범위 모드"
+"Block" = "블록"
+"Group notes" = "노트 그룹화"
+"The pattern could not be read." = "패턴을 읽을 수 없습니다."

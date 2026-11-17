@@ -10817,7 +10817,6 @@ countries: nl be
 "Not carried over or approximated:" = "Niet meegenomen of benaderd:"
 "... and {0} more" = "... en nog {0}"
 
-# --- Round 190iu: issues #186 (wheel zones) and #191 (temporary tools, MIDI drops, lanes, Track-only mode, takes)
 
 # --- rollup 0.1.30 step 4: Save a copy for 0.1.28 knows rounds 190jh / 190jl / 190jg / 190jf / 190jd
 "Facet EQ's automatic dynamic thresholds play with the bands' manual threshold: {0}" = "De automatische dynamische drempels van Facet EQ spelen met de handmatige drempel van de banden: {0}"
@@ -10887,3 +10886,25 @@ countries: nl be
 "FL keeps the track header column at a fixed width. With this on, drag the column's right edge to make the headers wider (a double click there goes back to FL's width); the width is kept for every project. Also in the Playlist menu." = "FL houdt de kolom met trackkoppen op een vaste breedte. Met deze optie aan sleep je de rechterrand van de kolom om de koppen breder te maken (een dubbelklik daar gaat terug naar de breedte van FL); de breedte geldt voor elk project. Ook in het Playlist-menu."
 "A switch beside Stretch: while it is lit, a click on an empty spot with the Pencil or the Brush deselects and moves the song position there, a drag draws a selection box (as FL's Select tool), and a double click places the clip. Also in the Playlist menu." = "Een schakelaar naast Stretch: zolang die brandt, deselecteert een klik op een lege plek met het Potlood of de Kwast en zet de songpositie daar, slepen tekent een selectiekader (zoals FL's Selecteer-gereedschap) en een dubbelklik plaatst de clip. Ook in het Playlist-menu."
 "A track that holds only automation clips of one instrument (or of a linked mixer track) is drawn right under that instrument's track, as a lane that folds with the track's arrow; the clips stay clips on their own tracks. On by default in the Clip-launch layout, as Live's lanes. Also in the Playlist menu." = "Een track met alleen automatiseringsclips van één instrument (of van een gekoppelde mixertrack) wordt direct onder de track van dat instrument getekend, als een baan die met de pijl van de track inklapt; de clips blijven clips op hun eigen tracks. Standaard aan in de Clip-launch-indeling, zoals de banen van Live. Ook in het Playlist-menu."
+
+# --- round 190jv: Mixer menu › Trim unused tracks (FL's Remove unused tracks question)
+"Trim unused tracks" = "Ongebruikte sporen opruimen"
+"Remove unused tracks" = "Ongebruikte sporen verwijderen"
+"Select the mixer track types to be removed." = "Kies welke soorten mixersporen verwijderd worden."
+"Unlinked tracks only" = "Alleen ongekoppelde sporen"
+"Unlinked and non-empty tracks" = "Ongekoppelde en niet-lege sporen"
+"This will |delete| {0} unused mixer track(s). Are you sure?" = "Hiermee worden {0} ongebruikte mixersporen |verwijderd|. Weet je het zeker?"
+"Trim unused mixer tracks" = "Ongebruikte mixersporen opruimen"
+"No unused mixer tracks" = "Geen ongebruikte mixersporen"
+
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183)
+"Scale highlighting" = "Toonladder markeren"
+
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183), FL arpeggiator patterns (prtools-0003)
+"FL arpeggiator pattern" = "FL-arpeggiatorpatroon"
+"None (the arpeggiator above)" = "Geen (de arpeggiator hierboven)"
+"Range (octaves)" = "Bereik (octaven)"
+"Range mode" = "Bereikmodus"
+"Block" = "Blok"
+"Group notes" = "Noten groeperen"
+"The pattern could not be read." = "Het patroon kon niet worden gelezen."

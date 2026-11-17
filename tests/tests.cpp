@@ -17864,3 +17864,8 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Polish190jpTests.inc" // round 190jp: Theme Adjustments and colour dots, bold interface text, Simple follow-ups
 #include "LiveLook190jnTests.inc" // round 190jn: the Clip-launch layout in Live's look (the Info View key)
 #include "Playlist190jqTests.inc" // round 190jq: Playlist header width (#164), pointer click (#191), automation clip lanes (#191.3)
+#include "Slides190jvTests.inc" // round 190jv: FL's stepped slide notes on its native generators
+#include "Trim190jvTests.inc" // round 190jv: Mixer › Trim unused tracks (FL's Remove unused tracks)
+#include "Pr190jvTests.inc" // round 190jv: Piano roll Scale highlighting › Automatic (FL's key guess)
+#include "PrArp190jvTests.inc" // round 190jv: FL's Piano roll arpeggiator patterns (TPRArpForm law)
+#include "Flm190jvTests.inc" // round 190jv: FL Studio Mobile racks with several instruments / an effect first (BUILD-LIST 19)

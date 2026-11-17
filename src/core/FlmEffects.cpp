@@ -263,9 +263,22 @@ void pitcher2 (const flm::Module& m, Mapped& out)
         if (v (1 + k, (cMinor >> k) & 1u ? 1.0f : 0.0f) > 0.5f)
             allowed |= (std::uint16_t) (1u << k);
     auto slot = tuneSlot (allowed);
-    // Speed: four one-poles at (200^v − 0.9)·2.29896 Hz on the target; LYNX's one pole matched at the half-way time
+    // round 190jv [EXEC: FL's render of the Rack generator, rea flm.md §4]: Pitcher 2 looks for the allowed notes in the
+    // sung note's own octave (C … B) — with only D allowed, A4 and B4 land on D4, not on the nearer D5 (Pitcher does take
+    // D5). So a pitch class with allowed notes only below it in its octave goes down, one with allowed notes only above
+    // it goes up (LYNX Tune's per-note direction); with both, the nearest is the octave's own
+    for (int k = 0; k < 12; ++k)
+        if (((allowed >> k) & 1u) == 0)
+        {
+            const auto below = (allowed & ((1u << k) - 1u)) != 0, above = (allowed >> (k + 1)) != 0;
+            slot.params[(std::size_t) (lt::noteDirC + k)] = below && ! above ? 1.0f : above && ! below ? 0.5f : 0.0f;
+        }
+    // Speed: four one-poles at (200^v − 0.9)·2.29896 Hz on the target. Round 190jv [EXEC: FL's renders at Speed 0, 0.1,
+    // 0.25, 0.5, 1, rea flm.md §4]: FL lands a target change at the cascade's 90 % time (5.32 stage τ) plus ~25 ms of
+    // detection, and never faster than ~45 ms; LYNX's one pole (90 % at 2.30 τ) is matched there — τ = 2.31 stage τ,
+    // at least 9 ms (round 190de matched the half-way time, 5.30 stage τ: up to 2.3× too slow, too fast at Speed 1)
     const auto fc = (std::pow (200.0, (double) v (13, 0.5f)) - 0.9) * 2.29896;
-    slot.params[lt::retune] = retuneValue (1000.0 * 5.30 / (2.0 * 3.14159265358979 * std::max (fc, 1.0e-3)));
+    slot.params[lt::retune] = retuneValue (std::max (1000.0 * 2.31 / (2.0 * 3.14159265358979 * std::max (fc, 1.0e-3)), 9.0));
     slot.params[lt::formantPreserve] = v (16, 0.0f) == 0.0f ? 1.0f : 0.0f; // (the module's flag is inverted)
     if (std::abs (v (17, 0.5f) - 0.5f) > 1e-4f)
     {
@@ -276,6 +289,10 @@ void pitcher2 (const flm::Module& m, Mapped& out)
     slot.params[lt::toleranceCents] = (float) std::clamp ((50.0 * stability - 3.0) / 40.0, 0.0, 1.0);
     slot.params[lt::mix] = std::clamp (v (22, 1.0f), 0.0f, 1.0f);
     slot.params[lt::lowLatency] = v (25, 0.0f) != 0.0f ? 1.0f : 0.0f;
+    // round 190jv [EXEC: FL's renders of a held sine, rea flm.md §4.3]: Pitcher 2's output is 1/√2 of its input when
+    // nothing is shifted (−3.02 dB, both formant modes), ~1.4 dB less while it shifts; LYNX Tune passes at 0 dB: the
+    // structural −3.01 dB as LYNX Tune's output trim (−24 … +24 dB)
+    slot.params[lt::outputTrim] = (float) ((24.0 - 20.0 * std::log10 (std::sqrt (2.0))) / 48.0);
     slot.params[lt::range] = 1.0f;
     out.partial.push_back ("FL Studio Mobile: Pitcher 2 (LYNX Tune's detector, shifter and retune curve)");
     if (v (20, 0.0f) > 1e-4f)

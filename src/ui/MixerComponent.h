@@ -175,6 +175,10 @@ public:
     // audio / instrument track is linked to one of them, "Delete tracks and channels" / "Unlink tracks and channels"
     void deleteTracks (std::vector<int> tracks);
     void deleteSelectedTracks() { deleteTracks (selection); }
+    // FL's Mixer menu › "Trim unused tracks" (round 190jv, REA FUN_012a6920): "Remove unused tracks" with the two
+    // choices, then "This will delete N unused mixer track(s). Are you sure?" (Remember my choice: Manage messages ›
+    // "Trim unused mixer tracks"); one undo step. Nothing is asked when no track is unused.
+    void trimUnusedTracks();
     // The insert's right-click menu (FL's mixer track menu, REA rounds 115/134/143); public for --snapshot and tests.
     juce::PopupMenu buildMenu (int track);
     juce::PopupMenu buildSendMenu (int track); // the route arrow / send knob menu from the selected track to `track`

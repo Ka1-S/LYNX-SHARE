@@ -10817,7 +10817,6 @@ countries: id
 "Not carried over or approximated:" = "Tidak terbawa atau didekati:"
 "... and {0} more" = "... dan {0} lagi"
 
-# --- Round 190iu: issues #186 (wheel zones) and #191 (temporary tools, MIDI drops, lanes, Track-only mode, takes)
 
 # --- rollup 0.1.30 step 4: Save a copy for 0.1.28 knows rounds 190jh / 190jl / 190jg / 190jf / 190jd
 "Facet EQ's automatic dynamic thresholds play with the bands' manual threshold: {0}" = "Ambang dinamis otomatis Facet EQ diputar dengan ambang manual band: {0}"
@@ -10887,3 +10886,25 @@ countries: id
 "FL keeps the track header column at a fixed width. With this on, drag the column's right edge to make the headers wider (a double click there goes back to FL's width); the width is kept for every project. Also in the Playlist menu." = "FL menjaga kolom kepala trek pada lebar tetap. Bila ini aktif, seret tepi kanan kolom untuk melebarkan kepala trek (klik ganda di sana kembali ke lebar FL); lebarnya disimpan untuk semua proyek. Juga di menu Playlist."
 "A switch beside Stretch: while it is lit, a click on an empty spot with the Pencil or the Brush deselects and moves the song position there, a drag draws a selection box (as FL's Select tool), and a double click places the clip. Also in the Playlist menu." = "Sakelar di samping Stretch: selama menyala, klik di tempat kosong dengan Pensil atau Kuas membatalkan pilihan dan memindahkan posisi lagu ke sana, menyeret menggambar kotak pilihan (seperti alat Pilih FL), dan klik ganda menaruh klip. Juga di menu Playlist."
 "A track that holds only automation clips of one instrument (or of a linked mixer track) is drawn right under that instrument's track, as a lane that folds with the track's arrow; the clips stay clips on their own tracks. On by default in the Clip-launch layout, as Live's lanes. Also in the Playlist menu." = "Trek yang hanya berisi klip otomasi dari satu instrumen (atau trek mixer yang ditautkan) digambar tepat di bawah trek instrumen itu, sebagai jalur yang dilipat dengan panah trek; klip tetap klip di treknya sendiri. Aktif secara bawaan di tata letak Clip-launch, seperti jalur Live. Juga di menu Playlist."
+
+# --- round 190jv: Mixer menu › Trim unused tracks (FL's Remove unused tracks question)
+"Trim unused tracks" = "Pangkas trek tak terpakai"
+"Remove unused tracks" = "Hapus trek tak terpakai"
+"Select the mixer track types to be removed." = "Pilih jenis trek Mixer yang akan dihapus."
+"Unlinked tracks only" = "Hanya trek tak tertaut"
+"Unlinked and non-empty tracks" = "Trek tak tertaut dan tidak kosong"
+"This will |delete| {0} unused mixer track(s). Are you sure?" = "Ini akan |menghapus| {0} trek Mixer tak terpakai. Yakin?"
+"Trim unused mixer tracks" = "Pangkas trek Mixer tak terpakai"
+"No unused mixer tracks" = "Tidak ada trek Mixer tak terpakai"
+
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183)
+"Scale highlighting" = "Sorotan tangga nada"
+
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183), FL arpeggiator patterns (prtools-0003)
+"FL arpeggiator pattern" = "Pola arpeggiator FL"
+"None (the arpeggiator above)" = "Tidak ada (arpeggiator di atas)"
+"Range (octaves)" = "Rentang (oktaf)"
+"Range mode" = "Mode rentang"
+"Block" = "Blok"
+"Group notes" = "Kelompokkan not"
+"The pattern could not be read." = "Pola tidak dapat dibaca."

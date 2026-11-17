@@ -1206,7 +1206,7 @@ public:
             if (nt.slide.moving()) // a slide note moves Final.Pitch (issue #14)
             {
                 const auto was = nt.slide.cents;
-                const auto d = (double) (nt.slide.advance ((float) n) - was);
+                const auto d = (double) (nt.slide.advanceFirst ((float) n) - was);
                 nt.finalPitch += d;
                 for (int k = 0; k < nt.count; ++k)
                     records[(std::size_t) nt.records[(std::size_t) k]].finalPitch += d;

@@ -10817,7 +10817,6 @@ countries: tr
 "Not carried over or approximated:" = "Aktarılmayan veya yaklaşık aktarılan:"
 "... and {0} more" = "... ve {0} tane daha"
 
-# --- Round 190iu: issues #186 (wheel zones) and #191 (temporary tools, MIDI drops, lanes, Track-only mode, takes)
 
 # --- rollup 0.1.30 step 4: Save a copy for 0.1.28 knows rounds 190jh / 190jl / 190jg / 190jf / 190jd
 "Facet EQ's automatic dynamic thresholds play with the bands' manual threshold: {0}" = "Facet EQ'nun otomatik dinamik eşikleri bantların elle ayarlanan eşiğiyle çalar: {0}"
@@ -10887,3 +10886,25 @@ countries: tr
 "FL keeps the track header column at a fixed width. With this on, drag the column's right edge to make the headers wider (a double click there goes back to FL's width); the width is kept for every project. Also in the Playlist menu." = "FL parça başlığı sütununu sabit genişlikte tutar. Bu açıkken başlıkları genişletmek için sütunun sağ kenarını sürükleyin (orada çift tıklama FL genişliğine döner); genişlik tüm projeler için saklanır. Ayrıca Playlist menüsünde."
 "A switch beside Stretch: while it is lit, a click on an empty spot with the Pencil or the Brush deselects and moves the song position there, a drag draws a selection box (as FL's Select tool), and a double click places the clip. Also in the Playlist menu." = "Esnet'in yanında bir anahtar: yanarken, Kalem veya Fırça ile boş bir yere tıklamak seçimi kaldırır ve şarkı konumunu oraya taşır, sürüklemek bir seçim kutusu çizer (FL'nin Seç aracı gibi) ve çift tıklama klibi yerleştirir. Ayrıca Playlist menüsünde."
 "A track that holds only automation clips of one instrument (or of a linked mixer track) is drawn right under that instrument's track, as a lane that folds with the track's arrow; the clips stay clips on their own tracks. On by default in the Clip-launch layout, as Live's lanes. Also in the Playlist menu." = "Yalnızca bir enstrümanın (veya bağlı bir mikser parçasının) otomasyon kliplerini içeren bir parça, o enstrümanın parçasının hemen altında, parçanın okuyla katlanan bir şerit olarak çizilir; klipler kendi parçalarında klip olarak kalır. Live'ın şeritleri gibi Clip-launch düzeninde varsayılan olarak açık. Ayrıca Playlist menüsünde."
+
+# --- round 190jv: Mixer menu › Trim unused tracks (FL's Remove unused tracks question)
+"Trim unused tracks" = "Kullanılmayan kanalları temizle"
+"Remove unused tracks" = "Kullanılmayan kanalları kaldır"
+"Select the mixer track types to be removed." = "Kaldırılacak mikser kanalı türlerini seçin."
+"Unlinked tracks only" = "Yalnızca bağlantısız kanallar"
+"Unlinked and non-empty tracks" = "Bağlantısız ve boş olmayan kanallar"
+"This will |delete| {0} unused mixer track(s). Are you sure?" = "Kullanılmayan {0} mikser kanalı |silinecek|. Emin misiniz?"
+"Trim unused mixer tracks" = "Kullanılmayan mikser kanallarını temizle"
+"No unused mixer tracks" = "Kullanılmayan mikser kanalı yok"
+
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183)
+"Scale highlighting" = "Gam vurgulama"
+
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183), FL arpeggiator patterns (prtools-0003)
+"FL arpeggiator pattern" = "FL arpej deseni"
+"None (the arpeggiator above)" = "Yok (yukarıdaki arpej)"
+"Range (octaves)" = "Aralık (oktav)"
+"Range mode" = "Aralık modu"
+"Block" = "Blok"
+"Group notes" = "Notaları grupla"
+"The pattern could not be read." = "Desen okunamadı."

@@ -10817,7 +10817,6 @@ countries: tw hk mo
 "Not carried over or approximated:" = "未帶過去或近似處理的內容："
 "... and {0} more" = "……還有 {0} 項"
 
-# --- Round 190iu: issues #186 (wheel zones) and #191 (temporary tools, MIDI drops, lanes, Track-only mode, takes)
 
 # --- rollup 0.1.30 step 4: Save a copy for 0.1.28 knows rounds 190jh / 190jl / 190jg / 190jf / 190jd
 "Facet EQ's automatic dynamic thresholds play with the bands' manual threshold: {0}" = "Facet EQ 的自動動態閾值將以各頻段的手動閾值播放：{0}"
@@ -10887,3 +10886,25 @@ countries: tw hk mo
 "FL keeps the track header column at a fixed width. With this on, drag the column's right edge to make the headers wider (a double click there goes back to FL's width); the width is kept for every project. Also in the Playlist menu." = "FL 的軌道標題欄寬度是固定的。開啟後，拖曳該欄的右邊緣可加寬標題（在那裡雙擊恢復 FL 的寬度）；寬度對所有專案生效。也在 Playlist 選單中。"
 "A switch beside Stretch: while it is lit, a click on an empty spot with the Pencil or the Brush deselects and moves the song position there, a drag draws a selection box (as FL's Select tool), and a double click places the clip. Also in the Playlist menu." = "「拉伸」旁邊的開關：亮起時，用鉛筆或筆刷點擊空白處會取消選取並把歌曲位置移到那裡，拖曳會畫出選取框（如 FL 的選取工具），雙擊放置片段。也在 Playlist 選單中。"
 "A track that holds only automation clips of one instrument (or of a linked mixer track) is drawn right under that instrument's track, as a lane that folds with the track's arrow; the clips stay clips on their own tracks. On by default in the Clip-launch layout, as Live's lanes. Also in the Playlist menu." = "只包含某個樂器（或已連結的混音器軌道）之自動化片段的軌道，會畫在該樂器軌道的正下方，作為可用軌道箭頭摺疊的子軌道；片段仍是其自身軌道上的片段。與 Live 的子軌道一樣，在 Clip-launch 版面中預設開啟。也在 Playlist 選單中。"
+
+# --- round 190jv: Mixer menu › Trim unused tracks (FL's Remove unused tracks question)
+"Trim unused tracks" = "清理未使用的軌道"
+"Remove unused tracks" = "移除未使用的軌道"
+"Select the mixer track types to be removed." = "選擇要移除的混音器軌道類型。"
+"Unlinked tracks only" = "僅未連結的軌道"
+"Unlinked and non-empty tracks" = "未連結及非空的軌道"
+"This will |delete| {0} unused mixer track(s). Are you sure?" = "這將|刪除| {0} 條未使用的混音器軌道。確定嗎？"
+"Trim unused mixer tracks" = "清理未使用的混音器軌道"
+"No unused mixer tracks" = "沒有未使用的混音器軌道"
+
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183)
+"Scale highlighting" = "音階醒目提示"
+
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183), FL arpeggiator patterns (prtools-0003)
+"FL arpeggiator pattern" = "FL 琶音器模式"
+"None (the arpeggiator above)" = "無（上面的琶音器）"
+"Range (octaves)" = "範圍（八度）"
+"Range mode" = "範圍模式"
+"Block" = "區塊"
+"Group notes" = "音符編組"
+"The pattern could not be read." = "無法讀取該模式。"

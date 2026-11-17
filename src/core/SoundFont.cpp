@@ -2,6 +2,7 @@
 // core/SoundFont.h and docs/analise/REA_rodada158.md.
 
 #include "core/SoundFont.h"
+#include "core/HostSlide.h"
 
 #include <algorithm>
 #include <chrono>
@@ -817,6 +818,8 @@ struct Voice
     float baseCents = 0, gainBase = 1, panL = 1, panR = 1, reverb = 0, chorus = 0;
     float lastGain = 0;
     float slideCents = 0, slideStep = 0; int slideLeft = 0;
+    // FL's stepped slide note (round 190jv, core/HostSlide.h Steps): slideStep at the control block where stepDue reaches 0
+    int stepsLeft = 0; double stepDue = 0.0, stepEvery = 0.0;
     float restAtStart = 0; // the channel's fine tune + main pitch in baseCents (they move it live: setChannelPitchNow)
     float filterBaseCents = 13500, filterQ = 0.7071f;
     bool oneShot = false;
@@ -1081,16 +1084,28 @@ public:
     // no voice and the note stayed flat (karatmep232's guitar, an FL SoundFont Player channel).
     void slideTo (int key, float cents, float samples) noexcept override
     {
-        pending.push ({ key, samples, NoteMsg::slide, 0, cents, 0 });
+        // (round 190jv: FL's steps ride along — the tick count in `id`, a tick's share of the slide in `pan`)
+        const auto stepped = HostSlide::pendingSteps();
+        pending.push ({ key, samples, NoteMsg::slide, stepped.fraction, cents, (std::uint32_t) std::max (0, stepped.ticks) });
     }
 
-    void applySlide (int key, float cents, float samples) noexcept
+    void applySlide (int key, float cents, float samples, int ticks = 0, float fraction = 0.0f) noexcept
     {
-        // the sounding voices glide to the new key (FL's slide notes)
+        // the sounding voices glide to the new key (FL's slide notes); round 190jv: in FL's n + 1 steps on its ticks
         for (auto& v : voices)
             if (v.active && ! v.released)
             {
                 const auto target = (float) (key - v.key) * 100.0f + cents;
+                if (ticks > 0)
+                {
+                    v.stepsLeft = ticks + 1;
+                    v.slideStep = (target - v.slideCents) / (float) v.stepsLeft;
+                    v.slideLeft = 0;
+                    v.stepEvery = (double) std::max (1.0f, samples) * (double) fraction;
+                    v.stepDue = 0.0;
+                    continue;
+                }
+                v.stepsLeft = 0;
                 const auto steps = std::max (1, (int) (samples / (float) block));
                 v.slideStep = (target - v.slideCents) / (float) steps;
                 v.slideLeft = steps;
@@ -1158,7 +1173,7 @@ public:
         {
             const auto& e = pending.events[(std::size_t) i];
             if (e.kind == NoteMsg::slide)
-                applySlide (e.key, e.cents, e.velocity); // (velocity = the slide's length in samples)
+                applySlide (e.key, e.cents, e.velocity, (int) e.id, e.pan); // (velocity = the slide's length in samples)
             else if (e.kind == NoteMsg::on)
             {
                 startingId = e.id;
@@ -1567,6 +1582,12 @@ private:
             const auto modLfo = v.modLfo.value(), vibLfo = v.vibLfo.value();
             if (v.slideLeft > 0)
                 v.slideCents += v.slideStep, --v.slideLeft;
+            if (v.stepsLeft > 0) // (round 190jv: FL's steps, each at the control block that starts on its tick)
+            {
+                while (v.stepsLeft > 0 && v.stepDue <= 1.0e-3 * v.stepEvery + 1.0e-6)
+                    v.slideCents += v.slideStep, --v.stepsLeft, v.stepDue += v.stepEvery;
+                v.stepDue -= (double) n;
+            }
             auto cents = v.baseCents + knobCents + (restCents - v.restAtStart) + v.slideCents + bendCents + modLevel * (float) r.modEnvToPitch + modLfo * (float) r.modLfoToPitch;
             cents += vibLfo * ((lfoOverride ? lfoDepth : (float) r.vibLfoToPitch) + (std::max (modWheel, param (pModWheel)) + pressure) * 50.0f);
             const auto step = (double) centsToRatio (cents) * (double) r.sampleRate / (double) rate;

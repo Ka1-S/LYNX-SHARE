@@ -272,17 +272,13 @@ TEST (flm190fn_flp_mobile_rack_left_as_stand_in_when_not_rebuilt)
         CHECK (report.unsupported.count (line + "; played with a LYNX SHARE synth preset") == 1);
         CHECK (report.converted.empty());
     };
-    // a drum kit, two instruments, an effect first, an active note effect, a state that is not a rack
+    // a drum kit, an Arpeggiator, a state that is not a rack (round 190jv: two instruments, an effect first and the note
+    // effects that act on each note are rebuilt now: tests/Flm190jvTests.inc)
     check (flm190fn::rackState (flm182c::rack (flm::kindNormal, {}, { flm182c::sample ("Kick", "@R@", "Drum Samples\\Kick\\Kick 1.wav") })), "FL Studio Mobile Rack (drum kit: not reproduced yet)");
-    check (flm190fn::rackState (flm182c::rack (flm::kindNormal, { flm182c::module (23, 2, {}, "Default/Default", 0, 127, pocketsaw::flmParamCount),
-                                                         flm182c::module (23, 3, {}, "Default/Default", 0, 127, pocketsaw::flmParamCount) })),
-           "FL Studio Mobile Rack (several instruments: not reproduced yet)");
-    check (flm190fn::rackState (flm182c::rack (flm::kindNormal, { flm182c::module (9, 3, {}, "Default/Default", 0, 127, 5),
+    // (round 190jv: Transpose, Scale and Randomizer run over FL's notes now; an Arpeggiator or a Note Echo stays)
+    check (flm190fn::rackState (flm182c::rack (flm::kindNormal, { flm182c::module (51, 4, {}, "Default/Default", 0, 127, 20),
                                                          flm182c::module (23, 2, {}, "Default/Default", 0, 127, pocketsaw::flmParamCount) })),
-           "FL Studio Mobile Rack (an effect before the instrument: not reproduced yet)");
-    check (flm190fn::rackState (flm182c::rack (flm::kindNormal, { flm182c::module (48, 4, {}, "Default/Default", 0, 127, 3),
-                                                         flm182c::module (23, 2, {}, "Default/Default", 0, 127, pocketsaw::flmParamCount) })),
-           "FL Studio Mobile Rack (note effects: not reproduced yet)");
+           "FL Studio Mobile Rack (an Arpeggiator or Note Echo: not reproduced yet)");
     check (Bytes { 'n', 'o', 'p', 'e', 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8 }, "FL Studio Mobile Rack (state not readable)");
 }
 
