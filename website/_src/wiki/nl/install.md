@@ -64,7 +64,7 @@ De map bevat je opties, de gekozen taal (`language.txt`), je sneltoetsen (`keys.
 
 ## Bijwerken
 
-Bij het opstarten vraagt LYNX SHARE GitHub om het nieuwste versienummer. Er wordt niets over jou verstuurd. Als er een nieuwe versie is, toont een balk `LYNX SHARE <version> is available` met een knop `Wat is er nieuw` en een updateknop. `Help › Controleren op updates...` vraagt het op elk moment.
+Bij het opstarten vraagt LYNX SHARE GitHub om het nieuwste versienummer. Er wordt niets over jou verstuurd. Als er een nieuwe versie is, toont een balk `LYNX SHARE <version> is beschikbaar` met een knop `Wat is er nieuw` en een updateknop. `Help › Controleren op updates...` vraagt het op elk moment.
 
 | Build | Hoe het wordt bijgewerkt |
 |---|---|

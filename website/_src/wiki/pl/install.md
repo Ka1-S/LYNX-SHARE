@@ -64,7 +64,7 @@ Folder zawiera Twoje opcje, wybrany język (`language.txt`), skróty (`keys.json
 
 ## Aktualizacja
 
-Przy starcie LYNX SHARE pyta GitHub o numer najnowszej wersji. Nic o Tobie nie jest wysyłane. Gdy wyjdzie nowa wersja, pasek pokazuje `LYNX SHARE <version> is available` z przyciskiem `Co nowego` i przyciskiem aktualizacji. `Pomoc › Sprawdź aktualizacje...` pyta o to w dowolnej chwili.
+Przy starcie LYNX SHARE pyta GitHub o numer najnowszej wersji. Nic o Tobie nie jest wysyłane. Gdy wyjdzie nowa wersja, pasek pokazuje `Dostępny jest LYNX SHARE <version>` z przyciskiem `Co nowego` i przyciskiem aktualizacji. `Pomoc › Sprawdź aktualizacje...` pyta o to w dowolnej chwili.
 
 | Wersja | Jak się aktualizuje |
 |---|---|

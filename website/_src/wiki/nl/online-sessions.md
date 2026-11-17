@@ -89,7 +89,7 @@ De host doet dit:
 
 Een gast doet dit:
 
-1. Open het pluginmenu van een van je kanalen of effectslots. De gedeelde plugins staan bovenaan, onder `On <host>'s computer`.
+1. Open het pluginmenu van een van je kanalen of effectslots. De gedeelde plugins staan bovenaan, onder `Op de computer van <host>`.
 2. Kies er een. In zijn venster staan de parameters van de plugin als schuifregelaars, met `Parameters zoeken`.
 3. Voeg noten toe en beweeg de schuifregelaars. Het venster toont `Updating...` terwijl de computer van de host rendert, daarna `Bijgewerkt`.
 

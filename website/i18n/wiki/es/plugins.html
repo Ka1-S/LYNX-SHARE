@@ -18,7 +18,7 @@
 <p>Por defecto, un plugin se ejecuta dentro de LYNX SHARE, así que un plugin que falla puede tumbar el programa. Como opción, cada plugin se ejecuta en su propio proceso.</p>
 <ol><li>Abre <code>Opciones › Configuración general...</code>.</li><li>Activa <code>Ejecutar plugins en un proceso aparte (protege a LYNX SHARE de los cierres inesperados)</code>.</li><li>Vuelve a abrir el proyecto para aplicarlo a los plugins que ya están abiertos.</li></ol>
 <p>Si uno de esos plugins falla o deja de responder, se silencia, aparece un mensaje y LYNX SHARE sigue funcionando. <code>Recargar</code> en ese mensaje vuelve a iniciar el plugin con los ajustes del último guardado o copia de seguridad, sin reabrir el proyecto. El editor del plugin se abre en su propia ventana y no se puede acoplar ni fijar.</p>
-<p>Para hacerlo solo con un plugin, usa <code>Ejecutar en un proceso aparte</code> o <code>Always run &lt;plugin&gt; in a separate process</code> en el menú del wrapper de la ventana del plugin. Cuando falla el editor de un plugin, el mensaje que aparece ofrece también la segunda.</p>
+<p>Para hacerlo solo con un plugin, usa <code>Ejecutar en un proceso aparte</code> o <code>Ejecutar siempre &lt;plugin&gt; en un proceso aparte</code> en el menú del wrapper de la ventana del plugin. Cuando falla el editor de un plugin, el mensaje que aparece ofrece también la segunda.</p>
 <p>Esto funciona en Windows y Linux, y desde la 0.1.25 en macOS.</p>
 <p>Un plugin que falla dentro de LYNX SHARE se desactiva, y su mensaje también ofrece <code>Recargar</code>. Más tarde, usa <code>Recargar el plugin que falló</code> en el menú del canal o en el menú de la ranura del efecto.</p>
 <h2 id="32-bit-plugins-windows-only">Plugins de 32 bits (solo Windows)</h2>

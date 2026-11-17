@@ -1,1 +1,5 @@
-{}
+{
+"u.0.1.29.t": "Fehlerbehebung für 0.1.28: Zurück zur vorherigen Version funktioniert",
+"u.0.1.29.s": "Eine kleine Fehlerbehebungsversion für 0.1.28. Hilfe › Zurück zur vorherigen Version installiert jetzt die Version, die du vorher hattest, und eine ältere Version, zu der du zurückkehrst, bietet dir die neuere nicht mehr sofort wieder an.",
+"u.0.1.29.b0": "<strong>Hilfe › Zurück zur vorherigen Version</strong> (neu in 0.1.28) bot 0.1.28 selbst an. Jetzt installiert es die Version, die du vorher hattest, mit derselben Prüfsummenkontrolle wie ein Update, und die verlassene Version wird von der automatischen Prüfung übersprungen."
+}

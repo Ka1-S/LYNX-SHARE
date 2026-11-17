@@ -64,7 +64,7 @@ Klasör, seçeneklerinizi, seçtiğiniz dili (`language.txt`), kısayollarınız
 
 ## Güncelleme
 
-Açılışta LYNX SHARE, GitHub'dan en yeni sürüm numarasını sorar. Sizinle ilgili hiçbir şey gönderilmez. Yeni bir sürüm çıktığında bir çubuk, `Yenilikler` düğmesi ve bir güncelleme düğmesiyle `LYNX SHARE <version> is available` yazısını gösterir. `Yardım › Güncellemeleri denetle...` istediğiniz zaman sorar.
+Açılışta LYNX SHARE, GitHub'dan en yeni sürüm numarasını sorar. Sizinle ilgili hiçbir şey gönderilmez. Yeni bir sürüm çıktığında bir çubuk, `Yenilikler` düğmesi ve bir güncelleme düğmesiyle `LYNX SHARE <version> çıktı` yazısını gösterir. `Yardım › Güncellemeleri denetle...` istediğiniz zaman sorar.
 
 | Derleme | Nasıl güncellenir |
 |---|---|

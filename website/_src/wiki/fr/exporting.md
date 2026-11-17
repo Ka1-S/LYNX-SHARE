@@ -10,7 +10,7 @@ Tout ce qui sort de LYNX SHARE passe par `Fichier › Exporter`. Les formats aud
 1. Choisissez `Fichier › Exporter › Fichier Wave...`.
 2. Laissez `Étendue` sur `Morceau (Playlist)` et `Fichiers` sur `Un fichier (le mixage)`.
 3. Choisissez une `Résolution` : 16 bits, 24 bits ou 32 bits (flottant).
-4. Réglez `File d'attente` sur `Laisser le reste` pour que les réverbs et les release s'éteignent après la dernière mesure.
+4. Réglez `Queue` sur `Laisser le reste` pour que les réverbs et les release s'éteignent après la dernière mesure.
 5. Cliquez sur `Exporter...`, choisissez un nom et un dossier, puis attendez le rendu.
 6. Une fois terminé, LYNX SHARE indique où est allé le fichier et son niveau de crête.
 
@@ -22,7 +22,7 @@ Tout ce qui sort de LYNX SHARE passe par `Fichier › Exporter`. Les formats aud
 |---|---|
 | `Étendue` | `Morceau (Playlist)`, `Pattern actuel` ou `Sélection de la Playlist` |
 | `Lecture` | Combien de fois l'étendue est jouée dans le fichier, de `Une fois` à 16 fois |
-| `File d'attente` | `Couper le reste` s'arrête exactement à la fin. `Laisser le reste` laisse le son s'éteindre. `Replier le reste` mixe la queue au début, pour les boucles |
+| `Queue` | `Couper le reste` s'arrête exactement à la fin. `Laisser le reste` laisse le son s'éteindre. `Replier le reste` mixe la queue au début, pour les boucles |
 | `Queue maximale` | 3, 6, 12 ou 30 secondes. La queue s'arrête plus tôt quand le son s'est éteint |
 | `Fichiers` | Un fichier, ou des stems (voir plus bas) |
 

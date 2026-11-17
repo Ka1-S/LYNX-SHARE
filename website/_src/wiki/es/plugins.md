@@ -62,7 +62,7 @@ Por defecto, un plugin se ejecuta dentro de LYNX SHARE, así que un plugin que f
 
 Si uno de esos plugins falla o deja de responder, se silencia, aparece un mensaje y LYNX SHARE sigue funcionando. `Recargar` en ese mensaje vuelve a iniciar el plugin con los ajustes del último guardado o copia de seguridad, sin reabrir el proyecto. El editor del plugin se abre en su propia ventana y no se puede acoplar ni fijar.
 
-Para hacerlo solo con un plugin, usa `Ejecutar en un proceso aparte` o `Always run <plugin> in a separate process` en el menú del wrapper de la ventana del plugin. Cuando falla el editor de un plugin, el mensaje que aparece ofrece también la segunda.
+Para hacerlo solo con un plugin, usa `Ejecutar en un proceso aparte` o `Ejecutar siempre <plugin> en un proceso aparte` en el menú del wrapper de la ventana del plugin. Cuando falla el editor de un plugin, el mensaje que aparece ofrece también la segunda.
 
 Esto funciona en Windows y Linux, y desde la 0.1.25 en macOS.
 

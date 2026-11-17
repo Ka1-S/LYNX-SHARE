@@ -1,1 +1,5 @@
-{}
+{
+"u.0.1.29.t": "Versão de correção da 0.1.28: Voltar para a versão anterior funciona",
+"u.0.1.29.s": "Uma pequena versão de correção da 0.1.28. Ajuda › Voltar para a versão anterior agora instala a versão que você tinha antes, e uma versão mais antiga para a qual você volta não oferece mais a nova logo em seguida.",
+"u.0.1.29.b0": "<strong>Ajuda › Voltar para a versão anterior</strong> (novo na 0.1.28) oferecia a própria 0.1.28. Agora ele instala a versão que você tinha antes, com a mesma verificação de checksum de uma atualização, e a versão que você deixou é ignorada pela verificação automática."
+}
