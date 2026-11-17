@@ -57,9 +57,10 @@ enum class Icon
     sessionRecord,     // a ring
     browserPanel,      // a left panel beside a page (show / hide the Browser)
     metronomeDots,     // Live's metronome: a ring and a dot
-    toStart            // round 190jj: BandLab's Back-to-start (a bar and a triangle pointing left), the Simple capsule's idle Stop
+    toStart,           // round 190jj: BandLab's Back-to-start (a bar and a triangle pointing left), the Simple capsule's idle Stop
+    scrub              // round natives190kj: Edison's Scrub button (a film reel: a ring with four holes around a hub)
 };
-constexpr int iconCount = (int) Icon::toStart + 1;
+constexpr int iconCount = (int) Icon::scrub + 1;
 
 namespace icons
 {

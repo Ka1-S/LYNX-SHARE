@@ -10922,6 +10922,15 @@ countries: id
 "Click-free (smooth) editing" = "Edit tanpa klik (halus)"
 "Click-free (smooth) editing: on" = "Edit tanpa klik (halus): aktif"
 "Click-free (smooth) editing: off" = "Edit tanpa klik (halus): nonaktif"
+"Dual view" = "Tampilan ganda"
+"Small grid-slicing" = "Iris grid kecil"
+"Medium grid-slicing" = "Iris grid sedang"
+"Large grid-slicing" = "Iris grid besar"
+"Detect pitch regions" = "Deteksi region nada"
+"Detecting pitch regions..." = "Mendeteksi region nada..."
+"Paused" = "Dijeda"
+"Scrub: hold and drag right to play forward, left to play backward; the further, the faster" = "Scrub: tahan dan seret ke kanan untuk memutar maju, ke kiri untuk mundur; makin jauh, makin cepat"
+
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] buka/tutup editor  [Alt]+[LMB] biarkan yang lain terbuka  [Ctrl]+[LMB] dengarkan  [2xLMB] Piano Roll  [LMB] seret naik/turun mengubah urutan  [RMB] menu channel"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak meter (kiri/kanan) dengan peak hold  [LMB] mematikan lampu clip"

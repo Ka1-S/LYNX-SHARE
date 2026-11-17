@@ -10922,6 +10922,15 @@ countries: ru by kz
 "Click-free (smooth) editing" = "Правка без щелчков (плавная)"
 "Click-free (smooth) editing: on" = "Правка без щелчков (плавная): вкл."
 "Click-free (smooth) editing: off" = "Правка без щелчков (плавная): выкл."
+"Dual view" = "Двойной вид"
+"Small grid-slicing" = "Нарезка по мелкой сетке"
+"Medium grid-slicing" = "Нарезка по средней сетке"
+"Large grid-slicing" = "Нарезка по крупной сетке"
+"Detect pitch regions" = "Найти области высоты тона"
+"Detecting pitch regions..." = "Поиск областей высоты тона..."
+"Paused" = "Пауза"
+"Scrub: hold and drag right to play forward, left to play backward; the further, the faster" = "Скраб: удерживайте и тяните вправо для воспроизведения вперёд, влево — назад; чем дальше, тем быстрее"
+
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] открыть/закрыть редактор  [Alt]+[LMB] не закрывать другие  [Ctrl]+[LMB] прослушать  [2xLMB] Piano Roll  [LMB] перетаскивание вверх/вниз меняет порядок  [RMB] меню канала"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Пиковый индикатор (левый/правый) с удержанием пика  [LMB] сбрасывает индикатор клиппинга"

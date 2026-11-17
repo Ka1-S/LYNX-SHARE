@@ -472,6 +472,10 @@ public:
     double getPreviewVolume() const noexcept { return previewVolume; }
     // Plays a sound made in memory through the same preview output (the start-up sound). UI thread.
     void previewSample (std::shared_ptr<const SampleData> sample, bool loop = false, float gain = 0.8f, bool audioEditor = false);
+    // Round natives190kj: FL Edison's Scrub button — the audio editor's sample from `startFrame`, its speed then set with
+    // setPreviewScrubSpeed (× normal, negative = backward, 0 = held). A previewSample (nullptr) ends it. UI thread.
+    void previewScrub (std::shared_ptr<const SampleData> sample, std::int64_t startFrame);
+    void setPreviewScrubSpeed (double speed) noexcept;
     // The Audio Editor's playback volume (its toolbar knob, round 162): 0..1.25 like the Browser's, 1 = unity.
     void setEditorVolume (double volume) noexcept;
     double getEditorVolume() const noexcept { return editorVolume; }

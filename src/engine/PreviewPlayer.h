@@ -38,6 +38,11 @@ public:
     void setVolume (float gainFactor) noexcept { volume.store (gainFactor, std::memory_order_relaxed); }
     // The Audio Editor's playback volume as a gain (round 162, issue #9). Any thread; applies at once.
     void setEditorVolume (float gainFactor) noexcept { editorVolume.store (gainFactor, std::memory_order_relaxed); }
+    // Round natives190kj: FL Edison's Scrub button (core/EdisonView.h scrubSpeed) — the editor's sample from `startFrame`
+    // at a speed set with setScrubSpeed (× the normal rate; negative = backward; 0 = held and silent), held at the ends
+    // instead of stopping. play() / playBrowser() / play (nullptr) end it. UI thread.
+    void playScrub (std::shared_ptr<const SampleData> sample, std::int64_t startFrame, float gain = 0.8f);
+    void setScrubSpeed (double speed) noexcept { scrubSpeed.store (speed, std::memory_order_relaxed); }
     // Any thread: the frame being played in the current sample, or -1 when nothing plays.
     double getPlayPosition() const noexcept { return playPosition.load (std::memory_order_relaxed); }
 
@@ -71,6 +76,8 @@ private:
     std::atomic<int> syncLatency { 0 };
     std::atomic<int> beatStartCount { 0 };
     bool pendingEditor = false, editor = false;
+    bool pendingScrub = false, scrubbing = false; // round natives190kj: Edison's Scrub button
+    std::atomic<double> scrubSpeed { 0.0 };
     std::int64_t pendingStart = 0, pendingEnd = 0, nextStart = 0, nextEnd = 0; // round 190iz: the Browser's range
     bool pendingFade = false, nextFade = false, fading = false;
     double endPosition = -1.0; // (audio thread) where the current Browser preview stops, -1 = the end

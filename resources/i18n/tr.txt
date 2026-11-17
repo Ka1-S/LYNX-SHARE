@@ -10922,6 +10922,15 @@ countries: tr
 "Click-free (smooth) editing" = "Tıklamasız (yumuşak) düzenleme"
 "Click-free (smooth) editing: on" = "Tıklamasız (yumuşak) düzenleme: açık"
 "Click-free (smooth) editing: off" = "Tıklamasız (yumuşak) düzenleme: kapalı"
+"Dual view" = "Çift görünüm"
+"Small grid-slicing" = "Küçük ızgaraya göre dilimle"
+"Medium grid-slicing" = "Orta ızgaraya göre dilimle"
+"Large grid-slicing" = "Büyük ızgaraya göre dilimle"
+"Detect pitch regions" = "Perde bölgelerini algıla"
+"Detecting pitch regions..." = "Perde bölgeleri algılanıyor..."
+"Paused" = "Duraklatıldı"
+"Scrub: hold and drag right to play forward, left to play backward; the further, the faster" = "Scrub: basılı tutup sağa sürükleyin ileri, sola sürükleyin geri çalar; ne kadar uzak, o kadar hızlı"
+
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editörü aç/kapat  [Alt]+[LMB] diğerlerini açık tut  [Ctrl]+[LMB] dinle  [2xLMB] Piano Roll  [LMB] yukarı/aşağı sürükle sıralar  [RMB] kanal menüsü"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak hold'lu tepe ölçer (sol/sağ)  [LMB] clip ışığını temizler"

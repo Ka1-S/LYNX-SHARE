@@ -10922,6 +10922,15 @@ countries: de at ch li lu
 "Click-free (smooth) editing" = "Klickfreie (weiche) Bearbeitung"
 "Click-free (smooth) editing: on" = "Klickfreie (weiche) Bearbeitung: an"
 "Click-free (smooth) editing: off" = "Klickfreie (weiche) Bearbeitung: aus"
+"Dual view" = "Doppelansicht"
+"Small grid-slicing" = "Am kleinen Raster schneiden"
+"Medium grid-slicing" = "Am mittleren Raster schneiden"
+"Large grid-slicing" = "Am großen Raster schneiden"
+"Detect pitch regions" = "Tonhöhen-Regionen erkennen"
+"Detecting pitch regions..." = "Tonhöhen-Regionen werden erkannt..."
+"Paused" = "Pausiert"
+"Scrub: hold and drag right to play forward, left to play backward; the further, the faster" = "Scrub: gedrückt halten und nach rechts ziehen spielt vorwärts, nach links rückwärts; je weiter, desto schneller"
+
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] Editor öffnen/schließen  [Alt]+[LMB] andere offen lassen  [Strg]+[LMB] vorhören  [2xLMB] Piano Roll  [LMB] hoch/runter ziehen sortiert um  [RMB] Kanalmenü"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak-Anzeige (links/rechts) mit Peak-Hold  [LMB] löscht die Übersteuerungsanzeige"

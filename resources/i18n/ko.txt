@@ -10922,6 +10922,15 @@ countries: kr
 "Click-free (smooth) editing" = "클릭 없는 (부드러운) 편집"
 "Click-free (smooth) editing: on" = "클릭 없는 (부드러운) 편집: 켜짐"
 "Click-free (smooth) editing: off" = "클릭 없는 (부드러운) 편집: 꺼짐"
+"Dual view" = "듀얼 보기"
+"Small grid-slicing" = "작은 격자로 자르기"
+"Medium grid-slicing" = "중간 격자로 자르기"
+"Large grid-slicing" = "큰 격자로 자르기"
+"Detect pitch regions" = "피치 영역 감지"
+"Detecting pitch regions..." = "피치 영역 감지 중..."
+"Paused" = "일시 정지"
+"Scrub: hold and drag right to play forward, left to play backward; the further, the faster" = "스크럽: 누른 채 오른쪽으로 끌면 정방향, 왼쪽으로 끌면 역방향 재생, 멀수록 빨라집니다"
+
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 에디터 열기/닫기  [Alt]+[LMB] 다른 에디터 유지  [Ctrl]+[LMB] 미리 듣기  [2xLMB] 피아노 롤  [LMB] 위/아래 드래그로 순서 변경  [RMB] 채널 메뉴"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "피크 홀드 기능이 있는 피크 미터(좌/우)  [LMB] 클립 표시등 지우기"

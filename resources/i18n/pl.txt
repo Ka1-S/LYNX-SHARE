@@ -10922,6 +10922,15 @@ countries: pl
 "Click-free (smooth) editing" = "Edycja bez trzasków (płynna)"
 "Click-free (smooth) editing: on" = "Edycja bez trzasków (płynna): wł."
 "Click-free (smooth) editing: off" = "Edycja bez trzasków (płynna): wył."
+"Dual view" = "Widok podwójny"
+"Small grid-slicing" = "Cięcie według małej siatki"
+"Medium grid-slicing" = "Cięcie według średniej siatki"
+"Large grid-slicing" = "Cięcie według dużej siatki"
+"Detect pitch regions" = "Wykryj regiony wysokości"
+"Detecting pitch regions..." = "Wykrywanie regionów wysokości..."
+"Paused" = "Wstrzymano"
+"Scrub: hold and drag right to play forward, left to play backward; the further, the faster" = "Scrub: przytrzymaj i przeciągnij w prawo, by odtwarzać do przodu, w lewo — do tyłu; im dalej, tym szybciej"
+
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] otwórz/zamknij edytor  [Alt]+[LMB] nie zamykaj innych  [Ctrl]+[LMB] odsłuch  [2xLMB] Piano Roll  [LMB] przeciągnij w górę/dół zmienia kolejność  [RMB] menu kanału"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Miernik szczytowy (lewy/prawy) z podtrzymaniem  [LMB] gasi lampkę przesterowania"

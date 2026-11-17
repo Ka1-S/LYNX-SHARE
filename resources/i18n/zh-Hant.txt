@@ -10922,6 +10922,15 @@ countries: tw hk mo
 "Click-free (smooth) editing" = "無爆音 (平滑) 編輯"
 "Click-free (smooth) editing: on" = "無爆音 (平滑) 編輯: 開"
 "Click-free (smooth) editing: off" = "無爆音 (平滑) 編輯: 關"
+"Dual view" = "雙重檢視"
+"Small grid-slicing" = "按小格線切片"
+"Medium grid-slicing" = "按中格線切片"
+"Large grid-slicing" = "按大格線切片"
+"Detect pitch regions" = "偵測音高區域"
+"Detecting pitch regions..." = "正在偵測音高區域..."
+"Paused" = "已暫停"
+"Scrub: hold and drag right to play forward, left to play backward; the further, the faster" = "拖曳試聽: 按住並向右拖曳正向播放，向左拖曳反向播放；越遠越快"
+
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 開啟/關閉編輯器  [Alt]+[LMB] 保持其他編輯器開啟  [Ctrl]+[LMB] 試聽  [2xLMB] 鋼琴捲軸  [LMB] 上下拖曳重新排序  [RMB] 通道選單"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "峰值電平表（左/右）帶峰值保持  [LMB] 清除削波指示燈"

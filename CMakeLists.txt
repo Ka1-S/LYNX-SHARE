@@ -305,6 +305,7 @@ target_sources(lynx_core PRIVATE
     src/core/AudioEdit.cpp
     src/core/AudioEditTools.cpp
     src/core/SampleProps.cpp
+    src/core/EdisonView.cpp
     src/core/FlAutoSlicer.cpp
     src/core/MixerOps.cpp
     src/core/History.cpp
