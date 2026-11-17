@@ -222,6 +222,7 @@
 #include "ui/PluginManager.h"
 #include "ui/ShortcutManager.h"
 #include "ui/NoteToolDialogs.h"
+#include "ui/ChordStripView.h" // round 190kd (--prchord190kd)
 #include "ui/EventEditor.h"
 #include "ui/AudioEditor.h"
 #include "ui/TempoTapper.h"
@@ -1965,6 +1966,13 @@ public:
             return;
         }
 
+        // --prchord190kd <folder> (round 190kd: FL's chord tool strip, scale shading, rack name alignment): src/PrChordShot190kd.inc
+        if (args.contains ("--prchord190kd"))
+        {
+            setApplicationReturnValue (runPrChordShot190kd (juce::File (args[args.indexOf ("--prchord190kd") + 1].unquoted())) ? 0 : 1);
+            quit();
+            return;
+        }
         // --trimshot190jv <folder> (round 190jv: Mixer menu › Trim unused tracks): src/TrimShot190jv.inc
         if (args.contains ("--trimshot190jv"))
         {
@@ -33151,6 +33159,7 @@ private:
 #include "BrowserShot190iz.inc" // round 190iz
 #include "UndoGesture190jv.inc" // round 190jv
 #include "TrimShot190jv.inc" // round 190jv
+#include "PrChordShot190kd.inc" // round 190kd
 #include "PrShot190jv.inc" // round 190jv
 
     static void writeWaveDemo (const juce::File& file, double bpm)

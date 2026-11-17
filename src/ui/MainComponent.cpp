@@ -2813,6 +2813,8 @@ void MainComponent::loadUiSettings()
             setEditorsInMainWindow (on);
         else if (key == "muteRemovedSteps")
             ChannelRackComponent::muteRemovedSteps = on;
+        else if (key == "rackNameAlignLeft") // round 190kd: FL's Channel name alignment
+            ChannelRackComponent::nameAlignLeft = on;
         else if (key == "audioTrackControls") // round 190w: Playlist › View › Track headers
             PlaylistComponent::showAudioTrackControls = on;
         else if (key == "audioTrackLevels")
@@ -3169,6 +3171,7 @@ void MainComponent::saveUiSettings()
                                       + "\nautoSelectLinked=" + juce::String (ChannelRackComponent::autoSelectLinked ? 1 : 0)
                                       + "\neditorsInMain=" + juce::String (editorsInMainWindowSetting() ? 1 : 0)
                                       + "\nmuteRemovedSteps=" + juce::String (ChannelRackComponent::muteRemovedSteps ? 1 : 0)
+                                      + "\nrackNameAlignLeft=" + juce::String (ChannelRackComponent::nameAlignLeft ? 1 : 0)
                                       + "\naudioTrackControls=" + juce::String (PlaylistComponent::showAudioTrackControls ? 1 : 0)
                                       + "\naudioTrackLevels=" + juce::String (PlaylistComponent::showAudioTrackLevels ? 1 : 0)
                                       + "\ninstrumentTrackLevels=" + juce::String (PlaylistComponent::showInstrumentTrackLevels ? 1 : 0)
@@ -4402,6 +4405,19 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
             menu.addItem (tr ("Select unused channels"), [this] { rack.selectUnused(); });
             action (menu, "rack.groupSelected", tr ("Group selected..."));
             menu.addSectionHeader (tr ("Options")); // (FL's SSMenu: "Mute removed steps" is in its Options part)
+            {
+                // FL's "Channel name alignment" › Left / Center (round 190kd; FL 2026: Options, before "Colorful channel controls",
+                // radio items, Center ticked by default)
+                juce::PopupMenu align;
+                const auto set = [this] (bool left) {
+                    ChannelRackComponent::nameAlignLeft = left;
+                    rack.repaint();
+                    saveUiSettings();
+                };
+                align.addItem (juce::PopupMenu::Item (tr ("Left")).setTicked (ChannelRackComponent::nameAlignLeft).setAction ([set] { set (true); }));
+                align.addItem (juce::PopupMenu::Item (tr ("Center")).setTicked (! ChannelRackComponent::nameAlignLeft).setAction ([set] { set (false); }));
+                menu.addSubMenu (tr ("Channel name alignment"), align);
+            }
             menu.addItem (tr ("Mute removed steps"), true, ChannelRackComponent::muteRemovedSteps, [this] {
                 ChannelRackComponent::muteRemovedSteps = ! ChannelRackComponent::muteRemovedSteps;
                 saveUiSettings();

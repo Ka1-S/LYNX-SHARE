@@ -38,6 +38,14 @@ juce::PopupMenu noteToolPresetMenuForSnapshot (juce::Component& panel);
 // The panel's choice box with the most items (the Limit tool's chord / scale list), for --curveshot; nullptr if none.
 juce::ComboBox* noteToolLongestChoiceForSnapshot (juce::Component& panel);
 
+// round 190kd (--prchord190kd): the Chord progression dialog's FL chord tool state and strip (ui/ChordStripView.h),
+// nullptr for the other tools; and its Generate button
+struct ChordToolState;
+class ChordStripView;
+ChordToolState* noteToolChordStateForSnapshot (juce::Component& panel);
+ChordStripView* noteToolChordViewForSnapshot (juce::Component& panel);
+void noteToolChordGenerateForSnapshot (juce::Component& panel);
+
 // Opens the tool in its own window. `onFinished` runs after Accept or Revert (the note indices changed).
 void showNoteTool (AudioEngine& engine, NoteTool tool, std::vector<int> indices, std::int64_t grid, std::function<void()> onFinished = {});
 } // namespace lynx

@@ -17876,3 +17876,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Spin190kbTests.inc" // round 190kb: the worker pool's waiting (statistics, tuning, bounded task-graph waits, adaptive spin)
 #include "Export190kaTests.inc" // round als190ka-export (owner decision D5): AIFF and M4A (AAC) export
 #include "Issues190jzTests.inc" // round 190jz: issues #192 (docked Browser), #194 (clip fade handles), #195 (Home, W)
+#include "PrChord190kdTests.inc" // round 190kd: FL's chord tool strip (Generate modes, Analyze, Learn from MIDI input, note options)

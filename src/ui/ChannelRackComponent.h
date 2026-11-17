@@ -70,6 +70,8 @@ public:
     static bool autoSelectLinked;
     // FL's Channel Rack option "Mute removed steps": turning a step off mutes its note instead of deleting it
     static bool muteRemovedSteps;
+    // FL's Channel rack menu › Options › "Channel name alignment" (round 190kd): Left / Center (FL's default: Center)
+    static bool nameAlignLeft;
 
     void paint (juce::Graphics& g) override;
     void mouseDown (const juce::MouseEvent& e) override;
