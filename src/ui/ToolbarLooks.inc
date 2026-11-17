@@ -152,7 +152,8 @@ void MainComponent::applyFlTiles()
         for (auto* b : { &metronomeButton, &tapTempoButton, &blendButton, &punchButton, &typingPianoButton })
             b->setLook (BL::flTile, box);
     }
-    // round 190ki (perf): the tiles come from cached pictures over this component's toolbar band (toolbarBackdropStamp)
+    // round 190ki (perf, opt-in LYNX_TILE_MODE=2): the tiles' bodies from an atlas of this component's toolbar band
+    // (toolbarBackdropStamp)
     for (auto* c : getChildren())
         if (auto* b = dynamic_cast<IconButton*> (c))
             b->setFlTileBackdrop (fl && b->getLook() == BL::flTile

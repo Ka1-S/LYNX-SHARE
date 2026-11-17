@@ -138,8 +138,9 @@ public:
     // within the button's bounds (in the parent; 0: not cacheable). The atlas is an image of the parent's band at the
     // parent's coordinates; each button keeps its region of it drawn for its current state (the backdrop and the body,
     // by the same calls, pixels and clip as the frame) and blits it; the glyph is drawn straight over it. Hover fades,
-    // fractional scales, translucent components, the software renderer and LYNX_PAINT_CACHE=0 / LYNX_TILE_MODE=0 paint
-    // straight. Empty: no cache.
+    // fractional scales, translucent components, the software renderer and LYNX_PAINT_CACHE=0 paint straight. Opt-in:
+    // LYNX_TILE_MODE=2 (Icons.cpp tileModeSetting: Direct2D then draws a later path of the frame a little differently).
+    // Empty: no cache.
     void setFlTileBackdrop (std::function<std::uint64_t (juce::Rectangle<int>)> stamp);
 
     // Optional extra gestures: when set, a right-click calls onRightClick instead of clicking the button,
@@ -187,7 +188,7 @@ private:
     bool actsAsSwitch() const;
 };
 
-// --selftest "paint_caches=" (round 190ki): IconButton's FL tile bodies from the atlas against the bodies painted
+// --selftest "paint_caches=" (round 190ki): IconButton's FL tile bodies from the atlas (opt-in) against the bodies painted
 // straight, over a backdrop with a translucent rounded well, at scales 1 and 2 on the native renderer (Direct2D on
 // Windows; the software renderer paints them straight and is only reported on stderr): "OK" when every pixel is the
 // same, else an error naming the case.

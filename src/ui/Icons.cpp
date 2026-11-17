@@ -1228,15 +1228,17 @@ void IconButton::paintLook (juce::Graphics& g, bool highlighted, bool down)
     g.drawFittedText (text, content.toNearestInt(), icon == Icon::none ? juce::Justification::centred : juce::Justification::centredLeft, 1, 0.8f);
 }
 
-// Round 190ki: whether the FL tiles' bodies come from the parent's atlas (LYNX_TILE_MODE: 0 straight, 2 the atlas, the
-// default)
+// Round 190ki: whether the FL tiles' bodies come from the parent's atlas (LYNX_TILE_MODE=2, opt-in) or are painted
+// straight (0, the default). The atlas gives the toolbar's own pixels, but Direct2D anti-aliases a later path a little
+// differently when the frame's draw calls change (the Piano roll's 4/4 flag: 8 pixels, up to 44 levels, --paintbench
+// Thief), so it stays off until a pixel-exact frame is not required; it saves ~0.25 ms more per whole frame there.
 namespace
 {
 int& tileModeSetting()
 {
     static int mode = [] {
-        const auto v = juce::SystemStats::getEnvironmentVariable ("LYNX_TILE_MODE", "2").getIntValue();
-        return v == 0 ? 0 : 2;
+        const auto v = juce::SystemStats::getEnvironmentVariable ("LYNX_TILE_MODE", "0").getIntValue();
+        return v == 2 ? 2 : 0;
     }();
     return mode;
 }
@@ -1357,7 +1359,7 @@ void IconButton::paintFlTile (juce::Graphics& g, bool highlighted, bool down)
     };
     const auto drawGlyph = [&] (juce::Graphics& k) { icons::draw (k, icon, area.withSizeKeepingCentre (box, box), fg); };
 
-    // Round 190ki (perf): the body from the parent's tile atlas, the glyph straight over it. The atlas is the parent's
+    // Round 190ki (perf, opt-in: LYNX_TILE_MODE=2): the body from the parent's tile atlas, the glyph straight over it. The atlas is the parent's
     // band at the parent's own coordinates, each button's region holding its current state: the backdrop and the body
     // drawn there by the same calls, at the same device pixels and under the same clip as in the frame, so a blit gives
     // the frame's pixels. (The glyph stays straight: Direct2D anti-aliases a path drawn into another target a little
@@ -1595,6 +1597,8 @@ juce::String flTileCacheSelfTest()
     }();
     juce::String failures, info;
     const auto softwareBefore = tileCacheOnSoftwareSetting();
+    const auto modeBefore = tileModeSetting();
+    tileModeSetting() = 2; // (the atlas, opt-in in the app)
     for (const auto native : { true, false })
         for (const auto scale : { 1, 2 })
         {
@@ -1610,7 +1614,10 @@ juce::String flTileCacheSelfTest()
             const auto made = render (scale, native), blitted = render (scale, native); // (the first paint fills the atlas)
             tileCacheOnSoftwareSetting() = softwareBefore;
             if (rest.atlasKey == 0)
+            {
+                tileModeSetting() = modeBefore;
                 return "ERROR the FL tile cache was not used (" + tag + ")";
+            }
             int worst = 0, worstAgain = 0;
             const auto n = compare (straight, made, worst) + compare (straight, blitted, worst);
             const auto nAgain = compare (straight, again, worstAgain);
@@ -1621,6 +1628,7 @@ juce::String flTileCacheSelfTest()
                 (native ? failures : info) << tag << ": " << n << " pixels differ, up to " << worst << " levels (straight twice: " << nAgain << ", "
                                            << worstAgain << "); ";
         }
+    tileModeSetting() = modeBefore;
     if (info.isNotEmpty())
         std::fprintf (stderr, "fl tiles on the software renderer (painted straight in the app): %s\n", info.toRawUTF8());
     if (failures.isNotEmpty())
