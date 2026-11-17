@@ -1849,6 +1849,30 @@ private:
 // (core/ProjectKey.h; round 190o), Groove has no LYNX model (listed as missing in REA_rodada183a.md).
 // The clip's colour and activator in one square, as the reference's clip title bar [LIVE 12.4 Clip View] (round 190s,
 // GAPMAP-0126 D15): filled = the clip plays, hollow = deactivated. Click switches it; right-click picks the colour.
+// Round 190kc: the Clip box's Commit button. Live 12.4 draws it as a 13 px round well with an arrow beside the Groove
+// label (shots/ref/live-clipview-midi-groove.png x 156..168 y 797..809; dim while the clip has no groove); the classic
+// look keeps a text button.
+class GrooveCommitButton final : public juce::TextButton
+{
+public:
+    void paintButton (juce::Graphics& g, bool over, bool down) override
+    {
+        if (! theme::livelook::active())
+        {
+            juce::TextButton::paintButton (g, over, down);
+            return;
+        }
+        namespace lv = theme::livelook;
+        const auto r = getLocalBounds().toFloat().withSizeKeepingCentre (13.0f, 13.0f);
+        const auto ink = lv::drawWell (g, r, down, true);
+        g.setColour (isEnabled() ? ink : ink.withAlpha (0.35f));
+        const auto cx = std::round (r.getCentreX()), cy = std::round (r.getCentreY());
+        g.fillRect (cx - 3.0f, cy, 6.0f, 1.0f); // (→: the shaft and the head)
+        g.fillRect (cx + 1.0f, cy - 2.0f, 1.0f, 5.0f);
+        g.fillRect (cx + 2.0f, cy - 1.0f, 1.0f, 3.0f);
+    }
+};
+
 class ClipChip final : public juce::Component, public juce::SettableTooltipClient
 {
 public:
@@ -2578,8 +2602,8 @@ private:
             put (length, { x0 + half + 4, y, half, row });
             y += row + 5;
             put (signatureLabel, { x0, y, half, row });
-            put (grooveLabel, { x0 + half + 4, y, half - 46, row });
-            put (commitGroove, { x0 + 2 * half + 4 - 44, y + 1, 44, row - 2 }); // (round 190kc)
+            put (grooveLabel, { x0 + half + 4, y, half - 16, row });
+            put (commitGroove, { x0 + 2 * half + 4 - 14, y, 14, row }); // (round 190kc: Live's round well)
             y += row + 1;
             put (signature, { x0, y, half, row });
             put (groove, { x0 + half + 4, y, half, row });
@@ -3097,7 +3121,7 @@ private:
     juce::TextButton setStart, setEnd, setPosition, setLength; // round 190dr
     juce::Label positionLabel, grooveLabel;
     juce::ComboBox groove;
-    juce::TextButton commitGroove; // round 190kc: Live's Commit button above the Clip Groove chooser
+    GrooveCommitButton commitGroove; // round 190kc: Live's Commit button beside the Groove label
     bool loading = false;
     std::unique_ptr<ui::TimerWhileShowing> showingTimer;
     juce::ToggleButton loop, legato;

@@ -10240,7 +10240,7 @@ juce::PopupMenu PlaylistComponent::buildAudioClipMenu (int index, int mouseX)
     }
     // round 190kc: Live's Extract Groove on an Arrangement audio clip (its attacks' timing and levels; Clip-launch layout)
     if (layoutstyle::current() == layoutstyle::Style::clipLaunch && sample != nullptr)
-        menu.addItem (tr ("Extract groove"), [this, index, sample, name = juce::File (path).getFileNameWithoutExtension().toStdString()] {
+        menu.addItem (tr ("Extract Groove(s)"), [this, index, sample, name = juce::File (path).getFileNameWithoutExtension().toStdString()] {
             engine.editSong ([&] (Song& s) {
                 if (index >= 0 && index < (int) s.playlist.size())
                     if (auto g = grooveaudio::extract (s, s.playlist[(std::size_t) index], *sample, GrooveBase::sixteenth, name); ! g.points.empty())

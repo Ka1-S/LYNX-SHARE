@@ -107,15 +107,16 @@ std::pair<juce::String, juce::String> describe (AudioEngine& engine, const remot
         case RemoteAction::record: return { tr ("Transport"), tr ("Record") };
         case RemoteAction::sessionRecord: return { tr ("Clip grid"), tr ("Session Record") };
         case RemoteAction::metronome: return { tr ("Transport"), tr ("Metronome") };
-        // round 190kc: the crossfader's positions and Live's Relative Session Mapping Strip
-        case RemoteAction::crossfaderLeft: return { tr ("Main"), tr ("Crossfader Left") };
-        case RemoteAction::crossfaderCentre: return { tr ("Main"), tr ("Crossfader Center") };
-        case RemoteAction::crossfaderRight: return { tr ("Main"), tr ("Crossfader Right") };
-        case RemoteAction::sceneUp: return { tr ("Scenes"), tr ("Scene Up") };
-        case RemoteAction::sceneDown: return { tr ("Scenes"), tr ("Scene Down") };
-        case RemoteAction::launchSelectedScene: return { tr ("Scenes"), tr ("Launch Selected Scene") };
-        case RemoteAction::cancelLaunch: return { tr ("Scenes"), tr ("Cancel Launch") };
-        case RemoteAction::launchSelectedClip: return { trackName (song, t.track), tr ("Launch Selected Clip") };
+        // round 190kc: the crossfader's positions and Live's Relative Session Mapping Strip, as Live 12.4's Key Mappings list
+        // names them (shots/ref/live-keymap-browser.png)
+        case RemoteAction::crossfaderLeft: return { tr ("Main") + " | " + tr ("Mixer"), tr ("Crossfader Left") };
+        case RemoteAction::crossfaderCentre: return { tr ("Main") + " | " + tr ("Mixer"), tr ("Crossfader Center") };
+        case RemoteAction::crossfaderRight: return { tr ("Main") + " | " + tr ("Mixer"), tr ("Crossfader Right") };
+        case RemoteAction::sceneUp: return { tr ("Main"), tr ("Scene Up") };
+        case RemoteAction::sceneDown: return { tr ("Main"), tr ("Scene Down") };
+        case RemoteAction::launchSelectedScene: return { tr ("Main"), tr ("Scene Launch") };
+        case RemoteAction::cancelLaunch: return { tr ("Main"), tr ("Cancel Scene Launch") };
+        case RemoteAction::launchSelectedClip: return { trackName (song, t.track), tr ("Track Launch") };
     }
     return {};
 }

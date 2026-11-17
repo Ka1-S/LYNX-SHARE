@@ -738,7 +738,7 @@ public:
         {
             for (int t = firstColumn(); t < columns && columnX (t) < cells.getRight(); ++t)
                 out.push_back ({ mapStripTrackBox (t).getIntersection (cells.withY (0).withHeight (getHeight())), remotemap::Target::selectedClip (t) });
-            const RemoteAction main[] { RemoteAction::sceneUp, RemoteAction::sceneDown, RemoteAction::launchSelectedScene, RemoteAction::cancelLaunch };
+            const RemoteAction main[] { RemoteAction::launchSelectedScene, RemoteAction::cancelLaunch, RemoteAction::sceneUp, RemoteAction::sceneDown };
             for (int k = 0; k < 4; ++k)
                 out.push_back ({ mapStripMainBox (k), remotemap::Target::of (main[k]) });
         }
@@ -993,19 +993,26 @@ public:
     }
 private:
     bool mapStrip = false;
-    static constexpr int mapStripHeight = 20;
+    // Live 12.4 (shots/ref/live-keymap-strip.png, the Patience set in Key Map Mode): a 17 px row and its 2 px separator under
+    // the status row; per track a button over the column (x 2..71 of a 76 px column, y 1..15) with a ▶; in the Main column
+    // Scene Launch ▶ (x 4, 13 px), Cancel Scene Launch ■ (x 19, 17 px), Scene Up / Down (x 38 / 55, 15 px round wells with
+    // an arrow) and the scene number box (x 72, 14 px). Only shown in a map mode, so always under the mode's tint.
+    static constexpr int mapStripHeight = 19;
     int mapStripNow() const noexcept { return mapStrip ? mapStripHeight : 0; }
     juce::Rectangle<int> mapStripRow() const { const auto cells = cellArea(); return { 0, cells.getBottom() + statusHeight, getWidth(), mapStripNow() }; }
-    // the strip's parts: a track's launch button; in the Main column 0 Scene Up, 1 Scene Down, 2 Launch, 3 Cancel Launch
+    // the strip's parts: a track's Track Launch; in the Main column 0 Scene Launch, 1 Cancel Scene Launch, 2 Scene Up,
+    // 3 Scene Down, 4 the scene number box
     juce::Rectangle<int> mapStripTrackBox (int track) const
     {
         const auto row = mapStripRow();
-        return juce::Rectangle<int> (columnX (track) + 3, row.getY() + 3, 16, row.getHeight() - 6);
+        return { columnX (track) + 2, row.getY() + 1, juce::jmax (4, (int) columnWidth - 6), 15 };
     }
     juce::Rectangle<int> mapStripMainBox (int which) const
     {
         const auto row = mapStripRow();
-        return { sceneX() + 4 + which * 20, row.getY() + 3, 16, row.getHeight() - 6 };
+        constexpr int x[] { 4, 19, 38, 55, 72 }, w[] { 13, 17, 15, 15, 14 };
+        which = juce::jlimit (0, 4, which);
+        return { sceneX() + x[which], row.getY() + 2, w[which], 15 };
     }
     void paintMapStrip (juce::Graphics& g) const
     {
@@ -1015,36 +1022,62 @@ private:
         namespace lv = theme::livelook;
         const auto live = liveLook();
         const auto row = mapStripRow();
-        g.setColour (live ? lv::surface : c::bg2);
-        g.fillRect (row);
         g.setColour (live ? lv::separator : c::border);
-        g.fillRect (row.getX(), row.getY(), row.getWidth(), 1);
-        const auto button = [&] (juce::Rectangle<int> r, int glyph) {
+        g.fillRect (row);
+        g.setColour (live ? lv::surface : c::bg2);
+        g.fillRect (row.withHeight (row.getHeight() - 2));
+        const auto ink = live ? lv::text : c::textSecondary;
+        const auto box = [&] (juce::Rectangle<int> r, bool round) {
+            if (round)
+            {
+                g.setColour (live ? lv::knobRing : c::border);
+                g.fillEllipse (r.toFloat());
+                g.setColour (live ? lv::well : c::bg4);
+                g.fillEllipse (r.toFloat().reduced (1.0f));
+                return;
+            }
             g.setColour (live ? lv::knobRing : c::border);
             g.fillRect (r);
             g.setColour (live ? lv::well : c::bg4);
             g.fillRect (r.reduced (1));
-            g.setColour (live ? lv::text : c::textSecondary);
-            const auto f = r.toFloat().withSizeKeepingCentre (7.0f, 7.0f);
-            juce::Path p;
-            if (glyph == 0)
-                p.addTriangle (f.getCentreX(), f.getY(), f.getRight(), f.getBottom(), f.getX(), f.getBottom());
-            else if (glyph == 1)
-                p.addTriangle (f.getX(), f.getY(), f.getRight(), f.getY(), f.getCentreX(), f.getBottom());
-            else if (glyph == 2)
-                p.addTriangle (f.getX(), f.getY(), f.getRight(), f.getCentreY(), f.getX(), f.getBottom());
-            else
-                p.addRectangle (f.reduced (0.5f));
-            g.fillPath (p);
+        };
+        const auto play = [&] (juce::Rectangle<int> r) {
+            g.setColour (ink);
+            const auto cx = r.getCentreX() - 3, cy = r.getCentreY();
+            for (int k = 0; k < 7; ++k) // (a ▶ in whole-pixel columns)
+                g.fillRect (cx + k, cy - (6 - k) / 2, 1, 2 * ((6 - k) / 2) + 1);
         };
         {
             juce::Graphics::ScopedSaveState save (g);
             g.reduceClipRegion (row.withRight (cellArea().getRight()));
             for (int t = firstColumn(); t < columnCount() && columnX (t) < cellArea().getRight(); ++t)
-                button (mapStripTrackBox (t), 2);
+            {
+                const auto r = mapStripTrackBox (t);
+                box (r, false);
+                play (r);
+            }
         }
-        for (int k = 0; k < 4; ++k)
-            button (mapStripMainBox (k), k == 3 ? 3 : k);
+        box (mapStripMainBox (0), false);
+        play (mapStripMainBox (0));
+        box (mapStripMainBox (1), false);
+        g.setColour (ink);
+        g.fillRect (mapStripMainBox (1).withSizeKeepingCentre (9, 9));
+        for (int k = 2; k <= 3; ++k)
+        {
+            const auto r = mapStripMainBox (k);
+            box (r, true);
+            g.setColour (ink);
+            const auto cx = r.getCentreX(), cy = r.getCentreY();
+            g.fillRect (cx, cy - 3, 1, 7); // (the arrow's stem and head)
+            const auto dir = k == 2 ? -1 : 1;
+            for (int d = 1; d <= 2; ++d)
+                g.fillRect (cx - d, cy + dir * (3 - d), 2 * d + 1, 1);
+        }
+        const auto number = mapStripMainBox (4);
+        box (number, false);
+        g.setColour (ink);
+        g.setFont (liveFont());
+        textcache::drawText (g, juce::String (selectedScene + 1), number, juce::Justification::centred, false);
     }
 public:
     std::unique_ptr<juce::Component> groovePool;
@@ -2050,7 +2083,7 @@ public:
                     engine.editSong ([=] (Song& s) { groove::commit (s, track, scene); });
                     repaint();
                 });
-                menu.addItem (tr ("Extract groove"), [this, track, scene] {
+                menu.addItem (tr ("Extract Groove(s)"), [this, track, scene] {
                     engine.editSong ([=] (Song& s) {
                         const auto* c = s.clipGrid ? launcher::clipAt (*s.clipGrid, track, scene) : nullptr;
                         if (c == nullptr || c->pattern < 0 || c->pattern >= (int) s.patterns.size())
@@ -2071,7 +2104,7 @@ public:
                     repaint();
                 });
                 const auto name = juce::File (juce::String::fromUTF8 (channel.samplePath.c_str())).getFileNameWithoutExtension().toStdString();
-                menu.addItem (tr ("Extract groove"), sample != nullptr, false, [this, track, scene, sample, name] {
+                menu.addItem (tr ("Extract Groove(s)"), sample != nullptr, false, [this, track, scene, sample, name] {
                     engine.editSong ([=] (Song& s) {
                         if (const auto* c = s.clipGrid ? launcher::clipAt (*s.clipGrid, track, scene) : nullptr)
                             if (auto g = grooveaudio::extract (s, *c, *sample, GrooveBase::sixteenth, name); ! g.points.empty())

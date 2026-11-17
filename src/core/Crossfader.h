@@ -12,7 +12,8 @@
 //
 // The gains: a track assigned to A hears the crossfader through `fraction` t = (1 - x) / 2 of its own side (1 at the far
 // left, 0 at the far right), one on B through t = (1 + x) / 2; each curve maps t to a gain. The curves were measured from
-// Live 12.4's own renders (see the table's comment). Pure, no allocation: the audio thread calls gain().
+// Live 12.4's own renders (core/CrossfaderCurves.inc; at the centre: Dipped 0.500, Intermediate 0.582, Constant Power 0.707,
+// Slow Fade / Slow Cut / Fast Cut / Transition 1.0). Pure, no allocation: the audio thread calls gain().
 
 #include <algorithm>
 #include <array>
@@ -39,21 +40,18 @@ inline float fractionFor (CrossfadeAssign side, float position) noexcept
     return side == CrossfadeAssign::a ? (1.0f - position) * 0.5f : (1.0f + position) * 0.5f;
 }
 
-// The gain of curve `curve` at fraction t (0..1); 1 = unattenuated.
+#include "core/CrossfaderCurves.inc"
+
+// The gain of curve `curve` at fraction t (0..1); 1 = unattenuated: Live's measured table, linear between its 257 points.
 inline float curveGain (int curve, float t) noexcept
 {
-    t = std::clamp (t, 0.0f, 1.0f);
-    constexpr float halfPi = 1.57079632679f;
-    switch (curve)
-    {
-        case 0: return t; // Dipped
-        case 1: return std::pow (t, 0.7f); // Intermediate
-        case 3: return t >= 0.5f ? 1.0f : std::sin (halfPi * t * 2.0f); // Slow Fade
-        case 4: return t >= 0.25f ? 1.0f : std::sin (halfPi * t * 4.0f); // Slow Cut
-        case 5: return t >= 0.03f ? 1.0f : t / 0.03f; // Fast Cut
-        case 6: return t >= 0.5f ? 1.0f : t * t * 4.0f; // Transition
-        default: return std::sin (halfPi * t); // Constant Power
-    }
+    if (curve < 0 || curve >= curveCount)
+        curve = defaultCurve;
+    t = std::clamp (t, 0.0f, 1.0f) * (float) (crossfaderTableSize - 1);
+    const auto i = std::min ((int) t, crossfaderTableSize - 2);
+    const auto f = t - (float) i;
+    const auto* row = crossfaderTable[curve];
+    return row[i] + (row[i + 1] - row[i]) * f;
 }
 
 // The gain the crossfader gives an insert with assignment `side` at `position` (-1..1).
@@ -64,9 +62,9 @@ inline float gain (int curve, CrossfadeAssign side, float position) noexcept
     return curveGain (curve, fractionFor (side, position));
 }
 
-// Live's three key-mappable positions (Crossfader Left / Center / Right): a key mapped to one of them flips the
-// crossfader between that position's two ends [Live manual: "A key mapped to any one of the three assignable crossfader
-// positions (left, center or right) will toggle the crossfader's absolute left and right positions."]
+// Live's three key-mappable positions (Crossfader Left / Center / Right). Measured in Live 12.4 (round 190kc): a press moves
+// the crossfader to its position (again: it stays); holding one and pressing / releasing another snaps back to the held
+// one on the release ("snapping back", Live manual 18.5).
 enum class Spot : std::uint8_t { left, centre, right };
 inline float spotPosition (Spot s) noexcept { return s == Spot::left ? -1.0f : s == Spot::right ? 1.0f : 0.0f; }
 

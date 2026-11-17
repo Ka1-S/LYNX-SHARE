@@ -2588,8 +2588,8 @@ void MainComponent::fireRemote (const remotemap::Fire& f)
             if (press)
                 runAction ("transport.metronome");
             break;
-        // round 190kc: the crossfader's positions [Live manual 18.5: a key on one position toggles the crossfader's left
-        // and right ends; with two positions mapped, holding one and pressing / releasing the other snaps back]
+        // round 190kc: the crossfader's positions (measured in Live 12.4: a press goes there; holding one position and
+        // pressing / releasing another snaps back to the held one, Live manual 18.5)
         case RemoteAction::crossfaderLeft:
         case RemoteAction::crossfaderCentre:
         case RemoteAction::crossfaderRight:
@@ -2599,9 +2599,7 @@ void MainComponent::fireRemote (const remotemap::Fire& f)
             float to = engine.getSong().crossfader;
             if (press)
             {
-                const auto at = crossfader::spotPosition (spot);
-                // pressed where it already is: a left or right key flips to the other end
-                to = std::abs (engine.getSong().crossfader - at) < 1.0e-4f && spot != crossfader::Spot::centre ? -at : at;
+                to = crossfader::spotPosition (spot);
                 heldCrossfaderSpots.push_back (t.action);
             }
             else

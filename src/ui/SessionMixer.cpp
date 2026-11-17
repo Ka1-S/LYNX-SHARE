@@ -107,11 +107,15 @@ constexpr LiveTick liveScale[] = { { 6.0f, 1.0f },     { 0.0f, 15.0f },    { -6.
                                    { -18.0f, 57.0f },  { -24.0f, 71.0f },  { -30.0f, 86.0f },  { -36.0f, 98.0f },
                                    { -42.0f, 109.0f }, { -48.0f, 118.0f }, { -54.0f, 127.0f }, { -60.0f, 134.0f } };
 constexpr float liveScaleFloor = 140.0f; // -inf (the last tick)
-// Round 190kc: Live's Crossfader section under Volume (the A / B buttons; the Main's crossfader) and the Main strip's
-// Pre / Post toggles (live-session.png x 1555..1580 y 589..601 and x 1589..1614 y 606..618: 26 x 13 with a 1 px #111111
-// rim, #FFAD56 with "Post" in #070707, a 1 px #5D5D5D lead line from the strip's left at the toggle's middle row)
-constexpr int liveCrossfadeHeight = 22;
-const juce::Colour livePostLine { 0xff5d5d5d }, liveSendOffRing { 0xff2a2a2a };
+// Round 190kc: Live's Crossfader section under Volume and the Main strip's Pre / Post toggles, captured in Live 12.4
+// (shots/ref/live-session-crossfader.png, live-pre-post.png). The section: 21 px + its 2 px separator; per strip A at
+// x 11 and B at x 38, 24 x 13 at y 4 with a 1 px #111111 rim, #1E1E1E off, A lit #FFAD56, B lit #03C3D5 (letters #070707
+// lit, #B5B5B5 off). The Main's crossfader: a 2 px #111111 line at y 4..5 from x 9 to 7 px before the strip's right, broken
+// 3 px at the position, and a 13 x 10 triangle (#5D5D5D, a #111111 rim) from y 6 under it. Pre / Post (live-session.png
+// x 1555..1580 y 589..601 and x 1589..1614 y 606..618): 26 x 13, a 1 px #111111 rim, Post #FFAD56 / Pre #03C3D5 with the
+// word in #070707, a 1 px #5D5D5D lead line from the strip's left at the toggle's middle row.
+constexpr int liveCrossfadeHeight = 21;
+const juce::Colour livePostLine { 0xff5d5d5d }, liveSendOffRing { 0xff2a2a2a }, liveBlue { 0xff03c3d5 }, liveThumb { 0xff5d5d5d };
 // Live's colours not in theme::livelook: the meter's 0 dB line and the line between its wells, the level ramp
 // (live-clipview-audio.png: green #00F758 to -18 dB, hold lines #E4DA00 at -11 dB and #F69B00 at -5 dB; red over 0 dB is
 // Live's clip red, not captured lit), ticks (white at 30 %: #757575 on #363636, #7D7D7D on #464646)
@@ -462,9 +466,10 @@ void SessionMixerComponent::addViewItems (juce::PopupMenu& menu)
     menu.addItem (tr ("Sends"), view.shown, view.sends, set (&SessionMixerView::sends, ! view.sends));
     menu.addItem (tr ("Volume"), view.shown, view.volume, set (&SessionMixerView::volume, ! view.volume));
     menu.addItem (tr ("Track Options"), view.shown, view.trackOptions, set (&SessionMixerView::trackOptions, ! view.trackOptions));
-    // round 190kc: Live's Mixer Controls › Return Tracks and Crossfader
-    menu.addItem (tr ("Return Tracks"), view.shown, view.returns, set (&SessionMixerView::returns, ! view.returns));
+    // round 190kc: Live's Mixer Controls › Crossfader, then (after a line) Return Tracks [shots/ref/live-view-mixer-controls.png]
     menu.addItem (tr ("Crossfader"), view.shown, view.crossfader, set (&SessionMixerView::crossfader, ! view.crossfader));
+    menu.addSeparator();
+    menu.addItem (tr ("Return Tracks"), view.shown, view.returns, set (&SessionMixerView::returns, ! view.returns));
     // round 190kc: Live's Create › Insert Return Track (a new return after the others, "C Return" for the third)
     menu.addSeparator();
     menu.addItem (tr ("Insert Return Track"), (int) sessionmixer::returnsOf (song).size() < sessionmixer::maxReturns, false, [this] {
@@ -616,9 +621,9 @@ juce::Rectangle<int> SessionMixerComponent::livePartBounds (int column, Part par
         case Part::xfadeB:
             if (sections.crossfade == 0 || main || strip.insert <= 0)
                 return {};
-            return { x0 + (w - 2) / 2 + (part == Part::xfadeA ? -24 : 1), crossY + 4, 23, 13 };
-        case Part::crossfader:
-            return sections.crossfade > 0 && main ? R (x0 + 8, crossY + 3, w - 14, 15) : R();
+            return { x0 + (part == Part::xfadeA ? 11 : 38), crossY + 4, 24, 13 };
+        case Part::crossfader: // (the line x 1549..1618 and the triangle to y 785 on a Main strip at x 1540, section y 769)
+            return sections.crossfade > 0 && main ? R (x0 + 9, crossY + 4, w - 16, 13) : R();
         case Part::none:
             break;
     }
@@ -678,7 +683,8 @@ void SessionMixerComponent::mapSpots (std::vector<mapmode::Spot>& out)
             add (Part::crossfader, 0);
             if (const auto box = partBounds (column, Part::crossfader); ! box.isEmpty())
             {
-                const auto field = std::min (14, box.getWidth() / 5);
+                // (Live's map modes split the line: Left at its first 10 px, Right at its last 10 px, Center at the middle)
+                const auto field = std::min (10, box.getWidth() / 6);
                 out.push_back ({ box.withWidth (field), remotemap::Target::of (RemoteAction::crossfaderLeft) });
                 out.push_back ({ box.withSizeKeepingCentre (field, box.getHeight()), remotemap::Target::of (RemoteAction::crossfaderCentre) });
                 out.push_back ({ box.withLeft (box.getRight() - field), remotemap::Target::of (RemoteAction::crossfaderRight) });
@@ -1002,7 +1008,7 @@ void SessionMixerComponent::paintCrossfadeSection (juce::Graphics& g, int column
             const auto letter = part == Part::xfadeA ? juce::String ("A") : juce::String ("B");
             if (live)
             {
-                liveWell (g, box, lit ? lv::on : hot (part) ? lv::raised : lv::well);
+                liveWell (g, box, lit ? (part == Part::xfadeA ? lv::on : liveBlue) : lv::well);
                 g.setFont (liveFont());
                 g.setColour (lit ? lv::ink : lv::text);
                 textcache::drawText (g, letter, box, juce::Justification::centred, false);
@@ -1016,16 +1022,26 @@ void SessionMixerComponent::paintCrossfadeSection (juce::Graphics& g, int column
     if (box.isEmpty())
         return;
     const auto pos = juce::jlimit (-1.0f, 1.0f, song.crossfader);
-    const auto x = (float) box.getX() + 4.0f + (pos + 1.0f) * 0.5f * (float) (box.getWidth() - 8);
+    const auto x = live ? (float) box.getX() + (pos + 1.0f) * 0.5f * (float) (box.getWidth() - 1)
+                        : (float) box.getX() + 4.0f + (pos + 1.0f) * 0.5f * (float) (box.getWidth() - 8);
     if (live)
     {
-        liveWell (g, box, hot (Part::crossfader) ? lv::raised : lv::well);
-        g.setColour (lv::text);
-        g.fillRect (box.getX() + 4, box.getY() + 4, box.getWidth() - 8, 1);
-        // the position: an upward ▲ under the line, in whole-pixel rows (no path)
-        g.setColour (lv::text);
-        for (int row = 0; row < 5; ++row)
-            g.fillRect (std::round (x) - (float) row, (float) box.getY() + 6.0f + (float) row, 1.0f + 2.0f * (float) row, 1.0f);
+        // the line, broken 3 px at the position, and the triangle under it, in whole-pixel rows (no path)
+        const auto cx = juce::jlimit (box.getX() + 1, box.getRight() - 2, (int) std::round (x));
+        g.setColour (lv::knobRing);
+        g.fillRect (box.getX(), box.getY(), cx - 1 - box.getX(), 2);
+        g.fillRect (cx + 2, box.getY(), box.getRight() - cx - 2, 2);
+        for (int row = 0; row < 10; ++row) // (#111111 rim rows, then the #5D5D5D fill one px inside)
+        {
+            const auto half = (row + 1) / 2 + (row >= 6 ? 1 : 0);
+            g.setColour (lv::knobRing);
+            g.fillRect (cx - half - 1, box.getY() + 2 + row, 2 * half + 3, 1);
+            if (row >= 1 && row <= 8)
+            {
+                g.setColour (liveThumb);
+                g.fillRect (cx - half, box.getY() + 2 + row, 2 * half + 1, 1);
+            }
+        }
     }
     else
     {
@@ -1205,7 +1221,7 @@ void SessionMixerComponent::paintStripLive (juce::Graphics& g, int column, int s
                 g.setColour (livePostLine);
                 g.fillRect (x0 + 3, box.getCentreY(), box.getX() - 2 - (x0 + 3), 1);
                 const auto pre = sessionmixer::isPre (song, rows[(std::size_t) r]);
-                liveWell (g, box, lv::on);
+                liveWell (g, box, pre ? liveBlue : lv::on);
                 text (pre ? tr ("Pre") : tr ("Post"), box, juce::Justification::centred, lv::ink);
             }
     }
@@ -1478,7 +1494,8 @@ void SessionMixerComponent::mouseDrag (const juce::MouseEvent& e)
     if (dragging.part == Part::crossfader) // (round 190kc: the triangle follows the pointer along the line)
     {
         const auto area = partBounds (dragging.column, Part::crossfader);
-        v = juce::jlimit (-1.0, 1.0, (double) (e.x - area.getX() - 4) / (double) std::max (1, area.getWidth() - 8) * 2.0 - 1.0);
+        const auto inset = liveLook() ? 0 : 4;
+        v = juce::jlimit (-1.0, 1.0, (double) (e.x - area.getX() - inset) / (double) std::max (1, area.getWidth() - 1 - 2 * inset) * 2.0 - 1.0);
     }
     else if (dragging.part == Part::fader)
     {
@@ -1658,10 +1675,12 @@ juce::PopupMenu SessionMixerComponent::sendMenu (const Hit& hit)
         engine.editSong ([=] (Song& s) { sessionmixer::setSendEnabled (s, from, to, ! on); });
         repaint();
     });
-    menu.addItem (tr ("Enable All Sends"), true, false, [this, from] {
-        engine.editSong ([from] (Song& s) {
+    // (Live 12.4: "Enable Send / Enable All Sends" on a send that is off, "Disable Send / Disable All Sends" on one that is
+    // on, shots/ref/live-return-send-menu-off.png, -on.png)
+    menu.addItem (on ? tr ("Disable All Sends") : tr ("Enable All Sends"), true, false, [this, from, on] {
+        engine.editSong ([from, on] (Song& s) {
             for (const auto r : sessionmixer::returnsOf (s))
-                sessionmixer::setSendEnabled (s, from, r, true);
+                sessionmixer::setSendEnabled (s, from, r, ! on);
         });
         repaint();
     });

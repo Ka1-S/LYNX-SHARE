@@ -191,6 +191,13 @@ TEST (cliplaunch190kc_crossfader_curves)
     // Constant Power keeps the power of A + B at the centre
     const auto c = crossfader::gain (crossfader::defaultCurve, CrossfadeAssign::a, 0.0f);
     CHECK (std::abs (2.0f * c * c - 1.0f) < 0.02f);
+    // the centre and quarter gains measured in Live 12.4's renders (xf/curves.json, round 190kc)
+    const std::pair<int, float> centre[] { { 0, 0.500f }, { 1, 0.582f }, { 2, 0.707f }, { 3, 1.0f }, { 4, 1.0f }, { 5, 1.0f }, { 6, 0.997f } };
+    for (const auto& [k, g] : centre)
+        CHECK (std::abs (crossfader::gain (k, CrossfadeAssign::b, 0.0f) - g) < 0.01f);
+    CHECK (std::abs (crossfader::gain (0, CrossfadeAssign::a, 0.5f) - 0.223f) < 0.01f);  // Dipped, a quarter from B
+    CHECK (std::abs (crossfader::gain (6, CrossfadeAssign::a, 0.5f) - 0.141f) < 0.01f);  // Transition
+    CHECK (crossfader::gain (5, CrossfadeAssign::a, 0.9f) > 0.98f);                      // Fast Cut: whole until the end
     CHECK (std::string (crossfader::curveName (6)) == "Transition" && std::string (crossfader::curveName (0)) == "Dipped");
 }
 
