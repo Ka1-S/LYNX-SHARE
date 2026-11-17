@@ -143,6 +143,15 @@ TEST (gb190ke_fade_out_places_garageband_points_on_the_master)
     CHECK (! songfade::present (s) && songfade::findAutomation (s) < 0);
     CHECK (s.playlistTracks[(std::size_t) clip.track].name.empty());
     CHECK (! songfade::remove (s));
+    // an armed Guitar track with no take yet is in use: the fade goes under it, not on it
+    auto withGuitar = empty();
+    withGuitar.bpm = 120.0;
+    addBeat (withGuitar, 4);
+    simpletracks::Request g;
+    g.kind = simpletracks::Kind::guitar;
+    const auto gt = simpletracks::addTrack (withGuitar, g);
+    const auto r5 = songfade::apply (withGuitar, 4.0);
+    CHECK (gt.ok() && r5.ok && r5.track == gt.track + 1);
 }
 
 TEST (gb190ke_fade_out_renders_in_the_export)

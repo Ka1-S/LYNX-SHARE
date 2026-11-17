@@ -67,6 +67,7 @@
         if (simple == nullptr)
             return false;
         simple->hideChooser();
+        ui.workspaceForTest().hide (workspace::Panel::channelRack); // (the new Drums track opened the rack: the timeline in view)
         auto& playlist = ui.getPlaylistForSnapshot();
         playlist.setViewForSnapshot (64.0, 0, 0);
         offline.dispatchPendingMessages();
@@ -114,6 +115,8 @@
             offline.dispatchPendingMessages();
             const auto& song = offline.getSong();
             const auto clip = songfade::findClip (song);
+            check ("the fade's clip is on a track of its own, under the Guitar track", clip >= 0 && song.playlist[(std::size_t) clip].track == 3,
+                   clip >= 0 ? juce::String (song.playlist[(std::size_t) clip].track) : juce::String());
             check ("Fade out the end: one automation clip on the Master's volume, ending with the music", clip >= 0
                        && song.playlist[(std::size_t) clip].end() == songfade::musicEnd (song)
                        && song.automations[(std::size_t) song.playlist[(std::size_t) clip].automation].target.kind == AutomationTargetKind::mixerVolume);
@@ -143,7 +146,7 @@
                 {
                     if (*k == simpletracks::Kind::instrument && synthTrack < 0)
                         synthTrack = t;
-                    if (*k == simpletracks::Kind::guitar && guitarTrack < 0)
+                    if ((*k == simpletracks::Kind::audio || *k == simpletracks::Kind::guitar || *k == simpletracks::Kind::voice) && guitarTrack < 0)
                         guitarTrack = t;
                     if (*k == simpletracks::Kind::drums && drumsTrack < 0)
                         drumsTrack = t;

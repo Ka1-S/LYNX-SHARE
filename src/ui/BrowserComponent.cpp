@@ -6497,7 +6497,10 @@ void BrowserComponent::setTagsPanelShown (bool shown)
 void BrowserComponent::setPickedTags (std::vector<std::string> tags)
 {
     picked = std::move (tags);
-    tagsPanel->repaint();
+    if (layoutstyle::current() == layoutstyle::Style::simple && tagsPanelShown) // (round 190ke: the picked chips come first)
+        tagsPanel->refresh();
+    else
+        tagsPanel->repaint();
     tagsButton->repaint();
     runSearch();
     savePrefs();

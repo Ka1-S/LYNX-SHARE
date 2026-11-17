@@ -304,7 +304,9 @@ private:
         const auto t = track ? track() : -1;
         insert = t >= 0 ? detailchain::forTrack (song, t).insert : -1;
         const auto kind = t >= 0 ? simpletracks::kindOf (song, t) : std::nullopt;
-        bass = kind == simpletracks::Kind::bass;
+        // a Bass track (the chooser's Bass tile names it "Bass", "Bass 2"...): FL's Bass range, down to F0
+        const auto trackName = t >= 0 && t < (int) song.playlistTracks.size() ? utf8 (song.playlistTracks[(std::size_t) t].name) : juce::String();
+        bass = trackName.containsIgnoreCase ("bass") || trackName.containsIgnoreCase (tr ("Bass"));
         const auto names = engine.getInputChannelNames();
         const auto [first, count] = st::inputFor (song, insert, (int) names.size());
         inputFirst = first;
@@ -317,7 +319,7 @@ private:
             if (count > 1 && first + 1 < (int) names.size())
                 name << " + " << utf8 (names[(std::size_t) first + 1]);
             if (t >= 0 && insert > 0 && insert < (int) song.mixer.size() && song.mixer[(std::size_t) insert].inputChannel >= 0 && kind)
-                source = tr (simpletracks::defaultName (*kind)) + juce::String::fromUTF8 ("  \xc2\xb7  ") + name;
+                source = (trackName.isNotEmpty() ? trackName : tr (simpletracks::defaultName (*kind))) + juce::String::fromUTF8 ("  \xc2\xb7  ") + name;
             else
                 source = name;
         }

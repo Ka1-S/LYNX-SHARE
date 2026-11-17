@@ -86,7 +86,8 @@ inline double seconds (const Song& song) noexcept
     return c < 0 ? 0.0 : secondsOf (song, song.playlist[(std::size_t) c].length);
 }
 
-// The track the fade's clip goes on: the one it is on already, else the first track under every placed clip.
+// The track the fade's clip goes on: the one it is on already, else the first track under every track in use (one with
+// clips, or a Simple / audio / instrument track, a name, lanes — an armed Guitar track without a take yet is in use).
 inline int trackFor (const Song& song) noexcept
 {
     if (const auto c = findClip (song); c >= 0)
@@ -95,6 +96,9 @@ inline int trackFor (const Song& song) noexcept
     for (const auto& c : song.playlist)
         if (c.gridSlot < 0)
             highest = std::max (highest, c.track);
+    for (int t = 0; t < (int) song.playlistTracks.size(); ++t)
+        if (const auto& pt = song.playlistTracks[(std::size_t) t]; pt.mode != PlaylistTrackMode::unassigned || ! pt.name.empty() || ! pt.lanes.empty())
+            highest = std::max (highest, t);
     return highest + 1;
 }
 
