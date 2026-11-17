@@ -367,8 +367,14 @@ juce::PopupMenu HintBar::copyMenu() const
 
 void HintBar::mouseDown (const juce::MouseEvent& e)
 {
-    if (e.mods.isPopupMenu())
-        copyMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+    if (! e.mods.isPopupMenu())
+        return;
+    auto menu = onMenu != nullptr ? onMenu() : juce::PopupMenu();
+    if (menu.getNumItems() > 0)
+        menu.addSeparator();
+    for (juce::PopupMenu::MenuItemIterator it (copyMenu()); it.next();)
+        menu.addItem (it.getItem());
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
 }
 
 void HintBar::paint (juce::Graphics& g)

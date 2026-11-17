@@ -76,10 +76,12 @@ public:
     void setHint (const Hint& hint, bool live = false);
     const Hint& getHint() const noexcept { return current; }
     void paint (juce::Graphics& g) override;
-    // FL's hint bar (manual "Title & Hint Bar": "Right-Click and copy any value from a control if desired", round 190kn,
-    // DF-47): right-click offers the shown value and text for the clipboard
+    // Round 190kn (DF-47): a right-click on the hint bar opens what FL 2026 opens there, the toolbars menu (captured:
+    // details190kn raw/f09), which the owner gives through `onMenu`; LYNX adds the shown value and text for the clipboard
+    // at its end (FL's own "copy any value" is the controls' Copy value, which LYNX's value menus have too)
     void mouseDown (const juce::MouseEvent& e) override;
     juce::PopupMenu copyMenu() const; // (tests / shots)
+    std::function<juce::PopupMenu()> onMenu;
     // Round 190jo (design190ia FM-7, the Pattern toolbar only): the hint a step larger and brighter, as FL's (cap 8 on one
     // line, cap 7 on two; FL cap 11 / 9); the other toolbars and windows keep the smaller text
     void setLarger (bool shouldBeLarger)

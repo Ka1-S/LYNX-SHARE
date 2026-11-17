@@ -362,6 +362,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     };
     stopButton.onRightClick = [this] { showStopMenu(); };
     output.onModeChanged = [this] { saveUiSettings(); };
+    hintBar.onMenu = [this] { return makeToolbarMenu(); }; // (round 190kn: FL's hint bar right-click = the toolbars menu)
     // round 190kn (FL's CPU panel): double-click = Plugin performance monitor; the menu's refresh rate is kept
     perfMeter.onOpenMonitor = [this] { showPluginMonitor (engine); };
     perfMeter.onRefreshChanged = [this] { saveUiSettings(); };

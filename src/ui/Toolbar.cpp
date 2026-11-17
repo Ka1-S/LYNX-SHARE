@@ -1704,7 +1704,9 @@ ui::Hint OutputMonitor::hintAt (juce::Point<int> p)
     {
         const auto x01 = juce::jlimit (0.0f, 1.0f, ((float) p.x + 0.5f - bars.getX()) / juce::jmax (1.0f, bars.getWidth()));
         h.text = tr ("Output peak meter, left and right (a bar turns red when that side clipped). The value is the level at the pointer");
-        h.value = juce::String (levelAt (x01), 1) + " dB";
+        // (FL 2026 hovering its output meter: "Peak meter (master)  -7.19dB 0.44", details190kn raw/f07)
+        const auto db = levelAt (x01);
+        h.value = juce::String (db, 2) + " dB  " + juce::String (juce::Decibels::decibelsToGain (db), 2);
         return h;
     }
     h.text = tr ("Output: {0} and the peak level of what you hear (the meter's top turns red when it clipped)  [LMB] next display  [RMB] display menu",

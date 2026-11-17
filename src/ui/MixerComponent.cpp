@@ -1883,13 +1883,24 @@ void MixerStrips::paint (juce::Graphics& g)
             const auto led = compactLayout ? 10.0f : 12.0f;
             const auto m = muteArea (t).toFloat().withSizeKeepingCentre (led, led);
             g.setColour (muteLed (track.muted));
-            g.fillEllipse (m);
-            if (track.lockState) // round 190kn: FL's locked state (Shift+click), the rack's lock colour
+            if (track.lockState)
             {
-                g.setColour (colour::warning);
-                g.drawEllipse (m.expanded (2.0f), 1.0f);
+                // round 190kn: FL's locked state (Shift+click) shows an open padlock in the LED's colour instead of the LED
+                // (FL 2026, details190kn raw/f05: a 10 x 5 body under a shackle open on the left, 13 px tall)
+                const auto u = m.getWidth() / 12.0f;
+                const auto body = juce::Rectangle<float> (m.getX() + 1.0f * u, m.getY() + 6.5f * u, 10.0f * u, 5.0f * u);
+                g.fillRect (body.toNearestInt());
+                juce::Path shackle;
+                shackle.startNewSubPath (body.getX() + 2.0f * u, body.getY() - 1.5f * u);
+                shackle.lineTo (body.getX() + 2.0f * u, body.getY() - 4.0f * u);
+                shackle.quadraticTo (body.getX() + 2.0f * u, m.getY() - 1.0f * u, body.getCentreX() + 0.5f * u, m.getY() - 1.0f * u);
+                shackle.quadraticTo (body.getRight() - 2.0f * u, m.getY() - 1.0f * u, body.getRight() - 2.0f * u, body.getY() - 4.0f * u);
+                shackle.lineTo (body.getRight() - 2.0f * u, body.getY());
+                g.strokePath (shackle, juce::PathStrokeType (juce::jmax (1.0f, 1.2f * u)));
             }
-            else if (! track.muted || hovered (Part::mute))
+            else
+                g.fillEllipse (m);
+            if (! track.lockState && (! track.muted || hovered (Part::mute)))
             {
                 g.setColour (hovered (Part::mute) ? colour::textSecondary : colour::ledOn.withAlpha (0.25f));
                 g.drawEllipse (m.expanded (2.0f), 1.0f);
@@ -3117,7 +3128,8 @@ ui::Hint MixerStrips::hintAt (juce::Point<int> p)
             // FL: "hovering your cursor over most peak meters will show the value at the pointer position" (round 190kn)
             const auto m = meterArea (t);
             const auto pos = juce::jlimit (0.0f, 1.0f, (float) (m.getBottom() - p.y) / (float) juce::jmax (1, m.getHeight()));
-            h.value = juce::String (-60.0f + 66.0f * pos, 1) + " dB";
+            const auto db = -60.0f + 66.0f * pos; // (FL's format, as its output meter: "-7.19dB 0.44")
+            h.value = juce::String (db, 2) + " dB  " + juce::String (juce::Decibels::decibelsToGain (db), 2);
             break;
         }
         case Part::route: h.text = name + " - " + tr ("Route the selected inserts to this one (drag after enabling: level). Ctrl+click: this track only, Shift: sidechain, Ctrl+Shift: sidechain only, right-click: menu"); h.hasMenu = true; break;

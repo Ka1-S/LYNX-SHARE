@@ -78,7 +78,14 @@
                 if (first.isEmpty())
                     first = it.getItem().text;
             check ("hint bar menu: \"" + first + "\"", first.contains ("-3.2 dB"));
-            menuShot (copy, "Hint bar", "hint-copy-menu");
+            {
+                // the right-click as the hint bar builds it: FL's toolbars menu (FL 2026 opens it there), then LYNX's copy items
+                auto whole = ui.getToolbarMenuForSnapshot();
+                whole.addSeparator();
+                for (juce::PopupMenu::MenuItemIterator it (copy); it.next();)
+                    whole.addItem (it.getItem());
+                menuShot (whole, "Hint bar", "hint-copy-menu");
+            }
 
             // the Mixer: a locked track (2), a soloed one (1), the hint at a mute switch and at a strip meter
             ui.setBounds (normalSize);
