@@ -2273,6 +2273,8 @@ juce::var channelToVar (const ChannelDef& c)
         o->setProperty ("uid", uidVar (c.uid));
     if (! c.standIns.empty())
         o->setProperty ("standIns", standInsToVar (c.standIns));
+    if (c.ara.active()) // round 190kx: edited in an ARA plugin (only then: every other file is what it was)
+        o->setProperty ("ara", juce::Array<juce::var> { str (c.ara.pluginId), str (c.ara.pluginName) });
     // Freeze (round 190ay): written only while frozen, so every other project's file is what it was
     if (c.freeze.on())
     {
@@ -2654,6 +2656,8 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
         def.patcher = patcherFromVar (c["patcher"], song);
     def.uid = uidFrom (c.getProperty ("uid", {}));
     def.standIns = standInsFromVar (c["standIns"]);
+    if (const auto& ara = c["ara"]; ara.isArray() && ara.size() >= 2 && def.instrument == InstrumentKind::audioClip) // (round 190kx)
+        def.ara = { ara[0].toString().toStdString(), ara[1].toString().toStdString() };
     for (const auto* key : { "freeze", "trackFreeze" })
         if (const auto& f = c[key]; f.isObject())
         {
@@ -3499,6 +3503,13 @@ juce::String toJson (const Song& song, bool stampVersion)
     if (envelopes != nullptr)
         root->setProperty ("clipEnvelopes", clipEnvelopesToVar (song, envelopeRemap, envelopeCount));
     root->setProperty ("playlist", clipsToVar (song.playlist, envelopes));
+    if (! song.araDocuments.empty()) // round 190kx: the ARA plugins' documents (only in a project that uses one)
+    {
+        juce::Array<juce::var> docs;
+        for (const auto& d : song.araDocuments)
+            docs.add (juce::Array<juce::var> { str (d.pluginId), str (d.archive) });
+        root->setProperty ("araDocuments", docs);
+    }
     root->setProperty ("clipFadesPerClip", true); // round 180d: a project without it has linear clip fades
     if (song.clipGrid) // the Clip-launch workflow's grid (round 181a): only in a project that has one
         root->setProperty ("clipGrid", clipGridToVar (*song.clipGrid, envelopes));
@@ -4026,6 +4037,11 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
         }
 
     song.clipEnvelopes = clipEnvelopesFromVar (root["clipEnvelopes"]); // (round 190gi; before every clip list)
+    song.araDocuments.clear(); // round 190kx
+    if (const auto* docs = root["araDocuments"].getArray())
+        for (const auto& d : *docs)
+            if (d.isArray() && d.size() >= 2)
+                song.araDocuments.push_back ({ d[0].toString().toStdString(), d[1].toString().toStdString() });
     song.playlist = clipsFromVar (root["playlist"], song);
     // saved before FL's S curve for clip fades (round 180d): those clips keep the straight fades the mix was made with
     const bool oldClipFades = ! root.hasProperty ("clipFadesPerClip");

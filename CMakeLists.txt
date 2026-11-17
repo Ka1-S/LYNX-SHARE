@@ -513,6 +513,7 @@ if(LYNX_BUILD_APP)
         src/engine/LiveRemotePlugins.cpp
         src/ui/LiveRemoteUi.cpp
         src/engine/PluginHost.cpp
+        src/engine/AraHost.cpp
         src/engine/FlStudio.cpp
         src/engine/PluginSandbox.cpp
         src/engine/SandboxWorker.cpp
@@ -542,6 +543,7 @@ if(LYNX_BUILD_APP)
         src/ui/ChannelRackComponent.cpp
         src/ui/PianoRollComponent.cpp
         src/ui/PlaylistComponent.cpp
+        src/ui/AraMenu.cpp
         src/ui/PatternBlocksView.cpp
         src/ui/MixerComponent.cpp
         src/ui/QuickPick.cpp
@@ -690,6 +692,7 @@ if(LYNX_BUILD_APP)
     target_include_directories(LYNX PRIVATE third_party/onnxruntime) # loaded at run time, never linked
 
     target_include_directories(LYNX PRIVATE third_party/clap/include)
+    target_include_directories(LYNX PRIVATE third_party/ara) # (ARA_API / ARA_Library, round 190kx)
     # the commit the build comes from (crash reports name it, round 159)
     execute_process(COMMAND git rev-parse --short=10 HEAD WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
                     OUTPUT_VARIABLE LYNX_GIT_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
@@ -700,6 +703,8 @@ if(LYNX_BUILD_APP)
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
         JUCE_PLUGINHOST_VST3=1
+        # ARA 2 hosting (round 190kx): Celemony's ARA SDK 2.1 headers and library sources in third_party/ara (Apache-2.0)
+        JUCE_PLUGINHOST_ARA=1
         # MP3 is read by LYNX (src/engine/Mp3Format, minimp3; round 157b), not by JUCE's MP3AudioFormat
         JUCE_USE_MP3AUDIOFORMAT=0
         JUCE_APPLICATION_NAME_STRING="$<TARGET_PROPERTY:LYNX,JUCE_PRODUCT_NAME>"

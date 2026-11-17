@@ -388,6 +388,9 @@ struct RackState
         // new as usual
         std::function<std::shared_ptr<Instrument> (const ChannelDef&, double sampleRate)> liveInstrument;
         std::function<std::shared_ptr<Effect> (const EffectSlot&, double sampleRate)> liveEffect;
+        // Round 190kx (core/AraLink.h): an audio clip channel edited in an ARA plugin takes the instrument this returns (the
+        // plugin's playback renderer, engine/AraHost); nullptr or unset: its clips play through its sampler as usual
+        std::function<std::shared_ptr<Instrument> (const ChannelDef&, double sampleRate)> araInstrument;
     };
 
     // Round 190gp: what the renderer's effect loop needs of each slot, worked out once per snapshot ([track][slot], one

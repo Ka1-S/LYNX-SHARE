@@ -3,6 +3,7 @@
 #include "core/DrawMode.h"
 #include "core/LayoutStyle.h"
 #include "ui/NewtoneEditor.h"
+#include "ui/AraMenu.h"
 #include "ui/TempoDetectionDialog.h"
 #include "ui/ClipGridComponent.h"
 #include "ui/CleanVoiceMenu.h"
@@ -11170,6 +11171,8 @@ juce::PopupMenu PlaylistComponent::buildAudioClipMenu (int index, int mouseX)
         ui::postHint (done, 2500);
         repaint();
     });
+    // round 190kx: ARA 2 (Melodyne, RipX, VocAlign...) on the clip's channel (LYNX's own: FL Studio 2026 hosts no ARA)
+    menu.addSubMenu (tr ("Edit in ARA plugin"), aramenu::forClip (engine, index));
     menu.addItem (tr ("Open in a new Sampler channel"), sample != nullptr, false, [this, ch] {
         if (onOpenInSampler)
             onOpenInSampler (ch);

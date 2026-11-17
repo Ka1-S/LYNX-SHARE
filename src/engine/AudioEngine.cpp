@@ -1,4 +1,5 @@
 #include "engine/AudioEngine.h"
+#include "core/AraRegions.h"
 #include "core/FlPluginDb.h"
 #include "core/HarmorResynth.h"
 #include "core/BrowserSend.h" // round 190iz (FL's preview length)
@@ -3792,6 +3793,8 @@ void AudioEngine::setSong (Song newSong)
     }
     if (clipLauncher != nullptr)
         clipLauncher->commands.push ({ launcher::Command::Type::reset });
+    if (araHost != nullptr) // round 190kx: another project: its own ARA documents (made again from its archives)
+        araHost->reset();
     undoStack.clear();
     redoStack.clear();
     sessionUndo.clear();
@@ -3941,6 +3944,19 @@ void AudioEngine::editSong (const std::function<void (Song&)>& edit, bool undoab
     followPatternLengths (lengthsBefore, song);
     clipops::updateCrossfades (song); // FL's automatic crossfades follow every edit (round 166e)
     publishSong();
+}
+
+bool AudioEngine::setChannelAra (int channel, const std::string& pluginId, const std::string& pluginName)
+{
+    if (channel < 0 || channel >= (int) song.channels.size() || song.channels[(std::size_t) channel].instrument != InstrumentKind::audioClip)
+        return false;
+    editSong ([&] (Song& s) {
+        auto& c = s.channels[(std::size_t) channel];
+        c.ara = pluginId.empty() ? AraLink {} : AraLink { pluginId, pluginName };
+        if (pluginId.empty() && ! ara::anyAraChannel (s))
+            s.araDocuments.clear(); // (the last one: no document is kept)
+    });
+    return true;
 }
 
 void AudioEngine::editSongPatternOrder (const std::function<void (Song&)>& edit)
@@ -5185,6 +5201,25 @@ void AudioEngine::publishSong()
     // "Low latency while recording" (round 190aq): the live inserts' paths, for this snapshot only (not the song)
     publishedLowLatency = lowLatencyTracksNow();
     factories.lowLatencyTracks = publishedLowLatency;
+    // round 190kx: ARA. The host is made the first time the song has an audio clip channel edited in an ARA plugin (a song
+    // without one never makes it); an export engine that renders with the live plugins borrows the live instances instead
+    if ((araHost != nullptr || ara::anyAraChannel (played)) && ! liveInstrumentSource && AraHost::available())
+    {
+        if (araHost == nullptr)
+        {
+            araHost = std::make_unique<AraHost> (plugins, [this] (const std::string& path) { return samples.load (juce::String::fromUTF8 (path.c_str())); });
+            araHost->onPlaybackRequest = [this] (int request, double seconds) {
+                if (request == 0)
+                    play();
+                else if (request == 1)
+                    stop();
+                else
+                    seek (std::max (0.0, seconds / ara::secondsPerTick (song)));
+            };
+        }
+        araHost->sync (played, transport.sampleRate.load());
+        factories.araInstrument = [this] (const ChannelDef& c, double rate) { return araHost->instrumentFor (c, rate); };
+    }
     auto state = RackState::build (played, &lastPublishedShape, transport.sampleRate.load(), factories);
     if (traceEdits)
         platform::settingsFile ("edits.log").appendText (juce::String (juce::Time::getMillisecondCounterHiRes() - buildStart, 1) + " ms rack build\n"
@@ -6809,6 +6844,18 @@ void AudioEngine::flushEdisonAudio()
 
 void AudioEngine::capturePluginStatesInto (Song& target, bool requireAll)
 {
+    // round 190kx: the ARA plugins' documents (their edits) as they are now; a document not made here (its plugin is
+    // missing) keeps what the project had
+    if (araHost != nullptr && ara::anyAraChannel (target))
+        for (auto& doc : araHost->archives())
+        {
+            auto it = std::find_if (target.araDocuments.begin(), target.araDocuments.end(), [&doc] (const AraDocumentArchive& a) { return a.pluginId == doc.pluginId; });
+            if (it != target.araDocuments.end())
+                *it = std::move (doc);
+            else
+                target.araDocuments.push_back (std::move (doc));
+        }
+
     const auto capture = [requireAll] (auto* plugin) {
         auto state = plugin->captureState();
         if (! state && requireAll) throw RemoteError ("failed", "Cannot capture a live device; no project changes were made");

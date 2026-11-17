@@ -4200,6 +4200,15 @@ std::shared_ptr<Effect> PluginHost::makeEffect (const PluginRef& ref, double sam
     return nullptr;
 }
 
+// Round 190kx (engine/AraHost.cpp): what an ARA playback renderer needs of the hosted plugins' machinery
+juce::AudioPlayHead& songPlayHead() { return timelinePlayHead (false); }
+
+std::uint32_t processGuarded (juce::AudioPluginInstance& plugin, juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi,
+                              std::atomic<bool>& crashed, const std::string& name) noexcept
+{
+    return runBlock (BlockCall { &plugin, &buffer, &midi }, crashed, name);
+}
+
 std::string capturePluginState (juce::AudioPluginInstance& plugin)
 {
     juce::MemoryBlock state;

@@ -1,4 +1,5 @@
 #include "engine/Exporter.h"
+#include "engine/AraHost.h"
 
 #include "core/Mastering.h"
 
@@ -227,6 +228,16 @@ std::shared_ptr<Instrument> LiveExportHold::lendInstrument (const ChannelDef& ch
     }
     const auto& mine = song.channels[at];
     auto unit = live.getChannelInstrument ((int) at);
+    // round 190kx: an audio clip channel edited in an ARA plugin renders with the live instance (its edits as they are now)
+    if (channel.instrument == InstrumentKind::audioClip && channel.ara.active())
+    {
+        if (! AraHost::isAraInstrument (unit.get()) || mine.ara != channel.ara || live.getTransport().sampleRate.load() != sampleRate)
+        {
+            refusal = "channel " + juce::String::fromUTF8 (channel.name.c_str()) + ": ARA plugin not lent";
+            return nullptr;
+        }
+        return unit;
+    }
     if (channel.instrument == InstrumentKind::plugin)
     {
         auto* p = dynamic_cast<PluginInstrument*> (unit.get());
