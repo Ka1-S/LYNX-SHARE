@@ -1,5 +1,6 @@
 #include "ui/Icons.h"
 #include "ui/Motion.h"
+#include "ui/PaintAB.h"
 
 #include <cmath>
 #include <map>
@@ -1227,19 +1228,14 @@ void IconButton::paintLook (juce::Graphics& g, bool highlighted, bool down)
 // Round 190jo (design190ia FM-1/FM-2/FM-3, decision (d) with FL's metrics; the Pattern toolbar only): FL's tile. FL's
 // buttons are 30x33 tiles at a 33 px pitch with a 1 px dark edge (ref/fl-toolbar-hover-hint.png 1184,4,1214,37); LYNX's
 // 31 px buttons give a 30x30 tile at the same pitch. The edge and the tile sit on whole device pixels at any scale.
+// Round 190ki (perf): at rest, hovered, pressed, on or disabled the tile comes from a picture of the backdrop with the
+// tile drawn over it (setFlTileBackdrop); the fade between two states paints straight.
 void IconButton::paintFlTile (juce::Graphics& g, bool highlighted, bool down)
 {
     using namespace theme;
     const auto on = getToggleState() || primary;
     const auto enabled = isEnabled();
     const auto h = ! enabled ? 0.0f : isTimerRunning() ? hover : (highlighted ? 1.0f : 0.0f);
-    const auto scale = juce::jmax (1.0f, g.getInternalContext().getPhysicalPixelScaleFactor());
-    const auto snap = [scale] (float v) { return std::round (v * scale) / scale; };
-    const auto b = getLocalBounds().toFloat();
-    const auto tile = juce::Rectangle<float>::leftTopRightBottom (snap (b.getX() + 0.5f), snap (b.getY() + 0.5f), snap (b.getRight() - 0.5f),
-                                                                  snap (b.getBottom() - 0.5f));
-    const auto line = std::round (scale) / scale; // one device pixel or more: never a blend
-    const auto r = 4.0f;
 
     // the fill: the tile at rest, then the state over it
     auto fill = colour::bg3;
@@ -1267,10 +1263,6 @@ void IconButton::paintFlTile (juce::Graphics& g, bool highlighted, bool down)
             edge = edge.interpolatedWith (colour::borderStrong, h);
         }
     }
-    g.setColour (fill);
-    g.fillRoundedRectangle (tile, r);
-    g.setColour (edge);
-    g.drawRoundedRectangle (tile.reduced (line * 0.5f), r - line * 0.5f, line);
 
     // the glyph
     auto fg = on ? iconOnColour
@@ -1281,7 +1273,96 @@ void IconButton::paintFlTile (juce::Graphics& g, bool highlighted, bool down)
         fg = fg.withMultipliedAlpha (0.35f);
     const auto area = getLocalBounds().toFloat();
     const auto box = lookIconBox > 0.0f ? lookIconBox : juce::jmin (area.getHeight() * iconFraction, iconMax);
-    icons::draw (g, icon, area.withSizeKeepingCentre (box, box), fg);
+
+    const auto drawTile = [&] (juce::Graphics& k) {
+        const auto scale = juce::jmax (1.0f, k.getInternalContext().getPhysicalPixelScaleFactor());
+        const auto snap = [scale] (float v) { return std::round (v * scale) / scale; };
+        const auto b = area;
+        const auto tile = juce::Rectangle<float>::leftTopRightBottom (snap (b.getX() + 0.5f), snap (b.getY() + 0.5f), snap (b.getRight() - 0.5f),
+                                                                      snap (b.getBottom() - 0.5f));
+        const auto line = std::round (scale) / scale; // one device pixel or more: never a blend
+        const auto r = 4.0f;
+        k.setColour (fill);
+        k.fillRoundedRectangle (tile, r);
+        k.setColour (edge);
+        k.drawRoundedRectangle (tile.reduced (line * 0.5f), r - line * 0.5f, line);
+        icons::draw (k, icon, area.withSizeKeepingCentre (box, box), fg);
+    };
+
+    int scale = 0;
+    const auto backdrop = tileCacheUsable (g, scale) ? tileBackdrop (getBounds()) : 0;
+    if (backdrop == 0)
+    {
+        drawTile (g);
+        return;
+    }
+    const auto mix = [] (std::uint64_t a, std::uint64_t v) { return (a ^ v) * 0x100000001b3ull; };
+    auto key = mix (mix (mix (0x243f6a8885a308d3ull, fill.getARGB()), edge.getARGB()), fg.getARGB());
+    key = mix (mix (mix (key, (std::uint64_t) icon), (std::uint64_t) juce::roundToInt (box * 64.0f)), (std::uint64_t) scale);
+    key = mix (mix (mix (mix (key, (std::uint64_t) (std::uint32_t) getX()), (std::uint64_t) (std::uint32_t) getY()), (std::uint64_t) getWidth()),
+               (std::uint64_t) getHeight());
+    // (the picture is made by the frame's own kind of renderer: a software frame (a snapshot into a software image) with
+    // a software picture, the native one (Direct2D, Core Graphics) with a native picture)
+    const auto software = dynamic_cast<juce::LowLevelGraphicsSoftwareRenderer*> (&g.getInternalContext()) != nullptr;
+    key = mix (mix (key, backdrop), software ? 5u : 6u);
+    auto it = tilePictures.find (key);
+    if (it == tilePictures.end())
+    {
+        if (tilePictures.size() >= 12) // (a button shows a handful of states; a new layout or palette starts again)
+            tilePictures.clear();
+        juce::Image picture (juce::Image::ARGB, getWidth() * scale, getHeight() * scale, true,
+                             software ? (const juce::ImageType&) juce::SoftwareImageType() : (const juce::ImageType&) juce::NativeImageType());
+        {
+            juce::Graphics k (picture);
+            k.addTransform (juce::AffineTransform::scale ((float) scale));
+            {
+                // the parent's paint where the button sits: the pixels the frame has under it (whole device pixels apart)
+                juce::Graphics::ScopedSaveState state (k);
+                k.setOrigin (-getPosition());
+                getParentComponent()->paint (k);
+            }
+            drawTile (k);
+        }
+        it = tilePictures.emplace (key, std::move (picture)).first;
+    }
+    juce::Graphics::ScopedSaveState state (g);
+    g.setColour (juce::Colours::black); // (opaque: JUCE draws an image with the colour's alpha)
+    g.setImageResamplingQuality (juce::Graphics::lowResamplingQuality);
+    if (scale == 1)
+        g.drawImageAt (it->second, 0, 0);
+    else
+        g.drawImage (it->second, area, juce::RectanglePlacement::stretchToFit);
+}
+
+void IconButton::setFlTileBackdrop (std::function<std::uint64_t (juce::Rectangle<int>)> stamp)
+{
+    tileBackdrop = std::move (stamp);
+    tilePictures.clear();
+    repaint();
+}
+
+// The cached tile only where it gives the pixels of painting straight: a backdrop told, the parent's paint the only thing
+// under the button (no sibling before it overlaps it), opaque components without transforms, a whole device scale, no fade
+bool IconButton::tileCacheUsable (juce::Graphics& g, int& scale) const
+{
+    if (tileBackdrop == nullptr || ! ui::paintCache() || isTimerRunning() || getWidth() <= 0 || getHeight() <= 0 || getWidth() > 256 || getHeight() > 256)
+        return false;
+    auto* parent = getParentComponent();
+    if (parent == nullptr || getAlpha() < 1.0f || parent->getAlpha() < 1.0f || isTransformed() || parent->isTransformed())
+        return false;
+    const auto s = g.getInternalContext().getPhysicalPixelScaleFactor();
+    const auto whole = std::round (s);
+    if (whole < 1.0f || whole > 3.0f || std::abs (s - whole) > 1.0e-4f)
+        return false;
+    for (auto* c : parent->getChildren())
+    {
+        if (c == this)
+            break;
+        if (c->isVisible() && c->getBounds().intersects (getBounds()))
+            return false;
+    }
+    scale = (int) whole;
+    return true;
 }
 
 void IconButton::paintButton (juce::Graphics& g, bool highlighted, bool down)
@@ -1372,5 +1453,69 @@ void IconButton::paintButton (juce::Graphics& g, bool highlighted, bool down)
     g.setColour (fg);
     g.setFont (font);
     g.drawFittedText (text, content.toNearestInt(), juce::Justification::centredLeft, 1, 0.85f);
+}
+
+juce::String flTileCacheSelfTest()
+{
+    using namespace theme;
+    struct Backdrop final : juce::Component
+    {
+        void paint (juce::Graphics& g) override
+        {
+            g.fillAll (colour::bg3);
+            const auto well = juce::Rectangle<float> (2.0f, 3.0f, 70.5f, 38.0f);
+            g.setColour (colour::bg1.withAlpha (0.55f));
+            g.fillRoundedRectangle (well, 6.0f);
+            g.setColour (colour::border);
+            g.drawRoundedRectangle (well.reduced (0.5f), 6.0f, 1.0f);
+        }
+    };
+    Backdrop parent;
+    parent.setSize (132, 46);
+    IconButton rest ("rest", Icon::play), on ("on", Icon::metronome), off ("off", Icon::record), corner ("corner", Icon::undo);
+    on.setClickingTogglesState (true);
+    on.setToggleState (true, juce::dontSendNotification);
+    off.setEnabled (false);
+    int x = 0;
+    for (auto* b : { &rest, &on, &off, &corner })
+    {
+        b->setLook (IconButton::Look::flTile, b == &rest ? 0.0f : 24.0f);
+        b->setBounds (x, 4, 31, 31);
+        parent.addAndMakeVisible (*b);
+        x += 33; // (the first and the third over the well's rounded ends)
+    }
+    const auto render = [&parent] (int scale, bool native) {
+        juce::Image image (juce::Image::ARGB, parent.getWidth() * scale, parent.getHeight() * scale, true,
+                           native ? (const juce::ImageType&) juce::NativeImageType() : (const juce::ImageType&) juce::SoftwareImageType());
+        juce::Graphics g (image);
+        g.addTransform (juce::AffineTransform::scale ((float) scale));
+        parent.paintEntireComponent (g, true);
+        return image;
+    };
+    const auto differences = [] (const juce::Image& a, const juce::Image& b) {
+        const juce::Image::BitmapData p (a, juce::Image::BitmapData::readOnly), q (b, juce::Image::BitmapData::readOnly);
+        int n = 0;
+        for (int y = 0; y < p.height; ++y)
+            for (int x = 0; x < p.width; ++x)
+                n += p.getPixelColour (x, y) != q.getPixelColour (x, y) ? 1 : 0;
+        return n;
+    };
+    juce::String detail;
+    for (const auto native : { true, false })
+        for (const auto scale : { 1, 2 })
+        {
+            for (auto* b : { &rest, &on, &off, &corner })
+                b->setFlTileBackdrop (nullptr);
+            const auto straight = render (scale, native);
+            for (auto* b : { &rest, &on, &off, &corner })
+                b->setFlTileBackdrop ([] (juce::Rectangle<int>) { return (std::uint64_t) 42; });
+            const auto made = render (scale, native), blitted = render (scale, native); // (the first paint makes the pictures)
+            if (rest.tilePictures.empty())
+                return "ERROR the FL tile cache was not used at scale " + juce::String (scale);
+            if (const auto n = differences (straight, made) + differences (straight, blitted); n > 0)
+                return "ERROR cached FL tiles differ from the tiles painted straight in " + juce::String (n) + " pixels (scale " + juce::String (scale)
+                       + (native ? ", native)" : ", software)");
+        }
+    return "OK";
 }
 } // namespace lynx

@@ -6825,7 +6825,12 @@ private:
         auto& lookBefore = juce::LookAndFeel::getDefaultLookAndFeel();
         juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
         const auto fontsResult = lynx::theme::fontSelfTest();
-        const auto paintCachesResult = lynx::theme::paintCacheSelfTest(); // (round 190gr)
+        auto paintCachesResult = lynx::theme::paintCacheSelfTest(); // (round 190gr)
+        if (paintCachesResult.startsWith ("OK")) // (round 190ki: the Pattern toolbar's cached FL tiles, the pixels of painting them straight)
+        {
+            const auto tiles = lynx::flTileCacheSelfTest();
+            paintCachesResult = tiles == "OK" ? paintCachesResult + ", FL tiles exact at x1 / x2" : tiles;
+        }
         const auto motionOverlayResult = lynx::ui::MotionOverlay::selfTest(); // (round 190ip)
         // round 190bm (0.1.25 showed the Mixer and the Playlist black): their cached pictures shown on native and
         // software targets against straight paints (ui/PictureCheck.h; --picturetest runs more sizes and scales)

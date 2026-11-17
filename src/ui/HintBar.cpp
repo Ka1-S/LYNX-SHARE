@@ -7,6 +7,7 @@
 #include "ui/I18n.h"
 #include "ui/Icons.h"
 #include "ui/Theme.h"
+#include "ui/TextCache.h"
 
 namespace lynx::ui
 {
@@ -56,7 +57,7 @@ bool noLineStart (juce::juce_wchar c)
 std::vector<Item> makeItems (const juce::String& text, const juce::Font& font, const juce::Font& keyFont, float glyph)
 {
     std::vector<Item> items;
-    const auto space = juce::GlyphArrangement::getStringWidth (font, " ");
+    const auto space = textcache::stringWidth (font, " ");
 
     // the subject: the words before the first ": " or " - " (when it comes early, before any glyph)
     auto titleEnd = -1;
@@ -85,8 +86,8 @@ std::vector<Item> makeItems (const juce::String& text, const juce::Font& font, c
             item.text = value;
             item.gap = pendingGap;
             item.width = item.kind == Item::Kind::mouse
-                             ? glyph + (value == "2xLMB" ? juce::GlyphArrangement::getStringWidth (keyFont, "x2") + 1.0f : 0.0f)
-                             : juce::GlyphArrangement::getStringWidth (keyFont, value) + 8.0f;
+                             ? glyph + (value == "2xLMB" ? textcache::stringWidth (keyFont, "x2") + 1.0f : 0.0f)
+                             : textcache::stringWidth (keyFont, value) + 8.0f;
             items.push_back (item);
             pendingGap = 0.0f;
             consumed += (int) segment.value.size() + 2;
@@ -123,7 +124,7 @@ std::vector<Item> makeItems (const juce::String& text, const juce::Font& font, c
                 Item item;
                 item.text = value.substring (from, to);
                 item.gap = pendingGap;
-                item.width = juce::GlyphArrangement::getStringWidth (font, item.text);
+                item.width = textcache::stringWidth (font, item.text);
                 item.title = titleEnd > 0 && consumed + from < titleEnd;
                 items.push_back (item);
                 pendingGap = 0.0f;
@@ -374,7 +375,7 @@ void HintBar::paint (juce::Graphics& g)
     if (current.value.isNotEmpty())
     {
         const juce::Font valueFont (font (type::small, true));
-        const auto w = juce::jmin (r.getWidth() / 3.0f, juce::GlyphArrangement::getStringWidth (valueFont, current.value) + 18.0f);
+        const auto w = juce::jmin (r.getWidth() / 3.0f, textcache::stringWidth (valueFont, current.value) + 18.0f);
         const auto valueArea = r.removeFromRight (juce::jmax (44.0f, w)).reduced (0.0f, 3.0f);
         g.setColour (live ? colour::accentMuted : colour::bg3);
         g.fillRoundedRectangle (valueArea, radius::sm);
@@ -446,9 +447,9 @@ juce::String quickTipOf (const juce::Component& c)
 juce::Rectangle<int> quickTipSize (const juce::String& tip)
 {
     const auto name = tip.upToFirstOccurrenceOf ("\t", false, false), key = tip.fromFirstOccurrenceOf ("\t", false, false);
-    auto w = juce::GlyphArrangement::getStringWidth (tipNameFont(), name) + 2.0f * tipPadX;
+    auto w = textcache::stringWidth (tipNameFont(), name) + 2.0f * tipPadX;
     if (key.isNotEmpty())
-        w += tipGap + juce::GlyphArrangement::getStringWidth (tipKeyFont(), key) + tipCapPad;
+        w += tipGap + textcache::stringWidth (tipKeyFont(), key) + tipCapPad;
     return { 0, 0, (int) std::ceil (w) + 2, tipHeight };
 }
 
@@ -464,14 +465,14 @@ void paintQuickTip (juce::Graphics& g, juce::Rectangle<float> bubble, const juce
     auto text = bubble.reduced (tipPadX, 0.0f);
     g.setColour (colour::textPrimary); // (round 190je, SG-25: the full token, was × 0.92)
     g.setFont (tipNameFont());
-    const auto nameWidth = juce::GlyphArrangement::getStringWidth (tipNameFont(), name);
+    const auto nameWidth = textcache::stringWidth (tipNameFont(), name);
     g.drawText (name, text.removeFromLeft (nameWidth + 1.0f), juce::Justification::centredLeft, false);
 
     if (key.isNotEmpty())
     {
         // the shortcut as a key cap, the way the hint bar shows keys (round 190je, SG-25: the text read 4.6:1 at × 0.85)
         text.removeFromLeft (tipGap);
-        const auto keyWidth = juce::GlyphArrangement::getStringWidth (tipKeyFont(), key) + tipCapPad;
+        const auto keyWidth = textcache::stringWidth (tipKeyFont(), key) + tipCapPad;
         const auto cap = text.withWidth (juce::jmin (keyWidth, text.getWidth()))
                              .withSizeKeepingCentre (juce::jmin (keyWidth, text.getWidth()), juce::jmin (text.getHeight() - 4.0f, tipKeyFont().getHeight() + 4.0f));
         g.setColour (colour::bg4);
@@ -583,7 +584,7 @@ void TweakReadout::paint (juce::Graphics& g)
     if (name.isNotEmpty() && value.isNotEmpty())
     {
         const juce::Font valueFont (font (type::small, true));
-        const auto w = juce::jmin (r.getWidth() * 0.4f, juce::GlyphArrangement::getStringWidth (valueFont, value) + 14.0f);
+        const auto w = juce::jmin (r.getWidth() * 0.4f, textcache::stringWidth (valueFont, value) + 14.0f);
         const auto valueArea = r.removeFromRight (juce::jmax (36.0f, w)).reduced (0.0f, 3.0f);
         g.setColour (fresh ? colour::accentMuted : colour::bg3);
         g.fillRoundedRectangle (valueArea, radius::sm);

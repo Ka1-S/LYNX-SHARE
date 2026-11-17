@@ -14,6 +14,7 @@
 #include "ui/Icons.h"
 #include "ui/PaintAB.h"
 #include "ui/Theme.h"
+#include "ui/TextCache.h"
 
 namespace lynx::toolbar
 {
@@ -382,7 +383,7 @@ void TimeDisplay::paintLook (juce::Graphics& g)
         g.fillRect (area.withWidth (juce::roundToInt (area.getWidth() * juce::jlimit (0.0, 1.0, linkProgress))));
     }
     auto f = monoFont (15.0f);
-    for (int i = 0; i < 8 && juce::GlyphArrangement::getStringWidth (f, readout) > (float) area.getWidth() - 10.0f; ++i)
+    for (int i = 0; i < 8 && textcache::stringWidth (f, readout) > (float) area.getWidth() - 10.0f; ++i)
         f = f.withHeight (f.getHeight() * 0.92f);
     g.setFont (f);
     g.setColour (red ? colour::record : colour::textPrimary);
@@ -426,9 +427,9 @@ void TimeDisplay::paint (juce::Graphics& g)
         const auto caption = mode == Mode::clock ? juce::String ("M:S:CS") : mode == Mode::smpte ? "SMPTE " + juce::String (timecode::rates[smpteRate].name)
                                                                                                  : juce::String ("B:S:T");
         const auto captionFont = font (9.0f, true);
-        const auto captionWidth = juce::GlyphArrangement::getStringWidth (captionFont, caption);
+        const auto captionWidth = textcache::stringWidth (captionFont, caption);
         const auto room = (float) area.getWidth() - 8.0f;
-        for (int i = 0; i < 16 && juce::GlyphArrangement::getStringWidth (big, readout) > room; ++i)
+        for (int i = 0; i < 16 && textcache::stringWidth (big, readout) > room; ++i)
             big = big.withHeight (big.getHeight() * 0.94f);
         g.setFont (big);
         g.drawText (readout, area.withTrimmedTop (2), juce::Justification::centred, false);
@@ -440,7 +441,7 @@ void TimeDisplay::paint (juce::Graphics& g)
     }
     auto readoutFont = monoFont (juce::jmin (26.0f, (float) area.getHeight() * 0.52f));
     // a narrow display (the compact toolbar) shrinks the digits instead of cutting them off
-    for (int i = 0; i < 12 && juce::GlyphArrangement::getStringWidth (readoutFont, readout) > (float) area.getWidth() - 8.0f; ++i)
+    for (int i = 0; i < 12 && textcache::stringWidth (readoutFont, readout) > (float) area.getWidth() - 8.0f; ++i)
         readoutFont = readoutFont.withHeight (readoutFont.getHeight() * 0.92f);
     g.setFont (readoutFont);
     g.drawText (readout, area.withTrimmedBottom (11), juce::Justification::centred, false);
@@ -979,7 +980,7 @@ void ChordPanel::paint (juce::Graphics& g)
     // past eight characters the name gets smaller, down to what fits (FL: its size minus 1.15 per character)
     const auto base = juce::jmin (20.0f, (float) area.getHeight() * 0.55f);
     auto readoutFont = monoFont (juce::jmax (9.0f, base - 1.15f * (float) juce::jmax (0, text.length() - 8)));
-    for (int i = 0; i < 10 && juce::GlyphArrangement::getStringWidth (readoutFont, text) > (float) area.getWidth() - 6.0f; ++i)
+    for (int i = 0; i < 10 && textcache::stringWidth (readoutFont, text) > (float) area.getWidth() - 6.0f; ++i)
         readoutFont = readoutFont.withHeight (readoutFont.getHeight() * 0.92f);
     g.setFont (readoutFont);
     g.drawText (text, area, juce::Justification::centred, false);
@@ -1012,7 +1013,7 @@ int LinkToggle::idealWidth (int)
     const auto f = theme::font (theme::type::small, true);
     auto widest = 0.0f;
     for (const auto* t : { "@Ableton Link: Link", "@Ableton Link: {0} Links" })
-        widest = juce::jmax (widest, juce::GlyphArrangement::getStringWidth (f, trc (t).replace ("{0}", "88")));
+        widest = juce::jmax (widest, textcache::stringWidth (f, trc (t).replace ("{0}", "88")));
     return juce::roundToInt (widest) + 12 + arrowWidth + 2;
 }
 
@@ -1067,7 +1068,7 @@ void LinkToggle::paint (juce::Graphics& g)
     g.setColour (on ? colour::accent : (over ? colour::textPrimary : colour::textSecondary));
     auto f = font (type::small, true);
     const auto label = text();
-    for (int i = 0; i < 8 && juce::GlyphArrangement::getStringWidth (f, label) > (float) main.getWidth() - 6.0f; ++i)
+    for (int i = 0; i < 8 && textcache::stringWidth (f, label) > (float) main.getWidth() - 6.0f; ++i)
         f = f.withHeight (f.getHeight() * 0.92f);
     g.setFont (f);
     g.drawText (label, main, juce::Justification::centred, false);
@@ -1168,7 +1169,7 @@ void KeyPanel::paint (juce::Graphics& g)
         const auto none = text.isEmpty();
         auto f = font (15.0f, ! none);
         const auto shown = none ? tr ("Key") : text;
-        for (int i = 0; i < 8 && juce::GlyphArrangement::getStringWidth (f, shown) > area.getWidth() - 20.0f; ++i)
+        for (int i = 0; i < 8 && textcache::stringWidth (f, shown) > area.getWidth() - 20.0f; ++i)
             f = f.withHeight (f.getHeight() * 0.92f);
         g.setFont (f);
         g.setColour (none ? colour::textSecondary : colour::textPrimary);
@@ -1194,7 +1195,7 @@ void KeyPanel::paint (juce::Graphics& g)
     g.setColour (none ? colour::textSecondary : colour::textPrimary);
     auto nameFont = font (type::body, ! none).withHeight (juce::jmin (17.0f, (float) area.getHeight() * 0.8f));
     const auto shown = none ? tr ("none") : text;
-    for (int i = 0; i < 8 && juce::GlyphArrangement::getStringWidth (nameFont, shown) > (float) area.getWidth(); ++i)
+    for (int i = 0; i < 8 && textcache::stringWidth (nameFont, shown) > (float) area.getWidth(); ++i)
         nameFont = nameFont.withHeight (nameFont.getHeight() * 0.92f);
     g.setFont (nameFont);
     g.drawText (shown, area, juce::Justification::centredLeft, true);

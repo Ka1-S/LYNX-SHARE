@@ -295,6 +295,19 @@ public:
     static constexpr int scrollBarSize = 12;
 
 private:
+    // round 190ki (perf): the rows of the grid in a cached picture (PianoRollComponent.cpp drawRowsPicture)
+    struct RowPaint
+    {
+        int key, y;
+        juce::Colour fill, line; // (line transparent: none)
+        bool octave;
+    };
+    std::vector<RowPaint> rowPaints;
+    juce::Image rowsPicture;
+    std::uint64_t rowsPictureKey = 0;
+    bool rowsPictureSoftware = false;
+    bool drawRowsPicture (juce::Graphics&, juce::Rectangle<int> grid, juce::Colour under, juce::Colour octaveLine,
+                          const std::function<void (juce::Graphics&, const RowPaint&, bool)>& paintRow);
     enum class Drag { none, move, resize, resizeLeft, erase, keyboard, select, velocity, velocityLine, velocitySet, paint, muting, knife,
                       zoomRange, listen, pan, keyZoom, timeZoom, keySelect, rulerSelect, seek, drumPaint, stretch, eventDraw, eventErase,
                       eventPaneBar, eventPaneAlternate, // (round 190fz: dragging the divider; a right-click on it, swapped on release)
