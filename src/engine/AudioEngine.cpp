@@ -852,6 +852,17 @@ float AudioEngine::renderOffline (const RenderOptions& options)
     lastRenderStats = {};
     // FL's init list first (play() would do it at the first block), so the plugins settle on those values too
     resetToInitialValues();
+    // round 190kx: an ARA plugin renders what it has analysed: the render waits (at most 3 minutes) until its analysis of
+    // the clips is done (a live engine's has long been; a fresh export engine's instances analyse now)
+    if (araHost != nullptr)
+    {
+        const auto onMessageThread = juce::MessageManager::existsAndIsCurrentThread();
+        const auto start = juce::Time::getMillisecondCounterHiRes();
+        juce::Thread::sleep (onMessageThread ? 0 : 300); // (the heartbeat's first look)
+        while (araHost->analysing() && juce::Time::getMillisecondCounterHiRes() - start < 180000.0)
+            juce::Thread::sleep (50);
+        lastRenderStats.araWaitMs = juce::Time::getMillisecondCounterHiRes() - start;
+    }
     int latency = getLatencySamples();
     if (options.pluginWarmUp)
         lastRenderStats.warmUp = warmUpPlugins (options.warmUp, sampleRate, blockSize, progress, latency);

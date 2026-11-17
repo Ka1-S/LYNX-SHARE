@@ -1089,6 +1089,7 @@ public:
         double graphMs = 0.0, writeMs = 0.0;
         warmup::Result warmUp; // the plugin warm-up before the render (blocks == 0: none ran)
         int trimmedSamples = 0; // the PDC trim used
+        double araWaitMs = 0.0; // round 190kx: how long the render waited for ARA plugins to finish their analysis
     };
     RenderStats getLastRenderStats() const noexcept { return lastRenderStats; }
     float renderOffline (double seconds, double sampleRate, juce::AudioFormatWriter* output = nullptr)

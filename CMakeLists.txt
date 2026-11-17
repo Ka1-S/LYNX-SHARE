@@ -514,6 +514,7 @@ if(LYNX_BUILD_APP)
         src/ui/LiveRemoteUi.cpp
         src/engine/PluginHost.cpp
         src/engine/AraHost.cpp
+        src/engine/AraTest.cpp
         src/engine/FlStudio.cpp
         src/engine/PluginSandbox.cpp
         src/engine/SandboxWorker.cpp

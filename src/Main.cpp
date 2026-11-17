@@ -1,4 +1,5 @@
 #include <juce_gui_basics/juce_gui_basics.h>
+#include "engine/AraHost.h"
 #include "engine/FileSort.h"
 #include "platform/Paths.h"
 #include "core/GrooveAudio.h"
@@ -918,6 +919,26 @@ public:
             const auto i = args.indexOf ("--midiouttest");
             const auto result = lynx::AudioEngine::midiOutPortSelfTest();
             juce::File (args[i + 1].unquoted()).replaceWithText ("midi_out_ports=" + result + "\nresult=" + (result.startsWith ("OK") ? "OK" : "FAILED") + "\n");
+            setApplicationReturnValue (result.startsWith ("OK") ? 0 : 1);
+            quit();
+            return;
+        }
+
+        if (args.contains ("--aratest"))
+        {
+            // LYNX --aratest <plugin.vst3> <audio.wav> <out folder> [project.lynx] (round 190kx, engine/AraTest.cpp): ARA 2
+            // hosting end to end (a plain clip vs the clip in the ARA plugin, the document archived and restored). No window.
+            const auto i = args.indexOf ("--aratest");
+            const juce::File out (args[i + 3].unquoted());
+            juce::String text;
+            const auto result = lynx::araSelfTest (juce::File (args[i + 1].unquoted()), juce::File (args[i + 2].unquoted()), out,
+                                                   args.size() > i + 4 ? juce::File (args[i + 4].unquoted()) : juce::File(),
+                                                   [&text, out] (const juce::String& line) {
+                                                       text << line << "\n";
+                                                       out.getChildFile ("aratest.txt").replaceWithText (text + "(running)\n");
+                                                   });
+            text << "ara=" << result << "\nresult=" << (result.startsWith ("OK") ? "OK" : "FAILED") << "\n";
+            out.getChildFile ("aratest.txt").replaceWithText (text);
             setApplicationReturnValue (result.startsWith ("OK") ? 0 : 1);
             quit();
             return;

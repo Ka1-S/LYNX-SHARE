@@ -405,6 +405,7 @@ struct Doc
     std::map<std::uint64_t, std::unique_ptr<Chan>> channels;
     ModelUpdates* updates = nullptr; // (owned by the controller)
     ARA::ARAPlaybackTransformationFlags transformations = 0;
+    std::vector<ARA::ARAContentType> analyzeable; // what the plugin analyses (its factory says)
 
     ~Doc()
     {
@@ -455,8 +456,47 @@ const ARA::ARAPlugInExtensionInstance* rawOf (const HM::PlugInExtensionInstance&
 }
 } // namespace
 
-struct AraHost::Impl
+struct AraHost::Impl : private juce::Timer
 {
+    // The model's heartbeat (ARA: the host calls notifyModelUpdates on the message thread for the plugin to report its
+    // analysis and edits), 10 times a second while a document exists, and whether any source is still being analysed
+    void timerCallback() override
+    {
+        if (docs.empty())
+        {
+            stopTimer();
+            busy = false;
+            return;
+        }
+        busy = poll();
+    }
+    bool poll()
+    {
+        bool any = false;
+        for (auto& [id, doc] : docs)
+        {
+            auto& dc = doc->controller->get();
+            dc.notifyModelUpdates();
+            for (auto& [uid, c] : doc->channels)
+            {
+                if (c->source == nullptr || c->data == nullptr)
+                    continue;
+                bool incomplete = false;
+                for (const auto type : doc->analyzeable)
+                    incomplete = incomplete || dc.isAudioSourceContentAnalysisIncomplete (c->source->getPluginRef(), type);
+                c->data->analysing.store (incomplete ? 1 : 0, std::memory_order_relaxed);
+                any = any || incomplete;
+            }
+        }
+        return any;
+    }
+    void heartbeat()
+    {
+        if (! docs.empty() && ! isTimerRunning())
+            startTimerHz (10);
+    }
+    std::atomic<bool> busy { false };
+
     PluginHost& plugins;
     SampleProvider samples;
     std::function<void (int, double)>* playbackHook = nullptr;
@@ -492,6 +532,8 @@ struct AraHost::Impl
         doc->description = d;
         doc->timeline = std::make_shared<Timeline>();
         doc->transformations = factory.get()->supportedPlaybackTransformationFlags;
+        for (ARA::ARASize k = 0; k < factory.get()->analyzeableContentTypesCount; ++k)
+            doc->analyzeable.push_back (factory.get()->analyzeableContentTypes[k]);
         auto updates = std::make_unique<ModelUpdates>();
         doc->updates = updates.get();
         auto playback = std::make_unique<Playback> (playbackHook);
@@ -844,6 +886,7 @@ void AraHost::sync (const Song& song, double sampleRate)
         else
             ++it;
     }
+    impl->heartbeat();
 }
 
 std::shared_ptr<Instrument> AraHost::instrumentFor (const ChannelDef& channel, double sampleRate)
@@ -919,13 +962,10 @@ std::vector<AraDocumentArchive> AraHost::archives()
 
 bool AraHost::analysing()
 {
-    for (auto& [id, doc] : impl->docs)
-        for (auto& [uid, c] : doc->channels)
-        {
-            if (c->data != nullptr && c->data->analysing.load (std::memory_order_relaxed) != 0)
-                return true;
-        }
-    return false;
+    // (on the message thread it asks the plugins now; elsewhere it reads what the heartbeat last found)
+    if (juce::MessageManager::existsAndIsCurrentThread())
+        return impl->busy = impl->poll();
+    return impl->busy.load();
 }
 
 int AraHost::documentCount() const { return (int) impl->docs.size(); }
