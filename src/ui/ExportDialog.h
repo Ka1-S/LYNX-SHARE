@@ -27,13 +27,20 @@ void showExportDialogForTracks (AudioEngine& engine, const juce::File& suggested
                                 const std::vector<int>& tracks, std::function<void (const std::vector<juce::File>&)> afterRender = {});
 
 // "Render to audio" (freeze): the insert becomes an audio clip on a new insert with the same
-// routing, and the original is muted. Runs on a background thread with progress.
+// routing, and the original is muted. Runs on a background thread with progress. Round 190jx: rendered with the plugin
+// instances that play (engine/Exporter.h LiveExportHold, as FL renders), playback stopped; the new insert is made once
+// they are given back.
 void bounceInsertToAudio (AudioEngine& engine, int track);
+// The same on the calling (message) thread, the file in `folder` (tests). liveInstances: with the hold as the menu's
+// (false: new instances, as the command line and the remote renderer do). Empty = done.
+juce::String bounceInsertToAudioNow (AudioEngine& engine, int track, bool liveInstances, const juce::File& folder);
 // Freeze (round 190ay; core/StandIns.h lynx::freeze — LYNX's own, FL has none): the channel's own sound (after its
 // instrument, before its volume, pan and insert) is rendered next to the project and plays in the channel's place while
 // the instrument / plugin is not loaded at all: its CPU and RAM are free, the channel's insert effects stay live. The
 // channel keeps its plugin and settings as they are, so Unfreeze brings back the same sound. A frozen channel is
 // rendered again from its instrument ("Re-freeze"). Close the channel's editor first (a plugin window holds its plugin).
+// Round 190jx: rendered with the plugin instances that play (LiveExportHold, as FL's renders), playback stopped; the
+// plugins are given back before the frozen one is unloaded.
 // Runs on a background thread with progress; `done` (optional, message thread) gets whether it froze.
 void freezeChannel (AudioEngine& engine, int channel, std::function<void (bool)> done = {});
 // Why `channel` cannot be frozen, as a translated sentence; empty = it can (round 190bj: "Freeze selected channels"
@@ -51,7 +58,10 @@ void freezeTrack (AudioEngine& engine, int channel, std::function<void (bool)> d
 // audio is current is flattened from that audio without a new render. One undo step.
 void bounceTrackInPlace (AudioEngine& engine, int channel);
 // The same without a window on the calling (message) thread, for the command-line modes and the tests. Empty = done.
-juce::String freezeTrackNow (AudioEngine& engine, int channel, bool flattenAfter = false, const std::function<bool (double)>& progress = {});
+// liveInstances (round 190jx): rendered with the plugin instances that play, as freezeTrack / freezeChannel do (the
+// command-line modes keep new instances).
+juce::String freezeTrackNow (AudioEngine& engine, int channel, bool flattenAfter = false, const std::function<bool (double)>& progress = {},
+                             bool liveInstances = false);
 juce::String flattenChannelNow (AudioEngine& engine, int channel);
 // Live's Bounce to New Track (round 190ff, freeze::planBounceToNewTrack) and Consolidate (freeze::planConsolidate) for the
 // selected Playlist clips of one track. In the background with progress; `now`: on the calling (message) thread with
@@ -59,7 +69,7 @@ juce::String flattenChannelNow (AudioEngine& engine, int channel);
 juce::String bounceToNewTrack (AudioEngine& engine, const std::vector<int>& clips, bool now = false);
 juce::String consolidateClips (AudioEngine& engine, const std::vector<int>& clips, bool now = false);
 // The same without a window, on the calling (message) thread: the command-line modes and the tests. Empty = frozen.
-juce::String freezeChannelNow (AudioEngine& engine, int channel, const std::function<bool (double)>& progress = {});
+juce::String freezeChannelNow (AudioEngine& engine, int channel, const std::function<bool (double)>& progress = {}, bool liveInstances = false);
 // FL's renders that come back into the project as audio clips (REA round 168e, core/QuickRender.h). Each opens the
 // render window in its audio-clip mode (WAV, no file dialog), renders in the background and then edits the song.
 // Playlist track menu "Consolidate this track" (From track start / From song start; Shift held = choose the folder): a

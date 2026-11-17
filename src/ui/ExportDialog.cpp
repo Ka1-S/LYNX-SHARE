@@ -134,6 +134,18 @@ public:
     std::function<void()> then; // after a successful export (round 174d: the video with the mix)
     // round 190jb: the live engine's plugins render this export (FL); given back when the thread is deleted
     std::shared_ptr<LiveExportHold> liveHold;
+    // round 190jx: runs (message thread) once the job and the hold are gone, the plugins given back and the live engine
+    // playing again: an edit of the song that uses the render (Render to audio's new insert)
+    std::function<void()> afterRelease;
+
+    ~ExportThread() override
+    {
+        job.reset();
+        liveHold.reset();
+        if (afterRelease)
+            afterRelease();
+    }
+
 private:
     juce::String error;
     bool ok = false;
@@ -1312,37 +1324,74 @@ private:
 };
 } // namespace
 
-void bounceInsertToAudio (AudioEngine& engine, int track)
+namespace
+{
+// Render to audio's job: the insert's sound into `file` (Music/LYNX/Renders), and the clip's length (the song + the
+// tail, at the ending tempo). Round 190jx: with `hold` open (FL renders with the plugin instances that play, as its
+// export does) the job takes the live engine's plugins.
+struct InsertRender
+{
+    std::unique_ptr<ExportJob> job;
+    juce::File file;
+    std::int64_t length = 0;
+};
+
+InsertRender makeInsertRender (AudioEngine& engine, int track, const juce::File& folder)
 {
     const auto& song = engine.getSong();
-
-    if (track <= 0 || track >= (int) song.mixer.size())
-        return;
-
     engine.capturePluginStates();
     const auto name = juce::String::fromUTF8 (song.mixer[(std::size_t) track].name.c_str());
-    const auto folder = juce::File::getSpecialLocation (juce::File::userMusicDirectory).getChildFile ("LYNX/Renders");
     folder.createDirectory();
-    const auto file = folder.getNonexistentChildFile (juce::File::createLegalFileName (name), ".wav");
+    InsertRender r;
+    r.file = folder.getNonexistentChildFile (juce::File::createLegalFileName (name), ".wav");
 
     ExportSettings settings;
     settings.format = ExportSettings::Format::wav32Float;
     settings.sampleRate = engine.getTransport().sampleRate.load();
     settings.tailSeconds = 4.0;
 
-    // clip length: the song + the tail, at the ending tempo
     std::int64_t musicTicks = 0;
     makeExportSong (song, true, 0, musicTicks);
-    const auto length = musicTicks + (std::int64_t) (settings.tailSeconds * song.tempoAt ((double) musicTicks) * ppq / 60.0);
+    r.length = musicTicks + (std::int64_t) (settings.tailSeconds * song.tempoAt ((double) musicTicks) * ppq / 60.0);
+    r.job = std::make_unique<ExportJob> (makeBounceSong (song, track), settings, r.file);
+    return r;
+}
+} // namespace
 
-    auto job = std::make_unique<ExportJob> (makeBounceSong (song, track), settings, file);
+void bounceInsertToAudio (AudioEngine& engine, int track)
+{
+    if (track <= 0 || track >= (int) engine.getSong().mixer.size())
+        return;
+
+    // round 190jx: FL renders with the plugin instances that play, playback stopped (the hold, before the job)
+    auto liveHold = LiveExportHold::open (engine);
+    auto render = makeInsertRender (engine, track, juce::File::getSpecialLocation (juce::File::userMusicDirectory).getChildFile ("LYNX/Renders"));
     auto* engineRef = &engine;
-    (new ExportThread (std::move (job), file, [engineRef, track, file, length] (bool ok) {
-        if (! ok)
-            return;
+    auto rendered = std::make_shared<bool> (false);
+    auto* thread = new ExportThread (std::move (render.job), render.file, [rendered] (bool ok) { *rendered = ok; }, tr ("Rendering insert to audio..."));
+    thread->liveHold = std::move (liveHold);
+    // the new insert once the plugins are given back and the engine plays again (its song edit then builds on them)
+    thread->afterRelease = [engineRef, track, file = render.file, length = render.length, rendered] {
+        if (*rendered)
+            engineRef->editSong ([&] (Song& s) { applyBounce (s, track, file.getFullPathName().toStdString(), length); });
+    };
+    thread->launchThread();
+}
 
-        engineRef->editSong ([&] (Song& s) { applyBounce (s, track, file.getFullPathName().toStdString(), length); });
-    }, tr ("Rendering insert to audio...")))->launchThread();
+juce::String bounceInsertToAudioNow (AudioEngine& engine, int track, bool liveInstances, const juce::File& folder)
+{
+    if (track <= 0 || track >= (int) engine.getSong().mixer.size())
+        return "no such insert";
+    auto liveHold = liveInstances ? LiveExportHold::open (engine) : nullptr;
+    auto render = makeInsertRender (engine, track, folder);
+    juce::String error;
+    const auto ok = render.job->run ({}, error);
+    render.job.reset();
+    liveHold.reset(); // (the plugins given back, the engine plays again)
+    if (! ok)
+        return error.isEmpty() ? juce::String ("cancelled") : error;
+    engine.editSong ([&] (Song& s) { applyBounce (s, track, render.file.getFullPathName().toStdString(), render.length); });
+    return {};
 }
 
 // --- Freeze (round 190ay) ---------------------------------------------------------------------------------------------
@@ -1458,6 +1507,7 @@ public:
 
     void threadComplete (bool userPressedCancel) override
     {
+        liveHold.reset(); // (round 190jx: the plugins given back first; the freeze's edit then unloads the frozen one)
         if (ok)
         {
             finishFreeze (engine, plan, std::move (stems));
@@ -1475,6 +1525,10 @@ public:
         juce::MessageManager::callAsync ([this] { delete this; });
     }
 
+public:
+    // round 190jx: the live engine's plugins render the freeze (FL renders with the instances that play)
+    std::shared_ptr<LiveExportHold> liveHold;
+
 private:
     AudioEngine& engine;
     FreezePlan plan;
@@ -1489,7 +1543,9 @@ namespace
 {
 void startFreeze (AudioEngine& engine, FreezePlan plan, std::function<void (bool)> done)
 {
+    auto liveHold = LiveExportHold::open (engine); // (round 190jx: the render takes the plugins that play; playback stops)
     auto* thread = new FreezeThread (engine, std::move (plan), std::move (done));
+    thread->liveHold = std::move (liveHold);
     // round 190bj (QA: the progress window's first frame was a blank white box): the window is shown and painted once,
     // here on the message thread, before the render starts (launchThread starts the thread first and shows it after)
     if (auto* window = thread->getAlertWindow())
@@ -1533,7 +1589,7 @@ void freezeTrack (AudioEngine& engine, int channel, std::function<void (bool)> d
     startFreeze (engine, planFreeze (engine, channel, true), std::move (done));
 }
 
-juce::String freezeTrackNow (AudioEngine& engine, int channel, bool flattenAfter, const std::function<bool (double)>& progress)
+juce::String freezeTrackNow (AudioEngine& engine, int channel, bool flattenAfter, const std::function<bool (double)>& progress, bool liveInstances)
 {
     if (const auto refusal = whyNoFreeze (engine, channel, true); refusal.isNotEmpty())
         return refusal;
@@ -1541,7 +1597,10 @@ juce::String freezeTrackNow (AudioEngine& engine, int channel, bool flattenAfter
     plan.flattenAfter = flattenAfter;
     std::vector<StandIn> stems;
     juce::String error;
-    if (! sessionpack::renderFreeze (plan.song, plan.channel, plan.rate, plan.folder, stems, progress, error, plan.insert, plan.flattenAfter))
+    auto liveHold = liveInstances ? LiveExportHold::open (engine) : nullptr;
+    const auto ok = sessionpack::renderFreeze (plan.song, plan.channel, plan.rate, plan.folder, stems, progress, error, plan.insert, plan.flattenAfter);
+    liveHold.reset();
+    if (! ok)
         return error.isEmpty() ? juce::String ("cancelled") : error;
     finishFreeze (engine, plan, std::move (stems));
     return {};
@@ -1735,14 +1794,17 @@ juce::String freezeRefusal (AudioEngine& engine, int channel)
     return whyNoFreeze (engine, channel);
 }
 
-juce::String freezeChannelNow (AudioEngine& engine, int channel, const std::function<bool (double)>& progress)
+juce::String freezeChannelNow (AudioEngine& engine, int channel, const std::function<bool (double)>& progress, bool liveInstances)
 {
     if (const auto refusal = whyNoFreeze (engine, channel); refusal.isNotEmpty())
         return refusal;
     const auto plan = planFreeze (engine, channel);
     std::vector<StandIn> stems;
     juce::String error;
-    if (! sessionpack::renderFreeze (plan.song, plan.channel, plan.rate, plan.folder, stems, progress, error))
+    auto liveHold = liveInstances ? LiveExportHold::open (engine) : nullptr;
+    const auto ok = sessionpack::renderFreeze (plan.song, plan.channel, plan.rate, plan.folder, stems, progress, error);
+    liveHold.reset(); // (the plugins given back before the freeze unloads the frozen one)
+    if (! ok)
         return error.isEmpty() ? juce::String ("cancelled") : error;
     finishFreeze (engine, plan, std::move (stems));
     return {};

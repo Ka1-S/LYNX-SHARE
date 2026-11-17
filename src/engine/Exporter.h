@@ -49,7 +49,7 @@ juce::String exportExtension (ExportSettings::Format format);
 
 // Round 190jb (owner decision 2026-11-16: FL-exact; docs/analise/REA_rodada190jb.md): FL renders with the plugin
 // instances that play, playback stopped. While a hold is open, an ExportJob made on the message thread (the Export
-// window's mix, its stems and its marker sections) renders with the live engine's hosted plugins and the Patchers that
+// window's mix, its stems and its marker sections; round 190jx: Render to audio and Freeze too) renders with the live engine's hosted plugins and the Patchers that
 // host plugins: the same instances, so a plugin with internal state, a random seed, a licence check or a long boot
 // renders what was heard. LYNX's own units are made new (their render is the same either way). Opening the hold stops
 // playback; when it and the last job that used it are gone (message thread), every plugin it lent gets its sample rate
