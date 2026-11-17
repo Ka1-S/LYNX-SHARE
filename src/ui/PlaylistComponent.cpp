@@ -3339,7 +3339,9 @@ void PlaylistComponent::paintAudioClip (juce::Graphics& g, const Clip& c, juce::
     // the waveform (ui/WaveformView, analysed in the background): the clean style fills the body with the
     // peak envelope mirrored around the centre, in a light tint of the clip colour
     const auto path = juce::String::fromUTF8 (channel.samplePath.c_str());
-    const auto summary = ui::WaveformCache::getInstance()->find (path, [this, path] { return engine.getSampleLibrary().load (path); });
+    // (round 190jn: a collapsed Live lane draws no waveform, so it does not ask for one — nor load the file for it)
+    const auto summary = liveLook && body.isEmpty() ? nullptr
+                                                    : ui::WaveformCache::getInstance()->find (path, [this, path] { return engine.getSampleLibrary().load (path); });
 
     if (summary != nullptr && body.getHeight() >= 3.0f && body.getWidth() >= 3.0f) // (narrower: the body colour says enough)
     {
@@ -3419,13 +3421,16 @@ void PlaylistComponent::paintAudioClip (juce::Graphics& g, const Clip& c, juce::
 
     // the clip's own envelope (round 190gi): the lane shown is edited here like an automation clip's curve; a clip whose
     // envelope is hidden still shows its volume line faintly
-    if (const auto* envelope = clipenv::of (song, c); envelope != nullptr && (envelope->shown != 0 || clipenv::active (*envelope)))
+    // (round 190jn: Live's look on a collapsed lane is the clip's strip only — no envelope, no fades: drawn there they were
+    // paths over an empty body, a Direct2D geometry each, for every audio clip of the view)
+    const auto liveCollapsed = liveLook.has_value() && body.isEmpty();
+    if (const auto* envelope = clipenv::of (song, c); ! liveCollapsed && envelope != nullptr && (envelope->shown != 0 || clipenv::active (*envelope)))
         paintClipEnvelope (g, c, *envelope);
 
     // fades: a shaded ramp over the body and a handle at the header's corner; an automatic crossfade (round 166e)
     // replaces that side's fade with FL's two crossing S-curves over the overlap
     const auto fadeIn = c.effectiveFadeIn(), fadeOut = c.effectiveFadeOut();
-    if (fadeIn > 0 || fadeOut > 0)
+    if ((fadeIn > 0 || fadeOut > 0) && ! liveCollapsed)
     {
         const auto inX = r.getX() + (float) (fadeIn * pixelsPerTick);
         const auto outX = r.getRight() - (float) (fadeOut * pixelsPerTick);
