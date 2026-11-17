@@ -2259,6 +2259,13 @@ void PlaylistComponent::paint (juce::Graphics& g)
             }
         }
 
+        // round 190jz (issue #194): FL 2026's fade handles and tension circles: the hovered audio clip's, and the one whose
+        // fade is being dragged
+        if (const auto fadeClip = drag == Drag::fadeIn || drag == Drag::fadeOut || drag == Drag::fadeTension ? dragClip
+                                  : drag == Drag::none ? hover.clip : -1;
+            fadeClip >= 0 && fadeClip < (int) song.playlist.size() && song.playlist[(std::size_t) fadeClip].kind == ClipKind::audio)
+            paintFadeHandles (g, fadeClip);
+
         // FL 2026's gain handle (round 166e): the hovered audio clip's, and the one being dragged
         if (const auto gainClip = drag == Drag::clipGain ? dragClip : drag == Drag::none ? hover.clip : -1; gainClip >= 0 && gainClip < (int) song.playlist.size())
             if (const auto handle = gainHandle (gainClip); ! handle.isEmpty())
@@ -3611,25 +3618,31 @@ void PlaylistComponent::paintAudioClip (juce::Graphics& g, const Clip& c, juce::
     if (const auto* envelope = clipenv::of (song, c); ! liveCollapsed && envelope != nullptr && (envelope->shown != 0 || clipenv::active (*envelope)))
         paintClipEnvelope (g, c, *envelope);
 
-    // fades: a shaded ramp over the body and a handle at the header's corner; an automatic crossfade (round 166e)
-    // replaces that side's fade with FL's two crossing S-curves over the overlap
+    // fades: the gain curve as the voice plays it (FL's S curve or a straight line, bent by the tension; round 190jz,
+    // issue #194: before, every fade but a crossfade was drawn straight), in the waveform's colour as FL 2026 draws it;
+    // the other layouts also shade what the fade takes away. An automatic crossfade (round 166e) replaces that side's fade
+    // with FL's two crossing S-curves over the overlap. The handles and the tension circles: paintFadeHandles (hover).
     const auto fadeIn = c.effectiveFadeIn(), fadeOut = c.effectiveFadeOut();
-    if ((fadeIn > 0 || fadeOut > 0) && ! liveCollapsed)
+    if ((fadeIn > 0 || fadeOut > 0) && ! liveCollapsed && body.getHeight() >= 3.0f)
     {
         const auto inX = r.getX() + (float) (fadeIn * pixelsPerTick);
         const auto outX = r.getRight() - (float) (fadeOut * pixelsPerTick);
         const auto shade = theme::colour::bg0.withAlpha (0.45f);
-        const auto line = (liveLook ? liveLook->content : clipContentColour (colour)).withAlpha (0.9f);
+        const auto line = liveLook ? liveLook->content.withAlpha (0.9f)
+                        : fl ? (band ? look.compactContent : look.content) : simpleLook ? simpleLook->content : clipContentColour (colour).withAlpha (0.9f);
         // the gain curve from x0 to x1 (rising: a fade in), as a line along the body
-        auto curve = [&body] (float x0, float x1, bool rising, bool sCurve, bool equalPower) {
+        auto curve = [&body] (float x0, float x1, bool rising, bool cross, bool equalPower, bool linear, float tension) {
             juce::Path p;
-            const auto steps = sCurve || equalPower ? juce::jlimit (4, 48, (int) std::abs (x1 - x0) / 3) : 1;
+            const auto bent = cross || equalPower || ! linear || tension != 0.0f;
+            // (a segment every 6 px, at most 16: the S curve reads the same and Thief's ~1 500 clips paint as fast as
+            // before round 190jz's curves, --paintbench; a fade under 4 px is a straight line)
+            const auto steps = bent && std::abs (x1 - x0) >= 4.0f ? juce::jlimit (2, 16, (int) std::abs (x1 - x0) / 6) : 1;
             for (int k = 0; k <= steps; ++k)
             {
                 const auto t = (float) k / (float) steps;
-                const auto up = rising ? t : 1.0f - t;
-                const auto level = equalPower ? std::sin (up * juce::MathConstants<float>::halfPi)
-                                 : sCurve     ? clipops::crossfadeCurve (up) : up;
+                const auto level = equalPower ? clipops::equalPowerCurve (rising ? t : 1.0f - t)
+                                 : cross      ? clipops::crossfadeCurve (rising ? t : 1.0f - t)
+                                              : clipops::fadeLevel (t, rising, linear, tension);
                 const juce::Point<float> q { x0 + (x1 - x0) * t, body.getBottom() - level * body.getHeight() };
                 if (k == 0)
                     p.startNewSubPath (q);
@@ -3638,27 +3651,30 @@ void PlaylistComponent::paintAudioClip (juce::Graphics& g, const Clip& c, juce::
             }
             return p;
         };
-        auto paintFade = [&] (float x0, float x1, bool rising, bool cross, bool equalPower) {
-            auto edge = curve (x0, x1, rising, cross, equalPower);
-            auto area = edge;
-            area.lineTo (x1, body.getY());
-            area.lineTo (x0, body.getY());
-            area.closeSubPath();
-            g.setColour (shade);
-            g.fillPath (area);
+        auto paintFade = [&] (float x0, float x1, bool rising, bool cross, bool equalPower, bool linear, float tension) {
+            auto edge = curve (x0, x1, rising, cross, equalPower, linear, tension);
+            if (! fl)
+            {
+                auto area = edge;
+                area.lineTo (x1, body.getY());
+                area.lineTo (x0, body.getY());
+                area.closeSubPath();
+                g.setColour (shade);
+                g.fillPath (area);
+            }
             g.setColour (line);
-            g.strokePath (edge, juce::PathStrokeType (1.2f));
+            g.strokePath (edge, juce::PathStrokeType (fl ? 1.6f : 1.2f));
             if (cross || equalPower) // the neighbour's side of the crossfade, which this clip covers
             {
                 g.setColour (line.withMultipliedAlpha (0.6f));
-                g.strokePath (curve (x0, x1, ! rising, cross, equalPower), juce::PathStrokeType (1.0f));
+                g.strokePath (curve (x0, x1, ! rising, cross, equalPower, false, 0.0f), juce::PathStrokeType (1.0f));
             }
         };
 
         if (fadeIn > 0)
-            paintFade (body.getX(), inX, true, c.crossfadeIn > 0, (c.fadeCurve & 1) != 0);
+            paintFade (r.getX(), inX, true, c.crossfadeIn > 0, (c.fadeCurve & 1) != 0, (c.linearFades & 1) != 0, c.fadeInTension);
         if (fadeOut > 0)
-            paintFade (outX, body.getRight(), false, c.crossfadeOut > 0, (c.fadeCurve & 2) != 0);
+            paintFade (outX, r.getRight(), false, c.crossfadeOut > 0, (c.fadeCurve & 2) != 0, (c.linearFades & 2) != 0, c.fadeOutTension);
     }
 }
 
@@ -4965,22 +4981,160 @@ int PlaylistComponent::warpMarkerAt (int index, juce::Point<int> p) const
 
 int PlaylistComponent::fadeHandleAt (int index, juce::Point<int> p) const
 {
-    const auto& c = engine.getSong().playlist[(std::size_t) index];
-
-    if (c.kind != ClipKind::audio)
+    const auto& song = engine.getSong();
+    if (index < 0 || index >= (int) song.playlist.size() || song.playlist[(std::size_t) index].kind != ClipKind::audio)
         return 0;
 
-    const auto y = trackToY (c.track) + 1 + 15;
-    const auto inX = tickToX ((double) c.start) + c.fadeIn * pixelsPerTick;
-    const auto outX = tickToX ((double) c.end()) - c.fadeOut * pixelsPerTick;
-
-    if (std::abs (p.y - y) > 6)
+    // round 190jz (issue #194, FL 2026): the handles sit in the top corners of the clip's body, under its header, at the
+    // ends of the fades (FL's triangles, 7 px when hovered); the nearer one wins on a narrow clip
+    const auto in = fadeHandlePoint (index, 0), out = fadeHandlePoint (index, 1);
+    const auto q = p.toFloat();
+    if (q.y < in.y - 3.0f || q.y > in.y + 9.0f)
         return 0;
-    if (std::abs (p.x - (inX + 2.0)) <= 6.0)
+    const auto dIn = std::abs (q.x - (in.x + 3.0f)), dOut = std::abs (q.x - (out.x - 3.0f));
+    if (dIn <= 6.0f && (dIn <= dOut || dOut > 6.0f))
         return 1;
-    if (std::abs (p.x - (outX - 2.0)) <= 6.0)
+    if (dOut <= 6.0f)
         return 2;
     return 0;
+}
+
+juce::Rectangle<float> PlaylistComponent::audioClipBody (int index) const
+{
+    // (as paintAudioClip: FL's header band on a tall track, the whole band on a short one; LYNX's header elsewhere)
+    const auto r = clipBounds (index).toFloat();
+    if (flClipLook())
+        return r.getHeight() + 1.0f < (float) flBandBelow ? r.reduced (0.0f, 1.0f) : r.withTrimmedTop (flHeaderHeight (r));
+    return r.withTrimmedTop (clipHeaderHeight (r));
+}
+
+juce::Point<float> PlaylistComponent::fadeHandlePoint (int index, int side) const
+{
+    const auto& c = engine.getSong().playlist[(std::size_t) index];
+    const auto body = audioClipBody (index);
+    const auto r = clipBounds (index).toFloat();
+    return side == 0 ? juce::Point<float> { r.getX() + (float) ((double) c.effectiveFadeIn() * pixelsPerTick), body.getY() }
+                     : juce::Point<float> { r.getRight() - (float) ((double) c.effectiveFadeOut() * pixelsPerTick), body.getY() };
+}
+
+std::optional<juce::Point<float>> PlaylistComponent::fadeTensionPoint (int index, int side) const
+{
+    // FL 2026: the circle in the middle of the fade, on its curve (none on a crossfade: LYNX's automatic and comp crossfades
+    // have no tension of their own, core Scheduler)
+    const auto& song = engine.getSong();
+    if (index < 0 || index >= (int) song.playlist.size())
+        return std::nullopt;
+    const auto& c = song.playlist[(std::size_t) index];
+    const auto length = side == 0 ? c.fadeIn : c.fadeOut;
+    const auto bit = side == 0 ? 1 : 2;
+    if (c.kind != ClipKind::audio || length <= 0 || (side == 0 ? c.crossfadeIn : c.crossfadeOut) > 0 || (c.fadeCurve & bit) != 0)
+        return std::nullopt;
+    const auto body = audioClipBody (index);
+    const auto r = clipBounds (index).toFloat();
+    const auto width = (float) ((double) length * pixelsPerTick);
+    if (width < 8.0f || body.getHeight() < 10.0f)
+        return std::nullopt;
+    const auto x = side == 0 ? r.getX() + width * 0.5f : r.getRight() - width * 0.5f;
+    const auto level = clipops::fadeLevel (0.5f, side == 0, (c.linearFades & bit) != 0, side == 0 ? c.fadeInTension : c.fadeOutTension);
+    return juce::Point<float> { x, body.getBottom() - level * body.getHeight() };
+}
+
+int PlaylistComponent::fadeTensionAt (int index, juce::Point<int> p) const
+{
+    for (int side = 0; side < 2; ++side)
+        if (const auto at = fadeTensionPoint (index, side); at && at->getDistanceFrom (p.toFloat()) <= 6.0f)
+            return side + 1;
+    return 0;
+}
+
+juce::Colour PlaylistComponent::fadeInk (int index) const
+{
+    // the waveform's colour, as paintAudioClip picks it
+    const auto& song = engine.getSong();
+    const auto& c = song.playlist[(std::size_t) index];
+    if (c.channel < 0 || c.channel >= (int) song.channels.size())
+        return theme::colour::textPrimary;
+    const auto& channel = song.channels[(std::size_t) c.channel];
+    const auto colour = audioClipColour (channel);
+    if (flClipLook())
+    {
+        const auto r = clipBounds (index).toFloat();
+        const auto look = theme::clipBody (juce::Colour (channel.colour), trackColourIn (song, c.track), ClipKind::audio, theme::ClipStyle::flTint);
+        return r.getHeight() + 1.0f < (float) flBandBelow ? look.compactContent : look.content;
+    }
+    if (const auto simpleLook = simpleClipLook (c))
+        return simpleLook->content;
+    return clipContentColour (colour);
+}
+
+juce::String PlaylistComponent::fadeLengthText (std::int64_t ticks) const
+{
+    // FL 2026's hint: minutes'seconds.milliseconds'' ("Fade in: 0'15.750''")
+    const auto ms = juce::roundToInt ((double) juce::jmax<std::int64_t> (0, ticks) * 60000.0 / (juce::jmax (1.0, engine.getSong().bpm) * ppq));
+    return juce::String (ms / 60000) + "'" + juce::String ((ms / 1000) % 60).paddedLeft ('0', 2) + "." + juce::String (ms % 1000).paddedLeft ('0', 3) + "''";
+}
+
+// Round 190jz (issue #194): FL 2026's fade handles over the hovered audio clip (FL shots fl-194-*): small triangles in the
+// waveform's colour at the body's top corners where the fades end (4 px), the hovered or dragged one white (7 px) with a
+// faint line down the clip, and on each fade the tension circle (a 7 px ring on the curve; hovered or dragged, a 12 px
+// disc). Drawn over the cached clips, for one clip only: nothing while nothing is hovered.
+void PlaylistComponent::paintFadeHandles (juce::Graphics& g, int index)
+{
+    const auto& song = engine.getSong();
+    if (index < 0 || index >= (int) song.playlist.size() || song.playlist[(std::size_t) index].kind != ClipKind::audio)
+        return;
+    const auto body = audioClipBody (index);
+    const auto r = clipBounds (index).toFloat();
+    if (r.getWidth() < 6.0f || body.getHeight() < 6.0f)
+        return;
+    const auto ink = fadeInk (index);
+    const juce::Graphics::ScopedSaveState keep (g);
+    g.reduceClipRegion (r.toNearestIntEdges());
+    const auto active = [&] (int target) {
+        if (dragClip == index && drag == Drag::fadeIn)
+            return target == 1;
+        if (dragClip == index && drag == Drag::fadeOut)
+            return target == 2;
+        if (dragClip == index && drag == Drag::fadeTension)
+            return target == 3 + fadeSide;
+        return drag == Drag::none && hover.clip == index && hover.fade == target;
+    };
+    for (int side = 0; side < 2; ++side)
+    {
+        const auto at = fadeHandlePoint (index, side);
+        const auto on = active (side + 1);
+        const auto size = on ? 7.0f : 4.0f;
+        const auto dir = side == 0 ? 1.0f : -1.0f;
+        if (on) // FL: a faint line down the clip under the handle
+        {
+            g.setColour (juce::Colours::white.withAlpha (0.12f));
+            g.fillRect (juce::Rectangle<float> (std::round (at.x) - (side == 0 ? 0.0f : 1.0f), body.getY(), 1.0f, body.getHeight()));
+        }
+        juce::Path corner;
+        corner.addTriangle (at.x, at.y, at.x + dir * size, at.y, at.x, at.y + size);
+        g.setColour (on ? juce::Colour (0xfff3ffff) : ink);
+        g.fillPath (corner);
+    }
+    for (int side = 0; side < 2; ++side)
+        if (const auto at = fadeTensionPoint (index, side))
+        {
+            if (active (3 + side))
+            {
+                const auto disc = juce::Rectangle<float> (12.0f, 12.0f).withCentre (*at);
+                g.setColour (ink.brighter (0.45f));
+                g.fillEllipse (disc);
+                g.setColour (juce::Colour (0xffe2eeef));
+                g.drawEllipse (disc.reduced (0.5f), 1.0f);
+            }
+            else
+            {
+                const auto ring = juce::Rectangle<float> (7.0f, 7.0f).withCentre (*at);
+                g.setColour (theme::colour::bg0.withAlpha (0.55f));
+                g.fillEllipse (ring);
+                g.setColour (ink);
+                g.drawEllipse (ring, 1.2f);
+            }
+        }
 }
 
 juce::Rectangle<float> PlaylistComponent::gainHandle (int index) const
@@ -5095,7 +5249,7 @@ juce::PopupMenu PlaylistComponent::fadeHandleMenu (int index, int side, bool cli
     };
     // FL 2026's fade handle menu (GUI, rounds 189l / 189n: shots FL-fade-in-menu-overlap.png): "Reset fade in" / "Reset fade
     // out" even on a crossfaded side, then "Create crossfade", enabled when the side has a clip to cross (FUN_00d023d0).
-    // ("Reset ... tension" belongs to FL's tension handle, the circle in a fade, which LYNX's clip fades don't have.)
+    // ("Reset ... tension" belongs to FL's tension handle, the circle in a fade: fadeTensionMenu, round 190jz.)
     // (round 190ey, live check 190ew PL-7: the clip menu's "Fade in / out curve" submenu reads "Reset", then the gain
     // handle's Normalize items; core flclipmenu::fadeCurve)
     menu.addItem (clipMenu ? tr ("Reset") : side == 0 ? tr ("Reset fade in") : tr ("Reset fade out"), [edit, side] {
@@ -5153,6 +5307,74 @@ juce::PopupMenu PlaylistComponent::fadeHandleMenu (int index, int side, bool cli
             const auto bit = (std::uint8_t) (side == 0 ? 1 : 2);
             c.linearFades = on ? (std::uint8_t) (c.linearFades | bit) : (std::uint8_t) (c.linearFades & ~bit);
         });
+    };
+    menu.addItem (tr ("Smooth curve"), true, ! linear, [setLinear] { setLinear (false); });
+    menu.addItem (tr ("Single curve"), true, linear, [setLinear] { setLinear (true); });
+    return menu;
+}
+
+// Round 190jz (issue #194): FL 2026's menu on a fade's tension handle (GUI shot fl-194-tension-menu.png): Reset fade in /
+// out tension, Create crossfade, Copy value, Paste value, Type in value... (FL's field: "Tension ±0-1 or %"), and the
+// Curve shape choice. On the clicked clip, or every selected audio clip when it is selected (as the fade handle's menu).
+juce::PopupMenu PlaylistComponent::fadeTensionMenu (int index, int side)
+{
+    const auto& song = engine.getSong();
+    juce::PopupMenu menu;
+    if (index < 0 || index >= (int) song.playlist.size())
+        return menu;
+    std::vector<int> targets;
+    for (auto i : isSelected (index) ? selection : std::vector<int> { index })
+        if (i >= 0 && i < (int) song.playlist.size() && song.playlist[(std::size_t) i].kind == ClipKind::audio)
+            targets.push_back (i);
+    const auto& clip = song.playlist[(std::size_t) index];
+    const auto handle = clipops::fadeTensionHandle (side == 0 ? clip.fadeInTension : clip.fadeOutTension);
+    auto setHandle = [this, targets, side] (double v) {
+        engine.editSong ([targets, side, raw = clipops::fadeTensionFromHandle (v)] (Song& s) {
+            for (auto i : targets)
+                if (i < (int) s.playlist.size())
+                    (side == 0 ? s.playlist[(std::size_t) i].fadeInTension : s.playlist[(std::size_t) i].fadeOutTension) = raw;
+        });
+        repaint();
+    };
+    menu.addItem (side == 0 ? tr ("Reset fade in tension") : tr ("Reset fade out tension"), [setHandle] { setHandle (0.0); });
+    std::vector<int> menuClips;
+    for (auto i : isSelected (index) ? selection : std::vector<int> { index })
+        if (i >= 0 && i < (int) song.playlist.size())
+            menuClips.push_back (i);
+    menu.addItem (tr ("Create crossfade"), clipops::canCreateCrossfade (song.playlist, menuClips, side, selection), false,
+                  [this, index, side, chosen = selection] {
+                      engine.editSong ([index, side, chosen] (Song& s) { clipops::createCrossfades (s.playlist, index, side, chosen); });
+                      repaint();
+                  });
+    menu.addItem (tr ("Copy value"), [handle] { copiedFadeTension = handle; hasCopiedFadeTension = true; });
+    menu.addItem (tr ("Paste value"), hasCopiedFadeTension, false, [setHandle] { setHandle (copiedFadeTension); });
+    menu.addItem (tr ("Type in value..."), [handle, setHandle] {
+        auto* window = new juce::AlertWindow (tr ("Tension"), tr ("Tension ±0-1 or %"), juce::MessageBoxIconType::NoIcon);
+        window->addTextEditor ("value", juce::String (handle, 4));
+        window->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+        window->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+        window->enterModalState (true, juce::ModalCallbackFunction::create ([window, setHandle] (int result) {
+                                     if (result != 1)
+                                         return;
+                                     const auto text = window->getTextEditorContents ("value").trim();
+                                     const auto number = text.retainCharacters ("-+0123456789.,").replaceCharacter (',', '.').getDoubleValue();
+                                     setHandle (text.containsChar ('%') ? number / 100.0 : number);
+                                 }),
+                                 true);
+    });
+    menu.addSectionHeader (tr ("Curve shape"));
+    const auto linear = (clip.linearFades & (side == 0 ? 1 : 2)) != 0;
+    auto setLinear = [this, targets, side] (bool on) {
+        engine.editSong ([targets, side, on] (Song& s) {
+            const auto bit = (std::uint8_t) (side == 0 ? 1 : 2);
+            for (auto i : targets)
+                if (i < (int) s.playlist.size())
+                {
+                    auto& c = s.playlist[(std::size_t) i];
+                    c.linearFades = on ? (std::uint8_t) (c.linearFades | bit) : (std::uint8_t) (c.linearFades & ~bit);
+                }
+        });
+        repaint();
     };
     menu.addItem (tr ("Smooth curve"), true, ! linear, [setLinear] { setLinear (false); });
     menu.addItem (tr ("Single curve"), true, linear, [setLinear] { setLinear (true); });
@@ -5971,6 +6193,13 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
             showFadeHandleMenu (hit, fade - 1);
             return;
         }
+    // FL 2026's tension handle menu (round 190jz)
+    if (e.mods.isRightButtonDown() && hit >= 0)
+        if (const auto side = fadeTensionAt (hit, e.getPosition()); side != 0)
+        {
+            fadeTensionMenu (hit, side - 1).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+            return;
+        }
 
     if (e.mods.isRightButtonDown())
     {
@@ -6219,14 +6448,47 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
         }
     }
 
-    // audio clip fade handles (drawn at the top corners of the body)
+    // audio clip fade handles (drawn at the top corners of the body); FL's manual: Alt+click resets one (round 190jz)
     if (hit >= 0)
         if (const auto fade = fadeHandleAt (hit, e.getPosition()); fade != 0)
         {
+            if (e.mods.isAltDown())
+            {
+                engine.editSong ([hit, side = fade - 1] (Song& s) {
+                    auto& c = s.playlist[(std::size_t) hit];
+                    (side == 0 ? c.fadeIn : c.fadeOut) = 0;
+                    (side == 0 ? c.fadeInTension : c.fadeOutTension) = 0.0f;
+                });
+                repaint();
+                return;
+            }
             setSelection ({});
             dragClip = hit;
             dragIndices = { hit };
             drag = fade == 1 ? Drag::fadeIn : Drag::fadeOut;
+            postDragHint();
+            return;
+        }
+    // round 190jz (issue #194): a fade's tension handle, dragged up / down (FL 2026: up raises the curve's middle); Alt+click
+    // resets it, as FL's manual says
+    if (hit >= 0)
+        if (const auto side = fadeTensionAt (hit, e.getPosition()); side != 0)
+        {
+            const auto& c = engine.getSong().playlist[(std::size_t) hit];
+            if (e.mods.isAltDown())
+            {
+                engine.editSong ([hit, in = side == 1] (Song& s) { (in ? s.playlist[(std::size_t) hit].fadeInTension : s.playlist[(std::size_t) hit].fadeOutTension) = 0.0f; });
+                repaint();
+                return;
+            }
+            setSelection ({});
+            dragClip = hit;
+            dragIndices = { hit };
+            fadeSide = side - 1;
+            fadeTensionStart = clipops::fadeTensionHandle (side == 1 ? c.fadeInTension : c.fadeOutTension);
+            fadeTensionStartY = e.y;
+            drag = Drag::fadeTension;
+            postDragHint();
             return;
         }
 
@@ -6800,20 +7062,39 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
         case Drag::fadeOut:
         {
             const auto& clip = engine.getSong().playlist[(std::size_t) dragClip];
-            // FL's Edit › "Snap fade handles" (off by default, EESnapFadeHandles): off, the handles move freely
-            const auto snapFade = snapOn && EditorGlobals::get().snapFadeHandles;
+            // FL's Edit › "Snap fade handles" (off by default, EESnapFadeHandles): off, the handles move freely and Alt snaps
+            // them (FL 2026's hint "Hold Alt to snap", round 190jz); on, Alt lets them move freely
+            const auto snapFade = snapOn && (EditorGlobals::get().snapFadeHandles != e.mods.isAltDown());
             const auto tick = snapFade ? snap (xToTick (e.x) + gridTicks() / 2.0, true) : (std::int64_t) xToTick (e.x);
             auto length = drag == Drag::fadeIn ? tick - clip.start : clip.end() - tick;
             length = juce::jlimit<std::int64_t> (0, clip.length, length);
             const auto in = drag == Drag::fadeIn;
 
-            if ((in ? clip.fadeIn : clip.fadeOut) == std::min (length, clip.length - (in ? clip.fadeOut : clip.fadeIn)))
+            if ((in ? clip.fadeIn : clip.fadeOut) == std::min (length, clip.length - (in ? clip.fadeOut : clip.fadeIn))
+                && clipops::manualFade (clip, in ? 0 : 1))
                 return;
 
+            // FL 2026 sets the side's manual bit when its handle is dragged (fade flags 0x1 in the saved file, round 190jz)
             engine.editSong ([i = dragClip, length, in] (Song& s) {
                 auto& c = s.playlist[(std::size_t) i];
                 (in ? c.fadeIn : c.fadeOut) = std::min (length, c.length - (in ? c.fadeOut : c.fadeIn));
+                clipops::setManualFade (c, in ? 0 : 1, true);
             });
+            postDragHint();
+            repaint();
+            return;
+        }
+
+        case Drag::fadeTension:
+        {
+            const auto v = juce::jlimit (-1.0, 1.0, fadeTensionStart + (fadeTensionStartY - e.y) * clipops::fadeTensionPerPixel);
+            const auto raw = clipops::fadeTensionFromHandle (v);
+            engine.editSong ([i = dragClip, in = fadeSide == 0, raw] (Song& s) {
+                if (i < (int) s.playlist.size())
+                    (in ? s.playlist[(std::size_t) i].fadeInTension : s.playlist[(std::size_t) i].fadeOutTension) = raw;
+            });
+            postDragHint();
+            repaint();
             return;
         }
 
@@ -7131,7 +7412,18 @@ bool PlaylistComponent::makeDragHint (ui::Hint& hint)
             hint.value = tr ("Gain: {0}", { gainText (clip->gain) });
             break;
         case Drag::fadeIn:
-        case Drag::fadeOut: hint.text = EditorGlobals::get().snapFadeHandles ? tr ("Setting the fade  [Alt] no snap") : tr ("Setting the fade"); break;
+        case Drag::fadeOut: // round 190jz: FL 2026's hint while a fade handle moves ("Fade out: 0'00.112''   Hold Alt to snap")
+            if (clip == nullptr)
+                return false;
+            hint.text = (drag == Drag::fadeIn ? tr ("Fade in: {0}", { fadeLengthText (clip->effectiveFadeIn()) })
+                                              : tr ("Fade out: {0}", { fadeLengthText (clip->effectiveFadeOut()) }))
+                        + "   " + (EditorGlobals::get().snapFadeHandles ? tr ("Hold Alt for no snap") : tr ("Hold Alt to snap"));
+            break;
+        case Drag::fadeTension: // FL 2026: "Tension: 15%"
+            if (clip == nullptr)
+                return false;
+            hint.text = tr ("Tension: {0}%", { juce::String (juce::roundToInt (clipops::fadeTensionHandle (fadeSide == 0 ? clip->fadeInTension : clip->fadeOutTension) * 100.0)) });
+            break;
         case Drag::warpMarker: hint.text = tr ("Moving the warp marker: the audio around it stretches  [Alt] no snap"); break;
         case Drag::tempoMarker:
             hint.text = tr ("Moving the tempo change  [Alt] no snap");
@@ -7226,6 +7518,34 @@ ui::Hint PlaylistComponent::dragHintForSnapshot (int clip, int point, bool tensi
     ui::Hint hint;
     makeDragHint (hint);
     drag = was;
+    return hint;
+}
+
+void PlaylistComponent::hoverFadeForSnapshot (int index, int target)
+{
+    // (--issueshot190jz) the clip hovered as the mouse would hover it, `target` drawn as hovered (-1: nothing hovered)
+    hover = {};
+    if (index >= 0 && index < (int) engine.getSong().playlist.size())
+    {
+        hover.clip = index;
+        hover.track = engine.getSong().playlist[(std::size_t) index].track;
+        hover.target = target == 1 || target == 2 ? gesture::Target::fadeHandle : target >= 3 ? gesture::Target::fadeTension : gesture::Target::item;
+        hover.fade = juce::jmax (0, target);
+    }
+    repaint();
+}
+
+ui::Hint PlaylistComponent::fadeDragHintForSnapshot (int index, int target)
+{
+    const auto was = drag;
+    const auto wasClip = dragClip;
+    drag = target == 1 ? Drag::fadeIn : target == 2 ? Drag::fadeOut : Drag::fadeTension;
+    dragClip = index;
+    fadeSide = target == 4 ? 1 : 0;
+    ui::Hint hint;
+    makeDragHint (hint);
+    drag = was;
+    dragClip = wasClip;
     return hint;
 }
 
@@ -12474,8 +12794,16 @@ PlaylistComponent::Hover PlaylistComponent::hoverAt (juce::Point<int> p) const
         h.target = gesture::Target::clipMenu;
     else if (regionLoopHandle (h.clip).expanded (2.0f).contains (p.toFloat())) // round 190jr
         h.target = gesture::Target::rightEdge;
-    else if (fadeHandleAt (h.clip, p) != 0)
+    else if (const auto handle = fadeHandleAt (h.clip, p); handle != 0)
+    {
         h.target = gesture::Target::fadeHandle;
+        h.fade = handle;
+    }
+    else if (const auto circle = fadeTensionAt (h.clip, p); circle != 0) // round 190jz (issue #194)
+    {
+        h.target = gesture::Target::fadeTension;
+        h.fade = circle + 2;
+    }
     else if (gainHandle (h.clip).expanded (2.0f).contains (p.toFloat()))
         h.target = gesture::Target::gainHandle;
     else if ((c.kind == ClipKind::automation || c.kind == ClipKind::audio) && automationPointAt (h.clip, p) >= 0) // (190gi: envelopes)
@@ -12730,6 +13058,24 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
         const auto onHeader = p.y < clipBounds (h.clip).getY() + (int) clipTitleHeight;
         if (h.target == gesture::Target::gainHandle)
             hint.text = actionHint (gesture::Action::clipGain, true);
+        else if (h.target == gesture::Target::fadeHandle) // round 190jz: FL's "Fade in: 0'00.000'' (auto)   Hold Alt to snap"
+        {
+            const auto& c = song.playlist[(std::size_t) h.clip];
+            const auto side = fadeHandleAt (h.clip, p) - 1;
+            hint.text = (side == 0 ? tr ("Fade in: {0}", { fadeLengthText (c.effectiveFadeIn()) }) : tr ("Fade out: {0}", { fadeLengthText (c.effectiveFadeOut()) }))
+                        + (clipops::manualFade (c, side) ? juce::String() : " " + tr ("(auto)")) + "   "
+                        + (EditorGlobals::get().snapFadeHandles ? tr ("Hold Alt for no snap") : tr ("Hold Alt to snap"));
+            hint.hasMenu = true;
+            return hint;
+        }
+        else if (h.target == gesture::Target::fadeTension) // FL: "Tension: 0%"
+        {
+            const auto& c = song.playlist[(std::size_t) h.clip];
+            const auto side = fadeTensionAt (h.clip, p) - 1;
+            hint.text = tr ("Tension: {0}%", { juce::String (juce::roundToInt (clipops::fadeTensionHandle (side == 0 ? c.fadeInTension : c.fadeOutTension) * 100.0)) });
+            hint.hasMenu = true;
+            return hint;
+        }
         else if (h.target == gesture::Target::clipMenu)
             hint.text = song.playlist[(std::size_t) h.clip].kind == ClipKind::audio
                             ? tr ("Clip menu: [LMB] or [RMB] opens it (pitch, fit to tempo, reverse, chop, make unique...)")

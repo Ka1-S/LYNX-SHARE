@@ -17875,3 +17875,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Flm190jvTests.inc" // round 190jv: FL Studio Mobile racks with several instruments / an effect first (BUILD-LIST 19)
 #include "Spin190kbTests.inc" // round 190kb: the worker pool's waiting (statistics, tuning, bounded task-graph waits, adaptive spin)
 #include "Export190kaTests.inc" // round als190ka-export (owner decision D5): AIFF and M4A (AAC) export
+#include "Issues190jzTests.inc" // round 190jz: issues #192 (docked Browser), #194 (clip fade handles), #195 (Home, W)

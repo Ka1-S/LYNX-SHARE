@@ -197,4 +197,25 @@ inline double rollPlayRightClickTarget (bool playing, double position, double la
 {
     return playing || position != lastStart ? std::max (0.0, lastStart) : 0.0;
 }
+// --- issue #195: going to the start ---------------------------------------------------------------------------------
+// FL's Home (KeyMap "transport.toStart"): the position goes to the start of the song (Song mode) or the pattern, playing
+// or not, and becomes the mark a later Stop goes back to ("Remember seek time"), as a ruler click at the start would.
+//
+// LYNX extra (Settings › LYNX extras, off by default): REAPER's W does the same. FL gives plain W nothing in its main
+// windows, so the key is free there; the typing keyboard keeps it while it is on (W is one of its notes), a text field
+// keeps it, and a key the user bound himself in the shortcut editor wins. The switch is kept in ui-options.txt
+// ("wToStart").
+inline bool& wGoesToStart() noexcept
+{
+    static bool on = false;
+    return on;
+}
+inline void setWGoesToStart (bool on) noexcept { wGoesToStart() = on; }
+
+// True when the key `keyCode` (JUCE: a letter is its capital) with these modifiers is the extra's W and nothing that
+// comes first takes it: the switch, no modifier, the typing keyboard not taking it, no text field focused.
+inline bool wKeyGoesToStart (bool extraOn, int keyCode, bool anyModifier, bool typingKeyboardTakesIt, bool textFieldFocused) noexcept
+{
+    return extraOn && (keyCode == 'W' || keyCode == 'w') && ! anyModifier && ! typingKeyboardTakesIt && ! textFieldFocused;
+}
 } // namespace lynx::transportedit

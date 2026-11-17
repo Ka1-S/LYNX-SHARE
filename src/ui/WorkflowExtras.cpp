@@ -6,6 +6,7 @@
 #include "core/PlaylistViewOptions.h"
 #include "core/PlaylistTrackOps.h"
 #include "core/TakeCleanup.h"
+#include "core/TransportEdit.h"
 #include "core/TrackOnly.h"
 #include "core/WheelZones.h"
 #include "engine/AudioEngine.h"
@@ -75,6 +76,8 @@ bool readUiOption (const juce::String& key, bool on)
         cliplanes::patternOn = on;
     else if (key == "clipLanesLive")
         cliplanes::liveOn = on;
+    else if (key == "wToStart") // issue #195: REAPER's W goes to the start (LYNX extra)
+        transportedit::setWGoesToStart (on);
     else
         return false;
     return true;
@@ -95,7 +98,8 @@ juce::String uiOptionsText()
            // round 190jq (the button before its switch: the loader reads them in this order)
            + "\nheaderWidthDrag=" + juce::String (headerwidth::draggable ? 1 : 0) + "\nheaderWidthExtra=" + juce::String (headerwidth::clampExtra (headerwidth::extra))
            + "\npointerClickButton=" + juce::String (pointerclick::buttonShown ? 1 : 0) + "\npointerClick=" + juce::String (pointerclick::on ? 1 : 0)
-           + "\nclipLanesPattern=" + juce::String (cliplanes::patternOn ? 1 : 0) + "\nclipLanesLive=" + juce::String (cliplanes::liveOn ? 1 : 0);
+           + "\nclipLanesPattern=" + juce::String (cliplanes::patternOn ? 1 : 0) + "\nclipLanesLive=" + juce::String (cliplanes::liveOn ? 1 : 0)
+           + "\nwToStart=" + juce::String (transportedit::wGoesToStart() ? 1 : 0); // (round 190jz, issue #195)
 }
 
 std::optional<bool> extraOn (std::string_view id)
@@ -114,6 +118,8 @@ std::optional<bool> extraOn (std::string_view id)
         return pointerclick::buttonShown;
     if (id == "playlist.clipLanes") // (the Pattern layout's switch; the Clip-launch layout has its own, on by default)
         return cliplanes::patternOn;
+    if (id == "transport.wToStart")
+        return transportedit::wGoesToStart();
     return std::nullopt;
 }
 
@@ -137,6 +143,8 @@ bool setExtra (std::string_view id, bool on)
         pointerclick::setButtonShown (on);
     else if (id == "playlist.clipLanes") // (issue #191.3)
         cliplanes::patternOn = on;
+    else if (id == "transport.wToStart")
+        transportedit::setWGoesToStart (on);
     else
         return false;
     if (onChanged)

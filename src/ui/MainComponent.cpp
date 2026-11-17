@@ -2004,6 +2004,13 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
     if (panelShown && focused == Panel::playlist && ! pianoRollKeysHere() && playlist.handleKey (key))
         return true;
 
+    // issue #195, LYNX extra (off by default): REAPER's W = Home, where nothing above took the key (the typing keyboard
+    // and the user's own keys come first; core/TransportEdit.h)
+    if (transportedit::wKeyGoesToStart (transportedit::wGoesToStart(), key.getKeyCode(), key.getModifiers().isAnyModifierKeyDown(), false,
+                                        dynamic_cast<juce::TextEditor*> (juce::Component::getCurrentlyFocusedComponent()) != nullptr)
+        && runAction ("transport.toStart"))
+        return true;
+
     // 4. the key map
     if (const auto action = keyMap.find (chord, focusContext(), pianoKeys); ! action.empty() && runAction (action))
         return true;
@@ -2170,6 +2177,7 @@ bool MainComponent::runAction (const std::string& id)
     if (is ("transport.playStop")) playStop();
     else if (is ("transport.pause")) playPause();
     else if (is ("transport.playFromStart")) playFromStart();
+    else if (is ("transport.toStart") || is ("playlist.toStart") || is ("pianoRoll.toStart")) moveToStart(); // (issue #195)
     else if (is ("transport.toggleMode")) toggleMode();
     else if (is ("transport.nextMarker")) engine.jumpToNextMarker (true);
     else if (is ("transport.previousMarker")) engine.jumpToNextMarker (false);
@@ -3421,6 +3429,21 @@ void MainComponent::playFromStart()
     playStartTicks = (double) target;
 }
 
+void MainComponent::moveToStart()
+{
+    // issue #195, FL's Home ("Move playback marker to start", core/TransportEdit.h): the start of the song or pattern,
+    // playing or stopped; it is the mark a later Stop goes back to, as a ruler click there would be (issue #169)
+    const auto songMode = engine.getSong().mode == PlayMode::song;
+    EditorGlobals::get().markSeek (0, songMode);
+    const auto playing = engine.getTransport().playing.load();
+    engine.seek (0.0);
+    if (! playing)
+    {
+        playStartTicks = 0.0;
+        transportPaused = false;
+    }
+}
+
 void MainComponent::stopAndRewind (bool toStart)
 {
     // Stop while nothing plays (the second press, or a double click) goes back to the very start even when
@@ -3467,6 +3490,10 @@ void MainComponent::showStopMenu()
     menu.addSeparator();
     menu.addItem (tr ("All notes off (panic)") + "\t" + tr ("double-click"), [this] { engine.panic(); });
     menu.addItem (tr ("Back to the start"), [this] { stopAndRewind (true); });
+    // issue #195: the LYNX extra beside FL's Home (Settings › LYNX extras, the same switch)
+    menu.addSeparator();
+    menu.addItem (tr ("W moves the playback marker to the start (as Home)"), true, transportedit::wGoesToStart(),
+                  [] { workflowextras::setExtra ("transport.wToStart", ! transportedit::wGoesToStart()); });
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&stopButton));
 }
 
@@ -4252,8 +4279,11 @@ void MainComponent::selectTabForSnapshot (int tab)
             engine.setSelectedChannel ((int) (std::max_element (counts.begin(), counts.end()) - counts.begin()));
     }
 
-    // each view on its own: the panel maximized over the workspace
+    // each view on its own: the panel maximized over the workspace (issue #192: a maximized panel now fills only what a
+    // docked Browser leaves, as FL's; here the Browser is left undocked behind it, so the pictures and --paintbench /
+    // --uiperf keep the whole workspace for the view, exactly as before)
     workspace.resetLayout();
+    workspace.dockBrowser (workspace::Dock::none);
     workspace.show (panel);
     workspace.toggleMaximised (panel);
     refreshPanelButtons();

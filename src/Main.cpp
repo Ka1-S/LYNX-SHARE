@@ -26,6 +26,7 @@
 #include "core/PlaylistOps.h"
 #include "core/LastTweaked.h"
 #include "core/ClipOps.h"
+#include "core/TransportEdit.h" // (round 190jz: --issueshot190jz)
 #include "core/SamplerPage.h"
 #include "core/FlTrackMenus.h"
 #include "core/FlClipMenu.h"
@@ -2665,6 +2666,13 @@ public:
             return;
         }
 
+        // --issueshot190jz <prefix> (round 190jz, issues #192, #194, #195): src/IssuesShot190jz.inc
+        if (args.contains ("--issueshot190jz"))
+        {
+            setApplicationReturnValue (runIssuesShot190jz (args[args.indexOf ("--issueshot190jz") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
         // --workflowshot190iu <prefix> (round 190iu, issues #186 and #191): src/WorkflowShot190iu.inc
         if (args.contains ("--workflowshot190iu"))
         {
@@ -16445,6 +16453,7 @@ private:
 
 #include "WorkflowShot190iu.inc" // round 190iu
 #include "PlaylistShot190jq.inc" // round 190jq
+#include "IssuesShot190jz.inc" // round 190jz
     // --trackautoshot190gz (round 190gz): see the dispatch above
     bool runTrackAutoShot190gz (const juce::String& prefix)
     {
