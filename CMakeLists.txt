@@ -106,6 +106,7 @@ add_library(lynx_core STATIC
     src/core/SimpleTracks.cpp
     src/core/SimplePads.cpp
     src/core/KeyFollow.cpp
+    src/core/LoopKeywords.cpp
     src/core/GoalKnobs.cpp
     src/core/ChainPresets.cpp
     src/core/SoundLibrary.cpp
