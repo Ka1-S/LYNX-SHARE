@@ -99,3 +99,18 @@ on or off later, and LYNX SHARE updates the entry when the AppImage file moves. 
 LYNX SHARE draws with JUCE's software renderer on Linux (X11 or XWayland). Since round 161b knobs and rounded panels come from
 cached pre-rendered images, which made the Mixer and Playlist several times cheaper to draw (`docs/analise/REA_rodada161b.md`). `LYNX --uiperf project.flp out.txt`
 times the drawing of the main windows on your machine.
+
+Moving playheads (the Playlist, Piano roll and Event editor, Gross Beat's locator) are drawn by the X server while the
+song plays, since round 190jx: the playhead's picture is sent once, and each frame the server puts back the pixels it
+covered, saves the ones under its new place and composites it there (XRender). LYNX itself paints nothing for it.
+Measured on Xvfb with Thief playing (median of 5 runs each, `LYNX --uiperf` with `LYNX_UIPERF_ONLY="overlay A/B"`):
+
+| view | window frames/s | painted Mpx/s | LYNX CPU | message thread | X server CPU |
+|---|---|---|---|---|---|
+| Playlist, repainted (before) | 98.0 | 17.56 | 60.4 % | 16.1 % | 3.5 % |
+| Playlist, drawn by the X server | 28.3 | 1.22 | 56.4 % | 11.0 % | 4.6 % |
+| Piano roll, repainted (before) | 97.4 | 14.42 | 66.6 % | 23.7 % | 3.3 % |
+| Piano roll, drawn by the X server | 28.1 | 1.48 | 56.6 % | 12.5 % | 1.5 % |
+
+`LYNX_OVERLAY=0` turns it off (the views repaint their playheads as before); without the X Render extension it is off by
+itself. `LYNX_OVERLAY_STATS=<file>` writes what it did every 2 seconds (frames, fallbacks and why, JUCE's blits).

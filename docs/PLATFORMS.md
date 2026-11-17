@@ -14,6 +14,7 @@ JUCE and builds anywhere; the app uses JUCE 8.0.4. Everything that differs per O
 | Plugin sandbox (separate process) | yes (opt-in) | yes (opt-in, since 0.1.25) | yes (opt-in) |
 | Settings | `%APPDATA%\LYNX` | `~/Library/Application Support/LYNX` | `$XDG_CONFIG_HOME/LYNX` (`~/.config/LYNX`) |
 | Waveform cache | `%APPDATA%\LYNX\wavecache` | `~/Library/Caches/LYNX/wavecache` | `$XDG_CACHE_HOME/LYNX/wavecache` (`~/.cache/LYNX`) |
+| Moving playheads while playing (`src/ui/MotionOverlay.h`) | DirectComposition visual (on) | Core Animation layer (**off by default**, `LYNX_OVERLAY_MAC=1`; checked headless on CI only) | drawn by the X server with XRender (on) ([LINUX.md](LINUX.md)) |
 | Crash report + emergency save | `%APPDATA%\LYNX\autosave` | `.../Application Support/LYNX/autosave` | `~/.config/LYNX/autosave` |
 | FL Studio installation (factory samples, plugin database) | registry, else `Program Files\Image-Line\FL Studio*` | `/Applications/FL Studio*.app/Contents/Resources/FL` (layout not confirmed) | a Windows FL Studio under Wine: `$WINEPREFIX` or `~/.wine`, `drive_c/Program Files/Image-Line/FL Studio*` |
 

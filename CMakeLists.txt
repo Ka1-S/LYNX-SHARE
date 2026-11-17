@@ -702,6 +702,10 @@ if(LYNX_BUILD_APP)
         # the system's video decoder (round 174d, ui/VideoMediaMac.mm; manual retain / release)
         target_sources(LYNX PRIVATE src/ui/VideoMediaMac.mm)
         set_source_files_properties(src/ui/VideoMediaMac.mm PROPERTIES COMPILE_OPTIONS "-fno-objc-arc")
+        # the moving marks as Core Animation layers (round 190jx, ui/MotionOverlayMac.h; off by default: LYNX_OVERLAY_MAC=1)
+        target_sources(LYNX PRIVATE src/ui/MotionOverlayMac.mm)
+        set_source_files_properties(src/ui/MotionOverlayMac.mm PROPERTIES COMPILE_OPTIONS "-fno-objc-arc")
+        target_link_libraries(LYNX PRIVATE "-framework QuartzCore")
         target_link_libraries(LYNX PRIVATE "-framework AVFoundation" "-framework CoreMedia" "-framework CoreVideo")
         target_link_libraries(LYNX PRIVATE ${CMAKE_DL_LIBS}) # (libcurl loaded at run time: engine/LiveLink.cpp)
     else()
@@ -710,6 +714,9 @@ if(LYNX_BUILD_APP)
         # LYNX's own PipeWire driver (round 161): vendored MIT headers, libpipewire-0.3.so.0 loaded at run time
         target_include_directories(LYNX SYSTEM PRIVATE third_party/pipewire/include/pipewire-0.3 third_party/pipewire/include/spa-0.2)
         target_link_libraries(LYNX PRIVATE ${CMAKE_DL_LIBS})
+        # the X server draws the moving marks (round 190jx, ui/MotionOverlayX11.h; libX11 / libXrender loaded at run time
+        # as JUCE loads them: only their headers are needed)
+        target_sources(LYNX PRIVATE src/ui/MotionOverlayX11.cpp)
     endif()
 
     # the UI font on Linux and the BSDs (src/ui/Theme.cpp); Windows and macOS use their own and don't carry the files

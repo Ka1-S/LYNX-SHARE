@@ -11,12 +11,18 @@
 // Windows: a DirectComposition visual in a topmost composition target of the view's window (above the window's own
 // Direct2D swap chain; the system keeps it under the sibling windows that cover that window). Its picture is painted once
 // per look (by the view's own paint code, at 8 sub-pixel phases) and only moved afterwards; a frame = an offset and a
-// clip, and one Commit. Linux / macOS: not available yet; show() returns false and the view paints the mark as before.
+// clip, and one Commit.
+// Linux / BSD (round 190jx, ui/MotionOverlayX11.h; X11 and XWayland): the X server draws the picture over the view's
+// window with XRender and keeps the pixels under it (a save-under); JUCE's blits there (cmake/LynxPatchJuce.cmake fix 41)
+// get it drawn again. A frame = a few requests, no paint of the view, no image sent.
+// macOS (round 190jx, ui/MotionOverlayMac.h): a Core Animation layer over the view's layer, moved with implicit
+// animations off. OFF by default (LYNX_OVERLAY_MAC=1): checked headless on the CI only, not on a screen.
 //
 // The view's own path stays the automatic fallback: show() returns false whenever the overlay cannot show the mark
-// exactly where the view would draw it (another platform, LYNX_OVERLAY=0, the window drawn by the CPU (Settings ›
-// General › Draw with the GPU off), no device yet, a component or a native window of the view's window covering the
-// mark, a transformed view). The view then paints the mark itself, as before this round.
+// exactly where the view would draw it (another platform, LYNX_OVERLAY=0, the window drawn by the CPU on Windows
+// (Settings › General › Draw with the GPU off), no device yet, a component or a native window of the view's window
+// covering the mark, a transformed view; Linux: no Render extension; macOS: LYNX_OVERLAY_MAC not 1). The view then
+// paints the mark itself, as before.
 //
 // Pixel-identical when nothing moves: the views use the overlay only while their mark moves (the transport plays). When
 // it stops, they paint the mark themselves again and hide the overlay a few frames later (hide (true)), so there is no
@@ -34,7 +40,7 @@
 // clipped as the view clips it vertically. Horizontally the overlay clips it to Mark::clip.
 //
 // LYNX_OVERLAY=0: never (the view paints every frame, as before). LYNX_OVERLAY_STATS=<file>: shows / fallbacks / pictures
-// painted, every 2 s.
+// painted, every 2 s (Linux: also JUCE's blits to the windows, and why the last show() fell back).
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
@@ -88,7 +94,8 @@ public:
     static bool prepareNow();
 
     // --selftest: Windows: the device, a composition target on a hidden window, a picture painted and committed, the
-    // fallback for a view that is not showing; elsewhere "OK (not available)"
+    // fallback for a view that is not showing; Linux: the X server's part on a pixmap (drawn at a sub-pixel place,
+    // clipped, drawn again after a blit, put back); macOS: the layer on a window never shown (renderInContext)
     static juce::String selfTest();
 
     struct Impl;

@@ -22,6 +22,8 @@
 #include "engine/ChannelRackProcessor.h"
 #include "engine/Exporter.h"
 #include "engine/PluginHost.h"
+#include "engine/SessionPack.h"
+#include "ui/ExportDialog.h" // (round 190jx: Render to audio and Freeze, as the menus run them)
 
 #include <cstdlib>
 
@@ -624,7 +626,12 @@ juce::String AudioEngine::exportParitySelfTest (const std::function<void (const 
 //  4. the hold given back: the engine plays again, the plugin at the device's rate in real-time mode;
 //  5. playback again: the same as the first (the export changed nothing that is heard afterwards);
 //  6. LYNX's own units with a plugin lent: insert 4's stem (sampler, EQ, automated fader) bit-identical with and without;
-//  7. an export at 44.1 kHz with the hold: the plugin prepared at that rate and back at 48 kHz afterwards.
+//  7. an export at 44.1 kHz with the hold: the plugin prepared at that rate and back at 48 kHz afterwards;
+//  8. (round 190jx) Render to audio of the plugin's insert with the live instance (the Mixer menu's hold): playback
+//     with the rendered audio in the insert's place = the first playback; with a new instance instead, it is not (the
+//     seeded test synth); the render undone, playback = the first (the plugin given back as it was);
+//  9. (round 190jx) Freeze of the plugin's channel with the live instance: playback of the frozen channel = the first
+//     playback, and its audio differs from a freeze made with a new instance (the seeded test synth).
 // With the LYNX Test Synth in its seeded mode (LYNX_TEST_SYNTH_SEED=1: a pitch per instance) the export without the
 // hold must differ from the playback: proof that the instance, not just the plugin, is what renders.
 juce::String AudioEngine::exportLiveSelfTest (const std::function<void (const juce::String&)>& log, const juce::StringArray& pluginFiles)
@@ -736,6 +743,7 @@ juce::String AudioEngine::exportLiveSelfTest (const std::function<void (const ju
         if (const auto e = live.deviceManager.initialise (0, 2, nullptr, true); e.isNotEmpty())
             return "ERROR open the stand-in device: " + e;
         live.deviceManager.addAudioCallback (&live);
+        live.setRecordingTarget (folder.getChildFile ("Audio").getChildFile ("Recorded"), "exportlive"); // (frozen audio: in the test's folder)
         live.setSong (song);
         for (int i = 0; i < 20; ++i)
         {
@@ -880,6 +888,94 @@ juce::String AudioEngine::exportLiveSelfTest (const std::function<void (const ju
         }
         const auto rateAfter = hostedNow() != nullptr ? hostedNow()->getSampleRate() : 0.0;
 
+        // 8. Render to audio of insert 5 (round 190jx): first with new instances (the old way), then as the menu does it
+        const auto renders = folder.getChildFile ("Renders");
+        auto settle = [&live] {
+            for (int i = 0; i < 20; ++i)
+            {
+                live.timerCallback();
+                live.freeRetiredRacks();
+                juce::Thread::sleep (5);
+            }
+        };
+        juce::String renderLine;
+        float renderFreshVsPlay = -1.0f, renderVsPlay = -1.0f, undoneVsPlay = -1.0f, frozenVsPlay = -1.0f, freezeStems = -1.0f;
+        {
+            if (const auto e = bounceInsertToAudioNow (live, 5, false, renders); e.isNotEmpty())
+                errors.add (name + ", Render to audio with a new instance: " + e);
+            settle();
+            const auto played = playOnce ("playback after Render to audio (new instance)");
+            if (! played.l.empty() && ! first.l.empty())
+                renderFreshVsPlay = maxDiff (played, first, fresh.l.size());
+            live.undo();
+            settle();
+        }
+        {
+            if (const auto e = bounceInsertToAudioNow (live, 5, true, renders); e.isNotEmpty())
+                errors.add (name + ", Render to audio: " + e);
+            if (live.heldForExport())
+                errors.add (name + ": the engine is still held after Render to audio");
+            if (auto* p = hostedNow(); p == nullptr || p->getSampleRate() != ParityDevice::rate || p->isNonRealtime())
+                errors.add (name + ": after Render to audio the plugin is not back in real time at the device's rate");
+            settle();
+            const auto played = playOnce ("playback after Render to audio");
+            if (! played.l.empty() && ! first.l.empty())
+                renderVsPlay = maxDiff (played, first, fresh.l.size());
+            live.undo();
+            settle();
+            const auto undone = playOnce ("playback after Render to audio, undone");
+            if (! undone.l.empty() && ! first.l.empty())
+                undoneVsPlay = maxDiff (undone, first, fresh.l.size());
+        }
+        // 9. Freeze of channel 4 (index 3; round 190jx): a stem made with a new instance first (sessionpack, no hold)
+        {
+            const auto freshFolder = folder.getChildFile ("FrozenFresh");
+            std::vector<StandIn> freshStems;
+            juce::String error;
+            Audio freshStem, heldStem;
+            if (! sessionpack::renderFreeze (live.getSong(), 3, ParityDevice::rate, freshFolder, freshStems, {}, error) || freshStems.empty())
+                errors.add (name + ", Freeze with a new instance: " + error);
+            else
+                freshStem = readWav (juce::File (juce::String::fromUTF8 (freshStems.front().path.c_str())));
+            if (const auto e = freezeChannelNow (live, 3, {}, true); e.isNotEmpty())
+                errors.add (name + ", Freeze: " + e);
+            else
+            {
+                const auto& f = live.getSong().channels[3].freeze;
+                if (! f.on() || f.stems.empty())
+                    errors.add (name + ": Freeze left the channel unfrozen");
+                else
+                    heldStem = readWav (juce::File (juce::String::fromUTF8 (f.stems.front().path.c_str())));
+            }
+            if (live.heldForExport())
+                errors.add (name + ": the engine is still held after Freeze");
+            settle();
+            const auto played = playOnce ("playback of the frozen channel");
+            if (! played.l.empty() && ! first.l.empty())
+                frozenVsPlay = maxDiff (played, first, fresh.l.size());
+            if (! freshStem.l.empty() && ! heldStem.l.empty())
+                freezeStems = maxDiff (freshStem, heldStem, juce::jmin (freshStem.l.size(), heldStem.l.size()));
+        }
+        renderLine = name + ": Render to audio with the live instance, playback after vs before " + db (renderVsPlay) + " (with a new instance "
+                     + db (renderFreshVsPlay) + "), undone " + db (undoneVsPlay) + "; Freeze with the live instance, playback of the frozen channel vs before "
+                     + db (frozenVsPlay) + ", its audio vs a new instance's " + db (freezeStems);
+        say (renderLine);
+        // (as the export: within what two playbacks of the plugin differ by, and at most -90 dBFS for one that repeats itself)
+        const auto playAllowed = juce::jmax (3.16e-5f, maxDiff (second, first, fresh.l.size()) * 2.0f);
+        if (renderVsPlay < 0.0f || renderVsPlay >= playAllowed)
+            errors.add (name + ": playback after Render to audio differs from playback before by " + db (renderVsPlay));
+        if (undoneVsPlay < 0.0f || undoneVsPlay >= playAllowed)
+            errors.add (name + ": playback after Render to audio, undone, differs from playback before by " + db (undoneVsPlay));
+        if (frozenVsPlay < 0.0f || frozenVsPlay >= playAllowed)
+            errors.add (name + ": playback of the frozen channel differs from playback before by " + db (frozenVsPlay));
+        if (std::getenv ("LYNX_TEST_SYNTH_SEED") != nullptr && name.startsWith ("LYNX Test Synth"))
+        {
+            if (renderFreshVsPlay >= 0.0f && renderFreshVsPlay < 1.0e-2f)
+                errors.add (name + ": Render to audio with a new instance sounds like the live one (" + db (renderFreshVsPlay) + "): the check can't tell");
+            if (freezeStems >= 0.0f && freezeStems < 1.0e-2f)
+                errors.add (name + ": a freeze with a new instance sounds like the live one (" + db (freezeStems) + "): the check can't tell");
+        }
+
         live.deviceManager.removeAudioCallback (&live);
         live.deviceManager.closeAudioDevice();
         if (errors.size() > errorsBefore || first.l.empty() || second.l.empty() || held.l.empty())
@@ -925,7 +1021,7 @@ juce::String AudioEngine::exportLiveSelfTest (const std::function<void (const ju
     ParityDevice::beforeBlock = nullptr;
     if (! errors.isEmpty())
         return "ERROR " + errors.joinIntoString ("; ");
-    return "OK (export with the live instances = playback: " + checked.joinIntoString (", ") + "; restored after"
+    return "OK (export, Render to audio and Freeze with the live instances = playback: " + checked.joinIntoString (", ") + "; restored after"
            + (notes.isEmpty() ? juce::String() : "; " + notes.joinIntoString (", ")) + ")";
 }
 } // namespace lynx

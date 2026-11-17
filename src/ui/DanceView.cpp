@@ -1,5 +1,7 @@
 #include "ui/DanceView.h"
 
+#include <algorithm>
+
 #include <cmath>
 #include <cstring>
 
@@ -711,6 +713,15 @@ void DanceStage::scan()
         else
             ++it;
     }
+    markOverlayCover();
+}
+
+void DanceStage::markOverlayCover()
+{
+    // round 190jx: the stage lies over the whole workspace but draws nothing where no dancer of its own is (none, hidden
+    // ones, or dancers in windows of their own): a moving playhead under it may then be drawn by ui/MotionOverlay
+    const auto draws = std::any_of (dancers.begin(), dancers.end(), [] (const auto& p) { return p.second.now.visible && p.second.window == nullptr; });
+    getProperties().set ("lynxOverlayIgnores", ! draws);
 }
 
 void DanceStage::update()
@@ -734,6 +745,7 @@ void DanceStage::timerCallback()
             hadWindows = windows;
             for (auto& [channel, d] : dancers)
                 syncWindow (d, windows);
+            markOverlayCover();
             repaint(); // (the stage draws the dancers without windows)
         }
         if (windows)

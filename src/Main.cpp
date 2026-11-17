@@ -12020,6 +12020,19 @@ private:
             bool threadsWanted = juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_THREADS", {}) == "1";
             std::vector<lynx::ThreadCpu> threadsStart;
             double messageCpuStart = 0.0; // the message thread's CPU seconds
+            // round 190jx: LYNX_UIPERF_PEER_PID=<pid> (Linux): another process's CPU over each step too (the X server, which
+            // draws the overlay's marks there)
+            int peerPid = juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_PEER_PID", "0").getIntValue();
+            double peerCpuStart = 0.0;
+            static double peerCpuSeconds (int pid)
+            {
+                if (pid <= 0)
+                    return 0.0;
+                const auto stat = juce::File ("/proc/" + juce::String (pid) + "/stat").loadFileAsString();
+                const auto fields = juce::StringArray::fromTokens (stat.fromLastOccurrenceOf (")", false, false), " ", "");
+                // (after the name: state is field 0, utime 11, stime 12, in clock ticks)
+                return fields.size() > 12 ? (fields[11].getDoubleValue() + fields[12].getDoubleValue()) / 100.0 : 0.0;
+            }
             double audioLoadSum = 0.0;    // the device's CPU use (AudioDeviceManager::getCpuUsage), summed per tick
             int audioLoadTicks = 0;
 
@@ -12058,6 +12071,7 @@ private:
                     wallStart = juce::Time::getMillisecondCounterHiRes();
                     cpuStart = lynx::processCpuSeconds();
                     messageCpuStart = lynx::threadCpuSeconds();
+                    peerCpuStart = peerCpuSeconds (peerPid);
                     if (threadsWanted) // round 190ih: LYNX_UIPERF_THREADS=1, the CPU of every thread over the step
                         threadsStart = lynx::threadCpuList();
                     lynx::grossBeatPaintStats (true);
@@ -12087,6 +12101,8 @@ private:
                      << "\n    CPU " << juce::String (wall > 0.0 ? 100.0 * cpu / wall : 0.0, 0) << "% (process, " << juce::String (wall / 1000.0, 1) << " s), message thread "
                      << juce::String (wall > 0.0 ? 100.0 * messageCpu / wall : 0.0, 1) << "%, audio device "
                      << juce::String (audioLoadTicks > 0 ? 100.0 * audioLoadSum / audioLoadTicks : 0.0, 1) << "%\n";
+                if (peerPid > 0 && wall > 0.0)
+                    text << "    peer process " << peerPid << " CPU " << juce::String (100.0 * 1000.0 * (peerCpuSeconds (peerPid) - peerCpuStart) / wall, 1) << "%\n";
                 if (threadsWanted && wall > 0.0)
                 {
                     std::vector<std::pair<double, juce::String>> rows;
@@ -12271,6 +12287,19 @@ private:
             engine->play();
         };
         run->steps.push_back ({ "piano roll maximised, pattern playing", [ui, playPattern] { ui->selectTabForSnapshot (1); playPattern(); }, {}, 3000 });
+        // round 190jx: the moving playheads alone, for the overlay's A/B (LYNX_UIPERF_ONLY="overlay A/B", LYNX_OVERLAY=0|1):
+        // the Playlist with the song playing and the Piano roll with the pattern playing, LYNX_UIPERF_PLAY_MS each (10 s)
+        {
+            const auto playMs = juce::jmax (1000, juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_PLAY_MS", "10000").getIntValue());
+            run->steps.push_back ({ "overlay A/B: playlist maximised, song playing", [this, ui] {
+                                       ui->selectTabForSnapshot (2);
+                                       engine->getTransport().songMode = true;
+                                       engine->rewind();
+                                       engine->play();
+                                   }, {}, playMs });
+            run->steps.push_back ({ "overlay A/B: piano roll maximised, pattern playing", [ui, playPattern] { ui->selectTabForSnapshot (1); playPattern(); }, {}, playMs,
+                                   [this] { engine->stop(); return juce::String(); } });
+        }
         run->steps.push_back ({ "channel rack maximised, pattern playing", [ui, playPattern] { ui->selectTabForSnapshot (0); playPattern(); }, {}, 3000 });
         const char* idleViews[] { "channel rack", "piano roll", "playlist", "mixer" };
         for (int view = 0; view < 4; ++view)
