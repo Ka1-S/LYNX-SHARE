@@ -2192,30 +2192,40 @@ std::optional<FlmRackChannel> importFlmRackState (const std::vector<std::uint8_t
         return fail ("FL Studio Mobile Rack (state not readable)");
     auto rack = std::move (*decoded);
     rack.kind = flm::kindNormal;
-    // what one channel of FL's cannot hold the way FLM plays it: more than one instrument, drum slots (their own
-    // channels in a .flm), stages (rack parts), note effects (baked into a .flm's notes; an .flp's notes are FL's)
-    int generators = 0;
-    bool effectBeforeInstrument = false, effectSeen = false, noteEffect = false;
+    // what one channel of FL's cannot hold the way FLM plays it: drum slots (their own channels in a .flm; FLM's own FLP
+    // export never puts a kit in this generator, FLM_FORMAT §8.1), note effects (baked into a .flm's notes; an .flp's
+    // notes are FL's). Round 190jv: several instruments (a Layer) and the rack's parts (an effect before an instrument)
+    // are rebuilt as the .flm import builds them — FL's render of the generator follows the same signal flow (190fe's
+    // FLM-in-FL renders and round 190jv's, FLM_FORMAT §8.2)
+    // Round 190jv: the note effects that act on each note (Transpose, Scale, Randomizer) go to the caller, which runs them
+    // over FL's notes of the channel (FL's render of a Rack generator with Transpose plays the notes transposed,
+    // FLM_FORMAT §8.2); an Arpeggiator or a Note Echo that is on acts in time and keeps the stand-in.
+    std::vector<const flm::Module*> generators;
+    std::vector<std::pair<std::uint32_t, std::vector<float>>> noteEffects;
+    bool timeEffect = false, otherNoteEffect = false;
     for (const auto& m : rack.modules)
     {
         if (flm::isGenerator (m.type))
-        {
-            ++generators;
-            effectBeforeInstrument = effectBeforeInstrument || effectSeen;
-        }
+            generators.push_back (&m);
         else if (flm::moduleCategory (m.type) == flm::ModuleCategory::noteEffect)
-            noteEffect = noteEffect || m.params.empty() || ! std::isfinite (m.params[0]) || m.params[0] >= 0.5f; // (parameter 0 = Enable)
-        else if (m.type != flm::module::tuner && m.type != flm::module::analyzer)
-            effectSeen = true;
+        {
+            const auto on = m.params.empty() || ! std::isfinite (m.params[0]) || m.params[0] >= 0.5f; // (parameter 0 = Enable)
+            if (! on)
+                continue;
+            if (m.type == flmnotefx::transpose || m.type == flmnotefx::scale || m.type == flmnotefx::randomizer)
+                noteEffects.push_back ({ m.type, m.params });
+            else if (flmnotefx::timeEffectActive (m.type, m.params))
+                timeEffect = true;
+            else if (m.type != flmnotefx::arpeggiator && m.type != flmnotefx::noteEcho)
+                otherNoteEffect = true;
+        }
     }
     if (! rack.kit.empty())
         return fail ("FL Studio Mobile Rack (drum kit: not reproduced yet)");
-    if (generators != 1)
-        return fail (generators == 0 ? "FL Studio Mobile Rack (no instrument)" : "FL Studio Mobile Rack (several instruments: not reproduced yet)");
-    if (effectBeforeInstrument)
-        return fail ("FL Studio Mobile Rack (an effect before the instrument: not reproduced yet)");
-    if (noteEffect)
-        return fail ("FL Studio Mobile Rack (note effects: not reproduced yet)");
+    if (generators.empty())
+        return fail ("FL Studio Mobile Rack (no instrument)");
+    if (timeEffect || otherNoteEffect)
+        return fail ("FL Studio Mobile Rack (an Arpeggiator or Note Echo: not reproduced yet)");
 
     // a one-channel FLM song: the master and the rack's channel, no lanes
     flm::Project song;
@@ -2237,16 +2247,73 @@ std::optional<FlmRackChannel> importFlmRackState (const std::vector<std::uint8_t
     FlpImportReport own;
     auto o = options;
     o.common.report = &own;
-    const auto imported = importFlmProject (song, o);
-    if (! imported || imported->channels.size() != 1 || imported->mixer.size() != 2)
+    auto imported = importFlmProject (song, o);
+    if (! imported || imported->channels.empty() || imported->mixer.size() < 2)
         return fail ("FL Studio Mobile Rack (not reproduced yet)");
+    // --- round 190jv: one instrument, or a Layer whose children are the rack's instruments in order (importFlmProject's
+    // instrumentIndex), each on its part of the rack (inserts 2… of the sub-song, sending into a later part or into the
+    // rack's insert 1)
     const auto& c = imported->channels.front();
-    if (c.instrument == InstrumentKind::synth || c.mixerTrack != 1)
-        return fail ("FL Studio Mobile Rack (" + moduleLabel (std::find_if (rack.modules.begin(), rack.modules.end(), [] (const flm::Module& m) {
-                                                     return flm::isGenerator (m.type);
-                                                 })->type) + ": not reproduced)");
+    const auto layered = generators.size() > 1;
+    const auto count = (std::size_t) (layered ? generators.size() + 1 : 1);
+    if (imported->channels.size() != count || (layered && (c.instrument != InstrumentKind::layer || c.layer.children.size() != generators.size())))
+        return fail ("FL Studio Mobile Rack (not reproduced yet)");
+    const auto inserts = (int) imported->mixer.size();
+    for (std::size_t k = layered ? 1 : 0; k < count; ++k)
+    {
+        const auto& played = imported->channels[k];
+        if (played.instrument == InstrumentKind::synth || played.mixerTrack < 1 || played.mixerTrack >= inserts
+            || (layered && c.layer.children[k - 1] != (int) k))
+            return fail ("FL Studio Mobile Rack (" + moduleLabel (generators[layered ? k - 1 : 0]->type) + ": not reproduced)");
+    }
+    // the parts something plays into (an instrument, or an earlier part that is played into); the others hear nothing
+    std::vector<bool> fed ((std::size_t) inserts, false);
+    for (std::size_t k = layered ? 1 : 0; k < count; ++k)
+        fed[(std::size_t) imported->channels[k].mixerTrack] = true;
+    for (int s = 2; s < inserts; ++s)
+    {
+        const auto& sends = imported->mixer[(std::size_t) s].sends;
+        if (sends.size() != 1 || (sends.front().target <= s && sends.front().target != 1) || sends.front().target >= inserts)
+            return fail ("FL Studio Mobile Rack (not reproduced yet)"); // (not a rack part: never made by importFlmProject)
+        if (fed[(std::size_t) s])
+            fed[(std::size_t) sends.front().target] = true;
+    }
+    std::vector<int> partOf ((std::size_t) inserts, -1); // sub-song insert → part (−1: the rack's insert or left out)
     FlmRackChannel out;
-    out.channel = c;
+    for (int s = 2, n = 0; s < inserts; ++s)
+        if (fed[(std::size_t) s])
+            partOf[(std::size_t) s] = n++;
+    for (int s = 2; s < inserts; ++s)
+        if (fed[(std::size_t) s])
+        {
+            auto& sub = imported->mixer[(std::size_t) s];
+            FlmRackChannel::Part part;
+            part.level = sub.sends.front().level;
+            part.into = partOf[(std::size_t) sub.sends.front().target]; // (−1: the rack's insert, sub-song insert 1)
+            part.insert = std::move (sub);
+            part.insert.sends.clear();
+            out.parts.push_back (std::move (part));
+        }
+    if (! layered && ! out.parts.empty())
+        return fail ("FL Studio Mobile Rack (not reproduced yet)"); // (one instrument is always in the rack's last part)
+    if (out.parts.empty())
+        own.converted.erase ("FL Studio Mobile: rack whose instruments and effects take turns (one insert per part)");
+    if (inserts > 2 && (int) out.parts.size() + 2 < inserts)
+        ++own.converted["FL Studio Mobile Rack: an effect before the rack's first instrument (hears nothing in FLM either: left out)"];
+    if (layered)
+    {
+        for (std::size_t k = 1; k < count; ++k)
+        {
+            out.childPart.push_back (partOf[(std::size_t) imported->channels[k].mixerTrack]);
+            out.children.push_back (std::move (imported->channels[k]));
+        }
+        out.channel = imported->channels.front();
+        out.channel.layer.children.clear(); // (the caller links them)
+    }
+    else
+        out.channel = c;
+    out.noteEffects = std::move (noteEffects);
+    // --- end of round 190jv
     out.insert = imported->mixer[1];
     const MixerTrack plain;
     out.insertUsed = ! out.insert.effects.empty() || std::abs (out.insert.volume - plain.volume) > 1.0e-4f || std::abs (out.insert.pan) > 1.0e-4f
@@ -2641,6 +2708,19 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
                     bendChannels.push_back ((int) song.channels.size() - 1);
             }
             ctx.note (&FlpImportReport::converted, "FL Studio Mobile: rack with several instruments (Layer)");
+            // round 190jv: a note's Time › Gate is its channel's — the Layer's (core/Scheduler.cpp playedTiming), so a
+            // module's own gate (3x Osc's Poly › Gate) reaches its notes only on the Layer: the instruments' gate when
+            // they share one (FL's render of an FLM rack: 3x Osc notes ~70 ms long, round 190gw); different gates are
+            // listed and the notes play as written
+            {
+                auto& children = song.channels[(std::size_t) instrument].layer.children;
+                const auto gate = children.empty() ? 0.0f : song.channels[(std::size_t) children.front()].misc.gateBeats;
+                const auto same = std::all_of (children.begin(), children.end(), [&] (int k) { return song.channels[(std::size_t) k].misc.gateBeats == gate; });
+                if (same)
+                    song.channels[(std::size_t) instrument].misc.gateBeats = gate;
+                else
+                    ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: instruments of one rack with different note gates (the notes play ungated)");
+            }
             return instrument;
         };
         const auto kitIndex = [&] {

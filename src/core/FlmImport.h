@@ -65,7 +65,9 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
 // as a .flm. `channel` = the rack's instrument on LYNX's engine (FL's channel settings are the caller's to keep);
 // `insert` = the rack's level, pan and effects, as FLM's own rack applies them after the instrument; `insertUsed` when
 // the insert changes the sound. nullopt (`why` = the report's line) when the state is not a rack or LYNX cannot rebuild
-// it yet (a drum kit, several instruments, rack parts, note effects): the caller keeps its stand-in.
+// it yet (a drum kit, an Arpeggiator or Note Echo): the caller keeps its stand-in. Round 190jv: several instruments, an
+// effect before an instrument and the note effects that act on each note are rebuilt (FlmRackChannel::children / parts /
+// noteEffects).
 // Round 190fn (FLM coverage effects-0048): the "FL Studio Mobile Rack FX" effect of an .flp mixer slot. Its state has the
 // same layout as the generator's, with effect modules only: they become one LYNX container slot (one branch: the modules'
 // slots in the rack's order, at the rack's level; its pan as a utility after them; switched off when the rack is muted),
@@ -77,6 +79,28 @@ struct FlmRackChannel
     ChannelDef channel;
     MixerTrack insert;
     bool insertUsed = false;
+    // --- round 190jv (FLM coverage instruments-0022, BUILD-LIST 19): a rack with several instruments, as the .flm import
+    // builds it (FLM_FORMAT §7.4, §8.2): `channel` is then a Layer (its `layer.children` empty: the caller links them) and
+    // `children` its instruments in the rack's order, each playing every note inside its own key range. The rack's
+    // parts (round 190fe: an instrument after an effect starts a new part; an effect hears only what comes before it)
+    // are `parts`, in order, each sending into `into` (−1 = the rack's insert, else a later part) at `level`;
+    // `childPart[k]` = the part child k plays into (−1 = the rack's insert). Parts nothing plays into are left out (an
+    // effect before the rack's first instrument hears nothing, in FLM as in FL's render). One instrument: `children`
+    // and `parts` stay empty and the result is the one of round 190fn.
+    struct Part
+    {
+        MixerTrack insert;
+        int into = -1;
+        float level = 1.0f;
+    };
+    std::vector<ChannelDef> children;
+    std::vector<int> childPart;
+    std::vector<Part> parts;
+    // The rack's note effects that act on each note (Transpose, Scale, Randomizer; FLM_FORMAT §7.2), in the rack's order
+    // as (module type, PRMS): FL's notes reach the rack's instruments through them, so the caller runs them over the
+    // channel's notes (flmnotefx::Chain). A rack whose Arpeggiator or Note Echo is on stays a stand-in.
+    std::vector<std::pair<std::uint32_t, std::vector<float>>> noteEffects;
+    // --- end of round 190jv
 };
 std::optional<FlmRackChannel> importFlmRackState (const std::vector<std::uint8_t>& pluginState, const FlmImportOptions& options,
                                                   double bpm, const std::string& channelName, std::string* why = nullptr);
