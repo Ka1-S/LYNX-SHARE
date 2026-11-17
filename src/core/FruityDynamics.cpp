@@ -204,57 +204,63 @@ struct PeakWindow
         count = 0;
     }
 
+    // (round 190kr: the positions and counters as locals, written back after the block: the int members could otherwise
+    // alias the int ring / queue being written and be stored / re-read at every sample. The same steps.)
     void run (float* buf, int n) noexcept
     {
         const int w = size;
         if (w < 2)
             return;
+        std::int32_t* const rg = ring.data();
+        std::int32_t* const qu = queue.data();
+        int ps = pos, hd = head, tl = tail, ct = count;
         for (int i = 0; i < n; ++i)
         {
             const auto x = fbits (buf[i]);
-            const int prev = pos;
-            if (++pos >= w)
-                pos = 0;
-            const auto ref = count > 0 ? ring[(std::size_t) queue[(std::size_t) head]] : ring[(std::size_t) prev];
-            if (x > ring[(std::size_t) prev])
+            const int prev = ps;
+            if (++ps >= w)
+                ps = 0;
+            const auto ref = ct > 0 ? rg[qu[hd]] : rg[prev];
+            if (x > rg[prev])
             {
-                while (count > 0)
+                while (ct > 0)
                 {
-                    if (x > ring[(std::size_t) queue[(std::size_t) tail]])
+                    if (x > rg[qu[tl]])
                     {
-                        --count;
-                        if (--tail < 0)
-                            tail = w - 1;
+                        --ct;
+                        if (--tl < 0)
+                            tl = w - 1;
                         continue;
                     }
-                    const auto t = queue[(std::size_t) head] - 1;
-                    if (pos == t || pos == t + w)
+                    const auto t = qu[hd] - 1;
+                    if (ps == t || ps == t + w)
                     {
-                        --count;
-                        if (++head >= w)
-                            head = 0;
+                        --ct;
+                        if (++hd >= w)
+                            hd = 0;
                     }
                     break;
                 }
             }
             else
             {
-                if (++tail >= w)
-                    tail = 0;
-                queue[(std::size_t) tail] = prev;
-                const auto t = queue[(std::size_t) head] - 1;
-                if (pos == t || pos == t + w)
+                if (++tl >= w)
+                    tl = 0;
+                qu[tl] = prev;
+                const auto t = qu[hd] - 1;
+                if (ps == t || ps == t + w)
                 {
-                    if (++head >= w)
-                        head = 0;
+                    if (++hd >= w)
+                        hd = 0;
                 }
                 else
-                    ++count;
+                    ++ct;
             }
-            ring[(std::size_t) pos] = x;
+            rg[ps] = x;
             const auto y = x < ref ? ref : x;
             std::memcpy (buf + i, &y, 4);
         }
+        pos = ps, head = hd, tail = tl, count = ct;
     }
 };
 
