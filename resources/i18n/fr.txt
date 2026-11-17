@@ -10910,3 +10910,7 @@ countries: fr be ch ca lu
 "The pattern could not be read." = "Le motif n'a pas pu être lu."
 "Draw docked LYNX editors in the main window (lighter live displays)" = "Dessiner les éditeurs LYNX ancrés dans la fenêtre principale (affichages en direct plus légers)"
 "On: a docked LYNX editor (Gross Beat, Fruity Limiter, Maximus...) is drawn by the main window: its moving displays use less CPU. Hosted plugins and detached windows keep windows of their own" = "Activé : un éditeur LYNX ancré (Gross Beat, Fruity Limiter, Maximus...) est dessiné par la fenêtre principale : ses affichages animés utilisent moins de CPU. Les plugins hébergés et les fenêtres détachées gardent leurs propres fenêtres"
+
+# --- rollup 0.1.30 step 5: Save a copy for 0.1.28 knows rounds 190js / 190jv
+"Hush De-esser's Single Vocal mode plays its earlier version: {0}" = "Le mode Single Vocal de Hush De-esser joue sa version précédente : {0}"
+"Slide notes on FL's native generators glide instead of stepping once per tick: {0}" = "Les notes slide sur les générateurs natifs de FL glissent au lieu d'avancer d'un pas par tick : {0}"

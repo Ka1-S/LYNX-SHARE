@@ -6461,6 +6461,23 @@ private:
             song.playlistTracks[1].grouped = true;
             song.playlistTracks[2].grouped = true;
             song.playlistTracks[2].nest = 1;
+            // rollup step 5 (round 190kh): Hush's Single Vocal revision (190js), a slide note on an FL native generator (190jv)
+            song.mixer[10].effects.push_back (lynx::makeEffectSlot (lynx::EffectKind::hushDeEsser)); // (new: Single Vocal, revision 1)
+            lynx::ChannelDef slider;
+            slider.name = "Slides";
+            slider.instrument = lynx::InstrumentKind::sampler;
+            song.channels.push_back (slider);
+            if (song.patterns.empty())
+                song.patterns.emplace_back();
+            {
+                lynx::Note slide;
+                slide.start = 0;
+                slide.length = lynx::ppq;
+                slide.channel = (int) song.channels.size() - 1;
+                slide.key = 64;
+                slide.slide = true;
+                song.patterns[0].notes.push_back (slide);
+            }
 
             const auto copy = lynx::olderlynx::forRelease (song, "0.1.28");
             juce::String why;
@@ -6548,6 +6565,8 @@ private:
             else if (copy.json.contains ("playlistTrackNest") || copy.json.contains ("displayView") || ! said ("{0} track(s) in nested Playlist folders")
                      || ! said ("Fruity Limiter's CURVE view"))
                 rollup030Result = "ERROR step-4 view items";
+            else if (! said ("Hush De-esser's Single Vocal mode") || ! said ("Slide notes on FL's native generators"))
+                rollup030Result = juce::String ("ERROR step-5 engine notes ") + (said ("Hush De-esser's Single Vocal") ? "" : "hush ") + (said ("Slide notes") ? "" : "slides");
             else if (const auto plain = lynx::olderlynx::forRelease (lynx::Song::makeDefault(), "0.1.28");
                      ! plain.ok || std::any_of (plain.lost.begin(), plain.lost.end(), [] (const lynx::olderlynx::Loss& l) {
                          const auto t = juce::String (l.text);
@@ -6556,7 +6575,7 @@ private:
                                 || t.startsWith ("Helix") || t.contains ("Echoform") || t.contains ("Halo") || t.contains ("Lattice") || t.contains ("LuxeVerb")
                                 || t.contains ("Texture") || t.contains ("Beats'") || t.startsWith ("Warped") || t.contains ("deactivated")
                                 || t.contains ("Facet") || t.contains ("MIDI Out") || t.contains ("hosted CLAP") || t.contains ("nested Playlist")
-                                || t.contains ("CURVE");
+                                || t.contains ("CURVE") || t.startsWith ("Slide notes");
                      }))
                 rollup030Result = "ERROR a plain project reports a loss it does not have";
         }

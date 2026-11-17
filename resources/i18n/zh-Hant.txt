@@ -10910,3 +10910,7 @@ countries: tw hk mo
 "The pattern could not be read." = "無法讀取該模式。"
 "Draw docked LYNX editors in the main window (lighter live displays)" = "在主視窗中繪製停靠的 LYNX 編輯器（即時顯示更輕量）"
 "On: a docked LYNX editor (Gross Beat, Fruity Limiter, Maximus...) is drawn by the main window: its moving displays use less CPU. Hosted plugins and detached windows keep windows of their own" = "開啟：停靠的 LYNX 編輯器（Gross Beat、Fruity Limiter、Maximus 等）由主視窗繪製，其動態顯示佔用更少 CPU。託管外掛程式和分離的視窗保留各自的視窗"
+
+# --- rollup 0.1.30 step 5: Save a copy for 0.1.28 knows rounds 190js / 190jv
+"Hush De-esser's Single Vocal mode plays its earlier version: {0}" = "Hush De-esser 的 Single Vocal 模式以舊版本播放: {0}"
+"Slide notes on FL's native generators glide instead of stepping once per tick: {0}" = "FL 原生產生器上的滑音音符平滑滑動，而不是每個 tick 走一步: {0}"

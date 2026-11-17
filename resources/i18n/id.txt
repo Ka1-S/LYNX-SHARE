@@ -10910,3 +10910,7 @@ countries: id
 "The pattern could not be read." = "Pola tidak dapat dibaca."
 "Draw docked LYNX editors in the main window (lighter live displays)" = "Gambar editor LYNX yang tertambat di jendela utama (tampilan langsung lebih ringan)"
 "On: a docked LYNX editor (Gross Beat, Fruity Limiter, Maximus...) is drawn by the main window: its moving displays use less CPU. Hosted plugins and detached windows keep windows of their own" = "Aktif: editor LYNX yang tertambat (Gross Beat, Fruity Limiter, Maximus...) digambar oleh jendela utama: tampilan bergeraknya memakai lebih sedikit CPU. Plugin yang di-host dan jendela terlepas tetap memiliki jendela sendiri"
+
+# --- rollup 0.1.30 step 5: Save a copy for 0.1.28 knows rounds 190js / 190jv
+"Hush De-esser's Single Vocal mode plays its earlier version: {0}" = "Mode Single Vocal Hush De-esser diputar dengan versi sebelumnya: {0}"
+"Slide notes on FL's native generators glide instead of stepping once per tick: {0}" = "Not slide pada generator bawaan FL meluncur halus alih-alih melangkah sekali per tick: {0}"

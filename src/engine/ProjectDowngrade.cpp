@@ -5,9 +5,11 @@
 #include "core/DirectWaveState.h"
 #include "core/EchoSuite.h"
 #include "core/FacetEq.h"
+#include "core/GeneratorPresets.h"
 #include "core/LuxeVerb.h"
 #include "core/LynxVerbs.h"
 #include "core/MixSuite.h"
+#include "core/RackRenderer.h"
 #include "core/VoiceShift.h"
 
 #include <cmath>
@@ -243,7 +245,7 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
     // effects (round 190ho): Voice Shift's Measured law revision 1, Ridge Strip's 4K Pink EQ; (round 190iq) Hush De-esser's
     // measured Allround timing (hidden parameters 0.1.28 ignores: it plays revision 0, Black, and the earlier timing)
     {
-        juce::StringArray thump, pink, hushTiming, echoVoicings, latticeTaps, luxeDucking, verbRevisions;
+        juce::StringArray thump, pink, hushTiming, hushVocal, echoVoicings, latticeTaps, luxeDucking, verbRevisions;
         forEachEffect (root, [&] (juce::DynamicObject& e, const juce::String& where) {
             auto* params = arrayOf (e.getProperty ("params"));
             if (params == nullptr) // (a slot written without parameters)
@@ -266,6 +268,10 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
                 // (the timing is the Allround law's: Single Vocal plays the same either way)
                 if ((float) (double) (*params)[mixsuite::hush::timing] >= 0.5f && (float) (double) (*params)[mixsuite::hush::allround] >= 0.5f)
                     addOnce (hushTiming, where);
+                // rollup step 5, round 190js: Single Vocal's "stands out" revision (hidden, after the timing; Allround ignores it)
+                if (params->size() > mixsuite::hush::vocalRevision && (float) (double) (*params)[mixsuite::hush::vocalRevision] >= 0.5f
+                    && (float) (double) (*params)[mixsuite::hush::allround] < 0.5f)
+                    addOnce (hushVocal, where);
                 params->removeRange (mixsuite::hush::timing, params->size() - mixsuite::hush::timing);
             }
             // rollup step 3: round 190is's Echoform voicings revision (heard only with an echo voicing), round 190it's
@@ -309,6 +315,8 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
             lost.push_back ({ TR_NOOP ("Ridge Strip's 4K Pink EQ plays as the Black EQ: {0}"), listOf (pink), true });
         if (! hushTiming.isEmpty())
             lost.push_back ({ TR_NOOP ("Hush De-esser's Allround mode plays its earlier timing: {0}"), listOf (hushTiming), true });
+        if (! hushVocal.isEmpty())
+            lost.push_back ({ TR_NOOP ("Hush De-esser's Single Vocal mode plays its earlier version: {0}"), listOf (hushVocal), true });
         if (! echoVoicings.isEmpty())
             lost.push_back ({ TR_NOOP ("Echoform's echo voicings play their earlier loop: {0}"), listOf (echoVoicings), true });
         if (! verbRevisions.isEmpty())
@@ -452,6 +460,29 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
         walk (root["playlistTracks"]);
         if (timed)
             lost.push_back ({ TR_NOOP ("Automation of hosted CLAP and VST3 plugins changes once per 128 samples in this release (0.1.30 places each change at its own sample)"), {}, true });
+    }
+
+    // rollup step 5, round 190jv: on FL's native generators a slide note moves in steps, once per tick of the project, as
+    // in FL (0.1.28 glides straight, except Slicex, which stepped already); engine behaviour, nothing to drop
+    {
+        juce::StringArray stepped;
+        const auto* channels = arrayOf (root["channels"]);
+        if (auto* patterns = arrayOf (root["patterns"]))
+            for (const auto& p : *patterns)
+                if (auto* notes = arrayOf (p["notes"]))
+                    for (const auto& n : *notes)
+                        if (n.isArray() && n.size() >= 9 && (bool) n[8]) // [start, length, channel, key, velocity, pan, fine, muted, slide, ..]
+                        {
+                            const auto ch = (int) n[2];
+                            if (channels == nullptr || ch < 0 || ch >= channels->size())
+                                continue;
+                            const auto& c = channels->getReference (ch);
+                            const auto kind = genpresets::kindFromId (c["instrument"].toString().toStdString());
+                            if (kind && *kind != InstrumentKind::slicex && RackRenderer::stepsSlides (*kind))
+                                addOnce (stepped, channelName (c, ch));
+                        }
+        if (! stepped.isEmpty())
+            lost.push_back ({ TR_NOOP ("Slide notes on FL's native generators glide instead of stepping once per tick: {0}"), listOf (stepped), true });
     }
 
     // the view

@@ -10910,3 +10910,7 @@ countries: ru by kz
 "The pattern could not be read." = "Не удалось прочитать паттерн."
 "Draw docked LYNX editors in the main window (lighter live displays)" = "Рисовать пристыкованные редакторы LYNX в главном окне (более лёгкие живые дисплеи)"
 "On: a docked LYNX editor (Gross Beat, Fruity Limiter, Maximus...) is drawn by the main window: its moving displays use less CPU. Hosted plugins and detached windows keep windows of their own" = "Вкл.: пристыкованный редактор LYNX (Gross Beat, Fruity Limiter, Maximus...) рисуется главным окном: его движущиеся дисплеи нагружают процессор меньше. Размещённые плагины и откреплённые окна остаются в своих окнах"
+
+# --- rollup 0.1.30 step 5: Save a copy for 0.1.28 knows rounds 190js / 190jv
+"Hush De-esser's Single Vocal mode plays its earlier version: {0}" = "Режим Single Vocal в Hush De-esser звучит в прежней версии: {0}"
+"Slide notes on FL's native generators glide instead of stepping once per tick: {0}" = "Ноты slide на родных генераторах FL скользят плавно, а не шагами на каждый тик: {0}"

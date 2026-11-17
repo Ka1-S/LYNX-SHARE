@@ -10910,3 +10910,7 @@ countries: kr
 "The pattern could not be read." = "패턴을 읽을 수 없습니다."
 "Draw docked LYNX editors in the main window (lighter live displays)" = "도킹된 LYNX 편집기를 메인 창에서 그리기 (더 가벼운 실시간 표시)"
 "On: a docked LYNX editor (Gross Beat, Fruity Limiter, Maximus...) is drawn by the main window: its moving displays use less CPU. Hosted plugins and detached windows keep windows of their own" = "켜짐: 도킹된 LYNX 편집기(Gross Beat, Fruity Limiter, Maximus...)를 메인 창이 그려서 움직이는 표시가 CPU를 덜 사용합니다. 호스팅된 플러그인과 분리된 창은 자체 창을 유지합니다"
+
+# --- rollup 0.1.30 step 5: Save a copy for 0.1.28 knows rounds 190js / 190jv
+"Hush De-esser's Single Vocal mode plays its earlier version: {0}" = "Hush De-esser의 Single Vocal 모드는 이전 버전으로 재생됩니다: {0}"
+"Slide notes on FL's native generators glide instead of stepping once per tick: {0}" = "FL 기본 제너레이터의 슬라이드 노트가 틱마다 단계적으로 움직이지 않고 부드럽게 이어집니다: {0}"
