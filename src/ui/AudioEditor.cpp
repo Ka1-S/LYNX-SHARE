@@ -17,6 +17,9 @@
 #include "core/AudioCapture.h"
 #include "core/AudioEditTools.h"
 #include "core/AutoWarp.h"
+#include "core/SampleProps.h"
+#include "core/TempoDetect.h"
+#include "core/WarpEngines.h"
 #include "core/EdisonFx.h"
 #include "core/EdisonScript.h"
 #include "core/SessionKeys.h"
@@ -36,6 +39,7 @@
 #include "ui/AudioClipboard.h"
 #include "ui/FileChoosers.h"
 #include "ui/HintBar.h"
+#include "ui/SampleProperties.h"
 #include "ui/ScriptPanel.h"
 #include "ui/ValueControl.h"
 #include "ui/I18n.h"
@@ -50,6 +54,14 @@ namespace lynx
 namespace
 {
 namespace ae = audioedit;
+
+// FL Edison's Edit › "Click-free (smooth) editing" (key C; on by default as FL's: round gaps190kf, core AudioEdit's
+// clickfree). One switch for every audio editor window of the session.
+bool& clickFreeEditing()
+{
+    static bool on = true;
+    return on;
+}
 
 // one clipboard for every editor window (copy in one, paste in another); Tools › Clipboard saves it (round 181b)
 ae::Audio& clipboard()
@@ -399,7 +411,7 @@ public:
             { TR_NOOP ("Paste"), TR_NOOP ("Paste at the cursor, or over the selection (Ctrl+V)"), [this] { paste (false); } },
             { TR_NOOP ("Delete"), TR_NOOP ("Delete the selection (Del)"), [this] { deleteSelection(); } },
             { TR_NOOP ("Trim"), TR_NOOP ("Keep only the selection"), [this] { trimSelection(); } },
-            { TR_NOOP ("Silence"), TR_NOOP ("Silence the selection (Clear)"), [this] { edit (tr ("Silence"), [] (ae::Document& d, ae::Range r) { ae::clear (d, r); }, true); } },
+            { TR_NOOP ("Silence"), TR_NOOP ("Silence the selection (Clear)"), [this] { edit (tr ("Silence"), [] (ae::Document& d, ae::Range r) { clickFreeEditing() ? ae::clickfree::clearClickFree (d, r) : ae::clear (d, r); }, true); } },
             { TR_NOOP ("Fade in"), TR_NOOP ("Fade in over the selection (curve: the arrow next to Fade out)"), [this] { fade (true); } },
             { TR_NOOP ("Fade out"), TR_NOOP ("Fade out over the selection"), [this] { fade (false); } },
             { "~", TR_NOOP ("Fade curve"), [this] { curveMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (quickButtons[8])); } },
@@ -694,6 +706,7 @@ public:
                     if (marks.hasLoop())
                         ae::setLoop (d, { marks.loopStart, marks.loopEnd });
                 }
+                ae::decodeWavProps (static_cast<const std::uint8_t*> (bytes.getData()), bytes.getSize(), d); // (round gaps190kf)
             }
         }
 
@@ -1741,6 +1754,17 @@ public:
             && sessionkeys::defaultKeyActs (sessionkeys::Command::audioQuantize))
         {
             quantizeWarp();
+            return true;
+        }
+        if (! ctrl && ! shift && ! k.getModifiers().isAltDown() && c == 'c') // FL's Edit › Click-free (smooth) editing (round gaps190kf)
+        {
+            clickFreeEditing() = ! clickFreeEditing();
+            setStatus (clickFreeEditing() ? tr ("Click-free (smooth) editing: on") : tr ("Click-free (smooth) editing: off"), false);
+            return true;
+        }
+        if (code == juce::KeyPress::F2Key && ! ctrl && ! shift) // FL's Format › Edit properties... (round gaps190kf)
+        {
+            showSampleProperties();
             return true;
         }
         if (ctrl && (code == 'Z' || c == 'z'))
@@ -2801,7 +2825,7 @@ private:
             return;
         clipboard() = ae::copy (doc.audio, selection);
         const auto at = selection.start;
-        edit (tr ("Cut"), [] (ae::Document& d, ae::Range r) { ae::erase (d, r); }, true);
+        edit (tr ("Cut"), [] (ae::Document& d, ae::Range r) { clickFreeEditing() ? ae::clickfree::eraseClickFree (d, r) : ae::erase (d, r); }, true);
         selection = {};
         cursor = at;
         repaint();
@@ -2811,7 +2835,7 @@ private:
     {
         if (selection.empty())
             return;
-        edit (tr ("Trim"), [] (ae::Document& d, ae::Range r) { ae::trim (d, r); }, true);
+        edit (tr ("Trim"), [] (ae::Document& d, ae::Range r) { clickFreeEditing() ? ae::clickfree::trimClickFree (d, r) : ae::trim (d, r); }, true);
         selection = {};
         cursor = 0;
         zoomToFit();
@@ -2822,7 +2846,7 @@ private:
         if (selection.empty())
             return;
         const auto at = selection.start;
-        edit (tr ("Delete"), [] (ae::Document& d, ae::Range r) { ae::erase (d, r); }, true);
+        edit (tr ("Delete"), [] (ae::Document& d, ae::Range r) { clickFreeEditing() ? ae::clickfree::eraseClickFree (d, r) : ae::erase (d, r); }, true);
         selection = {};
         cursor = at;
         repaint();
@@ -2841,9 +2865,9 @@ private:
         if (mix)
             ae::pasteMix (doc, at, clip);
         else if (! selection.empty())
-            ae::pasteReplace (doc, selection, clip);
+            clickFreeEditing() ? ae::clickfree::pasteReplaceClickFree (doc, selection, clip) : ae::pasteReplace (doc, selection, clip);
         else
-            ae::insert (doc, at, clip);
+            clickFreeEditing() ? ae::clickfree::insertClickFree (doc, at, clip) : ae::insert (doc, at, clip);
         selection = { at, at + length };
         commit (mix ? tr ("Paste mix") : tr ("Paste"));
         if (wasEmpty)
@@ -3321,6 +3345,77 @@ private:
 
     void showAmp() { openEdisonTool (audiotools::Tool::amp); } // Edison's Amp form (round 165l)
 
+    // FL Edison's Sample properties (Format › Edit properties..., F2; round gaps190kf, core/SampleProps.h)
+    void showSampleProperties()
+    {
+        if (doc.audio.empty() || recState != RecState::idle)
+            return;
+        const auto whole = doc.audio.frames();
+        const auto part = ! selection.empty() && selection.length() != whole;
+        SamplePropertiesHost h;
+        h.selectionFrames = (double) (part ? selection.length() : whole);
+        h.partSelected = part;
+        h.projectTempo = engine.getSong().bpm;
+        juce::Component::SafePointer<AudioEditor> self (this);
+        const auto range = part ? selection : ae::Range { 0, whole };
+        h.detectPitch = [self, range]() -> double {
+            if (self == nullptr)
+                return -1.0;
+            const auto mono = self->monoOf (range);
+            // LYNX's own detector (YIN pitch track, its median over the pitched frames): FL's analyser is not ported
+            const auto track = warpengine::pitchTrack (mono.data(), (long) mono.size(), self->doc.audio.sampleRate);
+            std::vector<float> pitched;
+            for (const auto v : track.semitones)
+                if (std::isfinite (v))
+                    pitched.push_back (v);
+            if (pitched.empty())
+                return -1.0;
+            std::nth_element (pitched.begin(), pitched.begin() + (std::ptrdiff_t) (pitched.size() / 2), pitched.end());
+            return (double) pitched[pitched.size() / 2];
+        };
+        h.detectTempo = [self, range] (int) -> double {
+            if (self == nullptr)
+                return 0.0;
+            const auto& a = self->doc.audio;
+            const auto* l = a.channels[0].data() + range.start;
+            const auto* r = a.numChannels() > 1 ? a.channels[1].data() + range.start : nullptr;
+            // LYNX's tempo detection (core/TempoDetect) for both of FL's song methods
+            return tempodetect::detect (l, r, (std::size_t) range.length(), a.sampleRate).bpm;
+        };
+        h.accept = [self] (const sampleprops::Form& f) {
+            if (self == nullptr)
+                return;
+            self->stopPlayback();
+            const auto rateChanged = sampleprops::accept (self->doc, f);
+            if (! f.fileName.empty())
+                self->doc.title = f.fileName;
+            if (f.int16)
+                self->bits = ae::WavFormat::int16;
+            self->selection = {};
+            self->commit (tr ("Edit properties"));
+            if (rateChanged)
+                self->zoomToFit();
+            self->updateTitle();
+        };
+        auto panel = makeSamplePropertiesPanel (doc, doc.title, std::move (h));
+        openToolWindow (std::move (panel), tr ("Sample properties"), "audioeditor-props");
+    }
+
+    // the range's audio, both channels mixed (for the detectors)
+    std::vector<float> monoOf (ae::Range r) const
+    {
+        const auto& a = doc.audio;
+        std::vector<float> m;
+        if (a.empty())
+            return m;
+        r = ae::clamp (doc, r);
+        m.assign (a.channels[0].begin() + r.start, a.channels[0].begin() + r.end);
+        if (a.numChannels() > 1)
+            for (std::size_t i = 0; i < m.size(); ++i)
+                m[i] = 0.5f * (m[i] + a.channels[1][(std::size_t) r.start + i]);
+        return m;
+    }
+
     void showResample()
     {
         if (doc.audio.empty())
@@ -3360,7 +3455,10 @@ private:
                                                        return;
                                                    const auto frames = (std::int64_t) std::llround (v[0] * 0.001 * self->doc.audio.sampleRate);
                                                    const auto at = self->cursor;
-                                                   ae::insertSilence (self->doc, at, frames);
+                                                   if (clickFreeEditing())
+                                                       ae::clickfree::insertSilenceClickFree (self->doc, at, frames);
+                                                   else
+                                                       ae::insertSilence (self->doc, at, frames);
                                                    self->selection = { at, at + frames };
                                                    self->commit (tr ("Insert silence"));
                                                },
@@ -5055,13 +5153,18 @@ juce::PopupMenu AudioEditor::editMenu (bool contextual)
     menu.addItem (tr ("Paste replace (drum)"), clip && sel, false, [this] { pasteFitted (true); });
     menu.addSeparator();
     menu.addItem (tr ("Delete") + "\tDel", sel, false, [this] { deleteSelection(); });
-    menu.addItem (tr ("Clear (silence)"), sel, false, [this] { edit (tr ("Silence"), [] (ae::Document& d, ae::Range r) { ae::clear (d, r); }, true); });
+    menu.addItem (tr ("Clear (silence)"), sel, false, [this] { edit (tr ("Silence"), [] (ae::Document& d, ae::Range r) { clickFreeEditing() ? ae::clickfree::clearClickFree (d, r) : ae::clear (d, r); }, true); });
     menu.addItem (tr ("Trim (keep the selection)"), sel, false, [this] { trimSelection(); });
     // (right-click on the selection: issue #12)
     menu.addItem (tr ("Send the selection to a new Sampler channel"), sel, false, [this] { sendRangeToNewSampler (selection); });
     menu.addItem (tr ("Insert silence..."), has, false, [this] { showInsertSilence(); });
     menu.addItem (tr ("Delete the part after the loop"), has && doc.hasLoop(), false,
                   [this] { edit (tr ("Delete after loop"), [] (ae::Document& d, ae::Range) { ae::deleteAfterLoop (d); }); });
+    if (! contextual) // (FL: the last item of Edison's Edit menu, round gaps190kf)
+    {
+        menu.addSeparator();
+        menu.addItem (tr ("Click-free (smooth) editing") + "\tC", true, clickFreeEditing(), [] { clickFreeEditing() = ! clickFreeEditing(); });
+    }
     menu.addSeparator();
     menu.addItem (tr ("Select all") + "\tCtrl+A", has, false, [this] {
         selection = { 0, doc.audio.frames() };
@@ -5102,6 +5205,31 @@ juce::PopupMenu AudioEditor::mainMenu()
     file.addSeparator();
     file.addItem (tr ("Send to the Playlist as an audio clip"), has, false, [this] { sendToPlaylist(); });
     file.addItem (tr ("Send to a new Sampler channel"), has, false, [this] { sendToNewSampler(); });
+
+    // FL's Format menu (round gaps190kf: Edison's WAVOptionsMenu › Format: Edit properties... F2, Precision, Channels)
+    juce::PopupMenu format;
+    format.addItem (tr ("Edit properties...") + "\tF2", has, false, [this] { showSampleProperties(); });
+    format.addSectionHeader (tr ("Precision"));
+    format.addItem (tr ("16Bit int"), has, doc.props.int16, [this] {
+        if (! doc.props.int16)
+            edit (tr ("16Bit int"), [] (ae::Document& d, ae::Range) { sampleprops::toInt16 (d); });
+        bits = ae::WavFormat::int16;
+    });
+    format.addItem (tr ("32Bit float"), has, ! doc.props.int16, [this] {
+        if (doc.props.int16)
+        {
+            doc.props.int16 = false;
+            commit (tr ("32Bit float"));
+        }
+        bits = ae::WavFormat::float32;
+    });
+    format.addSectionHeader (tr ("Channels"));
+    format.addItem (tr ("Mono"), has, doc.audio.numChannels() == 1, [this] {
+        edit (tr ("Convert to mono"), [] (ae::Document& d, ae::Range) { sampleprops::setChannels (d, sampleprops::Channels::monoMerged); });
+    });
+    format.addItem (tr ("Stereo"), has, doc.audio.numChannels() > 1, [this] {
+        edit (tr ("Convert to stereo"), [] (ae::Document& d, ae::Range) { sampleprops::setChannels (d, sampleprops::Channels::stereo); });
+    });
 
     juce::PopupMenu tools;
     using T = audiotools::Tool;
@@ -5353,6 +5481,7 @@ juce::PopupMenu AudioEditor::mainMenu()
 
     juce::PopupMenu menu;
     menu.addSubMenu (tr ("File"), file);
+    menu.addSubMenu (tr ("Format"), format);
     menu.addSubMenu (tr ("Edit"), editMenu (false));
     menu.addSubMenu (tr ("Select"), select, has);
     menu.addSubMenu (tr ("Tools"), tools, has);
