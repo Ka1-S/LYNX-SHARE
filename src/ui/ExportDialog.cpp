@@ -22,6 +22,7 @@
 #include "ui/FileChoosers.h"
 #include "ui/WindowOwner.h"
 
+#include "engine/AacEncoder.h"
 #include "engine/Exporter.h"
 #include "engine/Text.h"
 #include "ui/HintBar.h"
@@ -219,6 +220,30 @@ juce::File exportSettingsFile()
 juce::File exportPresetsFile() { return lynx::platform::settingsFile ("export-presets.txt"); }
 juce::File exportLastFile() { return lynx::platform::settingsFile ("export-last.txt"); }
 
+// The formats this window offers, in exportopts::Format order: M4A (the last) only where the system has an AAC encoder
+// (engine/AacEncoder.h; not on Linux)
+int offeredFormats()
+{
+    return aac::available() ? exportopts::formatCount : (int) exportopts::Format::aac;
+}
+
+juce::StringArray offeredFormatNames()
+{
+    juce::StringArray names;
+    for (int i = 0; i < offeredFormats(); ++i)
+        names.add (exportopts::formatName ((exportopts::Format) i));
+    return names;
+}
+
+// `o` without the formats this system cannot write (M4A without an AAC encoder: WAV instead, and no M4A "also")
+exportopts::Options withOfferedFormats (exportopts::Options o)
+{
+    if ((int) o.format >= offeredFormats())
+        o.format = exportopts::Format::wav;
+    o.moreFormats &= (1u << offeredFormats()) - 1u;
+    return exportopts::clamped (o);
+}
+
 // A row of buttons where exactly one is on (the output format).
 class Segmented final : public juce::Component
 {
@@ -320,7 +345,7 @@ public:
     {
         using namespace exportopts;
         if (persistent)
-            options = fromText (exportSettingsFile().loadFileAsString().toStdString());
+            options = withOfferedFormats (fromText (exportSettingsFile().loadFileAsString().toStdString()));
         if (clip != nullptr)
         {
             persistent = false; // (the Export window's own choices stay as they are)
@@ -344,7 +369,7 @@ public:
             options.stems = Stems::mixerTracks;
             options.stemsIncludeMaster = std::find (onlyTracks.begin(), onlyTracks.end(), 0) != onlyTracks.end();
         }
-        if (initialFormat >= 0 && initialFormat <= 3)
+        if (initialFormat >= 0 && initialFormat < offeredFormats())
             options = withSingleFormat (options, (Format) initialFormat);
         const auto& song = engine.getSong();
         // the range follows what is playing unless a selection was the last choice and still exists
@@ -424,24 +449,32 @@ public:
         // FL ticks several format boxes at once (REA round 139): the other formats written from the same render
         settingsui::styleLabel (alsoLabel, tr ("Also save"));
         addAndMakeVisible (alsoLabel);
-        for (int i = 0; i < 4; ++i)
+        for (int i = 0; i < exportopts::formatCount; ++i)
         {
-            static const char* names[] = { "WAV", "MP3", "OGG", "FLAC" };
-            alsoToggles[(std::size_t) i].setButtonText (names[i]);
-            alsoToggles[(std::size_t) i].setTooltip (tr ("Also write the {0} file from the same render (same name, its own extension)", { juce::String (names[i]) }));
+            const auto name = juce::String (formatName ((Format) i));
+            alsoToggles[(std::size_t) i].setButtonText (name);
+            alsoToggles[(std::size_t) i].setTooltip (tr ("Also write the {0} file from the same render (same name, its own extension)", { name }));
             alsoToggles[(std::size_t) i].onClick = [this] { readControls(); };
-            addAndMakeVisible (alsoToggles[(std::size_t) i]);
+            addChildComponent (alsoToggles[(std::size_t) i]);
+            alsoToggles[(std::size_t) i].setVisible (i < offeredFormats()); // (M4A: where the system can encode it)
         }
         combo (depthLabel, tr ("Bit depth"), depthBox, { tr ("16 bits (integer)"), tr ("24 bits (integer)"), tr ("32 bits (float)") });
-        juce::StringArray mp3Items, oggItems;
+        juce::StringArray mp3Items, oggItems, aacItems;
         for (auto k : mp3Bitrates())
             mp3Items.add (juce::String (k) + " kbps");
         for (auto k : oggBitrates())
             oggItems.add (juce::String (k) + " kbps");
+        for (auto k : aacBitrates())
+            aacItems.add (juce::String (k) + " kbps");
         combo (bitrateLabel, tr ("Bitrate"), mp3Box, mp3Items, tr ("Constant bitrate (higher: better sound, bigger file)"));
         addAndMakeVisible (oggBox);
         oggBox.addItemList (oggItems, 1);
         oggBox.onChange = [this] { readControls(); };
+        // M4A (owner decision D5): AAC through the system's encoder, which takes these four bitrates
+        addAndMakeVisible (aacBox);
+        aacBox.addItemList (aacItems, 1);
+        aacBox.setTooltip (tr ("AAC bitrate (the system's encoder; higher: better sound, bigger file)"));
+        aacBox.onChange = [this] { readControls(); };
         combo (compressionLabel, tr ("Compression"), flacLevelBox,
                { tr ("0 (fastest)"), "1", "2", "3", "4", tr ("5 (default)"), "6", "7", tr ("8 (smallest)") },
                tr ("FLAC is lossless at every level; higher levels make smaller files and take longer"));
@@ -560,7 +593,7 @@ public:
     // --snapshot: the window with this format chosen (0 WAV, 1 MP3, 2 OGG, 3 FLAC) and a few options set
     void setFormatForSnapshot (int format)
     {
-        options.format = (exportopts::Format) juce::jlimit (0, 3, format);
+        options.format = (exportopts::Format) juce::jlimit (0, offeredFormats() - 1, format);
         if (format == 3)
         {
             options.tail = exportopts::TailMode::wrap;
@@ -707,31 +740,42 @@ public:
         formatButtons.setBounds (right.removeFromTop (28));
         right.removeFromTop (4);
         {
-            // the four format ticks keep the room their names need; a caption too long to sit beside them
-            // ("Также сохранить", "Auch speichern") gets its own line above them instead of being cut
-            const auto ticks = 4 * 54;
-            const auto labelNeeds = theme::labelColumnWidth ({ &alsoLabel }, 0, 400);
-            const auto ownLine = labelNeeds > (right.getWidth() - ticks) * 11 / 10; // a slight squeeze is fine
-            if (ownLine)
+            // the format ticks keep the room their names need; a caption too long to sit beside them ("Также
+            // сохранить", "Auch speichern") gets its own line above them instead of being cut. Five or six formats
+            // (AIFF, M4A: owner decision D5) do not fit beside the caption: the caption has its own line, and the ticks
+            // take two rows when one is too narrow for them
+            const auto layout = alsoLayout (right.getWidth());
+            if (layout.ownLine)
                 alsoLabel.setBounds (right.removeFromTop (18));
             auto also = right.removeFromTop (22);
-            if (! ownLine) // as before round 165o
-                alsoLabel.setBounds (also.removeFromLeft (juce::jmax (juce::jmin (70, also.getWidth() - ticks),
-                                                                      juce::jmin (theme::labelColumnWidth ({ &alsoLabel }, 70, 130), also.getWidth() - ticks))));
-            const auto w = also.getWidth() / 4;
-            for (auto& t : alsoToggles)
-                t.setBounds (also.removeFromLeft (w));
+            if (! layout.ownLine) // as before round 165o
+                alsoLabel.setBounds (also.removeFromLeft (juce::jmax (juce::jmin (70, also.getWidth() - layout.ticks),
+                                                                      juce::jmin (theme::labelColumnWidth ({ &alsoLabel }, 70, 130), also.getWidth() - layout.ticks))));
+            const auto count = offeredFormats();
+            const auto perRow = (count + layout.rows - 1) / layout.rows;
+            const auto w = also.getWidth() / perRow;
+            for (int i = 0; i < count; ++i)
+            {
+                if (i > 0 && i % perRow == 0)
+                {
+                    right.removeFromTop (2);
+                    also = right.removeFromTop (22);
+                }
+                alsoToggles[(std::size_t) i].setBounds (also.removeFromLeft (w));
+            }
         }
         right.removeFromTop (gap);
         // the format's own settings: two rows, the others hidden
         using exportopts::Format;
         const auto f = options.format;
-        if (f == Format::wav || f == Format::flac)
+        if (f == Format::wav || f == Format::flac || f == Format::aiff)
             row (right, depthLabel, depthBox);
         if (f == Format::mp3)
             row (right, bitrateLabel, mp3Box);
         if (f == Format::ogg)
             row (right, bitrateLabel, oggBox);
+        if (f == Format::aac)
+            row (right, bitrateLabel, aacBox);
         if (f == Format::flac)
             row (right, compressionLabel, flacLevelBox);
         row (right, rateLabel, rateBox);
@@ -760,11 +804,38 @@ private:
         constexpr int rowHeight = 26, gap = 7;
         const auto leftHeight = 26 + 8 + 5 * (rowHeight + gap) + 22 + (sectionsToggle.isVisible() ? 24 : 0) + (onlyTracks.empty() ? 0 : gap + rowHeight + gap);
         const auto columnWidth = (620 - 32 - 24) / 2;
-        const auto labelNeeds = theme::labelColumnWidth ({ &alsoLabel }, 0, 400);
-        const auto ownLine = labelNeeds > (columnWidth - 4 * 54) * 11 / 10;
+        const auto layout = alsoLayout (columnWidth);
         // the most rows a format has: FLAC (bit depth, compression) + rate, channels, dither
-        const auto rightHeight = 26 + 8 + 28 + 4 + (ownLine ? 18 : 0) + 22 + gap + 5 * (rowHeight + gap);
+        const auto rightHeight = 26 + 8 + 28 + 4 + (layout.ownLine ? 18 : 0) + layout.rows * 22 + (layout.rows - 1) * 2 + gap + 5 * (rowHeight + gap);
         return juce::jmax (leftHeight, rightHeight);
+    }
+
+    // "Also save" and its format ticks in a column `width` wide: the caption beside the ticks or on its own line, the
+    // ticks in one row or two (each tick needs its box and its name)
+    struct AlsoLayout
+    {
+        bool ownLine = false;
+        int rows = 1;
+        int ticks = 0; // the width the ticks take in a row beside the caption
+    };
+    AlsoLayout alsoLayout (int width) const
+    {
+        AlsoLayout l;
+        const auto count = offeredFormats();
+        if (count <= 4) // (as before: four ticks of 54 px)
+        {
+            l.ticks = count * 54;
+            l.ownLine = theme::labelColumnWidth ({ &alsoLabel }, 0, 400) > (width - l.ticks) * 11 / 10; // a slight squeeze is fine
+            return l;
+        }
+        l.ownLine = true;
+        int widest = 0;
+        for (int i = 0; i < count; ++i)
+            widest = juce::jmax (widest, juce::GlyphArrangement::getStringWidthInt (theme::font (theme::type::body), formatName ((exportopts::Format) i)));
+        const auto each = widest + 24; // the tick box and its gap (the 54 px a tick always had for "FLAC")
+        l.rows = each * count <= width ? 1 : 2;
+        l.ticks = width;
+        return l;
     }
     int columnsBottom = 0;
     static constexpr int presetRowHeight = 26 + 14;
@@ -799,7 +870,7 @@ private:
         o.master = false;
         if (o.range == exportopts::Range::selection && ! exportopts::hasSelection (engine.getSong()))
             o.range = exportopts::Range::song;
-        return exportopts::clamped (o);
+        return withOfferedFormats (o); // (a preset made where M4A exists, opened where it does not: WAV)
     }
 
     void applyPreset()
@@ -939,9 +1010,13 @@ private:
         stemsMaster.setToggleState (options.stemsIncludeMaster, n);
         sectionsToggle.setToggleState (options.sections, n);
         formatButtons.setSelected ((int) options.format);
-        depthBox.setSelectedItemIndex (options.format == Format::flac ? (options.flacBits == 16 ? 0 : 1) : (options.wavBits == 16 ? 0 : options.wavBits == 24 ? 1 : 2), n);
+        depthBox.setSelectedItemIndex (options.format == Format::flac   ? (options.flacBits == 16 ? 0 : 1)
+                                       : options.format == Format::aiff ? (options.aiffBits == 16 ? 0 : 1)
+                                                                        : (options.wavBits == 16 ? 0 : options.wavBits == 24 ? 1 : 2),
+                                       n);
         mp3Box.setSelectedItemIndex (indexOf (mp3Bitrates(), options.mp3Kbps), n);
         oggBox.setSelectedItemIndex (indexOf (oggBitrates(), options.oggKbps), n);
+        aacBox.setSelectedItemIndex (indexOf (aacBitrates(), options.aacKbps), n);
         flacLevelBox.setSelectedItemIndex (options.flacLevel, n);
         int rate = 0;
         for (int i = 0; i < (int) sampleRates().size(); ++i)
@@ -962,7 +1037,7 @@ private:
         tempoToggle.setToggleState (options.saveTempo, n);
         loopMarkersToggle.setToggleState (options.loopMarkers, n);
         playlistMarkersToggle.setToggleState (options.playlistMarkers, n);
-        for (int i = 0; i < 4; ++i)
+        for (int i = 0; i < exportopts::formatCount; ++i)
             alsoToggles[(std::size_t) i].setToggleState (i == (int) options.format || (options.moreFormats & (1u << i)) != 0, n);
         refresh();
     }
@@ -985,11 +1060,14 @@ private:
             const auto depth = depthBox.getSelectedItemIndex();
             if (options.format == Format::flac)
                 options.flacBits = depth == 0 ? 16 : 24;
-            else
+            else if (options.format == Format::aiff)
+                options.aiffBits = depth == 0 ? 16 : 24;
+            else if (options.format == Format::wav)
                 options.wavBits = depth == 0 ? 16 : depth == 1 ? 24 : 32;
         }
         options.mp3Kbps = mp3Bitrates()[(std::size_t) juce::jlimit (0, (int) mp3Bitrates().size() - 1, mp3Box.getSelectedItemIndex())];
         options.oggKbps = oggBitrates()[(std::size_t) juce::jlimit (0, (int) oggBitrates().size() - 1, oggBox.getSelectedItemIndex())];
+        options.aacKbps = aacBitrates()[(std::size_t) juce::jlimit (0, (int) aacBitrates().size() - 1, aacBox.getSelectedItemIndex())];
         options.flacLevel = juce::jlimit (0, 8, flacLevelBox.getSelectedItemIndex());
         if (! realtime) // (real time shows the device's rate)
             options.sampleRate = sampleRates()[(std::size_t) juce::jlimit (0, (int) sampleRates().size() - 1, rateBox.getSelectedItemIndex())];
@@ -1016,7 +1094,7 @@ private:
         }
         realtime = realtimeToggle.isVisible() && realtimeToggle.getToggleState();
         options.moreFormats = 0;
-        for (int i = 0; i < 4; ++i) // (the previous main format's box was only shown ticked)
+        for (int i = 0; i < offeredFormats(); ++i) // (the previous main format's box was only shown ticked)
             if (i != (int) previousFormat && alsoToggles[(std::size_t) i].getToggleState())
                 options.moreFormats |= 1u << i;
         options = clamped (options); // (the main format is not "more")
@@ -1033,7 +1111,7 @@ private:
     void refresh()
     {
         using namespace exportopts;
-        // the depth list: FLAC has no float
+        // the depth list: FLAC and AIFF have no float
         depthBox.setItemEnabled (3, options.format == Format::wav);
         tailLengthBox.setEnabled (options.tail != TailMode::cut);
         stemsMaster.setEnabled (options.stems != Stems::none);
@@ -1072,21 +1150,22 @@ private:
         }
         stemsMaster.setEnabled (! realtime && options.stems != Stems::none && clip == nullptr);
         normalizeToggle.setEnabled (! masterMode); // (the mastering sets the level)
-        const auto ditherable = (options.format == Format::wav && options.wavBits != 32) || options.format == Format::flac;
+        const auto ditherable = (options.format == Format::wav && options.wavBits != 32) || options.format == Format::flac || options.format == Format::aiff;
         ditherBox.setEnabled (ditherable);
         ditherLabel.setEnabled (ditherable);
         const auto f = options.format;
-        for (int i = 0; i < 4; ++i)
+        for (int i = 0; i < offeredFormats(); ++i)
             alsoToggles[(std::size_t) i].setEnabled (i != (int) f && clip == nullptr);
         // (WAV only: FL writes them into WAV files)
         const auto wav = f == Format::wav || (options.moreFormats & (1u << (int) Format::wav)) != 0;
         for (auto* t : { &tempoToggle, &loopMarkersToggle, &playlistMarkersToggle })
             t->setEnabled (wav);
-        depthLabel.setVisible (f == Format::wav || f == Format::flac);
-        depthBox.setVisible (f == Format::wav || f == Format::flac);
-        bitrateLabel.setVisible (f == Format::mp3 || f == Format::ogg);
+        depthLabel.setVisible (f == Format::wav || f == Format::flac || f == Format::aiff);
+        depthBox.setVisible (f == Format::wav || f == Format::flac || f == Format::aiff);
+        bitrateLabel.setVisible (f == Format::mp3 || f == Format::ogg || f == Format::aac);
         mp3Box.setVisible (f == Format::mp3);
         oggBox.setVisible (f == Format::ogg);
+        aacBox.setVisible (f == Format::aac);
         compressionLabel.setVisible (f == Format::flac);
         flacLevelBox.setVisible (f == Format::flac);
 
@@ -1101,6 +1180,8 @@ private:
             info << " " << tr ("(+ tail up to {0} s)", { juce::String ((int) options.maxTailSeconds) });
         if (options.format == Format::mp3 && mp3SampleRate (options.sampleRate) != options.sampleRate)
             info << "  ·  " << tr ("MP3 at {0} Hz", { juce::String ((int) mp3SampleRate (options.sampleRate)) });
+        if (options.format == Format::aac && aacSampleRate (options.sampleRate) != options.sampleRate && aacSampleRate (options.sampleRate) > 0.0)
+            info << "  ·  " << tr ("M4A at {0} Hz", { juce::String ((int) aacSampleRate (options.sampleRate)) });
         if (sectioned)
             info << "  ·  " << tr ("{0} section(s)", { juce::String ((int) sectionList.size()) }) << "  ·  "
                  << tr ("{0} file(s)", { juce::String (fileCount (song, options, onlyTracks)) });
@@ -1295,15 +1376,15 @@ private:
     std::vector<exportopts::Preset> presets;
     exportopts::LastExport lastExport;
     bool snapshotLast = false; // --versionsshot: the last export's folder need not exist
-    Segmented formatButtons { { "WAV", "MP3", "OGG", "FLAC" } };
+    Segmented formatButtons { offeredFormatNames() };
     juce::Label depthLabel, bitrateLabel, compressionLabel, rateLabel, channelsLabel, ditherLabel;
-    juce::ComboBox depthBox, mp3Box, oggBox, flacLevelBox, rateBox, channelsBox, ditherBox;
+    juce::ComboBox depthBox, mp3Box, oggBox, aacBox, flacLevelBox, rateBox, channelsBox, ditherBox;
     juce::ToggleButton normalizeToggle, masterFxToggle, insertFxToggle, trimToggle, hqToggle, showToggle, polyToggle, warmUpToggle, realtimeToggle;
     juce::ToggleButton tempoToggle, loopMarkersToggle, playlistMarkersToggle;
     juce::ToggleButton videoToggle; // round 174d: also a video with the mix (shown when the project has a video clip)
     bool realtime = false; // "Render through the hardware in real time" (round 165c; not remembered: it takes the song's length)
     juce::Label alsoLabel;
-    std::array<juce::ToggleButton, 4> alsoToggles;
+    std::array<juce::ToggleButton, exportopts::formatCount> alsoToggles;
     juce::Label infoLabel, warningLabel;
     juce::TextButton exportButton { tr ("Export...") }, cancelButton { tr ("Cancel") };
     std::unique_ptr<juce::FileChooser> chooser;

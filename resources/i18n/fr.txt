@@ -10804,3 +10804,10 @@ countries: fr be ch ca lu
 "Automation of hosted CLAP and VST3 plugins changes once per 128 samples in this release (0.1.30 places each change at its own sample)" = "L'automation des plugins CLAP et VST3 hébergés change une fois tous les 128 échantillons dans cette version (0.1.30 place chaque changement sur son propre échantillon)"
 "{0} track(s) in nested Playlist folders open one level deep" = "{0} piste(s) dans des dossiers imbriqués de la Playlist s'ouvrent sur un seul niveau"
 "Fruity Limiter's CURVE view (its display shows the scrolling graph): {0}" = "La vue CURVE de Fruity Limiter (son affichage montre le graphe défilant) : {0}"
+
+# --- round als190ka-export (owner decision D5): AIFF and M4A export
+"AIFF file..." = "Fichier AIFF..."
+"M4A file..." = "Fichier M4A..."
+"AAC bitrate (the system's encoder; higher: better sound, bigger file)" = "Débit AAC (l'encodeur du système ; plus élevé : meilleur son, fichier plus gros)"
+"M4A at {0} Hz" = "M4A à {0} Hz"
+"M4A files take 44100 or 48000 Hz (or a multiple of it); this export is at {0} Hz" = "Les fichiers M4A prennent 44100 ou 48000 Hz (ou un multiple) ; cet export est à {0} Hz"

@@ -24,4 +24,10 @@ void run (bool everyUnit, int repeats, const juce::StringArray& pluginFiles, std
 // `pluginFile`: a hosted instrument that joins the sounds (its first instrument; empty = none).
 void stress (int count, std::int64_t seed, bool realtime, const juce::String& pluginFile, std::function<void (const juce::String&)> log,
              std::function<void (juce::String)> done);
+
+// The --selftest's check of the AIFF and M4A exports (owner decision D5): a 24-bit AIFF written from the same render as
+// a 24-bit WAV holds the same samples; a 16-bit AIFF streamed alone matches a 16-bit WAV render; M4A (a 96 kHz render)
+// comes out as an MPEG-4 file where the system has an AAC encoder, and is refused without a file where it has none.
+// Synchronous, on the calling thread. "OK (...)" or "ERROR ...".
+juce::String formatsCheck();
 } // namespace lynx::shortexport

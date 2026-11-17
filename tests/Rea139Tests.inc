@@ -12,9 +12,10 @@ TEST (rea139_last_exported_formats_like_fl)
     CHECK (both.format == Format::wav && flLastExportedMask (both) == 0x58);
     const auto f = formatsOf (both);
     CHECK (f.size() == 3 && f[0] == Format::wav && f[1] == Format::mp3 && f[2] == Format::flac);
-    // invalid masks fall back to WAV (FL: < 8 or > 0x3FF); MIDI / M4A only: WAV for the audio window
+    // invalid masks fall back to WAV (FL: < 8 or > 0x3FF); MIDI only: WAV for the audio window; M4A (owner decision D5,
+    // round als190ka-export): LYNX writes it now
     CHECK (withFlLastExported (o, 3).format == Format::wav && withFlLastExported (o, 0x800).moreFormats == 0);
-    CHECK (withFlLastExported (o, 0x80 | 0x200).format == Format::wav);
+    CHECK (withFlLastExported (o, 0x80).format == Format::wav && withFlLastExported (o, 0x80 | 0x200).format == Format::aac);
     CHECK (withFlLastExported (o, 0x20).format == Format::ogg && withFlLastExported (o, 0x20).moreFormats == 0);
     // a "<format> file..." entry: that format alone
     CHECK (withSingleFormat (both, Format::mp3).format == Format::mp3 && withSingleFormat (both, Format::mp3).moreFormats == 0);

@@ -10804,3 +10804,10 @@ countries: jp
 "Automation of hosted CLAP and VST3 plugins changes once per 128 samples in this release (0.1.30 places each change at its own sample)" = "このリリースでは、ホストした CLAP / VST3 プラグインのオートメーションは 128 サンプルごとに変化します (0.1.30 は各変化をそのサンプル位置に置きます)"
 "{0} track(s) in nested Playlist folders open one level deep" = "ネストした Playlist フォルダー内の {0} トラックは 1 階層で開かれます"
 "Fruity Limiter's CURVE view (its display shows the scrolling graph): {0}" = "Fruity Limiter の CURVE ビュー (表示はスクロールするグラフになります): {0}"
+
+# --- round als190ka-export (owner decision D5): AIFF and M4A export
+"AIFF file..." = "AIFFファイル..."
+"M4A file..." = "M4Aファイル..."
+"AAC bitrate (the system's encoder; higher: better sound, bigger file)" = "AACビットレート（システムのエンコーダー。高いほど音質が良く、ファイルが大きくなります）"
+"M4A at {0} Hz" = "M4A {0} Hz"
+"M4A files take 44100 or 48000 Hz (or a multiple of it); this export is at {0} Hz" = "M4Aファイルは44100または48000 Hz（またはその倍数）です。このエクスポートは{0} Hzです"
