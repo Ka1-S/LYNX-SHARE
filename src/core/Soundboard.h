@@ -191,6 +191,7 @@ public:
         rate = sampleRate > 0.0 ? sampleRate : 48000.0;
         reset();
         dirty = true;
+        fade = 0;
     }
     void reset() noexcept
     {
@@ -206,10 +207,36 @@ public:
     void process (float* l, float* r, int n, const float* p) noexcept
     {
         if (dirty || ! same (p))
-            design (p);
+        {
+            // a new object, Quality or Opening moves every mode: the ringing fades out over 5 ms, the banks restart
+            // empty and fade back in (no click); other changes retune the modes in place
+            const auto structural = ! dirty && (kindOf (p[type]) != kindOf (last[type]) || qualityOf (p[quality]) != qualityOf (last[quality])
+                                                || (p[opening] < 0.5f) != (last[opening] < 0.5f));
+            if (structural && fade <= 0)
+                fade = fadeLength();
+            if (fade <= 0)
+                design (p);
+        }
         float* io[2] { l, r };
         for (int i = 0; i < n; ++i)
         {
+            double fadeGain = 1.0;
+            if (fade > 0)
+            {
+                const auto len = fadeLength();
+                if (fade > len / 2)
+                    fadeGain = (double) (fade - len / 2) / (double) (len / 2); // out
+                else
+                {
+                    if (fade == len / 2)
+                    {
+                        reset();
+                        design (p);
+                    }
+                    fadeGain = 1.0 - (double) fade / (double) (len / 2); // in
+                }
+                --fade;
+            }
             double wet[2] {}, dry[2] {};
             for (int ch = 0; ch < 2; ++ch)
             {
@@ -225,7 +252,7 @@ public:
                     z = bank.pole[(std::size_t) k] * z + x;
                     acc += bank.weight[(std::size_t) k] * z.imag();
                 }
-                wet[ch] = acc * outGain;
+                wet[ch] = acc * outGain * fadeGain;
                 if (bleedGain > 0.0)
                     wet[ch] += bleedGain * biquad (bleedFilter[(std::size_t) ch], bleedC, dry[ch]);
             }
@@ -244,6 +271,9 @@ public:
     }
 
 private:
+    int fadeLength() const noexcept { return 2 * std::max (8, (int) (0.005 * rate)); }
+    int fade = 0;
+
     struct Bank
     {
         std::array<std::complex<double>, maxModes> pole {}, state {};

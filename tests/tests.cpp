@@ -17577,7 +17577,6 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Comp177Tests.inc"
 #include "AlsImport175aTests.inc"
 #include "Als190kaTests.inc" // round als190ka (issue #193): .als automation laws, sends, device on / off, Main devices, video clips
-#include "LiveDev190kkTests.inc" // round 190kk: Erosion → Corrode, Looper, MIDI Effect Racks into notes
 #include "AlsColours190igTests.inc" // round 190ig (CL-6): Live's colour table for .als imports in the Clip-launch layout
 #include "FlmImport182cTests.inc"
 #include "FlmEngines190uTests.inc"
@@ -17614,6 +17613,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "AlsDevices190bqTests.inc"
 #include "AlsDevices190cfTests.inc"
 #include "AlsDevices190edTests.inc"
+#include "LiveDev190kkTests.inc" // round 190kk: Erosion → Corrode, Vinyl → Platter, Corpus → Soundboard, Looper, MIDI Effect Racks (uses als190cf::)
 #include "AlsDevices190ekTests.inc"
 #include "Tetra190hsTests.inc" // round 190hs
 #include "Tetra190ixTests.inc" // round 190ix

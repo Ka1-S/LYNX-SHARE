@@ -60,9 +60,9 @@ TEST (livedev190kk_erosion_imports_onto_corrode_with_the_measured_depths)
     // the legacy device: Mode 2 is the sine (0.81 µs per unit of Amplitude), Mode 0 / 1 noise (mono / wide)
     t = als190cf::translate (livedev190kk::erosionLegacy (2, 5000.0, 50.0, 0.3));
     CHECK (t && t->slot.params[c::noise] == 0.0f && std::abs (c::sineDepthUs (t->slot.params[c::amount]) - 40.5) < 0.1);
-    t = als190cf::translate (livedev190kk::erosionLegacy (1, 5000.0, 200.0, 0.3));
+    t = als190cf::translate (livedev190kk::erosionLegacy (1, 5000.0, 150.0, 0.3)); // 0.34 µs per unit of Amplitude
     CHECK (t && t->slot.params[c::noise] == 1.0f && t->slot.params[c::stereo] == 1.0f
-           && std::abs (c::noiseDepthUs (t->slot.params[c::amount], 0.3, 5000.0) - 68.0) < 0.5);
+           && std::abs (c::noiseDepthUs (t->slot.params[c::amount], 0.3, 5000.0) - 51.0) < 0.5);
     // the band pass's noise is normalised: the closed-form variance matches a long impulse response
     const double b0 = 0.0119, b2 = -0.0119, a1 = -1.9686, a2 = 0.9762;
     double s1 = 0.0, s2 = 0.0, e = 0.0;
@@ -102,6 +102,7 @@ TEST (livedev190kk_midi_effect_rack_chains_are_written_into_the_notes)
     using namespace lynx;
     using namespace lynx::alsdev;
     using als190cf::range;
+    using als190cf::v;
     // a rack of two chains: keys 0…59 up an octave, 60…127 down an octave (Live 12.4's own MIDI Effect Rack shape)
     const auto pitch = [] (int st, const std::string& mapping = {}, double lo = -12.0, double hi = 12.0) {
         return "<MidiPitcher Id=\"0\">" + als190cf::on() + "<Pitch>" + mapping + v ("Manual", std::to_string (st)) + "<MidiControllerRange>" +
@@ -200,7 +201,7 @@ TEST (livedev190kk_vinyl_distortion_imports_onto_platter)
         for (int i = 0; i < 48000; ++i)
             l[(std::size_t) i] = r[(std::size_t) i] = level * (float) std::sin (2.0 * 3.141592653589793 * 1000.0 * i / 48000.0);
         for (int s = 0; s < 48000; s += 256)
-            fx->process (l.data() + s, r.data() + s, 256, slot.params, 120.0);
+            fx->process (l.data() + s, r.data() + s, std::min (256, 48000 - s), slot.params, 120.0);
     };
     std::vector<float> l, r;
     run (t->slot, 0.5f, l, r);

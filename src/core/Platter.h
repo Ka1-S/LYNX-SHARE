@@ -29,10 +29,11 @@
 
 namespace lynx::platter
 {
+// (the first seven are what the Device View's card shows: Drive, both bands' drive and frequency, the crackle)
 enum Param
 {
-    tracingOn, tracingDrive, tracingFreq, tracingWidth, pinchOn, pinchDrive, pinchFreq, pinchWidth, drive, hard, mono,
-    crackleDensity, crackleVolume, count
+    drive, tracingDrive, tracingFreq, pinchDrive, pinchFreq, crackleVolume, crackleDensity, tracingOn, tracingWidth, pinchOn,
+    pinchWidth, hard, mono, count
 };
 
 // ---- the knob laws (all parameters 0..1) ---------------------------------------------------------------------------

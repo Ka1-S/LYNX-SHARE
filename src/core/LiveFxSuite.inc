@@ -119,10 +119,10 @@ const EffectInfo& platterInfo()
     namespace v = platter;
     // a fresh device: Tracing on at 1 kHz, Drive at a third, soft, no crackle
     static const EffectInfo info { "Platter",
-                                   { { "Tracing", 1.0f }, { "Tracing drive", 0.5f }, { "Tracing freq.", v::bandHzValue (1000.0) },
-                                     { "Tracing width", v::bandQValue (3.0) }, { "Pinch", 0.0f }, { "Pinch drive", 0.5f },
-                                     { "Pinch freq.", v::bandHzValue (684.0) }, { "Pinch width", v::bandQValue (0.32) }, { "Drive", 0.33f },
-                                     { "Hard", 0.0f }, { "Mono", 0.0f }, { "Crackle density", 0.2f }, { "Crackle volume", 0.0f } } };
+                                   { { "Drive", 0.33f }, { "Tracing drive", 0.5f }, { "Tracing freq.", v::bandHzValue (1000.0) },
+                                     { "Pinch drive", 0.5f }, { "Pinch freq.", v::bandHzValue (684.0) }, { "Crackle volume", 0.0f },
+                                     { "Crackle density", 0.2f }, { "Tracing", 1.0f }, { "Tracing width", v::bandQValue (3.0) },
+                                     { "Pinch", 0.0f }, { "Pinch width", v::bandQValue (0.32) }, { "Hard", 0.0f }, { "Mono", 0.0f } } };
     static_assert (v::count == 13);
     return info;
 }
