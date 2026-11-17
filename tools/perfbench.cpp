@@ -624,7 +624,9 @@ int main (int argc, char** argv)
             std::vector<std::pair<double, std::string>> rows;
             for (std::size_t c = 0; c < song.channels.size() && c < (std::size_t) RackRenderer::maxChannels; ++c)
                 if (const auto ns = (double) u.channelNs[c].load(); ns > 0.0)
-                    rows.push_back ({ ns, "channel " + std::to_string (c) + " " + song.channels[c].name });
+                    rows.push_back ({ ns, "channel " + std::to_string (c) + " " + song.channels[c].name + " [kind "
+                                              + std::to_string ((int) song.channels[c].instrument) + (song.channels[c].samplePath.empty() ? std::string() : " " + std::filesystem::path (song.channels[c].samplePath).filename().string())
+                                              + ", insert " + std::to_string (song.channels[c].mixerTrack) + "]" });
             for (std::size_t t = 0; t < song.mixer.size(); ++t)
                 for (std::size_t k = 0; k < song.mixer[t].effects.size() && k < (std::size_t) maxEffectSlots; ++k)
                     if (const auto ns = (double) u.effectNs[t * maxEffectSlots + k].load(); ns > 0.0)
@@ -635,7 +637,9 @@ int main (int argc, char** argv)
             for (const auto& r : rows)
                 total += r.first;
             std::printf ("units: %.1f ms in channels and slots (%.1f%% of this rep's CPU)\n", total * 1e-6, 100.0 * total * 1e-6 / used);
-            for (std::size_t i = 0; i < rows.size() && i < 20; ++i)
+            // round 190kr: LYNX_PB_ALLUNITS=1 lists every unit (else the top 20)
+            const auto shownRows = std::getenv ("LYNX_PB_ALLUNITS") != nullptr ? rows.size() : (std::size_t) 20;
+            for (std::size_t i = 0; i < rows.size() && i < shownRows; ++i)
                 std::printf ("  %6.2f%% of a core  %s\n", 100.0 * rows[i].first * 1e-6 / audioMs, rows[i].second.c_str());
         }
         if (raw != nullptr && rep == 0)

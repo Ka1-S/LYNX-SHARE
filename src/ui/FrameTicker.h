@@ -19,6 +19,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "core/FramePacing.h"
+#include "ui/NativeChild.h"
 
 #include <algorithm>
 #include <atomic>
@@ -139,7 +140,7 @@ private:
                 return;
         }
 
-        if (owner.isShowing() && run (nowMs))
+        if (showing() && run (nowMs))
             quiet = 0;
         else
             ++quiet; // (detached by the timer: not from inside the attachment's own callback)
@@ -219,7 +220,7 @@ private:
         const auto nowMs = juce::Time::getMillisecondCounterHiRes();
         if (fixedHz() > 0) // diagnostics: a plain timer
         {
-            if (owner.isShowing())
+            if (showing())
                 run (nowMs);
             return;
         }
@@ -228,8 +229,23 @@ private:
         if (isAttached() && nowMs - lastVBlankMs < 150.0)
             return; // the display drives it
         // idle (or a window without vertical blanks): the same step at the poll's rate; moving → the display's rate
-        if (owner.isShowing() && run (nowMs) && ! isAttached())
+        if (showing() && run (nowMs) && ! isAttached())
             attach();
+    }
+
+    // round 190kr (QA-11): a view whose docked panel lies wholly under other panels' windows (the Playlist behind
+    // Thief's maximised Channel rack) is "showing" for JUCE, but nothing it paints reaches the screen: its steps wait
+    // (the idle poll looks again 20 times a second, and the first step after it shows again catches up)
+    bool showing() const
+    {
+        if (! owner.isShowing())
+            return false;
+        if (nativechild::coveredBySiblingWindows (owner))
+        {
+            nativechild::coveredSkips().fetch_add (1, std::memory_order_relaxed);
+            return false;
+        }
+        return true;
     }
 
     juce::Component& owner;

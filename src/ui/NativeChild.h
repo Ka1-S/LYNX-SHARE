@@ -2,6 +2,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include <atomic>
 #include <functional>
 #include <vector>
 
@@ -82,6 +83,17 @@ void removeFloater (juce::Component& c);
 // A floater or an overlay with an attached sibling above it that is neither: raiseOverlays (Windows; a cheap walk of
 // the siblings above each one). Elsewhere: nothing (raiseOverlays already runs on every stacking change).
 void keepFloatersInFront();
+// Round 190kr (QA-11): `c`'s native window is a child window (a docked panel: the Playlist, Piano roll, Mixer...) that
+// lies wholly under visible, opaque sibling windows above it, or under its parent's edges (and the same for each parent
+// child window): nothing it paints or composes reaches the screen. The Playlist behind Thief's maximised Channel rack.
+// A top-level window, a component without a native window of its own, and every platform but Windows: false.
+// Cheap (a walk of the siblings above it: a few user32 calls). LYNX_COVERCHECK=0: always false (A/B).
+bool coveredBySiblingWindows (const juce::Component& c);
+// `c` shows on screen: isShowing() (or an off-screen picture route, ui/ShotShowing.h) and not covered as above. The live
+// views' frame steps run only then (ui/FrameTicker.h).
+bool showsOnScreen (const juce::Component& c);
+// diagnostics (--uiperf): steps the frame tickers left out because their view was covered
+std::atomic<int>& coveredSkips();
 // The attached children of a native window (the main window's handle), from the bottom of their stacking order up.
 std::vector<juce::Component*> attachedChildren (void* parentWindow);
 
