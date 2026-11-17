@@ -4000,11 +4000,17 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
                 audible = ! trackZeros (track) && anyAbove (l, r, n, silenceLevel) ? 1 : 0;
 
             // round 190gp: a built-in whose declared tail is shorter than the hold is taken out once it has settled
-            const auto tail = plan.tailHold && declaredTails() ? effects[i]->tailSamples() : -1;
+            // (round 190kr: asked only when it can decide: past the hold the slot is out whatever its tail, and an audible
+            // input keeps it on. silent ≥ min (hold, t) ⇔ silent ≥ hold or silent ≥ t; the call was a cache miss on the
+            // effect object of every waiting slot at every block)
+            auto pastTail = [&] {
+                const auto tail = plan.tailHold && declaredTails() ? effects[i]->tailSamples() : -1;
+                return tail >= 0 && sd.silentSamples >= std::max (tail, 1);
+            };
             if (audible == 1)
                 sd.silentSamples = 0;
             // (at least one silent block runs: its output is measured, and one the effect makes audible keeps it on)
-            else if (sd.silentSamples >= (tail >= 0 ? std::min (hold, std::max (tail, 1)) : hold))
+            else if (sd.silentSamples >= hold || pastTail())
             {
                 if (plan.liveMeters)
                     clearMeters();
