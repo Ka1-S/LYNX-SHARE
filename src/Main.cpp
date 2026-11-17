@@ -27096,7 +27096,8 @@ private:
             ui.getPlaylistForSnapshot().addAudioClipAtPlayhead (wav);
             settle();
             int audioChannel = -1;
-            offline.editSong ([&audioChannel] (lynx::Song& s) {
+            const auto selectedChannel = offline.getSelectedChannel();
+            offline.editSong ([&audioChannel, selectedChannel] (lynx::Song& s) {
                 lynx::Clip audio;
                 if (! s.playlist.empty())
                 {
@@ -27198,16 +27199,17 @@ private:
                     }
                     pattern.lengthTicks = 4 * lynx::ppq;
                 }
-                // a "Lead" clip on the FX track for the Clip View's MIDI shot: notes of the first channel (the rack's selected
-                // one, which the docked Piano roll shows) in the Piano roll's opening rows
+                // a "Lead" clip on the FX track for the Clip View's MIDI shot: notes of the rack's selected channel (the docked
+                // Piano roll edits its notes) in the Piano roll's opening rows
                 {
+                    const auto kick = juce::jlimit (0, channels - 1, selectedChannel); // (the docked Piano roll edits the selected channel's notes)
                     lynx::Pattern lead;
                     lead.name = "Lead";
                     for (int k = 0; k < 6; ++k)
                     {
                         lynx::Note n;
-                        n.channel = 0;
-                        n.key = 86 + (k * 5) % 12;
+                        n.channel = kick;
+                        n.key = 79 + (k * 5) % 6; // (G6 .. C7 in FL's names, C5 = 60: the rows the docked Piano roll opens on)
                         n.start = (std::int64_t) k * lynx::ppq / 2;
                         n.length = lynx::ppq / 2;
                         n.velocity = 0.55f + 0.07f * (float) k;
