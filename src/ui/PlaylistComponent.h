@@ -650,6 +650,12 @@ private:
     juce::Colour liveClipColour (const Clip& clip) const;
     theme::ClipLook liveClipLook (const Clip& clip) const;
     void paintLiveGrid (juce::Graphics& g, juce::Rectangle<int> grid) const;
+    // Round 190jn (the coordinator's follow-up): Live's lane backgrounds, grid and separators from one cached image, made
+    // again only when the view's size, scroll, zoom, rows or bars change (false: draw them straight). LYNX_LIVEGRID_CACHE=0
+    // turns it off (A/B checks).
+    bool paintLiveLanesCached (juce::Graphics& g, juce::Rectangle<int> grid, int rows);
+    juce::Image liveLaneImage;
+    std::uint64_t liveLaneKey = 0;
     juce::Rectangle<float> paintLiveClipFrame (juce::Graphics& g, juce::Rectangle<float> r, const theme::ClipLook& look, const juce::String& name) const;
     // Live's grid lines from x0 to x1: level 0 = a bar group's first bar, 1 = a bar, 2 = a beat; `group` = the group's parity
     template <typename Line>

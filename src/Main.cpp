@@ -27171,7 +27171,7 @@ private:
                 s.mixer[4].inputChannel = 0;
                 s.mixer[4].inputStereo = true;
                 s.mixer[4].monitor = lynx::InputMonitor::automatic;
-                s.mixer[5].solo = true;
+                s.mixer[5].solo = false; // (soloed later: Live greys every activator while a track is soloed)
                 for (auto [from, to, level] : std::initializer_list<std::tuple<int, int, float>> { { 1, 6, 0.35f }, { 2, 6, 0.6f }, { 3, 6, 0.8f }, { 2, 7, 0.25f }, { 4, 7, 0.5f } })
                 {
                     lynx::MixerSend send;
@@ -27310,6 +27310,13 @@ private:
             gridView->resized();
             meters();
             area (*gridView, mixer->getBoundsInParent(), "13-mixer-io-off");
+            // a track soloed: Live greys every active activator (#757575, captured in shots/ref/live-mixer-solo-deactivated.png)
+            offline.editSong ([] (lynx::Song& s) { s.mixer[5].solo = true; }, false);
+            settle();
+            meters();
+            area (*gridView, mixer->getBoundsInParent(), "13-mixer-soloing");
+            offline.editSong ([] (lynx::Song& s) { s.mixer[5].solo = false; }, false);
+            settle();
             offline.editSong ([] (lynx::Song& s) { lynx::launcher::ensureGrid (s).mixerView.io = true; }, false);
             settle();
             gridView->resized();
@@ -27490,6 +27497,24 @@ private:
                 line ("set: Drums track colour #" + juce::String::toHexString ((int) (song.playlistTracks[(std::size_t) drums].colour & 0xffffff)).paddedLeft ('0', 6));
             check ("set: the Drums track has Live's colour #9BC48D (CL-6)", drums >= 0 && (song.playlistTracks[(std::size_t) drums].colour & 0xffffff) == 0x9bc48d);
             write (ui, "18-als-arrangement-19");
+            // the set's Session mixer (the coordinator's 190jn follow-up: every Patience track has its strip)
+            ui.setClipGridView (lynx::PlaylistArea::GridView::grid);
+            settle();
+            ui.resized();
+            settle();
+            if (auto* gridView = ui.getClipGridForSnapshot())
+                if (auto* mixer = lynx::clipGridMixer (*gridView))
+                {
+                    int strips = 0;
+                    for (int t = 0; t < 64; ++t)
+                        strips += mixer->partBounds (t, lynx::SessionMixerComponent::Part::volume).isEmpty() ? 0 : 1;
+                    line ("set: Session mixer strips with a volume: " + juce::String (strips) + ", mixer " + mixer->getBounds().toString()
+                          + ", grid " + gridView->getBounds().toString());
+                    write (ui, "13-als-window");
+                    area (*gridView, mixer->getBoundsInParent(), "13-als-mixer");
+                }
+            ui.setClipGridView (lynx::PlaylistArea::GridView::song);
+            settle();
             write (ui.getPlaylistForSnapshot(), "18-als-playlist-19");
             lynx::playlistTallLiveLanes() = true;
             ui.getPlaylistForSnapshot().liveLanesChanged();

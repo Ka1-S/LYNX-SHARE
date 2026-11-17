@@ -1,3 +1,4 @@
+#include <cstring>
 #include "core/FlCurve.h"
 #include "core/DrawMode.h"
 #include "core/LayoutStyle.h"
@@ -1840,7 +1841,8 @@ void PlaylistComponent::paint (juce::Graphics& g)
         const auto rows = this->paintedRows(); // (round 190jc, SG-2: the Simple layout's real tracks and its drop lane only)
         // round 190jn (CL-17): Live's lanes — the bar groups' shading and grid over the whole grid, a 2 px separator under each lane
         const auto live = liveArrangeLook();
-        if (live)
+        const auto liveLanesCached = live && paintLiveLanesCached (g, grid, rows);
+        if (live && ! liveLanesCached)
             paintLiveGrid (g, grid);
 
         for (int t = 0; t < rows; ++t)
@@ -1855,8 +1857,11 @@ void PlaylistComponent::paint (juce::Graphics& g)
 
             if (live)
             {
-                g.setColour (liveLaneSeparator);
-                g.fillRect (grid.getX(), y + trackHeight - 2, grid.getWidth(), 2);
+                if (! liveLanesCached) // (the cached image holds them)
+                {
+                    g.setColour (liveLaneSeparator);
+                    g.fillRect (grid.getX(), y + trackHeight - 2, grid.getWidth(), 2);
+                }
             }
             else
             {
@@ -7074,18 +7079,69 @@ void PlaylistComponent::paintLiveGrid (juce::Graphics& g, juce::Rectangle<int> g
     });
 }
 
+bool PlaylistComponent::paintLiveLanesCached (juce::Graphics& g, juce::Rectangle<int> grid, int rows)
+{
+    static const bool enabled = juce::SystemStats::getEnvironmentVariable ("LYNX_LIVEGRID_CACHE", "1") != "0";
+    if (! enabled || grid.isEmpty())
+        return false;
+    // whole physical pixels only (1x, 2x): the image then maps 1:1 onto the screen's pixels, the same pixels as drawn straight
+    const auto physical = g.getInternalContext().getPhysicalPixelScaleFactor();
+    const auto scale = std::round (physical);
+    if (scale < 1.0f || scale > 2.0f || std::abs (physical - scale) > 1.0e-4f)
+        return false;
+    const auto mix = [] (std::uint64_t h, std::uint64_t v) { return (h ^ v) * 0x100000001b3ull; };
+    const auto bits = [] (double v) {
+        std::uint64_t u = 0;
+        std::memcpy (&u, &v, sizeof u);
+        return u;
+    };
+    auto key = mix (mix (mix (mix (0xcbf29ce484222325ull, (std::uint64_t) grid.getX()), (std::uint64_t) grid.getY()), (std::uint64_t) grid.getWidth()),
+                    (std::uint64_t) grid.getHeight());
+    key = mix (mix (mix (key, (std::uint64_t) scale), bits (tickToX (0.0))), bits (tickToX ((double) ppq * 4096.0)));
+    const auto& song = engine.getSong();
+    const auto from = juce::jmax ((std::int64_t) 0, (std::int64_t) xToTick (grid.getX()) - song.barTicks());
+    const auto to = (std::int64_t) xToTick (grid.getRight()) + 1;
+    for (const auto& b : song.barsBetween (from, to)) // (the bars' places and lengths: a time signature change moves the grid)
+        key = mix (mix (key, (std::uint64_t) b.tick), (std::uint64_t) b.length);
+    for (int t = 0; t < rows; ++t)
+        if (const auto y = trackToY (t), h = heightOf (t); y <= grid.getBottom() && y + h >= grid.getY())
+            key = mix (mix (key, (std::uint64_t) (std::int64_t) y), (std::uint64_t) h);
+    const auto w = (int) scale * grid.getWidth(), h = (int) scale * grid.getHeight();
+    if (key != liveLaneKey || liveLaneImage.getWidth() != w || liveLaneImage.getHeight() != h)
+    {
+        if (liveLaneImage.getWidth() != w || liveLaneImage.getHeight() != h)
+            liveLaneImage = juce::Image (juce::Image::ARGB, w, h, false, juce::NativeImageType());
+        juce::Graphics ig (liveLaneImage);
+        ig.addTransform (juce::AffineTransform::translation ((float) -grid.getX(), (float) -grid.getY()).scaled (scale));
+        paintLiveGrid (ig, grid);
+        ig.setColour (liveLaneSeparator);
+        for (int t = 0; t < rows; ++t)
+            if (const auto y = trackToY (t), th = heightOf (t); y <= grid.getBottom() && y + th >= grid.getY())
+                ig.fillRect (grid.getX(), y + th - 2, grid.getWidth(), 2);
+        liveLaneKey = key;
+    }
+    if (scale == 1.0f)
+        g.drawImageAt (liveLaneImage, grid.getX(), grid.getY());
+    else
+        g.drawImage (liveLaneImage, grid.toFloat(), juce::RectanglePlacement::stretchToFit);
+    return true;
+}
+
 juce::Rectangle<float> PlaylistComponent::paintLiveClipFrame (juce::Graphics& g, juce::Rectangle<float> r, const theme::ClipLook& look,
                                                               const juce::String& name) const
 {
     const uitrace::Part tally (uitrace::part::frame);
     const auto rim = theme::liveShade (look.body, 0.53f);
-    g.setColour (look.body);
-    g.fillRect (r);
-    g.setColour (rim);
-    g.fillRect (r.withHeight (1.0f));
-    g.fillRect (r.withWidth (1.0f));
     const auto strip = (float) liveStripHeight;
-    g.fillRect (r.getX(), r.getY() + juce::jmin (strip, r.getHeight()) - 1.0f, r.getWidth(), 1.0f);
+    // (the rim colour under the whole clip, the body over the strip's inside and over the rest right of the left rim: two
+    // rectangles on a collapsed lane, three on a taller one, instead of four)
+    const auto stripRect = r.withHeight (juce::jmin (strip, r.getHeight()));
+    g.setColour (rim);
+    g.fillRect (r);
+    g.setColour (look.body);
+    g.fillRect (stripRect.withTrimmedLeft (1.0f).withTrimmedTop (1.0f).withTrimmedBottom (1.0f));
+    if (r.getHeight() > strip)
+        g.fillRect (r.withTrimmedTop (strip).withTrimmedLeft (1.0f));
 
     juce::Rectangle<float> body;
     if (r.getHeight() >= strip + 4.0f)
