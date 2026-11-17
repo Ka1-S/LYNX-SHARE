@@ -30,6 +30,7 @@
 #include "core/WarpTools.h"
 #include "core/WarpView.h"
 #include "core/ClipLauncher.h"
+#include "core/ClipBrace.h"
 #include "engine/SampleLibrary.h"
 #include "engine/Text.h"
 #include "platform/Paths.h"
@@ -752,6 +753,24 @@ public:
         return c != nullptr && c->sampler.keepPitch && c->sampler.warp.size() >= 2 ? c->sampler.warp : std::vector<WarpPoint> {};
     }
     void setWarpModeForPanel (bool on) { setWarpMode (on); }
+    void selectBraceForSnapshot (bool selected)
+    {
+        braceSelected = selected;
+        repaint();
+    }
+    void holdBraceForSnapshot (int part, std::int64_t tick)
+    {
+        const ClipGridSlot* slot = nullptr;
+        const auto* c = gridClip (&slot);
+        braceHeld = part > 0 && c != nullptr;
+        if (! braceHeld)
+            return;
+        auto clip = *c;
+        auto s = *slot;
+        clipbrace::move (clip, s, (clipbrace::Part) juce::jlimit (0, 5, part), tick, braceGridTicks());
+        braceShown = clipbrace::of (clip, s);
+        repaint();
+    }
     // --warpshot (round 190cy): ÷2 / ×2 as the buttons do it; a marker held in the middle of a drag
     void scaleWarpTempoForSnapshot (double factor) { scaleWarpTempo (factor); }
     void holdWarpDragForSnapshot (int index, double beatOrSeconds, bool slides)
@@ -779,6 +798,9 @@ public:
     {
         source.gridTrack = track;
         source.gridScene = scene;
+        resized(); // (round gaps190kf: the loop brace lane)
+        syncAxis();
+        repaint();
     }
     void setWarpMode (bool on)
     {
@@ -865,13 +887,22 @@ public:
     bool syncAxis()
     {
         warpview::BeatAxis next;
-        if (warpMode && beatTimeChosen() && ! doc.audio.empty() && doc.audio.sampleRate > 0.0)
+        if (rulerBelow != clipRulerBelow())
+            resized();
+        if (warpMode && beatTimeChosen() && ! doc.audio.empty() && doc.audio.sampleRate > 0.0 && ! rulerBelow)
         {
             if (warpDragHeld() && dragAxis.valid())
                 next = warpview::withScaleOf (dragAxis, warpDragSlides ? warpview::slidePreview (warpDragBefore, warpDrag, warpDragSeconds)
                                                                        : warpview::stretchPreview (warpDragBefore, warpDrag, warpDragBeat));
             else if (const auto markers = warpMarkers(); markers.size() >= 2)
                 next = warpview::makeAxis (markers, (double) doc.audio.frames(), doc.audio.sampleRate);
+            // round gaps190kf: a warped clip with no markers of its own still has Live's beat-time ruler in the Clip View
+            // (its file spans its beats at one tempo)
+            else if (gridClipShown())
+                if (const auto* c = warpChannel(); c != nullptr && c->sampler.stretchBeats > 0.0f)
+                    if (const auto seconds = (double) doc.audio.frames() / doc.audio.sampleRate; seconds > 0.0)
+                        next = warpview::makeAxis ({ { 0.0, 0.0 }, { seconds, (double) c->sampler.stretchBeats } }, (double) doc.audio.frames(),
+                                                   doc.audio.sampleRate);
         }
         if (next.valid() == axis.valid() && (! next.valid() || (next.markers == axis.markers && next.beat0 == axis.beat0 && next.unitsPerBeat == axis.unitsPerBeat && next.frames == axis.frames)))
             return false;
@@ -1464,8 +1495,13 @@ public:
         area.removeFromBottom (2);
         area = area.reduced (6, 0);
         levelArea = area.removeFromLeft (34);
-        rulerArea = area.removeFromTop (24);
+        // round gaps190kf: an unwarped clip's Clip View has its time ruler (seconds) under the waveform, as Live's [LIVE 12.4
+        // gaps190kf/raw/c13-unwarped.png: no beat ruler on top, "0:00 0:00:500 0:01 …" along the bottom]
+        rulerBelow = clipRulerBelow();
+        rulerArea = rulerBelow ? area.removeFromBottom (24) : area.removeFromTop (24);
         rulerArea.setX (area.getX());
+        // round gaps190kf: Live's loop brace and Start / End markers under the ruler (the Clip View of a grid clip)
+        clipLane = gridClipShown() ? area.removeFromTop (braceLaneHeight) : juce::Rectangle<int>();
         warpLane = warpMode ? area.removeFromTop (18) : juce::Rectangle<int>();
         waveArea = area;
         clampView();
@@ -1483,12 +1519,14 @@ public:
         g.drawHorizontalLine (36, 0.0f, (float) getWidth());
 
         paintRuler (g);
+        paintClipLane (g);
         paintLevels (g);
         if (spectrumView)
             paintSpectrum (g);
         else
             paintWave (g);
         paintOverlays (g);
+        paintBraceLines (g);
         if (warpMode)
             paintWarpLane (g);
         paintOverview (g);
@@ -1515,6 +1553,13 @@ public:
             warpMouseDown (e);
             return;
         }
+        if (clipLane.contains (pos))
+        {
+            braceMouseDown (e);
+            return;
+        }
+        if (std::exchange (braceSelected, false))
+            repaint (clipLane);
 
         if (overviewArea.contains (pos))
         {
@@ -1596,6 +1641,11 @@ public:
             warpMouseDrag (e);
             return;
         }
+        if (drag == Drag::brace)
+        {
+            braceMouseDrag (e);
+            return;
+        }
         if (drag == Drag::none)
             return;
 
@@ -1633,6 +1683,11 @@ public:
             warpMouseUp();
             return;
         }
+        if (drag == Drag::brace)
+        {
+            braceMouseUp();
+            return;
+        }
         if (drag == Drag::envPoint || drag == Drag::envBend)
         {
             drag = Drag::none;
@@ -1662,6 +1717,16 @@ public:
         const auto hover = warpMode && ! doc.audio.empty() && warpLane.contains (e.getPosition()) ? warpAttackAtX (e.x) : -1;
         if (std::exchange (warpHover, hover) != hover)
             repaint (warpLane.getUnion (waveArea));
+        // round gaps190kf: the brace's ends and the markers resize, the brace's body moves
+        if (clipLane.contains (e.getPosition()))
+        {
+            const auto part = bracePartAt (e.getPosition());
+            setMouseCursor (part == clipbrace::Part::loopBody ? juce::MouseCursor::DraggingHandCursor
+                            : part != clipbrace::Part::none   ? juce::MouseCursor::LeftRightResizeCursor
+                                                              : juce::MouseCursor::NormalCursor);
+        }
+        else if (getMouseCursor() != juce::MouseCursor::NormalCursor && ! clipLane.isEmpty())
+            setMouseCursor (juce::MouseCursor::NormalCursor);
     }
     void mouseExit (const juce::MouseEvent&) override
     {
@@ -1726,6 +1791,15 @@ public:
         if (warpMode && warpSelected > 0 && (code == juce::KeyPress::deleteKey || code == juce::KeyPress::backspaceKey))
         {
             removeWarpMarker (warpSelected);
+            return true;
+        }
+        // round gaps190kf (Live 8.9): a selected loop brace — Left / Right nudge it a grid step, Up / Down by its length
+        if (braceSelected && ! ctrl && ! shift
+            && (code == juce::KeyPress::leftKey || code == juce::KeyPress::rightKey || code == juce::KeyPress::upKey || code == juce::KeyPress::downKey))
+        {
+            const auto byLength = code == juce::KeyPress::upKey || code == juce::KeyPress::downKey;
+            const auto steps = code == juce::KeyPress::rightKey || code == juce::KeyPress::upKey ? 1 : -1;
+            editGridClip ([grid = braceGridTicks(), byLength, steps] (Clip& c, ClipGridSlot& slot) { return clipbrace::nudge (c, slot, grid, steps, byLength); });
             return true;
         }
         // round 190cg: Live's Insert Warp Markers and Quantize on a channel's audio
@@ -1927,7 +2001,8 @@ private:
         loopEnd,
         overview,
         envPoint,
-        envBend
+        envBend,
+        brace // round gaps190kf: the Clip View's loop brace / Start / End markers
     };
     enum class RecState
     {
@@ -2519,10 +2594,14 @@ private:
             if (x < (float) rulerArea.getX())
                 continue;
             g.setColour (colour::gridBar);
-            g.drawVerticalLine ((int) x, (float) rulerArea.getBottom() - 7.0f, (float) rulerArea.getBottom());
+            // (round gaps190kf: under the waveform the ticks hang from its top and the labels sit below them, as Live's)
+            if (rulerBelow)
+                g.drawVerticalLine ((int) x, (float) rulerArea.getY(), (float) rulerArea.getY() + 7.0f);
+            else
+                g.drawVerticalLine ((int) x, (float) rulerArea.getBottom() - 7.0f, (float) rulerArea.getBottom());
             g.setColour (colour::textSecondary);
-            g.drawText (formatTime ((std::int64_t) std::llround (t * rate)), juce::Rectangle<float> (x + 3.0f, (float) rulerArea.getY(), 90.0f, 13.0f),
-                        juce::Justification::centredLeft);
+            g.drawText (formatTime ((std::int64_t) std::llround (t * rate)),
+                        juce::Rectangle<float> (x + 3.0f, (float) rulerArea.getY() + (rulerBelow ? 9.0f : 0.0f), 90.0f, 13.0f), juce::Justification::centredLeft);
         }
     }
 
@@ -4352,6 +4431,231 @@ private:
         }
     }
 
+    // --- round gaps190kf: the Clip View's warp time line (Live's loop brace and Start / End markers, core/ClipBrace.h) ---
+    // Under the beat-time ruler (time in seconds for an unwarped clip) the grid clip's loop brace and its markers are drawn
+    // and dragged in content ticks; they snap to the ruler's grid (Alt: no snap, as Live's Alt / Cmd) and are written to
+    // the clip when the drag ends (one undo step), so the Clip panel's Start / End / Position / Length follow.
+    bool gridClipShown() const noexcept { return source.kind == Source::Kind::channel && source.gridTrack >= 0 && source.gridScene >= 0; }
+    bool clipRulerBelow() const
+    {
+        const auto* c = gridClipShown() ? warpChannel() : nullptr;
+        return c != nullptr && c->sampler.stretchBeats <= 0.0f;
+    }
+    const Clip* gridClip (const ClipGridSlot** slot = nullptr) const
+    {
+        const auto& song = engine.getSong();
+        const auto* c = song.clipGrid ? launcher::clipAt (*song.clipGrid, source.gridTrack, source.gridScene) : nullptr;
+        if (c == nullptr || c->kind != ClipKind::audio || ! juce::isPositiveAndBelow ((int) c->gridSlot, (int) song.clipGrid->slots.size()))
+            return nullptr;
+        if (slot != nullptr)
+            *slot = &song.clipGrid->slots[(std::size_t) c->gridSlot];
+        return c;
+    }
+    template <class Fn>
+    void editGridClip (Fn&& fn)
+    {
+        auto changed = false;
+        engine.editSong ([&] (Song& s) {
+            if (! s.clipGrid)
+                return;
+            if (auto* c = const_cast<Clip*> (launcher::clipAt (*s.clipGrid, source.gridTrack, source.gridScene));
+                c != nullptr && c->kind == ClipKind::audio && juce::isPositiveAndBelow ((int) c->gridSlot, (int) s.clipGrid->slots.size()))
+                changed = fn (*c, s.clipGrid->slots[(std::size_t) c->gridSlot]);
+        });
+        if (changed)
+            repaint();
+    }
+    // content tick <-> file frame / view x: through the warp axis (beats), else the warped length, else the song tempo
+    double braceFrameOfTick (double tick) const
+    {
+        if (axis.valid())
+            return axis.frameOfBeat (tick / (double) ppq);
+        if (const auto* c = warpChannel(); c != nullptr && c->sampler.stretchBeats > 0.0f)
+            return tick / (double) ppq / (double) c->sampler.stretchBeats * (double) doc.audio.frames();
+        return tick / (double) ppq * 60.0 / juce::jmax (1.0, engine.getSong().bpm) * doc.audio.sampleRate;
+    }
+    float braceTickToX (double tick) const
+    {
+        const auto unit = axis.valid() ? axis.unitOfBeat (tick / (double) ppq) : braceFrameOfTick (tick);
+        return (float) waveArea.getX() + (float) ((unit - viewStart) / fpp);
+    }
+    double braceXToTick (int x) const
+    {
+        const auto unit = viewStart + (double) (x - waveArea.getX()) * fpp;
+        if (axis.valid())
+            return axis.beatOfUnit (unit) * (double) ppq;
+        if (const auto* c = warpChannel(); c != nullptr && c->sampler.stretchBeats > 0.0f && doc.audio.frames() > 0)
+            return unit / (double) doc.audio.frames() * (double) c->sampler.stretchBeats * (double) ppq;
+        return unit / juce::jmax (1.0, doc.audio.sampleRate) * juce::jmax (1.0, engine.getSong().bpm) / 60.0 * (double) ppq;
+    }
+    // the ruler's grid in ticks (the step snapToGrid uses): beats in the beat-time view, the time ruler's step otherwise
+    std::int64_t braceGridTicks() const
+    {
+        if (doc.audio.empty())
+            return ppq;
+        if (axis.valid())
+        {
+            const auto perBar = juce::jmax (1, (int) std::lround ((double) engine.getSong().barTicks() / ppq));
+            const auto pixelsPerBeat = axis.unitsPerBeat / fpp;
+            const auto step = warpview::rulerStep (pixelsPerBeat, perBar);
+            const auto tick = step <= 1.0 ? 0.25 : (step <= perBar ? 1.0 : (double) perBar);
+            return juce::jmax<std::int64_t> (1, (std::int64_t) std::llround ((tick * pixelsPerBeat >= 6.0 ? tick : step) * ppq));
+        }
+        return juce::jmax<std::int64_t> (1, (std::int64_t) std::llround (timeRulerStep() * juce::jmax (1.0, engine.getSong().bpm) / 60.0 * ppq));
+    }
+    clipbrace::Marks braceMarks() const
+    {
+        if (braceHeld)
+            return braceShown;
+        const ClipGridSlot* slot = nullptr;
+        const auto* c = gridClip (&slot);
+        return c != nullptr ? clipbrace::of (*c, *slot) : clipbrace::Marks {};
+    }
+    clipbrace::Part bracePartAt (juce::Point<int> p) const
+    {
+        const ClipGridSlot* slot = nullptr;
+        if (clipLane.isEmpty() || doc.audio.empty() || gridClip (&slot) == nullptr)
+            return clipbrace::Part::none;
+        const auto m = braceMarks();
+        const auto xa = braceTickToX ((double) m.loopStart), xb = braceTickToX ((double) m.loopEnd);
+        const auto near = [&p] (float x) { return std::abs ((float) p.x - x) <= 5.0f; };
+        if (p.y >= clipLane.getY() + braceLaneHeight / 2)
+        {
+            // (the Start marker is drawn to the right of its place, the End marker to the left)
+            if (const auto xs = braceTickToX ((double) m.start); (float) p.x >= xs - 2.0f && (float) p.x <= xs + 7.0f)
+                return clipbrace::Part::start;
+            if (! m.loop)
+                if (const auto xe = braceTickToX ((double) m.end); (float) p.x >= xe - 7.0f && (float) p.x <= xe + 2.0f)
+                    return clipbrace::Part::end;
+            return clipbrace::Part::none;
+        }
+        if (near (xa))
+            return clipbrace::Part::loopStart;
+        if (near (xb))
+            return clipbrace::Part::loopEnd;
+        return (float) p.x > xa && (float) p.x < xb ? clipbrace::Part::loopBody : clipbrace::Part::none;
+    }
+    void paintClipLane (juce::Graphics& g)
+    {
+        using namespace theme;
+        if (clipLane.isEmpty())
+            return;
+        g.setColour (colour::bg1);
+        g.fillRect (clipLane);
+        if (doc.audio.empty() || gridClip() == nullptr)
+            return;
+        const juce::Graphics::ScopedSaveState save (g);
+        g.reduceClipRegion (clipLane.withX (waveArea.getX()).withRight (waveArea.getRight()));
+        const auto m = braceMarks();
+        const auto top = (float) clipLane.getY(), mid = top + (float) (braceLaneHeight / 2);
+        const auto xa = braceTickToX ((double) m.loopStart), xb = braceTickToX ((double) m.loopEnd);
+        // the loop brace [LIVE: a 1 px frame over the loop's span, a ">" inside its start and a "<" inside its end; brighter
+        // while Loop is on]; selected (its keys act) in the accent colour
+        // [LIVE 12.4 gaps190kf/raw/c3, c7, c8, c12: Loop on = a teal bar (#00bfaf) between 1 px grey lines (#919191) over the
+        // loop, a grey ">" in its start and "<" in its end; selected (its arrow keys act) light blue (#b0ddeb); Loop off = the
+        // grey frame alone]
+        const auto box = juce::Rectangle<float>::leftTopRightBottom (std::floor (xa), top + 1.0f, std::floor (xb) + 1.0f, mid);
+        if (m.loop || braceSelected)
+        {
+            g.setColour (braceSelected ? livelook::selectionFocused : livelook::clipMarker);
+            g.fillRect (box);
+            g.setColour (livelook::braceOff);
+            g.fillRect (box.withHeight (1.0f));
+            g.fillRect (box.withTop (box.getBottom() - 1.0f));
+        }
+        else
+        {
+            g.setColour (livelook::braceOff);
+            g.drawRect (box, 1.0f);
+        }
+        g.setColour (m.loop || braceSelected ? livelook::braceOn : livelook::braceOff);
+        const auto cy = (box.getY() + box.getBottom()) * 0.5f;
+        juce::Path chevrons;
+        chevrons.startNewSubPath (box.getX() + 2.5f, cy - 3.0f);
+        chevrons.lineTo (box.getX() + 5.5f, cy);
+        chevrons.lineTo (box.getX() + 2.5f, cy + 3.0f);
+        chevrons.startNewSubPath (box.getRight() - 2.5f, cy - 3.0f);
+        chevrons.lineTo (box.getRight() - 5.5f, cy);
+        chevrons.lineTo (box.getRight() - 2.5f, cy + 3.0f);
+        g.strokePath (chevrons, juce::PathStrokeType (1.2f));
+        // the Start marker (right of its place) and, with Loop off, the End marker (left of its place): grey while the loop
+        // brace is on (the brace carries the colour), teal with Loop off
+        g.setColour (m.loop ? livelook::braceOn : livelook::clipMarker);
+        const auto xs = std::floor (braceTickToX ((double) m.start)) + 0.5f;
+        juce::Path marks;
+        marks.addTriangle (xs, mid + 2.0f, xs + 5.0f, mid + 5.5f, xs, mid + 9.0f);
+        if (! m.loop)
+        {
+            const auto xe = std::floor (braceTickToX ((double) m.end)) + 0.5f;
+            marks.addTriangle (xe, mid + 2.0f, xe - 5.0f, mid + 5.5f, xe, mid + 9.0f);
+        }
+        g.fillPath (marks);
+    }
+    // the markers' lines down the waveform, and the played span a shade lighter [LIVE gaps190kf/raw/c3: 1 px grey lines at
+    // the loop's ends and the Start marker; the loop (Loop off: Start…End) lighter, #3e3e3e over #393939]
+    void paintBraceLines (juce::Graphics& g)
+    {
+        using namespace theme;
+        if (clipLane.isEmpty() || doc.audio.empty() || gridClip() == nullptr)
+            return;
+        const juce::Graphics::ScopedSaveState save (g);
+        g.reduceClipRegion (waveArea);
+        const auto m = braceMarks();
+        const auto xa = std::floor (braceTickToX ((double) m.loopStart)), xb = std::floor (braceTickToX ((double) m.loopEnd));
+        g.setColour (juce::Colours::white.withAlpha (0.025f));
+        g.fillRect (juce::Rectangle<float>::leftTopRightBottom (xa, (float) waveArea.getY(), xb, (float) waveArea.getBottom()));
+        g.setColour (livelook::braceOff);
+        for (const auto x : { xa, xb, std::floor (braceTickToX ((double) m.start)) })
+            g.drawVerticalLine ((int) x, (float) waveArea.getY(), (float) waveArea.getBottom());
+    }
+    void braceMouseDown (const juce::MouseEvent& e)
+    {
+        syncAxis();
+        const ClipGridSlot* slot = nullptr;
+        const auto* c = gridClip (&slot);
+        const auto part = bracePartAt (e.getPosition());
+        braceSelected = part == clipbrace::Part::loopStart || part == clipbrace::Part::loopEnd || part == clipbrace::Part::loopBody;
+        repaint (clipLane);
+        if (c == nullptr || part == clipbrace::Part::none)
+            return;
+        bracePart = part;
+        braceShown = clipbrace::of (*c, *slot);
+        braceGrab = braceXToTick (e.x) - (double) braceShown.loopStart;
+        braceHeld = true;
+        drag = Drag::brace;
+    }
+    std::int64_t braceTickFor (const juce::MouseEvent& e) const
+    {
+        const auto raw = braceXToTick (e.x) - (bracePart == clipbrace::Part::loopBody ? braceGrab : 0.0);
+        return e.mods.isAltDown() ? (std::int64_t) std::llround (raw) : clipbrace::snap (raw, braceGridTicks());
+    }
+    void braceMouseDrag (const juce::MouseEvent& e)
+    {
+        const ClipGridSlot* slot = nullptr;
+        const auto* c = gridClip (&slot);
+        if (c == nullptr)
+            return;
+        auto clip = *c;
+        auto s = *slot;
+        braceTick = braceTickFor (e);
+        braceMin = e.mods.isAltDown() ? 1 : braceGridTicks();
+        clipbrace::move (clip, s, bracePart, braceTick, braceMin);
+        braceShown = clipbrace::of (clip, s);
+        braceMoved = true;
+        repaint (clipLane);
+    }
+    void braceMouseUp()
+    {
+        drag = Drag::none;
+        braceHeld = false;
+        if (std::exchange (braceMoved, false))
+            editGridClip ([part = bracePart, tick = braceTick, minLength = braceMin] (Clip& c, ClipGridSlot& slot) {
+                return clipbrace::move (c, slot, part, tick, minLength);
+            });
+        bracePart = clipbrace::Part::none;
+        repaint (clipLane);
+    }
+
     // Round 190im (R13, DL-73; Live's manual 8.7): opened in the Clip View for a clip of the grid, the editor shows
     // where that clip plays while it is launched — its content position (launcher clock − the clip's anchor, wrapped
     // at its length, from its start offset) on the sample: through the warp axis for a warped clip, at the song's
@@ -4988,6 +5292,16 @@ private:
     juce::TextButton warpButton, autoWarpButton;
     bool warpMode = false;
     juce::Rectangle<int> warpLane;
+    // round gaps190kf: Live's loop brace (top half) and Start / End markers (bottom half) of the Clip View's grid clip
+    static constexpr int braceLaneHeight = 20;
+    bool rulerBelow = false; // the Clip View of an unwarped clip: the time ruler under the waveform (Live)
+    juce::Rectangle<int> clipLane;
+    clipbrace::Part bracePart = clipbrace::Part::none; // what the held drag moves
+    clipbrace::Marks braceShown;                       // the marks drawn (the held drag's preview, else the clip's)
+    bool braceHeld = false, braceSelected = false;
+    double braceGrab = 0.0;                            // a body drag: the pointer's tick minus the brace's start
+    std::int64_t braceTick = 0, braceMin = 1;          // where the held drag puts its part, the shortest loop
+    bool braceMoved = false;
     int warpDrag = -1, warpSelected = -1;   // marker index (in the channel's markers)
     double warpDragSeconds = 0.0;           // where the dragged marker goes (applied on release)
     // round 190cy: Shift + drag slides the audio under the marker; a plain drag takes it to `warpDragBeat` (the beat of
@@ -5470,6 +5784,18 @@ void setAudioEditorGridClip (juce::Component& panel, int track, int scene)
 {
     if (auto* editor = dynamic_cast<AudioEditor*> (&panel))
         editor->setGridClip (track, scene);
+}
+
+void selectAudioEditorBraceForSnapshot (juce::Component& panel, bool selected)
+{
+    if (auto* editor = dynamic_cast<AudioEditor*> (&panel))
+        editor->selectBraceForSnapshot (selected);
+}
+
+void holdAudioEditorBraceForSnapshot (juce::Component& panel, int part, std::int64_t tick)
+{
+    if (auto* editor = dynamic_cast<AudioEditor*> (&panel))
+        editor->holdBraceForSnapshot (part, tick);
 }
 
 void openAudioEditorRecording (AudioEngine& engine)

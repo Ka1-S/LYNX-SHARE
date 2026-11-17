@@ -8,6 +8,7 @@
 // loop kept) and sending the result to the Playlist as an audio clip, to a new Sampler channel or back to the
 // channel it came from.
 
+#include <cstdint>
 #include <memory>
 
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -29,6 +30,10 @@ void openAudioEditorForChannel (AudioEngine& engine, int channel, int clip = -1)
 std::unique_ptr<juce::Component> makeAudioEditorPanel (AudioEngine& engine, int channel, int clip, bool showWarp = true);
 // Round 190cy: the panel shows the sample of the grid's clip in (track, scene): ÷2 / ×2 scale that clip with the markers.
 void setAudioEditorGridClip (juce::Component& panel, int track, int scene);
+// Round gaps190kf (--gapsshot190kf): the Clip View's loop brace selected; a brace drag held at content tick `tick` (part:
+// 1 loop start, 2 loop end, 3 the brace, 4 Start, 5 End; 0 releases it without writing). No-op for other components.
+void selectAudioEditorBraceForSnapshot (juce::Component& panel, bool selected);
+void holdAudioEditorBraceForSnapshot (juce::Component& panel, int part, std::int64_t tick);
 // --warpshot (round 190cy): ÷2 (0.5) / ×2 (2) as the panel's buttons do it; a warp marker held in the middle of a drag
 // (plain: to `beatOrSeconds` as a beat; `slides` (Shift): to `beatOrSeconds` as a point of the audio).
 void scaleAudioEditorTempoForSnapshot (juce::Component& panel, double factor);

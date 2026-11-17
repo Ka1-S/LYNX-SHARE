@@ -949,6 +949,11 @@ private:
         semitones.setValue (whole, n);
         pitchKnob.setValue (whole, n);
         cents.setValue (std::round ((shown - whole) * 100.0), n);
+        // round gaps190kf: Re-Pitch has no transposition of its own [DOC Live 12 manual, Warp modes: "In this mode, the
+        // sample's transposition controls are deactivated because changing the playback speed directly affects the pitch"]
+        const auto repitch = warped && ! s.keepPitch;
+        for (auto* w : std::initializer_list<juce::Component*> { &pitchKnob, &semitones, &cents })
+            w->setEnabled (! repitch);
         reverse.setToggleState (c->reversed, n);
         // the mode's own settings: shown for the mode they belong to, only while the sample is warped and keeps its pitch
         const auto beats = warped && s.keepPitch && s.stretchMethod == StretchMethod::beats;

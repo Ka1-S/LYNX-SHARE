@@ -17858,3 +17858,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Livefix190jdCTests.inc" // round 190jd: Mixer peak hold and Extra large list, Limiter / Maximus history
 #include "Folders190jfTests.inc" // round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Alt+drag)
 #include "DawProject190jfTests.inc" // round 190jf B22: DAWproject import / export (core/DawProject.h, core/ZipLite.h)
+#include "Gaps190kfTests.inc" // round gaps190kf: Live Transpose ±48 in real time, the Clip View warp time line

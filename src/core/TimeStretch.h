@@ -88,6 +88,10 @@ class VoicePitchShifter
 {
 public:
     static constexpr double minFactor = 0.25, maxFactor = 4.0; // ±2 octaves
+    // round gaps190kf: an audio clip's own transposition reaches Live's ±48 st Transpose (detail-072: Complex, Tones and
+    // Beats in the Clip View): ±4 octaves. Only a clip transposed beyond ±24 st uses it, so every other note keeps the
+    // ±2 octave clamp it always had (old projects play bit-identical).
+    static constexpr double minClipFactor = 1.0 / 16.0, maxClipFactor = 16.0;
 
     VoicePitchShifter();
     ~VoicePitchShifter();
@@ -98,6 +102,7 @@ public:
     bool ready() const noexcept;
     int primeLength (double factor) const noexcept;
     int maxPrimeLength() const noexcept { return primeLength (minFactor); } // the longest: the lowest transposition
+    int maxClipPrimeLength() const noexcept { return primeLength (minClipFactor); } // (round gaps190kf: a clip's −48 st)
     // `l`/`r` (r may equal l): primeLength (factor) frames of the transposed source from the note's start
     void start (const float* l, const float* r, int frames) noexcept;
     void process (const float* inL, const float* inR, int inFrames, float* outL, float* outR, int outFrames) noexcept;
@@ -141,6 +146,7 @@ public:
     std::unique_ptr<VoicePitchShifter> make (int kind) const;
     // the longest priming a shifter of that kind takes (VoicePitchShifter::maxPrimeLength)
     int maxPrimeLength (int kind) const;
+    int maxClipPrimeLength (int kind) const; // (round gaps190kf: VoicePitchShifter::maxClipPrimeLength)
 
     // keep `count` fresh shifters of that kind ready (RackState::build sets it for each rack it builds); topUp() makes
     // what is missing. liveReserve: a chord a keyboard plays beyond the song (refilled 30 times a second)
