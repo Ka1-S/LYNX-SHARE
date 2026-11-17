@@ -247,6 +247,7 @@ bool drumBussToRack (const Element& device, Translated& out)
     {
         comp = makeEffectSlot (EffectKind::crestCompressor);
         auto& k = comp.params;
+        k[cr::revision] = 0.0f; // round 190kw: this map was measured on the fitted laws (revision 0)
         k[cr::style] = cr::styleValue (cr::Style::clean);
         k[cr::voicing] = 0.0f;
         k[cr::threshold] = linValue (drumbuss::compThresholdDb, -60.0, 0.0);

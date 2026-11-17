@@ -3760,6 +3760,10 @@ const SubstituteEntry* findPluginSubstitute (const PluginIdentity& plugin, bool 
 EffectSlot makeSubstituteSlot (const SubstituteEntry& entry, const PluginIdentity* original, int* translated)
 {
     auto slot = makeEffectSlot (entry.effect);
+    // round 190kw: the substitutes' Crest settings were measured on the fitted laws: they keep revision 0 (the Pro-C 3
+    // translator, applied below, sets 1)
+    if (slot.kind == EffectKind::crestCompressor)
+        slot.params[(std::size_t) dyn::crest::revision] = 0.0f;
     for (const auto& [index, value] : entry.preset)
         if (index >= 0 && index < maxEffectParams)
             slot.params[(std::size_t) index] = value;

@@ -719,6 +719,207 @@ float characterCurve (Character c, float x) noexcept
 
 namespace
 {
+// ---- round 190kw (REA_rodada190kw §1, static analysis of the reference's binary; LYNX's own code): the three "V1"
+// styles of the reference (Clean, Classic, Opto) compute an instantaneous gain reduction from the side chain's sample
+// level in dB and smooth that reduction (not the level) with a two-stage, program-dependent follower.
+//  - Times: every follower step is c = 1 − exp(−ln 10 / T), T in samples (the time to cover 90 % of a step).
+//  - Attack time = lo + span · a³ (a = the attack knob's position, 0.005 + 250 · a³ ms on the display); release time =
+//    rel · relScale + relBase − 0.9 · relDip · √((attack − attackMin) / (lo + span − attackMin)), at least relBase / 10
+//    (rel = the release knob's 0 … 1 share: 10 ms + 2490 ms · rel on the display).
+//  - Curve: overshoot d = level − threshold through the knee (below), × (1 − 1 / ratio) under 100 : 1, ≤ range, ≥ 0.
+//    Classic is a feedback design: it reads (min (d, range) − its own reduction) × ratio instead of d.
+//  - Knee: a quadratic knee of the knob's width blended with the style's own shape K(d) = B((d − off) / 48) ·
+//    (d − off) · scale (B a cubic Bézier through (0, 0), P1, P2, (1, 1), straight beyond its ends): K alone at 24 dB,
+//    the quadratic knee alone at 72 dB, under 24 dB the shape narrowed by knee / 24.
+struct V1Law
+{
+    double lo, attackMin, span, relBase, relDip, relScale; // seconds
+    double p1x, p1y, p2x, p2y, off, scale;                 // the knee shape
+    int kind;                                              // 0 clean, 1 classic (feedback), 2 opto
+};
+constexpr V1Law v1Laws[3] {
+    { 0.0001, 0.0002, 0.2499, 0.025, 0.09, 1.975, 0.093, 0.287, 0.52, 0.822, -11.0, 0.83, 0 },
+    { 0.003, 0.003, 0.997, 0.04, 0.13, 2.46, 0.0, 1.492, 0.541, 1.0, -3.0, 0.9, 1 },
+    { 0.001, 0.004, 0.249, 0.005, 0.02, 1.195, 0.022, 0.284, 0.76, 0.943, -13.3, 0.7338, 2 },
+};
+// the knee shape, sampled once (−20 … 100 dB, 8192 points, linear in between; straight past 100 dB)
+struct V1Knee
+{
+    static constexpr int points = 8192;
+    static constexpr double lo = -20.0, hi = 100.0;
+    std::array<double, points + 1> t {};
+    double top = 0.0, slope = 0.0;
+    explicit V1Knee (const V1Law& w) noexcept
+    {
+        const auto bez = [&] (double u) {
+            // y on the Bézier where x = u (bisection on its parameter); straight lines past the ends
+            if (u <= 0.0)
+                return w.p1x > 0.0 ? u * w.p1y / w.p1x : 0.0;
+            if (u >= 1.0)
+                return 1.0 + (u - 1.0) * (1.0 - w.p2y) / (1.0 - w.p2x);
+            const auto cx = 3.0 * w.p1x, bx = 3.0 * (w.p2x - w.p1x) - cx, ax = 1.0 - cx - bx;
+            const auto cy = 3.0 * w.p1y, by = 3.0 * (w.p2y - w.p1y) - cy, ay = 1.0 - cy - by;
+            double a = 0.0, b = 1.0, m = 0.5;
+            for (int k = 0; k < 60; ++k)
+            {
+                m = 0.5 * (a + b);
+                ((ax * m + bx) * m + cx) * m < u ? a = m : b = m;
+            }
+            return ((ay * m + by) * m + cy) * m;
+        };
+        const auto shape = [&] (double x) {
+            const auto v = std::max (0.0, x - w.off);
+            return bez (v / 48.0) * v * w.scale;
+        };
+        for (int i = 0; i <= points; ++i)
+            t[(std::size_t) i] = shape (lo + (hi - lo) * i / (points - 1));
+        top = shape (hi);
+        slope = top - shape (hi - 1.0);
+    }
+    double operator() (double x) const noexcept
+    {
+        if (x > lo && x < hi)
+        {
+            const auto f = (x - lo) * (points - 1) / (hi - lo);
+            const auto i = (int) f;
+            return t[(std::size_t) i] + (t[(std::size_t) i + 1] - t[(std::size_t) i]) * (f - i);
+        }
+        return x <= lo ? 0.0 : top + (x - hi) * slope;
+    }
+};
+const V1Knee& v1Knee (int kind) noexcept
+{
+    static const V1Knee k[3] { V1Knee (v1Laws[0]), V1Knee (v1Laws[1]), V1Knee (v1Laws[2]) };
+    return k[kind];
+}
+double v1KneeGain (const V1Knee& shape, double d, double knee) noexcept
+{
+    constexpr double eps = 1.1920928955078125e-07;
+    if (knee < eps)
+        return d;
+    if (std::abs (knee - 24.0) <= eps)
+        return shape (d);
+    const auto half = 0.5 * knee;
+    auto q = d;
+    if (d >= -half && d <= half)
+        q = (half + d) / knee * ((half + d) / knee) * half;
+    const auto k72 = knee / 72.0;
+    if (k72 < 1.0 / 3.0)
+    {
+        const auto s = 3.0 * k72;
+        return (shape (d / s) * s - q) * (s * s) + q;
+    }
+    const auto at = shape (d);
+    return (k72 - 1.0 / 3.0) * 1.5 * (q - at) + at;
+}
+inline double v1Coef (double samples) noexcept
+{
+    const auto t = (double) (float) samples;
+    return t <= 1.1920928955078125e-07 ? 1.0 : 1.0 - std::exp (-2.302585124969482 / t);
+}
+
+// ---- round 190kw (REA_rodada190kw §2): the reference's V2 styles (Vocal, Mastering, Bus, Punch, Pumping) are small
+// graphs of two generic elements, rebuilt here in LYNX's own code:
+//  - a gain computer (quadratic knee of the knob's width, × (1 − 1 / ratio) under 100 : 1, ≤ range, ≥ 0), in dB or as
+//    a reduction share 1 − 10^(−GR / 20);
+//  - a follower: y += (x − y) · c, c = 1 − exp(−ln 10 / (T · rate)); rising uses the attack time, blended towards
+//    0.1 · T · step by (1 − p1) and lengthened by p2 · e^(−step) for small steps; falling uses the release time,
+//    blended towards −0.1 · T · step by (1 − p5) and lengthened by p6 · e^(step) for steps under 10; with auto release
+//    T = k / (√y + 1).
+struct V2Follow
+{
+    double att = 0.0, rel = 0.0, p1 = 1.0, p2 = 0.0, p5 = 1.0, p6 = 0.0, autoK = 0.0;
+    bool autoRel = false;
+};
+// the last coefficient of each direction, reused while the time (in samples, as a float) does not change
+struct V2Cache
+{
+    float t[2] { -1.0f, -1.0f };
+    double c[2] { 1.0, 1.0 };
+};
+inline double v2Step (double& y, double x, const V2Follow& f, double rate, V2Cache& cache) noexcept
+{
+    const auto d = x - y;
+    double t;
+    if (d <= -1.1920928955078125e-07)
+    {
+        t = f.autoRel ? (double) (float) (f.autoK / (std::sqrt (std::max (y, 0.0)) + 1.0)) : f.rel;
+        if (f.p5 != 1.0)
+        {
+            const auto b = (double) (float) (t * d * -0.1);
+            t = (t - b) * f.p5 + b;
+        }
+        if (f.p6 != 0.0 && d > -10.0)
+            t += std::exp (std::max (d, -25.0)) * f.p6;
+    }
+    else
+    {
+        t = f.att;
+        if (f.p1 != 1.0)
+        {
+            const auto b = (double) (float) (t * d * 0.1);
+            t = (t - b) * f.p1 + b;
+        }
+        if (f.p2 != 0.0 && d < 10.0)
+            t += std::exp (std::max (-d, -25.0)) * f.p2;
+    }
+    const auto k = d <= -1.1920928955078125e-07 ? 1 : 0;
+    const auto samples = (float) ((double) (float) t * rate);
+    if (samples != cache.t[k])
+    {
+        cache.t[k] = samples;
+        cache.c[k] = v1Coef (samples);
+    }
+    y += d * cache.c[k];
+    return y;
+}
+// the quadratic knee (width k) of an overshoot
+inline double v2Knee (double over, double k) noexcept
+{
+    if (k > 1.1920928955078125e-07 && over >= -0.5 * k && over <= 0.5 * k)
+        return (0.5 * k + over) / k * ((0.5 * k + over) / k) * (0.5 * k);
+    return over;
+}
+// the running maximum of the last n samples (a monotone queue on fixed storage)
+struct SlidingMax
+{
+    std::vector<double> v;
+    std::vector<long long> at;
+    int head = 0, count = 0;
+    long long now = 0;
+    void setup (int capacity)
+    {
+        v.assign ((std::size_t) capacity, 0.0);
+        at.assign ((std::size_t) capacity, 0);
+        head = count = 0;
+        now = 0;
+    }
+    void clear() noexcept { head = count = 0; now = 0; }
+    double push (double x, int n) noexcept
+    {
+        const int cap = (int) v.size();
+        if (cap == 0)
+            return x;
+        while (count > 0 && v[(std::size_t) ((head + count - 1) % cap)] <= x)
+            --count;
+        if (count == cap)
+        {
+            head = (head + 1) % cap;
+            --count;
+        }
+        v[(std::size_t) ((head + count) % cap)] = x;
+        at[(std::size_t) ((head + count) % cap)] = now;
+        ++count;
+        while (count > 0 && at[(std::size_t) head] < now - n)
+        {
+            head = (head + 1) % cap;
+            --count;
+        }
+        ++now;
+        return v[(std::size_t) head];
+    }
+};
+
 class Compressor final : public Effect
 {
 public:
@@ -743,6 +944,8 @@ public:
         dc.set (sr);
         splitAudio.set (sr);
         splitSide.set (sr);
+        for (auto& h : holdMax) // round 190kw: Mastering's 10 ms hold at up to 8x oversampling
+            h.setup ((int) (rate * 0.01 * 8.0) + 8);
         latencyMs = -1.0; // re-apply the delays
         configure (lastParams);
         reset();
@@ -765,6 +968,8 @@ public:
                 s.reset();
         for (auto& d : det)
             d = {};
+        for (auto& h : holdMax)
+            h.clear();
         for (auto& pk : peaks)
             pk.fill (0.0f);
         dc.reset();
@@ -819,6 +1024,9 @@ private:
         double lin = 1e-6; // round 190v: two-way's follower (linear amplitude)
         double peak = -120.0; // round 173d: the input's peak (instant attack, the detector's release): the lift's ceiling
         int holdLeft = 0, gainHold = 0, peakPos = 0;
+        double v0 = 0.0, v1 = 0.0, v2 = 0.0, held = 0.0; // round 190kw: the V1 styles' follower (reduction, dB) and hold
+        double c0 = 0.0, c1 = 0.0, c2 = 0.0, lp1 = 0.0, lp2 = 0.0; // round 190kw: the V2 styles' followers, Mastering's smoother
+        V2Cache k0, k1, k2;
     };
 
     // per-chunk settings at the rate the detector runs at
@@ -834,6 +1042,16 @@ private:
         TwoWayLaw twoWay {};
         VariMuLaw variMu {};
         double aRl = 0.0; // two-way: the linear follower's release
+        // round 190kw: the V1 law (revision 1, Clean / Classic / Opto): attack and release in samples
+        const V1Law* v1 = nullptr;
+        const V1Knee* v1Shape = nullptr;
+        double v1A = 0.0, v1R = 0.0;
+        // round 190kw: the V2 law (revision 1): 3 vocal, 4 mastering, 5 bus, 6 punch, 7 pumping (the reference's order)
+        int v2 = 0;
+        V2Follow f0, f1, f2;
+        double vocalBase = 0.0; // Vocal: the second follower's release before the programme adds to it
+        int holdN = 0;          // Mastering: the reduction's 10 ms peak hold
+        double lpB0 = 0.0, lpB1 = 0.0, lpB2 = 0.0, lpA1 = 0.0, lpA2 = 0.0;
     };
     double styleGain (const Ctx& x, double level) const noexcept
     {
@@ -940,12 +1158,238 @@ private:
         }
         c.holdSamples = (int) (holdMs (p[hold]) * 0.001 * rate);
         c.window = sd.windowMs > 0.0 ? std::clamp ((int) (sd.windowMs * 0.001 * rate), 1, peakWindow) : 0;
+        // (with Auto release on, the V1 styles keep the fitted law: the reference's auto-release table is not rebuilt)
+        if (on (p[revision]) && ! on (p[autoRelease]) && (c.st == Style::clean || c.st == Style::classic || c.st == Style::opto))
+        {
+            const auto& w = v1Laws[c.st == Style::clean ? 0 : (c.st == Style::classic ? 1 : 2)];
+            c.v1 = &w;
+            c.v1Shape = &v1Knee (w.kind);
+            const auto a3 = std::clamp ((att - 0.005) / 250.0, 0.0, 1.0);
+            const auto rel = std::clamp ((releaseMs (p[release]) - 10.0) / 2490.0, 0.0, 1.0);
+            const auto attS = w.lo + w.span * a3;
+            const auto clampA = std::clamp (attS, w.attackMin, w.lo + w.span);
+            const auto relS = std::max (w.relBase * 0.1, rel * w.relScale + w.relBase
+                                        - std::sqrt ((clampA - w.attackMin) / (w.lo + w.span - w.attackMin)) * 0.9 * w.relDip);
+            c.v1A = attS * rate;
+            c.v1R = relS * rate;
+            c.window = 0;
+        }
+        else if (on (p[revision]) && (c.st == Style::vocal || c.st == Style::mastering || c.st == Style::bus
+                                      || c.st == Style::punch || c.st == Style::pumping))
+        {
+            // the knob laws (REA_rodada190kw §2): attack a³ · 0.25 s, release 2.5 s · tan (1.2 r²) / tan (1.2), the
+            // auto release's constant 3.6 r² + 0.1
+            const auto a3 = std::clamp ((att - 0.005) / 250.0, 0.0, 1.0);
+            const auto rel = std::clamp ((releaseMs (p[release]) - 10.0) / 2490.0, 0.0, 1.0);
+            const auto r2 = std::atan (rel * std::tan (1.2)) / 1.2;
+            const auto attS = a3 * 0.25, relS = rel * 2.5;
+            auto autoK = r2 * 3.6 + 0.1;
+            c.v2 = c.st == Style::vocal ? 3 : c.st == Style::mastering ? 4 : c.st == Style::bus ? 5 : c.st == Style::punch ? 6 : 7;
+            c.f0 = c.f1 = c.f2 = {};
+            V2Follow* last = &c.f0;
+            switch (c.v2)
+            {
+                case 3:
+                    c.f0.att = 0.25; c.f0.rel = 0.5;
+                    c.f1.att = a3 * 0.4; c.f1.p5 = 0.25;
+                    c.vocalBase = std::min (0.5 * std::sqrt (a3), 10.0) + rel + 0.005;
+                    autoK *= 0.5;
+                    last = &c.f1;
+                    break;
+                case 4:
+                    c.f0.att = std::max (0.0, 0.025 - relS * 0.1) + attS + 0.025; c.f0.p6 = 1.0;
+                    c.f1.att = attS + 5e-5; c.f1.rel = relS + 0.1;
+                    c.holdN = (int) (rate * 0.01);
+                    {
+                        // a 10 Hz two-pole low-pass on the held reduction (Butterworth, bilinear)
+                        const auto k = std::tan (3.141592653589793 * 10.0 / rate), q = 1.0 / std::sqrt (2.0);
+                        const auto n = 1.0 / (1.0 + k / q + k * k);
+                        c.lpB0 = k * k * n; c.lpB1 = 2.0 * c.lpB0; c.lpB2 = c.lpB0;
+                        c.lpA1 = 2.0 * (k * k - 1.0) * n; c.lpA2 = (1.0 - k / q + k * k) * n;
+                    }
+                    last = &c.f1;
+                    break;
+                case 5:
+                    c.f0.att = 0.35; c.f0.rel = 0.8;
+                    c.f1.rel = relS * 0.1 + 0.015; c.f1.p5 = 0.0;
+                    c.f2.att = attS + 0.0003; c.f2.rel = relS + 0.015; c.f2.p1 = 0.5; c.f2.p5 = 0.75; c.f2.p6 = 0.3;
+                    last = &c.f2;
+                    break;
+                case 6:
+                    c.f0.att = attS + 0.0001; c.f0.rel = relS + 0.05; c.f0.p1 = 0.9;
+                    break;
+                default:
+                    c.f0.rel = 0.5 * relS + 0.025;
+                    c.f1.att = attS; c.f1.rel = 0.5 * relS + 0.025;
+                    c.f2.att = 5e-5; c.f2.rel = 0.5 * relS + 0.005; c.f2.p5 = 0.25;
+                    last = &c.f2;
+                    break;
+            }
+            last->autoRel = on (p[autoRelease]);
+            last->autoK = autoK;
+            c.window = 0;
+        }
         return c;
     }
 
     // one detector step: the level → the gain (dB) the compressor applies now
+    // round 190kw: the V1 styles (REA_rodada190kw §1): the instantaneous reduction (dB, ≥ 0) of the sample level, then
+    // the style's two-stage follower; returns the gain (dB, ≤ 0)
+    double detectV1 (int c, double level, const Ctx& x) noexcept
+    {
+        auto& d = detCur[c];
+        const auto& w = *x.v1;
+        const auto in = std::max (-200.0, 20.0 * std::log10 (level + 1e-30));
+        auto over = in - x.thr;
+        const auto r = std::min (x.rat, 100.0);
+        if (w.kind == 1)
+            over = (std::min (over, x.rng) - d.v0) * r;
+        auto t = v1KneeGain (*x.v1Shape, over, x.kn);
+        if (x.rat < 100.0)
+            t *= 1.0 - 1.0 / x.rat;
+        if (w.kind != 1)
+            t = std::min (t, x.rng);
+        t = std::max (t, 0.0);
+        const auto P = x.rate, A = x.v1A, R = x.v1R;
+        if (w.kind == 0) // Clean: a slow stage (memory) under the main one
+        {
+            d.v1 += (t - d.v1) * v1Coef (t <= d.v1 ? 0.2 * P + R : 100.0 * A + 2.0 * P);
+            const auto y = std::max (d.v1, t);
+            const auto dt = y <= d.v0 ? R : std::exp (std::max (d.v0 - y, -25.0)) * (0.05 * P - 0.2 * A) + A;
+            d.v0 += (y - d.v0) * v1Coef (dt);
+            d.v2 = d.v0 - d.v1;
+        }
+        else if (w.kind == 1) // Classic: the reduction is the two stages' sum
+        {
+            d.v1 += (t - d.v1) * v1Coef (t <= d.v1 ? 2.0 * P - 1.8 * A : 0.43 * P + 100.0 * A);
+            const auto y = std::max (d.v1, t);
+            const auto dt = y <= d.v2 ? R : std::exp (std::max (d.v2 - y, -25.0)) * 10.0 * (2.0 * P - A) + A;
+            d.v2 += (y - d.v2) * v1Coef (dt);
+            d.v0 = d.v2 + d.v1;
+        }
+        else // Opto: the release slows for large steps (square root of the distance past 1 dB), then a 4 ms smoother
+        {
+            if (t <= d.v0)
+            {
+                auto v = t - d.v1;
+                if (v < -1.0)
+                    v = -std::sqrt (-v);
+                d.v1 += v1Coef (R) * v;
+                d.v0 += v1Coef (0.004 * P) * (d.v1 - d.v0);
+            }
+            else
+            {
+                d.v0 += (t - d.v0) * v1Coef (std::exp (std::max (d.v0 - t, -25.0)) * (0.05 * P - 0.2 * A) + A);
+                d.v1 = d.v0;
+            }
+        }
+        auto gr = d.v0;
+        if (x.holdSamples > 0) // the reduction's peaks held for the Hold time
+        {
+            if (gr >= d.held)
+            {
+                d.held = gr;
+                d.holdLeft = x.holdSamples;
+            }
+            else if (d.holdLeft > 0)
+            {
+                --d.holdLeft;
+                gr = d.held;
+            }
+            else
+                d.held = gr;
+        }
+        d.sustain = x.slowCoef * d.sustain + (1.0 - x.slowCoef) * gr;
+        return -gr;
+    }
+
+    // round 190kw: the V2 styles (REA_rodada190kw §2); `x0`: the side chain's level (linear magnitude, after the link)
+    double detectV2 (int c, double x0, const Ctx& x) noexcept
+    {
+        auto& d = detCur[c];
+        const auto rate = x.rate;
+        const auto mag = std::abs (x0);
+        const auto levelDb = mag > 1e-10 ? std::max (-180.0, 20.0 * std::log10 (mag)) : -180.0;
+        const auto curve = [&] (double lev) {
+            auto g = v2Knee (lev - x.thr, x.kn);
+            if (x.rat < 100.0)
+                g -= g / x.rat;
+            return std::max (0.0, std::min (g, x.rng));
+        };
+        const auto share = [] (double grDb) { return 1.0 - std::exp (-grDb * 0.1151292546497023); };
+        const auto toDb = [] (double r) { return std::min (180.0, -20.0 * std::log10 (std::max (std::abs (1.0 - r), 1e-9))); };
+        double gr = 0.0;
+        switch (x.v2)
+        {
+            case 3: // Vocal: its own curve, 20 log10 (1 + |x| (10^(−thr / 20) − 1)), no ratio
+            {
+                auto g = 0.0;
+                if (x.thr < -1.1920928955078125e-07)
+                    g = std::max (-180.0, 20.0 * std::log10 (mag * (std::exp (-x.thr * 0.1151292546497023) - 1.0) + 1.0));
+                const auto r = share (std::max (0.0, std::min (g, x.rng)));
+                v2Step (d.c0, r, x.f0, rate, d.k0);
+                auto f1 = x.f1;
+                f1.rel = x.vocalBase + 10.0 * std::pow (std::max (d.c0, 0.0), 5.5);
+                v2Step (d.c1, std::max (std::abs (r), std::abs (d.c0)), f1, rate, d.k1);
+                gr = toDb (d.c1);
+                break;
+            }
+            case 4: // Mastering: the reduction share, held 10 ms, smoothed, its own slow follower, the main follower
+            {
+                const auto r = share (curve (levelDb));
+                const auto h = holdMax[(std::size_t) c].push (r, x.holdN);
+                const auto e = x.lpB0 * h + d.lp1;
+                d.lp1 = x.lpB1 * h - x.lpA1 * e + d.lp2;
+                d.lp2 = x.lpB2 * h - x.lpA2 * e;
+                v2Step (d.c0, e, x.f0, rate, d.k0);
+                v2Step (d.c1, std::max (std::abs (r), std::abs (d.c0)), x.f1, rate, d.k1);
+                gr = toDb (d.c1);
+                break;
+            }
+            case 5: // Bus: dB domain, three followers behind maxima
+            {
+                const auto g = curve (levelDb);
+                v2Step (d.c0, g, x.f0, rate, d.k0);
+                v2Step (d.c1, std::max (std::abs (g), std::abs (d.c0)), x.f1, rate, d.k1);
+                gr = v2Step (d.c2, std::max (std::abs (g), std::abs (d.c1)), x.f2, rate, d.k2);
+                break;
+            }
+            case 6: // Punch: one follower on the dB reduction
+                gr = v2Step (d.c0, curve (levelDb), x.f0, rate, d.k0);
+                break;
+            default: // Pumping: two followers on the side chain's level itself, then the curve, then a fast follower
+            {
+                v2Step (d.c0, x0, x.f0, rate, d.k0);
+                v2Step (d.c1, d.c0, x.f1, rate, d.k1);
+                const auto m = std::abs (d.c1);
+                gr = v2Step (d.c2, curve (m > 1e-10 ? std::max (-180.0, 20.0 * std::log10 (m)) : -180.0), x.f2, rate, d.k2);
+                break;
+            }
+        }
+        gr = std::max (gr, 0.0);
+        if (x.holdSamples > 0)
+        {
+            if (gr >= d.held)
+            {
+                d.held = gr;
+                d.holdLeft = x.holdSamples;
+            }
+            else if (d.holdLeft > 0)
+            {
+                --d.holdLeft;
+                gr = d.held;
+            }
+            else
+                d.held = gr;
+        }
+        d.sustain = x.slowCoef * d.sustain + (1.0 - x.slowCoef) * gr;
+        return -gr;
+    }
+
     double detect (int c, double level, const Ctx& x) noexcept
     {
+        if (x.v1 != nullptr)
+            return detectV1 (c, level, x);
         auto& d = detCur[c];
         if (x.window > 0) // the peak of the last `window` samples
         {
@@ -1037,14 +1481,18 @@ private:
             const auto la = std::abs (a[i]), lb = std::abs (b[i]);
             const auto m = (double) std::max (la, lb);
             float g[2];
-            const auto g0 = detect (0, link * m + (1.0 - link) * la, x);
+            // round 190kw: the V2 styles read the same linked magnitude (Pumping's first followers included: measured,
+            // the signed sample scored lower on every block)
+            const auto g0 = x.v2 > 0 ? detectV2 (0, link * m + (1.0 - link) * la, x)
+                                     : detect (0, link * m + (1.0 - link) * la, x);
             g[0] = (float) dbToGain (g0);
             maxGr = std::max (maxGr, -g0);
             if (both)
                 g[1] = g[0];
             else
             {
-                const auto g1 = detect (1, link * m + (1.0 - link) * lb, x);
+                const auto g1 = x.v2 > 0 ? detectV2 (1, link * m + (1.0 - link) * lb, x)
+                                         : detect (1, link * m + (1.0 - link) * lb, x);
                 g[1] = (float) dbToGain (g1);
                 maxGr = std::max (maxGr, -g1);
             }
@@ -1354,6 +1802,7 @@ private:
     std::array<int, scBands> scCount {};
     bool scEqOn = false;
     std::array<Detector, 2> det {};
+    std::array<SlidingMax, 2> holdMax; // round 190kw: Mastering's 10 ms peak hold (sized in prepare for up to 8x)
     std::array<std::array<float, peakWindow>, 2> peaks {};
     // round 190al: the two-way style's low and high bands (the mid band uses the detectors and gain delay above)
     static constexpr int bandGainCapacity = 8192; // the look-ahead at the base rate (20 ms at 192 kHz), with room

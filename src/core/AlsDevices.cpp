@@ -285,6 +285,7 @@ bool compressorToCrest (const Element& device, EffectSlot& slot, Notes& notes, S
         return false;
     slot = makeEffectSlot (EffectKind::crestCompressor);
     auto& p = slot.params;
+    p[revision] = 0.0f; // round 190kw: this map was measured on the fitted laws (revision 0)
     p[style] = styleValue (Style::clean);
     p[voicing] = 0.0f;
     if (model == 1)
@@ -333,6 +334,7 @@ bool glueToCrest (const Element& device, EffectSlot& slot, Notes& notes, SideInp
         return false;
     slot = makeEffectSlot (EffectKind::crestCompressor);
     auto& p = slot.params;
+    p[revision] = 0.0f; // round 190kw: this map was measured on the fitted laws (revision 0)
     p[style] = styleValue (Style::bus);
     p[voicing] = 0.0f;
     p[threshold] = linValue (manual (device, "Threshold", 0.0), -60.0, 0.0); // [DATA: −40 … 0 dB]

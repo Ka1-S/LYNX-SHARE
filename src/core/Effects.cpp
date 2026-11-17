@@ -4355,6 +4355,8 @@ EffectSlot makeEffectSlot (EffectKind kind)
         slot.params[(std::size_t) mixsuite::hush::vocalRevision] = 1.0f;
     if (kind == EffectKind::echoform) // round 190is: a new Echoform runs the echo voicings' revision 1 (hidden parameter)
         slot.params[(std::size_t) echosuite::echoform::revision] = 1.0f;
+    if (kind == EffectKind::crestCompressor) // round 190kw: a new Crest runs the V1 styles' revision 1 (hidden parameter)
+        slot.params[(std::size_t) dyn::crest::revision] = 1.0f;
     // round 190it: a new Epoch Verb / Atrium / Foil Plate / Halo runs the 0.1.30 revision of the Measured law (hidden)
     if (kind == EffectKind::epochVerb) slot.params[(std::size_t) verbs::epoch::revision] = 1.0f;
     if (kind == EffectKind::atrium) slot.params[(std::size_t) verbs::atrium::revision] = 1.0f;
@@ -4437,6 +4439,9 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     // noise reduction has none
     if (slot.kind == EffectKind::crestCompressor && savedCount <= (std::size_t) dyn::crest::law)
         slot.params[(std::size_t) dyn::crest::law] = 0.0f;
+    // round 190kw: … and one saved before the V1 styles' revision keeps the fitted Clean / Classic / Opto (bit for bit)
+    if (slot.kind == EffectKind::crestCompressor && savedCount <= (std::size_t) dyn::crest::revision)
+        slot.params[(std::size_t) dyn::crest::revision] = 0.0f;
     if (slot.kind == EffectKind::sentryGate && savedCount <= (std::size_t) dyn::sentry::law)
         slot.params[(std::size_t) dyn::sentry::law] = 0.0f;
     // round 150: Auto-pan saved before the Tweak block keeps the Rhythm voicing's clipped angle

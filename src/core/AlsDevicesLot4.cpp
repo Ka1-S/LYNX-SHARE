@@ -999,6 +999,7 @@ bool roarToRack (const Element& device, Translated& out)
     {
         auto c = makeEffectSlot (EffectKind::crestCompressor);
         auto& k = c.params;
+        k[cr::revision] = 0.0f; // round 190kw: this map was measured on the fitted laws (revision 0)
         k[cr::style] = cr::styleValue (cr::Style::clean);
         k[cr::threshold] = linValue (-36.0 * comp, -60.0, 0.0);
         k[cr::ratio] = cr::ratioValue (4.0);

@@ -63,7 +63,12 @@ enum Param
     // ratio × knee × attack grid. Off = round 108's laws: what a project saved before that round loads with
     // (upgradeLoadedEffectParams), so it sounds as it did. The other styles ignore it.
     law,
-    count
+    count,
+    // round 190kw, hidden (not in the info: no control, no text; saved while non-zero): revision 1 runs the reference's
+    // own law for Clean, Classic and Opto (REA_rodada190kw §1: the reduction smoothed by each style's two-stage follower,
+    // its knee shape, its attack / release scaling). A new Crest and a translated Pro-C 3 state get 1; a project or
+    // preset saved before keeps 0 (the fitted laws, bit for bit)
+    revision = count
 };
 enum class Trigger { off, hostSync, midi };
 Trigger triggerOf (float v) noexcept;

@@ -248,6 +248,7 @@ int fromProC3 (const State& s, EffectSlot& slot)
     set (output, linValue (levelDb (s.at (91)) + levelDb (s.at (15)), -36.0, 36.0));
     set (oversampling, (float) std::clamp (roundIndex (s.at (94)), 0, 3) / 3.0f);
     set (maxLookahead, (float) std::clamp (roundIndex (s.at (95)), 0, 5) / 5.0f);
+    set (revision, 1.0f); // round 190kw: the reference's own V1 laws (Clean / Classic / Opto)
     return n;
 }
 
