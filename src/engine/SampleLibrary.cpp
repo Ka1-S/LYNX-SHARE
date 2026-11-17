@@ -15,6 +15,7 @@
 #include <set>
 
 #include "core/AudioEdit.h"
+#include "core/ContentShare.h"
 #include "core/SampleFiles.h"
 #include "core/OggVorbis.h"
 #include "core/Mp3Decoder.h"
@@ -48,6 +49,9 @@ struct SharedCache
     std::condition_variable done;
     std::map<juce::String, std::weak_ptr<const SampleData>> entries;
     std::set<juce::String> loading;
+    // round 190ks: the decoded samples in RAM by their content's fingerprint, so a second file with the same audio (a copy
+    // in another folder) shares the first one's data instead of holding it twice
+    std::multimap<std::uint64_t, std::weak_ptr<const SampleData>> byContent;
     // stretched copies (pitch-preserving tempo follow): the latest length per file, kept (shared like the decoded ones)
     std::mutex stretchLock;
     std::map<juce::String, std::shared_ptr<const SampleData>> stretched;
@@ -57,6 +61,50 @@ SharedCache& sharedCache()
 {
     static SharedCache c;
     return c;
+}
+} // namespace
+
+namespace
+{
+// round 190ks: what makes two decoded samples interchangeable — the audio and everything a channel reads beside it
+std::uint64_t contentPrint (const SampleData& d) noexcept
+{
+    auto h = contentshare::hashBytes (d.left.data(), d.left.size() * sizeof (float));
+    h = contentshare::hashBytes (d.right.data(), d.right.size() * sizeof (float), h);
+    const double fields[] = { d.sampleRate, (double) d.loopStart, (double) d.loopEnd, (double) d.acidBeats, (double) d.sliceMarkers,
+                              (double) d.bitsPerSample, d.floatData ? 1.0 : 0.0, d.cropped ? 1.0 : 0.0, d.cropFrom, d.cropTo };
+    h = contentshare::hashBytes (fields, sizeof (fields), h);
+    return contentshare::hashBytes (d.markerStarts.data(), d.markerStarts.size() * sizeof (std::int64_t), h);
+}
+
+bool sameContent (const SampleData& a, const SampleData& b) noexcept
+{
+    return a.sampleRate == b.sampleRate && a.loopStart == b.loopStart && a.loopEnd == b.loopEnd && a.markerStarts == b.markerStarts
+           && a.acidBeats == b.acidBeats && a.sliceMarkers == b.sliceMarkers && a.bitsPerSample == b.bitsPerSample && a.floatData == b.floatData
+           && a.cropped == b.cropped && a.cropFrom == b.cropFrom && a.cropTo == b.cropTo && a.left.size() == b.left.size()
+           && a.right.size() == b.right.size() && ! a.isMapped() && ! b.isMapped()
+           && std::memcmp (a.left.data(), b.left.data(), a.left.size() * sizeof (float)) == 0
+           && std::memcmp (a.right.data(), b.right.data(), a.right.size() * sizeof (float)) == 0;
+}
+
+// the data already in RAM with the same content, else `data` itself (then remembered); under the cache's lock
+std::shared_ptr<const SampleData> shareContent (SharedCache& shared, std::shared_ptr<const SampleData> data, std::uint64_t print)
+{
+    const auto [from, to] = shared.byContent.equal_range (print);
+    for (auto it = from; it != to;)
+    {
+        auto other = it->second.lock();
+        if (other == nullptr)
+        {
+            it = shared.byContent.erase (it); // (its last user let it go)
+            continue;
+        }
+        if (other == data || sameContent (*other, *data))
+            return other;
+        ++it;
+    }
+    shared.byContent.emplace (print, data);
+    return data;
 }
 } // namespace
 
@@ -956,9 +1004,14 @@ std::shared_ptr<const SampleData> SampleLibrary::load (const juce::String& path)
         shared.loading.insert (path);
     }
     auto data = decode (path);
+    // round 190ks: a sample decoded into RAM whose audio another file already holds shares that one's (mapped ones are
+    // the OS's page cache already). The print is made outside the lock.
+    const auto print = data != nullptr && ! data->isMapped() && data->frames() > 0 && contentshare::enabled() ? contentPrint (*data) : 0;
     {
         const std::scoped_lock l (shared.lock);
         shared.loading.erase (path);
+        if (data != nullptr && print != 0)
+            data = shareContent (shared, std::move (data), print);
         if (data != nullptr)
             shared.entries[path] = data;
     }
@@ -1057,8 +1110,9 @@ SampleLibrary::MemoryUse SampleLibrary::memoryUse()
     auto& shared = sharedCache();
     {
         const std::scoped_lock l (shared.lock);
+        std::set<const SampleData*> counted; // (round 190ks: two files sharing one copy count once)
         for (const auto& [path, weak] : shared.entries)
-            if (const auto data = weak.lock())
+            if (const auto data = weak.lock(); data != nullptr && counted.insert (data.get()).second)
             {
                 if (data->isMapped())
                     ++use.mappedSamples, use.mappedBytes += mappedBytesOf (*data);
