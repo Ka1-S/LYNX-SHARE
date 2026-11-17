@@ -11,21 +11,16 @@
 #include <optional>
 
 #include "core/DistructorFx.h"
+#include "core/LiveHistory.h"
 #include "core/EffectResponse.h"
 
 namespace lynx::designui
 {
-struct History
+// round 190kl (issue #197): the history advances by the time that passed (core/LiveHistory.h), 30 columns a second
+struct History : livehistory::History<3, 240>
 {
-    static constexpr int length = 240; // 8 s at 30 Hz
-    std::array<std::array<float, 3>, length> values {};
-    int pos = 0, count = 0;
-    void push (float a, float b, float c) noexcept
-    {
-        values[(std::size_t) pos] = { a, b, c };
-        pos = (pos + 1) % length;
-        count = count < length ? count + 1 : length;
-    }
+    using livehistory::History<3, 240>::push;
+    void push (float a, float b, float c) noexcept { push (std::array<float, 3> { a, b, c }); }
 };
 
 inline bool handles (const char* id) noexcept

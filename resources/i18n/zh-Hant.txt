@@ -10914,3 +10914,14 @@ countries: tw hk mo
 # --- rollup 0.1.30 step 5: Save a copy for 0.1.28 knows rounds 190js / 190jv
 "Hush De-esser's Single Vocal mode plays its earlier version: {0}" = "Hush De-esser 的 Single Vocal 模式以舊版本播放: {0}"
 "Slide notes on FL's native generators glide instead of stepping once per tick: {0}" = "FL 原生產生器上的滑音音符平滑滑動，而不是每個 tick 走一步: {0}"
+# --- round 190kl: the Peak Controller's LYNX LFO shapes (issue #197)
+"LYNX shapes" = "LYNX 波形"
+"Ramp down" = "下降斜坡"
+"Exp rise" = "指數上升"
+"Exp fall" = "指數下降"
+"Triangle skew" = "傾斜三角"
+"Pulse 25%" = "脈衝 25%"
+"Random x4" = "隨機 x4"
+"Steps 4" = "階梯 4"
+"Steps 8" = "階梯 8"
+"Steps 16" = "階梯 16"

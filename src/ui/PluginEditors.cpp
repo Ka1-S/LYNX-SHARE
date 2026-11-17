@@ -62,6 +62,7 @@
 #include "ui/ValueControl.h"
 #include "ui/WindowOwner.h"
 
+#include "core/PeakShapes.h"
 #include "ui/DesignDisplays.inc" // round 168r: the graphs of the designed editors
 
 namespace lynx
@@ -476,6 +477,14 @@ public:
         return fx != nullptr && param >= 0 && param < maxEffectParams ? fx->params[(std::size_t) param] : 0.0f;
     }
 
+    // round 190kl (issue #197): the Peak Controller's LYNX extra LFO shape shown on FL's Shape menu (0 = FL's shape)
+    int peakExtraShape (int param, const EffectSlot& fx) const
+    {
+        if (kind != EffectKind::peakController || param != plugui::paramIndex (kind, "LFO shape"))
+            return 0;
+        return peakshapes::idOf (fx.params[(std::size_t) peakshapes::extraShapeParam]);
+    }
+
     void setValue (int param, float value)
     {
         if (isStateParam (param))
@@ -510,6 +519,12 @@ public:
                 setParams (edits);
                 return;
             }
+        if (kind == EffectKind::peakController && current()->params[(std::size_t) peakshapes::extraShapeParam] != 0.0f
+            && param == plugui::paramIndex (kind, "LFO shape")) // round 190kl: stepping FL's Shape leaves LYNX's extra shape
+        {
+            setParams ({ { param, value }, { peakshapes::extraShapeParam, 0.0f } });
+            return;
+        }
         if (usesBar())
             bar.willEdit();
         editSlot ([param, v = juce::jlimit (0.0f, 1.0f, value)] (EffectSlot& target) { target.params[(std::size_t) param] = v; });
@@ -1477,6 +1492,8 @@ public:
                     g.setFont (font (juce::jmax (9.0f, juce::jmin (12.0f * s, r.getHeight() * 0.55f)), true));
                     if (kind == EffectKind::lynxTune && param == lynxtune::scale && fx.params[lynxtune::moreScales] >= 0.25f)
                         g.drawFittedText (tr (fx.params[lynxtune::moreScales] >= 0.75f ? "Diminished" : "Whole tone"), textArea.toNearestInt(), juce::Justification::centred, 1, 0.6f);
+                    else if (const auto extra = peakExtraShape (param, fx); extra != 0) // round 190kl: LYNX's extra LFO shape
+                        g.drawFittedText (tr (peakshapes::name (extra)), textArea.toNearestInt(), juce::Justification::centred, 1, 0.6f);
                     else if (kind == EffectKind::hardwareInsert) // the device's channel names (round 164d)
                         g.drawFittedText (valueText (param, value), textArea.reduced (4.0f * s, 0.0f).toNearestInt(), juce::Justification::centred, 1, 0.6f);
                     else if (chosen < (int) labels.size())
@@ -4774,6 +4791,24 @@ public:
                 menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withTargetScreenArea (localAreaToGlobal (r.toNearestInt())));
                 return;
             }
+            if (kind == EffectKind::peakController && param == plugui::paramIndex (kind, "LFO shape")) // round 190kl (issue #197)
+            {
+                // FL's five shapes first (the default; FL projects stay exact), then LYNX's extra shapes
+                const auto* fx = current();
+                const auto extra = fx != nullptr ? peakshapes::idOf (fx->params[(std::size_t) peakshapes::extraShapeParam]) : 0;
+                juce::PopupMenu menu;
+                const auto labels = plugui::optionLabels (item);
+                const auto chosen = plugui::optionAt (item, valueOf (param));
+                for (int o = 0; o < (int) labels.size(); ++o)
+                    menu.addItem (optionTexts (item)[(std::size_t) o], true, extra == 0 && o == chosen,
+                                  [this, param, v = plugui::optionValue (item, o)] { setParams ({ { param, v }, { peakshapes::extraShapeParam, 0.0f } }); });
+                menu.addSectionHeader (tr ("LYNX shapes"));
+                for (int id = 1; id <= peakshapes::count; ++id)
+                    menu.addItem (tr (peakshapes::name (id)), true, extra == id,
+                                  [this, id] { setParams ({ { peakshapes::extraShapeParam, peakshapes::valueOf (id) } }); });
+                menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withTargetScreenArea (localAreaToGlobal (r.toNearestInt())));
+                return;
+            }
             if (kind == EffectKind::lynxTune && param == lynxtune::scale) // round 128: + whole tone, diminished
             {
                 const auto* fx = current();
@@ -5786,8 +5821,10 @@ private:
         for (const auto& item : activeLayout().items) // round 168r: the Peak Controller's outputs scroll
             if (item.type == Item::display && designui::isLive (item.display) && visible (item))
             {
-                designHistory.push (liveMeter (0), liveMeter (1), liveMeter (2));
-                repaint (rectOf (item).getSmallestIntegerContainer());
+                // round 190kl (issue #197): by the clock, not one column per timer call (calls are dropped while a
+                // knob is dragged, which slowed the scrolling down); redrawn only when a column was added
+                if (designHistory.advance (juce::Time::getMillisecondCounterHiRes(), { liveMeter (0), liveMeter (1), liveMeter (2) }) > 0)
+                    repaint (rectOf (item).getSmallestIntegerContainer());
                 break;
             }
     }

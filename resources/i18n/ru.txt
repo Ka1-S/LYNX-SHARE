@@ -10914,3 +10914,14 @@ countries: ru by kz
 # --- rollup 0.1.30 step 5: Save a copy for 0.1.28 knows rounds 190js / 190jv
 "Hush De-esser's Single Vocal mode plays its earlier version: {0}" = "Режим Single Vocal в Hush De-esser звучит в прежней версии: {0}"
 "Slide notes on FL's native generators glide instead of stepping once per tick: {0}" = "Ноты slide на родных генераторах FL скользят плавно, а не шагами на каждый тик: {0}"
+# --- round 190kl: the Peak Controller's LYNX LFO shapes (issue #197)
+"LYNX shapes" = "Формы LYNX"
+"Ramp down" = "Пила вниз"
+"Exp rise" = "Эксп. подъём"
+"Exp fall" = "Эксп. спад"
+"Triangle skew" = "Скошенный треугольник"
+"Pulse 25%" = "Импульс 25%"
+"Random x4" = "Случайно x4"
+"Steps 4" = "Ступени 4"
+"Steps 8" = "Ступени 8"
+"Steps 16" = "Ступени 16"
