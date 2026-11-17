@@ -30,10 +30,17 @@
             offline.dispatchPendingMessages();
             ui.selectTabForSnapshot (2);
             offline.dispatchPendingMessages();
+            // (a wide window, so the toolbar has room for every panel: at 1920 with Thief's title the output panel is
+            // one of the groups the toolbar drops first)
+            const auto normalSize = ui.getBounds();
+            ui.setSize (2560, normalSize.getHeight());
+            offline.dispatchPendingMessages();
             const auto toolbar = ui.getToolbarBoundsForSnapshot();
             auto& out = ui.getOutputForSnapshot();
+            check ("toolbar: the output and CPU panels shown", out.isVisible() && ui.getPerfMeterForSnapshot().isVisible());
             auto& cpu = ui.getPerfMeterForSnapshot();
-            const auto right = juce::Rectangle<int> (cpu.getX() - 8, 0, ui.getWidth() - (cpu.getX() - 8), toolbar.getHeight());
+            const auto right = juce::Rectangle<int> (juce::jmin (cpu.getX(), out.getX()) - 8, 0,
+                                                     juce::jmax (cpu.getRight(), out.getRight()) + 8 - (juce::jmin (cpu.getX(), out.getX()) - 8), toolbar.getHeight());
             // a CPU history as FL's (a flat run with a spike near the end), 60 updates
             for (int k = 0; k < 60; ++k)
                 cpu.setValues (k == 52 ? 0.62 : k == 53 ? 0.35 : 0.12 + 0.02 * std::sin ((double) k * 0.7), 910ll * 1024 * 1024, 9);
@@ -49,8 +56,9 @@
             const auto at = juce::Point<int> ((int) (bars.getX() + bars.getWidth() * 0.75f), (int) bars.getCentreY());
             const auto hint = out.hintAt (at);
             line ("output bars hint: " + hint.text + " | " + hint.value);
-            check ("output bars: the value is the level at the pointer (about -15 dB at 3/4: " + hint.value + ")",
-                   hint.value.endsWith (" dB") && std::abs (hint.value.getFloatValue() + 15.0f) < 1.0f);
+            const auto expected = toolbar::OutputMonitor::levelAt (((float) at.x + 0.5f - bars.getX()) / bars.getWidth());
+            check ("output bars: the value is the level at the pointer (" + hint.value + ", expected " + juce::String (expected, 1) + " dB)",
+                   hint.value.endsWith (" dB") && std::abs (hint.value.getFloatValue() - expected) < 0.06f);
             check ("output bars: left above right, a 1 px gap", out.barArea (0).getBottom() < out.barArea (1).getY());
             ui.setHintForSnapshot (hint);
             saveArea (ui, toolbar, prefix + "-tb-hint-bars.png");
@@ -73,6 +81,7 @@
             menuShot (copy, "Hint bar", "hint-copy-menu");
 
             // the Mixer: a locked track (2), a soloed one (1), the hint at a mute switch and at a strip meter
+            ui.setBounds (normalSize);
             ui.selectTabForSnapshot (3);
             offline.dispatchPendingMessages();
             auto& strips = ui.getMixerForSnapshot().getStripsForSnapshot();
@@ -100,7 +109,7 @@
             check ("Mixer meter: the level under the pointer (about -27 dB at half height: " + meterHint.value + ")",
                    meterHint.value.endsWith (" dB") && std::abs (meterHint.value.getFloatValue() + 27.0f) < 1.0f);
             ui.setHintForSnapshot (meterHint);
-            saveArea (ui, toolbar, prefix + "-mixer-hint-meter.png");
+            saveArea (ui, ui.getToolbarBoundsForSnapshot(), prefix + "-mixer-hint-meter.png");
             {
                 MixerTrack locked;
                 locked.lockState = true;
@@ -162,11 +171,11 @@
                     dock->stepPresetForCheck (1);
                     offline.dispatchPendingMessages();
                     const auto after = name();
-                    line ("preset › : " + before + " -> " + after);
-                    check ("› steps to the next preset in the menu's order", after == juce::String (chains::stepped (before.toStdString(), 1)->name));
+                    line ("preset > : " + before + " -> " + after);
+                    check ("> steps to the next preset in the menu's order", after == juce::String (chains::stepped (before.toStdString(), 1)->name));
                     dock->stepPresetForCheck (-1);
                     offline.dispatchPendingMessages();
-                    check ("‹ steps back", name() == before);
+                    check ("< steps back", name() == before);
                     dock->bypassChainForCheck();
                     offline.dispatchPendingMessages();
                     dock->refresh();
