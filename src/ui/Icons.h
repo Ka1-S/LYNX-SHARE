@@ -61,9 +61,10 @@ enum class Icon
     // round 190jo (design190ia FW-22): the audio editor's tool grid and small icon row, LYNX vectors with Edison's metaphors
     copy, paste, trash, trim, silence, fadeIn, fadeOut, fadeCurve, normalize, amp, reverse, invert, dcCenter, resample,
     marker, region, setLoop, equalizer, denoise, reverb, spectrogram,
-    pointer            // round 190jq: the Playlist's pointer-click switch, a mouse pointer (issue #191)
+    pointer,           // round 190jq: the Playlist's pointer-click switch, a mouse pointer (issue #191)
+    scrub              // round natives190kj: Edison's Scrub button (a film reel: a ring with four holes around a hub)
 };
-constexpr int iconCount = (int) Icon::pointer + 1;
+constexpr int iconCount = (int) Icon::scrub + 1;
 
 namespace icons
 {

@@ -7,12 +7,15 @@
 #include <map>
 #include <set>
 
+#include "core/AudioEdit.h"
 #include "core/MixerOps.h"
 #include "core/NewtoneFx.h"
 #include "core/VocalPitch.h"
 #include "engine/MidiFileIo.h"
 #include "engine/Text.h"
 #include "ui/I18n.h"
+#include "ui/Icons.h"
+#include "ui/MidiClipboard.h"
 #include "ui/Theme.h"
 #include "ui/WindowOwner.h"
 
@@ -33,6 +36,25 @@ juce::String noteName (double midi)
     const auto k = (int) std::lround (midi);
     return juce::String (noteNames[((k % 12) + 12) % 12]) + juce::String (k / 12);
 }
+
+// Round 190kj: FL's Newtone window (FL 2026, measured on a 100 % capture): its header, piano-roll grid and note look.
+// Colours read off the capture; every shape is LYNX's own vector drawing.
+namespace flnt
+{
+// header: FL's form data (TSynthEditorForm in Newtone_x64.dll: control rectangles, TColor values, hints); note view: the
+// 100 % capture of round 190gu
+const juce::Colour header { 0xff1a2227 }, headerDark { 0xff151b1f }, transportFace { 0xff292f32 }, buttonFace { 0xff2f3437 },
+    buttonEdge { 0xff12171a }, iconInk { 0xffe4eaee }, caption { 0xff474f54 }, nameInk { 0xffebeef9 }, valueInk { 0xffb0b2b7 },
+    knobLabel { 0xffbccaca }, rail { 0xff3f484d }, cap { 0xffaeb4b7 }, centreArc { 0xff33c18c }, variationArc { 0xffffb00d },
+    transArc { 0xff33c1e1 }, slaveOn { 0xffff9b37 }, followOn { 0xff40c65a }, cutOn { 0xff799bbd }, advancedOn { 0xffc460a0 },
+    padOff { 0xff2a2a2a }, rulerBg { 0xff1e2930 }, rulerLine { 0xff2d3940 }, rulerInk { 0xffb4c0c8 }, rowIn { 0xff3d4e59 },
+    rowOut { 0xff2d3d47 }, rowLine { 0xff2b3b45 }, stepLine { 0xff2a3b46 }, beatLine { 0xff283b46 }, barLine { 0xff102632 },
+    keyWhite { 0xffcdd1d9 }, keyBlack { 0xff2d3038 }, keyLine { 0xff8b8e96 }, keyC { 0xffadb1b8 }, blob { 0xffced7dd },
+    orange { 0xffff7900 }, orangeLine { 0xffff9b30 }, pitchCore { 0xff14120f }, green { 0xff40c65a }, scroll { 0xff323a3f };
+constexpr int headerHeight = 88, formWidth = 727, keyboardWidth = 76, rulerHeight = 16, scrollSize = 18, defaultRow = 22;
+// FL's TVectorWheel sweep: from 145.7 degrees left of the top, 304 degrees clockwise (StartAngle / EndAngle)
+constexpr float knobStart = -2.5428f, knobSweep = 5.3058f;
+} // namespace flnt
 
 // Snap to scale (FL's Edit › Snap to scale / Scale): pitch classes from the key, bit n = key + n
 struct ScaleDef
@@ -89,8 +111,10 @@ struct BarSlider
 };
 
 class NewtoneEditor final : public juce::Component,
+                            public juce::SettableTooltipClient,
                             public juce::FileDragAndDropTarget,
                             private juce::ChangeListener,
+                            private juce::ScrollBar::Listener,
                             private juce::Timer
 {
 public:
@@ -240,11 +264,21 @@ public:
         perNote (vibEndKnob, [] (newtonefx::Note& p, double v) { p.vibAmpEnd = v; });
         perNote (tremoloKnob, [] (newtonefx::Note& p, double v) { p.tremAmp = v / 100.0; });
 
+        for (auto* bar : { &hScroll, &vScroll })
+        {
+            addChildComponent (*bar);
+            bar->addListener (this);
+            bar->setAutoHide (false);
+            bar->setColour (juce::ScrollBar::backgroundColourId, flnt::scroll.darker (0.3f));
+            bar->setColour (juce::ScrollBar::thumbColourId, juce::Colour (0xff5d6b73));
+        }
         setWantsKeyboardFocus (true);
         engine.addChangeListener (this);
         reloadFromSong();
-        startTimerHz (30);
-        setSize (1040, 520);
+        // (no timer while idle: it runs only while the preview plays, round 190kj)
+        setSize (flLook() ? flnt::formWidth : 1040, flLook() ? 582 : 520); // (FL's TSynthEditorForm: 727 x 582)
+        if (flLook())
+            centreRowsOnNotes();
     }
 
     ~NewtoneEditor() override
@@ -257,6 +291,11 @@ public:
     // ------------------------------------------------------------------------------------------------------------
     void paint (juce::Graphics& g) override
     {
+        if (flLook())
+        {
+            paintFl (g);
+            return;
+        }
         g.fillAll (theme::colour::bg2);
         const auto area = canvasArea();
         g.setColour (theme::colour::bg0);
@@ -306,6 +345,11 @@ public:
 
     void resized() override
     {
+        if (flLook())
+        {
+            resizedFl();
+            return;
+        }
         auto r = getLocalBounds().reduced (8);
         auto top = r.removeFromTop (26);
         for (auto* b : { &load, &analyse, &cutMode, &snapAll, &stretch, &reset, &preview, &save, &toPlaylist, &scoreButton, &snapButton })
@@ -364,6 +408,8 @@ public:
             engine.redo();
             return true;
         }
+        if (flLook() && flKey (key))
+            return true;
         if (warpMode() || sample == nullptr)
             return false;
         if (cmd && key.getKeyCode() == 'A')
@@ -412,6 +458,8 @@ public:
         grabKeyboardFocus();
         drag = {};
         band = {};
+        if (flLook() && flMouseDown (e))
+            return;
         if (sample == nullptr)
             return;
         if (! warpMode() && rulerArea().contains (e.getPosition()))
@@ -445,9 +493,10 @@ public:
         }
 
         const auto hit = noteAt (e.position);
-        if (cutMode.getToggleState() && hit >= 0 && ! e.mods.isPopupMenu())
+        const auto cutting = cutMode.getToggleState() || (flLook() && e.mods.isShiftDown()); // (FL: Shift = Cut mode while held)
+        if (cutting && hit >= 0 && ! e.mods.isPopupMenu())
         {
-            if (e.mods.isCtrlDown() || e.mods.isCommandDown())
+            if (e.mods.isCtrlDown() || e.mods.isCommandDown() || (flLook() && e.mods.isAltDown()))
             {
                 if (newtonefx::glueNote (notes, (std::size_t) hit))
                 {
@@ -468,7 +517,7 @@ public:
             selectionChanged();
             return;
         }
-        if (e.mods.isShiftDown())
+        if (! flLook() && e.mods.isShiftDown())
         {
             if (! selected.erase (hit))
                 selected.insert (hit);
@@ -482,6 +531,14 @@ public:
         }
         if (e.mods.isPopupMenu())
         {
+            // FL: right-click snaps the note to its nearest semitone (Shift+right-click: LYNX's note menu)
+            if (flLook() && ! e.mods.isShiftDown())
+            {
+                for (const auto q : selection())
+                    snapNote (q);
+                commit();
+                return;
+            }
             showNoteMenu (hit);
             return;
         }
@@ -497,6 +554,8 @@ public:
 
     void mouseDrag (const juce::MouseEvent& e) override
     {
+        if (flLook() && flMouseDrag (e))
+            return;
         if (warpMode())
         {
             if (drag.marker < 0 || drag.marker >= (int) warp.markers.size())
@@ -556,8 +615,10 @@ public:
         repaint();
     }
 
-    void mouseUp (const juce::MouseEvent&) override
+    void mouseUp (const juce::MouseEvent& e) override
     {
+        if (flLook())
+            flMouseUp (e);
         if (drag.moved)
             commit();
         drag = {};
@@ -568,8 +629,21 @@ public:
 
     void mouseMove (const juce::MouseEvent& e) override
     {
+        if (flLook())
+        {
+            flMouseMove (e);
+            return;
+        }
         const auto cutting = ! warpMode() && cutMode.getToggleState() && noteAt (e.position) >= 0;
         setMouseCursor (cutting ? juce::MouseCursor::IBeamCursor : juce::MouseCursor::NormalCursor);
+    }
+    void mouseExit (const juce::MouseEvent&) override
+    {
+        if (hoverHit != Hit::none)
+        {
+            hoverHit = Hit::none;
+            repaint (headerArea());
+        }
     }
 
     void mouseDoubleClick (const juce::MouseEvent& e) override
@@ -597,6 +671,32 @@ public:
         }
         if (cutMode.getToggleState())
             return;
+        if (flLook())
+        {
+            // FL: double-click a note = Advanced Edit on it; double-click the empty roll leaves Advanced Edit
+            if (hitAt (e.position) != Hit::none || ! flCanvas().contains (e.getPosition()))
+                return;
+            if (const auto k = noteAt (e.position); k >= 0)
+            {
+                currentNote = k;
+                advancedEdit = true;
+                // FL zooms in on the note (rows ~1.5 x taller), keeping it where it was clicked
+                const auto anchor = pitchOfY (e.position.y);
+                rowH = std::max (rowH, 33.0);
+                topPitch = anchor + (double) (e.position.y - (float) flCanvas().getY()) / rowH;
+                const auto at = outputOfX (e.position.x);
+                zoom = std::clamp (zoom * 1.35, 1.0, 512.0);
+                scroll = at - (e.position.x - (float) flCanvas().getX()) / pixelsPerSample();
+                clampScroll();
+                updateScrollBars();
+            }
+            else
+                advancedEdit = false, currentNote = -1;
+            selectionChanged();
+            resized();
+            repaint();
+            return;
+        }
         if (const auto k = noteAt (e.position); k >= 0)
         {
             snapNote (k);
@@ -619,6 +719,11 @@ public:
     {
         if (sample == nullptr)
             return;
+        if (flLook())
+        {
+            flWheel (e, w);
+            return;
+        }
         if (e.mods.isCtrlDown() || e.mods.isCommandDown())
         {
             const auto anchor = outputOfX (e.position.x);
@@ -747,13 +852,19 @@ private:
         tremoloKnob.slider.setValue (p.tremAmp * 100.0);
     }
 
+    // the scale: FL's look uses the track's key (FL's KeyIdx: the detected key, or the one picked in Edit › Scale)
     std::uint16_t scaleMask() const
     {
+        if (flLook())
+            return newtonefx::keyScaleMask (notes.key);
         const auto i = std::clamp (scaleBox.getSelectedId() - 1, 0, (int) std::size (scales) - 1);
         return scales[i].mask;
     }
-    int scaleKey() const { return std::max (0, keyBox.getSelectedId() - 1); }
-    double snapped (double pitch) const { return newtonefx::nearestInScale (pitch, scaleKey(), scaleMask()); }
+    int scaleKey() const { return flLook() ? std::max (0, notes.key) % 12 : std::max (0, keyBox.getSelectedId() - 1); }
+    double snapped (double pitch) const
+    {
+        return newtonefx::nearestInScale (pitch, scaleKey(), flLook() && ! snapScale ? (std::uint16_t) 0xFFF : scaleMask());
+    }
     void snapNote (int k)
     {
         auto& p = notes.pitches[(std::size_t) k];
@@ -831,11 +942,14 @@ private:
         kind = fx->kind;
         slave.setToggleState (fx->params[0] >= 0.5f, juce::dontSendNotification);
         savedState = fx->state;
+        auto fresh = false;
         if (fx->samplePath != samplePath || sample == nullptr)
         {
             samplePath = fx->samplePath;
             sample = samplePath.empty() ? nullptr : engine.getSampleLibrary().load (juce::String::fromUTF8 (samplePath.c_str()));
             analyseView();
+            readSampleTempo();
+            fresh = true;
         }
         if (warpMode())
         {
@@ -843,7 +957,11 @@ private:
             warp.frames = frames();
         }
         else if (auto t = newtonefx::trackOf (fx->state); t && sample != nullptr)
+        {
             notes = *t;
+            if (notes.key < 0)
+                notes.key = newtonefx::detectKey (notes); // (an older state: the key the notes give)
+        }
         else if (sample == nullptr)
             notes = {};
         else
@@ -856,8 +974,26 @@ private:
             });
         }
         selectionChanged();
+        if (fresh && flLook() && getHeight() > 0)
+            centreRowsOnNotes();
         updateButtons();
         repaint();
+    }
+
+    // the sample's own tempo (a WAV's acid chunk, FL's Tempo read-out; 0 = none, shown as "-")
+    void readSampleTempo()
+    {
+        sampleTempo = 0.0;
+        tempoSync = false;
+        const juce::File f (juce::String::fromUTF8 (samplePath.c_str()));
+        if (! f.hasFileExtension ("wav") || f.getSize() > (juce::int64) 512 * 1024 * 1024)
+            return;
+        juce::MemoryBlock data;
+        if (! f.loadFileAsData (data))
+            return;
+        audioedit::Document doc;
+        if (audioedit::decodeWavMarkers ((const std::uint8_t*) data.getData(), data.getSize(), doc))
+            sampleTempo = doc.props.tempo;
     }
 
     // the waveform and pitch curve shown (not saved)
@@ -950,10 +1086,12 @@ private:
         {
             previewing = false;
             engine.previewSample (nullptr);
+            stopTimer();
         }
         else
             startPreview();
         updateButtons();
+        repaint();
     }
 
     void startPreview()
@@ -962,7 +1100,13 @@ private:
         if (fx == nullptr || sample == nullptr)
             return;
         previewing = true;
-        engine.previewSample (newtonefx::renderedSource (sample, savedState), false, 0.8f);
+        silentTicks = 0;
+        auto out = newtonefx::renderedSource (sample, savedState);
+        if (flLook() && out != nullptr && (hasTimeSelection() || cursorAt > 0))
+            out = newtonefx::cropped (*out, previewOffset(), hasTimeSelection() ? timeSelB : (std::int64_t) out->frames()); // (FL plays the selection, or from the cursor)
+        previewSource = out;
+        engine.previewSample (out, flLook() && looping, 0.8f);
+        startTimerHz (30);
     }
 
     // FL's Snap to grid (Newtone / Newtime Snap menu): Beat, 1/2, 1/3, 1/4, 1/6, 1/8 beat, Off; Alt = free
@@ -993,14 +1137,29 @@ private:
     {
         if (sample == nullptr)
             return;
-        const auto out = newtonefx::renderedSource (sample, savedState);
+        auto out = newtonefx::renderedSource (sample, savedState);
+        if (out == nullptr)
+            return;
+        const auto part = flLook() && hasTimeSelection();
+        if (part)
+            out = newtonefx::cropped (*out, timeSelA, timeSelB);
         const juce::File src (juce::String::fromUTF8 (samplePath.c_str()));
         const auto folder = juce::File::getSpecialLocation (juce::File::userMusicDirectory).getChildFile ("LYNX/Edits");
         folder.createDirectory();
         const auto title = src.getFileNameWithoutExtension().isNotEmpty() ? src.getFileNameWithoutExtension() : juce::String ("Dragged sample");
         const auto file = folder.getNonexistentChildFile (juce::File::createLegalFileName (title), ".wav");
-        if (! writeWav (*out, file))
-            return;
+        if (part)
+        {
+            if (! writeWav (*out, file))
+                return;
+        }
+        else
+        {
+            // FL sends the audio with the note boundaries as markers (round 190kj)
+            const auto bytes = audioedit::encodeWav (newtonefx::regionsDocument (*out, notes, true));
+            if (! file.replaceWithData (bytes.data(), bytes.size()))
+                return;
+        }
         const auto& song = engine.getSong();
         const auto length = juce::jmax<std::int64_t> (ppq / 4, (std::int64_t) ((double) out->frames() / out->sampleRate * song.bpm / 60.0 * ppq));
         const auto start = (std::int64_t) (engine.getTransport().positionTicks.load() / ppq) * ppq;
@@ -1058,7 +1217,14 @@ private:
                                   if (safe == nullptr || fc.getResult() == juce::File())
                                       return;
                                   const auto out = newtonefx::renderedSource (safe->sample, safe->savedState);
-                                  writeWav (*out, fc.getResult().withFileExtension ("wav"));
+                                  const auto target = fc.getResult().withFileExtension ("wav");
+                                  if (safe->flLook() && safe->exportRegionsOnSave) // (FL's File › Export regions: the notes as regions)
+                                  {
+                                      const auto bytes = audioedit::encodeWav (newtonefx::regionsDocument (*out, safe->notes));
+                                      target.replaceWithData (bytes.data(), bytes.size());
+                                  }
+                                  else
+                                      writeWav (*out, target);
                               });
     }
 
@@ -1231,12 +1397,41 @@ private:
             if (engine.getPreviewPosition() < 0.0 && ++silentTicks > 15) // the preview ended
             {
                 previewing = false;
+                stopTimer();
                 updateButtons();
+                repaint();
             }
             else if (engine.getPreviewPosition() >= 0.0)
+            {
                 silentTicks = 0;
-            repaint (canvasArea());
+                // FL's header meter: the preview's peak over the last 33 ms
+                if (flLook() && previewSource != nullptr)
+                {
+                    const auto at = (std::int64_t) engine.getPreviewPosition();
+                    const auto from = std::max<std::int64_t> (0, at - (std::int64_t) (0.033 * previewSource->sampleRate));
+                    float peak = 0.0f;
+                    for (auto i = from; i < std::min<std::int64_t> (at, (std::int64_t) previewSource->frames()); ++i)
+                        peak = std::max ({ peak, std::abs (previewSource->leftData()[i]), previewSource->isStereo() ? std::abs (previewSource->rightData()[i]) : 0.0f });
+                    previewLevel = std::max (peak * 0.8f, previewLevel * 0.82f);
+                    repaint (headerArea());
+                }
+                // Auto-scroll (FL's A): the view pages along with the playback position
+                if (flLook() && autoScroll)
+                {
+                    const auto pos = engine.getPreviewPosition() + previewOffset();
+                    if (pos < scroll || pos > scroll + visibleLength() * 0.95)
+                    {
+                        scroll = pos - visibleLength() * 0.05;
+                        clampScroll();
+                        updateScrollBars();
+                        repaint();
+                    }
+                }
+            }
+            repaint (flLook() ? flBody() : canvasArea());
         }
+        else
+            stopTimer();
     }
     int silentTicks = 0;
 
@@ -1247,11 +1442,15 @@ private:
     }
     juce::Rectangle<int> panelArea() const
     {
+        if (flLook())
+            return flPanel();
         auto r = contentArea();
         return warpMode() ? juce::Rectangle<int>() : r.removeFromRight (250);
     }
     juce::Rectangle<int> rulerArea() const
     {
+        if (flLook())
+            return flKeyboard();
         auto r = contentArea();
         if (warpMode())
             return {};
@@ -1260,6 +1459,8 @@ private:
     }
     juce::Rectangle<int> canvasArea() const
     {
+        if (flLook())
+            return flCanvas();
         auto r = contentArea();
         if (! warpMode())
         {
@@ -1299,17 +1500,23 @@ private:
     }
     double rowHeight() const
     {
+        if (flLook())
+            return rowH;
         const auto [lo, hi] = pitchRange();
         return (double) canvasArea().getHeight() / std::max (1.0, hi - lo);
     }
     float yOfPitch (double midi) const
     {
+        if (flLook())
+            return (float) flCanvas().getY() + (float) ((topPitch - midi) * rowH);
         const auto [lo, hi] = pitchRange();
         const auto area = canvasArea();
         return (float) area.getBottom() - (float) ((midi - lo) * (double) area.getHeight() / std::max (1.0, hi - lo));
     }
     double pitchOfY (float y) const
     {
+        if (flLook())
+            return topPitch - (double) (y - (float) flCanvas().getY()) / rowH;
         const auto [lo, hi] = pitchRange();
         const auto area = canvasArea();
         return lo + (double) ((float) area.getBottom() - y) * std::max (1.0, hi - lo) / (double) std::max (1, area.getHeight());
@@ -1318,7 +1525,7 @@ private:
     juce::Rectangle<float> noteBounds (int k) const
     {
         const auto& p = notes.pitches[(std::size_t) k];
-        const auto h = (float) std::max (6.0, rowHeight() * 0.8);
+        const auto h = (float) std::max (6.0, rowHeight() * (flLook() ? 1.0 : 0.8));
         const auto x0 = xOfOutput ((double) p.curStart), x1 = xOfOutput ((double) p.curEnd);
         return { x0, yOfPitch (p.origPitch + p.shift) - 0.5f * h, std::max (2.0f, x1 - x0), h };
     }
@@ -1329,7 +1536,7 @@ private:
         for (int k = (int) notes.pitches.size() - 1; k >= 0; --k)
         {
             const auto& p = notes.pitches[(std::size_t) k];
-            if (p.origPitch <= 0.0)
+            if (p.origPitch <= 0.0 || ! p.voiced())
                 continue;
             const auto y = yOfPitch (p.origPitch + p.shift);
             if (pos.x >= xOfOutput ((double) p.curStart) && pos.x <= xOfOutput ((double) p.curEnd) && std::abs (pos.y - y) <= std::max (5.0f, 0.5f * h))
@@ -1460,6 +1667,1482 @@ private:
         }
     }
 
+    // ============================================================================================================
+    // Round 190kj: FL's Newtone window. The header (transport, slave / auto-scroll, name, title, the File / Edit /
+    // Select / Undo menus, Create score / Save as / Drag selection / Send selection to Playlist, Length / Sel, Tempo +
+    // Sync, the Center / Variation / Trans knobs, Cut mode and Advanced Edit) and the note view (keyboard, bar ruler,
+    // grid rows by scale, notes as FL draws them) at FL's measured sizes. Newtime keeps its own layout.
+    enum class Hit
+    {
+        none, loop, play, stop, slave, follow, fileMenu, editMenu, selectMenu, undo, score, saveAs, dragOut, toPlaylist, sync,
+        cut, advanced, knobCentre, knobVariation, knobTrans
+    };
+    bool flLook() const noexcept { return ! warpMode() && ! oldLook; }
+    bool oldLook = false; // (--newtoneshot "lynxlook": the round-165g layout, for the paint before / after only)
+public:
+    void shotState (const juce::String& state)
+    {
+        const auto arg = state.fromFirstOccurrenceOf (":", false, false);
+        if (state.startsWith ("select:"))
+        {
+            selected.clear();
+            for (const auto& t : juce::StringArray::fromTokens (arg, ",", ""))
+                selected.insert (t.getIntValue());
+            selectionChanged();
+        }
+        else if (state == "advanced")
+        {
+            advancedEdit = true;
+            currentNote = selected.empty() ? 1 : *selected.begin();
+            selected.clear();
+            rowH = 33.0;
+            zoom = 1.35;
+            if (currentNote < (int) notes.pitches.size())
+                scroll = std::max (0.0, (double) notes.pitches[(std::size_t) currentNote].curStart - 0.35 * visibleLength());
+            clampScroll();
+        }
+        else if (state == "vibrato")
+            vibratoEdit = true;
+        else if (state.startsWith ("cursor:"))
+            cursorAt = arg.getLargeIntValue();
+        else if (state == "cut")
+            cutMode.setToggleState (true, juce::dontSendNotification);
+        else if (state.startsWith ("timesel:"))
+            timeSelA = arg.upToFirstOccurrenceOf (",", false, false).getLargeIntValue(), timeSelB = arg.fromFirstOccurrenceOf (",", false, false).getLargeIntValue();
+        else if (state.startsWith ("zoom:"))
+            zoom = std::max (1.0, arg.getDoubleValue());
+        else if (state.startsWith ("shift:"))
+        {
+            const auto k = arg.upToFirstOccurrenceOf (",", false, false).getIntValue();
+            if (k >= 0 && k < (int) notes.pitches.size())
+                notes.pitches[(std::size_t) k].shift = arg.fromFirstOccurrenceOf (",", false, false).getDoubleValue();
+        }
+        else if (state == "lynxlook")
+        {
+            oldLook = true;
+            for (auto* b : { &load, &analyse, &cutMode, &snapAll, &reset, &preview, &save, &scoreButton, &snapButton, &toPlaylist })
+                b->setVisible (true);
+            slave.setVisible (true);
+            status.setVisible (true);
+            hScroll.setVisible (false);
+            vScroll.setVisible (false);
+            setSize (1040, 520);
+            updateButtons();
+        }
+        if (flLook() && ! (state == "advanced"))
+            centreRowsOnNotes();
+        else if (flLook() && currentNote >= 0 && currentNote < (int) notes.pitches.size())
+            topPitch = notes.pitches[(std::size_t) currentNote].origPitch + 0.5 * (double) flCanvas().getHeight() / rowH;
+        resized();
+        repaint();
+    }
+private:
+    bool looping = false, autoScroll = true, advancedEdit = false, snapScale = false; // (FL: Auto-scroll on at start)
+    // Edit › Advanced edit vibrato: LYNX shows its note panel (the selected notes' vibrato, tremolo, formant... as
+    // numbers) beside the roll; FL draws its vibrato handles on the note (not reproduced)
+    bool vibratoEdit = false;
+    std::int64_t cursorAt = 0;  // FL's play cursor (a click on the roll puts it there; playback starts from it)
+    int currentNote = -1;       // the note Advanced edit shows its handles on (the one double-clicked)
+    double rowH = flnt::defaultRow, topPitch = 74.0; // the note view's row height and the pitch at its top edge
+    std::int64_t timeSelA = -1, timeSelB = -1;     // FL's time selection (output samples), -1 = none
+    Hit pressedHit = Hit::none, hoverHit = Hit::none;
+    double knobFrom = 0.0;
+    bool rulerSelecting = false;
+    juce::ScrollBar hScroll { false }, vScroll { true };
+
+    bool hasTimeSelection() const noexcept { return timeSelA >= 0 && timeSelB > timeSelA; }
+    juce::Rectangle<int> headerArea() const { return getLocalBounds().removeFromTop (flnt::headerHeight); }
+    juce::Rectangle<int> flBody() const { return getLocalBounds().withTrimmedTop (flnt::headerHeight); }
+    juce::Rectangle<int> flKeyboard() const
+    {
+        return flBody().withTrimmedTop (flnt::rulerHeight).withTrimmedBottom (flnt::scrollSize).removeFromLeft (flnt::keyboardWidth);
+    }
+    juce::Rectangle<int> timeRulerArea() const
+    {
+        auto r = flBody().removeFromTop (flnt::rulerHeight).withTrimmedLeft (flnt::keyboardWidth).withTrimmedRight (flnt::scrollSize);
+        if (vibratoEdit)
+            r.removeFromRight (252);
+        return r;
+    }
+    juce::Rectangle<int> flCanvas() const
+    {
+        auto r = flBody().withTrimmedTop (flnt::rulerHeight).withTrimmedLeft (flnt::keyboardWidth).withTrimmedRight (flnt::scrollSize)
+                     .withTrimmedBottom (flnt::scrollSize);
+        if (vibratoEdit)
+            r.removeFromRight (252);
+        return r;
+    }
+    juce::Rectangle<int> flPanel() const
+    {
+        if (! vibratoEdit)
+            return {};
+        return flBody().withTrimmedTop (flnt::rulerHeight).withTrimmedRight (flnt::scrollSize).withTrimmedBottom (flnt::scrollSize)
+            .removeFromRight (252);
+    }
+
+    // header hit boxes, FL's positions at its 735 px window; the right-hand groups keep their distance to the right edge
+    juce::Rectangle<float> hitBox (Hit h) const
+    {
+        // FL's control rectangles; the right-anchored ones (akRight) keep their distance to the right edge
+        const auto shift = (float) (getWidth() - flnt::formWidth);
+        auto at = [&] (float x, float y, float w, float hh, bool right) { return juce::Rectangle<float> (x + (right ? shift : 0.0f), y, w, hh); };
+        switch (h)
+        {
+            case Hit::loop: return at (5, 11, 29, 28, false);
+            case Hit::play: return at (34, 11, 29, 28, false);
+            case Hit::stop: return at (63, 11, 29, 28, false);
+            case Hit::slave: return at (5, 41, 35, 17, false);
+            case Hit::follow: return at (43, 41, 35, 17, false);
+            case Hit::fileMenu: return at (326, 11, 26, 29, true);
+            case Hit::editMenu: return at (350, 11, 26, 29, true);
+            case Hit::selectMenu: return at (374, 11, 26, 29, true);
+            case Hit::undo: return at (398, 11, 26, 29, true);
+            case Hit::score: return at (437, 11, 26, 29, true);
+            case Hit::saveAs: return at (461, 11, 26, 29, true);
+            case Hit::dragOut: return at (485, 11, 26, 29, true);
+            case Hit::toPlaylist: return at (509, 11, 26, 29, true);
+            case Hit::sync: return at (514, 60, 31, 12, true);
+            case Hit::cut: return at (600, 64, 31, 18, true);
+            case Hit::advanced: return at (633, 64, 31, 18, true);
+            case Hit::knobCentre: return at (566, 9, 40, 40, true);
+            case Hit::knobVariation: return at (612, 9, 40, 40, true);
+            case Hit::knobTrans: return at (658, 9, 40, 40, true);
+            case Hit::none: break;
+        }
+        return {};
+    }
+    Hit hitAt (juce::Point<float> p) const
+    {
+        if (! headerArea().toFloat().contains (p))
+            return Hit::none;
+        for (int h = (int) Hit::loop; h <= (int) Hit::knobTrans; ++h)
+            if (hitBox ((Hit) h).contains (p))
+                return (Hit) h;
+        return Hit::none;
+    }
+    juce::String hitTip (Hit h) const
+    {
+        switch (h) // (FL's hints, TSynthEditorForm)
+        {
+            case Hit::loop: return tr ("Loop") + " (L)";
+            case Hit::play: return tr ("Play / pause") + " (" + tr ("Space") + ")";
+            case Hit::stop: return tr ("Stop") + " (" + tr ("Space") + ")";
+            case Hit::slave: return tr ("Slave playback to host (H)");
+            case Hit::follow: return tr ("Scroll to follow cursor") + " (A)";
+            case Hit::fileMenu: return tr ("File");
+            case Hit::editMenu: return tr ("Edit");
+            case Hit::selectMenu: return tr ("Select");
+            case Hit::undo: return tr ("Undo / Redo");
+            case Hit::score: return tr ("Send to pianoroll / Copy to MIDI clipboard");
+            case Hit::saveAs: return tr ("Save as...");
+            case Hit::dragOut: return tr ("Drag selection");
+            case Hit::toPlaylist: return tr ("Send to playlist");
+            case Hit::sync: return tr ("Tempo-sync");
+            case Hit::cut: return tr ("Cut mode") + " (C)";
+            case Hit::advanced: return tr ("Advanced edit") + " (Ctrl+E)";
+            case Hit::knobCentre: return tr ("Center");
+            case Hit::knobVariation: return tr ("Variation");
+            case Hit::knobTrans: return tr ("Transition");
+            case Hit::none: break;
+        }
+        return {};
+    }
+
+    // ---------------------------------------------------------------------------------------------- header paint
+    static void flButtonFace (juce::Graphics& g, juce::Rectangle<float> r, bool down, bool hover)
+    {
+        g.setColour (flnt::buttonEdge);
+        g.fillRoundedRectangle (r, 2.0f);
+        auto face = r.reduced (1.0f);
+        juce::ColourGradient grad (flnt::buttonFace.brighter (hover ? 0.18f : 0.08f), face.getX(), face.getY(), flnt::buttonFace.darker (down ? 0.3f : 0.1f),
+                                   face.getX(), face.getBottom(), false);
+        g.setGradientFill (grad);
+        g.fillRoundedRectangle (face, 1.5f);
+    }
+    static void flDropArrow (juce::Graphics& g, juce::Rectangle<float> r)
+    {
+        juce::Path tri;
+        const auto cx = r.getCentreX(), y = r.getBottom() - 6.0f;
+        tri.addTriangle (cx - 3.5f, y, cx + 3.5f, y, cx, y + 3.5f);
+        g.setColour (flnt::caption);
+        g.fillPath (tri);
+    }
+    void flIcon (juce::Graphics& g, Icon icon, juce::Rectangle<float> r, float size, bool menu, juce::Colour ink = flnt::iconInk) const
+    {
+        auto box = juce::Rectangle<float> (size, size).withCentre ({ r.getCentreX(), r.getY() + (menu ? 11.5f : r.getHeight() * 0.5f) });
+        icons::draw (g, icon, box, ink);
+        if (menu)
+            flDropArrow (g, r);
+    }
+    void flKnob (juce::Graphics& g, Hit h, double value01, juce::Colour arc, const juce::String& label, float labelX, float labelW) const
+    {
+        const auto box = hitBox (h);
+        const auto c = box.getCentre();
+        const auto r = 17.5f;
+        juce::Path rail;
+        rail.addCentredArc (c.x, c.y, r, r, 0.0f, flnt::knobStart, flnt::knobStart + flnt::knobSweep, true);
+        g.setColour (flnt::rail);
+        g.strokePath (rail, juce::PathStrokeType (3.0f, juce::PathStrokeType::curved, juce::PathStrokeType::butt));
+        const auto angle = flnt::knobStart + flnt::knobSweep * (float) std::clamp (value01, 0.0, 1.0);
+        if (value01 > 0.001)
+        {
+            juce::Path a;
+            a.addCentredArc (c.x, c.y, r, r, 0.0f, flnt::knobStart, angle, true);
+            g.setColour (arc);
+            g.strokePath (a, juce::PathStrokeType (3.0f, juce::PathStrokeType::curved, juce::PathStrokeType::butt));
+        }
+        const auto capBox = juce::Rectangle<float> (25.0f, 25.0f).withCentre (c);
+        juce::ColourGradient grad (flnt::cap.brighter (0.45f), capBox.getX() + 5.0f, capBox.getY() + 3.0f, flnt::cap.darker (0.55f), capBox.getRight(), capBox.getBottom(), true);
+        g.setGradientFill (grad);
+        g.fillEllipse (capBox);
+        g.setColour (juce::Colour (0xff3a4247));
+        g.drawEllipse (capBox, 1.0f);
+        const juce::Point<float> tip (c.x + 11.0f * std::sin (angle), c.y - 11.0f * std::cos (angle));
+        g.setColour (juce::Colour (0xff20272b));
+        g.drawLine ({ c, tip }, 2.2f);
+        g.setColour (flnt::knobLabel);
+        g.setFont (juce::Font (juce::FontOptions (10.0f, juce::Font::bold)).withHorizontalScale (0.86f));
+        g.drawText (label, juce::Rectangle<float> (labelX + (float) (getWidth() - flnt::formWidth), 50.0f, labelW, 11.0f), juce::Justification::centred, false);
+    }
+    void paintFlHeader (juce::Graphics& g) const
+    {
+        const auto area = headerArea().toFloat();
+        // (FL's toolbar as drawn: #191f24 at the top to #161c20 at the bottom, measured on the 2026 capture)
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0xff191f24), 0.0f, area.getY(), juce::Colour (0xff161c20), 0.0f, area.getBottom(), false));
+        g.fillRect (area);
+        g.setColour (flnt::buttonEdge);
+        g.drawHorizontalLine ((int) area.getBottom() - 1, area.getX(), area.getRight());
+        const auto shift = (float) (getWidth() - flnt::formWidth);
+
+        // transport (FL's FS_Sober buttons, a rounded border)
+        auto transport = [&] (Hit h, Icon icon, float size, juce::Colour ink) {
+            const auto r = hitBox (h);
+            g.setColour (flnt::buttonEdge);
+            g.fillRoundedRectangle (r, 3.0f);
+            g.setColour (flnt::transportFace.brighter (pressedHit == h ? -0.2f : hoverHit == h ? 0.15f : 0.0f));
+            g.fillRoundedRectangle (r.reduced (1.0f), 2.5f);
+            flIcon (g, icon, r, size, false, ink);
+        };
+        transport (Hit::loop, Icon::loop, 16.0f, looping ? flnt::slaveOn : flnt::iconInk);
+        transport (Hit::play, Icon::play, 12.0f, previewing ? flnt::green : flnt::iconInk);
+        transport (Hit::stop, Icon::stop, 10.0f, flnt::iconInk);
+        // FL's pads (FS_Pad): lit in their own colour when on
+        auto pad = [&] (Hit h, Icon icon, bool on, juce::Colour lit) {
+            const auto r = hitBox (h);
+            g.setColour (flnt::buttonEdge);
+            g.fillRoundedRectangle (r, 3.0f);
+            g.setColour (on ? lit : flnt::padOff.brighter (hoverHit == h ? 0.15f : 0.0f));
+            g.fillRoundedRectangle (r.reduced (1.0f), 2.5f);
+            flIcon (g, icon, r, 12.0f, false, on ? juce::Colour (0xff1b1b1b) : juce::Colour (0xffc0c0c0));
+        };
+        pad (Hit::slave, Icon::link, slave.getToggleState(), flnt::slaveOn);
+        pad (Hit::follow, Icon::follow, autoScroll, flnt::followOn);
+        pad (Hit::cut, Icon::knife, cutMode.getToggleState(), flnt::cutOn);
+        pad (Hit::advanced, Icon::envelope, advancedEdit, flnt::advancedOn);
+
+        // the plugin's name where FL draws its logo (LYNX writes the name; FL's artwork is not used)
+        g.setColour (juce::Colour (0xff8796a0));
+        g.setFont (juce::FontOptions (21.0f, juce::Font::bold));
+        g.drawText ("Newtone", juce::Rectangle<float> (107.0f, 12.0f, 150.0f, 30.0f), juce::Justification::centredLeft, false);
+
+        // the menu buttons and the actions (FS_ChannelPulse, a down arrow on the menus)
+        auto menuButton = [&] (Hit h, Icon icon, bool arrow) {
+            const auto r = hitBox (h);
+            g.setColour (flnt::buttonEdge);
+            g.fillRect (r);
+            g.setColour (flnt::buttonFace.brighter (pressedHit == h ? -0.2f : hoverHit == h ? 0.18f : 0.0f));
+            g.fillRect (r.reduced (1.0f));
+            flIcon (g, icon, r, 15.0f, arrow);
+        };
+        menuButton (Hit::fileMenu, Icon::save, true);
+        menuButton (Hit::editMenu, Icon::scissors, true);
+        menuButton (Hit::selectMenu, Icon::select, true);
+        menuButton (Hit::undo, Icon::undo, false);
+        menuButton (Hit::score, Icon::note, false);
+        menuButton (Hit::saveAs, Icon::save, false);
+        menuButton (Hit::dragOut, Icon::audioFile, false);
+        menuButton (Hit::toPlaylist, Icon::playlist, false);
+
+        // captions (Segoe 8, dark grey) and values
+        const auto captionFont = juce::Font (juce::FontOptions (9.5f)).withHorizontalScale (0.95f);
+        g.setFont (captionFont);
+        g.setColour (flnt::caption);
+        g.drawText (tr ("TITLE"), juce::Rectangle<float> (5.0f, 61.0f, 60.0f, 9.0f), juce::Justification::centredLeft, false);
+        g.drawText (tr ("LENGTH / SEL"), juce::Rectangle<float> (400.0f + shift, 61.0f, 72.0f, 9.0f), juce::Justification::centred, false);
+        g.drawText (tr ("TEMPO"), juce::Rectangle<float> (477.0f + shift, 61.0f, 37.0f, 9.0f), juce::Justification::centred, false);
+        g.setColour (flnt::nameInk);
+        g.setFont (juce::FontOptions (12.0f));
+        const juce::File f (juce::String::fromUTF8 (samplePath.c_str()));
+        g.drawText (sample != nullptr ? f.getFileName() : juce::String(), juce::Rectangle<float> (6.0f, 70.0f, 301.0f + shift, 14.0f), juce::Justification::centredLeft, true);
+        g.setColour (flnt::valueInk);
+        const auto lengthText = sample == nullptr ? juce::String()
+                                : hasTimeSelection() ? juce::String (timeSelB - timeSelA)
+                                                     : juce::String (frames());
+        g.drawText (lengthText, juce::Rectangle<float> (362.0f + shift, 70.0f, 104.0f, 15.0f), juce::Justification::centredRight, false);
+        g.drawText (sampleTempo > 0.0 ? juce::String (sampleTempo, 3) + "BPM" : juce::String ("-"), juce::Rectangle<float> (480.0f + shift, 70.0f, 70.0f, 15.0f),
+                    juce::Justification::centredLeft, false);
+        {
+            const auto r = hitBox (Hit::sync);
+            g.setColour (tempoSync ? flnt::slaveOn : juce::Colour (0xff11171a));
+            g.fillRoundedRectangle (r, 2.0f);
+            g.setColour (tempoSync ? juce::Colour (0xff1b1b1b) : flnt::valueInk.withAlpha (sampleTempo > 0.0 ? 0.9f : 0.45f));
+            g.setFont (juce::FontOptions (7.5f, juce::Font::bold));
+            g.drawText ("SYNC", r, juce::Justification::centred, false);
+        }
+
+        // the knobs: CENTER 0..100 %, VARIATION 0..200 % (100 % at the top), TRANS 0..100 % (FL's Max / default values)
+        flKnob (g, Hit::knobCentre, notes.centre, flnt::centreArc, tr ("CENTER"), 566.0f, 40.0f);
+        flKnob (g, Hit::knobVariation, notes.variation / 2.0, flnt::variationArc, tr ("VARIATION"), 607.0f, 50.0f);
+        {
+            // (FL marks a knob's non-zero default with a dot outside the ring: Variation's 100 %)
+            const auto c = hitBox (Hit::knobVariation).getCentre();
+            const auto a = flnt::knobStart + flnt::knobSweep * 0.5f;
+            g.setColour (flnt::variationArc);
+            g.fillEllipse (juce::Rectangle<float> (2.5f, 2.5f).withCentre ({ c.x + 22.5f * std::sin (a), c.y - 22.5f * std::cos (a) }));
+        }
+        flKnob (g, Hit::knobTrans, std::min (1.0, notes.transition), flnt::transArc, tr ("TRANS"), 658.0f, 40.0f);
+
+        // FL's level meter at the right edge (the preview's level while it plays)
+        const auto meter = juce::Rectangle<float> (710.0f + shift, 2.0f, 14.0f, 84.0f);
+        g.setColour (juce::Colour (0xff0d1114));
+        g.fillRect (meter);
+        if (previewing && previewLevel > 0.0f)
+        {
+            const auto h = meter.getHeight() * std::min (1.0f, previewLevel);
+            g.setColour (previewLevel >= 1.0f ? juce::Colour (0xffe03c3c) : flnt::green);
+            g.fillRect (meter.reduced (3.0f, 0.0f).withTop (meter.getBottom() - h));
+        }
+    }
+
+    // --------------------------------------------------------------------------------------------- note view paint
+    void paintFlKeyboard (juce::Graphics& g, juce::Rectangle<int> area) const
+    {
+        juce::Graphics::ScopedSaveState clip (g);
+        g.reduceClipRegion (area);
+        g.setColour (flnt::keyWhite);
+        g.fillRect (area);
+        const auto lo = (int) std::floor (pitchOfY ((float) area.getBottom())) - 1, hi = (int) std::ceil (pitchOfY ((float) area.getY())) + 1;
+        // white keys: FL's keyboard splits the octave into 7 equal keys (the black keys sit on their own rows)
+        g.setFont (juce::FontOptions (11.0f));
+        for (auto oct = (int) std::floor (lo / 12.0) * 12; oct <= hi; oct += 12)
+        {
+            const auto yTop = yOfPitch (oct + 11.5), yBottom = yOfPitch (oct - 0.5);
+            const auto keyH = (yBottom - yTop) / 7.0f;
+            for (int w = 0; w < 7; ++w)
+            {
+                const auto y = yBottom - keyH * (float) (w + 1);
+                g.setColour (flnt::keyLine);
+                g.drawHorizontalLine ((int) std::round (y), (float) area.getX(), (float) area.getRight());
+                if (w == 0)
+                {
+                    g.setColour (flnt::keyC);
+                    g.fillRect (juce::Rectangle<float> ((float) area.getX() + 26.0f, y + 1.0f, (float) area.getWidth() - 26.0f, keyH - 1.0f));
+                    g.setColour (juce::Colour (0xff3a3d44));
+                    g.drawText (noteName (oct), juce::Rectangle<float> ((float) area.getX(), y, (float) area.getWidth() - 3.0f, keyH), juce::Justification::bottomRight, false);
+                }
+            }
+            for (const auto b : { 1, 3, 6, 8, 10 })
+            {
+                const auto y0 = yOfPitch (oct + b + 0.5), y1 = yOfPitch (oct + b - 0.5);
+                g.setColour (flnt::keyBlack);
+                g.fillRect (juce::Rectangle<float> ((float) area.getX(), y0, (float) area.getWidth() * 0.6f, y1 - y0));
+            }
+        }
+        g.setColour (flnt::buttonEdge);
+        g.drawVerticalLine (area.getRight() - 1, (float) area.getY(), (float) area.getBottom());
+    }
+
+    double beatSamples() const
+    {
+        const auto bpm = std::max (1.0, engine.getSong().bpm);
+        return (sample != nullptr ? sample->sampleRate : 44100.0) * 60.0 / bpm;
+    }
+
+    void paintFlRuler (juce::Graphics& g, juce::Rectangle<int> area) const
+    {
+        juce::Graphics::ScopedSaveState clip (g);
+        g.reduceClipRegion (area);
+        g.setColour (flnt::rulerBg);
+        g.fillRect (area);
+        g.setColour (flnt::rulerLine);
+        g.drawHorizontalLine (area.getBottom() - 1, (float) area.getX(), (float) area.getRight());
+        if (hasTimeSelection())
+        {
+            g.setColour (flnt::orange.withAlpha (0.35f));
+            g.fillRect (juce::Rectangle<float>::leftTopRightBottom (xOfOutput ((double) timeSelA), (float) area.getY(), xOfOutput ((double) timeSelB), (float) area.getBottom()));
+        }
+        const auto bar = 4.0 * beatSamples();
+        g.setFont (juce::FontOptions (10.5f));
+        g.setColour (flnt::rulerInk);
+        const auto first = std::max (0.0, std::floor (outputOfX ((float) area.getX()) / bar));
+        for (auto b = first; b * bar < outputOfX ((float) area.getRight()); b += 1.0)
+        {
+            const auto x = xOfOutput (b * bar);
+            if (xOfOutput (bar) - xOfOutput (0.0) < 18.0f && std::fmod (b, 4.0) != 0.0)
+                continue;
+            g.drawText (juce::String ((int) b + 1), juce::Rectangle<float> (x + 2.0f, (float) area.getY() + 1.0f, 40.0f, (float) area.getHeight() - 2.0f),
+                        juce::Justification::centredLeft, false);
+        }
+        // FL's play cursor marker: an orange triangle pointing down
+        juce::Path flag;
+        const auto xc = xOfOutput ((double) cursorAt);
+        flag.addTriangle (xc - 7.0f, (float) area.getY() + 2.0f, xc + 7.0f, (float) area.getY() + 2.0f, xc, (float) area.getBottom() - 3.0f);
+        g.setColour (juce::Colour (0xffffc04a));
+        g.fillPath (flag);
+    }
+
+    // a note's voiced part in the output (where its blob is drawn)
+    std::pair<double, double> voicedSpan (const newtonefx::Note& p) const
+    {
+        const auto len = (double) (p.voicedEnd() - p.origStart) / std::max (1e-6, p.stretch);
+        return { (double) p.curStart, std::min ((double) p.curEnd, (double) p.curStart + len) };
+    }
+
+    void paintFlNotes (juce::Graphics& g, juce::Rectangle<int> area) const
+    {
+        juce::Graphics::ScopedSaveState clip (g);
+        g.reduceClipRegion (area);
+        // rows: in the scale lighter, out of it darker (FL's grid), a line between rows
+        const auto lo = (int) std::floor (pitchOfY ((float) area.getBottom())) - 1, hi = (int) std::ceil (pitchOfY ((float) area.getY())) + 1;
+        for (auto m = lo; m <= hi; ++m)
+        {
+            const auto y0 = yOfPitch (m + 0.5), y1 = yOfPitch (m - 0.5);
+            const auto inScale = (scaleMask() >> (((m - scaleKey()) % 12 + 12) % 12) & 1u) != 0;
+            g.setColour (inScale ? flnt::rowIn : flnt::rowOut);
+            g.fillRect (juce::Rectangle<float> ((float) area.getX(), y0, (float) area.getWidth(), y1 - y0));
+            g.setColour (flnt::rowLine);
+            g.drawHorizontalLine ((int) std::round (y1) - 1, (float) area.getX(), (float) area.getRight());
+        }
+        // time grid: steps (1/4 beat), beats, bars
+        const auto beat = beatSamples();
+        const auto step = beat / 4.0;
+        if (xOfOutput (step) - xOfOutput (0.0) >= 6.0f)
+        {
+            const auto first = std::max (0.0, std::floor (outputOfX ((float) area.getX()) / step));
+            for (auto k = first; k * step < outputOfX ((float) area.getRight()); k += 1.0)
+            {
+                const auto x = (int) std::round (xOfOutput (k * step));
+                const auto kk = (long long) k;
+                g.setColour (kk % 16 == 0 ? flnt::barLine : kk % 4 == 0 ? flnt::beatLine : flnt::stepLine);
+                g.drawVerticalLine (x, (float) area.getY(), (float) area.getBottom());
+            }
+        }
+        if (hasTimeSelection())
+        {
+            g.setColour (juce::Colours::white.withAlpha (0.07f));
+            g.fillRect (juce::Rectangle<float>::leftTopRightBottom (xOfOutput ((double) timeSelA), (float) area.getY(), xOfOutput ((double) timeSelB), (float) area.getBottom()));
+        }
+
+        float peakAll = 1e-6f;
+        for (const auto v : peaks)
+            peakAll = std::max (peakAll, v);
+        juce::Path pitchLine;
+        bool lineOpen = false;
+        for (int k = 0; k < (int) notes.pitches.size(); ++k)
+        {
+            const auto& p = notes.pitches[(std::size_t) k];
+            if (p.origPitch <= 0.0 || ! p.voiced())
+            {
+                lineOpen = false;
+                continue; // (the lead-in before the first note and FL's unvoiced notes: nothing drawn)
+            }
+            const auto x0 = xOfOutput ((double) p.curStart), x1 = xOfOutput ((double) p.curEnd);
+            if (x1 < (float) area.getX() - 200.0f || x0 > (float) area.getRight() + 200.0f)
+            {
+                lineOpen = false;
+                continue;
+            }
+            const auto target = p.origPitch + p.shift;
+            const auto y = yOfPitch (target);
+            const auto isSelected = selected.count (k) > 0;
+            const auto alpha = p.enabled ? 1.0f : 0.35f;
+            // the blob: the note's level, as FL draws its volume around the note
+            const auto [v0, v1] = voicedSpan (p);
+            const auto bx0 = xOfOutput (v0), bx1 = xOfOutput (v1);
+            juce::Path blob;
+            std::vector<juce::Point<float>> lower;
+            // FL's blob follows the note's level envelope (smoothed, ~2 rows tall when loud, tails tapering; fitted on the
+            // r5.wav capture: a square-root scale over the file's loudest peak, a ±30 ms envelope)
+            const auto half = (float) rowH * 1.25f;
+            const auto gain = (float) std::min (2.0, p.volume);
+            const auto reach = (std::int64_t) std::max (1.0, 0.03 * (sample != nullptr ? sample->sampleRate : 44100.0) / 256.0);
+            for (auto x = std::max (bx0, (float) area.getX() - 2.0f); x <= std::min (bx1, (float) area.getRight() + 2.0f); x += 1.0f)
+            {
+                const auto src = (double) p.origStart + (outputOfX (x) - (double) p.curStart) * p.stretch;
+                const auto src2 = (double) p.origStart + (outputOfX (x + 1.0f) - (double) p.curStart) * p.stretch;
+                const auto lo = std::max<std::int64_t> ((std::int64_t) std::max (0.0, src) / 256 - reach, p.origStart / 256);
+                const auto hi = std::min<std::int64_t> ((std::int64_t) std::max (0.0, src2) / 256 + reach, std::min<std::int64_t> ((std::int64_t) peaks.size() - 1, p.voicedEnd() / 256));
+                float m = 0.0f;
+                for (auto i = lo; i <= hi; ++i)
+                    m = std::max (m, peaks[(std::size_t) i]);
+                const auto h = std::max (1.0f, half * std::sqrt (std::min (1.0f, gain * m / peakAll)));
+                if (lower.empty())
+                    blob.startNewSubPath (x, y - h); // (juce::Path::isEmpty() stays true until a line: a flag, not it)
+                else
+                    blob.lineTo (x, y - h);
+                lower.push_back ({ x, y + h });
+            }
+            for (auto it = lower.rbegin(); it != lower.rend(); ++it)
+                blob.lineTo (*it);
+            blob.closeSubPath();
+            g.setColour (flnt::blob.withAlpha (alpha));
+            g.fillPath (blob);
+            // FL shades the nearest semitone of a note sung off it (seen: 24 c shaded, 12 c not; LYNX: beyond 20 c)
+            const auto semi = std::round (target);
+            if (std::abs (target - semi) > 0.2)
+            {
+                g.setColour (flnt::orange.withAlpha (0.35f * alpha));
+                g.fillRect (juce::Rectangle<float>::leftTopRightBottom (x0, yOfPitch (semi + 0.5) + 1.0f, x1, yOfPitch (semi - 0.5) - 1.0f));
+            }
+            // the note's average pitch: an orange outline, red when the note is selected (FL)
+            g.setColour ((isSelected ? juce::Colour (0xffff3c3c) : flnt::orange).withAlpha (alpha));
+            g.drawRoundedRectangle (juce::Rectangle<float>::leftTopRightBottom (x0 + 0.75f, y - 0.5f * (float) rowH + 0.75f, std::max (x0 + 3.0f, x1 - 0.75f),
+                                                                                 y + 0.5f * (float) rowH - 0.75f),
+                                    4.0f, 1.4f);
+            if (advancedEdit && k == currentNote)
+                paintAdvancedHandles (g, p, x0, x1, y);
+
+            // the detected pitch, moved with the note (drift and variation applied), joined to the note before
+            if (! pitchTrack.empty())
+            {
+                const auto [s0, s1] = std::pair<std::int64_t, std::int64_t> { p.origStart, p.voicedEnd() };
+                for (auto f = std::max<std::int64_t> (0, s0 / pitchHop); f < std::min<std::int64_t> ((std::int64_t) pitchTrack.size(), s1 / pitchHop + 1); ++f)
+                {
+                    const auto v = pitchTrack[(std::size_t) f];
+                    if (v < 0.0 || std::abs (v - p.origPitch) > 1.5 || f * pitchHop < s0 || f * pitchHop >= s1)
+                        continue;
+                    const auto px = xOfOutput ((double) p.curStart + (double) (f * pitchHop - p.origStart) / std::max (1e-6, p.stretch));
+                    const auto py = yOfPitch (p.origPitch + p.shift + p.drift * (v - p.origPitch));
+                    if (! lineOpen)
+                        pitchLine.startNewSubPath (px, py);
+                    else
+                        pitchLine.lineTo (px, py);
+                    lineOpen = true;
+                }
+                // a note followed by silence ends its line; a legato one joins the next note
+                lineOpen = lineOpen && p.voicedEnd() + (std::int64_t) (0.02 * (sample != nullptr ? sample->sampleRate : 44100.0)) >= p.origEnd;
+            }
+        }
+        g.setColour (flnt::orangeLine);
+        g.strokePath (pitchLine, juce::PathStrokeType (3.2f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        g.setColour (flnt::pitchCore);
+        g.strokePath (pitchLine, juce::PathStrokeType (1.2f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    }
+
+    // ---------------------------------------------------------------------------------------------- header actions
+    void headerClick (Hit h, bool right = false)
+    {
+        switch (h)
+        {
+            case Hit::loop: looping = ! looping; if (previewing) startPreview(); break;
+            case Hit::play: togglePreview(); break;
+            case Hit::stop: if (previewing) togglePreview(); break;
+            case Hit::slave: slave.setToggleState (! slave.getToggleState(), juce::sendNotification); break;
+            case Hit::follow: autoScroll = ! autoScroll; break;
+            case Hit::fileMenu: showFileMenu(); break;
+            case Hit::editMenu: showEditMenu(); break;
+            case Hit::selectMenu: showSelectMenu(); break;
+            case Hit::undo: engine.undo(); break;
+            case Hit::score:
+                if (right)
+                    copyScoreToMidiClipboard();
+                else
+                    sendScoreToSelectedChannel();
+                break;
+            case Hit::saveAs: saveWav(); break;
+            case Hit::dragOut: break; // (a drag starts in mouseDrag)
+            case Hit::toPlaylist: sendToPlaylist(); break;
+            case Hit::sync: toggleTempoSync(); break;
+            case Hit::cut: cutMode.setToggleState (! cutMode.getToggleState(), juce::dontSendNotification); updateButtons(); break;
+            case Hit::advanced:
+                advancedEdit = ! advancedEdit;
+                if (advancedEdit && currentNote < 0 && ! selected.empty())
+                    currentNote = *selected.begin();
+                updatePanel();
+                resized();
+                break;
+            case Hit::knobCentre:
+            case Hit::knobVariation:
+            case Hit::knobTrans:
+            case Hit::none: break;
+        }
+        repaint();
+    }
+    // the knobs' 0..1 positions: Center 0..100 %, Variation 0..200 % (FL's default 100 % at the top), Trans 0..100 %
+    double knobValue (Hit h) const
+    {
+        return h == Hit::knobCentre ? notes.centre : h == Hit::knobVariation ? notes.variation / 2.0 : std::min (1.0, notes.transition);
+    }
+    void setKnob (Hit h, double v01, bool done)
+    {
+        v01 = std::clamp (v01, 0.0, 1.0);
+        if (h == Hit::knobCentre)
+            newtonefx::applyCentre (notes, v01, selection());
+        else if (h == Hit::knobVariation)
+            newtonefx::applyVariation (notes, v01 * 2.0, selection());
+        else
+            newtonefx::applyTransition (notes, v01, selection());
+        if (done)
+            commit();
+        else
+            repaint();
+    }
+
+    // FL's WAVOptionsMenu (TSynthEditorForm): File, Edit, Select and Zoom; the header buttons open their own part, a
+    // right-click on the empty note view the whole menu. Items FL has that LYNX does not do yet are left out (no stubs):
+    // New, the slave options, Use project tempo on load, Edit properties, About, Cut / Copy / Paste.
+    juce::PopupMenu fileMenu()
+    {
+        juce::PopupMenu m;
+        m.addItem (tr ("Load sample...") + "\tCtrl+O", validSlot(), false, [this] { chooseSample(); });
+        m.addItem (tr ("Save sample as...") + "\tCtrl+S", sample != nullptr, false, [this] { saveWav(); });
+        m.addSeparator();
+        m.addItem (tr ("Save as MIDI..."), sample != nullptr, false, [this] { saveMidi(); });
+        m.addSeparator();
+        m.addItem (tr ("Export regions"), true, exportRegionsOnSave, [this] { exportRegionsOnSave = ! exportRegionsOnSave; });
+        m.addItem (tr ("Slave to host playback") + "\tH", validSlot(), slave.getToggleState(), [this] { slave.setToggleState (! slave.getToggleState(), juce::sendNotification); repaint(); });
+        return m;
+    }
+    juce::PopupMenu editMenu()
+    {
+        juce::PopupMenu m, scaleMenu, gridMenu, channels;
+        m.addItem (tr ("Undo") + "\tCtrl+Z", engine.canUndo(), false, [this] { engine.undo(); });
+        m.addItem (tr ("Redo") + "\tCtrl+Y", true, false, [this] { engine.redo(); });
+        m.addSeparator();
+        m.addItem (tr ("Copy to MIDI clipboard"), sample != nullptr, false, [this] { copyScoreToMidiClipboard(); });
+        m.addSeparator();
+        m.addItem (tr ("Delete") + "\tDel", sample != nullptr && ! selected.empty(), false, [this] {
+            for (const auto k : selected)
+                notes.pitches[(std::size_t) k].enabled = false;
+            commit();
+        });
+        m.addSeparator();
+        m.addItem (tr ("Quantize time") + "\tCtrl+Q", sample != nullptr, false, [this] { quantize(); });
+        m.addSeparator();
+        m.addItem (tr ("Advanced edit pitch") + "\tCtrl+E", sample != nullptr, advancedEdit, [this] { headerClick (Hit::advanced); });
+        m.addItem (tr ("Advanced edit vibrato"), sample != nullptr, vibratoEdit, [this] {
+            vibratoEdit = ! vibratoEdit;
+            updatePanel();
+            resized();
+            repaint();
+        });
+        m.addItem (tr ("Cut mode") + "\tC", sample != nullptr, cutMode.getToggleState(), [this] {
+            cutMode.setToggleState (! cutMode.getToggleState(), juce::dontSendNotification);
+            updateButtons();
+            repaint();
+        });
+        m.addSeparator();
+        m.addItem (tr ("Snap to scale"), true, snapScale, [this] { snapScale = ! snapScale; repaint(); });
+        // FL's Scale menu: major and minor in every key (FL's KeyIdx 0-23), two columns
+        scaleMenu.addSectionHeader (tr ("Major"));
+        for (int k = 0; k < 24; ++k)
+        {
+            if (k == 12)
+            {
+                scaleMenu.addColumnBreak();
+                scaleMenu.addSectionHeader (tr ("Minor"));
+            }
+            scaleMenu.addItem (noteNames[k % 12], true, notes.key == k, [this, k] {
+                notes.key = k;
+                commit();
+            });
+        }
+        m.addSubMenu (tr ("Scale"), scaleMenu);
+        const std::pair<int, const char*> items[] { { 1, "Beat" }, { 2, "1/2 beat" }, { 3, "1/3 beat" }, { 4, "1/4 beat" }, { 6, "1/6 beat" }, { 8, "1/8 beat" }, { 0, "Off" } };
+        for (const auto& [division, name] : items)
+            gridMenu.addItem (tr (name), true, snapDivision == division, [this, d = division] { snapDivision = d; });
+        m.addSubMenu (tr ("Snap to grid"), gridMenu);
+        m.addSeparator();
+        m.addItem (tr ("Send to playlist as audio clip"), sample != nullptr, false, [this] { sendToPlaylist(); });
+        const auto& song = engine.getSong();
+        for (int c = 0; c < (int) song.channels.size(); ++c)
+            channels.addItem (juce::String (c + 1) + ". " + juce::String::fromUTF8 (song.channels[(std::size_t) c].name.c_str()), [this, c] { sendScoreTo (c, true); });
+        m.addSubMenu (tr ("Send to piano roll"), channels, sample != nullptr && ! song.channels.empty() && ! song.patterns.empty());
+        return m;
+    }
+    juce::PopupMenu selectMenu()
+    {
+        juce::PopupMenu m;
+        const auto has = sample != nullptr && ! notes.pitches.empty();
+        m.addItem (tr ("Deselect") + "\t" + tr ("Up"), has, false, [this] { selectNone(); });
+        m.addItem (tr ("Select time around selection") + "\tCtrl+Enter", has, false, [this] { selectTimeAround(); });
+        m.addItem (tr ("Select before current selection"), has, false, [this] { selectBeside (false); });
+        m.addItem (tr ("Select after current selection"), has, false, [this] { selectBeside (true); });
+        m.addItem (tr ("Select all (time)"), has, false, [this] { selectAllTime(); });
+        m.addItem (tr ("Select all (slices)") + "\tCtrl+A", has, false, [this] { selectAllNotes(); });
+        m.addItem (tr ("Select all (time and slices)"), has, false, [this] { selectAllTime(); selectAllNotes(); });
+        return m;
+    }
+    juce::PopupMenu zoomMenu()
+    {
+        juce::PopupMenu m;
+        const auto has = sample != nullptr;
+        m.addItem (tr ("Zoom in") + "\tPgUp", has, false, [this] { zoomBy (1.5); });
+        m.addItem (tr ("Zoom out") + "\tPgDn", has, false, [this] { zoomBy (1.0 / 1.5); });
+        m.addItem (tr ("Zoom out full") + "\tHome", has, false, [this] { zoomFull(); });
+        m.addSeparator();
+        m.addItem (tr ("Zoom on selection") + "\tEnd", has, false, [this] { zoomOnSelection (0); });
+        m.addItem (tr ("Zoom on left of selection") + "\tCtrl+Left", has, false, [this] { zoomOnSelection (-1); });
+        m.addItem (tr ("Zoom on right of selection") + "\tCtrl+Right", has, false, [this] { zoomOnSelection (1); });
+        return m;
+    }
+    void showMenuAt (juce::PopupMenu m, Hit h)
+    {
+        m.showMenuAsync (juce::PopupMenu::Options().withTargetScreenArea (localAreaToGlobal (hitBox (h).toNearestInt())));
+    }
+    void showFileMenu() { showMenuAt (fileMenu(), Hit::fileMenu); }
+    void showEditMenu() { showMenuAt (editMenu(), Hit::editMenu); }
+    void showSelectMenu() { showMenuAt (selectMenu(), Hit::selectMenu); }
+    void showWholeMenu()
+    {
+        juce::PopupMenu m;
+        m.addSubMenu (tr ("File"), fileMenu());
+        m.addSubMenu (tr ("Edit"), editMenu());
+        m.addSubMenu (tr ("Select"), selectMenu());
+        m.addSubMenu (tr ("Zoom"), zoomMenu());
+        m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+    }
+
+    // Zoom
+    void zoomBy (double factor)
+    {
+        const auto centre = scroll + 0.5 * visibleLength();
+        zoom = std::clamp (zoom * factor, 1.0, 512.0);
+        scroll = centre - 0.5 * visibleLength();
+        clampScroll();
+        updateScrollBars();
+        repaint();
+    }
+    void zoomFull()
+    {
+        zoom = 1.0;
+        scroll = 0.0;
+        updateScrollBars();
+        repaint();
+    }
+    // on the time selection (0), or on its left / right half (-1 / 1); with none, on the selected notes' time
+    void zoomOnSelection (int side)
+    {
+        auto a = timeSelA, b = timeSelB;
+        if (! hasTimeSelection())
+        {
+            if (selected.empty())
+                return;
+            std::tie (a, b) = newtonefx::timeAround (notes, { selected.begin(), selected.end() });
+        }
+        if (b <= a)
+            return;
+        if (side < 0)
+            b = a + (b - a) / 2;
+        else if (side > 0)
+            a = a + (b - a) / 2;
+        zoom = std::clamp (totalLength() / (double) (b - a), 1.0, 512.0);
+        scroll = (double) a;
+        clampScroll();
+        updateScrollBars();
+        repaint();
+    }
+    void selectAllTime()
+    {
+        timeSelA = 0;
+        timeSelB = (std::int64_t) totalLength();
+        repaint();
+    }
+    // Edit › Quantize time: the selected notes' starts (all when none) to the snap grid (a beat when Snap is Off)
+    void quantize()
+    {
+        const auto division = snapDivision > 0 ? snapDivision : 1;
+        newtonefx::quantizeTime (notes, { selected.begin(), selected.end() }, beatSamples() / division);
+        commit();
+    }
+
+    void selectNone()
+    {
+        selected.clear();
+        timeSelA = timeSelB = -1;
+        selectionChanged();
+    }
+    void selectAllNotes()
+    {
+        selected.clear();
+        for (int k = 0; k < (int) notes.pitches.size(); ++k)
+            if (notes.pitches[(std::size_t) k].voiced())
+                selected.insert (k);
+        selectionChanged();
+    }
+    // FL's Select › Select time around selection (Ctrl+Enter): the time the selected notes take; with nothing selected,
+    // the part of the sample in view
+    void selectTimeAround()
+    {
+        if (selected.empty())
+        {
+            timeSelA = (std::int64_t) std::max (0.0, scroll);
+            timeSelB = (std::int64_t) std::min (totalLength(), scroll + visibleLength());
+        }
+        else
+        {
+            const auto r = newtonefx::timeAround (notes, { selected.begin(), selected.end() });
+            timeSelA = r.first;
+            timeSelB = r.second;
+        }
+        repaint();
+    }
+    // Select before / after current selection: the time from the start up to the selection, or from it to the end
+    void selectBeside (bool after)
+    {
+        if (! hasTimeSelection())
+            selectTimeAround();
+        if (! hasTimeSelection())
+            return;
+        const auto total = (std::int64_t) totalLength();
+        if (after)
+            timeSelA = timeSelB, timeSelB = total;
+        else
+            timeSelB = timeSelA, timeSelA = 0;
+        if (timeSelB <= timeSelA)
+            timeSelA = timeSelB = -1;
+        selected.clear();
+        for (const auto k : newtonefx::notesIn (notes, timeSelA, timeSelB))
+            selected.insert (k);
+        selectionChanged();
+    }
+
+    // FL's Create score: the score to the selected channel's piano roll in the current pattern (its notes there replaced)
+    void sendScoreToSelectedChannel()
+    {
+        const auto& song = engine.getSong();
+        if (song.channels.empty() || song.patterns.empty())
+            return;
+        sendScoreTo (std::clamp (engine.getSelectedChannel(), 0, (int) song.channels.size() - 1), true);
+    }
+    void sendScoreTo (int channel, bool replace = false)
+    {
+        if (sample == nullptr)
+            return;
+        const auto add = scoreNotes (channel);
+        engine.editSong ([add, channel, replace] (Song& s) {
+            if (s.patterns.empty())
+                return;
+            auto& pattern = s.patterns[(std::size_t) std::clamp (s.currentPattern, 0, (int) s.patterns.size() - 1)];
+            if (replace)
+                pattern.notes.erase (std::remove_if (pattern.notes.begin(), pattern.notes.end(), [channel] (const Note& n) { return n.channel == channel; }),
+                                     pattern.notes.end());
+            pattern.notes.insert (pattern.notes.end(), add.begin(), add.end());
+            pattern.sortNotes();
+        });
+    }
+    void copyScoreToMidiClipboard()
+    {
+        if (sample == nullptr)
+            return;
+        midiclipboard::put (MidiFileIo::writeNotes (engine.getSong(), scoreNotes (0), "Newtone"));
+    }
+
+    bool exportRegionsOnSave = true; // FL's File › Export regions (a checked option for Save sample as; on in FL 2026)
+    std::int64_t previewOffset() const noexcept { return ! flLook() ? 0 : hasTimeSelection() ? timeSelA : cursorAt; }
+    std::shared_ptr<const SampleData> previewSource;
+    float previewLevel = 0.0f;
+
+    // Sync: the whole sample stretched from its own tempo to the project's (FL's SYNC; the notes keep their pitch)
+    double sampleTempo = 0.0;
+    bool tempoSync = false;
+    void toggleTempoSync()
+    {
+        if (sampleTempo <= 0.0 || sample == nullptr)
+            return;
+        tempoSync = ! tempoSync;
+        newtonefx::stretchAll (notes, tempoSync ? sampleTempo / std::max (1.0, engine.getSong().bpm) : 1.0);
+        commit();
+    }
+
+    // Drag selection: the selection (or the whole sample) as a WAV dragged out of the window
+    void dragSelectionOut()
+    {
+        if (sample == nullptr)
+            return;
+        auto out = newtonefx::renderedSource (sample, savedState);
+        if (out == nullptr)
+            return;
+        if (hasTimeSelection())
+            out = newtonefx::cropped (*out, timeSelA, timeSelB);
+        const juce::File src (juce::String::fromUTF8 (samplePath.c_str()));
+        const auto file = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("LYNX")
+                              .getChildFile (juce::File::createLegalFileName (src.getFileNameWithoutExtension() + " (Newtone).wav"));
+        file.getParentDirectory().createDirectory();
+        if (writeWav (*out, file))
+            juce::DragAndDropContainer::performExternalDragDropOfFiles ({ file.getFullPathName() }, false, this);
+    }
+
+    void scrollBarMoved (juce::ScrollBar* bar, double start) override
+    {
+        if (bar == &hScroll)
+            scroll = start;
+        else
+            topPitch = 127.5 - start;
+        repaint();
+    }
+    void updateScrollBars()
+    {
+        if (! flLook())
+            return;
+        hScroll.setRangeLimits (0.0, totalLength(), juce::dontSendNotification);
+        hScroll.setCurrentRange (scroll, visibleLength(), juce::dontSendNotification);
+        const auto rows = (double) flCanvas().getHeight() / rowH;
+        vScroll.setRangeLimits (0.0, 128.0, juce::dontSendNotification);
+        vScroll.setCurrentRange (127.5 - topPitch, rows, juce::dontSendNotification);
+    }
+    // the view's rows centred on the notes (on a new sample)
+    void centreRowsOnNotes()
+    {
+        double lo = 1e9, hi = -1e9;
+        for (const auto& p : notes.pitches)
+            if (p.origPitch > 0.0 && p.voiced())
+                lo = std::min (lo, p.origPitch + p.shift), hi = std::max (hi, p.origPitch + p.shift);
+        if (lo > hi)
+            lo = 55.0, hi = 70.0;
+        const auto rows = (double) std::max (1, flCanvas().getHeight()) / rowH;
+        topPitch = std::round (0.5 * (lo + hi) + 0.5 * rows);
+    }
+
+    // ---------------------------------------------------------------------------------------------- FL mouse / keys
+    struct FlDrag
+    {
+        bool pan = false, knob = false, out = false, toggleOnClick = false;
+        Hit knobHit = Hit::none;
+        double scrollFrom = 0.0, topFrom = 0.0;
+        int edgeNote = -1;      // a note edge being moved
+        bool edgeLeft = false, detach = false;
+        std::int64_t edgeFrom = 0;
+        std::vector<std::pair<std::int64_t, std::int64_t>> spans; // the notes' [curStart, curEnd) at the start
+        int toggleNote = -1;
+    } fl;
+
+    // a note's edge under the point: (note, left edge?)
+    std::pair<int, bool> edgeAt (juce::Point<float> pos) const
+    {
+        for (int k = 0; k < (int) notes.pitches.size(); ++k)
+        {
+            const auto& p = notes.pitches[(std::size_t) k];
+            if (! p.voiced() || p.origPitch <= 0.0)
+                continue;
+            const auto y = yOfPitch (p.origPitch + p.shift);
+            if (std::abs (pos.y - y) > 0.5f * (float) rowH)
+                continue;
+            if (std::abs (pos.x - xOfOutput ((double) p.curStart)) <= 3.5f)
+                return { k, true };
+            if (std::abs (pos.x - xOfOutput ((double) p.curEnd)) <= 3.5f)
+                return { k, false };
+        }
+        return { -1, false };
+    }
+
+    bool flMouseDown (const juce::MouseEvent& e)
+    {
+        fl = {};
+        if (const auto h = hitAt (e.position); h != Hit::none)
+        {
+            pressedHit = h;
+            if (h == Hit::knobCentre || h == Hit::knobVariation || h == Hit::knobTrans)
+            {
+                fl.knob = true;
+                fl.knobHit = h;
+                knobFrom = knobValue (h);
+            }
+            else if (h == Hit::dragOut)
+                fl.out = true;
+            else
+                headerClick (h, e.mods.isPopupMenu());
+            repaint (headerArea());
+            return true;
+        }
+        if (headerArea().contains (e.getPosition()))
+            return true;
+        if (sample == nullptr)
+            return true;
+        if (e.mods.isMiddleButtonDown() || (e.mods.isCtrlDown() && e.mods.isAltDown()))
+        {
+            fl.pan = true;
+            fl.scrollFrom = scroll;
+            fl.topFrom = topPitch;
+            return true;
+        }
+        if (timeRulerArea().contains (e.getPosition()))
+        {
+            rulerSelecting = true;
+            timeSelA = timeSelB = std::clamp<std::int64_t> ((std::int64_t) outputOfX (e.position.x), 0, (std::int64_t) totalLength());
+            repaint();
+            return true;
+        }
+        if (! flCanvas().contains (e.getPosition()))
+            return false; // (the keyboard: the shared code moves the selection to the key clicked)
+        if (! e.mods.isPopupMenu())
+            if (const auto z = advZoneAt (e.position); z != AdvZone::none)
+            {
+                advDrag = z;
+                advFrom = notes.pitches[(std::size_t) currentNote];
+                return true;
+            }
+        // FL: a click puts the play cursor there (also on a note; a drag still moves the note)
+        if (! e.mods.isPopupMenu() && ! e.mods.isAnyModifierKeyDown())
+        {
+            cursorAt = std::clamp<std::int64_t> ((std::int64_t) outputOfX (e.position.x), 0, (std::int64_t) totalLength());
+            repaint();
+        }
+        // a right-click on the empty roll: FL's whole menu (File, Edit, Select, Zoom)
+        if (e.mods.isPopupMenu() && ! e.mods.isCtrlDown() && noteAt (e.position) < 0)
+        {
+            showWholeMenu();
+            return true;
+        }
+        // Ctrl+right-click: zoom to the time selection, or to the whole sample
+        if (e.mods.isPopupMenu() && e.mods.isCtrlDown())
+        {
+            if (hasTimeSelection())
+            {
+                zoom = std::clamp (totalLength() / (double) (timeSelB - timeSelA), 1.0, 512.0);
+                scroll = (double) timeSelA;
+            }
+            else
+                zoom = 1.0, scroll = 0.0;
+            clampScroll();
+            updateScrollBars();
+            repaint();
+            return true;
+        }
+        if (! cutMode.getToggleState() && ! e.mods.isShiftDown() && ! e.mods.isPopupMenu())
+            if (const auto [k, left] = edgeAt (e.position); k >= 0)
+            {
+                fl.edgeNote = k;
+                fl.edgeLeft = left;
+                fl.detach = e.mods.isCtrlDown();
+                const auto& p = notes.pitches[(std::size_t) k];
+                fl.edgeFrom = left ? p.curStart : p.curEnd;
+                for (const auto& q : notes.pitches)
+                    fl.spans.push_back ({ q.curStart, q.curEnd });
+                return true;
+            }
+        // Ctrl+click on a note: add it to / take it from the selection (a Ctrl+drag still moves the notes in time)
+        if (e.mods.isCtrlDown() && ! e.mods.isPopupMenu() && ! cutMode.getToggleState())
+            if (const auto k = noteAt (e.position); k >= 0)
+            {
+                fl.toggleNote = k;
+                if (selected.count (k) == 0)
+                    selected.insert (k), fl.toggleOnClick = false;
+                else
+                    fl.toggleOnClick = true;
+                selectionChanged();
+            }
+        timeSelA = timeSelB = -1;
+        return false;
+    }
+
+    // a note boundary moved: the note (and its joined neighbour unless detached) stretched to the new edge
+    void moveEdge (std::int64_t to)
+    {
+        const auto k = fl.edgeNote;
+        auto& p = notes.pitches[(std::size_t) k];
+        auto restretch = [] (newtonefx::Note& q) {
+            const auto out = std::max<std::int64_t> (1, q.curEnd - q.curStart);
+            q.stretch = (double) (q.origEnd - q.origStart) / (double) out;
+            if (std::abs (q.stretch - 1.0) < 1e-9)
+                q.stretch = 1.0;
+        };
+        for (std::size_t i = 0; i < notes.pitches.size() && i < fl.spans.size(); ++i)
+            notes.pitches[i].curStart = fl.spans[i].first, notes.pitches[i].curEnd = fl.spans[i].second;
+        if (fl.edgeLeft)
+        {
+            const auto lo = k > 0 ? notes.pitches[(std::size_t) k - 1].curStart + 1 : 0;
+            to = std::clamp<std::int64_t> (to, lo, p.curEnd - 1);
+            const auto joined = k > 0 && ! fl.detach && fl.spans[(std::size_t) k - 1].second == fl.spans[(std::size_t) k].first;
+            p.curStart = to;
+            if (joined)
+                notes.pitches[(std::size_t) k - 1].curEnd = to, restretch (notes.pitches[(std::size_t) k - 1]);
+        }
+        else
+        {
+            const auto hi = k + 1 < (int) notes.pitches.size() ? notes.pitches[(std::size_t) k + 1].curEnd - 1 : (std::int64_t) (4 * frames());
+            to = std::clamp<std::int64_t> (to, p.curStart + 1, hi);
+            const auto joined = k + 1 < (int) notes.pitches.size() && ! fl.detach && fl.spans[(std::size_t) k + 1].first == fl.spans[(std::size_t) k].second;
+            p.curEnd = to;
+            if (joined)
+                notes.pitches[(std::size_t) k + 1].curStart = to, restretch (notes.pitches[(std::size_t) k + 1]);
+        }
+        restretch (p);
+    }
+
+    bool flMouseDrag (const juce::MouseEvent& e)
+    {
+        if (advDrag != AdvZone::none)
+        {
+            advancedDrag (e);
+            return true;
+        }
+        if (fl.knob)
+        {
+            setKnob (fl.knobHit, knobFrom - (double) e.getDistanceFromDragStartY() / 150.0, false);
+            return true;
+        }
+        if (fl.out)
+        {
+            if (e.getDistanceFromDragStart() > 6)
+            {
+                fl.out = false;
+                pressedHit = Hit::none;
+                dragSelectionOut();
+            }
+            return true;
+        }
+        if (pressedHit != Hit::none)
+            return true;
+        if (fl.pan)
+        {
+            scroll = fl.scrollFrom - (double) e.getDistanceFromDragStartX() / pixelsPerSample();
+            topPitch = std::clamp (fl.topFrom + (double) e.getDistanceFromDragStartY() / rowH, 10.0, 127.5);
+            clampScroll();
+            updateScrollBars();
+            repaint();
+            return true;
+        }
+        if (rulerSelecting)
+        {
+            const auto at = std::clamp<std::int64_t> (snapPosition ((std::int64_t) outputOfX (e.position.x), e.mods.isAltDown()), 0, (std::int64_t) totalLength());
+            const auto from = (std::int64_t) std::clamp (outputOfX ((float) e.getMouseDownX()), 0.0, totalLength());
+            timeSelA = std::min (from, at);
+            timeSelB = std::max (from, at);
+            repaint();
+            return true;
+        }
+        if (fl.edgeNote >= 0 && fl.edgeNote < (int) notes.pitches.size())
+        {
+            const auto to = snapPosition (fl.edgeFrom + (std::int64_t) std::llround ((double) e.getDistanceFromDragStartX() / pixelsPerSample()), e.mods.isAltDown());
+            moveEdge (to);
+            drag.moved = true;
+            repaint();
+            return true;
+        }
+        if (fl.toggleNote >= 0 && e.getDistanceFromDragStart() > 3)
+            fl.toggleOnClick = false; // (a drag: a time move, not a toggle)
+        return false;
+    }
+
+    void flMouseUp (const juce::MouseEvent&)
+    {
+        if (fl.knob)
+            commit();
+        advDrag = AdvZone::none;
+        if (fl.toggleNote >= 0 && fl.toggleOnClick && ! drag.moved)
+        {
+            selected.erase (fl.toggleNote);
+            selectionChanged();
+        }
+        if (pressedHit != Hit::none)
+        {
+            pressedHit = Hit::none;
+            repaint (headerArea());
+        }
+        rulerSelecting = false;
+        fl = {};
+    }
+
+    void flMouseMove (const juce::MouseEvent& e)
+    {
+        const auto h = hitAt (e.position);
+        if (h != hoverHit)
+        {
+            hoverHit = h;
+            setTooltip (hitTip (h));
+            repaint (headerArea());
+        }
+        auto cursor = juce::MouseCursor::NormalCursor;
+        if (sample != nullptr && flCanvas().contains (e.getPosition()))
+        {
+            const auto onNote = noteAt (e.position) >= 0;
+            if ((cutMode.getToggleState() || e.mods.isShiftDown()) && onNote)
+                cursor = juce::MouseCursor::IBeamCursor;
+            else if (edgeAt (e.position).first >= 0)
+                cursor = juce::MouseCursor::LeftRightResizeCursor;
+            else if (onNote)
+                cursor = juce::MouseCursor::UpDownResizeCursor;
+        }
+        setMouseCursor (cursor);
+    }
+
+    // FL: wheel = up / down, Shift+wheel = sideways, Ctrl+wheel = zoom in time, Alt+wheel = zoom the rows
+    void flWheel (const juce::MouseEvent& e, const juce::MouseWheelDetails& w)
+    {
+        const auto d = w.deltaY != 0.0f ? w.deltaY : w.deltaX;
+        if (e.mods.isCtrlDown() || e.mods.isCommandDown())
+        {
+            const auto anchor = outputOfX (e.position.x);
+            zoom = std::clamp (zoom * (d > 0 ? 1.25 : 0.8), 1.0, 512.0);
+            scroll = anchor - (e.position.x - (float) canvasArea().getX()) / pixelsPerSample();
+        }
+        else if (e.mods.isAltDown())
+        {
+            const auto anchor = pitchOfY (e.position.y);
+            rowH = std::clamp (rowH * (d > 0 ? 1.15 : 1.0 / 1.15), 8.0, 64.0);
+            topPitch = anchor + (double) (e.position.y - (float) flCanvas().getY()) / rowH;
+        }
+        else if (e.mods.isShiftDown() || w.deltaX != 0.0f)
+            scroll -= d * 0.25 * visibleLength();
+        else
+            topPitch = std::clamp (topPitch + d * 6.0, 10.0, 127.5);
+        clampScroll();
+        updateScrollBars();
+        repaint();
+    }
+
+    bool flKey (const juce::KeyPress& key)
+    {
+        const auto cmd = key.getModifiers().isCommandDown();
+        const auto code = key.getKeyCode();
+        if (key == juce::KeyPress::spaceKey)
+        {
+            togglePreview();
+            return true;
+        }
+        if (cmd && (code == 'O' || code == 'o'))
+        {
+            chooseSample();
+            return true;
+        }
+        if (cmd && (code == 'S' || code == 's'))
+        {
+            saveWav();
+            return true;
+        }
+        if (cmd && key == juce::KeyPress::returnKey)
+        {
+            selectTimeAround();
+            return true;
+        }
+        if (sample != nullptr)
+        {
+            // FL's shortcuts (TSynthEditorForm menus): Ctrl+E Advanced edit pitch, Ctrl+A Select all (slices), Up Deselect,
+            // Ctrl+Q Quantize time, PgUp / PgDn / Home / End / Ctrl+Left / Ctrl+Right the Zoom menu
+            if (cmd && (code == 'E' || code == 'e'))
+                return headerClick (Hit::advanced), true;
+            if (cmd && (code == 'A' || code == 'a'))
+                return selectAllNotes(), true;
+            if (cmd && (code == 'Q' || code == 'q'))
+                return quantize(), true;
+            if (! cmd && key == juce::KeyPress::upKey)
+                return selectNone(), true;
+            if (! cmd && key == juce::KeyPress::downKey)
+                return true; // (FL's look: Up deselects; the old layout's Up / Down transposition is not here)
+            if (key == juce::KeyPress::pageUpKey)
+                return zoomBy (1.5), true;
+            if (key == juce::KeyPress::pageDownKey)
+                return zoomBy (1.0 / 1.5), true;
+            if (key == juce::KeyPress::homeKey)
+                return zoomFull(), true;
+            if (key == juce::KeyPress::endKey)
+                return zoomOnSelection (0), true;
+            if (cmd && key.getKeyCode() == juce::KeyPress::leftKey)
+                return zoomOnSelection (-1), true;
+            if (cmd && key.getKeyCode() == juce::KeyPress::rightKey)
+                return zoomOnSelection (1), true;
+        }
+        if (! cmd && ! key.getModifiers().isAltDown())
+        {
+            if (code == 'L' || code == 'l')
+                return headerClick (Hit::loop), true;
+            if (code == 'A' || code == 'a')
+                return headerClick (Hit::follow), true;
+            if (code == 'H' || code == 'h')
+                return headerClick (Hit::slave), true;
+        }
+        return false;
+    }
+
+    // ---------------------------------------------------------------------------------------- FL's Advanced edit
+    // The double-clicked note opens three rows tall (FL 2026 capture): the top band "volume" (drag up / down; the green
+    // and red bars there are the volume fade-in / fade-out times, dragged sideways), the middle row the pitch (the
+    // green arrows on the left: ramp-in, the red ones on the right: ramp-out, the comb: formant; elsewhere the pitch),
+    // the bottom band "variation" (drag up / down; its bars are the pitch smooth-in / smooth-out times).
+    enum class AdvZone { none, volume, variation, fadeIn, fadeOut, smoothIn, smoothOut, rampIn, rampOut, formant };
+    juce::Rectangle<float> advancedBox (const newtonefx::Note& p) const
+    {
+        const auto x0 = xOfOutput ((double) p.curStart), x1 = xOfOutput ((double) p.curEnd);
+        const auto y = yOfPitch (p.origPitch + p.shift);
+        return juce::Rectangle<float>::leftTopRightBottom (x0, y - 1.5f * (float) rowH, std::max (x0 + 24.0f, x1), y + 1.5f * (float) rowH);
+    }
+    float timeX (const newtonefx::Note& p, double samples, bool fromEnd) const
+    {
+        const auto out = samples / std::max (1e-9, p.stretch);
+        return xOfOutput (fromEnd ? (double) p.curEnd - out : (double) p.curStart + out);
+    }
+    AdvZone advZoneAt (juce::Point<float> pos) const
+    {
+        if (! advancedEdit || currentNote < 0 || currentNote >= (int) notes.pitches.size())
+            return AdvZone::none;
+        const auto& p = notes.pitches[(std::size_t) currentNote];
+        const auto box = advancedBox (p);
+        if (! box.contains (pos))
+            return AdvZone::none;
+        const auto band = (pos.y - box.getY()) / std::max (1.0f, box.getHeight());
+        const auto near = [&] (float x) { return std::abs (pos.x - x) <= 4.0f; };
+        if (band < 1.0f / 3.0f)
+            return near (timeX (p, p.fadeInTime, false)) ? AdvZone::fadeIn : near (timeX (p, p.fadeOutTime, true)) ? AdvZone::fadeOut : AdvZone::volume;
+        if (band > 2.0f / 3.0f)
+            return near (timeX (p, p.smoothIn, false)) ? AdvZone::smoothIn : near (timeX (p, p.smoothOut, true)) ? AdvZone::smoothOut : AdvZone::variation;
+        const auto w = box.getWidth();
+        if (pos.x < box.getX() + std::min (22.0f, 0.2f * w))
+            return AdvZone::rampIn;
+        if (pos.x > box.getRight() - 12.0f)
+            return AdvZone::formant;
+        if (pos.x > box.getRight() - std::min (34.0f, 0.3f * w))
+            return AdvZone::rampOut;
+        return AdvZone::none; // (the pitch itself: the shared note drag)
+    }
+    void paintAdvancedHandles (juce::Graphics& g, const newtonefx::Note& p, float, float, float y) const
+    {
+        const auto box = advancedBox (p);
+        const auto band = box.getHeight() / 3.0f;
+        g.setColour (juce::Colours::white.withAlpha (0.35f));
+        g.fillRoundedRectangle (box, 3.0f);
+        g.setColour (flnt::orange);
+        g.drawRoundedRectangle (box.reduced (0.75f), 3.0f, 1.6f);
+        g.setColour (juce::Colour (0xff3b4550));
+        g.setFont (juce::FontOptions (12.0f));
+        g.drawText (tr ("volume"), box.withHeight (band), juce::Justification::centred, false);
+        g.drawText (tr ("variation"), box.withTrimmedTop (2.0f * band), juce::Justification::centred, false);
+        const juce::Colour green (0xff2f9a3c), red (0xffb03030);
+        auto bar = [&] (float x, float top, juce::Colour c) {
+            g.setColour (c);
+            g.fillRect (juce::Rectangle<float> (x - 1.5f, top, 3.0f, band));
+        };
+        bar (timeX (p, p.fadeInTime, false), box.getY(), green);
+        bar (timeX (p, p.fadeOutTime, true), box.getY(), red);
+        bar (timeX (p, p.smoothIn, false), box.getY() + 2.0f * band, green);
+        bar (timeX (p, p.smoothOut, true), box.getY() + 2.0f * band, red);
+        // the middle row's handles: ramp-in arrows (green), ramp-out arrows (red), the formant comb
+        auto arrows = [&] (float cx, juce::Colour c) {
+            juce::Path a;
+            a.addTriangle (cx - 6.0f, y - 2.0f, cx + 6.0f, y - 2.0f, cx, y - 9.0f);
+            a.addTriangle (cx - 6.0f, y + 2.0f, cx + 6.0f, y + 2.0f, cx, y + 9.0f);
+            g.setColour (c.withAlpha (0.8f));
+            g.fillPath (a);
+        };
+        arrows (box.getX() + std::min (11.0f, 0.1f * box.getWidth()), green);
+        arrows (box.getRight() - std::min (23.0f, 0.2f * box.getWidth()), red);
+        g.setColour (red.withAlpha (0.85f));
+        for (int k = 0; k < 4; ++k)
+            g.fillRect (juce::Rectangle<float> (box.getRight() - 10.0f + 2.0f * (float) k, y - 5.0f + (float) (k % 2) * 2.0f, 1.2f, 9.0f - (float) (k % 2) * 2.0f));
+    }
+    AdvZone advDrag = AdvZone::none;
+    newtonefx::Note advFrom;
+    void advancedDrag (const juce::MouseEvent& e)
+    {
+        if (currentNote < 0 || currentNote >= (int) notes.pitches.size())
+            return;
+        auto& p = notes.pitches[(std::size_t) currentNote];
+        const auto dy = -(double) e.getDistanceFromDragStartY() / std::max (1.0, rowH);   // rows up
+        const auto dx = (double) e.getDistanceFromDragStartX() / pixelsPerSample() * p.stretch; // source samples
+        const auto len = (double) (p.origEnd - p.origStart);
+        switch (advDrag)
+        {
+            case AdvZone::volume: p.volume = std::clamp (advFrom.volume * std::pow (10.0, 6.0 * dy / 20.0), 0.0, 4.0); break;
+            case AdvZone::variation: p.drift = std::clamp (advFrom.drift + 0.5 * dy, 0.0, 2.0); break;
+            case AdvZone::fadeIn: p.fadeInTime = std::clamp (advFrom.fadeInTime + dx, 0.0, len); p.fadeInGain = p.fadeInTime > 0.0 ? 0.0 : 1.0; break;
+            case AdvZone::fadeOut: p.fadeOutTime = std::clamp (advFrom.fadeOutTime - dx, 0.0, len); p.fadeOutGain = p.fadeOutTime > 0.0 ? 0.0 : 1.0; break;
+            case AdvZone::smoothIn: p.smoothIn = std::clamp (advFrom.smoothIn + dx, 0.0, len); break;
+            case AdvZone::smoothOut: p.smoothOut = std::clamp (advFrom.smoothOut - dx, 0.0, len); break;
+            case AdvZone::rampIn: p.rampIn = std::clamp (advFrom.rampIn + dy, -12.0, 12.0); break;
+            case AdvZone::rampOut: p.rampOut = std::clamp (advFrom.rampOut + dy, -12.0, 12.0); break;
+            case AdvZone::formant: p.formant = std::clamp (advFrom.formant * std::exp2 (dy / 12.0), 0.25, 4.0); break;
+            case AdvZone::none: break;
+        }
+        drag.moved = true;
+        updatePanel();
+        repaint();
+    }
+
+    void paintFl (juce::Graphics& g)
+    {
+        g.fillAll (flnt::headerDark);
+        paintFlHeader (g);
+        const auto canvas = flCanvas();
+        g.setColour (flnt::rowOut);
+        g.fillRect (canvas);
+        if (sample == nullptr)
+        {
+            paintFlKeyboard (g, flKeyboard());
+            g.setColour (flnt::caption);
+            g.setFont (theme::font (theme::type::body));
+            g.drawText (validSlot() ? tr ("Load a sample to edit it (Load sample... or drop an audio file here)") : tr ("This slot no longer holds this plugin"),
+                        canvas, juce::Justification::centred);
+            return;
+        }
+        paintFlNotes (g, canvas);
+        paintFlRuler (g, timeRulerArea());
+        paintFlKeyboard (g, flKeyboard());
+        if (vibratoEdit)
+        {
+            g.setColour (flnt::header);
+            g.fillRect (flPanel());
+            g.setColour (flnt::buttonEdge);
+            g.drawVerticalLine (flPanel().getX(), (float) flPanel().getY(), (float) flPanel().getBottom());
+        }
+        g.setColour (flnt::rulerBg);
+        g.fillRect (flBody().removeFromTop (flnt::rulerHeight).removeFromLeft (flnt::keyboardWidth));
+        if (! band.isEmpty())
+        {
+            g.setColour (juce::Colours::white.withAlpha (0.12f));
+            g.fillRect (band);
+            g.setColour (juce::Colours::white.withAlpha (0.6f));
+            g.drawRect (band, 1.0f);
+        }
+        if (cursorAt > 0 && ! previewing)
+        {
+            g.setColour (juce::Colours::white.withAlpha (0.55f));
+            g.drawVerticalLine ((int) xOfOutput ((double) cursorAt), (float) canvas.getY(), (float) canvas.getBottom());
+        }
+        if (previewing)
+            if (const auto pos = engine.getPreviewPosition(); pos >= 0.0)
+            {
+                const auto x = xOfOutput (pos + previewOffset());
+                g.setColour (juce::Colour (0xff6fe36f));
+                g.drawVerticalLine ((int) x, (float) timeRulerArea().getY(), (float) canvas.getBottom());
+            }
+    }
+
+    void resizedFl()
+    {
+        for (auto* b : { &load, &analyse, &cutMode, &snapAll, &reset, &preview, &save, &scoreButton, &stretch, &snapButton, &toPlaylist })
+            b->setVisible (false);
+        slave.setVisible (false);
+        status.setVisible (false);
+        keyBox.setVisible (false);
+        scaleBox.setVisible (false);
+        for (auto* k : { &centreKnob, &variationKnob, &transitionKnob })
+            k->setVisible (false);
+        const auto body = flBody();
+        hScroll.setVisible (true);
+        vScroll.setVisible (true);
+        hScroll.setBounds (body.withTrimmedLeft (flnt::keyboardWidth).withTrimmedRight (flnt::scrollSize).removeFromBottom (flnt::scrollSize));
+        vScroll.setBounds (body.withTrimmedTop (flnt::rulerHeight).withTrimmedBottom (flnt::scrollSize).removeFromRight (flnt::scrollSize));
+        const auto showPanel = vibratoEdit && sample != nullptr;
+        panelTitle.setVisible (showPanel);
+        for (auto* k : { &pitchKnob, &formantKnob, &volumeKnob, &driftKnob, &rampInKnob, &rampOutKnob, &vibRateKnob, &vibStartKnob, &vibEndKnob, &tremoloKnob })
+            k->setVisible (showPanel);
+        if (showPanel)
+        {
+            auto panel = flPanel().reduced (6);
+            panelTitle.setBounds (panel.removeFromTop (20));
+            const auto lw = theme::labelColumnWidth ({ &pitchKnob.label, &formantKnob.label, &volumeKnob.label, &driftKnob.label, &rampInKnob.label, &rampOutKnob.label,
+                                                       &vibRateKnob.label, &vibStartKnob.label, &vibEndKnob.label, &tremoloKnob.label },
+                                                     92, 130);
+            for (auto* k : { &pitchKnob, &formantKnob, &volumeKnob, &driftKnob, &rampInKnob, &rampOutKnob, &vibRateKnob, &vibStartKnob, &vibEndKnob, &tremoloKnob })
+            {
+                k->place (panel.removeFromTop (22), lw);
+                panel.removeFromTop (3);
+            }
+        }
+        clampScroll();
+        updateScrollBars();
+    }
+
     void paintWarp (juce::Graphics& g, juce::Rectangle<int> area) const
     {
         // the warped waveform (where each part of the sample plays now)
@@ -1499,7 +3182,7 @@ public:
         setUsingNativeTitleBar (true);
         setContentOwned (new NewtoneEditor (engine, track, slot), true);
         setResizable (true, false);
-        setResizeLimits (760, 420, 4000, 2000);
+        setResizeLimits (600, 400, 4000, 2000); // (round 190kj: FL's Newtone window is 735 px wide)
         centreWithSize (getWidth(), getHeight());
         setVisible (true);
         dockOrKeepAbove (*this); // FL's docked plugin window (round 190ev)
@@ -1572,6 +3255,24 @@ void openSampleInMasterEditor (AudioEngine& engine, EffectKind kind, const std::
     }
     newtoneWindows().erase ({ 0, slot }); // (an open window shows the old sample: it opens again with the new one)
     NewtoneWindows::open (engine, 0, slot);
+}
+
+void setNewtoneShotState (juce::Component& editor, const juce::String& state)
+{
+    if (auto* e = dynamic_cast<NewtoneEditor*> (&editor))
+        e->shotState (state);
+}
+
+double newtonePaintMs (juce::Component& editor, int paints)
+{
+    juce::Image image (juce::Image::ARGB, std::max (1, editor.getWidth()), std::max (1, editor.getHeight()), true);
+    const auto t0 = juce::Time::getMillisecondCounterHiRes();
+    for (int k = 0; k < paints; ++k)
+    {
+        juce::Graphics g (image);
+        editor.paintEntireComponent (g, true);
+    }
+    return (juce::Time::getMillisecondCounterHiRes() - t0) / std::max (1, paints);
 }
 
 std::unique_ptr<juce::Component> makeNewtoneEditor (AudioEngine& engine, int track, int slot)

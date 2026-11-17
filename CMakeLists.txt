@@ -134,6 +134,7 @@ add_library(lynx_core STATIC
     src/core/DrumSynthLive.cpp
     src/core/Harmless.cpp
     src/core/Harmor.cpp
+    src/core/HarmorResynth.cpp
     src/core/Gms.cpp
     src/core/GmsMobile.cpp
     src/core/PocketSuperSaw.cpp
@@ -310,6 +311,7 @@ target_sources(lynx_core PRIVATE
     src/core/AudioEdit.cpp
     src/core/AudioEditTools.cpp
     src/core/SampleProps.cpp
+    src/core/EdisonView.cpp
     src/core/FlAutoSlicer.cpp
     src/core/MixerOps.cpp
     src/core/History.cpp

@@ -78,6 +78,12 @@ juce::StringArray audioEditorMenuForSnapshot (juce::Component& editor);
 // `probeFrame` snaps to (the tooltip first)
 juce::StringArray audioEditorMarkerMenuForSnapshot (juce::Component& editor, int marker);
 juce::String setAudioEditorSnapForSnapshot (juce::Component& editor, int mode, std::int64_t probeFrame);
+// round natives190kj: FL's Dual view / spectrogram and a zoom (from < to), FL's Edison commands ("grid-small" /
+// "grid-medium" / "grid-large" grid-slicing, "pitch-regions"; "grid" = the time grid at this zoom; returns the markers),
+// and the sample's properties (tempo-sync puts the grid in beats; the middle note sets the pitch period)
+void setAudioEditorViewForSnapshot (juce::Component& editor, bool spectrum, bool dual, std::int64_t from, std::int64_t to);
+juce::String audioEditorCommandForSnapshot (juce::Component& editor, const juce::String& what);
+void setAudioEditorSamplePropsForSnapshot (juce::Component& editor, const audioedit::SampleProps& props);
 // --edisonshot (round 165l): a tool window of `editor` (tool = audiotools::Tool as int; envelopeMode 0 wave,
 // 1 volume, 2 panning, 3 stereo separation: what the envelope tools work on), its English title, and the editor's mode.
 std::unique_ptr<juce::Component> makeAudioToolPanelForSnapshot (juce::Component& editor, int tool, int envelopeMode = 0);

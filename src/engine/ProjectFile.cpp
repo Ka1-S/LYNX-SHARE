@@ -1953,6 +1953,8 @@ juce::var channelToVar (const ChannelDef& c)
         o->setProperty ("controllerState", juce::Base64::toBase64 (c.controllerState.data(), c.controllerState.size()));
     if (! c.pluginState.empty())
         o->setProperty ("pluginState", juce::Base64::toBase64 (c.pluginState.data(), c.pluginState.size()));
+    if (c.engineRev != 0)
+        o->setProperty ("engineRev", c.engineRev); // (absent = 0: a project from before round natives190kj)
     if (! c.modelParams.empty())
     {
         juce::StringArray values;
@@ -2304,6 +2306,7 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
         for (int k = 0; k < values.size() && k < 8192; ++k) // (DrumSynth Live: 4562)
             def.modelParams.push_back (values[k].getFloatValue());
     }
+    def.engineRev = (int) c.getProperty ("engineRev", 0);
     if (const auto encoded = c["pluginState"].toString(); encoded.isNotEmpty())
     {
         juce::MemoryOutputStream decoded;

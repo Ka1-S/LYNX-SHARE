@@ -2206,6 +2206,17 @@ public:
             return;
         }
 
+        if (args.contains ("--newtoneshot"))
+        {
+            // LYNX --newtoneshot prefix audio.wav (round natives190kj): FL's Newtone window with the sample analysed, in a
+            // few states (-plain, -selected, -advanced, -cut, -timesel, -moved) and the paint time of the FL look against
+            // the round-165g layout (-paint.txt)
+            const auto i = args.indexOf ("--newtoneshot");
+            runNewtoneShot (args[i + 1].unquoted(), args[i + 2].unquoted());
+            quit();
+            return;
+        }
+
         if (args.contains ("--edisonslottest"))
         {
             // LYNX.exe --edisonslottest folder [project.flp]: round 190cd — the audio editor as a mixer-slot plugin through
@@ -21307,6 +21318,56 @@ private:
         return all;
     }
 
+    void runNewtoneShot (const juce::String& prefix, const juce::String& file)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        const auto sample = offline.getSampleLibrary().load (file);
+        if (sample == nullptr)
+        {
+            std::fprintf (stderr, "newtoneshot: cannot read %s\n", file.toRawUTF8());
+            return;
+        }
+        int at = 0;
+        offline.editSong ([&] (lynx::Song& song) {
+            if (song.mixer.size() < 2)
+                song.mixer.resize (2);
+            auto tone = lynx::makeEffectSlot (lynx::EffectKind::newtone);
+            tone.samplePath = file.toStdString();
+            tone.state = lynx::newtonefx::writeNative (lynx::newtonefx::analyseNotes (*sample));
+            at = (int) song.mixer[1].effects.size();
+            song.mixer[1].effects.push_back (tone);
+        }, false);
+        auto shot = [&] (const juce::String& name, const juce::StringArray& states) {
+            auto editor = lynx::makeNewtoneEditor (offline, 1, at);
+            for (const auto& st : states)
+                lynx::setNewtoneShotState (*editor, st);
+            saveSnapshot (*editor, prefix + "-" + name + ".png");
+        };
+        shot ("plain", {});
+        shot ("cursor", { "cursor:30000" });
+        shot ("selected", { "select:2" });
+        shot ("advanced", { "select:3", "advanced" });
+        shot ("vibrato", { "select:3", "vibrato" });
+        shot ("cut", { "cut" });
+        shot ("timesel", { "timesel:20000,60000" });
+        shot ("moved", { "shift:2,2", "select:2" });
+        // paint cost: 40 full paints of each layout
+        juce::String report;
+        {
+            auto fl = lynx::makeNewtoneEditor (offline, 1, at);
+            lynx::newtonePaintMs (*fl, 3);
+            report << "fl-look " << fl->getWidth() << "x" << fl->getHeight() << " ms/paint " << juce::String (lynx::newtonePaintMs (*fl, 40), 3) << "\n";
+            auto old = lynx::makeNewtoneEditor (offline, 1, at);
+            lynx::setNewtoneShotState (*old, "lynxlook");
+            lynx::newtonePaintMs (*old, 3);
+            report << "lynx-165g-look " << old->getWidth() << "x" << old->getHeight() << " ms/paint " << juce::String (lynx::newtonePaintMs (*old, 40), 3) << "\n";
+            saveSnapshot (*old, prefix + "-lynxlook.png");
+        }
+        lynx::shot::file (juce::File (prefix + "-paint.txt")).replaceWithText (report);
+        std::printf ("%s", report.toRawUTF8());
+    }
+
     void runEdisonShot (const juce::String& prefix, const juce::String& file)
     {
         namespace ae = lynx::audioedit;
@@ -21377,10 +21438,123 @@ private:
         {
             juce::StringArray snaps;
             const auto probe = (std::int64_t) (d.audio.frames() * 3 / 8) + 777;
-            for (int mode = 0; mode < 4; ++mode)
+            for (int mode = 0; mode < 5; ++mode) // (round natives190kj: 5 = Snap to pitch period)
                 snaps.add (lynx::setAudioEditorSnapForSnapshot (*editor, mode, probe));
             juce::File (prefix + "-snap.txt").replaceWithText (snaps.joinIntoString ("\n") + "\n");
+            lynx::setAudioEditorSnapForSnapshot (*editor, 0, probe);
             shot (*editor, "-editor-snap-on.png");
+        }
+        // round natives190kj: FL's Dual view, the time grid at a few zooms, grid-slicing, Detect pitch regions, the Scrub
+        // button's player (prefix-natives190kj.txt: one "name=ok|FAIL" or a report line per check)
+        {
+            juce::StringArray report;
+            const auto frames = d.audio.frames();
+            lynx::setAudioEditorViewForSnapshot (*editor, false, false, 0, frames);
+            shot (*editor, "-editor-wave.png");
+            lynx::setAudioEditorViewForSnapshot (*editor, false, true, 0, frames);
+            shot (*editor, "-editor-dual-wave.png");
+            lynx::setAudioEditorViewForSnapshot (*editor, true, false, 0, frames);
+            shot (*editor, "-editor-spectrum.png");
+            lynx::setAudioEditorViewForSnapshot (*editor, true, true, 0, frames);
+            shot (*editor, "-editor-dual-spectrum.png");
+            lynx::setAudioEditorViewForSnapshot (*editor, true, true, frames / 4, frames / 4 + 8 * 1080); // (8 samples per pixel)
+            shot (*editor, "-editor-dual-spectrum-zoom8.png");
+            lynx::setAudioEditorViewForSnapshot (*editor, false, false, 0, frames);
+            for (const auto& [from, to] : { std::pair<std::int64_t, std::int64_t> { 0, frames }, { 0, frames / 4 }, { 0, frames / 40 }, { 0, frames / 400 } })
+            {
+                lynx::setAudioEditorViewForSnapshot (*editor, false, false, from, to);
+                report.add ("grid seconds, view " + juce::String (from) + ".." + juce::String (to) + ": " + lynx::audioEditorCommandForSnapshot (*editor, "grid"));
+            }
+            lynx::setAudioEditorViewForSnapshot (*editor, false, false, 0, frames);
+            shot (*editor, "-editor-grid-seconds.png");
+            auto synced = d.props;
+            synced.tempo = 120.0;
+            synced.tempoSync = true;
+            lynx::setAudioEditorSamplePropsForSnapshot (*editor, synced);
+            report.add ("grid beats (tempo-sync 120 BPM): " + lynx::audioEditorCommandForSnapshot (*editor, "grid"));
+            shot (*editor, "-editor-grid-beats.png");
+            lynx::setAudioEditorSamplePropsForSnapshot (*editor, d.props);
+            {
+                auto plainDoc = d; // (a copy: the editor above keeps its markers for the tool shots)
+                plainDoc.markers.clear();
+                auto slicer = lynx::makeAudioEditorForSnapshot (offline, plainDoc, false);
+                slicer->setSize (1120, 600);
+                report.add (lynx::audioEditorCommandForSnapshot (*slicer, "grid-medium-all"));
+                shot (*slicer, "-editor-grid-slicing-medium.png");
+                report.add (lynx::audioEditorCommandForSnapshot (*slicer, "grid-small-all"));
+                shot (*slicer, "-editor-grid-slicing-small.png");
+            }
+            // Detect pitch regions on three sung-like notes (A3, C4, E4)
+            {
+                ae::Document m;
+                m.title = "Three notes";
+                m.audio.sampleRate = 44100.0;
+                const auto len = (std::size_t) (44100 * 3);
+                m.audio.channels.assign (1, std::vector<float> (len));
+                double phase = 0.0;
+                for (std::size_t i = 0; i < len; ++i)
+                {
+                    const auto hz = i < len / 3 ? 220.0 : i < 2 * len / 3 ? 261.6256 : 329.6276;
+                    phase += 2.0 * 3.141592653589793 * hz / 44100.0;
+                    m.audio.channels[0][i] = (float) (0.4 * std::sin (phase) + 0.2 * std::sin (2.0 * phase) + 0.1 * std::sin (3.0 * phase));
+                }
+                auto melody = lynx::makeAudioEditorForSnapshot (offline, m, false);
+                melody->setSize (1120, 600);
+                report.add (lynx::audioEditorCommandForSnapshot (*melody, "pitch-regions"));
+                shot (*melody, "-editor-pitch-regions.png");
+            }
+            // the Scrub button's player: paused (silent, held), 2x forward, 1x backward, held at the start
+            {
+                lynx::PreviewPlayer player;
+                player.prepareToPlay (44100.0, 512);
+                auto ramp = std::make_shared<lynx::SampleData>();
+                ramp->sampleRate = 44100.0;
+                ramp->left.resize (44100);
+                for (std::size_t i = 0; i < ramp->left.size(); ++i)
+                    ramp->left[i] = (float) i / 44100.0f;
+                ramp->right = ramp->left;
+                juce::AudioBuffer<float> block (2, 512);
+                juce::MidiBuffer midi;
+                player.playScrub (ramp, 22050, 1.0f);
+                player.processBlock (block, midi);
+                report.add (juce::String ("scrub paused holds=") + (player.getPlayPosition() == 22050.0 && block.getMagnitude (0, 512) == 0.0f ? "ok" : "FAIL"));
+                player.setScrubSpeed (2.0);
+                player.processBlock (block, midi);
+                report.add (juce::String ("scrub 2x forward=") + (std::abs (player.getPlayPosition() - (22050.0 + 1024.0)) < 1e-6 && std::abs (block.getSample (0, 511) - (22050.0f + 1022.0f) / 44100.0f) < 1e-3f ? "ok" : "FAIL")
+                            + " (pos " + juce::String (player.getPlayPosition()) + ", last " + juce::String (block.getSample (0, 511), 5) + ")");
+                player.setScrubSpeed (-1.0);
+                player.processBlock (block, midi);
+                report.add (juce::String ("scrub 1x backward=") + (std::abs (player.getPlayPosition() - (22050.0 + 512.0)) < 1e-6 && block.getSample (0, 0) > block.getSample (0, 511) ? "ok" : "FAIL"));
+                player.setScrubSpeed (-16.0);
+                for (int b = 0; b < 20; ++b)
+                    player.processBlock (block, midi);
+                report.add (juce::String ("scrub held at the start=") + (player.getPlayPosition() == 0.0 ? "ok" : "FAIL"));
+                // CPU of a 16x block (the widest kernel)
+                const auto t0 = juce::Time::getMillisecondCounterHiRes();
+                player.setScrubSpeed (16.0);
+                for (int b = 0; b < 200; ++b)
+                    player.processBlock (block, midi);
+                report.add ("scrub 16x: " + juce::String ((juce::Time::getMillisecondCounterHiRes() - t0) / 200.0, 4) + " ms per 512-frame block");
+            }
+            // paint cost: full paints of the editor, waveform / Dual view / spectrogram
+            for (const auto& [spectrum, dual, name] : { std::tuple<bool, bool, const char*> { false, false, "wave" }, { false, true, "dual-wave" }, { true, true, "dual-spectrum" }, { true, false, "spectrum" } })
+            {
+                lynx::setAudioEditorViewForSnapshot (*editor, spectrum, dual, 0, frames);
+                juce::Image img (juce::Image::ARGB, editor->getWidth(), editor->getHeight(), true);
+                {
+                    juce::Graphics g (img);
+                    editor->paintEntireComponent (g, true); // (the spectrogram images are made once)
+                }
+                const auto t0 = juce::Time::getMillisecondCounterHiRes();
+                for (int k = 0; k < 40; ++k)
+                {
+                    juce::Graphics g (img);
+                    editor->paintEntireComponent (g, true);
+                }
+                report.add ("paint " + juce::String (name) + ": " + juce::String ((juce::Time::getMillisecondCounterHiRes() - t0) / 40.0, 3) + " ms per full paint");
+            }
+            lynx::setAudioEditorViewForSnapshot (*editor, false, false, 0, frames);
+            juce::File (prefix + "-natives190kj.txt").replaceWithText (report.joinIntoString ("\n") + "\n");
         }
         // round gaps190kf: FL's Sample properties window (Format › Edit properties..., F2) for this audio, with a few
         // properties set, and the WAV chunks it writes (smpl / inst / acid / LIST INFO) listed
