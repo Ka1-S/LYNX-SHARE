@@ -138,6 +138,37 @@
         save (browser, "loops-08-layout-swapped.png");
         browser.setLoopLayout (loopkeys::Layout::defaults());
 
+        // rollup 0.1.30 step 6 (the owner's yes to gaps190kf's question): in the Simple layout, under Show All, LYNX's own
+        // beats and sounds (round 190ke) are listed too; Loop Types Pattern gives the beats only, Genre Trap the trap ones
+        {
+            const auto before = layoutstyle::current();
+            layoutstyle::setCurrent (layoutstyle::Style::simple);
+            browser.setLoopFilter (f);
+            browser.loadLoopsForSnapshot();
+            int beats = 0, sounds = 0;
+            for (const auto& item : factorycontent::items())
+            {
+                beats += item.kind == factorycontent::Kind::beat ? 1 : 0;
+                sounds += item.kind == factorycontent::Kind::sound ? 1 : 0;
+            }
+            check ("simple_lists_lynx_content", browser.numLoopsShownForSnapshot() == total + beats + sounds,
+                   juce::String (browser.numLoopsShownForSnapshot()) + " of " + juce::String (total + beats + sounds));
+            auto g = f;
+            g.types = loopkeys::pattern;
+            browser.setLoopFilter (g);
+            check ("simple_pattern_loops_are_lynx_beats", browser.numLoopsShownForSnapshot() == beats, juce::String (browser.numLoopsShownForSnapshot()));
+            save (browser, "loops-10-simple-lynx-beats.png");
+            g.types = loopkeys::allTypes;
+            g.keywords = { "trap" };
+            browser.setLoopFilter (g);
+            check ("simple_trap", browser.numLoopsShownForSnapshot() > 3, juce::String (browser.numLoopsShownForSnapshot()));
+            save (browser, "loops-11-simple-trap.png");
+            browser.setLoopFilter (f);
+            layoutstyle::setCurrent (before);
+            browser.loadLoopsForSnapshot();
+            check ("pattern_layout_without_lynx_content", browser.numLoopsShownForSnapshot() == total, juce::String (browser.numLoopsShownForSnapshot()));
+        }
+
         // the menus
         saveMenus ({ "Scale", "Loop Types" }, { browser.buildLoopScaleMenu(), browser.buildLoopTypesMenu() }, folder.getChildFile ("loops-09-menus.png").getFullPathName());
 
