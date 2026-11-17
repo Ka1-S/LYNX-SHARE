@@ -2791,6 +2791,7 @@ void setClipGridDeviceDropForSnapshot (juce::Component& grid, int track)
 }
 // --- round 190ef ---------------------------------------------------------------------------------------------------------
 bool& clipGridClassicLook() { return classicLook; }
+bool theme::livelook::active() noexcept { return liveLook(); }
 
 void setClipGridBlinkPhaseForSnapshot (int phase) { blinkPhaseForSnapshot = phase; }
 

@@ -957,6 +957,8 @@ void PianoRollComponent::paintOverview (juce::Graphics& g, juce::Rectangle<float
     }
 }
 
+bool PianoRollComponent::liveNotes() const { return fitKeysToNotes && ! liveNoteColour.isTransparent() && theme::livelook::active(); }
+
 void PianoRollComponent::paint (juce::Graphics& g)
 {
     const uitrace::Scope trace ("PianoRollComponent paint", true, g.getClipBounds());
@@ -1021,6 +1023,8 @@ void PianoRollComponent::paint (juce::Graphics& g)
         return cull && ! r.expanded (margin).getSmallestIntegerContainer().intersects (dirtyArea);
     };
 
+    const auto liveLookNotes = liveNotes(); // (round 190jn: docked in the Clip View's Live look)
+
     // --- grid ------------------------------------------------------------
     {
         juce::Graphics::ScopedSaveState state (g);
@@ -1035,12 +1039,19 @@ void PianoRollComponent::paint (juce::Graphics& g)
 
             // Note grid highlights (Alt+B, round 168g): off, every row looks the same (FL's "BlackKeys" option)
             auto row = gridHighlights && isBlackKey (key) ? rowBlack : rowWhite;
+            if (liveLookNotes) // (round 190jn: Live's note editor, one grey with a darker line under each row)
+                row = juce::Colour (0xff464f53);
             if (gridHighlights && inScale (key))
                 row = row.interpolatedWith (info, 0.10f);
             if (key == hover.key && drag == Drag::none)
                 row = row.interpolatedWith (textPrimary, 0.04f); // the row under the mouse
             g.setColour (row);
             g.fillRect (grid.getX(), y, grid.getWidth(), rowHeight);
+            if (liveLookNotes)
+            {
+                g.setColour (juce::Colour (0xff3d4548));
+                g.drawHorizontalLine (y + rowHeight - 1, (float) grid.getX(), (float) grid.getRight());
+            }
 
             if (! padRows.empty() || key % 12 == (folded() ? scaleRoot() : 0)) // folded: the octave line under each root (pads: each row)
             {
@@ -1121,12 +1132,25 @@ void PianoRollComponent::paint (juce::Graphics& g)
             // a selected muted note keeps a muted look (round 167k: Alt+M on a selection showed no change)
             auto fill = selected ? (n.muted ? accentHover.interpolatedWith (noteMuted, 0.6f) : accentHover.brighter (0.15f))
                                  : n.muted ? noteMuted : theme::noteGroupColour (n.colour, n.velocity);
-            if (hovered)
-                fill = fill.brighter (0.18f);
-            g.setColour (fill);
-            g.fillRoundedRectangle (r, 2.5f);
-            g.setColour (selected ? textPrimary : hovered ? textPrimary.withAlpha (0.75f) : bg0.withAlpha (0.6f));
-            g.drawRoundedRectangle (r, 2.5f, 1.0f);
+            if (liveLookNotes && ! selected && ! n.muted) // Live: the clip's colour × 0.86 with a black edge, square
+            {
+                fill = theme::liveShade (liveNoteColour, 0.86f).withAlpha (1.0f);
+                if (hovered)
+                    fill = fill.brighter (0.18f);
+                g.setColour (fill);
+                g.fillRect (r);
+                g.setColour (juce::Colours::black);
+                g.drawRect (r, 1.0f);
+            }
+            else
+            {
+                if (hovered)
+                    fill = fill.brighter (0.18f);
+                g.setColour (fill);
+                g.fillRoundedRectangle (r, 2.5f);
+                g.setColour (selected ? textPrimary : hovered ? textPrimary.withAlpha (0.75f) : bg0.withAlpha (0.6f));
+                g.drawRoundedRectangle (r, 2.5f, 1.0f);
+            }
 
             // "All" channels: whose note it is, by the channel's colour on its left edge (issue #12)
             if (allChannels && n.channel >= 0 && n.channel < (int) song.channels.size() && r.getWidth() > 5.0f)

@@ -17858,3 +17858,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Livefix190jdCTests.inc" // round 190jd: Mixer peak hold and Extra large list, Limiter / Maximus history
 #include "Folders190jfTests.inc" // round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Alt+drag)
 #include "DawProject190jfTests.inc" // round 190jf B22: DAWproject import / export (core/DawProject.h, core/ZipLite.h)
+#include "LiveLook190jnTests.inc" // round 190jn: the Clip-launch layout in Live's look (the Info View key)

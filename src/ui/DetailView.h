@@ -21,6 +21,11 @@ namespace lynx
 {
 class AudioEngine;
 class MidiToolsPanel;
+namespace ui
+{
+struct Hint;
+class InfoView;
+} // namespace ui
 
 // A card body drawn by another module (round 183c's racks): the Device View keeps the shared title bar (LED, name,
 // window button, fold, right-click menu, drag, the selection outline) and lays this component out as the card's body,
@@ -38,7 +43,7 @@ public:
     int widthLimit = 0;
 };
 
-class DetailView final : public juce::Component
+class DetailView final : public juce::Component, public juce::TooltipClient
 {
 public:
     // Factories of custom cards (nullptr result = an ordinary card). Set once at start-up by the module that owns them.
@@ -101,6 +106,14 @@ public:
     // its three MPE lanes stacked under the notes (not saved; envelopesTab wins when both are set)
     static inline bool mpeTab = false;
     static constexpr int minHeight = 140, edgeHeight = 5, stripHeight = 22;
+    // Round 190jn (design190ia CL-23 / CL-24): in the Clip-launch layout's Live look, Live's Info View at the left (the
+    // hint of the control under the mouse; the status strip's (i) button or Shift+? shows and hides it; ui-options) and
+    // Live's status strip (the (i) button, the status text in its field, the track's name, Clip / Device glyphs).
+    static inline bool infoViewShown = true;
+    void setInfoHint (const ui::Hint& hint); // (the main window's hint timer; nothing repaints unless the text changed)
+    void toggleInfoView();
+    ui::InfoView& infoViewForSnapshot();
+    juce::String getTooltip() override;
 
     // Round 190ce: the selected card's device (none: the Device View is not showing or nothing is selected) for the
     // hot-swap key; the 0 key switches the selected device on / off while the chain has the keyboard (false: not here).
@@ -118,6 +131,9 @@ public:
     bool isFoldedForCheck (int card) const;
     void toggleFoldForCheck (int card);
     MidiToolsPanel& midiToolsForSnapshot(); // the Clip page's Transform panel (round 190s)
+    // Round 190jn (CL-20a / CL-20b): the Clip page's Live column — its sections open or folded (Clip, Launch, Pitch & Time)
+    // and how far it is scrolled (px); only in the Clip-launch layout's Live look.
+    void clipSectionsForSnapshot (bool clipOpen, bool launchOpen, bool notesOpen, int scroll);
 
     void paint (juce::Graphics& g) override;
     void resized() override;
@@ -138,6 +154,11 @@ private:
     std::unique_ptr<DeviceChain> chain;
     std::unique_ptr<ClipPage> clipPage;
     juce::TextButton clipTab, devicesTab, optionsButton;
+    std::unique_ptr<ui::InfoView> info;
+    // the Live look's status strip parts (empty in LYNX's look)
+    juce::Rectangle<int> infoButtonArea() const;
+    juce::Rectangle<int> pageGlyphArea (bool devices) const;
+    void paintLiveStrip (juce::Graphics& g);
     int track = -1, scene = -1;
     int dragStartHeight = 0;
     bool resizing = false;

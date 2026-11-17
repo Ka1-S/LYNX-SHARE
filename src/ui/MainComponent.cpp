@@ -2938,6 +2938,10 @@ void MainComponent::loadUiSettings()
             clipGridSceneTempoShown() = on;
         else if (key == "clipGridClassicLook") // round 190ig: the clip grid without Live's look
             clipGridClassicLook() = on;
+        else if (key == "tallLiveLanes") // round 190jn: the Arrangement's 38 px lanes in Live's look (19 px by default)
+            playlistTallLiveLanes() = on;
+        else if (key == "infoViewShown") // round 190jn: Live's Info View in the detail view
+            DetailView::infoViewShown = on;
         else if (key == "simpleDockHeight") // round 190bu: the Simple workflow's track dock
             SimpleDock::preferredHeight = juce::jlimit (SimpleDock::minHeight, 2000, line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
         else if (key == "simpleDockShown")
@@ -3208,6 +3212,8 @@ void MainComponent::saveUiSettings()
                                       + "\ndetailShown=" + juce::String (DetailView::shownSetting ? 1 : 0)
                                       + "\nsceneTempoShown=" + juce::String (clipGridSceneTempoShown() ? 1 : 0)
                                       + "\nclipGridClassicLook=" + juce::String (clipGridClassicLook() ? 1 : 0)
+                                      + "\ntallLiveLanes=" + juce::String (playlistTallLiveLanes() ? 1 : 0)
+                                      + "\ninfoViewShown=" + juce::String (DetailView::infoViewShown ? 1 : 0)
                                       + "\nsessionButtonRow=" + juce::String (sessionButtonRowShown ? 1 : 0)
                                       + "\nsimpleDockHeight=" + juce::String (SimpleDock::preferredHeight)
                                       + "\nsimpleDockShown=" + juce::String (SimpleDock::shownSetting ? 1 : 0)
@@ -3941,13 +3947,32 @@ void MainComponent::addLayoutStyleItems (juce::PopupMenu& menu)
             refreshClipGrid (*clipGridView);
             saveUiSettings();
         });
-    // round 190ig: the clip grid in Live's look (the default) or round 181a's (an option, add-never-remove)
+    // round 190ig: the clip grid in Live's look (the default) or round 181a's (an option, add-never-remove); round 190jn:
+    // the same switch takes the Session mixer, the Arrangement, the Clip / Device View and the status strip with it
     if (isClipLaunchWorkflow() && clipGridView != nullptr)
-        menu.addItem (tr ("Classic LYNX look for the clip grid"), true, clipGridClassicLook(), [this] {
+        menu.addItem (tr ("Classic LYNX look in the Clip-launch layout"), true, clipGridClassicLook(), [this] {
             clipGridClassicLook() = ! clipGridClassicLook();
             refreshClipGrid (*clipGridView);
+            playlist.liveLanesChanged();
+            if (detailView != nullptr)
+            {
+                detailView->resized();
+                detailView->repaint();
+            }
+            playlistArea.resized();
             saveUiSettings();
         });
+    // round 190jn (design190ia CL-17, owner decision "go with recommended"): Live's 19 px Arrangement lanes are the
+    // default of Live's look; LYNX's 38 px lanes stay as this option
+    if (isClipLaunchWorkflow() && ! clipGridClassicLook())
+        menu.addItem (tr ("Tall Arrangement lanes"), true, playlistTallLiveLanes(), [this] {
+            playlistTallLiveLanes() = ! playlistTallLiveLanes();
+            playlist.liveLanesChanged();
+            saveUiSettings();
+        });
+    if (isClipLaunchWorkflow() && ! clipGridClassicLook() && detailView != nullptr)
+        menu.addItem (tr ("Info View") + shortcutText ("view.detailInfo"), true, DetailView::shownSetting && DetailView::infoViewShown,
+                      [this] { runAction ("view.detailInfo"); });
     // round 190bu: the Simple workflow's dock for the selected track (its sound and its effects)
     if (layoutStyle == Style::simple && simpleWorkflow != nullptr)
         menu.addItem (tr ("Track dock") + shortcutText ("view.detailToggle"), true, SimpleDock::shownSetting, [this] { runAction ("view.detailToggle"); });
@@ -4139,6 +4164,19 @@ bool MainComponent::runDetailAction (const std::string& id)
         detailView->setPage (DetailView::Page::devices);
     else if (id == "view.detailSwitch")
         detailView->togglePage();
+    else if (id == "view.detailInfo") // (round 190jn: Live's Info View, only in its look)
+    {
+        if (! theme::livelook::active())
+            return false;
+        if (! DetailView::shownSetting) // (hidden: the detail view comes back with its Info View)
+        {
+            runDetailAction ("view.detailToggle");
+            if (! DetailView::infoViewShown)
+                detailView->toggleInfoView();
+        }
+        else
+            detailView->toggleInfoView();
+    }
     else
         return false;
     return true;
@@ -6701,6 +6739,8 @@ void MainComponent::timerCallback()
         }
 
         hintBar.setHint (hint, live && hint.value.isNotEmpty());
+        if (detailView != nullptr && detailView->isShowing()) // (round 190jn: Live's Info View; repaints only on a change)
+            detailView->setInfoHint (hint);
         if (hoverValues)
             updateHoverValue (hovered, hint, live);
         if (++tweakTicks >= 3) // 10 times a second

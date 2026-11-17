@@ -53,7 +53,8 @@ public:
     juce::String getTooltip() override;
 
     // the parts of a strip (also what --liveshot190dr checks)
-    enum class Part { none, inType, inChannel, monIn, monAuto, monOff, output, send, delay, volume, fader, pan, activator, solo, arm };
+    // (round 190jn: `peak` = Live's peak-level pill above the volume field, Live's look only)
+    enum class Part { none, inType, inChannel, monIn, monAuto, monOff, output, send, delay, volume, fader, pan, activator, solo, arm, peak };
     struct Hit
     {
         int column = -1; // the grid column; -2 = the Main strip
@@ -65,6 +66,17 @@ public:
     juce::Rectangle<int> partBounds (int column, Part part, int row = 0) const;
     Hit hitAt (juce::Point<int> p) const;
     const std::vector<int>& sendTargets() const noexcept { return rows; }
+
+    // Round 190jn (--livelook190jnshot): an insert's meter as if the song played (bars, hold lines and the peak pill's
+    // loudest peak, linear gain; >= 1 = clipped), and a hovered part. The next tick() moves the meters on as usual.
+    void setMeterForSnapshot (int insert, float left, float right, float holdLeft, float holdRight, float maxPeak);
+    void setHoverForSnapshot (Hit hit) { hover = hit; repaint(); }
+    juce::String tipForSnapshot (const Hit& hit) const { return tipFor (hit); } // (the Info View's text for a part)
+    // the loudest peak the pill holds (linear gain, 0 = none)
+    float loudestPeak (int insert) const noexcept
+    {
+        return insert >= 0 && insert < (int) loudest.size() ? loudest[(std::size_t) insert] : 0.0f;
+    }
 
 private:
     void refreshCache() const;
@@ -78,6 +90,10 @@ private:
     void setValue (const Hit& hit, double v);
     void paintStrip (juce::Graphics& g, int column);
     void paintMeter (juce::Graphics& g, int insert, juce::Rectangle<int> area) const;
+    // round 190jn (design190ia CL-16): Live 12.4's Session mixer strip, in Live's look only (theme::livelook::active)
+    juce::Rectangle<int> livePartBounds (int column, Part part, int row) const;
+    void paintStripLive (juce::Graphics& g, int column, int selected);
+    void paintMeterLive (juce::Graphics& g, int insert, juce::Rectangle<int> area) const;
     void showInputMenu (int insert, bool channels);
     void showOutputMenu (int insert);
     juce::String tipFor (const Hit& hit) const;
@@ -91,6 +107,8 @@ private:
     mutable std::vector<int> allRows;                 // the Sends rows the strips would show
     mutable std::uint64_t cacheStamp = ~std::uint64_t (0);
     std::vector<meters::PeakHold> levels;             // per insert, left / right
+    std::vector<float> loudest;                       // round 190jn: per insert, the peak pill's loudest peak since a reset
+    int selectedShown = -1;                           // round 190jn: the grid's selected track the strips last showed
     std::uint64_t armsShownState = 0;                 // round 190ge: the arms the last tick saw (tick repaints on a change)
     ui::ValueDrag drag;
     Hit dragging, hover;
