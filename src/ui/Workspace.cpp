@@ -387,9 +387,13 @@ public:
         }
         if (panel == Panel::browser && dragEdges == 0 && (owner.isBrowserDockedPanel (panel) || owner.getBrowserDock() == workspace::Dock::none))
         {
-            // the title: the Browser follows the mouse, and docks at the side it is let go on (mouseUp); off the main
-            // window it detaches into its own window there (FL: "drop it anywhere on the screen")
-            owner.placeFrame (*this, r);
+            // the title: the Browser docks at the side it is let go on (mouseUp); off the main window it detaches into its
+            // own window there (FL: "drop it anywhere on the screen"). It stays put meanwhile (the panels in front of it are
+            // native windows on Windows, a moving Browser would go under them): the hint bar says where it will go.
+            const auto inside = owner.getScreenBounds().contains (e.getScreenPosition());
+            const auto right = owner.getLocalPoint (nullptr, e.getScreenPosition()).x >= owner.getWidth() / 2;
+            ui::postHint ({ ! inside ? tr ("Detached (own window)") : right ? tr ("Docked right") : tr ("Docked left"), {} });
+            setMouseCursor (juce::MouseCursor::DraggingHandCursor);
             return;
         }
 
@@ -421,6 +425,7 @@ public:
             && (owner.isBrowserDockedPanel (panel) || owner.getBrowserDock() == workspace::Dock::none))
         {
             dragging = false;
+            setMouseCursor (juce::MouseCursor::NormalCursor);
             owner.browserTitleDropped (e.getScreenPosition(), e.getDistanceFromDragStart() >= 4);
             return;
         }

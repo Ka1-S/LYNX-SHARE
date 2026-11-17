@@ -152,10 +152,10 @@ TEST (issues190jz_docked_browser_survives_resize_and_restart)
     moved[Panel::browser].bounds = { 300, 120, 260, 500 };
     auto movedText = moved.serialise();
     movedText = movedText.substr (0, movedText.find ("dock "));
-    const auto free = Layout::parse (movedText, 1600, 900);
-    CHECK (free.has_value() && free->browserDock == Dock::none && ! free->browserDocked());
-    CHECK (free.has_value() && ((*free)[Panel::browser].bounds == Rect { 300, 120, 260, 500 }));
-    CHECK (free.has_value() && (free->maximisedArea (Panel::playlist) == Rect { 0, 0, 1600, 900 })); // (as before)
+    const auto freeLayout = Layout::parse (movedText, 1600, 900);
+    CHECK (freeLayout.has_value() && freeLayout->browserDock == Dock::none && ! freeLayout->browserDocked());
+    CHECK (freeLayout.has_value() && ((*freeLayout)[Panel::browser].bounds == Rect { 300, 120, 260, 500 }));
+    CHECK (freeLayout.has_value() && (freeLayout->maximisedArea (Panel::playlist) == Rect { 0, 0, 1600, 900 })); // (as before)
     const auto fresh = Layout::parse (Layout::makeDefault (1600, 900).serialise().substr (0, Layout::makeDefault (1600, 900).serialise().find ("dock ")), 1600, 900);
     CHECK (fresh.has_value() && fresh->browserDock == Dock::left);
     // an unknown value reads as the default side
