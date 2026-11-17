@@ -1,9 +1,12 @@
 #include "ui/Icons.h"
 #include "ui/Motion.h"
+#include "ui/ImageCaches.h"
 #include "ui/PaintAB.h"
 
+#include <algorithm>
 #include <cmath>
 #include <map>
+#include <vector>
 
 #include "ui/Theme.h"
 
@@ -1225,6 +1228,70 @@ void IconButton::paintLook (juce::Graphics& g, bool highlighted, bool down)
     g.drawFittedText (text, content.toNearestInt(), icon == Icon::none ? juce::Justification::centred : juce::Justification::centredLeft, 1, 0.8f);
 }
 
+// Round 190ki: whether the FL tiles' bodies come from the parent's atlas (LYNX_TILE_MODE: 0 straight, 2 the atlas, the
+// default)
+namespace
+{
+int& tileModeSetting()
+{
+    static int mode = [] {
+        const auto v = juce::SystemStats::getEnvironmentVariable ("LYNX_TILE_MODE", "2").getIntValue();
+        return v == 0 ? 0 : 2;
+    }();
+    return mode;
+}
+
+struct TileAtlasEntry
+{
+    juce::Component::SafePointer<juce::Component> parent;
+    IconButton::TileAtlas atlas;
+};
+
+std::vector<TileAtlasEntry>& tileAtlases()
+{
+    static std::vector<TileAtlasEntry> list;
+    static const bool registered = ui::registerImageCache ([] { tileAtlases().clear(); }); (void) registered;
+    return list;
+}
+} // namespace
+
+int IconButton::tileCacheMode() { return tileModeSetting(); }
+
+// JUCE's software renderer (Linux, a software snapshot): the atlas came out 1 level apart at a few corner pixels of the
+// body in --selftest, so it paints straight there (the self-test switches it on to report that difference)
+static bool& tileCacheOnSoftwareSetting()
+{
+    static bool on = false;
+    return on;
+}
+bool IconButton::tileCacheOnSoftware() { return tileCacheOnSoftwareSetting(); }
+
+// The atlas of a parent's tiles: the parent's width by `bottom` (grown to the lowest tile asked for), at `scale`, of the
+// frame's kind (software or native). A new image is a new generation: every button draws its region again.
+IconButton::TileAtlas& IconButton::tileAtlasFor (juce::Component& parent, int bottom, int scale, bool software)
+{
+    auto& list = tileAtlases();
+    list.erase (std::remove_if (list.begin(), list.end(), [] (const TileAtlasEntry& e) { return e.parent == nullptr; }), list.end());
+    auto it = std::find_if (list.begin(), list.end(), [&parent] (const TileAtlasEntry& e) { return e.parent.getComponent() == &parent; });
+    if (it == list.end())
+    {
+        list.push_back ({ &parent, {} });
+        it = std::prev (list.end());
+    }
+    auto& a = it->atlas;
+    const auto width = parent.getWidth() * scale, height = juce::jmax (bottom, a.image.isNull() ? 0 : a.image.getHeight() / juce::jmax (1, a.scale)) * scale;
+    if (a.image.isNull() || a.scale != scale || a.software != software || a.image.getWidth() != width || a.image.getHeight() < bottom * scale)
+    {
+        static std::uint64_t generations = 0;
+        a.image = juce::Image (juce::Image::ARGB, width, height, true,
+                               software ? (const juce::ImageType&) juce::SoftwareImageType() : (const juce::ImageType&) juce::NativeImageType());
+        a.scale = scale;
+        a.software = software;
+        a.generation = ++generations;
+    }
+    return a;
+}
+
 // Round 190jo (design190ia FM-1/FM-2/FM-3, decision (d) with FL's metrics; the Pattern toolbar only): FL's tile. FL's
 // buttons are 30x33 tiles at a 33 px pitch with a 1 px dark edge (ref/fl-toolbar-hover-hint.png 1184,4,1214,37); LYNX's
 // 31 px buttons give a 30x30 tile at the same pitch. The edge and the tile sit on whole device pixels at any scale.
@@ -1274,7 +1341,8 @@ void IconButton::paintFlTile (juce::Graphics& g, bool highlighted, bool down)
     const auto area = getLocalBounds().toFloat();
     const auto box = lookIconBox > 0.0f ? lookIconBox : juce::jmin (area.getHeight() * iconFraction, iconMax);
 
-    const auto drawTile = [&] (juce::Graphics& k) {
+    // the tile's body (fill and edge) and its glyph
+    const auto drawBody = [&] (juce::Graphics& k) {
         const auto scale = juce::jmax (1.0f, k.getInternalContext().getPhysicalPixelScaleFactor());
         const auto snap = [scale] (float v) { return std::round (v * scale) / scale; };
         const auto b = area;
@@ -1286,58 +1354,57 @@ void IconButton::paintFlTile (juce::Graphics& g, bool highlighted, bool down)
         k.fillRoundedRectangle (tile, r);
         k.setColour (edge);
         k.drawRoundedRectangle (tile.reduced (line * 0.5f), r - line * 0.5f, line);
-        icons::draw (k, icon, area.withSizeKeepingCentre (box, box), fg);
     };
+    const auto drawGlyph = [&] (juce::Graphics& k) { icons::draw (k, icon, area.withSizeKeepingCentre (box, box), fg); };
 
+    // Round 190ki (perf): the body from the parent's tile atlas, the glyph straight over it. The atlas is the parent's
+    // band at the parent's own coordinates, each button's region holding its current state: the backdrop and the body
+    // drawn there by the same calls, at the same device pixels and under the same clip as in the frame, so a blit gives
+    // the frame's pixels. (The glyph stays straight: Direct2D anti-aliases a path drawn into another target a little
+    // differently, up to 23 levels at an edge in --selftest.)
     int scale = 0;
-    const auto backdrop = tileCacheUsable (g, scale) ? tileBackdrop (getBounds()) : 0;
+    const auto software = dynamic_cast<juce::LowLevelGraphicsSoftwareRenderer*> (&g.getInternalContext()) != nullptr;
+    const auto backdrop = tileCacheMode() != 0 && (! software || tileCacheOnSoftware()) && tileCacheUsable (g, scale) ? tileBackdrop (getBounds()) : 0;
     if (backdrop == 0)
     {
-        drawTile (g);
+        drawBody (g);
+        drawGlyph (g);
         return;
     }
     const auto mix = [] (std::uint64_t a, std::uint64_t v) { return (a ^ v) * 0x100000001b3ull; };
-    auto key = mix (mix (mix (0x243f6a8885a308d3ull, fill.getARGB()), edge.getARGB()), fg.getARGB());
-    key = mix (mix (mix (key, (std::uint64_t) icon), (std::uint64_t) juce::roundToInt (box * 64.0f)), (std::uint64_t) scale);
+    auto key = mix (mix (mix (0x243f6a8885a308d3ull, fill.getARGB()), edge.getARGB()), (std::uint64_t) scale);
     key = mix (mix (mix (mix (key, (std::uint64_t) (std::uint32_t) getX()), (std::uint64_t) (std::uint32_t) getY()), (std::uint64_t) getWidth()),
                (std::uint64_t) getHeight());
-    // (the picture is made by the frame's own kind of renderer: a software frame (a snapshot into a software image) with
-    // a software picture, the native one (Direct2D, Core Graphics) with a native picture)
-    const auto software = dynamic_cast<juce::LowLevelGraphicsSoftwareRenderer*> (&g.getInternalContext()) != nullptr;
     key = mix (mix (key, backdrop), software ? 5u : 6u);
-    auto it = tilePictures.find (key);
-    if (it == tilePictures.end())
+    auto& atlas = tileAtlasFor (*getParentComponent(), getBottom(), scale, software);
+    if (key != atlasKey || atlasGeneration != atlas.generation)
     {
-        if (tilePictures.size() >= 12) // (a button shows a handful of states; a new layout or palette starts again)
-            tilePictures.clear();
-        juce::Image picture (juce::Image::ARGB, getWidth() * scale, getHeight() * scale, true,
-                             software ? (const juce::ImageType&) juce::SoftwareImageType() : (const juce::ImageType&) juce::NativeImageType());
-        {
-            juce::Graphics k (picture);
-            k.addTransform (juce::AffineTransform::scale ((float) scale));
-            {
-                // the parent's paint where the button sits: the pixels the frame has under it (whole device pixels apart)
-                juce::Graphics::ScopedSaveState state (k);
-                k.setOrigin (-getPosition());
-                getParentComponent()->paint (k);
-            }
-            drawTile (k);
-        }
-        it = tilePictures.emplace (key, std::move (picture)).first;
+        juce::Graphics k (atlas.image);
+        k.addTransform (juce::AffineTransform::scale ((float) scale));
+        k.reduceClipRegion (getBounds());
+        getParentComponent()->paint (k);
+        k.setOrigin (getPosition());
+        drawBody (k);
+        atlasKey = key;
+        atlasGeneration = atlas.generation;
     }
-    juce::Graphics::ScopedSaveState state (g);
-    g.setColour (juce::Colours::black); // (opaque: JUCE draws an image with the colour's alpha)
-    g.setImageResamplingQuality (juce::Graphics::lowResamplingQuality);
-    if (scale == 1)
-        g.drawImageAt (it->second, 0, 0);
-    else
-        g.drawImage (it->second, area, juce::RectanglePlacement::stretchToFit);
+    const auto part = atlas.image.getClippedImage (juce::Rectangle<int> (getX() * scale, getY() * scale, getWidth() * scale, getHeight() * scale));
+    {
+        juce::Graphics::ScopedSaveState state (g);
+        g.setColour (juce::Colours::black); // (opaque: JUCE draws an image with the colour's alpha)
+        g.setImageResamplingQuality (juce::Graphics::lowResamplingQuality);
+        if (scale == 1)
+            g.drawImageAt (part, 0, 0);
+        else
+            g.drawImage (part, area, juce::RectanglePlacement::stretchToFit);
+    }
+    drawGlyph (g);
 }
 
 void IconButton::setFlTileBackdrop (std::function<std::uint64_t (juce::Rectangle<int>)> stamp)
 {
     tileBackdrop = std::move (stamp);
-    tilePictures.clear();
+    atlasKey = 0; // (its region of the atlas is drawn again)
     repaint();
 }
 
@@ -1472,7 +1539,9 @@ juce::String flTileCacheSelfTest()
     };
     Backdrop parent;
     parent.setSize (132, 46);
-    IconButton rest ("rest", Icon::play), on ("on", Icon::metronome), off ("off", Icon::record), corner ("corner", Icon::undo);
+    // (no glyphs: they are drawn straight over the cached body either way, and Direct2D anti-aliases a path a little
+    // differently after other work in a small target, which says nothing of the cache)
+    IconButton rest ("rest", Icon::none), on ("on", Icon::none), off ("off", Icon::none), corner ("corner", Icon::none);
     on.setClickingTogglesState (true);
     on.setToggleState (true, juce::dontSendNotification);
     off.setEnabled (false);
@@ -1492,30 +1561,70 @@ juce::String flTileCacheSelfTest()
         parent.paintEntireComponent (g, true);
         return image;
     };
-    const auto differences = [] (const juce::Image& a, const juce::Image& b) {
+    // the pixels that differ and the largest difference of a channel
+    const auto compare = [] (const juce::Image& a, const juce::Image& b, int& worst) {
         const juce::Image::BitmapData p (a, juce::Image::BitmapData::readOnly), q (b, juce::Image::BitmapData::readOnly);
         int n = 0;
         for (int y = 0; y < p.height; ++y)
             for (int x = 0; x < p.width; ++x)
-                n += p.getPixelColour (x, y) != q.getPixelColour (x, y) ? 1 : 0;
+            {
+                const auto c = p.getPixelColour (x, y), d = q.getPixelColour (x, y);
+                const auto delta = juce::jmax (std::abs ((int) c.getRed() - (int) d.getRed()), std::abs ((int) c.getGreen() - (int) d.getGreen()),
+                                               std::abs ((int) c.getBlue() - (int) d.getBlue()), std::abs ((int) c.getAlpha() - (int) d.getAlpha()));
+                n += delta > 0 ? 1 : 0;
+                worst = juce::jmax (worst, delta);
+            }
         return n;
     };
-    juce::String detail;
+    // LYNX_TILE_DEBUG=<folder>: the pictures as PNGs there
+    const auto debugFolder = juce::SystemStats::getEnvironmentVariable ("LYNX_TILE_DEBUG", {});
+    const auto save = [&debugFolder] (const juce::Image& image, const juce::String& name) {
+        if (debugFolder.isEmpty())
+            return;
+        const juce::File file (debugFolder + "/" + name + ".png");
+        file.deleteFile();
+        juce::FileOutputStream out (file);
+        juce::PNGImageFormat().writeImageToStream (image, out);
+    };
+    // the native renderer: the cached bodies must give the straight pixels; the software renderer (which paints straight
+    // in the app) is only reported (stderr). Where the native kind is the software renderer (Linux), nothing to compare.
+    const auto nativeIsSoftware = [] {
+        juce::Image probe (juce::Image::ARGB, 4, 4, true, juce::NativeImageType());
+        juce::Graphics g (probe);
+        return dynamic_cast<juce::LowLevelGraphicsSoftwareRenderer*> (&g.getInternalContext()) != nullptr;
+    }();
+    juce::String failures, info;
+    const auto softwareBefore = tileCacheOnSoftwareSetting();
     for (const auto native : { true, false })
         for (const auto scale : { 1, 2 })
         {
+            if (native && nativeIsSoftware)
+                continue;
+            tileCacheOnSoftwareSetting() = ! native;
+            const auto tag = juce::String (native ? "native" : "software") + "-x" + juce::String (scale);
             for (auto* b : { &rest, &on, &off, &corner })
                 b->setFlTileBackdrop (nullptr);
-            const auto straight = render (scale, native);
+            const auto straight = render (scale, native), again = render (scale, native);
             for (auto* b : { &rest, &on, &off, &corner })
                 b->setFlTileBackdrop ([] (juce::Rectangle<int>) { return (std::uint64_t) 42; });
-            const auto made = render (scale, native), blitted = render (scale, native); // (the first paint makes the pictures)
-            if (rest.tilePictures.empty())
-                return "ERROR the FL tile cache was not used at scale " + juce::String (scale);
-            if (const auto n = differences (straight, made) + differences (straight, blitted); n > 0)
-                return "ERROR cached FL tiles differ from the tiles painted straight in " + juce::String (n) + " pixels (scale " + juce::String (scale)
-                       + (native ? ", native)" : ", software)");
+            const auto made = render (scale, native), blitted = render (scale, native); // (the first paint fills the atlas)
+            tileCacheOnSoftwareSetting() = softwareBefore;
+            if (rest.atlasKey == 0)
+                return "ERROR the FL tile cache was not used (" + tag + ")";
+            int worst = 0, worstAgain = 0;
+            const auto n = compare (straight, made, worst) + compare (straight, blitted, worst);
+            const auto nAgain = compare (straight, again, worstAgain);
+            save (straight, "tile-" + tag + "-straight");
+            save (made, "tile-" + tag + "-cached");
+            save (IconButton::tileAtlasFor (parent, 35, scale, ! native).image, "tile-" + tag + "-atlas");
+            if (n > 0 || nAgain > 0)
+                (native ? failures : info) << tag << ": " << n << " pixels differ, up to " << worst << " levels (straight twice: " << nAgain << ", "
+                                           << worstAgain << "); ";
         }
+    if (info.isNotEmpty())
+        std::fprintf (stderr, "fl tiles on the software renderer (painted straight in the app): %s\n", info.toRawUTF8());
+    if (failures.isNotEmpty())
+        return "ERROR cached FL tiles differ from the tiles painted straight: " + failures;
     return "OK";
 }
 } // namespace lynx

@@ -1016,54 +1016,6 @@ void PianoRollComponent::paintOverview (juce::Graphics& g, juce::Rectangle<float
 
 bool PianoRollComponent::liveNotes() const { return fitKeysToNotes && ! liveNoteColour.isTransparent() && theme::livelook::active(); }
 
-// Round 190ki (perf): the Piano roll's rows (rowPaints, without the row under the mouse's tint) from one cached picture of
-// the grid's size, blitted on whole device pixels: the rows were ~100 fills per paint, and a moving playhead's 14 px column
-// paid for all of them. The picture is made by the same fills over the grid's bg1 (what paint's fillAll leaves there), so
-// it has the pixels of drawing them straight; it is made again when a row, its colours, the grid or the scale changes.
-// False (drawn straight): a fractional scale, a huge grid, LYNX_PAINT_CACHE=0.
-bool PianoRollComponent::drawRowsPicture (juce::Graphics& g, juce::Rectangle<int> grid, juce::Colour under, juce::Colour octaveLine,
-                                          const std::function<void (juce::Graphics&, const RowPaint&, bool)>& paintRow)
-{
-    if (! ui::paintCache() || grid.isEmpty())
-        return false;
-    const auto physical = g.getInternalContext().getPhysicalPixelScaleFactor();
-    const auto whole = std::round (physical);
-    if (whole < 1.0f || whole > 3.0f || std::abs (physical - whole) > 1.0e-4f || grid.getWidth() * whole > 8192.0f || grid.getHeight() * whole > 8192.0f)
-        return false;
-    const auto scale = (int) whole;
-    const auto mix = [] (std::uint64_t a, std::uint64_t v) { return (a ^ v) * 0x100000001b3ull; };
-    auto key = mix (mix (mix (mix (0x452821e638d01377ull, (std::uint64_t) (std::uint32_t) grid.getX()), (std::uint64_t) (std::uint32_t) grid.getY()),
-                         (std::uint64_t) grid.getWidth()), (std::uint64_t) grid.getHeight());
-    key = mix (mix (mix (mix (key, (std::uint64_t) scale), (std::uint64_t) rowHeight), under.getARGB()), octaveLine.getARGB());
-    for (const auto& r : rowPaints)
-        key = mix (mix (mix (mix (key, (std::uint64_t) (std::uint32_t) r.y), r.fill.getARGB()), r.line.getARGB()), r.octave ? 7u : 11u);
-    // (made by the frame's own kind of renderer: a software snapshot gets a software picture, the native frame a native one)
-    const auto software = dynamic_cast<juce::LowLevelGraphicsSoftwareRenderer*> (&g.getInternalContext()) != nullptr;
-    key = mix (key, software ? 5u : 6u);
-    if (key != rowsPictureKey || rowsPicture.isNull())
-    {
-        if (rowsPicture.getWidth() != grid.getWidth() * scale || rowsPicture.getHeight() != grid.getHeight() * scale || rowsPictureSoftware != software)
-            rowsPicture = juce::Image (juce::Image::ARGB, grid.getWidth() * scale, grid.getHeight() * scale, false,
-                                       software ? (const juce::ImageType&) juce::SoftwareImageType() : (const juce::ImageType&) juce::NativeImageType());
-        rowsPictureSoftware = software;
-        juce::Graphics k (rowsPicture);
-        k.addTransform (juce::AffineTransform::translation ((float) -grid.getX(), (float) -grid.getY()).scaled ((float) scale));
-        k.setColour (under);
-        k.fillRect (grid);
-        for (const auto& r : rowPaints)
-            paintRow (k, r, false);
-        rowsPictureKey = key;
-    }
-    juce::Graphics::ScopedSaveState state (g);
-    g.setColour (juce::Colours::black); // (opaque: JUCE draws an image with the colour's alpha)
-    g.setImageResamplingQuality (juce::Graphics::lowResamplingQuality);
-    if (scale == 1)
-        g.drawImageAt (rowsPicture, grid.getX(), grid.getY());
-    else
-        g.drawImage (rowsPicture, grid.toFloat(), juce::RectanglePlacement::stretchToFit);
-    return true;
-}
-
 void PianoRollComponent::paint (juce::Graphics& g)
 {
     const uitrace::Scope trace ("PianoRollComponent paint", true, g.getClipBounds());
@@ -1143,10 +1095,6 @@ void PianoRollComponent::paint (juce::Graphics& g)
         g.reduceClipRegion (grid);
 
         const auto autoRows = isAutoScale();
-        // round 190ki (perf): the rows as a list first (their fill, the 1 px line under each and the octave line), then
-        // drawn from one picture of them all where the context's scale is whole (the same fills into it: the same pixels),
-        // or straight. The row under the mouse is drawn over the picture, so moving the mouse keeps the picture.
-        rowPaints.clear();
         for (int key = 0; key < 128; ++key)
         {
             const auto y = keyToY (key);
@@ -1162,36 +1110,24 @@ void PianoRollComponent::paint (juce::Graphics& g)
                 row = juce::Colour (0xff464f53);
             if (gridHighlights && ! autoRows && inScale (key))
                 row = row.interpolatedWith (info, 0.10f);
+            if (key == hover.key && drag == Drag::none)
+                row = row.interpolatedWith (textPrimary, 0.04f); // the row under the mouse
+            g.setColour (row);
+            g.fillRect (grid.getX(), y, grid.getWidth(), rowHeight);
             // (round 190jn: Live's darker line under each row; round 190jo FM-15: FL's 1 px line under every row, the note
             // sits above it)
-            const auto line = liveLookNotes ? juce::Colour (0xff3d4548) : rowHeight >= 10 ? prStep : juce::Colour();
-            const auto octave = ! padRows.empty() || key % 12 == (folded() ? scaleRoot() : 0); // folded: the octave line under each root (pads: each row)
-            rowPaints.push_back ({ key, y, row, line, octave });
-        }
-        const auto paintRow = [&] (juce::Graphics& k, const RowPaint& r, bool hovered) {
-            k.setColour (hovered ? r.fill.interpolatedWith (textPrimary, 0.04f) : r.fill); // (the row under the mouse)
-            k.fillRect (grid.getX(), r.y, grid.getWidth(), rowHeight);
-            if (! r.line.isTransparent())
+            if (liveLookNotes || rowHeight >= 10)
             {
-                k.setColour (r.line);
-                k.drawHorizontalLine (r.y + rowHeight - 1, (float) grid.getX(), (float) grid.getRight());
+                g.setColour (liveLookNotes ? juce::Colour (0xff3d4548) : prStep);
+                g.drawHorizontalLine (y + rowHeight - 1, (float) grid.getX(), (float) grid.getRight());
             }
-            if (r.octave)
+
+            if (! padRows.empty() || key % 12 == (folded() ? scaleRoot() : 0)) // folded: the octave line under each root (pads: each row)
             {
-                k.setColour (prBeat);
-                k.drawHorizontalLine (r.y + rowHeight - 1, (float) grid.getX(), (float) grid.getRight());
+                g.setColour (prBeat);
+                g.drawHorizontalLine (y + rowHeight - 1, (float) grid.getX(), (float) grid.getRight());
             }
-        };
-        const auto hoverRow = drag == Drag::none ? hover.key : -1;
-        if (drawRowsPicture (g, grid, bg1, prBeat, paintRow))
-        {
-            for (const auto& r : rowPaints)
-                if (r.key == hoverRow)
-                    paintRow (g, r, true);
         }
-        else
-            for (const auto& r : rowPaints)
-                paintRow (g, r, r.key == hoverRow);
 
         drawVerticalGrid (grid);
         paintBackgroundWave (g, grid);

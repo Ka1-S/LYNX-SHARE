@@ -1103,6 +1103,20 @@ public:
             return;
         }
 
+        if (args.contains ("--paintcachetest"))
+        {
+            // LYNX --paintcachetest report.txt (round 190ki): --selftest's paint_caches item alone (the shape tiles, the
+            // cached FL toolbar tiles; LYNX_TILE_DEBUG=<folder> keeps the tiles' pictures as PNGs), off screen
+            const auto i = args.indexOf ("--paintcachetest");
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            auto result = lynx::theme::paintCacheSelfTest();
+            const auto tiles = lynx::flTileCacheSelfTest();
+            juce::File (args[i + 1].unquoted()).replaceWithText ("paint_caches=" + result + "\nfl_tiles=" + tiles + "\n");
+            setApplicationReturnValue (result.startsWith ("OK") && tiles == "OK" ? 0 : 1);
+            quit();
+            return;
+        }
+
         if (args.contains ("--timertest"))
         {
             // LYNX --timertest report.txt (round 174f): ui::TimerWhileShowing through hide / show / minimise (opens a small window)
