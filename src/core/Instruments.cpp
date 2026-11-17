@@ -2305,7 +2305,7 @@ public:
         const auto clipFades = std::exchange (nextClip, {});
         const auto clipShape = std::exchange (nextClipShape, (std::uint16_t) 0);
         const auto clipEnvelope = std::exchange (nextClipEnvelope, -1);
-        const auto clipPitch = clipMode ? (double) std::clamp (std::exchange (nextClipPitch, 0.0f), -48.0f, 48.0f) : 0.0; // (round 190hr: Live's ±48 st Transpose; the shifter reaches ±24)
+        const auto clipPitch = clipMode ? (double) std::clamp (std::exchange (nextClipPitch, 0.0f), -48.0f, 48.0f) : 0.0; // (round 190hr: Live's ±48 st Transpose; round gaps190kf: the shifter reaches it)
         // FL 2026's clip stretch (round 167l, FL render of a 2 s 440 Hz ramp: ×2 lasts 4 s at 220 Hz in Resample, at
         // 440 Hz in the stretch modes; ×0.5 lasts 1 s): the clip reads its file `stretch` times slower
         const auto clipStretch = clipMode ? (double) std::clamp (std::exchange (nextClipStretch, 1.0f), 0.01f, 100.0f) : 1.0;
@@ -2571,10 +2571,14 @@ public:
         // FL 2026's clip pitch (round 167k, FL render: +3 → 522.5 Hz from 440 Hz, the 2 s clip still 2 s on a channel
         // that resamples): a shift on top of the channel's own pitch, whatever the channel's mode, the length stays
         // (a stretched clip on a channel that keeps the pitch: read slower, shifted back up by the stretch)
+        // (round gaps190kf: only a clip whose own Transpose is beyond ±24 st — Live's range, never FL's ±12 — widens the
+        // shifter's range; a channel pitch plus a clip pitch that add up beyond ±24 keeps the old clamp)
+        wideClipShift = std::abs (clipPitch) > 24.0;
         if (clipMode && ! keyShift.load (std::memory_order_relaxed))
             startKeyShift (*target, clipPitch, base, true);
         else
             startKeyShift (*target, semitones + clipPitch + (clipStretch != 1.0 ? 12.0 * std::log2 (clipStretch) : 0.0), base);
+        wideClipShift = false;
         // issue #187: a warped voice that plays without a shifter reads at the playing tempo (its pitch follows, as a
         // resampled stretch does); a shifted one keeps its rate and its shifter takes the tempo
         if (tempoC != 1.0 && ! shifts[(std::size_t) (target - voices.data())].on)
@@ -2594,6 +2598,9 @@ public:
         bool primed = false;                        // primed in render (a few per block: it costs ~1 ms each)
         SamplerVoice ahead;                         // reads the source primeLength() frames ahead of the voice
         double factor = 1.0, glideRatio = 1.0;      // the note's transposition and its portamento / slide
+        // the factor's range: ±2 octaves, or (round gaps190kf) ±4 for a clip transposed beyond ±24 st, Live's ±48 Transpose
+        double lowest = VoicePitchShifter::minFactor, highest = VoicePitchShifter::maxFactor;
+        float gain = 1.0f; // round gaps190kf: the level law of a clip transposed above +24 st (1 = none)
         int glideLeft = 0;
         std::array<float, keyShiftBlock * 4 + 2> inL {}, inR {}; // the source read `factor` times faster
         std::array<float, keyShiftBlock> outL {}, outR {};
@@ -2642,6 +2649,11 @@ public:
 
         ks.on = true;
         ks.factor = std::exp2 (semitones / 12.0);
+        // (round gaps190kf: an audio clip's own Transpose beyond ±24 st takes the shifter's ±48 range; its prime buffer is
+        // sized for it, prepareKeyShift)
+        const auto wide = clipMode && wideClipShift && primeL.size() >= (std::size_t) ks.shifter->maxClipPrimeLength();
+        ks.lowest = wide ? VoicePitchShifter::minClipFactor : VoicePitchShifter::minFactor;
+        ks.highest = wide ? VoicePitchShifter::maxClipFactor : VoicePitchShifter::maxFactor;
         ks.glideLeft = 0;
         // portamento: the transposition glides from the previous note's (its length stays)
         if (v.glideLeft > 0 && lastFactor > 0.0)
@@ -2659,6 +2671,18 @@ public:
         }
 
         ks.ahead = v;
+        // (round gaps190kf: above +24 st the source is read 8–16 times as fast; the voice's 24-point sinc then spans one
+        // or two lobes of its lowered cutoff and dulls the sound — W3 vs Live: −4 dB at +36, −9 dB at +48. Such a clip
+        // reads through FL's 512-point sinc instead: few input frames a block, so it costs little)
+        // The stretch back by 8–16 times still loses level against Live: W3 (tone, voice, chords; Complex and Tones) +36 st
+        // −2.4 dB, +48 st −4.1 dB beyond the ±24 path's own difference: 0.3 dB + 2.1 dB per octave above +24, made up here
+        // (fitted on those renders: mean |level| vs Live 0.75 dB as ±24 played them, 0.92 with 2.1 dB / octave alone).
+        ks.gain = 1.0f;
+        if (wide && std::exp2 (semitones / 12.0) > VoicePitchShifter::maxFactor)
+        {
+            ks.ahead.kernel.setQuality (9);
+            ks.gain = (float) std::pow (10.0, (0.3 + 2.1 * std::log2 (std::exp2 (semitones / 12.0) / VoicePitchShifter::maxFactor)) / 20.0);
+        }
         ks.ahead.pitchMul = 1.0;
         ks.primed = false;
         ks.pos = ks.count = 0;
@@ -2669,7 +2693,7 @@ public:
     // the transposition the shifter applies now: the note's (gliding), the pitch envelope / LFO and the pitch wheel
     double shiftFactor (const SamplerVoice& v, const KeyShift& ks) const noexcept
     {
-        return std::clamp (ks.factor * v.pitchMul * bendMul, VoicePitchShifter::minFactor, VoicePitchShifter::maxFactor);
+        return std::clamp (ks.factor * v.pitchMul * bendMul, ks.lowest, ks.highest);
     }
 
     // Primes a new shifted voice's shifter with the start of its source (so its output has no latency). A render
@@ -2731,16 +2755,35 @@ public:
                 ks.owed += (double) ks.shifter->outputLatency() * (tempoC - ks.tempoAt) / factor;
                 ks.tempoAt = tempoC;
             }
-            const auto frames = std::clamp ((int) ks.owed, 0, (int) ks.inL.size());
+            // round gaps190kf: a clip transposed below −24 st owes more input than one buffer holds (−48 st: 16 frames an
+            // output frame); the block then goes through the shifter in 2, 4, 8 or 16 equal parts, each with its share of
+            // the input (the same ratio). Within ±24 st it is one part, as before.
+            const auto owedNow = std::max (0, (int) ks.owed);
+            const auto room = (int) ks.inL.size();
+            int parts = 1;
+            while (parts < 16 && owedNow > parts * room)
+                parts *= 2;
+            const auto frames = std::clamp (owedNow, 0, parts * room);
             ks.owed -= frames;
-            for (int i = 0; i < frames; ++i)
-                readAhead (v, ks, factor, ks.inL[(std::size_t) i], ks.inR[(std::size_t) i]);
-            ks.shifter->process (ks.inL.data(), ks.inR.data(), frames, ks.outL.data(), ks.outR.data(), keyShiftBlock);
+            const auto outPart = keyShiftBlock / parts;
+            for (int part = 0, done = 0; part < parts; ++part)
+            {
+                const auto upTo = (int) ((std::int64_t) frames * (part + 1) / parts), n = upTo - done;
+                done = upTo;
+                for (int i = 0; i < n; ++i)
+                    readAhead (v, ks, factor, ks.inL[(std::size_t) i], ks.inR[(std::size_t) i]);
+                ks.shifter->process (ks.inL.data(), ks.inR.data(), n, ks.outL.data() + part * outPart, ks.outR.data() + part * outPart, outPart);
+            }
             ks.pos = 0;
             ks.count = keyShiftBlock;
         }
         outL = ks.outL[(std::size_t) ks.pos];
         outR = ks.outR[(std::size_t) ks.pos];
+        if (ks.gain != 1.0f) // (round gaps190kf: a clip transposed above +24 st, see startKeyShift)
+        {
+            outL *= ks.gain;
+            outR *= ks.gain;
+        }
         ++ks.pos;
     }
 
@@ -2793,7 +2836,9 @@ public:
         }
         heldShifters.store (now, std::memory_order_relaxed);
         shifterUser.fill (-1);
-        const auto prime = (std::size_t) (shifterPool[0] != nullptr ? shifterPool[0]->maxPrimeLength() : shifterStock->maxPrimeLength (shifterKind));
+        // (round gaps190kf: an audio clip's channel primes for its Transpose's −48 st as well)
+        const auto prime = (std::size_t) (clipMode ? (shifterPool[0] != nullptr ? shifterPool[0]->maxClipPrimeLength() : shifterStock->maxClipPrimeLength (shifterKind))
+                                                   : (shifterPool[0] != nullptr ? shifterPool[0]->maxPrimeLength() : shifterStock->maxPrimeLength (shifterKind)));
         primeL.assign (prime, 0.0f);
         primeR.assign (prime, 0.0f);
     }
@@ -3906,6 +3951,7 @@ private:
     int shiftersNow = keyShiftVoices;            // made by prepareKeyShift (useShifterStock)
     std::atomic<int> heldShifters { 0 };         // shifterPool's filled slots (any thread may read it)
     std::vector<float> primeL, primeR;
+    bool wideClipShift = false; // round gaps190kf: the note starting now is a clip transposed beyond ±24 st
     std::atomic<bool> keyShift { false };
     std::atomic<int> keyShiftMethod { 0 };
     double lastFactor = 1.0; // the last shifted note's transposition (where its portamento starts)

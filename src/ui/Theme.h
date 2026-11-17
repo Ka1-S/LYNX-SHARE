@@ -261,6 +261,10 @@ inline const juce::Colour focusOutline { 0xff757575 }; // the focused view's 2 p
 // look", round 190ig's switch). Every Live-look painter (grid, Session mixer, Arrangement, Clip / Device View, Info View,
 // status bar) asks this one switch, so the Pattern and Simple layouts never change.
 bool active() noexcept;
+// round gaps190kf: the Clip View's Sample Editor (Live 12.4 Dark, 100 %: live190gu/warp/live-clipview-beats-defaults-full.png)
+inline const juce::Colour clipMarker { 0xff00bfaf }; // the clip's Start / End markers
+inline const juce::Colour braceOff { 0xff919191 };   // the loop brace while Loop is off
+inline const juce::Colour braceOn { 0xff808080 };    // its ">" / "<" over the teal bar, and the Start marker while Loop is on
 } // namespace livelook
 
 // Live derives every shade of a clip from its colour by multiplying the RGB channels (round 190ia: name ×0.24, idle

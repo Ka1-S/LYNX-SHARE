@@ -17754,6 +17754,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Settings190bxTests.inc"
 #include "Link190btTests.inc"
 #include "LiveBrowser190ceTests.inc"
+#include "LoopBrowser190kfTests.inc" // round gaps190kf: the Loop Browser's keywords and filters
 #include "Browser190izTests.inc" // round 190iz: Browser tags, FL tabs, Live sidebar, send to selected, 5-s preview
 #include "SimpleFx190buTests.inc"
 #include "SimpleGate190dgTests.inc"
@@ -17879,3 +17880,5 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Issues190jzTests.inc" // round 190jz: issues #192 (docked Browser), #194 (clip fade handles), #195 (Home, W)
 #include "PrChord190kdTests.inc" // round 190kd: FL's chord tool strip (Generate modes, Analyze, Learn from MIDI input, note options)
 #include "ClipLaunch190kcTests.inc" // round 190kc: Live return tracks, crossfader, relative session mappings, audio grooves
+#include "Gaps190kfTests.inc" // round gaps190kf: Live Transpose ±48 in real time, the Clip View warp time line
+#include "Gaps190kfNativesTests.inc" // round gaps190kf: FL Edison's Sample properties (form, Accept, WAV chunks)

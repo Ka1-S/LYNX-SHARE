@@ -849,7 +849,7 @@ int VoicePitchShifter::primeLength (double factor) const noexcept
 {
     if (impl == nullptr)
         return 0;
-    factor = std::clamp (factor, minFactor, maxFactor);
+    factor = std::clamp (factor, minClipFactor, maxClipFactor); // (round gaps190kf: a clip's ±48 st; the same inside ±24)
     return impl->stretch.outputSeekLength ((float) (1.0 / factor)) + 1;
 }
 
@@ -903,6 +903,19 @@ int ShifterStock::maxPrimeLength (int kind) const
         if (key.first == rate && key.second == kind)
             return length;
     const auto length = make (kind)->maxPrimeLength();
+    known.push_back ({ { rate, kind }, length });
+    return length;
+}
+
+int ShifterStock::maxClipPrimeLength (int kind) const
+{
+    static std::mutex lock;
+    static std::vector<std::pair<std::pair<double, int>, int>> known;
+    const std::scoped_lock l (lock);
+    for (const auto& [key, length] : known)
+        if (key.first == rate && key.second == kind)
+            return length;
+    const auto length = make (kind)->maxClipPrimeLength();
     known.push_back ({ { rate, kind }, length });
     return length;
 }

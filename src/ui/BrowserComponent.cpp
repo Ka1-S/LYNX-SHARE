@@ -94,6 +94,7 @@ bool isListed (const juce::File& f)
 }
 
 constexpr int maxResults = 500;
+constexpr int maxLoops = 20000; // round gaps190kf: the files the Loop Browser describes at most
 constexpr int maxSimilar = 100; // "Find similar samples" lists the nearest 100
 
 juce::Array<juce::File> childrenOf (const juce::File& folder)
@@ -659,6 +660,7 @@ private:
 
 // round 190iz: the tab icons, the row star, the TAGS button, the tags panel, the Live sidebar
 #include "ui/BrowserTagsLive.inc"
+#include "ui/LoopBrowserPanel.inc" // round gaps190kf
 
 class BrowserComponent::FileTree final : public juce::Component,
                                          public ui::HintSource,
@@ -1390,8 +1392,12 @@ public:
     {
         if (auto* parent = getParentComponent())
         {
-            const auto width = parent->getWidth();
+            auto width = parent->getWidth();
             const auto viewHeight = parent->getParentComponent() != nullptr ? parent->getParentComponent()->getHeight() : parent->getHeight();
+            // round gaps190kf: the Loop Browser's list keeps its Tempo / Key column and stars clear of the scroll bar
+            if (auto* view = dynamic_cast<juce::Viewport*> (parent->getParentComponent());
+                view != nullptr && flat && browser.isLoopsShown() && (int) rows.size() * rowHeight > viewHeight)
+                width = view->getWidth() - view->getScrollBarThickness();
             setSize (width, juce::jmax (viewHeight, (int) rows.size() * rowHeight));
         }
     }
@@ -3477,6 +3483,12 @@ BrowserComponent::BrowserComponent (AudioEngine& e, Role r)
     addAndMakeVisible (*tagsButton);
     tagsPanel = std::make_unique<TagsPanel> (*this);
     addChildComponent (*tagsPanel);
+    // round gaps190kf: the Loop Browser (the Sample browser window's: LYNX's own window, so FL's Browser panel keeps FL's row)
+    loopsButton = std::make_unique<LoopsButton> (*this);
+    addChildComponent (*loopsButton);
+    loopsButton->setVisible (role == Role::samples);
+    loopPanel = std::make_unique<LoopPanel> (*this);
+    addChildComponent (*loopPanel);
     sidebar = std::make_unique<LiveSidebar> (*this);
     sidebarView = std::make_unique<juce::Viewport>();
     sidebarView->setViewedComponent (sidebar.get(), false);
@@ -3688,6 +3700,8 @@ void BrowserComponent::collectionsChanged()
         }
         b->tree->repaint();
         b->results->repaint();
+        if (b->loopsShown && b->loopFilterState.favouritesOnly) // (round gaps190kf: the Favorites button's list)
+            b->applyLoopFilter();
     }
 }
 
@@ -4596,6 +4610,8 @@ public:
             wire (browser);
         addAndMakeVisible (browser);
         setSize (340, 620);
+        if (std::exchange (BrowserComponent::openLoopsNext, false)) // (round gaps190kf: the Simple layout's Loops tile)
+            browser.setLoopsShown (true);
     }
 
     ~SampleBrowserHost() override
@@ -5004,6 +5020,11 @@ void BrowserComponent::changeListenerCallback (juce::ChangeBroadcaster* source)
     if (source == &searcher->indexChanged)
     {
         applyFilterToTree();
+        if (loopsShown) // (round gaps190kf: the loops are listed again, in place)
+        {
+            runLoopSearch();
+            return;
+        }
         // the background check found changed folders: the results shown are searched again, in place
         if (resultsView->isVisible() && shownTab() != projectTab && searchBox.getText().trim().isNotEmpty())
             runSearch (true);
@@ -5094,6 +5115,11 @@ void BrowserComponent::resized()
         row.removeFromRight (4);
         tagsButton->setBounds (row.removeFromRight (TagsButton::width)); // (FL's TAGS button in the search row)
         row.removeFromRight (4);
+        if (loopsButton->isVisible()) // (round gaps190kf: the Sample browser window's LOOPS)
+        {
+            loopsButton->setBounds (row.removeFromRight (LoopsButton::width));
+            row.removeFromRight (4);
+        }
         searchBox.setBounds (row);
     }
     // indexing progress / what the search found (round 162)
@@ -5119,6 +5145,9 @@ void BrowserComponent::resized()
     tagsPanel->setVisible (tagsPanelShown);
     if (tagsPanelShown)
         tagsPanel->setBounds (area.removeFromTop (tagsPanel->heightFor (area.getWidth())));
+    loopPanel->setVisible (loopsShown);
+    if (loopsShown) // (round gaps190kf: the grid takes at most about half the height; its rows scroll past that)
+        loopPanel->setBounds (area.removeFromTop (loopPanel->heightFor (area.getWidth(), juce::jmax (140, area.getHeight() / 2 + 40))));
     nameHeader = liveLayout ? area.removeFromTop (18) : juce::Rectangle<int>();
     treeView->setBounds (area);
     resultsView->setBounds (area);
@@ -5714,6 +5743,14 @@ void BrowserComponent::runSearch (bool quiet)
         similarPartial = false;
         if (std::exchange (similarId, 0) != 0)
             similar->service->cancel();
+    }
+    if (loopsShown) // round gaps190kf: the Loop Browser's list (the box's text narrows it by name)
+    {
+        if (loopInfos.empty() && ! loopsAnswer)
+            runLoopSearch();
+        else
+            applyLoopFilter();
+        return;
     }
     if (tagFilterActive()) // round 190iz: tags picked in the tags panel, or "#tag" in the box
     {
@@ -6372,7 +6409,9 @@ void BrowserComponent::tagsChanged()
             b->resized(); // (the panel's height follows its chips)
         }
         b->tagsButton->repaint();
-        if (b->tagFilterActive() || b->resultsView->isVisible())
+        if (b->loopsShown) // (round gaps190kf: tags that name a keyword give it)
+            b->runLoopSearch();
+        else if (b->tagFilterActive() || b->resultsView->isVisible())
             b->runSearch (true);
         b->tree->repaint();
         b->results->repaint();
@@ -6489,6 +6528,11 @@ void BrowserComponent::setTagsPanelShown (bool shown)
     tagsPanelShown = shown;
     if (shown)
         tagsPanel->refresh();
+    if (shown && loopsShown) // (round gaps190kf: one filter panel at a time)
+    {
+        setLoopsShown (false);
+        return;
+    }
     resized();
     tagsButton->repaint();
     savePrefs();
@@ -6758,6 +6802,12 @@ void BrowserComponent::loadPrefs()
             liveSelection.collection = value.getIntValue();
         else if (key == "livePath")
             liveSelection.path = value.toStdString();
+        else if (key == "loopsPanel") // (round gaps190kf)
+            loopsShown = value == "1" && role == Role::samples;
+        else if (key == "loopCategories")
+            loopCategoryMask = juce::jlimit (1, 7, value.getIntValue());
+        else if (key == "loopLayout")
+            loopLayoutState = loopkeys::Layout::fromText (value.replaceCharacter ('|', '\n').toStdString());
     }
     {
         const auto shown = shownTags();
@@ -6778,10 +6828,15 @@ void BrowserComponent::savePrefs() const
          << "tagMatch=" << (matchMode == browsertags::Match::all ? "all" : "any") << "\n"
          << "liveCategory=" << (int) liveSelection.category << "\n"
          << "liveCollection=" << liveSelection.collection << "\n"
-         << "livePath=" << juce::String::fromUTF8 (liveSelection.path.c_str()) << "\n";
+         << "livePath=" << juce::String::fromUTF8 (liveSelection.path.c_str()) << "\n"
+         << "loopsPanel=" << (loopsShown ? 1 : 0) << "\n"
+         << "loopCategories=" << loopCategoryMask << "\n";
+    if (loopLayoutState != loopkeys::Layout::defaults())
+        text << "loopLayout=" << juce::String::fromUTF8 (loopLayoutState.toText().c_str()).trimEnd().replaceCharacter ('\n', '|') << "\n";
     for (const auto& t : picked)
         text << "tag=" << juce::String::fromUTF8 (t.c_str()) << "\n";
     prefsFile().getParentDirectory().createDirectory();
     prefsFile().replaceWithText (text);
 }
+#include "ui/LoopBrowserParts.inc" // round gaps190kf
 } // namespace lynx

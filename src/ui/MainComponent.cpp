@@ -3865,8 +3865,15 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
         };
         host.setTitleAccessory = [this] (juce::Component* c, int width) { workspace.setTitleAccessory (Panel::playlist, c, width); };
         host.showLoops = [this] {
+            // round gaps190kf: with the Loop Browser shown (GarageBand's loop browser: keyword buttons, scale, types)
             if (findToolWindow ("sampleBrowser") == nullptr)
+            {
+                BrowserComponent::openLoopsNext = true;
                 toggleSampleBrowser();
+                BrowserComponent::openLoopsNext = false;
+            }
+            else
+                BrowserComponent::showLoopsInSampleBrowser();
         };
         // round 190ch: Lyrics / Notes, Reference match and a new project from the "Start from" list
         host.toggleLyrics = [this] { toggleLyrics(); };

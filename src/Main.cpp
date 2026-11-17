@@ -226,6 +226,7 @@
 #include "ui/ChordStripView.h" // round 190kd (--prchord190kd)
 #include "ui/EventEditor.h"
 #include "ui/AudioEditor.h"
+#include "ui/SampleProperties.h"
 #include "ui/TempoTapper.h"
 #include "core/EventEdit.h"
 #include "core/FacetEq.h"
@@ -2008,6 +2009,14 @@ public:
         }
 
         // --browsershot190iz <folder> (round 190iz: FL's tabs, tags, Live's browser): src/BrowserShot190iz.inc
+        // --loopshot190kf <folder> (round gaps190kf: the Loop Browser): src/LoopShot190kf.inc
+        if (args.contains ("--loopshot190kf"))
+        {
+            setApplicationReturnValue (runLoopShot190kf (juce::File (args[args.indexOf ("--loopshot190kf") + 1].unquoted())) ? 0 : 1);
+            quit();
+            return;
+        }
+
         if (args.contains ("--browsershot190iz"))
         {
             setApplicationReturnValue (runBrowserShot190iz (juce::File (args[args.indexOf ("--browsershot190iz") + 1].unquoted())) ? 0 : 1);
@@ -2980,6 +2989,17 @@ public:
             // Auto-warp, Quantize audio, run from the menu), warp flags added on the flag strip and moved with Alt + drag,
             // and the Clip-launch Clip View's Envelopes tab (Clip › Gain, Mixer › Track Panning). Writes prefix-checks.txt.
             runClipEnvShot190gi (args[args.indexOf ("--clipenvshot190gi") + 1].unquoted());
+            quit();
+            return;
+        }
+
+        if (args.contains ("--gapsshot190kf"))
+        {
+            // LYNX.exe --gapsshot190kf prefix [file.wav]: round gaps190kf off-screen: the Clip View's warp time line (Live's
+            // loop brace and Start / End markers under the beat-time ruler, the seconds ruler of an unwarped clip) on the
+            // probe of gaps190kf/live/cv-clipview.als (voice.wav, warp markers at 30 % / 55 %, Loop 1.3 … 3.3, Start 1.4).
+            const auto i = args.indexOf ("--gapsshot190kf");
+            runGapsShot190kf (args[i + 1].unquoted(), i + 2 < args.size() ? args[i + 2].unquoted() : juce::String());
             quit();
             return;
         }
@@ -21362,6 +21382,32 @@ private:
             juce::File (prefix + "-snap.txt").replaceWithText (snaps.joinIntoString ("\n") + "\n");
             shot (*editor, "-editor-snap-on.png");
         }
+        // round gaps190kf: FL's Sample properties window (Format › Edit properties..., F2) for this audio, with a few
+        // properties set, and the WAV chunks it writes (smpl / inst / acid / LIST INFO) listed
+        {
+            auto withProps = d;
+            withProps.props.name = "Drum loop";
+            withProps.props.comments = "LYNX SHARE test loop";
+            withProps.props.tempo = 120.0;
+            withProps.props.tempoSync = true;
+            withProps.props.fineTune = 12.0;
+            lynx::SamplePropertiesHost host;
+            host.projectTempo = 120.0;
+            auto props = lynx::makeSamplePropertiesPanel (withProps, d.title.empty() ? std::string ("Drum loop") : d.title, host);
+            shot (*props, "-sample-properties.png");
+            // the file's own properties (a WAV without them: FL's defaults — the FL | LYNX pair of the form as it opens)
+            auto plain = lynx::makeSamplePropertiesPanel (d, file.isNotEmpty() ? juce::File (file).getFileNameWithoutExtension().toStdString() : std::string ("Drum loop"), host);
+            shot (*plain, "-sample-properties-file.png");
+            juce::StringArray chunks;
+            const auto wav = ae::encodeWav (withProps, ae::WavFormat::int16);
+            for (std::size_t p = 12; p + 8 <= wav.size();)
+            {
+                const auto len = (std::size_t) wav[p + 4] | (std::size_t) wav[p + 5] << 8 | (std::size_t) wav[p + 6] << 16 | (std::size_t) wav[p + 7] << 24;
+                chunks.add (juce::String (reinterpret_cast<const char*> (wav.data() + p), 4) + " " + juce::String ((int) len));
+                p += 8 + len + (len & 1);
+            }
+            juce::File (prefix + "-sample-properties-chunks.txt").replaceWithText (chunks.joinIntoString ("\n") + "\n");
+        }
         for (int t = 0; lynx::audioToolNameForSnapshot (t) != nullptr; ++t)
         {
             const auto envelopeTool = t >= 10 && t <= 14; // Scale levels .. Create sequence work on the volume envelope
@@ -27756,6 +27802,173 @@ private:
         juce::File (prefix + "-checks.txt").replaceWithText (checks);
     }
 
+    void runGapsShot190kf (const juce::String& prefix, const juce::String& wavPath)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        juce::String checks;
+        const auto check = [&checks] (const juce::String& what, bool ok) { checks << (ok ? "ok   " : "FAIL ") << what << "\n"; };
+        // the probe's file, else a LYNX-made stand-in (8.42 s of a decaying 220 Hz tone every half second, 44.1 kHz)
+        auto wav = juce::File (wavPath);
+        if (! wav.existsAsFile())
+        {
+            wav = juce::File (prefix + "-probe.wav");
+            wav.deleteFile();
+            const double rate = 44100.0;
+            juce::AudioBuffer<float> buffer (1, (int) (rate * 8.421));
+            for (int k = 0; k < buffer.getNumSamples(); ++k)
+            {
+                const auto t = std::fmod (k / rate, 0.5);
+                buffer.setSample (0, k, (float) (0.5 * std::exp (-t * 6.0) * std::sin (2.0 * juce::MathConstants<double>::pi * 220.0 * k / rate)));
+            }
+            if (auto out = std::unique_ptr<juce::FileOutputStream> (wav.createOutputStream()))
+                if (auto* writer = juce::WavAudioFormat().createWriterFor (out.get(), rate, 1, 16, {}, 0))
+                {
+                    out.release();
+                    std::unique_ptr<juce::AudioFormatWriter> owned (writer);
+                    owned->writeFromAudioSampleBuffer (buffer, 0, buffer.getNumSamples());
+                }
+        }
+        double seconds = 0.0;
+        {
+            juce::AudioFormatManager formats;
+            formats.registerBasicFormats();
+            if (std::unique_ptr<juce::AudioFormatReader> r (formats.createReaderFor (wav)); r != nullptr && r->sampleRate > 0.0)
+                seconds = (double) r->lengthInSamples / r->sampleRate;
+        }
+        check ("probe file " + wav.getFileName() + " " + juce::String (seconds, 3) + " s", seconds > 1.0);
+        const auto beats = seconds * 2.0; // (warped at 120 BPM, its own tempo)
+        offline.editSong ([&] (lynx::Song& s) {
+            s.bpm = 120.0;
+            lynx::ChannelDef ch;
+            ch.name = "warped";
+            ch.instrument = lynx::InstrumentKind::audioClip;
+            ch.samplePath = wav.getFullPathName().toStdString();
+            ch.sampler.keepPitch = true;
+            ch.sampler.stretchMethod = lynx::StretchMethod::complex;
+            ch.sampler.stretchBeats = (float) beats;
+            ch.sampler.warp = { { 0.0, 0.0 }, { seconds * 0.3, beats * 0.25 }, { seconds * 0.55, beats * 0.5 }, { seconds, beats } };
+            s.channels.push_back (ch);
+            const auto c = (int) s.channels.size() - 1;
+            lynx::Clip audio;
+            audio.kind = lynx::ClipKind::audio;
+            audio.channel = c;
+            audio.offset = 2 * lynx::ppq; // (Loop Position 1.3, Length 2.0.0 → 3.3, Start 1.4: the probe set's)
+            audio.length = 8 * lynx::ppq;
+            lynx::launcher::setClip (s, 0, 0, audio);
+            lynx::launcher::ensureGrid (s).scenes.resize (1);
+            auto& grid = *s.clipGrid;
+            for (auto& g : grid.clips)
+                if (g.gridSlot >= 0)
+                {
+                    grid.slots[(std::size_t) g.gridSlot].loop = true;
+                    grid.slots[(std::size_t) g.gridSlot].startMarker = lynx::ppq;
+                }
+        }, false);
+        offline.dispatchPendingMessages();
+        const auto editorOf = [] (juce::Component& panel) -> juce::Component* {
+            for (auto* child : panel.getChildren())
+                if (child->isVisible() && child->getWidth() > 400 && dynamic_cast<juce::Button*> (child) == nullptr)
+                    return child;
+            return nullptr;
+        };
+        const auto write = [&] (juce::Component& panel, const char* name) {
+            offline.dispatchPendingMessages();
+            const auto file = lynx::shot::file (juce::File (prefix + "-" + name + ".png"));
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (lynx::shot::snapshot (panel), out);
+        };
+        const auto slotOf = [&] (auto&& fn) {
+            offline.editSong ([&] (lynx::Song& s) {
+                for (auto& g : s.clipGrid->clips)
+                    if (g.gridSlot >= 0)
+                        fn (g, s.clipGrid->slots[(std::size_t) g.gridSlot]);
+            }, false);
+            offline.dispatchPendingMessages();
+        };
+        {
+            auto panel = lynx::makeClipAudioPanel (offline, 0, 0);
+            check ("the Clip View panel", panel != nullptr);
+            if (panel == nullptr)
+                return;
+            panel->setSize (1390, 670);
+            if (auto* e = editorOf (*panel)) // (the Clip-launch layout's beat-time view; off-screen there is no layout)
+                lynx::setAudioEditorBeatTimeForSnapshot (*e, 1);
+            write (*panel, "01-loop-on-start-marker");
+            // perf (round gaps190kf): the sample editor painted 40 times with the warp time line (a grid clip's editor)
+            // and without it (the same channel's editor panel, no grid clip) — ms per full paint
+            {
+                const auto timeIt = [] (juce::Component& c) {
+                    juce::Image image (juce::Image::ARGB, c.getWidth(), c.getHeight(), true);
+                    const auto t0 = juce::Time::getMillisecondCounterHiRes();
+                    for (int k = 0; k < 40; ++k)
+                    {
+                        juce::Graphics g (image);
+                        c.paintEntireComponent (g, false);
+                    }
+                    return (juce::Time::getMillisecondCounterHiRes() - t0) / 40.0;
+                };
+                if (auto* withLane = editorOf (*panel))
+                {
+                    auto plain = lynx::makeAudioEditorPanel (offline, (int) offline.getSong().channels.size() - 1, -1, true);
+                    plain->setSize (withLane->getWidth(), withLane->getHeight());
+                    lynx::setAudioEditorBeatTimeForSnapshot (*plain, 1);
+                    offline.dispatchPendingMessages();
+                    timeIt (*withLane);
+                    timeIt (*plain);
+                    double a = 0.0, b = 0.0;
+                    for (int round = 0; round < 3; ++round)
+                    {
+                        a += timeIt (*withLane) / 3.0;
+                        b += timeIt (*plain) / 3.0;
+                    }
+                    check ("paint ms: with the warp time line " + juce::String (a, 3) + ", without " + juce::String (b, 3), true);
+                }
+            }
+            auto* editor = editorOf (*panel);
+            check ("its sample editor", editor != nullptr);
+            if (editor != nullptr)
+            {
+                lynx::selectAudioEditorBraceForSnapshot (*editor, true);
+                write (*panel, "02-brace-selected");
+                lynx::selectAudioEditorBraceForSnapshot (*editor, false);
+                lynx::holdAudioEditorBraceForSnapshot (*editor, 2, 12 * lynx::ppq); // (the loop's end dragged to 4.1)
+                write (*panel, "03-loop-end-held-at-4.1");
+                lynx::holdAudioEditorBraceForSnapshot (*editor, 0, 0);
+            }
+        }
+        slotOf ([] (lynx::Clip& c, lynx::ClipGridSlot& slot) {
+            slot.loop = false;
+            slot.startMarker = 0;
+            c.offset = 0;
+            c.length = (std::int64_t) std::llround (10.0 * lynx::ppq);
+        });
+        {
+            auto panel = lynx::makeClipAudioPanel (offline, 0, 0);
+            if (panel != nullptr)
+            {
+                panel->setSize (1390, 670);
+                if (auto* e = editorOf (*panel))
+                    lynx::setAudioEditorBeatTimeForSnapshot (*e, 1);
+                write (*panel, "04-loop-off-start-end");
+            }
+        }
+        offline.editSong ([&] (lynx::Song& s) { lynx::clipsample::setWarp (s, (int) s.channels.size() - 1, false, seconds); }, false);
+        offline.dispatchPendingMessages();
+        {
+            auto panel = lynx::makeClipAudioPanel (offline, 0, 0);
+            if (panel != nullptr)
+            {
+                panel->setSize (1390, 670);
+                if (auto* e = editorOf (*panel))
+                    lynx::setAudioEditorBeatTimeForSnapshot (*e, 1);
+                write (*panel, "05-unwarped-seconds");
+            }
+        }
+        juce::File (prefix + "-checks.txt").replaceWithText (checks);
+    }
+
     void runLiveFactsShot190gx (const juce::String& prefix)
     {
         juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
@@ -33402,6 +33615,7 @@ private:
 #include "PrChordShot190kd.inc" // round 190kd
 #include "PrShot190jv.inc" // round 190jv
 #include "SimpleGbShot190ke.inc" // round 190ke
+#include "LoopShot190kf.inc"   // round gaps190kf
 
     static void writeWaveDemo (const juce::File& file, double bpm)
     {
