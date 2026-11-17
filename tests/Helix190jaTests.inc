@@ -153,7 +153,8 @@ TEST (helix190ja_tables_are_band_limited_and_lynx_own)
         for (int m = 0; m < w::mipCount; ++m)
         {
             const auto len = w::mipLength (m);
-            CHECK ((int) tb.data[(std::size_t) m].size() == w::frameCount * (len + 1));
+            for (int f = 0; f < w::frameCount; ++f) // (every frame inside the table's own data: equal frames are shared, 190js)
+                CHECK (tb.frame (m, f) >= tb.pool.data() && tb.frame (m, f) + len + 1 <= tb.pool.data() + tb.pool.size());
             for (int f = 0; f < w::frameCount; f += 21)
             {
                 const auto* fr = tb.frame (m, f);
@@ -192,6 +193,39 @@ TEST (helix190ja_tables_are_band_limited_and_lynx_own)
     CHECK (std::string (w::tableName (unknown.table)) == "Sync Sweep" && ! unknown.note.empty());
     CHECK (w::tableByName ("Shapes") >= 0 && w::tableByName ("No Such Table") == -1);
     CHECK (w::matchLiveTable (w::liveTableFor (w::tableByName ("Shapes"))).table == w::tableByName ("Shapes"));
+}
+
+// 190js: a frame bit for bit equal to another of the same length is kept once (the values the oscillator reads are the
+// floats one array per mip held: renders and every frame checked identical against the old layout); RAM per table
+TEST (helix190js_tables_keep_equal_frames_once)
+{
+    using namespace lynx;
+    namespace w = wt;
+    std::size_t full = 0; // one array per mip, as before 190js
+    for (int m = 0; m < w::mipCount; ++m)
+        full += (std::size_t) w::frameCount * (std::size_t) (w::mipLength (m) + 1) * sizeof (float);
+    // Harmonic Ladder's partials stop at 64: its four 4096-sample mips (1023 … 361 partials) hold the same frames, and so do
+    // its two 2048 and its two 1024 ones; mips of different lengths never share
+    const auto& ladder = w::table (w::tableByName ("Harmonic Ladder"));
+    bool shared = true;
+    for (int f = 0; f < w::frameCount; ++f)
+        shared = shared && ladder.frame (0, f) == ladder.frame (3, f) && ladder.frame (4, f) == ladder.frame (5, f)
+                 && ladder.frame (6, f) == ladder.frame (7, f) && ladder.frame (3, f) != ladder.frame (4, f);
+    CHECK (shared);
+    CHECK (ladder.bytes() < full / 3);
+    // Pulse Sweep steps through 9 widths: 9 frames per mip, not 64
+    const auto& steps = w::table (w::tableByName ("Pulse Sweep"));
+    std::set<const float*> distinct;
+    for (int f = 0; f < w::frameCount; ++f)
+        distinct.insert (steps.frame (0, f));
+    CHECK (distinct.size() == 9);
+    // a full-band, ever-changing table keeps every frame (Shapes)
+    CHECK (w::table (w::tableByName ("Shapes")).bytes() > full / 10 * 9);
+    // all the tables: under 80 % of the old layout (≈ 74 %)
+    std::size_t all = 0;
+    for (int t = 0; t < w::tableCount(); ++t)
+        all += w::table (t).bytes();
+    CHECK (all < full * (std::size_t) w::tableCount() / 5 * 4);
 }
 
 TEST (helix190ja_tuning_and_levels)

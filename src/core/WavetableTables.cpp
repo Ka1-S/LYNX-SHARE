@@ -1,16 +1,18 @@
 // Helix's wave tables (round 190ja, core/WavetableSynth.h): LYNX's own, generated here from additive and wave-shape
-// recipes the first time a table is used, kept as mipmaps (one per octave) and never freed. No table data comes from
-// another product: the recipes are textbook shapes (sine, triangle, saw, pulse), harmonic series, formant envelopes,
-// filter responses, FM / sync / fold sweeps and seeded noise. Live's table names map onto the closest table here
-// (matchLiveTable), chosen by measuring Live's rendered output black-box (docs/analise/REA_rodada190ja.md §4).
+// recipes the first time a table is used, kept as mipmaps (half an octave apart, each distinct frame once) and never
+// freed. No table data comes from another product: the recipes are textbook shapes (sine, triangle, saw, pulse), harmonic
+// series, formant envelopes, filter responses, FM / sync / fold sweeps and seeded noise. Live's table names map onto the
+// closest table here (matchLiveTable), chosen by measuring Live's rendered output black-box (docs/analise/REA_rodada190ja.md §4).
 
 #include "core/WavetableSynth.h"
 
 #include <algorithm>
 #include <cmath>
 #include <complex>
+#include <cstring>
 #include <functional>
 #include <mutex>
+#include <unordered_map>
 
 namespace lynx::wt
 {
@@ -542,13 +544,25 @@ std::unique_ptr<Table> build (const Recipe& recipe)
             s.amp[0] = 0.0;
         }
     }
-    double peak = 0.0;
+    // the mips, richest first; mip 0 sets the table's gain (below), then every frame is scaled and kept once: a frame bit for
+    // bit equal to one already kept (same length) points at it (190js: a static table's frames, the mips of a table whose
+    // partials stop below a mip's limit; the values are the same floats as one array per mip held, so the sound is too)
+    std::size_t full = 0;
+    for (int m = 0; m < mipCount; ++m)
+        full += (std::size_t) frameCount * (std::size_t) (mipLength (m) + 1);
+    std::vector<float> pool;
+    pool.reserve (full);
+    std::array<std::array<std::size_t, frameCount>, mipCount> at {};
+    std::unordered_multimap<std::uint64_t, std::pair<std::size_t, std::size_t>> kept; // a frame's hash → its offset in pool, length
+    std::vector<float> d;
+    float g = 1.0f;
     for (int m = 0; m < mipCount; ++m)
     {
         const auto len = mipLength (m), top = mipPartials (m);
-        auto& d = t->data[(std::size_t) m];
-        d.assign ((std::size_t) frameCount * (std::size_t) (len + 1), 0.0f);
+        const auto stride = (std::size_t) (len + 1);
+        d.assign ((std::size_t) frameCount * stride, 0.0f);
         std::vector<std::complex<double>> a ((std::size_t) len);
+        double peak = 0.0;
         for (int f = 0; f < frameCount; ++f)
         {
             std::fill (a.begin(), a.end(), std::complex<double> {});
@@ -562,7 +576,7 @@ std::unique_ptr<Table> build (const Recipe& recipe)
                     a[(std::size_t) (len - h)] = std::conj (c);
                 }
             fft (a, true);
-            auto* out = d.data() + (std::size_t) f * (std::size_t) (len + 1);
+            auto* out = d.data() + (std::size_t) f * stride;
             for (int i = 0; i < len; ++i)
             {
                 out[i] = (float) a[(std::size_t) i].real();
@@ -571,25 +585,54 @@ std::unique_ptr<Table> build (const Recipe& recipe)
             }
             out[len] = out[0];
         }
-    }
-    // one gain for the whole table: a shape recipe keeps its own ±1 scale (a sine frame peaks at 1, a square's band-limited
-    // edges overshoot it as Live's do [MEASURED 190ja a0: sine −3.0 dB, square's fundamental 4/π at the centre]); an
-    // additive one is scaled so its loudest frame peaks at 1
-    // noise tables: every frame at Live's level for its white noise table, −8.4 dB RMS full band [MEASURED 190ja a8]
-    const auto noiseTable = std::string (recipe.category) == "Noise" || std::string (recipe.name) == "White Noise";
-    double rms = 0.0;
-    if (noiseTable)
-    {
-        const auto& d0 = t->data[0];
-        for (int i = 0; i < mipLength (0); ++i)
-            rms += (double) d0[(std::size_t) i] * d0[(std::size_t) i];
-        rms = std::sqrt (rms / mipLength (0)) / 0.38;
-    }
-    const auto ref = noiseTable ? rms : recipe.shape ? shapePeak : peak;
-    const auto g = ref > 1.0e-12 ? (float) (1.0 / ref) : 1.0f;
-    for (auto& d : t->data)
+        if (m == 0)
+        {
+            // one gain for the whole table: a shape recipe keeps its own ±1 scale (a sine frame peaks at 1, a square's
+            // band-limited edges overshoot it as Live's do [MEASURED 190ja a0: sine −3.0 dB, square's fundamental 4/π at the
+            // centre]); an additive one is scaled so its loudest frame peaks at 1
+            // noise tables: every frame at Live's level for its white noise table, −8.4 dB RMS full band [MEASURED 190ja a8]
+            const auto noiseTable = std::string (recipe.category) == "Noise" || std::string (recipe.name) == "White Noise";
+            double rms = 0.0;
+            if (noiseTable)
+            {
+                for (int i = 0; i < len; ++i)
+                    rms += (double) d[(std::size_t) i] * d[(std::size_t) i];
+                rms = std::sqrt (rms / len) / 0.38;
+            }
+            const auto ref = noiseTable ? rms : recipe.shape ? shapePeak : peak;
+            g = ref > 1.0e-12 ? (float) (1.0 / ref) : 1.0f;
+        }
         for (auto& v : d)
             v *= g;
+        for (int f = 0; f < frameCount; ++f)
+        {
+            const auto* fr = d.data() + (std::size_t) f * stride;
+            std::uint64_t h = 1469598103934665603ull ^ (std::uint64_t) len; // FNV-1a over the frame's bits
+            for (std::size_t i = 0; i < stride; ++i)
+            {
+                std::uint32_t bits;
+                std::memcpy (&bits, fr + i, sizeof bits);
+                h = (h ^ bits) * 1099511628211ull;
+            }
+            auto found = pool.size();
+            for (auto [it, last] = kept.equal_range (h); it != last; ++it)
+                if (it->second.second == stride && std::memcmp (pool.data() + it->second.first, fr, stride * sizeof (float)) == 0)
+                {
+                    found = it->second.first;
+                    break;
+                }
+            if (found == pool.size())
+            {
+                pool.insert (pool.end(), fr, fr + stride);
+                kept.emplace (h, std::make_pair (found, stride));
+            }
+            at[(std::size_t) m][(std::size_t) f] = found;
+        }
+    }
+    t->pool.assign (pool.begin(), pool.end()); // (exactly the frames kept)
+    for (int m = 0; m < mipCount; ++m)
+        for (int f = 0; f < frameCount; ++f)
+            t->frames[(std::size_t) m][(std::size_t) f] = t->pool.data() + at[(std::size_t) m][(std::size_t) f];
     return t;
 }
 

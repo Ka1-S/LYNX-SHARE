@@ -101,9 +101,15 @@ int mipPartials (int mip) noexcept;            // the highest partial kept at mi
 struct Table
 {
     std::string category, name;
-    // [mip][frame][mipLength (mip) + 1]
-    std::array<std::vector<float>, mipCount> data;
-    const float* frame (int mip, int f) const noexcept { return data[(std::size_t) mip].data() + (std::size_t) f * (std::size_t) (mipLength (mip) + 1); }
+    // the distinct frames, each mipLength (its mip) + 1 floats (the guard sample last): a frame that is bit for bit the same
+    // as another of the same length (a static table's frames, the mips of a table with few partials) is kept once (190js)
+    std::vector<float> pool;
+    std::array<std::array<const float*, frameCount>, mipCount> frames {}; // [mip][frame] → into pool
+    const float* frame (int mip, int f) const noexcept { return frames[(std::size_t) mip][(std::size_t) f]; }
+    std::size_t bytes() const noexcept { return pool.size() * sizeof (float); } // the table's frame data
+    Table() = default;
+    Table (const Table&) = delete; // (frames point into pool)
+    Table& operator= (const Table&) = delete;
 };
 int tableCount() noexcept;
 const char* tableName (int index) noexcept;     // "Shapes"
