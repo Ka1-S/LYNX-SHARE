@@ -7086,10 +7086,10 @@ void PlaylistComponent::paintLiveGrid (juce::Graphics& g, juce::Rectangle<int> g
 
 bool PlaylistComponent::paintLiveLanesCached (juce::Graphics& g, juce::Rectangle<int> grid, int rows)
 {
-    // (off by default: measured on Thief it saved nothing a whole frame could see — the lanes are one fill plus a line per
-    // bar or beat, under 1 ms — and the blitted image differed by a level here and there from the lanes drawn straight;
-    // LYNX_LIVEGRID_CACHE=1 turns it on for checks)
-    static const bool enabled = juce::SystemStats::getEnvironmentVariable ("LYNX_LIVEGRID_CACHE", "0") == "1";
+    // (measured on Thief, Windows: the 19 px Arrangement's whole frame 15.6 -> 11.6 ms once the collapsed lanes' empty fade
+    // paths were gone; the frame's pixels match the lanes drawn straight but for 15 px of one glyph's edge over them.
+    // LYNX_LIVEGRID_CACHE=0 draws them straight, for checks)
+    static const bool enabled = juce::SystemStats::getEnvironmentVariable ("LYNX_LIVEGRID_CACHE", "1") != "0";
     if (! enabled || grid.isEmpty())
         return false;
     // whole physical pixels only (1x, 2x): the image then maps 1:1 onto the screen's pixels, the same pixels as drawn straight
