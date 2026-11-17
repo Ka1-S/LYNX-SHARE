@@ -2983,8 +2983,10 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
             const auto enabled = sends[k].boolean ("EnabledByUser", true);
             if (m.liveReturn && enabled) // (round 190kc: a return's send knob Live shows switched on, at any level)
                 m.returnSendsOn.push_back (returns[k]);
-            if (level > minusInfGain * 1.0001 && enabled)
-                m.sends.push_back ({ returns[k], (float) std::min (level, (double) maxFaderGain) });
+            // (round 190kc: a send switched on at -inf stays a send at 0 — Live's knob is there, mappable and automatable,
+            // the Patience demo's sends are all at -inf; before, no send was made and its envelope had nothing to move)
+            if (enabled)
+                m.sends.push_back ({ returns[k], level > minusInfGain * 1.0001 ? (float) std::min (level, (double) maxFaderGain) : 0.0f });
         }
     }
 

@@ -81,9 +81,9 @@ TEST (cliplaunch190kc_als_returns_sends_and_crossfader_import)
     CHECK (! song->mixer[(std::size_t) keys].liveReturn && song->mixer[(std::size_t) reverb].liveReturn);
     CHECK (sessionmixer::returnTitle (*song, reverb) == "A Reverb" && sessionmixer::returnTitle (*song, delay) == "B Delay");
     CHECK (sessionmixer::returnLetter (*song, keys).empty());
-    // a Sends row per return whatever the levels (Patience: every send at -inf), the -inf ones without a LYNX send
+    // a Sends row per return (Patience: every send at -inf); a send at -inf is a send at 0 (mappable, automatable)
     CHECK (sessionmixer::sendRows (*song, { keys, vocal }, 6) == std::vector<int> ({ reverb, delay }));
-    CHECK (sessionmixer::sendPosition (*song, keys, reverb) < 0.0f && sessionmixer::sendPosition (*song, keys, delay) < 0.0f);
+    CHECK (sessionmixer::sendPosition (*song, keys, reverb) == 0.0f && sessionmixer::sendPosition (*song, keys, delay) == 0.0f);
     CHECK (std::abs (faderGain (sessionmixer::sendPosition (*song, vocal, reverb)) - 0.5f) < 1e-4f); // (the set's amount)
     // Pre / Post per return; a return's sends: off unless the set switched them on
     CHECK (! sessionmixer::isPre (*song, reverb) && sessionmixer::isPre (*song, delay));
