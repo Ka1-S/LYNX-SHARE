@@ -11242,3 +11242,4 @@ countries: fr be ch ca lu
 "Stop editing in {0}" = "Arrêter l'édition dans {0}"
 "Find ARA plugins" = "Rechercher des plugins ARA"
 "Audio clips edited in an ARA plugin (Melodyne...) play without those edits: {0}" = "Les clips audio édités dans un plugin ARA (Melodyne...) sont lus sans ces modifications : {0}"
+"Separate close notes (analyse again)" = "Séparer les notes proches (analyser à nouveau)"

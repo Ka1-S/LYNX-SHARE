@@ -11242,3 +11242,4 @@ countries: tw hk mo
 "Stop editing in {0}" = "停止在 {0} 中編輯"
 "Find ARA plugins" = "尋找 ARA 外掛"
 "Audio clips edited in an ARA plugin (Melodyne...) play without those edits: {0}" = "在 ARA 外掛（Melodyne 等）中編輯的音訊片段將不帶這些編輯播放：{0}"
+"Separate close notes (analyse again)" = "分開相近的音符（重新分析）"

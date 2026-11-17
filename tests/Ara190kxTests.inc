@@ -3,6 +3,7 @@
 
 #include "core/AraRegions.h"
 #include "core/FlClipMenu.h"
+#include "core/NewtoneFx.h"
 
 namespace ara190kx
 {
@@ -96,4 +97,87 @@ TEST (ara190kx_ids_tempo_and_menu)
     auto a = s.channels[0], b = s.channels[0];
     b.ara = {};
     CHECK (! (a == b));
+}
+
+// Round 190kx: Newtone's "Separate close notes" analysis (core/NewtoneFx.h AnalyseOptions::fineSplit) against the
+// round's Melodyne 5 reference captures (Melodic detection of the same synthetic lines: every note of its own)
+namespace ara190kx
+{
+// a sung line (harmonics through three vowel formants, 15 ms fades): (MIDI note or 0 for a rest, seconds), vibrato depth
+// in cents at 5.5 Hz
+lynx::SampleData sung (const std::vector<std::pair<double, double>>& spec, double vibratoCents = 0.0)
+{
+    lynx::SampleData s;
+    s.sampleRate = 48000.0;
+    double ph = 0.0;
+    for (const auto& [midi, seconds] : spec)
+    {
+        const auto n = (int) (seconds * 48000.0);
+        for (int i = 0; i < n; ++i)
+        {
+            float v = 0.0f;
+            if (midi > 0.0)
+            {
+                const auto t = i / 48000.0;
+                const auto f0 = 440.0 * std::pow (2.0, (midi - 69.0) / 12.0) * std::pow (2.0, vibratoCents * std::sin (2.0 * M_PI * 5.5 * t) / 1200.0);
+                ph += 2.0 * M_PI * f0 / 48000.0;
+                for (int k = 1; k * f0 < 8000.0; ++k)
+                {
+                    const auto f = k * f0;
+                    double g = 0.05;
+                    for (const auto [F, B] : { std::pair { 700.0, 130.0 }, { 1220.0, 150.0 }, { 2600.0, 200.0 } })
+                        g += 1.0 / std::sqrt (1.0 + std::pow ((f - F) / B, 2.0));
+                    v += (float) (0.12 * g / k * std::sin (k * ph));
+                }
+                v *= (float) std::min ({ 1.0, i / 720.0, (n - i) / 720.0 });
+            }
+            s.left.push_back (v);
+        }
+    }
+    return s;
+}
+
+int voicedNotes (const lynx::newtonefx::Track& t)
+{
+    return (int) std::count_if (t.pitches.begin(), t.pitches.end(), [] (const lynx::newtonefx::Note& p) { return p.voiced(); });
+}
+} // namespace ara190kx
+
+TEST (melodyne190kx_newtone_fine_split_separates_close_notes)
+{
+    using namespace lynx;
+    newtonefx::AnalyseOptions fine;
+    fine.fineSplit = true;
+    // 45 cents apart (E +40, F -15) with a 20-cent vibrato: FL's analysis joins them into one note (Center then puts the
+    // E on F); the fine analysis keeps five notes, as Melodyne does
+    const auto offtune = ara190kx::sung ({ { 60.3, 0.5 }, { 61.75, 0.5 }, { 64.4, 0.5 }, { 64.85, 0.5 }, { 67.2, 1.0 } }, 20.0);
+    CHECK (ara190kx::voicedNotes (newtonefx::analyseNotes (offtune)) == 4);
+    const auto split = newtonefx::analyseNotes (offtune, fine);
+    CHECK (ara190kx::voicedNotes (split) == 5);
+    // and Center 100 % puts each on its own semitone
+    auto corrected = split;
+    newtonefx::applyCentre (corrected, 1.0);
+    std::vector<int> keys;
+    for (const auto& p : corrected.pitches)
+        if (p.voiced())
+            keys.push_back ((int) std::lround (p.origPitch + p.shift));
+    CHECK ((keys == std::vector<int> { 60, 62, 64, 65, 67 }));
+    // a 35-cent vibrato is no step, a slow 50-cent drift is no step, an ordinary melody is unchanged
+    const auto melody = std::vector<std::pair<double, double>> { { 60, .5 }, { 62, .5 }, { 64, .5 }, { 65, .5 }, { 67, 1.0 }, { 0, .25 }, { 65, .5 }, { 64, .5 }, { 62, .5 }, { 60, 1.0 } };
+    CHECK (ara190kx::voicedNotes (newtonefx::analyseNotes (ara190kx::sung (melody, 35.0), fine)) == 9);
+    CHECK (ara190kx::voicedNotes (newtonefx::analyseNotes (ara190kx::sung (melody), fine)) == 9);
+    CHECK (ara190kx::voicedNotes (newtonefx::analyseNotes (ara190kx::sung (melody))) == 9);
+}
+
+TEST (melodyne190kx_newtone_fl_analysis_unchanged_by_default)
+{
+    using namespace lynx;
+    // the default options are FL's analysis: the same notes as an explicit FL call, sample for sample
+    const auto s = ara190kx::sung ({ { 57, 0.4 }, { 0, 0.1 }, { 59, 0.6 }, { 60.4, 0.6 } }, 25.0);
+    const auto a = newtonefx::analyseNotes (s);
+    const auto b = newtonefx::analyseNotes (s, newtonefx::AnalyseOptions {});
+    CHECK (a.pitches.size() == b.pitches.size());
+    for (std::size_t i = 0; i < a.pitches.size() && i < b.pitches.size(); ++i)
+        CHECK (a.pitches[i].origStart == b.pitches[i].origStart && a.pitches[i].origEnd == b.pitches[i].origEnd
+               && a.pitches[i].origPitch == b.pitches[i].origPitch);
 }

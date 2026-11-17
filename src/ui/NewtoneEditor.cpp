@@ -1039,11 +1039,19 @@ private:
         repaint();
     }
 
+    bool fineAnalysis = false; // (round 190kx: "Separate close notes")
+    newtonefx::AnalyseOptions analyseOptions() const
+    {
+        newtonefx::AnalyseOptions o;
+        o.fineSplit = fineAnalysis;
+        return o;
+    }
+
     void reanalyse()
     {
         if (sample == nullptr || warpMode())
             return;
-        notes = newtonefx::analyseNotes (*sample);
+        notes = newtonefx::analyseNotes (*sample, analyseOptions());
         selected.clear();
         commit();
     }
@@ -2318,6 +2326,12 @@ private:
         });
         m.addSeparator();
         m.addItem (tr ("Quantize time") + "\tCtrl+Q", sample != nullptr, false, [this] { quantize(); });
+        // round 190kx (LYNX extra; off = FL's analysis): notes a fraction of a semitone apart, or a new attack on one
+        // pitch, become notes of their own (as Melodyne's Melodic detection), and the sample is analysed again
+        m.addItem (tr ("Separate close notes (analyse again)"), sample != nullptr && ! warpMode(), fineAnalysis, [this] {
+            fineAnalysis = ! fineAnalysis;
+            reanalyse();
+        });
         m.addSeparator();
         m.addItem (tr ("Advanced edit pitch") + "\tCtrl+E", sample != nullptr, advancedEdit, [this] { headerClick (Hit::advanced); });
         m.addItem (tr ("Advanced edit vibrato"), sample != nullptr, vibratoEdit, [this] {

@@ -11242,3 +11242,4 @@ countries: id
 "Stop editing in {0}" = "Berhenti mengedit di {0}"
 "Find ARA plugins" = "Cari plugin ARA"
 "Audio clips edited in an ARA plugin (Melodyne...) play without those edits: {0}" = "Klip audio yang diedit di plugin ARA (Melodyne...) diputar tanpa editan itu: {0}"
+"Separate close notes (analyse again)" = "Pisahkan nada yang berdekatan (analisis ulang)"

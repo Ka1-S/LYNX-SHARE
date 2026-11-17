@@ -122,7 +122,16 @@ std::shared_ptr<SampleData> renderEdits (const SampleData& source, const Track& 
 // REA_rodada190kj): the notes tile the file back to back (a lead-in note from 0 to the first one, each note owns the
 // silence after it, validEnd = where its voice ends), origPitch from whole-sample periods (fs / floor(fs / f0)), volume
 // fades 0.2 x the note's length, pitch smooth-in / out times measured from the glides (FL's ~73 ms after silence).
-Track analyseNotes (const SampleData& source);
+// Round 190kx (LYNX extra, off by default = FL's analysis above): `fineSplit` also ends a note where the pitch steps
+// by a third of a semitone or more and holds (FL: 0.7), and where the level dips between two voiced stretches (a new
+// attack on the same breath). Melodyne 5 (its Melodic algorithm, round 190kx's reference captures) separates notes 45
+// cents apart; FL's analysis joins them into one note between the two pitches, which Center then moves to the wrong
+// semitone.
+struct AnalyseOptions
+{
+    bool fineSplit = false;
+};
+Track analyseNotes (const SampleData& source, const AnalyseOptions& options = {});
 
 // ------------------------------------------------------------------------------------------------------------------
 // LYNX's Newtone editor tools (round 165g, FL's workflow interpreted: Cut mode / glue, the Center / Variation /

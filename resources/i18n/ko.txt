@@ -11242,3 +11242,4 @@ countries: kr
 "Stop editing in {0}" = "{0}에서 편집 중지"
 "Find ARA plugins" = "ARA 플러그인 찾기"
 "Audio clips edited in an ARA plugin (Melodyne...) play without those edits: {0}" = "ARA 플러그인(Melodyne 등)에서 편집한 오디오 클립은 그 편집 없이 재생됩니다: {0}"
+"Separate close notes (analyse again)" = "가까운 음 분리 (다시 분석)"

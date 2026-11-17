@@ -11242,3 +11242,4 @@ countries: tr
 "Stop editing in {0}" = "{0} içinde düzenlemeyi bırak"
 "Find ARA plugins" = "ARA eklentilerini bul"
 "Audio clips edited in an ARA plugin (Melodyne...) play without those edits: {0}" = "Bir ARA eklentisinde (Melodyne...) düzenlenen ses klipleri bu düzenlemeler olmadan çalar: {0}"
+"Separate close notes (analyse again)" = "Yakın notaları ayır (yeniden analiz et)"

@@ -11242,3 +11242,4 @@ countries: nl be
 "Stop editing in {0}" = "Stoppen met bewerken in {0}"
 "Find ARA plugins" = "ARA-plug-ins zoeken"
 "Audio clips edited in an ARA plugin (Melodyne...) play without those edits: {0}" = "Audioclips die in een ARA-plug-in (Melodyne...) zijn bewerkt, spelen zonder die bewerkingen: {0}"
+"Separate close notes (analyse again)" = "Dicht bij elkaar liggende noten scheiden (opnieuw analyseren)"
