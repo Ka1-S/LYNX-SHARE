@@ -10084,8 +10084,23 @@ void MainComponent::showImportReport()
         text << tr ("Samples found in another folder than the project says (FL Studio's folders or next to the project): {0}",
                     { juce::String (r.relocatedSamples) }) << "\n";
 
-    if (text.isNotEmpty())
-        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Project import"), text.trimEnd());
+    if (text.isEmpty())
+        return;
+    text = text.trimEnd();
+    // round 190kp (QA of 0.1.30): a long report (a big Live set has 40+ lines) was cut at the screen's height, with no way
+    // to read the rest. Past a screenful the lines go into a scrolling text block (JUCE's read-only text editor); a short
+    // report shows as before.
+    constexpr int plainLines = 30;
+    if (juce::StringArray::fromLines (text).size() <= plainLines)
+    {
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Project import"), text);
+        return;
+    }
+    auto* window = new juce::AlertWindow (tr ("Project import"), {}, juce::MessageBoxIconType::InfoIcon);
+    window->addTextBlock (text);
+    window->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey), juce::KeyPress (juce::KeyPress::escapeKey));
+    window->enterModalState (true, nullptr, true);
+    keepAboveMainWindow (*window);
 }
 
 void MainComponent::showAudioSettings()
