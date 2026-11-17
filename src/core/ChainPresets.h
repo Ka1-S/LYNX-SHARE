@@ -37,6 +37,10 @@ struct Preset
 const std::vector<Preset>& factory();
 const std::vector<const char*>& categories(); // in menu order
 const Preset* find (const std::string& name); // nullptr when no factory preset has that name
+// BandLab's "‹ Bass Boost ›" (round 190kn, DS-26): the factory preset before (`direction` < 0) or after the current one, in
+// the preset menu's order (category by category), wrapping round. A name that is not a factory preset (none, a user's
+// preset) steps to the first (›) or the last (‹) one.
+const Preset* stepped (const std::string& current, int direction);
 
 // The preset's slots, in rows 0, 1, 2… (a named parameter the effect doesn't have is skipped)
 std::vector<EffectSlot> slots (const Preset& preset);

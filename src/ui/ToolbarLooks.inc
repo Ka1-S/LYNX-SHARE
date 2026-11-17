@@ -639,7 +639,7 @@ juce::Component* MainComponent::toolbarPartForSnapshot (const juce::String& name
         { "overdub", &blendButton }, { "capture", &captureButton }, { "sessionRecord", &sessionRecordButton }, { "punch", &punchButton },
         { "draw", &drawModeButton }, { "computerKeys", &typingPianoButton }, { "keyMap", &keyMapButton }, { "midiMap", &midiMapButton },
         { "cpu", &perfMeter }, { "more", &moreButton }, { "sessionView", &sessionViewButton }, { "arrangementView", &arrangementViewButton },
-        { "status", &saveStatus }, { "masterVolume", &masterVolume }, { "masterPitch", &masterPitch }
+        { "status", &saveStatus }, { "masterVolume", &masterVolume }, { "masterPitch", &masterPitch }, { "undo", &undoButton }, { "redo", &redoButton }
     };
     if (name == "finish")
         return simpleWorkflow != nullptr ? simpleWorkflow->finishComponent() : nullptr;
@@ -649,8 +649,18 @@ juce::Component* MainComponent::toolbarPartForSnapshot (const juce::String& name
     return nullptr;
 }
 
+// round 190kn (BandLab, DS-11: the redo icon dims when there is nothing to redo; FL Studio Mobile shows Undo only after a
+// change): the Simple top bar greys Undo / Redo; the other looks keep them always on. setEnabled repaints only on a change.
+void MainComponent::updateUndoRedoEnabled()
+{
+    const auto simpleBar = toolbarLook == Look::simple;
+    undoButton.setEnabled (! simpleBar || engine.canUndo());
+    redoButton.setEnabled (! simpleBar || engine.canRedo());
+}
+
 void MainComponent::transportTickForSnapshot()
 {
+    updateUndoRedoEnabled();
     const auto playing = engine.getTransport().playing.load() || engine.isLinkWaiting();
     playButton.setToggleState (playing, juce::dontSendNotification);
     refreshModeButton();

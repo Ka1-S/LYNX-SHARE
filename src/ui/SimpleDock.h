@@ -119,6 +119,10 @@ public:
     juce::String soundNameForCheck() const;
     void clickSoundForCheck (int row);   // picks row `row` of the list as a click on its name does
     void stepSoundForCheck (int delta);  // the ‹ › arrows
+    // round 190kn (BandLab's effects side panel): the preset's ‹ › and the chain bypass, as their buttons do
+    void stepPresetForCheck (int delta);
+    void bypassChainForCheck();
+    bool bypassLitForCheck() const;
     void turnKnobForCheck (int card, float value);
     void moveCardForCheck (int card, int delta);
     void removeCardForCheck (int card);
