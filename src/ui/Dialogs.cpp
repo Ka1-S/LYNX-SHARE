@@ -820,9 +820,18 @@ class FlMessageWindow final : public juce::AlertWindow
 {
 public:
     explicit FlMessageWindow (const FlMessage& m)
-        : juce::AlertWindow (m.title, {}, juce::MessageBoxIconType::QuestionIcon), text (m.text)
+        : juce::AlertWindow (m.title, {}, m.icon), text (m.text)
     {
         addCustomComponent (&text);
+        for (int i = 0; i < m.options.size(); ++i) // (round 190jv: FL's exclusive choices; one is always ticked)
+        {
+            auto* b = choices.add (new juce::ToggleButton (m.options[i]));
+            b->setSize (text.getWidth(), 26);
+            b->setRadioGroupId (190);
+            b->setClickingTogglesState (true);
+            b->setToggleState (i == juce::jlimit (0, m.options.size() - 1, m.option), juce::dontSendNotification);
+            addCustomComponent (b);
+        }
         if (m.buttons.size() > 2) // FL stacks three or more choices, one under the other ("Playlist tracks"); Escape = 0
         {
             for (int i = 0; i < m.buttons.size(); ++i)
@@ -851,9 +860,17 @@ public:
     }
 
     bool remembered() const { return remember.getToggleState(); }
+    int chosenOption() const
+    {
+        for (int i = 0; i < choices.size(); ++i)
+            if (choices[i]->getToggleState())
+                return i;
+        return 0;
+    }
 
 private:
     FlMessageText text;
+    juce::OwnedArray<juce::ToggleButton> choices;
     juce::OwnedArray<juce::TextButton> stacked;
     juce::OwnedArray<juce::Component> rows;
     juce::ToggleButton remember;
@@ -877,6 +894,17 @@ void showFlMessage (const FlMessage& message, std::function<void (int, bool)> on
     keepAboveMainWindow (*window);
 }
 
+void showFlOptions (const FlMessage& message, std::function<void (int, int)> onChoice)
+{
+    auto* window = new FlMessageWindow (message);
+    window->enterModalState (true, juce::ModalCallbackFunction::create ([window, onChoice] (int result) {
+                                 if (onChoice != nullptr)
+                                     onChoice (result, window->chosenOption());
+                             }),
+                             true);
+    keepAboveMainWindow (*window);
+}
+
 std::unique_ptr<juce::AlertWindow> makeFlMessageDialog (const FlMessage& message)
 {
     return std::make_unique<FlMessageWindow> (message);
@@ -889,7 +917,9 @@ const std::vector<Entry>& all()
     // FL's entries LYNX shows (the rest of FL's list belongs to features with their own setting in LYNX)
     // (round 190ey: FL's "RecAutoSwitchExternalInput", the External input question of issue #152; its heading "Audio" is
     // inferred from FL's table order, not decoded)
+    // (round 190jv: FL's next record, 0x33, "TrimUnusedMixerTracks" in File/Data — the Trim unused tracks question)
     static const std::vector<Entry> entries { { "DeleteMixerTrack", TR_NOOP ("Delete mixer track"), TR_NOOP ("File/Data") },
+                                              { "TrimUnusedMixerTracks", TR_NOOP ("Trim unused mixer tracks"), TR_NOOP ("File/Data") },
                                               { "RecAutoSwitchExternalInput", TR_NOOP ("Auto switch to external input only"), TR_NOOP ("Audio") } };
     return entries;
 }

@@ -387,6 +387,131 @@ int removeUnusedTrailingInserts (Song& song, int keep)
     return removed;
 }
 
+namespace
+{
+// every slot of a chain, also inside containers and Patchers (read-only twin of forEachSlot)
+template <typename Fn>
+bool anySlot (const EffectSlot& slot, const Fn& fn)
+{
+    if (fn (slot))
+        return true;
+    for (const auto& branch : slot.branches)
+        for (const auto& child : branch.chain)
+            if (anySlot (child, fn))
+                return true;
+    for (const auto& node : slot.patcher.nodes)
+        if (! node.generator && anySlot (node.effect, fn))
+            return true;
+    return false;
+}
+
+// LYNX's stand-in for FL's plugin "side routing" (FUN_0127bcc0 with flag 2): a plugin of another insert or a channel
+// points at insert `t` (round 190jv)
+bool sideRoutedTo (const Song& song, int t)
+{
+    const auto pointsAt = [t] (const EffectSlot& slot) {
+        if (slot.sidechain == t || slot.sidechain2 == t)
+            return true;
+        for (int o = 0; o < maxSlotSends; ++o)
+            if (slotSendTarget (slot, o) == t)
+                return true;
+        return std::find (slot.patcher.outputTracks.begin(), slot.patcher.outputTracks.end(), t) != slot.patcher.outputTracks.end();
+    };
+    for (int x = 1; x < (int) song.mixer.size(); ++x)
+    {
+        if (x == t)
+            continue;
+        for (const auto& slot : song.mixer[(std::size_t) x].effects)
+            if (anySlot (slot, pointsAt))
+                return true;
+        for (const auto& tap : fruitySendsOf (song, x)) // (a hosted plugin's routed output pairs)
+            if (tap.target == t)
+                return true;
+    }
+    for (const auto& c : song.channels)
+    {
+        if (c.instrument == InstrumentKind::soundfont)
+            for (const auto p : { sf::pReverbTrack, sf::pChorusTrack })
+                if ((std::size_t) p < c.modelParams.size() && c.modelParams[(std::size_t) p] > 0.5f && (int) std::lround (c.modelParams[(std::size_t) p]) == t)
+                    return true;
+        if (c.instrument == InstrumentKind::voltage)
+            if (const auto vs = voltage::parse (c.pluginState))
+                if (std::find (vs->tracks.begin(), vs->tracks.end(), t) != vs->tracks.end())
+                    return true;
+        if (c.instrument == InstrumentKind::patcher) // its "To LYNX" outputs: an insert, or -1 = the k-th after its own
+        {
+            const auto& doc = c.patcher;
+            int outputs = (int) doc.outputTracks.size();
+            for (const auto& w : doc.wires)
+                if (w.kind == PatchWire::Kind::audio && w.to == patchToHost)
+                    outputs = std::max (outputs, w.toPort);
+            for (int k = 1; k <= outputs; ++k)
+            {
+                const auto set = k <= (int) doc.outputTracks.size() ? doc.outputTracks[(std::size_t) k - 1] : -1;
+                if ((set >= 0 ? set : std::min (std::max (0, c.mixerTrack) + k, maxMixerTracks - 1)) == t)
+                    return true;
+            }
+        }
+    }
+    return false;
+}
+} // namespace
+
+bool insertLinked (const Song& song, int t)
+{
+    if (! isInsert (song, t))
+        return true; // (the Master, or no such insert: never trimmed)
+    // FL: a channel's output, a Playlist audio track (LYNX: an instrument track's link too), a route in or out
+    if (std::any_of (song.channels.begin(), song.channels.end(), [t] (const ChannelDef& c) { return c.mixerTrack == t; }))
+        return true;
+    if (std::any_of (song.playlistTracks.begin(), song.playlistTracks.end(), [t] (const PlaylistTrack& p) { return p.mixerTrack == t; }))
+        return true;
+    if (std::any_of (song.mixer[(std::size_t) t].sends.begin(), song.mixer[(std::size_t) t].sends.end(),
+                     [&song, t] (const MixerSend& s) { return s.target > 0 && s.target != t && s.target < (int) song.mixer.size(); }))
+        return true;
+    for (int x = 1; x < (int) song.mixer.size(); ++x)
+        if (x != t && std::any_of (song.mixer[(std::size_t) x].sends.begin(), song.mixer[(std::size_t) x].sends.end(), [t] (const MixerSend& s) { return s.target == t; }))
+            return true;
+    return sideRoutedTo (song, t);
+}
+
+bool insertNonEmpty (const Song& song, int t)
+{
+    if (! isInsert (song, t))
+        return false;
+    const auto& m = song.mixer[(std::size_t) t];
+    return ! m.effects.empty() || (! m.name.empty() && m.name != "Insert " + std::to_string (t));
+}
+
+std::vector<int> unusedTracks (const Song& song, TrimUnused mode)
+{
+    // FL walks inserts 1…last (not the Master, not its "Current" track) and keeps those FUN_012a65c0 accepts
+    std::vector<int> out;
+    for (int t = 1; t < (int) song.mixer.size(); ++t)
+        if (! insertLinked (song, t) && (mode == TrimUnused::unlinkedAndNonEmpty || ! insertNonEmpty (song, t)))
+            out.push_back (t);
+    return out;
+}
+
+int trimTracks (Song& song, std::vector<int> tracks)
+{
+    std::sort (tracks.begin(), tracks.end());
+    tracks.erase (std::unique (tracks.begin(), tracks.end()), tracks.end());
+    int removed = 0;
+    for (auto it = tracks.rbegin(); it != tracks.rend(); ++it) // from the right: the numbers still to remove stay valid
+        if (deleteTrack (song, *it)) // (shifts every reference and appends a blank insert, which goes: the mixer shrinks)
+        {
+            song.mixer.pop_back();
+            ++removed;
+        }
+    return removed;
+}
+
+int trimUnusedTracks (Song& song, TrimUnused mode)
+{
+    return trimTracks (song, unusedTracks (song, mode));
+}
+
 bool deleteTrack (Song& song, int t)
 {
     const auto count = (int) song.mixer.size();

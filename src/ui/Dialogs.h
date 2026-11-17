@@ -61,8 +61,16 @@ struct FlMessage
     juce::String title, text;
     juce::StringArray buttons;
     bool rememberBox = false;
+    // round 190jv (REA FUN_009654f0, FL's flags 0x2000000 | 0x4000000): exclusive choices ticked like FL's checkboxes
+    // under the text, `option` ticked first ("Remove unused tracks": "Unlinked tracks only" | "Unlinked and non-empty
+    // tracks"); FL's MB_ICONEXCLAMATION boxes show the warning icon
+    juce::StringArray options;
+    int option = 0;
+    juce::MessageBoxIconType icon = juce::MessageBoxIconType::QuestionIcon;
 };
 void showFlMessage (const FlMessage& message, std::function<void (int, bool)> onChoice);
+// The same window with `options`: `onChoice(button, option)` gets the ticked choice (0, 1, ...).
+void showFlOptions (const FlMessage& message, std::function<void (int, int)> onChoice);
 std::unique_ptr<juce::AlertWindow> makeFlMessageDialog (const FlMessage& message);
 
 // FL's remembered message choices (Settings › General › Hints and warnings › "Manage messages", REA round 186c: the
