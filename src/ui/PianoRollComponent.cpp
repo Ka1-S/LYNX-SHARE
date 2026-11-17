@@ -1067,8 +1067,10 @@ void PianoRollComponent::paint (juce::Graphics& g)
             auto row = gridHighlights && isBlackKey (key) ? rowBlack : rowWhite;
             if (gridHighlights && autoRows) // FL's Automatic (round 190jv): the rows out of the guessed key dark; no guess, none
                 row = autoKey >= 0 && ! scaledetect::inScale (autoKey, key) ? rowBlack : rowWhite;
-            else if (gridHighlights && inScale (key))
-                row = row.interpolatedWith (info, 0.10f);
+            else if (gridHighlights && scaleIndex() > 0)
+                // a chosen scale as FL shades it (round 190kd, owner's decision; FL 2026 shot: the rows out of the scale
+                // take the black-key shade, the rows in it the white-key one, black keys or not)
+                row = inScale (key) ? rowWhite : rowBlack;
             if (key == hover.key && drag == Drag::none)
                 row = row.interpolatedWith (textPrimary, 0.04f); // the row under the mouse
             g.setColour (row);
@@ -1505,9 +1507,7 @@ void PianoRollComponent::paint (juce::Graphics& g)
         const auto keyColour = [&] (int key) {
             const auto black = isBlackKey (key) && ! list;
             const auto pressed = key == previewKey || isLit (key);
-            auto colour = black ? keyBlack : keyWhite;
-            if (inScale (key))
-                colour = colour.interpolatedWith (info, black ? 0.18f : 0.12f);
+            auto colour = black ? keyBlack : keyWhite; // (no scale tint on the keys: FL draws the piano as it is, round 190kd)
             if (key == hover.key && ! pressed)
                 colour = colour.interpolatedWith (accent, black ? 0.35f : 0.22f);
             return pressed ? accent : colour;
@@ -1570,7 +1570,8 @@ void PianoRollComponent::paint (juce::Graphics& g)
                 g.drawHorizontalLine (y + rowHeight - 1, 0.0f, (float) width);
             }
 
-            const auto isC = key % 12 == 0;
+            // the octave name on each C; with a chosen scale on each root, as FL labels it (round 190kd: "A3", "A4" in A minor)
+            const auto isC = key % 12 == (scaleIndex() > 0 && ! isAutoScale() ? scaleRoot() : 0);
 
             // every key named (LYNX, on by default: notenames::everyKey) once the rows are tall enough to read
             const auto everyKey = notenames::everyKey.load (std::memory_order_relaxed) && rowHeight >= 8;
