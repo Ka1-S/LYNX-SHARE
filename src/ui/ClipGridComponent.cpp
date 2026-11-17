@@ -1543,7 +1543,8 @@ public:
                 const auto fill = m.colour != 0 ? juce::Colour (m.colour) : lv::raised;
                 g.setColour (fill);
                 g.fillRect (box);
-                g.setColour (m.colour != 0 ? liveInk (fill) : lv::text);
+                // (Live: the name in colour x 0.24 on every return colour, also #7B7B7B's "B Delay", measured)
+                g.setColour (m.colour != 0 ? theme::liveShade (fill, 0.24f) : lv::text);
                 g.setFont (liveFont());
                 textcache::drawText (g, title, box.withTrimmedLeft (4), juce::Justification::centredLeft, true);
                 g.setColour (lv::surface);
