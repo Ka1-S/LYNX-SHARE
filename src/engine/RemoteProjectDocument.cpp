@@ -87,7 +87,7 @@ const DocumentFields& editableDocumentFields (DocumentShape shape)
         add (S::info, "url showOnOpen created workSeconds", S::readOnly);
         add (S::channel, "name instrument volume pan muted ghostHidden soloLock sample controllerState pluginState modelParams zones "
              "mixer maxPolyphony colour group swingMix arp cut keyRegion receiveFrom icon editorScale flWrapperFlags loopStarter uid "
-             "cutOthersOnly cutAtNoteEnd simplePad");
+             "cutOthersOnly cutAtNoteEnd simplePad engineRev"); // (engineRev: natives190kj, rollup step 6)
         add (S::channel, "freeze trackFreeze", S::readOnly); // (rendered stems: files LYNX wrote, and the live channel)
         add (S::channel, "plugin", S::plugin);
         add (S::channel, "flOrigin", S::origin);
@@ -122,7 +122,7 @@ const DocumentFields& editableDocumentFields (DocumentShape shape)
         add (S::mixer, "name volume pan muted solo soloSources threaded separator folded dock toMaster masterLevel colour stereo "
              "invertPhase swap input inputMono monitor recordSafe recordTo recordSource recordDryToo latencyMs latencyBypass "
              "compensateMaster icon output outputMode eq eqBypassed sends lostSends preSends chainBlend chainPreset "
-             "liveReturn returnPre returnSendsOn crossfade");
+             "liveReturn returnPre returnSendsOn crossfade smartControls"); // (smartControls: 190ke, rollup step 6)
         add (S::mixer, "effects", S::effect, true);
         add (S::mixer, "standIns", S::standIn, true);
         add (S::effect, "kind on params sendSpan mix smartDisable row sidechain sidechain2 sendTransient sendSustain state sample preset abOther abB "
