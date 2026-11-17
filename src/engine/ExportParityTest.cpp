@@ -952,21 +952,22 @@ juce::String AudioEngine::exportLiveSelfTest (const std::function<void (const ju
             if (! undone.l.empty() && ! first.l.empty())
                 undoneVsPlay = maxDiff (undone, first, fresh.l.size());
         }
-        // 9. Freeze of channel 4 (index 3; round 190jx): a stem made with a new instance first (sessionpack, no hold)
+        // 9. Freeze of the hosted channel (`hostedChannel`; round 190jx, the index made relative at rollup step 6: round 190jz's
+        // faded audio clip moved it from 3 to 4): a stem made with a new instance first (sessionpack, no hold)
         {
             const auto freshFolder = folder.getChildFile ("FrozenFresh");
             std::vector<StandIn> freshStems;
             juce::String error;
             Audio freshStem, heldStem;
-            if (! sessionpack::renderFreeze (live.getSong(), 3, ParityDevice::rate, freshFolder, freshStems, {}, error) || freshStems.empty())
+            if (! sessionpack::renderFreeze (live.getSong(), hostedChannel, ParityDevice::rate, freshFolder, freshStems, {}, error) || freshStems.empty())
                 errors.add (name + ", Freeze with a new instance: " + error);
             else
                 freshStem = readWav (juce::File (juce::String::fromUTF8 (freshStems.front().path.c_str())));
-            if (const auto e = freezeChannelNow (live, 3, {}, true); e.isNotEmpty())
+            if (const auto e = freezeChannelNow (live, hostedChannel, {}, true); e.isNotEmpty())
                 errors.add (name + ", Freeze: " + e);
             else
             {
-                const auto& f = live.getSong().channels[3].freeze;
+                const auto& f = live.getSong().channels[(std::size_t) hostedChannel].freeze;
                 if (! f.on() || f.stems.empty())
                     errors.add (name + ": Freeze left the channel unfrozen");
                 else
