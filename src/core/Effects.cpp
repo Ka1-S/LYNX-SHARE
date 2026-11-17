@@ -69,6 +69,8 @@
 #include <cmath>
 #include <complex>
 #include <cstdio>
+#include <cstdint>
+#include <type_traits>
 
 namespace lynx
 {
@@ -437,6 +439,64 @@ private:
 
 // ---------------------------------------------------------------------------
 
+// Round 190kg (perf): the basic Delay's glide over one chunk whose reads all lie before its writes — the same
+// operations per sample as Delay::process's own glide (the length steps toward the target and snaps within 0.001
+// sample; the line read between samples; the feedback low-pass), the two sides in one loop. Returns the samples it
+// glided (fewer than m when the glide lands). GCC's straight-line vectoriser paired the two sides into half-filled
+// vectors with more shuffles than work here, so it is off for this function (no effect on the results: the same
+// IEEE operations either way)
+#if defined(__GNUC__) && ! defined(__clang__)
+__attribute__ ((optimize ("no-tree-slp-vectorize")))
+#endif
+int delayGlideChunk (double& cur, double target, double glideK, const float* bufL, const float* bufR, std::size_t size,
+                     std::size_t at, int m, float dampCoeff, float& dampL, float& dampR, float* eL, float* eR) noexcept
+{
+    auto c = cur;
+    auto lpL = dampL, lpR = dampR;
+    int k = 0;
+    // flat: no position of the chunk wraps — its writes end before the line's end, and every read (≥ 1 sample after
+    // the line's start: the lengths are ≤ the larger of `c` and `target`) lies after the start; the read positions are
+    // then plain differences, the same ones the wrapping arithmetic gives
+    const auto longest = (std::size_t) (std::int64_t) std::max (c, target);
+    if (at + (std::size_t) m <= size && at >= longest + 1)
+    {
+        for (; k < m && c != target; ++k, ++at)
+        {
+            const auto diff = target - c;
+            c = std::abs (diff) < 0.001 ? target : c + diff * glideK;
+            const auto wholeSigned = (std::int64_t) c;
+            const auto frac = (float) (c - (double) wholeSigned);
+            const auto from = at - (std::size_t) wholeSigned;
+            const auto xL = bufL[from], xR = bufR[from];
+            lpL += dampCoeff * ((xL + (bufL[from - 1] - xL) * frac) - lpL);
+            lpR += dampCoeff * ((xR + (bufR[from - 1] - xR) * frac) - lpR);
+            eL[k] = lpL;
+            eR[k] = lpR;
+        }
+    }
+    else
+        for (; k < m && c != target; ++k)
+        {
+            const auto diff = target - c;
+            c = std::abs (diff) < 0.001 ? target : c + diff * glideK;
+            const auto wholeSigned = (std::int64_t) c; // (≥ 1 and < size)
+            const auto whole = (std::size_t) wholeSigned;
+            const auto frac = (float) (c - (double) wholeSigned);
+            const auto from = at >= whole ? at - whole : at + size - whole, before = from == 0 ? size - 1 : from - 1;
+            const auto xL = bufL[from], xR = bufR[from];
+            lpL += dampCoeff * ((xL + (bufL[before] - xL) * frac) - lpL);
+            lpR += dampCoeff * ((xR + (bufR[before] - xR) * frac) - lpR);
+            eL[k] = lpL;
+            eR[k] = lpR;
+            if (++at == size)
+                at = 0;
+        }
+    cur = c;
+    dampL = lpL;
+    dampR = lpR;
+    return k;
+}
+
 class Delay final : public Effect
 {
 public:
@@ -490,46 +550,146 @@ public:
         settled = true;
         lastIndex = index;
 
-        auto sample = [&] (int i, float echoL, float echoR) noexcept {
-            // 1-pole low-pass in the feedback path: repeats get darker
-            damp[0] += dampCoeff * (echoL - damp[0]);
-            damp[1] += dampCoeff * (echoR - damp[1]);
-            echoL = damp[0];
-            echoR = damp[1];
-
-            const auto inL = l[i], inR = r[i];
-
-            if (pingPong) // mono input on the left side, repeats alternate
-            {
-                buffer[0][write] = 0.5f * (inL + inR) + echoR * feedback;
-                buffer[1][write] = echoL * feedback;
-            }
-            else
-            {
-                buffer[0][write] = inL + echoL * feedback;
-                buffer[1][write] = inR + echoR * feedback;
-            }
-
-            l[i] = inL + mix * echoL;
-            r[i] = inR + mix * echoR;
-            write = (write + 1) % size;
+        // round 190kg (perf, bit for bit): the same arithmetic in the same order per sample, arranged for fewer
+        // instructions. The state lives in locals (the buffers' floats could alias the float members: every sample
+        // stored and reloaded them); positions wrap by a compare instead of a division; the glide's conversions are
+        // signed (the length is ≥ 1 and < 2^53: the same values, without the unsigned conversions' slow paths). And
+        // when the line is longer than a chunk, no sample of the chunk can read what the chunk writes, so the chunk
+        // runs in two passes: the echoes as the line holds them through the feedback low-pass (serial), then the line's
+        // writes and the outputs (independent per sample: vectorisable, still one IEEE operation each, in the same order)
+        float* const bufL = buffer[0].data();
+        float* const bufR = buffer[1].data();
+        auto w = write;
+        auto dampL = damp[0], dampR = damp[1];
+        auto cur = current;
+        const auto steadyPos = [&] (std::size_t at) noexcept { return (at + size - delaySamples) % size; };
+        // one glide step, then the echo read between samples at write position `at`
+        const auto glideRead = [&] (std::size_t at0, float& echoL, float& echoR) noexcept {
+            const auto diff = target - cur;
+            cur = std::abs (diff) < 0.001 ? target : cur + diff * glideK;
+            const auto wholeSigned = (std::int64_t) cur; // (≥ 1 and < size)
+            const auto whole = (std::size_t) wholeSigned;
+            const auto frac = (float) (cur - (double) wholeSigned);
+            const auto at = at0 >= whole ? at0 - whole : at0 + size - whole, before = at == 0 ? size - 1 : at - 1;
+            echoL = bufL[at] + (bufL[before] - bufL[at]) * frac;
+            echoR = bufR[at] + (bufR[before] - bufR[at]) * frac;
         };
+        const auto run = [&] (auto pingPongOn) noexcept {
+            constexpr bool pp = decltype (pingPongOn)::value;
+            // one sample as before round 190kg's passes (the chunks a short line could read back)
+            const auto sample = [&] (int i, float echoL, float echoR) noexcept {
+                // 1-pole low-pass in the feedback path: repeats get darker
+                dampL += dampCoeff * (echoL - dampL);
+                dampR += dampCoeff * (echoR - dampR);
+                echoL = dampL;
+                echoR = dampR;
 
-        int i = 0;
-        for (; i < n && current != target; ++i) // gliding toward the new tempo's length
-        {
-            const auto diff = target - current;
-            current = std::abs (diff) < 0.001 ? target : current + diff * glideK;
-            const auto whole = (std::size_t) current; // (≥ 1 and < size)
-            const auto frac = (float) (current - (double) whole);
-            const auto at = write >= whole ? write - whole : write + size - whole, before = at == 0 ? size - 1 : at - 1;
-            sample (i, buffer[0][at] + (buffer[0][before] - buffer[0][at]) * frac, buffer[1][at] + (buffer[1][before] - buffer[1][at]) * frac);
-        }
-        for (; i < n; ++i) // the steady length: whole samples, bit for bit as before
-        {
-            const auto readPos = (write + size - delaySamples) % size;
-            sample (i, buffer[0][readPos], buffer[1][readPos]);
-        }
+                const auto inL = l[i], inR = r[i];
+
+                if constexpr (pp) // mono input on the left side, repeats alternate
+                {
+                    bufL[w] = 0.5f * (inL + inR) + echoR * feedback;
+                    bufR[w] = echoL * feedback;
+                }
+                else
+                {
+                    bufL[w] = inL + echoL * feedback;
+                    bufR[w] = inR + echoR * feedback;
+                }
+
+                l[i] = inL + mix * echoL;
+                r[i] = inR + mix * echoR;
+                if (++w == size)
+                    w = 0;
+            };
+            constexpr int chunk = 64;
+            float eL[chunk], eR[chunk];
+            for (int i = 0; i < n;)
+            {
+                const int m = std::min (chunk, n - i);
+                // (the glide moves monotonically between `cur` and `target`: every length read in the chunk is ≥ the
+                // smaller one's whole part)
+                if (std::min (cur, target) <= (double) (m + 1))
+                {
+                    for (const int end = i + m; i < end; ++i)
+                    {
+                        float echoL, echoR;
+                        if (cur != target) // gliding toward the new tempo's length
+                            glideRead (w, echoL, echoR);
+                        else // the steady length: whole samples, bit for bit as before
+                        {
+                            const auto readPos = steadyPos (w);
+                            echoL = bufL[readPos];
+                            echoR = bufR[readPos];
+                        }
+                        sample (i, echoL, echoR);
+                    }
+                    continue;
+                }
+                // 1. the echoes through the feedback path's low-pass: read between samples while the glide moves
+                // (nothing the chunk writes is read: every length is > m), then whole samples at the steady length
+                const int g = cur != target ? delayGlideChunk (cur, target, glideK, bufL, bufR, size, w, m, dampCoeff, dampL, dampR, eL, eR) : 0;
+                if (g < m) // (one loop per side: no shuffles between them)
+                {
+                    auto at = w + (std::size_t) g;
+                    if (at >= size)
+                        at -= size;
+                    const auto from = steadyPos (at);
+                    const auto steady = [&] (const float* line, float& lp, float* e) noexcept {
+                        auto readPos = from;
+                        for (int k = g; k < m; ++k)
+                        {
+                            lp += dampCoeff * (line[readPos] - lp);
+                            e[k] = lp;
+                            if (++readPos == size)
+                                readPos = 0;
+                        }
+                    };
+                    steady (bufL, dampL, eL);
+                    steady (bufR, dampR, eR);
+                }
+                // 2. the line's writes and the outputs, in runs up to the line's end
+                for (int done = 0; done < m;)
+                {
+                    const int seg = (int) std::min<std::size_t> ((std::size_t) (m - done), size - w);
+                    float* const outL = l + i + done;
+                    float* const outR = r + i + done;
+                    float* const lineL = bufL + w;
+                    float* const lineR = bufR + w;
+                    const float* const echoL = eL + done;
+                    const float* const echoR = eR + done;
+                    for (int k = 0; k < seg; ++k)
+                    {
+                        const auto inL = outL[k], inR = outR[k];
+                        if constexpr (pp)
+                        {
+                            lineL[k] = 0.5f * (inL + inR) + echoR[k] * feedback;
+                            lineR[k] = echoL[k] * feedback;
+                        }
+                        else
+                        {
+                            lineL[k] = inL + echoL[k] * feedback;
+                            lineR[k] = inR + echoR[k] * feedback;
+                        }
+                        outL[k] = inL + mix * echoL[k];
+                        outR[k] = inR + mix * echoR[k];
+                    }
+                    done += seg;
+                    w += (std::size_t) seg;
+                    if (w == size)
+                        w = 0;
+                }
+                i += m;
+            }
+        };
+        if (pingPong)
+            run (std::true_type {});
+        else
+            run (std::false_type {});
+        current = cur;
+        write = w;
+        damp[0] = dampL;
+        damp[1] = dampR;
     }
 
 private:

@@ -864,6 +864,7 @@ struct Engine::Impl
         const auto onsetLevel = (float) s.onsetLevel, onsetFeed = (float) std::clamp (s.onsetFeed, 0.0, 1.0);
         const auto onsetFront = (float) std::clamp (s.onsetFront, 0.0, 1.0);
         const auto onsetOn = onsetLevel != 0.0f || onsetFeed != 0.0f;
+        const auto splitShare = 0.5f * (1.0f - onsetFeed); // (revision 1's build groups, below)
         if (onsetOn)
             for (int k = 0; k < onsetSteps; ++k)
                 for (int j = 0; j < onsetChans; ++j)
@@ -912,9 +913,25 @@ struct Engine::Impl
                     // into every line: one fixed random-sign FIR left its ripple (±3 … 4 dB, 50 … 200 Hz wide) on the
                     // whole tail; four independent ones average it out (a steady sine meets the tail's mean gain)
                     dif[c].write (v);
+                    // (round 190kg, perf: the four groups' sums in registers, each still added in the taps' order — the
+                    // indexed array went through memory at every tap)
+                    static_assert (buildTaps % 4 == 0);
+                    const auto tap = [&] (int k) noexcept { return bW[c][k] * (bD[c][k] == 0 ? v : dif[c].read (bD[c][k])); };
                     float g4[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-                    for (int k = 0; k < buildTaps; ++k)
-                        g4[k & 3] += bW[c][k] * (bD[c][k] == 0 ? v : dif[c].read (bD[c][k]));
+                    {
+                        float g0 = 0.0f, g1 = 0.0f, g2 = 0.0f, g3 = 0.0f;
+                        for (int k = 0; k < buildTaps; k += 4)
+                        {
+                            g0 += tap (k);
+                            g1 += tap (k + 1);
+                            g2 += tap (k + 2);
+                            g3 += tap (k + 3);
+                        }
+                        g4[0] = g0;
+                        g4[1] = g1;
+                        g4[2] = g2;
+                        g4[3] = g3;
+                    }
                     // below ~600 Hz the groups go on as one sum (the build's low band as before: there the few modes
                     // of the tank, not the taps, set the tone, and music read them as before); above, apart
                     float low = 0.0f;
@@ -936,6 +953,18 @@ struct Engine::Impl
                 }
                 d[c] = v;
             }
+            // revision 1's build groups into the lines of each half: a 4-point Hadamard (signs per line as below), × the
+            // build's share (round 190kg, perf: once per sample here instead of inside the line loop; the same operations)
+            float splitIn[2][4];
+            if (build && split)
+                for (int c = 0; c < 2; ++c)
+                {
+                    const auto* q = dg[c];
+                    splitIn[c][0] = splitShare * (q[0] + q[1] + q[2] + q[3]);
+                    splitIn[c][1] = splitShare * (q[0] + (-q[1]) + q[2] + (-q[3]));
+                    splitIn[c][2] = splitShare * (q[0] + q[1] + (-q[2]) + (-q[3]));
+                    splitIn[c][3] = splitShare * (q[0] + (-q[1]) + (-q[2]) + q[3]);
+                }
             eModPhase += eModInc;
             if (eModPhase > 2.0 * pi)
                 eModPhase -= 2.0 * pi;
@@ -1080,11 +1109,8 @@ struct Engine::Impl
                 const auto alt = (i & 1) == 0 ? 0.5f : -0.5f;
                 if (build && split)
                 {
-                    const auto hb = 0.5f * (1.0f - onsetFeed);
-                    const auto hl = dg[0][0] + (i & 1 ? -dg[0][1] : dg[0][1]) + (i & 2 ? -dg[0][2] : dg[0][2]) + ((i == 1 || i == 2) ? -dg[0][3] : dg[0][3]);
-                    const auto hr = dg[1][0] + (i & 1 ? -dg[1][1] : dg[1][1]) + (i & 2 ? -dg[1][2] : dg[1][2]) + ((i == 1 || i == 2) ? -dg[1][3] : dg[1][3]);
-                    lines[i].write (u + alt * in[0] + hb * hl);
-                    lines[i + 4].write (w + alt * in[1] + hb * hr);
+                    lines[i].write (u + alt * in[0] + splitIn[0][i]);
+                    lines[i + 4].write (w + alt * in[1] + splitIn[1][i]);
                 }
                 else
                 {
