@@ -12117,7 +12117,7 @@ private:
                          << perS (p.spinFound - a.spinFound) << ", parked " << perS (p.spinParked - a.spinParked) << ", timed out "
                          << perS (p.spinTimedOut - a.spinTimedOut) << "), sleeps " << perS (p.sleeps - a.sleeps) << "/s (early "
                          << perS (p.earlyWakes - a.earlyWakes) << "); waits " << msS (p.waitNs - a.waitNs) << " ms/s (" << perS (p.waits - a.waits)
-                         << "/s, yields " << perS (p.waitYields - a.waitYields) << ", sleeps " << perS (p.waitSleeps - a.waitSleeps)
+                         << "/s, yields " << perS (p.waitYields - a.waitYields) << ", sleeps " << perS (p.waitSleeps - a.waitSleeps) << " = " << msS (p.waitSleepNs - a.waitSleepNs) << " ms/s"
                          << "); caller wait " << msS (p.callerWaitNs - a.callerWaitNs) << " ms/s (sleeps " << perS (p.callerSleeps - a.callerSleeps) << "/s)\n";
                 }
                 {

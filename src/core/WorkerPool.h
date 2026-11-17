@@ -116,7 +116,7 @@ public:
         std::uint64_t workNs = 0;                          // workers inside work() (the indices they ran + their waits)
         std::uint64_t spinNs = 0, spins = 0;               // workers polling for the next round after finishing
         std::uint64_t spinFound = 0, spinParked = 0, spinTimedOut = 0, sleeps = 0, earlyWakes = 0;
-        std::uint64_t waitNs = 0, waits = 0, waitYields = 0, waitSleeps = 0; // await(): every thread of the round
+        std::uint64_t waitNs = 0, waits = 0, waitYields = 0, waitSleeps = 0, waitSleepNs = 0; // await(): every thread (waitNs includes the sleeps)
         std::uint64_t callerWaitNs = 0, callerSleeps = 0;  // the caller waiting for the round's last index
     };
     Stats stats() const noexcept;
@@ -156,7 +156,7 @@ private:
     struct alignas (64) Lane
     {
         std::atomic<std::uint64_t> workNs { 0 }, spinNs { 0 }, spins { 0 }, spinFound { 0 }, spinParked { 0 }, spinTimedOut { 0 },
-            sleeps { 0 }, earlyWakes { 0 }, waitNs { 0 }, waits { 0 }, waitYields { 0 }, waitSleeps { 0 }, callerWaitNs { 0 }, callerSleeps { 0 };
+            sleeps { 0 }, earlyWakes { 0 }, waitNs { 0 }, waits { 0 }, waitYields { 0 }, waitSleeps { 0 }, waitSleepNs { 0 }, callerWaitNs { 0 }, callerSleeps { 0 };
         std::atomic<int> sleepKey { -1 }; // the await() key this thread sleeps on (-1: none, or a notify took it)
         OsSemaphore sleep;
     };

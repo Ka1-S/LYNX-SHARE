@@ -206,6 +206,7 @@ WorkerPool::Stats WorkerPool::stats() const noexcept
         s.waits += r (l.waits);
         s.waitYields += r (l.waitYields);
         s.waitSleeps += r (l.waitSleeps);
+        s.waitSleepNs += r (l.waitSleepNs);
         s.callerWaitNs += r (l.callerWaitNs);
         s.callerSleeps += r (l.callerSleeps);
     }
@@ -226,7 +227,7 @@ void WorkerPool::awaitSlow (int key, void* ready, ReadyFn fn) noexcept
     const auto mode = lane != nullptr ? t.waitMode.load (std::memory_order_relaxed) : 0;
     const auto spinFor = std::chrono::microseconds (t.waitSpinMicros.load (std::memory_order_relaxed));
     const auto start = clock::now();
-    std::uint64_t yields = 0, sleeps = 0;
+    std::uint64_t yields = 0, sleeps = 0, sleptNs = 0;
 
     for (int spins = 0; ! fn (ready); ++spins)
     {
@@ -254,9 +255,11 @@ void WorkerPool::awaitSlow (int key, void* ready, ReadyFn fn) noexcept
             waitSleepers.fetch_sub (1, std::memory_order_seq_cst);
             break;
         }
+        const auto asleep = clock::now();
         lane->sleep.acquire();
         waitSleepers.fetch_sub (1, std::memory_order_seq_cst);
         ++sleeps;
+        sleptNs += (std::uint64_t) std::chrono::duration_cast<std::chrono::nanoseconds> (clock::now() - asleep).count();
         spins = 0; // (woken: the result is there; should it not be, spin and sleep again)
     }
 
@@ -266,6 +269,7 @@ void WorkerPool::awaitSlow (int key, void* ready, ReadyFn fn) noexcept
         bump (lane->waits, 1);
         bump (lane->waitYields, yields);
         bump (lane->waitSleeps, sleeps);
+        bump (lane->waitSleepNs, sleptNs);
     }
 }
 
