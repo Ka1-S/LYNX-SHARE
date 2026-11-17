@@ -45,6 +45,13 @@
 //   Grain Delay                    → Echoform (Pitch mode)
 //   Auto Filter's other types      → notch (Facet EQ), Morph at its four corners, DJ as a low / high pass; Drive as an Ember
 //                                    stage in a rack in front of the filter
+// Lot 5 (round 190kk, AlsDevicesLot5.cpp), each fitted to Live 12.4's own renders:
+//   Erosion (both generations)     → Corrode (LYNX's own engine)
+//   Corpus                         → Soundboard (LYNX's own engine)
+//   Vinyl Distortion               → Platter (LYNX's own engine)
+//   Looper                         → an empty Edison (the slot recorder) or, when Live's empty Looper is silent, a muted Utility
+//   MIDI Effect Rack               → its chains, zones and macro values written into the notes (or, one plain chain, its
+//                                    devices one by one as on the track)
 
 #include <array>
 #include <functional>
@@ -198,6 +205,9 @@ struct Context
     // is on this machine, "" = not there (empty function = no lookup: the convolution half is listed)
     std::function<std::string (const xml::Element& sampleRef)> findFile;
     bool drumBussRack = false; // (round 190fk) true: Drum Buss as round 190ek's rack (the A/B harness, its tests); else Anvil Bus
+    // (round 190kk) the macro values (0…127) of the rack the device sits in: a parameter mapped onto one of them takes the
+    // macro's value through its mapping (liveValue); nullptr = not in a rack
+    const std::array<double, 16>* macros = nullptr;
 };
 // One Live parameter that drives one LYNX parameter: `live` is the parameter's element path inside the device
 // ("Feedback", "Lfo/Frequency"), `value` turns Live's own unit into LYNX's 0..1. Automation envelopes and rack macro
@@ -312,19 +322,44 @@ struct NoteEdit
     float velocity = 0.78f; // 0..1
     double lengthBeats = 0.25;
 };
+struct NoteRackChain; // (round 190kk)
 struct NoteEffect
 {
-    enum class Kind { transpose, velocity, chord, length };
+    enum class Kind { transpose, velocity, chord, length, rack };
     Kind kind = Kind::transpose;
     std::string name;                 // "Pitch", "Velocity", …: for the report
     int semitones = 0;                // transpose
     int lowest = 1, range = 127, outLow = 1, outHigh = 127, mode = 0; // velocity (0 clip, 1 gate, 2 fixed)
     std::vector<std::pair<int, float>> chord; // semitones, velocity factor
     double lengthBeats = 0.0;         // length
+    // (round 190kk) a MIDI Effect Rack: every chain whose key / velocity / chain-select zones take the note plays it
+    // through its own effects (the zones' fades scale the velocity, core/Rack.h zoneVelocity); the chains' notes are
+    // summed (the same key from two chains at once plays once, at the louder velocity [ASSUMED])
+    std::vector<NoteRackChain> chains;
+    float selector = 0.0f;            // the rack's chain selector, 0…127
+};
+struct NoteRackChain
+{
+    RackZone key, velocity { 1, 127, 1, 127 }, select { 0, 0, 0, 0 };
+    bool active = true;
+    std::vector<NoteEffect> effects;
 };
 std::vector<NoteEdit> applyNoteEffect (const NoteEffect& effect, const NoteEdit& note);
 // nullopt: not one of those devices, or a setting that cannot be written into notes (then it stays "unsupported")
 std::optional<NoteEffect> noteEffectFromLiveDevice (const xml::Element& device, const Context& context, Notes& notes);
+// (round 190kk) A MIDI Effect Rack (MidiEffectGroupDevice) as one note effect: its chains, zones, chain selector and the
+// macro values on the parameters they are mapped to (each mapping linear over its MidiControllerRange [DATA], checked
+// in Live 12.4 for Pitch). Devices switched off pass their notes. nullopt: a device inside that cannot be written into
+// notes (`unsupported` names it: Arpeggiator in a split rack, Scale, Random, Note Echo, Max devices …).
+std::optional<NoteEffect> midiRackNotes (const xml::Element& rack, const Context& context, Notes& notes, std::string& unsupported);
+// A Live parameter's value for a translation: its Manual value, or — when it is mapped onto a macro of the rack the
+// context names — that macro's value through the mapping's range
+double liveValue (const xml::Element& device, const std::string& name, double fallback, const Context& context);
+// (round 190kk) true when the rack holds one active chain over every key, velocity and selector value (its devices then
+// act exactly as if they stood on the track: the importer takes them one by one, Arpeggiator included)
+bool midiRackIsPlain (const xml::Element& rack);
+// The rack's 16 macro values (0…127)
+std::array<double, 16> rackMacroValues (const xml::Element& rack);
 
 // ---- one entry point for the importer ---------------------------------------------------------------------------
 struct Translated
@@ -352,6 +387,17 @@ struct Translated
     };
     std::optional<Modulator> modulator;
 };
+// ================================================================================================ lot 5 (190kk)
+// Erosion (Live 12's and the legacy one) → Corrode, LYNX's degrader (core/Corrode.h has the measured laws). Legacy Mode 0 /
+// 1 / 2 = noise / wide noise / sine [MEASURED]; the legacy Amplitude onto Corrode's Amount through the measured depths.
+bool erosionToCorrode (const xml::Element& device, Translated& out);
+// Corpus → Soundboard, LYNX's resonant body (core/Soundboard.h has the measured laws)
+bool corpusToSoundboard (const xml::Element& device, Translated& out);
+// Vinyl Distortion → Platter, LYNX's record-wear effect (core/Platter.h has the measured laws)
+bool vinylToPlatter (const xml::Element& device, Translated& out);
+// Looper → an empty Edison slot (Monitor 0 / 3: the input passes) or a muted Utility (Monitor 1 / 2) [MEASURED]
+bool looperToSlot (const xml::Element& device, Translated& out);
+
 // nullopt: not one of the devices above, or its element lacks the parameters (then the importer does what it did
 // before: the device is dropped and listed)
 std::optional<Translated> effectFromLiveDevice (const xml::Element& device, const Context& context = {});

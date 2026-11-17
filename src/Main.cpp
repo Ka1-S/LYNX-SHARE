@@ -2679,6 +2679,16 @@ public:
             return;
         }
 
+        if (args.contains ("--livedevshot190kk"))
+        {
+            // LYNX.exe --livedevshot190kk prefix: round 190kk off-screen, in the Clip-launch layout: a track whose insert holds
+            // what Live's Erosion, Vinyl Distortion and Corpus (Core Library presets) import onto — Corrode, Platter,
+            // Soundboard — on the Device View as ordinary effect cards. Writes prefix-devices.png and prefix-checks.txt.
+            runLiveDevShot190kk (args[args.indexOf ("--livedevshot190kk") + 1].unquoted());
+            quit();
+            return;
+        }
+
         if (args.contains ("--liverackshot190hr"))
         {
             // LYNX.exe --liverackshot190hr prefix: round 190hr off-screen, in the Ableton-style layout: the Device View's
@@ -29147,6 +29157,93 @@ private:
         else
             checks << "no detail view\n";
         lynx::shot::file (juce::File (prefix + "-checks.txt")).replaceWithText (checks);
+    }
+
+    // round 190kk: Live's Erosion / Vinyl Distortion / Corpus imported, their LYNX engines on the Device View
+    void runLiveDevShot190kk (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        lynx::MainComponent ui (offline, false);
+        const auto size = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_SNAPSHOT_SIZE", "1600x900"), "x", "");
+        ui.setSize (juce::jlimit (800, 3840, size[0].getIntValue()), juce::jlimit (450, 2160, size[1].getIntValue()));
+        const auto par = [] (const char* name, double v) { return juce::String ("<") + name + "><Manual Value=\"" + juce::String (v) + "\" /></" + name + ">"; };
+        // the Core Library presets' values (Erosion "Fizzle", Vinyl Distortion "Crack" with Tracing on, Corpus "Pipe Resonator" closed)
+        const juce::String erosion = "<Erosion2 Id=\"1\"><On><Manual Value=\"true\" /></On>" + par ("Amount", 0.9) + par ("Frequency", 16000) +
+                                     par ("FilterWidth", 1.734) + par ("NoiseBlend", 1) + par ("StereoWidth", 1) + "</Erosion2>";
+        const juce::String vinyl = "<Vinyl Id=\"1\"><On><Manual Value=\"true\" /></On><Band1On><Manual Value=\"true\" /></Band1On>" + par ("Gain1", 0.5) +
+                                   par ("BandFreq1", 7500) + par ("BandQ1", 3) + "<Band2On><Manual Value=\"false\" /></Band2On>" + par ("Gain2", 0.35) +
+                                   par ("BandFreq2", 5366) + par ("BandQ2", 0.32) + par ("Drive", 1) + par ("SoftHard", 0) + par ("NormalMono", 0) +
+                                   par ("CracleDensity", 50) + par ("CracleVolume", 1) + "</Vinyl>";
+        juce::String corpus = "<Corpus Id=\"1\"><On><Manual Value=\"true\" /></On><FilterOn><Manual Value=\"false\" /></FilterOn>";
+        for (const auto& [k, v] : std::initializer_list<std::pair<const char*, double>> { { "ResonanceType", 5 }, { "ResonatorQuality", 3 },
+                 { "Frequency", 0.4603 }, { "Decay", 0.6032 }, { "FreqDamping", 0 }, { "AmpFreq", 0 }, { "Inharmonics", 0 }, { "Radius", 0.8642 },
+                 { "TubeOpening", 1 }, { "Ratio", 0.5 }, { "ExcitationX", 0.5 }, { "ListeningXL", 0.1 }, { "ListeningXR", 0.9 }, { "Detune", 0.047 },
+                 { "Drive", 0.405 }, { "Bleed", 0 }, { "DryWet", 0.696 }, { "StereoWidth", 1 }, { "FilterMidFreq", 1000 }, { "FilterBandWidth", 4 } })
+            corpus += par (k, v);
+        corpus += "</Corpus>";
+        std::vector<lynx::EffectSlot> slots;
+        juce::String checks;
+        for (const auto& text : { erosion, vinyl, corpus })
+        {
+            lynx::xml::Document doc;
+            doc.parse (text.toStdString());
+            if (const auto t = lynx::alsdev::effectFromLiveDevice (doc.root()))
+            {
+                slots.push_back (t->slot);
+                checks << t->from << " -> " << t->to << "\n";
+            }
+            else
+                checks << "NOT TRANSLATED\n";
+        }
+        offline.editSong ([&slots] (lynx::Song& s) {
+            if (s.channels.empty())
+                s.channels.resize (1);
+            s.channels[0].name = "Drums";
+            s.channels[0].mixerTrack = 2;
+            if (s.mixer.size() < 3)
+                s.mixer.resize (3);
+            s.mixer[2].name = "Drums";
+            s.mixer[2].effects = slots;
+            while (s.patterns.empty())
+                s.patterns.emplace_back();
+            s.patterns[0].name = "Beat";
+            s.patterns[0].notes.clear();
+            for (int n = 0; n < 4; ++n)
+            {
+                lynx::Note note;
+                note.channel = 0;
+                note.start = n * lynx::ppq;
+                note.key = 36;
+                s.patterns[0].notes.push_back (note);
+            }
+            s.patterns[0].lengthTicks = 4 * lynx::ppq;
+            s.playlistTracks.resize (std::max<std::size_t> (s.playlistTracks.size(), 2));
+            s.playlistTracks[1].name = "Drums";
+        }, false);
+        offline.dispatchPendingMessages();
+        ui.setVisible (true);
+        lynx::DetailView::shownSetting = lynx::DetailView::devicesPage = true;
+        ui.selectTabForSnapshot (2);
+        ui.setClipLaunchWorkflow (true);
+        offline.editSong ([] (lynx::Song& s) {
+            lynx::Clip clip;
+            clip.pattern = 0;
+            clip.length = 4 * lynx::ppq;
+            lynx::launcher::setClip (s, 1, 0, clip);
+        }, false);
+        offline.dispatchPendingMessages();
+        if (auto* detail = ui.getDetailViewForSnapshot())
+        {
+            detail->showSelection (1, 0);
+            detail->setPage (lynx::DetailView::Page::devices);
+            const auto file = lynx::shot::file (juce::File (prefix + "-devices.png"));
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (lynx::shot::snapshot (ui), out);
+            checks << "cards " << detail->cardCountForCheck() << ", insert " << detail->chainInsertForCheck() << "\n";
+        }
+        juce::File (prefix + "-checks.txt").replaceWithText (checks);
     }
 
     void runDetailShot (const juce::String& prefix)

@@ -833,6 +833,34 @@ std::optional<Translated> effectFromLiveDevice (const Element& device, const Con
         t.approximate = true;
         ok = grainDelayToEchoform (device, context, t);
     }
+    // ---- lot 5 (round 190kk) ----
+    else if (tag == "Erosion" || tag == "Erosion2")
+    {
+        t.from = "Erosion";
+        t.to = "Corrode";
+        t.approximate = true;
+        ok = erosionToCorrode (device, t);
+    }
+    else if (tag == "Vinyl")
+    {
+        t.from = "Vinyl Distortion";
+        t.to = "Platter";
+        t.approximate = true;
+        ok = vinylToPlatter (device, t);
+    }
+    else if (tag == "Corpus")
+    {
+        t.from = "Corpus";
+        t.to = "Soundboard";
+        t.approximate = true;
+        ok = corpusToSoundboard (device, t);
+    }
+    else if (tag == "Looper")
+    {
+        t.from = "Looper";
+        t.to = "Edison";
+        ok = looperToSlot (device, t);
+    }
     if (! ok)
         return std::nullopt;
     t.slot.enabled = device.boolean ("On/Manual", true);
