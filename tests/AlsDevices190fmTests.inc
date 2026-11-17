@@ -399,8 +399,8 @@ TEST (als190fm_roar_becomes_a_rack)
                                                                par ("Input_Blend", 0.25) + par ("Output_DryWet", 1.0) + par ("Output_CompressionAmount", 0.0) +
                                                                "<ModulationMatrix_Stage1Amount_Env Value=\"0.5\" />"));
     const auto* pr = p ? als190fm::rackOf (*p) : nullptr;
-    CHECK (pr != nullptr && pr->chains.size() == 1 && pr->chains[0].nodes.size() == 1);
-    if (pr != nullptr && pr->chains[0].nodes.size() == 1)
+    CHECK (pr != nullptr && pr->chains.size() == 1 && pr->chains[0].nodes.size() == 2); // (round qafix190kq: the inner rack, then the output Utility with Live's measured neutral gain)
+    if (pr != nullptr && pr->chains[0].nodes.size() == 2)
     {
         const auto& node = als190fm::nodeOf (p->slot.patcher, *pr, 0, 0);
         const auto* inner = rack::rackOf (node.patcher);
@@ -417,7 +417,7 @@ TEST (als190fm_roar_becomes_a_rack)
     const auto mb = als190fm::translate (als190fm::roar (3, par ("Input_LowMidCrossover", 200.0) + par ("Input_MidHighCrossover", 2000.0) + par ("Output_DryWet", 1.0) +
                                                                 par ("Stage3_Shaper_Type", 10)));
     const auto* mr = mb ? als190fm::rackOf (*mb) : nullptr;
-    if (mr != nullptr && mr->chains[0].nodes.size() == 1)
+    if (mr != nullptr && mr->chains[0].nodes.size() == 2)
     {
         const auto& node = als190fm::nodeOf (mb->slot.patcher, *mr, 0, 0);
         const auto* inner = rack::rackOf (node.patcher);
@@ -437,7 +437,7 @@ TEST (als190fm_roar_becomes_a_rack)
     const auto ms = als190fm::translate (als190fm::roar (4, par ("Stage1_Shaper_Amount", 0.0) + par ("Stage2_Shaper_Amount", 0.0) + flag ("Stage1_Filter_On", false) +
                                                                 flag ("Stage2_Filter_On", false) + par ("Output_DryWet", 1.0)));
     CHECK (ms.has_value() && ms && als190fm::rackOf (*ms) != nullptr);
-    if (const auto* mr2 = ms ? als190fm::rackOf (*ms) : nullptr; mr2 != nullptr && mr2->chains[0].nodes.size() == 1)
+    if (const auto* mr2 = ms ? als190fm::rackOf (*ms) : nullptr; mr2 != nullptr && mr2->chains[0].nodes.size() == 2)
     {
         const auto& node = als190fm::nodeOf (ms->slot.patcher, *mr2, 0, 0);
         const auto* inner = rack::rackOf (node.patcher);
