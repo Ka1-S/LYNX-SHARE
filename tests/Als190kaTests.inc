@@ -112,7 +112,7 @@ TEST (als190ka_automated_send_at_minus_inf_has_a_route)
     als190ka::Track t;
     t.sends = { 0.000316 }; // −inf
     t.envelopes = envelope ("110", fe (-63072000, 0.000316) + fe (0, 0.000316) + fe (8, 1.0) + fe (8, 1.0) + fe (12, 0.000316));
-    als190ka::Track quiet; // a send at −inf without an envelope still makes no route
+    als190ka::Track quiet; // a send at −inf without an envelope: since round 190kc (rollup 0.1.30 step 6) a send at 0 too
     lynx::FlpImportReport report;
     const auto s = load (set ({ t, quiet }), &report);
     CHECK (s.has_value());
@@ -120,7 +120,7 @@ TEST (als190ka_automated_send_at_minus_inf_has_a_route)
         return;
     const auto ret = (int) s->mixer.size() - 1; // the return is the last insert
     CHECK (s->routes (1, ret));
-    CHECK (! s->routes (2, ret));
+    CHECK (s->routes (2, ret)); // (190kc, its owner decision 1: an enabled send at −inf stays a send at 0, as Live's knob is there)
     bool zero = false;
     for (const auto& send : s->mixer[1].sends)
         zero = zero || (send.target == ret && send.level == 0.0f);

@@ -275,7 +275,7 @@ TEST (rollup030_loop_browser_lists_lynx_content)
 {
     using namespace lynx;
     const auto all = factoryloops::loops();
-    int beats = 0, sounds = 0, trapBeats = 0, bassSounds = 0;
+    int beats = 0, sounds = 0, trapBeats = 0, trapWord = 0, bassSounds = 0;
     for (const auto& info : all)
     {
         const auto* item = factoryloops::itemOf (info.path);
@@ -287,6 +287,7 @@ TEST (rollup030_loop_browser_lists_lynx_content)
         if (item->kind == factorycontent::Kind::beat)
         {
             ++beats;
+            trapWord += info.keywords.count ("trap") != 0 ? 1 : 0; // (the Trap keyword also takes "drill")
             CHECK (info.type == loopkeys::pattern);
             CHECK (info.tempo >= 60.0 && info.tempo <= 200.0);
             CHECK (info.scale == loopkeys::Scale::neither);
@@ -315,7 +316,7 @@ TEST (rollup030_loop_browser_lists_lynx_content)
     int passed = 0;
     for (const auto& info : all)
         passed += loopkeys::matches (info, f, false) ? 1 : 0;
-    CHECK (passed == trapBeats);
+    CHECK (passed == trapWord && trapWord >= trapBeats);
     CHECK (factoryloops::itemOf ("/home/user/Samples/Trap beat 1.wav") == nullptr);
     CHECK (factoryloops::itemOf (collections::pluginItem ("some.vst3")) == nullptr);
 }
