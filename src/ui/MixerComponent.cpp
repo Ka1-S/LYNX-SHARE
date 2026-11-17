@@ -2353,7 +2353,7 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
 
     // FL's mute switch (manual "Mixer › Mute Switch", round 190kn): Ctrl+right-click = Unmute All, Alt+click = solo the
     // track with every track routed to and from it, Shift+click = Lock/Unlock State
-    if (part == Part::mute && e.mods.isPopupMenu() && e.mods.isCtrlDown())
+    if (part == Part::mute && e.mods.isRightButtonDown() && flmods::ctrl (e.mods))
     {
         engine.editSong ([] (Song& s) { mixerops::unmuteAll (s); });
         ui::postHint ({ tr ("Unmute all: every mixer track unmuted and every solo cleared (locked tracks keep their state)"), {}, false, false }, 3000);
