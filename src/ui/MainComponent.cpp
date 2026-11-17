@@ -115,6 +115,7 @@
 #include "ui/AudioEditor.h"
 #include "ui/TempoTapper.h"
 #include "ui/ExportDialog.h"
+#include "engine/AacEncoder.h"
 #include "ui/AudioCheck.h"
 #include "ui/AlsExportDialog.h"
 #include "ui/DawProjectExport.h" // round 190jf (B22)
@@ -9022,7 +9023,11 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
             exports.addItem (tr ("MP3 file...") + shortcutText ("file.exportMp3"), [this] { exportAudio (1); });
             exports.addItem (tr ("OGG file..."), [this] { exportAudio (2); });
             exports.addItem (tr ("FLAC file..."), [this] { exportAudio (3); });
+            exports.addItem (tr ("AIFF file..."), [this] { exportAudio (4); }); // (LYNX's own; owner decision D5)
             exports.addItem (tr ("MIDI file...") + shortcutText ("file.exportMidi"), [this] { exportMidiFile(); });
+            // FL's "M4A file..." (after MIDI, as FL lists it): only where the system has an AAC encoder (engine/AacEncoder.h)
+            if (aac::available())
+                exports.addItem (tr ("M4A file..."), [this] { exportAudio (5); });
             exports.addItem (tr ("Last exported format(s)...") + shortcutText ("file.export"), [this] { exportAudio(); });
             exports.addSeparator();
             // FL's FileExportMasterAction ("Render the project to a file and master it"; FL Cloud there, on the computer here)

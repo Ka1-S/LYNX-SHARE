@@ -10804,3 +10804,10 @@ countries: kr
 "Automation of hosted CLAP and VST3 plugins changes once per 128 samples in this release (0.1.30 places each change at its own sample)" = "이 릴리스에서는 호스팅된 CLAP 및 VST3 플러그인의 오토메이션이 128샘플마다 한 번 바뀝니다 (0.1.30은 각 변화를 해당 샘플에 둡니다)"
 "{0} track(s) in nested Playlist folders open one level deep" = "중첩된 Playlist 폴더의 트랙 {0}개가 한 단계로 열립니다"
 "Fruity Limiter's CURVE view (its display shows the scrolling graph): {0}" = "Fruity Limiter의 CURVE 보기 (화면에는 흐르는 그래프가 표시됩니다): {0}"
+
+# --- round als190ka-export (owner decision D5): AIFF and M4A export
+"AIFF file..." = "AIFF 파일..."
+"M4A file..." = "M4A 파일..."
+"AAC bitrate (the system's encoder; higher: better sound, bigger file)" = "AAC 비트레이트(시스템 인코더, 높을수록 음질이 좋고 파일이 커짐)"
+"M4A at {0} Hz" = "M4A {0} Hz"
+"M4A files take 44100 or 48000 Hz (or a multiple of it); this export is at {0} Hz" = "M4A 파일은 44100 또는 48000 Hz(또는 그 배수)를 사용합니다. 이 내보내기는 {0} Hz입니다"

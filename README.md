@@ -169,7 +169,7 @@ Every one of them is listed, with a picture of its editor, in the
 
 - **Automation:** any knob or fader becomes an automation clip with points and curves (all 13 of FL's curve modes); MIDI controllers link to any parameter.
 - **Recording:** notes from the computer keyboard or a MIDI keyboard, and audio with punch in/out, loop takes and comping.
-- **Export:** WAV (16/24/32-bit float), MP3, FLAC and OGG; the song, one pattern, one file per marker section or stems (all mixer stems from one render); MIDI.
+- **Export:** WAV (16/24/32-bit float), MP3, FLAC, OGG, AIFF (16/24-bit) and M4A (AAC, with the system's encoder on Windows and macOS); the song, one pattern, one file per marker section or stems (all mixer stems from one render); MIDI.
 - **Third-party plugins:** VST3 and CLAP on every system, plus the formats in the table below. Plugins can run in a separate process, so one that crashes goes silent instead of taking your project down.
 - **Online sessions:** *File › Online session* sends a project as one `.lynxpack` file, or starts a live session for up to four people.
 - **And more:** themes, undo on every edit, autosave and project versions, freezing a channel or a whole track to audio, Ableton Link, MIDI controller profiles, and the interface in 15 languages.
@@ -379,7 +379,7 @@ LYNX SHARE also runs without a window, to render and convert projects. On macOS 
 
 ```
 LYNX.exe project.lynx                          open a project (.lynx, .flp, .als, .flm or .mid)
-LYNX.exe --export project.flp out.flac         render the song (wav/flac/ogg)
+LYNX.exe --export project.flp out.flac         render the song (wav/flac/ogg/mp3/aif; m4a on Windows and macOS)
 LYNX.exe --render project.flp out.wav 20       render 20 s of the current pattern (24-bit WAV)
 LYNX.exe --export-flp project.lynx out.flp     export an FL Studio project (.zip: with the samples)
 LYNX.exe --export-als project.flp folder [--live11]  export an Ableton Live set (<name> Project/<name>.als)

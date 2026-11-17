@@ -7,8 +7,10 @@
 
 #include "engine/ShortExportTest.h"
 
+#include <cstring>
 #include <thread>
 
+#include "engine/AacEncoder.h"
 #include "engine/AudioEngine.h"
 #include "engine/Exporter.h"
 #include "engine/Mp3Format.h"
@@ -841,6 +843,103 @@ void stress (int count, std::int64_t seed, bool realtime, const juce::String& pl
         runner->folder.deleteRecursively();
         juce::MessageManager::callAsync ([done, result] { done (result); });
     }).detach();
+}
+
+juce::String formatsCheck()
+{
+    // a sampler playing a decaying tone (the same samples on every render) for one bar, the Master without effects
+    const auto folder = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("lynx-selftest-formats-" + juce::String (juce::Random::getSystemRandom().nextInt (1000000)));
+    folder.createDirectory();
+    struct Cleanup
+    {
+        juce::File f;
+        ~Cleanup() { f.deleteRecursively(); }
+    } cleanup { folder };
+    auto song = Song::makeDefault();
+    song.bpm = 120.0;
+    ChannelDef ch;
+    ch.instrument = InstrumentKind::sampler;
+    ch.mixerTrack = 1;
+    ch.samplePath = writeTone (folder, 22050, 44100.0, false).getFullPathName().toStdString();
+    song.channels = { ch };
+    for (auto& track : song.mixer)
+        track.effects.clear();
+    song.patterns.clear();
+    song.patterns.emplace_back().name = "Formats";
+    song = withNote (song, 0);
+    song.mode = PlayMode::song;
+
+    juce::AudioFormatManager formats;
+    formats.registerBasicFormats();
+    auto exportWith = [&] (exportopts::Options o, const juce::String& name, juce::String& error) {
+        o.maxTailSeconds = 0.5;
+        o.dither = exportopts::DitherMode::none;
+        const auto file = folder.getChildFile (name + exportopts::extension (o.format));
+        ExportJob job (song, o, file);
+        if (! job.run ([] (double) { return true; }, error) && error.isEmpty())
+            error = "the export failed";
+        return file;
+    };
+    auto same = [] (const Decoded& a, const Decoded& b) {
+        return a.error.isEmpty() && b.error.isEmpty() && ! a.l.empty() && a.l == b.l && a.r == b.r && a.rate == b.rate;
+    };
+    auto bitsOf = [&formats] (const juce::File& f) {
+        std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (f));
+        return reader == nullptr ? 0 : (int) reader->bitsPerSample;
+    };
+
+    juce::StringArray done;
+    juce::String error;
+    // 24-bit AIFF from the same render as the 24-bit WAV ("Also save"): the same samples
+    exportopts::Options both;
+    both.sampleRate = 44100.0;
+    both.wavBits = 24;
+    both.aiffBits = 24;
+    both.moreFormats = 1u << (int) exportopts::Format::aiff;
+    const auto wav24 = exportWith (both, "both", error);
+    const auto aif24 = wav24.withFileExtension (exportopts::extension (exportopts::Format::aiff));
+    if (error.isNotEmpty())
+        return "ERROR wav + aiff export: " + error;
+    const auto a = decodeFile (formats, wav24), b = decodeFile (formats, aif24);
+    if (! same (a, b) || bitsOf (aif24) != 24)
+        return "ERROR the 24-bit AIFF differs from the WAV of the same render (" + juce::String ((int) a.l.size()) + " / " + juce::String ((int) b.l.size())
+               + " frames, " + juce::String (bitsOf (aif24)) + " bits)";
+    done.add ("aiff24 = wav24 (" + juce::String ((int) a.l.size()) + " frames)");
+
+    // a 16-bit AIFF on its own (streamed into the file while it renders) against a 16-bit WAV render
+    exportopts::Options wav16, aif16;
+    wav16.sampleRate = aif16.sampleRate = 48000.0;
+    wav16.wavBits = 16;
+    aif16.format = exportopts::Format::aiff;
+    aif16.aiffBits = 16;
+    const auto c = decodeFile (formats, exportWith (wav16, "w16", error));
+    const auto d = decodeFile (formats, exportWith (aif16, "a16", error));
+    if (error.isNotEmpty())
+        return "ERROR 16-bit export: " + error;
+    if (! same (c, d) || bitsOf (folder.getChildFile ("a16.aif")) != 16)
+        return "ERROR the streamed 16-bit AIFF differs from the 16-bit WAV render";
+    done.add ("aiff16 streamed = wav16");
+
+    // M4A: the system's AAC encoder (a 96 kHz render halved to 48 kHz first), or a clear refusal where there is none
+    exportopts::Options m4a;
+    m4a.format = exportopts::Format::aac;
+    m4a.sampleRate = 96000.0;
+    const auto m4aFile = exportWith (m4a, "m", error);
+    if (aac::available())
+    {
+        juce::MemoryBlock bytes;
+        m4aFile.loadFileAsData (bytes);
+        if (error.isNotEmpty() || bytes.getSize() < 2000 || std::memcmp (static_cast<const char*> (bytes.getData()) + 4, "ftyp", 4) != 0)
+            return "ERROR M4A: " + (error.isNotEmpty() ? error : "no MPEG-4 file (" + juce::String ((int) bytes.getSize()) + " bytes)");
+        done.add ("m4a " + juce::String ((int) bytes.getSize()) + " bytes");
+    }
+    else
+    {
+        if (error.isEmpty() || m4aFile.existsAsFile())
+            return "ERROR M4A without an AAC encoder did not refuse";
+        done.add ("m4a not available here (refused)");
+    }
+    return "OK (" + done.joinIntoString ("; ") + ")";
 }
 } // namespace lynx::shortexport
 

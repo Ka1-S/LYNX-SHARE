@@ -10804,3 +10804,10 @@ countries: tw hk mo
 "Automation of hosted CLAP and VST3 plugins changes once per 128 samples in this release (0.1.30 places each change at its own sample)" = "在此版本中，代管的 CLAP 和 VST3 外掛的自動化每 128 個取樣變化一次（0.1.30 將每個變化放在其自己的取樣上）"
 "{0} track(s) in nested Playlist folders open one level deep" = "巢狀 Playlist 資料夾中的 {0} 條音軌以一層開啟"
 "Fruity Limiter's CURVE view (its display shows the scrolling graph): {0}" = "Fruity Limiter 的 CURVE 檢視（其顯示為捲動圖形）：{0}"
+
+# --- round als190ka-export (owner decision D5): AIFF and M4A export
+"AIFF file..." = "AIFF檔案..."
+"M4A file..." = "M4A檔案..."
+"AAC bitrate (the system's encoder; higher: better sound, bigger file)" = "AAC 位元率（系統的編碼器；越高：聲音越好，檔案越大）"
+"M4A at {0} Hz" = "M4A，{0} Hz"
+"M4A files take 44100 or 48000 Hz (or a multiple of it); this export is at {0} Hz" = "M4A 檔案使用 44100 或 48000 Hz（或其倍數）；本次匯出為 {0} Hz"
