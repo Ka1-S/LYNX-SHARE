@@ -240,7 +240,7 @@ std::shared_ptr<Instrument> buildInstrument (const ChannelDef& channel, double s
             std::shared_ptr<const dw::ZoneSamples> s;
             if (samples && ! channel.zones[z].path.empty())
                 if (const auto data = samples (channel.zones[z].path))
-                    s = dw::zoneSamplesShared (data, z < formats.size() && formats[z]); // (round qafix190kq: shared between rack builds)
+                    s = dw::zoneSamplesShared (channel.zones[z].path, data, z < formats.size() && formats[z]); // (round qafix190kq: shared between rack builds)
             zs.push_back (std::move (s));
         }
         std::shared_ptr<Instrument> instrument = dw::makeDirectWaveInstrument (std::move (zs));

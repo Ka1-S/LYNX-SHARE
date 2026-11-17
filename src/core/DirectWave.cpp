@@ -2135,28 +2135,42 @@ std::shared_ptr<const ZoneSamples> zoneSamples (const SampleData& sample, bool i
     return z;
 }
 
-std::shared_ptr<const ZoneSamples> zoneSamplesShared (const std::shared_ptr<const SampleData>& sample, bool int16)
+std::shared_ptr<const ZoneSamples> zoneSamplesShared (const std::string& path, const std::shared_ptr<const SampleData>& sample, bool int16)
 {
     if (sample == nullptr)
         return nullptr;
+    // the sample's identity: length, channels and 64 of its values (a file changed on disk makes new zones)
+    const auto frames = sample->frames();
+    const auto stereo = sample->isStereo();
+    std::uint64_t print = 1469598103934665603ull;
+    for (std::size_t k = 0; frames > 0 && k < 64; ++k)
+    {
+        const auto at = k * (frames - 1) / 63;
+        float v[2] { sample->leftData()[at], stereo ? sample->rightData()[at] : 0.0f };
+        std::uint32_t bits[2];
+        std::memcpy (bits, v, sizeof bits);
+        print = (print ^ bits[0]) * 1099511628211ull;
+        print = (print ^ bits[1]) * 1099511628211ull;
+    }
     struct Entry
     {
-        std::weak_ptr<const SampleData> sample;
+        std::size_t frames = 0;
+        bool stereo = false;
+        std::uint64_t print = 0;
         std::weak_ptr<const ZoneSamples> zones;
     };
     static std::mutex lock;
-    static std::map<std::pair<const SampleData*, bool>, Entry> cache;
+    static std::map<std::pair<std::string, bool>, Entry> cache;
     const std::lock_guard<std::mutex> hold (lock);
-    const auto key = std::make_pair (sample.get(), int16);
-    if (const auto at = cache.find (key); at != cache.end())
-        if (const auto held = at->second.sample.lock(); held == sample) // (the same sample, not a new one at a freed address)
-            if (auto zones = at->second.zones.lock())
-                return zones;
+    const auto key = std::make_pair (path, int16);
+    if (const auto at = cache.find (key); at != cache.end() && at->second.frames == frames && at->second.stereo == stereo && at->second.print == print)
+        if (auto zones = at->second.zones.lock())
+            return zones;
     for (auto it = cache.begin(); it != cache.end();) // (entries nobody holds any more)
-        it = it->second.zones.expired() || it->second.sample.expired() ? cache.erase (it) : std::next (it);
+        it = it->second.zones.expired() ? cache.erase (it) : std::next (it);
     auto zones = zoneSamples (*sample, int16);
     if (zones != nullptr)
-        cache[key] = { sample, zones };
+        cache[key] = { frames, stereo, print, zones };
     return zones;
 }
 

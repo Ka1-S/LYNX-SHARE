@@ -593,12 +593,13 @@ enum class RoarFilter { lowPass, bandPass, highPass, notch, peak, morph, comb, r
 enum RoarMacro { rrDrive1, rrDrive2, rrDrive3, rrInput, rrOutput, rrDryWet, rrMacros };
 // Round qafix190kq (QA-1 of 0.1.30), [MEASURED] on Live 12.4's renders (core/AlsDevicesLot4.cpp):
 // a stage's Amount (0 … 1) as Ember's drive in dB (linear);
-constexpr double roarDrivePerUnitDb = 20.0;
+constexpr double roarDrivePerUnitDb = 23.0;
 double roarDriveDb (double amount) noexcept;
 // the gain of Roar with every stage at 0 and no compression (on the rack's output Utility);
-constexpr double roarNeutralDb = 1.55;
+constexpr double roarNeutralDb = 1.2;
 // Compression Amount (0 … 1) → Crest Clean's threshold (dB) and ratio
-constexpr double roarCompThresholdAt0 = -4.0, roarCompThresholdPerUnit = -13.0, roarCompRatioPerUnit = 6.5;
+constexpr double roarCompThresholdAt0 = -2.5, roarCompThresholdPerUnit = -13.0, roarCompRatioPerUnit = 7.5;
+constexpr double roarCompAttackMs = 30.0, roarCompReleaseMs = 150.0;
 double roarCompThresholdDb (double amount) noexcept;
 double roarCompRatio (double amount) noexcept;
 bool roarToRack (const xml::Element& device, Translated& out);

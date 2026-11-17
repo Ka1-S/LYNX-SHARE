@@ -108,31 +108,35 @@ TEST (qafix190kq_silent_export_says_why)
 
 TEST (qafix190kq_directwave_zones_are_shared_between_builds)
 {
-    auto s = std::make_shared<lynx::SampleData>();
-    s->sampleRate = 44100.0;
-    s->left.assign (1000, 0.25f);
-    s->right.assign (1000, -0.25f);
-    const std::shared_ptr<const lynx::SampleData> sample = s;
-    auto a = lynx::dw::zoneSamplesShared (sample, false);
-    auto b = lynx::dw::zoneSamplesShared (sample, false);
+    const auto make = [] (float l, float r, std::size_t n) {
+        auto s = std::make_shared<lynx::SampleData>();
+        s->sampleRate = 44100.0;
+        s->left.assign (n, l);
+        s->right.assign (n, r);
+        return std::shared_ptr<const lynx::SampleData> (s);
+    };
+    const auto sample = make (0.25f, -0.25f, 1000);
+    auto a = lynx::dw::zoneSamplesShared ("C:/x/zone.wav", sample, false);
+    auto b = lynx::dw::zoneSamplesShared ("C:/x/zone.wav", sample, false);
     CHECK (a != nullptr && a == b);
-    auto c = lynx::dw::zoneSamplesShared (sample, true);
+    // the export engine decodes the file again (the rack keeps the zones, not the decoded sample): the same zones
+    const auto decodedAgain = make (0.25f, -0.25f, 1000);
+    CHECK (lynx::dw::zoneSamplesShared ("C:/x/zone.wav", decodedAgain, false) == a);
+    // the other format, another file, or the same file changed on disk: zones of their own
+    auto c = lynx::dw::zoneSamplesShared ("C:/x/zone.wav", sample, true);
     CHECK (c != nullptr && c != a && c->bits == 16 && a->bits == 32);
+    CHECK (lynx::dw::zoneSamplesShared ("C:/x/other.wav", sample, false) != a);
+    const auto changed = make (0.5f, -0.25f, 1000);
+    const auto d = lynx::dw::zoneSamplesShared ("C:/x/zone.wav", changed, false);
+    CHECK (d != nullptr && d != a && d->f32[0][256] == 0.5f);
     // the same content as the plain copy
     const auto plain = lynx::dw::zoneSamples (*sample, false);
     CHECK (plain != nullptr && plain->f32 == a->f32 && plain->frames == a->frames && plain->channels == a->channels);
-    // once released, a later build makes it again (no stale buffer)
-    std::weak_ptr<const lynx::dw::ZoneSamples> gone = a;
-    a.reset();
-    b.reset();
+    // nothing is kept once no build holds it
+    std::weak_ptr<const lynx::dw::ZoneSamples> gone = c;
+    c.reset();
     CHECK (gone.expired());
-    auto other = std::make_shared<lynx::SampleData>();
-    other->sampleRate = 44100.0;
-    other->left.assign (10, 0.5f);
-    const std::shared_ptr<const lynx::SampleData> second = other;
-    const auto d = lynx::dw::zoneSamplesShared (second, false);
-    CHECK (d != nullptr && d->frames == 10);
-    CHECK (lynx::dw::zoneSamplesShared (nullptr, false) == nullptr);
+    CHECK (lynx::dw::zoneSamplesShared ("C:/x/zone.wav", nullptr, false) == nullptr);
 }
 
 // QA-6: the export's tail ends on a constant offset as on silence, not on sound or a slow decay
@@ -164,4 +168,39 @@ TEST (qafix190kq_tail_counts_dc_as_silence)
     std::fill (l.begin(), l.end(), 0.01f);
     CHECK (! quietBlock (ch, 2, 512, silence));
     CHECK (quietBlock (ch, 2, 0, silence));
+}
+
+// QA-6 (the DC's source): a step on an audio clip channel plays the whole clip (round 190jd) and then ENDS — it held the
+// sample's last value for ever (FL holds that DC only to a Playlist clip's own end): Never Out's hi-hat steps left a
+// voice each, -73 dBFS of DC summed after the song
+TEST (qafix190kq_clip_channel_step_ends_with_its_sample)
+{
+    auto data = std::make_shared<lynx::SampleData>();
+    data->sampleRate = r190io::rate;
+    data->left.assign ((std::size_t) (0.5 * r190io::rate), 0.0f);
+    for (std::size_t i = 0; i < data->left.size(); ++i)
+        data->left[i] = 0.2f + 0.1f * (float) std::sin (6.283185307179586 * 440.0 * (double) i / r190io::rate); // ends on ~0.2: a DC tail
+    data->right = data->left;
+    const auto song = r190io::stepSong (lynx::InstrumentKind::audioClip, "dc");
+    auto state = lynx::RackState::build (song, nullptr, r190io::rate, [data] (const std::string&) -> std::shared_ptr<const lynx::SampleData> { return data; });
+    lynx::RackRenderer rr;
+    rr.prepare (r190io::rate, 480);
+    const auto total = (int) (1.9 * r190io::rate);
+    std::vector<float> l ((std::size_t) total), r ((std::size_t) total);
+    double tick = 0.0;
+    const auto tps = lynx::ticksPerSample (song.bpm, r190io::rate);
+    for (int at = 0; at < total; at += 480)
+    {
+        const auto n = std::min (480, total - at);
+        rr.process (state.get(), true, tick, n, l.data() + at, r.data() + at);
+        tick += n * tps;
+    }
+    double during = 0.0, after = 0.0;
+    for (int i = (int) (0.1 * r190io::rate); i < (int) (0.4 * r190io::rate); ++i)
+        during = std::max (during, (double) std::abs (l[(std::size_t) i]));
+    for (int i = (int) (0.7 * r190io::rate); i < total; ++i)
+        after = std::max (after, (double) std::abs (l[(std::size_t) i]));
+    std::printf ("qafix190kq: a clip channel step: peak %.4f while the sample plays, %.6f after it\n", during, after);
+    CHECK (during > 0.05);  // (the whole clip plays: 190jd)
+    CHECK (after < 1.0e-6); // (no DC after it)
 }

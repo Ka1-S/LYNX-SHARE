@@ -1001,8 +1001,8 @@ bool roarToRack (const Element& device, Translated& out)
         }
 
     // the output: compression (round qafix190kq: [MEASURED] Live's Roar compresses gently — 79 % takes ~4.4 dB off pink
-    // noise at −12 dB RMS and nothing at −30 dB — fitted as Crest Clean with a 6 dB knee, 10 / 100 ms, threshold and
-    // ratio by roarCompThresholdDb / roarCompRatio), then the gain
+    // noise at −12 dB RMS and nothing at −30 dB — fitted as Crest Clean with a 6 dB knee, roarCompAttackMs /
+    // roarCompReleaseMs, threshold and ratio by roarCompThresholdDb / roarCompRatio), then the gain
     const auto comp = std::clamp (manual (device, "Output_CompressionAmount", 0.0), 0.0, 1.0);
     if (comp > 1.0e-3)
     {
@@ -1013,8 +1013,8 @@ bool roarToRack (const Element& device, Translated& out)
         k[cr::ratio] = cr::ratioValue (roarCompRatio (comp));
         k[cr::knee] = linValue (6.0, 0.0, 72.0);
         k[cr::range] = 1.0f;
-        k[cr::attack] = cr::attackValue (10.0);
-        k[cr::release] = cr::releaseValue (100.0);
+        k[cr::attack] = cr::attackValue (roarCompAttackMs);
+        k[cr::release] = cr::releaseValue (roarCompReleaseMs);
         k[cr::autoRelease] = 0.0f;
         k[cr::lookahead] = 0.0f;
         k[cr::output] = linValue (0.0, -36.0, 36.0);
