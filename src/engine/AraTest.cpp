@@ -195,6 +195,10 @@ juce::String araSelfTest (const juce::File& pluginFile, const juce::File& audio,
              + juce::String (saved.araDocuments.empty() ? 0 : (int) saved.araDocuments[0].archive.size()) + " base64 bytes");
         if (saved.araDocuments.empty())
             errors.add ("no ARA document archived");
+        // the session as a project (the round opens it in the app to edit the clip in the plugin's own window)
+        juce::String saveError;
+        if (! ProjectFile::save (saved, out.getChildFile ("ara-session.lynx"), saveError))
+            errors.add ("can't save ara-session.lynx: " + saveError);
         const auto restored = render (saved, "restored");
         compare (araOut, restored, "ARA vs restored", 0.98);
     }

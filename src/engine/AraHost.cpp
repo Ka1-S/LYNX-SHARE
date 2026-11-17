@@ -409,6 +409,9 @@ struct Doc
 
     ~Doc()
     {
+        // (the plugin's transport requests stop here: the controller may outlive the host, held by a playing instance)
+        if (controller != nullptr && controller->playbackAlive != nullptr)
+            *controller->playbackAlive = false;
         // the model objects before the controller (the bindings, held by the rack too, keep it as long as they live)
         if (controller != nullptr && controller->dc != nullptr)
         {
