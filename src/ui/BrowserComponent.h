@@ -13,6 +13,8 @@
 #include "core/BrowserPlaces.h"
 #include "core/BrowserSend.h"
 #include "core/BrowserTags.h"
+#include "core/LoopKeywords.h"
+#include "core/ProjectKey.h"
 #include "core/BrowserView.h"
 #include "core/HotSwap.h"
 #include "engine/AudioEngine.h"
@@ -326,6 +328,39 @@ public:
     class TagsPanel;
     class LiveSidebar;
 
+    // --- Round gaps190kf: the Loop Browser of the Sample browser window (GarageBand's: keyword buttons, Scale, Loop
+    // Types, favourites; LYNX's Tempo and Places; core/LoopKeywords.h). The search row's LOOPS button shows it.
+    void setLoopsShown (bool shown);
+    bool isLoopsShown() const noexcept { return loopsShown; }
+    const loopkeys::Filter& loopFilter() const noexcept { return loopFilterState; }
+    void setLoopFilter (loopkeys::Filter filter);
+    int loopCategories() const noexcept { return loopCategoryMask; } // a bit per loopkeys::Category
+    void setLoopCategories (int mask);
+    const loopkeys::Layout& loopLayout() const noexcept { return loopLayoutState; }
+    void setLoopLayout (loopkeys::Layout layout);
+    int loopTempoChoice() const noexcept { return loopTempo; } // loopkeys::tempoRanges() index
+    void setLoopTempoChoice (int choice);
+    void setLoopNearKey (bool on);
+    void setLoopPlace (int index); // -1 = every place, else loopPlaces()'s index
+    juce::Array<juce::File> loopPlaces() const;
+    juce::String loopPlaceName() const;
+    const std::map<std::string, int>& loopKeywordCounts() const noexcept { return loopCounts; }
+    bool loopsReady() const noexcept { return loopsAnswer; } // the loops were listed (the dimmed buttons mean something)
+    void showLoopPlacesMenu();
+    void showLoopScaleMenu();
+    void showLoopTempoMenu();
+    void showLoopTypesMenu();
+    juce::PopupMenu buildLoopScaleMenu();
+    juce::PopupMenu buildLoopTypesMenu();
+    int numLoopsShownForSnapshot() const;
+    void loadLoopsForSnapshot();
+    juce::Point<int> loopKeywordCentreForSnapshot (const std::string& id) const;
+    // the Simple layout's Loops tile: the next Sample browser opens with its Loop Browser shown; one already open shows it
+    static inline bool openLoopsNext = false;
+    static void showLoopsInSampleBrowser();
+    class LoopPanel;
+    class LoopsButton;
+
 private:
     void textEditorTextChanged (juce::TextEditor&) override;
     void textEditorEscapeKeyPressed (juce::TextEditor&) override;
@@ -433,6 +468,19 @@ private:
     bool tagFilterActive() const;
     juce::String effectiveQuery() const { const auto q = searchBox.getText().trim(); return q.isEmpty() ? categoryQuery : q; }
     void runTagFilter();
+    // round gaps190kf: the Loop Browser
+    void runLoopSearch();
+    void loopsAnswered (std::uint64_t id, std::vector<loopkeys::LoopInfo> infos, bool partial, bool truncated);
+    void applyLoopFilter();
+    std::unique_ptr<LoopPanel> loopPanel;
+    std::unique_ptr<LoopsButton> loopsButton;
+    bool loopsShown = false, loopsAnswer = false, loopsTruncated = false, loopNearKey = false;
+    loopkeys::Filter loopFilterState;
+    loopkeys::Layout loopLayoutState = loopkeys::Layout::defaults();
+    int loopCategoryMask = 1, loopTempo = 0, loopPlaceIndex = -1;
+    std::vector<loopkeys::LoopInfo> loopInfos;
+    std::map<std::string, int> loopCounts;
+    std::uint64_t loopSearchId = 0;
     browserview::ContentFilter activeFilter() const; // the tab's / Live entry's filter, else the view's
     bool showsRoot (int rootIndex) const;            // a folder place the current tab / Live entry lists
     struct SearchShared; // the process's search worker (core/SearchService), shared by every Browser

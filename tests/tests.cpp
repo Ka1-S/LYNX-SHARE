@@ -17749,6 +17749,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Settings190bxTests.inc"
 #include "Link190btTests.inc"
 #include "LiveBrowser190ceTests.inc"
+#include "LoopBrowser190kfTests.inc" // round gaps190kf: the Loop Browser's keywords and filters
 #include "Browser190izTests.inc" // round 190iz: Browser tags, FL tabs, Live sidebar, send to selected, 5-s preview
 #include "SimpleFx190buTests.inc"
 #include "SimpleGate190dgTests.inc"

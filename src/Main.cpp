@@ -1931,6 +1931,14 @@ public:
         }
 
         // --browsershot190iz <folder> (round 190iz: FL's tabs, tags, Live's browser): src/BrowserShot190iz.inc
+        // --loopshot190kf <folder> (round gaps190kf: the Loop Browser): src/LoopShot190kf.inc
+        if (args.contains ("--loopshot190kf"))
+        {
+            setApplicationReturnValue (runLoopShot190kf (juce::File (args[args.indexOf ("--loopshot190kf") + 1].unquoted())) ? 0 : 1);
+            quit();
+            return;
+        }
+
         if (args.contains ("--browsershot190iz"))
         {
             setApplicationReturnValue (runBrowserShot190iz (juce::File (args[args.indexOf ("--browsershot190iz") + 1].unquoted())) ? 0 : 1);
@@ -31828,6 +31836,7 @@ private:
     // --snapshot: 8 s of a synthetic stereo beat whose parts sit in different bands (kick = low, chord = mid,
     // hats and the noise riser = high), to show the spectral waveform colours
 #include "BrowserShot190iz.inc" // round 190iz
+#include "LoopShot190kf.inc"   // round gaps190kf
 
     static void writeWaveDemo (const juce::File& file, double bpm)
     {
