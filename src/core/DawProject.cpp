@@ -6,10 +6,13 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <iomanip>
 #include <limits>
+#include <locale>
 #include <list>
 #include <map>
 #include <set>
+#include <sstream>
 #include <tuple>
 
 #include "core/AlsDevices.h"
@@ -500,9 +503,26 @@ std::string numText (double v)
 {
     if (! std::isfinite (v) || v == 0.0)
         return "0";
+   #if defined (__APPLE__)
+    // (rollup 0.1.30: floating-point std::to_chars needs macOS 13.3 and LYNX targets 11.0, as AlsExport.cpp's num(): the
+    // shortest precision that reads back as the same double)
+    for (int precision = 15;; ++precision)
+    {
+        std::ostringstream text;
+        text.imbue (std::locale::classic());
+        text << std::setprecision (precision) << v;
+        std::istringstream back (text.str());
+        back.imbue (std::locale::classic());
+        double read = 0.0;
+        back >> read;
+        if (read == v || precision == 17)
+            return text.str();
+    }
+   #else
     char buf[64];
     const auto r = std::to_chars (buf, buf + sizeof buf, v);
     return std::string (buf, r.ptr);
+   #endif
 }
 std::string boolText (bool b) { return b ? "true" : "false"; }
 
