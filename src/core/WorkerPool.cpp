@@ -182,7 +182,7 @@ void WorkerPool::Tuning::apply (const char* spec) noexcept
     workerSpinMicros.store (std::clamp (parsedValue (spec, "spin", workerSpinMicros.load()), 0, 10000));
     drySpinMicros.store (std::clamp (parsedValue (spec, "dry", drySpinMicros.load()), 0, 10000));
     adaptiveSpin.store (parsedValue (spec, "adaptive", adaptiveSpin.load() ? 1 : 0) != 0);
-    waitMode.store (std::clamp (parsedValue (spec, "wait", waitMode.load()), 0, 1));
+    waitMode.store (std::clamp (parsedValue (spec, "wait", waitMode.load()), 0, 2));
     waitSpinMicros.store (std::clamp (parsedValue (spec, "waitspin", waitSpinMicros.load()), 0, 10000));
 }
 
@@ -270,6 +270,17 @@ void WorkerPool::awaitSlow (int key, void* ready, ReadyFn fn) noexcept
         bump (lane->waitYields, yields);
         bump (lane->waitSleeps, sleeps);
         bump (lane->waitSleepNs, sleptNs);
+    }
+}
+
+void WorkerPool::noteWait (std::uint64_t ns, bool handedOff) noexcept
+{
+    if (auto* lane = currentLane())
+    {
+        bump (lane->waitNs, ns);
+        bump (lane->waits, 1);
+        if (handedOff)
+            bump (lane->waitSleeps, 1);
     }
 }
 

@@ -101,7 +101,8 @@ public:
         std::atomic<bool> adaptiveSpin { true };
         std::atomic<int> drySpinMicros { 4 };
         // the waits inside a round for another index's result (await(): the task graph's next task): 0 = spin with a
-        // yield every 1024 pauses (before 190kb), 1 = spin `waitSpinMicros`, then sleep until notify() (no yield)
+        // yield every 1024 pauses (before 190kb), 1 = spin `waitSpinMicros`, then sleep until notify() (no yield),
+        // 2 = (the task graph) spin `waitSpinMicros`, then hand the position over to the thread that will push its task
         std::atomic<int> waitMode { 1 };
         std::atomic<int> waitSpinMicros { 30 };
         void apply (const char* spec) noexcept; // "spin=60,dry=4,adaptive=1,wait=1,waitspin=30" (missing keys: unchanged)
@@ -136,6 +137,9 @@ public:
     }
     // after publishing what await(key, …) waits for: wakes the thread sleeping on that key, if any (a fence and one
     // load when nobody sleeps)
+    // round 190kb: a wait the caller timed itself (the task graph's hand-off): counted as await()'s are, a hand-off as
+    // a sleep
+    void noteWait (std::uint64_t ns, bool handedOff) noexcept;
     void notify (int key) noexcept
     {
         std::atomic_thread_fence (std::memory_order_seq_cst);

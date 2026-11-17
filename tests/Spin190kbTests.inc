@@ -87,7 +87,7 @@ TEST (spin190kb_tuning_parses_specs_and_keeps_missing_keys)
     t.apply ("wait=1"); // the others stay
     CHECK (t.waitMode.load() == 1 && t.workerSpinMicros.load() == 20 && t.waitSpinMicros.load() == 5);
     t.apply ("wait=7,spin=-3,waitspin=99999"); // clamped
-    CHECK (t.waitMode.load() == 1 && t.workerSpinMicros.load() == 0 && t.waitSpinMicros.load() == 10000);
+    CHECK (t.waitMode.load() == 2 && t.workerSpinMicros.load() == 0 && t.waitSpinMicros.load() == 10000);
     t.apply ("nonsense,adaptive=1,,");
     CHECK (t.adaptiveSpin.load());
     t.apply (nullptr);
@@ -143,6 +143,8 @@ TEST (spin190kb_stats_count_rounds_spins_and_sleeps)
     CHECK (after.waits == before.waits); // (no await in these rounds)
 }
 
+static std::uint64_t spin190kbHandOffs = 0;
+
 TEST (spin190kb_task_graph_renders_the_same_in_every_wait_mode)
 {
     // the renderer's task graph with the old wait, the new one (sleeping at once too) and without a pool: bit for bit
@@ -170,6 +172,11 @@ TEST (spin190kb_task_graph_renders_the_same_in_every_wait_mode)
         auto state = lynx::RackState::build (song, nullptr, 48000.0);
         graph = state->graphOk;
         lynx::WorkerPool workers (4);
+        struct Count
+        {
+            lynx::WorkerPool& pool;
+            ~Count() { spin190kbHandOffs += pool.stats().waitSleeps; }
+        } count { workers };
         lynx::RackRenderer r;
         r.prepare (48000.0, 512);
         if (pool)
@@ -190,8 +197,14 @@ TEST (spin190kb_task_graph_renders_the_same_in_every_wait_mode)
     CHECK (graph);
     const auto bounded = render ("wait=1,waitspin=30,adaptive=1", true, unused);
     const auto sleeping = render ("wait=1,waitspin=0,adaptive=1,dry=0", true, unused);
+    // mode 2: the waiting position is handed over to the thread that pushes its task (at once: waitspin=0)
+    const auto handedAtOnce = render ("wait=2,waitspin=0,adaptive=0", true, unused);
+    const auto handedLater = render ("wait=2,waitspin=20,adaptive=1", true, unused);
     CHECK (old == alone);
     CHECK (bounded == alone);
     CHECK (sleeping == alone);
+    CHECK (handedAtOnce == alone);
+    CHECK (handedLater == alone);
+    CHECK (spin190kbHandOffs > 0); // (the hand-offs and sleeps did happen)
     CHECK (*std::max_element (alone.begin(), alone.end()) > 0.02f);
 }
