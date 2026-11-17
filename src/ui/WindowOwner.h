@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -154,6 +155,13 @@ struct ThreadCpu
     unsigned id = 0;
     std::string name;
     double seconds = 0.0;
+    std::uint64_t cycles = 0; // (round 190kb)
 };
 std::vector<ThreadCpu> threadCpuList();
+// Round 190kb: the CPU cycles this process has run (Windows: QueryProcessCycleTime — counted at every context switch,
+// exact, where the times above are sampled at the clock tick and miss or overcount short bursts) and the rate of
+// that count (the time-stamp counter's, measured once); 0 where the platform has no such count. ThreadCpu::cycles:
+// the same per thread.
+std::uint64_t processCpuCycles();
+double cpuCyclesPerSecond();
 } // namespace lynx

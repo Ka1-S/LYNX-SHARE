@@ -5778,13 +5778,10 @@ bool RackRenderer::runTaskGraph (const RackState& state, bool playing, int chann
     const auto timing = times->enabled.load (std::memory_order_relaxed);
     auto task = [&] (int position) {
         const ScopedHostTimeline timelineScope (ownTimeline);
-        int id;
-        for (int spins = 0; (id = graphSlots[(std::size_t) position].load (std::memory_order_acquire)) == 0; ++spins)
-        {
-            WorkerPool::relax();
-            if ((spins & 1023) == 1023)
-                std::this_thread::yield();
-        }
+        int id = 0;
+        // (round 190kb: a bounded spin, then sleep until the task pushed into this position wakes it; before, a spin
+        // with a yield every 1024 pauses for as long as it took)
+        workers->await (position, [&] { return (id = graphSlots[(std::size_t) position].load (std::memory_order_acquire)) != 0; });
         --id;
         for (;;) // (a serial chain runs here link after link: round 190gq)
         {
@@ -5819,7 +5816,11 @@ bool RackRenderer::runTaskGraph (const RackState& state, bool playing, int chann
         {
             const auto j = state.graphNext[(std::size_t) k];
             if (graphPending[(std::size_t) j].fetch_sub (1, std::memory_order_acq_rel) == 1)
-                graphSlots[(std::size_t) graphPushed.fetch_add (1, std::memory_order_acq_rel)].store (j + 1, std::memory_order_release);
+            {
+                const auto at = graphPushed.fetch_add (1, std::memory_order_acq_rel);
+                graphSlots[(std::size_t) at].store (j + 1, std::memory_order_release);
+                workers->notify (at);
+            }
         }
     };
     workers->parallelFor (tasks - state.graphFusedCount, task);

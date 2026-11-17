@@ -26,6 +26,7 @@
 #if JUCE_WINDOWS
  #include <windows.h>
  #include <tlhelp32.h>
+ #include <intrin.h>
 #endif
 #if JUCE_LINUX || JUCE_BSD || JUCE_MAC
  #include <dlfcn.h>
@@ -137,6 +138,8 @@ std::vector<ThreadCpu> threadCpuList()
         FILETIME created {}, exited {}, kernel {}, user {};
         if (GetThreadTimes (thread, &created, &exited, &kernel, &user))
             t.seconds = (double) ((((std::uint64_t) kernel.dwHighDateTime << 32) | kernel.dwLowDateTime) + (((std::uint64_t) user.dwHighDateTime << 32) | user.dwLowDateTime)) * 1e-7;
+        if (ULONG64 cycles = 0; QueryThreadCycleTime (thread, &cycles))
+            t.cycles = (std::uint64_t) cycles;
         if (getDescription != nullptr)
         {
             PWSTR text = nullptr;
@@ -152,6 +155,37 @@ std::vector<ThreadCpu> threadCpuList()
     CloseHandle (snapshot);
    #endif
     return out;
+}
+
+std::uint64_t processCpuCycles()
+{
+   #if JUCE_WINDOWS
+    ULONG64 cycles = 0;
+    return QueryProcessCycleTime (GetCurrentProcess(), &cycles) ? (std::uint64_t) cycles : 0;
+   #else
+    return 0;
+   #endif
+}
+
+double cpuCyclesPerSecond()
+{
+   #if JUCE_WINDOWS
+    // the cycle counts above run at the time-stamp counter's rate: measured against the performance counter over 50 ms
+    static const double rate = [] {
+        LARGE_INTEGER f {}, a {}, b {};
+        QueryPerformanceFrequency (&f);
+        QueryPerformanceCounter (&a);
+        const auto t0 = __rdtsc();
+        Sleep (50);
+        const auto t1 = __rdtsc();
+        QueryPerformanceCounter (&b);
+        const auto seconds = (double) (b.QuadPart - a.QuadPart) / (double) f.QuadPart;
+        return seconds > 0.0 ? (double) (t1 - t0) / seconds : 0.0;
+    }();
+    return rate;
+   #else
+    return 0.0;
+   #endif
 }
 
 juce::TextEditor* firstTextField (juce::Component& dialog)

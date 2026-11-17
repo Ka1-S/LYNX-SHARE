@@ -1061,6 +1061,8 @@ public:
     // Real-time health of the audio callback (REA round 87): callbacks over their deadline, late device calls, load.
     const RtStats& getRtStats() const noexcept { return rtStats; }
     RtStats& getRtStats() noexcept { return rtStats; }
+    // round 190kb: the renderer's worker pool (its waiting statistics for --uiperf; null without workers)
+    const WorkerPool* getWorkerPool() const noexcept { return workers.get(); }
 
     // What takes the most audio CPU: channels and insert effects, as a share of real time over the last ~2 s of
     // playback, heaviest first. UI thread.
