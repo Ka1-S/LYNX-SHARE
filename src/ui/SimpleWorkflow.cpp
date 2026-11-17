@@ -520,16 +520,20 @@ public:
 class SimpleTitleTools final : public juce::Component
 {
 public:
-    SimpleTitleTools (juce::Component& a, juce::Component& c) : add (a), lyrics (c)
+    SimpleTitleTools (juce::Component& a, juce::Component& c, juce::Component& d) : add (a), lyrics (c), automation (d)
     {
         addAndMakeVisible (add);
+        addAndMakeVisible (automation);
         addAndMakeVisible (lyrics);
     }
-    static constexpr int width = 110 + 6 + 80 + 10;
+    static constexpr int automationWidth = 96;
+    static constexpr int width = 110 + 6 + automationWidth + 6 + 80 + 10; // (round 190jr: + Automation)
     void resized() override
     {
         auto r = getLocalBounds();
         add.setBounds (r.removeFromLeft (110));
+        r.removeFromLeft (6);
+        automation.setBounds (r.removeFromLeft (automationWidth)); // (BandLab: the automation switch beside Add Track)
         r.removeFromLeft (6);
         lyrics.setBounds (r.removeFromLeft (80));
     }
@@ -537,6 +541,7 @@ public:
 private:
     juce::Component& add;
     juce::Component& lyrics;
+    juce::Component& automation;
 };
 
 SimpleWorkflow::SimpleWorkflow (AudioEngine& e, Host h) : engine (e), host (std::move (h))
@@ -566,7 +571,18 @@ SimpleWorkflow::SimpleWorkflow (AudioEngine& e, Host h) : engine (e), host (std:
             host.toggleLyrics();
     };
     lyricsButton = std::move (lyrics);
-    titleTools = std::make_unique<SimpleTitleTools> (*addButton, *lyricsButton);
+    // round 190jr (BUILD-LIST 13, BandLab's switch beside Add Track): each Simple track's row shows a parameter's line
+    auto automation = std::make_unique<juce::TextButton> (tr ("Automation"));
+    automation->setComponentID ("simple.automation");
+    automation->setTooltip (tr ("Automation: draw volume, pan or an effect's changes over time on each track"));
+    automation->setClickingTogglesState (true);
+    automation->setColour (juce::TextButton::buttonOnColourId, theme::colour::accent);
+    automation->onClick = [this, b = automation.get()] {
+        if (host.setAutomation)
+            host.setAutomation (b->getToggleState());
+    };
+    automationButton = std::move (automation);
+    titleTools = std::make_unique<SimpleTitleTools> (*addButton, *lyricsButton, *automationButton);
 
     // round 190dv: the Welcome screen and the first-song tour
     FirstSongTour::Host t;
@@ -758,6 +774,12 @@ void SimpleWorkflow::tick()
 {
     if (dock != nullptr)
         dock->tickInputMeter();
+}
+
+void SimpleWorkflow::automationShown (bool on)
+{
+    if (auto* b = dynamic_cast<juce::Button*> (automationButton.get()); b != nullptr && b->getToggleState() != on)
+        b->setToggleState (on, juce::dontSendNotification);
 }
 
 void SimpleWorkflow::left()
@@ -1132,7 +1154,7 @@ void SimpleWorkflow::chooseSample()
 
 void SimpleWorkflow::importFiles()
 {
-    fileChooser = ui::makeFileChooser (tr ("Import audio or MIDI"), juce::File(), engine.getSampleLibrary().wildcard() + ";*.mid;*.midi");
+    fileChooser = ui::makeFileChooser (tr ("Import audio or MIDI"), juce::File(), engine.getSampleLibrary().wildcard() + ";*.mid;*.midi;*.blx");
     ui::launchChooser (fileChooser,
                        juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::canSelectMultipleItems,
                        [this] (const juce::FileChooser& fc) { addFiles (fc.getResults(), 0); });
@@ -1143,8 +1165,17 @@ void SimpleWorkflow::importFolder()
     fileChooser = ui::makeFileChooser (tr ("Choose a folder of stems and MIDI files"), juce::File(), {});
     ui::launchChooser (fileChooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
                        [this] (const juce::FileChooser& fc) {
-                           if (fc.getResult().isDirectory())
-                               addFiles ({ fc.getResult() }, 0);
+                           if (! fc.getResult().isDirectory())
+                               return;
+                           // round 190jr (B15): a BandLab download folder (Cakewalk's, with its .blx) opens as the project
+                           auto blx = fc.getResult().findChildFiles (juce::File::findFiles, false, "*.blx");
+                           if (! blx.isEmpty() && host.openProject)
+                           {
+                               blx.sort();
+                               host.openProject (blx.getFirst());
+                               return;
+                           }
+                           addFiles ({ fc.getResult() }, 0);
                        });
 }
 
@@ -1169,6 +1200,12 @@ void SimpleWorkflow::addFiles (const juce::Array<juce::File>& files, std::int64_
         bool stem = false, muted = false;
     };
     std::vector<One> list;
+    for (const auto& file : files)
+        if (file.hasFileExtension ("blx") && host.openProject) // round 190jr (B15): a BandLab project opens as the project
+        {
+            host.openProject (file);
+            return;
+        }
     for (const auto& file : files)
     {
         if (! file.isDirectory())

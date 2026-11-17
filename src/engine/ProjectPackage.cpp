@@ -117,7 +117,10 @@ juce::File extractZip (const juce::File& zipFile, const juce::File& destinationR
                                                          || e->filename.endsWithIgnoreCase (".flm")
                                                          || e->filename.containsIgnoreCase (".band/projectData")
                                                          || e->filename.containsIgnoreCase (".band/Alternatives/000/ProjectData")
-                                                         || (zipFile.hasFileExtension ("band") && (e->filename == "projectData" || e->filename == "Alternatives/000/ProjectData"))))
+                                                         || (zipFile.hasFileExtension ("band") && (e->filename == "projectData" || e->filename == "Alternatives/000/ProjectData"))
+                                                         // (round 190jr: a BandLab .blx, or a zipped .blx holding its JSON)
+                                                         || e->filename.endsWithIgnoreCase (".blx")
+                                                         || (zipFile.hasFileExtension ("blx") && e->filename.endsWithIgnoreCase (".json"))))
             hasProject = true;
     if (! hasProject)
     {
@@ -142,12 +145,24 @@ juce::File extractZip (const juce::File& zipFile, const juce::File& destinationR
     }
 
     // (an FL Studio Mobile share-zip, round 182c: the .flm with its library tree, "My Samples/…", beside it)
-    for (const auto* pattern : { "*.lynx", "*.flp", "*.flm" })
+    for (const auto* pattern : { "*.lynx", "*.flp", "*.flm", "*.blx" })
     {
         auto found = folder.findChildFiles (juce::File::findFiles, true, pattern);
         found.sort();
         if (! found.isEmpty())
             return found.getFirst();
+    }
+    // (round 190jr: a .blx that was a zip of its revision JSON: the JSON becomes "<name>.blx" beside its samples)
+    if (zipFile.hasFileExtension ("blx"))
+    {
+        auto found = folder.findChildFiles (juce::File::findFiles, true, "*.json");
+        found.sort();
+        if (! found.isEmpty())
+        {
+            const auto blx = found.getFirst().getSiblingFile (juce::File::createLegalFileName (zipFile.getFileNameWithoutExtension()) + ".blx");
+            if (found.getFirst().copyFileTo (blx))
+                return blx;
+        }
     }
     // (round 190ic: a GarageBand song, shared from GarageBand for iOS as a zip of its .band folder, or zipped itself)
     if (zippedBand && garageBandPackage (folder) == folder)

@@ -59,6 +59,7 @@
 #include "core/FolderDrag.h" // round 190jf (B17)
 #include "core/KeyFollow.h"
 #include "core/SimpleTracks.h"
+#include "core/RegionLoop.h"
 #include "core/QuickRender.h"
 #include "core/TempoDetect.h"
 #include "core/Comping.h"
@@ -2064,6 +2065,25 @@ void PlaylistComponent::paint (juce::Graphics& g)
             smallClips.fill (g);
         }
 
+        // round 190jr: the Simple layout's region loop handles (BandLab's circular arrow at a region's top right)
+        if (simpleHeaders)
+            for (int i = 0; i < (int) song.playlist.size(); ++i)
+                if (const auto& c = song.playlist[(std::size_t) i]; (c.kind == ClipKind::pattern || c.kind == ClipKind::audio)
+                                                                    && tickToX ((double) c.end()) >= (double) g.getClipBounds().getX()
+                                                                    && tickToX ((double) c.end()) - 16.0 <= (double) g.getClipBounds().getRight())
+                if (const auto handle = regionLoopHandle (i); ! handle.isEmpty() && g.getClipBounds().toFloat().intersects (handle))
+                {
+                    const auto lit = (drag == Drag::regionLoop && i == regionloop::regionAt (song, loopTrack, loopStart, loopLike))
+                                     || (drag == Drag::none && hover.clip == i && handle.expanded (2.0f).contains (lastMouse.toFloat()));
+                    if (lit)
+                    {
+                        g.setColour (colour::bg0.withAlpha (0.55f));
+                        g.fillRoundedRectangle (handle.expanded (1.0f), 2.0f);
+                    }
+                    icons::draw (g, Icon::loop, handle, colour::textPrimary.withAlpha (lit ? 1.0f : 0.8f));
+                }
+        paintSimpleAutomation (g, grid); // round 190jr (nothing unless the Simple automation view is on)
+
         if (song.performanceZoneEnd() > 0)
             paintPerformance (g, grid);
 
@@ -2457,7 +2477,26 @@ void PlaylistComponent::paint (juce::Graphics& g)
                         button (solo, "S", m->solo, colour::info, hovered && hover.solo);
                         textRight = solo.getX() - 2.0f;
                     }
-                    if (const auto bar = trackVolume (t).toFloat(); ! bar.isEmpty() && m != nullptr)
+                    if (auto menuArea = simpleAutoMenu (t).toFloat(); ! menuArea.isEmpty() && m != nullptr)
+                    {
+                        // round 190jr, the Simple automation view (BandLab): the row's parameter as a menu field
+                        const auto target = simpleAutoTarget (t);
+                        g.setColour (hovered && menuArea.contains (lastMouse.toFloat()) ? colour::bg6 : colour::bg4);
+                        g.fillRoundedRectangle (menuArea, radius::sm);
+                        g.setColour (colour::textPrimary);
+                        g.setFont (font (type::caption, true));
+                        const auto name = target.kind == AutomationTargetKind::mixerVolume ? tr ("Volume")
+                                          : target.kind == AutomationTargetKind::mixerPan  ? tr ("Pan")
+                                                                                            : describeAutomationTarget (engine, target);
+                        g.drawText (name, menuArea.reduced (8.0f, 0.0f).withTrimmedRight (14.0f), juce::Justification::centredLeft, true);
+                        icons::draw (g, Icon::chevronDown, menuArea.removeFromRight (18.0f).reduced (3.0f), colour::textSecondary);
+                        if (simpleAutoLane (t) >= 0) // the track has automation for it: BandLab's small mark beside the header
+                        {
+                            g.setColour (colour::automation.brighter (0.4f));
+                            g.fillEllipse (juce::Rectangle<float> (5.0f, 5.0f).withCentre ({ menuArea.getX() - 5.0f, menuArea.getCentreY() }));
+                        }
+                    }
+                    else if (const auto bar = trackVolume (t).toFloat(); ! bar.isEmpty() && m != nullptr)
                     {
                         // volume: a bar filled up to the fader position, a tick at 0 dB
                         g.setColour (colour::bg0);
@@ -3622,8 +3661,8 @@ int PlaylistComponent::laneHeightOf (const AutomationLane& lane) const
 int PlaylistComponent::laneBlockHeight (int track) const
 {
     const auto& song = engine.getSong();
-    if (! autolanes::shown() || track < 0 || track >= (int) song.playlistTracks.size())
-        return 0;
+    if (! autolanes::shown() || track < 0 || track >= (int) song.playlistTracks.size() || simpleAutoOn (track))
+        return 0; // (round 190jr: the Simple automation view draws one lane over the track's own row instead)
     const auto& t = song.playlistTracks[(std::size_t) track];
     if (t.lanes.empty() || t.lanesFolded || t.folded || noteedit::isFoldedAway (song, track))
         return 0;
@@ -3635,6 +3674,8 @@ int PlaylistComponent::laneBlockHeight (int track) const
 
 juce::Rectangle<int> PlaylistComponent::laneRow (int track, int lane) const
 {
+    if (simpleAutoOn (track)) // round 190jr: the shown parameter's lane is the track's own row
+        return lane >= 0 && lane == simpleAutoLane (track) ? juce::Rectangle<int> (0, trackToY (track), getWidth(), heightOf (track)) : juce::Rectangle<int>();
     if (laneBlockHeight (track) <= 0)
         return {};
     const auto& lanes = engine.getSong().playlistTracks[(std::size_t) track].lanes;
@@ -3655,6 +3696,12 @@ juce::Rectangle<float> PlaylistComponent::laneBody (int track, int lane) const
 
 PlaylistComponent::LaneHit PlaylistComponent::laneAt (juce::Point<int> p) const
 {
+    if (simpleAutomation && p.x >= headerWidth && p.y >= tracksTop() && p.y < gridArea().getBottom()) // round 190jr
+        if (const auto track = yToTrack (p.y); simpleAutoOn (track))
+        {
+            const auto lane = simpleAutoLane (track);
+            return lane >= 0 ? LaneHit { track, lane } : LaneHit {};
+        }
     if (! autolanes::shown() || p.y < headerHeight || p.y >= gridArea().getBottom())
         return {};
     const auto track = yToTrack (p.y);
@@ -4091,6 +4138,266 @@ void PlaylistComponent::showAddLaneMenu (int track)
     menu.addSeparator();
     menu.addItem (tr ("Any control: right-click it > Automate in lane"), false, false, [] {});
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+}
+
+// --- round 190jr (BUILD-LIST 13): the Simple layout's region loop ----------------------------------------------------
+bool PlaylistComponent::regionLoopContinues (int clip) const
+{
+    const auto& song = engine.getSong();
+    if (clip < 0 || clip >= (int) song.playlist.size())
+        return false;
+    const auto& c = song.playlist[(std::size_t) clip];
+    for (const auto& o : song.playlist)
+        if (o.track == c.track && o.start == c.end() && o.kind == c.kind && o.pattern == c.pattern && o.channel == c.channel
+            && o.offset == c.offset && o.length <= c.length && o.gridSlot < 0 && o.gain == c.gain && o.pitch == c.pitch && o.muted == c.muted)
+            return true;
+    return false;
+}
+
+juce::Rectangle<float> PlaylistComponent::regionLoopHandle (int clip) const
+{
+    if (! simpleHeaders || ! regionloop::loopable (engine.getSong(), clip) || noteedit::isFoldedAway (engine.getSong(), engine.getSong().playlist[(std::size_t) clip].track))
+        return {};
+    const auto r = clipBounds (clip).toFloat();
+    const auto title = clipHeaderHeight (r);
+    if (r.getWidth() < 34.0f || title < 9.0f || regionLoopContinues (clip))
+        return {};
+    // BandLab: a small circular arrow at the right end of the region's name strip
+    const auto size = juce::jmin (11.0f, title - 2.0f);
+    return { r.getRight() - size - 3.0f, r.getY() + (title - size) * 0.5f, size, size };
+}
+
+void PlaylistComponent::regionLoopDragTo (int x)
+{
+    const auto& song = engine.getSong();
+    const auto region = regionloop::regionAt (song, loopTrack, loopStart, loopLike);
+    if (region < 0)
+        return;
+    const auto snapOn = ! juce::ModifierKeys::currentModifiers.isAltDown();
+    const auto run = regionloop::runOf (song, region);
+    const auto cap = regionloop::nextStart (song, run);
+    const auto first = song.playlist[(std::size_t) region].end();
+    const auto end = juce::jmax (first, juce::jmin (cap, snap (xToTick (x) + (snapOn ? gridTicks() / 2.0 : 0.0), snapOn)));
+    if (end == run.end)
+        return;
+    engine.editSong ([region, end] (Song& s) { regionloop::loopTo (s, region, end); });
+    postDragHint();
+    repaint();
+}
+
+// --- round 190jr (BUILD-LIST 13): the Simple layout's automation view (BandLab's automation switch) ---------------------
+void PlaylistComponent::setSimpleAutomation (bool on)
+{
+    if (on == simpleAutomation)
+        return;
+    simpleAutomation = on;
+    hover = {};
+    refreshTrackLayout(); // (the lanes under Simple tracks give way to the rows' own line)
+    updateScrollBars();
+    repaint();
+    if (onSimpleAutomationChanged)
+        onSimpleAutomationChanged (on);
+}
+
+bool PlaylistComponent::simpleAutoOn (int track) const
+{
+    return simpleAutomation && simpleHeaders && track >= 0 && track < (int) engine.getSong().playlistTracks.size() && simpleInsert (track) > 0
+           && ! noteedit::isFoldedAway (engine.getSong(), track);
+}
+
+AutomationTarget PlaylistComponent::simpleAutoTarget (int track) const
+{
+    const auto insert = simpleInsert (track);
+    if (const auto it = simpleAutoTargets.find (track); it != simpleAutoTargets.end() && it->second.index == insert)
+    {
+        const auto& t = it->second;
+        const auto& song = engine.getSong();
+        if (t.kind != AutomationTargetKind::effectParam
+            || (insert > 0 && insert < (int) song.mixer.size() && t.slot >= 0 && t.slot < (int) song.mixer[(std::size_t) insert].effects.size()))
+            return t;
+    }
+    return { AutomationTargetKind::mixerVolume, insert, 0, 0 };
+}
+
+int PlaylistComponent::simpleAutoLane (int track) const
+{
+    const auto& song = engine.getSong();
+    if (track < 0 || track >= (int) song.playlistTracks.size())
+        return -1;
+    const auto target = simpleAutoTarget (track);
+    const auto& lanes = song.playlistTracks[(std::size_t) track].lanes;
+    for (int i = 0; i < (int) lanes.size(); ++i)
+        if (const auto a = lanes[(std::size_t) i].automation; a >= 0 && a < (int) song.automations.size() && song.automations[(std::size_t) a].target == target)
+            return i;
+    return -1;
+}
+
+float PlaylistComponent::simpleAutoCurrent (const AutomationTarget& target) const
+{
+    const auto& song = engine.getSong();
+    if (target.index <= 0 || target.index >= (int) song.mixer.size())
+        return 0.5f;
+    const auto& m = song.mixer[(std::size_t) target.index];
+    switch (target.kind)
+    {
+        case AutomationTargetKind::mixerVolume: return m.volume;
+        case AutomationTargetKind::mixerPan: return juce::jlimit (0.0f, 1.0f, (m.pan + 1.0f) * 0.5f);
+        case AutomationTargetKind::effectParam:
+            if (target.slot >= 0 && target.slot < (int) m.effects.size() && target.param >= 0 && target.param < maxEffectParams)
+                return m.effects[(std::size_t) target.slot].params[(std::size_t) target.param];
+            return 0.5f;
+        default: return 0.5f;
+    }
+}
+
+juce::Rectangle<int> PlaylistComponent::simpleAutoMenu (int track) const
+{
+    if (! simpleAutoOn (track))
+        return {};
+    const auto v = trackVolume (track);
+    if (v.isEmpty())
+        return {};
+    const auto fx = trackFx (track);
+    const auto right = fx.isEmpty() ? v.getRight() : fx.getRight();
+    return { v.getX(), v.getCentreY() - 10, right - v.getX(), 20 };
+}
+
+void PlaylistComponent::showSimpleAutoMenu (int track)
+{
+    auto menu = buildSimpleAutoMenu (track);
+    if (menu.getNumItems() > 0)
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withTargetScreenArea (localAreaToGlobal (simpleAutoMenu (track))));
+}
+
+juce::PopupMenu PlaylistComponent::buildSimpleAutoMenu (int track)
+{
+    const auto& song = engine.getSong();
+    const auto insert = simpleInsert (track);
+    juce::PopupMenu menu;
+    if (insert <= 0 || insert >= (int) song.mixer.size())
+        return menu;
+    const auto current = simpleAutoTarget (track);
+    auto pick = [this, track] (AutomationTarget t) {
+        return [this, track, t] {
+            simpleAutoTargets[track] = t;
+            repaint();
+        };
+    };
+    // BandLab's order: Track (Pan, Volume), then each effect's parameters under the effect's name
+    menu.addSectionHeader (tr ("Track"));
+    for (const auto kind : { AutomationTargetKind::mixerPan, AutomationTargetKind::mixerVolume })
+    {
+        const AutomationTarget t { kind, insert, 0, 0 };
+        menu.addItem (kind == AutomationTargetKind::mixerPan ? tr ("Pan") : tr ("Volume"), true, current == t, pick (t));
+    }
+    const auto& effects = song.mixer[(std::size_t) insert].effects;
+    for (int slot = 0; slot < (int) effects.size(); ++slot)
+    {
+        const auto& fx = effects[(std::size_t) slot];
+        if (fx.kind == EffectKind::plugin || fx.kind == EffectKind::parallel || fx.kind == EffectKind::patcher)
+            continue; // (hosted plugins and containers: their parameters through "Automate in lane" on the control)
+        const auto& info = effectInfo (fx.kind);
+        if (info.params.empty())
+            continue;
+        menu.addSectionHeader (tr (info.name));
+        for (int p = 0; p < (int) info.params.size() && p < maxEffectParams; ++p)
+        {
+            const AutomationTarget t { AutomationTargetKind::effectParam, insert, slot, p };
+            menu.addItem (tr (info.params[(std::size_t) p].name), true, current == t, pick (t));
+        }
+    }
+    return menu;
+}
+
+bool PlaylistComponent::simpleAutoMouseDown (const juce::MouseEvent& e)
+{
+    if (! simpleAutomation || e.y < tracksTop() || e.y >= gridArea().getBottom())
+        return false;
+    const auto track = yToTrack (e.y);
+    if (! simpleAutoOn (track))
+        return false;
+    if (e.x < headerWidth) // the header's parameter menu
+    {
+        if (simpleAutoMenu (track).contains (e.getPosition()) && ! flmods::popup (e.mods))
+        {
+            showSimpleAutoMenu (track);
+            return true;
+        }
+        return false; // (M, S, the name: as ever)
+    }
+    if (simpleAutoLane (track) >= 0 || flmods::popup (e.mods) || ! e.mods.isLeftButtonDown())
+        return false; // (the lane exists: laneMouseDown edits it; a right-click on a flat line does nothing)
+    // the first point on this row: the lane is made now, flat at the parameter's current value (one undo step with the
+    // point laneMouseDown adds next: editSong joins the edits made while the button is held)
+    const auto target = simpleAutoTarget (track);
+    const auto value = simpleAutoCurrent (target);
+    const auto name = describeAutomationTarget (engine, target).toStdString();
+    engine.editSong ([track, target, name, value] (Song& s) { autolanes::addLane (s, track, target, name, value); });
+    return false;
+}
+
+void PlaylistComponent::paintSimpleAutomation (juce::Graphics& g, juce::Rectangle<int> grid)
+{
+    if (! simpleAutomation || ! simpleHeaders)
+        return;
+    using namespace theme;
+    const auto& song = engine.getSong();
+    const auto clipArea = g.getClipBounds();
+    const auto from = (float) juce::jmax (grid.getX(), clipArea.getX()), to = (float) juce::jmin (grid.getRight(), clipArea.getRight());
+    for (int t = 0; t < numTracks(); ++t)
+    {
+        if (! simpleAutoOn (t))
+            continue;
+        const auto row = juce::Rectangle<int> (grid.getX(), trackToY (t), grid.getWidth(), heightOf (t));
+        if (! row.intersects (clipArea))
+            continue;
+        // BandLab: the regions dim under the line
+        g.setColour (colour::bg0.withAlpha (0.45f));
+        g.fillRect (row.withTrimmedBottom (1));
+        const auto body = row.toFloat().reduced (0.0f, 4.0f); // (laneBody's rule for the row)
+        const auto lane = simpleAutoLane (t);
+        const auto a = lane >= 0 ? laneAutomation (t, lane) : -1;
+        const auto line = song.isTrackMuted (t) ? colour::textDisabled : colour::textPrimary;
+        if (a < 0)
+        {
+            // no automation yet: a dashed line at the parameter's current value (a click on it adds the first point)
+            const auto y = body.getBottom() - simpleAutoCurrent (simpleAutoTarget (t)) * body.getHeight();
+            juce::Path flat, dashed;
+            flat.startNewSubPath (from, y);
+            flat.lineTo (to, y);
+            const float dash[] = { 2.0f, 3.0f };
+            juce::PathStrokeType (1.0f).createDashedStroke (dashed, flat, dash, 2);
+            g.setColour (line.withAlpha (0.6f));
+            g.fillPath (dashed);
+            continue;
+        }
+        const auto& automation = song.automations[(std::size_t) a];
+        juce::Path curve;
+        auto lastY = 0.0f;
+        for (auto x = from; x <= to; x += 2.0f)
+        {
+            const auto yAt = [&] (int sx) { return body.getBottom() - laneShown (a, automation.valueAt (xToTick (sx))) * body.getHeight(); };
+            const auto y = yAt ((int) x);
+            if (x == from)
+                curve.startNewSubPath (x, y);
+            else
+                automationLineTo (curve, x - 2.0f, lastY, x, y, [&] { return yAt ((int) x - 1); });
+            lastY = y;
+        }
+        g.setColour (line);
+        g.strokePath (curve, juce::PathStrokeType (1.2f));
+        for (const auto& p : automation.points) // the points: small rings (BandLab)
+        {
+            const auto x = (float) tickToX ((double) p.tick);
+            if (x < from - 4.0f || x > to + 4.0f)
+                continue;
+            const auto y = body.getBottom() - laneShown (a, p.value) * body.getHeight();
+            g.setColour (colour::bg0);
+            g.fillEllipse (x - 3.0f, y - 3.0f, 6.0f, 6.0f);
+            g.setColour (line);
+            g.drawEllipse (x - 3.0f, y - 3.0f, 6.0f, 6.0f, 1.2f);
+        }
+    }
 }
 
 void PlaylistComponent::toggleAutomationLanes()
@@ -4973,6 +5280,9 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
         return;
     }
 
+    // round 190jr: the Simple automation view (its header menu; the first point on a row makes its lane)
+    if (simpleAutoMouseDown (e))
+        return;
     // round 177b: automation lanes (their own gestures in every tool)
     if (laneMouseDown (e))
         return;
@@ -5623,6 +5933,23 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
             return;
         }
 
+    // round 190jr (BUILD-LIST 13): the Simple layout's loop handle: a drag right repeats the region
+    if (hit >= 0 && ! flmods::popup (e.mods) && regionLoopHandle (hit).expanded (2.0f).contains (e.position))
+    {
+        const auto run = regionloop::runOf (engine.getSong(), hit);
+        if (! run.empty())
+        {
+            setSelection ({});
+            const auto& region = engine.getSong().playlist[(std::size_t) run.clips.front()];
+            loopTrack = region.track;
+            loopStart = region.start;
+            loopLike = region;
+            drag = Drag::regionLoop;
+            postDragHint();
+            return;
+        }
+    }
+
     // audio clip fade handles (drawn at the top corners of the body)
     if (hit >= 0)
         if (const auto fade = fadeHandleAt (hit, e.getPosition()); fade != 0)
@@ -6133,6 +6460,10 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
             return;
         }
 
+        case Drag::regionLoop:
+            regionLoopDragTo (e.x);
+            return;
+
         case Drag::clipGain:
         {
             const auto delta = (gainStartY - e.y) * clipops::clipGainDbPerPixel;
@@ -6457,6 +6788,15 @@ bool PlaylistComponent::makeDragHint (ui::Hint& hint)
             hint.text = tr ("Resizing {0} clip(s)  [Alt] no snap", { count });
             hint.value = position (drag == Drag::resize ? clip->end() : clip->start);
             break;
+        case Drag::regionLoop: // round 190jr
+            if (const auto region = regionloop::regionAt (song, loopTrack, loopStart, loopLike); region >= 0)
+            {
+                const auto run = regionloop::runOf (song, region);
+                hint.text = tr ("Looping the region: drag right to repeat it  [Alt] no snap");
+                hint.value = tr ("{0} passes", { juce::String ((double) (run.end - run.start) / (double) juce::jmax<std::int64_t> (1, run.pass), 2) })
+                             + "  " + position (run.end);
+            }
+            break;
         case Drag::slip: hint.text = tr ("Sliding the content inside the clip  [Alt] no snap"); break;
         case Drag::swipe: hint.text = tr ("Swiping this range to the comp  [Alt] no snap"); break;
         case Drag::clipGain:
@@ -6768,7 +7108,7 @@ void PlaylistComponent::mouseUp (const juce::MouseEvent& e)
             painted.push_back (i);
         sortClips (painted);
     }
-    else if (drag == Drag::resize || drag == Drag::trimLeft || drag == Drag::timeMove)
+    else if (drag == Drag::resize || drag == Drag::trimLeft || drag == Drag::timeMove || drag == Drag::regionLoop)
         sortClips();
 
     rippleOriginals.clear();
@@ -8943,9 +9283,31 @@ void PlaylistComponent::editMarkerName (std::int64_t tick, int existing)
 
 void PlaylistComponent::showClipMenu (int index)
 {
-    auto menu = buildClipMenu (index, getMouseXYRelative().x);
+    auto menu = withRegionLoopItems (buildClipMenu (index, getMouseXYRelative().x), index);
     if (menu.getNumItems() > 0)
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+}
+
+// round 190jr (BUILD-LIST 13, BandLab's region loop): the Simple layout's loop items, added at the end of the clip's own
+// menu (its layout and header stay as they are)
+juce::PopupMenu PlaylistComponent::withRegionLoopItems (juce::PopupMenu menu, int index)
+{
+    if (! simpleHeaders || ! regionloop::loopable (engine.getSong(), index) || menu.getNumItems() == 0)
+        return menu;
+    const auto run = regionloop::runOf (engine.getSong(), index);
+    const auto& region = engine.getSong().playlist[(std::size_t) run.clips.front()];
+    auto at = [this, track = region.track, start = region.start, like = region] { return regionloop::regionAt (engine.getSong(), track, start, like); };
+    menu.addSeparator();
+    menu.addItem (tr ("Loop until next"), [this, at] {
+        const auto end = juce::jmax (engine.getSong().songLength(), (std::int64_t) 0);
+        engine.editSong ([end, region = at()] (Song& s) { regionloop::loopUntilNext (s, region, end); });
+        sortClips();
+    });
+    menu.addItem (tr ("Unloop"), run.passes() > 1, false, [this, at] {
+        engine.editSong ([region = at()] (Song& s) { regionloop::unloop (s, region); });
+        sortClips();
+    });
+    return menu;
 }
 
 juce::PopupMenu PlaylistComponent::getClipMenuForSnapshot (int index)
@@ -8953,7 +9315,7 @@ juce::PopupMenu PlaylistComponent::getClipMenuForSnapshot (int index)
     if (index < 0 || index >= (int) engine.getSong().playlist.size())
         return {};
     const auto& c = engine.getSong().playlist[(std::size_t) index];
-    return buildClipMenu (index, (int) tickToX ((double) c.start + (double) c.length / 2.0));
+    return withRegionLoopItems (buildClipMenu (index, (int) tickToX ((double) c.start + (double) c.length / 2.0)), index);
 }
 
 // "Follow the project key" (with what it does now) and "Loop key ▸" for an audio clip (round 190ds, core/KeyFollow.h)
@@ -11542,6 +11904,8 @@ PlaylistComponent::Hover PlaylistComponent::hoverAt (juce::Point<int> p) const
 
     if (clipMenuButton (h.clip).contains (p))
         h.target = gesture::Target::clipMenu;
+    else if (regionLoopHandle (h.clip).expanded (2.0f).contains (p.toFloat())) // round 190jr
+        h.target = gesture::Target::rightEdge;
     else if (fadeHandleAt (h.clip, p) != 0)
         h.target = gesture::Target::fadeHandle;
     else if (gainHandle (h.clip).expanded (2.0f).contains (p.toFloat()))
