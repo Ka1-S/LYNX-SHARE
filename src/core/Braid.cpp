@@ -26,7 +26,9 @@ constexpr int maxVoices = 16;   // 12 poly voices + room for releases / stacks
 // --- measured constants (REA_rodada190ko §1; each names the render rows that fix it)
 struct Laws
 {
-    double engineLevel = 0.5;       // an engine at Volume 0 dB, centre: a full-scale wave → this per side [MEASURED m1 o00]
+    double engineLevel = 0.3536;    // an engine at Volume 0 dB, centre: a full-scale wave → this per side (−9 dBFS) [MEASURED m1 o00 m0-0:
+                                    // a sine peaks −15.1 dBFS at Meld's default Volume −6 dB]
+    double dcBlockHz = 18.0;        // each engine's output is high-passed (one pole) [MEASURED m1 o00 m1-0: a 261 Hz square droops 20 % per half cycle]
     double pitchModSemis = 48.0;    // Pitch Mod ← 1 [MEASURED m1 q1x]
     double detuneSemis = 1.0;       // Detune ← 1 (and the knob's ±0.5 = ± half a semitone) [MEASURED m1 q1y, p1]
     double volumeModDb = 24.0;      // Volume ← 1: dB [MEASURED m1 q2a]
@@ -407,13 +409,13 @@ float oscSample (int type, OscState& s, float f, float m1, float m2, Rng& rng) n
             s.phase = wrap01 (s.phase + f);
             return y;
         }
-        case 1: // Dual Basic Shapes: a second copy detuned up to a fifth
+        case 1: // Dual Basic Shapes: a second copy, Detune 1 = an octave above, each at half level [MEASURED m1 o01 m0-1 / m1-1]
         {
-            const auto ratio = std::pow (2.0f, m2 * 7.0f / 12.0f) + 0.003f;
-            const auto y = 0.5f * (shapeMorph (s.phase, dt, m1, 0.5f) + shapeMorph (s.phase2, dt * ratio, m1, 0.5f));
+            const auto ratio = std::exp2 (m2) * (1.0f + 0.0015f * m2);
+            const auto y = 0.5f * (shapeMorph (s.phase, dt, m1, 0.5f) + shapeMorph (s.phase2, std::min (dt * ratio, 0.49f), m1, 0.5f));
             s.phase = wrap01 (s.phase + f);
             s.phase2 = wrap01 (s.phase2 + f * ratio);
-            return y * 1.41f;
+            return y;
         }
         case 2: // Noisy Shapes: phase noise grows with Rough
         {
@@ -423,43 +425,46 @@ float oscSample (int type, OscState& s, float f, float m1, float m2, Rng& rng) n
             s.phase = wrap01 (s.phase + f);
             return y;
         }
-        case 3: // Square Sync: a square synced to the note, its own frequency Freq 1 … (+Freq 2 as a second, mixed)
+        case 3: // Square Sync: a square synced to the note at 1 + 2·Freq 1 + 8·Freq 2 − 2·Freq 1·Freq 2 times its pitch
+                // [MEASURED m1 o03: the spectrum peaks at harmonic 3 (1, 0), 9 (0, 1), 9 (1, 1), 3…5 (½, ½)]
         {
-            const auto r1 = std::pow (2.0f, m1 * 4.0f), r2 = std::pow (2.0f, m2 * 4.0f);
-            const auto y = 0.5f * (squareBl (s.phase2, std::min (dt * r1, 0.49f), 0.5f) + squareBl (s.phase3, std::min (dt * r2, 0.49f), 0.5f));
-            s.phase = s.phase + f;
-            s.phase2 = wrap01 (s.phase2 + f * r1);
-            s.phase3 = wrap01 (s.phase3 + f * r2);
+            const auto r = 1.0f + 2.0f * m1 + 8.0f * m2 - 2.0f * m1 * m2;
+            const auto y = squareBl (s.phase2, std::min (dt * r, 0.49f), 0.5f);
+            s.phase += f;
+            s.phase2 = wrap01 (s.phase2 + f * r);
             if (s.phase >= 1.0f)
             {
                 s.phase -= 1.0f;
-                s.phase2 = s.phase * r1;
-                s.phase3 = s.phase * r2;
+                s.phase2 = s.phase * r;
             }
             return y;
         }
-        case 4: // Square 5th: a square and a square a fifth above
+        case 4: // Square 5th: the square glides up by stacked fifths (×3 at ½, ×9 at 1); P Width narrows its pulse
+                // [MEASURED m1 o04: a plain square at 784 Hz (½) and 2355 Hz (1) from C3; P Width 1 = a one-sample pulse]
         {
-            const auto pw = 0.5f - 0.45f * m2;
-            const auto y = squareBl (s.phase, dt, pw) * (1.0f - 0.5f * m1) + 0.5f * m1 * squareBl (s.phase2, std::min (dt * 1.4983f, 0.49f), pw);
-            s.phase = wrap01 (s.phase + f);
-            s.phase2 = wrap01 (s.phase2 + f * 1.4983f);
+            const auto r = std::pow (3.0f, 2.0f * m1);
+            const auto fi = std::min (f * r, 0.49f);
+            const auto y = squareBl (s.phase, fi, std::max (0.5f - 0.5f * m2, fi));
+            s.phase = wrap01 (s.phase + f * r);
             return y;
         }
-        case 5: // Sub: a sine morphing into a square, a sine an octave below added by Aux
+        case 5: // Sub: an octave below the note, a sine morphing into a square (Tone), and a sine two octaves below (Aux)
+                // [MEASURED m1 o05: f0 130.8 Hz from C3; Aux 1 adds 65.4 Hz 5 dB above it]
         {
-            const auto sq = squareBl (s.phase, dt, 0.5f);
-            const auto y = sine (s.phase) * (1.0f - m1) + sq * m1 + m2 * sine (s.phase2);
-            s.phase = wrap01 (s.phase + f);
-            s.phase2 = wrap01 (s.phase2 + f * 0.5f);
-            return y / (1.0f + 0.5f * m2);
+            const auto fh = f * 0.5f;
+            const auto sq = squareBl (s.phase, std::min (fh, 0.49f), 0.5f);
+            const auto y = (sine (s.phase) * (1.0f - m1) + sq * m1 * 0.75f) + 1.8f * m2 * sine (s.phase2);
+            s.phase = wrap01 (s.phase + fh);
+            s.phase2 = wrap01 (s.phase2 + f * 0.25f);
+            return y;
         }
         case 6:
         case 7:
         case 8:
         case 9: // Swarm: eight detuned waves; Motion moves them, Spacing spreads them towards a chord
         {
-            constexpr float chord[8] { 0, 12, 7, 19, -12, 24, 5, 16 };
+            // Spacing 1 spreads the voices over −24, −12, 0 and +19 semitones [MEASURED m1 o06…o09 m0-1: 65 / 131 / 262 / 785 Hz]
+            constexpr float chord[8] { 0.0f, -12.0f, -24.0f, 19.0f, 0.0f, -12.0f, 7.0f, 12.0f };
             if (--s.swarmTick <= 0) // (the waves' ratios move slowly: once every 16 samples)
             {
                 s.swarmTick = 16;
@@ -468,7 +473,7 @@ float oscSample (int type, OscState& s, float f, float m1, float m2, Rng& rng) n
                     s.drift[(std::size_t) i] += (s.driftTarget[(std::size_t) i] - s.drift[(std::size_t) i]) * 0.008f;
                     if (rng.uni() < 0.0032f)
                         s.driftTarget[(std::size_t) i] = rng.bi();
-                    const auto cents = ((float) i - 3.5f) * 3.0f + s.drift[(std::size_t) i] * 20.0f * m1;
+                    const auto cents = s.drift[(std::size_t) i] * 120.0f * m1; // (Motion: up to a semitone of wander; 0 = the voices in unison)
                     s.ratio[(std::size_t) i] = std::exp2 ((cents * 0.01f + m2 * chord[i]) / 12.0f);
                 }
             }
@@ -481,36 +486,41 @@ float oscSample (int type, OscState& s, float f, float m1, float m2, Rng& rng) n
                 y += type == 6 ? sine (t) : type == 7 ? triangle (t) : type == 8 ? sawBl (t, di) : squareBl (t, di, 0.5f);
                 s.swarm[(std::size_t) i] = wrap01 (t + fi);
             }
-            return y * 0.25f;
+            return y * 0.159f; // (eight voices 2.1 dB above one wave [MEASURED m1 o06 m0-0: −16.0 dB rms against the sine's −18.1])
         }
-        case 10: // Harmonic FM: a sine modulated at a whole ratio
+        case 10: // Harmonic FM: the modulator at a harmonic ratio 0.25 · 40^Ratio, rounded to halves (0.25 at 0, 1.5 at ½, 10 at 1)
+                 // [MEASURED m1 o10: sidebands on a 65 Hz grid (0), 1.5 × (½), 10 × (1) from C3]
         {
-            const auto ratio = 1.0f + std::floor (m2 * 7.99f);
-            const auto y = sine (s.phase + 6.0f * m1 * sine (s.phase2) / twoPi);
+            auto ratio = 0.25f * std::pow (40.0f, m2);
+            ratio = ratio < 0.75f ? (ratio < 0.375f ? 0.25f : 0.5f) : std::round (ratio * 2.0f) * 0.5f;
+            const auto y = sine (s.phase + 1.43f * m1 * sine (s.phase2) / twoPi);
             s.phase = wrap01 (s.phase + f);
             s.phase2 = wrap01 (s.phase2 + f * ratio);
             return y;
         }
-        case 11: // Fold FM: FM then a wave folder shaped by Shape
+        case 11: // Fold FM: a sine phase-modulated at the note, then folded harder with Shape [MEASURED m1 o11: odd harmonics grow with Shape]
         {
-            auto x = sine (s.phase + 4.0f * m1 * sine (s.phase2) / twoPi) * (1.0f + 3.0f * m2);
+            auto x = sine (s.phase + 0.35f * m1 * sine (s.phase2)) * (1.15f + 2.5f * m2);
             while (x > 1.0f || x < -1.0f)
                 x = x > 1.0f ? 2.0f - x : -2.0f - x;
             s.phase = wrap01 (s.phase + f);
             s.phase2 = wrap01 (s.phase2 + f);
             return x;
         }
-        case 12: // Squelch: feedback FM through a resonant low pass
+        case 12: // Squelch: two octaves below the note, a sine phase-modulated at six times its rate (Amount) and by its own output
+                 // (Feedback) [MEASURED m1 o12: f0 65.4 Hz from C3; Amount 1 peaks at the 6th harmonic]
         {
-            const auto y = sine (s.phase + 3.0f * m1 * s.fb / twoPi);
-            s.fb = 0.5f * (s.fb + sine (s.phase + 2.5f * m2 * s.fb / twoPi));
-            s.phase = wrap01 (s.phase + f);
+            const auto fq = f * 0.25f;
+            const auto y = sine (s.phase + (0.5f * m1 * sine (s.phase2) + 0.35f * m2 * s.fb));
+            s.fb = 0.5f * (s.fb + y);
+            s.phase = wrap01 (s.phase + fq);
+            s.phase2 = wrap01 (s.phase2 + fq * 6.0f);
             return y;
         }
-        case 13: // Simple FM: a sine modulated at a free ratio
+        case 13: // Simple FM: the modulator at 4 · Ratio times the note, index 2.9 · Amount [MEASURED m1 o13 m0.5-0.5: 261 / 784 Hz equal]
         {
-            const auto ratio = 0.5f + m2 * 7.5f;
-            const auto y = sine (s.phase + 5.0f * m1 * sine (s.phase2) / twoPi);
+            const auto ratio = 4.0f * m2;
+            const auto y = sine (s.phase + 2.9f * m1 * sine (s.phase2) / twoPi);
             s.phase = wrap01 (s.phase + f);
             s.phase2 = wrap01 (s.phase2 + f * ratio);
             return y;
@@ -525,7 +535,7 @@ float oscSample (int type, OscState& s, float f, float m1, float m2, Rng& rng) n
             const auto fi = f * std::exp2 ((m2 > 0.02f ? arp[s.step] : 0.0f) / 12.0f);
             const auto y = squareBl (s.phase, std::min (fi, 0.49f), 0.5f - 0.375f * m1);
             s.phase = wrap01 (s.phase + fi);
-            return y;
+            return 0.5f * y; // (a half-level square [MEASURED m1 o14 m0-0: −21.3 dB rms against the sine's −18.1])
         }
         case 15: // Shepard's Pi: octave-spaced sines under a moving bell
         {
@@ -544,22 +554,18 @@ float oscSample (int type, OscState& s, float f, float m1, float m2, Rng& rng) n
             }
             return y * 0.6f;
         }
-        case 16: // Tarp: a plucked noise burst ringing at the pitch in a delay loop (Decay: the loop's feedback, Tone: its brightness)
+        case 16: // Tarp: a sustained, rounded saw an octave below the note; Tone opens it up, Decay acts on the notes' starts only
+                 // [MEASURED m1 o16: f0 130.8 Hz from C3, harmonics −27 / −33 / −45 dB at Tone 0, −38 / −25 / −40 / −31 at Tone 1,
+                 // Decay 1 = Decay 0 on a held note]
         {
-            const auto len = std::clamp (1.0f / std::max (f, 1.0e-4f), 2.0f, 2040.0f);
-            const auto excite = s.env > 1.0e-4f ? rng.bi() * s.env : 0.0f;
-            s.env *= 0.995f;
-            auto rp = (float) s.loopPos - len;
-            if (rp < 0.0f)
-                rp += 2048.0f;
-            const auto i0 = (int) rp;
-            const auto fr = rp - (float) i0;
-            const auto d = s.loop[(std::size_t) (i0 & 2047)] * (1.0f - fr) + s.loop[(std::size_t) ((i0 + 1) & 2047)] * fr;
-            s.lp += (0.15f + 0.85f * m2) * (d - s.lp);
-            const auto y = excite + s.lp * (0.95f + 0.0499f * m1);
-            s.loop[(std::size_t) s.loopPos] = y;
-            s.loopPos = (s.loopPos + 1) & 2047;
-            return std::clamp (y, -2.0f, 2.0f);
+            const auto fh = std::min (f * 0.5f, 0.45f);
+            const auto saw = sawBl (s.phase, fh);
+            s.phase = wrap01 (s.phase + fh);
+            const auto cut = std::min (fh * (1.2f + 10.0f * m2 * m2), 0.45f);
+            const auto a = 1.0f - std::exp (-6.2832f * cut);
+            s.lp += a * (saw - s.lp);
+            s.lp2 += a * (s.lp - s.lp2);
+            return s.lp2 * (1.6f - 0.6f * m2);
         }
         case 17: // Extratone: a sine whose pitch drops from above each cycle of a fast envelope (Pitch, Env Amount)
         {
@@ -587,34 +593,40 @@ float oscSample (int type, OscState& s, float f, float m1, float m2, Rng& rng) n
             v += (rng.bi() - v) * m2 * 0.05f;
             return y * 0.7f;
         }
-        case 19: // Filtered Noise: a band of noise (Freq relative to the note, Width)
+        case 19: // Filtered Noise: a band of noise around the note · 2^(±1.95 oct) (Freq 0…1), Width 1 = narrowest
+                 // [MEASURED m1 o19: centres 62 Hz (0) and 944 Hz (1) from C3]
         {
+            // Width 0 is broad noise, Width 1 a narrow, louder band [MEASURED rms −34 dB (0, 0) … −18 dB (1, 1)]
             float lp, bp, hp;
-            const auto fc = std::min (f * std::exp2 ((m1 - 0.5f) * 8.0f), 0.45f);
-            const auto k = 0.05f + 2.0f * m2;
-            s.svf.run (rng.bi(), s.tanA (fc), k, lp, bp, hp);
-            return bp * 0.5f * std::sqrt (k / (3.14159265f * fc)); // (about the same loudness at any width)
+            const auto fc = std::min (f * std::exp2 ((m1 - 0.5f) * 3.9f), 0.45f);
+            const auto k = 2.0f - 1.97f * m2;
+            const auto n = rng.bi();
+            s.svf.run (n, s.tanA (fc), k, lp, bp, hp);
+            const auto band = bp * std::sqrt (3.0f * k / (3.14159265f * fc));
+            return 0.22f * (1.0f - m2) * n + 1.1f * m2 * band;
         }
-        case 20: // Bitgrunge: a square and its sub-octaves combined bitwise
+        case 20: // Bitgrunge: a square at the note · 2^(10·(Freq − ½)) and its sub-octaves combined bitwise (Mult)
+                 // [MEASURED m1 o20: centroids 88 Hz (0), 422 (½), 3.8 kHz (1) from C3; −18 dB rms]
         {
-            const auto fi = f * std::exp2 ((m1 - 0.5f) * 4.0f);
-            s.phase = wrap01 (s.phase + std::min (fi, 0.45f));
+            const auto fi = std::min (f * std::exp2 ((m1 - 0.5f) * 10.0f), 0.45f);
+            s.phase = wrap01 (s.phase + fi);
             const auto bits = (int) (s.phase * 256.0f);
-            const auto mult = 1 + (int) (m2 * 6.0f);
+            const auto mult = (int) (m2 * 6.0f);
             int v = (bits >> 7) & 1;
             for (int i = 1; i <= mult; ++i)
                 v ^= (bits >> (7 - i)) & 1;
-            return v ? 0.7f : -0.7f;
+            return v ? 0.5f : -0.5f;
         }
-        case 21: // Crackle: random clicks (Density, Intensity)
+        case 21: // Crackle: short noise bursts at random (Density), brighter and louder with Intensity
+                 // [MEASURED m1 o21: −74 … −28 dB rms, centroid 1 … 5 kHz]
         {
-            if (rng.uni() < 0.0002f + 0.01f * m1 * m1)
-                s.eventAmp = rng.bi() * (0.3f + 0.7f * m2);
-            const auto y = s.eventAmp;
-            s.eventAmp *= 0.6f;
-            float lp, bp, hp;
-            s.svf.run (y, s.tanA (0.02f + 0.3f * m2), 0.7f, lp, bp, hp);
-            return (hp + bp) * 1.5f;
+            if (rng.uni() < 1.5e-5f * (1.0f + 600.0f * m1 * m1))
+                s.eventAmp = (0.3f + 0.7f * rng.uni()) * (0.6f + 0.8f * m2);
+            const auto y = s.eventAmp * rng.bi();
+            s.eventAmp *= 0.97f;
+            const auto a = 0.25f + 0.6f * m2;
+            s.lp += a * (y - s.lp);
+            return s.lp * 2.5f;
         }
         case 22: // Rain: droplets ringing near the pitch (Tone) at a rate (Rate)
         {
@@ -656,7 +668,7 @@ float oscSample (int type, OscState& s, float f, float m1, float m2, Rng& rng) n
                 y += sawBl (s.swarm[(std::size_t) i], std::min (fi, 0.49f));
                 s.swarm[(std::size_t) i] = wrap01 (s.swarm[(std::size_t) i] + fi);
             }
-            return y * 0.4f;
+            return y * 0.26f; // [MEASURED m1 o24 m0-0: −25 dB rms]
         }
     }
 }
@@ -681,7 +693,7 @@ constexpr float membraneRatios[modeCount] { 1.0f, 1.594f, 2.136f, 2.296f, 2.653f
 struct FilterCoefs
 {
     int type = 0;
-    float g = 1.0f, k = 1.4f, m1 = 0.0f, m2 = 0.0f, fc = 0.1f, drive = 1.0f;
+    float g = 1.0f, k = 1.4f, k2 = 1.4f, m1 = 0.0f, m2 = 0.0f, fc = 0.1f, drive = 1.0f;
     float combLen = 100.0f, combFb = 0.0f, combDamp = 0.0f;
     std::array<float, modeCount> modeG {}, modeAmp {};
     float modeK = 0.01f;
@@ -716,19 +728,19 @@ float filterOne (FilterState& st, float x, const FilterCoefs& c) noexcept
             s[1].run (y, c.g, c.k, lp, bp, hp);
             return svfMorph (lp, bp, hp, c.m2);
         }
-        case 2: // MS2 low pass: driven, 12 dB
-            s[0].run (std::tanh (x * c.drive) / std::max (1.0f, c.drive * 0.5f), c.g, c.k, lp, bp, hp);
-            return std::tanh (lp);
-        case 3:
-            s[0].run (std::tanh (x * c.drive) / std::max (1.0f, c.drive * 0.5f), c.g, c.k, lp, bp, hp);
-            return std::tanh (hp);
+        // the driven circuits: Drive is gain into a soft clip (+12 dB at ½ [MEASURED m1 f02 / f03 / f04 m0.5-0.5]), one 12 dB stage
+        case 2: // MS2 low pass
+            s[0].run (x * c.drive, c.g, c.k, lp, bp, hp);
+            return 1.6f * std::tanh (lp * 0.625f);
+        case 3: // MS2 high pass
+            s[0].run (x * c.drive, c.g, c.k, lp, bp, hp);
+            return 1.6f * std::tanh (hp * 0.625f);
         case 4: // OSR band pass
-            s[0].run (std::tanh (x * c.drive), c.g, c.k, lp, bp, hp);
-            return bp * c.k;
-        case 5: // LP Crunch: the distortion fed back
-            s[0].run (x - 0.3f * c.m2 * std::tanh (s[0].ic2 * 3.0f), c.g, c.k, lp, bp, hp);
-            s[1].run (std::tanh (lp * (1.0f + 3.0f * c.m2)), c.g, 1.4f, lp, bp, hp);
-            return lp;
+            s[0].run (x * c.drive, c.g, c.k, lp, bp, hp);
+            return 1.6f * std::tanh (bp * c.k * 0.625f);
+        case 5: // LP Crunch 12dB: the distortion fed back into the stage
+            s[0].run (x * c.drive - 0.3f * c.m2 * std::tanh (s[0].ic2 * 3.0f), c.g, c.k, lp, bp, hp);
+            return 1.6f * std::tanh (lp * 0.625f);
         case 6: // LP Switched Res: a resonant low pass whose input is sampled and held (Lofi)
         {
             holdT += 1.0f;
@@ -737,16 +749,15 @@ float filterOne (FilterState& st, float x, const FilterCoefs& c) noexcept
             s[0].run (hold, c.g, c.k, lp, bp, hp);
             return lp;
         }
-        case 7: // Filther: input and output distortion around a low pass
-            s[0].run (std::tanh (x * c.drive), c.g, c.k, lp, bp, hp);
-            s[1].run (lp, c.g, 1.4f, lp, bp, hp);
-            return std::tanh (lp * c.drive) / std::tanh (c.drive);
-        case 8: // EQ peak: boost around the cutoff
-            s[0].run (x, c.g, c.k, lp, bp, hp);
-            return x + bp * c.k * c.m2 * 4.0f;
-        case 9: // EQ notch: cut around the cutoff
-            s[0].run (x, c.g, c.k, lp, bp, hp);
-            return x - bp * c.k * c.m2;
+        case 7: // Filther: input and output distortion around a 12 dB low pass
+            s[0].run (1.6f * std::tanh (x * c.drive * 0.625f), c.g, c.k, lp, bp, hp);
+            return 1.6f * std::tanh (lp * 0.625f);
+        case 8: // Eq Peak: Boost (macro 1) around the cutoff, Q (macro 2) its width
+            s[0].run (x, c.g, c.k2, lp, bp, hp);
+            return x + bp * c.k2 * c.m1 * 3.0f;
+        case 9: // Eq Notch: Cut (macro 1), Q (macro 2)
+            s[0].run (x, c.g, c.k2, lp, bp, hp);
+            return x - bp * c.k2 * c.m1;
         case 10: // Phaser: four all-pass stages with feedback
         {
             auto y = x + c.m1 * 0.9f * ap[7];
@@ -801,7 +812,7 @@ float filterOne (FilterState& st, float x, const FilterCoefs& c) noexcept
             for (int m = 0; m < modeCount; ++m)
             {
                 st.modes[(std::size_t) m].run (x, c.modeG[(std::size_t) m], c.modeK, lp, bp, hp);
-                y += bp * c.modeAmp[(std::size_t) m] * c.modeK * 2.0f; // (bp · k: unity at each mode)
+                y += bp * c.modeAmp[(std::size_t) m] * c.modeK; // (bp · k: unity at each mode)
             }
             return y;
         }
@@ -818,7 +829,7 @@ struct EngineVoice
     Lfo1State l1;
     float l1Phase = 0.0f, l2Phase = 0.0f, l2Held = 0.0f;
     float l1Out = 0.0f, l1FxOut = 0.0f, l2Out = 0.0f;
-    OnePole toneLp, toneHp, toneLpR, toneHpR;
+    OnePole toneLp, toneHp, toneLpR, toneHpR, dc;
     float pitchNow = 0.0f, glideFrom = 0.0f, glidePos = 1.0f;
     // the control step's results
     float f = 0.0f, m1 = 0.0f, m2 = 0.0f, gainL = 0.0f, gainR = 0.0f, toneA = 1.0f, toneMode = 0.0f;
@@ -969,7 +980,11 @@ struct Engine::Impl
                 return i;
         return oldest >= 0 ? oldest : 0;
     }
-    int stackCount() const noexcept { return 1 << std::clamp ((int) std::lround (v (stacked)), 0, 2); }
+    // Stacked Voices: index 0 / 1 / 2 = 1 / 2 / 3 voices per note, spread evenly −1 … +1 [MEASURED m1 pK: two voices at
+    // ±50 cents, pF: three at −50 / 0 / +50 cents through the default matrix's ±0.5 detune rows]
+    // the stacked voices share the level: the same loudness for 1, 2 or 3 [MEASURED m1 pC / pK / pF: −15.0 dB rms each]
+    float stackGain() const noexcept { return 1.0f / std::sqrt ((float) stackCount()); }
+    int stackCount() const noexcept { return 1 + std::clamp ((int) std::lround (v (stacked)), 0, 3); }
 
     void note (int key, float vel, float pitch, float slide, float pressure) noexcept
     {
@@ -1006,7 +1021,17 @@ struct Engine::Impl
             startVoice (voices[(std::size_t) freeVoice()], key, vel, pitch, slide, pressure, stackPos (s, stacks), false);
         lastKeyPitch = (float) key + pitch;
     }
-    static float stackPos (int s, int n) noexcept { return n <= 1 ? 0.0f : -1.0f + 2.0f * (float) s / (float) (n - 1); }
+    // one voice per note: each held note of a chord takes its own Spread value, −0.25, −0.25, −0.5, −0.5, −0.75 … in the
+    // order the notes came [MEASURED m1 pE: a single note's engines at ∓12.5 cents; pJ: the third note of a chord at ∓25]
+    float stackPos (int s, int n) const noexcept
+    {
+        if (n > 1)
+            return -1.0f + 2.0f * (float) s / (float) (n - 1);
+        int held = 0;
+        for (const auto& vo : voices)
+            held += vo.active && vo.held ? 1 : 0;
+        return -0.25f * (float) (1 + held / 2);
+    }
 
     // the matrix's sum for one target (engine k's row t)
     float modSum (const Voice&, int target) const noexcept
@@ -1021,6 +1046,20 @@ struct Engine::Impl
         return s;
     }
     bool modded (int target) const noexcept { return routeCount[(std::size_t) target] > 0; }
+    // the Volume rows only pull the level down: a source at its top leaves it, at its bottom it takes `amount` of it away —
+    // gain × (1 + Σ a (s − 1) / 2) [MEASURED m1 pG: the default Vel → Volume 50 % gives 0 / −2.5 / −4 / −6 dB at velocity
+    // 127 / 64 / 32 / 1]
+    float volumeFactor (int target) const noexcept
+    {
+        const auto n = routeCount[(std::size_t) target];
+        float s = 0.0f;
+        for (int i = 0; i < n; ++i)
+        {
+            const auto& r = routes[(std::size_t) target][(std::size_t) i];
+            s += r.amount * (sources[(std::size_t) r.source] - 1.0f) * 0.5f;
+        }
+        return std::max (0.0f, 1.0f + s);
+    }
     void takeSources (const Voice& vo) noexcept
     {
         for (int i = 0; i < sourceCount; ++i)
@@ -1042,7 +1081,7 @@ struct Engine::Impl
             case src::bLfo1Fx: return b.l1FxOut;
             case src::bLfo2: return b.l2Out;
             case src::bAmpEnv: return b.amp.value;
-            case src::velocity: return vo.velocity;
+            case src::velocity: return 2.0f * vo.velocity - 1.0f; // (bipolar: velocity 64 is 0 [MEASURED m1 q10: no pitch change at 64])
             case src::key: return ((float) vo.key - 60.0f) / (float) laws.keySpan;
             case src::pitchBend: return bendRange > 0.0f ? clampBi (bend / bendRange) : 0.0f; // (the wheel, ±1)
             case src::notePitchBend: return clampBi (vo.notePitch / 48.0f);
@@ -1151,8 +1190,9 @@ struct Engine::Impl
                 c.m2 = clamp01 ((float) ev (k, eng::filterMacro2) + modSum (vo, t0 + tgt::filterMacro2));
                 c.fc = (float) (fhz / rate);
                 c.g = (float) std::tan (pi * std::min (fhz / rate, 0.45));
-                c.k = 2.0f - 1.95f * c.m1;          // Q
-                c.drive = 1.0f + 7.0f * c.m2 * c.m2; // drive
+                c.k = 2.0f - 1.95f * c.m1;  // Q (macro 1 on most types)
+                c.k2 = 2.0f - 1.95f * c.m2; // Q (macro 2 on the EQs)
+                c.drive = std::pow (10.0f, 24.0f * c.m2 / 20.0f); // Drive: +24 dB at 1
                 if (c.type == 12)
                 {
                     static constexpr float f1[5] { 730, 530, 270, 570, 300 }, f2[5] { 1090, 1840, 2290, 840, 870 };
@@ -1172,8 +1212,9 @@ struct Engine::Impl
                 }
                 else if (c.type == 15 || c.type == 16)
                 {
-                    const auto ratio = 0.5f + c.m1; // (the plate's side ratio / the membrane's tension spread)
-                    const auto t60 = 0.02f + 2.0f * c.m2 * c.m2;
+                    // Plate: Q (macro 1), Ratio (macro 2: the plate's sides); Membrane: Q, Damp (the high modes shorter) — the modes'
+                    // peaks keep their height whatever the Q [MEASURED m1 f15 / f16]
+                    const auto ratio = c.type == 15 ? 0.5f + c.m2 : 1.0f;
                     for (int m = 0; m < modeCount; ++m)
                     {
                         float r = membraneRatios[m];
@@ -1184,10 +1225,9 @@ struct Engine::Impl
                         }
                         const auto f = std::min ((double) fhz * r / rate, 0.45);
                         c.modeG[(std::size_t) m] = (float) std::tan (pi * f);
-                        c.modeAmp[(std::size_t) m] = 1.0f / (1.0f + 0.3f * (float) m);
+                        c.modeAmp[(std::size_t) m] = (c.type == 16 ? std::pow (1.0f - 0.6f * c.m2, (float) m) : 1.0f) / (1.0f + 0.15f * (float) m);
                     }
-                    // the modes' damping: k = 2ζ, with T60 = 6.91 / (ζ ω) → k = 13.8 / (ω T60), at the first mode
-                    c.modeK = (float) std::clamp (13.8 / (2.0 * pi * fhz * t60), 0.0005, 1.0);
+                    c.modeK = 0.08f * (1.0f - c.m1) * (1.0f - c.m1) + 0.004f; // (Q 0 already rings [MEASURED m1 f15 / f16 m0-0])
                 }
             }
             // tone, pan, volume, envelope
@@ -1195,9 +1235,11 @@ struct Engine::Impl
             e.toneMode = tone;
             const auto toneHz = tone < 0.0f ? 20000.0 * std::exp2 (tone * laws.toneOctaves * 1.5) : 20.0 * std::exp2 (tone * laws.toneOctaves * 1.5);
             e.toneA = (float) (1.0 - std::exp (-2.0 * pi * std::min (toneHz, rate * 0.45) / rate));
-            const auto pan = clampBi ((float) ev (k, eng::pan) + modSum (vo, t0 + tgt::pan));
-            const auto db = (float) ev (k, eng::volume) + modSum (vo, t0 + tgt::volume) * (float) laws.volumeModDb;
-            const auto g = (ev (k, eng::on) >= 0.5 ? (float) laws.engineLevel : 0.0f) * std::pow (10.0f, db / 20.0f) * e.amp.value;
+            // (the Pan rows: amount 0.5 = a full side [MEASURED m1 pK: ±0.5 · Spread ±1 puts each voice wholly left / right])
+            const auto pan = clampBi ((float) ev (k, eng::pan) + 2.0f * modSum (vo, t0 + tgt::pan));
+            const auto db = (float) ev (k, eng::volume);
+            const auto g = (ev (k, eng::on) >= 0.5 ? (float) laws.engineLevel : 0.0f) * std::pow (10.0f, db / 20.0f) * e.amp.value * stackGain()
+                           * (modded (t0 + tgt::volume) ? volumeFactor (t0 + tgt::volume) : 1.0f);
             // the pan law: −3 dB at the centre's partner side (constant power)
             const auto angle = (pan + 1.0f) * 0.25f * (float) pi;
             e.gainL = g * std::cos (angle) * 1.41421356f;
@@ -1232,6 +1274,7 @@ struct Engine::Impl
                         x = e.toneLp.lp (x, e.toneA);
                     else if (e.toneMode > 0.001f)
                         x -= e.toneHp.lp (x, e.toneA);
+                    x -= e.dc.lp (x, dcA);
                     l[i + j] += x * e.gainL;
                     r[i + j] += x * e.gainR;
                 }
@@ -1248,8 +1291,10 @@ struct Engine::Impl
     }
 
     float tmpL[512] {}, tmpR[512] {};
+    float dcA = 0.0f;
     void render (float* l, float* r, int n, double tempo) noexcept
     {
+        dcA = (float) (1.0 - std::exp (-2.0 * pi * laws.dcBlockHz / rate));
         const auto driveAmt = (float) v (drive);
         const auto lim = on (limiter);
         const auto outGain = (float) v (volume);

@@ -45,7 +45,18 @@ inline double decaySeconds (float v) noexcept { return logLaw (v, 0.001, 20.0); 
 inline double pitchModSemis (float v) noexcept { return linLaw (v, 0.0, 4.0); }
 inline int harmonicCount (float v) noexcept { return std::clamp ((int) std::lround (linLaw (v, 1.0, 256.0)), 1, 256); }
 inline float harmonicValue (int n) noexcept { return linValue (n, 1.0, 256.0); }
-inline int unisonVoices (float v) noexcept { return 1 + stepOf (v, 4); } // Unison 0…3 → 1…4 voices
+// Unison 0…3 → copies of the partials: 1, 3, 5, 9, spread to ±(0, 2.9, 7, 20) % at Amount ½ [MEASURED s1 r08: unison 1 at 0.5 =
+// the partial and two at ±2.9 %, 6 dB down; unison 3 a cluster ±20 % wide]
+inline int unisonVoices (float v) noexcept
+{
+    static constexpr int n[4] { 1, 3, 5, 9 };
+    return n[stepOf (v, 4)];
+}
+inline double unisonSpread (float v, double amount) noexcept
+{
+    static constexpr double d[4] { 0.0, 0.058, 0.14, 0.4 };
+    return d[stepOf (v, 4)] * amount;
+}
 inline double inputDb (float v) noexcept { return linLaw (v, -24.0, 24.0); }
 inline int modeOf (float v) noexcept { return stepOf (v, 4); } // None, Chorus, Wander, Granular
 
@@ -53,17 +64,19 @@ inline int modeOf (float v) noexcept { return stepOf (v, 4); } // None, Chorus, 
 // the partial's frequency: n-th harmonic, stretched — Stretch 1 = odd harmonics only, −1 = squeezed towards the first
 // [MEASURED s1 r04 stretch ±0.5 / ±1]
 inline double partialRatio (int n, double s) noexcept { return 1.0 + (double) (n - 1) * (1.0 + s); }
-// the decay of partial n: Decay is the first partial's T60; HF / LF damping shorten the high / low partials
-// [MEASURED s1 r02, r03]
-inline double partialT60 (double decay, double hz, double hf, double lf) noexcept
+// the decay of partial n (the harmonic's number): every partial's T60 is Decay [MEASURED s1 r00 / r02: 1.00 / 0.20 / 5.0 s for all];
+// HF damping divides it by 1 + 0.54 h^3.27 (n − 1), LF damping the lowest 10 l partials by 1 + 0.29 (10 l + 1 − n)
+// [MEASURED r03: hf 0.5 → partial 40 at 0.31 s; hf 1 → partial 5 at 0.32 s; lf 0.5 → partial 1 at 0.41 s, from the 6th on
+// untouched; lf 1 → partial 1 at 0.25 s, from the 11th on untouched]
+inline double partialT60 (double decay, int n, double hf, double lf) noexcept
 {
-    const auto hi = std::pow (std::max (hz, 20.0) / 1000.0, -3.0 * hf);
-    const auto lo = std::pow (std::max (hz, 20.0) / 1000.0, 3.0 * lf);
-    return std::max (1.0e-3, decay * std::min (1.0, hi) * std::min (1.0, lo));
+    const auto hi = 1.0 + 0.54 * std::pow (std::clamp (hf, 0.0, 1.0), 3.27) * (double) (n - 1);
+    const auto lo = 1.0 + 0.29 * std::max (0.0, 10.0 * std::clamp (lf, 0.0, 1.0) + 1.0 - (double) n);
+    return std::max (1.0e-3, decay / (hi * lo));
 }
 
 constexpr int frameSize = 2048;
-constexpr int maxPartials = 256, maxUnison = 4;
+constexpr int maxPartials = 256, maxUnison = 9;
 
 class Engine
 {
@@ -130,9 +143,9 @@ public:
         }
     }
 
-    // Dry/Wet [MEASURED s1 r10: MODEL until fitted — linear]
-    static double dryLaw (double w) noexcept { return 1.0 - w; }
-    static double wetLaw (double w) noexcept { return w; }
+    // Dry/Wet: equal power, as Spectral Time's [MEASURED s1 r10]
+    static double dryLaw (double w) noexcept { return std::cos (w * spectral::pi * 0.5); }
+    static double wetLaw (double w) noexcept { return std::sin (w * spectral::pi * 0.5); }
 
 private:
     static constexpr int hop = frameSize / 4;
@@ -158,21 +171,27 @@ private:
         const auto st = stretchOf (p[stretch]);
         const auto sh = std::exp2 (shiftSemis (p[shift]) / 12.0);
         const auto H = harmonicCount (p[harmonics]);
-        const auto U = unisonVoices (p[unison]);
         const auto uAmt = (double) std::clamp (p[unisonAmount], 0.0f, 1.0f);
+        // copies with no spread fall together with the partial itself: one copy (no coherent build-up of identical ones)
+        const auto U = uAmt < 0.01 ? 1 : unisonVoices (p[unison]);
         const auto dec = decaySeconds (p[decay]);
         const auto hf = (double) std::clamp (p[hfDamp], 0.0f, 1.0f), lf = (double) std::clamp (p[lfDamp], 0.0f, 1.0f);
         const auto mode = modeOf (p[modMode]);
         const auto mRate = (double) std::clamp (p[modRate], 0.0f, 1.0f);
         const auto pm = pitchModSemis (p[pitchMod]);
         const auto hopS = (double) hop / rate;
-        const auto norm = 2.0f / (0.5f * (float) frameSize); // a sine of amplitude a gives a·N/4 at its bin (Hann)
+        const auto norm = 4.0f / (float) frameSize; // a sine of amplitude a gives a·N/4 at its bin (Hann)
+        const auto spacing = f0 * std::max (0.25, 1.0 + st);
         for (int u = 0; u < U; ++u)
         {
             auto& b = bank[(std::size_t) u];
             // unison copies detuned symmetrically [MEASURED s1 r08: MODEL]
-            const auto cents = U > 1 ? (-1.0 + 2.0 * u / (U - 1)) * 50.0 * uAmt : 0.0;
-            const auto detune = std::exp2 (cents / 1200.0);
+            const auto spread = U > 1 ? (-1.0 + 2.0 * u / (U - 1)) * unisonSpread (p[unison], uAmt) : 0.0;
+            const auto detune = 1.0 + spread;
+            // the centre copy 6 dB above the others, the copies together 4.3 dB above one, whatever their number [MEASURED r08:
+            // −45.1 dB rms at unison 1 and 3 against −49.4 without]
+            const auto w = U > 1 ? 0.67f * (float) std::sqrt (2.7 / (4.0 + (double) (U - 1))) : 1.0f; // (0.67: fitted on r08)
+            const auto voiceGain = U > 1 ? (u == U / 2 ? 2.0f * w : w) : 1.0f;
             int count = 0;
             for (int n = 1; n <= H && count < maxPartials; ++n)
             {
@@ -202,32 +221,39 @@ private:
                         g = 1.0f;
                     grainGain = g;
                 }
-                // the excitation: the input's magnitude at the partial's place in the (pitch-shifted) input
+                // the excitation: the input's energy around the partial (in the pitch-shifted input), weighted down linearly to
+                // 0.9 of the partials' spacing away [MEASURED s1 r00: a 500 Hz tone rings the 440 / 550 Hz partials at 0.36 / 0.44 of
+                // its level, 2 kHz the 1980 Hz one at 0.8; an impulse every partial at −49 dB]
                 const auto at = fn / sh / binHz;
-                const auto k = (int) at;
+                const auto reach = std::max (1.5, 0.9 * spacing / sh / binHz);
+                const auto k0 = std::max (1, (int) std::ceil (at - reach)), k1 = std::min (frameSize / 2 - 1, (int) std::floor (at + reach));
                 double eL = 0.0, eR = 0.0;
-                if (k >= 0 && k + 1 < frameSize / 2)
+                for (int k = k0; k <= k1; ++k)
                 {
-                    const auto fr = at - k;
-                    eL = std::abs (specL[(std::size_t) k]) * (1.0 - fr) + std::abs (specL[(std::size_t) k + 1]) * fr;
-                    eR = std::abs (specR[(std::size_t) k]) * (1.0 - fr) + std::abs (specR[(std::size_t) k + 1]) * fr;
+                    const auto w = 1.0 - std::abs ((double) k - at) / reach;
+                    eL += w * w * std::norm (specL[(std::size_t) k]);
+                    eR += w * w * std::norm (specR[(std::size_t) k]);
                 }
-                const auto t60 = partialT60 (dec, fn, hf, lf);
+                eL = std::sqrt (eL), eR = std::sqrt (eR);
+                const auto t60 = partialT60 (dec, n, hf, lf);
                 const auto g = (float) std::exp (-6.907755 * hopS / t60);
                 auto& tl = b.targetL[(std::size_t) count];
                 auto& tr = b.targetR[(std::size_t) count];
                 // a partial rings on at least as loud as its excitation now, then decays [MODEL: a peak-hold resonance]
-                tl = std::max (tl * g, (float) eL * norm * coupling) * (mode == 3 ? 1.0f : 1.0f);
+                tl = std::max (tl * g, (float) eL * norm * coupling);
                 tr = std::max (tr * g, (float) eR * norm * coupling);
-                const auto ampTL = tl * grainGain / (float) std::sqrt ((double) U), ampTR = tr * grainGain / (float) std::sqrt ((double) U);
+                const auto ampTL = tl * grainGain * voiceGain, ampTR = tr * grainGain * voiceGain;
                 b.dAmpL[(std::size_t) count] = (ampTL - b.ampL[(std::size_t) count]) / (float) hop;
                 b.dAmpR[(std::size_t) count] = (ampTR - b.ampR[(std::size_t) count]) / (float) hop;
                 // the rotator for this hop's frequency
                 const auto w = 2.0 * spectral::pi * freq / rate;
                 b.wr[(std::size_t) count] = (float) std::cos (w);
                 b.wi[(std::size_t) count] = (float) std::sin (w);
-                if (count >= b.count) // a new partial starts at phase 0
-                    b.re[(std::size_t) count] = 1.0f, b.im[(std::size_t) count] = 0.0f;
+                if (count >= b.count) // a new partial starts at phase 0; its unison copies at their own random phases
+                {
+                    const auto a = u == U / 2 ? 0.0f : rng.uni() * 6.2831853f;
+                    b.re[(std::size_t) count] = std::cos (a), b.im[(std::size_t) count] = std::sin (a);
+                }
                 else // renormalise the rotator against drift
                 {
                     const auto m = std::sqrt (b.re[(std::size_t) count] * b.re[(std::size_t) count] + b.im[(std::size_t) count] * b.im[(std::size_t) count]);
@@ -268,7 +294,7 @@ private:
         }
     }
 
-    static constexpr float coupling = 1.0f; // [MEASURED s1 r00: MODEL until fitted]
+    static constexpr float coupling = 0.8f; // (the band energy above gives Live's level on an impulse; 0.8 fits its drums and presets [s1 r00, k1 sr*])
     double rate = 48000.0;
     spectral::Fft fft;
     std::vector<float> window, inL, inR;

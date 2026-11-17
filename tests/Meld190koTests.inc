@@ -132,7 +132,7 @@ TEST (meld190ko_braid_plays_every_oscillator_and_filter_bounded_and_deterministi
             for (const auto v : x)
                 finite = finite && std::isfinite (v), peak = std::max (peak, std::abs (v));
             CHECK (finite && peak < 2.0f);
-            CHECK (meld190ko::rms (x, 0.05, 0.4) > 1.0e-4);
+            CHECK ((t == 21 && m == 0.0) || meld190ko::rms (x, 0.05, 0.4) > 1.0e-4); // (Crackle at Density 0: a click now and then)
             CHECK (x == meld190ko::play (s, 60, 0.6, 0.4));
         }
     for (int f = 0; f < b::filterTypeCount; ++f)
@@ -202,7 +202,7 @@ TEST (meld190ko_spectral_time_and_resonator_import_onto_timeprism_and_harmonia)
         const auto* p = tr->slot.params.data();
         // Freq as a note (dial mode 1): MIDI 57 = 220 Hz, whatever the stored Hz says
         CHECK (std::abs (h::frequencyHz (p[h::frequency]) - 220.0) < 0.05);
-        CHECK (std::abs (h::shiftSemis (p[h::shift]) - 7.0) < 1e-4 && h::harmonicCount (p[h::harmonics]) == 64 && h::unisonVoices (p[h::unison]) == 3);
+        CHECK (std::abs (h::shiftSemis (p[h::shift]) - 7.0) < 1e-4 && h::harmonicCount (p[h::harmonics]) == 64 && h::unisonVoices (p[h::unison]) == 5);
         CHECK (std::abs (h::decaySeconds (p[h::decay]) - 2.0) < 1e-3 && std::abs (h::inputDb (p[h::input]) + 6.0) < 1e-4 && h::modeOf (p[h::modMode]) == 2);
     }
     CHECK (effectInfo (EffectKind::timeprism).params.size() == (std::size_t) t::count);
@@ -245,4 +245,81 @@ TEST (meld190ko_envelopes_on_meld_and_the_spectral_devices_move_lynx_parameters)
             found = als190cf::near (a.points[0].value, 0.25) && als190cf::near (a.points[1].value, 0.75);
     CHECK (found);
     CHECK (report.unsupported.count ("Automation of a device parameter (Keys)") == 0);
+}
+
+TEST (meld190ko_measured_laws_of_the_three_engines)
+{
+    using namespace lynx;
+    namespace b = braid;
+    namespace t = timeprism;
+    namespace h = harmonia;
+    // --- Braid: a sine engine at 0 dB peaks at −9 dBFS before Meld's −6 dB volume (Live: −15.1 dBFS) [m1 o00]
+    std::vector<double> s (b::defaults().begin(), b::defaults().end());
+    s[(std::size_t) (b::engineBase (1) + b::eng::on)] = 0.0;
+    s[(std::size_t) (b::engineBase (0) + b::eng::volume)] = 0.0;
+    s[(std::size_t) (b::engineBase (0) + b::eng::filterOn)] = 0.0;
+    for (int tg = 0; tg < b::targetCount; ++tg)
+        for (int src = 0; src < b::sourceCount; ++src)
+            s[(std::size_t) b::matrixIndex (tg, src)] = 0.0;
+    auto x = meld190ko::play (s, 60, 1.0, 0.9);
+    CHECK (std::abs (20.0 * std::log10 (meld190ko::toneAt (x, 261.6256, 0.2, 0.8)) - (-15.05)) < 0.3);
+    // Shape 1 = a square: odd harmonics only, the 3rd 9.5 dB under the first [m1 o00 m1-0]
+    s[(std::size_t) (b::engineBase (0) + b::eng::oscMacro1)] = 1.0;
+    x = meld190ko::play (s, 60, 1.0, 0.9);
+    const auto h1 = meld190ko::toneAt (x, 261.6256, 0.2, 0.8), h2 = meld190ko::toneAt (x, 523.25, 0.2, 0.8), h3 = meld190ko::toneAt (x, 784.88, 0.2, 0.8);
+    CHECK (std::abs (20.0 * std::log10 (h3 / h1) - (-9.5)) < 0.5 && 20.0 * std::log10 (h2 / h1 + 1e-12) < -60.0);
+    // Velocity → Volume 50 % takes 6 dB away at velocity 1 and nothing at 127 [m1 pG]
+    s[(std::size_t) (b::engineBase (0) + b::eng::oscMacro1)] = 0.0;
+    s[(std::size_t) b::matrixIndex (b::tgt::volume, b::src::velocity)] = 0.5;
+    const auto at = [&] (float vel) {
+        b::RefNote n;
+        n.velocity = vel;
+        n.release = 40000;
+        const auto o = b::renderReference (s, { n }, 48000.0, 48000);
+        std::vector<float> m (o.size() / 2);
+        for (std::size_t i = 0; i < m.size(); ++i)
+            m[i] = o[2 * i];
+        return meld190ko::toneAt (m, 261.6256, 0.2, 0.8);
+    };
+    CHECK (std::abs (20.0 * std::log10 (at (1.0f / 127.0f) / at (1.0f)) - (-6.0)) < 0.2);
+    // --- Timeprism: a 250 ms delay of an impulse is one impulse 12 hops of 1024 later (Ultra) [s1 t00 / t08]
+    {
+        auto slot = makeEffectSlot (EffectKind::timeprism);
+        slot.params[t::time] = t::logValue (0.25, 0.01, 3.0);
+        slot.params[t::feedback] = 0.0f, slot.params[t::delayMix] = 1.0f, slot.params[t::mix] = 1.0f, slot.params[t::input] = 1.0f;
+        slot.params[t::resolution] = t::stepValue (3, 4);
+        std::vector<float> l (48000, 0.0f), r (48000, 0.0f);
+        l[4800] = r[4800] = 1.0f;
+        auto [ol, orr] = meld190ko::runSlot (slot, l, r);
+        int peak = 0;
+        for (int i = 0; i < (int) ol.size(); ++i)
+            peak = std::abs (ol[(std::size_t) i]) > std::abs (ol[(std::size_t) peak]) ? i : peak;
+        CHECK (peak - 4800 == 12288 && std::abs (ol[(std::size_t) peak] - 1.0f) < 0.01f);
+        // the mixes are equal power: 0.707 of the dry at 50 %
+        CHECK (std::abs (t::Engine::dryLaw (0.5) - 0.70711) < 1e-4 && std::abs (t::Engine::wetLaw (0.5) - 0.70711) < 1e-4);
+        // Tilt 1 delays the 20 kHz end by about a second, Mask 0.5 bends it to x^1.5 [s1 t03 / t04]
+        CHECK (std::abs (t::tiltOffset (1.0, 1.0, 0.0) - 1.0) < 1e-9 && std::abs (t::tiltOffset (0.25, 1.0, 0.5) - 0.125) < 1e-9);
+        CHECK (std::abs (t::tiltOffset (0.25, -1.0, 0.0) - 0.75) < 1e-9);
+        // Notes: index 15 = one bar, 3 = 1/24 bar [s1 t10]
+        CHECK (std::abs (t::divisionBeats (15) - 4.0) < 1e-9 && std::abs (t::divisionBeats (3) - 4.0 / 24.0) < 1e-9);
+    }
+    // --- Harmonia: the partials' T60 laws [s1 r03]
+    CHECK (std::abs (h::partialT60 (1.0, 40, 0.5, 0.0) - 0.31) < 0.02 && std::abs (h::partialT60 (1.0, 5, 1.0, 0.0) - 0.32) < 0.02);
+    CHECK (std::abs (h::partialT60 (1.0, 1, 0.0, 1.0) - 0.256) < 0.01 && h::partialT60 (1.0, 11, 0.0, 1.0) == 1.0);
+    // Stretch: 1 = odd harmonics, −½ = half-harmonic steps [s1 r04]
+    CHECK (h::partialRatio (2, 1.0) == 3.0 && h::partialRatio (3, -0.5) == 2.0);
+    {
+        auto slot = makeEffectSlot (EffectKind::harmonia);
+        slot.params[h::frequency] = h::frequencyValue (110.0), slot.params[h::decay] = h::logValue (1.0, 0.001, 20.0);
+        slot.params[h::stretch] = 0.5f, slot.params[h::shift] = 0.5f, slot.params[h::hfDamp] = 0.0f, slot.params[h::lfDamp] = 0.0f;
+        slot.params[h::mix] = 1.0f, slot.params[h::harmonics] = 1.0f, slot.params[h::unison] = 0.0f, slot.params[h::input] = 0.5f;
+        slot.params[h::modMode] = 0.0f;
+        std::vector<float> l (48000, 0.0f), r (48000, 0.0f);
+        l[4800] = r[4800] = 1.0f;
+        auto [ol, orr] = meld190ko::runSlot (slot, l, r);
+        // an impulse rings every harmonic of 110 Hz, about −49 dB each, and nothing between them
+        const auto a2 = meld190ko::toneAt (ol, 220.0, 0.12, 0.32), a3 = meld190ko::toneAt (ol, 330.0, 0.12, 0.32), mid = meld190ko::toneAt (ol, 275.0, 0.12, 0.32);
+        CHECK (std::abs (20.0 * std::log10 (a2) - 20.0 * std::log10 (a3)) < 1.5 && 20.0 * std::log10 (a2 / (mid + 1e-12)) > 20.0);
+        CHECK (20.0 * std::log10 (a2) > -60.0 && 20.0 * std::log10 (a2) < -44.0);
+    }
 }

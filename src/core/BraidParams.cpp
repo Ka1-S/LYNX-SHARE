@@ -120,8 +120,8 @@ std::string fmt (const char* f, double v)
 
 // [DATA 190ko: Live 12.4's menus, read from its device in the GUI session; LYNX's own names where they describe the same thing]
 constexpr const char* oscNames[oscTypeCount] { "Basic Shapes", "Dual Basic Shapes", "Noisy Shapes", "Square Sync", "Square 5th", "Sub",
-                                               "Swarm Sine", "Swarm Triangle", "Swarm Saw", "Swarm Square", "Harmonic FM", "Fold FM",
-                                               "Squelch", "Simple FM", "Chip", "Shepard's Pi", "Tarp", "Extratone", "Noise Loop",
+                                               "Swarm Sine", "Swarm Triangle", "Swarm Saw", "Swarm Square", "Harmonic Fm", "Fold Fm",
+                                               "Squelch", "Simple Fm", "Chip", "Shepard's Pi", "Tarp", "Extratone", "Noise Loop",
                                                "Filtered Noise", "Bitgrunge", "Crackle", "Rain", "Bubble", "Chord" };
 constexpr const char* oscMacros[oscTypeCount][2] { { "Shape", "Tone" }, { "Shape", "Detune" }, { "Shape", "Rough" }, { "Freq 1", "Freq 2" },
                                                    { "5th Amt", "P Width" }, { "Tone", "Aux" }, { "Motion", "Spacing" }, { "Motion", "Spacing" },
@@ -130,21 +130,22 @@ constexpr const char* oscMacros[oscTypeCount][2] { { "Shape", "Tone" }, { "Shape
                                                    { "Decay", "Tone" }, { "Pitch", "Env Amt" }, { "Rate", "Fade" }, { "Freq", "Width" },
                                                    { "Freq", "Mult" }, { "Density", "Intensity" }, { "Tone", "Rate" }, { "Density", "Spread" },
                                                    { "Shape", "Inversion" } };
-constexpr const char* filterNames[filterTypeCount] { "SVF 12", "SVF 24", "MS2 LP", "MS2 HP", "OSR", "LP Crunch", "LP Switched Res",
-                                                     "Filther", "EQ Peak", "EQ Notch", "Phaser", "Redux", "Vowel", "Comb +", "Comb -",
-                                                     "Plate Resonator", "Membrane Resonator" };
+constexpr const char* filterNames[filterTypeCount] { "SVF 12dB", "SVF 24dB", "LP 12dB MS2", "HP 12dB MS2", "BP 12dB OSR", "LP Crunch 12dB",
+                                                     "LP Switched Res", "Filther", "Eq Peak", "Eq Notch", "Phaser", "Redux", "Vowel",
+                                                     "Comb +", "Comb -", "Plate Resonator", "Membrane Resonator" };
 constexpr const char* filterMacros[filterTypeCount][2] { { "Q", "L-B-H-N" }, { "Q", "L-B-H-N" }, { "Q", "Drive" }, { "Q", "Drive" },
                                                          { "Q", "Drive" }, { "Q", "Drive" }, { "Q", "Lofi" }, { "Q", "Drive" },
-                                                         { "Q", "Boost" }, { "Q", "Cut" }, { "Feedback", "Spread" }, { "Crush", "Lofi" },
-                                                         { "Q", "Morph" }, { "Feedback", "Damp" }, { "Feedback", "Damp" },
-                                                         { "Ratio", "Decay" }, { "Ratio", "Decay" } };
+                                                         { "Boost", "Q" }, { "Cut", "Q" }, { "Feedb", "Spread" }, { "Crush", "Lofi" },
+                                                         { "Q", "Morph" }, { "Feedb", "Damp" }, { "Feedb", "Damp" }, { "Q", "Ratio" },
+                                                         { "Q", "Damp" } };
 constexpr const char* genNames[lfoGenCount] { "Basic Shapes", "Ramp", "Wander", "Alternate", "Euclid", "Pulsate" };
-constexpr const char* fxNames[lfoFxCount] { "Off", "Shape", "Gain", "Offset", "Smooth", "Quantize", "Skew", "Steps", "Mirror", "Fold",
-                                            "Wrap", "Bipolar", "Unipolar", "Invert", "Clip", "Ramp Up", "Ramp Down", "Jitter", "Delay" };
-constexpr const char* wave2Names[lfo2WaveCount] { "Sine", "Triangle", "Saw Up", "Saw Down", "Rectangle", "Random S&H" };
-constexpr const char* sourceNames[sourceCount] { "A Mod Env", "A LFO 1", "A LFO 1 FX", "A LFO 2", "A Amp Env", "B Mod Env", "B LFO 1",
-                                                 "B LFO 1 FX", "B LFO 2", "B Amp Env", "Velocity", "Key", "Pitch Bend", "Note PB",
-                                                 "Pressure", "Mod Wheel", "Random", "Slide", "Spread" };
+constexpr const char* fxNames[lfoFxCount] { "None", "Offset", "Attenuverter", "Gate", "Skew Unipolar", "Skew Bipolar", "Unipolarizer",
+                                            "Quantizer", "S&H", "Independent S&H", "Clipper", "Fade In", "Fade Out", "Slew Down", "Slew Up",
+                                            "Slew Up & Down", "Trig Env", "Comparator", "Scrambler" };
+constexpr const char* wave2Names[lfo2WaveCount] { "Sine", "Tri", "Saw Up", "Saw Down", "Rectangle", "Random S&H" };
+constexpr const char* sourceNames[sourceCount] { "A Env", "A M Env", "A LFO 1", "A LFO 1 FX", "A LFO 2", "B Env", "B M Env", "B LFO 1",
+                                                 "B LFO 1 FX", "B LFO 2", "Vel", "Pitch", "PB", "Note PB", "Press", "Mod W", "Rand",
+                                                 "Slide", "Spread" };
 constexpr const char* targetNames[tgt::perEngine] { "Detune", "Pitch Mod", "Pitch Quant", "Osc Macro 1", "Osc Macro 2", "Filter Freq",
                                                     "Filter Macro 1", "Filter Macro 2", "LFO 1 Rate", "LFO 1 Macro 1", "LFO 1 Macro 2",
                                                     "LFO 1 FX 1 Macro", "LFO 1 FX 2 Macro", "LFO 2 Rate", "Amp Attack", "Amp Decay",

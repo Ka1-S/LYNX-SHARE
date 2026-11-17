@@ -67,12 +67,13 @@ enum : int
     volume, perEngine
 };
 }
-// modulation sources (Live's matrix columns in the set's order [MEASURED 190ko q00…q18 + Live's matrix labels])
+// modulation sources (Live's matrix columns in the set's order: each engine's A Env, M Env, LFO 1, LFO 1 FX, LFO 2, then Vel,
+// Pitch, PB, Note PB, Press, Mod W, Rand, Slide, Spread [SHOT 190ko mx1…mx3: the Matrix / MIDI / MPE tabs; MEASURED m1 q00…q18])
 namespace src
 {
 enum : int
 {
-    aModEnv, aLfo1, aLfo1Fx, aLfo2, aAmpEnv, bModEnv, bLfo1, bLfo1Fx, bLfo2, bAmpEnv, velocity, key, pitchBend, notePitchBend, pressure,
+    aAmpEnv, aModEnv, aLfo1, aLfo1Fx, aLfo2, bAmpEnv, bModEnv, bLfo1, bLfo1Fx, bLfo2, velocity, key, pitchBend, notePitchBend, pressure,
     modWheel, random, slide, spread
 };
 }

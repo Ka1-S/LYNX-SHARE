@@ -189,7 +189,7 @@ const EffectInfo& timeprismInfo()
                                      { "Retrigger", 1.0f }, { "Sync units", 0.0f }, { "Interval", t::logValue (0.5, 0.02, 10.0) },
                                      { "Interval beats", t::stepValue (6, 22) }, { "Fade type", 0.0f }, { "Fade in", t::logValue (0.0056, 0.002, 10.0) },
                                      { "Fade out", t::logValue (0.04, 0.02, 10.0) }, { "X-fade", 0.0f }, { "Sensitivity", 0.5f },
-                                     { "Resolution", t::stepValue (3, 5) }, { "Order", 0.0f } } };
+                                     { "Resolution", t::stepValue (3, 4) }, { "Order", 0.0f } } };
     static_assert (t::count == 28);
     return info;
 }
@@ -221,7 +221,11 @@ std::string timeprismParamText (int param, float v)
         case t::spray: return fmt ("%.0f ms", t::sprayOf (v) * 1000.0);
         case t::mask: return fmt ("%+.0f%%", t::maskOf (v) * 100.0);
         case t::shift: return fmt ("%+.1f Hz", t::shiftHz (v));
-        case t::resolution: return fmt ("%.0f", (double) t::frameSizeOf (t::resolutionOf (v)));
+        case t::resolution:
+        {
+            static const char* const r[4] { "Low", "Mid", "High", "Ultra" };
+            return r[t::resolutionOf (v)];
+        }
         default: return fmt ("%.0f%%", v * 100.0);
     }
 }

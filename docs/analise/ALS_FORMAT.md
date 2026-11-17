@@ -734,3 +734,38 @@ MIDI Effect Racks: Branches/MidiEffectBranch {DeviceChain/MidiToMidiDeviceChain/
 ZoneSettings/KeyRange + VelocityRange (Min, Max, CrossfadeMin, CrossfadeMax), MixerDevice/Speaker}, ChainSelector,
 MacroControls.k; a parameter mapped to a macro carries KeyMidi (Channel 16, NoteOrController = k) and its range in
 MidiControllerRange (linear).
+
+## 29. Live's still-dropped devices, lot 6: Meld, Spectral Time, Spectral Resonator (round 190ko, 2026-11-17) [LIVE renders, DATA]
+Probe sets rendered in Live 12.4 Trial (the round's folder `/mnt/e/lynx-work/meld190ko`: m1 laws, m2 the 84 Core Library
+Meld presets, s1 the spectral laws; 190kk's k1 holds the 14 shipped spectral presets on a drum loop). Clean-room: renders,
+saved sets and Live's own menus as shown in its GUI. Code: `core/AlsDevicesLot6.cpp`; engines `core/Braid.h` (+ .cpp,
+`BraidParams.cpp`), `core/Timeprism.h`, `core/Harmonia.h` on `core/SpectralCore.h` (wrappers `core/LiveFxSuite.inc`).
+Laws and scores: `docs/analise/REA_rodada190ko.md`.
+
+| Live device (tag) | LYNX | how |
+|---|---|---|
+| InstrumentMeld (Meld) | Braid (new instrument) | every member copied in Meld's units (Braid keeps them); ModulationConnections → the 50 × 19 matrix |
+| Spectral (Spectral Time) | Timeprism (new effect) | every member a ParamLink |
+| Transmute (Spectral Resonator) | Harmonia (new effect) | every member a ParamLink; Freq read as Hz or as a note by FrequencyDialMode |
+
+Meld [DATA: Defaults/Instruments/Meld.adv and 142 Meld devices in the Core Library]: per engine
+`MeldVoice_Engine{A,B}_` + On; Oscillator_{OscillatorType 0…24, Macro1, Macro2, UseScale, Reset, ResetToVoiceOffset};
+Oscillator_Pitch_{Keytracking, Transpose ±12, TransposeScaleDegrees ±48, TransposeOctaves ±3, Detune ±0.5}; Filter_{On,
+FilterType 0…16, Frequency 20…20480 Hz, Macro1, Macro2, UseScale}; Lfo1_{GeneratorType 0…5, Sync, Retrigger, Rate
+0.01…200 Hz, SyncedRate 0…21, PhaseOffset 0…360, GeneratorMacro1/2, Transformer1Type / Transformer2Type 0…18 +
+Macro}; Lfo2_{Waveform 0…5, Sync, Rate, SyncedRate, Retrigger, PhaseOffset}; AmpEnvelope_{Times_Attack 0…40 s / Decay /
+Release, Slopes_*, Sustain, LoopMode 0…3}; FilterEnvelope_ (the modulation envelope: also Values_Initial / Peak /
+Sustain / Final); ToneFilter ±1, Pan, Volume −50…24 dB, GlideMode, GlideTime 0…20 s. Global: MeldVoice_{EngineBDelay,
+Drive, LimiterOn, LinkAmpEnvelopes, UseScale, VoiceSpreadAmount, LegacyEnvLoopBehaviour}, Volume (linear, 0…2), MonoPoly,
+MonoLegato, PolyVoices, UnisonVoices (stacked voices). ModulationConnections holds 50 ModulationConnectionsForMeld rows
+(TargetName "A Detune" … "B Volume", the same order in every set) with ModulationAmounts.0…18 (−1…1).
+Spectral Time: Freezer_{On, FreezeOn, AvoidFreezingOnsets, SyncIntervalUnits, SyncIntervalBeats 0…21,
+SyncIntervalSeconds 0.02…10, MainMode (0 manual, 1 retrigger), RetriggerMode (0 onsets, 1 sync), FadeType,
+FadeIn 0.002…10 s, CrossfadePercent, FadeOut 0.02…10 s, Sensitivity}, Delay_{On, TimeSeconds 0.01…3, TimeUnit 0…4,
+TimeSixteenths 1…16, TimeDivisions 0…21, Feedback, Tilt ±2, Spray 0…0.4 s, Mask ±1, StereoSpread, FrequencyShift
+±400 Hz, DryWet}, InputSendGain, Resolution, DryWet, ZeroLatencyDry, ProcessingOrder.
+Spectral Resonator: MidiPitch_{MidiGate, MonoPolyMode, Polyphony, Transpose, TransposeScaleDegrees, PitchBendRange, Glide},
+PartialFrequencies_{FrequencyDialMode, FrequencyHz 8.2…2000, FrequencyNote 0…96, Shift ±48 st, PartialStretch ±1,
+QuantizeToScaleOrTuning}, DecayDamping_{DecayTime 0.001…20 s, HighFreqDamp, LowFreqDamp}, Modulation_{ModMode 0…3,
+ModRate, PitchModAmount 0…4 st}, Global_{PitchMode, NumHarmonics 1…256, Unison 0…3, UnisonAmount, InputSend ±24 dB,
+DryWet, UseScale}, MidiSideChain (the MIDI pitch source; listed, not applied).

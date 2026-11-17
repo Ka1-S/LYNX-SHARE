@@ -159,7 +159,7 @@ bool spectralTimeToTimeprism (const Element& device, Translated& out)
         { "Delay_FrequencyShift", t::shift, 0.0, [] (double x) { return t::linValue (x, -400.0, 400.0); } },
         { "Delay_DryWet", t::delayMix, 0.5, unit },
         { "InputSendGain", t::input, 1.0, unit },
-        { "Resolution", t::resolution, 3.0, [] (double i) { return t::stepValue ((int) std::lround (i), 5); } },
+        { "Resolution", t::resolution, 3.0, [] (double i) { return t::stepValue ((int) std::lround (i), 4); } },
         { "DryWet", t::mix, 1.0, unit },
         { "ProcessingOrder", t::order, 0.0, onOff },
     };
@@ -185,6 +185,13 @@ bool spectralResonatorToHarmonia (const Element& device, Translated& out)
 {
     namespace h = harmonia;
     if (! has (device, "PartialFrequencies_FrequencyHz") || ! has (device, "DecayDamping_DecayTime"))
+        return false;
+    // the quality gate (round 190ko): on Live's renders of the shipped presets, a decay of 15 s or longer, eight unison copies
+    // spread wider than 10 %, or the granular modulation on a decay of 5 s or more scored worse than leaving the device out —
+    // those stay dropped and listed, as before (the k1 presets Metallic Tail, Drum Snow, Dripping Grains)
+    const auto decay = value (device, "DecayDamping_DecayTime", 1.0);
+    if (decay >= 15.0 || ((int) std::lround (value (device, "Global_Unison", 0.0)) >= 3 && value (device, "Global_UnisonAmount", 0.0) >= 0.1)
+        || ((int) std::lround (value (device, "Modulation_ModMode", 0.0)) == 3 && decay >= 5.0))
         return false;
     out.slot = makeEffectSlot (EffectKind::harmonia);
     auto& p = out.slot.params;
