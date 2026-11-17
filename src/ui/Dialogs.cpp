@@ -826,6 +826,10 @@ public:
         for (int i = 0; i < m.options.size(); ++i) // (round 190jv: FL's exclusive choices; one is always ticked)
         {
             auto* b = choices.add (new juce::ToggleButton (m.options[i]));
+            // (round 190kd, FL 2026 shot f09: FL draws each choice once, as a radio dot; an AlertWindow labels a named
+            // custom component above it, so the name goes)
+            b->setName ({});
+            b->getProperties().set ("lynxRadio", true);
             b->setSize (text.getWidth(), 26);
             b->setRadioGroupId (190);
             b->setClickingTogglesState (true);
