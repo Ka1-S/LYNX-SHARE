@@ -4545,7 +4545,7 @@ struct Engine::Impl
     {
         if (! v.slide.moving())
             return;
-        v.pitch = v.notePitch + v.slide.advance ((float) n);
+        v.pitch = v.notePitch + v.slide.advanceFirst ((float) n);
         for (auto& o : v.ops)
             if (o.active)
                 o.freq = opFreq (v, o);

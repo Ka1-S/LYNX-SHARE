@@ -10804,3 +10804,22 @@ countries: de at ch li lu
 "Automation of hosted CLAP and VST3 plugins changes once per 128 samples in this release (0.1.30 places each change at its own sample)" = "Automation gehosteter CLAP- und VST3-Plugins ändert sich in dieser Version einmal pro 128 Samples (0.1.30 setzt jede Änderung auf ihr eigenes Sample)"
 "{0} track(s) in nested Playlist folders open one level deep" = "{0} Spur(en) in verschachtelten Playlist-Ordnern öffnen sich eine Ebene tief"
 "Fruity Limiter's CURVE view (its display shows the scrolling graph): {0}" = "Die CURVE-Ansicht von Fruity Limiter (seine Anzeige zeigt den laufenden Graphen): {0}"
+# --- round 190jv: Mixer menu › Trim unused tracks (FL's Remove unused tracks question)
+"Trim unused tracks" = "Unbenutzte Spuren entfernen"
+"Remove unused tracks" = "Unbenutzte Spuren entfernen"
+"Select the mixer track types to be removed." = "Wählen Sie die Arten von Mixer-Spuren, die entfernt werden sollen."
+"Unlinked tracks only" = "Nur unverknüpfte Spuren"
+"Unlinked and non-empty tracks" = "Unverknüpfte und nicht leere Spuren"
+"This will |delete| {0} unused mixer track(s). Are you sure?" = "Dadurch werden {0} unbenutzte Mixer-Spur(en) |gelöscht|. Sind Sie sicher?"
+"Trim unused mixer tracks" = "Unbenutzte Mixer-Spuren entfernen"
+"No unused mixer tracks" = "Keine unbenutzten Mixer-Spuren"
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183)
+"Scale highlighting" = "Skalen-Hervorhebung"
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183), FL arpeggiator patterns (prtools-0003)
+"FL arpeggiator pattern" = "FL-Arpeggiator-Pattern"
+"None (the arpeggiator above)" = "Keins (der Arpeggiator oben)"
+"Range (octaves)" = "Bereich (Oktaven)"
+"Range mode" = "Bereichsmodus"
+"Block" = "Block"
+"Group notes" = "Noten gruppieren"
+"The pattern could not be read." = "Das Pattern konnte nicht gelesen werden."

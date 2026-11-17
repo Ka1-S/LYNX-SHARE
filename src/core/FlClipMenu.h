@@ -5,7 +5,7 @@
 // FLEngine_x64.dll handlers (EEAUMenuPopup 0x1237290 and the OnClick handlers), [SHOT] flgap189o FL-clipmenu-*.png.
 // FL draws it in two columns with section bands: "Audio clip" + "Region" on the left, "Sample" + "Automation" + "Fades"
 // on the right. The Playlist builds its audio clip menu from this list in this order (texts are the English keys of
-// the i18n tables); LYNX's own items with no FL counterpart follow FL's last section below a line.
+// the i18n tables); LYNX's own items with no FL counterpart get a third column (round 190jv).
 
 #include "core/ClipOps.h"
 #include "core/Song.h"
@@ -73,9 +73,10 @@ inline std::vector<Entry> fl()
         { K::item, TR_NOOP ("Pitch-correct sample"), H::yes, 'P' },
         { K::item, TR_NOOP ("Time-warp sample"), H::yes, 'T' },
         { K::item, TR_NOOP ("Extract stems from sample") },
-        // (FL 2026 only offers to download the module here, live check 190gu B3: "This feature needs to be downloaded before it
-        // can be used"; LYNX's Deverb is the audio editor's tool, so the item stays out)
-        { K::item, TR_NOOP ("Deverb"), H::missing },
+        // (FL 2026 only offers to download its neural module here, live check 190gu B3: "This feature needs to be downloaded
+        // before it can be used". Round 190jv (details190if DE-113): FL's menu shows the item, so LYNX does too; it opens
+        // the clip's sample in LYNX's audio editor with LYNX's own Deverb tool (core/AudioEditTools.h deverb, round 167c))
+        { K::item, TR_NOOP ("Deverb") },
         { K::item, TR_NOOP ("Detect tempo"), H::yes, 'D' },
         { K::item, TR_NOOP ("Fit to tempo"), H::yes, 'F' },
         { K::header, TR_NOOP ("Automation") },
@@ -114,7 +115,8 @@ inline std::vector<Entry> fadeCurve()
     };
 }
 
-// LYNX's own audio clip items with no FL counterpart (kept: add, never remove), after FL's Fades below a line, in this
+// LYNX's own audio clip items with no FL counterpart (kept: add, never remove), in a third column of their own after FL's
+// two (round 190jv: FL's two columns stay as FL draws them; before, they followed FL's Fades below a line), in this
 // order. Round 190gi: Clip envelope ›, Auto-warp, Quantize audio (core/ClipEnvelope.h, core/ClipWarp.h); round 190hp: Split at silence... (core/StripSilence.h). Comping's "Promote this take..." comes first when the clip is on a take lane (core/Comping, round 163).
 inline std::vector<std::string> lynxExtras()
 {

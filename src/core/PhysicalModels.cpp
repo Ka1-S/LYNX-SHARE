@@ -1253,7 +1253,7 @@ private:
         {
             const auto n = std::min (48, count - done);
             if (v.slide.moving())
-                v.slide.advance ((float) n);
+                v.slide.advanceFirst ((float) n); // (round 190jv: moved before it renders; FL's steps, core/HostSlide.h)
             if (! chunkLaws (v, n))
             {
                 v.active = false;
@@ -1581,7 +1581,7 @@ public:
         // × 1/√2: FL's per-voice levels are Vol·cos/sin((1 + pan)π/4), LYNX's channel gains √2·cos/sin (REA_rodada28 §4)
         auto rate = fs * pitch;
         if (slide.moving())
-            slide.advance ((float) n);
+            slide.advanceFirst ((float) n); // (round 190jv: moved before it renders; FL's steps, core/HostSlide.h)
         if (const auto shift = noteCents + slide.cents; shift != 0.0f) // FL's Final.Pitch: 2^(clamp(T, ±12)/12)
             rate *= std::exp2 (std::clamp ((double) shift / 100.0, -12.0, 12.0) / 12.0);
         renderResampled (source, rate, hostRate, position, left, right, n, gl * 0.70710678f, gr * 0.70710678f, previous, current);
@@ -2164,7 +2164,7 @@ private:
     {
         if (slide.moving() || slide.cents != 0.0f) // the zone and the decay stay as chosen at note on
         {
-            slide.advance ((float) n);
+            slide.advanceFirst ((float) n); // (round 190jv: moved before it renders; FL's steps, core/HostSlide.h)
             pitch = std::clamp ((int) (finalPitch + slide.cents + 2400.0f), 0, 9600);
         }
         setPitch (pitch);

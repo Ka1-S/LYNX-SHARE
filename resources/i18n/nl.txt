@@ -10804,3 +10804,22 @@ countries: nl be
 "Automation of hosted CLAP and VST3 plugins changes once per 128 samples in this release (0.1.30 places each change at its own sample)" = "Automatisering van gehoste CLAP- en VST3-plugins verandert in deze versie eens per 128 samples (0.1.30 zet elke wijziging op haar eigen sample)"
 "{0} track(s) in nested Playlist folders open one level deep" = "{0} track(s) in geneste Playlist-mappen openen één niveau diep"
 "Fruity Limiter's CURVE view (its display shows the scrolling graph): {0}" = "De CURVE-weergave van Fruity Limiter (het display toont de scrollende grafiek): {0}"
+# --- round 190jv: Mixer menu › Trim unused tracks (FL's Remove unused tracks question)
+"Trim unused tracks" = "Ongebruikte sporen opruimen"
+"Remove unused tracks" = "Ongebruikte sporen verwijderen"
+"Select the mixer track types to be removed." = "Kies welke soorten mixersporen verwijderd worden."
+"Unlinked tracks only" = "Alleen ongekoppelde sporen"
+"Unlinked and non-empty tracks" = "Ongekoppelde en niet-lege sporen"
+"This will |delete| {0} unused mixer track(s). Are you sure?" = "Hiermee worden {0} ongebruikte mixersporen |verwijderd|. Weet je het zeker?"
+"Trim unused mixer tracks" = "Ongebruikte mixersporen opruimen"
+"No unused mixer tracks" = "Geen ongebruikte mixersporen"
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183)
+"Scale highlighting" = "Toonladder markeren"
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183), FL arpeggiator patterns (prtools-0003)
+"FL arpeggiator pattern" = "FL-arpeggiatorpatroon"
+"None (the arpeggiator above)" = "Geen (de arpeggiator hierboven)"
+"Range (octaves)" = "Bereik (octaven)"
+"Range mode" = "Bereikmodus"
+"Block" = "Blok"
+"Group notes" = "Noten groeperen"
+"The pattern could not be read." = "Het patroon kon niet worden gelezen."

@@ -856,6 +856,37 @@ public:
     // all edits made while the same mouse click is held down
     // (dragging a note, turning a knob) become a single step.
     void editSong (const std::function<void (Song&)>& edit, bool undoable = true);
+    // One undo step per mouse gesture (queue item 73, round 190jv): an editor opens a gesture at its mouseDown and closes
+    // it when its mouseUp returns (UndoGesture below); every undoable edit in between (each move of a drag, the
+    // autoscroll's, the drop at mouseUp) shares the gesture's first undo step. Without an open gesture the engine falls
+    // back to the press of the main mouse, which only real mouse presses set: events from another input source (touch,
+    // pen, a driven test route) gave one step per move there. A gesture whose mouseUp never came (its component went
+    // away) ends by itself at the next edit made with no mouse button down.
+    void beginUndoGesture() noexcept;
+    void endUndoGesture() noexcept;
+    bool isUndoGestureOpen() const noexcept { return gestureOpen; }
+    // mouseDown: `const AudioEngine::UndoGesture g (engine, AudioEngine::UndoGesture::begin);`, first line of mouseUp:
+    // `const AudioEngine::UndoGesture g (engine, AudioEngine::UndoGesture::end);` (closes when mouseUp returns)
+    struct UndoGesture
+    {
+        enum Kind { begin, end };
+        UndoGesture (AudioEngine& e, Kind k) noexcept : engine (e), kind (k)
+        {
+            if (kind == begin)
+                engine.beginUndoGesture();
+            else
+                engine.gestureEnding = true; // (mouseUp's own edits: the button is already up, still the gesture's)
+        }
+        ~UndoGesture()
+        {
+            if (kind == end)
+                engine.endUndoGesture();
+        }
+        UndoGesture (const UndoGesture&) = delete;
+        UndoGesture& operator= (const UndoGesture&) = delete;
+        AudioEngine& engine;
+        Kind kind;
+    };
     // FL's General › "Detach all new plugins" (issue #116; a UI setting, off by default as in FL): the plugins an edit
     // adds start Detached (detachNewPlugins in core/Song.h)
     void setDetachNewPlugins (bool on) noexcept { detachNewPluginsOn = on; }
@@ -1636,6 +1667,8 @@ private:
     void sessionStep (bool redo);
     void historyStep (bool redo);
     juce::Time lastUndoPress; // mouse click that already produced an undo step
+    // the open mouse gesture (beginUndoGesture): it already saved its undo step; it began with a real button down
+    bool gestureOpen = false, gestureSaved = false, gestureRealMouse = false, gestureEnding = false;
     SnapshotExchange<RackState> rackExchange;
     std::shared_ptr<LiveLevels> publishedLevels; // the last snapshot's live levels (editLevels writes them)
     bool levelsPending = false;                  // editLevels changed the Song since the last publish

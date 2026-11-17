@@ -10804,3 +10804,22 @@ countries: tr
 "Automation of hosted CLAP and VST3 plugins changes once per 128 samples in this release (0.1.30 places each change at its own sample)" = "Barındırılan CLAP ve VST3 eklentilerinin otomasyonu bu sürümde her 128 örnekte bir değişir (0.1.30 her değişikliği kendi örneğine koyar)"
 "{0} track(s) in nested Playlist folders open one level deep" = "İç içe Playlist klasörlerindeki {0} parça tek düzey olarak açılır"
 "Fruity Limiter's CURVE view (its display shows the scrolling graph): {0}" = "Fruity Limiter'ın CURVE görünümü (ekranı kayan grafiği gösterir): {0}"
+# --- round 190jv: Mixer menu › Trim unused tracks (FL's Remove unused tracks question)
+"Trim unused tracks" = "Kullanılmayan kanalları temizle"
+"Remove unused tracks" = "Kullanılmayan kanalları kaldır"
+"Select the mixer track types to be removed." = "Kaldırılacak mikser kanalı türlerini seçin."
+"Unlinked tracks only" = "Yalnızca bağlantısız kanallar"
+"Unlinked and non-empty tracks" = "Bağlantısız ve boş olmayan kanallar"
+"This will |delete| {0} unused mixer track(s). Are you sure?" = "Kullanılmayan {0} mikser kanalı |silinecek|. Emin misiniz?"
+"Trim unused mixer tracks" = "Kullanılmayan mikser kanallarını temizle"
+"No unused mixer tracks" = "Kullanılmayan mikser kanalı yok"
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183)
+"Scale highlighting" = "Gam vurgulama"
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183), FL arpeggiator patterns (prtools-0003)
+"FL arpeggiator pattern" = "FL arpej deseni"
+"None (the arpeggiator above)" = "Yok (yukarıdaki arpej)"
+"Range (octaves)" = "Aralık (oktav)"
+"Range mode" = "Aralık modu"
+"Block" = "Blok"
+"Group notes" = "Notaları grupla"
+"The pattern could not be read." = "Desen okunamadı."

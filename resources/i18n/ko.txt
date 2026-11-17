@@ -10804,3 +10804,22 @@ countries: kr
 "Automation of hosted CLAP and VST3 plugins changes once per 128 samples in this release (0.1.30 places each change at its own sample)" = "이 릴리스에서는 호스팅된 CLAP 및 VST3 플러그인의 오토메이션이 128샘플마다 한 번 바뀝니다 (0.1.30은 각 변화를 해당 샘플에 둡니다)"
 "{0} track(s) in nested Playlist folders open one level deep" = "중첩된 Playlist 폴더의 트랙 {0}개가 한 단계로 열립니다"
 "Fruity Limiter's CURVE view (its display shows the scrolling graph): {0}" = "Fruity Limiter의 CURVE 보기 (화면에는 흐르는 그래프가 표시됩니다): {0}"
+# --- round 190jv: Mixer menu › Trim unused tracks (FL's Remove unused tracks question)
+"Trim unused tracks" = "사용하지 않는 트랙 정리"
+"Remove unused tracks" = "사용하지 않는 트랙 제거"
+"Select the mixer track types to be removed." = "제거할 믹서 트랙 종류를 선택하세요."
+"Unlinked tracks only" = "연결되지 않은 트랙만"
+"Unlinked and non-empty tracks" = "연결되지 않은 트랙과 비어 있지 않은 트랙"
+"This will |delete| {0} unused mixer track(s). Are you sure?" = "사용하지 않는 믹서 트랙 {0}개를 |삭제|합니다. 계속할까요?"
+"Trim unused mixer tracks" = "사용하지 않는 믹서 트랙 정리"
+"No unused mixer tracks" = "사용하지 않는 믹서 트랙이 없습니다"
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183)
+"Scale highlighting" = "스케일 하이라이트"
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183), FL arpeggiator patterns (prtools-0003)
+"FL arpeggiator pattern" = "FL 아르페지에이터 패턴"
+"None (the arpeggiator above)" = "없음 (위의 아르페지에이터)"
+"Range (octaves)" = "범위 (옥타브)"
+"Range mode" = "범위 모드"
+"Block" = "블록"
+"Group notes" = "노트 그룹화"
+"The pattern could not be read." = "패턴을 읽을 수 없습니다."

@@ -10804,3 +10804,22 @@ countries: tw hk mo
 "Automation of hosted CLAP and VST3 plugins changes once per 128 samples in this release (0.1.30 places each change at its own sample)" = "在此版本中，代管的 CLAP 和 VST3 外掛的自動化每 128 個取樣變化一次（0.1.30 將每個變化放在其自己的取樣上）"
 "{0} track(s) in nested Playlist folders open one level deep" = "巢狀 Playlist 資料夾中的 {0} 條音軌以一層開啟"
 "Fruity Limiter's CURVE view (its display shows the scrolling graph): {0}" = "Fruity Limiter 的 CURVE 檢視（其顯示為捲動圖形）：{0}"
+# --- round 190jv: Mixer menu › Trim unused tracks (FL's Remove unused tracks question)
+"Trim unused tracks" = "清理未使用的軌道"
+"Remove unused tracks" = "移除未使用的軌道"
+"Select the mixer track types to be removed." = "選擇要移除的混音器軌道類型。"
+"Unlinked tracks only" = "僅未連結的軌道"
+"Unlinked and non-empty tracks" = "未連結及非空的軌道"
+"This will |delete| {0} unused mixer track(s). Are you sure?" = "這將|刪除| {0} 條未使用的混音器軌道。確定嗎？"
+"Trim unused mixer tracks" = "清理未使用的混音器軌道"
+"No unused mixer tracks" = "沒有未使用的混音器軌道"
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183)
+"Scale highlighting" = "音階醒目提示"
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183), FL arpeggiator patterns (prtools-0003)
+"FL arpeggiator pattern" = "FL 琶音器模式"
+"None (the arpeggiator above)" = "無（上面的琶音器）"
+"Range (octaves)" = "範圍（八度）"
+"Range mode" = "範圍模式"
+"Block" = "區塊"
+"Group notes" = "音符編組"
+"The pattern could not be read." = "無法讀取該模式。"

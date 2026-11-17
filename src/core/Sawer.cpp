@@ -2447,7 +2447,7 @@ public:
     {
         for (auto& s : slots)
             if (s.slide.moving())
-                s.slide.advance ((float) n);
+                s.slide.advanceFirst ((float) n); // (round 190jv: moved before it renders; FL's steps, core/HostSlide.h)
         tables();
         auto tpos = songBeats;
         eng.playing = songBeats >= 0.0;

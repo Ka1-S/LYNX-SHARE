@@ -2117,7 +2117,7 @@ void Synth::render (float* L, float* R, int n) noexcept
     for (int k = 0; k < 128; ++k) // a slide note moves the key's Final.Pitch (issue #14)
         if (slides[k].moving())
         {
-            const auto c = (double) slides[k].advance ((float) n);
+            const auto c = (double) slides[k].advanceFirst ((float) n);
             ptab[k] = F ((F (100.0 * k - 6000.0 + notePofs[k] + c) * 0.01 - k) + 60.0);
         }
     for (auto& v : pool)

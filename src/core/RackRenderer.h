@@ -589,6 +589,8 @@ public:
     // Allocates the mixer buffers: call off the audio thread.
     // Blocks larger than maxBlockSize are processed in pieces.
     void prepare (double sampleRate, int maxBlockSize = 2048);
+    // FL's native generators, whose slide notes the host moves in steps on FL's ticks (round 190jv, core/HostSlide.h Steps)
+    static bool stepsSlides (InstrumentKind kind) noexcept;
 
     // Round 190gn (A6, memory): the channel and mixer buffers are sized by the songs played, not for 1 024 channels and
     // 501 inserts (~8 MB, all touched). Off the audio thread, before `state` reaches process(): grows them (in steps of
@@ -916,6 +918,14 @@ private:
     std::array<std::array<std::atomic<std::uint64_t>, 2>, maxChannels> sounding {};
     std::array<std::atomic<std::uint32_t>, maxChannels> strikes {}; // (noteStrikes; written only by publishSoundingKeys)
     std::array<NoteMask, maxChannels> struckNotes {};        // keys started in this block (a note shorter than a block still shows)
+    // FL's stepped slide notes (round 190jv, core/HostSlide.h Steps): a channel's stepped slide on the song's ticks; the
+    // render calls split there (a sample after its start, then on each of FL's ticks up to its end)
+    struct SlideTicks
+    {
+        double start = 0.0; // the slide's start (song ticks)
+        int k = 0, n = 0;   // the next step, the slide's length (FL ticks)
+    };
+    std::array<SlideTicks, maxChannels> slideTicks {};
     std::array<NoteMask, maxChannels> publishedNotes {};     // what soundingKeys holds (stored only on a change)
     int publishedTop = 0;                                   // channels past it have nothing published
     void publishSoundingKeys (int channels) noexcept;

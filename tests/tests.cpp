@@ -17858,3 +17858,8 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Livefix190jdCTests.inc" // round 190jd: Mixer peak hold and Extra large list, Limiter / Maximus history
 #include "Folders190jfTests.inc" // round 190jf: B17 Playlist folders (nested groups, FL group mute / solo, Alt+drag)
 #include "DawProject190jfTests.inc" // round 190jf B22: DAWproject import / export (core/DawProject.h, core/ZipLite.h)
+#include "Slides190jvTests.inc" // round 190jv: FL's stepped slide notes on its native generators
+#include "Trim190jvTests.inc" // round 190jv: Mixer › Trim unused tracks (FL's Remove unused tracks)
+#include "Pr190jvTests.inc" // round 190jv: Piano roll Scale highlighting › Automatic (FL's key guess)
+#include "PrArp190jvTests.inc" // round 190jv: FL's Piano roll arpeggiator patterns (TPRArpForm law)
+#include "Flm190jvTests.inc" // round 190jv: FL Studio Mobile racks with several instruments / an effect first (BUILD-LIST 19)

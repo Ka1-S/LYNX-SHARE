@@ -4433,6 +4433,7 @@ private:
 
     // --- Edison's tools (round 165l): the tool windows' host ---------------------------------------------------
 public:
+    void openDeverbTool() { openEdisonTool (audiotools::Tool::deverb); } // (the audio clip menu's Deverb, round 190jv)
     const ae::Document& toolDocument() const override { return doc; }
     ae::Range toolSelection() const override { return selection; }
     void toolApply (const juce::String& label, ae::Document d, ae::Range newSelection) override
@@ -5432,6 +5433,19 @@ void openAudioEditorForChannel (AudioEngine& engine, int channel, int clip)
     auto* editor = openWindow (engine, { Source::Kind::channel, channel, path, clip });
     if (path.isNotEmpty())
         editor->loadFile (juce::File (path));
+}
+
+void openAudioEditorDeverb (AudioEngine& engine, int channel, int clip)
+{
+    const auto& song = engine.getSong();
+    if (! juce::isPositiveAndBelow (channel, (int) song.channels.size()))
+        return;
+    const auto path = juce::String::fromUTF8 (song.channels[(std::size_t) channel].samplePath.c_str());
+    if (path.isEmpty())
+        return;
+    auto* editor = openWindow (engine, { Source::Kind::channel, channel, path, clip });
+    editor->loadFile (juce::File (path));
+    editor->openDeverbTool();
 }
 
 std::unique_ptr<juce::Component> makeAudioEditorPanel (AudioEngine& engine, int channel, int clip, bool showWarp)

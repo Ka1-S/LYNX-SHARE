@@ -4855,6 +4855,7 @@ ui::Hint PlaylistComponent::hoverForSnapshot()
 
 void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
 {
+    const AudioEngine::UndoGesture undoGesture (engine, AudioEngine::UndoGesture::begin); // (round 190jv: one undo step per gesture)
     followEditStamp = engine.getPublishCount(); // (round 190im, R15)
     downMods = e.mods;
     startedOnEmpty = erasedSomething = holdExpired = false;
@@ -6565,6 +6566,7 @@ ui::Hint PlaylistComponent::dragHintForSnapshot (int clip, int point, bool tensi
 
 void PlaylistComponent::mouseUp (const juce::MouseEvent& e)
 {
+    const AudioEngine::UndoGesture undoGesture (engine, AudioEngine::UndoGesture::end); // (closes when mouseUp returns)
     // round 190im (R15): a gesture that changed the song is an edit by hand: Follow pauses (when that option is on)
     EditorGlobals::get().pauseFollowIfEdited (EditorGlobals::FollowView::playlist, followEditStamp, engine.getPublishCount());
     if (insertsMouseUp (e)) // issue #154: a click or a drag in a linked header's effects list
@@ -9692,6 +9694,8 @@ juce::PopupMenu PlaylistComponent::buildAudioClipMenu (int index, int mouseX)
             menu.addItem (label (e), sample != nullptr, false, [this, ch, index] { openAudioEditorForChannel (engine, ch, index); });
         else if (t == "Extract stems from sample")
             menu.addItem (label (e), sample != nullptr, false, [this, index] { extractStemsFromClip (engine, index, [this] { sortClips(); }); });
+        else if (t == "Deverb") // (round 190jv: LYNX's own Deverb in the audio editor; FL 2026 downloads a module here)
+            menu.addItem (label (e), sample != nullptr, false, [this, ch, index] { openAudioEditorDeverb (engine, ch, index); });
         else if (t == "Detect tempo") // (live check 190ew PL-8: one item opening FL's Tempo detection dialog)
             menu.addItem (label (e), sample != nullptr, false, [this, index, sample] { showDetectTempo (index, sample); });
         else if (t == "Fit to tempo")
@@ -9773,7 +9777,9 @@ juce::PopupMenu PlaylistComponent::buildAudioClipMenu (int index, int mouseX)
     }
 
     // --- LYNX's own items (no FL counterpart), core flclipmenu::lynxExtras --------------------------------------------
-    menu.addSeparator();
+    // (round 190jv: a third column, so FL's two stay as FL draws them; JUCE breaks columns only where asked, and round
+    // 190je's tall-menu split (JUCE fix 39, lynxTallMenuBreakHook) leaves a menu with breaks alone)
+    menu.addColumnBreak();
     menu.addSectionHeader (tr ("LYNX extras")); // (round 190gi: as the Clip View's menu, DetailView; FL's sections stay FL's)
     // round 190ds, Simple workflow only (LYNX's own): the clip follows the project key, and its loop's key
     if (simpleHeaders)
@@ -13661,6 +13667,7 @@ void PatternPicker::paint (juce::Graphics& g)
 
 void PatternPicker::mouseDown (const juce::MouseEvent& e)
 {
+    const AudioEngine::UndoGesture undoGesture (engine, AudioEngine::UndoGesture::begin); // (round 190jv: one undo step per gesture)
     for (int t = 0; t < 3; ++t)
         if (tabBounds (t).contains (e.getPosition()))
         {
@@ -13837,6 +13844,7 @@ int PatternPicker::listRowOfPattern (int pattern) const
 
 void PatternPicker::mouseUp (const juce::MouseEvent& e)
 {
+    const AudioEngine::UndoGesture undoGesture (engine, AudioEngine::UndoGesture::end); // (closes when mouseUp returns)
     if (dragging) // (issue #177: the drag ended; the press changed nothing more)
     {
         dragging = false;

@@ -2808,6 +2808,56 @@ void MixerStrips::deleteTracks (std::vector<int> tracks)
                    });
 }
 
+// FL's Mixer menu › "Trim unused tracks" (round 190jv; REA FUN_012a6920 → FUN_012a65c0 / FUN_0127bcc0, removal by
+// FUN_012a5280 with flags 0x11, docs/analise/REA_rodada190jv.md): "Remove unused tracks|Select the mixer track types to be
+// removed." with two exclusive choices ("Unlinked tracks only" ticked) and OK / Cancel; then, when at least one track
+// would go, "Remove unused tracks|This will |delete| %d unused mixer track(s). Are you sure?" (Yes / No and Remember my
+// choice: FL's message 0x33 "TrimUnusedMixerTracks", File/Data). With none FL does nothing (LYNX: a hint). FL refuses the
+// whole trim while a plugin has "side routing"; LYNX renumbers those references, so it never refuses (MixerOps.h).
+void MixerStrips::trimUnusedTracks()
+{
+    juce::Component::SafePointer<MixerStrips> safe (this);
+    FlMessage ask { tr ("Remove unused tracks"), tr ("Select the mixer track types to be removed."), { tr ("OK"), tr ("Cancel") }, false };
+    ask.options = { tr ("Unlinked tracks only"), tr ("Unlinked and non-empty tracks") };
+    ask.icon = juce::MessageBoxIconType::WarningIcon;
+    showFlOptions (ask, [safe] (int button, int option) {
+        if (safe == nullptr || button != 1)
+            return;
+        const auto mode = option == 1 ? mixerops::TrimUnused::unlinkedAndNonEmpty : mixerops::TrimUnused::unlinkedOnly;
+        const auto count = (int) mixerops::unusedTracks (safe->engine.getSong(), mode).size();
+        if (count == 0)
+        {
+            ui::postHint ({ tr ("No unused mixer tracks"), {}, false, false }, 3000);
+            return;
+        }
+        auto run = [safe, mode] {
+            if (safe == nullptr)
+                return;
+            int removed = 0;
+            safe->engine.editSongStructural ([&removed, mode] (Song& s) { removed = mixerops::trimUnusedTracks (s, mode); });
+            safe->revealed.clear(); // (their numbers moved)
+            // FL keeps the selected number, the last track when it is past the end now (FUN_0128fa20)
+            const auto at = juce::jlimit (0, (int) safe->engine.getSong().mixer.size() - 1, safe->selected);
+            safe->setSelection ({ at }, at);
+            ui::postHint ({ tr ("Removed {0} unused insert(s)", { juce::String (removed) }), {}, false, false }, 3000);
+        };
+        if (! messages::shown ("TrimUnusedMixerTracks"))
+        {
+            run();
+            return;
+        }
+        showFlMessage ({ tr ("Remove unused tracks"), tr ("This will |delete| {0} unused mixer track(s). Are you sure?", { juce::String (count) }),
+                         { tr ("Yes"), tr ("No") }, true },
+                       [run] (int button, bool remember) {
+                           if (button != 1)
+                               return;
+                           if (remember)
+                               messages::setShown ("TrimUnusedMixerTracks", false);
+                           run();
+                       });
+    });
+}
+
 void MixerStrips::linkSelectedChannels (bool startingHere)
 {
     const auto channels = engine.getSelectedChannels();
@@ -4153,6 +4203,10 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
         menu.addSubMenu (tr ("Plugin delay compensation"), pdc);
     }
     menu.addSubMenu (tr ("Mixer layout"), MixerLayoutBox::menu (*this)); // as the title bar's drop-down (issue #52)
+    // FL's Options section: after View / Detached and a separator, "Trim unused tracks" (round 190jv, REA FUN_012a6920)
+    menu.addSeparator();
+    menu.addItem (tr ("Trim unused tracks"), [this] { trimUnusedTracks(); });
+    menu.addSeparator();
     mixeroptions::addItems (menu, engine, false);
 
     return menu;
