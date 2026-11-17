@@ -366,7 +366,7 @@ juce::String Check::step (int index)
                 if (nativechild::isAbove (s.anchor()->getWindowHandle(), p->getWindowHandle()))
                 {
                     const auto wr = nativechild::rectInParentWindow (*p);
-                    const auto inP = r.getIntersection (wr) - wr.getPosition();
+                    auto inP = r.getIntersection (wr) - wr.getPosition();
                     follows = follows && nativechild::cutsInto (p->getWindowHandle(), inP.removeFromRight (2).removeFromBottom (2));
                 }
             out << s.expect ("resize_moves_holes", follows);
