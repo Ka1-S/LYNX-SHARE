@@ -107,6 +107,9 @@ juce::String araSelfTest (const juce::File& pluginFile, const juce::File& audio,
                 if (AraHost::isAra (t))
                     plugin = t;
             }
+        // (the scanned list, for a test profile's plugins.xml: the app then finds the plugin by its id)
+        if (auto xml = scanner.getPluginHost().getKnownPlugins().createXml())
+            xml->writeTo (out.getChildFile ("plugins.xml"));
     }
     if (plugin.name.isEmpty())
         return "ERROR no ARA plugin in " + pluginFile.getFileName();
