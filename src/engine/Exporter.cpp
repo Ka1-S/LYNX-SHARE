@@ -5,6 +5,7 @@
 #include "core/Dither.h"
 #include "core/MessageThreadOwned.h"
 #include "core/Mp3Encoder.h"
+#include "engine/AacEncoder.h"
 #include "engine/AudioEngine.h"
 #include "core/Patcher.h"
 #include "engine/PluginHost.h"
@@ -48,6 +49,18 @@ Options ExportSettings::toOptions() const
 
 namespace
 {
+// M4A without a system AAC encoder (Linux; a Windows N edition without the Media Feature Pack): said before the render
+bool formatsWritable (const Options& o, juce::String& error)
+{
+    for (const auto f : formatsOf (o))
+        if (f == exportopts::Format::aac && ! aac::available())
+        {
+            error = juce::String::fromUTF8 (aac::unavailableReason().c_str());
+            return false;
+        }
+    return true;
+}
+
 // tail length in ticks for `seconds` at the tempo where the music ends
 std::int64_t tailTicksFor (const Song& song, const Options& o, std::int64_t& musicTicks, std::int64_t& loopTicks)
 {
@@ -423,6 +436,8 @@ Options ExportJob::realtimeOptions (Options o, double deviceRate)
 
 bool ExportJob::runRealtime (const std::function<bool (double)>& progress, juce::String& error)
 {
+    if (! formatsWritable (options, error))
+        return false;
     for (const auto f : formatsOf (options))
         if (const auto file = f == options.format ? output : output.withFileExtension (extension (f)); ! canReplace (file))
         {
@@ -556,6 +571,8 @@ bool ExportJob::openSink (Sink& sink, juce::String& error)
     render.exactSamples = exactFrames; // (round 190gh: every stem as long as the mix)
     writtenFrames = 0;
 
+    if (! formatsWritable (options, error))
+        return false;
     for (const auto f : formatsOf (options))
         if (const auto file = f == options.format ? output : output.withFileExtension (extension (f)); ! canReplace (file))
         {
@@ -564,7 +581,8 @@ bool ExportJob::openSink (Sink& sink, juce::String& error)
         }
 
     // streaming straight into the file when nothing needs the whole render first (the classic WAV/FLAC/OGG export)
-    sink.streaming = options.format != exportopts::Format::mp3 && options.channels == Channels::stereo && ! options.normalize && ! options.master
+    // (MP3 and M4A encode the whole render at the end: their encoders' rates may differ from the render's)
+    sink.streaming = options.format != exportopts::Format::mp3 && options.format != exportopts::Format::aac && options.channels == Channels::stereo && ! options.normalize && ! options.master
                      && options.tail == TailMode::leave && formatsOf (options).size() == 1;
 
     if (! sink.streaming)
@@ -594,6 +612,8 @@ bool ExportJob::openSink (Sink& sink, juce::String& error)
         format = std::make_unique<juce::OggVorbisAudioFormat>();
         quality = oggQualityIndex (*format, options.oggKbps);
     }
+    else if (options.format == exportopts::Format::aiff)
+        format = std::make_unique<juce::AiffAudioFormat>();
     else
         format = std::make_unique<juce::WavAudioFormat>();
 
@@ -752,6 +772,43 @@ bool ExportJob::writeFile (const Options& o, const juce::File& file, float* left
         return replaceTarget (temp, file, error);
     }
 
+    if (o.format == exportopts::Format::aac)
+    {
+        // M4A (owner decision D5): the system's AAC encoder (engine/AacEncoder.h) at 44.1 / 48 kHz — a render at
+        // 88.2 / 96 / 176.4 / 192 kHz is brought down by halving (exportopts::decimate)
+        if (! aac::available())
+        {
+            error = utf8 (aac::unavailableReason().c_str());
+            return false;
+        }
+        const auto factor = aacDecimation (o.sampleRate);
+        if (factor <= 0)
+        {
+            error = tr ("M4A files take 44100 or 48000 Hz (or a multiple of it); this export is at {0} Hz", { juce::String ((int) o.sampleRate) });
+            return false;
+        }
+        std::vector<float> dl, dr;
+        const float* l = left;
+        const float* r = channels == 2 ? right : left;
+        auto n = (long long) frames;
+        if (factor > 1)
+        {
+            dl = decimate (std::vector<float> (left, left + frames), o.sampleRate, factor);
+            if (channels == 2)
+                dr = decimate (std::vector<float> (right, right + frames), o.sampleRate, factor);
+            l = dl.data();
+            r = channels == 2 ? dr.data() : l;
+            n = (long long) dl.size();
+        }
+        std::string message;
+        if (! aac::encode (temp.getFile().getFullPathName().toStdString(), l, r, n, channels, (int) aacSampleRate (o.sampleRate), o.aacKbps, message))
+        {
+            error = utf8 (message.c_str());
+            return false;
+        }
+        return replaceTarget (temp, file, error);
+    }
+
     std::unique_ptr<juce::AudioFormat> format;
     int quality = 0;
     if (o.format == exportopts::Format::flac)
@@ -764,6 +821,8 @@ bool ExportJob::writeFile (const Options& o, const juce::File& file, float* left
         format = std::make_unique<juce::OggVorbisAudioFormat>();
         quality = oggQualityIndex (*format, o.oggKbps);
     }
+    else if (o.format == exportopts::Format::aiff)
+        format = std::make_unique<juce::AiffAudioFormat>();
     else
         format = std::make_unique<juce::WavAudioFormat>();
 
@@ -1257,7 +1316,7 @@ int runStemExport (const StemPlan& plan, std::function<void (std::function<void(
         // are made together only as far as about 2 GB of it goes; streamed files have no such limit
         const auto& set = plan.sets[s];
         const auto o = clamped (set.options);
-        const auto streamed = o.format != exportopts::Format::mp3 && o.channels == Channels::stereo && ! o.normalize && ! o.master
+        const auto streamed = o.format != exportopts::Format::mp3 && o.format != exportopts::Format::aac && o.channels == Channels::stereo && ! o.normalize && ! o.master
                               && o.tail == TailMode::leave && formatsOf (o).size() == 1;
         const auto seconds = exportMusicSeconds (set.song, o) + tailSecondsFor (o);
         const auto bytesEach = std::max (1.0, seconds * o.sampleRate * 2.0 * sizeof (float));
