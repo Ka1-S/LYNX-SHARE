@@ -212,9 +212,8 @@ TEST (parity190jh_waves_l2_sslcomp_supertap_are_translated)
     CHECK (n == 0); // L1 / L3 / L4: their own lists, not read
     // SSLComp: threshold +4, 2:1, attack 30 ms, release Auto, make-up 2 dB, mix 100 %
     auto sc = parity190jh::waves ("SSLComp Stereo", "SSLComp", parity190jh::list (22, { { 0, "4" }, { 1, "0" }, { 3, "5" }, { 4, "4" }, { 5, "2" }, { 19, "100" } }), n);
-    CHECK (sc.kind == EffectKind::compressor && n == 7);
-    CHECK (std::abs (sc.params[0] - (float) ((4.0 - 23.0 + 60.0) / 60.0)) < 1e-5f && std::abs (sc.params[1] - 1.0f / 19.0f) < 1e-5f);
-    CHECK (std::abs (sc.params[4] - 2.0f / 24.0f) < 1e-5f && sc.params[5] == 0.0f && sc.params[6] == 1.0f);
+    // (round 190kt: SSLComp now stands in on Crest's console law, its own entry; tests/Parity190ktTests.inc)
+    CHECK (sc.kind == EffectKind::crestCompressor && n == 22);
     parity190jh::waves ("CLA-3A Stereo", "CLA-3A", parity190jh::list (22, { { 0, "4" } }), n);
     CHECK (n == 0);
     // SuperTap: every tap off (its default) = the dry signal; one tap; two taps hard left / right with feedback

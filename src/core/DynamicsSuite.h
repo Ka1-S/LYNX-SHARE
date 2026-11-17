@@ -63,7 +63,15 @@ enum Param
     // ratio × knee × attack grid. Off = round 108's laws: what a project saved before that round loads with
     // (upgradeLoadedEffectParams), so it sounds as it did. The other styles ignore it.
     law,
-    count
+    count,
+    // round 190kt, hidden (not in the info: no control, no text; saved while non-zero): the Bus style's console law — a
+    // FEEDBACK compressor (the detector hears the compressed output) with a rational soft knee and RC ballistics,
+    // LYNX's own model of the console bus compressor's structure (REA_rodada190kt §2), fitted on our renders. Off (0) for
+    // new instances and every project saved before (the Bus style as it was, bit for bit); the bus-compressor
+    // translators (Waves SSLComp) set it. Threshold / ratio / knee / attack / release keep their ranges and mean, in
+    // this law: the detector's threshold, 1 + the loop gain, the knee's width (dB), and the RC time constants (ms);
+    // Auto release adds a slow second capacitor (consoleAuto* in DynamicsSuite.cpp)
+    busLaw = count
 };
 enum class Trigger { off, hostSync, midi };
 Trigger triggerOf (float v) noexcept;
@@ -120,6 +128,9 @@ double trimDb (float v) noexcept;        // input / output: −36 .. +36 dB
 // Static curve: gain (dB, ≤ 0 for downward styles) the compressor settles to for a steady sine of `inputDb` peak
 // level (side chain flat, no auto gain). Used by the editor's curve and the tests.
 double staticGainDb (const EffectParams& p, double inputDb);
+// round 190kt: the console law's steady gain (dB) for a steady tone of `peakDb` sample peak (threshold dBFS, ratio,
+// knee dB as Crest's knobs read); a fixed point of the feedback loop
+double consoleSteadyDb (double thresholdDb, double ratio, double kneeDb, double peakDb) noexcept;
 // The character stage's transfer curve at a drive (no compensation), for the editor.
 float characterCurve (Character c, float x) noexcept;
 } // namespace crest

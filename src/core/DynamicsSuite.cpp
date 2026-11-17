@@ -258,7 +258,7 @@ namespace
 {
 // The style families (fitted to MEASURE_fabfilter §2, see REA_rodada108 §3): time-constant scales of the level
 // detector (τ = scale × knob), the knee every curve gets on top of the knob, and the curve family.
-enum class Curve { downward, upward, twoWay, vocal, variMu, twoWayClassic, variMuClassic };
+enum class Curve { downward, upward, twoWay, vocal, variMu, twoWayClassic, variMuClassic, console };
 struct StyleDef
 {
     double attackScale;  // detector attack τ = scale × knob
@@ -320,7 +320,34 @@ const StyleDef& defOf (Style st, bool measured) noexcept
         return classicDefs[1];
     return styleDefs[(int) st];
 }
-const StyleDef& defOf (const EffectParams& p) noexcept { return defOf (styleOf (p), on (p[law])); }
+// round 190kt: the Bus style's console law (the hidden busLaw parameter); its own detector in Crest::detect
+constexpr StyleDef consoleDef { 1.0, 1.0, 1.0, 0.0, 1.0, Curve::console, 0.0, 0.0, 1.0, 0.0, 0.002, 0.0, 0.0, 0.0 };
+bool consoleLaw (const EffectParams& p) noexcept { return styleOf (p) == Style::bus && on (p[busLaw]); }
+const StyleDef& defOf (const EffectParams& p) noexcept { return consoleLaw (p) ? consoleDef : defOf (styleOf (p), on (p[law])); }
+
+// ---- round 190kt: the console law (REA_rodada190kt §2–§3) ----
+// LYNX's own model of a console bus compressor's structure, learnt by REA of the Waves SSLComp DSP (clean-room: the
+// structure only; every constant below is fitted on our own black-box renders, /mnt/e/lynx-work/rea190kt/lab):
+//   - FEEDBACK detection: the detector hears the output, the input level × the gain it is applying now, clipped at
+//     full scale, in the log domain over a small floor;
+//   - the over-threshold amount o (nats) through the loop gain K = ratio − 1 and a rational soft knee
+//     g = y² / (y − k), y = −K·o (k = the knee in nepers: twice the knee knob's dB in nepers, so 72 dB reaches 16.6): quadratic onset, asymptote y + k (a hard-knee feedback loop
+//     settles at ratio 1 + K);
+//   - RC ballistics on the log gain: the attack charges the timing capacitor towards that target while the release
+//     resistor discharges it (state += a·(target − state) − r·state); the release lets the gain recover towards 0 dB,
+//     never past the target. Auto release: a second, larger capacitor in series with its own slow discharge path (the
+//     gain is the sum of the two voltages), so short peaks recover fast and a long reduction slowly.
+constexpr double consoleFloor = 1.0e-3;          // the detector's floor (linear, −60 dBFS) [EXEC fit, lab/fitstatic2.py]
+constexpr double consoleAutoCapRatio = 0.1697;     // Auto: the slow capacitor charges this much slower [EXEC fit, lab/fitdyn.py]
+constexpr double consoleAutoSlowMs = 2527.0;     // Auto: the slow capacitor's discharge time constant [EXEC fit]
+constexpr double nepersPerDb = 0.11512925464970228; // ln 10 / 20
+double consoleTarget (double over, double loop, double kneeN) noexcept
+{
+    if (over <= 0.0)
+        return 0.0;
+    const auto y = -loop * over;
+    return y * y / (y - kneeN);
+}
 
 double releaseTau (const StyleDef& d, double knobMs) noexcept
 {
@@ -597,6 +624,8 @@ double curveGain (const StyleDef& d, double x, double thr, double r, double knee
     const auto s = 1.0 - 1.0 / r;
     switch (d.curve)
     {
+        case Curve::console:
+            return std::max (-range, consoleSteadyDb (thr, r, knee, x));
         case Curve::upward:
         {
             // upward: quiet parts are lifted toward a point `offsetDb` from the threshold (−10.5 dB: under it); above
@@ -656,6 +685,21 @@ void scEqParams (const EffectParams& p, EffectParams& out) noexcept
     out[(std::size_t) facet::scaleParam] = 0.5f;
 }
 } // namespace
+
+double consoleSteadyDb (double thresholdDb, double ratio, double kneeDb, double peakDb) noexcept
+{
+    // the loop settles where the gain equals the curve's answer to the output level: s − F(s) = 0, s − F(s) rises
+    const auto a = std::exp (peakDb * nepersPerDb), lnT = thresholdDb * nepersPerDb;
+    const auto loop = std::max (0.0, std::min (ratio, 1.0e4) - 1.0), kneeN = std::max (1.0e-4, 2.0 * kneeDb * nepersPerDb);
+    auto f = [&] (double g) { return consoleTarget (std::log (std::min (1.0, a * std::exp (g)) + consoleFloor) - lnT, loop, kneeN); };
+    double lo = -30.0, hi = 0.0;
+    for (int i = 0; i < 60; ++i)
+    {
+        const auto m = 0.5 * (lo + hi);
+        (m - f (m) < 0.0 ? lo : hi) = m;
+    }
+    return 0.5 * (lo + hi) / nepersPerDb;
+}
 
 double staticGainDb (const EffectParams& p, double inputDb)
 {
@@ -818,6 +862,7 @@ private:
         double env = -120.0, sustain = 0.0, gain = 0.0;
         double lin = 1e-6; // round 190v: two-way's follower (linear amplitude)
         double peak = -120.0; // round 173d: the input's peak (instant attack, the detector's release): the lift's ceiling
+        double cs = 0.0, c1 = 0.0, c2 = 0.0; // round 190kt: the console law's log gain (nepers) and its two capacitors
         int holdLeft = 0, gainHold = 0, peakPos = 0;
     };
 
@@ -834,6 +879,8 @@ private:
         TwoWayLaw twoWay {};
         VariMuLaw variMu {};
         double aRl = 0.0; // two-way: the linear follower's release
+        // round 190kt: the console law (threshold nepers, loop gain, knee nepers, attack / release / slow-cap rates)
+        double cT = 0.0, cK = 1.0, cKnee = 1.0, cA = 0.0, cR = 0.0, cA2 = 0.0, cR2 = 0.0;
     };
     double styleGain (const Ctx& x, double level) const noexcept
     {
@@ -924,6 +971,17 @@ private:
         }
         c.aP = coef (c.relMs, rate);
         c.autoRel = on (p[autoRelease]) && sd.curve != Curve::twoWay && sd.curve != Curve::twoWayClassic;
+        if (sd.curve == Curve::console) // round 190kt: the RC rates of the knobs' time constants, per sample
+        {
+            c.relMs = releaseMs (p[release]);
+            c.cT = c.thr * nepersPerDb;
+            c.cK = std::max (0.0, std::min (c.rat, 1.0e4) - 1.0);
+            c.cKnee = std::max (1.0e-4, 2.0 * c.kn * nepersPerDb); // (the knee in nepers = twice the knob's)
+            c.cA = std::min (1.0, 1000.0 / (att * rate));
+            c.cR = std::min (1.0, 1000.0 / (c.relMs * rate));
+            c.cA2 = c.cA * consoleAutoCapRatio;
+            c.cR2 = std::min (1.0, 1000.0 / (consoleAutoSlowMs * rate));
+        }
         c.rate = rate;
         c.slowCoef = coef (1000.0, rate);
         c.gainBlend = sd.gainBlend;
@@ -954,6 +1012,26 @@ private:
             d.peakPos = (d.peakPos + 1) % x.window;
             for (int k = 0; k < x.window; ++k)
                 level = std::max (level, (double) ring[(std::size_t) k]);
+        }
+        if (x.curve == Curve::console) // round 190kt: the console law (feedback, RC ballistics); no hold / lift / blend
+        {
+            const auto t = consoleTarget (std::log (std::min (1.0, level * std::exp (d.cs)) + consoleFloor) - x.cT, x.cK, x.cKnee);
+            if (! x.autoRel)
+                d.cs = d.cs > t ? d.cs + x.cA * (t - d.cs) - x.cR * d.cs : std::min (d.cs * (1.0 - x.cR), t);
+            else if (d.cs > t)
+            {
+                const auto e = t - d.c1 - d.c2;
+                d.c1 += x.cA * e - x.cR * d.c1;
+                d.c2 += x.cA2 * e - x.cR2 * d.c2;
+                d.cs = d.c1 + d.c2;
+            }
+            else
+            {
+                d.c1 *= 1.0 - x.cR;
+                d.c2 *= 1.0 - x.cR2;
+                d.cs = std::min (d.c1 + d.c2, t);
+            }
+            return std::max (-x.rng, d.cs / nepersPerDb);
         }
         const auto in = std::max (-120.0, 20.0 * std::log10 (level + 1e-12));
         if (x.curve == Curve::twoWay) // round 190v: the follower works on the amplitude, not on its level in dB
