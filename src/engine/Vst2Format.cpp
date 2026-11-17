@@ -288,6 +288,10 @@ public:
         events.resize (sizeof (std::int32_t) * 2 + sizeof (void*) * (maxEvents + 2));
         midiEvents.resize (maxEvents);
         timeInfo = {};
+        // GitHub #198 (round 190ks): a plugin that sends MIDI (its pads, an arpeggiator) says so through canDo; what it
+        // sends (audioMasterProcessEvents) comes back in processBlock's buffer, the wrapper's MIDI output
+        for (const auto* what : { "sendVstMidiEvent", "sendVstEvents" })
+            sendsMidi = sendsMidi || effect->dispatcher (effect, abi::canDo, 0, 0, (void*) what, 0.0f) > 0;
     }
 
     ~Vst2Instance() override
@@ -332,6 +336,8 @@ public:
         if (! active || n > maxBlock)
         {
             buffer.clear();
+            if (sendsMidi)
+                midi.clear(); // (round 190ks: it sent nothing)
             return;
         }
 
@@ -386,6 +392,22 @@ public:
         else if (effect->process != nullptr)
             effect->process (effect, inputs.data(), outputs.data(), n);
 
+        // round 190ks: the buffer comes back with what the plugin sent during the block (or from its window since the
+        // last block), at its sample (JUCE's processBlock rule: afterwards the MIDI buffer holds the plugin's output)
+        if (sendsMidi)
+        {
+            midi.clear();
+            const juce::SpinLock::ScopedLockType sl (sentLock);
+            for (int k = 0; k < sentCount; ++k)
+            {
+                const auto& e = sent[(std::size_t) k];
+                const auto status = (std::uint8_t) e.data[0];
+                if (status >= 0x80 && status < 0xF0)
+                    midi.addEvent (e.data, juce::MidiMessage::getMessageLengthFromFirstByte (status), juce::jlimit (0, n - 1, e.deltaFrames));
+            }
+            sentCount = 0;
+        }
+
         // main output: the first one or two outputs (a mono plugin feeds both sides); then the other outputs on the
         // channels of the extra buses (issue #114), as many as are enabled
         const auto mainChannels = getBusCount (false) > 0 ? getChannelCountOfBus (false, 0) : 0;
@@ -406,7 +428,7 @@ public:
         return samples > 1 && rate > 0.0 ? (double) samples / rate : 0.0;
     }
     bool acceptsMidi() const override { return description.isInstrument; }
-    bool producesMidi() const override { return false; }
+    bool producesMidi() const override { return sendsMidi; } // (round 190ks)
 
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return (effect->flags & abi::hasEditor) != 0; }
@@ -497,6 +519,19 @@ public:
                 }
                 return 0;
             case abi::getTime: return (std::intptr_t) &timeInfo;
+            case abi::hostProcessEvents: // (round 190ks) the plugin sends MIDI: kept for the next processBlock's output
+                if (sendsMidi && ptr != nullptr)
+                {
+                    const auto* header = static_cast<const std::uint8_t*> (ptr);
+                    std::int32_t count = 0;
+                    std::memcpy (&count, header, 4);
+                    const auto* const* list = reinterpret_cast<const abi::MidiEvent* const*> (header + (sizeof (void*) == 8 ? 16 : 8));
+                    const juce::SpinLock::ScopedLockType sl (sentLock);
+                    for (int k = 0; k < count && sentCount < (int) sent.size(); ++k)
+                        if (list[k] != nullptr && list[k]->type == 1) // (MIDI; SysEx is not passed on)
+                            sent[(std::size_t) sentCount++] = *list[k];
+                }
+                return 1;
             case abi::ioChanged:
                 onMainThread ([this] { setLatencySamples (effect->initialDelay); });
                 return 1;
@@ -636,6 +671,12 @@ private:
     std::vector<std::uint8_t> events; // VstEvents header + pointer list
     std::vector<abi::MidiEvent> midiEvents;
     abi::TimeInfo timeInfo {};
+    // round 190ks: the MIDI the plugin sent (audioMasterProcessEvents: on the audio thread during processReplacing, or
+    // from its window's thread), until processBlock passes it on; preallocated, the rest of a burst is dropped
+    bool sendsMidi = false;
+    juce::SpinLock sentLock;
+    std::array<abi::MidiEvent, 512> sent {};
+    int sentCount = 0;
     std::atomic<std::thread::id> audioThread {};
 };
 

@@ -4247,6 +4247,8 @@ countries: br
 "Send MOD X as polyphonic aftertouch" = "Enviar o MOD X como aftertouch polifônico"
 "Send each note's Modulation X as polyphonic aftertouch" = "Enviar a Modulação X de cada nota como aftertouch polifônico"
 "Send All Notes Off when playback stops" = "Enviar All Notes Off quando a reprodução para"
+"Record notes from the plugin window" = "Gravar notas da janela do plugin"
+"While recording, the notes the plugin plays from its own window (pads or keys clicked in it) are recorded on its channel" = "Durante a gravação, as notas que o plugin toca pela própria janela (pads ou teclas clicados nela) são gravadas no canal dele"
 "Off: only the notes still held get their note off" = "Desligado: só as notas ainda seguradas recebem o note off"
 "Reset plugin when LYNX SHARE resets" = "Reiniciar o plugin quando o LYNX SHARE reinicia"
 "Reset the plugin before an export and on panic (clears its tails and held notes)" = "Reiniciar o plugin antes de exportar e no pânico (limpa as caudas e as notas seguradas)"

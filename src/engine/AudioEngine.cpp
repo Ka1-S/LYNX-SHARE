@@ -749,6 +749,7 @@ void AudioEngine::buildInitialGraph()
         rackProcessor->setPerformance (performanceLive.get());
         rackProcessor->getRenderer().reserveFor (lastPublishedShape); // (round 190gn: a song published before the graph)
         rackProcessor->getRenderer().setHardwareMidiPorts (hardwareMidiPorts); // (round 190jl)
+        rackProcessor->getRenderer().setOwnNoteChannels (ownNoteChannels); // (round 190ks)
         // FL's own metronome sounds from its install (Data\System), LYNX's stand-ins without it (round 165z-a2)
         const auto& flData = flStudioAccess().roots.data;
         rackProcessor->setMetronome (std::make_unique<Metronome> (transport, flData.empty() ? juce::File() : platform::localFile (flData)));
@@ -1817,6 +1818,27 @@ void AudioEngine::sendLiveNote (int channel, int key, float velocity, bool on, b
     if (taking)
         uiRecorded.push_back ({ recordTickFor (now), channel, key, velocity, on });
     if (record && slotTaking.load (std::memory_order_relaxed)) // a slot of the clip grid records (round 190bv)
+        uiSlotRecorded.push_back ({ recordTickFor (now), channel, key, velocity, on });
+}
+
+void AudioEngine::sendGuiNote (int channel, int key, float velocity, bool on)
+{
+    key = juce::jlimit (0, 127, key);
+    if (on)
+        startOnInput(); // ("Wait for input": a pad hit starts the take, as a played key does)
+    markLiveNote (key, juce::roundToInt (velocity * 127.0f), on);
+    NoteEvent e;
+    e.type = on ? NoteEvent::Type::on : NoteEvent::Type::off;
+    e.channel = channel;
+    e.key = key;
+    e.velocity = velocity;
+    liveEvents.push (e);
+    const auto now = juce::Time::getMillisecondCounterHiRes();
+    const auto taking = transport.recording.load() && (transport.playing.load() || isCountingIn());
+    logPlayedNote (channel, key, velocity, on, transport.playing.load() ? recordTickFor (now) : -1.0, taking);
+    if (taking)
+        uiRecorded.push_back ({ recordTickFor (now), channel, key, velocity, on });
+    if (slotTaking.load (std::memory_order_relaxed))
         uiSlotRecorded.push_back ({ recordTickFor (now), channel, key, velocity, on });
 }
 
@@ -3593,6 +3615,7 @@ void AudioEngine::updateRecording()
         recorder.add (song, e);
     }
 
+    takeRecordedPluginNotes(); // GitHub #198 (round 190ks): the notes plugin windows played
     for (auto ui : uiRecorded)
     {
         if (! recordOptions.recordNotes || ! catchEarlyNote (ui, takeCatch) || outsidePunch (ui))
@@ -4342,6 +4365,67 @@ void AudioEngine::publishRenderAheadTargets()
                         add ((int) c);
     }
     renderAheadTargets.publish (channels.data(), count, tracks.data(), trackCount);
+    publishOwnNoteChannels(); // (round 190ks: the same editors)
+}
+
+// GitHub #198 (round 190ks): the channels whose hosted plugin's window is open — what it plays from there is recorded
+// (core/RackRenderer.h ownNotes). Their channel index is looked up at each publish, as the render-ahead's.
+void AudioEngine::publishOwnNoteChannels()
+{
+    std::array<std::uint64_t, RackRenderer::ownNoteWords> mask {};
+    for (const auto& e : openEditors)
+        if (e.track < 0 && e.find)
+            if (const auto* ref = e.find (song))
+                for (std::size_t c = 0; c < song.channels.size() && c < (std::size_t) RackRenderer::maxChannels; ++c)
+                    if (&song.channels[c].plugin == ref && song.channels[c].instrument == InstrumentKind::plugin
+                        && song.channels[c].plugin.recordOwnNotes)
+                        mask[c >> 6] |= std::uint64_t { 1 } << (c & 63);
+    if (mask == ownNoteChannels)
+        return;
+    ownNoteChannels = mask;
+    if (rackProcessor != nullptr)
+        rackProcessor->getRenderer().setOwnNoteChannels (ownNoteChannels);
+}
+
+void AudioEngine::takePluginNotes (int done) noexcept
+{
+    if (rackProcessor == nullptr)
+        return;
+    auto& rack = rackProcessor->getRenderer();
+    const auto count = rack.takeOwnNotes (ownNotesTaken.data(), (int) ownNotesTaken.size());
+    if (count == 0)
+        return;
+    // (as a played note: a take while recording and playing or counting in; a clip slot that records)
+    const auto take = transport.recording.load (std::memory_order_relaxed)
+                      && (transport.playing.load (std::memory_order_relaxed) || isCountingIn());
+    const auto slot = slotTaking.load (std::memory_order_relaxed);
+    if (! take && ! slot)
+        return;
+    const auto clock = liveClock();
+    const auto rate = juce::jmax (1.0, transport.sampleRate.load (std::memory_order_relaxed));
+    for (int k = 0; k < count; ++k)
+    {
+        const auto& o = ownNotesTaken[(std::size_t) k];
+        // the click reached the plugin by this block: recorded where the song was heard then, as a played note
+        const auto eventMs = clock.timeMs + 1000.0 * (double) (done + o.sample) / rate;
+        PluginRecorded r;
+        r.event = { recordTickFor (eventMs), (int) o.channel, (int) o.key, o.velocity, o.velocity > 0.0f };
+        r.take = take;
+        r.slot = slot;
+        pluginRecordQueue.push (r);
+    }
+}
+
+void AudioEngine::takeRecordedPluginNotes()
+{
+    PluginRecorded r;
+    while (pluginRecordQueue.pop (r))
+    {
+        if (r.take)
+            uiRecorded.push_back (r.event); // (with the typing keyboard's: the same filter, punch and count-in catch)
+        if (r.slot)
+            uiSlotRecorded.push_back (r.event);
+    }
 }
 
 namespace
@@ -5033,6 +5117,8 @@ void AudioEngine::publishSong()
     } };
     ++songStamp;
     ++publishCount;
+    if (! openEditors.empty()) // (round 190ks: a channel moved or its option changed: its index / mark follows)
+        publishOwnNoteChannels();
     // round 190jl: a MIDI Out channel added, or moved to a port a hardware output has, renders live
     if ((hardwareMidiPorts[0] | hardwareMidiPorts[1] | hardwareMidiPorts[2] | hardwareMidiPorts[3]) != 0)
         publishRenderAheadTargets();
@@ -7582,6 +7668,7 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
                 midiSync.requestPortNotesOff();
         }
         hardwareMidiWasPlaying = transport.playing.load (std::memory_order_relaxed);
+        takePluginNotes (done); // GitHub #198 (round 190ks): what plugin windows played in this part
 
         if (takesLocked) // the tapped takes' part of this block, now rendered (round 168x)
         {

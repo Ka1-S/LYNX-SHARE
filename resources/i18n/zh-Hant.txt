@@ -4205,6 +4205,8 @@ countries: tw hk mo
 "Send MOD X as polyphonic aftertouch" = "將MOD X作為複音觸後傳送"
 "Send each note's Modulation X as polyphonic aftertouch" = "將每個音符的調變X作為複音觸後傳送"
 "Send All Notes Off when playback stops" = "停止播放時傳送All Notes Off"
+"Record notes from the plugin window" = "錄製外掛視窗中的音符"
+"While recording, the notes the plugin plays from its own window (pads or keys clicked in it) are recorded on its channel" = "錄音時，外掛在其視窗中演奏的音符（在視窗中點擊的打擊墊或琴鍵）會錄製到它的通道上"
 "Off: only the notes still held get their note off" = "關：只有仍被按住的音符會收到note off"
 "Reset plugin when LYNX SHARE resets" = "LYNX SHARE重設時重設外掛"
 "Reset the plugin before an export and on panic (clears its tails and held notes)" = "匯出前和緊急停止時重設外掛（清除其尾音和按住的音符）"

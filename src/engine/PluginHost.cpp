@@ -700,6 +700,22 @@ void PluginInstrument::collectMidiOutput (const juce::MidiBuffer& buffer) noexce
         const auto m = event.getMessage();
         if ((m.isNoteOn() || m.isNoteOff()) && midiOutCount < (int) midiOut.size())
             midiOut[(std::size_t) midiOutCount++] = { m.getNoteNumber(), m.isNoteOn() ? m.getFloatVelocity() : 0.0f };
+        // GitHub #198 (round 190ks): its own notes for a take; a note on of a key it was sent within 50 ms is the echo of
+        // that note (a "MIDI thru" plugin), and so is the note off of a key whose note on was not its own
+        if (recordOwn && (m.isNoteOn() || m.isNoteOff()))
+        {
+            const auto key = juce::jlimit (0, 127, m.getNoteNumber());
+            const auto window = (std::int64_t) (ownnotes::echoSeconds * juce::jmax (1.0, plugin->getSampleRate()));
+            const auto own = echoGuard.noteOut (key, m.isNoteOn(), samplesSeen, window);
+            if (own && ownNoteCount < (int) ownNotes.size())
+            {
+                auto& o = ownNotes[(std::size_t) ownNoteCount++];
+                o.sample = hardwareBlockAt + (hardwarePositions ? juce::jmax (0, event.samplePosition) : 0);
+                o.key = (std::uint8_t) key;
+                o.midiChannel = (std::uint8_t) juce::jlimit (0, 15, m.getChannel() - 1);
+                o.velocity = m.isNoteOn() ? m.getFloatVelocity() : 0.0f;
+            }
+        }
         // round 190jl: the channel messages to the hardware outputs on the wrapper's output port
         if (hardwareOut && event.numBytes >= 2 && event.numBytes <= 3 && event.data[0] >= 0x80 && event.data[0] < 0xF0
             && hardwareMidiCount < (int) hardwareMidi.size())
@@ -718,6 +734,14 @@ int PluginInstrument::takeHardwareMidi (HardwareMidi* out, int max) noexcept
     const auto count = juce::jmin (max, hardwareMidiCount);
     std::copy (hardwareMidi.begin(), hardwareMidi.begin() + count, out);
     hardwareMidiCount = 0;
+    return count;
+}
+
+int PluginInstrument::takeOwnNotes (OwnNote* out, int max) noexcept
+{
+    const auto count = juce::jmin (max, ownNoteCount);
+    std::copy (ownNotes.begin(), ownNotes.begin() + count, out);
+    ownNoteCount = 0;
     return count;
 }
 
@@ -976,6 +1000,8 @@ void PluginInstrument::rememberMidi (const juce::MidiBuffer& messages) noexcept
         const auto status = event.data[0] & 0xf0, channel = event.data[0] & 0x0f;
         if (status == 0x90 || status == 0x80)
             deliveredKeys.set (channel, event.data[1], status == 0x90 && event.data[2] != 0);
+        if (status == 0x90 && event.data[2] != 0) // (round 190ks: the echo guard of takeOwnNotes)
+            echoGuard.noteIn (event.data[1] & 0x7f, samplesSeen);
     }
 }
 
@@ -1199,6 +1225,7 @@ void PluginInstrument::render (float* left, float* right, int n, float gl, float
             fixed->run (io.data(), count, false, process);
             mixOutputs (io.data(), juce::jmin (channels, (int) io.size()), done, count, gl, gr, left, right);
             done += count;
+            samplesSeen += count; // (round 190ks)
         }
         return;
     }
@@ -1226,6 +1253,7 @@ void PluginInstrument::render (float* left, float* right, int n, float gl, float
 
         mixOutputs (view.getArrayOfReadPointers(), view.getNumChannels(), done, count, gl, gr, left, right);
         done += count;
+        samplesSeen += count; // (round 190ks)
     }
 }
 

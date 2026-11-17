@@ -54,6 +54,7 @@
 #include "core/Scratcher.h"
 
 #include <algorithm>
+#include <bit>
 #include <atomic>
 #include <chrono>
 #include <cstdlib>
@@ -4638,9 +4639,14 @@ void RackRenderer::process (const RackState* state,
         if (! state->hardwareMidiChannels.empty()) // (round 190jl)
             hardwareMidiBeforeChunk (*state);
         timedGridPos = grid ? pos : -1; // (round 190jg: sample-accurate automation keeps to the export's grid)
+        const auto ownNotes = ownAnyOn || ownWantedAny.load (std::memory_order_acquire); // (round 190ks)
+        if (ownNotes)
+            ownNotesBeforeChunk (*state);
         processChunk (*state, playing, startTick + done * tps, n, left + done, right + done, meters, continuing);
         if (! state->hardwareMidiChannels.empty())
             hardwareMidiAfterChunk (*state, n);
+        if (ownNotes)
+            ownNotesAfterChunk (*state, n);
         resumeAudio = false;
         chaseNotes = false;
         done += n;
@@ -4689,6 +4695,93 @@ void RackRenderer::addHardwareMidi (int sample, int port, const std::uint8_t* by
     m.size = (std::uint8_t) size;
     m.source = (std::uint8_t) std::clamp (source, 0, 255);
     m.bytes = { bytes[0], size > 1 ? bytes[1] : std::uint8_t { 0 }, size > 2 ? bytes[2] : std::uint8_t { 0 } };
+}
+
+// ---- The plugins' own notes, for a take (GitHub #198, round 190ks) ---------------------------------------------------
+
+void RackRenderer::setOwnNoteChannels (const std::array<std::uint64_t, ownNoteWords>& channels) noexcept
+{
+    auto any = false;
+    for (std::size_t w = 0; w < channels.size(); ++w)
+    {
+        ownWanted[w].store (channels[w], std::memory_order_relaxed);
+        any = any || channels[w] != 0;
+    }
+    ownWantedAny.store (any, std::memory_order_release);
+}
+
+int RackRenderer::takeOwnNotes (OwnNoteEvent* out, int max) noexcept
+{
+    const auto count = std::min (max, ownEventCount);
+    std::copy (ownEvents.begin(), ownEvents.begin() + count, out);
+    ownEventCount = 0;
+    return count;
+}
+
+// Before a chunk: each marked channel's capture is on (asked every chunk: an instrument made again starts off); a channel
+// no longer marked is switched off once
+void RackRenderer::ownNotesBeforeChunk (const RackState& state) noexcept
+{
+    const auto count = std::min<std::size_t> (state.instruments.size(), (std::size_t) maxChannels);
+    auto anyOn = false;
+    for (std::size_t w = 0; w < (std::size_t) ownNoteWords; ++w)
+    {
+        const auto wanted = ownWanted[w].load (std::memory_order_relaxed);
+        auto bits = wanted | ownOn[w];
+        std::uint64_t on = 0;
+        while (bits != 0)
+        {
+            const auto b = (std::size_t) std::countr_zero (bits);
+            bits &= bits - 1;
+            const auto c = w * 64 + b;
+            if (c >= count || state.instruments[c] == nullptr)
+                continue;
+            const auto want = (wanted >> b & 1u) != 0 && ! foreignChannel ((int) c);
+            if (want || (ownOn[w] >> b & 1u) != 0)
+                state.instruments[c]->setRecordOwnNotes (want);
+            if (want)
+                on |= std::uint64_t { 1 } << b;
+        }
+        ownOn[w] = on;
+        anyOn = anyOn || on != 0;
+    }
+    ownAnyOn = anyOn;
+}
+
+// After a chunk: the notes each capture kept, at their sample in the process() block, in time order
+void RackRenderer::ownNotesAfterChunk (const RackState& state, int n) noexcept
+{
+    const auto first = ownEventCount;
+    const auto count = std::min<std::size_t> (state.instruments.size(), (std::size_t) maxChannels);
+    for (std::size_t w = 0; w < (std::size_t) ownNoteWords; ++w)
+        for (auto bits = ownOn[w]; bits != 0; bits &= bits - 1)
+        {
+            const auto c = w * 64 + (std::size_t) std::countr_zero (bits);
+            if (c >= count || state.instruments[c] == nullptr)
+                continue;
+            const auto taken = state.instruments[c]->takeOwnNotes (ownScratch.data(), (int) ownScratch.size());
+            for (int k = 0; k < taken && ownEventCount < ownNoteCapacity; ++k)
+            {
+                const auto& o = ownScratch[(std::size_t) k];
+                auto& e = ownEvents[(std::size_t) ownEventCount++];
+                e.sample = liveInputOffset + std::clamp (o.sample, 0, std::max (0, n - 1));
+                e.channel = (std::int32_t) c;
+                e.key = o.key;
+                e.midiChannel = o.midiChannel;
+                e.velocity = o.velocity;
+            }
+        }
+    for (int i = first + 1; i < ownEventCount; ++i) // (stable insertion sort: a few notes)
+    {
+        const auto m = ownEvents[(std::size_t) i];
+        auto j = i;
+        while (j > first && ownEvents[(std::size_t) j - 1].sample > m.sample)
+        {
+            ownEvents[(std::size_t) j] = ownEvents[(std::size_t) j - 1];
+            --j;
+        }
+        ownEvents[(std::size_t) j] = m;
+    }
 }
 
 // Before a chunk: the capture of each MIDI Out channel / plugin whose port an output device has is on (bit 0); a

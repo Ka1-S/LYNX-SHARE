@@ -317,6 +317,9 @@ struct PluginRef
     // before), 1 as played, 2 soft, 3 hard, 4 fixed at `fixedVelocity` (1…127). core/Preferences.h mapPluginVelocity
     int velocityMode = 0;
     int fixedVelocity = 100;
+    // GitHub #198 (round 190ks): the notes the plugin plays from its own window (pads / keys clicked in it, sent on its MIDI
+    // output) are recorded on its channel while recording, as played notes; off: they are not. Projects saved before: on
+    bool recordOwnNotes = true;
 
     bool operator== (const PluginRef& o) const
     {
@@ -330,7 +333,8 @@ struct PluginRef
                && processInactive == o.processInactive && inputs == o.inputs
                && allowHostKeys == o.allowHostKeys && hostKeysFirst == o.hostKeysFirst
                && detached == o.detached && playedBy == o.playedBy && values == o.values
-               && pinned == o.pinned && velocityMode == o.velocityMode && fixedVelocity == o.fixedVelocity;
+               && pinned == o.pinned && velocityMode == o.velocityMode && fixedVelocity == o.fixedVelocity
+               && recordOwnNotes == o.recordOwnNotes;
     }
 };
 

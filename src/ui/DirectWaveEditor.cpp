@@ -1799,7 +1799,7 @@ private:
     void playKey (int key, bool on)
     {
         if (channel >= 0)
-            engine.sendLiveNote (channel, key, 100.0f / 128.0f, on);
+            engine.sendGuiNote (channel, key, 100.0f / 128.0f, on); // (GitHub #198: recorded while recording)
     }
 
     juce::String zonesText() const

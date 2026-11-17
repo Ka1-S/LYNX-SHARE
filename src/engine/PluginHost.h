@@ -21,6 +21,7 @@
 #include "core/RemotePlugins.h"
 #include "core/PluginHold.h"
 #include "core/Instruments.h"
+#include "core/OwnNotes.h"
 #include "core/MidiControls.h"
 #include "core/Mpe.h"
 #include "core/Vfx.h"
@@ -220,6 +221,9 @@ public:
     // Output "Port"): every short channel message, at its sample in the chunk
     void setHardwareMidi (bool on) noexcept override { hardwareOut = on; }
     int takeHardwareMidi (HardwareMidi* out, int max) noexcept override;
+    // GitHub #198 (round 190ks): the notes the plugin plays from its own window, for a take (Instrument::takeOwnNotes)
+    void setRecordOwnNotes (bool on) noexcept override { recordOwn = on; }
+    int takeOwnNotes (OwnNote* out, int max) noexcept override;
     // Issue #14: the channel's PITCH knob, fine tune and main pitch reach the plugin as MIDI pitch bend (scaled by the
     // wrapper's pitch bend range), and a slide note bends the sounding notes to its key over its length
     void setLivePitch (float cents) noexcept override { livePitch = cents; }
@@ -268,6 +272,13 @@ private:
     std::array<HardwareMidi, 512> hardwareMidi {};
     int hardwareMidiCount = 0, hardwareBlockAt = 0;
     bool hardwarePositions = true; // false: a fixed block's events (their samples are the fixed block's, not the chunk's)
+    // GitHub #198 (round 190ks): the notes it sends on its own while a take records (collectMidiOutput); the echo guard
+    // keeps when each key's note on last went in (samplesSeen) and which keys' note ons were its own
+    bool recordOwn = false;
+    std::array<OwnNote, 256> ownNotes {};
+    int ownNoteCount = 0;
+    std::int64_t samplesSeen = 0;
+    ownnotes::EchoGuard echoGuard;
     HostedOptions options;
     std::atomic<bool> flVelocity { false };
     juce::uint8 midiVelocity (float velocity) const noexcept;

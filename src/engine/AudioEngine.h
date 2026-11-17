@@ -486,6 +486,12 @@ public:
     // Note played live (PC keyboard, preview). UI thread.
     // `record` = goes into the recording if recording is on (Piano Roll preview doesn't).
     void sendLiveNote (int channel, int key, float velocity, bool on, bool record = false);
+    // GitHub #198 (round 190ks): a note played by clicking an instrument's own pads or keys (FPC's pads, DirectWave's and
+    // Slicex's keyboards): heard on the channel and recorded while recording, as a played note — FL's host entry for a
+    // plugin note "as if the user played it" (Dispatcher opcode 0x38 → the MIDI / typing keyboard's record-and-play
+    // function, REA rea/REA-plugin-midiout-record.md). FL's own FPC / Slicex clicks only play (a LYNX extra here, the
+    // issue's request). Never moved by the input scale snap (a pad's key is the pad). UI thread.
+    void sendGuiNote (int channel, int key, float velocity, bool on);
     // The keys held right now on MIDI inputs and the typing piano (as played, before the scale snap), ascending; for
     // the Piano Roll's chord readout (any thread).
     std::vector<int> heldInputKeys() const;
@@ -814,6 +820,12 @@ public:
     static juce::String midiHotplugSelfTest();
     // Round 190jl (engine/MidiOutPortTest.cpp): MIDI Out channels to the hardware outputs on their port, end to end
     static juce::String midiOutPortSelfTest();
+    // Round 190ks (GitHub #198): a take records what a hosted plugin plays from its window (src/engine/PadRecordTest.cpp,
+    // `LYNX --padrectest "<LYNX Test Pads.vst3>" report.txt`)
+    static juce::String padRecordSelfTest (const juce::String& pluginPath);
+    // Round 190ks: what 8 identical SoundFont / Sampler channels cost in memory (src/engine/ShareMemoryTest.cpp,
+    // `LYNX --sharetest <folder> sf2-same|sf2-copies|wav-same|wav-copies report.txt`)
+    static juce::String shareMemorySelfTest (const juce::File& folder, const juce::String& which);
     const prefs::MidiPrefs& getMidiPrefs() const noexcept { return midiPrefs; }
     // Applies them (and saves them in %APPDATA%\LYNX\midi-settings.txt when `save`).
     void setMidiPrefs (const prefs::MidiPrefs& prefs, bool save = true);
@@ -1515,6 +1527,27 @@ private:
     std::array<std::uint64_t, 4> hardwareMidiPorts {};
     void configureMidiOutputs(); // message thread: MidiSyncIo's devices, the rack's ports
     std::array<RackRenderer::HardwareMidiEvent, RackRenderer::hardwareMidiCapacity> hardwareMidiTaken {}; // audio thread
+    // GitHub #198 (round 190ks): the notes hosted plugins play from their own window (pads, keys clicked in it), recorded
+    // like played notes. The channels whose plugin window is open (UI thread, at each publish of the editors / song) go
+    // to the live rack; its notes come back after each part of the device callback (audio thread) and, while a take or
+    // a clip slot records, go to the UI thread through pluginRecordQueue (tick: where the song was heard, as a played
+    // note's; `slot` = a clip slot records too).
+    struct PluginRecorded
+    {
+        RecordedEvent event;
+        bool take = false, slot = false;
+    };
+    SpscQueue<PluginRecorded, 1024> pluginRecordQueue; // audio thread -> UI
+    std::array<RackRenderer::OwnNoteEvent, RackRenderer::ownNoteCapacity> ownNotesTaken {}; // audio thread
+    std::array<std::uint64_t, RackRenderer::ownNoteWords> ownNoteChannels {};             // UI thread (last published)
+    void publishOwnNoteChannels();
+    void takePluginNotes (int done) noexcept; // audio thread, after a part of the device callback
+public:
+    // the plugin notes waiting for the UI thread (updateRecording takes them; tests). UI thread.
+    void takeRecordedPluginNotes();
+    // GitHub #198: the channels whose plugin notes are recorded now (tests). UI thread.
+    const std::array<std::uint64_t, RackRenderer::ownNoteWords>& recordedPluginChannels() const noexcept { return ownNoteChannels; }
+private:
     bool hardwareMidiWasPlaying = false; // audio thread
     // FL's "Receive notes from" (round 165f-rack): the channels locked to a MIDI input device (and MIDI channel, 0 = any),
     // rebuilt from the song on every publish; guarded by midiPrefsLock too

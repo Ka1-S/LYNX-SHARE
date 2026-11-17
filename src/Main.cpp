@@ -911,6 +911,30 @@ public:
             return;
         }
 
+        if (args.contains ("--sharetest"))
+        {
+            // LYNX --sharetest <folder> <case> report.txt (round 190ks): the memory 8 identical SoundFont / Sampler channels
+            // cost (LYNX_CONTENT_SHARE=0: byte copies held separately, as before). No window.
+            const auto i = args.indexOf ("--sharetest");
+            const auto result = lynx::AudioEngine::shareMemorySelfTest (juce::File (args[i + 1].unquoted()), args[i + 2].unquoted());
+            juce::File (args[i + 3].unquoted()).replaceWithText ("share=" + result + "\nresult=" + (result.startsWith ("OK") ? "OK" : "FAILED") + "\n");
+            setApplicationReturnValue (result.startsWith ("OK") ? 0 : 1);
+            quit();
+            return;
+        }
+
+        if (args.contains ("--padrectest"))
+        {
+            // LYNX --padrectest "<LYNX Test Pads.vst3>" report.txt (round 190ks, GitHub #198): a take records the notes a
+            // hosted plugin plays from its own window (the live engine on a stand-in device). No window.
+            const auto i = args.indexOf ("--padrectest");
+            const auto result = lynx::AudioEngine::padRecordSelfTest (args[i + 1].unquoted());
+            juce::File (args[i + 2].unquoted()).replaceWithText ("pad_record=" + result + "\nresult=" + (result.startsWith ("OK") ? "OK" : "FAILED") + "\n");
+            setApplicationReturnValue (result.startsWith ("OK") ? 0 : 1);
+            quit();
+            return;
+        }
+
         if (args.contains ("--midiouttest"))
         {
             // LYNX --midiouttest report.txt (round 190jl): MIDI Out channels to the hardware MIDI outputs on their port

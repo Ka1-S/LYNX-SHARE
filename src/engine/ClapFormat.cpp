@@ -461,6 +461,7 @@ public:
 
             if (notes->count (plugin, true) > 0 && notes->get (plugin, 0, true, &info))
                 midiDialect = (info.supported_dialects & CLAP_NOTE_DIALECT_CLAP) == 0;
+            hasNoteOutput = notes->count (plugin, false) > 0; // (GitHub #198, round 190ks: a plugin that sends notes)
         }
 
         inputChannels = mainPortChannels (true, description.isInstrument ? 0 : 2);
@@ -607,6 +608,8 @@ public:
         if (gate.exchange (true))
         {
             buffer.clear();
+            if (hasNoteOutput)
+                midi.clear(); // (round 190ks: it sent nothing)
             return;
         }
         audioThread.store (std::this_thread::get_id());
@@ -621,6 +624,8 @@ public:
         if (restartPending.load() || ! active || n > maxBlock)
         {
             buffer.clear();
+            if (hasNoteOutput)
+                midi.clear(); // (round 190ks: it sent nothing)
             gate.store (false);
             return;
         }
@@ -666,6 +671,11 @@ public:
         for (const auto m : midi)
             addMidi (m.getMessage(), (uint32_t) juce::jlimit (0, n - 1, m.samplePosition));
         events.sortByTime(); // (CLAP: a block's input events in time order)
+        // GitHub #198 (round 190ks): with a note output port, the buffer comes back with what the plugin sent (JUCE's
+        // processBlock rule: after the call, the MIDI buffer holds the plugin's output)
+        outMidi = hasNoteOutput ? &midi : nullptr;
+        if (outMidi != nullptr)
+            midi.clear();
 
         std::array<float*, 16> inputs {};
         std::array<float*, 16> outputs {};
@@ -698,6 +708,30 @@ public:
                 if (auto it = self->byId.find (v->param_id); it != self->byId.end())
                     it->second->setFromPlugin (v->value);
             }
+            // GitHub #198 (round 190ks): the notes it sends (its note output port), as MIDI at their sample
+            if (self->outMidi != nullptr && e->space_id == CLAP_CORE_EVENT_SPACE_ID)
+            {
+                const auto at = (int) e->time;
+                if (e->type == CLAP_EVENT_NOTE_ON || e->type == CLAP_EVENT_NOTE_OFF)
+                {
+                    const auto* note = reinterpret_cast<const clap_event_note_t*> (e);
+                    if (note->key >= 0 && note->key < 128)
+                    {
+                        const auto ch = note->channel >= 0 && note->channel < 16 ? note->channel + 1 : 1;
+                        const auto velocity = (float) juce::jlimit (0.0, 1.0, note->velocity);
+                        self->outMidi->addEvent (e->type == CLAP_EVENT_NOTE_ON && velocity > 0.0f
+                                                     ? juce::MidiMessage::noteOn (ch, note->key, velocity)
+                                                     : juce::MidiMessage::noteOff (ch, note->key, velocity),
+                                                 at);
+                    }
+                }
+                else if (e->type == CLAP_EVENT_MIDI)
+                {
+                    const auto* m = reinterpret_cast<const clap_event_midi_t*> (e);
+                    if (m->data[0] >= 0x80 && m->data[0] < 0xF0)
+                        self->outMidi->addEvent (m->data, juce::MidiMessage::getMessageLengthFromFirstByte (m->data[0]), at);
+                }
+            }
 
             return true;
         };
@@ -714,6 +748,7 @@ public:
 
         plugin->process (plugin, &process);
         steadyTime += n;
+        outMidi = nullptr;
 
         for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
             buffer.copyFrom (ch, 0, scratch, juce::jmin (ch, outputChannels - 1), 0, n);
@@ -746,7 +781,7 @@ public:
         });
     }
     bool acceptsMidi() const override { return description.isInstrument; }
-    bool producesMidi() const override { return false; }
+    bool producesMidi() const override { return hasNoteOutput; } // (round 190ks)
 
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return gui != nullptr; }
@@ -1143,6 +1178,8 @@ private:
     std::atomic<int> threadPoolRequests { 0 }, threadPoolTasks { 0 }; // (diagnostics)
     friend struct ClapHostThreadPool;
     bool midiDialect = false;
+    bool hasNoteOutput = false;           // (round 190ks) a note output port: its notes come back in processBlock's buffer
+    juce::MidiBuffer* outMidi = nullptr;  // (round 190ks) that buffer while process() runs
     std::atomic<float> expressionRange { 0.0f }; // issue #108: > 0 = member channels' MPE data go out as note expressions
     bool initialised = false;
 

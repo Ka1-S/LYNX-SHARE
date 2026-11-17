@@ -17900,3 +17900,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Natives190kjNewtoneTests.inc" // round natives190kj: Newtone note analysis as FL's (tiling, whole-sample pitch, fades), editor commands
 #include "Natives190kjEdisonTests.inc" // round natives190kj: FL Edison Dual view, grid step, pitch-period snap, grid-slicing, scrub, pitch regions
 #include "Natives190kjHarmorTests.inc" // round natives190kj: Harmor resynthesis (analysis, voice, engine revision)
+#include "Own190ksTests.inc" // round 190ks: GitHub #198, the notes a plugin plays from its own window are recorded

@@ -508,6 +508,8 @@ if(LYNX_BUILD_APP)
         src/engine/ExportParityTest.cpp
         src/engine/MidiHotplugTest.cpp
         src/engine/MidiOutPortTest.cpp
+        src/engine/PadRecordTest.cpp
+        src/engine/ShareMemoryTest.cpp
         src/ui/LiveSessionUi.cpp
         src/ui/LiveChat.cpp
         src/engine/LiveRemotePlugins.cpp
