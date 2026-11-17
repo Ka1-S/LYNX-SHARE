@@ -437,6 +437,24 @@ bool isVideoFile (const juce::File& file)
     return videoExtensions.contains (file.getFileExtension().trimCharactersAtStart (".").toLowerCase());
 }
 
+juce::File soundTrackWav (const juce::File& video)
+{
+    static std::mutex lock; // (two loads of the same file must not write one WAV together)
+    const std::scoped_lock hold (lock);
+    auto folder = platform::cacheFolder ("video-audio");
+    folder.createDirectory();
+    const auto key = juce::String::toHexString (video.getFullPathName().hashCode64()) + "-"
+                     + juce::String::toHexString (video.getLastModificationTime().toMilliseconds()) + "-" + juce::String::toHexString (video.getSize());
+    const auto wav = folder.getChildFile (video.getFileNameWithoutExtension() + " (sound) " + juce::String::toHexString (key.hashCode64()) + ".wav");
+    if (wav.existsAsFile() && wav.getSize() > 44)
+        return wav;
+    const auto temp = wav.getSiblingFile (wav.getFileNameWithoutExtension() + ".part.wav");
+    if (media::extractAudioToWav (video, temp) && temp.moveFileTo (wav))
+        return wav;
+    temp.deleteFile();
+    return {};
+}
+
 bool importVideo (AudioEngine& engine, const juce::File& file, double songSeconds, int track)
 {
     if (! file.existsAsFile())

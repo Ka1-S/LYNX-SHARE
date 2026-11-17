@@ -634,6 +634,8 @@ public:
         // rollup 0.1.28 (REA 190hb action 4, FL's "Init DWM"): the compositor on MMCSS, steadier frames under CPU load
         // (Windows; LYNX_DWM_MMCSS=0 leaves it off)
         lynx::powerhints::enableCompositorMmcss();
+        // round als190ka (issue #193): a video's sound track for the sample library (a Live set's video clips)
+        lynx::SampleLibrary::setVideoSoundDecoder ([] (const juce::File& video) { return lynx::videotracks::soundTrackWav (video); });
         // round 190ci: also for a fault on a stack Windows cannot walk, which never reaches that handler (Windows)
         lynx::crashguard::setUnwalkableFaultHandler (onCrash);
         if (const auto args = juce::StringArray::fromTokens (commandLine, true); args.contains ("--faulttest"))
