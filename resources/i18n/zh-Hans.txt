@@ -10946,6 +10946,14 @@ countries: cn sg
 "Undo / Redo" = "撤销 / 重做"
 "variation" = "变化"
 "Advanced edit vibrato" = "高级编辑颤音"
+"Dual view" = "双重视图"
+"Small grid-slicing" = "按小网格切片"
+"Medium grid-slicing" = "按中网格切片"
+"Large grid-slicing" = "按大网格切片"
+"Detect pitch regions" = "检测音高区域"
+"Detecting pitch regions..." = "正在检测音高区域..."
+"Paused" = "已暂停"
+"Scrub: hold and drag right to play forward, left to play backward; the further, the faster" = "擦动: 按住并向右拖动正向播放，向左拖动反向播放；越远越快"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 打开/关闭编辑器  [Alt]+[LMB] 保持其他编辑器打开  [Ctrl]+[LMB] 试听  [2xLMB] 钢琴卷帘  [LMB] 上下拖动重新排序  [RMB] 通道菜单"

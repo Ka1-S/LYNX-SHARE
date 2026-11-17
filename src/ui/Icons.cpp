@@ -788,6 +788,14 @@ Shape make (Icon icon)
             fi.addPath (tri.createPathWithRoundedCorners (1.5f));
             break;
         }
+        case Icon::scrub: // a film reel (LYNX vector; reads like FL Edison's Scrub button): a ring, four holes, a hub
+        {
+            st.addEllipse (4.5f, 4.5f, 15.0f, 15.0f);
+            for (const auto a : { 0.785398f, 2.356194f, 3.926991f, 5.497787f })
+                st.addEllipse (12.0f + 3.8f * std::sin (a) - 1.9f, 12.0f - 3.8f * std::cos (a) - 1.9f, 3.8f, 3.8f);
+            fi.addEllipse (11.0f, 11.0f, 2.0f, 2.0f);
+            break;
+        }
     }
 
     return s;

@@ -10946,6 +10946,14 @@ countries: it ch sm
 "Undo / Redo" = "Annulla / Ripeti"
 "variation" = "variazione"
 "Advanced edit vibrato" = "Modifica avanzata del vibrato"
+"Dual view" = "Vista doppia"
+"Small grid-slicing" = "Taglio sulla griglia piccola"
+"Medium grid-slicing" = "Taglio sulla griglia media"
+"Large grid-slicing" = "Taglio sulla griglia grande"
+"Detect pitch regions" = "Rileva regioni di intonazione"
+"Detecting pitch regions..." = "Rilevamento regioni di intonazione..."
+"Paused" = "In pausa"
+"Scrub: hold and drag right to play forward, left to play backward; the further, the faster" = "Scrub: tieni premuto e trascina a destra per riprodurre in avanti, a sinistra all'indietro; più lontano, più veloce"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] apri/chiudi l'editor  [Alt]+[LMB] lascia aperti gli altri  [Ctrl]+[LMB] ascolta  [2xLMB] Piano Roll  [LMB] trascina su/giù riordina  [RMB] menu del canale"

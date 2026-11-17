@@ -1622,6 +1622,18 @@ void AudioEngine::previewSample (std::shared_ptr<const SampleData> sample, bool 
         preview->play (std::move (sample), loop, gain, audioEditor);
 }
 
+void AudioEngine::previewScrub (std::shared_ptr<const SampleData> sample, std::int64_t startFrame)
+{
+    if (preview != nullptr)
+        preview->playScrub (std::move (sample), startFrame, 1.0f);
+}
+
+void AudioEngine::setPreviewScrubSpeed (double speed) noexcept
+{
+    if (preview != nullptr)
+        preview->setScrubSpeed (speed);
+}
+
 void AudioEngine::setEditorVolume (double volume) noexcept
 {
     editorVolume = controls::clampUtilityVolume (volume);

@@ -17862,3 +17862,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Gaps190kfTests.inc" // round gaps190kf: Live Transpose ±48 in real time, the Clip View warp time line
 #include "Gaps190kfNativesTests.inc" // round gaps190kf: FL Edison's Sample properties (form, Accept, WAV chunks)
 #include "Natives190kjNewtoneTests.inc" // round natives190kj: Newtone note analysis as FL's (tiling, whole-sample pitch, fades), editor commands
+#include "Natives190kjEdisonTests.inc" // round natives190kj: FL Edison Dual view, grid step, pitch-period snap, grid-slicing, scrub, pitch regions
