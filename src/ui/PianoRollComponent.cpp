@@ -1056,6 +1056,7 @@ void PianoRollComponent::paint (juce::Graphics& g)
         g.reduceClipRegion (grid);
 
         const auto autoRows = isAutoScale();
+        const auto chosenScale = scaleIndex() > 0; // (round 190kd: read once per paint, not per row)
         for (int key = 0; key < 128; ++key)
         {
             const auto y = keyToY (key);
@@ -1067,7 +1068,7 @@ void PianoRollComponent::paint (juce::Graphics& g)
             auto row = gridHighlights && isBlackKey (key) ? rowBlack : rowWhite;
             if (gridHighlights && autoRows) // FL's Automatic (round 190jv): the rows out of the guessed key dark; no guess, none
                 row = autoKey >= 0 && ! scaledetect::inScale (autoKey, key) ? rowBlack : rowWhite;
-            else if (gridHighlights && scaleIndex() > 0)
+            else if (gridHighlights && chosenScale)
                 // a chosen scale as FL shades it (round 190kd, owner's decision; FL 2026 shot: the rows out of the scale
                 // take the black-key shade, the rows in it the white-key one, black keys or not)
                 row = inScale (key) ? rowWhite : rowBlack;
@@ -1512,6 +1513,7 @@ void PianoRollComponent::paint (juce::Graphics& g)
                 colour = colour.interpolatedWith (accent, black ? 0.35f : 0.22f);
             return pressed ? accent : colour;
         };
+        const auto labelClass = scaleIndex() > 0 ? scaleRoot() : 0; // (once per paint)
         for (int key = 0; key < 128; ++key)
         {
             const auto y = keyToY (key);
@@ -1571,7 +1573,7 @@ void PianoRollComponent::paint (juce::Graphics& g)
             }
 
             // the octave name on each C; with a chosen scale on each root, as FL labels it (round 190kd: "A3", "A4" in A minor)
-            const auto isC = key % 12 == (scaleIndex() > 0 && ! isAutoScale() ? scaleRoot() : 0);
+            const auto isC = key % 12 == labelClass;
 
             // every key named (LYNX, on by default: notenames::everyKey) once the rows are tall enough to read
             const auto everyKey = notenames::everyKey.load (std::memory_order_relaxed) && rowHeight >= 8;

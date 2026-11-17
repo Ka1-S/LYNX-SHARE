@@ -109,5 +109,11 @@ The byte-code spec (`rea/chordtool-spec.md`) gives the laws; the main ones:
 - Not built: FL's Performance and Advanced tabs, Play / Solo / One note preview, the strip's own undo / redo, chord drag
   (Chord nudge, Snap), Note linking, FL's "Pending changes" question (LYNX's Cancel restores), FL's reference-scale key
   tab entries beyond Major (Ionian) / Minor Natural (Aeolian).
-- Scale shading (S2, S3) and Channel name alignment (N1, N2) are FL-exact; the arpeggiator list follows A2 with
-  headings per folder (the folder's own patterns sit where they sort, between "5 notes" and "Riff machine").
+- Scale shading (S2, S3) and Channel name alignment (N1, N2) are FL-exact; the arpeggiator list follows A2 (the
+  folder's own pattern first, then a heading per folder); within a folder LYNX's natural sort differs a little from FL's
+  ("Trance" after "Trance 7", "1- 2 3" after "1 3 2"). The current pattern is not drawn bold.
+- Analyze: without FL's HMM style data, a block with few notes can name a different chord than FL (the session's line:
+  FL Am∆11, F♯m add9, A, A; LYNX Am(maj7, 9), Amaj7, Amaj7, Amaj7). LYNX keeps the single analysis's type priority in
+  the sequence as its stand-in for FL's vocabulary priorities.
+- The Trim choices dialog now draws each choice once as a radio dot (it repeated each choice as a label above a tick
+  box).
