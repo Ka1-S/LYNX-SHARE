@@ -28141,7 +28141,7 @@ private:
                 {
                     const auto all = lynx::clipwarp::attacks (*sample);
                     const auto& sm = song.channels[(std::size_t) audio->channel].sampler;
-                    line ("audio file: " + juce::String ((int) sample->left.size()) + " frames at " + juce::String (sample->sampleRate) + " Hz, "
+                    line ("audio file: " + juce::String ((int) sample->frames()) + " frames at " + juce::String (sample->sampleRate) + " Hz, "
                           + juce::String ((int) all.size()) + " attacks (first " + juce::String (all.empty() ? -1.0 : all.front(), 3) + " s); clip offset "
                           + juce::String (audio->offset) + " length " + juce::String (audio->length) + " stretch " + juce::String (audio->stretch, 3)
                           + "; warp " + juce::String ((int) sm.warp.size()) + " markers, keepPitch " + juce::String ((int) sm.keepPitch)

@@ -54,10 +54,12 @@ inline std::vector<Hit> hitsOf (const Song& song, const Clip& clip, const Sample
             continue;
         // the attack's level: its peak in the 30 ms after it
         const auto from = (std::size_t) std::max (0.0, t * sample.sampleRate);
-        const auto to = std::min (sample.left.size(), from + (std::size_t) (0.03 * sample.sampleRate));
+        const auto to = std::min (sample.frames(), from + (std::size_t) (0.03 * sample.sampleRate));
+        const auto* l = sample.leftData();
+        const auto* r = sample.rightData(); // (the left channel again for a mono file)
         float peak = 0.0f;
         for (auto i = from; i < to; ++i)
-            peak = std::max ({ peak, std::abs (sample.left[i]), i < sample.right.size() ? std::abs (sample.right[i]) : 0.0f });
+            peak = std::max ({ peak, std::abs (l[i]), std::abs (r[i]) });
         out.push_back ({ t, tick, peak });
         loudest = std::max (loudest, peak);
     }
