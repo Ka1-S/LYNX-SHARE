@@ -742,6 +742,7 @@ void RenderAhead::wakeThread() noexcept
 void RenderAhead::threadLoop (std::function<void()> onStart)
 {
     const ScopedFlushDenormals noDenormals;
+    WorkerPool::nameCurrentThread ("LYNX render-ahead"); // (round 190kb)
     if (onStart)
         onStart();
     while (! quit.load (std::memory_order_acquire))

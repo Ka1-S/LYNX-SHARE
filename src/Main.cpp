@@ -459,7 +459,7 @@ namespace juce
 extern int lynxD2DPresents; // (cmake/LynxPatchJuce.cmake, round 190gv: every Direct2D window present)
 }
 #endif
-// round 190jy: --uiperf's presents per second
+// round 190jy: --uiperf's presents per second (190kb's cycles line reads it too)
 static int uiPerfPresents()
 {
    #if JUCE_WINDOWS
@@ -12136,8 +12136,15 @@ private:
             int presentsStart = 0;        // round 190jy: Direct2D presents of every LYNX window (Windows)
             double audioLoadSum = 0.0;    // the device's CPU use (AudioDeviceManager::getCpuUsage), summed per tick
             int audioLoadTicks = 0;
+            // round 190kb: exact CPU cycles, the worker pool's waiting, the callbacks' deadlines, the Direct2D presents
+            std::uint64_t cyclesStart = 0;
+            lynx::WorkerPool::Stats poolStart;
+            lynx::RtStats::Snapshot rtStart; // (presentsStart: 190jy's, above)
 
-            UiPerf (LynxApplication& a, juce::File r) : app (a), report (std::move (r)) {}
+            UiPerf (LynxApplication& a, juce::File r) : app (a), report (std::move (r))
+            {
+                lynx::WorkerPool::nameCurrentThread ("LYNX message thread"); // (round 190kb: the threads' lines)
+            }
 
             juce::ComponentPeer* peer() const { return app.mainWindow != nullptr ? app.mainWindow->getPeer() : nullptr; }
 
@@ -12177,6 +12184,10 @@ private:
                     if (threadsWanted) // round 190ih: LYNX_UIPERF_THREADS=1, the CPU of every thread over the step
                         threadsStart = lynx::threadCpuList();
                     lynx::grossBeatPaintStats (true);
+                    cyclesStart = lynx::processCpuCycles();
+                    if (const auto* pool = app.engine->getWorkerPool())
+                        poolStart = pool->stats();
+                    rtStart = app.engine->getRtStats().snapshot();
                     audioLoadSum = 0.0;
                     audioLoadTicks = 0;
                     frame = 0;
@@ -12215,22 +12226,53 @@ private:
                     text << "    presents " << juce::String (wall > 0.0 ? 1000.0 * (uiPerfPresents() - presentsStart) / wall : 0.0, 1)
                          << "/s; docked editors: " << native << " own windows, " << inMain << " in the main window, " << hidden << " hidden\n";
                 }
+                const auto cycleRate = lynx::cpuCyclesPerSecond();
+                if (cycleRate > 0.0 && wall > 0.0)
+                    text << "    CPU cycles " << juce::String (100.0 * (double) (lynx::processCpuCycles() - cyclesStart) / cycleRate / (wall / 1000.0), 1)
+                         << "% (process, exact); presents " << juce::String (1000.0 * (uiPerfPresents() - presentsStart) / wall, 1) << "/s\n";
+                if (const auto* pool = app.engine->getWorkerPool(); pool != nullptr && wall > 0.0)
+                {
+                    // round 190kb: per second of the step (time in ms/s = tenths of a percent of one core)
+                    const auto p = pool->stats();
+                    const auto& a = poolStart;
+                    const auto perS = [wall] (std::uint64_t v) { return juce::String (1000.0 * (double) v / wall, 0); };
+                    const auto msS = [wall] (std::uint64_t ns) { return juce::String ((double) ns / 1.0e6 * 1000.0 / wall, 2); };
+                    text << "    pool: rounds " << perS (p.rounds - a.rounds) << "/s; workers work " << msS (p.workNs - a.workNs)
+                         << " ms/s, spin " << msS (p.spinNs - a.spinNs) << " ms/s (" << perS (p.spins - a.spins) << "/s: found "
+                         << perS (p.spinFound - a.spinFound) << ", parked " << perS (p.spinParked - a.spinParked) << ", timed out "
+                         << perS (p.spinTimedOut - a.spinTimedOut) << "), sleeps " << perS (p.sleeps - a.sleeps) << "/s (early "
+                         << perS (p.earlyWakes - a.earlyWakes) << "); waits " << msS (p.waitNs - a.waitNs) << " ms/s (" << perS (p.waits - a.waits)
+                         << "/s, yields " << perS (p.waitYields - a.waitYields) << ", sleeps " << perS (p.waitSleeps - a.waitSleeps) << " = " << msS (p.waitSleepNs - a.waitSleepNs) << " ms/s"
+                         << "); caller wait " << msS (p.callerWaitNs - a.callerWaitNs) << " ms/s (sleeps " << perS (p.callerSleeps - a.callerSleeps) << "/s)\n";
+                }
+                {
+                    const auto r = app.engine->getRtStats().snapshot();
+                    text << "    callbacks " << juce::String ((juce::int64) (r.callbacks - rtStart.callbacks)) << ", over the deadline "
+                         << juce::String ((juce::int64) (r.overBudget - rtStart.overBudget)) << ", 80-100 % " << juce::String ((juce::int64) (r.nearBudget - rtStart.nearBudget))
+                         << ", late " << juce::String ((juce::int64) (r.lateCalls - rtStart.lateCalls)) << "\n";
+                }
                 if (threadsWanted && wall > 0.0)
                 {
+                    // (round 190kb: and each thread's exact cycles in brackets, as % of one core; sorted by them where known)
                     std::vector<std::pair<double, juce::String>> rows;
                     for (const auto& t : lynx::threadCpuList())
                     {
                         auto before = 0.0;
+                        std::uint64_t cyclesBefore = 0;
                         for (const auto& b : threadsStart)
                             if (b.id == t.id)
-                                before = b.seconds;
-                        if (const auto used = t.seconds - before; used > 0.0005)
-                            rows.push_back ({ 100.0 * 1000.0 * used / wall, juce::String (t.id) + " " + (t.name.empty() ? juce::String ("(unnamed)") : juce::String (t.name)) });
+                                before = b.seconds, cyclesBefore = b.cycles;
+                        const auto used = t.seconds - before;
+                        const auto exact = cycleRate > 0.0 ? 100.0 * (double) (t.cycles - cyclesBefore) / cycleRate / (wall / 1000.0) : -1.0;
+                        if (used > 0.0005 || exact > 0.05)
+                            rows.push_back ({ exact >= 0.0 ? exact : 100.0 * 1000.0 * used / wall,
+                                              juce::String (t.id) + " " + (t.name.empty() ? juce::String ("(unnamed)") : juce::String (t.name)) + " "
+                                                  + juce::String (100.0 * 1000.0 * used / wall, 1) + "%" + (exact >= 0.0 ? " [" + juce::String (exact, 1) + "%]" : juce::String()) });
                     }
                     std::sort (rows.begin(), rows.end(), [] (const auto& a, const auto& b) { return a.first > b.first; });
                     text << "    threads:";
-                    for (std::size_t k = 0; k < rows.size() && k < 10; ++k)
-                        text << " " << rows[k].second << " " << juce::String (rows[k].first, 1) << "%;";
+                    for (std::size_t k = 0; k < rows.size() && k < 16; ++k)
+                        text << " " << rows[k].second << ";";
                     text << "\n";
                 }
                 if (const auto gb = lynx::grossBeatPaintStats (false); gb.isNotEmpty())
@@ -12706,6 +12748,98 @@ private:
                                    lynx::FormulaControllerWindows::closeAll();
                                    return juce::String();
                                } });
+        // round 190kb: LYNX_UIPERF_SPINAB=n — the worker pool's waiting policies (WorkerPool::Tuning) A/B inside one
+        // process while the song plays with live editor windows: per set (LYNX_UIPERF_SPINAB_SETS, default "G,GLM": G
+        // Gross Beat, L Fruity Limiter, M Maximus; on the master when the project has none), n cycles over every
+        // variant (LYNX_UIPERF_SPINAB_VARIANTS="name:spec;…", spec as LYNX_POOL) with the windows hidden and shown,
+        // 2.5 s steps, the order turning every cycle. Run with LYNX_UIPERF_THREADS=1 for the threads' lines.
+        if (const auto cycles = juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_SPINAB", "0").getIntValue(); cycles > 0)
+        {
+            auto sets = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_SPINAB_SETS", "G,GLM"), ",", {});
+            struct Variant
+            {
+                juce::String name, spec;
+            };
+            std::vector<Variant> variants;
+            for (const auto& v : juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable (
+                                                                  "LYNX_UIPERF_SPINAB_VARIANTS", "old:spin=60,adaptive=0,wait=0;new:spin=60,adaptive=1,dry=4,wait=1,waitspin=30"),
+                                                              ";", {}))
+                if (v.containsChar (':'))
+                    variants.push_back ({ v.upToFirstOccurrenceOf (":", false, false).trim(), v.fromFirstOccurrenceOf (":", false, false).trim() });
+            auto shown = std::make_shared<std::vector<juce::Component::SafePointer<juce::Component>>>();
+            // every step plays the same part of the song (LYNX_UIPERF_SPINAB_AT: a fraction of the song, default 0.4): the
+            // audio work differs from part to part far more than between the variants (a first run without this put the
+            // variants of one cycle in different parts and read the parts)
+            auto at = std::make_shared<double> (0.0);
+            const auto atFraction = juce::jlimit (0.0, 0.95, juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_SPINAB_AT", "0.4").getDoubleValue());
+            auto keepPlaying = [this, at] {
+                engine->getTransport().songMode = true;
+                engine->seek (*at);
+                if (! engine->getTransport().playing.load())
+                    engine->play();
+            };
+            for (const auto& set : sets)
+            {
+                const auto name = set.trim();
+                run->steps.push_back ({ "spin A/B " + name + " open", [this, name, shown, keepPlaying, at, atFraction] {
+                                           *at = atFraction * engine->getTransport().songEnd.load();
+                                           lynx::NativeEffectWindows::closeAll();
+                                           shown->clear();
+                                           std::vector<juce::Component*> before;
+                                           auto& desktop = juce::Desktop::getInstance();
+                                           for (int i = 0; i < desktop.getNumComponents(); ++i)
+                                               before.push_back (desktop.getComponent (i));
+                                           auto openKind = [this] (lynx::EffectKind kind) {
+                                               auto& so = engine->getSong();
+                                               for (int t = 0; t < (int) so.mixer.size(); ++t)
+                                                   for (int k = 0; k < (int) so.mixer[(std::size_t) t].effects.size(); ++k)
+                                                       if (so.mixer[(std::size_t) t].effects[(std::size_t) k].kind == kind)
+                                                       {
+                                                           lynx::NativeEffectWindows::open (*engine, t, k);
+                                                           return;
+                                                       }
+                                               // (not in the project: on the master, after its effects)
+                                               if (so.mixer.empty() || so.mixer[0].effects.size() >= (std::size_t) lynx::maxEffectSlots)
+                                                   return;
+                                               const auto slot = (int) so.mixer[0].effects.size();
+                                               engine->editSong ([kind] (lynx::Song& s2) { s2.mixer[0].effects.push_back (lynx::makeEffectSlot (kind)); }, false);
+                                               engine->dispatchPendingMessages();
+                                               lynx::NativeEffectWindows::open (*engine, 0, slot);
+                                           };
+                                           if (name.containsChar ('G'))
+                                               openKind (lynx::EffectKind::grossBeat);
+                                           if (name.containsChar ('L'))
+                                               openKind (lynx::EffectKind::fruityLimiter);
+                                           if (name.containsChar ('M'))
+                                               openKind (lynx::EffectKind::maximus);
+                                           for (int i = 0; i < desktop.getNumComponents(); ++i)
+                                               if (auto* c = desktop.getComponent (i); std::find (before.begin(), before.end(), c) == before.end())
+                                                   shown->emplace_back (c);
+                                           keepPlaying();
+                                       }, {}, 1500, [shown, at] { return "    windows of the set: " + juce::String ((int) shown->size()) + ", every step from tick " + juce::String (*at, 0) + "\n"; } });
+                for (int c = 0; c < cycles; ++c)
+                    for (int k = 0; k < (int) variants.size() * 2; ++k)
+                    {
+                        // (the variants in turn, starting one further each cycle; hidden / shown swapped every cycle)
+                        const auto& v = variants[(std::size_t) ((k / 2 + c) % (int) variants.size())];
+                        const auto visible = ((k % 2) == 1) != ((c % 2) == 1);
+                        run->steps.push_back ({ "spin A/B " + name + " " + v.name + (visible ? " shown" : " hidden") + " cycle " + juce::String (c + 1),
+                                                [spec = v.spec, visible, shown, keepPlaying] {
+                                                    lynx::WorkerPool::tuning().apply (spec.toRawUTF8());
+                                                    for (auto& w : *shown)
+                                                        if (w != nullptr && w->isVisible() != visible)
+                                                            w->setVisible (visible);
+                                                    keepPlaying();
+                                                }, {}, 2500 });
+                    }
+            }
+            run->steps.push_back ({ "spin A/B close", [this, shown] {
+                                       engine->stop();
+                                       shown->clear();
+                                       lynx::NativeEffectWindows::closeAll();
+                                       lynx::WorkerPool::tuning().apply (juce::SystemStats::getEnvironmentVariable ("LYNX_POOL", "").toRawUTF8());
+                                   }, {}, 500 });
+        }
         // round 190iv: the Simple layout (its toolbar) idle and while the song plays
         run->steps.push_back ({ "idle: simple layout, stopped", [this, ui] {
                                    engine->stop();

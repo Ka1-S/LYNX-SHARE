@@ -7282,6 +7282,7 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
     if (const auto id = (unsigned long) GetCurrentThreadId(); id != deviceThreadId.load (std::memory_order_relaxed))
     {
         deviceThreadId.store (id, std::memory_order_relaxed);
+        WorkerPool::nameCurrentThread ("LYNX audio device"); // (round 190kb: per-thread CPU lists)
         const auto before = GetThreadPriority (GetCurrentThread());
         deviceThreadPriorityBefore.store (before, std::memory_order_relaxed);
         if (boostDeviceThread && before < THREAD_PRIORITY_TIME_CRITICAL)

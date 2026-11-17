@@ -5825,31 +5825,66 @@ bool RackRenderer::runTaskGraph (const RackState& state, bool playing, int chann
     graphPushed.store (pushed, std::memory_order_release); // (the pool publishes its work after this: seq_cst)
 
     const auto timing = times->enabled.load (std::memory_order_relaxed);
+    // round 190kb: the wait for a position's task (WorkerPool::Tuning::waitMode): 0 spin with a yield every 1024
+    // pauses (before), 1 bounded spin then sleep until notified, 2 bounded spin then hand the position over — the thread
+    // that pushes its task runs it at once itself (no wake-up on the critical path) and this one goes back to the pool
+    constexpr int handedOver = -1;
+    const auto waitMode = WorkerPool::tuning().waitMode.load (std::memory_order_relaxed);
+    const auto handOffSpin = std::chrono::microseconds (WorkerPool::tuning().waitSpinMicros.load (std::memory_order_relaxed));
     auto task = [&] (int position) {
         const ScopedHostTimeline timelineScope (ownTimeline);
-        int id;
-        for (int spins = 0; (id = graphSlots[(std::size_t) position].load (std::memory_order_acquire)) == 0; ++spins)
+        int id = 0;
+        auto& slot = graphSlots[(std::size_t) position];
+        if (waitMode == 2)
         {
-            WorkerPool::relax();
-            if ((spins & 1023) == 1023)
-                std::this_thread::yield();
+            if ((id = slot.load (std::memory_order_acquire)) == 0)
+            {
+                const auto start = std::chrono::steady_clock::now();
+                auto handed = false;
+                for (int spins = 0; (id = slot.load (std::memory_order_acquire)) == 0; ++spins)
+                {
+                    WorkerPool::relax();
+                    if ((spins & 63) == 63 && std::chrono::steady_clock::now() - start > handOffSpin)
+                    {
+                        auto expected = 0;
+                        if (slot.compare_exchange_strong (expected, handedOver, std::memory_order_acq_rel))
+                        {
+                            handed = true;
+                            break;
+                        }
+                        id = expected; // (its task came at that moment)
+                        break;
+                    }
+                }
+                workers->noteWait ((std::uint64_t) std::chrono::duration_cast<std::chrono::nanoseconds> (std::chrono::steady_clock::now() - start).count(), handed);
+                if (handed)
+                    return;
+            }
         }
+        else
+            // (round 190kb: mode 1, a bounded spin, then sleep until the task pushed into this position wakes it)
+            workers->await (position, [&] { return (id = slot.load (std::memory_order_acquire)) != 0; });
         --id;
+        // the tasks of handed-over positions this thread runs (pushed by it); more than fit: run in place, recursively
+        std::array<int, 32> taken;
+        int takenCount = 0;
+        auto chain = [&] (int first, auto& self) -> void {
+            auto at = first;
         for (;;) // (a serial chain runs here link after link: round 190gq)
         {
         const auto before = timing || measureUnits ? ProcessTimes::now() : 0; // (A7: every task's time, for the next chunk's choice)
-        if (id < channels)
+        if (at < channels)
         {
-            renderChannel (state, id, n);
+            renderChannel (state, at, n);
             const auto spent = ProcessTimes::now() - before;
-            if (timing && id < ProcessTimes::channels)
-                times->channelNs[(std::size_t) id].fetch_add (spent, std::memory_order_relaxed);
+            if (timing && at < ProcessTimes::channels)
+                times->channelNs[(std::size_t) at].fetch_add (spent, std::memory_order_relaxed);
             if (measureUnits)
-                channelCostNs[(std::size_t) id] = (std::uint32_t) std::min<std::uint64_t> (spent, 0xffffffffu);
+                channelCostNs[(std::size_t) at] = (std::uint32_t) std::min<std::uint64_t> (spent, 0xffffffffu);
         }
         else
         {
-            const auto t = id - channels + 1;
+            const auto t = at - channels + 1;
             sumChannelsInto (state, t, channels, n);
             if (live)
                 mixLiveInputTrack (state, t, recording, playing, n);
@@ -5859,17 +5894,30 @@ bool RackRenderer::runTaskGraph (const RackState& state, bool playing, int chann
             if (measureUnits && t < maxMixerTracks)
                 trackCostNs[(std::size_t) t] = (std::uint32_t) std::min<std::uint64_t> (ProcessTimes::now() - before, 0xffffffffu);
         }
-        const auto fused = (std::size_t) id < state.graphFused.size() ? state.graphFused[(std::size_t) id] : -1;
+        const auto fused = (std::size_t) at < state.graphFused.size() ? state.graphFused[(std::size_t) at] : -1;
         if (fused < 0)
             break;
-        id = fused;
+        at = fused;
         }
-        for (auto k = state.graphNextStart[(std::size_t) id]; k < state.graphNextStart[(std::size_t) id + 1]; ++k)
+        for (auto k = state.graphNextStart[(std::size_t) at]; k < state.graphNextStart[(std::size_t) at + 1]; ++k)
         {
             const auto j = state.graphNext[(std::size_t) k];
             if (graphPending[(std::size_t) j].fetch_sub (1, std::memory_order_acq_rel) == 1)
-                graphSlots[(std::size_t) graphPushed.fetch_add (1, std::memory_order_acq_rel)].store (j + 1, std::memory_order_release);
+            {
+                const auto pos = graphPushed.fetch_add (1, std::memory_order_acq_rel);
+                auto expected = 0;
+                if (graphSlots[(std::size_t) pos].compare_exchange_strong (expected, j + 1, std::memory_order_acq_rel))
+                    workers->notify (pos);
+                else if (takenCount < (int) taken.size()) // (its thread handed the position over: this one runs it)
+                    taken[(std::size_t) takenCount++] = j;
+                else
+                    self (j, self);
+            }
         }
+        };
+        chain (id, chain);
+        while (takenCount > 0)
+            chain (taken[(std::size_t) --takenCount], chain);
     };
     workers->parallelFor (tasks - state.graphFusedCount, task);
 

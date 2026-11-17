@@ -500,6 +500,7 @@ int main (int argc, char** argv)
         double worstMs = 0.0, spinMs = 0.0;
         std::vector<double> callbackMs;
         const auto processCpu0 = cpuMs (CLOCK_PROCESS_CPUTIME_ID);
+        const auto pool0 = pool != nullptr ? pool->stats() : WorkerPool::Stats {}; // (round 190kb)
         counter.start();
         for (std::size_t pos = 0; pos < totalSamples; pos += (std::size_t) blockSize)
         {
@@ -572,6 +573,20 @@ int main (int argc, char** argv)
             std::printf ("paced: %d dropouts (%.2f per minute), %d callbacks over their block (%.2f per minute), worst callback %.3f ms, p99 %.3f ms, "
                          "median %.3f ms (budget %.3f ms)\n", dropouts, dropouts * 60.0 / audioSeconds, over, over * 60.0 / audioSeconds, worstMs, callbackMs[std::min (callbackMs.size() - 1, (std::size_t) (0.99 * (double) callbackMs.size()))],
                          callbackMs[callbackMs.size() / 2], 1000.0 * blockSize / sampleRate);
+        }
+        if (pool != nullptr) // round 190kb: where the workers' time went, per second of audio (ms/s = 0.1 % of a core)
+        {
+            const auto p = pool->stats();
+            const auto audioSeconds = (double) totalSamples / sampleRate;
+            const auto ms = [audioSeconds] (std::uint64_t ns) { return (double) ns / 1.0e6 / audioSeconds; };
+            const auto per = [audioSeconds] (std::uint64_t n) { return (double) n / audioSeconds; };
+            std::printf ("pool: rounds %.0f/s, work %.2f ms/s, spin %.2f ms/s (%.0f/s: found %.0f, parked %.0f, timed out %.0f), sleeps %.0f/s (early %.0f), "
+                         "waits %.2f ms/s (%.0f/s, yields %.0f, sleeps %.0f = %.2f ms/s), caller wait %.2f ms/s (sleeps %.0f/s)\n",
+                         per (p.rounds - pool0.rounds), ms (p.workNs - pool0.workNs), ms (p.spinNs - pool0.spinNs), per (p.spins - pool0.spins),
+                         per (p.spinFound - pool0.spinFound), per (p.spinParked - pool0.spinParked), per (p.spinTimedOut - pool0.spinTimedOut),
+                         per (p.sleeps - pool0.sleeps), per (p.earlyWakes - pool0.earlyWakes), ms (p.waitNs - pool0.waitNs), per (p.waits - pool0.waits),
+                         per (p.waitYields - pool0.waitYields), per (p.waitSleeps - pool0.waitSleeps), ms (p.waitSleepNs - pool0.waitSleepNs),
+                         ms (p.callerWaitNs - pool0.callerWaitNs), per (p.callerSleeps - pool0.callerSleeps));
         }
         if (ahead != nullptr)
         {
