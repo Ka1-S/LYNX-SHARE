@@ -21,6 +21,7 @@ namespace
 {
 // ---------------------------------------------------------------------------------------------------------------------
 // A small JSON reader: the revision tree only (numbers as double, strings UTF-8 with \u escapes, depth-limited)
+struct JsonField;
 struct Json
 {
     enum class Type : std::uint8_t { null, boolean, number, string, array, object } type = Type::null;
@@ -28,17 +29,11 @@ struct Json
     double n = 0.0;
     std::string s;
     std::vector<Json> items;
-    std::vector<std::pair<std::string, Json>> fields;
+    // (an object's members: a struct of its own, not std::pair — clang with libstdc++ 14 / 15 instantiates
+    // std::pair<std::string, Json> while Json is still incomplete and fails; CI, rollup step 5)
+    std::vector<JsonField> fields;
 
-    const Json* get (const char* key) const noexcept
-    {
-        if (type != Type::object)
-            return nullptr;
-        for (const auto& [k, v] : fields)
-            if (k == key)
-                return &v;
-        return nullptr;
-    }
+    const Json* get (const char* key) const noexcept; // (below JsonField)
     double num (const char* key, double fallback) const noexcept
     {
         const auto* v = get (key);
@@ -65,13 +60,31 @@ struct Json
         const auto* v = get (key);
         return v != nullptr && v->type == Type::string ? v->s : std::string();
     }
-    const std::vector<Json>& list (const char* key) const noexcept
-    {
-        static const std::vector<Json> none;
-        const auto* v = get (key);
-        return v != nullptr && v->type == Type::array ? v->items : none;
-    }
+    const std::vector<Json>& list (const char* key) const noexcept; // (below JsonField)
 };
+
+struct JsonField
+{
+    std::string key;
+    Json value;
+};
+
+const Json* Json::get (const char* key) const noexcept
+{
+    if (type != Type::object)
+        return nullptr;
+    for (const auto& [k, v] : fields)
+        if (k == key)
+            return &v;
+    return nullptr;
+}
+
+const std::vector<Json>& Json::list (const char* key) const noexcept
+{
+    static const std::vector<Json> none;
+    const auto* v = get (key);
+    return v != nullptr && v->type == Type::array ? v->items : none;
+}
 
 class JsonReader
 {
@@ -233,7 +246,7 @@ private:
                     Json v;
                     if (! value (v, depth + 1))
                         return false;
-                    out.fields.emplace_back (std::move (key), std::move (v));
+                    out.fields.push_back ({ std::move (key), std::move (v) });
                     space();
                     if (p < end && *p == ',')
                     {
