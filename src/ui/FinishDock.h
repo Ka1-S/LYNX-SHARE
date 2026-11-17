@@ -21,6 +21,8 @@ class FinishDock final : public juce::Component,
                          private juce::Timer
 {
 public:
+    // tests and --simplegb190keshot: the fade switch as a click sets it
+    void setFadeForCheck (bool on, double seconds) { setFade (on, seconds); }
     static constexpr int width = 360; // (round 190jc, SG-16: 300 -> 360, look tiles near BandLab Mastering's 182 x 76)
 
     // What "Save the song as a file" opens (round 190t): the Export window on one format (0 WAV, 1 MP3) and
@@ -49,6 +51,8 @@ private:
     void choose (int id);
     void changed (bool structural); // the intensity / tone moved: the chain follows (one undo step per drag)
     void autoLevel();
+    void setFade (bool on, double seconds); // round 190ke: the song's fade-out (core/SongFade.h)
+    void refreshFade();
     void timerCallback() override;
 
     AudioEngine& engine;
@@ -61,6 +65,10 @@ private:
     juce::TextButton closeButton, hearWithout, autoButton, removeButton, otherApps, matchButton;
     juce::Slider intensity, tone[3];
     juce::Label toneNames[3], marks[3];
+    // round 190ke (owner decision D5, GarageBand's Mix › Fade Out): "Fade out the end" and its length
+    juce::ToggleButton fadeButton;
+    juce::ComboBox fadeLength;
+    juce::Label fadeInfo;
     std::shared_ptr<std::atomic<int>> measuring; // Auto level's render: 0 idle, 1 running (shared with its thread)
     std::shared_ptr<std::atomic<float>> measuredLufs;
     bool updating = false;

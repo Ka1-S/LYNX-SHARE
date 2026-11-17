@@ -12,6 +12,7 @@
 #include "ui/FileChoosers.h"
 #include "ui/DialogFrame.h"
 #include "ui/FinishDock.h"
+#include "ui/SimpleTuner.h"
 #include "ui/FirstSongTour.h"
 #include "ui/I18n.h"
 #include "ui/LoopStarterWindow.h"
@@ -590,6 +591,9 @@ SimpleWorkflow::SimpleWorkflow (AudioEngine& e, Host h) : engine (e), host (std:
             showFinish();
     };
     finishButton = std::move (finish);
+    // round 190ke: the top bar's tuner (GarageBand's Tuner button)
+    tunerButton = simpletunerui::makeButton();
+    tunerButton->onClick = [this] { toggleTuner(); };
     // round 190ch: the project's Lyrics / Notes panel, docked beside the timeline
     auto lyrics = std::make_unique<juce::TextButton> (tr ("Lyrics"));
     lyrics->setTooltip (tr ("Lyrics and notes of this project"));
@@ -634,6 +638,46 @@ SimpleWorkflow::SimpleWorkflow (AudioEngine& e, Host h) : engine (e), host (std:
     t.songIsEmpty = [this] { return simpletracks::isEmptySong (engine.getSong()); };
     t.newProjectFirst = host.newProjectForTour;
     tour = std::make_unique<FirstSongTour> (engine, std::move (t), host.offerWelcome);
+}
+
+// --- the tuner (round 190ke) --------------------------------------------------------------------------------------------
+void SimpleWorkflow::toggleTuner()
+{
+    if (tunerBox != nullptr)
+    {
+        if (auto* box = dynamic_cast<juce::CallOutBox*> (tunerBox.getComponent()))
+            box->dismiss();
+        tunerBox = nullptr;
+        simpletunerui::setOpen (*tunerButton, false);
+        return;
+    }
+    auto* parent = tunerButton->getParentComponent();
+    if (parent == nullptr || ! tunerButton->isShowing())
+        return;
+    auto panel = simpletunerui::makePanel (engine, [this] { return host.selectedTrack ? host.selectedTrack() : -1; });
+    auto& box = juce::CallOutBox::launchAsynchronously (std::move (panel), tunerButton->getScreenBounds(), nullptr);
+    tunerBox = &box;
+    simpletunerui::setOpen (*tunerButton, true);
+    // the call-out closes itself on a click outside: the button follows when it goes
+    struct Watch final : juce::ComponentListener
+    {
+        juce::Component::SafePointer<juce::Component> button;
+        juce::Component::SafePointer<juce::Component>* holder = nullptr;
+        void componentBeingDeleted (juce::Component& c) override
+        {
+            c.removeComponentListener (this);
+            // (the button lives as long as the workflow: without it, `holder` is gone too)
+            if (button != nullptr && holder != nullptr && holder->getComponent() == &c)
+                *holder = nullptr;
+            if (auto* b = dynamic_cast<juce::Button*> (button.getComponent()))
+                simpletunerui::setOpen (*b, false);
+            delete this;
+        }
+    };
+    auto* watch = new Watch();
+    watch->button = tunerButton.get();
+    watch->holder = &tunerBox;
+    box.addComponentListener (watch);
 }
 
 // --- "Start from" (round 190ch) -----------------------------------------------------------------------------------------
@@ -702,6 +746,8 @@ SimpleWorkflow::~SimpleWorkflow()
 {
     if (active)
         left();
+    if (auto* box = tunerBox.getComponent()) // (round 190ke: an open tuner goes first: its watch points at tunerBox)
+        delete box;
     tour.reset(); // (before the chooser and the docks it may point at)
     alive.fetch_sub (1, std::memory_order_relaxed);
 }
@@ -813,6 +859,8 @@ void SimpleWorkflow::automationShown (bool on)
 void SimpleWorkflow::left()
 {
     active = false;
+    if (tunerBox != nullptr) // (round 190ke: the tuner belongs to the Simple top bar)
+        toggleTuner();
     if (tour != nullptr) // (round 190dv: kept where it is; Help continues it)
     {
         if (tour->isRunning())

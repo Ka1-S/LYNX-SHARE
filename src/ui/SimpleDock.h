@@ -13,6 +13,8 @@
 //               "Only notes in key" folds the rows to the project key.
 //   Pads        (round 190fo) a Sampler track's 16 pads (core/SimplePads.h): play, drop sounds on them, their region,
 //               mode, envelope, tone, pitch, pan, volume, group and colour; kits of the user's own.
+//   Controls    (round 190ke) eight big knobs on the track's key settings (GarageBand's Smart Controls, core/SmartControls.h):
+//               the instrument's parameters, the chain's effects, Reverb / Pan / Volume; Edit mapping re-points a knob.
 //   Effects     the track's insert as cards: one-knob effects (core/GoalKnobs.h) show one big knob, any other effect
 //               its Mix; on / off, move, remove, "Editor" opens the effect's own window. On the left the chain's
 //               preset (core/ChainPresets.h, the user's own in Documents/LYNX/Chain presets) and Blend, the dry/wet
@@ -53,7 +55,7 @@ public:
         std::function<void()> openPianoRollPanel;
     };
 
-    enum class Tab { instrument, keyboard, editor, effects, pads };
+    enum class Tab { instrument, keyboard, editor, effects, pads, controls };
 
     SimpleDock (AudioEngine& engine, Hooks hooks);
     ~SimpleDock() override;
@@ -167,6 +169,15 @@ public:
     class EffectsPage;
     class InstrumentPage;
     class EditorPage;
+    class ControlsPage; // round 190ke: the Controls tab (GarageBand's Smart Controls, ui/SimpleControlsPage.inc)
+
+    // round 190ke (tests, --simplegb190keshot): the Controls tab's knobs
+    bool hasControlsTabForCheck() const noexcept { return controlsTab; }
+    void controlsTurnForCheck (int knob, float value);
+    juce::String controlsNameForCheck (int knob) const;
+    float controlsValueForCheck (int knob) const;
+    void controlsEditingForSnapshot (bool on);
+    juce::PopupMenu controlsMenuForSnapshot (int knob);
 
 private:
     void showPage();
@@ -179,6 +190,7 @@ private:
     std::unique_ptr<InstrumentPage> instrumentPage;
     std::unique_ptr<EditorPage> editorPage;
     std::unique_ptr<PadsPage> padsPage;
+    std::unique_ptr<ControlsPage> controlsPage; // round 190ke
     std::unique_ptr<juce::Component> keyboardPage; // (made the first time the Keyboard tab shows)
     // round 190jc (design190ia SG-7, SG-8): the strip's buttons draw themselves: the tabs with a vector icon before the
     // label (a lone tab as a section title), the hide button as BandLab's round close X at the strip's left
@@ -189,7 +201,7 @@ private:
         bool lone = false; // the only tab: drawn as a section title
         void paintButton (juce::Graphics& g, bool over, bool down) override;
     };
-    StripButton instrumentButton, keyboardButton, editorButton, effectsButton, padsButton, hideButton;
+    StripButton instrumentButton, keyboardButton, editorButton, effectsButton, padsButton, controlsButton, hideButton;
     juce::ToggleButton followButton;
     juce::String followText;
     Tab tab = Tab::effects;
@@ -197,6 +209,7 @@ private:
     bool instrumentTab = false; // the track has an instrument whose sound can be picked
     bool playTabs = false;      // the track plays notes (Instrument / Sampler): Keyboard and Editor
     bool padsTab = false;       // round 190fo: a Sampler track's pads
+    bool controlsTab = false;   // round 190ke: a track with an insert: its eight knobs
     int track = -1, insert = -1, channel = -1;
     juce::Colour trackColourNow() const; // round 190jj: the shown track's colour (its own, else its kind's), for held keys
     // round 190ih (DS-9): the record dock's input level

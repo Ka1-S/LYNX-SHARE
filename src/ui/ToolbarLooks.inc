@@ -99,6 +99,9 @@ std::vector<juce::Component*> MainComponent::lookOnlyParts()
     if (simpleWorkflow != nullptr)
         if (auto* finish = simpleWorkflow->finishComponent(); finish != nullptr && finish->getParentComponent() == this)
             parts.push_back (finish);
+    if (simpleWorkflow != nullptr) // (round 190ke)
+        if (auto* tuner = simpleWorkflow->tunerComponent(); tuner != nullptr && tuner->getParentComponent() == this)
+            parts.push_back (tuner);
     return parts;
 }
 
@@ -218,6 +221,15 @@ void MainComponent::applyToolbarLook()
             else if (! simple && finish->getParentComponent() == this)
                 removeChildComponent (finish);
         }
+    // round 190ke: the tuner's button, after the Simple tempo capsule (GarageBand's Tuner button in the control bar)
+    if (simpleWorkflow != nullptr)
+        if (auto* tuner = simpleWorkflow->tunerComponent())
+        {
+            if (simple && tuner->getParentComponent() != this)
+                addChildComponent (tuner);
+            else if (! simple && tuner->getParentComponent() == this)
+                removeChildComponent (tuner);
+        }
 
     if (fl)
         for (auto* c : lookOnlyParts())
@@ -280,6 +292,7 @@ void MainComponent::layoutSimpleToolbar (juce::Rectangle<int> bar, int menuWidth
     widths[(std::size_t) P::more] = sb::moreWidth;
     widths[(std::size_t) P::status] = sb::statusWidth;
     widths[(std::size_t) P::finish] = simpleWorkflow != nullptr && simpleWorkflow->finishComponent() != nullptr ? sb::finishWidth : 0;
+    widths[(std::size_t) P::tuner] = simpleWorkflow != nullptr && simpleWorkflow->tunerComponent() != nullptr ? sb::segment : 0;
 
     // the hint column keeps 320 px when it can (FL's), else only the menu's width
     auto minHint = juce::jmax (menuWidth + 8, 320);
@@ -324,7 +337,7 @@ void MainComponent::layoutSimpleToolbar (juce::Rectangle<int> bar, int menuWidth
         lookCapsules.push_back (capsuleRow (x, at - x));
     };
 
-    for (const auto part : { P::transport, P::tempo, P::key, P::master, P::file, P::link })
+    for (const auto part : { P::transport, P::tempo, P::tuner, P::key, P::master, P::file, P::link })
     {
         if (! shown[(std::size_t) part])
             continue;
@@ -338,6 +351,10 @@ void MainComponent::layoutSimpleToolbar (juce::Rectangle<int> bar, int menuWidth
                 break;
             case P::tempo: // metronome | tempo | time signature (BandLab's)
                 capsule (r.getX(), { { &metronomeButton, sb::segment }, { &tempoDisplay, sb::tempoWidth }, { &signatureBox, sb::signatureWidth } });
+                break;
+            case P::tuner: // round 190ke: one segment, its own capsule
+                if (auto* tuner = simpleWorkflow->tunerComponent())
+                    capsule (r.getX(), { { tuner, sb::segment } });
                 break;
             case P::key: put (keyPanel, capsuleRow (r.getX(), r.getWidth())); break;
             case P::master:

@@ -468,6 +468,7 @@ enum class Part
     more,      // "⋯"
     status,    // "Last saved"
     finish,
+    tuner,     // round 190ke: GarageBand's Tuner button, a one-segment capsule after the tempo capsule
     count_
 };
 inline constexpr int partCount = (int) Part::count_;
@@ -475,7 +476,7 @@ inline constexpr int partCount = (int) Part::count_;
 // What stays when the room is short: the lowest first goes (the transport, the menu and Finish stay).
 inline int priority (Part p) noexcept
 {
-    static constexpr std::array<int, partCount> pr { 100, 90, 70, 40, 50, 45, 95, 60, 100 };
+    static constexpr std::array<int, partCount> pr { 100, 90, 70, 40, 50, 45, 95, 60, 100, 55 };
     return pr[(std::size_t) p];
 }
 

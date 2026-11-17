@@ -252,6 +252,15 @@
 #include "ui/AudioCheck.h"
 #include "ui/StemExtract.h"
 #include "core/RegionLoop.h" // round 190jr: --bandlab190jrshot
+#include "core/FactoryContent.h" // round 190ke: --simplegb190keshot
+#include "core/SongFade.h"
+#include "core/SoundLibrary.h"
+#include "core/SynthParams.h"
+#include "core/GoalKnobs.h"
+#include "core/DetailChain.h"
+#include "ui/FinishDock.h"
+#include "ui/SimpleDock.h"
+#include "ui/SimpleTuner.h"
 #include "ui/AudioToMidi.h"
 #include "ui/ShotScale.h"
 #include "core/LaneView.h"       // round 190iu
@@ -1985,6 +1994,14 @@ public:
         if (args.contains ("--undogesture190jv"))
         {
             setApplicationReturnValue (runUndoGesture190jv (juce::File (args[args.indexOf ("--undogesture190jv") + 1].unquoted())) ? 0 : 1);
+            quit();
+            return;
+        }
+
+        // --simplegb190keshot <folder> (round 190ke: tuner, fade-out, Controls tab, LYNX content): src/SimpleGbShot190ke.inc
+        if (args.contains ("--simplegb190keshot"))
+        {
+            setApplicationReturnValue (runSimpleGbShot190ke (juce::File (args[args.indexOf ("--simplegb190keshot") + 1].unquoted())) ? 0 : 1);
             quit();
             return;
         }
@@ -33161,6 +33178,7 @@ private:
 #include "TrimShot190jv.inc" // round 190jv
 #include "PrChordShot190kd.inc" // round 190kd
 #include "PrShot190jv.inc" // round 190jv
+#include "SimpleGbShot190ke.inc" // round 190ke
 
     static void writeWaveDemo (const juce::File& file, double bpm)
     {

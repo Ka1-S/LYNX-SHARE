@@ -104,8 +104,15 @@ public:
     void showFinish();
     void hideFinish();
     bool isFinishShowing() const noexcept;
+    juce::Component* finishDockForSnapshot() const noexcept { return finishDock.get(); } // round 190ke
     // Round 190iv: the Finish button, placed by the main window at the right of the Simple top bar (design190ia SG-A)
     juce::Component* finishComponent() const noexcept { return finishButton.get(); }
+    // Round 190ke (owner decision D5, GarageBand's Tuner button in its control bar): the tuner's button, placed by the main
+    // window after the tempo capsule of the Simple top bar; a click opens the tuner (ui/SimpleTuner.h) under it for the
+    // selected track's input, a second click (or a click elsewhere) closes it
+    juce::Component* tunerComponent() const noexcept { return tunerButton.get(); }
+    void toggleTuner();
+    bool isTunerShowing() const noexcept { return tunerBox != nullptr; }
 
     // The dock for the selected track (slices S5, S6, S13, S14; ui/SimpleDock.h): its sound and its effects, under the
     // timeline. Made the first time it shows.
@@ -174,6 +181,8 @@ private:
     std::string dismissedFor; // the project (Song::projectId) whose chooser was closed by hand
     std::unique_ptr<juce::Component> startFrom, lyricsButton; // round 190ch
     std::unique_ptr<juce::Component> automationButton;        // round 190jr
+    std::unique_ptr<juce::Button> tunerButton;                // round 190ke
+    juce::Component::SafePointer<juce::Component> tunerBox;   // the open tuner's call-out (null: closed)
     std::unique_ptr<Chooser> chooser;
     std::unique_ptr<juce::Component> addButton, finishButton, titleTools;
     std::unique_ptr<juce::Component> finishDock;

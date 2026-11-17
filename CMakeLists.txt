@@ -67,6 +67,8 @@ add_library(lynx_core STATIC
     src/core/BandImport.cpp
     src/core/BlxImport.cpp
     src/core/RegionLoop.cpp
+    src/core/SmartControls.cpp
+    src/core/FactoryContent.cpp
     src/core/FlmEffects.cpp
     src/core/FlmNoteFx.cpp
     src/core/FlmDwSampler.cpp
@@ -640,6 +642,7 @@ if(LYNX_BUILD_APP)
         src/ui/SimpleWorkflow.cpp
         src/ui/FinishDock.cpp
         src/ui/SimpleDock.cpp
+        src/ui/SimpleTuner.cpp
         src/ui/HistoryPanel.cpp
         src/ui/VersionsPanel.cpp
         src/ui/LyricsPanel.cpp

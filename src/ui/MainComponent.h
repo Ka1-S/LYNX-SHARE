@@ -584,6 +584,7 @@ private:
     void dumpScoreLog (int minutes); // Tools › Score logger (REA round 165f)
     // View > Audio editor: the selected channel's sample when it is a Sampler with one, else an empty editor
     void openAudioEditorForSelection();
+    void addFactoryItem (const std::string& pluginKey); // round 190ke: a "LYNX content" item of the Browser (core/FactoryContent.h)
     void connectBrowser (BrowserComponent& b); // the main Browser and the Sample browser window (round 163)
     void toggleSampleBrowser();
     void openSampleBrowser();

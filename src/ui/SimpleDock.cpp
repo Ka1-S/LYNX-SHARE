@@ -11,6 +11,7 @@
 #include "core/KeyFollow.h"
 #include "core/MixerOps.h"
 #include "core/SimplePads.h"
+#include "core/SmartControls.h"
 #include "core/SimpleTracks.h"
 #include "core/SoundLibrary.h"
 #include "engine/AudioEngine.h"
@@ -2524,8 +2525,12 @@ private:
     std::unique_ptr<juce::FileChooser> chooser;
 };
 
+#include "ui/SimpleControlsPage.inc" // round 190ke: the Controls tab
+
 SimpleDock::SimpleDock (AudioEngine& e, Hooks h) : engine (e), hooks (std::move (h))
 {
+    controlsPage = std::make_unique<ControlsPage> (e);
+    addChildComponent (*controlsPage);
     // the Instrument tab's "Keyboard" button shows the dock's own Keyboard tab (round 190ds)
     hooks.showKeys = [this] { showKeyboard(); };
     effectsPage = std::make_unique<EffectsPage> (engine);
@@ -2550,13 +2555,17 @@ SimpleDock::SimpleDock (AudioEngine& e, Hooks h) : engine (e), hooks (std::move 
     padsButton.setButtonText (tr ("Pads"));
     padsButton.setTooltip (tr ("The Sampler track's 16 pads: their sounds and how they play"));
     padsButton.setComponentID ("simple.dock.pads");
+    controlsButton.setButtonText (tr ("Controls"));
+    controlsButton.setTooltip (tr ("Eight big knobs for the track's main settings (its sound, its effects and its level)"));
+    controlsButton.setComponentID ("simple.dock.controls");
     // round 190dv: what the first-song tour's ring finds
     setComponentID ("simple.dock"); // (round 190jp: the tour keeps its card off the dock)
     keyboardButton.setComponentID ("simple.dock.keyboard");
     editorButton.setComponentID ("simple.dock.editor");
     effectsButton.setComponentID ("simple.dock.effects");
     const std::pair<juce::TextButton*, Tab> tabs[] { { &instrumentButton, Tab::instrument }, { &keyboardButton, Tab::keyboard },
-                                                     { &editorButton, Tab::editor }, { &padsButton, Tab::pads }, { &effectsButton, Tab::effects } };
+                                                     { &editorButton, Tab::editor }, { &padsButton, Tab::pads }, { &controlsButton, Tab::controls },
+                                                     { &effectsButton, Tab::effects } };
     for (auto [b, t] : tabs)
     {
         b->setClickingTogglesState (true);
@@ -2580,6 +2589,7 @@ SimpleDock::SimpleDock (AudioEngine& e, Hooks h) : engine (e), hooks (std::move 
     editorButton.glyph = (int) ui::simplelook::Glyph::notes;
     effectsButton.glyph = (int) ui::simplelook::Glyph::fx;
     padsButton.glyph = (int) ui::simplelook::Glyph::pads;
+    controlsButton.glyph = (int) ui::simplelook::Glyph::dials;
     hideButton.setButtonText (tr ("Hide the track dock"));
     hideButton.setTooltip (tr ("Hide the track dock"));
     hideButton.onClick = [this] {
@@ -2628,7 +2638,10 @@ void SimpleDock::refresh()
     keyboardButton.setVisible (playTabs);
     editorButton.setVisible (playTabs);
     padsButton.setVisible (padsTab);
-    if ((tab == Tab::instrument && ! instrumentTab) || ((tab == Tab::keyboard || tab == Tab::editor) && ! playTabs) || (tab == Tab::pads && ! padsTab))
+    controlsTab = track >= 0 && insert > 0 && insert < (int) song.mixer.size();
+    controlsButton.setVisible (controlsTab);
+    if ((tab == Tab::instrument && ! instrumentTab) || ((tab == Tab::keyboard || tab == Tab::editor) && ! playTabs) || (tab == Tab::pads && ! padsTab)
+        || (tab == Tab::controls && ! controlsTab))
         tab = Tab::effects;
     if (! tabChosen && (instrumentTab || playTabs))
         tab = instrumentTab ? Tab::instrument : Tab::keyboard; // (an instrument track opens on its sound; an audio track on its effects)
@@ -2641,6 +2654,7 @@ void SimpleDock::refresh()
     showPage();
     editorPage->show (playTabs ? track : -1, channel);
     padsPage->show (padsTab ? track : -1);
+    controlsPage->show (controlsTab ? track : -1, channel, controlsTab ? insert : -1);
     updateFollow();
     resized();
     repaint();
@@ -2649,7 +2663,8 @@ void SimpleDock::refresh()
 void SimpleDock::setTab (Tab t)
 {
     tabChosen = true; // (a refresh keeps a tab that was asked for)
-    if ((t == Tab::instrument && ! instrumentTab) || ((t == Tab::keyboard || t == Tab::editor) && ! playTabs) || (t == Tab::pads && ! padsTab))
+    if ((t == Tab::instrument && ! instrumentTab) || ((t == Tab::keyboard || t == Tab::editor) && ! playTabs) || (t == Tab::pads && ! padsTab)
+        || (t == Tab::controls && ! controlsTab))
         t = Tab::effects;
     const auto padsBefore = tab == Tab::pads;
     tab = t;
@@ -2669,6 +2684,8 @@ void SimpleDock::cycleTab()
         shown.push_back (Tab::keyboard), shown.push_back (Tab::editor);
     if (padsTab)
         shown.push_back (Tab::pads);
+    if (controlsTab)
+        shown.push_back (Tab::controls);
     shown.push_back (Tab::effects);
     const auto at = std::find (shown.begin(), shown.end(), tab);
     setTab (at == shown.end() || at + 1 == shown.end() ? shown.front() : *(at + 1));
@@ -2678,6 +2695,7 @@ void SimpleDock::showPage()
 {
     auto& button = tab == Tab::instrument ? instrumentButton : tab == Tab::keyboard ? keyboardButton : tab == Tab::editor ? editorButton
                  : tab == Tab::pads                                         ? padsButton
+                 : tab == Tab::controls                                     ? controlsButton
                                                                             : effectsButton;
     button.setToggleState (true, juce::dontSendNotification);
     if (tab == Tab::keyboard && keyboardPage == nullptr)
@@ -2692,6 +2710,7 @@ void SimpleDock::showPage()
     effectsPage->setVisible (tab == Tab::effects);
     editorPage->setVisible (tab == Tab::editor);
     padsPage->setVisible (tab == Tab::pads);
+    controlsPage->setVisible (tab == Tab::controls);
     if (keyboardPage != nullptr)
         keyboardPage->setVisible (tab == Tab::keyboard);
 }
@@ -2710,6 +2729,11 @@ void SimpleDock::padsKnobForCheck (int knob, float v) { padsPage->turnForCheck (
 void SimpleDock::padsRegionForCheck (float start, float end) { padsPage->setRegionForCheck (start, end); }
 void SimpleDock::padsNormalizeForCheck() { padsPage->normalizeForCheck(); }
 void SimpleDock::padsHitForCheck (int pad) { padsPage->hit (pad); }
+void SimpleDock::controlsTurnForCheck (int knob, float value) { controlsPage->turnForCheck (knob, value); }
+juce::String SimpleDock::controlsNameForCheck (int knob) const { return controlsPage->nameForCheck (knob); }
+float SimpleDock::controlsValueForCheck (int knob) const { return controlsPage->valueForCheck (knob); }
+void SimpleDock::controlsEditingForSnapshot (bool on) { controlsPage->setEditingForSnapshot (on); }
+juce::PopupMenu SimpleDock::controlsMenuForSnapshot (int knob) { return controlsPage->remapMenu (knob); }
 void SimpleDock::padsPressForSnapshot (int pad, float amount) { padsPage->pressForSnapshot (pad, amount); }
 void SimpleDock::padsWatchForCheck() { padsPage->watchPlayback(); }
 float SimpleDock::padsPressForCheck (int pad) const { return padsPage->pressShownForCheck (pad); }
@@ -2927,6 +2951,7 @@ void SimpleDock::paint (juce::Graphics& g)
     auto text = strip.withLeft (hideButton.getRight() + 10).withRight (instrumentButton.isVisible() ? instrumentButton.getX() - 12
                                                       : keyboardButton.isVisible() ? keyboardButton.getX() - 12
                                                       : padsButton.isVisible()     ? padsButton.getX() - 12
+                                                      : controlsButton.isVisible() ? controlsButton.getX() - 12
                                                                                    : effectsButton.getX() - 12);
     if (track < 0)
     {
@@ -3032,7 +3057,7 @@ void SimpleDock::resized()
     auto strip = stripAll.withSizeKeepingCentre (stripAll.getWidth(), tabHeight);
     followButton.setBounds (strip.removeFromRight (190).withTrimmedRight (10).withSizeKeepingCentre (180, juce::jmin (24, tabHeight)));
     // the tabs sit after the track's name, left of the middle
-    const auto count = 1 + (instrumentTab ? 1 : 0) + (playTabs ? 2 : 0) + (padsTab ? 1 : 0);
+    const auto count = 1 + (instrumentTab ? 1 : 0) + (playTabs ? 2 : 0) + (padsTab ? 1 : 0) + (controlsTab ? 1 : 0);
     auto tabs = strip.withLeft (juce::jmin (300, getWidth() / 3)).withWidth (tabWidth * count);
     std::vector<juce::TextButton*> shown;
     if (instrumentTab)
@@ -3041,6 +3066,8 @@ void SimpleDock::resized()
         shown.push_back (&keyboardButton), shown.push_back (&editorButton);
     if (padsTab)
         shown.push_back (&padsButton);
+    if (controlsTab)
+        shown.push_back (&controlsButton);
     shown.push_back (&effectsButton);
     for (std::size_t i = 0; i < shown.size(); ++i)
     {
@@ -3053,6 +3080,7 @@ void SimpleDock::resized()
     instrumentPage->setBounds (body);
     editorPage->setBounds (body);
     padsPage->setBounds (body);
+    controlsPage->setBounds (body);
     if (keyboardPage != nullptr)
         keyboardPage->setBounds (body);
 }

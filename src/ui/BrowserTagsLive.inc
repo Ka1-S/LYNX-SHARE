@@ -167,6 +167,9 @@ public:
     explicit TagsPanel (BrowserComponent& b) : browser (b) { setRepaintsOnMouseActivity (true); }
 
     static constexpr int chipHeight = 18, gap = 3, pad = 4, maxRows = 4;
+    // round 190ke: the Simple layout lists LYNX content's tags too (GarageBand's Loop Browser shows its keyword buttons
+    // as a grid of up to seven rows): more rows there, and the picked tags first so a pick never falls off the panel
+    static int rowsAllowed() { return layoutstyle::current() == layoutstyle::Style::simple ? 9 : maxRows; }
 
     // The height the panel needs at `width` (its chips wrapped, at most maxRows rows), from the tags as they are.
     int heightFor (int width)
@@ -293,7 +296,7 @@ private:
             const auto w = juce::GlyphArrangement::getStringWidthInt (font, chip.text) + 12;
             if (x > pad && x + w > width - pad)
             {
-                if (rowsUsed == maxRows)
+                if (rowsUsed == rowsAllowed())
                     return;
                 ++rowsUsed;
                 x = pad;
@@ -307,8 +310,12 @@ private:
         place ({ ChipKind::any, {}, tr ("Any"), 0, {} });
         place ({ ChipKind::all, {}, tr ("All"), 0, {} });
         x += 4;
-        for (const auto& t : BrowserComponent::tagStore().all())
-            place ({ ChipKind::tag, t.name, juce::String::fromUTF8 (t.name.c_str()), t.items, {} });
+        const auto all = BrowserComponent::shownTags().all(); // (round 190ke: LYNX content's tags in Simple)
+        const auto simple = layoutstyle::current() == layoutstyle::Style::simple;
+        for (int pass = simple ? 0 : 1; pass < 2; ++pass)
+            for (const auto& t : all)
+                if (! simple || isPicked (t.name) == (pass == 0))
+                    place ({ ChipKind::tag, t.name, juce::String::fromUTF8 (t.name.c_str()), t.items, {} });
     }
 
     void tagMenu (const std::string& tag)
