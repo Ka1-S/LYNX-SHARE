@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <map>
+#include <typeinfo>
 #include <utility>
 
 #if JUCE_WINDOWS
@@ -17,6 +18,19 @@
  #include <d3d11.h>
  #include <dxgi.h>
  #include <dcomp.h>
+#elif JUCE_MAC
+ #include "ui/MotionOverlayMac.h"
+#elif JUCE_LINUX || JUCE_BSD
+ #include "ui/MotionOverlayX11.h"
+
+#include <vector>
+
+namespace juce
+{
+// cmake/LynxPatchJuce.cmake fix 39 (round 190jx), in juce_Windowing_linux.cpp; weak: without the fix they are null
+extern void (*lynxX11AfterBlitHook) (unsigned long window, const RectangleList<int>& blitted) __attribute__ ((weak));
+void* lynxX11Display() __attribute__ ((weak));
+} // namespace juce
 #endif
 
 namespace lynx::ui
@@ -61,8 +75,20 @@ bool overlayWanted()
     return on;
 }
 
+#if JUCE_LINUX || JUCE_BSD
+bool hookInstalled(); // (below: fix 39's hook, which also counts JUCE's blits for the statistics)
+#endif
+
+// why the last show() fell back (LYNX_OVERLAY_STATS; Linux / macOS backend): a short reason, and the component that
+// covered the mark when that was it
+juce::String& lastFallback()
+{
+    static juce::String why; // (message thread)
+    return why;
+}
+
 // LYNX_OVERLAY_STATS=<file>: per second, the frames the overlays showed, the show() calls that fell back, the pictures
-// painted (every 2 s while something calls show())
+// painted (every 2 s while something calls show()); X11: also JUCE's blits to the windows (presents) and their pixels
 void writeStats()
 {
     static const auto path = juce::SystemStats::getEnvironmentVariable ("LYNX_OVERLAY_STATS", {});
@@ -79,9 +105,22 @@ void writeStats()
     const auto s = (now - since) / 1000.0;
     const auto shown = MotionOverlay::framesShown().load(), fell = MotionOverlay::fallbacks().load(),
                pictures = MotionOverlay::picturesPainted().load();
+    juce::String extra;
+#if JUCE_LINUX || JUCE_BSD
+    static x11overlay::BlitStats blits0;
+    if (hookInstalled())
+    {
+        const auto b = x11overlay::blitStats();
+        extra << " blits/s " << juce::String ((double) (b.blits - blits0.blits) / s, 1) << " blit_Mpx/s "
+              << juce::String ((double) (b.pixels - blits0.pixels) / s / 1.0e6, 3);
+        blits0 = b;
+    }
+#endif
+    if (fell != fell0 && lastFallback().isNotEmpty())
+        extra << " last fallback: " << lastFallback();
     juce::File (path).appendText (juce::String (now / 1000.0, 1) + " overlay frames/s " + juce::String ((shown - shown0) / s, 1)
                                   + " fallbacks/s " + juce::String ((fell - fell0) / s, 1) + " pictures " + juce::String (pictures - pictures0)
-                                  + " show_ms/s " + juce::String ((double) (showMicros().load() - micros0) / 1000.0 / s, 2)
+                                  + " show_ms/s " + juce::String ((double) (showMicros().load() - micros0) / 1000.0 / s, 2) + extra
                                   + juce::newLine);
     since = now;
     shown0 = shown;
@@ -773,7 +812,411 @@ bool MotionOverlay::prepareNow()
     return overlayWanted() && Devices::get().makeNow();
 }
 
-#else // ! JUCE_WINDOWS: not available; the views paint their marks as before
+#elif JUCE_LINUX || JUCE_BSD || JUCE_MAC
+
+// Linux / BSD (round 190jx): the X server draws the mark over the view's window and keeps the pixels under it
+// (ui/MotionOverlayX11.h). LYNX runs through XWayland on Wayland desktops, so this is the path there too.
+//
+// Why this way (round 190jx; measured with a stand-alone X client on Xvfb, 1200 frames of an 18 x 800 px mark moving
+// 0.6 px a frame): a native ARGB child window moved with XMoveWindow costs the server about as much, but each whole-pixel
+// step uncovers a strip of the window under it (719 Expose events, 575,200 px), which JUCE would paint and blit again at
+// every step; the save-under above needs no paint and no image at all (the client side: 22-33 ms of CPU for the 1200
+// frames, against 134-227 ms for putting the columns). An OpenGL layer would put the whole view in a GL window.
+// macOS (round 190jx, ui/MotionOverlayMac.h): the same steps with a CALayer over the view's layer; off by default
+// (LYNX_OVERLAY_MAC=1): checked headless on the CI's macOS runner only.
+namespace
+{
+#if JUCE_MAC
+using Sprite = maclayer::Sprite;
+using SpriteRect = maclayer::Rect;
+bool backendReady() { return maclayer::enabled(); }
+double windowScale (juce::ComponentPeer& peer) { return maclayer::backingScale (peer.getNativeHandle()); }
+bool nativeOver (void* handle, juce::Rectangle<int> r) { return maclayer::subviewOver (handle, { r.getX(), r.getY(), r.getWidth(), r.getHeight() }); }
+#else
+void afterBlitHook (unsigned long window, const juce::RectangleList<int>& blitted)
+{
+    std::array<x11overlay::Rect, 16> rects {};
+    std::vector<x11overlay::Rect> many;
+    auto* list = rects.data();
+    const auto n = blitted.getNumRectangles();
+    if (n > (int) rects.size())
+    {
+        many.resize ((std::size_t) n);
+        list = many.data();
+    }
+    int i = 0;
+    for (const auto& r : blitted)
+        list[i++] = { r.getX(), r.getY(), r.getWidth(), r.getHeight() };
+    x11overlay::afterBlit (window, list, n);
+}
+
+// JUCE's display and fix 39's hook (weak: a JUCE without the fix links, and the views paint their marks)
+bool hookInstalled()
+{
+    static const bool on = [] {
+        if (&juce::lynxX11AfterBlitHook == nullptr || juce::lynxX11Display == nullptr)
+            return false;
+        auto* display = juce::lynxX11Display();
+        if (display == nullptr)
+            return false;
+        x11overlay::setDisplay (display);
+        juce::lynxX11AfterBlitHook = afterBlitHook;
+        return true;
+    }();
+    return on;
+}
+
+bool x11Ready()
+{
+    return hookInstalled() && x11overlay::ready();
+}
+
+using Sprite = x11overlay::Sprite;
+using SpriteRect = x11overlay::Rect;
+bool backendReady() { return x11Ready(); }
+double windowScale (juce::ComponentPeer& peer) { return peer.getPlatformScaleFactor(); }
+bool nativeOver (void*, juce::Rectangle<int>) { return false; } // (the X server clips the drawing to what is visible)
+#endif
+} // namespace
+
+struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentListener
+{
+    // the same sub-pixel scheme as on Windows (see there): pictures cached at 1/8 px, the rest a translation that the
+    // X server samples bilinearly (XRender)
+    static constexpr int maxPhases = 64;
+    static bool subPixel()
+    {
+        static const bool on = juce::SystemStats::getEnvironmentVariable ("LYNX_OVERLAY_SUBPIXEL", {}) != "0";
+        return on;
+    }
+    static int phases()
+    {
+        static const int n = [] {
+            const auto v = juce::SystemStats::getEnvironmentVariable ("LYNX_OVERLAY_PHASES", {});
+            return v.isEmpty() ? 8 : juce::jlimit (1, maxPhases, v.getIntValue());
+        }();
+        return n;
+    }
+
+    Impl (MotionOverlay& o, juce::Component& ownerIn, Painter p, bool over)
+        : overlay (o), owner (ownerIn), painter (std::move (p)), overChildren (over)
+    {
+        owner.addComponentListener (this);
+    }
+
+    ~Impl() override
+    {
+        owner.removeComponentListener (this);
+        stopTimer();
+        leaveWindow();
+    }
+
+    bool show (const Mark& mark)
+    {
+        writeStats();
+        const ScopedTime timed;
+        if (! place (mark))
+        {
+            ++fallbacks();
+            if (showing || sprite.drawn())
+                hideNow (false);
+            return false;
+        }
+        ++framesShown();
+        showing = true;
+        lastShowMs = juce::Time::getMillisecondCounterHiRes();
+        hideAtMs = 0.0;
+        if (! isTimerRunning())
+            startTimerHz (20);
+        return true;
+    }
+
+    void hide (bool afterFrames)
+    {
+        if (! showing && ! sprite.drawn())
+            return;
+        showing = false;
+        if (afterFrames && sprite.drawn())
+        {
+            // the view paints the mark again now; JUCE's blit of it only refreshes the pixels kept under ours, which go
+            // in a few frames (then the window shows the painted one)
+            sprite.setShowing (false);
+            hideAtMs = juce::Time::getMillisecondCounterHiRes() + 50.0;
+            if (! isTimerRunning())
+                startTimerHz (20);
+            return;
+        }
+        hideNow (false);
+    }
+
+    bool place (const Mark& mark)
+    {
+        // (the reason only for LYNX_OVERLAY_STATS: no strings made per frame otherwise)
+        static const bool explain = juce::SystemStats::getEnvironmentVariable ("LYNX_OVERLAY_STATS", {}).isNotEmpty();
+        auto why = [] (const auto& reason) {
+            if (explain)
+                lastFallback() = reason();
+            return false;
+        };
+        if (! overlayWanted() || ! backendReady())
+            return why ([] { return juce::String ("off or not available"); });
+        auto* peer = owner.getPeer();
+        // (X11: isMinimised() is a round trip to the server, ~0.2 ms a frame; a minimised window is unmapped and the
+        // server draws nothing on it, and JUCE repaints it when it comes back, which the blit hook sees)
+#if JUCE_MAC
+        if (peer == nullptr || ! owner.isShowing() || peer->isMinimised())
+#else
+        if (peer == nullptr || ! owner.isShowing())
+#endif
+            return why ([] { return juce::String ("not showing"); });
+        auto& top = peer->getComponent();
+        auto* const window = peer->getNativeHandle();
+        if (window == nullptr)
+            return why ([] { return juce::String ("no native window"); });
+        for (auto* c = &owner; c != nullptr; c = c->getParentComponent())
+            if (c->isTransformed() && (c->getTransform().mat01 != 0.0f || c->getTransform().mat10 != 0.0f))
+                return why ([] { return juce::String ("rotated"); });
+        // window pixels: top-level coordinates x topScale (as on Windows; macOS: points x the backing scale)
+        const auto topScale = windowScale (*peer) * (double) top.getDesktopScaleFactor();
+        const auto s = topScale * (double) juce::Component::getApproximateScaleFactorForComponent (&owner)
+                       / juce::jmax (0.0001, (double) juce::Component::getApproximateScaleFactorForComponent (&top));
+        const auto ownerPos = top.getLocalPoint (&owner, juce::Point<float>()).toDouble() * topScale;
+
+        auto clipTop = top.getLocalArea (&owner, mark.clip.getIntersection (owner.getLocalBounds()));
+        for (auto* c = owner.getParentComponent(); c != nullptr && c != &top; c = c->getParentComponent())
+            clipTop = clipTop.getIntersection (top.getLocalArea (c, c->getLocalBounds()));
+        clipTop = clipTop.getIntersection (top.getLocalBounds());
+        const auto clip = owner.getLocalArea (&top, clipTop);
+        const auto markArea = mark.extent.toFloat().translated (mark.x, 0.0f).getSmallestIntegerContainer().getIntersection (clip);
+        if (markArea.isEmpty())
+        {
+            if (sprite.drawn())
+                hideNow (false);
+            return true;
+        }
+        // components of the window over the mark: the view paints it (the X server itself clips it to what of the window
+        // is visible: native child windows, sibling windows, other programs' windows)
+        if (const auto cover = coveredByComponents (top, markArea); cover.whole)
+        {
+            if (sprite.drawn()) // (nothing of it in view: nothing to show, nothing for the view to paint)
+                hideNow (false);
+            return true;
+        }
+        else if (cover.by != nullptr)
+            return why ([&] {
+                return "covered by " + cover.by->getName() + " (" + typeid (*cover.by).name() + ") at "
+                       + top.getLocalArea (cover.by->getParentComponent(), cover.by->getBounds()).toString() + ", the mark at "
+                       + top.getLocalArea (&owner, markArea).toString();
+            });
+        if (nativeOver (window, (top.getLocalArea (&owner, markArea).toDouble() * topScale).getSmallestIntegerContainer()))
+            return why ([] { return juce::String ("a native view over it"); });
+        if (attachedPeer != peer || attachedWindow != window)
+        {
+            leaveWindow();
+            attachedPeer = peer;
+            attachedWindow = window;
+        }
+
+        const auto xWin = ownerPos.x + (double) mark.x * s;
+        const auto whole = std::floor (xWin);
+        const auto steps = phases();
+        const auto phase = juce::jlimit (0, steps - 1, (int) std::floor ((xWin - whole) * steps));
+        const auto left = (int) std::floor ((double) mark.extent.getX() * s) - 1;
+        const auto topY = (int) std::floor (ownerPos.y + (double) mark.extent.getY() * s) - 1;
+        const auto w = (int) std::ceil ((double) mark.extent.getWidth() * s) + 3, h = (int) std::ceil ((double) mark.extent.getHeight() * s) + 3;
+        const auto reference = (int) std::floor ((double) clipTop.getCentreX() * topScale);
+        const PictureKey key { mark.look, w, h, reference, topY, s, ownerPos.x - std::floor (ownerPos.x), ownerPos.y };
+        if (! (key == pictureKey))
+        {
+            pictureKey = key;
+            drawn.fill (false);
+        }
+        if (! drawn[(std::size_t) phase])
+        {
+            const auto originX = reference + left;
+            const auto at = juce::AffineTransform::scale ((float) s).translated ((float) (ownerPos.x - originX), (float) (ownerPos.y - topY));
+            const auto xAt = ((double) reference + (double) phase / steps - ownerPos.x) / s;
+            if (scratch.isNull() || scratch.getWidth() != w || scratch.getHeight() != h)
+                scratch = juce::Image (juce::Image::ARGB, w, h, true, juce::SoftwareImageType());
+            else
+                scratch.clear (scratch.getBounds());
+            {
+                juce::Graphics g (scratch);
+                g.addTransform (at);
+                painter (g, (float) xAt);
+            }
+            const juce::Image::BitmapData pixels (scratch, juce::Image::BitmapData::readOnly);
+            if (! sprite.upload (phase, pixels.data, w, h, pixels.lineStride))
+                return why ([] { return juce::String ("picture not sent"); });
+            drawn[(std::size_t) phase] = true;
+            ++picturesPainted();
+        }
+        const auto rest = subPixel() ? (xWin - whole) - (double) phase / steps : 0.0;
+        const auto clipWin = (clipTop.toDouble() * topScale);
+        const auto cx = (int) std::round (clipWin.getX()), cy = (int) std::round (clipWin.getY());
+        const SpriteRect clipRect { cx, cy, (int) std::round (clipWin.getRight()) - cx, (int) std::round (clipWin.getBottom()) - cy };
+        sprite.setShowing (true);
+#if JUCE_MAC
+        const auto placed = sprite.place (window, phase, (int) whole + left, topY, rest, clipRect);
+#else
+        const auto placed = sprite.place ((unsigned long) (juce::pointer_sized_uint) window, phase, (int) whole + left, topY, rest, clipRect);
+#endif
+        return placed || why ([] { return juce::String ("not drawn"); });
+    }
+
+    // the component of the window over the mark, if any; whole: an opaque one in front of all of it (nobody needs to
+    // draw the mark: a panel over the view, as the Piano roll behind a floating Channel rack)
+    struct Cover
+    {
+        const juce::Component* by = nullptr;
+        bool whole = false;
+    };
+    Cover coveredByComponents (juce::Component& top, juce::Rectangle<int> area) const
+    {
+        const auto covers = [&] (const juce::Component& c, const juce::Component& parent) {
+            if (! c.isVisible() || c.getAlpha() <= 0.0f || (bool) c.getProperties().getWithDefault ("lynxOverlayIgnores", false))
+                return false;
+            return owner.getLocalArea (&parent, c.getBounds()).intersects (area);
+        };
+        if (! overChildren)
+            for (auto* child : owner.getChildren())
+                if (covers (*child, owner))
+                    return { child, false };
+        for (auto* c = &owner; c != &top && c->getParentComponent() != nullptr; c = c->getParentComponent())
+        {
+            auto* parent = c->getParentComponent();
+            for (int i = parent->getIndexOfChildComponent (c) + 1; i < parent->getNumChildComponents(); ++i)
+                if (auto* sibling = parent->getChildComponent (i); covers (*sibling, *parent))
+                    return { sibling, sibling->isOpaque() && sibling->getAlpha() >= 1.0f && owner.getLocalArea (parent, sibling->getBounds()).contains (area) };
+        }
+        return {};
+    }
+
+    // the window this view was drawn on is still JUCE's: put the pixels back; gone: forget it (the server freed it)
+    void leaveWindow()
+    {
+        if (attachedPeer != nullptr && juce::ComponentPeer::isValidPeer (attachedPeer) && attachedPeer->getNativeHandle() == attachedWindow)
+            sprite.restore();
+        else
+            sprite.forget();
+        attachedPeer = nullptr;
+        attachedWindow = nullptr;
+    }
+
+    void hideNow (bool lostIt)
+    {
+        const auto was = showing;
+        showing = false;
+        hideAtMs = 0.0;
+        if (sprite.drawn())
+        {
+            if (attachedPeer != nullptr && juce::ComponentPeer::isValidPeer (attachedPeer))
+                sprite.restore();
+            else
+                sprite.forget();
+        }
+        stopTimer();
+        if (lostIt && was && overlay.onHidden)
+            overlay.onHidden();
+    }
+
+    void timerCallback() override
+    {
+        const auto now = juce::Time::getMillisecondCounterHiRes();
+        if (hideAtMs > 0.0 && now >= hideAtMs)
+        {
+            hideNow (false);
+            return;
+        }
+        if (showing && now - lastShowMs > 100.0)
+        {
+            hideNow (true);
+            return;
+        }
+        if (! showing && hideAtMs <= 0.0)
+            stopTimer();
+    }
+
+    void componentMovedOrResized (juce::Component&, bool, bool) override { lostPlace(); }
+    void componentVisibilityChanged (juce::Component&) override { lostPlace(); }
+    void componentParentHierarchyChanged (juce::Component&) override { lostPlace(); }
+    void lostPlace()
+    {
+        if (showing || sprite.drawn())
+            hideNow (true);
+    }
+
+    MotionOverlay& overlay;
+    juce::Component& owner;
+    Painter painter;
+    bool overChildren;
+
+    Sprite sprite;
+    juce::ComponentPeer* attachedPeer = nullptr;
+    void* attachedWindow = nullptr;
+    std::array<bool, maxPhases> drawn {};
+    struct PictureKey
+    {
+        std::uint64_t look = 0;
+        int w = 0, h = 0, reference = 0, topY = 0;
+        double scale = 0.0, ownerFractionX = -1.0, ownerY = 0.0;
+        bool operator== (const PictureKey&) const = default;
+    };
+    PictureKey pictureKey;
+    juce::Image scratch;
+    bool showing = false;
+    double lastShowMs = 0.0, hideAtMs = 0.0;
+};
+
+bool MotionOverlay::available()
+{
+    return overlayWanted() && backendReady();
+}
+
+bool MotionOverlay::prepareNow()
+{
+    return overlayWanted() && backendReady();
+}
+
+juce::String MotionOverlay::selfTest()
+{
+#if JUCE_MAC
+    // the layer is checked whether or not it is on (it is off by default: the views paint their marks)
+    juce::Component host;
+    host.setBounds (120, 40, 400, 300);
+    host.addToDesktop (juce::ComponentPeer::windowHasTitleBar); // (never shown)
+    auto* peer = host.getPeer();
+    if (peer == nullptr)
+        return "ERROR no window";
+    if (const juce::String why (maclayer::selfTest (peer->getNativeHandle())); why.isNotEmpty())
+        return "ERROR " + why;
+    MotionOverlay overlay (host, [] (juce::Graphics& g, float x) { g.fillRect (juce::Rectangle<float> (x - 0.5f, 0.0f, 1.5f, 300.0f)); });
+    if (overlay.show ({ 100.25f, { -8, 0, 16, 300 }, host.getLocalBounds(), 1 }) || overlay.isShowing())
+        return "ERROR shown in a window that is not showing";
+    if (! overlayWanted() || ! maclayer::enabled())
+        return "OK (Core Animation layer checked headless; off by default: LYNX_OVERLAY_MAC=1 turns it on)";
+    return "OK (Core Animation layer checked headless; on: LYNX_OVERLAY_MAC=1)";
+#else
+    if (! overlayWanted())
+        return "OK (off: LYNX_OVERLAY=0)";
+    if (! hookInstalled())
+        return "OK (not available: no X display or JUCE without fix 39; the views paint their marks)";
+    if (! x11overlay::ready())
+        return "OK (not available: " + juce::String (x11overlay::whyNot()) + "; the views paint their marks)";
+    if (const juce::String why (x11overlay::selfTestOnServer()); why.isNotEmpty())
+        return "ERROR " + why;
+    // a view whose window is not on screen: the overlay must not take its mark
+    juce::Component host;
+    host.setBounds (120, 40, 400, 300);
+    host.addToDesktop (juce::ComponentPeer::windowHasTitleBar); // (never shown)
+    MotionOverlay overlay (host, [] (juce::Graphics& g, float x) { g.fillRect (juce::Rectangle<float> (x - 0.5f, 0.0f, 1.5f, 300.0f)); });
+    if (overlay.show ({ 100.25f, { -8, 0, 16, 300 }, host.getLocalBounds(), 1 }) || overlay.isShowing())
+        return "ERROR shown in a window that is not showing";
+    return "OK (X11: drawn, half a pixel moved, clipped, drawn again after a blit, put back)";
+#endif
+}
+
+#else // not available; the views paint their marks as before
 
 struct MotionOverlay::Impl
 {

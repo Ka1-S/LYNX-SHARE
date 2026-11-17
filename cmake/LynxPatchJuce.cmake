@@ -249,6 +249,13 @@
 #    A window above now covers the point only while it is on the screen: mapped and viewable, and not minimised
 #    (_NET_WM_STATE_HIDDEN). The X round trips run only for a point inside such a window's bounds.
 #
+# 39. Linux/BSD only, juce_gui_basics/native/juce_Windowing_linux.cpp (round 190jx): the X11 backend of LYNX's moving
+#    marks (ui/MotionOverlay.h, ui/MotionOverlayX11.h) draws a playhead with the X server over a window's pixels and
+#    keeps the pixels under it. It must know when JUCE replaced pixels there: after the repaint manager blits its
+#    rectangles to a window, `lynxX11AfterBlitHook` (set by LYNX) gets the window and the rectangles (window pixels), and
+#    the marks there are drawn again over the new pixels, in the same order of requests on the same connection.
+#    `lynxX11Display()` hands LYNX JUCE's display connection (so its requests are ordered with JUCE's). Null hook: nothing.
+#
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
 
@@ -387,6 +394,12 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("a minimised window covers nothing" "LYNX patch (issue #188): a window above"
             "            if (auto* peer = static_cast<LinuxComponentPeer*> (otherPeer))|NL|                if (peer->contains (globalToLocal (*peer, localToGlobal (*this, localPos.toFloat())).roundToInt(), true))|NL|                    return false;|NL|"
             "            // LYNX patch (issue #188): a window above covers the point only while it is on the screen (a minimised|NL|            // window keeps its bounds and stays visible for JUCE; the X round trips only inside its bounds)|NL|            if (auto* peer = static_cast<LinuxComponentPeer*> (otherPeer))|NL|                if (peer->contains (globalToLocal (*peer, localToGlobal (*this, localPos.toFloat())).roundToInt(), true)|NL|                    && peer->lynxIsOnScreen())|NL|                    return false;|NL|")
+        lynx_juce_fix("X11 blits told to LYNX: the hook" "LYNX patch (round 190jx): the hook LYNX's moving marks"
+            "class LinuxComponentPeer final : public ComponentPeer,"
+            "// LYNX patch (round 190jx): the hook LYNX's moving marks (ui/MotionOverlayX11.h) use to draw again over pixels JUCE|NL|// replaced: the window and the rectangles just blitted to it, in window pixels (cmake/LynxPatchJuce.cmake, fix 39)|NL|void (*lynxX11AfterBlitHook) (unsigned long window, const RectangleList<int>& blitted) = nullptr;|NL|void* lynxX11Display() { return XWindowSystem::getInstance()->getDisplay(); }|NL||NL|class LinuxComponentPeer final : public ComponentPeer,")
+        lynx_juce_fix("X11 blits told to LYNX: after a blit" "LYNX patch (round 190jx): the window's pixels"
+            "                for (auto& i : originalRepaintRegion)|NL|                   XWindowSystem::getInstance()->blitToWindow (peer.windowH, image, i, totalArea);|NL|"
+            "                for (auto& i : originalRepaintRegion)|NL|                   XWindowSystem::getInstance()->blitToWindow (peer.windowH, image, i, totalArea);|NL||NL|                // LYNX patch (round 190jx): the window's pixels there are new (fix 39)|NL|                if (lynxX11AfterBlitHook != nullptr)|NL|                    lynxX11AfterBlitHook ((unsigned long) peer.windowH, originalRepaintRegion);|NL|")
         lynx_juce_fix("a minimised window covers nothing: on the screen" "LYNX patch (issue #188): on the screen"
             "    bool contains (Point<int> localPos, bool trueIfInAChildWindow) const override|NL|    {|NL|"
             "    // LYNX patch (issue #188): on the screen = mapped, viewable (its ancestors mapped too) and not minimised|NL|    bool lynxIsOnScreen() const|NL|    {|NL|        if (windowH == 0)|NL|            return false;|NL||NL|        {|NL|            XWindowSystemUtilities::ScopedXLock xLock;|NL|            XWindowAttributes atts;|NL||NL|            if (! X11Symbols::getInstance()->xGetWindowAttributes (XWindowSystem::getInstance()->getDisplay(), windowH, &atts)|NL|                || atts.map_state != IsViewable)|NL|                return false;|NL|        }|NL||NL|        return ! XWindowSystem::getInstance()->isMinimised (windowH);|NL|    }|NL||NL|    bool contains (Point<int> localPos, bool trueIfInAChildWindow) const override|NL|    {|NL|")
