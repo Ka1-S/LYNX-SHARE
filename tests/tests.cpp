@@ -17865,6 +17865,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Bug190ieTests.inc" // round 190ie (issue #185: tempo automation through the basic Delay)
 #include "Perf190kgTests.inc" // round 190kg: the basic Delay's faster loops render round 190ie's samples bit for bit
 #include "Harm190krTests.inc" // round beatfl190kr: Harmless's vector sine bank, Vocodex's sliding max: the old bits
+#include "Shift190krTests.inc" // round 190kr: Signalsmith Stretch's faster loops render the base commit's pitch shifts bit for bit
 #include "PerfGate190idTests.inc" // round perfgate190id: the performance gate's synthetic projects (community slice B12)
 #include "Details190ihTests.inc" // round 190ih: DETAILS slices R2, R3, R4, R7, R9, R12, R14
 #include "Rackmix190ioTests.inc" // round 190io: FL rack + Mixer landmarks, Mixer details, issue #154 part 2
