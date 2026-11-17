@@ -92,6 +92,7 @@ public:
 
     void paint (juce::Graphics& g) override;
     void resized() override;
+    void childrenChanged() override; // (round 190jy: an editor drawn here put in front by toFront)
 
     // used by the frames
     void activate (Panel panel);
@@ -144,6 +145,7 @@ private:
     std::vector<std::unique_ptr<EditorWindow>> editorWindowList;
     std::unique_ptr<EditorWatch> editorWatch;
     bool updatingHoles = false, raisingEditor = false;
+    int childCountSeen = 0;
     void keepEditorWindowsOnTop(); // (above the plain frames: the Browser)
 
     struct PeerWatch;

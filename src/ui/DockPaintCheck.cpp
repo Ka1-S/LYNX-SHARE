@@ -3,12 +3,16 @@
 #include "core/Effects.h"
 #include "engine/AudioEngine.h"
 #include "ui/MainComponent.h"
+#include "ui/Motion.h"
+#include "ui/PluginSkin.h"
 #include "ui/NativeChild.h"
 #include "ui/PluginEditors.h"
 #include "ui/WindowOwner.h"
 #include "ui/Workspace.h"
 
 #include <algorithm>
+#include <set>
+#include <utility>
 #include <vector>
 
 #if JUCE_WINDOWS
@@ -28,7 +32,7 @@ struct Check::State
     juce::Component::SafePointer<juce::Component> panel; // a native panel under the editor
     juce::Rectangle<int> bounds;                          // the editor's place in the desktop
     juce::Component* content = nullptr;
-    juce::Image inMain, native; // the editor on the screen, drawn each way
+    juce::Image inMain, inMain2, native; // the editor on the screen, drawn each way (twice by the main window)
     bool playingBefore = false;
     int fails = 0;
 
@@ -126,14 +130,27 @@ struct Check::State
         juce::PNGImageFormat().writeImageToStream (image, out);
     }
 
-    static int differingPixels (const juce::Image& a, const juce::Image& b)
+    // the pixels that differ between two pictures of the same drawing (an animation that runs by itself)
+    static std::set<std::pair<int, int>> movingMask (const juce::Image& a, const juce::Image& b)
+    {
+        std::set<std::pair<int, int>> out;
+        if (a.isValid() && b.isValid() && a.getBounds() == b.getBounds())
+            for (int y = 0; y < a.getHeight(); ++y)
+                for (int x = 0; x < a.getWidth(); ++x)
+                    if (a.getPixelAt (x, y) != b.getPixelAt (x, y))
+                        out.insert ({ x, y });
+        return out;
+    }
+
+    static int differingPixels (const juce::Image& a, const juce::Image& b, const std::set<std::pair<int, int>>* ignore = nullptr)
     {
         if (! a.isValid() || ! b.isValid() || a.getBounds() != b.getBounds())
             return -1;
         int n = 0;
         for (int y = 0; y < a.getHeight(); ++y)
             for (int x = 0; x < a.getWidth(); ++x)
-                n += a.getPixelAt (x, y) != b.getPixelAt (x, y) ? 1 : 0;
+                if (a.getPixelAt (x, y) != b.getPixelAt (x, y) && (ignore == nullptr || ignore->count ({ x, y }) == 0))
+                    ++n;
         return n;
     }
 
@@ -167,7 +184,7 @@ Check::~Check() = default;
 
 int Check::count()
 {
-    return 14;
+    return 15;
 }
 
 juce::String Check::step (int index)
@@ -182,9 +199,9 @@ juce::String Check::step (int index)
         out << s.expect ("setup", false, why);
         return out;
     };
-    if (index > 0 && index < 13 && s.gb == nullptr)
+    if (index > 0 && index < 14 && s.gb == nullptr)
         return index == 1 ? bail ("no Gross Beat window") : juce::String();
-    if (index >= 4 && index < 12 && s.anchor() == nullptr)
+    if (index >= 5 && index < 13 && s.anchor() == nullptr)
         return s.expect ("still_in_main_window_at_step_" + juce::String (index), false);
 
     switch (index)
@@ -209,6 +226,11 @@ juce::String Check::step (int index)
             if (s.gb == nullptr)
                 return bail ("Gross Beat did not open docked");
             moveDockedEditors (true);
+            // (still pictures for the pixel comparison: the editors' animated art and LYNX's animations off)
+            skin::setArtMotion (false);
+            skin::kickArtLayers();
+            ui::motion::enabled() = false;
+            s.gb->repaint();
             break;
         }
         case 1:
@@ -238,10 +260,15 @@ juce::String Check::step (int index)
             out << s.expect ("clicks_reach_main_window", nativechild::windowAt (gb, centre) == s.mainHandle());
             s.inMain = s.capture();
             s.save (s.inMain, "gb-in-main-window.png");
-            moveDockedEditors (false);
             break;
         }
         case 2:
+        {
+            s.inMain2 = s.capture(); // (what still moves by itself is not counted below)
+            moveDockedEditors (false);
+            break;
+        }
+        case 3:
         {
             auto& gb = *s.gb;
             out << s.expect ("undock_native_child", nativechild::isAttached (gb) && ! isEditorInMainWindow (gb)
@@ -255,17 +282,21 @@ juce::String Check::step (int index)
             out << s.expect ("undock_keeps_stacking", s.panel == nullptr || nativechild::isAbove (gb.getWindowHandle(), s.panel->getWindowHandle()));
             break;
         }
-        case 3:
+        case 4:
         {
             s.native = s.capture();
             s.save (s.native, "gb-native-child.png");
-            const auto diff = State::differingPixels (s.inMain, s.native);
+            const auto moving = State::movingMask (s.inMain, s.inMain2);
+            const auto diff = State::differingPixels (s.inMain, s.native, &moving);
+            const auto total = State::differingPixels (s.inMain, s.native);
             out << s.expect ("pixels_identical", diff == 0, diff < 0 ? "no capture" : juce::String (diff) + " px differ of "
-                                                                                          + juce::String (s.native.getWidth() * s.native.getHeight()));
+                                                                                          + juce::String (s.native.getWidth() * s.native.getHeight())
+                                                                                          + " (" + juce::String (total) + " with the "
+                                                                                          + juce::String ((int) moving.size()) + " px that moved by themselves)");
             moveDockedEditors (true);
             break;
         }
-        case 4:
+        case 5:
         {
             auto& gb = *s.gb;
             out << s.expect ("dock_again_same_place", isEditorInMainWindow (gb) && gb.getBounds() == s.bounds && gb.getContentComponent() == s.content);
@@ -277,7 +308,7 @@ juce::String Check::step (int index)
             }
             break;
         }
-        case 5:
+        case 6:
         {
             auto& gb = *s.gb;
             if (s.panel != nullptr)
@@ -289,10 +320,10 @@ juce::String Check::step (int index)
                 const auto at = gb.getLocalArea (&ws, ws.getLocalArea (nullptr, s.panel->getScreenBounds()).getIntersection (gb.getBounds())).getCentre();
                 out << s.expect ("clicks_reach_raised_panel", nativechild::windowAt (gb, at) == s.panel->getWindowHandle());
             }
-            gb.toFront (false); // (the editor asked for again: NativeEffectWindows::open)
+            gb.toFront (true); // (the editor asked for again: NativeEffectWindows::open)
             break;
         }
-        case 6:
+        case 7:
         {
             if (s.panel != nullptr)
             {
@@ -312,7 +343,7 @@ juce::String Check::step (int index)
             }
             break;
         }
-        case 7:
+        case 8:
         {
             if (s.panel != nullptr)
             {
@@ -322,12 +353,12 @@ juce::String Check::step (int index)
                 if (at.x >= 0)
                     nativechild::postClickForTest (s.mainHandle(), at);
                 else
-                    s.gb->toFront (false);
+                    s.gb->toFront (true);
                 out << "dockcheck_editor_click_at=" << (at.x >= 0 ? at.toString() : juce::String ("none free: toFront")) << "\n";
             }
             break;
         }
-        case 8:
+        case 9:
         {
             if (s.panel != nullptr)
                 out << s.expect ("editor_click_raises_editor", nativechild::isAbove (s.anchor()->getWindowHandle(), s.panel->getWindowHandle()));
@@ -338,7 +369,7 @@ juce::String Check::step (int index)
             out << s.expect ("space_posted", nativechild::pressSpaceForTest (s.mainHandle()));
             break;
         }
-        case 9:
+        case 10:
         {
             const auto now = s.engine.getTransport().playing.load();
             out << s.expect ("space_from_editor_runs_shortcut", now != s.playingBefore);
@@ -358,7 +389,7 @@ juce::String Check::step (int index)
             s.gb->setBounds (s.bounds.withSize (s.bounds.getWidth() + 40, s.bounds.getHeight() + 30));
             break;
         }
-        case 10:
+        case 11:
         {
             bool follows = true;
             const auto r = nativechild::physicalInTop (ws, s.gb->getBounds());
@@ -384,7 +415,7 @@ juce::String Check::step (int index)
             setEditorsDetached (false);
             break;
         }
-        case 11:
+        case 12:
         {
             out << s.expect ("floating_stays_own_window", s.detached != nullptr && s.detached->isOnDesktop() && ! nativechild::isAttached (*s.detached)
                                                               && ! isEditorInMainWindow (*s.detached));
@@ -392,12 +423,12 @@ juce::String Check::step (int index)
                 s.detached->closeButtonPressed();
             break;
         }
-        case 12:
+        case 13:
         {
             s.gb->closeButtonPressed();
             break;
         }
-        case 13:
+        case 14:
         {
             bool cleared = ws.editorWindows().empty();
             for (auto* c : nativechild::attachedChildren (s.mainHandle()))

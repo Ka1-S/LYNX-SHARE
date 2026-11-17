@@ -1128,6 +1128,20 @@ void Workspace::raiseEditorWindow (juce::Component& window)
     updateEditorHoles();
 }
 
+void Workspace::childrenChanged()
+{
+    // round 190jy: an editor drawn here that came in front of the desktop's other children without a focus grab
+    // (Component::toFront (false) tells no listener): its anchor comes in front of the native windows too, as a
+    // docked window's toFront brings it in front of them. Children added or removed are not a reorder.
+    const auto count = getNumChildComponents();
+    const auto reordered = count == childCountSeen;
+    childCountSeen = count;
+    if (! reordered || raisingEditor || editorWindowList.empty() || count == 0)
+        return;
+    if (auto* last = getChildComponent (count - 1); last != nullptr && hasEditorWindow (*last))
+        raiseEditorWindow (*last);
+}
+
 void Workspace::keepEditorWindowsOnTop()
 {
     if (editorWindowList.empty())
