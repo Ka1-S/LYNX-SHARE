@@ -9,6 +9,7 @@
 namespace lynx
 {
 class AudioEngine;
+enum class RemoteAction : std::uint8_t;
 class SessionMixerComponent;
 
 // The clip grid of the Clip-launch workflow (round 181a, core/ClipLauncher.h): Playlist tracks as columns, scenes as rows.
@@ -52,6 +53,10 @@ void setClipGridBlinkPhaseForSnapshot (int phase);
 // tick of the grid's timer; a cell's rectangle (kind 0 a slot, 1 a track's status cell, 2 a scene cell); the selected
 // scene and whether the scene is the selection; a slot selected; the hint at a point (text, value); a key pressed.
 void launchClipGridSceneForSnapshot (juce::Component& grid, int scene);
+// Round 190kc: Live's Relative Session Mapping Strip acting on the grid (Scene Up / Down, Launch Selected Scene, a track's
+// clip at the selected scene: press and release).
+void clipGridRelativeSession (juce::Component& grid, RemoteAction action, int track, bool press);
+void setClipGridMapStrip (juce::Component& grid, bool on); // (shown while a map mode is on)
 void tickClipGridForSnapshot (juce::Component& grid);
 juce::Rectangle<int> clipGridCellForSnapshot (juce::Component& grid, int kind, int track, int scene);
 std::pair<int, bool> clipGridSceneSelectionForSnapshot (juce::Component& grid);

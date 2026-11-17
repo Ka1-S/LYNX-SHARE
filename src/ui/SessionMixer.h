@@ -27,9 +27,15 @@ public:
     void mapSpots (std::vector<mapmode::Spot>& out) override;
     explicit SessionMixerComponent (AudioEngine& engine);
 
-    // The grid's columns: `count` columns `columnWidth` wide, scrolled by `scrollX`, in [0, tracksWidth); the Main strip
-    // is `mainWidth` wide to the right of the tracks.
-    void setColumns (int count, int columnWidth, int scrollX, int tracksWidth, int mainWidth);
+    // The grid's columns: `count` columns `columnWidth` wide, scrolled by `scrollX`, in [0, tracksWidth); round 190kc:
+    // `returns` return strips (Live's return tracks, columnWidth each) right of the tracks; the Main strip is `mainWidth`
+    // wide to the right of them.
+    void setColumns (int count, int columnWidth, int scrollX, int tracksWidth, int mainWidth, int returns = 0);
+    // Round 190kc: the return strips the grid shows for this song (Live's View › Mixer Controls › Return Tracks).
+    static int returnColumnsFor (const Song& song);
+    // the grid column code of return strip k (Hit::column, partBounds)
+    static constexpr int returnBase = 1 << 16;
+    static constexpr int returnColumn (int k) noexcept { return returnBase + k; }
     // The height the shown sections take when at most `available` px are free (0: the mixer is hidden).
     int wantedHeight (int available) const;
     // True when the Volume section (with each track's Arm button) is on screen: the grid's status row then shows no arm.
@@ -54,10 +60,13 @@ public:
 
     // the parts of a strip (also what --liveshot190dr checks)
     // (round 190jn: `peak` = Live's peak-level pill above the volume field, Live's look only)
-    enum class Part { none, inType, inChannel, monIn, monAuto, monOff, output, send, delay, volume, fader, pan, activator, solo, arm, peak };
+    // (round 190kc: `post` = a return's Pre / Post toggle in the Main strip's Sends section (row = the return's row);
+    // `xfadeA` / `xfadeB` = the Crossfade Assign buttons; `crossfader` = the Main strip's crossfader)
+    enum class Part { none, inType, inChannel, monIn, monAuto, monOff, output, send, delay, volume, fader, pan, activator, solo, arm, peak,
+                      post, xfadeA, xfadeB, crossfader };
     struct Hit
     {
-        int column = -1; // the grid column; -2 = the Main strip
+        int column = -1; // the grid column; -2 = the Main strip; returnColumn (k) = return strip k (round 190kc)
         Part part = Part::none;
         int row = 0;     // Sends: the row
         bool operator== (const Hit&) const = default;
@@ -72,6 +81,10 @@ public:
     void setMeterForSnapshot (int insert, float left, float right, float holdLeft, float holdRight, float maxPeak);
     void setHoverForSnapshot (Hit hit) { hover = hit; repaint(); }
     juce::String tipForSnapshot (const Hit& hit) const { return tipFor (hit); } // (the Info View's text for a part)
+    // Round 190kc: the menus a right-click opens on a return's send knob and on the crossfader (--cliplaunch190kcshot)
+    juce::PopupMenu sendMenu (const Hit& hit);
+    juce::PopupMenu crossfaderMenu();
+    int returnColumnCount() const noexcept { return returnColumns; }
     // the loudest peak the pill holds (linear gain, 0 = none)
     float loudestPeak (int insert) const noexcept
     {
@@ -95,12 +108,18 @@ private:
     void paintStripLive (juce::Graphics& g, int column, int selected);
     void paintMeterLive (juce::Graphics& g, int insert, juce::Rectangle<int> area) const;
     void showInputMenu (int insert, bool channels);
+    void showSendMenu (const Hit& hit);   // round 190kc: a return's send knob (Enable Send / Enable All Sends)
+    void showCrossfaderMenu();            // round 190kc: the crossfader's seven curves
+    bool isReturn (int column) const noexcept { return column >= returnBase && column < returnBase + returnColumns; }
+    void paintCrossfadeSection (juce::Graphics& g, int column, bool live);
     void showOutputMenu (int insert);
     juce::String tipFor (const Hit& hit) const;
 
     static constexpr int mainColumn = -2;
     AudioEngine& engine;
     int columns = 0, columnWidth = 104, scroll = 0, tracksWidth = 0, mainWidth = 128;
+    int returnColumns = 0;                            // round 190kc: return strips shown
+    mutable std::vector<int> returnInserts;           // round 190kc: the returns' inserts (refreshCache)
     sessionmixer::Sections sections;
     std::vector<int> rows;                            // the Sends rows shown: their target inserts
     mutable std::vector<sessionmixer::Strip> strips;  // per column (refreshCache)

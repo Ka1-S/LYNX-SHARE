@@ -1,3 +1,4 @@
+#include "core/Crossfader.h"
 #include "core/RackRenderer.h"
 #include "core/Dropouts.h"
 #include "core/HostTimelineScope.h"
@@ -184,6 +185,7 @@ void LiveLevels::store (const Song& song) noexcept
     }
     for (std::size_t v = 0; v < song.vcas.size(); ++v)
         vcaLevel[v].store (song.vcas[v].level, std::memory_order_relaxed);
+    crossfader.store (song.crossfader, std::memory_order_relaxed);
 }
 
 std::unique_ptr<const RackState> RackState::build (Song song,
@@ -1992,6 +1994,7 @@ void RackState::buildAutomationTables()
     routeAutos.clear();
     hasAutomation = false;
     tempoAutomation = -1;
+    crossfaderAutomation = -1;
 
     // binds automation slot `a` (an automation, or a pattern event lane after them) to its target
     const auto bind = [this] (int a, const AutomationTarget& t) {
@@ -2080,6 +2083,7 @@ void RackState::buildAutomationTables()
                 break;
 
             case AutomationTargetKind::tempo: tempoAutomation = a; break;
+            case AutomationTargetKind::crossfader: crossfaderAutomation = a; break; // (round 190kc)
             case AutomationTargetKind::vcaLevel:
                 if (t.index >= 0 && t.index < (int) song.vcas.size())
                     vcaLevelAuto[(std::size_t) t.index] = a;
@@ -2232,6 +2236,7 @@ void RackState::buildAutomationTables()
                 return found;
             }
             case AutomationTargetKind::tempo:
+            case AutomationTargetKind::crossfader:
             case AutomationTargetKind::none: break;
         }
         return -1;
@@ -6058,6 +6063,17 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
                                                    : position;
                 g *= faderGain (automatedPosition);
             }
+            level.ll *= g;
+            level.lr *= g;
+            level.rl *= g;
+            level.rr *= g;
+        }
+        if (track.crossfade != CrossfadeAssign::none) // round 190kc: Live's crossfader, at the gain stage (a VCA)
+        {
+            auto position = state.live != nullptr ? state.live->crossfader.load (std::memory_order_relaxed) : state.song.crossfader;
+            if (state.hasAutomation && state.crossfaderAutomation >= 0)
+                position = crossfader::positionOf (automatedLevel (state, state.crossfaderAutomation, crossfader::valueOf (position), t));
+            const auto g = crossfader::gain (state.song.crossfadeCurve, track.crossfade, position);
             level.ll *= g;
             level.lr *= g;
             level.rl *= g;

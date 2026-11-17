@@ -2879,6 +2879,11 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
     song.mixer[0].pan = (float) mainMixer.number ("Pan/Manual", 0);
     registerMixerTargets (ctx, mainMixer, 0, "Main");
     readGroovePool (ctx, set, mainMixer); // (round 190fm)
+    // round 190kc: Live's crossfader (Main's CrossFade -1..1, LiveSet/CrossfadeCurve 0..6) and its automation target
+    song.crossfader = (float) std::clamp (mainMixer.number ("CrossFade/Manual", 0), -1.0, 1.0);
+    song.crossfadeCurve = std::clamp ((int) set.number ("CrossfadeCurve", 2), 0, 6);
+    if (const auto id = targetId (mainMixer.child ("CrossFade")); ! id.empty())
+        ctx.targets[id] = { AutomationTarget { AutomationTargetKind::crossfader, 0, 0, 0 }, ValueMap::pan, "Crossfade", {} }; // (-1..1 → 0..1, as a pan)
 
     // tracks: one insert each (returns too), in order
     const auto tracks = set.child ("Tracks").children();
@@ -2903,7 +2908,16 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
         insertOf[i] = (int) song.mixer.size() - 1;
         const auto kind = tracks[i].name();
         if (kind == "ReturnTrack")
+        {
             returns.push_back (insertOf[i]);
+            // round 190kc: a Live return track (the Session mixer's return strips and Sends rows). Live keeps the
+            // return's letter in its EffectiveName ("B-Delay": a return never renamed) and shows "B Delay" [DATA:
+            // Patience, the default set]; LYNX keeps the name without it (the letter follows the return's place)
+            auto& r = song.mixer.back();
+            r.liveReturn = true;
+            if (r.name.size() > 2 && r.name[1] == '-' && r.name[0] >= 'A' && r.name[0] <= 'L' && tracks[i].value ("Name/UserName").empty())
+                r.name.erase (0, 2);
+        }
         else
         {
             PlaylistTrack row;
@@ -2943,6 +2957,9 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
         m.pan = (float) std::clamp (mixer.number ("Pan/Manual", 0), -1.0, 1.0);
         m.muted = ! mixer.boolean ("Speaker/Manual", true);
         m.solo = mixer.boolean ("SoloSink", false);
+        // round 190kc: Live's Crossfade Assign (CrossFadeState 0 A, 1 none, 2 B)
+        if (const auto state = (int) mixer.number ("CrossFadeState/Manual", 1); state == 0 || state == 2)
+            m.crossfade = state == 0 ? CrossfadeAssign::a : CrossfadeAssign::b;
         registerMixerTargets (ctx, mixer, insertOf[i], m.name);
         const auto out = t.value ("DeviceChain/AudioOutputRouting/Target", "AudioOut/Main");
         const auto group = t.value ("TrackGroupId", "-1");
@@ -2963,7 +2980,10 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
             const auto level = sends[k].number ("Send/Manual", 0);
             if (const auto id = targetId (sends[k].child ("Send")); ! id.empty())
                 ctx.targets[id] = { AutomationTarget { AutomationTargetKind::mixerSend, insertOf[i], returns[k], 0 }, ValueMap::fader, "send", {} };
-            if (level > minusInfGain * 1.0001 && sends[k].boolean ("EnabledByUser", true))
+            const auto enabled = sends[k].boolean ("EnabledByUser", true);
+            if (m.liveReturn && enabled) // (round 190kc: a return's send knob Live shows switched on, at any level)
+                m.returnSendsOn.push_back (returns[k]);
+            if (level > minusInfGain * 1.0001 && enabled)
                 m.sends.push_back ({ returns[k], (float) std::min (level, (double) maxFaderGain) });
         }
     }
@@ -2974,10 +2994,13 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
         const auto toggles = set.child ("SendsPre").children ("SendPreBool");
         for (std::size_t k = 0; k < toggles.size() && k < returns.size(); ++k)
             if (toggles[k].attr ("Value") == "true")
+            {
+                song.mixer[(std::size_t) returns[k]].returnPre = true; // (round 190kc: the return's own toggle)
                 for (auto& m : song.mixer)
                     for (auto& send : m.sends)
                         if (send.target == returns[k])
                             send.pre = true;
+            }
     }
 
     // channels, devices and arrangement clips
@@ -3217,6 +3240,21 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
         projectkey::set (song, liveScaleOf (set));
     else if (ctx.clipKeySeen)
         projectkey::set (song, ctx.clipKey);
+    // round 190kc: the Session mixer's sections as the set shows them (LiveSet/ViewStates: MixerInSession, SessionIO,
+    // SessionSends, SessionReturns, SessionVolume, SessionTrackOptions, SessionCrossFade) [DATA: every Live 12 set]
+    if (song.clipGrid)
+        if (const auto views = set.child ("ViewStates"); views)
+        {
+            auto& v = song.clipGrid->mixerView;
+            const auto flag = [&views] (const char* name, bool fallback) { return views.number (std::string (name), fallback ? 1 : 0) != 0; };
+            v.shown = flag ("MixerInSession", v.shown);
+            v.io = flag ("SessionIO", v.io);
+            v.sends = flag ("SessionSends", v.sends);
+            v.returns = flag ("SessionReturns", v.returns);
+            v.volume = flag ("SessionVolume", v.volume);
+            v.trackOptions = flag ("SessionTrackOptions", v.trackOptions);
+            v.crossfader = flag ("SessionCrossFade", v.crossfader);
+        }
     if (song.clipGrid) // round 190hr: a clip scale equal to the project's key just follows it
         for (auto& slot : song.clipGrid->slots)
             if (slot.ownScale && projectkey::clipScale (slot, song) == projectkey::get (song))

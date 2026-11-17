@@ -1039,6 +1039,7 @@ juce::String describeAutomationTarget (AudioEngine& engine, const AutomationTarg
         }
 
         case AutomationTargetKind::tempo: return tr ("Tempo");
+        case AutomationTargetKind::crossfader: return tr ("Main") + " - " + tr ("Crossfade"); // (round 190kc: Live's Main › Mixer › Crossfade)
         case AutomationTargetKind::vcaLevel: // (round 177a)
             return t.index >= 0 && t.index < (int) song.vcas.size() ? nameOf (song.vcas[(std::size_t) t.index].name) + " - " + tr ("VCA level")
                                                                    : tr ("VCA level");

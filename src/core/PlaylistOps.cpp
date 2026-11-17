@@ -1106,6 +1106,7 @@ int trackFor (const Song& song, const AutomationTarget& target)
             break;
         case AutomationTargetKind::none:
         case AutomationTargetKind::tempo:
+        case AutomationTargetKind::crossfader: // (round 190kc)
             break;
     }
     if (channel >= 0)

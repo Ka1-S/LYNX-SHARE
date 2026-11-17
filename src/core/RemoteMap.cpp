@@ -33,6 +33,14 @@ bool valid (const Target& t) noexcept
         case RemoteAction::clipSlot: return t.track >= 0 && t.scene >= 0;
         case RemoteAction::sceneLaunch: return t.scene >= 0;
         case RemoteAction::trackStop: return t.track >= 0;
+        case RemoteAction::launchSelectedClip: return t.track >= 0; // (round 190kc)
+        case RemoteAction::crossfaderLeft:
+        case RemoteAction::crossfaderCentre:
+        case RemoteAction::crossfaderRight:
+        case RemoteAction::sceneUp:
+        case RemoteAction::sceneDown:
+        case RemoteAction::launchSelectedScene:
+        case RemoteAction::cancelLaunch:
         case RemoteAction::stopAllClips:
         case RemoteAction::play:
         case RemoteAction::stop:
@@ -49,7 +57,7 @@ Target targetOf (const RemoteMapping& m)
     t.action = m.action;
     if (m.action == RemoteAction::parameter)
         t.param = m.target;
-    if (m.action == RemoteAction::clipSlot || m.action == RemoteAction::trackStop)
+    if (m.action == RemoteAction::clipSlot || m.action == RemoteAction::trackStop || m.action == RemoteAction::launchSelectedClip)
         t.track = m.track;
     if (m.action == RemoteAction::clipSlot || m.action == RemoteAction::sceneLaunch)
         t.scene = m.scene;
@@ -322,9 +330,17 @@ bool canBeGlobal (const Target& t) noexcept
         case RemoteAction::stop:
         case RemoteAction::record:
         case RemoteAction::sessionRecord:
-        case RemoteAction::metronome: return true;
+        case RemoteAction::metronome:
+        case RemoteAction::crossfaderLeft: // (round 190kc: the crossfader and the relative strip are set-wide controls)
+        case RemoteAction::crossfaderCentre:
+        case RemoteAction::crossfaderRight:
+        case RemoteAction::sceneUp:
+        case RemoteAction::sceneDown:
+        case RemoteAction::launchSelectedScene:
+        case RemoteAction::cancelLaunch: return true;
         case RemoteAction::clipSlot:
-        case RemoteAction::trackStop: return false;
+        case RemoteAction::trackStop:
+        case RemoteAction::launchSelectedClip: return false;
     }
     return false;
 }

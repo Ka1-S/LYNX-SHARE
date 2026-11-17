@@ -1410,6 +1410,7 @@ const char* targetKindName (AutomationTargetKind k)
         case AutomationTargetKind::mixerSend: return "mixerSend";
         case AutomationTargetKind::vcaLevel: return "vcaLevel";
         case AutomationTargetKind::channelAdjust: return "channelAdjust";
+        case AutomationTargetKind::crossfader: return "crossfader";
         case AutomationTargetKind::none: break;
     }
     return "none";
@@ -1420,7 +1421,7 @@ AutomationTargetKind targetKindFromName (const juce::String& name)
     for (auto k : { AutomationTargetKind::channelVolume, AutomationTargetKind::channelPan, AutomationTargetKind::channelParam,
                     AutomationTargetKind::mixerVolume, AutomationTargetKind::mixerPan, AutomationTargetKind::effectParam,
                     AutomationTargetKind::tempo, AutomationTargetKind::effectMix, AutomationTargetKind::mixerSend,
-                    AutomationTargetKind::vcaLevel, AutomationTargetKind::channelAdjust })
+                    AutomationTargetKind::vcaLevel, AutomationTargetKind::channelAdjust, AutomationTargetKind::crossfader })
         if (name == targetKindName (k))
             return k;
 
@@ -1729,7 +1730,7 @@ juce::var clipGridToVar (const ClipGrid& grid, const std::vector<int>* envelopes
     if (grid.mixerView != SessionMixerView {})
     {
         const auto& m = grid.mixerView;
-        juce::Array<juce::var> view { m.shown, m.io, m.sends, m.volume, m.trackOptions };
+        juce::Array<juce::var> view { m.shown, m.io, m.sends, m.volume, m.trackOptions, m.returns, m.crossfader }; // (round 190kc: + returns, crossfader)
         root->setProperty ("mixerView", view);
     }
     juce::Array<juce::var> scenes;
@@ -1806,7 +1807,14 @@ std::optional<ClipGrid> clipGridFromVar (const juce::var& v, const Song& song)
     grid.backOnStop = (bool) v.getProperty ("backOnStop", false);
     grid.followActions = (bool) v.getProperty ("followActions", true);
     if (const auto* view = v["mixerView"].getArray(); view != nullptr && view->size() >= 5)
+    {
         grid.mixerView = { (bool) (*view)[0], (bool) (*view)[1], (bool) (*view)[2], (bool) (*view)[3], (bool) (*view)[4] };
+        if (view->size() >= 7) // (round 190kc)
+        {
+            grid.mixerView.returns = (bool) (*view)[5];
+            grid.mixerView.crossfader = (bool) (*view)[6];
+        }
+    }
     if (const auto* scenes = v["scenes"].getArray())
         for (const auto& o : *scenes)
         {
@@ -2701,6 +2709,20 @@ juce::var mixerTrackToVar (const MixerTrack& t)
         o->setProperty ("monitor", (int) t.monitor);
     if (t.recordSafe)
         o->setProperty ("recordSafe", true);
+    // round 190kc: Live's return tracks and Crossfade Assign
+    if (t.liveReturn)
+        o->setProperty ("liveReturn", true);
+    if (t.returnPre)
+        o->setProperty ("returnPre", true);
+    if (! t.returnSendsOn.empty())
+    {
+        juce::Array<juce::var> on;
+        for (const auto target : t.returnSendsOn)
+            on.add (target);
+        o->setProperty ("returnSendsOn", on);
+    }
+    if (t.crossfade != CrossfadeAssign::none)
+        o->setProperty ("crossfade", t.crossfade == CrossfadeAssign::a ? "A" : "B");
     if (! t.recordTo.empty())
         o->setProperty ("recordTo", juce::String::fromUTF8 (t.recordTo.c_str()));
     if (t.recordSource != RecordSource::postEq) // round 168x: FL's "Record" position (Post EQ, FL's default, not written)
@@ -2794,6 +2816,14 @@ MixerTrack mixerTrackFromVar (const juce::var& t)
     track.inputStereo = ! (bool) t.getProperty ("inputMono", false);
     track.monitor = monitorFromKey ((int) t.getProperty ("monitor", 0), t.hasProperty ("monitor"));
     track.recordSafe = (bool) t.getProperty ("recordSafe", false);
+    track.liveReturn = (bool) t.getProperty ("liveReturn", false); // (round 190kc)
+    track.returnPre = (bool) t.getProperty ("returnPre", false);
+    if (const auto* on = t["returnSendsOn"].getArray())
+        for (const auto& target : *on)
+            if ((int) target > 0 && (int) target < maxMixerTracks)
+                track.returnSendsOn.push_back ((int) target);
+    if (const auto side = t.getProperty ("crossfade", "").toString(); side == "A" || side == "B")
+        track.crossfade = side == "A" ? CrossfadeAssign::a : CrossfadeAssign::b;
     track.recordTo = t.getProperty ("recordTo", "").toString().toStdString();
     track.recordSource = (RecordSource) juce::jlimit (0, 5, (int) t.getProperty ("recordSource", (int) RecordSource::postEq));
     track.recordDryToo = (bool) t.getProperty ("recordDryToo", false);
@@ -2886,6 +2916,11 @@ juce::String toJson (const Song& song, bool stampVersion)
     }
     if (song.substitutesBypassed)
         root->setProperty ("substitutesBypassed", true);
+    // round 190kc: Live's crossfader (only when not the defaults)
+    if (song.crossfader != 0.0f)
+        root->setProperty ("crossfader", (double) song.crossfader);
+    if (song.crossfadeCurve != 2)
+        root->setProperty ("crossfadeCurve", song.crossfadeCurve);
     if (song.cleanMixer)
         root->setProperty ("cleanMixer", true);
     if (song.performanceMode)
@@ -3737,6 +3772,8 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
         }
     }
     song.substitutesBypassed = (bool) root.getProperty ("substitutesBypassed", false);
+    song.crossfader = juce::jlimit (-1.0f, 1.0f, (float) (double) root.getProperty ("crossfader", 0.0)); // (round 190kc)
+    song.crossfadeCurve = juce::jlimit (0, 6, (int) root.getProperty ("crossfadeCurve", 2));
     song.cleanMixer = (bool) root.getProperty ("cleanMixer", false);
     song.performanceMode = (bool) root.getProperty ("performanceMode", false);
     song.autoCrossfades = (bool) root.getProperty ("autoCrossfades", false);
@@ -4120,7 +4157,7 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
                 continue;
             RemoteMapping m;
             const auto action = (int) o.getProperty ("action", -1);
-            if (action < 0 || action > (int) RemoteAction::metronome)
+            if (action < 0 || action > (int) RemoteAction::launchSelectedClip) // (round 190kc: + the crossfader and relative strip)
                 continue; // (an action a newer version added)
             m.action = (RemoteAction) action;
             if (o.hasProperty ("key"))

@@ -107,6 +107,15 @@ std::pair<juce::String, juce::String> describe (AudioEngine& engine, const remot
         case RemoteAction::record: return { tr ("Transport"), tr ("Record") };
         case RemoteAction::sessionRecord: return { tr ("Clip grid"), tr ("Session Record") };
         case RemoteAction::metronome: return { tr ("Transport"), tr ("Metronome") };
+        // round 190kc: the crossfader's positions and Live's Relative Session Mapping Strip
+        case RemoteAction::crossfaderLeft: return { tr ("Main"), tr ("Crossfader Left") };
+        case RemoteAction::crossfaderCentre: return { tr ("Main"), tr ("Crossfader Center") };
+        case RemoteAction::crossfaderRight: return { tr ("Main"), tr ("Crossfader Right") };
+        case RemoteAction::sceneUp: return { tr ("Scenes"), tr ("Scene Up") };
+        case RemoteAction::sceneDown: return { tr ("Scenes"), tr ("Scene Down") };
+        case RemoteAction::launchSelectedScene: return { tr ("Scenes"), tr ("Launch Selected Scene") };
+        case RemoteAction::cancelLaunch: return { tr ("Scenes"), tr ("Cancel Launch") };
+        case RemoteAction::launchSelectedClip: return { trackName (song, t.track), tr ("Launch Selected Clip") };
     }
     return {};
 }

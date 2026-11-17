@@ -40,6 +40,7 @@ struct Target
     static Target sceneLaunch (int scene) { return { RemoteAction::sceneLaunch, {}, -1, scene }; }
     static Target trackStop (int track) { return { RemoteAction::trackStop, {}, track, -1 }; }
     static Target of (RemoteAction a) { return { a, {}, -1, -1 }; }
+    static Target selectedClip (int track) { return { RemoteAction::launchSelectedClip, {}, track, -1 }; } // (round 190kc)
 };
 bool valid (const Target& t) noexcept;
 Target targetOf (const RemoteMapping& m);

@@ -79,6 +79,7 @@
 #include "core/TrackInserts.h"
 #include "core/StandIns.h"
 #include "core/Groove.h"
+#include "core/GrooveAudio.h"
 #include "ui/GroovePoolComponent.h"
 #include "ui/AutomationUi.h"
 #include "ui/ChannelSettings.h"
@@ -10237,6 +10238,15 @@ juce::PopupMenu PlaylistComponent::buildAudioClipMenu (int index, int mouseX)
         }
         menu.addSubMenu (tr ("Clip envelope"), env);
     }
+    // round 190kc: Live's Extract Groove on an Arrangement audio clip (its attacks' timing and levels; Clip-launch layout)
+    if (layoutstyle::current() == layoutstyle::Style::clipLaunch && sample != nullptr)
+        menu.addItem (tr ("Extract groove"), [this, index, sample, name = juce::File (path).getFileNameWithoutExtension().toStdString()] {
+            engine.editSong ([&] (Song& s) {
+                if (index >= 0 && index < (int) s.playlist.size())
+                    if (auto g = grooveaudio::extract (s, s.playlist[(std::size_t) index], *sample, GrooveBase::sixteenth, name); ! g.points.empty())
+                        groove::add (s.grooves, std::move (g));
+            });
+        });
     // warp from the Playlist (round 190gi, core/ClipWarp.h): the audio editor's Auto-warp and Quantize audio on this clip
     const auto warpable = sample != nullptr && ! clipops::playsBackwards (channel, clip);
     menu.addItem (tr ("Auto-warp"), warpable, false, [this, index, sample, file = juce::File (path).getFileNameWithoutExtension().toStdString()] {

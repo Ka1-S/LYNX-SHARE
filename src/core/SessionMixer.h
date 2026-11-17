@@ -194,11 +194,105 @@ inline bool setOutput (Song& song, int insert, int to)
     return true;
 }
 
+// --- Return tracks (round 190kc) ------------------------------------------------------------------------------------
+// Live's return tracks: the inserts flagged MixerTrack::liveReturn, in mixer order (Live's A, B, C …; at most 12).
+constexpr int maxReturns = 12;
+inline std::vector<int> returnsOf (const Song& song)
+{
+    std::vector<int> out;
+    for (int i = 1; i < (int) song.mixer.size() && (int) out.size() < maxReturns; ++i)
+        if (song.mixer[(std::size_t) i].liveReturn)
+            out.push_back (i);
+    return out;
+}
+// A return's letter ("A" for the first …), "" for an insert that is not a return.
+inline std::string returnLetter (const Song& song, int insert)
+{
+    const auto list = returnsOf (song);
+    const auto it = std::find (list.begin(), list.end(), insert);
+    return it == list.end() ? std::string() : std::string (1, (char) ('A' + (it - list.begin())));
+}
+// The name Live shows in the return's title bar: its letter, a space, its name ("A Reverb") [SHOT live-session.png].
+inline std::string returnTitle (const Song& song, int insert)
+{
+    const auto letter = returnLetter (song, insert);
+    if (letter.empty() || ! validInsert (song, insert))
+        return validInsert (song, insert) ? song.mixer[(std::size_t) insert].name : std::string();
+    return letter + " " + song.mixer[(std::size_t) insert].name;
+}
+// A send knob of return `from` to return `to` is off until it is switched on (Live: "the Send controls in Return tracks
+// are disabled by default"); a return's send to itself makes feedback in Live and is never on in LYNX (an insert cannot
+// route into itself). Tracks' send knobs are always on.
+inline bool sendEnabled (const Song& song, int from, int to)
+{
+    if (! validInsert (song, from) || ! song.mixer[(std::size_t) from].liveReturn)
+        return true;
+    if (from == to)
+        return false;
+    const auto& on = song.mixer[(std::size_t) from].returnSendsOn;
+    return std::find (on.begin(), on.end(), to) != on.end();
+}
+inline bool setSendEnabled (Song& song, int from, int to, bool enabled)
+{
+    if (! validInsert (song, from) || ! validInsert (song, to) || from == to || ! song.mixer[(std::size_t) from].liveReturn)
+        return false;
+    auto& on = song.mixer[(std::size_t) from].returnSendsOn;
+    const auto it = std::find (on.begin(), on.end(), to);
+    if (enabled == (it != on.end()))
+        return false;
+    if (enabled)
+        on.push_back (to);
+    else
+    {
+        on.erase (it);
+        auto& sends = song.mixer[(std::size_t) from].sends;
+        sends.erase (std::remove_if (sends.begin(), sends.end(), [to] (const MixerSend& s) { return s.target == to; }), sends.end());
+    }
+    return true;
+}
+// Live's Pre / Post toggle of a return: every send into it follows (and new ones take it, setSendPosition).
+inline bool isPre (const Song& song, int returnInsert) noexcept
+{
+    return validInsert (song, returnInsert) && song.mixer[(std::size_t) returnInsert].returnPre;
+}
+inline void setPre (Song& song, int returnInsert, bool pre)
+{
+    if (! validInsert (song, returnInsert))
+        return;
+    song.mixer[(std::size_t) returnInsert].returnPre = pre;
+    for (auto& m : song.mixer)
+        for (auto& send : m.sends)
+            if (send.target == returnInsert)
+                send.pre = pre;
+}
+// Create › Insert Return Track: a new insert flagged as a return, after the last return (or at the end), named
+// `name`; returns its insert (-1: the mixer is full). The inserts after it move up one (mixerops' remap is the caller's
+// when inserts must move; here the new insert is appended, Live's order is the returns' own order).
+inline int insertReturn (Song& song, const std::string& name)
+{
+    if ((int) returnsOf (song).size() >= maxReturns || (int) song.mixer.size() >= maxMixerTracks)
+        return -1;
+    if (song.mixer.empty())
+        song.mixer = Song::defaultMixer (0);
+    MixerTrack m;
+    m.name = name;
+    m.liveReturn = true;
+    song.mixer.push_back (std::move (m));
+    return (int) song.mixer.size() - 1;
+}
+
 // --- Sends section --------------------------------------------------------------------------------------------------
-// The rows: every insert one of the strips' inserts sends to (Live has a row per return track; any LYNX insert can
-// take a send), ascending, at most `maxRows`.
+// The rows: with return tracks (round 190kc, Live) one row per return, all of them whatever the sends are (Live shows a
+// knob for every return, at -inf when nothing is sent); without returns every insert one of the strips' inserts sends
+// to (any LYNX insert can take a send), ascending, at most `maxRows`.
 inline std::vector<int> sendRows (const Song& song, const std::vector<int>& inserts, int maxRows)
 {
+    if (auto returns = returnsOf (song); ! returns.empty())
+    {
+        if ((int) returns.size() > maxRows)
+            returns.resize ((std::size_t) std::max (0, maxRows));
+        return returns;
+    }
     std::vector<int> rows;
     for (const auto i : inserts)
         if (validInsert (song, i))
@@ -228,6 +322,8 @@ inline bool setSendPosition (Song& song, int from, int to, float position)
     if (! validInsert (song, from) || to <= 0 || to >= (int) song.mixer.size() || to == from)
         return false;
     position = std::clamp (position, 0.0f, 1.0f);
+    if (! sendEnabled (song, from, to)) // (round 190kc: a return's send stays off until it is switched on)
+        return false;
     auto& sends = song.mixer[(std::size_t) from].sends;
     auto it = std::find_if (sends.begin(), sends.end(), [to] (const MixerSend& s) { return s.target == to; });
     if (it == sends.end())
@@ -236,6 +332,7 @@ inline bool setSendPosition (Song& song, int from, int to, float position)
             return false;
         MixerSend send;
         send.target = to;
+        send.pre = song.mixer[(std::size_t) to].liveReturn && song.mixer[(std::size_t) to].returnPre; // (round 190kc: the return's Pre / Post)
         sends.push_back (send);
         it = sends.end() - 1;
     }
@@ -263,19 +360,21 @@ inline void setTrackDelayMs (Song& song, int insert, double ms)
 struct Sections
 {
     int io = 0, sends = 0, trackOptions = 0, volume = 0;
-    int total() const noexcept { return io + sends + trackOptions + volume; }
+    int crossfade = 0; // round 190kc: Live's Crossfader section under Volume (the A / B buttons, the Main's crossfader)
+    int total() const noexcept { return io + sends + trackOptions + volume + crossfade; }
 };
-constexpr int ioHeight = 112, sendRowHeight = 26, trackOptionsHeight = 40, volumeHeight = 120;
+constexpr int ioHeight = 112, sendRowHeight = 26, trackOptionsHeight = 40, volumeHeight = 120, crossfadeHeight = 24;
 inline Sections sectionHeights (const SessionMixerView& view, int sendRowCount, int available)
 {
     Sections s;
     if (! view.shown)
         return s;
     s.volume = view.volume ? volumeHeight : 0;
+    s.crossfade = view.crossfader ? crossfadeHeight : 0;
     s.trackOptions = view.trackOptions ? trackOptionsHeight : 0;
     s.sends = view.sends && sendRowCount > 0 ? sendRowCount * sendRowHeight + 6 : 0;
     s.io = view.io ? ioHeight : 0;
-    for (auto* part : { &s.io, &s.sends, &s.trackOptions, &s.volume })
+    for (auto* part : { &s.io, &s.sends, &s.trackOptions, &s.volume, &s.crossfade })
         if (s.total() > std::max (0, available))
             *part = 0;
     return s;

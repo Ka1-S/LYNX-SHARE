@@ -8,10 +8,12 @@
 #include <cstring>
 
 #include "core/ClipLauncher.h"
+#include "core/SessionMixer.h"
 #include "core/DetailChain.h"
 #include "core/PlaylistOps.h"
 #include "ui/PluginDropUi.h"
 #include "core/Groove.h"
+#include "core/GrooveAudio.h"
 #include "core/SessionKeys.h"
 #include "core/SessionOps.h"
 #include "engine/SampleLibrary.h"
@@ -219,7 +221,7 @@ public:
         if (groovePool != nullptr && groovePool->isVisible())
             groovePool->setBounds (0, getHeight() - footerNow() - poolHeight(), getWidth(), poolHeight());
         const auto cells = cellArea();
-        mixer->setBounds (0, cells.getBottom() + statusHeight, getWidth(), mixerHeight());
+        mixer->setBounds (0, cells.getBottom() + statusHeight + mapStripNow(), getWidth(), mixerHeight());
         clampScroll();
         syncControls();
     }
@@ -286,7 +288,8 @@ public:
         }
 
         // the scene column stays in place
-        const juce::Rectangle<int> sceneColumn (cells.getRight(), 0, sceneWidthNow(), cells.getBottom() + statusHeight);
+        paintReturnColumns (g, cells); // (round 190kc: Live's return tracks, between the tracks and the Main column)
+        const juce::Rectangle<int> sceneColumn (sceneX(), 0, sceneWidthNow(), cells.getBottom() + statusHeight);
         if (liveLook())
         {
             // Live's Main column (round 190ia CL-14b, live-session.png x 1540..1625 y 86..240): a 2 px separator, the "Main"
@@ -320,6 +323,7 @@ public:
             for (int r = firstRow(); r < scenes && rowY (r) < cells.getBottom(); ++r)
                 paintScene (g, *grid, r, { sceneColumn.getX(), rowY (r), sceneWidthNow(), rowHeight });
         }
+        paintMapStrip (g); // (round 190kc)
         g.setColour (live ? theme::livelook::separator : c::border); // (the status row's top edge, across the tracks and the scene column)
         g.fillRect (0, cells.getBottom(), getWidth(), 1);
         // a clip or a file dragged over a slot: where it would land
@@ -426,7 +430,7 @@ public:
                 repaint();
                 return;
             }
-            if (e.x < cellArea().getRight() + launchZone)
+            if (e.x < sceneX() + launchZone)
                 launchScene (hit.scene);
             repaint();
             return;
@@ -725,10 +729,19 @@ public:
                                  remotemap::Target::slot (t, r) });
             out.push_back ({ juce::Rectangle<int> (columnX (t), cells.getBottom(), launchZone, statusHeight), remotemap::Target::trackStop (t) });
         }
-        const juce::Rectangle<int> sceneColumn (cells.getRight(), cells.getY(), sceneWidthNow(), cells.getHeight());
+        const juce::Rectangle<int> sceneColumn (sceneX(), cells.getY(), sceneWidthNow(), cells.getHeight());
         for (int r = firstRow(); r < scenes && rowY (r) < cells.getBottom(); ++r)
             out.push_back ({ juce::Rectangle<int> (sceneColumn.getX(), rowY (r), sceneBaseWidthNow(), rowHeight).getIntersection (sceneColumn),
                              remotemap::Target::sceneLaunch (r) });
+        // round 190kc: the Relative Session Mapping Strip
+        if (mapStrip)
+        {
+            for (int t = firstColumn(); t < columns && columnX (t) < cells.getRight(); ++t)
+                out.push_back ({ mapStripTrackBox (t).getIntersection (cells.withY (0).withHeight (getHeight())), remotemap::Target::selectedClip (t) });
+            const RemoteAction main[] { RemoteAction::sceneUp, RemoteAction::sceneDown, RemoteAction::launchSelectedScene, RemoteAction::cancelLaunch };
+            for (int k = 0; k < 4; ++k)
+                out.push_back ({ mapStripMainBox (k), remotemap::Target::of (main[k]) });
+        }
     }
 
     void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& w) override
@@ -880,10 +893,10 @@ public:
             return hint;
         }
         const auto hit = hitTestCell (p);
-        if (hit.scene >= 0 && hit.track < 0 && p.x >= cells.getRight())
+        if (hit.scene >= 0 && hit.track < 0 && p.x >= sceneX())
         {
             const auto& scenes = grid->scenes;
-            hint.text = p.x < cells.getRight() + launchZone
+            hint.text = p.x < sceneX() + launchZone
                             ? tr ("Scene Launch button: [LMB] launches every clip in this row; the next scene is selected  [Ctrl][Enter] launches the selected scene")
                             : tr ("Scene: [LMB] selects it  [RMB] scene menu (insert, duplicate, rename, tempo)  [Ctrl][R] renames it");
             hint.value = hit.scene < (int) scenes.size() && ! scenes[(std::size_t) hit.scene].name.empty()
@@ -953,7 +966,7 @@ private:
     {
         const auto cells = cellArea();
         if (row >= 0)
-            repaint (juce::Rectangle<int> (cells.getRight(), rowY (row), sceneWidthNow(), rowHeight).getIntersection (cells.withRight (getWidth())));
+            repaint (juce::Rectangle<int> (sceneX(), rowY (row), sceneWidthNow(), rowHeight).getIntersection (cells.withRight (getWidth())));
     }
     int queuedScene = -1;       // the scene launched here, until its clips start (−1: none)
     bool queuedSeen = false;    // (one of its clips was seen waiting)
@@ -966,6 +979,74 @@ private:
     RingButton sessionRecord;
     juce::ComboBox globalQuant;
     bool buttonRow = true, stopAllDown = false; // (round 190iv)
+public:
+    // Round 190kc: Live's Relative Session Mapping Strip, under the status row while a map mode is on [Live manual 34.2.4.1:
+    // "In both MIDI Map Mode and Key Map Mode, a strip of assignable controls appears below the Session grid"]: per track a
+    // button that launches its clip at the highlighted scene; in the Main column Scene Up / Down, Launch and Cancel Launch.
+    void setMapStrip (bool on)
+    {
+        if (mapStrip == on)
+            return;
+        mapStrip = on;
+        resized();
+        repaint();
+    }
+private:
+    bool mapStrip = false;
+    static constexpr int mapStripHeight = 20;
+    int mapStripNow() const noexcept { return mapStrip ? mapStripHeight : 0; }
+    juce::Rectangle<int> mapStripRow() const { const auto cells = cellArea(); return { 0, cells.getBottom() + statusHeight, getWidth(), mapStripNow() }; }
+    // the strip's parts: a track's launch button; in the Main column 0 Scene Up, 1 Scene Down, 2 Launch, 3 Cancel Launch
+    juce::Rectangle<int> mapStripTrackBox (int track) const
+    {
+        const auto row = mapStripRow();
+        return juce::Rectangle<int> (columnX (track) + 3, row.getY() + 3, 16, row.getHeight() - 6);
+    }
+    juce::Rectangle<int> mapStripMainBox (int which) const
+    {
+        const auto row = mapStripRow();
+        return { sceneX() + 4 + which * 20, row.getY() + 3, 16, row.getHeight() - 6 };
+    }
+    void paintMapStrip (juce::Graphics& g) const
+    {
+        if (! mapStrip)
+            return;
+        namespace c = theme::colour;
+        namespace lv = theme::livelook;
+        const auto live = liveLook();
+        const auto row = mapStripRow();
+        g.setColour (live ? lv::surface : c::bg2);
+        g.fillRect (row);
+        g.setColour (live ? lv::separator : c::border);
+        g.fillRect (row.getX(), row.getY(), row.getWidth(), 1);
+        const auto button = [&] (juce::Rectangle<int> r, int glyph) {
+            g.setColour (live ? lv::knobRing : c::border);
+            g.fillRect (r);
+            g.setColour (live ? lv::well : c::bg4);
+            g.fillRect (r.reduced (1));
+            g.setColour (live ? lv::text : c::textSecondary);
+            const auto f = r.toFloat().withSizeKeepingCentre (7.0f, 7.0f);
+            juce::Path p;
+            if (glyph == 0)
+                p.addTriangle (f.getCentreX(), f.getY(), f.getRight(), f.getBottom(), f.getX(), f.getBottom());
+            else if (glyph == 1)
+                p.addTriangle (f.getX(), f.getY(), f.getRight(), f.getY(), f.getCentreX(), f.getBottom());
+            else if (glyph == 2)
+                p.addTriangle (f.getX(), f.getY(), f.getRight(), f.getCentreY(), f.getX(), f.getBottom());
+            else
+                p.addRectangle (f.reduced (0.5f));
+            g.fillPath (p);
+        };
+        {
+            juce::Graphics::ScopedSaveState save (g);
+            g.reduceClipRegion (row.withRight (cellArea().getRight()));
+            for (int t = firstColumn(); t < columnCount() && columnX (t) < cellArea().getRight(); ++t)
+                button (mapStripTrackBox (t), 2);
+        }
+        for (int k = 0; k < 4; ++k)
+            button (mapStripMainBox (k), k == 3 ? 3 : k);
+    }
+public:
     std::unique_ptr<juce::Component> groovePool;
     int scrollX = 0, scrollY = 0;
     int selectedTrack = 0, selectedScene = 0;
@@ -1011,22 +1092,27 @@ private:
     juce::Rectangle<int> stopAllBox() const
     {
         const auto cells = cellArea();
-        return { cells.getRight() + 6, cells.getBottom() + 3, statusHeight - 6, statusHeight - 6 };
+        return { sceneX() + 6, cells.getBottom() + 3, statusHeight - 6, statusHeight - 6 };
     }
+    // Round 190kc: Live's return tracks as columns between the tracks and the Main column (no slots; their strips are in
+    // the Session mixer under them), as View › Mixer Controls › Return Tracks shows them
+    int returnColumnsNow() const { return SessionMixerComponent::returnColumnsFor (engine.getSong()); }
+    int returnsWidthNow() const { return returnColumnsNow() * columnWidth; }
+    int sceneX() const { return cellArea().getRight() + returnsWidthNow(); }
     juce::Rectangle<int> cellArea() const
     {
-        return { 0, headerHeight, juce::jmax (0, getWidth() - sceneWidthNow()),
-                 juce::jmax (0, getHeight() - headerHeight - footerNow() - statusHeight - poolHeight() - mixerHeight()) };
+        return { 0, headerHeight, juce::jmax (0, getWidth() - sceneWidthNow() - returnsWidthNow()),
+                 juce::jmax (0, getHeight() - headerHeight - footerNow() - statusHeight - mapStripNow() - poolHeight() - mixerHeight()) };
     }
     // the Session mixer's height (round 190dr): its shown sections, leaving the slots at least two rows
     int mixerHeight() const
     {
-        return mixer == nullptr ? 0 : mixer->wantedHeight (getHeight() - headerHeight - footerNow() - statusHeight - poolHeight() - 2 * rowHeight);
+        return mixer == nullptr ? 0 : mixer->wantedHeight (getHeight() - headerHeight - footerNow() - statusHeight - mapStripNow() - poolHeight() - 2 * rowHeight);
     }
     void syncMixer()
     {
         if (mixer != nullptr)
-            mixer->setColumns (columnCount(), columnWidth, scrollX, cellArea().getRight(), sceneWidthNow());
+            mixer->setColumns (columnCount(), columnWidth, scrollX, cellArea().getRight(), sceneWidthNow(), returnColumnsNow());
     }
     int poolHeight() const
     {
@@ -1127,6 +1213,8 @@ private:
         const auto r = (p.y - headerHeight + scrollY) / rowHeight;
         if (r >= 0 && r < rowCount())
             out.scene = r;
+        if (p.x >= cells.getRight() && p.x < sceneX()) // (round 190kc: the return columns hold no slots)
+            out.scene = -1;
         if (p.x < cells.getRight())
             if (const auto t = (p.x + scrollX) / columnWidth; t >= 0 && t < columnCount())
                 out.track = t;
@@ -1391,6 +1479,66 @@ private:
             const auto mark = box.withTrimmedLeft (box.getWidth() - 20).withSizeKeepingCentre (14, 11).toFloat();
             g.drawRect (mark, 1.0f);
             g.drawLine (mark.getX(), mark.getBottom(), mark.getRight(), mark.getY(), 1.4f);
+        }
+    }
+
+    // Round 190kc: Live's return tracks (live-session.png x 1390..1539: "A Reverb", "B Delay"): a title box in the
+    // return's colour with its letter and name, then the column without slots — the rows' 1 px separators on #363636 —
+    // down to the status row. The classic look draws the same on its own greys.
+    void paintReturnColumns (juce::Graphics& g, juce::Rectangle<int> cells) const
+    {
+        const auto count = returnColumnsNow();
+        if (count == 0)
+            return;
+        const auto& song = engine.getSong();
+        const auto returns = sessionmixer::returnsOf (song);
+        const auto live = liveLook();
+        namespace c = theme::colour;
+        namespace lv = theme::livelook;
+        for (int k = 0; k < count && k < (int) returns.size(); ++k)
+        {
+            const juce::Rectangle<int> column (cells.getRight() + k * columnWidth, 0, columnWidth, cells.getBottom() + statusHeight);
+            if (ui::paintCache() && ! g.clipRegionIntersects (column))
+                continue;
+            const auto& m = song.mixer[(std::size_t) returns[(std::size_t) k]];
+            const auto title = utf8 (sessionmixer::returnTitle (song, returns[(std::size_t) k]));
+            if (live)
+            {
+                g.setColour (lv::separator);
+                g.fillRect (column);
+                const auto box = column.withHeight (headerHeight).withTrimmedRight (2).withTrimmedBottom (2);
+                const auto fill = m.colour != 0 ? juce::Colour (m.colour) : lv::raised;
+                g.setColour (fill);
+                g.fillRect (box);
+                g.setColour (m.colour != 0 ? liveInk (fill) : lv::text);
+                g.setFont (liveFont());
+                textcache::drawText (g, title, box.withTrimmedLeft (4), juce::Justification::centredLeft, true);
+                g.setColour (lv::surface);
+                const auto body = juce::Rectangle<int> (column.getX(), headerHeight, columnWidth - 2, cells.getHeight() + statusHeight);
+                for (int r = firstRow(); r < rowCount() && rowY (r) < cells.getBottom(); ++r)
+                    g.fillRect (juce::Rectangle<int> (column.getX(), rowY (r), columnWidth - 2, (int) rowHeight - 1).getIntersection (body.withBottom (cells.getBottom())));
+                if (rowY (rowCount()) < cells.getBottom())
+                    g.fillRect (juce::Rectangle<int> (column.getX(), rowY (rowCount()), columnWidth - 2, cells.getBottom() - rowY (rowCount())).getIntersection (body));
+                g.fillRect (column.getX(), cells.getBottom() + 1, columnWidth - 2, statusHeight - 1);
+            }
+            else
+            {
+                g.setColour (c::bg2);
+                g.fillRect (column);
+                const auto head = column.withHeight (headerHeight);
+                g.setColour (c::bg3);
+                g.fillRect (head);
+                if (m.colour != 0)
+                {
+                    g.setColour (juce::Colour (m.colour));
+                    g.fillRect (head.getX(), head.getBottom() - 3, head.getWidth(), 3);
+                }
+                g.setColour (c::textPrimary);
+                g.setFont (theme::font (theme::type::small, true));
+                textcache::drawText (g, title, head.withTrimmedLeft (6).withTrimmedRight (4), juce::Justification::centredLeft, true);
+                g.setColour (c::border);
+                g.fillRect (column.getRight() - 1, 0, 1, column.getHeight());
+            }
         }
     }
 
@@ -1714,7 +1862,7 @@ private:
     {
         if (! sceneFieldsOn || scene < 0)
             return 0;
-        const juce::Rectangle<int> r (cellArea().getRight(), rowY (scene), sceneWidthNow(), rowHeight);
+        const juce::Rectangle<int> r (sceneX(), rowY (scene), sceneWidthNow(), rowHeight);
         if (sceneFieldBox (r, 1).contains (p))
             return 1;
         if (const auto box = sceneFieldBox (r, 2); box.contains (p))
@@ -1893,7 +2041,8 @@ public:
             menu.addItem ((slot->active ? tr ("Deactivate Clip") : tr ("Activate Clip")) + sessionkeys::menuKey (sessionkeys::Command::gridDeactivateClip),
                           [this, track, scene] { toggleClipActive (track, scene); });
             menu.addSubMenu (tr ("Follow action"), followMenu (track, scene, slot->follow));
-            // grooves play on the notes of MIDI clips (round 190bv)
+            // grooves play on the notes of MIDI clips (round 190bv); round 190kc: Commit and Extract on audio clips too
+            // (Live's manual 14.1.2 / 14.2.1: warp markers at the attacks; the attacks' timing and levels)
             if (const auto* clip = launcher::clipAt (*grid, track, scene); clip != nullptr && clip->kind == ClipKind::pattern)
             {
                 menu.addSubMenu (tr ("Groove"), grooveMenu (track, scene, slot->groove));
@@ -1908,6 +2057,25 @@ public:
                             return;
                         const auto& pattern = s.patterns[(std::size_t) c->pattern];
                         groove::add (s.grooves, groove::extract (pattern, c->length, GrooveBase::sixteenth, pattern.name));
+                    });
+                    showGroovePool (true);
+                });
+            }
+            else if (clip != nullptr && clip->kind == ClipKind::audio && clip->channel >= 0 && clip->channel < (int) engine.getSong().channels.size())
+            {
+                const auto& channel = engine.getSong().channels[(std::size_t) clip->channel];
+                const auto sample = engine.getSampleLibrary().load (juce::String::fromUTF8 (channel.samplePath.c_str()));
+                menu.addSubMenu (tr ("Groove"), grooveMenu (track, scene, slot->groove));
+                menu.addItem (tr ("Commit groove"), slot->groove != 0 && sample != nullptr, false, [this, track, scene, sample] {
+                    engine.editSong ([=] (Song& s) { grooveaudio::commit (s, track, scene, *sample); });
+                    repaint();
+                });
+                const auto name = juce::File (juce::String::fromUTF8 (channel.samplePath.c_str())).getFileNameWithoutExtension().toStdString();
+                menu.addItem (tr ("Extract groove"), sample != nullptr, false, [this, track, scene, sample, name] {
+                    engine.editSong ([=] (Song& s) {
+                        if (const auto* c = s.clipGrid ? launcher::clipAt (*s.clipGrid, track, scene) : nullptr)
+                            if (auto g = grooveaudio::extract (s, *c, *sample, GrooveBase::sixteenth, name); ! g.points.empty())
+                                groove::add (s.grooves, std::move (g));
                     });
                     showGroovePool (true);
                 });
@@ -2120,6 +2288,35 @@ public:
     // --details190imshot (round 190im): a scene launched as its button launches it; the grid's timer tick; the cell
     // rectangles (0 a slot, 1 a track's status cell, 2 a scene cell); the selection
     void launchSceneForSnapshot (int scene) { launchScene (scene); }
+    // Round 190kc: Live's Relative Session Mapping Strip — the highlighted (selected) scene moves up / down (Live keeps it
+    // in view), is launched (and the one below selected, as its button does), or a track's clip in it is launched
+    void relativeSession (RemoteAction action, int track, bool press)
+    {
+        switch (action)
+        {
+            case RemoteAction::sceneUp:
+            case RemoteAction::sceneDown:
+                if (! press)
+                    return;
+                selectedScene = juce::jlimit (0, rowCount() - 1, selectedScene + (action == RemoteAction::sceneUp ? -1 : 1));
+                sceneSelected = true;
+                titleSelected = false;
+                selectedField = 0;
+                revealSelection();
+                repaint();
+                notify (GridPick::select);
+                return;
+            case RemoteAction::launchSelectedScene:
+                if (press)
+                    launchScene (juce::jlimit (0, rowCount() - 1, selectedScene));
+                return;
+            case RemoteAction::launchSelectedClip: // (a press and a release: the slot's launch mode, as a mapped slot)
+                engine.launcherCommand ({ press ? launcher::Command::Type::launch : launcher::Command::Type::release, track, selectedScene });
+                return;
+            default:
+                return;
+        }
+    }
     void tickForSnapshot() { timerCallback(); }
     juce::Rectangle<int> cellForSnapshot (int kind, int track, int scene) const
     {
@@ -2127,7 +2324,7 @@ public:
         if (kind == 1)
             return { columnX (track), cells.getBottom(), columnWidth, statusHeight };
         if (kind == 2)
-            return { cells.getRight(), rowY (scene), sceneWidthNow(), rowHeight };
+            return { sceneX(), rowY (scene), sceneWidthNow(), rowHeight };
         return { columnX (track), rowY (scene), columnWidth, rowHeight };
     }
     std::pair<int, bool> sceneSelectionForSnapshot() const { return { selectedScene, sceneSelected }; }
@@ -2794,6 +2991,18 @@ bool& clipGridClassicLook() { return classicLook; }
 bool theme::livelook::active() noexcept { return liveLook(); }
 
 void setClipGridBlinkPhaseForSnapshot (int phase) { blinkPhaseForSnapshot = phase; }
+
+void setClipGridMapStrip (juce::Component& grid, bool on)
+{
+    if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
+        g->setMapStrip (on);
+}
+
+void clipGridRelativeSession (juce::Component& grid, RemoteAction action, int track, bool press)
+{
+    if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
+        g->relativeSession (action, track, press);
+}
 
 void launchClipGridSceneForSnapshot (juce::Component& grid, int scene)
 {

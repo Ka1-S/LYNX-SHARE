@@ -1566,6 +1566,10 @@ enum class OutputMode : std::uint8_t
 constexpr int outputDefault = -2; // Master: the device's first output pair; inserts: none (they reach it via the Master)
 constexpr int outputNone = -1;    // no hardware output (the Master too)
 
+// Live's Crossfade Assign buttons (round 190kc, Clip-launch layout; core/Crossfader.h). The values are those of the
+// set's Mixer/CrossFadeState (0 = A, 1 = none, 2 = B [DATA: every Live 12 set]).
+enum class CrossfadeAssign : std::uint8_t { a, none, b };
+
 struct MixerTrack
 {
     std::string name;
@@ -1645,6 +1649,19 @@ struct MixerTrack
     // The chain preset ("sound") last put on this insert (core/ChainPresets.h; "" = none). A name only: the slots are
     // the chain. Saved.
     std::string chainPreset;
+    // Live's return tracks (round 190kc, the Clip-launch layout; core/SessionMixer.h). A return is an insert like any
+    // other (the engine routes it as one); the flag makes the Session mixer show it as a return strip (A, B …: its
+    // letter is its place among the returns) and give every track a Sends row for it, as Live does. Set by the .als
+    // import and by Create › Insert Return Track. Saved.
+    bool liveReturn = false;
+    // A return's Pre / Post toggle (Live's SendsPre, per return): on, every send into it leaves before the sending
+    // track's fader (MixerSend::pre); new sends take it. Saved.
+    bool returnPre = false;
+    // A return's sends to returns that are switched on (Live: "the Send controls in Return tracks are disabled by
+    // default"; Enable Send / Enable All Sends). Targets (inserts). Saved.
+    std::vector<int> returnSendsOn;
+    // Live's Crossfade Assign (round 190kc): the crossfader fades this insert at its gain stage. Saved when not none.
+    CrossfadeAssign crossfade = CrossfadeAssign::none;
     bool operator== (const MixerTrack&) const = default; // (Online Sessions P2: entity comparison, round 169b)
 };
 
@@ -1746,7 +1763,9 @@ enum class AutomationTargetKind : std::uint8_t
     vcaLevel,      // index = VCA (Song::vcas): its fader (round 177a; LYNX's own, FL has no VCA)
     // index = channel, param = which Levels adjustment (round 190dz): FL's channel parameter 0x10 + param —
     // 0 pan (0…1 = −1…1), 1 volume (0…1 = 0…200 %, FL's whole 0…25600 travel), 3 Mod X, 4 Mod Y (0…1 = −1…1)
-    channelAdjust
+    channelAdjust,
+    // Live's crossfader (round 190kc, the Main track's CrossFade): 0..1 = left..right (Song::crossfader -1..1)
+    crossfader
 };
 
 namespace leveladjust
@@ -2220,7 +2239,10 @@ std::vector<MidiLink> linksWithGlobal (const std::vector<MidiLink>& project, con
 // track's clip stop button, Stop all clips, or a transport switch.
 enum class RemoteAction : std::uint8_t
 {
-    parameter, clipSlot, sceneLaunch, trackStop, stopAllClips, play, stop, record, sessionRecord, metronome
+    parameter, clipSlot, sceneLaunch, trackStop, stopAllClips, play, stop, record, sessionRecord, metronome,
+    // round 190kc: Live's crossfader positions (Crossfader Left / Center / Right) and its Relative Session Mapping Strip
+    // (Scene Up / Down, Launch the highlighted scene, Cancel Launch, a track's clip at the highlighted scene: track)
+    crossfaderLeft, crossfaderCentre, crossfaderRight, sceneUp, sceneDown, launchSelectedScene, cancelLaunch, launchSelectedClip
 };
 // A mapping of a computer key (Key Map Mode), or of a MIDI controller / key to something other than a parameter (MIDI
 // Map Mode; a parameter's MIDI mapping is a MidiLink, FL's storage). Saved with the project (the reference saves key
@@ -2458,6 +2480,8 @@ struct ClipGridScene
 struct SessionMixerView
 {
     bool shown = true, io = true, sends = true, volume = true, trackOptions = false;
+    // round 190kc: Live's Mixer Controls › Return Tracks and Crossfader (SessionReturns, SessionCrossFade)
+    bool returns = true, crossfader = false;
     bool operator== (const SessionMixerView&) const = default;
 };
 
@@ -2697,6 +2721,11 @@ struct Song
     bool automationChunks = false;
     std::optional<ClipGrid> clipGrid; // the Clip-launch workflow's grid (round 181a); empty until it is first used
     GroovePool grooves; // the groove pool (round 190bv); empty in every project that never used one
+    // Live's crossfader (round 190kc, the Clip-launch layout; core/Crossfader.h): its position -1 (A) .. 1 (B) and its
+    // curve (Live's CrossfadeCurve: 0 Dipped, 1 Intermediate, 2 Constant Power, 3 Slow Fade, 4 Slow Cut, 5 Fast Cut,
+    // 6 Transition; Live's default set: 2). Only inserts with a Crossfade Assign hear it. Saved when not the default.
+    float crossfader = 0.0f;
+    int crossfadeCurve = 2;
     // The end of the performance zone: the first Start marker's tick, or 0 (no zone) without one / when off.
     std::int64_t performanceZoneEnd() const noexcept;
     bool inPerformanceZone (const Clip& clip) const noexcept { return performanceMode && clip.start < performanceZoneEnd(); }

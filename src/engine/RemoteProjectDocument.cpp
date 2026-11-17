@@ -49,7 +49,7 @@ const DocumentFields& editableDocumentFields (DocumentShape shape)
             for (const auto& name : juce::StringArray::fromTokens (names, " ", ""))
                 result[owner].emplace (name, DocumentField { child, array });
         };
-        add (S::root, "bpm beatsPerBar swing chanceSeed channelGroups masterPitch substitutesBypassed cleanMixer performanceMode "
+        add (S::root, "bpm beatsPerBar swing chanceSeed channelGroups masterPitch substitutesBypassed cleanMixer performanceMode crossfader crossfadeCurve "
              "autoCrossfades compCrossfadeMs playTruncatedNotes fastDeclick panLaw autoPdc compensateAutomations timeSettings "
              "scaleHighlight dataFolder currentPattern playlist patternBlocks blocks playlistTracks playlistTrackHeights "
              "playlistTrackColours playlistTrackGroups playlistCompTracks playlistTrackLocks playlistTrackLanes "
@@ -121,7 +121,8 @@ const DocumentFields& editableDocumentFields (DocumentShape shape)
              "boost eq ringMix ringFreq stereoDelay cutoff resonance reverb reverbType pogo clip");
         add (S::mixer, "name volume pan muted solo soloSources threaded separator folded dock toMaster masterLevel colour stereo "
              "invertPhase swap input inputMono monitor recordSafe recordTo recordSource recordDryToo latencyMs latencyBypass "
-             "compensateMaster icon output outputMode eq eqBypassed sends lostSends preSends chainBlend chainPreset");
+             "compensateMaster icon output outputMode eq eqBypassed sends lostSends preSends chainBlend chainPreset "
+             "liveReturn returnPre returnSendsOn crossfade");
         add (S::mixer, "effects", S::effect, true);
         add (S::mixer, "standIns", S::standIn, true);
         add (S::effect, "kind on params sendSpan mix smartDisable row sidechain sidechain2 sendTransient sendSustain state sample preset abOther abB "

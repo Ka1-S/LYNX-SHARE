@@ -1,6 +1,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "engine/FileSort.h"
 #include "platform/Paths.h"
+#include "core/GrooveAudio.h"
 #include "core/EditorScale.h"
 #include "core/SimplePads.h"
 
@@ -2331,6 +2332,17 @@ public:
             // at FL's "zoom 17" (50 px tracks, 39.75 px a bar), and playing (the activity column), as FL's reference shots
             const auto i = args.indexOf ("--design190igshot");
             runDesign190igShot (args[i + 1].unquoted(), args[i + 2].unquoted());
+            quit();
+            return;
+        }
+
+        if (args.contains ("--cliplaunch190kcshot"))
+        {
+            // LYNX --cliplaunch190kcshot prefix set.als: round 190kc off screen (Live's return tracks, Sends rows, Pre / Post,
+            // the crossfader, the map modes' crossfader positions and relative strip, Commit / Extract on audio); prefix-checks.txt
+            const auto i = args.indexOf ("--cliplaunch190kcshot");
+            const auto set = i + 2 < args.size() && ! args[i + 2].startsWith ("--") ? args[i + 2].unquoted() : juce::String();
+            runClipLaunch190kcShot (args[i + 1].unquoted(), set);
             quit();
             return;
         }
@@ -27941,6 +27953,205 @@ private:
         lynx::clipGridClassicLook() = classicBefore;
         lynx::playlistTallLiveLanes() = tallBefore;
         wav.deleteFile();
+        line ("done");
+    }
+
+    // Round 190kc (see --cliplaunch190kcshot above): the Patience set in the Clip-launch layout
+    void runClipLaunch190kcShot (const juce::String& prefix, const juce::String& set)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        const juce::ScopedValueSetter<bool> shown (lynx::ui::showingForShots(), true);
+        juce::String checks;
+        const auto flush = [&] { juce::File (lynx::shot::file (juce::File (prefix + "-checks.txt"))).replaceWithText (checks); };
+        const auto check = [&] (const juce::String& what, bool ok) { checks << (ok ? "ok   " : "FAIL ") << what << "\n"; flush(); };
+        const auto line = [&] (const juce::String& what) { checks << "     " << what << "\n"; flush(); };
+        const auto write = [&prefix] (juce::Component& c, const juce::String& name) { savePng (lynx::shot::snapshot (c), prefix + "-" + name + ".png"); };
+        const auto area = [&prefix] (juce::Component& c, juce::Rectangle<int> r, const juce::String& name) { saveArea (c, r, prefix + "-" + name + ".png"); };
+        const auto size = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_SNAPSHOT_SIZE", "1920x1080"), "x", "");
+        const auto w = juce::jlimit (800, 3840, size[0].getIntValue()), h = juce::jlimit (450, 2160, size[1].getIntValue());
+        const auto classicBefore = lynx::clipGridClassicLook();
+        lynx::clipGridClassicLook() = false;
+        if (set.isEmpty() || ! juce::File (set).existsAsFile())
+        {
+            check ("the Live set given", false);
+            return;
+        }
+        using Part = lynx::SessionMixerComponent::Part;
+        lynx::AudioEngine offline (false);
+        lynx::MainComponent ui (offline, false);
+        ui.setSize (w, h);
+        const auto settle = [&] {
+            for (int k = 0; k < 3; ++k)
+                offline.dispatchPendingMessages();
+        };
+        ui.setVisible (true);
+        lynx::DetailView::shownSetting = true;
+        lynx::DetailView::devicesPage = true;
+        ui.selectTabForSnapshot (2);
+        ui.setClipLaunchWorkflow (true);
+        settle();
+        ui.openFile (juce::File (set));
+        settle();
+        ui.setClipGridView (lynx::PlaylistArea::GridView::grid);
+        settle();
+        ui.resized();
+        settle();
+        auto* gridView = ui.getClipGridForSnapshot();
+        auto* mixer = gridView != nullptr ? lynx::clipGridMixer (*gridView) : nullptr;
+        if (gridView == nullptr || mixer == nullptr)
+        {
+            check ("a clip grid with its Session mixer", false);
+            return;
+        }
+        const auto& song = offline.getSong();
+        const auto returns = lynx::sessionmixer::returnsOf (song);
+        line ("returns: " + juce::String ((int) returns.size()) + ", return strips " + juce::String (mixer->returnColumnCount()));
+        check ("the set's two returns are Live return tracks (A Reverb, B Delay)",
+               returns.size() == 2 && lynx::sessionmixer::returnTitle (song, returns[0]) == "A Reverb" && lynx::sessionmixer::returnTitle (song, returns[1]) == "B Delay");
+        check ("two return strips beside the tracks", mixer->returnColumnCount() == 2);
+        check ("every track shows a Sends row per return (the sends at -inf)",
+               mixer->sendTargets() == returns && ! mixer->partBounds (0, Part::send, 1).isEmpty());
+        const auto retA = lynx::SessionMixerComponent::returnColumn (0);
+        check ("a return strip: Sends, volume, activator, Solo, no Arm",
+               ! mixer->partBounds (retA, Part::send, 1).isEmpty() && ! mixer->partBounds (retA, Part::activator).isEmpty()
+                   && ! mixer->partBounds (retA, Part::solo).isEmpty() && mixer->partBounds (retA, Part::arm).isEmpty());
+        check ("the Main strip: a Pre / Post toggle per return", ! mixer->partBounds (-2, Part::post, 0).isEmpty() && ! mixer->partBounds (-2, Part::post, 1).isEmpty());
+        line ("Post A " + mixer->partBounds (-2, Part::post, 0).toString() + ", Post B " + mixer->partBounds (-2, Part::post, 1).toString()
+              + ", return A activator " + mixer->partBounds (retA, Part::activator).toString());
+        write (ui, "window");
+        area (*gridView, mixer->getBoundsInParent(), "mixer");
+        area (*gridView, { 0, 0, gridView->getWidth(), 240 }, "grid-top");
+        // a return's send to the other one, switched on; Pre on return B
+        offline.editSong ([&returns] (lynx::Song& s) {
+            lynx::sessionmixer::setSendEnabled (s, returns[0], returns[1], true);
+            lynx::sessionmixer::setPre (s, returns[1], true);
+        });
+        settle();
+        area (*gridView, mixer->getBoundsInParent(), "mixer-sendon-pre");
+        check ("return A's send to B switched on, B Pre", lynx::sessionmixer::sendEnabled (song, returns[0], returns[1]) && lynx::sessionmixer::isPre (song, returns[1]));
+        saveMenus (juce::StringArray { "Return send" }, std::vector<juce::PopupMenu> { mixer->sendMenu ({ lynx::SessionMixerComponent::returnColumn (1), Part::send, 0 }) },
+                   prefix + "-menu-send.png");
+        offline.editSong ([&returns] (lynx::Song& s) {
+            lynx::sessionmixer::setSendEnabled (s, returns[0], returns[1], false);
+            lynx::sessionmixer::setPre (s, returns[1], false);
+        });
+        // the crossfader section: track 1 on A, track 2 on B, the crossfader a little towards A
+        const auto i0 = lynx::sessionmixer::stripOf (song, 0).insert, i1 = lynx::sessionmixer::stripOf (song, 1).insert;
+        offline.editSong ([i0, i1] (lynx::Song& s) {
+            lynx::launcher::ensureGrid (s).mixerView.crossfader = true;
+            if (i0 > 0)
+                s.mixer[(std::size_t) i0].crossfade = lynx::CrossfadeAssign::a;
+            if (i1 > 0)
+                s.mixer[(std::size_t) i1].crossfade = lynx::CrossfadeAssign::b;
+            s.crossfader = -0.3f;
+        });
+        settle();
+        ui.resized();
+        settle();
+        check ("the Crossfader section: A / B on a track, the crossfader on Main",
+               ! mixer->partBounds (0, Part::xfadeA).isEmpty() && ! mixer->partBounds (0, Part::xfadeB).isEmpty() && ! mixer->partBounds (-2, Part::crossfader).isEmpty());
+        line ("A " + mixer->partBounds (0, Part::xfadeA).toString() + ", B " + mixer->partBounds (0, Part::xfadeB).toString() + ", crossfader "
+              + mixer->partBounds (-2, Part::crossfader).toString());
+        area (*gridView, mixer->getBoundsInParent(), "mixer-crossfader");
+        saveMenus (juce::StringArray { "Crossfader" }, std::vector<juce::PopupMenu> { mixer->crossfaderMenu() }, prefix + "-menu-curve.png");
+        lynx::clipGridClassicLook() = true;
+        lynx::refreshClipGrid (*gridView);
+        ui.resized();
+        settle();
+        area (*gridView, mixer->getBoundsInParent(), "classic-mixer-crossfader");
+        write (ui, "classic-window");
+        lynx::clipGridClassicLook() = false;
+        lynx::refreshClipGrid (*gridView);
+        ui.resized();
+        settle();
+
+        // the map modes: a key on a slot, a scene, Scene Down, the crossfader's left position
+        using namespace lynx::remotemap;
+        offline.editSong ([] (lynx::Song& s) {
+            assignKey (s, Target::slot (0, 0), 'Q');
+            assignKey (s, Target::sceneLaunch (0), 'W');
+            assignKey (s, Target::of (lynx::RemoteAction::sceneDown), 'J');
+            assignKey (s, Target::of (lynx::RemoteAction::crossfaderLeft), 'Z');
+        });
+        for (const auto mode : { Mode::key, Mode::midi })
+        {
+            ui.setMapMode (mode);
+            settle();
+            if (auto* overlay = ui.mapOverlayForSnapshot())
+            {
+                overlay->refresh();
+                const auto& spots = overlay->spots();
+                const auto count = [&spots] (lynx::RemoteAction a) { return (int) std::count_if (spots.begin(), spots.end(), [a] (const auto& sp) { return sp.target.action == a; }); };
+                line (juce::String (mode == Mode::key ? "key" : "midi") + " map: " + juce::String ((int) spots.size()) + " spots; relative strip "
+                      + juce::String (count (lynx::RemoteAction::sceneUp) + count (lynx::RemoteAction::sceneDown) + count (lynx::RemoteAction::launchSelectedScene)
+                                      + count (lynx::RemoteAction::cancelLaunch))
+                      + ", per-track launch " + juce::String (count (lynx::RemoteAction::launchSelectedClip)) + ", crossfader positions "
+                      + juce::String (count (lynx::RemoteAction::crossfaderLeft) + count (lynx::RemoteAction::crossfaderCentre) + count (lynx::RemoteAction::crossfaderRight)));
+                check (juce::String (mode == Mode::key ? "Key" : "MIDI") + " Map Mode: the relative strip and the crossfader's three positions are mappable",
+                       count (lynx::RemoteAction::sceneUp) == 1 && count (lynx::RemoteAction::sceneDown) == 1 && count (lynx::RemoteAction::launchSelectedScene) == 1
+                           && count (lynx::RemoteAction::cancelLaunch) == 1 && count (lynx::RemoteAction::launchSelectedClip) >= 4
+                           && count (lynx::RemoteAction::crossfaderLeft) == 1 && count (lynx::RemoteAction::crossfaderRight) == 1);
+            }
+            write (ui, mode == Mode::key ? "keymap" : "midimap");
+        }
+        ui.setMapMode (Mode::off);
+        settle();
+
+        // grooves on clips: a groove of LYNX's bank on the first MIDI clip and on an audio clip; the Clip View's Commit
+        int midiTrack = -1, midiScene = -1, audioTrack = -1, audioScene = -1;
+        if (song.clipGrid)
+            for (const auto& c : song.clipGrid->clips)
+            {
+                const auto scene = c.gridSlot >= 0 && c.gridSlot < (int) song.clipGrid->slots.size() ? song.clipGrid->slots[(std::size_t) c.gridSlot].scene : -1;
+                if (c.kind == lynx::ClipKind::pattern && midiTrack < 0)
+                    midiTrack = c.track, midiScene = scene;
+                if (c.kind == lynx::ClipKind::audio && audioTrack < 0)
+                    audioTrack = c.track, audioScene = scene;
+            }
+        line ("MIDI clip " + juce::String (midiTrack) + "/" + juce::String (midiScene) + ", audio clip " + juce::String (audioTrack) + "/" + juce::String (audioScene));
+        std::uint32_t grooveId = 0;
+        offline.editSong ([&grooveId, midiTrack, midiScene, audioTrack, audioScene] (lynx::Song& s) {
+            auto g = lynx::groove::factoryBank().front().groove;
+            g.timing = 1.0f;
+            grooveId = lynx::groove::add (s.grooves, g);
+            lynx::groove::setClipGroove (s, midiTrack, midiScene, grooveId);
+            lynx::groove::setClipGroove (s, audioTrack, audioScene, grooveId);
+        });
+        settle();
+        if (auto* detail = ui.getDetailViewForSnapshot(); detail != nullptr && midiTrack >= 0 && audioTrack >= 0)
+        {
+            detail->showSelection (midiTrack, midiScene);
+            detail->setPage (lynx::DetailView::Page::clip);
+            settle();
+            write (*detail, "clip-midi-groove");
+            detail->showSelection (audioTrack, audioScene);
+            detail->setPage (lynx::DetailView::Page::clip);
+            settle();
+            write (*detail, "clip-audio-groove");
+            const auto* audio = lynx::launcher::clipAt (*song.clipGrid, audioTrack, audioScene);
+            const auto sample = audio != nullptr && audio->channel >= 0 ? offline.getSampleLibrary().load (juce::String::fromUTF8 (song.channels[(std::size_t) audio->channel].samplePath.c_str()))
+                                                                         : nullptr;
+            check ("the audio clip's file loads", sample != nullptr);
+            if (sample != nullptr && audio != nullptr)
+            {
+                const auto hits = lynx::grooveaudio::hitsOf (song, *audio, *sample);
+                const auto pool = song.grooves.grooves.size();
+                offline.editSong ([&] (lynx::Song& s) {
+                    if (const auto* c = lynx::launcher::clipAt (*s.clipGrid, audioTrack, audioScene))
+                        if (auto g = lynx::grooveaudio::extract (s, *c, *sample, lynx::GrooveBase::sixteenth, "Vocal groove"); ! g.points.empty())
+                            lynx::groove::add (s.grooves, std::move (g));
+                });
+                line ("audio clip: " + juce::String ((int) hits.size()) + " attacks; pool " + juce::String ((int) pool) + " -> " + juce::String ((int) song.grooves.grooves.size()));
+                check ("Extract Groove from the audio clip adds a groove", song.grooves.grooves.size() == pool + 1);
+                int placed = -1;
+                offline.editSong ([&] (lynx::Song& s) { placed = lynx::grooveaudio::commit (s, audioTrack, audioScene, *sample); });
+                auto gridCopy = *song.clipGrid;
+                const auto* slot = lynx::launcher::settingsAt (gridCopy, audioTrack, audioScene);
+                line ("commit on audio: " + juce::String (placed) + " warp markers");
+                check ("Commit on the audio clip writes warp markers and sets its groove to None", placed > 0 && slot != nullptr && slot->groove == 0);
+            }
+        }
+        lynx::clipGridClassicLook() = classicBefore;
         line ("done");
     }
 
