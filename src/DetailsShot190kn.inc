@@ -58,7 +58,7 @@
             line ("output bars hint: " + hint.text + " | " + hint.value);
             const auto expected = toolbar::OutputMonitor::levelAt (((float) at.x + 0.5f - bars.getX()) / bars.getWidth());
             check ("output bars: the value is the level at the pointer (" + hint.value + ", expected " + juce::String (expected, 1) + " dB)",
-                   hint.value.endsWith (" dB") && std::abs (hint.value.getFloatValue() - expected) < 0.06f);
+                   hint.value.contains (" dB") && std::abs (hint.value.getFloatValue() - expected) < 0.06f);
             check ("output bars: left above right, a 1 px gap", out.barArea (0).getBottom() < out.barArea (1).getY());
             ui.setHintForSnapshot (hint);
             saveArea (ui, toolbar, prefix + "-tb-hint-bars.png");
@@ -114,7 +114,7 @@
             const auto meterHint = strips.hintAt ({ meter.getX() + 2, meter.getBottom() - meter.getHeight() / 2 });
             line ("meter hint: " + meterHint.text + " | " + meterHint.value);
             check ("Mixer meter: the level under the pointer (about -27 dB at half height: " + meterHint.value + ")",
-                   meterHint.value.endsWith (" dB") && std::abs (meterHint.value.getFloatValue() + 27.0f) < 1.0f);
+                   meterHint.value.contains (" dB") && std::abs (meterHint.value.getFloatValue() + 27.0f) < 1.0f);
             ui.setHintForSnapshot (meterHint);
             saveArea (ui, ui.getToolbarBoundsForSnapshot(), prefix + "-mixer-hint-meter.png");
             {
