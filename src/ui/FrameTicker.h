@@ -27,6 +27,8 @@
 #include <cstdlib>
 #include <functional>
 #include <map>
+#include <string>
+#include <typeinfo>
 #include <vector>
 
 namespace lynx::ui
@@ -106,8 +108,30 @@ private:
     bool run (double nowMs)
     {
         stepsRun().fetch_add (1, std::memory_order_relaxed);
-        return step != nullptr && step (nowMs);
+        const auto moved = step != nullptr && step (nowMs);
+        if (perOwnerWanted()) // (round 190kr, --uiperf: which live views step, and how often they move)
+        {
+            auto& counts = perOwner()[typeid (owner).name()];
+            ++counts.first;
+            counts.second += moved ? 1 : 0;
+        }
+        return moved;
     }
+
+public:
+    // diagnostics (round 190kr, LYNX_UIPERF_TICKERS=1): per view type, the steps run and the steps that moved (message thread)
+    static bool perOwnerWanted()
+    {
+        static const bool on = std::getenv ("LYNX_UIPERF_TICKERS") != nullptr;
+        return on;
+    }
+    static std::map<std::string, std::pair<long long, long long>>& perOwner()
+    {
+        static std::map<std::string, std::pair<long long, long long>> m;
+        return m;
+    }
+
+private:
 
     void onVBlank (double seconds)
     {

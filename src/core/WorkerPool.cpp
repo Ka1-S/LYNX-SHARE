@@ -184,6 +184,7 @@ void WorkerPool::Tuning::apply (const char* spec) noexcept
     adaptiveSpin.store (parsedValue (spec, "adaptive", adaptiveSpin.load() ? 1 : 0) != 0);
     waitMode.store (std::clamp (parsedValue (spec, "wait", waitMode.load()), 0, 2));
     waitSpinMicros.store (std::clamp (parsedValue (spec, "waitspin", waitSpinMicros.load()), 0, 10000));
+    helpPercent.store (std::clamp (parsedValue (spec, "help", helpPercent.load()), 0, 1000));
 }
 
 WorkerPool::Stats WorkerPool::stats() const noexcept
@@ -534,7 +535,11 @@ void WorkerPool::run (int n, void* ctx, Call fn) noexcept
 
     // wake only the sleepers that are needed (spinning workers already see the ticket)
     if (const auto asleep = sleeping.load (std::memory_order_seq_cst); asleep > 0)
-        wake->release (std::min (asleep, n - 1));
+    {
+        const auto limit = wakeLimit.load (std::memory_order_relaxed); // (round 190kr)
+        if (const auto wanted = std::min ({ asleep, n - 1, limit < 0 ? n : limit }); wanted > 0)
+            wake->release (wanted);
+    }
 
     work (false);
 

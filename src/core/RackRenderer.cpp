@@ -5413,6 +5413,12 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         lastWorkShareValue = chunkNs > 0.0 ? (double) work / chunkNs : 0.0;
         if (events.size() == 0 && work < serialWorkNs && (liveInput == nullptr || liveInput->numChannels == 0))
             workers = nullptr;
+        // round 190kr: as many workers woken as the work needs (WorkerPool::Tuning::helpPercent): ~1 ms of Thief's work in a
+        // 2.9 ms chunk woke all five
+        if (const auto help = WorkerPool::tuning().helpPercent.load (std::memory_order_relaxed); help > 0 && chunkNs > 0.0)
+            pool->setWakeLimit (std::clamp ((int) std::ceil ((double) work / (help * 0.01 * chunkNs)) - 1, 0, pool->workers()));
+        else
+            pool->setWakeLimit (-1);
     }
 
     // 1) channels, each with its own notes at the exact sample (in parallel when worth it)
