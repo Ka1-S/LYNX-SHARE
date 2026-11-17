@@ -219,6 +219,7 @@
 #include "ui/NoteToolDialogs.h"
 #include "ui/EventEditor.h"
 #include "ui/AudioEditor.h"
+#include "ui/SampleProperties.h"
 #include "ui/TempoTapper.h"
 #include "core/EventEdit.h"
 #include "core/FacetEq.h"
@@ -20683,6 +20684,32 @@ private:
                 snaps.add (lynx::setAudioEditorSnapForSnapshot (*editor, mode, probe));
             juce::File (prefix + "-snap.txt").replaceWithText (snaps.joinIntoString ("\n") + "\n");
             shot (*editor, "-editor-snap-on.png");
+        }
+        // round gaps190kf: FL's Sample properties window (Format › Edit properties..., F2) for this audio, with a few
+        // properties set, and the WAV chunks it writes (smpl / inst / acid / LIST INFO) listed
+        {
+            auto withProps = d;
+            withProps.props.name = "Drum loop";
+            withProps.props.comments = "LYNX SHARE test loop";
+            withProps.props.tempo = 120.0;
+            withProps.props.tempoSync = true;
+            withProps.props.fineTune = 12.0;
+            lynx::SamplePropertiesHost host;
+            host.projectTempo = 120.0;
+            auto props = lynx::makeSamplePropertiesPanel (withProps, d.title.empty() ? std::string ("Drum loop") : d.title, host);
+            shot (*props, "-sample-properties.png");
+            // the file's own properties (a WAV without them: FL's defaults — the FL | LYNX pair of the form as it opens)
+            auto plain = lynx::makeSamplePropertiesPanel (d, file.isNotEmpty() ? juce::File (file).getFileNameWithoutExtension().toStdString() : std::string ("Drum loop"), host);
+            shot (*plain, "-sample-properties-file.png");
+            juce::StringArray chunks;
+            const auto wav = ae::encodeWav (withProps, ae::WavFormat::int16);
+            for (std::size_t p = 12; p + 8 <= wav.size();)
+            {
+                const auto len = (std::size_t) wav[p + 4] | (std::size_t) wav[p + 5] << 8 | (std::size_t) wav[p + 6] << 16 | (std::size_t) wav[p + 7] << 24;
+                chunks.add (juce::String (reinterpret_cast<const char*> (wav.data() + p), 4) + " " + juce::String ((int) len));
+                p += 8 + len + (len & 1);
+            }
+            juce::File (prefix + "-sample-properties-chunks.txt").replaceWithText (chunks.joinIntoString ("\n") + "\n");
         }
         for (int t = 0; lynx::audioToolNameForSnapshot (t) != nullptr; ++t)
         {
