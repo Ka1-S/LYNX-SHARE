@@ -362,6 +362,9 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     };
     stopButton.onRightClick = [this] { showStopMenu(); };
     output.onModeChanged = [this] { saveUiSettings(); };
+    // round 190kn (FL's CPU panel): double-click = Plugin performance monitor; the menu's refresh rate is kept
+    perfMeter.onOpenMonitor = [this] { showPluginMonitor (engine); };
+    perfMeter.onRefreshChanged = [this] { saveUiSettings(); };
     recordButton.setOnColour (theme::colour::record);
     recordButton.setIconColour (theme::colour::record.withMultipliedSaturation (0.8f));
     recordButton.onClick = [this] { toggleRecording(); };
@@ -3102,6 +3105,8 @@ void MainComponent::loadUiSettings()
         else if (key == "followChannelRack" || key == "followAudioEditor")
             EditorGlobals::get().setFollowingView (key == "followChannelRack" ? EditorGlobals::FollowView::channelRack
                                                                                : EditorGlobals::FollowView::audioEditor, on, false);
+        else if (key == "cpuRefresh") // round 190kn
+            toolbar::PerformanceMeter::refresh = juce::jlimit (0, 2, line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
         else if (key == "scopeMode")
             toolbar::OutputMonitor::mode = juce::jlimit (0, toolbar::OutputMonitor::modeCount - 1,
                                                          line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
@@ -3363,6 +3368,7 @@ void MainComponent::saveUiSettings()
                                       + "\nfollowChannelRack=" + juce::String (EditorGlobals::get().isFollowingView (EditorGlobals::FollowView::channelRack) ? 1 : 0)
                                       + "\nfollowAudioEditor=" + juce::String (EditorGlobals::get().isFollowingView (EditorGlobals::FollowView::audioEditor) ? 1 : 0)
                                       + "\nscopeMode=" + juce::String (toolbar::OutputMonitor::mode)
+                                      + "\ncpuRefresh=" + juce::String (toolbar::PerformanceMeter::refresh)
                                       + "\ntoolbarGroups=" + juce::String (toolbarLayout.orderToString())
                                       + "\ntoolbarIcons=" + toolbarlayout::Layout::iconSizeId (toolbarLayout.iconSize)
                                       + "\nuiScale=" + juce::String (toolbarLayout.uiScale)
@@ -6911,7 +6917,9 @@ void MainComponent::timerCallback()
         {
             const auto source = juce::Desktop::getInstance().getMainMouseSource();
 
-            if (auto* under = source.getComponentUnderMouse())
+            if (auto* under = source.getComponentUnderMouse(); under == &hintBar)
+                hint = hintBar.getHint(); // (round 190kn: the hint stays while the pointer is on the bar, for its copy menu)
+            else if (under != nullptr)
             {
                 live = source.isDragging();
                 const auto at = live ? source.getLastMouseDownPosition() : source.getScreenPosition();
@@ -6943,6 +6951,7 @@ void MainComponent::timerCallback()
     linkToggle.update();
     if (toolbarLook != toolbarlayout::Look::fl)
         updateLookFields(); // (round 190iv: the Simple / Clip-launch toolbar's own fields; each repaints only on a change)
+    updateUndoRedoEnabled();
     if (const auto linkTempo = engine.getLink().isEnabled() ? engine.getLink().sessionTempo() : 0.0; linkTempo != shownLinkTempo)
     {
         shownLinkTempo = linkTempo;
@@ -6964,7 +6973,7 @@ void MainComponent::timerCallback()
     updateChordPanel();
 
     // CPU / memory / polyphony, a few times a second
-    if (++meterTicks >= 8 && perfMeter.isVisible() && ! hintsFrozen)
+    if (++meterTicks >= toolbar::PerformanceMeter::refreshTicks() && perfMeter.isVisible() && ! hintsFrozen)
     {
         const uitrace::Scope part ("timer: performance meter", false);
         meterTicks = 0;

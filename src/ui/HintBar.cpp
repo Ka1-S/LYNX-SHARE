@@ -354,6 +354,23 @@ void InfoView::paint (juce::Graphics& g)
     layout.draw (g, area.withHeight (layout.getHeight()));
 }
 
+juce::PopupMenu HintBar::copyMenu() const
+{
+    juce::PopupMenu menu;
+    const auto value = plainHint (current.value).trim();
+    const auto text = plainHint (current.text).trim();
+    menu.addItem (value.isEmpty() ? tr ("Copy value") : tr ("Copy value: {0}", { value }), value.isNotEmpty(), false,
+                  [value] { juce::SystemClipboard::copyTextToClipboard (value); });
+    menu.addItem (tr ("Copy text"), text.isNotEmpty(), false, [text] { juce::SystemClipboard::copyTextToClipboard (text); });
+    return menu;
+}
+
+void HintBar::mouseDown (const juce::MouseEvent& e)
+{
+    if (e.mods.isPopupMenu())
+        copyMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+}
+
 void HintBar::paint (juce::Graphics& g)
 {
     using namespace theme;

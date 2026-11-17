@@ -1101,6 +1101,9 @@ public:
     // Latest output samples (mono), for the oscilloscope. UI thread.
     void copyScope (float* destination, int count) const noexcept;
     static constexpr int scopeSize = 2048;
+    // round 190kn (FL's output panel, DF-23): the peak of the device output's left (0) / right (1) side since the last
+    // read, for the toolbar's stereo bars. One reader (the toolbar's output display). UI thread.
+    float takeOutputPeak (int channel) noexcept { return outputPeak[(std::size_t) (channel & 1)].exchange (0.0f, std::memory_order_relaxed); }
 
     // Real-time health of the audio callback (REA round 87): callbacks over their deadline, late device calls, load.
     const RtStats& getRtStats() const noexcept { return rtStats; }
@@ -1499,6 +1502,7 @@ private:
     double lastCaptureMs = -1.0; // UI thread: the newest note Capture MIDI took
     std::array<std::atomic<float>, scopeSize> scope {}; // ring buffer of the output (written by audio)
     std::atomic<int> scopeWrite { 0 };
+    std::array<std::atomic<float>, 2> outputPeak {}; // (round 190kn) raised by audio, taken by the toolbar
     juce::MidiDeviceListConnection midiDevicesChanged;
     std::vector<std::string> lastMidiInputIds;       // the MIDI inputs available at the last check (UI thread)
     std::vector<prefs::MidiPort> lastMidiPorts;       // inputs and outputs at the last check (ids "in:" / "out:"; UI thread)

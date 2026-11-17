@@ -7615,13 +7615,26 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
             auto w = scopeWrite.load (std::memory_order_relaxed);
             const auto* right = numOutputChannels > 1 && outputs[1] != nullptr ? outputs[1] : outputs[0];
 
+            float peakL = 0.0f, peakR = 0.0f;
             for (int i = 0; i < n; ++i)
             {
                 scope[(std::size_t) w].store (0.5f * (outputs[0][i] + right[i]), std::memory_order_relaxed);
                 w = (w + 1) % scopeSize;
+                peakL = juce::jmax (peakL, std::abs (outputs[0][i]));
+                peakR = juce::jmax (peakR, std::abs (right[i]));
             }
 
             scopeWrite.store (w, std::memory_order_release);
+            // the toolbar's stereo bars (round 190kn): the loudest sample of each side since the UI's last read
+            for (int ch = 0; ch < 2; ++ch)
+            {
+                const auto v = ch == 0 ? peakL : peakR;
+                auto& slot = outputPeak[(std::size_t) ch];
+                auto current = slot.load (std::memory_order_relaxed);
+                while (v > current && ! slot.compare_exchange_weak (current, v, std::memory_order_relaxed))
+                {
+                }
+            }
         }
 
         if (playing)
