@@ -4799,13 +4799,49 @@ public:
                 juce::PopupMenu menu;
                 const auto labels = plugui::optionLabels (item);
                 const auto chosen = plugui::optionAt (item, valueOf (param));
+                // each item with a picture of its shape, as FL's own menu has (drawn by LYNX: one period)
+                const auto icon = [] (std::function<double (double)> f) {
+                    juce::Path path;
+                    for (int i = 0; i <= 64; ++i)
+                    {
+                        const auto x = (double) i / 64.0;
+                        const auto pt = juce::Point<float> ((float) (x * 24.0), (float) (2.0 + (1.0 - juce::jlimit (0.0, 1.0, f (x))) * 12.0));
+                        if (i == 0)
+                            path.startNewSubPath (pt);
+                        else
+                            path.lineTo (pt);
+                    }
+                    auto d = std::make_unique<juce::DrawablePath>();
+                    d->setPath (path);
+                    d->setFill (juce::FillType (juce::Colours::transparentBlack));
+                    d->setStrokeFill (juce::FillType (theme::colour::textPrimary));
+                    d->setStrokeType (juce::PathStrokeType (1.4f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+                    return d;
+                };
+                const std::function<double (double)> flShapes[5] {
+                    [] (double x) { return 0.5 + 0.5 * std::sin (juce::MathConstants<double>::twoPi * x); },
+                    [] (double x) { return 1.0 - std::abs (2.0 * x - 1.0); },
+                    [] (double x) { return x < 0.5 ? 1.0 : 0.0; },
+                    [] (double x) { return x; },
+                    [] (double x) { static const double v[4] { 0.3, 0.9, 0.1, 0.6 }; return v[juce::jlimit (0, 3, (int) (x * 4.0))]; } };
                 for (int o = 0; o < (int) labels.size(); ++o)
-                    menu.addItem (optionTexts (item)[(std::size_t) o], true, extra == 0 && o == chosen,
-                                  [this, param, v = plugui::optionValue (item, o)] { setParams ({ { param, v }, { peakshapes::extraShapeParam, 0.0f } }); });
+                {
+                    juce::PopupMenu::Item entry (optionTexts (item)[(std::size_t) o]);
+                    entry.setTicked (extra == 0 && o == chosen);
+                    if (o < 5)
+                        entry.setImage (icon (flShapes[o]));
+                    entry.setAction ([this, param, v = plugui::optionValue (item, o)] { setParams ({ { param, v }, { peakshapes::extraShapeParam, 0.0f } }); });
+                    menu.addItem (std::move (entry));
+                }
                 menu.addSectionHeader (tr ("LYNX shapes"));
                 for (int id = 1; id <= peakshapes::count; ++id)
-                    menu.addItem (tr (peakshapes::name (id)), true, extra == id,
-                                  [this, id] { setParams ({ { peakshapes::extraShapeParam, peakshapes::valueOf (id) } }); });
+                {
+                    juce::PopupMenu::Item entry (tr (peakshapes::name (id)));
+                    entry.setTicked (extra == id);
+                    entry.setImage (icon ([id] (double x) { return peakshapes::wave (id, x, 7u); }));
+                    entry.setAction ([this, id] { setParams ({ { peakshapes::extraShapeParam, peakshapes::valueOf (id) } }); });
+                    menu.addItem (std::move (entry));
+                }
                 menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withTargetScreenArea (localAreaToGlobal (r.toNearestInt())));
                 return;
             }
