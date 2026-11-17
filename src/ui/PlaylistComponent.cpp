@@ -10702,7 +10702,7 @@ juce::PopupMenu PlaylistComponent::buildAudioClipMenu (int index, int mouseX)
 
     // --- LYNX's own items (no FL counterpart), core flclipmenu::lynxExtras --------------------------------------------
     // (round 190jv: a third column, so FL's two stay as FL draws them; JUCE breaks columns only where asked, and round
-    // 190je's tall-menu split (JUCE fix 39, lynxTallMenuBreakHook) leaves a menu with breaks alone)
+    // 190je's tall-menu split (JUCE fix 40, lynxTallMenuBreakHook) leaves a menu with breaks alone)
     menu.addColumnBreak();
     menu.addSectionHeader (tr ("LYNX extras")); // (round 190gi: as the Clip View's menu, DetailView; FL's sections stay FL's)
     // round 190ds, Simple workflow only (LYNX's own): the clip follows the project key, and its loop's key
