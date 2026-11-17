@@ -4,6 +4,7 @@
 // oscillator states and every lane sum — for every bank height, segment lengths around the control blocks, and
 // partials whose amplitude and target are zero.
 
+#include <limits>
 #include <random>
 
 namespace harm190kr
@@ -107,3 +108,91 @@ TEST (perf190kr_harmless_bank_kernel_matches_the_one_group_loop)
     CHECK (same == cases);
 }
 
+// Vocodex's band followers: the van Herk / Gil-Werman sliding maximum must give exactly what round 190kg's monotonic
+// queue gave (verbatim below) — over windows from 1 to longer than the blocks, block lengths that cut the chunks
+// anywhere, ties, zeros, and NaNs (the queue lets a NaN through on its own sample and forgets everything before it).
+namespace harm190kr
+{
+struct SlidingMaxQueue
+{
+    int window = 1;
+    std::vector<float> value;
+    std::vector<std::uint32_t> when;
+    int head = 0, count = 0;
+    std::uint32_t clock = 0;
+
+    explicit SlidingMaxQueue (int w)
+    {
+        window = std::max (1, w);
+        value.assign ((std::size_t) window, 0.0f);
+        when.assign ((std::size_t) window, 0);
+    }
+
+    void run (float* e, int n) noexcept
+    {
+        if (window <= 1)
+            return;
+        for (int k = 0; k < n; ++k, ++clock)
+        {
+            while (count > 0 && clock - when[(std::size_t) head] >= (std::uint32_t) window)
+            {
+                head = head + 1 == window ? 0 : head + 1;
+                --count;
+            }
+            const float x = e[k];
+            while (count > 0)
+            {
+                auto back = head + count - 1;
+                if (back >= window)
+                    back -= window;
+                if (value[(std::size_t) back] > x)
+                    break;
+                --count;
+            }
+            auto pos = head + count;
+            if (pos >= window)
+                pos -= window;
+            value[(std::size_t) pos] = x;
+            when[(std::size_t) pos] = clock;
+            ++count;
+            e[k] = value[(std::size_t) head];
+        }
+    }
+};
+} // namespace harm190kr
+
+TEST (perf190kr_vocodex_sliding_max_matches_the_queue)
+{
+    using namespace harm190kr;
+    int cases = 0, same = 0;
+    for (const int w : { 1, 2, 3, 7, 30, 41, 69, 81, 300 })
+        for (const int block : { 1, 7, 30, 64, 480 })
+            for (int kind = 0; kind < 3; ++kind)
+            {
+                std::mt19937 rng ((unsigned) (w * 31 + block * 7 + kind));
+                std::uniform_real_distribution<float> u (0.0f, 1.0f);
+                std::vector<float> x (3000);
+                for (std::size_t i = 0; i < x.size(); ++i)
+                {
+                    // an envelope with plateaus (ties), exact zeros, decays and bursts
+                    const auto t = (float) i;
+                    x[i] = (i / 200) % 3 == 0 ? 0.0f : (i % 50 < 10 ? 0.5f : std::fabs (std::sin (t * 0.01f)) * u (rng));
+                    if (kind == 1 && i % 997 == 500)
+                        x[i] = std::numeric_limits<float>::quiet_NaN(); // a NaN now and then
+                    if (kind == 2 && i >= 1200 && i < 1203)
+                        x[i] = std::numeric_limits<float>::quiet_NaN(); // a short run of NaNs
+                }
+                auto ref = x;
+                SlidingMaxQueue q (w);
+                for (std::size_t at = 0; at < ref.size(); at += (std::size_t) block)
+                    q.run (ref.data() + at, (int) std::min<std::size_t> ((std::size_t) block, ref.size() - at));
+                const auto got = lynx::vocodex::slidingMaxForTest (w, x, block);
+                ++cases;
+                if (got.size() == ref.size() && std::memcmp (got.data(), ref.data(), sizeof (float) * ref.size()) == 0)
+                    ++same;
+                else
+                    std::printf ("  Vocodex sliding max differs from the queue: window %d, block %d, input %d\n", w, block, kind);
+            }
+    std::printf ("  Vocodex sliding max vs round 190kg's queue: %d / %d bit-identical\n", same, cases);
+    CHECK (same == cases);
+}
