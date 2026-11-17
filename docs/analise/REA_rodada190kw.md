@@ -128,4 +128,49 @@ sample (the signed sample scored 6.73 → 6.73 on its 26 files, the magnitude 6.
 - **Pro-MB / Pro-G / Pro-DS / Pro-L 2** share the elements read in §2 (`Detector`, `Capacitor`, `PeakHold`; `Capacitor`
   vtables: Pro-G 0x1801d8690, Pro-R 2 0x1802082e0, Saturn 2 0x18020e628, Pro-Q 4 0x18023d5c8). Prism and Sentry were not
   re-modelled this round.
-- **ValhallaVintageVerb → Epoch** and **Timeless 3**: not analysed this round (time went to Pro-C 3, Saturn 2 and Pro-R 2).
+- **ValhallaVintageVerb** [STATIC + EXEC] (analysis: /mnt/e/lynx-work/rea190kw/rea/vv/; implementation: §9): knob laws
+  (parameter table 0x180376f30, conversions 0x1803aba00: skewed controls min + (max − min)·v^(1/k), k = ln 0.5 /
+  ln((mid − min)/(max − min)); Decay 0.2 … 70 s, 7 s at mid) and the equal-power Mix already match LYNX. Every mode's loop
+  gain is the RT60 law 10^(−3 L / (fs T)) split over its N gain stages (0x1803a9670 and siblings; N = 2 halls, 5 Plate, 6
+  most rooms, 16 Palace; per line with RT = 1.2 × Decay in Chamber1979 / Hall1984); the input enters after the gain stage,
+  so the first half-lap never sees Decay. Size scales each mode's loop length by its own law (size functions
+  0x1803a8590 … 0x18039aaf0). There is no per-mode output gain: the level follows the loop, E(T, s) = E0 / (1 −
+  10^(−6 ℓ(s)/T)), and the early part (first 80 ms) does not change with Decay (Epoch's rises ~3 dB). 1970s runs the engine
+  at half the host rate (a quarter at ≥ 60 kHz).
+- **Timeless 3**: no state translator existed (the substitute ran Fruity Delay 3 at its defaults); see §10.
+
+## 5. Saturn 2 → Ember: the recovered laws [STATIC] (analyst's report; implementation: §7)
+
+Style factory 0x18017cb90 builds the 28 styles in UI order, each from one helper (0x180113ed0) taking a curve type, a power
+P, a negative-side scale B, the drive range lo … hi (dB), a reference level and a trim. Curves (scalar reference 0x180113600;
+SIMD twins e.g. 0x180141e40), on t ≥ 0: ArcTan (2/π)·atan(πt/2); DivAbs t/(1 + t); Tanh; Sine sin(π/2·min(t, 1)); Poly2
+2t − t² (t ≤ 1); Poly3 1.5t − 0.5t³ (t ≤ 1); Rectify (Poly2, full wave); Tube — asymmetric and piecewise (a hard ceiling
+above u = 0.32002, a quadratic between −0.08905 and 0.32002 with slope 3.9375 at 0, an exponential-like negative branch,
+a floor below −1.75482; C¹ joins). Asymmetry and softness: y = sign(x) · f((β|x|)^P)^(1/P) / β with β = 1 above zero, B
+below. The transformer styles and Breakdown add a level-dependent linear knee k = 0.5 − 0.49 (2z − z²), z = min(|v|/4, 1),
+v the shaper input band-limited 70 Hz … 5 kHz (0x180113500, 0x180112f10).
+Drive and auto gain (0x180114090, 0x1801140d0): pre-gain G = 10^((lo + (hi − lo)·d)/20), d the Drive knob 0 … 1; post-gain
+10^(trim/20) · 2C / (f(G·C) − min(f(−G·C), 0)), C = 10^(ref/20): a sine at the style's reference level keeps its
+peak-to-peak level ("increases the input gain and corrects the output gain correspondingly", the plug-in's own help).
+Per-style pre / post EQ (emphasis / de-emphasis pairs; the amps' 4 … 8 shaping filters), the band tone stack (low shelf
+120 Hz, bell 600 Hz, high shelf 2.5 kHz, high shelf 7 kHz; the four amp models 170 / 500 / 1500 / 4500 Hz), High Quality
+(Off 1×, Good 8×, Superb 32× for the shaper), FoldBack y = (1 + d²)² / (1 + 99d²) · sin((1 + 99d²) x), BitCrusher (sample
+and hold for d²·500 samples). Not recovered: the Dynamics curve's meaning, the exact feedback law, the crossover design,
+the Smudge / Breakdown pitch internals.
+
+## 6. Pro-R 2 → LuxeVerb's Space engine: the recovered laws [STATIC + EXEC] (analyst's report; implementation: §8)
+
+True stereo (Channel constructor 0x1801539b0): each channel has a 16-line FDN (Hadamard 16), a 2-line FDN (Hadamard 2), a
+16-line early network, early reflections, a Thickner, six tone filters; a CrossInput feeds each channel's input to the
+other. Line gain 10^(−3 · len / T) (0x180119f20).
+- Stereo Width (0x18017ce10; the state value is the raw knob 0 … 1.2, default 0.7): v = √|W − 1|; input M/S: side gain
+  min((2·min(W, 1) − 0.8)² + 0.21, 1); output M/S: W < 0.7: Y = W/0.7, X = 1 + 0.8 (√(2 − Y²) − 1); W ≥ 0.7: X = 1 −
+  1.25e, Y = 1 + 0.5e, e = max(W − 1, 0); the two channels' 16-line networks are linked by an orthogonal rotation
+  √(1 − v²/2) / ±v/√2 around their Hadamard outputs (0x180154f20). Checked tap by tap on the irL captures: output side /
+  mid 0 / .335 / .779 / 1 / 1.466 predicted and measured at W = 0 / .3 / .6 / .9 / 1.2.
+- Space: displayed time 0.2 … 10 s; the network runs T = 1.15 × displayed × 4^DecayRate (0x180156940); the early network
+  decays at T without the rate; the 2-line network at ≈ (200 + 0.00088 (T − 200))·rate ms; line lengths 5.18 ms ×
+  1.12402^(k + n0 + j), k = floor(14 sin(π/2 · S^0.8)), n0 = 9 / 10 / 11 by Distance (0x180156d20); late level
+  ((250/T_ms)^0.7 + 1.3) × (1 + 0.5 d) × a Distance / Character term (0x180157290).
+- Brightness (0x1801564e0): darkness d = 1 − min(B/0.7, 1); four tone stages at 2^(14.136 − 4d) Hz, one at 2^(13.873 −
+  2d) Hz, a 200 Hz stage of −8 (2.5 (B − 0.6))₊² dB (less a width term), in-loop absorption moved down d octaves.

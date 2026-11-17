@@ -154,3 +154,24 @@ TEST (parity190kw_crest_v1_and_v2_static_laws)
     // revision 0 keeps the fitted Clean (its own knee offsets: not the plain 15 dB)
     CHECK (std::abs (parity190kw::settledGainDb (parity190kw::crest (cr::styleValue (cr::Style::clean), 0.0f, 0.5f, r4, 0.0f, 0.3f, 0.3f, 0.0f), -10.0) + 15.0) > 0.2);
 }
+
+TEST (parity190kw_crest_editor_curve_follows_the_revision)
+{
+    using namespace lynx;
+    namespace cr = dyn::crest;
+    const auto r4 = cr::ratioValue (4.0);
+    const auto curve = [&] (cr::Style st, float rev, double in) {
+        return cr::staticGainDb (parity190kw::crest (cr::styleValue (st), 0.0f, 0.5f, r4, 0.0f, 0.3f, 0.3f, rev).params, in);
+    };
+    // the editor's static curve is the law that runs: −10 dBFS against −30 dB, 4 : 1, hard knee
+    for (auto st : { cr::Style::clean, cr::Style::opto, cr::Style::punch, cr::Style::bus, cr::Style::pumping })
+        CHECK (parity190kw::near (curve (st, 1.0f, -10.0), -15.0, 0.01));
+    CHECK (parity190kw::near (curve (cr::Style::classic, 1.0f, -10.0), -2.0 * 20.0 * 3.0 / 7.0, 0.01));
+    CHECK (parity190kw::near (curve (cr::Style::vocal, 1.0f, -10.0),
+                              -20.0 * std::log10 (1.0 + std::pow (10.0, -0.5) * (std::pow (10.0, 1.5) - 1.0)), 0.01));
+    // and the settled render agrees with it
+    CHECK (parity190kw::near (parity190kw::settledGainDb (parity190kw::crest (cr::styleValue (cr::Style::classic), 0.0f, 0.5f, r4, 0.0f, 0.3f, 0.3f, 1.0f), -10.0, 8.0),
+                              curve (cr::Style::classic, 1.0f, -10.0), 0.15));
+    // revision 0 keeps the fitted curve (unchanged for projects saved before)
+    CHECK (! parity190kw::near (curve (cr::Style::clean, 0.0f, -10.0), -15.0, 0.2));
+}

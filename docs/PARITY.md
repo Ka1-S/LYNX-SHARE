@@ -3982,3 +3982,56 @@ latency change.
 - Facet: the −30 dB time-constant probe is at 3 (from 2): the reference's cut after the short bursts (7.5 / 8.7 s) is
   still deeper than the model's.
 - PuigTec, SuperTap's feedback delay and modulation, EchoBoy's shelving cuts (round 190jh's list) not touched.
+
+## Round 190kw: static REA of the references — Crest gets Pro-C 3's own style laws
+
+The owner allowed static reverse-engineering of the third-party binaries for parity (clean-room: the laws are understood
+and re-written in LYNX's own code; nothing copied, nothing bypassed). The binaries keep MSVC RTTI, which names every DSP
+class; the Pro-C 3 style laws were read from the decompiled classes and rebuilt (evidence, addresses and constants:
+docs/analise/REA_rodada190kw.md; lab /mnt/e/lynx-work/rea190kw/).
+
+**Built (Crest, hidden `crest::revision` = 1):**
+- Clean / Classic / Opto (the reference's "V1" styles): the instantaneous reduction of the side chain's sample level, smoothed
+  in dB by each style's own two-stage, program-dependent follower (every step 1 − exp(−ln 10 / T), T in samples); the
+  style's Bézier knee shape blended with the quadratic knee by the knob; attack lo + span · a³ and a release that shortens
+  with the attack, per style. Classic is a feedback design (its target reads the reduction already applied).
+- Vocal / Mastering / Bus / Punch / Pumping: the reference wires them from its generic gain computer (quadratic knee, ratio,
+  range; Vocal its own soft curve without ratio) and generic followers (attack / release blended with the step size, the
+  step's exponential lengthening, maxima between stages); Mastering also holds the reduction 10 ms and smooths it at 10 Hz.
+- A new Crest and a translated Pro-C 3 state run revision 1; a project or preset saved before keeps 0 (the fitted laws, bit
+  for bit); Live's device maps and the plug-in substitutes' Crest keep 0 (they were measured on the fitted laws); with Auto
+  release on, Clean / Classic / Opto keep the fitted law. Allround (Versatile), Smooth, Upward, Two-way (TTM), Op-El and
+  Vari-Mu are untouched (generated graph classes in the reference: not rebuilt this round).
+
+**Scores** (refcap030 bank, Pro-C 3 → Crest through the translator; before = the branch point, after = revision 1):
+
+| block | files | before → after | up / same / down |
+|---|---|---|---|
+| grid | 238 | 6.35 → 7.87 | 136 / 102 / 0 |
+| mode | 48 | 6.56 → 8.54 | 47 / 1 / 0 |
+| pairs | 36 | 6.22 → 9.44 | 35 / 1 / 0 |
+| prog | 42 | 5.95 → 7.64 | 24 / 18 / 0 |
+| sr44 / sr48 / sr96 | 20 each | 6.55 / 6.70 / 6.50 → 7.85 / 7.95 / 7.65 | 35 / 25 / 0 |
+| styles | 84 | 6.01 → 7.71 | 48 / 36 / 0 |
+| **all** | **508** | **6.30 → 7.99** | **325 / 183 / 0** |
+
+Per style (all blocks): Clean 6.59 → 8.91, Classic 5.73 → 8.96, Opto 5.76 → 8.21, Vocal 5.73 → 8.77, Mastering 5.46 → 8.00,
+Bus 6.13 → 9.18, Punch 7.05 → 8.95, Pumping 6.73 → 9.31; the six untouched styles are unchanged file for file.
+
+Other banks: refcap182's programme (Pro-C 3, 25 files) 6.04 → 7.52 (15 up, 0 down); tp172b's Pro-C 3 captures (20 files)
+6.2 → 7.5 (S1 / S2 / S4 up to 8–9, D and S3 unchanged, 0 down).
+
+**Old projects.** Revision 0 renders byte for byte as the base commit: `gold/gold.sh` (base fxrender against the round's,
+every Pro-C 3 style's state with the revision forced off + Crest defaults over five styles, 44.1 / 48 / 96 kHz): 57 / 57
+identical; fingerprints of both revisions in tests/Parity190kwGold.inc. The editor's static curve follows the law that runs
+(revision 1: the reference's curves; revision 0 unchanged).
+
+**CPU** (thread time on one pinned core, 20 s at 48 kHz in blocks of 512, best of 5, three runs; % of real time, revision 0 →
+1): Clean 0.54 … 0.64 → 0.46 … 0.58, Classic 0.46 … 0.62 → 0.46 … 0.64, Opto 0.50 … 0.61 → 0.35 … 0.55, Vocal 0.78 … 1.08 →
+1.01 … 1.06, Mastering 0.54 … 0.68 → 0.81 … 0.90, Bus 0.43 … 0.47 → 0.70 … 0.75, Punch 0.49 … 0.53 → 0.28 … 0.37, Pumping
+0.38 … 0.42 → 0.52 … 0.60. Bus / Mastering / Pumping cost up to +0.3 point of one core (three followers whose times move
+with every step: one exp each per sample; the coefficient is cached while the time holds). No latency change.
+
+**Still off:** Allround (Versatile) 6.66, Smooth 5.08, Upward 6.62, Two-way (TTM) 7.38, Op-El 5.85 and Vari-Mu 6.19 keep their
+fitted laws (the reference builds them as generated graph classes — `VariMuCompressor` is a balanced tube-pair model — read
+but not rebuilt); Clean / Classic / Opto's auto release.

@@ -657,8 +657,17 @@ void scEqParams (const EffectParams& p, EffectParams& out) noexcept
 }
 } // namespace
 
+namespace
+{
+// round 190kw: the static curve of the revision-1 styles (defined with their laws below); false when the style keeps its
+// fitted law
+bool revisionStaticDb (const EffectParams& p, double inputDb, double& gainDb) noexcept;
+} // namespace
+
 double staticGainDb (const EffectParams& p, double inputDb)
 {
+    if (double g = 0.0; revisionStaticDb (p, inputDb, g))
+        return g;
     const auto& def = defOf (p);
     const auto att = attackMs (p[attack]);
     if (def.curve == Curve::twoWay)
@@ -919,6 +928,60 @@ struct SlidingMax
         return v[(std::size_t) head];
     }
 };
+
+bool revisionStaticDb (const EffectParams& p, double inputDb, double& gainDb) noexcept
+{
+    if (! on (p[revision]))
+        return false;
+    const auto st = styleOf (p);
+    const auto thr = thresholdDb (p[threshold]), rat = ratioOf (p[ratio]), kn = kneeDb (p[knee]);
+    const auto rng = std::max (0.01, rangeDb (p[range]));
+    const auto d = inputDb - thr;
+    if ((st == Style::clean || st == Style::opto) && ! on (p[autoRelease]))
+    {
+        // the per-sample peak detector settles at the peak's target (REA_rodada190kw §1)
+        auto t = v1KneeGain (v1Knee (st == Style::clean ? 0 : 2), d, kn);
+        if (rat < 100.0)
+            t *= 1.0 - 1.0 / rat;
+        gainDb = -std::max (0.0, std::min (t, rng));
+        return true;
+    }
+    if (st == Style::classic && ! on (p[autoRelease]))
+    {
+        // the feedback design settles where both stages hold the target t and the reduction is 2t:
+        // t = knee ((min (d, range) − 2t) · ratio) · (1 − 1/ratio)
+        const auto& shape = v1Knee (1);
+        const auto r = std::min (rat, 100.0);
+        const auto f = [&] (double t) {
+            auto v = v1KneeGain (shape, (std::min (d, rng) - 2.0 * t) * r, kn);
+            if (rat < 100.0)
+                v *= 1.0 - 1.0 / rat;
+            return std::max (0.0, v) - t;
+        };
+        double lo = 0.0, hi = std::max (0.0, d) + 1.0;
+        for (int k = 0; k < 60; ++k)
+            (f (0.5 * (lo + hi)) > 0.0 ? lo : hi) = 0.5 * (lo + hi);
+        gainDb = -2.0 * 0.5 * (lo + hi);
+        return true;
+    }
+    if (st == Style::vocal)
+    {
+        auto g = 0.0;
+        if (thr < -1.1920928955078125e-07)
+            g = 20.0 * std::log10 (dbToGain (inputDb) * (dbToGain (-thr) - 1.0) + 1.0);
+        gainDb = -std::max (0.0, std::min (g, rng));
+        return true;
+    }
+    if (st == Style::mastering || st == Style::bus || st == Style::punch || st == Style::pumping)
+    {
+        auto g = v2Knee (d, kn);
+        if (rat < 100.0)
+            g -= g / rat;
+        gainDb = -std::max (0.0, std::min (g, rng));
+        return true;
+    }
+    return false;
+}
 
 class Compressor final : public Effect
 {
