@@ -35,6 +35,25 @@ void setEditorsDetached (bool detached);
 // Call where keepAboveMainWindow was called (after the window is visible): docks the window, or keeps it above the main
 // window when it can't be docked. True when it is docked.
 bool dockOrKeepAbove (juce::DocumentWindow& window);
+// Round 190jy (queue item 44; Settings › General › "Draw docked LYNX editors in the main window", off by default;
+// LYNX_EDITORS_IN_MAIN=1 / 0 overrides it): a docked LYNX editor window (not a hosted plugin's, nor one that holds a
+// native view of its own) is drawn by the main window as one of its components instead of a native child window, so a
+// live display (Gross Beat, Fruity Limiter, Maximus...) costs its paint and no second window presenting frames. It keeps
+// its place among the docked panels and plugin windows (Workspace::addEditorWindow). Windows only. Floating (detached)
+// editors stay windows of their own. Switching it moves the docked editors that are open.
+bool editorsInMainWindow();
+bool editorsInMainWindowSetting(); // (the saved choice, without the environment's override)
+void setEditorsInMainWindow (bool on);
+// Moves the open docked LYNX editors to (true) or from (false) the main window's drawing, at the same place, in the same
+// stacking position; returns how many moved. (The setting's switch; --uiperf A/B and tests.)
+int moveDockedEditors (bool intoMainWindow);
+// `window` is a docked LYNX editor drawn by the main window
+bool isEditorInMainWindow (const juce::Component& window);
+// The docked LYNX editor windows that are open (native child windows and the ones drawn by the main window)
+std::vector<juce::DocumentWindow*> dockedEditorWindows();
+// The window a component belongs to as the user sees it: the nearest editor drawn by the main window, else its
+// top-level component (focus, linked windows, click raise)
+juce::Component* editorWindowOf (juce::Component* c);
 // A window's top-left on the screen, and moving it there, docked or not (a docked window's own position is in the main
 // window's client area).
 void setWindowScreenPosition (juce::Component& window, juce::Point<int> screenTopLeft);

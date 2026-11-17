@@ -10908,3 +10908,5 @@ countries: tr
 "Block" = "Blok"
 "Group notes" = "Notaları grupla"
 "The pattern could not be read." = "Desen okunamadı."
+"Draw docked LYNX editors in the main window (lighter live displays)" = "Yerleştirilmiş LYNX düzenleyicilerini ana pencerede çiz (daha hafif canlı göstergeler)"
+"On: a docked LYNX editor (Gross Beat, Fruity Limiter, Maximus...) is drawn by the main window: its moving displays use less CPU. Hosted plugins and detached windows keep windows of their own" = "Açık: yerleştirilmiş bir LYNX düzenleyicisi (Gross Beat, Fruity Limiter, Maximus...) ana pencere tarafından çizilir: hareketli göstergeleri daha az CPU kullanır. Barındırılan eklentiler ve ayrılmış pencereler kendi pencerelerini korur"

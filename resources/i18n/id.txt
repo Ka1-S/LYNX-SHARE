@@ -10908,3 +10908,5 @@ countries: id
 "Block" = "Blok"
 "Group notes" = "Kelompokkan not"
 "The pattern could not be read." = "Pola tidak dapat dibaca."
+"Draw docked LYNX editors in the main window (lighter live displays)" = "Gambar editor LYNX yang tertambat di jendela utama (tampilan langsung lebih ringan)"
+"On: a docked LYNX editor (Gross Beat, Fruity Limiter, Maximus...) is drawn by the main window: its moving displays use less CPU. Hosted plugins and detached windows keep windows of their own" = "Aktif: editor LYNX yang tertambat (Gross Beat, Fruity Limiter, Maximus...) digambar oleh jendela utama: tampilan bergeraknya memakai lebih sedikit CPU. Plugin yang di-host dan jendela terlepas tetap memiliki jendela sendiri"

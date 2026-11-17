@@ -2800,6 +2800,8 @@ void MainComponent::loadUiSettings()
         }
         else if (key == "autoSelectLinked")
             ChannelRackComponent::autoSelectLinked = on;
+        else if (key == "editorsInMain") // round 190jy: Settings › General › Draw docked LYNX editors in the main window
+            setEditorsInMainWindow (on);
         else if (key == "muteRemovedSteps")
             ChannelRackComponent::muteRemovedSteps = on;
         else if (key == "audioTrackControls") // round 190w: Playlist › View › Track headers
@@ -3156,6 +3158,7 @@ void MainComponent::saveUiSettings()
                                       + "\nsampleAccurateAutomation=" + juce::String (sampleAccurateAutomation() ? 1 : 0)
                                       + "\ndetachNewPlugins=" + juce::String (engine.detachesNewPlugins() ? 1 : 0)
                                       + "\nautoSelectLinked=" + juce::String (ChannelRackComponent::autoSelectLinked ? 1 : 0)
+                                      + "\neditorsInMain=" + juce::String (editorsInMainWindowSetting() ? 1 : 0)
                                       + "\nmuteRemovedSteps=" + juce::String (ChannelRackComponent::muteRemovedSteps ? 1 : 0)
                                       + "\naudioTrackControls=" + juce::String (PlaylistComponent::showAudioTrackControls ? 1 : 0)
                                       + "\naudioTrackLevels=" + juce::String (PlaylistComponent::showAudioTrackLevels ? 1 : 0)
@@ -8180,6 +8183,7 @@ void MainComponent::openSettings (int page)
         o.artMotion = skin::artMotion();
         o.uiAnimations = ui::motion::enabled();
         o.gpuRendering = gpuRenderingEnabled();
+        o.editorsInMainWindow = editorsInMainWindowSetting(); // (round 190jy)
         o.pluginStyle = skin::forcedStyle();
         o.splash = safe->startup.splash;
         o.startupSound = safe->startup.sound;
@@ -8259,6 +8263,11 @@ void MainComponent::openSettings (int page)
         }
         if (o.gpuRendering != gpuRenderingEnabled())
             setGpuRenderingEnabled (o.gpuRendering);
+        if (o.editorsInMainWindow != editorsInMainWindowSetting()) // round 190jy: the open docked editors move at once
+        {
+            setEditorsInMainWindow (o.editorsInMainWindow);
+            self.saveUiSettings();
+        }
         if (o.waveSpectral != ui::WaveformCache::spectral || o.waveStereo != ui::WaveformCache::stereo)
         {
             ui::WaveformCache::spectral = o.waveSpectral;

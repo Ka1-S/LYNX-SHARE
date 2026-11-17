@@ -10908,3 +10908,5 @@ countries: jp
 "Block" = "ブロック"
 "Group notes" = "ノートをグループ化"
 "The pattern could not be read." = "パターンを読み込めませんでした。"
+"Draw docked LYNX editors in the main window (lighter live displays)" = "ドッキングした LYNX エディターをメインウィンドウで描画する（ライブ表示が軽くなります）"
+"On: a docked LYNX editor (Gross Beat, Fruity Limiter, Maximus...) is drawn by the main window: its moving displays use less CPU. Hosted plugins and detached windows keep windows of their own" = "オン：ドッキングした LYNX エディター（Gross Beat、Fruity Limiter、Maximus など）をメインウィンドウが描画し、動く表示の CPU 使用量が減ります。ホストされたプラグインと切り離したウィンドウは独自のウィンドウのままです"

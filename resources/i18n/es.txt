@@ -10908,3 +10908,5 @@ countries: es mx ar co cl pe ve
 "Block" = "Bloque"
 "Group notes" = "Agrupar notas"
 "The pattern could not be read." = "No se pudo leer el patrón."
+"Draw docked LYNX editors in the main window (lighter live displays)" = "Dibujar los editores de LYNX acoplados en la ventana principal (pantallas en vivo más ligeras)"
+"On: a docked LYNX editor (Gross Beat, Fruity Limiter, Maximus...) is drawn by the main window: its moving displays use less CPU. Hosted plugins and detached windows keep windows of their own" = "Activado: un editor de LYNX acoplado (Gross Beat, Fruity Limiter, Maximus...) lo dibuja la ventana principal: sus pantallas en movimiento usan menos CPU. Los plugins alojados y las ventanas separadas mantienen ventanas propias"

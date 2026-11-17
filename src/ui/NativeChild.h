@@ -144,4 +144,32 @@ bool pressSpaceForTest (void* fallback);
 // (HTCLIENT) = the window takes the mouse there, -1 (HTTRANSPARENT) = the click goes to the window under it. (Round
 // 190cj: an attached component that is not opaque answers "transparent" wherever its hitTest says no.)
 int hitCodeAt (const juce::Component& c, juce::Point<int> localPoint);
+
+// Round 190jy (queue item 44, core/DockStack.h editorsAbove): docked LYNX editors drawn by the main window itself show
+// through holes in the native siblings below them.
+// `holes`: rectangles in the attached component's own native window, physical pixels (0,0 = its top-left); empty = the
+// whole window shows (no window region). The window is only touched when its holes change. Windows only (elsewhere
+// nothing: the editors stay native child windows there).
+void setHoles (juce::Component& c, const std::vector<juce::Rectangle<int>>& holes);
+std::vector<juce::Rectangle<int>> holesOf (const juce::Component& c);
+// Whether any part of `rectInWindow` (physical pixels of that native window) is in one of its holes (the window has a
+// region and the rectangle is not wholly inside it). Windows only; elsewhere false.
+bool cutsInto (void* window, juce::Rectangle<int> rectInWindow);
+// Runs (message thread) after an attached child window moved, was resized, shown, hidden or put elsewhere in the
+// stacking order, or after the floaters / overlays were raised (nullptr: nothing). The workspace keeps the holes current.
+void setStackingListener (std::function<void()> listener);
+// The main window's client-area rectangle of `boundsInArea` (in `area`'s coordinates), in physical pixels, rounded edge
+// by edge (as its own drawing of a component there is clipped).
+juce::Rectangle<int> physicalInTop (const juce::Component& area, juce::Rectangle<int> boundsInArea);
+// An attached component's native window rectangle in its parent's client area, physical pixels (empty: not attached).
+juce::Rectangle<int> rectInParentWindow (const juce::Component& c);
+// The click raise (raiseOnAnyClick) and the key forwarding (forwardUnusedKeys) of a component that stops being an
+// attached window (it is drawn by the main window now).
+void stopRaiseOnAnyClick (juce::Component& c);
+// Puts the attached `c` right above `below` in the native stacking order (nullptr: at the bottom); Windows only.
+void placeJustAbove (juce::Component& c, juce::Component* below);
+// --selftest (round 190jy): two attached children of a never-shown window: a hole set and read back (the system's region,
+// its hit test there), cleared again, and placeJustAbove's order. "OK", "OK (not available ...)" elsewhere, or "ERROR ...".
+juce::String editorHolesSelfTest();
+void stopForwardingUnusedKeys (juce::Component& c);
 } // namespace lynx::nativechild

@@ -148,6 +148,7 @@
 #include "ui/ShotShowing.h"
 #include "ui/SimpleLook.h"
 #include "ui/NativeChild.h"
+#include "ui/DockPaintCheck.h"
 #include "ui/Workspace.h"
 #include "ui/PluginThumbs.h"
 #include "ui/ClipProperties.h"
@@ -452,6 +453,22 @@ juce::String collectUncleanSessions()
 // window paints tells whether it covered the fader. Measured: how long a move waited for the message thread, the time
 // from a move to the first frame that shows the fader after it (input → paint), and whether the value stays put when
 // the mouse is released.
+#if JUCE_WINDOWS
+namespace juce
+{
+extern int lynxD2DPresents; // (cmake/LynxPatchJuce.cmake, round 190gv: every Direct2D window present)
+}
+#endif
+// round 190jy: --uiperf's presents per second
+static int uiPerfPresents()
+{
+   #if JUCE_WINDOWS
+    return juce::lynxD2DPresents;
+   #else
+    return 0;
+   #endif
+}
+
 struct UiPerfDrag final : public std::enable_shared_from_this<UiPerfDrag>,
                           private juce::HighResolutionTimer
 {
@@ -5943,6 +5960,8 @@ private:
         // issue #161: a click in a panel (a native child window that takes no focus on a click) of an inactive main
         // window activates it (back from another app, Space played nothing until the Browser was clicked)
         const auto clickActivationResult = lynx::nativechild::clickActivationSelfTest();
+        // round 190jy (queue item 44): the holes the native panels get under a docked editor drawn by the main window
+        const auto editorHolesResult = lynx::nativechild::editorHolesSelfTest();
 
         // round 177b: automation lanes come back from a project (track, automation, height, folded)
         juce::String lanesResult = "OK";
@@ -6830,7 +6849,8 @@ private:
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK" && warplaw190ikResult == "OK" && editorScale190heResult == "OK" && sfModBase190heResult == "OK" && trackauto190gzResult == "OK" && community190hqResult == "OK" && rollup030Result == "OK"
                         && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
                         && hostedStateContentionResult.startsWith ("OK")
-                        && danceWindowResult == "OK" && clickActivationResult == "OK" && motionOverlayResult.startsWith ("OK");
+                        && danceWindowResult == "OK" && clickActivationResult == "OK" && motionOverlayResult.startsWith ("OK")
+                        && editorHolesResult.startsWith ("OK");
 
         juce::String report;
         report << "connections=" << offline.getNumGraphConnections() << "\n"
@@ -6891,6 +6911,7 @@ private:
                << "dance_window=" << danceWindowResult << "\n"
                << "dance_window_detail=" << danceWindowDetail << "\n"
                << "click_activation=" << clickActivationResult << "\n"
+               << "editor_holes=" << editorHolesResult << "\n"
                << "lanes_saved=" << lanesResult << "\n"
                << "arrange190cg_saved=" << arrange190cgResult << "\n"
                << "livescr190dr=" << livescr190drResult << "\n"
@@ -12093,6 +12114,7 @@ private:
                 // (after the name: state is field 0, utime 11, stime 12, in clock ticks)
                 return fields.size() > 12 ? (fields[11].getDoubleValue() + fields[12].getDoubleValue()) / 100.0 : 0.0;
             }
+            int presentsStart = 0;        // round 190jy: Direct2D presents of every LYNX window (Windows)
             double audioLoadSum = 0.0;    // the device's CPU use (AudioDeviceManager::getCpuUsage), summed per tick
             int audioLoadTicks = 0;
 
@@ -12132,6 +12154,7 @@ private:
                     cpuStart = lynx::processCpuSeconds();
                     messageCpuStart = lynx::threadCpuSeconds();
                     peerCpuStart = peerCpuSeconds (peerPid);
+                    presentsStart = uiPerfPresents();
                     if (threadsWanted) // round 190ih: LYNX_UIPERF_THREADS=1, the CPU of every thread over the step
                         threadsStart = lynx::threadCpuList();
                     lynx::grossBeatPaintStats (true);
@@ -12163,6 +12186,16 @@ private:
                      << juce::String (audioLoadTicks > 0 ? 100.0 * audioLoadSum / audioLoadTicks : 0.0, 1) << "%\n";
                 if (peerPid > 0 && wall > 0.0)
                     text << "    peer process " << peerPid << " CPU " << juce::String (100.0 * 1000.0 * (peerCpuSeconds (peerPid) - peerCpuStart) / wall, 1) << "%\n";
+                // round 190jy: every LYNX window's Direct2D presents (the main window's and each native child's) and how
+                // the docked LYNX editors were drawn
+                {
+                    int native = 0, inMain = 0, hidden = 0;
+                    for (auto* w : lynx::dockedEditorWindows())
+                        if (w != nullptr)
+                            (! w->isVisible() ? hidden : lynx::isEditorInMainWindow (*w) ? inMain : native) += 1;
+                    text << "    presents " << juce::String (wall > 0.0 ? 1000.0 * (uiPerfPresents() - presentsStart) / wall : 0.0, 1)
+                         << "/s; docked editors: " << native << " own windows, " << inMain << " in the main window, " << hidden << " hidden\n";
+                }
                 if (threadsWanted && wall > 0.0)
                 {
                     std::vector<std::pair<double, juce::String>> rows;
@@ -12497,6 +12530,152 @@ private:
                                                     engine->play();
                                                 }
                                             }, {}, 2500 });
+        }
+        // round 190jy (queue item 44): LYNX_UIPERF_DOCKAB=n — the docked LYNX editors with live displays, playing, each set
+        // hidden / a native child window / drawn by the main window, n cycles of 2.5 s steps in one process.
+        // LYNX_UIPERF_DOCKAB_SETS (default "G,L,M,GLM"): G Gross Beat, L Fruity Limiter, M Maximus (both on the master).
+        if (const auto cycles = juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_DOCKAB", "0").getIntValue(); cycles > 0)
+        {
+            auto sets = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_DOCKAB_SETS", "G,L,M,GLM"), ",", {});
+            auto shown = std::make_shared<std::vector<juce::Component::SafePointer<juce::DocumentWindow>>>();
+            auto keepPlaying = [this] {
+                engine->getTransport().songMode = true;
+                if (! engine->getTransport().playing.load()) // (the song ended: again)
+                {
+                    engine->rewind();
+                    engine->play();
+                }
+            };
+            for (const auto& set : sets)
+            {
+                const auto name = set.trim();
+                run->steps.push_back ({ "dock A/B " + name + " open", [this, name, shown, keepPlaying] {
+                                           lynx::NativeEffectWindows::closeAll();
+                                           for (auto* w : lynx::dockedEditorWindows()) // (a channel's settings window of the set before)
+                                               if (w != nullptr)
+                                                   w->closeButtonPressed();
+                                           shown->clear();
+                                           auto& song = engine->getSong();
+                                           auto openKind = [this] (lynx::EffectKind kind) {
+                                               auto& so = engine->getSong();
+                                               for (int t = 0; t < (int) so.mixer.size(); ++t)
+                                                   for (int k = 0; k < (int) so.mixer[(std::size_t) t].effects.size(); ++k)
+                                                       if (so.mixer[(std::size_t) t].effects[(std::size_t) k].kind == kind)
+                                                       {
+                                                           lynx::NativeEffectWindows::open (*engine, t, k);
+                                                           return;
+                                                       }
+                                               // (not in the project: on the master, after its effects)
+                                               if (so.mixer.empty() || so.mixer[0].effects.size() >= (std::size_t) lynx::maxEffectSlots)
+                                                   return;
+                                               const auto slot = (int) so.mixer[0].effects.size();
+                                               engine->editSong ([kind] (lynx::Song& s2) { s2.mixer[0].effects.push_back (lynx::makeEffectSlot (kind)); }, false);
+                                               engine->dispatchPendingMessages();
+                                               lynx::NativeEffectWindows::open (*engine, 0, slot);
+                                           };
+                                           juce::ignoreUnused (song);
+                                           if (name.containsChar ('G'))
+                                               openKind (lynx::EffectKind::grossBeat);
+                                           if (name.containsChar ('L'))
+                                               openKind (lynx::EffectKind::fruityLimiter);
+                                           if (name.containsChar ('M'))
+                                               openKind (lynx::EffectKind::maximus);
+                                           // S: a Slicex channel (a 2 s tone in 4 regions) that plays the notes of the project's busiest
+                                           // channel, its settings window open (its deck's play line moves while it sounds)
+                                           if (name.containsChar ('S'))
+                                           {
+                                               const auto wav = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("lynx-uiperf-slicex.wav");
+                                               {
+                                                   juce::AudioBuffer<float> tone (2, 96000);
+                                                   for (int i = 0; i < tone.getNumSamples(); ++i)
+                                                       tone.setSample (0, i, 0.3f * (float) std::sin (juce::MathConstants<double>::twoPi * (200.0 + 200.0 * (i / 24000)) * i / 48000.0));
+                                                   tone.copyFrom (1, 0, tone, 0, 0, tone.getNumSamples());
+                                                   wav.deleteFile();
+                                                   if (auto out = std::unique_ptr<juce::OutputStream> (wav.createOutputStream()))
+                                                       if (auto writer = std::unique_ptr<juce::AudioFormatWriter> (juce::WavAudioFormat().createWriterFor (out.get(), 48000.0, 2, 16, {}, 0)))
+                                                       {
+                                                           out.release();
+                                                           writer->writeFromAudioSampleBuffer (tone, 0, tone.getNumSamples());
+                                                       }
+                                               }
+                                               int busiest = -1;
+                                               {
+                                                   std::map<int, int> count;
+                                                   for (const auto& pat : engine->getSong().patterns)
+                                                       for (const auto& n : pat.notes)
+                                                           ++count[n.channel];
+                                                   int best = 0;
+                                                   for (const auto& [ch, n] : count)
+                                                       if (n > best)
+                                                           best = n, busiest = ch;
+                                               }
+                                               const auto index = (int) engine->getSong().channels.size();
+                                               engine->editSong ([&wav, busiest, index] (lynx::Song& s2) {
+                                                   lynx::ChannelDef ch;
+                                                   ch.name = "Slicex (uiperf)";
+                                                   ch.instrument = lynx::InstrumentKind::slicex;
+                                                   ch.samplePath = wav.getFullPathName().toStdString();
+                                                   auto state = lynx::slicex::fresh();
+                                                   lynx::slicex::setDeckFile (state, 0, ch.samplePath, 4);
+                                                   lynx::slicex::setDeckBeats (state, 0, 0.0, 4.0);
+                                                   ch.pluginState = lynx::slicex::write (state);
+                                                   s2.channels.push_back (ch);
+                                                   for (auto& pat : s2.patterns)
+                                                   {
+                                                       std::vector<lynx::Note> copies;
+                                                       for (const auto& n : pat.notes)
+                                                           if (n.channel == busiest)
+                                                           {
+                                                               auto c = n;
+                                                               c.channel = index;
+                                                               c.key = 60 + (int) (copies.size() % 4); // (the four slices in turn)
+                                                               copies.push_back (c);
+                                                           }
+                                                       pat.notes.insert (pat.notes.end(), copies.begin(), copies.end());
+                                                       pat.sortNotes();
+                                                   }
+                                               }, false);
+                                               engine->dispatchPendingMessages();
+                                               lynx::openChannelSettings (*engine, index);
+                                           }
+                                           for (auto* w : lynx::dockedEditorWindows())
+                                               shown->emplace_back (w);
+                                           keepPlaying();
+                                       }, {}, 1500 });
+                static const char* variantNames[] = { "hidden", "own window", "main window" };
+                for (int c = 0; c < cycles; ++c)
+                    for (int v = 0; v < 3; ++v)
+                        run->steps.push_back ({ "dock A/B " + name + " " + variantNames[v] + " cycle " + juce::String (c + 1), [v, shown, keepPlaying] {
+                                                   if (v > 0)
+                                                       lynx::moveDockedEditors (v == 2);
+                                                   for (auto& w : *shown)
+                                                       if (w != nullptr && w->isVisible() != (v > 0))
+                                                           w->setVisible (v > 0);
+                                                   keepPlaying();
+                                               }, {}, 2500 });
+            }
+            run->steps.push_back ({ "dock A/B close", [this, shown] {
+                                       engine->stop();
+                                       shown->clear();
+                                       lynx::NativeEffectWindows::closeAll();
+                                       for (auto* w : lynx::dockedEditorWindows())
+                                           if (w != nullptr)
+                                               w->closeButtonPressed();
+                                   }, {}, 500 });
+        }
+        // round 190jy: LYNX_UIPERF_DOCKCHECK=1 — the checks of a docked editor drawn by the main window (ui/DockPaintCheck.h),
+        // on screen in this main window; LYNX_UIPERF_DOCKCHECK_SHOTS=<folder> keeps the two on-screen pictures compared
+        if (juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_DOCKCHECK", {}) == "1")
+        {
+            auto check = std::make_shared<std::unique_ptr<lynx::dockpaint::Check>>();
+            auto lines = std::make_shared<juce::String>();
+            for (int i = 0; i < lynx::dockpaint::Check::count(); ++i)
+                run->steps.push_back ({ "dock check " + juce::String (i), [this, ui, check, lines, i] {
+                                           if (*check == nullptr)
+                                               *check = std::make_unique<lynx::dockpaint::Check> (*engine, *ui, *mainWindow,
+                                                                                                juce::File (juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_DOCKCHECK_SHOTS", {})));
+                                           *lines = (*check)->step (i);
+                                       }, {}, 700, [lines] { return *lines; } });
         }
         run->steps.push_back ({ "Gross Beat window, song playing", [this] {
                                    engine->getTransport().songMode = true;

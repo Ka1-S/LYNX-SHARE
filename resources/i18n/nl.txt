@@ -10908,3 +10908,5 @@ countries: nl be
 "Block" = "Blok"
 "Group notes" = "Noten groeperen"
 "The pattern could not be read." = "Het patroon kon niet worden gelezen."
+"Draw docked LYNX editors in the main window (lighter live displays)" = "Gedockte LYNX-editors in het hoofdvenster tekenen (lichtere live-weergaven)"
+"On: a docked LYNX editor (Gross Beat, Fruity Limiter, Maximus...) is drawn by the main window: its moving displays use less CPU. Hosted plugins and detached windows keep windows of their own" = "Aan: een gedockte LYNX-editor (Gross Beat, Fruity Limiter, Maximus...) wordt door het hoofdvenster getekend: de bewegende weergaven gebruiken minder CPU. Gehoste plugins en losgemaakte vensters houden een eigen venster"

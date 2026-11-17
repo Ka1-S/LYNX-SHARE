@@ -10908,3 +10908,5 @@ countries: cn sg
 "Block" = "块"
 "Group notes" = "音符编组"
 "The pattern could not be read." = "无法读取该模式。"
+"Draw docked LYNX editors in the main window (lighter live displays)" = "在主窗口中绘制停靠的 LYNX 编辑器（实时显示更轻量）"
+"On: a docked LYNX editor (Gross Beat, Fruity Limiter, Maximus...) is drawn by the main window: its moving displays use less CPU. Hosted plugins and detached windows keep windows of their own" = "开启：停靠的 LYNX 编辑器（Gross Beat、Fruity Limiter、Maximus 等）由主窗口绘制，其动态显示占用更少 CPU。托管插件和分离的窗口保留各自的窗口"

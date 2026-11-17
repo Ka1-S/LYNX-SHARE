@@ -10908,3 +10908,5 @@ countries: it ch sm
 "Block" = "Blocco"
 "Group notes" = "Raggruppa le note"
 "The pattern could not be read." = "Impossibile leggere il pattern."
+"Draw docked LYNX editors in the main window (lighter live displays)" = "Disegna gli editor LYNX agganciati nella finestra principale (display dal vivo più leggeri)"
+"On: a docked LYNX editor (Gross Beat, Fruity Limiter, Maximus...) is drawn by the main window: its moving displays use less CPU. Hosted plugins and detached windows keep windows of their own" = "Attivo: un editor LYNX agganciato (Gross Beat, Fruity Limiter, Maximus...) viene disegnato dalla finestra principale: i suoi display in movimento usano meno CPU. I plugin ospitati e le finestre staccate mantengono finestre proprie"
