@@ -138,6 +138,21 @@ private:
     bool dragged = false;
 };
 
+// A button of FL's narrow 42 px boxes (Round, Limit): LYNX's look, the word in the small UI size with 2 px margins, so it
+// is not cut ("Rou...") where FL's smaller form font fits it
+class CompactButton final : public juce::TextButton
+{
+public:
+    void paintButton (juce::Graphics& g, bool over, bool down) override
+    {
+        auto& lf = getLookAndFeel();
+        lf.drawButtonBackground (g, *this, findColour (getToggleState() ? buttonOnColourId : buttonColourId), over, down);
+        g.setFont (theme::font (theme::type::small));
+        g.setColour (findColour (textColourOffId).withMultipliedAlpha (isEnabled() ? 1.0f : 0.45f));
+        g.drawFittedText (getButtonText(), getLocalBounds().reduced (2, 0), juce::Justification::centred, 1, 0.8f);
+    }
+};
+
 class SamplePropertiesPanel final : public juce::Component
 {
 public:
@@ -433,7 +448,8 @@ private:
     bool linking = false;
     juce::Label titleLabel, commentsLabel, fileNameLabel, rateLabel, formatLabel, bpmLabel, beatsLabel, middleLabel, lowLabel, highLabel, fineLabel;
     juce::TextEditor nameEdit, commentsEdit, fileNameEdit, rateEdit, tempoEdit, beatsEdit, fineEdit;
-    juce::TextButton rateSet, roundTempo, roundBeats, limit, bpmDetect, bpmDefault, roundPitch, pitchDetect, pitchDefault, accept;
+    juce::TextButton rateSet, bpmDetect, bpmDefault, pitchDetect, pitchDefault, accept;
+    CompactButton roundTempo, roundBeats, limit, roundPitch; // (FL's 42 px boxes: their words drawn small enough to fit)
     juce::ToggleButton resampleBox, tempoSync;
     juce::ComboBox formatSel, channelsSel, middleSel, lowSel, highSel;
     RangeKeyboard keyboard;

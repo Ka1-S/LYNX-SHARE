@@ -20679,6 +20679,9 @@ private:
             host.projectTempo = 120.0;
             auto props = lynx::makeSamplePropertiesPanel (withProps, d.title.empty() ? std::string ("Drum loop") : d.title, host);
             shot (*props, "-sample-properties.png");
+            // the file's own properties (a WAV without them: FL's defaults — the FL | LYNX pair of the form as it opens)
+            auto plain = lynx::makeSamplePropertiesPanel (d, file.isNotEmpty() ? juce::File (file).getFileNameWithoutExtension().toStdString() : std::string ("Drum loop"), host);
+            shot (*plain, "-sample-properties-file.png");
             juce::StringArray chunks;
             const auto wav = ae::encodeWav (withProps, ae::WavFormat::int16);
             for (std::size_t p = 12; p + 8 <= wav.size();)

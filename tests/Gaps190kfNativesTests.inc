@@ -313,3 +313,38 @@ TEST (gaps190kf_clickfree_paste_and_clear)
     CHECK (t.audio.frames() == 29000 && t.audio.channels[0][5000] == t0[6000]);
     CHECK (std::abs (t.audio.channels[0][0] - (float) ((double) t0[1000] * g (0))) < 1e-6f);
 }
+
+// Bit-identity for files and projects saved before this round: a document without sample properties writes the same
+// bytes as before (smpl only with a loop, unity note 60, fraction 0, one loop; no inst / acid / LIST), and decode → encode
+// of such a file gives the same bytes back (the readers find no property, so nothing new is written)
+TEST (gaps190kf_props_old_files_stay_byte_identical)
+{
+    using namespace gaps190kfnatives;
+    auto d = sine (1.5, 48000.0, 330.0, 2);
+    d.loopStart = 4800;
+    d.loopEnd = 52800;
+    for (const auto format : { gkf_ae::WavFormat::int16, gkf_ae::WavFormat::float32 })
+    {
+        const auto w = gkf_ae::encodeWav (d, format);
+        std::uint32_t len = 0;
+        const auto* smpl = chunk (w, "smpl", &len);
+        CHECK (smpl != nullptr && len == 60);
+        if (smpl != nullptr)
+            CHECK (u32 (smpl + 12) == 60 && u32 (smpl + 16) == 0 && u32 (smpl + 28) == 1 && u32 (smpl + 44) == 4800 && u32 (smpl + 48) == 52799);
+        CHECK (chunk (w, "inst") == nullptr && chunk (w, "acid") == nullptr && chunk (w, "LIST") == nullptr);
+        gkf_ae::Document back;
+        CHECK (gkf_ae::decodeWav (w.data(), w.size(), back));
+        CHECK (! back.props.hasPitchInfo() && ! back.props.hasTempoInfo() && back.props.name.empty() && back.props.comments.empty());
+        CHECK (back.props.int16 == (format == gkf_ae::WavFormat::int16)); // (FL's Precision as the file's)
+        CHECK (gkf_ae::encodeWav (back, format) == w);
+    }
+    // the plain edits (click-free off) are untouched by the click-free ones: a plain delete is the exact splice
+    auto plain = sine (1.0, 44100.0, 440.0);
+    const auto orig = plain.audio.channels[0];
+    gkf_ae::erase (plain, { 1000, 3000 });
+    bool exact = plain.audio.frames() == (std::int64_t) orig.size() - 2000;
+    for (std::size_t i = 0; exact && i < plain.audio.channels[0].size(); ++i)
+        exact = plain.audio.channels[0][i] == orig[i < 1000 ? i : i + 2000];
+    CHECK (exact);
+}
+

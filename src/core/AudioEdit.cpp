@@ -1305,6 +1305,9 @@ bool decodeWav (const std::uint8_t* data, std::size_t size, Document& out)
     bool any = false;
     parseMarkers (data, size, out, frames, any);
     decodeWavProps (data, size, out); // (round gaps190kf)
+    // FL's Format › Precision shows a PCM file of 16 bits or fewer as "16Bit int" [FL 2026: sine440.wav, 16-bit, opens
+    // as 16Bit int — natives/ev/fl-sample-properties.png]; only the menu and the form read it (the samples are not touched)
+    out.props.int16 = format == 1 && bits <= 16;
     return true;
 }
 
