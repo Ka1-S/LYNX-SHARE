@@ -3982,3 +3982,58 @@ latency change.
 - Facet: the −30 dB time-constant probe is at 3 (from 2): the reference's cut after the short bursts (7.5 / 8.7 s) is
   still deeper than the model's.
 - PuigTec, SuperTap's feedback delay and modulation, EchoBoy's shelving cuts (round 190jh's list) not touched.
+
+## Round 190kw (Timeless 3 translator): FabFilter Timeless 3 → Echoform (the hidden line law)
+
+0.1.30 plugin parity. Black-box on captures already on disk (lab and evidence: `/mnt/e/lynx-work/rea190kw/tl3/`,
+REA_part.md). Same score as rounds 190iq … 190js (`scripts/fxparity.py`, 0–10): the references' own renders against LYNX
+loading the plug-in's saved state through its substitute.
+
+**Before.** `[fabfilter-timeless]` played Fruity Delay 3 at FL's default whatever the state said: 2.37 / 10 on refcap030's
+Timeless 3 bank (279 files), the lowest FabFilter row.
+
+**The state.** FFBS v1, 1007 values, one per parameter of the plug-in's own VST3 list in its order (refcap182's parameter
+dumps name every index; the plug-in's parameter-set order read statically agrees): delay time (the normalised knob), time
+pan, offset, sync, read mode, freeze, ping pong, 15 taps, feedback (0 … 2) / pan / cross mix / inverts, six filters
+(log2 Hz, gain, pan, peak, style, shape, slope, enabled, used), drive, lo-fi, diffuse, dynamics, pitch, width, wet level
+/ pan, mix (−1 … 1). Every capture's Filter 1 is "unused": its 55 frequency × style renders are the same sound.
+
+**What the reference does (measured).** The delay time knob, read off the echoes' sample positions at 44.1 / 48 / 96 kHz
+and the display texts (5 ms … 5 s; no closed form fits, so a monotone cubic in log ms through 11 points); echoes on whole
+samples; the dry at unity up to Mix 50 %, the wet 2 × Mix; the echo flat to 15 kHz through a linear-phase low-pass on
+every read (−2.3 dB at 20 kHz, −6 dB at 24 kHz at 48 kHz) and a 15.5 Hz one-pole low cut in the loop; the feedback per
+pass = the stored fraction; nearly linear (−0.08 dB at a 0 dBFS impulse), the loop settling near ±6 above 100 %; ping
+pong feeds the start side's own input only (programme regression: left echo 0.60 × left input, −0.03 × right).
+
+**Stand-in: Echoform** (the multi-mode echo already playing H-Delay, SuperTap and the Soundtoys delays). Fruity Delay 3 is
+FL-exact and has no line to match the reference's dry / wet law, read filter or whole-sample times; Echoform's Clean mode
+reaches them with one hidden addition: **the line law** (`echoform::lineLaw`, past the info's parameters and its revision:
+no control, no text; saved while non-zero; set only by a translated Timeless 3 state or the entry's preset `#109=1`): the
+reference's dry / wet law, the read through a Kaiser-windowed sinc fitted per rate (44.1 kHz: half length 12, cutoff 0.94
+of Nyquist, β 11; 48 kHz: 8 / 0.9175 / 9.5; 96 kHz: 4 / 0.8625 / 6.5; residual −44 … −49 dB under the echo), whole-sample
+delays, a 5.5 tanh (x / 5.5) limit instead of the Clean shaper and the line's 2 tanh (x / 2), and in ping pong the start
+side's own input. Without it (every project and preset saved before) Echoform renders bit for bit as before (six Echoform
+settings and Fruity Delay 3 compared byte for byte against the base build). The translator `timeless3`
+(`fabfilter::fromTimeless3`) carries delay time / sync (1/2 … 1/16, dotted / triplet offsets) / time pan, feedback (ping
+pong: the square, as Echoform's ping-pong loops √gain per side), feedback pan / cross mix, mix, width, wet level / pan,
+freeze, the filters in use (low pass → high cut, high pass → low cut), drive and diffuse; the last groups are by meaning,
+not measured (no capture uses them). Not carried: the extra taps, lo-fi, dynamics, pitch shift, feedback invert, the M/S
+channel mode, the modulation sources. Without a readable state (Timeless 2): the reference's default (a single 350 ms
+echo, no feedback, Mix 50 %, the line law).
+
+| refcap030 Timeless 3 block | files | before → after | up / same / down |
+|---|---|---|---|
+| grid (Filter 1 style × freq, inert: S1 250 ms / 50 %; ping pong × feedback, left impulse) | 125 | 1.94 → **7.68** | 122 / 3 / 0 |
+| grid2 (delay time × feedback 0 … 200 %, 96 kHz) | 25 | 2.16 → **5.88** | 24 / 1 / 0 |
+| mode (read mode, filter style, channel mode on S1) | 45 | 3.00 → **6.00** | 45 / 0 / 0 |
+| pairs (time × feedback, feedback × filter freq) | 36 | 1.75 → **5.03** | 36 / 0 / 0 |
+| sr44 / sr48 / sr96 (D, S1, S2 ping pong, S3 width 0) | 48 | 3.38 / 3.44 / 3.56 → **7.94 / 7.94 / 7.56** | 47 / 1 / 0 |
+| **all** | 279 | **2.37 → 6.93** | 274 / 5 / 0 |
+| refcap182 programme (D / S1 / S2 / S3 × drums, bass, guitar, vocal, mix) | 20 | 3.45 → **7.25** | 20 / 0 / 0 |
+
+What is still off: feedback at 100 % and above (the reference's loop grows to about ±6 and self-oscillates from nothing
+in ping pong; scores 1 … 5), the mode block's ir renders (the reference put the same state's echo at 12000 samples there and
+at 11999 in grid / sr48: a one-sample spread in its own captures; 4 / 10 on those 15 files), S1's programme with louder
+peaks (5 … 7). CPU (thread time, 20 s at 48 kHz, blocks of 512, best of 5, three runs on a loaded machine): Fruity Delay 3
+at its default 0.68 … 0.84 % → Echoform from the D / S1 / S2 states 1.50 … 2.12 % (the same settings without the line law
+1.32 … 1.68 %): Echoform's engine costs about twice Fruity Delay 3's (+0.8 … 1.2 points of one core).

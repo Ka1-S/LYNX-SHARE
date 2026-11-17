@@ -17775,6 +17775,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Parity190itTests.inc"
 #include "Parity190jhTests.inc" // round 190jh: Facet's automatic threshold, Pro-Q 4 dynamic bands, Waves L2 / SuperTap / SSLComp / CLA-76
 #include "Parity190jsTests.inc" // round 190js: the Waves reverbs on Reeverb 2, Hush's Single Vocal revision, Facet's auto-threshold refit
+#include "Parity190kwTl3Tests.inc" // round 190kw: Timeless 3 states on Echoform (the hidden line law)
 #include "Sampler190dhTests.inc"
 #include "Fix190eaTests.inc"
 #include "Iss158Tests.inc"

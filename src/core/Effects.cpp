@@ -4542,6 +4542,9 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     // round 190is: an Echoform saved before the voicings' revision keeps rounds 147 / 150's voicings
     if (slot.kind == EffectKind::echoform && savedCount <= (std::size_t) echosuite::echoform::revision)
         slot.params[(std::size_t) echosuite::echoform::revision] = 0.0f;
+    // round 190kw: … and one saved before the line law (hidden, set only by a translated Timeless 3 state) keeps the engine
+    if (slot.kind == EffectKind::echoform && savedCount <= (std::size_t) echosuite::echoform::lineLaw)
+        slot.params[(std::size_t) echosuite::echoform::lineLaw] = 0.0f;
     // round 190ca: a Nebula saved before the cloud law keeps the classic engine in every mode
     if (slot.kind == EffectKind::nebula && savedCount <= (std::size_t) verbs::nebula::law)
         slot.params[(std::size_t) verbs::nebula::law] = 0.0f;
