@@ -664,7 +664,7 @@ juce::String AudioEngine::exportLiveSelfTest (const std::function<void (const ju
         juce::File f;
         ~Cleanup() { f.deleteRecursively(); }
     } cleanup { folder };
-    for (int k = 0; k < 3; ++k)
+    for (int k = 0; k < 4; ++k) // (parity-3: round 190jz's faded audio clip)
         if (! writeSample (folder.getChildFile ("parity-" + juce::String (k) + ".wav"), k))
             return "ERROR can't write the test samples in " + folder.getFullPathName();
 
@@ -737,10 +737,12 @@ juce::String AudioEngine::exportLiveSelfTest (const std::function<void (const ju
         c.name = "Hosted";
         c.volume = 0.8f;
         c.mixerTrack = 5;
+        // (its index: after paritySong's channels, which round 190jz's faded audio clip made four)
+        const auto hostedChannel = (int) song.channels.size();
         song.channels.push_back (c);
         song.mixer[5].name = "Hosted";
         for (int k = 0; k < 8; ++k)
-            song.patterns[0].notes.push_back ({ (std::int64_t) k * ppq / 2 + 11, ppq / 3, 3, 57 + (k % 4) * 3, 0.8f });
+            song.patterns[0].notes.push_back ({ (std::int64_t) k * ppq / 2 + 11, ppq / 3, hostedChannel, 57 + (k % 4) * 3, 0.8f });
         song.patterns[0].sortNotes();
         const auto errorsBefore = errors.size();
 
@@ -844,7 +846,7 @@ juce::String AudioEngine::exportLiveSelfTest (const std::function<void (const ju
             return worst;
         };
         auto hostedNow = [&]() -> juce::AudioPluginInstance* {
-            auto* p = dynamic_cast<PluginInstrument*> (live.getChannelInstrument (3).get());
+            auto* p = dynamic_cast<PluginInstrument*> (live.getChannelInstrument (hostedChannel).get());
             return p != nullptr ? &p->getInstance() : nullptr;
         };
 
