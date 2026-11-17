@@ -24,6 +24,7 @@
 #include "core/WavetableSynth.h"
 #include "core/Gzip.h"
 #include "core/Inflate.h"
+#include "core/LiveFader.h"
 #include "core/LiveScales.h"
 #include "core/OggVorbis.h"
 #include "core/Patcher.h"
@@ -2242,6 +2243,8 @@ struct Exporter
             const auto& a = song.automations[(std::size_t) c->automation];
             Node* owner = nullptr;
             std::string path;
+            int sendIndex = -1;
+            bool gain = false;
             std::function<double (float)> map;
             switch (a.target.kind)
             {
@@ -2254,11 +2257,23 @@ struct Exporter
                     owner = ownerOf (a.target.index);
                     path = "DeviceChain/Mixer/Volume/AutomationTarget";
                     map = [] (float v) { return std::clamp ((double) faderGain (v), minGain, maxGain); };
+                    gain = true;
                     break;
                 case AutomationTargetKind::mixerPan:
                     owner = ownerOf (a.target.index);
                     path = "DeviceChain/Mixer/Pan/AutomationTarget";
                     map = [] (float v) { return (double) v * 2.0 - 1.0; };
+                    break;
+                // round als190ka: a send to an insert that became a return track: that return's send knob (Live's
+                // send tops out at 0 dB [DATA: MidiControllerRange Max 1])
+                case AutomationTargetKind::mixerSend:
+                    if (const auto r = returnOf.find (a.target.slot); r != returnOf.end() && a.target.index != a.target.slot)
+                    {
+                        owner = ownerOf (a.target.index);
+                        sendIndex = r->second;
+                        map = [] (float v) { return std::clamp ((double) faderGain (v), minGain, 1.0); };
+                        gain = true;
+                    }
                     break;
                 default: break;
             }
@@ -2267,13 +2282,71 @@ struct Exporter
                 note ("Automation not exported: " + a.name);
                 continue;
             }
-            const auto* t = owner->at (path);
+            const Node* t = nullptr;
+            if (sendIndex >= 0)
+            {
+                if (auto* sends = owner->at ("DeviceChain/Mixer/Sends"); sends != nullptr && sendIndex < (int) sends->kids.size())
+                    t = sends->kids[(std::size_t) sendIndex].at ("Send/AutomationTarget");
+            }
+            else
+                t = owner->at (path);
             if (t == nullptr)
                 continue;
             auto& slot = envelopes[t->get ("Id")];
             slot.first = owner;
-            for (const auto& p : a.points)
-                slot.second.push_back ({ beats (c->start + p.tick), map (p.value) });
+            // round als190ka: LYNX's curve (bends, FL's curve modes, its straight fader travel) as Live's straight
+            // pieces: each segment is cut until what Live plays between two events (straight along its fader for the
+            // gains, core/LiveFader.h) stays within 0.1 dB (gains) or 0.3 % of the range of LYNX's curve
+            const auto& pts = a.points;
+            const auto valueAt = [&pts] (double tick) { return (double) automationCurveAt (pts, tick); };
+            double lo = 1.0e300, hi = -1.0e300;
+            for (const auto& p : pts)
+                lo = std::min (lo, map (p.value)), hi = std::max (hi, map (p.value));
+            const auto span = std::max (1.0e-9, hi - lo);
+            const auto off = [gain, span] (double truth, double straight) {
+                if (gain)
+                {
+                    const auto db = [] (double g) { return g > 1.0e-3 ? 20.0 * std::log10 (g) : -60.0; };
+                    return std::abs (db (truth) - db (straight)) / 0.1;
+                }
+                return std::abs (truth - straight) / (0.003 * span);
+            };
+            const auto send = sendIndex >= 0;
+            // what Live plays between two of its events: straight along its fader's travel for the gains
+            // (core/LiveFader.h), straight in the value otherwise
+            const auto liveBetween = [gain, send] (double l0, double l1, double q) {
+                if (! gain)
+                    return l0 + (l1 - l0) * q;
+                const auto p0 = livefader::positionOfGain (l0, send), p1 = livefader::positionOfGain (l1, send);
+                return livefader::gainAt (p0 + (p1 - p0) * q, send);
+            };
+            std::function<void (double, double, int)> piece = [&] (double t0, double t1, int depth) {
+                const auto l0 = map ((float) valueAt (t0)), l1 = map ((float) valueAt (t1));
+                double worst = 0.0;
+                for (const auto q : { 0.25, 0.5, 0.75 })
+                    worst = std::max (worst, off (map ((float) valueAt (t0 + (t1 - t0) * q)), liveBetween (l0, l1, q)));
+                if (depth < 7 && worst > 1.0)
+                {
+                    piece (t0, 0.5 * (t0 + t1), depth + 1);
+                    piece (0.5 * (t0 + t1), t1, depth + 1);
+                    return;
+                }
+                slot.second.push_back ({ beats (c->start) + t1 / (double) ppq, l1 });
+            };
+            for (std::size_t k = 0; k < pts.size(); ++k)
+            {
+                // the point itself (a jump: two points at one tick keep their order)
+                slot.second.push_back ({ beats (c->start + pts[k].tick), map (pts[k].value) });
+                if (k + 1 < pts.size() && pts[k + 1].tick > pts[k].tick)
+                {
+                    const auto t0 = (double) pts[k].tick, t1 = (double) pts[k + 1].tick;
+                    // the inner pieces only: the next point is written as itself
+                    const auto before = slot.second.size();
+                    piece (t0, t1, 0);
+                    if (slot.second.size() > before)
+                        slot.second.pop_back();
+                }
+            }
         }
         for (auto& [pointee, entry] : envelopes)
         {

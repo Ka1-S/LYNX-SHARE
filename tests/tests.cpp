@@ -17576,6 +17576,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Fluid174eTests.inc"
 #include "Comp177Tests.inc"
 #include "AlsImport175aTests.inc"
+#include "Als190kaTests.inc" // round als190ka (issue #193): .als automation laws, sends, device on / off, Main devices, video clips
 #include "AlsColours190igTests.inc" // round 190ig (CL-6): Live's colour table for .als imports in the Clip-launch layout
 #include "FlmImport182cTests.inc"
 #include "FlmEngines190uTests.inc"

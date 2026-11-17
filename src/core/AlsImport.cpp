@@ -20,10 +20,13 @@
 #include "core/FlWrapper.h"
 #include "core/Groove.h"
 #include "core/Gzip.h"
+#include "core/LiveFader.h"
 #include "core/LiveScales.h"
 #include "core/MissingFiles.h"
 #include "core/SessionOps.h"
+#include "core/SessionIds.h"
 #include "core/TimeStretch.h"
+#include "core/VideoTrack.h"
 #include "core/XmlLite.h"
 
 // Evidence tags as in docs/analise/ALS_FORMAT.md: [DATA] the sets Live 12 ships, [BIN] Live 12.4's member-name table.
@@ -93,7 +96,7 @@ std::string joinPath (const std::string& folder, const std::string& rel)
 std::string targetId (const Element& parameter) { return parameter.path ("AutomationTarget").attr ("Id"); }
 
 // How an automated value maps to LYNX's 0..1 for its target
-enum class ValueMap { fader, pan, tempo, plain };
+enum class ValueMap { fader, send, pan, tempo, plain };
 
 struct Target
 {
@@ -167,6 +170,20 @@ struct Ctx
     // round 190gi: the track being read's Clip Gain (MainSequencer/VolumeModulationTarget) and Track Panning modulation
     // (Mixer/Pan/ModulationTarget) ids, the targets of its audio clips' clip envelopes
     std::string clipVolumeTarget, clipPanTarget;
+    std::string clipTrackVolumeTarget; // (round als190ka) Mixer/Volume/ModulationTarget, and its fader's position
+    double clipTrackFader = 0.85;
+    // issue #193 (round als190ka): Live's video clips (an arrangement AudioClip whose file is a video), placed on video
+    // tracks once the tempo map is complete (song seconds need the tempo automation): the Live track's insert, the
+    // file, the arrangement span in beats, the file's second at the clip's start
+    struct PendingVideo
+    {
+        int insert = 0;
+        std::string path, name;
+        double startBeats = 0.0, endBeats = 0.0, offsetSeconds = 0.0;
+        bool warped = false;
+    };
+    std::vector<PendingVideo> videos;
+    bool inTakeLane = false; // (round als190ka) the clips being read sit on a take lane: no video clip of their own
 
     explicit Ctx (const AlsImportOptions& o) : options (o), report (o.common.report) {}
 
@@ -1494,6 +1511,23 @@ void finishLinks (Ctx& ctx)
 }
 
 // Audio effects of a track (after its instrument): plugins carried over, the rest listed
+// Issue #193 (round als190ka): a device's on / off switch under an envelope [DATA: Device/On{Manual, AutomationTarget},
+// BoolEvents]. Live's bypass passes the dry signal, which is LYNX's slot mix at 0: the envelope moves the slot's mix
+// between 0 (off) and the slot's own mix (on). A device that is off in the set but switched on by its envelope gets its
+// slot switched on (the envelope's first value keeps it silent until then).
+void deviceOnTarget (Ctx& ctx, const Element& d, MixerTrack& insert, int slot)
+{
+    const auto id = targetId (d.child ("On"));
+    if (id.empty() || ctx.automated.count (id) == 0 || slot < 0 || slot >= (int) insert.effects.size())
+        return;
+    auto& fx = insert.effects[(std::size_t) slot];
+    fx.enabled = true;
+    const auto mix = fx.mix;
+    const auto track = (int) (&insert - ctx.song.mixer.data());
+    ctx.targets[id] = { AutomationTarget { AutomationTargetKind::effectMix, track, slot, 0 }, ValueMap::plain, deviceName (d) + " On",
+                        [mix] (double v) { return v > 0.5 ? mix : 0.0f; } };
+}
+
 void effectsFrom (Ctx& ctx, const std::vector<Element>& devices, MixerTrack& insert)
 {
     for (const auto& d : devices)
@@ -1520,6 +1554,7 @@ void effectsFrom (Ctx& ctx, const std::vector<Element>& devices, MixerTrack& ins
                     },
                     &slots);
                 appendVst3Slots (insert.effects.back().plugin.foreign, slots); // (round 190ek)
+                deviceOnTarget (ctx, d, insert, at);
             }
             continue;
         }
@@ -1539,6 +1574,7 @@ void effectsFrom (Ctx& ctx, const std::vector<Element>& devices, MixerTrack& ins
                 placeRackAutos (ctx, insert.effects.back().patcher, autos, [track, at] (int k) {
                     return AutomationTarget { AutomationTargetKind::effectParam, track, at, k };
                 });
+                deviceOnTarget (ctx, d, insert, at);
             }
             continue;
         }
@@ -1567,6 +1603,7 @@ void effectsFrom (Ctx& ctx, const std::vector<Element>& devices, MixerTrack& ins
                 if (const auto id = targetId (d.path (l.live)); ! id.empty())
                     ctx.targets[id] = { AutomationTarget { AutomationTargetKind::effectParam, track, (int) insert.effects.size() - 1, l.param },
                                         ValueMap::plain, from + " " + spacedName (pathFileName (l.live)), std::move (l.value) };
+            deviceOnTarget (ctx, d, insert, (int) insert.effects.size() - 1);
             continue;
         }
         // (round 190cf) a device LYNX could hold, on an insert whose slots are all taken, is named with that reason
@@ -1673,9 +1710,12 @@ std::map<int, NoteCurves> perNoteCurvesOf (const Element& clip)
         };
         std::vector<Event> events;
         for (const auto& e : list.path ("Events").children ("PerNoteEvent"))
-            events.push_back ({ std::max (0.0, numberAttr (e, "TimeOffset")), numberAttr (e, "Value"), e.hasAttr ("CurveControl1X"),
-                                std::clamp (numberAttr (e, "CurveControl1X"), 0.0, 1.0), numberAttr (e, "CurveControl1Y"),
-                                std::clamp (numberAttr (e, "CurveControl2X", 1.0), 0.0, 1.0), numberAttr (e, "CurveControl2Y", 1.0) });
+            // (round als190ka: Live leaves out the controls that are 0.5, so any one of them marks a curve and a missing
+            // one is 0.5)
+            events.push_back ({ std::max (0.0, numberAttr (e, "TimeOffset")), numberAttr (e, "Value"),
+                                e.hasAttr ("CurveControl1X") || e.hasAttr ("CurveControl1Y") || e.hasAttr ("CurveControl2X") || e.hasAttr ("CurveControl2Y"),
+                                std::clamp (numberAttr (e, "CurveControl1X", 0.5), 0.0, 1.0), numberAttr (e, "CurveControl1Y", 0.5),
+                                std::clamp (numberAttr (e, "CurveControl2X", 0.5), 0.0, 1.0), numberAttr (e, "CurveControl2Y", 0.5) });
         if (events.empty())
             continue;
         std::stable_sort (events.begin(), events.end(), [] (const Event& a, const Event& b) { return a.time < b.time; });
@@ -1846,6 +1886,9 @@ void clipEnvelopeTargets (Ctx& ctx, const Element& track)
 {
     ctx.clipVolumeTarget = track.path ("DeviceChain/MainSequencer/VolumeModulationTarget").attr ("Id");
     ctx.clipPanTarget = track.path ("DeviceChain/Mixer/Pan/ModulationTarget").attr ("Id");
+    // (round als190ka) the Mixer's Track Volume modulation, and the fader it moves
+    ctx.clipTrackVolumeTarget = track.path ("DeviceChain/Mixer/Volume/ModulationTarget").attr ("Id");
+    ctx.clipTrackFader = livefader::positionOfGain (track.path ("DeviceChain/Mixer").number ("Volume/Manual", 1.0), false);
 }
 
 // An audio clip's clip envelopes (round 190gi): the Clip Gain and Track Panning ones as a new entry of the song's
@@ -1857,12 +1900,32 @@ int clipEnvelopeOf (Ctx& ctx, const Element& clip, const ToTicks& contentTicks)
     for (const auto& env : clip.path ("Envelopes/Envelopes").children ("ClipEnvelope"))
     {
         const auto pointee = env.path ("EnvelopeTarget/PointeeId").attr ("Value");
-        const auto lane = ! pointee.empty() && pointee == ctx.clipVolumeTarget ? clipenv::volumeLane
-                          : ! pointee.empty() && pointee == ctx.clipPanTarget  ? clipenv::panLane
-                                                                               : (std::uint8_t) 0;
+        // round als190ka: the Mixer's Track Volume modulation [LIVE 12.4 render, fader at 0 dB: modulation m plays
+        // −17·(1 − m) dB, i.e. the fader at (1 + m)/2 of its position]: carried on the clip's volume lane as the gain
+        // that difference makes (exact while the fader stays above position 0.4, where the fader is linear in dB)
+        const auto trackVolume = ! pointee.empty() && pointee == ctx.clipTrackVolumeTarget;
+        const auto lane = ! pointee.empty() && (pointee == ctx.clipVolumeTarget || trackVolume) ? clipenv::volumeLane
+                          : ! pointee.empty() && pointee == ctx.clipPanTarget                   ? clipenv::panLane
+                                                                                                : (std::uint8_t) 0;
+        const auto fader = ctx.clipTrackFader;
+        const auto asClipGain = [trackVolume, fader] (double live) {
+            if (! trackVolume)
+                return live;
+            const auto db = livefader::volumeDb (fader * (1.0 + std::clamp (live, 0.0, 1.0)) * 0.5) - livefader::volumeDb (fader);
+            return clipenv::liveValueOfGain (std::isfinite (db) ? std::pow (10.0, db / 20.0) : 0.0);
+        };
+        if (trackVolume)
+        {
+            if (! clipenv::laneOf (e, clipenv::volumeLane).empty())
+            {
+                ctx.note (&FlpImportReport::unsupported, "Track Volume clip envelope together with a Clip Gain envelope (the Clip Gain one is kept)");
+                continue;
+            }
+            ctx.note (&FlpImportReport::approximated, "Track Volume clip envelope (on the clip's volume; Live's law measured with the fader at 0 dB)");
+        }
         if (lane == 0)
         {
-            ctx.note (&FlpImportReport::unsupported, "Clip envelopes of devices and of other mixer controls (left out; Clip Gain and Track Panning are kept)");
+            ctx.note (&FlpImportReport::unsupported, "Clip envelopes of devices and of other mixer controls (left out; Clip Gain, Track Volume and Track Panning are kept)");
             continue;
         }
         std::vector<AutomationPoint> points;
@@ -1872,8 +1935,8 @@ int clipEnvelopeOf (Ctx& ctx, const Element& clip, const ToTicks& contentTicks)
         for (const auto& ev : env.path ("Automation/Events").children())
         {
             const auto t = numberAttr (ev, "Time");
-            const auto live = numberAttr (ev, "Value");
-            curves = curves || ev.hasAttr ("CurveControl1X");
+            const auto live = asClipGain (numberAttr (ev, "Value"));
+            curves = curves || ev.hasAttr ("CurveControl1X") || ev.hasAttr ("CurveControl1Y") || ev.hasAttr ("CurveControl2X") || ev.hasAttr ("CurveControl2Y");
             if (t < -1.0e6) // the "before the song" event [DATA]
             {
                 before = clipenv::fromLive (lane, live);
@@ -2010,6 +2073,26 @@ void addAudioClip (Ctx& ctx, const Element& clip, int row, int mixerTrack, doubl
         for (auto* v : { &unwarpedLoop.start, &unwarpedLoop.end, &unwarpedLoop.loopStart, &unwarpedLoop.loopEnd })
             *v *= bpm / 60.0;
     const auto passes = passesOf (warped ? loop : unwarpedLoop, length);
+    // issue #193 (round als190ka): a video file on an arrangement audio track is one of Live's video clips: the picture
+    // goes onto a LYNX video track with the clip's own trim (where it starts, which second of the file, how long), the
+    // sound stays this audio clip on the track's insert (the sample library decodes a video's sound track). Live shows
+    // video from the Arrangement only; a Session clip plays its sound only [Live 12 manual, "Working with Video"].
+    if (out == nullptr && ! ctx.inTakeLane && videotrack::isVideoPath (path) && ! passes.empty())
+    {
+        Ctx::PendingVideo v;
+        v.insert = mixerTrack;
+        v.path = path;
+        v.name = user;
+        v.startBeats = at;
+        v.endBeats = at + passes.front().to - passes.front().from;
+        // the file's second at the clip's start: unwarped clips keep their markers in seconds, warped ones in content
+        // beats (the warp markers map them back to the file's seconds)
+        v.offsetSeconds = std::max (0.0, warped ? (loop.start - beatAtZero) / std::max (1.0e-9, rate) : loop.start);
+        v.warped = warped;
+        if (passes.size() > 1)
+            ctx.note (&FlpImportReport::approximated, "Looped video clip (the picture plays the first pass; the sound loops)");
+        ctx.videos.push_back (std::move (v));
+    }
     for (const auto& pass : passes)
     {
         Clip c;
@@ -2140,16 +2223,115 @@ ClipFollow followOf (const Element& f)
 // ---------------------------------------------------------------------------------------------------------------
 // Automation
 
+// ---- issue #193 (round als190ka): Live's envelopes, point for point -----------------------------------------------
+// One breakpoint [DATA: FloatEvent{@Time, @Value [, @CurveControl1X/1Y/2X/2Y]}, BoolEvent / EnumEvent{@Time, @Value}].
+struct LiveEvent
+{
+    double time = 0.0, value = 0.0;
+    bool curved = false;
+    double x1 = 0.0, y1 = 0.0, x2 = 1.0, y2 = 1.0;
+};
+
+std::vector<LiveEvent> eventsOf (const Element& events, bool& stepped)
+{
+    std::vector<LiveEvent> out;
+    stepped = false;
+    for (const auto& e : events.children())
+    {
+        LiveEvent ev;
+        ev.time = numberAttr (e, "Time");
+        if (e.name() == "FloatEvent")
+        {
+            ev.value = numberAttr (e, "Value");
+            // Live writes only the controls that are not 0.5 [LIVE 12.4 save of the round's probe set: (0.5, 0, 1, 0.5)
+            // came back as CurveControl1Y="0" CurveControl2X="1"]: any one of them makes the segment curved
+            if (e.hasAttr ("CurveControl1X") || e.hasAttr ("CurveControl1Y") || e.hasAttr ("CurveControl2X") || e.hasAttr ("CurveControl2Y"))
+            {
+                ev.curved = true;
+                ev.x1 = std::clamp (numberAttr (e, "CurveControl1X", 0.5), 0.0, 1.0);
+                ev.y1 = numberAttr (e, "CurveControl1Y", 0.5);
+                ev.x2 = std::clamp (numberAttr (e, "CurveControl2X", 0.5), 0.0, 1.0);
+                ev.y2 = numberAttr (e, "CurveControl2Y", 0.5);
+            }
+        }
+        else if (e.name() == "BoolEvent" || e.name() == "EnumEvent")
+        {
+            const auto v = e.attr ("Value");
+            ev.value = v == "true" ? 1.0 : v == "false" ? 0.0 : numberAttr (e, "Value");
+            stepped = true;
+        }
+        else
+            continue;
+        out.push_back (ev);
+    }
+    // in time order; events at one time keep the set's order (Live writes a jump as the value before, then after)
+    std::stable_sort (out.begin(), out.end(), [] (const LiveEvent& a, const LiveEvent& b) { return a.time < b.time; });
+    return out;
+}
+
+// The fraction 0…1 of the way from `a` to the next event at fraction `f` of the time between them: straight, or the
+// cubic Bézier through (0, 0), (x1, y1), (x2, y2), (1, 1) that `a` carries, in the segment's normalised time and value
+// [LIVE 12.4 renders, round als190ka: the controls on an event bend the segment that STARTS there]
+double segmentShape (const LiveEvent& a, double f) noexcept
+{
+    if (! a.curved)
+        return f;
+    // x(s) is monotonic for controls within 0…1: bisection for the s whose x is f
+    double lo = 0.0, hi = 1.0;
+    for (int k = 0; k < 40; ++k)
+    {
+        const auto s = 0.5 * (lo + hi), r = 1.0 - s;
+        const auto x = 3.0 * r * r * s * a.x1 + 3.0 * r * s * s * a.x2 + s * s * s;
+        (x < f ? lo : hi) = s;
+    }
+    const auto s = 0.5 * (lo + hi), r = 1.0 - s;
+    return 3.0 * r * r * s * a.y1 + 3.0 * r * s * s * a.y2 + s * s * s;
+}
+
 float mapValue (ValueMap m, double v)
 {
     switch (m)
     {
-        case ValueMap::fader: return faderPosition ((float) std::clamp (v <= minusInfGain * 1.0001 ? 0.0 : v, 0.0, (double) maxFaderGain));
+        case ValueMap::fader:
+        case ValueMap::send: return faderPosition ((float) std::clamp (v <= minusInfGain * 1.0001 ? 0.0 : v, 0.0, (double) maxFaderGain));
         case ValueMap::pan: return (float) std::clamp ((v + 1.0) * 0.5, 0.0, 1.0);
         case ValueMap::tempo: return std::clamp (valueFromTempo (v), 0.0f, 1.0f);
         case ValueMap::plain: break;
     }
     return (float) std::clamp (v, 0.0, 1.0);
+}
+
+// Live moves a parameter in a straight line along its own travel [LIVE 12.4 renders, round als190ka]: for the mixer's
+// volume and sends that is the fader's position (core/LiveFader.h), not the gain the set stores and not LYNX's own fader
+// travel, so each segment is cut into pieces until LYNX's straight pieces stay within 0.1 dB of Live's curve (above
+// −60 dB). Other parameters go straight (or along their bend) in the target's own 0…1, as before; a bent one is cut
+// until the pieces stay within 0.3 % of the travel. `valueAt (f)` is the target's value at fraction f of the segment;
+// the pieces' ends after the segment's start go to `add (time, value)` in order, the segment's end included.
+template <typename ValueAt, typename Add>
+void matchSegment (const LiveEvent& a, const LiveEvent& b, const ValueAt& valueAt, bool gain, const Add& add, double f0 = 0.0, double f1 = 1.0,
+                   int depth = 0)
+{
+    const auto v0 = (double) valueAt (f0), v1 = (double) valueAt (f1);
+    double off = 0.0;
+    for (const auto q : { 0.25, 0.5, 0.75 })
+    {
+        const auto truth = (double) valueAt (f0 + (f1 - f0) * q), straight = v0 + (v1 - v0) * q;
+        if (gain)
+        {
+            const auto db = [] (double pos) { const auto g = (double) faderGain ((float) pos); return g > 1.0e-3 ? 20.0 * std::log10 (g) : -60.0; };
+            off = std::max (off, std::abs (db (truth) - db (straight)) / 0.1);
+        }
+        else
+            off = std::max (off, std::abs (truth - straight) / 0.003);
+    }
+    if (depth < 7 && off > 1.0)
+    {
+        const auto fm = 0.5 * (f0 + f1);
+        matchSegment (a, b, valueAt, gain, add, f0, fm, depth + 1);
+        matchSegment (a, b, valueAt, gain, add, fm, f1, depth + 1);
+        return;
+    }
+    add (a.time + (b.time - a.time) * f1, (float) v1);
 }
 
 void addAutomation (Ctx& ctx, const Element& envelopes, const std::string& owner, int& automationRow)
@@ -2184,25 +2366,79 @@ void addAutomation (Ctx& ctx, const Element& envelopes, const std::string& owner
                 ctx.note (&FlpImportReport::unsupported, "Automation of a device parameter (" + owner + ")");
             continue;
         }
-        std::vector<std::pair<double, double>> events;
-        for (const auto& e : env.path ("Automation/Events").children())
-            if (e.name() == "FloatEvent")
-                events.push_back ({ numberAttr (e, "Time"), numberAttr (e, "Value") });
+        bool stepped = false;
+        auto events = eventsOf (env.path ("Automation/Events"), stepped);
         if (events.empty())
             continue;
-        std::stable_sort (events.begin(), events.end(), [] (auto& a, auto& b) { return a.first < b.first; });
         // the "before the song" point: the value at the start
         for (auto& e : events)
-            if (e.first <= beforeSongTime + 1.0)
-                e.first = 0.0;
+            if (e.time <= beforeSongTime + 1.0)
+                e.time = 0.0;
+        const auto& target = it->second;
         if (events.size() == 1)
-            continue; // a single value: the parameter's own setting already holds it
+        {
+            // a single value: Live plays the envelope's value, not the control's own setting (round als190ka: Live's
+            // default set holds Tempo Manual 100 under a one-event envelope of 120, and plays at 120). The mixer's
+            // controls and the tempo take it as their setting; other parameters keep theirs (as before)
+            const auto v = events.front().value;
+            const auto& t = target.target;
+            const auto track = t.index >= 0 && t.index < (int) ctx.song.mixer.size() ? &ctx.song.mixer[(std::size_t) t.index] : nullptr;
+            if (t.kind == AutomationTargetKind::tempo)
+                ctx.song.bpm = std::clamp (v, minTempo, maxTempo);
+            else if (t.kind == AutomationTargetKind::mixerVolume && track != nullptr && ! target.law)
+                track->volume = mapValue (target.map, v);
+            else if (t.kind == AutomationTargetKind::mixerPan && track != nullptr && ! target.law)
+                track->pan = (float) std::clamp (v, -1.0, 1.0);
+            else if (t.kind == AutomationTargetKind::mixerSend && track != nullptr && ! target.law)
+                for (auto& send : track->sends)
+                    if (send.target == t.slot)
+                        send.level = v > minusInfGain * 1.0001 ? (float) std::min (v, (double) maxFaderGain) : 0.0f;
+            continue;
+        }
+        const std::function<float (double)> to = [&target] (double v) {
+            return target.law ? std::clamp (target.law (v), 0.0f, 1.0f) : mapValue (target.map, v);
+        };
+        const auto gain = ! target.law && (target.map == ValueMap::fader || target.map == ValueMap::send);
         Automation a;
-        a.name = owner + " " + it->second.name;
-        a.target = it->second.target;
-        const auto first = std::max (0.0, events.front().first);
-        for (const auto& [t, v] : events)
-            a.points.push_back ({ ticksOf (std::max (0.0, t) - first), it->second.law ? std::clamp (it->second.law (v), 0.0f, 1.0f) : mapValue (it->second.map, v), 0.0f });
+        a.name = owner + " " + target.name;
+        a.target = target.target;
+        const auto first = std::max (0.0, events.front().time);
+        const auto add = [&a, first] (double t, float v) { a.points.push_back ({ ticksOf (std::max (0.0, t) - first), v, 0.0f }); };
+        add (events.front().time, to (events.front().value));
+        bool curves = false;
+        for (std::size_t k = 1; k < events.size(); ++k)
+        {
+            const auto& prev = events[k - 1];
+            const auto& next = events[k];
+            if (stepped)
+            {
+                // on / off and choices hold their value until the next event
+                if (next.time > prev.time)
+                    add (next.time, to (prev.value));
+                add (next.time, to (next.value));
+                continue;
+            }
+            curves = curves || (prev.curved && next.time > prev.time);
+            if (next.time <= prev.time || prev.value == next.value)
+                add (next.time, to (next.value));
+            else if (gain)
+            {
+                // along Live's fader travel (a send's fader sits 6 dB lower)
+                const auto send = target.map == ValueMap::send;
+                const auto p0 = livefader::positionOfGain (prev.value, send), p1 = livefader::positionOfGain (next.value, send);
+                matchSegment (
+                    prev, next, [&] (double f) { return mapValue (target.map, livefader::gainAt (p0 + (p1 - p0) * segmentShape (prev, f), send)); },
+                    true, add);
+            }
+            else if (prev.curved)
+            {
+                const auto v0 = (double) to (prev.value), v1 = (double) to (next.value);
+                matchSegment (prev, next, [&] (double f) { return v0 + (v1 - v0) * segmentShape (prev, f); }, false, add);
+            }
+            else
+                add (next.time, to (next.value));
+        }
+        (void) curves;
         ctx.song.automations.push_back (std::move (a));
         Clip c;
         c.kind = ClipKind::automation;
@@ -2220,7 +2456,12 @@ void registerMixerTargets (Ctx& ctx, const Element& mixer, int insert, const std
         ctx.targets[id] = { AutomationTarget { AutomationTargetKind::mixerVolume, insert, 0, 0 }, ValueMap::fader, "volume", {} };
     if (const auto id = targetId (mixer.child ("Pan")); ! id.empty())
         ctx.targets[id] = { AutomationTarget { AutomationTargetKind::mixerPan, insert, 0, 0 }, ValueMap::pan, "pan", {} };
-    (void) name;
+    // (issue #193) the track's on / off switch: LYNX's mixer mute has no automation, so it is named on its own
+    if (const auto id = targetId (mixer.child ("Speaker")); ! id.empty() && ctx.automated.count (id) != 0)
+    {
+        ctx.note (&FlpImportReport::unsupported, "Track on / off automation (" + name + ": LYNX's mute is not automated; the track stays as saved)");
+        ctx.explained.insert (id);
+    }
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -2850,7 +3091,19 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
     const auto mainMixer = main.path ("DeviceChain/Mixer");
     song.bpm = std::clamp (mainMixer.number ("Tempo/Manual", 120), minTempo, maxTempo);
     if (const auto id = targetId (mainMixer.child ("Tempo")); ! id.empty())
+    {
         ctx.targets[id] = { AutomationTarget { AutomationTargetKind::tempo, 0, 0, 0 }, ValueMap::tempo, "tempo", {} };
+        // round als190ka: under a tempo envelope Live plays the envelope's value, not Tempo/Manual (Live's own default set
+        // holds Manual 100 under a one-event envelope of 120 and plays at 120): the song starts at the envelope's first
+        // value, which every unwarped clip's length is worked out with
+        for (const auto& env : main.path ("AutomationEnvelopes/Envelopes").children ("AutomationEnvelope"))
+            if (env.path ("EnvelopeTarget/PointeeId").attr ("Value") == id)
+            {
+                bool stepped = false;
+                if (const auto events = eventsOf (env.path ("Automation/Events"), stepped); ! events.empty())
+                    song.bpm = std::clamp (events.front().value, minTempo, maxTempo);
+            }
+    }
     ctx.signatureTarget = targetId (mainMixer.child ("TimeSignature"));
     // the tempo envelope's shown range [DATA: Mixer/TempoAutomationViewBottom / Top, 60 and 200 in every stored set]
     if (const auto low = mainMixer.number ("TempoAutomationViewBottom", 0), high = mainMixer.number ("TempoAutomationViewTop", 0); high > low && low > 0)
@@ -2890,6 +3143,7 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
         for (const auto& env : t.path ("AutomationEnvelopes/Envelopes").children ("AutomationEnvelope"))
             ctx.automated.insert (env.path ("EnvelopeTarget/PointeeId").attr ("Value"));
     std::vector<int> insertOf (tracks.size(), 0), rowOf (tracks.size(), -1);
+    std::vector<std::vector<int>> laneRowsOf (tracks.size()); // (round als190ka) the rows of each track's take lanes
     std::map<std::string, int> groupInsert, groupRow, groupDepth;
     std::vector<int> returns;
     for (std::size_t i = 0; i < tracks.size(); ++i)
@@ -2928,6 +3182,30 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
                 groupInsert[tracks[i].attr ("Id")] = insertOf[i];
                 song.playlistTracks.back().collapsed = ! tracks[i].boolean ("TrackUnfolded", true);
             }
+            // round als190ka (coverage arrangement-0134): Live's take lanes [DATA: TakeLanes/TakeLanes/TakeLane{Name,
+            // ClipAutomation/Events}] → LYNX's take lanes (core/Comping.h): muted tracks folded one level under the
+            // track, whose own row (Live's main lane, what plays) becomes the comp track. A track inside a group keeps
+            // its group; its lanes nest under it (a comp needs a top-level header, so there it is a plain folder).
+            else if (const auto lanes = tracks[i].path ("TakeLanes/TakeLanes").children ("TakeLane"); ! lanes.empty())
+            {
+                const auto depth = row.grouped ? 1 + row.nest : 0;
+                song.playlistTracks.back().compTrack = depth == 0;
+                for (std::size_t k = 0; k < lanes.size(); ++k)
+                {
+                    PlaylistTrack lane;
+                    lane.name = lanes[k].value ("Name");
+                    if (lane.name.empty())
+                        lane.name = row.name + " " + std::to_string (k + 1);
+                    lane.colour = row.colour;
+                    lane.grouped = true;
+                    lane.nest = depth;
+                    lane.muted = true;
+                    lane.mixerTrack = row.mixerTrack;
+                    lane.mode = row.mode;
+                    song.playlistTracks.push_back (lane);
+                    laneRowsOf[i].push_back ((int) song.playlistTracks.size() - 1);
+                }
+            }
         }
     }
 
@@ -2961,10 +3239,15 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
             if (returns[k] == insertOf[i])
                 continue;
             const auto level = sends[k].number ("Send/Manual", 0);
-            if (const auto id = targetId (sends[k].child ("Send")); ! id.empty())
-                ctx.targets[id] = { AutomationTarget { AutomationTargetKind::mixerSend, insertOf[i], returns[k], 0 }, ValueMap::fader, "send", {} };
-            if (level > minusInfGain * 1.0001 && sends[k].boolean ("EnabledByUser", true))
-                m.sends.push_back ({ returns[k], (float) std::min (level, (double) maxFaderGain) });
+            const auto id = targetId (sends[k].child ("Send"));
+            if (! id.empty())
+                ctx.targets[id] = { AutomationTarget { AutomationTargetKind::mixerSend, insertOf[i], returns[k], 0 }, ValueMap::send, "send", {} };
+            // issue #193 (round als190ka): a send whose knob rests at −inf but has an envelope (a throw: the send opens
+            // for one word, one snare) still needs its route, at 0 — before, no route was made and the envelope had no
+            // send to move, so the return never heard the track
+            const auto automated = ! id.empty() && ctx.automated.count (id) != 0;
+            if ((level > minusInfGain * 1.0001 || automated) && sends[k].boolean ("EnabledByUser", true))
+                m.sends.push_back ({ returns[k], level > minusInfGain * 1.0001 ? (float) std::min (level, (double) maxFaderGain) : 0.0f });
         }
     }
 
@@ -3065,9 +3348,34 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
                     addAudioClip (ctx, clip, rowOf[i], insertOf[i], start, clip.number ("CurrentEnd", start) - start, insert.name);
                 }
         }
-        if (! t.path ("TakeLanes/TakeLanes").children ("TakeLane").empty())
-            ctx.note (&FlpImportReport::unsupported, "Take lanes (only the main lane is kept)");
+        // (round als190ka) the take lanes' clips, on their muted rows
+        const auto lanes = t.path ("TakeLanes/TakeLanes").children ("TakeLane");
+        for (std::size_t k = 0; k < lanes.size() && k < laneRowsOf[i].size(); ++k)
+        {
+            const auto row = laneRowsOf[i][k];
+            auto& laneRow = song.playlistTracks[(std::size_t) row];
+            ctx.inTakeLane = true;
+            for (const auto& clip : lanes[k].path ("ClipAutomation/Events").children())
+            {
+                const auto start = clip.number ("CurrentStart", numberAttr (clip, "Time"));
+                const auto length = clip.number ("CurrentEnd", start) - start;
+                if (clip.name() == "MidiClip" && channelOf[i] >= 0)
+                {
+                    laneRow.mode = PlaylistTrackMode::instrument;
+                    laneRow.channel = channelOf[i];
+                    addMidiClip (ctx, clip, row, channelOf[i], start, length);
+                }
+                else if (clip.name() == "AudioClip" && kind == "AudioTrack")
+                    addAudioClip (ctx, clip, row, insertOf[i], start, length, insert.name);
+            }
+            ctx.inTakeLane = false;
+        }
+        if (! lanes.empty())
+            ctx.note (&FlpImportReport::converted, "Take lanes (muted lanes under their track; the main lane plays)");
     }
+    // issue #193 (round als190ka): the Main track's own devices (a mixed set's bus chain: EQ, glue, limiter) go onto
+    // LYNX's Master insert with their envelopes; before, they were left out without a word
+    effectsFrom (ctx, main.path ("DeviceChain/DeviceChain/Devices").children(), song.mixer[0]);
 
     finishLinks (ctx); // (round 190ed)
 
@@ -3202,6 +3510,39 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
     addAutomation (ctx, main.child ("AutomationEnvelopes"), "Main", automationRow);
     for (std::size_t i = 0; i < tracks.size(); ++i)
         addAutomation (ctx, tracks[i].child ("AutomationEnvelopes"), song.mixer[(std::size_t) insertOf[i]].name, automationRow);
+
+    // issue #193 (round als190ka): Live's video clips → one LYNX video track per Live track that holds video, each clip
+    // with Live's trim, in song seconds (now that the tempo automation is in place). LYNX's video clips run in real
+    // time; a warped video clip at another tempo plays its picture at the file's own speed.
+    {
+        std::map<int, int> trackOf;
+        for (const auto& v : ctx.videos)
+        {
+            const auto start = song.secondsForTicks (ticksOf (v.startBeats));
+            const auto end = song.secondsForTicks (ticksOf (v.endBeats));
+            if (end <= start)
+                continue;
+            auto [it, added] = trackOf.try_emplace (v.insert, (int) song.videoTracks.size());
+            if (added)
+            {
+                VideoTrack t;
+                t.name = v.name;
+                song.videoTracks.push_back (std::move (t));
+            }
+            VideoClip c;
+            c.path = v.path;
+            c.start = start;
+            c.offset = v.offsetSeconds;
+            c.length = end - start;
+            c.uid = uids::next (song);
+            auto& clips = song.videoTracks[(std::size_t) it->second].clips;
+            clips.push_back (c);
+            std::stable_sort (clips.begin(), clips.end(), [] (const VideoClip& a, const VideoClip& b) { return a.start < b.start; });
+            if (v.warped)
+                ctx.note (&FlpImportReport::approximated, "Warped video clip (the picture plays at the file's own speed)");
+            ctx.note (&FlpImportReport::converted, "Video clip (on a video track, trimmed as in Live)");
+        }
+    }
 
     std::stable_sort (song.playlist.begin(), song.playlist.end(), [] (const Clip& a, const Clip& b) { return a.start < b.start; });
     if (song.patterns.empty())
