@@ -10088,17 +10088,41 @@ void MainComponent::showImportReport()
         return;
     text = text.trimEnd();
     // round 190kp (QA of 0.1.30): a long report (a big Live set has 40+ lines) was cut at the screen's height, with no way
-    // to read the rest. Past a screenful the lines go into a scrolling text block (JUCE's read-only text editor); a short
-    // report shows as before.
+    // to read the rest. Past a screenful the lines go into a read-only text box of a fixed size that scrolls (JUCE's own
+    // text block grows with the text and ran under the OK button); a short report shows as before.
     constexpr int plainLines = 30;
     if (juce::StringArray::fromLines (text).size() <= plainLines)
     {
         juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Project import"), text);
         return;
     }
-    auto* window = new juce::AlertWindow (tr ("Project import"), {}, juce::MessageBoxIconType::InfoIcon);
-    window->addTextBlock (text);
-    window->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey), juce::KeyPress (juce::KeyPress::escapeKey));
+    struct ReportWindow final : juce::AlertWindow
+    {
+        explicit ReportWindow (const juce::String& report, int height)
+            : juce::AlertWindow (tr ("Project import"), {}, juce::MessageBoxIconType::InfoIcon)
+        {
+            box.setMultiLine (true, true);
+            box.setReadOnly (true);
+            box.setScrollbarsShown (true);
+            box.setCaretVisible (false);
+            box.setColour (juce::TextEditor::backgroundColourId, juce::Colours::transparentBlack);
+            box.setColour (juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
+            box.setColour (juce::TextEditor::focusedOutlineColourId, juce::Colours::transparentBlack);
+            box.setColour (juce::TextEditor::shadowColourId, juce::Colours::transparentBlack);
+            if (isColourSpecified (juce::AlertWindow::textColourId))
+                box.setColour (juce::TextEditor::textColourId, findColour (juce::AlertWindow::textColourId));
+            box.setFont (getLookAndFeel().getAlertWindowMessageFont());
+            box.setText (report, false);
+            box.setSize (760, height);
+            addCustomComponent (&box);
+            addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey), juce::KeyPress (juce::KeyPress::escapeKey));
+        }
+        juce::TextEditor box;
+    };
+    const auto area = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay() != nullptr
+                          ? juce::Desktop::getInstance().getDisplays().getPrimaryDisplay()->userArea.getHeight()
+                          : 800;
+    auto* window = new ReportWindow (text, juce::jlimit (240, 600, area - 260));
     window->enterModalState (true, nullptr, true);
     keepAboveMainWindow (*window);
 }
