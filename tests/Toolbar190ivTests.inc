@@ -31,7 +31,7 @@ TEST (toolbar190iv_simple_bar_fits_by_priority)
     for (int i = 0; i < partCount; ++i)
         widths[(std::size_t) i] = 100;
     // everything fits in a wide window
-    auto shown = fit (widths, gap, 9 * (100 + gap));
+    auto shown = fit (widths, gap, partCount * (100 + gap)); // (round 190ke: + the tuner)
     for (int i = 0; i < partCount; ++i)
         CHECK (shown[(std::size_t) i]);
     // narrower: the master knobs go first, then the Link toggle, then the file buttons; transport and Finish always stay

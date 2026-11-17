@@ -52,7 +52,7 @@ inline juce::Colour inkOn (juce::Colour fill)
 
 // --- the Simple workflow's small vector glyphs (round 190jc, design190ia SG-7..SG-10, SG-12: no more 2-5 px text glyphs
 // for ‹ › × − +). LYNX's own shapes, stroked with round caps; `r` is the glyph's box, drawn centred in it.
-enum class Glyph { chevronLeft, chevronRight, cross, plus, minus, piano, keyboard, notes, fx, pads };
+enum class Glyph { chevronLeft, chevronRight, cross, plus, minus, piano, keyboard, notes, fx, pads, dials };
 
 inline void drawGlyph (juce::Graphics& g, Glyph glyph, juce::Rectangle<float> r, juce::Colour colour, float stroke = 1.5f)
 {
@@ -159,6 +159,18 @@ inline void drawGlyph (juce::Graphics& g, Glyph glyph, juce::Rectangle<float> r,
             const auto gap = b.getWidth() * 0.16f, cell = (b.getWidth() - gap) * 0.5f;
             for (int i = 0; i < 4; ++i)
                 g.fillRoundedRectangle (b.getX() + (float) (i % 2) * (cell + gap), b.getY() + (float) (i / 2) * (cell + gap), cell, cell, cell * 0.25f);
+            return;
+        }
+        case Glyph::dials: // round 190ke, the Controls tab (GarageBand's Smart Controls dial): two knobs with their pointers
+        {
+            const auto d = juce::jmin (r.getWidth() * 0.5f, r.getHeight()) - stroke;
+            for (int i = 0; i < 2; ++i)
+            {
+                const auto kc = juce::Point<float> (r.getX() + r.getWidth() * (i == 0 ? 0.25f : 0.75f), c.y + (i == 0 ? d * 0.12f : -d * 0.12f));
+                g.drawEllipse (juce::Rectangle<float> (d, d).withCentre (kc), stroke);
+                const auto a = i == 0 ? -0.9f : 1.1f;
+                g.drawLine (kc.x, kc.y, kc.x + d * 0.42f * std::sin (a), kc.y - d * 0.42f * std::cos (a), stroke);
+            }
             return;
         }
     }

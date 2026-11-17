@@ -5,6 +5,7 @@
 
 #include "core/MasterLooks.h"
 #include "core/Mastering.h"
+#include "core/SongFade.h"
 #include "engine/AudioEngine.h"
 #include "engine/Exporter.h"
 #include "ui/I18n.h"
@@ -325,6 +326,30 @@ FinishDock::FinishDock (AudioEngine& e, std::function<void()> close, Saving s)
         addAndMakeVisible (matchButton);
     }
 
+    // round 190ke (GarageBand's Mix › Fade Out, its iPad switch "Fade Out"): the Master's volume falls to silence over the
+    // song's last seconds; an ordinary automation clip on the Master, so it can be edited and every export renders it
+    fadeButton.setButtonText (tr ("Fade out the end"));
+    fadeButton.setTooltip (tr ("Adds a fade-out of the Master's volume over the song's last seconds (an automation clip you can edit)"));
+    fadeButton.setComponentID ("simple.finish.fade");
+    fadeButton.onClick = [this] {
+        if (! updating)
+            setFade (fadeButton.getToggleState(), fadeLength.getSelectedId() > 0 ? (double) fadeLength.getSelectedId() : songfade::defaultSeconds);
+    };
+    addAndMakeVisible (fadeButton);
+    for (const int seconds : { 5, 10, 15, 20, 30 })
+        fadeLength.addItem (tr ("{0} s", { juce::String (seconds) }), seconds);
+    fadeLength.setSelectedId ((int) songfade::defaultSeconds, juce::dontSendNotification);
+    fadeLength.setTooltip (tr ("How long the fade-out lasts"));
+    fadeLength.onChange = [this] {
+        if (! updating && fadeButton.getToggleState())
+            setFade (true, (double) fadeLength.getSelectedId());
+    };
+    addAndMakeVisible (fadeLength);
+    fadeInfo.setFont (theme::font (theme::type::caption));
+    fadeInfo.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+    fadeInfo.setMinimumHorizontalScale (0.8f);
+    addAndMakeVisible (fadeInfo);
+
     // the last step in plain words: the song as one file, with the look on (round 190t)
     if (saving.exportAudio)
     {
@@ -390,6 +415,7 @@ void FinishDock::refresh()
     for (int i = 0; i < 3; ++i)
         tone[i].setValue (has ? shown.tone[(std::size_t) i] : 0.0, juce::dontSendNotification);
     hearWithout.setToggleState (looks::bypassed (song), juce::dontSendNotification);
+    refreshFade();
     for (auto* c : std::initializer_list<juce::Component*> { &hearWithout, &intensity, &tone[0], &tone[1], &tone[2], &autoButton, &removeButton })
         c->setEnabled (has);
     if (measuring->load() == 0)
@@ -403,6 +429,39 @@ void FinishDock::refresh()
             const auto seconds = exportMusicSeconds (song, o);
             saveRows[i]->setSize (seconds > 0.0 ? juce::File::descriptionOfSizeInBytes (exportopts::estimatedBytes (o, seconds)) : juce::String());
         }
+}
+
+void FinishDock::setFade (bool on, double seconds)
+{
+    if (on)
+    {
+        auto placed = false;
+        engine.editSong ([seconds, &placed] (Song& s) { placed = songfade::apply (s, seconds).ok; });
+        juce::ignoreUnused (placed); // (nothing placed yet: refreshFade says so)
+    }
+    else if (songfade::present (engine.getSong()))
+        engine.editSong ([] (Song& s) { songfade::remove (s); });
+    refreshFade();
+}
+
+void FinishDock::refreshFade()
+{
+    const juce::ScopedValueSetter<bool> guard (updating, true);
+    const auto& song = engine.getSong();
+    const auto on = songfade::present (song);
+    fadeButton.setToggleState (on, juce::dontSendNotification);
+    if (on)
+    {
+        const auto seconds = (int) std::lround (songfade::seconds (song));
+        if (fadeLength.indexOfItemId (seconds) >= 0)
+            fadeLength.setSelectedId (seconds, juce::dontSendNotification);
+        else
+            fadeLength.setText (tr ("{0} s", { juce::String (seconds) }), juce::dontSendNotification);
+        fadeInfo.setText (tr ("On the Master track's volume: edit its points on the timeline"), juce::dontSendNotification);
+    }
+    else
+        fadeInfo.setText (songfade::musicEnd (song) > 0 ? juce::String() : tr ("Nothing to fade yet: put something on the timeline first."),
+                          juce::dontSendNotification);
 }
 
 void FinishDock::choose (int id)
@@ -502,6 +561,7 @@ void FinishDock::paint (juce::Graphics& g)
 
 void FinishDock::resized()
 {
+    constexpr int fadeRowHeight = 10 + 28 + 18;
     auto r = getLocalBounds().reduced (12, 10);
     r.removeFromTop (4);
     auto head = r.removeFromTop (32);
@@ -510,7 +570,8 @@ void FinishDock::resized()
     status.setBounds (r.removeFromTop (34));
     r.removeFromTop (4);
     // (a short window: the look tiles give way so that the Save rows stay in view)
-    const auto saveH = (saveRows[0] != nullptr ? 22 + 2 * 36 + (otherApps.isVisible() ? 34 : 0) + 10 : 0) + (matchButton.isVisible() ? 34 : 0);
+    const auto saveH = (saveRows[0] != nullptr ? 22 + 2 * 36 + (otherApps.isVisible() ? 34 : 0) + 10 : 0) + (matchButton.isVisible() ? 34 : 0)
+                       + fadeRowHeight; // (round 190ke: the fade-out row)
     const auto gap = 6;
     const auto tileH = juce::jlimit (46, 76, (r.getHeight() - 306 - saveH) / 4 - gap); // (round 190jc, SG-16: up to 76 px)
     const auto colW = (r.getWidth() - gap) / 2;
@@ -554,6 +615,15 @@ void FinishDock::resized()
         r.removeFromTop (6);
     }
     peakHint.setBounds (r.removeFromTop (32));
+    // round 190ke: Fade out the end [10 s ▾], and what it made
+    r.removeFromTop (10);
+    {
+        auto row = r.removeFromTop (28);
+        fadeLength.setBounds (row.removeFromRight (84));
+        row.removeFromRight (8);
+        fadeButton.setBounds (row);
+        fadeInfo.setBounds (r.removeFromTop (18));
+    }
     if (saveRows[0] != nullptr)
     {
         r.removeFromTop (10);

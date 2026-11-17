@@ -307,7 +307,7 @@ private:
         place ({ ChipKind::any, {}, tr ("Any"), 0, {} });
         place ({ ChipKind::all, {}, tr ("All"), 0, {} });
         x += 4;
-        for (const auto& t : BrowserComponent::tagStore().all())
+        for (const auto& t : BrowserComponent::shownTags().all()) // (round 190ke: LYNX content's tags in Simple)
             place ({ ChipKind::tag, t.name, juce::String::fromUTF8 (t.name.c_str()), t.items, {} });
     }
 

@@ -7433,6 +7433,25 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
                 liveInput.numChannels = c + 1;
         }
 
+        // round 190ke: the Simple tuner's input (only while the tuner shows: one relaxed load otherwise)
+        if (const auto tf = tunerFirst.load (std::memory_order_acquire); tf >= 0 && tf < LiveInput::maxChannels && n > 0)
+        {
+            const auto* a = liveInput.channels[(std::size_t) tf];
+            const auto* b = tunerCount.load (std::memory_order_relaxed) > 1 && tf + 1 < LiveInput::maxChannels ? liveInput.channels[(std::size_t) tf + 1] : nullptr;
+            if (a != nullptr)
+            {
+                tunerTapData->sampleRate.store (transport.sampleRate.load (std::memory_order_relaxed), std::memory_order_relaxed);
+                std::array<float, 256> mono;
+                for (int at = 0; at < n; at += (int) mono.size())
+                {
+                    const auto count = juce::jmin ((int) mono.size(), n - at);
+                    for (int i = 0; i < count; ++i)
+                        mono[(std::size_t) i] = b != nullptr ? 0.5f * (a[at + i] + b[at + i]) : a[at + i];
+                    tunerTapData->write (mono.data(), mono.data(), count);
+                }
+            }
+        }
+
         // audio recording: this block's input goes to the takes' streams (without waiting on a lock). Every take gets
         // every block (silence for an input channel missing now), so all of them keep the same timeline (round 163).
         // The lock is held through the render when takes are tapped inside their inserts (round 168x): their part of

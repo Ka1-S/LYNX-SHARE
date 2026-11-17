@@ -23,6 +23,7 @@
 #include "core/Preferences.h"
 #include "core/LiveEventQueue.h"
 #include "core/LiveInput.h"
+#include "core/VisualFx.h"
 #include "core/HardwareOutput.h"
 #include "core/LiveRecordView.h"
 #include "core/Recorder.h"
@@ -703,6 +704,14 @@ public:
             lastInputPeaks[(std::size_t) (track * 2 + side)] = v;
         return v;
     }
+    // Round 190ke: the Simple tuner's input: device input channels [first, first + count) mixed to mono into tunerTap()
+    // while first >= 0. The tuner sets it only while it shows; −1 (the default) = off, the callback skips it. UI thread.
+    void setTunerInput (int first, int count) noexcept
+    {
+        tunerCount.store (juce::jlimit (0, 2, count), std::memory_order_relaxed);
+        tunerFirst.store (count > 0 ? first : -1, std::memory_order_release);
+    }
+    const visualfx::Tap& tunerTap() const noexcept { return *tunerTapData; }
     float peekInputPeak (int track, int side) const noexcept
     {
         return track >= 0 && track < maxMixerTracks && (side == 0 || side == 1) ? lastInputPeaks[(std::size_t) (track * 2 + side)] : 0.0f;
@@ -1603,6 +1612,9 @@ private:
     void writeJournals();
     bool journalsWritten = false;
     MeterBank meters;
+    // round 190ke: the Simple tuner's input tap (setTunerInput)
+    std::atomic<int> tunerFirst { -1 }, tunerCount { 0 };
+    std::unique_ptr<visualfx::Tap> tunerTapData = std::make_unique<visualfx::Tap>();
     std::unique_ptr<AudioLogger> audioLogger; // after `meters` (it reads meters.logTap): destroyed first
     PluginHost plugins;
     juce::StringArray missingPlugins, matchedPlugins, pluginsWithoutState;

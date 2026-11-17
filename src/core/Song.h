@@ -1645,6 +1645,9 @@ struct MixerTrack
     // The chain preset ("sound") last put on this insert (core/ChainPresets.h; "" = none). A name only: the slots are
     // the chain. Saved.
     std::string chainPreset;
+    // The Simple dock's Controls tab (round 190ke, core/SmartControls.h): the user's own mapping of its eight knobs,
+    // encoded by smartcontrols::encode ("" = LYNX's default mapping for the track's instrument and chain). Saved.
+    std::string smartControls;
     bool operator== (const MixerTrack&) const = default; // (Online Sessions P2: entity comparison, round 169b)
 };
 

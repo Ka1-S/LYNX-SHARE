@@ -22,6 +22,9 @@
 #include "core/VoltageController.h"
 #include "core/FlpImport.h"
 #include "core/ProjectContents.h"
+#include "core/FactoryContent.h"
+#include "core/LayoutStyle.h"
+#include "core/SoundLibrary.h"
 #include "core/SearchIndex.h"
 #include "core/SearchQuery.h"
 #include "core/SearchService.h"
@@ -698,7 +701,8 @@ public:
         item,     // something of the project (pattern, sample, generator, effect, automation clip, undo step)
         plugins,  // the Plugin database and its folders (round 142): built-in, FL engines, installed plugins
         plugin,   // one of its plugins (double-click adds it)
-        collection // a collection's heading in the STARRED tab (round 190ce): its items are its children
+        collection, // a collection's heading in the STARRED tab (round 190ce): its items are its children
+        factory     // round 190ke: "LYNX content" and its folders (the Simple layout): LYNX's own sounds, beats, chains
     };
 
     struct Node
@@ -767,6 +771,8 @@ public:
     // A Plugin database entry outside the database's tree (a collection's item): the same row, double-click and drag.
     static std::unique_ptr<Node> makePluginItem (BrowserComponent& browser, const std::string& key)
     {
+        if (factorycontent::isKey (key)) // (round 190ke: LYNX's own content in a collection or a tag search)
+            return makeFactoryItem (browser, key);
         auto safe = juce::Component::SafePointer<BrowserComponent> (&browser);
         for (int generators = 1; generators >= 0; --generators)
         {
@@ -807,6 +813,107 @@ public:
                     }
         }
         return nullptr; // (the plugin is not installed any more: the collection leaves it out)
+    }
+
+    // Round 190ke (owner decision D2): one item of LYNX's own content, a plugin-like row (double-click / Enter: add it;
+    // drag a sound onto the Channel Rack) whose key the collections and the tags store; nullptr for an unknown key
+    static std::unique_ptr<Node> makeFactoryItem (BrowserComponent& browser, const std::string& key)
+    {
+        const auto* item = factorycontent::find (key);
+        if (item == nullptr)
+            return nullptr;
+        auto safe = juce::Component::SafePointer<BrowserComponent> (&browser);
+        auto n = std::make_unique<Node>();
+        n->kind = Kind::plugin;
+        n->pluginKey = key;
+        n->label = n->original = juce::String::fromUTF8 (item->name.c_str());
+        n->detail = juce::String::fromUTF8 (item->detail.c_str());
+        if (item->kind == factorycontent::Kind::sound)
+        {
+            n->icon = Icon::keyboard;
+            const auto index = item->index;
+            n->generator = [index]() -> std::optional<ChannelDef> {
+                const auto& sounds = soundlib::builtIn();
+                return index >= 0 && index < (int) sounds.size() ? soundlib::channelFor (sounds[(std::size_t) index]) : std::nullopt;
+            };
+            n->activate = [safe, make = n->generator, key] {
+                if (safe != nullptr && safe->onFactoryItem) // (the Simple layout: a new instrument track)
+                    safe->onFactoryItem (key);
+                else if (auto c = make(); c && safe != nullptr && safe->onAddInstrument)
+                    safe->onAddInstrument (std::move (*c));
+            };
+        }
+        else
+        {
+            n->icon = item->kind == factorycontent::Kind::beat ? Icon::note : Icon::mixer;
+            n->activate = [safe, key] {
+                if (safe != nullptr && safe->onFactoryItem)
+                    safe->onFactoryItem (key);
+            };
+        }
+        return n;
+    }
+    // "LYNX content" with its three folders, each by category / genre (built open or closed as `open` remembers)
+    static std::unique_ptr<Node> makeFactoryRoot (BrowserComponent& browser, const std::set<juce::String>& open)
+    {
+        auto folder = [&open] (Node* parent, const juce::String& label, const juce::String& path) {
+            auto n = std::make_unique<Node>();
+            n->kind = Kind::factory;
+            n->folder = n->loaded = true;
+            n->label = label;
+            n->icon = Icon::folder;
+            n->parent = parent;
+            n->depth = parent != nullptr ? parent->depth + 1 : 0;
+            n->userFolder = path.toStdString(); // (the key `open` remembers it by)
+            n->expanded = open.count (path) > 0;
+            return n;
+        };
+        auto root = folder (nullptr, tr ("LYNX content"), "lynx-content");
+        root->colour = theme::colour::accent;
+        const std::tuple<factorycontent::Kind, const char*, juce::String> kinds[] { { factorycontent::Kind::sound, "Sounds", tr ("Sounds") },
+                                                                                    { factorycontent::Kind::beat, "Beats", tr ("Beats") },
+                                                                                    { factorycontent::Kind::chain, "Effect chains", tr ("Effect chains") } };
+        int total = 0;
+        for (const auto& [kind, id, title] : kinds)
+        {
+            const auto kindPath = juce::String ("lynx-content/") + id;
+            auto group = folder (root.get(), title, kindPath);
+            std::map<std::string, std::unique_ptr<Node>> byFolder;
+            std::vector<std::string> order;
+            for (const auto& item : factorycontent::items())
+            {
+                if (item.kind != kind)
+                    continue;
+                auto& sub = byFolder[item.folder];
+                if (sub == nullptr)
+                {
+                    const auto& f = item.folder; // (the words that mean something else elsewhere get their context, as the Simple dock's)
+                    const auto shown = f == "Keys" ? trc ("@sound category: Keys") : f == "Bass" ? trc ("@instrument: Bass") : f == "Lead" ? trc ("@sound category: Lead")
+                                     : f == "Effects" ? trc ("@sound category: Effects") : tr (juce::String::fromUTF8 (f.c_str()));
+                    sub = folder (group.get(), shown, kindPath + "/" + juce::String::fromUTF8 (f.c_str()));
+                    order.push_back (item.folder);
+                }
+                if (auto leaf = makeFactoryItem (browser, item.key))
+                {
+                    leaf->parent = sub.get();
+                    leaf->depth = sub->depth + 1;
+                    sub->children.push_back (std::move (leaf));
+                }
+            }
+            int count = 0;
+            for (const auto& f : order)
+            {
+                auto& sub = byFolder[f];
+                sub->detail = juce::String ((int) sub->children.size());
+                count += (int) sub->children.size();
+                group->children.push_back (std::move (sub));
+            }
+            group->detail = juce::String (count);
+            total += count;
+            root->children.push_back (std::move (group));
+        }
+        root->detail = juce::String (total);
+        return root;
     }
 
     // round 190iz: a collection's items (STARRED tab, Live's Collections) and Live's plugin categories as lists
@@ -1134,6 +1241,14 @@ public:
 
     bool selectedIsFolder() const { return juce::isPositiveAndBelow (selected, (int) rows.size()) && rows[(std::size_t) selected]->folder; }
     int numRows() const { return (int) rows.size(); }
+    // round 190ke (--simplegb190keshot): the rows' names as shown
+    juce::StringArray rowLabels() const
+    {
+        juce::StringArray out;
+        for (const auto* n : rows)
+            out.add (n->label.isNotEmpty() ? n->label : n->file.getFileName());
+        return out;
+    }
     int getSelectedRow() const { return selected; }
 
     void select (int row, bool preview)
@@ -1192,7 +1307,7 @@ public:
     {
         n.expanded = true;
         load (n);
-        if (n.kind == Kind::project || n.kind == Kind::category)
+        if (n.kind == Kind::project || n.kind == Kind::category || n.kind == Kind::factory)
             for (auto& c : n.children)
                 if (c->folder && c->kind != Kind::fsFolder)
                     expandAll (*c);
@@ -1833,10 +1948,21 @@ public:
                 h.value = n.detail;
                 return h;
             case Kind::plugin:
+                if (factorycontent::isKey (n.pluginKey) && ! n.generator) // round 190ke: a beat or an effect chain
+                {
+                    h.text = n.label + " (" + n.detail + ")  " + tr ("[double-click] add it: a beat as a new Drums track at the playhead, a chain on the selected track");
+                    h.hasMenu = true;
+                    return h;
+                }
                 h.text = n.label + " (" + n.detail + ")  "
                          + (n.generator ? tr ("[double-click] add it as a new channel, or drag it onto the Channel Rack")
                                         : tr ("[double-click] add it to the selected insert, or drag it onto a mixer insert or an effect slot"));
                 h.hasMenu = true;
+                return h;
+            case Kind::factory:
+                h.text = tr ("LYNX content: LYNX's own sounds, beats and effect chains, with tags (the TAGS button filters them)") + "  "
+                         + (n.expanded ? tr ("[LMB] close") : tr ("[LMB] open"));
+                h.value = n.detail;
                 return h;
             case Kind::collection:
                 h.text = tr ("Collection: the items you put in it (right-click an item > Collections, or the keys 1-7 on a selected row)") + "  "
@@ -2475,6 +2601,18 @@ private:
         // (issue #104: the items below act on the Plugin database folder as it is on disk now)
         if (n.kind == Kind::plugin || n.kind == Kind::plugins)
             quickpick::refreshPluginDatabase (engine, true);
+        if (n.kind == Kind::plugin && factorycontent::isKey (n.pluginKey)) // round 190ke: LYNX's own content
+        {
+            menu.addSectionHeader (n.label);
+            menu.addItem (tr ("Add"), [act = n.activate] {
+                if (act)
+                    act();
+            });
+            if (const auto item = itemOf (n); ! item.empty())
+                browser.addCollectionItems (menu, item);
+            present (menu);
+            return;
+        }
         if (n.kind == Kind::plugin)
         {
             menu.addSectionHeader (n.label);
@@ -2567,7 +2705,7 @@ private:
             present (menu);
             return;
         }
-        if (n.kind == Kind::project || n.kind == Kind::category || n.kind == Kind::plugins)
+        if (n.kind == Kind::project || n.kind == Kind::category || n.kind == Kind::plugins || n.kind == Kind::factory)
         {
             menu.addSectionHeader (n.label);
             expandItems();
@@ -2725,6 +2863,14 @@ private:
                 browser.openPluginFolders.insert (key);
             else
                 browser.openPluginFolders.erase (key);
+        }
+        if (n.kind == Kind::factory) // round 190ke (remembered: the folders are built again with the tree)
+        {
+            const auto key = juce::String::fromUTF8 (n.userFolder.c_str());
+            if (n.expanded)
+                browser.openFactoryFolders.insert (key);
+            else
+                browser.openFactoryFolders.erase (key);
         }
         if (n.kind == Kind::collection)
         {
@@ -4766,6 +4912,9 @@ void BrowserComponent::rebuildTree()
         top.push_back (FileTree::makePluginDatabase (*this, openPluginFolders));
         browserStartupMark ("  browser: the Plugin database tree");
     }
+    // round 190ke (owner decision D2): LYNX's own content with its tags, in the Simple layout
+    if (! liveLayout && layoutstyle::current() == layoutstyle::Style::simple && (allLike || tab == presetsTab || tab == soundsTab))
+        top.push_back (FileTree::makeFactoryRoot (*this, openFactoryFolders));
 
     if (liveLayout && cat == Category::templates) // round 190iz: Live's Templates: the user's project templates
     {
@@ -5469,6 +5618,17 @@ void BrowserComponent::showScores (const juce::String& subfolder)
     showNote (tr ("FL Studio's scores were not found (FL Studio is not installed)"));
 }
 
+void BrowserComponent::showFactoryContentForSnapshot (const juce::StringArray& openFolders)
+{
+    openFactoryFolders.clear();
+    for (const auto& f : openFolders)
+        openFactoryFolders.insert (f);
+    rebuildTree();
+}
+
+juce::StringArray BrowserComponent::rowLabelsForCheck() const { return tree->rowLabels(); }
+juce::StringArray BrowserComponent::resultLabelsForCheck() const { return results->rowLabels(); }
+
 void BrowserComponent::showProjectForSnapshot()
 {
     setTab (projectTab);
@@ -6152,6 +6312,32 @@ browsertags::Store& BrowserComponent::tagStore()
     return store;
 }
 
+browsertags::Store BrowserComponent::shownTags()
+{
+    if (layoutstyle::current() != layoutstyle::Style::simple)
+        return tagStore();
+    return factorycontent::merged (tagStore());
+}
+
+void BrowserComponent::layoutStyleChanged()
+{
+    static bool wasSimple = false; // (only a move into or out of the Simple layout changes what is listed)
+    const auto simple = layoutstyle::current() == layoutstyle::Style::simple;
+    if (std::exchange (wasSimple, simple) == simple)
+        return;
+    for (auto* b : liveBrowsers())
+    {
+        b->rebuildTree();
+        if (b->tagsPanelShown)
+        {
+            b->tagsPanel->refresh();
+            b->resized();
+        }
+        if (b->tagFilterActive())
+            b->runSearch (true);
+    }
+}
+
 juce::File BrowserComponent::tagsFile()
 {
     // the user's tag store (FL: one tag database of the user; not in the project)
@@ -6178,7 +6364,8 @@ void BrowserComponent::tagsChanged()
     for (auto* b : liveBrowsers())
     {
         // picked tags that were deleted go
-        std::erase_if (b->picked, [] (const std::string& t) { return ! tagStore().exists (t); });
+        const auto shown = shownTags();
+        std::erase_if (b->picked, [&shown] (const std::string& t) { return ! shown.exists (t); });
         if (b->tagsPanelShown)
         {
             b->tagsPanel->refresh();
@@ -6208,10 +6395,11 @@ void BrowserComponent::addTagItems (juce::PopupMenu& menu, const std::string& it
     juce::Component::SafePointer<BrowserComponent> safe (this);
     // FL's Tags section: Favorite (LYNX's Starred / the collections, above), Tags ▸, Add tag, Edit tags
     juce::PopupMenu tags;
-    for (const auto& t : tagStore().all())
+    const auto shown = shownTags(); // (round 190ke: with LYNX content's tags in the Simple layout)
+    for (const auto& t : shown.all())
     {
         const auto name = juce::String::fromUTF8 (t.name.c_str());
-        tags.addItem (name, true, tagStore().has (item, t.name), [safe, item, name] {
+        tags.addItem (name, true, shown.has (item, t.name), [safe, item, name] {
             if (safe != nullptr)
                 safe->setTagged (item, name, ! tagStore().has (item, name.toStdString()));
         });
@@ -6336,7 +6524,7 @@ void BrowserComponent::runTagFilter()
     // FL: the picked tags filter the content (Any / All); Live: "#tag" in the search; the rest of the text must be in
     // the item's name
     const auto query = browsertags::parseQuery (searchBox.getText().trim().toStdString());
-    const auto& store = tagStore();
+    const auto store = shownTags(); // (round 190ke: LYNX content's tags too, in the Simple layout)
     std::vector<std::string> items;
     if (! picked.empty())
         items = store.filter (picked, matchMode);
@@ -6568,7 +6756,10 @@ void BrowserComponent::loadPrefs()
         else if (key == "livePath")
             liveSelection.path = value.toStdString();
     }
-    std::erase_if (picked, [] (const std::string& t) { return ! tagStore().exists (t); });
+    {
+        const auto shown = shownTags();
+        std::erase_if (picked, [&shown] (const std::string& t) { return ! shown.exists (t); });
+    }
     if (! browserplaces::libraryAvailable (liveSelection.category) || liveSelection.category == browserplaces::Category::addFolder)
         liveSelection = {};
 }

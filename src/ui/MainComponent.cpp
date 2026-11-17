@@ -1,4 +1,7 @@
 #include "ui/ControllerBridge.h"
+#include "core/DetailChain.h"
+#include "core/FactoryContent.h"
+#include "core/SoundLibrary.h"
 #include "ui/ExternalDrag.h"
 #include "ui/LabelFont.h"
 #include "ui/AudioClipboard.h"
@@ -2645,6 +2648,64 @@ void MainComponent::loadKeyMap()
 // --- Browsers ------------------------------------------------------------------------------------
 
 // The main Browser and the separate Sample browser window (round 163) act on the project the same way.
+void MainComponent::addFactoryItem (const std::string& key)
+{
+    const auto* item = factorycontent::find (key);
+    if (item == nullptr)
+        return;
+    const auto& song = engine.getSong();
+    switch (item->kind)
+    {
+        case factorycontent::Kind::sound:
+        {
+            const auto& sounds = soundlib::builtIn();
+            if (item->index < 0 || item->index >= (int) sounds.size())
+                return;
+            auto channel = soundlib::channelFor (sounds[(std::size_t) item->index]);
+            if (! channel)
+                return;
+            if (simpleWorkflow != nullptr && layoutStyle == layoutstyle::Style::simple)
+            {
+                simpletracks::Request q;
+                q.kind = simpletracks::Kind::instrument;
+                q.name = item->name;
+                q.channel = std::move (channel);
+                simpleWorkflow->add (std::move (q));
+            }
+            else
+            {
+                rack.addChannel (std::move (*channel), true);
+                showPanel (Panel::channelRack);
+            }
+            return;
+        }
+        case factorycontent::Kind::beat:
+        {
+            const auto bar = juce::jmax<std::int64_t> (1, song.barTicks());
+            const auto fromBar = (int) ((std::int64_t) engine.songPlayheadTicks() / bar);
+            simpletracks::Result made;
+            engine.editSongStructural ([item, fromBar, &made] (Song& s) { made = factorycontent::addBeat (s, *item, fromBar); });
+            if (made.ok() && made.track >= 0)
+                playlist.selectTrack (made.track);
+            return;
+        }
+        case factorycontent::Kind::chain:
+        {
+            const auto track = playlist.getCurrentTrack();
+            const auto insert = track >= 0 ? detailchain::forTrack (song, track).insert : -1;
+            if (insert <= 0)
+            {
+                juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("LYNX content"), tr ("Select a track first: the chain goes on its effects."));
+                return;
+            }
+            engine.editSongStructural ([item, insert] (Song& s) { factorycontent::applyChain (s, *item, insert); });
+            if (simpleWorkflow != nullptr && layoutStyle == layoutstyle::Style::simple)
+                simpleWorkflow->showEffectsOfInsert (insert);
+            return;
+        }
+    }
+}
+
 void MainComponent::connectBrowser (BrowserComponent& b)
 {
     b.onOpenProject = [this] (const juce::File& file) { confirmDiscard ([this, file] { openFile (file); }); };
@@ -2695,6 +2756,9 @@ void MainComponent::connectBrowser (BrowserComponent& b)
         else
             showPanel (Panel::mixer);
     };
+    // round 190ke (owner decision D2): "LYNX content" in the Simple layout: a sound becomes an instrument track, a beat a
+    // Drums track at the playhead, an effect chain goes on the selected track
+    b.onFactoryItem = [this] (const std::string& key) { addFactoryItem (key); };
     b.onPreviewVolumeChanged = [this] { saveUiSettings(); };
     // round 190ce: hot-swap (the main Browser only: it is the one the device buttons and the key link)
     b.onHotSwapChanged = [this] {
@@ -3853,6 +3917,7 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
         detailView->releaseEditor();
     layoutStyle = style;
     layoutstyle::setCurrent (style); // (round 190cm: the clip grid's and the audio editor's Ableton-style keys follow it)
+    BrowserComponent::layoutStyleChanged(); // (round 190ke: "LYNX content" and its tags in the Simple layout)
     if (! clipLaunch && getMapMode() != remotemap::Mode::off) // (round 190ef: the map modes belong to the Clip-launch layout)
         setMapMode (remotemap::Mode::off);
     browser.setLiveItemMenus (clipLaunch); // (round 190cy: Live's flat collection labels in the rows' menus)

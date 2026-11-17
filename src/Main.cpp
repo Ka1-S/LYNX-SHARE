@@ -246,6 +246,15 @@
 #include "ui/AudioCheck.h"
 #include "ui/StemExtract.h"
 #include "core/RegionLoop.h" // round 190jr: --bandlab190jrshot
+#include "core/FactoryContent.h" // round 190ke: --simplegb190keshot
+#include "core/SongFade.h"
+#include "core/SoundLibrary.h"
+#include "core/SynthParams.h"
+#include "core/GoalKnobs.h"
+#include "core/DetailChain.h"
+#include "ui/FinishDock.h"
+#include "ui/SimpleDock.h"
+#include "ui/SimpleTuner.h"
 #include "ui/AudioToMidi.h"
 #include "ui/ShotScale.h"
 #include "core/LaneView.h"       // round 190iu
@@ -1927,6 +1936,14 @@ public:
             check (song, "rack");
             out.getChildFile ("diff.txt").replaceWithText (report);
             setApplicationReturnValue (0);
+            quit();
+            return;
+        }
+
+        // --simplegb190keshot <folder> (round 190ke: tuner, fade-out, Controls tab, LYNX content): src/SimpleGbShot190ke.inc
+        if (args.contains ("--simplegb190keshot"))
+        {
+            setApplicationReturnValue (runSimpleGbShot190ke (juce::File (args[args.indexOf ("--simplegb190keshot") + 1].unquoted())) ? 0 : 1);
             quit();
             return;
         }
@@ -31827,6 +31844,7 @@ private:
     // --snapshot: 8 s of a synthetic stereo beat whose parts sit in different bands (kick = low, chord = mid,
     // hats and the noise riser = high), to show the spectral waveform colours
 #include "BrowserShot190iz.inc" // round 190iz
+#include "SimpleGbShot190ke.inc" // round 190ke
 
     static void writeWaveDemo (const juce::File& file, double bpm)
     {

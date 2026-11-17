@@ -173,6 +173,11 @@ public:
     void selectFirstSampleForSnapshot();
     // --snapshot: the PROJECT tab with the patterns, generators and samples open, a sample selected
     void showProjectForSnapshot();
+    // round 190ke (--simplegb190keshot): "LYNX content" with these folders open ("lynx-content", "lynx-content/Beats"...),
+    // and the rows listed now (tree / tag-filter results)
+    void showFactoryContentForSnapshot (const juce::StringArray& openFolders);
+    juce::StringArray rowLabelsForCheck() const;
+    juce::StringArray resultLabelsForCheck() const;
     void showPluginDatabaseForSnapshot();
     std::vector<juce::PopupMenu> pluginDatabaseMenusForSnapshot(); // round 190bf: a folder's and an entry's right-click menus
     // FL's "Locate sample in browser" (the sampler's File row, round 190df): the ALL tab with the folders opened down to
@@ -285,6 +290,12 @@ public:
     // "Send to selected channel or focused plugin", FL's preview length ----------------------------------------------------
     // One tag store for every Browser of the process (the user's, browser-tags.txt in the settings folder; not the project).
     static browsertags::Store& tagStore();
+    // Round 190ke (owner decision D2): what the TAGS panel, the tag filter and the row menus' ticks see — the user's store,
+    // plus the built-in tags of LYNX's own factory content (core/FactoryContent.h) in the Simple layout
+    static browsertags::Store shownTags();
+    // Round 190ke: the "LYNX content" items' actions the main window carries out (a beat becomes a Drums track at the
+    // playhead; an effect chain goes onto the selected track's insert). Sounds go through onAddInstrument.
+    std::function<void (const std::string& pluginKey)> onFactoryItem;
     // FL's "Tags" section of a row's menu: Tags ▸ (each tag ticked on / off), Add tag..., Edit tags...
     void addTagItems (juce::PopupMenu& menu, const std::string& item);
     void askAddTag (const std::string& item); // FL's "Add a tag": names separated by commas
@@ -457,6 +468,11 @@ private:
     bool searchPending = false, projectDirty = false;
     juce::File projectFile;
     std::set<juce::String> openPluginFolders; // the Plugin database folders the user opened (round 142)
+    std::set<juce::String> openFactoryFolders; // round 190ke: the "LYNX content" folders the user opened
+public:
+    // round 190ke: the layout style changed (the Simple layout lists "LYNX content" and its tags): every Browser follows
+    static void layoutStyleChanged();
+private:
 
     AudioEngine& engine;
     Role role = Role::main;

@@ -2763,6 +2763,8 @@ juce::var mixerTrackToVar (const MixerTrack& t)
         o->setProperty ("chainBlend", projectNumber (t.chainBlend, 10000.0f));
     if (! t.chainPreset.empty())
         o->setProperty ("chainPreset", str (t.chainPreset));
+    if (! t.smartControls.empty()) // (round 190ke: the Simple Controls tab's own mapping)
+        o->setProperty ("smartControls", str (t.smartControls));
     if (! t.standIns.empty())
         o->setProperty ("standIns", standInsToVar (t.standIns));
 
@@ -2806,6 +2808,7 @@ MixerTrack mixerTrackFromVar (const juce::var& t)
     track.icon = juce::jlimit (0, 0xFFFF, (int) t.getProperty ("icon", 0));
     track.chainBlend = juce::jlimit (0.0f, 1.0f, (float) (double) t.getProperty ("chainBlend", 1.0));
     track.chainPreset = t.getProperty ("chainPreset", "").toString().toStdString();
+    track.smartControls = t.getProperty ("smartControls", "").toString().toStdString();
     track.outputChannel = juce::jlimit (outputDefault, 255, (int) t.getProperty ("output", outputDefault));
     if (const auto mode = t["outputMode"].toString(); mode == "mono")
         track.outputMode = OutputMode::monoSum;
@@ -4647,6 +4650,7 @@ void applyMixerTrackState (MixerTrack& target, const MixerTrack& state, bool tak
     target.effects = state.effects;
     target.chainBlend = state.chainBlend; // (round 190bu: a state is the whole chain, its Blend and its preset name too)
     target.chainPreset = state.chainPreset;
+    target.smartControls = state.smartControls; // (round 190ke)
 }
 
 // Round 190jf (B22): one channel / effect slot as the project stores it, for a LYNX device inside a DAWproject file

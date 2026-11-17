@@ -17592,6 +17592,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "BandImport190jmTests.inc" // round 190jm: issue #184 project (GarageBand for iOS 2.3+ events, Sampler)
 #include "Blx190jrTests.inc"
 #include "Stems190jrTests.inc"
+#include "SimpleGb190keTests.inc" // round 190ke: GarageBand / BandLab ideas in Simple (fade-out, Controls, tuner, factory tags)
 #include "FlmImport189hCTests.inc"
 #include "FlmImport190bsTests.inc"
 #include "PocketFx190byTests.inc" // round 190by
