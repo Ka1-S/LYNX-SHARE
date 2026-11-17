@@ -709,21 +709,74 @@ private:
     std::unique_ptr<FolderList> searchFolders, browserFolders, pluginFolders, flmResources;
 };
 
+// Round 190jp (design190ia FW-19): FL's Settings tabs, their captions a step larger (type::title, was 7 px caps at
+// type::body) in a 30 px row; the LYNX identity stays (the selected tab lifted, the red underline). LYNX's own tabs come
+// after a 12 px gap, as FL sets apart its Debug / Account / About.
+class SettingsTab final : public juce::TabBarButton
+{
+public:
+    SettingsTab (const juce::String& name, juce::TabbedButtonBar& bar, bool gapBefore) : juce::TabBarButton (name, bar), gap (gapBefore ? groupGap : 0) {}
+
+    static constexpr int groupGap = 12;
+    static juce::Font captionFont() { return theme::font (theme::type::title); }
+
+    int getBestTabLength (int) override
+    {
+        return juce::roundToInt (juce::GlyphArrangement::getStringWidth (captionFont(), getButtonText())) + 26 + gap;
+    }
+    bool hitTest (int x, int y) override { return x >= gap && juce::TabBarButton::hitTest (x, y); }
+
+    void paintButton (juce::Graphics& g, bool over, bool down) override
+    {
+        using namespace theme::colour;
+        auto area = getActiveArea().toFloat().withTrimmedLeft ((float) gap);
+        const auto front = isFrontTab();
+        if (front || over || down)
+        {
+            g.setColour (front ? bg3 : bg2);
+            g.fillRoundedRectangle (area.reduced (2.0f, 3.0f), theme::radius::md);
+        }
+        if (front)
+        {
+            g.setColour (accent);
+            g.fillRoundedRectangle (area.withTop (area.getBottom() - 2.0f).reduced (10.0f, 0.0f), 1.0f);
+        }
+        g.setColour (front ? textPrimary : over ? textPrimary.withAlpha (0.85f) : textSecondary);
+        g.setFont (captionFont());
+        g.drawFittedText (getButtonText(), area.toNearestInt().reduced (4, 0), juce::Justification::centred, 1, 0.8f);
+    }
+
+private:
+    int gap;
+};
+
+class SettingsTabs final : public juce::TabbedComponent
+{
+public:
+    SettingsTabs() : juce::TabbedComponent (juce::TabbedButtonBar::TabsAtTop) {}
+    int firstOwnTab = -1; // the tab with the gap before it
+
+    juce::TabBarButton* createTabButton (const juce::String& name, int index) override
+    {
+        return new SettingsTab (name, getTabbedButtonBar(), index == firstOwnTab);
+    }
+};
+
 class SettingsPanel final : public juce::Component
 {
 public:
     SettingsPanel (AudioEngine& engine, SettingsPage page, bool persistent, SettingsHooks hooks)
     {
-        tabs.setTabBarDepth (34);
+        tabs.setTabBarDepth (30);
         tabs.setOutline (0);
-        // FL's order: device pages first, then the app, then the project
-        // (round 190gl: Link after MIDI, as the reference DAW's Settings put Link beside Tempo & MIDI; named in full, as
-        // Ableton's Link integration guidelines ask of other apps)
-        const std::pair<SettingsPage, juce::String> order[] = { { SettingsPage::audio, tr ("Audio") },     { SettingsPage::midi, tr ("MIDI") },
-                                                                { SettingsPage::link, tr ("Ableton Link") },
-                                                                { SettingsPage::general, tr ("General") }, { SettingsPage::theme, tr ("Theme") },
-                                                                { SettingsPage::files, tr ("Files") },     { SettingsPage::extras, tr ("LYNX extras") },
-                                                                { SettingsPage::project, tr ("Project") }, { SettingsPage::info, tr ("Info") } };
+        // FL's order (round 190jp, design190ia FW-19: MIDI, Audio, General, File, Theme, Project, Info), then LYNX's own
+        // pages after a gap (Ableton Link, named in full as Ableton's Link integration guidelines ask of other apps)
+        const std::pair<SettingsPage, juce::String> order[] = { { SettingsPage::midi, tr ("MIDI") },       { SettingsPage::audio, tr ("Audio") },
+                                                                { SettingsPage::general, tr ("General") }, { SettingsPage::files, tr ("Files") },
+                                                                { SettingsPage::theme, tr ("Theme") },     { SettingsPage::project, tr ("Project") },
+                                                                { SettingsPage::info, tr ("Info") },       { SettingsPage::link, tr ("Ableton Link") },
+                                                                { SettingsPage::extras, tr ("LYNX extras") } };
+        tabs.firstOwnTab = 7;
         for (const auto& [p, name] : order)
         {
             juce::Component* content = nullptr;
@@ -765,7 +818,7 @@ public:
     }
 
 private:
-    juce::TabbedComponent tabs { juce::TabbedButtonBar::TabsAtTop };
+    SettingsTabs tabs;
     std::vector<SettingsPage> pages; // in tab order
 };
 

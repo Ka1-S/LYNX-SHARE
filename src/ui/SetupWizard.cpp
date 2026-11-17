@@ -10,6 +10,7 @@
 #include "ui/AudioCheck.h"
 #include "engine/FlStudio.h"
 #include "ui/FileChoosers.h"
+#include "ui/DialogFrame.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
 #include "platform/Paths.h"
@@ -40,6 +41,23 @@ public:
     }
 };
 
+// round 190jp (design190ia SG-24): a workflow choice's name in bold body text over its smaller description (the name
+// was drawn smaller than the text under it)
+class RadioChoice final : public juce::ToggleButton
+{
+public:
+    explicit RadioChoice (const juce::String& text) : juce::ToggleButton (text) {}
+
+    void paintButton (juce::Graphics& g, bool over, bool down) override
+    {
+        const auto tick = juce::jmin (16.0f, (float) getHeight() - 4.0f);
+        getLookAndFeel().drawTickBox (g, *this, 2.0f, ((float) getHeight() - tick) * 0.5f, tick, tick, getToggleState(), isEnabled(), over, down);
+        g.setColour (theme::colour::textPrimary.withMultipliedAlpha (isEnabled() ? 1.0f : 0.5f));
+        g.setFont (theme::font (theme::type::body, true));
+        g.drawFittedText (getButtonText(), getLocalBounds().withTrimmedLeft (juce::roundToInt (tick) + 8), juce::Justification::centredLeft, 1, 0.85f);
+    }
+};
+
 class SetupWizard final : public juce::Component,
                           private juce::ListBoxModel,
                           private juce::ComponentListener,
@@ -66,6 +84,9 @@ public:
         intro.setColour (juce::Label::textColourId, theme::colour::textSecondary);
         intro.setJustificationType (juce::Justification::topLeft);
         intro.setMinimumHorizontalScale (1.0f);
+        languageLabel.setFont (theme::font (theme::type::body)); // (as the device selector's row labels beside it)
+        languageLabel.setColour (juce::Label::textColourId, theme::colour::textPrimary);
+        languageLabel.setJustificationType (juce::Justification::centredRight);
         for (auto* c : std::initializer_list<juce::Component*> { &title, &intro, &languageLabel, &languageBox, &audioLabel, &devices, &flLabel,
                                                                  &flStatus, &foldersLabel, &folders, &addFolder, &removeFolder, &resetFolders,
                                                                  &scanNow, &progressBar, &scanStatus, &scanAtStart, &workflowLabel, &workflowIntro })
@@ -96,6 +117,7 @@ public:
                 }
             note.setText (text, juce::dontSendNotification);
             note.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+            note.setFont (theme::font (theme::type::small)); // (round 190jp, SG-24: under the bold name, a step smaller)
             note.setJustificationType (juce::Justification::topLeft);
             note.setMinimumHorizontalScale (1.0f);
             note.setBorderSize (juce::BorderSize<int> (0, 26, 0, 0)); // under the name, past the radio dot
@@ -278,12 +300,16 @@ private:
         intro.setBounds (r.removeFromTop (textHeight (intro, w, 22)));
         r.removeFromTop (8);
 
+        // round 190jp (design190ia SG-24): the Language row on the audio device selector's grid (JUCE's selector puts
+        // its labels right-aligned in the left 35 % and its boxes from there, 60 % wide)
         auto row = r.removeFromTop (26);
-        languageLabel.setBounds (row.removeFromLeft (150));
-        languageBox.setBounds (row.removeFromLeft (juce::jmin (220, row.getWidth())));
-        r.removeFromTop (10);
+        const auto gridX = juce::roundToInt ((float) w * 0.35f);
+        languageLabel.setBounds (row.removeFromLeft (gridX).withTrimmedRight (5));
+        languageBox.setBounds (row.removeFromLeft (juce::jmin (juce::roundToInt ((float) w * 0.6f), row.getWidth())));
+        r.removeFromTop (20);
 
         workflowLabel.setBounds (r.removeFromTop (24));
+        r.removeFromTop (8);
         workflowIntro.setBounds (r.removeFromTop (textHeight (workflowIntro, w, 18)));
         r.removeFromTop (4);
         for (int i = 0; i < layoutstyle::count; ++i)
@@ -292,7 +318,7 @@ private:
             styleNotes[(std::size_t) i].setBounds (r.removeFromTop (textHeight (styleNotes[(std::size_t) i], w, 18)));
             r.removeFromTop (2);
         }
-        r.removeFromTop (8);
+        r.removeFromTop (20);
 
         audioLabel.setBounds (r.removeFromTop (24));
         devices.setBounds (r.getX(), r.getY(), w, 200); // its resized() sets its own height
@@ -305,11 +331,14 @@ private:
             r.removeFromTop (h + 6);
         }
 
+        r.removeFromTop (14);
         flLabel.setBounds (r.removeFromTop (24));
+        r.removeFromTop (4);
         flStatus.setBounds (r.removeFromTop (textHeight (flStatus, w, 22)));
-        r.removeFromTop (10);
+        r.removeFromTop (20);
 
         foldersLabel.setBounds (r.removeFromTop (24));
+        r.removeFromTop (8);
         auto list = r.removeFromTop (118);
         auto buttons = list.removeFromRight (juce::jmin (150, w / 3));
         folders.setBounds (list.withTrimmedRight (8));
@@ -442,15 +471,15 @@ private:
     bool layingOut = false;
     juce::Label title, intro, flStatus, scanStatus, workflowIntro;
     SectionLabel workflowLabel { tr ("Workflow") };
-    std::array<juce::ToggleButton, layoutstyle::count> styleChoices { juce::ToggleButton (tr ("Pattern workflow (default)")),
-                                                                      juce::ToggleButton (tr ("Clip-launch workflow")),
-                                                                      juce::ToggleButton (tr ("Simple workflow")) };
+    std::array<RadioChoice, layoutstyle::count> styleChoices { RadioChoice (tr ("Pattern workflow (default)")), RadioChoice (tr ("Clip-launch workflow")),
+                                                               RadioChoice (tr ("Simple workflow")) };
     std::array<juce::Label, layoutstyle::count> styleNotes {
         juce::Label ({}, tr ("Pattern workflow: works the way FL Studio does, with the Channel Rack, Piano Roll, Playlist and Mixer.")),
         juce::Label ({}, tr ("Clip-launch workflow: clips and scenes launched from a grid, in the style of Ableton Live, with a Session mixer and the clip and device views; patterns and the Channel Rack stay one click away.")),
         juce::Label ({}, tr ("Simple workflow: BandLab's approachable one-window style mixed with FL Studio Mobile's way of working, with tracks and a timeline, loops, pads and quick recording; FL Studio Mobile projects (.flm) open too."))
     };
-    SectionLabel languageLabel { tr ("Language") }, audioLabel { tr ("Audio output") }, flLabel { "FL Studio" },
+    juce::Label languageLabel { {}, tr ("Language") };
+    SectionLabel audioLabel { tr ("Audio output") }, flLabel { "FL Studio" },
         foldersLabel { tr ("Plugin folders ({0})", { platform::pluginFormatNames() }) };
     juce::ComboBox languageBox;
     juce::AudioDeviceSelectorComponent devices;
@@ -491,8 +520,10 @@ public:
             g.setColour (juce::Colours::black.withAlpha (0.08f));
             g.drawRoundedRectangle (panel.expanded ((float) i), 4.0f + (float) i, 2.0f);
         }
-        g.setColour (theme::colour::accent.withAlpha (0.6f));
-        g.drawRect (wizard.getBounds().expanded (1), 1);
+        // round 190jp (design190ia SG-20): the one LYNX dialog frame (1 px frame, the 3 px accent strip on top) instead of
+        // a red outline of its own; the wizard's big title stays in its body (SG-24)
+        const auto frame = wizard.getBounds().expanded (1).withTop (wizard.getY() - 1 - ui::dialog::accentStrip);
+        ui::dialog::paintFrame (g, frame.toFloat(), ui::dialog::Kind::window, false);
     }
 
     void resized() override

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+#include <array>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -142,10 +144,20 @@ constexpr int imageFitCount = 5;
 const char* imageFitId (ImageFit fit); // "fill", "fit", "stretch", "tile", "centre"
 ImageFit imageFitFromId (const std::string& id);
 
+// FL's colour dots on its Theme page (round 190jp, design190ia FW-20): the colours of the selection, the highlight, muted
+// things, options, lit steps, meters, waveforms and the text, each the theme's own unless set (0).
+enum class Dot : int { selection = 0, highlight, mute, option, steps, meters, waves, text };
+constexpr int dotCount = 8;
+const char* dotId (Dot dot); // "selection", "highlight", ... (the .lynxtheme keys)
+
 // A theme: what a .lynxtheme file holds and what Options › Theme edits.
 struct Spec
 {
     std::string name = "LYNX";
+    // FL's Adjustments (round 190jp, design190ia FW-20; Live: Brightness / Color Intensity / Color Hue): shifts of the
+    // whole palette's surfaces and text, 0 = none. hue in degrees (-180..180), the others -1..1.
+    float hue = 0.0f, saturation = 0.0f, brightness = 0.0f, contrast = 0.0f, text = 0.0f;
+    std::array<std::uint32_t, dotCount> dots {}; // FL's colour dots (Dot order); 0 = the theme's own colour
     std::uint32_t accent = defaultAccent;
     std::uint32_t background = defaultBackground;
     std::uint32_t workspace = 0;     // the workspace backdrop's colour; 0 = automatic (the theme's deepest surface)
@@ -158,7 +170,12 @@ struct Spec
     float gridIntensity = 1.0f;      // Grid line intensity (round 190je): gridIntensityMin..Max, 1 = the theme's lines
     MenuStyle menuStyle = MenuStyle::lynxDark; // Menu style (round 190je)
 
-    bool isDefaultLook() const noexcept { return accent == defaultAccent && background == defaultBackground && workspace == 0 && image.empty(); }
+    bool hasAdjustments() const noexcept { return hue != 0.0f || saturation != 0.0f || brightness != 0.0f || contrast != 0.0f || text != 0.0f; }
+    bool hasDots() const noexcept { return std::any_of (dots.begin(), dots.end(), [] (std::uint32_t c) { return c != 0; }); }
+    bool isDefaultLook() const noexcept
+    {
+        return accent == defaultAccent && background == defaultBackground && workspace == 0 && image.empty() && ! hasAdjustments() && ! hasDots();
+    }
     bool operator== (const Spec&) const = default;
 };
 
@@ -170,6 +187,18 @@ const std::vector<Spec>& builtInThemes();
 
 // The workspace backdrop colour of a theme (its own, or the palette's bg0).
 std::uint32_t workspaceColour (const Spec& spec);
+
+// --- Settings › Theme › Adjustments and colour dots (round 190jp, design190ia FW-20) ------------------------------------
+// The theme's Adjustments over a palette: Hue turns the surfaces' and the text's hue; Saturation tints the grey surfaces
+// (or greys them); Brightness lifts or lowers the surfaces; Contrast spreads them apart from (or towards) the raised
+// surface bg3; Text moves the text away from (or towards) the panels. The accent family stays the user's colour. With no
+// adjustment the palette is returned as it is (bit-identical).
+Palette withAdjustments (Palette palette, const Spec& spec);
+// The dots that are palette tokens (highlight = accentHover, mute = textDisabled, text = textPrimary, selection =
+// selectionFill at its own alpha); the others (option, steps, meters, waves) are drawing colours ui/ThemeSettings sets.
+Palette withDots (Palette palette, const Spec& spec);
+// derivePalette, the Adjustments, the dots: the palette a theme draws with.
+Palette adjustedPalette (const Spec& spec);
 
 // --- colour maths ------------------------------------------------------------------------------------------------
 double relativeLuminance (std::uint32_t argb);              // WCAG 2 (0..1)

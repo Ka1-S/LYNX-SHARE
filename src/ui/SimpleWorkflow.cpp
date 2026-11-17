@@ -10,6 +10,7 @@
 #include "engine/AudioEngine.h"
 #include "engine/MidiFileIo.h"
 #include "ui/FileChoosers.h"
+#include "ui/DialogFrame.h"
 #include "ui/FinishDock.h"
 #include "ui/FirstSongTour.h"
 #include "ui/I18n.h"
@@ -147,14 +148,25 @@ public:
         g.drawRoundedRectangle (r.reduced (0.5f), theme::radius::lg, 1.0f);
         const auto side = juce::jmin (64.0f, r.getHeight() - 12.0f);
         drawGlyph (g, glyph, { r.getX() + 8.0f, r.getCentreY() - side / 2.0f, side, side }, tint);
-        auto text = getLocalBounds().withTrimmedLeft ((int) side + 22).withTrimmedRight (8 + rightReserve).reduced (0, 8);
-        text = text.withSizeKeepingCentre (text.getWidth(), juce::jmin (text.getHeight(), 56));
+        // round 190jp (190jc follow-up: the Instrument help was cut beside "More..."): the help in as many lines as the
+        // tile has room for, in body text when it fits there, else a step smaller; the block centred
+        auto text = getLocalBounds().withTrimmedLeft ((int) side + 22).withTrimmedRight (8 + rightReserve).reduced (0, 6);
+        const auto room = text.getHeight() - 20;
+        auto helpFont = theme::font (theme::type::body);
+        auto lines = linesFor (helpFont, text.getWidth());
+        if ((float) lines * helpFont.getHeight() > (float) room)
+        {
+            helpFont = theme::font (theme::type::small);
+            lines = linesFor (helpFont, text.getWidth());
+        }
+        lines = juce::jlimit (1, juce::jmax (1, (int) ((float) room / helpFont.getHeight())), lines);
+        text = text.withSizeKeepingCentre (text.getWidth(), juce::jmin (text.getHeight(), 20 + (int) std::ceil ((float) lines * helpFont.getHeight())));
         g.setColour (theme::colour::textPrimary);
         g.setFont (theme::font (theme::type::title, true));
         g.drawFittedText (name, text.removeFromTop (20), juce::Justification::centredLeft, 1, 0.85f);
         g.setColour (theme::colour::textSecondary);
-        g.setFont (theme::font (theme::type::body));
-        g.drawFittedText (help, text, juce::Justification::topLeft, 2, 0.75f);
+        g.setFont (helpFont);
+        g.drawFittedText (help, text, juce::Justification::topLeft, lines, 0.85f);
     }
 
     void mouseEnter (const juce::MouseEvent&) override { repaint(); }
@@ -178,13 +190,39 @@ public:
     void focusGained (FocusChangeType) override { repaint(); }
     void focusLost (FocusChangeType) override { repaint(); }
 
+    // the width a button with `text` needs on the tile's right (its text and the button's own margins)
+    static int reserveFor (const juce::Button& b)
+    {
+        return juce::jlimit (72, 150, (int) std::ceil (juce::GlyphArrangement::getStringWidth (theme::font (theme::type::body), b.getButtonText())) + 40);
+    }
+
 private:
+    int linesFor (const juce::Font& f, int width) const
+    {
+        juce::AttributedString s;
+        s.append (help, f);
+        s.setWordWrap (juce::AttributedString::byWord);
+        juce::TextLayout l;
+        l.createLayout (s, (float) juce::jmax (1, width));
+        return juce::jmax (1, l.getNumLines());
+    }
+
     Glyph glyph;
     juce::Colour tint;
     juce::String name, help;
 };
 
 juce::Colour kindColour (Kind kind) { return juce::Colour (simpletracks::defaultColour (kind)); }
+
+// Round 190jp (owner follow-up to 190jc's SG-14): the New-track chooser's squares nearer BandLab's saturated ones (its
+// voice #f12c18 is s 0.90 v 0.95; LYNX's track colours are muted, s 0.43-0.71): the kind's hue, saturation and brightness
+// raised most of the way. Only the chooser's pictures: the tracks keep LYNX's own colours.
+juce::Colour chooserColour (Kind kind)
+{
+    const auto c = kindColour (kind);
+    const auto s = c.getSaturation(), v = c.getBrightness();
+    return juce::Colour::fromHSV (c.getHue(), s + (0.92f - s) * 0.7f, v + (0.95f - v) * 0.6f, 1.0f);
+}
 
 // The name a new track of `kind` takes, in the UI's language
 std::string trackNameFor (Kind kind)
@@ -210,19 +248,18 @@ class SimpleWorkflow::Chooser final : public juce::Component
 public:
     explicit Chooser (SimpleWorkflow& w)
         : owner (w),
-          voice (Glyph::voice, kindColour (Kind::voice), tr ("Voice / audio"), tr ("Record your voice or any sound from a microphone.")),
-          instrument (Glyph::instrument, kindColour (Kind::instrument), tr ("Instrument"), tr ("Play a sound with the computer keys, the mouse or a MIDI keyboard.")),
-          drums (Glyph::drums, kindColour (Kind::drums), tr ("Drums"), tr ("Make a beat on a step grid, or start from a starter beat.")),
-          sampler (Glyph::sampler, kindColour (Kind::sampler), tr ("Sampler"), tr ("16 pads: put a sound on each and play them with the keys.")),
-          guitar (Glyph::guitar, kindColour (Kind::guitar), tr ("Guitar / bass"), tr ("Plug in a guitar or a bass and play it through the track's effects.")),
+          voice (Glyph::voice, chooserColour (Kind::voice), tr ("Voice / audio"), tr ("Record your voice or any sound from a microphone.")),
+          instrument (Glyph::instrument, chooserColour (Kind::instrument), tr ("Instrument"), tr ("Play a sound with the computer keys, the mouse or a MIDI keyboard.")),
+          drums (Glyph::drums, chooserColour (Kind::drums), tr ("Drums"), tr ("Make a beat on a step grid, or start from a starter beat.")),
+          sampler (Glyph::sampler, chooserColour (Kind::sampler), tr ("Sampler"), tr ("16 pads: put a sound on each and play them with the keys.")),
+          guitar (Glyph::guitar, chooserColour (Kind::guitar), tr ("Guitar / bass"), tr ("Plug in a guitar or a bass and play it through the track's effects.")),
           import (Glyph::import, theme::colour::bg6, tr ("Import"), tr ("Bring in audio or MIDI files: one track each.")),
           loops (Glyph::loops, theme::colour::bg6, tr ("Loops"), tr ("Browse loops and drag them onto the timeline."))
     {
         setWantsKeyboardFocus (true);
         getProperties().set ("lynxKeepsKeys", true); // (round 190fc: its tiles' keys while it is up)
         title.setText (tr ("New track"), juce::dontSendNotification);
-        title.setFont (theme::font (theme::type::display, true));
-        title.setJustificationType (juce::Justification::centred);
+        ui::dialog::styleTitle (title); // (round 190jp: the one dialog title, design190ia SG-20)
         footer.setText (tr ("Each track gets its own channel and mixer track."), juce::dontSendNotification);
         footer.setFont (theme::font (theme::type::small));
         footer.setColour (juce::Label::textColourId, theme::colour::textSecondary);
@@ -246,7 +283,6 @@ public:
         voice.onClick = [this] { owner.addAudio (Kind::voice); };
         // one click gives a sound to play at once (LYNX's own synth); "More..." lists every instrument, plugin and Soundfont
         instrument.onClick = [this] { owner.addDefaultInstrument(); };
-        instrument.rightReserve = 104;
         moreInstruments.setButtonText (tr ("More..."));
         moreInstruments.onClick = [this] { owner.chooseInstrument (moreInstruments); };
         instrument.addAndMakeVisible (moreInstruments);
@@ -255,7 +291,6 @@ public:
         // one click away
         sampler.onClick = [this] { owner.addPads(); };
         sampler.setComponentID ("simple.tile.sampler");
-        sampler.rightReserve = 104;
         samplerKeys.setButtonText (tr ("On keys..."));
         samplerKeys.setTooltip (tr ("One sound played over the whole keyboard, at every pitch"));
         samplerKeys.onClick = [this] { owner.chooseSample(); };
@@ -263,7 +298,6 @@ public:
         guitar.onClick = [this] { owner.addAudio (bassButton.getToggleState() ? Kind::bass : Kind::guitar); };
         import.onClick = [this] { owner.importFiles(); };
         // round 190fo: a whole folder of stems and MIDI files (another app's "download stems", LYNX's own export)
-        import.rightReserve = 104;
         importFolder.setButtonText (tr ("Folder..."));
         importFolder.setTooltip (tr ("A folder of stems and MIDI files: one track each, all from the start"));
         importFolder.onClick = [this] { owner.importFolder(); };
@@ -285,14 +319,17 @@ public:
             guitar.addAndMakeVisible (*b);
         }
         guitarButton.setToggleState (true, juce::dontSendNotification);
+        // (round 190jp: each side button's room from its own text, so the help beside it keeps what it can)
+        instrument.rightReserve = Tile::reserveFor (moreInstruments);
+        sampler.rightReserve = Tile::reserveFor (samplerKeys);
+        import.rightReserve = Tile::reserveFor (importFolder);
 
         for (auto* c : std::initializer_list<juce::Component*> { &title, &close, &voice, &instrument, &drums, &sampler, &guitar, &import, &loops, &footer, &startFrom, &tourButton })
             addAndMakeVisible (*c);
 
         // the starter-beat page
         starterTitle.setText (tr ("Starter beat"), juce::dontSendNotification);
-        starterTitle.setFont (theme::font (theme::type::display, true));
-        starterTitle.setJustificationType (juce::Justification::centred);
+        ui::dialog::styleTitle (starterTitle);
         back.setButtonText (juce::String::fromUTF8 ("\xe2\x80\xb9 ") + tr ("Back"));
         back.onClick = [this] { showTilesPage(); };
         useTempo.setButtonText (tr ("Use the suggested tempo"));
@@ -339,27 +376,18 @@ public:
 
     void paint (juce::Graphics& g) override
     {
-        g.fillAll (theme::colour::bg0.withAlpha (0.72f)); // the timeline stays faintly visible behind
-        const auto c = card().toFloat();
-        g.setColour (juce::Colours::black.withAlpha (0.35f));
-        g.fillRoundedRectangle (c.translated (0.0f, 4.0f).expanded (2.0f), theme::radius::lg + 2.0f);
-        g.setColour (theme::colour::bg2);
-        g.fillRoundedRectangle (c, theme::radius::lg);
-        g.setColour (theme::colour::borderStrong);
-        g.drawRoundedRectangle (c.reduced (0.5f), theme::radius::lg, 1.0f);
-        g.setColour (theme::colour::accent);
-        g.fillRect (c.getX() + 24.0f, c.getY() + 52.0f, c.getWidth() - 48.0f, 1.0f);
+        ui::dialog::paintDim (g, getLocalBounds()); // the timeline stays faintly visible behind
+        ui::dialog::paintFrame (g, card().toFloat(), ui::dialog::Kind::overlay); // (round 190jp: the one dialog frame)
     }
 
     void resized() override
     {
-        auto c = card().reduced (20, 14);
-        auto top = c.removeFromTop (34);
+        auto top = ui::dialog::titleRow (card()).reduced (10, 0);
         close.setBounds (top.removeFromRight (28).withSizeKeepingCentre (28, 28));
         back.setBounds (top.removeFromLeft (90).withSizeKeepingCentre (90, 28));
-        title.setBounds (top);
-        starterTitle.setBounds (top);
-        c.removeFromTop (16);
+        title.setBounds (ui::dialog::titleRow (card()).reduced (100, 0)); // (centred on the card: Back and the X stay clear)
+        starterTitle.setBounds (title.getBounds());
+        auto c = ui::dialog::bodyOf (card()).reduced (20, 14);
         footer.setBounds (c.removeFromBottom (20));
         c.removeFromBottom (6);
         {
@@ -397,7 +425,7 @@ public:
         bassButton.setBounds (sw);
 
         // the starter-beat page: the tempo switch, then the starters in three columns (a click adds one)
-        auto s = card().reduced (20, 14).withTrimmedTop (50);
+        auto s = ui::dialog::bodyOf (card()).reduced (20, 14);
         useTempo.setBounds (s.removeFromTop (28));
         s.removeFromTop (10);
         const auto columns = 3, buttonH = starterRowHeight;
@@ -472,7 +500,7 @@ private:
             auto icon = glyphPath (Glyph::drums);
             const auto box = text.removeFromLeft (18).toFloat().withSizeKeepingCentre (18.0f, 18.0f);
             icon.applyTransform (juce::AffineTransform::scale (box.getWidth(), box.getHeight()).translated (box.getX(), box.getY()));
-            g.setColour (kindColour (Kind::drums));
+            g.setColour (chooserColour (Kind::drums));
             g.strokePath (icon, juce::PathStrokeType (1.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
             text.removeFromLeft (10);
             g.setColour (theme::colour::textPrimary);

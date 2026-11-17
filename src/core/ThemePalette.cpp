@@ -309,6 +309,123 @@ const Palette& defaultPalette()
     return builtIn;
 }
 
+// --- Adjustments and colour dots (round 190jp, design190ia FW-20) --------------------------------------------------------
+namespace
+{
+struct Hsv
+{
+    double h, s, v; // h in degrees 0..360, s and v 0..1
+};
+
+Hsv toHsv (std::uint32_t c)
+{
+    const auto r = red (c) / 255.0, g = green (c) / 255.0, b = blue (c) / 255.0;
+    const auto hi = std::max ({ r, g, b }), lo = std::min ({ r, g, b }), d = hi - lo;
+    auto h = 0.0;
+    if (d > 0.0)
+    {
+        if (hi == r)
+            h = 60.0 * std::fmod ((g - b) / d, 6.0);
+        else if (hi == g)
+            h = 60.0 * ((b - r) / d + 2.0);
+        else
+            h = 60.0 * ((r - g) / d + 4.0);
+    }
+    if (h < 0.0)
+        h += 360.0;
+    return { h, hi > 0.0 ? d / hi : 0.0, hi };
+}
+
+std::uint32_t fromHsv (Hsv x, std::uint32_t alphaOf)
+{
+    auto h = std::fmod (x.h, 360.0);
+    if (h < 0.0)
+        h += 360.0;
+    const auto s = std::clamp (x.s, 0.0, 1.0), v = std::clamp (x.v, 0.0, 1.0);
+    const auto c = v * s, hp = h / 60.0, xx = c * (1.0 - std::abs (std::fmod (hp, 2.0) - 1.0)), m = v - c;
+    double r = 0, g = 0, b = 0;
+    if (hp < 1) { r = c; g = xx; }
+    else if (hp < 2) { r = xx; g = c; }
+    else if (hp < 3) { g = c; b = xx; }
+    else if (hp < 4) { g = xx; b = c; }
+    else if (hp < 5) { r = xx; b = c; }
+    else { r = c; b = xx; }
+    const auto out = rgb ((int) std::lround ((r + m) * 255.0), (int) std::lround ((g + m) * 255.0), (int) std::lround ((b + m) * 255.0));
+    return (out & 0x00ffffffu) | (alphaOf & 0xff000000u);
+}
+} // namespace
+
+const char* dotId (Dot dot)
+{
+    static const char* ids[] { "selection", "highlight", "mute", "option", "steps", "meters", "waves", "text" };
+    const auto i = (int) dot;
+    return i >= 0 && i < dotCount ? ids[i] : "selection";
+}
+
+Palette withAdjustments (Palette p, const Spec& spec)
+{
+    if (! spec.hasAdjustments())
+        return p;
+    const auto hue = std::clamp ((double) spec.hue, -180.0, 180.0);
+    const auto sat = std::clamp ((double) spec.saturation, -1.0, 1.0);
+    const auto bright = std::clamp ((double) spec.brightness, -1.0, 1.0);
+    const auto contrast = std::clamp ((double) spec.contrast, -1.0, 1.0);
+    const auto text = std::clamp ((double) spec.text, -1.0, 1.0);
+    const auto light = relativeLuminance (p.bg1) > 0.4;
+    const auto pivot = toHsv (p.bg3).v; // Contrast spreads the surfaces around the raised one
+
+    // hue and saturation: every grey and text token keeps its value, its tint turns / grows / fades
+    const auto tint = [&] (Hsv x) {
+        x.h += hue;
+        x.s = sat >= 0.0 ? x.s + sat * std::max (0.0, 0.6 - x.s) : x.s * (1.0 + sat);
+        return x;
+    };
+    for (auto* token : { &p.bg0, &p.bg1, &p.bg2, &p.bg3, &p.bg4, &p.bg5, &p.bg6, &p.border, &p.borderStrong, &p.knobTrack, &p.stepOff, &p.stepOffAlt,
+                         &p.gridBar, &p.gridBeat, &p.gridStep, &p.keyBlack, &p.rowWhite, &p.rowBlack, &p.noteMuted, &p.ledOff, &p.outline })
+    {
+        auto x = tint (toHsv (*token));
+        x.v = bright >= 0.0 ? x.v + bright * (1.0 - x.v) * 0.35 : x.v * (1.0 + bright * 0.6);
+        x.v = pivot + (x.v - pivot) * (1.0 + contrast * 0.8);
+        *token = fromHsv (x, *token);
+    }
+    // the text: away from the panels (towards white on a dark theme, black on a light one) or towards them
+    const auto away = light ? 0xff000000u : 0xffffffffu;
+    for (auto* token : { &p.textPrimary, &p.textSecondary, &p.textDisabled, &p.knobArc })
+    {
+        const auto tinted = fromHsv (tint (toHsv (*token)), *token);
+        *token = text >= 0.0 ? mix (tinted, away, text * 0.6) : mix (tinted, p.bg2, -text * 0.5);
+    }
+    return p;
+}
+
+Palette withDots (Palette p, const Spec& spec)
+{
+    const auto dot = [&spec] (Dot d) { return spec.dots[(std::size_t) d]; };
+    if (const auto c = dot (Dot::highlight); c != 0)
+        p.accentHover = c | 0xff000000u;
+    if (const auto c = dot (Dot::mute); c != 0)
+        p.textDisabled = c | 0xff000000u;
+    if (const auto c = dot (Dot::text); c != 0)
+        p.textPrimary = c | 0xff000000u;
+    if (const auto c = dot (Dot::selection); c != 0)
+        p.selectionFill = (c & 0x00ffffffu) | (p.selectionFill & 0xff000000u);
+    return p;
+}
+
+Palette adjustedPalette (const Spec& spec)
+{
+    // (merge 190jp + 190je: from paletteFor, so the grid line intensity holds; after Adjustments the contrast floors are
+    // held again, as derivePalette holds them)
+    auto p = withAdjustments (paletteFor (spec), spec);
+    if (spec.hasAdjustments())
+    {
+        p.textSecondary = withContrast (p.textSecondary, p.bg3, textContrastFloor);
+        p.textDisabled = withContrast (p.textDisabled, p.bg3, disabledContrastFloor);
+        p.outline = withContrast (p.outline, p.bg4, partContrastFloor);
+    }
+    return withDots (p, spec);
+}
+
 const char* imageFitId (ImageFit fit)
 {
     switch (fit)

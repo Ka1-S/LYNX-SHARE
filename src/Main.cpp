@@ -176,6 +176,7 @@
 #include "core/Sfz.h"
 #include "core/Slicex.h"
 #include "ui/Dialogs.h"
+#include "ui/DialogFrame.h"
 #include "ui/FileChoosers.h"
 #include "ui/TrackIcons.h"
 #include "core/RackOps.h"
@@ -703,6 +704,9 @@ public:
         // text size (issue #189): saved in Settings › General; --textsize 125 overrides it for this run
         const auto textSizeArg = args.indexOf ("--textsize");
         lynx::theme::setTextSize (textSizeArg >= 0 ? args[textSizeArg + 1].getIntValue() : lynx::theme::savedTextSize());
+        // bold text (round 190jp): saved in Settings › General; --boldtext 1 (labels) or 2 (all) overrides it for this run
+        const auto boldTextArg = args.indexOf ("--boldtext");
+        lynx::theme::setBoldText (boldTextArg >= 0 ? args[boldTextArg + 1].getIntValue() : lynx::theme::savedBoldText());
         // round 190je: FL-style condensed labels (Settings › General); --condensedlabels for one run. --menustyle flClassic: FL's
         // light menus for one run (Settings › Theme keeps the saved choice)
         lynx::theme::setCondensedLabels (args.contains ("--condensedlabels") || lynx::theme::savedCondensedLabels());
@@ -21306,6 +21310,22 @@ private:
             }
             shoot (lynx::SettingsPage::audio, "audio-whole", 680, 1500);
             shoot (lynx::SettingsPage::general, "general-whole", 680, 2400); // (round 190gh: + the Updates section's previous-version row)
+            // round 190jp (design190ia FW-20): the whole Theme page (thumbnails, Adjustments, dots, A | B), then with
+            // Adjustments and two dots set, in that theme
+            shoot (lynx::SettingsPage::theme, "theme-whole", 680, 1900);
+            {
+                const auto before = lynx::themeui::current();
+                auto adjusted = before;
+                adjusted.hue = 40.0f;
+                adjusted.saturation = 0.45f;
+                adjusted.contrast = 0.3f;
+                adjusted.text = 0.4f;
+                adjusted.dots[(std::size_t) lynx::themes::Dot::steps] = 0xffffa040;
+                adjusted.dots[(std::size_t) lynx::themes::Dot::highlight] = 0xff30a5ff;
+                lynx::themeui::apply (adjusted, false);
+                shoot (lynx::SettingsPage::theme, "theme-adjusted", 680, 1900);
+                lynx::themeui::apply (before, false);
+            }
         }
         juce::LookAndFeel::setDefaultLookAndFeel (nullptr);
     }
@@ -23578,6 +23598,8 @@ private:
             frame.removeChildComponent (&w);
         };
         const auto buttonTexts = [] (juce::AlertWindow& w) {
+            if (auto* d = dynamic_cast<lynx::ui::dialog::Dialog*> (&w)) // (round 190jp: LYNX's dialog, its own buttons)
+                return d->dialogButtonTexts();
             juce::StringArray texts;
             for (int b = 0; b < w.getNumButtons(); ++b)
                 if (auto* button = w.getButton (b))
@@ -23630,7 +23652,8 @@ private:
                 const auto texts = buttonTexts (*w);
                 check ("Support window: Donate on Ko-fi, Close", texts == juce::StringArray { lynx::tr ("Donate on Ko-fi"), lynx::tr ("Close") });
                 check ("Support window: Donate on Ko-fi points at the constant",
-                       w->getButton (0) != nullptr && w->getButton (0)->getTooltip() == juce::String (lynx::links::donate));
+                       dynamic_cast<lynx::ui::dialog::Dialog*> (w.get()) != nullptr
+                           && static_cast<lynx::ui::dialog::Dialog*> (w.get())->dialogButton (0)->getTooltip() == juce::String (lynx::links::donate));
                 check ("Support window title", w->getName() == lynx::tr ("Support LYNX SHARE"));
                 saveAlert (*w, "support");
             }

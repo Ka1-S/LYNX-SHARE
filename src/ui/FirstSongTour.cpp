@@ -2,6 +2,7 @@
 
 #include "engine/AudioEngine.h"
 #include "platform/Paths.h"
+#include "ui/DialogFrame.h"
 #include "ui/I18n.h"
 #include "ui/Motion.h"
 #include "ui/NativeChild.h"
@@ -432,8 +433,7 @@ public:
         setWantsKeyboardFocus (true);
         getProperties().set ("lynxKeepsKeys", true); // (round 190fc: Esc and its options' keys while it is up)
         title.setText (tr ("Welcome to LYNX"), juce::dontSendNotification);
-        title.setFont (theme::font (theme::type::display, true));
-        title.setJustificationType (juce::Justification::centred);
+        ui::dialog::styleTitle (title); // (round 190jp: the one dialog title, design190ia SG-20)
         // round 190hw: what this workflow is, then the question (two lines: wrapped, never squeezed)
         subtitle.setText (tr ("The Simple workflow: tracks and a timeline, loops, pads and quick recording, all in one window. What would you like to do?"), juce::dontSendNotification);
         subtitle.setMinimumHorizontalScale (1.0f);
@@ -466,26 +466,16 @@ public:
 
     void paint (juce::Graphics& g) override
     {
-        g.fillAll (theme::colour::bg0.withAlpha (0.72f));
-        const auto c = card().toFloat();
-        g.setColour (juce::Colours::black.withAlpha (0.35f));
-        g.fillRoundedRectangle (c.translated (0.0f, 4.0f).expanded (2.0f), theme::radius::lg + 2.0f);
-        g.setColour (theme::colour::bg2);
-        g.fillRoundedRectangle (c, theme::radius::lg);
-        g.setColour (theme::colour::borderStrong);
-        g.drawRoundedRectangle (c.reduced (0.5f), theme::radius::lg, 1.0f);
-        g.setColour (theme::colour::accent);
-        g.fillRect (c.getX() + 24.0f, c.getY() + 52.0f, c.getWidth() - 48.0f, 1.0f);
+        ui::dialog::paintDim (g, getLocalBounds());
+        ui::dialog::paintFrame (g, card().toFloat(), ui::dialog::Kind::overlay); // (round 190jp: the one dialog frame)
     }
 
     void resized() override
     {
-        auto c = card().reduced (24, 14);
-        auto top = c.removeFromTop (34);
+        auto top = ui::dialog::titleRow (card()).reduced (10, 0);
         close.setBounds (top.removeFromRight (28).withSizeKeepingCentre (28, 28));
-        top.removeFromLeft (28);
-        title.setBounds (top);
-        c.removeFromTop (12);
+        title.setBounds (top.reduced (28, 0));
+        auto c = ui::dialog::bodyOf (card()).reduced (24, 14);
         subtitle.setBounds (c.removeFromTop (44));
         c.removeFromTop (10);
         footer.setBounds (c.removeFromBottom (20));
@@ -779,7 +769,12 @@ void FirstSongTour::update()
     // round 190jc (design190ia SG-18): beside the ring first (BandLab's coachmark, 12 px from its target with a notch); a
     // corner only when there is no room beside it
     const auto box = [] (juce::Rectangle<int> r) { return tour::Box { r.getX(), r.getY(), r.getWidth(), r.getHeight() }; };
-    const auto beside = tour::placeCard (box (ring.expanded (6)), box (window->getLocalBounds().reduced (12)), w, h, 14, box (keepClear));
+    // (round 190jp: a ring inside the Simple dock keeps the card off the dock, so the keys it points at stay in view)
+    juce::Rectangle<int> dockArea;
+    if (auto* dock = findShowing (*window, "simple.dock"))
+        if (const auto area = areaIn (*window, *dock); area.contains (ring))
+            dockArea = area;
+    const auto beside = tour::placeCard (box (ring.expanded (6)), box (window->getLocalBounds().reduced (12)), w, h, 14, box (keepClear), box (dockArea));
     if (beside.side != tour::Side::none)
         place = { beside.card.x, beside.card.y, beside.card.w, beside.card.h };
     layer->setCard (place, beside.side);

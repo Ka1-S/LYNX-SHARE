@@ -5,6 +5,7 @@
 
 #include "core/Links.h"
 #include "engine/PluginHost.h"
+#include "ui/DialogFrame.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
 #include "ui/WindowOwner.h"
@@ -71,22 +72,19 @@ private:
     juce::StringArray paragraphs;
 };
 
-class SupportWindow final : public juce::AlertWindow
+// round 190jp (design190ia slice 20): the one LYNX dialog frame (it was this window's look: the strip, the frame) with
+// its title row; "Donate on Ko-fi" stays the accent default
+class SupportWindow final : public ui::dialog::Dialog
 {
 public:
-    SupportWindow() : juce::AlertWindow (tr ("Support LYNX SHARE"), {}, juce::MessageBoxIconType::NoIcon)
+    SupportWindow() : ui::dialog::Dialog (tr ("Support LYNX SHARE"), SupportText::textWidth + 2 * ui::dialog::padding)
     {
         setComponentID ("support.window");
-        addCustomComponent (&text);
-        addButton (tr ("Donate on Ko-fi"), 1, juce::KeyPress (juce::KeyPress::returnKey));
-        addButton (tr ("Close"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
-        if (auto* donate = getButton (0))
-        {
-            donate->setColour (juce::TextButton::buttonColourId, theme::colour::accent);
-            donate->setColour (juce::TextButton::textColourOffId, theme::colour::onAccent);
-            donate->setComponentID ("support.donate");
-            donate->setTooltip (juce::String (links::donate));
-        }
+        addContent (text);
+        auto& donate = addDialogButton (tr ("Donate on Ko-fi"), 1, true);
+        donate.setComponentID ("support.donate");
+        donate.setTooltip (juce::String (links::donate));
+        addDialogButton (tr ("Close"), 0, false, true);
     }
 
 private:

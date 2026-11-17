@@ -19,6 +19,9 @@ void keepAboveMainWindow (juce::Component& window); // call after the window is 
 // The main window's native handle (HWND / X11 Window id; nullptr without one): a plugin's window in a separate
 // process is kept above it (round 162d).
 void* mainWindowHandle();
+// The main window's component (nullptr before it exists: --snapshot routes, tests). Round 190jp: Settings › Theme takes
+// a preset's thumbnail from it.
+juce::Component* mainWindowComponent();
 
 // Round 190ev (issue #152, 0.1.26: "the Channel rack almost never comes to the front"): LYNX's own plugin-like editor
 // windows (channel settings, the native effects' and controllers' editors, automation clip settings) are FL's docked
