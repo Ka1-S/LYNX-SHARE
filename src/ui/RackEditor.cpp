@@ -22,6 +22,7 @@
 #include "ui/FileChoosers.h"
 #include "ui/HintBar.h"
 #include "ui/I18n.h"
+#include "ui/LiveLook.h"
 #include "ui/MixerComponent.h"
 #include "ui/PatcherEditor.h"
 #include "ui/PluginPicker.h"
@@ -463,6 +464,7 @@ struct RackView::Impl
                 cell.removeFromBottom (15); // (the Map button, painted)
             cell.removeFromBottom (13); // (the value, painted)
             k.setBounds (cell.reduced (4, 1));
+            k.liveRing = theme::livelook::active(); // (round 190jn: Live's open-ring knob in the Clip-launch layout's Live look)
         }
         const auto w = width (owner.getHeight());
         if (w != lastWidth)
@@ -482,7 +484,13 @@ struct RackView::Impl
     }
 
     juce::Rectangle<int> powerLed() const { return { header.getX() + 7, header.getCentreY() - 5, 10, 10 }; }
-    juce::Rectangle<int> columnButton (int k) const { return { column.getX() + 2, column.getY() + 4 + k * 20, viewColumn - 4, 18 }; }
+    juce::Rectangle<int> columnButton (int k) const
+    {
+        // Live's look (round 190jn, CL-21): round 13 px toggles on a 17 px pitch (live-session.png rack 1227..1239, y 828 / 845)
+        if (theme::livelook::active())
+            return { column.getX() + 4, column.getY() + 4 + k * 17, 13, 13 };
+        return { column.getX() + 2, column.getY() + 4 + k * 20, viewColumn - 4, 18 };
+    }
     // the view column's buttons, top to bottom. An Instrument / Audio Effect / MIDI Effect Rack: M C D V + −. A Drum
     // Rack in Live's order (round 190el, 190ei B1c: macros, + / − while the macros show, variations, pads, chain list,
     // then I-O / S / R while the chain list shows), then LYNX's devices toggle (D) last
@@ -624,7 +632,8 @@ struct RackView::Impl
     // --- paint ------------------------------------------------------------------------------------------------------
     void paint (juce::Graphics& g)
     {
-        g.fillAll (col::bg2);
+        const auto live = theme::livelook::active();
+        g.fillAll (live ? theme::livelook::surface : col::bg2);
         const auto* r = rack();
         if (r == nullptr)
             return;
@@ -651,10 +660,17 @@ struct RackView::Impl
         }
 
         // view column: macros, chains, devices, variations, + / − (Live's selectors [SHOT]); a Drum Rack's in Live's order
-        g.setColour (col::bg3);
+        g.setColour (live ? theme::livelook::surface : col::bg3);
         g.fillRect (column);
         const auto items = columnItems();
-        for (int k = 0; k < (int) items.size(); ++k)
+        for (int k = 0; live && k < (int) items.size(); ++k) // Live: round toggles, lit #FFAD56 with dark ink, else #1E1E1E
+        {
+            const auto b = columnButton (k).toFloat();
+            g.setColour (theme::livelook::drawWell (g, b, columnLit (*r, items[(std::size_t) k])));
+            g.setFont (theme::font (9.0f, true));
+            g.drawText (columnLabel (items[(std::size_t) k]), b, juce::Justification::centred, false);
+        }
+        for (int k = 0; ! live && k < (int) items.size(); ++k)
         {
             const auto b = columnButton (k).toFloat();
             const auto lit = columnLit (*r, items[(std::size_t) k]);
@@ -756,13 +772,21 @@ struct RackView::Impl
             const auto cell = macroCell (m);
             auto plate = cell.withHeight (16).reduced (2, 1).toFloat();
             const auto mapped = ! r.macros[(std::size_t) m].mappings.empty();
-            g.setColour (mapped ? col::info.withAlpha (0.35f) : col::bg3);
-            g.fillRoundedRectangle (plate, theme::radius::sm);
-            g.setColour (mapped ? col::textPrimary : col::textDisabled);
+            // Live's look (round 190jn): a mapped macro's plate #B5B5B5 with #070707 ink (190ei 909 Core Kit "Low Gain"),
+            // its cell framed #242424 on #363636
+            const auto live = theme::livelook::active();
+            if (live)
+            {
+                g.setColour (theme::livelook::separator);
+                g.drawRect (cell.reduced (1, 0), 1);
+            }
+            g.setColour (live ? (mapped ? theme::livelook::padName : theme::livelook::raised) : mapped ? col::info.withAlpha (0.35f) : col::bg3);
+            g.fillRoundedRectangle (plate, live ? 0.0f : theme::radius::sm);
+            g.setColour (live ? (mapped ? theme::livelook::ink : theme::livelook::text) : mapped ? col::textPrimary : col::textDisabled);
             g.drawFittedText (macroName (m), plate.toNearestInt().reduced (2, 0), juce::Justification::centred, 1, 0.8f);
             auto valueRow = cell.withTrimmedBottom (owner.mapping ? 15 : 0);
             valueRow = valueRow.removeFromBottom (13);
-            g.setColour (mapped ? col::textPrimary : col::textSecondary);
+            g.setColour (live ? theme::livelook::text : mapped ? col::textPrimary : col::textSecondary);
             g.drawFittedText (macroText (m, r.macros[(std::size_t) m].value), valueRow, juce::Justification::centred, 1, 0.8f);
             if (owner.mapping)
             {
@@ -987,7 +1011,7 @@ struct RackView::Impl
 
     void paintPads (juce::Graphics& g, const RackDoc& r)
     {
-        g.setColour (col::bg1);
+        g.setColour (theme::livelook::active() ? theme::livelook::surface : col::bg1);
         g.fillRect (pads.reduced (1));
         // the overview: all 128 pads, 32 rows of 4 (C-2 at the bottom), the shown rows framed
         const auto rowH = (float) overview.getHeight() / (float) rack::drumPadRows;
@@ -1019,6 +1043,32 @@ struct RackView::Impl
                     g.setColour (col::textDisabled);
                     g.drawText (keyText (key), pad, juce::Justification::centred);
                 }
+                else if (theme::livelook::active())
+                {
+                    // Live 12.4's pad (round 190jn; 190ei mn_drumrack-choke-menu.png 645..860 × 828..990): a #242424 frame,
+                    // the name area #B5B5B5 (selected #637E86) with #070707 ink, the M ▶ S strip in #363636 cells with
+                    // #B5B5B5 letters; lit buttons keep LYNX's colours (Live's lit pad buttons were not captured)
+                    namespace ll = theme::livelook;
+                    const auto& chain = r.chains[(std::size_t) chainIndex];
+                    g.setColour (ll::separator);
+                    g.fillRect (pad);
+                    const auto nameArea = pad.reduced (1).withTrimmedBottom (14);
+                    g.setColour (key == selected ? ll::selectionUnfocused : chain.active ? ll::padName : ll::padName.withMultipliedBrightness (0.7f));
+                    g.fillRect (nameArea);
+                    g.setColour (ll::ink);
+                    g.drawFittedText (str (chain.name), nameArea.reduced (3, 0), juce::Justification::centredTop, 2, 0.75f);
+                    const bool lit[] { ! chain.active, previewKey == key, chain.solo };
+                    const char* labels[] { "M", "\xe2\x96\xb6", "S" };
+                    const juce::Colour on[] { col::warning, col::accent, col::warning };
+                    for (int k = 0; k < 3; ++k)
+                    {
+                        const auto b = padButton (pad, k).toFloat();
+                        g.setColour (lit[k] ? on[k] : ll::surface);
+                        g.fillRect (b);
+                        g.setColour (lit[k] ? col::bg0 : k == 1 ? ll::raised.brighter (0.3f) : ll::text);
+                        g.drawText (juce::String::fromUTF8 (labels[k]), b, juce::Justification::centred);
+                    }
+                }
                 else
                 {
                     const auto& chain = r.chains[(std::size_t) chainIndex];
@@ -1042,7 +1092,7 @@ struct RackView::Impl
                         g.drawText (juce::String::fromUTF8 (labels[k]), b, juce::Justification::centred);
                     }
                 }
-                if (key == selected)
+                if (key == selected && ! (chainIndex >= 0 && theme::livelook::active())) // (Live: the selected pad's fill)
                 {
                     g.setColour (col::accent);
                     g.drawRoundedRectangle (pad.toFloat().reduced (0.5f), theme::radius::sm, 2.0f);
@@ -2664,15 +2714,56 @@ void RackView::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheel
 
 std::unique_ptr<juce::Component> RackView::makeTitleAccessory()
 {
-    struct Accessory final : juce::Component
+    struct Accessory final : juce::Component, public juce::TooltipClient
     {
         juce::TextButton rand { "Rand" }, map { "Map" };
+        // Live's look (round 190jn, CL-21): Live's rack title bar has R (randomise, a round well) and M (map, a square
+        // well, lit while mapping) at 13 px on a 16 px pitch (live-session.png "H..." rack 1271..1299)
+        static bool live() { return theme::livelook::active(); }
+        juce::Rectangle<float> wellOf (int k) const { return { (float) getWidth() - 16.0f * (float) (2 - k), (float) (getHeight() - 13) / 2.0f, 13.0f, 13.0f }; }
         void resized() override
         {
+            rand.setVisible (! live());
+            map.setVisible (! live());
             auto a = getLocalBounds();
             map.setBounds (a.removeFromRight (30));
             a.removeFromRight (2);
             rand.setBounds (a.removeFromRight (34));
+        }
+        void paint (juce::Graphics& g) override
+        {
+            if (! live())
+                return;
+            namespace ll = theme::livelook;
+            g.setFont (theme::font (9.0f, true));
+            g.setColour (ll::drawWell (g, wellOf (0), false));
+            g.drawText ("R", wellOf (0), juce::Justification::centred, false);
+            const auto m = wellOf (1);
+            const bool lit = map.getToggleState();
+            g.setColour (ll::wellRim);
+            g.fillRoundedRectangle (m, 2.0f);
+            g.setColour (lit ? ll::on : ll::well);
+            g.fillRoundedRectangle (m.reduced (1.0f), 1.5f);
+            g.setColour (lit ? ll::ink : ll::text);
+            g.drawText ("M", m, juce::Justification::centred, false);
+        }
+        void mouseUp (const juce::MouseEvent& e) override
+        {
+            if (! live() || ! getLocalBounds().contains (e.getPosition()))
+                return;
+            if (wellOf (0).expanded (1.0f).contains (e.position) && rand.onClick != nullptr)
+                rand.onClick();
+            else if (wellOf (1).expanded (1.0f).contains (e.position) && map.onClick != nullptr)
+            {
+                map.setToggleState (! map.getToggleState(), juce::dontSendNotification);
+                map.onClick();
+            }
+            repaint();
+        }
+        juce::String getTooltip() override
+        {
+            const auto p = getMouseXYRelative().toFloat();
+            return live() ? (wellOf (0).contains (p) ? rand.getTooltip() : wellOf (1).contains (p) ? map.getTooltip() : juce::String()) : juce::String();
         }
     };
     auto a = std::make_unique<Accessory>();
@@ -3077,7 +3168,7 @@ public:
         return widthLimit > 0 ? std::max (std::min (wanted, widthLimit), view->minimumWidth (bodyHeight)) : wanted;
     }
     juce::Component* titleAccessory() override { return accessory.get(); }
-    int titleAccessoryWidth() const override { return RackView::titleAccessoryWidth; }
+    int titleAccessoryWidth() const override { return theme::livelook::active() ? 32 : RackView::titleAccessoryWidth; }
     void resized() override { view->setBounds (getLocalBounds()); }
 
 private:

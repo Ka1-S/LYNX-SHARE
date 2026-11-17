@@ -13,6 +13,7 @@
 #include "ui/AudioEditor.h"
 #include "ui/AutomationUi.h"
 #include "ui/I18n.h"
+#include "ui/LiveClipLook.h"
 #include "ui/NumBox.h"
 #include "ui/Theme.h"
 
@@ -718,6 +719,11 @@ public:
 
     void paint (juce::Graphics& g) override
     {
+        if (liveShown)
+        {
+            paintLive (g);
+            return;
+        }
         using namespace theme;
         const auto column = getLocalBounds().removeFromLeft (columnWidth);
         g.setColour (colour::bg1);
@@ -770,6 +776,12 @@ public:
     // and Fade at the bottom; on the right the Gain fader with its dB read-out, then Pitch: the knob, st and ct boxes
     void resized() override
     {
+        applyLook();
+        if (liveShown)
+        {
+            resizedLive();
+            return;
+        }
         auto area = getLocalBounds();
         auto column = area.removeFromLeft (columnWidth).reduced (8, 0);
         column.removeFromTop (20);
@@ -868,7 +880,214 @@ public:
             envelopes->setBounds (area);
     }
 
+    // --- round 190jn (design190ia CL-20a): Live 12.4's Audio section (live-clipview-audio.png 249..418 × 789..994) ---------
+    // In the Clip-launch layout's Live look: a 170 px column with Live's 17 px "Audio" header (click: fold), Warp 83 × 13
+    // (#FFAD56 on) at 12 px, the mode under it, BPM ÷2 ×2 then Reverse | Edit and Fade from the bottom up (the mode's own
+    // settings between, folding away when they don't fit: round 190ig's rule); at the right (104..162) Gain as Live's rail
+    // with its ▶ handle and the 24 / 0 / 70 marks, its dB under it, Pitch as Live's ring knob and the st / ct fields at the
+    // bottom. The editor's title bar is Live's 17 px #363636 bar with the Sample | Envelopes tabs centred.
+    static inline bool audioOpen = true; // (UI state, not saved)
+    void mouseDown (const juce::MouseEvent& e) override
+    {
+        if (liveShown && liveHeader.contains (e.getPosition()))
+        {
+            audioOpen = ! audioOpen;
+            resized();
+            repaint();
+        }
+    }
+
 private:
+    bool liveShown = false;
+    juce::Rectangle<int> liveHeader, liveContent;
+    int liveDivideY = 0, liveFadeSepY = 0;
+    void applyLook()
+    {
+        const auto live = theme::livelook::active();
+        if (live == liveShown)
+            return;
+        liveShown = live;
+        for (auto* c : std::initializer_list<juce::Component*> { &warp, &halve, &twice, &reverse, &edit, &fade, &mode, &preserve, &beatsLaw, &gain, &pitchKnob,
+                                                                 &semitones, &cents })
+            liveclip::style (*c, live);
+        for (auto* b : { &sampleTab, &envelopesTab })
+        {
+            liveclip::swapColour (*b, juce::TextButton::buttonColourId, theme::livelook::surface, live);
+            liveclip::swapColour (*b, juce::TextButton::buttonOnColourId, liveclip::header, live);
+            liveclip::swapColour (*b, juce::TextButton::textColourOffId, theme::livelook::text, live);
+            liveclip::swapColour (*b, juce::TextButton::textColourOnId, theme::livelook::text, live);
+            b->setConnectedEdges (live ? juce::Button::ConnectedOnLeft | juce::Button::ConnectedOnRight : 0);
+        }
+        if (live)
+            gain.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 58, liveclip::row);
+        else
+            gain.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 62, 16);
+    }
+
+    void resizedLive()
+    {
+        const auto row = liveclip::row;
+        auto area = getLocalBounds();
+        auto column = area.removeFromLeft (liveclip::columnWidth);
+        area.removeFromLeft (2);
+        liveHeader = column.removeFromTop (liveclip::headerHeight);
+        column.removeFromTop (1);
+        liveContent = column;
+        const std::initializer_list<juce::Component*> controls { &warp, &mode, bpm.get(), &halve, &twice, &gain, &pitchKnob, &semitones, &cents, &reverse, &edit,
+                                                                 &fade, &preserve, &loopMode, envelope.get(), grainTones.get(), grainTexture.get(), flux.get(),
+                                                                 proFormants.get(), proEnvelope.get(), &beatsLaw };
+        modeLabel1 = modeLabel2 = bpmLabel = gainLabel = pitchLabel = stLabel = ctLabel = {};
+        liveDivideY = liveFadeSepY = 0;
+        if (! audioOpen)
+            for (auto* c : controls)
+                c->setBounds ({});
+        else
+        {
+            auto left = juce::Rectangle<int> (12, column.getY() + 4, 83, std::max (0, column.getHeight() - 8));
+            auto right = juce::Rectangle<int> (104, column.getY() + 4, 58, std::max (0, column.getHeight() - 8));
+            warp.setBounds (left.removeFromTop (row));
+            left.removeFromTop (4);
+            mode.setBounds (left.removeFromTop (row));
+            left.removeFromTop (4);
+            // from the bottom: Fade, then Reverse | Edit, then BPM ÷2 ×2 (round 190ig: these keep their room)
+            fade.setBounds (left.removeFromBottom (row).withWidth (27));
+            liveFadeSepY = left.getBottom() - 3;
+            left.removeFromBottom (6);
+            {
+                auto r = left.removeFromBottom (row);
+                reverse.setBounds (r.removeFromLeft (53));
+                r.removeFromLeft (4);
+                edit.setBounds (r);
+            }
+            liveDivideY = left.getBottom() - 3;
+            left.removeFromBottom (6);
+            {
+                auto r = left.removeFromBottom (row);
+                bpm->setBounds (r.removeFromLeft (40));
+                r.removeFromLeft (3);
+                halve.setBounds (r.removeFromLeft (19));
+                r.removeFromLeft (2);
+                twice.setBounds (r.removeFromLeft (19));
+                bpmLabel = left.removeFromBottom (row);
+            }
+            left.removeFromBottom (3);
+            // the mode's own settings, as LYNX's look lays them out, in 13 px rows; a row that doesn't fit folds away
+            {
+                const auto first = preserve.isVisible() || grainTones->isVisible() || grainTexture->isVisible() || proFormants->isVisible();
+                const auto beatsRow = loopMode.isVisible() || envelope->isVisible();
+                const auto secondBox = flux->isVisible() || proEnvelope->isVisible();
+                const auto take = [&left] (int h) {
+                    return left.getHeight() >= h ? left.removeFromTop (h) : juce::Rectangle<int> (left.getX(), left.getY(), left.getWidth(), 0);
+                };
+                juce::Rectangle<int> row1, row2, row3;
+                if (first && left.getHeight() >= 2 * row + 2)
+                {
+                    modeLabel1 = take (row);
+                    row1 = take (row);
+                }
+                if ((beatsRow || secondBox) && left.getHeight() >= (secondBox ? 2 * row + 6 : row + 3))
+                {
+                    left.removeFromTop (3);
+                    row2 = take (row);
+                }
+                if ((secondBox && ! row2.isEmpty()) || (beatsLaw.isVisible() && left.getHeight() >= row))
+                    row3 = take (row);
+                preserve.setBounds (row1);
+                grainTones->setBounds (row1);
+                grainTexture->setBounds (row1);
+                proFormants->setBounds (row1);
+                loopMode.setBounds (row2.withWidth (juce::jmax (0, row2.getWidth() / 2 - 2)));
+                envelope->setBounds (row2.withTrimmedLeft (row2.getWidth() / 2 + 2));
+                modeLabel2 = row2;
+                flux->setBounds (row3);
+                proEnvelope->setBounds (row3);
+                beatsLaw.setBounds (row3);
+            }
+            // the right part: Gain over its rail and dB, then Pitch, its knob, "st" and the st | ct fields at the bottom
+            gainLabel = right.removeFromTop (row);
+            {
+                auto fields = right.removeFromBottom (row);
+                semitones.setBounds (fields.removeFromLeft (fields.getWidth() / 2));
+                cents.setBounds (fields);
+            }
+            stLabel = right.removeFromBottom (row);
+            pitchKnob.setBounds (right.removeFromBottom (28).withSizeKeepingCentre (28, 28));
+            pitchLabel = right.removeFromBottom (row);
+            right.removeFromBottom (2);
+            gain.setBounds (right.withTrimmedLeft (4));
+        }
+        titleBar = area.removeFromTop (liveclip::headerHeight);
+        area.removeFromTop (1);
+        {
+            auto tabs = titleBar.withSizeKeepingCentre (60 + 1 + 60, liveclip::headerHeight);
+            sampleTab.setBounds (tabs.removeFromLeft (60));
+            tabs.removeFromLeft (1);
+            envelopesTab.setBounds (tabs);
+        }
+        if (editor != nullptr)
+            editor->setBounds (area);
+        if (envelopes != nullptr)
+            envelopes->setBounds (area);
+    }
+
+    void paintLive (juce::Graphics& g)
+    {
+        namespace ll = theme::livelook;
+        const auto w = liveclip::columnWidth;
+        g.fillAll (ll::window);
+        g.setColour (ll::surface);
+        g.fillRect (0, 0, w, getHeight());
+        g.setColour (ll::separator);
+        g.fillRect (w, 0, 2, getHeight());
+        liveclip::paintHeader (g, liveHeader, tr ("Audio"), 2, audioOpen);
+        if (audioOpen)
+        {
+            g.setColour (ll::separator); // (Live: a line between the left and the right part, and over Reverse and Fade)
+            g.fillRect (99, liveContent.getY() + 4, 1, std::max (0, liveContent.getHeight() - 8));
+            if (liveDivideY > 0)
+                g.fillRect (12, liveDivideY, 83, 1);
+            if (liveFadeSepY > 0)
+                g.fillRect (12, liveFadeSepY, 83, 1);
+            g.setColour (ll::text);
+            g.setFont (theme::font (theme::type::small));
+            g.drawText (tr ("BPM"), bpmLabel, juce::Justification::centredLeft);
+            if (preserve.isVisible())
+                g.drawText (tr ("Preserve"), modeLabel1, juce::Justification::centredLeft);
+            if (grainTones->isVisible() || grainTexture->isVisible())
+                g.drawText (tr ("Grain Size"), modeLabel1, juce::Justification::centredLeft);
+            if (proFormants->isVisible())
+                g.drawText (tr ("Formants"), modeLabel1, juce::Justification::centredLeft);
+            g.drawText (tr ("Gain"), gainLabel, juce::Justification::centred);
+            g.drawText (tr ("Pitch"), pitchLabel, juce::Justification::centred);
+            g.drawText ("st", stLabel, juce::Justification::centred);
+            // the rail's marks: 24 at the top, 0, 70 at the bottom (Live's Gain scale, live-clipview-audio.png 352..410)
+            if (! gain.getBounds().isEmpty())
+                for (const auto v : { 24.0, 0.0, -70.0 })
+                {
+                    const auto y = gain.getY() + juce::roundToInt (gain.getPositionOfValue (v));
+                    g.drawText (juce::String (juce::roundToInt (std::abs (v))), juce::Rectangle<int> (gain.getRight() - 16, y - 6, 18, 12),
+                                juce::Justification::centredRight);
+                }
+        }
+        if (! titleBar.isEmpty())
+        {
+            g.setColour (ll::surface);
+            g.fillRect (titleBar);
+            g.setColour (ll::separator);
+            g.fillRect (titleBar.getX(), titleBar.getBottom(), titleBar.getWidth(), 1);
+            const auto icon = titleBar.withWidth (22).toFloat().withSizeKeepingCentre (14.0f, 9.0f);
+            g.setColour (ll::text);
+            g.drawRect (icon, 1.0f);
+            for (int k = 0; k < 4; ++k)
+            {
+                const auto x = icon.getX() + 3.0f + (float) k * 2.6f, h = k % 2 == 0 ? 5.0f : 2.5f;
+                g.fillRect (x, icon.getCentreY() - h * 0.5f, 1.2f, h);
+            }
+            g.setFont (theme::font (theme::type::small));
+            g.drawText (titleText, titleBar.withTrimmedLeft (26).withRight (sampleTab.getX() - 6), juce::Justification::centredLeft, true);
+        }
+    }
+
     void changeListenerCallback (juce::ChangeBroadcaster*) override { refresh(); }
 
     const SamplerSettings& sampler() const

@@ -265,6 +265,7 @@ public:
     static constexpr int flPatternHeaderWidth = 106, flTallHeader = 40;
     static int flHeaderWidthNow() noexcept;
     bool flHeaders() const noexcept;
+    bool liveHeaders() const; // round 190jn: Live's header row (the Live look, not the Simple or the linked headers)
     std::vector<char> activityShown; // round 190ig (FM-28): [track] its activity strip lit (FL's Pattern layout, while playing)
     // Issue #154 (round 190ht; core/TrackInserts.h), a LYNX extra, off by default (FL keeps an insert's effects in the
     // Mixer): the linked headers get a column listing their mixer track's insert effects, and are this much wider.
@@ -350,6 +351,17 @@ public:
     void setLiveStyle (bool on);
     bool hasLiveStyle() const noexcept { return liveStyle; }
     static constexpr int liveFoldedHeight = 17; // a folded track: its title bar's height
+    // Round 190jn (design190ia CL-17, CL-18, owner decision CL-17): the Arrangement in Live 12.4's look while the
+    // Clip-launch layout shows it (theme::livelook::active(); the classic look keeps round 190cg's): Live's 19 px collapsed
+    // lanes (17 px + a 2 px separator) by default, LYNX's 38 px with View › "Tall Arrangement lanes"
+    // (playlistTallLiveLanes()); clips as colour blocks with dark names and waveforms; Live's track header row.
+    static constexpr int liveCollapsedHeight = 19;
+    // the Live headers: Live's 2 px separator, its 103 px name box in the track colour, a 2 px separator, then the
+    // controls panel (#363636) with the 46 px activator, and LYNX's 9 px selection / meter column
+    static constexpr int liveHeaderWidth = 170;
+    bool liveArrangeLook() const noexcept;
+    // after View › "Tall Arrangement lanes" or the classic look changed: the rows, the header width and the picture again
+    void liveLanesChanged();
     bool automationFollows() const noexcept;
     // 0 duplicate, 1 cut, 2 copy, 3 paste (at the time selection's start, else the song position), 4 crop the selected clips
     void timeCommand (int which);
@@ -652,6 +664,21 @@ private:
     struct SmallClips;
     void addSmallClip (SmallClips& batch, float physicalScale, const Clip& clip, juce::Rectangle<float> bounds, bool current);
     void paintAutomationClip (juce::Graphics& g, const Clip& clip, juce::Rectangle<float> bounds);
+    // round 190jn (CL-17, CL-18): a clip's colour in Live's look (its own, else its track's) and its look; Live's lanes
+    // (bar-group shading and grid); a clip's Live frame, returning its body (empty on a collapsed lane)
+    juce::Colour liveClipColour (const Clip& clip) const;
+    theme::ClipLook liveClipLook (const Clip& clip) const;
+    void paintLiveGrid (juce::Graphics& g, juce::Rectangle<int> grid) const;
+    // Round 190jn (the coordinator's follow-up): Live's lane backgrounds, grid and separators from one cached image, made
+    // again only when the view's size, scroll, zoom, rows or bars change (false: draw them straight; whole-pixel scales
+    // only). LYNX_LIVEGRID_CACHE=0 turns it off (checks).
+    bool paintLiveLanesCached (juce::Graphics& g, juce::Rectangle<int> grid, int rows);
+    juce::Image liveLaneImage;
+    std::uint64_t liveLaneKey = 0;
+    juce::Rectangle<float> paintLiveClipFrame (juce::Graphics& g, juce::Rectangle<float> r, const theme::ClipLook& look, const juce::String& name) const;
+    // Live's grid lines from x0 to x1: level 0 = a bar group's first bar, 1 = a bar, 2 = a beat; `group` = the group's parity
+    template <typename Line>
+    void forEachLiveGridLine (double x0, double x1, Line&& line) const;
 
     void refreshArrangementBox();
     void arrangementChosen();
@@ -1199,4 +1226,8 @@ private:
     juce::Component* detailView = nullptr;
     std::function<int (int)> detailHeightFor;
 };
+// Round 190jn (design190ia CL-17, owner decision): View › "Tall Arrangement lanes" in the Clip-launch layout's Live look
+// (a preference, off by default: Live's 19 px collapsed lanes; on: LYNX's 38 px rows). PlaylistComponent::liveLanesChanged
+// after a change.
+bool& playlistTallLiveLanes();
 } // namespace lynx
