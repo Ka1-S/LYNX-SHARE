@@ -151,7 +151,7 @@ public:
     static inline int simpleWorkflowAliveAfterTeardown = -1;
     // The Clip-launch workflow's detail view (round 183a), made with the grid; nullptr until then.
     DetailView* getDetailViewForSnapshot() const noexcept { return detailView.get(); }
-    bool runActionForSnapshot (const std::string& id) { return runAction (id); } // (round 190jn: Q, the hot-swap key)
+    bool runActionForSnapshot (const std::string& id) { return runAction (id); } // (round 190jn: Q, the hot-swap key; round 190jz: --issueshot190jz)
     juce::Component* getClipGridForSnapshot() const noexcept { return clipGridView.get(); } // --gridshot (round 190bv)
     // round 190ch (LYNX's own): the project's Lyrics / Notes panel — docked on the right of the Playlist in every layout,
     // or in its own window — and the Reference match window
@@ -167,7 +167,6 @@ public:
     void showPanelsForSnapshot (std::initializer_list<workspace::Panel> panels);
     void openQuickAddForTest() { showQuickAdd(); } // --windowtest
     Workspace& workspaceForTest() { return workspace; } // --plugwintest dock mode (issue #116)
-    bool runActionForSnapshot (const std::string& id) { return runAction (id); } // --issueshot190jz
     const keys::KeyMap& getKeyMapForSnapshot() const { return keyMap; }
     juce::Component* setupOverlayForTest() const { return setupOverlay.get(); }
     juce::Component* danceStageForTest() const { return danceStage.get(); } // (a DanceStage, ui/DanceView.h)
