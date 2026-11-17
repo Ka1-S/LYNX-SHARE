@@ -113,7 +113,7 @@ TEST (parity190js_hush_single_vocal_revision0_renders_as_the_base_commit_did)
     // 2.2 s of the gold input in blocks of 256: FNV-1a of the float bits, the energy, two samples. From the base commit's
     // objects (origin/parity190jh; /mnt/e/lynx-work/parity190js/gold: gold_base.txt — the round's objects print the same lines)
     const Case cases[] = {
-#include "tests/Parity190jsGold.inc"
+#include "Parity190jsGold.inc" // (beside this file: the CMake test build has no -I for the repository root)
     };
     for (const auto& c : cases)
     {
