@@ -168,6 +168,7 @@ bool ChannelRackComponent::keepEditorsOpen = false;
 bool ChannelRackComponent::selectFirstChannelWithNotes = false;
 bool ChannelRackComponent::autoSelectLinked = true;
 bool ChannelRackComponent::muteRemovedSteps = false;
+bool ChannelRackComponent::nameAlignLeft = false;
 
 ChannelRackComponent::ChannelRackComponent (AudioEngine& e)
     : engine (e)
@@ -1145,10 +1146,13 @@ void ChannelRackComponent::paint (juce::Graphics& g)
                 // "Titey Tom" between the left edge and the icon)
                 g.setColour (onAccent.withAlpha (channel.muted ? 0.5f : frozen ? 0.7f : 0.92f));
                 g.setFont (theme::font (theme::type::body + 1.0f));
-                const auto rightTrim = rightUsed + iconWidth > 0.0f ? rightUsed + iconWidth + 4.0f : 6.0f;
-                const auto textArea = nameArea.withTrimmedLeft (6.0f).withTrimmedRight (rightTrim);
+                // FL's Channel rack menu › Options › Channel name alignment › Left (round 190kd): the name from the left edge,
+                // as LYNX drew it before 190jp
+                const auto left = nameAlignLeft;
+                const auto rightTrim = rightUsed + iconWidth > 0.0f ? rightUsed + iconWidth + 4.0f : left ? 5.0f : 6.0f;
+                const auto textArea = nameArea.withTrimmedLeft (left ? 7.0f : 6.0f).withTrimmedRight (rightTrim);
                 textcache::drawText (g, theme::fitMiddle (juce::String::fromUTF8 (channel.name.c_str()), g.getCurrentFont(), textArea.getWidth()), textArea,
-                                     juce::Justification::centred, false);
+                                     left ? juce::Justification::centredLeft : juce::Justification::centred, false);
                 g.setFont (theme::font (theme::type::body));
             }
 
