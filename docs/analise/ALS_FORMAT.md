@@ -676,3 +676,36 @@ Before → after per case (the rack against the engine, same stimuli, same metri
   so the sound and the automation stay (null test). Ctrl+Shift+G ungroups a one-chain Instrument Rack whose chain starts
   with its instrument: the instrument returns to the channel and the audio effects after it go to the front of the
   channel's mixer insert (refused when the channel plays into Master or the insert has no room).
+
+## 27. Envelopes as Live plays them, video clips and take lanes (round als190ka, issue #193, 2026-11-17) [LIVE]
+Probe sets built from Live's default template (`/mnt/e/lynx-work/als190ka/s/tools/a1.py`, `a2.py`), opened and saved by
+Live 12.4.16 Trial, every track exported on its own (1 kHz sine, 48 kHz, 32-bit float). Renders and Live's own save:
+`/mnt/e/lynx-work/als190ka/renders/`, `sets/a1-live Project/a1-live.als`.
+- **Interpolation.** Live moves a parameter in a straight line along its *normalised* travel, not in the stored value.
+  For the mixer that is the fader: track volume dB = 40·p − 34 for p ≥ 0.4 (0 dB at 0.85, +6 at 1), a measured curve
+  below (−18 dB at 0.4 … −65.5 dB at 0.0125, silence at 0); a send is the same fader 6 dB lower (0 dB at the top); a
+  return's volume is a track volume. Table and inverse: `core/LiveFader.h`. Utility's Gain and EQ Eight's band gain move
+  straight in dB, EQ Eight's frequency in log frequency (a 100 Hz → 10 kHz ramp passes 1 kHz at the middle).
+- **Curves.** `CurveControl1X/1Y/2X/2Y` on an event bend the segment that **starts** there: a cubic Bézier from (0, 0) to
+  (1, 1) in the segment's normalised time and travel (for the fader: its position). Live writes only the controls that
+  are not 0.5 (a missing one is 0.5): (0.5, 0, 1, 0.5) was saved as `CurveControl1Y="0" CurveControl2X="1"`. The model
+  matches the renders within 0.09 dB.
+- **Jumps** are two events at one time, the value before first (Ids are not in time order).
+- **One-event envelopes win over Manual.** Live's default set holds Tempo/Manual 100 under a tempo envelope whose only event is
+  120. Live plays 120.
+- **Track Volume clip envelope** (Mixer/Volume/ModulationTarget, warped clip): with the fader at 0 dB, m plays
+  −17·(1 − m) dB (m = 1 … 0: 0, −1.7, −4.2, −8.5, −12.7, −15.3, −17.0 dB), i.e. the fader at (1 + m)/2 of its position.
+- **Video clips** are ordinary arrangement `AudioClip`s whose `SampleRef` is the video file. Unwarped: `Loop/LoopStart`
+  and `LoopEnd` are seconds of the file; Live wrote the warp marker `SecTime="5" BeatTime="0"` for a clip starting 5 s into
+  the file. The render plays file seconds 5…9 from 2.0 s (beat 4 at 120 BPM).
+- **Take lanes**: `TakeLanes/TakeLanes/TakeLane{Name, ClipAutomation/Events/(AudioClip|MidiClip)}`; the track's own
+  arrangement clips are the main lane (what plays).
+
+LYNX (`AlsImport.cpp`): gains are cut into straight pieces within 0.1 dB of Live's fader curve. A bent segment
+of any other parameter follows the Bézier in the target's 0…1, within 0.3 %. Bool and enum envelopes are steps: a device's
+On becomes its slot's mix, 0 when off (Live's bypass passes the dry signal). The track's Speaker is listed, since LYNX's
+mute is not automated. A send at −inf with an envelope gets its route. Main track devices go to the Master. A one-event
+envelope sets the tempo or the mixer control. Video clips go to a video track with Live's trim (start, file offset,
+length in song seconds), and the sound stays an audio clip that the sample library decodes from the video. Take lanes
+become muted lanes folded under the track, which becomes the comp track (core/Comping.h). The export writes send
+envelopes and cuts LYNX's curves into pieces that Live's fader reproduces within 0.1 dB.

@@ -11044,3 +11044,10 @@ countries: br
 # --- rollup 0.1.30 step 5: Save a copy for 0.1.28 knows rounds 190js / 190jv
 "Hush De-esser's Single Vocal mode plays its earlier version: {0}" = "O modo Single Vocal do Hush De-esser toca a versão anterior: {0}"
 "Slide notes on FL's native generators glide instead of stepping once per tick: {0}" = "As notas slide nos geradores nativos do FL deslizam em vez de avançar um passo por tick: {0}"
+
+# --- round als190ka-export (owner decision D5): AIFF and M4A export
+"AIFF file..." = "Arquivo AIFF..."
+"M4A file..." = "Arquivo M4A..."
+"AAC bitrate (the system's encoder; higher: better sound, bigger file)" = "Taxa de bits do AAC (o codificador do sistema; maior: som melhor, arquivo maior)"
+"M4A at {0} Hz" = "M4A em {0} Hz"
+"M4A files take 44100 or 48000 Hz (or a multiple of it); this export is at {0} Hz" = "Arquivos M4A usam 44100 ou 48000 Hz (ou um múltiplo disso); esta exportação está em {0} Hz"

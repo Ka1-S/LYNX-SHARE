@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cmath>
 #include <cstdlib>
 #include <condition_variable>
@@ -18,6 +19,7 @@
 #include "core/OggVorbis.h"
 #include "core/Mp3Decoder.h"
 #include "core/TimeStretch.h"
+#include "core/VideoTrack.h"
 #include "core/LoadTrace.h"
 #include "engine/Mp3Format.h"
 #include "engine/WavPackFormat.h"
@@ -209,8 +211,24 @@ juce::String SampleLibrary::wildcard() const
     return formats.getWildcardForAllFormats() + ";*.speech"; // FL's speech files are samples too (round 168b)
 }
 
+namespace
+{
+std::atomic<SampleLibrary::VideoSoundDecoder> videoSoundDecoder { nullptr };
+}
+
+void SampleLibrary::setVideoSoundDecoder (VideoSoundDecoder decoder) noexcept { videoSoundDecoder.store (decoder); }
+
 std::unique_ptr<juce::AudioFormatReader> SampleLibrary::createReader (const juce::File& file)
 {
+    // a video file: its sound track, decoded by the system into a cached WAV (round als190ka, issue #193)
+    if (videotrack::isVideoPath (file.getFullPathName().toStdString()))
+    {
+        if (const auto decoder = videoSoundDecoder.load(); decoder != nullptr)
+            if (const auto wav = decoder (file); wav.existsAsFile())
+                return std::unique_ptr<juce::AudioFormatReader> (formats.createReaderFor (wav));
+        return nullptr;
+    }
+
     // before JUCE's own Ogg reader (vorbisfile), which drops blocks in many of FL's files (REA_rodada77 §3)
     if (auto reader = createFlOggReader (file))
         return reader;
@@ -1061,10 +1079,21 @@ SampleLibrary::MemoryUse SampleLibrary::memoryUse()
 
 std::shared_ptr<const SampleData> SampleLibrary::decode (const juce::String& path)
 {
-    const auto file = platform::localFile (path); // FL's Windows spelling on macOS/Linux (platform/Paths.h)
+    auto file = platform::localFile (path); // FL's Windows spelling on macOS/Linux (platform/Paths.h)
 
     if (! file.existsAsFile())
         return nullptr;
+
+    // a video's sound track (round als190ka): read from its decoded WAV, which also keys the disk cache (a cache keyed on
+    // the video would outlive a better decode of the same file)
+    if (videotrack::isVideoPath (file.getFullPathName().toStdString()))
+    {
+        const auto decoder = videoSoundDecoder.load();
+        const auto wav = decoder != nullptr ? decoder (file) : juce::File();
+        if (! wav.existsAsFile())
+            return nullptr;
+        file = wav;
+    }
 
     // FL's .speech files: spoken by LYNX's speech synthesizer, one slice (marker) per word (round 168b; FL's sample
     // loader speaks them too and hands the words over as a Zero-X grid)

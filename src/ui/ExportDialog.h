@@ -89,7 +89,8 @@ void renderPatternsAsAudioClips (AudioEngine& engine, const std::vector<int>& pa
 // selection (quickrender::Start).
 void exportAllPlaylistTracks (AudioEngine& engine, const juce::String& projectName, quickrender::Start start, bool groups);
 
-// Panel only (for --snapshot mode; `format`: 0 WAV, 1 MP3, 2 OGG, 3 FLAC with loop/stem options set). Nothing is saved.
+// Panel only (for --snapshot mode; `format`: 0 WAV, 1 MP3, 2 OGG, 3 FLAC with loop/stem options set, 4 AIFF, 5 M4A where
+// the system has an AAC encoder). Nothing is saved.
 std::unique_ptr<juce::Component> makeExportPanel (AudioEngine& engine, int format = 0);
 // The panel of showExportDialogForTracks (for --snapshot).
 // The panel with round 190ap's additions in use (--versionsshot): two presets, one chosen, "One file per marker section" on.

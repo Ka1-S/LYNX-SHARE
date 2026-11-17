@@ -95,5 +95,8 @@ bool splitClip (VideoTrack& track, int index, double at, std::uint64_t uid);
 double snapToFrame (const VideoSettings& v, double songSeconds) noexcept;
 // The end of the last video clip (seconds), 0 without any
 double videoEnd (const std::vector<VideoTrack>& tracks) noexcept;
+// Whether a path names a video file, by its extension (the list ui/VideoTracks offers; round als190ka: a Live set's
+// video clips and the sample library's video sound tracks)
+bool isVideoPath (const std::string& path) noexcept;
 } // namespace videotrack
 } // namespace lynx

@@ -271,9 +271,13 @@ bool extractAudioToWav (const juce::File& video, const juce::File& wav)
     if (! ffmpeg.existsAsFile())
         return false;
     juce::ChildProcess proc;
-    if (proc.start (juce::StringArray { ffmpeg.getFullPathName(), "-nostdin", "-v", "quiet", "-y", "-i", video.getFullPathName(), "-vn", "-sn",
-                                        "-ac", "2", "-c:a", "pcm_s16le", wav.getFullPathName() },
-                    0))
+    // round als190ka: a mono sound track stays mono (ffmpeg's mono → stereo mix puts it 3 dB down on each side; Live and the
+    // sample library play a mono file at full level on both)
+    juce::StringArray args { ffmpeg.getFullPathName(), "-nostdin", "-v", "quiet", "-y", "-i", video.getFullPathName(), "-vn", "-sn" };
+    if (! p.report.contains (" mono,") && ! p.report.contains (", mono"))
+        args.addArray (juce::StringArray { "-ac", "2" });
+    args.addArray (juce::StringArray { "-c:a", "pcm_s16le", wav.getFullPathName() });
+    if (proc.start (args, 0))
         proc.waitForProcessToFinish (10 * 60 * 1000);
     return wav.existsAsFile() && wav.getSize() > 44;
 }

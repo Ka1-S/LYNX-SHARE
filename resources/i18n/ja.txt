@@ -10914,3 +10914,10 @@ countries: jp
 # --- rollup 0.1.30 step 5: Save a copy for 0.1.28 knows rounds 190js / 190jv
 "Hush De-esser's Single Vocal mode plays its earlier version: {0}" = "Hush De-esser の Single Vocal モードは以前のバージョンで再生されます: {0}"
 "Slide notes on FL's native generators glide instead of stepping once per tick: {0}" = "FL のネイティブジェネレーターのスライドノートは、1 ティックごとの段階ではなく滑らかに移ります: {0}"
+
+# --- round als190ka-export (owner decision D5): AIFF and M4A export
+"AIFF file..." = "AIFFファイル..."
+"M4A file..." = "M4Aファイル..."
+"AAC bitrate (the system's encoder; higher: better sound, bigger file)" = "AACビットレート（システムのエンコーダー。高いほど音質が良く、ファイルが大きくなります）"
+"M4A at {0} Hz" = "M4A {0} Hz"
+"M4A files take 44100 or 48000 Hz (or a multiple of it); this export is at {0} Hz" = "M4Aファイルは44100または48000 Hz（またはその倍数）です。このエクスポートは{0} Hzです"

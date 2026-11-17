@@ -32,6 +32,10 @@ and downloads it only if you agree. The Demucs code is MIT; its authors state th
 is not clear. On Windows, ONNX Runtime uses the Microsoft Visual C++ Redistributable already on the computer; LYNX does
 not ship it.
 
+M4A (AAC) export uses the AAC encoder of the operating system: Media Foundation's on Windows, AudioToolbox's on macOS.
+LYNX ships no AAC encoder (no FDK-AAC, no FFmpeg): the codec and its patent licensing come with the system that provides
+it. Where there is no system encoder (Linux, Windows "N" editions without the Media Feature Pack), M4A is not offered.
+
 Every component is available under an OSI-approved open-source licence, and LYNX uses each of them under that
 licence; no proprietary or closed-source code is compiled into or shipped with LYNX. Where Steinberg offers a
 proprietary licence as an alternative (VST 3 SDK, ASIO SDK), LYNX takes the GPLv3 option, which is compatible with

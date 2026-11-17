@@ -91,6 +91,7 @@
 #include "platform/LinuxRealtime.h"
 #include "engine/PowerHints.h"
 #include "engine/Exporter.h"
+#include "engine/AacEncoder.h"
 #include "engine/FlStudioExport.h"
 #include "engine/MidiFileIo.h"
 #include "engine/PluginHost.h"
@@ -654,6 +655,8 @@ public:
         // rollup 0.1.28 (REA 190hb action 4, FL's "Init DWM"): the compositor on MMCSS, steadier frames under CPU load
         // (Windows; LYNX_DWM_MMCSS=0 leaves it off)
         lynx::powerhints::enableCompositorMmcss();
+        // round als190ka (issue #193): a video's sound track for the sample library (a Live set's video clips)
+        lynx::SampleLibrary::setVideoSoundDecoder ([] (const juce::File& video) { return lynx::videotracks::soundTrackWav (video); });
         // round 190ci: also for a fault on a stack Windows cannot walk, which never reaches that handler (Windows)
         lynx::crashguard::setUnwalkableFaultHandler (onCrash);
         if (const auto args = juce::StringArray::fromTokens (commandLine, true); args.contains ("--faulttest"))
@@ -6859,8 +6862,9 @@ private:
         // round 190ci: a fault leaves a crash file, also on a stack Windows cannot walk (that FPC fault left none)
         const auto faultResult = faultReportSelfTest();
         const auto stemsResult = stemsSinglePassSelfTest(); // round 190gj
+        const auto exportFormatsResult = lynx::shortexport::formatsCheck(); // AIFF and M4A (owner decision D5)
         juce::LookAndFeel::setDefaultLookAndFeel (&lookBefore);
-        const auto ok = editorsResult.startsWith ("OK") && ! faultResult.startsWith ("ERROR") && stemsResult == "OK"
+        const auto ok = editorsResult.startsWith ("OK") && ! faultResult.startsWith ("ERROR") && stemsResult == "OK" && exportFormatsResult.startsWith ("OK")
                         && mixerBasics == "OK" && fontsResult == "OK" && paintCachesResult.startsWith ("OK") && picturesResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && pluginLevelsOk && flp168jOk && clipFades180dOk && blocksOk && takeoverOk && compOk && polyOk && latencyOk && preSendOk && lowLatencyOk && previewInTimeOk && substituteOk && patcherOk && rackResult == "OK" && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && exportParity.startsWith ("OK") && exportLive.startsWith ("OK") && midiHotplug.startsWith ("OK") && midiOutPorts.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
@@ -6875,6 +6879,7 @@ private:
         report << "connections=" << offline.getNumGraphConnections() << "\n"
                << "peak=" << peak << "\n"
                << "stems_single_pass=" << stemsResult << "\n"
+               << "export_formats=" << exportFormatsResult << "\n"
                << "project=" << (projectOk ? "OK" : "ERROR " + error) << "\n"
                << "playlist_track_modes_roundtrip=" << (trackModes122Ok ? "OK" : "ERROR") << "\n"
                << "project_features=" << (richOk ? "OK" : "ERROR") << "\n"
@@ -18609,8 +18614,10 @@ private:
         quit();
     }
 
-    // LYNX.exe --export project.(flp|als|lynx) output.(wav|flac|ogg|mp3) [--pattern] [--insert N] [--rate N]
-    // Same path as "Export" in the UI: the whole song (or the current pattern) with its tail.
+    // LYNX.exe --export project.(flp|als|lynx) output.(wav|flac|ogg|mp3|aif|aiff|m4a|aac) [--pattern] [--insert N] [--rate N]
+    // Same path as "Export" in the UI: the whole song (or the current pattern) with its tail. .aif / .aiff: 24-bit AIFF;
+    // .m4a: AAC at 192 kbps through the system's encoder (engine/AacEncoder.h; .aac writes the same MPEG-4 file under the
+    // name .m4a). M4A is not available on Linux: the export stops with that message.
     void runExport (const juce::String& inputPath, const juce::String& outputPath, bool patternOnly, int insert)
     {
         juce::String error, report;
@@ -18651,9 +18658,17 @@ private:
                 ok = true;
             }
 
+            // M4A without a system AAC encoder (Linux): said before anything is rendered
+            if (ok && juce::File (outputPath).hasFileExtension ("m4a;aac") && ! lynx::aac::available())
+            {
+                ok = false;
+                error = juce::String::fromUTF8 (lynx::aac::unavailableReason().c_str());
+            }
+
             if (ok)
             {
-                const juce::File output (outputPath);
+                // (an .aac name gets the MPEG-4 file it holds: .m4a)
+                const juce::File output (juce::File (outputPath).hasFileExtension ("aac") ? juce::File (outputPath).withFileExtension ("m4a") : juce::File (outputPath));
                 lynx::ExportSettings settings;
                 settings.wholeSong = ! patternOnly;
                 settings.format = output.hasFileExtension ("flac") ? lynx::ExportSettings::Format::flac24
@@ -18688,6 +18703,16 @@ private:
                 {
                     options.format = lynx::exportopts::Format::mp3;
                     options.mp3Kbps = 320;
+                }
+                else if (output.hasFileExtension ("aif;aiff")) // (as the .wav: 24 bits, no dither)
+                {
+                    options.format = lynx::exportopts::Format::aiff;
+                    options.aiffBits = 24;
+                }
+                else if (output.hasFileExtension ("m4a"))
+                {
+                    options.format = lynx::exportopts::Format::aac;
+                    options.aacKbps = 192;
                 }
                 lynx::ExportJob job (insert > 0 ? lynx::makeBounceSong (loader.getSong(), insert) : loader.getSong(), options, output);
                 job.setExtraData (true);
@@ -18752,7 +18777,8 @@ private:
                        << "song_seconds=" << job.getMusicSeconds() << "\n"
                        << "peak=" << job.getPeak() << "\n"
                        << "final_progress=" << lastPercent << "\n"
-                       << "bytes=" << output.getSize() << "\n";
+                       << "bytes=" << output.getSize() << "\n"
+                       << "file=" << output.getFullPathName() << "\n";
                 ok = ok && job.getPeak() > 0.001f;
             }
         }
@@ -31832,6 +31858,9 @@ private:
             saveWindow (lynx::makeExportPanel (offline), "-export.png");
             saveWindow (lynx::makeExportPanel (offline, 1), "-export-mp3.png");
             saveWindow (lynx::makeExportPanel (offline, 3), "-export-flac-stems.png");
+            saveWindow (lynx::makeExportPanel (offline, 4), "-export-aiff.png"); // owner decision D5
+            if (lynx::aac::available())
+                saveWindow (lynx::makeExportPanel (offline, 5), "-export-m4a.png");
             {
                 // REA round 165f-mixer: the mixer track's Track latency / routing submenus, Disk recording, PDC, and the
                 // Export window for "Render selected tracks to wave file(s)"
