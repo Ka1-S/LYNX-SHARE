@@ -109,7 +109,7 @@ TEST (gb190ke_fade_out_places_garageband_points_on_the_master)
     CHECK (r.ok);
     CHECK (songfade::present (s));
     CHECK (std::abs (songfade::seconds (s) - 10.0) < 1.0e-6);
-    const auto& clip = s.playlist[(std::size_t) r.clip];
+    const auto clip = s.playlist[(std::size_t) r.clip]; // (a copy: the playlist grows below)
     CHECK (clip.kind == ClipKind::automation && clip.end() == end && clip.start == end - songfade::ticksFor (s, 10.0));
     CHECK (clip.track == beat.track + 1);
     CHECK (s.playlistTracks[(std::size_t) clip.track].name == songfade::kTrackName);
