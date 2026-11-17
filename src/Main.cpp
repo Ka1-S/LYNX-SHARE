@@ -28021,6 +28021,7 @@ private:
         write (ui, "window");
         area (*gridView, mixer->getBoundsInParent(), "mixer");
         area (*gridView, { 0, 0, gridView->getWidth(), 240 }, "grid-top");
+        area (*gridView, mixer->getBoundsInParent().withTrimmedLeft (mixer->getWidth() - 260), "mixer-returns");
         // a return's send to the other one, switched on; Pre on return B
         offline.editSong ([&returns] (lynx::Song& s) {
             lynx::sessionmixer::setSendEnabled (s, returns[0], returns[1], true);
@@ -28028,6 +28029,7 @@ private:
         });
         settle();
         area (*gridView, mixer->getBoundsInParent(), "mixer-sendon-pre");
+        area (*gridView, mixer->getBoundsInParent().withTrimmedLeft (mixer->getWidth() - 260), "mixer-returns-sendon-pre");
         check ("return A's send to B switched on, B Pre", lynx::sessionmixer::sendEnabled (song, returns[0], returns[1]) && lynx::sessionmixer::isPre (song, returns[1]));
         saveMenus (juce::StringArray { "Return send" }, std::vector<juce::PopupMenu> { mixer->sendMenu ({ lynx::SessionMixerComponent::returnColumn (1), Part::send, 0 }) },
                    prefix + "-menu-send.png");
@@ -28046,13 +28048,14 @@ private:
             s.crossfader = -0.3f;
         });
         settle();
-        ui.resized();
+        gridView->resized(); // (the menu item does this: the grid gives the mixer its new height)
         settle();
         check ("the Crossfader section: A / B on a track, the crossfader on Main",
                ! mixer->partBounds (0, Part::xfadeA).isEmpty() && ! mixer->partBounds (0, Part::xfadeB).isEmpty() && ! mixer->partBounds (-2, Part::crossfader).isEmpty());
         line ("A " + mixer->partBounds (0, Part::xfadeA).toString() + ", B " + mixer->partBounds (0, Part::xfadeB).toString() + ", crossfader "
               + mixer->partBounds (-2, Part::crossfader).toString());
         area (*gridView, mixer->getBoundsInParent(), "mixer-crossfader");
+        area (*gridView, mixer->getBoundsInParent().withTrimmedLeft (mixer->getWidth() - 260), "mixer-returns-crossfader");
         saveMenus (juce::StringArray { "Crossfader" }, std::vector<juce::PopupMenu> { mixer->crossfaderMenu() }, prefix + "-menu-curve.png");
         lynx::clipGridClassicLook() = true;
         lynx::refreshClipGrid (*gridView);
@@ -28135,6 +28138,15 @@ private:
             if (sample != nullptr && audio != nullptr)
             {
                 const auto hits = lynx::grooveaudio::hitsOf (song, *audio, *sample);
+                {
+                    const auto all = lynx::clipwarp::attacks (*sample);
+                    const auto& sm = song.channels[(std::size_t) audio->channel].sampler;
+                    line ("audio file: " + juce::String ((int) sample->left.size()) + " frames at " + juce::String (sample->sampleRate) + " Hz, "
+                          + juce::String ((int) all.size()) + " attacks (first " + juce::String (all.empty() ? -1.0 : all.front(), 3) + " s); clip offset "
+                          + juce::String (audio->offset) + " length " + juce::String (audio->length) + " stretch " + juce::String (audio->stretch, 3)
+                          + "; warp " + juce::String ((int) sm.warp.size()) + " markers, keepPitch " + juce::String ((int) sm.keepPitch)
+                          + ", first content beat " + juce::String (all.empty() ? 0.0 : lynx::grooveaudio::contentBeat (sm, all.front(), song.bpm), 3));
+                }
                 const auto pool = song.grooves.grooves.size();
                 offline.editSong ([&] (lynx::Song& s) {
                     if (const auto* c = lynx::launcher::clipAt (*s.clipGrid, audioTrack, audioScene))
