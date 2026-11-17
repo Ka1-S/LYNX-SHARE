@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cstring>
 
+#include "core/AudioEdit.h"
 #include "core/Instruments.h"
 #include "core/Scheduler.h"
 #include "core/VocalPitch.h"
@@ -138,6 +139,7 @@ void readTracks (State& s)
             t.selfBpm = number (xml, object, "SelfBPM", 0.0);
             t.edited = globalEdited (xml, object);
             t.globalFormant = number (xml, object, "GlobalFormantShift", 1.0);
+            t.key = (int) number (xml, object, "KeyIdx", -1.0);
 
             for (const auto note : elements (xml, "Pitch_", object, limit))
             {
@@ -170,6 +172,8 @@ void readTracks (State& s)
                 p.rampIn = v ("fRampIn", 0.0);
                 p.rampOut = v ("fRampOut", 0.0);
                 p.enabled = v ("bIsEnabled", 1.0) != 0.0;
+                p.validEnd = (std::int64_t) v ("iOrigValidNoteEnd", -1.0);
+                p.velocity = v ("fOrigVelocity", -1.0);
                 if (! std::isfinite (p.stretch) || p.stretch <= 0.0)
                     p.stretch = 1.0;
                 t.pitches.push_back (p);
@@ -707,7 +711,8 @@ struct Reader
     }
 };
 
-constexpr std::uint32_t nativeVersion = 2; // 2 (round 165g): + the editor's knobs, the notes' pitch ramps and analysed smooth times
+constexpr std::uint32_t nativeVersion = 3; // 2 (round 165g): + the editor's knobs, the notes' pitch ramps and analysed smooth times;
+                                           // 3 (round 190kj): + each note's voiced end and analysed velocity
 constexpr std::uint32_t warpVersion = 1;
 
 double median (std::vector<double> v)
@@ -733,7 +738,8 @@ Track analyseNotes (const SampleData& source)
             mono[(std::size_t) i] = 0.5f * (mono[(std::size_t) i] + source.rightData()[i]);
 
     const int hop = std::max (64, (int) std::lround (256.0 * fs / 44100.0));
-    const auto frames = vocal::analysePitch (mono.data(), (int) n, fs, hop, 60.0, 1000.0);
+    // (round 190kj: a looser voicing threshold than the tuner's 0.15, so rough and low voices stay voiced as in FL)
+    const auto frames = vocal::analysePitch (mono.data(), (int) n, fs, hop, 60.0, 1000.0, 0.3f);
     float loudest = 0.0f;
     for (const auto& f : frames)
         loudest = std::max (loudest, f.level);
@@ -753,24 +759,23 @@ Track analyseNotes (const SampleData& source)
     };
 
     const auto minFrames = std::max<std::size_t> (2, (std::size_t) std::lround (0.06 * fs / hop)); // notes ≥ 60 ms
-    const auto smoothTime = 0.015 * fs;
+    const auto holdFrames = std::max (3, (int) std::lround (0.058 * fs / hop));
+    struct Run
+    {
+        std::size_t a, b; // voiced frames [a, b)
+        double hz;        // their median frequency
+    };
+    std::vector<Run> runs;
     auto close = [&] (std::size_t a, std::size_t b) { // frames [a, b) → a note
         if (b <= a || b - a < minFrames)
             return;
         std::vector<double> v;
         for (auto k = a; k < b; ++k)
             if (note[k] >= 0.0)
-                v.push_back (note[k]);
-        Note p;
-        p.origStart = p.curStart = std::clamp<std::int64_t> ((std::int64_t) a * hop - hop / 2, 0, n);
-        p.origEnd = p.curEnd = std::clamp<std::int64_t> ((std::int64_t) b * hop - hop / 2, p.origStart, n);
-        if (! t.pitches.empty() && p.origStart < t.pitches.back().origEnd)
-            p.origStart = p.curStart = t.pitches.back().origEnd;
-        if (p.origEnd <= p.origStart)
+                v.push_back (frames[k].hz);
+        if (v.empty())
             return;
-        p.origPitch = median (v);
-        p.smoothIn = p.smoothOut = p.origSmoothIn = p.origSmoothOut = smoothTime;
-        t.pitches.push_back (p);
+        runs.push_back ({ a, b, median (v) });
     };
 
     std::size_t start = 0;
@@ -789,8 +794,9 @@ Track analyseNotes (const SampleData& source)
         const auto here = voiced ? smooth (k) : -1.0;
         if (! voiced || std::abs (here - centre) > 0.7)
         {
-            // a gap or a new pitch held for 3 frames ends the note (one-frame glitches and slides stay in it)
-            if (! voiced || ++away >= 3)
+            // a gap, or a new pitch held for 58 ms (FL's segmentation, fitted on 17 files), ends the note (glitches,
+            // slides and short wobbles stay in it)
+            if (! voiced || ++away >= holdFrames)
             {
                 const auto end = voiced ? k - (std::size_t) (away - 1) : k;
                 close (start, end);
@@ -804,6 +810,77 @@ Track analyseNotes (const SampleData& source)
         away = 0;
         centre += 0.1 * (here - centre); // (follows a slow drift)
     }
+
+    // FL's layout (round 190kj, measured on FL's own analysis of 17 files): the notes tile the file. A note starts at
+    // its voice's onset (or at the pitch change from the note before) and owns everything up to the next note; a lead-in
+    // note (unvoiced, the first note's pitch) covers the file's start; validEnd = where the note's voice ends.
+    const auto toSample = [&] (std::size_t k) { return std::clamp<std::int64_t> ((std::int64_t) k * hop - hop / 2, 0, n); };
+    const auto flPitch = [&] (double hz) { // whole-sample periods, as FL's fOrigPitch
+        const auto period = std::floor (fs / hz);
+        return period >= 1.0 ? vocal::hzToNote (fs / period) : vocal::hzToNote (hz);
+    };
+    const auto defaultSmooth = 0.073 * fs; // FL's smooth-in after silence (3200-3300 samples at 44.1 kHz)
+    const auto onsetLead = (std::int64_t) std::lround (1.75 * hop); // the voicing detector's lag behind the onset
+    std::vector<Note> out;
+    for (std::size_t i = 0; i < runs.size(); ++i)
+    {
+        const auto& r = runs[i];
+        Note p;
+        const bool legato = i > 0 && runs[i - 1].b + 2 >= r.a;
+        auto first = r.a;
+        if (legato) // a pitch change: the note starts where the pitch leaves the note before
+        {
+            const auto before = vocal::hzToNote (runs[i - 1].hz);
+            while (first > runs[i - 1].a + 1 && note[first - 1] >= 0.0 && std::abs (note[first - 1] - before) > 0.33)
+                --first;
+        }
+        p.origStart = std::max<std::int64_t> (0, toSample (first) - (legato ? 0 : onsetLead)); // (a pitch change: no lead)
+        if (! out.empty() && p.origStart <= out.back().origStart)
+            p.origStart = out.back().origStart + 1;
+        if (p.origStart >= n)
+            break;
+        p.validEnd = std::max (p.origStart + 1, toSample (r.b));
+        p.origPitch = flPitch (r.hz);
+        // the glide into the note: from its start until the pitch settles within a third of a semitone of the note's
+        // own (a note after silence: FL's default); the glide out: from where it leaves it to the voice's end
+        const auto target = vocal::hzToNote (r.hz);
+        // (a note after silence that starts on its pitch: FL's default; one that scoops into it: the scoop)
+        auto settle = first;
+        while (settle < r.b && (note[settle] < 0.0 || std::abs (note[settle] - target) > 0.33))
+            ++settle;
+        const auto scoop = (double) (settle - first) * hop;
+        const double in = legato ? std::min (defaultSmooth, scoop) : (scoop > 0.0 ? std::min (defaultSmooth, scoop) : defaultSmooth);
+        auto k = r.b;
+        while (k > r.a && (note[k - 1] < 0.0 || std::abs (note[k - 1] - target) > 0.33))
+            --k;
+        p.smoothIn = p.origSmoothIn = in;
+        p.smoothOut = p.origSmoothOut = (double) (r.b - k) * hop; // + the silence after the voice (below)
+        out.push_back (p);
+    }
+    if (! out.empty() && out.front().origStart > 0)
+    {
+        Note lead;
+        lead.origStart = 0;
+        lead.origPitch = out.front().origPitch;
+        lead.validEnd = 0;
+        lead.velocity = 0.0;
+        const auto len = (double) out.front().origStart;
+        lead.smoothIn = lead.smoothOut = lead.origSmoothIn = lead.origSmoothOut = std::max (0.0, len - 0.0045 * fs);
+        out.insert (out.begin(), lead);
+    }
+    for (std::size_t i = 0; i < out.size(); ++i)
+    {
+        auto& p = out[i];
+        p.origEnd = i + 1 < out.size() ? out[i + 1].origStart : n;
+        p.validEnd = p.validEnd == 0 ? 0 : std::min (p.validEnd, p.origEnd);
+        if (p.validEnd != 0)
+            p.smoothOut = p.origSmoothOut = p.smoothOut + (double) (p.origEnd - p.validEnd);
+        p.curStart = p.origStart;
+        p.curEnd = p.origEnd;
+        p.fadeInTime = p.fadeOutTime = 0.2 * (double) (p.origEnd - p.origStart);
+    }
+    t.pitches = std::move (out);
+    t.key = detectKey (t);
     t.notes = (int) t.pitches.size();
     return t;
 }
@@ -899,7 +976,7 @@ void applyCentre (Track& track, double amount, const std::vector<int>& which)
 
 void applyVariation (Track& track, double amount, const std::vector<int>& which)
 {
-    amount = std::clamp (amount, 0.0, 1.0);
+    amount = std::clamp (amount, 0.0, 2.0); // (FL's Variation knob goes to 200 %: the drift exaggerated)
     forNotes (track, which, [amount] (Note& p) { p.drift = amount; });
     if (which.empty())
         track.variation = amount;
@@ -953,11 +1030,13 @@ std::vector<ScoreNote> score (const Track& track, double sampleRate)
     if (sampleRate <= 0.0)
         return out;
     for (const auto& p : track.pitches)
-        if (p.enabled && p.origPitch > 0.0 && p.curEnd > p.curStart)
+        if (p.enabled && p.voiced() && p.origPitch > 0.0 && p.curEnd > p.curStart)
         {
+            // (round 190kj: a note's voiced part; the silence FL's analysis gives it after its voice is not in the score)
+            const auto end = std::min ((double) p.curEnd, (double) p.curStart + (double) (p.voicedEnd() - p.origStart) / std::max (1e-9, p.stretch));
             ScoreNote n;
             n.start = (double) p.curStart / sampleRate;
-            n.length = (double) (p.curEnd - p.curStart) / sampleRate;
+            n.length = std::max (1.0, end - (double) p.curStart) / sampleRate;
             n.key = std::clamp ((int) std::lround (p.origPitch + p.shift), 0, 127);
             n.velocity = (float) std::clamp (0.78 * p.volume, 0.0, 1.0);
             out.push_back (n);
@@ -968,7 +1047,11 @@ std::vector<ScoreNote> score (const Track& track, double sampleRate)
 std::vector<DetectedNote> detectScore (const SampleData& source, double* detune)
 {
     std::vector<DetectedNote> out;
-    const auto track = analyseNotes (source);
+    auto track = analyseNotes (source);
+    // (round 190kj: the analysis tiles the file; the score takes the voiced notes, each up to where its voice ends)
+    track.pitches.erase (std::remove_if (track.pitches.begin(), track.pitches.end(), [] (const Note& p) { return ! p.voiced(); }), track.pitches.end());
+    for (auto& p : track.pitches)
+        p.origEnd = p.voicedEnd();
     if (track.pitches.empty())
     {
         if (detune != nullptr)
@@ -1048,6 +1131,161 @@ int dumpScore (Song& song, int channel, const std::vector<DetectedNote>& notes, 
     return count;
 }
 
+int detectKey (const Track& track)
+{
+    static constexpr double major[12] { 6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88 };
+    static constexpr double minor[12] { 6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17 };
+    double h[12] {};
+    bool any = false;
+    for (const auto& p : track.pitches)
+        if (p.voiced() && p.origPitch > 0.0)
+        {
+            const auto k = (int) std::lround (p.origPitch);
+            h[((k % 12) + 12) % 12] += (double) (p.voicedEnd() - p.origStart);
+            any = true;
+        }
+    if (! any)
+        return -1;
+    auto corr = [&] (const double* prof, int tonic) {
+        double mx = 0.0, my = 0.0;
+        for (int i = 0; i < 12; ++i)
+            mx += h[i], my += prof[i];
+        mx /= 12.0, my /= 12.0;
+        double sxy = 0.0, sxx = 0.0, syy = 0.0;
+        for (int i = 0; i < 12; ++i)
+        {
+            const auto x = h[(i + tonic) % 12] - mx, y = prof[i] - my;
+            sxy += x * y, sxx += x * x, syy += y * y;
+        }
+        return sxx > 0.0 && syy > 0.0 ? sxy / std::sqrt (sxx * syy) : -2.0;
+    };
+    int best = 0;
+    double score = -3.0;
+    for (int k = 0; k < 24; ++k)
+        if (const auto r = corr (k < 12 ? major : minor, k % 12); r > score)
+            score = r, best = k;
+    return best;
+}
+
+std::uint16_t keyScaleMask (int key) noexcept
+{
+    if (key < 0)
+        return 0xFFF;
+    return key < 12 ? (std::uint16_t) 0b101010110101 : (std::uint16_t) 0b010110101101; // (major / natural minor from the tonic)
+}
+
+std::pair<std::int64_t, std::int64_t> timeAround (const Track& track, const std::vector<int>& which)
+{
+    std::int64_t a = -1, b = -1;
+    for (const auto k : which)
+    {
+        if (k < 0 || k >= (int) track.pitches.size())
+            continue;
+        const auto& p = track.pitches[(std::size_t) k];
+        const auto end = p.curStart + (std::int64_t) std::llround ((double) (p.voicedEnd() - p.origStart) / std::max (1e-9, p.stretch));
+        a = a < 0 ? p.curStart : std::min (a, p.curStart);
+        b = std::max (b, std::min (p.curEnd, end));
+    }
+    return { a, b };
+}
+
+std::vector<int> notesIn (const Track& track, std::int64_t a, std::int64_t b)
+{
+    std::vector<int> out;
+    for (int k = 0; k < (int) track.pitches.size(); ++k)
+    {
+        const auto& p = track.pitches[(std::size_t) k];
+        if (p.voiced() && p.curStart < b && p.curEnd > a)
+            out.push_back (k);
+    }
+    return out;
+}
+
+audioedit::Document regionsDocument (const SampleData& audio, const Track& track, bool asMarkers)
+{
+    audioedit::Document doc;
+    doc.audio.sampleRate = audio.sampleRate;
+    const auto n = (std::size_t) audio.frames();
+    doc.audio.channels.emplace_back (audio.leftData(), audio.leftData() + n);
+    if (audio.isStereo())
+        doc.audio.channels.emplace_back (audio.rightData(), audio.rightData() + n);
+    for (const auto& p : track.pitches)
+    {
+        if (! p.voiced() || ! p.enabled || p.origPitch <= 0.0 || p.curStart >= (std::int64_t) n)
+            continue;
+        audioedit::Marker m;
+        m.start = p.curStart;
+        m.end = asMarkers ? p.curStart : std::min<std::int64_t> ((std::int64_t) n, p.curEnd);
+        const auto key = (int) std::lround (p.origPitch + p.shift);
+        static const char* const names[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+        m.name = std::string (names[((key % 12) + 12) % 12]) + std::to_string (key / 12);
+        m.keyNum = std::clamp (key, 0, 127);
+        doc.markers.push_back (m);
+    }
+    return doc;
+}
+
+void quantizeTime (Track& track, const std::vector<int>& which, double grid)
+{
+    if (! (grid > 0.0))
+        return;
+    std::vector<int> chosen = which;
+    if (chosen.empty())
+        for (int k = 0; k < (int) track.pitches.size(); ++k)
+            chosen.push_back (k);
+    for (const auto k : chosen)
+    {
+        if (k <= 0 || k >= (int) track.pitches.size() || ! track.pitches[(std::size_t) k].voiced())
+            continue; // (the first note keeps the file's start)
+        auto& p = track.pitches[(std::size_t) k];
+        auto& before = track.pitches[(std::size_t) k - 1];
+        const auto to = (std::int64_t) std::llround (std::round ((double) p.curStart / grid) * grid);
+        const auto joined = before.curEnd == p.curStart;
+        const auto lo = before.curStart + 1, hi = p.curEnd - 1;
+        if (to < lo || to > hi)
+            continue;
+        p.curStart = to;
+        if (joined)
+            before.curEnd = to;
+        for (auto* q : { &before, &p })
+        {
+            const auto out = std::max<std::int64_t> (1, q->curEnd - q->curStart);
+            q->stretch = (double) (q->origEnd - q->origStart) / (double) out;
+            if (std::abs (q->stretch - 1.0) < 1e-9)
+                q->stretch = 1.0;
+        }
+    }
+    track.edited = std::any_of (track.pitches.begin(), track.pitches.end(), [&track] (const Note& p) { return p.edited (track.globalFormant); });
+}
+
+void stretchAll (Track& track, double ratio)
+{
+    if (! (ratio > 0.0) || ! std::isfinite (ratio))
+        return;
+    for (auto& p : track.pitches)
+    {
+        p.curStart = (std::int64_t) std::llround ((double) p.origStart * ratio);
+        p.curEnd = std::max (p.curStart + 1, (std::int64_t) std::llround ((double) p.origEnd * ratio));
+        p.stretch = std::abs (ratio - 1.0) < 1e-12 ? 1.0 : (double) (p.origEnd - p.origStart) / (double) (p.curEnd - p.curStart);
+    }
+    track.edited = std::any_of (track.pitches.begin(), track.pitches.end(), [&track] (const Note& p) { return p.edited (track.globalFormant); });
+}
+
+std::shared_ptr<SampleData> cropped (const SampleData& s, std::int64_t a, std::int64_t b)
+{
+    const auto n = (std::int64_t) s.frames();
+    a = std::clamp<std::int64_t> (a, 0, n);
+    b = std::clamp<std::int64_t> (b, 0, n);
+    if (b <= a)
+        a = 0, b = n;
+    auto out = std::make_shared<SampleData>();
+    out->sampleRate = s.sampleRate;
+    out->left.assign (s.leftData() + a, s.leftData() + b);
+    if (s.isStereo())
+        out->right.assign (s.rightData() + a, s.rightData() + b);
+    return out;
+}
+
 std::vector<std::uint8_t> writeNative (const Track& track)
 {
     std::vector<std::uint8_t> out { 'L', 'X', 'N', 'T' };
@@ -1057,6 +1295,7 @@ std::vector<std::uint8_t> writeNative (const Track& track)
     put (out, track.centre);
     put (out, track.variation);
     put (out, track.transition);
+    put (out, (std::int32_t) track.key); // (version 3)
     put (out, (std::uint32_t) track.pitches.size());
     for (const auto& p : track.pitches)
     {
@@ -1070,6 +1309,8 @@ std::vector<std::uint8_t> writeNative (const Track& track)
         put (out, p.rampOut);
         put (out, p.origSmoothIn);
         put (out, p.origSmoothOut);
+        put (out, p.validEnd);
+        put (out, p.velocity);
     }
     return out;
 }
@@ -1091,6 +1332,8 @@ std::optional<Track> parseNative (const std::vector<std::uint8_t>& state)
         t.variation = r.get<double>();
         t.transition = r.get<double>();
     }
+    if (version >= 3)
+        t.key = r.get<std::int32_t>();
     const auto count = r.get<std::uint32_t>();
     if (! r.ok || count > 100000)
         return std::nullopt;
@@ -1114,6 +1357,11 @@ std::optional<Track> parseNative (const std::vector<std::uint8_t>& state)
         {
             p.origSmoothIn = p.smoothIn;
             p.origSmoothOut = p.smoothOut;
+        }
+        if (version >= 3)
+        {
+            p.validEnd = r.get<std::int64_t>();
+            p.velocity = r.get<double>();
         }
         t.pitches.push_back (p);
     }

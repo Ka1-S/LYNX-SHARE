@@ -2129,6 +2129,17 @@ public:
             return;
         }
 
+        if (args.contains ("--newtoneshot"))
+        {
+            // LYNX --newtoneshot prefix audio.wav (round natives190kj): FL's Newtone window with the sample analysed, in a
+            // few states (-plain, -selected, -advanced, -cut, -timesel, -moved) and the paint time of the FL look against
+            // the round-165g layout (-paint.txt)
+            const auto i = args.indexOf ("--newtoneshot");
+            runNewtoneShot (args[i + 1].unquoted(), args[i + 2].unquoted());
+            quit();
+            return;
+        }
+
         if (args.contains ("--edisonslottest"))
         {
             // LYNX.exe --edisonslottest folder [project.flp]: round 190cd — the audio editor as a mixer-slot plugin through
@@ -20608,6 +20619,56 @@ private:
         report << (all ? "ALL OK\n" : "FAILURES\n");
         folder.getChildFile ("report.txt").replaceWithText (report);
         return all;
+    }
+
+    void runNewtoneShot (const juce::String& prefix, const juce::String& file)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        const auto sample = offline.getSampleLibrary().load (file);
+        if (sample == nullptr)
+        {
+            std::fprintf (stderr, "newtoneshot: cannot read %s\n", file.toRawUTF8());
+            return;
+        }
+        int at = 0;
+        offline.editSong ([&] (lynx::Song& song) {
+            if (song.mixer.size() < 2)
+                song.mixer.resize (2);
+            auto tone = lynx::makeEffectSlot (lynx::EffectKind::newtone);
+            tone.samplePath = file.toStdString();
+            tone.state = lynx::newtonefx::writeNative (lynx::newtonefx::analyseNotes (*sample));
+            at = (int) song.mixer[1].effects.size();
+            song.mixer[1].effects.push_back (tone);
+        }, false);
+        auto shot = [&] (const juce::String& name, const juce::StringArray& states) {
+            auto editor = lynx::makeNewtoneEditor (offline, 1, at);
+            for (const auto& st : states)
+                lynx::setNewtoneShotState (*editor, st);
+            saveSnapshot (*editor, prefix + "-" + name + ".png");
+        };
+        shot ("plain", {});
+        shot ("cursor", { "cursor:30000" });
+        shot ("selected", { "select:2" });
+        shot ("advanced", { "select:3", "advanced" });
+        shot ("vibrato", { "select:3", "vibrato" });
+        shot ("cut", { "cut" });
+        shot ("timesel", { "timesel:20000,60000" });
+        shot ("moved", { "shift:2,2", "select:2" });
+        // paint cost: 40 full paints of each layout
+        juce::String report;
+        {
+            auto fl = lynx::makeNewtoneEditor (offline, 1, at);
+            lynx::newtonePaintMs (*fl, 3);
+            report << "fl-look " << fl->getWidth() << "x" << fl->getHeight() << " ms/paint " << juce::String (lynx::newtonePaintMs (*fl, 40), 3) << "\n";
+            auto old = lynx::makeNewtoneEditor (offline, 1, at);
+            lynx::setNewtoneShotState (*old, "lynxlook");
+            lynx::newtonePaintMs (*old, 3);
+            report << "lynx-165g-look " << old->getWidth() << "x" << old->getHeight() << " ms/paint " << juce::String (lynx::newtonePaintMs (*old, 40), 3) << "\n";
+            saveSnapshot (*old, prefix + "-lynxlook.png");
+        }
+        lynx::shot::file (juce::File (prefix + "-paint.txt")).replaceWithText (report);
+        std::printf ("%s", report.toRawUTF8());
     }
 
     void runEdisonShot (const juce::String& prefix, const juce::String& file)

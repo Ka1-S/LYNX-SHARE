@@ -24,6 +24,10 @@
 namespace lynx
 {
 struct SampleData;
+namespace audioedit
+{
+struct Document;
+}
 }
 
 namespace lynx::newtonefx
@@ -45,6 +49,13 @@ struct Note
     double vibPeriod = 0.0, vibAmpStart = 0.0, vibAmpEnd = 0.0, tremAmp = 0.0; // fVibFreq is a period in seconds
     double rampIn = 0.0, rampOut = 0.0;      // fRampIn / fRampOut: semitones at the note's start / end, gone after smoothIn / before smoothOut
     bool enabled = true;
+    // round 190kj: FL's analysis tiles the whole file (a note owns the silence after it); iOrigValidNoteEnd = where its
+    // voiced part ends in the source (0 = an unvoiced note, e.g. the lead-in before the first note; -1 = not known:
+    // the whole note), fOrigVelocity = its analysed level 0..1 (-1 = not known)
+    std::int64_t validEnd = -1;
+    double velocity = -1.0;
+    bool voiced() const noexcept { return validEnd != 0; }
+    std::int64_t voicedEnd() const noexcept { return validEnd > origStart ? std::min (validEnd, origEnd) : origEnd; }
 
     // the render differs from the source over this note
     bool edited (double globalFormant) const noexcept;
@@ -65,6 +76,7 @@ struct Track
     // the editor's global knobs as last set (FL folds them into the notes when it saves; so does LYNX): Center 0..1
     // (pull toward the note's semitone), Variation 0..1 (the notes' drift), Transition 0..2 (× the analysed times)
     double centre = 0.0, variation = 1.0, transition = 1.0;
+    int key = -1; // FL's KeyIdx (the sample's detected key: 0-11 C..B major, 12-23 C..B minor); -1 = not known
 };
 
 // The plugin's saved state (record 0xD5 of a mixer slot), REA_rodada73 §2
@@ -106,7 +118,10 @@ std::shared_ptr<SampleData> renderEdits (const SampleData& source, const Track& 
 // own format in EffectSlot::state (FL's XML project is only read). The source sample is EffectSlot::samplePath.
 
 // LYNX's note analysis of a sample (YIN pitch track, core/VocalPitch.h): voiced stretches of steady pitch become
-// notes (Note.origPitch = their median pitch; nothing edited). Newtone: timeWarp = false.
+// notes (nothing edited). Newtone: timeWarp = false. Round 190kj, as FL's Newtone analyses (measured on its own DLL,
+// REA_rodada190kj): the notes tile the file back to back (a lead-in note from 0 to the first one, each note owns the
+// silence after it, validEnd = where its voice ends), origPitch from whole-sample periods (fs / floor(fs / f0)), volume
+// fades 0.2 x the note's length, pitch smooth-in / out times measured from the glides (FL's ~73 ms after silence).
 Track analyseNotes (const SampleData& source);
 
 // ------------------------------------------------------------------------------------------------------------------
@@ -159,7 +174,30 @@ std::vector<DetectedNote> detectScore (const SampleData& source, double* detune 
 // are left out. Returns how many notes went in.
 int dumpScore (Song& song, int channel, const std::vector<DetectedNote>& notes, double sampleRate);
 
-// Newtone: the track's notes. "LXNT" + version + frames + global formant + the notes.
+// The key of a track's notes as FL's KeyIdx (0-11 C..B major, 12-23 C..B minor): Krumhansl-Schmuckler on the voiced
+// notes' pitch classes weighted by length (FL's own detector is zplane's: this matched it on 17 of 23 files, the
+// others a relative or neighbouring key); -1 without voiced notes. And a key's scale as a Snap-to-scale mask.
+int detectKey (const Track& track);
+std::uint16_t keyScaleMask (int key) noexcept; // bits from the key's tonic (natural minor for 12-23)
+
+// Round 190kj, FL's Newtone editor commands:
+// Select › Select time around selection: the output time [start, end) the chosen notes take (their voiced parts).
+std::pair<std::int64_t, std::int64_t> timeAround (const Track& track, const std::vector<int>& which);
+// The voiced notes that overlap output time [a, b) (Select before / after current selection).
+std::vector<int> notesIn (const Track& track, std::int64_t a, std::int64_t b);
+// File › Export regions: `audio` (the edited sample) with one region per voiced note, named after the note it sounds
+// (FL's key names, C5 = 60) and linked to that key; Send to Playlist as audio clip: the same marks as markers at the
+// notes' starts (`asMarkers`).
+audioedit::Document regionsDocument (const SampleData& audio, const Track& track, bool asMarkers = false);
+// Edit › Quantize time (Ctrl+Q): the chosen notes' starts (all when none) moved to the nearest line of a grid of `grid`
+// output samples; the note before a joined one ends there; both keep their audio, stretched to the new lengths.
+void quantizeTime (Track& track, const std::vector<int>& which, double grid);
+// Sync: every note placed and stretched by `ratio` (output length / source length; 1 = as recorded), pitch kept.
+void stretchAll (Track& track, double ratio);
+// Frames [a, b) of a sample (a new sample; the whole one when the range is empty).
+std::shared_ptr<SampleData> cropped (const SampleData& s, std::int64_t a, std::int64_t b);
+
+// Newtone: the track's notes. "LXNT" + version + frames + global formant + the knobs (+ the key, version 3) + the notes.
 std::vector<std::uint8_t> writeNative (const Track& track);
 std::optional<Track> parseNative (const std::vector<std::uint8_t>& state);
 // The track a slot's state describes: LYNX's own, or the first Newtone track of FL's state (nullopt: none)

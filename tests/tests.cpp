@@ -17861,3 +17861,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "DawProject190jfTests.inc" // round 190jf B22: DAWproject import / export (core/DawProject.h, core/ZipLite.h)
 #include "Gaps190kfTests.inc" // round gaps190kf: Live Transpose ±48 in real time, the Clip View warp time line
 #include "Gaps190kfNativesTests.inc" // round gaps190kf: FL Edison's Sample properties (form, Accept, WAV chunks)
+#include "Natives190kjNewtoneTests.inc" // round natives190kj: Newtone note analysis as FL's (tiling, whole-sample pitch, fades), editor commands
