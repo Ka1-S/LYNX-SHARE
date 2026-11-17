@@ -1858,8 +1858,13 @@ struct Exporter
             if (m <= 0 || m >= (int) song.mixer.size())
                 return -1;
             const auto& mx = song.mixer[(std::size_t) m];
-            if (mx.toMaster || mx.sends.size() != 1)
+            if (mx.toMaster || mx.sends.empty())
                 return -1;
+            // (round 190kc: besides its route, sends to Live return tracks or at -inf, as an imported set's tracks have)
+            for (std::size_t k = 1; k < mx.sends.size(); ++k)
+                if (const auto to = mx.sends[k].target;
+                    mx.sends[k].level > 0.0f && ! (to > 0 && to < (int) song.mixer.size() && song.mixer[(std::size_t) to].liveReturn))
+                    return -1;
             const auto target = mx.sends.front().target;
             return target > 0 && target < (int) song.mixer.size() && target != m && perInsert.count (target) == 0 ? target : -1;
         };

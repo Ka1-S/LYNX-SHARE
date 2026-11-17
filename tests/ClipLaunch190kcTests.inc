@@ -31,7 +31,8 @@ inline std::string returnsSet()
          "<MidiClip Id=\"1\" Time=\"0\">" + v ("CurrentStart", "0") + v ("CurrentEnd", "4") + v ("Name", "Riff") +
          "<Loop>" + v ("LoopStart", "0") + v ("LoopEnd", "4") + v ("StartRelative", "0") + v ("LoopOn", "true") + "</Loop>" +
          "<Notes><KeyTracks><KeyTrack Id=\"0\"><Notes>" + midiNote (0, 1, 90) + "</Notes>" + v ("MidiKey", "64") +
-         "</KeyTrack></KeyTracks></Notes></MidiClip></Value></ClipSlot></ClipSlot></ClipSlotList></MainSequencer><DeviceChain><Devices /></DeviceChain></DeviceChain></MidiTrack>";
+         "</KeyTrack></KeyTracks></Notes></MidiClip></Value></ClipSlot></ClipSlot></ClipSlotList></MainSequencer><DeviceChain><Devices>" +
+         vst3Device ("010000000E020000504B0304") + "</Devices></DeviceChain></DeviceChain></MidiTrack>";
     s += "<AudioTrack Id=\"20\">" + name ("Vocal") + v ("Color", "20") + v ("TrackGroupId", "-1") + "<DeviceChain>" +
          mix (200, 2, send (0, 0.5, true) + send (1, std::stod (minf), true)) + "<AudioOutputRouting>" + v ("Target", "AudioOut/Main") +
          "</AudioOutputRouting><DeviceChain><Devices /></DeviceChain></DeviceChain></AudioTrack>";
