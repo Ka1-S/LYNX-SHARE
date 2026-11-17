@@ -4799,8 +4799,9 @@ public:
                 juce::PopupMenu menu;
                 const auto labels = plugui::optionLabels (item);
                 const auto chosen = plugui::optionAt (item, valueOf (param));
-                // each item with a picture of its shape, as FL's own menu has (drawn by LYNX: one period)
-                const auto icon = [] (std::function<double (double)> f) {
+                // each item with a picture of its shape, as FL's own menu has (drawn by LYNX: one period); the picture
+                // takes the place of the tick, so the shape playing is drawn in the editor's accent colour
+                const auto icon = [this] (std::function<double (double)> f, bool playing) {
                     juce::Path path;
                     for (int i = 0; i <= 64; ++i)
                     {
@@ -4814,7 +4815,7 @@ public:
                     auto d = std::make_unique<juce::DrawablePath>();
                     d->setPath (path);
                     d->setFill (juce::FillType (juce::Colours::transparentBlack));
-                    d->setStrokeFill (juce::FillType (theme::colour::textPrimary));
+                    d->setStrokeFill (juce::FillType (playing ? accent : theme::colour::textPrimary));
                     d->setStrokeType (juce::PathStrokeType (1.4f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
                     return d;
                 };
@@ -4829,7 +4830,7 @@ public:
                     juce::PopupMenu::Item entry (optionTexts (item)[(std::size_t) o]);
                     entry.setTicked (extra == 0 && o == chosen);
                     if (o < 5)
-                        entry.setImage (icon (flShapes[o]));
+                        entry.setImage (icon (flShapes[o], extra == 0 && o == chosen));
                     entry.setAction ([this, param, v = plugui::optionValue (item, o)] { setParams ({ { param, v }, { peakshapes::extraShapeParam, 0.0f } }); });
                     menu.addItem (std::move (entry));
                 }
@@ -4838,7 +4839,7 @@ public:
                 {
                     juce::PopupMenu::Item entry (tr (peakshapes::name (id)));
                     entry.setTicked (extra == id);
-                    entry.setImage (icon ([id] (double x) { return peakshapes::wave (id, x, 7u); }));
+                    entry.setImage (icon ([id] (double x) { return peakshapes::wave (id, x, 7u); }, extra == id));
                     entry.setAction ([this, id] { setParams ({ { peakshapes::extraShapeParam, peakshapes::valueOf (id) } }); });
                     menu.addItem (std::move (entry));
                 }

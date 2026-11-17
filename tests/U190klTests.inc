@@ -264,3 +264,35 @@ TEST (u190kl_projects_without_extra_shapes_save_as_before)
     // FL's parameter list is unchanged (automation, links and the FL import see FL's twelve controls)
     CHECK (lynx::effectInfo (lynx::EffectKind::peakController).params.size() == 12);
 }
+
+TEST (u190kl_a_docked_window_placed_again_keeps_a_size_within_a_pixel)
+{
+    using lynx::dockstack::keepsSize;
+    // Gross Beat at 150 %: 1047 units = 1570.5 px; made at 1570 px, placed at 1571: kept (no resize on the first move)
+    CHECK (keepsSize (1570, 1137, 1047, 758, 1.5));
+    CHECK (keepsSize (1571, 1137, 1047, 758, 1.5));
+    // a real resize (one unit = 1.5 px) is not kept; nor one pixel at 100 %
+    CHECK (! keepsSize (1570, 1137, 1048, 758, 1.5));
+    CHECK (! keepsSize (1570, 1137, 1046, 758, 1.5));
+    CHECK (! keepsSize (400, 300, 401, 300, 1.0));
+    CHECK (keepsSize (400, 300, 400, 300, 1.0));
+    // every size at the usual scales: the exact rounding is always kept, a one-unit change never is
+    for (const auto scale : { 1.0, 1.1, 1.25, 1.5, 1.75, 2.0, 2.5, 0.8, 0.9, 1.875 })
+        for (int w = 50; w < 1300; w += 7)
+        {
+            const auto p = lynx::dockstack::physicalPlace (0, 0, w, 211, scale);
+            CHECK (keepsSize (p.w, p.h, w, 211, scale));
+            CHECK (! keepsSize (p.w, p.h, w + 1, 211, scale) || scale < 1.5); // (from 150 % a unit is 1.5 px or more)
+        }
+    // a window resized unit by unit (its edge dragged) never lags its exact size by a pixel or more
+    for (const auto scale : { 0.8, 0.9, 1.1, 1.25, 1.5, 1.75 })
+    {
+        auto native = lynx::dockstack::physicalPlace (0, 0, 300, 200, scale).w;
+        for (int w = 300; w < 700; ++w)
+        {
+            if (! keepsSize (native, (int) std::lround (200 * scale), w, 200, scale))
+                native = lynx::dockstack::physicalPlace (0, 0, w, 200, scale).w;
+            CHECK (std::abs (native - w * scale) < 1.0);
+        }
+    }
+}

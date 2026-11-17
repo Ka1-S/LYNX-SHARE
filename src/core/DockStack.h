@@ -92,6 +92,15 @@ inline PhysicalRect physicalPlace (int x, int y, int w, int h, double scale) noe
     return { r (x * scale), r (y * scale), r (w * scale), r (h * scale) };
 }
 
+// Issue #197 (round 190kl): a docked window that already has a size in pixels within a pixel of its exact size (w and h
+// times the scale: a size some other rounding gave it, e.g. JUCE's when the window was made) keeps it when it is placed
+// again. Without this, the first move of a freshly opened editor at 150 % still resized it once (Gross Beat: 1570 px made,
+// 1571 px placed) and Windows showed the window's new, undrawn buffers: a white flash with only its live display drawn.
+inline bool keepsSize (int nativeW, int nativeH, int w, int h, double scale) noexcept
+{
+    return std::abs ((double) nativeW - w * scale) < 1.0 && std::abs ((double) nativeH - h * scale) < 1.0;
+}
+
 // Round 190jy (queue item 44, Settings › General › "Draw docked LYNX editors in the main window"): a docked LYNX editor
 // can be drawn by the main window itself (its own components, its own frames) instead of a native child window of its
 // own: a live display then costs its paint and no second window presenting frames (Gross Beat: +8 points of process CPU
