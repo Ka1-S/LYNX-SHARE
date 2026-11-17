@@ -10713,3 +10713,25 @@ countries: nl be
 "Complex Pro and Texture transpositions play through the Pitch knob: {0}" = "Transposities van Complex Pro en Texture spelen via de Pitch-knop: {0}"
 "Warped samples do not follow tempo changes in this release: they keep the project tempo" = "Gewarpte samples volgen in deze versie geen tempowisselingen: ze houden het projecttempo"
 "{0} deactivated clip slot(s) play again" = "{0} gedeactiveerde clipslot(s) spelen weer"
+
+# --- round 190jv: Mixer menu › Trim unused tracks (FL's Remove unused tracks question)
+"Trim unused tracks" = "Ongebruikte sporen opruimen"
+"Remove unused tracks" = "Ongebruikte sporen verwijderen"
+"Select the mixer track types to be removed." = "Kies welke soorten mixersporen verwijderd worden."
+"Unlinked tracks only" = "Alleen ongekoppelde sporen"
+"Unlinked and non-empty tracks" = "Ongekoppelde en niet-lege sporen"
+"This will |delete| {0} unused mixer track(s). Are you sure?" = "Hiermee worden {0} ongebruikte mixersporen |verwijderd|. Weet je het zeker?"
+"Trim unused mixer tracks" = "Ongebruikte mixersporen opruimen"
+"No unused mixer tracks" = "Geen ongebruikte mixersporen"
+
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183)
+"Scale highlighting" = "Toonladder markeren"
+
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183), FL arpeggiator patterns (prtools-0003)
+"FL arpeggiator pattern" = "FL-arpeggiatorpatroon"
+"None (the arpeggiator above)" = "Geen (de arpeggiator hierboven)"
+"Range (octaves)" = "Bereik (octaven)"
+"Range mode" = "Bereikmodus"
+"Block" = "Blok"
+"Group notes" = "Noten groeperen"
+"The pattern could not be read." = "Het patroon kon niet worden gelezen."

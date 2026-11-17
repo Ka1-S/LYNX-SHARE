@@ -17,6 +17,7 @@
 #include "core/MarkerPlan.h"
 #include "core/NoteEdit.h"
 #include "core/NoteTools.h"
+#include "core/ScaleDetect.h"
 #include "core/Mpe.h"
 #include "core/NoteCurves.h"
 #include "core/Rack.h"
@@ -279,6 +280,8 @@ PianoRollComponent::PianoRollComponent (AudioEngine& e)
         if (s == 0)
         {
             scaleBox.addItem (tr (scales()[0].name), 1);
+            // FL's View › Scale highlighting › Automatic (round 190jv, core/ScaleDetect.h): the key guessed from the notes
+            scaleBox.addItem (tr ("Automatic"), autoScaleId);
             continue;
         }
 
@@ -738,18 +741,43 @@ std::vector<int> PianoRollComponent::chordIntervals() const
 int PianoRollComponent::scaleIndex() const
 {
     const auto id = scaleBox.getSelectedId();
-    return id <= 1 ? 0 : id / 100;
+    return id <= 1 || id == autoScaleId ? 0 : id / 100;
 }
 
 int PianoRollComponent::scaleRoot() const
 {
     const auto id = scaleBox.getSelectedId();
-    return id <= 1 ? 0 : (id % 100) - 1;
+    return id <= 1 || id == autoScaleId ? 0 : (id % 100) - 1;
 }
 
 bool PianoRollComponent::inScale (int key) const
 {
+    if (isAutoScale()) // (round 190jv: the guessed key's scale; no guess, no key in it)
+        return scaledetect::inScale (autoKey, key);
     return scaleIndex() > 0 && notetools::inScale (key, scaleRoot(), scaleIndex());
+}
+
+// FL's Automatic scale highlighting (round 190jv, core/ScaleDetect.h): FL guesses again after every edit and selection
+// change; here the guess is made again when the song, the pattern, the channel or the selection changed since the last
+// paint (no timer, nothing while idle)
+void PianoRollComponent::updateAutoKey()
+{
+    if (! isAutoScale())
+        return;
+    const auto stamp = engine.getSongStamp();
+    const auto& song = engine.getSong();
+    const auto channel = engine.getSelectedChannel();
+    if (autoKeyValid && stamp == autoKeyStamp && song.currentPattern == autoKeyPattern && channel == autoKeyChannel
+        && allChannels == autoKeyAllChannels && selection == autoKeySelection)
+        return;
+    autoKeyValid = true;
+    autoKeyStamp = stamp;
+    autoKeyPattern = song.currentPattern;
+    autoKeyChannel = channel;
+    autoKeyAllChannels = allChannels;
+    autoKeySelection = selection;
+    autoKey = scaledetect::detect (currentPattern (song).notes, [this] (const Note& n) { return edits (n); },
+                                   [this] (int i) { return isSelected (i); });
 }
 
 int PianoRollComponent::snapKey (int key) const
@@ -965,6 +993,7 @@ void PianoRollComponent::paint (juce::Graphics& g)
     const auto patternLength = pattern.effectiveLength (song.meter());
     const auto bar = song.barTicks();
     const auto snapGrid = gridTicks();
+    updateAutoKey(); // (round 190jv: View › Scale highlighting › Automatic)
 
     // the overview follows the notes (edits, undo, another channel or pattern) and the view
     {
@@ -1024,6 +1053,7 @@ void PianoRollComponent::paint (juce::Graphics& g)
         juce::Graphics::ScopedSaveState state (g);
         g.reduceClipRegion (grid);
 
+        const auto autoRows = isAutoScale();
         for (int key = 0; key < 128; ++key)
         {
             const auto y = keyToY (key);
@@ -1033,7 +1063,9 @@ void PianoRollComponent::paint (juce::Graphics& g)
 
             // Note grid highlights (Alt+B, round 168g): off, every row looks the same (FL's "BlackKeys" option)
             auto row = gridHighlights && isBlackKey (key) ? rowBlack : rowWhite;
-            if (gridHighlights && inScale (key))
+            if (gridHighlights && autoRows) // FL's Automatic (round 190jv): the rows out of the guessed key dark; no guess, none
+                row = autoKey >= 0 && ! scaledetect::inScale (autoKey, key) ? rowBlack : rowWhite;
+            else if (gridHighlights && inScale (key))
                 row = row.interpolatedWith (info, 0.10f);
             if (key == hover.key && drag == Drag::none)
                 row = row.interpolatedWith (textPrimary, 0.04f); // the row under the mouse
@@ -1931,6 +1963,7 @@ void PianoRollComponent::beginTimeZoom (const juce::MouseEvent& e)
 
 void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
 {
+    const AudioEngine::UndoGesture undoGesture (engine, AudioEngine::UndoGesture::begin); // (round 190jv: one undo step per gesture)
     followEditStamp = engine.getPublishCount(); // (round 190im, R15)
     if (engine.getSong().channels.empty())
         return;
@@ -2851,6 +2884,7 @@ void PianoRollComponent::postDragHint (const juce::MouseEvent& e)
 
 void PianoRollComponent::mouseUp (const juce::MouseEvent& e)
 {
+    const AudioEngine::UndoGesture undoGesture (engine, AudioEngine::UndoGesture::end); // (closes when mouseUp returns)
     EditorGlobals::get().pauseFollowIfEdited (EditorGlobals::FollowView::pianoRoll, followEditStamp, engine.getPublishCount()); // (round 190im, R15)
     ui::clearPostedHint();
     if (drag == Drag::eventPaneBar) // round 190fz: remembered once the drag ends
@@ -5516,6 +5550,7 @@ juce::PopupMenu PianoRollComponent::viewMenu()
     // FL's EEViewMenu, its "Helpers" items (DFM)
     juce::PopupMenu menu;
     menu.addItem (tr ("Note grid highlights") + keyText ("pianoRoll.gridHighlights"), true, gridHighlights, [this] { runAction ("pianoRoll.gridHighlights"); });
+    menu.addSubMenu (tr ("Scale highlighting"), scaleHighlightMenu()); // (round 190jv; FL's EEAutoKeyMenu)
     menu.addItem (tr ("Show chord name for selection") + keyText ("pianoRoll.showChordName"), true, showChordName,
                   [this] { runAction ("pianoRoll.showChordName"); });
     menu.addItem (tr ("Background waveform") + keyText ("pianoRoll.backgroundWave"), true, isBackgroundWaveShown(),
@@ -5538,6 +5573,27 @@ juce::PopupMenu PianoRollComponent::viewMenu()
             backgroundWaveOn() = false;
             repaint();
         });
+    return menu;
+}
+
+// FL's View › Scale highlighting (EEAutoKeyMenu, round 190jv): in FL's DFM order — "Root note" and the twelve roots,
+// "Scale", Snap to scale, FL's Default / Black notes (LYNX: "No scale", the black-key rows) and Automatic; FL appends
+// its Reference scales after the last of them, here LYNX's scale list (the toolbar scale box's). The roots apply to a
+// chosen scale, so they wait for one.
+juce::PopupMenu PianoRollComponent::scaleHighlightMenu()
+{
+    juce::PopupMenu menu;
+    const auto scale = scaleIndex(), root = scaleRoot();
+    menu.addSectionHeader (tr ("Root note"));
+    for (int r = 0; r < 12; ++r)
+        menu.addItem (juce::String (notenames::pitchName (r)), scale > 0, scale > 0 && root == r, [this, r, scale] { setScale (r, scale); });
+    menu.addSectionHeader (tr ("Scale"));
+    menu.addItem (tr ("Snap notes to the scale") + keyText ("pianoRoll.scaleSnap"), scale > 0, scaleSnap, [this] { setScaleSnap (! scaleSnap); });
+    menu.addItem (tr (notetools::scales()[0].name), true, scaleBox.getSelectedId() == 1, [this] { setScale (0, 0); });
+    menu.addItem (tr ("Automatic"), true, isAutoScale(), [this] { setAutoScale (true); });
+    menu.addSeparator();
+    for (int s = 1; s < (int) notetools::scales().size(); ++s)
+        menu.addItem (tr (notetools::scales()[(std::size_t) s].name), true, scale == s, [this, s, root] { setScale (root, s); });
     return menu;
 }
 

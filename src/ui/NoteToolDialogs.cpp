@@ -5,6 +5,7 @@
 #include <map>
 #include <optional>
 
+#include "core/FlArpeggiator.h"
 #include "core/NoteTools.h"
 #include "core/PianoRollTools.h"
 #include "engine/FlStudio.h"
@@ -258,6 +259,22 @@ public:
 
     std::function<void()> onFinished;
 
+    // round 190jv (--prshot190jv): picks the item of the choice `name` whose text starts with `item`, as a click would
+    // (the preview follows); false when there is no such control or item
+    bool chooseForSnapshot (const juce::String& name, const juce::String& item)
+    {
+        for (std::size_t c = 0; c < controls.size(); ++c)
+            if (controls[c].kind == Control::choice && controls[c].name == name)
+                if (auto* box = dynamic_cast<juce::ComboBox*> (editors[c].get()))
+                    for (int i = 0; i < box->getNumItems(); ++i)
+                        if (box->getItemText (i).startsWith (item))
+                        {
+                            box->setSelectedItemIndex (i, juce::sendNotificationSync);
+                            return true;
+                        }
+        return false;
+    }
+
     void paint (juce::Graphics& g) override
     {
         g.fillAll (theme::colour::bg2);
@@ -450,6 +467,57 @@ private:
         preview();
     }
 
+    // FL's Piano roll arpeggiator tool (round 190jv, coverage prtools-0003; core/FlArpeggiator.h): its pattern from the
+    // user's FL install (Data/Patches/Scores/Arpeggiator, read only) and its options, after LYNX's own arpeggiator's
+    // four. "None" keeps LYNX's arpeggiator; a pattern runs FL's law with FL's controls (DFM TPRArpForm, FL's defaults).
+    static constexpr std::size_t flArpFirst = 4; // (the controls after Step, Gate, Direction, Octaves)
+    void addFlArpeggiator()
+    {
+        header (tr ("FL arpeggiator pattern"));
+        juce::StringArray patterns { tr ("None (the arpeggiator above)") };
+        patterns.addArray (scoreFolder ("Arpeggiator").names);
+        add ({ Control::choice, tr ("Pattern"), 0, 0, 1, 0, {}, patterns });
+        const juce::StringArray modes { tr ("Normal"), tr ("Flip"), tr ("Alternate") };
+        add ({ Control::choice, tr ("Pattern mode"), 0, 2, 1, 0, {}, modes });
+        add ({ Control::slider, tr ("Range (octaves)"), 1.0, 6.0, 1.0, 1.0, [] (double v) { return juce::String (juce::roundToInt (v)); } });
+        add ({ Control::choice, tr ("Range mode"), 0, 2, 1, 0, {}, modes });
+        add ({ Control::choice, tr ("Sync"), 0, 2, 1, 0, {}, { tr ("Time"), tr ("Block"), tr ("Chord") } });
+        add ({ Control::slider, tr ("Time mul"), 1.0, 7.0, 1.0, 4.0, [] (double v) {
+                  static const char* names[] = { "1/8", "1/4", "1/2", "1", "2", "3", "4" };
+                  return juce::String::charToString ((juce::juce_wchar) 0x00D7) + names[juce::jlimit (1, 7, juce::roundToInt (v)) - 1];
+              } });
+        add ({ Control::slider, tr ("Gate"), 0.0, 48.0, 1.0, 48.0, [] (double v) { return juce::String (juce::roundToInt (v * 100.0 / 48.0)) + "%"; } });
+        add ({ Control::toggle, tr ("Group notes"), 0, 1, 1, 0 });
+        addLevelStrengths();
+    }
+
+    bool applyFlArpeggiator (Pattern& p)
+    {
+        const auto first = flArpFirst + 1; // (after the header)
+        const auto pattern = intValue (first) - 1;
+        if (pattern < 0)
+            return false;
+        const auto score = scoreFolder ("Arpeggiator").load (pattern);
+        if (! score)
+        {
+            status = tr ("The pattern could not be read.");
+            return true;
+        }
+        flarp::Options f;
+        f.patternMode = (flarp::Mode) juce::jlimit (0, 2, intValue (first + 1));
+        f.range = juce::jlimit (1, 6, intValue (first + 2));
+        f.rangeMode = (flarp::Mode) juce::jlimit (0, 2, intValue (first + 3));
+        f.sync = (flarp::Sync) juce::jlimit (0, 2, intValue (first + 4));
+        f.timeMul = juce::jlimit (1, 7, intValue (first + 5));
+        f.gate = juce::jlimit (0, 48, intValue (first + 6));
+        f.groupNotes = on (first + 7);
+        const auto s = levelStrengths (first + 9); // (after the strengths' header)
+        const auto wheel = [] (float v) { return juce::jlimit (0, 128, juce::roundToInt (v * 128.0f)); };
+        f.strength = { wheel (s.pan), wheel (s.velocity), wheel (s.release), wheel (s.modX), wheel (s.modY), wheel (s.pitch) };
+        flarp::apply (p, indices, flarp::prepare (*score, f), f);
+        return true;
+    }
+
     juce::StringArray levelNames() const
     {
         juce::StringArray levels;
@@ -509,6 +577,7 @@ private:
                 add ({ Control::slider, tr ("Gate"), 0.05, 1.0, 0.01, 0.8, percent });
                 add ({ Control::choice, tr ("Direction"), 0, 3, 1, 0, {}, { tr ("Up"), tr ("Down"), tr ("Up and down"), tr ("Down and up") } });
                 add ({ Control::slider, tr ("Octaves"), 1.0, 4.0, 1.0, 1.0, [] (double v) { return juce::String (juce::roundToInt (v)); } });
+                addFlArpeggiator();
                 break;
             case NoteTool::flip:
             {
@@ -851,6 +920,8 @@ private:
             case NoteTool::arpeggiate:
             {
                 static const std::int64_t stepTicks[] = { ppq, ppq / 2, ppq / 3, ppq / 4, ppq / 6, ppq / 8 };
+                if (applyFlArpeggiator (p)) // (round 190jv: an FL pattern chosen: FL's arpeggiator tool instead)
+                    break;
                 ArpeggiateOptions o;
                 o.step = stepTicks[juce::jlimit (0, 5, intValue (0))];
                 o.gate = (float) value (1);
@@ -1281,6 +1352,12 @@ bool noteToolGenerates (NoteTool tool) noexcept
 std::unique_ptr<juce::Component> makeNoteToolPanel (AudioEngine& engine, NoteTool tool, std::vector<int> indices, std::int64_t grid)
 {
     return std::make_unique<NoteToolPanel> (engine, tool, std::move (indices), grid);
+}
+
+bool noteToolChooseForSnapshot (juce::Component& panel, const juce::String& control, const juce::String& item)
+{
+    auto* tool = dynamic_cast<NoteToolPanel*> (&panel);
+    return tool != nullptr && tool->chooseForSnapshot (control, item);
 }
 
 juce::PopupMenu noteToolPresetMenuForSnapshot (juce::Component& panel)

@@ -10713,3 +10713,25 @@ countries: id
 "Complex Pro and Texture transpositions play through the Pitch knob: {0}" = "Transposisi Complex Pro dan Texture diputar lewat kenop Pitch: {0}"
 "Warped samples do not follow tempo changes in this release: they keep the project tempo" = "Sampel yang di-warp tidak mengikuti perubahan tempo di rilis ini: tetap pada tempo proyek"
 "{0} deactivated clip slot(s) play again" = "{0} slot klip yang dinonaktifkan berbunyi lagi"
+
+# --- round 190jv: Mixer menu › Trim unused tracks (FL's Remove unused tracks question)
+"Trim unused tracks" = "Pangkas trek tak terpakai"
+"Remove unused tracks" = "Hapus trek tak terpakai"
+"Select the mixer track types to be removed." = "Pilih jenis trek Mixer yang akan dihapus."
+"Unlinked tracks only" = "Hanya trek tak tertaut"
+"Unlinked and non-empty tracks" = "Trek tak tertaut dan tidak kosong"
+"This will |delete| {0} unused mixer track(s). Are you sure?" = "Ini akan |menghapus| {0} trek Mixer tak terpakai. Yakin?"
+"Trim unused mixer tracks" = "Pangkas trek Mixer tak terpakai"
+"No unused mixer tracks" = "Tidak ada trek Mixer tak terpakai"
+
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183)
+"Scale highlighting" = "Sorotan tangga nada"
+
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183), FL arpeggiator patterns (prtools-0003)
+"FL arpeggiator pattern" = "Pola arpeggiator FL"
+"None (the arpeggiator above)" = "Tidak ada (arpeggiator di atas)"
+"Range (octaves)" = "Rentang (oktaf)"
+"Range mode" = "Mode rentang"
+"Block" = "Blok"
+"Group notes" = "Kelompokkan not"
+"The pattern could not be read." = "Pola tidak dapat dibaca."

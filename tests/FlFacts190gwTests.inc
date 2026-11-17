@@ -222,12 +222,12 @@ TEST (flfacts190gw_clip_menu_items)
 {
     using namespace lynx;
     // B3: Pitch-correct / Time-warp sample (LYNX's Newtone / Newtime), Crossfade with (enabled when there is a clip to
-    // crossfade with); Deverb stays out (FL 2026 only offers a download there)
+    // crossfade with); round 190jv: Deverb shown as in FL's menu (LYNX's own Deverb; FL 2026 only offers a download there)
     const auto all = flclipmenu::shown (false, false);
     const auto has = [&all] (const char* text) {
         return std::any_of (all.begin(), all.end(), [text] (const flclipmenu::Entry& e) { return e.text == text; });
     };
-    CHECK (has ("Pitch-correct sample") && has ("Time-warp sample") && has ("Crossfade with") && ! has ("Deverb"));
+    CHECK (has ("Pitch-correct sample") && has ("Time-warp sample") && has ("Crossfade with") && has ("Deverb"));
 
     // Newtone / Newtime on the Master: a new one in the first empty slot, the sample loaded; the same slot next time
     auto song = Song::makeDefault();

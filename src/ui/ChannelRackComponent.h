@@ -126,6 +126,7 @@ public:
     void closeEditorForHotSwap (int channel) { closeEditor (channel); }
     void assignSampleForHotSwap (int channel, const juce::File& file) { assignSample (channel, file); }
     juce::PopupMenu getChannelMenuForSnapshot (int channel) { return buildChannelMenu (channel); }
+    juce::Rectangle<int> stepBoundsForTests (int row, int step) const { return stepBounds (row, step); } // (--undogesture190jv)
     // round 190in (R8): the channel's items of FL's wrapper ▸ menu (the channel and plugin windows ask through
     // channelWrapperItemsHandler)
     void fillWindowMenu (int channel, wrappermenu::Spec& spec);

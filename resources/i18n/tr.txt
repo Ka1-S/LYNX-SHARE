@@ -10713,3 +10713,25 @@ countries: tr
 "Complex Pro and Texture transpositions play through the Pitch knob: {0}" = "Complex Pro ve Texture transpozeleri Pitch düğmesiyle çalar: {0}"
 "Warped samples do not follow tempo changes in this release: they keep the project tempo" = "Bu sürümde warp edilmiş sample'lar tempo değişikliklerini izlemez: proje temposunda kalır"
 "{0} deactivated clip slot(s) play again" = "Devre dışı bırakılmış {0} klip yuvası yeniden çalar"
+
+# --- round 190jv: Mixer menu › Trim unused tracks (FL's Remove unused tracks question)
+"Trim unused tracks" = "Kullanılmayan kanalları temizle"
+"Remove unused tracks" = "Kullanılmayan kanalları kaldır"
+"Select the mixer track types to be removed." = "Kaldırılacak mikser kanalı türlerini seçin."
+"Unlinked tracks only" = "Yalnızca bağlantısız kanallar"
+"Unlinked and non-empty tracks" = "Bağlantısız ve boş olmayan kanallar"
+"This will |delete| {0} unused mixer track(s). Are you sure?" = "Kullanılmayan {0} mikser kanalı |silinecek|. Emin misiniz?"
+"Trim unused mixer tracks" = "Kullanılmayan mikser kanallarını temizle"
+"No unused mixer tracks" = "Kullanılmayan mikser kanalı yok"
+
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183)
+"Scale highlighting" = "Gam vurgulama"
+
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183), FL arpeggiator patterns (prtools-0003)
+"FL arpeggiator pattern" = "FL arpej deseni"
+"None (the arpeggiator above)" = "Yok (yukarıdaki arpej)"
+"Range (octaves)" = "Aralık (oktav)"
+"Range mode" = "Aralık modu"
+"Block" = "Blok"
+"Group notes" = "Notaları grupla"
+"The pattern could not be read." = "Desen okunamadı."

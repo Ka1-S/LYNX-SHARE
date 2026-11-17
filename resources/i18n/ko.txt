@@ -10713,3 +10713,25 @@ countries: kr
 "Complex Pro and Texture transpositions play through the Pitch knob: {0}" = "Complex Pro와 Texture의 트랜스포즈는 Pitch 노브로 재생됩니다: {0}"
 "Warped samples do not follow tempo changes in this release: they keep the project tempo" = "이 릴리스에서는 워프된 샘플이 템포 변화를 따르지 않습니다: 프로젝트 템포를 유지합니다"
 "{0} deactivated clip slot(s) play again" = "비활성화한 클립 슬롯 {0}개가 다시 재생됩니다"
+
+# --- round 190jv: Mixer menu › Trim unused tracks (FL's Remove unused tracks question)
+"Trim unused tracks" = "사용하지 않는 트랙 정리"
+"Remove unused tracks" = "사용하지 않는 트랙 제거"
+"Select the mixer track types to be removed." = "제거할 믹서 트랙 종류를 선택하세요."
+"Unlinked tracks only" = "연결되지 않은 트랙만"
+"Unlinked and non-empty tracks" = "연결되지 않은 트랙과 비어 있지 않은 트랙"
+"This will |delete| {0} unused mixer track(s). Are you sure?" = "사용하지 않는 믹서 트랙 {0}개를 |삭제|합니다. 계속할까요?"
+"Trim unused mixer tracks" = "사용하지 않는 믹서 트랙 정리"
+"No unused mixer tracks" = "사용하지 않는 믹서 트랙이 없습니다"
+
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183)
+"Scale highlighting" = "스케일 하이라이트"
+
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183), FL arpeggiator patterns (prtools-0003)
+"FL arpeggiator pattern" = "FL 아르페지에이터 패턴"
+"None (the arpeggiator above)" = "없음 (위의 아르페지에이터)"
+"Range (octaves)" = "범위 (옥타브)"
+"Range mode" = "범위 모드"
+"Block" = "블록"
+"Group notes" = "노트 그룹화"
+"The pattern could not be read." = "패턴을 읽을 수 없습니다."

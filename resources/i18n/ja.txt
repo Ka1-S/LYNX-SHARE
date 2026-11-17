@@ -10713,3 +10713,25 @@ countries: jp
 "Complex Pro and Texture transpositions play through the Pitch knob: {0}" = "Complex Pro と Texture のトランスポーズは Pitch ノブで再生されます: {0}"
 "Warped samples do not follow tempo changes in this release: they keep the project tempo" = "このリリースではワープしたサンプルはテンポの変化に従いません: プロジェクトのテンポのままです"
 "{0} deactivated clip slot(s) play again" = "無効化した {0}個のクリップスロットが再び鳴ります"
+
+# --- round 190jv: Mixer menu › Trim unused tracks (FL's Remove unused tracks question)
+"Trim unused tracks" = "未使用トラックを整理"
+"Remove unused tracks" = "未使用トラックの削除"
+"Select the mixer track types to be removed." = "削除するミキサートラックの種類を選択してください。"
+"Unlinked tracks only" = "リンクのないトラックのみ"
+"Unlinked and non-empty tracks" = "リンクのないトラックと空でないトラック"
+"This will |delete| {0} unused mixer track(s). Are you sure?" = "未使用のミキサートラック {0} 個を|削除|します。よろしいですか？"
+"Trim unused mixer tracks" = "未使用ミキサートラックの整理"
+"No unused mixer tracks" = "未使用のミキサートラックはありません"
+
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183)
+"Scale highlighting" = "スケールのハイライト"
+
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183), FL arpeggiator patterns (prtools-0003)
+"FL arpeggiator pattern" = "FL アルペジエーターのパターン"
+"None (the arpeggiator above)" = "なし (上のアルペジエーター)"
+"Range (octaves)" = "レンジ (オクターブ)"
+"Range mode" = "レンジモード"
+"Block" = "ブロック"
+"Group notes" = "ノートをグループ化"
+"The pattern could not be read." = "パターンを読み込めませんでした。"

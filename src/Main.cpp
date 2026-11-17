@@ -1874,6 +1874,30 @@ public:
             return;
         }
 
+        // --prshot190jv <folder> (round 190jv: Piano roll › Scale highlighting › Automatic): src/PrShot190jv.inc
+        if (args.contains ("--prshot190jv"))
+        {
+            setApplicationReturnValue (runPrShot190jv (juce::File (args[args.indexOf ("--prshot190jv") + 1].unquoted())) ? 0 : 1);
+            quit();
+            return;
+        }
+
+        // --trimshot190jv <folder> (round 190jv: Mixer menu › Trim unused tracks): src/TrimShot190jv.inc
+        if (args.contains ("--trimshot190jv"))
+        {
+            setApplicationReturnValue (runTrimShot190jv (juce::File (args[args.indexOf ("--trimshot190jv") + 1].unquoted())) ? 0 : 1);
+            quit();
+            return;
+        }
+
+        // --undogesture190jv <report.txt> (round 190jv, queue item 73: one undo step per drag): src/UndoGesture190jv.inc
+        if (args.contains ("--undogesture190jv"))
+        {
+            setApplicationReturnValue (runUndoGesture190jv (juce::File (args[args.indexOf ("--undogesture190jv") + 1].unquoted())) ? 0 : 1);
+            quit();
+            return;
+        }
+
         // --browsershot190iz <folder> (round 190iz: FL's tabs, tags, Live's browser): src/BrowserShot190iz.inc
         if (args.contains ("--browsershot190iz"))
         {
@@ -17128,7 +17152,6 @@ private:
         {
             const auto menu = playlist.getClipMenuForSnapshot (0);
             juce::StringArray got, want;
-            int breakAfter = -1;
             for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
             {
                 const auto& item = it.getItem();
@@ -17136,21 +17159,23 @@ private:
                          : item.isSeparator              ? juce::String ("-")
                          : item.isSectionHeader          ? "[" + plain (item.text) + "]"
                                                          : plain (item.text));
-                if (item.shouldBreakAfter)
-                    breakAfter = got.size() - 1;
             }
             for (const auto& e : lynx::flclipmenu::shown (true, false))
                 if (e.kind != lynx::flclipmenu::Entry::Kind::columnBreak)
                     want.add (e.kind == lynx::flclipmenu::Entry::Kind::separator ? juce::String ("-")
                               : e.kind == lynx::flclipmenu::Entry::Kind::header  ? "[" + lynx::tr (e.text.c_str()) + "]"
                                                                                  : lynx::tr (e.text.c_str()));
-            want.add ("-");
-            want.add ("[" + lynx::tr ("LYNX extras") + "]"); // (round 190gi)
+            want.add ("[" + lynx::tr ("LYNX extras") + "]"); // (round 190gi; round 190jv: in a third column)
             for (const auto& x : lynx::flclipmenu::lynxExtras())
                 want.add (lynx::tr (x.c_str()));
             check ("clip_menu_fl_order", got == want, got.joinIntoString ("|"));
-            check ("clip_menu_two_columns", breakAfter >= 0 && got[breakAfter] == lynx::tr ("Chop") && got[breakAfter + 1] == "[" + lynx::tr ("Sample") + "]",
-                   juce::String (breakAfter));
+            // FL's two columns (Chop | Sample), then LYNX's own items in a third (round 190jv)
+            juce::StringArray breaks;
+            for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+                if (it.getItem().shouldBreakAfter)
+                    breaks.add (it.getItem().isSectionHeader || it.getItem().customComponent != nullptr ? "?" : plain (it.getItem().text));
+            check ("clip_menu_two_columns", breaks.size() == 2 && breaks[0] == lynx::tr ("Chop") && breaks[1] == lynx::tr ("Fade out curve"),
+                   breaks.joinIntoString ("|"));
             const auto* crossfade = find (menu, lynx::tr ("Crossfade with"));
             check ("crossfade_with_greyed", crossfade != nullptr && ! crossfade->isEnabled);
             const auto* region = find (menu, lynx::tr ("Select region"));
@@ -31012,6 +31037,9 @@ private:
     // --snapshot: 8 s of a synthetic stereo beat whose parts sit in different bands (kick = low, chord = mid,
     // hats and the noise riser = high), to show the spectral waveform colours
 #include "BrowserShot190iz.inc" // round 190iz
+#include "UndoGesture190jv.inc" // round 190jv
+#include "TrimShot190jv.inc" // round 190jv
+#include "PrShot190jv.inc" // round 190jv
 
     static void writeWaveDemo (const juce::File& file, double bpm)
     {

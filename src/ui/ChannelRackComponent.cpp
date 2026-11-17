@@ -2097,6 +2097,7 @@ void ChannelRackComponent::showEuclideanFill (int channel)
 
 void ChannelRackComponent::mouseDown (const juce::MouseEvent& e)
 {
+    const AudioEngine::UndoGesture undoGesture (engine, AudioEngine::UndoGesture::begin); // (round 190jv: one undo step per gesture)
     int row = 0;
     const auto area = areaAt (e.x, e.y, row);
     const auto& song = engine.getSong();
@@ -2377,6 +2378,7 @@ void ChannelRackComponent::mouseDrag (const juce::MouseEvent& e)
 
 void ChannelRackComponent::mouseUp (const juce::MouseEvent& e)
 {
+    const AudioEngine::UndoGesture undoGesture (engine, AudioEngine::UndoGesture::end); // (closes when mouseUp returns)
     previews.releaseAll(); // the audition (Ctrl+click) and the steps' previews stop with the button
 
     if (nameDownRow >= 0 && ! nameDragged && e.mouseWasClicked())

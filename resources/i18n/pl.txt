@@ -10713,3 +10713,25 @@ countries: pl
 "Complex Pro and Texture transpositions play through the Pitch knob: {0}" = "Transpozycje Complex Pro i Texture grają przez pokrętło Pitch: {0}"
 "Warped samples do not follow tempo changes in this release: they keep the project tempo" = "W tej wersji próbki z warpem nie podążają za zmianami tempa: zachowują tempo projektu"
 "{0} deactivated clip slot(s) play again" = "Wyłączone sloty klipów grają znowu: {0}"
+
+# --- round 190jv: Mixer menu › Trim unused tracks (FL's Remove unused tracks question)
+"Trim unused tracks" = "Przytnij nieużywane ścieżki"
+"Remove unused tracks" = "Usuń nieużywane ścieżki"
+"Select the mixer track types to be removed." = "Wybierz rodzaje ścieżek miksera do usunięcia."
+"Unlinked tracks only" = "Tylko niepołączone ścieżki"
+"Unlinked and non-empty tracks" = "Niepołączone i niepuste ścieżki"
+"This will |delete| {0} unused mixer track(s). Are you sure?" = "Spowoduje to |usunięcie| nieużywanych ścieżek miksera: {0}. Kontynuować?"
+"Trim unused mixer tracks" = "Przycinanie nieużywanych ścieżek miksera"
+"No unused mixer tracks" = "Brak nieużywanych ścieżek miksera"
+
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183)
+"Scale highlighting" = "Podświetlanie skali"
+
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183), FL arpeggiator patterns (prtools-0003)
+"FL arpeggiator pattern" = "Wzorzec arpeggiatora FL"
+"None (the arpeggiator above)" = "Brak (arpeggiator powyżej)"
+"Range (octaves)" = "Zakres (oktawy)"
+"Range mode" = "Tryb zakresu"
+"Block" = "Blok"
+"Group notes" = "Grupuj nuty"
+"The pattern could not be read." = "Nie udało się odczytać wzorca."

@@ -17845,3 +17845,8 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Warp190ikTests.inc" // round 190ik: Complex Pro, granular Texture, the pitch-aware Beats detector
 #include "Details190imTests.inc" // round 190im: activity meter reader, deactivated grid clips, Live keys 0 / Ctrl+E
 #include "Toolbar190ivTests.inc" // round 190iv: the toolbar per layout style (Simple capsules, Live control bar)
+#include "Slides190jvTests.inc" // round 190jv: FL's stepped slide notes on its native generators
+#include "Trim190jvTests.inc" // round 190jv: Mixer › Trim unused tracks (FL's Remove unused tracks)
+#include "Pr190jvTests.inc" // round 190jv: Piano roll Scale highlighting › Automatic (FL's key guess)
+#include "PrArp190jvTests.inc" // round 190jv: FL's Piano roll arpeggiator patterns (TPRArpForm law)
+#include "Flm190jvTests.inc" // round 190jv: FL Studio Mobile racks with several instruments / an effect first (BUILD-LIST 19)

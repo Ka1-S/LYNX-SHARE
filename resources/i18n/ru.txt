@@ -10713,3 +10713,25 @@ countries: ru by kz
 "Complex Pro and Texture transpositions play through the Pitch knob: {0}" = "Транспонирование Complex Pro и Texture играет через ручку Pitch: {0}"
 "Warped samples do not follow tempo changes in this release: they keep the project tempo" = "В этой версии варпнутые сэмплы не следуют за сменой темпа: они сохраняют темп проекта"
 "{0} deactivated clip slot(s) play again" = "Отключённых слотов клипов, которые снова играют: {0}"
+
+# --- round 190jv: Mixer menu › Trim unused tracks (FL's Remove unused tracks question)
+"Trim unused tracks" = "Убрать неиспользуемые дорожки"
+"Remove unused tracks" = "Удаление неиспользуемых дорожек"
+"Select the mixer track types to be removed." = "Выберите, какие дорожки микшера удалить."
+"Unlinked tracks only" = "Только несвязанные дорожки"
+"Unlinked and non-empty tracks" = "Несвязанные и непустые дорожки"
+"This will |delete| {0} unused mixer track(s). Are you sure?" = "Будет |удалено| неиспользуемых дорожек микшера: {0}. Продолжить?"
+"Trim unused mixer tracks" = "Удаление неиспользуемых дорожек микшера"
+"No unused mixer tracks" = "Нет неиспользуемых дорожек микшера"
+
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183)
+"Scale highlighting" = "Подсветка гаммы"
+
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183), FL arpeggiator patterns (prtools-0003)
+"FL arpeggiator pattern" = "Паттерн арпеджиатора FL"
+"None (the arpeggiator above)" = "Нет (арпеджиатор выше)"
+"Range (octaves)" = "Диапазон (октавы)"
+"Range mode" = "Режим диапазона"
+"Block" = "Блок"
+"Group notes" = "Группировать ноты"
+"The pattern could not be read." = "Не удалось прочитать паттерн."

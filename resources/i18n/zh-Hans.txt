@@ -10713,3 +10713,25 @@ countries: cn sg
 "Complex Pro and Texture transpositions play through the Pitch knob: {0}" = "Complex Pro 和 Texture 的移调通过 Pitch 旋钮播放：{0}"
 "Warped samples do not follow tempo changes in this release: they keep the project tempo" = "此版本中经过变速的采样不跟随速度变化：保持项目速度"
 "{0} deactivated clip slot(s) play again" = "{0} 个已停用的片段槽会重新发声"
+
+# --- round 190jv: Mixer menu › Trim unused tracks (FL's Remove unused tracks question)
+"Trim unused tracks" = "清理未使用的轨道"
+"Remove unused tracks" = "移除未使用的轨道"
+"Select the mixer track types to be removed." = "选择要移除的混音器轨道类型。"
+"Unlinked tracks only" = "仅未链接的轨道"
+"Unlinked and non-empty tracks" = "未链接及非空的轨道"
+"This will |delete| {0} unused mixer track(s). Are you sure?" = "这将|删除| {0} 条未使用的混音器轨道。确定吗？"
+"Trim unused mixer tracks" = "清理未使用的混音器轨道"
+"No unused mixer tracks" = "没有未使用的混音器轨道"
+
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183)
+"Scale highlighting" = "音阶高亮"
+
+# --- round 190jv: Piano roll View › Scale highlighting › Automatic (pianoroll-0183), FL arpeggiator patterns (prtools-0003)
+"FL arpeggiator pattern" = "FL 琶音器模式"
+"None (the arpeggiator above)" = "无（上面的琶音器）"
+"Range (octaves)" = "范围（八度）"
+"Range mode" = "范围模式"
+"Block" = "块"
+"Group notes" = "音符编组"
+"The pattern could not be read." = "无法读取该模式。"
