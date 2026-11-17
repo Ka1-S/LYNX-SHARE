@@ -696,7 +696,14 @@ struct Workspace::EditorWindow
 struct Workspace::EditorWatch final : juce::ComponentListener
 {
     explicit EditorWatch (Workspace& w) : owner (w) {}
-    void componentMovedOrResized (juce::Component&, bool, bool) override { owner.updateEditorHoles(); }
+    void componentMovedOrResized (juce::Component&, bool, bool) override
+    {
+        // the editor at its new place in the main window's frame first, then the holes: no frame shows the panel's
+        // hole at the new place before the editor is drawn there (a strip of the desktop's backdrop on each drag step)
+        if (auto* peer = owner.getPeer(); peer != nullptr && owner.isShowing())
+            peer->performAnyPendingRepaintsNow();
+        owner.updateEditorHoles();
+    }
     void componentVisibilityChanged (juce::Component&) override { owner.updateEditorHoles(); }
     void componentBroughtToFront (juce::Component& c) override { owner.raiseEditorWindow (c); }
     void componentBeingDeleted (juce::Component& c) override
@@ -713,8 +720,11 @@ struct Workspace::EditorWatch final : juce::ComponentListener
             }
         // (after it is gone: the holes it made are closed)
         juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<Workspace> (&owner)] {
-            if (safe != nullptr)
-                safe->updateEditorHoles();
+            if (safe == nullptr)
+                return;
+            safe->updateEditorHoles();
+            if (safe->editorWindowList.empty())
+                nativechild::setStackingListener (nullptr);
         });
     }
     Workspace& owner;

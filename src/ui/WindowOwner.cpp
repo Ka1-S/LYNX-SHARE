@@ -1591,6 +1591,11 @@ void setWindowScreenPosition (juce::Component& window, juce::Point<int> screenTo
         nativechild::place (window, *editorDock, r.withPosition (editorDock->getLocalPoint (nullptr, screenTopLeft)));
         return;
     }
+    if (editorDock != nullptr && editorDock->hasEditorWindow (window)) // (round 190jy: a child component of the desktop)
+    {
+        window.setTopLeftPosition (editorDock->getLocalPoint (nullptr, screenTopLeft));
+        return;
+    }
     window.setTopLeftPosition (screenTopLeft);
 }
 
