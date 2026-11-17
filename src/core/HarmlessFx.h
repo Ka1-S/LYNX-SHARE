@@ -57,6 +57,10 @@ private:
 // parameter 5 (band mix) stored in the state
 int maximusMixParameter (const MaximusPreset& preset) noexcept;
 
+// Round 190kr test hook: Maximus's sample-by-sample kernels (biquad and smoother cascades, the two-lane half-band
+// stages) render exactly what the plain loops they replaced render (random filters, states and blocks)
+bool kernelsMatchReference (std::uint32_t seed) noexcept;
+
 // The whole rack of one Harmless instance (state lives here; the presets are shared)
 class Rack
 {
