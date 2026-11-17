@@ -297,7 +297,11 @@ enum Param { frequency, threshold, range, mode, detector, listen, lookahead, rel
              // round 190iq, hidden (not in the info: no control, no text; saved while non-zero): the measured timing of the
              // reference's Allround law (vmatch::vocalds Settings::timing = 1; Single Vocal is unchanged); a new Hush and a
              // translated Pro-DS state get 1, a project or preset saved before keeps 0 (tp172b's timing, bit for bit)
-             timing = count };
+             timing = count,
+             // round 190js, hidden (saved while non-zero): Single Vocal's "stands out" revision (vmatch::vocalds
+             // Settings::vocalRevision = 1; Allround is unchanged); a new Hush and a translated Pro-DS state get 1, a project
+             // or preset saved before keeps 0 (round 148's Single Vocal, bit for bit)
+             vocalRevision };
 double airDb (float v) noexcept;        // round 190dm: 0 … +12 dB
 constexpr double airHz = 8151.0, airSlope = 0.5;
 bool extended (const EffectParams& p) noexcept;         // round 165x: the extended law (and not the classic voicing)

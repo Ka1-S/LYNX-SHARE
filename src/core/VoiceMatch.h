@@ -154,6 +154,9 @@ struct Settings
     double link = 1.0, linkOnly = 0.0;
     bool gate = true; // round tp172b: false = the reference's Allround mode (no single-vocal gate, the same level law)
     int timing = 0;   // round 190iq: 1 = the Allround law's measured timing revision (detector, gain, look-ahead); Single Vocal ignores it
+    // round 190js: 1 = Single Vocal's "stands out" revision (the band must stand out from the signal below it by the
+    // measured margin, the gate decides a fixed delay late, the measured level law and gain timing); Allround ignores it
+    int vocalRevision = 0;
 };
 
 class DeEsser
@@ -177,6 +180,9 @@ private:
     // round 165x: the second detector lane (the right channel's blend, or the side signal)
     Biquad bhp1, bhp2, blp1, blp2, blow1, blow2;
     double beh = 0.0, bqh = 0.0, bql = 0.0, bsm = 0.0;
+    // round 190js: Single Vocal's revision compares the signal above a split under the band with the signal below it
+    Biquad shi1, shi2, slo1, slo2, bshi1, bshi2, bslo1, bslo2, sbody, bsbody;
+    double designedSplit = -1.0;
     bool bopen = false;
     std::array<float, ring> blevel {}, bratio {};
     std::array<float, ring> dl {}, dr {}, level {}, ratio {};

@@ -150,8 +150,11 @@ TEST (parity190jh_facet_auto_threshold_follows_the_loudest_recent_level)
     const double loud = gainAt (1.5), back = gainAt (3.0), later = gainAt (5.5);
     std::printf ("  facet auto: %.2f dB at -12 dBFS, %.2f / %.2f dB at -40 dBFS (1 s / 3.5 s later)\n", loud, back, later);
     CHECK (std::abs (loud - (6.0 - 15.0)) < 0.6);          // the whole range
-    CHECK (back > 6.0 - 6.0 && back < 6.0 - 0.5);          // mostly recovered (the soft knee still takes a little)
-    CHECK (later < back - 0.2 && later > 6.0 - 15.0);      // the threshold creeps down with the top (soft knee: slowly)
+    // round 190js refitted the law (the knee is 1.53 x the range: a -15 dB band lets go 28 dB under the top, the reference's
+    // behaviour on the time-constant probe): 1 s later still releasing (305 ms here), then about recovered while the
+    // threshold creeps down into the knee
+    CHECK (back > 6.0 - 1.0 && back < 6.0 + 0.1);
+    CHECK (later > 6.0 - 1.5 && later < 6.0 + 0.1);
     // the manual threshold at the same setting is the old law: -80 dB = the whole range at both levels
     auto m = s;
     m.params[(std::size_t) facet::autoThresholdParam0] = 0.0f;
@@ -184,8 +187,8 @@ TEST (parity190jh_pro_q4_dynamic_bands_are_translated)
     CHECK (std::abs (facet::rangeDb (s.params[(std::size_t) facet::rangeParam0 + 1]) - 12.0) < 0.01 && ! facet::autoThreshold (s.params, 1));
     CHECK (std::abs (facet::thresholdDb (s.params[(std::size_t) facet::thresholdParam0 + 1]) + 30.0) < 0.01);
     CHECK (! facet::isDynamic (s.params, 2) && ! facet::autoThreshold (s.params, 2)); // dynamics off: a static band
-    CHECK (std::abs (facet::attackMs (s.params[(std::size_t) facet::attackParam]) - 18.1) < 0.1);
-    CHECK (std::abs (facet::releaseMs (s.params[(std::size_t) facet::releaseParam]) - 305.0) < 1.0);
+    CHECK (std::abs (facet::attackMs (s.params[(std::size_t) facet::attackParam]) - 9.22) < 0.1);   // (round 190js: was 18.1 / 305)
+    CHECK (std::abs (facet::releaseMs (s.params[(std::size_t) facet::releaseParam]) - 268.0) < 1.0);
     // the manual threshold law (the parameter's own texts): 0 -90, 0.125 -66, 0.25 -45, 0.875 -7.5 dB
     for (const auto& [x, db] : { std::pair { 0.0f, -80.0 }, std::pair { 0.125f, -66.0 }, std::pair { 0.25f, -45.0 }, std::pair { 0.875f, -7.5 } })
     {

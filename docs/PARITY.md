@@ -4004,3 +4004,103 @@ Sources: docs/analise/REA_rodada190iu.md.
 | Automation clips into their tracks' lanes (#191.3) | FL: automation clips only (24.1 puts "Turn into automation clip" of an instrument track on grouped sub-tracks). Live: lanes under each track (Automation Mode, A; fold triangle) | Lanes since 177b (on in Clip-launch, option in Pattern). New: Playlist menu "Move automation clips into their tracks' lanes (N)" while lanes are on: clips of controls owned by an instrument track or a linked insert, one undo step | LYNX extra (partial: no pure view projection, see REA doc) |
 | Separate patterns per track / Track-only mode (#191.5) | FL: Split by channel, Make unique, Lock to content, Auto name; instrument tracks (20.1) place their own channel pattern; no auto-separation option | View › Layout style / Settings › LYNX extras "Track-only mode (no Channel rack: 1 track = 1 instrument)", off: Pattern layout without the rack; every instrument added gets its own instrument track (FL's pieces, .flp unchanged); switching on offers to give the existing ones a track | LYNX extra (optional) |
 | Delete takes and recorded envelopes (#191.6) | FL: picker lists patterns / audio clips / automation; "Purge unused audio clips"; "Delete unused recorded files"; no delete on Browser › Current project audio / automation rows | Picker panel right-click on an audio clip or automation row: Delete; Picker panel menu: Purge unused audio clips (N), Delete unused automation clips (N); Browser › Current project › Automation and audio-clip rows: Delete. The panel itself hides with FL's Picker panel › Enable (Alt+P) | LYNX extra (menu items) |
+
+## Round 190js: the Waves reverbs on Reeverb 2, Hush's Single Vocal "stands out" revision, Facet's auto threshold refitted
+
+Plugin parity 5 of 0.1.30. Black-box, on captures already on disk (lab and evidence: `/mnt/e/lynx-work/parity190js/`,
+HANDOFF.md). Same score as rounds 190iq … 190jh (`scripts/fxparity.py`, 0–10, higher is better): the references' own renders
+against LYNX loading the plug-in's saved state through its substitute / translator.
+
+**The Waves reverbs (RVerb, H-Reverb, TrueVerb → Reeverb 2).** Why round 190jh's lab translation failed: it took the
+references' own tone values (RVerb's 5.7 kHz roll-off, Reeverb's high-damping default) and a wet level per decay only, but
+the score at this level is set by the long-term third-octave spectrum and the level of each file (a reverb's tail does
+not null: 4 = spectrum within 2.5 dB and level within 1.5 dB). Each reference's band gain (out / in per third octave) was
+measured from the programme renders (pooled over the five signals; the IR deconvolved for decay, pre-delay and the direct
+path) and is not what the states say: RVerb is flat to 1 kHz and −8 / −15 / −19 dB at 2.8 / 5.7 / 11 kHz; H-Reverb has a
++5 … 6 dB hump at 700 Hz and −20 … −27 dB at 11 … 18 kHz; TrueVerb is a filtered direct path (−4.8 … −6.2 dB, falling
+with Distance) under a bright tail. All three keep about the same wet energy whatever the decay (RVerb: −3 … −4 dB in the
+mids at 0.8 … 4 s), so a longer decay needs a lower wet control. Reeverb 2 (the stand-in since round 129; its engine is
+unchanged) can reach every setting's tone (per-setting fits 0.8 … 2.5 dB mean |band error|), so the role stays on it and
+its controls are fitted, all five settings at once, on a model of the score (the input's third-octave spectrum times the
+impulse response's band gain against the reference render: spectrum and level per file). The translator `waves-reverb`
+reads the decay, the pre-delay, TrueVerb's reverb / early-reflection levels, Distance and Direct, H-Reverb's ducking
+(on: 0.25 × its range off the wet level [model], fitted on X4) and sets each reverb's fitted tone (raw Reeverb 2 values in
+`wavesVerbFits`), the wet level by the decay (−8.25 / −7.5 / −5.25 dB per decade) and the slot at 100 %. Atrium,
+LuxeVerb and Epoch were tried for RVerb's role first (Foil Plate not: a plate's role): their best band errors on RVerb's
+default were 2.0 / 2.4 / 8.4 dB (Epoch's top band stops at its high cut), against Reeverb 2's 0.8.
+
+| refcap182 programme (25 files each) | before → after | up / same / down |
+|---|---|---|
+| RVerb → Reeverb 2 | 2.04 → **3.48** (D 2.0 → 4.0, X1 2.0 → 2.6, X2 2.2 → 3.6, X3 2.0 → 3.6, X4 2.0 → 3.6) | 22 / 3 / 0 |
+| H-Reverb → Reeverb 2 | 1.72 → **3.16** (D 1.8 → 3.4, X1 1.8 → 3.6, X2 1.0 → 2.2, X3 2.0 → 3.4, X4 ducking 2.0 → 3.2) | 22 / 3 / 0 |
+| TrueVerb → Reeverb 2 | 3.24 → **3.96** (D 3.4 → 4.0, X1 3.6 → 4.0, X2 4.0 = 4.0, X3 3.0 → 4.0, X4 direct off 2.2 → 3.8) | 15 / 10 / 0 |
+
+**Facet EQ's automatic threshold, refitted (Pro-Q 4's Auto).** Round 190jh fitted it on 10 ms windows, which smeared the
+time-constant probe's bursts. Refitted by Nelder-Mead on the C++ renders themselves (5 ms windows of grid2's `tc` and
+`stairs` at ranges −30 / −15 / +15, lab build with the law's constants from the environment, `facet/fitc.py`): the knee is
+**1.53 × the range** (not a fixed 30.5 dB) — after a −6 dBFS burst the reference keeps ~5 dB of cut at −40 dBFS with a
+−30 dB range and none with −15 dB, which one fixed knee cannot do; this is the "settles ~9 dB lower" of round 190jh — and the
+gain timing at Pro-Q's 50 % is **9.2 / 268 ms** (the translator's attack / release; was 18.1 / 305). A slower rise of the
+top and an offset under the level were also free in the fit and came out at 0; the fit's top fall (1.58 dB/s) cost the
+−15 dB stairs a step on the score, so the fall stays 1.70 dB/s. Trajectory error 1.067 → 0.67 dB rms (tc −30: 1.77 → 1.10,
+mean +1.00 → +0.12 dB). The
+automatic threshold has not been released (round 190jh's branch), so its law changes without a revision; manual bands
+render bit for bit as before.
+
+| refcap030 Pro-Q 4 block | files | before → after | up / same / down |
+|---|---|---|---|
+| grid2 (Dynamic Range × Threshold; stairs, time constants; the threshold is ignored under Auto) | 50 | 6.60 → **6.90** | 10 / 40 / 0 (tc −30: 2 → 3, ESR −3.4 → −10.2 dB; tc +15: 6 → 8) |
+| grid, mode, pairs, 44.1 / 48 / 96 kHz | 150 | each unchanged | 0 / 150 / 0 |
+| all (row) | 200 | 8.53 → **8.60** | 10 / 190 / 0 |
+
+refcap182's programme and tp172b have no dynamic band in their states (unchanged by construction).
+
+**Hush De-esser ← Pro-DS Single Vocal: the "stands out" revision.** Pro-DS's default mode. On refcap030's `ess`
+probe (a 500 Hz body at −14 dBFS under 5 … 9 kHz bursts of rising level, a sweep of band tones, a long burst alone) the
+reference leaves a burst alone until it stands out from the body (+5 dB: −0.2 dB; +11 dB: the whole range at every
+threshold), ignores band tones at the body's level, starts ~20 ms after the burst minus the look-ahead and holds a
+steady reduction; a burst alone follows a level law (92 / 87 / 66 % of the range at thresholds −48 / −30 / −12 dB).
+Round 148's gate compared the band (high-pass … low-pass) with everything under the high-pass, so a 5 … 9 kHz burst's own
+lower half counted as the body: it opened on every burst and its level law moved with the noise (−5 … −10 dB under a
+burst the reference cuts by 12). **Revision 1** (hidden `hush::vocalRevision`, Allround unchanged) compares the signal above
+a split (0.567 × the high-pass, 4th-order) with the body below it from 200 Hz up (a kick drum's low end hid the cymbals of
+tp172b's drums), opens at +8.2 dB and closes at +7.6 dB over 4.9 ms averages, decides 1.6 ms behind the look-ahead, and has
+its own level law (offset 9 dB, span × 1.11) and gain timing (6.2 / 20 ms). Fitted by Nelder-Mead on the 27 Single Vocal ess
+renders (lab build, `hush/fitsv.py`: 3.05 → 0.50 dB rms over 5 ms windows, full band and above 4 kHz), the body's
+high-pass and the law offset then chosen on the parity score of the drums / vocal / mix / stim renders (`hush/svscore.py`).
+A new Hush and a translated Pro-DS state run it; a project or preset saved before keeps round 148's Single Vocal.
+
+| Pro-DS bank (Single Vocal and Allround settings) | files | before → after | up / same / down |
+|---|---|---|---|
+| refcap030 grid / mode / pairs | 10 / 33 / 18 | 4.80 / 5.55 / 5.72 → **6.80 / 7.21 / 7.94** | 32 / 29 / 0 |
+| refcap030 44.1 / 48 / 96 kHz | 15 each | 6.13 / 6.13 / 6.40 → **6.67 / 7.20 / 7.13** | 16 / 27 / 2 (44.1 kHz S4 stim, 96 kHz S1 stim: 6 → 5) |
+| refcap030, all blocks (row) | 106 | 5.79 → **7.21** | 48 / 56 / 2 |
+| refcap182 programme | 25 | 8.60 → 8.68 | 2 / 23 / 0 |
+| tp172b (vocal, music, sweep, drums) | 20 | 6.70 → **7.20** | 8 / 12 / 0 |
+
+The two files a step down are the `stim` signal at 44.1 kHz (S4, look-ahead off) and 96 kHz (S1): the reference cuts
+the band ~1.4 / 0.5 dB on average there, the revision +1.1 dB less / 1.5 dB more (spectrum 0.74 / 0.79 dB against the
+6-point limit of 0.6); at 48 kHz the same two settings went 5 → 7 and 6 → 6. Twelve variants (body high-pass 150 … 500 Hz,
+split 0.52 … 0.62, open threshold, ratio and gain timing) kept them at 5; shipped as an owner decision (HANDOFF).
+
+**Old projects.** Reeverb 2's engine is unchanged (the translator only changes what a project with the missing Waves
+plug-in loads); Facet's manual dynamic bands, Hush's Allround and Hush's Single Vocal with the revision off (every project
+or preset saved before: `upgradeLoadedEffectParams`) render byte for byte as the base commit (`lab/gold.sh`: the base
+binary against the round's, 171 renders at 44.1 / 48 / 96 kHz, 0 differ; fingerprints in `tests/Parity190jsGold.inc`;
+round 190jh's Facet fingerprints pass unchanged).
+
+**CPU** (thread time, 20 s at 48 kHz in blocks of 512, best of 5, three runs pinned to one core; `cpu/bench.log`): Hush
+Single Vocal 0.41 … 0.44 % of a core (revision 0) → 0.46 … 0.54 % (revision 1: four more biquads and the body's high-pass in
+the stand-out test); Facet with one automatic band 0.24 … 0.27 % (manual 0.17 … 0.21 %); Reeverb 2 at the old stand-in
+setting 0.29 … 0.38 % against the translated RVerb / H-Reverb / TrueVerb defaults 0.25 … 0.35 % (the same engine). No
+latency change.
+
+**Still off:**
+- RVerb X1 (Reverb Type 3, diffusion 80) stays at 2 … 3 (its guitar −4.8 dB): one tone for every type; H-Reverb X2 (short,
+  ER-heavy, 0.4 s) 2.2; H-Reverb's ducking is a fixed share of its range, not an envelope; TrueVerb's direct path is flat
+  (the reference's has a short low-pass FIR) — a 4 is the top here, a 5 needs the tail to null.
+- Hush: the two `stim` files above; split band (Band Processing = split) keeps round 148's split [model] (its ess error
+  2.3 dB rms, the rest 0.2 … 0.7).
+- Facet: the −30 dB time-constant probe is at 3 (from 2): the reference's cut after the short bursts (7.5 / 8.7 s) is
+  still deeper than the model's.
+- PuigTec, SuperTap's feedback delay and modulation, EchoBoy's shelving cuts (round 190jh's list) not touched.

@@ -124,7 +124,7 @@ matches by name).
 | ValhallaShimmer | Halo (round 100) | name | every parameter (bare `parameterN` attributes; mode lists partly not confirmed) |
 | ValhallaFutureVerb | Horizon (round 100) | name | every parameter |
 | Soundtoys Little Plate | Foil Plate (round 129; 2 s, 100 % wet, slot dry/wet 25 %; was Reeverb 2) | name | — |
-| Waves RVerb / H-Reverb / TrueVerb | Reeverb 2 (100 % wet, slot dry/wet 25 %) | Waves name | — |
+| Waves RVerb / H-Reverb / TrueVerb | Reeverb 2 (100 % wet, slot dry/wet 25 %) | Waves name | round 190js: decay, pre-delay, the wet level by the decay, each reverb's measured tone, H-Reverb's ducking, TrueVerb's direct path / reverb / early levels (slot at 100 %) |
 | FabFilter Pro-R | LuxeVerb (default) | name | — |
 | Waves H-Delay | Echoform (round 119; was Fruity Delay 3) | VST3 class ID [DATA], Waves name | sync (host / BPM / ms), note, time, feedback, ping-pong (pairs) / stereo, mix, output, filters; laws measured on the official trial [EXEC] (round 119 §2) |
 | Waves NS1 | Quell Denoiser (round 119) | Waves name | the one knob (RealWorld 229), Quell fitted to the official trial [EXEC] (round 119 §3) |
@@ -146,7 +146,7 @@ matches by name).
 | Waves CLA-2A | Glow Leveler (peak reduction 30 %, gain +2 dB; round 113) | VST3 class ID [DATA], Waves name | gain, peak reduction, comp / limit, laws measured on the official trial [EXEC] (round 113 §3c) |
 | Waves SSL E-Channel, SSL Native Channel Strip / 4K E / 4K B / Vocalstrip | Ridge Strip (neutral; round 96) | VST3 class ID [DATA], Waves name, names | SSL E-Channel: filters, 4-band EQ, compressor, output, band laws measured on the official trial [EXEC] (round 113 §3c) |
 | Waves Q10, REQ, SSLEQ | Parametric EQ (flat) | Waves names | — |
-| FabFilter Pro-Q | Facet EQ (flat, round 99) | names | Pro-Q 4: bands, shapes, slopes, phase mode (round 124 / 144); round 190jh: dynamic bands (range, Auto → Facet's automatic threshold, manual threshold, attack / release) |
+| FabFilter Pro-Q | Facet EQ (flat, round 99) | names | Pro-Q 4: bands, shapes, slopes, phase mode (round 124 / 144); round 190jh: dynamic bands (range, Auto → Facet's automatic threshold, manual threshold, attack / release; round 190js: the automatic threshold refitted, 50 % = 9.2 / 268 ms) |
 | Waves DeEsser | Hush De-esser (5.5 kHz, −20 dBFS, 4 dB; round 113) | Waves name | frequency, threshold, split / wideband, side-chain filter, monitor, laws measured on the official trial [EXEC] (round 113 §3c) |
 | FabFilter Pro-DS, Harrison De-Esser | Hush De-esser (default; round 96) | names | — |
 | Slate Digital Fresh Air | Aether (neutral without a state; round 96) | name | Mid / High Air → Aether's air shelf gain and frequency, laws measured on the official trial (within 0.5 dB RMS for her settings) [EXEC] (round 113) |

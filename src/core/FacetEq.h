@@ -159,6 +159,18 @@ double autoGainDb (const EffectParams& params, double sampleRate) noexcept;
 // windows, Nelder-Mead): 1.06 dB rms over 6 trajectories (a fixed threshold at the floor: 4.9 dB) [model: the reference's
 // own detector is not known; its top settles ~9 dB under short loud bursts, which this follower does not do].
 constexpr double autoFloorDb = -39.7, autoDecayDbPerSecond = 1.70, autoKneeDb = 30.5;
+// Round 190js: refitted at 5 ms on the C++ renders themselves (the 10 ms windows above smeared the bursts): the knee
+// scales with the range (kneePerRange x |range|: the band starts moving |range| x kneePerRange / 2 under the threshold),
+// so after a loud burst a -30 dB band keeps ~5 dB of cut 30 dB below it as the reference does while a -15 dB band
+// lets go (autoLaw(); the floor and the fall are round 190jh's constants above). The law also has a slower
+// rise toward the level + an offset and its own gain timing (autoTopRiseMs / autoTopOffsetDb / attackMs / releaseMs:
+// all 0 = off, which the fit chose). See docs/PARITY.md "Round 190js".
+struct AutoLaw
+{
+    double floorDb, decayDbPerSecond, kneeDb, topOffsetDb, topRiseMs, attackMs, releaseMs;
+    double kneePerRange; // > 0: the knee is this many times the range's size (kneeDb unused)
+};
+const AutoLaw& autoLaw() noexcept;
 bool autoThreshold (const EffectParams& params, int band) noexcept;
 // the auto mode's gain law: dynamicGainDb with the auto knee
 double autoDynamicGainDb (double levelDb, double topDb, double rangeDb) noexcept;
