@@ -489,12 +489,15 @@ private:
         juce::StringArray patterns { tr ("None (the arpeggiator above)") };
         patterns.addArray (scoreFolder ("Arpeggiator").names);
         Control picker { Control::choice, tr ("Pattern"), 0, 0, 1, 0, {}, patterns };
-        // FL's preset list (round 190kd, FL 2026 shot f23-arp-presets): the patterns under a heading per folder ("1 note",
-        // "2 notes" … "Riff machine"), each by its own name, then the folder's own patterns after a separator. The item
-        // id is the pattern's index + 2 (applyFlArpeggiator reads the id, the list's order is FL's)
+        // FL's preset list (round 190kd, FL 2026 shot f23-arp-presets): the folder's own patterns first (FL: "Default"
+        // at the top), then the patterns under a heading per folder ("1 note", "2 notes" … "Riff machine"), each by its
+        // own name. The item id is the pattern's index + 2 (applyFlArpeggiator reads the id, the list's order is FL's)
         picker.fill = [] (juce::ComboBox& box) {
             box.addItem (tr ("None (the arpeggiator above)"), 1);
             const auto& names = scoreFolder ("Arpeggiator").names;
+            for (int i = 0; i < names.size(); ++i)
+                if (! names[i].containsChar ('/'))
+                    box.addItem (names[i], i + 2);
             juce::String folder = "-";
             for (int i = 0; i < names.size(); ++i)
             {
@@ -507,10 +510,6 @@ private:
                 folder = here;
                 box.addItem (name.fromLastOccurrenceOf ("/", false, false), i + 2);
             }
-            box.addSeparator();
-            for (int i = 0; i < names.size(); ++i)
-                if (! names[i].containsChar ('/'))
-                    box.addItem (names[i], i + 2);
         };
         add (std::move (picker));
         const juce::StringArray modes { tr ("Normal"), tr ("Flip"), tr ("Alternate") };
