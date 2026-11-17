@@ -11223,3 +11223,10 @@ countries: cn sg
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 打开/关闭编辑器  [Alt]+[LMB] 保持其他编辑器打开  [Ctrl]+[LMB] 试听  [2xLMB] 钢琴卷帘  [LMB] 上下拖动重新排序  [RMB] 通道菜单"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "峰值电平表（左/右）带峰值保持  [LMB] 清除削波指示灯"
+
+# --- rollup 0.1.30 step 6: Save a copy for 0.1.28 knows rounds 190kc / 190ke / natives190kj
+"The crossfader (Live's Crossfade Assign) is not in this release: these inserts play at their full level, and its automation does nothing: {0}" = "此版本没有交叉推子（Live 的 Crossfade Assign）：这些插入轨以满电平播放，其自动化不起作用: {0}"
+"Live return tracks show as ordinary mixer inserts: {0}" = "Live 的返回轨显示为普通的混音器插入轨: {0}"
+"The Simple Controls tab's own knob mappings: {0}" = "Simple 的 Controls 标签页的自定义旋钮映射: {0}"
+"Harmor parts with a sample in the IMG section play their timbres instead of the resynthesis: {0}" = "IMG 部分带有采样的 Harmor 声部改为播放其音色，而不是重合成: {0}"
+"Newtone's detected key and note velocities are left out: {0}" = "Newtone 检测到的调性和音符力度被省略: {0}"

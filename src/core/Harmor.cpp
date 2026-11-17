@@ -6824,6 +6824,22 @@ std::vector<std::string> harmorFallbacks (const std::vector<std::uint8_t>& state
     return buildPatch (*S, 44100.0, 120.0)->fallbacks;
 }
 
+bool harmorUsesResynthesis (const std::vector<std::uint8_t>& state)
+{
+    // (rollup 0.1.30 step 6: Save a copy for 0.1.28 reports the channels whose sound round natives190kj changed)
+    try
+    {
+        if (const auto S = parseState (state))
+            for (const auto& part : S->parts)
+                if (part.present && parseImage (part.tailBytes).resynth)
+                    return true;
+    }
+    catch (...)
+    {
+    }
+    return false;
+}
+
 std::optional<std::vector<std::uint8_t>> harmorUpgradeState (const std::vector<std::uint8_t>& state)
 {
     try

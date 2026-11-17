@@ -11223,3 +11223,10 @@ countries: kr
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 에디터 열기/닫기  [Alt]+[LMB] 다른 에디터 유지  [Ctrl]+[LMB] 미리 듣기  [2xLMB] 피아노 롤  [LMB] 위/아래 드래그로 순서 변경  [RMB] 채널 메뉴"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "피크 홀드 기능이 있는 피크 미터(좌/우)  [LMB] 클립 표시등 지우기"
+
+# --- rollup 0.1.30 step 6: Save a copy for 0.1.28 knows rounds 190kc / 190ke / natives190kj
+"The crossfader (Live's Crossfade Assign) is not in this release: these inserts play at their full level, and its automation does nothing: {0}" = "크로스페이더(Live의 Crossfade Assign)는 이 릴리스에 없습니다: 이 인서트들은 최대 레벨로 재생되며 그 오토메이션은 아무 효과가 없습니다: {0}"
+"Live return tracks show as ordinary mixer inserts: {0}" = "Live 리턴 트랙은 일반 믹서 인서트로 표시됩니다: {0}"
+"The Simple Controls tab's own knob mappings: {0}" = "Simple Controls 탭의 사용자 노브 매핑: {0}"
+"Harmor parts with a sample in the IMG section play their timbres instead of the resynthesis: {0}" = "IMG 섹션에 샘플이 있는 Harmor 파트는 리신시스 대신 음색으로 재생됩니다: {0}"
+"Newtone's detected key and note velocities are left out: {0}" = "Newtone이 감지한 키와 노트 벨로시티는 제외됩니다: {0}"

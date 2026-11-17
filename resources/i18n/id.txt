@@ -11223,3 +11223,10 @@ countries: id
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] buka/tutup editor  [Alt]+[LMB] biarkan yang lain terbuka  [Ctrl]+[LMB] dengarkan  [2xLMB] Piano Roll  [LMB] seret naik/turun mengubah urutan  [RMB] menu channel"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak meter (kiri/kanan) dengan peak hold  [LMB] mematikan lampu clip"
+
+# --- rollup 0.1.30 step 6: Save a copy for 0.1.28 knows rounds 190kc / 190ke / natives190kj
+"The crossfader (Live's Crossfade Assign) is not in this release: these inserts play at their full level, and its automation does nothing: {0}" = "Crossfader (Crossfade Assign milik Live) tidak ada di rilis ini: insert ini diputar dengan level penuh, dan otomasinya tidak berpengaruh: {0}"
+"Live return tracks show as ordinary mixer inserts: {0}" = "Track return Live tampil sebagai insert mixer biasa: {0}"
+"The Simple Controls tab's own knob mappings: {0}" = "Pemetaan kenop sendiri pada tab Controls di Simple: {0}"
+"Harmor parts with a sample in the IMG section play their timbres instead of the resynthesis: {0}" = "Part Harmor dengan sampel di bagian IMG memainkan timbre-nya alih-alih resintesis: {0}"
+"Newtone's detected key and note velocities are left out: {0}" = "Kunci nada yang terdeteksi dan velocity not Newtone dihilangkan: {0}"

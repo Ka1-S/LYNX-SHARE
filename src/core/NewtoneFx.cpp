@@ -1286,16 +1286,21 @@ std::shared_ptr<SampleData> cropped (const SampleData& s, std::int64_t a, std::i
     return out;
 }
 
-std::vector<std::uint8_t> writeNative (const Track& track)
+std::vector<std::uint8_t> writeNative (const Track& track) { return writeNative (track, nativeVersion); }
+
+std::vector<std::uint8_t> writeNative (const Track& track, std::uint32_t version)
 {
+    // (version 2: what releases before round natives190kj read — rollup 0.1.30 step 6's Save a copy for 0.1.28)
+    version = std::clamp (version, 2u, nativeVersion);
     std::vector<std::uint8_t> out { 'L', 'X', 'N', 'T' };
-    put (out, nativeVersion);
+    put (out, version);
     put (out, (std::int64_t) track.frames);
     put (out, track.globalFormant);
     put (out, track.centre);
     put (out, track.variation);
     put (out, track.transition);
-    put (out, (std::int32_t) track.key); // (version 3)
+    if (version >= 3)
+        put (out, (std::int32_t) track.key); // (version 3)
     put (out, (std::uint32_t) track.pitches.size());
     for (const auto& p : track.pitches)
     {
@@ -1309,8 +1314,11 @@ std::vector<std::uint8_t> writeNative (const Track& track)
         put (out, p.rampOut);
         put (out, p.origSmoothIn);
         put (out, p.origSmoothOut);
-        put (out, p.validEnd);
-        put (out, p.velocity);
+        if (version >= 3)
+        {
+            put (out, p.validEnd);
+            put (out, p.velocity);
+        }
     }
     return out;
 }

@@ -6567,6 +6567,28 @@ private:
                 slide.slide = true;
                 song.patterns[0].notes.push_back (slide);
             }
+            // rollup step 6 (round 190km): Live's Crossfade Assign and a return track (190kc), the Simple Controls tab's own
+            // mapping (190ke), a Newtone slot whose state is version 3 (natives190kj: + the key and the notes' velocity)
+            song.mixer[11].crossfade = lynx::CrossfadeAssign::a;
+            song.crossfader = -0.5f;
+            song.mixer[12].liveReturn = true;
+            song.mixer[12].returnPre = true;
+            song.mixer[13].smartControls = "custom";
+            {
+                auto newtoneSlot = lynx::makeEffectSlot (lynx::EffectKind::newtone);
+                lynx::newtonefx::Track nt;
+                nt.frames = 48000;
+                nt.key = 9;
+                lynx::newtonefx::Note n;
+                n.origEnd = n.curEnd = 24000;
+                n.origPitch = 69.0;
+                n.velocity = 0.8;
+                n.validEnd = 20000;
+                nt.pitches = { n };
+                nt.notes = 1;
+                newtoneSlot.state = lynx::newtonefx::writeNative (nt);
+                song.mixer[14].effects.push_back (newtoneSlot);
+            }
 
             const auto copy = lynx::olderlynx::forRelease (song, "0.1.28");
             juce::String why;
@@ -6656,6 +6678,20 @@ private:
                 rollup030Result = "ERROR step-4 view items";
             else if (! said ("Hush De-esser's Single Vocal mode") || ! said ("Slide notes on FL's native generators"))
                 rollup030Result = juce::String ("ERROR step-5 engine notes ") + (said ("Hush De-esser's Single Vocal") ? "" : "hush ") + (said ("Slide notes") ? "" : "slides");
+            else if (! said ("The crossfader (Live's Crossfade Assign)") || ! said ("Live return tracks show") || ! said ("The Simple Controls tab's")
+                     || copy.json.contains ("\"crossfade") || copy.json.contains ("liveReturn") || copy.json.contains ("returnPre")
+                     || copy.json.contains ("smartControls") || copy.json.contains ("engineRev"))
+                rollup030Result = "ERROR step-6 mixer items";
+            else if (const auto nts = [&parsed] {
+                         juce::MemoryOutputStream bytes;
+                         std::vector<std::uint8_t> st;
+                         if (juce::Base64::convertFromBase64 (bytes, parsed["mixer"][14]["effects"][0]["state"].toString()))
+                             st.assign (static_cast<const std::uint8_t*> (bytes.getData()), static_cast<const std::uint8_t*> (bytes.getData()) + bytes.getDataSize());
+                         return st;
+                     }();
+                     ! said ("Newtone's detected key") || lynx::newtonefx::nativeVersionOf (nts) != 2 || ! lynx::newtonefx::parseNative (nts)
+                     || lynx::newtonefx::parseNative (nts)->pitches.size() != 1 || lynx::newtonefx::parseNative (nts)->pitches[0].curEnd != 24000)
+                rollup030Result = "ERROR step-6 Newtone state";
             else if (const auto plain = lynx::olderlynx::forRelease (lynx::Song::makeDefault(), "0.1.28");
                      ! plain.ok || std::any_of (plain.lost.begin(), plain.lost.end(), [] (const lynx::olderlynx::Loss& l) {
                          const auto t = juce::String (l.text);
@@ -6664,7 +6700,8 @@ private:
                                 || t.startsWith ("Helix") || t.contains ("Echoform") || t.contains ("Halo") || t.contains ("Lattice") || t.contains ("LuxeVerb")
                                 || t.contains ("Texture") || t.contains ("Beats'") || t.startsWith ("Warped") || t.contains ("deactivated")
                                 || t.contains ("Facet") || t.contains ("MIDI Out") || t.contains ("hosted CLAP") || t.contains ("nested Playlist")
-                                || t.contains ("CURVE") || t.startsWith ("Slide notes");
+                                || t.contains ("CURVE") || t.startsWith ("Slide notes") || t.contains ("crossfader") || t.contains ("return tracks")
+                                || t.contains ("Controls tab") || t.startsWith ("Harmor") || t.startsWith ("Newtone");
                      }))
                 rollup030Result = "ERROR a plain project reports a loss it does not have";
         }

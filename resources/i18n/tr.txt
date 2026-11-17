@@ -11223,3 +11223,10 @@ countries: tr
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editörü aç/kapat  [Alt]+[LMB] diğerlerini açık tut  [Ctrl]+[LMB] dinle  [2xLMB] Piano Roll  [LMB] yukarı/aşağı sürükle sıralar  [RMB] kanal menüsü"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak hold'lu tepe ölçer (sol/sağ)  [LMB] clip ışığını temizler"
+
+# --- rollup 0.1.30 step 6: Save a copy for 0.1.28 knows rounds 190kc / 190ke / natives190kj
+"The crossfader (Live's Crossfade Assign) is not in this release: these inserts play at their full level, and its automation does nothing: {0}" = "Crossfader (Live'ın Crossfade Assign özelliği) bu sürümde yok: bu insert'ler tam seviyede çalar ve otomasyonu hiçbir şey yapmaz: {0}"
+"Live return tracks show as ordinary mixer inserts: {0}" = "Live dönüş kanalları sıradan mikser insert'leri olarak görünür: {0}"
+"The Simple Controls tab's own knob mappings: {0}" = "Simple Controls sekmesinin kendi düğme eşlemeleri: {0}"
+"Harmor parts with a sample in the IMG section play their timbres instead of the resynthesis: {0}" = "IMG bölümünde sample bulunan Harmor partları resentez yerine kendi tınılarını çalar: {0}"
+"Newtone's detected key and note velocities are left out: {0}" = "Newtone'un algıladığı ton ve nota velocity değerleri dışarıda kalır: {0}"

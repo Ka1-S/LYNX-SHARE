@@ -11352,3 +11352,10 @@ countries: br
 "Detecting pitch regions..." = "Detectando regiões de altura..."
 "Paused" = "Pausado"
 "Scrub: hold and drag right to play forward, left to play backward; the further, the faster" = "Scrub: segure e arraste para a direita para tocar para a frente, para a esquerda para tocar de trás para a frente; quanto mais longe, mais rápido"
+
+# --- rollup 0.1.30 step 6: Save a copy for 0.1.28 knows rounds 190kc / 190ke / natives190kj
+"The crossfader (Live's Crossfade Assign) is not in this release: these inserts play at their full level, and its automation does nothing: {0}" = "O crossfader (Crossfade Assign do Live) não existe nesta versão: estes inserts tocam no nível cheio e a automação dele não faz nada: {0}"
+"Live return tracks show as ordinary mixer inserts: {0}" = "As faixas de retorno do Live aparecem como inserts comuns do mixer: {0}"
+"The Simple Controls tab's own knob mappings: {0}" = "Os mapeamentos próprios dos knobs da aba Controls do Simple: {0}"
+"Harmor parts with a sample in the IMG section play their timbres instead of the resynthesis: {0}" = "As partes do Harmor com um sample na seção IMG tocam seus timbres em vez da ressíntese: {0}"
+"Newtone's detected key and note velocities are left out: {0}" = "O tom detectado e as velocidades das notas do Newtone ficam de fora: {0}"

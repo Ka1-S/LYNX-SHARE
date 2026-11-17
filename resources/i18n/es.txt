@@ -11223,3 +11223,10 @@ countries: es mx ar co cl pe ve
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] abrir/cerrar el editor  [Alt]+[LMB] mantener los demás abiertos  [Ctrl]+[LMB] preescuchar  [2xLMB] Piano Roll  [LMB] arrastrar arriba/abajo reordena  [RMB] menú del canal"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Medidor de picos (izquierda/derecha) con retención de picos  [LMB] apaga el indicador de saturación"
+
+# --- rollup 0.1.30 step 6: Save a copy for 0.1.28 knows rounds 190kc / 190ke / natives190kj
+"The crossfader (Live's Crossfade Assign) is not in this release: these inserts play at their full level, and its automation does nothing: {0}" = "El crossfader (Crossfade Assign de Live) no está en esta versión: estos inserts suenan a su nivel completo y su automatización no hace nada: {0}"
+"Live return tracks show as ordinary mixer inserts: {0}" = "Las pistas de retorno de Live se muestran como inserts normales del mezclador: {0}"
+"The Simple Controls tab's own knob mappings: {0}" = "Las asignaciones de perillas propias de la pestaña Controls de Simple: {0}"
+"Harmor parts with a sample in the IMG section play their timbres instead of the resynthesis: {0}" = "Las partes de Harmor con una muestra en la sección IMG tocan sus timbres en lugar de la resíntesis: {0}"
+"Newtone's detected key and note velocities are left out: {0}" = "Se omiten la tonalidad detectada y las velocidades de las notas de Newtone: {0}"

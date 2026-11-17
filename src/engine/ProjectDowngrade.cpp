@@ -6,9 +6,11 @@
 #include "core/EchoSuite.h"
 #include "core/FacetEq.h"
 #include "core/GeneratorPresets.h"
+#include "core/Harmor.h"
 #include "core/LuxeVerb.h"
 #include "core/LynxVerbs.h"
 #include "core/MixSuite.h"
+#include "core/NewtoneFx.h"
 #include "core/RackRenderer.h"
 #include "core/VoiceShift.h"
 
@@ -496,6 +498,85 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
                         }
         if (! stepped.isEmpty())
             lost.push_back ({ TR_NOOP ("Slide notes on FL's native generators glide instead of stepping once per tick: {0}"), listOf (stepped), true });
+    }
+
+    // rollup step 6, round 190kc: Live's crossfader (Crossfade Assign per insert, the Main's position and curve, its
+    // automation target "crossfader", which 0.1.28 reads as no target) and the return tracks' flags (a return is an
+    // insert like any other: 0.1.28 routes it the same, its sends are ordinary sends)
+    {
+        juce::StringArray assigned, returns;
+        if (auto* mixer = arrayOf (root["mixer"]))
+            for (int t = 0; t < mixer->size(); ++t)
+                if (auto* m = objectOf ((*mixer)[t]))
+                {
+                    if (drop (*m, "crossfade"))
+                        addOnce (assigned, insertName (root["mixer"], t));
+                    if (m->getProperty ("liveReturn").isBool() && (bool) m->getProperty ("liveReturn"))
+                        addOnce (returns, insertName (root["mixer"], t));
+                    drop (*m, "liveReturn");
+                    drop (*m, "returnPre");
+                    drop (*m, "returnSendsOn");
+                }
+        drop (o, "crossfader");
+        drop (o, "crossfadeCurve");
+        if (! assigned.isEmpty())
+            lost.push_back ({ TR_NOOP ("The crossfader (Live's Crossfade Assign) is not in this release: these inserts play at their full level, and its automation does nothing: {0}"),
+                             listOf (assigned), true });
+        if (! returns.isEmpty())
+            lost.push_back ({ TR_NOOP ("Live return tracks show as ordinary mixer inserts: {0}"), listOf (returns), false });
+    }
+
+    // rollup step 6, round 190ke: the Simple dock's Controls tab and its own knob mapping (0.1.28 has no Controls tab)
+    {
+        juce::StringArray mapped;
+        if (auto* mixer = arrayOf (root["mixer"]))
+            for (int t = 0; t < mixer->size(); ++t)
+                if (auto* m = objectOf ((*mixer)[t]); m != nullptr && drop (*m, "smartControls"))
+                    addOnce (mapped, insertName (root["mixer"], t));
+        if (! mapped.isEmpty())
+            lost.push_back ({ TR_NOOP ("The Simple Controls tab's own knob mappings: {0}"), listOf (mapped), false });
+    }
+
+    // rollup step 6, round natives190kj: ChannelDef::engineRev (Harmor 1 = a part with a sample in its IMG section plays
+    // FL's resynthesis; 0.1.28 plays such a part's timbres) and Newtone's state version 3 (+ the key, each note's voiced
+    // end and velocity): 0.1.28 reads up to version 2 and would load no notes at all, so the state is written as version
+    // 2 (the notes and every edit kept; the voiced end only shaped the analysed smooth times, which are saved)
+    {
+        juce::StringArray resynth, newtone;
+        forEachChannel (root, [&] (juce::DynamicObject& c, int i) {
+            const auto rev = (int) c.getProperty ("engineRev");
+            if (drop (c, "engineRev") && rev >= 1 && c.getProperty ("instrument").toString() == "harmor")
+            {
+                juce::MemoryOutputStream decoded;
+                if (juce::Base64::convertFromBase64 (decoded, c.getProperty ("pluginState").toString()))
+                {
+                    const auto* bytes = static_cast<const std::uint8_t*> (decoded.getData());
+                    if (harmorUsesResynthesis (std::vector<std::uint8_t> (bytes, bytes + decoded.getDataSize())))
+                        addOnce (resynth, channelName (juce::var (&c), i));
+                }
+            }
+        });
+        forEachEffect (root, [&] (juce::DynamicObject& e, const juce::String& where) {
+            if (e.getProperty ("kind").toString() != "newtone")
+                return;
+            juce::MemoryOutputStream decoded;
+            if (! juce::Base64::convertFromBase64 (decoded, e.getProperty ("state").toString()))
+                return;
+            const auto* bytes = static_cast<const std::uint8_t*> (decoded.getData());
+            const std::vector<std::uint8_t> state (bytes, bytes + decoded.getDataSize());
+            if (newtonefx::nativeVersionOf (state) < 3)
+                return;
+            if (const auto track = newtonefx::parseNative (state))
+            {
+                const auto older = newtonefx::writeNative (*track, 2);
+                e.setProperty ("state", juce::Base64::toBase64 (older.data(), older.size()));
+                addOnce (newtone, where);
+            }
+        });
+        if (! resynth.isEmpty())
+            lost.push_back ({ TR_NOOP ("Harmor parts with a sample in the IMG section play their timbres instead of the resynthesis: {0}"), listOf (resynth), true });
+        if (! newtone.isEmpty())
+            lost.push_back ({ TR_NOOP ("Newtone's detected key and note velocities are left out: {0}"), listOf (newtone), false });
     }
 
     // the view

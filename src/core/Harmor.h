@@ -56,6 +56,9 @@ std::optional<std::vector<std::uint8_t>> harmorUpgradeState (const std::vector<s
 
 // the round-34 fallbacks this state relies on (empty: everything it uses is modelled), for logs and reports
 std::vector<std::string> harmorFallbacks (const std::vector<std::uint8_t>& state);
+// true when a part of this state has a sample in its IMG section (resynthesis, played as FL's DLL since round
+// natives190kj with ChannelDef::engineRev 1; before, such a part played its timbres)
+bool harmorUsesResynthesis (const std::vector<std::uint8_t>& state);
 
 // Byte offset of a raw integer parameter inside the state (part 0/1: part parameter 0…385; part −1: global 0…52, then
 // 53…58 = the effects rack's unit order),

@@ -199,6 +199,16 @@ std::shared_ptr<SampleData> cropped (const SampleData& s, std::int64_t a, std::i
 
 // Newtone: the track's notes. "LXNT" + version + frames + global formant + the knobs (+ the key, version 3) + the notes.
 std::vector<std::uint8_t> writeNative (const Track& track);
+// The same in an older layout (2: without the key and the notes' voiced end / velocity, as 0.1.28 reads it; rollup
+// 0.1.30 step 6); clamped to 2…the current version.
+std::vector<std::uint8_t> writeNative (const Track& track, std::uint32_t version);
+// The layout version of a state ("LXNT"; 0: not one)
+inline std::uint32_t nativeVersionOf (const std::vector<std::uint8_t>& state)
+{
+    return state.size() >= 8 && state[0] == 'L' && state[1] == 'X' && state[2] == 'N' && state[3] == 'T'
+               ? (std::uint32_t) state[4] | ((std::uint32_t) state[5] << 8) | ((std::uint32_t) state[6] << 16) | ((std::uint32_t) state[7] << 24)
+               : 0u;
+}
 std::optional<Track> parseNative (const std::vector<std::uint8_t>& state);
 // The track a slot's state describes: LYNX's own, or the first Newtone track of FL's state (nullopt: none)
 std::optional<Track> trackOf (const std::vector<std::uint8_t>& state);
