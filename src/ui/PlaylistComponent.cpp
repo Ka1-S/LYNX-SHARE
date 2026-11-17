@@ -3362,7 +3362,9 @@ void PlaylistComponent::paintAudioClip (juce::Graphics& g, const Clip& c, juce::
         auto curve = [&body] (float x0, float x1, bool rising, bool cross, bool equalPower, bool linear, float tension) {
             juce::Path p;
             const auto bent = cross || equalPower || ! linear || tension != 0.0f;
-            const auto steps = bent ? juce::jlimit (4, 48, (int) std::abs (x1 - x0) / 3) : 1;
+            // (a segment every 6 px, at most 16: the S curve reads the same and Thief's ~1 500 clips paint as fast as
+            // before round 190jz's curves, --paintbench; a fade under 4 px is a straight line)
+            const auto steps = bent && std::abs (x1 - x0) >= 4.0f ? juce::jlimit (2, 16, (int) std::abs (x1 - x0) / 6) : 1;
             for (int k = 0; k <= steps; ++k)
             {
                 const auto t = (float) k / (float) steps;
