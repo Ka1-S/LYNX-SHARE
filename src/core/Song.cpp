@@ -888,8 +888,12 @@ std::vector<bool> Song::soloAudible() const
     if (n > 0)
         audible[0] = true;
 
-    // downstream: the signal path from the soloed tracks to Master
+    // downstream: the signal path from the soloed tracks to Master; a track with its state locked (FL's Shift+click
+    // on the mute switch, round 190kn) is not silenced by a solo elsewhere, so its path stays too
     std::vector<int> stack = soloed;
+    for (std::size_t t = 1; t < n; ++t)
+        if (mixer[t].lockState && ! mixer[t].solo)
+            stack.push_back ((int) t);
 
     while (! stack.empty())
     {

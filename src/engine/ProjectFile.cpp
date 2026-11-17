@@ -2684,6 +2684,8 @@ juce::var mixerTrackToVar (const MixerTrack& t)
     o->setProperty ("solo", t.solo);
     if (! t.soloSources)
         o->setProperty ("soloSources", false);
+    if (t.lockState)
+        o->setProperty ("lockState", true);
     if (! t.threaded)
         o->setProperty ("threaded", false);
     if (t.separator)
@@ -2808,6 +2810,7 @@ MixerTrack mixerTrackFromVar (const juce::var& t)
     track.muted = (bool) t.getProperty ("muted", false);
     track.solo = (bool) t.getProperty ("solo", false);
     track.soloSources = (bool) t.getProperty ("soloSources", true);
+    track.lockState = (bool) t.getProperty ("lockState", false);
     track.threaded = (bool) t.getProperty ("threaded", true);
     track.separator = (bool) t.getProperty ("separator", false);
     track.folded = (bool) t.getProperty ("folded", false);

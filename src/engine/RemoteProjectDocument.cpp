@@ -119,7 +119,7 @@ const DocumentFields& editableDocumentFields (DocumentShape shape)
         add (S::sampler, "precomputed", S::precomputed);
         add (S::precomputed, "removeDc normalize reversePolarity fadeStereo swapStereo pingPong fadeIn fadeOut crossfade trim "
              "boost eq ringMix ringFreq stereoDelay cutoff resonance reverb reverbType pogo clip");
-        add (S::mixer, "name volume pan muted solo soloSources threaded separator folded dock toMaster masterLevel colour stereo "
+        add (S::mixer, "name volume pan muted solo soloSources lockState threaded separator folded dock toMaster masterLevel colour stereo "
              "invertPhase swap input inputMono monitor recordSafe recordTo recordSource recordDryToo latencyMs latencyBypass "
              "compensateMaster icon output outputMode eq eqBypassed sends lostSends preSends chainBlend chainPreset "
              "liveReturn returnPre returnSendsOn crossfade smartControls"); // (smartControls: 190ke, rollup step 6)

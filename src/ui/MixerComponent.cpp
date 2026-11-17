@@ -1884,7 +1884,12 @@ void MixerStrips::paint (juce::Graphics& g)
             const auto m = muteArea (t).toFloat().withSizeKeepingCentre (led, led);
             g.setColour (muteLed (track.muted));
             g.fillEllipse (m);
-            if (! track.muted || hovered (Part::mute))
+            if (track.lockState) // round 190kn: FL's locked state (Shift+click), the rack's lock colour
+            {
+                g.setColour (colour::warning);
+                g.drawEllipse (m.expanded (2.0f), 1.0f);
+            }
+            else if (! track.muted || hovered (Part::mute))
             {
                 g.setColour (hovered (Part::mute) ? colour::textSecondary : colour::ledOn.withAlpha (0.25f));
                 g.drawEllipse (m.expanded (2.0f), 1.0f);
@@ -2197,6 +2202,14 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
     headerDragTrack = -1;
     headerDragged = false;
 
+    // FL's track label: "Can be Middle-clicked ... to rename the track or recolor it" (round 190kn)
+    if (part == Part::header && e.mods.isMiddleButtonDown())
+    {
+        selectTrack (t);
+        runMenuItem (tr ("Rename and color..."));
+        return;
+    }
+
     if (part == Part::inserts && insertsMouseDown (e, t)) // issue #154 part 2 (round 190io)
         return;
 
@@ -2338,6 +2351,28 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
         return;
     }
 
+    // FL's mute switch (manual "Mixer › Mute Switch", round 190kn): Ctrl+right-click = Unmute All, Alt+click = solo the
+    // track with every track routed to and from it, Shift+click = Lock/Unlock State
+    if (part == Part::mute && e.mods.isPopupMenu() && e.mods.isCtrlDown())
+    {
+        engine.editSong ([] (Song& s) { mixerops::unmuteAll (s); });
+        ui::postHint ({ tr ("Unmute all: every mixer track unmuted and every solo cleared (locked tracks keep their state)"), {}, false, false }, 3000);
+        return;
+    }
+    if (part == Part::mute && e.mods.isAltDown() && ! flmods::popup (e.mods) && t > 0)
+    {
+        engine.editSong ([t] (Song& s) { mixerops::soloSelected (s, { t }, true); });
+        return;
+    }
+    if (part == Part::mute && e.mods.isShiftDown() && ! flmods::popup (e.mods))
+    {
+        engine.editSong ([t] (Song& s) { mixerops::toggleLockState (s, t); });
+        const auto locked = t < (int) engine.getSong().mixer.size() && engine.getSong().mixer[(std::size_t) t].lockState;
+        ui::postHint ({ locked ? tr ("State locked: a solo elsewhere doesn't silence this track (Shift+click again to unlock)")
+                               : tr ("State unlocked"), {}, false, false }, 3000);
+        repaint (muteArea (t).expanded (3));
+        return;
+    }
     if (part == Part::mute && (flmods::popup (e.mods) || flmods::ctrl (e.mods))) // solo on the same LED
     {
         soloExclusive (t);
@@ -3068,11 +3103,23 @@ ui::Hint MixerStrips::hintAt (juce::Point<int> p)
         case Part::stereo:
         case Part::send:
             return ui::valueHint (specFor (part, t), valueOf (part, t), gesture);
-        case Part::mute: h.text = name + " - " + tr ("Click: mute.  Right-click or Ctrl+click: solo"); break;
+        case Part::mute:
+            h.text = name + " - " + tr ("Click: mute.  Right-click or Ctrl+click: solo.  Alt+click: solo with its routes.  Shift+click: lock the state.  Ctrl+right-click: unmute all");
+            if (song.mixer[(std::size_t) t].lockState)
+                h.value = tr ("State locked");
+            break;
         case Part::arm: h.text = name + " - " + mixerinput::armHint (engine, t); h.hasMenu = true; break;
         case Part::input: h.text = name + " - " + tr ("Input level of this insert's audio input  [LMB] choose the input"); h.hasMenu = true; break;
         case Part::solo: h.text = name + " - " + tr ("Solo"); break;
-        case Part::meter: h.text = name + " - " + tr ("Peak meter (left/right) with peak hold  [LMB] selects the track and clears the clip light"); break;
+        case Part::meter:
+        {
+            h.text = name + " - " + tr ("Peak meter (left/right) with peak hold  [LMB] selects the track and clears the clip light");
+            // FL: "hovering your cursor over most peak meters will show the value at the pointer position" (round 190kn)
+            const auto m = meterArea (t);
+            const auto pos = juce::jlimit (0.0f, 1.0f, (float) (m.getBottom() - p.y) / (float) juce::jmax (1, m.getHeight()));
+            h.value = juce::String (-60.0f + 66.0f * pos, 1) + " dB";
+            break;
+        }
         case Part::route: h.text = name + " - " + tr ("Route the selected inserts to this one (drag after enabling: level). Ctrl+click: this track only, Shift: sidechain, Ctrl+Shift: sidechain only, right-click: menu"); h.hasMenu = true; break;
         case Part::add: h.text = tr ("Add a mixer insert"); break;
         case Part::inserts: // issue #154 part 2 (round 190io); FL's Extra large list has no dots (round 190jd)
@@ -6536,6 +6583,9 @@ void EffectsPanel::mouseDown (const juce::MouseEvent& e)
 
         if (flmods::popup (e.mods) || (e.mods.isShiftDown() && ! ledBounds (row).contains (e.getPosition()))) // (FL: Shift+click = the menu)
             showSlotMenu (i);
+        else if (ledBounds (row).contains (e.getPosition()) && (flmods::ctrl (e.mods) || e.mods.isAltDown()))
+            // FL's slot LED: "Solo/Unsolo - (Ctrl+Left-Click), (Alt/Opt+Left-Click)" (round 190kn)
+            engine.editSong ([t = track, i] (Song& song) { mixerops::soloSlot (song, t, i); });
         else if (ledBounds (row).contains (e.getPosition())) // LED: bypass
             engine.editSong ([t = track, i] (Song& song) {
                 auto& slot = song.mixer[(std::size_t) t].effects[(std::size_t) i];
@@ -6906,6 +6956,7 @@ ui::Hint EffectsPanel::hintAt (juce::Point<int> p)
                 return h;
             }
             h.text = used ? (arrowBounds (i).contains (p) ? tr ("Effect slot options: replace, move, delete...")
+                             : ledBounds (i).contains (p) ? tr ("Effect on/off: click bypasses.  Ctrl+click or Alt+click: solo this effect (again: all on)")
                                                           : tr ("Effect slot: click shows or hides its window (and its knobs below), the LED bypasses, the wheel or a drag moves it up or down, right-click: options"))
                           : tr ("Empty slot: click to add an effect");
             h.hasMenu = used;

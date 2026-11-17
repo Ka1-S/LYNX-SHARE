@@ -202,6 +202,13 @@ void resetToDefault (Song& song, const std::vector<int>& tracks);
 // REA_rodada167l §4): the targets play with their path to Master; the alt solo also keeps the tracks that feed them.
 // Again on the same solo clears it; one kind on the other kind switches to it.
 void soloSelected (Song& song, const std::vector<int>& targets, bool alt);
+// FL's mute-switch modifiers (manual "Mixer › Mute Switch", round 190kn): Ctrl+right-click = "Unmute All" (every insert
+// unmuted and every solo cleared; a track with its state locked keeps its mute), Shift+click = "Lock/Unlock State".
+void unmuteAll (Song& song);
+void toggleLockState (Song& song, int track);
+// FL's effect-slot LED: Ctrl/Alt+click = "Solo/Unsolo" the slot (manual "Mute/Disable LED - The same as for the Mixer
+// Track mute LEDs"): only this effect of the insert stays on; again on a soloed slot turns every effect of it on.
+void soloSlot (Song& song, int track, int index);
 // "Reset selected track(s) routing": each insert sends only to the Master again, at full level.
 void resetRouting (Song& song, const std::vector<int>& tracks);
 // "Unroute tracks routed to the selected track(s)": the sends into them are removed (an insert left with no
