@@ -251,7 +251,9 @@ TEST (als175a_imports_a_set)
     CHECK (s.mixer[3].muted && ! s.mixer[2].muted);
     // Keys → Reverb at 0 dB; Vocal → Band (group) only, not to the Master
     CHECK (s.mixer[2].sends.size() == 1 && s.mixer[2].sends[0].target == 4 && std::abs (s.mixer[2].sends[0].level - 1.0f) < 1e-6);
-    CHECK (! s.mixer[3].toMaster && s.mixer[3].sends.size() == 1 && s.mixer[3].sends[0].target == 1);
+    // (round 190kc: its send to the return at -inf is kept as a send at 0, after the route into the group)
+    CHECK (! s.mixer[3].toMaster && s.mixer[3].sends.size() == 2 && s.mixer[3].sends[0].target == 1 && s.mixer[3].sends[1].target == 4
+           && s.mixer[3].sends[1].level == 0.0f);
     // the VST2 insert (with its chunk) and the native EQ in the report
     CHECK (s.mixer[3].effects.size() == 1 && s.mixer[3].effects[0].plugin.foreign.format == ForeignPlugin::Format::vst2);
     if (s.mixer[3].effects.size() == 1)

@@ -48,6 +48,7 @@ inline std::string valueText (const Song& song, const AutomationTarget& t, float
             break;
         }
         case AutomationTargetKind::tempo: std::snprintf (text, sizeof (text), "%.2f BPM", tempoFromValue (v)); break;
+        case AutomationTargetKind::crossfader: std::snprintf (text, sizeof (text), "%.2f", (double) (v * 2.0f - 1.0f)); break; // (round 190kc)
         case AutomationTargetKind::channelAdjust: // Levels adjustment (round 190dz): the pan as FL writes it, the rest in %
         {
             if (t.param == leveladjust::pan)

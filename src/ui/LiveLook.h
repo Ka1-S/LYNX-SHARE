@@ -103,6 +103,22 @@ inline void drawMixerKnobDirect (juce::Graphics& g, juce::Rectangle<float> box, 
     g.drawLine ({ centre, tip }, 3.0f);
 }
 
+// Round 190kc: a switched-off send knob of a return track (live-session.png x 1397..1424 y 581..608: Live draws its ring
+// and needle #2A2A2A on the strip's #363636 instead of #111111 / #181818)
+inline void drawMixerKnobOffDirect (juce::Graphics& g, juce::Rectangle<float> box, float value01, float)
+{
+    const auto centre = box.getCentre();
+    const auto radius = box.getWidth() * 0.5f - 1.5f;
+    constexpr auto from = -juce::MathConstants<float>::pi * 0.75f, to = juce::MathConstants<float>::pi * 0.75f;
+    const juce::Colour off { 0xff2a2a2a };
+    juce::Path ring;
+    ring.addCentredArc (centre.x, centre.y, radius, radius, 0.0f, from, to, true);
+    g.setColour (off);
+    g.strokePath (ring, juce::PathStrokeType (3.0f, juce::PathStrokeType::curved, juce::PathStrokeType::butt));
+    const auto angle = from + juce::jlimit (0.0f, 1.0f, value01) * (to - from);
+    g.drawLine ({ centre, centre.getPointOnCircumference (radius + 1.0f, angle) }, 3.0f);
+}
+
 // A small ▼ (`width` px across its top, odd) as rows of whole pixels from `top`: no path to build (Direct2D) and crisp.
 inline void fillDownMark (juce::Graphics& g, float centreX, float top, int width, juce::Colour colour)
 {

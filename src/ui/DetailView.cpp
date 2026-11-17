@@ -15,6 +15,7 @@
 #include "core/DetailChain.h"
 #include "core/RackOps.h"
 #include "core/Groove.h"
+#include "core/GrooveAudio.h"
 #include "core/Effects.h"
 #include "core/FlEffects.h"
 #include "core/HotSwap.h"
@@ -1848,6 +1849,30 @@ private:
 // (core/ProjectKey.h; round 190o), Groove has no LYNX model (listed as missing in REA_rodada183a.md).
 // The clip's colour and activator in one square, as the reference's clip title bar [LIVE 12.4 Clip View] (round 190s,
 // GAPMAP-0126 D15): filled = the clip plays, hollow = deactivated. Click switches it; right-click picks the colour.
+// Round 190kc: the Clip box's Commit button. Live 12.4 draws it as a 13 px round well with an arrow beside the Groove
+// label (shots/ref/live-clipview-midi-groove.png x 156..168 y 797..809; dim while the clip has no groove); the classic
+// look keeps a text button.
+class GrooveCommitButton final : public juce::TextButton
+{
+public:
+    void paintButton (juce::Graphics& g, bool over, bool down) override
+    {
+        if (! theme::livelook::active())
+        {
+            juce::TextButton::paintButton (g, over, down);
+            return;
+        }
+        namespace lv = theme::livelook;
+        const auto r = getLocalBounds().toFloat().withSizeKeepingCentre (13.0f, 13.0f);
+        const auto ink = lv::drawWell (g, r, down, true);
+        g.setColour (isEnabled() ? ink : ink.withAlpha (0.35f));
+        const auto cx = std::round (r.getCentreX()), cy = std::round (r.getCentreY());
+        g.fillRect (cx - 3.0f, cy, 6.0f, 1.0f); // (→: the shaft and the head)
+        g.fillRect (cx + 1.0f, cy - 2.0f, 1.0f, 5.0f);
+        g.fillRect (cx + 2.0f, cy - 1.0f, 1.0f, 3.0f);
+    }
+};
+
 class ClipChip final : public juce::Component, public juce::SettableTooltipClient
 {
 public:
@@ -2054,6 +2079,13 @@ public:
             engine.editSong ([t = track, sc = scene, id] (Song& s) { groove::setClipGroove (s, t, sc, id); });
         };
         addAndMakeVisible (groove);
+        // round 190kc: Live's Commit (manual 14.1.2): the groove written into the clip — MIDI notes moved, an audio clip's
+        // warp markers at its attacks — and the chooser back to None
+        commitGroove.setButtonText (tr ("Commit"));
+        commitGroove.setConnectedEdges (0);
+        commitGroove.setTooltip (tr ("Commit: writes the groove into the clip (MIDI: the notes move; audio: warp markers at its attacks) and sets the groove to None"));
+        commitGroove.onClick = [this] { commitClipGroove(); };
+        addAndMakeVisible (commitGroove);
         signature.setFont (font (type::small));
         signature.setColour (juce::Label::textColourId, colour::textPrimary);
         signature.setTooltip (tr ("The project's time signature (clips have no signature of their own in LYNX SHARE)"));
@@ -2342,6 +2374,7 @@ public:
         auto c2 = r.removeFromLeft (clipPanel2);
         r.removeFromLeft (gap);
         halves (take (c2, 14), signatureLabel, grooveLabel);
+        commitGroove.setBounds (grooveLabel.getBounds().removeFromRight (46).withTrimmedTop (1)); // (round 190kc)
         halves (take (c2, 20), signature, groove);
         scaleLabel.setBounds (take (c2, 14));
         {
@@ -2466,7 +2499,7 @@ private:
         return { &start, &end, &position, &length, &followTime, &setStart, &setEnd, &setPosition, &setLength, &followOn, &linked, &invert, &reverse,
                  &makeLegato, &humanize, &duplicate, &quantize, &randomize, &timesTwo, &divideTwo, &fitScale, &addInterval, &scaleMode, &groove, &mode,
                  &quant, &followA, &followB, &scaleRoot, &scaleName, &loop, &legato, &nameLabel, &startLabel, &endLabel, &lengthLabel,
-                 &positionLabel, &grooveLabel, &signatureLabel, &modeLabel, &quantLabel, &scaleLabel, &signature };
+                 &positionLabel, &grooveLabel, &signatureLabel, &modeLabel, &quantLabel, &scaleLabel, &signature, &commitGroove };
     }
     // the look follows the layout's switch (checked on every layout and load; nothing changes while it stays the same)
     void applyLook()
@@ -2569,7 +2602,8 @@ private:
             put (length, { x0 + half + 4, y, half, row });
             y += row + 5;
             put (signatureLabel, { x0, y, half, row });
-            put (grooveLabel, { x0 + half + 4, y, half, row });
+            put (grooveLabel, { x0 + half + 4, y, half - 16, row });
+            put (commitGroove, { x0 + 2 * half + 4 - 14, y, 14, row }); // (round 190kc: Live's round well)
             y += row + 1;
             put (signature, { x0, y, half, row });
             put (groove, { x0 + half + 4, y, half, row });
@@ -2583,7 +2617,7 @@ private:
         }
         else
             hide ({ &startLabel, &setStart, &endLabel, &setEnd, &start, &end, &loop, &positionLabel, &setPosition, &lengthLabel, &setLength, &position,
-                    &length, &signatureLabel, &grooveLabel, &signature, &groove, &scaleLabel, &scaleMode, &scaleRoot, &scaleName });
+                    &length, &signatureLabel, &grooveLabel, &signature, &groove, &scaleLabel, &scaleMode, &scaleRoot, &scaleName, &commitGroove });
         // Launch (+ Follow Action)
         headerY[1] = y;
         y += liveclip::headerHeight + 1;
@@ -2685,6 +2719,20 @@ private:
                 b->setEnabled (on && loop.getToggleState());
     }
     // 0 Start, 1 End, 2 Position, 3 Length (Length's Set ends the loop there: LYNX's loop ends where the clip does)
+    // round 190kc: Commit (the Clip box's button)
+    void commitClipGroove()
+    {
+        const auto& song = engine.getSong();
+        const auto* c = song.clipGrid ? launcher::clipAt (*song.clipGrid, track, scene) : nullptr;
+        if (c == nullptr)
+            return;
+        if (c->kind == ClipKind::pattern)
+            engine.editSong ([t = track, sc = scene] (Song& s) { groove::commit (s, t, sc); });
+        else if (c->kind == ClipKind::audio && c->channel >= 0 && c->channel < (int) song.channels.size())
+            if (const auto sample = engine.getSampleLibrary().load (juce::String::fromUTF8 (song.channels[(std::size_t) c->channel].samplePath.c_str())))
+                engine.editSong ([t = track, sc = scene, sample] (Song& s) { grooveaudio::commit (s, t, sc, *sample); });
+    }
+
     void setHere (int which)
     {
         float progress = 0.0f;
@@ -2776,9 +2824,11 @@ private:
                     if (pool[(std::size_t) i].id == slot->groove)
                         selected = i + 2;
             groove.setSelectedId (selected, n);
-            groove.setEnabled (c->kind == ClipKind::pattern);
+            // (round 190kc: audio clips take a groove too, for Commit: LYNX plays grooves live on MIDI clips only)
+            groove.setEnabled (c->kind == ClipKind::pattern || c->kind == ClipKind::audio);
             groove.setTooltip (c->kind == ClipKind::pattern ? tr ("The groove this clip plays through (the Groove Pool)")
-                                                            : tr ("Grooves play on MIDI clips only in LYNX SHARE"));
+                                                            : tr ("The groove for this audio clip: Commit writes it as warp markers (LYNX SHARE plays grooves live on MIDI clips only)"));
+            commitGroove.setEnabled (slot != nullptr && slot->groove != 0 && (c->kind == ClipKind::pattern || c->kind == ClipKind::audio));
         }
         if (slot != nullptr)
         {
@@ -3071,6 +3121,7 @@ private:
     juce::TextButton setStart, setEnd, setPosition, setLength; // round 190dr
     juce::Label positionLabel, grooveLabel;
     juce::ComboBox groove;
+    GrooveCommitButton commitGroove; // round 190kc: Live's Commit button beside the Groove label
     bool loading = false;
     std::unique_ptr<ui::TimerWhileShowing> showingTimer;
     juce::ToggleButton loop, legato;

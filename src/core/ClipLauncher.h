@@ -104,7 +104,9 @@ struct Command
     // `at` > 0 on record: a fixed length in ticks, the recording ends by itself. `at` >= 0 on launch: the clip's
     // position 0 is at that point of the clock (the end of its recording), whenever the command arrives; the launch
     // waits for the clip to exist, since the song that holds it is published separately.
-    enum class Type : std::uint8_t { launch, release, launchScene, stopTrack, stopAll, backToArrangement, reset, record, recordEnd };
+    // (round 190kc: cancelLaunch = Live's "Cancel Launch" of the Relative Session Mapping Strip: the launches still
+    // waiting for their grid point are dropped, what plays goes on)
+    enum class Type : std::uint8_t { launch, release, launchScene, stopTrack, stopAll, backToArrangement, reset, record, recordEnd, cancelLaunch };
     Type type = Type::launch;
     int track = 0;
     int scene = 0;

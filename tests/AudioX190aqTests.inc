@@ -189,7 +189,8 @@ TEST (audiox190aq_pre_fader_send_in_flp_and_als)
         int pre = 0, post = 0;
         for (const auto& m : back->mixer)
             for (const auto& send : m.sends)
-                (send.pre ? pre : post)++;
+                if (send.level > 0.0f) // (round 190kc: the -inf sends of the other tracks come back as sends at 0)
+                    (send.pre ? pre : post)++;
         CHECK (pre == 2); // Live's "Pre" comes back as LYNX's pre-fader sends
     }
     // a return fed both ways stays "Post" in Live, with a note

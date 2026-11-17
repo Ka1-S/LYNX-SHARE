@@ -624,6 +624,15 @@ void Player::apply (const Song& song, const ClipGrid& grid, const GridIndex& ind
             for (int i = 0; i < numActive; ++i)
                 stopTrack (song, grid, active[(std::size_t) i], now);
             return;
+        case Command::Type::cancelLaunch: // (round 190kc)
+            for (int i = 0; i < numActive; ++i)
+                if (auto& t = active[(std::size_t) i]; t.next.slot >= 0 && t.next.from > now)
+                {
+                    t.next = Play {};
+                    t.heldSlot = -1;
+                    t.repeatEvery = 0.0;
+                }
+            return;
         case Command::Type::backToArrangement:
             // at once: the grid's clips end here and the Playlist resumes in this block
             for (int i = 0; i < numActive; ++i)

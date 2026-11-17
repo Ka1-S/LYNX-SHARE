@@ -62,6 +62,7 @@ struct LiveLevels
     std::vector<std::atomic<float>> mixerVolume, mixerPan, mixerStereo;
     std::vector<std::atomic<float>> channelVolume, channelPan;
     std::vector<std::atomic<float>> vcaLevel; // VCA faders (round 177a)
+    std::atomic<float> crossfader { 0.0f };   // round 190kc: Live's crossfader position (-1..1)
 };
 
 // Immutable snapshot published by the UI. Instruments are shared between
@@ -158,6 +159,7 @@ struct RackState
     launcher::GridIndex gridIndex;
     bool launchers = false;
     int tempoAutomation = -1; // tempo automation, if any
+    int crossfaderAutomation = -1; // round 190kc: Live's crossfader automation, if any
     bool tempoMap = false;    // the tempo moves while playing (tempo automation or pattern Tempo events, core/TempoMap.h)
 
     // PDC: per-edge delays (nullptr = no delay) and the latencies used to build the plan.

@@ -862,6 +862,7 @@ private:
     std::unique_ptr<mapmode::Overlay> mapOverlay;
     std::unique_ptr<mapmode::MappingBrowser> mappingBrowser;
     std::vector<int> heldMappedKeys;
+    std::vector<RemoteAction> heldCrossfaderSpots; // round 190kc: the crossfader positions whose mapped key / note is down
     bool mapKeyPressed (const juce::KeyPress& key);
     void layoutMapMode();
     void syncClipLaunchSwitches();

@@ -1335,6 +1335,7 @@ float Song::targetValue (const AutomationTarget& t) const noexcept
                        ? mixer[(std::size_t) t.index].effects[(std::size_t) t.slot].mix
                        : -1.0f;
         case AutomationTargetKind::tempo: return valueFromTempo (bpm);
+        case AutomationTargetKind::crossfader: return std::clamp ((crossfader + 1.0f) * 0.5f, 0.0f, 1.0f); // (round 190kc)
         case AutomationTargetKind::vcaLevel:
             return t.index >= 0 && t.index < (int) vcas.size() ? vcas[(std::size_t) t.index].level : -1.0f;
         case AutomationTargetKind::none: break;
@@ -1372,6 +1373,7 @@ bool Song::setTargetValue (const AutomationTarget& t, float v) noexcept
         case AutomationTargetKind::mixerVolume: if (! validTrack) return false; mixer[(std::size_t) t.index].volume = v; return true;
         case AutomationTargetKind::mixerPan: if (! validTrack) return false; mixer[(std::size_t) t.index].pan = v * 2.0f - 1.0f; return true;
         case AutomationTargetKind::tempo: bpm = tempoFromValue (v); return true;
+        case AutomationTargetKind::crossfader: crossfader = v * 2.0f - 1.0f; return true; // (round 190kc)
         case AutomationTargetKind::vcaLevel:
             if (t.index < 0 || t.index >= (int) vcas.size())
                 return false;

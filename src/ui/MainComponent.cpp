@@ -13,6 +13,7 @@
 #include "ui/ThemeSettings.h"
 #include "ui/ColourPicker.h"
 #include "core/AutoScanPolicy.h"
+#include "core/Crossfader.h"
 #include "core/RenderAhead.h"
 #include "core/DrawMode.h"
 #include "core/SessionKeys.h"
@@ -2480,6 +2481,8 @@ void MainComponent::setMapMode (remotemap::Mode mode)
     mapOverlay->setVisible (mode != remotemap::Mode::off);
     mappingBrowser->setMode (mode);
     mappingBrowser->setVisible (mode != remotemap::Mode::off);
+    if (clipGridView != nullptr) // (round 190kc: Live's Relative Session Mapping Strip under the grid)
+        setClipGridMapStrip (*clipGridView, mode != remotemap::Mode::off);
     layoutMapMode();
     syncClipLaunchSwitches();
     if (mode != was)
@@ -2602,6 +2605,44 @@ void MainComponent::fireRemote (const remotemap::Fire& f)
         case RemoteAction::metronome:
             if (press)
                 runAction ("transport.metronome");
+            break;
+        // round 190kc: the crossfader's positions (measured in Live 12.4: a press goes there; holding one position and
+        // pressing / releasing another snaps back to the held one, Live manual 18.5)
+        case RemoteAction::crossfaderLeft:
+        case RemoteAction::crossfaderCentre:
+        case RemoteAction::crossfaderRight:
+        {
+            const auto spot = t.action == RemoteAction::crossfaderLeft ? crossfader::Spot::left
+                            : t.action == RemoteAction::crossfaderRight ? crossfader::Spot::right : crossfader::Spot::centre;
+            float to = engine.getSong().crossfader;
+            if (press)
+            {
+                to = crossfader::spotPosition (spot);
+                heldCrossfaderSpots.push_back (t.action);
+            }
+            else
+            {
+                heldCrossfaderSpots.erase (std::remove (heldCrossfaderSpots.begin(), heldCrossfaderSpots.end(), t.action), heldCrossfaderSpots.end());
+                if (heldCrossfaderSpots.empty())
+                    break;
+                const auto back = heldCrossfaderSpots.back(); // (snaps back to the position still held)
+                to = crossfader::spotPosition (back == RemoteAction::crossfaderLeft ? crossfader::Spot::left
+                                               : back == RemoteAction::crossfaderRight ? crossfader::Spot::right : crossfader::Spot::centre);
+            }
+            engine.editLevels ([to] (Song& s) { s.crossfader = to; }, false);
+            break;
+        }
+        // round 190kc: Live's Relative Session Mapping Strip
+        case RemoteAction::sceneUp:
+        case RemoteAction::sceneDown:
+        case RemoteAction::launchSelectedScene:
+        case RemoteAction::launchSelectedClip:
+            if (clipGridView != nullptr)
+                clipGridRelativeSession (*clipGridView, t.action, t.track, press);
+            break;
+        case RemoteAction::cancelLaunch:
+            if (press)
+                engine.launcherCommand ({ launcher::Command::Type::cancelLaunch });
             break;
     }
 }

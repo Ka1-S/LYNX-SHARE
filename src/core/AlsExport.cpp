@@ -430,6 +430,7 @@ struct Exporter
     bool live11 = false;
     std::set<std::string> noted;
     int sceneCount = 1; // the set's scenes: the clip grid's rows (round 181c), else one
+    std::vector<int> exportReturns; // round 190kc: the inserts written as return tracks, in order
 
     void note (const std::string& what)
     {
@@ -999,6 +1000,9 @@ struct Exporter
             mixer->value ("Pan/Manual", num ((double) std::clamp (t.pan, -1.0f, 1.0f)));
             mixer->value ("Speaker/Manual", boolean (! t.muted));
             mixer->value ("SoloSink", boolean (t.solo));
+            // round 190kc: Live's Crossfade Assign (0 A, 1 none, 2 B)
+            if (t.insert > 0 && t.insert < (int) song.mixer.size() && t.ownsInsert)
+                mixer->value ("CrossFadeState/Manual", num ((int) song.mixer[(std::size_t) t.insert].crossfade));
             if (auto* sends = mixer->child ("Sends"))
             {
                 sends->kids.clear();
@@ -1008,9 +1012,13 @@ struct Exporter
                     h.set ("Id", num (r));
                     h.value ("Send/Manual", num (minGain));
                     // a return track's sends to the returns are off, as Live saves them [LIVE: its default set and
-                    // demo sets; round 182b]
+                    // demo sets; round 182b], unless switched on (round 190kc: MixerTrack::returnSendsOn)
                     if (t.kind == LiveTrack::Kind::ret)
-                        h.value ("EnabledByUser", "false");
+                    {
+                        const auto& on = song.mixer[(std::size_t) t.insert].returnSendsOn;
+                        const auto target = r < (int) exportReturns.size() ? exportReturns[(std::size_t) r] : -1;
+                        h.value ("EnabledByUser", std::find (on.begin(), on.end(), target) != on.end() ? "true" : "false");
+                    }
                     sends->add (std::move (h));
                 }
             }
@@ -1851,8 +1859,13 @@ struct Exporter
             if (m <= 0 || m >= (int) song.mixer.size())
                 return -1;
             const auto& mx = song.mixer[(std::size_t) m];
-            if (mx.toMaster || mx.sends.size() != 1)
+            if (mx.toMaster || mx.sends.empty())
                 return -1;
+            // (round 190kc: besides its route, sends to Live return tracks or at -inf, as an imported set's tracks have)
+            for (std::size_t k = 1; k < mx.sends.size(); ++k)
+                if (const auto to = mx.sends[k].target;
+                    mx.sends[k].level > 0.0f && ! (to > 0 && to < (int) song.mixer.size() && song.mixer[(std::size_t) to].liveReturn))
+                    return -1;
             const auto target = mx.sends.front().target;
             return target > 0 && target < (int) song.mixer.size() && target != m && perInsert.count (target) == 0 ? target : -1;
         };
@@ -1863,6 +1876,9 @@ struct Exporter
             for (const auto& s : song.mixer[m].sends)
                 if (s.target != busOf ((int) m))
                     sendTargets.insert (s.target);
+        for (std::size_t m = 1; m < song.mixer.size(); ++m) // (round 190kc: Live's return tracks, sent to or not)
+            if (song.mixer[m].liveReturn)
+                sendTargets.insert ((int) m);
         std::set<int> buses;
         for (std::size_t m = 1; m < song.mixer.size(); ++m)
             if (const auto b = busOf ((int) m); b > 0)
@@ -1971,6 +1987,7 @@ struct Exporter
 
         // nodes
         const auto returns = (int) returnInsert.size();
+        exportReturns = returnInsert;
         std::vector<int> trackIds (ordered.size());
         for (std::size_t i = 0; i < ordered.size(); ++i)
             trackIds[i] = 8 + (int) i;
@@ -2099,6 +2116,9 @@ struct Exporter
         if (main != nullptr)
         {
             main->value ("DeviceChain/Mixer/Tempo/Manual", num (song.bpm));
+            // round 190kc: Live's crossfader position and curve
+            main->value ("DeviceChain/Mixer/CrossFade/Manual", num ((double) std::clamp (song.crossfader, -1.0f, 1.0f)));
+            set.value ("CrossfadeCurve", num (std::clamp (song.crossfadeCurve, 0, 6)));
             // the signature at the song start: a signature marker there, else the project's n/4 (round 190cg)
             int startNum = song.beatsPerBar, startDen = meterUnit (song.beatUnit); // (round 190fg: the song meter's own denominator)
             for (const auto& m : song.markers())
@@ -2147,6 +2167,8 @@ struct Exporter
                     for (const auto& s : song.mixer[m].sends)
                         if (s.target == target && returnOf.count (s.target) != 0 && s.target != busOf ((int) m))
                             (s.pre ? preSends : postSends)++;
+                if (song.mixer[(std::size_t) target].liveReturn) // (round 190kc: a return's own Pre / Post toggle)
+                    preSends = song.mixer[(std::size_t) target].returnPre ? 1 : 0, postSends = preSends == 0 ? 1 : 0;
                 if (preSends > 0 && postSends > 0)
                     note ("Pre-fader sends: Live switches Pre / Post per return track, so the sends to " + song.mixer[(std::size_t) target].name
                           + " are all exported post-fader");
@@ -2183,6 +2205,15 @@ struct Exporter
         // the set-wide quantisation has no Global entry: Live's number is the clip number − 1 [LIVE: 9 = 1/8]
         if (session && grid->globalQuant != LaunchQuant::global)
             set.value ("GlobalQuantisation", num ((int) grid->globalQuant - 1));
+        // round 190kc: the Session mixer's sections (LiveSet/ViewStates)
+        if (session)
+        {
+            const auto& v = grid->mixerView;
+            for (const auto& [name, on] : { std::pair<const char*, bool> { "MixerInSession", v.shown }, { "SessionIO", v.io }, { "SessionSends", v.sends },
+                                            { "SessionReturns", v.returns }, { "SessionVolume", v.volume }, { "SessionTrackOptions", v.trackOptions },
+                                            { "SessionCrossFade", v.crossfader } })
+                set.value (std::string ("ViewStates/") + name, on ? "1" : "0");
+        }
         if (auto* locs = set.at ("Locators/Locators"))
         {
             locs->kids.clear();
@@ -2274,6 +2305,11 @@ struct Exporter
                         map = [] (float v) { return std::clamp ((double) faderGain (v), minGain, 1.0); };
                         gain = true;
                     }
+                    break;
+                case AutomationTargetKind::crossfader: // (round 190kc: Main's CrossFade, -1..1)
+                    owner = main;
+                    path = "DeviceChain/Mixer/CrossFade/AutomationTarget";
+                    map = [] (float v) { return (double) v * 2.0 - 1.0; };
                     break;
                 default: break;
             }
