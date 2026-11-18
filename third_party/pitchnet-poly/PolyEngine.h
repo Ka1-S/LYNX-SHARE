@@ -116,6 +116,11 @@ struct Params
     // Opt-in research detector; without evidence it uses the original DSP-only path.
     DetectionMode detectionMode = DetectionMode::Harmonic;
 
+    // LYNX modification (round 190lk): analyze() leaves the masks out (Analysis::masks stays empty per note); the
+    // blocks an edit needs are built later by ensureMasks(). Memory then follows the edited spans, not the length
+    // of the recording (the masks were ~0.6 MB per second of dense chords).
+    bool deferMasks = false;
+
     /** Framing that keeps ~93 ms windows and 8x overlap at any sample rate. */
     static Params forSampleRate(double rate)
     {
@@ -182,6 +187,9 @@ struct Analysis
     std::vector<Note> notes;           // active notes followed by inactive candidates
     std::vector<NoteMasks> masks;      // one entry per note in `notes` (inactive: empty)
     std::vector<CandidateFeatures> candidateFeatures; // only with Params::exportFeatures
+    // LYNX modification (round 190lk): which NMF blocks' masks are built (Params::deferMasks / ensureMasks); empty
+    // after a full analyze() (all built)
+    std::vector<unsigned char> maskBlocksBuilt;
 
     double frameToSeconds(double frame) const { return frame * params.hop / params.sampleRate; }
 };
@@ -320,5 +328,28 @@ AudioSpan renderNotes(const Analysis& analysis,
 
 /** One note's separated signal (no edits), for auditioning/solo. */
 std::vector<float> extractNote(const Analysis& analysis, const std::vector<float>& channel, int noteIndex);
+
+// ---- LYNX modification (round 190lk): masks on demand (PolyLazy.cpp) ----
+
+/**
+ * The frames whose masks render() / renderNotes() read for these edits: each edited note's span with its
+ * pre/post frames and its claim tail (NoteEdit::takeBackground), widened to the whole span of every active note
+ * that overlaps it, as sorted, disjoint inclusive ranges (empty when there is no edit).
+ */
+std::vector<std::pair<int, int>> framesForEdits(const Analysis& analysis, const std::map<int, NoteEdit>& edits);
+
+/**
+ * Builds the masks of every NMF block that overlaps frames [frameLo, frameHi] and is not built yet (from `mono`,
+ * the signal the analysis was made from). The masks of a block are exactly those analyze() builds without
+ * Params::deferMasks. False when cancelled (the masks then stay as they were).
+ */
+bool ensureMasks(Analysis& analysis, const float* mono, int numSamples, int frameLo, int frameHi,
+                 const std::atomic<bool>* cancel = nullptr);
+
+/** Frees every mask (they are built again on demand). */
+void releaseMasks(Analysis& analysis);
+
+/** Bytes the masks take now. */
+size_t maskBytes(const Analysis& analysis);
 
 } // namespace polyphonic

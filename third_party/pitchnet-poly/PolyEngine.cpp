@@ -90,7 +90,14 @@ Analysis analyze(const float* mono, int numSamples, const Params& params, const 
     }
     if (cancelled()) return out;
 
-    buildMasks(ctx, active, out);
+    if (params.deferMasks)
+    {
+        // LYNX modification (round 190lk): no masks now; ensureMasks() builds the blocks an edit needs
+        out.masks.assign(out.notes.size(), {});
+        out.maskBlocksBuilt.assign(maskBlocks(params, out.numFrames).size(), 0);
+    }
+    else
+        buildMasks(ctx, active, out);
     report(1.0f);
     return out;
 }

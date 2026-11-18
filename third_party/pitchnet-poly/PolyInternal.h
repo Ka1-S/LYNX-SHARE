@@ -110,7 +110,7 @@ struct Context
 std::vector<float> hannPeriodic(int n);
 void medianRow(const float* in, int K, int width, float* out, std::vector<float>& scratch);
 /** One streaming pass: spectral peaks with instantaneous frequency, tonality and whitening. */
-void analyzeSpectra(Context& ctx, const std::atomic<bool>* cancel);
+void analyzeSpectra(Context& ctx, const std::atomic<bool>* cancel, int frameLo = 0, int frameHi = -1); // (LYNX: frame range)
 
 // ---- PolyExtraction.cpp ----
 int numCentsBins(const Params& p);
@@ -141,6 +141,11 @@ void scoreCandidates(const Context& ctx, std::vector<Candidate>& cands, const No
 
 // ---- PolySoundModel.cpp ----
 void buildMasks(const Context& ctx, const std::vector<Candidate>& notes, Analysis& out);
+// LYNX modification (round 190lk): the masks in blocks, on demand. The block grid of buildMasks: block b covers core
+// frames [first, last) and is solved over [lo, hi) (its margins).
+struct MaskBlock { int coreLo, coreHi, lo, hi; };
+std::vector<MaskBlock> maskBlocks(const Params& p, int numFrames);
+void buildMaskBlock(const Context& ctx, const std::vector<Candidate>& notes, const MaskBlock& block, Analysis& out);
 
 } // namespace detail
 } // namespace polyphonic

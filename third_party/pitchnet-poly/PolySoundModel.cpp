@@ -262,11 +262,12 @@ void nmfBlock(const Context& ctx, const std::vector<Candidate>& notes, const std
 // Notes only interact where they overlap in time, so the NMF is solved in blocks of a few seconds
 // (with margins) to bound memory on long recordings. A recording shorter than one block is
 // solved in one piece.
-void buildMasks(const Context& ctx, const std::vector<Candidate>& notes, Analysis& out)
+// LYNX modification (round 190lk): the block grid and one block's solve are separate functions (maskBlocks,
+// buildMaskBlock), so that LYNX can build the masks of the blocks an edit reaches on demand (ensureMasks) instead
+// of keeping every note's masks for the whole recording. buildMasks solves the same blocks in the same way.
+std::vector<MaskBlock> maskBlocks(const Params& p, int T)
 {
-    const Params& p = ctx.p;
-    const int T = ctx.numFrames;
-    out.masks.assign(out.notes.size(), {});
+    std::vector<MaskBlock> blocks;
     const int core = std::max(16, static_cast<int>(std::lround(4.0 * p.sampleRate / p.hop)));
     const int margin = static_cast<int>(std::lround(0.5 * p.sampleRate / p.hop));
     for (int blockStart = 0; blockStart < T; blockStart += core)
@@ -274,19 +275,32 @@ void buildMasks(const Context& ctx, const std::vector<Candidate>& notes, Analysi
         int coreEnd = std::min(T, blockStart + core);
         if (T - coreEnd < margin)                     // fold a short tail into this block
             coreEnd = T;
-        const int lo = std::max(0, blockStart - margin), hi = std::min(T, coreEnd + margin);
-        std::vector<int> idx;
-        for (int ni = 0; ni < static_cast<int>(notes.size()); ++ni)
-        {
-            const auto& n = notes[static_cast<size_t>(ni)];
-            if (n.end + p.postFrames >= lo && n.start - p.preFrames < hi)
-                idx.push_back(ni);
-        }
-        if (!idx.empty())
-            nmfBlock(ctx, notes, idx, lo, hi, blockStart, coreEnd, out);
+        blocks.push_back({blockStart, coreEnd, std::max(0, blockStart - margin), std::min(T, coreEnd + margin)});
         if (coreEnd == T)
             break;
     }
+    return blocks;
+}
+
+void buildMaskBlock(const Context& ctx, const std::vector<Candidate>& notes, const MaskBlock& block, Analysis& out)
+{
+    const Params& p = ctx.p;
+    std::vector<int> idx;
+    for (int ni = 0; ni < static_cast<int>(notes.size()); ++ni)
+    {
+        const auto& n = notes[static_cast<size_t>(ni)];
+        if (n.end + p.postFrames >= block.lo && n.start - p.preFrames < block.hi)
+            idx.push_back(ni);
+    }
+    if (!idx.empty())
+        nmfBlock(ctx, notes, idx, block.lo, block.hi, block.coreLo, block.coreHi, out);
+}
+
+void buildMasks(const Context& ctx, const std::vector<Candidate>& notes, Analysis& out)
+{
+    out.masks.assign(out.notes.size(), {});
+    for (const auto& block : maskBlocks(ctx.p, ctx.numFrames))
+        buildMaskBlock(ctx, notes, block, out);
 }
 
 } // namespace detail

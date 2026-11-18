@@ -135,7 +135,7 @@ std::vector<Band> whiteningBands(const std::vector<double>& cb, const Params& p,
 
 } // namespace
 
-void analyzeSpectra(Context& ctx, const std::atomic<bool>* cancel)
+void analyzeSpectra(Context& ctx, const std::atomic<bool>* cancel, int frameLo, int frameHi)
 {
     const Params& p = ctx.p;
     StftFrames frames(ctx.audio, ctx.numSamples, p);
@@ -159,14 +159,31 @@ void analyzeSpectra(Context& ctx, const std::atomic<bool>* cancel)
     const float overNoise = std::pow(10.0f, p.peakOverNoiseDb / 20.0f);
     const float ifScale = static_cast<float>(p.fftSize / (2.0 * kPi * p.hop));
 
-    frames.spectrum(0, cur.data());
-    if (T > 1)
-        frames.spectrum(1, nxt.data());
-    for (int t = 0; t < T; ++t)
+    // LYNX modification (round 190lk): peaks for frames [frameLo, frameHi) only (the others stay empty), so the
+    // masks of a few NMF blocks can be built on demand without a pass over the whole recording. Each frame's peaks
+    // depend only on that frame and its neighbours, so they are the same as in a whole pass.
+    const int tLo = std::clamp(frameLo, 0, T);
+    const int tHi = frameHi < 0 ? T : std::clamp(frameHi, tLo, T);
+    for (int t = 0; t <= tLo && t <= T; ++t)
+        pk.frameStart[static_cast<size_t>(t)] = 0;
+    if (tLo > 0 && tLo < T)
+    {
+        frames.spectrum(tLo - 1, prev.data());
+        frames.spectrum(tLo, cur.data());
+        if (tLo + 1 < T)
+            frames.spectrum(tLo + 1, nxt.data());
+    }
+    else
+    {
+        frames.spectrum(0, cur.data());
+        if (T > 1)
+            frames.spectrum(1, nxt.data());
+    }
+    for (int t = tLo; t < tHi; ++t)
     {
         if (cancel && cancel->load())
             return;
-        if (t > 0)
+        if (t > tLo)
         {
             prev.swap(cur);
             cur.swap(nxt);
@@ -265,7 +282,8 @@ void analyzeSpectra(Context& ctx, const std::atomic<bool>* cancel)
             }
         }
     }
-    pk.frameStart[static_cast<size_t>(T)] = static_cast<int>(pk.bin.size());
+    for (int t = tHi; t <= T; ++t)
+        pk.frameStart[static_cast<size_t>(t)] = static_cast<int>(pk.bin.size());
 }
 
 } // namespace detail
