@@ -4200,6 +4200,43 @@ low-pass plus a first-order shelf on four inner paths. Atrium's level over Decay
 flat within ±1 dB over ±4 Hz, ours ±4 … 12 dB). More modulation moved it 1 … 1.5 dB only — a denser late tank is its own
 project. Room scores unchanged (mode 3.31, pairs 4.22, sr48 3.44, sr96 3.38).
 
+## Round 190ly (Valhalla, part 2): the dense tank for ValhallaRoom only; Delay, FreqEcho and VintageVerb laws
+
+Black-box (refcap030 captures; clean-room: LYNX's own code and fits). Evidence: docs/analise/REA_rodada190ly.md, lab
+`/mnt/e/lynx-work/valhalla2_190ly/`. Score: round 190lg's scorer, the same copy before and after. Every change is a hidden value;
+with it off the round renders byte for byte as round 190ls (126 / 126 fxrender renders, `gold/gold.sh`).
+
+- **Atrium (owner decision, perf-first):** the dense 32-line tank (`atrium::reaLaw`) is set only by the ValhallaRoom translator
+  (the substitute table's new `replaced = …` items, applied only when a slot replaces a device). A new Atrium is the light
+  8-line tank again (−29 % instructions against round 190ls); translated ValhallaRoom states keep the dense tank (scores as 190ls).
+- **Echoform ← ValhallaDelay (hidden `echoform::valhallaLaw`, set by the ValhallaDelay translator only):** −1.1 dB of loop gain
+  at Feedback 100 % (the reference fades 1.5 dB a pass, the tape loop grew), none at 70 / 160 %; the loop diffusion read back
+  out of the echo time (it made every pass 33 ms late) and 3.5 × as long, so the echo spreads around its time as the reference's.
+- **Spiral Echo ← ValhallaFreqEcho (hidden `spiral::rateLaw`, new instances / translated):** the analytic filter's phase turned
+  onto its 48 kHz phase at every rate (−66.7° and half a sample at 96 kHz); a steady tone through the loop now reads the same at
+  44.1 / 48 / 96 kHz (96 kHz was 2.2 dB off).
+- **Epoch Verb ← ValhallaVintageVerb (hidden `epoch::shortTrim`, new instances / translated):** Concert Hall's short-decay trim
+  (+1.3 … +2.7 dB from 500 Hz up at 0.51 s, faded out by 2.9 s; the lows keep the 0.1.27 voicing — the other banks need them).
+
+| Bank (refcap030 → LYNX) | files | before → after | up / same / down |
+|---|---|---|---|
+| ValhallaDelay → Echoform (mode / pairs / sr48 / sr96) | 164 | 3.96 → 4.04 | 6 / 158 / 0 |
+| … pairs | 36 | 3.94 → 4.22 | 4 / 32 / 0 |
+| ValhallaFreqEcho → Spiral Echo, sr96 | 16 | 3.31 → 4.81 | 13 / 3 / 0 |
+| ValhallaFreqEcho → Spiral Echo, sr48 | 16 | 4.06 → 4.06 | 0 / 16 / 0 |
+| ValhallaVintageVerb → Epoch Verb (all blocks) | 154 | 2.67 → 2.92 | 39 / 115 / 0 |
+| … mode (ColorMode / ReverbMode sweeps at 0.51 s) | 96 | 2.16 → 2.48 | 31 / 65 / 0 |
+| ValhallaRoom → Atrium (translated) | 116 | 3.80 → 3.80 | byte-identical |
+
+| Gate bank (other captures of the same plug-ins) | files | before → after | up / same / down |
+|---|---|---|---|
+| tp172d VintageVerb / Delay / FreqEcho / Room | 15 / 16 / 16 / 12 | 3.73 → 3.87 / 4.56 = / 4.50 = / 3.67 = | 2 / 57 / 0 |
+| verb183b captures VintageVerb / Delay / Room | 18 / 25 / 17 | 3.56 → 3.61 / 2.92 = / 3.88 = | 1 / 59 / 0 |
+| refcap182 programme VintageVerb / Delay / FreqEcho / Room | 25 / 20 / 20 / 20 | 3.48 → 3.64 / 4.20 → 4.25 / 4.25 = / 3.80 = | 5 / 80 / 0 |
+
+CPU (fxrender, 20 s incl. file I/O, instructions): Echoform's ValhallaDelay role +0.9 %, Spiral Echo at 96 kHz +1.8 % (0 at
+48 kHz), Epoch's short trim +0.01 %, a new Atrium −29 % (light tank).
+
 ## Round 190ls (Valhalla): Atrium on a dense late tank for the ValhallaRoom role
 
 Static analysis of the official ValhallaRoom binary by the owner's leave (clean-room: the structure understood, LYNX's own

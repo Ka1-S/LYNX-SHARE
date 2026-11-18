@@ -70,6 +70,9 @@ struct SubstituteEntry
     // the LYNX effect and its default preset
     EffectKind effect = EffectKind::eq;
     std::vector<std::pair<int, float>> preset; // parameter position -> normalised value, over makeEffectSlot (effect)
+    // round 190ly ("replaced = …", same items as preset): applied over the preset only when the slot replaces an original
+    // device (project / import translation), not for one added by hand from a substitute menu
+    std::vector<std::pair<int, float>> replacedPreset;
     float mix = 1.0f;                          // slot dry/wet of the substitute
     std::vector<SubstituteParamMap> params;
     // a built-in state translator (core/FabFilterStates.h: "pro-c3", "pro-mb", "pro-g", "saturn2") run after the
