@@ -9,6 +9,7 @@
 #include "core/LynxTune.h"
 #include "core/PeakShapes.h"
 #include "core/LynxVerbs.h"
+#include "core/LimiterLaw.h"
 
 #include "core/Effector.h"
 #include "core/PitcherDsp.h"
@@ -951,6 +952,14 @@ public:
         delay[1].assign (size, 0.0f);
         maxValues.assign (size, 0.0f);
         maxTimes.assign (size, 0);
+        // round 190lf: the L2 law's buffers, sized for 192 kHz (no allocation in prepare / process)
+        const auto l2Size = (std::size_t) std::ceil (limiterlaw::windowAt48k * maxSampleRate / 48000.0) + 2;
+        l2Delay[0].assign (l2Size, 0.0);
+        l2Delay[1].assign (l2Size, 0.0);
+        l2MinValues.assign (l2Size + 1, 1.0);
+        l2MinTimes.assign (l2Size + 1, 0);
+        l2BoxA.assign (l2Size, 1.0);
+        l2BoxB.assign (l2Size, 1.0);
     }
 
     void prepare (double sr) noexcept override
@@ -960,6 +969,13 @@ public:
         // issue #134: the default project has this limiter on its Master)
         lookahead = std::clamp ((int) std::lround (lookaheadSeconds * sr), 1, (int) delay[0].size());
         attack = (float) (1.0 - std::exp (-1.0 / (lookahead * 0.3)));
+        // round 190lf: the L2 law's window and smoothing, scaled from 48 kHz (window = boxA + boxB - 1)
+        const auto scale = sr / 48000.0;
+        l2BoxALength = std::clamp ((int) std::lround (limiterlaw::boxAAt48k * scale), 1, (int) l2BoxA.size());
+        l2BoxBLength = std::clamp ((int) std::lround (limiterlaw::boxBAt48k * scale), 1, (int) l2BoxB.size());
+        l2Window = std::clamp (l2BoxALength + l2BoxBLength - 1, 1, (int) l2Delay[0].size());
+        l2Attack = 1.0 - std::exp (-1.0 / (limiterlaw::arcFollowAttackS * sr));
+        l2Release = 1.0 - std::exp (-1.0 / (limiterlaw::arcFollowReleaseS * sr));
         reset();
     }
 
@@ -975,13 +991,23 @@ public:
         count = 1;
         maxValues[0] = 0.0f;
         maxTimes[0] = -1;
+        resetL2();
     }
 
-    int latencySamples() const noexcept override { return lookahead; }
+    int latencySamples() const noexcept override { return l2Active.load (std::memory_order_relaxed) ? l2Window : lookahead; }
     int tailSamples() const noexcept override { return tail; }
 
     void process (float* l, float* r, int n, const EffectParams& params, double) noexcept override
     {
+        if (limiterlaw::isL2 (params[(std::size_t) limiterlaw::lawParam]))
+        {
+            processL2 (l, r, n, params);
+            return;
+        }
+
+        if (l2Active.load (std::memory_order_relaxed))
+            l2Active.store (false, std::memory_order_relaxed);
+
         const auto ceiling = dbToGain (limiterCeilingDb (params[0]));
         const auto input = dbToGain (limiterGainDb (params[1]));
         const auto release = (float) (1.0 - std::exp (-1.0 / (limiterReleaseMs (params[2]) * 0.001 * sampleRate)));
@@ -1032,6 +1058,123 @@ public:
     }
 
 private:
+    // round 190lf: the L2 law (core/LimiterLaw.h, docs/analise/REA_rodada190lf.md §2). The Gain knob is the make-up
+    // (an L2 threshold t and ceiling c: gain = c − t), the input limited at ceiling / gain: the gain each sample needs, its
+    // minimum over the window, ARC's follower of that minimum and its release (or the Release knob's), two moving
+    // averages; the audio delayed by the window. Every constant is LYNX's own fit on our Waves-demo probes.
+    void processL2 (float* l, float* r, int n, const EffectParams& params) noexcept
+    {
+        namespace ll = limiterlaw;
+        if (! l2Active.load (std::memory_order_relaxed))
+        {
+            resetL2();
+            l2Active.store (true, std::memory_order_relaxed);
+        }
+
+        const double ceiling = std::pow (10.0, limiterCeilingDb (params[0]) / 20.0);
+        const double gainDb = (double) limiterGainDb (params[1]) - 24.0 * (double) params[(std::size_t) ll::trimParam];
+        const double threshold = ceiling / std::pow (10.0, gainDb / 20.0);
+        const double makeup = std::min (ceiling, ll::ceilingMax) / threshold;
+        const bool arc = params[(std::size_t) ll::arcParam] >= 0.5f;
+        const double releaseS = limiterReleaseMs (params[2]) * 0.001 * ll::manualTimeScale;
+        const double manual = std::exp (-1.0 / (releaseS * sampleRate));
+        tail = tailOf (l2Window + 16.0 * (arc ? ll::arcFollowReleaseS : releaseS) * sampleRate + 64.0);
+        const int capacity = (int) l2MinValues.size();
+
+        for (int i = 0; i < n; ++i)
+        {
+            const double a = l[i], b = r[i];
+            const double peak = std::max (std::abs (a), std::abs (b));
+            const double need = peak > threshold ? threshold / peak : 1.0;
+
+            // the smallest need over the last l2Window samples (sliding minimum with a monotonic queue)
+            while (l2Count > 0 && l2MinValues[(std::size_t) ((l2Head + l2Count - 1) % capacity)] >= need)
+                --l2Count;
+            const auto slot = (std::size_t) ((l2Head + l2Count) % capacity);
+            l2MinValues[slot] = need;
+            l2MinTimes[slot] = l2Clock;
+            ++l2Count;
+            if (l2MinTimes[(std::size_t) l2Head] <= l2Clock - l2Window)
+            {
+                l2Head = (l2Head + 1) % capacity;
+                --l2Count;
+            }
+            ++l2Clock;
+            const double least = l2MinValues[(std::size_t) l2Head];
+
+            double g = least;
+            if (arc)
+            {
+                l2Follow += (least - l2Follow) * (least < l2Follow ? l2Attack : l2Release);
+                g = std::min (least, l2Follow);
+            }
+
+            if (g <= l2Gain)
+                l2Gain = g;
+            else
+            {
+                auto keep = manual;
+                if (arc)
+                {
+                    const double u = std::max (std::log (std::max (l2Gain, 1.0e-12)), ll::arcDepthFloor);
+                    const double v = std::clamp ((l2Follow - l2Gain) / std::max (l2Follow, 1.0e-9), 0.0, 1.0);
+                    const auto& q = ll::arcLaw;
+                    const double rate = std::exp (std::min (q[0] + q[1] * u + q[2] * v + q[3] * u * v + q[4] * u * u + q[5] * v * v, 12.0));
+                    keep = std::exp (-rate / sampleRate);
+                }
+                l2Gain = g + (l2Gain - g) * keep;
+            }
+
+            // two moving averages (their running sums recomputed at every wrap: no drift)
+            l2SumA += l2Gain - l2BoxA[(std::size_t) l2IndexA];
+            l2BoxA[(std::size_t) l2IndexA] = l2Gain;
+            if (++l2IndexA == l2BoxALength)
+            {
+                l2IndexA = 0;
+                l2SumA = 0.0;
+                for (int k = 0; k < l2BoxALength; ++k)
+                    l2SumA += l2BoxA[(std::size_t) k];
+            }
+            const double first = l2SumA / l2BoxALength;
+            l2SumB += first - l2BoxB[(std::size_t) l2IndexB];
+            l2BoxB[(std::size_t) l2IndexB] = first;
+            if (++l2IndexB == l2BoxBLength)
+            {
+                l2IndexB = 0;
+                l2SumB = 0.0;
+                for (int k = 0; k < l2BoxBLength; ++k)
+                    l2SumB += l2BoxB[(std::size_t) k];
+            }
+            const double smooth = l2SumB / l2BoxBLength * makeup;
+
+            const auto p = (std::size_t) l2Position;
+            const double outL = l2Delay[0][p] * smooth, outR = l2Delay[1][p] * smooth;
+            l2Delay[0][p] = a;
+            l2Delay[1][p] = b;
+            if (++l2Position >= l2Window)
+                l2Position = 0;
+            l[i] = (float) outL;
+            r[i] = (float) outR;
+        }
+    }
+
+    void resetL2() noexcept
+    {
+        std::fill (l2Delay[0].begin(), l2Delay[0].end(), 0.0);
+        std::fill (l2Delay[1].begin(), l2Delay[1].end(), 0.0);
+        std::fill (l2BoxA.begin(), l2BoxA.end(), 1.0);
+        std::fill (l2BoxB.begin(), l2BoxB.end(), 1.0);
+        l2SumA = (double) l2BoxALength;
+        l2SumB = (double) l2BoxBLength;
+        l2IndexA = l2IndexB = l2Position = 0;
+        l2Follow = l2Gain = 1.0;
+        l2Clock = 0;
+        l2Head = 0;
+        l2Count = 1;
+        l2MinValues[0] = 1.0;
+        l2MinTimes[0] = -1;
+    }
+
     double sampleRate = 44100.0;
     int lookahead = 64, position = 0;
     float attack = 0.1f, gain = 1.0f;
@@ -1041,6 +1184,15 @@ private:
     int head = 0, count = 0;
     std::int64_t clock = 0;
     int tail = -1;
+
+    std::atomic<bool> l2Active { false };
+    int l2Window = 64, l2BoxALength = 27, l2BoxBLength = 38, l2Position = 0, l2IndexA = 0, l2IndexB = 0;
+    double l2Attack = 0.0, l2Release = 0.0, l2Follow = 1.0, l2Gain = 1.0, l2SumA = 27.0, l2SumB = 38.0;
+    std::array<std::vector<double>, 2> l2Delay;
+    std::vector<double> l2MinValues, l2BoxA, l2BoxB;   // monotonic (increasing) queue for the sliding minimum; the averages
+    std::vector<std::int64_t> l2MinTimes;
+    int l2Head = 0, l2Count = 0;
+    std::int64_t l2Clock = 0;
 };
 
 // ---------------------------------------------------------------------------

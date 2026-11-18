@@ -226,7 +226,8 @@ TEST (parity190js_waves_reverbs_are_translated_onto_reeverb2)
     const auto tv = parity190jh::waves ("TrueVerb Stereo", "TrueVerb",
                                         parity190jh::list (50, { { 0, "1.6" }, { 5, "4.5" }, { 24, "63" }, { 42, "-10" }, { 43, "-12" } }), n);
     const auto t0 = reeverb2::fromParams (tv.params);
-    CHECK (t0.p[10] == (int) std::lround (160.0 * 0.8 * std::pow (10.0, (-0.7 - 0.135 * 4.5) / 20.0)) && t0.p[1] == 221);
+    // round 190lf: the direct sound is Reeverb's hidden direct law (TrueVerb's measured low shelf); Reeverb's own dry at 0
+    CHECK (t0.p[10] == 0 && tv.params[(std::size_t) reeverb2DirectLaw] == 1.0f && t0.p[1] == 221);
     CHECK (t0.p[11] == (int) std::lround (160.0 * 0.36 * std::pow (10.0, -12.0 / 20.0)));
     const auto td = parity190jh::waves ("TrueVerb Stereo", "TrueVerb", parity190jh::list (50, { { 0, "1.6" }, { 29, "1" } }), n);
     CHECK (reeverb2::fromParams (td.params).p[10] == 0);
