@@ -1120,6 +1120,27 @@ juce::Rectangle<int> MixerStrips::stereoArea (int t) const
     return { stripX (t) + w / 2, r.knobsTop, w - w / 2, r.knobsHeight };
 }
 
+// Round 190lr (DF-80, capture fl-strip-phase-swap.png): FL draws "Reverse polarity" (an up and a down arrowhead) and
+// "Swap left and right" (a left and a right arrowhead) left of the stereo separation knob, stacked, grey (#B1B7BB) and
+// light blue (#7CCFFE) when on; a click toggles them. Only where the strip leaves room beside the knob.
+juce::Rectangle<int> MixerStrips::invertIcon (int t) const
+{
+    const auto a = stereoArea (t);
+    const auto& sp = spec();
+    const auto knob = sp.stackedKnobs ? sp.knobSize - 6 : 22;
+    const auto room = (a.getWidth() - knob) / 2;
+    if (a.isEmpty() || room < 9 || a.getHeight() < 22)
+        return {};
+    const auto w = juce::jmin (12, room - 1);
+    return { a.getX() + (room - w) / 2, a.getCentreY() - 11, w, 10 };
+}
+
+juce::Rectangle<int> MixerStrips::swapIcon (int t) const
+{
+    const auto i = invertIcon (t);
+    return i.isEmpty() ? i : i.translated (0, 12);
+}
+
 juce::Rectangle<int> MixerStrips::muteArea (int t) const
 {
     const auto r = rows();
@@ -1528,6 +1549,10 @@ MixerStrips::Part MixerStrips::partAt (int t, juce::Point<int> p) const
         return Part::route;
     if (panArea (t).contains (p))
         return Part::pan;
+    if (invertIcon (t).expanded (1).contains (p)) // (round 190lr, DF-80)
+        return Part::invert;
+    if (swapIcon (t).expanded (1).contains (p))
+        return Part::swap;
     if (stereoArea (t).contains (p))
         return Part::stereo;
     if (muteArea (t).contains (p))
@@ -1891,6 +1916,23 @@ void MixerStrips::paint (juce::Graphics& g)
         if (sp.stereoKnob)
             drawKnob (g, stereoArea (t).toFloat().withSizeKeepingCentre (stereoKnob, stereoKnob), (track.stereo + 1.0f) * 0.5f, true,
                       dragging (Part::stereo) ? colour::accent : colour::knobArc, hovered (Part::stereo) || dragging (Part::stereo));
+        // round 190lr (DF-80): FL's polarity and swap icons
+        if (const auto inv = invertIcon (t); ! inv.isEmpty())
+        {
+            const auto ink = [] (bool on, bool over) { return on ? juce::Colour (0xff7ccffe) : juce::Colour (0xffb1b7bb).withAlpha (over ? 1.0f : 0.85f); };
+            const auto a = inv.toFloat();
+            juce::Path p;
+            p.addTriangle (a.getCentreX() - 3.5f, a.getY() + 4.0f, a.getCentreX() + 3.5f, a.getY() + 4.0f, a.getCentreX(), a.getY());
+            p.addTriangle (a.getCentreX() - 3.5f, a.getBottom() - 4.0f, a.getCentreX() + 3.5f, a.getBottom() - 4.0f, a.getCentreX(), a.getBottom());
+            g.setColour (ink (track.invertPhase, hovered (Part::invert)));
+            g.fillPath (p);
+            const auto b = swapIcon (t).toFloat();
+            juce::Path q;
+            q.addTriangle (b.getX() + 1.0f, b.getCentreY(), b.getCentreX() - 1.0f, b.getY() + 1.0f, b.getCentreX() - 1.0f, b.getBottom() - 1.0f);
+            q.addTriangle (b.getRight() - 1.0f, b.getCentreY(), b.getCentreX() + 1.0f, b.getY() + 1.0f, b.getCentreX() + 1.0f, b.getBottom() - 1.0f);
+            g.setColour (ink (track.swapChannels, hovered (Part::swap)));
+            g.fillPath (q);
+        }
         }
 
         // mute and solo
@@ -2483,6 +2525,14 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
     {
         case Part::mute:
             engine.editSong ([t] (Song& s) { s.mixer[(std::size_t) t].muted = ! s.mixer[(std::size_t) t].muted; });
+            return;
+
+        case Part::invert: // round 190lr (DF-80)
+            engine.editSong ([t] (Song& s) { s.mixer[(std::size_t) t].invertPhase = ! s.mixer[(std::size_t) t].invertPhase; });
+            return;
+
+        case Part::swap:
+            engine.editSong ([t] (Song& s) { s.mixer[(std::size_t) t].swapChannels = ! s.mixer[(std::size_t) t].swapChannels; });
             return;
 
         case Part::solo:
@@ -3125,6 +3175,8 @@ ui::Hint MixerStrips::hintAt (juce::Point<int> p)
         case Part::arm: h.text = name + " - " + mixerinput::armHint (engine, t); h.hasMenu = true; break;
         case Part::input: h.text = name + " - " + tr ("Input level of this insert's audio input  [LMB] choose the input"); h.hasMenu = true; break;
         case Part::solo: h.text = name + " - " + tr ("Solo"); break;
+        case Part::invert: h.text = name + " - " + tr ("Reverse polarity"); h.value = song.mixer[(std::size_t) t].invertPhase ? tr ("On") : tr ("Off"); break;
+        case Part::swap: h.text = name + " - " + tr ("Swap left and right"); h.value = song.mixer[(std::size_t) t].swapChannels ? tr ("On") : tr ("Off"); break;
         case Part::meter:
         {
             h.text = name + " - " + tr ("Peak meter (left/right) with peak hold  [LMB] selects the track and clears the clip light");
@@ -4264,6 +4316,16 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
                      [this] { engine.editSong ([] (Song& s) { s.compensateMixerLevels = ! s.compensateMixerLevels; }); });
         menu.addSubMenu (tr ("Plugin delay compensation"), pdc);
     }
+    {
+        // round 190lr (DF-60): FL's View submenu, with its Waveforms switch (Alt+W)
+        juce::PopupMenu view;
+        view.addItem (tr ("Waveforms") + "\tAlt+W", true, meterWaveforms, [this] {
+            setMeterWaveforms (! meterWaveforms);
+            if (mixeroptions::changed)
+                mixeroptions::changed();
+        });
+        menu.addSubMenu (tr ("View"), view);
+    }
     menu.addSubMenu (tr ("Mixer layout"), MixerLayoutBox::menu (*this)); // as the title bar's drop-down (issue #52)
     // FL's Options section: after View / Detached and a separator, "Trim unused tracks" (round 190jv, REA FUN_012a6920)
     menu.addSeparator();
@@ -4604,6 +4666,75 @@ void MixerStrips::showLoudnessMenu()
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
 }
 
+void MixerStrips::setMeterWaveforms (bool on)
+{
+    meterWaveforms = on;
+    waveRing.clear();
+    waveFrameMax.clear();
+    waveQuiet.clear();
+    waveHead = 0;
+    waveAccumMs = 0.0;
+    repaint();
+}
+
+// Round 190lr (DF-60): one row per 1/70 s (FL's scroll, filmed: ~7 px per 100 ms), each the loudest block peak since the
+// row before; only the wells that still show sound repaint
+void MixerStrips::advanceWaves (double elapsedMs, juce::Rectangle<int>& dirty, bool showing)
+{
+    const auto count = levels.size();
+    if (waveRing.size() != (std::size_t) waveRows * count)
+    {
+        waveRing.assign ((std::size_t) waveRows * count, 0.0f);
+        waveFrameMax.assign (count, 0.0f);
+        waveQuiet.assign (count, waveRows);
+        waveHead = 0;
+    }
+    constexpr double rowMs = 1000.0 / 70.0;
+    waveAccumMs = juce::jmin (waveAccumMs + elapsedMs, rowMs * 16.0);
+    auto rows = 0;
+    for (; waveAccumMs >= rowMs; waveAccumMs -= rowMs, ++rows)
+    {
+        waveHead = (waveHead + 1) % waveRows;
+        for (std::size_t i = 0; i < count; ++i)
+        {
+            const auto v = waveFrameMax[i];
+            waveRing[(std::size_t) waveHead * count + i] = v;
+            waveQuiet[i] = v > 1.0e-4f ? 0 : juce::jmin (waveRows, waveQuiet[i] + 1);
+        }
+        std::fill (waveFrameMax.begin(), waveFrameMax.end(), 0.0f);
+    }
+    if (rows == 0 || ! showing)
+        return;
+    for (int t = 0; t < (int) count / 2; ++t)
+        if ((waveQuiet[(std::size_t) t * 2] < waveRows || waveQuiet[(std::size_t) t * 2 + 1] < waveRows) && ! isHidden (t) && ! isFoldTab (t))
+        {
+            const auto area = meterArea (t).expanded (1);
+            dirty = dirty.isEmpty() ? area : dirty.getUnion (area);
+        }
+}
+
+void MixerStrips::paintMeterWave (juce::Graphics& g, int t, juce::Rectangle<int> area) const
+{
+    const auto count = levels.size();
+    if (waveRing.size() != (std::size_t) waveRows * count || t < 0 || (std::size_t) t * 2 + 1 >= count)
+        return;
+    const auto silenced = isSilenced (t);
+    const auto tone = [silenced] (juce::Colour c) { return silenced ? silencedMeterColour (c) : c; };
+    const auto mid = (float) area.getCentreX();
+    const auto half = (float) area.getWidth() * 0.5f;
+    for (int y = 0; y < area.getHeight() && y < waveRows; ++y)
+    {
+        const auto row = (std::size_t) ((waveHead - y + waveRows) % waveRows) * count; // (the newest at the top)
+        const auto l = waveRing[row + (std::size_t) t * 2], r = waveRing[row + (std::size_t) t * 2 + 1];
+        if (l <= 1.0e-4f && r <= 1.0e-4f)
+            continue;
+        const auto loud = juce::jmax (l, r);
+        g.setColour (tone (loud >= 1.0f ? theme::colour::meterClip : loud >= meters::flTickOrange ? theme::colour::meterMid : theme::colour::meterLow));
+        const auto wl = half * meterPosition (l), wr = half * meterPosition (r);
+        g.fillRect (juce::Rectangle<float> (mid - wl, (float) (area.getY() + y), wl + wr, 1.0f));
+    }
+}
+
 // One meter's level, peak hold line and clip latch, inside its well (painted with the strip, or over the cached picture)
 void MixerStrips::paintMeterLevel (juce::Graphics& g, int t, int ch, juce::Rectangle<int> bar) const
 {
@@ -4682,7 +4813,9 @@ void MixerStrips::paintMeterLevels (juce::Graphics& g) const
         if (dockOf (t) == MixerDock::middle)
             for (const auto& r : pinned)
                 g.excludeClipRegion (r);
-        if (meterShown)
+        if (meterShown && meterWaveforms) // round 190lr (DF-60): FL's Waveforms view instead of the two bars
+            paintMeterWave (g, t, meters.withWidth (2 * sp.meterWidth + 2));
+        else if (meterShown)
             for (int ch = 0; ch < 2; ++ch)
                 paintMeterLevel (g, t, ch, juce::Rectangle<int> (meters.getX() + ch * (sp.meterWidth + 2), meters.getY(), sp.meterWidth, meters.getHeight()));
         if (barsShown)
@@ -4760,6 +4893,8 @@ bool MixerStrips::liveFrame (double nowMs)
         const auto before = m;
         const auto peak = meters.takePeak ((int) (i / 2), (int) (i % 2));
         m.advanceFl (peak, elapsed); // ~20 dB/s bar falloff; FL's 2.6 s peak hold, then an accelerating fall (round 190jd)
+        if (meterWaveforms && i < waveFrameMax.size()) // (round 190lr: the frame's peak for the waveform's next row)
+            waveFrameMax[i] = juce::jmax (waveFrameMax[i], peak);
         // "Show only used inserts" (round 190am): an insert that receives audio always shows, whatever feeds it
         if (showUsedOnly && peak > 1.0e-4f && i >= 2 && revealed.count ((int) (i / 2)) == 0 && isHidden ((int) (i / 2)))
             woken = (int) (i / 2);
@@ -4815,6 +4950,11 @@ bool MixerStrips::liveFrame (double nowMs)
                 }
                 was = level;
             }
+    }
+    if (meterWaveforms) // round 190lr (DF-60)
+    {
+        advanceWaves (elapsed, dirty, showing);
+        moving = moving || std::any_of (waveQuiet.begin(), waveQuiet.end(), [] (int q) { return q < waveRows; });
     }
     // the loudness panel (round 190am; nothing while it is off): repainted when a shown number or the bar changes
     if (showLoudness && showing)
@@ -8233,6 +8373,12 @@ bool MixerComponent::runAction (const std::string& id)
         strips.linkSelectedChannels (true);
     else if (id == "mixer.selectLinkedChannels")
         strips.selectLinkedChannels();
+    else if (id == "mixer.waveforms") // round 190lr (DF-60): FL's Alt+W
+    {
+        strips.setMeterWaveforms (! MixerStrips::meterWaveforms);
+        if (mixeroptions::changed)
+            mixeroptions::changed();
+    }
     else if (id == "mixer.audioEditor")
         return strips.runMenuItem (tr ("Open audio editor"));
     else if (id == "mixer.audioEditorRecord")

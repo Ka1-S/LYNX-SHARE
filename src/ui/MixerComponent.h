@@ -191,6 +191,11 @@ public:
     // (Song::insertInUse) take no room; "+" brings back the first unused insert before adding one.
     // Round 190am: the selected inserts and any insert whose meter moves always show (mixerops::hiddenUnusedInserts).
     static inline bool showUsedOnly = false;
+    // Round 190lr (DF-60): FL's Mixer menu › View › "Waveforms" (Alt+W; ui-options.txt "mixerWaveforms", off by default):
+    // each strip's meter well shows the recent block peaks as a waveform that scrolls down (the newest at the top, about
+    // 70 px a second as FL; capture fl-mixer-meterwave.png), the left channel left of the middle, the right one right
+    static inline bool meterWaveforms = false;
+    void setMeterWaveforms (bool on);
     // Mixer menu › "Loudness meter beside the Master (LYNX)" (round 190am; ui-options.txt "mixerLoudness"; off = FL's
     // mixer, and nothing is measured): a narrow panel right of the Master with the short-term and integrated loudness
     // (LUFS) and the true peak (dBTP) of the Master's output, and a Reset button (core/MasterLoudness.h).
@@ -239,7 +244,7 @@ public:
     std::pair<int, int> cacheCountersForPerf() noexcept { return { std::exchange (pictureInvalidations, 0), std::exchange (pictureRefills, 0) }; }
 
 private:
-    enum class Part { none, pan, stereo, fader, meter, mute, solo, route, send, header, body, add, arm, input, fold, tab, inserts };
+    enum class Part { none, pan, stereo, fader, meter, mute, solo, route, send, header, body, add, arm, input, fold, tab, inserts, invert, swap };
 
     void changeListenerCallback (juce::ChangeBroadcaster*) override;
 
@@ -381,6 +386,9 @@ private:
     juce::Rectangle<int> armArea (int track) const;
     juce::Rectangle<int> inputArea (int track) const; // the input level bar (inserts with an input source)
     juce::Rectangle<int> stereoArea (int track) const;
+    // round 190lr (DF-80, FL's mixer track: polarity and swap icons left of the stereo separation knob, light blue when on)
+    juce::Rectangle<int> invertIcon (int track) const;
+    juce::Rectangle<int> swapIcon (int track) const;
     juce::Rectangle<int> meterArea (int track) const;
     // round 177d: the gain-reduction meter beside the peak meters (only on strips with one of LYNX's own dynamics)
     juce::Rectangle<int> grArea (int track) const;
@@ -446,6 +454,15 @@ private:
 
     std::vector<meters::PeakHold> levels; // per track*2: bar, peak hold and clip latch
     std::vector<float> inputLevels;       // per track: input level (decaying)
+    // round 190lr (DF-60): the waveform view's history, one row per 1/70 s: waveRing[row * meters + meter] (meter = track
+    // * 2 + side), the newest row at waveHead; each meter's rows since its last sound (no repaint once all have scrolled out)
+    std::vector<float> waveRing, waveFrameMax;
+    std::vector<int> waveQuiet;
+    int waveHead = 0;
+    double waveAccumMs = 0.0;
+    static constexpr int waveRows = 512;
+    void advanceWaves (double elapsedMs, juce::Rectangle<int>& dirty, bool showing);
+    void paintMeterWave (juce::Graphics& g, int t, juce::Rectangle<int> area) const;
     std::vector<int> grShown;             // per track: the gain-reduction meter's drawn height (-1: none)
     ui::FrameTicker frames { *this, [this] (double ms) { return liveFrame (ms); } };
 

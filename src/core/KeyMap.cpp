@@ -454,6 +454,7 @@ std::vector<Action> makeActions()
         { "mixer.linkChannels", TR_NOOP ("Link the selected channels to the selected insert"), Context::mixer, { chord ('L', ctrl) } },
         { "mixer.linkChannelsFrom", TR_NOOP ("Link the selected channels to inserts starting from the selected one"), Context::mixer, { chord ('L', ctrl | shift) } },
         { "mixer.selectLinkedChannels", TR_NOOP ("Select the channels linked to the selected insert"), Context::mixer, { chord ('L', alt) } },
+        { "mixer.waveforms", TR_NOOP ("Waveforms instead of the peak meters"), Context::mixer, { chord ('W', alt) } }, // round 190lr (DF-60)
         // FL's mixer track menu keys (round 167k, the DFM's ShortCut values: F2, S, Alt+R, Shift+Alt+R)
         { "mixer.rename", TR_NOOP ("Rename and color the selected mixer track"), Context::mixer, { chord (f2) } },
         { "mixer.audioEditor", TR_NOOP ("Open the audio editor"), Context::mixer, { chord ('E', ctrl) } },
