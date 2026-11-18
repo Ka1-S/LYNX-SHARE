@@ -846,6 +846,9 @@ struct Voice
     std::uint64_t age = 0;
     std::array<EngineVoice, 2> e {};
     int counter = 0; // samples to the next control step
+    // FL's channel porta / Mono and slide notes (rollup 0.1.30 step 7, as Helix / Tetra; core/HostSlide.h): the voice
+    // takes HostSlide::pendingGlide at its start and glides to a slide note's pitch (cents from its key)
+    HostSlide host;
 };
 } // namespace
 
@@ -928,6 +931,9 @@ struct Engine::Impl
         vo.pressure = pressure;
         vo.age = ++ages;
         vo.counter = 0;
+        // (the channel's live pitch moves every voice through pitchOffset, so the slide does not track it: NaN reference)
+        vo.host = {};
+        vo.host.anchor (NAN);
         if (! legatoKeep)
             vo.random = rng.bi();
         vo.spread = spreadPos;
@@ -1108,6 +1114,8 @@ struct Engine::Impl
     void control (Voice& vo, double tempo) noexcept
     {
         const auto dt = (float) (controlRate / rate);
+        // FL's porta glide / slide notes, in semitones, for this step's samples (HostSlide)
+        const auto hostSt = vo.host.moving() || vo.host.cents != 0.0f ? vo.host.advance ((float) controlRate) * 0.01f : 0.0f;
         takeSources (vo); // (the modulators' times / rates follow the previous step's sources)
         for (int k = 0; k < 2; ++k)
         {
@@ -1162,7 +1170,7 @@ struct Engine::Impl
             auto semis = (ev (k, eng::keytrack) >= 0.5 ? (float) vo.key - 60.0f : 0.0f) + 60.0f + (float) ev (k, eng::transpose)
                          + 12.0f * (float) ev (k, eng::octaves) + (float) ev (k, eng::degrees) // (no scale: a degree is a semitone)
                          + ((float) ev (k, eng::detune) + modSum (vo, t0 + tgt::detune)) * (float) laws.detuneSemis
-                         + modSum (vo, t0 + tgt::pitch) * (float) laws.pitchModSemis + pitchOffset;
+                         + modSum (vo, t0 + tgt::pitch) * (float) laws.pitchModSemis + pitchOffset + hostSt;
             if (ev (k, eng::keytrack) >= 0.5)
                 semis += vo.notePitch * 0.0f; // (the note's own pitch is a matrix source, Note PB)
             if (e.glidePos < 1.0f)
@@ -1376,14 +1384,12 @@ void Engine::notePressure (int key, float pressure) noexcept
 }
 void Engine::slideTo (float semitones, float samples) noexcept
 {
+    // FL's slide note (core/HostSlide.h): the sounding voices move to its pitch over its length, then stay there
+    if (! std::isfinite (semitones) || ! std::isfinite (samples))
+        return;
     for (auto& v : impl->voices)
         if (v.active && v.held)
-            for (auto& e : v.e)
-            {
-                e.glideFrom = (float) v.key + v.notePitch - semitones;
-                e.glidePos = 0.0f;
-                (void) samples;
-            }
+            v.host.start ((semitones - (float) v.key) * 100.0f, std::max (samples, 1.0f));
 }
 void Engine::setPitchOffset (float semitones) noexcept { impl->pitchOffset = semitones; }
 void Engine::setPitchBend (float semitones, float range) noexcept
