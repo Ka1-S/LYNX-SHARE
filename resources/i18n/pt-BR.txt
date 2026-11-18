@@ -11381,3 +11381,4 @@ countries: br
 "Natural pitch engine (LYNX)" = "Motor de afinação natural (LYNX)"
 "Pitch modulation" = "Modulação de afinação"
 "Pitch drift" = "Deriva de afinação"
+"Newtone's natural pitch engine, pitch modulation and pitch drift are left out (the notes play with the first engine): {0}" = "O motor de afinação natural, a modulação e a deriva de afinação do Newtone ficam de fora (as notas tocam com o primeiro motor): {0}"

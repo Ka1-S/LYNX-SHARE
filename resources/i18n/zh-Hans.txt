@@ -11252,3 +11252,4 @@ countries: cn sg
 "Natural pitch engine (LYNX)" = "自然音高引擎（LYNX）"
 "Pitch modulation" = "音高调制"
 "Pitch drift" = "音高漂移"
+"Newtone's natural pitch engine, pitch modulation and pitch drift are left out (the notes play with the first engine): {0}" = "Newtone 的自然音高引擎、音高调制和音高漂移将被省略（音符使用第一代引擎播放）：{0}"

@@ -11252,3 +11252,4 @@ countries: ru by kz
 "Natural pitch engine (LYNX)" = "Естественный движок высоты (LYNX)"
 "Pitch modulation" = "Модуляция высоты"
 "Pitch drift" = "Дрейф высоты"
+"Newtone's natural pitch engine, pitch modulation and pitch drift are left out (the notes play with the first engine): {0}" = "Естественный движок высоты, модуляция и дрейф высоты Newtone не сохраняются (ноты звучат с первым движком): {0}"

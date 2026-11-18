@@ -11252,3 +11252,4 @@ countries: tr
 "Natural pitch engine (LYNX)" = "Doğal perde motoru (LYNX)"
 "Pitch modulation" = "Perde modülasyonu"
 "Pitch drift" = "Perde kayması"
+"Newtone's natural pitch engine, pitch modulation and pitch drift are left out (the notes play with the first engine): {0}" = "Newtone'un doğal perde motoru, perde modülasyonu ve perde kayması dışarıda kalır (notalar ilk motorla çalar): {0}"

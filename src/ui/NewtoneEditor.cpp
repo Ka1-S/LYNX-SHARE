@@ -1691,6 +1691,7 @@ private:
     bool flLook() const noexcept { return ! warpMode() && ! oldLook; }
     bool oldLook = false; // (--newtoneshot "lynxlook": the round-165g layout, for the paint before / after only)
 public:
+    juce::PopupMenu editMenuForSnapshot() { return editMenu(); } // (round 190li: --newtoneshot190li)
     void shotState (const juce::String& state)
     {
         const auto arg = state.fromFirstOccurrenceOf (":", false, false);
@@ -3305,6 +3306,13 @@ void setNewtoneShotState (juce::Component& editor, const juce::String& state)
 {
     if (auto* e = dynamic_cast<NewtoneEditor*> (&editor))
         e->shotState (state);
+}
+
+juce::PopupMenu newtoneEditMenuForSnapshot (juce::Component& editor)
+{
+    if (auto* e = dynamic_cast<NewtoneEditor*> (&editor))
+        return e->editMenuForSnapshot();
+    return {};
 }
 
 double newtonePaintMs (juce::Component& editor, int paints)

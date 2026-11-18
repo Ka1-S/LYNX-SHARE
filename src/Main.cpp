@@ -2249,6 +2249,17 @@ public:
             return;
         }
 
+        if (args.contains ("--newtoneshot190li"))
+        {
+            // LYNX --newtoneshot190li prefix audio.wav (round 190li): Newtone with the natural engine (a new slot), as
+            // analysed and after Correct pitch 100 / 100 (centre and drift; the vibrato kept), and its Edit menu with the
+            // round's items, for the Melodyne | LYNX pairs (with --shot-scale 1.5 for @150)
+            const auto i = args.indexOf ("--newtoneshot190li");
+            runNewtoneShot190li (args[i + 1].unquoted(), args[i + 2].unquoted());
+            quit();
+            return;
+        }
+
         if (args.contains ("--newtoneshot190kx"))
         {
             // LYNX --newtoneshot190kx prefix audio.wav (round 190kx): Newtone with FL's analysis and with "Separate close
@@ -21477,6 +21488,48 @@ private:
                 report << "no ARA submenu\n";
         }
         lynx::shot::file (juce::File (prefix + "-menus.txt")).replaceWithText (report);
+        std::printf ("%s", report.toRawUTF8());
+    }
+
+    void runNewtoneShot190li (const juce::String& prefix, const juce::String& file)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        const auto sample = offline.getSampleLibrary().load (file);
+        if (sample == nullptr)
+        {
+            std::fprintf (stderr, "newtoneshot190li: cannot read %s\n", file.toRawUTF8());
+            return;
+        }
+        juce::String report;
+        for (const auto corrected : { false, true })
+        {
+            auto track = lynx::newtonefx::analyseNotes (*sample);
+            track.engine = lynx::newtonefx::latestEngine;
+            if (corrected)
+                lynx::newtonefx::correctPitch (track, 1.0, 1.0);
+            offline.editSong ([&] (lynx::Song& song) {
+                if (song.mixer.size() < 2)
+                    song.mixer.resize (2);
+                song.mixer[1].effects.clear();
+                auto tone = lynx::makeEffectSlot (lynx::EffectKind::newtone);
+                tone.samplePath = file.toStdString();
+                tone.state = lynx::newtonefx::writeNative (track);
+                song.mixer[1].effects.push_back (tone);
+            }, false);
+            auto editor = lynx::makeNewtoneEditor (offline, 1, 0);
+            const auto name = juce::String (corrected ? "natural-correct100" : "natural-analysed");
+            saveSnapshot (*editor, prefix + "-" + name + ".png");
+            if (! corrected)
+                saveMenus (juce::StringArray { lynx::tr ("Edit") }, std::vector<juce::PopupMenu> { lynx::newtoneEditMenuForSnapshot (*editor) },
+                           prefix + "-edit-menu" + ".png");
+            report << name << ":";
+            for (const auto& p : track.pitches)
+                if (p.voiced())
+                    report << " " << juce::String (p.origPitch + p.shift, 2);
+            report << "\n";
+        }
+        lynx::shot::file (juce::File (prefix + "-notes.txt")).replaceWithText (report);
         std::printf ("%s", report.toRawUTF8());
     }
 

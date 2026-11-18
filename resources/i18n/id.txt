@@ -11252,3 +11252,4 @@ countries: id
 "Natural pitch engine (LYNX)" = "Mesin nada alami (LYNX)"
 "Pitch modulation" = "Modulasi nada"
 "Pitch drift" = "Pergeseran nada"
+"Newtone's natural pitch engine, pitch modulation and pitch drift are left out (the notes play with the first engine): {0}" = "Mesin nada alami, modulasi nada, dan pergeseran nada Newtone dihilangkan (not diputar dengan mesin pertama): {0}"

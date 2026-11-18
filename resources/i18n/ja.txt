@@ -11252,3 +11252,4 @@ countries: jp
 "Natural pitch engine (LYNX)" = "ナチュラル ピッチエンジン (LYNX)"
 "Pitch modulation" = "ピッチモジュレーション"
 "Pitch drift" = "ピッチドリフト"
+"Newtone's natural pitch engine, pitch modulation and pitch drift are left out (the notes play with the first engine): {0}" = "Newtone のナチュラル ピッチエンジン、ピッチモジュレーション、ピッチドリフトは含まれません (ノートは最初のエンジンで再生されます): {0}"

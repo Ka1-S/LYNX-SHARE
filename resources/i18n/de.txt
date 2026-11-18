@@ -11252,3 +11252,4 @@ countries: de at ch li lu
 "Natural pitch engine (LYNX)" = "Natürliche Tonhöhen-Engine (LYNX)"
 "Pitch modulation" = "Tonhöhenmodulation"
 "Pitch drift" = "Tonhöhendrift"
+"Newtone's natural pitch engine, pitch modulation and pitch drift are left out (the notes play with the first engine): {0}" = "Newtones natürliche Tonhöhen-Engine, Tonhöhenmodulation und Tonhöhendrift entfallen (die Noten spielen mit der ersten Engine): {0}"

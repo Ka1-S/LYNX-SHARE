@@ -11252,3 +11252,4 @@ countries: pl
 "Natural pitch engine (LYNX)" = "Naturalny silnik wysokości (LYNX)"
 "Pitch modulation" = "Modulacja wysokości"
 "Pitch drift" = "Dryf wysokości"
+"Newtone's natural pitch engine, pitch modulation and pitch drift are left out (the notes play with the first engine): {0}" = "Naturalny silnik wysokości, modulacja i dryf wysokości Newtone zostają pominięte (nuty grają z pierwszym silnikiem): {0}"

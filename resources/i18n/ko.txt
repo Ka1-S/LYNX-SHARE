@@ -11252,3 +11252,4 @@ countries: kr
 "Natural pitch engine (LYNX)" = "자연스러운 피치 엔진 (LYNX)"
 "Pitch modulation" = "피치 모듈레이션"
 "Pitch drift" = "피치 드리프트"
+"Newtone's natural pitch engine, pitch modulation and pitch drift are left out (the notes play with the first engine): {0}" = "Newtone의 자연스러운 피치 엔진, 피치 모듈레이션과 피치 드리프트는 빠집니다 (노트는 첫 번째 엔진으로 재생됩니다): {0}"
