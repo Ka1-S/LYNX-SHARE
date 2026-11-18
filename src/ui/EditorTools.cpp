@@ -543,9 +543,9 @@ void EditorGlobals::setFollowing (bool pianoRoll, bool on, bool save)
 {
     auto& flag = pianoRoll ? followPianoRoll : followPlaylist;
     // (round 190im, R15: a Follow click while it is paused resumes it, as Live's; it stays on)
-    if (auto& paused = followPaused[(std::size_t) (pianoRoll ? FollowView::pianoRoll : FollowView::playlist)]; paused)
+    if (const auto view = pianoRoll ? FollowView::pianoRoll : FollowView::playlist; isFollowPaused (view))
     {
-        paused = false;
+        resumeFollow (view);
         if (! on && flag)
         {
             sendChangeMessage();
@@ -567,9 +567,9 @@ void EditorGlobals::setFollowingView (FollowView v, bool on, bool save)
     if (v == FollowView::playlist || v == FollowView::pianoRoll)
         return setFollowing (v == FollowView::pianoRoll, on, save);
     auto& flag = v == FollowView::channelRack ? followRack : followAudioEditor;
-    if (auto& paused = followPaused[(std::size_t) v]; paused)
+    if (isFollowPaused (v))
     {
-        paused = false;
+        resumeFollow (v);
         if (! on && flag)
         {
             sendChangeMessage();

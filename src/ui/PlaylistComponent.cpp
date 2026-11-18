@@ -13726,7 +13726,7 @@ bool PlaylistComponent::liveFrame (double nowMs)
     auto& globals = EditorGlobals::get();
     globals.noteTransport (playing);
     if (playing && scrollTicks != followSeenScroll && pixelsPerTick == followSeenZoom)
-        globals.pauseFollow (EditorGlobals::FollowView::playlist);
+        globals.pauseFollowForScroll (EditorGlobals::FollowView::playlist);
     followSeenScroll = scrollTicks;
     followSeenZoom = pixelsPerTick;
     auto tick = -1.0;

@@ -5248,7 +5248,7 @@ bool PianoRollComponent::playheadFrame (double)
     auto& globals = EditorGlobals::get();
     globals.noteTransport (playing);
     if (playing && scrollTicks != followSeenScroll && pixelsPerTick == followSeenZoom)
-        globals.pauseFollow (EditorGlobals::FollowView::pianoRoll);
+        globals.pauseFollowForScroll (EditorGlobals::FollowView::pianoRoll);
     followSeenScroll = scrollTicks;
     followSeenZoom = pixelsPerTick;
 

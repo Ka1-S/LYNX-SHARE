@@ -11,6 +11,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "core/EditorGestures.h"
+#include "core/FollowPause.h"
 #include "core/ToolbarLayout.h"
 #include "engine/AudioEngine.h"
 #include "ui/Icons.h"
@@ -232,6 +233,7 @@ public:
     // The Channel Rack's and the Audio Editor's Follow (issue #12): the rack pages to the playing step of a long
     // pattern, the Audio Editor to its playback position.
     enum class FollowView { playlist, pianoRoll, channelRack, audioEditor };
+    static_assert ((int) FollowView::audioEditor == followpause::audioEditor && (int) FollowView::playlist == followpause::playlist);
     bool isFollowingView (FollowView v) const noexcept
     {
         return v == FollowView::channelRack ? followRack : v == FollowView::audioEditor ? followAudioEditor : isFollowing (v == FollowView::pianoRoll);
@@ -243,28 +245,27 @@ public:
     // captured; 0 / 1 = set by hand (Options › "Auto scrolling pauses on a scroll or an edit", saved with the UI options).
     int followPausesOnEdit = -1;
     bool followPausing() const noexcept { return followPausesOnEdit < 0 ? clipLaunchWorkflow : followPausesOnEdit != 0; }
-    void pauseFollow (FollowView v) noexcept
+    void pauseFollow (FollowView v) noexcept { followState.pause ((int) v, followPausing(), isFollowingView (v)); }
+    // round 190kp: a sideways scroll a view saw between two frames (not counted right after a layout switch)
+    void pauseFollowForScroll (FollowView v) noexcept
     {
-        if (followPausing() && isFollowingView (v))
-            followPaused[(std::size_t) v] = true;
+        followState.pauseForScroll ((int) v, followPausing(), isFollowingView (v), juce::Time::getMillisecondCounterHiRes());
     }
-    bool isFollowPaused (FollowView v) const noexcept { return followPaused[(std::size_t) v]; }
+    // (round 190kp: a pause counts only where pausing is on, see core/FollowPause.h)
+    bool isFollowPaused (FollowView v) const noexcept { return followState.isPaused ((int) v, followPausing()); }
     // Follow is on for the view and not paused now
-    bool followsNow (FollowView v) const noexcept { return isFollowingView (v) && ! followPaused[(std::size_t) v]; }
+    bool followsNow (FollowView v) const noexcept { return followState.follows ((int) v, isFollowingView (v), followPausing()); }
     // the song changed during a gesture or a key of the view (an edit by hand)
     void pauseFollowIfEdited (FollowView v, std::uint64_t before, std::uint64_t after) noexcept
     {
         if (before != after)
             pauseFollow (v);
     }
-    void resumeFollow (FollowView v) noexcept { followPaused[(std::size_t) v] = false; }
+    void resumeFollow (FollowView v) noexcept { followState.resume ((int) v); }
     // each view's frame step tells the transport's state: a play or a stop lifts every pause
-    void noteTransport (bool playing) noexcept
-    {
-        if (playing != lastTransportPlaying)
-            followPaused = {};
-        lastTransportPlaying = playing;
-    }
+    void noteTransport (bool playing) noexcept { followState.noteTransport (playing); }
+    // round 190kp: the layout style changed (not a scroll by hand): every pause is lifted
+    void followLayoutChanged() noexcept { followState.layoutChanged (juce::Time::getMillisecondCounterHiRes()); }
     // Called after an option the main window saves changed here (it writes ui-options.txt).
     std::function<void()> onOptionsChanged;
 
@@ -273,8 +274,7 @@ private:
     int gridOption = grid::screenOption, lastGridOption = grid::screenOption;
     std::int64_t defaultNoteLength = 0;
     bool followPlaylist = true, followPianoRoll = true, followRack = true, followAudioEditor = true;
-    std::array<bool, 4> followPaused {}; // round 190im: [FollowView]
-    bool lastTransportPlaying = false;
+    followpause::State followState; // round 190im: the pauses [FollowView] (round 190kp: core/FollowPause.h)
 };
 
 // The global grid selector of the main toolbar: left-click picks the grid, right-click sets the
