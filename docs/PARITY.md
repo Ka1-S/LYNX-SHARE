@@ -4764,3 +4764,66 @@ would need UI).
 **Still off:** Doubler2 (4.48), Waves Tune Real-Time (5.36) and RVerb / H-Reverb's decay (time / the table's ceiling);
 NS1 at 20 … 100 % (a new engine); PuigTec's mains hum, tube harmonics (−50 dB at −4 dBFS) and its resampler's
 fractional delay; L2's IDR dither; CLA-76's auto make-up and output saturation (no scored setting uses them).
+
+## Round 190ln (Valhalla reverbs): Foil Plate on ValhallaPlate's own EQ and bass decay; ValhallaRoom read, not changed
+
+Static analysis of the official ValhallaPlate / ValhallaRoom binaries by the owner's leave (clean-room: the laws understood,
+LYNX's own code written; nothing of the plug-ins copied). Evidence: docs/analise/REA_rodada190ln.md, lab
+`/mnt/e/lynx-work/rea3_190ln/vr/`. Score: `scripts/fxparity.py` with round 190lg's alignment window in time (~85 ms), the
+same scorer before and after.
+
+**Foil Plate ← ValhallaPlate (hidden `verbs::foil::reaLaw`, index 18, one past round 190it's revision).** Read only with
+revision 1 and the plate voicing off (the ValhallaPlate role; Little Plate's role never reads it). A new instance and a
+translated ValhallaPlate state get 1; a project saved before loads 0 and renders bit for bit as before (42 / 42 renders of
+revisions 0 and 1 at 44.1 / 48 / 96 kHz against the base commit's objects, plus 42 / 42 fxrender renders of translated states;
+fingerprints in `tests/Parity190lnVrTests.inc`).
+- Low / High EQ: the reference's first-order shelves — the bilinear transform of (gLow + gHigh·s/ω0) / (1 + s/ω0), the corner
+  at the panel's frequency (not pre-warped), ±12 dB linear in the value — in place of round 183b's second-order shelves placed
+  by ear (`Settings::shelfOrder`, LYNX's engine).
+- Bass decay: the reference's bass lines ring at Decay up to ~2.5 s and at up to 1.4 × Decay from ~10 s; Foil's bass
+  multiplier follows that law's ratio to the default 3 s (its voicings were fitted there).
+
+| Bank (ValhallaPlate captures → Foil Plate) | files | before → after | up / same / down |
+|---|---|---|---|
+| refcap030 mode / pairs / sr48 / sr96 | 124 | 3.73 → **3.76** | 4 / 119 / 1 |
+| verb183b captures | 18 | 3.78 → 3.83 | 1 / 17 / 0 |
+| refcap182 programme | 25 | 3.84 → 3.84 | 0 / 25 / 0 |
+| tp172d | 15 | 3.73 → 3.73 | 0 / 15 / 0 |
+
+Up: the Low EQ +7 dB impulse (spectrum 2.58 → 1.57 dB) and the Decay 1.5 s music files. The one file down (sr48 S3 impulse
+4 → 3) is the scorer's alignment on a diffuse tail: the bands moved < 0.1 dB but the found lag jumped from +16 to −74 ms.
+
+**ValhallaRoom → Atrium: read, not changed.** Its late network has 2 × 16 lines (ours 8), its HiCut is a Butterworth
+low-pass plus a first-order shelf on four inner paths. Atrium's level over Decay and its octaves from 125 Hz up are within
+~1 dB; the files at 1 … 3 are the test signal's 1 kHz staircase, a linear effect of the tank's fine structure (the reference
+flat within ±1 dB over ±4 Hz, ours ±4 … 12 dB). More modulation moved it 1 … 1.5 dB only — a denser late tank is its own
+project. Room scores unchanged (mode 3.31, pairs 4.22, sr48 3.44, sr96 3.38).
+
+## Round 190ln (Slate / Eiosis): AirEQ and Infinity EQ translated onto Facet EQ in physical units
+
+Static REA of the third-party binaries by the owner's leave (2026-11-17), clean-room (docs/analise/REA_rodada190ln.md §1 … §5;
+lab /mnt/e/lynx-work/rea3_190ln). Until now a project that used **Eiosis AirEQ**, Slate's **VM AirEQ Air / Earth** or
+**Infinity EQ** opened Facet EQ flat (round 190ar left the EQ modules without a translator: their per-setting maps did not
+interpolate). Their states are XML archives of normalised values; they are now read in physical units:
+- **AirEQ** (`translate = eiosis-aireq`): low / high cuts (shallow / steep, slope, Q), the Earth and Air shelves, five
+  bells / shelves, strength (per-band exclusion), mid / side or left / right placement, input / output trims. Value laws
+  through the plug-in's own value texts (its tapers are 11-knot tables interpolated linearly in the unit — structure seen
+  statically, the knots not read). Shapes fitted with Facet's own prototypes on the references' renders: a bell's peak and
+  width follow the dial (peak 5.6 / 9.5 / 11.6 / 18.1 dB for a dial of 3 / 6 / 9 / 18 dB at Q 1, × q^0.35; Facet Q falls from
+  1.0 to 0.50 as the gain grows, × q^0.876), shelves are the cookbook shelf of slope Q, Earth / Air are Facet shelves fitted
+  per dial value, cuts are Butterworth at Q 0.71.
+- **Infinity EQ** (`translate = slate-infinity-eq`): the first eight enabled of its 24 bands — cuts, shelves, bells (Width =
+  the cookbook bandwidth in semitones), notch, tilt, dynamics (target, threshold or automatic), placement, output.
+
+| reference → LYNX | files (sweeps / programme / probes) | before → after | up / same / down |
+|---|---|---|---|
+| Eiosis AirEQ → Facet EQ | 154 / 25 / 10 | 5.78 → **8.85** (sweeps 6.18 → 8.93, programme 4.20 → 8.52, probes 3.70 → 8.40) | 99 / 90 / 0 |
+| VM AirEQ Air → Facet EQ | 31 / 25 / 10 | 4.38 → **8.05** | 51 / 15 / 0 |
+| VM AirEQ Earth → Facet EQ | 31 / 25 / 10 | 4.44 → **7.39** | 50 / 16 / 0 |
+| Infinity EQ → Facet EQ | — / 30 / 12 | 4.71 → **8.00** | 34 / 8 / 0 |
+
+Score: scripts/fxparity.py with round 190lg's time-based alignment window, before and after. No LYNX effect changed (gold:
+24 renders of Facet, the role-entry EQs and Pro-Q 4 translations at 44.1 / 48 / 96 kHz identical to the base binary); the
+translated Facet costs its bands (+0.1 … 0.3 % of one core over flat). Open: AirEQ's per-band Character and "steep" bell
+switch, the shallow 6 dB low cut's resonance (no capture with them on; the licence ended 11-13), Infinity EQ's Q2, the other
+VM EQ modules (FG-73 / FG-N / FG-S / SD-PE1 / CS-EQ / CS-Lift: same route, thin banks).

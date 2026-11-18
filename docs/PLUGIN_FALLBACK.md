@@ -160,7 +160,23 @@ matches by name).
 | FabFilter Pro-Q | Facet EQ (flat, round 99) | names | Pro-Q 4: bands, shapes, slopes, phase mode (round 124 / 144); round 190jh: dynamic bands (range, Auto → Facet's automatic threshold, manual threshold, attack / release; round 190js: the automatic threshold refitted, 50 % = 9.2 / 268 ms) |
 | Waves DeEsser | Hush De-esser (5.5 kHz, −20 dBFS, 4 dB; round 113) | Waves name | frequency, threshold, split / wideband, side-chain filter, monitor, laws measured on the official trial [EXEC] (round 113 §3c) |
 | FabFilter Pro-DS, Harrison De-Esser | Hush De-esser (default; round 96) | names | — |
+| Eiosis AirEQ, Slate VM AirEQ Air / Earth | Facet EQ (flat without a state; round 190ln) | names | round 190ln: the XML state in physical units — low / high cuts (shallow / steep, slopes, Q), Earth and Air shelves, five bells / shelves (the reference's gain-and-Q law fitted on its renders), strength, mid / side or left / right placement, input / output trims; the "steep" bell switch is not modelled (REA_rodada190ln §3) |
+| Slate Digital Infinity EQ | Facet EQ (flat without a state; round 190ln) | names | round 190ln: the first eight enabled of its 24 bands — cuts, shelves, bells (width in semitones), notch, tilt, dynamics (target, threshold or automatic), channel placement, output (REA_rodada190ln §4) |
 | Slate Digital Fresh Air | Aether (neutral without a state; round 96) | name | Mid / High Air → Aether's air shelf gain and frequency, laws measured on the official trial (within 0.5 dB RMS for her settings) [EXEC] (round 113) |
+| Kilohearts Disperser | Facet EQ's hidden all-pass cascade (round 190ln; bands off) | name | order, cutoff, pinch: `order` cookbook all-pass sections at the cutoff with Q = pinch, the structure read statically in the plug-in's engine [STATIC] (REA_rodada190ln, Kilohearts) |
+| kHs Gain, Channel Mixer, Stereo | Utility (round 190ln) | names | gain (stored linear); the 2 × 2 matrix; width / mid as the M/S matrix, pan as balance [DATA] |
+| kHs Haas | Stereo Shaper (round 190ln) | name | delayed channel, delay [DATA] |
+| kHs Filter, 3-Band EQ, Formant Filter | Facet EQ (round 190ln) | names | type, cutoff, Q, gain, slope (×n = 12n dB/oct); split shelves around the mid gain; the two formant peaks [DATA] |
+| kHs Ladder Filter, Nonlinear Filter | Filter (round 190ln) | names | type, cutoff, resonance / Q (ladder: 24 dB/oct) [DATA] |
+| kHs Compressor, Compactor, Dynamics | Compressor (round 190ln) | names | threshold, ratio, attack, release, make-up (Dynamics: the downward part) [DATA] |
+| kHs Limiter, Clipper, Gate | Limiter / Fruity Soft Clipper / Sentry Gate (round 190ln) | names | input / output gains folded into gain and ceiling; threshold, knee-less clip; gate threshold, times, range, look-ahead [DATA] |
+| kHs Transient Shaper | Strike Shaper (round 190ln) | name | attack / sustain (±100 % → ±12 dB, not measured), clip [DATA] |
+| kHs Distortion, Faturator | Distortion (round 190ln) | names | drive (Faturator's 0 … 100 % → 0 … 24 dB, not measured), mix [DATA] |
+| kHs Bitcrush, Frequency Shifter, Pitch Shifter | Lo-fi / Frequency shifter / Pitch shift (round 190ln) | names | rate, bits, mix; shift; pitch, grain, mix [DATA] |
+| kHs Chorus, Ensemble, Phaser, Flanger | Chorus / Fruity Phaser / Fruity Flanger (round 190ln) | names | rate, depth, mix; order → stages, depth range; delay, depth, rate, feedback, spread [DATA] |
+| kHs Reverb | Reeverb 2 (round 190ln) | name | decay, size, damping, width, early, dry / wet [DATA] |
+| kHs Delay, Dual Delay | Echoform, Clean character (round 190ln) | names | time or synced note, ping-pong / dual and ratio, feedback, duck, mix [DATA] |
+| kHs Tape Stop, Comb Filter, Trance Gate | Pocket Tape Stop / Pocket Comb Filter / Volume gate (round 190ln) | names | play, times; cutoff → pitch, polarity, mix; the selected pattern (steps, ties, the ADS level of each run), depth, attack, release, mix [DATA] |
 | Soundtoys Decapitator, FabFilter Saturn | Ember Saturator (drive +1.4 dB, auto gain; round 113) | VST2 ID `StDc`, names | Saturn 2: multiband mode — bands, crossovers, style family, drive, mix, level (round 108) [EXEC layout]; Decapitator: her states (round 135, read black-box in the official trial: payload hash → voicing, drive, punish, tone, wide cuts, thump / steep, mix, trim) |
 | Soundtoys PanMan | Auto-pan, panner sources (round 135: a 3.56 Hz soft LFO, 150° wide, analog — her usual setting) | VST2 ID [DATA], name | her states (round 135, read black-box in the official trial: source, rate, steps, width, smoothing, gains, analog) |
 

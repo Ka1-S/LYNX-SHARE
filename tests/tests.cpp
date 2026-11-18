@@ -17824,6 +17824,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Parity190hoTests.inc"
 #include "Parity190iqTests.inc"
 #include "Parity190itTests.inc"
+#include "Parity190lnVrTests.inc" // round 190ln: Foil Plate on ValhallaPlate's own EQ / bass-decay laws (after Parity190it: its gold helpers)
 #include "Parity190jhTests.inc" // round 190jh: Facet's automatic threshold, Pro-Q 4 dynamic bands, Waves L2 / SuperTap / SSLComp / CLA-76
 #include "Parity190jsTests.inc" // round 190js: the Waves reverbs on Reeverb 2, Hush's Single Vocal revision, Facet's auto-threshold refit
 #include "Parity190ktTests.inc" // round 190kt: REA of the Waves SSLComp DSP, Crest's console law, SSLComp on Crest
@@ -17841,6 +17842,8 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Parity190lfDynTests.inc" // round 190lf (dyn): Glow Leveler's cell law (REA of the Waves CLA-2A), CLA-2A on it
 #include "Parity190lfVerbTests.inc" // round 190lf (verb): H-Delay's measured loop (Echoform hybrid law 1), TrueVerb's direct sound
 #include "Parity190lfNs1Tests.inc" // round 190lf (ns1): Quell's zero law (REA of the Waves NS1: 0 % = its bare all-pass pair), NS1 on it
+#include "Parity190lnTests.inc" // round 190ln: Eiosis AirEQ / Slate Infinity EQ translated onto Facet EQ in physical units
+#include "Parity190lnKhsTests.inc" // round 190ln: Kilohearts states (kHs snapins, Faturator, Disperser) on LYNX stand-ins
 #include "Sampler190dhTests.inc"
 #include "Fix190eaTests.inc"
 #include "Iss158Tests.inc"

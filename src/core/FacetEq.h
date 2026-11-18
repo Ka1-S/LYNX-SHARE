@@ -90,7 +90,17 @@ constexpr int autoThresholdParam0 = paramCount; // + band
 // release knobs. 0 = round 190jh / 190js's fitted law (every project saved before; bit for bit). A new Facet and a
 // translated Pro-Q 4 state get 1.
 constexpr int autoRevisionParam = autoThresholdParam0 + 8;
-constexpr int storedParamCount = autoRevisionParam + 1;
+// round 190ln (the Kilohearts Disperser role), hidden the same way — saved while non-zero, so every project saved before
+// loads 0 (off) and plays bit for bit as before: a cascade of second-order all-pass sections (the cookbook all-pass,
+// bilinear) after the bands, [126] how many (value × 64 sections, 0 = off), [127] their frequency (hz law), [128] their
+// Q (q law). Set only by the Disperser translator (core/KiloheartsStates.inc). [125] stays free: round 190lg's Pro-Q 4
+// automatic-threshold revision (branch rea2_190lg) takes it.
+constexpr int dispersionCountParam = autoThresholdParam0 + 9;
+constexpr int dispersionFreqParam = dispersionCountParam + 1;
+constexpr int dispersionQParam = dispersionCountParam + 2;
+constexpr int maxDispersionSections = 64;
+int dispersionSections (float v) noexcept; // 0 … 64
+constexpr int storedParamCount = dispersionCountParam + 3;
 constexpr int maxSections = 8; // 96 dB/oct = 16th order
 
 enum class Shape { off, bell, lowShelf, highShelf, lowCut, highCut, notch, bandPass, tiltShelf, flatTilt, allPass };

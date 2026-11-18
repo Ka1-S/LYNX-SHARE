@@ -755,6 +755,7 @@ public:
         delayPos = 0;
         dynUsed.fill (0.0);
         spectral.reset();
+        for (auto& a : apState) a = {};
         for (auto& m : meters) m.store (0.0f, std::memory_order_relaxed);
         for (auto* r : { &srcRing[0], &srcRing[1], &tgtRing[0], &tgtRing[1] }) std::fill (r->begin(), r->end(), 0.0f);
         cmpPos = 0;
@@ -857,6 +858,23 @@ public:
         if (spectralNow)
             spectral.process (left, right, n);
 
+        if (apCount > 0) // round 190ln: the hidden all-pass cascade (the Disperser role)
+            for (int i = 0; i < n; ++i)
+            {
+                double x[2] { (double) left[i], (double) right[i] };
+                for (int c = 0; c < 2; ++c)
+                    for (int k = 0; k < apCount; ++k)
+                    {
+                        auto& z = apState[(std::size_t) k][(std::size_t) c];
+                        const double y = apB0 * x[c] + z[0];
+                        z[0] = apB1 * x[c] - apB1 * y + z[1]; // b1 = a1 for an all-pass
+                        z[1] = x[c] - apB0 * y;               // b2 = 1, a2 = b0
+                        x[c] = y;
+                    }
+                left[i] = (float) x[0];
+                right[i] = (float) x[1];
+            }
+
         if (outMidSide)
             for (int i = 0; i < n; ++i)
             {
@@ -938,6 +956,20 @@ private:
         for (int i = 0; i < storedParamCount; ++i) cached[(std::size_t) i] = params[(std::size_t) i];
         current = params;
         seenParams = true;
+        {
+            // round 190ln: the all-pass cascade's sections (cookbook all-pass: b0 = a2 = (1 − α) / (1 + α), b1 = a1 =
+            // −2 cos w0 / (1 + α), b2 = a0 = 1, α = sin w0 / 2Q); a changed count starts the new sections from rest
+            const int count = dispersionSections (params[(std::size_t) dispersionCountParam]);
+            if (count > 0)
+            {
+                const double f = std::min (hz (params[(std::size_t) dispersionFreqParam]), 0.45 * sampleRate);
+                const double w0 = 2.0 * pi * f / sampleRate, alpha = std::sin (w0) / (2.0 * q (params[(std::size_t) dispersionQParam]));
+                apB0 = (1.0 - alpha) / (1.0 + alpha);
+                apB1 = -2.0 * std::cos (w0) / (1.0 + alpha);
+                for (int k = apCount; k < count; ++k) apState[(std::size_t) k] = {};
+            }
+            apCount = count;
+        }
         const auto newMode = phase (params[(std::size_t) phaseParam]);
         if (newMode != mode)
         {
@@ -1307,6 +1339,9 @@ private:
     Phase mode = Phase::zeroLatency;
     EffectParams current {};
     std::array<float, storedParamCount> cached {};
+    int apCount = 0; // round 190ln: the hidden all-pass cascade
+    double apB0 = 1.0, apB1 = 0.0;
+    std::array<std::array<std::array<double, 2>, 2>, maxDispersionSections> apState {};
     std::array<std::array<Section, maxSections>, bands> sections {};
     std::array<std::array<State, maxSections>, bands> state {};
     std::array<int, bands> counts {};
@@ -1509,6 +1544,11 @@ std::string paramText (int p, float v)
         case 3: std::snprintf (t, sizeof (t), "%.3f", q (v)); return t;
         default: std::snprintf (t, sizeof (t), "%d dB/oct", slopeDb (v)); return t;
     }
+}
+
+int dispersionSections (float v) noexcept
+{
+    return std::clamp ((int) std::lround ((double) v * maxDispersionSections), 0, maxDispersionSections);
 }
 
 int design (const EffectParams& params, int band, double sampleRate, std::array<Section, maxSections>& out, double extraDb) noexcept

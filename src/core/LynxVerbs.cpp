@@ -640,9 +640,24 @@ struct Engine::Impl
         if (toneMidOn)
             toneMid.peaking (sr, std::min (s.toneMidHz, 0.45 * sr), std::max (0.1, s.toneMidQ), s.toneMidDb);
         shelfLowOn = std::abs (s.lowShelfDb) > 0.01;
+        shelfHighOn = std::abs (s.highShelfDb) > 0.01;
+        if (s.shelfOrder == 1)
+        {
+            // round 190ln: first-order shelves, (gLow + gHigh·s/ω0) / (1 + s/ω0) through the bilinear transform with
+            // k = 2·fs / ω0 (the corner not pre-warped): b0 = gLow + gHigh·k, b1 = gLow − gHigh·k, a0 = 1 + k, a1 = 1 − k
+            const auto firstOrder = [this] (Biquad& f, double hz, double gLow, double gHigh)
+            {
+                const auto k = sr / (pi * std::max (1.0, hz));
+                f.set (gLow + gHigh * k, gLow - gHigh * k, 0.0, 1.0 + k, 1.0 - k, 0.0);
+            };
+            if (shelfLowOn)
+                firstOrder (shelfLow, s.lowShelfHz, std::pow (10.0, s.lowShelfDb / 20.0), 1.0);
+            if (shelfHighOn)
+                firstOrder (shelfHigh, s.highShelfHz, 1.0, std::pow (10.0, s.highShelfDb / 20.0));
+            return;
+        }
         if (shelfLowOn)
             shelfLow.shelf (sr, s.lowShelfHz, s.lowShelfDb, false, 0.7);
-        shelfHighOn = std::abs (s.highShelfDb) > 0.01;
         if (shelfHighOn)
             shelfHigh.shelf (sr, std::min (s.highShelfHz, 0.45 * sr), s.highShelfDb, true, 0.7);
     }
@@ -2349,6 +2364,23 @@ protected:
             {
                 s.revision = 1; // round 190it
                 applyTrim (s, foilTrim[p[14] >= 0.5f ? foil::typeCount : choice (p[11], foil::typeCount)]);
+                // round 190ln (reaLaw, the ValhallaPlate role): the reference's own laws, read by static REA
+                // (docs/analise/REA_rodada190ln.md). Its Low / High EQ are first-order shelves with the corner at the
+                // panel's frequency (20 … 2000 / 200 … 20000 Hz) and ±12 dB (the gain linear in dB); ours were second-order
+                // shelves placed by ear (half-gain near 0.47 / 0.5 × the frequency, the cut of the high one −9 dB). Its
+                // bass decay is longer than Decay from ~2.5 s on (foil::reaBassRtMult); the voicings above were fitted at
+                // the default Decay (3 s), so the bass decay moves by the law's ratio to that point (its loop's bass
+                // crossover, a one-pole at 200 Hz, was tried for ours at 250 Hz: one file a step lower, none higher)
+                if (p[foil::reaLaw] >= 0.5f && p[14] < 0.5f)
+                {
+                    s.shelfOrder = 1;
+                    s.lowShelfHz = 20.0 + 1980.0 * p[7];
+                    s.lowShelfDb = -12.0 + 24.0 * p[8];
+                    s.highShelfHz = 200.0 + 19800.0 * p[9];
+                    s.highShelfDb = -12.0 + 24.0 * p[10];
+                    if (! infinite)
+                        s.lowMult *= foil::reaBassRtMult (rt) / foil::reaBassRtMult (3.0);
+                }
             }
         }
     }
@@ -3083,6 +3115,10 @@ float atrium::decayValue (double s) noexcept { return (float) skewInverse (s, 0.
 double foil::lowCutHz (float v) noexcept { return v <= 0.0f ? 0.0 : 20.0 * std::pow (50.0, (double) std::min (v, 1.0f)); }
 const char* foil::typeName (int i) noexcept { return foilTypes[std::clamp (i, 0, foil::typeCount - 1)].name; }
 double foil::decaySec (float v) noexcept { return foilDecaySec (v); }
+// round 190ln (static REA of ValhallaPlate, docs/analise/REA_rodada190ln.md): its tank runs two sets of lines, one at Decay
+// and one at a longer bass decay that equals Decay up to ~2.5 s and grows to 1.4 × Decay by ~10 s (and stays there). Our
+// own law of that shape: a linear rise of the multiple between the two points
+double foil::reaBassRtMult (double decay) noexcept { return 1.0 + 0.4 * std::clamp ((decay - 2.5) / 7.5, 0.0, 1.0); }
 const char* nebula::modeName (int i) noexcept { return nebulaModes[std::clamp (i, 0, nebula::modeCount - 1)].name; }
 double nebula::delayMs (float v) noexcept { return nebulaDelayMs (v); }
 bool nebula::cloudMode (int mode) noexcept { return nebulaTopology (mode) != cloud::Topology::none; }
