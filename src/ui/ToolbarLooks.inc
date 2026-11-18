@@ -14,6 +14,8 @@
 
 #include "core/ClipLauncher.h"
 #include "core/DrawMode.h"
+#include "core/ValueMath.h"
+#include "engine/Metronome.h"
 #include "ui/ClipGridComponent.h"
 #include "ui/I18n.h"
 #include "ui/LiveSessionUi.h"
@@ -37,7 +39,7 @@ void MainComponent::setUpLookParts()
     lookPartsReady = true;
     for (auto* c : std::initializer_list<juce::Component*> { &signatureBox, &quantBox, &saveStatus, &moreButton, &browserToggleButton,
                                                              &backToArrangementButton, &captureButton, &sessionRecordButton, &drawModeButton,
-                                                             &keyMapButton, &midiMapButton, &sessionViewButton, &arrangementViewButton })
+                                                             &keyMapButton, &midiMapButton, &sessionViewButton, &arrangementViewButton, &cycleButton, &metronomeMenuButton })
     {
         addChildComponent (c);
         c->setMouseClickGrabsKeyboardFocus (false);
@@ -90,12 +92,249 @@ void MainComponent::setUpLookParts()
     arrangementViewButton.onClick = [this] { setClipGridView (PlaylistArea::GridView::song); };
 
     saveStatus.onSave = [this] { save (false); };
+
+    // round 190ld (details DS-2, BandLab B07: ⟳ after Record in the transport capsule): the Playlist's loop switch
+    const auto cycleText = tr ("Cycle: plays the loop range over and over (without one: the bar at the song position)");
+    cycleButton.setTooltip (cycleText);
+    ui::setHint (cycleButton, cycleText);
+    cycleButton.onClick = [this] { toggleCycle(); };
+    cycleButton.setToggleLook (true); // (a switch: lit while it cycles)
+
+    // round 190ld (details DS-1, BandLab B07): the ▾ beside the metronome opens BandLab's metronome popover
+    metronomeMenuButton.setTooltip (tr ("Metronome: tap tempo, sound, volume and count-in"));
+    ui::setHint (metronomeMenuButton, tr ("Metronome: tap tempo, sound, volume and count-in"), true);
+    metronomeMenuButton.onClick = [this] { showMetronomePopover(); };
+}
+
+namespace
+{
+// BandLab's metronome popover (bandlab190p shots/07-metronome-tap-countin.png, 342 x 356 at 100 %): Tap Tempo (− tempo / Tap
+// +), Metronome Sound (the sounds and ▶ to hear it), Metronome Volume (a slider and its dB) and Count-in Duration (Off /
+// 1 Bar / 2 Bars); LYNX's colours, BandLab's order and controls (Simple layout only)
+class MetronomePopover final : public juce::Component
+{
+public:
+    explicit MetronomePopover (AudioEngine& e, std::function<void()> saveIn) : engine (e), save (std::move (saveIn))
+    {
+        using namespace theme;
+        for (auto* b : { &minus, &plus })
+        {
+            b->setColour (juce::TextButton::buttonColourId, juce::Colours::transparentBlack);
+            b->setColour (juce::TextButton::textColourOffId, colour::textPrimary);
+            addAndMakeVisible (b);
+        }
+        minus.onClick = [this] { setTempo (engine.getSong().bpm - 1.0); };
+        plus.onClick = [this] { setTempo (engine.getSong().bpm + 1.0); };
+        ui::setHint (minus, tr ("Tempo - 1 BPM"));
+        ui::setHint (plus, tr ("Tempo + 1 BPM"));
+        for (int i = 0; i < metronome::soundCount; ++i)
+            sound.addItem (tr (metronome::soundName (i)), i + 1);
+        sound.setSelectedId (metronome::clampSound (engine.getTransport().metronomeSound.load()) + 1, juce::dontSendNotification);
+        sound.onChange = [this] {
+            engine.getTransport().metronomeSound.store (sound.getSelectedId() - 1);
+            save();
+        };
+        addAndMakeVisible (sound);
+        hear.onClick = [this] { preview(); };
+        hear.setTooltip (tr ("Hear the metronome sound"));
+        addAndMakeVisible (hear);
+        volume.setSliderStyle (juce::Slider::LinearHorizontal);
+        volume.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
+        volume.setRange (0.0, controls::maxUtilityVolume, 0.01);
+        volume.setDoubleClickReturnValue (true, 1.0);
+        volume.setValue (engine.getTransport().metronomeVolume.load(), juce::dontSendNotification);
+        volume.onValueChange = [this] {
+            engine.getTransport().metronomeVolume.store ((float) volume.getValue());
+            repaint (volumeText);
+        };
+        volume.onDragEnd = [this] { save(); };
+        addAndMakeVisible (volume);
+        const juce::String names[] { tr ("Off"), tr ("1 Bar"), tr ("2 Bars") };
+        for (int i = 0; i < 3; ++i)
+        {
+            auto& b = countIn[(std::size_t) i];
+            b.setButtonText (names[i]);
+            b.setClickingTogglesState (false);
+            b.setColour (juce::TextButton::buttonColourId, colour::bg1);
+            b.setColour (juce::TextButton::buttonOnColourId, colour::bg5);
+            b.setColour (juce::TextButton::textColourOffId, colour::textSecondary);
+            b.setColour (juce::TextButton::textColourOnId, colour::textPrimary);
+            b.onClick = [this, i] {
+                auto o = engine.getRecordOptions();
+                o.countInBars = i;
+                engine.setRecordOptions (o);
+                refreshCountIn();
+                save();
+            };
+            addAndMakeVisible (b);
+        }
+        refreshCountIn();
+        setSize (300, 340);
+    }
+
+    void refreshCountIn()
+    {
+        const auto bars = engine.getRecordOptions().countInBars;
+        for (int i = 0; i < 3; ++i)
+            countIn[(std::size_t) i].setToggleState (bars == i || (i == 2 && bars > 2), juce::dontSendNotification);
+    }
+
+    void resized() override
+    {
+        auto r = getLocalBounds().reduced (12, 10);
+        r.removeFromTop (26); // "Tap Tempo"
+        tapBox = r.removeFromTop (60);
+        minus.setBounds (tapBox.withWidth (tapBox.getWidth() / 3).reduced (8));
+        plus.setBounds (tapBox.withTrimmedLeft (tapBox.getWidth() * 2 / 3).reduced (8));
+        tapArea = tapBox.withTrimmedLeft (tapBox.getWidth() / 3).withWidth (tapBox.getWidth() / 3);
+        r.removeFromTop (10);
+        r.removeFromTop (26); // "Metronome Sound"
+        auto row = r.removeFromTop (30);
+        hear.setBounds (row.removeFromRight (30));
+        row.removeFromRight (8);
+        sound.setBounds (row);
+        r.removeFromTop (10);
+        r.removeFromTop (26); // "Metronome Volume"
+        row = r.removeFromTop (24);
+        volumeText = row.removeFromRight (64);
+        row.removeFromLeft (22); // (the speaker)
+        volume.setBounds (row);
+        r.removeFromTop (10);
+        r.removeFromTop (26); // "Count-in Duration"
+        row = r.removeFromTop (34);
+        for (int i = 0; i < 3; ++i)
+            countIn[(std::size_t) i].setBounds (row.withX (row.getX() + row.getWidth() * i / 3).withWidth (row.getWidth() / 3).reduced (2));
+    }
+
+    void paint (juce::Graphics& g) override
+    {
+        using namespace theme;
+        g.fillAll (colour::bg2);
+        g.setColour (colour::textPrimary);
+        g.setFont (font (type::body, true));
+        auto y = 10;
+        for (const auto& title : { tr ("Tap Tempo"), tr ("Metronome Sound"), tr ("Metronome Volume"), tr ("Count-in Duration") })
+        {
+            g.drawText (title, 12, y, getWidth() - 24, 22, juce::Justification::centredLeft, true);
+            y += title == tr ("Tap Tempo") ? 26 + 60 + 10 : title == tr ("Metronome Sound") ? 26 + 30 + 10 : 26 + 24 + 10;
+        }
+        fillRoundRect (g, tapBox.toFloat(), radius::md, colour::bg1);
+        g.setColour (colour::border);
+        g.fillRect (tapArea.getX(), tapBox.getY() + 16, 1, tapBox.getHeight() - 32);
+        g.fillRect (tapArea.getRight(), tapBox.getY() + 16, 1, tapBox.getHeight() - 32);
+        if (flash > 0.0f)
+            fillRoundRect (g, tapArea.reduced (4).toFloat(), radius::sm, colour::accent.withAlpha (0.25f * flash));
+        g.setColour (colour::textPrimary);
+        g.setFont (font (type::title, true));
+        g.drawText (juce::String (juce::roundToInt (engine.getSong().bpm)), tapArea.withTrimmedBottom (24), juce::Justification::centredBottom, false);
+        g.setColour (colour::textSecondary);
+        g.setFont (font (type::small));
+        g.drawText (tr ("Tap"), tapArea.withTrimmedTop (36), juce::Justification::centredTop, false);
+        // the speaker beside the volume and the level in dB
+        icons::draw (g, Icon::listen, volume.getBounds().toFloat().withX ((float) volume.getX() - 22.0f).withWidth (18.0f), colour::textSecondary);
+        g.setColour (colour::textPrimary);
+        g.setFont (font (type::small, true));
+        const auto gain = (float) volume.getValue();
+        g.drawText (gain <= 0.0f ? juce::String ("-inf dB") : juce::String (juce::Decibels::gainToDecibels (gain), 1).replace ("-0.0", "0.0") + " dB",
+                    volumeText, juce::Justification::centredRight, false);
+    }
+
+    void mouseDown (const juce::MouseEvent& e) override
+    {
+        if (! tapArea.contains (e.getPosition()))
+            return;
+        if (const auto bpm = taps.tap (juce::Time::getMillisecondCounterHiRes()))
+            setTempo (*bpm);
+        flash = 1.0f;
+        repaint (tapBox);
+        juce::Timer::callAfterDelay (150, [safe = juce::Component::SafePointer<MetronomePopover> (this)] {
+            if (safe != nullptr)
+            {
+                safe->flash = 0.0f;
+                safe->repaint (safe->tapBox);
+            }
+        });
+    }
+
+    std::function<void()> save;
+
+private:
+    void setTempo (double bpm)
+    {
+        bpm = controls::clampTempo (bpm);
+        if (std::abs (bpm - engine.getSong().bpm) > 1e-9)
+            engine.editSong ([bpm] (Song& s) { clipops::followTempo (s, bpm); });
+        repaint (tapBox);
+    }
+
+    // ▶: four clicks of the chosen sound at the song's tempo, the first one the downbeat, through the preview player
+    void preview()
+    {
+        const auto& data = flStudioAccess().roots.data;
+        const auto sounds = Metronome::loadSounds (data.empty() ? juce::File() : platform::localFile (data));
+        const auto& s = sounds[(std::size_t) metronome::clampSound (engine.getTransport().metronomeSound.load())];
+        if (s.frames() <= 0)
+            return;
+        const auto beat = (int) std::lround (s.rate * 60.0 / juce::jmax (20.0, engine.getSong().bpm));
+        auto out = std::make_shared<SampleData>();
+        out->sampleRate = s.rate;
+        out->left.assign ((std::size_t) (beat * 4 + s.frames()), 0.0f);
+        out->right = out->left;
+        const auto gain = (float) volume.getValue();
+        for (int k = 0; k < 4; ++k)
+            for (int i = 0; i < s.frames(); ++i)
+            {
+                out->left[(std::size_t) (k * beat + i)] += s.left[(std::size_t) i] * gain;
+                out->right[(std::size_t) (k * beat + i)] += (s.right.empty() ? s.left : s.right)[(std::size_t) i] * gain;
+            }
+        engine.previewSample (out, false, 0.8f);
+    }
+
+    AudioEngine& engine;
+    juce::TextButton minus { juce::String::fromUTF8 ("\xe2\x88\x92") }, plus { "+" };
+    juce::ComboBox sound;
+    IconButton hear { "hear", Icon::play };
+    juce::Slider volume;
+    std::array<juce::TextButton, 3> countIn;
+    juce::Rectangle<int> tapBox, tapArea, volumeText;
+    controls::TapTempo taps;
+    float flash = 0.0f;
+};
+} // namespace
+
+void MainComponent::showMetronomePopover()
+{
+    auto popover = std::make_unique<MetronomePopover> (engine, [this] { saveUiSettings(); refreshRecordOptionButtons(); });
+    juce::CallOutBox::launchAsynchronously (std::move (popover), metronomeMenuButton.getScreenBounds(), nullptr);
+}
+
+std::unique_ptr<juce::Component> MainComponent::makeMetronomePopoverForSnapshot()
+{
+    return std::make_unique<MetronomePopover> (engine, [] {});
+}
+
+void MainComponent::toggleCycle()
+{
+    const auto& song = engine.getSong();
+    if (song.hasLoop())
+    {
+        engine.editSong ([] (Song& s) { s.loopOff = ! s.loopOff; }, false);
+        return;
+    }
+    // no range yet: BandLab's cycle region is one bar (B07: bar 1 at the song's start); here the bar at the song position
+    const auto bar = juce::jmax<std::int64_t> (1, song.barTicks());
+    const auto from = (std::int64_t) std::floor (engine.getTransport().positionTicks.load() / (double) bar) * bar;
+    engine.editSong ([from, bar] (Song& s) {
+        s.loopStart = from;
+        s.loopEnd = from + bar;
+        s.loopOff = false;
+    });
 }
 
 std::vector<juce::Component*> MainComponent::lookOnlyParts()
 {
     std::vector<juce::Component*> parts { &signatureBox, &quantBox, &saveStatus, &moreButton, &browserToggleButton, &backToArrangementButton, &captureButton,
-                                          &sessionRecordButton, &drawModeButton, &keyMapButton, &midiMapButton, &sessionViewButton, &arrangementViewButton };
+                                          &sessionRecordButton, &drawModeButton, &keyMapButton, &midiMapButton, &sessionViewButton, &arrangementViewButton, &cycleButton, &metronomeMenuButton };
     if (simpleWorkflow != nullptr)
         if (auto* finish = simpleWorkflow->finishComponent(); finish != nullptr && finish->getParentComponent() == this)
             parts.push_back (finish);
@@ -225,6 +464,10 @@ void MainComponent::applyToolbarLook()
     playButton.setCorners (true, ! simple);
     stopButton.setCorners (! simple, ! simple);
     recordButton.setCorners (! simple, ! simple);
+    cycleButton.setLook (BL::capsule, sb::stopBox); // (Simple only)
+    cycleButton.setCorners (false, false);
+    metronomeMenuButton.setLook (BL::capsule, 14.0f);
+    metronomeMenuButton.setCorners (false, false);
     // the metronome: the first segment of the tempo capsule / Live's ring-and-dot box
     metronomeButton.setLook (fl ? BL::flTile : simple ? BL::capsule : BL::liveBox, simple ? 20.0f : fl ? flTileIconBox() : 13.0f);
     metronomeButton.setCorners (true, fl);
@@ -332,8 +575,8 @@ void MainComponent::layoutSimpleToolbar (juce::Rectangle<int> bar, int menuWidth
     }
 
     std::array<int, sb::partCount> widths {};
-    widths[(std::size_t) P::transport] = 3 * sb::segment + sb::timeWidth;
-    widths[(std::size_t) P::tempo] = sb::segment + sb::tempoWidth + sb::signatureWidth;
+    widths[(std::size_t) P::transport] = 4 * sb::segment + sb::timeWidth; // (round 190ld: + BandLab's Cycle)
+    widths[(std::size_t) P::tempo] = sb::segment + sb::chevronWidth + sb::tempoWidth + sb::signatureWidth; // (round 190ld: BandLab's ▾)
     widths[(std::size_t) P::key] = toolbarLayout.isShown (Group::key) ? sb::keyWidth : 0;
     // (round 190jj: BandLab's master volume slider with its meter, then LYNX's master pitch knob)
     widths[(std::size_t) P::master] = toolbarLayout.isShown (Group::master) ? toolbar::MasterKnob::sliderWidth + 8 + h + 26 : 0;
@@ -396,11 +639,13 @@ void MainComponent::layoutSimpleToolbar (juce::Rectangle<int> bar, int menuWidth
         switch (part)
         {
             case P::transport: // play | stop | record | the time (BandLab's transport capsule, at FL's transport place)
-                capsule (r.getX(), { { &playButton, sb::segment }, { &stopButton, sb::segment }, { &recordButton, sb::segment }, { &timeDisplay, sb::timeWidth } });
+                capsule (r.getX(), { { &playButton, sb::segment }, { &stopButton, sb::segment }, { &recordButton, sb::segment }, { &cycleButton, sb::segment },
+                                     { &timeDisplay, sb::timeWidth } });
                 transportArea = {};
                 break;
             case P::tempo: // metronome | tempo | time signature (BandLab's)
-                capsule (r.getX(), { { &metronomeButton, sb::segment }, { &tempoDisplay, sb::tempoWidth }, { &signatureBox, sb::signatureWidth } });
+                capsule (r.getX(), { { &metronomeButton, sb::segment }, { &metronomeMenuButton, sb::chevronWidth }, { &tempoDisplay, sb::tempoWidth },
+                                     { &signatureBox, sb::signatureWidth } });
                 break;
             case P::tuner: // round 190ke: one segment, its own capsule
                 if (auto* tuner = simpleWorkflow->tunerComponent())
@@ -632,6 +877,8 @@ void MainComponent::updateLookFields()
         // round 190jj: BandLab's master meter behind the master volume (its rail repaints only when a bar moved a pixel)
         if (masterVolume.isVisible())
             masterVolume.tickMeter (juce::Time::getMillisecondCounterHiRes());
+        if (const auto on = engine.getSong().loopPlays(); cycleButton.getToggleState() != on) // round 190ld: lit while it cycles
+            cycleButton.setToggleState (on, juce::dontSendNotification);
         if (++saveStatusTicks >= 60) // every 2 s at the 30 Hz timer (the minutes in "Backed up 2 min ago")
         {
             saveStatusTicks = 0;
@@ -689,7 +936,8 @@ juce::Component* MainComponent::toolbarPartForSnapshot (const juce::String& name
         { "overdub", &blendButton }, { "capture", &captureButton }, { "sessionRecord", &sessionRecordButton }, { "punch", &punchButton },
         { "draw", &drawModeButton }, { "computerKeys", &typingPianoButton }, { "keyMap", &keyMapButton }, { "midiMap", &midiMapButton },
         { "cpu", &perfMeter }, { "more", &moreButton }, { "sessionView", &sessionViewButton }, { "arrangementView", &arrangementViewButton },
-        { "status", &saveStatus }, { "masterVolume", &masterVolume }, { "masterPitch", &masterPitch }, { "undo", &undoButton }, { "redo", &redoButton }
+        { "status", &saveStatus }, { "masterVolume", &masterVolume }, { "masterPitch", &masterPitch }, { "undo", &undoButton }, { "redo", &redoButton },
+        { "cycle", &cycleButton }, { "metronomeMenu", &metronomeMenuButton }, { "countIn", &countInButton }, { "waitInput", &waitInputButton }, { "midiLight", &midiLight } // (round 190ld)
     };
     if (name == "finish")
         return simpleWorkflow != nullptr ? simpleWorkflow->finishComponent() : nullptr;

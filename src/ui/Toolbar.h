@@ -143,8 +143,16 @@ class MidiActivityLight final : public juce::Component,
                                 public ui::HintSource
 {
 public:
-    // `count` = the engine's running count of received messages; call ~30 times a second.
-    void update (std::uint32_t count, const juce::StringArray& activeInputs);
+    // `count` = the engine's running count of received messages; call ~30 times a second. Round 190ld (FL's Sync
+    // indicator colours, manual "Toolbar panels"): `projectLinked` / `globalLinked` = the engine's counts of messages a
+    // project link / a global link took: orange = handled by a project link, blue = by a global link, green = used by
+    // no link, grey = nothing.
+    void update (std::uint32_t count, const juce::StringArray& activeInputs, std::uint32_t projectLinked = 0, std::uint32_t globalLinked = 0);
+    // FL's MIDI Sync light (round 190ld): "Blinks at the beginning of each beat and signals blue at the beginning of each
+    // bar" while master sync is sent (FL: "works only when the Enable MIDI Output option ... is checked")
+    void beat (bool barStart);
+    enum class Kind : std::uint8_t { unhandled, project, global, beat, bar };
+    Kind litKind() const noexcept { return kind; }
     bool isLit() const noexcept { return litFrames > 0; }
     void paint (juce::Graphics& g) override;
     void mouseUp (const juce::MouseEvent& e) override;
@@ -153,9 +161,10 @@ public:
     std::function<void()> onReconnect;
 
 private:
-    std::uint32_t lastCount = 0;
+    std::uint32_t lastCount = 0, lastProject = 0, lastGlobal = 0;
     bool seenCount = false;
     int litFrames = 0;
+    Kind kind = Kind::unhandled, paintedKind = Kind::unhandled;
     juce::StringArray inputs;
 };
 
@@ -187,6 +196,14 @@ public:
     std::function<void()> onOpenMonitor, onRefreshChanged;
     enum Refresh { slow, medium, fast };
     static inline int refresh = medium;   // saved in the UI options ("cpuRefresh")
+    // round 190ld: FL's "Misc" radio pair, what the panel's second number shows: the voice count (FL's default) or the
+    // frames per second of the display (LYNX: frames in which something on screen moved). Saved ("cpuView").
+    enum SecondView { voiceCount, framesPerSecond };
+    static inline int secondView = voiceCount;
+    void setFramesPerSecond (int fps);
+    // FL's info lines under Misc ("Handles: 753 (GDI) / 569 (USER)", "Threads: 41"): this process's own counts
+    static int threadCount();
+    static std::pair<int, int> guiHandles(); // {GDI, USER}; {-1, -1} where the OS has no such count
     static int refreshTicks() noexcept { return refresh == slow ? 16 : refresh == fast ? 4 : 8; } // of the main 30 Hz timer
     static constexpr int historySize = 96; // the running graph's points (one per update; 25 s at Medium)
     juce::Rectangle<float> graphArea() const; // (tests / shots; empty in the Live look)
@@ -205,7 +222,7 @@ private:
     double cpu = 0.0, cpuSmoothed = 0.0;
     toolbarlayout::Look look = toolbarlayout::Look::fl;
     std::int64_t memory = 0;
-    int voices = 0, peakVoices = 0;
+    int voices = 0, peakVoices = 0, fps = 0;
     std::array<float, historySize> cpuHistory {}; // oldest first (round 190kn)
     int cpuHistoryCount = 0;
     juce::int64 paintedSignature = -1;

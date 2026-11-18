@@ -940,6 +940,7 @@ void knob (juce::Graphics& g, juce::Rectangle<float> boundsIn, const KnobLook& k
     key = key * 401u + (std::uint64_t) std::lround (scale * 100.0f);
     key ^= (std::uint64_t) k.accent.getARGB() * 0x9e3779b97f4a7c15ull;
     key ^= (std::uint64_t) k.capTint.getARGB() * 0xc2b2ae3d27d4eb4full;
+    key ^= ((std::uint64_t) k.ring.getARGB() * 0x165667b19e3779f9ull) ^ (k.noArc ? 0x27d4eb2f165667c5ull : 0u); // round 190ld
 
     static std::unordered_map<std::uint64_t, juce::Image> cache;
     static const bool registered = lynx::ui::registerImageCache ([] { cache.clear(); }); (void) registered;

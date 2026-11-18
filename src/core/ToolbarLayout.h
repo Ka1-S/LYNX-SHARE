@@ -454,6 +454,7 @@ inline constexpr int capsuleHeight = 40, radius = 20, segment = 44, divider = 1;
 inline constexpr int timeWidth = 112, tempoWidth = 92, signatureWidth = 56, keyWidth = 112;
 inline constexpr int statusWidth = 172, statusHeight = 24, finishWidth = 92, moreWidth = 32;
 inline constexpr int gap = 12; // between capsules
+inline constexpr int chevronWidth = 28; // round 190ld (DS-1): BandLab's ▾ beside the metronome (B07: a 28 px segment)
 // glyphs (SG-1): play 14 x 16, stop 12 x 12, record ⌀ 14 (as icon boxes on LYNX's 24-unit grid)
 inline constexpr float playBox = 25.0f, stopBox = 22.0f, recordBox = 24.0f; // (round 190jj: Back-to-start in the stop box)
 

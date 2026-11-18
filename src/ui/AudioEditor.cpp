@@ -65,6 +65,14 @@ bool& clickFreeEditing()
     return on;
 }
 
+// round 190ld (DP-58, owner decision PL2): FL Edison's wheel (zoom; Shift+wheel scrolls) by default; View › "Wheel
+// scrolls (LYNX)" switches every audio editor of the session to LYNX's earlier mapping (wheel scrolls, Ctrl+wheel zooms)
+bool& wheelScrollsLynx()
+{
+    static bool on = false;
+    return on;
+}
+
 // one clipboard for every editor window (copy in one, paste in another); Tools › Clipboard saves it (round 181b)
 ae::Audio& clipboard()
 {
@@ -266,6 +274,7 @@ class AudioEditor final : public juce::Component,
                           public juce::FileDragAndDropTarget,
                           public audiotools::Host,
                           public juce::DragAndDropTarget,
+                          public ui::HintSource,
                           private juce::Timer
 {
 public:
@@ -1703,6 +1712,15 @@ public:
 
         const auto pos = e.getPosition();
 
+        if (e.mods.isMiddleButtonDown() && (waveArea.contains (pos) || rulerArea.contains (pos))) // round 190ld (DP-58)
+        {
+            drag = Drag::middle;
+            middleGrab = { e.x, e.y };
+            middleFpp = fpp;
+            middleView = viewStart;
+            return;
+        }
+
         if (warpMode && warpLane.contains (pos))
         {
             warpMouseDown (e);
@@ -1761,6 +1779,17 @@ public:
             return;
         }
 
+        if (waveArea.contains (pos) && (e.mods.isCtrlDown() || e.mods.isCommandDown()) && ! e.mods.isShiftDown())
+        {
+            // round 190ld (DP-57): FL's Ctrl+click places the play-head (the cursor) without making a selection
+            cursor = snapFrame (xToFrame (e.x));
+            selection = {};
+            if (playing)
+                startPlayback();
+            repaint();
+            return;
+        }
+
         if (waveArea.contains (pos) || rulerArea.contains (pos))
         {
             const auto f = snapFrame (xToFrame (e.x));
@@ -1804,6 +1833,17 @@ public:
         if (drag == Drag::brace)
         {
             braceMouseDrag (e);
+            return;
+        }
+        if (drag == Drag::middle) // round 190ld (DP-58): up zooms in (around where the drag began), left / right scrolls
+        {
+            const auto anchorX = (float) middleGrab.x;
+            const auto frame = middleView + (anchorX - (float) waveArea.getX()) * middleFpp;
+            fpp = middleFpp * std::pow (1.01, (double) (e.y - middleGrab.y));
+            clampView();
+            viewStart = frame - (anchorX - (float) waveArea.getX()) * fpp - (double) (e.x - middleGrab.x) * fpp;
+            clampView();
+            repaint();
             return;
         }
         if (drag == Drag::none)
@@ -1936,12 +1976,44 @@ public:
         repaint();
     }
 
+    // round 190ld (DP-59): FL's hint bar over the waveform (capture 190ld F30, fl-edison-hint-F30/F30b): the time under the
+    // mouse as "s:ms" ("0:500") and the level at the mouse's height in dB and linear ("-18.34dB 0.12")
+    ui::Hint hintAt (juce::Point<int>) override { return waveHintAt (getMouseXYRelative()); }
+
+    // (--details190ldshot: the hint at a point given as fractions of the waveform area)
+    ui::Hint waveHintForSnapshot (float fx, float fy) const
+    {
+        return waveHintAt ({ waveArea.getX() + juce::roundToInt ((float) waveArea.getWidth() * fx), waveArea.getY() + juce::roundToInt ((float) waveArea.getHeight() * fy) });
+    }
+
+    ui::Hint waveHintAt (juce::Point<int> p) const
+    {
+        if (doc.audio.empty() || ! waveArea.contains (p) || (spectrumView && ! dualView) || doc.audio.sampleRate <= 0.0)
+            return {};
+        const auto lanes = juce::jmax (1, doc.audio.numChannels());
+        const auto lane = laneBounds (juce::jlimit (0, lanes - 1, (int) ((float) (p.y - waveArea.getY()) * (float) lanes / (float) juce::jmax (1, waveArea.getHeight()))));
+        const auto half = juce::jmax (1.0f, lane.getHeight() * 0.5f - 2.0f);
+        const auto level = juce::jlimit (0.0f, 1.0f, std::abs (lane.getCentreY() - (float) p.y) / half);
+        const auto ms = (std::int64_t) std::floor ((double) xToFrame (p.x) * 1000.0 / doc.audio.sampleRate);
+        const auto minutes = ms / 60000, seconds = (ms / 1000) % 60, millis = ms % 1000;
+        ui::Hint h;
+        h.text = (minutes > 0 ? juce::String (minutes) + ":" + juce::String (seconds).paddedLeft ('0', 2) : juce::String (seconds))
+                 + ":" + juce::String (millis).paddedLeft ('0', 3);
+        h.value = (level > 0.0f ? juce::String (20.0f * std::log10 (level), 2) : juce::String ("-inf")) + "dB " + juce::String (level, 2);
+        return h;
+    }
+
     void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& w) override
     {
         if (doc.audio.empty() || e.eventComponent == &scrubButton)
             return;
         const auto delta = std::abs (w.deltaY) > std::abs (w.deltaX) ? w.deltaY : w.deltaX;
-        if (e.mods.isCtrlDown() || e.mods.isCommandDown())
+        // round 190ld (DP-58, owner decision PL2): FL's mapping by default — the wheel zooms around the mouse,
+        // Shift+wheel (or a sideways swipe) scrolls; View › "Wheel scrolls (LYNX)" brings back LYNX's (wheel scrolls,
+        // Ctrl+wheel zooms)
+        const auto zoomGesture = wheelScrollsLynx() ? (e.mods.isCtrlDown() || e.mods.isCommandDown())
+                                                    : (std::abs (w.deltaY) >= std::abs (w.deltaX) && ! e.mods.isShiftDown());
+        if (zoomGesture)
             zoomAround ((float) e.x, delta > 0 ? 0.8 : 1.25);
         else
         {
@@ -2184,7 +2256,8 @@ private:
         overview,
         envPoint,
         envBend,
-        brace // round gaps190kf: the Clip View's loop brace / Start / End markers
+        brace, // round gaps190kf: the Clip View's loop brace / Start / End markers
+        middle // round 190ld (DP-58): FL's middle-drag — up / down zooms, left / right scrolls
     };
     enum class RecState
     {
@@ -5709,6 +5782,8 @@ private:
     std::int64_t cursor = 0, anchor = 0;
     double viewStart = 0.0, fpp = 1.0;
     Drag drag = Drag::none;
+    juce::Point<int> middleGrab;                 // round 190ld: the middle-drag's start, and the view then
+    double middleFpp = 1.0, middleView = 0.0;
     int dragMarkerIndex = -1;
 
     bool spectrumView = false, logFrequency = true;
@@ -6165,6 +6240,7 @@ juce::PopupMenu AudioEditor::mainMenu()
         logFrequency = ! logFrequency;
         repaint();
     });
+    view.addItem (tr ("Wheel scrolls (LYNX)"), true, wheelScrollsLynx(), [] { wheelScrollsLynx() = ! wheelScrollsLynx(); }); // round 190ld
     juce::PopupMenu time;
     const std::pair<TimeFormat, const char*> formats[] = { { TimeFormat::automatic, TR_NOOP ("Auto") },
                                                            { TimeFormat::seconds, TR_NOOP ("Minutes : seconds") },
@@ -6547,6 +6623,15 @@ void setAudioEditorSamplePropsForSnapshot (juce::Component& component, const aud
 {
     if (auto* editor = dynamic_cast<AudioEditor*> (&component))
         editor->setSamplePropsForSnapshot (props);
+}
+
+juce::String audioEditorHoverHintForSnapshot (juce::Component& component, float fx, float fy)
+{
+    auto* editor = dynamic_cast<AudioEditor*> (&component);
+    if (editor == nullptr)
+        return {};
+    const auto h = editor->waveHintForSnapshot (fx, fy);
+    return h.text + (h.value.isNotEmpty() ? "  " + h.value : juce::String());
 }
 
 juce::StringArray audioEditorMenuForSnapshot (juce::Component& component)

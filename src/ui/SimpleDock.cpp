@@ -2901,13 +2901,30 @@ bool SimpleDock::inputMeterShown() const
 juce::Rectangle<int> SimpleDock::inputMeterArea() const
 {
     const auto right = followButton.isVisible() ? followButton.getX() - 10 : getWidth() - 10; // (round 190jj merge: 190jc moved the hide button to the left)
-    return { right - 190, 0, 190, stripHeight() };
+    return { right - 232, 0, 232, stripHeight() };
 }
 
 juce::Rectangle<int> SimpleDock::inputMeterBar() const
 {
     const auto a = inputMeterArea();
-    return { a.getRight() - 110, a.getCentreY() - 2, 110, 4 };
+    return { a.getRight() - 42 - 110, a.getCentreY() - 2, 110, 4 };
+}
+
+// round 190ld (DS-9, BandLab B22: a round headphones switch right of the input bar): hear the input while recording
+juce::Rectangle<int> SimpleDock::monitorButton() const
+{
+    const auto a = inputMeterArea();
+    const auto d = juce::jmin (32, a.getHeight() - 4);
+    return { a.getRight() - d, a.getCentreY() - d / 2, d, d };
+}
+
+bool SimpleDock::monitoring() const
+{
+    const auto& song = engine.getSong();
+    if (insert <= 0 || insert >= (int) song.mixer.size())
+        return false;
+    const auto mode = song.mixer[(std::size_t) insert].monitor;
+    return mode == InputMonitor::on || (mode != InputMonitor::off && engine.isInsertArmed (insert));
 }
 
 juce::Colour SimpleDock::trackColourNow() const
@@ -3060,6 +3077,12 @@ void SimpleDock::paint (juce::Graphics& g)
             const auto db = inputLevel * 60.0f - 60.0f;
             fillRoundRect (g, bar.withWidth (w).toFloat(), 2.0f, db >= -0.5f ? colour::meterClip : db >= -9.0f ? colour::meterMid : colour::meterLow);
         }
+        // the monitor switch (round 190ld): lit while the input is heard
+        const auto button = monitorButton().toFloat();
+        const auto on = monitoring();
+        g.setColour (on ? colour::accent : colour::bg4);
+        g.fillEllipse (button);
+        ui::simplelook::drawGlyph (g, ui::simplelook::Glyph::headphones, button.reduced (button.getWidth() * 0.28f), on ? colour::onAccent : colour::textPrimary);
         rightEdge = area.getX() - 10;
     }
     if (followButton.isVisible()) // round 190ds: the loop's key and what following does
@@ -3231,6 +3254,16 @@ void SimpleDock::mouseMove (const juce::MouseEvent& e)
 
 void SimpleDock::mouseDown (const juce::MouseEvent& e)
 {
+    if (inputMeterShown() && insert > 0 && monitorButton().contains (e.getPosition()) && ! e.mods.isPopupMenu())
+    {
+        // hear the input (Monitor On) / don't (Off); the Mixer's input menu has the other modes
+        engine.editSong ([i = insert, on = ! monitoring()] (Song& s) {
+            if (i < (int) s.mixer.size())
+                s.mixer[(std::size_t) i].monitor = on ? InputMonitor::on : InputMonitor::off;
+        });
+        repaint (monitorButton().expanded (2));
+        return;
+    }
     resizing = e.y < edgeHeight;
     dragStartHeight = getHeight();
 }

@@ -70,6 +70,9 @@ public:
     static bool autoSelectLinked;
     // FL's Channel Rack option "Mute removed steps": turning a step off mutes its note instead of deleting it
     static bool muteRemovedSteps;
+    // FL 2026's Channel rack menu › Options › "Show mixer track selectors" (Alt+M; round 190ld, DE-26): the mixer track
+    // number box beside each channel's knobs; off = the column goes. Saved ("rackMixerSelectors")
+    static inline bool showMixerSelectors = true;
     // FL's Channel rack menu › Options › "Channel name alignment" (round 190kd): Left / Center (FL's default: Center)
     static bool nameAlignLeft;
 
@@ -177,6 +180,11 @@ public:
     // otherwise only the channels of that group (Song::channelGroups). New channels join the group shown.
     int getFilterGroup() const noexcept { return filterGroup; }
     void setFilterGroup (int group);
+    void stepFilterGroup (int direction); // round 190ld: FL's Page Up / Page Down
+    // round 190ld (DF-118): FL's wrapper Channel column, Save channel state as... / Browse channel states
+    void saveChannelState (int channel);
+    void openChannelState (int channel);
+    static juce::File channelStateFolder();
     juce::String filterName() const;
     void showFilterMenu (juce::Component* target);
     void groupSelected (); // "Group selected..." (Alt+G): the selected channels go into a new, named group
@@ -219,7 +227,7 @@ private:
     int loopDragRow = -1, loopDragStart = 0;
     float loopDragY = 0.0f;
     void parentSizeChanged() override { updateSize(); repaint(); } // (the fitted miniatures follow the visible width)
-    int nameLeft() const noexcept { return muteWidth + 2 * knobWidth + routeWidth + 2; }
+    int nameLeft() const noexcept { return muteWidth + 2 * knobWidth + (showMixerSelectors ? routeWidth : 0) + 2; }
     int selectLeft() const noexcept { return nameLeft() + nameWidth + 4; }
     int gridLeft() const noexcept { return selectLeft() + selectWidth + 8; }
     juce::Rectangle<int> rowBounds (int row) const;

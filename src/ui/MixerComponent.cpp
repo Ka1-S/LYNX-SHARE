@@ -77,6 +77,22 @@ constexpr int wiresHeight = 14;
 constexpr int laneHeight = switchHeight + sendKnobHeight + wiresHeight + 4;
 constexpr int masterScaleWidth = 17; // the dB numbers beside the master meter (round 162, issue #9)
 
+// FL's locked state (Shift+click on a mute switch or a slot LED): an open padlock in the current colour in the LED's
+// place (round 190kn; FL 2026, details190kn raw/f05: a 10 x 5 body under a shackle open on the left, 13 px tall)
+void paintLockedLed (juce::Graphics& g, juce::Rectangle<float> m)
+{
+    const auto u = m.getWidth() / 12.0f;
+    const auto body = juce::Rectangle<float> (m.getX() + 1.0f * u, m.getY() + 6.5f * u, 10.0f * u, 5.0f * u);
+    g.fillRect (body.toNearestInt());
+    juce::Path shackle;
+    shackle.startNewSubPath (body.getX() + 2.0f * u, body.getY() - 1.5f * u);
+    shackle.lineTo (body.getX() + 2.0f * u, body.getY() - 4.0f * u);
+    shackle.quadraticTo (body.getX() + 2.0f * u, m.getY() - 1.0f * u, body.getCentreX() + 0.5f * u, m.getY() - 1.0f * u);
+    shackle.quadraticTo (body.getRight() - 2.0f * u, m.getY() - 1.0f * u, body.getRight() - 2.0f * u, body.getY() - 4.0f * u);
+    shackle.lineTo (body.getRight() - 2.0f * u, body.getY());
+    g.strokePath (shackle, juce::PathStrokeType (juce::jmax (1.0f, 1.2f * u)));
+}
+
 // Fader 0..1 -> dB, with 0.8 = 0 dB (as in FL).
 juce::String faderToDb (float volume)
 {
@@ -1884,20 +1900,7 @@ void MixerStrips::paint (juce::Graphics& g)
             const auto m = muteArea (t).toFloat().withSizeKeepingCentre (led, led);
             g.setColour (muteLed (track.muted));
             if (track.lockState)
-            {
-                // round 190kn: FL's locked state (Shift+click) shows an open padlock in the LED's colour instead of the LED
-                // (FL 2026, details190kn raw/f05: a 10 x 5 body under a shackle open on the left, 13 px tall)
-                const auto u = m.getWidth() / 12.0f;
-                const auto body = juce::Rectangle<float> (m.getX() + 1.0f * u, m.getY() + 6.5f * u, 10.0f * u, 5.0f * u);
-                g.fillRect (body.toNearestInt());
-                juce::Path shackle;
-                shackle.startNewSubPath (body.getX() + 2.0f * u, body.getY() - 1.5f * u);
-                shackle.lineTo (body.getX() + 2.0f * u, body.getY() - 4.0f * u);
-                shackle.quadraticTo (body.getX() + 2.0f * u, m.getY() - 1.0f * u, body.getCentreX() + 0.5f * u, m.getY() - 1.0f * u);
-                shackle.quadraticTo (body.getRight() - 2.0f * u, m.getY() - 1.0f * u, body.getRight() - 2.0f * u, body.getY() - 4.0f * u);
-                shackle.lineTo (body.getRight() - 2.0f * u, body.getY());
-                g.strokePath (shackle, juce::PathStrokeType (juce::jmax (1.0f, 1.2f * u)));
-            }
+                paintLockedLed (g, m); // round 190kn: FL's locked state (Shift+click), an open padlock in the LED's colour
             else
                 g.fillEllipse (m);
             if (! track.lockState && (! track.muted || hovered (Part::mute)))
@@ -6154,7 +6157,10 @@ void EffectsPanel::paint (juce::Graphics& g)
             else
             {
                 g.setColour (muteLed (! slot.enabled));
-                g.fillEllipse (ledArea);
+                if (slot.lockState) // round 190ld: FL's slot LED "the same as for the Mixer Track mute LEDs": Shift+click locks
+                    paintLockedLed (g, ledArea.expanded (2.0f));
+                else
+                    g.fillEllipse (ledArea);
             }
             if (slotHovered && hoverLed)
             {
@@ -6595,6 +6601,9 @@ void EffectsPanel::mouseDown (const juce::MouseEvent& e)
 
         if (flmods::popup (e.mods) || (e.mods.isShiftDown() && ! ledBounds (row).contains (e.getPosition()))) // (FL: Shift+click = the menu)
             showSlotMenu (i);
+        else if (ledBounds (row).contains (e.getPosition()) && e.mods.isShiftDown())
+            // FL's slot LED: Shift+click = "Lock/Unlock State", as on the track's mute switch (round 190ld)
+            engine.editSong ([t = track, i] (Song& song) { mixerops::toggleSlotLock (song, t, i); });
         else if (ledBounds (row).contains (e.getPosition()) && (flmods::ctrl (e.mods) || e.mods.isAltDown()))
             // FL's slot LED: "Solo/Unsolo - (Ctrl+Left-Click), (Alt/Opt+Left-Click)" (round 190kn)
             engine.editSong ([t = track, i] (Song& song) { mixerops::soloSlot (song, t, i); });
@@ -6968,7 +6977,7 @@ ui::Hint EffectsPanel::hintAt (juce::Point<int> p)
                 return h;
             }
             h.text = used ? (arrowBounds (i).contains (p) ? tr ("Effect slot options: replace, move, delete...")
-                             : ledBounds (i).contains (p) ? tr ("Effect on/off: click bypasses.  Ctrl+click or Alt+click: solo this effect (again: all on)")
+                             : ledBounds (i).contains (p) ? tr ("Effect on/off: click bypasses.  Ctrl+click or Alt+click: solo this effect (again: all on).  Shift+click: lock its state")
                                                           : tr ("Effect slot: click shows or hides its window (and its knobs below), the LED bypasses, the wheel or a drag moves it up or down, right-click: options"))
                           : tr ("Empty slot: click to add an effect");
             h.hasMenu = used;

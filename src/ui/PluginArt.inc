@@ -729,7 +729,8 @@ inline void knob (juce::Graphics& g, Rectangle<float> area, const KnobLook& k)
     const auto hover = juce::jlimit (0.0f, 1.0f, k.active ? 1.0f : k.hover);
     const auto from = k.bipolar ? arcStart + arcRange * 0.5f : arcStart;
     const auto to = arcStart + arcRange * value;
-    const auto lit = k.enabled ? (k.active ? p.accent.brighter (0.25f) : p.accent) : theme::colour::textDisabled;
+    const auto litBase = k.ring.getAlpha() > 0 ? k.ring : p.accent; // round 190ld: a knob's own ring colour (Delay 3's warning)
+    const auto lit = k.enabled ? (k.active ? litBase.brighter (0.25f) : litBase) : theme::colour::textDisabled;
     const auto lit2 = k.enabled ? p.accent2 : theme::colour::textDisabled;
     const Point<float> dir { std::sin (to), -std::cos (to) };
 
@@ -905,7 +906,7 @@ inline void knob (juce::Graphics& g, Rectangle<float> area, const KnobLook& k)
     {
         g.setColour (p.track.withAlpha (k.enabled ? 1.0f : 0.6f));
         g.strokePath (arc (c, r, arcStart, arcStart + arcRange), juce::PathStrokeType (t, juce::PathStrokeType::curved, th0.buttTrack ? juce::PathStrokeType::butt : juce::PathStrokeType::rounded));
-        if (std::abs (to - from) > 0.002f)
+        if (std::abs (to - from) > 0.002f && ! k.noArc)
         {
             const auto v = arc (c, r, from, to);
             if (fx && k.enabled && th0.arcGlow > 0.0f)

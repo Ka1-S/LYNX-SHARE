@@ -329,7 +329,31 @@ void BrowserComponent::applyLoopFilter()
         }
         // GarageBand's Tempo and Key columns ("Display original tempo and key"), on the row's right
         const auto tempo = loopkeys::tempoText (info), key = loopkeys::keyText (info);
-        if (! tempo.empty() || ! key.empty() || n->file != juce::File())
+        if (layoutstyle::current() == layoutstyle::Style::simple)
+        {
+            // round 190ld (details DS-41, BandLab B11 "4 bars · Synth · Moody, Bright · 149bpm · B"): in the Simple layout a
+            // row names its instrument and its moods (the loop's keywords) before the tempo and the key
+            juce::StringArray parts, moods;
+            juce::String instrument;
+            for (const auto& id : info.keywords)
+                if (const auto* k = loopkeys::find (id))
+                {
+                    if (k->category == loopkeys::Category::instrument && instrument.isEmpty() && juce::String (k->id).startsWith ("all ") == false)
+                        instrument = tr (k->label);
+                    else if (k->category == loopkeys::Category::descriptor && moods.size() < 2)
+                        moods.add (tr (k->label));
+                }
+            if (instrument.isNotEmpty())
+                parts.add (instrument);
+            if (! moods.isEmpty())
+                parts.add (moods.joinIntoString (", "));
+            if (! tempo.empty())
+                parts.add (juce::String (tempo) + "bpm");
+            if (! key.empty())
+                parts.add (juce::String (key));
+            n->detail = parts.isEmpty() ? juce::String (" ") : parts.joinIntoString (juce::String::fromUTF8 (" \xc2\xb7 "));
+        }
+        else if (! tempo.empty() || ! key.empty() || n->file != juce::File())
             n->detail = tempo.empty() && key.empty() ? juce::String (" ")
                                                       : juce::String (tempo) + (tempo.empty() || key.empty() ? "" : juce::String::fromUTF8 ("  \xc2\xb7  ")) + juce::String (key);
         nodes.push_back (std::move (n));

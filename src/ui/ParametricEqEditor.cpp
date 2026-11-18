@@ -277,6 +277,7 @@ DisplaySettings& displaySettings()
             else if (key == "heatmap") d.heatmap = value.getIntValue() != 0;
             else if (key == "position") d.position = juce::jlimit (0, 2, value.getIntValue());
             else if (key == "soloOnShift") d.soloOnShift = value.getIntValue() != 0;
+            else if (key == "monitorInput") d.monitorInput = value.getIntValue() != 0;
         }
         return d;
     }();
@@ -287,7 +288,8 @@ void saveDisplaySettings()
 {
     const auto& d = displaySettings();
     displayFile().replaceWithText ("spectrum=" + juce::String ((int) d.spectrum) + "\nheatmap=" + juce::String ((int) d.heatmap) + "\nposition="
-                                   + juce::String (d.position) + "\nsoloOnShift=" + juce::String ((int) d.soloOnShift) + "\n");
+                                   + juce::String (d.position) + "\nsoloOnShift=" + juce::String ((int) d.soloOnShift)
+                                   + "\nmonitorInput=" + juce::String ((int) d.monitorInput) + "\n");
 }
 
 void addDisplayItems (juce::PopupMenu& menu, std::function<void()> changed)
@@ -308,6 +310,11 @@ void addDisplayItems (juce::PopupMenu& menu, std::function<void()> changed)
     menu.addSubMenu (tr ("Heatmap position"), position);
     // round 190ih: FL's Shift on a band token: solo it while held (on), or drag its width left / right (off)
     menu.addItem (tr ("Solo on Shift"), true, d.soloOnShift, [apply] { apply ([] (DisplaySettings& s) { s.soloOnShift = ! s.soloOnShift; }); });
+    // round 190ld (DP-14), FL's manual (Parametric EQ 2 › Monitor): the display shows the input signal (pre-EQ) or the
+    // output signal (post-EQ, the default)
+    menu.addSectionHeader (tr ("Monitor"));
+    menu.addItem (tr ("Input (pre EQ)"), true, d.monitorInput, [apply] { apply ([] (DisplaySettings& s) { s.monitorInput = true; }); });
+    menu.addItem (tr ("Output (post EQ)"), true, ! d.monitorInput, [apply] { apply ([] (DisplaySettings& s) { s.monitorInput = false; }); });
 }
 
 Analyser::Analyser()
@@ -350,8 +357,9 @@ bool Analyser::update (AudioEngine& engine, int track, int slot, bool claim, juc
     const auto srNow = tap.sampleRate.load (std::memory_order_relaxed);
     const auto sr = srNow > 8000.0 ? srNow : 48000.0;
     std::fill (data.begin(), data.end(), 0.0f);
+    const auto& ring = settings.monitorInput ? tap.pre : tap.post; // round 190ld (DP-14): FL's Monitor input / output
     for (int i = 0; i < fftSize; ++i)
-        data[(std::size_t) i] = tap.post[(std::size_t) ((written - (std::uint32_t) fftSize + (std::uint32_t) i) & (ProcessTimes::AnalyzerTap::size - 1))]
+        data[(std::size_t) i] = ring[(std::size_t) ((written - (std::uint32_t) fftSize + (std::uint32_t) i) & (ProcessTimes::AnalyzerTap::size - 1))]
                                     .load (std::memory_order_relaxed) * window[(std::size_t) i];
     fft.performFrequencyOnlyForwardTransform (data.data(), true);
     const auto norm = 4.0f / (float) fftSize; // Hann (coherent gain ½), one side: a full-scale sine = 0 dB

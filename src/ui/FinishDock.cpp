@@ -209,7 +209,8 @@ private:
 
 FinishDock::FinishDock (AudioEngine& e, std::function<void()> close, Saving s)
     : engine (e), onClose (std::move (close)), saving (std::move (s)), measuring (std::make_shared<std::atomic<int>> (0)),
-      measuredLufs (std::make_shared<std::atomic<float>> (0.0f))
+      measuredLufs (std::make_shared<std::atomic<float>> (0.0f)), matching (std::make_shared<std::atomic<int>> (0)),
+      matchDb (std::make_shared<std::atomic<float>> (0.0f))
 {
     setComponentID ("simple.finishDock"); // (round 190dv: the first-song tour keeps its card off it)
     setTitle (tr ("Master looks"));
@@ -229,14 +230,16 @@ FinishDock::FinishDock (AudioEngine& e, std::function<void()> close, Saving s)
     addAndMakeVisible (closeButton);
 
     hearWithout.setButtonText (tr ("Hear without"));
-    hearWithout.setTooltip (tr ("Switches the look off and on, to compare (A/B)"));
+    hearWithout.setTooltip (tr ("Switches the look off and on, to compare (A/B), at the same loudness. Right-click: hear the raw level instead"));
     hearWithout.setClickingTogglesState (true);
     hearWithout.onClick = [this] {
         if (updating)
             return;
         const auto off = hearWithout.getToggleState();
         engine.editSong ([off] (Song& s) { looks::setBypassed (s, off); });
+        updateListenGain();
     };
+    hearWithout.addMouseListener (this, false);
     addAndMakeVisible (hearWithout);
 
     for (int i = 0; i < looks::count; ++i)
@@ -391,6 +394,92 @@ void FinishDock::save (int format)
 FinishDock::~FinishDock()
 {
     stopTimer();
+    engine.setListenGain (1.0f);
+}
+
+void FinishDock::mouseDown (const juce::MouseEvent& e)
+{
+    if (e.eventComponent != &hearWithout || ! e.mods.isPopupMenu())
+        return;
+    juce::PopupMenu menu;
+    menu.addItem (tr ("Same loudness as with the look"), true, matchLoudness, [this] {
+        matchLoudness = ! matchLoudness;
+        updateListenGain();
+    });
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&hearWithout));
+}
+
+// round 190ld (DS-44): while "Hear without" is on, the device plays the song at the look's loudness: the gain is the
+// difference of the two offline loudnesses (the song with and without the look), measured once per look setting
+void FinishDock::updateListenGain()
+{
+    const auto& song = engine.getSong();
+    if (! matchLoudness || ! looks::present (song) || ! looks::bypassed (song))
+    {
+        engine.setListenGain (1.0f);
+        return;
+    }
+    if (matchValid && matchedFor == song.masterLook)
+    {
+        engine.setListenGain (juce::Decibels::decibelsToGain (matchDb->load()));
+        return;
+    }
+    engine.setListenGain (1.0f); // (the raw level until the match is measured)
+    measureMatch();
+}
+
+namespace
+{
+// the song's integrated loudness (LUFS) from an offline 44.1 kHz render of its first 10 minutes; -100 when silent
+float renderedLufs (const Song& song)
+{
+    exportopts::Options o;
+    o.format = exportopts::Format::wav;
+    o.wavBits = 32;
+    o.sampleRate = 44100.0;
+    const auto file = juce::File::createTempFile (".wav");
+    ExportJob job (song, o, file);
+    job.setExtraData (false);
+    juce::String error;
+    float lufs = -100.0f;
+    if (job.run ([] (double) { return true; }, error))
+    {
+        juce::WavAudioFormat wav;
+        if (std::unique_ptr<juce::AudioFormatReader> reader (wav.createReaderFor (file.createInputStream().release(), true)); reader != nullptr)
+        {
+            const auto n = (int) juce::jmin<juce::int64> (reader->lengthInSamples, (juce::int64) (44100.0 * 600.0));
+            juce::AudioBuffer<float> buf ((int) juce::jmax (2u, reader->numChannels), n);
+            reader->read (&buf, 0, n, 0, true, true);
+            std::vector<float> l (buf.getReadPointer (0), buf.getReadPointer (0) + n), r (buf.getReadPointer (1), buf.getReadPointer (1) + n);
+            double value = 0.0, peak = 0.0;
+            mastering::measure (l, r, 44100.0, value, peak);
+            lufs = (float) value;
+        }
+    }
+    file.deleteFile();
+    return lufs;
+}
+} // namespace
+
+void FinishDock::measureMatch()
+{
+    if (matching->load() != 0)
+        return;
+    auto with = engine.getSong();
+    looks::setBypassed (with, false);
+    auto without = with;
+    looks::setBypassed (without, true);
+    matchedFor = with.masterLook;
+    matchValid = false;
+    matching->store (1);
+    auto flag = matching;
+    auto result = matchDb;
+    std::thread ([with = std::move (with), without = std::move (without), flag, result] {
+        const auto a = renderedLufs (with), b = renderedLufs (without);
+        result->store (a < -70.0f || b < -70.0f ? 0.0f : juce::jlimit (-24.0f, 24.0f, a - b));
+        flag->store (2);
+    }).detach();
+    startTimer (100);
 }
 
 void FinishDock::refresh()
@@ -415,6 +504,7 @@ void FinishDock::refresh()
     for (int i = 0; i < 3; ++i)
         tone[i].setValue (has ? shown.tone[(std::size_t) i] : 0.0, juce::dontSendNotification);
     hearWithout.setToggleState (looks::bypassed (song), juce::dontSendNotification);
+    updateListenGain(); // (round 190ld: the A/B's loudness follows an undo or another project)
     refreshFade();
     for (auto* c : std::initializer_list<juce::Component*> { &hearWithout, &intensity, &tone[0], &tone[1], &tone[2], &autoButton, &removeButton })
         c->setEnabled (has);
@@ -535,9 +625,20 @@ void FinishDock::autoLevel()
 
 void FinishDock::timerCallback()
 {
+    if (matching->load() == 2) // round 190ld: the loudness match is measured
+    {
+        matching->store (0);
+        matchValid = true;
+        updateListenGain();
+    }
     if (measuring->load() != 2)
+    {
+        if (measuring->load() == 0 && matching->load() == 0)
+            stopTimer();
         return;
-    stopTimer();
+    }
+    if (matching->load() == 0)
+        stopTimer();
     measuring->store (0);
     autoButton.setEnabled (shown.id != 0);
     const auto lufs = measuredLufs->load();

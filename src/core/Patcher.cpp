@@ -5,6 +5,7 @@
 #include "core/XyController.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cctype>
 #include <cmath>
 #include <cstring>
@@ -240,6 +241,8 @@ struct Graph::Node
     bool sidechain = false;
     int inLatency = 0, outLatency = 0;
     std::vector<int> mainInputs, sideInputs; // wire indices
+    std::atomic<float> peak { 0.0f };       // round 190ld: main-output peak and process time while watched (Graph::watch)
+    std::atomic<std::uint64_t> ns { 0 };
 };
 
 struct Graph::AudioWire
@@ -1275,14 +1278,54 @@ std::shared_ptr<Instrument> Graph::instrumentAt (int node) const
     return node >= 0 && node < (int) nodes.size() ? nodes[(std::size_t) node]->instrument : nullptr;
 }
 
+namespace
+{
+std::uint64_t nowNs() noexcept
+{
+    return (std::uint64_t) std::chrono::duration_cast<std::chrono::nanoseconds> (std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+float blockPeak (const float* l, const float* r, int n) noexcept
+{
+    float p = 0.0f;
+    for (int i = 0; i < n; ++i)
+        p = std::max (p, std::max (std::abs (l[i]), std::abs (r[i])));
+    return p;
+}
+void raisePeak (std::atomic<float>& a, float p) noexcept
+{
+    if (p > a.load (std::memory_order_relaxed))
+        a.store (p, std::memory_order_relaxed);
+}
+} // namespace
+
+float Graph::takeNodePeak (int node) noexcept
+{
+    return node >= 0 && node < (int) nodes.size() ? nodes[(std::size_t) node]->peak.exchange (0.0f, std::memory_order_relaxed) : 0.0f;
+}
+
+std::uint64_t Graph::nodeNanoseconds (int node) const noexcept
+{
+    return node >= 0 && node < (int) nodes.size() ? nodes[(std::size_t) node]->ns.load (std::memory_order_relaxed) : 0u;
+}
+
 void Graph::process (const float* inL, const float* inR, const float* scL, const float* scR, float* outL, float* outR, int n, double bpm) noexcept
 {
+    const auto watched = watchLeft.load (std::memory_order_relaxed) > 0; // round 190ld (View › Activity / Performance)
+    const auto start = watched ? nowNs() : 0u;
+    if (watched)
+        raisePeak (inputPeak, blockPeak (inL, inR, n));
     for (int done = 0; done < n; done += capacity)
     {
         const auto piece = std::min (capacity, n - done);
         pieceOffset = hwOffset + done;
         processPiece (inL + done, inR + done, scL != nullptr ? scL + done : nullptr, scR != nullptr ? scR + done : nullptr, outL + done,
                       outR + done, piece, bpm);
+    }
+    if (watched)
+    {
+        graphNs.fetch_add (nowNs() - start, std::memory_order_relaxed);
+        framesWatched.fetch_add ((std::uint64_t) n, std::memory_order_relaxed);
+        watchLeft.fetch_sub (n, std::memory_order_relaxed);
     }
 }
 
@@ -1570,6 +1613,13 @@ void Graph::renderNodes (const float* inL, const float* inR, const float* scL, c
     auto* inBufR = scratch[1].data();
     auto* scBufL = scratch[2].data();
     auto* scBufR = scratch[3].data();
+    const auto watched = watchLeft.load (std::memory_order_relaxed) > 0; // round 190ld: per node (View › Activity / Performance)
+    std::uint64_t nodeStart = 0;
+    auto measured = [&] (Node& node, const float* l, const float* r) {
+        const auto end = nowNs();
+        node.ns.fetch_add (end - nodeStart, std::memory_order_relaxed);
+        raisePeak (node.peak, blockPeak (l, r, n));
+    };
 
     for (const auto i : order)
     {
@@ -1577,6 +1627,8 @@ void Graph::renderNodes (const float* inL, const float* inR, const float* scL, c
         auto& v = values.nodes[(std::size_t) i];
         auto* oL = node.out[0][0].data() + start;
         auto* oR = node.out[0][1].data() + start;
+        if (watched)
+            nodeStart = nowNs();
 
         if (node.generator)
         {
@@ -1584,6 +1636,8 @@ void Graph::renderNodes (const float* inL, const float* inR, const float* scL, c
             std::fill (oR, oR + n, 0.0f);
             if (node.instrument != nullptr)
                 node.instrument->render (oL, oR, n, 1.0f, 1.0f);
+            if (watched)
+                measured (node, oL, oR);
             continue;
         }
 
@@ -1623,6 +1677,8 @@ void Graph::renderNodes (const float* inL, const float* inR, const float* scL, c
                     hR[k] *= g;
                 }
         }
+        if (watched)
+            measured (node, oL, oR);
     }
 
     // "To LYNX SHARE": the main output and the extra ones

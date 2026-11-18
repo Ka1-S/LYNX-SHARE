@@ -24,7 +24,8 @@ namespace lynx::livekeys
 {
 enum class Command
 {
-    none, toggleView, metronome, arrangementRecord, sessionRecord, backToArrangement, computerKeyboard, browser, follow, consolidate
+    none, toggleView, metronome, arrangementRecord, sessionRecord, backToArrangement, computerKeyboard, browser, follow, consolidate,
+    continuePlay // round 190ld (DL-66): Live's Shift+Space "Continue Play" from where the song stopped
 };
 
 constexpr Command commandFor (keys::Chord chord, layoutstyle::Style style) noexcept
@@ -48,6 +49,8 @@ constexpr Command commandFor (keys::Chord chord, layoutstyle::Style style) noexc
             return Command::none;
         case ctrl | alt:
             return key == 'B' ? Command::browser : Command::none;
+        case shift:
+            return key == space ? Command::continuePlay : Command::none;
         case ctrl:
             return key == 'J' ? Command::consolidate : Command::none;
         default:
@@ -71,6 +74,7 @@ constexpr const char* menuKey (Command c, layoutstyle::Style style) noexcept
         case Command::browser: return "\tCtrl+Alt+B";
         case Command::follow: return "\tCtrl+Shift+F";
         case Command::consolidate: return "\tCtrl+J";
+        case Command::continuePlay: return "\tShift+Space";
         case Command::none: break;
     }
     return "";

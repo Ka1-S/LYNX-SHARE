@@ -205,6 +205,9 @@ public:
     juce::File getSelectedFile() const;
     // Left / Right: close / open the selected folder (Left on a file goes to its folder)
     void openFolder (bool open);
+    // Live (manual 4.9, round 190ld DL-98): "preview ... by pressing Shift+Enter or the right arrow key when a browser item
+    // is selected" while the preview switch is off. False when the selection is not a file
+    bool previewSelected();
 
     // Drags from the Browser (tree or search results): is it one, and which file it carries.
     static bool isBrowserDrag (const juce::DragAndDropTarget::SourceDetails& details);
@@ -426,7 +429,8 @@ private:
     static std::vector<BrowserComponent*>& liveBrowsers();
     void collectionsChanged(); // every Browser draws its rows (and its STARRED tab) again
     std::set<int> closedCollections; // the STARRED tab's collection headings the user folded
-    bool previewWanted (bool asked) const noexcept { return asked && autoPreview; }
+    bool previewWanted (bool asked) const noexcept { return asked && (autoPreview || forcePreview); }
+    bool forcePreview = false; // round 190ld (DL-98): Live's Shift+Enter / → preview even with the automatic preview off
     hotswap::Session swapSession;
     bool liveItemMenus = false;
     // round 190cy: hot-swap starts on the linked effect's current preset (Live 12.4.16 reveals it, live check 190cw

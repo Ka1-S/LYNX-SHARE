@@ -432,6 +432,10 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     }
     countInButton.onClick = [this] { runAction ("record.countIn"); };
     waitInputButton.onClick = [this] { runAction ("record.waitForInput"); };
+    // FL (manual "Toolbar panels", round 190ld): "Recording Count-in ... Right-Click to choose bars"; Wait for input's
+    // right-click has "Only when recording" and "Respect recording filter"
+    countInButton.onRightClick = [this] { makeCountInMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&countInButton)); };
+    waitInputButton.onRightClick = [this] { makeWaitInputMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&waitInputButton)); };
     // round 170e2: FL's "Blend recorded notes" switch (on = overdub, off = replace) and its tempo tapper button
     blendButton.setOnColour (theme::colour::bg6);
     blendButton.setIconColourWhenOn (theme::colour::accent);
@@ -2053,6 +2057,15 @@ bool MainComponent::runLiveKey (livekeys::Command command)
         case C::browser: return runAction ("panel.browser");
         case C::follow: return runAction ("playlist.follow");
         case C::consolidate: return runAction ("tools.consolidateSelection");
+        case C::continuePlay: // Live: playback goes on from the point where it stopped (not from where it started)
+            if (engine.getTransport().playing.load() || engine.isWaitingForInput() || engine.isCountingIn())
+                return true;
+            if (stoppedAtTicks >= 0.0)
+                engine.seek (stoppedAtTicks);
+            notePlayStart (true);
+            transportPaused = false;
+            engine.startPlayback();
+            return true;
         case C::none: break;
     }
     return false;
@@ -2375,6 +2388,16 @@ bool MainComponent::runAction (const std::string& id)
         }
     }
     else if (is ("rack.groupSelected")) rack.groupSelected();
+    else if (is ("rack.mixerSelectors")) // round 190ld (DE-26): FL's "Show mixer track selectors"
+    {
+        ChannelRackComponent::showMixerSelectors = ! ChannelRackComponent::showMixerSelectors;
+        rack.updateSize();
+        rack.resized();
+        rack.repaint();
+        saveUiSettings();
+    }
+    else if (is ("rack.filterPrevious")) rack.stepFilterGroup (-1); // round 190ld (DE-37)
+    else if (is ("rack.filterNext")) rack.stepFilterGroup (1);
     else if (is ("rack.rotateLeft")) rack.rotateSelected (-1);
     else if (is ("rack.rotateRight")) rack.rotateSelected (1);
     else if (is ("browser.previous")) browser.step (-1, false);
@@ -2383,7 +2406,17 @@ bool MainComponent::runAction (const std::string& id)
     else if (is ("browser.swapNext")) browser.step (1, true);
     else if (is ("browser.load")) browser.loadSelected();
     else if (is ("browser.closeFolder")) browser.openFolder (false);
-    else if (is ("browser.openFolder")) browser.openFolder (true);
+    else if (is ("browser.openFolder"))
+    {
+        // round 190ld (DL-98, Clip-launch only): Live's → previews a selected file; on a folder it opens it as before
+        if (! (layoutStyle == layoutstyle::Style::clipLaunch && browser.previewSelected()))
+            browser.openFolder (true);
+    }
+    else if (is ("browser.previewLive")) // round 190ld (DL-98): Live's Shift+Enter, Clip-launch only
+    {
+        if (layoutStyle != layoutstyle::Style::clipLaunch || ! browser.previewSelected())
+            return false;
+    }
     else if (is ("browser.rename"))
     {
         if (! browser.renameSelectedPlugin()) // not a plugin: F2's global action (rename the pattern)
@@ -2923,6 +2956,8 @@ void MainComponent::loadUiSettings()
             setEditorsInMainWindow (on);
         else if (key == "muteRemovedSteps")
             ChannelRackComponent::muteRemovedSteps = on;
+        else if (key == "rackMixerSelectors") // round 190ld
+            ChannelRackComponent::showMixerSelectors = on;
         else if (key == "rackNameAlignLeft") // round 190kd: FL's Channel name alignment
             ChannelRackComponent::nameAlignLeft = on;
         else if (key == "audioTrackControls") // round 190w: Playlist › View › Track headers
@@ -3068,6 +3103,10 @@ void MainComponent::loadUiSettings()
             sessionButtonRowShown = on;
         else if (key == "sceneTempoShown") // round 190ef: the clip grid's scene tempo / time signature fields
             clipGridSceneTempoShown() = on;
+        else if (key == "sceneSelectNext") // round 190ld: Live's scene-launch preferences
+            clipGridSelectNextOnLaunch() = on;
+        else if (key == "sceneRecordOnLaunch")
+            clipGridRecordOnSceneLaunch() = on;
         else if (key == "clipGridClassicLook") // round 190ig: the clip grid without Live's look
             clipGridClassicLook() = on;
         else if (key == "tallLiveLanes") // round 190jn: the Arrangement's 38 px lanes in Live's look (19 px by default)
@@ -3109,6 +3148,8 @@ void MainComponent::loadUiSettings()
                                                                                : EditorGlobals::FollowView::audioEditor, on, false);
         else if (key == "cpuRefresh") // round 190kn
             toolbar::PerformanceMeter::refresh = juce::jlimit (0, 2, line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
+        else if (key == "cpuView") // round 190ld: FL's View voice count / View FPS
+            toolbar::PerformanceMeter::secondView = juce::jlimit (0, 1, line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
         else if (key == "scopeMode")
             toolbar::OutputMonitor::mode = juce::jlimit (0, toolbar::OutputMonitor::modeCount - 1,
                                                          line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
@@ -3207,11 +3248,16 @@ void MainComponent::loadUiSettings()
                 o.compensateOutput = v != 0;
             engine.setRecordOptions (o);
         }
-        else if (key == "recordPunchLoop" || key == "recordPreRoll" || key == "recordPostRoll" || key == "recordLoop" || key == "recordLastPassPlays")
+        else if (key == "recordPunchLoop" || key == "recordPreRoll" || key == "recordPostRoll" || key == "recordLoop" || key == "recordLastPassPlays"
+                 || key == "waitOnlyWhenRecording" || key == "waitRespectFilter")
         {
             auto o = engine.getRecordOptions();
             const auto v = line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue();
-            if (key == "recordPunchLoop")
+            if (key == "waitOnlyWhenRecording") // round 190ld
+                o.waitOnlyWhenRecording = v != 0;
+            else if (key == "waitRespectFilter")
+                o.waitRespectFilter = v != 0;
+            else if (key == "recordPunchLoop")
                 o.punchLoopRegion = v != 0;
             else if (key == "recordLoop")
                 o.loopRecord = v != 0;
@@ -3283,6 +3329,7 @@ void MainComponent::saveUiSettings()
                                       + "\nautoSelectLinked=" + juce::String (ChannelRackComponent::autoSelectLinked ? 1 : 0)
                                       + "\neditorsInMain=" + juce::String (editorsInMainWindowSetting() ? 1 : 0)
                                       + "\nmuteRemovedSteps=" + juce::String (ChannelRackComponent::muteRemovedSteps ? 1 : 0)
+                                      + "\nrackMixerSelectors=" + juce::String (ChannelRackComponent::showMixerSelectors ? 1 : 0)
                                       + "\nrackNameAlignLeft=" + juce::String (ChannelRackComponent::nameAlignLeft ? 1 : 0)
                                       + "\naudioTrackControls=" + juce::String (PlaylistComponent::showAudioTrackControls ? 1 : 0)
                                       + "\naudioTrackLevels=" + juce::String (PlaylistComponent::showAudioTrackLevels ? 1 : 0)
@@ -3347,6 +3394,8 @@ void MainComponent::saveUiSettings()
                                       + "\ndetailHeight=" + juce::String (DetailView::preferredHeight)
                                       + "\ndetailShown=" + juce::String (DetailView::shownSetting ? 1 : 0)
                                       + "\nsceneTempoShown=" + juce::String (clipGridSceneTempoShown() ? 1 : 0)
+                                      + "\nsceneSelectNext=" + juce::String (clipGridSelectNextOnLaunch() ? 1 : 0)
+                                      + "\nsceneRecordOnLaunch=" + juce::String (clipGridRecordOnSceneLaunch() ? 1 : 0)
                                       + "\nclipGridClassicLook=" + juce::String (clipGridClassicLook() ? 1 : 0)
                                       + "\ntallLiveLanes=" + juce::String (playlistTallLiveLanes() ? 1 : 0)
                                       + "\ninfoViewShown=" + juce::String (DetailView::infoViewShown ? 1 : 0)
@@ -3371,6 +3420,7 @@ void MainComponent::saveUiSettings()
                                       + "\nfollowAudioEditor=" + juce::String (EditorGlobals::get().isFollowingView (EditorGlobals::FollowView::audioEditor) ? 1 : 0)
                                       + "\nscopeMode=" + juce::String (toolbar::OutputMonitor::mode)
                                       + "\ncpuRefresh=" + juce::String (toolbar::PerformanceMeter::refresh)
+                                      + "\ncpuView=" + juce::String (toolbar::PerformanceMeter::secondView)
                                       + "\ntoolbarGroups=" + juce::String (toolbarLayout.orderToString())
                                       + "\ntoolbarIcons=" + toolbarlayout::Layout::iconSizeId (toolbarLayout.iconSize)
                                       + "\nuiScale=" + juce::String (toolbarLayout.uiScale)
@@ -3416,6 +3466,8 @@ void MainComponent::saveUiSettings()
                                       + "\nrecordPunchLoop=" + juce::String (engine.getRecordOptions().punchLoopRegion ? 1 : 0)
                                       + "\nrecordLoop=" + juce::String (engine.getRecordOptions().loopRecord ? 1 : 0)
                                       + "\nrecordLastPassPlays=" + juce::String (engine.getRecordOptions().lastLoopPassPlays ? 1 : 0)
+                                      + "\nwaitOnlyWhenRecording=" + juce::String (engine.getRecordOptions().waitOnlyWhenRecording ? 1 : 0)
+                                      + "\nwaitRespectFilter=" + juce::String (engine.getRecordOptions().waitRespectFilter ? 1 : 0)
                                       + "\nrecordBlend=" + juce::String (engine.getRecordOptions().mode == RecordMode::overdub ? 1 : 0)
                                       + "\nrecordPreRoll=" + juce::String (engine.getRecordOptions().preRollBars)
                                       // FL's precount switch and duration, and the metronome switch (issue #152)
@@ -3445,6 +3497,7 @@ void MainComponent::playStop()
     {
         // back to the remembered position: the last ruler click, else where playback started (FL, issue #169)
         const auto back = stopReturn (false, true);
+        stoppedAtTicks = transport.positionTicks.load(); // (round 190ld: Live's Shift+Space continues from here)
         engine.stop();
         engine.seek ((double) back);
         playStartTicks = (double) back;
@@ -4544,6 +4597,9 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
                 ChannelRackComponent::muteRemovedSteps = ! ChannelRackComponent::muteRemovedSteps;
                 saveUiSettings();
             });
+            // FL 2026's next item there (round 190ld, DE-26): the mixer track number boxes on / off (Alt+M)
+            menu.addItem (tr ("Show mixer track selectors") + shortcutText ("rack.mixerSelectors"), true, ChannelRackComponent::showMixerSelectors,
+                          [this] { runAction ("rack.mixerSelectors"); });
             // FL's place for it (round 190cj, seen in FL 2026: Channel rack menu > Options, after "Mute removed steps" and
             // "Show mixer track selectors"; it was in Settings > General): a row's miniature shows the whole pattern
             menu.addItem (tr ("Show complete piano roll preview"), true, ChannelRackComponent::completePreview.load(), [this] {
@@ -4958,6 +5014,43 @@ void MainComponent::addRecordQuantizeItems (juce::PopupMenu& menu)
                   [set] { set ([] (AudioEngine::RecordOptions& r) { r.quantiseAutomation = ! r.quantiseAutomation; }); });
 }
 
+// The count-in lengths (the record menu's submenu, and FL's right-click on the Count-in button, round 190ld)
+juce::PopupMenu MainComponent::makeCountInMenu()
+{
+    const auto o = engine.getRecordOptions();
+    auto set = [this] (int bars) {
+        auto options = engine.getRecordOptions();
+        options.countInBars = bars;
+        engine.setRecordOptions (options);
+        refreshRecordOptionButtons();
+        saveUiSettings();
+    };
+    juce::PopupMenu countIn;
+    countIn.addItem (tr ("Off"), true, o.countInBars == 0, [set] { set (0); });
+    for (int bars : { 1, 2, 4 })
+        countIn.addItem (bars == 1 ? tr ("1 bar") : tr ("{0} bars", { juce::String (bars) }), true, o.countInBars == bars, [set, bars] { set (bars); });
+    return countIn;
+}
+
+// FL's Wait for input right-click (round 190ld)
+juce::PopupMenu MainComponent::makeWaitInputMenu()
+{
+    const auto o = engine.getRecordOptions();
+    auto set = [this] (std::function<void (AudioEngine::RecordOptions&)> change) {
+        auto options = engine.getRecordOptions();
+        change (options);
+        engine.setRecordOptions (options);
+        refreshRecordOptionButtons();
+        saveUiSettings();
+    };
+    juce::PopupMenu menu;
+    menu.addItem (tr ("Only when recording"), true, o.waitOnlyWhenRecording,
+                  [set] { set ([] (AudioEngine::RecordOptions& r) { r.waitOnlyWhenRecording = ! r.waitOnlyWhenRecording; }); });
+    menu.addItem (tr ("Respect recording filter"), true, o.waitRespectFilter,
+                  [set] { set ([] (AudioEngine::RecordOptions& r) { r.waitRespectFilter = ! r.waitRespectFilter; }); });
+    return menu;
+}
+
 void MainComponent::addRecordOptions (juce::PopupMenu& menu)
 {
     const auto o = engine.getRecordOptions();
@@ -4969,12 +5062,7 @@ void MainComponent::addRecordOptions (juce::PopupMenu& menu)
         saveUiSettings();
     };
 
-    juce::PopupMenu countIn;
-    countIn.addItem (tr ("Off"), true, o.countInBars == 0, [set] { set ([] (AudioEngine::RecordOptions& r) { r.countInBars = 0; }); });
-    for (int bars : { 1, 2, 4 })
-        countIn.addItem (bars == 1 ? tr ("1 bar") : tr ("{0} bars", { juce::String (bars) }), true, o.countInBars == bars,
-                         [set, bars] { set ([bars] (AudioEngine::RecordOptions& r) { r.countInBars = bars; }); });
-    menu.addSubMenu (tr ("Count-in") + shortcutText ("record.countIn"), countIn);
+    menu.addSubMenu (tr ("Count-in") + shortcutText ("record.countIn"), makeCountInMenu());
     menu.addItem (tr ("Wait for the first note to start") + shortcutText ("record.waitForInput"), true, o.waitForInput,
                   [set] { set ([] (AudioEngine::RecordOptions& r) { r.waitForInput = ! r.waitForInput; }); });
     menu.addItem (tr ("Loop record") + shortcutText ("record.loop"), true, o.loopRecord,
@@ -6982,6 +7070,8 @@ void MainComponent::timerCallback()
         meterTicks = 0;
         const auto held = (int) heldKeys.size();
         const auto notes = playing ? songstats::soundingNotes (engine.getSong(), transport.positionTicks.load()) : 0;
+        if (toolbar::PerformanceMeter::secondView == toolbar::PerformanceMeter::framesPerSecond) // round 190ld: View FPS
+            perfMeter.setFramesPerSecond (ui::FrameTicker::uiFrameRate());
         perfMeter.setValues (engine.getDeviceManager().getCpuUsage(), toolbar::PerformanceMeter::processMemoryBytes(), notes + held);
         const auto rt = engine.getRtStats().snapshot();
         juce::StringArray heaviest;
@@ -7020,7 +7110,22 @@ void MainComponent::timerCallback()
 
     if (++midiInputTicks % 30 == 1) // the open MIDI inputs, once a second
         midiLightInputs = engine.getActiveMidiInputs();
-    midiLight.update (engine.getMidiActivity(), midiLightInputs);
+    midiLight.update (engine.getMidiActivity(), midiLightInputs, engine.getMidiProjectLinked(), engine.getMidiGlobalLinked());
+    // FL's MIDI Sync light (round 190ld): with master sync sent, a blink on each beat, blue on each bar's first
+    if (engine.getMidiSync().sending() && transport.playing.load())
+    {
+        const auto& song = engine.getSong();
+        const auto beatTicks = juce::jmax<std::int64_t> (1, song.beatTicks());
+        const auto beat = (std::int64_t) std::floor (transport.positionTicks.load() / (double) beatTicks);
+        if (beat != syncLightBeat)
+        {
+            if (syncLightBeat != std::numeric_limits<std::int64_t>::min())
+                midiLight.beat (beat % juce::jmax (1, (int) (song.barTicks() / beatTicks)) == 0);
+            syncLightBeat = beat;
+        }
+    }
+    else
+        syncLightBeat = std::numeric_limits<std::int64_t>::min();
 
     // If a closed dialog left the main window without a focused component, take it back so the PC keyboard
     // keeps playing. Only while the main window itself is the active one: another LYNX window (Audio editor,
@@ -9345,8 +9450,11 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         for (int i = 0; i < shown; ++i)
         {
             const auto file = recent.getFile (i);
-            juce::PopupMenu::Item item (file.getFileName());
-            item.shortcutKeyDescription = file.getParentDirectory().getFileName(); // its folder on the right
+            // FL: the row's Alt+1 … Alt+0 on the right (round 190ld, DF-137); the folder stays beside the name
+            const auto id = "file.recent" + std::to_string (i + 1);
+            const auto keyText = shortcutText (id.c_str()).trimCharactersAtStart ("\t");
+            juce::PopupMenu::Item item (keyText.isEmpty() ? file.getFileName() : file.getFileName() + "  (" + file.getParentDirectory().getFileName() + ")");
+            item.shortcutKeyDescription = keyText.isNotEmpty() ? keyText : file.getParentDirectory().getFileName(); // (else its folder on the right)
             item.setEnabled (file.existsAsFile()).setAction ([this, file] { confirmDiscard ([this, file] { openFile (file); }); });
             menu.addItem (std::move (item));
         }

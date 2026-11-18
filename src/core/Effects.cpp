@@ -2311,7 +2311,34 @@ public:
         useSide[1] = true;
     }
 
+    // round 190ld (DP-32): the band display's live levels — FL's bands display animates each analysis band's level.
+    // Up to 32 columns (more bands: the loudest of each group), 6 bits each (−60…0 dB in 63 steps), four columns per
+    // output 0…7 packed as an exact integer in the float (vocoder::bandColumn decodes). Nothing while no editor shows them.
+    float controlOutput (int output) const noexcept override
+    {
+        if (! metersShown || output < 0 || output >= 8)
+            return 0.0f;
+        const auto bands = engine.state().bands;
+        const auto columns = std::min (bands, 32), per = std::max (1, bands / std::max (1, columns));
+        std::uint32_t packed = 0;
+        for (int c = 0; c < 4; ++c)
+        {
+            const auto column = output * 4 + c;
+            if (column >= columns)
+                break;
+            float peak = 0.0f;
+            for (int b = column * per; b < (column + 1) * per; ++b)
+                peak = std::max (peak, engine.bandMeter (b));
+            const auto q = peak > 0.001f ? std::clamp ((int) std::lround ((20.0f * std::log10 (peak) + 60.0f) * (63.0f / 60.0f)), 0, 63) : 0;
+            packed |= (std::uint32_t) q << (6 * c);
+        }
+        return (float) packed;
+    }
+
+    void setMetersShown (bool shown) noexcept override { metersShown = shown; }
+
 private:
+    bool metersShown = false; // (an editor counts itself in ProcessTimes::metersWanted)
     fvocoder::Engine engine;
     fvocoder::State saved;
     std::array<float, 16> last {};

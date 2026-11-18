@@ -79,12 +79,23 @@ void soloSlot (Song& song, int track, int index)
     auto& fx = song.mixer[(std::size_t) track].effects;
     if (index < 0 || index >= (int) fx.size())
         return;
+    // (round 190ld: a slot with its state locked, Shift+click, keeps its state and doesn't count for "only this one on")
     bool soloed = fx[(std::size_t) index].enabled;
     for (std::size_t i = 0; i < fx.size(); ++i)
-        if ((int) i != index && fx[i].enabled)
+        if ((int) i != index && fx[i].enabled && ! fx[i].lockState)
             soloed = false;
     for (std::size_t i = 0; i < fx.size(); ++i)
-        fx[i].enabled = soloed || (int) i == index;
+        if (! fx[i].lockState || (int) i == index)
+            fx[i].enabled = soloed || (int) i == index;
+}
+
+void toggleSlotLock (Song& song, int track, int index)
+{
+    if (track < 0 || track >= (int) song.mixer.size())
+        return;
+    auto& fx = song.mixer[(std::size_t) track].effects;
+    if (index >= 0 && index < (int) fx.size())
+        fx[(std::size_t) index].lockState = ! fx[(std::size_t) index].lockState;
 }
 
 namespace

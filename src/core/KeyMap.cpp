@@ -200,6 +200,12 @@ std::vector<Action> makeActions()
         { "rack.groupSelected", TR_NOOP ("Put the selected channels in a new filter group"), Context::channelRack, { chord ('G', alt) } },
         { "rack.rotateLeft", TR_NOOP ("Rotate the selected channels' steps left"), Context::channelRack, { chord (left, ctrl | shift) } },
         { "rack.rotateRight", TR_NOOP ("Rotate the selected channels' steps right"), Context::channelRack, { chord (right, ctrl | shift) } },
+        // FL's Channel rack (manual "Channel Rack › Filter"; round 190ld, DE-37): Page Up / Page Down = the previous / next
+        // filter group, in the group menu's order
+        { "rack.filterPrevious", TR_NOOP ("Previous filter group"), Context::channelRack, { chord (pageUp) } },
+        { "rack.filterNext", TR_NOOP ("Next filter group"), Context::channelRack, { chord (pageDown) } },
+        // FL 2026's Channel rack menu › Options › "Show mixer track selectors" (Alt+M) (round 190ld, DE-26)
+        { "rack.mixerSelectors", TR_NOOP ("Show mixer track selectors"), Context::channelRack, { chord ('M', alt) } },
 
         // Piano Roll (focused): tool dialogs and zoom
         { "pianoRoll.toStart", TR_NOOP ("Move the playback marker to start"), Context::pianoRoll, { chord (home) } }, // (issue #195)
@@ -279,15 +285,15 @@ std::vector<Action> makeActions()
         { "pianoRoll.markerSignature", TR_NOOP ("Pattern time markers: Add time signature change..."), Context::pianoRoll, { chord ('T', shift | alt) } },
         // the tools and the other single letters (FL's keys; issue #12: they were fixed in the editor and won over a
         // global shortcut given the same key)
-        { "pianoRoll.tool.pencil", TR_NOOP ("Tool: Pencil"), Context::pianoRoll, { chord ('P') } },
-        { "pianoRoll.tool.brush", TR_NOOP ("Tool: Brush"), Context::pianoRoll, { chord ('B') } },
-        { "pianoRoll.tool.drumPaint", TR_NOOP ("Tool: Drum brush"), Context::pianoRoll, { chord ('N') } },
-        { "pianoRoll.tool.eraser", TR_NOOP ("Tool: Eraser"), Context::pianoRoll, { chord ('D') } },
+        { "pianoRoll.tool.pencil", TR_NOOP ("Tool: Draw"), Context::pianoRoll, { chord ('P') } },
+        { "pianoRoll.tool.brush", TR_NOOP ("Tool: Paint"), Context::pianoRoll, { chord ('B') } },
+        { "pianoRoll.tool.drumPaint", TR_NOOP ("Tool: Paint drum sequencer"), Context::pianoRoll, { chord ('N') } },
+        { "pianoRoll.tool.eraser", TR_NOOP ("Tool: Delete"), Context::pianoRoll, { chord ('D') } },
         { "pianoRoll.tool.mute", TR_NOOP ("Tool: Mute"), Context::pianoRoll, { chord ('T') } },
-        { "pianoRoll.tool.knife", TR_NOOP ("Tool: Knife"), Context::pianoRoll, { chord ('C') } },
-        { "pianoRoll.tool.lasso", TR_NOOP ("Tool: Lasso (select)"), Context::pianoRoll, { chord ('E') } },
+        { "pianoRoll.tool.knife", TR_NOOP ("Tool: Slice"), Context::pianoRoll, { chord ('C') } },
+        { "pianoRoll.tool.lasso", TR_NOOP ("Tool: Select"), Context::pianoRoll, { chord ('E') } },
         { "pianoRoll.tool.zoom", TR_NOOP ("Tool: Zoom"), Context::pianoRoll, { chord ('Z') } },
-        { "pianoRoll.tool.listen", TR_NOOP ("Tool: Listen"), Context::pianoRoll, { chord ('Y') } },
+        { "pianoRoll.tool.listen", TR_NOOP ("Tool: Playback"), Context::pianoRoll, { chord ('Y') } },
         { "pianoRoll.slide", TR_NOOP ("Slide notes on/off (new notes)"), Context::pianoRoll, { chord ('S') } },
         // round 190an (LYNX's own option; FL has none, so no key by default): the Piano roll's Snap to scale switch
         { "pianoRoll.scaleSnap", TR_NOOP ("Snap notes to the scale on/off"), Context::pianoRoll, {} },
@@ -348,14 +354,14 @@ std::vector<Action> makeActions()
         { "playlist.quantizeStarts", TR_NOOP ("Quantize the clips' starts"), Context::playlist, { chord ('Q', ctrl) } },
         { "playlist.quantizeHalf", TR_NOOP ("Quantize the clips' starts 50% (halfway to the grid)"), Context::playlist, {} },
         { "playlist.follow", TR_NOOP ("Follow the playhead (auto scrolling) on/off"), Context::playlist, {} },
-        { "playlist.tool.pencil", TR_NOOP ("Tool: Pencil"), Context::playlist, { chord ('P') } },
-        { "playlist.tool.brush", TR_NOOP ("Tool: Brush"), Context::playlist, { chord ('B') } },
-        { "playlist.tool.eraser", TR_NOOP ("Tool: Eraser"), Context::playlist, { chord ('D') } },
+        { "playlist.tool.pencil", TR_NOOP ("Tool: Draw"), Context::playlist, { chord ('P') } },
+        { "playlist.tool.brush", TR_NOOP ("Tool: Paint"), Context::playlist, { chord ('B') } },
+        { "playlist.tool.eraser", TR_NOOP ("Tool: Delete"), Context::playlist, { chord ('D') } },
         { "playlist.tool.mute", TR_NOOP ("Tool: Mute"), Context::playlist, { chord ('T') } },
-        { "playlist.tool.knife", TR_NOOP ("Tool: Knife"), Context::playlist, { chord ('C') } },
-        { "playlist.tool.lasso", TR_NOOP ("Tool: Lasso (select)"), Context::playlist, { chord ('E') } },
+        { "playlist.tool.knife", TR_NOOP ("Tool: Slice"), Context::playlist, { chord ('C') } },
+        { "playlist.tool.lasso", TR_NOOP ("Tool: Select"), Context::playlist, { chord ('E') } },
         { "playlist.tool.zoom", TR_NOOP ("Tool: Zoom"), Context::playlist, { chord ('Z') } },
-        { "playlist.tool.listen", TR_NOOP ("Tool: Listen"), Context::playlist, { chord ('Y') } },
+        { "playlist.tool.listen", TR_NOOP ("Tool: Playback"), Context::playlist, { chord ('Y') } },
         { "playlist.tool.slip", TR_NOOP ("Tool: Slip"), Context::playlist, { chord ('S') } },
         // FL's Performance mode (round 165m; Ctrl+P on FL's Playlist menu [DFM])
         { "playlist.performanceMode", TR_NOOP ("Performance mode on/off (launch the clips before the Start marker)"), Context::playlist, { chord ('P', ctrl) } },
@@ -422,6 +428,8 @@ std::vector<Action> makeActions()
         { "browser.swapPrevious", TR_NOOP ("Previous file into the selected channel"), Context::browser, { chord (up, shift) } },
         { "browser.swapNext", TR_NOOP ("Next file into the selected channel"), Context::browser, { chord (down, shift) } },
         { "browser.load", TR_NOOP ("Load the file into the selected channel"), Context::browser, { chord (enter) } },
+        // round 190ld (DL-98): Live's Shift+Enter preview; it acts in the Clip-launch layout only
+        { "browser.previewLive", TR_NOOP ("Preview the selected file (Clip-launch layout)"), Context::browser, { chord (enter, shift) } },
         { "browser.closeFolder", TR_NOOP ("Close the folder (or go to the parent folder)"), Context::browser, { chord (left) } },
         { "browser.openFolder", TR_NOOP ("Open the folder"), Context::browser, { chord (right) } },
         { "browser.rename", TR_NOOP ("Rename the selected plugin (Plugin database)"), Context::browser, { chord (f2) } },

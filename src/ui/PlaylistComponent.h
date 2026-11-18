@@ -691,6 +691,9 @@ public:
     }
     static const std::vector<Clip>& copiedClips() noexcept { return clipboard; }
     static std::uint64_t copiedStamp() noexcept { return clipboardStamp; }
+    // round 190ld (--details190ldshot): the Simple header's Fx pill and its chain preset
+    juce::Rectangle<int> trackFxForSnapshot (int track) const { return trackFx (track); }
+    juce::String simpleFxPresetForSnapshot (int track) const { return simpleFxPreset (track); }
 
 private:
     void pasteClips (std::int64_t at = -1);
@@ -758,6 +761,9 @@ private:
     juce::Rectangle<int> trackVolume (int track) const;
     juce::Rectangle<int> trackPan (int track) const;
     juce::Rectangle<int> trackFx (int track) const;
+    juce::String simpleFxPreset (int track) const; // round 190ld (DS-13): the insert's chain preset ("" = none)
+    int simpleFxWidth (int track) const;
+    static juce::Font simpleFxFont();
     // issue #154 (round 190ht): the insert effects column of a linked header (empty: not shown on this track), the
     // width it takes, the row under a point (an effect index, trackinserts::addRow, -1), its painting and gestures
     juce::Rectangle<int> trackInserts (int track) const;

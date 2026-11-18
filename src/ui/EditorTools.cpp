@@ -17,16 +17,18 @@ namespace lynx
 const std::vector<EditToolInfo>& editTools()
 {
     static const std::vector<EditToolInfo> list {
-        { EditTool::pencil, Icon::draw, TR_NOOP ("Pencil"), TR_NOOP ("Click adds, drag moves, drag an edge resizes"), 'P' },
-        { EditTool::brush, Icon::brush, TR_NOOP ("Brush"), TR_NOOP ("Drag to paint a run of notes or clips"), 'B' },
-        { EditTool::drumPaint, Icon::drumBrush, TR_NOOP ("Drum brush"),
+        // FL's tool names (owner decision E1, details DE-58, round 190ld; were Pencil / Brush / Drum brush / Eraser / Knife /
+        // Lasso / Listen)
+        { EditTool::pencil, Icon::draw, TR_NOOP ("Draw"), TR_NOOP ("Click adds, drag moves, drag an edge resizes"), 'P' },
+        { EditTool::brush, Icon::brush, TR_NOOP ("Paint"), TR_NOOP ("Drag to paint a run of notes or clips"), 'B' },
+        { EditTool::drumPaint, Icon::drumBrush, TR_NOOP ("Paint drum sequencer"),
           TR_NOOP ("Drag to paint one short hit per grid cell, on whatever key is under the mouse"), 'N' },
-        { EditTool::eraser, Icon::erase, TR_NOOP ("Eraser"), TR_NOOP ("Click or drag to delete"), 'D' },
+        { EditTool::eraser, Icon::erase, TR_NOOP ("Delete"), TR_NOOP ("Click or drag to delete"), 'D' },
         { EditTool::mute, Icon::mute, TR_NOOP ("Mute"), TR_NOOP ("Click or drag to mute or unmute"), 'T' },
-        { EditTool::knife, Icon::knife, TR_NOOP ("Knife"), TR_NOOP ("Drag a line to cut; a click cuts at the cursor"), 'C' },
-        { EditTool::lasso, Icon::select, TR_NOOP ("Lasso"), TR_NOOP ("Click or drag to select (Shift adds)"), 'E' },
+        { EditTool::knife, Icon::knife, TR_NOOP ("Slice"), TR_NOOP ("Drag a line to cut; a click cuts at the cursor"), 'C' },
+        { EditTool::lasso, Icon::select, TR_NOOP ("Select"), TR_NOOP ("Click or drag to select (Shift adds)"), 'E' },
         { EditTool::zoom, Icon::zoom, TR_NOOP ("Zoom"), TR_NOOP ("Click zooms in, drag a range to zoom to it; right-click zooms out"), 'Z' },
-        { EditTool::listen, Icon::listen, TR_NOOP ("Listen"), TR_NOOP ("Click or drag to hear what is under the cursor"), 'Y' },
+        { EditTool::listen, Icon::listen, TR_NOOP ("Playback"), TR_NOOP ("Click or drag to hear what is under the cursor"), 'Y' },
         { EditTool::slip, Icon::slip, TR_NOOP ("Slip"), TR_NOOP ("Drag inside a clip to move its content under it"), 'S' },
     };
     return list;
