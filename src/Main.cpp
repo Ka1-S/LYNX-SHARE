@@ -21737,8 +21737,9 @@ private:
         check (true, "paint " + juce::String (lynx::polyEditorPaintMs (*editor, 10), 2) + " ms (note assignment view)");
         shoot ("lo-assign");
         int cand = -1;
+        // (the longest candidate)
         for (const auto& l : notes)
-            if (l.candidate && l.start < 2.0 && (cand < 0 || l.end - l.start > 0.3))
+            if (l.candidate && (cand < 0 || l.end - l.start > notes[(std::size_t) cand].end - notes[(std::size_t) cand].start))
                 cand = l.k;
         if (cand >= 0)
         {
