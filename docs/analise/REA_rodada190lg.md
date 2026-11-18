@@ -204,3 +204,44 @@ plays) left almost nothing after the dip at long rates (−8 … −16 dB).
   their rms. A static FDN's response at one frequency is Rayleigh-distributed (±5 dB); the reference itself varies
   ±1.5 dB between identical captures (its modulation). 190kw-r2 had L / R +3.0 / −4.8 dB on that tone, this round
   +6.4 / −2.4, revision 0 −0.5 / −1.5: G4 (Rate × Ducking), the mode stims and S1 / D stims move with it.
+
+## 5. Pro-C 3 → Crest: Versatile (the reference's default style) rebuilt as Allround under revision 1 [STATIC + EXEC] → landed (merged)
+
+Branch `rea2_190lg-vers` (off `rea2_190lg`). Evidence: the coordinator's notes `vers/NOTES.md`, the decompiled files
+`/mnt/e/lynx-work/rea190kw/rea/out/proc3_vers*.c`, `proc3_det.c`, `proc3_cap.c`, this round's `lin.c` (LinearCapacitor,
+RandomModulationProducer, RangeLimiter; Ghidra project copy), `proc3_rtti.txt`. LYNX's code is written from the laws
+below, not from decompiled text; the reference's piecewise-linear knob curves are not copied (LYNX fits its own smooth
+laws to their shape).
+
+### The graph [STATIC] (VersatileCompressor_MainCompressorAlgorithm: constructor 0x180164ae0, wiring 0x180167a00,
+### parameter update 0x1801673c0, outer → inner 0x1801688b0)
+
+x = the linked side-chain magnitude (as for round 190kw's V2 styles).
+- slow: sA = 0.979424 x + mA · max (EQ204 (x), 0) (Mixer ac; RangeLimiter b0 = clamp (0, 10000); mA = Mixer b5 =
+  0.020348 + 0.015089 · a RandomModulationProducer) → Detector a6 → Capacitor a5 (attack 0.0008 + 0.2492 a³ s, release
+  0.01 + 0.968061 tan (1.2 r²) s, auto-release constant 2.049379 r² + 0.0905348, two step terms from the attack knob).
+- fast: sB = 0.91 x + mB · min (x, 0) (Mixer ad, RangeLimiter ae = clamp (−10000, 0); mB = 0.09 + random) → EQFilter a9
+  (2^12.64 ≈ 6.39 kHz) → Detector a7 → LinearCapacitor a8. With x a magnitude, min (x, 0) = 0: the random term never
+  reaches the fast path.
+- reduction = max (S, w · F) (Mixer aa, mode max), w = clamp (0.9 + 0.0397797 · F, 0.7, 1.06) (Mixer ab + RangeLimiter b3).
+- LinearCapacitor (vtable 0x18021fe08, process 0x18010fd90): a slew limiter. Per sample the output moves toward its
+  input by at most unit / (rate · T) — T = the attack time rising, the release time falling (each ≥ 0.1 sample),
+  unit = 1 (24 in its other mode). Its two times come from the knob times through two piecewise-linear curves.
+- RandomModulationProducer (process 0x18011b0d0, next value 0x18011b360): a 24-bit LFSR (taps 0x11d872b) drawing values,
+  joined linearly or by a cubic (2t³ − 3t² form) at the node's rate (fields 0.011 / 7.822 and 0.008 / 9.059).
+
+### [EXEC] what the bank settled (refcap030 Versatile files, new scorer; lab: env-overridable law in a lab build)
+- Domain: the detectors' output read as dB of reduction compressed every file by 1.5 … 4 dB (36 of 38 down); read as
+  the reduction share 1 − 10^(−GR / 20) (as round 190kw's Mastering / Vocal) the steady files reach ESR −42 … −50 dB.
+- The attack knob's two step-dependent Capacitor terms (LYNX's p1 / p2 or p5 / p6 readings of the two curves, every
+  assignment tried): all scored lower than leaving them neutral (6.50 / 5.55 / 7.13 against 7.87): not built.
+- Release of the fast path: with LYNX's fit of the reference's curve the fast path held the reduction up on music
+  (−0.3 … −0.6 dB, 4 files down); at half of it round 108's measured burst (attack 10 / release 200 ms, the gain back
+  half-way after 61.6 ms on the reference) reads 59.5 ms (full curve 120 ms, no fast path 28 ms) and the bank is
+  7.82 with no file down — taken.
+- Random modulators: their mean (mA = 0.020348).
+- EQ shapes (enum 0, the second value 0.12 / 0.16 unresolved): two-pole low-passes at 204 Hz / 6.39 kHz.
+
+### LYNX's own smooth knob laws (fitted to the curves' shape, not their points)
+- T3 (attack s): 0.08 · s / 0.02 up to 0.02 s, then 0.15 · (s / 0.2)^0.273.
+- T4 (release s): 0.19 + 0.55 s + 0.03 s² (half of the fitted 0.38 + 1.1 s + 0.06 s²).
