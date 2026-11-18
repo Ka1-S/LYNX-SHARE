@@ -108,13 +108,43 @@ int addLetterClip (Song& song, int track, int letter, std::int64_t at)
     const auto p = letterPattern (song, track, letter);
     if (p < 0)
         return -1;
-    const auto bar = std::max<std::int64_t> (1, song.barTicks());
     Clip clip;
     clip.kind = ClipKind::pattern;
     clip.pattern = p;
     clip.track = track;
-    clip.start = std::max<std::int64_t> (0, at) / bar * bar;
+    clip.start = std::max<std::int64_t> (0, at);
     clip.length = song.patterns[(std::size_t) p].effectiveLength (song.meter());
+    // BandLab (capture C f): the new region overwrites what lies under it on the track — a region it starts inside keeps
+    // its left part, one it ends inside goes on from its end (its own content, same end), one it covers goes
+    const auto from = clip.start, to = clip.start + clip.length;
+    std::vector<Clip> rights;
+    for (auto it = song.playlist.begin(); it != song.playlist.end();)
+    {
+        auto& c = *it;
+        if (c.track != track || c.start >= to || c.end() <= from)
+        {
+            ++it;
+            continue;
+        }
+        if (c.end() > to)
+        {
+            auto right = c;
+            right.offset += to - c.start;
+            right.start = to;
+            right.length = c.end() - to;
+            right.uid = 0;
+            rights.push_back (right);
+        }
+        if (c.start < from)
+        {
+            c.length = from - c.start;
+            ++it;
+        }
+        else
+            it = song.playlist.erase (it);
+    }
+    for (auto& r : rights)
+        song.playlist.push_back (r);
     song.playlist.push_back (clip);
     return (int) song.playlist.size() - 1;
 }

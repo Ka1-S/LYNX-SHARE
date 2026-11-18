@@ -47,11 +47,32 @@ public:
     {
         const auto& transport = engine.getTransport();
         const auto playing = transport.playing.load (std::memory_order_relaxed);
-        if (previewing && ! playing)
+        if (previewing && ! playing && juce::Time::getMillisecondCounter() - previewStarted > 500) // (the transport may start a block later)
             stopPreview();
-        const auto step = isShowing() ? simplesteps::playingStep (engine.getSong(), track, pattern,
-                                                                  transport.positionTicks.load (std::memory_order_relaxed), playing)
-                                      : -1;
+        const auto pos = transport.positionTicks.load (std::memory_order_relaxed);
+        // BandLab (capture C b): while the song plays, the dock shows the pattern under the playhead and its ▶, letters and
+        // Add are greyed out
+        const auto song = playing && ! previewing;
+        if (song != songPlaying)
+        {
+            songPlaying = song;
+            repaint (topArea);
+        }
+        if (song && isShowing())
+        {
+            const auto& s = engine.getSong();
+            for (const auto& c : s.playlist)
+                if (c.kind == ClipKind::pattern && c.track == track && ! c.muted && pos >= (double) c.start && pos < (double) c.end())
+                {
+                    if (const auto l = simplesteps::letterOf (s, track, c.pattern); l >= 0 && l != letter)
+                    {
+                        letter = l;
+                        update();
+                    }
+                    break;
+                }
+        }
+        const auto step = isShowing() ? simplesteps::playingStep (engine.getSong(), track, pattern, pos, playing) : -1;
         setPlayingStep (step);
     }
 
@@ -115,16 +136,17 @@ public:
             g.drawText (juce::String (juce::roundToInt (swing * 100.0f)) + "%", swingValue, juce::Justification::centredLeft, false);
             // the page's own ▶ (■ while it plays the pattern)
             const auto play = playButton.toFloat();
-            g.setColour (hover == Part::play ? colour::bg5 : colour::bg4);
+            const auto ink = songPlaying ? colour::textDisabled : colour::textPrimary; // (greyed while the song plays)
+            g.setColour (hover == Part::play && ! songPlaying ? colour::bg5 : colour::bg4);
             g.fillEllipse (play);
             if (previewing)
-                g.setColour (colour::textPrimary), g.fillRect (juce::Rectangle<float> (9.0f, 9.0f).withCentre (play.getCentre()));
+                g.setColour (ink), g.fillRect (juce::Rectangle<float> (12.0f, 12.0f).withCentre (play.getCentre())); // (BandLab's ■ 12 x 12)
             else
             {
-                juce::Path tri;
+                juce::Path tri; // (BandLab's ▶ 10 x 12)
                 const auto c = play.getCentre();
-                tri.addTriangle (c.x - 3.5f, c.y - 5.5f, c.x - 3.5f, c.y + 5.5f, c.x + 5.5f, c.y);
-                g.setColour (colour::textPrimary);
+                tri.addTriangle (c.x - 4.0f, c.y - 6.0f, c.x - 4.0f, c.y + 6.0f, c.x + 6.0f, c.y);
+                g.setColour (ink);
                 g.fillPath (tri);
             }
             // A … H: the shown one white with dark ink (BandLab), the others on the control colour
@@ -133,13 +155,15 @@ public:
             {
                 const auto r = letterBox (l).toFloat();
                 const auto shown = l == letter;
-                fillRoundRect (g, r, radius::md, shown ? colour::textPrimary : hover == Part::letter && hoverIndex == l ? colour::bg5 : colour::bg4);
-                g.setColour (shown ? colour::bg0 : (with & (1u << l)) != 0 ? colour::textPrimary : colour::textSecondary);
+                const auto over = hover == Part::letter && hoverIndex == l && ! songPlaying;
+                fillRoundRect (g, r, radius::md, shown ? (songPlaying ? colour::textDisabled : over ? colour::textSecondary.brighter (0.4f) : colour::textPrimary)
+                                                       : over ? colour::bg5 : colour::bg4);
+                g.setColour (shown ? colour::bg0 : songPlaying ? colour::textDisabled : (with & (1u << l)) != 0 ? colour::textPrimary : colour::textSecondary);
                 g.setFont (font (type::small, true));
                 g.drawText (juce::String::charToString ((juce::juce_wchar) ('A' + l)), r.toNearestInt(), juce::Justification::centred, false);
             }
-            fillRoundRect (g, addButton.toFloat(), radius::md, hover == Part::add ? colour::bg5 : colour::bg4);
-            g.setColour (colour::textPrimary);
+            fillRoundRect (g, addButton.toFloat(), radius::md, hover == Part::add && ! songPlaying ? colour::bg5 : colour::bg4);
+            g.setColour (songPlaying ? colour::textDisabled : colour::textPrimary);
             g.setFont (font (type::small, true));
             g.drawText (tr ("Add {0}", { juce::String::charToString ((juce::juce_wchar) ('A' + letter)) }), addButton, juce::Justification::centred, false);
         }
@@ -272,12 +296,12 @@ public:
             return;
         }
         if (playButton.contains (p))
-            return togglePreview();
+            return songPlaying ? void() : togglePreview();
         for (int l = 0; l < simplesteps::letterCount; ++l)
             if (letterBox (l).contains (p))
-                return pickLetter (l);
+                return songPlaying ? void() : pickLetter (l);
         if (addButton.contains (p))
-            return addClip();
+            return songPlaying ? void() : addClip();
         if (const auto row = rowAt (p.y); row >= 0 && p.x < gridArea.getX() + headWidth && p.x >= gridArea.getX())
             return audition (row);
         const auto [row, step] = cellAt (p);
@@ -334,9 +358,12 @@ private:
     Part hover = Part::none;
     int hoverIndex = -1;
     int shownStep = -1;
-    bool previewing = false, draggingSwing = false, paintOn = true;
+    bool previewing = false, draggingSwing = false, paintOn = true, songPlaying = false;
+public:
+    juce::String lastMessage; // (the last bubble's text, for the checks)
+private:
     int paintRow = -1, lastPainted = -1, litRow = -1;
-    juce::uint32 litAt = 0;
+    juce::uint32 litAt = 0, previewStarted = 0;
     const Pattern emptyPattern {};
 
     juce::Colour trackColour() const
@@ -537,6 +564,15 @@ private:
 
     void addClip()
     {
+        // BandLab (capture C e): an empty pattern is not put on the track: "Make a beat first before exporting it to a track."
+        if (pattern < 0 || engine.getSong().patterns[(std::size_t) pattern].notes.empty())
+        {
+            auto* bubble = new juce::BubbleMessageComponent (300);
+            addChildComponent (bubble);
+            bubble->showAt (addButton, juce::AttributedString (tr ("Make a beat first before exporting it to a track.")), 2500, true, true);
+            lastMessage = tr ("Make a beat first before exporting it to a track.");
+            return;
+        }
         const auto at = (std::int64_t) juce::jmax (0.0, engine.getTransport().positionTicks.load (std::memory_order_relaxed));
         engine.editSong ([t = track, l = letter, at] (Song& s) {
             simplesteps::ensureLetter (s, t, l);
@@ -573,6 +609,7 @@ private:
             s.currentPattern = p;
         }, false);
         previewing = true;
+        previewStarted = juce::Time::getMillisecondCounter();
         engine.play();
         repaint (playButton);
     }

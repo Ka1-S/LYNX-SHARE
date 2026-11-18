@@ -69,18 +69,37 @@ TEST (details190lr_drum_machine_rows_letters_and_clips)
     simplesteps::setLengthBars (song, b, 2);
     CHECK (simplesteps::stepCount (song, b) == 32 && simplesteps::lengthBars (song, b) == 2);
 
-    // Add B at a position inside bar 3: the clip starts on bar 3, as long as the pattern
+    // Add B at the playhead, unsnapped (BandLab): it overwrites the part of A's second clip under it (A keeps its left part)
+    const auto bar = song.barTicks();
     const auto before = song.playlist.size();
-    const auto clip = simplesteps::addLetterClip (song, track, 1, 2 * song.barTicks() + 500);
-    CHECK (clip >= 0 && song.playlist.size() == before + 1);
-    CHECK (song.playlist[(std::size_t) clip].start == 2 * song.barTicks() && song.playlist[(std::size_t) clip].length == 2 * song.barTicks());
+    const auto clip = simplesteps::addLetterClip (song, track, 1, bar + 500);
+    CHECK (clip >= 0 && song.playlist.size() == before + 1 && clip == (int) song.playlist.size() - 1);
+    CHECK (song.playlist[(std::size_t) clip].start == bar + 500 && song.playlist[(std::size_t) clip].length == 2 * bar);
+    const auto lengthAt = [&song, track] (std::int64_t start) {
+        for (const auto& c : song.playlist)
+            if (c.track == track && c.start == start)
+                return c.length;
+        return (std::int64_t) -1;
+    };
+    CHECK (lengthAt (0) == bar && lengthAt (bar) == 500);
     CHECK (simplesteps::addLetterClip (song, track, 5, 0) == -1); // (F has no pattern)
 
     // the playing step: in the clip of B (song mode), and nothing outside the track's clips of that pattern
-    CHECK (simplesteps::playingStep (song, track, b, (double) (2 * song.barTicks() + 5 * ticksPerStep + 10), true) == 5);
-    CHECK (simplesteps::playingStep (song, track, b, (double) (2 * song.barTicks() + 5 * ticksPerStep), false) == -1);
+    CHECK (simplesteps::playingStep (song, track, b, (double) (bar + 500 + 5 * ticksPerStep + 10), true) == 5);
+    CHECK (simplesteps::playingStep (song, track, b, (double) (bar + 500 + 5 * ticksPerStep), false) == -1);
     CHECK (simplesteps::playingStep (song, track, b, 10.0, true) == -1);
-    CHECK (simplesteps::playingStep (song, track, a, (double) (song.barTicks() + 3 * ticksPerStep), true) == 3); // (A's second clip)
+    CHECK (simplesteps::playingStep (song, track, a, (double) (bar / 2 + 3 * ticksPerStep), true) == 11); // (A's first clip)
+
+    // A one bar long put in the middle of B's clip: B keeps its left part, and goes on after A from where it was
+    const auto inside = bar + 500 + bar / 2;
+    simplesteps::addLetterClip (song, track, 0, inside);
+    CHECK (lengthAt (bar + 500) == bar / 2 && lengthAt (inside) == bar);
+    bool right = false;
+    for (const auto& c : song.playlist)
+        if (c.track == track && c.pattern == b && c.start == inside + bar)
+            right = c.offset == bar / 2 + bar && c.end() == 3 * bar + 500;
+    CHECK (right);
+
     song.mode = PlayMode::pattern;
     song.currentPattern = a;
     CHECK (simplesteps::playingStep (song, track, a, (double) (7 * song.barTicks() + 9 * ticksPerStep), true) == 9);

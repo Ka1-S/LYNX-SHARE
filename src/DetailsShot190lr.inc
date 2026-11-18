@@ -24,7 +24,46 @@
             return all;
         };
         using namespace lynx;
-        juce::ignoreUnused (project);
+        if (project.isNotEmpty())
+        {
+            // ---- Pattern layout, the FL demo: the Mixer's View › Waveforms and FL's polarity / swap icons
+            AudioEngine offline (false);
+            MainComponent ui (offline, false);
+            ui.setSize (1920, 1080);
+            ui.openFile (juce::File (project));
+            offline.dispatchPendingMessages();
+            ui.selectTabForSnapshot (3);
+            offline.dispatchPendingMessages();
+            auto& strips = ui.getMixerForSnapshot().getStripsForSnapshot();
+            const auto inv = strips.invertIconForSnapshot (1);
+            check ("the polarity and swap icons beside the stereo knob (Wide layout)", ! inv.isEmpty() && ! strips.swapIconForSnapshot (1).isEmpty());
+            offline.editSong ([] (Song& s) {
+                if (s.mixer.size() > 2)
+                    s.mixer[2].invertPhase = s.mixer[2].swapChannels = true;
+            });
+            offline.dispatchPendingMessages();
+            const auto icons = juce::Rectangle<int> (strips.invertIconForSnapshot (1).getX() - 4, inv.getY() - 6, 120, 34);
+            savePng (strips.createComponentSnapshot (icons.getIntersection (strips.getLocalBounds()), true, 3.0f), prefix + "-mixer-phase-swap@3x.png");
+            write (strips, "mixer-phase-swap");
+            strips.setMeterWaveforms (true);
+            offline.getTransport().playing.store (true);
+            double ms = 1000.0;
+            for (int f = 0; f < 90; ++f)
+            {
+                for (int k = 0; k < maxMixerTracks; ++k)
+                {
+                    const auto wobble = 0.5f + 0.5f * std::sin ((float) f * 0.37f + (float) k);
+                    offline.getMeters().accumulate (k, (k == 0 ? 1.0f : 0.25f + 0.12f * (float) (k % 5)) * wobble, (k == 0 ? 0.9f : 0.22f + 0.1f * (float) (k % 5)) * wobble);
+                }
+                strips.frameForSnapshot (ms += 1000.0 / 60.0);
+            }
+            offline.getTransport().playing.store (false);
+            check ("Waveforms: on (FL's View menu)", MixerStrips::meterWaveforms);
+            write (strips, "mixer-waveforms");
+            const auto wells = strips.meterAreaForSnapshot (0).getUnion (strips.meterAreaForSnapshot (4)).expanded (4);
+            savePng (strips.createComponentSnapshot (wells.getIntersection (strips.getLocalBounds()), true, 3.0f), prefix + "-mixer-waveforms@3x.png");
+            strips.setMeterWaveforms (false);
+        }
         {
             // ---- Simple layout: a Drums track and its Drum Machine tab
             AudioEngine offline (false);
@@ -152,6 +191,77 @@
                 check (".lynx keeps the scene follow action", back && back->clipGrid && back->clipGrid->scenes.size() >= 2
                                                                   && back->clipGrid->scenes[1].follow == offline.getSong().clipGrid->scenes[1].follow
                                                                   && back->clipGrid->scenes[0].follow == ClipFollow {});
+            }
+            if (gridView != nullptr && set.isNotEmpty())
+            {
+                const auto& song = offline.getSong();
+                // Live's hover: a clip's launch ▶, a track's Stop ■, a scene's ▶ grow by 2 px
+                int ct = -1, cs = -1;
+                for (int t = 0; t < 8 && ct < 0; ++t)
+                    for (int r = 0; r < 16 && ct < 0; ++r)
+                        if (launcher::clipAt (*song.clipGrid, t, r) != nullptr)
+                            ct = t, cs = r;
+                check ("a clip in the set", ct >= 0);
+                const auto zoom = [&] (juce::Rectangle<int> r, const juce::String& name) {
+                    savePng (gridView->createComponentSnapshot (r.getIntersection (gridView->getLocalBounds()), true, 4.0f), prefix + "-" + name + "@4x.png");
+                };
+                if (ct >= 0)
+                {
+                    const auto cell = clipGridCellForSnapshot (*gridView, 0, ct, cs);
+                    zoom (cell.withWidth (60), "hover-none-clip");
+                    clipGridHoverForSnapshot (*gridView, 1, ct, cs);
+                    zoom (cell.withWidth (60), "hover-clip-launch");
+                    clipGridHoverForSnapshot (*gridView, 2, ct, -1);
+                    zoom (clipGridCellForSnapshot (*gridView, 1, ct, 0).withWidth (60), "hover-track-stop");
+                    clipGridHoverForSnapshot (*gridView, 3, -1, 0);
+                    zoom (clipGridCellForSnapshot (*gridView, 2, 0, 0).withWidth (60), "hover-scene-launch");
+                    clipGridHoverForSnapshot (*gridView, 0, -1, -1);
+                }
+                // a rectangle selection: Shift+click from slot (0, 0) to (2, 2) selects 9 slots
+                clipGridSelectRangeForSnapshot (*gridView, 0, 0, 2, 2);
+                check ("a rectangle selection of 3 x 3 slots", clipGridSelectedCountForSnapshot (*gridView) == 9);
+                write (*gridView, "grid-range-selection");
+                // the Session mixer: RMS under the peak, the automated volume's LED
+                if (auto* mixer = clipGridMixer (*gridView))
+                {
+                    for (int i = 0; i < 6; ++i)
+                        mixer->setMeterForSnapshot (i, 0.5f + 0.08f * (float) i, 0.45f + 0.08f * (float) i, 0.7f, 0.65f, 0.8f);
+                    write (*mixer, "session-mixer-rms");
+                }
+                // the Device View: a meter after each device (the first track with an insert)
+                if (auto* detail = ui.getDetailViewForSnapshot())
+                {
+                    detail->showSelection (ct >= 0 ? ct : 0, cs >= 0 ? cs : 0);
+                    detail->setPage (DetailView::Page::devices);
+                    offline.dispatchPendingMessages();
+                    detail->deviceLevelsForSnapshot (0.6f, 0.5f);
+                    write (*detail, "device-view-meters");
+                    line ("device cards: " + juce::String (detail->cardCountForCheck()));
+                }
+                // a Drum Rack's pads: a sounding pad's ▶ in Live's orange
+                for (int c = 0; c < (int) song.channels.size(); ++c)
+                    if (rack::isDrumRack (song.channels[(std::size_t) c]))
+                    {
+                        auto view = RackWindows::makeChannelView (offline, c, true);
+                        view->setSize (std::max (420, view->preferredWidth (210)), 232);
+                        const auto* r = rack::rackOf (song.channels[(std::size_t) c].patcher);
+                        int lit = 0;
+                        for (int key = rack::drumFirstPad; key < rack::drumFirstPad + 16 && lit < 2; ++key)
+                            if (rack::padChain (*r, key) >= 0)
+                                view->padLitForSnapshot (key), ++lit;
+                        check ("a Drum Rack with pads to light", lit > 0);
+                        write (*view, "drumrack-pads-lit");
+                        break;
+                    }
+                // Delete clears every slot of the rectangle (one undo step)
+                clipGridSelectRangeForSnapshot (*gridView, 0, 0, 1, 1);
+                clipGridKeyForSnapshot (*gridView, juce::KeyPress (juce::KeyPress::deleteKey));
+                offline.dispatchPendingMessages();
+                bool cleared = true;
+                for (int t = 0; t <= 1; ++t)
+                    for (int r = 0; r <= 1; ++r)
+                        cleared = cleared && launcher::clipAt (*offline.getSong().clipGrid, t, r) == nullptr;
+                check ("Delete clears the 2 x 2 rectangle", cleared);
             }
             const auto metronome = texts (ui.metronomeMenuForSnapshot());
             line ("metronome menu: " + metronome.joinIntoString (" | "));

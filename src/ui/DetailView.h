@@ -130,6 +130,7 @@ public:
     int chainChannelForCheck() const;
     bool isFoldedForCheck (int card) const;
     void toggleFoldForCheck (int card);
+    void deviceLevelsForSnapshot (float left, float right); // round 190lr (DL-87): every device meter at these peaks
     MidiToolsPanel& midiToolsForSnapshot(); // the Clip page's Transform panel (round 190s)
     // Round 190jn (CL-20a / CL-20b): the Clip page's Live column — its sections open or folded (Clip, Launch, Pitch & Time)
     // and how far it is scrolled (px); only in the Clip-launch layout's Live look.

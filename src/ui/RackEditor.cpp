@@ -2737,6 +2737,16 @@ RackView::~RackView() = default;
 
 bool RackView::keyPressed (const juce::KeyPress& key) { return impl->padKey (key); }
 
+void RackView::padLitForSnapshot (int key)
+{
+    if (key >= 0 && key < 128)
+    {
+        impl->soundingShown[(std::size_t) (key >> 6)] |= std::uint64_t (1) << (key & 63);
+        impl->litUntil[(std::size_t) key] = juce::Time::getMillisecondCounterHiRes() + 60000.0;
+    }
+    repaint();
+}
+
 juce::PopupMenu RackView::padMenuForSnapshot (int key)
 {
     const auto* r = impl->rack();

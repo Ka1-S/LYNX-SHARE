@@ -1949,6 +1949,18 @@ private:
     }
     std::vector<std::size_t> watched;
     std::vector<meters::PeakHold> deviceLevels;
+public:
+    void deviceLevelsForSnapshot (float left, float right)
+    {
+        deviceLevels.assign (cards.size() * 2, {});
+        for (std::size_t i = 0; i < deviceLevels.size(); ++i)
+        {
+            deviceLevels[i].level = i % 2 == 0 ? left : right;
+            deviceLevels[i].peak = juce::jmin (1.0f, (i % 2 == 0 ? left : right) * 1.25f);
+        }
+        repaint();
+    }
+private:
 
     void timerCallback() override
     {
@@ -4032,6 +4044,7 @@ int DetailView::chainInsertForCheck() const { return chain->insertShown(); }
 int DetailView::chainChannelForCheck() const { return chain->channelShown(); }
 bool DetailView::isFoldedForCheck (int card) const { return chain->isCardFolded (card); }
 void DetailView::toggleFoldForCheck (int card) { chain->toggleCardFold (card); }
+void DetailView::deviceLevelsForSnapshot (float left, float right) { chain->deviceLevelsForSnapshot (left, right); }
 // ---------------------------------------------------------------------------------------------------------------------
 // Round 190dr: the description of a device card dragged out of the Device View
 namespace

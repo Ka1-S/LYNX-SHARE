@@ -239,6 +239,11 @@ public:
     juce::Rectangle<int> faderRailForSnapshot (int track) const { return faderRail (track); }
     juce::Rectangle<int> muteAreaForSnapshot (int track) const { return muteArea (track); }   // round 190kn
     juce::Rectangle<int> meterAreaForSnapshot (int track) const { return meterArea (track); } // round 190kn
+    // round 190lr (--details190lrshot): one display frame at `nowMs` (the Waveforms view's rows, the meters), the
+    // polarity / swap icons and the strip part under a point
+    bool frameForSnapshot (double nowMs) { return liveFrame (nowMs); }
+    juce::Rectangle<int> invertIconForSnapshot (int track) const { return invertIcon (track); }
+    juce::Rectangle<int> swapIconForSnapshot (int track) const { return swapIcon (track); }
     void stepHeldRail(); // one step of the rail press being held (also called by --selftest, without the timer)
     // --uiperf: how many repaints spoiled the strips' picture and how often it was drawn again, since the last call
     std::pair<int, int> cacheCountersForPerf() noexcept { return { std::exchange (pictureInvalidations, 0), std::exchange (pictureRefills, 0) }; }

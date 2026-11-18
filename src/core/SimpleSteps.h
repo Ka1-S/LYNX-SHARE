@@ -46,9 +46,10 @@ int letterOf (const Song& song, int track, int pattern);
 // The pattern of `letter`, made when missing: empty, as long as A, the track's colour, named "<track> B" … (A is
 // made as "<track>" for a Drums track that lost its pattern). −1 for a track that is not a Drums track.
 int ensureLetter (Song& song, int track, int letter);
-// "Add A": a clip of the letter's pattern on the track at `at` (ticks, snapped down to a bar), as long as the pattern.
-// Clips of the track at that place are left alone (a clip on top plays as any other). Returns the new clip's index in
-// song.playlist, −1 when the letter has no pattern.
+// "Add A": a clip of the letter's pattern on the track at `at` (ticks; BandLab: exactly at the playhead, unsnapped), as
+// long as the pattern. It overwrites what lies under it on the track: a clip it starts inside keeps its left part, a clip
+// it ends inside goes on from its end, a clip it covers goes. Returns the new clip's index in song.playlist (the last),
+// −1 when the letter has no pattern.
 int addLetterClip (Song& song, int track, int letter, std::int64_t at);
 
 // The step count of a pattern of that song (its length in sixteenths; at least one bar)
