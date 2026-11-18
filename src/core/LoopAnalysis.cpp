@@ -531,10 +531,12 @@ keyfollow::Detection detectKey (const SampleData& audio)
     }
     std::array<double, 12> chroma {}, bass {}, start {};
     const auto startFrames = std::max<std::size_t> (1, (std::size_t) std::lround (o.startSeconds * rate / hop));
+    std::vector<int> chords; // each sounding frame's three strongest pitch classes (a bit mask): one held chord sets no key
     for (std::size_t frameIndex = 0; frameIndex < frames.size(); ++frameIndex)
     {
         const auto& row = frames[frameIndex];
         const auto mag = [&row, first] (int k) { return (double) row[(std::size_t) (k - first)]; };
+        const auto before = chroma;
         for (int k = lo; k <= hi; ++k)
         {
             const auto m = mag (k);
@@ -572,6 +574,24 @@ keyfollow::Detection detectKey (const SampleData& audio)
                 bass[(std::size_t) pc] += w;
             if (frameIndex < startFrames)
                 start[(std::size_t) pc] += w;
+        }
+        std::array<double, 12> added {};
+        double addedSum = 0.0;
+        for (int i = 0; i < 12; ++i)
+            addedSum += (added[(std::size_t) i] = chroma[(std::size_t) i] - before[(std::size_t) i]);
+        if (addedSum > 0.0)
+        {
+            int mask = 0;
+            for (int pick = 0; pick < 3; ++pick)
+            {
+                const auto top = (int) (std::max_element (added.begin(), added.end()) - added.begin());
+                if (added[(std::size_t) top] <= 0.0)
+                    break;
+                mask |= 1 << top;
+                added[(std::size_t) top] = -1.0;
+            }
+            if (std::find (chords.begin(), chords.end(), mask) == chords.end())
+                chords.push_back (mask);
         }
     }
     double sum = 0.0, bassSum = 0.0;
@@ -611,7 +631,7 @@ keyfollow::Detection detectKey (const SampleData& audio)
     int strong = 0;
     for (auto v : out.chroma)
         strong += v >= 0.05f ? 1 : 0;
-    if (best.r >= o.minCorrelation && best.r - other >= o.minMargin && strong >= 3)
+    if (best.r >= o.minCorrelation && best.r - other >= o.minMargin && strong >= o.minPitchClasses && (int) chords.size() >= o.minChords)
         out.key = best.key;
     // the major key or its relative minor (the same notes; profiles barely tell them apart): the tonic's weight with its
     // fifth decides, counted over the whole loop, its bass and its first moments (a loop starts on its downbeat, which

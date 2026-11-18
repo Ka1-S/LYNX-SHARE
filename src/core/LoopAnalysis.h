@@ -75,6 +75,8 @@ struct KeyOptions
     double bassHz = 200.0;
     double lowHz = 55.0, highHz = 2100.0;
     double minCorrelation = 0.6, minMargin = 0.05;
+    int minPitchClasses = 4;      // pitch classes of at least 5 % each (a single chord, three notes, sets no key)
+    int minChords = 2;            // different sets of the three strongest pitch classes over the frames (one held chord: none)
     bool tonicDecision = true;    // a major key or its relative minor: decided by the tonic and its fifth
     double tonicBass = 1.0, tonicStart = 2.0, startSeconds = 0.5; // ... with the bass and the loop's start weighted in
     bool hpss = true;             // harmonic / percussive separation first (drums leave fewer peaks)
