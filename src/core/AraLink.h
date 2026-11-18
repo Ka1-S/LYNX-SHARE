@@ -32,6 +32,7 @@ struct AraDocumentArchive
 {
     std::string pluginId;
     std::string archive; // base64 of the bytes the plugin wrote (ARA storeObjectsToArchive)
+    std::string archiveId; // the plugin's document archive id when it wrote it (ARA: handed back with the archive)
     bool operator== (const AraDocumentArchive&) const = default;
 };
 } // namespace lynx

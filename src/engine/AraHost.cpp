@@ -137,16 +137,24 @@ public:
     void destroyAudioReader (ARA::ARAAudioReaderHostRef ref) noexcept override { delete reinterpret_cast<Reader*> (ref); }
 };
 
+// An archive being read: its bytes and the document archive id it was written with (ARA wants it back: a plugin asks
+// for it to check the archive's version; Melodyne reads it, so it must never be null)
+struct ArchiveIn
+{
+    juce::MemoryBlock data;
+    std::string archiveId;
+};
+
 class Archiving final : public ARA::Host::ArchivingControllerInterface
 {
 public:
     ARA::ARASize getArchiveSize (ARA::ARAArchiveReaderHostRef ref) noexcept override
     {
-        return (ARA::ARASize) reinterpret_cast<const juce::MemoryBlock*> (ref)->getSize();
+        return (ARA::ARASize) reinterpret_cast<const ArchiveIn*> (ref)->data.getSize();
     }
     bool readBytesFromArchive (ARA::ARAArchiveReaderHostRef ref, ARA::ARASize position, ARA::ARASize length, ARA::ARAByte buffer[]) noexcept override
     {
-        const auto* block = reinterpret_cast<const juce::MemoryBlock*> (ref);
+        const auto* block = &reinterpret_cast<const ArchiveIn*> (ref)->data;
         if (position + length > block->getSize())
             return false;
         std::memcpy (buffer, static_cast<const char*> (block->getData()) + position, length);
@@ -159,7 +167,10 @@ public:
     }
     void notifyDocumentArchivingProgress (float) noexcept override {}
     void notifyDocumentUnarchivingProgress (float) noexcept override {}
-    ARA::ARAPersistentID getDocumentArchiveID (ARA::ARAArchiveReaderHostRef) noexcept override { return nullptr; }
+    ARA::ARAPersistentID getDocumentArchiveID (ARA::ARAArchiveReaderHostRef ref) noexcept override
+    {
+        return reinterpret_cast<const ArchiveIn*> (ref)->archiveId.c_str();
+    }
 };
 
 // the song's tempo and meter, as the musical context's content (set by sync before the plugin reads it)
@@ -418,6 +429,7 @@ struct Doc
     ModelUpdates* updates = nullptr; // (owned by the controller)
     ARA::ARAPlaybackTransformationFlags transformations = 0;
     std::vector<ARA::ARAContentType> analyzeable; // what the plugin analyses (its factory says)
+    std::string archiveId;                         // the factory's document archive id (what its archives are written as)
 
     ~Doc()
     {
@@ -548,6 +560,8 @@ struct AraHost::Impl : private juce::Timer
         doc->description = d;
         doc->timeline = std::make_shared<Timeline>();
         doc->transformations = factory.get()->supportedPlaybackTransformationFlags;
+        if (factory.get()->documentArchiveID != nullptr)
+            doc->archiveId = factory.get()->documentArchiveID;
         for (ARA::ARASize k = 0; k < factory.get()->analyzeableContentTypesCount; ++k)
             doc->analyzeable.push_back (factory.get()->analyzeableContentTypes[k]);
         auto updates = std::make_unique<ModelUpdates>();
@@ -696,7 +710,7 @@ struct AraHost::Impl : private juce::Timer
             juce::MemoryOutputStream stream;
             const auto ok = doc->controller->get().storeObjectsToArchive (reinterpret_cast<ARA::ARAArchiveWriterHostRef> (&stream), nullptr);
             if (ok)
-                out.push_back ({ id, juce::Base64::toBase64 (stream.getData(), stream.getDataSize()).toStdString() });
+                out.push_back ({ id, juce::Base64::toBase64 (stream.getData(), stream.getDataSize()).toStdString(), doc->archiveId });
         }
         return out;
     }
@@ -823,7 +837,10 @@ void AraHost::sync (const Song& song, double sampleRate)
                         juce::MemoryOutputStream decoded;
                         if (juce::Base64::convertFromBase64 (decoded, juce::String::fromUTF8 (it->archive.c_str())))
                         {
-                            juce::MemoryBlock block (decoded.getData(), decoded.getDataSize());
+                            ArchiveIn block;
+                            block.data = juce::MemoryBlock (decoded.getData(), decoded.getDataSize());
+                            // (an archive saved without its id: the plugin's own, the only one it can be from)
+                            block.archiveId = ! it->archiveId.empty() ? it->archiveId : doc->archiveId;
                             if (! doc->controller->get().restoreObjectsFromArchive (reinterpret_cast<ARA::ARAArchiveReaderHostRef> (&block), nullptr))
                                 error = description->name + ": its saved edits could not be read";
                         }

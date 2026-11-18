@@ -3507,7 +3507,7 @@ juce::String toJson (const Song& song, bool stampVersion)
     {
         juce::Array<juce::var> docs;
         for (const auto& d : song.araDocuments)
-            docs.add (juce::Array<juce::var> { str (d.pluginId), str (d.archive) });
+            docs.add (juce::Array<juce::var> { str (d.pluginId), str (d.archive), str (d.archiveId) });
         root->setProperty ("araDocuments", docs);
     }
     root->setProperty ("clipFadesPerClip", true); // round 180d: a project without it has linear clip fades
@@ -4041,7 +4041,8 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
     if (const auto* docs = root["araDocuments"].getArray())
         for (const auto& d : *docs)
             if (d.isArray() && d.size() >= 2)
-                song.araDocuments.push_back ({ d[0].toString().toStdString(), d[1].toString().toStdString() });
+                song.araDocuments.push_back ({ d[0].toString().toStdString(), d[1].toString().toStdString(),
+                                               d.size() >= 3 ? d[2].toString().toStdString() : std::string() });
     song.playlist = clipsFromVar (root["playlist"], song);
     // saved before FL's S curve for clip fades (round 180d): those clips keep the straight fades the mix was made with
     const bool oldClipFades = ! root.hasProperty ("clipFadesPerClip");

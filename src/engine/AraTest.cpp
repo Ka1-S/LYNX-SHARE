@@ -202,6 +202,11 @@ juce::String araSelfTest (const juce::File& pluginFile, const juce::File& audio,
         juce::String saveError;
         if (! ProjectFile::save (saved, out.getChildFile ("ara-session.lynx"), saveError))
             errors.add ("can't save ara-session.lynx: " + saveError);
+        else if (auto back = ProjectFile::load (out.getChildFile ("ara-session.lynx"), saveError);
+                 ! back || back->channels.empty() || back->channels[0].ara != saved.channels[0].ara || back->araDocuments != saved.araDocuments)
+            errors.add ("ara-session.lynx did not read back the ARA link and document");
+        else
+            say ("ara-session.lynx: the ARA link and the document read back");
         const auto restored = render (saved, "restored");
         compare (araOut, restored, "ARA vs restored", 0.98);
     }
