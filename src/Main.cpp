@@ -21746,26 +21746,38 @@ private:
             shoot ("lo-assign-selected");
             const auto toggled = state ("toggle:" + juce::String (cand));
             engine.dispatchPendingMessages();
-            juce::Thread::sleep (50);
-            engine.dispatchPendingMessages();
             const auto m = lynx::polyedit::parse (engine.getSong().channels[(std::size_t) channel].polyEdit);
             check (m && m->notes[(std::size_t) cand].active, "a double-click makes candidate " + juce::String (cand) + " a note: " + toggled);
             shoot ("lo-assign-made");
             engine.undo();
             engine.dispatchPendingMessages();
             const auto u = lynx::polyedit::parse (engine.getSong().channels[(std::size_t) channel].polyEdit);
-            check (u && ! u->notes[(std::size_t) cand].active, "undo makes it a candidate again");
+            state ("follow");
+            auto shown = false;
+            for (const auto& line : juce::StringArray::fromLines (lynx::polyEditorNotes (*editor)))
+                shown = shown || (line.startsWith (juce::String (cand) + " ") && line.endsWith (" candidate"));
+            check (u && ! u->notes[(std::size_t) cand].active && shown, "undo makes it a candidate again (the editor follows)");
         }
         else
             check (candidates == 0, "no candidate to assign");
         state ("assign:off");
 
-        // 2. a rubber band over the chord at the picked note, then the selected notes moved up two semitones together
-        state ("band:" + juce::String (pickLine.start - 0.05) + ":" + juce::String (pickLine.midi + 14.0) + ":" + juce::String (pickLine.start + 0.25) + ":"
-               + juce::String (pickLine.midi - 20.0));
+        // 2. a rubber band over a chord (the one starting between 1.5 and 3 s, else the picked note's), then the selected notes
+        // moved up two semitones together
+        double chordAt = pickLine.start, chordLo = 1000.0, chordHi = -1000.0;
+        for (const auto& l : notes)
+            if (! l.candidate && l.start > 1.5 && l.start < 3.0)
+            {
+                chordAt = l.start;
+                break;
+            }
+        for (const auto& l : notes)
+            if (! l.candidate && std::abs (l.start - chordAt) < 0.15)
+                chordLo = std::min (chordLo, l.midi), chordHi = std::max (chordHi, l.midi);
+        const auto bandSpec = "band:" + juce::String (chordAt + 0.1) + ":" + juce::String (chordHi + 1.5) + ":" + juce::String (chordAt + 0.6) + ":"
+                              + juce::String (chordLo - 1.5);
         state ("band:show");
-        const auto banded = state ("band:" + juce::String (pickLine.start - 0.05) + ":" + juce::String (pickLine.midi + 14.0) + ":" + juce::String (pickLine.start + 0.25) + ":"
-                                   + juce::String (pickLine.midi - 20.0));
+        const auto banded = state (bandSpec);
         const auto chosen = juce::StringArray::fromTokens (banded.fromFirstOccurrenceOf ("selects ", false, false), ",", "");
         check (chosen.size() >= 2, "the rubber band " + banded);
         shoot ("lo-band");
@@ -21785,8 +21797,12 @@ private:
         state ("clear");
         state ("select:");
 
-        // 3. stretch: the picked note 150 % long (its end handle)
+        // 3. stretch: the picked note 150 % long (its end handle), the first two bars zoomed in
+        state ("follow");
+        state ("view:0:" + juce::String (pickLine.midi + 12.0) + ":16");
+        state ("zoom:" + juce::String (1000.0 / 4.5));
         state ("select:" + juce::String (pick));
+        shoot ("lo-stretch-before");
         state ("stretch:" + juce::String (pick) + ":1.5");
         shoot ("lo-stretch");
         check (state ("render").startsWith ("render"), "a stretched note renders");
@@ -21826,6 +21842,7 @@ private:
         engine.undo();
         engine.dispatchPendingMessages();
         state ("clear");
+        state ("follow");
 
         // 5. a dragged note heard: its render on its own (the first one builds the masks of its span)
         state ("pitch:" + juce::String (pick) + ":1");
@@ -21871,6 +21888,14 @@ private:
             }
             lynx::PolyEditorWindows::prepareOnOpen = false;
             check (lynx::PolyEditorWindows::prepareEditedClips (engine) == 0, "off by default: nothing is prepared");
+            {
+                // what a dragged note costs at first without it: its masks are built by the first preview
+                auto cold = lynx::makePolyEditor (engine, channel, true);
+                cold->setSize (1100, 580);
+                const auto first = lynx::setPolyEditorShotState (*cold, "preview:" + juce::String (pick));
+                const auto next = lynx::setPolyEditorShotState (*cold, "preview:" + juce::String (pick));
+                check (first.startsWith ("preview"), "without it, the first drag of an edited note: " + first + "; the next: " + next);
+            }
             lynx::PolyEditorWindows::prepareOnOpen = true;
             const auto t0 = juce::Time::getMillisecondCounterHiRes();
             const auto queued = lynx::PolyEditorWindows::prepareEditedClips (engine);

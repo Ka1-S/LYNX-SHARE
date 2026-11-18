@@ -306,10 +306,12 @@ public:
         {
             assignMode = parts.size() > 1 && parts[1] == "on";
             assignButton.setToggleState (assignMode, juce::dontSendNotification);
+            updateStatus();
         }
         else if (s.startsWith ("toggle:") && valid (note))
         {
-            toggleAssignment (note);
+            toggleAssignment (note, false);
+            shotState ("render"); // (the route waits for nothing: the new state is committed now, as the worker would)
             return "assignment " + juce::String (note) + (model.notes[(std::size_t) note].active ? " is a note" : " is a candidate");
         }
         else if (s.startsWith ("tool:"))
@@ -338,7 +340,7 @@ public:
             // what a dragged note plays: its render on its own, timed
             const auto t0 = juce::Time::getMillisecondCounterHiRes();
             std::int64_t from = 0;
-            const auto part = polyedit::renderNote (*sample, model, note, *analysis, &from);
+            const auto part = polyedit::renderNote (*sample, previewModel(), note, *analysis, &from);
             const auto ms = juce::Time::getMillisecondCounterHiRes() - t0;
             return "preview " + juce::String (ms, 1) + " ms, " + juce::String (part != nullptr ? (double) part->left.size() / sample->sampleRate : 0.0, 2) + " s of audio";
         }
@@ -363,8 +365,14 @@ public:
                 polyedit::remember (path, blob, out);
             rendered = out;
             publish (blob);
+            // (a render the worker was making for an earlier state is no longer wanted)
+            rendering = false;
+            ++renderGeneration;
+            updateStatus();
             return "render " + juce::String (ms, 1) + " ms, masks " + juce::String ((double) polyphonic::maskBytes (*analysis) / 1.0e6, 2) + " MB";
         }
+        else if (s == "follow")
+            followSong(); // (what the timer does after an undo / redo of the song)
         else if (s == "undo" || s == "redo")
         {
             bufferStep (s == "undo" ? -1 : 1);
@@ -375,6 +383,7 @@ public:
             applyToBuffer (true);
             return "applied";
         }
+        updateStatus();
         repaint();
         return {};
     }
@@ -977,7 +986,7 @@ private:
 
     // Melodyne's note assignment: a candidate becomes a note, or a note a candidate (its edit goes); one undo step. The
     // masks depend on which notes are active, so the analysis object is made again.
-    void toggleAssignment (int k)
+    void toggleAssignment (int k, bool commitNow = true)
     {
         if (! valid (k))
             return;
@@ -988,7 +997,8 @@ private:
         analysis = polyedit::toAnalysis (model);
         notesChanged();
         selected = { k };
-        commit();
+        if (commitNow)
+            commit();
         updateStatus();
         repaint();
     }
@@ -1047,13 +1057,22 @@ private:
         previewing = true;
     }
 
+    // What a dragged note is heard from: the edit state without "take background" (the note's claim on what no note owns
+    // and its 2 s tail cost 250 - 700 ms a render; without them ~60 - 90 ms for a 2 s note). The committed render keeps it.
+    polyedit::Model previewModel() const
+    {
+        auto m = model;
+        m.takeBackground = false;
+        return m;
+    }
+
     // Round 190lo: a pressed note gets its masks ready on the worker (the first render of a span builds them), so that
     // dragging it is heard at once
     void warmPreview (int k)
     {
         if (! valid (k) || sample == nullptr || analysis == nullptr)
             return;
-        worker->postPreview ([m = model, k, src = sample, a = analysis] (const std::atomic<bool>&) {
+        worker->postPreview ([m = previewModel(), k, src = sample, a = analysis] (const std::atomic<bool>&) {
             std::int64_t from = 0;
             (void) polyedit::renderNote (*src, m, k, *a, &from); // (the result is thrown away; the masks stay)
         });
@@ -1079,7 +1098,7 @@ private:
             previewing = false;
             updateStatus();
         }
-        worker->postPreview ([this, m = model, k = dragNote, src = sample, a = analysis, generation] (const std::atomic<bool>&) {
+        worker->postPreview ([this, m = previewModel(), k = dragNote, src = sample, a = analysis, generation] (const std::atomic<bool>&) {
             std::int64_t from = 0;
             auto part = polyedit::renderNote (*src, m, k, *a, &from);
             if (part == nullptr)
@@ -1109,7 +1128,12 @@ private:
             playAt = at;
             repaint (notesArea());
         }
-        // the song changed under the editor (undo / redo): its edit state follows
+        followSong();
+    }
+
+    // the song changed under the editor (undo / redo): its edit state follows
+    void followSong()
+    {
         if (bufferMode())
             return;
         const auto& song = engine.getSong();
@@ -1231,6 +1255,31 @@ private:
                 }
             pitchRange[k] = lo <= hi ? std::pair { lo, hi } : std::pair { 0.0f, 0.0f };
         }
+        // the candidates note assignment offers (Melodyne shows its possible notes as plain blobs at one pitch): long
+        // enough to be a note (>= 0.15 s), and not the double of a note that is already there (same pitch, mostly the same time)
+        candidateShown.assign (model.notes.size(), 0);
+        const auto fs = std::max (1e-6, model.frameSeconds());
+        auto& median = medians;
+        median.assign (model.notes.size(), 0.0f);
+        std::vector<std::size_t> actives;
+        for (std::size_t k = 0; k < model.notes.size(); ++k)
+        {
+            median[k] = model.notes[k].medianMidi();
+            if (model.notes[k].active)
+                actives.push_back (k);
+        }
+        for (std::size_t k = 0; k < model.notes.size(); ++k)
+        {
+            const auto& c = model.notes[k];
+            if (c.active || (c.endFrame - c.startFrame + 1) * fs < 0.15)
+                continue;
+            const auto doubled = std::any_of (actives.begin(), actives.end(), [&] (std::size_t a) {
+                const auto& n = model.notes[a];
+                const auto overlap = std::min (n.endFrame, c.endFrame) - std::max (n.startFrame, c.startFrame);
+                return std::abs (median[a] - median[k]) < 0.5f && overlap > (c.endFrame - c.startFrame) / 2;
+            });
+            candidateShown[k] = doubled ? 0 : 1;
+        }
     }
 
     // the output frame of the note's frame i under its stretch (PitchNet's StretchMap: the attack keeps its speed; a
@@ -1291,6 +1340,7 @@ private:
         const auto half = (float) std::clamp (rowHeight * 0.48 * std::sqrt (std::min (1.0, energy / std::max (1e-12, loudest)) * gain), 1.5, rowHeight * 0.9);
         const auto frames = (int) n.f0.size();
         const auto curve = e.pitchMoves() ? polyedit::pitchCurveOf (n, e, fs) : std::vector<float>();
+        const auto flatPitch = n.active ? 0.0f : (k < (int) medians.size() ? medians[(std::size_t) k] : n.medianMidi());
         std::vector<juce::Point<float>> lower;
         const auto spacing = fs * pixelsPerSecond * std::max (0.25, (double) e.stretch);
         const auto step = std::max (1, (int) std::floor (2.0 / std::max (1e-6, spacing))); // (about 2 px apart)
@@ -1304,7 +1354,8 @@ private:
             if (at < 0.0)
                 break;
             lastFrame = i;
-            const auto pitch = 69.0 + 12.0 * std::log2 (f / 440.0) + e.semitones + (i < (int) curve.size() ? curve[(std::size_t) i] : 0.0f);
+            // (a candidate is drawn flat at its pitch: its track often jumps between partials)
+            const auto pitch = n.active ? 69.0 + 12.0 * std::log2 (f / 440.0) + e.semitones + (i < (int) curve.size() ? curve[(std::size_t) i] : 0.0f) : (double) flatPitch;
             const auto x = xOfSeconds (at * fs + e.moveSeconds);
             const auto shown = (int) std::lround (outFrame (n, e, frames - 1) >= 0.0 ? frames : std::max (1.0, (n.endFrame - n.startFrame) * (double) e.stretch));
             const auto taper = (float) std::min ({ 1.0, (i + 1) / 4.0, (shown - i) / 6.0 });
@@ -1351,7 +1402,10 @@ private:
         return p;
     }
 
-    bool shown (int k) const { return model.notes[(std::size_t) k].active || assignMode; }
+    bool shown (int k) const
+    {
+        return model.notes[(std::size_t) k].active || (assignMode && k < (int) candidateShown.size() && candidateShown[(std::size_t) k] != 0);
+    }
 
     int noteAt (juce::Point<float> at, bool candidates = true) const
     {
@@ -1531,10 +1585,10 @@ private:
         if (assignMode)
             for (int k = 0; k < (int) model.notes.size(); ++k)
             {
-                if (model.notes[(std::size_t) k].active || ! onScreen (k))
+                if (model.notes[(std::size_t) k].active || ! shown (k) || ! onScreen (k))
                     continue;
                 const auto blob = blobOf (k, false);
-                g.setColour (pal::blob.withAlpha (selected.count (k) ? 0.35f : 0.14f));
+                g.setColour (pal::blob.withAlpha (selected.count (k) ? 0.35f : 0.05f)); // (Melodyne: possible notes are outlines)
                 g.fillPath (blob);
                 g.setColour (selected.count (k) ? juce::Colours::white : pal::blob.withAlpha (0.55f));
                 g.strokePath (blob, juce::PathStrokeType (selected.count (k) ? 1.4f : 0.8f));
@@ -1554,9 +1608,18 @@ private:
             g.setColour (pal::orangeLine.withAlpha (0.7f));
             g.fillPath (dashed);
         }
+        // (the selected notes last: on top of the others, as Melodyne draws them)
+        std::vector<int> order;
+        order.reserve (model.notes.size());
         for (int k = 0; k < (int) model.notes.size(); ++k)
+            if (model.notes[(std::size_t) k].active && selected.count (k) == 0)
+                order.push_back (k);
+        for (auto k : selected)
+            if (valid (k) && model.notes[(std::size_t) k].active)
+                order.push_back (k);
+        for (const auto k : order)
         {
-            if (! model.notes[(std::size_t) k].active || ! onScreen (k))
+            if (! onScreen (k))
                 continue;
             const auto blob = blobOf (k, false);
             const auto e = editOf (k);
@@ -1588,7 +1651,8 @@ private:
             {
                 g.setColour (pal::pitchCore.withAlpha (e.mute ? 0.3f : 0.85f));
                 g.setFont (juce::FontOptions ((float) std::min (11.0, rowHeight * 0.8)));
-                g.drawText (noteName (n.medianMidi() + e.semitones), b.withWidth (40.0f).translated (4.0f, 0.0f), juce::Justification::centredLeft, false);
+                g.drawText (noteName ((k < (int) medians.size() ? medians[(std::size_t) k] : n.medianMidi()) + e.semitones), b.withWidth (40.0f).translated (4.0f, 0.0f),
+                            juce::Justification::centredLeft, false);
             }
         }
         if (showBand && ! band.isEmpty())
@@ -1629,6 +1693,8 @@ private:
     juce::Rectangle<float> band;
     std::map<int, polyedit::Edit> dragStart;
     std::vector<std::pair<float, float>> pitchRange;
+    std::vector<char> candidateShown;
+    std::vector<float> medians; // (each note's pitch: notesChanged())
     // buffer mode: the editor's own history (blob, its render)
     std::vector<std::pair<std::vector<std::uint8_t>, std::shared_ptr<const SampleData>>> bufferHistory;
     int bufferAt = 0;
