@@ -7,6 +7,7 @@
 #include "core/VoiceMatch.h"
 #include "core/EchoSuite.h"
 #include "core/LynxTune.h"
+#include "core/PeakShapes.h"
 #include "core/LynxVerbs.h"
 
 #include "core/Effector.h"
@@ -2805,7 +2806,11 @@ public:
             songBeats += beats;
         const auto whole = std::floor (cycles);
         const auto lfoAmount = (lfoAmountRaw < 0.0 ? -1.0 : 1.0) * (std::pow (6.0, std::abs (lfoAmountRaw) / 256.0) - 1.0) * 0.2;
-        const auto lfo = std::clamp (p[4] + lfoAmount * tension (wave (shape, cycles - whole, (std::uint32_t) (std::int64_t) whole), lfoTension), 0.0, 1.0);
+        // round 190kl (issue #197): LYNX's extra shapes (core/PeakShapes.h) when one is picked; none = FL's shape, as before
+        const auto extra = peakshapes::idOf (p[peakshapes::extraShapeParam]);
+        const auto shaped = extra != 0 ? peakshapes::wave (extra, cycles - whole, (std::uint32_t) (std::int64_t) whole)
+                                       : wave (shape, cycles - whole, (std::uint32_t) (std::int64_t) whole);
+        const auto lfo = std::clamp (p[4] + lfoAmount * tension (shaped, lfoTension), 0.0, 1.0);
 
         // outputs 0 = peak + LFO, 1 = peak, 2 = LFO; Ramp: at most 1/8 of the range per host tick (96 per quarter note)
         const double targets[3] { std::min (1.0, peak + lfo), peak, lfo };

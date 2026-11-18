@@ -62,6 +62,7 @@
 #include "ui/ValueControl.h"
 #include "ui/WindowOwner.h"
 
+#include "core/PeakShapes.h"
 #include "ui/DesignDisplays.inc" // round 168r: the graphs of the designed editors
 
 namespace lynx
@@ -476,6 +477,14 @@ public:
         return fx != nullptr && param >= 0 && param < maxEffectParams ? fx->params[(std::size_t) param] : 0.0f;
     }
 
+    // round 190kl (issue #197): the Peak Controller's LYNX extra LFO shape shown on FL's Shape menu (0 = FL's shape)
+    int peakExtraShape (int param, const EffectSlot& fx) const
+    {
+        if (kind != EffectKind::peakController || param != plugui::paramIndex (kind, "LFO shape"))
+            return 0;
+        return peakshapes::idOf (fx.params[(std::size_t) peakshapes::extraShapeParam]);
+    }
+
     void setValue (int param, float value)
     {
         if (isStateParam (param))
@@ -510,6 +519,12 @@ public:
                 setParams (edits);
                 return;
             }
+        if (kind == EffectKind::peakController && current()->params[(std::size_t) peakshapes::extraShapeParam] != 0.0f
+            && param == plugui::paramIndex (kind, "LFO shape")) // round 190kl: stepping FL's Shape leaves LYNX's extra shape
+        {
+            setParams ({ { param, value }, { peakshapes::extraShapeParam, 0.0f } });
+            return;
+        }
         if (usesBar())
             bar.willEdit();
         editSlot ([param, v = juce::jlimit (0.0f, 1.0f, value)] (EffectSlot& target) { target.params[(std::size_t) param] = v; });
@@ -1477,6 +1492,8 @@ public:
                     g.setFont (font (juce::jmax (9.0f, juce::jmin (12.0f * s, r.getHeight() * 0.55f)), true));
                     if (kind == EffectKind::lynxTune && param == lynxtune::scale && fx.params[lynxtune::moreScales] >= 0.25f)
                         g.drawFittedText (tr (fx.params[lynxtune::moreScales] >= 0.75f ? "Diminished" : "Whole tone"), textArea.toNearestInt(), juce::Justification::centred, 1, 0.6f);
+                    else if (const auto extra = peakExtraShape (param, fx); extra != 0) // round 190kl: LYNX's extra LFO shape
+                        g.drawFittedText (tr (peakshapes::name (extra)), textArea.toNearestInt(), juce::Justification::centred, 1, 0.6f);
                     else if (kind == EffectKind::hardwareInsert) // the device's channel names (round 164d)
                         g.drawFittedText (valueText (param, value), textArea.reduced (4.0f * s, 0.0f).toNearestInt(), juce::Justification::centred, 1, 0.6f);
                     else if (chosen < (int) labels.size())
@@ -4774,6 +4791,61 @@ public:
                 menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withTargetScreenArea (localAreaToGlobal (r.toNearestInt())));
                 return;
             }
+            if (kind == EffectKind::peakController && param == plugui::paramIndex (kind, "LFO shape")) // round 190kl (issue #197)
+            {
+                // FL's five shapes first (the default; FL projects stay exact), then LYNX's extra shapes
+                const auto* fx = current();
+                const auto extra = fx != nullptr ? peakshapes::idOf (fx->params[(std::size_t) peakshapes::extraShapeParam]) : 0;
+                juce::PopupMenu menu;
+                const auto labels = plugui::optionLabels (item);
+                const auto chosen = plugui::optionAt (item, valueOf (param));
+                // each item with a picture of its shape, as FL's own menu has (drawn by LYNX: one period); the picture
+                // takes the place of the tick, so the shape playing is drawn in the editor's accent colour
+                const auto icon = [this] (std::function<double (double)> f, bool playing) {
+                    juce::Path path;
+                    for (int i = 0; i <= 64; ++i)
+                    {
+                        const auto x = (double) i / 64.0;
+                        const auto pt = juce::Point<float> ((float) (x * 24.0), (float) (2.0 + (1.0 - juce::jlimit (0.0, 1.0, f (x))) * 12.0));
+                        if (i == 0)
+                            path.startNewSubPath (pt);
+                        else
+                            path.lineTo (pt);
+                    }
+                    auto d = std::make_unique<juce::DrawablePath>();
+                    d->setPath (path);
+                    d->setFill (juce::FillType (juce::Colours::transparentBlack));
+                    d->setStrokeFill (juce::FillType (playing ? accent : theme::colour::textPrimary));
+                    d->setStrokeType (juce::PathStrokeType (1.4f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+                    return d;
+                };
+                const std::function<double (double)> flShapes[5] {
+                    [] (double x) { return 0.5 + 0.5 * std::sin (juce::MathConstants<double>::twoPi * x); },
+                    [] (double x) { return 1.0 - std::abs (2.0 * x - 1.0); },
+                    [] (double x) { return x < 0.5 ? 1.0 : 0.0; },
+                    [] (double x) { return x; },
+                    [] (double x) { static const double v[4] { 0.3, 0.9, 0.1, 0.6 }; return v[juce::jlimit (0, 3, (int) (x * 4.0))]; } };
+                for (int o = 0; o < (int) labels.size(); ++o)
+                {
+                    juce::PopupMenu::Item entry (optionTexts (item)[(std::size_t) o]);
+                    entry.setTicked (extra == 0 && o == chosen);
+                    if (o < 5)
+                        entry.setImage (icon (flShapes[o], extra == 0 && o == chosen));
+                    entry.setAction ([this, param, v = plugui::optionValue (item, o)] { setParams ({ { param, v }, { peakshapes::extraShapeParam, 0.0f } }); });
+                    menu.addItem (std::move (entry));
+                }
+                menu.addSectionHeader (tr ("LYNX shapes"));
+                for (int id = 1; id <= peakshapes::count; ++id)
+                {
+                    juce::PopupMenu::Item entry (tr (peakshapes::name (id)));
+                    entry.setTicked (extra == id);
+                    entry.setImage (icon ([id] (double x) { return peakshapes::wave (id, x, 7u); }, extra == id));
+                    entry.setAction ([this, id] { setParams ({ { peakshapes::extraShapeParam, peakshapes::valueOf (id) } }); });
+                    menu.addItem (std::move (entry));
+                }
+                menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withTargetScreenArea (localAreaToGlobal (r.toNearestInt())));
+                return;
+            }
             if (kind == EffectKind::lynxTune && param == lynxtune::scale) // round 128: + whole tone, diminished
             {
                 const auto* fx = current();
@@ -5786,8 +5858,10 @@ private:
         for (const auto& item : activeLayout().items) // round 168r: the Peak Controller's outputs scroll
             if (item.type == Item::display && designui::isLive (item.display) && visible (item))
             {
-                designHistory.push (liveMeter (0), liveMeter (1), liveMeter (2));
-                repaint (rectOf (item).getSmallestIntegerContainer());
+                // round 190kl (issue #197): by the clock, not one column per timer call (calls are dropped while a
+                // knob is dragged, which slowed the scrolling down); redrawn only when a column was added
+                if (designHistory.advance (juce::Time::getMillisecondCounterHiRes(), { liveMeter (0), liveMeter (1), liveMeter (2) }) > 0)
+                    repaint (rectOf (item).getSmallestIntegerContainer());
                 break;
             }
     }

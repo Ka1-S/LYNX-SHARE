@@ -63,6 +63,19 @@ RECT physicalRect (const juce::Component& c, const juce::ComponentPeer& peer, ju
     return { r.x, r.y, r.x + r.w, r.y + r.h };
 }
 
+// Issue #197 (round 190kl): `want` keeps the native window's present size when that is within a pixel of the exact
+// size (core/DockStack.h keepsSize): placing a window again only moves it
+void keepNativeSize (const juce::Component& c, const juce::ComponentPeer& peer, juce::Rectangle<int> bounds, RECT now, RECT& want)
+{
+    const auto scale = peer.getPlatformScaleFactor() * (double) c.getDesktopScaleFactor();
+    const auto w = (int) (now.right - now.left), h = (int) (now.bottom - now.top);
+    if (dockstack::keepsSize (w, h, bounds.getWidth(), bounds.getHeight(), scale))
+    {
+        want.right = want.left + w;
+        want.bottom = want.top + h;
+    }
+}
+
 // LYNX's own exact placement is under way (placePhysically): the window procedure leaves its position alone
 bool placingExactly = false;
 
@@ -88,8 +101,9 @@ void placePhysically (juce::Component& c, juce::Rectangle<int> bounds)
     auto* parent = hwnd != nullptr ? GetParent (hwnd) : nullptr;
     if (parent == nullptr)
         return;
-    const auto want = physicalRect (c, *peer, bounds);
+    auto want = physicalRect (c, *peer, bounds);
     const auto now = rectInParent (hwnd, parent);
+    keepNativeSize (c, *peer, bounds, now, want); // (issue #197: a move is never also a resize)
     if (now.left == want.left && now.top == want.top && now.right == want.right && now.bottom == want.bottom)
         return;
     const juce::ScopedValueSetter<bool> exact (placingExactly, true); // (this place stands: placeAtOnce leaves it)
@@ -330,7 +344,9 @@ void placeAtOnce (juce::Component& c, WINDOWPOS& pos)
     auto* peer = c.getPeer();
     if (peer == nullptr || ! isAttached (c) || GetParent (pos.hwnd) == nullptr || (GetWindowLongPtr (pos.hwnd, GWL_STYLE) & WS_CHILD) == 0)
         return;
-    const auto want = physicalRect (c, *peer, c.getBounds());
+    auto want = physicalRect (c, *peer, c.getBounds());
+    if (auto* parent = GetParent (pos.hwnd))
+        keepNativeSize (c, *peer, c.getBounds(), rectInParent (pos.hwnd, parent), want); // (issue #197)
     if ((pos.flags & SWP_NOMOVE) == 0)
     {
         pos.x = want.left;
@@ -654,8 +670,9 @@ bool isPlacedAt (const juce::Component& c, const juce::Component& area, juce::Re
     auto* parent = hwnd != nullptr ? GetParent (hwnd) : nullptr;
     if (parent == nullptr || ! isAttached (c))
         return true; // (no native window to move)
-    const auto want = physicalRect (c, *peer, boundsInArea + originOf (area));
+    auto want = physicalRect (c, *peer, boundsInArea + originOf (area));
     const auto now = rectInParent (hwnd, parent);
+    keepNativeSize (c, *peer, boundsInArea + originOf (area), now, want); // (issue #197)
     return now.left == want.left && now.top == want.top && now.right == want.right && now.bottom == want.bottom;
    #else
     juce::ignoreUnused (c, area, boundsInArea);
@@ -765,8 +782,9 @@ bool placedPhysically (const juce::Component& c)
     RECT now {};
     GetWindowRect (hwnd, &now);
     MapWindowPoints (nullptr, parent, reinterpret_cast<POINT*> (&now), 2);
-    return std::abs (now.left - b.getX()) <= 1.0 && std::abs (now.top - b.getY()) <= 1.0 && std::abs (now.right - b.getRight()) <= 1.0
-           && std::abs (now.bottom - b.getBottom()) <= 1.0;
+    // (the right and bottom edges: the position's rounding plus a kept size within a pixel, round 190kl)
+    return std::abs (now.left - b.getX()) <= 1.0 && std::abs (now.top - b.getY()) <= 1.0 && std::abs (now.right - b.getRight()) < 1.5
+           && std::abs (now.bottom - b.getBottom()) < 1.5;
    #else
     juce::ignoreUnused (c);
     return true;
