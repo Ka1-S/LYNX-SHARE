@@ -137,6 +137,8 @@ TEST (parity190it_revision0_renders_as_the_base_commit_did)
         const auto& c = cs[(std::size_t) g.k];
         auto slot = makeEffectSlot (c.kind);
         slot.params[(std::size_t) c.rev] = 0.0f;
+        if (c.kind == EffectKind::luxeVerb) // round 190kw: … and the Space engine's revision (a project saved before)
+            slot.params[(std::size_t) luxeVerbSpaceRevision] = 0.0f;
         if (c.idx >= 0) slot.params[(std::size_t) c.idx] = c.val;
         if (c.idx2 >= 0) slot.params[(std::size_t) c.idx2] = c.val2;
         const int n = (int) (1.6 * 48000.0);

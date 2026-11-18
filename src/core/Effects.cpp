@@ -4362,6 +4362,8 @@ EffectSlot makeEffectSlot (EffectKind kind)
     if (kind == EffectKind::halo) slot.params[(std::size_t) verbs::halo::revision] = 1.0f;
     if (kind == EffectKind::latticeMod) // round 190it: … and a new Lattice Mod its tap network's revision 1 (hidden)
         slot.params[(std::size_t) echosuite::lattice::revision] = 1.0f;
+    if (kind == EffectKind::luxeVerb) // round 190kw: a new LuxeVerb's Space engine runs the Pro-R 2 laws' revision 1 (hidden)
+        slot.params[(std::size_t) luxeVerbSpaceRevision] = 1.0f;
 
     return slot;
 }
@@ -4542,6 +4544,9 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     // round 190is: an Echoform saved before the voicings' revision keeps rounds 147 / 150's voicings
     if (slot.kind == EffectKind::echoform && savedCount <= (std::size_t) echosuite::echoform::revision)
         slot.params[(std::size_t) echosuite::echoform::revision] = 0.0f;
+    // round 190kw: a LuxeVerb saved before the Space engine's revision keeps tp172b / 190it's Space engine (bit for bit)
+    if (slot.kind == EffectKind::luxeVerb && savedCount <= (std::size_t) luxeVerbSpaceRevision)
+        slot.params[(std::size_t) luxeVerbSpaceRevision] = 0.0f;
     // round 190ca: a Nebula saved before the cloud law keeps the classic engine in every mode
     if (slot.kind == EffectKind::nebula && savedCount <= (std::size_t) verbs::nebula::law)
         slot.params[(std::size_t) verbs::nebula::law] = 0.0f;

@@ -771,6 +771,11 @@ int fromProR2 (const State& s, EffectSlot& slot)
     set (character, s.at (5));
     set (thickness, (s.at (6) + 1.0) / 2.0);
     set (width, s.at (7));
+    // round 190kw: the Space engine's revision 1 (the recovered laws) for Modern, and Stereo Width's raw 0 … 1.2 (past 1
+    // hidden). Vintage and Plate keep revision 0: their fit under revision 1 scored below tp172b's on refcap030's grid
+    // (Vintage 3.0 / Plate 3.0 against 3.1 / 3.6), so they stay on the engine that measures better until refitted
+    p[(std::size_t) luxeVerbSpaceRevision] = s.at (4) < 0.5f ? 1.0f : 0.0f;
+    p[(std::size_t) luxeVerbSpaceWidthExt] = (float) std::clamp (((double) s.at (7) - 1.0) / 0.2, 0.0, 1.0);
     set (mix, s.at (9) / 100.0);
     set (predelay, s.at (16));
     // round 190it: value 8 is Ducking in dB (0 … 48, read from states saved at 0 / 50 / 100 %: 0 / 24 / 48)
