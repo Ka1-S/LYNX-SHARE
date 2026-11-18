@@ -47,7 +47,8 @@ for new analyses (a project saved by round 190lk plays exactly as before).
    `PolyEngine.cpp` after the note filter). PitchNet splits a held note where its level rises 2x within ~45 ms; a pad or
    strings playing the same pitch in the next chord rises over ~0.25 s, so two chords' notes became one. The new pass
    cuts an active note where its level dips to at most 30 % of what it had reached and comes back 3x within 0.5 s with
-   most of its partials rising together; the pieces keep the note's probability (it never changes which candidates are
+   most of its partials rising together (a dip above 15 % only where other notes begin or end too: beating detuned
+   voices dip inside a held chord); the pieces keep the note's probability (it never changes which candidates are
    notes). Lab: pad notes found with their own onset 9 → 14 of 17 (with LYNX's evidence rules in `core/PolyEdit.cpp`:
    16 of 17); piano, guitar, organ, real piano and real strings unchanged.
 3. **Overlap-aware moves** (`Params::overlapAwareMoves`, `PolyRenderer.cpp`). A moved note's copy comes from another

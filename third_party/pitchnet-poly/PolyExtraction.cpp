@@ -767,6 +767,7 @@ constexpr double kSlowDip = 0.3;    // the dip: at most 30 % of the level the no
 constexpr double kSlowRise = 3.0;   // then back up by 3x (+9.5 dB) within 0.5 s
 constexpr double kSlowBack = 0.35;  // to at least 35 % of the earlier level
 constexpr double kSlowShare = 0.6;  // with 60 % of its present partials rising 2x or more
+constexpr double kSlowDeepDip = 0.15; // deeper than this (-16.5 dB) needs no other note starting or ending there
 
 struct ReattackTest
 {
@@ -889,7 +890,8 @@ std::vector<Candidate> splitReattacks(const Context& ctx, const std::vector<Cand
 // LYNX modification (round 190lo): slow re-attacks. A note played again with a slow attack (a pad, strings, a swell)
 // never rises by 2x within splitReattacks()'s 4-frame window, so two chords that hold the same pitch became one note.
 // Here: the level dips well below what it had been, then comes back within ~0.5 s with most of the note's partials
-// rising together; the cut goes at the bottom of the dip. Run on the active notes after the note filter (the pieces
+// rising together (where the dip is not very deep, other notes must begin or end there too: a chord change); the cut
+// goes at the bottom of the dip. Run on the active notes after the note filter (the pieces
 // keep the note's probability), so that it never changes which candidates are notes.
 std::vector<Candidate> splitSlowReattacks(const Context& ctx, const std::vector<Candidate>& notes)
 {
@@ -919,6 +921,17 @@ std::vector<Candidate> splitSlowReattacks(const Context& ctx, const std::vector<
                         after = test.meanOf(j - 3, j + 3), afterAt = j;
                 if (!(trough <= kSlowDip * before && after >= kSlowRise * trough && after >= kSlowBack * before))
                     continue;
+                // a dip that is not very deep counts where other notes begin or end too (a chord change), not inside
+                // a held chord (where beating detuned voices dip as well)
+                if (trough > kSlowDeepDip * before)
+                {
+                    const int at0 = n.start + i, near = static_cast<int>(std::lround(0.2 * ctx.p.sampleRate / ctx.p.hop));
+                    bool chordChange = false;
+                    for (const auto& o : notes)
+                        chordChange = chordChange || (&o != &n && (std::abs(o.start - at0) <= near || std::abs(o.end - at0) <= near));
+                    if (!chordChange)
+                        continue;
+                }
                 // most present partials rise together from the dip to the new peak
                 int present = 0, rising = 0;
                 double strongest = 0.0;

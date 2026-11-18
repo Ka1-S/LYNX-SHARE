@@ -225,13 +225,14 @@ TEST (polyedit190lo_fallback_detector_without_evidence_is_the_harmonic_one)
 TEST (polyedit190lo_slow_reattacks_split_a_held_pitch)
 {
     using namespace lynx::polyedit;
-    // a pad-like C4 (0.25 s attacks, 0.1 s release) played in two chords 0.3 s apart, over a held G3
+    // a pad-like C4 (0.25 s attacks, 0.1 s release) held through a chord change 0.3 s apart: G3 + C4, then A3 + C4
     auto source = std::make_shared<lynx::SampleData>();
     source->sampleRate = pe190lk::rate;
     source->left.assign ((std::size_t) (2.8 * pe190lk::rate), 0.0f);
     pe190lo::tone (source->left, pe190lk::rate, 60.0, 0.0, 0.9, 0.25);
+    pe190lo::tone (source->left, pe190lk::rate, 55.0, 0.0, 0.9, 0.25);
     pe190lo::tone (source->left, pe190lk::rate, 60.0, 1.2, 2.2, 0.25);
-    pe190lo::tone (source->left, pe190lk::rate, 55.0, 0.0, 2.2, 0.25);
+    pe190lo::tone (source->left, pe190lk::rate, 57.0, 1.2, 2.2, 0.25);
     auto notesAt = [] (const Model& m, double key) {
         int n = 0;
         for (const auto& note : m.notes)
@@ -243,7 +244,7 @@ TEST (polyedit190lo_slow_reattacks_split_a_held_pitch)
     Model a, b;
     CHECK (analyse (*source, nullptr, a, nullptr, {}, split));
     CHECK (analyse (*source, nullptr, b, nullptr, {}, joined));
-    CHECK (notesAt (a, 60.0) == 2 && notesAt (a, 55.0) == 1);
+    CHECK (notesAt (a, 60.0) == 2 && notesAt (a, 55.0) == 1 && notesAt (a, 57.0) == 1);
     CHECK (notesAt (b, 60.0) <= 1);
 }
 
