@@ -3659,7 +3659,7 @@ void AudioEngine::launcherCommand (const launcher::Command& command)
         return;
     using T = launcher::Command::Type;
     const auto starts = command.type == T::launch || command.type == T::launchScene || command.type == T::record;
-    if (! transport.playing.load() && ! starts && command.type != T::backToArrangement && command.type != T::reset
+    if (! transport.playing.load() && ! starts && command.type != T::backToArrangement && command.type != T::trackBackToArrangement && command.type != T::reset
         && command.type != T::recordEnd) // (a recordEnd while stopped cancels a recording that never began)
         return;
     if (starts && song.mode != PlayMode::song) // the grid plays with the song

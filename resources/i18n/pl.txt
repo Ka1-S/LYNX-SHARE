@@ -11317,3 +11317,4 @@ countries: pl
 "Play this pattern on its own" = "Odtwórz sam ten wzór"
 "Put this pattern on the track at the song position" = "Umieść ten wzór na ścieżce w pozycji utworu"
 "Make a beat first before exporting it to a track." = "Najpierw utwórz bit, zanim wyeksportujesz go na ścieżkę."
+"Back to Arrangement: [LMB] this track plays its Playlist clips again" = "Powrót do Arrangement: [LMB] ta ścieżka znów gra swoje klipy z Playlisty"

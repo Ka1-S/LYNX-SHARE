@@ -11317,3 +11317,4 @@ countries: id
 "Play this pattern on its own" = "Putar pola ini saja"
 "Put this pattern on the track at the song position" = "Taruh pola ini di trek pada posisi lagu"
 "Make a beat first before exporting it to a track." = "Buat beat dulu sebelum mengekspornya ke trek."
+"Back to Arrangement: [LMB] this track plays its Playlist clips again" = "Kembali ke Arrangement: [LMB] trek ini memutar lagi klip Playlist-nya"

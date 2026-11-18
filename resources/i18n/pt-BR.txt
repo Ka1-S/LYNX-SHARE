@@ -11446,3 +11446,4 @@ countries: br
 "Play this pattern on its own" = "Tocar só este padrão"
 "Put this pattern on the track at the song position" = "Colocar este padrão na faixa na posição da música"
 "Make a beat first before exporting it to a track." = "Faça uma batida antes de exportá-la para uma faixa."
+"Back to Arrangement: [LMB] this track plays its Playlist clips again" = "Voltar ao Arrangement: [LMB] esta faixa toca de novo seus clipes da Playlist"

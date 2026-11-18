@@ -669,6 +669,21 @@ void Player::apply (const Song& song, const ClipGrid& grid, const GridIndex& ind
                     t.repeatEvery = 0.0;
                 }
             return;
+        case Command::Type::trackBackToArrangement: // round 190lr (DL-38): one track
+            if (c.track < 0 || c.track >= maxTracks)
+                return;
+            if (auto* t = stateOf (c.track, false))
+            {
+                t->next = Play {};
+                if (t->current.slot >= 0)
+                    t->current.until = std::min (t->current.until, std::max (std::ceil (now - 1.0e-6), t->current.from));
+            }
+            if (takenTracks[(std::size_t) c.track])
+            {
+                backTracks.set ((std::size_t) c.track);
+                takenTracks.reset ((std::size_t) c.track);
+            }
+            return;
         case Command::Type::backToArrangement:
             // at once: the grid's clips end here and the Playlist resumes in this block
             for (int i = 0; i < numActive; ++i)

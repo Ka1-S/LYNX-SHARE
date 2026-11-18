@@ -488,6 +488,14 @@ public:
                 showSlotMenu (hit.track, hit.scene);
             return;
         }
+        // round 190lr (DL-38, Live's single-track Back to Arrangement): a click on a taken track's mark gives that track's
+        // Playlist clips back at once (the others stay with the grid)
+        if (const auto t = headerTrackAt (e.getPosition()); t >= 0 && e.x >= columnX (t) + columnWidth - 22 && trackTaken (t))
+        {
+            engine.launcherCommand ({ launcher::Command::Type::trackBackToArrangement, t });
+            repaint();
+            return;
+        }
         if (const auto t = headerTrackAt (e.getPosition()); t >= 0) // a column's title selects its track (round 183a)
         {
             selectedTrack = t;
@@ -1017,6 +1025,11 @@ public:
             return hint;
         const auto& song = engine.getSong();
         const auto cells = cellArea();
+        if (const auto t = headerTrackAt (p); t >= 0 && p.x >= columnX (t) + columnWidth - 22 && trackTaken (t)) // (round 190lr)
+        {
+            hint.text = tr ("Back to Arrangement: [LMB] this track plays its Playlist clips again");
+            return hint;
+        }
         if (const auto t = headerTrackAt (p); t >= 0)
         {
             hint.text = tr ("Track title: [LMB] selects the track  [RMB] track menu  [Ctrl][R] renames it");
@@ -1377,6 +1390,11 @@ public:
             onPick (selectedTrack, selectedScene, pick);
     }
     // the track whose column title is at p, or -1
+    bool trackTaken (int t) const
+    {
+        const auto* state = engine.launcherState();
+        return state != nullptr && t >= 0 && t < launcher::maxTracks && state->tracks[(std::size_t) t].taken.load (std::memory_order_relaxed);
+    }
     int headerTrackAt (juce::Point<int> p) const
     {
         if (p.y < 0 || p.y >= headerHeight || p.x < 0 || p.x >= cellArea().getRight())

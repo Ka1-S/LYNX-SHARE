@@ -11317,3 +11317,4 @@ countries: nl be
 "Play this pattern on its own" = "Alleen dit patroon afspelen"
 "Put this pattern on the track at the song position" = "Dit patroon op de songpositie op het spoor zetten"
 "Make a beat first before exporting it to a track." = "Maak eerst een beat voordat je die naar een spoor exporteert."
+"Back to Arrangement: [LMB] this track plays its Playlist clips again" = "Terug naar Arrangement: [LMB] dit spoor speelt weer zijn Playlist-clips"

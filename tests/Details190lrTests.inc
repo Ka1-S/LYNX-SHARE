@@ -161,3 +161,21 @@ TEST (details190lr_scene_follow_action_launches_the_next_scene)
     r.until (4 * bar);
     CHECK (r.runtime.player.sceneFollowScene() == -1);
 }
+
+// Live's single-track Back to Arrangement: only that track gives its Playlist clips back; the other stays with the grid
+TEST (details190lr_one_track_back_to_arrangement)
+{
+    using namespace lynx;
+    constexpr auto bar = grid181a::bar;
+    auto s = grid181a::patternSong();
+    launcher::setClip (s, 0, 0, grid181a::patternClip (0));
+    launcher::setClip (s, 1, 0, grid181a::patternClip (1));
+    grid181a::Run r (std::move (s));
+    r.command (launcher::Command::Type::launchScene, 0, 0);
+    r.until (bar / 2);
+    CHECK (r.runtime.player.taken()[0] && r.runtime.player.taken()[1]);
+    r.command (launcher::Command::Type::trackBackToArrangement, 0, 0);
+    r.until (bar / 2 + bar / 4);
+    CHECK (! r.runtime.player.taken()[0] && r.runtime.player.taken()[1]);
+    CHECK (r.runtime.player.playingOn (0) == -1 && r.runtime.player.playingOn (1) >= 0);
+}

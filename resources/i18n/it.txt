@@ -11317,3 +11317,4 @@ countries: it ch sm
 "Play this pattern on its own" = "Riproduci solo questo pattern"
 "Put this pattern on the track at the song position" = "Metti questo pattern sulla traccia alla posizione del brano"
 "Make a beat first before exporting it to a track." = "Crea prima un beat prima di esportarlo su una traccia."
+"Back to Arrangement: [LMB] this track plays its Playlist clips again" = "Torna all'Arrangement: [LMB] questa traccia suona di nuovo le sue clip della Playlist"

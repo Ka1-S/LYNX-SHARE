@@ -11317,3 +11317,4 @@ countries: tr
 "Play this pattern on its own" = "Yalnızca bu paterni çal"
 "Put this pattern on the track at the song position" = "Bu paterni şarkı konumunda parçaya koy"
 "Make a beat first before exporting it to a track." = "Bir parçaya aktarmadan önce bir ritim yapın."
+"Back to Arrangement: [LMB] this track plays its Playlist clips again" = "Arrangement'a dön: [LMB] bu parça Playlist kliplerini yeniden çalar"

@@ -11317,3 +11317,4 @@ countries: cn sg
 "Play this pattern on its own" = "单独播放此样式"
 "Put this pattern on the track at the song position" = "在歌曲位置把此样式放到轨道上"
 "Make a beat first before exporting it to a track." = "请先做一个节拍，再把它导出到轨道。"
+"Back to Arrangement: [LMB] this track plays its Playlist clips again" = "回到编排：[LMB] 此轨道重新播放它的 Playlist 片段"

@@ -11317,3 +11317,4 @@ countries: fr be ch ca lu
 "Play this pattern on its own" = "Jouer ce motif seul"
 "Put this pattern on the track at the song position" = "Placer ce motif sur la piste à la position du morceau"
 "Make a beat first before exporting it to a track." = "Créez d'abord un rythme avant de l'exporter vers une piste."
+"Back to Arrangement: [LMB] this track plays its Playlist clips again" = "Retour à l'Arrangement : [LMB] cette piste rejoue ses clips de la Playlist"
