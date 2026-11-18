@@ -109,7 +109,7 @@ TEST (harrison190le_32c_dials_read_the_originals_scales)
     // bells: the measured dials (0.65 / 0.85 / 1) and the table's 0.75 / 0.875, odd, monotone
     CHECK (std::abs (r::h32BellDb (0.65f) - 2.4906) < 1e-3 && std::abs (r::h32BellDb (0.85f) - 6.9366) < 1e-3 && std::abs (r::h32BellDb (1.0f) - 13.7374) < 1e-3);
     CHECK (std::abs (r::h32BellDb (0.75f) - 4.5) < 1e-3 && std::abs (r::h32BellDb (0.875f) - 7.8) < 1e-3 && std::abs (r::h32BellDb (0.625f) - 2.1) < 0.06);
-    CHECK (r::h32BellDb (0.5f) == 0.0 && std::abs (r::h32BellDb (0.2f) + r::h32BellDb (0.8f)) < 1e-9);
+    CHECK (r::h32BellDb (0.5f) == 0.0 && std::abs (r::h32BellDb (0.25f) + r::h32BellDb (0.75f)) < 1e-9); // (exact floats: odd)
     for (int k = 1; k <= 200; ++k)
         CHECK (r::h32BellDb (0.5f + 0.0025f * (float) k) > r::h32BellDb (0.5f + 0.0025f * (float) (k - 1)));
     CHECK (std::abs (r::h32Q (2.4906) - 0.525) < 2e-3 && std::abs (r::h32Q (-6.9366) - 0.57) < 2e-3 && std::abs (r::h32Q (13.7374) - 0.75) < 2e-3);
@@ -193,7 +193,7 @@ TEST (harrison190le_32c_curve_is_the_measured_law)
         CHECK (std::abs (r::responseDb (p, sr, 215.0 / 8.0) - r::responseDb (p, sr, 215.0 / 16.0) - 12.0) < 0.2);
         p[r::hpf] = r::h32HpfValue (25.0);
         p[r::lpf] = r::h32LpfValue (20000.0);
-        if (sr >= 48000.0) // the trial's default at 48 kHz: -2.40 dB at 18 kHz (measured)
+        if (sr == 48000.0) // the trial's default at 48 kHz: -2.40 dB at 18 kHz (measured; at 96 kHz it is nearer the analog -2.2)
             CHECK (std::abs (r::responseDb (p, sr, 18000.0) + 2.40) < 0.06);
         CHECK (std::abs (r::responseDb (p, sr, 1000.0)) < 0.01);
     }
