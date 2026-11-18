@@ -41,8 +41,7 @@ struct Settings
     // round 148: the console the settings drive — 0 the E-type channel of round 123, 1 the "4K" console measured on the
     // SSL 4K E trial (REA_rodada148 §2). The 4K's own controls (ignored by model 0):
     int model = 0;
-    int colour = 0;               // EQ colour: 0 Brown, 1 Black, 2 Orange; round 190ho: 3 Pink (the 4K G's own EQ)
-    bool pinkDiv3 = false, pinkMult3 = false; // round 190ho: Pink's LMF ÷3 / HMF ×3 (they do nothing in the other colours)
+    int colour = 0;               // EQ colour: 0 Brown, 1 Black, 2 Orange
     bool pre = false;             // the mic pre: drive `micDb` (0 … 50 dB, level-compensated)
     double micDb = 0.0;
     bool vca = false;             // the Analogue VCA (the dynamics' VCA colour)
@@ -52,6 +51,18 @@ struct Settings
     // round 165 (model 0): "EQ to Dyn S.C." — [EXEC] the filters (unless split) and the EQ leave the audio and feed only
     // the dynamics' side chain; with the filter split on, the filters stay at the input of the audio path
     bool eqToSidechain = false;
+    // round 190lb (model 1, off = the old sound): the "Pink" EQ colour of the SSL 4K G, measured black-box on its
+    // impulse grid (docs/analise/BLACKBOX_rodada190lb.md §2). With `pink` the four bands take the dials in the
+    // original's own units (LF ±18, mids ±22, HF ±20 dB; LMF 0.2 … 2.5 kHz before ÷3, HMF 0.6 … 7 kHz before ×3) and
+    // the LF / HF Bell switches do nothing (the reference's Pink bands are shelves only)
+    bool pink = false, lmfDiv3 = false, hmfMult3 = false;
+    // the SSL 4K G's own measured details (either colour; off = the 4K E's): its 18 dB/oct high-pass, its low-pass
+    // without bilinear cramping (a matched second-order section; the dial reaches 23.8 kHz), and its output ceiling
+    // (hard clip at 1.1108, both polarities, before the output trim)
+    bool k4g = false;
+    // round 190lb: the 4K E's own high-pass in Black / Orange, third order (18 dB/oct; its trial's K4E_ir renders — Brown
+    // keeps the measured 12 dB/oct one). Off = the old 12 dB/oct high-pass for every colour
+    bool e18HighPass = false;
 };
 
 // Q of the mid bands as the console's dial shows it, for a 0..1 dial position (3.5 at 0 .. 0.1 at 1)
@@ -60,8 +71,6 @@ double dialFromQ (double q) noexcept;
 
 // One EQ band / filter as a digital biquad at `sampleRate` (band 0 LF, 1 LMF, 2 HMF, 3 HF). False = flat (skip it).
 bool bandBiquad (int band, const Settings& s, double sampleRate, Biquad& out);
-// round 190ho: the band's second section (Pink's shelves: the overshoot bell after the shelf). False = none
-bool bandExtraBiquad (int band, const Settings& s, double sampleRate, Biquad& out);
 // The 3rd-order high-pass as a first-order section and a biquad
 bool highPass (const Settings& s, double sampleRate, Biquad& first, Biquad& second);
 bool lowPass (const Settings& s, double sampleRate, Biquad& out);
@@ -87,11 +96,11 @@ private:
     double sr = 48000.0;
     Settings designed {};
     bool designedOnce = false;
-    Biquad hp1, hp2, lp, bands[4], extras[4], vcaHp;
+    Biquad hp1, hp2, lp, bands[4], vcaHp;
     // round 165: the side chain's own copies of the filters / EQ (same coefficients, own state): [0] the gate's
     // detector (it hears the input), [1] the compressor's (it hears the compressor's output: a feedback design)
-    struct ScChain { Biquad hp1, hp2, lp, bands[4], extras[4]; } sc[2];
-    bool hpOn = false, lpOn = false, bandOn[4] {}, extraOn[4] {};
+    struct ScChain { Biquad hp1, hp2, lp, bands[4]; } sc[2];
+    bool hpOn = false, lpOn = false, bandOn[4] {};
     // dynamics state
     double env = 0.0, gr = 0.0, gr1 = 0.0, yl = 0.0, yr = 0.0;
     double genv = 0.0, ggr = 0.0;

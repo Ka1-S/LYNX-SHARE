@@ -708,6 +708,17 @@ lynx = Echoform
 preset = Mode=0.0415; Sync L=0.6248; Note L=0.4498; Feedback=0.125; Mix=0.25; Law=0
 names = SSL Native X-Echo; SSL X-Delay; Stellar Echo SD-201; Harrison_3DDelay
 
+# round 190lb: D16 Group Repeater (a tape / analog delay modeller, 0.1 .. 1000 ms per channel, feedback with its own
+# loop filters; the public manual, BLACKBOX_rodada190lb §7). Its code is PACE-encrypted and its trial expired before
+# any capture, and no saved state of it was available: spec-based, unscored. It plays the delay role's quarter-note
+# preset (as the other tape-style delays above do); its own settings are not translated
+[d16-repeater]
+product = Repeater
+vendor = D16 Group
+lynx = Echoform
+preset = Mode=0.0415; Sync L=0.6248; Note L=0.4498; Feedback=0.125; Mix=0.25; Law=0
+names = Repeater
+
 [complete-access-saturators]
 product = saturators (Slate Heatwave / Revival, SSL Fusion Vintage Drive / X-Saturator, Harrison Tape Saturator)
 vendor = Complete Access (role)
@@ -2514,11 +2525,7 @@ int translateSslVocalstrip2 (const std::vector<std::uint8_t>& state, EffectSlot&
         p[r::lmfGain] = gain (gMid * at ("LowMidEqGain", 0.0));
         // round 190ho: on the 4K G the ÷3 / ×3 switches act in its Pink EQ only (K4G_ir: Black with ÷3 or ×3 renders the
         // same as without); Pink takes them as its own switches (they move its centre ×0.24 / ×2.9, not ÷3 / ×3)
-        const bool pink = k4g && at ("EqType", 1.0) < 0.5;
         const bool div3 = ! k4g && at ("LowMidEqDiv3", 0.0) >= 0.5, mult3 = ! k4g && at ("HighMidEqMult3", 0.0) >= 0.5;
-        p[r::k4Pink] = pink ? 1.0f : 0.0f;
-        p[r::k4PinkDiv3] = pink && at ("LowMidEqDiv3", 0.0) >= 0.5 ? 1.0f : 0.0f;
-        p[r::k4PinkMult3] = pink && at ("HighMidEqMult3", 0.0) >= 0.5 ? 1.0f : 0.0f;
         p[r::lmfFreq] = logNorm (at ("LowMidEqFreq", 1.0) * 1000.0 / (div3 ? 3.0 : 1.0), 200.0, 2500.0);
         p[r::lmfQ] = r::k4QValue (at ("LowMidEqQ", 1.5));
         p[r::hmfGain] = gain (gMid * at ("HighMidEqGain", 0.0));
@@ -2530,6 +2537,39 @@ int translateSslVocalstrip2 (const std::vector<std::uint8_t>& state, EffectSlot&
         p[r::eqOn] = sw ("EqIn", true);
         // (the 4K G's Black = this console's Black; its Pink = the hidden Pink EQ above, the selector then reads Black)
         p[r::k4Colour] = r::k4ColourValue (k4g ? 1 : k4b ? 0 : (int) std::lround (at ("EqColour", 0.0)));
+        if (k4e && ! k4g && ! k4b)
+        {
+            // round 190lb (black-box, BLACKBOX_rodada190lb §3): the 4K E's high-pass is 18 dB/oct in Black and Orange
+            // (its trial's K4E_ir renders; Brown keeps the 12 dB/oct one this console was fitted with), from 14.8 Hz
+            const auto colour = (int) std::lround (at ("EqColour", 0.0));
+            if (colour >= 1)
+            {
+                p[r::k4eHpLaw] = 1.0f;
+                const auto hpE = at ("HighPassFreq", 10.0);
+                p[r::hpf] = hpE < 10.5 ? 0.0f : std::max (1e-4f, logNorm (hpE, 16.0, 350.0));
+            }
+        }
+        if (k4g)
+        {
+            // round 190lb (black-box, BLACKBOX_rodada190lb §2): the 4K G's EqType 0 = Pink (its default), 1 = Black. Pink
+            // is its own EQ (the 4K voicing's hidden Pink colour): the gains stay scaled onto the ±15 dials as above,
+            // the mid frequencies are the dials before ÷3 / ×3 (the switches go with them). Either colour: its own
+            // filters (an 18 dB/oct high-pass from 14.8 Hz, a low-pass up to 23.8 kHz; HighPassFreq 10 / LowPassFreq 35 =
+            // out) and its 1.1108 output ceiling (k4gLaw)
+            const bool pink = at ("EqType", 0.0) < 0.5;
+            p[r::k4Pink] = pink ? 1.0f : 0.0f;
+            p[r::k4gLaw] = 1.0f;
+            const auto hp4 = at ("HighPassFreq", 10.0), lp4 = at ("LowPassFreq", 35.0);
+            p[r::hpf] = hp4 < 10.5 ? 0.0f : std::max (1e-4f, logNorm (hp4, 16.0, 350.0));
+            p[r::lpf] = lp4 > 34.0 ? 0.0f : std::max (1e-4f, logNorm (lp4 * 1000.0, 22000.0, 3000.0));
+            if (pink)
+            {
+                p[r::lmfFreq] = logNorm (at ("LowMidEqFreq", 1.0) * 1000.0, 200.0, 2500.0);
+                p[r::hmfFreq] = logNorm (at ("HighMidEqFreq", 3.0) * 1000.0, 600.0, 7000.0);
+                p[r::k4LmfDiv3] = sw ("LowMidEqDiv3", false);
+                p[r::k4HmfMult3] = sw ("HighMidEqMult3", false);
+            }
+        }
         // round tp172c4: the B's ratio, compressor release and gate release are switch steps (its ratio: out, 2, 4, 10 : 1,
         // "ds"; its releases: "ds", .2, .4, .8, 1.6 s, auto — the two non-numbered ones read as the times whose static
         // curve they match), measured on its trial (K4B_dyn / K4B_mk / K4B_mic): every step compresses near-limiting,

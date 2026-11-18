@@ -556,12 +556,12 @@ vmatch::echannel::Settings consoleSettingsOf (const EffectParams& p) noexcept
     if (k4Voicing (p)) // round 148: the 4K console (its own Q scale, colour, mic pre, VCA, make-up, mix)
     {
         e.model = 1;
-        e.colour = on (p[k4Pink]) ? 3 : k4ColourIndex (p[k4Colour]); // round 190ho: Pink (hidden, set by the 4K G translation)
-        e.pinkDiv3 = on (p[k4PinkDiv3]);
-        e.pinkMult3 = on (p[k4PinkMult3]);
+        e.colour = k4ColourIndex (p[k4Colour]);
         e.lmfQ = k4Q (p[lmfQ]);
         e.hmfQ = k4Q (p[hmfQ]);
-        e.lpKHz = e.lpKHz >= 15.9 ? 0.0 : e.lpKHz;
+        e.k4g = on (p[k4gLaw]); // round 190lb: the SSL 4K G's own filters and ceiling
+        e.e18HighPass = on (p[k4eHpLaw]); // round 190lb: the SSL 4K E's Black / Orange high-pass
+        e.lpKHz = e.lpKHz >= 15.9 && ! e.k4g ? 0.0 : e.lpKHz;
         e.filtersBeforeDynamics = true;
         e.pre = on (p[k4Pre]);
         e.micDb = k4MicDb (p[k4Mic]);
@@ -569,6 +569,16 @@ vmatch::echannel::Settings consoleSettingsOf (const EffectParams& p) noexcept
         e.autoMakeup = on (p[autoMakeup]);
         e.makeupOffsetDb = k4OffsetDb (p[k4MakeupOffset]);
         e.compMix = std::clamp ((double) p[compMix], 0.0, 1.0);
+        if (on (p[k4Pink])) // round 190lb: the SSL 4K G's Pink colour, its dials in their own ranges
+        {
+            e.pink = true;
+            e.lfGain *= 18.0 / 15.0;
+            e.lmfGain *= 22.0 / 15.0;
+            e.hmfGain *= 22.0 / 15.0;
+            e.hfGain *= 20.0 / 15.0;
+            e.lmfDiv3 = on (p[k4LmfDiv3]);
+            e.hmfMult3 = on (p[k4HmfMult3]);
+        }
     }
     return e;
 }

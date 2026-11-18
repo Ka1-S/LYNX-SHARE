@@ -211,6 +211,8 @@ TEST (parity190ho_voice_shift_revision1_keeps_the_onset_out_of_the_formant_shift
     CHECK (r1 < r0 - 3.0);
 }
 
+// rollup 0.1.30 step 8: round 190lb's Pink EQ (one section per band, BLACKBOX_rodada190lb §2: K4G_ir Pink 6.73 against
+// this round's 6.50) replaced this round's; these two tests now check 190lb's code against this round's reference points
 TEST (parity190ho_ridge_4k_g_pink_is_translated_and_hidden)
 {
     using namespace lynx;
@@ -219,18 +221,18 @@ TEST (parity190ho_ridge_4k_g_pink_is_translated_and_hidden)
     auto p = tp172c::sslSlot ("SSL 4K G", "<PARAM id=\"EqType\" value=\"0.0\"/><PARAM id=\"LowMidEqFreq\" value=\"1.0\"/>"
                                          "<PARAM id=\"LowMidEqDiv3\" value=\"1.0\"/><PARAM id=\"HighMidEqFreq\" value=\"3.0\"/>"
                                          "<PARAM id=\"HighMidEqMult3\" value=\"1.0\"/><PARAM id=\"LowEqGain\" value=\"18.0\"/>").params;
-    CHECK (r::k4Voicing (p) && p[r::k4Pink] == 1.0f && p[r::k4PinkDiv3] == 1.0f && p[r::k4PinkMult3] == 1.0f);
+    CHECK (r::k4Voicing (p) && p[r::k4Pink] == 1.0f && p[r::k4LmfDiv3] == 1.0f && p[r::k4HmfMult3] == 1.0f);
     CHECK (std::abs (r::lmfHz (p[r::lmfFreq]) - 1000.0) < 0.5 && std::abs (r::hmfHz (p[r::hmfFreq]) - 3000.0) < 1.0); // the dials themselves
     CHECK (std::abs (r::bandGainDb (p[r::lfGain], false) - 15.0) < 1e-3); // ±18 onto the 4K's ±15, as for Black
     p = tp172c::sslSlot ("SSL 4K G", "<PARAM id=\"EqType\" value=\"1.0\"/><PARAM id=\"LowMidEqDiv3\" value=\"1.0\"/>").params;
-    CHECK (p[r::k4Pink] == 0.0f && p[r::k4PinkDiv3] == 0.0f && r::k4ColourIndex (p[r::k4Colour]) == 1);
+    CHECK (p[r::k4Pink] == 0.0f && p[r::k4LmfDiv3] == 0.0f && r::k4ColourIndex (p[r::k4Colour]) == 1);
     // the 4K E has no Pink: its colour selector as before
     p = tp172c::sslSlot ("SSL 4K E", "<PARAM id=\"EqColour\" value=\"2.0\"/><PARAM id=\"EqType\" value=\"0.0\"/>").params;
     CHECK (p[r::k4Pink] == 0.0f && r::k4ColourIndex (p[r::k4Colour]) == 2);
     // hidden: a new Ridge Strip and every project saved before have it off (0 is not saved)
     auto slot = makeEffectSlot (EffectKind::ridgeStrip);
     CHECK (slot.params[(std::size_t) r::k4Pink] == 0.0f && savedEffectParamCount (slot) <= (std::size_t) r::count);
-    CHECK ((int) r::k4Pink > (int) r::count && (int) r::k4PinkMult3 < maxEffectParams);
+    CHECK ((int) r::k4Pink > (int) r::count && (int) r::k4HmfMult3 < maxEffectParams);
 }
 
 TEST (parity190ho_ridge_4k_pink_follows_the_reference_curves)
@@ -239,7 +241,8 @@ TEST (parity190ho_ridge_4k_pink_follows_the_reference_curves)
     namespace ec = vmatch::echannel;
     ec::Settings s;
     s.model = 1;
-    s.colour = 3;
+    s.colour = 1;
+    s.pink = true; // (round 190lb's Settings: the gains in the G's own dB)
     s.autoMakeup = false;
     // [black-box] the 4K G trial's Pink impulse renders (tp172c K4G_ir), magnitudes in dB; the 4K's ±15 dB scale carries
     // the G's ±18 / ±22 / ±20 dials. Within 0.6 dB of the reference (the fits are within 0.02 … 0.4 dB rms)
@@ -257,23 +260,19 @@ TEST (parity190ho_ridge_4k_pink_follows_the_reference_curves)
         }
         return ok;
     };
-    s.lfGain = 15.0; s.lfHz = 200.0; // LF +18 at 200 Hz: steeper than Black, overshooting below 0 dB near 3 kHz
+    s.lfGain = 18.0; s.lfHz = 200.0; // LF +18 at 200 Hz: steeper than Black, overshooting below 0 dB near 3 kHz
     CHECK (near ({ { 31.0, 18.2 }, { 125.0, 16.7 }, { 315.0, 10.3 }, { 800.0, 3.3 }, { 3150.0, -1.2 }, { 12500.0, -0.1 } }));
     s.lfBell = true; // no Bell mode in Pink (the renders are identical)
     CHECK (near ({ { 31.0, 18.2 }, { 3150.0, -1.2 } }));
     s.lfGain = 0.0; s.lfBell = false;
-    s.lmfGain = 15.0; s.lmfKHz = 1.0; s.lmfQ = 1.5; // LMF +22 at 1 kHz
+    s.lmfGain = 22.0; s.lmfKHz = 1.0; s.lmfQ = 1.5; // LMF +22 at 1 kHz
     CHECK (near ({ { 200.0, 3.9 }, { 500.0, 11.3 }, { 800.0, 17.8 }, { 1250.0, 20.1 }, { 3150.0, 8.3 } }));
-    s.pinkDiv3 = true; // ÷3: the centre near 260 Hz (×0.24, not ÷3)
+    s.lmfDiv3 = true; // ÷3: the centre near 260 Hz (×0.24, not ÷3)
     CHECK (near ({ { 125.0, 11.8 }, { 200.0, 18.2 }, { 315.0, 19.5 }, { 800.0, 7.9 } }));
-    s.lmfGain = 0.0; s.pinkDiv3 = false;
-    s.hmfGain = -15.0; s.hmfKHz = 3.0; s.hmfQ = 1.5; // HMF -22 at 3 kHz
+    s.lmfGain = 0.0; s.lmfDiv3 = false;
+    s.hmfGain = -22.0; s.hmfKHz = 3.0; s.hmfQ = 1.5; // HMF -22 at 3 kHz
     CHECK (near ({ { 500.0, -3.1 }, { 1250.0, -9.6 }, { 3150.0, -21.4 }, { 8000.0, -9.8 } }));
     s.hmfGain = 0.0;
-    s.hfGain = -15.0; s.hfKHz = 8.0; // HF -20 at 8 kHz: a wide shelf with +1.7 dB of overshoot under 1 kHz
+    s.hfGain = -20.0; s.hfKHz = 8.0; // HF -20 at 8 kHz: a wide shelf with +1.7 dB of overshoot under 1 kHz
     CHECK (near ({ { 315.0, 0.8 }, { 800.0, 1.7 }, { 2000.0, -4.3 }, { 5000.0, -12.0 }, { 12500.0, -17.5 } }));
-    // the selector's colours are untouched (no second section)
-    s.colour = 1;
-    Biquad b;
-    CHECK (! ec::bandExtraBiquad (3, s, 48000.0, b));
 }

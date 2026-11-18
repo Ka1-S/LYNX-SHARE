@@ -157,10 +157,14 @@ enum Param
     // 0.25 s x the value), set by the Harrison 32Classic translation (its dial is a real time constant, 2.5 ms in Limiter
     // mode; Ridge has only the switch)
     compAttackFine,
-    // round 190ho, hidden the same way: the 4K voicing's Pink EQ (the SSL 4K G's own EQ, measured on its trial; core/VoiceMatch.cpp
-    // k4 Pink) in place of the colour selector's, and its LMF ÷3 / HMF ×3 switches — set by the 4K G translation (EQ Type
-    // Pink); 0 = the colour selector's EQ, so every project saved before plays as it did
-    k4Pink, k4PinkDiv3, k4PinkMult3
+    // round 190lb, hidden the same way (set only by the SSL 4K G translation; off = the old sound): the 4K voicing's
+    // Pink EQ colour (core/VoiceMatch.h echannel::Settings::pink: the gains then read ±18 / ±22 / ±20 dB from Ridge's
+    // ±15 dB dials, the LMF / HMF frequencies are the original's dials before its ÷3 / ×3 switches), those two switches,
+    // and k4gLaw: the 4K G's own filters (18 dB/oct high-pass, an uncramped low-pass up to 23.8 kHz) and its output
+    // ceiling (1.1108, both polarities)
+    k4Pink, k4LmfDiv3, k4HmfMult3, k4gLaw,
+    // round 190lb, hidden (set only by the SSL 4K E translation): its Black / Orange high-pass at 18 dB/oct (as measured)
+    k4eHpLaw
 };
 double compGrCapDb (float v) noexcept;   // 0 = no cap (a huge value), else 0 .. 60 dB
 double compAttackFineSeconds (float v) noexcept; // 0 .. 0.25 s
