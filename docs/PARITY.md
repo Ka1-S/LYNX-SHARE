@@ -4263,3 +4263,31 @@ the clipper itself costs nothing measurable.
 **Still off after 190lg:** the amps' 4 … 8-section EQs above 5 kHz (bell / shelf Q conventions), the transformers' dynamic
 knee, Broken Tube above −15 dBFS (−1.6 dB), why the Subtle / transformer styles skip the clipper (measured, not found
 statically); Power Amp / Breakdown keep round 150's characters (the law still scored them down: lab 2.17).
+
+## Round 190lg (Pro-Q 4 → Facet EQ): the automatic threshold on the reference's own structure (hidden revision)
+
+Static REA of Pro-Q 4's `BandCompander` (REA notes docs/analise/REA_rodada190lg.md): with Auto on, the band's detector
+reads its per-sample magnitude against a peak follower of itself (instant rise, 10 s fall, never under −40 dB), in dB,
+through the usual gain computer, and the reduction runs through three followers whose times come from the band's
+detection region (10 Hz … 20 kHz by default) and the attack / release knobs. Facet runs this as **revision 1** of its
+automatic threshold (hidden `facet::autoRevisionParam` = 125): the follower and its constants are the reference's; the
+threshold / knee mapping stays round 190js's fit (the reference's Auto buses were not traced: the band moves from |range|
+under the peak level over a knee of 1.53 × |range|, which the captures confirm with the new detector); the three followers'
+times are the reference's laws with scales fitted on the captures' gain trajectories (f1 × 0.65, f2 attack × 0.05, f2
+release × 0.6: mean trajectory error 0.33 → 0.16 dB over the −30 / −15 / +15 / +30 dB sweeps, tc + stairs). Only the
+Pro-Q 4 translator sets it; a project saved before keeps round 190js's law; a plain Facet is unchanged (Auto is hidden).
+
+| bank (new time-based scorer, before and after; before = fxrG) | files | before → after | up / same / down |
+|---|---|---|---|
+| refcap030 Pro-Q 4 grid2 (the Auto sweep: Dynamic Range × Threshold) | 50 | 6.90 → **7.50** | 15 / 35 / 0 |
+| · range −30 / −15 / +30 dB, time-constant probe | 5 each | 3 / 5 / 5 → **5 / 7 / 7** | 15 up |
+| grid / mode / pairs / sr44 / sr48 / sr96 | 30 / 39 / 36 / 15 / 15 / 15 | 9.33 / 8.74 / 9.19 / 9.27 / 9.27 / 9.73 = | 0 / 150 / 0 |
+| **refcap030 Pro-Q 4, all blocks** | 200 | 8.61 → **8.76** | 15 / 185 / 0 |
+| refcap182 programme | 25 | 9.40 → 9.40 | 0 / 25 / 0 (no Auto band) |
+| tp172b | 20 | 9.35 → 9.35 | 0 / 20 / 0 (no Auto band) |
+
+Old projects: `gold/gold.sh` (fxrender with the revision forced off against the base binary: the five Auto states, every
+sixth grid / pairs state, refcap182's Pro-Q 4 states; 44.1 / 48 / 96 kHz): 48 / 48 byte-identical. CPU (one Auto band,
+thread time, one pinned core, 20 s at 48 kHz, best of 5, three runs): 0.24 … 0.26 % → 0.27 … 0.32 % of a core. Not built:
+the reference's start-up follower (its count's setter was not traced) and the band's own detection range (Facet has none:
+the reference's default is used for the times).
