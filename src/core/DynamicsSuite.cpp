@@ -2398,7 +2398,8 @@ namespace
 // lab build only: LYNX_MBLAB="key=value …" scales the laws (fitting on the bank; never in a product build)
 struct MbLab
 {
-    double aAtk = 1, aRel = 1, bAtk = 1, bRel = 1, p6 = 1, hold = 1, lead = 1, lpOrder = 2, soft = 1, oldSoft = 0, relFit = 1;
+    double aAtk = 1, aRel = 1, bAtk = 1, bRel = 1, p6 = 1, hold = 1, lead = 1, lpOrder = 2, soft = 1, oldSoft = 0;
+    double inv = 1, invSlope = 0, invW = 1;
     MbLab()
     {
         if (const char* e = std::getenv ("LYNX_MBLAB"))
@@ -2418,7 +2419,8 @@ struct MbLab
                     const auto v = std::atof (kv.c_str() + eq + 1);
                     double* f = k == "aAtk" ? &aAtk : k == "aRel" ? &aRel : k == "bAtk" ? &bAtk : k == "bRel" ? &bRel : k == "p6" ? &p6
                               : k == "hold" ? &hold : k == "lead" ? &lead : k == "lp" ? &lpOrder : k == "soft" ? &soft
-                              : k == "oldSoft" ? &oldSoft : k == "relFit" ? &relFit : nullptr;
+                              : k == "oldSoft" ? &oldSoft : k == "inv" ? &inv
+                              : k == "invSlope" ? &invSlope : k == "invW" ? &invW : nullptr;
                     if (f != nullptr)
                         *f = v;
                 }
@@ -2430,13 +2432,13 @@ struct MbLab
 const MbLab& mbLab() { static const MbLab l; return l; }
 #endif
 // the release knob (0 … 1) in seconds: LYNX's own smooth law fitted to the shape of the reference's curve (5 ms … 5 s:
-// a quadratic rise, then a steep step around 86 % into the long times)
+// a power-law rise, then a steep step around 88 % into the long times; fitted on 15 … 100 %, within 13 % there)
 double mbReleaseS (float v) noexcept
 {
     const auto x = (double) std::clamp (v, 0.0f, 1.0f);
-    const auto step = [] (double t) { return 1.0 / (1.0 + std::exp (-(t - 0.86) / 0.035)); };
+    const auto step = [] (double t) { return 1.0 / (1.0 + std::exp (-(t - 0.878) / 0.044)); };
     const auto lo = step (0.0), hi = step (1.0);
-    return 0.005 + 1.76 * x * x + (4.995 - 1.76) * (step (x) - lo) / (hi - lo);
+    return 0.005 + 1.64 * std::pow (x, 1.87) + (4.995 - 1.64) * (step (x) - lo) / (hi - lo);
 }
 // the band's detector lead (ms) under the reference's look-ahead switch: half a period of the band's centre (at most 5 ms)
 // plus the band's own look-ahead, 0.1 … 20 ms
@@ -2457,6 +2459,17 @@ double mbReduction (double over, double squeeze, double knee, double range, doub
     }
     return std::max (0.0, std::min (g, range));
 }
+// the inverted modes' gain computer (0 … 36 dB): below the threshold, a one-sided knee (the overshoot's square inside the
+// knee's width, then the overshoot − half the width) × (ratio − 1), the soft range of the knee's width under 36 dB
+double mbBelow (double under, double slope, double knee) noexcept
+{
+    if (under <= 0.0)
+        return 0.0;
+    auto v = under - 0.5 * knee;
+    if (knee > 1.1920928955078125e-07 && v <= 0.5 * knee)
+        v = under / knee * (under / knee) * (0.5 * knee);
+    return mbReduction (v * slope, 1.0, 0.0, 36.0, knee);
+}
 // one detector channel's state
 struct MbDetector
 {
@@ -2474,7 +2487,9 @@ struct MbDetector
 struct MbBand
 {
     bool on = false;
+    bool inverted = false;       // upward compression / downward expansion: the graph runs on 36 − the detector's output
     double sign = -1.0, thr = 0.0, squeeze = 0.0, knee = 0.0, range = 0.0, soft = 12.0;
+    double slope = 1.0, scale = 1.0, relA = 0.0, rel = 0.0;
     int holdN = 0;
     int lpOrder = 2;             // the low pass: two-pole Butterworth (1: one pole; the lab compares)
     double lp[5] { 1, 0, 0, 0, 0 }; // b0, b1, b2, a1, a2 (one pole: lp[0] = its coefficient)
@@ -3359,12 +3374,19 @@ private:
         auto& m = mb[(std::size_t) b];
         const auto rng = rangeDb (at (fRange));
         const bool expand = on (at (fMode));
-        // the graph rebuilt here: a downward compressor or an upward expander (the reference's other two modes run an
-        // inverted graph; they keep the measured detector)
-        if (std::abs (rng) < 0.01 || expand != (rng > 0.0))
+        if (std::abs (rng) < 0.01)
             return;
+        // a downward compressor or an upward expander runs the graph on the detector's reduction; an upward compressor
+        // or a downward expander on 36 dB − it (the detector then reads how far the level is under the threshold)
+        m.inverted = expand != (rng > 0.0);
+#ifdef LYNX_MBLAB
+        if (m.inverted && mbLab().inv < 0.5)
+            return;
+#endif
         m.on = true;
         m.sign = rng > 0.0 ? 1.0 : -1.0;
+        m.slope = ratioOf (at (fRatio)) - 1.0;
+        m.scale = std::abs (rng) / 36.0;
         m.thr = thresholdDb (at (fThreshold));
         m.squeeze = isInfiniteRatio (at (fRatio)) ? 1.0 : 1.0 - 1.0 / ratioOf (at (fRatio));
         m.knee = kneeDb (at (fKnee));
@@ -3384,6 +3406,8 @@ private:
         m.fb.rel = rel;
         m.fb.p5 = 1.0 - 0.7 * slow;
         m.fb.p6 = 0.1 * rel;
+        m.rel = rel;
+        m.relA = m.inverted ? 0.007 : 0.0; // follower B's release grows with follower A (s per dB)
         m.lpOrder = 2;
 #ifdef LYNX_MBLAB
         const auto& lab = mbLab();
@@ -3391,8 +3415,12 @@ private:
         m.fa.rel *= lab.aRel;
         m.fb.att *= lab.bAtk;
         m.fb.rel *= lab.bRel;
+        m.rel *= lab.bRel;
         m.fb.p6 *= lab.p6;
         holdMs *= lab.hold;
+        m.relA *= lab.invW;
+        if (lab.invSlope > 0.5) // the slope read as the gain's own (ratio − 1 per dB under the threshold)
+            m.slope /= m.scale;
         m.lpOrder = (int) lab.lpOrder;
         m.soft *= lab.soft;
         if (lab.oldSoft > 0.5)
@@ -3415,10 +3443,11 @@ private:
     }
 
     // round 190lg: one sample of revision 1's graph for a detector channel reading magnitude x; returns the gain (dB)
-    double runRevision1 (const MbBand& m, MbDetector& d, double x) noexcept
+    double runRevision1 (MbBand& m, MbDetector& d, double x) noexcept
     {
         const auto level = std::max (-180.0, 20.0 * std::log10 (x + 1e-30));
-        auto g = mbReduction (level - m.thr, m.squeeze, m.knee, m.range, m.soft);
+        auto g = m.inverted ? 36.0 - mbBelow (m.thr - level, m.slope, m.knee)
+                            : mbReduction (level - m.thr, m.squeeze, m.knee, m.range, m.soft);
         g = d.hold.push (g, m.holdN);
         if (m.lpOrder == 1)
             g = d.lp1 += (g - d.lp1) * m.lp[0];
@@ -3430,8 +3459,10 @@ private:
             g = y;
         }
         crest::v2Step (d.a, g, m.fa, sr, d.ka);
+        if (m.inverted)
+            m.fb.rel = m.rel + m.relA * d.a;
         crest::v2Step (d.b, std::max (d.a, g), m.fb, sr, d.kb);
-        return m.sign * d.b;
+        return m.inverted ? m.sign * m.scale * (36.0 - d.b) : m.sign * d.b;
     }
 
     void configure (const EffectParams& p) noexcept
