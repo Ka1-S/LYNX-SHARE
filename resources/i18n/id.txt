@@ -4337,6 +4337,7 @@ countries: id
 "Measured effect characters" = "Karakter efek terukur"
 "Brown|Black|Orange" = "Brown|Black|Orange"
 "4K console" = "4K console"
+"32C console" = "Konsol 32C"
 "Mic pre" = "Mic pre"
 "Mic" = "Mic"
 "Vocal detector" = "Detektor vokal"

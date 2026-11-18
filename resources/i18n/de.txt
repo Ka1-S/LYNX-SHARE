@@ -4337,6 +4337,7 @@ countries: de at ch li lu
 "Measured effect characters" = "Gemessene Effektcharaktere"
 "Brown|Black|Orange" = "Braun|Schwarz|Orange"
 "4K console" = "4K-Konsole"
+"32C console" = "32C-Konsole"
 "Mic pre" = "Mic-Pre"
 "Mic" = "Mic"
 "Vocal detector" = "Vocal-Detektor"

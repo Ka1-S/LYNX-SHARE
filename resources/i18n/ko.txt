@@ -4337,6 +4337,7 @@ countries: kr
 "Measured effect characters" = "측정된 이펙트 캐릭터"
 "Brown|Black|Orange" = "브라운|블랙|오렌지"
 "4K console" = "4K 콘솔"
+"32C console" = "32C 콘솔"
 "Mic pre" = "마이크 프리"
 "Mic" = "마이크"
 "Vocal detector" = "보컬 디텍터"

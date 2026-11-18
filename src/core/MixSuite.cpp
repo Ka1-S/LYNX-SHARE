@@ -77,6 +77,7 @@ struct OnePoleHp
         b1 = -b0;
         a1 = (k - 1.0) / (k + 1.0);
     }
+    void bypass() noexcept { b0 = 1.0; b1 = a1 = 0.0; } // round 190le: a pass-through (the 32C's high-pass is second order)
     void reset() noexcept { x1[0] = x1[1] = y1[0] = y1[1] = 0.0; }
     float process (float x, int ch) noexcept
     {
@@ -435,6 +436,126 @@ double autoMakeupDb (const EffectParams& p) noexcept
     return vmatch::echannel::compMakeupDb (e);
 }
 
+// ---- round 190le: the 32C voicing's scales. The dial positions are the original's host parameters (refcap0124's
+// table: its own texts at ninths of the travel); the band laws were measured on tp172c's H32_eq impulse grid
+// (BLACKBOX_rodada190lb.md §4, lab fits in /mnt/e/lynx-work/harrison190le/lab)
+bool h32Voicing (const EffectParams& p) noexcept
+{
+    return on (p[h32]) && ! modernVoicing (p) && ! k4Voicing (p) && ! eVoicing (p) && ! vocalVoicing (p);
+}
+namespace
+{
+// a law through knots at equal steps of the dial, interpolated on the logarithm (exactly invertible)
+template <std::size_t N>
+double logKnots (float v, const double (&hz)[N]) noexcept
+{
+    const auto x = (double) std::clamp (v, 0.0f, 1.0f) * (double) (N - 1);
+    const auto i = std::min ((std::size_t) x, N - 2);
+    return hz[i] * std::pow (hz[i + 1] / hz[i], x - (double) i);
+}
+template <std::size_t N>
+float logKnotsValue (double f, const double (&hz)[N]) noexcept
+{
+    if (! (f > hz[0])) return 0.0f;
+    if (f >= hz[N - 1]) return 1.0f;
+    std::size_t i = 0;
+    while (i + 2 < N && f > hz[i + 1]) ++i;
+    return (float) (((double) i + std::log (f / hz[i]) / std::log (hz[i + 1] / hz[i])) / (double) (N - 1));
+}
+// the original's texts at ninths of the travel (host parameter table)
+constexpr double kH32Hpf[9] { 25.0, 33.0, 85.0, 215.0, 456.0, 841.0, 1400.0, 2160.0, 3150.0 };
+constexpr double kH32Lpf[9] { 160.0, 212.0, 538.0, 1360.0, 2900.0, 5340.0, 8880.0, 13710.0, 20000.0 };
+constexpr double kH32Lmf[9] { 103.586, 210.0, 311.709, 414.0, 608.74, 950.0, 1778.5, 2980.0, 4366.39 };
+constexpr double kH32Hmf[9] { 270.697, 427.0, 711.314, 996.0, 1421.74, 2050.0, 3544.21, 5780.0, 8000.0 };
+// the end bands in Bell mode: the saved dial at quarters of the travel (tp172c states; the bell sits there exactly)
+constexpr double kH32LoBell[5] { 18.9487, 58.8066, 111.355, 369.313, 798.73 };
+constexpr double kH32HiBell[5] { 689.048, 1389.53, 3618.97, 9021.65, 14497.6 };
+// the bells' gain taper: |gain| at |2 (v - 0.5)| (the measured dials 0.3 / 0.7 / 1 and the table's 0.5 / 0.75)
+constexpr double kH32TaperX[6] { 0.0, 0.3, 0.5, 0.7, 0.75, 1.0 };
+constexpr double kH32TaperDb[6] { 0.0, 2.490617, 4.5, 6.936618, 7.8, 13.737392 };
+// monotone cubic through the taper's knots (Fritsch–Butland weighted harmonic slopes, as PCHIP)
+double taperDb (double x) noexcept
+{
+    constexpr int n = 6;
+    x = std::clamp (x, 0.0, 1.0);
+    double d[n - 1], m[n];
+    for (int k = 0; k < n - 1; ++k)
+        d[k] = (kH32TaperDb[k + 1] - kH32TaperDb[k]) / (kH32TaperX[k + 1] - kH32TaperX[k]);
+    m[0] = d[0];
+    m[n - 1] = d[n - 2];
+    for (int k = 1; k < n - 1; ++k)
+    {
+        const double h0 = kH32TaperX[k] - kH32TaperX[k - 1], h1 = kH32TaperX[k + 1] - kH32TaperX[k];
+        const double w1 = 2.0 * h1 + h0, w2 = h1 + 2.0 * h0;
+        m[k] = d[k - 1] * d[k] <= 0.0 ? 0.0 : (w1 + w2) / (w1 / d[k - 1] + w2 / d[k]);
+    }
+    int k = 0;
+    while (k < n - 2 && x > kH32TaperX[k + 1]) ++k;
+    const double h = kH32TaperX[k + 1] - kH32TaperX[k], t = (x - kH32TaperX[k]) / h, t2 = t * t, t3 = t2 * t;
+    return (2 * t3 - 3 * t2 + 1) * kH32TaperDb[k] + (t3 - 2 * t2 + t) * h * m[k] + (-2 * t3 + 3 * t2) * kH32TaperDb[k + 1]
+           + (t3 - t2) * h * m[k + 1];
+}
+} // namespace
+double h32HpfHz (float v) noexcept { return v <= 0.0f ? 0.0 : logKnots (v, kH32Hpf); }
+double h32LpfHz (float v) noexcept { return v <= 0.0f ? 0.0 : logKnots (1.0f - v, kH32Lpf); }
+double h32LmfHz (float v) noexcept { return logKnots (v, kH32Lmf); }
+double h32HmfHz (float v) noexcept { return logKnots (v, kH32Hmf); }
+// the shelves' centres: straight lines in the dial, broken at its middle (the table: 25 / 145 / 1500 Hz, 400 / 2650 / 10000 Hz)
+double h32LfHz (float v, bool bell) noexcept
+{
+    const auto x = (double) std::clamp (v, 0.0f, 1.0f);
+    return bell ? logKnots (v, kH32LoBell) : x <= 0.5 ? 25.0 + 240.0 * x : 145.0 + 2710.0 * (x - 0.5);
+}
+double h32HfHz (float v, bool bell) noexcept
+{
+    const auto x = (double) std::clamp (v, 0.0f, 1.0f);
+    return bell ? logKnots (v, kH32HiBell) : x <= 0.5 ? 400.0 + 4500.0 * x : 2650.0 + 14700.0 * (x - 0.5);
+}
+double h32ShelfDb (float v) noexcept { return 27.0 * ((double) std::clamp (v, 0.0f, 1.0f) - 0.5); }
+double h32BellDb (float v) noexcept
+{
+    const auto x = 2.0 * ((double) std::clamp (v, 0.0f, 1.0f) - 0.5);
+    return std::copysign (taperDb (std::abs (x)), x);
+}
+// fitted on the bells of the grid (0.525 / 0.57 / 0.75 at 2.49 / 6.94 / 13.74 dB, the same for every band)
+double h32Q (double gainDb) noexcept
+{
+    const auto g = std::min (std::abs (gainDb), 13.74);
+    return 0.5248794 - 0.00356832 * g + 0.00145216 * g * g;
+}
+float h32HpfValue (double hz) noexcept { return std::max (1e-4f, logKnotsValue (hz, kH32Hpf)); }
+float h32LpfValue (double hz) noexcept { return std::max (1e-4f, 1.0f - logKnotsValue (hz, kH32Lpf)); }
+float h32LmfValue (double hz) noexcept { return logKnotsValue (hz, kH32Lmf); }
+float h32HmfValue (double hz) noexcept { return logKnotsValue (hz, kH32Hmf); }
+float h32LfValue (double bellHz) noexcept { return logKnotsValue (bellHz, kH32LoBell); }
+float h32HfValue (double bellHz) noexcept { return logKnotsValue (bellHz, kH32HiBell); }
+float h32GainValue (double dialDb) noexcept
+{
+    const auto a = std::min (std::abs (dialDb), kH32TaperDb[5]);
+    double lo = 0.0, hi = 1.0; // the taper rises: bisection
+    for (int i = 0; i < 40; ++i)
+    {
+        const auto mid = 0.5 * (lo + hi);
+        (taperDb (mid) < a ? lo : hi) = mid;
+    }
+    return (float) (0.5 + std::copysign (0.25 * (lo + hi), dialDb));
+}
+std::vector<std::pair<int, float>> linkedEdit (const EffectParams& p, int param, float value)
+{
+    std::vector<std::pair<int, float>> edits { { param, value } };
+    if (! on (value))
+        return edits;
+    if (param == h32)
+    {
+        for (const int other : { (int) modern, (int) console4k, (int) voicing })
+            if (on (p[(std::size_t) other]))
+                edits.push_back ({ other, 0.0f });
+    }
+    else if ((param == modern || param == console4k || param == voicing) && on (p[h32]))
+        edits.push_back ({ (int) h32, 0.0f });
+    return edits;
+}
+
 // round 145: the Vocal strip voicing's settings (the reference's own laws, core/VoxStrip.h)
 voxstrip::Settings vocalSettings (const EffectParams& p) noexcept
 {
@@ -482,6 +603,11 @@ struct EqDesign
 
     void design (const EffectParams& p, double sr)
     {
+        if (h32Voicing (p)) // round 190le: the 32C voicing's own EQ
+        {
+            design32 (p, sr);
+            return;
+        }
         const bool black = on (p[curve]);
         hpOn = p[hpf] > 0.0f;
         lpOn = p[lpf] > 0.0f;
@@ -515,6 +641,106 @@ struct EqDesign
 
     // "black" bells: proportional Q — wide for small boosts / cuts, narrower as the gain grows
     static double propQ (double q, double gainDb) { return std::max (0.2, q * (0.5 + std::abs (gainDb) / 12.0)); }
+
+    // ---- round 190le: the 32C voicing (Harrison 32Classic, measured on tp172c's H32_eq impulse grid at 48 kHz; every
+    // law below reproduced the 148 renders within 0.05 dB rms, lab /mnt/e/lynx-work/harrison190le/lab):
+    //  - filters: second-order Butterworth high- / low-pass at the dial, magnitude-matched (no bilinear cramping: the
+    //    20 kHz low-pass is -2.4 dB at 18 kHz, as the original's always-in default);
+    //  - Lo: a first-order shelf (analog (s + wc sqrtG) / (s + wc / sqrtG)), bilinear, prewarped at its centre;
+    //  - Hi: a first-order shelf whose magnitude equals the analog one at DC, at its centre and at Nyquist;
+    //  - bells (the mids, and the end bands in Bell mode): magnitude-matched peaking filters at the dial, Q(|gain|).
+    // M. Vicanek, "Matched Second Order Digital Filters" (2016) for the matched sections; the first-order match is the
+    // same idea with one pole (three magnitude conditions, a closed-form quadratic for the pole)
+    void design32 (const EffectParams& p, double sr)
+    {
+        hpOn = p[hpf] > 0.0f;
+        lpOn = p[lpf] > 0.0f;
+        hp1.bypass();
+        if (hpOn)
+            matchedPass (hp2, sr, h32HpfHz (p[hpf]), true);
+        if (lpOn)
+            matchedPass (lp, sr, h32LpfHz (p[lpf]), false);
+        const bool loBell = on (p[lfBell]), hiBell = on (p[hfBell]);
+        if (loBell)
+            bell32 (lf, sr, h32LfHz (p[lfFreq], true), h32BellDb (p[lfGain]));
+        else
+            lowShelf32 (lf, sr, h32LfHz (p[lfFreq], false), h32ShelfDb (p[lfGain]));
+        if (hiBell)
+            bell32 (hf, sr, h32HfHz (p[hfFreq], true), h32BellDb (p[hfGain]));
+        else
+            highShelf32 (hf, sr, h32HfHz (p[hfFreq], false), h32ShelfDb (p[hfGain]));
+        bell32 (lmf, sr, h32LmfHz (p[lmfFreq]), h32BellDb (p[lmfGain]));
+        bell32 (hmf, sr, h32HmfHz (p[hmfFreq]), h32BellDb (p[hmfGain]));
+    }
+
+    // the poles of an analog second-order section (s^2 + 2 zeta s + 1 at w0) by z = e^(sT)
+    static void matchedPoles (double w0, double zeta, double& a1, double& a2) noexcept
+    {
+        a1 = zeta <= 1.0 ? -2.0 * std::exp (-zeta * w0) * std::cos (std::sqrt (1.0 - zeta * zeta) * w0)
+                         : -2.0 * std::exp (-zeta * w0) * std::cosh (std::sqrt (zeta * zeta - 1.0) * w0);
+        a2 = std::exp (-2.0 * zeta * w0);
+    }
+
+    // Butterworth (Q 1/sqrt 2) high- / low-pass, magnitude-matched at DC, the corner and Nyquist (Vicanek's HP / LP)
+    static void matchedPass (Biquad& b, double sr, double hz, bool high) noexcept
+    {
+        constexpr double q = 0.70710678118654752;
+        const double w0 = 2.0 * pi * std::clamp (hz, 1.0, sr * 0.49) / sr;
+        double a1, a2;
+        matchedPoles (w0, 0.5 / q, a1, a2);
+        const double A0 = (1.0 + a1 + a2) * (1.0 + a1 + a2), A1 = (1.0 - a1 + a2) * (1.0 - a1 + a2), A2 = -4.0 * a2;
+        const double p1 = std::sin (w0 / 2.0) * std::sin (w0 / 2.0), p0 = 1.0 - p1, p2 = 4.0 * p0 * p1;
+        if (high)
+        {
+            const double b0 = q * std::sqrt (std::max (A0 * p0 + A1 * p1 + A2 * p2, 0.0)) / (4.0 * p1);
+            b.set (b0, -2.0 * b0, b0, 1.0, a1, a2);
+            return;
+        }
+        const double R1 = (A0 * p0 + A1 * p1 + A2 * p2) * q * q;
+        const double B0 = A0, B1 = (R1 - B0 * p0) / p1;
+        const double b0 = 0.5 * (std::sqrt (B0) + std::sqrt (std::max (B1, 0.0)));
+        b.set (b0, std::sqrt (B0) - b0, 0.0, 1.0, a1, a2);
+    }
+
+    static void bell32 (Biquad& b, double sr, double hz, double db) noexcept
+    {
+        if (std::abs (db) < 1e-4)
+            b.set (1.0, 0.0, 0.0, 1.0, 0.0, 0.0);
+        else
+            voxstrip::matchedPeak (b, sr, hz, h32Q (db), db);
+    }
+
+    static void lowShelf32 (Biquad& b, double sr, double centreHz, double db) noexcept
+    {
+        const double g = std::sqrt (dbToGain (db)), wc = 2.0 * pi * std::min (centreHz, sr * 0.45);
+        const double wz = wc * g, wp = wc / g, k = wc / std::tan (wc / (2.0 * sr));
+        b.set (k + wz, wz - k, 0.0, k + wp, wp - k, 0.0);
+    }
+
+    static void highShelf32 (Biquad& b, double sr, double centreHz, double db) noexcept
+    {
+        if (std::abs (db) < 1e-4)
+        {
+            b.set (1.0, 0.0, 0.0, 1.0, 0.0, 0.0);
+            return;
+        }
+        // analog |H|^2 = G^2 (w^2 + wz^2) / (w^2 + wp^2), wz = wc / sqrtG, wp = wc sqrtG: 1 at DC, G at the centre
+        const double G = dbToGain (db), sg = std::sqrt (G), wc = 2.0 * pi * std::min (centreHz, sr * 0.45);
+        const double wz = wc / sg, wp = wc * sg, wn = pi * sr;
+        const double hn = G * G * (wn * wn + wz * wz) / (wn * wn + wp * wp), hm = G;
+        const double phi = std::sin (wc / (2.0 * sr)) * std::sin (wc / (2.0 * sr));
+        // |1 + a1 z^-1|^2 = (1 + a1)^2 - 4 a1 phi (phi = sin^2 (w / 2)); the three conditions give a1^2 + B a1 + 1 = 0
+        const double P = (1.0 - phi) - hm, Q = hn * phi;
+        const double B = (2.0 * P - 2.0 * Q + 4.0 * hm * phi) / (P + Q);
+        if (! std::isfinite (B) || B * B <= 4.0)
+        {
+            lowShelf32 (b, sr, centreHz, 0.0); // (never with the original's ranges) flat rather than unstable
+            return;
+        }
+        const double big = 0.5 * (-B - std::copysign (std::sqrt (B * B - 4.0), B)), a1 = 1.0 / big;
+        const double s = 1.0 + a1, d = std::sqrt (hn) * (1.0 - a1);
+        b.set (0.5 * (s + d), 0.5 * (s - d), 0.0, 1.0, a1, 0.0);
+    }
 };
 } // namespace
 
@@ -4234,6 +4460,27 @@ std::string modernParamText (int param, float v)
     }
 }
 
+// round 190le: the 32C voicing's read-outs (the original's own dials; the end bands read the shelf's centre and plateau,
+// or in Bell mode the bell's frequency and peak, as its panel does)
+std::string h32ParamText (int param, float v, const EffectParams& p)
+{
+    switch (param)
+    {
+        case hpf: return v <= 0.0f ? "off" : hzText (h32HpfHz (v));
+        case lpf: return v <= 0.0f ? "off" : hzText (h32LpfHz (v));
+        case lfGain: return fmt ("%+.1f dB", on (p[lfBell]) ? h32BellDb (v) : h32ShelfDb (v));
+        case hfGain: return fmt ("%+.1f dB", on (p[hfBell]) ? h32BellDb (v) : h32ShelfDb (v));
+        case lmfGain: case hmfGain: return fmt ("%+.1f dB", h32BellDb (v));
+        case lfFreq: return hzText (h32LfHz (v, on (p[lfBell])));
+        case hfFreq: return hzText (h32HfHz (v, on (p[hfBell])));
+        case lmfFreq: return hzText (h32LmfHz (v));
+        case hmfFreq: return hzText (h32HmfHz (v));
+        case lmfQ: case hmfQ: case curve: return "-";
+        case h32: return on (v) ? "32C console" : "off";
+        default: return paramText (EffectKind::ridgeStrip, param, v);
+    }
+}
+
 std::string vocalParamText (int param, float v)
 {
     namespace vs = voxstrip;
@@ -4320,6 +4567,7 @@ std::string paramText (EffectKind kind, int param, float v)
             case order: return on (v) ? "dyn > EQ" : "EQ > dyn";
             case voicing: return on (v) ? "E console" : "classic";
             case console4k: return on (v) ? "4K console" : "off";
+            case h32: return on (v) ? "32C console" : "off"; // round 190le
             case modern: case compPeak: case gateHold: return modernParamText (param, v); // round tp172c
             case k4Colour: case k4Mic: case k4MakeupOffset: return k4ParamText (param, v);
             case filterSplit: return on (v) ? "split" : "with EQ";

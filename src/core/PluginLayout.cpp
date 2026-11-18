@@ -1882,15 +1882,21 @@ Layout ridgeStrip()
         v.push_back (section (4, y, 276, 98, names[b]));
         v.push_back (dial (54, y + 44.0f, 36, gains[b], TR_NOOP ("Gain"), bipolar));
         v.push_back (dial (140, y + 44.0f, 36, freqs[b], TR_NOOP ("Freq")));
-        if (b == 1 || b == 2)
-            v.push_back (dial (226, y + 44.0f, 30, extra[b], TR_NOOP ("Q")));
+        if (b == 1 || b == 2) // (round 190le: the 32C's mid bands have no Q control: their Q follows the gain)
+            v.push_back (when (dial (226, y + 44.0f, 30, extra[b], TR_NOOP ("Q")), "32C voicing", 0.0f, 0.5f));
         else
             v.push_back (toggle (194, y + 34.0f, 72, 20, extra[b], TR_NOOP ("Bell")));
     }
     v.push_back (section (4, 520, 276, 124, TR_NOOP ("Equalizer")));
     // round 165: the Brown / Black curves are Ridge's own engine's (the E console voicing has the console's one curve)
     // (round tp172c: two conditions at most — the 4K and Modern voicings; in the E voicing the curve has no effect)
-    v.push_back (when (when (tabs (10, 548, 150, 20, "EQ curve", TR_NOOP ("Brown|Black")), "4K voicing", 0.0f, 0.5f), "Modern voicing", 0.0f, 0.5f));
+    {
+        auto c = when (when (tabs (10, 548, 150, 20, "EQ curve", TR_NOOP ("Brown|Black")), "4K voicing", 0.0f, 0.5f), "Modern voicing", 0.0f, 0.5f);
+        c.idleParam = "32C voicing"; // round 190le: the 32C voicing has its own curve (dimmed: it does nothing there)
+        c.idleMin = 0.5f;
+        c.idleMax = 1.0f;
+        v.push_back (c);
+    }
     // round tp172c: the Modern voicing (the console measured on the SSL Native Channel Strip 2 trial) — the curve picks its
     // E / G EQ type; its compressor's peak detector, the gate's hold and the make-up offset join the dynamics
     v.push_back (when (tabs (10, 548, 150, 20, "EQ curve", TR_NOOP ("E type|G type")), "Modern voicing", 0.5f, 1.0f));
@@ -1902,6 +1908,9 @@ Layout ridgeStrip()
     // its gain, the make-up offset; the rest of the panel drives it with the console's own scales
     v.push_back (when (when (tabs (10, 548, 150, 20, "EQ colour", TR_NOOP ("Brown|Black|Orange")), "4K voicing", 0.5f, 1.0f), "Modern voicing", 0.0f, 0.5f));
     v.push_back (toggle (170, 584, 104, 20, "4K voicing", TR_NOOP ("4K console")));
+    // round 190le: the 32C voicing (Ridge's own engine with the EQ measured on the Harrison 32Classic trial: its filters,
+    // first-order shelves and matched bells; the EQ dials read the original's) — a switch like the 4K and Modern ones
+    v.push_back (toggle (10, 620, 150, 20, "32C voicing", TR_NOOP ("32C console")));
     v.push_back (when (when (dial (652, 52, 24, "Make-up offset", TR_NOOP ("Offset"), bipolar), "4K voicing", 0.5f, 1.0f), "Modern voicing", 0.0f, 0.5f));
     v.push_back (toggle (170, 548, 104, 20, "EQ on", TR_NOOP ("EQ in")));
     // round 123: the voicing — Ridge's own engine, or the measured E-type console (substitutes start there)
@@ -4674,6 +4683,8 @@ int stateIndex (EffectKind kind, int param)
 
 const char* paramName (EffectKind kind, int index)
 {
+    if (const auto* hidden = hiddenEffectParamName (kind, index)) // round 190le: a hidden parameter with a control
+        return hidden;
     if (index < 0 || index >= paramCount (kind))
         return "";
     if (const auto s = stateIndex (kind, index); s >= 0)
@@ -4692,7 +4703,7 @@ int paramIndex (EffectKind kind, const char* name)
     if (const auto* table = stateparams::tableFor (kind))
         if (const auto s = table->index (name); s >= 0)
             return (int) params.size() + s;
-    return -1;
+    return hiddenEffectParamIndex (kind, name); // round 190le
 }
 
 float stateValue01 (EffectKind kind, int param, const std::vector<std::uint8_t>& state)

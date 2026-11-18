@@ -4337,6 +4337,7 @@ countries: es mx ar co cl pe ve
 "Measured effect characters" = "Caracteres de efecto medidos"
 "Brown|Black|Orange" = "Marrón|Negro|Naranja"
 "4K console" = "Consola 4K"
+"32C console" = "Consola 32C"
 "Mic pre" = "Previo de micro"
 "Mic" = "Micro"
 "Vocal detector" = "Detector vocal"

@@ -4337,6 +4337,7 @@ countries: nl be
 "Measured effect characters" = "Gemeten effectkarakters"
 "Brown|Black|Orange" = "Brown|Black|Orange"
 "4K console" = "4K console"
+"32C console" = "32C-console"
 "Mic pre" = "Mic pre"
 "Mic" = "Mic"
 "Vocal detector" = "Zangdetector"

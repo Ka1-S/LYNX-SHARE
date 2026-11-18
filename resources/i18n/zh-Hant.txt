@@ -4337,6 +4337,7 @@ countries: tw hk mo
 "Measured effect characters" = "實測效果特性"
 "Brown|Black|Orange" = "Brown|Black|Orange"
 "4K console" = "4K調音台"
+"32C console" = "32C調音台"
 "Mic pre" = "麥克風前級"
 "Mic" = "麥克風"
 "Vocal detector" = "人聲偵測器"

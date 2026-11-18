@@ -4337,6 +4337,7 @@ countries: pl
 "Measured effect characters" = "Zmierzone charaktery efektu"
 "Brown|Black|Orange" = "Brown|Black|Orange"
 "4K console" = "Konsola 4K"
+"32C console" = "Konsola 32C"
 "Mic pre" = "Przedwzm. mikr."
 "Mic" = "Mikr."
 "Vocal detector" = "Detektor wokalu"

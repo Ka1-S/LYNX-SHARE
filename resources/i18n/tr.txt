@@ -4337,6 +4337,7 @@ countries: tr
 "Measured effect characters" = "Ölçülmüş efekt karakterleri"
 "Brown|Black|Orange" = "Brown|Black|Orange"
 "4K console" = "4K console"
+"32C console" = "32C konsol"
 "Mic pre" = "Mic pre"
 "Mic" = "Mikrofon"
 "Vocal detector" = "Vokal dedektörü"

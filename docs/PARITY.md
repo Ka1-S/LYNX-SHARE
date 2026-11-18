@@ -55,7 +55,7 @@ there.
 | Ridge Strip (4K) | SSL 4K E | 9 | 8 | 6 | 8 | 148 | tp172c4: the 4K compressor blends its measured ratio nodes in log slope (10:1 acted like ~100:1; S4 6 dB too deep): fxparity 5.4 → 6.0; 190lb: its Black / Orange high-pass is 18 dB/oct (K4E_ir): 24 changed files 4.67 → 6.25, none down |
 | Ridge Strip (4K) | SSL 4K B | 8 | 8 | 5 | 8 | tp172c | tp172c4: its stepped compressor (out / 2 / 4 / 10 : 1 / ds, stepped releases) read as the 4K's near-limiting curve with the measured knee offsets, its threshold-only auto make-up, its gentler mic pre: fxparity 3.5 → 5.2 |
 | Ridge Strip (4K) | SSL 4K G | 8 | 8 | 5 | 8 | 190lb | tp172c4: its ±18 / ±20 / ±22 dB dials scaled onto the 4K's ±15 (same curves), its deeper slow compressor: fxparity 4.4 → 5.1; 190ho: its Pink EQ measured (Pink impulse renders 4.07 → 6.50; replaced by 190lb's in the 0.1.30 rollup, step 8), ÷3 / ×3 do nothing in its Black (kept); 190lb (black-box): its Pink EQ measured on its own (the default colour; proportional-Q bells, resonant shelves, no bell on LF / HF), both colours its 18 dB/oct high-pass, uncramped low-pass and 1.1108 ceiling: all 594 files 5.17 → 6.26 (249 up / 2 down, owner decision in BLACKBOX_rodada190lb §11) |
-| Ridge Strip | Harrison 32Classic Channel Strip | 7 | 6 | 4 | 8 | tp172c | tp172c5: its state translated (was Ridge's defaults): EQ shelves / bells / filters fitted on the trial's impulse grid (a mid out of Ridge's band range moves to a free neighbour), the compressor's static line (the dial - 2 dB RMS, the Limiter ~1.8 dB lower, under -40 dBFS through the input trim), its auto make-up law, gate / expander: fxparity 3.0 → 4.5 (EQ bank 2.8 → 5.4, dynamics 3.8 → 5.5, make-up 3.6 → 6.6); tp172c6: its saturator on Ridge's new DRIVE section (Saturate model, the dial's -24 .. +24 dB shifting the measured clip curve): 32C 4.5 → 5.2 (saturator bank 5.3); tp172c10: its compressor's 27.5 dB reduction cap as a hidden Ridge parameter set by the translation (the original has no control for it): dynamics bank 5.5 → 6.2; tp172c11: its attack dial as a real time constant (hidden Ridge parameter), release time constants from the stair decay (0.25 / 0.35 / 1.6 s at 50 / 104 / 351.5 ms, half in Limiter mode): dynamics bank 6.2 → 6.7, make-up bank 6.7 → 6.6, 32C 5.2 = 5.2 |
+| Ridge Strip | Harrison 32Classic Channel Strip | 7 | 6 | 4 | 8 | tp172c | tp172c5: its state translated (was Ridge's defaults): EQ shelves / bells / filters fitted on the trial's impulse grid (a mid out of Ridge's band range moves to a free neighbour), the compressor's static line (the dial - 2 dB RMS, the Limiter ~1.8 dB lower, under -40 dBFS through the input trim), its auto make-up law, gate / expander: fxparity 3.0 → 4.5 (EQ bank 2.8 → 5.4, dynamics 3.8 → 5.5, make-up 3.6 → 6.6); tp172c6: its saturator on Ridge's new DRIVE section (Saturate model, the dial's -24 .. +24 dB shifting the measured clip curve): 32C 4.5 → 5.2 (saturator bank 5.3); tp172c10: its compressor's 27.5 dB reduction cap as a hidden Ridge parameter set by the translation (the original has no control for it): dynamics bank 5.5 → 6.2; tp172c11: its attack dial as a real time constant (hidden Ridge parameter), release time constants from the stair decay (0.25 / 0.35 / 1.6 s at 50 / 104 / 351.5 ms, half in Limiter mode): dynamics bank 6.2 → 6.7, make-up bank 6.7 → 6.6, 32C 5.2 = 5.2; 190le: its EQ in Ridge's new **32C voicing** (the exact law of BLACKBOX_rodada190lb §4: first-order shelves, matched bells at the dial with Q(|gain|), matched 12 dB/oct filters to 3.15 kHz / 160 Hz; its own dials): EQ bank 5.36 → 9.99 (curve error 1.15 → 0.00 dB rms, filters 8.3 / 9.0 → 0.01 / 0.00 dB), all 302 files 5.88 → 8.54 (206 up, 0 down) |
 | Ridge Strip | Harrison MPC Channel Strip | 7 | 6 | 5 | 8 | tp172c | tp172c5: its 8 bands onto Ridge's 4 (shelves on LF / HF, the bells on the free slots), the 12 dB/oct filters on the 32C's laws, its compressor's measured line and knee: fxparity 4.6 → 5.5 (dynamics bank 3.8 → 6.6, EQ bank 1.9 → 3.2: band-pass / notch shapes, Q under 0.5 and ±19 dB gains are outside Ridge's bands; open for this release: no new Ridge bands or plugin) |
 | Kiln Channel (Console E / G / A / N / Y, Tube) | Slate VCC Channel | 7 | 7 | 7 | 8 | tp172c7 | tp172c7: its own plugin (was Ridge's DRIVE section): a compact dark single-channel console like the original (amber VU, console selector with the six models round it, Input / Output, Drive, Group, Noise reduction and Group bypass keys, main In / Out columns with meters), own art and emblem; the same measured drive stages; its noise floor per console (NR off: E / G -113.9, A -110.0, N -109.8, Y -101.6, Tube -101.9 dBFS RMS, uncorrelated L / R) and group bypass shared by the group's channels; state fully translated (console, drive, trims, NR, group, group bypass, main gains): fxparity 6.8 (drive bank 6.8, US A 6.3, group / NR sets 6.7 / 6.9) |
 | Fret Channel (guitar / bass channel strip) | SSL Guitarstrip | 8 | 7 | 6 | 8 | tp172c8 | tp172c8: its own plugin (was Ridge with its DRIVE section): input / output, phase correction (align to side chain / left / right, ±20 ms delay with ±1 / ±10 sample nudges, polarity, 1st / 2nd-order all-pass with its phase screen, correlation), the EQ (LF / MF / HF shelves and bell, high- and low-pass, pre / post), the compressor (five measured modes, threshold, mix, auto gain), the guitar amp (pre-amp, drive, Boost / Punch / Edge) and bass amp (drive, Punch / Shape) with mix, output mix, mono and side-chain listen; the panel in the original's layout, own drawing. State translated 1:1. fxparity 5.7 (bank 5.5 → 5.8 → 6.0, voicings at drive 2.8 → 3.2 → 3.9). tp172c9: part of each amp's tone runs ahead of its curve, as the original's drive sweeps show (guitar: a 4 kHz low-pass, so its highs compress less; bass: a +17 dB 1.27 kHz pre-emphasis shelf, so its highs compress more), nodes refitted on the de-embedded harmonics, bass voicings ahead of the amp, Boost / Punch laws measured at drive. Missing: the EQ's Auto listen key (not in the state) |
@@ -4194,3 +4194,54 @@ rose) and K4G_ir BlHFBf1g5 4 → 3 (an extreme Black boost at the ceiling). Old 
 0 mismatches. CPU: no measurable difference (law on / off in one build). Harrison 32C's exact EQ law (first-order
 shelves, bells at the dial, Q by |gain|, 12 dB/oct filters to 3.15 kHz / 160 Hz) waits for a "32C" voicing (owner
 decision, BLACKBOX §11).
+
+## Round 190le: Ridge Strip's "32C" voicing (Harrison 32Classic EQ law) and the Lustrous Plates translator
+
+Owner decisions taken (recommended options of BLACKBOX_rodada190lb §11.3 and §5.4). Work folder
+`/mnt/e/lynx-work/harrison190le/` (lab scripts, runs, logs).
+
+**Harrison 32C → Ridge Strip, 32C voicing.** A new voicing of Ridge's own engine (hidden parameter `h32`, saved only while
+on, with its own panel switch "32C console" beside the 4K / Modern ones: `hiddenEffectParamIndex` lets a layout reach a
+hidden parameter by name). Its EQ is the law measured in round 190lb, now reproduced exactly on all 148 renders of tp172c's
+H32_eq grid (lab `shelves*.py`, `bells.py`, `hp.py`): Lo shelf first order, bilinear prewarped at its centre (rms 0.0003 dB);
+Hi shelf first order, its magnitude matched to the analog shelf at DC, at its centre and at Nyquist (max 0.009 dB; plain or
+prewarped bilinear were 0.27 dB off at 10 kHz); bells (mids, and the end bands in Bell mode) magnitude-matched peaking
+sections (Vicanek) at the dial with Q(|g|) = 0.5249 − 0.00357 |g| + 0.00145 g² (≤ 0.004 dB); Butterworth 12 dB/oct high- /
+low-pass at the dial, magnitude-matched (the always-in 20 kHz low-pass is −2.40 dB at 18 kHz, as measured). The dials read
+the original's own host scales (texts at ninths of the travel): Hi shelf centre 400 … 2650 … 10000 Hz and Lo 25 … 145 …
+1500 Hz (straight lines broken at the middle), their bells 689 … 14 500 / 19 … 799 Hz, Hi-Mid 271 Hz … 8 kHz, Low-Mid
+104 Hz … 4.37 kHz, high-pass 25 Hz … 3.15 kHz, low-pass 20 kHz … 160 Hz, shelf plateau ±13.5 dB linear, bell gain ±13.74 dB
+on the original's taper; the Q dials hide (the 32C has none), the Brown / Black tabs dim. The translation now sets the
+voicing and its dials (the saved end-band frequency / gain are the Bell mode's; the shelf follows the dial); dynamics,
+trims and saturator as before. Switching a console voicing (E / 4K / Modern) on switches the 32C off and the reverse.
+
+| reference → LYNX | bank | files | before → after | up / same / down |
+|---|---|---|---|---|
+| Harrison 32C → Ridge Strip 32C | tp172c H32_eq (impulse grid) | 148 | 5.36 → **9.99** | 148 / 0 / 0 |
+| | tp172c H32_dyn | 72 | 6.74 → **7.51** | 27 / 45 / 0 |
+| | tp172c H32_sat | 20 | 5.30 → **6.25** | 11 / 9 / 0 |
+| | tp172c H32_mk | 42 | 6.57 → **7.02** | 10 / 32 / 0 |
+| | refcap182 programme | 20 | 5.70 → **6.90** | 10 / 10 / 0 |
+| | all | 302 | 5.88 → **8.54** | 206 / 96 / 0 |
+
+Curve error on the grid (30 Hz – 16 kHz, rms dB): shelves 1.16 / 0.82 → 0.00, end bells 0.72 / 0.75 → 0.00, mid bells
+0.38 / 0.42 → 0.00, filters 8.33 / 9.02 → 0.01 / 0.00 (`logs/curveerr_*.txt`).
+
+**LiquidSonics Lustrous Plates → Foil Plate.** Round 190bz is in; its Classic law is the old engine bit for bit, and round
+190ca's physical Foil fit of the plate (Iron, full band, Classic law) is the setting used, so no refit was needed. Its
+plain ValueTree state is read (`LP_FullState` › `StateVT` › PARAM id / value): Damper and Plate Model → Foil decay, the two
+700 Hz shelves and the low cut (190ca's knots: Damper 2.5 / 5, model 12 = "Reserved (using Iridium)"); Dry/Wet → Foil's Mix
+at the same wet : dry ratio (equal-power law; the ends are one path); Width scales the fitted width; Master Gain moves both
+shelves (a flat wet gain); a Master EQ low cut above the fitted one replaces it. Not mapped: modulation, dispersion, the
+band EQs, the high cut, dynamics.
+
+| reference → LYNX | bank | files | before → after (wave) | tail score | up / same / down |
+|---|---|---|---|---|---|
+| Lustrous Plates → Foil Plate (role preset → translator) | refcap182 programme | 20 | 1.55 → **2.20** | 4.00 → **6.07** | wave 13 / 7 / 0, tail 20 / 0 / 0 |
+
+Gate: old projects `lab/gold.sh` (base = round 190lb's fxrender): every strip whose translation is unchanged via `--sub`
+(SSL 4K E / G / B, Channel Strip 2, Vocalstrip 2, Harrison MPC), the Harrison 32C Ridge Strips a project saved before holds
+(base `--dump`), Ridge Strips set directly in every voicing — also with the 32C switch on under a console voicing — and
+Foil Plate as the role preset and at defaults; 44.1 / 48 / 96 kHz: **666 renders, 0 mismatches**. CPU (one binary, 280 s
+programme, user seconds best of 5): old translation vs 32C voicing 3.02 / 2.93 (S1), 5.97 / 5.88 (S3), 2.86 / 2.95 (S2):
+no measurable difference (same section count; the coefficients are designed once per block). Latency 0.

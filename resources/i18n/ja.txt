@@ -4337,6 +4337,7 @@ countries: jp
 "Measured effect characters" = "計測したエフェクトキャラクター"
 "Brown|Black|Orange" = "Brown|Black|Orange"
 "4K console" = "4Kコンソール"
+"32C console" = "32Cコンソール"
 "Mic pre" = "マイクプリ"
 "Mic" = "マイク"
 "Vocal detector" = "ボーカル検出器"
