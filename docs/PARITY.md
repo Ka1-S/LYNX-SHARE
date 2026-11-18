@@ -3982,3 +3982,53 @@ latency change.
 - Facet: the −30 dB time-constant probe is at 3 (from 2): the reference's cut after the short bursts (7.5 / 8.7 s) is
   still deeper than the model's.
 - PuigTec, SuperTap's feedback delay and modulation, EchoBoy's shelving cuts (round 190jh's list) not touched.
+
+## Round 190kw (VintageVerb → Epoch)
+
+Built from the laws recovered by static REA of ValhallaVintageVerb (docs/analise/REA_rodada190kw.md §4; clean-room, LYNX's own
+code and tables). Lab and evidence: `/mnt/e/lynx-work/rea190kw/vvimpl/` (REA_part.md). Same score as rounds 190iq / it
+(`scripts/fxparity.py`, 0–10), the reference's own renders against LYNX loading the saved state through its translator.
+
+The step is a **hidden parameter past 190it's revision**: `verbs::epoch::loopLaw` (index 19, no control, no string, saved
+while non-zero). It is read only with the Measured law and revision 1. New instances and the VintageVerb translator get it.
+A project or preset saved before loads 0, so revisions 0 and 1 render bit for bit as the base commit did. Gold: 72 / 72
+renders (12 settings × revision 0 / 1 × 44.1 / 48 / 96 kHz, `gold/`); fingerprints in `tests/Parity190kwVvTests.inc`.
+
+| What the reference does (static, checked on the captures) | What loopLaw changes |
+|---|---|
+| No per-mode output gain. Each mode is a loop whose gain is the RT60 law over N gain stages, the input entering after a stage, so the wet energy is E(T, s) = E0 / (1 − 10^(−6 ℓ(s)/T)) with ℓ = c·L(s)/N | Epoch's level follows that law per mode: the base level at 0.513 s (the mode sweep's impulse energy), plus the reference's growth over Decay and Size (its own loop-length law per mode), minus Epoch's own growth. Epoch's growth was measured once per mode at 0.513 … 70 s, and over Size it is (0.3 + 0.7 s)^−0.64 at any Decay. Revision 1's per-mode tone trims still fade out by 1.41 s |
+| The first 80 ms hold over Decay (−10.65 dB at 0.51 / 7 / 33 s); Epoch's rose 3 dB from 2 to 4 s | The early taps hold their long-decay level at every Decay |
+| Spectra differ, so the best-scoring level is not always the energy match | Fitted on the scores: Concert Hall +0.3 dB (its own-growth knots fitted to the 2.9 … 33 s captures), Room −0.4 dB, Bright Hall +1.25 dB, Grit Plate −3.25 dB, Gated −2 dB. Drift Chamber keeps revision 1 (its test signal lost a step) |
+
+Concert Hall against revision 1 (`tests/Parity190kwVvTests.inc`): +2.3 dB at Decay 0.51 s, −1.3 dB at 7 s (the analyst's
+law: +2.0 / −1.3).
+
+**Scores** (refcap030 bank, 154 files; before → after; up / same / down):
+
+| Block | files | before → after | up / same / down |
+|---|---|---|---|
+| mode (ReverbMode + ColorMode sweeps, 0.51 s) | 96 | 2.16 → **2.74** | 56 / 40 / 0 |
+| pairs (PreDelay × Decay 0.51 / 7 / 33 s) | 18 | 3.44 → **3.89** | 8 / 10 / 0 |
+| sr48 (D, S1 … S4) | 20 | 3.50 → **3.70** | 4 / 16 / 0 |
+| sr96 | 20 | 3.60 → **3.70** | 3 / 16 / 1 (S1 impulse 4 → 3) |
+| **all** | 154 | **2.67 → 3.12** | 71 / 82 / 1 |
+
+Other Epoch banks (round 190it's `gate2.py`): tp172d's matched settings 3.73 → 3.73 (15 files, 0 / 15 / 0), verb183b's captures 3.56 → 3.89 (18, 6 up, 0 down), refcap182's programme 3.48 → 3.64 (25, 4 up, 0 down).
+
+**CPU** (thread time, 20 s at 48 kHz in blocks of 512, best of 5, two runs; `cpu/bench.log`, a loaded machine ±15 %):
+Concert Hall default 2.00 % (base) / 2.04 % (new instance); Concert Hall 0.51 s 1.98 / 1.99; Room 2.90 / 3.03; Plate 7 s
+2.38 / 2.55. Revision 0 / 1 forced on the round's objects: 1.90 … 2.97 %, the same as the base within the noise. The step
+adds a few `pow` / `log10` per block in `configure`, not per sample. No latency change.
+
+**Still off / not built:**
+- The per-mode Size law in the DSP (only the level follows it; Epoch's lines still scale by 0.3 + 0.7·Size). There are no
+  captures at Size ≠ 100 % except Concert Hall's.
+- RT = Decay with a first lap free of Decay, as a DSP change. 1970s at half the host rate and the ×0.64 mod depth.
+- The early level at long decays is 1.5 … 2 dB under the reference's −10.65 dB at 7 … 33 s, because the law scales the
+  whole wet path.
+- 96 kHz: at Decay 0.51 s the reference is 1.3 dB quieter at 96 kHz than at 48 kHz against Epoch. With the law, sr96 S1's
+  impulse is +1.6 dB over it (4 → 3; the setting's sweep, test signal and music there went up). A 96 kHz trim is not
+  built (owner decision: the rate dependence is Epoch's, not measured further).
+- Score-led stands: Grit Plate −3.25 dB and Gated −2 dB sit under the impulse's energy match (their test-signal / impulse
+  files score higher there). Smooth Room's +2.5 dB (test signal only) and Drift Chamber's +1.5 dB (impulse only) were not
+  taken.

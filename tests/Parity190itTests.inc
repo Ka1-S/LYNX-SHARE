@@ -88,7 +88,8 @@ TEST (parity190it_revisions_are_hidden_new_instances_run_them_old_projects_do_no
         CHECK (effectInfo (kind).params.size() == (std::size_t) rev); // hidden: no new control, no new string
         auto s = makeEffectSlot (kind);
         CHECK (s.params[(std::size_t) rev] == 1.0f);
-        CHECK (savedEffectParamCount (s) == (std::size_t) rev + 1); // saved, since it is not zero
+        // saved, since it is not zero (round 190kw: Epoch's loop law, one further, is saved with it)
+        CHECK (savedEffectParamCount (s) == (std::size_t) rev + (kind == EffectKind::epochVerb ? 2 : 1));
         auto now = s;
         upgradeLoadedEffectParams (now, (std::size_t) rev + 1);
         CHECK (now.params[(std::size_t) rev] == 1.0f);

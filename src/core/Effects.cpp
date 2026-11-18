@@ -4357,6 +4357,8 @@ EffectSlot makeEffectSlot (EffectKind kind)
         slot.params[(std::size_t) echosuite::echoform::revision] = 1.0f;
     // round 190it: a new Epoch Verb / Atrium / Foil Plate / Halo runs the 0.1.30 revision of the Measured law (hidden)
     if (kind == EffectKind::epochVerb) slot.params[(std::size_t) verbs::epoch::revision] = 1.0f;
+    if (kind == EffectKind::epochVerb) // round 190kw: … and Epoch's level the reference's loop law (hidden)
+        slot.params[(std::size_t) verbs::epoch::loopLaw] = 1.0f;
     if (kind == EffectKind::atrium) slot.params[(std::size_t) verbs::atrium::revision] = 1.0f;
     if (kind == EffectKind::foilPlate) slot.params[(std::size_t) verbs::foil::revision] = 1.0f;
     if (kind == EffectKind::halo) slot.params[(std::size_t) verbs::halo::revision] = 1.0f;
@@ -4511,6 +4513,9 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
         }
         if (rev >= 0 && savedCount <= (std::size_t) rev)
             slot.params[(std::size_t) rev] = 0.0f;
+        // round 190kw: an Epoch Verb saved before the loop law keeps revision 1 as it was (or revision 0), bit for bit
+        if (slot.kind == EffectKind::epochVerb && savedCount <= (std::size_t) verbs::epoch::loopLaw)
+            slot.params[(std::size_t) verbs::epoch::loopLaw] = 0.0f;
     }
     // round 152: a Compressor saved before the measured vintage curve keeps the round-150 curve
     if (slot.kind == EffectKind::compressor && savedCount <= 18 && slot.params.size() > 18)
