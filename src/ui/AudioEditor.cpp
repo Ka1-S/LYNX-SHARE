@@ -3488,7 +3488,9 @@ private:
     }
 
     // --- Tools › Analysis › Convert to MIDI (round a2m189b): the selection (or the whole audio) as a new pattern
-    void convertToMidi (a2m::Mode mode)
+    void convertToMidi (a2m::Mode mode) { convertToMidi (mode, std::nullopt); }
+    void convertToMidi (const a2m::ConvertOptions& options) { convertToMidi (a2m::Mode::harmony, options); }
+    void convertToMidi (a2m::Mode mode, const std::optional<a2m::ConvertOptions>& options)
     {
         if (doc.audio.empty())
             return;
@@ -3501,10 +3503,14 @@ private:
             for (std::size_t i = 0; i < mono.size(); ++i)
                 mono[i] += ch[(std::size_t) from + i] / (float) channels;
         juce::Component::SafePointer<AudioEditor> self (this);
-        convertAudioToMidi (engine, std::move (mono), doc.audio.sampleRate, mode, safeTitle(), [self] (int count) {
+        auto shown = [self] (int count) {
             if (self != nullptr && count > 0)
                 self->setStatus (tr ("{0} notes put in a new pattern", { juce::String (count) }), false);
-        });
+        };
+        if (options)
+            convertAudioToMidi (engine, std::move (mono), doc.audio.sampleRate, *options, safeTitle(), shown);
+        else
+            convertAudioToMidi (engine, std::move (mono), doc.audio.sampleRate, mode, safeTitle(), shown);
     }
 
     // --- scripts (Tools › Scripting: Run script / Edit last script; REA_rodada167c.md §2) -----------------------------
@@ -6173,6 +6179,14 @@ juce::PopupMenu AudioEditor::mainMenu()
         for (const auto& [label, mode] : modes)
             convert.addItem (tr (label), [this, m = mode] { convertToMidi (m); });
         tools.addSubMenu (tr ("Convert to MIDI"), convert, has);
+        // round 190lj: with the options dialog (polyphonic by default), quantized to the Piano roll's step when asked
+        tools.addItem (tr ("Convert to MIDI (polyphonic)..."), has, false, [this] {
+            juce::Component::SafePointer<AudioEditor> self (this);
+            showConvertOptions (engine, this, (std::int64_t) ticksPerStep, [self] (const a2m::ConvertOptions& options) {
+                if (self != nullptr)
+                    self->convertToMidi (options);
+            });
+        });
     }
 
     juce::PopupMenu regions;
@@ -6632,6 +6646,12 @@ juce::String audioEditorHoverHintForSnapshot (juce::Component& component, float 
         return {};
     const auto h = editor->waveHintForSnapshot (fx, fy);
     return h.text + (h.value.isNotEmpty() ? "  " + h.value : juce::String());
+}
+
+juce::PopupMenu audioEditorMainMenuForSnapshot (juce::Component& component)
+{
+    auto* editor = dynamic_cast<AudioEditor*> (&component);
+    return editor != nullptr ? editor->mainMenu() : juce::PopupMenu();
 }
 
 juce::StringArray audioEditorMenuForSnapshot (juce::Component& component)

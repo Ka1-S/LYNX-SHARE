@@ -1,10 +1,13 @@
 #include "core/AudioToMidi.h"
 
+#include <array>
 #include <cmath>
 #include <complex>
 #include <limits>
 #include <queue>
+#include <utility>
 
+#include "core/AudioEdit.h"
 #include "core/NoteEdit.h"
 
 namespace lynx::a2m
@@ -14,42 +17,155 @@ bool runModel (const std::vector<float>& mono, int framesPerWindow,
                const std::function<bool (const float* in, float* note, float* onset)>& model,
                const std::function<void (double)>& progress, Posteriorgram& out)
 {
+    return runModelBatched (mono, framesPerWindow, 1, false,
+                            [&model] (const float* in, int, float* note, float* onset, float*) { return model (in, note, onset); }, progress, out);
+}
+
+bool runModelBatched (const std::vector<float>& mono, int framesPerWindow, int batch, bool withContour,
+                      const std::function<bool (const float* in, int count, float* note, float* onset, float* contour)>& model,
+                      const std::function<void (double)>& progress, Posteriorgram& out)
+{
     const auto samples = (std::int64_t) mono.size();
     const auto windows = numWindows (samples);
     const auto keep = framesPerWindow - overlapFrames; // the frames of a window that are kept (half the overlap off each side)
+    batch = std::clamp (batch, 1, 16);
     out.frames = (int) std::max<std::int64_t> (1, (samples + hop - 1) / hop);
     out.note.assign ((std::size_t) out.frames * keys, 0.0f);
     out.onset.assign ((std::size_t) out.frames * keys, 0.0f);
+    out.contour.assign (withContour ? (std::size_t) out.frames * contourBins : 0, 0.0f);
     if (keep <= 0)
         return false;
 
-    std::vector<float> in ((std::size_t) windowSamples), note ((std::size_t) framesPerWindow * keys), onset (note.size());
-    for (int w = 0; w < windows; ++w)
+    const auto perWindow = (std::size_t) framesPerWindow * keys, perContour = (std::size_t) framesPerWindow * contourBins;
+    std::vector<float> in ((std::size_t) windowSamples * (std::size_t) batch), note (perWindow * (std::size_t) batch), onset (note.size()),
+        contour (withContour ? perContour * (std::size_t) batch : 0);
+    for (int first = 0; first < windows; first += batch)
     {
-        // window w starts half an overlap before sample w * stride: its frame i is at sample w * stride + (i - 15) * hop
-        const auto from = (std::int64_t) w * windowStride - overlapSamples / 2;
-        for (int i = 0; i < windowSamples; ++i)
+        const auto count = std::min (batch, windows - first);
+        for (int j = 0; j < count; ++j)
         {
-            const auto s = from + i;
-            in[(std::size_t) i] = s >= 0 && s < samples ? mono[(std::size_t) s] : 0.0f;
+            // window w starts half an overlap before sample w * stride: its frame i is at sample w * stride + (i - 15) * hop
+            const auto from = (std::int64_t) (first + j) * windowStride - overlapSamples / 2;
+            auto* dest = in.data() + (std::size_t) j * windowSamples;
+            for (int i = 0; i < windowSamples; ++i)
+            {
+                const auto s = from + i;
+                dest[i] = s >= 0 && s < samples ? mono[(std::size_t) s] : 0.0f;
+            }
         }
-        if (! model (in.data(), note.data(), onset.data()))
+        if (! model (in.data(), count, note.data(), onset.data(), withContour ? contour.data() : nullptr))
             return false;
 
-        // every output frame k (sample k * hop) from the window whose kept part holds it: an exact time grid (Basic
-        // Pitch's own unwrapping concatenates 142 kept frames per 141.27-frame stride and corrects the drift afterwards)
-        const auto firstSample = (std::int64_t) w * windowStride;
-        const auto lastSample = w + 1 < windows ? firstSample + windowStride : samples + hop;
-        for (auto k = (firstSample + hop - 1) / hop; k * hop < lastSample && k < out.frames; ++k)
+        for (int j = 0; j < count; ++j)
         {
-            const auto local = std::clamp<std::int64_t> (overlapFrames / 2 + std::llround ((double) (k * hop - firstSample) / hop), 0, framesPerWindow - 1);
-            std::copy_n (note.data() + local * keys, keys, out.note.data() + k * keys);
-            std::copy_n (onset.data() + local * keys, keys, out.onset.data() + k * keys);
+            const auto w = first + j;
+            // every output frame k (sample k * hop) from the window whose kept part holds it: an exact time grid (Basic
+            // Pitch's own unwrapping concatenates 142 kept frames per 141.27-frame stride and corrects the drift afterwards)
+            const auto firstSample = (std::int64_t) w * windowStride;
+            const auto lastSample = w + 1 < windows ? firstSample + windowStride : samples + hop;
+            for (auto k = (firstSample + hop - 1) / hop; k * hop < lastSample && k < out.frames; ++k)
+            {
+                const auto local = std::clamp<std::int64_t> (overlapFrames / 2 + std::llround ((double) (k * hop - firstSample) / hop), 0, framesPerWindow - 1);
+                std::copy_n (note.data() + (std::size_t) j * perWindow + (std::size_t) local * keys, keys, out.note.data() + k * keys);
+                std::copy_n (onset.data() + (std::size_t) j * perWindow + (std::size_t) local * keys, keys, out.onset.data() + k * keys);
+                if (withContour)
+                    std::copy_n (contour.data() + (std::size_t) j * perContour + (std::size_t) local * contourBins, contourBins, out.contour.data() + k * contourBins);
+            }
         }
         if (progress)
-            progress ((double) (w + 1) / (double) windows);
+            progress ((double) (first + count) / (double) windows);
     }
     return true;
+}
+
+namespace
+{
+double sincOf (double x) noexcept
+{
+    if (std::abs (x) < 1.0e-9)
+        return 1.0;
+    const auto px = 3.141592653589793 * x;
+    return std::sin (px) / px;
+}
+
+double blackmanOf (double x) noexcept // x in [-1, 1]
+{
+    if (std::abs (x) >= 1.0)
+        return 0.0;
+    const auto t = (x + 1.0) * 0.5;
+    return 0.42 - 0.5 * std::cos (2.0 * 3.141592653589793 * t) + 0.08 * std::cos (4.0 * 3.141592653589793 * t);
+}
+
+std::int64_t gcdOf (std::int64_t a, std::int64_t b) noexcept
+{
+    while (b != 0)
+        a = std::exchange (b, a % b);
+    return a;
+}
+} // namespace
+
+std::vector<float> toModelRate (const std::vector<float>& mono, double rate, const std::function<bool()>& stop)
+{
+    const auto n = (std::int64_t) mono.size();
+    if (n == 0 || ! (rate > 0.0))
+        return {};
+    const auto outFrames = std::max<std::int64_t> (1, std::llround ((double) n * modelRate / rate));
+    if (std::abs (rate - modelRate) < 1.0)
+        return mono;
+    const auto whole = (std::int64_t) std::llround (rate);
+    const auto g = gcdOf ((std::int64_t) modelRate, whole);
+    const std::int64_t up = (std::int64_t) modelRate / g, down = (std::int64_t) whole / g; // input frames per output frame = down / up
+    if (std::abs ((double) whole - rate) > 1.0e-9 || up > 4096)
+        return audioedit::resampleChannel (mono, outFrames, stop);
+    // (resampleChannel steps n / outFrames, a hair off the rate ratio when n * up / down isn't whole: this keeps the
+    // exact ratio, at most half an input frame apart at the end; equal to it when the length divides)
+
+    const auto step = (double) down / (double) up;
+    const auto cutoff = std::min (1.0, 1.0 / step);
+    const auto halfWidth = 16.0 / cutoff;
+    // output o reads around t = (o + 0.5) * step - 0.5 = ((2o + 1) * down - up) / (2 up): its phase is o mod up
+    struct Phase
+    {
+        std::int64_t first = 0; // the first tap's input frame for the phase's first output
+        std::vector<double> taps;
+        double weights = 0.0;
+    };
+    std::vector<Phase> phases ((std::size_t) up);
+    for (std::int64_t p = 0; p < up; ++p)
+    {
+        const auto t = ((double) p + 0.5) * step - 0.5;
+        auto& ph = phases[(std::size_t) p];
+        ph.first = (std::int64_t) std::ceil (t - halfWidth);
+        const auto last = (std::int64_t) std::floor (t + halfWidth);
+        for (auto k = ph.first; k <= last; ++k)
+        {
+            const auto x = t - (double) k;
+            const auto w = cutoff * sincOf (cutoff * x) * blackmanOf (x / halfWidth);
+            ph.taps.push_back (w);
+            ph.weights += w;
+        }
+    }
+    std::vector<float> out ((std::size_t) outFrames, 0.0f);
+    for (std::int64_t o = 0; o < outFrames; ++o)
+    {
+        if ((o & 0xffff) == 0 && stop && stop())
+            return {};
+        const auto& ph = phases[(std::size_t) (o % up)];
+        const auto first = ph.first + (o / up) * down; // phase p + up * m sits m * down input frames later
+        double sum = 0.0;
+        const auto taps = (std::int64_t) ph.taps.size();
+        if (first >= 0 && first + taps <= n)
+        {
+            const auto* x = mono.data() + first;
+            for (std::int64_t k = 0; k < taps; ++k)
+                sum += ph.taps[(std::size_t) k] * x[k];
+        }
+        else // edges: the nearest sample continues (no dip to zero)
+            for (std::int64_t k = 0; k < taps; ++k)
+                sum += ph.taps[(std::size_t) k] * mono[(std::size_t) std::clamp<std::int64_t> (first + k, 0, n - 1)];
+        out[(std::size_t) o] = (float) (ph.weights != 0.0 ? sum / ph.weights : 0.0);
+    }
+    return out;
 }
 
 namespace
@@ -104,7 +220,7 @@ std::vector<Note> notesFromPosteriorgram (const Posteriorgram& pg, const NoteOpt
         for (int b = 0; b < keys; ++b)
             if (b < lowBin || b >= highBin)
                 frames[(std::size_t) (t * keys + b)] = onsets[(std::size_t) (t * keys + b)] = 0.0f;
-    Posteriorgram constrained { n, frames, onsets };
+    Posteriorgram constrained { n, frames, onsets, {} };
     if (options.inferOnsets)
         onsets = inferOnsets (constrained);
 
@@ -115,7 +231,7 @@ std::vector<Note> notesFromPosteriorgram (const Posteriorgram& pg, const NoteOpt
     auto remaining = frames;
     auto toTime = [&] (int frame) { return (double) frame * hop / modelRate + timeOffset; };
     auto add = [&] (int from, int to, int bin) {
-        notes.push_back ({ toTime (from), toTime (to), bin + lowestKey, std::clamp (meanOf (constrained, from, to, bin), 0.0f, 1.0f) });
+        notes.push_back ({ toTime (from), toTime (to), bin + lowestKey, std::clamp (meanOf (constrained, from, to, bin), 0.0f, 1.0f), {} });
     };
 
     // onset peaks (scipy's argrelmax along time: strictly above both neighbours), latest first, high keys first at a tie
@@ -236,12 +352,13 @@ NoteOptions optionsFor (Mode mode) noexcept
     return options;
 }
 
-std::vector<Note> transcribe (const Posteriorgram& pg, Mode mode)
+namespace
 {
-    auto notes = notesFromPosteriorgram (pg, optionsFor (mode));
-    if (mode != Mode::melody)
-        return notes;
-    notes = monophonic (std::move (notes), 0.05);
+// the Melody mode's decoder after note creation: one note at a time, each start moved back to where its key's
+// activation reached half its level (at most 5 frames, never into the previous note)
+std::vector<Note> melodyOf (const Posteriorgram& pg, std::vector<Note> notes, double minSeconds)
+{
+    notes = monophonic (std::move (notes), minSeconds);
     auto previousEnd = -1.0;
     for (auto& n : notes)
     {
@@ -262,6 +379,95 @@ std::vector<Note> transcribe (const Posteriorgram& pg, Mode mode)
         n.start = (double) start * hop / modelRate;
     }
     return notes;
+}
+} // namespace
+
+std::vector<Note> transcribe (const Posteriorgram& pg, Mode mode)
+{
+    auto notes = notesFromPosteriorgram (pg, optionsFor (mode));
+    if (mode != Mode::melody)
+        return notes;
+    return melodyOf (pg, std::move (notes), 0.05);
+}
+
+// --- "Convert to MIDI (polyphonic)" with options (round 190lj) ---------------------------------------------------------
+NoteOptions noteOptionsOf (const ConvertOptions& o) noexcept
+{
+    NoteOptions n;
+    n.frameThreshold = std::clamp (1.0f - o.noteSensitivity, 0.05f, 0.95f);
+    n.onsetThreshold = std::clamp (1.0f - o.splitSensitivity, 0.05f, 0.95f);
+    n.minNoteSeconds = std::clamp (o.minNoteMs, 0.0, 5000.0) / 1000.0;
+    n.melodiaTrick = ! o.polyphonic;
+    n.minKey = std::clamp (std::min (o.minKey, o.maxKey), lowestKey, lowestKey + keys - 1);
+    n.maxKey = std::clamp (std::max (o.minKey, o.maxKey), lowestKey, lowestKey + keys - 1);
+    return n;
+}
+
+std::vector<Note> transcribe (const Posteriorgram& pg, const ConvertOptions& options)
+{
+    const auto settings = noteOptionsOf (options);
+    auto notes = notesFromPosteriorgram (pg, settings);
+    if (! options.polyphonic)
+        notes = melodyOf (pg, std::move (notes), settings.minNoteSeconds);
+    if (options.pitchBends)
+        addPitchBends (pg, notes);
+    return notes;
+}
+
+void addPitchBends (const Posteriorgram& pg, std::vector<Note>& notes, BendCentre where)
+{
+    if (pg.frames <= 0 || pg.contour.size() < (std::size_t) pg.frames * contourBins)
+        return;
+    constexpr int tolerance = 25, window = 2 * tolerance + 1;
+    // scipy.signal.windows.gaussian (51, std=5)
+    std::array<double, window> gaussian {};
+    for (int i = 0; i < window; ++i)
+        gaussian[(std::size_t) i] = std::exp (-0.5 * std::pow ((double) (i - tolerance) / 5.0, 2.0));
+    for (auto& n : notes)
+    {
+        n.bends.clear();
+        const auto from = std::clamp ((int) std::lround (n.start * modelRate / hop), 0, pg.frames);
+        const auto to = std::clamp ((int) std::lround (n.end * modelRate / hop), from, pg.frames);
+        if (to <= from)
+            continue;
+        // midi_pitch_to_contour_bin: 36 log2 (hz / 27.5); the model's own answer for the key: one bin up
+        const auto centre = contourPerKey * (n.key - lowestKey) + (where == BendCentre::measured ? 1 : 0);
+        const auto low = std::max (centre - tolerance, 0), high = std::min (contourBins, centre + tolerance + 1);
+        std::vector<int> values;
+        values.reserve ((std::size_t) (to - from));
+        for (int t = from; t < to; ++t)
+        {
+            const auto* row = pg.contour.data() + (std::size_t) t * contourBins;
+            auto best = low;
+            auto bestValue = -1.0;
+            for (int b = low; b < high; ++b)
+            {
+                const auto v = (double) row[b] * gaussian[(std::size_t) (b - centre + tolerance)];
+                if (v > bestValue) // (numpy's argmax: the first of equal values)
+                {
+                    bestValue = v;
+                    best = b;
+                }
+            }
+            values.push_back (best - centre); // 1/3 semitones
+        }
+        if (std::all_of (values.begin(), values.end(), [] (int v) { return v == 0; }))
+            continue;
+        // note_events_to_midi spreads a note's bends evenly from its start to its end (np.linspace)
+        const auto span = n.end - n.start;
+        const auto count = (int) values.size();
+        auto timeOf = [&] (int i) { return count > 1 ? span * (double) i / (double) (count - 1) : 0.0; };
+        auto centsOf = [] (int v) { return (float) v * 100.0f / (float) contourPerKey; };
+        n.bends.push_back ({ 0.0, centsOf (values[0]) });
+        for (int i = 1; i < count; ++i)
+            if (values[(std::size_t) i] != values[(std::size_t) (i - 1)])
+            {
+                // a step: the value held up to the frame before, then the new one (the curve is linear in between)
+                if (n.bends.back().seconds < timeOf (i - 1))
+                    n.bends.push_back ({ timeOf (i - 1), centsOf (values[(std::size_t) (i - 1)]) });
+                n.bends.push_back ({ timeOf (i), centsOf (values[(std::size_t) i]) });
+            }
+    }
 }
 
 // --- drums ---------------------------------------------------------------------------------------------------------
@@ -480,7 +686,7 @@ std::vector<Note> drumHits (const float* mono, std::int64_t count, double rate, 
                 continue; // (unless it is as loud as the loudest snares: a short clap-like snare layered on a kick)
             last = t;
             const auto time = std::max (0.0, ((double) t - 0.5) * step / rate);
-            hits.push_back ({ time, time + 0.0625, keysOf[k], std::clamp (act[std::min (frames - 1, t + 3)] / peak, 0.1f, 1.0f) });
+            hits.push_back ({ time, time + 0.0625, keysOf[k], std::clamp (act[std::min (frames - 1, t + 3)] / peak, 0.1f, 1.0f), {} });
         }
     }
 
@@ -533,11 +739,29 @@ FrameRange clipFrames (const Clip& clip, const ClipTiming& timing, std::int64_t 
     return { first, last - first };
 }
 
+bool canPlayNotes (const ChannelDef& channel) noexcept
+{
+    switch (channel.instrument)
+    {
+        case InstrumentKind::audioClip:
+        case InstrumentKind::fruitydance:
+        case InstrumentKind::videoplayer:
+        case InstrumentKind::dashboard:
+            return false;
+        default:
+            return true;
+    }
+}
+
 int addPattern (Song& song, Mode mode, const std::vector<Note>& notes, const std::function<double (double)>& tickOf,
-                std::int64_t lengthTicks, const Names& names)
+                std::int64_t lengthTicks, const Names& names, const Placement& place)
 {
     const auto drums = mode == Mode::drums;
-    const auto firstChannel = (int) song.channels.size();
+    // round 190lj: an existing channel plays them (melody / harmony), else new channels at the end of the rack
+    const auto existing = ! drums && place.channel >= 0 && place.channel < (int) song.channels.size()
+                       && canPlayNotes (song.channels[(std::size_t) place.channel]);
+    const auto firstChannel = existing ? place.channel : (int) song.channels.size();
+    const auto grid = drums ? (std::int64_t) 0 : std::max<std::int64_t> (0, place.quantizeTicks);
     Pattern pattern;
     pattern.name = names.pattern;
     const auto limit = lengthTicks > 0 ? (double) lengthTicks : std::numeric_limits<double>::max();
@@ -554,6 +778,39 @@ int addPattern (Song& song, Mode mode, const std::vector<Note>& notes, const std
         note.key = drums ? 60 : n.key;
         note.length = drums ? (std::int64_t) ticksPerStep : std::max<std::int64_t> (1, (std::int64_t) std::llround (std::min (limit, to)) - note.start);
         note.velocity = std::clamp (n.velocity, 0.05f, 1.0f);
+        if (grid > 0)
+        {
+            // to the nearest grid line at both ends, one grid step at least, still inside the clip
+            const auto end = (std::int64_t) std::llround (std::min (limit, to) / (double) grid) * grid;
+            note.start = (std::int64_t) std::llround (std::max (0.0, from) / (double) grid) * grid;
+            if ((double) note.start >= limit)
+                note.start = std::max<std::int64_t> (0, (std::int64_t) std::ceil (limit / (double) grid) * grid - grid);
+            note.length = std::max (grid, end - note.start);
+            if ((double) (note.start + note.length) > limit && limit < std::numeric_limits<double>::max())
+                note.length = std::max<std::int64_t> (1, (std::int64_t) std::llround (limit) - note.start);
+        }
+        if (! drums && ! n.bends.empty())
+        {
+            // the bends in the note's pitch curve, ticks from where it sounds (before any quantizing: the bend keeps its
+            // place in the note)
+            NoteCurves curves;
+            auto& lane = curves.lane (NoteCurveLane::pitch);
+            const auto origin = std::max (0.0, from);
+            for (const auto& b : n.bends)
+            {
+                // (the song tick of the bend: in a reversed clip the note's last bends come first, sorted below)
+                const auto at = tickOf (n.start + b.seconds);
+                if (at < 0.0 || at >= limit)
+                    continue;
+                lane.push_back ({ (float) std::max (0.0, at - origin), b.cents });
+            }
+            if (! lane.empty())
+            {
+                curves.normalise();
+                if (lane.size() > 1 || lane.front().value != 0.0f)
+                    note.curves = std::move (curves);
+            }
+        }
         pattern.notes.push_back (note);
     }
     if (pattern.notes.empty())
@@ -573,14 +830,14 @@ int addPattern (Song& song, Mode mode, const std::vector<Note>& notes, const std
         addChannel (names.snare, InstrumentKind::snare);
         addChannel (names.hat, InstrumentKind::hat);
     }
-    else
+    else if (! existing)
         addChannel (names.channel, InstrumentKind::synth);
     song.patterns.push_back (std::move (pattern));
     return (int) song.patterns.size() - 1;
 }
 
 int addClipPattern (Song& song, int clipIndex, const std::string& sourcePath, Mode mode, const std::vector<Note>& notes,
-                    std::int64_t analysedFirst, const ClipTiming& timing, const Names& names)
+                    std::int64_t analysedFirst, const ClipTiming& timing, const Names& names, const Placement& place)
 {
     if (clipIndex < 0 || clipIndex >= (int) song.playlist.size() || timing.framesPerTick <= 0.0)
         return -1;
@@ -595,7 +852,7 @@ int addClipPattern (Song& song, int clipIndex, const std::string& sourcePath, Mo
         const auto fromZero = timing.backwards ? timing.spanFrames - (frame - timing.zeroFrame) : frame - timing.zeroFrame;
         return fromZero / timing.framesPerTick - (double) source.offset;
     };
-    const auto patternIndex = addPattern (song, mode, notes, tickOf, source.length, names);
+    const auto patternIndex = addPattern (song, mode, notes, tickOf, source.length, names, place);
     if (patternIndex < 0)
         return -1;
 

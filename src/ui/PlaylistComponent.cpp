@@ -11190,6 +11190,18 @@ juce::PopupMenu PlaylistComponent::buildAudioClipMenu (int index, int mouseX)
             convert.addItem (tr (text), [this, index, m = mode] { convertClipToMidi (engine, index, m, [this] { sortClips(); }); });
         menu.addSubMenu (tr ("Convert to MIDI"), convert, sample != nullptr);
     }
+    // round 190lj: the same with its options (Basic Pitch polyphonic or one note at a time, sensitivities, shortest note,
+    // key range, pitch bends, quantize to the snap, the channel that plays them); in every layout (Simple too)
+    menu.addItem (tr ("Convert to MIDI (polyphonic)..."), sample != nullptr, false, [this, index] {
+        juce::Component::SafePointer<PlaylistComponent> self (this);
+        showConvertOptions (engine, this, gridTicks(), [self, index] (const a2m::ConvertOptions& options) {
+            if (self != nullptr)
+                convertClipToMidi (self->engine, index, options, [self] {
+                    if (self != nullptr)
+                        self->sortClips();
+                });
+        });
+    });
     addLiveTrackItems (engine, menu, index, targets, [safe = juce::Component::SafePointer<PlaylistComponent> (this)] {
         if (safe != nullptr)
         {
