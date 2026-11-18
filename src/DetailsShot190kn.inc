@@ -69,7 +69,8 @@
             int rows = 0;
             for (juce::PopupMenu::MenuItemIterator it (cpu.makeMenu()); it.next();)
                 rows += it.getItem().isSeparator || it.getItem().isSectionHeader ? 0 : 1;
-            check ("CPU menu: Slow, Medium, Fast and the monitor (" + juce::String (rows) + " items)", rows == 4);
+            // (rollup step 8: round 190ld added FL's Misc rows View voice count, View FPS and the thread count: --details190ldshot)
+            check ("CPU menu: Slow, Medium, Fast, the monitor and round 190ld's three Misc rows (" + juce::String (rows) + " items)", rows == 7);
             // the hint bar's right-click menu copies the value shown
             ui.setHintForSnapshot ({ "Master volume", "-3.2 dB", false, false });
             const auto copy = ui.getHintBarForSnapshot().copyMenu();
