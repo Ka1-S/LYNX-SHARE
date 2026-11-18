@@ -11,6 +11,7 @@ using namespace lynx;
 inline Song drumSong (int* trackOut)
 {
     Song song;
+    song.mixer = Song::defaultMixer();
     simpletracks::Request q;
     q.kind = simpletracks::Kind::drums;
     q.name = "Drums";
@@ -46,6 +47,8 @@ TEST (details190lr_drum_machine_rows_letters_and_clips)
     int track = -1;
     auto song = details190lr::drumSong (&track);
     CHECK (track >= 0);
+    if (track < 0)
+        return;
     const auto rows = simplesteps::kitRows (song, track);
     CHECK (rows.size() == 3);
     CHECK (song.channels[(std::size_t) rows[0]].name == "Kick");
