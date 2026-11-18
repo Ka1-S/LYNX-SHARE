@@ -71,8 +71,19 @@ enum Param
     // translators (Waves SSLComp) set it. Threshold / ratio / knee / attack / release keep their ranges and mean, in
     // this law: the detector's threshold, 1 + the loop gain, the knee's width (dB), and the RC time constants (ms);
     // Auto release adds a slow second capacitor (consoleAuto* in DynamicsSuite.cpp)
-    busLaw = count
+    busLaw = count,
+    // round 190ky, hidden like busLaw (no control, no text; saved while non-zero): the FET law — a FET feedback limiter
+    // (the detector hears the gained signal, three parallel peak followers sum into a control level, a two-term soft
+    // law turns it into gain), LYNX's own model of the structure REA showed in a FET-limiter emulation's DSP
+    // (REA_rodada190ky §2), fitted on our renders. 0 = off: new instances and every project saved before (each style as
+    // it was, bit for bit). k / 16 (k = 1 … 10) picks one of the fitted voicings (fetVoiceFits in DynamicsSuite.cpp: two
+    // revisions × the four ratio buttons and all buttons); the knobs keep their meaning: threshold = the control
+    // level's knee, ratio = 1 + the first term's slope, knee = its width (dB), attack / release = the followers' time
+    // constants (each follower at fitted multiples of them)
+    fetLaw
 };
+constexpr int fetVoices = 10;
+float fetLawValue (int voice) noexcept; // voice 0 … 9 → the fetLaw value (voice + 1) / 16
 enum class Trigger { off, hostSync, midi };
 Trigger triggerOf (float v) noexcept;
 double triggerBeats (float v) noexcept;     // whole, 1/2, 1/4, 1/8, 1/16 note (quarter notes: 4 … 0.25)
@@ -131,6 +142,9 @@ double staticGainDb (const EffectParams& p, double inputDb);
 // round 190kt: the console law's steady gain (dB) for a steady tone of `peakDb` sample peak (threshold dBFS, ratio,
 // knee dB as Crest's knobs read); a fixed point of the feedback loop
 double consoleSteadyDb (double thresholdDb, double ratio, double kneeDb, double peakDb) noexcept;
+// round 190ky: the FET law's steady gain (dB) for a steady 1 kHz tone of `peakDb` sample peak (the fixed point of its
+// feedback loop; Crest's knobs and fetLaw value as in the parameter list)
+double fetSteadyDb (const EffectParams& p, double peakDb) noexcept;
 // The character stage's transfer curve at a drive (no compensation), for the editor.
 float characterCurve (Character c, float x) noexcept;
 } // namespace crest

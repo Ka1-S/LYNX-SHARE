@@ -258,7 +258,7 @@ namespace
 {
 // The style families (fitted to MEASURE_fabfilter §2, see REA_rodada108 §3): time-constant scales of the level
 // detector (τ = scale × knob), the knee every curve gets on top of the knob, and the curve family.
-enum class Curve { downward, upward, twoWay, vocal, variMu, twoWayClassic, variMuClassic, console };
+enum class Curve { downward, upward, twoWay, vocal, variMu, twoWayClassic, variMuClassic, console, fet };
 struct StyleDef
 {
     double attackScale;  // detector attack τ = scale × knob
@@ -323,7 +323,90 @@ const StyleDef& defOf (Style st, bool measured) noexcept
 // round 190kt: the Bus style's console law (the hidden busLaw parameter); its own detector in Crest::detect
 constexpr StyleDef consoleDef { 1.0, 1.0, 1.0, 0.0, 1.0, Curve::console, 0.0, 0.0, 1.0, 0.0, 0.002, 0.0, 0.0, 0.0 };
 bool consoleLaw (const EffectParams& p) noexcept { return styleOf (p) == Style::bus && on (p[busLaw]); }
-const StyleDef& defOf (const EffectParams& p) noexcept { return consoleLaw (p) ? consoleDef : defOf (styleOf (p), on (p[law])); }
+// round 190ky: the FET law (the hidden fetLaw parameter, any style); its own detector in Crest::detect
+constexpr StyleDef fetDef { 1.0, 1.0, 1.0, 0.0, 1.0, Curve::fet, 0.0, 0.0, 1.0, 0.0, 0.002, 0.0, 0.0, 0.0 };
+int fetVoiceOf (const EffectParams& p) noexcept { return p[fetLaw] > 0.0f ? std::clamp ((int) std::lround (p[fetLaw] * 16.0f) - 1, 0, fetVoices - 1) : -1; }
+const StyleDef& defOf (const EffectParams& p) noexcept
+{
+    if (fetVoiceOf (p) >= 0)
+        return fetDef;
+    return consoleLaw (p) ? consoleDef : defOf (styleOf (p), on (p[law]));
+}
+
+// ---- round 190ky: the FET law (REA_rodada190ky §2–§3) ----
+// LYNX's own model of a FET feedback limiter's structure, learnt by REA of the Waves CLA-76 DSP (clean-room: the
+// structure only; the vendor's transfer tables and time-constant tables are not read or used — every constant below is
+// fitted on our own black-box renders, /mnt/e/lynx-work/waves190ky/lab):
+//   - FEEDBACK detection: the detector hears the gained signal (the input level × the gain applied now), full-wave;
+//   - three parallel peak followers (attack / release one-poles) summed with weights into a control level (dB);
+//   - the gain (dB) = −S1·W1·softplus((L − T1) / W1) − S2·W2·softplus((L − T2) / W2), floored at −range: a knee and
+//     a slope per term (a hard-knee feedback loop of slope S settles at ratio 1 + S); the second term bends the top.
+// Voicing = two revisions × the four ratio buttons and all buttons; the knobs give T1 (threshold), S1 (ratio − 1), W1
+// (knee) and the followers' attack / release times, each follower at its fitted multiples of them.
+struct FetVoiceFit
+{
+    double t2, w2, s2;                // the second term: its knee relative to T1 (dB), width (dB), slope
+    double a1, a2, a3, r1, r2, r3;    // each follower's attack and release as multiples of the knobs' times
+    double w1, w2f;                   // the first / second follower's weight (the third gets the rest)
+};
+constexpr FetVoiceFit fetVoiceFits[fetVoices] {
+    // Blacky 20 / 12 / 8 / 4 : 1, all buttons; Bluey 20 / 12 / 8 / 4 : 1, all buttons [EXEC fits, lab/fit76s.py, fit76t.py]
+// fit76:begin (FETFITS: lab/gen76.py)
+    { 12.4297, 0.4157, 0.03962, 0.082994, 2.7665, 1.0, 6.4919, 201.248, 1.0, 0.0386, 0.9614 }, // Blacky 20
+    { 26.2217, 2.4921, 1.08445, 0.061288, 2.0429, 1.0, 4.6520, 144.212, 1.0, 0.0535, 0.9465 }, // Blacky 12
+    { 13.4436, 1.3593, 1.59831, 0.042060, 1.4020, 1.0, 3.0222, 93.689, 1.0, 0.0811, 0.9189 }, // Blacky 8
+    { 34.7504, 9.6349, -0.02494, 0.013129, 1.0000, 1.0, 2.0000, 18.214, 1.0, 0.0541, 0.9459 }, // Blacky 4
+    { 18.1440, 8.0353, 0.01076, 0.075075, 1.0000, 1.0, 2.0000, 14.748, 1.0, 0.0944, 0.9056 }, // Blacky A
+    { 1.6568, 2.2631, 0.28439, 0.123429, 4.1143, 1.0, 9.9192, 307.494, 1.0, 0.0254, 0.9746 }, // Bluey 20
+    { 14.9234, 4.0104, 0.66515, 0.079247, 2.6416, 1.0, 6.1743, 191.402, 1.0, 0.0406, 0.9594 }, // Bluey 12
+    { 27.0542, 0.8988, 1.08752, 0.048540, 1.6180, 1.0, 3.5715, 110.716, 1.0, 0.0691, 0.9309 }, // Bluey 8
+    { 38.8183, 18.4511, -0.23685, 0.012877, 0.9808, 1.0, 1.9512, 17.770, 1.0, 0.0554, 0.9446 }, // Bluey 4
+    { 23.2384, 2.4234, 0.20916, 0.077045, 1.0262, 1.0, 2.0573, 15.170, 1.0, 0.0919, 0.9081 }, // Bluey A
+// fit76:end
+};
+double fetSoftplus (double z) noexcept { return z > 30.0 ? z : std::log1p (std::exp (z)); }
+double fetLawDb (double levelDb, double t1, double w1, double s1, const FetVoiceFit& v, double range) noexcept
+{
+    const auto t2 = t1 + v.t2;
+    const auto g = -s1 * w1 * fetSoftplus ((levelDb - t1) / w1) - v.s2 * v.w2 * fetSoftplus ((levelDb - t2) / v.w2);
+    return std::clamp (g, -range, 0.0);
+}
+// the wet path's static tone under the FET law: a first-order low shelf and a first-order high shelf (bilinear,
+// prewarped), fitted on the third-octave balance of refcap182's CLA-76 programme against LYNX without it (−0.35 dB at
+// 60 Hz, −0.12 dB at 200 Hz; the probes' low-level response: −0.37 / −0.25 dB) [EXEC: lab/tone76.py, lab/fittone.py]
+constexpr double fetLowShelfDb = -0.423, fetLowShelfHz = 131.0, fetHighShelfDb = -0.816, fetHighShelfHz = 16906.0;
+struct FetTone
+{
+    double b0[2] {}, b1[2] {}, a1[2] {};
+    double x1[2][2] {}, y1[2][2] {};
+    void set (double rate) noexcept
+    {
+        for (int k = 0; k < 2; ++k)
+        {
+            const bool low = k == 0;
+            const auto g = std::pow (10.0, (low ? fetLowShelfDb : fetHighShelfDb) / 20.0);
+            const auto hz = std::min (low ? fetLowShelfHz : fetHighShelfHz, 0.45 * rate);
+            const auto w = std::tan (M_PI * hz / rate); // H(s) = (s + w g) / (s + w) low, (g s + w) / (s + w) high
+            const auto nb0 = low ? 1.0 + w * g : g + w, nb1 = low ? w * g - 1.0 : w - g, d0 = 1.0 + w, d1 = w - 1.0;
+            b0[k] = nb0 / d0;
+            b1[k] = nb1 / d0;
+            a1[k] = d1 / d0;
+        }
+    }
+    void reset() noexcept { for (auto& c : x1) c[0] = c[1] = 0.0; for (auto& c : y1) c[0] = c[1] = 0.0; }
+    float process (float v, int c) noexcept
+    {
+        double x = v;
+        for (int k = 0; k < 2; ++k)
+        {
+            const auto y = b0[k] * x + b1[k] * x1[c][k] - a1[k] * y1[c][k];
+            x1[c][k] = x;
+            y1[c][k] = y;
+            x = y;
+        }
+        return (float) x;
+    }
+};
 
 // ---- round 190kt: the console law (REA_rodada190kt §2–§3) ----
 // LYNX's own model of a console bus compressor's structure, learnt by REA of the Waves SSLComp DSP (clean-room: the
@@ -721,8 +804,31 @@ double staticGainDb (const EffectParams& p, double inputDb)
         };
         return 20.0 * std::log10 (band (0, 0.97504) + band (2, 0.02496));
     }
+    if (def.curve == Curve::fet)
+        return fetSteadyDb (p, inputDb);
     return curveGain (def, inputDb, thresholdDb (p[threshold]), ratioOf (p[ratio]), kneeDb (p[knee]),
                       std::max (0.01, rangeDb (p[range])), att);
+}
+
+float fetLawValue (int voice) noexcept { return (float) (std::clamp (voice, 0, fetVoices - 1) + 1) / 16.0f; }
+
+double fetSteadyDb (const EffectParams& p, double peakDb) noexcept
+{
+    // a steady tone: the followers settle at its peak, so the loop settles where g = law (peak + g); g − law (peak + g)
+    // rises with g
+    const auto v = fetVoiceOf (p);
+    if (v < 0)
+        return 0.0;
+    const auto& f = fetVoiceFits[v];
+    const auto t1 = thresholdDb (p[threshold]), w1 = std::max (0.1, kneeDb (p[knee])), s1 = std::max (0.0, std::min (ratioOf (p[ratio]), 1.0e4) - 1.0);
+    const auto rng = std::max (0.01, rangeDb (p[range]));
+    double lo = -rng, hi = 0.0;
+    for (int i = 0; i < 60; ++i)
+    {
+        const auto m = 0.5 * (lo + hi);
+        (m - fetLawDb (peakDb + m, t1, w1, s1, f, rng) < 0.0 ? lo : hi) = m;
+    }
+    return 0.5 * (lo + hi);
 }
 
 float characterCurve (Character c, float x) noexcept
@@ -785,6 +891,7 @@ public:
     {
         sr = rate;
         dc.set (sr);
+        fetTone.set (sr);
         splitAudio.set (sr);
         splitSide.set (sr);
         latencyMs = -1.0; // re-apply the delays
@@ -812,6 +919,7 @@ public:
         for (auto& pk : peaks)
             pk.fill (0.0f);
         dc.reset();
+        fetTone.reset();
         splitAudio.reset();
         splitSide.reset();
         for (auto& b : bandDet)
@@ -863,6 +971,7 @@ private:
         double lin = 1e-6; // round 190v: two-way's follower (linear amplitude)
         double peak = -120.0; // round 173d: the input's peak (instant attack, the detector's release): the lift's ceiling
         double cs = 0.0, c1 = 0.0, c2 = 0.0; // round 190kt: the console law's log gain (nepers) and its two capacitors
+        double fe[3] {}, fg = 1.0; // round 190ky: the FET law's three followers and the gain it applies now (linear)
         int holdLeft = 0, gainHold = 0, peakPos = 0;
     };
 
@@ -881,6 +990,10 @@ private:
         double aRl = 0.0; // two-way: the linear follower's release
         // round 190kt: the console law (threshold nepers, loop gain, knee nepers, attack / release / slow-cap rates)
         double cT = 0.0, cK = 1.0, cKnee = 1.0, cA = 0.0, cR = 0.0, cA2 = 0.0, cR2 = 0.0;
+        // round 190ky: the FET law (its voicing, the first term's knee / width / slope, the followers' rates and weights)
+        const FetVoiceFit* fv = nullptr;
+        double fT1 = 0.0, fW1 = 1.0, fS1 = 0.0;
+        double fA[3] {}, fR[3] {}, fWt[3] {};
     };
     double styleGain (const Ctx& x, double level) const noexcept
     {
@@ -982,6 +1095,24 @@ private:
             c.cA2 = c.cA * consoleAutoCapRatio;
             c.cR2 = std::min (1.0, 1000.0 / (consoleAutoSlowMs * rate));
         }
+        if (sd.curve == Curve::fet) // round 190ky: the followers' one-pole rates per sample
+        {
+            const auto& f = fetVoiceFits[std::max (0, fetVoiceOf (p))];
+            c.fv = &f;
+            c.fT1 = c.thr;
+            c.fW1 = std::max (0.1, c.kn);
+            c.fS1 = std::max (0.0, std::min (c.rat, 1.0e4) - 1.0);
+            const auto relMs = releaseMs (p[release]);
+            const double am[3] { f.a1, f.a2, f.a3 }, rm[3] { f.r1, f.r2, f.r3 };
+            for (int k = 0; k < 3; ++k)
+            {
+                c.fA[k] = 1.0 - std::exp (-1000.0 / (std::max (1.0e-4, att * am[k]) * rate));
+                c.fR[k] = std::exp (-1000.0 / (std::max (1.0e-3, relMs * rm[k]) * rate));
+            }
+            c.fWt[0] = f.w1;
+            c.fWt[1] = f.w2f;
+            c.fWt[2] = 1.0 - f.w1 - f.w2f;
+        }
         c.rate = rate;
         c.slowCoef = coef (1000.0, rate);
         c.gainBlend = sd.gainBlend;
@@ -1012,6 +1143,19 @@ private:
             d.peakPos = (d.peakPos + 1) % x.window;
             for (int k = 0; k < x.window; ++k)
                 level = std::max (level, (double) ring[(std::size_t) k]);
+        }
+        if (x.curve == Curve::fet) // round 190ky: the FET law (feedback, three followers); no hold / window / blend
+        {
+            const auto u = level * d.fg;
+            double cv = 0.0;
+            for (int k = 0; k < 3; ++k)
+            {
+                d.fe[k] = u > d.fe[k] ? d.fe[k] + x.fA[k] * (u - d.fe[k]) : d.fe[k] * x.fR[k];
+                cv += x.fWt[k] * d.fe[k];
+            }
+            const auto g = fetLawDb (20.0 * std::log10 (cv + 1.0e-9), x.fT1, x.fW1, x.fS1, *x.fv, x.rng);
+            d.fg = std::exp (g * nepersPerDb);
+            return g;
         }
         if (x.curve == Curve::console) // round 190kt: the console law (feedback, RC ballistics); no hold / lift / blend
         {
@@ -1352,9 +1496,15 @@ private:
             balance (panOf (p[dryPan]), dryA, dryB);
         }
         const bool panned = wetA != 1.0f || wetB != 1.0f || dryA != 1.0f || dryB != 1.0f;
+        const bool fetToneOn = fetVoiceOf (p) >= 0;
         for (int i = 0; i < n; ++i)
         {
             float a = wl[(std::size_t) i], b = wr[(std::size_t) i];
+            if (fetToneOn) // round 190ky: the FET law's static tone, on the compressed path only
+            {
+                a = fetTone.process (a, 0);
+                b = fetTone.process (b, 1);
+            }
             if (ms)
             {
                 const auto m = a, d = b;
@@ -1414,6 +1564,7 @@ private:
     }
 
     double sr = 48000.0, latencyMs = -1.0;
+    FetTone fetTone; // round 190ky: the FET law's wet-path tone
     double programSum = 0.0, programMs = 1e-4, programDb = -40.0; // auto threshold: the programme's slow RMS
     int osFactor = 0, laSamples = 0;
     std::atomic<int> latency { 0 };
