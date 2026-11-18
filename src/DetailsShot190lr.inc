@@ -141,7 +141,7 @@
                         }
                     dock->stepsVelocityToolForSnapshot (true);
                     // the playing step (the song plays it) lights its column
-                    dock->stepsPlayingStepForSnapshot (5);
+                    dock->stepsPlayingStepForSnapshot (4);
                     write (*dock, "simple-drum-machine-2bars-playing");
                     savePng (dock->createComponentSnapshot (dock->getLocalBounds().withHeight (juce::jmin (dock->getHeight(), 140)), true, 2.0f),
                              prefix + "-simple-drum-machine@2x.png");
@@ -153,19 +153,26 @@
                     check ("pattern B is a new empty pattern named after the track",
                            b >= 0 && b != pattern && offline.getSong().patterns[(std::size_t) b].notes.empty()
                                && juce::String (offline.getSong().patterns[(std::size_t) b].name).endsWith (" B"));
+                    dock->stepsAddClipForCheck(); // (BandLab: an empty pattern is not put on the track)
+                    check ("Add on an empty pattern: nothing added", offline.getSong().playlist.back().pattern != b);
+                    dock->stepsClickForCheck (0, 0);
+                    dock->stepsClickForCheck (0, 8);
+                    offline.dispatchPendingMessages();
                     const auto clips = offline.getSong().playlist.size();
                     dock->stepsAddClipForCheck();
                     offline.dispatchPendingMessages();
-                    check ("Add B: a clip of B on the track", offline.getSong().playlist.size() == clips + 1
-                                                               && offline.getSong().playlist.back().pattern == b && offline.getSong().playlist.back().track == drums);
+                    check ("Add B: a clip of B on the track at the playhead (what it covers is overwritten)",
+                           offline.getSong().playlist.size() > 0 && offline.getSong().playlist.back().pattern == b
+                               && offline.getSong().playlist.back().track == drums && offline.getSong().playlist.back().start == 0);
+                    juce::ignoreUnused (clips);
                     write (*dock, "simple-drum-machine-pattern-b");
                     // ▶ plays the pattern on its own (Pattern mode), ■ gives the song back
                     dock->stepsLetterForCheck (0);
                     dock->stepsPreviewForCheck();
-                    check ("▶: the pattern plays on its own", dock->stepsPreviewingForCheck() && offline.getSong().mode == PlayMode::pattern
+                    check ("play: the pattern plays on its own", dock->stepsPreviewingForCheck() && offline.getSong().mode == PlayMode::pattern
                                                                 && offline.getSong().currentPattern == pattern);
                     dock->stepsPreviewForCheck();
-                    check ("■: the song mode again", ! dock->stepsPreviewingForCheck() && offline.getSong().mode == PlayMode::song);
+                    check ("stop: the song mode again", ! dock->stepsPreviewingForCheck() && offline.getSong().mode == PlayMode::song);
                     // the row keys: A plays the bottom row while the tab shows
                     check ("key A plays the kick row", dock->stepsChannelForKey ('A') == kick && dock->stepsChannelForKey ('Z') == -1);
                     write (ui, "simple-drum-machine-window");

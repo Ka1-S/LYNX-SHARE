@@ -1971,9 +1971,11 @@ void MixerStrips::paint (juce::Graphics& g)
             {
                 const auto bar = juce::Rectangle<int> (meters.getX() + ch * (sp.meterWidth + 2), meters.getY(), sp.meterWidth, meters.getHeight());
                 theme::fillRoundRect (g, bar.toFloat(), 1.5f, colour::bg0);
-                if (! cachePainting) // (cached: the levels are drawn over the picture, paintMeterLevels)
+                if (! cachePainting && ! meterWaveforms) // (cached: the levels are drawn over the picture, paintMeterLevels)
                     paintMeterLevel (g, t, ch, bar);
             }
+            if (! cachePainting && meterWaveforms) // round 190lr (DF-60): FL's Waveforms view instead of the two bars
+                paintMeterWave (g, t, meters.withWidth (2 * sp.meterWidth + 2));
 
             if (hovered (Part::meter))
             {
