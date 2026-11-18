@@ -1397,6 +1397,7 @@ public:
             c.makeupRef = 100.0 * std::clamp ((double) p[makeupRef], 0.0, 1.0);
             c.memory = on (p[optoMemory]);
             c.scWeighting = on (p[scWeighting]) ? 1 : 0;
+            c.cellLaw = on (p[cellLaw]) ? 1 : 0; // round 190lf (hidden)
             const auto mx = std::clamp (p[mix], 0.0f, 1.0f);
             const int hz = analogHz (p[analog]);
             const auto trimGain = (float) dbToGain (trimDb (p[trim]));

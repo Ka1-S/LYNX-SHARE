@@ -214,6 +214,12 @@ struct Settings
     // weighting. 0 = the voicing's own emphasis (every project before); 1 = the even weighting those references measured
     // (much less treble emphasis, a little more bass), its 1 kHz gain the same, so every 1 kHz law fitted before holds
     int scWeighting = 0;
+    // round 190lf [EXEC] (REA_rodada190lf_dyn §1): the cell law. 0 = the laws above (every project before); 1 = LYNX's
+    // compact opto behaviour model fitted on our black-box probes of an opto-leveler emulation (a feedback side chain
+    // through a low and a high peaking filter, a fast and a slow conductance sharing the light, an exposure that slows
+    // the release, a high-frequency band that is reduced less, its own peak reduction / Hi Freq / gain laws). Uses
+    // gain, peakReduction, hiFreq, limit, autoMakeup / makeupRef; the other switches above are ignored
+    int cellLaw = 0;
 };
 double autoMakeupDb (double peakReduction) noexcept; // round 152: AUTO MAKEUP's gain (dB) at a peak reduction dial
 double gainForMakeupDb (double db) noexcept;          // round 165x: the gain dial giving makeupDb (inverse)
@@ -235,6 +241,12 @@ private:
     Biquad scHigh190, scLow190; // round 190fx: the even weighting (Settings::scWeighting)
     double scShift190 = 0.0;    // its level shift (dB) that keeps the chain's 1 kHz gain where the emphasis put it
     double scDesignedRate = 0.0;
+    // round 190lf: the cell law's state (Settings::cellLaw = 1)
+    void processCell (float* l, float* r, int n, const Settings& s) noexcept;
+    struct Peak2 { double b0 = 1, b1 = 0, b2 = 0, a1 = 0, a2 = 0, x1[2] {}, x2[2] {}, y1[2] {}, y2[2] {}; };
+    Peak2 cellLow, cellHigh;
+    double cellHiFreq = -1.0, cellRate = 0.0;
+    double ccf = 0.0, ccs = 0.0, cc3 = 0.0, cexp = 0.0, cenv = 0.0, cyp[2] {}, chx[2] {}, chy[2] {};
     float last = 0.0f;
 };
 } // namespace opto

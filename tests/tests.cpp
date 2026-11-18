@@ -17778,6 +17778,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Parity190ktTests.inc" // round 190kt: REA of the Waves SSLComp DSP, Crest's console law, SSLComp on Crest
 #include "Parity190kyTests.inc" // round 190ky: Crest's FET law (REA of the Waves CLA-76 DSP), CLA-76 on it
 #include "Parity190lfTests.inc" // round 190lf: the Limiter's L2 law (REA of the Waves L2 DSP), L2 on it; PuigTec EQP1A on Facet EQ
+#include "Parity190lfDynTests.inc" // round 190lf (dyn): Glow Leveler's cell law (REA of the Waves CLA-2A), CLA-2A on it
 #include "Sampler190dhTests.inc"
 #include "Fix190eaTests.inc"
 #include "Iss158Tests.inc"

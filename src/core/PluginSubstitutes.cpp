@@ -1984,6 +1984,10 @@ int translateWavesCla2a (const std::vector<std::uint8_t>& state, EffectSlot& slo
     // round 165x [EXEC]: 17 = VU DISPLAY (0 In, 1 GR, 2 Out; read back through the trial's own parameter)
     const auto vu = std::lround (wavesValue (rw, 17).value_or (1.0));
     slot.params[g::vuDisplay] = vu == 0 ? 0.5f : vu == 2 ? 1.0f : 0.0f;
+    // round 190lf [EXEC] (REA_rodada190lf_dyn §1): the cell law — LYNX's compact opto behaviour model, fitted on our
+    // demo-mode probes of the reference (stairs at eight peak reduction dials, Compress and Limit; bursts of 50 ms … 8 s;
+    // 60 Hz / 200 Hz / 1 kHz / 5 kHz stairs at Hi Freq 0 / 20 / 50 / 100; a multitone under reduction for the tilt)
+    slot.params[g::cellLaw] = 1.0f;
     return 8;
 }
 
@@ -2019,10 +2023,14 @@ constexpr Cla76Fit cla76Fits[10] {
     { -31.3386, 0.1073, 3.5943, -1.71 }, // Bluey 4 (law at -40 dBFS: 0.00 dB)
     { -27.7634, 0.1384, 11.2319, -1.06 }, // Bluey A (law at -40 dBFS: -0.00 dB)
 };
-constexpr Cla76Times cla76Times[3] { // the slow follower's attack and half the fast follower's release (ms) at knob 1 / 7
+constexpr Cla76Times cla76Times[4] { // the slow follower's attack and half the fast follower's release (ms) at knob 1 / 7
     { 11.8931, 5.4866, 247.8996, 30.3698 }, // 20 / 12 / 8 (fit76r.py)
     { 29.6727, 0.6607, 1039.0365, 132.2632 }, // 4 (fit76j.py, fit76p.py)
     { 5.2967, 0.1560, 1847.6547, 33.0881 }, // all buttons (fit76jA.py)
+    // round 190lf [EXEC] (REA_rodada190lf_dyn §2): Bluey 20 / 12 / 8 — the release at knob 7 fitted through the shipped
+    // voicings on Bluey 12:1 probes (waves2_190lf/dyn/lab/fit76x.py), knob 1 refined on refcap182's Bluey 12:1 programme
+    // (X4, lab/x4prog.py: the probe fit's 2.1 s at knob 1 over-reduced it), the attack as the row above
+    { 11.8931, 5.4866, 795.0, 12.6423 },
 };
 constexpr double cla76RangeDb = 40.0;
 constexpr int cla76InPoints = 14, cla76OutPoints = 12;
@@ -2063,7 +2071,7 @@ int translateWavesCla76 (const std::vector<std::uint8_t>& state, EffectSlot& slo
     p[c::knee] = linNorm (f.w1, 0.0, 72.0);
     p[c::range] = off ? 0.0f : linNorm (cla76RangeDb, 0.0, 60.0);
     // the knobs' times, geometric between knob 1 and knob 7 (20 / 12 / 8, 4 and all buttons each their own)
-    const auto& t = cla76Times[ratioIndex == 4 ? 2 : ratioIndex == 3 ? 1 : 0];
+    const auto& t = cla76Times[ratioIndex == 4 ? 2 : ratioIndex == 3 ? 1 : bluey ? 3 : 0]; // round 190lf: Bluey 20 / 12 / 8 their own
     p[c::attack] = c::attackValue (t.attack7 * std::pow (t.attack1 / t.attack7, (7.0 - attackKnob) / 6.0));
     p[c::release] = c::releaseValue (t.release7 * std::pow (t.release1 / t.release7, (7.0 - releaseKnob) / 6.0));
     p[c::autoRelease] = 0.0f;
