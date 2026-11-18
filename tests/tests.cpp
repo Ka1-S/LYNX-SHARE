@@ -17905,3 +17905,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Natives190kjEdisonTests.inc" // round natives190kj: FL Edison Dual view, grid step, pitch-period snap, grid-slicing, scrub, pitch regions
 #include "Natives190kjHarmorTests.inc" // round natives190kj: Harmor resynthesis (analysis, voice, engine revision)
 #include "Qa190kpTests.inc" // round qa190kp: Follow pause after a layout switch during playback
+#include "Dsp190kzTests.inc" // round 190kz: exact Reeverb 2 LFO sine and sinc seeds, Maximus revision 1, the opt-in unity bypass
