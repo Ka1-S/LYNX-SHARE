@@ -655,6 +655,8 @@ const EffectInfo& anvilInfo();  // round 190fk: Anvil Bus (core/AnvilBus.h)
 const EffectInfo& corrodeInfo(); // round 190kk: Corrode (core/Corrode.h)
 const EffectInfo& soundboardInfo(); // round 190kk: Soundboard (core/Soundboard.h)
 const EffectInfo& platterInfo(); // round 190kk: Platter (core/Platter.h)
+const EffectInfo& timeprismInfo(); // round 190ko: Timeprism (core/Timeprism.h)
+const EffectInfo& harmoniaInfo(); // round 190ko: Harmonia (core/Harmonia.h)
 
 std::string paramText (EffectKind kind, int param, float v);
 std::unique_ptr<Effect> make (EffectKind kind);

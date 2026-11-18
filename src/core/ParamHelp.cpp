@@ -457,6 +457,23 @@ const std::map<std::pair<K, std::string>, const char*>& own()
         { { K::platter, "hard" }, TR_NOOP ("Soft: a gentle, constant colour; Hard: grit that grows with the level") },
         { { K::platter, "crackle volume" }, TR_NOOP ("Level of the surface crackle") },
         { { K::platter, "crackle density" }, TR_NOOP ("How many crackles per second") },
+        // Timeprism (round 190ko)
+        { { K::timeprism, "time" }, TR_NOOP ("The delay time every frequency starts from") },
+        { { K::timeprism, "feedback" }, TR_NOOP ("How much of the delayed sound goes round again") },
+        { { K::timeprism, "shift" }, TR_NOOP ("Moves each repeat up or down in frequency, in Hz") },
+        { { K::timeprism, "tilt" }, TR_NOOP ("Right: the highs come back later; left: the lows come back later") },
+        { { K::timeprism, "spray" }, TR_NOOP ("Scatters the delay times of the frequencies at random") },
+        { { K::timeprism, "mask" }, TR_NOOP ("Keeps Tilt and Spray to the highs (right) or to the lows (left)") },
+        { { K::timeprism, "freeze" }, TR_NOOP ("Holds the sound of this moment and keeps playing it") },
+        { { K::timeprism, "resolution" }, TR_NOOP ("Bigger: finer frequencies but blurrier timing and more latency") },
+        // Harmonia (round 190ko)
+        { { K::harmonia, "frequency" }, TR_NOOP ("The pitch of the first partial the input makes ring") },
+        { { K::harmonia, "decay" }, TR_NOOP ("How long the partials ring") },
+        { { K::harmonia, "stretch" }, TR_NOOP ("Squeezes the partials together (left) or spreads them apart (right)") },
+        { { K::harmonia, "shift" }, TR_NOOP ("Moves the input's pitch before it reaches the partials") },
+        { { K::harmonia, "hf damp" }, TR_NOOP ("Makes the high partials die sooner") },
+        { { K::harmonia, "lf damp" }, TR_NOOP ("Makes the low partials die sooner") },
+        { { K::harmonia, "harmonics" }, TR_NOOP ("How many partials ring") },
         // Anvil Bus (round 190fk)
         { { K::anvilBus, "drive" }, TR_NOOP ("How hard the drums hit the drive stage") },
         { { K::anvilBus, "drive type" }, TR_NOOP ("Soft folds the loudest peaks over, Medium and Hard clip them, each with its own tone") },

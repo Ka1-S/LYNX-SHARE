@@ -143,6 +143,9 @@ add_library(lynx_core STATIC
     src/core/WavetableSynth.cpp
     src/core/WavetableTables.cpp
     src/core/AlsDevicesWt.cpp
+    src/core/Braid.cpp
+    src/core/BraidParams.cpp
+    src/core/AlsDevicesLot6.cpp
     src/core/Morphine.cpp
     src/core/FruitKick.cpp
     src/core/BassDrum.cpp

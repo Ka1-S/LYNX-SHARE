@@ -2857,6 +2857,17 @@ public:
             return;
         }
 
+        if (args.contains ("--meldshot190ko"))
+        {
+            // LYNX.exe --meldshot190ko prefix meld.adv spectraltime.adv spectralresonator.adv: round 190ko off-screen, in the
+            // Clip-launch layout: a track whose instrument is what a Live Meld preset imports onto (Braid) and whose insert
+            // holds what Spectral Time and Spectral Resonator presets import onto (Timeprism, Harmonia), on the Device View.
+            // Writes prefix-devices.png and prefix-checks.txt.
+            const auto i = args.indexOf ("--meldshot190ko");
+            runMeldShot190ko (args[i + 1].unquoted(), args[i + 2].unquoted(), args[i + 3].unquoted(), args[i + 4].unquoted());
+            quit();
+            return;
+        }
         if (args.contains ("--livedevshot190kk"))
         {
             // LYNX.exe --livedevshot190kk prefix: round 190kk off-screen, in the Clip-launch layout: a track whose insert holds
@@ -31289,6 +31300,102 @@ private:
     }
 
     // round 190kk: Live's Erosion / Vinyl Distortion / Corpus imported, their LYNX engines on the Device View
+    void runMeldShot190ko (const juce::String& prefix, const juce::String& meld, const juce::String& time, const juce::String& resonator)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        lynx::MainComponent ui (offline, false);
+        const auto size = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_SNAPSHOT_SIZE", "1600x900"), "x", "");
+        ui.setSize (juce::jlimit (800, 3840, size[0].getIntValue()), juce::jlimit (450, 2160, size[1].getIntValue()));
+        juce::String checks;
+        // a Live device preset (.adv, gzip) → its device element's text
+        const auto deviceOf = [] (const juce::String& path, lynx::xml::Document& doc) {
+            juce::MemoryBlock raw;
+            juce::File (path).loadFileAsData (raw);
+            juce::MemoryInputStream in (raw, false);
+            juce::GZIPDecompressorInputStream gz (&in, false, juce::GZIPDecompressorInputStream::gzipFormat);
+            const auto text = gz.readEntireStreamAsString();
+            if (! doc.parse (text.toStdString()))
+                return lynx::xml::Element();
+            const auto kids = doc.root().children();
+            return kids.empty() ? lynx::xml::Element() : kids.front();
+        };
+        lynx::ChannelDef braid;
+        braid.instrument = lynx::InstrumentKind::braid;
+        braid.name = "Meld";
+        {
+            lynx::xml::Document doc;
+            lynx::alsdev::Notes notes;
+            const auto d = deviceOf (meld, doc);
+            const auto ok = (bool) d && lynx::alsdev::meldToBraid (d, braid, notes);
+            checks << (ok ? "ok   " : "FAIL ") << "Meld -> Braid: " << meld << "\n";
+            braid.name = juce::File (meld).getFileNameWithoutExtension().toStdString();
+        }
+        std::vector<lynx::EffectSlot> slots;
+        for (const auto& path : { time, resonator })
+        {
+            lynx::xml::Document doc;
+            const auto d = deviceOf (path, doc);
+            if (const auto t = d ? lynx::alsdev::effectFromLiveDevice (d) : std::nullopt)
+            {
+                slots.push_back (t->slot);
+                checks << "ok   " << t->from << " -> " << t->to << ": " << path << "\n";
+            }
+            else
+                checks << "FAIL NOT TRANSLATED: " << path << "\n";
+        }
+        offline.editSong ([&slots, &braid] (lynx::Song& s) {
+            if (s.channels.empty())
+                s.channels.resize (1);
+            braid.mixerTrack = 2;
+            s.channels[0] = braid;
+            if (s.mixer.size() < 3)
+                s.mixer.resize (3);
+            s.mixer[2].name = braid.name;
+            s.mixer[2].effects = slots;
+            while (s.patterns.empty())
+                s.patterns.emplace_back();
+            s.patterns[0].name = "Chords";
+            s.patterns[0].notes.clear();
+            for (const int key : { 48, 52, 55 })
+            {
+                lynx::Note note;
+                note.channel = 0;
+                note.start = 0;
+                note.length = 2 * lynx::ppq;
+                note.key = key;
+                s.patterns[0].notes.push_back (note);
+            }
+            s.patterns[0].lengthTicks = 4 * lynx::ppq;
+            s.playlistTracks.resize (std::max<std::size_t> (s.playlistTracks.size(), 2));
+            s.playlistTracks[1].name = braid.name;
+        }, false);
+        offline.dispatchPendingMessages();
+        ui.setVisible (true);
+        lynx::DetailView::shownSetting = lynx::DetailView::devicesPage = true;
+        ui.selectTabForSnapshot (2);
+        ui.setClipLaunchWorkflow (true);
+        offline.editSong ([] (lynx::Song& s) {
+            lynx::Clip clip;
+            clip.pattern = 0;
+            clip.length = 4 * lynx::ppq;
+            lynx::launcher::setClip (s, 1, 0, clip);
+        }, false);
+        offline.dispatchPendingMessages();
+        if (auto* detail = ui.getDetailViewForSnapshot())
+        {
+            detail->showSelection (1, 0);
+            detail->setPage (lynx::DetailView::Page::devices);
+            offline.dispatchPendingMessages();
+            const auto file = lynx::shot::file (juce::File (prefix + "-devices.png"));
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (lynx::shot::snapshot (ui), out);
+            checks << "cards " << detail->cardCountForCheck() << ", insert " << detail->chainInsertForCheck() << "\n";
+        }
+        juce::File (prefix + "-checks.txt").replaceWithText (checks);
+    }
+
     void runLiveDevShot190kk (const juce::String& prefix)
     {
         juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);

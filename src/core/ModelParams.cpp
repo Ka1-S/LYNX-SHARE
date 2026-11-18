@@ -12,6 +12,7 @@
 #include "core/PocketSuperSaw.h"
 #include "core/FmSynth.h"
 #include "core/WavetableSynth.h"
+#include "core/Braid.h"
 #include "core/PoiZone.h"
 #include "core/Sawer.h"
 #include "core/Toxic.h"

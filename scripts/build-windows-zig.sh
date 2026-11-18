@@ -244,6 +244,8 @@ APP_SOURCES+=(src/core/PocketSuperSaw.cpp)
 APP_SOURCES+=(src/core/FmSynth.cpp src/core/AlsDevicesFm.cpp)
 # Helix: LYNX's own wavetable synth and the import of Live's Wavetable onto it (round 190ja)
 APP_SOURCES+=(src/core/WavetableSynth.cpp src/core/WavetableTables.cpp src/core/AlsDevicesWt.cpp)
+# Braid (Live's Meld) and the spectral effects' import, round 190ko
+APP_SOURCES+=(src/core/Braid.cpp src/core/BraidParams.cpp src/core/AlsDevicesLot6.cpp)
 # onboarding: FL Studio integration (plugin database, sample relocation), background scan, setup wizard
 APP_SOURCES+=(src/core/FlPluginDb.cpp src/engine/FlStudio.cpp src/ui/SetupWizard.cpp)
 APP_SOURCES+=(src/core/PluginCatalog.cpp src/ui/PluginPicker.cpp)

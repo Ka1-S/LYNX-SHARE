@@ -3471,6 +3471,8 @@ const EffectInfo& effectInfoOf (EffectKind kind)
         case EffectKind::corrode: return mixsuite::corrodeInfo();
         case EffectKind::soundboard: return mixsuite::soundboardInfo();
         case EffectKind::platter: return mixsuite::platterInfo();
+        case EffectKind::timeprism: return mixsuite::timeprismInfo();
+        case EffectKind::harmonia: return mixsuite::harmoniaInfo();
         case EffectKind::pocketAutoduck:
         {
             static const EffectInfo info { "Pocket Autoduck", { { "Ducking", 0.501f }, { "Attack", 0.1f }, { "Curve", 0.501f }, { "Time", 1.0f },
@@ -4407,6 +4409,8 @@ std::string formatEffectParam (EffectKind kind, int param, float v, double bpm)
         case EffectKind::corrode:
         case EffectKind::soundboard:
         case EffectKind::platter:
+        case EffectKind::timeprism:
+        case EffectKind::harmonia:
             return mixsuite::paramText (kind, param, v);
         case EffectKind::lynxTune:
             return lynxtune::paramText (param, v);
@@ -4989,7 +4993,9 @@ std::unique_ptr<Effect> makeEffect (EffectKind kind)
         case EffectKind::anvilBus:
         case EffectKind::corrode:
         case EffectKind::soundboard:
-        case EffectKind::platter: return mixsuite::make (kind); // LYNX's own mixing suite (REA_rodada96)
+        case EffectKind::platter:
+        case EffectKind::timeprism:
+        case EffectKind::harmonia: return mixsuite::make (kind); // LYNX's own mixing suite (REA_rodada96)
         case EffectKind::rackMixer: return rack::makeChainMixer(); // a rack chain's mixer (round 183c)
         case EffectKind::edison: return std::make_unique<edisonfx::Processor>(); // without its slot: nothing to play (round 190cd)
         case EffectKind::lynxTune: return lynxtune::make(); // LYNX's own pitch corrector (REA_rodada95)

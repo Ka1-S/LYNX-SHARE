@@ -180,8 +180,10 @@ enum class InstrumentKind : std::uint8_t
                     // values 0…1 in modelParams (FLM's parameter k + 1 at index k)
     tetra,          // Tetra (round 190hs, core/FmSynth.h): LYNX's own 4-operator FM synth (Live's Operator imports onto it);
                     // its values in Operator's units in modelParams (fm::stateSize: parameters, then the user waves' partials)
-    helix           // Helix (round 190ja, core/WavetableSynth.h): LYNX's own wavetable synth (Live's Wavetable imports onto it);
+    helix,          // Helix (round 190ja, core/WavetableSynth.h): LYNX's own wavetable synth (Live's Wavetable imports onto it);
                     // its values in Wavetable's units in modelParams (wt::stateSize: parameters, the two tables, the matrix)
+    braid           // Braid (round 190ko, core/Braid.h): LYNX's own two-engine macro synth (Live's Meld imports onto it); its
+                    // values in Meld's units in modelParams (braid::stateSize: parameters, then the modulation matrix)
 };
 
 // External plugin: format identifier (the app knows how to find the file) + saved state.
@@ -1254,10 +1256,12 @@ enum class EffectKind : std::uint8_t
     anvilBus,        // LYNX's drum-bus processor (round 190fk, core/AnvilBus.h): drive (3 types), crunch, damp, transients, boom, comp; Live's Drum Buss imports onto it
     corrode,         // LYNX's degrader (round 190kk, core/Corrode.h): a short delay moved by a sine or band-passed noise; Live's Erosion imports onto it
     soundboard,      // LYNX's resonant body (round 190kk, core/Soundboard.h): a bank of tuned modes laid out as 7 objects; Live's Corpus imports onto it
-    platter          // LYNX's record-wear effect (round 190kk, core/Platter.h): tracing / pinch distortion on a band, crackle; Live's Vinyl Distortion imports onto it
+    platter,         // LYNX's record-wear effect (round 190kk, core/Platter.h): tracing / pinch distortion on a band, crackle; Live's Vinyl Distortion imports onto it
+    timeprism,       // LYNX's spectral freezer and delay (round 190ko, core/Timeprism.h); Live's Spectral Time imports onto it
+    harmonia         // LYNX's spectral resonator (round 190ko, core/Harmonia.h): a bank of partials the input's spectrum excites; Live's Spectral Resonator imports onto it
 };
 // the last EffectKind (loops over every kind; update when one is appended)
-constexpr EffectKind lastEffectKind = EffectKind::platter;
+constexpr EffectKind lastEffectKind = EffectKind::harmonia;
 
 // round 165x: 160 → 192 (Ember had reached 160; a slot's parameters are 768 bytes, project files store only an engine's
 // own count, so older projects load unchanged). Round 150: 128 → 160 (Prism Multiband 155, Ember 133).

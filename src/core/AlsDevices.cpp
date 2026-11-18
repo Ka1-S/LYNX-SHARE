@@ -861,6 +861,21 @@ std::optional<Translated> effectFromLiveDevice (const Element& device, const Con
         t.to = "Edison";
         ok = looperToSlot (device, t);
     }
+    // ---- lot 6 (round 190ko) ----
+    else if (tag == "Spectral")
+    {
+        t.from = "Spectral Time";
+        t.to = "Timeprism";
+        t.approximate = true;
+        ok = spectralTimeToTimeprism (device, t);
+    }
+    else if (tag == "Transmute")
+    {
+        t.from = "Spectral Resonator";
+        t.to = "Harmonia";
+        t.approximate = true;
+        ok = spectralResonatorToHarmonia (device, t);
+    }
     if (! ok)
         return std::nullopt;
     t.slot.enabled = device.boolean ("On/Manual", true);

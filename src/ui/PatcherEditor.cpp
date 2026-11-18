@@ -1659,6 +1659,7 @@ private:
             case EffectKind::reeverb2: case EffectKind::reeverb1: case EffectKind::fruityDelay2: case EffectKind::fruityDelay3:
             case EffectKind::fruityDelayBank: case EffectKind::luxeVerb: case EffectKind::multibandDelay: case EffectKind::flDelay1: case EffectKind::convolver: case EffectKind::pocketTranceDelay: case EffectKind::pocketTapeDelay: case EffectKind::pocketTapeStop:
             case EffectKind::pocketReverbClassic: case EffectKind::pocketReverb2: case EffectKind::pocketReverb: // round 190dw
+            case EffectKind::timeprism: // round 190ko
                 return "Delay reverb";
             case EffectKind::distortion: case EffectKind::lofi: case EffectKind::fruityWaveShaper: case EffectKind::fruitySoftClipper:
             case EffectKind::fruityBloodOverdrive: case EffectKind::fruityFastDist: case EffectKind::hardcore: case EffectKind::distructor: case EffectKind::pocketDistortion: case EffectKind::pocketWaveshaper:
@@ -1676,6 +1677,7 @@ private:
             case EffectKind::vocoder: case EffectKind::vocodex: case EffectKind::aether: case EffectKind::flLowLifter:
             case EffectKind::flCenter: case EffectKind::flBassBoost: case EffectKind::fl7BandEq:
             case EffectKind::soundboard: // round 190kk (a resonator)
+            case EffectKind::harmonia: // round 190ko (a resonator)
                 return "Filter";
             case EffectKind::chorus: case EffectKind::fruityChorus: case EffectKind::hyperChorus: case EffectKind::vintageChorus:
             case EffectKind::fruityFlangus: case EffectKind::fruityFlanger: case EffectKind::fruityPhaser: case EffectKind::vintagePhaser:

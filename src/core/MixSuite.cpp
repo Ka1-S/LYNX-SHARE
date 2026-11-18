@@ -20,6 +20,8 @@
 #include "core/Corrode.h"
 #include "core/Soundboard.h"
 #include "core/Platter.h"
+#include "core/Timeprism.h"
+#include "core/Harmonia.h"
 #include "core/VoiceMatch.h"
 #include "core/VoxStrip.h"
 
@@ -4064,13 +4066,15 @@ std::unique_ptr<Effect> makeAnvil(); // round 190fk (core/AnvilSuite.inc)
 std::unique_ptr<Effect> makeCorrode(); // round 190kk (core/LiveFxSuite.inc)
 std::unique_ptr<Effect> makeSoundboard();
 std::unique_ptr<Effect> makePlatter();
+std::unique_ptr<Effect> makeTimeprism(); // round 190ko (core/LiveFxSuite.inc)
+std::unique_ptr<Effect> makeHarmonia();
 bool isSuiteKind (EffectKind kind) noexcept
 {
     return kind == EffectKind::ridgeStrip || kind == EffectKind::glowLeveler || kind == EffectKind::hushDeEsser
            || kind == EffectKind::aether || kind == EffectKind::ember || kind == EffectKind::kilnChannel
            || kind == EffectKind::fretChannel || kind == EffectKind::shellChannel || kind == EffectKind::strikeShaper
            || kind == EffectKind::anvilBus || kind == EffectKind::corrode || kind == EffectKind::soundboard
-           || kind == EffectKind::platter;
+           || kind == EffectKind::platter || kind == EffectKind::timeprism || kind == EffectKind::harmonia;
 }
 
 std::unique_ptr<Effect> make (EffectKind kind)
@@ -4090,6 +4094,8 @@ std::unique_ptr<Effect> make (EffectKind kind)
         case EffectKind::corrode: return makeCorrode();
         case EffectKind::soundboard: return makeSoundboard();
         case EffectKind::platter: return makePlatter();
+        case EffectKind::timeprism: return makeTimeprism();
+        case EffectKind::harmonia: return makeHarmonia();
         default: return nullptr;
     }
 }
@@ -4262,6 +4268,10 @@ std::string paramText (EffectKind kind, int param, float v)
         return soundboardParamText (param, v);
     if (kind == EffectKind::platter)
         return platterParamText (param, v);
+    if (kind == EffectKind::timeprism)
+        return timeprismParamText (param, v);
+    if (kind == EffectKind::harmonia)
+        return harmoniaParamText (param, v);
     if (kind == EffectKind::kilnChannel)
     {
         namespace k = kiln;

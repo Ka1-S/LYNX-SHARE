@@ -168,6 +168,7 @@ const char* instrumentId (InstrumentKind k)
         case InstrumentKind::pocketSuperSaw: return "pocketsupersaw";
         case InstrumentKind::tetra: return "tetra";
         case InstrumentKind::helix: return "helix";
+        case InstrumentKind::braid: return "braid"; // round 190ko
     }
     return "synth";
 }
@@ -182,7 +183,7 @@ InstrumentKind instrumentFromId (const juce::String& id)
                     InstrumentKind::fruitkick, InstrumentKind::bassdrum, InstrumentKind::toxic,
                     InstrumentKind::threeosc, InstrumentKind::autogun, InstrumentKind::transistorbass,
                     InstrumentKind::simsynth, InstrumentKind::wasp, InstrumentKind::plucked, InstrumentKind::beepmap, InstrumentKind::sawer, InstrumentKind::flkeys,
-                    InstrumentKind::granulizer, InstrumentKind::drumaxx, InstrumentKind::slayer, InstrumentKind::fruitydance, InstrumentKind::directwave, InstrumentKind::midiOut, InstrumentKind::patcher, InstrumentKind::soundfont, InstrumentKind::layer, InstrumentKind::dashboard, InstrumentKind::voltage, InstrumentKind::vfx, InstrumentKind::videoplayer, InstrumentKind::keplerExo, InstrumentKind::wavetraveller, InstrumentKind::fruityslicer, InstrumentKind::slicex, InstrumentKind::fpc, InstrumentKind::pocketSuperSaw, InstrumentKind::tetra, InstrumentKind::helix })
+                    InstrumentKind::granulizer, InstrumentKind::drumaxx, InstrumentKind::slayer, InstrumentKind::fruitydance, InstrumentKind::directwave, InstrumentKind::midiOut, InstrumentKind::patcher, InstrumentKind::soundfont, InstrumentKind::layer, InstrumentKind::dashboard, InstrumentKind::voltage, InstrumentKind::vfx, InstrumentKind::videoplayer, InstrumentKind::keplerExo, InstrumentKind::wavetraveller, InstrumentKind::fruityslicer, InstrumentKind::slicex, InstrumentKind::fpc, InstrumentKind::pocketSuperSaw, InstrumentKind::tetra, InstrumentKind::helix, InstrumentKind::braid })
         if (id == instrumentId (k))
             return k;
 
@@ -306,6 +307,8 @@ const char* effectId (EffectKind k)
         case EffectKind::corrode: return "corrode"; // round 190kk
         case EffectKind::soundboard: return "soundboard"; // round 190kk
         case EffectKind::platter: return "platter"; // round 190kk
+        case EffectKind::timeprism: return "timeprism"; // round 190ko
+        case EffectKind::harmonia: return "harmonia"; // round 190ko
         case EffectKind::lynxTune: return "lynxTune";
         case EffectKind::fruityPhaser: return "fruityPhaser";
         case EffectKind::epochVerb: return "epochVerb";
@@ -1391,7 +1394,7 @@ std::optional<EffectKind> effectFromId (const juce::String& id)
                     EffectKind::fruityMute2, EffectKind::bigClock, EffectKind::tuner, EffectKind::htmlNotebook,
                     EffectKind::scratcher, EffectKind::transmitter, EffectKind::flEmphasis, EffectKind::flTransporter,
                     EffectKind::kilnChannel, EffectKind::fretChannel, EffectKind::shellChannel, EffectKind::strikeShaper, EffectKind::rackMixer,
-                    EffectKind::edison, EffectKind::anvilBus, EffectKind::corrode, EffectKind::soundboard, EffectKind::platter })
+                    EffectKind::edison, EffectKind::anvilBus, EffectKind::corrode, EffectKind::soundboard, EffectKind::platter, EffectKind::timeprism, EffectKind::harmonia })
         if (id == effectId (k))
             return k;
 

@@ -148,17 +148,24 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
     flattenEffects (root, { "soundboard" },
                     TR_NOOP ("Soundboard (an imported Live Corpus) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})"),
                     lost);
+    // round 190ko: Live's Spectral Time / Spectral Resonator engines
+    flattenEffects (root, { "timeprism" },
+                    TR_NOOP ("Timeprism (an imported Live Spectral Time) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})"),
+                    lost);
+    flattenEffects (root, { "harmonia" },
+                    TR_NOOP ("Harmonia (an imported Live Spectral Resonator) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})"),
+                    lost);
 
     // channels: Tetra (round 190hs) is not in 0.1.28, which would play its channels as its basic synth: an empty Sampler
     // (silent) keeps the channel, its notes and its routing; DirectWave states (rounds 190hz / 190ii) get their short zone
     // records completed as DirectWave reads them, since 0.1.28 skipped them (FL's version-36 programs lost their loops)
     {
-        juce::StringArray tetra, helix;
+        juce::StringArray tetra, helix, braid;
         forEachChannel (root, [&] (juce::DynamicObject& c, int i) {
             const auto instrument = c.getProperty ("instrument").toString();
-            if (instrument == "tetra" || instrument == "helix") // (rollup step 3: Helix, round 190ja, as Tetra)
+            if (instrument == "tetra" || instrument == "helix" || instrument == "braid") // (rollup step 3: Helix, round 190ja, as Tetra; Braid, 190ko)
             {
-                (instrument == "tetra" ? tetra : helix).add (channelName (juce::var (&c), i));
+                (instrument == "tetra" ? tetra : instrument == "helix" ? helix : braid).add (channelName (juce::var (&c), i));
                 c.setProperty ("instrument", "sampler");
                 drop (c, "modelParams");
                 drop (c, "pluginState");
@@ -182,6 +189,8 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
             lost.push_back ({ TR_NOOP ("Tetra is not in this release: its channels become empty Samplers and play nothing: {0}"), listOf (tetra), true });
         if (! helix.isEmpty())
             lost.push_back ({ TR_NOOP ("Helix is not in this release: its channels become empty Samplers and play nothing: {0}"), listOf (helix), true });
+        if (! braid.isEmpty())
+            lost.push_back ({ TR_NOOP ("Braid is not in this release: its channels become empty Samplers and play nothing: {0}"), listOf (braid), true });
     }
 
     // notes: index 19 holds a note's MPE curves (round 190hy)

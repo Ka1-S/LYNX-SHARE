@@ -6860,7 +6860,8 @@ bool isModelKind (InstrumentKind kind) noexcept
            || kind == InstrumentKind::simsynth || kind == InstrumentKind::wasp || kind == InstrumentKind::plucked
            || kind == InstrumentKind::beepmap || kind == InstrumentKind::sawer || kind == InstrumentKind::flkeys
            || kind == InstrumentKind::granulizer || kind == InstrumentKind::drumaxx
-           || kind == InstrumentKind::slayer || kind == InstrumentKind::fruitydance || kind == InstrumentKind::sytrus || kind == InstrumentKind::pocketSuperSaw;
+           || kind == InstrumentKind::slayer || kind == InstrumentKind::fruitydance || kind == InstrumentKind::sytrus || kind == InstrumentKind::pocketSuperSaw
+           || kind == InstrumentKind::braid; // (round 190ko: Braid's parameters as a knob list, Meld's units)
 }
 
 // The instrument page of a channel or a Patcher node (null: none of its own)
@@ -7332,6 +7333,7 @@ bool hasChannelSettings (InstrumentKind kind) noexcept
         case InstrumentKind::pocketSuperSaw:
         case InstrumentKind::tetra:
         case InstrumentKind::helix:
+        case InstrumentKind::braid:
             return true;
         default:
             return false;
