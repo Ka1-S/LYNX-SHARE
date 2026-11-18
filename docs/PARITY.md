@@ -4102,6 +4102,12 @@ some Waves settings (renders with the previous setting's state); every probe of 
   modulation as a smoothed, free-running triangle, as measured.
 - **Reeverb 2 — the direct law** (hidden; TrueVerb only, direct sound on): TrueVerb's exact first-order direct-sound shelf
   by Distance, and a refit tail (decay, bass, damping, wet) for those settings.
+- **Quell Denoiser — the zero law** (hidden [5]; Waves NS1 only; sub-round after the crash, `REA_rodada190lf_ns1.md`): REA
+  of NS1's DSP (zero-latency split, per-band cuts transparent when open, a slewing noise-floor tracker, a soft thr⁴ weight,
+  a voice-activity flag) and of its saved states (the knob moves the split 60 Hz / 16 kHz → 110 Hz / 8 kHz, the band
+  centres, the low / high cuts 0 → −70 dB). At 0 % NS1 is exactly its all-pass pair (−40 … −71 dB ESR on refcap182's D):
+  Amount 0 is that bare pair and the matched engine fades in up to 20 % (from 20 % the engine alone, bit for bit). NS1's
+  20 … 100 % need its own moving layout and tracker (next round; probes ready in `waves2_190lf/ns1/cap`).
 
 | reference → LYNX | files | before → after | up / same / down |
 |---|---|---|---|
@@ -4111,6 +4117,7 @@ some Waves settings (renders with the previous setting's state); every probe of 
 | Waves CLA-76 → Crest (FET law, Bluey row) | 25 | 6.92 → **7.16** | 5 / 20 / 0 |
 | Waves H-Delay → Echoform (hybrid law 1) | 30 | 6.27 → **7.00** | 6 / 24 / 0 |
 | Waves TrueVerb → Reeverb 2 (direct law) | 25 | 3.96 → **4.20** | 3 / 22 / 0 |
+| Waves NS1 → Quell Denoiser (zero law) | 25 | 4.84 → **5.40** | 5 / 20 / 0 |
 | Waves RVerb / H-Reverb → Reeverb 2 (unchanged) | 25 / 25 | 3.48 / 3.16 | — |
 | Waves SSLComp, SuperTap (unchanged, checked) | 25 / 25 | 7.56 / 6.44 | 0 / 25 / 0 each |
 
@@ -4126,18 +4133,20 @@ was not changed.
 **Old projects.** Every new behaviour runs only with its hidden law set by the translators. Gold renders (base = round
 190ky's binary, 44.1 / 48 / 96 kHz × 3 programme signals, byte-identical): the Limiter (default + 10 settings) and Facet,
 117; Glow Leveler's own and classic voicings + Crest, 153; Echoform's engines and styles, Reeverb 2 by hand and the
-unchanged reverb / H-Delay translations, 144 — **414 renders, 0 differ**.
+unchanged reverb / H-Delay translations, 144; Quell (default, classic / matched engines, tracker, Listen, Output), 135 —
+**549 renders, 0 differ**.
 
 **CPU** (`/mnt/e/lynx-work/waves2_190lf/cpu/bench.log`: 35 s stereo at 48 kHz incl. file I/O, best of 5 on one core, base =
 round 190ky's binary, load ~15, so ±30 %: a plain file copy measured 0.84 / 0.71 s): L2 states 1.04 / 0.73 s → 0.86 / 1.10 s
 (ARC / manual; the law ≈ +1 % of a core at most), its latency 72 → 64 samples; PuigTec 0.92 s (Facet, eight bands: ≈ +0.6 %
 of a core against the copy; before it had no stand-in); CLA-2A 1.03 / 1.07 → 1.00 / 0.92 s, CLA-76 X4 1.11 → 0.94 s,
-H-Delay 2.67 / 2.70 / 1.99 → 2.06 / 2.25 / 1.86 s, TrueVerb 2.18 / 2.78 → 2.02 / 1.94 s: no measurable change.
+H-Delay 2.67 / 2.70 / 1.99 → 2.06 / 2.25 / 1.86 s, TrueVerb 2.18 / 2.78 → 2.02 / 1.94 s, NS1 D / S1 2.10 / 2.05 →
+2.13 / 1.97 s (best of 7): no measurable change.
 
 **Tests:** `tests/Parity190lfTests.inc` (4: the L2 law hidden / off, brickwall and make-up, ARC vs manual release, the L2 and
-PuigTec translations), `Parity190lfDynTests.inc` (3), `Parity190lfVerbTests.inc` (6); expectations moved: Parity190jh (L2 → the
-law), VoiceMatchTests123 / Parity165x (CLA-2A on the cell law), Echo190dl / Parity190js (H-Delay / TrueVerb). Mini runner
-(round 190ky's list + the round's three files): **543 906 checks, 0 failures**. No full Linux / Windows build, no
+PuigTec translations), `Parity190lfDynTests.inc` (3), `Parity190lfVerbTests.inc` (6), `Parity190lfNs1Tests.inc` (4); expectations moved: Parity190jh (L2 → the
+law), VoiceMatchTests123 / Parity165x (CLA-2A on the cell law), Echo190dl / Parity190js (H-Delay / TrueVerb), VoiceToolsTests119 (NS1: 3 values). Mini runner
+(round 190ky's list + the round's four files): **543 929 checks, 0 failures**. No full Linux / Windows build, no
 --selftest (no UI change, no new strings; the train does those).
 
 **Owner decisions (reversible; the recommended option taken):** (1) CLA-2A ships on the cell law although X2_vocal goes 8 → 7
@@ -4147,5 +4156,5 @@ on (with it off it would cost X4 0.2 … 0.6); (3) PuigTec stands in on Facet EQ
 would need UI).
 
 **Still off:** Doubler2 (4.48), Waves Tune Real-Time (5.36) and RVerb / H-Reverb's decay (time / the table's ceiling);
-NS1 (4.84): see below if its sub-round landed; PuigTec's mains hum, tube harmonics (−50 dB at −4 dBFS) and its resampler's
+NS1 at 20 … 100 % (a new engine); PuigTec's mains hum, tube harmonics (−50 dB at −4 dBFS) and its resampler's
 fractional delay; L2's IDR dither; CLA-76's auto make-up and output saturation (no scored setting uses them).

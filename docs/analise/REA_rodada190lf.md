@@ -77,5 +77,4 @@ sub-rounds' results are in their files and in docs/PARITY.md "Round 190lf".
 ## 5. Not done
 
 Doubler2 (4.48) and Waves Tune Real-Time (5.36): time (each a time-varying process that needs its own REA and probe
-set; their baselines stay). NS1 (4.84): a separate sub-round after the 04:56 crash (`REA_rodada190lf_ns1.md` if it
-landed). PuigTec's mains hum, the resampler's fractional delay and the tube stage's harmonics are not modelled.
+set; their baselines stay). NS1: a separate sub-round after the 04:56 crash (`REA_rodada190lf_ns1.md`: 0 % exact, 4.84 → 5.40; 20 … 100 % next). PuigTec's mains hum, the resampler's fractional delay and the tube stage's harmonics are not modelled.
