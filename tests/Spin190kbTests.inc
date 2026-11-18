@@ -112,12 +112,27 @@ TEST (spin190kb_task_graph_waits_run_every_position_once_in_every_mode)
         else
             CHECK (after.waitYields == before.waitYields); // (the new one never yields)
     }
-    // waitspin=0: the waits that found no task slept (the statistics see them)
+    // waitspin=0: the waits that found no task slept (the statistics see them).
+    // Round 190kz (sched): counted, not timed. A wait happens only when a worker takes a position before the thread
+    // that will push its task has done so, i.e. only when two threads really run at once. On a loaded machine (load
+    // 29-36: other builds on every core) the workers can be woken so late that the caller ran a whole 200-round batch
+    // alone, every position already pushed when taken: no wait at all, so nothing could sleep (1 failure in 5 runs).
+    // So batches run until the statistics have seen waits that slept (bounded: 40 batches of 100 rounds, about a
+    // second even when loaded); every batch must still run every position exactly once.
     lynx::WorkerPool::tuning().apply ("wait=1,waitspin=0");
     const auto before = pool.stats();
-    CHECK (spin190kb::runGraph (pool, 200) == 0);
-    CHECK (pool.stats().waitSleeps > before.waitSleeps);
+    auto wrongRuns = 0;
+    for (int batch = 0; batch < 40; ++batch)
+    {
+        wrongRuns += spin190kb::runGraph (pool, 100);
+        const auto now = pool.stats();
+        if (now.waits > before.waits && now.waitSleeps > before.waitSleeps)
+            break;
+        std::this_thread::sleep_for (std::chrono::milliseconds (2)); // (give the scheduler a chance to run the workers)
+    }
+    CHECK (wrongRuns == 0);
     CHECK (pool.stats().waits > before.waits);
+    CHECK (pool.stats().waitSleeps > before.waitSleeps);
 }
 
 TEST (spin190kb_stats_count_rounds_spins_and_sleeps)
