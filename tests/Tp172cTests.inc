@@ -45,7 +45,9 @@ TEST (ridge_channel_strip_2_state_translated_tp172c)
     for (const double ratio : { 1.1, 1.8, 4.3, 10.0, 21.0, 38.0, 63.0 })
         CHECK (std::abs (r::mRatio (r::mRatioValue (ratio)) - ratio) < 1e-3 * ratio);
 
-    p = tp172c::sslSlot ("SSL 4K G", "<PARAM id=\"LowMidEqFreq\" value=\"1.5\"/><PARAM id=\"LowMidEqDiv3\" value=\"1.0\"/>"
+    // (EqType 1 = Black; since round 190lb a state without it reads as the 4K G's default, Pink: Parity190lbTests.inc)
+    p = tp172c::sslSlot ("SSL 4K G", "<PARAM id=\"EqType\" value=\"1.0\"/>"
+                                     "<PARAM id=\"LowMidEqFreq\" value=\"1.5\"/><PARAM id=\"LowMidEqDiv3\" value=\"1.0\"/>"
                                      "<PARAM id=\"HighMidEqFreq\" value=\"2.0\"/><PARAM id=\"HighMidEqMult3\" value=\"1.0\"/>").params;
     CHECK (r::k4Voicing (p) && r::k4ColourIndex (p[r::k4Colour]) == 1);
     CHECK (std::abs (r::lmfHz (p[r::lmfFreq]) - 500.0) < 0.1 && std::abs (r::hmfHz (p[r::hmfFreq]) - 6000.0) < 1.0);

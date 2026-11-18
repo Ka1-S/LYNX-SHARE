@@ -51,6 +51,18 @@ struct Settings
     // round 165 (model 0): "EQ to Dyn S.C." — [EXEC] the filters (unless split) and the EQ leave the audio and feed only
     // the dynamics' side chain; with the filter split on, the filters stay at the input of the audio path
     bool eqToSidechain = false;
+    // round 190lb (model 1, off = the old sound): the "Pink" EQ colour of the SSL 4K G, measured black-box on its
+    // impulse grid (docs/analise/BLACKBOX_rodada190lb.md §2). With `pink` the four bands take the dials in the
+    // original's own units (LF ±18, mids ±22, HF ±20 dB; LMF 0.2 … 2.5 kHz before ÷3, HMF 0.6 … 7 kHz before ×3) and
+    // the LF / HF Bell switches do nothing (the reference's Pink bands are shelves only)
+    bool pink = false, lmfDiv3 = false, hmfMult3 = false;
+    // the SSL 4K G's own measured details (either colour; off = the 4K E's): its 18 dB/oct high-pass, its low-pass
+    // without bilinear cramping (a matched second-order section; the dial reaches 23.8 kHz), and its output ceiling
+    // (hard clip at 1.1108, both polarities, before the output trim)
+    bool k4g = false;
+    // round 190lb: the 4K E's own high-pass in Black / Orange, third order (18 dB/oct; its trial's K4E_ir renders — Brown
+    // keeps the measured 12 dB/oct one). Off = the old 12 dB/oct high-pass for every colour
+    bool e18HighPass = false;
 };
 
 // Q of the mid bands as the console's dial shows it, for a 0..1 dial position (3.5 at 0 .. 0.1 at 1)

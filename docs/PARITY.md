@@ -52,9 +52,9 @@ there.
 | LYNX Tune | Auto-Tune Pro | 8 | 7 | 6 (ref expired) | 8 | 135 | 165j: sound only (highs kept, measured; scores unchanged) |
 | Ridge Strip (Vocal strip) | SSL Native Vocalstrip 2 | 9 | 7 | 8 (ref expired) | 8 | 145 |  |
 | Ridge Strip (Modern) | SSL Native Channel Strip 2 | 9 | 8 | 7 | 8 | tp172c | sound 3 → 7 (fxparity 2.6 → 7.1, 30 renders); look: the console's colour-coded caps on grey metal, three columns |
-| Ridge Strip (4K) | SSL 4K E | 9 | 8 | 6 | 8 | 148 | tp172c4: the 4K compressor blends its measured ratio nodes in log slope (10:1 acted like ~100:1; S4 6 dB too deep): fxparity 5.4 → 6.0 |
+| Ridge Strip (4K) | SSL 4K E | 9 | 8 | 6 | 8 | 148 | tp172c4: the 4K compressor blends its measured ratio nodes in log slope (10:1 acted like ~100:1; S4 6 dB too deep): fxparity 5.4 → 6.0; 190lb: its Black / Orange high-pass is 18 dB/oct (K4E_ir): 24 changed files 4.67 → 6.25, none down |
 | Ridge Strip (4K) | SSL 4K B | 8 | 8 | 5 | 8 | tp172c | tp172c4: its stepped compressor (out / 2 / 4 / 10 : 1 / ds, stepped releases) read as the 4K's near-limiting curve with the measured knee offsets, its threshold-only auto make-up, its gentler mic pre: fxparity 3.5 → 5.2 |
-| Ridge Strip (4K) | SSL 4K G | 8 | 8 | 5 | 8 | tp172c | tp172c4: its ±18 / ±20 / ±22 dB dials scaled onto the 4K's ±15 (same curves), its deeper slow compressor: fxparity 4.4 → 5.1; its Pink EQ type still plays as Black |
+| Ridge Strip (4K) | SSL 4K G | 8 | 8 | 5 | 8 | tp172c | tp172c4: its ±18 / ±20 / ±22 dB dials scaled onto the 4K's ±15 (same curves), its deeper slow compressor: fxparity 4.4 → 5.1; its Pink EQ type still plays as Black; 190lb (black-box): its Pink EQ measured on its own (the default colour; proportional-Q bells, resonant shelves, no bell on LF / HF), both colours its 18 dB/oct high-pass, uncramped low-pass and 1.1108 ceiling: all 594 files 5.17 → 6.26 (249 up / 2 down, owner decision in BLACKBOX_rodada190lb §11) |
 | Ridge Strip | Harrison 32Classic Channel Strip | 7 | 6 | 4 | 8 | tp172c | tp172c5: its state translated (was Ridge's defaults): EQ shelves / bells / filters fitted on the trial's impulse grid (a mid out of Ridge's band range moves to a free neighbour), the compressor's static line (the dial - 2 dB RMS, the Limiter ~1.8 dB lower, under -40 dBFS through the input trim), its auto make-up law, gate / expander: fxparity 3.0 → 4.5 (EQ bank 2.8 → 5.4, dynamics 3.8 → 5.5, make-up 3.6 → 6.6); tp172c6: its saturator on Ridge's new DRIVE section (Saturate model, the dial's -24 .. +24 dB shifting the measured clip curve): 32C 4.5 → 5.2 (saturator bank 5.3); tp172c10: its compressor's 27.5 dB reduction cap as a hidden Ridge parameter set by the translation (the original has no control for it): dynamics bank 5.5 → 6.2; tp172c11: its attack dial as a real time constant (hidden Ridge parameter), release time constants from the stair decay (0.25 / 0.35 / 1.6 s at 50 / 104 / 351.5 ms, half in Limiter mode): dynamics bank 6.2 → 6.7, make-up bank 6.7 → 6.6, 32C 5.2 = 5.2 |
 | Ridge Strip | Harrison MPC Channel Strip | 7 | 6 | 5 | 8 | tp172c | tp172c5: its 8 bands onto Ridge's 4 (shelves on LF / HF, the bells on the free slots), the 12 dB/oct filters on the 32C's laws, its compressor's measured line and knee: fxparity 4.6 → 5.5 (dynamics bank 3.8 → 6.6, EQ bank 1.9 → 3.2: band-pass / notch shapes, Q under 0.5 and ±19 dB gains are outside Ridge's bands; open for this release: no new Ridge bands or plugin) |
 | Kiln Channel (Console E / G / A / N / Y, Tube) | Slate VCC Channel | 7 | 7 | 7 | 8 | tp172c7 | tp172c7: its own plugin (was Ridge's DRIVE section): a compact dark single-channel console like the original (amber VU, console selector with the six models round it, Input / Output, Drive, Group, Noise reduction and Group bypass keys, main In / Out columns with meters), own art and emblem; the same measured drive stages; its noise floor per console (NR off: E / G -113.9, A -110.0, N -109.8, Y -101.6, Tube -101.9 dBFS RMS, uncorrelated L / R) and group bypass shared by the group's channels; state fully translated (console, drive, trims, NR, group, group bypass, main gains): fxparity 6.8 (drive bank 6.8, US A 6.3, group / NR sets 6.7 / 6.9) |
@@ -4024,3 +4024,32 @@ checks, 0 failures.
 **Still off:** the analog extras (noise, ripple, the small second-order term; off by default in the reference), the
 inter-sample peak allowance, the fade stage; Bus Compressor 2 (above); CLA-76 / CLA-2A read for structure only
 (REA_rodada190kt §5).
+
+
+## Round 190lb: black-box study of the licence-protected plug-ins — SSL 4K G Pink EQ, 4K G / 4K E filters
+
+The owner's rule of 2026-11-17: never break the encryption (round 190kt found SSL, Harrison, LiquidSonics, Antares, Sonic
+Academy, D16 and Overloud PACE-encrypted). Each plug-in is a black box: its own API data and audio captured before the
+trials ended, public manuals and hardware descriptions. Evidence, laws, sources and the spec of every plug-in of the group:
+`docs/analise/BLACKBOX_rodada190lb.md`. No plug-in of the group was loaded (trials ended 11-13; PACE's activation window).
+
+**SSL 4K G — Pink** (its default EQ colour; LYNX played it as Black): each band one second-order section fitted per
+render of tp172c's K4G_ir grid — boost / cut mirror each other, proportional-Q bells whose centre rises with the gain,
+resonant shelves whose turnover falls with the gain, no bell on LF / HF, the dials' full ±18 / ±22 / ±20 dB; ÷3 = ×0.242,
+×3 = ×2.88. Both colours: an 18 dB/oct high-pass from 14.8 Hz, a Butterworth low-pass with no bilinear cramping (dial up
+to 23.8 kHz), a hard ceiling at 1.1108. Hidden Ridge parameters `k4Pink` (+ `k4LmfDiv3`, `k4HmfMult3`) and `k4gLaw`, set
+only by the 4K G translation. **SSL 4K E**: Black / Orange high-pass 18 dB/oct (hidden `k4eHpLaw`; Brown keeps its
+12 dB/oct). **D16 Repeater** → Echoform at the delay role's preset (spec-based, unscored).
+
+| reference → LYNX | bank | files | before → after | up / same / down |
+|---|---|---|---|---|
+| SSL 4K G → Ridge Strip 4K (Pink, filters, ceiling) | tp172c K4G_ir / SSL_4K_G / K4G_dyn / K4G_mic + refcap182 | 594 | 5.17 → **6.26** | 249 / 343 / 2 |
+| · Pink impulse grid | tp172c K4G_ir | 206 | 4.07 → **6.73** | |
+| SSL 4K E → Ridge Strip 4K (Black / Orange high-pass) | tp172c K4E_ir / SSL_4K_E + refcap182 (changed settings only) | 24 | 4.67 → **6.25** | 24 / 0 / 0 |
+| Harrison 32C → Ridge Strip (measured only, nothing changed) | tp172c H32_eq | 148 | 5.4 | — |
+
+Down (owner decision): SSL_4K_G S1_stair 7 → 5 (a four-band Pink combination 0.8 dB loud at 1 kHz; its programme files
+rose) and K4G_ir BlHFBf1g5 4 → 3 (an extreme Black boost at the ceiling). Old projects: `lab/gold.sh`, 522 renders,
+0 mismatches. CPU: no measurable difference (law on / off in one build). Harrison 32C's exact EQ law (first-order
+shelves, bells at the dial, Q by |gain|, 12 dB/oct filters to 3.15 kHz / 160 Hz) waits for a "32C" voicing (owner
+decision, BLACKBOX §11).

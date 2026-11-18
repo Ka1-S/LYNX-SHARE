@@ -236,8 +236,77 @@ void shelf (bool low, double f0, double db, double q, double sr, Biquad& b) noex
 
 constexpr float qNode[5] = { 0.5f, 1.0f, 1.5f, 2.0f, 3.0f };
 
+// ---- round 190lb: the SSL 4K G's Pink colour ([EXEC] black-box, its trial's impulse grid; BLACKBOX_rodada190lb §2).
+// Every band is one second-order section whose frequency, gain and Q move with the dial's gain (proportional Q: wide
+// at small gains, narrower at full gain; the frequency rises with the gain); boost and cut mirror each other.
+#include "core/Console4KPinkTables.inc"
+
+double tableAt (const float* xs, const float* ys, int n, double x) noexcept;
+
+// one { f0 or ratio, |gain|, Q } from a row of three |gain| nodes: under the first node its frequency and Q with the
+// gain scaled toward 0; between nodes the frequency (log), gain and Q interpolate
+void pinkGainRow (const float (*row)[3], const float* gainNodes, double a, double out[3]) noexcept
+{
+    if (a <= gainNodes[0])
+    {
+        out[0] = row[0][0];
+        out[1] = row[0][1] * a / gainNodes[0];
+        out[2] = row[0][2];
+        return;
+    }
+    const auto ax = nodeAt (gainNodes, 3, a, false);
+    out[0] = std::exp (lerp (std::log ((double) row[ax.i][0]), std::log ((double) row[ax.i + 1][0]), ax.t));
+    out[1] = lerp (row[ax.i][1], row[ax.i + 1][1], ax.t);
+    out[2] = lerp (row[ax.i][2], row[ax.i + 1][2], ax.t);
+}
+
+bool pinkBand (int which, const Settings& s, double sr, Biquad& out) noexcept
+{
+    double g = 0.0, f = 0.0, q = 1.5, maxDb = 18.0;
+    switch (which)
+    {
+        case 0: g = s.lfGain; f = std::clamp (s.lfHz, 30.0, 450.0); break;
+        case 1: g = s.lmfGain; f = std::clamp (s.lmfKHz, 0.2, 2.5) * 1000.0; q = s.lmfQ; maxDb = 22.0; break;
+        case 2: g = s.hmfGain; f = std::clamp (s.hmfKHz, 0.6, 7.0) * 1000.0; q = s.hmfQ; maxDb = 22.0; break;
+        default: g = s.hfGain; f = std::clamp (s.hfKHz, 1.5, 16.0) * 1000.0; maxDb = 20.0; break;
+    }
+    const double a = std::min (std::abs (g), maxDb), sign = g < 0.0 ? -1.0 : 1.0;
+    if (a < 0.05)
+        return false;
+    double v[3], lo[3], hi[3];
+    if (which == 1 || which == 2)
+    {
+        const bool lmf = which == 1;
+        const auto& tab = lmf ? pinkLmf : pinkHmf;
+        const auto aq = nodeAt (pinkQNode, 3, std::clamp (q, 0.5, 3.0), true);
+        pinkGainRow (tab[aq.i], pinkMidGain, a, lo);
+        pinkGainRow (tab[aq.i + 1], pinkMidGain, a, hi);
+        v[0] = std::exp (lerp (std::log (lo[0]), std::log (hi[0]), aq.t));
+        v[1] = lerp (lo[1], hi[1], aq.t);
+        v[2] = std::exp (lerp (std::log (lo[2]), std::log (hi[2]), aq.t));
+        double hz = lmf ? tableAt (pinkLmfDial, pinkLmfHz, 5, f) : tableAt (pinkHmfDial, pinkHmfHz, 5, f);
+        if (lmf && s.lmfDiv3) hz *= pinkDiv3;
+        if (! lmf && s.hmfMult3) hz *= pinkMult3;
+        voxstrip::matchedPeak (out, sr, hz * v[0], v[2], sign * v[1]);
+        return true;
+    }
+    const bool low = which == 0;
+    const auto& tab = low ? pinkLf : pinkHf;
+    const auto* gn = low ? pinkLfGain : pinkHfGain;
+    const auto af = nodeAt (low ? pinkLfDial : pinkHfDial, 5, f, true);
+    pinkGainRow (tab[af.i], gn, a, lo);
+    pinkGainRow (tab[af.i + 1], gn, a, hi);
+    v[0] = std::exp (lerp (std::log (lo[0]), std::log (hi[0]), af.t));
+    v[1] = lerp (lo[1], hi[1], af.t);
+    v[2] = lerp (lo[2], hi[2], af.t);
+    shelf (low, v[0], sign * v[1], v[2], sr, out);
+    return true;
+}
+
 bool band (int which, const Settings& s, double sr, Biquad& out) noexcept
 {
+    if (s.pink)
+        return pinkBand (which, s, sr, out);
     const int c = std::clamp (s.colour, 0, 2);
     double g = 0.0, f = 0.0, q = 1.5;
     bool bell = false;
@@ -300,8 +369,61 @@ double tableAt (const float* xs, const float* ys, int n, double x) noexcept
     return std::exp (lerp (std::log ((double) ys[a.i]), std::log ((double) ys[a.i + 1]), a.t));
 }
 
+// round 190lb: the SSL 4K G's filters ([EXEC] K4G_ir: HPF / LPF renders, both colours alike; lab fithp.py / fitlp.py):
+// the high-pass is third order (a first-order section and a second-order one, Q ~1: 18 dB/oct), the low-pass a
+// second-order section with no bilinear cramping (magnitude-matched); per dial node { f first-order, f second, Q } /
+// { f0, Q }
+constexpr float g4HpDial[7] = { 14.8f, 36.7f, 86.7f, 146.7f, 233.3f, 312.5f, 350.0f };
+constexpr float g4Hp[7][3] = { { 19.3f, 18.4f, 1.004f }, { 42.0f, 41.3f, 0.991f }, { 77.0f, 77.0f, 0.986f }, { 130.1f, 131.7f, 0.984f },
+                               { 181.0f, 195.0f, 0.968f }, { 214.0f, 274.7f, 0.937f }, { 278.1f, 433.9f, 0.922f } };
+// the 4K E's Black and Orange high-pass (K4E_ir, fitted above its hiss floor: rms 0.02 … 0.28 dB)
+constexpr float e4BlHp[7][3] = { { 20.4f, 18.3f, 1.045f }, { 40.3f, 41.1f, 0.972f }, { 64.6f, 79.0f, 0.924f }, { 97.8f, 139.1f, 0.904f },
+                                 { 140.8f, 204.1f, 0.904f }, { 186.2f, 278.7f, 0.903f }, { 279.3f, 422.6f, 0.906f } };
+constexpr float e4OrHp[7][3] = { { 22.6f, 15.7f, 1.197f }, { 46.0f, 33.6f, 1.119f }, { 78.9f, 63.0f, 1.058f }, { 119.5f, 110.1f, 0.994f },
+                                 { 172.1f, 161.7f, 0.992f }, { 232.0f, 219.7f, 0.994f }, { 340.7f, 335.2f, 0.990f } };
+constexpr float g4LpDial[7] = { 3.0f, 3.38f, 3.83f, 4.67f, 7.0f, 10.67f, 23.84f };
+constexpr float g4Lp[7][2] = { { 3179.7f, 0.708f }, { 3587.8f, 0.707f }, { 4316.5f, 0.706f }, { 5529.3f, 0.704f }, { 7492.4f, 0.702f },
+                               { 12298.1f, 0.699f }, { 23686.1f, 0.651f } };
+
+// a digital frequency (Hz at the 48 kHz calibration) re-warped for `sr`: the w0 of a bilinear section
+double warped (double f0, double sr) noexcept
+{
+    const double fd = std::min (refRate / pi * std::atan (pi * f0 / refRate), 0.495 * sr);
+    return 2.0 * sr * std::tan (pi * fd / sr);
+}
+
+bool g4HighPass (const Settings& s, double sr, Biquad& first, Biquad& second) noexcept
+{
+    const auto& tab = s.k4g ? g4Hp : s.colour == 2 ? e4OrHp : e4BlHp;
+    const auto ax = nodeAt (g4HpDial, 7, std::clamp (s.hpHz, 14.8, 350.0), true);
+    const auto at = [&] (int k) { return std::exp (lerp (std::log ((double) tab[ax.i][k]), std::log ((double) tab[ax.i + 1][k]), ax.t)); };
+    const double w = warped (at (0), sr), c = 2.0 * sr;
+    first.set (c / (c + w), -c / (c + w), 0.0, 1.0, (w - c) / (c + w), 0.0);
+    const double n[3] { 1.0, 0.0, 0.0 }, d[3] { 1.0, 1.0 / at (2), 1.0 };
+    bilinearAt (n, d, at (1), sr, second);
+    return true;
+}
+
+// a magnitude-matched second-order low-pass (impulse-invariant poles, numerator fitted to the analog magnitude at DC
+// and at the pole frequency)
+void matchedLowPass (Biquad& b, double sr, double hz, double q) noexcept
+{
+    const double w0 = 2.0 * pi * std::min (hz, 0.49 * sr) / sr, zeta = 1.0 / (2.0 * q);
+    const double a1 = zeta <= 1.0 ? -2.0 * std::exp (-zeta * w0) * std::cos (std::sqrt (1.0 - zeta * zeta) * w0)
+                                  : -2.0 * std::exp (-zeta * w0) * std::cosh (std::sqrt (zeta * zeta - 1.0) * w0);
+    const double a2 = std::exp (-2.0 * zeta * w0);
+    const double A0 = (1.0 + a1 + a2) * (1.0 + a1 + a2), A1 = (1.0 - a1 + a2) * (1.0 - a1 + a2), A2 = -4.0 * a2;
+    const double p1 = std::sin (w0 / 2.0) * std::sin (w0 / 2.0), p0 = 1.0 - p1, p2 = 4.0 * p0 * p1;
+    const double R1 = (A0 * p0 + A1 * p1 + A2 * p2) * q * q;
+    const double B0 = A0, B1 = std::max ((R1 - B0 * p0) / p1, 0.0);
+    const double b0 = 0.5 * (std::sqrt (B0) + std::sqrt (B1)), b1 = std::sqrt (B0) - b0;
+    b.set (b0, b1, 0.0, 1.0, a1, a2);
+}
+
 bool highPass (const Settings& s, double sr, Biquad& first, Biquad& second) noexcept
 {
+    if (s.k4g || (s.e18HighPass && s.colour >= 1))
+        return s.hpHz > 0.0 && g4HighPass (s, sr, first, second);
     if (s.hpHz < 16.5)
         return false;
     const double f = std::clamp (s.hpHz, 20.0, 350.0);
@@ -314,6 +436,13 @@ bool highPass (const Settings& s, double sr, Biquad& first, Biquad& second) noex
 
 bool lowPass (const Settings& s, double sr, Biquad& out) noexcept
 {
+    if (s.k4g && s.lpKHz > 0.0) // round 190lb
+    {
+        const auto ax = nodeAt (g4LpDial, 7, std::clamp (s.lpKHz, 3.0, 23.84), true);
+        const double f0 = std::exp (lerp (std::log ((double) g4Lp[ax.i][0]), std::log ((double) g4Lp[ax.i + 1][0]), ax.t));
+        matchedLowPass (out, sr, f0, lerp (g4Lp[ax.i][1], g4Lp[ax.i + 1][1], ax.t));
+        return true;
+    }
     if (s.lpKHz <= 0.0 || s.lpKHz >= 15.9)
         return false;
     const double f = std::clamp (s.lpKHz, 3.0, 15.95);
@@ -573,7 +702,8 @@ void Channel::design (const Settings& s) noexcept
         return a.hpHz == b.hpHz && a.lpKHz == b.lpKHz && a.lfGain == b.lfGain && a.lfHz == b.lfHz && a.lfBell == b.lfBell
             && a.lmfGain == b.lmfGain && a.lmfKHz == b.lmfKHz && a.lmfQ == b.lmfQ && a.hmfGain == b.hmfGain && a.hmfKHz == b.hmfKHz
             && a.hmfQ == b.hmfQ && a.hfGain == b.hfGain && a.hfKHz == b.hfKHz && a.hfBell == b.hfBell
-            && a.model == b.model && a.colour == b.colour;
+            && a.model == b.model && a.colour == b.colour
+            && a.pink == b.pink && a.lmfDiv3 == b.lmfDiv3 && a.hmfMult3 == b.hmfMult3 && a.k4g == b.k4g && a.e18HighPass == b.e18HighPass; // round 190lb
     };
     if (designedOnce && eq (s, designed))
         return;
@@ -750,6 +880,11 @@ void Channel::process (float* l, float* r, int n, const Settings& s) noexcept
         {
             a += hiss * gauss (noise[0]);
             b += hiss * gauss (noise[1]);
+        }
+        if (s.k4g) // round 190lb: the SSL 4K G's output ceiling (its renders clip at 1.1108, both polarities)
+        {
+            a = std::clamp (a, -k4::pinkCeiling, k4::pinkCeiling);
+            b = std::clamp (b, -k4::pinkCeiling, k4::pinkCeiling);
         }
         l[i] = (float) (a * outG);
         r[i] = (float) (b * outG);

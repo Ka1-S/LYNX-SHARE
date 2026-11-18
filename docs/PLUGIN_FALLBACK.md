@@ -129,6 +129,7 @@ matches by name).
 | Waves H-Delay | Echoform (round 119; was Fruity Delay 3) | VST3 class ID [DATA], Waves name | sync (host / BPM / ms), note, time, feedback, ping-pong (pairs) / stereo, mix, output, filters; laws measured on the official trial [EXEC] (round 119 §2) |
 | Waves NS1 | Quell Denoiser (round 119) | Waves name | the one knob (RealWorld 229), Quell fitted to the official trial [EXEC] (round 119 §3) |
 | Waves Doubler (2 / 4 voices) | Gemini Doubler (round 119) | Waves name | every control of voices 1–2, direct, align, shelves, feedback cut, range [EXEC] (round 119 §4) |
+| D16 Group Repeater | Echoform (round 190lb; the delay role's quarter-note preset, 25 % mix; spec-based, unscored: no capture or state exists) | name | — |
 | Soundtoys EchoBoy / PrimalTap | Echoform (round 129; tape / lo-fi echo, 1/4 note, 25 % feedback, 25 % mix; was Fruity Delay 3) | VST2 ID [DATA] (EchoBoy), names | — |
 | Waves SuperTap | Echoform (round 190jh; was Fruity Delay 3; no state: the dry signal, as SuperTap's default) | Waves name | taps 1–2 (on, gain, pan, delay at its BPM), feedback, tap filter → Echoform's clean Single / Dual echo, dry at unity [EXEC] (refcap182) |
 | FabFilter Timeless | Fruity Delay 3 | names | — |
@@ -146,6 +147,7 @@ matches by name).
 | FabFilter Pro-G | Sentry Gate (round 108) | names | every control [EXEC layout] |
 | Waves CLA-2A | Glow Leveler (peak reduction 30 %, gain +2 dB; round 113) | VST3 class ID [DATA], Waves name | gain, peak reduction, comp / limit, laws measured on the official trial [EXEC] (round 113 §3c) |
 | Waves SSL E-Channel, SSL Native Channel Strip / 4K E / 4K B / Vocalstrip | Ridge Strip (neutral; round 96) | VST3 class ID [DATA], Waves name, names | SSL E-Channel: filters, 4-band EQ, compressor, output, band laws measured on the official trial [EXEC] (round 113 §3c) |
+| SSL 4K G / 4K E (round 190lb, black-box) | Ridge Strip, 4K voicing | names | 4K G: EqType Pink (its default) → the measured Pink EQ (hidden k4Pink, ÷3 / ×3), both colours its 18 dB/oct high-pass, uncramped low-pass and 1.1108 output ceiling (k4gLaw); 4K E Black / Orange: its 18 dB/oct high-pass (k4eHpLaw) [EXEC] (BLACKBOX_rodada190lb §2–3) |
 | Waves Q10, REQ, SSLEQ | Parametric EQ (flat) | Waves names | — |
 | FabFilter Pro-Q | Facet EQ (flat, round 99) | names | Pro-Q 4: bands, shapes, slopes, phase mode (round 124 / 144); round 190jh: dynamic bands (range, Auto → Facet's automatic threshold, manual threshold, attack / release; round 190js: the automatic threshold refitted, 50 % = 9.2 / 268 ms) |
 | Waves DeEsser | Hush De-esser (5.5 kHz, −20 dBFS, 4 dB; round 113) | Waves name | frequency, threshold, split / wideband, side-chain filter, monitor, laws measured on the official trial [EXEC] (round 113 §3c) |
