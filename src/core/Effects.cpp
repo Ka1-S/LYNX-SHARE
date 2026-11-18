@@ -4439,6 +4439,9 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     // round 152: … and before the gain-stage attack keeps round 150's level-follower attack
     if (slot.kind == EffectKind::prismMultiband && savedCount <= (std::size_t) dyn::prism::rev152)
         slot.params[(std::size_t) dyn::prism::rev152] = 0.0f;
+    // round 190lg: … and before revision 1 (Pro-MB's own band compander graph) keeps the measured detector (bit for bit)
+    if (slot.kind == EffectKind::prismMultiband && savedCount <= (std::size_t) dyn::prism::revision)
+        slot.params[(std::size_t) dyn::prism::revision] = slot.params[(std::size_t) dyn::prism::lookaheadSwitch] = 0.0f;
     // round 190v: Crest saved before its two-way / vari-mu refit keeps round 108's laws, Sentry saved before its Vocal
     // noise reduction has none
     if (slot.kind == EffectKind::crestCompressor && savedCount <= (std::size_t) dyn::crest::law)
