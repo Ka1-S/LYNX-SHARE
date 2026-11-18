@@ -51,6 +51,24 @@ unchanged).
   without ARA writes neither (files unchanged). 0.1.28 copies drop both with a loss line.
 - Nothing is created for a song without ARA channels (no host object, no document, no instance): zero cost.
 
+### 3.1 Verified with Melodyne 5 studio 5.4.2 (Windows, round builds of the branch)
+
+- `LYNX --aratest Melodyne.vst3 mono-melody.wav out`: the scan lists Melodyne with its ARA factory; the clip played
+  through Melodyne without an edit equals the plain clip (correlation 1.0000 at lag 0, 0.00 dB); the document archive
+  (81 KB, archive id `com.celemony.ara.chunk.13`) is saved in the .lynx, read back, and a new engine restored from it
+  renders the same (correlation 1.0000, 0.00 dB; restored render 0.11 s, no new analysis).
+- In the app: the clip menu's "Edit in ARA plugin › Melodyne" opens Melodyne's editor in a LYNX plugin window showing
+  the clip's notes at its place on LYNX's timeline (tempo 120, C major from LYNX's musical context); all notes dragged
+  +3 semitones in that editor, the project saved, then rendered: against Melodyne standalone doing the same edit on
+  the same file, pitch 0.0 cents apart, spectral envelope 0.21 dB rms, level +0.01 dB.
+- Bugs found and fixed on the way: JUCE's ARA factory is released by code in the plugin's module, which unloaded with
+  the last instance (the controller now keeps the first instance until it is gone); Melodyne reads the document archive
+  id while restoring (it is now saved with the archive and handed back, never null); a plugin missing from a list that
+  was still loading was given up for good (now asked again); ARA clips play at the audio clip unity gain.
+- CPU, LYNX idle with the transport stopped (test profile, 20 s, % of one core): the project without ARA 10.0 (Melodyne
+  not loaded: no ARA object exists), with the clip in Melodyne 13.4 before the idle rule (Melodyne's processBlock every
+  block), see HANDOFF for the number after it.
+
 ## 4. Melodyne 5 behaviour used as reference (standalone, synthetic material of our own)
 
 | Material | Melodyne | LYNX Newtone (before) | LYNX Newtone (round 190kx) |
