@@ -137,6 +137,8 @@ public:
     // Edits channel `channel` (an audio clip channel) in the ARA plugin `pluginId` (empty: back to its sampler), one undo
     // step. False: not an audio clip channel. The plugin's editor opens with AraHost::pluginOf afterwards.
     bool setChannelAra (int channel, const std::string& pluginId, const std::string& pluginName);
+    // The ARA host brought in line with the song again (a channel whose plugin or sample was not ready is tried again)
+    void refreshAra() { publishSong(); }
     // Online Sessions (round 168a): the channels / inserts whose third-party plugin is missing here and that play their
     // stand-in render instead (core/StandIns.h), as of the last publish — the Channel Rack and the Mixer badge them.
     bool playsStandIn (int channel) const noexcept

@@ -1,5 +1,7 @@
 #include "ui/AraMenu.h"
 
+#include "platform/Paths.h"
+
 #include "core/AraRegions.h"
 #include "engine/AraHost.h"
 #include "engine/AudioEngine.h"
@@ -60,12 +62,25 @@ bool openEditor (AudioEngine& engine, int clipIndex)
     const auto& channel = song.channels[(std::size_t) clip.channel];
     auto* host = engine.getAraHost();
     auto* plugin = host->pluginOf (channel.uid);
+    if (plugin == nullptr) // (not made yet, e.g. its sample was still loading: the host is asked once more)
+    {
+        engine.refreshAra();
+        host = engine.getAraHost();
+        plugin = host != nullptr ? host->pluginOf (channel.uid) : nullptr;
+    }
+    if (host == nullptr)
+        return false;
     auto owner = host->ownerOf (channel.uid);
     if (plugin == nullptr || owner == nullptr)
     {
+        platform::settingsFile ("ara.log").appendText (juce::Time::getCurrentTime().toString (true, true, true, true) + " no instance for "
+                                                       + juce::String::fromUTF8 (channel.name.c_str()) + ": " + host->lastError() + "\n");
         hint (tr ("{0} could not be started: {1}", { juce::String::fromUTF8 (channel.ara.pluginName.c_str()), host->lastError() }));
         return false;
     }
+    platform::settingsFile ("ara.log").appendText (juce::Time::getCurrentTime().toString (true, true, true, true) + " editor of "
+                                                   + juce::String::fromUTF8 (channel.name.c_str()) + ": " + plugin->getName()
+                                                   + (plugin->hasEditor() ? " (has an editor)" : " (no editor)") + "\n");
     PluginWindows::open (owner, *plugin, juce::String::fromUTF8 (channel.ara.pluginName.c_str()) + " - " + juce::String::fromUTF8 (channel.name.c_str()));
     host->showInEditor (channel.uid, { clip.uid });
     return true;

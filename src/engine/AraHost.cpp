@@ -17,6 +17,7 @@
 #include "core/Instruments.h"
 #include "core/Song.h"
 #include "engine/PluginHost.h"
+#include "platform/Paths.h"
 
 #include <algorithm>
 #include <cstring>
@@ -76,6 +77,13 @@ int AraHost::instanceCount() const { return 0; }
 namespace
 {
 namespace HM = juce::ARAHostModel;
+
+// what the host did and why something failed, one line each, in the settings folder's ara.log (diagnostics; only written
+// while ARA is in use)
+void logLine (const juce::String& line)
+{
+    platform::settingsFile ("ara.log").appendText (juce::Time::getCurrentTime().toString (true, true, true, true) + " " + line + "\n");
+}
 
 // ---- what the host refs point to --------------------------------------------------------------------------------------
 struct SourceData // an AudioSource's host ref: the sample it reads (immutable, shared with its readers)
@@ -765,8 +773,9 @@ void AraHost::sync (const Song& song, double sampleRate)
         auto description = impl->plugins.find (juce::String::fromUTF8 (pluginId.c_str()));
         if (description == nullptr)
         {
+            // (not failed for good: the plugin list may still be loading, or a scan may add it; asked again next time)
             error = juce::String::fromUTF8 (song.channels[(std::size_t) indices.front()].ara.pluginName.c_str()) + ": not installed";
-            impl->failed.insert (pluginId);
+            logLine (error);
             continue;
         }
         Doc* doc = nullptr;
@@ -782,6 +791,7 @@ void AraHost::sync (const Song& song, double sampleRate)
             if (first == nullptr || (doc = impl->docFor (pluginId, *description, first)) == nullptr)
             {
                 error = impl->error.isNotEmpty() ? impl->error : description->name + ": " + why;
+                logLine (error);
                 impl->failed.insert (pluginId);
                 continue;
             }
@@ -816,6 +826,7 @@ void AraHost::sync (const Song& song, double sampleRate)
                     slot = std::make_unique<Chan>();
                     if (! impl->makeChannel (*doc, *slot, def, order))
                     {
+                        logLine ("channel " + juce::String::fromUTF8 (def.name.c_str()) + ": its sample is not loaded (" + juce::String::fromUTF8 (def.samplePath.c_str()) + ")");
                         doc->channels.erase (def.uid);
                         continue;
                     }
@@ -890,6 +901,8 @@ void AraHost::sync (const Song& song, double sampleRate)
                 }
             }
             c->binding = impl->bind (*doc, *c, std::move (instance));
+            logLine (description->name + " bound to channel " + juce::String::fromUTF8 (c->name.c_str()) + (c->binding != nullptr ? ": ok" : ": " + impl->error)
+                     + " (" + juce::String ((int) c->regions.size()) + " region(s))");
         }
     }
 
