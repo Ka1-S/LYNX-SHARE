@@ -245,3 +245,38 @@ x = the linked side-chain magnitude (as for round 190kw's V2 styles).
 ### LYNX's own smooth knob laws (fitted to the curves' shape, not their points)
 - T3 (attack s): 0.08 · s / 0.02 up to 0.02 s, then 0.15 · (s / 0.2)^0.273.
 - T4 (release s): 0.19 + 0.55 s + 0.03 s² (half of the fitted 0.38 + 1.1 s + 0.06 s²).
+
+## 6. Pro-Q 4 → Facet EQ: the dynamic band's auto threshold on the reference's own detector [STATIC + EXEC] → landed (merged)
+
+Branch `rea2_190lg-q4` (off `rea2_190lg` e821c2616). Evidence: `/mnt/e/lynx-work/rea190kw/rea/out/q4_bc.c`,
+`q4_bcctor.c`, `q4_f.c` and this round's decompiles (copy of the ProQ_4 Ghidra project): `auto.c` (0x180116380 /
+0x180116100 / 0x18012fda0 / 0x18012be30), `xref_bc.c` (the band that builds the compander), `k.c` (0x180129710).
+LYNX's code is written from the laws below; the one knob table (0x180129710) is not copied — LYNX fits its own curve.
+
+### The structure [STATIC]
+- BandCompander (vtable 0x1802403c0, process 0x18014e820). With Auto on ([0x35], default 1) it runs a `NormalizerStub`
+  (constructor 0x180116380, process 0x180116530): two followers (0x180116100: one-pole, coefficient
+  1 − exp(−ln 10 / (T · rate)), attack T when rising, release when falling: 0x18012bfe0) with attack 0 and release 10 s,
+  the output type 0 (|x| / envelope) and the dB flag on. Per sample: env = follower (|x|); out = |x| / max (env, 0.01)
+  in dB (floor −40 dB). The second follower runs only while a start-up count is positive and then hands its state to
+  the first (the count's setter was not traced: not built).
+- The level then goes through the usual gain computer 0x18012fda0 (threshold, quadratic knee, ratio, range). The
+  threshold / knee buses' values in Auto mode were not traced: LYNX keeps round 190js's fitted mapping (threshold
+  = the peak level − |range|, knee = 1.53 |range|), which the captures confirm with the reference's own detector.
+- Three more followers smooth the reduction ([0x7c] f0, [0x7d] f1, [0x7e] f2): y0 = f0 (GR), y1 = f1 (y0),
+  y = f2 (max (y0, y1)). Their times (0x18014ee20) come from the compander's region (state values 17 / 18 of the band:
+  its detection range in log2 Hz, 10 Hz … 20 kHz by default) and two knobs (BC +0x50 = attack %, +0x2d8 = release %):
+  rel = 0.005 + 2.495 K (release % / 100) s (K: a 6-point table); u = 1 − 0.1 clamp (lo − 4.5, 0, 10);
+  atk = (A² ((3.6e-5 u² + 6e-5) u² + 6e-5 u² + 1e-4))² · 0.59975 + 0.00025 s; centre = 2^((lo + hi) / 2);
+  low = 100 / max (centre, 100); wide = (clamp (hi − lo, 2, 8) − 2) / 6.
+  f0: attack 0, release (min (1, wide + low) · 0.02 + 0.015) s; f1: attack max (0.12, 0.3 − 30 atk), release
+  1.29 rel + 0.25; f2: attack 0.01 wide + atk, release (0.25 low + 0.45) rel.
+
+### [EXEC] what the bank settled (refcap030 grid2 = the auto sweep; gain trajectories in 50 ms frames)
+- Envelope 10 s, floor −40 dB, knee 1.53 |range|: the minimum of the trajectory error (8 s / 12 s and knee 1.4 / 1.7
+  all worse).
+- With the reference's times at scale 1 the band released ~3× too slowly and attacked over 250 ms where the captures
+  reach the whole range within 100 ms. Fitted scales: f1 × 0.65, f2 attack × 0.05, f2 release × 0.6 (mean trajectory
+  error 0.33 dB → 0.16 dB). The uncertain link is the knob percent: LYNX holds attack / release in ms and maps them back
+  (50 % = 9.22 / 268 ms, the translator's law).
+- LYNX's release curve: K (x) = (e^(3.32 x) − 1) / (e^3.32 − 1) (own smooth fit, not the table's points).
