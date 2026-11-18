@@ -987,6 +987,7 @@ public:
     {
         if (ready)
             engine.flush();
+        directZ[0] = directZ[1] = 0.0;
     }
 
     void process (float* left, float* right, int n, const EffectParams& params, double bpm) noexcept override
@@ -999,13 +1000,40 @@ public:
         }
         else
             engine.set (s, bpm > 0 ? bpm : 120.0);
-        engine.process (left, right, n);
+        const bool direct = params[(std::size_t) reeverb2DirectLaw] >= 0.5f; // round 190lf (hidden)
+        if (! direct)
+        {
+            engine.process (left, right, n);
+            return;
+        }
+        // the measured direct path (TrueVerb's): y = a·x − b·Σ ρ^(k−1) x[n−k], added to the engine's output (its own dry
+        // control is at 0 in that translation); a, b, ρ from the hidden parameters
+        const double a = params[(std::size_t) reeverb2DirectLaw + 1], b = params[(std::size_t) reeverb2DirectLaw + 2];
+        const double rho = std::clamp ((double) params[(std::size_t) reeverb2DirectLaw + 3], 0.0, 0.999);
+        for (int done = 0; done < n;)
+        {
+            const int m = std::min (n - done, (int) dryL.size());
+            std::copy (left + done, left + done + m, dryL.data());
+            std::copy (right + done, right + done + m, dryR.data());
+            engine.process (left + done, right + done, m);
+            for (int i = 0; i < m; ++i)
+            {
+                const double xl = dryL[(std::size_t) i], xr = dryR[(std::size_t) i];
+                left[done + i] += (float) (a * xl - b * directZ[0]);
+                right[done + i] += (float) (a * xr - b * directZ[1]);
+                directZ[0] = xl + rho * directZ[0];
+                directZ[1] = xr + rho * directZ[1];
+            }
+            done += m;
+        }
     }
 
 private:
     reeverb2::Engine engine;
     int rate = 44100;
     bool ready = false;
+    std::array<float, 1024> dryL {}, dryR {}; // round 190lf: the direct path's input, block by block
+    double directZ[2] {};
 };
 
 std::int32_t i32 (const std::vector<std::uint8_t>& d, std::size_t at)
