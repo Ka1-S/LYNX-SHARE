@@ -46,6 +46,9 @@ Analysis analyze(const float* mono, int numSamples, const Params& params, const 
     refineOnsets(ctx, active);
     // refined onsets change starts and pitch curves: join notes of one pitch that still overlap
     active = mergeFragments(ctx, std::move(active), true);
+    // LYNX modification (round 190lo): slow re-attacks (pads, strings) split after the note filter
+    if (params.slowReattacks)
+        active = splitSlowReattacks(ctx, active);
     std::stable_sort(active.begin(), active.end(), [](const Candidate& a, const Candidate& b) {
         return a.start != b.start ? a.start < b.start : a.midi() < b.midi();
     });

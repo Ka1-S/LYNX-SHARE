@@ -687,6 +687,35 @@ std::vector<std::vector<float>> synthesize(const Analysis& A, const std::vector<
     std::vector<std::vector<float>> out(static_cast<size_t>(numCh), std::vector<float>(static_cast<size_t>(to - from), 0.0f));
     std::vector<float> frame(static_cast<size_t>(N));
     std::vector<Complex> spec(static_cast<size_t>(K));
+    // LYNX modification (round 190lo): overlap-aware moves (Params::overlapAwareMoves). A moved note's copy comes
+    // from another frame; in bins the note shares with other notes that copy carries their sound too, from that
+    // other frame, and its complex sum with what stays here partly cancels (the two frames' phases differ): the
+    // shared partials of a sustained chord lose level. The copy is collected on its own and joined with what stays
+    // with the phase of their complex sum (as before, continuous from frame to frame) and the level of their power
+    // sum (what two independent parts add up to).
+    std::vector<std::vector<Complex>> moved(static_cast<size_t>(numCh), std::vector<Complex>(static_cast<size_t>(K)));
+    bool movedPending = false;
+    auto joinMoved = [&]() {
+        if (!movedPending)
+            return;
+        movedPending = false;
+        for (int c = 0; c < numCh; ++c)
+        {
+            auto& y = Y[static_cast<size_t>(c)];
+            auto& m = moved[static_cast<size_t>(c)];
+            for (int k = 0; k < K; ++k)
+            {
+                const Complex mv = m[static_cast<size_t>(k)];
+                if (mv == Complex{})
+                    continue;
+                m[static_cast<size_t>(k)] = Complex{};
+                const Complex r = y[static_cast<size_t>(k)];
+                const Complex sum = r + mv;
+                const float level = std::sqrt(std::norm(r) + std::norm(mv)), as = std::abs(sum);
+                y[static_cast<size_t>(k)] = as > 1e-20f ? sum * (level / as) : sum;
+            }
+        }
+    };
 
     auto fracDelay = [&](double delta, int k) {
         return delta == 0.0 ? Complex(1.0f, 0.0f) : std::polar(1.0f, static_cast<float>(-2.0 * kPi * k * delta / N));
@@ -783,6 +812,7 @@ std::vector<std::vector<float>> synthesize(const Analysis& A, const std::vector<
         const size_t editsHere = transform ? states.size() : 0;
         for (size_t sIndex = 0; sIndex < editsHere; ++sIndex)
         {
+            joinMoved();
             auto& st = states[sIndex];
             const Note& n = A.notes[static_cast<size_t>(st.note)];
             const NoteMasks& nm = A.masks[static_cast<size_t>(st.note)];
@@ -920,6 +950,9 @@ std::vector<std::vector<float>> synthesize(const Analysis& A, const std::vector<
                     }
                 }
                 const Complex rot = std::polar(1.0f, static_cast<float>(phase)) * binShiftSign(shift);
+                // (LYNX, round 190lo: a pure move's copy is joined by joinMoved())
+                const bool apart = p.overlapAwareMoves && !soloMode && st.moves && !st.shifts && !st.stretches;
+                movedPending = movedPending || apart;
                 for (int c = 0; c < numCh; ++c)
                 {
                     const Complex* x = source.get(c, s);
@@ -932,7 +965,7 @@ std::vector<std::vector<float>> synthesize(const Analysis& A, const std::vector<
                         tr.frame = u;
                         tr.phase = std::remainder(std::arg(x[kp]) + kPi * kp + phase, 2.0 * kPi);
                     }
-                    auto& y = Y[static_cast<size_t>(c)];
+                    auto& y = apart ? moved[static_cast<size_t>(c)] : Y[static_cast<size_t>(c)];
                     for (int k = 0; k < pm.count; ++k)
                     {
                         const int kk = pm.lo + k + shift;
@@ -979,7 +1012,9 @@ std::vector<std::vector<float>> synthesize(const Analysis& A, const std::vector<
                 {
                     if (!backgroundAt(st.D).part(st.note, s, c, part.data()))
                         continue;
-                    auto& y = Y[static_cast<size_t>(c)];
+                    const bool apart = p.overlapAwareMoves && !soloMode && st.moves && !st.shifts && !st.stretches;
+                    movedPending = movedPending || apart;
+                    auto& y = apart ? moved[static_cast<size_t>(c)] : Y[static_cast<size_t>(c)];
                     for (int k = 1; k < K - 1; ++k)
                     {
                         const int kk = k + bandShift[static_cast<size_t>(k)];
@@ -990,6 +1025,7 @@ std::vector<std::vector<float>> synthesize(const Analysis& A, const std::vector<
                 }
             }
         }
+        joinMoved();
         // inverse transform and weighted overlap-add
         for (int c = 0; transform && c < numCh; ++c)
         {

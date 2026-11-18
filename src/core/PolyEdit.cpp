@@ -287,6 +287,97 @@ std::vector<std::pair<int, int>> missedRegions (const std::vector<Note>& notes, 
 }
 } // namespace
 
+namespace
+{
+// Basic Pitch's mean note posterior at a note's semitone over its frames (-1 = no evidence there)
+double support (const Note& n, const polyphonic::NoteEvidence& ev, double frameSeconds)
+{
+    if (ev.empty())
+        return -1.0;
+    const auto bands = ev.note.size() / ev.frameTimes.size();
+    const auto band = (long) std::lround (n.medianMidi()) - 21;
+    if (band < 0 || band >= (long) bands)
+        return -1.0;
+    double sum = 0.0;
+    int count = 0;
+    for (std::size_t f = 0; f < ev.frameTimes.size(); ++f)
+        if (ev.frameTimes[f] >= n.startFrame * frameSeconds && ev.frameTimes[f] <= n.endFrame * frameSeconds)
+            sum += ev.note[f * bands + (std::size_t) band], ++count;
+    return count > 0 ? sum / count : -1.0;
+}
+
+// Round 190lo: a note split at slow re-attacks (Params::slowReattacks) leaves pieces of one pitch end to end; a piece
+// Basic Pitch hardly hears while another piece of the chain is clearly heard is a tail the tracker carried on, not a
+// note: it becomes a candidate
+void dropUnheardPieces (std::vector<Note>& active, std::vector<Note>& candidates, const polyphonic::NoteEvidence& ev, double frameSeconds)
+{
+    constexpr double quiet = 0.15, share = 0.25;
+    std::vector<int> chain (active.size(), -1);
+    int chains = 0;
+    for (std::size_t i = 0; i < active.size(); ++i)
+    {
+        if (chain[i] < 0)
+            chain[i] = chains++;
+        for (std::size_t j = 0; j < active.size(); ++j)
+            if (j != i && chain[j] < 0 && std::abs (active[j].startFrame - (active[i].endFrame + 1)) <= 1
+                && std::abs (active[j].medianMidi() - active[i].medianMidi()) < 0.3f)
+                chain[j] = chain[i];
+    }
+    std::vector<double> heard (active.size()), best ((std::size_t) chains, 0.0);
+    std::vector<int> pieces ((std::size_t) chains, 0);
+    for (std::size_t i = 0; i < active.size(); ++i)
+    {
+        heard[i] = support (active[i], ev, frameSeconds);
+        best[(std::size_t) chain[i]] = std::max (best[(std::size_t) chain[i]], heard[i]);
+        ++pieces[(std::size_t) chain[i]];
+    }
+    std::vector<Note> kept;
+    for (std::size_t i = 0; i < active.size(); ++i)
+    {
+        const auto c = (std::size_t) chain[i];
+        if (pieces[c] > 1 && heard[i] >= 0.0 && heard[i] < quiet && heard[i] < share * best[c])
+        {
+            active[i].active = false;
+            candidates.push_back (std::move (active[i]));
+        }
+        else
+            kept.push_back (std::move (active[i]));
+    }
+    active = std::move (kept);
+}
+// Round 190lo: a candidate the note filter only just rejected that Basic Pitch clearly hears is a note, unless it sits
+// an octave (or two) above a note sounding with it: octave ghosts are where both the filter and Basic Pitch are least sure
+void rescueHeardCandidates (std::vector<Note>& active, std::vector<Note>& candidates, const polyphonic::NoteEvidence& ev, double frameSeconds)
+{
+    constexpr float nearlyNote = 0.35f;   // note filter probability (a note from 0.5)
+    constexpr double heard = 0.3;         // Basic Pitch's mean posterior at its semitone
+    constexpr double minSeconds = 0.2;
+    std::vector<Note> kept;
+    const auto before = active.size();
+    for (auto& c : candidates)
+    {
+        const auto midi = c.medianMidi();
+        const auto octaveAbove = std::any_of (active.begin(), active.begin() + (long) before, [&] (const Note& a) {
+            const auto overlap = std::min (a.endFrame, c.endFrame) - std::max (a.startFrame, c.startFrame);
+            const auto up = midi - a.medianMidi();
+            return overlap > 0 && (std::abs (up - 12.0f) < 0.5f || std::abs (up - 24.0f) < 0.5f);
+        });
+        const auto doubles = std::any_of (active.begin(), active.end(), [&] (const Note& a) {
+            return std::min (a.endFrame, c.endFrame) > std::max (a.startFrame, c.startFrame) && std::abs (a.medianMidi() - midi) < 0.6f;
+        });
+        if (c.probability >= nearlyNote && (c.endFrame - c.startFrame) * frameSeconds >= minSeconds && ! octaveAbove && ! doubles
+            && support (c, ev, frameSeconds) >= heard)
+        {
+            c.active = true;
+            active.push_back (std::move (c));
+        }
+        else
+            kept.push_back (std::move (c));
+    }
+    candidates = std::move (kept);
+}
+} // namespace
+
 bool analyse (const SampleData& source, const polyphonic::NoteEvidence* evidence, Model& out, const std::atomic<bool>* cancel,
               const std::function<void (float)>& progress, const AnalyseOptions& options)
 {
@@ -296,6 +387,7 @@ bool analyse (const SampleData& source, const polyphonic::NoteEvidence* evidence
     const auto mono = monoOf (source);
     auto params = polyphonic::Params::forSampleRate (source.sampleRate);
     params.deferMasks = true; // (LYNX: the masks of the edited blocks are built when rendering)
+    params.slowReattacks = options.slowReattacks;
     const auto useEvidence = evidence != nullptr && ! evidence->empty();
     const auto detector = useEvidence ? options.detector : Detector::harmonic;
     if (detector == Detector::guided)
@@ -313,6 +405,8 @@ bool analyse (const SampleData& source, const polyphonic::NoteEvidence* evidence
     std::vector<Note> active, candidates;
     for (const auto& n : a.notes)
         (n.active ? active : candidates).push_back (noteOf (n));
+    if (options.slowReattacks && useEvidence)
+        dropUnheardPieces (active, candidates, *evidence, out.frameSeconds());
     if (detector == Detector::fallback)
     {
         // Round 190lo: where Basic Pitch hears notes the harmonic detector missed (pads, detuned saws, slow attacks), the
@@ -348,30 +442,37 @@ bool analyse (const SampleData& source, const polyphonic::NoteEvidence* evidence
                 auto n = noteOf (gn);
                 n.startFrame += lo;
                 n.endFrame += lo;
-                const auto mid = (n.startFrame + n.endFrame) / 2;
                 const auto midi = n.medianMidi();
                 const auto doubles = std::any_of (active.begin(), active.end(), [&] (const Note& o) {
                     const auto overlap = std::min (o.endFrame, n.endFrame) - std::max (o.startFrame, n.startFrame);
                     return overlap > 0 && std::abs (o.medianMidi() - midi) < 0.6f;
                 });
+                // (not an octave or two above a note sounding with it: the octave ghosts the detectors are least sure of)
+                const auto octaveAbove = std::any_of (active.begin(), active.end(), [&] (const Note& o) {
+                    const auto overlap = std::min (o.endFrame, n.endFrame) - std::max (o.startFrame, n.startFrame);
+                    const auto up = midi - o.medianMidi();
+                    return overlap > 0 && (std::abs (up - 12.0f) < 0.5f || std::abs (up - 24.0f) < 0.5f);
+                });
                 bool fills = false;
                 for (int t = n.startFrame; t <= n.endFrame && ! fills; t += 4)
                     fills = ! std::any_of (active.begin(), active.end(), [&] (const Note& o) { return covers (o, midi, t); });
-                (void) mid;
-                if (! doubles && fills)
+                if (! doubles && ! octaveAbove && fills)
                     active.push_back (std::move (n));
             }
             if (progress)
                 progress (0.8f + 0.2f * (float) (r + 1) / (float) regions.size());
         }
-        std::stable_sort (active.begin(), active.end(), [] (const Note& x, const Note& y) {
-            return x.startFrame != y.startFrame ? x.startFrame < y.startFrame : x.medianMidi() < y.medianMidi();
-        });
     }
+    if (options.rescueHeard && useEvidence)
+        rescueHeardCandidates (active, candidates, *evidence, out.frameSeconds());
+    std::stable_sort (active.begin(), active.end(), [] (const Note& x, const Note& y) {
+        return x.startFrame != y.startFrame ? x.startFrame < y.startFrame : x.medianMidi() < y.medianMidi();
+    });
     out.notes = std::move (active);
     if (options.keepCandidates)
         for (auto& c : candidates)
-            out.notes.push_back (std::move (c));
+            if (c.probability >= options.candidateFloor && (c.endFrame - c.startFrame + 1) * out.frameSeconds() >= 0.1)
+                out.notes.push_back (std::move (c));
     return true;
 }
 
@@ -384,7 +485,7 @@ std::vector<std::uint8_t> write (const Model& m)
     o.put ((std::int64_t) m.frames);
     o.put ((std::int32_t) m.fftSize);
     o.put ((std::int32_t) m.hop);
-    o.put ((std::uint8_t) ((m.evidence ? 1u : 0u) | (m.takeBackground ? 2u : 0u)));
+    o.put ((std::uint8_t) ((m.evidence ? 1u : 0u) | (m.takeBackground ? 2u : 0u) | (m.overlapAwareMoves ? 4u : 0u)));
     o.put ((std::uint32_t) m.notes.size());
     for (const auto& n : m.notes)
     {
@@ -438,6 +539,7 @@ std::optional<Model> parse (const std::vector<std::uint8_t>& blob)
     const auto flags = in.get<std::uint8_t>();
     m.evidence = (flags & 1u) != 0;
     m.takeBackground = (flags & 2u) != 0;
+    m.overlapAwareMoves = (flags & 4u) != 0;
     const auto count = in.get<std::uint32_t>();
     if (! in.ok || count > blob.size())
         return std::nullopt;
@@ -495,6 +597,7 @@ std::unique_ptr<polyphonic::Analysis> toAnalysis (const Model& m)
     a->params.fftSize = m.fftSize;
     a->params.hop = m.hop;
     a->params.deferMasks = true;
+    a->params.overlapAwareMoves = m.overlapAwareMoves; // (round 190lo)
     a->numSamples = (int) m.frames;
     a->numFrames = 1 + (int) ((m.frames + m.hop - 1) / m.hop); // (PitchNet's StftFrames)
     a->numBins = m.fftSize / 2 + 1;
