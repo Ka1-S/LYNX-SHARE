@@ -17778,6 +17778,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Parity190kwTests.inc" // round 190kw: static REA — Crest's Pro-C 3 V1 / V2 style laws (hidden revision)
 #include "Parity190kwTl3Tests.inc" // round 190kw: Timeless 3 states on Echoform (the hidden line law)
 #include "Parity190kwVvTests.inc" // round 190kw: Epoch Verb's level on ValhallaVintageVerb's loop law (after Parity190it: its gold helpers)
+#include "Parity190kwSatTests.inc" // round 190kw: Saturn 2 -> Ember, the styles' own laws (hidden revision)
 #include "Sampler190dhTests.inc"
 #include "Fix190eaTests.inc"
 #include "Iss158Tests.inc"

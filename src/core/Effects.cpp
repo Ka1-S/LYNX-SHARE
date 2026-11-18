@@ -4357,6 +4357,8 @@ EffectSlot makeEffectSlot (EffectKind kind)
         slot.params[(std::size_t) echosuite::echoform::revision] = 1.0f;
     if (kind == EffectKind::crestCompressor) // round 190kw: a new Crest runs the V1 styles' revision 1 (hidden parameter)
         slot.params[(std::size_t) dyn::crest::revision] = 1.0f;
+    if (kind == EffectKind::ember) // round 190kw: a new Ember runs the Saturn styles' own laws (hidden parameter)
+        slot.params[(std::size_t) mixsuite::ember::revision] = 1.0f;
     // round 190it: a new Epoch Verb / Atrium / Foil Plate / Halo runs the 0.1.30 revision of the Measured law (hidden)
     if (kind == EffectKind::epochVerb) slot.params[(std::size_t) verbs::epoch::revision] = 1.0f;
     if (kind == EffectKind::epochVerb) // round 190kw: … and Epoch's level the reference's loop law (hidden)
@@ -4549,6 +4551,9 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     // round 190js: … and one saved before Single Vocal's revision keeps round 148's Single Vocal (bit for bit)
     if (slot.kind == EffectKind::hushDeEsser && savedCount <= (std::size_t) mixsuite::hush::vocalRevision)
         slot.params[(std::size_t) mixsuite::hush::vocalRevision] = 0.0f;
+    // round 190kw: an Ember saved before the Saturn styles' laws keeps round 150's measured characters (bit for bit)
+    if (slot.kind == EffectKind::ember && savedCount <= (std::size_t) mixsuite::ember::revision)
+        slot.params[(std::size_t) mixsuite::ember::revision] = 0.0f;
     // round 190is: an Echoform saved before the voicings' revision keeps rounds 147 / 150's voicings
     if (slot.kind == EffectKind::echoform && savedCount <= (std::size_t) echosuite::echoform::revision)
         slot.params[(std::size_t) echosuite::echoform::revision] = 0.0f;

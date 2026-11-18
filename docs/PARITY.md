@@ -4142,3 +4142,99 @@ adds a few `pow` / `log10` per block in `configure`, not per sample. No latency 
 - Score-led stands: Grit Plate −3.25 dB and Gated −2 dB sit under the impulse's energy match (their test-signal / impulse
   files score higher there). Smooth Room's +2.5 dB (test signal only) and Drift Chamber's +1.5 dB (impulse only) were not
   taken.
+
+## Round 190kw (Saturn 2 → Ember): the styles' own laws (hidden revision)
+
+The reference's style laws were recovered by static analysis (round 190kw's analyst, `rea190kw/rea/sat2`) and written as
+LYNX's own code (`core/EmberSaturnStyles.inc`, `saturnCurve` / `saturnPreDb` / `saturnPostGain` in core/MixSuite):
+each style is a curve (arctan, x / (1 + x), tanh, sine, 2nd / 3rd order, the asymmetric tube curve, rectifier) with a
+power P and a negative-side scale B — `y = sign(x) · f((β|x|)^P)^(1/P) / β`, β = B below zero — a drive range (the
+pre-gain lo … hi dB over the reference's 0 … 100 %), a level compensation `10^(trim/20) · 2C / (F(G·C) − min(F(−G·C), 0))`
+(C = the style's reference level: a sine there keeps its peak-to-peak level), its own EQ before / after the curve and
+the band tone stack (low shelf 120 Hz, bell 600 Hz, high shelves 2.5 / 7 kHz; the amps 170 / 500 / 1500 / 4500 Hz).
+
+- Hidden `ember::revision` (index 163; a new Ember and a translated Saturn 2 state = 1, anything saved before = 0) and
+  `lawRate` (164: the reference's High Quality off — the law's curve at the base rate, the latency unchanged). Ember's
+  Drive keeps its scale; the reference's drive is `referenceDrive (driveDb (v))` = 1.2 v (the translator's 30 / 36 ×).
+- The law runs for the styles that scored up on the lab files and net up on the bank: Subtle / Clean / Warm / Broken
+  Tube, Subtle Tape, Warm / Old Tape, Tweed, Plexi, Brit Pop, Lead / Screaming Amp, Subtle Saturation. The others keep
+  round 150 / 152's measured characters (`lawCharacter`): Power Amp and Breakdown (net level / down on the bank: 3 / 2
+  and 3 / 6 files up / down), the transformers (their dynamic "LL" knee was
+  not recovered: ESR −11 → −15 dB but the IMD spectrum 4 … 8 dB off), Clean Tape / Gentle / Heavy Saturation (a steady
+  −0.7 … −1 dB level offset), Brit Rock / Smooth / Crunchy Amp (a 5.6 kHz segment 16 dB loud: their resonant low-pass Q
+  convention), the rectifier (the reference's saturates), Smudge / Foldback / Destroy (stages not recovered).
+- Lab (refcap030 grid subset, 168 files): base 3.375 → law (all styles) 3.643 (56 up / 27 down); without the style EQ
+  3.190 (18 / 44); with B read as 1 / B 3.625 — the EQ is part of the law, B as recovered.
+- Superb's 32× / Good's 8× keep Ember's 4× (8× scored no better on the lab files and costs twice the CPU).
+
+refcap030 bank (scripts/fxparity.py, Saturn 2 translated by `fromSaturn2`; per file before → after):
+
+| block | files | mean before → after | up / same / down |
+|---|---|---|---|
+| grid | 588 | 3.55 → 3.93 | 158 / 428 / 2 |
+| mode | 33 | 4.67 → 4.88 | 18 / 4 / 11 |
+| pairs | 54 | 3.78 → 4.41 | 28 / 23 / 3 |
+| sr44 | 20 | 5.55 → 6.10 | 9 / 8 / 3 |
+| sr48 | 20 | 5.60 → 6.10 | 8 / 8 / 4 |
+| sr96 | 20 | 5.60 → 6.10 | 8 / 10 / 2 |
+| prog | 84 | 4.31 → 4.38 | 13 / 63 / 8 |
+| **all** | 819 | 3.84 → **4.20** | 242 / 544 / 33 |
+
+All 33 files a step down are 6 → 5 (two 7 → 6, one 3 → 2 / 2 → 1) on broadband signals (25 of them `mix`) of the
+tube / tape styles (Clean / Warm Tube, Warm / Old Tape, Plexi): the waveform match improves (ESR −3 … −11 → −17 … −23 dB)
+but the third-octave balance crosses the 6-point limit (0.37 … 0.45 → 0.75 … 0.83 dB): a steady −0.5 … −0.9 dB level
+offset against the reference (its small-signal gain is ~1 dB higher than the recovered compensation gives — the same
+offset that kept Clean Tape / the saturations out) and up to +3.5 dB at 16 kHz (the cuts' Q convention; a Butterworth-at-
+Q-1 reading scored worse). Shipped as an owner decision (HANDOFF): net +0.36 over the bank, 242 up / 33 down.
+
+**Old projects.** Revision 0 renders byte for byte as the base commit: fxrender of the base (parity190js `fxr4`) and of
+the round over 16 Ember settings (characters, bands, drives, oversampling, PUNISH, effect law) at 44.1 / 48 / 96 kHz,
+48 files, 0 differ (`rea190kw/sat/ident.sh`); fingerprints in `tests/Parity190kwSatGold.inc`.
+
+**CPU** (thread time, 20 s at 48 kHz in blocks of 512, best of 5, three runs on one core under load; `rea190kw/sat/
+bench_g.log`), revision 0 → 1 at Ember's 4×: Round valve (Warm Tube) 0.86 → 1.03 %, Chime combo (Brit Pop: P = 0.8, 16
+EQ sections) 1.02 → 1.29 %, Worn reel (Old Tape) 2.40 → 1.17 %, Solo amp (Lead Amp) 2.64 → 0.97 %, three bands 6.17 →
+3.39 %; a translated Saturn state with High Quality off runs the curve at the base rate: 0.36 … 0.65 %. The P ≠ 1 styles
+read their curve from a per-band table (64 points per octave, < 3e-5 relative; two powf per oversampled sample cost
+2.4 %). No latency change.
+
+**Still off:** the transformers' dynamic knee, the rectifier, the base styles' level offset, the amps' resonant
+low-pass convention (round 150's characters stay for them); Dynamics, feedback, crossovers and the Smudger / Breakdown
+pitch internals keep LYNX's behaviour.
+
+### Round 190lg: the ~1 dB small-signal offset found (Saturn 2 → Ember, revision 1)
+
+- The offset was the reference's **channel output soft clipper** (static: a cubic `T · (1.5u − 0.5u³)`, u = clamp (k·x, ±1),
+  k = (1 / (12T²) + 2/3) / T, threshold T = 0 dB): small-signal gain 9/8 (+1.02 dB), ceiling 0 dBFS. Its absence was the
+  steady +1.02 dB the reference measured over the law on Clean / Warm / Broken Tube, the tapes, the saturations, Tweed and
+  the FX styles (identical at 44.1 / 48 / 96 kHz and every High Quality), and the extra compression near 0 dBFS at low drive.
+  With it the law fits the level sweeps within 0.03 dB at every level and drive. The Subtle styles and the transformers
+  measure without it (`saturnClipStyle`).
+- The cut filters' Q: the reference's Q 1 is Butterworth (LYNX scaled the resonant pair by q / √½: +1.3 dB at 31 Hz,
+  +1 … +5 dB at 12.7 … 16 kHz). The law's DC blocker is the reference's ~1.5 Hz (was 8 Hz: −0.3 dB at 31 Hz).
+- The law now also runs for Clean Tape, Gentle and Heavy Saturation (kept out in 190kw for that offset).
+- Scorer: round 190lg's time-based alignment window for before and after.
+
+refcap030 bank, base = rea190kw (Ember revision 0 law-free, as every project before) → round 190lg:
+
+| block | files | mean before → after | up / same / down |
+|---|---|---|---|
+| grid | 588 | 3.55 → 4.63 | 283 / 305 / 0 |
+| mode | 33 | 4.67 → 7.88 | 33 / 0 / 0 |
+| pairs | 54 | 3.78 → 6.20 | 44 / 10 / 0 |
+| sr44 | 20 | 5.55 → 7.80 | 14 / 6 / 0 |
+| sr48 | 20 | 5.60 → 7.75 | 14 / 6 / 0 |
+| sr96 | 20 | 5.60 → 7.80 | 14 / 6 / 0 |
+| prog | 84 | 4.31 → 5.04 | 37 / 47 / 0 |
+| **all** | 819 | 3.84 → **5.14** | **439 / 380 / 0** (round 190kw: 4.20, 33 down) |
+
+refcap182 programme 25 files 6.16 → 7.88 (19 up / 0 down); tp172b 20 files 5.1 → 7.75 (20 up / 0 down). Nothing down.
+Old projects (revision 0): 48 / 48 renders byte-identical to the base (`rea2_190lg/sat/ident.sh`). CPU (thread time, 20 s
+at 48 kHz, best of 5, `rea2_190lg/sat/bench_190lg.log`), revision 0 → 1 at 4×: Round valve 0.87 → 0.98 / 0.99 %, Chime
+combo 0.93 → 1.17 / 1.22 %, Worn reel 2.07 / 2.16 → 1.02 / 0.99 %, Open reel (Clean Tape, new on the law) 2.03 / 2.06 →
+1.09 / 1.14 %, Mellow clip (Gentle Saturation, new) 1.95 / 2.15 → 0.94 / 0.90 %, three bands 5.21 / 5.43 → 3.26 / 3.21 %;
+the clipper itself costs nothing measurable.
+
+**Still off after 190lg:** the amps' 4 … 8-section EQs above 5 kHz (bell / shelf Q conventions), the transformers' dynamic
+knee, Broken Tube above −15 dBFS (−1.6 dB), why the Subtle / transformer styles skip the clipper (measured, not found
+statically); Power Amp / Breakdown keep round 150's characters (the law still scored them down: lab 2.17).
