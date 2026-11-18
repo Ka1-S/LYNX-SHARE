@@ -4573,3 +4573,27 @@ mix). Revision 1 was never released (not in main, no tag), so it changes freely.
 **CPU** (Space engine alone, 20 s at 48 kHz, blocks of 512, best of 5, under load 17 … 20, two interleaved runs): revision
 1 4.1 … 5.9 % (190lg-r2's 4.5 … 5.6 %), revision 0 6.1 … 8.0 %: the 79 taps cost what the skipped early / 2-line networks
 save at Distance ≤ ½.
+
+## Round 190lz (Pro-R 2 → LuxeVerb Space revision 1: the taps' tone and the Space-½ level) — NOT merged
+
+Owner decision on 190lp's taps (options b + c): one more refit of the music level at Space ≤ ¼, the three two-step
+1 kHz-tone drops accepted as a modal lottery, then the re-gate. Measured black-box (docs/analise/REA_rodada190lz.md):
+both sides are linear at Space ¼ (music and sweeps within ±0.5 dB of each side's own impulse prediction), and the music
+excess sat in the taps' window (0 … 40 ms: +3 … +4 dB from 125 Hz to 2 kHz, −1 dB at 4 … 8 kHz; none at decay rate
+× 2 … × 4); Space ½ sat 1.2 dB under the reference at every rate; Distance 0.8 1.7 dB. Revision 1 only:
+- the taps' own tone: a −3 dB bell at 700 Hz (Q 0.5) and +1.5 dB above 4 kHz on the tap sum, in full to rate × 1, gone
+  by × 4 (`Fit1::tapEqDb …`, `eqR0 / eqR1`);
+- the body by Space: +1.3 dB at Space ½, linear to 0 at ¼ and ¾ (`Fit1::spaceDb`); the distance table's ¾ point 0.06 →
+  0.36 dB.
+
+| bank (time-window scorer; before = fxr_m4, revision 0) | files | before → 190lp → **190lz** | up / same / down |
+|---|---|---|---|
+| refcap030 Pro-R 2, all blocks | 323 | 3.30 → 3.69 → **3.77** | 109 / 198 / 16 (190lp 102 / 195 / 26) |
+| refcap182 programme | 20 | 3.95 → 4.05 → **4.05** | 2 / 17 / 1 |
+| tp172b | 12 | 3.83 → 4.00 → **4.00** | 1 / 11 / 0 |
+
+17 files down (190lp 27): 5 qualify (one step, waveform clearly better), 3 are the accepted 1 kHz-tone files, **9 do not
+meet the rule** (four more 1 kHz-tone files, two D-state impulses on low single modes, PX3 S0.5 W0.8 mix, the drums stem
+at S1 in refcap030 and refcap182): not merged; the list goes to the owner. Old projects: revision 0 byte-identical
+(gold 15 / 15, fxrender revision 0 = fxr_m4 12 / 12); every other effect byte-identical to 190lp (158 / 158). CPU of
+the Space engine 3.5 … 4.5 % → 3.7 … 4.7 % of a core (two biquads per channel on the taps; within the noise).
