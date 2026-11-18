@@ -18135,6 +18135,12 @@ private:
                     want.add (e.kind == lynx::flclipmenu::Entry::Kind::separator ? juce::String ("-")
                               : e.kind == lynx::flclipmenu::Entry::Kind::header  ? "[" + lynx::tr (e.text.c_str()) + "]"
                                                                                  : lynx::tr (e.text.c_str()));
+            // (rollup step 8: the separators round 190kx's key items bring into the LYNX extras column go with them)
+            for (int k = got.indexOf ("[" + lynx::tr ("LYNX extras") + "]") + 1; k > 0 && k < got.size();)
+                if (got[k] == "-")
+                    got.remove (k);
+                else
+                    ++k;
             want.add ("[" + lynx::tr ("LYNX extras") + "]"); // (round 190gi; round 190jv: in a third column)
             for (const auto& x : lynx::flclipmenu::lynxExtras())
                 want.add (lynx::tr (x.c_str()));
