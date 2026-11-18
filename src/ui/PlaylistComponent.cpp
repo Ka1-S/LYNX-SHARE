@@ -1504,6 +1504,11 @@ int PlaylistComponent::heightOf (int track) const
         return 0;
     if (noteedit::isFoldedAway (engine.getSong(), track))
         return hideCollapsedGroups ? 0 : foldedHeight; // FL's View › "Hide collapsed grouped tracks" (round 190jf)
+    // rollup 0.1.30 step 7 (owner, QA-2): the Simple layout hides imported take lanes (Live's TakeLanes, round
+    // qafix190kq's PlaylistTrack::takeLane), as the clip grid and the Session mixer do; the Pattern layout's Playlist and
+    // the Clip-launch Arrangement keep them under their track. (A comp made in LYNX keeps its lanes everywhere.)
+    if (simpleHeaders && track >= 0 && track < (int) tracks.size() && tracks[(std::size_t) track].takeLane && tracks[(std::size_t) track].grouped)
+        return 0;
     if (arrange::isFolded (engine.getSong(), track)) // round 190cg: a folded track is its title bar
         return liveFoldedHeight;
     const auto h = track >= 0 && track < (int) tracks.size() ? tracks[(std::size_t) track].height : 0;
