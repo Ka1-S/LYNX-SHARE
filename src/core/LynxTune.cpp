@@ -615,6 +615,12 @@ public:
         const auto dt = 1.0 / sr;
         const auto stereo = r != nullptr && r != l;
         float peakIn = 0.0f, peakOut = 0.0f; // round 135w: the input / output meters
+        // round 190li (CPU only, the same values to the bit): the per-sample smoothing coefficients, computed once per
+        // block (the high shelf's pole, the activity and created-vibrato followers) or when their time changes (retune)
+        const double shelfPole = std::exp (-2.0 * 3.141592653589793 * 3000.0 / sr);
+        const double activityCoef = 1.0 - std::exp (-1.0 / (0.01 * sr));
+        const double extraCoef = 1.0 - std::exp (-dt / 0.003);
+        double retuneT = -1.0, retuneCoef = 1.0;
 
         for (int i = 0; i < n; ++i)
         {
@@ -755,12 +761,17 @@ public:
                 const auto x = std::clamp ((noteAge - 0.275) / 0.1, 0.0, 1.0);
                 t += human * 0.135 * x * x * (3.0 - 2.0 * x);
             }
-            shift += (t > 0.0 ? 1.0 - std::exp (-dt / t) : 1.0) * (wanted - shift);
+            if (t != retuneT)
+            {
+                retuneT = t;
+                retuneCoef = t > 0.0 ? 1.0 - std::exp (-dt / t) : 1.0;
+            }
+            shift += retuneCoef * (wanted - shift);
 
             auto semis = shift + trans;
             if (natural || extra != 0.0)
             {
-                extra += (1.0 - std::exp (-dt / 0.003)) * (extraWanted - extra);
+                extra += extraCoef * (extraWanted - extra);
                 semis += extra;
             }
             if (amount < 1.0)
@@ -823,10 +834,10 @@ public:
                 // Round 165j ([RUN] REA_rodada165j §4, her 24 live-set takes against Auto-Tune Pro with her states): the
                 // corrected voice was still 0.52 dB darker at 2.5-6.3 kHz relative to 300-1000 Hz (Auto-Tune: 0.07); the
                 // shelf now starts at 3 kHz with +1.5 dB (tilt -0.13 dB; pitch, bursts and formant distance not worse)
-                const double a = std::exp (-2.0 * 3.141592653589793 * 3000.0 / sr);
+                const double a = shelfPole;
                 // (voiced only: unvoiced sounds pass as plain overlap-add, untouched)
                 const double want = unvoicedFor > 0.0 ? 0.0 : std::min (1.0, std::abs (semis - trans) / 0.05);
-                activity += (1.0 - std::exp (-1.0 / (0.01 * sr))) * (want - activity);
+                activity += activityCoef * (want - activity);
                 constexpr double lift = 0.18850222743702228; // 10^(1.5/20) - 1
                 for (int c = 0; c < 2; ++c)
                 {
