@@ -129,6 +129,9 @@ struct RenderAhead::Entry
     int samples = 0;
     bool playing = false;
     std::array<float, 2 * maxMixerTracks> peaks {}; // [i * 2 + side]: the i-th insert of the part rendered ahead
+    // round 190lr (DL-108): the blocks' sums of squares and their frames, kept only while the Session mixer's RMS bars show
+    std::array<float, 2 * maxMixerTracks> power {};
+    std::array<int, maxMixerTracks> powerFrames {};
 };
 
 struct RenderAhead::Partition
@@ -839,6 +842,12 @@ void RenderAhead::harvestMeters (Entry& entry) noexcept
             const auto a = m.takePeak (t, side), v = m.takeViewPeak (t, side), s = m.takeSessionPeak (t, side);
             entry.peaks[(std::size_t) (i * 2 + side)] = std::max ({ a, v, s });
         }
+        float pl = 0.0f, pr = 0.0f;
+        int frames = 0;
+        m.takePowerSums (t, pl, pr, frames); // (round 190lr: zeros while nobody wants them)
+        entry.power[(std::size_t) (i * 2)] = pl;
+        entry.power[(std::size_t) (i * 2 + 1)] = pr;
+        entry.powerFrames[(std::size_t) i] = frames;
     }
 }
 
@@ -846,11 +855,16 @@ void RenderAhead::replayMeters (const Entry& entry, MeterBank* meters) noexcept
 {
     if (meters == nullptr)
         return;
+    const auto power = meters->powerWanted.load (std::memory_order_relaxed);
+    aheadMeters->powerWanted.store (power, std::memory_order_relaxed); // (round 190lr: the part rendered ahead sums them too)
     for (int i = 0; i < current->aheadTrackCount; ++i)
     {
         const auto l = entry.peaks[(std::size_t) (i * 2)], r = entry.peaks[(std::size_t) (i * 2 + 1)];
         if (l > 0.0f || r > 0.0f)
             meters->accumulate (current->aheadTrackList[(std::size_t) i], l, r);
+        if (power && entry.powerFrames[(std::size_t) i] > 0)
+            meters->accumulatePower (current->aheadTrackList[(std::size_t) i], entry.power[(std::size_t) (i * 2)], entry.power[(std::size_t) (i * 2 + 1)],
+                                     entry.powerFrames[(std::size_t) i]);
     }
 }
 

@@ -2455,6 +2455,31 @@ float peakOf (const float* data, int n) noexcept
     return peak;
 }
 
+// Round 190lr (DL-108): the block's sum of squares, for the Session mixer's RMS bars (only while they show); four
+// partial sums the compiler can keep in lanes
+float squaresOf (const float* data, int n) noexcept
+{
+    float s0 = 0.0f, s1 = 0.0f, s2 = 0.0f, s3 = 0.0f;
+    int i = 0;
+    for (; i + 4 <= n; i += 4)
+    {
+        s0 += data[i] * data[i];
+        s1 += data[i + 1] * data[i + 1];
+        s2 += data[i + 2] * data[i + 2];
+        s3 += data[i + 3] * data[i + 3];
+    }
+    for (; i < n; ++i)
+        s0 += data[i] * data[i];
+    const auto sum = (s0 + s1) + (s2 + s3);
+    return std::isfinite (sum) ? sum : 0.0f;
+}
+
+void meterPower (MeterBank* meters, int track, const float* l, const float* r, int n) noexcept
+{
+    if (meters != nullptr && meters->powerWanted.load (std::memory_order_relaxed))
+        meters->accumulatePower (track, squaresOf (l, n), squaresOf (r, n), n);
+}
+
 // No NaN / inf in the block? Round 190ge: by the exponent bits (all ones only for an inf or a NaN), four lanes at a
 // time. (The form before, x · 0 summed — 0 for every finite x — was one serial chain of float additions on every
 // compiler: the order of a float sum may not change. It ran after every effect slot, every block.)
@@ -5630,6 +5655,7 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
     if (meters != nullptr)
     {
         meters->accumulate (0, peakOf (left, numSamples), peakOf (right, numSamples));
+        meterPower (meters, 0, left, right, numSamples);
         meters->capture.push (0, left, right, numSamples);
         meters->logTap.push (0, left, right, numSamples);
         meters->loudness.push (left, right, numSamples, sampleRate); // (round 190am: one atomic load while it is off)
@@ -6109,6 +6135,7 @@ void RackRenderer::runSilencedTrack (const RackState& state, int t, int n, const
         return;
     last = applyMatrix (l, r, l, r, n, std::isnan (last.ll) ? level : last, level);
     meters->accumulate (t, peakOf (l, n), peakOf (r, n));
+    meterPower (meters, t, l, r, n);
 }
 
 void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank* meters) noexcept
@@ -6295,6 +6322,7 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
         else
         {
             meters->accumulate (t, peakOf (l, n), peakOf (r, n));
+            meterPower (meters, t, l, r, n);
             meters->capture.push (t, l, r, n);
         }
     }

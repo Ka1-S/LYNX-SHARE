@@ -6899,6 +6899,7 @@ void MainComponent::timerCallback()
         resized();
     }
     const uitrace::Scope trace ("MainComponent timer", false);
+    engine.getMeters().expirePower (juce::Time::getMillisecondCounter()); // (round 190lr: the RMS sums stop with their reader)
     {
         const uitrace::Scope part ("timer: toolbar displays", false);
         masterVolume.update();

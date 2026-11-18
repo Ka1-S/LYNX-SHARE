@@ -127,6 +127,7 @@ private:
     mutable std::uint64_t cacheStamp = ~std::uint64_t (0);
     std::vector<meters::PeakHold> levels;             // per insert, left / right
     std::vector<float> loudest;                       // round 190jn: per insert, the peak pill's loudest peak since a reset
+    std::vector<float> rms;                           // round 190lr (DL-108): per insert, left / right, the RMS bar (linear)
     int selectedShown = -1;                           // round 190jn: the grid's selected track the strips last showed
     std::uint64_t armsShownState = 0;                 // round 190ge: the arms the last tick saw (tick repaints on a change)
     ui::ValueDrag drag;

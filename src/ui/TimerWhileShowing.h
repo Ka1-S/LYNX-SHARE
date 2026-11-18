@@ -9,6 +9,8 @@
 // Minimising the window does not count as hidden: JUCE reports no event when a window is restored, so a timer stopped
 // for a minimised window would never start again. It keeps running then, as before this class.
 
+#include <functional>
+
 #include <juce_gui_basics/juce_gui_basics.h>
 
 namespace lynx::ui
@@ -17,6 +19,9 @@ class TimerWhileShowing final : private juce::ComponentMovementWatcher
 {
 public:
     TimerWhileShowing (juce::Component& v, juce::Timer& t, int hz) : juce::ComponentMovementWatcher (&v), view (v), timer (t), rateHz (hz) { update(); }
+
+    // round 190lr: told when the timer stops (false) or starts (true), e.g. to stop asking the audio thread for levels
+    std::function<void (bool)> onRunningChanged;
 
 private:
     // the view and all its parents visible, the top one on the desktop (minimised or not)
@@ -33,10 +38,13 @@ private:
     }
     void update()
     {
+        const auto was = timer.isTimerRunning();
         if (! shown())
             timer.stopTimer();
         else if (! timer.isTimerRunning())
             timer.startTimerHz (rateHz);
+        if (onRunningChanged != nullptr && was != timer.isTimerRunning())
+            onRunningChanged (timer.isTimerRunning());
     }
     void componentMovedOrResized (bool, bool) override {}
     void componentPeerChanged() override { update(); }
