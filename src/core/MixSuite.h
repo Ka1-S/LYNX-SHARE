@@ -528,6 +528,10 @@ double saturnPreDb (int s, double referenceDrive) noexcept;   // the gain before
 // the level compensation after the curve: 10^(trim / 20) · 2C / (F (G·C) − min (F (−G·C), 0)), C = 10^(ref / 20): a
 // sine at the style's reference level keeps its peak-to-peak level
 double saturnPostGain (int s, double referenceDrive) noexcept;
+// round 190lg: the reference's channel output soft clipper (threshold 0 dB, small-signal gain 9/8) and the styles it
+// measures on (all but the Subtle ones and the transformers)
+bool saturnClipStyle (int s) noexcept;
+float saturnClip (float x) noexcept;
 constexpr int tapeSpeeds = 5;
 int tapeSpeedIndex (float v) noexcept;          // 0 … 4 = 30, 15, 7½, 3¾, 1⅞ ips
 const char* tapeSpeedName (int k) noexcept;

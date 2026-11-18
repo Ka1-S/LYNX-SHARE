@@ -2835,21 +2835,35 @@ bool saturnRaw (const EffectParams& p) noexcept { return on (p[lawRate]); }
 bool lawCharacter (int k) noexcept
 {
     // the styles whose law scored up on the refcap030 lab files and net up on the whole bank (docs/PARITY.md "Round
-    // 190kw"). The others keep round 150 / 152's measured characters: Power Amp and Breakdown (net level / down on the
-    // bank), the effect styles (their smudger, foldback and destroy stages were not recovered),
-    // the transformers (their dynamic knee was not recovered), Clean Tape / Gentle and Heavy Saturation (a steady
-    // 0.7 … 1 dB level offset against the reference), Brit Rock, Smooth / Crunchy Amp and the rectifier (their EQ /
+    // 190kw"; round 190lg: + Clean Tape, Gentle and Heavy Saturation, whose steady ~1 dB offset was the reference's
+    // channel soft clipper). The others keep round 150 / 152's measured characters: Power Amp and Breakdown (net level /
+    // down on the bank), the effect styles (their smudger, foldback and destroy stages were not recovered), the
+    // transformers (their dynamic knee was not recovered), Brit Rock, Smooth / Crunchy Amp and the rectifier (their EQ /
     // curve conventions do not reproduce the reference yet)
-    static constexpr bool on[characters] { true, true, true, true, true, false, true, true, true, true, false, true,
-                                           false, false, true, true, false, true, false, false, false, false, false, false,
+    static constexpr bool on[characters] { true, true, true, true, true, true, true, true, true, true, false, true,
+                                           false, false, true, true, false, true, true, true, false, false, false, false,
                                            false, false, false, false };
     return k >= 1 && k <= characters && on[k - 1];
+}
+// round 190lg: the reference's channel output soft clipper (found statically: a cubic 1.5u − 0.5u³ on u = clamp (k·x, ±1),
+// k = (1 / (12T²) + 2/3) / T, times T, threshold T = 0 dB): small-signal gain 1 + 1 / (8T²) = 9/8 (+1.02 dB), ceiling 0 dBFS
+// from |x| ≥ 4/3. It is the ~1 dB the law missed and the extra compression near 0 dBFS at low drive (the refcap030 level
+// sweeps of Clean / Warm Tube, Clean Tape, Gentle Saturation fit within 0.03 dB at every level and drive with it). The
+// Subtle styles and the transformers measure without it (small-signal gain exactly the compensation's, no compression).
+bool saturnClipStyle (int s) noexcept
+{
+    return ! (s == 0 || s == 4 || s == 17 || s == 20 || s == 21 || s == 22);
+}
+float saturnClip (float x) noexcept
+{
+    const auto u = std::clamp (0.75f * x, -1.0f, 1.0f);
+    return u * (1.5f - 0.5f * u * u);
 }
 
 namespace
 {
 // RBJ cookbook sections at the reference's Q (shelves with the Q form), a cut of slope index n as Butterworth sections
-// (an odd order's first-order section first) with the last pair's Q scaled by q / √½
+// (an odd order's first-order section first) with the last pair's Q scaled by q (round 190lg: q = 1 is Butterworth, as the reference)
 int saturnSections (lynx::Biquad* out, int room, const SaturnFilter& f, double sr) noexcept
 {
     constexpr double pi = 3.141592653589793;
@@ -2895,7 +2909,7 @@ int saturnSections (lynx::Biquad* out, int room, const SaturnFilter& f, double s
         if (b == nullptr) return n;
         // Butterworth pole pair j (the last one is the most resonant)
         double q = 1.0 / (2.0 * std::cos (pi * (2.0 * (pairs - 1 - j) + 1.0 + (order % 2)) / (2.0 * order)));
-        if (j == pairs - 1) q *= (double) f.q / 0.70710678118654752;
+        if (j == pairs - 1) q *= (double) f.q; // round 190lg: the reference's Q 1 is the Butterworth response (was × q / √½)
         const auto alpha = sw / (2.0 * q);
         if (high) b->set ((1 + cw) / 2, -(1 + cw), (1 + cw) / 2, 1 + alpha, -2 * cw, 1 - alpha);
         else b->set ((1 - cw) / 2, 1 - cw, (1 - cw) / 2, 1 + alpha, -2 * cw, 1 - alpha);
@@ -3309,6 +3323,11 @@ public:
             d.setLength (Oversampler::latency());
         for (auto& d : bandDc)
             d.set (sr, 8.0);
+        // round 190lg: the law's DC blocker at the reference's ~1.5 Hz (its DC after a loud asymmetric tube passage decays
+        // with τ ≈ 0.11 s on the refcap030 level sweeps; Ember's own 8 Hz one cut the law's lows by 0.3 dB at 31 Hz)
+        satDc.set (sr, 1.5);
+        for (auto& d : satBandDc)
+            d.set (sr, 1.5);
         splitBands = 0; // redesign the crossovers at the new rate
         lastVoice = -1;
         tapeNow = -1; // round 190fj: the tape filters at the new rate
@@ -3353,6 +3372,9 @@ public:
         for (auto& d : rawDelay)
             d.reset();
         for (auto& d : bandDc)
+            d.reset();
+        satDc.reset();
+        for (auto& d : satBandDc)
             d.reset();
         for (auto& x : split) x.reset();
         for (auto& row : ap)
@@ -3655,6 +3677,7 @@ private:
         // round 152 (with the measured law): the single band applies band 1's mix and level like the reference (before,
         // they only acted in the multiband mode)
         const bool bandLaw = measuredEffects (p);
+        const bool satClip = chr.sat && powered && saturnClipStyle (chr.satStyle); // round 190lg
         const auto bandMix = std::clamp (p[band1Mix], 0.0f, 1.0f);
         const auto bandGain = (float) dbToGain (bandLevelDb (p[band1Level]));
 
@@ -3675,8 +3698,9 @@ private:
             }
             else
             {
-                a = dc.process (wl[(std::size_t) i], 0) * compA2;
-                b = dc.process (wr[(std::size_t) i], 1) * compB;
+                auto& dcs = chr.sat ? satDc : dc; // round 190lg
+                a = dcs.process (wl[(std::size_t) i], 0) * compA2;
+                b = dcs.process (wr[(std::size_t) i], 1) * compB;
             }
             if (chr.k > 0) chr.post (a, b);
             if (collapse) pitch[0].run (a, b, cRatio); // round 152
@@ -3709,6 +3733,11 @@ private:
             if (muted) { a = 0.0f; b = 0.0f; }
             a *= panA; // round 147: the band's pan
             b *= panB;
+            if (satClip) // round 190lg: the reference's channel soft clipper
+            {
+                a = saturnClip (a);
+                b = saturnClip (b);
+            }
             l[i] = (da + (a - da) * mx) * out;
             r[i] = (db + (b - db) * mx) * out;
         }
@@ -3920,7 +3949,8 @@ private:
             const bool silent = state == BandState::mute || (anySolo && state != BandState::solo);
             for (int i = 0; i < n; ++i)
             {
-                auto wa = bandDc[(std::size_t) b].process (bl[i], 0) * k, wb = bandDc[(std::size_t) b].process (br[i], 1) * kB;
+                auto& dcb = chr.sat ? satBandDc[(std::size_t) b] : bandDc[(std::size_t) b]; // round 190lg
+                auto wa = dcb.process (bl[i], 0) * k, wb = dcb.process (br[i], 1) * kB;
                 if (chr.k > 0) chr.post (wa, wb);
                 if (collapse) pitch[(std::size_t) b].run (wa, wb, ratio); // round 152
                 if (post) ex.post (wa, wb, dryBand[0][(std::size_t) i], dryBand[1][(std::size_t) i]);
@@ -3941,6 +3971,7 @@ private:
             }
         }
 
+        const bool satClip = chars[0].sat && on (p[bandExtra (0, 0)]) && saturnClipStyle (chars[0].satStyle); // round 190lg
         for (int i = 0; i < n; ++i)
         {
             auto a = tiltHi.process (tiltLo.process (wl[(std::size_t) i], 0), 0);
@@ -3952,6 +3983,11 @@ private:
             }
             float da = l[i], db = r[i];
             dry.process (da, db);
+            if (satClip) // round 190lg: the reference's channel soft clipper on the bands' sum (band 1's style decides)
+            {
+                a = saturnClip (a);
+                b = saturnClip (b);
+            }
             l[i] = (da + (a - da) * mx) * out;
             r[i] = (db + (b - db) * mx) * out;
         }
@@ -4133,6 +4169,8 @@ private:
     std::array<std::array<Oversampler, 2>, maxBands> bandOs;
     std::array<Delay2<256>, maxBands> bandDry;
     std::array<OnePoleHp, maxBands> bandDc;
+    OnePoleHp satDc;                                // round 190lg: the law bands' DC blocker (1.5 Hz)
+    std::array<OnePoleHp, maxBands> satBandDc;
     std::array<std::array<std::array<float, maxBlock>, 2>, maxBands> bandBuf {};
     std::array<std::array<float, maxBlock>, 2> dryBand {};
     std::array<BandExtras, maxBands> extras;

@@ -4041,3 +4041,40 @@ read their curve from a per-band table (64 points per octave, < 3e-5 relative; t
 **Still off:** the transformers' dynamic knee, the rectifier, the base styles' level offset, the amps' resonant
 low-pass convention (round 150's characters stay for them); Dynamics, feedback, crossovers and the Smudger / Breakdown
 pitch internals keep LYNX's behaviour.
+
+### Round 190lg: the ~1 dB small-signal offset found (Saturn 2 → Ember, revision 1)
+
+- The offset was the reference's **channel output soft clipper** (static: a cubic `T · (1.5u − 0.5u³)`, u = clamp (k·x, ±1),
+  k = (1 / (12T²) + 2/3) / T, threshold T = 0 dB): small-signal gain 9/8 (+1.02 dB), ceiling 0 dBFS. Its absence was the
+  steady +1.02 dB the reference measured over the law on Clean / Warm / Broken Tube, the tapes, the saturations, Tweed and
+  the FX styles (identical at 44.1 / 48 / 96 kHz and every High Quality), and the extra compression near 0 dBFS at low drive.
+  With it the law fits the level sweeps within 0.03 dB at every level and drive. The Subtle styles and the transformers
+  measure without it (`saturnClipStyle`).
+- The cut filters' Q: the reference's Q 1 is Butterworth (LYNX scaled the resonant pair by q / √½: +1.3 dB at 31 Hz,
+  +1 … +5 dB at 12.7 … 16 kHz). The law's DC blocker is the reference's ~1.5 Hz (was 8 Hz: −0.3 dB at 31 Hz).
+- The law now also runs for Clean Tape, Gentle and Heavy Saturation (kept out in 190kw for that offset).
+- Scorer: round 190lg's time-based alignment window for before and after.
+
+refcap030 bank, base = rea190kw (Ember revision 0 law-free, as every project before) → round 190lg:
+
+| block | files | mean before → after | up / same / down |
+|---|---|---|---|
+| grid | 588 | 3.55 → 4.63 | 283 / 305 / 0 |
+| mode | 33 | 4.67 → 7.88 | 33 / 0 / 0 |
+| pairs | 54 | 3.78 → 6.20 | 44 / 10 / 0 |
+| sr44 | 20 | 5.55 → 7.80 | 14 / 6 / 0 |
+| sr48 | 20 | 5.60 → 7.75 | 14 / 6 / 0 |
+| sr96 | 20 | 5.60 → 7.80 | 14 / 6 / 0 |
+| prog | 84 | 4.31 → 5.04 | 37 / 47 / 0 |
+| **all** | 819 | 3.84 → **5.14** | **439 / 380 / 0** (round 190kw: 4.20, 33 down) |
+
+refcap182 programme 25 files 6.16 → 7.88 (19 up / 0 down); tp172b 20 files 5.1 → 7.75 (20 up / 0 down). Nothing down.
+Old projects (revision 0): 48 / 48 renders byte-identical to the base (`rea2_190lg/sat/ident.sh`). CPU (thread time, 20 s
+at 48 kHz, best of 5, `rea2_190lg/sat/bench_190lg.log`), revision 0 → 1 at 4×: Round valve 0.87 → 0.98 / 0.99 %, Chime
+combo 0.93 → 1.17 / 1.22 %, Worn reel 2.07 / 2.16 → 1.02 / 0.99 %, Open reel (Clean Tape, new on the law) 2.03 / 2.06 →
+1.09 / 1.14 %, Mellow clip (Gentle Saturation, new) 1.95 / 2.15 → 0.94 / 0.90 %, three bands 5.21 / 5.43 → 3.26 / 3.21 %;
+the clipper itself costs nothing measurable.
+
+**Still off after 190lg:** the amps' 4 … 8-section EQs above 5 kHz (bell / shelf Q conventions), the transformers' dynamic
+knee, Broken Tube above −15 dBFS (−1.6 dB), why the Subtle / transformer styles skip the clipper (measured, not found
+statically); Power Amp / Breakdown keep round 150's characters (the law still scored them down: lab 2.17).

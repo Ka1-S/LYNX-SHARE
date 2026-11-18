@@ -122,7 +122,7 @@ TEST (parity190kw_ember_saturn_curves_drive_and_level_laws)
         auto s = makeEffectSlot (EffectKind::ember);
         s.params[(std::size_t) em::characterParam (0)] = 5.0f / (float) em::characters;
         s.params[(std::size_t) em::drive] = drive;
-        CHECK (em::lawCharacter (5) && ! em::lawCharacter (6) && ! em::lawCharacter (27));
+        CHECK (em::lawCharacter (5) && em::lawCharacter (6) && ! em::lawCharacter (27)); // round 190lg: + Clean Tape
         const double sr = 48000.0, a = std::pow (10.0, -10.0 / 20.0);
         const int n = (int) (0.5 * sr);
         std::vector<float> l ((std::size_t) n), r ((std::size_t) n);
@@ -184,4 +184,52 @@ TEST (parity190kw_ember_revision0_renders_as_the_base_commit_did)
        #endif
         CHECK (std::abs (e - c.energy) < 1e-6 * c.energy + 1e-9);
     }
+}
+
+namespace parity190kw
+{
+// the gain (dB) of a law band at small signal: a sine of `hz` at −40 dBFS through Ember (rms of the last half vs the input's)
+inline double sineGainDb (const lynx::EffectSlot& s, double hz, double dbfs = -40.0, double sr = 48000.0)
+{
+    const int n = (int) (1.2 * sr);
+    const double a = std::pow (10.0, dbfs / 20.0) * std::sqrt (2.0);
+    std::vector<float> l ((std::size_t) n), r ((std::size_t) n);
+    for (int i = 0; i < n; ++i) l[(std::size_t) i] = r[(std::size_t) i] = (float) (a * std::sin (2.0 * M_PI * hz * i / sr));
+    render (s, sr, l, r);
+    double e = 0.0;
+    for (int i = n / 2; i < n; ++i) e += (double) l[(std::size_t) i] * l[(std::size_t) i];
+    return 10.0 * std::log10 (e / (n - n / 2)) - 20.0 * std::log10 (a / std::sqrt (2.0));
+}
+} // namespace parity190kw
+
+TEST (parity190lg_ember_saturn_channel_clipper_butterworth_cuts_and_dc)
+{
+    using namespace lynx;
+    namespace em = mixsuite::ember;
+    // the reference's channel soft clipper (threshold 0 dB): small-signal slope 9/8, ceiling 1 from |x| = 4/3, odd, smooth
+    CHECK (std::abs (em::saturnClip (1e-4f) / 1e-4f - 1.125f) < 1e-4f);
+    CHECK (em::saturnClip (4.0f / 3.0f) == 1.0f && em::saturnClip (3.0f) == 1.0f && em::saturnClip (-3.0f) == -1.0f);
+    CHECK (std::abs (em::saturnClip (0.5f) + em::saturnClip (-0.5f)) < 1e-7f);
+    CHECK (std::abs (em::saturnClip (4.0f / 3.0f - 1e-3f) - 1.0f) < 1e-5f);
+    // it acts on every style but the Subtle ones and the transformers (measured on the refcap030 level sweeps)
+    for (const int st : { 0, 4, 17, 20, 21, 22 }) CHECK (! em::saturnClipStyle (st));
+    for (const int st : { 1, 2, 3, 5, 6, 7, 18, 19 }) CHECK (em::saturnClipStyle (st));
+    const auto slot = [] (int style, float referenceDrive) {
+        auto s = makeEffectSlot (EffectKind::ember);
+        s.params[(std::size_t) em::characterParam (0)] = (float) (style + 1) / (float) em::characters;
+        s.params[(std::size_t) em::drive] = referenceDrive * 30.0f / 36.0f;
+        s.params[(std::size_t) em::lawRate] = 1.0f; // the reference's High Quality off
+        return s;
+    };
+    // Clean Tape at drive 0: the reference's small-signal gain is 1.1268 (+1.04 dB) at −39 dBFS (the compensation's
+    // 1.0016 × the clipper's 9/8); Subtle Tape: its trim alone (+0.1 dB)
+    CHECK (std::abs (parity190kw::sineGainDb (slot (5, 0.0f), 1000.0) - 1.04) < 0.06);
+    CHECK (std::abs (parity190kw::sineGainDb (slot (4, 0.0f), 1000.0) - 0.10) < 0.06);
+    // the cut filters' Q 1 is Butterworth: Warm Tube at 25 %, 16 kHz vs 1 kHz small-signal gain (the reference's third
+    // octaves: +2.35 vs +1.79 dB; with the old resonant Q 1 the law gave +5.1 vs +0.6)
+    const auto wt = slot (2, 0.25f);
+    CHECK (std::abs (parity190kw::sineGainDb (wt, 16000.0) - parity190kw::sineGainDb (wt, 1000.0) - 0.56) < 0.5);
+    // the law's DC blocker at 1.5 Hz: Subtle Tape (no EQ of its own) loses < 0.05 dB at 31 Hz against 1 kHz
+    const auto stp = slot (4, 0.5f);
+    CHECK (std::abs (parity190kw::sineGainDb (stp, 31.0) - parity190kw::sineGainDb (stp, 1000.0)) < 0.05);
 }
