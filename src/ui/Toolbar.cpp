@@ -1304,7 +1304,10 @@ ui::Hint PerformanceMeter::hintAt (juce::Point<int> p)
 bool OutputMonitor::update (double nowMs)
 {
     if (! isShowing() || getWidth() <= 0)
+    {
+        stopOverlay();
         return false;
+    }
 
     // the time since the last frame (the falloffs below are per 1/30 s, as when this ran on a 30 Hz timer)
     const auto elapsed = lastMs > 0.0 ? juce::jlimit (0.0, 250.0, nowMs - lastMs) : 1000.0 / 30.0;
@@ -1341,6 +1344,7 @@ bool OutputMonitor::update (double nowMs)
         peak = held = column = 0.0f;
         bands.fill (0.0f);
         columnMs = 0.0;
+        stopOverlay();
         return false;
     }
 
@@ -1355,7 +1359,7 @@ bool OutputMonitor::update (double nowMs)
         std::fill (history.end() - columns, history.end(), column);
         column = 0.0f;
         if (mode == longView)
-            repaint();
+            frameChanged();
     }
 
     if (mode == spectrum)
@@ -1387,8 +1391,50 @@ bool OutputMonitor::update (double nowMs)
 
     // (the long view only moves with its columns, above; the scope and the spectrum every frame)
     if (mode != longView)
-        repaint();
+        frameChanged();
     return true;
+}
+
+std::atomic<int>& OutputMonitor::overlayFrames()
+{
+    static std::atomic<int> n { 0 };
+    return n;
+}
+
+void OutputMonitor::frameChanged()
+{
+    static const bool wanted = [] {
+#if JUCE_WINDOWS
+        const auto* v = std::getenv ("LYNX_SCOPE_OVERLAY");
+        return v == nullptr || juce::String (v) != "0";
+#else
+        return false; // (the X11 / macOS overlays send a whole picture per frame: no gain over the repaint there)
+#endif
+    }();
+    if (wanted)
+    {
+        const auto was = gpuDisplay.isShowing();
+        const auto area = getLocalBounds();
+        if (gpuDisplay.show ({ 0.0f, area, area, ++overlayKey }))
+        {
+            ++overlayFrames();
+            if (! was)
+                repaint(); // (once: the window shows what is behind the display, the overlay's picture over it)
+            return;
+        }
+        if (was)
+            gpuDisplay.hide();
+    }
+    repaint();
+}
+
+void OutputMonitor::stopOverlay()
+{
+    if (gpuDisplay.isShowing())
+    {
+        gpuDisplay.hide (true); // (it stays a few frames: the repaint below is on screen first)
+        repaint();
+    }
 }
 
 juce::String OutputMonitor::modeName (int m)
@@ -1433,6 +1479,13 @@ void OutputMonitor::mouseDown (const juce::MouseEvent& e)
 }
 
 void OutputMonitor::paint (juce::Graphics& g)
+{
+    if (gpuDisplay.isShowing())
+        return; // (round 190kz: the overlay shows it)
+    paintDisplay (g, false);
+}
+
+void OutputMonitor::paintDisplay (juce::Graphics& g, bool software)
 {
     using namespace theme;
     auto area = getLocalBounds().toFloat();
@@ -1492,7 +1545,7 @@ void OutputMonitor::paint (juce::Graphics& g)
     // oscilloscope
     g.setColour (colour::border);
     g.drawHorizontalLine ((int) scope.getCentreY(), scope.getX(), scope.getRight());
-    juce::Path wave;
+    wave.clear(); // (round 190kz: the member keeps its storage, no allocation per frame)
     const auto mid = scope.getCentreY();
     const auto half = scope.getHeight() * 0.47f;
     const auto width = juce::jmax (1, (int) scope.getWidth());
@@ -1516,7 +1569,7 @@ void OutputMonitor::paint (juce::Graphics& g)
         const auto* v = std::getenv ("LYNX_SCOPE_IMAGE");
         return v == nullptr || juce::String (v) != "0";
     }();
-    if (! viaImage)
+    if (! viaImage || software) // (software: the overlay's picture, already drawn by the CPU)
     {
         g.setColour (lineColour);
         g.strokePath (wave, stroke);

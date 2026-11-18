@@ -33,9 +33,9 @@ def symbolize(symbolizer, exe, base, rvas):
         return names
     order = sorted(rvas)
     text = "\n".join("0x%x" % (base + r) for r in order) + "\n"
-    out = subprocess.run([symbolizer, "--obj=" + exe, "--functions=short", "--inlining", "--demangle", "--output-style=GNU"],
+    out = subprocess.run([symbolizer, "--obj=" + exe, "--functions=short", "--inlining", "--demangle"],
                          input=text, capture_output=True, text=True, check=False).stdout
-    # GNU style: per address, pairs of lines (function, file:line), innermost first; addresses separated by a blank line
+    # LLVM style: per address, pairs of lines (function, file:line:col), innermost first; a blank line after each address
     blocks = out.split("\n\n")
     for rva, block in zip(order, blocks):
         lines = [l for l in block.split("\n") if l.strip()]
@@ -100,13 +100,15 @@ def main():
     if windows == 0:
         sys.exit("no window in the range")
     base = image_base(a.exe)
-    names = symbolize(a.symbolizer, a.exe, base, set(self_raw) | set(total_raw))
+    # caller frames are return addresses: the call is the instruction before (rva - 1), else the inlined function of the
+    # next statement would be named
+    names = symbolize(a.symbolizer, a.exe, base, set(self_raw) | {r - 1 for r in total_raw})
     self_fn = defaultdict(int)
     total_fn = defaultdict(int)
     for r, w in self_raw.items():
         self_fn[names.get(r, ["?"])[0]] += w
     for r, w in total_raw.items():
-        for f in dict.fromkeys(names.get(r, ["?"])):
+        for f in dict.fromkeys(names.get(r - 1, ["?"])):
             total_fn[f] += w
     pct = lambda w: 100.0 * w / max(1, samples)
     print("%d windows, message thread CPU %.1f %% (mean of the windows), %d weight units" % (windows, sum(cpu) / len(cpu), samples))
