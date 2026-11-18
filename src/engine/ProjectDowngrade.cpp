@@ -537,6 +537,10 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
             lost.push_back ({ TR_NOOP ("The Simple Controls tab's own knob mappings: {0}"), listOf (mapped), false });
     }
 
+    // round 190kz: EffectSlot::engineRev (Maximus 1 = its gain smoothers in double precision; 0.1.28 runs the x87 ones,
+    // which gave the same samples on every Maximus state measured): dropped, nothing to report
+    forEachEffect (root, [&] (juce::DynamicObject& e, const juce::String&) { drop (e, "engineRev"); });
+
     // rollup step 6, round natives190kj: ChannelDef::engineRev (Harmor 1 = a part with a sample in its IMG section plays
     // FL's resynthesis; 0.1.28 plays such a part's timbres) and Newtone's state version 3 (+ the key, each note's voiced
     // end and velocity): 0.1.28 reads up to version 2 and would load no notes at all, so the state is written as version
