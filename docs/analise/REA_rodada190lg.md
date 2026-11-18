@@ -343,3 +343,15 @@ rel (x) = 0.005 + 1.76 x² + 3.235 · (σ (x) − σ (0)) / (σ (1) − σ (0)) 
   M_DynamicsMode 1 0.47 → 0.003, upward compression +18 dB 3.33 → 0.02 dB); reading the slope as the gain's own
   (ratio − 1 per dB) was 1.33 / 1.19 dB off.
 - The EQFilter as a two-pole Butterworth low pass; no time scale was needed (unlike Pro-Q 4's round).
+
+## 8. Pro-L 2 and Pro-G: not read (their styles are embedded presets) — owner decision
+
+[STATIC, names only] Pro-L 2's style list is the strings `transparent.limiter`, `punchy.limiter` … `safe.limiter`; the
+function at 0x180133d30 hands each name to 0x1800e4f10, which builds a `PresetPreloader` that loads the style from the
+plug-in's internal preset store: each style is a preset (parameter set) of its generic `DynamicsEngine` (Detector /
+Capacitor / PeakHold / AveragingFilter / TransferCurve / Saturator). Pro-G's `algo1.expander` … `algo6.expander` are built
+the same way. Reading them would be reading the reference's presets, which the clean-room rule excludes, so they were not
+read. Options for the owner: (a) allow reading only their structure (which elements, wired how) while every number stays
+fitted black-box on the bank; (b) black-box fitting only on the weak spots (Pro-L 2: Style 0.571 stairs, S3, the pairs
+block's Gain 0.8; recommended now); (c) leave them. Pro-L 2's sr96 block already moved 6.21 → 7.54 from the scorer
+window alone (§1).
