@@ -40,7 +40,13 @@ lynx::Song song (bool heldNotesEffect, bool compressor = false)
     s.setRoute (9, 11, true, 0.5f);
     s.mixer[9].effects.push_back (makeEffectSlot (EffectKind::reverb));
     if (heldNotesEffect) // (Pitcher reads every channel's held notes: the block stays piece by piece)
-        s.mixer[5].effects.push_back (makeEffectSlot (EffectKind::pitchCorrect));
+    {
+        // (a new Pitcher takes its notes from its MIDI port (param 43 "Port routing" on, round 190ee) and reads no held
+        // notes: an older project's Pitcher, Port routing off, does)
+        auto pitcher = makeEffectSlot (EffectKind::pitchCorrect);
+        pitcher.params[43] = 0.0f;
+        s.mixer[5].effects.push_back (pitcher);
+    }
     if (compressor) // (LYNX's compressor reads them only with its MIDI trigger on: at its defaults the block is batched)
         s.mixer[6].effects.push_back (makeEffectSlot (EffectKind::compressor));
     const auto bars = 4 * 4 * ppq;
