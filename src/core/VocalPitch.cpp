@@ -452,11 +452,13 @@ Psola::Psola() : env ((std::size_t) ringSize, 0.0f), wsum ((std::size_t) ringSiz
         in[c].assign ((std::size_t) ringSize, 0.0f);
         acc[c].assign ((std::size_t) ringSize, 0.0f);
     }
+    envCoef = (float) (1.0 - std::exp (-2.0 * pi * 900.0 / sr)); // (the default rate until prepare())
 }
 
 void Psola::prepare (double sampleRate, double maxPeriod, int latency) noexcept
 {
     sr = sampleRate > 0.0 ? sampleRate : 44100.0;
+    envCoef = (float) (1.0 - std::exp (-2.0 * pi * 900.0 / sr)); // (round 190li: once here, no longer per sample)
     maxP = std::clamp (maxPeriod, 16.0, ringSize / 8.0);
     delay = std::clamp (latency, 8, ringSize / 2);
     lag = 0;
@@ -644,9 +646,8 @@ void Psola::process (const float* x, float* y, int channels) noexcept
     for (int c = 0; c < channels; ++c)
         in[c][(std::size_t) (now & m)] = std::isfinite (x[c]) ? x[c] : 0.0f;
     const auto mono = channels == 2 ? 0.5f * (in[0][(std::size_t) (now & m)] + in[1][(std::size_t) (now & m)]) : in[0][(std::size_t) (now & m)];
-    // a gentle low-pass (one pole near 900 Hz) of the input: the marks lock to its peaks
-    const auto a = (float) (1.0 - std::exp (-2.0 * pi * 900.0 / sr));
-    envZ += a * (mono - envZ);
+    // a gentle low-pass (one pole near 900 Hz) of the input: the marks lock to its peaks (envCoef: prepare())
+    envZ += envCoef * (mono - envZ);
     if (! std::isfinite (envZ))
         envZ = 0.0f;
     env[(std::size_t) (now & m)] = envZ;

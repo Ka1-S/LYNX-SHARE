@@ -11,8 +11,9 @@
 # plus its own measures of the render:
 #   vib      vibrato depth kept (output / source, on the notes with vibrato; the model's own value next to it)
 #   steps    pitch steps: frames where the render's pitch curve jumps > 12 c in 5 ms more than the model's does
+#   jitter   frame-to-frame wobble of the render's pitch around the model's (rms cents, target flips left out)
 #   click    voiced / unvoiced switches: the worst 1 ms high-band (> 5 kHz) level within 10 ms of each switch,
-#            render − source (dB, > 0 = a click)
+#            render − source (dB, > 0 = a click; click_mean = the mean over the switches)
 #   cpu      instructions (or ns) per sample of the offline run
 #
 # usage: tunelab.py <material dir> <out dir> --lab <lynxtunelab> [--retunes 0,20,50,100] [--extra "rev=1 ..."]
@@ -90,7 +91,9 @@ def pitch_curve(x, truth, frames):
         if c is None:
             out.append(np.nan); continue
         hz = vl.f0_at(x, fi * truth['hop'], 440 * 2 ** ((c / 100 - 69) / 12), span_cents=150)
-        out.append(vl.cents(hz) if hz > 0 else np.nan)
+        v = vl.cents(hz) if hz > 0 else np.nan
+        # (f0_at's parabolic step is unbounded on a flat dip: a reading outside the searched span is no reading)
+        out.append(v if abs(v - c) <= 160 else np.nan)
     return np.array(out)
 
 
@@ -132,7 +135,11 @@ def own_measures(render, src, model, src_truth, model_truth):
     ok = (np.diff(fr) == 1) & ~np.isnan(cr[1:]) & ~np.isnan(cr[:-1]) & ~np.isnan(cm[1:]) & ~np.isnan(cm[:-1])
     jr = np.abs(np.diff(cr))[ok]; jm = np.abs(np.diff(cm))[ok]
     res['steps'] = int(np.sum((jr > 12) & (jr > jm + 8)))
-    res['jitter'] = round(float(np.sqrt(np.mean((np.diff(cr - cm)[ok]) ** 2))), 2) if ok.any() else None
+    # frame-to-frame wobble of the render's pitch around the model's (rms cents; frames where either changes note or
+    # reads > 40 c apart are left out: those are target flips, counted by `steps`)
+    dd = np.diff(cr - cm)[ok]
+    near = (np.abs((cr - cm)[1:][ok]) < 40) & (np.abs((cr - cm)[:-1][ok]) < 40)
+    res['jitter'] = round(float(np.sqrt(np.mean(dd[near] ** 2))), 2) if near.any() else None
     # clicks at voiced / unvoiced switches (high band, 1 ms frames)
     def hp(x):
         X = np.fft.rfft(x); f = np.fft.rfftfreq(len(x), 1 / SR)
@@ -205,6 +212,8 @@ def compare(argv):
                 return f'{a}->{b}'
             if m == 'vib':
                 w = abs(b - 1) > abs(a - 1) + tol[m]
+            elif m in ('click', 'click_mean'):
+                w = max(b, 0) > max(a, 0) + tol[m]   # only an excess over the source is a click
             else:
                 w = vl.worse(b, a, m, tol.get(m, 0.0))
             if w:

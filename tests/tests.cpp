@@ -17409,6 +17409,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Render155Tests.inc"
 #include "Tune157Tests.inc"
 #include "Tune165Tests.inc"
+#include "Tune190liTests.inc" // round 190li: the vocal pitch toolkit's CPU pass
 #include "HwOut156Tests.inc"
 #include "SoundFont158Tests.inc"
 #include "Mp3157Tests.inc"

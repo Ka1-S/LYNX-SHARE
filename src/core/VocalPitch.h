@@ -204,6 +204,7 @@ private:
     std::vector<float> markLin;            // round 190li: a linear copy of the low-passed input around a mark's candidates
     std::vector<double> markScore;         // round 190li: the candidates' correlations
     float envZ = 0.0f;
+    float envCoef = 0.0f; // round 190li: the 900 Hz low-pass's coefficient (prepare())
 };
 // ---------------------------------------------------------------------------------------------------------------------
 // Breath noise (round 190bb, LYNX Tune's Breathiness; issue #103). Aspiration noise for a voice, written from textbook
