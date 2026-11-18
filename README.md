@@ -276,7 +276,7 @@ LYNX SHARE ships **native** plugins inspired by the third-party plugins producer
 
 | Vendor | Inspired by → LYNX SHARE plugin |
 |---|---|
-| **FabFilter** | Pro-L 2 → **Apex Limiter** · Pro-C 2 / 3 → **Crest Compressor** · Pro-MB → **Prism Multiband** · Pro-G → **Sentry Gate** · Pro-Q 2 / 3 / 4 → **Facet EQ** · Pro-DS → **Hush De-esser** · Saturn → **Ember Saturator** · Pro-R 2 → LuxeVerb (stand-in) · Timeless 3 → Fruity Delay 3 (stand-in) |
+| **FabFilter** | Timeless 3 → **Echoform** · Pro-L 2 → **Apex Limiter** · Pro-C 2 / 3 → **Crest Compressor** · Pro-MB → **Prism Multiband** · Pro-G → **Sentry Gate** · Pro-Q 2 / 3 / 4 → **Facet EQ** · Pro-DS → **Hush De-esser** · Saturn → **Ember Saturator** · Pro-R 2 → LuxeVerb (stand-in) |
 | **Valhalla DSP** | VintageVerb → **Epoch Verb** · Room → **Atrium** · Plate → **Foil Plate** · Supermassive → **Nebula** · Shimmer → **Halo** · FutureVerb → **Horizon** · Delay → **Echoform** · FreqEcho → **Spiral Echo** · SpaceModulator → **Orbit** · UberMod → **Lattice Mod** |
 | **Antares** | Auto-Tune → **LYNX Tune** |
 | **Waves** | H-Delay → **Echoform** · SuperTap → **Echoform** · CLA-2A → **Glow Leveler** · CLA-76 → **Crest Compressor** · SSL E-Channel → **Ridge Strip** · S1 Imager → **Stereo Shaper** · DeEsser → **Hush De-esser** · NS1 → **Quell Denoiser** · Doubler → **Gemini Doubler** · Tune Real-Time → **LYNX Tune** · RVerb, H-Reverb, TrueVerb → Reeverb 2 (stand-in) · L1, L2, L3, L4 → Limiter (stand-in) · Renaissance Compressor → Compressor (stand-in) · CLA-76, CLA-3A, C1, SSLComp, API-2500 → Compressor (stand-in) · Q10, Renaissance EQ, SSL EQ → Parametric EQ (stand-in) |
