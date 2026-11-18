@@ -20,6 +20,23 @@
 #else
 #	define SIGNALSMITH_STRETCH_SSE2 0
 #endif
+// LYNX (round 190kz): the same loops eight bands at a time with AVX2 where the CPU has it (picked at run time:
+// src/core/CpuFeatures.h, LYNX_CPU=sse2 forces the four-at-a-time loops). The same IEEE operations per band in the
+// same order (no FMA), so all paths give the same bits; the remaining bands go through the SSE2 / scalar loops.
+#if SIGNALSMITH_STRETCH_SSE2 && (defined(__GNUC__) || defined(__clang__)) && (defined(__x86_64__) || defined(__i386__)) && defined(__has_include)
+#	if __has_include("core/CpuFeatures.h")
+#		include "core/CpuFeatures.h"
+#		include <immintrin.h>
+#		define SIGNALSMITH_STRETCH_AVX LYNX_CPU_DISPATCH
+#	endif
+#endif
+#ifndef SIGNALSMITH_STRETCH_AVX
+#	define SIGNALSMITH_STRETCH_AVX 0
+#endif
+#if SIGNALSMITH_STRETCH_AVX
+#	define SIGNALSMITH_AVX2 __attribute__((target("avx2")))
+#	define SIGNALSMITH_AVX2_INLINE __attribute__((target("avx2"), always_inline)) inline
+#endif
 
 namespace signalsmith { namespace stretch {
 
@@ -954,6 +971,9 @@ private:
 		const Sample *qR[2] = {predInR.data(), predInR.data() + bands}, *qI[2] = {predInI.data(), predInI.data() + bands};
 		const Sample *qE[2] = {predEnergy.data(), predEnergy.data() + bands};
 		int b = startB;
+#if SIGNALSMITH_STRETCH_AVX
+		if (avxOn()) b = lockOtherChannelAvx(startB, endB);
+#endif
 #if SIGNALSMITH_STRETCH_SSE2
 		const __m128 floor = _mm_set1_ps(noiseFloor);
 		for (; b + 4 <= endB; b += 4) {
@@ -1012,6 +1032,9 @@ private:
 		Sample *oR = bandOut(channel), *oI = bandOutI(channel), *pR = bandPrev(channel), *pI = bandPrevI(channel);
 		const Sample *rR = rotTableR.data(), *rI = rotTableI.data();
 		int b = 0;
+#if SIGNALSMITH_STRETCH_AVX
+		if (avxOn()) b = rotateBandsAvx(oR, oI, pR, pI, rR, rI);
+#endif
 #if SIGNALSMITH_STRETCH_SSE2
 		for (; b + 4 <= bands; b += 4) {
 			__m128 rotR = _mm_loadu_ps(rR + b), rotI = _mm_loadu_ps(rI + b), xR, xI;
@@ -1037,6 +1060,9 @@ private:
 		const Sample *iR = bandIn(c), *iI = bandInI(c);
 		Sample *e = bandEnergy(c);
 		int b = 0;
+#if SIGNALSMITH_STRETCH_AVX
+		if (avxOn()) b = inputEnergiesAvx(iR, iI, e);
+#endif
 #if SIGNALSMITH_STRETCH_SSE2
 		for (; b + 4 <= bands; b += 4) {
 			__m128 r = _mm_loadu_ps(iR + b), i = _mm_loadu_ps(iI + b);
@@ -1082,6 +1108,9 @@ private:
 	// the output map is {b, 1}: band b reads band b with a fraction of exactly 0 (the same arithmetic, in fours)
 	void preliminaryIdentity(int c) {
 		int b = 0;
+#if SIGNALSMITH_STRETCH_AVX
+		if (avxOn()) b = preliminaryIdentityAvx(c);
+#endif
 #if SIGNALSMITH_STRETCH_SSE2
 		const Sample *eV = bandEnergy(c), *iR = bandIn(c), *iI = bandInI(c), *pR = bandPrev(c), *pI = bandPrevI(c);
 		Sample *oR = bandOut(c), *oI = bandOutI(c);
@@ -1121,6 +1150,9 @@ private:
 		Sample *pE = predEnergy.data() + size_t(c)*bands, *saved = savedPredEnergy.data() + size_t(c)*bands;
 		Sample *qR = predInR.data() + size_t(c)*bands, *qI = predInI.data() + size_t(c)*bands;
 		int b = 0;
+#if SIGNALSMITH_STRETCH_AVX
+		if (avxOn()) b = preliminaryIdentityInputsAvx(eV, iR, iI, pE, saved, qR, qI);
+#endif
 #if SIGNALSMITH_STRETCH_SSE2
 		const __m128 zero = _mm_setzero_ps(), one = _mm_set1_ps(Sample(1));
 		for (; b + 4 <= bands; b += 4) {
@@ -1147,6 +1179,9 @@ private:
 		const Sample *pE = predEnergy.data() + size_t(c)*bands, *saved = savedPredEnergy.data() + size_t(c)*bands;
 		const Sample *qR = predInR.data() + size_t(c)*bands, *qI = predInI.data() + size_t(c)*bands;
 		int b = 0;
+#if SIGNALSMITH_STRETCH_AVX
+		if (avxOn()) b = preliminaryIdentityOutputsAvx(pR, pI, oR, oI, pE, saved, qR, qI);
+#endif
 #if SIGNALSMITH_STRETCH_SSE2
 		const __m128 zero = _mm_setzero_ps(), floor = _mm_set1_ps(noiseFloor);
 		for (; b + 4 <= bands; b += 4) {
@@ -1292,6 +1327,238 @@ private:
 		return _mm_or_ps(_mm_and_ps(mask, ifSet), _mm_andnot_ps(mask, ifClear));
 	}
 #endif
+#if SIGNALSMITH_STRETCH_AVX
+	// LYNX (round 190kz): eight-band versions of the four-band loops above and below. Each one is the SSE2 loop with
+	// the same operations on eight lanes (_mm_*_ps → _mm256_*_ps, compare predicates as the SSE2 ones: LE/GT, ordered
+	// signalling), run first; the bands it leaves go through the SSE2 loop and the scalar loop as before.
+	static bool avxOn() { return lynx::cpu::hasAvx2(); }
+	static SIGNALSMITH_AVX2_INLINE void mulV8(__m256 aR, __m256 aI, __m256 bR, __m256 bI, __m256 &outR, __m256 &outI) {
+		outR = _mm256_sub_ps(_mm256_mul_ps(aR, bR), _mm256_mul_ps(aI, bI));
+		outI = _mm256_add_ps(_mm256_mul_ps(aR, bI), _mm256_mul_ps(aI, bR));
+	}
+	static SIGNALSMITH_AVX2_INLINE void mulConjV8(__m256 aR, __m256 aI, __m256 bR, __m256 bI, __m256 &outR, __m256 &outI) {
+		outR = _mm256_add_ps(_mm256_mul_ps(bR, aR), _mm256_mul_ps(bI, aI));
+		outI = _mm256_sub_ps(_mm256_mul_ps(bR, aI), _mm256_mul_ps(bI, aR));
+	}
+	static SIGNALSMITH_AVX2_INLINE __m256 selectV8(__m256 mask, __m256 ifSet, __m256 ifClear) {
+		return _mm256_or_ps(_mm256_and_ps(mask, ifSet), _mm256_andnot_ps(mask, ifClear));
+	}
+	// a value of the maximum-energy channel of each lane at band `at`
+	static SIGNALSMITH_AVX2_INLINE __m256 selectedV8(const Sample *const *v, __m256 mask, int at) {
+		return selectV8(mask, _mm256_loadu_ps(v[1] + at), _mm256_loadu_ps(v[0] + at));
+	}
+	// the lanes of bands b..b+7 whose maximum-energy channel is 1
+	SIGNALSMITH_AVX2_INLINE __m256 maskAt8(int b) const {
+		return _mm256_castsi256_ps(_mm256_cmpgt_epi32(_mm256_loadu_si256((const __m256i *)(maxChannelOf.data() + b)), _mm256_setzero_si256()));
+	}
+	SIGNALSMITH_AVX2_INLINE __m256 inputBinsV8(int b) const {
+		return _mm256_setr_ps(outputMap[b].inputBin, outputMap[b + 1].inputBin, outputMap[b + 2].inputBin, outputMap[b + 3].inputBin,
+			outputMap[b + 4].inputBin, outputMap[b + 5].inputBin, outputMap[b + 6].inputBin, outputMap[b + 7].inputBin);
+	}
+	// fractionalV on eight lanes (the same per-lane arithmetic; the plain-load case needs eight neighbouring bands)
+	SIGNALSMITH_AVX2_INLINE void fractionalV8(__m256 index, const Sample *const *re, const Sample *const *im, bool sameChannel, __m256 &outR, __m256 &outI) const {
+		__m256i t = _mm256_cvttps_epi32(index);
+		__m256 tF = _mm256_cvtepi32_ps(t);
+		t = _mm256_add_epi32(t, _mm256_castps_si256(_mm256_cmp_ps(tF, index, _CMP_GT_OS)));
+		__m256 frac = _mm256_sub_ps(index, _mm256_cvtepi32_ps(t));
+		alignas(32) int idx[8];
+		_mm256_store_si256((__m256i *)idx, t);
+		__m256 lowR, lowI, highR, highI;
+		bool contiguous = sameChannel && idx[0] >= -bandPad && idx[0] <= bands + bandPad - 9;
+		for (int j = 1; j < 8 && contiguous; ++j) contiguous = idx[j] == idx[0] + j;
+		if (contiguous) {
+			int k = idx[0] + bandPad;
+			lowR = _mm256_loadu_ps(re[0] + k);
+			lowI = _mm256_loadu_ps(im[0] + k);
+			highR = _mm256_loadu_ps(re[0] + k + 1);
+			highI = _mm256_loadu_ps(im[0] + k + 1);
+		} else {
+			alignas(32) Sample loR[8], loI[8], hiR[8], hiI[8];
+			for (int j = 0; j < 8; ++j) {
+				int k = std::min(std::max(idx[j], -bandPad), bands + bandPad - 2) + bandPad;
+				loR[j] = re[j][k];
+				loI[j] = im[j][k];
+				hiR[j] = re[j][k + 1];
+				hiI[j] = im[j][k + 1];
+			}
+			lowR = _mm256_load_ps(loR);
+			lowI = _mm256_load_ps(loI);
+			highR = _mm256_load_ps(hiR);
+			highI = _mm256_load_ps(hiI);
+		}
+		outR = _mm256_add_ps(lowR, _mm256_mul_ps(_mm256_sub_ps(highR, lowR), frac));
+		outI = _mm256_add_ps(lowI, _mm256_mul_ps(_mm256_sub_ps(highI, lowI), frac));
+	}
+
+	SIGNALSMITH_AVX2 int rotateBandsAvx(Sample *oR, Sample *oI, Sample *pR, Sample *pI, const Sample *rR, const Sample *rI) {
+		int b = 0;
+		for (; b + 8 <= bands; b += 8) {
+			__m256 rotR = _mm256_loadu_ps(rR + b), rotI = _mm256_loadu_ps(rI + b), xR, xI;
+			mulV8(_mm256_loadu_ps(oR + b), _mm256_loadu_ps(oI + b), rotR, rotI, xR, xI);
+			_mm256_storeu_ps(oR + b, xR);
+			_mm256_storeu_ps(oI + b, xI);
+			mulV8(_mm256_loadu_ps(pR + b), _mm256_loadu_ps(pI + b), rotR, rotI, xR, xI);
+			_mm256_storeu_ps(pR + b, xR);
+			_mm256_storeu_ps(pI + b, xI);
+		}
+		return b;
+	}
+	SIGNALSMITH_AVX2 int inputEnergiesAvx(const Sample *iR, const Sample *iI, Sample *e) {
+		int b = 0;
+		for (; b + 8 <= bands; b += 8) {
+			__m256 r = _mm256_loadu_ps(iR + b), i = _mm256_loadu_ps(iI + b);
+			_mm256_storeu_ps(e + b, _mm256_add_ps(_mm256_mul_ps(r, r), _mm256_mul_ps(i, i)));
+		}
+		return b;
+	}
+	SIGNALSMITH_AVX2 int preliminaryIdentityAvx(int c) {
+		int b = 0;
+		const Sample *eV = bandEnergy(c), *iR = bandIn(c), *iI = bandInI(c), *pR = bandPrev(c), *pI = bandPrevI(c);
+		Sample *oR = bandOut(c), *oI = bandOutI(c);
+		Sample *pE = predEnergy.data() + size_t(c)*bands, *qR = predInR.data() + size_t(c)*bands, *qI = predInI.data() + size_t(c)*bands;
+		const __m256 zero = _mm256_setzero_ps(), one = _mm256_set1_ps(Sample(1)), floor = _mm256_set1_ps(noiseFloor);
+		for (; b + 8 <= bands; b += 8) {
+			__m256 prevEnergy = _mm256_loadu_ps(pE + b);
+			__m256 eLow = _mm256_loadu_ps(eV + b), eHigh = _mm256_loadu_ps(eV + b + 1);
+			__m256 e = _mm256_mul_ps(_mm256_add_ps(eLow, _mm256_mul_ps(_mm256_sub_ps(eHigh, eLow), zero)), one);
+			_mm256_storeu_ps(pE + b, e);
+			__m256 lowR = _mm256_loadu_ps(iR + b), lowI = _mm256_loadu_ps(iI + b);
+			__m256 inR = _mm256_add_ps(lowR, _mm256_mul_ps(_mm256_sub_ps(_mm256_loadu_ps(iR + b + 1), lowR), zero));
+			__m256 inI = _mm256_add_ps(lowI, _mm256_mul_ps(_mm256_sub_ps(_mm256_loadu_ps(iI + b + 1), lowI), zero));
+			_mm256_storeu_ps(qR + b, inR);
+			_mm256_storeu_ps(qI + b, inI);
+			__m256 plR = _mm256_loadu_ps(pR + b), plI = _mm256_loadu_ps(pI + b);
+			__m256 prR = _mm256_add_ps(plR, _mm256_mul_ps(_mm256_sub_ps(_mm256_loadu_ps(pR + b + 1), plR), zero));
+			__m256 prI = _mm256_add_ps(plI, _mm256_mul_ps(_mm256_sub_ps(_mm256_loadu_ps(pI + b + 1), plI), zero));
+			__m256 ftR, ftI, phR, phI;
+			mulConjV8(inR, inI, prR, prI, ftR, ftI);
+			mulV8(_mm256_loadu_ps(oR + b), _mm256_loadu_ps(oI + b), ftR, ftI, phR, phI);
+			__m256 d = _mm256_add_ps(_mm256_max_ps(e, prevEnergy), floor);
+			_mm256_storeu_ps(oR + b, _mm256_div_ps(phR, d));
+			_mm256_storeu_ps(oI + b, _mm256_div_ps(phI, d));
+		}
+		return b;
+	}
+	SIGNALSMITH_AVX2 int preliminaryIdentityInputsAvx(const Sample *eV, const Sample *iR, const Sample *iI, Sample *pE, Sample *saved, Sample *qR, Sample *qI) {
+		int b = 0;
+		const __m256 zero = _mm256_setzero_ps(), one = _mm256_set1_ps(Sample(1));
+		for (; b + 8 <= bands; b += 8) {
+			_mm256_storeu_ps(saved + b, _mm256_loadu_ps(pE + b));
+			__m256 eLow = _mm256_loadu_ps(eV + b), eHigh = _mm256_loadu_ps(eV + b + 1);
+			_mm256_storeu_ps(pE + b, _mm256_mul_ps(_mm256_add_ps(eLow, _mm256_mul_ps(_mm256_sub_ps(eHigh, eLow), zero)), one));
+			__m256 lowR = _mm256_loadu_ps(iR + b), lowI = _mm256_loadu_ps(iI + b);
+			_mm256_storeu_ps(qR + b, _mm256_add_ps(lowR, _mm256_mul_ps(_mm256_sub_ps(_mm256_loadu_ps(iR + b + 1), lowR), zero)));
+			_mm256_storeu_ps(qI + b, _mm256_add_ps(lowI, _mm256_mul_ps(_mm256_sub_ps(_mm256_loadu_ps(iI + b + 1), lowI), zero)));
+		}
+		return b;
+	}
+	SIGNALSMITH_AVX2 int preliminaryIdentityOutputsAvx(const Sample *pR, const Sample *pI, Sample *oR, Sample *oI, const Sample *pE, const Sample *saved, const Sample *qR, const Sample *qI) {
+		int b = 0;
+		const __m256 zero = _mm256_setzero_ps(), floor = _mm256_set1_ps(noiseFloor);
+		for (; b + 8 <= bands; b += 8) {
+			__m256 inR = _mm256_loadu_ps(qR + b), inI = _mm256_loadu_ps(qI + b);
+			__m256 plR = _mm256_loadu_ps(pR + b), plI = _mm256_loadu_ps(pI + b);
+			__m256 prR = _mm256_add_ps(plR, _mm256_mul_ps(_mm256_sub_ps(_mm256_loadu_ps(pR + b + 1), plR), zero));
+			__m256 prI = _mm256_add_ps(plI, _mm256_mul_ps(_mm256_sub_ps(_mm256_loadu_ps(pI + b + 1), plI), zero));
+			__m256 ftR, ftI, phR, phI;
+			mulConjV8(inR, inI, prR, prI, ftR, ftI);
+			mulV8(_mm256_loadu_ps(oR + b), _mm256_loadu_ps(oI + b), ftR, ftI, phR, phI);
+			__m256 d = _mm256_add_ps(_mm256_max_ps(_mm256_loadu_ps(pE + b), _mm256_loadu_ps(saved + b)), floor);
+			_mm256_storeu_ps(oR + b, _mm256_div_ps(phR, d));
+			_mm256_storeu_ps(oI + b, _mm256_div_ps(phI, d));
+		}
+		return b;
+	}
+	SIGNALSMITH_AVX2 int prepareMaxChannelsAvx() {
+		int b = 0;
+		for (; b + 8 <= bands; b += 8) {
+			__m256 e0 = _mm256_loadu_ps(predEnergy.data() + b), e1 = _mm256_loadu_ps(predEnergy.data() + bands + b);
+			__m256i one = _mm256_and_si256(_mm256_castps_si256(_mm256_cmp_ps(e1, e0, _CMP_GT_OS)), _mm256_set1_epi32(1));
+			_mm256_storeu_si256((__m256i *)(maxChannelOf.data() + b), one);
+		}
+		return b;
+	}
+	SIGNALSMITH_AVX2 int lockOtherChannelAvx(int startB, int endB) {
+		Sample *outR[2] = {bandOut(0), bandOut(1)}, *outI[2] = {bandOutI(0), bandOutI(1)};
+		const Sample *qR[2] = {predInR.data(), predInR.data() + bands}, *qI[2] = {predInI.data(), predInI.data() + bands};
+		const Sample *qE[2] = {predEnergy.data(), predEnergy.data() + bands};
+		int b = startB;
+		const __m256 floor = _mm256_set1_ps(noiseFloor);
+		for (; b + 8 <= endB; b += 8) {
+			__m256 mask = maskAt8(b);
+			__m256 o0R = _mm256_loadu_ps(outR[0] + b), o0I = _mm256_loadu_ps(outI[0] + b);
+			__m256 o1R = _mm256_loadu_ps(outR[1] + b), o1I = _mm256_loadu_ps(outI[1] + b);
+			__m256 q0R = _mm256_loadu_ps(qR[0] + b), q0I = _mm256_loadu_ps(qI[0] + b), q1R = _mm256_loadu_ps(qR[1] + b), q1I = _mm256_loadu_ps(qI[1] + b);
+			__m256 e0 = _mm256_loadu_ps(qE[0] + b), e1 = _mm256_loadu_ps(qE[1] + b);
+			__m256 mOutR = selectV8(mask, o1R, o0R), mOutI = selectV8(mask, o1I, o0I);
+			__m256 pR = selectV8(mask, q1R, q0R), pI = selectV8(mask, q1I, q0I);
+			__m256 cR = selectV8(mask, q0R, q1R), cI = selectV8(mask, q0I, q1I);
+			__m256 cE = selectV8(mask, e0, e1);
+			__m256 twR, twI, cpR, cpI;
+			mulConjV8(cR, cI, pR, pI, twR, twI);
+			mulV8(mOutR, mOutI, twR, twI, cpR, cpI);
+			__m256 phaseNorm = _mm256_add_ps(_mm256_mul_ps(cpR, cpR), _mm256_mul_ps(cpI, cpI));
+			__m256 weak = _mm256_cmp_ps(phaseNorm, floor, _CMP_LE_OS);
+			__m256 phR = selectV8(weak, cR, cpR), phI = selectV8(weak, cI, cpI);
+			__m256 inNorm = _mm256_add_ps(_mm256_add_ps(_mm256_mul_ps(cR, cR), _mm256_mul_ps(cI, cI)), floor);
+			__m256 scale = _mm256_sqrt_ps(_mm256_div_ps(cE, selectV8(weak, inNorm, phaseNorm)));
+			__m256 lockedR = _mm256_mul_ps(phR, scale), lockedI = _mm256_mul_ps(phI, scale);
+			_mm256_storeu_ps(outR[0] + b, selectV8(mask, lockedR, o0R));
+			_mm256_storeu_ps(outI[0] + b, selectV8(mask, lockedI, o0I));
+			_mm256_storeu_ps(outR[1] + b, selectV8(mask, o1R, lockedR));
+			_mm256_storeu_ps(outI[1] + b, selectV8(mask, o1I, lockedI));
+		}
+		return b;
+	}
+	// prepareMainPrediction, one time factor: one channel's twists from band b (returns where the SSE2 loop goes on)
+	SIGNALSMITH_AVX2 int twistsAvx(int b, int twistEnd, const Sample *iR, const Sample *iI, const Sample *cqR, const Sample *cqI,
+			Sample *tR, Sample *tI, Sample *lR, Sample *lI, Sample timeFactor, Sample longTimeFactor) {
+		const __m256 tf = _mm256_set1_ps(timeFactor), ltf = _mm256_set1_ps(longTimeFactor);
+		const Sample *re[8], *im[8];
+		for (int j = 0; j < 8; ++j) {
+			re[j] = iR - bandPad;
+			im[j] = iI - bandPad;
+		}
+		for (; b + 8 <= twistEnd; b += 8) {
+			__m256 bin = inputBinsV8(b);
+			__m256 pR = _mm256_loadu_ps(cqR + b), pI = _mm256_loadu_ps(cqI + b), dR, dI, xR, xI;
+			fractionalV8(_mm256_sub_ps(bin, tf), re, im, true, dR, dI);
+			mulConjV8(pR, pI, dR, dI, xR, xI);
+			_mm256_storeu_ps(tR + b, xR);
+			_mm256_storeu_ps(tI + b, xI);
+			fractionalV8(_mm256_sub_ps(bin, ltf), re, im, true, dR, dI);
+			mulConjV8(pR, pI, dR, dI, xR, xI);
+			_mm256_storeu_ps(lR + b, xR);
+			_mm256_storeu_ps(lI + b, xI);
+		}
+		return b;
+	}
+	// prepareMainPrediction, one time factor: each band's terms from its maximum-energy channel, from band b
+	SIGNALSMITH_AVX2 int selectAvx(int b, int endB, int L) {
+		const Sample *oR[2] = {bandOut(0), bandOut(1)}, *oI[2] = {bandOutI(0), bandOutI(1)};
+		const Sample *tR[2], *tI[2], *lR[2], *lI[2];
+		for (int c = 0; c < 2; ++c) {
+			tR[c] = twistR.data() + size_t(c)*bandStride;
+			tI[c] = twistI.data() + size_t(c)*bandStride;
+			lR[c] = longTwistR.data() + size_t(c)*bandStride;
+			lI[c] = longTwistI.data() + size_t(c)*bandStride;
+		}
+		for (; b + 8 <= endB && b + 8 + L <= bands; b += 8) {
+			__m256 mask = maskAt8(b), xR, xI;
+			_mm256_storeu_ps(selTwistR.data() + b, selectedV8(tR, mask, b));
+			_mm256_storeu_ps(selTwistI.data() + b, selectedV8(tI, mask, b));
+			_mm256_storeu_ps(selLongTwistR.data() + b, selectedV8(lR, mask, b));
+			_mm256_storeu_ps(selLongTwistI.data() + b, selectedV8(lI, mask, b));
+			mulConjV8(selectedV8(oR, mask, b + 1), selectedV8(oI, mask, b + 1), selectedV8(tR, mask, b + 1), selectedV8(tI, mask, b + 1), xR, xI);
+			_mm256_storeu_ps(selUpR.data() + b, xR);
+			_mm256_storeu_ps(selUpI.data() + b, xI);
+			mulConjV8(selectedV8(oR, mask, b + L), selectedV8(oI, mask, b + L), selectedV8(lR, mask, b + L), selectedV8(lI, mask, b + L), xR, xI);
+			_mm256_storeu_ps(selLongUpR.data() + b, xR);
+			_mm256_storeu_ps(selLongUpI.data() + b, xI);
+		}
+		return b;
+	}
+#endif
 
 	// once per block (the main prediction's first step): the maximum-energy channel of each band, and (two channels,
 	// no split computation) the pending rotations / preliminary outputs of the channels that are the maximum somewhere
@@ -1299,6 +1566,9 @@ private:
 		int b = 0;
 #if SIGNALSMITH_STRETCH_SSE2
 		if (channels == 2) {
+#if SIGNALSMITH_STRETCH_AVX
+			if (avxOn()) b = prepareMaxChannelsAvx();
+#endif
 			for (; b + 4 <= bands; b += 4) {
 				// channel 1 only when its energy is greater (`e > maxEnergy`)
 				__m128 e0 = _mm_loadu_ps(predEnergy.data() + b), e1 = _mm_loadu_ps(predEnergy.data() + bands + b);
@@ -1430,6 +1700,9 @@ private:
 				re[j] = iR - bandPad;
 				im[j] = iI - bandPad;
 			}
+#if SIGNALSMITH_STRETCH_AVX
+			if (avxOn()) b = twistsAvx(b, twistEnd, iR, iI, cqR, cqI, tR, tI, lR, lI, timeFactor, longTimeFactor);
+#endif
 			for (; b + 4 <= twistEnd; b += 4) {
 				__m128 bin = inputBinsV(b);
 				__m128 pR = _mm_loadu_ps(cqR + b), pI = _mm_loadu_ps(cqI + b), dR, dI, xR, xI;
@@ -1465,6 +1738,9 @@ private:
 				lR[c] = longTwistR.data() + size_t(c)*bandStride;
 				lI[c] = longTwistI.data() + size_t(c)*bandStride;
 			}
+#if SIGNALSMITH_STRETCH_AVX
+			if (avxOn()) b = selectAvx(b, endB, L);
+#endif
 			for (; b + 4 <= endB && b + 4 + L <= bands; b += 4) {
 				__m128 mask = maskAt(b), xR, xI;
 				_mm_storeu_ps(selTwistR.data() + b, selected(tR, mask, b));
