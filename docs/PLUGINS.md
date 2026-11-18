@@ -134,7 +134,7 @@ see [Generators](#generators).
 | **Close** | the same algorithm; within −60 dB of the original on (almost) all tested states, typically −80 dB or better; the gaps are listed |
 | **Approximate** | the plugin's saved settings are mapped onto a LYNX SHARE built-in effect or synth: similar sound, not the same engine |
 | **Placeholder** | the state is kept and the plugin makes no sound / passes audio through, as the original does in FL Studio 2026 |
-| **Fitted** | LYNX SHARE's own engine (not the original's algorithm), designed so that black-box measurements of the third-party original — decay times per band, onset, build-up, levels, filters, parameter laws — match within the tolerances listed for it |
+| **Fitted** | LYNX SHARE's own engine (not the original's algorithm), designed so that black-box measurements of the third-party original — decay times per band, onset, build-up, levels, filters, parameter laws — match within the tolerances listed for it. Since 2026-11, by the project owner's decision, some are also informed by clean-room static analysis of the original's binary (laws and structure in our own words, [`docs/analise/REA_*.md`](analise)); no third-party code, tables, presets or content is copied and licence protections are never bypassed |
 
 **How you get it:** *Insert* = can be added to any mixer insert (Mixer slot menu or the F8 quick-add palette).
 *Import* = created when you open an FL Studio project (`.flp`) or drop an FL effect preset; the engine is kept

@@ -11,7 +11,11 @@ configuration or design?" Round 114 scored only the layout. This audit checks **
 
 Sources: each original's official trial installed on this PC, hosted black-box in our own host (parameter lists read
 through the public VST3 API — every control, range and option text — plus screenshots of each view as a user sees
-it), the official manuals, and `docs/specs/*.md`. Nothing was decompiled; no graphics, presets or names were copied.
+it), the official manuals, and `docs/specs/*.md`. Round 128 decompiled nothing; no graphics, presets or names were copied.
+Since 2026-11, by the project owner's decision, some sound work (the FabFilter roles from round 190kw on) was also
+informed by clean-room static analysis of the third-party binaries — laws and structure in our own words, evidence in
+`docs/analise/REA_*.md`; no third-party code, tables, presets or content is copied and licence protections are never
+bypassed. Those rounds' sections say so.
 Reference screenshots stay outside git (`D:\lynx-work\parity128\ref`); the side-by-side pages are on the Desktop
 (`LYNX-paridade`).
 
