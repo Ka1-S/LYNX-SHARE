@@ -302,6 +302,12 @@
                     offline.getTransport().countIn.store (0.0);
                     ui.transportTickForSnapshot();
                 }
+                // the song at bar 5: the line in the middle of the miniature, the clips scrolled under it
+                offline.getTransport().positionTicks.store ((double) song.barTicks() * 4.0);
+                refreshClipGrid (*gridView);
+                write (*gridView, "grid-status-bar5");
+                offline.getTransport().positionTicks.store (0.0);
+                refreshClipGrid (*gridView);
                 // a MIDI track locked to a controller (Live: Monitor In): the keyboard icon; an audio track monitoring On: the
                 // microphone; an armed track on Auto keeps its miniature (Live 12.4, raw/L09)
                 int midiTrack = -1, audioTrack = -1;
@@ -328,10 +334,7 @@
                 offline.dispatchPendingMessages();
                 refreshClipGrid (*gridView);
                 write (*gridView, "grid-status-armed");
-                offline.getTransport().positionTicks.store ((double) song.barTicks() * 4.0);
-                refreshClipGrid (*gridView);
-                write (*gridView, "grid-status-bar5");
-                offline.getTransport().positionTicks.store (0.0);
+
             }
         }
         {
