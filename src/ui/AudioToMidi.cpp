@@ -501,14 +501,15 @@ juce::String keyName (int key)
     return juce::MidiMessage::getMidiNoteName (key, true, true, 5);
 }
 
-// a label and a 0..100 % slider on one row (AlertWindow has no slider of its own)
+// a 0..100 % slider with its name above it, as the AlertWindow names its boxes (it has no slider of its own)
 struct SliderRow final : juce::Component
 {
     SliderRow (const juce::String& text, float value, const juce::String& tip)
     {
         label.setText (text, juce::dontSendNotification);
+        label.setBorderSize ({});
         slider.setSliderStyle (juce::Slider::LinearHorizontal);
-        slider.setTextBoxStyle (juce::Slider::TextBoxRight, false, 52, 20);
+        slider.setTextBoxStyle (juce::Slider::TextBoxRight, false, 56, 22);
         slider.setRange (0.0, 100.0, 1.0);
         slider.setTextValueSuffix (" %");
         slider.setValue (std::round (value * 100.0f), juce::dontSendNotification);
@@ -516,12 +517,18 @@ struct SliderRow final : juce::Component
         label.setTooltip (tip);
         addAndMakeVisible (label);
         addAndMakeVisible (slider);
-        setSize (380, 28);
+        setSize (380, 46);
     }
+    void lookAndFeelChanged() override
+    {
+        label.setFont (getLookAndFeel().getAlertWindowFont());
+        label.setColour (juce::Label::textColourId, findColour (juce::AlertWindow::textColourId));
+    }
+    void parentHierarchyChanged() override { lookAndFeelChanged(); }
     void resized() override
     {
-        label.setBounds (0, 3, 150, 22);
-        slider.setBounds (150, 3, getWidth() - 150, 22);
+        label.setBounds (0, 0, getWidth(), 18);
+        slider.setBounds (0, 20, getWidth(), 24);
     }
     float value() const { return (float) slider.getValue() / 100.0f; }
     juce::Label label;
