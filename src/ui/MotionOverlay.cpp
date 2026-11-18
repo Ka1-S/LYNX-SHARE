@@ -143,8 +143,8 @@ struct LiveGdiWindow
     HBITMAP bitmap = nullptr, previous = nullptr;
     void* bits = nullptr;
     int bw = 0, bh = 0;
-    RECT placed { 0, 0, 0, 0 };
-    bool visible = false;
+    RECT placed { 0, 0, 0, 0 }, shownClip { 0, 0, 0, 0 };
+    bool visible = false, fresh = false; // fresh: the window shows the bitmap's pixels
 
     ~LiveGdiWindow() { destroy(); }
 
@@ -175,6 +175,7 @@ struct LiveGdiWindow
         bitmap = previous = nullptr;
         bits = nullptr;
         bw = bh = 0;
+        fresh = false;
     }
 
     void hide()
@@ -229,13 +230,26 @@ struct LiveGdiWindow
             bw = w;
             bh = h;
         }
+        auto changed = false;
         {
+            // (a frame whose pixels are the ones shown already, at the same place, is not handed over again: no work for
+            // the window manager either, e.g. the scope's flat line in a quiet passage)
             const juce::Image::BitmapData pixels (picture, juce::Image::BitmapData::readOnly);
             for (int row = 0; row < h; ++row)
-                std::memcpy (static_cast<std::uint8_t*> (bits) + (std::size_t) row * (std::size_t) w * 4, pixels.getLinePointer (row), (std::size_t) w * 4);
+            {
+                auto* dst = static_cast<std::uint8_t*> (bits) + (std::size_t) row * (std::size_t) w * 4;
+                if (changed || std::memcmp (dst, pixels.getLinePointer (row), (std::size_t) w * 4) != 0)
+                {
+                    std::memcpy (dst, pixels.getLinePointer (row), (std::size_t) w * 4);
+                    changed = true;
+                }
+            }
         }
-        GdiFlush();
         const RECT want { x + clip.getX(), y + clip.getY(), x + clip.getRight(), y + clip.getBottom() };
+        const RECT clip0 { clip.getX(), clip.getY(), clip.getRight(), clip.getBottom() };
+        if (! changed && visible && fresh && EqualRect (&want, &placed) && EqualRect (&clip0, &shownClip))
+            return true;
+        GdiFlush();
         if (! EqualRect (&want, &placed))
         {
             SetWindowPos (window, HWND_TOP, want.left, want.top, want.right - want.left, want.bottom - want.top, SWP_NOACTIVATE | SWP_NOREDRAW);
@@ -245,7 +259,12 @@ struct LiveGdiWindow
         POINT from { clip.getX(), clip.getY() };
         BLENDFUNCTION blend { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
         if (! UpdateLayeredWindow (window, nullptr, nullptr, &size, memory, &from, 0, &blend, ULW_ALPHA))
+        {
+            fresh = false;
             return false;
+        }
+        fresh = true;
+        shownClip = clip0;
         if (! visible)
         {
             ShowWindow (window, SW_SHOWNA);
