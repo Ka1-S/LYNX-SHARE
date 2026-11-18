@@ -4372,6 +4372,8 @@ EffectSlot makeEffectSlot (EffectKind kind)
     if (kind == EffectKind::halo) slot.params[(std::size_t) verbs::halo::revision] = 1.0f;
     if (kind == EffectKind::latticeMod) // round 190it: … and a new Lattice Mod its tap network's revision 1 (hidden)
         slot.params[(std::size_t) echosuite::lattice::revision] = 1.0f;
+    if (kind == EffectKind::luxeVerb) // round 190kw: a new LuxeVerb's Space engine runs the Pro-R 2 laws' revision 1 (hidden)
+        slot.params[(std::size_t) luxeVerbSpaceRevision] = 1.0f;
 
     return slot;
 }
@@ -4576,6 +4578,9 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     // round 190kw: … and one saved before the line law (hidden, set only by a translated Timeless 3 state) keeps the engine
     if (slot.kind == EffectKind::echoform && savedCount <= (std::size_t) echosuite::echoform::lineLaw)
         slot.params[(std::size_t) echosuite::echoform::lineLaw] = 0.0f;
+    // round 190kw: a LuxeVerb saved before the Space engine's revision keeps tp172b / 190it's Space engine (bit for bit)
+    if (slot.kind == EffectKind::luxeVerb && savedCount <= (std::size_t) luxeVerbSpaceRevision)
+        slot.params[(std::size_t) luxeVerbSpaceRevision] = 0.0f;
     // round 190ca: a Nebula saved before the cloud law keeps the classic engine in every mode
     if (slot.kind == EffectKind::nebula && savedCount <= (std::size_t) verbs::nebula::law)
         slot.params[(std::size_t) verbs::nebula::law] = 0.0f;
