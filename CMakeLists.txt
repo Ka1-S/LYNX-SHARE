@@ -111,6 +111,7 @@ add_library(lynx_core STATIC
     src/core/SimpleTracks.cpp
     src/core/SimplePads.cpp
     src/core/KeyFollow.cpp
+    src/core/LoopAnalysis.cpp
     src/core/LoopKeywords.cpp
     src/core/GoalKnobs.cpp
     src/core/ChainPresets.cpp
@@ -645,6 +646,7 @@ if(LYNX_BUILD_APP)
         src/ui/TempoDetectionDialog.cpp
         src/ui/LoopStarterWindow.cpp
         src/ui/SimpleWorkflow.cpp
+        src/ui/LoopInfo.cpp
         src/ui/FinishDock.cpp
         src/ui/SimpleDock.cpp
         src/ui/SimpleTuner.cpp

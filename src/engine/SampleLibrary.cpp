@@ -1150,4 +1150,30 @@ std::shared_ptr<const SampleData> SampleLibrary::decode (const juce::String& pat
 
     return data;
 }
+
+// Round 190kx: what the loop analysis reads (see the header)
+bool SampleLibrary::readForAnalysis (const juce::File& file, double seconds, SampleData& out, double& totalSeconds)
+{
+    out = SampleData {};
+    totalSeconds = 0.0;
+    const auto reader = createReader (file);
+    if (reader == nullptr || reader->sampleRate <= 0.0 || reader->numChannels == 0 || reader->lengthInSamples <= 0)
+        return false;
+    totalSeconds = (double) reader->lengthInSamples / reader->sampleRate;
+    out.sampleRate = reader->sampleRate;
+    const auto frames = (int) juce::jmin (reader->lengthInSamples, (juce::int64) (seconds * reader->sampleRate), (juce::int64) 1 << 26);
+    const auto channels = (int) juce::jmin (reader->numChannels, 8u);
+    juce::AudioBuffer<float> buffer (channels, frames);
+    if (! reader->read (&buffer, 0, frames, 0, true, true))
+        return false;
+    out.left.assign ((std::size_t) frames, 0.0f);
+    for (int c = 0; c < channels; ++c)
+    {
+        const auto* data = buffer.getReadPointer (c);
+        for (int i = 0; i < frames; ++i)
+            out.left[(std::size_t) i] += data[i] / (float) channels;
+    }
+    readWavExtras (file, out);
+    return true;
+}
 } // namespace lynx

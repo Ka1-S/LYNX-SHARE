@@ -3,7 +3,9 @@
 #include <algorithm>
 
 #include "core/FirstSongTour.h"
+#include "core/ClipOps.h"
 #include "core/KeyFollow.h"
+#include "core/LoopAnalysis.h"
 #include "core/LoopStarter.h"
 #include "core/MidiImport.h"
 #include "core/SimplePads.h"
@@ -1379,13 +1381,29 @@ void SimpleWorkflow::addFiles (const juce::Array<juce::File>& files, std::int64_
         // a loop made for a tempo (ACID beats, or a tempo in its name that makes whole bars) keeps time: it lasts its
         // beats at the project's tempo, at its own pitch, and follows the tempo from then on (round 190p)
         q.audioBeats = simpletracks::loopBeats (file.getFileName().toStdString(), seconds, data->acidBeats, engine.getSong().meter());
+        // round 190kx: a loop whose name and file don't say its tempo or key takes what the analysis finds in its audio
+        // (as BandLab's loops keep the project's tempo and key; Settings › LYNX extras "simple.loopDetect"): from the
+        // cache when the Browser showed it, else analysed on a worker after it is placed (applyLoopAnalysis)
+        const auto detects = loopanalysis::dropDetects().load() && seconds <= loopanalysis::maxSeconds;
+        bool analyseLater = false;
+        std::optional<loopanalysis::Result> found;
+        if (detects && (q.audioBeats <= 0.0f || ! keyfollow::keyInName (file.getFileName().toStdString())))
+        {
+            const loopanalysis::Stamp stamp { file.getFullPathName().toStdString(), file.getSize(), file.getLastModificationTime().toMilliseconds() };
+            found = loopanalysis::Cache::shared().find (stamp);
+            analyseLater = ! found.has_value();
+            if (found && q.audioBeats <= 0.0f && found->isLoop())
+                q.audioBeats = (float) std::round (found->beats);
+        }
         // round 190ds: a loop follows the project key — its key from its name, else detected from a loop's audio (a
         // file made for a tempo); voice takes and songs (over 70 s) are left alone
         if (seconds <= 70.0)
         {
             auto key = keyfollow::keyInName (file.getFileName().toStdString());
             int source = key ? 1 : 0;
-            if (! key && q.audioBeats > 0.0f)
+            if (! key && found && found->key && (q.audioBeats > 0.0f || found->isLoop()))
+                key = found->key, source = 2; // (round 190kx: the analysis' key)
+            if (! key && q.audioBeats > 0.0f && ! detects)
                 if (key = keyfollow::detectKey (*data).key; key)
                     source = 2;
             if (key)
@@ -1398,7 +1416,9 @@ void SimpleWorkflow::addFiles (const juce::Array<juce::File>& files, std::int64_
                     firstKey = key;
             }
         }
-        add (std::move (q));
+        const auto fitLater = analyseLater && q.audioBeats <= 0.0f, keyLater = analyseLater && ! q.followKey;
+        if (add (std::move (q)) && (fitLater || keyLater))
+            applyLoopAnalysis (file, data, fitLater, keyLater);
     }
     if (! failed.isEmpty())
         juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not import"),
@@ -1455,5 +1475,54 @@ void SimpleWorkflow::addDrums (const std::string& genre, bool steps, bool useTem
         q.bpm = loopstarter::suggestedTempo (sources, id); // the number on the starter's button, not the plan's random
                                                            // one: the beat is in steps, so it follows (same undo step)
     add (std::move (q));
+}
+
+// Round 190kx: a dropped loop the cache didn't know is analysed on a worker thread (core/LoopAnalysis, from the audio
+// already loaded); the answer then fits the loop's channel to the project's tempo (a loop of whole beats, pitch kept)
+// and / or gives it the key it found (its clips follow the project key) — one more undo step, and only where the user
+// hasn't changed the channel meanwhile (its stretch, its loop key).
+void SimpleWorkflow::applyLoopAnalysis (const juce::File& file, std::shared_ptr<const SampleData> data, bool fit, bool key)
+{
+    const loopanalysis::Stamp stamp { file.getFullPathName().toStdString(), file.getSize(), file.getLastModificationTime().toMilliseconds() };
+    juce::Thread::launch ([this, alive = std::weak_ptr<int> (lifetime), stamp, data, fit, key, name = file.getFileName().toStdString()] {
+        const auto r = loopanalysis::analyse (*data, name);
+        loopanalysis::Cache::shared().put (stamp, r);
+        juce::MessageManager::callAsync ([this, alive, stamp, data, fit, key, r] {
+            if (alive.expired())
+                return;
+            const auto wantFit = fit && r.isLoop(), wantKey = key && r.key.has_value() && (r.isLoop() || ! fit);
+            if (! wantFit && ! wantKey)
+                return;
+            bool keyed = false;
+            engine.editSong ([&] (Song& s) {
+                for (int c = 0; c < (int) s.channels.size(); ++c)
+                {
+                    auto& ch = s.channels[(std::size_t) c];
+                    if (ch.instrument != InstrumentKind::audioClip || ch.samplePath != stamp.path)
+                        continue;
+                    if (wantFit && ch.sampler.stretchBeats <= 0.0f)
+                    {
+                        const auto frames = (double) clipops::clipSpan (ch, data).frames;
+                        const auto before = clipops::fileTicks (ch, frames, data->sampleRate, s.bpm);
+                        ch.sampler.stretchBeats = (float) std::round (r.beats);
+                        ch.sampler.keepPitch = true;
+                        clipops::rescaleClipsOf (s, c, before, clipops::fileTicks (ch, frames, data->sampleRate, s.bpm));
+                    }
+                    if (wantKey && ch.sampler.loopKeyRoot < 0)
+                    {
+                        std::vector<int> clips;
+                        for (int i = 0; i < (int) s.playlist.size(); ++i)
+                            if (s.playlist[(std::size_t) i].kind == ClipKind::audio && s.playlist[(std::size_t) i].channel == c)
+                                clips.push_back (i);
+                        keyfollow::setLoopKey (s, c, r.key, 2);
+                        keyfollow::setFollow (s, clips, true);
+                        keyed = true;
+                    }
+                }
+            });
+            if (keyed && keyfollow::asksToSetKey (engine.getSong()))
+                offerProjectKey (r.key->root, r.key->minor);
+        });
+    });
 }
 } // namespace lynx
