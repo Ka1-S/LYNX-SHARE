@@ -10,9 +10,12 @@
 //   modulation=<0..2>  pitchdrift=<0..2>                     LYNX's split of Variation (round 190li; every note)
 //   formant=<sel>:<st> volume=<sel>:<dB> stretch=<sel>:<factor, > 1 = longer> lengthen=<sel>:<seconds> (later notes move)
 //   quantize=<grid seconds>
+//   bench=<N>          render N more times and print the render's cost (ms, and CPU instructions per source second where
+//                      the kernel exposes the counter): the engine's cost for an edit (the editor's preview plays the result)
 // <sel> = "all", or "@<seconds>": the voiced note whose source span holds that time.
 // Standalone build (no core library): g++ -std=c++20 -O2 -Isrc -DNEWTONELAB_STANDALONE tools/newtonelab.cpp
 //   src/core/NewtoneFx.cpp src/core/VocalPitch.cpp
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -37,8 +40,43 @@ std::shared_ptr<SampleData> timeStretch (const SampleData&, double, StretchMetho
 }
 #endif
 
+#ifdef __linux__
+#include <linux/perf_event.h>
+#include <sys/ioctl.h>
+#include <sys/syscall.h>
+#include <unistd.h>
+#endif
+
 namespace
 {
+long long instructionsOf (void (*f) (void*), void* ctx)
+{
+#ifdef __linux__
+    perf_event_attr a {};
+    a.type = PERF_TYPE_HARDWARE;
+    a.size = sizeof a;
+    a.config = PERF_COUNT_HW_INSTRUCTIONS;
+    a.disabled = 1;
+    a.exclude_kernel = 1;
+    a.exclude_hv = 1;
+    const auto fd = (int) syscall (SYS_perf_event_open, &a, 0, -1, -1, 0);
+    if (fd >= 0)
+    {
+        ioctl (fd, PERF_EVENT_IOC_RESET, 0);
+        ioctl (fd, PERF_EVENT_IOC_ENABLE, 0);
+        f (ctx);
+        ioctl (fd, PERF_EVENT_IOC_DISABLE, 0);
+        long long n = 0;
+        if (read (fd, &n, sizeof n) != (ssize_t) sizeof n)
+            n = -1;
+        close (fd);
+        return n;
+    }
+#endif
+    f (ctx);
+    return -1;
+}
+
 std::shared_ptr<lynx::SampleData> readWav (const char* path)
 {
     std::ifstream in (path, std::ios::binary);
@@ -260,7 +298,7 @@ int main (int argc, char** argv)
         }
         else if (key == "quantize")
             quantizeTime (track, {}, amount * fs);
-        else if (key != "fine" && key != "engine")
+        else if (key != "fine" && key != "engine" && key != "bench")
         {
             std::fprintf (stderr, "unknown option %s\n", a.c_str());
             return 1;
@@ -269,6 +307,31 @@ int main (int argc, char** argv)
     track.edited = true;
     if (std::string (argv[2]) == "-")
         return 0;
+    int bench = 0;
+    for (const auto& a : args)
+        if (a.rfind ("bench=", 0) == 0)
+            bench = std::atoi (a.c_str() + 6);
+    if (bench > 0)
+    {
+        struct Ctx
+        {
+            const lynx::SampleData* s;
+            const Track* t;
+            int n;
+        } ctx { src.get(), &track, bench };
+        const auto t0 = std::chrono::steady_clock::now();
+        const auto ins = instructionsOf ([] (void* c) {
+            auto* x = static_cast<Ctx*> (c);
+            for (int k = 0; k < x->n; ++k)
+                (void) renderEdits (*x->s, *x->t);
+        }, &ctx);
+        const auto ms = std::chrono::duration<double, std::milli> (std::chrono::steady_clock::now() - t0).count() / bench;
+        const auto seconds = (double) src->frames() / fs;
+        std::printf ("bench: %.1f ms per render of %.2f s (%.1f ms per second of audio)", ms, seconds, ms / seconds);
+        if (ins > 0)
+            std::printf (", %.1f M instructions per second of audio", (double) ins / bench / seconds / 1e6);
+        std::printf ("\n");
+    }
     auto out = renderEdits (*src, track);
     writeWav (argv[2], out != nullptr ? *out : *src);
     std::printf ("notes %d engine %d rendered %s\n", (int) track.pitches.size(), track.engine, out != nullptr ? "yes" : "no (unedited)");

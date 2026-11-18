@@ -96,7 +96,7 @@ def f0_at(x, centre, expect_hz, win=2048, span_cents=250):
     if 1 <= k < hi:
         a, b, g = cm[k - 1], cm[k], cm[k + 1]
         den = a - 2 * b + g
-        k = k + (0.5 * (a - g) / den if abs(den) > 1e-12 else 0)
+        k = k + (float(np.clip(0.5 * (a - g) / den, -1.0, 1.0)) if abs(den) > 1e-12 else 0)   # (a flat dip: at most a lag)
     return SR / k
 
 

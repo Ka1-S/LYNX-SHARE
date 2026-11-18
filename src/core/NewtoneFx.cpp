@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <mutex>
 
 #include "core/AudioEdit.h"
 #include "core/Instruments.h"
@@ -519,6 +520,14 @@ float readAt (const std::vector<float>& x, double pos) noexcept
 //    rest is the modulation.
 namespace
 {
+struct AnalysisCache
+{
+    std::uint64_t key = 0;
+    std::int64_t frames = 0;
+    std::vector<vocal::PitchFrame> pitch;
+    std::vector<Mark> marks;
+};
+
 std::shared_ptr<SampleData> renderNatural (const SampleData& source, const Track& track)
 {
     const auto n = (std::int64_t) source.frames();
@@ -536,8 +545,49 @@ std::shared_ptr<SampleData> renderNatural (const SampleData& source, const Track
 
     const int hop = 128, unvoicedHop = std::max (16, (int) std::lround (128.0 * fs / 44100.0));
     std::vector<vocal::PitchFrame> frames;
-    auto marks = analyse (mono, fs, frames, hop, unvoicedHop);
-    refineMarks (marks, mono);
+    // the analysis (pitch frames and marks: ~2/3 of a render's cost) is kept for the last sample rendered, so the
+    // renders that follow each edit of the same sample skip it (the result is the same either way)
+    std::vector<Mark> marks;
+    {
+        std::uint64_t key = 1469598103934665603ull;
+        auto mix = [&key] (std::uint64_t v) { key = (key ^ v) * 1099511628211ull; };
+        mix ((std::uint64_t) n);
+        mix ((std::uint64_t) std::llround (fs * 1000.0));
+        mix ((std::uint64_t) (std::uintptr_t) source.leftData());
+        mix ((std::uint64_t) (std::uintptr_t) (stereo ? source.rightData() : nullptr));
+        const auto stride = std::max<std::int64_t> (1, n / 4096);
+        for (std::int64_t i = 0; i < n; i += stride)
+        {
+            std::uint32_t bits = 0;
+            std::memcpy (&bits, &mono[(std::size_t) i], 4);
+            mix (bits);
+        }
+        static std::mutex lock;
+        static std::shared_ptr<const AnalysisCache> last;
+        std::shared_ptr<const AnalysisCache> hit;
+        {
+            const std::lock_guard<std::mutex> guard (lock);
+            if (last != nullptr && last->key == key && last->frames == n)
+                hit = last;
+        }
+        if (hit != nullptr)
+        {
+            frames = hit->pitch;
+            marks = hit->marks;
+        }
+        else
+        {
+            marks = analyse (mono, fs, frames, hop, unvoicedHop);
+            refineMarks (marks, mono);
+            auto entry = std::make_shared<AnalysisCache>();
+            entry->key = key;
+            entry->frames = n;
+            entry->pitch = frames;
+            entry->marks = marks;
+            const std::lock_guard<std::mutex> guard (lock);
+            last = std::move (entry);
+        }
+    }
     if (marks.empty() || frames.empty())
         return nullptr;
     const auto frameOf = [&] (double pos) {
