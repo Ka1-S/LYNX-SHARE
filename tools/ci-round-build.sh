@@ -25,7 +25,10 @@ if ! git cat-file -e "HEAD:.github/workflows/round-build.yml" 2>/dev/null; then
 fi
 tree="$(git write-tree)"
 unset GIT_INDEX_FILE
-sha="$(git commit-tree "$tree" -p HEAD -m "Round build of $(git rev-parse --short HEAD)")"
+# LYNX_CI_RELEASE_OPT=1: the release's code generation (real -O3 + ThinLTO, round 190kz) instead of the fast default
+msg="Round build of $(git rev-parse --short HEAD)"
+[[ "${LYNX_CI_RELEASE_OPT:-0}" == 1 ]] && msg="$msg [release-opt]"
+sha="$(git commit-tree "$tree" -p HEAD -m "$msg")"
 
 # LYNX_CI_FORBIDDEN (optional, set on the machine): a text that must never leave it. Never put its value in this file.
 if [[ -n "${LYNX_CI_FORBIDDEN:-}" ]] && git grep -qIi -e "$LYNX_CI_FORBIDDEN" "$sha" --; then
