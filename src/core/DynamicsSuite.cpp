@@ -929,7 +929,7 @@ struct SlidingMax
     }
 };
 
-// ---- round 190lg (REA_rodada190lg §…): Versatile, Pro-C 3's default style (LYNX's Allround), rebuilt from the reference's
+// ---- round 190lg (REA_rodada190lg, Versatile): Pro-C 3's default style (LYNX's Allround), rebuilt from the reference's
 // own graph of generic elements: two gain computers (the usual quadratic knee, ratio and range, as the reduction share
 // 1 − 10^(−GR / 20)) on two slightly different readings of the side chain's level,
 //  - slow: 0.979 × the level + 0.0203 × the level low-passed at 204 Hz → the gain computer → the knob-timed follower
@@ -941,8 +941,8 @@ struct SlidingMax
 //  gains with slow random modulators: LYNX runs their mean. T3 / T4 are LYNX's own smooth fits of the reference's
 //  piecewise-linear knob curves; T4 runs at half that fit: round 108's measured burst (attack 10 / release 200 ms: the
 //  gain back half-way after 61.6 ms) reads 59.5 ms with it (120 ms with the full fit, 28 ms without the fast path), and
-//  the full fit held the fast path up on the bank's music files (0.3 … 0.6 dB too much reduction). The attack knob's two step-dependent follower terms are not built
-//  (every reading of them scored lower on the bank than leaving them neutral)
+//  the full fit held the fast path up on the bank's music files (0.3 … 0.6 dB too much reduction). The attack knob's two
+//  step-dependent follower terms are not built (every reading of them scored lower on the bank than leaving them neutral)
 struct VersLaw
 {
     double slowLevel = 0.979424, slowLowMix = 0.020348, slowLowHz = 204.0;
