@@ -74,6 +74,8 @@ std::unique_ptr<juce::Component> makeAudioEditorForSnapshot (AudioEngine& engine
 std::unique_ptr<juce::Component> makeAudioEditorForFileSnapshot (AudioEngine& engine, const juce::File& file);
 // --snapshot: the items of the editor's main menu, one per line ("Section > Item"), for the menu check.
 juce::StringArray audioEditorMenuForSnapshot (juce::Component& editor);
+// round 190ld (--details190ldshot): the hint bar's text over the waveform at (fx, fy) of its area: "s:ms  level dB linear"
+juce::String audioEditorHoverHintForSnapshot (juce::Component& editor, float fx, float fy);
 // round 190ee: a marker's menu as lines ("Trigger note > C5  [x]"), and FL's snap mode set (snapping on) with where
 // `probeFrame` snaps to (the tooltip first)
 juce::StringArray audioEditorMarkerMenuForSnapshot (juce::Component& editor, int marker);

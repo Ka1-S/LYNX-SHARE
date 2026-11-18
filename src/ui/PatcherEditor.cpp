@@ -716,6 +716,40 @@ private:
     std::uint64_t lastGraphNs = 0;
     juce::int64 lastPerfTicks = 0;
     const patcher::Graph* perfGraph = nullptr;
+    bool snapshotViews = false; // (--details190ldshot: the read-outs taken off screen)
+
+public:
+    // round 190ld (--details190ldshot): View › Activity / Latency / Performance set, a test signal run through the running
+    // graph (watched) for `seconds` of audio, half a second of wall time, then the read-outs taken as the timer takes
+    // them. False without a running graph.
+    bool runViewsForSnapshot (bool activity, bool latency, bool performance, double seconds)
+    {
+        auto& v = patcherView();
+        v.activity = activity;
+        v.latency = latency;
+        v.performance = performance;
+        auto* g = runningGraph();
+        if (g == nullptr)
+            return false;
+        const juce::ScopedValueSetter<bool> offScreen (snapshotViews, true);
+        lastPerfTicks = 0;
+        viewTick(); // (the baseline)
+        g->watch();
+        std::vector<float> l (512), r (512);
+        const auto blocks = juce::jmax (1, (int) (seconds * 48000.0 / 512.0));
+        for (int b = 0; b < blocks; ++b)
+        {
+            for (int i = 0; i < 512; ++i)
+                l[(std::size_t) i] = r[(std::size_t) i] = 0.3f * std::sin (0.0575f * (float) (b * 512 + i));
+            g->process (l.data(), r.data(), nullptr, nullptr, l.data(), r.data(), 512, 120.0);
+        }
+        juce::Thread::sleep (500);
+        viewTick();
+        activityPhase = 23.0f;
+        return true;
+    }
+    juce::PopupMenu viewMenuForSnapshot() { return viewMenu(); }
+private:
 
     juce::PopupMenu viewMenu()
     {
@@ -744,7 +778,7 @@ private:
     void viewTick()
     {
         const auto& v = patcherView();
-        auto* g = (v.activity || v.performance) && ! surfaceView && isShowing() ? runningGraph() : nullptr;
+        auto* g = (v.activity || v.performance) && ! surfaceView && (isShowing() || snapshotViews) ? runningGraph() : nullptr;
         const auto* doc = currentDoc();
         const auto wasAnimating = std::find (nodeActive.begin(), nodeActive.end(), 1) != nodeActive.end() || hostActive;
         if (g == nullptr || doc == nullptr)
@@ -2735,6 +2769,18 @@ bool takeEffectFromBrowser (const EffectSlot& fx)
 std::unique_ptr<juce::Component> makeSlotEditor (AudioEngine& engine, int track, int slot)
 {
     return std::make_unique<PatcherEditor> (engine, Target { false, track, slot }); // (the window's content: picker pictures)
+}
+
+bool runViewsForSnapshot (juce::Component& editor, bool activity, bool latency, bool performance, double seconds)
+{
+    auto* p = dynamic_cast<PatcherEditor*> (&editor);
+    return p != nullptr && p->runViewsForSnapshot (activity, latency, performance, seconds);
+}
+
+juce::PopupMenu viewMenuForSnapshot (juce::Component& editor)
+{
+    auto* p = dynamic_cast<PatcherEditor*> (&editor);
+    return p != nullptr ? p->viewMenuForSnapshot() : juce::PopupMenu();
 }
 
 std::unique_ptr<juce::Component> makeChannelEditor (AudioEngine& engine, int channel)

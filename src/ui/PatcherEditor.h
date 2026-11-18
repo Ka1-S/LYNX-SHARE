@@ -12,6 +12,10 @@ namespace PatcherWindows
 void openSlot (AudioEngine& engine, int track, int slot);
 std::unique_ptr<juce::Component> makeSlotEditor (AudioEngine& engine, int track, int slot); // (the window's content)
 std::unique_ptr<juce::Component> makeChannelEditor (AudioEngine& engine, int channel);
+// round 190ld (--details190ldshot): a slot / channel editor's View › Activity / Latency / Performance with a test signal
+// run through its running graph (false: none), and its View menu
+bool runViewsForSnapshot (juce::Component& editor, bool activity, bool latency, bool performance, double seconds);
+juce::PopupMenu viewMenuForSnapshot (juce::Component& editor);
 void openChannel (AudioEngine& engine, int channel);
 bool isChannelOpen (int channel);
 void closeChannel (int channel);

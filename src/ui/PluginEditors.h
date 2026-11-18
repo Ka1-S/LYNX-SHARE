@@ -1,5 +1,7 @@
 #pragma once
 
+#include <array>
+
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "engine/AudioEngine.h"
@@ -40,6 +42,12 @@ void setNativeEditorDemo (bool on);
 bool tickNativeEffectEditor (juce::Component& editor);
 // round 190ih (--details190ihshot): Gross Beat's editor on its time (0) or volume (1) envelope
 bool showGrossBeatEnvelopeForSnapshot (juce::Component& editor, int envelopeKind);
+// round 190ld (--details190ldshot): Fruity Delay 3's Time-knob menu while TEMPO SYNC is on (empty otherwise); the
+// Vocoder's band columns as Vocoder::controlOutput 0…7 packs them; Fruity Limiter's graph fed `steps` synthetic frames
+// and paused (false: not a Limiter / Maximus monitor)
+juce::PopupMenu delay3TimeMenuForSnapshot (juce::Component& editor);
+bool setVocoderBandsForSnapshot (juce::Component& editor, const std::array<std::uint32_t, 8>& packed);
+bool pauseLimiterForSnapshot (juce::Component& editor, int steps);
 // round 190ih (--uiperf): Gross Beat editors' paints since the last reset ("" when none): count, area, time
 juce::String grossBeatPaintStats (bool reset);
 // round 190ih (--uiperf A/B): Gross Beat's diagnostic switches at run time (the LYNX_GB_DIAG bits)

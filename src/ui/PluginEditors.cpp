@@ -934,6 +934,11 @@ public:
     // a step (1/16 note) = 48.
     void showDelay3TimeMenu (int param, const ui::ValueSpec& spec)
     {
+        delay3TimeMenu (param, spec).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+    }
+
+    juce::PopupMenu delay3TimeMenu (int param, const ui::ValueSpec& spec)
+    {
         struct NoteValue { const char* note; int kind; int raw; }; // kind 0 plain, 1 dotted, 2 triplet
         static const NoteValue values[] { { "1/64", 0, 12 }, { "1/32", 0, 24 }, { "1/16", 0, 48 }, { "1/8", 0, 96 }, { "1/4", 0, 192 },
                                           { "1/2", 0, 384 }, { "1/16", 1, 72 }, { "1/8", 1, 144 }, { "1/4", 1, 288 }, { "1/2", 1, 576 },
@@ -957,8 +962,38 @@ public:
                 placed = true;
             }
         }
-        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+        return menu;
     }
+
+public:
+    // round 190ld (--details190ldshot): the synced Time knob's menu, the Vocoder's published band columns, the Limiter's
+    // graph fed with a synthetic level history and paused
+    juce::PopupMenu delay3TimeMenuForSnapshot()
+    {
+        for (const auto& item : activeLayout().items)
+            if (delay3SyncedTime (item))
+                return delay3TimeMenu (paramOf (item), specFor (item));
+        return {};
+    }
+    void setVocoderBandsForSnapshot (const std::array<std::uint32_t, 8>& packed)
+    {
+        vocBandsSeen = packed;
+        repaint();
+    }
+    bool pauseLimiterForSnapshot (int steps)
+    {
+        if (! monitorShown)
+            return false;
+        for (int k = 0; k < steps; ++k)
+        {
+            const auto in = 0.35f + 0.3f * std::abs (std::sin ((float) k * 0.11f)) + (k % 9 == 0 ? 0.4f : 0.0f);
+            monitorStep (in, juce::jmin (in, 0.7f), 1000.0 / 30.0, true);
+        }
+        monitorPaused = true;
+        repaint();
+        return true;
+    }
+public: // (the class stays public from here, as before)
 
     void paintItem (juce::Graphics& g, const LayoutItem& item, int index, const EffectSlot& fx)
     {
@@ -6362,6 +6397,26 @@ juce::String grossBeatPaintStats (bool reset)
     if (reset)
         st = {};
     return text;
+}
+
+juce::PopupMenu delay3TimeMenuForSnapshot (juce::Component& editor)
+{
+    auto* native = dynamic_cast<NativeEffectEditor*> (&editor);
+    return native != nullptr ? native->delay3TimeMenuForSnapshot() : juce::PopupMenu();
+}
+
+bool setVocoderBandsForSnapshot (juce::Component& editor, const std::array<std::uint32_t, 8>& packed)
+{
+    auto* native = dynamic_cast<NativeEffectEditor*> (&editor);
+    if (native == nullptr) return false;
+    native->setVocoderBandsForSnapshot (packed);
+    return true;
+}
+
+bool pauseLimiterForSnapshot (juce::Component& editor, int steps)
+{
+    auto* native = dynamic_cast<NativeEffectEditor*> (&editor);
+    return native != nullptr && native->pauseLimiterForSnapshot (steps);
 }
 
 bool showGrossBeatEnvelopeForSnapshot (juce::Component& editor, int envelopeKind)

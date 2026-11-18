@@ -327,6 +327,158 @@
                 offline.getTransport().positionTicks.store (0.0);
             }
         }
+        {
+            // ---- round 190ld plugins: FL-native plugin details (Fruity Delay 3, Fruity Vocoder, Patcher, Edison,
+            // Parametric EQ 2, Fruity Limiter), each editor at FL's size (scale 1)
+            AudioEngine offline (false);
+            const auto loadSlot = [&offline] (const EffectSlot& fx) {
+                Song song;
+                song.mixer.resize (2);
+                song.mixer[0].name = "Master";
+                song.mixer[1].name = "Insert 1";
+                song.mixer[1].effects.push_back (fx);
+                offline.setSong (std::move (song));
+                offline.dispatchPendingMessages();
+            };
+            const auto paramNamed = [] (EffectKind kind, const char* name) {
+                const auto& params = effectInfo (kind).params;
+                for (int i = 0; i < (int) params.size(); ++i)
+                    if (std::strcmp (params[(std::size_t) i].name, name) == 0)
+                        return i;
+                return -1;
+            };
+
+            // (1) Fruity Delay 3, TEMPO SYNC on: step dots and no value arc; the Time knob's Set ▸ menu; the Feedback
+            // ring at 90 / 97 / 100 %
+            {
+                auto fx = makeEffectSlot (EffectKind::fruityDelay3);
+                const auto sync = paramNamed (EffectKind::fruityDelay3, "Tempo sync"), feedback = paramNamed (EffectKind::fruityDelay3, "Feedback");
+                check ("Delay 3: Tempo sync and Feedback parameters", sync >= 0 && feedback >= 0);
+                if (sync >= 0 && feedback >= 0)
+                {
+                    fx.params[(std::size_t) sync] = 1.0f;
+                    loadSlot (fx);
+                    auto editor = makeNativeEffectEditor (offline, 1, 0, 1.0f, 0);
+                    write (*editor, "plug-delay3-sync");
+                    const auto menu = delay3TimeMenuForSnapshot (*editor);
+                    const auto items = texts (menu);
+                    int setValues = 0;
+                    for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+                        if (it.getItem().text == lynx::tr ("Set") && it.getItem().subMenu != nullptr)
+                            setValues = it.getItem().subMenu->getNumItems();
+                    line ("Delay 3 Time menu: " + items.joinIntoString (" | "));
+                    check ("Delay 3: the synced Time menu has Set with 14 values", setValues == 14);
+                    menuShot (menu, "Time", "plug-delay3-set-menu");
+                    for (const auto& [value, name] : std::initializer_list<std::pair<float, const char*>> { { 0.90f, "plug-delay3-fb-090" }, { 0.97f, "plug-delay3-fb-097" }, { 1.0f, "plug-delay3-fb-100" } })
+                    {
+                        auto f = fx;
+                        f.params[(std::size_t) feedback] = value;
+                        loadSlot (f);
+                        auto e = makeNativeEffectEditor (offline, 1, 0, 1.0f, 0);
+                        write (*e, name);
+                    }
+                }
+            }
+
+            // (2) Fruity Vocoder: the band levels of a test signal (modulator 440 Hz on L, carrier 110 Hz on R), as the
+            // effect publishes them while an editor shows them
+            {
+                const auto slot = makeEffectSlot (EffectKind::vocoder);
+                auto voc = makeEffect (EffectKind::vocoder);
+                voc->prepare (48000.0);
+                voc->setMetersShown (true);
+                std::vector<float> l (512), r (512);
+                for (int b = 0; b < 40; ++b)
+                {
+                    for (int i = 0; i < 512; ++i)
+                    {
+                        const auto t = (float) (b * 512 + i) / 48000.0f;
+                        l[(std::size_t) i] = 0.5f * std::sin (6.2831853f * 440.0f * t) + 0.2f * std::sin (6.2831853f * 1900.0f * t);
+                        r[(std::size_t) i] = 0.5f * std::sin (6.2831853f * 110.0f * t);
+                    }
+                    voc->process (l.data(), r.data(), 512, slot.params, 120.0);
+                }
+                std::array<std::uint32_t, 8> packed {};
+                std::uint32_t lit = 0;
+                for (int o = 0; o < 8; ++o)
+                    lit |= packed[(std::size_t) o] = (std::uint32_t) voc->controlOutput (o);
+                check ("Vocoder: the test signal lights some bands", lit != 0u);
+                loadSlot (slot);
+                auto editor = makeNativeEffectEditor (offline, 1, 0, 1.0f, 0);
+                check ("Vocoder: the editor takes the band levels", setVocoderBandsForSnapshot (*editor, packed));
+                write (*editor, "plug-vocoder-bands");
+            }
+
+            // (3) Patcher: Fruity Filter → Maximus, View › Activity + Latency + Performance after a test signal; its View menu
+            {
+                auto fx = makeEffectSlot (EffectKind::patcher);
+                PatchNode a, b;
+                a.effect = makeEffectSlot (EffectKind::fruityFilter);
+                a.x = 220.0f;
+                a.y = 120.0f;
+                b.effect = makeEffectSlot (EffectKind::maximus);
+                b.x = 440.0f;
+                b.y = 200.0f;
+                const auto na = patcher::addNode (fx.patcher, a), nb = patcher::addNode (fx.patcher, b);
+                for (const auto& [from, to] : std::initializer_list<std::pair<int, int>> { { patchFromHost, na }, { na, nb }, { nb, patchToHost } })
+                {
+                    PatchWire w;
+                    w.from = from;
+                    w.to = to;
+                    fx.patcher.wires.push_back (w);
+                }
+                loadSlot (fx);
+                auto editor = PatcherWindows::makeSlotEditor (offline, 1, 0);
+                editor->setSize (900, 560);
+                const auto ran = PatcherWindows::runViewsForSnapshot (*editor, true, true, true, 0.5);
+                check ("Patcher: a running graph measured with the test signal", ran);
+                write (*editor, "plug-patcher-views");
+                const auto view = PatcherWindows::viewMenuForSnapshot (*editor);
+                line ("Patcher View menu: " + texts (view).joinIntoString (" | "));
+                check ("Patcher: View menu has Activity, Latency and Performance",
+                       texts (view).contains (lynx::tr ("Activity")) && texts (view).contains (lynx::tr ("Latency")) && texts (view).contains (lynx::tr ("Performance")));
+                menuShot (view, "View", "plug-patcher-view-menu");
+            }
+
+            // (4) Edison: a short generated sample; the hint bar's read-out over the wave
+            {
+                audioedit::Document d;
+                d.title = "Tone";
+                d.audio.sampleRate = 44100.0;
+                const auto frames = (std::size_t) 44100;
+                d.audio.channels.assign (2, std::vector<float> (frames, 0.0f));
+                for (std::size_t i = 0; i < frames; ++i)
+                {
+                    const auto env = (float) std::exp (-3.0 * (double) i / 44100.0);
+                    d.audio.channels[0][i] = d.audio.channels[1][i] = 0.6f * env * (float) std::sin (2.0 * 3.141592653589793 * 220.0 * (double) i / 44100.0);
+                }
+                auto editor = makeAudioEditorForSnapshot (offline, d, false);
+                editor->setSize (1120, 600);
+                const auto hint = audioEditorHoverHintForSnapshot (*editor, 0.4f, 0.12f);
+                line ("Edison hover hint: " + hint);
+                check ("Edison: the hover hint shows the level in dB", hint.contains ("dB"));
+                write (*editor, "plug-edison-hover");
+            }
+
+            // (5) Parametric EQ 2: the display menu with FL's Monitor input / output
+            {
+                juce::PopupMenu menu;
+                peqview::addDisplayItems (menu, {});
+                const auto items = texts (menu);
+                line ("PEQ2 display menu: " + items.joinIntoString (" | "));
+                check ("PEQ2: display menu has Monitor input (pre) / output (post)",
+                       items.contains (lynx::tr ("Input (pre EQ)")) && items.contains (lynx::tr ("Output (post EQ)")));
+                menuShot (menu, "Display", "plug-peq2-menu");
+            }
+
+            // (6) Fruity Limiter: the scrolling graph with a synthetic history, paused by a click
+            {
+                loadSlot (makeEffectSlot (EffectKind::fruityLimiter));
+                auto editor = makeNativeEffectEditor (offline, 1, 0, 1.0f, 0);
+                check ("Limiter: the graph paused", pauseLimiterForSnapshot (*editor, 240));
+                write (*editor, "plug-limiter-paused");
+            }
+        }
         juce::File (prefix + "-checks.txt").replaceWithText (checks + "result=" + (allOk ? "OK" : "FAIL") + "\n");
         return allOk;
     }

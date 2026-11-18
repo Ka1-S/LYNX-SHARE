@@ -1978,9 +1978,16 @@ public:
 
     // round 190ld (DP-59): FL's hint bar over the waveform (capture 190ld F30, fl-edison-hint-F30/F30b): the time under the
     // mouse as "s:ms" ("0:500") and the level at the mouse's height in dB and linear ("-18.34dB 0.12")
-    ui::Hint hintAt (juce::Point<int>) override
+    ui::Hint hintAt (juce::Point<int>) override { return waveHintAt (getMouseXYRelative()); }
+
+    // (--details190ldshot: the hint at a point given as fractions of the waveform area)
+    ui::Hint waveHintForSnapshot (float fx, float fy) const
     {
-        const auto p = getMouseXYRelative();
+        return waveHintAt ({ waveArea.getX() + juce::roundToInt ((float) waveArea.getWidth() * fx), waveArea.getY() + juce::roundToInt ((float) waveArea.getHeight() * fy) });
+    }
+
+    ui::Hint waveHintAt (juce::Point<int> p) const
+    {
         if (doc.audio.empty() || ! waveArea.contains (p) || (spectrumView && ! dualView) || doc.audio.sampleRate <= 0.0)
             return {};
         const auto lanes = juce::jmax (1, doc.audio.numChannels());
@@ -6616,6 +6623,15 @@ void setAudioEditorSamplePropsForSnapshot (juce::Component& component, const aud
 {
     if (auto* editor = dynamic_cast<AudioEditor*> (&component))
         editor->setSamplePropsForSnapshot (props);
+}
+
+juce::String audioEditorHoverHintForSnapshot (juce::Component& component, float fx, float fy)
+{
+    auto* editor = dynamic_cast<AudioEditor*> (&component);
+    if (editor == nullptr)
+        return {};
+    const auto h = editor->waveHintForSnapshot (fx, fy);
+    return h.text + (h.value.isNotEmpty() ? "  " + h.value : juce::String());
 }
 
 juce::StringArray audioEditorMenuForSnapshot (juce::Component& component)
