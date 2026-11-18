@@ -100,6 +100,10 @@ const std::vector<Gap>& knownGaps()
         { "Kepler Exo", "Mod * amount", "gap173d2-3" },
         { "Kepler Exo", "X offset", "gap173d2-3" },
         { "Kepler Exo", "Y offset", "gap173d2-3" },
+        // Braid (round 190ko): LYNX's second LFO 1 transformer starts on Bipolar (the default's neutral) and the audit moves
+        // it to its two ends, None and Scrambler, which Braid passes through unchanged too (Scrambler is not modelled
+        // yet); every type between moves the LFO (its macro wakes on Ramp up). Rollup 0.1.30 step 7 (round 190lc)
+        { "Braid", "* LFO 1 FX 2", "rollup030-7-braid-scrambler" },
     };
     return g;
 }
@@ -176,7 +180,7 @@ void auditEngines (const std::set<std::string>& names, bool except, bool without
 // the slow engines in tests of their own (the build runs the chunks in parallel)
 const std::set<std::string>& slow()
 {
-    static const std::set<std::string> s { "GMS", "Sawer", "Toxic Biohazard", "Harmless", "Kepler Exo", "Transistor Bass", "Sytrus", "Drumaxx", "Tetra", "Helix" };
+    static const std::set<std::string> s { "GMS", "Sawer", "Toxic Biohazard", "Harmless", "Kepler Exo", "Transistor Bass", "Sytrus", "Drumaxx", "Tetra", "Helix", "Braid" };
     return s;
 }
 } // namespace ctlwake173d
@@ -196,6 +200,9 @@ TEST (ctlwake173d_generator_controls_tetra) { ctlwake173d::auditEngines ({ "Tetr
 // (rollup 0.1.30: Helix, LYNX's own wavetable synth (round 190ja), needs nothing of FL either; its contexts are Helix hints in
 // tools/CtlWake.h, its keys from a tools/ctlwake survey: 100 controls, 0 dead, HiQ allowed)
 TEST (ctlwake173d_generator_controls_helix) { ctlwake173d::auditEngines ({ "Helix" }, false, true); }
+// (rollup 0.1.30 step 7: Braid, LYNX's own two-engine macro synth (round 190ko), needs nothing of FL; its contexts are Braid
+// hints in tools/CtlWake.h)
+TEST (ctlwake173d_generator_controls_braid) { ctlwake173d::auditEngines ({ "Braid" }, false, true); }
 
 // every editor control reads and writes on the engine's new channel: a state saved before a parameter existed (Slayer's
 // version 0, Kepler's 34 floats, Kepler Exo's 151) silently dropped its edits

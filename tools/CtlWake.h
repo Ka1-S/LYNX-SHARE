@@ -33,6 +33,7 @@
 #include "CtlAudit.h"
 #include "core/FmSynth.h"
 #include "core/WavetableSynth.h"
+#include "core/Braid.h"
 #include "core/Morphine.h"
 #include "core/TransistorBass.h"
 
@@ -522,6 +523,80 @@ inline std::vector<Hint> hintsFor (InstrumentKind kind, const std::vector<Contro
             named ("unison on (Classic)", { { "Unison Mode", 1.0f }, { "Unison Amount", 0.5f } });
             named ("mono, a legato second note", { { "Poly", 0.0f }, { "Glide", 0.3f } }, "pat:mono");
             named ("the amp envelope shaped, held long", { { "Amp Decay", 0.15f }, { "Amp Sustain", 0.3f }, { "Amp Loop Mode", 2.0f } }, "pat:long");
+            break;
+        }
+        case InstrumentKind::braid:
+        {
+            // (rollup 0.1.30 step 7, round 190lc) Braid's new channel is Live's default Meld (core/BraidParams.cpp): both
+            // engines Basic Shapes as a sine (Shape 0, so Tone has nothing to colour), filters wide open, amp sustain at
+            // full (Decay / its slope / Loop unheard), and a matrix that routes only the bend, MPE pitch, velocity and the
+            // voice spread, so each engine's mod envelope, LFO 1 (with its two FX) and LFO 2 move nothing until a matrix
+            // cell routes them; glide wants a glide time and a mono legato note, Legato a mono patch, Link Envelopes an
+            // engine B whose own amp envelope differs, Osc Reset a chord hit again while it sounds
+            const auto routed = [] (std::vector<std::pair<int, float>> cells) {
+                return [cells] (ChannelDef& d) {
+                    if ((int) d.modelParams.size() < braid::stateSize)
+                    {
+                        const auto def = braidDefaults();
+                        const auto have = d.modelParams.size();
+                        d.modelParams.resize ((std::size_t) braid::stateSize);
+                        std::copy (def.begin() + (std::ptrdiff_t) have, def.end(), d.modelParams.begin() + (std::ptrdiff_t) have);
+                    }
+                    for (const auto& [cell, v] : cells)
+                        d.modelParams[(std::size_t) cell] = v;
+                };
+            };
+            using namespace braid;
+            for (int k = 0; k < 2; ++k)
+            {
+                const std::string e = k == 0 ? "A " : "B ";
+                const auto t = k * tgt::perEngine;
+                const auto modEnv = k == 0 ? src::aModEnv : src::bModEnv, lfo1 = k == 0 ? src::aLfo1 : src::bLfo1,
+                           lfo1Fx = k == 0 ? src::aLfo1Fx : src::bLfo1Fx, lfo2 = k == 0 ? src::aLfo2 : src::bLfo2;
+                // (Basic Shapes' second macro is the pulse width: heard near the square end of Shape)
+                named (e + "shaped near a square, its filter at 1 kHz", { { e + "Osc Macro 1", 0.9f }, { e + "Filter Freq", 1000.0f },
+                                                                          { e + "Filter Macro 1", 0.5f } });
+                // (a mono, non-legato voice restarts on the same voice: its phase reset is heard)
+                named (e + "shaped as a saw, mono, not legato, the chord hit again", { { e + "Osc Macro 1", 0.6f }, { "Poly", 0.0f }, { "Legato", 0.0f } },
+                       "pat:retrig");
+                const std::vector<std::pair<std::string, float>> amp { { e + "Amp Decay", 0.4f }, { e + "Amp Sustain", 0.3f }, { e + "Amp Attack", 0.05f } };
+                named (e + "amp envelope decaying to 0.3", amp);
+                auto ampLoop = amp;
+                ampLoop.push_back ({ e + "Amp Loop", 1.0f });
+                named (e + "amp envelope decaying to 0.3, held long", ampLoop, "pat:long");
+                // the mod envelope slow and shaped, on the engine's filter (at 1 kHz) and pitch
+                const std::vector<std::pair<std::string, float>> mod { { e + "Filter Freq", 1000.0f }, { e + "Mod Attack", 0.15f }, { e + "Mod Decay", 0.3f },
+                                                                       { e + "Mod Release", 0.3f }, { e + "Mod Initial", 0.1f }, { e + "Mod Peak", 1.0f },
+                                                                       { e + "Mod Sustain", 0.3f }, { e + "Mod Final", 0.2f } };
+                const auto modCells = routed ({ { matrixIndex (t + tgt::filterFreq, modEnv), 0.6f }, { matrixIndex (t + tgt::pitch, modEnv), 0.3f } });
+                named (e + "mod envelope slow and shaped, on its filter and pitch", mod);
+                out.back().apply = modCells;
+                auto modLoop = mod;
+                modLoop.push_back ({ e + "Mod Loop", 1.0f });
+                named (e + "mod envelope slow and shaped, on its filter and pitch, looping", modLoop, "pat:long");
+                out.back().apply = modCells;
+                // LFO 1 (and its FX output) and LFO 2 on the engine's filter and pitch: free at 4 Hz, tempo-synced, after a gap
+                const auto lfoCells = routed ({ { matrixIndex (t + tgt::filterFreq, lfo1), 0.5f }, { matrixIndex (t + tgt::pitch, lfo1Fx), 0.3f },
+                                                { matrixIndex (t + tgt::detune, lfo2), 0.8f }, { matrixIndex (t + tgt::filterMacro1, lfo2), 0.5f } });
+                // (LFO 1 near a square, so its pulse width counts; its second FX a ramp up instead of the neutral Bipolar;
+                // LFO 2 retriggered, so its phase counts after a gap; the free rates off the synced ones' 4 Hz at 120 BPM)
+                const std::vector<std::pair<std::string, float>> lfos { { e + "Filter Freq", 1000.0f }, { e + "Filter Macro 1", 0.4f }, { e + "LFO 1 Rate", 3.0f },
+                                                                        { e + "LFO 1 Macro 1", 0.9f }, { e + "LFO 1 FX 1 Macro", 0.5f },
+                                                                        { e + "LFO 1 FX 2", 15.0f }, { e + "LFO 1 FX 2 Macro", 0.5f },
+                                                                        { e + "LFO 2 Rate", 3.0f }, { e + "LFO 2 Retrigger", 1.0f } };
+                named (e + "LFO 1 / its FX / LFO 2 at 4 Hz on its filter and pitch", lfos);
+                out.back().apply = lfoCells;
+                auto synced = lfos;
+                synced.push_back ({ e + "LFO 1 Sync", 1.0f });
+                synced.push_back ({ e + "LFO 2 Sync", 1.0f });
+                named (e + "LFO 1 / its FX / LFO 2 tempo-synced on its filter and pitch", synced);
+                out.back().apply = lfoCells;
+                named (e + "LFO 1 / its FX / LFO 2 at 4 Hz on its filter and pitch, a note after a gap", lfos, "pat:gap");
+                out.back().apply = lfoCells;
+                named (e + "glide over a legato second note", { { "Poly", 0.0f }, { e + "Glide Time", 0.3f } }, "pat:mono");
+            }
+            named ("mono, a second note over the first, a slow attack", { { "Poly", 0.0f }, { "A Amp Attack", 0.2f }, { "B Amp Attack", 0.2f } }, "pat:mono");
+            named ("engine B's own amp envelope slow", { { "B Amp Attack", 0.5f }, { "B Amp Sustain", 0.3f }, { "B Amp Decay", 0.3f } });
             break;
         }
         default:
