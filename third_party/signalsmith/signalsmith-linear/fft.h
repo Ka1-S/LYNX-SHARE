@@ -16,6 +16,19 @@
 #else
 #	define SIGNALSMITH_LINEAR_SSE2 0
 #endif
+// LYNX (round 190kz): the strided radix-4 passes, the 2-point pass and the radix-5 final pass also eight values at a time
+// with AVX2 where the CPU has it (picked at run time: src/core/CpuFeatures.h; LYNX_CPU=sse2 keeps the four-wide loops).
+// The same operations on eight lanes, so every path gives the same bits.
+#if SIGNALSMITH_LINEAR_SSE2 && (defined(__GNUC__) || defined(__clang__)) && (defined(__x86_64__) || defined(__i386__)) && defined(__has_include)
+#	if __has_include("core/CpuFeatures.h")
+#		include "core/CpuFeatures.h"
+#		include <immintrin.h>
+#		define SIGNALSMITH_LINEAR_AVX LYNX_CPU_DISPATCH
+#	endif
+#endif
+#ifndef SIGNALSMITH_LINEAR_AVX
+#	define SIGNALSMITH_LINEAR_AVX 0
+#endif
 
 #if defined(__FAST_MATH__) && (__apple_build_version__ >= 16000000) && (__apple_build_version__ <= 16000099) && !defined(SIGNALSMITH_IGNORE_BROKEN_APPLECLANG)
 #	error Apple Clang 16.0.0 generates incorrect SIMD for ARM. If you HAVE to use this version of Clang, turn off -ffast-math.
@@ -272,6 +285,11 @@ private:
 		} else {
 			// 2-point FFT
 			size_t s = 0;
+#if SIGNALSMITH_LINEAR_AVX
+			if constexpr (simdFloat) {
+				if (lynx::cpu::hasAvx2()) s = pass2Avx(stride, inputR, inputI, outputR, outputI);
+			}
+#endif
 #if SIGNALSMITH_LINEAR_SSE2
 			if constexpr (simdFloat) {
 				for (; s + 4 <= stride; s += 4) {
@@ -294,6 +312,76 @@ private:
 			}
 		}
 	}
+
+#if SIGNALSMITH_LINEAR_AVX
+	// the 2-point pass and the strided radix-4 pass eight values at a time: butterfly4's operations on eight lanes
+	__attribute__((target("avx2"))) static size_t pass2Avx(size_t stride, const Sample *inputR, const Sample *inputI, Sample *outputR, Sample *outputI) {
+		size_t s = 0;
+		for (; s + 8 <= stride; s += 8) {
+			__m256 ar = _mm256_loadu_ps(inputR + s), ai = _mm256_loadu_ps(inputI + s);
+			__m256 br = _mm256_loadu_ps(inputR + s + stride), bi = _mm256_loadu_ps(inputI + s + stride);
+			_mm256_storeu_ps(outputR + s, _mm256_add_ps(ar, br));
+			_mm256_storeu_ps(outputI + s, _mm256_add_ps(ai, bi));
+			_mm256_storeu_ps(outputR + s + stride, _mm256_sub_ps(ar, br));
+			_mm256_storeu_ps(outputI + s + stride, _mm256_sub_ps(ai, bi));
+		}
+		return s;
+	}
+	template<bool inverse>
+	__attribute__((target("avx2"), always_inline)) static inline void butterfly8(__m256 ar, __m256 ai, __m256 br0, __m256 bi0, __m256 cr0, __m256 ci0, __m256 dr0, __m256 di0,
+			__m256 tbr, __m256 tbi, __m256 tcr, __m256 tci, __m256 tdr, __m256 tdi,
+			Sample *oAr, Sample *oAi, Sample *oBr, Sample *oBi, Sample *oCr, Sample *oCi, Sample *oDr, Sample *oDi) {
+		__m256 br, bi, cr, ci, dr, di;
+		if (inverse) {
+			br = _mm256_add_ps(_mm256_mul_ps(br0, tbr), _mm256_mul_ps(bi0, tbi)); bi = _mm256_sub_ps(_mm256_mul_ps(bi0, tbr), _mm256_mul_ps(br0, tbi));
+			cr = _mm256_add_ps(_mm256_mul_ps(cr0, tcr), _mm256_mul_ps(ci0, tci)); ci = _mm256_sub_ps(_mm256_mul_ps(ci0, tcr), _mm256_mul_ps(cr0, tci));
+			dr = _mm256_add_ps(_mm256_mul_ps(dr0, tdr), _mm256_mul_ps(di0, tdi)); di = _mm256_sub_ps(_mm256_mul_ps(di0, tdr), _mm256_mul_ps(dr0, tdi));
+		} else {
+			br = _mm256_sub_ps(_mm256_mul_ps(br0, tbr), _mm256_mul_ps(bi0, tbi)); bi = _mm256_add_ps(_mm256_mul_ps(bi0, tbr), _mm256_mul_ps(br0, tbi));
+			cr = _mm256_sub_ps(_mm256_mul_ps(cr0, tcr), _mm256_mul_ps(ci0, tci)); ci = _mm256_add_ps(_mm256_mul_ps(ci0, tcr), _mm256_mul_ps(cr0, tci));
+			dr = _mm256_sub_ps(_mm256_mul_ps(dr0, tdr), _mm256_mul_ps(di0, tdi)); di = _mm256_add_ps(_mm256_mul_ps(di0, tdr), _mm256_mul_ps(dr0, tdi));
+		}
+		__m256 ac0r = _mm256_add_ps(ar, cr), ac0i = _mm256_add_ps(ai, ci);
+		__m256 ac1r = _mm256_sub_ps(ar, cr), ac1i = _mm256_sub_ps(ai, ci);
+		__m256 bd0r = _mm256_add_ps(br, dr), bd0i = _mm256_add_ps(bi, di);
+		__m256 bd1r = inverse ? _mm256_sub_ps(br, dr) : _mm256_sub_ps(dr, br);
+		__m256 bd1i = inverse ? _mm256_sub_ps(bi, di) : _mm256_sub_ps(di, bi);
+		__m256 rotR = _mm256_xor_ps(bd1i, _mm256_set1_ps(-0.0f)), rotI = bd1r;
+		_mm256_storeu_ps(oAr, _mm256_add_ps(ac0r, bd0r));
+		_mm256_storeu_ps(oAi, _mm256_add_ps(ac0i, bd0i));
+		_mm256_storeu_ps(oBr, _mm256_add_ps(ac1r, rotR));
+		_mm256_storeu_ps(oBi, _mm256_add_ps(ac1i, rotI));
+		_mm256_storeu_ps(oCr, _mm256_sub_ps(ac0r, bd0r));
+		_mm256_storeu_ps(oCi, _mm256_sub_ps(ac0i, bd0i));
+		_mm256_storeu_ps(oDr, _mm256_sub_ps(ac1r, rotR));
+		_mm256_storeu_ps(oDi, _mm256_sub_ps(ac1i, rotI));
+	}
+	template<bool inverse>
+	__attribute__((target("avx2"))) void combine4StridedAvx(size_t size, size_t stride, const Sample *inputR, const Sample *inputI, Sample *outputR, Sample *outputI) const {
+		auto twiddleStep = working.size()/size;
+		size_t quarter = size/4;
+		for (size_t i = 0; i < quarter; ++i) {
+			Complex twiddleB = twiddles[i*twiddleStep];
+			Complex twiddleC = twiddles[i*2*twiddleStep];
+			Complex twiddleD = twiddles[i*3*twiddleStep];
+			__m256 tbr = _mm256_set1_ps(twiddleB.real()), tbi = _mm256_set1_ps(twiddleB.imag());
+			__m256 tcr = _mm256_set1_ps(twiddleC.real()), tci = _mm256_set1_ps(twiddleC.imag());
+			__m256 tdr = _mm256_set1_ps(twiddleD.real()), tdi = _mm256_set1_ps(twiddleD.imag());
+			const Sample *inAr = inputR + 4*i*stride, *inAi = inputI + 4*i*stride;
+			for (size_t s = 0; s < stride; s += 8) {
+				butterfly8<inverse>(_mm256_loadu_ps(inAr + s), _mm256_loadu_ps(inAi + s),
+					_mm256_loadu_ps(inAr + stride + s), _mm256_loadu_ps(inAi + stride + s),
+					_mm256_loadu_ps(inAr + 2*stride + s), _mm256_loadu_ps(inAi + 2*stride + s),
+					_mm256_loadu_ps(inAr + 3*stride + s), _mm256_loadu_ps(inAi + 3*stride + s),
+					tbr, tbi, tcr, tci, tdr, tdi,
+					outputR + i*stride + s, outputI + i*stride + s,
+					outputR + (i + quarter)*stride + s, outputI + (i + quarter)*stride + s,
+					outputR + (i + quarter*2)*stride + s, outputI + (i + quarter*2)*stride + s,
+					outputR + (i + quarter*3)*stride + s, outputI + (i + quarter*3)*stride + s);
+			}
+		}
+	}
+#endif
 
 	// Combine interleaved results into a single spectrum
 #if SIGNALSMITH_LINEAR_SSE2
@@ -347,6 +435,12 @@ private:
 #if SIGNALSMITH_LINEAR_SSE2
 		if constexpr (simdFloat) {
 			size_t quarter = size/4;
+#if SIGNALSMITH_LINEAR_AVX
+			if (stride%8 == 0 && lynx::cpu::hasAvx2()) {
+				combine4StridedAvx<inverse>(size, stride, inputR, inputI, outputR, outputI);
+				return;
+			}
+#endif
 			if (stride%4 == 0) { // four of each butterfly's interleaved values at a time, the twiddles broadcast
 				for (size_t i = 0; i < quarter; ++i) {
 					Complex twiddleB = twiddles[i*twiddleStep];
@@ -901,6 +995,38 @@ private:
 			f4[i] = a + bcde01 - bcde11;
 		}
 	}
+#if SIGNALSMITH_LINEAR_AVX
+	// the radix-5 final pass eight values at a time (the SSE2 loop's operations on eight lanes)
+	__attribute__((target("avx2"))) size_t finalPass5Avx(Sample *f0r, Sample *f0i, Sample *f1r, Sample *f1i, Sample *f2r, Sample *f2i, Sample *f3r, Sample *f3i,
+			Sample *f4r, Sample *f4i, Sample tw1r, Sample tw1i, Sample tw2r, Sample tw2i) {
+		size_t i = 0;
+		const __m256 t1r = _mm256_set1_ps(tw1r), t1i = _mm256_set1_ps(tw1i), t2r = _mm256_set1_ps(tw2r), t2i = _mm256_set1_ps(tw2i);
+		for (; i + 8 <= innerSize; i += 8) {
+			__m256 ar = _mm256_loadu_ps(f0r + i), ai = _mm256_loadu_ps(f0i + i), br = _mm256_loadu_ps(f1r + i), bi = _mm256_loadu_ps(f1i + i);
+			__m256 cr = _mm256_loadu_ps(f2r + i), ci = _mm256_loadu_ps(f2i + i), dr = _mm256_loadu_ps(f3r + i), di = _mm256_loadu_ps(f3i + i);
+			__m256 er = _mm256_loadu_ps(f4r + i), ei = _mm256_loadu_ps(f4i + i);
+			__m256 be0r = _mm256_add_ps(br, er), be0i = _mm256_add_ps(bi, ei);
+			__m256 be1r = _mm256_sub_ps(ei, bi), be1i = _mm256_sub_ps(br, er);
+			__m256 cd0r = _mm256_add_ps(cr, dr), cd0i = _mm256_add_ps(ci, di);
+			__m256 cd1r = _mm256_sub_ps(di, ci), cd1i = _mm256_sub_ps(cr, dr);
+			__m256 b01r = _mm256_add_ps(_mm256_mul_ps(be0r, t1r), _mm256_mul_ps(cd0r, t2r)), b01i = _mm256_add_ps(_mm256_mul_ps(be0i, t1r), _mm256_mul_ps(cd0i, t2r));
+			__m256 b02r = _mm256_add_ps(_mm256_mul_ps(be0r, t2r), _mm256_mul_ps(cd0r, t1r)), b02i = _mm256_add_ps(_mm256_mul_ps(be0i, t2r), _mm256_mul_ps(cd0i, t1r));
+			__m256 b11r = _mm256_add_ps(_mm256_mul_ps(be1r, t1i), _mm256_mul_ps(cd1r, t2i)), b11i = _mm256_add_ps(_mm256_mul_ps(be1i, t1i), _mm256_mul_ps(cd1i, t2i));
+			__m256 b12r = _mm256_sub_ps(_mm256_mul_ps(be1r, t2i), _mm256_mul_ps(cd1r, t1i)), b12i = _mm256_sub_ps(_mm256_mul_ps(be1i, t2i), _mm256_mul_ps(cd1i, t1i));
+			_mm256_storeu_ps(f0r + i, _mm256_add_ps(_mm256_add_ps(ar, be0r), cd0r));
+			_mm256_storeu_ps(f0i + i, _mm256_add_ps(_mm256_add_ps(ai, be0i), cd0i));
+			_mm256_storeu_ps(f1r + i, _mm256_add_ps(_mm256_add_ps(ar, b01r), b11r));
+			_mm256_storeu_ps(f1i + i, _mm256_add_ps(_mm256_add_ps(ai, b01i), b11i));
+			_mm256_storeu_ps(f2r + i, _mm256_add_ps(_mm256_add_ps(ar, b02r), b12r));
+			_mm256_storeu_ps(f2i + i, _mm256_add_ps(_mm256_add_ps(ai, b02i), b12i));
+			_mm256_storeu_ps(f3r + i, _mm256_sub_ps(_mm256_add_ps(ar, b02r), b12r));
+			_mm256_storeu_ps(f3i + i, _mm256_sub_ps(_mm256_add_ps(ai, b02i), b12i));
+			_mm256_storeu_ps(f4r + i, _mm256_sub_ps(_mm256_add_ps(ar, b01r), b11r));
+			_mm256_storeu_ps(f4i + i, _mm256_sub_ps(_mm256_add_ps(ai, b01i), b11i));
+		}
+		return i;
+	}
+#endif
 	template<bool inverse>
 	void finalPass5(Sample *f0r, Sample *f0i) {
 		auto *f1r = f0r + innerSize;
@@ -917,6 +1043,11 @@ private:
 		const Sample tw2r = -0.8090169943749473;
 		const Sample tw2i = -0.5877852522924732*(inverse ? -1 : 1);
 		size_t i = 0;
+#if SIGNALSMITH_LINEAR_AVX
+		if constexpr (std::is_same<Sample, float>::value) {
+			if (lynx::cpu::hasAvx2()) i = finalPass5Avx(f0r, f0i, f1r, f1i, f2r, f2i, f3r, f3i, f4r, f4i, tw1r, tw1i, tw2r, tw2i);
+		}
+#endif
 #if SIGNALSMITH_LINEAR_SSE2
 		if constexpr (std::is_same<Sample, float>::value) {
 			const __m128 t1r = _mm_set1_ps(tw1r), t1i = _mm_set1_ps(tw1i), t2r = _mm_set1_ps(tw2r), t2i = _mm_set1_ps(tw2i);

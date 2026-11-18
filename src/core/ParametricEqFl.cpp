@@ -1,6 +1,7 @@
 #include "core/ParametricEqFl.h"
 #include "core/ParametricEqLinear.h"
 #include "core/Simd.h"
+#include "core/CpuFeatures.h"
 
 #include <algorithm>
 #include <cmath>
@@ -656,8 +657,9 @@ void runStage (Stage& st, float* io, int n) noexcept
 // float output is the next one's input, the end-of-call flush per stage), but sample by sample, so the stages' recursions
 // overlap, with the interleaved left / right pair in the two lanes of an SSE2 double vector: per lane the same IEEE
 // double operations in the same order as runStage.
+// (always inlined: runStagesAvx2 below takes the same body in VEX encoding)
 template <int count>
-void runStagesN (Stage* const* st, float* io, int n) noexcept
+__attribute__ ((always_inline)) inline void runStagesN (Stage* const* st, float* io, int n) noexcept
 {
     __m128d x1[count], x2[count], y1[count], y2[count];
     for (int k = 0; k < count; ++k)
@@ -690,8 +692,32 @@ void runStagesN (Stage* const* st, float* io, int n) noexcept
     }
 }
 
+#if LYNX_CPU_DISPATCH
+// round 190kz: the same cascade compiled for AVX2 (picked at run time, src/core/CpuFeatures.h): the same SSE2 operations,
+// VEX-encoded (three-operand forms, fewer register copies), the same bits; no FMA (the target list has none)
+LYNX_TARGET_AVX2 void runStagesAvx2 (Stage* const* st, int count, float* io, int n) noexcept
+{
+    for (; count >= 4; st += 4, count -= 4)
+        runStagesN<4> (st, io, n);
+    switch (count)
+    {
+        case 1: runStagesN<1> (st, io, n); return;
+        case 2: runStagesN<2> (st, io, n); return;
+        case 3: runStagesN<3> (st, io, n); return;
+        default: return;
+    }
+}
+#endif
+
 void runStages (Stage* const* st, int count, float* io, int n) noexcept
 {
+#if LYNX_CPU_DISPATCH
+    if (cpu::hasAvx2())
+    {
+        runStagesAvx2 (st, count, io, n);
+        return;
+    }
+#endif
     switch (count)
     {
         case 0: return;
