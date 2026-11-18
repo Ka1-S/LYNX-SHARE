@@ -4357,8 +4357,6 @@ EffectSlot makeEffectSlot (EffectKind kind)
         slot.params[(std::size_t) echosuite::echoform::revision] = 1.0f;
     if (kind == EffectKind::crestCompressor) // round 190kw: a new Crest runs the V1 styles' revision 1 (hidden parameter)
         slot.params[(std::size_t) dyn::crest::revision] = 1.0f;
-    if (kind == EffectKind::facetEq) // round 190lg: a new Facet's automatic threshold runs Pro-Q 4's structure (hidden)
-        slot.params[(std::size_t) facet::autoRevisionParam] = 1.0f;
     if (kind == EffectKind::ember) // round 190kw: a new Ember runs the Saturn styles' own laws (hidden parameter)
         slot.params[(std::size_t) mixsuite::ember::revision] = 1.0f;
     // round 190it: a new Epoch Verb / Atrium / Foil Plate / Halo runs the 0.1.30 revision of the Measured law (hidden)
