@@ -88,3 +88,23 @@ TEST (codegen190kz_signalsmith_avx2_renders_the_sse2_bits)
                  lynx::cpu::levelName (lynx::cpu::level()));
     CHECK (same == total);
 }
+
+// Parametric EQ 2's band cascade and Maximus's biquad cascades (the AVX2 copies: the same SSE2 operations, VEX-encoded)
+// against round 190kr's plain-loop references, at the SSE2 level and at the CPU's own level
+TEST (codegen190kz_peq2_and_maximus_cascades_avx2_match_the_plain_loops)
+{
+    int ok[2] = { 0, 0 };
+    constexpr int seeds = 60;
+    for (int lv = 0; lv < 2; ++lv)
+    {
+        lynx::cpu::setLevelForTest (lv == 0 ? lynx::cpu::sse2 : -1);
+        for (unsigned seed = 1; seed <= (unsigned) seeds; ++seed)
+            ok[lv] += (lynx::peqfl::stagesMatchReference (seed * 2246822519u) ? 1 : 0)
+                      + (lynx::hlfx::kernelsMatchReference (seed * 2654435761u) ? 1 : 0);
+        lynx::cpu::setLevelForTest (-1);
+    }
+    std::printf ("  PEQ2 / Maximus cascades: sse2 %d / %d, %s %d / %d match the plain loops\n", ok[0], 2 * seeds,
+                 lynx::cpu::levelName (lynx::cpu::level()), ok[1], 2 * seeds);
+    CHECK (ok[0] == 2 * seeds);
+    CHECK (ok[1] == 2 * seeds);
+}
