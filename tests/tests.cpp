@@ -17901,3 +17901,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Natives190kjEdisonTests.inc" // round natives190kj: FL Edison Dual view, grid step, pitch-period snap, grid-slicing, scrub, pitch regions
 #include "Natives190kjHarmorTests.inc" // round natives190kj: Harmor resynthesis (analysis, voice, engine revision)
 #include "Details190knTests.inc" // round details190kn: FL mute-switch modifiers (Unmute All, Lock state, slot solo), BandLab chain-preset stepper
+#include "Details190ldTests.inc" // round details2_190ld: FL slot and Playlist track lock state, Live Shift+Space continue, FL tool names

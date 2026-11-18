@@ -62,9 +62,10 @@ enum class Icon
     copy, paste, trash, trim, silence, fadeIn, fadeOut, fadeCurve, normalize, amp, reverse, invert, dcCenter, resample,
     marker, region, setLoop, equalizer, denoise, reverb, spectrogram,
     pointer,           // round 190jq: the Playlist's pointer-click switch, a mouse pointer (issue #191)
-    scrub              // round natives190kj: Edison's Scrub button (a film reel: a ring with four holes around a hub)
+    scrub,             // round natives190kj: Edison's Scrub button (a film reel: a ring with four holes around a hub)
+    cycle              // round 190ld: BandLab's Cycle (loop) switch, two arrows round a rounded box (B07 at 966,74)
 };
-constexpr int iconCount = (int) Icon::scrub + 1;
+constexpr int iconCount = (int) Icon::cycle + 1;
 
 namespace icons
 {

@@ -37,7 +37,7 @@ bool sameSlot (const EffectSlot& a, const EffectSlot& b) noexcept
 {
     return a.kind == b.kind && a.enabled == b.enabled && a.params == b.params && a.mix == b.mix && a.plugin == b.plugin
            && a.sidechain == b.sidechain && a.sidechain2 == b.sidechain2 && a.sendTracks == b.sendTracks && a.branches.size() == b.branches.size() && a.state == b.state
-           && a.presetName == b.presetName && a.abOther == b.abOther && a.abShowingB == b.abShowingB;
+           && a.presetName == b.presetName && a.abOther == b.abOther && a.abShowingB == b.abShowingB && a.lockState == b.lockState;
 }
 
 bool sameEffects (const MixerTrack& a, const MixerTrack& b) noexcept
@@ -269,7 +269,8 @@ ChangeLabel describeChange (const Song& before, const Song& after)
             || before.playlistTracks[i].colour != after.playlistTracks[i].colour || before.playlistTracks[i].grouped != after.playlistTracks[i].grouped
             || before.playlistTracks[i].collapsed != after.playlistTracks[i].collapsed || before.playlistTracks[i].nest != after.playlistTracks[i].nest
             || before.playlistTracks[i].compTrack != after.playlistTracks[i].compTrack
-            || before.playlistTracks[i].lockedToContent != after.playlistTracks[i].lockedToContent)
+            || before.playlistTracks[i].lockedToContent != after.playlistTracks[i].lockedToContent
+            || before.playlistTracks[i].soloLock != after.playlistTracks[i].soloLock)
             return label (TR_NOOP ("Playlist tracks"));
 
     for (std::size_t i = 0; i < after.playlistTracks.size(); ++i)

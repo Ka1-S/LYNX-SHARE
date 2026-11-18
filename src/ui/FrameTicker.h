@@ -62,6 +62,20 @@ public:
         static std::atomic<int> n { 0 };
         return n;
     }
+    // FL's FPS readout ("Show FL Studio user interface screen refresh rate", 143 on a 144 Hz display in FL 2026): the rate
+    // LYNX's moving views are drawn at — the display's refresh measured from its vertical blanks, under Settings › General ›
+    // Animation rate (LYNX_FRAME_HZ when set); 0 before the first vertical blank
+    static int uiFrameRate()
+    {
+        if (fixedHz() > 0)
+            return fixedHz();
+        const auto period = framePeriodMs();
+        if (period <= 0.0)
+            return 0;
+        const auto refresh = 1000.0 / period;
+        const auto n = rateLimit() != 0 ? framepace::evenDivisor (refresh, rateLimit() < 0 ? framepace::balancedCap : (double) rateLimit()) : 1;
+        return juce::roundToInt (refresh / (double) juce::jmax (1, n));
+    }
 
     // Settings › General › Animation rate (round 174e2): 0 = the display's refresh, else at most this many frames a
     // second (60, 30) for every ticker, still on the display's vertical blanks; -1 = Balanced (round 190ip: the refresh

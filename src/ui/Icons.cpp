@@ -575,6 +575,26 @@ Shape make (Icon icon)
             line (st, 16.5f, 15.0f, 19.5f, 12.0f);
             break;
         }
+        case Icon::cycle: // BandLab's repeat glyph: the top run to the right, the bottom run to the left, round corners
+        {
+            juce::Path a;
+            a.startNewSubPath (5.5f, 13.0f);
+            a.lineTo (5.5f, 10.0f);
+            a.quadraticTo (5.5f, 7.5f, 8.0f, 7.5f);
+            a.lineTo (16.0f, 7.5f);
+            st.addPath (a);
+            juce::Path b;
+            b.startNewSubPath (18.5f, 11.0f);
+            b.lineTo (18.5f, 14.0f);
+            b.quadraticTo (18.5f, 16.5f, 16.0f, 16.5f);
+            b.lineTo (8.0f, 16.5f);
+            st.addPath (b);
+            juce::Path h;
+            h.addTriangle (19.0f, 7.5f, 15.0f, 4.5f, 15.0f, 10.5f);
+            h.addTriangle (5.0f, 16.5f, 9.0f, 13.5f, 9.0f, 19.5f);
+            fi.addPath (h);
+            break;
+        }
         case Icon::loop: // two arcs chasing each other around (a loop), arrow heads at their ends
         {
             constexpr float r = 7.0f;

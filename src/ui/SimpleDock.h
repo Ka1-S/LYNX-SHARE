@@ -219,6 +219,8 @@ private:
     // round 190ih (DS-9): the record dock's input level
     bool inputMeterShown() const;
     juce::Rectangle<int> inputMeterArea() const, inputMeterBar() const;
+    juce::Rectangle<int> monitorButton() const; // round 190ld (DS-9): BandLab's headphones switch
+    bool monitoring() const;
     float inputLevel = 0.0f;
     bool inputMeterWasShown = false, inputMeterForced = false;
     int dragStartHeight = 0;

@@ -1192,6 +1192,8 @@ juce::var effectToVar (const EffectSlot& slot)
         e->setProperty ("look", (int) slot.look);
     if (slot.displayView != 0) // the editor display's second view (round 190jd)
         e->setProperty ("displayView", (int) slot.displayView);
+    if (slot.lockState) // FL's slot lock state (round 190ld)
+        e->setProperty ("lockState", true);
     if (slot.goal != 0) // a one-knob effect (round 190bu): the goal and where its knob stands
     {
         e->setProperty ("goal", (int) slot.goal);
@@ -1285,6 +1287,7 @@ std::optional<EffectSlot> effectFromVar (const juce::var& e)
     slot.row = juce::jlimit (-1, maxEffectSlots - 1, (int) e.getProperty ("row", -1));
     slot.look = (std::uint8_t) juce::jlimit (0, 255, (int) e.getProperty ("look", 0));
     slot.displayView = (std::uint8_t) juce::jlimit (0, 1, (int) e.getProperty ("displayView", 0));
+    slot.lockState = (bool) e.getProperty ("lockState", false);
     slot.goal = (std::uint8_t) juce::jlimit (0, 255, (int) e.getProperty ("goal", 0));
     slot.goalAmount = juce::jlimit (0.0f, 1.0f, (float) (double) e.getProperty ("goalAmount", 0.5));
 
@@ -3580,6 +3583,14 @@ juce::String toJson (const Song& song, bool stampVersion)
         if (! locks.isEmpty())
             root->setProperty ("playlistTrackLocks", locks);
 
+        // FL's solo lock on a Playlist track's mute switch (round 190ld): the locked tracks' indices
+        juce::Array<juce::var> soloLocks;
+        for (std::size_t i = 0; i < song.playlistTracks.size(); ++i)
+            if (song.playlistTracks[i].soloLock)
+                soloLocks.add ((int) i);
+        if (! soloLocks.isEmpty())
+            root->setProperty ("playlistTrackSoloLocks", soloLocks);
+
         // automation lanes (round 177b): [track, folded 0/1, [automation, height], ...]
         juce::Array<juce::var> lanes;
         for (std::size_t i = 0; i < song.playlistTracks.size(); ++i)
@@ -4415,6 +4426,16 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
                     song.playlistTracks.resize (index + 1);
                 song.playlistTracks[index].lockedToContent = (int) t[1] != 0;
                 song.playlistTracks[index].lockedHeight = juce::jlimit (-1000, 1000, (int) t[2]);
+            }
+
+    if (auto* soloLocks = root["playlistTrackSoloLocks"].getArray()) // round 190ld
+        for (const auto& t : *soloLocks)
+            if ((int) t >= 0 && (int) t < 500)
+            {
+                const auto index = (std::size_t) (int) t;
+                if (song.playlistTracks.size() <= index)
+                    song.playlistTracks.resize (index + 1);
+                song.playlistTracks[index].soloLock = true;
             }
 
     if (auto* performance = root["playlistTrackPerformance"].getArray())

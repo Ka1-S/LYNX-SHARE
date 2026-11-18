@@ -1875,7 +1875,7 @@ bool EffectSlot::operator== (const EffectSlot& o) const
         || sidechain2 != o.sidechain2 || sendTracks != o.sendTracks || state != o.state || samplePath != o.samplePath || ! (substituteFor == o.substituteFor)
         || presetName != o.presetName || abOther != o.abOther || abShowingB != o.abShowingB || branches.size() != o.branches.size()
         || links.size() != o.links.size() || ! (patcher == o.patcher) || row != o.row || look != o.look || goal != o.goal
-        || goalAmount != o.goalAmount || displayView != o.displayView || ! (flOrigin == o.flOrigin))
+        || goalAmount != o.goalAmount || displayView != o.displayView || lockState != o.lockState || ! (flOrigin == o.flOrigin))
         return false;
     for (std::size_t i = 0; i < branches.size(); ++i)
         if (branches[i].gain != o.branches[i].gain || branches[i].chain != o.branches[i].chain)

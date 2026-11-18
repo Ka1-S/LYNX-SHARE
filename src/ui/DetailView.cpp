@@ -354,6 +354,9 @@ public:
             return;
         }
         select (hit.card);
+        // round 190ld (DL-83): the clicked parameter is the selected one, which Delete returns to its default
+        selectedKnobCard = hit.part == Part::knob ? hit.card : -1;
+        selectedKnob = hit.part == Part::knob ? hit.knob : -1;
         if (hit.part != Part::title && hit.part != Part::folded && refuseLocked (card, hit.part == Part::knob ? hit.knob : -2))
             return;
 
@@ -511,6 +514,20 @@ public:
     bool keyPressed (const juce::KeyPress& key) override
     {
         const auto i = selectedCard();
+        // Live (manual 17.1, details DL-83): "Delete returns the selected parameter to its default" — the knob clicked
+        // last; with no parameter selected Delete removes the selected device as before
+        if ((key.isKeyCode (juce::KeyPress::deleteKey) || key.isKeyCode (juce::KeyPress::backspaceKey)) && ! key.getModifiers().isAnyModifierKeyDown()
+            && selectedKnobCard >= 0 && selectedKnobCard == i && selectedKnobCard < (int) cards.size() && selectedKnob >= 0)
+        {
+            const auto& card = cards[(std::size_t) selectedKnobCard];
+            if (! cardLocked (card, selectedKnob))
+            {
+                const auto spec = knobSpec (card, selectedKnob);
+                setKnob (card, selectedKnob, spec.defaultValue);
+                ui::flashValueTip (*this, knobBounds (card, selectedKnob), spec.text (spec.defaultValue));
+            }
+            return true;
+        }
         if ((key.isKeyCode (juce::KeyPress::deleteKey) || key.isKeyCode (juce::KeyPress::backspaceKey)) && i >= 0
             && cards[(std::size_t) i].kind == Card::effect)
         {
@@ -767,6 +784,7 @@ private:
         std::unique_ptr<DetailCard> card;
     };
     enum class Part { none, picker, title, led, window, swap, save, knob, body, folded };
+    int selectedKnobCard = -1, selectedKnob = -1; // round 190ld (DL-83): the parameter Delete resets
     struct Hit
     {
         Part part = Part::none;

@@ -52,7 +52,7 @@ inline juce::Colour inkOn (juce::Colour fill)
 
 // --- the Simple workflow's small vector glyphs (round 190jc, design190ia SG-7..SG-10, SG-12: no more 2-5 px text glyphs
 // for ‹ › × − +). LYNX's own shapes, stroked with round caps; `r` is the glyph's box, drawn centred in it.
-enum class Glyph { chevronLeft, chevronRight, cross, plus, minus, piano, keyboard, notes, fx, pads, dials };
+enum class Glyph { chevronLeft, chevronRight, cross, plus, minus, piano, keyboard, notes, fx, pads, dials, headphones };
 
 inline void drawGlyph (juce::Graphics& g, Glyph glyph, juce::Rectangle<float> r, juce::Colour colour, float stroke = 1.5f)
 {
@@ -114,6 +114,22 @@ inline void drawGlyph (juce::Graphics& g, Glyph glyph, juce::Rectangle<float> r,
             {
                 const auto x = keys.getX() + keys.getWidth() * (float) k / 4.0f;
                 g.drawLine (x, keys.getY(), x, keys.getBottom(), stroke * 0.8f);
+            }
+            return;
+        }
+        case Glyph::headphones: // round 190ld (DS-9, BandLab B22's monitor switch): a headband over two ear cups
+        {
+            const auto b = r.reduced (r.getWidth() * 0.08f);
+            juce::Path band;
+            band.addCentredArc (b.getCentreX(), b.getY() + b.getHeight() * 0.55f, b.getWidth() * 0.42f, b.getHeight() * 0.42f, 0.0f,
+                                -juce::MathConstants<float>::halfPi, juce::MathConstants<float>::halfPi, true);
+            g.strokePath (band, line);
+            const auto cupW = b.getWidth() * 0.22f, cupH = b.getHeight() * 0.36f, cupY = b.getY() + b.getHeight() * 0.55f;
+            for (const auto x : { b.getCentreX() - b.getWidth() * 0.42f - cupW * 0.5f, b.getCentreX() + b.getWidth() * 0.42f - cupW * 0.5f })
+            {
+                juce::Path cup;
+                cup.addRoundedRectangle (x, cupY, cupW, cupH, cupW * 0.4f);
+                g.strokePath (cup, line);
             }
             return;
         }

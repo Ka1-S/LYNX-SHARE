@@ -66,6 +66,9 @@ constexpr int fixedLengths[] = { 1, 2, 4, 8, 16, 32 };
 // and a time signature field at its right; the scene column grows by their width
 constexpr int tempoFieldWidth = 46, signatureFieldWidth = 42, sceneFieldsWidth = tempoFieldWidth + signatureFieldWidth + 4;
 bool sceneFieldsOn = false;
+// Live's two scene-launch preferences in the Main track menu (round 190ld, Live 12.4 shots/ref/live-scene-menu-queued.png):
+// "Select Next Scene on Launch" (on, as LYNX always did) and "Trigger Recording on Launch" (details DL-36; off)
+bool selectNextOnLaunch = true, recordOnSceneLaunch = false;
 // round 190em: Live 12.4.16's launch triangle of a scene without its own tempo / signature (190ei shot: #1E1E1E)
 const juce::Colour liveSceneTriangle { 0xff1e1e1e };
 // round 190ig (CL-11, CL-12): a waiting launch in Live pulses: its triangle (a waiting stop: the track's stop square)
@@ -700,8 +703,20 @@ public:
         if (hit.track >= 0 && hit.scene >= 0 && e.x - columnX (hit.track) >= launchZone)
             if (const auto* grid = gridOf(); grid != nullptr)
             {
-                if (launcher::clipAt (*grid, hit.track, hit.scene) == nullptr)
-                    putPattern (hit.track, hit.scene, engine.getSong().currentPattern);
+                if (launcher::clipAt (*grid, hit.track, hit.scene) == nullptr && e.mods.isAltDown())
+                    putPattern (hit.track, hit.scene, engine.getSong().currentPattern); // (owner L2: Alt keeps the old way)
+                else if (launcher::clipAt (*grid, hit.track, hit.scene) == nullptr)
+                {
+                    // Live (owner decision L2, details DL-22, round 190ld): a double-click on an empty slot makes an empty
+                    // MIDI clip and shows it in the Detail View; the slot menu keeps "Put a pattern here"
+                    insertEmptyClip (hit.track, hit.scene);
+                    if (const auto* now = gridOf(); now != nullptr && launcher::clipAt (*now, hit.track, hit.scene) != nullptr)
+                    {
+                        selectedTrack = hit.track;
+                        selectedScene = hit.scene;
+                        notify (GridPick::openClip);
+                    }
+                }
                 else
                     notify (GridPick::openClip); // (round 183a: the clip in the Detail View)
             }
@@ -918,7 +933,7 @@ public:
             if (clip == nullptr)
                 hint.text = engine.isGridTrackArmed (hit.track) ? tr ("Clip Record button: [LMB] records a new clip into this slot")
                             : onButton ? tr ("Clip Stop button: [LMB] stops the clip playing on this track (at the launch quantisation)")
-                                       : tr ("Empty slot: drop a clip, a pattern or a sample here  [2xLMB] puts the current pattern here  [RMB] slot menu");
+                                       : tr ("Empty slot: drop a clip, a pattern or a sample here  [2xLMB] a new empty MIDI clip  [Alt][2xLMB] the current pattern  [RMB] slot menu");
             else
             {
                 hint.text = onButton ? tr ("Clip Launch button: [LMB] launches the clip (at the launch quantisation)  [Enter] launches the selected clip")
@@ -959,7 +974,10 @@ private:
         queuedSeen = false;
         queuedTicks = 0;
         queuedBlink = blinkPhaseNow();
-        if (scene + 1 < rowCount())
+        // Live's "Trigger Recording on Launch": the armed tracks record into this scene's empty slots
+        if (recordOnSceneLaunch && ! engine.isSessionRecording())
+            engine.toggleSessionRecord (scene);
+        if (selectNextOnLaunch && scene + 1 < rowCount())
         {
             selectedScene = scene + 1;
             sceneSelected = true;
@@ -1783,6 +1801,11 @@ public:
             }
             }
         }
+        else if (const auto icon = monitorIcon (t, engine.isGridTrackArmed (t)); icon != 0)
+            // Live 12.4 (details2_190ld raw/L08): the monitor icon replaces the miniature, centred in its 55 px
+            paintMonitorIcon (g, icon, juce::Rectangle<int> (cell.getX() + 17, cell.getY() + 2, right - 1 - cell.getX() - 17, cell.getHeight() - 4));
+        else if (view == nullptr || ! view->taken.load (std::memory_order_relaxed))
+            paintMiniature (g, song, t, juce::Rectangle<int> (cell.getX() + 17, cell.getY() + 2, right - 1 - cell.getX() - 17, cell.getHeight() - 4));
         if (! armShown)
             return;
         const auto armed = engine.isGridTrackArmed (t);
@@ -1790,6 +1813,65 @@ public:
         g.fillRect (arm);
         g.setColour (armed ? lv::ink : lv::text);
         g.fillEllipse (arm.withSizeKeepingCentre (7.0f, 7.0f));
+    }
+
+    // Round 190ld (DL-11): Live's monitor icons, measured in Live 12.4 (details2_190ld raw/L08), drawn as LYNX vectors:
+    // a MIDI track's 22 x 11 keyboard (a #757575 frame and key lines, the black keys 2 x 6 in #b5b5b5) and an audio track's
+    // 7 x 13 microphone (#b5b5b5: a 3 x 7 head in a U-shaped holder on a stem)
+    static void paintMonitorIcon (juce::Graphics& g, int icon, juce::Rectangle<int> area)
+    {
+        namespace lv = theme::livelook;
+        const juce::Colour frame { 0xff757575 };
+        if (icon == 2)
+        {
+            const auto k = juce::Rectangle<int> (22, 11).withCentre (area.getCentre());
+            g.setColour (frame);
+            g.drawRect (k, 1);
+            for (int i = 1; i < 7; ++i) // the white keys' edges, every 3 px
+                g.fillRect (k.getX() + i * 3, k.getY() + 1, 1, k.getHeight() - 2);
+            g.setColour (lv::text);
+            for (const auto i : { 1, 2, 4, 5, 6 }) // C# D#, F# G# A#
+                g.fillRect (k.getX() + i * 3 - 1, k.getY() + 1, 2, 6);
+            return;
+        }
+        const auto m = juce::Rectangle<int> (7, 13).withCentre (area.getCentre());
+        g.setColour (lv::text);
+        g.fillRoundedRectangle (juce::Rectangle<float> ((float) m.getX() + 2.0f, (float) m.getY(), 3.0f, 7.0f), 1.2f);
+        g.fillRect (m.getX(), m.getY() + 4, 1, 3);
+        g.fillRect (m.getRight() - 1, m.getY() + 4, 1, 3);
+        g.fillRect (m.getX() + 1, m.getY() + 7, 1, 1);
+        g.fillRect (m.getRight() - 2, m.getY() + 7, 1, 1);
+        g.fillRect (m.getX() + 2, m.getY() + 8, 3, 1);
+        g.fillRect (m.getX() + 3, m.getY() + 9, 1, 3);
+    }
+
+    // Round 190ld (DL-10): the Arrangement miniature of track `t` in `area` (Live: 55 x 13 px, blocks and line alike)
+    void paintMiniature (juce::Graphics& g, const Song& song, int t, juce::Rectangle<int> area) const
+    {
+        namespace lv = theme::livelook;
+        if (area.getWidth() < 4 || area.getHeight() < 4)
+            return;
+        const auto span = (double) miniatureBeats * (double) lynx::ppq;
+        const auto pxPerTick = (double) area.getWidth() / span;
+        const auto step = (double) miniatureStepTicks (song);
+        const auto pos = std::floor (juce::jmax (0.0, engine.getTransport().positionTicks.load (std::memory_order_relaxed)) / step) * step;
+        const auto half = std::floor ((double) area.getWidth() * 0.5) / pxPerTick; // (the line stops at the middle)
+        const auto from = juce::jmax (0.0, pos - half);
+        const auto trackColour = t < (int) song.playlistTracks.size() ? song.playlistTracks[(std::size_t) t].colour : 0u;
+        const auto blocks = area.toFloat();
+        for (const auto& clip : song.playlist)
+        {
+            if (clip.track != t || clip.length <= 0 || clip.muted || (double) (clip.start + clip.length) <= from || (double) clip.start >= from + span)
+                continue;
+            const auto x0 = std::round (blocks.getX() + (float) (juce::jmax (0.0, (double) clip.start - from) * pxPerTick));
+            const auto x1 = std::round (blocks.getX() + (float) (juce::jmin (span, (double) (clip.start + clip.length) - from) * pxPerTick));
+            const auto colour = trackColour != 0 ? juce::Colour (trackColour)
+                              : clip.kind == ClipKind::audio ? theme::colour::audioClip : theme::tame (PlaylistComponent::patternColour (song, clip.pattern));
+            g.setColour (colour);
+            g.fillRect (juce::Rectangle<float> (x0, blocks.getY(), juce::jmax (1.0f, x1 - x0), blocks.getHeight()));
+        }
+        g.setColour (lv::text);
+        g.fillRect (area.getX() + juce::roundToInt ((pos - from) * pxPerTick), area.getY(), 1, area.getHeight());
     }
 
     void paintScene (juce::Graphics& g, const ClipGrid& grid, int row, juce::Rectangle<int> r) const
@@ -2045,6 +2127,110 @@ public:
         buildSlotMenu (track, scene).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
     }
 
+    void addLaunchOptions (juce::PopupMenu& menu, int track, int scene)
+    {
+        const auto* grid = gridOf();
+        if (grid == nullptr || launcher::clipAt (*grid, track, scene) == nullptr)
+            return;
+        auto copy = *grid;
+        const auto* slot = launcher::settingsAt (copy, track, scene);
+        juce::PopupMenu quant;
+        for (const auto& [q, name] : quantNames)
+            quant.addItem ((q == LaunchQuant::global || q <= LaunchQuant::bar) ? tr (name) : juce::String (name), true, slot->quant == q, [this, track, scene, q = q] {
+                editSlot (track, scene, [q] (ClipGridSlot& s) { s.quant = q; });
+            });
+        menu.addSubMenu (tr ("Launch quantisation"), quant);
+        juce::PopupMenu modes;
+        for (const auto& [m, name] : modeNames)
+            modes.addItem (tr (name), true, slot->mode == m, [this, track, scene, m = m] { editSlot (track, scene, [m] (ClipGridSlot& s) { s.mode = m; }); });
+        menu.addSubMenu (tr ("Launch mode"), modes);
+        menu.addItem (tr ("Legato (keep the position)"), true, slot->legato, [this, track, scene, on = slot->legato] {
+            editSlot (track, scene, [on] (ClipGridSlot& s) { s.legato = ! on; });
+        });
+        menu.addItem (tr ("Loop"), true, slot->loop, [this, track, scene, on = slot->loop] {
+            editSlot (track, scene, [on] (ClipGridSlot& s) { s.loop = ! on; });
+        });
+    }
+
+    // the clip's groove items (round 190ld: one helper for both looks): the Groove submenu and Commit, and Extract Groove(s)
+    void addGrooveItems (juce::PopupMenu& menu, int track, int scene, bool grooveAndCommit, bool extract)
+    {
+        const auto* grid = gridOf();
+        if (grid == nullptr)
+            return;
+        auto copy = *grid;
+        const auto* slot = launcher::settingsAt (copy, track, scene);
+        if (slot == nullptr)
+            return;
+        // grooves play on the notes of MIDI clips (round 190bv); round 190kc: Commit and Extract on audio clips too
+        // (Live's manual 14.1.2 / 14.2.1: warp markers at the attacks; the attacks' timing and levels)
+        if (const auto* clip = launcher::clipAt (*grid, track, scene); clip != nullptr && clip->kind == ClipKind::pattern)
+        {
+            if (grooveAndCommit)
+            {
+                menu.addSubMenu (tr ("Groove"), grooveMenu (track, scene, slot->groove));
+                menu.addItem (tr ("Commit groove"), slot->groove != 0, false, [this, track, scene] {
+                    engine.editSong ([=] (Song& s) { groove::commit (s, track, scene); });
+                    repaint();
+                });
+            }
+            if (extract)
+            menu.addItem (tr ("Extract Groove(s)"), [this, track, scene] {
+                engine.editSong ([=] (Song& s) {
+                    const auto* c = s.clipGrid ? launcher::clipAt (*s.clipGrid, track, scene) : nullptr;
+                    if (c == nullptr || c->pattern < 0 || c->pattern >= (int) s.patterns.size())
+                        return;
+                    const auto& pattern = s.patterns[(std::size_t) c->pattern];
+                    groove::add (s.grooves, groove::extract (pattern, c->length, GrooveBase::sixteenth, pattern.name));
+                });
+                showGroovePool (true);
+            });
+        }
+        else if (clip != nullptr && clip->kind == ClipKind::audio && clip->channel >= 0 && clip->channel < (int) engine.getSong().channels.size())
+        {
+            const auto& channel = engine.getSong().channels[(std::size_t) clip->channel];
+            const auto sample = engine.getSampleLibrary().load (juce::String::fromUTF8 (channel.samplePath.c_str()));
+            if (grooveAndCommit)
+            {
+                menu.addSubMenu (tr ("Groove"), grooveMenu (track, scene, slot->groove));
+                menu.addItem (tr ("Commit groove"), slot->groove != 0 && sample != nullptr, false, [this, track, scene, sample] {
+                    engine.editSong ([=] (Song& s) { grooveaudio::commit (s, track, scene, *sample); });
+                    repaint();
+                });
+            }
+            const auto name = juce::File (juce::String::fromUTF8 (channel.samplePath.c_str())).getFileNameWithoutExtension().toStdString();
+            if (extract)
+            menu.addItem (tr ("Extract Groove(s)"), sample != nullptr, false, [this, track, scene, sample, name] {
+                engine.editSong ([=] (Song& s) {
+                    if (const auto* c = s.clipGrid ? launcher::clipAt (*s.clipGrid, track, scene) : nullptr)
+                        if (auto g = grooveaudio::extract (s, *c, *sample, GrooveBase::sixteenth, name); ! g.points.empty())
+                            groove::add (s.grooves, std::move (g));
+                });
+                showGroovePool (true);
+            });
+        }
+    }
+
+    void addExtractGroove (juce::PopupMenu& menu, int track, int scene) { addGrooveItems (menu, track, scene, false, true); }
+
+    // LYNX's own clip options after Live's items (round 190ld): a pattern into the slot, launch settings, follow action, groove
+    void addClipOptions (juce::PopupMenu& menu, int track, int scene, bool)
+    {
+        const auto& song = engine.getSong();
+        juce::PopupMenu patterns;
+        for (int p = 0; p < (int) song.patterns.size(); ++p)
+            patterns.addItem (utf8 (song.patterns[(std::size_t) p].name), [this, track, scene, p] { putPattern (track, scene, p); });
+        menu.addSubMenu (tr ("Put a pattern here"), patterns);
+        addLaunchOptions (menu, track, scene);
+        if (const auto* grid = gridOf())
+        {
+            auto copy = *grid;
+            if (const auto* slot = launcher::settingsAt (copy, track, scene))
+                menu.addSubMenu (tr ("Follow action"), followMenu (track, scene, slot->follow));
+        }
+        addGrooveItems (menu, track, scene, true, false);
+    }
+
 public:
     juce::PopupMenu buildSlotMenu (int track, int scene)
     {
@@ -2053,6 +2239,36 @@ public:
         if (grid == nullptr)
             return menu;
         const auto& song = engine.getSong();
+        // Round 190ld (Live 12.4's clip menu, details2_190ld shots/ref/live-clip-menu.png): in Live's look a clip's menu
+        // starts with Live's items in Live's order and groups (Cut / Copy / Duplicate / Delete; Rename / Extract Groove(s) /
+        // Deactivate Clip; the colour last), then LYNX's own options after a separator (add, never remove)
+        if (liveLook() && launcher::clipAt (*grid, track, scene) != nullptr)
+        {
+            auto copy = *grid;
+            const auto* slot = launcher::settingsAt (copy, track, scene);
+            menu.addItem (tr ("Cut") + "\tCtrl+X", [this, track, scene] { copySlot (track, scene, true); });
+            menu.addItem (tr ("Copy") + "\tCtrl+C", [this, track, scene] { copySlot (track, scene, false); });
+            menu.addItem (tr ("Duplicate") + "\tCtrl+D", [this, track, scene] { duplicateSlot (track, scene); });
+            menu.addItem (tr ("Delete") + "\tDel", [this, track, scene] {
+                engine.editSong ([=] (Song& s) { launcher::clearClip (s, track, scene); });
+                repaint();
+            });
+            menu.addSeparator();
+            menu.addItem (tr ("Rename") + sessionkeys::menuKey (sessionkeys::Command::gridRename), [this, track, scene] { renameClip (track, scene); });
+            addExtractGroove (menu, track, scene);
+            menu.addItem ((slot->active ? tr ("Deactivate Clip") : tr ("Activate Clip")) + sessionkeys::menuKey (sessionkeys::Command::gridDeactivateClip),
+                          [this, track, scene] { toggleClipActive (track, scene); });
+            menu.addSeparator();
+            menu.addSubMenu (tr ("Change color"), ui::colourMenu (slot->colour, [this, track, scene] (std::uint32_t c) {
+                editSlot (track, scene, [c] (ClipGridSlot& s) { s.colour = c; });
+            }, mouseArea()));
+            menu.addSeparator();
+            addClipOptions (menu, track, scene, false);
+            menu.addItem (tr ("Paste") + "\tCtrl+V", canPaste(), false, [this, track, scene] { pasteSlot (track, scene); });
+            menu.addSeparator();
+            addGridOptions (menu);
+            return menu;
+        }
         juce::PopupMenu patterns;
         for (int p = 0; p < (int) song.patterns.size(); ++p)
             patterns.addItem (utf8 (song.patterns[(std::size_t) p].name), [this, track, scene, p] { putPattern (track, scene, p); });
@@ -2062,22 +2278,7 @@ public:
         {
             auto copy = *grid;
             const auto* slot = launcher::settingsAt (copy, track, scene);
-            juce::PopupMenu quant;
-            for (const auto& [q, name] : quantNames)
-                quant.addItem ((q == LaunchQuant::global || q <= LaunchQuant::bar) ? tr (name) : juce::String (name), true, slot->quant == q, [this, track, scene, q = q] {
-                    editSlot (track, scene, [q] (ClipGridSlot& s) { s.quant = q; });
-                });
-            menu.addSubMenu (tr ("Launch quantisation"), quant);
-            juce::PopupMenu modes;
-            for (const auto& [m, name] : modeNames)
-                modes.addItem (tr (name), true, slot->mode == m, [this, track, scene, m = m] { editSlot (track, scene, [m] (ClipGridSlot& s) { s.mode = m; }); });
-            menu.addSubMenu (tr ("Launch mode"), modes);
-            menu.addItem (tr ("Legato (keep the position)"), true, slot->legato, [this, track, scene, on = slot->legato] {
-                editSlot (track, scene, [on] (ClipGridSlot& s) { s.legato = ! on; });
-            });
-            menu.addItem (tr ("Loop"), true, slot->loop, [this, track, scene, on = slot->loop] {
-                editSlot (track, scene, [on] (ClipGridSlot& s) { s.loop = ! on; });
-            });
+            addLaunchOptions (menu, track, scene);
             // round 190im (R12, DL-15): Live's Deactivate / Activate Clip (key 0 in the Clip-launch layout)
             menu.addItem ((slot->active ? tr ("Deactivate Clip") : tr ("Activate Clip")) + sessionkeys::menuKey (sessionkeys::Command::gridDeactivateClip),
                           [this, track, scene] { toggleClipActive (track, scene); });
@@ -2087,45 +2288,7 @@ public:
             menu.addSubMenu (tr ("Change color"), ui::colourMenu (slot->colour, [this, track, scene] (std::uint32_t c) {
                 editSlot (track, scene, [c] (ClipGridSlot& s) { s.colour = c; });
             }, mouseArea()));
-            // grooves play on the notes of MIDI clips (round 190bv); round 190kc: Commit and Extract on audio clips too
-            // (Live's manual 14.1.2 / 14.2.1: warp markers at the attacks; the attacks' timing and levels)
-            if (const auto* clip = launcher::clipAt (*grid, track, scene); clip != nullptr && clip->kind == ClipKind::pattern)
-            {
-                menu.addSubMenu (tr ("Groove"), grooveMenu (track, scene, slot->groove));
-                menu.addItem (tr ("Commit groove"), slot->groove != 0, false, [this, track, scene] {
-                    engine.editSong ([=] (Song& s) { groove::commit (s, track, scene); });
-                    repaint();
-                });
-                menu.addItem (tr ("Extract Groove(s)"), [this, track, scene] {
-                    engine.editSong ([=] (Song& s) {
-                        const auto* c = s.clipGrid ? launcher::clipAt (*s.clipGrid, track, scene) : nullptr;
-                        if (c == nullptr || c->pattern < 0 || c->pattern >= (int) s.patterns.size())
-                            return;
-                        const auto& pattern = s.patterns[(std::size_t) c->pattern];
-                        groove::add (s.grooves, groove::extract (pattern, c->length, GrooveBase::sixteenth, pattern.name));
-                    });
-                    showGroovePool (true);
-                });
-            }
-            else if (clip != nullptr && clip->kind == ClipKind::audio && clip->channel >= 0 && clip->channel < (int) engine.getSong().channels.size())
-            {
-                const auto& channel = engine.getSong().channels[(std::size_t) clip->channel];
-                const auto sample = engine.getSampleLibrary().load (juce::String::fromUTF8 (channel.samplePath.c_str()));
-                menu.addSubMenu (tr ("Groove"), grooveMenu (track, scene, slot->groove));
-                menu.addItem (tr ("Commit groove"), slot->groove != 0 && sample != nullptr, false, [this, track, scene, sample] {
-                    engine.editSong ([=] (Song& s) { grooveaudio::commit (s, track, scene, *sample); });
-                    repaint();
-                });
-                const auto name = juce::File (juce::String::fromUTF8 (channel.samplePath.c_str())).getFileNameWithoutExtension().toStdString();
-                menu.addItem (tr ("Extract Groove(s)"), sample != nullptr, false, [this, track, scene, sample, name] {
-                    engine.editSong ([=] (Song& s) {
-                        if (const auto* c = s.clipGrid ? launcher::clipAt (*s.clipGrid, track, scene) : nullptr)
-                            if (auto g = grooveaudio::extract (s, *c, *sample, GrooveBase::sixteenth, name); ! g.points.empty())
-                                groove::add (s.grooves, std::move (g));
-                    });
-                    showGroovePool (true);
-                });
-            }
+            addGrooveItems (menu, track, scene, true, true);
             menu.addSeparator();
             menu.addItem (tr ("Cut") + "\tCtrl+X", [this, track, scene] { copySlot (track, scene, true); });
             menu.addItem (tr ("Copy") + "\tCtrl+C", [this, track, scene] { copySlot (track, scene, false); });
@@ -2291,6 +2454,8 @@ public:
     // A scene's menu (round 190ef adds the reference's Duplicate, Capture and Insert Scene and the colour).
     juce::PopupMenu buildSceneMenu (int scene)
     {
+        if (liveLook())
+            return buildSceneMenuLive (scene);
         juce::PopupMenu menu;
         // round 190kn (DL-7): Live's "Cancel Scene Launch" (manual 7.2: "clicking the Cancel Scene Launch entry in the Main
         // track's context menu"); here the scene column is Live's Main track. Enabled while a launched scene waits.
@@ -2321,6 +2486,65 @@ public:
             });
             repaint();
         }, mouseArea()));
+        const auto tempo = engine.getSong().bpm;
+        menu.addItem (info.tempo > 0.0 ? tr ("Scene tempo: {0} (remove)", { juce::String (info.tempo, 2) })
+                                       : tr ("Scene tempo: take {0} when launched", { juce::String (tempo, 2) }),
+                      [this, scene, tempo, had = info.tempo > 0.0] {
+                          engine.editSong ([=] (Song& s) { session::setSceneTempo (s, scene, had ? 0.0 : tempo); });
+                      });
+        if (info.beatsPerBar > 0)
+            menu.addItem (tr ("Disable scene time signature"), [this, scene] { engine.editSong ([scene] (Song& s) { session::setSceneBeats (s, scene, 0); }); });
+        menu.addSeparator();
+        addGridOptions (menu);
+        return menu;
+    }
+
+    // Round 190ld: Live 12.4's Main track menu (details2_190ld shots/ref/live-scene-menu-queued.png) in Live's look — its
+    // items in Live's order and groups (Duplicate / Delete; Rename; Insert Scene / Capture and Insert Scene; Cancel Scene
+    // Launch; the colour), then LYNX's own scene items and the grid options after a separator (add, never remove)
+    juce::PopupMenu buildSceneMenuLive (int scene)
+    {
+        juce::PopupMenu menu;
+        const auto* grid = gridOf();
+        menu.addItem (tr ("Duplicate") + "\tCtrl+D", [this, scene] { duplicateScene (scene); });
+        menu.addItem (tr ("Delete"), grid != nullptr && grid->scenes.size() > 1, false, [this, scene] { deleteScene (scene); });
+        menu.addSeparator();
+        menu.addItem (tr ("Rename") + sessionkeys::menuKey (sessionkeys::Command::gridRename), [this, scene] { renameScene (scene); });
+        menu.addSeparator();
+        menu.addItem (tr ("Insert Scene") + sessionkeys::menuKey (sessionkeys::Command::gridInsertScene), [this, scene] {
+            engine.editSong ([scene] (Song& s) { launcher::insertScene (s, scene); });
+            clampScroll();
+            repaint();
+        });
+        menu.addItem (tr ("Capture and Insert Scene") + sessionkeys::menuKey (sessionkeys::Command::gridCaptureInsertScene),
+                      [this, scene] { captureAndInsertScene (scene); });
+        menu.addSeparator();
+        menu.addItem (tr ("Cancel Scene Launch"), queuedScene >= 0, false, [this] { cancelSceneLaunch(); });
+        menu.addSeparator();
+        menu.addItem (tr ("Select Next Scene on Launch (Pref)"), true, selectNextOnLaunch, [this] {
+            selectNextOnLaunch = ! selectNextOnLaunch;
+            if (onSceneFieldsChanged != nullptr)
+                onSceneFieldsChanged(); // (saved with the UI settings)
+        });
+        menu.addItem (tr ("Trigger Recording on Launch (Pref)"), true, recordOnSceneLaunch, [this] {
+            recordOnSceneLaunch = ! recordOnSceneLaunch;
+            if (onSceneFieldsChanged != nullptr)
+                onSceneFieldsChanged();
+        });
+        menu.addSeparator();
+        static const ClipGridScene unnamed;
+        const auto& info = grid != nullptr && scene < (int) grid->scenes.size() ? grid->scenes[(std::size_t) scene] : unnamed;
+        menu.addSubMenu (tr ("Change color"), ui::colourMenu (info.colour, [this, scene] (std::uint32_t c) {
+            engine.editSong ([scene, c] (Song& s) {
+                auto& g = launcher::ensureGrid (s);
+                while ((int) g.scenes.size() <= scene)
+                    g.scenes.emplace_back();
+                g.scenes[(std::size_t) scene].colour = c;
+            });
+            repaint();
+        }, mouseArea()));
+        menu.addSeparator();
+        menu.addItem (tr ("Add scene below"), [this, scene] { insertSceneBelow (scene); });
         const auto tempo = engine.getSong().bpm;
         menu.addItem (info.tempo > 0.0 ? tr ("Scene tempo: {0} (remove)", { juce::String (info.tempo, 2) })
                                        : tr ("Scene tempo: take {0} when launched", { juce::String (tempo, 2) }),
@@ -2837,7 +3061,8 @@ private:
                 const auto from = cell.getX() + (int) std::floor (juce::jmin (a, b)) - 1, to = cell.getX() + (int) std::ceil (juce::jmax (a, b)) + 1;
                 repaint (juce::Rectangle<int> (from, cell.getBottom() - 3, to - from, 3).getIntersection (cell).getIntersection (cells).getIntersection (visible));
             }
-            if (liveLook() && was.oneShotSecond != now.oneShotSecond) // (round 190im, DL-9: a one-shot's time left)
+            if (liveLook() && (was.oneShotSecond != now.oneShotSecond || was.miniStep != now.miniStep || was.monitor != now.monitor))
+                // (round 190im, DL-9: a one-shot's time left; round 190ld: the miniature's position, the monitor icon)
                 repaint (juce::Rectangle<int> (x, cells.getBottom(), columnWidth, statusHeight + 1).getIntersection (visible));
             was = now;
         }
@@ -2881,6 +3106,8 @@ private:
         std::uint32_t blink = 0;      // the blink phase, while something in the column blinks
         std::uint64_t recordTick = 0; // while it records: the recording's start, the clock, a 33 ms tick
         int oneShotSecond = -1;       // round 190im (DL-9): a playing one-shot clip's seconds left
+        int miniStep = -1;            // round 190ld (DL-10): the song position's step in the Arrangement miniature
+        int monitor = 0;              // round 190ld (DL-11): 1 = an audio track monitoring In (mic), 2 = a MIDI one (keyboard)
     };
 
     ColumnView columnView (int t) const
@@ -2905,6 +3132,13 @@ private:
             }
             if (c.pending >= 0 || c.recordPending >= 0 || c.stopping)
                 c.blink = blinkPhaseNow();
+            if (liveLook())
+            {
+                c.monitor = monitorIcon (t, c.armed);
+                if (c.playing < 0 && c.recording < 0 && ! c.taken)
+                    c.miniStep = (int) std::floor (juce::jmax (0.0, engine.getTransport().positionTicks.load (std::memory_order_relaxed))
+                                                   / (double) miniatureStepTicks (engine.getSong()));
+            }
             if (c.recording >= 0)
                 c.recordTick = mixBits (mixBits (mixBits (1469598103934665603ull, bitsOf (v.recordFrom.load (std::memory_order_relaxed))),
                                                  bitsOf (state->clockNow.load (std::memory_order_relaxed))),
@@ -2913,6 +3147,32 @@ private:
         return c;
     }
     std::vector<ColumnView> columnViews; // [column] what the last tick saw
+
+    // Round 190ld (DL-10, Live 12 Info View: "a miniaturized view of the Arrangement clips if the track is playing back the
+    // Arrangement"; filmed in Live 12.4, details2_190ld raw/L01-L05): the status cell of a track that plays its Playlist
+    // shows ~20 beats of the Arrangement (55 px in Live: 2.75 px a beat) — its clips as blocks in their colour, the song
+    // position as a 1 px #b5b5b5 line that moves right from the start until the middle, then the clips scroll under it.
+    // The span and the repaint steps:
+    static constexpr int miniatureBeats = 20, miniatureSteps = 80;
+    static std::int64_t miniatureStepTicks (const Song&)
+    {
+        return juce::jmax<std::int64_t> (1, (std::int64_t) miniatureBeats * (std::int64_t) lynx::ppq / miniatureSteps);
+    }
+    // Round 190ld (DL-11, Live manual 7.3: "A microphone icon appears in an audio track that is set to monitor its input.
+    // A keyboard icon appears in a MIDI track"): 1 = mic, 2 = keyboard, 0 = none.
+    // Live 12.4 shows it for Monitor "In" only (raw/L09: an armed track on Auto keeps its miniature). LYNX's equivalents:
+    // an audio track whose insert monitors "On"; a MIDI track whose channel takes a controller's input whatever is armed
+    // (its "Receive from" lock).
+    int monitorIcon (int t, bool) const
+    {
+        const auto& song = engine.getSong();
+        const auto chain = detailchain::forTrack (song, t);
+        if (engine.gridTrackInput (t) == AudioEngine::GridInput::midi)
+            return chain.channel >= 0 && chain.channel < (int) song.channels.size() && ! song.channels[(std::size_t) chain.channel].receiveFrom.empty() ? 2 : 0;
+        if (chain.insert <= 0 || chain.insert >= (int) song.mixer.size())
+            return 0;
+        return song.mixer[(std::size_t) chain.insert].monitor == InputMonitor::on ? 1 : 0;
+    }
 
     // round 190im (DL-9): a playing one-shot clip's (Loop off) time left in seconds at the song's tempo; −1: not one
     double oneShotSecondsLeft (int t, int scene, float progress) const
@@ -3160,6 +3420,9 @@ bool& clipGridSceneTempoShown()
 {
     return sceneFieldsOn;
 }
+
+bool& clipGridSelectNextOnLaunch() { return selectNextOnLaunch; }
+bool& clipGridRecordOnSceneLaunch() { return recordOnSceneLaunch; }
 
 void refreshClipGrid (juce::Component& grid)
 {

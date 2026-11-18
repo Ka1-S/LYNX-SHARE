@@ -51,6 +51,11 @@ private:
     void choose (int id);
     void changed (bool structural); // the intensity / tone moved: the chain follows (one undo step per drag)
     void autoLevel();
+    // round 190ld (DS-44, owner decision S7): "Hear without" plays the song without the look at the look's loudness
+    // (both measured offline, once per look setting); the raw level is one right-click away
+    void updateListenGain();
+    void measureMatch();
+    void mouseDown (const juce::MouseEvent& e) override;
     void setFade (bool on, double seconds); // round 190ke: the song's fade-out (core/SongFade.h)
     void refreshFade();
     void timerCallback() override;
@@ -71,6 +76,14 @@ private:
     juce::Label fadeInfo;
     std::shared_ptr<std::atomic<int>> measuring; // Auto level's render: 0 idle, 1 running (shared with its thread)
     std::shared_ptr<std::atomic<float>> measuredLufs;
+    // round 190ld: the loudness match's render (0 idle, 1 running, 2 done) and its result (dB to add to the A side)
+    std::shared_ptr<std::atomic<int>> matching;
+    std::shared_ptr<std::atomic<float>> matchDb;
+    MasterLookSettings matchedFor { -1 }; // the look setting matchDb belongs to (id -1: none yet)
+    bool matchValid = false;
+public:
+    static inline bool matchLoudness = true; // right-click on "Hear without": off = hear the raw level
+private:
     bool updating = false;
 };
 } // namespace lynx

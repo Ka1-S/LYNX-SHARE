@@ -1330,6 +1330,10 @@ struct EffectSlot
     // analysis graph, 1 = LYNX's transfer curve with its grid and level trail. Saved in .lynx ("displayView"); FL's .flp
     // has no such setting. Editor only: the audio never reads it.
     std::uint8_t displayView = 0;
+    // FL's "Lock/Unlock State" on the slot LED (Shift+click, manual "Mute/Disable LED - The same as for the Mixer Track
+    // mute LEDs", round 190ld): soloing another slot of the insert (Ctrl/Alt+click) leaves this one as it is. Saved only
+    // when on ("lockState"); FL's .flp keeps it in the UI state only.
+    bool lockState = false;
     FlOrigin flOrigin;    // imported from FL: the original effect plugin (round 171e)
     InstanceTag instance; // runtime identity of the slot (never saved, not compared)
 
@@ -2346,6 +2350,9 @@ struct PlaylistTrack
     // round 190cg (Live's track fold switch): the row is folded to a thin strip that still shows its clips as bars; its
     // lanes hide with it. View only; saved with the project.
     bool folded = false;
+    // FL's Shift+click on a Playlist track's mute switch = lock its state (manual Playlist › Mute / Solo, round 190ld): a
+    // solo of another track leaves it as it is. Saved ("playlistTrackSoloLocks").
+    bool soloLock = false;
     bool operator== (const PlaylistTrack&) const = default;
 };
 

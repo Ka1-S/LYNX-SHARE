@@ -869,7 +869,7 @@ void soloTrack (Song& song, int track, int trackCount, flsettings::SoloMemory* m
     soloRows ((int) h.size(), track, memory, restore,
               [&h] (int t) { return h[(std::size_t) t].muted; },
               [&h] (int t, bool on) { h[(std::size_t) t].muted = on; },
-              [] (int) { return true; });
+              [&h] (int t) { return ! h[(std::size_t) t].soloLock; }); // (round 190ld: FL's locked state)
 }
 void soloChannel (Song& song, int channel, flsettings::SoloMemory* memory, bool restore)
 {

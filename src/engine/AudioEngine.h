@@ -320,6 +320,11 @@ public:
         // Ctrl+P turns a 2-bar count-in off and back on at 2 bars. A count-in that is on sets it.
         int countInLength = 1;
         bool waitForInput = false;      // playback starts at the first played note
+        // FL's Wait for input right-click (manual "Toolbar panels", round 190ld): "Only when recording" (on = LYNX's
+        // behaviour so far: Play alone never waits) and "Respect recording filter" (only input the recording filter takes
+        // starts it: notes start it only while the filter records notes)
+        bool waitOnlyWhenRecording = true;
+        bool waitRespectFilter = false;
         RecordMode mode = RecordMode::replace; // "Blend recorded notes" off, FL's factory default (round 177c)
         std::int64_t quantise = 0;      // record quantise in ticks (<= 1: as played); follows the global grid
         bool placeSongClip = true;      // song mode: a take puts a clip of the pattern where recording started
@@ -798,6 +803,14 @@ public:
     juce::StringArray getActiveMidiInputs() const;
     // Counts the messages received from the enabled MIDI inputs (the toolbar's MIDI activity light).
     std::uint32_t getMidiActivity() const noexcept { return midiActivity.load (std::memory_order_relaxed); }
+    // round 190ld (Simple › Finish, details DS-44): a gain on what the device plays only (never in a render or an
+    // export), so the "Hear without" A/B is heard at the mastered song's loudness; 1 = off. Faded over one block.
+    void setListenGain (float gain) noexcept { listenGain.store (gain, std::memory_order_relaxed); }
+    float getListenGain() const noexcept { return listenGain.load (std::memory_order_relaxed); }
+    // round 190ld (FL's Sync indicator colours): messages a project link / mapping and a global link / mapping took
+    // (message thread, counted in applyControllers)
+    std::uint32_t getMidiProjectLinked() const noexcept { return midiProjectLinked; }
+    std::uint32_t getMidiGlobalLinked() const noexcept { return midiGlobalLinked; }
     std::uint32_t getMidiPlayed() const noexcept { return midiPlayed.load (std::memory_order_relaxed); }
     // Closes and opens again every enabled MIDI input (the MIDI light's click; Settings › MIDI › Refresh).
     void reconnectMidiInputs();
@@ -1453,6 +1466,8 @@ private:
     std::vector<int> takeClearedChannels; // replace mode: channels already cleared in this take
     std::atomic<bool> waitingForInput { false };
     void startOnInput() noexcept; // MIDI or UI thread: the first note while waiting starts playback
+    void preparePlay() noexcept;  // play()'s start without the start itself (a Play that waits for input, round 190ld)
+    std::atomic<bool> notesStartWait { true }; // round 190ld: "Respect recording filter" with notes not recorded = false
     std::vector<int> armedInserts;
     // round 190aq: the inserts "Low latency while recording" bypasses latency-adding slots on, as last published
     std::vector<char> publishedLowLatency;
@@ -1510,6 +1525,9 @@ private:
     int midiDeviceListVersion = 0;
     int midiCheckTicks = 0;
     std::atomic<std::uint32_t> midiActivity { 0 }, midiPlayed { 0 };
+    std::uint32_t midiProjectLinked = 0, midiGlobalLinked = 0; // (message thread, round 190ld)
+    std::atomic<float> listenGain { 1.0f };
+    float listenGainNow = 1.0f; // (audio thread: the gain the last block ended at)
     prefs::MidiPrefs midiPrefs;                      // UI thread
     juce::SpinLock midiPrefsLock;                    // guards midiPrefsShared (UI writes, MIDI thread reads)
     prefs::MidiPrefs midiPrefsShared;

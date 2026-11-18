@@ -127,6 +127,10 @@ public:
     juce::PopupMenu makeToolbarMoreMenuForSnapshot() { return makeToolbarMoreMenu(); }
     void setSaveStatusForSnapshot (toolbarlayout::SaveState state);
     juce::Component* toolbarPartForSnapshot (const juce::String& name);
+    // round 190ld (--details190ldshot): FL's Count-in / Wait for input right-click menus, the Simple Cycle switch
+    juce::PopupMenu countInMenuForSnapshot() { return makeCountInMenu(); }
+    juce::PopupMenu waitInputMenuForSnapshot() { return makeWaitInputMenu(); }
+    void toggleCycleForSnapshot() { toggleCycle(); }
     void updateUndoRedoEnabled(); // round 190kn: the Simple top bar greys Undo / Redo with nothing to undo / redo
     // round 190jj: one timer tick of the transport's shown states (Play / Pause, Stop, Record, the time, the Simple
     // capsule's lock, the master meter), for shots and tests with an offline engine
@@ -788,6 +792,16 @@ private:
     IconButton moreButton { "toolbarMore", Icon::more };
     IconButton browserToggleButton { "liveBrowser", Icon::browserPanel };
     IconButton backToArrangementButton { "backToArrangement", Icon::backToArrangement };
+    IconButton cycleButton { "cycle", Icon::cycle }; // round 190ld (DS-2): BandLab's Cycle switch in the Simple transport capsule
+    IconButton metronomeMenuButton { "metronomeMenu", Icon::chevronDown }; // round 190ld (DS-1): BandLab's metronome popover
+    void showMetronomePopover();
+public:
+    std::unique_ptr<juce::Component> makeMetronomePopoverForSnapshot();
+private:
+    void toggleCycle();
+    double stoppedAtTicks = -1.0; // round 190ld (DL-66): where Space last stopped the song
+    juce::PopupMenu makeCountInMenu();   // round 190ld: FL's right-click on Count-in / Wait for input
+    juce::PopupMenu makeWaitInputMenu();
     IconButton captureButton { "captureMidi", Icon::capture };
     IconButton sessionRecordButton { "sessionRecord", Icon::sessionRecord };
     IconButton drawModeButton { "drawMode", Icon::draw };
@@ -824,6 +838,7 @@ private:
     bool toolbarFrame (double nowMs);
     ui::FrameTicker toolbarFrames { *this, [this] (double ms) { return toolbarFrame (ms); }, 72.0 };
     int meterTicks = 0;
+    std::int64_t syncLightBeat = std::numeric_limits<std::int64_t>::min(); // round 190ld: FL's MIDI Sync light
     juce::String driverTipType; // the device type the ASIO suggestion was worked out for
 
     // hint bar: what the control under the mouse does, its live value, and markers for

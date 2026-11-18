@@ -209,6 +209,9 @@ void toggleLockState (Song& song, int track);
 // FL's effect-slot LED: Ctrl/Alt+click = "Solo/Unsolo" the slot (manual "Mute/Disable LED - The same as for the Mixer
 // Track mute LEDs"): only this effect of the insert stays on; again on a soloed slot turns every effect of it on.
 void soloSlot (Song& song, int track, int index);
+// FL's Shift+click on the slot LED = "Lock/Unlock State" (round 190ld): a locked slot keeps its on/off state when
+// another slot of the insert is soloed.
+void toggleSlotLock (Song& song, int track, int index);
 // "Reset selected track(s) routing": each insert sends only to the Master again, at full level.
 void resetRouting (Song& song, const std::vector<int>& tracks);
 // "Unroute tracks routed to the selected track(s)": the sends into them are removed (an insert left with no

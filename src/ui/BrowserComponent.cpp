@@ -6142,6 +6142,16 @@ void BrowserComponent::openFolder (bool open)
         tree->openSelected (open);
 }
 
+bool BrowserComponent::previewSelected()
+{
+    const auto file = getSelectedFile();
+    if (! file.existsAsFile())
+        return false;
+    const juce::ScopedValueSetter<bool> force (forcePreview, true);
+    fileSelected (file, true);
+    return true;
+}
+
 void BrowserComponent::loadSelected()
 {
     if (hotSwapLoadSelected()) // round 190ce: while linked, Enter replaces the linked device

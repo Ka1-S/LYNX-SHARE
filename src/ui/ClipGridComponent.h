@@ -44,6 +44,9 @@ void setClipGridDeviceDropForSnapshot (juce::Component& grid, int track);
 // kept with the UI settings: each scene shows its tempo and time signature fields); refreshClipGrid after a change; the
 // listener hears the grid's own switch (in its options menu).
 bool& clipGridSceneTempoShown();
+// Round 190ld: Live's scene-launch preferences (Main track menu): select the next scene on launch, record on launch (DL-36)
+bool& clipGridSelectNextOnLaunch();
+bool& clipGridRecordOnSceneLaunch();
 // Round 190ig: View › "Classic LYNX look for the clip grid" (a preference, off by default: the grid takes Live's look in the
 // Clip-launch layout; on: round 181a's look); refreshClipGrid after a change.
 bool& clipGridClassicLook();

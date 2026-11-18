@@ -5828,6 +5828,12 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
             repaint (0, headerHeight, headerWidth, getHeight() - headerHeight);
             return;
         }
+        // FL's Shift+click on the mute switch = lock its state (round 190ld, DE-129): a solo elsewhere leaves it alone
+        if (onLed && e.mods.isShiftDown() && ! e.mods.isAltDown() && ! flmods::ctrl (e.mods) && ! flmods::popup (e.mods))
+        {
+            editTrack (track, [] (PlaylistTrack& t) { t.soloLock = ! t.soloLock; });
+            return;
+        }
         // FL's group mute / solo (manual › Playlist › Mute / Solo, round 190jf B17): Alt+click on the mute LED of any track
         // of a group mutes / unmutes the whole group, Alt+right-click solos it (core/NoteEdit.h › muteGroup / soloGroup)
         if (onLed && e.mods.isAltDown() && ! noteedit::groupMuteSet (engine.getSong(), track).empty())
@@ -8687,8 +8693,18 @@ void PlaylistComponent::paintSimpleHeaderControls (juce::Graphics& g, int t, juc
     g.setColour (colour::textPrimary);
     g.drawLine (pan.getCentreX(), pan.getCentreY(), pan.getCentreX() + (knob - 1.5f) * std::sin (angle), pan.getCentreY() - (knob - 1.5f) * std::cos (angle), 1.5f);
 
-    // "+FX", with the insert's effect count
-    if (const auto fx = trackFx (t).toFloat(); ! fx.isEmpty())
+    // "+FX", with the insert's effect count; with a chain preset BandLab's pill: "Fx <preset>" in the track's colour
+    // (round 190ld, DS-13: bandlab190p 11-sounds-free-loops.png, the Drum Machine track's purple "Fx Bass Boost")
+    if (const auto fx = trackFx (t).toFloat(); ! fx.isEmpty() && ! m->chainPreset.empty())
+    {
+        const auto fill = trackColour != 0 ? juce::Colour (trackColour) : colour::accent;
+        g.setColour (hovered && hover.fx ? fill.brighter (0.15f) : fill);
+        g.fillRoundedRectangle (fx, fx.getHeight() * 0.5f);
+        g.setColour (fill.getPerceivedBrightness() > 0.5f ? colour::bg0 : juce::Colours::white);
+        g.setFont (simpleFxFont());
+        g.drawText ("Fx " + simpleFxPreset (t), fx.reduced (fx.getHeight() * 0.5f, 0.0f), juce::Justification::centred, true);
+    }
+    else if (const auto fx = trackFx (t).toFloat(); ! fx.isEmpty())
     {
         const auto count = (int) m->effects.size();
         g.setColour (hovered && hover.fx ? colour::bg6 : colour::bg4);
@@ -8772,7 +8788,7 @@ juce::Rectangle<int> PlaylistComponent::trackVolume (int track) const
     {
         // round 190jc (SG-3): the volume line from the name's left to the pan knob, the "+FX" pill at the plate's right
         const auto z = simpleSizes();
-        const auto right = headerWidth - rightColumn() - 10 - z.fxWidth - 8 - z.knob - 10;
+        const auto right = headerWidth - rightColumn() - 10 - simpleFxWidth (track) - 8 - z.knob - 10;
         return { 12, trackToY (track) + h - 6 - z.volumeHit, juce::jmax (20, right - 12), z.volumeHit };
     }
     // a linked header (round 190gz): the bar under the first row, the pan knob at its right (Logic / Bitwig's compact row)
@@ -8802,7 +8818,32 @@ juce::Rectangle<int> PlaylistComponent::trackFx (int track) const
     if (v.isEmpty() || ! simpleHeaders)
         return {};
     const auto z = simpleSizes();
-    return { trackPan (track).getRight() + 8, v.getCentreY() - z.fxHeight / 2, z.fxWidth, z.fxHeight };
+    return { trackPan (track).getRight() + 8, v.getCentreY() - z.fxHeight / 2, simpleFxWidth (track), z.fxHeight };
+}
+
+juce::Font PlaylistComponent::simpleFxFont()
+{
+    return theme::font (ui::simplelook::largeControls() ? theme::type::body : theme::type::small, true);
+}
+
+// round 190ld (details DS-13, BandLab B11 "Fx Bass Boost"): the insert's chain preset, "" = none
+juce::String PlaylistComponent::simpleFxPreset (int track) const
+{
+    const auto insert = simpleInsert (track);
+    const auto& song = engine.getSong();
+    return insert > 0 && insert < (int) song.mixer.size() ? juce::String::fromUTF8 (song.mixer[(std::size_t) insert].chainPreset.c_str()) : juce::String();
+}
+
+// The Fx pill's width: "+ FX" / "FX n" in the usual pill; with a chain preset BandLab's "Fx <preset>" pill, as wide as
+// its name needs (at most 2.6 pills, the volume line gives the room; the name is cut with "..." beyond that)
+int PlaylistComponent::simpleFxWidth (int track) const
+{
+    const auto z = simpleSizes();
+    const auto preset = simpleFxPreset (track);
+    if (preset.isEmpty())
+        return z.fxWidth;
+    const auto text = juce::GlyphArrangement::getStringWidthInt (simpleFxFont(), "Fx " + preset);
+    return juce::jlimit (z.fxWidth, juce::roundToInt ((float) z.fxWidth * 2.6f), text + z.fxHeight);
 }
 
 // --- issue #154 (round 190ht): the insert effects column of the linked headers -------------------------------------
@@ -12574,6 +12615,21 @@ bool PlaylistComponent::handleKey (const juce::KeyPress& key)
         return true;
     }
 
+    // Live (manual 9.x Audio Clip Fades, details DL-67, round 190ld): Delete over a fade handle returns that fade to its
+    // 4 ms default, in the Clip-launch layout only (elsewhere Delete deletes as FL's)
+    if (code == juce::KeyPress::deleteKey && ! mods.isAnyModifierKeyDown() && layoutstyle::current() == layoutstyle::Style::clipLaunch
+        && (hover.fade == 1 || hover.fade == 2) && hover.clip >= 0 && hover.clip < (int) engine.getSong().playlist.size()
+        && engine.getSong().playlist[(std::size_t) hover.clip].kind == ClipKind::audio)
+    {
+        const auto ticks = juce::jmax<std::int64_t> (1, juce::roundToInt (0.004 * juce::jmax (1.0, engine.getSong().bpm) / 60.0 * (double) ppq));
+        engine.editSong ([index = hover.clip, in = hover.fade == 1, ticks] (Song& s) {
+            auto& c = s.playlist[(std::size_t) index];
+            (in ? c.fadeIn : c.fadeOut) = juce::jmin (ticks, c.length);
+        });
+        repaint();
+        return true;
+    }
+
     if (code == juce::KeyPress::deleteKey && ! mods.isShiftDown())
     {
         if (ripple)
@@ -13016,11 +13072,13 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
         hint.text = h.arm     ? tr ("Audio track: [LMB] arm / disarm recording (its mixer track)")
                     : h.input ? tr ("Audio track: [LMB] audio input source and monitoring (its mixer track)")
                     : h.led && ! noteedit::groupMuteSet (song, h.track).empty() // round 190jf: FL's group mute / solo
-                        ? tr ("Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Alt][LMB] mute the group  [Alt][RMB] solo the group")
-                    : h.led   ? tr ("Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo")
+                        ? tr ("Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Shift][LMB] lock its state  [Alt][LMB] mute the group  [Alt][RMB] solo the group")
+                    : h.led   ? tr ("Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo  [Shift][LMB] lock its state")
                     : h.arrow ? tr ("Track group: [LMB] collapse / expand the grouped tracks")
                               : tr ("Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down  [Alt] drag: move into / out of a group");
         hint.value = trackName (h.track);
+        if (h.led && h.track < (int) song.playlistTracks.size() && song.playlistTracks[(std::size_t) h.track].soloLock) // round 190ld
+            hint.value << "  " << tr ("(state locked)");
         if (const auto mode = trackmodes::describe (song, h.track); ! mode.empty()) // FL's "(Instrument track)" / "(Audio track, ...)"
             hint.value += " " + (mode.rfind ("(Audio", 0) == 0 ? tr ("(Audio track, linked to mixer track {0})", { juce::String (song.playlistTracks[(std::size_t) h.track].mixerTrack) })
                                                                  : tr ("(Instrument track)"));

@@ -1150,6 +1150,12 @@ void AudioEngine::stopClipPreview() noexcept
 
 void AudioEngine::play() noexcept
 {
+    preparePlay();
+    transport.playing.store (true);
+}
+
+void AudioEngine::preparePlay() noexcept
+{
     stopClipPreview(); // (live check 190ew PL-3: transport start ends a clip preview)
     if (! transport.playing.load())
     {
@@ -1162,7 +1168,6 @@ void AudioEngine::play() noexcept
             if (const auto start = transport.markerStart.load(); start > 0)
                 transport.seekRequest.store ((double) start);
     }
-    transport.playing.store (true);
 }
 
 // FL resets its "initialized controls" whenever the song position is set in song mode (playing starts, a jump):
@@ -1245,6 +1250,7 @@ void AudioEngine::setRecordOptions (const RecordOptions& options)
     recordOptions.postRollBars = juce::jlimit (0, 8, options.postRollBars);
     recordOptions.catchWindow = juce::jlimit<std::int64_t> (0, ppq, options.catchWindow);
     compensatePlayed.store (options.compensateOutput);
+    notesStartWait.store (! options.waitRespectFilter || options.recordNotes);
     updateLinearSong();
     refreshLowLatency(); // (round 190aq: the option switched while an insert is live)
     sendChangeMessage();
@@ -1254,6 +1260,14 @@ void AudioEngine::startPlayback()
 {
     if (! transport.recording.load())
     {
+        // FL's Wait for input with "Only when recording" off (round 190ld): Play alone waits for the first note too
+        if (recordOptions.waitForInput && ! recordOptions.waitOnlyWhenRecording && ! transport.playing.load())
+        {
+            preparePlay();
+            waitingForInput.store (true);
+            sendChangeMessage();
+            return;
+        }
         play();
         return;
     }
@@ -1319,6 +1333,8 @@ void AudioEngine::startPlayback()
 
 void AudioEngine::startOnInput() noexcept
 {
+    if (! notesStartWait.load (std::memory_order_relaxed)) // (round 190ld: FL's "Respect recording filter")
+        return;
     if (waitingForInput.exchange (false))
         transport.playing.store (true);
 }
@@ -5828,6 +5844,8 @@ void AudioEngine::applyControllers()
             auto& previous = remoteValues.try_emplace ({ ev.cc, ev.channel, ev.port }, -1).first->second;
             const auto fires = remotemap::midiFires (song, globalMappings, ev.channel, ev.cc, ev.value, previous, ev.port);
             previous = ev.value;
+            if (! fires.empty()) // round 190ld: the MIDI light's "handled" colour
+                ++midiProjectLinked;
             if (onRemoteFire != nullptr)
                 for (const auto& f : fires)
                     onRemoteFire (f);
@@ -5851,6 +5869,11 @@ void AudioEngine::applyControllers()
             // (round 190bt: a link follows the devices with exactly its port number, as FL's controller id does)
             if (link.cc != ev.cc || ! (link.channel < 0 || link.channel == ev.channel) || link.port != ev.port)
                 continue;
+            // round 190ld (FL's Sync indicator): a project link (the list's first part) or a global one took it
+            if (&link - links.data() < (std::ptrdiff_t) song.midiLinks.size())
+                ++midiProjectLinked;
+            else
+                ++midiGlobalLinked;
             const auto absolute = linkformula::linkModeIsAbsolute (link.mode);
             if (absolute && ! lastOfKey)
                 continue; // (a controller's earlier values this frame: only the last one moves the control)
@@ -7603,6 +7626,21 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
                     }
                 }
             takeLock.exit();
+        }
+
+        // round 190ld: the Finish dock's loudness-matched "Hear without" (the device's output only)
+        if (const auto want = listenGain.load (std::memory_order_relaxed); want != 1.0f || listenGainNow != 1.0f)
+        {
+            for (int ch = 0; ch < numOutputChannels; ++ch)
+                if (auto* out = outputs[(std::size_t) ch]; out != nullptr)
+                {
+                    if (want == listenGainNow)
+                        juce::FloatVectorOperations::multiply (out, want, n);
+                    else
+                        for (int i = 0; i < n; ++i)
+                            out[i] *= listenGainNow + (want - listenGainNow) * (float) (i + 1) / (float) n;
+                }
+            listenGainNow = want;
         }
 
         for (int ch = 0; ch < numOutputChannels; ++ch)
