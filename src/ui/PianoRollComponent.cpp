@@ -5,6 +5,7 @@
 #include "ui/PianoRollComponent.h"
 #include "ui/PaintAB.h"
 #include "core/ChordReadout.h"
+#include "core/RowBands.h"
 #include "core/KeyMap.h"
 #include "core/NoteNames.h"
 
@@ -1062,6 +1063,8 @@ void PianoRollComponent::paint (juce::Graphics& g)
     const auto lift = [] (juce::Colour c, float amount) { return c.interpolatedWith (textPrimary, amount); };
     const auto prBar = lift (gridBar, 0.06f), prBeat = lift (gridBeat, 0.05f), prStep = lift (gridStep, 0.035f);
     const auto prRowBlack = rowBlack.interpolatedWith (juce::Colours::black, 0.1f);
+    // issue #205 (round 190lw): a selected note's row band (FL 2026 capture: BANDNOTE)
+    const auto rowBand = [] (juce::Colour row, bool live) { return row.interpolatedWith (textPrimary, live ? 0.10f : 0.10f); };
 
     auto drawVerticalGrid = [&] (juce::Rectangle<int> area) {
         // grid lines: bar > beat > snap (unless too dense)
@@ -1096,6 +1099,12 @@ void PianoRollComponent::paint (juce::Graphics& g)
 
         const auto autoRows = isAutoScale();
         const auto chosenScale = scaleIndex() > 0; // (round 190kd: read once per paint, not per row)
+        // issue #205 (round 190lw): FL's row bands — the rows of the selected notes lit across the whole grid, and while a
+        // note is pressed or dragged, the rows of the notes that follow the mouse (the hover band no longer goes away)
+        const auto noteDrag = drag == Drag::move || drag == Drag::resize || drag == Drag::resizeLeft;
+        auto bandRows = rowbands::of (pattern.notes, selection);
+        if (noteDrag)
+            bandRows |= rowbands::of (pattern.notes, dragIndices);
         for (int key = 0; key < 128; ++key)
         {
             const auto y = keyToY (key);
@@ -1114,7 +1123,9 @@ void PianoRollComponent::paint (juce::Graphics& g)
                 row = inScale (key) ? rowWhite : prRowBlack;
             if (liveLookNotes) // (round 190jn: Live's note editor, one grey with a darker line under each row)
                 row = juce::Colour (0xff464f53);
-            if (key == hover.key && drag == Drag::none)
+            if (bandRows.test ((std::size_t) key))
+                row = rowBand (row, liveLookNotes);
+            else if (key == hover.key && drag == Drag::none)
                 row = row.interpolatedWith (textPrimary, 0.04f); // the row under the mouse
             g.setColour (row);
             g.fillRect (grid.getX(), y, grid.getWidth(), rowHeight);

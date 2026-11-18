@@ -2289,6 +2289,8 @@ void PlaylistComponent::paint (juce::Graphics& g)
                 g.strokePath (half, juce::PathStrokeType (1.0f));
             }
 
+        paintPointSelection (g); // issue #207 (round 190lw): selected points and their rubber band
+
         if (! rubberBand.isEmpty())
         {
             g.setColour (colour::selectionFill);
@@ -5780,6 +5782,9 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
         return;
     }
 
+    // issue #207 (round 190lw): the pen, a curve's rubber band and a selected points' move (LYNX extras)
+    if (pointMouseDown (e, -1))
+        return;
     // round 190jr: the Simple automation view (its header menu; the first point on a row makes its lane)
     if (simpleAutoMouseDown (e))
         return;
@@ -6682,6 +6687,12 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
 {
     if (insertsMouseDrag (e)) // issue #154: an effect dragged from a linked header's list
         return;
+    if (drag == Drag::pen || drag == Drag::pointBand || drag == Drag::pointsMove) // issue #207 (round 190lw)
+    {
+        pointMouseDrag (e);
+        postDragHint();
+        return;
+    }
     if (levelDrag != 0 && levelInsert > 0 && levelInsert < (int) engine.getSong().mixer.size())
     {
         // a Simple header's volume (along the bar) or pan (up / down, as a knob); Shift: fine
@@ -7385,6 +7396,8 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
 
 bool PlaylistComponent::makeDragHint (ui::Hint& hint)
 {
+    if (makePointDragHint (hint)) // issue #207 (round 190lw)
+        return true;
     const auto& song = engine.getSong();
     const auto count = juce::String ((int) std::max<std::size_t> (1, dragIndices.size()));
     auto position = [&song] (std::int64_t tick) {
@@ -7572,6 +7585,13 @@ void PlaylistComponent::mouseUp (const juce::MouseEvent& e)
     if (insertsMouseUp (e)) // issue #154: a click or a drag in a linked header's effects list
     {
         drag = Drag::none;
+        return;
+    }
+    if (drag == Drag::pen || drag == Drag::pointBand || drag == Drag::pointsMove) // issue #207 (round 190lw)
+    {
+        pointMouseUp (e);
+        ui::clearPostedHint();
+        updateHover (e.getPosition(), e.mods);
         return;
     }
     if (drag == Drag::headerWidth) // round 190jq (issue #164): the width is a preference (ui-options.txt), saved now
@@ -12663,6 +12683,9 @@ bool PlaylistComponent::handleKey (const juce::KeyPress& key)
     const auto code = key.getKeyCode();
     const auto letter = keys::letterOfKeyCode (code); // (0 for F-keys, numpad, arrows: issue #12)
 
+    if (pointKeyPressed (key)) // issue #207 (round 190lw): Delete / Esc / Ctrl+C / X / V on selected points
+        return true;
+
     if (code == juce::KeyPress::backspaceKey)
     {
         EditorGlobals::get().toggleGrid();
@@ -13018,6 +13041,13 @@ void PlaylistComponent::updateCursor (juce::ModifierKeys mods)
         setMouseCursor (juce::MouseCursor::UpDownResizeCursor); // (a locked row's band: a click unlocks it, no resize)
         return;
     }
+    // issue #207 (round 190lw): Ctrl held over a curve: the pen
+    if (flmods::ctrl (mods) && ! mods.isAltDown() && ! mods.isShiftDown()
+        && (tools.getTool() == EditTool::pencil || tools.getTool() == EditTool::brush || tools.getTool() == EditTool::lasso) && curveSpotAt (p).valid())
+    {
+        setMouseCursor (editorCursor (gesture::Cursor::draw));
+        return;
+    }
     if (const auto lane = laneAt (p); lane.track >= 0) // round 177b
     {
         if (p.x >= headerWidth && drawmode::isOn()) // round 190ef: Draw Mode's pencil
@@ -13057,6 +13087,13 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
                    ? juce::String::fromUTF8 (song.playlistTracks[(std::size_t) t].name.c_str())
                    : tr ("Track {0}", { juce::String (t + 1) });
     };
+
+    // issue #207 (round 190lw): Ctrl held over a curve
+    if (flmods::ctrl (mods) && ! mods.isAltDown() && ! mods.isShiftDown() && curveSpotAt (p).valid())
+    {
+        hint.text = tr ("Pen: [Ctrl] drag draws the curve freehand  [Select tool] drag selects points  [Del] deletes them  [Ctrl+C/V] copy, paste");
+        return hint;
+    }
 
     if (const auto lane = laneAt (p); lane.track >= 0) // round 177b
     {
@@ -15407,5 +15444,7 @@ int PlaylistComponent::flHeaderWidthNow() noexcept
 {
     return flClipLook() ? flPatternHeaderWidth : flHeaderWidth;
 }
+
+#include "PlaylistPoints190lw.inc" // issue #207 (round 190lw)
 
 } // namespace lynx

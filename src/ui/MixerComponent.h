@@ -503,6 +503,11 @@ public:
         showSlotMenu (slot);
     }
     void showAddMenuFor (int row) { showAddMenu (row); }
+    // Issue #206 (round 190lw, a LYNX extra): a double-click on an empty slot opens the effect search (the Quick-add
+    // palette with the effects alone, its search box focused); the chosen effect lands in that slot. FL's single click
+    // (the plugin menu at once) stays: the menu is closed when the second click comes.
+    void showSlotSearch (int row);
+    std::unique_ptr<juce::Component> makeSlotSearch (int row); // (the shot route shows it in a window of its own)
     std::function<void (juce::PopupMenu&, int slot)> extendSlotMenu; // items put first in a slot's menu (nullptr: none)
     static inline juce::PopupMenu* slotMenuForSnapshot = nullptr;    // the shot routes: the next slot menu goes here instead of opening
     // Round 190ce: the slot menu's "Hot-swap in the Browser" (set once by the main window; nullptr: no such item)
@@ -597,6 +602,13 @@ private:
     const std::vector<EffectSlot>* slots() const;
     void showAddMenu (int slot);
     void showSlotMenu (int slot);
+    int placeEffectAtRow (int row, EffectSlot fx); // the effect into empty slot `row` (FL's slot places); its index, -1 none
+    // issue #206: the press that opened an empty slot's menu, and the watch for the second press (it lands on the menu's
+    // window, so the panel never sees it as a double-click; core/SecondClick.h)
+    struct SecondClickWatch;
+    std::unique_ptr<SecondClickWatch> secondClick;
+    void armSecondClick (const juce::MouseEvent& e, int row);
+    void disarmSecondClick();
     juce::Rectangle<int> pluginButtonBounds() const;
     void openEditor (int slot);
     // Freeze (round 190ff): a track freeze holds this insert's effects (not loaded): a click, wheel or drop on the slots

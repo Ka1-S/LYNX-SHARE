@@ -17928,3 +17928,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "LoopAnalysis190kxTests.inc" // round 190kx: loop analysis (key and tempo of the user's own loops; core/LoopAnalysis.h)
 #include "Vocal190liTests.inc" // round 190li: Newtone natural engine (engine 1), modulation / drift split, sung centre, analysis octave guard
 #include "Newtone190lmTests.inc" // rollup 0.1.30 step 8: a new Newtone slot (natural engine) analysed with "Separate close notes"
+#include "Issues190lwTests.inc" // round 190lw: issues #205 / #206 / #207 (row bands, second click, automation point editing)
