@@ -50,8 +50,31 @@ states (loadcomponent) on the probe stimuli.
 
 ### 1.3 LYNX's cell law
 
-@@CELL@@
+Glow Leveler, hidden `Settings::cellLaw` = 1 (0 = every older voicing exactly; set only by the CLA-2A translator).
+Per sample: the side chain hears the cell's output (feedback; in Limit plus a share of the input) through a low and a
+high peaking filter (the Hi Freq weighting; the filters' gains move with the dial), the louder channel's level times the
+peak reduction / Hi Freq shifts (dial tables, below) is held by the light's persistence (peak hold, `envMs`) and lights the
+cell above 1: C* = (u − 1)^γ. A fast and a slow conductance share C*; each charges towards its part (the fast one in the
+log1p domain) and releases as dC/dt = −(a Cⁿ + b C) / (1 + mg · E), E an exposure that charges while the cell is lit
+and fades slowly. The audio gain is 1 / (1 + Cf + Cs) (Limit: floored), the band above the tilt frequency reduced less,
+then the Gain dial's make-up (the measured dial law) and the Opto classic voicing's idle response and harmonics.
+
+Fits (`lab/fit2a.py`, a C sim `lab/c/opto2a.c` that is the product path; tables written into VoiceMatch.cpp by
+`lab/gen2a.py`): 1 kHz stairs 0.05–0.16 dB rms, bursts 0.1–0.36 dB, Limit 80 ≈ 0.5 dB, the tilt 0.26 dB. Fitted on the
+probes alone the law scored 4.9–5.3 on refcap182's programme (broadband material was reduced less than by the
+reference), so a final refinement ran on refcap182's 30 programme renders themselves (`lab/fitprog.py`: 10 ms frame
+gains from 3 s on; stated as such): prog rms 0.36 dB (`lab/f2a_p4.json`). The coordinator moved the Hi Freq 0 shift
+from −2.93 to −3.2 dB (X2, the only Hi Freq 0 setting: X2_vocal level −0.34 → −0.17 dB).
+Peak reduction shifts (dB) at 0 / 30 / 46 / 60 / 70 / 80 / 90 / 100: −60, −5.0, 17.9, 29.3, 37.8, 42.8, 45.6, 48.5;
+Hi Freq at 0 / 20 / 50 / 100: −3.2, −4.06, 0, +5.41.
 
 ## 2. Waves CLA-76 leftovers
 
-@@C76@@
+- **Bluey 12 (refcap182's X4, 5.2)**: Bluey step / release probes (`cap/cla76f.txt`, 39 renders: Bluey 20 / 12 / 8 at
+  knobs 1 / 4 / 7). Fitted through the shipped FET law (`lab/fit76x.py`) the probes went 4.22 → 1.78 dB rms, but that row
+  over-reduced X4 on the programme (ESR 1–3 dB worse); the shipped row keeps Blacky's attack, the release at knob 7 from
+  the probes (12.6 ms) and knob 1's release refined on X4 (795 ms; frame rms 1.09 → 0.64 dB). A translator-only change
+  (a new `cla76Times` row for Bluey 20 / 12 / 8): fetLaw values untouched, projects saved by round 190ky unchanged.
+- **Auto make-up** (state 105): −1.7 dB at Input −12, 0 at −24 (two points; no scored setting uses it) — not modelled.
+- **Amplifier / output saturation**: with Comp Off at Input ≥ −12 the second harmonic reaches −9 dB; no scored setting
+  reaches it — not modelled.

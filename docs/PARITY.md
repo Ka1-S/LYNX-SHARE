@@ -4071,3 +4071,81 @@ core per CLA-76 instance. No latency.
 **Still off:** the amplifier / output saturation stage, the analog noise and hum, auto make-up, the reset ramps (host
 artefacts in refcap182's first second); X4 (Bluey 12:1) stays at 5 (its release scaling is a model, no Bluey 12:1 step
 probe); CLA-2A, L2, RVerb, H-Delay, PuigTec, Valhalla FutureVerb and Slate / Eiosis not refit (REA_rodada190ky §5–§7).
+
+## Round 190lf: REA of the Waves DSP, third pass — the Limiter's L2 law, PuigTec on Facet, CLA-2A's cell law, H-Delay's loop, TrueVerb's direct sound
+
+Rounds 190kt / 190ky's path (small, unwrapped Waves V17 DSP DLLs; black-box probes in Waves demo mode with a 1.5 s silent
+lead; clean-room: structure from REA, every LYNX constant fitted on our renders, no vendor table read out). Evidence:
+`docs/analise/REA_rodada190lf.md` (L2, PuigTec, the host finding), `REA_rodada190lf_dyn.md` (CLA-2A, CLA-76),
+`REA_rodada190lf_verb.md` (reverbs, H-Delay). **Host finding:** on refcap030's fxmeasure host `defaults` + `set` loses
+some Waves settings (renders with the previous setting's state); every probe of this round runs from component states
+(refcap182's, or crafted by `lab/mkcomp.py`).
+
+- **Limiter — the L2 law** (hidden [3]; [4] ARC, [5] trim; 0 = the classic limiter, every project saved before). L2's
+  make-up is exactly ceiling − threshold (0.999 / threshold at Ceiling 0 dB): the Gain knob carries it. A 64-sample window
+  (= latency) minimum of the needed gain, two moving averages of 27 and 38 samples (a spike's dip is box(64) ∗ box(27) ∗
+  box(38) to 0.0005), the manual Release as the 90 % recovery time, and ARC as a follower of the window minimum (107 /
+  218 ms) plus a release rate that follows the depth and the follower (fitted on 8 probes, 0.061 dB rms; the scored
+  renders not used). Waves L2 translates onto it.
+- **Waves PuigTec EQP1A → Facet EQ** (a new substitute entry: such projects had no stand-in). Eight zero-latency Facet
+  bands: the reference's flat response (+1.1 dB, its resampler's roll-off), the Low Frequency switch's own lift, the low
+  boost / atten as two shelves whose values are cubic polynomials of both knobs (the boost-and-dip interaction), the high
+  boost bell and the atten shelf interpolated over a 1.375-step knob grid × five bandwidths — fitted on ~1 000 impulse
+  probes. Facet's code is unchanged.
+- **Glow Leveler — the cell law** (hidden `Settings::cellLaw`; Waves CLA-2A only): a compact opto behaviour model —
+  feedback side chain through the Hi Freq weighting, a light with persistence, fast and slow conductances with
+  state-dependent release and an exposure memory, the high band reduced less (the tilt), the gain dial's measured make-up.
+  Fitted on our probes and, as a final refinement (stated), on refcap182's programme renders.
+- **Crest's FET law — CLA-76 Bluey 20 / 12 / 8**: a translator row (`cla76Times`) from Bluey step / release probes, knob 1's
+  release refined on X4; fetLaw values untouched.
+- **Echoform — hybrid law 1** (hidden; Waves H-Delay only): HiPass / LoPass (2nd order) and LoFi inside the loop, the
+  modulation as a smoothed, free-running triangle, as measured.
+- **Reeverb 2 — the direct law** (hidden; TrueVerb only, direct sound on): TrueVerb's exact first-order direct-sound shelf
+  by Distance, and a refit tail (decay, bass, damping, wet) for those settings.
+
+| reference → LYNX | files | before → after | up / same / down |
+|---|---|---|---|
+| Waves L2 → Limiter (L2 law) | 25 | 7.32 → **9.52** | 25 / 0 / 0 |
+| Waves PuigTec EQP1A → Facet EQ (new entry) | 25 | no stand-in (n = 0) → **7.60** | — |
+| Waves CLA-2A → Glow Leveler (cell law) | 30 | 5.57 → **6.47** | 18 / 11 / 1 |
+| Waves CLA-76 → Crest (FET law, Bluey row) | 25 | 6.92 → **7.16** | 5 / 20 / 0 |
+| Waves H-Delay → Echoform (hybrid law 1) | 30 | 6.27 → **7.00** | 6 / 24 / 0 |
+| Waves TrueVerb → Reeverb 2 (direct law) | 25 | 3.96 → **4.20** | 3 / 22 / 0 |
+| Waves RVerb / H-Reverb → Reeverb 2 (unchanged) | 25 / 25 | 3.48 / 3.16 | — |
+| Waves SSLComp, SuperTap (unchanged, checked) | 25 / 25 | 7.56 / 6.44 | 0 / 25 / 0 each |
+
+Scorer: `scripts/fxparity.py` as on this branch (round 190ky's; round 190lg's time-based alignment window is not in it).
+Per setting: L2 D 9.0 → 10.0, X1 7.2 → 9.8, X2 6.6 → 8.8, X3 6.0 → 10.0, X4 7.8 → 9.0; PuigTec D 8.0, X1 8.0, X2 6.8,
+X3 8.0, X4 7.2; CLA-2A D 6.4 → 7.4, S1 5.0 → 6.2, S2 5.0 → 6.0, S3 5.0 → 6.0, X1 5.8 → 6.8, X2 6.2 → 6.4; CLA-76 X4 5.2 →
+6.4; H-Delay X2 3.4 → 7.6, S2 3.8 → 4.0; TrueVerb X1 4.0 → 5.2. The one file down: CLA-2A X2_vocal 8 → 7 (its waveform
+match improved: ESR −25.5 → −26.2 dB, gESR −26.2 → −26.8; third-octave error 0.14 → 0.21 dB crosses the 0.15 step) — owner
+rule (one step down with a better waveform) applied, listed below. The reverbs: RVerb is exactly LTI and an independent
+reverb with its time-frequency envelope scores only 3.6 … 3.8 on this table (REA_rodada190lf_verb §1), so its decay law
+was not changed.
+
+**Old projects.** Every new behaviour runs only with its hidden law set by the translators. Gold renders (base = round
+190ky's binary, 44.1 / 48 / 96 kHz × 3 programme signals, byte-identical): the Limiter (default + 10 settings) and Facet,
+117; Glow Leveler's own and classic voicings + Crest, 153; Echoform's engines and styles, Reeverb 2 by hand and the
+unchanged reverb / H-Delay translations, 144 — **414 renders, 0 differ**.
+
+**CPU** (`/mnt/e/lynx-work/waves2_190lf/cpu/bench.log`: 35 s stereo at 48 kHz incl. file I/O, best of 5 on one core, base =
+round 190ky's binary, load ~15, so ±30 %: a plain file copy measured 0.84 / 0.71 s): L2 states 1.04 / 0.73 s → 0.86 / 1.10 s
+(ARC / manual; the law ≈ +1 % of a core at most), its latency 72 → 64 samples; PuigTec 0.92 s (Facet, eight bands: ≈ +0.6 %
+of a core against the copy; before it had no stand-in); CLA-2A 1.03 / 1.07 → 1.00 / 0.92 s, CLA-76 X4 1.11 → 0.94 s,
+H-Delay 2.67 / 2.70 / 1.99 → 2.06 / 2.25 / 1.86 s, TrueVerb 2.18 / 2.78 → 2.02 / 1.94 s: no measurable change.
+
+**Tests:** `tests/Parity190lfTests.inc` (4: the L2 law hidden / off, brickwall and make-up, ARC vs manual release, the L2 and
+PuigTec translations), `Parity190lfDynTests.inc` (3), `Parity190lfVerbTests.inc` (6); expectations moved: Parity190jh (L2 → the
+law), VoiceMatchTests123 / Parity165x (CLA-2A on the cell law), Echo190dl / Parity190js (H-Delay / TrueVerb). Mini runner
+(round 190ky's list + the round's three files): **543 906 checks, 0 failures**. No full Linux / Windows build, no
+--selftest (no UI change, no new strings; the train does those).
+
+**Owner decisions (reversible; the recommended option taken):** (1) CLA-2A ships on the cell law although X2_vocal goes 8 → 7
+(waveform better) and the law reduces a steady −6 dBFS tone 1.4 dB less than round 123's trial measured on one user state
+(VoiceMatchTests123 / Parity165x expectations moved to the new law); (2) TrueVerb's refit tail only with the direct sound
+on (with it off it would cost X4 0.2 … 0.6); (3) PuigTec stands in on Facet EQ (no dedicated Pultec engine: a new effect
+would need UI).
+
+**Still off:** Doubler2 (4.48), Waves Tune Real-Time (5.36) and RVerb / H-Reverb's decay (time / the table's ceiling);
+NS1 (4.84): see below if its sub-round landed; PuigTec's mains hum, tube harmonics (−50 dB at −4 dBFS) and its resampler's
+fractional delay; L2's IDR dither; CLA-76's auto make-up and output saturation (no scored setting uses them).

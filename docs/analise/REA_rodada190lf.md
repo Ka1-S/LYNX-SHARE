@@ -1,7 +1,7 @@
 # REA round 190lf — the Waves DSP binaries, third pass (owner's permission of 2026-11-17)
 
 Scope: the brief's Waves list after rounds 190kt / 190ky — L2, CLA-2A, the three Waves reverbs, H-Delay, PuigTec EQP1A,
-Doubler2 / NS1 / Waves Tune Real-Time and the CLA-76 leftovers. The coordinator took L2 and PuigTec (this file, §1–§4);
+Doubler2 / NS1 / Waves Tune Real-Time and the CLA-76 leftovers. The coordinator took L2 and PuigTec (this file, §1–§5);
 two sub-rounds took CLA-2A + CLA-76 ("dyn", `REA_rodada190lf_dyn.md`) and the reverbs + H-Delay ("verb",
 `REA_rodada190lf_verb.md`). Tools as in 190ky: the rea MCP (Ghidra 12.1.4 headless, `decompile_all` into
 `/mnt/e/lynx-work/waves2_190lf/ev/`), the bundles' ParamXML and black-box renders in Waves demo mode on refcap030's
@@ -39,7 +39,7 @@ with the make-up; IDR dither / noise shaping last. LYNX's own description of eac
 
 The law is behind the Limiter's hidden parameter [3] (0 = the classic limiter, exactly as before; [4] ARC, [5] trim). The
 c simulation (`lab/c/l2sim.c`) of the law predicted refcap182's programme renders at ESR −110 … −120 dB (D), −56 … −123 (X1),
-−55 … −69 (X2), −85 … −115 (X3, manual 100 ms), −56 … −70 (X4) before the C++ port; the table in §5 is the C++ binary's.
+−55 … −69 (X2), −85 … −115 (X3, manual 100 ms), −56 … −70 (X4) before the C++ port; the table in §4 is the C++ binary's.
 
 ## 3. Waves PuigTec EQP1A → Facet EQ [DECOMP: `ev/puigtec_gmcp`; EXEC: `cap/pta…ptf`, 1 000 impulse probes]
 
@@ -61,10 +61,21 @@ the Low Frequency switch's lift (two shelves per position), the low section on t
 polynomials of both knobs (fitted jointly on 80 probes per Low Frequency, Levenberg–Marquardt), the high boost on a bell
 and the atten on a 12 dB/oct high shelf, both interpolated over a 1.375-step knob grid × five bandwidths (per-probe fits
 ≤ 0.25 dB rms). All values are LYNX's fits written by `lab/gen_pt.py` into `translateWavesPuigTec`. Facet's own code is
-unchanged (no gold renders needed for it beyond the check in §5).
+unchanged (its gold renders: docs/PARITY.md "Round 190lf").
 
-## 4. Not done
+## 4. Results (refcap182 programme, scorer `scripts/fxparity.py` of this branch = round 190ky's)
 
-Doubler2 (4.48), NS1 (4.84) and Waves Tune Real-Time (5.36): time (each a time-varying / adaptive process that needs its
-own REA and probe set; their baselines stay). PuigTec's mains hum, the resampler's fractional delay and the tube stage's
-harmonics are not modelled.
+| reference → LYNX | files | before → after | up / same / down |
+|---|---|---|---|
+| L2 → Limiter (L2 law) | 25 | 7.32 → 9.52 | 25 / 0 / 0 |
+| PuigTec EQP1A → Facet EQ | 25 | n = 0 → 7.60 | — |
+
+L2 per setting: D 9.0 → 10.0, X1 7.2 → 9.8, X2 6.6 → 8.8, X3 6.0 → 10.0, X4 7.8 → 9.0. PuigTec: D 8.0, X1 8.0, X2 6.8,
+X3 8.0, X4 7.2 (the predicted curve errors against the measured states: 0.01 / 0.13 / 0.20 / 0.01 / 0.18 dB rms). The
+sub-rounds' results are in their files and in docs/PARITY.md "Round 190lf".
+
+## 5. Not done
+
+Doubler2 (4.48) and Waves Tune Real-Time (5.36): time (each a time-varying process that needs its own REA and probe
+set; their baselines stay). NS1 (4.84): a separate sub-round after the 04:56 crash (`REA_rodada190lf_ns1.md` if it
+landed). PuigTec's mains hum, the resampler's fractional delay and the tube stage's harmonics are not modelled.

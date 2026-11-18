@@ -124,9 +124,9 @@ matches by name).
 | ValhallaShimmer | Halo (round 100) | name | every parameter (bare `parameterN` attributes; mode lists partly not confirmed) |
 | ValhallaFutureVerb | Horizon (round 100) | name | every parameter |
 | Soundtoys Little Plate | Foil Plate (round 129; 2 s, 100 % wet, slot dry/wet 25 %; was Reeverb 2) | name | — |
-| Waves RVerb / H-Reverb / TrueVerb | Reeverb 2 (100 % wet, slot dry/wet 25 %) | Waves name | round 190js: decay, pre-delay, the wet level by the decay, each reverb's measured tone, H-Reverb's ducking, TrueVerb's direct path / reverb / early levels (slot at 100 %) |
+| Waves RVerb / H-Reverb / TrueVerb | Reeverb 2 (100 % wet, slot dry/wet 25 %) | Waves name | round 190js: decay, pre-delay, the wet level by the decay, each reverb's measured tone, H-Reverb's ducking, TrueVerb's direct path / reverb / early levels (slot at 100 %) ; round 190lf: TrueVerb with the direct sound on gets its measured direct-sound shelf (Reeverb 2's hidden direct law, by Distance) and a refit tail [EXEC] (REA_rodada190lf_verb §2) |
 | FabFilter Pro-R | LuxeVerb (default) | name | — |
-| Waves H-Delay | Echoform (round 119; was Fruity Delay 3) | VST3 class ID [DATA], Waves name | sync (host / BPM / ms), note, time, feedback, ping-pong (pairs) / stereo, mix, output, filters; laws measured on the official trial [EXEC] (round 119 §2) |
+| Waves H-Delay | Echoform (round 119; was Fruity Delay 3) | VST3 class ID [DATA], Waves name | sync (host / BPM / ms), note, time, feedback, ping-pong (pairs) / stereo, mix, output, filters; laws measured on the official trial [EXEC] (round 119 §2) ; round 190lf: HiPass / LoPass / LoFi inside the loop and the free-running modulation as measured (Echoform's hidden hybrid law 1) [EXEC] (REA_rodada190lf_verb §3) |
 | Waves NS1 | Quell Denoiser (round 119) | Waves name | the one knob (RealWorld 229), Quell fitted to the official trial [EXEC] (round 119 §3) |
 | Waves Doubler (2 / 4 voices) | Gemini Doubler (round 119) | Waves name | every control of voices 1–2, direct, align, shelves, feedback cut, range [EXEC] (round 119 §4) |
 | Soundtoys EchoBoy / PrimalTap | Echoform (round 129; tape / lo-fi echo, 1/4 note, 25 % feedback, 25 % mix; was Fruity Delay 3) | VST2 ID [DATA] (EchoBoy), names | — |
@@ -136,7 +136,8 @@ matches by name).
 | ValhallaFreqEcho | Spiral Echo (round 101) | VST3 class ID [derived], name | all 8 settings |
 | ValhallaSpaceModulator | Orbit (round 101) | VST3 class ID [derived], name | all 6 settings |
 | ValhallaUberMod | Lattice Mod (round 101) | VST3 class ID [derived], name | all but DelaySync and InputPan (meaning not confirmed) |
-| Waves L1/L2/L3/L4 | Limiter | Waves name | L2 (round 190jh): threshold → input gain, out ceiling, release (ARC → 10 ms) [EXEC] (refcap182) |
+| Waves L1/L2/L3/L4 | Limiter (L2: the L2 law, round 190lf) | Waves name | L2: threshold and out ceiling (the Gain knob = ceiling − threshold), release, ARC onto the Limiter's hidden L2 law (window, ARC follower and release, two moving averages; structure from REA of the reference's DSP, every constant fitted on our probes) [DECOMP + EXEC] (REA_rodada190lf §2; round 190jh before) |
+| Waves PuigTec EQP1A | Facet EQ (round 190lf; no entry before) | Waves name | every control but Mains: low boost / atten / frequency, high boost / bandwidth / frequency, atten / select, gain, in / out onto eight fitted Facet bands [DECOMP + EXEC] (REA_rodada190lf §3) |
 | FabFilter Pro-L | Apex Limiter (round 99) | names | — |
 | Waves CLA-76 | Crest Compressor with the FET law (round 190ky; was the Bus style fitted to the official trial, round 127) | Waves name | Input, Output (their measured gains), Attack, Release, Ratio (59), Revision (56), Comp off (4), Mix (103), Trim (104) onto the FET law (a feedback limiter whose structure REA read in the reference's DSP; every constant fitted on our demo-mode probes) [DECOMP + EXEC] (REA_rodada190ky §2–§4) |
 | Waves RComp, CLA-3A, C1, API-2500 | Compressor (2:1 above −15 dBFS, auto gain; round 113) | VST3 class ID [DATA], Waves names | RComp: threshold, ratio, attack, release (ARC), gain, laws measured on the official trial [EXEC] (round 113 §3c) |
@@ -144,7 +145,7 @@ matches by name).
 | FabFilter Pro-C (2 / 3) | Crest Compressor (round 108) | names | Pro-C 3: style, threshold, ratio, knee, range, attack, release, hold, look-ahead, character, side-chain EQ (3 bands), levels, mix, oversampling [EXEC layout] |
 | FabFilter Pro-MB | Prism Multiband (round 108) | names | enabled bands laid out on Prism's four, threshold, ratio, range, mode, knee, attack / release, level, solo, look-ahead, mix [EXEC layout] |
 | FabFilter Pro-G | Sentry Gate (round 108) | names | every control [EXEC layout] |
-| Waves CLA-2A | Glow Leveler (peak reduction 30 %, gain +2 dB; round 113) | VST3 class ID [DATA], Waves name | gain, peak reduction, comp / limit, laws measured on the official trial [EXEC] (round 113 §3c) |
+| Waves CLA-2A | Glow Leveler (peak reduction 30 %, gain +2 dB; round 113) | VST3 class ID [DATA], Waves name | gain, peak reduction, comp / limit, laws measured on the official trial [EXEC] (round 113 §3c) ; round 190lf: Glow Leveler's cell law (a compact opto model whose structure REA read in the reference's DSP; fitted on our probes and refined on refcap182's programme) [DECOMP + EXEC] (REA_rodada190lf_dyn §1) |
 | Waves SSL E-Channel, SSL Native Channel Strip / 4K E / 4K B / Vocalstrip | Ridge Strip (neutral; round 96) | VST3 class ID [DATA], Waves name, names | SSL E-Channel: filters, 4-band EQ, compressor, output, band laws measured on the official trial [EXEC] (round 113 §3c) |
 | Waves Q10, REQ, SSLEQ | Parametric EQ (flat) | Waves names | — |
 | FabFilter Pro-Q | Facet EQ (flat, round 99) | names | Pro-Q 4: bands, shapes, slopes, phase mode (round 124 / 144); round 190jh: dynamic bands (range, Auto → Facet's automatic threshold, manual threshold, attack / release; round 190js: the automatic threshold refitted, 50 % = 9.2 / 268 ms) |
