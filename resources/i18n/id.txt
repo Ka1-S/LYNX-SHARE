@@ -11390,3 +11390,8 @@ countries: id
 "Crest Compressor's FET law (the Waves CLA-76 stand-in) plays as its style: {0}" = "Hukum FET Crest Compressor (pengganti Waves CLA-76) diputar sebagai gayanya: {0}"
 "Crest Compressor's styles play their earlier laws (not the reference's): {0}" = "Gaya Crest Compressor diputar dengan hukum sebelumnya (bukan milik referensi): {0}"
 "Lock states of effect slots and Playlist tracks" = "Status kunci slot efek dan trek Playlist"
+"Rename and color the selected channel" = "Ganti nama dan warna channel yang dipilih"
+"Added {0} to the Browser" = "{0} ditambahkan ke Browser"
+"Added {0} folders to the Browser" = "{0} folder ditambahkan ke Browser"
+"{0} is in the Browser already" = "{0} sudah ada di Browser"
+"These folders are in the Browser already" = "Folder-folder ini sudah ada di Browser"

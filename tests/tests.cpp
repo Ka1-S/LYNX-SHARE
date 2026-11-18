@@ -17934,3 +17934,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Codegen190kzTests.inc" // round 190kz codegen: runtime CPU dispatch (AVX2 paths render the SSE2 bits)
 #include "Dsp190kzTests.inc" // round 190kz: exact Reeverb 2 LFO sine and sinc seeds, Maximus revision 1
 #include "Issue204Tests.inc" // round 190lq: issue #204, an audio clip channel played from notes (whole clip, layered, key pitch)
+#include "Issues190llTests.inc" // round 190ll: issues #199 (hosted synth from the piano roll), #200, #201, #203

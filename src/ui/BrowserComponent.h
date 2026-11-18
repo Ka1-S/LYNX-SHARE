@@ -58,6 +58,7 @@ class Shared;
 //    Left/Right close / open folders (Left on a file or a closed folder: to its folder)
 //  - the Plugin database's plugins can be dragged onto the Channel Rack (generators) and the Mixer (effects)
 class BrowserComponent final : public juce::Component,
+                               public juce::FileDragAndDropTarget, // (issue #200: a dropped folder joins the list)
                                private juce::TextEditor::Listener,
                                private juce::ChangeListener,
                                private juce::Timer
@@ -172,6 +173,16 @@ public:
 
     void focusSearch();
     void addUserFolder(); // asks for a folder and adds it to the folder list
+    // Issue #200 (round 190ll, core/UserFolders.h): FL's "drop any folder from an external File Browser onto the FL
+    // Studio Browser and it will be added to the list". The folders among `paths` not listed yet join the list (the
+    // Browser shows ALL and names them in its note); returns how many were added.
+    int addUserFolders (const juce::StringArray& paths);
+    bool isInterestedInFileDrag (const juce::StringArray& files) override; // (any folder)
+    void fileDragEnter (const juce::StringArray& files, int, int) override;
+    void fileDragExit (const juce::StringArray&) override;
+    void filesDropped (const juce::StringArray& files, int, int) override;
+    void paintOverChildren (juce::Graphics& g) override; // the outline while a folder is dragged over
+    bool folderDragOver = false;
     void reloadUserFolders() { rebuildRoots(); } // after the list changed elsewhere (Settings > Files)
     void setSearchForSnapshot (const juce::String& text);
     // For snapshots: selects (and "previews" without sound) the first audio file under the first folder,

@@ -11390,3 +11390,8 @@ countries: de at ch li lu
 "Crest Compressor's FET law (the Waves CLA-76 stand-in) plays as its style: {0}" = "Das FET-Gesetz des Crest Compressors (der Ersatz für Waves CLA-76) spielt als sein Stil: {0}"
 "Crest Compressor's styles play their earlier laws (not the reference's): {0}" = "Die Stile des Crest Compressors spielen ihre früheren Gesetze (nicht die der Referenz): {0}"
 "Lock states of effect slots and Playlist tracks" = "Sperrzustände von Effekt-Slots und Playlist-Spuren"
+"Rename and color the selected channel" = "Ausgewählten Kanal umbenennen und einfärben"
+"Added {0} to the Browser" = "{0} zum Browser hinzugefügt"
+"Added {0} folders to the Browser" = "{0} Ordner zum Browser hinzugefügt"
+"{0} is in the Browser already" = "{0} ist bereits im Browser"
+"These folders are in the Browser already" = "Diese Ordner sind bereits im Browser"

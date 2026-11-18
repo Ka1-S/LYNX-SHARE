@@ -11390,3 +11390,8 @@ countries: cn sg
 "Crest Compressor's FET law (the Waves CLA-76 stand-in) plays as its style: {0}" = "Crest Compressor 的 FET 法则（Waves CLA-76 的替代）以其风格播放：{0}"
 "Crest Compressor's styles play their earlier laws (not the reference's): {0}" = "Crest Compressor 的风格以先前的法则播放（不是参考的法则）：{0}"
 "Lock states of effect slots and Playlist tracks" = "效果槽和播放列表轨道的锁定状态"
+"Rename and color the selected channel" = "重命名并着色所选通道"
+"Added {0} to the Browser" = "已将 {0} 添加到浏览器"
+"Added {0} folders to the Browser" = "已将 {0} 个文件夹添加到浏览器"
+"{0} is in the Browser already" = "{0} 已在浏览器中"
+"These folders are in the Browser already" = "这些文件夹已在浏览器中"

@@ -198,6 +198,21 @@ public:
     int autoScaleKeyForTests() { updateAutoKey(); return isAutoScale() ? autoKey : -1; }
     juce::PopupMenu getViewMenuForSnapshot() { return viewMenu(); }
     juce::PopupMenu getScaleHighlightMenuForSnapshot() { return scaleHighlightMenu(); }
+    // issue #203 (round 190ll): the toolbar's scale choice as shown — the FL layout's box and the menu its click opens;
+    // docked, the root and scale boxes (their texts and item counts)
+    bool scaleBoxesSplitForTests() const { return splitScaleBoxes(); }
+    juce::String scaleTextForTests() const { return scaleBox.getText(); }
+    juce::String scaleRootTextForTests() const { return scaleRootBox.getText(); }
+    juce::String scaleNameTextForTests() const { return scaleNameBox.getText(); }
+    int scaleNameItemsForTests() const { return scaleNameBox.getNumItems(); }
+    void pickScaleRootForTests (int root) { scaleRootBox.setSelectedId (root + 1, juce::sendNotificationSync); }
+    void pickScaleNameForTests (int itemIndex) { scaleNameBox.setSelectedItemIndex (itemIndex, juce::sendNotificationSync); }
+    int scaleRootForTests() const { return scaleRoot(); }
+    int scaleIndexForTests() const { return scaleIndex(); }
+    juce::Rectangle<int> scaleBoundsForSnapshot() const
+    {
+        return splitScaleBoxes() ? scaleRootBox.getBounds().getUnion (scaleNameBox.getBounds()) : scaleBox.getBounds();
+    }
     // The scale the rows show (LYNX's scale list index, 0 = none) on `root` (round 190ds: the Simple dock's "Only notes
     // in key" sets the project key here before folding)
     void setScale (int root, int scale) { scaleBox.setSelectedId (scale <= 0 ? 1 : scale * 100 + root + 1, juce::sendNotificationSync); }
@@ -423,7 +438,29 @@ private:
     juce::ComboBox laneBox; // what the bottom lane edits: velocity, pan or fine pitch
     IconComboBox chordBox { Icon::chord }; // chord created on each click (like FL's "stamp")
     IconButton slideButton { "slide", Icon::slide }; // new notes slide (like FL's slide tool)
-    IconComboBox scaleBox { Icon::keyboard }; // scale highlighted on the keyboard rows
+    // scale highlighted on the keyboard rows. Issue #203 (round 190ll): its list held every scale on each of the 12
+    // roots (C Major, C# Major, ... B Locrian). In the FL layout a click opens FL's View › Scale highlighting menu
+    // instead (its "Root note" and "Scale" sections: one root, one scale); docked in the Clip-launch and Simple layouts
+    // the root and the scale are two boxes side by side, as Live's Clip View "Scale" (root | scale name) and BandLab's
+    // Smart View (key | scale). This box stays the one place the choice lives (its ids, the saved data, the tests).
+    class ScaleBox final : public IconComboBox
+    {
+    public:
+        using IconComboBox::IconComboBox;
+        std::function<void()> onPopup;
+        void showPopup() override
+        {
+            if (onPopup)
+                onPopup();
+            else
+                IconComboBox::showPopup();
+        }
+    };
+    ScaleBox scaleBox { Icon::keyboard };
+    juce::ComboBox scaleRootBox, scaleNameBox; // (issue #203: docked in the Clip-launch / Simple layouts)
+    int splitRoot = 0;                         // the root box's choice while no scale is chosen
+    bool splitScaleBoxes() const noexcept { return fitKeysToNotes; }
+    void refreshScaleBoxes();
     // note colour groups (FL's 16 note colours; REA round 153): new notes get `noteColour`; the swatch opens a menu
     // that picks it, colours the selection and selects by colour
     class ColourSwatch final : public juce::Button

@@ -5,6 +5,7 @@
 #include "ui/FileChoosers.h"
 #include "ui/ImageReadback.h"
 #include "ui/MixerComponent.h"
+#include "core/SelectionRename.h"
 #include "core/MixSnapshots.h"
 #include "ui/PluginOffTag.h"
 #include "ui/SlotWatch.h"
@@ -3739,17 +3740,17 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
     const auto targets = std::find (selection.begin(), selection.end(), t) != selection.end() ? selection : std::vector<int> { t };
     const auto trackName = juce::String::fromUTF8 (song.mixer[(std::size_t) t].name.c_str());
 
-    auto rename = [this, t] {
+    // issue #201 (round 190ll, core/SelectionRename.h): FL's "Set the selected Mixer Track name, color & icon" — with
+    // several selected, the colour goes to all of them and the name to the unnamed ones
+    auto rename = [this, t, targets] {
         if (t >= (int) engine.getSong().mixer.size())
             return;
         const auto& track = engine.getSong().mixer[(std::size_t) t];
         showNameAndColourDialog (tr ("Rename track"), juce::String::fromUTF8 (track.name.c_str()), track.colour,
-                                 [this, t] (const juce::String& name, std::uint32_t colour) {
+                                 [this, t, targets, oldName = track.name, oldColour = track.colour] (const juce::String& name, std::uint32_t colour) {
                                      if (t < (int) engine.getSong().mixer.size())
-                                         engine.editSong ([t, n = name.trim().toStdString(), colour] (Song& s) {
-                                             if (! n.empty())
-                                                 s.mixer[(std::size_t) t].name = n;
-                                             s.mixer[(std::size_t) t].colour = colour;
+                                         engine.editSong ([t, targets, r = selrename::Result { oldName, name.trim().toStdString(), oldColour, colour }] (Song& s) {
+                                             selrename::applyToMixer (s, t, targets, r);
                                          });
                                  });
     };
@@ -3763,20 +3764,20 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
 
     // FL's first section: name and colour (REA_rodada115)
     menu.addItem (tr ("Rename and color...") + "\tF2", rename);
-    menu.addItem (tr ("Change color..."), [this, t] { // (FL: the colour selector at once)
+    menu.addItem (tr ("Change color..."), [this, t, targets] { // (FL: the colour selector at once)
         const auto current = engine.getSong().mixer[(std::size_t) t].colour;
         const auto mouse = juce::Desktop::getMousePosition();
-        const auto set = [this, t] (std::uint32_t colour) {
+        const auto set = [this, t, targets] (std::uint32_t colour) { // (issue #201: every selected track)
             if (t < (int) engine.getSong().mixer.size())
-                engine.editSong ([t, colour] (Song& s) { s.mixer[(std::size_t) t].colour = colour; });
+                engine.editSong ([targets, colour] (Song& s) { selrename::colourMixer (s, targets, colour); });
         };
         ui::showColourPickerPopup ({ mouse.x, mouse.y, 1, 1 }, tr ("Change color..."), current != 0 ? juce::Colour (current) : juce::Colour (lynxPalette()[0]), {},
                                    [set] (juce::Colour c) { set (c.getARGB()); }, {}, [set] { set (0); });
     });
-    menu.addItem (tr ("Random color"), [this, t] {
+    menu.addItem (tr ("Random color"), [this, targets] {
         const auto& palette = lynxPalette();
         const auto colour = palette[(std::size_t) juce::Random::getSystemRandom().nextInt ((int) palette.size())];
-        engine.editSong ([t, colour] (Song& s) { s.mixer[(std::size_t) t].colour = colour; });
+        engine.editSong ([targets, colour] (Song& s) { selrename::colourMixer (s, targets, colour); }); // (issue #201)
     });
     // FL's "Gradient color..." (SetGradientColorMenuClick, REA_rodada177a §5): greyed below two selected tracks; the
     // Gradient editor starts from the first and the last selected track's colours

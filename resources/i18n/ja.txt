@@ -11390,3 +11390,8 @@ countries: jp
 "Crest Compressor's FET law (the Waves CLA-76 stand-in) plays as its style: {0}" = "Crest Compressor の FET 則（Waves CLA-76 の代替）はそのスタイルとして再生されます: {0}"
 "Crest Compressor's styles play their earlier laws (not the reference's): {0}" = "Crest Compressor のスタイルは以前の則で再生されます（リファレンスのものではありません）: {0}"
 "Lock states of effect slots and Playlist tracks" = "エフェクトスロットとプレイリストトラックのロック状態"
+"Rename and color the selected channel" = "選択したチャンネルの名前と色を変更"
+"Added {0} to the Browser" = "{0} をブラウザーに追加しました"
+"Added {0} folders to the Browser" = "{0} 個のフォルダーをブラウザーに追加しました"
+"{0} is in the Browser already" = "{0} はすでにブラウザーにあります"
+"These folders are in the Browser already" = "これらのフォルダーはすでにブラウザーにあります"

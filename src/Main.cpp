@@ -1601,6 +1601,23 @@ public:
             return;
         }
 
+        if (args.contains ("--issuesshot190ll"))
+        {
+            // --issuesshot190ll <prefix> (round 190ll, issues #200 / #203): src/IssuesShot190ll.inc
+            setApplicationReturnValue (runIssuesShot190ll (args[args.indexOf ("--issuesshot190ll") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+
+        if (args.contains ("--hostplaytest190ll"))
+        {
+            // LYNX --hostplaytest190ll report.txt "<LYNX Test Synth.vst3>" [--buffer N] (round 190ll, issue #199): src/HostPlay190ll.inc
+            const auto i = args.indexOf ("--hostplaytest190ll");
+            const auto buffer = args.contains ("--buffer") ? args[args.indexOf ("--buffer") + 1].getIntValue() : 1024;
+            runHostPlayTest190ll (juce::File (args[i + 1].unquoted()), juce::File (args[i + 2].unquoted()), juce::jlimit (16, 4096, buffer));
+            return;
+        }
+
         if (args.contains ("--vst3noteidtest"))
         {
             const auto i = args.indexOf ("--vst3noteidtest");
@@ -34530,6 +34547,8 @@ private:
 #include "TrimShot190jv.inc" // round 190jv
 #include "PrChordShot190kd.inc" // round 190kd
 #include "PrShot190jv.inc" // round 190jv
+#include "HostPlay190ll.inc" // round 190ll (issue #199)
+#include "IssuesShot190ll.inc" // round 190ll (issues #200, #201, #203)
 #include "SimpleGbShot190ke.inc" // round 190ke
 #include "LoopShot190kf.inc"   // round gaps190kf
 #include "QaRest190lcShot.inc"  // rollup 0.1.30 step 7 (round 190lc)

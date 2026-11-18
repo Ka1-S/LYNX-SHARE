@@ -154,6 +154,8 @@ public:
         const auto bpm = t.bpm.load (std::memory_order_relaxed);
         const auto rate = t.sampleRate.load (std::memory_order_relaxed);
         // (the block's own start: a generator's chunk is split at its notes, round 169c)
+        // (round 190ll: a fixed block that began before the song's start says so: a position just below 0, as a
+        // count-in's, so its blocks still follow each other)
         const auto quarters = t.tickAt (hostBlockOffset()) / (double) ppq;
         const auto beatsPerBar = juce::jmax (1, t.beatsPerBar.load (std::memory_order_relaxed));
         const auto beatUnit = meterUnit (t.beatUnit.load (std::memory_order_relaxed));
@@ -1191,7 +1193,11 @@ void PluginInstrument::render (float* left, float* right, int n, float gl, float
         midi.clear();
         recoveryMidi = false;
 
-        auto process = [this] (float* const* ch, int count) {
+        // round 190ll (issue #199): each fixed block's play head is where that block began (it may have begun in an
+        // earlier stretch or chunk), not the stretch it completes in: the blocks follow each other by exactly their length
+        int stretchAt = 0;
+        auto process = [this, &stretchAt] (float* const* ch, int count, int end) {
+            setHostBlockOffset (stretchAt + end - count);
             juce::AudioBuffer<float> view (buffer.getArrayOfWritePointers(), buffer.getNumChannels(), count);
             view.clear();
             if (! crashed.load (std::memory_order_relaxed))
@@ -1220,6 +1226,7 @@ void PluginInstrument::render (float* left, float* right, int n, float gl, float
         {
             const auto count = juce::jmin (blockSize, n - done);
             setHostBlockOffset (chunkOffset + done);
+            stretchAt = chunkOffset + done;
             hardwareBlockAt = chunkOffset + done; // (round 190jl)
             hardwarePositions = false;
             fixed->run (io.data(), count, false, process);
@@ -2059,9 +2066,13 @@ void PluginEffect::process (float* left, float* right, int n, const EffectParams
             }
         }
         // routed: output pair 1 / 2 come back on channels 0-1 / 2-3 (pairs past the second are not carried here)
-        fixed->run (io, n, true, [this, isRouted] (float* const* ch, int count) {
+        // round 190ll (issue #199): each fixed block's play head is where the block began (see PluginInstrument::render)
+        const auto runAt = hostBlockOffset();
+        const juce::ScopeGuard offsetBack { [runAt] { setHostBlockOffset (runAt); } };
+        fixed->run (io, n, true, [this, isRouted, runAt] (float* const* ch, int count, int end) {
             if (crashed.load (std::memory_order_relaxed))
                 return; // (crashed in an earlier block of this call: the input passes through)
+            setHostBlockOffset (runAt + end - count);
             juce::AudioBuffer<float> view (buffer.getArrayOfWritePointers(), buffer.getNumChannels(), count);
             view.clear();
             view.copyFrom (0, 0, ch[0], count);

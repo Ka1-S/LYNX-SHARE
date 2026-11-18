@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <type_traits>
 #include <vector>
 
 namespace lynx
@@ -41,7 +42,9 @@ public:
 
     // `io[c]` (c < channels given at construction, `n` samples each) is replaced with the delayed output. `hasInput`
     // false: blocks start silent (instruments). `process (float* const* channels, int block)` works in place on a
-    // whole block.
+    // whole block. Round 190ll (issue #199): a `process (channels, block, end)` also gets where that block's input ended
+    // in this call (samples into `io`): the block began at `end - block`, which is negative when it began in an earlier
+    // call — where a hosted plugin's play head must say the block starts, so that its blocks follow each other in time.
     template <typename Process>
     void run (float* const* io, int n, bool hasInput, Process&& process) noexcept
     {
@@ -68,7 +71,10 @@ public:
 
             if (pos == block)
             {
-                process (pointers.data(), block);
+                if constexpr (std::is_invocable_v<Process&, float* const*, int, int>)
+                    process (pointers.data(), block, done);
+                else
+                    process (pointers.data(), block);
                 std::copy (input.begin(), input.end(), output.begin());
                 pos = 0;
             }

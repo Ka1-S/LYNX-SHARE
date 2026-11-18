@@ -7,6 +7,7 @@
 #include "engine/FlStudio.h"
 #include "ui/BrowserComponent.h"
 
+#include "core/UserFolders.h"
 #include "core/PluginDbFolder.h"
 
 #include "ui/AudioClipboard.h"
@@ -1717,6 +1718,7 @@ public:
     bool isInterestedInFileDrag (const juce::StringArray& files) override
     {
         // the files the Browser lists (samples, MIDI, projects, presets): an other file would not show in the folder
+        // (issue #200: folders alone go to the Browser itself, which adds them to its list)
         return ! flat && std::any_of (files.begin(), files.end(), [] (const juce::String& f) {
             const juce::File file (f);
             return file.existsAsFile() && isListed (file);
@@ -1742,6 +1744,13 @@ public:
     {
         dropRow = -1;
         repaint();
+        // issue #200 (round 190ll): folders dropped with the files join the Browser's folder list (FL)
+        juce::StringArray folders;
+        for (const auto& path : files)
+            if (juce::File (path).isDirectory())
+                folders.add (path);
+        if (! folders.isEmpty() && browser.addUserFolders (folders) > 0)
+            return; // (the tree was built again: its rows are gone; the files stay where they are)
         const auto row = dropFolderRow (y);
         if (row < 0)
         {
@@ -5147,6 +5156,72 @@ void BrowserComponent::addUserFolder()
         setTab (allTab);
         rebuildRoots();
     });
+}
+
+int BrowserComponent::addUserFolders (const juce::StringArray& paths)
+{
+    std::vector<std::string> dropped;
+    juce::StringArray names;
+    for (const auto& path : paths)
+        if (const juce::File folder (path); folder.isDirectory())
+            dropped.push_back (folder.getFullPathName().toStdString());
+    if (dropped.empty())
+        return 0;
+    std::vector<std::string> list;
+    for (const auto& line : juce::StringArray::fromLines (userFoldersFile().loadFileAsString()))
+        list.push_back (line.toStdString());
+    const auto added = userfolders::add (list, dropped, ! juce::File::areFileNamesCaseSensitive());
+    if (added.empty())
+    {
+        showNote (dropped.size() == 1 ? tr ("{0} is in the Browser already", { juce::File (juce::String::fromUTF8 (dropped.front().c_str())).getFileName() })
+                                      : tr ("These folders are in the Browser already"));
+        return 0;
+    }
+    juce::StringArray lines;
+    for (const auto& l : list)
+        lines.add (juce::String::fromUTF8 (l.c_str()));
+    userFoldersFile().getParentDirectory().createDirectory();
+    userFoldersFile().replaceWithText (lines.joinIntoString ("\n"));
+    setTab (allTab);
+    rebuildRoots();
+    for (auto* other : liveBrowsers()) // (the other Browsers list the same folders)
+        if (other != this)
+            other->reloadUserFolders();
+    showNote (added.size() == 1 ? tr ("Added {0} to the Browser", { juce::File (juce::String::fromUTF8 (added.front().c_str())).getFileName() })
+                                : tr ("Added {0} folders to the Browser", { juce::String ((int) added.size()) }));
+    return (int) added.size();
+}
+
+bool BrowserComponent::isInterestedInFileDrag (const juce::StringArray& files)
+{
+    return std::any_of (files.begin(), files.end(), [] (const juce::String& f) { return juce::File (f).isDirectory(); });
+}
+
+void BrowserComponent::fileDragEnter (const juce::StringArray&, int, int)
+{
+    folderDragOver = true;
+    repaint();
+}
+
+void BrowserComponent::fileDragExit (const juce::StringArray&)
+{
+    folderDragOver = false;
+    repaint();
+}
+
+void BrowserComponent::filesDropped (const juce::StringArray& files, int, int)
+{
+    folderDragOver = false;
+    repaint();
+    addUserFolders (files);
+}
+
+void BrowserComponent::paintOverChildren (juce::Graphics& g)
+{
+    if (! folderDragOver)
+        return;
+    g.setColour (theme::colour::accent);
+    g.drawRect (getLocalBounds(), 2);
 }
 
 void BrowserComponent::removeUserFolder (const juce::File& folder)

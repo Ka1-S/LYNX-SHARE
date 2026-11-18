@@ -11390,3 +11390,8 @@ countries: kr
 "Crest Compressor's FET law (the Waves CLA-76 stand-in) plays as its style: {0}" = "Crest Compressor의 FET 법칙(Waves CLA-76 대체)은 해당 스타일로 재생됩니다: {0}"
 "Crest Compressor's styles play their earlier laws (not the reference's): {0}" = "Crest Compressor의 스타일은 이전 법칙으로 재생됩니다(레퍼런스의 법칙이 아님): {0}"
 "Lock states of effect slots and Playlist tracks" = "이펙트 슬롯과 플레이리스트 트랙의 잠금 상태"
+"Rename and color the selected channel" = "선택한 채널 이름 및 색상 변경"
+"Added {0} to the Browser" = "{0}을(를) 브라우저에 추가했습니다"
+"Added {0} folders to the Browser" = "폴더 {0}개를 브라우저에 추가했습니다"
+"{0} is in the Browser already" = "{0}은(는) 이미 브라우저에 있습니다"
+"These folders are in the Browser already" = "이 폴더들은 이미 브라우저에 있습니다"

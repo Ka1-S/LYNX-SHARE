@@ -187,6 +187,7 @@ public:
     static juce::File channelStateFolder();
     juce::String filterName() const;
     void showFilterMenu (juce::Component* target);
+    void rename (int channel); // "Rename and color..." (F2; issue #201: a new colour goes to every selected channel)
     void groupSelected (); // "Group selected..." (Alt+G): the selected channels go into a new, named group
     void moveSelectedToGroup (int group); // -1 = no group
     bool isShown (int row) const;          // not hidden by the filter
@@ -263,7 +264,6 @@ private:
     void openNewGenerator (int row, InstrumentKind kind); // the window a new / replaced generator opens with
     void assignSample (int channel, const juce::File& file);
     void assignSampleNow (int channel, const juce::File& file); // (no Speech properties step)
-    void rename (int channel);
     void openPluginWindow (int channel);
     // Freeze (round 190ay, ui/ExportDialog.h freezeChannel): the frozen channel's hint; "Unfreeze to edit" in the hint
     // bar when an edit of a frozen channel is refused (true = refused); Freeze / Re-freeze of several channels, one

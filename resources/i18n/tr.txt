@@ -11390,3 +11390,8 @@ countries: tr
 "Crest Compressor's FET law (the Waves CLA-76 stand-in) plays as its style: {0}" = "Crest Compressor'ın FET yasası (Waves CLA-76 yerine geçeni) kendi stili olarak çalar: {0}"
 "Crest Compressor's styles play their earlier laws (not the reference's): {0}" = "Crest Compressor'ın stilleri önceki yasalarıyla çalar (referansınkilerle değil): {0}"
 "Lock states of effect slots and Playlist tracks" = "Efekt yuvalarının ve Playlist parçalarının kilit durumları"
+"Rename and color the selected channel" = "Seçili kanalı yeniden adlandır ve renklendir"
+"Added {0} to the Browser" = "{0} Browser'a eklendi"
+"Added {0} folders to the Browser" = "{0} klasör Browser'a eklendi"
+"{0} is in the Browser already" = "{0} zaten Browser'da"
+"These folders are in the Browser already" = "Bu klasörler zaten Browser'da"

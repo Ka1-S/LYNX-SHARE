@@ -321,6 +321,38 @@ PianoRollComponent::PianoRollComponent (AudioEngine& e)
     scaleBox.setSelectedId (1, juce::dontSendNotification);
     scaleSnapButton.setEnabled (false); // until a scale is chosen
     scaleBox.setTooltip (tr ("Highlights the notes of a scale"));
+    // issue #203 (round 190ll): the FL layout's click opens FL's Scale highlighting menu (root and scale apart)
+    scaleBox.onPopup = [this] {
+        scaleHighlightMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&scaleBox).withMinimumWidth (scaleBox.getWidth()));
+    };
+    // docked (Clip-launch: Live's Clip View Scale; Simple: BandLab's Smart View): a root box and a scale box
+    for (int root = 0; root < 12; ++root)
+        scaleRootBox.addItem (juce::String (notenames::pitchName (root)), root + 1);
+    scaleNameBox.addItem (tr (scales()[0].name), 1);
+    scaleNameBox.addItem (tr ("Automatic"), autoScaleId);
+    for (int s = 1; s < (int) scales().size(); ++s)
+        scaleNameBox.addItem (tr (scales()[(std::size_t) s].name), s * 100);
+    scaleRootBox.setTooltip (tr ("Root note"));
+    scaleNameBox.setTooltip (tr ("Highlights the notes of a scale"));
+    scaleRootBox.onChange = [this] {
+        splitRoot = juce::jlimit (0, 11, scaleRootBox.getSelectedId() - 1);
+        if (scaleIndex() > 0)
+            setScale (splitRoot, scaleIndex());
+    };
+    scaleNameBox.onChange = [this] {
+        const auto id = scaleNameBox.getSelectedId();
+        if (id == autoScaleId)
+            setAutoScale (true);
+        else
+            setScale (scaleIndex() > 0 ? scaleRoot() : splitRoot, id >= 100 ? id / 100 : 0);
+    };
+    for (auto* box : { &scaleRootBox, &scaleNameBox })
+    {
+        box->setWantsKeyboardFocus (false);
+        box->setMouseClickGrabsKeyboardFocus (false);
+        addChildComponent (box);
+    }
+    refreshScaleBoxes();
 
     // round 170e: an icon (FL's slide tool is one) instead of the word "Slide"
     slideButton.setClickingTogglesState (true);
@@ -361,12 +393,13 @@ PianoRollComponent::PianoRollComponent (AudioEngine& e)
     chordBubble.setInterceptsMouseClicks (false, false);
     addChildComponent (chordBubble);
 
-    for (auto* box : { &chordBox, &scaleBox })
+    for (auto* box : { &chordBox, static_cast<IconComboBox*> (&scaleBox) })
     {
         box->setWantsKeyboardFocus (false);
         box->setMouseClickGrabsKeyboardFocus (false);
         box->onChange = [this] {
             publishScale();
+            refreshScaleBoxes(); // (issue #203: the docked root / scale boxes show the choice)
             scaleSnapButton.setEnabled (scaleIndex() > 0);
             if (rows.count < 128 || foldToScale)
                 updateKeyRows(); // the folded rows follow the scale
@@ -700,8 +733,22 @@ void PianoRollComponent::resized()
     place (colourButton, h, true);
     // the chord stamp shrinks to its icon and arrow before it is hidden (discussion #10; FL's stamp is an icon button)
     place (chordBox, 100 <= bar.getWidth() - reserved ? 100 : pianoroll::compactChordBoxWidth, true);
-    place (scaleBox, 164, true);
-    if (scaleBox.isVisible())
+    if (splitScaleBoxes()) // (issue #203: docked, the root and the scale apart, as Live's Clip View and BandLab)
+    {
+        scaleBox.setVisible (false);
+        place (scaleRootBox, 52, true);
+        if (scaleRootBox.isVisible())
+            place (scaleNameBox, 124, true);
+        else
+            scaleNameBox.setVisible (false);
+    }
+    else
+    {
+        scaleRootBox.setVisible (false);
+        scaleNameBox.setVisible (false);
+        place (scaleBox, 164, true);
+    }
+    if (splitScaleBoxes() ? scaleNameBox.isVisible() : scaleBox.isVisible())
         place (scaleSnapButton, h);
     else
         scaleSnapButton.setVisible (false);
@@ -827,6 +874,18 @@ void PianoRollComponent::setScaleSnap (bool on)
     scaleSnapButton.setToggleState (on, juce::dontSendNotification);
     publishScale();
     repaint();
+}
+
+// Issue #203 (round 190ll): the docked root / scale boxes show the scale box's choice (a root chosen while no scale is
+// stays in the root box and goes with the scale picked next)
+void PianoRollComponent::refreshScaleBoxes()
+{
+    const auto scale = scaleIndex();
+    if (scale > 0)
+        splitRoot = scaleRoot();
+    scaleRootBox.setSelectedId (splitRoot + 1, juce::dontSendNotification);
+    scaleNameBox.setSelectedId (isAutoScale() ? autoScaleId : scale > 0 ? scale * 100 : 1, juce::dontSendNotification);
+    scaleRootBox.setEnabled (! isAutoScale()); // (Automatic guesses the root too)
 }
 
 void PianoRollComponent::publishScale()
@@ -5761,6 +5820,9 @@ juce::PopupMenu PianoRollComponent::scaleHighlightMenu()
     menu.addSectionHeader (tr ("Root note"));
     for (int r = 0; r < 12; ++r)
         menu.addItem (juce::String (notenames::pitchName (r)), scale > 0, scale > 0 && root == r, [this, r, scale] { setScale (r, scale); });
+    // issue #203 (round 190ll): FL draws the roots and the scales in two columns ("Root note" | "Scale"; live190cq
+    // curves190bw-05c-scale-highlighting-menu.png), the toolbar's scale box opens this menu too
+    menu.addColumnBreak();
     menu.addSectionHeader (tr ("Scale"));
     menu.addItem (tr ("Snap notes to the scale") + keyText ("pianoRoll.scaleSnap"), scale > 0, scaleSnap, [this] { setScaleSnap (! scaleSnap); });
     menu.addItem (tr (notetools::scales()[0].name), true, scaleBox.getSelectedId() == 1, [this] { setScale (0, 0); });

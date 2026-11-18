@@ -2398,6 +2398,11 @@ bool MainComponent::runAction (const std::string& id)
     }
     else if (is ("rack.filterPrevious")) rack.stepFilterGroup (-1); // round 190ld (DE-37)
     else if (is ("rack.filterNext")) rack.stepFilterGroup (1);
+    else if (is ("rack.rename")) // (issue #201, round 190ll)
+    {
+        if (const auto c = engine.getSelectedChannel(); c >= 0 && c < (int) engine.getSong().channels.size())
+            rack.rename (c);
+    }
     else if (is ("rack.rotateLeft")) rack.rotateSelected (-1);
     else if (is ("rack.rotateRight")) rack.rotateSelected (1);
     else if (is ("browser.previous")) browser.step (-1, false);

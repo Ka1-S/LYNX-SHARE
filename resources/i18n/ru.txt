@@ -11390,3 +11390,8 @@ countries: ru by kz
 "Crest Compressor's FET law (the Waves CLA-76 stand-in) plays as its style: {0}" = "FET-закон Crest Compressor (замена Waves CLA-76) звучит как его стиль: {0}"
 "Crest Compressor's styles play their earlier laws (not the reference's): {0}" = "Стили Crest Compressor звучат по прежним законам (не по законам эталона): {0}"
 "Lock states of effect slots and Playlist tracks" = "Состояния блокировки слотов эффектов и дорожек плейлиста"
+"Rename and color the selected channel" = "Переименовать и окрасить выбранный канал"
+"Added {0} to the Browser" = "{0} добавлена в Browser"
+"Added {0} folders to the Browser" = "Папок добавлено в Browser: {0}"
+"{0} is in the Browser already" = "{0} уже есть в Browser"
+"These folders are in the Browser already" = "Эти папки уже есть в Browser"
