@@ -11332,3 +11332,4 @@ countries: es mx ar co cl pe ve
 "Move slot right" = "Mover ranura a la derecha"
 "Alternate meter scale" = "Escala alternativa de medidores"
 "Alternate scale for all peak meters" = "Escala alternativa para todos los medidores de pico"
+"Drag: set  ·  Ctrl+drag: scale all  ·  Right-drag: ramp  ·  Alt+click: reset" = "Arrastrar: definir  ·  Ctrl+arrastrar: escalar todo  ·  Arrastrar con clic derecho: rampa  ·  Alt+clic: restablecer"

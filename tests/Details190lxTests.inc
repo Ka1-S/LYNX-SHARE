@@ -3,6 +3,7 @@
 #include "core/RecordLoop.h"
 #include "core/SessionOps.h"
 #include "core/MeterScale.h"
+#include "core/NoteTools.h"
 
 namespace details190lx
 {
@@ -98,4 +99,29 @@ TEST (details190lx_alternate_meter_scale_law)
     }
     CHECK (std::abs (position (1.0f, false) - positionOfDb (0.0f, false)) < 1.0e-5f);
     CHECK (position (0.0f, true) == positionOfDb (-60.0f, true));
+}
+
+// FL's Channel rack graph tabs Note and Shift (DE-30): Note is the key over the lane, Shift the start offset in the step
+// (100 % = 99 % of a step); the old lanes read and write as before
+TEST (details190lx_graph_note_and_shift_lanes)
+{
+    using namespace lynx;
+    using namespace lynx::notetools;
+    Note n;
+    n.start = 3 * ticksPerStep;
+    n.key = 60;
+    CHECK (std::abs (graphValue (n, graphNote, ticksPerStep) - 60.0f / 127.0f) < 1.0e-5f);
+    setGraphValue (n, graphNote, 1.0f, ticksPerStep);
+    CHECK (n.key == 127);
+    CHECK (graphValue (n, graphShift, ticksPerStep) == 0.0f);
+    setGraphValue (n, graphShift, 1.0f, ticksPerStep);
+    CHECK (n.start > 3 * ticksPerStep && n.start < 4 * ticksPerStep);
+    CHECK (std::abs (graphValue (n, graphShift, ticksPerStep) - 1.0f) < 0.01f);
+    setGraphValue (n, graphShift, 0.0f, ticksPerStep);
+    CHECK (n.start == 3 * ticksPerStep);
+    setGraphValue (n, (int) Level::velocity, 0.25f, ticksPerStep);
+    CHECK (std::abs (n.velocity - 0.25f) < 1.0e-6f && std::abs (graphValue (n, (int) Level::velocity, ticksPerStep) - 0.25f) < 1.0e-6f);
+    CHECK (graphIsBipolar ((int) Level::pan) && ! graphIsBipolar (graphNote) && ! graphIsBipolar (graphShift));
+    CHECK (graphDefault (graphShift) == 0.0f && std::abs (graphDefault (graphNote) - 60.0f / 127.0f) < 1.0e-5f);
+    CHECK (graphTabOrder[0] == graphNote && graphTabOrder[graphLaneCount - 1] == graphShift);
 }

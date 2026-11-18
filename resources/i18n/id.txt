@@ -11332,3 +11332,4 @@ countries: id
 "Move slot right" = "Pindahkan slot ke kanan"
 "Alternate meter scale" = "Skala meter alternatif"
 "Alternate scale for all peak meters" = "Skala alternatif untuk semua meter puncak"
+"Drag: set  ·  Ctrl+drag: scale all  ·  Right-drag: ramp  ·  Alt+click: reset" = "Seret: atur  ·  Ctrl+seret: skalakan semua  ·  Seret kanan: ramp  ·  Alt+klik: reset"

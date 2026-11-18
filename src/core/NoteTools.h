@@ -34,6 +34,19 @@ void setLevelValue (Note& note, Level level, float normalised) noexcept;
 float levelDefault (Level level) noexcept; // normalised value of a fresh note
 bool levelIsBipolar (Level level) noexcept; // drawn from the centre line (pan, fine pitch)
 
+// Round 190lx (DE-30, FL manual Channel rack "Graph editor": tabs Note, Velocity, Release, Fine Pitch, Pan, Mod X, Mod Y,
+// Shift): the Channel rack graph's lanes. 0…5 are the Levels above; 6 = Note (the key, 0…127 over the lane), 7 = Shift
+// (the note's start offset in its step: "100% shift equals 99% of the note position equal to one 16th note").
+// FL's Rep (note repeat) has no lane: LYNX's notes have no repeat yet.
+constexpr int graphLaneCount = 8, graphNote = 6, graphShift = 7;
+inline constexpr int graphTabOrder[graphLaneCount] { graphNote, (int) Level::velocity, (int) Level::release, (int) Level::finePitch,
+                                                     (int) Level::pan, (int) Level::modX, (int) Level::modY, graphShift };
+const char* graphLaneName (int lane);                         // English, for tr()
+float graphValue (const Note& note, int lane, std::int64_t stepTicks) noexcept;
+void setGraphValue (Note& note, int lane, float normalised, std::int64_t stepTicks) noexcept;
+float graphDefault (int lane) noexcept;
+bool graphIsBipolar (int lane) noexcept;
+
 // --- scales -----------------------------------------------------------------------------------
 struct ScaleInfo
 {

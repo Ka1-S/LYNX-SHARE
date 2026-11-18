@@ -11332,3 +11332,4 @@ countries: tr
 "Move slot right" = "Yuvayı sağa taşı"
 "Alternate meter scale" = "Alternatif ölçer ölçeği"
 "Alternate scale for all peak meters" = "Tüm tepe ölçerler için alternatif ölçek"
+"Drag: set  ·  Ctrl+drag: scale all  ·  Right-drag: ramp  ·  Alt+click: reset" = "Sürükle: ayarla  ·  Ctrl+sürükle: tümünü ölçekle  ·  Sağ sürükle: rampa  ·  Alt+tık: sıfırla"

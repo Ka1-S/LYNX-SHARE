@@ -88,6 +88,22 @@
                 line ("graph Ctrl+drag velocities: " + vs);
                 check ("graph editor: Ctrl+drag on one column scales every column (FL: the others follow)", halved);
                 write (rack, "rack-graph-ctrl-scaled");
+                // FL's Shift tab (DE-30): a drag to the middle starts the step's note half a step later
+                rack.setGraphLevelForSnapshot (notetools::graphShift);
+                offline.dispatchPendingMessages();
+                const auto at = rack.laneSpotForSnapshot (pressed, 0.5f);
+                const auto left = juce::ModifierKeys (juce::ModifierKeys::leftButtonModifier);
+                rack.mouseDown (mouseOn (rack, at, at, left, false));
+                rack.mouseUp (mouseOn (rack, at, at, {}, false));
+                offline.dispatchPendingMessages();
+                const auto notes = notesInStep (offline.getSong().activePattern(), channel, pressed);
+                const auto offset = notes.empty() ? -1 : (int) (offline.getSong().activePattern().notes[(std::size_t) notes.front()].start - (std::int64_t) pressed * ticksPerStep);
+                line ("Shift lane at 0.5: offset " + juce::String (offset) + " of " + juce::String ((int) ticksPerStep) + " ticks");
+                check ("graph editor Shift tab: the note starts later in its step", offset > ticksPerStep / 3 && offset < ticksPerStep * 2 / 3);
+                write (rack, "rack-graph-shift");
+                rack.setGraphLevelForSnapshot (notetools::graphNote);
+                offline.dispatchPendingMessages();
+                write (rack, "rack-graph-note");
             }
         }
         {

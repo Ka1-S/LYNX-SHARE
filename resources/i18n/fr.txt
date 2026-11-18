@@ -11332,3 +11332,4 @@ countries: fr be ch ca lu
 "Move slot right" = "Déplacer l'emplacement à droite"
 "Alternate meter scale" = "Échelle alternative des vumètres"
 "Alternate scale for all peak meters" = "Échelle alternative pour tous les crête-mètres"
+"Drag: set  ·  Ctrl+drag: scale all  ·  Right-drag: ramp  ·  Alt+click: reset" = "Glisser : définir  ·  Ctrl+glisser : tout mettre à l'échelle  ·  Glisser clic droit : rampe  ·  Alt+clic : réinitialiser"

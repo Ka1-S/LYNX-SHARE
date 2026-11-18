@@ -11332,3 +11332,4 @@ countries: pl
 "Move slot right" = "Przesuń slot w prawo"
 "Alternate meter scale" = "Alternatywna skala mierników"
 "Alternate scale for all peak meters" = "Alternatywna skala dla wszystkich mierników szczytowych"
+"Drag: set  ·  Ctrl+drag: scale all  ·  Right-drag: ramp  ·  Alt+click: reset" = "Przeciągnij: ustaw  ·  Ctrl+przeciąg: skaluj wszystko  ·  Prawy przeciąg: rampa  ·  Alt+klik: resetuj"

@@ -11332,3 +11332,4 @@ countries: kr
 "Move slot right" = "슬롯을 오른쪽으로 이동"
 "Alternate meter scale" = "대체 미터 눈금"
 "Alternate scale for all peak meters" = "모든 피크 미터에 대체 눈금 사용"
+"Drag: set  ·  Ctrl+drag: scale all  ·  Right-drag: ramp  ·  Alt+click: reset" = "드래그: 설정  ·  Ctrl+드래그: 모두 스케일  ·  우클릭 드래그: 램프  ·  Alt+클릭: 초기화"

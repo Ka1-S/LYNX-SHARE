@@ -11332,3 +11332,4 @@ countries: tw hk mo
 "Move slot right" = "槽位右移"
 "Alternate meter scale" = "備用電平表刻度"
 "Alternate scale for all peak meters" = "所有峰值表使用備用刻度"
+"Drag: set  ·  Ctrl+drag: scale all  ·  Right-drag: ramp  ·  Alt+click: reset" = "拖曳：設定  ·  Ctrl+拖曳：全部縮放  ·  右鍵拖曳：斜坡  ·  Alt+點擊：重設"
