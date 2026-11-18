@@ -6782,6 +6782,22 @@ private:
                 auto crestSlot = lynx::makeEffectSlot (lynx::EffectKind::crestCompressor);
                 crestSlot.params[(std::size_t) lynx::dyn::crest::busLaw] = 1.0f;
                 song.mixer[16].effects.push_back (crestSlot);
+                // rollup step 8: a new Crest (round 190kw's revision 1), a Crest on round 190ky's FET law, a Ridge Strip with
+                // round 190lb's 4K G filters, an Echoform on round 190kw's Timeless 3 line law in a locked slot (round
+                // 190ld), and a Playlist track's solo lock (round 190ld)
+                song.mixer[16].effects.push_back (lynx::makeEffectSlot (lynx::EffectKind::crestCompressor));
+                auto fetSlot = lynx::makeEffectSlot (lynx::EffectKind::crestCompressor);
+                fetSlot.params[(std::size_t) lynx::dyn::crest::revision] = 0.0f;
+                fetSlot.params[(std::size_t) lynx::dyn::crest::fetLaw] = lynx::dyn::crest::fetLawValue (0);
+                song.mixer[16].effects.push_back (fetSlot);
+                auto k4gSlot = lynx::makeEffectSlot (lynx::EffectKind::ridgeStrip);
+                k4gSlot.params[(std::size_t) lynx::mixsuite::ridge::k4gLaw] = 1.0f;
+                song.mixer[16].effects.push_back (k4gSlot);
+                auto lineSlot = lynx::makeEffectSlot (lynx::EffectKind::echoform);
+                lineSlot.params[(std::size_t) lynx::echosuite::echoform::lineLaw] = 1.0f;
+                lineSlot.lockState = true;
+                song.mixer[16].effects.push_back (lineSlot);
+                song.playlistTracks[4].soloLock = true;
                 song.mixer[1].lockState = true; // (the default mixer has inserts 1…16)
                 song.mixer[2].solo = true;
                 song.playlistTracks[3].takeLane = true;
@@ -6898,6 +6914,13 @@ private:
                      || parsed["mixer"][16]["effects"][0]["params"].size() > lynx::dyn::crest::busLaw
                      || copy.json.contains ("lockState") || copy.json.contains ("playlistTakeLanes") || copy.json.contains ("recordOwnNotes"))
                 rollup030Result = "ERROR step-7 items";
+            else if (const auto& m16 = parsed["mixer"][16]["effects"];
+                     ! said ("Crest Compressor's styles play their earlier laws") || ! said ("Crest Compressor's FET law")
+                     || ! said ("Ridge Strip's measured SSL 4K G / 4K E filters") || ! said ("Echoform's Timeless 3 line law")
+                     || ! said ("Lock states of effect slots and Playlist tracks") || copy.json.contains ("playlistTrackSoloLocks")
+                     || m16[1]["params"].size() > lynx::dyn::crest::busLaw || m16[2]["params"].size() > lynx::dyn::crest::busLaw
+                     || m16[3]["params"].size() > lynx::mixsuite::ridge::k4Pink || m16[4]["params"].size() > lynx::echosuite::echoform::revision)
+                rollup030Result = "ERROR step-8 items";
             else if (const auto plain = lynx::olderlynx::forRelease (lynx::Song::makeDefault(), "0.1.28");
                      ! plain.ok || std::any_of (plain.lost.begin(), plain.lost.end(), [] (const lynx::olderlynx::Loss& l) {
                          const auto t = juce::String (l.text);
@@ -6908,7 +6931,8 @@ private:
                                 || t.contains ("Facet") || t.contains ("MIDI Out") || t.contains ("hosted CLAP") || t.contains ("nested Playlist")
                                 || t.contains ("CURVE") || t.startsWith ("Slide notes") || t.contains ("crossfader") || t.contains ("return tracks")
                                 || t.contains ("Controls tab") || t.startsWith ("Harmor") || t.startsWith ("Newtone")
-                                || t.contains ("Peak Controller") || t.contains ("console law") || t.startsWith ("Mixer lock") || t.contains ("take lane");
+                                || t.contains ("Peak Controller") || t.contains ("console law") || t.startsWith ("Mixer lock") || t.contains ("take lane")
+                                || t.contains ("Crest") || t.startsWith ("Lock states");
                      }))
                 rollup030Result = "ERROR a plain project reports a loss it does not have";
         }

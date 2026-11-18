@@ -271,7 +271,7 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
     // effects (round 190ho): Voice Shift's Measured law revision 1, Ridge Strip's 4K Pink EQ; (round 190iq) Hush De-esser's
     // measured Allround timing (hidden parameters 0.1.28 ignores: it plays revision 0, Black, and the earlier timing)
     {
-        juce::StringArray thump, pink, hushTiming, hushVocal, echoVoicings, latticeTaps, luxeDucking, verbRevisions;
+        juce::StringArray thump, pink, consoleFilters, lineLaw, hushTiming, hushVocal, echoVoicings, latticeTaps, luxeDucking, verbRevisions;
         forEachEffect (root, [&] (juce::DynamicObject& e, const juce::String& where) {
             auto* params = arrayOf (e.getProperty ("params"));
             if (params == nullptr) // (a slot written without parameters)
@@ -287,6 +287,10 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
             {
                 if ((float) (double) (*params)[mixsuite::ridge::k4Pink] >= 0.5f)
                     addOnce (pink, where);
+                // rollup step 8: round 190lb's SSL 4K G / 4K E filters (and the G's ceiling), round 190le's 32C voicing
+                for (const auto hidden : { mixsuite::ridge::k4gLaw, mixsuite::ridge::k4eHpLaw, mixsuite::ridge::h32 })
+                    if (params->size() > hidden && (float) (double) (*params)[hidden] >= 0.5f)
+                        addOnce (consoleFilters, where);
                 params->removeRange (mixsuite::ridge::k4Pink, params->size() - mixsuite::ridge::k4Pink);
             }
             else if (kind == "hushDeEsser" && params->size() > mixsuite::hush::timing)
@@ -306,6 +310,9 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
             {
                 if ((float) (double) (*params)[echosuite::echoform::revision] >= 0.5f && (float) (double) (*params)[echosuite::echoform::voicing] >= 0.5f)
                     addOnce (echoVoicings, where);
+                // rollup step 8: round 190kw's line law (set only by a translated FabFilter Timeless 3 state)
+                if (params->size() > echosuite::echoform::lineLaw && (float) (double) (*params)[echosuite::echoform::lineLaw] >= 0.5f)
+                    addOnce (lineLaw, where);
                 params->removeRange (echosuite::echoform::revision, params->size() - echosuite::echoform::revision);
             }
             else if (kind == "latticeMod" && params->size() > echosuite::lattice::revision)
@@ -339,6 +346,10 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
             lost.push_back ({ TR_NOOP ("Voice Shift's Measured law plays its earlier version (a low thump at sung onsets): {0}"), listOf (thump), true });
         if (! pink.isEmpty())
             lost.push_back ({ TR_NOOP ("Ridge Strip's 4K Pink EQ plays as the Black EQ: {0}"), listOf (pink), true });
+        if (! consoleFilters.isEmpty())
+            lost.push_back ({ TR_NOOP ("Ridge Strip's measured SSL 4K G / 4K E filters and its 32C voicing are left out: {0}"), listOf (consoleFilters), true });
+        if (! lineLaw.isEmpty())
+            lost.push_back ({ TR_NOOP ("Echoform's Timeless 3 line law plays as its own echo: {0}"), listOf (lineLaw), true });
         if (! hushTiming.isEmpty())
             lost.push_back ({ TR_NOOP ("Hush De-esser's Allround mode plays its earlier timing: {0}"), listOf (hushTiming), true });
         if (! hushVocal.isEmpty())
@@ -600,7 +611,7 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
     // round qafix190kq's imported take lanes (0.1.28 gives them columns in the clip grid and the Session mixer) and round
     // 190ks's "record the notes played in the plugin's window" switch (written only when off: 0.1.28 never records them)
     {
-        juce::StringArray shapes, console, locked;
+        juce::StringArray shapes, console, locked, fet, crestLaws;
         forEachEffect (root, [&] (juce::DynamicObject& e, const juce::String& where) {
             auto* params = arrayOf (e.getProperty ("params"));
             if (params == nullptr)
@@ -616,6 +627,13 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
             {
                 if ((float) (double) (*params)[dyn::crest::busLaw] >= 0.5f)
                     addOnce (console, where);
+                // rollup step 8: round 190ky's FET law (the Waves CLA-76 stand-in), round 190kw's revision 1 (a new Crest:
+                // the Pro-C 3 laws of its styles; 0.1.28 plays the fitted laws)
+                const auto at = [params] (int i) { return params->size() > i ? (float) (double) (*params)[i] : 0.0f; };
+                if (at (dyn::crest::fetLaw) > 0.0f)
+                    addOnce (fet, where);
+                else if (at (dyn::crest::revision) >= 0.5f && at (dyn::crest::busLaw) < 0.5f)
+                    addOnce (crestLaws, where);
                 params->removeRange (dyn::crest::busLaw, params->size() - dyn::crest::busLaw);
             }
         });
@@ -632,6 +650,13 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
             if (auto* plugin = objectOf (c.getProperty ("plugin")))
                 drop (*plugin, "recordOwnNotes");
         });
+        // rollup step 8: round 190ld's lock states of effect slots and Playlist tracks (a later solo leaves them as they
+        // are; nothing they play changes)
+        bool slotLocks = false;
+        forEachEffect (root, [&] (juce::DynamicObject& e, const juce::String&) { slotLocks = drop (e, "lockState") || slotLocks; });
+        const auto trackLocks = drop (o, "playlistTrackSoloLocks");
+        if (slotLocks || trackLocks)
+            lost.push_back ({ TR_NOOP ("Lock states of effect slots and Playlist tracks"), {}, false });
         if (auto* mixer = arrayOf (root["mixer"]))
             for (auto& m : *mixer)
                 if (auto* fx = arrayOf (m["effects"]))
@@ -642,6 +667,10 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
             lost.push_back ({ TR_NOOP ("The Peak Controller's LYNX LFO shapes play its FL Shape: {0}"), listOf (shapes), true });
         if (! console.isEmpty())
             lost.push_back ({ TR_NOOP ("Crest Compressor's console law (the Waves SSLComp stand-in) plays as its Bus style: {0}"), listOf (console), true });
+        if (! fet.isEmpty())
+            lost.push_back ({ TR_NOOP ("Crest Compressor's FET law (the Waves CLA-76 stand-in) plays as its style: {0}"), listOf (fet), true });
+        if (! crestLaws.isEmpty())
+            lost.push_back ({ TR_NOOP ("Crest Compressor's styles play their earlier laws (not the reference's): {0}"), listOf (crestLaws), true });
         if (! locked.isEmpty())
             lost.push_back ({ TR_NOOP ("Mixer lock states (a solo silences these inserts, and Unmute all unmutes them): {0}"), listOf (locked), soloed });
         if (auto* lanes = arrayOf (root["playlistTakeLanes"]))

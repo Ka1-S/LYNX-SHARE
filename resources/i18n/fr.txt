@@ -11383,3 +11383,10 @@ countries: fr be ch ca lu
 "Pitch modulation" = "Modulation de hauteur"
 "Pitch drift" = "Dérive de hauteur"
 "Newtone's natural pitch engine, pitch modulation and pitch drift are left out (the notes play with the first engine): {0}" = "Le moteur de hauteur naturel, la modulation et la dérive de hauteur de Newtone sont omis (les notes jouent avec le premier moteur) : {0}"
+
+# --- rollup 0.1.30 step 8: Save a copy for 0.1.28 knows rounds 190lb / 190le / 190ky / 190kw / 190ld
+"Ridge Strip's measured SSL 4K G / 4K E filters and its 32C voicing are left out: {0}" = "Les filtres SSL 4K G / 4K E mesurés de Ridge Strip et sa voix 32C sont omis : {0}"
+"Echoform's Timeless 3 line law plays as its own echo: {0}" = "La loi de ligne Timeless 3 d'Echoform joue comme son propre écho : {0}"
+"Crest Compressor's FET law (the Waves CLA-76 stand-in) plays as its style: {0}" = "La loi FET de Crest Compressor (le remplaçant de Waves CLA-76) joue comme son style : {0}"
+"Crest Compressor's styles play their earlier laws (not the reference's): {0}" = "Les styles de Crest Compressor jouent leurs lois antérieures (pas celles de la référence) : {0}"
+"Lock states of effect slots and Playlist tracks" = "États de verrouillage des emplacements d'effets et des pistes de la Playlist"

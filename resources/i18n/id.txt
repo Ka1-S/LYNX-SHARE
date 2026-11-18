@@ -11383,3 +11383,10 @@ countries: id
 "Pitch modulation" = "Modulasi nada"
 "Pitch drift" = "Pergeseran nada"
 "Newtone's natural pitch engine, pitch modulation and pitch drift are left out (the notes play with the first engine): {0}" = "Mesin nada alami, modulasi nada, dan pergeseran nada Newtone dihilangkan (not diputar dengan mesin pertama): {0}"
+
+# --- rollup 0.1.30 step 8: Save a copy for 0.1.28 knows rounds 190lb / 190le / 190ky / 190kw / 190ld
+"Ridge Strip's measured SSL 4K G / 4K E filters and its 32C voicing are left out: {0}" = "Filter SSL 4K G / 4K E terukur pada Ridge Strip dan voicing 32C-nya dihilangkan: {0}"
+"Echoform's Timeless 3 line law plays as its own echo: {0}" = "Hukum jalur Timeless 3 pada Echoform diputar sebagai gema miliknya sendiri: {0}"
+"Crest Compressor's FET law (the Waves CLA-76 stand-in) plays as its style: {0}" = "Hukum FET Crest Compressor (pengganti Waves CLA-76) diputar sebagai gayanya: {0}"
+"Crest Compressor's styles play their earlier laws (not the reference's): {0}" = "Gaya Crest Compressor diputar dengan hukum sebelumnya (bukan milik referensi): {0}"
+"Lock states of effect slots and Playlist tracks" = "Status kunci slot efek dan trek Playlist"

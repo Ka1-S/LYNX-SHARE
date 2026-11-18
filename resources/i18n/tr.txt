@@ -11383,3 +11383,10 @@ countries: tr
 "Pitch modulation" = "Perde modülasyonu"
 "Pitch drift" = "Perde kayması"
 "Newtone's natural pitch engine, pitch modulation and pitch drift are left out (the notes play with the first engine): {0}" = "Newtone'un doğal perde motoru, perde modülasyonu ve perde kayması dışarıda kalır (notalar ilk motorla çalar): {0}"
+
+# --- rollup 0.1.30 step 8: Save a copy for 0.1.28 knows rounds 190lb / 190le / 190ky / 190kw / 190ld
+"Ridge Strip's measured SSL 4K G / 4K E filters and its 32C voicing are left out: {0}" = "Ridge Strip'in ölçülmüş SSL 4K G / 4K E filtreleri ve 32C sesi dışarıda kalır: {0}"
+"Echoform's Timeless 3 line law plays as its own echo: {0}" = "Echoform'un Timeless 3 hat yasası kendi yankısı olarak çalar: {0}"
+"Crest Compressor's FET law (the Waves CLA-76 stand-in) plays as its style: {0}" = "Crest Compressor'ın FET yasası (Waves CLA-76 yerine geçeni) kendi stili olarak çalar: {0}"
+"Crest Compressor's styles play their earlier laws (not the reference's): {0}" = "Crest Compressor'ın stilleri önceki yasalarıyla çalar (referansınkilerle değil): {0}"
+"Lock states of effect slots and Playlist tracks" = "Efekt yuvalarının ve Playlist parçalarının kilit durumları"

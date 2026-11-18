@@ -11512,3 +11512,10 @@ countries: br
 "Pitch modulation" = "Modulação de afinação"
 "Pitch drift" = "Deriva de afinação"
 "Newtone's natural pitch engine, pitch modulation and pitch drift are left out (the notes play with the first engine): {0}" = "O motor de afinação natural, a modulação e a deriva de afinação do Newtone ficam de fora (as notas tocam com o primeiro motor): {0}"
+
+# --- rollup 0.1.30 step 8: Save a copy for 0.1.28 knows rounds 190lb / 190le / 190ky / 190kw / 190ld
+"Ridge Strip's measured SSL 4K G / 4K E filters and its 32C voicing are left out: {0}" = "Os filtros medidos do SSL 4K G / 4K E do Ridge Strip e sua voz 32C ficam de fora: {0}"
+"Echoform's Timeless 3 line law plays as its own echo: {0}" = "A lei de linha do Timeless 3 no Echoform toca como o eco próprio dele: {0}"
+"Crest Compressor's FET law (the Waves CLA-76 stand-in) plays as its style: {0}" = "A lei FET do Crest Compressor (o substituto do Waves CLA-76) toca como o estilo dele: {0}"
+"Crest Compressor's styles play their earlier laws (not the reference's): {0}" = "Os estilos do Crest Compressor tocam com as leis anteriores (não as da referência): {0}"
+"Lock states of effect slots and Playlist tracks" = "Estados de bloqueio dos slots de efeito e das faixas da Playlist"

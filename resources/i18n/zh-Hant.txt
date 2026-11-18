@@ -11383,3 +11383,10 @@ countries: tw hk mo
 "Pitch modulation" = "音高調變"
 "Pitch drift" = "音高漂移"
 "Newtone's natural pitch engine, pitch modulation and pitch drift are left out (the notes play with the first engine): {0}" = "Newtone 的自然音高引擎、音高調變與音高漂移將被省略（音符以第一代引擎播放）：{0}"
+
+# --- rollup 0.1.30 step 8: Save a copy for 0.1.28 knows rounds 190lb / 190le / 190ky / 190kw / 190ld
+"Ridge Strip's measured SSL 4K G / 4K E filters and its 32C voicing are left out: {0}" = "Ridge Strip 測得的 SSL 4K G / 4K E 濾波器及其 32C 音色被省略：{0}"
+"Echoform's Timeless 3 line law plays as its own echo: {0}" = "Echoform 的 Timeless 3 線路法則以其自身的回聲播放：{0}"
+"Crest Compressor's FET law (the Waves CLA-76 stand-in) plays as its style: {0}" = "Crest Compressor 的 FET 法則（Waves CLA-76 的替代）以其風格播放：{0}"
+"Crest Compressor's styles play their earlier laws (not the reference's): {0}" = "Crest Compressor 的風格以先前的法則播放（不是參考的法則）：{0}"
+"Lock states of effect slots and Playlist tracks" = "效果槽和播放清單軌道的鎖定狀態"

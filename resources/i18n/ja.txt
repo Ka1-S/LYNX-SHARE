@@ -11383,3 +11383,10 @@ countries: jp
 "Pitch modulation" = "ピッチモジュレーション"
 "Pitch drift" = "ピッチドリフト"
 "Newtone's natural pitch engine, pitch modulation and pitch drift are left out (the notes play with the first engine): {0}" = "Newtone のナチュラル ピッチエンジン、ピッチモジュレーション、ピッチドリフトは含まれません (ノートは最初のエンジンで再生されます): {0}"
+
+# --- rollup 0.1.30 step 8: Save a copy for 0.1.28 knows rounds 190lb / 190le / 190ky / 190kw / 190ld
+"Ridge Strip's measured SSL 4K G / 4K E filters and its 32C voicing are left out: {0}" = "Ridge Strip の測定済み SSL 4K G / 4K E フィルターと 32C ボイシングは省かれます: {0}"
+"Echoform's Timeless 3 line law plays as its own echo: {0}" = "Echoform の Timeless 3 ライン則は Echoform 自身のエコーとして再生されます: {0}"
+"Crest Compressor's FET law (the Waves CLA-76 stand-in) plays as its style: {0}" = "Crest Compressor の FET 則（Waves CLA-76 の代替）はそのスタイルとして再生されます: {0}"
+"Crest Compressor's styles play their earlier laws (not the reference's): {0}" = "Crest Compressor のスタイルは以前の則で再生されます（リファレンスのものではありません）: {0}"
+"Lock states of effect slots and Playlist tracks" = "エフェクトスロットとプレイリストトラックのロック状態"
