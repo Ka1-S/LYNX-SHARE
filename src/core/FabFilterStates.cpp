@@ -629,7 +629,10 @@ int fromProQ4 (const State& s, EffectSlot& slot)
         {
             set (facet::rangeParam0 + band, facet::rangeValue (rangeDb));
             if (s.at (base + 11) >= 0.5f)
+            {
                 set (facet::autoThresholdParam0 + band, 1.0f);
+                p[(std::size_t) facet::autoRevisionParam] = 1.0f; // round 190lg: the reference's own structure
+            }
             else
             {
                 const double v = std::clamp ((double) s.at (base + 12), 0.0, 1.0);

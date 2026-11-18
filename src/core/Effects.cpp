@@ -4446,6 +4446,9 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     // round 190kw: … and one saved before the V1 styles' revision keeps the fitted Clean / Classic / Opto (bit for bit)
     if (slot.kind == EffectKind::crestCompressor && savedCount <= (std::size_t) dyn::crest::revision)
         slot.params[(std::size_t) dyn::crest::revision] = 0.0f;
+    // round 190lg: a Facet saved before keeps round 190jh / 190js's automatic-threshold law (bit for bit)
+    if (slot.kind == EffectKind::facetEq && savedCount <= (std::size_t) facet::autoRevisionParam)
+        slot.params[(std::size_t) facet::autoRevisionParam] = 0.0f;
     if (slot.kind == EffectKind::sentryGate && savedCount <= (std::size_t) dyn::sentry::law)
         slot.params[(std::size_t) dyn::sentry::law] = 0.0f;
     // round 150: Auto-pan saved before the Tweak block keeps the Rhythm voicing's clipped angle
