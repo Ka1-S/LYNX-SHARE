@@ -4038,9 +4038,9 @@ identical; fingerprints of both revisions in tests/Parity190kwGold.inc. The edit
 0.38 … 0.42 → 0.52 … 0.60. Bus / Mastering / Pumping cost up to +0.3 point of one core (three followers whose times move
 with every step: one exp each per sample; the coefficient is cached while the time holds). No latency change.
 
-**Still off:** Smooth 5.08, Upward 6.62, Two-way (TTM) 7.38, Op-El 5.85 and Vari-Mu 6.19 keep their
-fitted laws (the reference builds them as generated graph classes — `VariMuCompressor` is a balanced tube-pair model — read
-but not rebuilt); Clean / Classic / Opto's auto release. (Allround / Versatile: built in round 190lg, below.)
+**Still off:** Upward 6.62, Two-way (TTM) 7.38 and Vari-Mu 6.19 keep their fitted laws (the reference builds them as
+generated graph classes — `VariMuCompressor` is a balanced tube-pair model — read but not rebuilt); Clean / Classic / Opto's
+auto release. (Allround / Versatile: built in round 190lg; Smooth 5.08 and Op-El 5.85: built in round 190lp; both below.)
 **Round 190lg — Allround = Pro-C 3's Versatile (its default style), revision 1.** Rebuilt from the reference's own graph
 (`VersatileCompressor_MainCompressorAlgorithm`, read statically; REA notes docs/analise/REA_rodada190lg.md): two gain
 computers on two readings of the linked side-chain level, working on the reduction share 1 − 10^(−GR / 20) — slow: 0.979 ×
@@ -4065,6 +4065,40 @@ Old projects: `gold/gold.sh` (fxrender with the revision forced off against roun
 revision-1 Allround fingerprint in tests/Parity190kwGold.inc moves to the new law. CPU (thread time, one pinned core, 20 s
 at 48 kHz, best of 5, three runs): Allround 0.62 … 0.66 % → 0.97 … 1.00 % of a core (+0.35 point: two gain computers, two
 low-passes and the share's exp / log a sample).
+
+**Round 190lp — Smooth and Op-El = Pro-C 3's own graphs (revision 1).** Read statically (REA notes
+docs/analise/REA_rodada190lp.md, part crest) and rebuilt in LYNX's own code on the reduction share 1 − 10^(−GR / 20), as
+Versatile:
+- **Smooth** — a feed-forward stand-in for a feedback design: a first gain computer (threshold + 0.21 dB, its ratio the
+  knob's up to 10 : 1 then easing towards 16 : 1) drives two followers (the knob times, release × 0.44; attack × 9,
+  release × 2.26) whose max (× 0.761 / 0.769) turns the side chain down before the main gain computer; that one (its
+  threshold × a factor of the ratio, 1 at 1 : 1 → about 1.18 at 20 : 1) drives C0 (the knob's attack, release × 0.43) and
+  C1 (attack × 9, release × 2.25); the reduction max (A · C0, C1), A = 1.0081 − 0.0123 · 0.610 · C0 · F0. Knob laws:
+  attack 0.25 s · a³, release 0.02 s + 2.48 s · tan (1.2 r²) / tan (1.2), auto-release constant from LYNX's fit of the
+  reference's curve.
+- **Op-El** — two gain computers (the knobs'; the knob's ratio with a fixed 30 dB knee and 60 dB range), their squared
+  shares followed by a fast (attack 0.998 × + 0.5 ms, release 0.596 × + 10 ms), a slower (9.99 × + 2 ms / 1.79 × + 30 ms)
+  and a very slow follower (149.9 × + 15 ms / 4.77 × + 80 ms), weighted 0.8 / 0.15 / 0.05 and summed in power; the first
+  reads the side chain through a wide −11 dB high shelf (LYNX's own second-order shelf at 0.4167 × the rate, ≤ 26.7 kHz).
+LYNX's smooth fits replace the reference's piecewise-linear curves (the ratio factor, the ratio easing, the auto-release
+constant). Not built: Upward (its loud-signal cut and expansion detector mode not decoded), TTM (a multiband object) and
+Vari-Mu (a feedback tube model): they keep their fitted laws. Revision 1 still never shipped, so both join it.
+
+| bank (time-window scorer, before = rea2_190lg's final fxr_m4) | files | before → after | up / same / down |
+|---|---|---|---|
+| refcap030 Pro-C 3, all blocks | 508 | 8.08 → **8.35** | 51 / 457 / 0 |
+| · Smooth files | 26 | 5.08 → **7.96** | 26 / 0 / 0 (stairs ESR −9 … −20 → −39 … −54 dB; mix −24 → −31) |
+| · Op-El files | 26 | 5.85 → **8.19** | 25 / 1 / 0 (stairs ESR −14 … −24 → −28 … −38 dB; mix −28 → −57) |
+| · grid / prog / styles blocks | 238 / 42 / 84 | 7.96 / 7.64 / 7.82 → 8.33 / 7.79 / 8.31 | the 51 up |
+| · every other style's file (all blocks: mode, pairs, sr44 / 48 / 96 included) | 456 | unchanged file for file (score, rms, spectrum, ESR) | 0 / 456 / 0 |
+| refcap182 programme / tp172b (no Smooth or Op-El setting) | 25 / 20 | 7.64 / 8.0 = | 0 / 25 / 0, 0 / 20 / 0 (identical metrics) |
+
+Old projects: `gold/gold.sh` (fxrender with the revision forced off against rea2_190lg's): 72 / 72 renders identical (every
+Pro-C 3 style's state, the style values and the Smooth / Op-El voicings at 44.1 / 48 / 96 kHz); revision-0 fingerprints
+(tests/Parity190lpCrestGold.inc) equal the base's. CPU (thread time, 20 s at 48 kHz, best of 5, three runs, machine under
+load ~27): Smooth 0.62 … 0.68 % → 1.27 … 1.39 % of a core (+0.65 point: four followers, two gain computers and their
+exp / log a sample), Op-El 0.61 … 0.73 % → 1.03 … 1.16 % (+0.43 point: three followers, two gain computers, the shelf;
+Allround in the same runs 0.65 … 0.66 → 0.93 … 1.06, as round 190lg measured).
 
 ## Round 190kw (Timeless 3 translator): FabFilter Timeless 3 → Echoform (the hidden line law)
 
