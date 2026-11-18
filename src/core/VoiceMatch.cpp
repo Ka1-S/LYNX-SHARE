@@ -1280,10 +1280,23 @@ void Leveler::reset() noexcept
     scLow172.reset();
     scHigh190.reset();
     scLow190.reset();
+    // round 190lf: the cell law's state
+    ccf = ccs = cc3 = cexp = cenv = 0.0;
+    for (int c = 0; c < 2; ++c)
+    {
+        cyp[c] = chx[c] = chy[c] = 0.0;
+        for (auto* f : { &cellLow, &cellHigh })
+            f->x1[c] = f->x2[c] = f->y1[c] = f->y2[c] = 0.0;
+    }
 }
 
 void Leveler::process (float* l, float* r, int n, const Settings& s) noexcept
 {
+    if (s.cellLaw == 1)
+    {
+        processCell (l, r, n, s);
+        return;
+    }
     const double dt = 1.0 / sr;
     if (scDesignedRate != sr)
     {
@@ -1409,6 +1422,123 @@ void Leveler::process (float* l, float* r, int n, const Settings& s) noexcept
             const double t = tb[0] * tx[c][0] + tb[1] * tx[c][1] + tb[2] * tx[c][2] + tb[3] * tx[c][3] - ta[1] * ty[c][1] - ta[2] * ty[c][2] - ta[3] * ty[c][3];
             ty[c][0] = t;
             *ch[c] = (float) t;
+        }
+        maxGr = std::max (maxGr, -gainToDb (g));
+    }
+    last = (float) maxGr;
+}
+namespace
+{
+// round 190lf [EXEC] (docs/analise/REA_rodada190lf_dyn.md §1): the cell law (Settings::cellLaw = 1), LYNX's compact opto
+// behaviour model. Per sample: the side chain hears the cell's output (feedback; in Limit plus a share of the input)
+// through a low and a high peaking filter, the louder channel's level |sc| · 10^(shift / 20) (shift: the peak
+// reduction dial's and the Hi Freq dial's laws, below) held by the light's persistence (a peak hold releasing with
+// envMs) is u, and lights the cell above u = 1: C* = (u − 1)^gamma. A fast and a slow
+// conductance share C* (1 − share, share; a third, very fast one share3 of it): each charges towards its part (the fast one in the log1p domain at
+// (1 + C)^beta / tau), and releases as dC/dt = −(a Cⁿ + b C) / (1 + mg · E), E an exposure (0 … 1) that charges while the
+// cell is lit and fades slowly — the longer and harder it was lit, the slower it recovers. The audio sees
+// g = 1 / (1 + Cf + Cs) (Limit: floored), its band above tiltHz (first order) reduced less (× min (hmax, g^−kappa)), then
+// the gain dial's make-up, the small 2nd / 3rd harmonic and the unit's idle response of the Opto classic voicing.
+// Every constant is fitted on our own probes (waves2_190lf/dyn/lab/fit2a.py; tables written by lab/gen2a.py).
+struct CellLaw
+{
+    double gamma, gammaLimit, feedForward, floorDb, tauA, beta, a, n, b, share, tauAs, a2, n2, b2, mg, mchMs, mdcMs;
+    double lowHz, lowQ, lowDb, highHz, highQ, highDb, highDbSlope, tiltHz, kappa, hmaxDb, limitShift, envMs;
+    double share3, att3Ms, rel3Ms; // a third, very fast conductance (one-pole attack / release) taking share3 of C*
+    double lowDbSlope;             // the low filter's gain per 50 of the Hi Freq dial away from 50 (as highDbSlope)
+};
+// fit2a:begin (CELL190LF: lab/gen2a.py)
+constexpr CellLaw cell190lf { 2.99579, 3.41216, 0.0590878, 29.5474, 62.4002, 0.364894, 0.978602, 2.90891, 6.9967, 0.240615, 1578.64, 55.4413, 4.83264, 0.258853, 1.82323, 343.78, 86.7507,
+                              86.091, 0.482178, 4.08894, 8007.81, 0.936114, 8.06835, -0.400425, 20000, 1.66958, 17.2213, 2.18174, 1.81797, 0, 0.5, 10, -1.71018 };
+constexpr double cellPrKnob[] { 0, 30, 46, 60, 70, 80, 90, 100 };
+constexpr double cellPrShift[] { -60, -5, 17.9491, 29.3419, 37.824, 42.789, 45.602, 48.4861 };
+constexpr double cellHfKnob[] { 0, 20, 50, 100 };
+constexpr double cellHfShift[] { -2.927, -4.05829, 0, 5.41484 };
+constexpr double cellGainKnob[] { 0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100 };
+constexpr double cellGainDb[] { -56.219, -34.954, -18.053, -2.544, 8.477, 16.908, 24.746, 29.768, 33.784, 35.289, 38.799 };
+// fit2a:end
+void cellPeak (double sr, double hz, double q, double db, double& b0, double& b1, double& b2, double& a1, double& a2) noexcept
+{
+    const double A = std::pow (10.0, db / 40.0), w = 2.0 * pi * std::min (hz, 0.45 * sr) / sr, al = std::sin (w) / (2.0 * q), cw = std::cos (w), a0 = 1.0 + al / A;
+    b0 = (1.0 + al * A) / a0; b1 = -2.0 * cw / a0; b2 = (1.0 - al * A) / a0; a1 = -2.0 * cw / a0; a2 = (1.0 - al / A) / a0;
+}
+} // namespace
+
+void Leveler::processCell (float* l, float* r, int n, const Settings& s) noexcept
+{
+    const auto& c = cell190lf;
+    const double dt = 1.0 / sr;
+    const double hf = std::clamp (s.hiFreq, 0.0, 100.0);
+    const double highDb = c.highDb + c.highDbSlope * (hf - 50.0) / 50.0, lowDb = c.lowDb + c.lowDbSlope * (hf - 50.0) / 50.0;
+    if (cellRate != sr || cellHiFreq != hf) // the filters follow the Hi Freq dial
+    {
+        cellRate = sr;
+        cellHiFreq = hf;
+        cellPeak (sr, c.lowHz, c.lowQ, lowDb, cellLow.b0, cellLow.b1, cellLow.b2, cellLow.a1, cellLow.a2);
+        cellPeak (sr, c.highHz, c.highQ, highDb, cellHigh.b0, cellHigh.b1, cellHigh.b2, cellHigh.a1, cellHigh.a2);
+    }
+    const double shift = table (cellPrKnob, cellPrShift, (int) std::size (cellPrKnob), std::clamp (s.peakReduction, 0.0, 100.0))
+                       + table (cellHfKnob, cellHfShift, (int) std::size (cellHfKnob), hf) + (s.limit ? c.limitShift : 0.0);
+    const double K = dbToGain (shift), gam = s.limit ? c.gammaLimit : c.gamma, ff = s.limit ? c.feedForward : 0.0;
+    const double gFloor = s.limit ? dbToGain (-c.floorDb) : 0.0;
+    const double eUp = 1.0 - std::exp (-dt * 1000.0 / c.mchMs), eDn = 1.0 - std::exp (-dt * 1000.0 / c.mdcMs);
+    const double envR = std::exp (-dt * 1000.0 / c.envMs);
+    const double a3 = 1.0 - std::exp (-dt * 1000.0 / c.att3Ms), r3 = 1.0 - std::exp (-dt * 1000.0 / c.rel3Ms);
+    const double cAs = 1.0 - std::exp (-dt * 1000.0 / c.tauAs), hpc = std::exp (-2.0 * pi * c.tiltHz / sr), hmax = dbToGain (c.hmaxDb);
+    // the measured level at 1 kHz (the idle response's mid-band loss given back, as the Opto classic voicing does)
+    const double mk = dbToGain (table (cellGainKnob, cellGainDb, (int) std::size (cellGainKnob), std::clamp (s.gain, 0.0, 100.0)) + idleMakeupDb
+                                + (s.autoMakeup ? autoMakeupDb (s.peakReduction) - autoMakeupDb (s.makeupRef) : 0.0));
+    const auto bq = [] (Peak2& f, double x, int ch) noexcept
+    {
+        const double y = f.b0 * x + f.b1 * f.x1[ch] + f.b2 * f.x2[ch] - f.a1 * f.y1[ch] - f.a2 * f.y2[ch];
+        f.x2[ch] = f.x1[ch]; f.x1[ch] = x; f.y2[ch] = f.y1[ch]; f.y1[ch] = y;
+        return y;
+    };
+    const double* tb = idleB;
+    const double* ta = idleA;
+    double maxGr = 0.0;
+    for (int i = 0; i < n; ++i)
+    {
+        float* ch[2] = { &l[i], &r[i] };
+        double u = 0.0;
+        for (int k = 0; k < 2; ++k)
+            u = std::max (u, std::abs (bq (cellHigh, bq (cellLow, cyp[k] + ff * *ch[k], k), k)));
+        cenv = std::max (u * K, cenv * envR);
+        u = cenv;
+        const double ct = u > 1.0 ? std::pow (u - 1.0, gam) : 0.0;
+        const double t3 = c.share3 * ct, tf = (1.0 - c.share) * (1.0 - c.share3) * ct, ts = c.share * (1.0 - c.share3) * ct;
+        cc3 += (t3 > cc3 ? a3 : r3) * (t3 - cc3);
+        const double lit = ct / (1.0 + ct);
+        cexp += (lit > cexp ? eUp : eDn) * (lit - cexp);
+        const double slow = 1.0 + c.mg * cexp;
+        if (tf > ccf)
+        {
+            double cd = std::log1p (ccf);
+            cd += (std::log1p (tf) - cd) * (1.0 - std::exp (-dt * 1000.0 * std::pow (1.0 + ccf, c.beta) / c.tauA));
+            ccf = std::expm1 (cd);
+        }
+        else
+            ccf = std::max (tf, ccf - dt * (c.a * std::pow (ccf, c.n) + c.b * ccf) / slow);
+        if (ts > ccs)
+            ccs += (ts - ccs) * cAs;
+        else
+            ccs = std::max (ts, ccs - dt * (c.a2 * std::pow (ccs, c.n2) + c.b2 * ccs) / slow);
+        const double g = std::max (gFloor, 1.0 / (1.0 + ccf + ccs + cc3));
+        const double h = std::min (hmax, std::pow (g, -c.kappa));
+        for (int k = 0; k < 2; ++k)
+        {
+            const double y = g * *ch[k];
+            cyp[k] = y;
+            const double hp = hpc * (chy[k] + y - chx[k]);
+            chx[k] = y;
+            chy[k] = hp;
+            double o = (y + (h - 1.0) * hp) * mk;
+            o = o + h2 * o * o + h3 * o * o * o;
+            for (int j = 3; j > 0; --j) { tx[k][j] = tx[k][j - 1]; ty[k][j] = ty[k][j - 1]; }
+            tx[k][0] = o;
+            const double t = tb[0] * tx[k][0] + tb[1] * tx[k][1] + tb[2] * tx[k][2] + tb[3] * tx[k][3] - ta[1] * ty[k][1] - ta[2] * ty[k][2] - ta[3] * ty[k][3];
+            ty[k][0] = t;
+            *ch[k] = (float) t;
         }
         maxGr = std::max (maxGr, -gainToDb (g));
     }
