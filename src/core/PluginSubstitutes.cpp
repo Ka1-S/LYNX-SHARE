@@ -12,6 +12,7 @@
 
 #include "core/Effects.h"
 #include "core/FabFilterStates.h"
+#include "core/FacetEq.h"
 #include "core/FlEffects.h"
 #include "core/FlPluginDb.h"
 #include "core/FlWrapper.h"
@@ -485,11 +486,23 @@ waves = CLA-76
 translate = waves-cla-76
 preset = Style=0.9; Threshold=0.6; Ratio=0.546; Knee=0.13; Range=0.53; Auto gain=1
 
+# round 190kt: the console bus compressor on Crest's Bus style with its console law (a feedback compressor, LYNX's own
+# model of the structure REA showed in the reference's DSP, fitted on our demo-mode probes: docs/PARITY.md "Round 190kt",
+# docs/analise/REA_rodada190kt.md). Was Compressor's classic voicing (round 190jh). Without a readable state: Crest's
+# Bus style at its top threshold (the reference's default, +15, reduces nothing on programme)
+[waves-sslcomp]
+product = SSLComp
+vendor = Waves
+lynx = Crest Compressor
+waves = SSLComp
+translate = waves-sslcomp-bus
+preset = Style=0.9; Threshold=1
+
 [waves-compressors]
-product = Waves compressor (CLA-3A / C1 / SSLComp / API-2500)
+product = Waves compressor (CLA-3A / C1 / API-2500)
 vendor = Waves
 lynx = Compressor
-waves = CLA-3A; C1 comp; C1comp; SSLComp; API-2500
+waves = CLA-3A; C1 comp; C1comp; API-2500
 preset = Threshold=0.75; Ratio=0.0526; Auto gain=1
 # round 190jh: an SSLComp state's RealWorld list is translated (threshold, ratio, attack, release, make-up, mix),
 # measured on refcap182's SSLComp programme captures; the others keep the preset
@@ -1541,6 +1554,75 @@ int translateWavesSslComp (const std::vector<std::uint8_t>& state, EffectSlot& s
     slot.params[5] = 0.0f;
     slot.params[6] = (float) std::clamp (wavesValue (rw, 19).value_or (100.0) / 100.0, 0.0, 1.0);
     return 7;
+}
+
+// SSLComp → Crest's Bus style with the console law (round 190kt [EXEC]; the state's RealWorld list as above, plus 8 IN
+// (compression on), 20 trim dB). The console law takes the detector's threshold, loop gain, knee and RC time constants;
+// the reference's knobs reach them through LYNX's fits on our demo-mode probes (rea190kt/lab: fitstatic2.py on 1 kHz
+// stairs at 3 ratios × 4 thresholds, 0.02 … 0.2 dB rms; fitdyn.py / fitauto.py on level steps and drum bursts):
+// per ratio step, threshold = knob + a cubic in the knob, loop gain and knee linear in the knob.
+struct SslBusFit { double off, q1, q2, q3, loop, loopT, knee, kneeT; };
+// a make-up on the compressed path only, blended with the dry path at `mix`, then a trim on both: Crest's mix and output
+void consoleMix (EffectParams& p, double mix, double makeupDb, double trimDb)
+{
+    namespace c = dyn::crest;
+    mix = std::clamp (mix, 0.0, 1.0);
+    const auto mk = std::pow (10.0, makeupDb / 20.0), sum = (1.0 - mix) + mk * mix;
+    p[c::mix] = (float) (mk * mix / sum);
+    p[c::input] = 0.5f;
+    p[c::output] = (float) std::clamp ((trimDb + 20.0 * std::log10 (sum) + 36.0) / 72.0, 0.0, 1.0);
+}
+constexpr SslBusFit sslBusFits[3] {
+    { -35.4220, 0.2569, -0.0006, -0.2269, 2.6844, -0.0974, 10.0000, 0.6599 },
+    { -26.5435, 0.4816, 0.0122, -0.2725, 4.3253, -0.5199, 2.7142, -0.9498 },
+    { -22.0192, 0.4841, -0.0060, -0.2320, 14.5155, 0.1545, 1.5414, 0.3730 },
+};
+constexpr double sslBusAttackMs[6] { 0.047, 0.988, 1.645, 8.435, 30.81, 111.0 };   // the six attack positions' RC time constants
+constexpr double sslBusReleaseMs[5] { 85.8, 127.6, 264.3, 560.5, 26.66 };  // 0.1 / 0.3 / 0.6 / 1.2 s and Auto's fast capacitor
+int translateWavesSslCompBus (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    namespace c = dyn::crest;
+    const auto rw = wavesRealWorldParams (state);
+    const auto threshold = wavesValue (rw, 0), ratio = wavesValue (rw, 1);
+    if (slot.kind != EffectKind::crestCompressor || ! threshold || ! ratio || wavesPluginName (state) != "SSLComp")
+        return 0;
+    const auto pick = [&] (std::size_t i, double fallback, int count) { return std::clamp ((int) std::lround (wavesValue (rw, i).value_or (fallback)), 0, count - 1); };
+    const auto& f = sslBusFits[pick (1, 1.0, 3)];
+    const auto t = std::clamp (*threshold, -15.0, 15.0), u = t / 15.0;
+    const auto thr = t + f.off + f.q1 * t + f.q2 * t * u + f.q3 * t * u * u;
+    const bool in = wavesValue (rw, 8).value_or (1.0) >= 0.5;
+    const auto release = pick (4, 3.0, 5);
+    auto& p = slot.params;
+    p[c::style] = c::styleValue (c::Style::bus);
+    p[c::voicing] = 0.0f;
+    p[c::busLaw] = 1.0f;
+    p[c::threshold] = (float) std::clamp ((thr + 60.0) / 60.0, 0.0, 1.0);
+    p[c::ratio] = in ? c::ratioValue (1.0 + f.loop * (1.0 + f.loopT * u)) : 0.0f;
+    p[c::knee] = (float) std::clamp (f.knee * (1.0 + f.kneeT * u) * 8.685889638065035 / 2.0 / 72.0, 0.0, 1.0); // nepers → the knob
+    p[c::range] = 1.0f;
+    p[c::attack] = c::attackValue (sslBusAttackMs[pick (3, 2.0, 6)]);
+    p[c::release] = c::releaseValue (sslBusReleaseMs[release]);
+    p[c::autoRelease] = release == 4 ? 1.0f : 0.0f;
+    p[c::hold] = p[c::lookahead] = p[c::maxLookahead] = 0.0f;
+    p[c::character] = 0.0f;
+    p[c::oversampling] = 0.0f;
+    p[c::autoGain] = 0.0f;
+    p[c::autoThreshold] = 0.0f;
+    p[c::stereoLink] = 1.0f;
+    p[c::linkMode] = c::linkModeValue (c::LinkMode::stereo);
+    // the reference's make-up acts on the compressed path only (trim · (dry · (1 − mix) + wet · make-up · mix)); Crest's
+    // output acts on both, so the blend and the output carry it
+    consoleMix (p, wavesValue (rw, 19).value_or (100.0) / 100.0, wavesValue (rw, 5).value_or (0.0), wavesValue (rw, 20).value_or (0.0));
+    for (int b = 0; b < c::scBands; ++b)
+        p[c::scParam (b, 0)] = facet::shapeValue (facet::Shape::off);
+    const auto hp = wavesValue (rw, 21).value_or (20.0);
+    if (hp > 20.5) // the side-chain high-pass (12 dB/oct; 20 Hz = off)
+    {
+        p[c::scParam (0, 0)] = facet::shapeValue (facet::Shape::lowCut);
+        p[c::scParam (0, 1)] = facet::hzValue (hp);
+        p[c::scParam (0, 4)] = facet::slopeValue (12);
+    }
+    return 22;
 }
 
 // round 190jh: SuperTap's echo levels on Echoform (see translateWavesSuperTap), fitted on refcap182's programme
@@ -3154,6 +3236,8 @@ RawTranslator rawTranslatorNamed (std::string_view name)
         return translateWavesSuperTap;
     if (name == "waves-sslcomp")
         return translateWavesSslComp;
+    if (name == "waves-sslcomp-bus")
+        return translateWavesSslCompBus;
     if (name == "waves-reverb")
         return translateWavesReverb;
     return nullptr;

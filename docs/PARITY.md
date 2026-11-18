@@ -4123,3 +4123,45 @@ design190ia shots/ref/fl-playlist.png (fixed 100 px column, names cut as "Pitch 
 | Moving the editor window while its display runs | FL's window moves cleanly | 0.1.29 at a fractional interface or display scale (150 %): every move step also resized the docked window by one pixel, and the new, undrawn Direct2D buffers showed as white flashes with only the live display drawn in them (captured: 100 white frames in a 6 s drag). Round 190hx's fix for issue #178 (position and size rounded on their own) removes it; 0 white frames at 100 % in either build | Fixed (190hx, after 0.1.29) |
 | The display's scrolling speed while a knob is dragged | FL's display runs by time | It moved one column per editor timer call, and JUCE drops timer calls while a dragged knob keeps the message thread busy, so it slowed down. Now one column per 33 ms of real time (`core/LiveHistory.h`); a late call adds the missed columns as a straight line | FL-exact behaviour |
 | More LFO shapes | Sine, Triangle, Square, Saw, Random | FL's five stay first and are the default. The Shape menu adds a "LYNX shapes" section: Ramp down, Exp rise, Exp fall, Triangle skew, Half sine, Pulse 25%, Steps 4 / 8 / 16, Smooth random, Random x4 (`core/PeakShapes.h`, table revision 1). They are stored in a hidden parameter (index 12, id / 64) that is not written while 0, so earlier projects load, render and save byte for byte as before, and FL's parameter list (automation, links, the .flp import) is unchanged. Phase, Tension, Speed and the song lock apply as for FL's shapes. FL export writes FL's Shape (FL has no such shapes) | LYNX extra |
+
+## Round 190kt: REA of third-party binaries — Crest's console law, Waves SSLComp on it
+
+The owner's permission of 2026-11-17 (REA on third-party plug-in binaries, clean-room) opened the plug-ins round 190hv
+could not capture. Evidence and method: `docs/analise/REA_rodada190kt.md`. In short: the SSL, Harrison, LiquidSonics,
+Antares, Sonic Academy, D16 and Overloud binaries are PACE-encrypted (nothing readable; their existing black-box banks
+stay what we have), Slate / Eiosis / Valhalla are readable but large, and the Waves V17 DSP DLLs are small and unwrapped.
+The Waves SSLComp DSP was read (§2): a feedback bus compressor with a log-domain rational soft knee and RC ballistics.
+
+**Crest Compressor — the Bus style's console law** (hidden `busLaw`, past Crest's info: no control, no string; off for new
+instances and for every project saved before). The detector hears the output (feedback), sample peaks clipped at full
+scale over a −60 dBFS floor; the over-threshold amount (nepers) goes through the loop gain (ratio − 1) and the knee
+`y² / (y − k)`; the log gain follows an RC network (attack charges, the release resistor discharges; Auto adds a slow
+second capacitor, 2.53 s, charging 0.17 × as fast). Threshold, ratio, knee, attack and release keep their knobs.
+Every constant is fitted on our own Waves-demo probes (`/mnt/e/lynx-work/rea190kt/cap`, 44 renders, mutes masked):
+steady curve 0.16 / 0.05 / 0.02 dB rms at 2 / 4 / 10 : 1 over four thresholds; time constants within 0.1 … 0.3 dB rms on
+level steps.
+
+**Waves SSLComp → Crest's console law** (was Compressor's classic voicing, round 190jh): threshold (per ratio step, the
+knob plus a fitted cubic), ratio, attack, release (Auto), make-up on the compressed path only (Crest's mix and output carry
+it), IN, mix, trim, side-chain high-pass.
+
+| reference → LYNX | bank | files | before → after | up / same / down |
+|---|---|---|---|---|
+| SSLComp → Crest (console law) | refcap182 programme | 25 | 5.68 → **7.56** | 21 / 4 / 0 |
+| SSL Native Bus Compressor 2 → Crest (console law, **not shipped**) | tp172c / refcap182 | 16 / 20 | 6.06 → 5.06 / 6.20 → 5.30 | kept on round 190ar's map |
+
+Bus Compressor 2's steady curve fits the same law (0.24 dB rms on tp172c's four stairs) but its timing does not match
+SSLComp's time constants and it has no step probes (its trial expired): it stays on its fitted map.
+
+**Old projects.** The console law runs only with `busLaw` = 1, which only the SSLComp translator sets. `lab/gold.sh`: Crest
+at all 11 styles × 2 settings (+ auto release) and the Bus default, 44.1 / 48 / 96 kHz × 3 programme signals, the base
+binary against the round's: 207 renders, 0 differ.
+
+**CPU** (35 s stereo at 48 kHz including file I/O, best of 5 on one core; `cpu/bench.log`): Crest's Bus style 1.12 … 1.27 s,
+the console law through the SSLComp translator 1.35 s, the old stand-in (Compressor) 0.98 s: about +1 % of a core per
+SSLComp instance. No latency. Tests: the mini runner (190js's list + every Crest-related test file + the round's) 543 732
+checks, 0 failures.
+
+**Still off:** the analog extras (noise, ripple, the small second-order term; off by default in the reference), the
+inter-sample peak allowance, the fade stage; Bus Compressor 2 (above); CLA-76 / CLA-2A read for structure only
+(REA_rodada190kt §5).
