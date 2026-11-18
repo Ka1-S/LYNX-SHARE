@@ -182,6 +182,12 @@ std::vector<double> wavesRealWorldParams (const std::vector<std::uint8_t>& state
 // Soundtoys states (read black-box in the official trials) are translated by it.
 std::optional<std::uint64_t> soundtoysStateHash (const std::vector<std::uint8_t>& state);
 int knownSoundtoysStates() noexcept;
+// Round 190kv: the Soundtoys factory presets. The fingerprint of a state's encoded payload without its volatile fields
+// (0 when the state has none); the fingerprints known for a plug-in's widget name ("EchoBoy", "Decapitator", …); a known
+// fingerprint applied to a slot of the matching LYNX effect (the number of parameters set, 0 when not known).
+std::uint64_t soundtoysFactoryFingerprint (const std::vector<std::uint8_t>& state);
+std::vector<std::uint64_t> soundtoysFactoryFingerprints (std::string_view widget);
+int applySoundtoysFactoryPreset (std::string_view widget, std::uint64_t fingerprint, EffectSlot& slot);
 
 // --- lossless text form of an .flp plugin reference (.lynx keeps it for substitutes) ------------------------------
 // Base64 of a versioned binary record of every ForeignPlugin field; foreignFromText(foreignToText(p)) == p, the

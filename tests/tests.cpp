@@ -17808,3 +17808,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "PluginDrop190hfTests.inc" // issue #152 point 6: plugins dropped on the tracks (FL and Live layouts)
 #include "Rollup028Tests.inc" // round 190fv: semantic interactions of the 0.1.28 rollup
 #include "Parity190isTests.inc" // round 190is: Echoform voicings revision 1, the Soundtoys echoes' own defaults
+#include "Stoys190kvTests.inc" // round 190kv: the Soundtoys factory presets (fingerprint of the encoded payload -> their own settings)
