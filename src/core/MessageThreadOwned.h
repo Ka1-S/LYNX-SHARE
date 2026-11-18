@@ -9,6 +9,7 @@
 // shared state that the queued calls keep alive, and it is still created and deleted only by the posted calls.
 
 #include <atomic>
+#include "platform/CvWait.h"
 #include <chrono>
 #include <condition_variable>
 #include <functional>
@@ -90,7 +91,7 @@ private:
                 step.abandoned = true;
                 return false;
             }
-            step.cv.wait_for (g, std::chrono::milliseconds (20));
+            cvwait::waitFor (step.cv, g, std::chrono::milliseconds (20)); // (round 190la: platform/CvWait.h)
         }
         return true;
     }

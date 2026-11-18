@@ -1,4 +1,5 @@
 #include "engine/LiveLink.h"
+#include "platform/CvWait.h"
 
 #include <chrono>
 #include <cstring>
@@ -26,7 +27,7 @@ bool Connection::next (std::pair<bool, std::vector<std::uint8_t>>& out, int wait
 {
     std::unique_lock<std::mutex> g (lock);
     if (outgoing.empty() && waitMs > 0)
-        wake.wait_for (g, std::chrono::milliseconds (waitMs), [this] { return ! outgoing.empty() || stopping.load(); });
+        cvwait::waitFor (wake, g, std::chrono::milliseconds (waitMs), [this] { return ! outgoing.empty() || stopping.load(); }); // (round 190la: platform/CvWait.h)
     if (outgoing.empty())
         return false;
     out = std::move (outgoing.front());
