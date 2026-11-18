@@ -313,8 +313,16 @@
                 int midiTrack = -1, audioTrack = -1;
                 for (int t = 0; t < 16; ++t)
                 {
-                    if (midiTrack < 0 && offline.gridTrackInput (t) == AudioEngine::GridInput::midi && detailchain::forTrack (song, t).channel >= 0)
-                        midiTrack = t;
+                    // (a track whose channel no other column shows: the imported set gives several columns channel 0)
+                    if (const auto ch = detailchain::forTrack (song, t).channel;
+                        midiTrack < 0 && offline.gridTrackInput (t) == AudioEngine::GridInput::midi && ch >= 0)
+                    {
+                        auto shared = false;
+                        for (int u = 0; u < 16 && ! shared; ++u)
+                            shared = u != t && detailchain::forTrack (song, u).channel == ch;
+                        if (! shared)
+                            midiTrack = t;
+                    }
                     if (audioTrack < 0 && detailchain::forTrack (song, t).insert > 0 && detailchain::forTrack (song, t).channel < 0)
                         audioTrack = t;
                 }
