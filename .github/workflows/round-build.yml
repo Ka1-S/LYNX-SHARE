@@ -36,9 +36,14 @@ jobs:
           key: round-objcache-${{ github.run_id }}
           restore-keys: round-objcache-
 
+      # Round builds keep the fast default (-O2, no LTO). "[release-opt]" in the commit message (tools/ci-round-build.sh
+      # with LYNX_CI_RELEASE_OPT=1) builds with the release's code generation instead (round 190kz: real -O3 + ThinLTO).
       - name: Build
+        env:
+          RELEASE_OPT: ${{ contains(github.event.head_commit.message, '[release-opt]') }}
         run: |
           ulimit -s 1048576 || true
+          if [[ "$RELEASE_OPT" == true ]]; then export LYNX_WIN_OPT="-O2 -Xclang -O3" LYNX_WIN_LTO=thin; fi
           ZIG="$RUNNER_TEMP/zig/zig" JUCE_DIR="$RUNNER_TEMP/juce" OUT=build-win JOBS="$(nproc)" scripts/build-windows-zig.sh
 
       - uses: actions/upload-artifact@v4
