@@ -4,6 +4,7 @@
 #include "ui/PlaylistComponent.h"
 
 #include <algorithm>
+#include <set>
 #include <cmath>
 #include <cstring>
 
@@ -498,10 +499,29 @@ public:
         }
         if (const auto t = headerTrackAt (e.getPosition()); t >= 0) // a column's title selects its track (round 183a)
         {
+            // round 190lr (DL-109, Live manual 18.2 "Multiple adjacent or nonadjacent tracks can be selected at once by
+            // Shift-clicking or Ctrl-clicking"): the Session mixer's edits then act on all of them
+            if (e.mods.isShiftDown() && selectedTrack >= 0)
+            {
+                trackSet.clear();
+                for (int k = juce::jmin (selectedTrack, t); k <= juce::jmax (selectedTrack, t); ++k)
+                    trackSet.insert (k);
+            }
+            else if (e.mods.isCommandDown())
+            {
+                if (trackSet.empty() && selectedTrack >= 0)
+                    trackSet.insert (selectedTrack);
+                if (trackSet.erase (t) == 0)
+                    trackSet.insert (t);
+            }
+            else
+                trackSet.clear();
             selectedTrack = t;
             sceneSelected = false;
             titleSelected = true; // (round 190ef: Ctrl+R renames it)
             repaint();
+            if (mixer != nullptr)
+                mixer->repaint();
             notify (GridPick::select);
             return;
         }
@@ -1390,6 +1410,21 @@ public:
             onPick (selectedTrack, selectedScene, pick);
     }
     // the track whose column title is at p, or -1
+    // round 190lr (DL-109): the tracks selected together (empty: only selectedTrack)
+    std::set<int> trackSet;
+    std::vector<int> selectedTracks() const
+    {
+        if (trackSet.size() < 2)
+            return { selectedTrack };
+        return { trackSet.begin(), trackSet.end() };
+    }
+    void selectTracksForSnapshot (std::vector<int> tracks)
+    {
+        trackSet = { tracks.begin(), tracks.end() };
+        if (! tracks.empty())
+            selectedTrack = tracks.back();
+        repaint();
+    }
     bool trackTaken (int t) const
     {
         const auto* state = engine.launcherState();
@@ -1860,7 +1895,7 @@ public:
         namespace c = theme::colour;
         namespace lv = theme::livelook;
         const auto cell = r.withTrimmedTop (2).withTrimmedRight (2);
-        g.setColour (t == selectedTrack ? lv::raised : lv::surface);
+        g.setColour (t == selectedTrack || trackSet.count (t) > 0 ? lv::raised : lv::surface);
         g.fillRect (cell);
         const auto* view = state != nullptr ? &state->tracks[(std::size_t) t] : nullptr;
         // (a stop waiting for its grid point: the square pulses black ↔ the playing green, as in Live — film3)
@@ -3531,6 +3566,19 @@ bool clipGridDrag (const juce::var& description, int& track, int& scene)
     track = parts[1].getIntValue();
     scene = parts[2].getIntValue();
     return track >= 0 && scene >= 0;
+}
+
+std::vector<int> clipGridSelectedTracks (juce::Component& grid)
+{
+    if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
+        return g->selectedTracks();
+    return {};
+}
+
+void clipGridSelectTracksForSnapshot (juce::Component& grid, std::vector<int> tracks)
+{
+    if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
+        g->selectTracksForSnapshot (std::move (tracks));
 }
 
 std::pair<int, int> clipGridSelection (juce::Component& grid)

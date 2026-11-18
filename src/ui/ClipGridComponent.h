@@ -35,6 +35,9 @@ juce::PopupMenu clipGridSlotMenu (juce::Component& grid, int track, int scene);
 bool clipGridDrag (const juce::var& description, int& track, int& scene);
 // The grid's selected track and scene ({ 0, 0 } before any click).
 std::pair<int, int> clipGridSelection (juce::Component& grid);
+// round 190lr (DL-109): the tracks selected together with Shift / Ctrl+click on their titles (one: the selected track)
+std::vector<int> clipGridSelectedTracks (juce::Component& grid);
+void clipGridSelectTracksForSnapshot (juce::Component& grid, std::vector<int> tracks);
 // Round 190dr: the Session mixer under the slots (ui/SessionMixer.h), and the column a dragged device would land in
 // (-1: none), for --liveshot190dr.
 SessionMixerComponent* clipGridMixer (juce::Component& grid);

@@ -804,24 +804,52 @@ double SessionMixerComponent::valueFor (const Hit& hit) const
     return 0.0;
 }
 
+// Round 190lr (DL-109): the inserts of the other tracks selected with this column (Shift / Ctrl+click on the grid's titles)
+std::vector<int> SessionMixerComponent::groupedInserts (int column) const
+{
+    std::vector<int> out;
+    auto* parent = getParentComponent();
+    if (parent == nullptr || column < 0 || column >= columns)
+        return out;
+    const auto tracks = clipGridSelectedTracks (*parent);
+    if (tracks.size() < 2 || std::find (tracks.begin(), tracks.end(), column) == tracks.end())
+        return out;
+    const auto own = insertFor (column);
+    for (const auto t : tracks)
+        if (const auto i = t >= 0 && t < columns ? insertFor (t) : -1; i >= 0 && i != own && std::find (out.begin(), out.end(), i) == out.end())
+            out.push_back (i);
+    return out;
+}
+
 void SessionMixerComponent::setValue (const Hit& hit, double v)
 {
     const auto insert = insertFor (hit.column);
     if (insert < 0)
         return;
+    const auto others = groupedInserts (hit.column); // (round 190lr: the selected tracks move by the same amount)
     switch (hit.part)
     {
         case Part::volume:
         case Part::fader:
-            engine.editLevels ([insert, v = (float) juce::jlimit (0.0, 1.0, v)] (Song& s) {
-                if (insert < (int) s.mixer.size())
-                    s.mixer[(std::size_t) insert].volume = v;
+            engine.editLevels ([insert, others, v = (float) juce::jlimit (0.0, 1.0, v)] (Song& s) {
+                if (insert >= (int) s.mixer.size())
+                    return;
+                const auto delta = v - s.mixer[(std::size_t) insert].volume;
+                s.mixer[(std::size_t) insert].volume = v;
+                for (const auto i : others)
+                    if (i < (int) s.mixer.size())
+                        s.mixer[(std::size_t) i].volume = juce::jlimit (0.0f, 1.0f, s.mixer[(std::size_t) i].volume + delta);
             });
             break;
         case Part::pan:
-            engine.editLevels ([insert, v = (float) juce::jlimit (-1.0, 1.0, v)] (Song& s) {
-                if (insert < (int) s.mixer.size())
-                    s.mixer[(std::size_t) insert].pan = v;
+            engine.editLevels ([insert, others, v = (float) juce::jlimit (-1.0, 1.0, v)] (Song& s) {
+                if (insert >= (int) s.mixer.size())
+                    return;
+                const auto delta = v - s.mixer[(std::size_t) insert].pan;
+                s.mixer[(std::size_t) insert].pan = v;
+                for (const auto i : others)
+                    if (i < (int) s.mixer.size())
+                        s.mixer[(std::size_t) i].pan = juce::jlimit (-1.0f, 1.0f, s.mixer[(std::size_t) i].pan + delta);
             });
             break;
         case Part::send:
@@ -852,6 +880,7 @@ void SessionMixerComponent::paint (juce::Graphics& g)
             return;
         auto* parent = getParentComponent();
         const auto selected = parent != nullptr ? clipGridSelection (*parent).first : -1;
+        paintGroup = parent != nullptr ? clipGridSelectedTracks (*parent) : std::vector<int> {}; // (round 190lr, DL-109)
         {
             juce::Graphics::ScopedSaveState save (g);
             g.reduceClipRegion (juce::Rectangle<int> (0, 0, tracksWidth, getHeight()));
@@ -1144,7 +1173,8 @@ void SessionMixerComponent::paintStripLive (juce::Graphics& g, int column, int s
     const auto* m = strip.insert >= 0 && strip.insert < (int) song.mixer.size() ? &song.mixer[(std::size_t) strip.insert] : nullptr;
 
     // the strip (selected track #464646), each section's 2 px separator under it, the track-colour stripe at the foot
-    g.setColour (! main && column == selected ? lv::raised : lv::surface);
+    g.setColour (! main && (column == selected || (paintGroup.size() > 1 && std::find (paintGroup.begin(), paintGroup.end(), column) != paintGroup.end()))
+                     ? lv::raised : lv::surface);
     g.fillRect (content);
     g.setColour (lv::separator);
     {
@@ -1484,7 +1514,11 @@ void SessionMixerComponent::mouseDown (const juce::MouseEvent& e)
             break;
         case Part::activator:
             if (! popup)
-                engine.editSong ([insert, on = ! sessionmixer::isActive (song, insert)] (Song& s) { sessionmixer::setActive (s, insert, on); });
+                engine.editSong ([insert, others = groupedInserts (hit.column), on = ! sessionmixer::isActive (song, insert)] (Song& s) {
+                    sessionmixer::setActive (s, insert, on);
+                    for (const auto i : others) // (round 190lr, DL-109: every selected track)
+                        sessionmixer::setActive (s, i, on);
+                });
             break;
         case Part::solo:
             if (! popup)

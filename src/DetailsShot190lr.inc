@@ -221,6 +221,9 @@
                 clipGridSelectRangeForSnapshot (*gridView, 0, 0, 2, 2);
                 check ("a rectangle selection of 3 x 3 slots", clipGridSelectedCountForSnapshot (*gridView) == 9);
                 write (*gridView, "grid-range-selection");
+                // several tracks selected (Shift+click on titles): the mixer strips selected together
+                clipGridSelectTracksForSnapshot (*gridView, { 0, 1, 2 });
+                check ("three tracks selected together", clipGridSelectedTracks (*gridView).size() == 3);
                 // the Session mixer: RMS under the peak, the automated volume's LED
                 if (auto* mixer = clipGridMixer (*gridView))
                 {
