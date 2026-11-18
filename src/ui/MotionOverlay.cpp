@@ -18,6 +18,7 @@
  #include <windows.h>
  #include <d3d11.h>
  #include <dxgi.h>
+ #include <dxgi1_2.h>
  #include <dcomp.h>
 #elif JUCE_MAC
  #include "ui/MotionOverlayMac.h"
@@ -499,7 +500,15 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
         auto& picture = pictures[exact ? 0 : (std::size_t) phase];
         if (exact && picture.drawn && picture.phase != phase)
             picture.drawn = false; // (one picture, painted again at the new phase)
-        if (! picture.drawn)
+        if (live) // (round 190kz) painted again and presented on every frame, in its own swap chain
+        {
+            const auto originX = reference + left;
+            const auto at = juce::AffineTransform::scale ((float) s).translated ((float) (ownerPos.x - originX), (float) (ownerPos.y - topY));
+            const auto xAt = ((double) reference + (double) phase / steps - ownerPos.x) / s;
+            if (! paintLive (w, h, at, (float) xAt))
+                return false;
+        }
+        else if (! picture.drawn)
         {
             const auto originX = reference + left;
             const auto at = juce::AffineTransform::scale ((float) s).translated ((float) (ownerPos.x - originX), (float) (ownerPos.y - topY));
@@ -520,6 +529,28 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
         shiftRest._11 = 1.0f;
         shiftRest._22 = 1.0f;
         shiftRest._31 = (float) rest;
+        if (live)
+        {
+            // the swap chain's presents show the new pictures by themselves: the visual changes (and is committed) only
+            // when its place, its clip or its swap chain changed
+            const LiveKey placed { offsetX, offsetY, local.left, local.top, local.right, local.bottom, (float) rest, chainSerial };
+            if (inTree && placed == liveKey)
+                return true;
+            auto done = SUCCEEDED (visual->SetContent (chain.p)) && SUCCEEDED (visual->SetOffsetX (offsetX))
+                        && SUCCEEDED (visual->SetOffsetY (offsetY)) && SUCCEEDED (visual->SetClip (local))
+                        && SUCCEEDED (visual->SetTransform (shiftRest));
+            if (done && ! inTree)
+                done = inTree = SUCCEEDED (target->root->AddVisual (visual.p, TRUE, nullptr));
+            if (done)
+                done = SUCCEEDED (dev.dcomp->Commit());
+            if (! done)
+            {
+                deviceLost();
+                return false;
+            }
+            liveKey = placed;
+            return true;
+        }
         auto ok = SUCCEEDED (visual->SetContent (picture.surface.p)) && SUCCEEDED (visual->SetOffsetX (offsetX))
                   && SUCCEEDED (visual->SetOffsetY (offsetY)) && SUCCEEDED (visual->SetClip (local))
                   && SUCCEEDED (visual->SetTransform (shiftRest));
@@ -710,6 +741,68 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
         return true;
     }
 
+    // (round 190kz) the live picture: painted in software, copied into the swap chain's back buffer, presented without
+    // waiting (a frame the compositor has not taken yet is simply replaced by the next one)
+    bool paintLive (int w, int h, const juce::AffineTransform& at, float x)
+    {
+        auto& dev = Devices::get();
+        if (! chain || chainW != w || chainH != h)
+        {
+            chain.reset();
+            Com<IDXGIDevice> dxgiDevice;
+            Com<IDXGIAdapter> adapter;
+            Com<IDXGIFactory2> factory;
+            if (FAILED (dev.d3d->QueryInterface (__uuidof (IDXGIDevice), (void**) dxgiDevice.put())) || FAILED (dxgiDevice->GetAdapter (adapter.put()))
+                || FAILED (adapter->GetParent (__uuidof (IDXGIFactory2), (void**) factory.put())))
+                return false;
+            DXGI_SWAP_CHAIN_DESC1 desc {};
+            desc.Width = (UINT) w;
+            desc.Height = (UINT) h;
+            desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+            desc.SampleDesc.Count = 1;
+            desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+            desc.BufferCount = 2;
+            desc.Scaling = DXGI_SCALING_STRETCH;
+            desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
+            desc.AlphaMode = DXGI_ALPHA_MODE_PREMULTIPLIED;
+            if (FAILED (factory->CreateSwapChainForComposition (dev.d3d.p, &desc, nullptr, chain.put())))
+            {
+                chain.reset();
+                return false;
+            }
+            chainW = w;
+            chainH = h;
+            ++chainSerial;
+        }
+        if (scratch.isNull() || scratch.getWidth() != w || scratch.getHeight() != h)
+            scratch = juce::Image (juce::Image::ARGB, w, h, true, juce::SoftwareImageType());
+        else
+            scratch.clear (scratch.getBounds());
+        {
+            juce::Graphics g (scratch);
+            g.addTransform (at);
+            painter (g, x);
+        }
+        Com<ID3D11Texture2D> buffer;
+        if (FAILED (chain->GetBuffer (0, __uuidof (ID3D11Texture2D), (void**) buffer.put())))
+        {
+            deviceLost();
+            return false;
+        }
+        {
+            const juce::Image::BitmapData pixels (scratch, juce::Image::BitmapData::readOnly);
+            dev.context->UpdateSubresource (buffer.p, 0, nullptr, pixels.data, (UINT) pixels.lineStride, 0);
+        }
+        const auto hr = chain->Present (0, DXGI_PRESENT_DO_NOT_WAIT);
+        if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET)
+        {
+            deviceLost();
+            return false;
+        }
+        ++picturesPainted();
+        return true;
+    }
+
     void hideNow (bool lostIt)
     {
         const auto was = showing;
@@ -733,6 +826,8 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
             target->root->RemoveVisual (visual.p);
         inTree = false;
         visual.reset();
+        chain.reset();
+        liveKey = {};
         for (auto& p : pictures)
             p = {};
         pictureKey = {};
@@ -806,6 +901,17 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
     };
     PictureKey pictureKey;
     juce::Image scratch; // (the software picture, kept: painted again at each 1/128 px the mark moves)
+    // live pictures (round 190kz): their swap chain and where the visual was last put
+    struct LiveKey
+    {
+        float x = 0.0f, y = 0.0f, l = 0.0f, t = 0.0f, r = 0.0f, b = 0.0f, rest = 0.0f;
+        int serial = -1;
+        bool operator== (const LiveKey&) const = default;
+    };
+    Com<IDXGISwapChain1> chain;
+    int chainW = 0, chainH = 0, chainSerial = 0;
+    LiveKey liveKey;
+    bool live = false;
     bool showing = false, inTree = false;
     double lastShowMs = 0.0, hideAtMs = 0.0;
 };
@@ -1215,6 +1321,7 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
     PictureKey pictureKey;
     juce::Image scratch;
     bool showing = false;
+    bool live = false; // (round 190kz: no effect on X11 / macOS)
     double lastShowMs = 0.0, hideAtMs = 0.0;
 };
 
@@ -1279,6 +1386,7 @@ struct MotionOverlay::Impl
     }
     void hide (bool) {}
     bool showing = false;
+    bool live = false; // (round 190kz: no effect here)
 };
 
 bool MotionOverlay::available()
@@ -1413,5 +1521,10 @@ void MotionOverlay::hide (bool afterFrames)
 bool MotionOverlay::isShowing() const noexcept
 {
     return impl->showing;
+}
+
+void MotionOverlay::setLive (bool on) noexcept
+{
+    impl->live = on;
 }
 } // namespace lynx::ui

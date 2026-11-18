@@ -292,6 +292,7 @@ class OutputMonitor final : public juce::Component,
 public:
     explicit OutputMonitor (AudioEngine& e) : engine (e)
     {
+        gpuDisplay.setLive (true);
         gpuDisplay.onHidden = [this] { repaint(); }; // (the overlay went by itself: the view paints the display again)
     }
     // one display frame (round 174e: at the display's refresh; the falloffs and the long view's scroll go by time, as
