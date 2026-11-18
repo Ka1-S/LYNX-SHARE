@@ -139,6 +139,10 @@ struct Settings
     // (gLow + gHigh·s/ω0) / (1 + s/ω0), ω0 = 2π·hz (not pre-warped), gLow or gHigh the shelf's gain (Foil Plate's ValhallaPlate
     // role, read by static REA); 2 = the second-order shelves every front-end had (projects saved before, every other effect)
     int shelfOrder = 2;
+    // round 190ls, law 1 only: 1 = the late tank is the dense network (32 lines in two halves of 16, a 16-point Hadamard
+    // inside each half, the halves rotated into each other by crossFeed; no loop all-passes): Atrium's ValhallaRoom role,
+    // whose late network has 32 lines (static REA). Needs an engine made with dense = true; 0 = the 8-line tank
+    int dense = 0;
 };
 constexpr int engineBands = 8;
 // the octave-band RT60 (s, 63 Hz … 8 kHz) the engine aims at for a line of lineMs under law 1 (tests, fitting)
@@ -148,7 +152,8 @@ class Engine
 {
 public:
     // maxLineSec: longest tank line the effect may ask for (sets the memory)
-    explicit Engine (double maxLineSec = 0.5, double maxPredelaySec = 0.6);
+    // dense: also allocates the dense late tank (Settings::dense; round 190ls)
+    explicit Engine (double maxLineSec = 0.5, double maxPredelaySec = 0.6, bool dense = false);
     ~Engine();
     void prepare (double sampleRate);
     void reset() noexcept;
@@ -180,6 +185,9 @@ constexpr int paramCount = 23;
 constexpr int engineLaw = 22; // round 190bz: 0 = the classic engine (projects saved before), 1 = the 0.1.27 law
 constexpr int revision = paramCount; // round 190it, hidden (no control, saved while non-zero): 1 = the 0.1.30 revision of
                                      //   the Measured law (new instances, translated states); 0 = projects saved before
+constexpr int reaLaw = paramCount + 1; // round 190ls, hidden (read only with the engine law and revision 1): 1 = the
+                                       //   ValhallaRoom role on the dense late tank (32 lines, the reference's count, static REA)
+                                       //   with its laws refitted (new instances, translated states); 0 = revision 1 as before
 constexpr int typeCount = 12;
 const char* typeName (int index) noexcept;
 double decaySec (float v) noexcept;

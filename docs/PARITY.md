@@ -4200,6 +4200,43 @@ low-pass plus a first-order shelf on four inner paths. Atrium's level over Decay
 flat within ±1 dB over ±4 Hz, ours ±4 … 12 dB). More modulation moved it 1 … 1.5 dB only — a denser late tank is its own
 project. Room scores unchanged (mode 3.31, pairs 4.22, sr48 3.44, sr96 3.38).
 
+## Round 190ls (Valhalla): Atrium on a dense late tank for the ValhallaRoom role
+
+Static analysis of the official ValhallaRoom binary by the owner's leave (clean-room: the structure understood, LYNX's own
+code written; no code, table or preset copied). Evidence: docs/analise/REA_rodada190ls.md, lab `/mnt/e/lynx-work/valhalla190ls/`.
+Score: `scripts/fxparity.py` with round 190lg's alignment window in time (~85 ms), the same scorer before and after.
+
+**Atrium ← ValhallaRoom (hidden `verbs::atrium::reaLaw`, index 24, one past round 190it's revision).** Read with the engine
+law and revision 1. A new instance and a translated ValhallaRoom state get 1; a project saved before loads 0 and renders bit
+for bit as before (42 / 42 renders of revisions 0 and 1 at 44.1 / 48 / 96 kHz against the base commit's objects, 81 / 81
+fxrender renders of translated states, Atrium's own settings and every other LYNX reverb / delay; fingerprints in
+`tests/Parity190lsTests.inc`).
+- The reference's late network has 32 lines in two halves; in every group of four, two lines move (one modulator, one each
+  way) and two stay. Atrium's engine gets a dense tank of that size (`Settings::dense`): 32 lines of LYNX's own lengths, a
+  16-point Hadamard per half, Late cross between the halves, law 1's per-line loop filters, the reference's modulation layout.
+- Late modulation × 4 on the moving lines: the reference's steady 1 kHz tone swings like that (sd of 10 ms levels 2.03 dB;
+  the 8-line tank's 1.19 dB, the dense tank's 2.26 dB).
+- Trims per type (`roomTrim`) on the type sweep's impulses; Large Room at half the sweep's lift at 63 / 125 Hz (music and bass
+  renders of the other banks).
+
+| Bank (ValhallaRoom captures → Atrium) | files | before → after | up / same / down |
+|---|---|---|---|
+| refcap030 mode (type sweep) | 48 | 3.31 → 3.58 | 14 / 30 / 4 |
+| refcap030 pairs | 36 | 4.22 → 4.25 | 1 / 34 / 1 |
+| refcap030 sr48 | 16 | 3.44 → 3.56 | 2 / 14 / 0 |
+| refcap030 sr96 | 16 | 3.38 → 3.69 | 3 / 13 / 0 |
+| **refcap030 all** | 116 | **3.62 → 3.80** | 20 / 91 / 5 |
+| tp172d | 12 | 3.58 → 3.67 | 1 / 11 / 0 |
+| verb183b captures | 17 | 3.88 → 3.88 | 0 / 17 / 0 |
+| refcap182 programme | 20 | 3.70 → 3.80 | 2 / 18 / 0 |
+
+The five files a step lower: four are the test signal's 1 kHz staircase (a steady tone through a time-varying tank: its level
+is the draw of the modulation at that frequency; the spectrum error fell on three of them, 2.35 / 2.37 / 2.25 → 2.28 / 1.91 /
+1.86 dB), one a music render whose level moved onto the reference (+0.69 → −0.05 dB) while its spectrum error crossed the
+2.5 dB step (2.14 → 2.52 dB).
+CPU (Atrium, 48 kHz, instructions of 20 s × 4 settings × 5 runs, one core): 80.0 G → 80.2 G with the law off (+0.3 %),
+118.7 G with the dense tank (+48 %; cycles +45 … 50 %, ~3.3 → ~4.8 % of a core in thread time) — the 32-line tank itself.
+
 ## Round 190ln (Slate / Eiosis): AirEQ and Infinity EQ translated onto Facet EQ in physical units
 
 Static REA of the third-party binaries by the owner's leave (2026-11-17), clean-room (docs/analise/REA_rodada190ln.md §1 … §5;

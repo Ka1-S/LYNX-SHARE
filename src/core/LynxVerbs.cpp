@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+#include <type_traits>
 
 #include "core/Biquad.h"
 #include "core/Effects.h"
@@ -34,6 +35,24 @@ constexpr double inApCoef[4] = { 0.75, 0.75, 0.625, 0.625 };
 // in-loop all-pass length as a fraction of its line, early smearing all-passes (ms)
 constexpr double loopApFraction = 0.16;
 constexpr double earlyApMs[2][2] = { { 7.13, 2.31 }, { 6.47, 2.83 } };
+
+// round 190ls: the dense late tank (Settings::dense): 32 lines, lengths as multiples of the geometric mean of the shape's
+// set (× lineScale), spread over 0.55 … 1.6 of it on a near-geometric grid with jitter, alternately in the two halves
+// (LYNX's own set: no common factors, every half spanning the whole range)
+constexpr int denseCount = 32, denseHalf = 16;
+// the outputs read every line through two Walsh rows (22 and 13): sign of line j = (−1)^popcount (j & row)
+constexpr float walshSign (int j, unsigned row) noexcept { return (__builtin_popcount ((unsigned) j & row) & 1) != 0 ? -1.0f : 1.0f; }
+constexpr std::array<float, 32> walshRow (unsigned row) noexcept
+{
+    std::array<float, 32> a {};
+    for (int j = 0; j < 32; ++j)
+        a[(std::size_t) j] = walshSign (j, row);
+    return a;
+}
+constexpr auto denseOutL = walshRow (22u), denseOutR = walshRow (13u);
+constexpr double denseRatio[denseCount] = {
+    0.553, 0.571, 0.588, 0.611, 0.629, 0.652, 0.673, 0.697, 0.719, 0.743, 0.769, 0.793, 0.821, 0.847, 0.877, 0.905,
+    0.937, 0.967, 1.001, 1.033, 1.069, 1.103, 1.142, 1.179, 1.219, 1.259, 1.303, 1.345, 1.391, 1.437, 1.487, 1.597 };
 
 constexpr int earlyTaps = 14;
 constexpr int buildTaps = 40;
@@ -92,6 +111,47 @@ struct Line
         const auto c2 = xm1 - 2.5f * x0 + 2.0f * x1 - 0.5f * x2;
         const auto c3 = 0.5f * (x2 - xm1) + 1.5f * (x0 - x1);
         return ((c3 * f + c2) * f + c1) * f + x0;
+    }
+};
+
+// round 190ls: the dense tank's 32 lines in one buffer, frame-major (frame f holds every line's sample at f × 32 … f × 32 + 31):
+// every line has the same capacity and moves on one write position, so a sample's 32 writes are one contiguous store (measured
+// against one buffer per line and line after line in one buffer: the fewest cycles)
+struct DenseBank
+{
+    static constexpr int lines = 32;
+    std::vector<float> buf;
+    int mask = 0, pos = 0;
+
+    void allocate (int samples)
+    {
+        const auto n = nextPow2 (std::max (4, samples + 4));
+        buf.assign ((std::size_t) n * lines, 0.0f);
+        mask = n - 1;
+        pos = 0;
+    }
+    void clear() noexcept
+    {
+        std::fill (buf.begin(), buf.end(), 0.0f);
+        pos = 0;
+    }
+    // line j's sample written d writes ago (d ≥ 1)
+    float read (int j, int d) const noexcept { return buf[(std::size_t) ((((pos - d) & mask) * lines) + j)]; }
+    // fractional delay (≥ 2), 4-point Hermite (as Line::readFrac)
+    float readFrac (int j, double d) const noexcept
+    {
+        const auto i = (int) d;
+        const auto f = (float) (d - i);
+        const auto xm1 = read (j, i - 1), x0 = read (j, i), x1 = read (j, i + 1), x2 = read (j, i + 2);
+        const auto c1 = 0.5f * (x1 - xm1);
+        const auto c2 = xm1 - 2.5f * x0 + 2.0f * x1 - 0.5f * x2;
+        const auto c3 = 0.5f * (x2 - xm1) + 1.5f * (x0 - x1);
+        return ((c3 * f + c2) * f + c1) * f + x0;
+    }
+    void write (const float* x) noexcept
+    {
+        std::copy (x, x + lines, buf.begin() + (std::ptrdiff_t) pos * lines);
+        pos = (pos + 1) & mask;
     }
 };
 
@@ -408,7 +468,15 @@ struct Engine::Impl
     bool bellOn[3] {};
     int onsetD[onsetSteps][onsetChans] {};
 
-    Impl (double maxLine, double maxPre) : maxLineSec (maxLine), maxPreSec (maxPre)
+    // ---- the dense late tank (round 190ls; allocated only for an engine made with dense = true) ----
+    bool denseAlloc = false;
+    DenseBank dLine;
+    double dCur[denseCount] {}, dKey[14 + denseCount] {};
+    bool dDesigned = false;
+    float dB0[loopShelves][denseCount] {}, dB1[loopShelves][denseCount] {}, dA1[loopShelves][denseCount] {}, dZ[loopShelves][denseCount] {};
+    float dBw[denseCount] {}, dLc[denseCount] {};
+
+    Impl (double maxLine, double maxPre, bool dense) : maxLineSec (maxLine), maxPreSec (maxPre), denseAlloc (dense)
     {
         Lcg r { 0x2545F491u };
         for (int c = 0; c < 2; ++c)
@@ -452,6 +520,8 @@ struct Engine::Impl
             lines[i].allocate (maxLine + (int) (0.05 * sr));
             loopAp[i].line.allocate ((int) (0.2 * maxLineSec * sr) + 8);
         }
+        if (denseAlloc)
+            dLine.allocate (maxLine + (int) (0.05 * sr));
         for (auto& sh : shifters)
             sh.prepare (sr, 0.06);
         for (int k = 0; k < onsetSteps; ++k)
@@ -518,6 +588,16 @@ struct Engine::Impl
         mmInc = -1.0;
         renorm = 0;
         loopDesigned = toneDesigned = false;
+        if (denseAlloc)
+        {
+            dLine.clear();
+            for (auto& row : dZ)
+                for (auto& z : row)
+                    z = 0.0f;
+            for (int j = 0; j < denseCount; ++j)
+                dBw[j] = dLc[j] = 0.0f;
+            dDesigned = false;
+        }
     }
 
     double targetLen (const Settings& s, int i) const noexcept
@@ -706,8 +786,64 @@ struct Engine::Impl
             tb[b] = std::tan (pi * std::min (bandHz[b], 0.45 * sr) / sr);
         for (int i = 0; i < lineCount; ++i)
         {
+            float b0[loopShelves], b1[loopShelves], a1[loopShelves];
+            designLine (s, sr, key[14 + i], tc, tb, b0, b1, a1);
+            for (int k = 0; k < loopShelves; ++k)
+            {
+                shB0[k][i] = b0[k];
+                shB1[k][i] = b1[k];
+                shA1[k][i] = a1[k];
+            }
+        }
+    }
+
+    // round 190ls: the dense tank's line j (samples) for the shape and lineScale, whole samples
+    double denseTarget (const Settings& s, int j) const noexcept
+    {
+        const auto shape = std::clamp (s.shape, 0, 2);
+        double mean = 0.0;
+        for (int i = 0; i < lineCount; ++i)
+            mean += std::log (shapes[shape][i]);
+        const auto ms = std::exp (mean / lineCount) * denseRatio[j] * std::max (0.0, s.lineScale);
+        return std::floor (clampPos (ms * sr / 1000.0, 8.0, maxLineSec * sr));
+    }
+    // the dense tank's loop filters (as designLoop's, per line, redone only when a setting or a length moves)
+    void designDense (const Settings& s) noexcept
+    {
+        double key[14 + denseCount] = { s.rt60, s.lowMult, s.lowXover, s.highMult, s.highXover, s.gateSec };
+        for (int b = 0; b < engineBands; ++b)
+            key[6 + b] = s.bandRtMult[b];
+        for (int j = 0; j < denseCount; ++j)
+            key[14 + j] = dCur[j];
+        if (dDesigned && std::equal (std::begin (key), std::end (key), std::begin (dKey)))
+            return;
+        std::copy (std::begin (key), std::end (key), std::begin (dKey));
+        dDesigned = true;
+        double tc[loopShelves], tb[engineBands];
+        for (int k = 0; k < loopShelves; ++k)
+            tc[k] = std::tan (pi * std::min (loopShelfHz[k], 0.45 * sr) / sr);
+        for (int b = 0; b < engineBands; ++b)
+            tb[b] = std::tan (pi * std::min (bandHz[b], 0.45 * sr) / sr);
+        for (int j = 0; j < denseCount; ++j)
+        {
+            float b0[loopShelves], b1[loopShelves], a1[loopShelves];
+            designLine (s, sr, key[14 + j], tc, tb, b0, b1, a1);
+            for (int k = 0; k < loopShelves; ++k)
+            {
+                dB0[k][j] = b0[k];
+                dB1[k][j] = b1[k];
+                dA1[k][j] = a1[k];
+            }
+        }
+    }
+
+    // one line's loop filter (law 1): a gain folded into six first-order shelves meeting the per-band loss of a line of
+    // len samples (designLoop; round 190ls: also the dense tank's lines)
+    static void designLine (const Settings& s, double sr, double len, const double* tc, const double* tb, float* b0, float* b1, float* a1) noexcept
+    {
+        {
             double target[engineBands], shelf[loopShelves], gainDb = 0.0;
-            bandLossDb (s, sr, key[14 + i], target);
+            bandLossDb (s, sr, len, target);
             fitShelves (tc, loopShelves, tb, target, 1e-3, gainDb, shelf);
             // never above unity at any frequency: the highest point of the response on a grid of 40 frequencies from
             // 0 Hz to the top (the cascade of first-order shelves is smooth: between two grid points it cannot rise by
@@ -731,9 +867,9 @@ struct Engine::Impl
             for (int k = 0; k < loopShelves; ++k)
             {
                 const auto r = std::pow (10.0, shelf[k] / 40.0), den = 1.0 + tc[k] / r, fold = k == 0 ? g : 1.0;
-                shB0[k][i] = (float) (fold * (1.0 + tc[k] * r) / den);
-                shB1[k][i] = (float) (fold * (tc[k] * r - 1.0) / den);
-                shA1[k][i] = (float) ((tc[k] / r - 1.0) / den);
+                b0[k] = (float) (fold * (1.0 + tc[k] * r) / den);
+                b1[k] = (float) (fold * (tc[k] * r - 1.0) / den);
+                a1[k] = (float) ((tc[k] / r - 1.0) / den);
             }
         }
     }
@@ -828,6 +964,28 @@ struct Engine::Impl
                 curLen[i] = target[i];
             loopAp[i].len = std::clamp ((int) (target[i] * loopApFraction), 1, loopAp[i].line.mask - 2);
         }
+        // round 190ls: the dense tank (Atrium's ValhallaRoom role; not with a gate, a shimmer or split sides)
+        const auto dense = denseAlloc && s.dense == 1 && s.gateSec <= 0.0 && s.splitSides == false
+                           && s.shiftFeedback * s.shiftMix <= 0.0;
+        double dTarget[denseCount] {};
+        if (dense)
+        {
+            for (int j = 0; j < denseCount; ++j)
+            {
+                dTarget[j] = denseTarget (s, j);
+                if (first || dCur[j] < 8.0)
+                    dCur[j] = dTarget[j];
+            }
+            designDense (s);
+        }
+        bool dGlide = false; // (a length gliding: every line read through the interpolator, the glide run per sample)
+        int dInt[denseCount] {};
+        if (dense)
+            for (int j = 0; j < denseCount; ++j)
+            {
+                dGlide = dGlide || dCur[j] != dTarget[j];
+                dInt[j] = (int) dTarget[j];
+            }
         first = false;
         double step[lineCount]; // round 190ie: the glide per sample (fixed, or a tempo change spread over the block)
         for (int i = 0; i < lineCount; ++i)
@@ -886,6 +1044,10 @@ struct Engine::Impl
                     onsetD[k][j] = std::clamp ((int) (std::clamp (s.onsetSec, 0.001, maxOnsetSec) * onsetSpan[k] * onsetFrac[k][j] * sr), 1,
                                                onsetLine[k][j].mask - 2);
         const auto bwOn = absorb[0].bw.a != 0.0f, lcOn = absorb[0].lc.a != 1.0f;
+        const auto bwA = absorb[0].bw.a, lcA = absorb[0].lc.a;
+        // (the tank's stored energy does not depend on its size, so 32 lines read at 1 / √32 would be 6 dB under the
+        // 8-line tank: read at its 1 / √8, the levels of the front-ends hold)
+        const auto denseNorm = (float) (1.0 / std::sqrt ((double) lineCount));
         constexpr float r2 = 0.70710678f; // (two inputs spread over four channels)
         constexpr float tiny = 1.0e-18f; // keeps the recirculating states out of the denormal range
 
@@ -1017,120 +1179,234 @@ struct Engine::Impl
             }
 
             // late tank
-            float sOut[lineCount];
-            for (int i = 0; i < lineCount; ++i)
+            float lateL, lateR;
+            if (dense)
             {
-                curLen[i] += std::clamp (target[i] - curLen[i], -step[i], step[i]);
-                if (s.lengthSpread > 0) // (round 190ie: the loop all-pass follows its gliding line)
-                    loopAp[i].len = std::clamp ((int) (curLen[i] * loopApFraction), 1, loopAp[i].line.mask - 2);
-                const auto c = lfoC[i] * lfoRc[i] - lfoS[i] * lfoRs[i];
-                lfoS[i] = lfoS[i] * lfoRc[i] + lfoC[i] * lfoRs[i];
-                lfoC[i] = c;
-                const auto dl = std::max (2.0, curLen[i] - modDepth * 0.5 * (1.0 + lfoS[i]));
-                auto y = lines[i].readFrac (dl);
-                if (apG[i] != 0.0f)
-                    y = loopAp[i].process (y, apG[i]);
-                sOut[i] = y;
-            }
-            for (int k = 0; k < loopShelves; ++k)
-                for (int i = 0; i < lineCount; ++i)
+                // round 190ls: the dense tank (32 lines, two halves of 16)
+                float y[denseCount];
+                // the reference's layout: in each group of four lines two move — modulator j / 4 of the 8-line tank's
+                // eight, one line each way — and two stay (read at whole samples unless their length glides)
+                if (dGlide)
+                    for (int j = 0; j < denseCount; ++j)
+                        dCur[j] += std::clamp (dTarget[j] - dCur[j], -0.25, 0.25);
+                const auto half = 0.5 * modDepth;
+                for (int g = 0; g < denseCount; g += 4)
                 {
-                    const auto y = shB0[k][i] * sOut[i] + shZ[k][i];
-                    shZ[k][i] = shB1[k][i] * sOut[i] - shA1[k][i] * y;
-                    sOut[i] = y;
-                }
-            if (bwOn)
-                for (int i = 0; i < lineCount; ++i)
-                    sOut[i] = absorb[i].bw.lp (sOut[i]);
-            if (lcOn)
-                for (int i = 0; i < lineCount; ++i)
-                    sOut[i] -= absorb[i].lc.lp (sOut[i]);
-
-            float lateL = (sOut[0] + sOut[1] + sOut[2] - sOut[3] + sOut[4] + sOut[5] - sOut[6] + sOut[7]) * norm;
-            float lateR = (sOut[0] - sOut[1] + sOut[2] + sOut[3] + sOut[4] - sOut[5] + sOut[6] + sOut[7]) * norm;
-            if (s.splitSides)
-            {
-                lateL = (sOut[0] + sOut[1] + sOut[2] - sOut[3]) * norm * 1.41421356f;
-                lateR = (sOut[4] - sOut[5] + sOut[6] + sOut[7]) * norm * 1.41421356f;
-            }
-            const float in[2] = { (1.0f - onsetFeed) * (d[0] + send * e[0]) + onsetFeed * on[0] + tiny,
-                                  (1.0f - onsetFeed) * (d[1] + send * e[1]) + onsetFeed * on[1] + tiny };
-            if (gated)
-            {
-                lateL = 0.3f * lateL + d[0];
-                lateR = 0.3f * lateR + d[1];
-            }
-
-            // mixing: each half through two layers of rotations by mixAngle × 45° (at 45° a normalised 4-point
-            // Hadamard up to signs), then the halves rotated into each other by crossFeed × 45°, swinging by the
-            // matrix modulator (orthogonal for any amount)
-            auto crossCos = (float) crossCos0, crossSin = (float) crossSin0;
-            float hc[2] = { mc, mc }, hs[2] = { msn, msn };
-            if (mmDepth > 0.0)
-            {
-                const auto c = mmC * mmRc - mmS * mmRs;
-                mmS = mmS * mmRc + mmC * mmRs;
-                mmC = c;
-                const auto dlt = mmDepth * mmS, d2 = dlt * dlt;
-                const auto cd = 1.0 - d2 * (0.5 - d2 * (1.0 / 24.0 - d2 * (1.0 / 720.0)));
-                const auto sd = dlt * (1.0 - d2 * (1.0 / 6.0 - d2 * (1.0 / 120.0 - d2 * (1.0 / 5040.0))));
-                crossCos = (float) (crossCos0 * cd - crossSin0 * sd);
-                crossSin = (float) (crossSin0 * cd + crossCos0 * sd);
-                // the rotations inside the halves swing too, the two halves in opposite ways
-                hc[0] = (float) (mc * cd - msn * sd);
-                hs[0] = (float) (msn * cd + mc * sd);
-                hc[1] = (float) (mc * cd + msn * sd);
-                hs[1] = (float) (msn * cd - mc * sd);
-            }
-            float h[lineCount];
-            for (int half = 0; half < lineCount; half += 4)
-            {
-                const auto qc = hc[half / 4], qs = hs[half / 4];
-                const auto a0 = qc * sOut[half] + qs * sOut[half + 1], a1 = qc * sOut[half + 1] - qs * sOut[half];
-                const auto a2 = qc * sOut[half + 2] + qs * sOut[half + 3], a3 = qc * sOut[half + 3] - qs * sOut[half + 2];
-                h[half] = qc * a0 + qs * a2;
-                h[half + 2] = qc * a2 - qs * a0;
-                h[half + 1] = qc * a1 + qs * a3;
-                h[half + 3] = qc * a3 - qs * a1;
-            }
-            for (int i = 0; i < 4; ++i)
-            {
-                const auto a = h[i], b = h[i + 4];
-                auto u = crossCos * a + crossSin * b, w = -crossSin * a + crossCos * b;
-                if (shimmer > 0.0f && (i & 1) == 0)
-                {
-                    const auto second = i == 2 && voice2 > 0.0f;
-                    const auto r = second ? ratio2 : ratio;
-                    const auto amount = second ? shimmer * voice2 : shimmer;
-                    if (s.shimmerEnergy > 0.0)
+                    const auto m = half * lfoS[g >> 2];
+                    y[g] = dLine.readFrac (g, std::max (2.0, dCur[g] - half - m));
+                    y[g + 1] = dLine.readFrac (g + 1, std::max (2.0, dCur[g + 1] - half + m));
+                    if (dGlide)
                     {
-                        const auto bb = shimmerB[second ? 1 : 0], keep = shimmerKeep[second ? 1 : 0];
-                        auto hp = [&] (int k, float v)
-                        {
-                            shiftHp[k][0] += hpC * (v - shiftHp[k][0]);
-                            v -= shiftHp[k][0];
-                            shiftHp[k][1] += hpC * (v - shiftHp[k][1]);
-                            return v - shiftHp[k][1];
-                        };
-                        u = keep * u + bb * hp (i / 2, shifters[i / 2].process (u, r));
-                        w = keep * w + bb * hp (2 + i / 2, shifters[2 + i / 2].process (w, r));
+                        y[g + 2] = dLine.readFrac (g + 2, dCur[g + 2]);
+                        y[g + 3] = dLine.readFrac (g + 3, dCur[g + 3]);
                     }
                     else
                     {
-                        u = (1.0f - amount) * u + amount * shifters[i / 2].process (u, r);
-                        w = (1.0f - amount) * w + amount * shifters[2 + i / 2].process (w, r);
+                        y[g + 2] = dLine.read (g + 2, dInt[g + 2]);
+                        y[g + 3] = dLine.read (g + 3, dInt[g + 3]);
                     }
                 }
-                const auto alt = (i & 1) == 0 ? 0.5f : -0.5f;
-                if (build && split)
+                for (int i = 0; i < lineCount; ++i)
                 {
-                    lines[i].write (u + alt * in[0] + splitIn[0][i]);
-                    lines[i + 4].write (w + alt * in[1] + splitIn[1][i]);
+                    const auto c = lfoC[i] * lfoRc[i] - lfoS[i] * lfoRs[i];
+                    lfoS[i] = lfoS[i] * lfoRc[i] + lfoC[i] * lfoRs[i];
+                    lfoC[i] = c;
                 }
-                else
+                for (int k = 0; k < loopShelves; ++k)
+                    for (int j = 0; j < denseCount; ++j)
+                    {
+                        const auto v = dB0[k][j] * y[j] + dZ[k][j];
+                        dZ[k][j] = dB1[k][j] * y[j] - dA1[k][j] * v;
+                        y[j] = v;
+                    }
+                if (bwOn)
+                    for (int j = 0; j < denseCount; ++j)
+                        y[j] = dBw[j] = y[j] + bwA * (dBw[j] - y[j]);
+                if (lcOn)
+                    for (int j = 0; j < denseCount; ++j)
+                    {
+                        dLc[j] = y[j] + lcA * (dLc[j] - y[j]);
+                        y[j] -= dLc[j];
+                    }
+                // outputs: two Walsh rows (22 and 13) over all 32 lines
+                float oL = 0.0f, oR = 0.0f;
+                for (int j = 0; j < denseCount; ++j)
                 {
-                    lines[i].write (u + alt * in[0]);
-                    lines[i + 4].write (w + alt * in[1]);
+                    oL += denseOutL[j] * y[j];
+                    oR += denseOutR[j] * y[j];
+                }
+                lateL = oL * denseNorm;
+                lateR = oR * denseNorm;
+                const float in[2] = { (1.0f - onsetFeed) * (d[0] + send * e[0]) + onsetFeed * on[0] + tiny,
+                                      (1.0f - onsetFeed) * (d[1] + send * e[1]) + onsetFeed * on[1] + tiny };
+                // mixing: a 16-point Hadamard inside each half (four butterfly stages, × 1/4), then the halves rotated
+                // into each other by crossFeed × 45° (swinging by the matrix modulator)
+                {
+                    // (stage by stage over both halves at once; a stage of span len pairs k and k + len in every block of
+                    // 2 · len: the inner loops run over contiguous lines, so the wide stages are vector operations)
+                    const auto stage = [&y] (auto span) noexcept
+                    {
+                        constexpr int len = decltype (span)::value;
+                        for (int b = 0; b < denseCount; b += 2 * len)
+                            for (int k = b; k < b + len; ++k)
+                            {
+                                const auto u = y[k], w = y[k + len];
+                                y[k] = u + w;
+                                y[k + len] = u - w;
+                            }
+                    };
+                    stage (std::integral_constant<int, 1> {});
+                    stage (std::integral_constant<int, 2> {});
+                    stage (std::integral_constant<int, 4> {});
+                    stage (std::integral_constant<int, 8> {});
+                }
+                auto crossCos = (float) crossCos0, crossSin = (float) crossSin0;
+                if (mmDepth > 0.0)
+                {
+                    const auto c = mmC * mmRc - mmS * mmRs;
+                    mmS = mmS * mmRc + mmC * mmRs;
+                    mmC = c;
+                    const auto dlt = mmDepth * mmS;
+                    crossCos = (float) std::cos (crossAngle + dlt);
+                    crossSin = (float) std::sin (crossAngle + dlt);
+                }
+                crossCos *= 0.25f;
+                crossSin *= 0.25f;
+                float w[denseCount];
+                for (int j = 0; j < denseHalf; ++j)
+                {
+                    const auto a = y[j], bb = y[j + denseHalf];
+                    // the input: ±1/4 on every line of its half; revision 1's four build groups on lines j & 3, ±1/2
+                    const auto sgIn = (j & 1) == 0 ? 0.25f : -0.25f;
+                    auto inL = sgIn * in[0], inR = sgIn * in[1];
+                    if (build && split)
+                    {
+                        const auto sg = (j & 4) == 0 ? 0.5f : -0.5f;
+                        inL += sg * splitIn[0][j & 3];
+                        inR += sg * splitIn[1][j & 3];
+                    }
+                    w[j] = crossCos * a + crossSin * bb + inL;
+                    w[j + denseHalf] = -crossSin * a + crossCos * bb + inR;
+                }
+                dLine.write (w);
+            }
+            else
+            {
+                float sOut[lineCount];
+                for (int i = 0; i < lineCount; ++i)
+                {
+                    curLen[i] += std::clamp (target[i] - curLen[i], -step[i], step[i]);
+                    if (s.lengthSpread > 0) // (round 190ie: the loop all-pass follows its gliding line)
+                        loopAp[i].len = std::clamp ((int) (curLen[i] * loopApFraction), 1, loopAp[i].line.mask - 2);
+                    const auto c = lfoC[i] * lfoRc[i] - lfoS[i] * lfoRs[i];
+                    lfoS[i] = lfoS[i] * lfoRc[i] + lfoC[i] * lfoRs[i];
+                    lfoC[i] = c;
+                    const auto dl = std::max (2.0, curLen[i] - modDepth * 0.5 * (1.0 + lfoS[i]));
+                    auto y = lines[i].readFrac (dl);
+                    if (apG[i] != 0.0f)
+                        y = loopAp[i].process (y, apG[i]);
+                    sOut[i] = y;
+                }
+                for (int k = 0; k < loopShelves; ++k)
+                    for (int i = 0; i < lineCount; ++i)
+                    {
+                        const auto y = shB0[k][i] * sOut[i] + shZ[k][i];
+                        shZ[k][i] = shB1[k][i] * sOut[i] - shA1[k][i] * y;
+                        sOut[i] = y;
+                    }
+                if (bwOn)
+                    for (int i = 0; i < lineCount; ++i)
+                        sOut[i] = absorb[i].bw.lp (sOut[i]);
+                if (lcOn)
+                    for (int i = 0; i < lineCount; ++i)
+                        sOut[i] -= absorb[i].lc.lp (sOut[i]);
+
+                lateL = (sOut[0] + sOut[1] + sOut[2] - sOut[3] + sOut[4] + sOut[5] - sOut[6] + sOut[7]) * norm;
+                lateR = (sOut[0] - sOut[1] + sOut[2] + sOut[3] + sOut[4] - sOut[5] + sOut[6] + sOut[7]) * norm;
+                if (s.splitSides)
+                {
+                    lateL = (sOut[0] + sOut[1] + sOut[2] - sOut[3]) * norm * 1.41421356f;
+                    lateR = (sOut[4] - sOut[5] + sOut[6] + sOut[7]) * norm * 1.41421356f;
+                }
+                const float in[2] = { (1.0f - onsetFeed) * (d[0] + send * e[0]) + onsetFeed * on[0] + tiny,
+                                      (1.0f - onsetFeed) * (d[1] + send * e[1]) + onsetFeed * on[1] + tiny };
+                if (gated)
+                {
+                    lateL = 0.3f * lateL + d[0];
+                    lateR = 0.3f * lateR + d[1];
+                }
+
+                // mixing: each half through two layers of rotations by mixAngle × 45° (at 45° a normalised 4-point
+                // Hadamard up to signs), then the halves rotated into each other by crossFeed × 45°, swinging by the
+                // matrix modulator (orthogonal for any amount)
+                auto crossCos = (float) crossCos0, crossSin = (float) crossSin0;
+                float hc[2] = { mc, mc }, hs[2] = { msn, msn };
+                if (mmDepth > 0.0)
+                {
+                    const auto c = mmC * mmRc - mmS * mmRs;
+                    mmS = mmS * mmRc + mmC * mmRs;
+                    mmC = c;
+                    const auto dlt = mmDepth * mmS, d2 = dlt * dlt;
+                    const auto cd = 1.0 - d2 * (0.5 - d2 * (1.0 / 24.0 - d2 * (1.0 / 720.0)));
+                    const auto sd = dlt * (1.0 - d2 * (1.0 / 6.0 - d2 * (1.0 / 120.0 - d2 * (1.0 / 5040.0))));
+                    crossCos = (float) (crossCos0 * cd - crossSin0 * sd);
+                    crossSin = (float) (crossSin0 * cd + crossCos0 * sd);
+                    // the rotations inside the halves swing too, the two halves in opposite ways
+                    hc[0] = (float) (mc * cd - msn * sd);
+                    hs[0] = (float) (msn * cd + mc * sd);
+                    hc[1] = (float) (mc * cd + msn * sd);
+                    hs[1] = (float) (msn * cd - mc * sd);
+                }
+                float h[lineCount];
+                for (int half = 0; half < lineCount; half += 4)
+                {
+                    const auto qc = hc[half / 4], qs = hs[half / 4];
+                    const auto a0 = qc * sOut[half] + qs * sOut[half + 1], a1 = qc * sOut[half + 1] - qs * sOut[half];
+                    const auto a2 = qc * sOut[half + 2] + qs * sOut[half + 3], a3 = qc * sOut[half + 3] - qs * sOut[half + 2];
+                    h[half] = qc * a0 + qs * a2;
+                    h[half + 2] = qc * a2 - qs * a0;
+                    h[half + 1] = qc * a1 + qs * a3;
+                    h[half + 3] = qc * a3 - qs * a1;
+                }
+                for (int i = 0; i < 4; ++i)
+                {
+                    const auto a = h[i], b = h[i + 4];
+                    auto u = crossCos * a + crossSin * b, w = -crossSin * a + crossCos * b;
+                    if (shimmer > 0.0f && (i & 1) == 0)
+                    {
+                        const auto second = i == 2 && voice2 > 0.0f;
+                        const auto r = second ? ratio2 : ratio;
+                        const auto amount = second ? shimmer * voice2 : shimmer;
+                        if (s.shimmerEnergy > 0.0)
+                        {
+                            const auto bb = shimmerB[second ? 1 : 0], keep = shimmerKeep[second ? 1 : 0];
+                            auto hp = [&] (int k, float v)
+                            {
+                                shiftHp[k][0] += hpC * (v - shiftHp[k][0]);
+                                v -= shiftHp[k][0];
+                                shiftHp[k][1] += hpC * (v - shiftHp[k][1]);
+                                return v - shiftHp[k][1];
+                            };
+                            u = keep * u + bb * hp (i / 2, shifters[i / 2].process (u, r));
+                            w = keep * w + bb * hp (2 + i / 2, shifters[2 + i / 2].process (w, r));
+                        }
+                        else
+                        {
+                            u = (1.0f - amount) * u + amount * shifters[i / 2].process (u, r);
+                            w = (1.0f - amount) * w + amount * shifters[2 + i / 2].process (w, r);
+                        }
+                    }
+                    const auto alt = (i & 1) == 0 ? 0.5f : -0.5f;
+                    if (build && split)
+                    {
+                        lines[i].write (u + alt * in[0] + splitIn[0][i]);
+                        lines[i + 4].write (w + alt * in[1] + splitIn[1][i]);
+                    }
+                    else
+                    {
+                        lines[i].write (u + alt * in[0]);
+                        lines[i + 4].write (w + alt * in[1]);
+                    }
                 }
             }
             if ((++renorm & 8191u) == 0) // the rotating pairs drift by rounding: back onto the unit circle
@@ -1412,7 +1688,7 @@ struct Engine::Impl
     }
 };
 
-Engine::Engine (double maxLineSec, double maxPredelaySec) : impl (std::make_unique<Impl> (maxLineSec, maxPredelaySec)) {}
+Engine::Engine (double maxLineSec, double maxPredelaySec, bool dense) : impl (std::make_unique<Impl> (maxLineSec, maxPredelaySec, dense)) {}
 Engine::~Engine() = default;
 void Engine::prepare (double sampleRate) { impl->prepare (sampleRate); }
 void Engine::reset() noexcept { impl->reset(); }
@@ -1566,6 +1842,8 @@ void fitOverride (Settings& s)
         else if (k == "earlyms") s.earlySec = v / 1000.0;
         else if (k == "bl") s.bandLimit *= v;
         else if (k == "rev") s.revision = (int) v;
+        else if (k == "dense") s.dense = (int) v;
+        else if (k == "mrate") s.modRateHz *= v;
         else if (k == "split") s.buildSplit = v >= 0.5;
         else if (k == "lbw") s.loopBandwidth = v;
         else if (k == "hcut") s.outHighCut = v;
@@ -1589,7 +1867,7 @@ void fitOverride (Settings& s)
 class VerbEffect : public Effect
 {
 public:
-    VerbEffect (EffectKind k, double maxLineSec, double maxPreSec) : kind (k), engine (maxLineSec, maxPreSec) {}
+    VerbEffect (EffectKind k, double maxLineSec, double maxPreSec, bool dense = false) : kind (k), engine (maxLineSec, maxPreSec, dense) {}
 
     void prepare (double sampleRate) noexcept override
     {
@@ -1781,6 +2059,25 @@ LYNX_FIT_TABLE Rev1Trim foilTrim[foil::typeCount + 1] = {
     {}, // the measured plate voicing
 };
 LYNX_FIT_TABLE Rev1Trim haloTrim[7] = {};                   // per reverb mode
+// round 190ls: Atrium's ValhallaRoom role on the dense tank (atrium::reaLaw), per type on top of revision 1's trims: the
+// dense tank's level and tone against the reference's impulses (refcap030's type sweep, two closed-loop passes, 3-point
+// smoothed over the bands; Large Room, the type of every other capture, 0.65 dB under the sweep's level and half its lift at
+// 63 / 125 Hz: at the sweep's trim the music, bass and test signals of the pairs / sr blocks and of tp172d / refcap182 /
+// verb183b sat 0.5 … 2 dB over the reference)
+LYNX_FIT_TABLE Rev1Trim roomTrim[atrium::typeCount] = {
+    { -0.60, { 1.03, 0.50, -0.10, 0.05, -0.27, -0.79, 0.09, 0.54 } }, // Large Room
+    { -2.19, { 4.15, -0.45, -0.07, 0.99, -0.27, -0.42, 0.23, 0.60 } }, // Medium Room
+    { -0.50, { 1.74, -0.45, -0.11, 0.45, -0.00, -0.30, 0.42, 1.86 } }, // Bright Room
+    { -0.90, { 5.12, 1.05, -0.79, -0.20, -0.22, -0.17, 0.33, 0.91 } }, // Large Chamber
+    { -0.22, { 2.35, -0.07, -0.42, 0.41, -0.23, -0.19, 0.50, 0.02 } }, // Dark Room
+    { -0.14, { 3.70, 1.76, 0.92, 0.09, -0.98, -1.17, -0.62, 0.23 } }, // Dark Chamber
+    { -0.90, { 5.38, 0.64, -0.91, 0.26, -0.09, -0.27, 0.36, 0.77 } }, // Dark Space
+    { -0.55, { 4.95, 0.34, -0.59, 0.62, -0.06, -0.37, 0.06, 0.44 } }, // Deep Space
+    { -0.57, { 4.55, 0.62, -0.71, 0.55, 0.20, -0.52, -0.15, 0.46 } }, // Mirror Space
+    { -0.40, { 4.47, 0.77, 0.41, 0.10, -0.67, -0.45, -0.16, 0.43 } }, // Vast Space
+    { -0.38, { 5.46, 0.52, -0.40, 0.80, -0.20, -0.65, -0.08, 0.34 } }, // Distant Space
+    {}, // Dense Room (no capture)
+};
 #ifdef LYNX_VERB_FIT
 // the fitting harness: LYNX_VTRIM=<file>, lines "<epoch|atrium|foil|halo> <index> <gain dB> <8 × dB>"
 bool loadTrims()
@@ -1795,8 +2092,8 @@ bool loadTrims()
                                 &t.db[3], &t.db[4], &t.db[5], &t.db[6], &t.db[7]) == 11)
             {
                 const std::string n = name;
-                Rev1Trim* table = n == "epoch" ? epochTrim : n == "atrium" ? atriumTrim : n == "foil" ? foilTrim : n == "halo" ? haloTrim : nullptr;
-                const int count = n == "epoch" ? epoch::modeCount : n == "atrium" ? atrium::typeCount : n == "foil" ? foil::typeCount + 1 : 7;
+                Rev1Trim* table = n == "epoch" ? epochTrim : n == "atrium" ? atriumTrim : n == "foil" ? foilTrim : n == "halo" ? haloTrim : n == "room" ? roomTrim : nullptr;
+                const int count = n == "epoch" ? epoch::modeCount : n == "atrium" || n == "room" ? atrium::typeCount : n == "foil" ? foil::typeCount + 1 : 7;
                 if (table != nullptr && i >= 0 && i < count)
                     table[i] = t;
             }
@@ -2022,10 +2319,23 @@ LYNX_FIT_TABLE LawVoicing atriumLaw[atrium::typeCount] = {
 
 double atriumDecaySec (float v) { return skewLaw (v, 0.1, 100.0, 5.717); }
 
+// round 190ls (atrium::reaLaw): the ValhallaRoom role on the dense late tank, after revision 1. The reference's late network
+// is 32 lines whose eight modulators move half of them (static REA); its steady 1 kHz tone (refcap030's staircase) then
+// swings by 2.0 dB (sd of 10 ms levels) where the 8-line tank's swung 1.2 dB and sat 2 dB under it on average. The dense tank,
+// its moving lines at four times revision 1's depth, meets it (2.3 dB; Late mod depth 50 %, 0.5 Hz: ±1.1 ms), and the trims
+// per type (roomTrim) take its tone back onto the reference's impulses (docs/analise/REA_rodada190ls.md)
+LYNX_FIT_TABLE double roomModScale = 4.0;
+void applyRoomLaw (const EffectParams& p, Settings& s) noexcept
+{
+    s.dense = 1;
+    s.modDepthMs *= roomModScale;
+    applyTrim (s, roomTrim[choice (p[19], atrium::typeCount)]);
+}
+
 class AtriumFx final : public VerbEffect
 {
 public:
-    AtriumFx() : VerbEffect (EffectKind::atrium, 0.25, 1.05) {}
+    AtriumFx() : VerbEffect (EffectKind::atrium, 0.25, 1.05, true) {} // (round 190ls: with the dense tank)
 
 protected:
     int structure (const EffectParams& p) const noexcept override { return choice (p[19], atrium::typeCount) + (p[atrium::engineLaw] >= 0.5f ? 1000 : 0); }
@@ -2089,6 +2399,8 @@ protected:
             s.revision = 1; // round 190it
             applyTrim (s, atriumTrim[choice (p[19], atrium::typeCount)]);
             s.buildSplit = true;
+            if (p[atrium::reaLaw] >= 0.5f)
+                applyRoomLaw (p, s);
         }
     }
 };
