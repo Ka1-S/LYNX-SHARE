@@ -86,6 +86,10 @@ inline constexpr Item items[] = {
     { "general.hoverValues", TR_NOOP ("Editing"), TR_NOOP ("Show a control's value next to the mouse when hovering over it (LYNX)"),
       TR_NOOP ("The value of the knob or fader under the mouse shows beside the cursor, not only in the hint bar. Also on the General page."),
       "ui-options.txt:hoverValues" },
+    // round 190lo: the polyphonic note editor's clips with edits get their notes' masks built on a background thread at open
+    { "polyEdit.prepareOnOpen", TR_NOOP ("Editing"), TR_NOOP ("Prepare edited clips when a project opens (LYNX)"),
+      TR_NOOP ("When a project opens, the audio clips whose notes were edited in Edit notes (polyphonic) are prepared in the background, so the editor opens ready to play a dragged note. Also in that editor's Options menu."),
+      "ui-options.txt:polyPrepareOnOpen" },
     // round 190jz (issue #195): REAPER's key for FL's Home; FL leaves plain W free in its main windows
     { "transport.wToStart", TR_NOOP ("Transport"), TR_NOOP ("W moves the playback marker to the start (as Home)"),
       TR_NOOP ("The REAPER key for going back to the start of the song or pattern, beside FL's Home; the typing keyboard keeps W while it is on. Also in the Stop button's right-click menu."),

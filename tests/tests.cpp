@@ -17510,6 +17510,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "AudioToMidi189bTests.inc"
 #include "Poly2Midi190ljTests.inc"
 #include "PolyEdit190lkTests.inc"
+#include "PolyEdit190loUiTests.inc" // (round 190lo, UI half)
 #include "Zoom167tTests.inc"
 #include "PianoKeys190jTests.inc"
 #include "Proll168gTests.inc"

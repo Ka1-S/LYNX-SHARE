@@ -163,5 +163,21 @@ void remember (const std::string& key, const std::vector<std::uint8_t>& blob, st
 std::string stateKey (const std::vector<std::uint8_t>& blob);
 // Drops every cached render (tests, low memory)
 void clearCache();
+
+// --- round 190lo (UI): analyses prepared ahead of time ---------------------------------------------------------------------
+// The editor needs PitchNet's analysis object with the masks of the edited notes' blocks (built on demand, 0.5–1.6 s per
+// edited span) before it can render or let a dragged note be heard. "Prepare edited clips when a project opens" (a LYNX
+// extra, off by default) builds them on a background thread for the clips that already have edits; the editor takes the
+// prepared object when it opens. At most 4 objects / ~256 MB of masks are kept; the oldest go first.
+// Builds the masks of every edited note's span of `model` in `analysis` (an object from toAnalysis (model)); false when
+// cancelled or the model does not fit the source.
+bool prepareMasks (const SampleData& source, const Model& model, polyphonic::Analysis& analysis, const std::atomic<bool>* cancel = nullptr);
+void keepPrepared (const std::string& key, const Model& model, std::shared_ptr<polyphonic::Analysis> analysis);
+// the prepared object for this sample and these notes (the same active set), taken out of the store; nullptr when none
+std::shared_ptr<polyphonic::Analysis> takePrepared (const std::string& key, const Model& model);
+std::size_t preparedCount();
+void clearPrepared();
+// Two models with the same analysed notes (their `active` flags may differ: a note assignment)
+bool sameNotes (const Model& a, const Model& b);
 } // namespace polyedit
 } // namespace lynx

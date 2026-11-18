@@ -697,4 +697,84 @@ void clearCache()
     const std::lock_guard<std::mutex> lock (cacheLock);
     cache.clear();
 }
+// --- round 190lo (UI): analyses prepared ahead of time ---------------------------------------------------------------------
+bool prepareMasks (const SampleData& source, const Model& model, polyphonic::Analysis& analysis, const std::atomic<bool>* cancel)
+{
+    if (! fits (model, source))
+        return false;
+    const auto edits = editsOf (model);
+    if (edits.empty())
+        return true;
+    return prepare (source, edits, analysis, monoOf (source), cancel);
+}
+
+namespace
+{
+struct Prepared
+{
+    std::string key;
+    std::vector<Note> notes;
+    std::shared_ptr<polyphonic::Analysis> analysis;
+};
+std::mutex preparedLock;
+std::list<Prepared> preparedStore; // most recent first
+constexpr std::size_t preparedEntries = 4, preparedBytes = (std::size_t) 256 << 20;
+} // namespace
+
+void keepPrepared (const std::string& key, const Model& model, std::shared_ptr<polyphonic::Analysis> analysis)
+{
+    if (analysis == nullptr)
+        return;
+    const std::lock_guard<std::mutex> lock (preparedLock);
+    preparedStore.remove_if ([&] (const Prepared& p) { return p.key == key; });
+    preparedStore.push_front ({ key, model.notes, std::move (analysis) });
+    std::size_t bytes = 0, count = 0;
+    for (auto it = preparedStore.begin(); it != preparedStore.end();)
+    {
+        bytes += polyphonic::maskBytes (*it->analysis);
+        if (++count > preparedEntries || (count > 1 && bytes > preparedBytes))
+            it = preparedStore.erase (it);
+        else
+            ++it;
+    }
+}
+
+std::shared_ptr<polyphonic::Analysis> takePrepared (const std::string& key, const Model& model)
+{
+    const std::lock_guard<std::mutex> lock (preparedLock);
+    for (auto it = preparedStore.begin(); it != preparedStore.end(); ++it)
+        if (it->key == key)
+        {
+            auto out = it->notes == model.notes ? it->analysis : nullptr;
+            preparedStore.erase (it);
+            return out;
+        }
+    return nullptr;
+}
+
+std::size_t preparedCount()
+{
+    const std::lock_guard<std::mutex> lock (preparedLock);
+    return preparedStore.size();
+}
+
+void clearPrepared()
+{
+    const std::lock_guard<std::mutex> lock (preparedLock);
+    preparedStore.clear();
+}
+
+bool sameNotes (const Model& a, const Model& b)
+{
+    if (a.notes.size() != b.notes.size())
+        return false;
+    for (std::size_t i = 0; i < a.notes.size(); ++i)
+    {
+        const auto& x = a.notes[i];
+        const auto& y = b.notes[i];
+        if (x.startFrame != y.startFrame || x.endFrame != y.endFrame || x.f0 != y.f0 || x.inharmonicity != y.inharmonicity)
+            return false;
+    }
+    return true;
+}
 } // namespace lynx::polyedit
