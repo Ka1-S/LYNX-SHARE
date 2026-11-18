@@ -136,6 +136,7 @@
 #include "ui/TypeAhead.h"
 #include "ui/WaveformView.h"
 #include "ui/WorkflowExtras.h" // round 190iu (issues #186, #191)
+#include "ui/TextCache.h" // round 190ki: the tempo readout's widths
 
 #include "core/HintMarkup.h"
 #include "core/SongStats.h"
@@ -6047,7 +6048,7 @@ void MainComponent::TempoDisplay::paint (juce::Graphics& g)
         }
         const auto number = std::abs (rounded - std::round (rounded)) < 0.005 ? juce::String ((int) std::round (rounded)) : juce::String (rounded, 2);
         const juce::Font big (font (15.0f, true)), unit (font (type::small));
-        const auto w1 = juce::GlyphArrangement::getStringWidth (big, number), w2 = juce::GlyphArrangement::getStringWidth (unit, "bpm");
+        const auto w1 = textcache::stringWidth (big, number), w2 = textcache::stringWidth (unit, "bpm");
         auto x = (float) box.getCentreX() - (w1 + 4.0f + w2) / 2.0f;
         const auto baseline = (float) box.getCentreY() + 5.0f;
         // (round 190jj: greyed while a take records or counts in, as BandLab's)
@@ -6082,13 +6083,13 @@ void MainComponent::TempoDisplay::paint (juce::Graphics& g)
     juce::Font big (monoFont (22.0f));
     const juce::Font small (monoFont (11.0f)), caption (font (type::caption - 1.0f));
     {
-        const auto rest = juce::GlyphArrangement::getStringWidth (small, "." + fraction) + 6.0f + juce::GlyphArrangement::getStringWidth (caption, "BPM");
-        for (int i = 0; i < 8 && juce::GlyphArrangement::getStringWidth (big, whole) + rest > area.getWidth() - 6.0f; ++i)
+        const auto rest = textcache::stringWidth (small, "." + fraction) + 6.0f + textcache::stringWidth (caption, "BPM");
+        for (int i = 0; i < 8 && textcache::stringWidth (big, whole) + rest > area.getWidth() - 6.0f; ++i)
             big = big.withHeight (big.getHeight() * 0.94f);
     }
-    const auto wholeWidth = juce::GlyphArrangement::getStringWidth (big, whole);
-    const auto fracWidth = juce::GlyphArrangement::getStringWidth (small, "." + fraction);
-    const auto unitWidth = juce::GlyphArrangement::getStringWidth (caption, "BPM");
+    const auto wholeWidth = textcache::stringWidth (big, whole);
+    const auto fracWidth = textcache::stringWidth (small, "." + fraction);
+    const auto unitWidth = textcache::stringWidth (caption, "BPM");
     auto x = area.getCentreX() - (wholeWidth + fracWidth + 6.0f + unitWidth) / 2.0f;
     const auto baseline = area.getCentreY() + 5.0f;
 

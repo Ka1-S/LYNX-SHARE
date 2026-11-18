@@ -148,12 +148,62 @@ void MainComponent::applyFlTiles()
         menuBar.repaint();
     }
     hintBar.setLarger (fl);
-    if (! fl)
-        return;
-    for (auto* b : { &playButton, &stopButton, &recordButton })
-        b->setLook (BL::flTile, 0.0f);
-    for (auto* b : { &metronomeButton, &tapTempoButton, &blendButton, &punchButton, &typingPianoButton })
-        b->setLook (BL::flTile, box);
+    if (fl)
+    {
+        for (auto* b : { &playButton, &stopButton, &recordButton })
+            b->setLook (BL::flTile, 0.0f);
+        for (auto* b : { &metronomeButton, &tapTempoButton, &blendButton, &punchButton, &typingPianoButton })
+            b->setLook (BL::flTile, box);
+    }
+    // round 190ki (perf, opt-in LYNX_TILE_MODE=2): the tiles' bodies from an atlas of this component's toolbar band
+    // (toolbarBackdropStamp)
+    for (auto* c : getChildren())
+        if (auto* b = dynamic_cast<IconButton*> (c))
+            b->setFlTileBackdrop (fl && b->getLook() == BL::flTile
+                                      ? std::function<std::uint64_t (juce::Rectangle<int>)> ([this] (juce::Rectangle<int> r) { return toolbarBackdropStamp (r); })
+                                      : nullptr);
+}
+
+// Round 190ki: everything MainComponent::paint draws within `b` (a toolbar button's bounds) as one number, for the tiles'
+// cached pictures (IconButton::setFlTileBackdrop): the band, the wells, separators, the mode and transport wells, the hint
+// well, the title and the captions, with the tokens they use. 0: not cacheable there (paint straight). Anything new that
+// paint() draws under the toolbar's buttons must join this.
+std::uint64_t MainComponent::toolbarBackdropStamp (juce::Rectangle<int> b) const
+{
+    using namespace theme;
+    const auto mix = [] (std::uint64_t a, std::uint64_t v) { return (a ^ v) * 0x100000001b3ull; };
+    if (toolbarLook != Look::fl)
+        return 0;
+    const auto near = b.expanded (2); // (an anti-aliased edge reaches past its shape)
+    auto h = mix (mix (0x13198a2e03707344ull, (std::uint64_t) getWidth()), (std::uint64_t) toolbarHeight);
+    for (auto c : { colour::bg1, colour::bg2, colour::bg3, colour::border, colour::borderStrong, colour::textSecondary, colour::textDisabled })
+        h = mix (h, c.getARGB());
+    const auto rect = [&] (juce::Rectangle<int> r) {
+        h = r.intersects (near) ? mix (mix (mix (mix (h, (std::uint64_t) (std::uint32_t) r.getX()), (std::uint64_t) (std::uint32_t) r.getY()),
+                                            (std::uint64_t) (std::uint32_t) r.getWidth()), (std::uint64_t) (std::uint32_t) r.getHeight())
+                                : mix (h, 1u);
+    };
+    rect ({ 0, 0, getWidth(), toolbarHeight });
+    h = mix (h, toolbarLayout.separators ? 2u : 3u);
+    if (toolbarLayout.separators)
+        for (const auto& r : panelBounds)
+            rect (r);
+    else
+        for (auto x : dividers)
+            rect ({ x, 12, 1, toolbarHeight - 24 });
+    rect (modeArea);
+    rect (transportArea);
+    rect (hintBar.getBounds());
+    if (titleArea.intersects (near))
+        return 0; // (the title and a live session's people change; no button sits there)
+    for (const auto& [area, text] : { std::pair { snapLabelArea, tr ("SNAP") }, std::pair { patternLabelArea, tr ("PATTERN") } })
+        if (area.intersects (near))
+        {
+            rect (area);
+            h = mix (mix (mix (h, (std::uint64_t) text.hashCode64()), (std::uint64_t) (std::int64_t) (type::caption * 1000.0f)),
+                     (std::uint64_t) boldText());
+        }
+    return h == 0 ? 1 : h;
 }
 
 // The widgets' looks for the layout style shown now. Pattern: every widget back to FL's look (the parts only the other

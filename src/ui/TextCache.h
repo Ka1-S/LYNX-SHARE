@@ -188,4 +188,35 @@ inline void drawFittedText (juce::Graphics& g, const juce::String& text, int x, 
 {
     drawFittedText (g, text, juce::Rectangle<int> { x, y, w, h }, justification, maximumLines, minimumHorizontalScale);
 }
+
+// Round 190ki: GlyphArrangement::getStringWidth (font, text) from a cache. JUCE 8 shapes the text on every call (JUCE's
+// own arrangement cache covers drawText / drawSingleLineText, not this); the toolbar's tempo and time panels measured
+// their readouts several times per paint (round 190jo's fitting loops). The same float as the call, kept per font and
+// text. LYNX_PAINT_CACHE=0: measured every time, as before.
+inline float stringWidth (const juce::Font& font, const juce::String& text)
+{
+    if (! ui::paintCache())
+        return juce::GlyphArrangement::getStringWidth (font, text);
+    struct Entry
+    {
+        juce::Font font;
+        juce::String text;
+        float width;
+    };
+    static std::unordered_multimap<std::uint64_t, Entry> map;
+    const auto height = detail::thousandths (font.getHeight()), scale = detail::thousandths (font.getHorizontalScale());
+    auto h = detail::mixHash (detail::mixHash (detail::mixHash (0x9e3779b97f4a7c15ull, (std::uint64_t) height), (std::uint64_t) scale),
+                              (std::uint64_t) text.hashCode64());
+    h = detail::mixHash (h, (std::uint64_t) font.getTypefaceStyle().hashCode64());
+    for (auto [it, end] = map.equal_range (h); it != end; ++it)
+    {
+        if (it->second.font == font && it->second.text == text) // (Font's == compares every property)
+            return it->second.width;
+    }
+    if (map.size() > 4000) // (readouts of a long session: start again rather than grow)
+        map.clear();
+    const auto width = juce::GlyphArrangement::getStringWidth (font, text);
+    map.emplace (h, Entry { font, text, width });
+    return width;
+}
 } // namespace lynx::textcache

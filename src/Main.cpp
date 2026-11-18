@@ -1119,6 +1119,20 @@ public:
             return;
         }
 
+        if (args.contains ("--paintcachetest"))
+        {
+            // LYNX --paintcachetest report.txt (round 190ki): --selftest's paint_caches item alone (the shape tiles, the
+            // cached FL toolbar tiles; LYNX_TILE_DEBUG=<folder> keeps the tiles' pictures as PNGs), off screen
+            const auto i = args.indexOf ("--paintcachetest");
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            auto result = lynx::theme::paintCacheSelfTest();
+            const auto tiles = lynx::flTileCacheSelfTest();
+            juce::File (args[i + 1].unquoted()).replaceWithText ("paint_caches=" + result + "\nfl_tiles=" + tiles + "\n");
+            setApplicationReturnValue (result.startsWith ("OK") && tiles == "OK" ? 0 : 1);
+            quit();
+            return;
+        }
+
         if (args.contains ("--timertest"))
         {
             // LYNX --timertest report.txt (round 174f): ui::TimerWhileShowing through hide / show / minimise (opens a small window)
@@ -6951,7 +6965,12 @@ private:
         auto& lookBefore = juce::LookAndFeel::getDefaultLookAndFeel();
         juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
         const auto fontsResult = lynx::theme::fontSelfTest();
-        const auto paintCachesResult = lynx::theme::paintCacheSelfTest(); // (round 190gr)
+        auto paintCachesResult = lynx::theme::paintCacheSelfTest(); // (round 190gr)
+        if (paintCachesResult.startsWith ("OK")) // (round 190ki: the Pattern toolbar's cached FL tiles, the pixels of painting them straight)
+        {
+            const auto tiles = lynx::flTileCacheSelfTest();
+            paintCachesResult = tiles == "OK" ? paintCachesResult + ", FL tiles exact at x1 / x2" : tiles;
+        }
         const auto motionOverlayResult = lynx::ui::MotionOverlay::selfTest(); // (round 190ip)
         // round 190bm (0.1.25 showed the Mixer and the Playlist black): their cached pictures shown on native and
         // software targets against straight paints (ui/PictureCheck.h; --picturetest runs more sizes and scales)

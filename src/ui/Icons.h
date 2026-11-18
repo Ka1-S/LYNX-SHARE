@@ -2,6 +2,10 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include <cstdint>
+#include <functional>
+#include <unordered_map>
+
 // LYNX's own vector icons, drawn with juce::Path on a 24x24 grid. Original designs, one family:
 // - live area 3..21 (a 3-unit margin), coordinates on half units so 24 px and 16 px stay crisp;
 // - line icons share one fine stroke (strokeWidth(): about 1.25-1.5 px at toolbar sizes), round caps and joins;
@@ -130,6 +134,15 @@ public:
     Look getLook() const noexcept { return look; }
     // flTile: hover previews the "on" look (a switch) instead of the plain hover (a momentary button)
     void setHoverShowsOn (bool shouldShowOn) { hoverShowsOn = shouldShowOn; }
+    // Round 190ki (perf): flTile's body (fill and edge) from the parent's tile atlas. The parent paints an opaque backdrop
+    // under the button (its own paint(), no sibling under the button) and `stamp` names everything that backdrop shows
+    // within the button's bounds (in the parent; 0: not cacheable). The atlas is an image of the parent's band at the
+    // parent's coordinates; each button keeps its region of it drawn for its current state (the backdrop and the body,
+    // by the same calls, pixels and clip as the frame) and blits it; the glyph is drawn straight over it. Hover fades,
+    // fractional scales, translucent components, the software renderer and LYNX_PAINT_CACHE=0 paint straight. Opt-in:
+    // LYNX_TILE_MODE=2 (Icons.cpp tileModeSetting: Direct2D then draws a later path of the frame a little differently).
+    // Empty: no cache.
+    void setFlTileBackdrop (std::function<std::uint64_t (juce::Rectangle<int>)> stamp);
 
     // Optional extra gestures: when set, a right-click calls onRightClick instead of clicking the button,
     // and a double-click calls onDoubleClick (after the two single clicks).
@@ -146,7 +159,23 @@ private:
     void timerCallback() override;
     void paintLook (juce::Graphics&, bool highlighted, bool down);
     void paintFlTile (juce::Graphics&, bool highlighted, bool down);
+    bool tileCacheUsable (juce::Graphics&, int& scale) const;
+public:
+    struct TileAtlas
+    {
+        juce::Image image;
+        int scale = 0;
+        bool software = false;
+        std::uint64_t generation = 0;
+    };
+private:
+    static int tileCacheMode();
+    static bool tileCacheOnSoftware();
+    static TileAtlas& tileAtlasFor (juce::Component& parent, int bottom, int scale, bool software);
+    std::uint64_t atlasKey = 0, atlasGeneration = 0;
+    friend juce::String flTileCacheSelfTest();
     Look look = Look::standard;
+    std::function<std::uint64_t (juce::Rectangle<int>)> tileBackdrop;
     float lookIconBox = 0.0f;
     bool hoverShowsOn = false;
     float hover = 0.0f; // 0 = at rest, 1 = under the mouse (animated)
@@ -159,4 +188,10 @@ private:
     bool onColoursSet = false;
     bool actsAsSwitch() const;
 };
+
+// --selftest "paint_caches=" (round 190ki): IconButton's FL tile bodies from the atlas (opt-in) against the bodies painted
+// straight, over a backdrop with a translucent rounded well, at scales 1 and 2 on the native renderer (Direct2D on
+// Windows; the software renderer paints them straight and is only reported on stderr): "OK" when every pixel is the
+// same, else an error naming the case.
+juce::String flTileCacheSelfTest();
 } // namespace lynx

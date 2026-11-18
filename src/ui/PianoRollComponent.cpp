@@ -1536,8 +1536,10 @@ void PianoRollComponent::paint (juce::Graphics& g)
     // --- keyboard ------------------------------------------------------------
     // flat keys; every C is labelled with its octave, the other white keys too when the rows are tall
     // enough; the key under the mouse (and the one sounding) are lit
+    // (round 190ki, perf: all of it lies within `keys`; a playhead column elsewhere skips the 128 keys, their labels and
+    // the gradient)
+    if (const auto keys = juce::Rectangle<int> (0, headerHeight, keyboardWidth, grid.getHeight()); g.clipRegionIntersects (keys))
     {
-        const auto keys = juce::Rectangle<int> (0, headerHeight, keyboardWidth, grid.getHeight());
         juce::Graphics::ScopedSaveState state (g);
         g.reduceClipRegion (keys);
         g.setColour (bg0);
