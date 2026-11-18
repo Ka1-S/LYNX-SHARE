@@ -939,8 +939,9 @@ struct SlidingMax
 //    1 per T3 s and falls by at most 1 per T4 s, both from the knob times);
 //  the reduction is max (slow, w · fast), w = 0.9 + 0.0398 · fast (within 0.7 … 1.06). The reference drifts two mixer
 //  gains with slow random modulators: LYNX runs their mean. T3 / T4 are LYNX's own smooth fits of the reference's
-//  piecewise-linear knob curves; T4 runs at a quarter of that fit (the bank's music files: the full one held the fast
-//  path up and compressed 0.3 … 0.6 dB too much). The attack knob's two step-dependent follower terms are not built
+//  piecewise-linear knob curves; T4 runs at half that fit: round 108's measured burst (attack 10 / release 200 ms: the
+//  gain back half-way after 61.6 ms) reads 59.5 ms with it (120 ms with the full fit, 28 ms without the fast path), and
+//  the full fit held the fast path up on the bank's music files (0.3 … 0.6 dB too much reduction). The attack knob's two step-dependent follower terms are not built
 //  (every reading of them scored lower on the bank than leaving them neutral)
 struct VersLaw
 {
@@ -951,7 +952,7 @@ struct VersLaw
     // T3 (attack s): linear up to t3At s (t3Lin · s / t3At), then t3Pow · (s / t3Ref)^t3Exp
     double t3At = 0.02, t3Lin = 0.08, t3Pow = 0.15, t3Ref = 0.2, t3Exp = 0.273;
     // T4 (release s) = t4A + t4B s + t4C s²
-    double t4A = 0.095, t4B = 0.275, t4C = 0.015;
+    double t4A = 0.19, t4B = 0.55, t4C = 0.03;
 };
 inline const VersLaw& versLaw() noexcept
 {
