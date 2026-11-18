@@ -608,11 +608,11 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
                     addOnce (shapes, where);
                 params->removeRange (peakshapes::extraShapeParam, params->size() - peakshapes::extraShapeParam);
             }
-            else if (kind == "crestCompressor" && params->size() > crest::busLaw)
+            else if (kind == "crestCompressor" && params->size() > dyn::crest::busLaw)
             {
-                if ((float) (double) (*params)[crest::busLaw] >= 0.5f)
+                if ((float) (double) (*params)[dyn::crest::busLaw] >= 0.5f)
                     addOnce (console, where);
-                params->removeRange (crest::busLaw, params->size() - crest::busLaw);
+                params->removeRange (dyn::crest::busLaw, params->size() - dyn::crest::busLaw);
             }
         });
         bool soloed = false;

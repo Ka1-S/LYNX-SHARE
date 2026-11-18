@@ -6671,7 +6671,7 @@ private:
                 peakSlot.params[(std::size_t) lynx::peakshapes::extraShapeParam] = (float) lynx::peakshapes::expFall / lynx::peakshapes::idScale;
                 song.mixer[15].effects.push_back (peakSlot);
                 auto crestSlot = lynx::makeEffectSlot (lynx::EffectKind::crestCompressor);
-                crestSlot.params[(std::size_t) lynx::crest::busLaw] = 1.0f;
+                crestSlot.params[(std::size_t) lynx::dyn::crest::busLaw] = 1.0f;
                 song.mixer[16].effects.push_back (crestSlot);
                 song.mixer[17].lockState = true;
                 song.mixer[18].solo = true;
@@ -6786,7 +6786,7 @@ private:
             else if (! said ("The Peak Controller's LYNX LFO shapes") || ! said ("Crest Compressor's console law") || ! said ("Mixer lock states")
                      || ! said ("{0} imported take lane(s)")
                      || parsed["mixer"][15]["effects"][0]["params"].size() > lynx::peakshapes::extraShapeParam
-                     || parsed["mixer"][16]["effects"][0]["params"].size() > lynx::crest::busLaw
+                     || parsed["mixer"][16]["effects"][0]["params"].size() > lynx::dyn::crest::busLaw
                      || copy.json.contains ("lockState") || copy.json.contains ("playlistTakeLanes") || copy.json.contains ("recordOwnNotes"))
                 rollup030Result = "ERROR step-7 items";
             else if (const auto plain = lynx::olderlynx::forRelease (lynx::Song::makeDefault(), "0.1.28");

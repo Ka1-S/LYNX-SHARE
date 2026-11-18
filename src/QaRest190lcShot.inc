@@ -47,7 +47,7 @@
         {
             ui.setLayoutStyle (style);
             offline.dispatchPendingMessages();
-            const auto menu = ui.getMenuForIndex (4, tr ("View"));
+            const auto menu = ui.getMenuForSnapshot (4);
             juce::StringArray top, sub;
             const juce::PopupMenu* windowsAndTools = nullptr;
             int rows = 0;
