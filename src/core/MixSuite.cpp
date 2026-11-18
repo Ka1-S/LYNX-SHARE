@@ -2834,14 +2834,15 @@ bool saturnLaw (const EffectParams& p) noexcept { return on (p[revision]); }
 bool saturnRaw (const EffectParams& p) noexcept { return on (p[lawRate]); }
 bool lawCharacter (int k) noexcept
 {
-    // the styles whose law scored up on every refcap030 lab file (docs/PARITY.md "Round 190kw"). The others keep round
-    // 150 / 152's measured characters: the effect styles (their smudger, foldback and destroy stages were not recovered),
+    // the styles whose law scored up on the refcap030 lab files and net up on the whole bank (docs/PARITY.md "Round
+    // 190kw"). The others keep round 150 / 152's measured characters: Power Amp and Breakdown (net level / down on the
+    // bank), the effect styles (their smudger, foldback and destroy stages were not recovered),
     // the transformers (their dynamic knee was not recovered), Clean Tape / Gentle and Heavy Saturation (a steady
     // 0.7 … 1 dB level offset against the reference), Brit Rock, Smooth / Crunchy Amp and the rectifier (their EQ /
     // curve conventions do not reproduce the reference yet)
     static constexpr bool on[characters] { true, true, true, true, true, false, true, true, true, true, false, true,
-                                           false, false, true, true, true, true, false, false, false, false, false, false,
-                                           true, false, false, false };
+                                           false, false, true, true, false, true, false, false, false, false, false, false,
+                                           false, false, false, false };
     return k >= 1 && k <= characters && on[k - 1];
 }
 
