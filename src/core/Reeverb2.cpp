@@ -21,6 +21,30 @@ namespace lynx
 {
 namespace reeverb2
 {
+// (float) std::sin ((double) ph · 2π) for the LFO, faster (round 190kz, owner decision 4f) and exact: an odd polynomial
+// to r^23 on [−π/2, π/2] (error < 1e-15) gives v; when every value within 1e-14 of v rounds to the same float, that float
+// is what std::sin's (≤ 1 ulp) result rounds to, else std::sin itself. Checked on every float phase in [0, 1): all
+// 1,065,353,216 identical to the plain expression (agents/dsp/f/lfosin.txt of round 190kz); 2.5x faster on a phase walk.
+float lfoSine (float ph) noexcept
+{
+    const double x = (double) ph * 6.283185307179586;
+    if (! (x >= 0.0 && x < 6.283185307179586))
+        return (float) std::sin (x);
+    const double pi = 3.141592653589793, halfPi = 1.5707963267948966;
+    double r = x > pi ? x - 6.283185307179586 : x; // (−π, π]
+    r = r > halfPi ? pi - r : r < -halfPi ? -pi - r : r;
+    const double r2 = r * r;
+    static constexpr double c[12] = { 1.0, -1.0 / 6.0, 1.0 / 120.0, -1.0 / 5040.0, 1.0 / 362880.0, -1.0 / 39916800.0, 1.0 / 6227020800.0,
+                                      -1.0 / 1307674368000.0, 1.0 / 355687428096000.0, -1.0 / 121645100408832000.0,
+                                      1.0 / 51090942171709440000.0, -1.0 / 25852016738884976640000.0 };
+    double q = c[11];
+    for (int k = 10; k >= 0; --k)
+        q = q * r2 + c[k];
+    const double v = q * r;
+    const float lo = (float) (v - 1.0e-14), hi = (float) (v + 1.0e-14);
+    return lo == hi ? lo : (float) std::sin (x);
+}
+
 // FL's control ranges (REA_rodada7 §3.2) and the two option bytes
 const std::array<Range, reeverb2ParamCount> ranges { {
     { 19, 3000 }, { 5, 221 }, { 0, 384 }, { 1, 100 }, { 0, 100 }, { 1, 200 }, { 5, 221 }, { 20, 300 }, { 25, 2000 },
@@ -379,7 +403,7 @@ struct Engine::Impl
             amount = std::abs ((double) diff) < 0.01 ? target : diff * smooth + amount + 1.0e-30f;
             // with no modulation depth the product is a zero of the amount's sign for any s in [−1, 1]: the sine is
             // only computed when it can change the delay
-            const float s = amount != 0.0f ? (float) std::sin ((double) ph * 6.283185307179586) : 0.0f;
+            const float s = amount != 0.0f ? lfoSine (ph) : 0.0f;
             const float dly = amount * ((s + 1.0f) * 0.5f);
 
             // input: high cut one-pole, low cut through a first-order all-pass
