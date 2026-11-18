@@ -17907,6 +17907,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Spin190kbTests.inc" // round 190kb: the worker pool's waiting (statistics, tuning, bounded task-graph waits, adaptive spin)
 #include "Beat190krTests.inc" // round 190kr: the worker pool wakes only the workers a chunk's work needs; the same samples
 #include "Lighter190laTests.inc" // round 190la: timed waits without the sub-millisecond spin (platform/CvWait.h)
+#include "Sched190kzTests.inc" // round 190kz: one worker-pool round per device block cut in pieces; the same samples
 #include "Export190kaTests.inc" // round als190ka-export (owner decision D5): AIFF and M4A (AAC) export
 #include "Issues190jzTests.inc" // round 190jz: issues #192 (docked Browser), #194 (clip fade handles), #195 (Home, W)
 #include "PrChord190kdTests.inc" // round 190kd: FL's chord tool strip (Generate modes, Analyze, Learn from MIDI input, note options)
@@ -17928,3 +17929,5 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "LoopAnalysis190kxTests.inc" // round 190kx: loop analysis (key and tempo of the user's own loops; core/LoopAnalysis.h)
 #include "Vocal190liTests.inc" // round 190li: Newtone natural engine (engine 1), modulation / drift split, sung centre, analysis octave guard
 #include "Newtone190lmTests.inc" // rollup 0.1.30 step 8: a new Newtone slot (natural engine) analysed with "Separate close notes"
+#include "Codegen190kzTests.inc" // round 190kz codegen: runtime CPU dispatch (AVX2 paths render the SSE2 bits)
+#include "Dsp190kzTests.inc" // round 190kz: exact Reeverb 2 LFO sine and sinc seeds, Maximus revision 1

@@ -587,6 +587,21 @@ int main (int argc, char** argv)
                          per (p.sleeps - pool0.sleeps), per (p.earlyWakes - pool0.earlyWakes), ms (p.waitNs - pool0.waitNs), per (p.waits - pool0.waits),
                          per (p.waitYields - pool0.waitYields), per (p.waitSleeps - pool0.waitSleeps), ms (p.waitSleepNs - pool0.waitSleepNs),
                          ms (p.callerWaitNs - pool0.callerWaitNs), per (p.callerSleeps - pool0.callerSleeps));
+            // round 190kz (sched): rounds per device block, and the blocks rendered batched (one round for all their pieces)
+            const auto blocks = (double) ((totalSamples + (std::size_t) blockSize - 1) / (std::size_t) blockSize);
+            std::printf ("sched: %.2f rounds per block, batched blocks %llu (one round %llu) since start, of %.0f measured blocks\n",
+                         (double) (p.rounds - pool0.rounds) / std::max (1.0, blocks), (unsigned long long) renderer->batchedBlockCount(),
+                         (unsigned long long) renderer->batchedRoundCount(), blocks);
+            {
+                static const char* const why[] = { "switched off", "no graph", "big block", "live controllers", "MIDI between units",
+                                                   "launchers", "bindings", "held notes", "timed params", "many pieces", "other" };
+                std::printf ("sched: not batched:");
+                auto any = false;
+                for (int k = 0; k < (int) RackRenderer::BatchRefusal::count; ++k)
+                    if (const auto c = renderer->batchRefusedCount ((RackRenderer::BatchRefusal) k); c > 0)
+                        std::printf (" %s %llu", why[k], (unsigned long long) c), any = true;
+                std::printf ("%s\n", any ? "" : " none");
+            }
         }
         if (ahead != nullptr)
         {

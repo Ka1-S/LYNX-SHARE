@@ -97,5 +97,8 @@ private:
     struct Impl;
     std::unique_ptr<Impl> d;
 };
+
+// the LFO's sine, (float) std::sin ((double) ph · 2π) bit for bit, faster (round 190kz; exposed for the tests)
+float lfoSine (float ph) noexcept;
 } // namespace reeverb2
 } // namespace lynx

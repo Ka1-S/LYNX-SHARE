@@ -102,8 +102,15 @@ jobs:
           echo "$JUCE_SHA256  juce.tar.gz" | sha256sum -c -
           tar xzf juce.tar.gz && mv "JUCE-$JUCE_VERSION" "juce-$JUCE_VERSION" && rm juce.tar.gz
 
+      # Release code generation (round 190kz, owner decision; docs/PLATFORMS.md "Release optimisation"): a real -O3
+      # (zig maps -O3 to -O2, so the -O3 goes to clang itself) and ThinLTO of LYNX's own objects; the instruction set
+      # stays the x86-64 baseline (SSE2), the hottest loops pick AVX2 at run time (src/core/CpuFeatures.h). About
+      # 8 more minutes of link on the runner; Harmless.cpp stays out of LTO (LYNX_WIN_LTO_SKIP, measured)
       - name: Build (Zig cross compile)
         shell: bash
+        env:
+          LYNX_WIN_OPT: -O2 -Xclang -O3
+          LYNX_WIN_LTO: thin
         run: |
           ZIG="$HOME/opt/zig-x86_64-linux-$ZIG_VERSION/zig" JUCE_DIR="$HOME/opt/juce-$JUCE_VERSION" OUT=build-win \
             ./scripts/build-windows-zig.sh 2>&1 | grep -v '^1 warning generated\.$'

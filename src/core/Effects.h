@@ -165,6 +165,12 @@ public:
     // The notes held on every Channel Rack channel (`count` masks, by channel index) during the next process(); the
     // pointer stays valid until the next call. Effects that follow notes (LYNX Tune's MIDI targets) keep it.
     virtual void setHeldNotes (const NoteMask* /*channels*/, int /*count*/) noexcept {}
+    // Round 190kz: true for an effect that can read those held notes (setHeldNotes) while it processes; it reads every
+    // channel's, so the renderer keeps such a slot's block piece by piece (RackRenderer::processBatched) — when its
+    // parameters are automated, or when followsHeldNotesWith says these settings read them
+    virtual bool followsHeldNotes() const noexcept { return false; }
+    // ... with these parameter values (the slot's own): does it read them? (default: whenever it can)
+    virtual bool followsHeldNotesWith (const EffectParams& /*params*/) const noexcept { return followsHeldNotes(); }
     // Round 190ee: a note reaching the effect through its MIDI input port (FL: a MIDI Out channel on the port the
     // effect listens to), before the process() that follows. `velocity` 1…127, 0 = note off; `midiChannel` 0…15.
     // Audio thread. Effects that take notes: Gross Beat (slot selection), Pitcher (MIDI mode / Harmonize).

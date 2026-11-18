@@ -52,7 +52,9 @@ cmp -s "$OUT/JuceConfig.h.new" "$OUT/JuceConfig.h" 2>/dev/null && rm "$OUT/JuceC
 #                it turns sin + cos of one value into a call of the C runtime's sincos. )
 #  LYNX_WIN_LTO  thin = ThinLTO for LYNX's own objects (JUCE's modules stay out), default 0: measured on Windows it gained
 #                0-14 % (streaming most) but made the FL Harmless engine 1.5x slower (fixed by keeping Harmless.cpp
-#                out of it), for a 15-25 minute link. Off until each engine is checked under it.
+#                out of it), for a 15-25 minute link. Default off (local and round builds); the release (release.yml,
+#                round 190kz) builds with LYNX_WIN_OPT="-O2 -Xclang -O3" LYNX_WIN_LTO=thin: about 8 more minutes on
+#                a 4-thread CI runner, nothing slower beyond the noise (table in docs/PLATFORMS.md).
 #  LYNX_WIN_GC   1 = the link drops unreferenced code and folds identical functions (see "Linking" below), default 1.
 # -ffp-contract=off always, as CMakeLists.txt does for Linux and macOS: no fused multiply-add, so the FL-exact engines keep
 # their operation order whatever CPU the code is built for (baseline x86-64 has no FMA, so today it changes nothing).
@@ -171,6 +173,11 @@ export COMMON_STR="${COMMON[*]}"
 JUCE_COMMON=(); for a in "${COMMON[@]}"; do [[ "$a" == -flto* ]] || JUCE_COMMON+=("$a"); done
 export JUCE_COMMON_STR="${JUCE_COMMON[*]}"
 export NOLTO_COMMON_STR="$JUCE_COMMON_STR"
+# LYNX_WIN_LTO_SKIP: LYNX sources compiled outside ThinLTO (plain objects in the same link), space-separated.
+# LYNX_WIN_LTO_SCOPE: all = every LYNX source in ThinLTO; core = only the engine's (src/core, src/flp: the audio code),
+# the UI and the rest as plain objects: the link's LTO back end then has about half the code to optimise.
+export LYNX_WIN_LTO_SKIP="${LYNX_WIN_LTO_SKIP-src/core/Harmless.cpp}"
+export LYNX_WIN_LTO_SCOPE="${LYNX_WIN_LTO_SCOPE:-all}"
 
 echo "Compiling JUCE modules (cached)..."
 # the modules and the extra units JUCE's CMake compiles along with them, in one parallel pool
@@ -399,7 +406,8 @@ printf '%s\n' "${APP_SOURCES[@]}" | xargs -P "$JOBS" -I{} bash -c '
     extra=""; [[ "$src" == src/platform/CrashGuard.cpp ]] && extra="-fms-extensions"
     [[ "$src" == src/ui/CrashReporter.cpp ]] && extra="-iquote $OUT"
     [[ "$src" == src/engine/AbletonLink.cpp ]] && extra="-isystem third_party/link/include -isystem third_party/link/asio/include"
-    common="$COMMON_STR"; [[ "$src" == src/core/Harmless.cpp ]] && common="$NOLTO_COMMON_STR" # (1.5x slower under ThinLTO)
+    common="$COMMON_STR"; [[ " $LYNX_WIN_LTO_SKIP " == *" $src "* ]] && common="$NOLTO_COMMON_STR"
+    [[ "$LYNX_WIN_LTO_SCOPE" == core && "$src" != src/core/* && "$src" != src/flp/* ]] && common="$NOLTO_COMMON_STR"
     cached_pp "$obj" -- $ZIG c++ $common $extra -Wall -Wextra -Werror=return-type -c "$src" -o "$obj"'
 
 # 2026-11-04: an object whose source left APP_SOURCES (another branch's build in this folder) must not be linked

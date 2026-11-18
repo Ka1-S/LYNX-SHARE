@@ -842,6 +842,14 @@ void Graph::setHeldNotes (const NoteMask* channels, int count) noexcept
             n->effect->setHeldNotes (channels, count);
 }
 
+bool Graph::followsHeldNotes() const noexcept
+{
+    for (const auto& n : nodes)
+        if (n->effect != nullptr && n->effect->followsHeldNotes())
+            return true;
+    return false;
+}
+
 void Graph::noteOn (int key, float velocity) noexcept { deliver (0, true, key, velocity, -1); }
 void Graph::noteOff (int key) noexcept { deliver (0, false, key, 0.0f, -1); }
 void Graph::noteOnMidi (int key, float velocity, int midiChannel) noexcept { deliver (0, true, key, velocity, midiChannel); }
@@ -1745,6 +1753,7 @@ public:
         side = l != nullptr && r != nullptr;
     }
     void setHeldNotes (const NoteMask* channels, int count) noexcept override { graph.setHeldNotes (channels, count); }
+    bool followsHeldNotes() const noexcept override { return graph.followsHeldNotes(); } // (round 190kz)
     int latencySamples() const noexcept override { return graph.latencySamples(); }
 
     Graph graph;

@@ -8,6 +8,7 @@
 #include "core/ToolbarLayout.h"
 #include "engine/AudioEngine.h"
 #include "ui/Icons.h"
+#include "ui/MotionOverlay.h"
 #include "ui/ValueControl.h"
 
 // Widgets of the main toolbar (docs/WORKFLOW_FL.md section 5.1), each with its own hint: the song position
@@ -80,6 +81,14 @@ private:
     juce::uint32 shownAt = 0; // (round 190jo) when `shown` last changed: the B:S:T ticks repaint at most every 100 ms
     bool red = false;           // (round 190jj) the Simple capsule's recording / count-in time
     double linkProgress = -1.0; // (round 190gl) the Link session's progress bar while the transport waits / is stopped
+    // (round 190kz) the FL look's fitted digit height and caption width, worked out again only when the readout's length,
+    // the box or the mode change (the digits are a monospaced font): shaping the text twice per paint was ~4 % of the
+    // message thread while playing
+    struct Fit
+    {
+        int length = -1, width = -1, height = -1, mode = -1;
+        float scale = 0.0f, digits = 0.0f, caption = 0.0f;
+    } fit;
     Mode mode = Mode::bars;
     int smpteRate = 5; // timecode::rates index (30 fps)
 };
@@ -324,7 +333,11 @@ class OutputMonitor final : public juce::Component,
                             public ui::HintSource
 {
 public:
-    explicit OutputMonitor (AudioEngine& e) : engine (e) {}
+    explicit OutputMonitor (AudioEngine& e) : engine (e)
+    {
+        gpuDisplay.setLive (true);
+        gpuDisplay.onHidden = [this] { repaint(); }; // (the overlay went by itself: the view paints the display again)
+    }
     // one display frame (round 174e: at the display's refresh; the falloffs and the long view's scroll go by time, as
     // they did at 30 Hz). Returns true while the display moves (false once a silent output has fallen to zero).
     bool update (double nowMs);
@@ -351,8 +364,26 @@ public:
     static juce::String modeName (int m);
     std::function<void()> onModeChanged;   // the main window saves the choice
 
+    // diagnostics (LYNX_OVERLAY_STATS / --selftest): frames this display showed on the GPU overlay instead of a repaint
+    static std::atomic<int>& overlayFrames();
+
 private:
     void setMode (int newMode);
+    // Round 190kz: while it moves, the whole display (background, meter, scope) is a picture on the GPU overlay
+    // (ui/MotionOverlay: a DirectComposition visual over the main window) painted in software each frame, so the main
+    // window runs no Direct2D frame and no present for it. Profiled (Windows, Thief playing, toolbar at the display's
+    // rate): the main window's frames were ~58 % of the message thread's cycles (EndDraw 28 %, the display's paint 11 %,
+    // present 11 %), nearly all for this display. The repaint stays the fallback whenever the overlay cannot show it
+    // (another platform, drawing with the CPU, something in front of it). LYNX_SCOPE_OVERLAY=0: always the repaint.
+    void frameChanged();      // the display's picture changed this frame: on the overlay, else a repaint
+    void stopOverlay();       // it stopped moving: the view paints itself again
+    void paintDisplay (juce::Graphics& g, bool software);
+    ui::MotionOverlay gpuDisplay { *this, [this] (juce::Graphics& g, float x) {
+        g.addTransform (juce::AffineTransform::translation (x, 0.0f));
+        paintDisplay (g, true);
+    } };
+    std::uint64_t overlayKey = 0; // a new value each frame: the overlay paints its picture again
+    juce::Path wave;              // the scope's path, its storage kept from frame to frame
     AudioEngine& engine;
     std::array<float, 1024> samples {};
     juce::Image scopeImage, scopeNative; // the oscilloscope's stroke, drawn in software, and its copy for the window (round 174e2)

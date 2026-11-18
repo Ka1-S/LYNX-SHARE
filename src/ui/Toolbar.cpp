@@ -446,10 +446,18 @@ void TimeDisplay::paint (juce::Graphics& g)
         const auto caption = mode == Mode::clock ? juce::String ("M:S:CS") : mode == Mode::smpte ? "SMPTE " + juce::String (timecode::rates[smpteRate].name)
                                                                                                  : juce::String ("B:S:T");
         const auto captionFont = font (9.0f, true);
-        const auto captionWidth = textcache::stringWidth (captionFont, caption);
-        const auto room = (float) area.getWidth() - 8.0f;
-        for (int i = 0; i < 16 && textcache::stringWidth (big, readout) > room; ++i)
-            big = big.withHeight (big.getHeight() * 0.94f);
+        const auto key = Fit { readout.length(), area.getWidth(), area.getHeight(), (int) mode * 64 + smpteRate, (float) theme::textSize() };
+        if (key.length != fit.length || key.width != fit.width || key.height != fit.height || key.mode != fit.mode || key.scale != fit.scale)
+        {
+            fit = key;
+            fit.caption = textcache::stringWidth (captionFont, caption);
+            const auto room = (float) area.getWidth() - 8.0f;
+            for (int i = 0; i < 16 && textcache::stringWidth (big, readout) > room; ++i)
+                big = big.withHeight (big.getHeight() * 0.94f);
+            fit.digits = big.getHeight();
+        }
+        big = big.withHeight (fit.digits);
+        const auto captionWidth = fit.caption;
         g.setFont (big);
         g.drawText (readout, area.withTrimmedTop (2), juce::Justification::centred, false);
         g.setColour (colour::textSecondary);
@@ -1482,7 +1490,10 @@ ui::Hint PerformanceMeter::hintAt (juce::Point<int> p)
 bool OutputMonitor::update (double nowMs)
 {
     if (! isShowing() || getWidth() <= 0)
+    {
+        stopOverlay();
         return false;
+    }
 
     // the time since the last frame (the falloffs below are per 1/30 s, as when this ran on a 30 Hz timer)
     const auto elapsed = lastMs > 0.0 ? juce::jlimit (0.0, 250.0, nowMs - lastMs) : 1000.0 / 30.0;
@@ -1539,6 +1550,7 @@ bool OutputMonitor::update (double nowMs)
         sideHeld.fill (0.0f);
         bands.fill (0.0f);
         columnMs = 0.0;
+        stopOverlay();
         return false;
     }
 
@@ -1553,7 +1565,7 @@ bool OutputMonitor::update (double nowMs)
         std::fill (history.end() - columns, history.end(), column);
         column = 0.0f;
         if (mode == longView)
-            repaint();
+            frameChanged();
     }
 
     if (mode == spectrum)
@@ -1585,10 +1597,54 @@ bool OutputMonitor::update (double nowMs)
 
     // (the long view only moves with its columns, above; the scope and the spectrum every frame)
     if (mode != longView)
-        repaint();
+        frameChanged();
+    else if (gpuDisplay.isShowing())
+        frameChanged(); // (the stereo bars move every frame: on the overlay that is the whole picture)
     else
         repaint (barsArea().getSmallestIntegerContainer()); // (the stereo bars move every frame)
     return true;
+}
+
+std::atomic<int>& OutputMonitor::overlayFrames()
+{
+    static std::atomic<int> n { 0 };
+    return n;
+}
+
+void OutputMonitor::frameChanged()
+{
+    static const bool wanted = [] {
+#if JUCE_WINDOWS
+        const auto* v = std::getenv ("LYNX_SCOPE_OVERLAY");
+        return v == nullptr || juce::String (v) != "0";
+#else
+        return false; // (the X11 / macOS overlays send a whole picture per frame: no gain over the repaint there)
+#endif
+    }();
+    if (wanted)
+    {
+        const auto was = gpuDisplay.isShowing();
+        const auto area = getLocalBounds();
+        if (gpuDisplay.show ({ 0.0f, area, area, ++overlayKey }))
+        {
+            ++overlayFrames();
+            if (! was)
+                repaint(); // (once: the window shows what is behind the display, the overlay's picture over it)
+            return;
+        }
+        if (was)
+            gpuDisplay.hide();
+    }
+    repaint();
+}
+
+void OutputMonitor::stopOverlay()
+{
+    if (gpuDisplay.isShowing())
+    {
+        gpuDisplay.hide (true); // (it stays a few frames: the repaint below is on screen first)
+        repaint();
+    }
 }
 
 juce::String OutputMonitor::modeName (int m)
@@ -1636,6 +1692,13 @@ void OutputMonitor::mouseDown (const juce::MouseEvent& e)
 }
 
 void OutputMonitor::paint (juce::Graphics& g)
+{
+    if (gpuDisplay.isShowing())
+        return; // (round 190kz: the overlay shows it)
+    paintDisplay (g, false);
+}
+
+void OutputMonitor::paintDisplay (juce::Graphics& g, bool software)
 {
     using namespace theme;
     auto area = getLocalBounds().toFloat();
@@ -1698,7 +1761,7 @@ void OutputMonitor::paint (juce::Graphics& g)
     // oscilloscope
     g.setColour (colour::border);
     g.drawHorizontalLine ((int) scope.getCentreY(), scope.getX(), scope.getRight());
-    juce::Path wave;
+    wave.clear(); // (round 190kz: the member keeps its storage, no allocation per frame)
     const auto mid = scope.getCentreY();
     const auto half = scope.getHeight() * 0.47f;
     const auto width = juce::jmax (1, (int) scope.getWidth());
@@ -1722,7 +1785,7 @@ void OutputMonitor::paint (juce::Graphics& g)
         const auto* v = std::getenv ("LYNX_SCOPE_IMAGE");
         return v == nullptr || juce::String (v) != "0";
     }();
-    if (! viaImage)
+    if (! viaImage || software) // (software: the overlay's picture, already drawn by the CPU)
     {
         g.setColour (lineColour);
         g.strokePath (wave, stroke);

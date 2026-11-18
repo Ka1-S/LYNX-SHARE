@@ -78,6 +78,12 @@ public:
 
     bool isShowing() const noexcept;
 
+    // Round 190kz: a picture that changes on every frame (the toolbar's output display). Windows: it lives in a small
+    // composition swap chain (painted, copied, presented: no DirectComposition commit per frame); a DirectComposition
+    // surface painted again each frame cost as much as the window's own Direct2D frame. Elsewhere it changes nothing.
+    // Set it before the first show().
+    void setLive (bool on) noexcept;
+
     // the overlay hid itself (no show() for ~100 ms, the view's window changed, the device was lost): the view paints the
     // mark again from now on
     std::function<void()> onHidden;

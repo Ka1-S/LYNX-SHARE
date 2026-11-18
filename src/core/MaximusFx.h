@@ -43,7 +43,8 @@ struct SoundgoodizerState
 std::optional<SoundgoodizerState> parseSoundgoodizer (const std::vector<std::uint8_t>& state);
 const char* soundgoodizerPresetFile (int preset); // "a.dat" … "d.dat"
 
-std::unique_ptr<Effect> make (const std::vector<std::uint8_t>& slotState);
+// engineRev: EffectSlot::engineRev (0 = the x87 gain smoothers as before, 1 = double precision, round 190kz)
+std::unique_ptr<Effect> make (const std::vector<std::uint8_t>& slotState, int engineRev = 0);
 
 // --- editing a Maximus slot (the native editor's page) -------------------------------------------------------
 // The 59 parameters of the Maximus state (REA_rodada8 §1.2: 7 globals, then 13 per band low / mid / high / master),

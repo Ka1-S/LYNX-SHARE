@@ -1192,6 +1192,8 @@ juce::var effectToVar (const EffectSlot& slot)
         e->setProperty ("mix", projectNumber (slot.mix, 10000.0f));
     if (! slot.smartDisable)
         e->setProperty ("smartDisable", false);
+    if (slot.engineRev != 0)
+        e->setProperty ("engineRev", slot.engineRev); // (absent = 0: a project from before round 190kz)
     if (slot.row >= 0) // the mixer row (FL's slot places, round 170b); absent = right after the previous effect
         e->setProperty ("row", slot.row);
     if (slot.look != 0) // part of a Master look (round 189k)
@@ -1290,6 +1292,7 @@ std::optional<EffectSlot> effectFromVar (const juce::var& e)
     slot.enabled = (bool) e.getProperty ("on", true);
     slot.mix = juce::jlimit (0.0f, 1.0f, (float) (double) e.getProperty ("mix", 1.0));
     slot.smartDisable = (bool) e.getProperty ("smartDisable", true);
+    slot.engineRev = juce::jlimit (0, 64, (int) e.getProperty ("engineRev", 0));
     slot.row = juce::jlimit (-1, maxEffectSlots - 1, (int) e.getProperty ("row", -1));
     slot.look = (std::uint8_t) juce::jlimit (0, 255, (int) e.getProperty ("look", 0));
     slot.displayView = (std::uint8_t) juce::jlimit (0, 1, (int) e.getProperty ("displayView", 0));

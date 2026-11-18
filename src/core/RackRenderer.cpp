@@ -2657,7 +2657,8 @@ void RackRenderer::prepare (double sr, int maxBlockSize)
     lowLatencySkipped.assign ((std::size_t) maxMixerTracks * maxEffectSlots, 0);
     goalGlideAmount.assign ((std::size_t) maxMixerTracks * maxEffectSlots, std::numeric_limits<float>::quiet_NaN());
     goalGlideEffect.assign ((std::size_t) maxMixerTracks * maxEffectSlots, nullptr);
-    automationValues.fill (std::numeric_limits<float>::quiet_NaN());
+    for (auto& slot : automationValues.v) // (round 190kz: every piece's slot)
+        slot.fill (std::numeric_limits<float>::quiet_NaN());
     lastTrackGain.fill ({ std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f, 0.0f });
     lastTapGain.fill ({ std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f, 0.0f });
     lastMeterGain.fill ({ std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f, 0.0f });
@@ -2685,7 +2686,12 @@ void RackRenderer::prepare (double sr, int maxBlockSize)
         bufferExchange.publish (makeBuffers (channels, tracks, frames));
     }
     // (round 190gp: the lazy-zero flags of the inserts and the shared silent block a reader of an unwritten insert gets)
-    trackUnwritten.assign ((std::size_t) maxMixerTracks, 0);
+    for (auto& slot : trackUnwritten.v)
+        slot.fill (0);
+    // round 190kz: the units' plugin parameter bindings (built on the audio thread for each state: no allocation there)
+    unitParamStart.assign ((std::size_t) maxChannels + maxMixerTracks + 1, 0);
+    unitParams.assign (4096, 0);
+    unitParamsState = nullptr;
     zeroBlock.assign ((std::size_t) blockCapacity, 0.0f);
     hwScratch.assign (2 * (std::size_t) blockCapacity, 0.0f);
     layerPick.assign ((std::size_t) maxChannels * 128, (std::int16_t) -1);
@@ -2709,7 +2715,7 @@ void RackRenderer::prepare (double sr, int maxBlockSize)
 
 float* RackRenderer::rawTrackBuffer (int track, int channel) noexcept
 {
-    return buffers->mix.data() + ((std::size_t) track * 2 + (std::size_t) channel) * (std::size_t) buffers->frames;
+    return buffers->mix.data() + ((std::size_t) track * 2 + (std::size_t) channel) * (std::size_t) buffers->frames + (std::size_t) pieceOffset.get();
 }
 
 std::unique_ptr<const RackRenderer::Buffers> RackRenderer::makeBuffers (int channels, int tracks, int frames)
@@ -2795,7 +2801,7 @@ const float* RackRenderer::trackInput (int track, int channel) noexcept
 
 float* RackRenderer::tapBuffer (int tap, int side) noexcept
 {
-    return tapBuffers.data() + ((std::size_t) tap * 2 + (std::size_t) side) * chunkCapacity;
+    return tapBuffers.data() + ((std::size_t) tap * 2 + (std::size_t) side) * chunkCapacity + (std::size_t) pieceOffset.get();
 }
 
 float RackRenderer::automated (int automation, float base) const noexcept
@@ -2975,7 +2981,7 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
         // only the plugin parameters driven by pattern events and by live controllers (links: FL's work in any mode,
         // round 165)
         if (! state.eventLanes.empty() || ! state.liveAutomations.empty())
-            applyPluginParams (state, std::min<int> ((int) song.automations.size(), RackState::maxAutomations), true);
+            applyOrDeferParams (state, std::min<int> ((int) song.automations.size(), RackState::maxAutomations), true);
         return;
     }
 
@@ -3027,7 +3033,22 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
                                    ? bpm / 60.0 * (double) ppq / state.sampleRate
                                    : 0.0;
     clearOverriddenValues();
-    applyPluginParams (state, 0);
+    applyOrDeferParams (state, 0, false);
+}
+
+// Round 190kz: in a batched block's serial part (processBatched) the bindings are applied later, by each unit for its
+// piece; elsewhere now, as before
+void RackRenderer::applyOrDeferParams (const RackState& state, int firstSlot, bool andLive) noexcept
+{
+    if (! deferParams)
+    {
+        applyPluginParams (state, firstSlot, andLive);
+        return;
+    }
+    auto& piece = pieces[(std::size_t) pieceSlot()];
+    piece.params = true;
+    piece.paramsFirst = firstSlot;
+    piece.paramsLive = andLive;
 }
 
 void RackRenderer::updateModulators (const RackState& state, double tick, int numSamples) noexcept
@@ -3079,55 +3100,60 @@ float RackRenderer::automatedLevel (const RackState& state, int automation, floa
 
 void RackRenderer::applyPluginParams (const RackState& state, int firstSlot, bool andLive) noexcept
 {
-    for (const auto& b : state.pluginParams)
+    for (std::size_t k = 0; k < state.pluginParams.size(); ++k)
+        applyPluginParam (state, k, firstSlot, andLive);
+}
+
+// one binding of applyPluginParams (round 190kz: processBatched applies each unit's own inside its task)
+void RackRenderer::applyPluginParam (const RackState& state, std::size_t index, int firstSlot, bool andLive) noexcept
+{
+    const auto& b = state.pluginParams[index];
+    if (b.automation < firstSlot
+        && ! (andLive && (std::size_t) b.automation < state.song.automations.size() && state.song.automations[(std::size_t) b.automation].isLive()))
+        return;
+
+    const auto v = automationValues[(std::size_t) b.automation];
+
+    if (std::isnan (v) || (b.channel >= 0 ? foreignChannel (b.channel) : foreignTrack (b.track)))
+        return;
+
+    if (b.channel >= 0)
     {
-        if (b.automation < firstSlot
-            && ! (andLive && (std::size_t) b.automation < state.song.automations.size() && state.song.automations[(std::size_t) b.automation].isLive()))
-            continue;
-
-        const auto v = automationValues[(std::size_t) b.automation];
-
-        if (std::isnan (v) || (b.channel >= 0 ? foreignChannel (b.channel) : foreignTrack (b.track)))
-            continue;
-
-        if (b.channel >= 0)
+        const auto kind = (std::size_t) b.channel < state.song.channels.size() ? state.song.channels[(std::size_t) b.channel].instrument
+                                                                                : InstrumentKind::plugin;
+        if (midictl::isPitchBend (b.param) && kind != InstrumentKind::plugin && kind != InstrumentKind::midiOut
+            && b.channel < (int) state.instruments.size() && b.channel < maxChannels)
         {
-            const auto kind = (std::size_t) b.channel < state.song.channels.size() ? state.song.channels[(std::size_t) b.channel].instrument
-                                                                                    : InstrumentKind::plugin;
-            if (midictl::isPitchBend (b.param) && kind != InstrumentKind::plugin && kind != InstrumentKind::midiOut
-                && b.channel < (int) state.instruments.size() && b.channel < maxChannels)
+            // LYNX's own instruments: the bend as the controller's wheel plays it (applyLiveControl), when it changes
+            if (! automatedBendReset)
             {
-                // LYNX's own instruments: the bend as the controller's wheel plays it (applyLiveControl), when it changes
-                if (! automatedBendReset)
-                {
-                    automatedBend.fill (std::numeric_limits<float>::quiet_NaN());
-                    automatedBendReset = true;
-                }
-                auto& last = automatedBend[(std::size_t) b.channel];
-                if (! (last == v) && state.instruments[(std::size_t) b.channel] != nullptr)
-                {
-                    last = v;
-                    NoteEvent e;
-                    e.type = NoteEvent::Type::control;
-                    e.channel = b.channel;
-                    e.key = NoteEvent::controlPitchBend;
-                    e.velocity = std::clamp (v, 0.0f, 1.0f) * 2.0f - 1.0f;
-                    applyLiveControl (state, e);
-                }
-                continue;
+                automatedBend.fill (std::numeric_limits<float>::quiet_NaN());
+                automatedBendReset = true;
             }
-            if (b.channel < (int) state.instruments.size())
-                state.instruments[(std::size_t) b.channel]->setParameter (b.param, v);
-            // a MIDI Out's controls reach the plugins on its port
-            if ((std::size_t) b.channel < state.midiTargets.size() && midictl::isMidiParam (b.param)) // (a Dashboard's outputs stay its own)
-                for (const auto t : state.midiTargets[(std::size_t) b.channel])
-                    if (t < (int) state.instruments.size())
-                        state.instruments[(std::size_t) t]->setParameter (b.param, v);
+            auto& last = automatedBend[(std::size_t) b.channel];
+            if (! (last == v) && state.instruments[(std::size_t) b.channel] != nullptr)
+            {
+                last = v;
+                NoteEvent e;
+                e.type = NoteEvent::Type::control;
+                e.channel = b.channel;
+                e.key = NoteEvent::controlPitchBend;
+                e.velocity = std::clamp (v, 0.0f, 1.0f) * 2.0f - 1.0f;
+                applyLiveControl (state, e);
+            }
+            return;
         }
-        else if (b.track < (int) state.effects.size() && b.slot < (int) state.effects[(std::size_t) b.track].size())
-        {
-            state.effects[(std::size_t) b.track][(std::size_t) b.slot]->setParameter (b.param, compensatedAutomation (state, b.automation, b.track, b.slot, v));
-        }
+        if (b.channel < (int) state.instruments.size())
+            state.instruments[(std::size_t) b.channel]->setParameter (b.param, v);
+        // a MIDI Out's controls reach the plugins on its port
+        if ((std::size_t) b.channel < state.midiTargets.size() && midictl::isMidiParam (b.param)) // (a Dashboard's outputs stay its own)
+            for (const auto t : state.midiTargets[(std::size_t) b.channel])
+                if (t < (int) state.instruments.size())
+                    state.instruments[(std::size_t) t]->setParameter (b.param, v);
+    }
+    else if (b.track < (int) state.effects.size() && b.slot < (int) state.effects[(std::size_t) b.track].size())
+    {
+        state.effects[(std::size_t) b.track][(std::size_t) b.slot]->setParameter (b.param, compensatedAutomation (state, b.automation, b.track, b.slot, v));
     }
 }
 
@@ -3297,7 +3323,7 @@ void RackRenderer::deliverToEffects (const RackState& state, const NoteEvent& e)
 
 float* RackRenderer::channelBuffer (int channel, int side) noexcept
 {
-    return buffers->channel.data() + ((std::size_t) channel * 2 + (std::size_t) side) * chunkCapacity;
+    return buffers->channel.data() + ((std::size_t) channel * 2 + (std::size_t) side) * chunkCapacity + (std::size_t) pieceOffset.get();
 }
 
 float* RackRenderer::trackScratch (int track, int side) noexcept
@@ -3599,7 +3625,7 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
                                        + (c.misc.mainPitch && c.instrument != InstrumentKind::audioClip ? state.song.masterPitch : 0.0f);
                 // FL's channel Mono / Porta (round 168l): a Mono note over a held one moves the sounding voice instead
                 const auto mode = polyMode (c, instrument);
-                const auto glideSamples = (float) (channelpoly::glideBeats (mode.portaBeats) * ppq / std::max (1.0e-9, chunkTps));
+                const auto glideSamples = (float) (channelpoly::glideBeats (mode.portaBeats) * ppq / std::max (1.0e-9, chunkTps.get()));
                 auto& poly = polyLayers[(std::size_t) i];
                 // (an echo delay's repeats are FL's generated voices: they don't enter the Mono list)
                 const auto on = e.echo ? channelpoly::On {} : poly.noteOn (mode, e.key, noteCents, e.porta, e.colour);
@@ -3677,7 +3703,7 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
             const auto off = e.echo ? channelpoly::Off { e.key } : polyLayers[(std::size_t) i].noteOff (mode, e.key, e.colour);
             if (off.slide)
                 instrument.slideTo (off.key, off.cents,
-                                    (float) (channelpoly::glideBeats (mode.portaBeats) * ppq / std::max (1.0e-9, chunkTps)));
+                                    (float) (channelpoly::glideBeats (mode.portaBeats) * ppq / std::max (1.0e-9, chunkTps.get())));
             if (off.release >= 0)
             {
                 // FL ends the note's own voice (round 190ej); a Mono channel's shared voice ends with its last note
@@ -4630,6 +4656,13 @@ void RackRenderer::process (const RackState* state,
     else if (gridNextTick < 0.0 || std::abs (startTick - gridNextTick) > 1.0e-3)
         gridSample = pieceStart = 0; // started, or jumped (a seek, the loop)
 
+    // round 190kz (sched): the same pieces with one task-graph round for the whole block, where that is exact
+    const auto batch = batchable (*state, numSamples);
+    if (batch && planPieces (*state, playing, startTick, numSamples, tps, chunk, grid))
+        processBatched (*state, playing, numSamples, left, right, meters);
+    else if (batch && pieceCount < 0) // (more than maxPieces: pattern events close together)
+        ++batchRefused[(std::size_t) BatchRefusal::manyPieces];
+    else
     for (int done = 0; done < numSamples;)
     {
         auto n = std::min (chunk, numSamples - done);
@@ -5205,6 +5238,15 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
                                  float* left, float* right, MeterBank* meters, bool continuing) noexcept
 {
     const auto chunkStartNs = workers != nullptr ? ProcessTimes::now() : 0;
+    chunkPrelude (state, playing, startTick, numSamples, continuing);
+    auto* const pool = chunkSchedule (state, numSamples, events.size());
+    chunkUnits (state, playing, numSamples, meters);
+    chunkMaster (state, numSamples, left, right, meters, pool, chunkStartNs);
+}
+
+// (round 190kz: processChunk's parts, in its order; processBatched runs them piece by piece around one round)
+void RackRenderer::chunkPrelude (const RackState& state, bool playing, double startTick, int numSamples, bool continuing) noexcept
+{
     chunkTick = startTick;
     chunkPlaying = playing;
     // FL: playback starting puts every control the user moved back under its automation (issue #125)
@@ -5495,13 +5537,18 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
     if (state.hasEffectMidiRoutes)
         for (int k = 0; k < events.size(); ++k)
             deliverToEffects (state, events[k]);
+}
 
+WorkerPool* RackRenderer::chunkSchedule (const RackState& state, int numSamples, int eventCount) noexcept
+{
+    const auto& song = state.song;
+    const auto tracks = std::max<int> (1, (int) song.mixer.size());
     // Round 190ge: no note or event in this chunk, no live input, and the last one took under 60 µs (an idle project:
     // the channels idle, the effects smart-disabled): the workers stay asleep. Waking them per chunk cost an idle
     // project with 3 workers ~15 % of a core at 64 samples, ten times the work itself. Serial and parallel give the
     // same samples (the task graph and the layers only change who computes what); the next note runs in parallel.
     auto* const pool = workers;
-    if (pool != nullptr && events.size() == 0 && lastChunkNs < lightChunkNs && (liveInput == nullptr || liveInput->numChannels == 0))
+    if (pool != nullptr && eventCount == 0 && lastChunkNs < lightChunkNs && (liveInput == nullptr || liveInput->numChannels == 0))
         workers = nullptr;
     // A7 (round 190gq): the same when the work the chunk's units did last time comes to less than handing it out costs
     // (waking the workers, their spinning, the last one's wait), and nothing starts in this chunk: a chunk where notes
@@ -5528,7 +5575,7 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         const auto chunkNs = sampleRate > 0.0 ? 1.0e9 * numSamples / sampleRate : 0.0;
         parallelChunk = state.parallel || (double) work >= parallelShare * chunkNs;
         lastWorkShareValue = chunkNs > 0.0 ? (double) work / chunkNs : 0.0;
-        if (events.size() == 0 && work < serialWorkNs && (liveInput == nullptr || liveInput->numChannels == 0))
+        if (eventCount == 0 && work < serialWorkNs && (liveInput == nullptr || liveInput->numChannels == 0))
             workers = nullptr;
         // round 190kr: as many workers woken as the work needs (WorkerPool::Tuning::helpPercent): ~1 ms of Thief's work in a
         // 2.9 ms chunk woke all five
@@ -5537,7 +5584,13 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         else
             pool->setWakeLimit (-1);
     }
+    return pool;
+}
 
+void RackRenderer::chunkUnits (const RackState& state, bool playing, int numSamples, MeterBank* meters) noexcept
+{
+    const auto& song = state.song;
+    const auto tracks = std::max<int> (1, (int) song.mixer.size());
     // 1) channels, each with its own notes at the exact sample (in parallel when worth it)
     const auto channels = std::min<int> ({ (int) state.instruments.size(), (int) song.channels.size(), maxChannels });
     auto channel = [this, &state, numSamples] (int c) {
@@ -5686,6 +5739,12 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         }
     }
 
+}
+
+void RackRenderer::chunkMaster (const RackState& state, int numSamples, float* left, float* right, MeterBank* meters, WorkerPool* pool,
+                                std::uint64_t chunkStartNs) noexcept
+{
+    const auto& song = state.song;
     workers = pool;
 
     // render-ahead (round 190gq): what the live part takes from this one goes out now; the Master is the live part's
@@ -6054,6 +6113,485 @@ bool RackRenderer::runTaskGraph (const RackState& state, bool playing, int chann
     if (live)
         mixLiveInputTrack (state, 0, recording, playing, n);
     mixMetronome (state, 0, n);
+    return true;
+}
+
+// ---- Round 190kz (sched): one task-graph round per device callback ----------------------------------------------------
+// A block the loop in process() cuts in pieces (with automation: pieces of 128 on the export's grid of 512, and wherever
+// a pattern event falls) ran one worker-pool round per piece: at a device block of 480, about four wake-ups, spins and
+// waits for the last task per block, half of the audio CPU on Windows. A batched block runs
+//   1. every piece's serial part (chunkPrelude: the automation's values, the transport, the notes and events), in order,
+//      each into its own slot of the per-chunk state (PieceValue / PieceArray / PieceEvents, pieceTimelines);
+//   2. ONE round of the task graph in which each channel and insert renders its pieces one after another, piece k with
+//      slot k's state and its own plugin parameter bindings for that piece (applyUnitParams: what updateAutomation's
+//      applyPluginParams did for that unit at that piece), into its buffers at the piece's offset;
+//   3. the Master's pieces, in order (chunkMaster), and the last piece's state becomes the renderer's again.
+// Every unit gets exactly the calls it got piece by piece before — the same sizes, values and order, its inputs' same
+// samples — so the output is the same bit for bit; only what runs at the same time changes (as with the task graph
+// itself). It is used only where nothing a piece's serial part does depends on the previous piece's units, or reaches
+// a unit outside its own task (batchable): no MIDI a unit sends to the next chunk (wrapper output ports, VFX, Dashboards,
+// hardware MIDI, mixer-slot MIDI routes), no live controllers (they read a unit's output), no effect that follows the
+// Channel rack's held notes, no sample-accurate plugin parameters, no launchers, no render-ahead split, no PDC "when
+// recording or not playing" switch, no generator extra outputs, no binding that reaches another unit; at most maxPieces
+// pieces and one mixer buffer of samples. Anything else plays piece by piece as before.
+// LYNX_POOL="rounds=chunk" (or rounds=0): one round per piece, as before (A/B); "rounds=block" (1, the default): batched.
+namespace
+{
+bool taskGraphEnabled() noexcept
+{
+    static const bool enabled = [] { const char* e = std::getenv ("LYNX_TASKGRAPH"); return e == nullptr || std::atoi (e) != 0; }();
+    return enabled;
+}
+
+void copyTimeline (const HostTimeline& from, HostTimeline& to) noexcept
+{
+    constexpr auto r = std::memory_order_relaxed;
+    to.tick.store (from.tick.load (r), r);
+    to.loopStart.store (from.loopStart.load (r), r);
+    to.loopEnd.store (from.loopEnd.load (r), r);
+    to.looping.store (from.looping.load (r), r);
+    to.bpm.store (from.bpm.load (r), r);
+    to.sampleRate.store (from.sampleRate.load (r), r);
+    to.playing.store (from.playing.load (r), r);
+    to.beatsPerBar.store (from.beatsPerBar.load (r), r);
+    to.beatUnit.store (from.beatUnit.load (r), r);
+    to.ticksPerSample.store (from.ticksPerSample.load (r), r);
+    to.chunk.store (from.chunk.load (r), r);
+}
+} // namespace
+
+bool RackRenderer::buildUnitParams (const RackState& state) noexcept
+{
+    const auto& song = state.song;
+    const auto channels = std::min<int> ({ (int) state.instruments.size(), (int) song.channels.size(), maxChannels });
+    const auto tracks = std::max<int> (1, (int) song.mixer.size());
+    const auto units = (std::size_t) maxChannels + maxMixerTracks;
+    unitParamsBend = unitParamsTimed = unitParamsHeld = false;
+    if (unitParamStart.size() < units + 1 || state.pluginParams.size() > unitParams.size())
+        return false;
+    // each binding's unit, as applyPluginParam reaches it: -1 = it sets nothing, -2 = it reaches another unit (or one
+    // that is not rendered as a task): not batched
+    auto unitOf = [&] (const RackState::PluginParamBinding& b) noexcept -> int {
+        if (b.channel >= 0)
+        {
+            const auto c = (std::size_t) b.channel;
+            if (c < state.midiTargets.size() && midictl::isMidiParam (b.param) && ! state.midiTargets[c].empty())
+                return -2; // (a MIDI Out's controls reach the plugins on its port)
+            const auto kind = c < song.channels.size() ? song.channels[c].instrument : InstrumentKind::plugin;
+            if (midictl::isPitchBend (b.param) && kind != InstrumentKind::plugin && kind != InstrumentKind::midiOut
+                && b.channel < (int) state.instruments.size() && b.channel < maxChannels)
+            {
+                // (applyLiveControl: a Layer's children, a MIDI Out's port)
+                if (kind == InstrumentKind::layer || (state.hasMidiRoutes && c < state.midiTargets.size() && ! state.midiTargets[c].empty()))
+                    return -2;
+                unitParamsBend = true;
+                return b.channel < channels ? b.channel : -2;
+            }
+            if (b.channel >= (int) state.instruments.size())
+                return -1;
+            if (const auto* instrument = state.instruments[c].get(); instrument != nullptr && instrument->takesTimedParameters())
+                unitParamsTimed = true;
+            return b.channel < channels ? b.channel : -2;
+        }
+        if (b.track < 0)
+            return -2;
+        if (b.track >= (int) state.effects.size() || b.slot < 0 || b.slot >= (int) state.effects[(std::size_t) b.track].size())
+            return b.slot < 0 ? -2 : -1;
+        if (const auto* effect = state.effects[(std::size_t) b.track][(std::size_t) b.slot].get(); effect != nullptr && effect->takesTimedParameters())
+            unitParamsTimed = true;
+        return b.track < tracks && b.track < maxMixerTracks ? maxChannels + b.track : -2;
+    };
+    std::fill (unitParamStart.begin(), unitParamStart.begin() + (std::ptrdiff_t) units + 1, 0);
+    for (const auto& b : state.pluginParams)
+    {
+        const auto u = unitOf (b);
+        if (u == -2)
+            return false;
+        if (u >= 0)
+            ++unitParamStart[(std::size_t) u + 1];
+    }
+    for (std::size_t u = 0; u < units; ++u)
+        unitParamStart[u + 1] += unitParamStart[u];
+    // (a second pass, in the bindings' order: each unit keeps applyPluginParams' order; unitParamStart[u] moves on to its
+    // end as it fills, then back)
+    for (std::size_t k = 0; k < state.pluginParams.size(); ++k)
+        if (const auto u = unitOf (state.pluginParams[k]); u >= 0)
+            unitParams[(std::size_t) unitParamStart[(std::size_t) u]++] = (int) k;
+    for (std::size_t u = units; u > 0; --u)
+        unitParamStart[u] = unitParamStart[u - 1];
+    unitParamStart[0] = 0;
+    // the effects that follow the Channel rack's held notes read every channel's at their piece: not batched — a slot
+    // whose settings read them, or one that can and has automated parameters (its settings may turn that on mid-block)
+    for (std::size_t t = 0; t < state.effects.size() && t < song.mixer.size(); ++t)
+        for (std::size_t s = 0; s < state.effects[t].size() && s < song.mixer[t].effects.size(); ++s)
+        {
+            const auto* effect = state.effects[t][s].get();
+            if (effect == nullptr || ! effect->followsHeldNotes())
+                continue;
+            auto automated = false;
+            if (t < state.effectParamAuto.size() && s < state.effectParamAuto[t].size())
+                for (const auto a : state.effectParamAuto[t][s])
+                    automated = automated || a >= 0;
+            for (const auto& b : state.pluginParams)
+                automated = automated || (b.channel < 0 && b.track == (int) t && b.slot == (int) s);
+            if (automated || effect->followsHeldNotesWith (song.mixer[t].effects[s].params))
+                unitParamsHeld = true;
+        }
+    return true;
+}
+
+void RackRenderer::applyUnitParams (const RackState& state, int unit, const Piece& piece) noexcept
+{
+    if (! piece.params || unit < 0 || (std::size_t) unit + 1 >= unitParamStart.size())
+        return;
+    for (auto k = unitParamStart[(std::size_t) unit]; k < unitParamStart[(std::size_t) unit + 1]; ++k)
+        applyPluginParam (state, (std::size_t) unitParams[(std::size_t) k], piece.paramsFirst, piece.paramsLive);
+}
+
+bool RackRenderer::batchable (const RackState& state, int numSamples) noexcept
+{
+    const auto refuse = [this] (BatchRefusal why) noexcept {
+        ++batchRefused[(std::size_t) why];
+        return false;
+    };
+    if (WorkerPool::tuning().blockRounds.load (std::memory_order_relaxed) == 0)
+        return refuse (BatchRefusal::switchedOff);
+    if (workers == nullptr || workers->workers() == 0 || split != nullptr || ownTimeline != nullptr || buffers == nullptr || ! taskGraphEnabled() || ! state.graphOk)
+        return refuse (BatchRefusal::noGraph);
+    if (! flsettings::options().multithreadGenerators.load (std::memory_order_relaxed) || ! flsettings::options().multithreadMixer.load (std::memory_order_relaxed))
+        return refuse (BatchRefusal::noGraph);
+    if (numSamples > chunkCapacity || numSamples > buffers->frames || numSamples > (int) zeroBlock.size())
+        return refuse (BatchRefusal::bigBlock);
+    if (! state.liveAutomations.empty())
+        return refuse (BatchRefusal::liveControllers);
+    if (state.hasMidiOutputs || ! state.portEventChannels.empty() || ! state.dashboardChannels.empty() || ! state.vfxChannels.empty()
+        || state.hasEffectMidiRoutes || ! state.hardwareMidiChannels.empty())
+        return refuse (BatchRefusal::midiBetweenUnits);
+    if (state.anyBypassWhenIdle)
+        return refuse (BatchRefusal::other);
+    if (state.launchers || launchersRunning || runningLauncher != nullptr || ! state.performanceZone.empty() || perfRunning
+        || (perfLive != nullptr && perfLive->anyPlaying.load (std::memory_order_relaxed)))
+        return refuse (BatchRefusal::launchers);
+    const auto channels = std::min<int> ({ (int) state.instruments.size(), (int) state.song.channels.size(), maxChannels });
+    const auto tracks = std::max<int> (1, (int) state.song.mixer.size());
+    const auto tasks = channels + tracks - 1;
+    if (state.graphChannels != channels || tasks <= 0 || tasks > graphCapacity || (int) state.graphIndegree.size() != tasks)
+        return refuse (BatchRefusal::noGraph);
+    for (int c = 0; c < channels; ++c) // (runTaskGraph's check: a generator's extra outputs go to inserts known only now)
+        if (state.instruments[(std::size_t) c] != nullptr && state.instruments[(std::size_t) c]->auxOutputCount() > 0)
+            return refuse (BatchRefusal::noGraph);
+    if (&state != unitParamsState || state.serial != unitParamsSerial)
+    {
+        unitParamsOk = buildUnitParams (state);
+        unitParamsState = &state;
+        unitParamsSerial = state.serial;
+    }
+    if (! unitParamsOk)
+        return refuse (BatchRefusal::bindings);
+    if (unitParamsHeld)
+        return refuse (BatchRefusal::heldNotes);
+    // (an editor previewing a slot's settings: they are not the slot's own, which buildUnitParams judged)
+    if (overrideParams != nullptr && overrideTrack >= 0 && (std::size_t) overrideTrack < state.effects.size() && overrideSlot >= 0
+        && (std::size_t) overrideSlot < state.effects[(std::size_t) overrideTrack].size()
+        && state.effects[(std::size_t) overrideTrack][(std::size_t) overrideSlot] != nullptr
+        && state.effects[(std::size_t) overrideTrack][(std::size_t) overrideSlot]->followsHeldNotes())
+        return refuse (BatchRefusal::heldNotes);
+    if (unitParamsTimed && sampleAccurateAutomation())
+        return refuse (BatchRefusal::timedParams);
+    return true;
+}
+
+bool RackRenderer::planPieces (const RackState& state, bool playing, double startTick, int numSamples, double tps, int chunk, bool grid) noexcept
+{
+    // (process()'s loop, without rendering: the same pieces, the same moves of pieceStart; undone when not batched)
+    constexpr int piece = 128, exportBlock = 512;
+    const auto pieceStartBefore = pieceStart;
+    pieceCount = 0;
+    for (int done = 0; done < numSamples;)
+    {
+        if (pieceCount == maxPieces)
+        {
+            pieceStart = pieceStartBefore;
+            pieceCount = -1; // (counted as a refusal by process())
+            return false;
+        }
+        auto n = std::min (chunk, numSamples - done);
+        auto continuing = false;
+        const auto pos = gridSample + done;
+        if (grid)
+        {
+            const auto blockEnd = (pos / exportBlock + 1) * exportBlock;
+            auto pieceEnd = std::min<std::int64_t> (pieceStart + piece, blockEnd);
+            if (pos >= pieceEnd)
+            {
+                pieceStart = pos;
+                pieceEnd = std::min<std::int64_t> (pos + piece, blockEnd);
+            }
+            continuing = pos > pieceStart;
+            n = (int) std::min<std::int64_t> (std::min (blockCapacity, numSamples - done), pieceEnd - pos);
+        }
+        auto atEvent = false;
+        if (playing && ! state.eventLanes.empty() && tps > 0.0)
+        {
+            const auto ahead = ticksToNextEvent (state, startTick + done * tps);
+            if (ahead < (double) n * tps)
+            {
+                n = std::max (1, (int) std::ceil (ahead / tps - 1.0e-9));
+                atEvent = true;
+            }
+        }
+        auto& p = pieces[(std::size_t) pieceCount++];
+        p = Piece {};
+        p.samples = n;
+        p.offset = done;
+        p.startTick = startTick + done * tps;
+        p.continuing = continuing;
+        p.gridPos = grid ? pos : -1;
+        done += n;
+        if (grid && atEvent)
+            pieceStart = pos + n;
+    }
+    if (pieceCount < 2) // (one piece: one round either way)
+    {
+        pieceStart = pieceStartBefore;
+        pieceCount = 0;
+        return false;
+    }
+    return true;
+}
+
+void RackRenderer::carryPieceState (int from, int to) noexcept
+{
+    trackUnwritten.carry (from, to);
+    trackSamples.carry (from, to);
+    automationValues.carry (from, to);
+    trackActive.carry (from, to);
+    tapActive.carry (from, to);
+    channelSilent.carry (from, to);
+    chunkStartTick.carry (from, to);
+    chunkTps.carry (from, to);
+    clipEnvTableShown.carry (from, to);
+    liveInputOffset.carry (from, to);
+    chunkTick.carry (from, to);
+    chunkPlaying.carry (from, to);
+    pdcBypassNow.carry (from, to);
+    compensateTick.carry (from, to);
+    compensateTicksPerSample.carry (from, to);
+}
+
+void RackRenderer::processBatched (const RackState& state, bool playing, int numSamples, float* left, float* right, MeterBank* meters) noexcept
+{
+    const auto chunkStartNs = ProcessTimes::now();
+    auto& shared = hostTimeline(); // (this thread's play head: the shared one, batchable wants no own one)
+    ++batchedBlocks;
+
+    // 1) the pieces' serial parts, in order, each in its slot
+    int eventCount = 0;
+    for (int k = 0; k < pieceCount; ++k)
+    {
+        auto& piece = pieces[(std::size_t) k];
+        const ScopedPiece slot (k);
+        if (k > 0)
+            carryPieceState (k - 1, k);
+        copyTimeline (k == 0 ? shared : pieceTimelines[(std::size_t) k - 1], pieceTimelines[(std::size_t) k]);
+        const ScopedHostTimeline timelineScope (&pieceTimelines[(std::size_t) k]);
+        pieceOffset = piece.offset;
+        liveInputOffset = piece.offset;
+        timedGridPos = piece.gridPos;
+        deferParams = true;
+        chunkPrelude (state, playing, piece.startTick, piece.samples, piece.continuing);
+        deferParams = false;
+        eventCount += events.size();
+        piece.live = liveInput != nullptr && liveInput->numChannels > 0;
+        piece.recording = piece.live && liveInput->recording.load (std::memory_order_relaxed);
+        resumeAudio = false;
+        chaseNotes = false;
+    }
+
+    // 2) the units: A7's choice for the block (its pieces' average size, all their events), then one round, or each
+    // piece on this thread as before
+    auto* const pool = chunkSchedule (state, std::max (1, numSamples / pieceCount), eventCount);
+    auto* const chosen = workers;
+    if (unitParamsBend && ! automatedBendReset) // (applyPluginParam's first bend, made here: tasks run it at once)
+    {
+        automatedBend.fill (std::numeric_limits<float>::quiet_NaN());
+        automatedBendReset = true;
+    }
+    const auto channels = std::min<int> ({ (int) state.instruments.size(), (int) state.song.channels.size(), maxChannels });
+    if (runBatchedGraph (state, playing, channels, meters))
+    {
+        ++batchedRounds;
+        for (int k = 0; k < pieceCount; ++k)
+        {
+            const auto& piece = pieces[(std::size_t) k];
+            const ScopedPiece slot (k);
+            const ScopedHostTimeline timelineScope (&pieceTimelines[(std::size_t) k]);
+            applyUnitParams (state, maxChannels, piece); // (the Master's own bindings)
+            // (runTaskGraph's end: the Master's own channels and input)
+            sumChannelsInto (state, 0, channels, piece.samples);
+            if (piece.live)
+                mixLiveInputTrack (state, 0, piece.recording, playing, piece.samples);
+            mixMetronome (state, 0, piece.samples);
+            chunkMaster (state, piece.samples, left + piece.offset, right + piece.offset, meters, pool, chunkStartNs);
+        }
+    }
+    else
+        for (int k = 0; k < pieceCount; ++k)
+        {
+            const auto& piece = pieces[(std::size_t) k];
+            const ScopedPiece slot (k);
+            const ScopedHostTimeline timelineScope (&pieceTimelines[(std::size_t) k]);
+            if (piece.params)
+                applyPluginParams (state, piece.paramsFirst, piece.paramsLive);
+            workers = chosen;
+            chunkUnits (state, playing, piece.samples, meters);
+            chunkMaster (state, piece.samples, left + piece.offset, right + piece.offset, meters, pool, chunkStartNs);
+        }
+    workers = pool;
+
+    // 3) the last piece's state is the renderer's (slot 0) again, as after the last chunk of the loop
+    carryPieceState (pieceCount - 1, 0);
+    pieceOffset.v[0] = 0;
+    {
+        const auto& last = events.more[(std::size_t) pieceCount - 2];
+        events.first.clear();
+        for (const auto& e : last)
+            events.first.add (e);
+    }
+    copyTimeline (pieceTimelines[(std::size_t) pieceCount - 1], shared);
+    // (A7's light-chunk rule compares one chunk's time)
+    lastChunkNs = (ProcessTimes::now() - chunkStartNs) / (std::uint64_t) pieceCount;
+}
+
+bool RackRenderer::runBatchedGraph (const RackState& state, bool playing, int channels, MeterBank* meters) noexcept
+{
+    // (runTaskGraph's conditions; batchable checked the rest for the whole block)
+    if (workers == nullptr || ! parallelChunk)
+        return false;
+    const auto tracks = std::max<int> (1, (int) state.song.mixer.size());
+    const auto tasks = channels + tracks - 1;
+
+    for (int k = 0; k < pieceCount; ++k)
+    {
+        const ScopedPiece slot (k);
+        trackActive.fill (0);
+        tapActive.fill (0);
+    }
+    for (int i = 0; i < tasks; ++i)
+    {
+        graphPending[(std::size_t) i].store (state.graphIndegree[(std::size_t) i], std::memory_order_relaxed);
+        graphSlots[(std::size_t) i].store (0, std::memory_order_relaxed);
+    }
+    auto pushed = 0;
+    for (const auto r : state.graphRoots)
+        graphSlots[(std::size_t) pushed++].store (r + 1, std::memory_order_relaxed);
+    graphPushed.store (pushed, std::memory_order_release);
+
+    const auto timing = times->enabled.load (std::memory_order_relaxed);
+    constexpr int handedOver = -1;
+    const auto waitMode = WorkerPool::tuning().waitMode.load (std::memory_order_relaxed);
+    const auto handOffSpin = std::chrono::microseconds (WorkerPool::tuning().waitSpinMicros.load (std::memory_order_relaxed));
+    const auto count = (std::uint64_t) pieceCount;
+    auto task = [&] (int position) {
+        int id = 0;
+        auto& slot = graphSlots[(std::size_t) position];
+        if (waitMode == 2)
+        {
+            if ((id = slot.load (std::memory_order_acquire)) == 0)
+            {
+                const auto start = std::chrono::steady_clock::now();
+                auto handed = false;
+                for (int spins = 0; (id = slot.load (std::memory_order_acquire)) == 0; ++spins)
+                {
+                    WorkerPool::relax();
+                    if ((spins & 63) == 63 && std::chrono::steady_clock::now() - start > handOffSpin)
+                    {
+                        auto expected = 0;
+                        if (slot.compare_exchange_strong (expected, handedOver, std::memory_order_acq_rel))
+                        {
+                            handed = true;
+                            break;
+                        }
+                        id = expected;
+                        break;
+                    }
+                }
+                workers->noteWait ((std::uint64_t) std::chrono::duration_cast<std::chrono::nanoseconds> (std::chrono::steady_clock::now() - start).count(), handed);
+                if (handed)
+                    return;
+            }
+        }
+        else
+            workers->await (position, [&] { return (id = slot.load (std::memory_order_acquire)) != 0; });
+        --id;
+        std::array<int, 32> taken;
+        int takenCount = 0;
+        auto chain = [&] (int first, auto& self) -> void {
+            auto at = first;
+            for (;;)
+            {
+                const auto before = timing || measureUnits ? ProcessTimes::now() : 0;
+                // the unit's pieces, one after another: piece k with slot k's state, its own bindings for that piece
+                for (int k = 0; k < pieceCount; ++k)
+                {
+                    const auto& piece = pieces[(std::size_t) k];
+                    const ScopedPiece pieceScope (k);
+                    const ScopedHostTimeline timelineScope (&pieceTimelines[(std::size_t) k]);
+                    const auto n = piece.samples;
+                    if (at < channels)
+                    {
+                        applyUnitParams (state, at, piece);
+                        renderChannel (state, at, n);
+                    }
+                    else
+                    {
+                        const auto t = at - channels + 1;
+                        applyUnitParams (state, maxChannels + t, piece);
+                        sumChannelsInto (state, t, channels, n);
+                        if (piece.live)
+                            mixLiveInputTrack (state, t, piece.recording, playing, n);
+                        mixMetronome (state, t, n);
+                        mixSideInput (state, t, n);
+                        processTrack (state, t, n, meters);
+                    }
+                }
+                const auto spent = ProcessTimes::now() - before;
+                // (A7 keeps one chunk's cost: the pieces' average)
+                if (at < channels)
+                {
+                    if (timing && at < ProcessTimes::channels)
+                        times->channelNs[(std::size_t) at].fetch_add (spent, std::memory_order_relaxed);
+                    if (measureUnits)
+                        channelCostNs[(std::size_t) at] = (std::uint32_t) std::min<std::uint64_t> (spent / count, 0xffffffffu);
+                }
+                else if (const auto t = at - channels + 1; measureUnits && t < maxMixerTracks)
+                    trackCostNs[(std::size_t) t] = (std::uint32_t) std::min<std::uint64_t> (spent / count, 0xffffffffu);
+                const auto fused = (std::size_t) at < state.graphFused.size() ? state.graphFused[(std::size_t) at] : -1;
+                if (fused < 0)
+                    break;
+                at = fused;
+            }
+            for (auto k = state.graphNextStart[(std::size_t) at]; k < state.graphNextStart[(std::size_t) at + 1]; ++k)
+            {
+                const auto j = state.graphNext[(std::size_t) k];
+                if (graphPending[(std::size_t) j].fetch_sub (1, std::memory_order_acq_rel) == 1)
+                {
+                    const auto pos = graphPushed.fetch_add (1, std::memory_order_acq_rel);
+                    auto expected = 0;
+                    if (graphSlots[(std::size_t) pos].compare_exchange_strong (expected, j + 1, std::memory_order_acq_rel))
+                        workers->notify (pos);
+                    else if (takenCount < (int) taken.size())
+                        taken[(std::size_t) takenCount++] = j;
+                    else
+                        self (j, self);
+                }
+            }
+        };
+        chain (id, chain);
+        while (takenCount > 0)
+            chain (taken[(std::size_t) --takenCount], chain);
+    };
+    workers->parallelFor (tasks - state.graphFusedCount, task);
     return true;
 }
 

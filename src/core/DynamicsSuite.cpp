@@ -1218,6 +1218,11 @@ public:
         held = channels;
         heldCount = count;
     }
+    bool followsHeldNotes() const noexcept override { return true; } // (round 190kz)
+    bool followsHeldNotesWith (const EffectParams& p) const noexcept override // (the MIDI trigger on a channel: chunk())
+    {
+        return triggerOf (p[trigger]) == Trigger::midi && triggerChannelOf (p[triggerChannel]) >= 0;
+    }
 
     void process (float* l, float* r, int n, const EffectParams& p, double bpm) noexcept override
     {

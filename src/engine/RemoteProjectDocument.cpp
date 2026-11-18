@@ -126,7 +126,7 @@ const DocumentFields& editableDocumentFields (DocumentShape shape)
         add (S::mixer, "effects", S::effect, true);
         add (S::mixer, "standIns", S::standIn, true);
         add (S::effect, "kind on params sendSpan mix smartDisable row sidechain sidechain2 sendTransient sendSustain state sample preset abOther abB "
-             "look goal goalAmount lockState");
+             "look goal goalAmount lockState engineRev"); // (engineRev: round 190kz)
         add (S::effect, "plugin substituteFor", S::plugin);
         add (S::effect, "flOrigin", S::origin);
         add (S::effect, "patcher", S::patcher);

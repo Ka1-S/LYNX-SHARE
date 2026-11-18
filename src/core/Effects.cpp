@@ -2390,6 +2390,11 @@ public:
         held = channels;
         heldCount = count;
     }
+    bool followsHeldNotes() const noexcept override { return true; } // (round 190kz)
+    bool followsHeldNotesWith (const EffectParams& p) const noexcept override // (process(): unless the MIDI port routes its notes)
+    {
+        return ! (p[(std::size_t) pcorr::portRoutingParam] > 0.5f);
+    }
 
     // round 190ee: a note from the MIDI Out channels on the Pitcher's port (FL: note in 0x180007a40, velocity / 127)
     void midiNote (int key, int velocity, int) noexcept override
@@ -2642,6 +2647,14 @@ public:
         for (auto& b : branches)
             for (auto& c : b.chain)
                 c.effect->setHeldNotes (channels, count);
+    }
+    bool followsHeldNotes() const noexcept override // (round 190kz)
+    {
+        for (const auto& b : branches)
+            for (const auto& c : b.chain)
+                if (c.effect != nullptr && c.effect->followsHeldNotes())
+                    return true;
+        return false;
     }
 
     void process (float* l, float* r, int n, const EffectParams&, double bpm) noexcept override
@@ -4914,7 +4927,7 @@ std::unique_ptr<Effect> makeEffect (const EffectSlot& slot)
     if (slot.kind == EffectKind::vocodex)
         return vocodex::make (slot.state);
     if (slot.kind == EffectKind::maximus)
-        return maximusfx::make (slot.state);
+        return maximusfx::make (slot.state, slot.engineRev);
     if (slot.kind == EffectKind::multibandDelay)
         return mbdelay::make (slot.state, &slot.params); // (#113: the mode's latency known at once)
     if (slot.kind == EffectKind::vocoder)

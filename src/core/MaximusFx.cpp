@@ -67,7 +67,7 @@ namespace
 class MaximusEffect final : public Effect
 {
 public:
-    explicit MaximusEffect (const std::vector<std::uint8_t>& slotState)
+    MaximusEffect (const std::vector<std::uint8_t>& slotState, int rev) : engineRev (rev)
     {
         if (const auto blob = unpack (slotState))
             if ((preset = presetOf (*blob)) != nullptr)
@@ -77,7 +77,7 @@ public:
     void prepare (double sampleRate) noexcept override
     {
         if (preset != nullptr)
-            engine.prepare (preset, sampleRate, mix); // allocates; called off the audio thread by the host
+            engine.prepare (preset, sampleRate, mix, engineRev); // allocates; called off the audio thread by the host
     }
 
     void reset() noexcept override { engine.reset(); }
@@ -92,13 +92,14 @@ public:
 private:
     std::shared_ptr<const hlfx::MaximusPreset> preset;
     int mix = 1000;
+    int engineRev = 0; // EffectSlot::engineRev (round 190kz)
     hlfx::MaximusProcessor engine;
 };
 } // namespace
 
-std::unique_ptr<Effect> make (const std::vector<std::uint8_t>& slotState)
+std::unique_ptr<Effect> make (const std::vector<std::uint8_t>& slotState, int engineRev)
 {
-    return std::make_unique<MaximusEffect> (slotState);
+    return std::make_unique<MaximusEffect> (slotState, engineRev);
 }
 // --- editing -----------------------------------------------------------------------------------------------
 
