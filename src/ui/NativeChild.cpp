@@ -1,5 +1,6 @@
 #include "ui/NativeChild.h"
 #include "ui/WindowOwner.h"
+#include "ui/ShotShowing.h"
 #include "core/DockStack.h"
 #include "core/DockingPolicy.h"
 
@@ -789,6 +790,128 @@ bool placedPhysically (const juce::Component& c)
     juce::ignoreUnused (c);
     return true;
    #endif
+}
+
+namespace
+{
+bool coverCheckWanted()
+{
+    static const bool on = juce::SystemStats::getEnvironmentVariable ("LYNX_COVERCHECK", {}).trim() != "0";
+    return on;
+}
+} // namespace
+
+std::atomic<int>& coveredSkips()
+{
+    static std::atomic<int> n { 0 };
+    return n;
+}
+
+bool coveredBySiblingWindows (const juce::Component& c)
+{
+   #if JUCE_WINDOWS
+    if (! coverCheckWanted())
+        return false;
+    auto* peer = c.getPeer();
+    auto* hwnd = peer != nullptr ? static_cast<HWND> (peer->getNativeHandle()) : nullptr;
+    if (hwnd == nullptr || (GetWindowLongPtr (hwnd, GWL_STYLE) & WS_CHILD) == 0)
+        return false;
+    // what of the window can show: its rectangle, clipped by each parent's client area on the way up (screen pixels)
+    RECT visible {};
+    if (! GetWindowRect (hwnd, &visible))
+        return false;
+    for (auto w = hwnd; (GetWindowLongPtr (w, GWL_STYLE) & WS_CHILD) != 0;)
+    {
+        const auto parent = GetParent (w);
+        if (parent == nullptr)
+            return false;
+        RECT client {};
+        GetClientRect (parent, &client);
+        MapWindowPoints (parent, nullptr, reinterpret_cast<POINT*> (&client), 2);
+        if (! IntersectRect (&visible, &visible, &client))
+            return true; // (scrolled or moved out of its parent: nothing shows)
+        // a visible sibling above `w` that holds all of it: an opaque window (not layered: the floaters and the tour's
+        // dimmed layer let what is under them show) with no region of its own (a region can leave a hole: round 190jy's
+        // docked editors drawn by the main window)
+        for (auto above = GetWindow (w, GW_HWNDPREV); above != nullptr; above = GetWindow (above, GW_HWNDPREV))
+        {
+            if (! IsWindowVisible (above) || (GetWindowLongPtr (above, GWL_EXSTYLE) & (WS_EX_LAYERED | WS_EX_TRANSPARENT)) != 0)
+                continue;
+            RECT r {};
+            if (! GetWindowRect (above, &r) || r.left > visible.left || r.top > visible.top || r.right < visible.right || r.bottom < visible.bottom)
+                continue;
+            if (auto* region = CreateRectRgn (0, 0, 0, 0))
+            {
+                const auto type = GetWindowRgn (above, region);
+                DeleteObject (region);
+                if (type != ERROR)
+                    continue; // (it has a region: perhaps a hole over us)
+            }
+            return true;
+        }
+        w = parent;
+    }
+    return false;
+   #else
+    juce::ignoreUnused (c);
+    return false;
+   #endif
+}
+
+juce::String describeCover (const juce::Component& c)
+{
+   #if JUCE_WINDOWS
+    auto* peer = c.getPeer();
+    auto* hwnd = peer != nullptr ? static_cast<HWND> (peer->getNativeHandle()) : nullptr;
+    if (hwnd == nullptr)
+        return "no window";
+    const auto rectText = [] (const RECT& r) { return juce::String (r.left) + "," + juce::String (r.top) + " " + juce::String (r.right - r.left) + "x" + juce::String (r.bottom - r.top); };
+    RECT visible {};
+    GetWindowRect (hwnd, &visible);
+    juce::String out;
+    out << "window " << juce::String::toHexString ((juce::pointer_sized_int) hwnd) << " " << rectText (visible)
+        << ((GetWindowLongPtr (hwnd, GWL_STYLE) & WS_CHILD) != 0 ? " child" : " top-level") << (IsWindowVisible (hwnd) ? "" : " INVISIBLE")
+        << " showing " << (c.isShowing() ? 1 : 0) << " covered " << (coveredBySiblingWindows (c) ? 1 : 0);
+    for (auto w = hwnd; (GetWindowLongPtr (w, GWL_STYLE) & WS_CHILD) != 0;)
+    {
+        const auto parent = GetParent (w);
+        if (parent == nullptr)
+            break;
+        RECT client {};
+        GetClientRect (parent, &client);
+        MapWindowPoints (parent, nullptr, reinterpret_cast<POINT*> (&client), 2);
+        IntersectRect (&visible, &visible, &client);
+        out << " | in parent " << juce::String::toHexString ((juce::pointer_sized_int) parent) << " visible " << rectText (visible) << ", above:";
+        for (auto above = GetWindow (w, GW_HWNDPREV); above != nullptr; above = GetWindow (above, GW_HWNDPREV))
+        {
+            if (! IsWindowVisible (above))
+                continue;
+            RECT r {};
+            GetWindowRect (above, &r);
+            const auto ex = GetWindowLongPtr (above, GWL_EXSTYLE);
+            auto type = ERROR;
+            if (auto* region = CreateRectRgn (0, 0, 0, 0))
+            {
+                type = GetWindowRgn (above, region);
+                DeleteObject (region);
+            }
+            wchar_t cls[64] {};
+            GetClassNameW (above, cls, 63);
+            out << " [" << juce::String (cls).substring (0, 24) << " " << rectText (r) << ((ex & WS_EX_LAYERED) != 0 ? " layered" : "")
+                << ((ex & WS_EX_TRANSPARENT) != 0 ? " transparent" : "") << (type != ERROR ? " region " + juce::String ((int) type) : juce::String())
+                << (r.left <= visible.left && r.top <= visible.top && r.right >= visible.right && r.bottom >= visible.bottom ? " HOLDS" : "") << "]";
+        }
+        w = parent;
+    }
+    return out;
+   #else
+    return c.isShowing() ? "showing" : "not showing";
+   #endif
+}
+
+bool showsOnScreen (const juce::Component& c)
+{
+    return (c.isShowing() || ui::showingForShots()) && ! coveredBySiblingWindows (c);
 }
 
 std::vector<juce::Component*> attachedChildren (void* parentWindow)

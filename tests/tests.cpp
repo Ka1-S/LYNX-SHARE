@@ -17865,6 +17865,9 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Rollup030Tests.inc" // round 190il: semantic interactions of the 0.1.30 rollup (keep last)
 #include "Bug190ieTests.inc" // round 190ie (issue #185: tempo automation through the basic Delay)
 #include "Perf190kgTests.inc" // round 190kg: the basic Delay's faster loops render round 190ie's samples bit for bit
+#include "Harm190krTests.inc" // round beatfl190kr: Harmless's vector sine bank, Vocodex's sliding max: the old bits
+#include "Shift190krTests.inc" // round 190kr: Signalsmith Stretch's faster loops render the base commit's pitch shifts bit for bit
+#include "Perf190krTests.inc" // round 190kr: the FL-native mixer effects' faster kernels render the plain loops' samples bit for bit
 #include "PerfGate190idTests.inc" // round perfgate190id: the performance gate's synthetic projects (community slice B12)
 #include "Details190ihTests.inc" // round 190ih: DETAILS slices R2, R3, R4, R7, R9, R12, R14
 #include "Rackmix190ioTests.inc" // round 190io: FL rack + Mixer landmarks, Mixer details, issue #154 part 2
@@ -17892,6 +17895,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "PrArp190jvTests.inc" // round 190jv: FL's Piano roll arpeggiator patterns (TPRArpForm law)
 #include "Flm190jvTests.inc" // round 190jv: FL Studio Mobile racks with several instruments / an effect first (BUILD-LIST 19)
 #include "Spin190kbTests.inc" // round 190kb: the worker pool's waiting (statistics, tuning, bounded task-graph waits, adaptive spin)
+#include "Beat190krTests.inc" // round 190kr: the worker pool wakes only the workers a chunk's work needs; the same samples
 #include "Export190kaTests.inc" // round als190ka-export (owner decision D5): AIFF and M4A (AAC) export
 #include "Issues190jzTests.inc" // round 190jz: issues #192 (docked Browser), #194 (clip fade handles), #195 (Home, W)
 #include "PrChord190kdTests.inc" // round 190kd: FL's chord tool strip (Generate modes, Analyze, Learn from MIDI input, note options)

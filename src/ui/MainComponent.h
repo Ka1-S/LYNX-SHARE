@@ -815,10 +815,23 @@ private:
     int midiInputTicks = 0;
     bool realtimeHintChecked = false; // Linux: the real-time priority hint was considered (round 161)
     toolbar::OutputMonitor output { engine };
-    // the toolbar's live displays (output monitor, song position, time), at the display's refresh up to 72 Hz (round
-    // 174e: the oscilloscope is a 1024-point path; at 72 Hz it already moves fluidly and costs half of 144)
+    // the toolbar's live displays (output monitor, song position, time), at the display's refresh (round 174e capped
+    // them at 72 Hz: the oscilloscope's stroke costs twice as much at 144). Round 190kr (QA-11): with the Channel rack
+    // maximised over the Playlist (Thief's default view) the toolbar's scope is the only thing that moves at the
+    // display's rate; FL draws it at 143 frames a second, LYNX at 72 (86 screen updates a second; 0.1.29's 143 were the
+    // covered Playlist's own playhead frames, painted for nobody). Windows, Thief playing, 2 runs each under load: 72 Hz
+    // 85 updates/s, 76.6 % of a core for the process; the display's rate 134/s, 75-93 % (message thread +7, GPU driver
+    // +2 points). LYNX_TOOLBAR_HZ=<n>: another cap (72 = before round 190kr), for A/B measurements.
     bool toolbarFrame (double nowMs);
-    ui::FrameTicker toolbarFrames { *this, [this] (double ms) { return toolbarFrame (ms); }, 72.0 };
+    static double toolbarHz()
+    {
+        static const double hz = [] {
+            const auto v = juce::SystemStats::getEnvironmentVariable ("LYNX_TOOLBAR_HZ", {}).getDoubleValue();
+            return v >= 10.0 ? juce::jmin (v, 1000.0) : 170.0; // (170: FrameTicker's own cap, the display's rate up to 170 Hz)
+        }();
+        return hz;
+    }
+    ui::FrameTicker toolbarFrames { *this, [this] (double ms) { return toolbarFrame (ms); }, toolbarHz() };
     int meterTicks = 0;
     juce::String driverTipType; // the device type the ASIO suggestion was worked out for
 

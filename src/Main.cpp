@@ -152,6 +152,7 @@
 #include "ui/ShotShowing.h"
 #include "ui/SimpleLook.h"
 #include "ui/NativeChild.h"
+#include "ui/FrameTicker.h"
 #include "ui/DockPaintCheck.h"
 #include "ui/Workspace.h"
 #include "ui/PluginThumbs.h"
@@ -12288,6 +12289,8 @@ private:
             std::uint64_t cyclesStart = 0;
             lynx::WorkerPool::Stats poolStart;
             lynx::RtStats::Snapshot rtStart; // (presentsStart: 190jy's, above)
+            std::map<std::string, std::pair<long long, long long>> tickersStart; // round 190kr
+            int coveredStart = 0;
 
             UiPerf (LynxApplication& a, juce::File r) : app (a), report (std::move (r))
             {
@@ -12333,6 +12336,8 @@ private:
                         threadsStart = lynx::threadCpuList();
                     lynx::grossBeatPaintStats (true);
                     cyclesStart = lynx::processCpuCycles();
+                    tickersStart = lynx::ui::FrameTicker::perOwner();
+                    coveredStart = lynx::nativechild::coveredSkips().load();
                     if (const auto* pool = app.engine->getWorkerPool())
                         poolStart = pool->stats();
                     rtStart = app.engine->getRtStats().snapshot();
@@ -12425,6 +12430,20 @@ private:
                 }
                 if (const auto gb = lynx::grossBeatPaintStats (false); gb.isNotEmpty())
                     text << "    " << gb << "\n";
+                // round 190kr: LYNX_UIPERF_TICKERS=1, the live views' frame steps per second (run / moved) and the steps
+                // left out because the view's docked panel was covered
+                if (lynx::ui::FrameTicker::perOwnerWanted() && wall > 0.0)
+                {
+                    text << "    tickers:";
+                    for (const auto& [name, counts] : lynx::ui::FrameTicker::perOwner())
+                    {
+                        const auto before = tickersStart.count (name) != 0 ? tickersStart.at (name) : std::pair<long long, long long> {};
+                        if (counts.first != before.first)
+                            text << " " << juce::String (name).fromLastOccurrenceOf ("::", false, false).retainCharacters ("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_")
+                                 << " " << juce::String (1000.0 * (double) (counts.first - before.first) / wall, 0) << "/" << juce::String (1000.0 * (double) (counts.second - before.second) / wall, 0);
+                    }
+                    text << "; covered skips " << juce::String (1000.0 * (double) (lynx::nativechild::coveredSkips().load() - coveredStart) / wall, 0) << "/s\n";
+                }
                 if (s.finish)
                     text << s.finish();
                 juce::File (report).replaceWithText (text);

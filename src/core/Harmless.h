@@ -37,6 +37,12 @@ std::optional<std::vector<float>> harmlessParams (const std::vector<std::uint8_t
 
 std::unique_ptr<Instrument> makeHarmlessInstrument();
 
+// test hook (round beatfl190kr): one pass of the sine-bank kernel over caller-owned arrays (osc0/osc1/oscC/T/A: top
+// partials, a multiple of 8; kpow: m + 1 values; acc: 8·m lane sums, added to). path 0 = the SSE2 build, 1 = the AVX
+// build (false, nothing done, where the CPU or the build lacks AVX)
+bool harmlessBankKernelForTest (int path, double* osc0, double* osc1, const double* oscC, const double* T, const double* A,
+                                int top, int m, const double* kpow, double* acc) noexcept;
+
 // modelParams of a new LYNX instance (round 168o): FL's untouched patch (Saw, open filter, no modulation, effects off)
 std::vector<float> harmlessDefaultModelParams();
 } // namespace lynx

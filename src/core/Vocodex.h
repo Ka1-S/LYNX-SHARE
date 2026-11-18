@@ -157,4 +157,8 @@ std::vector<std::uint8_t> appendInstallData (std::vector<std::uint8_t> flState, 
 std::pair<std::vector<std::uint8_t>, InstallData> splitInstallData (const std::vector<std::uint8_t>& slotState);
 
 std::unique_ptr<Effect> make (const std::vector<std::uint8_t>& state);
+
+// test hook (round beatfl190kr): the band followers' sliding maximum (window W: the current input and the W − 1 before
+// it) run over the input in blocks of the given length, from a cleared state
+std::vector<float> slidingMaxForTest (int window, const std::vector<float>& input, int block);
 } // namespace lynx::vocodex

@@ -105,7 +105,16 @@ public:
         // 2 = (the task graph) spin `waitSpinMicros`, then hand the position over to the thread that will push its task
         std::atomic<int> waitMode { 1 };
         std::atomic<int> waitSpinMicros { 30 };
-        void apply (const char* spec) noexcept; // "spin=60,dry=4,adaptive=1,wait=1,waitspin=30" (missing keys: unchanged)
+        // Round 190kr: how many workers a round wakes, from the work it has (RackRenderer: the chunk's units' measured
+        // work last time). `helpPercent` = the work one thread should get, in % of the chunk's real time: a chunk whose
+        // work is W wakes ceil(W / (help% x chunk)) - 1 sleeping workers (0: every one that is needed, as before).
+        // Thief at 480 samples had all 5 workers woken for ~1 ms of work per 2.9 ms chunk: ~1,900 sleeps and wake-ups a
+        // second and their spins. Who computes what changes no sample (the task graph is exact on any thread count).
+        // Measured on Windows (Thief at 480 samples, --uiperf exact cycles, 2 runs x 3 cycles, ~1,150 callbacks per
+        // cell): 0 = 89-90 % of a core for the process, 25 = 76-81 %, 35 = 78-80 %, 50 = 76-79 %; callbacks over the
+        // deadline 0 / 0 / 5 / 15. Default 25; LYNX_POOL="help=0" = every needed sleeper woken (before round 190kr).
+        std::atomic<int> helpPercent { 25 };
+        void apply (const char* spec) noexcept; // "spin=60,dry=4,adaptive=1,wait=1,waitspin=30,help=0" (missing keys: unchanged)
     };
     static Tuning& tuning() noexcept;
 
@@ -147,6 +156,10 @@ public:
             notifySlow (key);
     }
 
+    // Round 190kr: at most this many sleeping workers are woken by the next rounds (< 0: no limit). Workers that are
+    // spinning still join. Set by the caller before a parallelFor (the audio thread); any value is safe.
+    void setWakeLimit (int limit) noexcept { wakeLimit.store (limit, std::memory_order_relaxed); }
+
     // Diagnostics: how many indices the workers (not the calling thread) ran, and how many times a worker
     // was woken from sleep. Relaxed counters.
     std::uint64_t indicesRunByWorkers() const noexcept { return byWorkers.load (std::memory_order_relaxed); }
@@ -183,6 +196,7 @@ private:
     std::vector<std::thread> threads;
     std::atomic<bool> quit { false };
     alignas (64) std::atomic<int> sleeping { 0 }; // workers blocked (or about to block) on `wake`
+    std::atomic<int> wakeLimit { -1 };            // round 190kr: setWakeLimit
     // the generation (see `ticket`) of the last parallelFor before park(); while the ticket still carries it,
     // the pool is parked and a worker without work sleeps instead of spinning
     std::atomic<std::uint64_t> parkedGeneration { ~std::uint64_t (0) };

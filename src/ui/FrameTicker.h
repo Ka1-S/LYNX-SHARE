@@ -19,6 +19,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "core/FramePacing.h"
+#include "ui/NativeChild.h"
 
 #include <algorithm>
 #include <atomic>
@@ -26,6 +27,8 @@
 #include <cstdlib>
 #include <functional>
 #include <map>
+#include <string>
+#include <typeinfo>
 #include <vector>
 
 namespace lynx::ui
@@ -105,8 +108,30 @@ private:
     bool run (double nowMs)
     {
         stepsRun().fetch_add (1, std::memory_order_relaxed);
-        return step != nullptr && step (nowMs);
+        const auto moved = step != nullptr && step (nowMs);
+        if (perOwnerWanted()) // (round 190kr, --uiperf: which live views step, and how often they move)
+        {
+            auto& counts = perOwner()[typeid (owner).name()];
+            ++counts.first;
+            counts.second += moved ? 1 : 0;
+        }
+        return moved;
     }
+
+public:
+    // diagnostics (round 190kr, LYNX_UIPERF_TICKERS=1): per view type, the steps run and the steps that moved (message thread)
+    static bool perOwnerWanted()
+    {
+        static const bool on = std::getenv ("LYNX_UIPERF_TICKERS") != nullptr || std::getenv ("LYNX_TICKER_LOG") != nullptr;
+        return on;
+    }
+    static std::map<std::string, std::pair<long long, long long>>& perOwner()
+    {
+        static std::map<std::string, std::pair<long long, long long>> m;
+        return m;
+    }
+
+private:
 
     void onVBlank (double seconds)
     {
@@ -139,7 +164,7 @@ private:
                 return;
         }
 
-        if (owner.isShowing() && run (nowMs))
+        if (showing() && run (nowMs))
             quiet = 0;
         else
             ++quiet; // (detached by the timer: not from inside the attachment's own callback)
@@ -203,6 +228,7 @@ private:
         }
         void timerCallback() override
         {
+            writeLog();
             polling = true;
             const auto list = tickers; // (a step may delete views, and their tickers with them)
             for (auto* t : list)
@@ -212,6 +238,46 @@ private:
             if (orphaned)
                 delete this;
         }
+
+        // round 190kr: LYNX_TICKER_LOG=<file>, every 2 s: each view type's frame steps per second (run / moved), the
+        // steps left out because the view was covered, and for every ticker whose view is showing how the cover check
+        // sees its window (ui/NativeChild.h describeCover)
+        void writeLog()
+        {
+            static const auto path = juce::SystemStats::getEnvironmentVariable ("LYNX_TICKER_LOG", {});
+            if (path.isEmpty())
+                return;
+            const auto now = juce::Time::getMillisecondCounterHiRes();
+            if (logSince <= 0.0)
+            {
+                logSince = now;
+                logStart = perOwner();
+                logCovered = nativechild::coveredSkips().load();
+                return;
+            }
+            if (now - logSince < 2000.0)
+                return;
+            const auto s = (now - logSince) / 1000.0;
+            juce::String text;
+            text << juce::String (now / 1000.0, 1) << " tickers attached " << attachedNow().load() << ":";
+            for (const auto& [name, counts] : perOwner())
+            {
+                const auto before = logStart.count (name) != 0 ? logStart.at (name) : std::pair<long long, long long> {};
+                text << " " << juce::String (name).fromLastOccurrenceOf ("::", false, false).retainCharacters ("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_")
+                     << " " << juce::String ((double) (counts.first - before.first) / s, 0) << "/" << juce::String ((double) (counts.second - before.second) / s, 0);
+            }
+            text << "; covered skips " << juce::String ((double) (nativechild::coveredSkips().load() - logCovered) / s, 0) << "/s\n";
+            for (auto* t : tickers)
+                if (t->owner.isShowing())
+                    text << "    " << juce::String (typeid (t->owner).name()) << ": " << nativechild::describeCover (t->owner) << "\n";
+            juce::File (path).appendText (text);
+            logSince = now;
+            logStart = perOwner();
+            logCovered = nativechild::coveredSkips().load();
+        }
+        double logSince = 0.0;
+        std::map<std::string, std::pair<long long, long long>> logStart;
+        int logCovered = 0;
     };
 
     void poll()
@@ -219,7 +285,7 @@ private:
         const auto nowMs = juce::Time::getMillisecondCounterHiRes();
         if (fixedHz() > 0) // diagnostics: a plain timer
         {
-            if (owner.isShowing())
+            if (showing())
                 run (nowMs);
             return;
         }
@@ -228,8 +294,23 @@ private:
         if (isAttached() && nowMs - lastVBlankMs < 150.0)
             return; // the display drives it
         // idle (or a window without vertical blanks): the same step at the poll's rate; moving → the display's rate
-        if (owner.isShowing() && run (nowMs) && ! isAttached())
+        if (showing() && run (nowMs) && ! isAttached())
             attach();
+    }
+
+    // round 190kr (QA-11): a view whose docked panel lies wholly under other panels' windows (the Playlist behind
+    // Thief's maximised Channel rack) is "showing" for JUCE, but nothing it paints reaches the screen: its steps wait
+    // (the idle poll looks again 20 times a second, and the first step after it shows again catches up)
+    bool showing() const
+    {
+        if (! owner.isShowing())
+            return false;
+        if (nativechild::coveredBySiblingWindows (owner))
+        {
+            nativechild::coveredSkips().fetch_add (1, std::memory_order_relaxed);
+            return false;
+        }
+        return true;
     }
 
     juce::Component& owner;
