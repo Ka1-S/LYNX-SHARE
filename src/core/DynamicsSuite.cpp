@@ -1715,7 +1715,7 @@ private:
                 const auto sA = v.slowLevel * x0 + v.slowLowMix * std::max (low, 0.0);
                 const auto sB = lp (x.vB, v.fastLevel * x0, d.vb1, d.vb2);
                 const auto dbOf = [] (double m) { m = std::abs (m); return m > 1e-10 ? std::max (-180.0, 20.0 * std::log10 (m)) : -180.0; };
-                const auto slow = v2Step (d.c0, share (curve (dbOf (sA))), x.f0, rate, d.k0);
+                const auto slow = v2Step (d.q0, share (curve (dbOf (sA))), x.f0, rate, d.k0);
                 const auto step = share (curve (dbOf (sB))) - d.vF;
                 d.vF += step > 0.0 ? std::min (step, x.vUp) : std::max (step, -x.vDown);
                 gr = toDb (std::max (slow, std::clamp (v.wBase + v.wSlope * d.vF, v.wMin, v.wMax) * d.vF));

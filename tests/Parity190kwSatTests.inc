@@ -150,7 +150,7 @@ TEST (parity190kw_ember_revision0_renders_as_the_base_commit_did)
     // before the round). Taken with the round's objects; fxrender renders of the same settings through the base commit's
     // and the round's binaries are byte-identical (/mnt/e/lynx-work/rea190kw/sat/ident.sh: 0 of 48 files differ)
     const Case cases[] = {
-#include "tests/Parity190kwSatGold.inc"
+#include "Parity190kwSatGold.inc" // (rollup step 9: relative to this file; CMake has no repository root on the include path)
     };
     for (const auto& c : cases)
     {
