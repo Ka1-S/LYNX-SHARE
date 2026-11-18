@@ -198,6 +198,9 @@ std::vector<Action> makeActions()
         { "rack.pianoRollView", TR_NOOP ("Piano-roll view of all channels on/off"), Context::channelRack, {} },
         { "rack.follow", TR_NOOP ("Follow the playhead (page along with the playing step) on/off"), Context::channelRack, {} },
         { "rack.groupSelected", TR_NOOP ("Put the selected channels in a new filter group"), Context::channelRack, { chord ('G', alt) } },
+        // issue #201 (round 190ll): the channel menu's "Rename and color... F2" with the rack focused (a new colour goes to
+        // every selected channel)
+        { "rack.rename", TR_NOOP ("Rename and color the selected channel"), Context::channelRack, { chord (f2) } },
         { "rack.rotateLeft", TR_NOOP ("Rotate the selected channels' steps left"), Context::channelRack, { chord (left, ctrl | shift) } },
         { "rack.rotateRight", TR_NOOP ("Rotate the selected channels' steps right"), Context::channelRack, { chord (right, ctrl | shift) } },
 

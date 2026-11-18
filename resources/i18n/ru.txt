@@ -11230,3 +11230,8 @@ countries: ru by kz
 "The Simple Controls tab's own knob mappings: {0}" = "Собственные назначения ручек вкладки Controls в Simple: {0}"
 "Harmor parts with a sample in the IMG section play their timbres instead of the resynthesis: {0}" = "Партии Harmor с сэмплом в секции IMG играют своими тембрами вместо ресинтеза: {0}"
 "Newtone's detected key and note velocities are left out: {0}" = "Найденная Newtone тональность и velocity нот не сохраняются: {0}"
+"Rename and color the selected channel" = "Переименовать и окрасить выбранный канал"
+"Added {0} to the Browser" = "{0} добавлена в Browser"
+"Added {0} folders to the Browser" = "Папок добавлено в Browser: {0}"
+"{0} is in the Browser already" = "{0} уже есть в Browser"
+"These folders are in the Browser already" = "Эти папки уже есть в Browser"

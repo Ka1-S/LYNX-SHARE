@@ -11230,3 +11230,8 @@ countries: tr
 "The Simple Controls tab's own knob mappings: {0}" = "Simple Controls sekmesinin kendi düğme eşlemeleri: {0}"
 "Harmor parts with a sample in the IMG section play their timbres instead of the resynthesis: {0}" = "IMG bölümünde sample bulunan Harmor partları resentez yerine kendi tınılarını çalar: {0}"
 "Newtone's detected key and note velocities are left out: {0}" = "Newtone'un algıladığı ton ve nota velocity değerleri dışarıda kalır: {0}"
+"Rename and color the selected channel" = "Seçili kanalı yeniden adlandır ve renklendir"
+"Added {0} to the Browser" = "{0} Browser'a eklendi"
+"Added {0} folders to the Browser" = "{0} klasör Browser'a eklendi"
+"{0} is in the Browser already" = "{0} zaten Browser'da"
+"These folders are in the Browser already" = "Bu klasörler zaten Browser'da"

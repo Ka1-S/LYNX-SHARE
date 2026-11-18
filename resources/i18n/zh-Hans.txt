@@ -11230,3 +11230,8 @@ countries: cn sg
 "The Simple Controls tab's own knob mappings: {0}" = "Simple 的 Controls 标签页的自定义旋钮映射: {0}"
 "Harmor parts with a sample in the IMG section play their timbres instead of the resynthesis: {0}" = "IMG 部分带有采样的 Harmor 声部改为播放其音色，而不是重合成: {0}"
 "Newtone's detected key and note velocities are left out: {0}" = "Newtone 检测到的调性和音符力度被省略: {0}"
+"Rename and color the selected channel" = "重命名并着色所选通道"
+"Added {0} to the Browser" = "已将 {0} 添加到浏览器"
+"Added {0} folders to the Browser" = "已将 {0} 个文件夹添加到浏览器"
+"{0} is in the Browser already" = "{0} 已在浏览器中"
+"These folders are in the Browser already" = "这些文件夹已在浏览器中"

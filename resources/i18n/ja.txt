@@ -11230,3 +11230,8 @@ countries: jp
 "The Simple Controls tab's own knob mappings: {0}" = "Simple の Controls タブ独自のノブ割り当て: {0}"
 "Harmor parts with a sample in the IMG section play their timbres instead of the resynthesis: {0}" = "IMG セクションにサンプルがある Harmor のパートは、リシンセシスではなく音色で再生されます: {0}"
 "Newtone's detected key and note velocities are left out: {0}" = "Newtone が検出したキーとノートのベロシティは省かれます: {0}"
+"Rename and color the selected channel" = "選択したチャンネルの名前と色を変更"
+"Added {0} to the Browser" = "{0} をブラウザーに追加しました"
+"Added {0} folders to the Browser" = "{0} 個のフォルダーをブラウザーに追加しました"
+"{0} is in the Browser already" = "{0} はすでにブラウザーにあります"
+"These folders are in the Browser already" = "これらのフォルダーはすでにブラウザーにあります"

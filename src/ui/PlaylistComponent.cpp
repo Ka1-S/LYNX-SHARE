@@ -1,4 +1,5 @@
 #include <cstring>
+#include "core/SelectionRename.h"
 #include "core/FlCurve.h"
 #include "core/DrawMode.h"
 #include "core/LayoutStyle.h"
@@ -9386,6 +9387,27 @@ std::vector<int> PlaylistComponent::tracksForMenu (int track) const
     return out;
 }
 
+// A track's colour as "Rename and color" sets it (the Simple workflow's track also colours its insert and channel)
+void PlaylistComponent::recolourTrack (Song& s, int track, std::uint32_t colour, bool simple)
+{
+    if (track < 0)
+        return;
+    if ((int) s.playlistTracks.size() <= track)
+        s.playlistTracks.resize ((std::size_t) track + 1);
+    if (simple && simpletracks::kindOf (s, track).has_value())
+        simpletracks::recolour (s, track, colour);
+    else
+        s.playlistTracks[(std::size_t) track].colour = colour;
+}
+
+void PlaylistComponent::colourTracks (const std::vector<int>& tracks, std::uint32_t colour)
+{
+    engine.editSong ([tracks, colour, simple = simpleHeaders] (Song& s) {
+        for (const auto t : tracks)
+            recolourTrack (s, t, colour, simple);
+    });
+}
+
 void PlaylistComponent::editTrack (int track, std::function<void (PlaylistTrack&)> change)
 {
     if (track < 0)
@@ -9415,13 +9437,14 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
     ui::addItemHeader (menu, tr ("Playlist track"), ! info.name.empty() ? juce::String::fromUTF8 (info.name.c_str()) : tr ("Track {0}", { juce::String (track + 1) }),
                        info.colour != 0 ? juce::Colour (info.colour) : juce::Colour());
     menu.addItem (theme::mnemonic (tr ("Rename and color..."), 'R'), [this, track] { renameTrack (track); });
-    menu.addSubMenu (tr ("Change color"), ui::colourMenu (info.colour, [this, track] (std::uint32_t colour) {
-                         editTrack (track, [colour] (PlaylistTrack& t) { t.colour = colour; });
+    // (issue #201, round 190ll: a colour picked here goes to every selected track when this one is among them)
+    menu.addSubMenu (tr ("Change color"), ui::colourMenu (info.colour, [this, tracks = tracksForMenu (track)] (std::uint32_t colour) {
+                         colourTracks (tracks, colour);
                      }, juce::Rectangle<int> (juce::Desktop::getMousePosition().x, juce::Desktop::getMousePosition().y, 1, 1)));
-    menu.addItem (tr ("Random color"), [this, track] {
+    menu.addItem (tr ("Random color"), [this, tracks = tracksForMenu (track)] {
         const auto& palette = lynxPalette();
         const auto c = palette[(std::size_t) juce::Random::getSystemRandom().nextInt ((int) palette.size())];
-        editTrack (track, [c] (PlaylistTrack& t) { t.colour = c; });
+        colourTracks (tracks, c);
     });
     // FL's "Change icon" (EEPLTrackIconMenuClick, REA round 168h); LYNX's own icon set
     menu.addItem (tr ("Change icon..."), [this, track, current = info.icon] {
@@ -9799,21 +9822,25 @@ void PlaylistComponent::renameTrack (int track)
     const auto& tracks = engine.getSong().playlistTracks;
     const auto current = track < (int) tracks.size() ? juce::String::fromUTF8 (tracks[(std::size_t) track].name.c_str()) : juce::String();
     const auto colour = track < (int) tracks.size() ? tracks[(std::size_t) track].colour : 0u;
+    // issue #201 (round 190ll, core/SelectionRename.h): a new colour goes to every selected track (the name to this one)
     showNameAndColourDialog (tr ("Rename track"), current.isNotEmpty() ? current : tr ("Track {0}", { juce::String (track + 1) }), colour,
-                             [this, track] (const juce::String& newName, std::uint32_t newColour) {
+                             [this, track, colour, targets = tracksForMenu (track)] (const juce::String& newName, std::uint32_t newColour) {
                                  const auto name = newName.trim().toStdString();
                                  const auto together = simpleHeaders && simpletracks::kindOf (engine.getSong(), track).has_value();
-                                 engine.editSong ([track, name, newColour, together] (Song& s) {
+                                 engine.editSong ([track, name, newColour, together, colour, targets] (Song& s) {
                                      if ((int) s.playlistTracks.size() <= track)
                                          s.playlistTracks.resize ((std::size_t) track + 1);
                                      if (together) // (the Simple workflow: the track, its insert and its channel, round 184a)
                                      {
                                          simpletracks::rename (s, track, name);
                                          simpletracks::recolour (s, track, newColour);
+                                         if (newColour != colour)
+                                             for (const auto t : targets)
+                                                 if (t != track)
+                                                     recolourTrack (s, t, newColour, true);
                                          return;
                                      }
-                                     s.playlistTracks[(std::size_t) track].name = name;
-                                     s.playlistTracks[(std::size_t) track].colour = newColour;
+                                     selrename::applyToPlaylistTracks (s, track, targets, { {}, name, colour, newColour });
                                  });
                              });
 }

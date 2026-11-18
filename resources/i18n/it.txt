@@ -11230,3 +11230,8 @@ countries: it ch sm
 "The Simple Controls tab's own knob mappings: {0}" = "Le assegnazioni delle manopole proprie della scheda Controls di Simple: {0}"
 "Harmor parts with a sample in the IMG section play their timbres instead of the resynthesis: {0}" = "Le parti di Harmor con un campione nella sezione IMG suonano i loro timbri invece della risintesi: {0}"
 "Newtone's detected key and note velocities are left out: {0}" = "La tonalità rilevata e le velocity delle note di Newtone vengono tralasciate: {0}"
+"Rename and color the selected channel" = "Rinomina e colora il canale selezionato"
+"Added {0} to the Browser" = "{0} aggiunta al Browser"
+"Added {0} folders to the Browser" = "{0} cartelle aggiunte al Browser"
+"{0} is in the Browser already" = "{0} è già nel Browser"
+"These folders are in the Browser already" = "Queste cartelle sono già nel Browser"

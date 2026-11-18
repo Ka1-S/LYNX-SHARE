@@ -798,6 +798,9 @@ private:
     void editTrack (int track, std::function<void (PlaylistTrack&)> change);
     int currentTrack = -1; // the track selected by a click on its header (FL marks it next to the LED)
     std::vector<int> selectedTracks; // Ctrl / Shift+click on headers: more selected tracks (round 165m)
+    // issue #201 (round 190ll): a colour for several tracks; a Simple track's insert and channel follow it
+    static void recolourTrack (Song& s, int track, std::uint32_t colour, bool simple);
+    void colourTracks (const std::vector<int>& tracks, std::uint32_t colour);
     bool isTrackSelected (int track) const;
     std::vector<int> tracksForMenu (int track) const;
     // round 190dx: FL's new instrument tracks (core trackmodes::addInstrumentTrack; on an instrument track the

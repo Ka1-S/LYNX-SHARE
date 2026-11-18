@@ -11230,3 +11230,8 @@ countries: id
 "The Simple Controls tab's own knob mappings: {0}" = "Pemetaan kenop sendiri pada tab Controls di Simple: {0}"
 "Harmor parts with a sample in the IMG section play their timbres instead of the resynthesis: {0}" = "Part Harmor dengan sampel di bagian IMG memainkan timbre-nya alih-alih resintesis: {0}"
 "Newtone's detected key and note velocities are left out: {0}" = "Kunci nada yang terdeteksi dan velocity not Newtone dihilangkan: {0}"
+"Rename and color the selected channel" = "Ganti nama dan warna channel yang dipilih"
+"Added {0} to the Browser" = "{0} ditambahkan ke Browser"
+"Added {0} folders to the Browser" = "{0} folder ditambahkan ke Browser"
+"{0} is in the Browser already" = "{0} sudah ada di Browser"
+"These folders are in the Browser already" = "Folder-folder ini sudah ada di Browser"

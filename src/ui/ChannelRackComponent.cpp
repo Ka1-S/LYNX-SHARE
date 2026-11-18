@@ -1,3 +1,4 @@
+#include "core/SelectionRename.h"
 #include "core/FlSettings.h"
 #include <unordered_map>
 #include "ui/Motion.h"
@@ -2637,8 +2638,10 @@ void ChannelRackComponent::fillWindowMenu (int channel, wrappermenu::Spec& spec)
         if (safe == nullptr || channel >= (int) safe->engine.getSong().channels.size())
             return;
         m = ui::colourMenu (safe->engine.getSong().channels[(std::size_t) channel].colour, [safe, channel] (std::uint32_t colour) {
-                if (safe != nullptr && channel < (int) safe->engine.getSong().channels.size())
-                    safe->engine.editSong ([channel, colour] (Song& s) { s.channels[(std::size_t) channel].colour = colour; });
+                if (safe != nullptr && channel < (int) safe->engine.getSong().channels.size()) // (issue #201: every selected channel)
+                    safe->engine.editSong ([targets = selrename::targets (channel, safe->engine.getSelectedChannels()), colour] (Song& s) {
+                        selrename::colourChannels (s, targets, colour);
+                    });
             }, juce::Rectangle<int> (juce::Desktop::getMousePosition().x, juce::Desktop::getMousePosition().y, 1, 1));
     };
     spec.randomColour = [safe, channel] {
@@ -2646,7 +2649,9 @@ void ChannelRackComponent::fillWindowMenu (int channel, wrappermenu::Spec& spec)
             return;
         const auto& palette = lynxPalette();
         const auto colour = palette[(std::size_t) juce::Random::getSystemRandom().nextInt ((int) palette.size())];
-        safe->engine.editSong ([channel, colour] (Song& s) { s.channels[(std::size_t) channel].colour = colour; });
+        safe->engine.editSong ([targets = selrename::targets (channel, safe->engine.getSelectedChannels()), colour] (Song& s) {
+            selrename::colourChannels (s, targets, colour); // (issue #201)
+        });
     };
     spec.changeIcon = [safe, channel] {
         if (safe == nullptr || channel >= (int) safe->engine.getSong().channels.size())
@@ -3207,12 +3212,13 @@ void ChannelRackComponent::openPluginWindow (int channel)
 void ChannelRackComponent::rename (int channel)
 {
     const auto& c = engine.getSong().channels[(std::size_t) channel];
+    // issue #201 (round 190ll, core/SelectionRename.h): a new colour goes to every selected channel (the name to this one)
+    const auto targets = selrename::targets (channel, engine.getSelectedChannels());
     showNameAndColourDialog (tr ("Rename channel"), juce::String::fromUTF8 (c.name.c_str()), c.colour,
-                             [this, channel] (const juce::String& name, std::uint32_t colour) {
+                             [this, channel, targets, oldName = c.name, oldColour = c.colour] (const juce::String& name, std::uint32_t colour) {
                                  if (channel < (int) engine.getSong().channels.size())
-                                     engine.editSong ([channel, n = name.toStdString(), colour] (Song& s) {
-                                         s.channels[(std::size_t) channel].name = n;
-                                         s.channels[(std::size_t) channel].colour = colour;
+                                     engine.editSong ([channel, targets, r = selrename::Result { oldName, name.toStdString(), oldColour, colour }] (Song& s) {
+                                         selrename::applyToChannels (s, channel, targets, r);
                                      });
                              });
 }
