@@ -315,6 +315,7 @@ struct Binding
     double sampleRate = 0.0;
     std::atomic<bool> crashed { false };
     std::atomic<bool> ready { false }; // prepared for playback (false while its regions change)
+    std::atomic<bool> editorOpen { false }; // its editor is open (the heartbeat looks, on the message thread)
     std::string name;
 
     ~Binding()
@@ -357,7 +358,12 @@ public:
     void noteOn (int, float) noexcept override {}   // (the clips' notes: the plugin plays its regions by itself)
     void noteOff (int) noexcept override {}
     void allNotesOff() noexcept override {}
-    bool idle() const noexcept override { return false; } // (it plays from the timeline, and previews its editor's notes)
+    // Rendered while the song plays, or while its editor is open (it previews the notes clicked there); otherwise idle: a
+    // stopped song with ARA channels costs no plugin calls (round 190kx: +3.4 % of a core with Melodyne before)
+    bool idle() const noexcept override
+    {
+        return ! hostTimeline().playing.load (std::memory_order_relaxed) && ! binding->editorOpen.load (std::memory_order_relaxed);
+    }
     int latencySamples() const noexcept override { return binding->plugin->getLatencySamples(); }
     void transportReset() noexcept override {}
 
@@ -514,6 +520,8 @@ struct AraHost::Impl : private juce::Timer
             dc.notifyModelUpdates();
             for (auto& [uid, c] : doc->channels)
             {
+                if (c->binding != nullptr)
+                    c->binding->editorOpen.store (c->binding->plugin->getActiveEditor() != nullptr, std::memory_order_relaxed);
                 if (c->source == nullptr || c->data == nullptr)
                     continue;
                 bool incomplete = false;
