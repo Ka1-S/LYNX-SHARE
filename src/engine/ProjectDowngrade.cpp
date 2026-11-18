@@ -3,6 +3,7 @@
 #include "engine/ProjectFile.h"
 
 #include "core/DirectWaveState.h"
+#include "core/DynamicsSuite.h"
 #include "core/EchoSuite.h"
 #include "core/FacetEq.h"
 #include "core/GeneratorPresets.h"
@@ -11,6 +12,7 @@
 #include "core/LynxVerbs.h"
 #include "core/MixSuite.h"
 #include "core/NewtoneFx.h"
+#include "core/PeakShapes.h"
 #include "core/RackRenderer.h"
 #include "core/VoiceShift.h"
 
@@ -586,6 +588,65 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
             lost.push_back ({ TR_NOOP ("Harmor parts with a sample in the IMG section play their timbres instead of the resynthesis: {0}"), listOf (resynth), true });
         if (! newtone.isEmpty())
             lost.push_back ({ TR_NOOP ("Newtone's detected key and note velocities are left out: {0}"), listOf (newtone), false });
+    }
+
+    // rollup step 7: round 190kl's extra Peak Controller LFO shapes and round 190kt's console law of Crest's Bus style
+    // (hidden parameters past the slot's count, written only when set; 0.1.28 plays FL's Shape and the Bus style as it
+    // was), round 190kn's mixer lock state (0.1.28: a solo elsewhere silences the insert and Unmute All unmutes it),
+    // round qafix190kq's imported take lanes (0.1.28 gives them columns in the clip grid and the Session mixer) and round
+    // 190ks's "record the notes played in the plugin's window" switch (written only when off: 0.1.28 never records them)
+    {
+        juce::StringArray shapes, console, locked;
+        forEachEffect (root, [&] (juce::DynamicObject& e, const juce::String& where) {
+            auto* params = arrayOf (e.getProperty ("params"));
+            if (params == nullptr)
+                return;
+            const auto kind = e.getProperty ("kind").toString();
+            if (kind == "peakController" && params->size() > peakshapes::extraShapeParam)
+            {
+                if (peakshapes::idOf ((float) (double) (*params)[peakshapes::extraShapeParam]) != 0)
+                    addOnce (shapes, where);
+                params->removeRange (peakshapes::extraShapeParam, params->size() - peakshapes::extraShapeParam);
+            }
+            else if (kind == "crestCompressor" && params->size() > crest::busLaw)
+            {
+                if ((float) (double) (*params)[crest::busLaw] >= 0.5f)
+                    addOnce (console, where);
+                params->removeRange (crest::busLaw, params->size() - crest::busLaw);
+            }
+        });
+        bool soloed = false;
+        if (auto* mixer = arrayOf (root["mixer"]))
+            for (int t = 0; t < mixer->size(); ++t)
+                if (auto* m = objectOf ((*mixer)[t]))
+                {
+                    soloed = soloed || (bool) m->getProperty ("solo");
+                    if (drop (*m, "lockState"))
+                        addOnce (locked, insertName (root["mixer"], t));
+                }
+        forEachChannel (root, [&] (juce::DynamicObject& c, int) {
+            if (auto* plugin = objectOf (c.getProperty ("plugin")))
+                drop (*plugin, "recordOwnNotes");
+        });
+        if (auto* mixer = arrayOf (root["mixer"]))
+            for (auto& m : *mixer)
+                if (auto* fx = arrayOf (m["effects"]))
+                    for (auto& e : *fx)
+                        if (auto* plugin = objectOf (e["plugin"]))
+                            drop (*plugin, "recordOwnNotes");
+        if (! shapes.isEmpty())
+            lost.push_back ({ TR_NOOP ("The Peak Controller's LYNX LFO shapes play its FL Shape: {0}"), listOf (shapes), true });
+        if (! console.isEmpty())
+            lost.push_back ({ TR_NOOP ("Crest Compressor's console law (the Waves SSLComp stand-in) plays as its Bus style: {0}"), listOf (console), true });
+        if (! locked.isEmpty())
+            lost.push_back ({ TR_NOOP ("Mixer lock states (a solo silences these inserts, and Unmute all unmutes them): {0}"), listOf (locked), soloed });
+        if (auto* lanes = arrayOf (root["playlistTakeLanes"]))
+        {
+            const auto count = lanes->size();
+            drop (o, "playlistTakeLanes");
+            if (count > 0)
+                lost.push_back ({ TR_NOOP ("{0} imported take lane(s) get their own columns in the clip grid and the Session mixer"), juce::String (count), false });
+        }
     }
 
     // the view

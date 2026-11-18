@@ -11279,3 +11279,9 @@ countries: ru by kz
 "Timeprism (an imported Live Spectral Time) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})" = "Timeprism (импортированный Spectral Time из Live) отсутствует в этой версии: он становится выключенным Utility в своём слоте, а его автоматизация ничего не делает ({0})"
 "Harmonia (an imported Live Spectral Resonator) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})" = "Harmonia (импортированный Spectral Resonator из Live) отсутствует в этой версии: он становится выключенным Utility в своём слоте, а его автоматизация ничего не делает ({0})"
 "Braid is not in this release: its channels become empty Samplers and play nothing: {0}" = "Braid отсутствует в этой версии: его каналы становятся пустыми Sampler и ничего не играют: {0}"
+
+# --- rollup 0.1.30 step 7: Save a copy for 0.1.28 knows rounds 190kl / 190kt / 190kn / qafix190kq
+"The Peak Controller's LYNX LFO shapes play its FL Shape: {0}" = "Формы LFO LYNX в Peak Controller звучат как его форма FL: {0}"
+"Crest Compressor's console law (the Waves SSLComp stand-in) plays as its Bus style: {0}" = "Консольный закон Crest Compressor (замена Waves SSLComp) звучит как его стиль Bus: {0}"
+"Mixer lock states (a solo silences these inserts, and Unmute all unmutes them): {0}" = "Состояния блокировки микшера (соло заглушает эти инсерты, а «Включить звук всех» снимает с них заглушение): {0}"
+"{0} imported take lane(s) get their own columns in the clip grid and the Session mixer" = "Импортированные дорожки дублей ({0}) получают свои столбцы в сетке клипов и в микшере Session"

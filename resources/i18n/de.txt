@@ -11279,3 +11279,9 @@ countries: de at ch li lu
 "Timeprism (an imported Live Spectral Time) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})" = "Timeprism (ein importiertes Live Spectral Time) gibt es in dieser Version nicht: es wird zu einem ausgeschalteten Utility in seinem Slot, und seine Automation bewirkt nichts ({0})"
 "Harmonia (an imported Live Spectral Resonator) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})" = "Harmonia (ein importierter Live Spectral Resonator) gibt es in dieser Version nicht: es wird zu einem ausgeschalteten Utility in seinem Slot, und seine Automation bewirkt nichts ({0})"
 "Braid is not in this release: its channels become empty Samplers and play nothing: {0}" = "Braid gibt es in dieser Version nicht: seine Kanäle werden zu leeren Samplern und spielen nichts: {0}"
+
+# --- rollup 0.1.30 step 7: Save a copy for 0.1.28 knows rounds 190kl / 190kt / 190kn / qafix190kq
+"The Peak Controller's LYNX LFO shapes play its FL Shape: {0}" = "Die LYNX-LFO-Formen des Peak Controllers spielen seine FL-Form: {0}"
+"Crest Compressor's console law (the Waves SSLComp stand-in) plays as its Bus style: {0}" = "Das Konsolengesetz des Crest Compressors (der Ersatz für Waves SSLComp) spielt als sein Bus-Stil: {0}"
+"Mixer lock states (a solo silences these inserts, and Unmute all unmutes them): {0}" = "Sperrzustände im Mixer (ein Solo schaltet diese Inserts stumm, und „Stummschaltung für alle aufheben“ hebt ihre Stummschaltung auf): {0}"
+"{0} imported take lane(s) get their own columns in the clip grid and the Session mixer" = "{0} importierte Take-Spur(en) erhalten eigene Spalten im Clip-Raster und im Session-Mixer"

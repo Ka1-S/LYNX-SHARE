@@ -82,6 +82,8 @@
 #include "core/DirectWaveState.h"
 #include "core/MixSnapshots.h"
 #include "core/VoiceShift.h"
+#include "core/PeakShapes.h" // rollup step 7: the copy for 0.1.28 self-test
+#include "core/DynamicsSuite.h"
 #include "core/TempoMarkers.h"
 #include "engine/RemoteControl.h"
 #include "engine/RemoteError.h"
@@ -6650,6 +6652,23 @@ private:
                 newtoneSlot.state = lynx::newtonefx::writeNative (nt);
                 song.mixer[14].effects.push_back (newtoneSlot);
             }
+            // rollup step 7 (round 190lc): a Peak Controller on a LYNX shape (190kl), Crest's console law (190kt), a locked
+            // insert beside a solo (190kn), an imported take lane (qafix190kq), a plugin that records no notes from its
+            // window (190ks)
+            {
+                auto peakSlot = lynx::makeEffectSlot (lynx::EffectKind::peakController);
+                peakSlot.params[(std::size_t) lynx::peakshapes::extraShapeParam] = (float) lynx::peakshapes::expFall / lynx::peakshapes::idScale;
+                song.mixer[15].effects.push_back (peakSlot);
+                auto crestSlot = lynx::makeEffectSlot (lynx::EffectKind::crestCompressor);
+                crestSlot.params[(std::size_t) lynx::crest::busLaw] = 1.0f;
+                song.mixer[16].effects.push_back (crestSlot);
+                song.mixer[17].lockState = true;
+                song.mixer[18].solo = true;
+                song.playlistTracks[3].takeLane = true;
+                for (auto& c : song.channels)
+                    if (c.name == "Hosted")
+                        c.plugin.recordOwnNotes = false;
+            }
 
             const auto copy = lynx::olderlynx::forRelease (song, "0.1.28");
             juce::String why;
@@ -6753,6 +6772,12 @@ private:
                      ! said ("Newtone's detected key") || lynx::newtonefx::nativeVersionOf (nts) != 2 || ! lynx::newtonefx::parseNative (nts)
                      || lynx::newtonefx::parseNative (nts)->pitches.size() != 1 || lynx::newtonefx::parseNative (nts)->pitches[0].curEnd != 24000)
                 rollup030Result = "ERROR step-6 Newtone state";
+            else if (! said ("The Peak Controller's LYNX LFO shapes") || ! said ("Crest Compressor's console law") || ! said ("Mixer lock states")
+                     || ! said ("{0} imported take lane(s)")
+                     || parsed["mixer"][15]["effects"][0]["params"].size() > lynx::peakshapes::extraShapeParam
+                     || parsed["mixer"][16]["effects"][0]["params"].size() > lynx::crest::busLaw
+                     || copy.json.contains ("lockState") || copy.json.contains ("playlistTakeLanes") || copy.json.contains ("recordOwnNotes"))
+                rollup030Result = "ERROR step-7 items";
             else if (const auto plain = lynx::olderlynx::forRelease (lynx::Song::makeDefault(), "0.1.28");
                      ! plain.ok || std::any_of (plain.lost.begin(), plain.lost.end(), [] (const lynx::olderlynx::Loss& l) {
                          const auto t = juce::String (l.text);
@@ -6762,7 +6787,8 @@ private:
                                 || t.contains ("Texture") || t.contains ("Beats'") || t.startsWith ("Warped") || t.contains ("deactivated")
                                 || t.contains ("Facet") || t.contains ("MIDI Out") || t.contains ("hosted CLAP") || t.contains ("nested Playlist")
                                 || t.contains ("CURVE") || t.startsWith ("Slide notes") || t.contains ("crossfader") || t.contains ("return tracks")
-                                || t.contains ("Controls tab") || t.startsWith ("Harmor") || t.startsWith ("Newtone");
+                                || t.contains ("Controls tab") || t.startsWith ("Harmor") || t.startsWith ("Newtone")
+                                || t.contains ("Peak Controller") || t.contains ("console law") || t.startsWith ("Mixer lock") || t.contains ("take lane");
                      }))
                 rollup030Result = "ERROR a plain project reports a loss it does not have";
         }

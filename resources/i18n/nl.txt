@@ -11279,3 +11279,9 @@ countries: nl be
 "Timeprism (an imported Live Spectral Time) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})" = "Timeprism (een geïmporteerde Live Spectral Time) zit niet in deze versie: hij wordt een uitgeschakelde Utility op zijn plek, en zijn automatisering doet niets ({0})"
 "Harmonia (an imported Live Spectral Resonator) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})" = "Harmonia (een geïmporteerde Live Spectral Resonator) zit niet in deze versie: hij wordt een uitgeschakelde Utility op zijn plek, en zijn automatisering doet niets ({0})"
 "Braid is not in this release: its channels become empty Samplers and play nothing: {0}" = "Braid zit niet in deze versie: zijn kanalen worden lege Samplers en spelen niets: {0}"
+
+# --- rollup 0.1.30 step 7: Save a copy for 0.1.28 knows rounds 190kl / 190kt / 190kn / qafix190kq
+"The Peak Controller's LYNX LFO shapes play its FL Shape: {0}" = "De LYNX-LFO-vormen van de Peak Controller spelen zijn FL-vorm: {0}"
+"Crest Compressor's console law (the Waves SSLComp stand-in) plays as its Bus style: {0}" = "De consolewet van Crest Compressor (de vervanger van Waves SSLComp) speelt als zijn Bus-stijl: {0}"
+"Mixer lock states (a solo silences these inserts, and Unmute all unmutes them): {0}" = "Vergrendelstatussen van de mixer (een solo dempt deze inserts, en Alles dempen opheffen heft hun demping op): {0}"
+"{0} imported take lane(s) get their own columns in the clip grid and the Session mixer" = "{0} geïmporteerde take-baan/banen krijgen eigen kolommen in het clipraster en de Session-mixer"

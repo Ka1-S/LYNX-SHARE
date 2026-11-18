@@ -11279,3 +11279,9 @@ countries: tr
 "Timeprism (an imported Live Spectral Time) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})" = "Timeprism (içe aktarılmış bir Live Spectral Time) bu sürümde yok: yuvasında kapalı bir Utility olur ve otomasyonu hiçbir şey yapmaz ({0})"
 "Harmonia (an imported Live Spectral Resonator) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})" = "Harmonia (içe aktarılmış bir Live Spectral Resonator) bu sürümde yok: yuvasında kapalı bir Utility olur ve otomasyonu hiçbir şey yapmaz ({0})"
 "Braid is not in this release: its channels become empty Samplers and play nothing: {0}" = "Braid bu sürümde yok: kanalları boş Sampler'lara dönüşür ve hiçbir şey çalmaz: {0}"
+
+# --- rollup 0.1.30 step 7: Save a copy for 0.1.28 knows rounds 190kl / 190kt / 190kn / qafix190kq
+"The Peak Controller's LYNX LFO shapes play its FL Shape: {0}" = "Peak Controller'ın LYNX LFO şekilleri FL şekliyle çalar: {0}"
+"Crest Compressor's console law (the Waves SSLComp stand-in) plays as its Bus style: {0}" = "Crest Compressor'ın konsol yasası (Waves SSLComp yerine geçen) Bus stiliyle çalar: {0}"
+"Mixer lock states (a solo silences these inserts, and Unmute all unmutes them): {0}" = "Mikser kilit durumları (bir solo bu insert'leri susturur, Tümünün sesini aç da sesini açar): {0}"
+"{0} imported take lane(s) get their own columns in the clip grid and the Session mixer" = "İçe aktarılan {0} take şeridi klip ızgarasında ve Session mikserinde kendi sütunlarını alır"

@@ -11279,3 +11279,9 @@ countries: tw hk mo
 "Timeprism (an imported Live Spectral Time) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})" = "Timeprism (匯入的 Live Spectral Time) 不在此版本中: 它在插槽中變為關閉的 Utility, 其自動化不起作用 ({0})"
 "Harmonia (an imported Live Spectral Resonator) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})" = "Harmonia (匯入的 Live Spectral Resonator) 不在此版本中: 它在插槽中變為關閉的 Utility, 其自動化不起作用 ({0})"
 "Braid is not in this release: its channels become empty Samplers and play nothing: {0}" = "Braid 不在此版本中: 其通道變為空的取樣器, 不發出任何聲音: {0}"
+
+# --- rollup 0.1.30 step 7: Save a copy for 0.1.28 knows rounds 190kl / 190kt / 190kn / qafix190kq
+"The Peak Controller's LYNX LFO shapes play its FL Shape: {0}" = "Peak Controller 的 LYNX LFO 形狀以其 FL 形狀播放：{0}"
+"Crest Compressor's console law (the Waves SSLComp stand-in) plays as its Bus style: {0}" = "Crest Compressor 的控台定律（Waves SSLComp 的替代）以其 Bus 風格播放：{0}"
+"Mixer lock states (a solo silences these inserts, and Unmute all unmutes them): {0}" = "混音器鎖定狀態（獨奏會使這些插入軌靜音，「全部取消靜音」會取消它們的靜音）：{0}"
+"{0} imported take lane(s) get their own columns in the clip grid and the Session mixer" = "{0} 條匯入的錄音條（take lane）在片段網格與 Session 混音器中有各自的欄"

@@ -11279,3 +11279,9 @@ countries: kr
 "Timeprism (an imported Live Spectral Time) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})" = "Timeprism(가져온 Live Spectral Time)은 이 버전에 없습니다: 슬롯에서 꺼진 Utility가 되고 오토메이션은 아무것도 하지 않습니다 ({0})"
 "Harmonia (an imported Live Spectral Resonator) is not in this release: it becomes a switched-off Utility in its slot, and its automation does nothing ({0})" = "Harmonia(가져온 Live Spectral Resonator)는 이 버전에 없습니다: 슬롯에서 꺼진 Utility가 되고 오토메이션은 아무것도 하지 않습니다 ({0})"
 "Braid is not in this release: its channels become empty Samplers and play nothing: {0}" = "Braid는 이 버전에 없습니다: 채널이 빈 샘플러가 되어 아무것도 재생하지 않습니다: {0}"
+
+# --- rollup 0.1.30 step 7: Save a copy for 0.1.28 knows rounds 190kl / 190kt / 190kn / qafix190kq
+"The Peak Controller's LYNX LFO shapes play its FL Shape: {0}" = "Peak Controller의 LYNX LFO 셰이프는 FL 셰이프로 재생됩니다: {0}"
+"Crest Compressor's console law (the Waves SSLComp stand-in) plays as its Bus style: {0}" = "Crest Compressor의 콘솔 법칙(Waves SSLComp 대체)은 Bus 스타일로 재생됩니다: {0}"
+"Mixer lock states (a solo silences these inserts, and Unmute all unmutes them): {0}" = "믹서 잠금 상태(솔로하면 이 인서트가 음소거되고, 모두 음소거 해제로 해제됩니다): {0}"
+"{0} imported take lane(s) get their own columns in the clip grid and the Session mixer" = "가져온 테이크 레인 {0}개가 클립 그리드와 Session 믹서에 자체 열을 갖습니다"
