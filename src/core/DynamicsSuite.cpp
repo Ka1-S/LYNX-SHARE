@@ -389,7 +389,7 @@ struct FetTone
             const bool low = k == 0;
             const auto g = std::pow (10.0, (low ? fetLowShelfDb : fetHighShelfDb) / 20.0);
             const auto hz = std::min (low ? fetLowShelfHz : fetHighShelfHz, 0.45 * rate);
-            const auto w = std::tan (M_PI * hz / rate); // H(s) = (s + w g) / (s + w) low, (g s + w) / (s + w) high
+            const auto w = std::tan (pi * hz / rate); // H(s) = (s + w g) / (s + w) low, (g s + w) / (s + w) high
             const auto nb0 = low ? 1.0 + w * g : g + w, nb1 = low ? w * g - 1.0 : w - g, d0 = 1.0 + w, d1 = w - 1.0;
             b0[k] = nb0 / d0;
             b1[k] = nb1 / d0;
