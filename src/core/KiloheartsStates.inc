@@ -18,13 +18,16 @@ struct Json
     enum class Type : std::uint8_t { null, string, object, array };
     Type type = Type::null;
     std::string text;
-    std::vector<std::pair<std::string, Json>> members; // object
+    // object: names[k] -> values[k] (rollup step 9: two vectors, not std::pair<std::string, Json> — a pair of the type
+    // being defined is ill-formed, and clang's libstdc++ checks reject it; std::vector of an incomplete type is allowed)
+    std::vector<std::string> names;
+    std::vector<Json> values;
     std::vector<Json> items;                           // array
     const Json* get (std::string_view key) const noexcept
     {
-        for (const auto& [k, v] : members)
-            if (k == key)
-                return &v;
+        for (std::size_t k = 0; k < names.size() && k < values.size(); ++k)
+            if (names[k] == key)
+                return &values[k];
         return nullptr;
     }
 };
@@ -59,7 +62,8 @@ public:
                 Json v;
                 if (! parse (v, depth + 1))
                     return false;
-                out.members.emplace_back (std::move (key), std::move (v));
+                out.names.push_back (std::move (key));
+                out.values.push_back (std::move (v));
                 skip();
                 if (p < s.size() && s[p] == ',')
                 {
