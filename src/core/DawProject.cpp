@@ -738,7 +738,7 @@ struct Imp
         std::string err;
         if (auto bytes = zipr.extract (path, &err))
             return std::move (*bytes);
-        note (&FlpImportReport::unsupported, what + " (file missing in the project: " + path + ")");
+        note (&FlpImportReport::notReproduced, what + " (file missing in the project: " + path + ")");
         return {};
     }
 
@@ -750,7 +750,7 @@ struct Imp
             return {};
         if (flag (st, "external", false))
         {
-            note (&FlpImportReport::unsupported, "Plug-in state stored outside the project");
+            note (&FlpImportReport::notReproduced, "Plug-in state stored outside the project");
             return {};
         }
         return embedded (st.attr ("path"), "Plug-in state");
@@ -761,7 +761,7 @@ struct Imp
     {
         if ((int) song.mixer.size() >= maxMixerTracks)
         {
-            note (&FlpImportReport::unsupported, "Mixer channels past LYNX's insert limit (played through the Master)");
+            note (&FlpImportReport::notReproduced, "Mixer channels past LYNX's insert limit (played through the Master)");
             return 0;
         }
         MixerTrack m;
@@ -803,7 +803,7 @@ struct Imp
         }
         m.solo = flag (ch, "solo", false);
         if (ch.attr ("role") == "vca")
-            note (&FlpImportReport::unsupported, "VCA channels (kept as ordinary inserts)");
+            note (&FlpImportReport::notReproduced, "VCA channels (kept as ordinary inserts)");
     }
 
     std::optional<ForeignPlugin> pluginOf (const Element& d)
@@ -1094,7 +1094,7 @@ struct Imp
             {
                 if (instrument == nullptr || haveInstrument)
                 {
-                    note (&FlpImportReport::unsupported, "Instrument on an audio track or a second instrument: " + name);
+                    note (&FlpImportReport::notReproduced, "Instrument on an audio track or a second instrument: " + name);
                     continue;
                 }
                 haveInstrument = true;
@@ -1134,12 +1134,12 @@ struct Imp
                 else
                     note (&FlpImportReport::unsupported, "Instrument: " + name + " (LYNX's synth plays the notes)");
                 if (! enabled)
-                    note (&FlpImportReport::unsupported, "Instrument switched off (it plays in LYNX)");
+                    note (&FlpImportReport::notReproduced, "Instrument switched off (it plays in LYNX)");
                 continue;
             }
             if (role == "noteFX")
             {
-                note (&FlpImportReport::unsupported, "Note effect: " + name);
+                note (&FlpImportReport::notReproduced, "Note effect: " + name);
                 continue;
             }
             if (role == "analyzer")
@@ -1221,7 +1221,7 @@ struct Imp
                 song.mixer[0].colour = colour;
             readDevices (ch, 0, nullptr, -1, id);
             if (contentTracks.count (id))
-                note (&FlpImportReport::unsupported, "Clips on the master track");
+                note (&FlpImportReport::notReproduced, "Clips on the master track");
             for (const auto& sub : subTracks)
                 readTrack (sub, depth + 1);
             return;
@@ -1308,12 +1308,12 @@ struct Imp
                 const auto vol = send.child ("Volume");
                 if (j < 0 || j == insert)
                 {
-                    note (&FlpImportReport::unsupported, "Send to an unknown channel");
+                    note (&FlpImportReport::notReproduced, "Send to an unknown channel");
                     continue;
                 }
                 if (send.child ("Enable") && ! flag (send.child ("Enable"), "value", true))
                 {
-                    note (&FlpImportReport::unsupported, "Switched-off sends (left out)");
+                    note (&FlpImportReport::notReproduced, "Switched-off sends (left out)");
                     continue;
                 }
                 if (const auto pan = send.child ("Pan"); pan && std::abs (panOfValue (num (pan, "value", 0.5), pan.attr ("unit"), num (pan, "min", 0.0), num (pan, "max", 1.0))) > 1e-4)
@@ -1370,9 +1370,9 @@ struct Imp
         else if (n == "markers" || n == "Markers")
             readMarkers (e, s);
         else if (n == "ClipSlot")
-            note (&FlpImportReport::unsupported, "Clip slots on the arrangement");
+            note (&FlpImportReport::notReproduced, "Clip slots on the arrangement");
         else if (n == "Video")
-            note (&FlpImportReport::unsupported, "Video");
+            note (&FlpImportReport::notReproduced, "Video");
     }
 
     void readClip (const Element& clip, const Scope& s)
@@ -1422,7 +1422,7 @@ struct Imp
             if (it != byId.end())
                 readTimeline (it->second, inner);
             else
-                note (&FlpImportReport::unsupported, "Clip that refers to missing content");
+                note (&FlpImportReport::notReproduced, "Clip that refers to missing content");
             return;
         }
         for (const auto& c : clip.children())
@@ -1438,7 +1438,7 @@ struct Imp
         const auto ch = channelOfTrack.find (s.track);
         if (row < 0 || ch == channelOfTrack.end())
         {
-            note (&FlpImportReport::unsupported, "Notes on a track without an instrument");
+            note (&FlpImportReport::notReproduced, "Notes on a track without an instrument");
             return;
         }
         // the pattern: one per Notes element (clips that refer to the same element share it)
@@ -1485,7 +1485,7 @@ struct Imp
             if (midiChannels)
                 note (&FlpImportReport::approximated, "MIDI channels of notes (all play on the track's instrument)");
             if (expressions)
-                note (&FlpImportReport::unsupported, "Per-note expressions");
+                note (&FlpImportReport::notReproduced, "Per-note expressions");
             p.sortNotes();
             song.patterns.push_back (std::move (p));
             pattern = (int) song.patterns.size() - 1;
@@ -1545,7 +1545,7 @@ struct Imp
                 return {};
             if (! options.common.saveEmbedded)
             {
-                note (&FlpImportReport::unsupported, "Embedded audio (no place to save it)");
+                note (&FlpImportReport::notReproduced, "Embedded audio (no place to save it)");
                 return {};
             }
             return options.common.saveEmbedded (bytes, pathFileName (path));
@@ -1601,7 +1601,7 @@ struct Imp
         const auto audio = warps.child ("Audio");
         if (! audio)
         {
-            note (&FlpImportReport::unsupported, "Warped content that is not an audio file");
+            note (&FlpImportReport::notReproduced, "Warped content that is not an audio file");
             return;
         }
         readAudio (audio, s, &marks);
@@ -1613,7 +1613,7 @@ struct Imp
         const auto row = rowOf (s.track);
         if (row < 0)
         {
-            note (&FlpImportReport::unsupported, "Audio on a track without a Playlist row");
+            note (&FlpImportReport::notReproduced, "Audio on a track without a Playlist row");
             return;
         }
         const auto name = s.wins.front().name;
@@ -1623,7 +1623,7 @@ struct Imp
         const auto path = resolveFile (audio.child ("File"), "Audio clip: " + (name.empty() ? nameOfTrack[s.track] : name));
         if (saved.empty())
         {
-            note (&FlpImportReport::unsupported, "Audio without a file reference");
+            note (&FlpImportReport::notReproduced, "Audio without a file reference");
             return;
         }
         auto seconds = num (audio, "duration", 0.0);
@@ -1752,9 +1752,9 @@ struct Imp
         if (param.empty())
         {
             if (target.hasAttr ("expression"))
-                note (&FlpImportReport::unsupported, "MIDI / expression automation (" + target.attr ("expression") + ")");
+                note (&FlpImportReport::notReproduced, "MIDI / expression automation (" + target.attr ("expression") + ")");
             else
-                note (&FlpImportReport::unsupported, "Automation without a target");
+                note (&FlpImportReport::notReproduced, "Automation without a target");
             return;
         }
         // (song beat, value, linear) through the windows
@@ -1805,7 +1805,7 @@ struct Imp
         if (it == targets.end())
         {
             const auto why = explained.find (param);
-            note (&FlpImportReport::unsupported, why != explained.end() ? why->second : std::string ("Automation of a parameter LYNX has no counterpart for"));
+            note (&FlpImportReport::notReproduced, why != explained.end() ? why->second : std::string ("Automation of a parameter LYNX has no counterpart for"));
             return;
         }
         if (raw.empty())
@@ -1852,7 +1852,7 @@ struct Imp
             song.addMarker (x);
         }
         if (coloured)
-            note (&FlpImportReport::unsupported, "Marker colours");
+            note (&FlpImportReport::notReproduced, "Marker colours");
     }
 
     // Scenes (the clip launcher) → LYNX's clip grid, as the .als import's Session view [XSD: Scene → a timeline whose
@@ -1876,7 +1876,7 @@ struct Imp
                 if (row < 0)
                 {
                     if (clip)
-                        note (&FlpImportReport::unsupported, "Clip slots of a track without a Playlist row");
+                        note (&FlpImportReport::notReproduced, "Clip slots of a track without a Playlist row");
                     continue;
                 }
                 if (! clip)
@@ -1916,7 +1916,7 @@ struct Imp
                 const auto id = launcher::setClip (song, row, scene, first);
                 if (id < 0)
                 {
-                    note (&FlpImportReport::unsupported, "Clip slots past LYNX's grid limits");
+                    note (&FlpImportReport::notReproduced, "Clip slots past LYNX's grid limits");
                     continue;
                 }
                 auto& slot = song.clipGrid->slots[(std::size_t) id];
@@ -1931,7 +1931,7 @@ struct Imp
         {
             if ((int) k >= launcher::maxScenes)
             {
-                note (&FlpImportReport::unsupported, "Scenes past LYNX's grid limit");
+                note (&FlpImportReport::notReproduced, "Scenes past LYNX's grid limit");
                 break;
             }
             walk (scenes[k], {}, (int) k);
@@ -2050,7 +2050,7 @@ struct Imp
         info.comments = root.child ("Comment").text();
         for (const auto* other : { "Album", "OriginalArtist", "Composer", "Songwriter", "Producer", "Arranger", "Year", "Copyright" })
             if (! root.child (other).text().empty())
-                note (&FlpImportReport::unsupported, std::string ("Project info: ") + other);
+                note (&FlpImportReport::notReproduced, std::string ("Project info: ") + other);
     }
 };
 

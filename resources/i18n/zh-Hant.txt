@@ -11241,3 +11241,4 @@ countries: tw hk mo
 "Steps 4" = "階梯 4"
 "Steps 8" = "階梯 8"
 "Steps 16" = "階梯 16"
+"Not reproduced (left out or played differently):" = "未還原（已省略或以不同方式播放）："

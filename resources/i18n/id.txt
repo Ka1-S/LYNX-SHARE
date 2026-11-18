@@ -11241,3 +11241,4 @@ countries: id
 "Steps 4" = "Tangga 4"
 "Steps 8" = "Tangga 8"
 "Steps 16" = "Tangga 16"
+"Not reproduced (left out or played differently):" = "Tidak direproduksi (dihilangkan atau diputar dengan cara lain):"

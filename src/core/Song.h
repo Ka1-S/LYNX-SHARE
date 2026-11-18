@@ -2324,6 +2324,10 @@ struct PlaylistTrack
     // A comp track (round 177c, core/Comping.h): this group header is what plays, its grouped tracks are take lanes. Set
     // only by "Comp these takes"; a group of takes is an ordinary track group until then.
     bool compTrack = false;
+    // Round qafix190kq (QA-2): an imported take lane (Live's TakeLanes, core/AlsImport.cpp) — also one nested under a track
+    // inside a group, whose header is a plain folder (a comp needs a top-level header). Lanes belong to their track: the
+    // clip grid and the Session mixer show no column for them (comp::isTakeLane). Saved ("playlistTakeLanes").
+    bool takeLane = false;
     // FL's "Track mode" (REA round 146a; .flp record 0xEE: u32 mode at byte 49 = 0 / 1 audio / 3 instrument, i32 mixer
     // track at 53, i32 channel at 57). An audio track is linked to a mixer track: audio clips placed on it play through
     // that track (their channel is routed there). An instrument track belongs to a channel (and its mixer track).

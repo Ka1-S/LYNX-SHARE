@@ -10,6 +10,8 @@
 #include <cstdint>
 #include <cstring>
 #include <deque>
+
+#include "core/TailSilence.h"
 #include <functional>
 #include <optional>
 
@@ -117,6 +119,9 @@ private:
     {
         const auto blockPeak = view.getMagnitude (0, n);
         peak = std::max (peak, blockPeak);
+        // (before the dither, as the peak: the tail's silence test below)
+        const auto quiet = done + n > setup.musicSamples && ! setup.exact
+                           && tailsilence::quietBlock (view.getArrayOfReadPointers(), view.getNumChannels(), n, silence);
 
         if (dither)
             for (int ch = 0; ch < view.getNumChannels(); ++ch)
@@ -134,10 +139,11 @@ private:
             writeMs += juce::Time::getMillisecondCounterHiRes() - beforeWrite;
         }
 
-        // in the tail: half a second of silence ends it
+        // in the tail: half a second of silence ends it (round qafix190kq, QA-6 of 0.1.30: a constant offset is silence
+        // too — a DC of -73 dBFS left by the song kept FL's "Leave remainder" tail running to its cap, 5.5 s more)
         if (done + n > setup.musicSamples && ! setup.exact)
         {
-            quietSamples = blockPeak < silence ? quietSamples + n : 0;
+            quietSamples = quiet ? quietSamples + n : 0;
             if (quietSamples > (std::int64_t) (setup.sampleRate * 0.5))
                 endedInTail = ended = true;
         }

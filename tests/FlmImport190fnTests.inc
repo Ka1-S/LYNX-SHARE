@@ -121,7 +121,7 @@ TEST (flm190fn_factory_samples_from_the_users_resources_first)
         CHECK (s && pathOf (*s, "Kick") == fl + "/Drum Samples/Kick/Kick 1.wav");
         CHECK (s && pathOf (*s, "Clap").empty());
         CHECK (report.missingSamples == 1);
-        CHECK (report.unsupported.count ("FL Studio Mobile factory content not found: add the app's Resources folder in Settings > Files") == 1);
+        CHECK (report.notReproduced.count ("FL Studio Mobile factory content not found: add the app's Resources folder in Settings > Files") == 1);
     }
     {
         // the user's own Resources folder first: both found there, nothing listed
@@ -130,7 +130,7 @@ TEST (flm190fn_factory_samples_from_the_users_resources_first)
         CHECK (s && pathOf (*s, "Kick") == mine + "/Drum Samples/Kick/Kick 1.wav");
         CHECK (s && pathOf (*s, "Clap") == mine + "/Drum Samples/Clap/Clap 2.wav");
         CHECK (report.missingSamples == 0);
-        CHECK (report.unsupported.empty() || report.unsupported.count ("FL Studio Mobile factory content not found: add the app's Resources folder in Settings > Files") == 0);
+        CHECK (report.notReproduced.empty() || report.notReproduced.count ("FL Studio Mobile factory content not found: add the app's Resources folder in Settings > Files") == 0);
     }
     {
         // no FL at all: the user's folder alone does it
@@ -144,7 +144,7 @@ TEST (flm190fn_factory_samples_from_the_users_resources_first)
         FlpImportReport report;
         const auto s = run (true, true, report);
         CHECK (s && pathOf (*s, "Clap").empty());
-        CHECK (report.unsupported.count ("FL Studio Mobile factory content not found in the Resources folders of Settings > Files") == 1);
+        CHECK (report.notReproduced.count ("FL Studio Mobile factory content not found in the Resources folders of Settings > Files") == 1);
     }
 }
 
@@ -310,7 +310,7 @@ TEST (flm190fn_newer_app_version_is_named)
         FlpImportReport report;
         const auto s = importFlm (song (version), flm182c::options (&report));
         CHECK (s.has_value());
-        return report.unsupported.count ("FL Studio Mobile " + version + " (newer than this import knows: new settings may be missing)");
+        return report.notReproduced.count ("FL Studio Mobile " + version + " (newer than this import knows: new settings may be missing)");
     };
     CHECK (lines ("5.1.0") == 1);
     CHECK (lines ("6.0") == 1);
@@ -354,7 +354,7 @@ TEST (flm190fn_effect_enable_lane_switches_the_slots)
         }
     CHECK (lanes == 1);
     CHECK (report.converted.count ("FL Studio Mobile: effect automation") == 1);
-    CHECK (report.unsupported.count ("FL Studio Mobile: automation of an effect switch or layout (not imported)") == 0);
+    CHECK (report.notReproduced.count ("FL Studio Mobile: automation of an effect switch or layout (not imported)") == 0);
 }
 
 TEST (flm190fn_flp_mobile_rack_fx_on_the_flm_engines)

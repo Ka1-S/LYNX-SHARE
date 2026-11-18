@@ -616,7 +616,7 @@ TEST (dawproject190jf_round_trip)
             return n.tick == m.tick && n.name == m.name && n.numerator == m.numerator && n.denominator == m.denominator && n.action == m.action;
         }));
     // nothing went missing on the way
-    CHECK (report.unsupported.empty() && report.droppedEffects.empty() && report.missingSamples == 0);
+    CHECK (report.unsupported.empty() && report.notReproduced.empty() && report.droppedEffects.empty() && report.missingSamples == 0);
 
     // and again: the second trip changes nothing more
     const auto again = exportDawProject (b, eo);
@@ -679,13 +679,13 @@ TEST (dawproject190jf_bitwig_readme_example)
     CHECK (pc != nullptr && pc->length == 7680 && pc->offset == 0);
     CHECK (ac != nullptr && ac->length == std::llround (8.00003433227539 * 960) && ac->offset == 0 && ac->fadeIn == 0);
     // the CLAP state file is not in this example: reported, the plug-in starts at its defaults
-    CHECK (reported (report.unsupported, "Plug-in state") && reported (report.converted, "Surge XT"));
+    CHECK (reported (report.notReproduced, "Plug-in state") && reported (report.converted, "Surge XT"));
     // without the audio file inside: reported, no clip
     FlpImportReport r2;
     io.common.report = &r2;
     const auto noAudio = importDawProject (zipOf ({ { "project.xml", bytesOf (xmlText) } }), io, &err);
     // (the clip stays, its channel without a sample, as the .flp import keeps a channel whose sample is missing)
-    CHECK (noAudio && noAudio->playlist.size() == 2 && reported (r2.unsupported, "Embedded audio"));
+    CHECK (noAudio && noAudio->playlist.size() == 2 && reported (r2.notReproduced, "Embedded audio"));
     CHECK (noAudio && noAudio->channels.size() == 2 && noAudio->channels[1].samplePath.empty() && noAudio->channels[1].name == "Drumfunk3 170bpm");
 }
 
@@ -822,7 +822,7 @@ TEST (dawproject190jf_handmade_features)
         CHECK (v2.format == ForeignPlugin::Format::vst2 && v2.vst2Id == 1415534897u && parseFlVst2State (v2.state, st) && st.chunk == fx.chunk);
         CHECK (reported (report.approximated, "program chunk"));
     }
-    CHECK (reported (report.droppedEffects, "Mystery") && reported (report.approximated, "bandPass") && reported (report.unsupported, "Note effect: Some Arp"));
+    CHECK (reported (report.droppedEffects, "Mystery") && reported (report.approximated, "bandPass") && reported (report.notReproduced, "Note effect: Some Arp"));
     CHECK (reported (report.unsupported, "Notes track without an instrument") && s.channels.size() == 2 && s.channels[0].instrument == InstrumentKind::synth);
     // the looped notes clip: four passes over the loop, one pattern
     CHECK (s.patterns.size() == 2 && s.patterns[0].name == "Riff" && s.patterns[0].notes.size() == 3 && reported (report.approximated, "MIDI channels"));
@@ -840,7 +840,7 @@ TEST (dawproject190jf_handmade_features)
     CHECK (vol != nullptr && vol->points.size() == 2 && vol->points[1].tick == 7680 && near (vol->points[1].value, faderPosition (1.0f)) && laneHas (s, 0, vol->target));
     const auto* pan = automationOf (s, { AutomationTargetKind::mixerPan, 2, 0, 0 });
     CHECK (pan != nullptr && pan->points.size() == 2 && pan->points[0].mode == flcurve::singleCurve && pan->points[1].tick == 3840 && near (pan->points[1].value, 1.0));
-    CHECK (reported (report.unsupported, "built-in device's Threshold") && reported (report.unsupported, "pitchBend"));
+    CHECK (reported (report.notReproduced, "built-in device's Threshold") && reported (report.notReproduced, "pitchBend"));
     // tempo map, meter and its change, markers, scenes, metadata
     const auto* tempoClip = tempomarkers::clipOf (s, tempomarkers::automationIndex (s));
     CHECK (tempoClip != nullptr && tempoClip->track == 3 && s.playlistTracks[3].name == "Tempo" && ! s.playlistTracks[3].grouped);
@@ -849,7 +849,7 @@ TEST (dawproject190jf_handmade_features)
     CHECK (s.beatsPerBar == 7 && s.beatUnit == 8);
     CHECK (std::any_of (s.markers().begin(), s.markers().end(), [] (const Marker& m) { return m.tick == 13440 && m.numerator == 4 && m.action == Marker::timeSignature; }));
     CHECK (std::any_of (s.markers().begin(), s.markers().end(), [] (const Marker& m) { return m.tick == 15360 && m.name == "Drop"; }));
-    CHECK (reported (report.unsupported, "Marker colours"));
+    CHECK (reported (report.notReproduced, "Marker colours"));
     // the scenes → the clip grid: scene A's clip on the Synth row, its loop with the Start marker a beat in; scene B empty
     CHECK (s.clipGrid.has_value() && s.patterns.size() == 2);
     if (s.clipGrid)
@@ -862,7 +862,7 @@ TEST (dawproject190jf_handmade_features)
         CHECK (clip != g.clips.end() && clip->track == 2 && clip->pattern == 1 && clip->offset == 0 && clip->length == 1920);
         CHECK (std::any_of (g.slots.begin(), g.slots.end(), [] (const ClipGridSlot& x) { return x.noStop && x.scene == 0; }));
     }
-    CHECK (s.info.title == "Hand" && s.info.author == "Me" && s.info.comments == "c" && reported (report.unsupported, "Project info: Album"));
+    CHECK (s.info.title == "Hand" && s.info.author == "Me" && s.info.comments == "c" && reported (report.notReproduced, "Project info: Album"));
     // a missing external file: in the Missing files list; the clip stays, its channel without a sample until it is located
     FlpImportReport r2;
     io.common.report = &r2;
@@ -920,7 +920,7 @@ TEST (dawproject190jf_robustness)
     const auto s = importDawProject (zipOf ({ { "project.xml", bytesOf (odd) } }), io, &err);
     CHECK (s && s->playlist.size() <= 4096 && ! s->patterns.empty());
     CHECK (s && std::all_of (s->patterns.front().notes.begin(), s->patterns.front().notes.end(), [] (const Note& n) { return n.key <= 127 && n.start >= 0; }));
-    CHECK (reported (report.unsupported, "missing content") && reported (report.approximated, "unknown or looping destination"));
+    CHECK (reported (report.notReproduced, "missing content") && reported (report.approximated, "unknown or looping destination"));
 }
 
 TEST (dawproject190jf_what_does_not_map)

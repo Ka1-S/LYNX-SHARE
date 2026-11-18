@@ -11241,3 +11241,4 @@ countries: cn sg
 "Steps 4" = "阶梯 4"
 "Steps 8" = "阶梯 8"
 "Steps 16" = "阶梯 16"
+"Not reproduced (left out or played differently):" = "未还原（已省略或以不同方式播放）："

@@ -39,8 +39,9 @@ TEST (rollup027_flm_layer_plays_supersaw_on_its_own_engine)
     CHECK (high.instrument == InstrumentKind::pocketSuperSaw && (int) high.modelParams.size() == pocketsaw::paramCount && ! high.muted);
     CHECK (high.name == "Stack (SuperSaw)" && high.keyLow == 60 && high.keyHigh == 127 && high.mixerTrack == layer->mixerTrack);
     CHECK (report.converted.count ("FL Studio Mobile: SuperSaw") == 1 && report.converted.count ("FL Studio Mobile: rack with several instruments (Layer)") == 1);
-    for (const auto& [what, count] : report.unsupported)
-        CHECK (what.find ("SuperSaw") == std::string::npos);
+    for (const auto* list : { &report.unsupported, &report.notReproduced }) // (round qafix190kq: both lists)
+        for (const auto& [what, count] : *list)
+            CHECK (what.find ("SuperSaw") == std::string::npos);
     // the effect 190by mapped sits on the Layer's insert and is not listed as dropped
     const auto& slots = song->mixer[(std::size_t) layer->mixerTrack].effects;
     CHECK (std::any_of (slots.begin(), slots.end(), [] (const EffectSlot& s) { return s.kind == EffectKind::pocketComb; }));

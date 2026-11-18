@@ -11370,3 +11370,4 @@ countries: br
 "Steps 4" = "Degraus 4"
 "Steps 8" = "Degraus 8"
 "Steps 16" = "Degraus 16"
+"Not reproduced (left out or played differently):" = "Não reproduzido (deixado de fora ou tocado de outro jeito):"

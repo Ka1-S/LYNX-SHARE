@@ -474,7 +474,7 @@ TEST (flm182c_imports_a_project)
            && report.converted.count ("FL Studio Mobile: Reverb (legacy)") == 1 && report.converted.count ("FL Studio Mobile: Limiter") == 1
            && report.droppedEffects.empty());
     // F6: the master's Level lane → a Master volume automation clip (8 beats in, one 16-beat pass, FLM's fader law)
-    CHECK (s.automations.size() == 1 && report.unsupported.count ("FL Studio Mobile: automation of module parameters (not imported yet)") == 0);
+    CHECK (s.automations.size() == 1 && report.notReproduced.count ("FL Studio Mobile: automation of module parameters (not imported yet)") == 0);
     if (s.automations.size() == 1)
     {
         const auto& a = s.automations[0];
@@ -607,7 +607,7 @@ TEST (flm182c_real_projects)
                      "%zu clips (%d audio), end %.3f beats, %d samples missing, %zu dropped effects, %zu unsupported\n",
                      entry.path().filename().string().c_str(), ms, song->bpm, song->beatsPerBar, song->mixer.size(), song->channels.size(), samplers,
                      directWaves, song->patterns.size(), notes, song->playlist.size(), audioClips, (double) end / ppq, report.missingSamples,
-                     report.droppedEffects.size(), report.unsupported.size());
+                     report.droppedEffects.size(), report.unsupported.size() + report.notReproduced.size());
     }
 }
 

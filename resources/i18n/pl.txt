@@ -11241,3 +11241,4 @@ countries: pl
 "Steps 4" = "Schodki 4"
 "Steps 8" = "Schodki 8"
 "Steps 16" = "Schodki 16"
+"Not reproduced (left out or played differently):" = "Nie odtworzono (pominięte lub grane inaczej):"

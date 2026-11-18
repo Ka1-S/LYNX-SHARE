@@ -2419,7 +2419,9 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 const auto note = flextra::inertPluginNote (c.pluginName); // round 165g: ReWired, Video Player, FL Studio Mobile
                 if (c.pluginName == "ReWired")
                     def.muted = true; // no sound of their own in LYNX: the stand-in synth must not play their notes
-                ++r.unsupported[note.empty() ? c.pluginName : note]; // (Keyboard Controller only sends notes to other channels)
+                // (Keyboard Controller only sends notes to other channels). Round qafix190kq: ReWired stays silent, so it is
+                // "not reproduced", not "played with a synth preset"
+                ++(c.pluginName == "ReWired" ? r.notReproduced : r.unsupported)[note.empty() ? c.pluginName : note];
             }
         }
 
@@ -3773,7 +3775,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
         };
         auto note = [&] (const std::string& what) {
             if (options.report != nullptr)
-                ++options.report->unsupported["Pattern events: " + what];
+                ++options.report->notReproduced["Pattern events: " + what];
         };
         // FL value → our 0..1 for a target (nothing when the target or its scale is not reproduced)
         auto convertor = [&] (flp::ControlId id, AutomationTarget& target) -> std::function<float (std::int32_t)> {

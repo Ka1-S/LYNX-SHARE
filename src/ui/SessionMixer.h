@@ -30,7 +30,10 @@ public:
     // The grid's columns: `count` columns `columnWidth` wide, scrolled by `scrollX`, in [0, tracksWidth); round 190kc:
     // `returns` return strips (Live's return tracks, columnWidth each) right of the tracks; the Main strip is `mainWidth`
     // wide to the right of them.
-    void setColumns (int count, int columnWidth, int scrollX, int tracksWidth, int mainWidth, int returns = 0);
+    // Round qafix190kq (QA-2): `tracks` = the Playlist track of each column (the grid skips take lanes); empty: column c
+    // is track c.
+    void setColumns (int count, int columnWidth, int scrollX, int tracksWidth, int mainWidth, int returns = 0,
+                     const std::vector<int>& tracks = {});
     // Round 190kc: the return strips the grid shows for this song (Live's View › Mixer Controls › Return Tracks).
     static int returnColumnsFor (const Song& song);
     // the grid column code of return strip k (Hit::column, partBounds)
@@ -95,6 +98,12 @@ private:
     void refreshCache() const;
     sessionmixer::Strip stripFor (int column) const;
     int insertFor (int column) const; // Main: 0
+    // round qafix190kq: the Playlist track of a track column (the grid's map), and the column of a track (−1: none)
+    int trackOf (int column) const noexcept
+    {
+        return column >= 0 && column < (int) columnTracks.size() ? columnTracks[(std::size_t) column] : column;
+    }
+    int columnOf (int track) const noexcept;
     int stripX (int column) const noexcept;
     int stripWidth (int column) const noexcept { return column == mainColumn ? mainWidth : columnWidth; }
     void layoutSections();
@@ -119,6 +128,7 @@ private:
     AudioEngine& engine;
     int columns = 0, columnWidth = 104, scroll = 0, tracksWidth = 0, mainWidth = 128;
     int returnColumns = 0;                            // round 190kc: return strips shown
+    std::vector<int> columnTracks;                    // round qafix190kq: each column's Playlist track (empty: the same)
     mutable std::vector<int> returnInserts;           // round 190kc: the returns' inserts (refreshCache)
     sessionmixer::Sections sections;
     std::vector<int> rows;                            // the Sends rows shown: their target inserts

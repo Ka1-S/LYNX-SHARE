@@ -11241,3 +11241,4 @@ countries: kr
 "Steps 4" = "계단 4"
 "Steps 8" = "계단 8"
 "Steps 16" = "계단 16"
+"Not reproduced (left out or played differently):" = "재현되지 않음(제외되거나 다르게 재생):"

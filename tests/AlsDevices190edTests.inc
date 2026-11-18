@@ -453,7 +453,7 @@ TEST (als190ed_operator_and_drift_become_the_synth)
     CHECK (song.has_value() && report.converted.count ("Operator -> Tetra (LYNX's FM synth)") == 1);
     FlpImportReport fmReport;
     const auto fm = als190ed::import (als190ed::set (als190ed::operatorDevice (0, { 1.0, 0.5, 0.000316227757, 0.000316227757 }), {}), fmReport);
-    CHECK (fm.has_value() && fmReport.converted.count ("Operator -> Tetra (LYNX's FM synth)") == 1 && fmReport.unsupported.empty());
+    CHECK (fm.has_value() && fmReport.converted.count ("Operator -> Tetra (LYNX's FM synth)") == 1 && fmReport.unsupported.empty() && fmReport.notReproduced.empty());
 }
 
 TEST (als190ed_envelopes_of_racks_and_plugins_follow)
@@ -559,8 +559,8 @@ TEST (als190ed_envelopes_of_racks_and_plugins_follow)
     const auto* v3 = als190ed::automationOn (*song, { AutomationTargetKind::effectParam, bus, 2, 0 });
     CHECK (v3 != nullptr && v3->points.size() == 2 && v3 != nullptr && near (v3->points[0].value, 0.0) && near (v3->points[1].value, 1.0));
     CHECK (flVst3ParamSlots (song->mixer[(std::size_t) bus].effects[2].plugin.foreign.state) == (std::vector<std::int32_t> { 12345678 }));
-    CHECK (report.unsupported.count ("Automation of a VST3 plugin's parameter (kHs Gain: Live keeps the plugin's own id, not its index)") == 0);
-    CHECK (report.unsupported.count ("Automation of a device parameter (Bus)") == 0);
+    CHECK (report.notReproduced.count ("Automation of a VST3 plugin's parameter (kHs Gain: Live keeps the plugin's own id, not its index)") == 0);
+    CHECK (report.notReproduced.count ("Automation of a device parameter (Bus)") == 0);
     // the Instrument Rack's macro 1 on the Keys channel: 0 … 63.5 → 0 … 0.5
     int keys = -1;
     for (int c = 0; c < (int) song->channels.size(); ++c)
@@ -568,5 +568,5 @@ TEST (als190ed_envelopes_of_racks_and_plugins_follow)
     CHECK (keys >= 0 && song->channels[(std::size_t) std::max (keys, 0)].instrument == InstrumentKind::patcher);
     const auto* macro1 = als190ed::automationOn (*song, { AutomationTargetKind::channelParam, keys, 0, 1 });
     CHECK (macro1 != nullptr && macro1->points.size() == 2 && macro1 != nullptr && near (macro1->points[1].value, 0.5));
-    CHECK (report.unsupported.count ("Automation of a device parameter (Keys)") == 0);
+    CHECK (report.notReproduced.count ("Automation of a device parameter (Keys)") == 0);
 }

@@ -439,7 +439,7 @@ TEST (band190ic_imports_simple_tracks)
     CHECK (kick && snare);
     // the report: what was approximated and what wasn't converted
     CHECK (report.approximated.count ("GarageBand instrument \"Grand Piano\" (LYNX's built-in synth, Bell preset)") == 1);
-    CHECK (report.unsupported.count ("GarageBand: tempo changes (the song plays at its first tempo)") == 1 && report.missingSamples == 0);
+    CHECK (report.notReproduced.count ("GarageBand: tempo changes (the song plays at its first tempo)") == 1 && report.missingSamples == 0);
 
     // a missing file is listed; a located one (the Missing files window) is used on the next import
     files.erase ("/songs/Jingle.band/Media/Audio Recorder#01.aif");
@@ -505,6 +505,6 @@ TEST (band190ic_real_projects)
         }
         std::printf ("  %s: bpm %.2f %d/%d, %d tracks, %d pattern clips (%d notes), %d audio clips, %d files missing, %zu unsupported kinds\n",
                      entry.path().filename().string().c_str(), song->bpm, song->beatsPerBar, song->beatUnit,
-                     simpletracks::nextEmptyTrack (*song), patternClips, notes, audioClips, report.missingSamples, report.unsupported.size());
+                     simpletracks::nextEmptyTrack (*song), patternClips, notes, audioClips, report.missingSamples, report.unsupported.size() + report.notReproduced.size());
     }
 }

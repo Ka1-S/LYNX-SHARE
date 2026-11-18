@@ -11241,3 +11241,4 @@ countries: es mx ar co cl pe ve
 "Steps 4" = "Escalones 4"
 "Steps 8" = "Escalones 8"
 "Steps 16" = "Escalones 16"
+"Not reproduced (left out or played differently):" = "No reproducido (omitido o reproducido de otra forma):"

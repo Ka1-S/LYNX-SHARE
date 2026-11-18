@@ -150,7 +150,7 @@ Song importBand (const band::Project& project, const BandImportOptions& options)
     if (project.keyRoot >= 0)
         projectkey::set (song, keyfollow::projectKeyFor ({ project.keyRoot, project.keyMinor }));
     if (! project.tempoChanges.empty())
-        note (report, &FlpImportReport::unsupported, "GarageBand: tempo changes (the song plays at its first tempo)", (int) project.tempoChanges.size());
+        note (report, &FlpImportReport::notReproduced, "GarageBand: tempo changes (the song plays at its first tempo)", (int) project.tempoChanges.size());
 
     // song sections (GarageBand for iOS) and markers; signature changes
     int sections = 0;
@@ -274,7 +274,7 @@ Song importBand (const band::Project& project, const BandImportOptions& options)
         const auto made = simpletracks::addTrack (song, q);
         if (! made.ok())
         {
-            note (report, &FlpImportReport::unsupported, "GarageBand: tracks past LYNX's track or insert count");
+            note (report, &FlpImportReport::notReproduced, "GarageBand: tracks past LYNX's track or insert count");
             continue;
         }
         const auto colour = simpletracks::defaultColour (q.kind);
@@ -344,17 +344,17 @@ Song importBand (const band::Project& project, const BandImportOptions& options)
                 song.playlist.push_back (clip);
                 note (report, &FlpImportReport::converted, "GarageBand: audio region");
                 if (region.fades)
-                    note (report, &FlpImportReport::unsupported, "GarageBand: audio region fades");
+                    note (report, &FlpImportReport::notReproduced, "GarageBand: audio region fades");
                 continue;
             }
             if (region.folder)
             {
-                note (report, &FlpImportReport::unsupported, "GarageBand: folder / take folder regions (their inner regions)");
+                note (report, &FlpImportReport::notReproduced, "GarageBand: folder / take folder regions (their inner regions)");
                 continue;
             }
             if (region.patternContent)
             {
-                note (report, &FlpImportReport::unsupported, "GarageBand: Smart Drums, Drummer and pattern regions (\"" + region.name + "\")");
+                note (report, &FlpImportReport::notReproduced, "GarageBand: Smart Drums, Drummer and pattern regions (\"" + region.name + "\")");
                 if (region.notes.empty())
                     continue;
             }
@@ -400,11 +400,11 @@ Song importBand (const band::Project& project, const BandImportOptions& options)
             song.playlist.push_back (clip);
             note (report, &FlpImportReport::converted, "GarageBand: MIDI region");
             if (region.controllerEvents > 0)
-                note (report, &FlpImportReport::unsupported, "GarageBand: MIDI controllers (sustain pedal, pitch bend, modulation...)", region.controllerEvents);
+                note (report, &FlpImportReport::notReproduced, "GarageBand: MIDI controllers (sustain pedal, pitch bend, modulation...)", region.controllerEvents);
         }
     }
     if (! project.tracks.empty())
-        note (report, &FlpImportReport::unsupported, "GarageBand: the tracks' effects and instrument settings (not converted)");
+        note (report, &FlpImportReport::notReproduced, "GarageBand: the tracks' effects and instrument settings (not converted)");
     std::stable_sort (song.playlist.begin(), song.playlist.end(), [] (const Clip& a, const Clip& b) { return a.start < b.start; });
     if (song.patterns.empty())
         song.patterns.push_back (Pattern {}); // (a song keeps at least one pattern)

@@ -169,7 +169,7 @@ TEST (livefacts190gx_als_unwarped_clip_envelopes_are_left_out)
         return;
     const auto* audio = livefacts190gx::firstAudio (*plain);
     CHECK (audio != nullptr && clipenv::of (*plain, *audio) == nullptr && plain->clipEnvelopes.empty());
-    CHECK (report.unsupported.count ("Clip envelopes of unwarped audio clips (left out: Live does not play them)") == 1);
+    CHECK (report.notReproduced.count ("Clip envelopes of unwarped audio clips (left out: Live does not play them)") == 1);
 }
 
 TEST (livefacts190gx_als_import_follows_lives_ramp)

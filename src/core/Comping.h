@@ -36,6 +36,11 @@ struct Group
 // The group `track` belongs to (the comp track or one of its lanes); invalid when the track has no lanes.
 Group groupOf (const Song& song, int track);
 
+// Round qafix190kq (QA-2): is Playlist track `track` a take lane — a grouped track under a comp track, or an imported
+// lane (PlaylistTrack::takeLane) still in its group? Live shows take lanes only in the Arrangement, under their track:
+// the clip grid and the Session mixer skip them.
+bool isTakeLane (const Song& song, int track);
+
 // Song::compCrossfadeMs in ticks at the song's tempo (rounded to an even number: the crossfade is centred).
 std::int64_t crossfadeTicks (const Song& song);
 

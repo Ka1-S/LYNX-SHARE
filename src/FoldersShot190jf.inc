@@ -367,6 +367,7 @@
             list ("converted", r.converted);
             list ("approximated", r.approximated);
             list ("unsupported", r.unsupported);
+            list ("not reproduced", r.notReproduced); // (round qafix190kq)
             list ("dropped effect", r.droppedEffects);
             list ("partial effect", r.partialEffects);
             report.add ("import report: missing samples " + juce::String (r.missingSamples));

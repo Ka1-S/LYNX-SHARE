@@ -300,7 +300,7 @@ TEST (flm188f_imports_effects_and_their_lanes)
         }
     CHECK (s.automations.size() == 1 && params.count (0) == 1);
     CHECK (report.converted.count ("FL Studio Mobile: effect automation") == 1
-           && report.unsupported.count ("FL Studio Mobile: automation of module parameters (not imported yet)") == 1);
+           && report.notReproduced.count ("FL Studio Mobile: automation of module parameters (not imported yet)") == 1);
     int rows = 0;
     for (const auto& t : s.playlistTracks)
         rows += t.name.rfind ("Pad Frequency : FX Filter", 0) == 0;

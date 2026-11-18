@@ -96,8 +96,9 @@ TEST (flm190jv_flp_mobile_rack_with_several_instruments_is_a_layer)
     }
     CHECK (report.converted.count ("FL Studio Mobile Rack") == 1 && report.converted.count ("FL Studio Mobile: rack with several instruments (Layer)") == 1);
     CHECK (report.converted.count ("Layer") == 0);
-    for (const auto& [what, n] : report.unsupported)
-        CHECK (what.find ("FL Studio Mobile Rack") == std::string::npos);
+    for (const auto* list : { &report.unsupported, &report.notReproduced }) // (round qafix190kq: both lists)
+        for (const auto& [what, n] : *list)
+            CHECK (what.find ("FL Studio Mobile Rack") == std::string::npos);
 }
 
 TEST (flm190jv_flp_mobile_rack_parts_take_turns)

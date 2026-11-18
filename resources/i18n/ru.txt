@@ -11241,3 +11241,4 @@ countries: ru by kz
 "Steps 4" = "Ступени 4"
 "Steps 8" = "Ступени 8"
 "Steps 16" = "Ступени 16"
+"Not reproduced (left out or played differently):" = "Не воспроизводится (пропущено или звучит иначе):"

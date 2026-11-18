@@ -3429,8 +3429,12 @@ public:
 
                 const auto pastEnd = (double) flrs::wholeFrames (v.position) > lastFrame || v.position < v.first;
                 // FL holds an audio clip's last value as DC to the clip's end (its note-off): the clip does not end with
-                // the sample (FL renders, REA_rodada167l §1 / round 168j); other voices end with their region
-                if ((pastEnd && ! clipMode) || (v.stolen && v.fade <= 0.0f) || (v.env <= 0.0f && v.stage >= 1))
+                // the sample (FL renders, REA_rodada167l §1 / round 168j); other voices end with their region.
+                // Round qafix190kq (QA-6 of 0.1.30): a NOTE of an audio clip channel (a step, a Piano roll note; keys below
+                // audioClipKeyBase) has no clip end since round 190jd lets it play the whole clip — it ends with the
+                // sample, as FL's 1 / 2 / 5 s renders do. It held the sample's last value for ever: every hi-hat step of
+                // "Never Out" left its DC voice, -73 dBFS summed, and the export's tail never fell silent.
+                if ((pastEnd && (! clipMode || v.key < audioClipKeyBase)) || (v.stolen && v.fade <= 0.0f) || (v.env <= 0.0f && v.stage >= 1))
                 {
                     v.active = false;
                     break;

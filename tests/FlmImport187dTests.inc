@@ -177,10 +177,10 @@ TEST (flm187d_mixer_and_rack_automation)
     }
     CHECK (report.converted.count ("FL Studio Mobile: Pan automation") == 1 && report.converted.count ("FL Studio Mobile: send level automation") == 1
            && report.converted.at ("FL Studio Mobile: send level automation") == 2);
-    CHECK (report.unsupported.count ("FL Studio Mobile: Mute/Solo automation (LYNX automates neither)") == 1
-           && report.unsupported.count ("FL Studio Mobile: automation of module parameters (not imported yet)") == 0
+    CHECK (report.notReproduced.count ("FL Studio Mobile: Mute/Solo automation (LYNX automates neither)") == 1
+           && report.notReproduced.count ("FL Studio Mobile: automation of module parameters (not imported yet)") == 0
            && report.converted.count ("FL Studio Mobile: instrument parameter automation") == 1
-           && report.unsupported.count ("FL Studio Mobile: send level automation without that route") == 1
+           && report.notReproduced.count ("FL Studio Mobile: send level automation without that route") == 1
            // (round 190dw: CC #1 is the mod wheel, which no instrument of that empty rack reads: nothing to play)
            && report.converted.count ("FL Studio Mobile: mod-wheel automation on instruments that ignore the wheel (nothing to play)") == 1);
     // the point shapes are FLM's saved samples, so no "straight lines" approximation is reported any more
@@ -233,6 +233,7 @@ TEST (flm187d_real_project_reports)
         list ("converted", report.converted);
         list ("partial", report.partialEffects);
         list ("unsupported", report.unsupported);
+        list ("not reproduced", report.notReproduced);
         list ("dropped", report.droppedEffects);
     }
 }

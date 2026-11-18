@@ -11241,3 +11241,4 @@ countries: tr
 "Steps 4" = "Basamak 4"
 "Steps 8" = "Basamak 8"
 "Steps 16" = "Basamak 16"
+"Not reproduced (left out or played differently):" = "Yeniden üretilmedi (dışarıda bırakıldı veya farklı çalınıyor):"

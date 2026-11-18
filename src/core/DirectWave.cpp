@@ -1,4 +1,8 @@
 #include "core/DirectWave.h"
+
+#include <map>
+
+#include <mutex>
 #include "core/HostSlide.h"
 
 #include "core/BassDrum.h"
@@ -2129,6 +2133,45 @@ std::shared_ptr<const ZoneSamples> zoneSamples (const SampleData& sample, bool i
         }
     }
     return z;
+}
+
+std::shared_ptr<const ZoneSamples> zoneSamplesShared (const std::string& path, const std::shared_ptr<const SampleData>& sample, bool int16)
+{
+    if (sample == nullptr)
+        return nullptr;
+    // the sample's identity: length, channels and 64 of its values (a file changed on disk makes new zones)
+    const auto frames = sample->frames();
+    const auto stereo = sample->isStereo();
+    std::uint64_t print = 1469598103934665603ull;
+    for (std::size_t k = 0; frames > 0 && k < 64; ++k)
+    {
+        const auto at = k * (frames - 1) / 63;
+        float v[2] { sample->leftData()[at], stereo ? sample->rightData()[at] : 0.0f };
+        std::uint32_t bits[2];
+        std::memcpy (bits, v, sizeof bits);
+        print = (print ^ bits[0]) * 1099511628211ull;
+        print = (print ^ bits[1]) * 1099511628211ull;
+    }
+    struct Entry
+    {
+        std::size_t frames = 0;
+        bool stereo = false;
+        std::uint64_t print = 0;
+        std::weak_ptr<const ZoneSamples> zones;
+    };
+    static std::mutex lock;
+    static std::map<std::pair<std::string, bool>, Entry> cache;
+    const std::lock_guard<std::mutex> hold (lock);
+    const auto key = std::make_pair (path, int16);
+    if (const auto at = cache.find (key); at != cache.end() && at->second.frames == frames && at->second.stereo == stereo && at->second.print == print)
+        if (auto zones = at->second.zones.lock())
+            return zones;
+    for (auto it = cache.begin(); it != cache.end();) // (entries nobody holds any more)
+        it = it->second.zones.expired() ? cache.erase (it) : std::next (it);
+    auto zones = zoneSamples (*sample, int16);
+    if (zones != nullptr)
+        cache[key] = { frames, stereo, print, zones };
+    return zones;
 }
 
 // a WAV whose audio is 16-bit PCM (format 1, or extensible with the PCM sub-format)

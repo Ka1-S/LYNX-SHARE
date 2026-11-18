@@ -11241,3 +11241,4 @@ countries: fr be ch ca lu
 "Steps 4" = "Paliers 4"
 "Steps 8" = "Paliers 8"
 "Steps 16" = "Paliers 16"
+"Not reproduced (left out or played differently):" = "Non reproduit (omis ou joué autrement) :"

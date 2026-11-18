@@ -816,7 +816,7 @@ TEST (als190bq_a_set_with_live_devices_opens_on_lynx_effects)
     // the report: exact pairs under converted, fitted pairs and every note under "kept but approximated", the rest as before
     CHECK (report.converted.count ("EQ Eight -> Facet EQ") == 1 && report.converted.count ("Utility -> Utility") == 1 && report.converted.count ("Simpler") == 1);
     CHECK (als190bq::reportHas (report.partialEffects, "Compressor -> Crest Compressor") && als190bq::reportHas (report.partialEffects, "Reverb -> Atrium"));
-    CHECK (report.droppedEffects.count ("Erosion") == 1 && report.droppedEffects.size() == 1 && report.unsupported.count ("MidiArpeggiator") == 1);
+    CHECK (report.droppedEffects.count ("Erosion") == 1 && report.droppedEffects.size() == 1 && report.notReproduced.count ("MidiArpeggiator") == 1);
     CHECK (als190bq::reportHas (report.approximated, "Simpler: Slice mode") && als190bq::reportHas (report.approximated, "Simpler: velocity sensitivity"));
     // the Simpler: −6 dB, 4 slices, and its notes moved from C1 up to LYNX's slice keys
     const ChannelDef* sampler = nullptr;

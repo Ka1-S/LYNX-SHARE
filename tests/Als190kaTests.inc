@@ -208,7 +208,7 @@ TEST (als190ka_track_on_off_automation_is_named)
     const auto s = load (text, &report);
     CHECK (s.has_value());
     bool named = false, generic = false;
-    for (const auto& [what, n] : report.unsupported)
+    for (const auto& [what, n] : report.notReproduced) // (round qafix190kq: automation lines left `unsupported`)
     {
         named = named || what.rfind ("Track on / off automation", 0) == 0;
         generic = generic || what.rfind ("Automation of a device parameter", 0) == 0;

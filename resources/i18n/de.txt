@@ -11241,3 +11241,4 @@ countries: de at ch li lu
 "Steps 4" = "Stufen 4"
 "Steps 8" = "Stufen 8"
 "Steps 16" = "Stufen 16"
+"Not reproduced (left out or played differently):" = "Nicht nachgebildet (weggelassen oder anders gespielt):"

@@ -11241,3 +11241,4 @@ countries: nl be
 "Steps 4" = "Trappen 4"
 "Steps 8" = "Trappen 8"
 "Steps 16" = "Trappen 16"
+"Not reproduced (left out or played differently):" = "Niet nagebootst (weggelaten of anders afgespeeld):"

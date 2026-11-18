@@ -34,6 +34,7 @@
 #include "core/OneClickRec.h"
 #include "core/WarpTools.h"
 #include "core/Comping.h"
+#include "core/ExportSilence.h"
 #include "core/Drumaxx.h"
 #include "core/PatternBlocks.h"
 #include "core/LoadTrace.h"
@@ -18876,6 +18877,7 @@ private:
                 report << "converted=" << joined (importReport.converted) << "\n"
                        << "approximated=" << joined (importReport.approximated) << "\n"
                        << "unsupported=" << joined (importReport.unsupported) << "\n"
+                       << "not_reproduced=" << joined (importReport.notReproduced) << "\n" // (round qafix190kq)
                        << "dropped_effects=" << joined (importReport.droppedEffects) << "\n"
                        << "partial_effects=" << joined (importReport.partialEffects) << "\n"
                        << "missing_samples=" << importReport.missingSamples << "\n";
@@ -18922,7 +18924,14 @@ private:
                        << "final_progress=" << lastPercent << "\n"
                        << "bytes=" << output.getSize() << "\n"
                        << "file=" << output.getFullPathName() << "\n";
-                ok = ok && job.getPeak() > 0.001f;
+                // round qafix190kq (QA-9): a silent render failed with an empty message. Say why: a project with nothing to
+                // play (Live's lesson sets "Playing Software Instruments" / "Recording Audio" hold no clip at all), or a
+                // render that stays below -60 dBFS
+                if (ok && job.getPeak() <= 0.001f)
+                {
+                    ok = false;
+                    error = juce::String::fromUTF8 (lynx::exportsilence::reason (loader.getSong(), patternOnly).c_str());
+                }
             }
         }
 
@@ -23856,6 +23865,32 @@ private:
             juce::String info;
             info << "grid " << (song.clipGrid ? "yes" : "no") << ", clips " << (song.clipGrid ? (int) song.clipGrid->clips.size() : 0)
                  << ", scenes " << (song.clipGrid ? (int) song.clipGrid->scenes.size() : 0) << ", playlist clips " << (int) song.playlist.size() << "\n";
+            // round qafix190kq (QA-2): the grid's columns (take lanes have none) and the Session mixer's strips follow them
+            if (auto* grid = ui.getClipGridForSnapshot())
+            {
+                const auto columns = lynx::clipGridColumnTracks (*grid);
+                int lanes = 0, laneColumns = 0;
+                for (int t = 0; t < (int) song.playlistTracks.size(); ++t)
+                    lanes += lynx::comp::isTakeLane (song, t) ? 1 : 0;
+                juce::StringArray names;
+                for (const auto t : columns)
+                {
+                    laneColumns += lynx::comp::isTakeLane (song, t) ? 1 : 0;
+                    names.add (t < (int) song.playlistTracks.size() ? juce::String::fromUTF8 (song.playlistTracks[(std::size_t) t].name.c_str()) : "(empty)");
+                }
+                info << "playlist tracks " << (int) song.playlistTracks.size() << ", take lanes " << lanes << ", grid columns " << (int) columns.size()
+                     << ", lane columns " << laneColumns << "\ncolumns: " << names.joinIntoString (" | ") << "\n";
+                // the lanes' flag survives a save and an open (ProjectFile "playlistTakeLanes")
+                juce::String error;
+                auto same = false;
+                if (const auto back = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (song), error); back && back->playlistTracks.size() == song.playlistTracks.size())
+                {
+                    same = true;
+                    for (std::size_t t = 0; t < song.playlistTracks.size(); ++t)
+                        same = same && back->playlistTracks[t].takeLane == song.playlistTracks[t].takeLane;
+                }
+                info << "take lanes after save + open: " << (same ? "same" : "DIFFERENT") << "\n";
+            }
             juce::File (prefix + "-file.txt").replaceWithText (info);
             ui.setClipLaunchWorkflow (false);
             return;

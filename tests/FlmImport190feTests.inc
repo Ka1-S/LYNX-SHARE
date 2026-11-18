@@ -181,8 +181,8 @@ TEST (flm190fe_3xosc_lanes_play)
         CHECK (cutoff->points[0].value == 0.0f && std::abs (cutoff->points[1].value - 1.0f) < 1e-6f);
     if (volume != nullptr && volume->points.size() == 2) // v · clamp(2·0.75 − 1)
         CHECK (volume->points[0].value == 0.0f && std::abs (volume->points[1].value - 0.5f) < 1e-6f);
-    CHECK (report.unsupported.count ("FL Studio Mobile: automation of 3x Osc parameter 140 (not imported)") == 1);
-    CHECK (report.unsupported.count ("FL Studio Mobile: automation of 3x Osc parameter 13 (not imported)") == 0);
+    CHECK (report.notReproduced.count ("FL Studio Mobile: automation of 3x Osc parameter 140 (not imported)") == 1);
+    CHECK (report.notReproduced.count ("FL Studio Mobile: automation of 3x Osc parameter 13 (not imported)") == 0);
 
     // heard: a lane held at a value against the import of that value, without the lane: coarse +12, the cutoff at ¼
     // (on the 3x Osc's filter type 3, HP, so it is heard), the Volume at 0.8 (FLM's gain 0.8 with the envelope amount 0.75)
