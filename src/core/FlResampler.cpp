@@ -64,6 +64,68 @@ float sixPoint (const float* t, double frac) noexcept
     return (float) (acc + even (5));
 }
 
+// The kernel's eight float seeds from the four sines (round 190kz, owner decision 4e, done exactly): the sines come
+// from an odd polynomial (to r^23 on [−π/2, π/2], error < 1e-15) instead of four library calls, and the seeds are kept
+// only when every value within 1e-14 of each one rounds to the same float — then they are the floats the library's
+// sines give, because a sine error δ moves a seed by at most 7δ (polynomial ≤ 3.2e-16 measured, a libm within 1 ulp:
+// 7δ < 3e-15); otherwise (about one frame in 90,000) the library sines are used. The same samples as before, bit for bit
+// (tests/Dsp190kzTests.inc; round 190kz agents/dsp/e).
+inline double polySine (double x) noexcept // x in [0, 2π)
+{
+    const double pi = 3.141592653589793, halfPi = 1.5707963267948966;
+    double r = x > pi ? x - 6.283185307179586 : x; // (−π, π]
+    r = r > halfPi ? pi - r : r < -halfPi ? -pi - r : r;
+    const double r2 = r * r;
+    static constexpr double c[12] = { 1.0, -1.0 / 6.0, 1.0 / 120.0, -1.0 / 5040.0, 1.0 / 362880.0, -1.0 / 39916800.0, 1.0 / 6227020800.0,
+                                      -1.0 / 1307674368000.0, 1.0 / 355687428096000.0, -1.0 / 121645100408832000.0,
+                                      1.0 / 51090942171709440000.0, -1.0 / 25852016738884976640000.0 };
+    double q = c[11];
+    for (int j = 10; j >= 0; --j)
+        q = q * r2 + c[j];
+    return q * r;
+}
+
+// seeds from s0…s3 (the sines at e0, e0 − step, e2, e2 + cutoff); `guard`: false when a seed lies within 1e-14 of a
+// float rounding boundary
+inline bool seedsFrom (const Kernel& k, double s0, double s1, double s2, double s3, float* seed, bool guard) noexcept
+{
+    bool sure = true;
+    auto put = [&] (int i, ext v) {
+        seed[i] = (float) v;
+        if (guard)
+            sure = sure && (float) (v - (ext) 1.0e-14) == (float) (v + (ext) 1.0e-14);
+    };
+    {
+        const ext a = s0, b = s1, c2 = (ext) k.twoCosStep;
+        put (7, a);
+        put (3, b);
+        const ext t = a * c2 - b;
+        put (6, t);
+        put (2, t * c2 - a);
+    }
+    {
+        const ext a = s2, b = s3, c2 = (ext) k.twoCosCutoff;
+        put (5, a);
+        put (1, b);
+        const ext t = a * c2 - b;
+        put (4, t);
+        put (0, t * c2 - a);
+    }
+    return sure;
+}
+} // namespace
+
+void sincSeeds (const Kernel& k, double a0, double a1, double a2, double a3, float* seed, bool plain) noexcept
+{
+    const auto inRange = [] (double x) { return x >= 0.0 && x < 6.283185307179586; };
+    if (! plain && inRange (a0) && inRange (a1) && inRange (a2) && inRange (a3)
+        && seedsFrom (k, polySine (a0), polySine (a1), polySine (a2), polySine (a3), seed, true))
+        return;
+    seedsFrom (k, std::sin (a0), std::sin (a1), std::sin (a2), std::sin (a3), seed, false);
+}
+
+namespace
+{
 // Windowed sinc over 2N taps: weight(d) = sin(w·d)/(π·d) · (0.36 + c + 0.64·c²)/2 with c = cos(π·d/N), d = frac − m
 // for tap m (frame i + m, m = −N+1 … N). The sines and cosines start from four library sines per output frame and
 // advance by the Chebyshev recurrence s(d−2) = 2·cos·s(d−1) − s(d) in single precision; 1/(π·d) is the SSE estimate
@@ -75,26 +137,8 @@ void sinc (const Kernel& k, const float* tl, const float* tr, double fracIn, flo
     const ext ex = (ext) x, na = -(ext) k.step, w = (ext) k.cutoff;
     const ext e0 = ex * na + (ext) 1.5707963267948966;
     const ext e2 = ex * w;
-    const double s0 = std::sin ((double) e0), s1 = std::sin ((double) (e0 + na));
-    const double s2 = std::sin ((double) e2), s3 = std::sin ((double) (e2 + w));
-
     float seed[8];
-    {
-        const ext a = s0, b = s1, c2 = (ext) k.twoCosStep;
-        seed[7] = (float) a;
-        seed[3] = (float) b;
-        const ext t = a * c2 - b;
-        seed[6] = (float) t;
-        seed[2] = (float) (t * c2 - a);
-    }
-    {
-        const ext a = s2, b = s3, c2 = (ext) k.twoCosCutoff;
-        seed[5] = (float) a;
-        seed[1] = (float) b;
-        const ext t = a * c2 - b;
-        seed[4] = (float) t;
-        seed[0] = (float) (t * c2 - a);
-    }
+    sincSeeds (k, (double) e0, (double) (e0 + na), (double) e2, (double) (e2 + w), seed);
 #if defined(__x86_64__) || defined(__i386__)
     const ext piX = 3.14159265358979323846264338327950288L;
 #else

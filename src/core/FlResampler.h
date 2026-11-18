@@ -6,7 +6,8 @@
 // 1…9 (1 linear, 2 Hermite, 3…9 sinc 16, 24, 32, 64, 128, 256, 512 points); FL plays with index 4 (24-point sinc) and
 // renders with index 5 (32-point sinc) unless the user changes them. The kernels reproduce FL's arithmetic (x87
 // extended precision for the linear/Hermite kernels and the sinc seeds, SSE single precision with the reciprocal
-// estimate for the sinc sums), so on the same CPU they give FL's bits; the sine of the seeds comes from the C library.
+// estimate for the sinc sums), so on the same CPU they give FL's bits; the sine of the seeds is the C library's (a
+// guarded polynomial that gives the same float seeds, round 190kz).
 
 #include <cstdint>
 
@@ -38,6 +39,10 @@ struct Kernel
 // Writes the interpolated left/right frame for the fractional part `frac` (0 ≤ frac < 1). Call it with the x87 unit at
 // 64-bit precision (flvp::X87Extended in scope), as FL runs it.
 void interpolate (const Kernel& k, const float* tapsL, const float* tapsR, double frac, float& outL, float& outR) noexcept;
+
+// The sinc kernel's eight float seeds from the sines at a0…a3 (round 190kz): a guarded polynomial sine whose seeds are the
+// library sines' bit for bit, or (plain) the library sines themselves — the two give the same floats (tests)
+void sincSeeds (const Kernel& k, double a0, double a1, double a2, double a3, float* seed, bool plain = false) noexcept;
 
 // The read speed FL computes for a pitch in cents and a rate ratio (sample rate / output rate):
 // exactly `ratio` at 0 cents, else exp(cents · ln2/1200) · ratio.

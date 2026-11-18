@@ -100,3 +100,31 @@ TEST (dsp190kz_reeverb2_lfo_sine_is_the_plain_sine_bit_for_bit)
         check (ph);
     CHECK (checked > 1000000 && differing == 0);
 }
+
+TEST (dsp190kz_sampler_sinc_seeds_are_the_library_sines_bit_for_bit)
+{
+    // owner decision 4e, done exactly: the FL-sinc kernel's four sines per frame come from a guarded polynomial; its float
+    // seeds equal the library sines' (the guard falls back to std::sin within 1e-14 of a float boundary). Random frames
+    // over every kernel width and cutoff the sampler uses, plus the speeds of a 48 kHz device
+    std::uint32_t r = 190;
+    auto next = [&r] { r = r * 1664525u + 1013904223u; return (double) (r >> 8) / 16777216.0; };
+    long frames = 0, differing = 0;
+    for (const int quality : { 1, 2, 3, 4, 5, 6, 7, 8, 9 })
+        for (const double speed : { 0.25, 0.5, 0.75, 0.9183673469387755, 1.0, 1.0884353741496599, 1.5, 2.0, 3.7 })
+        {
+            lynx::flrs::Kernel k;
+            k.setQuality (quality);
+            k.setSpeed (speed);
+            for (int i = 0; i < 20000; ++i)
+            {
+                const double x = std::max (1e-25, next());
+                const auto na = -(long double) k.step, w = (long double) k.cutoff, e0 = (long double) x * na + 1.5707963267948966L, e2 = (long double) x * w;
+                float a[8], b[8];
+                lynx::flrs::sincSeeds (k, (double) e0, (double) (e0 + na), (double) e2, (double) (e2 + w), a, false);
+                lynx::flrs::sincSeeds (k, (double) e0, (double) (e0 + na), (double) e2, (double) (e2 + w), b, true);
+                differing += std::memcmp (a, b, sizeof a) != 0;
+                ++frames;
+            }
+        }
+    CHECK (frames == 9 * 9 * 20000 && differing == 0);
+}
