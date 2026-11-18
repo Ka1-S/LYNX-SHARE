@@ -11286,3 +11286,6 @@ countries: cn sg
 "Metronome Sound" = "节拍器声音"
 "Metronome Volume" = "节拍器音量"
 "Count-in Duration" = "预备拍时长"
+"Previous filter group" = "上一个筛选组"
+"Next filter group" = "下一个筛选组"
+"This file is not a channel state LYNX SHARE can read." = "此文件不是 LYNX SHARE 能读取的通道状态。"

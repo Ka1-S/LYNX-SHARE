@@ -39,6 +39,8 @@
 #include "ui/ChannelSettings.h"
 
 #include "engine/Text.h"
+#include "engine/ProjectFile.h"
+#include "platform/Paths.h"
 #include "ui/Dialogs.h"
 #include "ui/HintBar.h"
 #include "ui/ExportDialog.h"
@@ -252,6 +254,21 @@ int ChannelRackComponent::visibleIndex (int row) const
 int ChannelRackComponent::shownCount() const
 {
     return visibleIndex ((int) engine.getSong().channels.size());
+}
+
+// round 190ld (DE-37): FL's Page Up / Page Down step the filter groups in the menu's order (All, Unsorted, Audio clips,
+// then the project's groups), wrapping round
+void ChannelRackComponent::stepFilterGroup (int direction)
+{
+    const auto& song = engine.getSong();
+    std::vector<int> order { rackfilter::all, rackfilter::unsorted, rackfilter::audioClips };
+    for (int g = 0; g < (int) song.channelGroups.size(); ++g)
+        if (! rackfilter::isBuiltinName (song.channelGroups[(std::size_t) g]))
+            order.push_back (g);
+    const auto at = std::find (order.begin(), order.end(), filterGroup);
+    const auto i = at == order.end() ? 0 : (int) (at - order.begin());
+    const auto n = (int) order.size();
+    setFilterGroup (order[(std::size_t) (((i + (direction < 0 ? -1 : 1)) % n + n) % n)]);
 }
 
 void ChannelRackComponent::setFilterGroup (int group)
@@ -2633,6 +2650,17 @@ void ChannelRackComponent::fillWindowMenu (int channel, wrappermenu::Spec& spec)
         if (safe != nullptr && channel < (int) safe->engine.getSong().channels.size())
             safe->rename (channel);
     };
+    // FL's Channel column (round 190ld, DF-118): "Save channel state as..." writes the channel as the project stores it
+    // (ProjectFile::channelStateBytes, LYNX's .lynxchannel); "Browse channel states" opens one into this channel (its
+    // mixer track stays). FL's own .fst states are read by the Browser.
+    spec.saveChannelState = [safe, channel] {
+        if (safe != nullptr && channel < (int) safe->engine.getSong().channels.size())
+            safe->saveChannelState (channel);
+    };
+    spec.browseChannelStates = [safe, channel] {
+        if (safe != nullptr && channel < (int) safe->engine.getSong().channels.size())
+            safe->openChannelState (channel);
+    };
     spec.changeColour = [safe, channel] (juce::PopupMenu& m) {
         if (safe == nullptr || channel >= (int) safe->engine.getSong().channels.size())
             return;
@@ -3075,6 +3103,61 @@ void ChannelRackComponent::showAddChannelMenu (int insertAt)
     addInstrumentItems (menu, insertAt);
     quickpick::addFolderViewItems (menu, engine); // FL: Categories / Simple / Tree at the bottom
     quickpick::showMenu (menu, juce::PopupMenu::Options().withTargetComponent (this).withMousePosition(), std::move (picks));
+}
+
+juce::File ChannelRackComponent::channelStateFolder()
+{
+    return platform::documentsFolder().getChildFile ("LYNX/Channel states");
+}
+
+void ChannelRackComponent::saveChannelState (int channel)
+{
+    const auto& c = engine.getSong().channels[(std::size_t) channel];
+    const auto folder = channelStateFolder();
+    folder.createDirectory();
+    const auto name = juce::File::createLegalFileName (juce::String::fromUTF8 (c.name.c_str())).trim();
+    fileChooser = lynx::ui::makeFileChooser (tr ("Save channel state as..."), folder.getChildFile ((name.isEmpty() ? juce::String ("Channel") : name) + ".lynxchannel"),
+                                             "*.lynxchannel");
+    lynx::ui::launchChooser (fileChooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
+                                              | juce::FileBrowserComponent::warnAboutOverwriting,
+                             [this, channel] (const juce::FileChooser& chooser) {
+                                 auto file = chooser.getResult();
+                                 if (file == juce::File() || channel >= (int) engine.getSong().channels.size())
+                                     return;
+                                 file = file.withFileExtension ("lynxchannel");
+                                 const auto bytes = ProjectFile::channelStateBytes (engine.getSong().channels[(std::size_t) channel]);
+                                 if (! file.replaceWithData (bytes.data(), bytes.size()))
+                                     juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Save channel state as..."),
+                                                                             tr ("Could not write {0}", { file.getFullPathName() }));
+                             });
+}
+
+void ChannelRackComponent::openChannelState (int channel)
+{
+    fileChooser = lynx::ui::makeFileChooser (tr ("Browse channel states"), channelStateFolder(), "*.lynxchannel");
+    lynx::ui::launchChooser (fileChooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                             [this, channel] (const juce::FileChooser& chooser) {
+                                 juce::MemoryBlock data;
+                                 if (! chooser.getResult().loadFileAsData (data) || channel >= (int) engine.getSong().channels.size())
+                                     return;
+                                 const auto* p = static_cast<const std::uint8_t*> (data.getData());
+                                 auto loaded = ProjectFile::channelFromStateBytes (std::vector<std::uint8_t> (p, p + data.getSize()));
+                                 if (! loaded)
+                                 {
+                                     juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Browse channel states"),
+                                                                             tr ("This file is not a channel state LYNX SHARE can read."));
+                                     return;
+                                 }
+                                 closeEditor (channel);
+                                 engine.editSongStructural ([channel, def = *loaded] (Song& s) mutable {
+                                     if (channel >= (int) s.channels.size())
+                                         return;
+                                     auto& old = s.channels[(std::size_t) channel];
+                                     def.mixerTrack = old.mixerTrack; // (the channel keeps its place in the mix and its filter group)
+                                     def.group = old.group;
+                                     old = std::move (def);
+                                 });
+                             });
 }
 
 void ChannelRackComponent::chooseSample (int channel, int insertAt)

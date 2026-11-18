@@ -11286,3 +11286,6 @@ countries: tr
 "Metronome Sound" = "Metronom sesi"
 "Metronome Volume" = "Metronom seviyesi"
 "Count-in Duration" = "Geri sayım süresi"
+"Previous filter group" = "Önceki filtre grubu"
+"Next filter group" = "Sonraki filtre grubu"
+"This file is not a channel state LYNX SHARE can read." = "Bu dosya LYNX SHARE'in okuyabileceği bir kanal durumu değil."

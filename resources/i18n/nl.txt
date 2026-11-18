@@ -11286,3 +11286,6 @@ countries: nl be
 "Metronome Sound" = "Metronoomgeluid"
 "Metronome Volume" = "Metronoomvolume"
 "Count-in Duration" = "Duur aftellen"
+"Previous filter group" = "Vorige filtergroep"
+"Next filter group" = "Volgende filtergroep"
+"This file is not a channel state LYNX SHARE can read." = "Dit bestand is geen kanaalstatus die LYNX SHARE kan lezen."

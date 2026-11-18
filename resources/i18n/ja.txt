@@ -11286,3 +11286,6 @@ countries: jp
 "Metronome Sound" = "メトロノームのサウンド"
 "Metronome Volume" = "メトロノームの音量"
 "Count-in Duration" = "カウントインの長さ"
+"Previous filter group" = "前のフィルターグループ"
+"Next filter group" = "次のフィルターグループ"
+"This file is not a channel state LYNX SHARE can read." = "このファイルは LYNX SHARE が読めるチャンネルの状態ではありません。"

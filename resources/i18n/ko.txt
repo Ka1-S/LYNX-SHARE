@@ -11286,3 +11286,6 @@ countries: kr
 "Metronome Sound" = "메트로놈 사운드"
 "Metronome Volume" = "메트로놈 볼륨"
 "Count-in Duration" = "카운트인 길이"
+"Previous filter group" = "이전 필터 그룹"
+"Next filter group" = "다음 필터 그룹"
+"This file is not a channel state LYNX SHARE can read." = "이 파일은 LYNX SHARE가 읽을 수 있는 채널 상태가 아닙니다."

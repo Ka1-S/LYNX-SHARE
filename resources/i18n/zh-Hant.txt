@@ -11286,3 +11286,6 @@ countries: tw hk mo
 "Metronome Sound" = "節拍器聲音"
 "Metronome Volume" = "節拍器音量"
 "Count-in Duration" = "預備拍長度"
+"Previous filter group" = "上一個篩選群組"
+"Next filter group" = "下一個篩選群組"
+"This file is not a channel state LYNX SHARE can read." = "此檔案不是 LYNX SHARE 能讀取的通道狀態。"

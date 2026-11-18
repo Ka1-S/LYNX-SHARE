@@ -11286,3 +11286,6 @@ countries: es mx ar co cl pe ve
 "Metronome Sound" = "Sonido del metrónomo"
 "Metronome Volume" = "Volumen del metrónomo"
 "Count-in Duration" = "Duración de la cuenta previa"
+"Previous filter group" = "Grupo de filtro anterior"
+"Next filter group" = "Siguiente grupo de filtro"
+"This file is not a channel state LYNX SHARE can read." = "Este archivo no es un estado de canal que LYNX SHARE pueda leer."

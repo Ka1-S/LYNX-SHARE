@@ -11286,3 +11286,6 @@ countries: ru by kz
 "Metronome Sound" = "Звук метронома"
 "Metronome Volume" = "Громкость метронома"
 "Count-in Duration" = "Длительность отсчёта"
+"Previous filter group" = "Предыдущая группа фильтра"
+"Next filter group" = "Следующая группа фильтра"
+"This file is not a channel state LYNX SHARE can read." = "Этот файл не является состоянием канала, которое LYNX SHARE может прочитать."

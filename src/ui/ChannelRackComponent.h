@@ -177,6 +177,11 @@ public:
     // otherwise only the channels of that group (Song::channelGroups). New channels join the group shown.
     int getFilterGroup() const noexcept { return filterGroup; }
     void setFilterGroup (int group);
+    void stepFilterGroup (int direction); // round 190ld: FL's Page Up / Page Down
+    // round 190ld (DF-118): FL's wrapper Channel column, Save channel state as... / Browse channel states
+    void saveChannelState (int channel);
+    void openChannelState (int channel);
+    static juce::File channelStateFolder();
     juce::String filterName() const;
     void showFilterMenu (juce::Component* target);
     void groupSelected (); // "Group selected..." (Alt+G): the selected channels go into a new, named group

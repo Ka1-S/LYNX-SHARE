@@ -2387,6 +2387,8 @@ bool MainComponent::runAction (const std::string& id)
         }
     }
     else if (is ("rack.groupSelected")) rack.groupSelected();
+    else if (is ("rack.filterPrevious")) rack.stepFilterGroup (-1); // round 190ld (DE-37)
+    else if (is ("rack.filterNext")) rack.stepFilterGroup (1);
     else if (is ("rack.rotateLeft")) rack.rotateSelected (-1);
     else if (is ("rack.rotateRight")) rack.rotateSelected (1);
     else if (is ("browser.previous")) browser.step (-1, false);

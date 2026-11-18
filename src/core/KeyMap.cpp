@@ -200,6 +200,10 @@ std::vector<Action> makeActions()
         { "rack.groupSelected", TR_NOOP ("Put the selected channels in a new filter group"), Context::channelRack, { chord ('G', alt) } },
         { "rack.rotateLeft", TR_NOOP ("Rotate the selected channels' steps left"), Context::channelRack, { chord (left, ctrl | shift) } },
         { "rack.rotateRight", TR_NOOP ("Rotate the selected channels' steps right"), Context::channelRack, { chord (right, ctrl | shift) } },
+        // FL's Channel rack (manual "Channel Rack › Filter"; round 190ld, DE-37): Page Up / Page Down = the previous / next
+        // filter group, in the group menu's order
+        { "rack.filterPrevious", TR_NOOP ("Previous filter group"), Context::channelRack, { chord (pageUp) } },
+        { "rack.filterNext", TR_NOOP ("Next filter group"), Context::channelRack, { chord (pageDown) } },
 
         // Piano Roll (focused): tool dialogs and zoom
         { "pianoRoll.toStart", TR_NOOP ("Move the playback marker to start"), Context::pianoRoll, { chord (home) } }, // (issue #195)

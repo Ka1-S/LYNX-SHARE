@@ -268,6 +268,39 @@
                 line ("tracks with an Arrangement clip at the start: " + juce::String (withClips));
                 refreshClipGrid (*gridView);
                 write (*gridView, "grid-status");
+                // Live's clip and Main track menus in Live's order (the first clip of the set; scene 1)
+                for (int t = 0, done = 0; t < 8 && ! done; ++t)
+                    for (int r = 0; r < 32 && ! done; ++r)
+                        if (launcher::clipAt (*song.clipGrid, t, r) != nullptr)
+                        {
+                            const auto items = texts (clipGridSlotMenu (*gridView, t, r));
+                            line ("clip menu: " + items.joinIntoString (" | "));
+                            check ("clip menu starts with Live's Cut / Copy / Duplicate / Delete, then Rename",
+                                   items.size() > 5 && items[0].startsWith (lynx::tr ("Cut")) && items[3].startsWith (lynx::tr ("Delete"))
+                                       && items[4].startsWith (lynx::tr ("Rename")));
+                            menuShot (clipGridSlotMenu (*gridView, t, r), "Clip", "grid-clip-menu");
+                            done = 1;
+                        }
+                {
+                    const auto items = texts (clipGridSceneMenu (*gridView, 0));
+                    line ("scene menu: " + items.joinIntoString (" | "));
+                    check ("scene menu in Live's order (Duplicate first, Cancel Scene Launch, the two prefs)",
+                           items.size() > 6 && items[0].startsWith (lynx::tr ("Duplicate")) && items.contains (lynx::tr ("Cancel Scene Launch"))
+                               && items.contains (lynx::tr ("Trigger Recording on Launch (Pref)")));
+                    menuShot (clipGridSceneMenu (*gridView, 0), "Scene", "grid-scene-menu");
+                }
+                // Live's count-in: the position field filled #03c3d5 with dark digits (2 bars of 4/4, a beat and an eighth in)
+                {
+                    offline.getTransport().countIn.store (2.0 * (double) song.barTicks() - 1.5 * (double) lynx::ppq);
+                    ui.transportTickForSnapshot();
+                    if (auto* position = ui.toolbarPartForSnapshot ("position"))
+                    {
+                        position->repaint();
+                        saveArea (ui, position->getBounds().expanded (60, 4), prefix + "-live-countin.png");
+                    }
+                    offline.getTransport().countIn.store (0.0);
+                    ui.transportTickForSnapshot();
+                }
                 // a MIDI track locked to a controller (Live: Monitor In): the keyboard icon; an audio track monitoring On: the
                 // microphone; an armed track on Auto keeps its miniature (Live 12.4, raw/L09)
                 int midiTrack = -1, audioTrack = -1;

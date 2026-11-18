@@ -11286,3 +11286,6 @@ countries: id
 "Metronome Sound" = "Suara metronom"
 "Metronome Volume" = "Volume metronom"
 "Count-in Duration" = "Durasi hitungan masuk"
+"Previous filter group" = "Grup filter sebelumnya"
+"Next filter group" = "Grup filter berikutnya"
+"This file is not a channel state LYNX SHARE can read." = "Berkas ini bukan status kanal yang dapat dibaca LYNX SHARE."
