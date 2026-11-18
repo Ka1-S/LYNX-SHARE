@@ -3,6 +3,7 @@
 #include "core/DrawMode.h"
 #include "core/LayoutStyle.h"
 #include "ui/NewtoneEditor.h"
+#include "ui/AraMenu.h"
 #include "ui/TempoDetectionDialog.h"
 #include "ui/ClipGridComponent.h"
 #include "ui/CleanVoiceMenu.h"
@@ -95,6 +96,8 @@
 #include "ui/QuickPick.h"
 #include "ui/Icons.h"
 #include "ui/SimpleLook.h"
+#include "core/LoopAnalysis.h" // round 190kx
+#include "ui/LoopInfo.h"
 
 #include <map>
 #include <unordered_map>
@@ -10283,6 +10286,35 @@ void PlaylistComponent::addKeyFollowItems (juce::PopupMenu& menu, int index, con
         keys.addSubMenu (minor ? tr ("Minor") : tr ("Major"), roots);
     }
     keys.addSeparator();
+    // round 190kx: the key of the audio itself (core/LoopAnalysis detectKey, on a worker thread): found, it becomes the
+    // loop key ("detected"); not found, the hint says so and nothing changes
+    {
+        const auto path = juce::String::fromUTF8 (song.channels[(std::size_t) channel].samplePath.c_str());
+        keys.addItem (tr ("Detect from the audio"), path.isNotEmpty(), false, [this, channel, path] {
+            auto sample = engine.getSampleLibrary().load (path);
+            if (sample == nullptr)
+                return;
+            ui::postHint ({ tr ("Detecting the loop's key..."), {}, false, false });
+            juce::Thread::launch ([safe = juce::Component::SafePointer<PlaylistComponent> (this), sample, channel, path] {
+                const auto d = loopanalysis::detectKey (*sample);
+                juce::MessageManager::callAsync ([safe, d, channel, path] {
+                    if (safe == nullptr)
+                        return;
+                    auto& song = safe->engine.getSong();
+                    if (channel >= (int) song.channels.size() || juce::String::fromUTF8 (song.channels[(std::size_t) channel].samplePath.c_str()) != path)
+                        return; // (the channel changed meanwhile)
+                    if (! d.key)
+                    {
+                        ui::postHint ({ tr ("No clear key in this audio (drums, noise or too short)"), {}, false, false });
+                        return;
+                    }
+                    const auto key = *d.key;
+                    safe->engine.editSong ([channel, key] (Song& s) { keyfollow::setLoopKey (s, channel, key, 2); });
+                    ui::postHint ({ tr ("Loop key"), juce::String (projectkey::rootName (key.root)) + " " + (key.minor ? tr ("minor") : tr ("major")), false, false });
+                });
+            });
+        });
+    }
     keys.addItem (tr ("Not known"), true, ! key, [this, channel] { engine.editSong ([channel] (Song& s) { keyfollow::setLoopKey (s, channel, std::nullopt, 0); }); });
     const auto source = song.channels[(std::size_t) channel].sampler.loopKeySource;
     menu.addSubMenu (tr ("Loop key") + (key ? ": " + keyText (*key) + (source == 1 ? " (" + tr ("from its name") + ")" : source == 2 ? " (" + tr ("detected") + ")" : juce::String())
@@ -11072,9 +11104,34 @@ juce::PopupMenu PlaylistComponent::buildAudioClipMenu (int index, int mouseX)
     // 190je's tall-menu split (JUCE fix 40, lynxTallMenuBreakHook) leaves a menu with breaks alone)
     menu.addColumnBreak();
     menu.addSectionHeader (tr ("LYNX extras")); // (round 190gi: as the Clip View's menu, DetailView; FL's sections stay FL's)
-    // round 190ds, Simple workflow only (LYNX's own): the clip follows the project key, and its loop's key
-    if (simpleHeaders)
-        addKeyFollowItems (menu, index, targets);
+    // round 190ds (LYNX's own): the clip follows the project key, and its loop's key; round 190kx: in every layout (this
+    // column is LYNX's own), with "Detect from the audio" in Loop key and a one-click fit to the project's tempo
+    addKeyFollowItems (menu, index, targets);
+    if (sample != nullptr)
+    {
+        // the loop analysis' tempo when it knows the file (the Browser showed it, a drop analysed it) and finds a loop of
+        // whole beats, in the octave nearest the project's (clipops::fitBeats); else the same count as FL's Fit to tempo
+        auto beats = 0.0f;
+        if (loopInfo == nullptr)
+            loopInfo = loopinfo::Shared::get (engine); // (kept while the Playlist exists: the worker and its answers)
+        auto& info = loopInfo;
+        if (const auto known = info->known (channel.samplePath); known && known->isLoop() && sample->acidBeats <= 0.0f)
+            beats = clipops::fitBeats ((double) sample->frames() / sample->sampleRate, song.bpm, 0.0f, known->bpm);
+        else
+            info->request ({ channel.samplePath }); // (known the next time the menu opens)
+        if (beats <= 0.0f)
+            beats = tempodetect::fitBeatsOf (sample.get(), song.bpm);
+        if (beats > 0.0f)
+        {
+            const auto whole = std::abs (beats - std::round (beats)) < 0.005f;
+            const auto count = juce::String (beats, whole ? 0 : 2) + " " + (beats == 1.0f ? tr ("beat") : tr ("beats"));
+            const auto seconds = frames / juce::jmax (1.0, rate);
+            const auto from = seconds > 0.0 ? juce::String (beats * 60.0 / seconds, 1) : juce::String();
+            const auto fitted = channel.sampler.stretchBeats == beats && channel.sampler.keepPitch;
+            menu.addItem (tr ("Fit to the project tempo ({0}, from {1} BPM)", { count, from }), true, fitted,
+                          [fitTo = clipFitter (index, sample), beats] { fitTo (beats, true); });
+        }
+    }
     // comping (round 163): a take lane's clip onto its comp track (the group header above)
     if (const auto comp = takes::compTrackOf (song, clip.track); comp >= 0)
     {
@@ -11216,6 +11273,8 @@ juce::PopupMenu PlaylistComponent::buildAudioClipMenu (int index, int mouseX)
         ui::postHint (done, 2500);
         repaint();
     });
+    // round 190kx: ARA 2 (Melodyne, RipX, VocAlign...) on the clip's channel (LYNX's own: FL Studio 2026 hosts no ARA)
+    menu.addSubMenu (tr ("Edit in ARA plugin"), aramenu::forClip (engine, index));
     menu.addItem (tr ("Open in a new Sampler channel"), sample != nullptr, false, [this, ch] {
         if (onOpenInSampler)
             onOpenInSampler (ch);

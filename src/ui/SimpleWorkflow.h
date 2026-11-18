@@ -17,6 +17,7 @@
 namespace lynx
 {
 class AudioEngine;
+struct SampleData;
 class FirstSongTour;
 class SimpleDock;
 
@@ -174,6 +175,8 @@ private:
     void updateDock(); // shows or hides the dock as the setting says, on the Playlist's current track
     void showKeysForNewTrack(); // a new instrument: the dock's Keyboard tab (or the Touch keyboard window, dock hidden)
     void offerProjectKey (int root, bool minor); // a keyed loop came into a project without a key
+    // round 190kx: a dropped loop the analysis cache didn't know: analysed on a worker, then fitted / keyed
+    void applyLoopAnalysis (const juce::File& file, std::shared_ptr<const SampleData> data, bool fit, bool key);
 
     AudioEngine& engine;
     Host host;
@@ -193,5 +196,6 @@ private:
     juce::String lastKeyQuestion;
     std::unique_ptr<juce::FileChooser> fileChooser;
     juce::File sampleFolder; // where the last sample for a Sampler track came from (this session)
+    std::shared_ptr<int> lifetime = std::make_shared<int> (0); // (round 190kx: late answers check it)
 };
 } // namespace lynx

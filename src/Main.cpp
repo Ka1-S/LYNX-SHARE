@@ -1,4 +1,5 @@
 #include <juce_gui_basics/juce_gui_basics.h>
+#include "engine/AraHost.h"
 #include "engine/FileSort.h"
 #include "platform/Paths.h"
 #include "core/GrooveAudio.h"
@@ -259,6 +260,9 @@
 #include "ui/StemExtract.h"
 #include "core/RegionLoop.h" // round 190jr: --bandlab190jrshot
 #include "core/FactoryContent.h" // round 190ke: --simplegb190keshot
+#include "core/KeyFollow.h"     // round 190kx: --loopinfo190kxshot
+#include "core/LoopAnalysis.h"
+#include "../tests/LoopCorpus190kx.h" // (LYNX's own synthetic loops, written for the shot)
 #include "core/SongFade.h"
 #include "core/SoundLibrary.h"
 #include "core/SynthParams.h"
@@ -946,6 +950,26 @@ public:
             const auto i = args.indexOf ("--midiouttest");
             const auto result = lynx::AudioEngine::midiOutPortSelfTest();
             juce::File (args[i + 1].unquoted()).replaceWithText ("midi_out_ports=" + result + "\nresult=" + (result.startsWith ("OK") ? "OK" : "FAILED") + "\n");
+            setApplicationReturnValue (result.startsWith ("OK") ? 0 : 1);
+            quit();
+            return;
+        }
+
+        if (args.contains ("--aratest"))
+        {
+            // LYNX --aratest <plugin.vst3> <audio.wav> <out folder> [project.lynx] (round 190kx, engine/AraTest.cpp): ARA 2
+            // hosting end to end (a plain clip vs the clip in the ARA plugin, the document archived and restored). No window.
+            const auto i = args.indexOf ("--aratest");
+            const juce::File out (args[i + 3].unquoted());
+            juce::String text;
+            const auto result = lynx::araSelfTest (juce::File (args[i + 1].unquoted()), juce::File (args[i + 2].unquoted()), out,
+                                                   args.size() > i + 4 ? juce::File (args[i + 4].unquoted()) : juce::File(),
+                                                   [&text, out] (const juce::String& line) {
+                                                       text << line << "\n";
+                                                       out.getChildFile ("aratest.txt").replaceWithText (text + "(running)\n");
+                                                   });
+            text << "ara=" << result << "\nresult=" << (result.startsWith ("OK") ? "OK" : "FAILED") << "\n";
+            out.getChildFile ("aratest.txt").replaceWithText (text);
             setApplicationReturnValue (result.startsWith ("OK") ? 0 : 1);
             quit();
             return;
@@ -2062,6 +2086,14 @@ public:
             return;
         }
 
+        // --loopinfo190kxshot <folder> (round 190kx: loop key / tempo in the Simple rows, the Loop Browser, the clip menu)
+        if (args.contains ("--loopinfo190kxshot"))
+        {
+            setApplicationReturnValue (runLoopInfoShot190kx (juce::File (args[args.indexOf ("--loopinfo190kxshot") + 1].unquoted())) ? 0 : 1);
+            quit();
+            return;
+        }
+
         // --loopshot190kf <folder> (round gaps190kf: the Loop Browser): src/LoopShot190kf.inc
         if (args.contains ("--loopshot190kf"))
         {
@@ -2255,6 +2287,27 @@ public:
             // editor before / after some of them, as PNGs (a synthetic drum loop without a file)
             const auto i = args.indexOf ("--edisonshot");
             runEdisonShot (args[i + 1].unquoted(), i + 2 < args.size() ? args[i + 2].unquoted() : juce::String());
+            quit();
+            return;
+        }
+
+        if (args.contains ("--arashot190kx"))
+        {
+            // LYNX --arashot190kx prefix (round 190kx): the Playlist's audio clip menu with its "Edit in ARA plugin" submenu
+            // (a stand-in Melodyne entry in this engine's plugin list, as a scan lists the installed one), before and after the
+            // clip's channel is edited in it
+            const auto i = args.indexOf ("--arashot190kx");
+            runAraShot190kx (args[i + 1].unquoted());
+            quit();
+            return;
+        }
+
+        if (args.contains ("--newtoneshot190kx"))
+        {
+            // LYNX --newtoneshot190kx prefix audio.wav (round 190kx): Newtone with FL's analysis and with "Separate close
+            // notes", each as analysed and after Center 100 % (Melodyne's Correct Pitch), for the Melodyne | LYNX pairs
+            const auto i = args.indexOf ("--newtoneshot190kx");
+            runNewtoneShot190kx (args[i + 1].unquoted(), args[i + 2].unquoted());
             quit();
             return;
         }
@@ -17997,6 +18050,11 @@ private:
             for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
             {
                 const auto& item = it.getItem();
+                // (round 190kx's loop items, whose labels carry the clip's own key / tempo, are not in the fixed list)
+                if (! item.isSeparator && ! item.isSectionHeader
+                    && (plain (item.text).startsWith (lynx::tr ("Follow the project key")) || plain (item.text).startsWith (lynx::tr ("Loop key"))
+                        || plain (item.text).startsWith (lynx::tr ("Fit to the project tempo ({0}, from {1} BPM)").upToFirstOccurrenceOf (" (", false, false))))
+                    continue;
                 got.add (item.customComponent != nullptr ? "[" + lynx::tr ("Audio clip") + "]"
                          : item.isSeparator              ? juce::String ("-")
                          : item.isSectionHeader          ? "[" + plain (item.text) + "]"
@@ -21494,6 +21552,118 @@ private:
         report << (all ? "ALL OK\n" : "FAILURES\n");
         folder.getChildFile ("report.txt").replaceWithText (report);
         return all;
+    }
+
+    void runAraShot190kx (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine engine (false);
+        juce::PluginDescription melodyne;
+        melodyne.name = "Melodyne";
+        melodyne.manufacturerName = "Celemony";
+        melodyne.pluginFormatName = "VST3";
+        melodyne.fileOrIdentifier = "C:\\Program Files\\Common Files\\VST3\\Celemony\\Melodyne\\Melodyne.vst3";
+        melodyne.uniqueId = 0x190;
+        melodyne.isInstrument = false;
+       #if JUCE_PLUGINHOST_ARA
+        melodyne.hasARAExtension = true;
+       #endif
+        engine.getPluginHost().getKnownPlugins().addType (melodyne);
+        lynx::MainComponent ui (engine, false);
+        ui.setSize (1600, 900);
+        {
+            auto song = lynx::Song::makeDefault();
+            song.channels.push_back ({});
+            song.channels.back().name = "Vocal";
+            song.channels.back().instrument = lynx::InstrumentKind::audioClip;
+            song.channels.back().samplePath = writeShotSample (juce::File (prefix + "-vox.wav"), 330.0).getFullPathName().toStdString();
+            lynx::Clip c;
+            c.kind = lynx::ClipKind::audio;
+            c.channel = (int) song.channels.size() - 1;
+            c.track = 3;
+            c.start = 4 * lynx::ppq;
+            c.length = 2 * lynx::ppq;
+            song.playlist.push_back (c);
+            engine.setSong (std::move (song));
+        }
+        engine.dispatchPendingMessages();
+        auto& playlist = ui.getPlaylistForSnapshot();
+        auto sub = [] (const juce::PopupMenu& menu, const juce::String& text) -> const juce::PopupMenu* {
+            for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+                if (it.getItem().subMenu != nullptr && it.getItem().text == text)
+                    return it.getItem().subMenu.get();
+            return nullptr;
+        };
+        juce::String report;
+        for (const auto edited : { false, true })
+        {
+            if (edited) // (the channel edited in the stand-in: the menu ticks it and offers its editor; nothing is loaded here)
+            {
+                const auto ch = engine.getSong().playlist[0].channel;
+                engine.editSong ([ch, id = melodyne.createIdentifierString().toStdString()] (lynx::Song& s) {
+                    s.channels[(std::size_t) ch].ara = { id, "Melodyne" };
+                }, false);
+            }
+            const auto menu = playlist.getClipMenuForSnapshot (0);
+            savePng (columnMenuImage (menu), prefix + (edited ? "-clip-menu-edited.png" : "-clip-menu.png"));
+            if (const auto* ara = sub (menu, lynx::tr ("Edit in ARA plugin")))
+            {
+                savePng (columnMenuImage (*ara), prefix + (edited ? "-ara-submenu-edited.png" : "-ara-submenu.png"));
+                report << (edited ? "edited:" : "plain:");
+                for (juce::PopupMenu::MenuItemIterator it (*ara); it.next();)
+                    report << " [" << (it.getItem().isSeparator ? juce::String ("-") : it.getItem().text) << (it.getItem().isTicked ? " *" : "") << "]";
+                report << "\n";
+            }
+            else
+                report << "no ARA submenu\n";
+        }
+        lynx::shot::file (juce::File (prefix + "-menus.txt")).replaceWithText (report);
+        std::printf ("%s", report.toRawUTF8());
+    }
+
+    void runNewtoneShot190kx (const juce::String& prefix, const juce::String& file)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        const auto sample = offline.getSampleLibrary().load (file);
+        if (sample == nullptr)
+        {
+            std::fprintf (stderr, "newtoneshot190kx: cannot read %s\n", file.toRawUTF8());
+            return;
+        }
+        juce::String report;
+        for (const auto fine : { false, true })
+            for (const auto corrected : { false, true })
+            {
+                lynx::newtonefx::AnalyseOptions options;
+                options.fineSplit = fine;
+                auto track = lynx::newtonefx::analyseNotes (*sample, options);
+                if (corrected)
+                {
+                    lynx::newtonefx::applyCentre (track, 1.0);
+                    lynx::newtonefx::applyVariation (track, 0.0);
+                }
+                int at = 0;
+                offline.editSong ([&] (lynx::Song& song) {
+                    if (song.mixer.size() < 2)
+                        song.mixer.resize (2);
+                    song.mixer[1].effects.clear();
+                    auto tone = lynx::makeEffectSlot (lynx::EffectKind::newtone);
+                    tone.samplePath = file.toStdString();
+                    tone.state = lynx::newtonefx::writeNative (track);
+                    song.mixer[1].effects.push_back (tone);
+                }, false);
+                auto editor = lynx::makeNewtoneEditor (offline, 1, at);
+                const auto name = juce::String (fine ? "fine" : "fl") + (corrected ? "-centre100" : "-analysed");
+                saveSnapshot (*editor, prefix + "-" + name + ".png");
+                report << name << ":";
+                for (const auto& p : track.pitches)
+                    if (p.voiced())
+                        report << " " << juce::String (p.origPitch + p.shift, 2);
+                report << "\n";
+            }
+        lynx::shot::file (juce::File (prefix + "-notes.txt")).replaceWithText (report);
+        std::printf ("%s", report.toRawUTF8());
     }
 
     void runNewtoneShot (const juce::String& prefix, const juce::String& file)
@@ -34091,6 +34261,7 @@ private:
 #include "SimpleGbShot190ke.inc" // round 190ke
 #include "LoopShot190kf.inc"   // round gaps190kf
 #include "QaRest190lcShot.inc"  // rollup 0.1.30 step 7 (round 190lc)
+#include "LoopInfoShot190kx.inc" // round 190kx
 
     static void writeWaveDemo (const juce::File& file, double bpm)
     {

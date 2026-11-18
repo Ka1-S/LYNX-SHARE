@@ -79,6 +79,7 @@
 #include "ui/SamplerImportUi.h"
 #include "ui/ToolWindow.h"
 #include "ui/WorkflowExtras.h" // round 190iu (issue #191.6)
+#include "ui/LoopInfo.h" // round 190kx
 
 namespace lynx
 {
@@ -719,6 +720,8 @@ public:
         std::vector<std::unique_ptr<Node>> children;
 
         juce::String label, detail; // display name (empty: the file's) and the dimmed detail after it
+        juce::String loopText; // round 190kx: a loop's bars, tempo and key (the Simple layout's rows; empty: not known)
+        bool loopKnown = false; // (the worker answered for this file)
         juce::Colour colour;        // transparent: the default
         Icon icon = Icon::none;     // none: by file type
         Category category = Category::samples;
@@ -1244,6 +1247,7 @@ public:
 
     bool selectedIsFolder() const { return juce::isPositiveAndBelow (selected, (int) rows.size()) && rows[(std::size_t) selected]->folder; }
     int numRows() const { return (int) rows.size(); }
+    const Node* nodeAt (int row) const { return juce::isPositiveAndBelow (row, (int) rows.size()) ? rows[(std::size_t) row] : nullptr; } // (round 190kx)
     // round 190ke (--simplegb190keshot): the rows' names as shown
     juce::StringArray rowLabels() const
     {
@@ -1384,9 +1388,45 @@ public:
                 rows.push_back (n.get());
         else if (root != nullptr)
             addRows (*root);
+        if (! flat && browser.showsLoopRowInfo())
+            askLoopInfo();
 
         updateSize();
         repaint();
+    }
+
+    // round 190kx: the Simple layout's rows of audio files show their bars, tempo and key (BandLab's loop rows): the
+    // listed files are analysed once (ui/LoopInfo's worker, cached per file), answers fill the rows as they come
+    void askLoopInfo()
+    {
+        std::vector<std::string> wanted;
+        for (const auto* n : rows)
+            if (n->kind == Kind::file && ! n->folder && ! n->loopKnown && isAudio (n->file))
+                if (wanted.size() < 1000)
+                    wanted.push_back (n->file.getFullPathName().toStdString());
+        if (wanted.empty())
+            return;
+        auto& shared = browser.loopInfoShared();
+        refreshLoopTexts();
+        shared.request (wanted);
+    }
+
+    void refreshLoopTexts()
+    {
+        if (browser.loopInfo == nullptr)
+            return;
+        const auto meter = browser.engine.getSong().meter();
+        bool changed = false;
+        for (auto* n : rows)
+            if (n->kind == Kind::file && ! n->folder && ! n->loopKnown)
+                if (const auto r = browser.loopInfo->known (n->file.getFullPathName().toStdString()))
+                {
+                    n->loopKnown = true;
+                    n->loopText = loopinfo::rowText (*r, meter);
+                    changed = true;
+                }
+        if (changed)
+            repaint();
     }
 
     void updateSize()
@@ -1463,6 +1503,7 @@ public:
         const auto first = juce::jmax (0, clip.getY() / rowHeight), last = juce::jmin ((int) rows.size() - 1, clip.getBottom() / rowHeight);
         const auto previewing = browser.isPreviewPlaying() ? browser.previewedFile : juce::File();
         const auto live = rowHeight == liveRowHeight; // (round 190iz: the Clip-launch layout's Live-style list)
+        const auto loopRows = ! flat && browser.showsLoopRowInfo(); // (round 190kx: the Simple layout's loop rows)
         juce::RectangleList<int> guides;              // (round 190iz: FL's dotted tree guides, filled at once below)
 
         for (int i = first; i <= last; ++i)
@@ -1561,6 +1602,15 @@ public:
                 g.setColour (textDisabled);
                 const auto w = juce::jmin (text.getWidth() / 2, juce::GlyphArrangement::getStringWidthInt (g.getCurrentFont(), where) + 4);
                 g.drawText (where, text.removeFromRight (w), juce::Justification::centredRight, true);
+            }
+
+            // round 190kx: a loop's bars, tempo and key on the right (the Simple layout, BandLab's loop rows)
+            if (n.loopText.isNotEmpty() && loopRows)
+            {
+                g.setFont (theme::font (theme::type::caption));
+                g.setColour (textDisabled);
+                const auto w = juce::jmin (text.getWidth() / 2, juce::GlyphArrangement::getStringWidthInt (g.getCurrentFont(), n.loopText) + 6);
+                g.drawText (n.loopText, text.removeFromRight (w), juce::Justification::centredRight, true);
             }
 
             const auto name = n.label.isNotEmpty() ? n.label
@@ -4583,6 +4633,10 @@ juce::PopupMenu BrowserComponent::buildViewMenu()
         if (safe->onPreviewVolumeChanged != nullptr)
             safe->onPreviewVolumeChanged(); // (saved with the preview volume)
     });
+    // round 190kx (Simple layout, as BandLab): dropped loops take the tempo and key found in their audio
+    if (showsLoopRowInfo())
+        menu.addItem (tr ("Dropped loops take the tempo and key found in their audio"), true, loopanalysis::dropDetects().load(),
+                      [] { workflowextras::setExtra ("simple.loopDetect", ! loopanalysis::dropDetects().load()); });
     menu.addSeparator();
     menu.addItem (tr ("Refresh"), [safe] { if (safe != nullptr) safe->rebuildRoots(); });
     menu.addItem (tr ("Refresh search index"), [safe] { if (safe != nullptr) safe->refreshSearchIndex (false); });
@@ -5006,8 +5060,40 @@ void BrowserComponent::setProjectFile (const juce::File& file)
     rebuildTree(); // the "Project folder" entry follows the project
 }
 
+// round 190kx: the loop analysis' worker, made on first use
+loopinfo::Shared& BrowserComponent::loopInfoShared()
+{
+    if (loopInfo == nullptr)
+    {
+        loopInfo = loopinfo::Shared::get (engine);
+        loopInfo->addChangeListener (this);
+    }
+    return *loopInfo;
+}
+
+bool BrowserComponent::showsLoopRowInfo() const { return ! liveLayout && layoutstyle::current() == layoutstyle::Style::simple; }
+
+void BrowserComponent::loopInfoChanged()
+{
+    tree->refreshLoopTexts();
+    // the Loop Browser lists again with the new tempos and keys (at most twice a second: its rows are rebuilt)
+    if (loopsShown && ! std::exchange (loopFilterAgainAsked, true))
+        juce::Timer::callAfterDelay (500, [safe = juce::Component::SafePointer<BrowserComponent> (this)] {
+            if (safe == nullptr)
+                return;
+            safe->loopFilterAgainAsked = false;
+            if (safe->loopsShown)
+                safe->applyLoopFilter();
+        });
+}
+
 void BrowserComponent::changeListenerCallback (juce::ChangeBroadcaster* source)
 {
+    if (loopInfo != nullptr && source == loopInfo.get())
+    {
+        loopInfoChanged();
+        return;
+    }
     if (source == &searcher->statusChanged)
     {
         indexStatusChanged();
@@ -5086,6 +5172,8 @@ BrowserComponent::~BrowserComponent()
     similar->statusChanged.removeChangeListener (this);
     if (similarId != 0)
         similar->service->cancel();
+    if (loopInfo != nullptr)
+        loopInfo->removeChangeListener (this);
     focusWatcher.reset();
     engine.previewFile ({});
 }
@@ -5657,6 +5745,29 @@ void BrowserComponent::showFactoryContentForSnapshot (const juce::StringArray& o
 }
 
 juce::StringArray BrowserComponent::rowLabelsForCheck() const { return tree->rowLabels(); }
+
+// round 190kx (--loopinfo190kxshot): waits for the loop analysis of what is listed, then fills the rows / Loop Browser
+bool BrowserComponent::waitLoopInfoForSnapshot (int timeoutMs)
+{
+    if (loopInfo == nullptr)
+        return true;
+    const auto idle = loopInfo->service().waitIdle (timeoutMs);
+    tree->refreshLoopTexts();
+    if (loopsShown)
+        applyLoopFilter();
+    return idle;
+}
+
+std::size_t BrowserComponent::loopInfoQueuedForCheck() { return loopInfo != nullptr ? loopInfo->service().queued() : 0; }
+
+juce::StringArray BrowserComponent::loopRowTextsForCheck() const
+{
+    juce::StringArray out;
+    for (int i = 0; i < tree->numRows(); ++i)
+        if (const auto* n = tree->nodeAt (i); n != nullptr && n->loopText.isNotEmpty())
+            out.add (n->file.getFileNameWithoutExtension() + ": " + n->loopText);
+    return out;
+}
 juce::StringArray BrowserComponent::resultLabelsForCheck() const { return results->rowLabels(); }
 
 void BrowserComponent::showProjectForSnapshot()

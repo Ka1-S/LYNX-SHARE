@@ -17921,3 +17921,5 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Stoys190kvTests.inc" // round 190kv: the Soundtoys factory presets (fingerprint of the encoded payload -> their own settings)
 #include "Details190ldTests.inc" // round details2_190ld: FL slot and Playlist track lock state, Live Shift+Space continue, FL tool names
 #include "Details190ldPluginTests.inc" // round details2_190ld: Vocoder band levels published while watched, Patcher activity measured only while watched
+#include "Ara190kxTests.inc" // round 190kx: ARA 2 on audio clips (the clips as playback regions, ids, tempo, the clip menu)
+#include "LoopAnalysis190kxTests.inc" // round 190kx: loop analysis (key and tempo of the user's own loops; core/LoopAnalysis.h)

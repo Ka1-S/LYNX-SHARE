@@ -678,6 +678,18 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
         if (drop (o, "mixSnapshots"))
             lost.push_back ({ TR_NOOP ("Mix snapshots (the Mixer menu)"), {}, false });
     }
+
+    // round 190kx: audio clips edited in an ARA plugin (Melodyne...) play unedited in 0.1.28 (it hosts no ARA)
+    {
+        juce::StringArray edited;
+        forEachChannel (root, [&] (juce::DynamicObject& c, int i) {
+            if (drop (c, "ara"))
+                edited.add (channelName (juce::var (&c), i));
+        });
+        drop (o, "araDocuments");
+        if (! edited.isEmpty())
+            lost.push_back ({ TR_NOOP ("Audio clips edited in an ARA plugin (Melodyne...) play without those edits: {0}"), listOf (edited), false });
+    }
 }
 
 // --- 0.1.29 / 0.1.30 → 0.1.28 ------------------------------------------------------------------------------------------

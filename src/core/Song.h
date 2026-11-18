@@ -18,6 +18,7 @@
 #include <utility>
 
 #include "core/Adr.h"
+#include "core/AraLink.h"
 #include "core/MidiGenerateOptions.h"
 #include "core/NoteCurves.h"
 #include "core/VideoTrack.h"
@@ -1097,6 +1098,8 @@ struct ChannelDef
         bool operator== (const SimplePad&) const = default;
     };
     SimplePad simplePad;
+    // Round 190kx (core/AraLink.h): an audio clip channel edited in an ARA 2 plugin (Melodyne...); empty = not
+    AraLink ara;
     InstanceTag instance; // runtime identity of the channel (never saved)
 
     bool hasKeyRegion() const noexcept { return keyLow > 0 || keyHigh < 127; }
@@ -2884,6 +2887,9 @@ struct Song
     // writes the used ones only. Empty: no cost.
     std::vector<ClipEnvelope> clipEnvelopes;
     std::vector<Modulator> modulators; // round 177b: LYNX's modulators (empty: no cost)
+    // round 190kx (core/AraLink.h): the ARA documents of the plugins the song's audio clip channels are edited in (their
+    // edits: Melodyne's notes...), as each plugin archived them at the last save; empty: none (no cost)
+    std::vector<AraDocumentArchive> araDocuments;
     std::vector<PlaylistTrack> playlistTracks; // index = track; tracks past the end use the default
     // The Playlist's default row in px at 100 % (FL's base row): FL 2026's 48 (live check 190gu B1, the Default template
     // at FL's default zoom); a .lynx saved before round 190gw has no such key and keeps LYNX's old 38. A row's FL size

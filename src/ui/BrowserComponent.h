@@ -32,6 +32,10 @@ struct Result;
 
 namespace lynx
 {
+namespace loopinfo
+{
+class Shared;
+}
 // File browser (like FL's Browser): drawn by LYNX itself so it can show what the mouse is over and explain it
 // in the hint bar.
 //  - three tabs, as FL's Browser: STARRED (the files and folders starred from their right-click menu), ALL (the current project, then every sample folder: FL's folders, Documents,
@@ -179,6 +183,9 @@ public:
     // and the rows listed now (tree / tag-filter results)
     void showFactoryContentForSnapshot (const juce::StringArray& openFolders);
     juce::StringArray rowLabelsForCheck() const;
+    bool waitLoopInfoForSnapshot (int timeoutMs);     // round 190kx: the loop analysis of the listed files, rows filled
+    juce::StringArray loopRowTextsForCheck() const;   // round 190kx: "name: 4 bars · 102 BPM · D minor" per row that has one
+    std::size_t loopInfoQueuedForCheck();             // round 190kx: files the loop analysis still has to do
     juce::StringArray resultLabelsForCheck() const;
     void showPluginDatabaseForSnapshot();
     std::vector<juce::PopupMenu> pluginDatabaseMenusForSnapshot(); // round 190bf: a folder's and an entry's right-click menus
@@ -504,6 +511,13 @@ private:
     bool searchPartial = false;
     struct SimilarShared; // the process's similarity worker (core/SampleSimilarity), shared by every Browser
     std::shared_ptr<SimilarShared> similar;
+    // round 190kx (core/LoopAnalysis, ui/LoopInfo): the key and tempo of the user's loops — the Simple layout's rows (as
+    // BandLab's loop rows) and the Loop Browser's Tempo / Key columns where the name has none. Made on first use.
+    std::shared_ptr<loopinfo::Shared> loopInfo;
+    loopinfo::Shared& loopInfoShared();
+    bool showsLoopRowInfo() const; // the Simple layout's file rows show their bars, tempo and key
+    void loopInfoChanged();
+    bool loopFilterAgainAsked = false; // (an answer re-filters the Loop Browser at most twice a second)
     juce::File similarTo; // the sample whose similar ones are listed (none: an ordinary search)
     std::uint64_t similarId = 0;
     bool similarPartial = false;

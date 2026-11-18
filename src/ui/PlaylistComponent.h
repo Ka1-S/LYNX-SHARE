@@ -28,6 +28,10 @@
 namespace lynx
 {
 struct SampleData; // (core/Instruments.h)
+namespace loopinfo
+{
+class Shared; // (ui/LoopInfo.h, round 190kx)
+}
 // (shots, round 190el) the audio clip's Slice to New MIDI Track dialog for clip `clipIndex`, built but not shown, with
 // "Create one slice per" at item `per` (rack::SlicePer)
 std::unique_ptr<juce::Component> makeSliceDialogForSnapshot (AudioEngine& engine, int clipIndex, int per);
@@ -707,6 +711,7 @@ private:
     std::function<void (float, bool)> clipFitter (int index, std::shared_ptr<const SampleData> sample);
     juce::PopupMenu fitToTempoMenu (int index, std::shared_ptr<const SampleData> sample);
     void showDetectTempo (int index, std::shared_ptr<const SampleData> sample);
+    std::shared_ptr<loopinfo::Shared> loopInfo; // round 190kx: the loop analysis (ui/LoopInfo), made when a clip menu first asks
     void duplicateSelection();
     void seekTo (int x, bool snapOn = true); // Alt held while scrubbing: snapOn false (free position, FL)
     void paintAudioClip (juce::Graphics& g, const Clip& clip, juce::Rectangle<float> bounds);

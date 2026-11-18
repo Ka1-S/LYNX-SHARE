@@ -749,4 +749,11 @@ void preparePlugin (juce::AudioPluginInstance& plugin, double sampleRate, int bl
 
 // Current plugin state as base64 (for saving in the project).
 std::string capturePluginState (juce::AudioPluginInstance& plugin);
+
+// Round 190kx (engine/AraHost.cpp, ARA playback renderers): the song's play head as hosted generators see it (without
+// the loop), and one processBlock call under the plugin crash guard (non-zero: it crashed; `crashed` is then set and
+// the crash is recorded under `name`). Audio thread.
+juce::AudioPlayHead& songPlayHead();
+std::uint32_t processGuarded (juce::AudioPluginInstance& plugin, juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi,
+                              std::atomic<bool>& crashed, const std::string& name) noexcept;
 } // namespace lynx

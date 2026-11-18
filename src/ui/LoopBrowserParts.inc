@@ -291,6 +291,16 @@ void BrowserComponent::loopsAnswered (std::uint64_t id, std::vector<loopkeys::Lo
     std::stable_sort (infos.begin(), infos.end(), [] (const loopkeys::LoopInfo& a, const loopkeys::LoopInfo& b) {
         return juce::String::fromUTF8 (a.name.c_str()).compareNatural (juce::String::fromUTF8 (b.name.c_str())) < 0;
     });
+    // round 190kx: the loops whose name gives no tempo or key are analysed (ui/LoopInfo; the answers fill the Tempo and
+    // Key columns and the filters as they come)
+    {
+        std::vector<std::string> unknown;
+        for (const auto& info : infos)
+            if ((! (info.tempo > 0.0) || info.keyRoot < 0) && factoryloops::itemOf (info.path) == nullptr && unknown.size() < 2000)
+                unknown.push_back (info.path);
+        if (! unknown.empty())
+            loopInfoShared().request (unknown);
+    }
     loopInfos = std::move (infos);
     loopsAnswer = ! partial;
     loopsTruncated = truncated;
@@ -309,6 +319,20 @@ void BrowserComponent::applyLoopFilter()
         f.nearKey = key->root;
     const auto& store = collectionStore();
     const auto favourite = [this, &store] (std::size_t i) { return store.has (loopInfos[i].path, 0); };
+    // round 190kx: what the analysis found where the name says nothing (a loop of whole beats: its tempo; a key)
+    if (loopInfo != nullptr)
+        for (auto& info : loopInfos)
+            if (! (info.tempo > 0.0) || info.keyRoot < 0)
+                if (const auto r = loopInfo->known (info.path))
+                {
+                    if (! (info.tempo > 0.0) && r->isLoop())
+                        info.tempo = r->bpm;
+                    if (info.keyRoot < 0 && r->key)
+                    {
+                        info.keyRoot = r->key->root;
+                        info.scale = r->key->minor ? loopkeys::Scale::minor : loopkeys::Scale::major;
+                    }
+                }
     loopCounts = loopkeys::keywordCounts (loopInfos, f, favourite);
     std::vector<std::unique_ptr<FileTree::Node>> nodes;
     for (std::size_t i = 0; i < loopInfos.size(); ++i)

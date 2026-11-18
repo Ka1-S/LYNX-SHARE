@@ -724,7 +724,7 @@ double median (std::vector<double> v)
 }
 } // namespace
 
-Track analyseNotes (const SampleData& source)
+Track analyseNotes (const SampleData& source, const AnalyseOptions& options)
 {
     Track t;
     const auto n = (std::int64_t) source.frames();
@@ -778,6 +778,31 @@ Track analyseNotes (const SampleData& source)
         runs.push_back ({ a, b, median (v) });
     };
 
+    // round 190kx, fineSplit: a voiced frame at a level dip (6 dB under the loudest frame within 60 ms on both sides, the
+    // lowest frame there) starts a new note
+    const auto stepLimit = options.fineSplit ? 0.33 : 0.7;
+    const auto dipReach = std::max<std::size_t> (2, (std::size_t) std::lround (0.06 * fs / hop));
+    const auto atDip = [&] (std::size_t k) {
+        if (! options.fineSplit || k < dipReach || k + dipReach >= frames.size())
+            return false;
+        float before = 0.0f, after = 0.0f, lowest = frames[k].level;
+        for (std::size_t j = k - dipReach; j < k; ++j)
+            before = std::max (before, frames[j].level), lowest = std::min (lowest, frames[j].level);
+        for (std::size_t j = k + 1; j <= k + dipReach; ++j)
+            after = std::max (after, frames[j].level), lowest = std::min (lowest, frames[j].level);
+        return frames[k].level <= lowest && frames[k].level < 0.3f * before && frames[k].level < 0.3f * after; // (−10 dB)
+    };
+    // (fineSplit: the pitch a step is measured on is the median over ±90 ms, a vibrato's whole period at 5.5 Hz, so a
+    // vibrato is not a step)
+    const auto wide = std::max<std::size_t> (2, (std::size_t) std::lround (0.09 * fs / hop));
+    auto smoothWide = [&] (std::size_t k) {
+        std::vector<double> v;
+        for (auto j = k >= wide ? k - wide : 0; j <= std::min (frames.size() - 1, k + wide); ++j)
+            if (note[j] >= 0.0)
+                v.push_back (note[j]);
+        return median (v);
+    };
+
     std::size_t start = 0;
     bool inNote = false;
     double centre = 0.0;
@@ -791,8 +816,17 @@ Track analyseNotes (const SampleData& source)
                 inNote = true, start = k, centre = note[k], away = 0;
             continue;
         }
-        const auto here = voiced ? smooth (k) : -1.0;
-        if (! voiced || std::abs (here - centre) > 0.7)
+        if (voiced && k - start >= minFrames && atDip (k))
+        {
+            close (start, k);
+            start = k;
+            centre = smoothWide (k);
+            away = 0;
+            continue;
+        }
+        // (fineSplit: the pitch is the median over ±90 ms, a vibrato's whole period at 5.5 Hz, so a vibrato is no step)
+        const auto here = voiced ? (options.fineSplit ? smoothWide (k) : smooth (k)) : -1.0;
+        if (! voiced || std::abs (here - centre) > stepLimit)
         {
             // a gap, or a new pitch held for 58 ms (FL's segmentation, fitted on 17 files), ends the note (glitches,
             // slides and short wobbles stay in it)
@@ -808,7 +842,8 @@ Track analyseNotes (const SampleData& source)
             continue;
         }
         away = 0;
-        centre += 0.1 * (here - centre); // (follows a slow drift)
+        centre += (options.fineSplit ? 0.02 : 0.1) * (here - centre); // (follows a slow drift; fineSplit: a slower one, so
+                                                                         // a smaller step is not taken in as drift)
     }
 
     // FL's layout (round 190kj, measured on FL's own analysis of 17 files): the notes tile the file. A note starts at

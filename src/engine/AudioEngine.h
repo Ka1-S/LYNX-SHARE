@@ -36,6 +36,7 @@
 #include "engine/AbletonLink.h"
 #include "engine/ControllerIo.h"
 #include "core/RackRenderer.h"
+#include "engine/AraHost.h"
 #include "core/RenderAhead.h"
 #include "core/RtStats.h"
 #include "core/Dropouts.h"
@@ -130,6 +131,14 @@ public:
     // Tools > Audio logger (REA round 153): records everything the Master plays to a WAV in the background.
     AudioLogger& getAudioLogger();
     PluginHost& getPluginHost() noexcept { return plugins; }
+    // ARA 2 (round 190kx, engine/AraHost.h): the host of the audio clip channels edited in an ARA plugin; nullptr until the
+    // song first has one (no ARA plugin, no document, no CPU before that). Message thread.
+    AraHost* getAraHost() noexcept { return araHost.get(); }
+    // Edits channel `channel` (an audio clip channel) in the ARA plugin `pluginId` (empty: back to its sampler), one undo
+    // step. False: not an audio clip channel. The plugin's editor opens with AraHost::pluginOf afterwards.
+    bool setChannelAra (int channel, const std::string& pluginId, const std::string& pluginName);
+    // The ARA host brought in line with the song again (a channel whose plugin or sample was not ready is tried again)
+    void refreshAra() { publishSong(); }
     // Online Sessions (round 168a): the channels / inserts whose third-party plugin is missing here and that play their
     // stand-in render instead (core/StandIns.h), as of the last publish — the Channel Rack and the Mixer badge them.
     bool playsStandIn (int channel) const noexcept
@@ -1107,6 +1116,7 @@ public:
         double graphMs = 0.0, writeMs = 0.0;
         warmup::Result warmUp; // the plugin warm-up before the render (blocks == 0: none ran)
         int trimmedSamples = 0; // the PDC trim used
+        double araWaitMs = 0.0; // round 190kx: how long the render waited for ARA plugins to finish their analysis
     };
     RenderStats getLastRenderStats() const noexcept { return lastRenderStats; }
     float renderOffline (double seconds, double sampleRate, juce::AudioFormatWriter* output = nullptr)
@@ -1709,6 +1719,7 @@ private:
     std::unique_ptr<visualfx::Tap> tunerTapData = std::make_unique<visualfx::Tap>();
     std::unique_ptr<AudioLogger> audioLogger; // after `meters` (it reads meters.logTap): destroyed first
     PluginHost plugins;
+    std::unique_ptr<AraHost> araHost; // (after `plugins`: its plugin instances go first; round 190kx)
     juce::StringArray missingPlugins, matchedPlugins, pluginsWithoutState;
     FlpImportReport importReport;
     std::vector<MissingPlugin> missingPluginDetails;

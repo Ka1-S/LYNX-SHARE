@@ -955,8 +955,25 @@ std::unique_ptr<const RackState> RackState::build (Song song,
         const auto kind = channel.instrument;
         const auto p = channelOrigin[i] >= 0 ? (std::size_t) channelOrigin[i] : std::numeric_limits<std::size_t>::max();
 
+        // round 190kx: an audio clip channel edited in an ARA plugin plays through that plugin (the ARA host keeps one
+        // instance per channel: asking again returns the same instance)
+        if (kind == InstrumentKind::audioClip && channel.ara.active())
+        {
+            std::shared_ptr<Instrument> unit;
+            if (factories.araInstrument)
+                unit = factories.araInstrument (channel, sampleRate);
+            else if (factories.liveInstrument)
+                unit = factories.liveInstrument (channel, sampleRate);
+            if (unit != nullptr)
+            {
+                state->instruments.push_back (std::move (unit));
+                continue;
+            }
+        }
+
         if (previous != nullptr && p < previous->song.channels.size() && p < previous->instruments.size()
             && previous->song.channels[p].instrument == kind && kind != InstrumentKind::patcher
+            && previous->song.channels[p].ara == channel.ara // (round 190kx: into / out of an ARA plugin: another instrument)
             && ((kind != InstrumentKind::granulizer && kind != InstrumentKind::wavetraveller)
                 || previous->song.channels[p].samplePath == channel.samplePath)
             && (kind != InstrumentKind::fruityslicer

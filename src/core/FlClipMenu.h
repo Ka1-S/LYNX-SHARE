@@ -122,7 +122,7 @@ inline std::vector<std::string> lynxExtras()
 {
     return { TR_NOOP ("Color palette"), TR_NOOP ("Split here"), TR_NOOP ("Split at silence..."), TR_NOOP ("Merge clips"), TR_NOOP ("Reverse"), TR_NOOP ("Convert to MIDI"), TR_NOOP ("Slice to New MIDI Track..."), TR_NOOP ("Pitch... (semitones, cents, keep length)"),
              TR_NOOP ("Normalize"), TR_NOOP ("Clip volume"), TR_NOOP ("Clip envelope"), TR_NOOP ("Auto-warp"), TR_NOOP ("Quantize audio"),
-             TR_NOOP ("Open in a new Sampler channel"), TR_NOOP ("Show the file in Explorer"), TR_NOOP ("Cut"), TR_NOOP ("Copy"), TR_NOOP ("Paste here") };
+             TR_NOOP ("Edit in ARA plugin"), TR_NOOP ("Open in a new Sampler channel"), TR_NOOP ("Show the file in Explorer"), TR_NOOP ("Cut"), TR_NOOP ("Copy"), TR_NOOP ("Paste here") };
 }
 
 // What LYNX shows of FL's list: FL's entries without the missing ones, Crossfade with only while it is greyed in FL
