@@ -189,7 +189,7 @@
                 // BandLab's metronome popover from the ▾ beside the metronome (DS-1)
                 {
                     auto* chevron = ui.toolbarPartForSnapshot ("metronomeMenu");
-                    check ("the metronome capsule has BandLab's ▾", chevron != nullptr && chevron->isVisible());
+                    check ("the metronome capsule has BandLab's chevron segment", chevron != nullptr && chevron->isVisible());
                     auto popover = ui.makeMetronomePopoverForSnapshot();
                     popover->setVisible (true);
                     popover->resized();
@@ -273,7 +273,8 @@
                     for (int r = 0; r < 32 && ! done; ++r)
                         if (launcher::clipAt (*song.clipGrid, t, r) != nullptr)
                         {
-                            const auto items = texts (clipGridSlotMenu (*gridView, t, r));
+                            auto items = texts (clipGridSlotMenu (*gridView, t, r));
+                            items.removeEmptyStrings(); // (the separators)
                             line ("clip menu: " + items.joinIntoString (" | "));
                             check ("clip menu starts with Live's Cut / Copy / Duplicate / Delete, then Rename",
                                    items.size() > 5 && items[0].startsWith (lynx::tr ("Cut")) && items[3].startsWith (lynx::tr ("Delete"))
@@ -312,6 +313,12 @@
                         audioTrack = t;
                 }
                 line ("monitor icons on tracks " + juce::String (midiTrack) + " (MIDI) and " + juce::String (audioTrack) + " (audio)");
+                {
+                    juce::String chains;
+                    for (int t = 0; t < 8; ++t)
+                        chains << t << ":" << detailchain::forTrack (song, t).channel << (offline.gridTrackInput (t) == AudioEngine::GridInput::midi ? "m " : "a ");
+                    line ("track chains (track:channel kind): " + chains);
+                }
                 offline.editSong ([midiTrack, audioTrack] (Song& s) {
                     if (midiTrack >= 0)
                         s.channels[(std::size_t) detailchain::forTrack (s, midiTrack).channel].receiveFrom = "Keys";

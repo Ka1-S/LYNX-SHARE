@@ -98,6 +98,7 @@ void MainComponent::setUpLookParts()
     cycleButton.setTooltip (cycleText);
     ui::setHint (cycleButton, cycleText);
     cycleButton.onClick = [this] { toggleCycle(); };
+    cycleButton.setToggleLook (true); // (a switch: lit while it cycles)
 
     // round 190ld (details DS-1, BandLab B07): the ▾ beside the metronome opens BandLab's metronome popover
     metronomeMenuButton.setTooltip (tr ("Metronome: tap tempo, sound, volume and count-in"));

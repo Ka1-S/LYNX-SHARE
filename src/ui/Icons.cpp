@@ -1194,6 +1194,8 @@ void IconButton::paintLook (juce::Graphics& g, bool highlighted, bool down)
         // records, Record is a red rounded square in a dark-red disc, steady (no blink: BandLab and Live; FL's blink is the
         // FL look's only). BandLab's disc is as wide as its idle dot (18 px) and the square 8 px of it (measured at 100 %).
         fg = icon == Icon::record ? colour::record : colour::textPrimary;
+        if (icon == Icon::cycle && on) // round 190ld: the Cycle switch lit (the capsule's "on = the accent glyph", round 190iv)
+            fg = colour::accent;
         if (icon == Icon::record && on && enabled && text.isEmpty())
         {
             const auto box = lookIconBox > 0.0f ? lookIconBox : juce::jmin (area.getHeight() * iconFraction, iconMax);
