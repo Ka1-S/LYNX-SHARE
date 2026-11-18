@@ -7,6 +7,17 @@
 
 namespace poly190lj
 {
+// (rollup 0.1.30 step 8: g++ 13 hit an internal compiler error, gimplify_var_or_parm_decl, on braced a2m::Note lists with
+// an empty `bends` inside a function that takes them by reference; the notes are made here instead)
+lynx::a2m::Note note (double start, double end, int key, float velocity)
+{
+    lynx::a2m::Note n;
+    n.start = start;
+    n.end = end;
+    n.key = key;
+    n.velocity = velocity;
+    return n;
+}
 // a fake model: note = the window's input at the frame, onset = the bin, contour = the frame's index in its window
 bool fake (const float* in, int count, float* note, float* onset, float* contour)
 {
@@ -167,7 +178,8 @@ TEST (poly190lj_pitch_bends_follow_the_contour)
         pg.contour[(std::size_t) t * contourBins + (std::size_t) (centre + 30)] = 1.0f;
     for (int t = 60; t < 90; ++t)
         pg.contour[(std::size_t) t * contourBins + (std::size_t) (contourPerKey * (72 - lowestKey) + 1)] = 0.9f;
-    std::vector<Note> notes { { 10 * frame, 50 * frame, 60, 0.8f, {} }, { 60 * frame, 90 * frame, 72, 0.8f, {} }, { 0.0, 0.0, 21, 0.5f, {} } };
+    std::vector<Note> notes { poly190lj::note (10 * frame, 50 * frame, 60, 0.8f), poly190lj::note (60 * frame, 90 * frame, 72, 0.8f),
+                              poly190lj::note (0.0, 0.0, 21, 0.5f) };
     addPitchBends (pg, notes);
     const auto& b = notes[0].bends;
     CHECK (b.size() == 3);
@@ -189,7 +201,7 @@ TEST (poly190lj_pitch_bends_follow_the_contour)
     auto low = poly190lj::flatPg (40);
     for (int t = 0; t < 40; ++t)
         low.contour[(std::size_t) t * contourBins + 2] = 0.9f;
-    std::vector<Note> edge { { 0.0, 20 * frame, 21, 0.5f, {} } };
+    std::vector<Note> edge { poly190lj::note (0.0, 20 * frame, 21, 0.5f) };
     addPitchBends (low, edge);
     CHECK (edge[0].bends.size() == 1 && std::abs (edge[0].bends[0].cents - 33.333f) < 0.01f);
     auto edgeReference = edge;
