@@ -193,6 +193,10 @@ public:
     std::function<bool (int)> loaded, muted;
     std::function<int()> selected;
     std::function<void (int)> onPad;
+    // GitHub #198 (round 190ks): a pad hit / its release; `velocity` 0..1 from where it was hit (FL's FPC manual: "The
+    // vertical position clicked affects triggered velocity. Top = low velocity, bottom = high velocity")
+    std::function<void (int, float)> onPadDown;
+    std::function<void (int)> onPadUp;
 
     static juce::Rectangle<int> cell (int pad)
     {
@@ -220,9 +224,31 @@ public:
     void mouseDown (const juce::MouseEvent& e) override
     {
         for (int pad = 0; pad < 16; ++pad)
-            if (cell (pad).contains (e.getPosition()) && onPad)
-                onPad (pad);
+            if (cell (pad).contains (e.getPosition()))
+            {
+                if (onPad)
+                    onPad (pad);
+                const auto r = cell (pad);
+                if (onPadDown)
+                {
+                    held = pad;
+                    onPadDown (pad, padVelocity ((float) (e.getPosition().y - r.getY()), (float) r.getHeight()));
+                }
+            }
     }
+
+    void mouseUp (const juce::MouseEvent&) override
+    {
+        if (held >= 0 && onPadUp)
+            onPadUp (held);
+        held = -1;
+    }
+
+    // the hit's velocity 0..1: top = low, bottom = high (FL's FPC; `y` from the pad's top, of `height`)
+    static float padVelocity (float y, float height) noexcept { return juce::jlimit (1.0f / 127.0f, 1.0f, (y + 0.5f) / juce::jmax (1.0f, height)); }
+
+private:
+    int held = -1; // the pad the mouse holds down
 };
 
 // a pad's volume or pan envelope as FL's TMEnvEditor shows it (round 190z): a grid of quarter units by quarter levels at
@@ -375,7 +401,6 @@ class FpcEditor final : public juce::Component,
 public:
     FpcEditor (AudioEngine& e, std::function<ChannelDef* (Song&)> l, int c) : engine (e), locate (std::move (l)), channel (c)
     {
-        juce::ignoreUnused (channel);
         auto button = [this] (juce::TextButton& b, const juce::String& caption, const juce::String& hint, std::function<void()> click) {
             b.setButtonText (caption);
             ui::setHint (b, hint);
@@ -516,7 +541,21 @@ public:
         };
         grid.muted = [this] (int pad) { return kit.pads[(std::size_t) (bank() * 16 + pad)].muted(); };
         grid.selected = [this] { return selectedPad % 16; };
-        grid.onPad = [this] (int pad) { selectPad (bank() * 16 + pad, true); };
+        // a click on a pad selects it and plays it on the channel, at the velocity of where it was hit (FL's FPC), and
+        // while recording it is recorded (GitHub #198: a LYNX extra, FL's FPC only plays it); in a Patcher, where the
+        // node has no channel of its own, it previews the pad's sample
+        grid.onPad = [this] (int pad) { selectPad (bank() * 16 + pad, channel < 0); };
+        grid.onPadDown = [this] (int pad, float velocity) {
+            if (channel < 0)
+                return;
+            heldKey = kit.pads[(std::size_t) (bank() * 16 + pad)].note;
+            engine.sendGuiNote (channel, heldKey, velocity, true);
+        };
+        grid.onPadUp = [this] (int) {
+            if (channel >= 0 && heldKey >= 0)
+                engine.sendGuiNote (channel, heldKey, 0.0f, false);
+            heldKey = -1;
+        };
         ui::setHint (grid, tr ("Click a pad to select and play it; drop a sample on a pad to load it"));
         addAndMakeVisible (grid);
 
@@ -541,7 +580,12 @@ public:
         setSize (juce::roundToInt (790.0f * scale), juce::roundToInt (367.0f * scale));
     }
 
-    ~FpcEditor() override { engine.removeChangeListener (this); }
+    ~FpcEditor() override
+    {
+        engine.removeChangeListener (this);
+        if (channel >= 0 && heldKey >= 0) // (a pad still held when the window closes)
+            engine.sendGuiNote (channel, heldKey, 0.0f, false);
+    }
 
     void paint (juce::Graphics& g) override
     {
@@ -928,6 +972,7 @@ private:
     std::vector<std::uint8_t> lastState;
     std::vector<SampleZone> lastZones;
     int selectedPad = 0, selectedLayer = 0, envelopeTab = 0;
+    int heldKey = -1; // (round 190ks) the key a held pad plays
     bool loading = false;
 
     juce::TextButton previousPad, nextPad, createLayer, deleteLayer, layerUp, layerDown, spreadEven, loadButton, volumeTab, panTab;

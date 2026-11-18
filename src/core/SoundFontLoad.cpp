@@ -2,6 +2,7 @@
 // and validates the RIFF chunks itself (so damaged files are rejected before TinySoundFont indexes them) and keeps the
 // samples as 16-bit. See core/SoundFont.h.
 
+#include "core/ContentShare.h"
 #include "core/Sfz.h"
 #include "core/SoundFont.h"
 
@@ -10,6 +11,10 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <condition_variable>
+#include <map>
+#include <mutex>
+#include <set>
 
 #if defined(__clang__)
  #pragma clang diagnostic push
@@ -409,6 +414,65 @@ std::shared_ptr<const Font> loadFontFile (const std::string& path, std::string* 
             *error = "could not read the file";
         return nullptr;
     }
+    // round 190ks: a bank another file already loaded byte for byte (a copy in another folder) is shared, not held twice:
+    // FontLibrary shares one load per path; this shares one font per content (two 64-bit prints and the size; the name a
+    // file without INAM takes from its file name must match too)
+    struct Shared
+    {
+        std::size_t size = 0;
+        std::uint64_t second = 0;
+        bool namedInFile = false;
+        std::string stem;
+        std::weak_ptr<const Font> font;
+    };
+    static std::mutex sharedLock;
+    static std::condition_variable sharedDone;
+    static std::multimap<std::uint64_t, Shared> sharedFonts;
+    static std::set<std::pair<std::uint64_t, std::uint64_t>> parsing; // (the same bytes being parsed by another load)
+    const auto stem = std::filesystem::path ((const char8_t*) path.c_str()).stem().string();
+    const auto first = contentshare::hashBytes (bytes.data(), bytes.size());
+    const auto second = contentshare::hashBytes (bytes.data(), bytes.size(), 0xC2B2AE3D27D4EB4Full);
+    const auto key = std::make_pair (first, second);
+    const auto sharing = contentshare::enabled();
+    if (sharing)
+    {
+        std::unique_lock<std::mutex> g (sharedLock);
+        for (;;)
+        {
+            const auto [from, to] = sharedFonts.equal_range (first);
+            for (auto it = from; it != to;)
+            {
+                auto other = it->second.font.lock();
+                if (other == nullptr)
+                {
+                    it = sharedFonts.erase (it);
+                    continue;
+                }
+                if (it->second.size == bytes.size() && it->second.second == second && (it->second.namedInFile || it->second.stem == stem))
+                    return other;
+                ++it;
+            }
+            if (parsing.count (key) == 0)
+                break;
+            sharedDone.wait (g); // (a channel loading the same bank from another file: its font is shared once parsed)
+        }
+        parsing.insert (key);
+    }
+    struct Done
+    {
+        bool on;
+        std::pair<std::uint64_t, std::uint64_t> key;
+        ~Done()
+        {
+            if (! on)
+                return;
+            {
+                const std::lock_guard<std::mutex> g (sharedLock);
+                parsing.erase (key);
+            }
+            sharedDone.notify_all();
+        }
+    } done { sharing, key };
     std::shared_ptr<const Font> font;
     try
     {
@@ -424,8 +488,11 @@ std::shared_ptr<const Font> loadFontFile (const std::string& path, std::string* 
     {
         auto f = std::const_pointer_cast<Font> (font);
         f->path = path;
-        if (f->name.empty())
-            f->name = std::filesystem::path ((const char8_t*) path.c_str()).stem().string();
+        const auto namedInFile = ! f->name.empty();
+        if (! namedInFile)
+            f->name = stem;
+        const std::lock_guard<std::mutex> g (sharedLock);
+        sharedFonts.emplace (first, Shared { bytes.size(), second, namedInFile, stem, font });
     }
     return font;
 }

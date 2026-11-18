@@ -529,7 +529,8 @@ public:
     ~WrapperSettingsPage() override { engine.removeChangeListener (this); }
 
     // (+ Options › Bit size where it applies; + the MIDI group's Velocity row for an instrument, round 190ao)
-    int preferredHeight() const { return (bridge32Supported() ? 474 : 410) + (instrumentChannel ? rowHeight : 0); }
+    // (round 190ks: + the MIDI group's "Record notes from the plugin window" row)
+    int preferredHeight() const { return (bridge32Supported() ? 474 : 410) + rowHeight + (instrumentChannel ? rowHeight : 0); }
     void selectTab (int t) { showTab (juce::jlimit (0, 2, t)); }
 
     void paint (juce::Graphics& g) override

@@ -382,6 +382,8 @@ juce::var pluginToVar (const PluginRef& p)
         o->setProperty ("midiOutPort", p.midiOutPort);
     if (! p.notifyRender)
         o->setProperty ("notifyRender", false);
+    if (! p.recordOwnNotes) // (round 190ks)
+        o->setProperty ("recordOwnNotes", false);
     if (p.latencyOverrideMs >= 0.0f)
         o->setProperty ("latencyMs", p.latencyOverrideMs);
     // the round-151 wrapper options, when not FL's defaults
@@ -469,6 +471,7 @@ PluginRef pluginFromVar (const juce::var& v)
     p.midiInPort = juce::jlimit (-1, 255, (int) v.getProperty ("midiInPort", -1));
     p.midiOutPort = juce::jlimit (-1, 255, (int) v.getProperty ("midiOutPort", -1));
     p.notifyRender = (bool) v.getProperty ("notifyRender", true);
+    p.recordOwnNotes = (bool) v.getProperty ("recordOwnNotes", true); // (round 190ks)
     p.latencyOverrideMs = v.hasProperty ("latencyMs") ? juce::jlimit (0.0f, 2000.0f, (float) (double) v["latencyMs"]) : -1.0f;
     p.releaseVelocity = (bool) v.getProperty ("releaseVelocity", true);
     p.sendBendRange = (bool) v.getProperty ("sendBendRange", false);

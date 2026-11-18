@@ -227,6 +227,20 @@ public:
     };
     virtual void setHardwareMidi (bool /*on*/) noexcept {}
     virtual int takeHardwareMidi (HardwareMidi* /*out*/, int /*max*/) noexcept { return 0; }
+    // GitHub #198 (round 190ks): the notes a hosted plugin plays from its own window (pads or keys clicked in it) and sends
+    // on its MIDI output, so a take records them on its channel. The rack switches the capture on for the chunk (audio
+    // thread, before the chunk's render) while a take records; the instrument keeps each note on / off it sent itself —
+    // not the echo of a note it was sent (a "MIDI thru" plugin): a note on of a key it was sent within the last 50 ms is
+    // an echo, and so is the note off of a key whose note on was one — with its sample in the chunk; the rack takes them
+    // after the chunk.
+    struct OwnNote
+    {
+        std::int32_t sample = 0;
+        std::uint8_t key = 60, midiChannel = 0;
+        float velocity = 0.0f; // 0 = note off
+    };
+    virtual void setRecordOwnNotes (bool /*on*/) noexcept {}
+    virtual int takeOwnNotes (OwnNote* /*out*/, int /*max*/) noexcept { return 0; }
     // the live MIDI input of the noteOn / noteOff / midiMessage calls that follow, until it is set again (NoteEvent::source,
     // 0 = none; the rack sets it around a live event and puts it back to 0)
     virtual void setNoteSource (int /*source*/) noexcept {}

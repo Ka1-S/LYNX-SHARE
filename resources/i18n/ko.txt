@@ -4205,6 +4205,8 @@ countries: kr
 "Send MOD X as polyphonic aftertouch" = "MOD X를 폴리포닉 애프터터치로 보내기"
 "Send each note's Modulation X as polyphonic aftertouch" = "각 노트의 모듈레이션 X를 폴리포닉 애프터터치로 보내기"
 "Send All Notes Off when playback stops" = "재생이 멈추면 All Notes Off 보내기"
+"Record notes from the plugin window" = "플러그인 창의 노트 녹음"
+"While recording, the notes the plugin plays from its own window (pads or keys clicked in it) are recorded on its channel" = "녹음 중에 플러그인이 자체 창에서 연주한 노트(창에서 클릭한 패드나 건반)를 해당 채널에 녹음합니다"
 "Off: only the notes still held get their note off" = "꺼짐: 아직 누르고 있는 노트에만 노트 오프 전송"
 "Reset plugin when LYNX SHARE resets" = "LYNX SHARE가 초기화할 때 플러그인 초기화"
 "Reset the plugin before an export and on panic (clears its tails and held notes)" = "내보내기 전과 패닉 시 플러그인 초기화(테일과 지속 노트 제거)"

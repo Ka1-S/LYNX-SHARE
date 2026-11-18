@@ -2048,7 +2048,7 @@ public:
         keyboard.current = [this] (int key) { return key == keyOfRegion (regionDeck(), regionIndex()); };
         keyboard.play = [this] (int key, bool on) {
             if (channel >= 0)
-                engine.sendLiveNote (channel, key, 0.78125f, on);
+                engine.sendGuiNote (channel, key, 0.78125f, on); // (GitHub #198: recorded while recording)
         };
         keyboard.menu = [this] (int key) { keyMenu (key); };
         addAndMakeVisible (keyboard);

@@ -260,7 +260,7 @@ APP_SOURCES+=(src/core/LiveSession.cpp src/core/LiveCrypto.cpp src/engine/LiveLi
 APP_SOURCES+=(src/core/RemotePlugins.cpp src/engine/LiveRemotePlugins.cpp src/ui/LiveRemoteUi.cpp)
 # round 190c: the device-change and short-export self-tests (issues #134, #138)
 APP_SOURCES+=(src/engine/DeviceChangeTest.cpp src/engine/ShortExportTest.cpp)
-APP_SOURCES+=(src/engine/ExportParityTest.cpp src/engine/MidiHotplugTest.cpp src/engine/MidiOutPortTest.cpp)
+APP_SOURCES+=(src/engine/ExportParityTest.cpp src/engine/MidiHotplugTest.cpp src/engine/MidiOutPortTest.cpp src/engine/PadRecordTest.cpp src/engine/ShareMemoryTest.cpp)
 # round 190az: a CLAP plugin deleted on another thread while the message thread is blocked
 APP_SOURCES+=(src/engine/ClapTeardownTest.cpp)
 APP_SOURCES+=(src/engine/HostingTests.cpp) # (round 190jg: --sandboxgrouptest, --sandboxbench, --clapext, --automationtimingtest)

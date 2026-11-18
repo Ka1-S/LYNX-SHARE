@@ -765,6 +765,22 @@ public:
     int takeHardwareMidi (HardwareMidiEvent* out, int max) noexcept;
     static constexpr int hardwareMidiCapacity = 2048;
 
+    // GitHub #198 (round 190ks): the notes hosted plugins play from their own window (Instrument::takeOwnNotes) on the
+    // channels the engine marks (UI thread: a bit per channel, those whose plugin window is open while recording is armed).
+    // Only the renderer the engine plays live gets the marks (the one rendering ahead never does: open editors' channels
+    // render live). After process(): the notes of the block in time order (then gone), `sample` in the process() block.
+    struct OwnNoteEvent
+    {
+        std::int32_t sample = 0;
+        std::int32_t channel = 0;
+        std::uint8_t key = 60, midiChannel = 0;
+        float velocity = 0.0f; // 0 = note off
+    };
+    static constexpr int ownNoteWords = maxChannels / 64;
+    void setOwnNoteChannels (const std::array<std::uint64_t, ownNoteWords>& channels) noexcept;
+    int takeOwnNotes (OwnNoteEvent* out, int max) noexcept;
+    static constexpr int ownNoteCapacity = 512;
+
     // Events of the last block (for tests and diagnostics).
     const EventBuffer& lastEvents() const noexcept { return events; }
     // Song notes started and not ended yet (round 169d; tests and diagnostics)
@@ -988,6 +1004,16 @@ private:
     void hardwareMidiBeforeChunk (const RackState& state) noexcept;
     void hardwareMidiAfterChunk (const RackState& state, int n) noexcept;
     void addHardwareMidi (int sample, int port, const std::uint8_t* bytes, int size, int source) noexcept;
+    // the plugins' own notes (round 190ks)
+    std::array<std::atomic<std::uint64_t>, ownNoteWords> ownWanted {};
+    std::atomic<bool> ownWantedAny { false };
+    std::array<std::uint64_t, ownNoteWords> ownOn {}; // the channels whose capture is on for the current chunk
+    bool ownAnyOn = false;
+    std::array<OwnNoteEvent, ownNoteCapacity> ownEvents {};
+    int ownEventCount = 0;
+    std::array<Instrument::OwnNote, 256> ownScratch {};
+    void ownNotesBeforeChunk (const RackState& state) noexcept;
+    void ownNotesAfterChunk (const RackState& state, int n) noexcept;
     const float* clickLeft = nullptr;
     const float* clickRight = nullptr;
     int clickTrack = 0;
