@@ -17782,6 +17782,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Parity190kwTl3Tests.inc" // round 190kw: Timeless 3 states on Echoform (the hidden line law)
 #include "Parity190kwVvTests.inc" // round 190kw: Epoch Verb's level on ValhallaVintageVerb's loop law (after Parity190it: its gold helpers)
 #include "Parity190kwSatTests.inc" // round 190kw: Saturn 2 -> Ember, the styles' own laws (hidden revision)
+#include "Parity190kwR2Tests.inc" // round 190kw: Pro-R 2 → LuxeVerb Space, the Space engine's revision 1 (recovered laws)
 #include "Sampler190dhTests.inc"
 #include "Fix190eaTests.inc"
 #include "Iss158Tests.inc"

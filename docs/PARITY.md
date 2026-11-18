@@ -4323,3 +4323,108 @@ against the base binary: every mode state, every third pairs state, every grid s
 44.1 / 48 / 96 kHz): 99 / 99 byte-identical. CPU (one bass band, Pro-MB's default-like state, thread time, one pinned core,
 20 s at 48 kHz, best of 5, three runs): 0.85 … 0.92 % → 1.01 … 1.02 % of a core (the 20 ms look-ahead and the two
 followers). Not traced: the band's 0 … 2 output amount property (+0x108, default 1: kept at 1).
+
+## Round 190kw (Pro-R 2 → LuxeVerb Space)
+
+LuxeVerb's Space engine gets a hidden **revision 1** (`luxeVerbSpaceRevision`) written from the Pro-R 2 laws that the round
+recovered by static analysis (docs/analise/REA_rodada190kw.md): true stereo (each channel its own network; the law's 16
+line lengths 5.18 ms × 1.12402^(k + n0 + j) split even / odd between the channels), the input M/S (s_in) and output X / Y
+width matrices with the feedback rotation √(1 − v²/2) / ± v / √2, a 2-line network ((200 + 0.00088 (T − 200)) × rate ms),
+an early network at 1.15 × the displayed time without the rate, Space 0 = 0.2 s, the late-level law
+((250 / T)^0.7 + 1.3) (1 + 0.5 d) f10 and the brightness filters (d = 1 − min (B / 0.7, 1): one-pole low pass, high shelf
+following d, 200 Hz shelf −8e²). Open constants fitted on refcap030 (component spectra, `lab/comp.py` / `lab/fit.py`).
+The Pro-R 2 translator passes Stereo Width raw (0 … 1.2; past 1 in the hidden `luxeVerbSpaceWidthExt`) and sets
+revision 1 for **Modern** states; Vintage / Plate keep revision 0 (their revision-1 fit scored lower on the grid).
+
+| refcap030 Pro-R 2 (fxparity) | files | before → after | up / same / down |
+|---|---|---|---|
+| grid (Style × Character) | 30 | 3.43 → **3.50** | 2 / 28 / 0 |
+| grid2 (Space × Rate, Distance × Character, Brightness × Thickness, Space × Width, Rate × Ducking, 96 kHz) | 140 | 2.81 → **3.30** | 62 / 58 / 20 |
+| · Space × Width (left-only impulse) | 25 | 2.16 → **3.32** | 20 / 5 / 0 |
+| · Brightness × Thickness | 25 | 2.72 → **3.20** | 11 / 11 / 3 |
+| · Space × Rate | 25 | 3.12 → **3.48** | 8 / 13 / 4 |
+| · Rate × Ducking (noise burst) | 25 | 2.00 → **2.60** | 14 / 5 / 6 |
+| mode / pairs / prog | 18 / 72 / 6 | 3.72 / 3.38 / 3.50 → 3.78 / 3.43 / 3.50 | 21 / 57 / 18 |
+| 44.1 / 48 / 96 kHz | 16 each | 4.44 / 4.12 / 4.06 → 4.12 / 3.94 / 4.19 | 4 / 39 / 5 |
+| styles | 9 | 4.00 → 4.00 | 0 / 9 / 0 |
+| **all blocks** | 323 | 3.30 → **3.51** | 89 / 191 / 43 |
+| refcap182 programme (Pro-R 2) | 20 | 3.95 → 3.95 | 0 / 20 / 0 |
+| tp172b (impulse / drums / music) | 12 | 3.83 → 3.75 | 1 / 10 / 1 (D drums 6 → 4) |
+
+**Not landed as "nothing worse"**: 43 files go a step down (owner decision, HANDOFF): the default state D at 44.1 / 48 kHz
+(6 → 4: rms −0.5 → −0.6 dB at 30 % mix, the 6-point limit is 0.5), long rates with Ducking (the fitted late level
+× T^−0.94 leaves the tail after the dip too quiet: −8 … −16 dB at rate 400 %), Distance ≥ 0.75 (+1.6 … +2.7 dB), and
+several pairs `mix` files.
+
+**Old projects.** Revision 0 is the tp172b / 190it engine unchanged: 15 gold renders (5 settings × 44.1 / 48 / 96 kHz) from
+the base objects equal the round's objects with revision 0 (`tests/Parity190kwR2Tests.inc`), and fxrender's Pro-R 2
+renders with revision 0 are byte-identical to the base binary at 44.1 / 48 / 96 kHz. `upgradeLoadedEffectParams` sets 0
+for every LuxeVerb saved before.
+
+**CPU** (Space engine alone, 20 s at 48 kHz in blocks of 512, best of 5; `lab/bench1.cpp`): revision 0 5.2 … 6.0 %,
+revision 1 4.0 … 4.3 % (two 8-line halves; 2 × 16 lines measured 10.1 % and were dropped; one sin / cos a sample for the
+lines' modulation).
+
+**Still off:** the in-loop brightness filters on the even lines and the early network's own tone filters (not built);
+Vintage / Plate under revision 1; CrossInput x fitted at 0.5 (x = 1 scores the width impulses better, 3.40 vs 3.32, but
+lifts a centred input by 1.7 dB against the fitted levels); the Space display text still reads 0.30 s at Space 0.
+
+## Round 190lg (Pro-R 2 → LuxeVerb Space revision 1: the levels refitted on time windows)
+
+Round 190kw's revision 1 fitted its open levels on the captures' total level and spectrum only. Per time window (0 … 5 ms
+… 6.4 s) and band the fit was wrong in time: the early network (1.15 × the displayed time, no rate) carried the whole
+tail and the late network sat 6 / 14 / 25 dB under the reference at Decay Rate × 0.25 / 1 / 4, so long rates died early
+(−22 dB at 1.6 … 3.2 s), short ones rang 2.9 s, and Ducking left no tail at long rates. Round 190lg (branch
+`rea2_190lg-r2`) refits revision 1 on the energy per time window and band of every Modern capture (components rendered
+alone, `lab/comp3.py` / `lab/fit4.py`, then the real fxparity bank, `lab/lab2.py`; REA notes in
+docs/analise/REA_rodada190lg.md):
+
+- the late network carries the tail at every rate (its level a fitted surface over Space, rate, Distance and Character on
+  top of the recovered G law); the early network is a build-up of 0.3 × 1.15 × the displayed time;
+- Distance takes the early energy (the reference: −30 dB at 0 … 5 ms from Distance 0 to 1, the tail within 1.6 dB): the
+  early / 2-line networks and the reflections fall with Distance, plus a fitted whole-wet trim;
+- Thickness is the reference's Thickner (static: saturation + compander): the measured −13.2 dB per unit below 0 (the
+  reflections included) and 6.8 (1 − (1 − t)²) dB above act only on a quiet wet (full below −38 dBFS, none above
+  −28 dBFS): an impulse's tail moves, a music wet does not (the reference: ≤ 1.4 dB).
+
+All scores with round 190lg's time-based alignment window (before and after; 44.1 / 48 kHz identical to the old scorer,
+the base bank re-scored identically at 96 kHz too). Before = d9bfc68ce (revision 0 for every state); the 190kw-r2 column
+is that round's own run (old scorer; its 96 kHz files were not re-scored).
+
+| refcap030 Pro-R 2 (fxparity) | files | before → 190kw-r2 → **190lg** | up / same / down (190lg) |
+|---|---|---|---|
+| grid (Style × Character) | 30 | 3.43 → 3.50 → **3.47** | 1 / 29 / 0 |
+| grid2 | 140 | 2.81 → 3.30 → **3.48** | 71 / 62 / 7 |
+| · Space × Rate | 25 | 3.12 → 3.48 → **3.76** | 10 / 14 / 1 |
+| · Distance × Character | 25 | 3.60 → 3.64 → **3.88** | 8 / 16 / 1 |
+| · Brightness × Thickness | 25 | 2.72 → 3.20 → **3.40** | 14 / 10 / 1 |
+| · Space × Width (left-only impulse) | 25 | 2.16 → 3.32 → **3.32** | 20 / 5 / 0 |
+| · Rate × Ducking (noise burst + 1 kHz tone) | 25 | 2.00 → 2.60 → **2.92** | 18 / 3 / 4 |
+| · Style × Space, 96 kHz | 15 | 3.53 → 3.73 → **3.67** | 1 / 14 / 0 |
+| mode | 18 | 3.72 → 3.78 → **3.72** | 2 / 15 / 1 |
+| pairs | 72 | 3.38 → 3.43 → **3.79** | 25 / 43 / 4 |
+| prog / styles | 6 / 9 | 3.50 / 4.00 → = → **=** | 0 / 15 / 0 |
+| 44.1 / 48 / 96 kHz | 16 each | 4.44 / 4.12 / 4.06 → 4.12 / 3.94 / 4.19 → **4.12 / 4.25 / 4.25** | 5 / 39 / 4 |
+| **all blocks** | 323 | 3.30 → 3.51 → **3.68** | **104 / 203 / 16** (190kw-r2: 89 / 191 / 43) |
+| refcap182 programme | 20 | 3.95 → 3.95 → **4.05** | 1 / 19 / 0 |
+| tp172b (impulse / drums / music) | 12 | 3.83 → 3.75 → **3.75** | 1 / 10 / 1 |
+
+**Still down (17 files, not landed as "nothing worse"; owner decision in the round's HANDOFF):**
+- 7 are dominated by a long steady 1 kHz sine (Rate × Ducking 0.5 / 0 and 1 / 0.5 · 0.75 · 1, the mode stim at Character
+  Tilt 0, the 44.1 kHz S1 / D stims): a static network's response at one frequency is a modal draw (±5 dB; this engine
+  L / R +6.4 / −2.4 dB on that tone, revision 0 −0.5 / −1.5) and the reference varies ±1.5 dB between identical captures.
+- 3 are the default state D (30 % mix) at its 6-point limits: 44.1 / 48 kHz impulse spectrum 0.88 / 0.72 dB (limit 0.6:
+  the 31 … 62 Hz third octaves, a modal pattern again), tp172b D drums rms −0.58 dB (limit 0.5). The D state as a whole:
+  20 files, 4 down / 3 up (prog182 D mix 4 → 6, 48 / 96 kHz D stim 4 → 6 / 3 → 4).
+- 7 one-step drops where fxparity's alignment moved (lag 203 → 3542, 227 → 1238, …): Space 0.75 at Rate 0, Distance 0.25
+  Character 0.75, Brightness 0.75 Thickness 0.25, two Distance 0.2 mixes, Character 0.8 Thickness 0.5, Space 0.5 Width
+  0.8 mix. The reference's reflections are fixed single-sample taps (L 6.69 / 11.33 / 18.35 / 25.42 ms, R 8.31 / 12.50 /
+  21.15 / 32.40 ms at every rate, Space and Distance); LYNX's do not line up, so the cross-correlation often locks onto a
+  late arrival. Matching those taps is the next step (not built).
+
+**Old projects.** Revision 0 untouched: the 15 gold renders equal the base commit's (`tests/Parity190kwR2Tests.inc`), and
+fxrender's Pro-R 2 renders with the revision forced to 0 are byte-identical to the base binary at 44.1 / 48 / 96 kHz
+(D / S1 × impulse / mix). Revision 1 was never released (190kw-r2 was not merged), so it changes freely.
+
+**CPU** (Space engine alone, 20 s at 48 kHz, blocks of 512, best of 5, under load 31 … 34): revision 1 4.1 … 5.3 %
+before, 4.2 … 5.3 % after (Thickness ≠ 0 adds one log10 / exp a sample: 4.3 … 4.7 %); revision 0 5.6 … 6.9 %.
