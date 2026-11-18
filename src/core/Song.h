@@ -1108,6 +1108,9 @@ struct ChannelDef
     SimplePad simplePad;
     // Round 190kx (core/AraLink.h): an audio clip channel edited in an ARA 2 plugin (Melodyne...); empty = not
     AraLink ara;
+    // Round 190lk (core/PolyEdit.h): an audio clip channel's notes edited in LYNX's polyphonic note editor (the analysis
+    // and the edits, "LXPE"); its clips play the edited render of the sample. Empty = not edited.
+    std::vector<std::uint8_t> polyEdit;
     InstanceTag instance; // runtime identity of the channel (never saved)
 
     bool hasKeyRegion() const noexcept { return keyLow > 0 || keyHigh < 127; }

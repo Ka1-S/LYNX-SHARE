@@ -89,6 +89,15 @@ add_library(lynx_core STATIC
     src/core/SynthPresets.cpp
     src/core/Slicer.cpp
     src/core/AudioToMidi.cpp
+    src/core/PolyEdit.cpp
+    # PitchNet's polyphonic engine (round 190lk; AGPL-3.0, third_party/pitchnet-poly/README-LYNX.md)
+    third_party/pitchnet-poly/PolyEngine.cpp
+    third_party/pitchnet-poly/PolyExtraction.cpp
+    third_party/pitchnet-poly/PolyPurifier.cpp
+    third_party/pitchnet-poly/PolyRenderer.cpp
+    third_party/pitchnet-poly/PolySoundModel.cpp
+    third_party/pitchnet-poly/PolySpectral.cpp
+    third_party/pitchnet-poly/PolyLazy.cpp
     src/core/Templates.cpp
     src/core/FlWrapper.cpp
     src/core/FlPluginDb.cpp
@@ -691,7 +700,8 @@ if(LYNX_BUILD_APP)
         src/ui/Updater.cpp
         src/ui/AudioCheck.cpp
         src/ui/StemExtract.cpp
-        src/ui/AudioToMidi.cpp)
+        src/ui/AudioToMidi.cpp
+        src/ui/PolyEditor.cpp)
     target_sources(LYNX PRIVATE src/Main.cpp ${LYNX_APP_SOURCES})
     # Ableton Link 4.1.1 (GPL-2.0-or-later, used under the GPLv3; third_party/link, round 190gl) with its bundled Asio
     # (Boost licence): header-only, used by src/engine/AbletonLink.cpp alone (it sets Link's and Asio's macros itself)

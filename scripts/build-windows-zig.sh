@@ -225,6 +225,7 @@ APP_SOURCES+=(src/core/DrumControls.cpp src/core/BankStates.cpp src/core/DrumBan
 APP_SOURCES+=(src/core/KeyMap.cpp src/core/PresetCycle.cpp src/core/Sfz.cpp src/core/Workspace.cpp src/core/RackOps.cpp src/core/PlaylistTrackOps.cpp src/core/ChannelMiscFx.cpp src/core/MidiImport.cpp src/ui/Workspace.cpp src/ui/NativeChild.cpp src/ui/DockPaintCheck.cpp src/ui/MotionOverlay.cpp src/ui/ExternalDrag.cpp src/ui/ExternalDragX11.cpp src/ui/ValueControl.cpp src/ui/Dialogs.cpp)
 # Wave Traveller (round 167f)
 APP_SOURCES+=(src/core/WaveTraveller.cpp src/ui/WaveTravellerEditor.cpp)
+APP_SOURCES+=(src/core/PolyEdit.cpp src/ui/PolyEditor.cpp third_party/pitchnet-poly/PolyEngine.cpp third_party/pitchnet-poly/PolyExtraction.cpp third_party/pitchnet-poly/PolyPurifier.cpp third_party/pitchnet-poly/PolyRenderer.cpp third_party/pitchnet-poly/PolySoundModel.cpp third_party/pitchnet-poly/PolySpectral.cpp third_party/pitchnet-poly/PolyLazy.cpp) # polyphonic note editor (round 190lk)
 APP_SOURCES+=(src/core/DawProject.cpp src/core/ZipLite.cpp) # DAWproject import / export (round 190jf, B22)
 APP_SOURCES+=(src/core/FruitySlicer.cpp src/ui/FruitySlicerEditor.cpp)
 # FL's Envelope / instrument settings page of the plugin voice processor (round 190f)

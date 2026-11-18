@@ -1,6 +1,7 @@
 #include "ui/AudioEditor.h"
 #include "ui/AudioEditorTools.h"
 #include "ui/AudioToMidi.h"
+#include "ui/PolyEditor.h"
 #include "ui/BrowserComponent.h"
 #include "ui/EditorTools.h"
 
@@ -3999,6 +4000,32 @@ private:
         setStatus (tr ("{0} markers added", { juce::String (n) }), false);
     }
 
+    // Round 190lo: Tools › Analysis › "Edit notes (polyphonic)..." — LYNX's polyphonic note editor (ui/PolyEditor.h) on
+    // the selection, or the whole audio, as a buffer: the editor keeps its own undo, and its Apply writes the edited notes
+    // back over the same frames as one Edison undo step
+    void editNotesPolyphonic()
+    {
+        if (doc.audio.empty() || recState != RecState::idle)
+            return;
+        const auto range = ae::orAll (doc, selection);
+        auto data = std::make_shared<SampleData>();
+        data->sampleRate = doc.audio.sampleRate;
+        data->left.assign (doc.audio.channels[0].begin() + range.start, doc.audio.channels[0].begin() + range.end);
+        if (doc.audio.numChannels() > 1)
+            data->right.assign (doc.audio.channels[1].begin() + range.start, doc.audio.channels[1].begin() + range.end);
+        juce::Component::SafePointer<AudioEditor> self (this);
+        PolyEditorWindows::openBuffer (engine, data, "Edison", [self, range, frames = doc.audio.frames()] (std::shared_ptr<const SampleData> out) {
+            if (self == nullptr || out == nullptr || self->doc.audio.frames() != frames || (std::int64_t) out->left.size() != range.length())
+                return;
+            self->stopPlayback();
+            auto& ch = self->doc.audio.channels;
+            std::copy (out->left.begin(), out->left.end(), ch[0].begin() + range.start);
+            if (ch.size() > 1)
+                std::copy ((out->right.empty() ? out->left : out->right).begin(), (out->right.empty() ? out->left : out->right).end(), ch[1].begin() + range.start);
+            self->commit (tr ("Edit notes (polyphonic)"));
+        });
+    }
+
     // FL's Detect pitch regions (round natives190kj, 0x869100): one region per detected note, named after it. FL's
     // pitch analyser is not ported: the notes are LYNX's Newtone analysis (core/NewtoneFx.h analyseNotes).
     void detectPitchRegions()
@@ -6187,6 +6214,8 @@ juce::PopupMenu AudioEditor::mainMenu()
                     self->convertToMidi (options);
             });
         });
+        // round 190lo: the polyphonic note editor on the selection (or the whole audio), in buffer mode
+        tools.addItem (tr ("Edit notes (polyphonic)..."), has && recState == RecState::idle, false, [this] { editNotesPolyphonic(); });
     }
 
     juce::PopupMenu regions;

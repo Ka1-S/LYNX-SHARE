@@ -2289,6 +2289,8 @@ juce::var channelToVar (const ChannelDef& c)
         o->setProperty ("standIns", standInsToVar (c.standIns));
     if (c.ara.active()) // round 190kx: edited in an ARA plugin (only then: every other file is what it was)
         o->setProperty ("ara", juce::Array<juce::var> { str (c.ara.pluginId), str (c.ara.pluginName) });
+    if (! c.polyEdit.empty() && c.instrument == InstrumentKind::audioClip) // round 190lk: notes edited in the polyphonic editor
+        o->setProperty ("polyEdit", juce::Base64::toBase64 (c.polyEdit.data(), c.polyEdit.size()));
     // Freeze (round 190ay): written only while frozen, so every other project's file is what it was
     if (c.freeze.on())
     {
@@ -2673,6 +2675,15 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
     def.standIns = standInsFromVar (c["standIns"]);
     if (const auto& ara = c["ara"]; ara.isArray() && ara.size() >= 2 && def.instrument == InstrumentKind::audioClip) // (round 190kx)
         def.ara = { ara[0].toString().toStdString(), ara[1].toString().toStdString() };
+    if (const auto encoded = c["polyEdit"].toString(); encoded.isNotEmpty() && def.instrument == InstrumentKind::audioClip) // (round 190lk)
+    {
+        juce::MemoryOutputStream decoded;
+        if (juce::Base64::convertFromBase64 (decoded, encoded))
+        {
+            const auto* bytes = static_cast<const std::uint8_t*> (decoded.getData());
+            def.polyEdit.assign (bytes, bytes + decoded.getDataSize());
+        }
+    }
     for (const auto* key : { "freeze", "trackFreeze" })
         if (const auto& f = c[key]; f.isObject())
         {

@@ -727,6 +727,17 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
         if (! edited.isEmpty())
             lost.push_back ({ TR_NOOP ("Audio clips edited in an ARA plugin (Melodyne...) play without those edits: {0}"), listOf (edited), false });
     }
+
+    // round 190lk: audio clips whose notes were edited in the polyphonic note editor play unedited in 0.1.28
+    {
+        juce::StringArray edited;
+        forEachChannel (root, [&] (juce::DynamicObject& c, int i) {
+            if (drop (c, "polyEdit"))
+                edited.add (channelName (juce::var (&c), i));
+        });
+        if (! edited.isEmpty())
+            lost.push_back ({ TR_NOOP ("Audio clips with notes edited in the polyphonic note editor play without those edits: {0}"), listOf (edited), false });
+    }
 }
 
 // --- 0.1.29 / 0.1.30 → 0.1.28 ------------------------------------------------------------------------------------------

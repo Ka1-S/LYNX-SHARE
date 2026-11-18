@@ -4,6 +4,7 @@
 #include "ui/ControllerEditors.h"
 #include "ui/Controllers164.h"
 #include "ui/NewtoneEditor.h"
+#include "ui/PolyEditor.h"
 #include "ui/AudioEditor.h"
 #include "ui/VisualEditors.h"
 #include "ui/FlExtraEditors.h"
@@ -6674,6 +6675,7 @@ void closeAll()
     FormulaControllerWindows::closeAll();
     Controller164Windows::closeAll();
     NewtoneWindows::closeAll();
+    PolyEditorWindows::closeAll(); // (round 190lk)
     VisualWindows::closeAll();
     FlExtraWindows::closeAll();
     FacetEqWindows::closeAll();

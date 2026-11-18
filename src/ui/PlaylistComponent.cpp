@@ -4,6 +4,7 @@
 #include "core/DrawMode.h"
 #include "core/LayoutStyle.h"
 #include "ui/NewtoneEditor.h"
+#include "ui/PolyEditor.h"
 #include "ui/AraMenu.h"
 #include "ui/TempoDetectionDialog.h"
 #include "ui/ClipGridComponent.h"
@@ -11229,6 +11230,10 @@ juce::PopupMenu PlaylistComponent::buildAudioClipMenu (int index, int mouseX)
                 });
         });
     });
+    // round 190lk: the polyphonic note editor (ui/PolyEditor, core/PolyEdit.h): the channel's notes, chords included,
+    // edited one by one; the channel's clips play the edited render (an ARA-edited channel plays its plugin instead)
+    menu.addItem (tr ("Edit notes (polyphonic)..."), sample != nullptr && ! channel.ara.active(), false,
+                  [this, ch] { PolyEditorWindows::open (engine, ch); });
     addLiveTrackItems (engine, menu, index, targets, [safe = juce::Component::SafePointer<PlaylistComponent> (this)] {
         if (safe != nullptr)
         {

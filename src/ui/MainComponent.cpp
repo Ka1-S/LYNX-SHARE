@@ -60,6 +60,7 @@
 #include "core/EditorPolish.h"
 
 #include "ui/HistoryPanel.h"
+#include "ui/PolyEditor.h" // (round 190lo)
 #include "ui/LyricsPanel.h"
 #include "ui/ReferenceMatchPanel.h"
 #include "ui/VersionsPanel.h"
@@ -3061,6 +3062,8 @@ void MainComponent::loadUiSettings()
             PianoRollComponent::showChordName = on;
         else if (key == "prSongBars")
             PianoRollComponent::songBarsRuler = on;
+        else if (key == "polyPrepareOnOpen") // (round 190lo: a LYNX extra, ui/PolyEditor.h)
+            PolyEditorWindows::prepareOnOpen = on;
         else if (key == "prKeyStyle") // (round 190j: 0 = flat, FL's; 1 = piano keys)
             PianoRollComponent::keyStyle = line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue() == 1 ? pianokeys::Style::piano
                                                                                                                   : pianokeys::Style::flat;
@@ -3381,6 +3384,7 @@ void MainComponent::saveUiSettings()
                                       + "\nprGridHighlights=" + juce::String (PianoRollComponent::gridHighlights ? 1 : 0)
                                       + "\nprShowChordName=" + juce::String (PianoRollComponent::showChordName ? 1 : 0)
                                       + "\nprSongBars=" + juce::String (PianoRollComponent::songBarsRuler ? 1 : 0)
+                                      + "\npolyPrepareOnOpen=" + juce::String (PolyEditorWindows::prepareOnOpen ? 1 : 0)
                                       + "\nprKeyStyle=" + juce::String ((int) PianoRollComponent::keyStyle)
                                       + "\naudioLogEnabled=" + juce::String (engine.getRollingLog().isEnabled() ? 1 : 0)
                                       + "\naudioLogSeconds=" + juce::String (engine.getRollingLog().lengthSeconds())
@@ -8398,6 +8402,9 @@ void MainComponent::openLynxProject (const juce::File& file, bool withoutPlugins
     currentFile = file;
     importedFlpFile = juce::File();
     projectName = file.getFileNameWithoutExtension();
+    // round 190lo (LYNX extra, off by default): clips with polyphonic note edits get their analysis ready in the background
+    if (const auto queued = PolyEditorWindows::prepareEditedClips (engine); queued > 0)
+        platform::testModeLog ("polyphonic edits prepared in the background: " + juce::String (queued) + " clips");
     importedSuffix = {};
     rememberRecent (file);
     updateTitle();

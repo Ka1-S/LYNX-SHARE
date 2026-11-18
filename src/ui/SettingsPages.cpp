@@ -12,6 +12,7 @@
 #include "core/FlSettings.h"
 #include "core/LayoutStyle.h"
 #include "core/LynxExtras.h"
+#include "ui/PolyEditor.h"
 #include "ui/WorkflowExtras.h" // round 190iu
 #include "core/PlaylistOps.h"
 #include "core/ToolbarLayout.h"
@@ -2590,6 +2591,7 @@ bool lynxExtraOn (AudioEngine& engine, const SettingsHooks& hooks, std::string_v
     if (id == "playlist.automationLanes") return autolanes::shown();
     if (id == "playlist.trackInserts") return PlaylistComponent::showTrackInserts;
     if (id == "pianoRoll.songBarsRuler") return PianoRollComponent::songBarsRuler;
+    if (id == "polyEdit.prepareOnOpen") return PolyEditorWindows::prepareOnOpen; // (round 190lo)
     if (id == "general.hoverValues") return hooks.getGeneral && hooks.getGeneral().hoverValues;
     if (id == "project.linkTracks") return hooks.getGeneral && hooks.getGeneral().linkTracksInNewProjects;
     if (id == "record.lastLoopPassPlays") return engine.getRecordOptions().lastLoopPassPlays;
@@ -2672,6 +2674,11 @@ void setLynxExtra (AudioEngine& engine, const SettingsHooks& hooks, std::string_
             PianoRollComponent::songBarsRuler = on;
             saved();
         }
+    }
+    else if (id == "polyEdit.prepareOnOpen") // round 190lo (ui/PolyEditor.h)
+    {
+        PolyEditorWindows::prepareOnOpen = on;
+        saved();
     }
     else if (id == "general.hoverValues")
     {

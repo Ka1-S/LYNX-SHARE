@@ -1,5 +1,6 @@
 #include "core/Crossfader.h"
 #include "core/RackRenderer.h"
+#include "core/PolyEdit.h"
 #include "core/Dropouts.h"
 #include "core/HostTimelineScope.h"
 #include "core/Rack.h"
@@ -328,6 +329,12 @@ std::shared_ptr<Instrument> buildInstrument (const ChannelDef& channel, double s
         && ! channel.samplePath.empty())
         sample = samples (channel.samplePath);
 
+    // round 190lk (core/PolyEdit.h): an audio clip whose notes were edited in the polyphonic editor plays the edited
+    // render of its sample (made once per edit state, cached; a channel without edits takes none of this)
+    const auto polyKey = kind == InstrumentKind::audioClip && sample != nullptr ? polyedit::stateKey (channel.polyEdit) : std::string();
+    if (! polyKey.empty())
+        sample = polyedit::renderedFor (channel.samplePath, sample, channel.polyEdit);
+
     // FL's Sampler › Precomputed effects (REA_rodada167h §2): the played region, processed once
     // Audio clips too (round 167k, FL render r167k/fl/clip/p_*: an audio clip channel's Normalize, Reverse polarity,
     // Fade in / out play in FL); a clip plays the whole file, so the region stays whole there
@@ -356,7 +363,7 @@ std::shared_ptr<Instrument> buildInstrument (const ChannelDef& channel, double s
             {
                 const auto ratio = target / ((double) span->frames() / span->sampleRate);
                 auto stretched = factories.stretchedSpans
-                                     ? factories.stretchedSpans (channel.samplePath, precompute::variantKey (spanSettings, clip), span, ratio,
+                                     ? factories.stretchedSpans (channel.samplePath, precompute::variantKey (spanSettings, clip) + polyKey, span, ratio,
                                                                  channel.sampler.stretchMethod, channel.sampler.stretchPitch, stretchOptionsOf (channel.sampler))
                                      : std::shared_ptr<const SampleData> (timeStretchSpan (*span, ratio, channel.sampler.stretchMethod,
                                                                                            channel.sampler.stretchPitch, stretchOptionsOf (channel.sampler)));
@@ -370,7 +377,15 @@ std::shared_ptr<Instrument> buildInstrument (const ChannelDef& channel, double s
             const auto ratio = target / ((double) precompute::stretchedFrames (sample, channel.sampler, clip) / sample->sampleRate);
             const auto map = warpStretchMap (channel.sampler.warp, (double) sample->frames(), sample->sampleRate,
                                              (double) std::llround ((double) sample->frames() * ratio));
-            if (auto stretched = factories.stretchedSamples (channel.samplePath, ratio, channel.sampler.stretchMethod, channel.sampler.stretchPitch, map,
+            // round 190lk: the polyphonic editor's render (not the file) is what stretches (a warp map's clip plays the
+            // file's stretch without the note edits: the span cache takes no warp map)
+            if (! polyKey.empty() && channel.sampler.warp.empty() && factories.stretchedSpans)
+            {
+                if (auto stretched = factories.stretchedSpans (channel.samplePath, polyKey, sample, ratio, channel.sampler.stretchMethod,
+                                                               channel.sampler.stretchPitch, stretchOptionsOf (channel.sampler)))
+                    sample = std::move (stretched);
+            }
+            else if (auto stretched = factories.stretchedSamples (channel.samplePath, ratio, channel.sampler.stretchMethod, channel.sampler.stretchPitch, map,
                                                          stretchOptionsOf (channel.sampler)))
                 sample = std::move (stretched);
         }
@@ -992,6 +1007,7 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                     && previous->song.channels[p].pluginState == channel.pluginState && previous->sampleRate == sampleRate))
             && ((kind != InstrumentKind::sampler && kind != InstrumentKind::audioClip && kind != InstrumentKind::flkeys)
                 || (previous->song.channels[p].samplePath == channel.samplePath && previous->song.channels[p].zones == channel.zones
+                    && previous->song.channels[p].polyEdit == channel.polyEdit // (round 190lk: other note edits, another render)
                     && previous->song.channels[p].modelParams == channel.modelParams
                     && previous->song.channels[p].sampler.keepPitch == channel.sampler.keepPitch
                     && clipShiftWanted (previous->song, p) == clipShiftWanted (song, i)
