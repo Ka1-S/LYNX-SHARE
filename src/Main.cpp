@@ -21835,8 +21835,7 @@ private:
         juce::String report;
         for (const auto corrected : { false, true })
         {
-            auto track = lynx::newtonefx::analyseNotes (*sample);
-            track.engine = lynx::newtonefx::latestEngine;
+            auto track = lynx::newtonefx::analyseNewSlot (*sample); // (a new slot: natural engine, Separate close notes)
             if (corrected)
                 lynx::newtonefx::correctPitch (track, 1.0, 1.0);
             offline.editSong ([&] (lynx::Song& song) {

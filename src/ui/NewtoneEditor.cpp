@@ -959,6 +959,7 @@ private:
         else if (auto t = newtonefx::trackOf (fx->state); t && sample != nullptr)
         {
             notes = *t;
+            fineAnalysis = notes.fineSplit; // (the analysis the notes came from)
             if (notes.key < 0)
                 notes.key = newtonefx::detectKey (notes); // (an older state: the key the notes give)
         }
@@ -966,9 +967,10 @@ private:
             notes = {};
         else
         {
-            // a sample without notes yet (a fresh slot, or a sample chosen from the slot menu): analyse it now
-            notes = newtonefx::analyseNotes (*sample);
-            notes.engine = newtonefx::latestEngine; // (round 190li: a new slot renders with LYNX's natural engine)
+            // a sample without notes yet (a fresh slot, or a sample chosen from the slot menu): analyse it now. Round
+            // 190li: a new slot renders with LYNX's natural engine; owner 2026-11-18: with "Separate close notes" on
+            notes = newtonefx::analyseNewSlot (*sample);
+            fineAnalysis = notes.fineSplit;
             juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<NewtoneEditor> (this)] {
                 if (safe != nullptr)
                     safe->commit();

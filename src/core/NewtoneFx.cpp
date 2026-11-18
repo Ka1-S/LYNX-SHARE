@@ -1395,9 +1395,10 @@ struct Reader
     }
 };
 
-constexpr std::uint32_t nativeVersion = 4; // 2 (round 165g): + the editor's knobs, the notes' pitch ramps and analysed smooth times;
+constexpr std::uint32_t nativeVersion = 5; // 2 (round 165g): + the editor's knobs, the notes' pitch ramps and analysed smooth times;
                                            // 3 (round 190kj): + each note's voiced end and analysed velocity;
-                                           // 4 (round 190li): + the engine revision, each note's modulation / pitch drift
+                                           // 4 (round 190li): + the engine revision, each note's modulation / pitch drift;
+                                           // 5 (rollup 0.1.30 step 8): + the analysis's "Separate close notes" (fineSplit)
 constexpr std::uint32_t warpVersion = 1;
 
 double median (std::vector<double> v)
@@ -1409,9 +1410,24 @@ double median (std::vector<double> v)
 }
 } // namespace
 
+AnalyseOptions newSlotAnalyseOptions() noexcept
+{
+    AnalyseOptions o;
+    o.fineSplit = latestEngine >= 1; // (owner, 2026-11-18: on for new slots with the natural engine)
+    return o;
+}
+
+Track analyseNewSlot (const SampleData& source)
+{
+    auto t = analyseNotes (source, newSlotAnalyseOptions());
+    t.engine = latestEngine;
+    return t;
+}
+
 Track analyseNotes (const SampleData& source, const AnalyseOptions& options)
 {
     Track t;
+    t.fineSplit = options.fineSplit;
     const auto n = (std::int64_t) source.frames();
     t.frames = n;
     if (n <= 0)
@@ -2048,11 +2064,12 @@ std::shared_ptr<SampleData> cropped (const SampleData& s, std::int64_t a, std::i
 
 std::vector<std::uint8_t> writeNative (const Track& track)
 {
-    // (round 190li: a track that uses nothing of version 4 is written as version 3, byte for byte as before)
+    // (round 190li: a track that uses nothing of version 4 is written as version 3, byte for byte as before; rollup step 8:
+    // version 5 only for a fine-split analysis)
     const auto v4 = track.engine != 0 || std::any_of (track.pitches.begin(), track.pitches.end(), [] (const Note& p) {
                         return p.modulation != 1.0 || p.pitchDrift != 1.0;
                     });
-    return writeNative (track, v4 ? nativeVersion : 3u);
+    return writeNative (track, track.fineSplit ? 5u : v4 ? 4u : 3u);
 }
 
 std::vector<std::uint8_t> writeNative (const Track& track, std::uint32_t version)
@@ -2070,6 +2087,8 @@ std::vector<std::uint8_t> writeNative (const Track& track, std::uint32_t version
         put (out, (std::int32_t) track.key); // (version 3)
     if (version >= 4)
         put (out, (std::int32_t) track.engine); // (version 4)
+    if (version >= 5)
+        put (out, (std::uint8_t) (track.fineSplit ? 1 : 0)); // (version 5)
     put (out, (std::uint32_t) track.pitches.size());
     for (const auto& p : track.pitches)
     {
@@ -2119,6 +2138,8 @@ std::optional<Track> parseNative (const std::vector<std::uint8_t>& state)
         t.key = r.get<std::int32_t>();
     if (version >= 4)
         t.engine = r.get<std::int32_t>();
+    if (version >= 5)
+        t.fineSplit = r.get<std::uint8_t>() != 0;
     const auto count = r.get<std::uint32_t>();
     if (! r.ok || count > 100000)
         return std::nullopt;

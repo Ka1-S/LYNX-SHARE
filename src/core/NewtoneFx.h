@@ -90,6 +90,10 @@ struct Track
     // scored against Melodyne 5: tools/vocallab): a voicing-aware pitch-synchronous resynthesis, smooth note joins,
     // the drift / modulation split. A new Newtone slot gets `latestEngine`.
     int engine = 0;
+    // rollup 0.1.30 step 8 (owner, 2026-11-18): the notes come from the "Separate close notes" analysis
+    // (AnalyseOptions::fineSplit). Only an analysis sets it; saved as layout 5, only when set (else as before, byte for
+    // byte). The editor's tick shows it.
+    bool fineSplit = false;
 };
 constexpr int latestEngine = 1;
 
@@ -151,6 +155,11 @@ struct AnalyseOptions
     bool octaveGuard = true;
 };
 Track analyseNotes (const SampleData& source, const AnalyseOptions& options = {});
+// The analysis a NEW Newtone slot gets (owner, 2026-11-18): with LYNX's natural engine (latestEngine ≥ 1)
+// "Separate close notes" is on; FL imports, older projects and any other analysis keep FL's (AnalyseOptions {}).
+AnalyseOptions newSlotAnalyseOptions() noexcept;
+// A new slot's notes: newSlotAnalyseOptions()'s analysis, rendered with `latestEngine`
+Track analyseNewSlot (const SampleData& source);
 
 // ------------------------------------------------------------------------------------------------------------------
 // LYNX's Newtone editor tools (round 165g, FL's workflow interpreted: Cut mode / glue, the Center / Variation /

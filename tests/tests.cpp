@@ -17927,3 +17927,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Ara190kxTests.inc" // round 190kx: ARA 2 on audio clips (the clips as playback regions, ids, tempo, the clip menu)
 #include "LoopAnalysis190kxTests.inc" // round 190kx: loop analysis (key and tempo of the user's own loops; core/LoopAnalysis.h)
 #include "Vocal190liTests.inc" // round 190li: Newtone natural engine (engine 1), modulation / drift split, sung centre, analysis octave guard
+#include "Newtone190lmTests.inc" // rollup 0.1.30 step 8: a new Newtone slot (natural engine) analysed with "Separate close notes"
