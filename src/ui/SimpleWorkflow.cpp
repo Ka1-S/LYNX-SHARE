@@ -549,14 +549,15 @@ public:
 class SimpleTitleTools final : public juce::Component
 {
 public:
-    SimpleTitleTools (juce::Component& a, juce::Component& c, juce::Component& d) : add (a), lyrics (c), automation (d)
+    SimpleTitleTools (juce::Component& a, juce::Component& c, juce::Component& d, juce::Component& e) : add (a), lyrics (c), automation (d), loops (e)
     {
         addAndMakeVisible (add);
         addAndMakeVisible (automation);
         addAndMakeVisible (lyrics);
+        addAndMakeVisible (loops);
     }
     static constexpr int automationWidth = 96;
-    static constexpr int width = 110 + 6 + automationWidth + 6 + 80 + 10; // (round 190jr: + Automation)
+    static constexpr int width = 110 + 6 + automationWidth + 6 + 80 + 6 + 80 + 10; // (round 190jr: + Automation; round 190lx: + Loops)
     void resized() override
     {
         auto r = getLocalBounds();
@@ -565,12 +566,15 @@ public:
         automation.setBounds (r.removeFromLeft (automationWidth)); // (BandLab: the automation switch beside Add Track)
         r.removeFromLeft (6);
         lyrics.setBounds (r.removeFromLeft (80));
+        r.removeFromLeft (6);
+        loops.setBounds (r.removeFromLeft (80)); // (round 190lx, DS-42: BandLab's Sounds button beside Lyrics / Notes)
     }
 
 private:
     juce::Component& add;
     juce::Component& lyrics;
     juce::Component& automation;
+    juce::Component& loops;
 };
 
 SimpleWorkflow::SimpleWorkflow (AudioEngine& e, Host h) : engine (e), host (std::move (h))
@@ -603,6 +607,15 @@ SimpleWorkflow::SimpleWorkflow (AudioEngine& e, Host h) : engine (e), host (std:
             host.toggleLyrics();
     };
     lyricsButton = std::move (lyrics);
+    // round 190lx (DS-42): the Loops dock on the right of the timeline (BandLab's "BandLab Sounds" button)
+    auto loops = std::make_unique<juce::TextButton> (tr ("Loops"));
+    loops->setTooltip (tr ("Loops: browse loops and drag them onto the timeline"));
+    loops->setComponentID ("simple.loops");
+    loops->onClick = [this] {
+        if (host.toggleLoops)
+            host.toggleLoops();
+    };
+    loopsButton = std::move (loops);
     // round 190jr (BUILD-LIST 13, BandLab's switch beside Add Track): each Simple track's row shows a parameter's line
     auto automation = std::make_unique<juce::TextButton> (tr ("Automation"));
     automation->setComponentID ("simple.automation");
@@ -614,7 +627,7 @@ SimpleWorkflow::SimpleWorkflow (AudioEngine& e, Host h) : engine (e), host (std:
             host.setAutomation (b->getToggleState());
     };
     automationButton = std::move (automation);
-    titleTools = std::make_unique<SimpleTitleTools> (*addButton, *lyricsButton, *automationButton);
+    titleTools = std::make_unique<SimpleTitleTools> (*addButton, *lyricsButton, *automationButton, *loopsButton);
 
     // round 190dv: the Welcome screen and the first-song tour
     FirstSongTour::Host t;

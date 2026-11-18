@@ -39,7 +39,8 @@ void MainComponent::setUpLookParts()
     lookPartsReady = true;
     for (auto* c : std::initializer_list<juce::Component*> { &signatureBox, &quantBox, &saveStatus, &moreButton, &browserToggleButton,
                                                              &backToArrangementButton, &captureButton, &sessionRecordButton, &drawModeButton,
-                                                             &keyMapButton, &midiMapButton, &sessionViewButton, &arrangementViewButton, &cycleButton, &metronomeMenuButton })
+                                                             &keyMapButton, &midiMapButton, &sessionViewButton, &arrangementViewButton, &cycleButton, &metronomeMenuButton,
+                                                             &liveLoopButton, &punchOutButton })
     {
         addChildComponent (c);
         c->setMouseClickGrabsKeyboardFocus (false);
@@ -104,6 +105,26 @@ void MainComponent::setUpLookParts()
     metronomeMenuButton.setTooltip (tr ("Metronome: tap tempo, sound, volume and count-in"));
     ui::setHint (metronomeMenuButton, tr ("Metronome: tap tempo, sound, volume and count-in"), true);
     metronomeMenuButton.onClick = [this] { showMetronomePopover(); };
+
+    // round 190lx (DL-61, Live manual 19.3.1, capture190ji live-loop-punch-z3): Live's Loop switch and Punch-Out switch
+    // after its Punch-In switch (the punch button in this look); lit: Live's orange plate (the live box's toggle look)
+    const auto loopText = tr ("Loop switch: plays the loop region over and over");
+    liveLoopButton.setTooltip (loopText);
+    ui::setHint (liveLoopButton, loopText);
+    liveLoopButton.onClick = [this] { toggleLiveLoop(); };
+    liveLoopButton.setToggleLook (true);
+    const auto outText = tr ("Punch-Out switch: audio recording stops at the end of the loop region");
+    punchOutButton.setTooltip (outText);
+    ui::setHint (punchOutButton, outText);
+    punchOutButton.onClick = [this] { runAction ("record.punchOut"); };
+    punchOutButton.setToggleLook (true);
+}
+
+// Round 190lx (DL-61): Live's Loop switch. With a loop region it switches its looping (the region stays, as Live's brace);
+// without one it sets one as the Simple Cycle does, a bar at the song position.
+void MainComponent::toggleLiveLoop()
+{
+    toggleCycle();
 }
 
 namespace
@@ -334,7 +355,8 @@ void MainComponent::toggleCycle()
 std::vector<juce::Component*> MainComponent::lookOnlyParts()
 {
     std::vector<juce::Component*> parts { &signatureBox, &quantBox, &saveStatus, &moreButton, &browserToggleButton, &backToArrangementButton, &captureButton,
-                                          &sessionRecordButton, &drawModeButton, &keyMapButton, &midiMapButton, &sessionViewButton, &arrangementViewButton, &cycleButton, &metronomeMenuButton };
+                                          &sessionRecordButton, &drawModeButton, &keyMapButton, &midiMapButton, &sessionViewButton, &arrangementViewButton, &cycleButton, &metronomeMenuButton,
+                                          &liveLoopButton, &punchOutButton };
     if (simpleWorkflow != nullptr)
         if (auto* finish = simpleWorkflow->finishComponent(); finish != nullptr && finish->getParentComponent() == this)
             parts.push_back (finish);
@@ -430,6 +452,11 @@ void MainComponent::applyToolbarLook()
     blendButton.setIcon (look == Look::live ? Icon::plus : Icon::blend);
     for (auto* b : { &punchButton, &typingPianoButton })
         b->setLook (look == Look::live ? BL::liveBox : fl ? BL::flTile : BL::standard, look == Look::live ? 14.0f : fl ? flTileIconBox() : 0.0f);
+    // round 190lx (DL-61): in Live's bar the punch button is its Punch-In switch, Loop and Punch-Out beside it
+    punchButton.setIcon (look == Look::live ? Icon::punchIn : Icon::punch);
+    for (auto* b : { &liveLoopButton, &punchOutButton })
+        b->setLook (BL::liveBox, 14.0f);
+    refreshRecordOptionButtons();
     for (auto* b : { &browserToggleButton, &backToArrangementButton, &captureButton, &sessionRecordButton, &drawModeButton, &keyMapButton, &midiMapButton })
         b->setLook (BL::liveBox, 13.0f);
     for (auto* b : { &sessionViewButton, &arrangementViewButton })
@@ -704,6 +731,8 @@ void MainComponent::layoutLiveControlBar (juce::Rectangle<int> bar, int menuWidt
             case I::capture: return &captureButton;
             case I::sessionRecord: return &sessionRecordButton;
             case I::punch: return &punchButton;
+            case I::loopSwitch: return &liveLoopButton;
+            case I::punchOut: return &punchOutButton;
             case I::draw: return &drawModeButton;
             case I::computerKeys: return &typingPianoButton;
             case I::keyMap: return &keyMapButton;
@@ -753,7 +782,7 @@ void MainComponent::layoutLiveControlBar (juce::Rectangle<int> bar, int menuWidt
     const auto rightW = runWidth (I::draw, I::arrangementView);
     placeRun (I::draw, I::arrangementView, rightEnd - rightW);
     const auto centreW = runWidth (I::backToArrangement, I::sessionRecord);
-    const auto punchW = width (I::punch);
+    const auto punchW = runWidth (I::punch, I::punchOut); // (round 190lx: Punch-In, Loop, Punch-Out)
     const auto tail = punchW > 0 ? lb::sectionGap + punchW : 0;
     // the transport where Live's is: Live centres its transport group together with the loop / punch group after it
     // (CL-2: 716..1011 and 1033..1267 at 1920 px); LYNX has only punch there, so the group keeps Live's loop width
@@ -762,7 +791,7 @@ void MainComponent::layoutLiveControlBar (juce::Rectangle<int> bar, int menuWidt
     centreX = juce::jmax (centreX, leftEnd + lb::sectionGap);
     const auto centreEnd = placeRun (I::backToArrangement, I::sessionRecord, centreX);
     if (punchW > 0)
-        put (punchButton, { centreEnd + lb::sectionGap, y, punchW, lb::box });
+        placeRun (I::punch, I::punchOut, centreEnd + lb::sectionGap);
 }
 
 // --- paint --------------------------------------------------------------------------------------------------------------
@@ -844,6 +873,8 @@ void MainComponent::updateLookFields()
             taken = state->tracks[(std::size_t) t].taken.load (std::memory_order_relaxed);
     if (backToArrangementButton.getToggleState() != taken)
         backToArrangementButton.setToggleState (taken, juce::dontSendNotification);
+    if (const auto on = engine.getSong().loopPlays(); liveLoopButton.getToggleState() != on) // round 190lx (DL-61)
+        liveLoopButton.setToggleState (on, juce::dontSendNotification);
     if (const auto on = engine.isSessionRecording(); sessionRecordButton.getToggleState() != on)
         sessionRecordButton.setToggleState (on, juce::dontSendNotification);
     const auto view = playlistArea.getGridView();
@@ -883,7 +914,7 @@ juce::Component* MainComponent::toolbarPartForSnapshot (const juce::String& name
         { "play", &playButton }, { "stop", &stopButton }, { "record", &recordButton }, { "metronome", &metronomeButton }, { "tap", &tapTempoButton },
         { "tempo", &tempoDisplay }, { "signature", &signatureBox }, { "quantisation", &quantBox }, { "key", &keyPanel }, { "link", &linkToggle },
         { "browser", &browserToggleButton }, { "backToArrangement", &backToArrangementButton }, { "position", &timeDisplay },
-        { "overdub", &blendButton }, { "capture", &captureButton }, { "sessionRecord", &sessionRecordButton }, { "punch", &punchButton },
+        { "overdub", &blendButton }, { "capture", &captureButton }, { "sessionRecord", &sessionRecordButton }, { "punch", &punchButton }, { "liveLoop", &liveLoopButton }, { "punchOut", &punchOutButton },
         { "draw", &drawModeButton }, { "computerKeys", &typingPianoButton }, { "keyMap", &keyMapButton }, { "midiMap", &midiMapButton },
         { "cpu", &perfMeter }, { "more", &moreButton }, { "sessionView", &sessionViewButton }, { "arrangementView", &arrangementViewButton },
         { "status", &saveStatus }, { "masterVolume", &masterVolume }, { "masterPitch", &masterPitch }, { "undo", &undoButton }, { "redo", &redoButton },
@@ -951,7 +982,9 @@ juce::PopupMenu MainComponent::makeToolbarMoreMenu()
         item (I::tap, tr ("Tap tempo"), false, [this] { tapTempoButton.triggerClick(); });
         item (I::overdub, tr ("Blend recorded notes"), blendButton.getToggleState(), [this] { runAction ("record.blend"); });
         item (I::capture, tr ("Capture MIDI: the notes just played without recording into the pattern"), false, [this] { runAction ("record.captureMidi"); });
-        item (I::punch, tr ("Punch in / out"), punchButton.getToggleState(), [this] { runAction ("record.punch"); });
+        item (I::punch, tr ("Punch-In"), punchButton.getToggleState(), [this] { runAction ("record.punchIn"); });
+        item (I::loopSwitch, tr ("Loop"), liveLoopButton.getToggleState(), [this] { toggleLiveLoop(); });
+        item (I::punchOut, tr ("Punch-Out"), punchOutButton.getToggleState(), [this] { runAction ("record.punchOut"); });
         item (I::computerKeys, tr ("Typing keyboard to piano"), typingPianoButton.getToggleState(), [this] { runAction ("view.typingPiano"); });
         item (I::draw, tr ("Draw Mode"), drawmode::isOn(), [] { drawmode::toggle(); });
         item (I::keyMap, tr ("Key Map Mode: map computer keys to clips, scenes, buttons and controls (Ctrl+K)"), getMapMode() == remotemap::Mode::key,

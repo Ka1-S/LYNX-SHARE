@@ -290,6 +290,58 @@ int duplicate (Song& song, int track, int scene)
     return paste (song, track, scene + 1, *content) ? scene + 1 : -1;
 }
 
+SlotBlock copyBlock (const Song& song, int t0, int s0, int t1, int s1)
+{
+    SlotBlock block;
+    if (t0 > t1)
+        std::swap (t0, t1);
+    if (s0 > s1)
+        std::swap (s0, s1);
+    if (t0 < 0 || s0 < 0)
+        return block;
+    block.tracks = t1 - t0 + 1;
+    block.scenes = s1 - s0 + 1;
+    for (int s = s0; s <= s1; ++s)
+        for (int t = t0; t <= t1; ++t)
+            if (auto content = copyOf (song, t, s))
+                block.clips.push_back ({ t - t0, s - s0, std::move (*content) });
+    return block;
+}
+
+void clearBlock (Song& song, int t0, int s0, int t1, int s1)
+{
+    if (! song.clipGrid)
+        return;
+    for (int s = std::min (s0, s1); s <= std::max (s0, s1); ++s)
+        for (int t = std::min (t0, t1); t <= std::max (t0, t1); ++t)
+            if (t >= 0 && s >= 0)
+                launcher::clearClip (song, t, s);
+}
+
+int pasteBlock (Song& song, int track, int scene, const SlotBlock& block)
+{
+    if (track < 0 || scene < 0)
+        return 0;
+    int placed = 0;
+    for (const auto& item : block.clips)
+    {
+        const auto t = track + item.track, s = scene + item.scene;
+        if (t >= launcher::maxTracks || s >= launcher::maxScenes)
+            continue;
+        placed += paste (song, t, s, item.content) ? 1 : 0;
+    }
+    return placed;
+}
+
+int duplicateBlock (Song& song, int t0, int s0, int t1, int s1)
+{
+    const auto block = copyBlock (song, t0, s0, t1, s1);
+    const auto to = std::max (s0, s1) + 1;
+    if (block.empty() || to + block.scenes > launcher::maxScenes)
+        return -1;
+    return pasteBlock (song, std::min (t0, t1), to, block) > 0 ? to : -1;
+}
+
 bool toPlaylist (Song& song, int track, int scene, int playlistTrack, std::int64_t tick)
 {
     const auto content = copyOf (song, track, scene);

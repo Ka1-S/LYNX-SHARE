@@ -17,6 +17,22 @@ inline bool linear (PlayMode mode, bool hasLoopRegion, bool loopRecord, bool pun
     return mode == PlayMode::song && (! hasLoopRegion || ! loopRecord || punchLoopRegion);
 }
 
+// Round 190lx (DL-61, Live's separate Punch-In / Punch-Out switches, manual 19.3.1): the range an audio take keeps.
+// `punching`: punch is on and the song has a loop region (Song mode). In: the take starts at the region's start (else
+// where recording starts, `here`); out: it ends at the region's end (else it runs on: `open`), and only then does the
+// post-roll stop playback.
+struct PunchEnds
+{
+    std::int64_t in = 0, out = 0;
+    bool stopsAtOut = false;
+};
+inline PunchEnds punchEnds (std::int64_t here, std::int64_t loopStart, std::int64_t loopEnd, bool punching, bool punchIn, bool punchOut,
+                            std::int64_t open) noexcept
+{
+    const auto in = punching && punchIn, out = punching && punchOut;
+    return { in ? loopStart : here, out ? loopEnd : open, out };
+}
+
 // The notes' rule: punch in/out is for audio and does not change where notes go.
 inline bool notesLinear (PlayMode mode, bool hasLoopRegion, bool loopRecord) noexcept
 {

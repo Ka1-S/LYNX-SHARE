@@ -1,5 +1,6 @@
 #include "ui/ControllerBridge.h"
 #include "core/DetailChain.h"
+#include "core/MeterScale.h"
 #include "core/FactoryContent.h"
 #include "core/SoundLibrary.h"
 #include "ui/ExternalDrag.h"
@@ -457,7 +458,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     }
     loopRecordButton.onClick = [this] { runAction ("record.loop"); };
     stepEditButton.onClick = [this] { runAction ("record.stepEdit"); };
-    punchButton.onClick = [this] { runAction ("record.punch"); };
+    punchButton.onClick = [this] { runAction (toolbarLook == toolbarlayout::Look::live ? "record.punchIn" : "record.punch"); }; // (round 190lx: Live's Punch-In)
 
     for (int i = 0; i < workspace::panelCount; ++i)
     {
@@ -2316,15 +2317,27 @@ bool MainComponent::runAction (const std::string& id)
         engine.setRecordOptions (o);
         refreshRecordOptionButtons();
     }
-    else if (is ("record.blend") || is ("record.loop") || is ("record.punch"))
+    else if (is ("record.blend") || is ("record.loop") || is ("record.punch") || is ("record.punchIn") || is ("record.punchOut"))
     {
         auto o = engine.getRecordOptions();
         if (is ("record.blend"))
             o.mode = o.mode == RecordMode::overdub ? RecordMode::replace : RecordMode::overdub;
         else if (is ("record.loop"))
             o.loopRecord = ! o.loopRecord;
-        else
+        else if (is ("record.punch"))
+        {
             o.punchLoopRegion = ! o.punchLoopRegion;
+            if (o.punchLoopRegion) // (the one switch: both ends, round 163's punch)
+                o.punchIn = o.punchOut = true;
+        }
+        else // round 190lx (DL-61): Live's Punch-In / Punch-Out switches, each on its own
+        {
+            auto in = o.punchLoopRegion && o.punchIn, out = o.punchLoopRegion && o.punchOut;
+            (is ("record.punchIn") ? in : out) = ! (is ("record.punchIn") ? in : out);
+            o.punchLoopRegion = in || out;
+            if (o.punchLoopRegion)
+                o.punchIn = in, o.punchOut = out;
+        }
         engine.setRecordOptions (o);
         refreshRecordOptionButtons();
         saveUiSettings();
@@ -2951,6 +2964,8 @@ void MainComponent::loadUiSettings()
             ChannelRackComponent::selectFirstChannelWithNotes = on;
         else if (key == "prPaintMode") // FL's PRPaintMode (round 189o)
             PianoRollComponent::monophonicPainting = on;
+        else if (key == "altMeterScale") // round 190lx (DF-61): FL's "Alternate meter scale"
+            meterscale::alternate() = on;
         else if (key == "prPreviewPlaying") // issue #183: the Piano roll's "Preview notes while playing" (off)
             PianoRollComponent::previewWhilePlaying = on;
         else if (key == "limitEditors") // FL's LimitEditors (round 189o; on unless saved off)
@@ -3264,7 +3279,7 @@ void MainComponent::loadUiSettings()
                 o.compensateOutput = v != 0;
             engine.setRecordOptions (o);
         }
-        else if (key == "recordPunchLoop" || key == "recordPreRoll" || key == "recordPostRoll" || key == "recordLoop" || key == "recordLastPassPlays"
+        else if (key == "recordPunchLoop" || key == "recordPunchEnds" || key == "recordPreRoll" || key == "recordPostRoll" || key == "recordLoop" || key == "recordLastPassPlays"
                  || key == "waitOnlyWhenRecording" || key == "waitRespectFilter")
         {
             auto o = engine.getRecordOptions();
@@ -3275,6 +3290,8 @@ void MainComponent::loadUiSettings()
                 o.waitRespectFilter = v != 0;
             else if (key == "recordPunchLoop")
                 o.punchLoopRegion = v != 0;
+            else if (key == "recordPunchEnds") // round 190lx (DL-61): 1 = in, 2 = out (none: both, the one switch's punch)
+                o.punchIn = (v & 1) != 0 || (v & 3) == 0, o.punchOut = (v & 2) != 0 || (v & 3) == 0;
             else if (key == "recordLoop")
                 o.loopRecord = v != 0;
             else if (key == "recordLastPassPlays")
@@ -3340,6 +3357,7 @@ void MainComponent::saveUiSettings()
                                       + juce::String (ChannelRackComponent::keepEditorsOpen ? 1 : 0)
                                       + "\nselFirstChanPatChanges=" + juce::String (ChannelRackComponent::selectFirstChannelWithNotes ? 1 : 0)
                                       + "\nprPaintMode=" + juce::String (PianoRollComponent::monophonicPainting ? 1 : 0)
+                                      + "\naltMeterScale=" + juce::String (meterscale::alternate() ? 1 : 0)
                                       + "\nprPreviewPlaying=" + juce::String (PianoRollComponent::previewWhilePlaying ? 1 : 0)
                                       + "\nlimitEditors=" + juce::String (editorlimit::enabled() ? 1 : 0)
                                       + "\nsampleAccurateAutomation=" + juce::String (sampleAccurateAutomation() ? 1 : 0)
@@ -3484,6 +3502,7 @@ void MainComponent::saveUiSettings()
                                       + "\nrecordClips=" + juce::String (engine.getRecordOptions().recordClips ? 1 : 0)
                                       + "\nrecordQuantiseAutomation=" + juce::String (engine.getRecordOptions().quantiseAutomation ? 1 : 0)
                                       + "\nrecordPunchLoop=" + juce::String (engine.getRecordOptions().punchLoopRegion ? 1 : 0)
+                                      + "\nrecordPunchEnds=" + juce::String ((engine.getRecordOptions().punchIn ? 1 : 0) | (engine.getRecordOptions().punchOut ? 2 : 0))
                                       + "\nrecordLoop=" + juce::String (engine.getRecordOptions().loopRecord ? 1 : 0)
                                       + "\nrecordLastPassPlays=" + juce::String (engine.getRecordOptions().lastLoopPassPlays ? 1 : 0)
                                       + "\nwaitOnlyWhenRecording=" + juce::String (engine.getRecordOptions().waitOnlyWhenRecording ? 1 : 0)
@@ -3945,7 +3964,19 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
                 toggleTouchKeyboard (engine);
         };
         host.setTitleAccessory = [this] (juce::Component* c, int width) { workspace.setTitleAccessory (Panel::playlist, c, width); };
+        host.toggleLoops = [this] { // round 190lx (DS-42): the Simple title bar's Loops button
+            if (isLoopsDockShowing())
+                hideLoopsDock();
+            else
+                showLoopsDock();
+        };
         host.showLoops = [this] {
+            // round 190lx (DS-42): docked on the right of the timeline and the track dock, as BandLab's Sounds panel
+            if (layoutStyle == layoutstyle::Style::simple)
+            {
+                showLoopsDock();
+                return;
+            }
             // round gaps190kf: with the Loop Browser shown (GarageBand's loop browser: keyword buttons, scale, types)
             if (findToolWindow ("sampleBrowser") == nullptr)
             {
@@ -4049,6 +4080,8 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
     }
     if (from == Style::simple && style != Style::simple && simpleWorkflow != nullptr)
         simpleWorkflow->left();
+    if (style != Style::simple) // (round 190lx: the Loops dock is the Simple layout's own)
+        hideLoopsDock();
     // round 190fc (H2): every click in the Simple window leaves the keys with the main window (text fields excepted)
     if (style == Style::simple)
         juce::Desktop::getInstance().addGlobalMouseListener (&simpleClickKeys);
@@ -4932,6 +4965,40 @@ void MainComponent::showLyrics (bool floating)
     playlistArea.setSideDock (lyricsDock.get(), LyricsPanel::width);
 }
 
+// Round 190lx (DS-42, capture 190lr B21): BandLab's Sounds panel docks on the right from the timeline's top down to the
+// bottom bar, 401 px wide, and narrows the timeline and the track dock under it (the Playlist area's side dock does both).
+// It shares that place with Lyrics / Notes and the Finish dock: the one shown last stays.
+void MainComponent::showLoopsDock()
+{
+    if (loopsDock == nullptr)
+        loopsDock = BrowserComponent::makeLoopsDock (engine, [this] (BrowserComponent& b) { connectBrowser (b); }, [this] {
+            juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<MainComponent> (this)] {
+                if (safe != nullptr)
+                    safe->hideLoopsDock();
+            });
+        });
+    else if (auto* b = BrowserComponent::browserOfLoopsDock (loopsDock.get()))
+        b->setLoopsShown (true);
+    if (isLoopsDockShowing())
+        return;
+    if (simpleWorkflow != nullptr && simpleWorkflow->isFinishShowing())
+        simpleWorkflow->hideFinish();
+    if (lyricsDock != nullptr && lyricsDock->getParentComponent() != nullptr)
+        static_cast<LyricsPanel&> (*lyricsDock).commit();
+    if (! workspace.isPanelVisible (Panel::playlist))
+    {
+        workspace.show (Panel::playlist);
+        refreshPanelButtons();
+    }
+    playlistArea.setSideDock (loopsDock.get(), BrowserComponent::loopsDockWidth);
+}
+
+void MainComponent::hideLoopsDock()
+{
+    if (isLoopsDockShowing())
+        playlistArea.setSideDock (nullptr, 0);
+}
+
 void MainComponent::showReferenceMatch()
 {
     if (auto* open = findToolWindow ("referenceMatch"))
@@ -5576,6 +5643,17 @@ void MainComponent::refreshRecordOptionButtons()
     stepEditButton.setTooltip (withKey (engine.isStepEdit() ? tr ("Step edit: on (stopped, played notes go into the pattern one snap step after another)")
                                                             : tr ("Step edit: off"),
                                         "record.stepEdit"));
+    if (toolbarLook == toolbarlayout::Look::live) // round 190lx (DL-61): Live's Punch-In switch, the Punch-Out one beside it
+    {
+        punchButton.setToggleState (o.punchLoopRegion && o.punchIn, juce::dontSendNotification);
+        punchButton.setTooltip (tr ("Punch-In switch: audio recording starts at the start of the loop region"));
+        ui::setHint (punchButton, punchButton.getTooltip());
+        punchHintLive = true;
+        punchOutButton.setToggleState (o.punchLoopRegion && o.punchOut, juce::dontSendNotification);
+        return;
+    }
+    if (std::exchange (punchHintLive, false))
+        setControlHints();
     punchButton.setToggleState (o.punchLoopRegion, juce::dontSendNotification);
     punchButton.setTooltip (withKey (o.punchLoopRegion ? tr ("Punch in/out: on (audio is kept only inside the loop region)") : tr ("Punch in/out: off"),
                                      "record.punch"));
@@ -8537,6 +8615,7 @@ void MainComponent::openSettings (int page)
         o.keepEditorsOpen = ChannelRackComponent::keepEditorsOpen;
         o.selectFirstChannelWithNotes = ChannelRackComponent::selectFirstChannelWithNotes;
         o.monophonicPainting = PianoRollComponent::monophonicPainting;
+        o.alternateMeterScale = meterscale::alternate();
         o.detachNewPlugins = safe->engine.detachesNewPlugins();
         o.autoSelectLinked = ChannelRackComponent::autoSelectLinked;
         o.alternateUndo = safe->alternateUndo;
@@ -8639,6 +8718,8 @@ void MainComponent::openSettings (int page)
         ChannelRackComponent::keepEditorsOpen = o.keepEditorsOpen;
         ChannelRackComponent::selectFirstChannelWithNotes = o.selectFirstChannelWithNotes;
         PianoRollComponent::monophonicPainting = o.monophonicPainting;
+        if (std::exchange (meterscale::alternate(), o.alternateMeterScale) != o.alternateMeterScale) // (round 190lx: the meters' scale changed)
+            self.repaint();
         self.engine.setDetachNewPlugins (o.detachNewPlugins);
         setEditorsDetached (o.detachNewPlugins); // (round 190ev)
         ChannelRackComponent::autoSelectLinked = o.autoSelectLinked;

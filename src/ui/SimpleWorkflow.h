@@ -30,6 +30,7 @@ public:
         std::function<void()> showKeys;                    // an instrument was added from the chooser: the on-screen keyboard
         std::function<void (juce::Component*, int)> setTitleAccessory; // the Playlist title bar's accessory (nullptr: none)
         std::function<void()> showLoops;                   // the sample browser, to drag loops onto the timeline
+        std::function<void()> toggleLoops;                 // round 190lx (DS-42): the Loops dock shown / hidden
         // round 190ch: the Lyrics / Notes panel (the main window's, the same in every layout), Reference match, and a
         // new project from the "Start from" list
         std::function<void()> toggleLyrics;
@@ -183,6 +184,7 @@ private:
     std::string dismissedFor; // the project (Song::projectId) whose chooser was closed by hand
     std::unique_ptr<juce::Component> startFrom, lyricsButton; // round 190ch
     std::unique_ptr<juce::Component> automationButton;        // round 190jr
+    std::unique_ptr<juce::Component> loopsButton;             // round 190lx (DS-42)
     std::unique_ptr<juce::Button> tunerButton;                // round 190ke
     juce::Component::SafePointer<juce::Component> tunerBox;   // the open tuner's call-out (null: closed)
     std::unique_ptr<Chooser> chooser;

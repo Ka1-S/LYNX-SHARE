@@ -2903,6 +2903,11 @@ public: // (the class stays public from here, as before)
             paintDecayEq (g, r, fx);
             return;
         }
+        else if (tpTraceDisplay (item.display)) // round 190lx (DP-31): FL's time-graph of the input / output peaks
+        {
+            paintTpTrace (g, inner, fx.enabled);
+            return;
+        }
         else if (id == "envelope") // decay shape of a reverb / delay tail
         {
             grid (8, 4);
@@ -4679,7 +4684,7 @@ public: // (the class stays public from here, as before)
                 setLimiterView (part);
                 return;
             }
-        if (limiterViewItem (item)) // round 190ld (DP-25): FL's "Click on the display to Pause" (again: it scrolls on)
+        if (limiterViewItem (item) || tpTraceItem (item)) // round 190ld (DP-25): FL's "Click on the display to Pause" (again: it scrolls on)
         {
             if (! e.mods.isPopupMenu())
             {
@@ -5614,6 +5619,9 @@ private:
         if (limiterViewItem (item) && limiterViewPartAt (item, p) >= 0) // round 190jd
             return { tr ("Display: FL's scrolling graph or LYNX's transfer curve  [LMB] switch (kept for this effect)"),
                      limiterViewPartAt (item, p) == 0 ? tr ("GRAPH") : tr ("CURVE"), false, false };
+        if (tpTraceItem (item)) // round 190lx (DP-31)
+            return { tr ("Transient Processor: input peaks (green), output peaks (purple), the transient processing (red; above the middle line a boost, below a cut)  [LMB] pause / resume"),
+                     monitorPaused ? tr ("Paused") : juce::String(), false, false };
         if (limiterViewItem (item)) // round 190ld (DP-25)
             return { tr ("Analysis display  [LMB] pause / resume"), monitorPaused ? tr ("Paused") : juce::String(), false, false };
         if (item.type == Item::display && juce::String (item.display) == "sgamount")
@@ -6107,8 +6115,12 @@ private:
     long long monitorPainted = 0;
     bool monitorDisplay (const char* id) const
     {
-        return id != nullptr && ((kind == EffectKind::fruityLimiter && std::strcmp (id, "limiter") == 0) || std::strcmp (id, "maxbands") == 0);
+        return id != nullptr && ((kind == EffectKind::fruityLimiter && std::strcmp (id, "limiter") == 0) || std::strcmp (id, "maxbands") == 0
+                                 || tpTraceDisplay (id));
     }
+    // round 190lx (DP-31): Transient Processor's lower trace (FL manual "Visualization Controls")
+    bool tpTraceDisplay (const char* id) const { return kind == EffectKind::transientProcessor && id != nullptr && std::strcmp (id, "envelope") == 0; }
+    bool tpTraceItem (const LayoutItem& item) const { return item.type == Item::display && tpTraceDisplay (item.display); }
     bool monitorPaused = false; // round 190ld (DP-25): the Limiter's graph paused by a click (Maximus' Monitor never is)
     bool limiterGraphShown() const
     {
@@ -6180,6 +6192,73 @@ private:
             g.strokePath (gain, juce::PathStrokeType (juce::jmax (1.0f, colW)));
         }
     }
+    // Round 190lx (DP-31, FL manual Transient Processor "Visualization Controls"): the lower trace scrolls right to left
+    // while the song plays: the input peaks (green) and the output peaks (purple), grey where they overlap, and the
+    // transient processing alone as a red line about the middle (zero) line: above = a boost, below = a cut, flat = none.
+    // The line is the output over the input without the GAIN knob (the plugin's out gain, 10^((x − 0.5) · 0.9)).
+    void paintTpTrace (juce::Graphics& g, juce::Rectangle<float> area, bool enabled) const
+    {
+        const auto dim = [enabled] (juce::Colour c) { return enabled ? c : c.withMultipliedAlpha (0.35f); };
+        const juce::Graphics::ScopedSaveState state (g);
+        g.reduceClipRegion (area.getSmallestIntegerContainer());
+        g.setColour (juce::Colour (tpTraceBackground));
+        g.fillRect (area);
+        const auto midY = std::round (area.getCentreY());
+        g.setColour (dim (juce::Colour (tpTraceZero)));
+        g.fillRect (area.getX(), midY, area.getWidth(), 1.0f);
+        const auto n = monitor.size();
+        if (n > 0)
+        {
+            const auto colW = juce::jmax (0.5f, scale());
+            const auto yOf = [&] (float level) { return area.getBottom() - area.getHeight() * dynhistory::axis (level); };
+            const auto outGain = (float) std::pow (10.0, ((double) param01 ("Gain") - 0.5) * 0.9);
+            juce::RectangleList<float> greens, purples, greys;
+            juce::Path process;
+            bool started = false;
+            const auto columns = juce::jmin (n, (int) std::ceil (area.getWidth() / colW));
+            for (int a = columns - 1; a >= 0; --a)
+            {
+                const auto& c = monitor.at (a);
+                const auto x1 = area.getRight() - (float) a * colW, x0 = juce::jmax (area.getX(), x1 - colW);
+                const auto yIn = yOf (c.in), yOut = yOf (c.out);
+                const auto yLow = juce::jmax (yIn, yOut), yHigh = juce::jmin (yIn, yOut);
+                if (yLow < area.getBottom())
+                    greys.addWithoutMerging ({ x0, yLow, x1 - x0, area.getBottom() - yLow });
+                if (yHigh < yLow - 0.25f)
+                    (yIn < yOut ? greens : purples).addWithoutMerging ({ x0, yHigh, x1 - x0, yLow - yHigh });
+                if (! c.started)
+                    continue;
+                const auto db = juce::jlimit (-tpTraceRangeDb, tpTraceRangeDb, juce::Decibels::gainToDecibels (c.gain / outGain, -100.0f));
+                const auto py = juce::jlimit (area.getY(), area.getBottom() - 1.0f, midY - db / tpTraceRangeDb * area.getHeight() * 0.5f);
+                if (! started)
+                    process.startNewSubPath (x0, py);
+                else
+                    process.lineTo (x0, py);
+                process.lineTo (x1, py);
+                started = true;
+            }
+            g.setColour (dim (juce::Colour (tpTraceGrey)));
+            g.fillRectList (greys);
+            g.setColour (dim (juce::Colour (tpTraceGreen)));
+            g.fillRectList (greens);
+            g.setColour (dim (juce::Colour (tpTracePurple)));
+            g.fillRectList (purples);
+            if (started)
+            {
+                g.setColour (dim (juce::Colour (tpTraceRed)));
+                g.strokePath (process, juce::PathStrokeType (juce::jmax (1.0f, colW)));
+            }
+        }
+        if (monitorPaused)
+        {
+            g.setColour (theme::colour::textSecondary);
+            g.setFont (theme::font (theme::type::caption));
+            g.drawText (tr ("Paused"), area.reduced (6.0f, 4.0f).toNearestInt(), juce::Justification::topLeft, false);
+        }
+    }
+    static constexpr std::uint32_t tpTraceBackground = 0xff1b2024, tpTraceZero = 0xff3c464d, tpTraceGrey = 0xff8a9298, tpTraceGreen = 0xff6fd16a,
+                                   tpTracePurple = 0xff9b74d6, tpTraceRed = 0xffe0463c;
+    static constexpr float tpTraceRangeDb = 12.0f; // (the red line's ± range over half the height)
     static bool levelDisplay (const char* id)
     {
         return std::strcmp (id, "meter") == 0 || std::strcmp (id, "limiter") == 0 || std::strcmp (id, "compressor") == 0 || std::strcmp (id, "dynamics") == 0;

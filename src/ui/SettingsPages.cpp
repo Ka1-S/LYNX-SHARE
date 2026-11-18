@@ -167,7 +167,7 @@ public:
         for (auto* c : std::initializer_list<juce::Component*> { &workflowTitle, &layoutStyleLabel, &layoutStyleBox, &layoutStyleNote, &alsSessionLabel, &alsSessionBox, &languageTitle, &displayTitle, &startupTitle, &editingTitle, &backupTitle,
                                                                  &pluginsTitle, &languageLabel, &languageBox, &languageNote, &scaleLabel, &scaleBox, &menuLabel, &menuBox,
                                                                  &wavesLabel, &wavesBox, &stereoWaves, &noteNamesLabel, &noteNamesBox, &blackNotesLabel, &blackNotesBox, &everyKeyNames, &rackColumn, &rackStepColour, &pluginStyleLabel, &pluginStyleBox, &artMotion, &reducedEffects, &uiAnimations, &animationLabel, &animationBox, &animationNote, &gpuRendering, &editorsInMain, &templateLabel, &templateBox, &templateNote, &startupProjectLabel, &startupProjectBox, &splash, &startupSound, &scanAtStart, &supportNoteBox, &menuEntry,
-                                                                 &typingPiano, &keepEditors, &rememberSeek, &clipsLoop, &autoClipsAtPlayback, &firstChannel, &monoPaint, &autoSelectLinked, &noTypingPriority, &hoverValues, &editInLabel, &editInBox, &undoLabel,
+                                                                 &typingPiano, &keepEditors, &rememberSeek, &clipsLoop, &autoClipsAtPlayback, &firstChannel, &monoPaint, &altMeterScale, &autoSelectLinked, &noTypingPriority, &hoverValues, &editInLabel, &editInBox, &undoLabel,
                                                                  &undoBox, &alternateUndo, &hintsTitle, &manageMessages, &messagesNote, &autosaveLabel, &autosaveBox, &keepLabel, &keepBox, &openBackups, &backupQuiet, &longestWaitLabel, &longestWaitBox, &unusedTakes, &detachNew,
                                                                  &sandboxLabel, &sandboxBox, &sandboxNote, &substitutes, &substitutesNote, &sampleAccurate, &limitEditors, &managePlugins, &manageShortcuts, &shortcutsNote,
                                                                  &reportsTitle, &crashLabel, &crashBox, &crashNote, &updatesTitle, &checkUpdates, &checkNow, &updatesNote,
@@ -364,6 +364,9 @@ public:
         toggle (monoPaint, tr ("Monophonic painting in piano roll"), options.monophonicPainting,
                 [this] (bool on) { options.monophonicPainting = on; });
         monoPaint.setTooltip (tr ("On: the Paint tool replaces the notes under each new note, and Shift paints over them. Off: the other way round"));
+        // FL's General › Miscellaneous "Alternate meter scale" (round 190lx, DF-61; FL's hint "Alternate scale for all peak meters")
+        toggle (altMeterScale, tr ("Alternate meter scale"), options.alternateMeterScale, [this] (bool on) { options.alternateMeterScale = on; });
+        altMeterScale.setTooltip (tr ("Alternate scale for all peak meters"));
         // FL's next Miscellaneous box, DisablePlugFocusDefaultBox (off; round 187a, issue #96)
         toggle (noTypingPriority, tr ("Disable typing keyboard priority by default"), options.disableTypingPriority,
                 [this] (bool on) { options.disableTypingPriority = on; });
@@ -602,7 +605,7 @@ private:
             menuEntry.setBounds (r.full (24));
 
         r.section (editingTitle);
-        for (auto* t : { &typingPiano, &keepEditors, &autoNameChannels, &detachNew, &rememberSeek, &clipsLoop, &autoClipsAtPlayback, &firstChannel, &monoPaint, &autoSelectLinked, &noTypingPriority,
+        for (auto* t : { &typingPiano, &keepEditors, &autoNameChannels, &detachNew, &rememberSeek, &clipsLoop, &autoClipsAtPlayback, &firstChannel, &monoPaint, &altMeterScale, &autoSelectLinked, &noTypingPriority,
                          &restoreAfterSolo, &readSampleTempo, &hoverValues })
             t->setBounds (r.full (24));
         editInBox.setBounds (r.row (editInLabel, 0));
@@ -827,7 +830,7 @@ private:
     juce::Label remoteStatus;
     juce::HyperlinkButton translationLink;
     juce::ComboBox animationBox, crashBox, languageBox, scaleBox, menuBox, wavesBox, noteNamesBox, blackNotesBox, pluginStyleBox, editInBox, undoBox, autosaveBox, keepBox, longestWaitBox, sandboxBox;
-    juce::ToggleButton detachNew, editorsInMain, stereoWaves, everyKeyNames, rackColumn, rackStepColour, artMotion, reducedEffects, uiAnimations, gpuRendering, splash, startupSound, scanAtStart, supportNoteBox, menuEntry, typingPiano, keepEditors, rememberSeek, clipsLoop, autoClipsAtPlayback, firstChannel, monoPaint, hoverValues, alternateUndo, substitutes, sampleAccurate, limitEditors, backupQuiet, unusedTakes, checkUpdates, noTypingPriority, autoSelectLinked;
+    juce::ToggleButton detachNew, editorsInMain, stereoWaves, everyKeyNames, rackColumn, rackStepColour, artMotion, reducedEffects, uiAnimations, gpuRendering, splash, startupSound, scanAtStart, supportNoteBox, menuEntry, typingPiano, keepEditors, rememberSeek, clipsLoop, autoClipsAtPlayback, firstChannel, monoPaint, altMeterScale, hoverValues, alternateUndo, substitutes, sampleAccurate, limitEditors, backupQuiet, unusedTakes, checkUpdates, noTypingPriority, autoSelectLinked;
     juce::ToggleButton autoNameChannels, restoreAfterSolo, readSampleTempo, historyNewestFirst; // FL's options of round 190bx (core/FlSettings.h)
     juce::TextButton openBackups { tr ("Open backup folder") }, managePlugins { tr ("Plugin manager...") }, manageShortcuts { tr ("Manage shortcuts...") },
         checkNow { tr ("Check now") }, manageMessages { tr ("Manage messages") }, goBack;

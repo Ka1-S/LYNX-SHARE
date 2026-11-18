@@ -595,6 +595,18 @@ Shape make (Icon icon)
             fi.addPath (h);
             break;
         }
+        // round 190lx (DL-61): Live's switch glyphs as measured in capture190ji (13 x 6 px in a 21 x 17 px box: runs of
+        // 5 / 5 px and a 3 px slope; the loop box 13 x 9 px open at the bottom for its arrow)
+        case Icon::punchIn:
+            polyline (st, { { 1.5f, 7.5f }, { 9.5f, 7.5f }, { 14.5f, 16.5f }, { 22.5f, 16.5f } });
+            break;
+        case Icon::punchOut:
+            polyline (st, { { 1.5f, 16.5f }, { 9.5f, 16.5f }, { 14.5f, 7.5f }, { 22.5f, 7.5f } });
+            break;
+        case Icon::liveLoop:
+            polyline (st, { { 8.0f, 18.5f }, { 1.5f, 18.5f }, { 1.5f, 4.5f }, { 22.5f, 4.5f }, { 22.5f, 18.5f }, { 17.5f, 18.5f } });
+            fi.addTriangle (10.5f, 18.5f, 15.5f, 14.5f, 15.5f, 22.5f);
+            break;
         case Icon::loop: // two arcs chasing each other around (a loop), arrow heads at their ends
         {
             constexpr float r = 7.0f;

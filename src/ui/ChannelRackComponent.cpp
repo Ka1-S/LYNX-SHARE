@@ -1812,6 +1812,13 @@ float ChannelRackComponent::laneValueAt (int y) const
     return juce::jlimit (0.0f, 1.0f, (bottom - (float) y) / juce::jmax (1.0f, bottom - top));
 }
 
+juce::Point<int> ChannelRackComponent::laneSpotForSnapshot (int step, float value) const
+{
+    const auto lane = laneBounds();
+    const auto top = (float) lane.getY() + 6.0f, bottom = (float) lane.getBottom() - 6.0f;
+    return { gridLeft() + step * stepWidth + stepWidth / 2, juce::roundToInt (bottom - value * (bottom - top)) };
+}
+
 void ChannelRackComponent::setLaneValue (int step, float value)
 {
     const auto channel = graphRow();
@@ -1828,6 +1835,22 @@ void ChannelRackComponent::applyLane (const juce::MouseEvent& e)
     const auto steps = numSteps();
     const auto step = juce::jlimit (0, steps - 1, (e.x - gridLeft()) / stepWidth);
     const auto value = laneValueAt (e.y);
+
+    if (laneScaleBase >= 0.0f) // round 190lx (DE-31): Ctrl scales every column (bipolar lanes about their centre)
+    {
+        const auto level = (notetools::Level) graphLevel;
+        const auto centre = level == notetools::Level::pan || level == notetools::Level::finePitch ? 0.5f : 0.0f;
+        const auto from = laneScaleBase - centre, to = value - centre;
+        const auto k = std::abs (from) > 1.0e-4f ? to / from : 0.0f;
+        const auto offset = std::abs (from) > 1.0e-4f ? 0.0f : to - from; // (a column at the centre: they move with it)
+        engine.editSong ([=, items = laneScaleFrom] (Song& s) {
+            auto& p = s.activePattern();
+            for (const auto& [i, v0] : items)
+                if (i < p.notes.size())
+                    notetools::setLevelValue (p.notes[i], level, centre + (v0 - centre) * k + offset);
+        });
+        return;
+    }
 
     if (e.mods.isRightButtonDown()) // a straight ramp from the press to here
     {
@@ -2173,6 +2196,25 @@ void ChannelRackComponent::mouseDown (const juce::MouseEvent& e)
 
             laneDownStep = step;
             laneDownValue = laneValueAt (e.y);
+            laneScaleFrom.clear();
+            laneScaleBase = -1.0f;
+            if (e.mods.isCommandDown() && e.mods.isLeftButtonDown()) // round 190lx (DE-31)
+            {
+                const auto& p = engine.getSong().activePattern();
+                const auto level = (notetools::Level) graphLevel;
+                for (int st = 0; st < numSteps(); ++st)
+                    for (auto i : notesInStep (p, graphRow(), st))
+                    {
+                        const auto v = notetools::levelValue (p.notes[(std::size_t) i], level);
+                        if (st == step && laneScaleBase < 0.0f)
+                            laneScaleBase = v;
+                        laneScaleFrom.push_back ({ (std::size_t) i, v });
+                    }
+                if (laneScaleBase < 0.0f) // (an empty column: nothing to scale from)
+                    laneScaleFrom.clear();
+                else
+                    return; // (the drag scales)
+            }
             applyLane (e);
             return;
         }
@@ -2424,6 +2466,8 @@ void ChannelRackComponent::mouseUp (const juce::MouseEvent& e)
     ui::clearPostedHint();
     paintMode = PaintMode::none;
     laneDownStep = -1;
+    laneScaleBase = -1.0f; // (round 190lx)
+    laneScaleFrom.clear();
 
     if (knobDrag != Area::none)
         repaint();
@@ -2575,7 +2619,7 @@ ui::Hint ChannelRackComponent::hintAt (juce::Point<int> p)
             h.text = tr ("Graph lane: choose what the bars edit (Ctrl+K hides the lane)");
             break;
         case Area::lane:
-            h.text = name + " - " + tr ("Graph lane: drag sets the steps, right-drag draws a ramp, Alt+click resets");
+            h.text = name + " - " + tr ("Graph lane: drag sets the steps, Ctrl+drag scales them all, right-drag draws a ramp, Alt+click resets");
             break;
         default:
             break;

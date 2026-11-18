@@ -535,8 +535,8 @@ enum class Item
     link, browser, tap, tempo, signature, metronome, quantisation, key,
     // centre
     backToArrangement, position, play, stop, record, overdub, capture, sessionRecord,
-    // after the transport (Live: loop / punch)
-    punch,
+    // after the transport (Live: loop / punch; round 190lx DL-61: Punch-In, Loop, Punch-Out as Live's three switches)
+    punch, loopSwitch, punchOut,
     // right
     draw, computerKeys, keyMap, midiMap, cpu, more, sessionView, arrangementView,
     count_
@@ -546,7 +546,7 @@ inline constexpr int itemCount = (int) Item::count_;
 enum class Section { left, centre, loop, right };
 inline Section sectionOf (Item i) noexcept
 {
-    return i <= Item::key ? Section::left : i <= Item::sessionRecord ? Section::centre : i == Item::punch ? Section::loop : Section::right;
+    return i <= Item::key ? Section::left : i <= Item::sessionRecord ? Section::centre : i <= Item::punchOut ? Section::loop : Section::right;
 }
 
 // Live's measured widths at 100 % (CL-2): the boxes, text fields and glyph buttons.
@@ -557,8 +557,8 @@ inline int defaultWidth (Item i) noexcept
         0, 18, 25, 41, 41, 38, 44, 112,
         // back pos play stop rec overdub capture sessionRec
         20, 82, 20, 20, 20, 16, 16, 16,
-        // punch
-        20,
+        // punch-in loop punch-out (capture190ji live-loop-punch-z3: 21 px switches)
+        20, 20, 20,
         // draw keys keyMap midiMap cpu more session arrangement
         16, 16, 26, 30, 54, 18, 16, 16
     };
@@ -572,7 +572,7 @@ inline int priority (Item i) noexcept
     static constexpr std::array<int, itemCount> p {
         58, 42, 50, 100, 60, 80, 75, 70,
         85, 100, 100, 100, 100, 45, 40, 78,
-        35,
+        35, 36, 35,
         55, 52, 30, 30, 65, 100, 100, 100
     };
     return p[(std::size_t) i];

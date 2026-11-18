@@ -1022,6 +1022,22 @@ public:
             setView (from, to - from);
     }
 
+    // Round 190lx (DP-47, FL's autoscroll; REA DFM NoAutoScrollBtn "Disable autoscrolling"): while zoomed in, a play line
+    // that leaves the view turns the page so it shows at the left edge again. The zoom stays; the page is not written
+    // into the state (only the user's own zooms are). True: the view moved.
+    bool followFrame (double frame)
+    {
+        const auto total = frames(), length = shownLength();
+        if (frame < 0.0 || length >= total || total <= 0.0)
+            return false;
+        const auto start = shownStart();
+        if (frame >= start && frame < start + length)
+            return false;
+        viewStart = std::clamp (frame, 0.0, std::max (0.0, total - length));
+        repaint();
+        return true;
+    }
+
     // FL's "Zoom on left / right of selection": half a frame a pixel, centred on `frame`
     void zoomAt (double frame)
     {
@@ -2959,6 +2975,7 @@ private:
     // deck's own Play previews it), the deck's Play button is lit and a red line follows the newest voice in its deck.
     // A FrameTicker step: it runs only while the editor shows, at most 30 times a second, and goes idle (a 20 Hz poll of
     // one atomic) once nothing moves
+    bool autoScroll = true; // round 190lx (DP-47): off = FL's "Disable autoscrolling" pressed
     bool followPlay()
     {
         int deck = -1;
@@ -2984,6 +3001,8 @@ private:
         for (int d = 0; d < 2; ++d)
         {
             const auto target = d == deck ? frame : -1.0;
+            if (autoScroll && target >= 0.0 && deckView[(std::size_t) d].followFrame (target)) // round 190lx (DP-47)
+                moved = true;
             if (deckView[(std::size_t) d].getPlayFrame() != target)
             {
                 deckView[(std::size_t) d].setPlayFrame (target);

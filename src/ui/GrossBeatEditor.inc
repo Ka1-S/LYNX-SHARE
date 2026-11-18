@@ -604,6 +604,13 @@
         const auto slotName = juce::String::fromUTF8 (gbState().slots[(std::size_t) gbSlotIndex()].name.c_str());
         menu.addSectionHeader ((gbEditKind == 0 ? tr ("Time slot {0}", { juce::String (gbSlotOf (0) + 1) }) : tr ("Volume slot {0}", { juce::String (gbSlotOf (1) + 1) }))
                                + (slotName.isEmpty() ? juce::String() : " - " + slotName));
+        // round 190lx (DP-4, FL manual: "Right-click the slot button and select Move slot left / Move slot right")
+        {
+            const auto k = gbEditKind, at = gbSlotOf (gbEditKind);
+            menu.addItem (tr ("Move slot left"), at > 0, false, [this, k, at] { gbMoveSlot (k, at, -1); });
+            menu.addItem (tr ("Move slot right"), at + 1 < grossbeat::slotsPerKind, false, [this, k, at] { gbMoveSlot (k, at, 1); });
+            menu.addSeparator();
+        }
         menu.addItem (tr ("Copy"), [this] { gbClipboard = gbState().slots[(std::size_t) gbSlotIndex()]; });
         menu.addItem (tr ("Paste"), gbClipboard.has_value(), false, [this] {
             if (gbClipboard)
@@ -758,6 +765,19 @@
         if (param >= 0 && gbSlotOf (kindIndex) != slot)
             setParams ({ { param, grossbeat::paramFromRaw (kindIndex, slot) } });
         repaint();
+    }
+
+    // Round 190lx (DP-4, FL manual "Right-click the slot button and select Move slot left / Move slot right"): the slot
+    // trades places with its neighbour in the same row of 36; the selection goes with it
+    void gbMoveSlot (int kindIndex, int slot, int delta)
+    {
+        const auto to = slot + delta;
+        if (to < 0 || to >= grossbeat::slotsPerKind || slot < 0 || slot >= grossbeat::slotsPerKind)
+            return;
+        auto state = gbState();
+        std::swap (state.slots[(std::size_t) (kindIndex * grossbeat::slotsPerKind + slot)], state.slots[(std::size_t) (kindIndex * grossbeat::slotsPerKind + to)]);
+        gbWriteState (state);
+        gbSelect (kindIndex, to);
     }
 
     juce::String gbSlotTitle (int kindIndex, int slot) const

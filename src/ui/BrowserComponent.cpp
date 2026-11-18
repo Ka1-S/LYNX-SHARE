@@ -4651,6 +4651,71 @@ public:
 };
 } // namespace
 
+namespace
+{
+// Round 190lx (DS-42): the Simple layout's Loops dock (BrowserComponent::makeLoopsDock)
+class LoopsDock final : public juce::Component
+{
+public:
+    LoopsDock (AudioEngine& engine, const std::function<void (BrowserComponent&)>& wire, std::function<void()> closed)
+        : browser (engine, BrowserComponent::Role::samples), onClose (std::move (closed))
+    {
+        if (wire != nullptr)
+            wire (browser);
+        title.setText (tr ("Loops"), juce::dontSendNotification);
+        title.setFont (theme::font (theme::type::title, true));
+        title.setColour (juce::Label::textColourId, theme::colour::textPrimary);
+        title.setInterceptsMouseClicks (false, false);
+        closeButton.setButtonText (juce::String::fromUTF8 ("\xc3\x97"));
+        closeButton.setTooltip (tr ("Close"));
+        closeButton.onClick = [this] {
+            if (onClose != nullptr)
+                onClose();
+        };
+        addAndMakeVisible (title);
+        addAndMakeVisible (closeButton);
+        addAndMakeVisible (browser);
+        browser.setLoopsShown (true);
+        setTitle (tr ("Loops"));
+    }
+
+    void paint (juce::Graphics& g) override
+    {
+        g.fillAll (theme::colour::bg2);
+        g.setColour (theme::colour::border); // (BandLab: a 1 px edge on the left)
+        g.drawVerticalLine (0, 0.0f, (float) getHeight());
+    }
+
+    void resized() override
+    {
+        auto r = getLocalBounds().withTrimmedLeft (1);
+        auto head = r.removeFromTop (36).reduced (12, 4);
+        closeButton.setBounds (head.removeFromRight (28));
+        title.setBounds (head);
+        browser.setBounds (r);
+    }
+
+    BrowserComponent browser;
+
+private:
+    juce::Label title;
+    juce::TextButton closeButton;
+    std::function<void()> onClose;
+};
+} // namespace
+
+std::unique_ptr<juce::Component> BrowserComponent::makeLoopsDock (AudioEngine& engine, const std::function<void (BrowserComponent&)>& wire,
+                                                                  std::function<void()> onClose)
+{
+    return std::make_unique<LoopsDock> (engine, wire, std::move (onClose));
+}
+
+BrowserComponent* BrowserComponent::browserOfLoopsDock (juce::Component* dock)
+{
+    auto* d = dynamic_cast<LoopsDock*> (dock);
+    return d != nullptr ? &d->browser : nullptr;
+}
+
 std::unique_ptr<juce::Component> BrowserComponent::makeSampleBrowserContent (AudioEngine& engine, const std::function<void (BrowserComponent&)>& wire)
 {
     auto host = std::make_unique<SampleBrowserHost> (engine, wire);

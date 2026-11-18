@@ -88,6 +88,13 @@ public:
     // The Sample browser window's content: a drag container holding a Browser of role `samples`; `wire` connects
     // its callbacks like the main Browser's. The window keeps its bounds and open state in the view file.
     static std::unique_ptr<juce::Component> makeSampleBrowserContent (AudioEngine& engine, const std::function<void (BrowserComponent&)>& wire);
+    // Round 190lx (DS-42, BandLab's Sounds panel, capture 190lr B21 bl-sounds-panel.png: docked right of the timeline from
+    // the ruler down to the bottom bar, 401 px wide, narrowing the timeline and the track dock): the Simple layout's Loops
+    // dock, a title row with × and a Browser of role `samples` showing its Loop Browser. Not a window: nothing saved.
+    static constexpr int loopsDockWidth = 401;
+    static std::unique_ptr<juce::Component> makeLoopsDock (AudioEngine& engine, const std::function<void (BrowserComponent&)>& wire,
+                                                           std::function<void()> onClose);
+    static BrowserComponent* browserOfLoopsDock (juce::Component* dock);
     // Whether the Sample browser was open when LYNX last closed (its view file).
     static bool sampleBrowserWasOpen();
     // Round 190hd: the Browser's search index kept up to date by a low-priority child process (LYNX --browser-indexer

@@ -156,7 +156,8 @@ public:
     static inline int simpleWorkflowAliveAfterTeardown = -1;
     // The Clip-launch workflow's detail view (round 183a), made with the grid; nullptr until then.
     DetailView* getDetailViewForSnapshot() const noexcept { return detailView.get(); }
-    bool runActionForSnapshot (const std::string& id) { return runAction (id); } // (round 190jn: Q, the hot-swap key; round 190jz: --issueshot190jz)
+    bool runActionForSnapshot (const std::string& id) { return runAction (id); }
+    void updateLookFieldsForSnapshot() { updateLookFields(); } // (round 190lx) // (round 190jn: Q, the hot-swap key; round 190jz: --issueshot190jz)
     juce::Component* getClipGridForSnapshot() const noexcept { return clipGridView.get(); } // --gridshot (round 190bv)
     // round 190ch (LYNX's own): the project's Lyrics / Notes panel — docked on the right of the Playlist in every layout,
     // or in its own window — and the Reference match window
@@ -808,6 +809,11 @@ private:
     IconButton browserToggleButton { "liveBrowser", Icon::browserPanel };
     IconButton backToArrangementButton { "backToArrangement", Icon::backToArrangement };
     IconButton cycleButton { "cycle", Icon::cycle }; // round 190ld (DS-2): BandLab's Cycle switch in the Simple transport capsule
+    // round 190lx (DL-61): Live's Loop and Punch-Out switches beside the Punch-In one (punchButton) in the Clip-launch bar
+    IconButton liveLoopButton { "liveLoop", Icon::liveLoop };
+    IconButton punchOutButton { "punchOut", Icon::punchOut };
+    void toggleLiveLoop();
+    bool punchHintLive = false; // (the punch button's hint is Live's Punch-In one)
     IconButton metronomeMenuButton { "metronomeMenu", Icon::chevronDown }; // round 190ld (DS-1): BandLab's metronome popover
     void showMetronomePopover();
 public:
@@ -886,6 +892,14 @@ private:
     layoutstyle::SettingsReader startStyle; // the style saved in the UI settings (applied when the window is ready)
     // round 190ch: the docked Lyrics / Notes panel (made when first shown) and the ones living in tool windows
     std::unique_ptr<juce::Component> lyricsDock;
+    // round 190lx (DS-42): the Simple layout's Loops dock on the right (BandLab's Sounds panel)
+    std::unique_ptr<juce::Component> loopsDock;
+    void showLoopsDock();
+    void hideLoopsDock();
+public:
+    bool isLoopsDockShowing() const { return loopsDock != nullptr && loopsDock->getParentComponent() != nullptr; }
+    juce::Component* showLoopsDockForSnapshot() { showLoopsDock(); return loopsDock.get(); }
+private:
     juce::Component::SafePointer<juce::Component> lyricsWindowPanel, referenceMatchPanel;
     void refreshSongNotes(); // the song changed: the panels above follow
     bool lanesBeforeClipLaunch = false; // the Automation lanes setting to go back to

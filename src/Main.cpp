@@ -2479,6 +2479,16 @@ public:
             return;
         }
 
+        if (args.contains ("--details190lxshot"))
+        {
+            // LYNX --details190lxshot prefix project.flp [set.als]: round 190lx off screen (src/DetailsShot190lx.inc)
+            const auto i = args.indexOf ("--details190lxshot");
+            const auto set = i + 3 < args.size() && ! args[i + 3].startsWith ("--") ? args[i + 3].unquoted() : juce::String();
+            setApplicationReturnValue (runDetailsShot190lx (args[i + 1].unquoted(), args[i + 2].unquoted(), set) ? 0 : 1);
+            quit();
+            return;
+        }
+
         if (args.contains ("--details190lrshot"))
         {
             // LYNX --details190lrshot prefix project.flp [set.als]: round 190lr off screen (src/DetailsShot190lr.inc)
@@ -16593,6 +16603,7 @@ private:
 #include "DetailsShot190kn.inc" // round 190kn
 #include "DetailsShot190ld.inc" // round 190ld
 #include "DetailsShot190lr.inc" // round 190lr
+#include "DetailsShot190lx.inc" // round 190lx
     // --trackautoshot190gz (round 190gz): see the dispatch above
     bool runTrackAutoShot190gz (const juce::String& prefix)
     {
