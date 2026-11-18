@@ -471,7 +471,8 @@ bool analyse (const SampleData& source, const polyphonic::NoteEvidence* evidence
     out.notes = std::move (active);
     if (options.keepCandidates)
         for (auto& c : candidates)
-            out.notes.push_back (std::move (c));
+            if (c.probability >= options.candidateFloor && (c.endFrame - c.startFrame + 1) * out.frameSeconds() >= 0.1)
+                out.notes.push_back (std::move (c));
     return true;
 }
 

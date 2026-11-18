@@ -114,7 +114,9 @@ enum class Detector
 struct AnalyseOptions
 {
     Detector detector = Detector::fallback;
-    bool keepCandidates = true; // keep the rejected candidates (Note::active false) for note assignment
+    bool keepCandidates = true; // keep the rejected candidates (Note::active false) for note assignment ...
+    float candidateFloor = 0.1f; // ... those the note filter gave at least this probability, 0.1 s or longer (most
+                                 // candidates are overtones and fragments below 0.1: ~200 for 9 s of a pad)
     bool slowReattacks = true;  // split notes at slow re-attacks (pads, strings: the same pitch in the next chord)
     bool rescueHeard = true;    // with evidence: a candidate the filter nearly took and Basic Pitch hears becomes a note
 };
