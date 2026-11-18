@@ -3982,3 +3982,48 @@ latency change.
 - Facet: the −30 dB time-constant probe is at 3 (from 2): the reference's cut after the short bursts (7.5 / 8.7 s) is
   still deeper than the model's.
 - PuigTec, SuperTap's feedback delay and modulation, EchoBoy's shelving cuts (round 190jh's list) not touched.
+
+## Round 190kw (Pro-R 2 → LuxeVerb Space)
+
+LuxeVerb's Space engine gets a hidden **revision 1** (`luxeVerbSpaceRevision`) written from the Pro-R 2 laws that the round
+recovered by static analysis (docs/analise/REA_rodada190kw.md): true stereo (each channel its own network; the law's 16
+line lengths 5.18 ms × 1.12402^(k + n0 + j) split even / odd between the channels), the input M/S (s_in) and output X / Y
+width matrices with the feedback rotation √(1 − v²/2) / ± v / √2, a 2-line network ((200 + 0.00088 (T − 200)) × rate ms),
+an early network at 1.15 × the displayed time without the rate, Space 0 = 0.2 s, the late-level law
+((250 / T)^0.7 + 1.3) (1 + 0.5 d) f10 and the brightness filters (d = 1 − min (B / 0.7, 1): one-pole low pass, high shelf
+following d, 200 Hz shelf −8e²). Open constants fitted on refcap030 (component spectra, `lab/comp.py` / `lab/fit.py`).
+The Pro-R 2 translator passes Stereo Width raw (0 … 1.2; past 1 in the hidden `luxeVerbSpaceWidthExt`) and sets
+revision 1 for **Modern** states; Vintage / Plate keep revision 0 (their revision-1 fit scored lower on the grid).
+
+| refcap030 Pro-R 2 (fxparity) | files | before → after | up / same / down |
+|---|---|---|---|
+| grid (Style × Character) | 30 | 3.43 → **3.50** | 2 / 28 / 0 |
+| grid2 (Space × Rate, Distance × Character, Brightness × Thickness, Space × Width, Rate × Ducking, 96 kHz) | 140 | 2.81 → **3.30** | 62 / 58 / 20 |
+| · Space × Width (left-only impulse) | 25 | 2.16 → **3.32** | 20 / 5 / 0 |
+| · Brightness × Thickness | 25 | 2.72 → **3.20** | 11 / 11 / 3 |
+| · Space × Rate | 25 | 3.12 → **3.48** | 8 / 13 / 4 |
+| · Rate × Ducking (noise burst) | 25 | 2.00 → **2.60** | 14 / 5 / 6 |
+| mode / pairs / prog | 18 / 72 / 6 | 3.72 / 3.38 / 3.50 → 3.78 / 3.43 / 3.50 | 21 / 57 / 18 |
+| 44.1 / 48 / 96 kHz | 16 each | 4.44 / 4.12 / 4.06 → 4.12 / 3.94 / 4.19 | 4 / 39 / 5 |
+| styles | 9 | 4.00 → 4.00 | 0 / 9 / 0 |
+| **all blocks** | 323 | 3.30 → **3.51** | 89 / 191 / 43 |
+| refcap182 programme (Pro-R 2) | 20 | 3.95 → 3.95 | 0 / 20 / 0 |
+| tp172b (impulse / drums / music) | 12 | 3.83 → 3.75 | 1 / 10 / 1 (D drums 6 → 4) |
+
+**Not landed as "nothing worse"**: 43 files go a step down (owner decision, HANDOFF): the default state D at 44.1 / 48 kHz
+(6 → 4: rms −0.5 → −0.6 dB at 30 % mix, the 6-point limit is 0.5), long rates with Ducking (the fitted late level
+× T^−0.94 leaves the tail after the dip too quiet: −8 … −16 dB at rate 400 %), Distance ≥ 0.75 (+1.6 … +2.7 dB), and
+several pairs `mix` files.
+
+**Old projects.** Revision 0 is the tp172b / 190it engine unchanged: 15 gold renders (5 settings × 44.1 / 48 / 96 kHz) from
+the base objects equal the round's objects with revision 0 (`tests/Parity190kwR2Tests.inc`), and fxrender's Pro-R 2
+renders with revision 0 are byte-identical to the base binary at 44.1 / 48 / 96 kHz. `upgradeLoadedEffectParams` sets 0
+for every LuxeVerb saved before.
+
+**CPU** (Space engine alone, 20 s at 48 kHz in blocks of 512, best of 5; `lab/bench1.cpp`): revision 0 5.2 … 6.0 %,
+revision 1 4.0 … 4.3 % (two 8-line halves; 2 × 16 lines measured 10.1 % and were dropped; one sin / cos a sample for the
+lines' modulation).
+
+**Still off:** the in-loop brightness filters on the even lines and the early network's own tone filters (not built);
+Vintage / Plate under revision 1; CrossInput x fitted at 0.5 (x = 1 scores the width impulses better, 3.40 vs 3.32, but
+lifts a centred input by 1.7 dB against the fitted levels); the Space display text still reads 0.30 s at Space 0.
