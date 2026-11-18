@@ -90,6 +90,10 @@ inline constexpr Item items[] = {
     { "transport.wToStart", TR_NOOP ("Transport"), TR_NOOP ("W moves the playback marker to the start (as Home)"),
       TR_NOOP ("The REAPER key for going back to the start of the song or pattern, beside FL's Home; the typing keyboard keeps W while it is on. Also in the Stop button's right-click menu."),
       "ui-options.txt:wToStart" },
+    // round 190kx: BandLab fits its loops to the project's tempo and key; on by default in the Simple layout only
+    { "simple.loopDetect", TR_NOOP ("Simple workflow"), TR_NOOP ("Dropped loops take the tempo and key found in their audio"),
+      TR_NOOP ("In the Simple layout a loop whose file and name don't say its tempo or key is analysed when it is dropped: a loop of whole beats keeps the project's tempo and a key it finds follows the project key, as BandLab's loops do. On by default. Also in the Browser options menu of the Simple layout."),
+      "ui-options.txt:simpleLoopDetect" },
     { "record.lastLoopPassPlays", TR_NOOP ("Recording"), TR_NOOP ("After loop recording, only the last pass plays"),
       TR_NOOP ("The earlier passes stay under it, muted, to pick from. Also in the recording options menu."),
       "ui-options.txt:recordLastPassPlays" },

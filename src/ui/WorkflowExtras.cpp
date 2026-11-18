@@ -3,6 +3,7 @@
 #include "core/LaneView.h"
 #include "core/LayoutStyle.h"
 #include "core/MidiDrop.h"
+#include "core/LoopAnalysis.h" // round 190kx
 #include "core/PlaylistViewOptions.h"
 #include "core/PlaylistTrackOps.h"
 #include "core/TakeCleanup.h"
@@ -78,6 +79,8 @@ bool readUiOption (const juce::String& key, bool on)
         cliplanes::liveOn = on;
     else if (key == "wToStart") // issue #195: REAPER's W goes to the start (LYNX extra)
         transportedit::setWGoesToStart (on);
+    else if (key == "simpleLoopDetect") // round 190kx: Simple drops take the tempo and key found in the audio
+        loopanalysis::dropDetects() = on;
     else
         return false;
     return true;
@@ -99,7 +102,8 @@ juce::String uiOptionsText()
            + "\nheaderWidthDrag=" + juce::String (headerwidth::draggable ? 1 : 0) + "\nheaderWidthExtra=" + juce::String (headerwidth::clampExtra (headerwidth::extra))
            + "\npointerClickButton=" + juce::String (pointerclick::buttonShown ? 1 : 0) + "\npointerClick=" + juce::String (pointerclick::on ? 1 : 0)
            + "\nclipLanesPattern=" + juce::String (cliplanes::patternOn ? 1 : 0) + "\nclipLanesLive=" + juce::String (cliplanes::liveOn ? 1 : 0)
-           + "\nwToStart=" + juce::String (transportedit::wGoesToStart() ? 1 : 0); // (round 190jz, issue #195)
+           + "\nwToStart=" + juce::String (transportedit::wGoesToStart() ? 1 : 0) // (round 190jz, issue #195)
+           + "\nsimpleLoopDetect=" + juce::String (loopanalysis::dropDetects().load() ? 1 : 0); // (round 190kx)
 }
 
 std::optional<bool> extraOn (std::string_view id)
@@ -120,6 +124,8 @@ std::optional<bool> extraOn (std::string_view id)
         return cliplanes::patternOn;
     if (id == "transport.wToStart")
         return transportedit::wGoesToStart();
+    if (id == "simple.loopDetect") // round 190kx
+        return loopanalysis::dropDetects().load();
     return std::nullopt;
 }
 
@@ -145,6 +151,8 @@ bool setExtra (std::string_view id, bool on)
         cliplanes::patternOn = on;
     else if (id == "transport.wToStart")
         transportedit::setWGoesToStart (on);
+    else if (id == "simple.loopDetect") // round 190kx
+        loopanalysis::dropDetects() = on;
     else
         return false;
     if (onChanged)

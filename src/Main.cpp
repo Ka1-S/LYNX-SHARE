@@ -256,6 +256,9 @@
 #include "ui/StemExtract.h"
 #include "core/RegionLoop.h" // round 190jr: --bandlab190jrshot
 #include "core/FactoryContent.h" // round 190ke: --simplegb190keshot
+#include "core/KeyFollow.h"     // round 190kx: --loopinfo190kxshot
+#include "core/LoopAnalysis.h"
+#include "../tests/LoopCorpus190kx.h" // (LYNX's own synthetic loops, written for the shot)
 #include "core/SongFade.h"
 #include "core/SoundLibrary.h"
 #include "core/SynthParams.h"
@@ -2030,6 +2033,14 @@ public:
         }
 
         // --browsershot190iz <folder> (round 190iz: FL's tabs, tags, Live's browser): src/BrowserShot190iz.inc
+        // --loopinfo190kxshot <folder> (round 190kx: loop key / tempo in the Simple rows, the Loop Browser, the clip menu)
+        if (args.contains ("--loopinfo190kxshot"))
+        {
+            setApplicationReturnValue (runLoopInfoShot190kx (juce::File (args[args.indexOf ("--loopinfo190kxshot") + 1].unquoted())) ? 0 : 1);
+            quit();
+            return;
+        }
+
         // --loopshot190kf <folder> (round gaps190kf: the Loop Browser): src/LoopShot190kf.inc
         if (args.contains ("--loopshot190kf"))
         {
@@ -33981,6 +33992,7 @@ private:
 #include "PrShot190jv.inc" // round 190jv
 #include "SimpleGbShot190ke.inc" // round 190ke
 #include "LoopShot190kf.inc"   // round gaps190kf
+#include "LoopInfoShot190kx.inc" // round 190kx
 
     static void writeWaveDemo (const juce::File& file, double bpm)
     {

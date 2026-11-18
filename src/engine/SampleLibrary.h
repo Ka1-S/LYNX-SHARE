@@ -74,6 +74,11 @@ public:
     // the Browser's "Find similar samples" analyses whole folders with it). False when the file can't be read.
     bool readMono (const juce::File& file, double seconds, std::vector<float>& mono, double& sampleRate);
 
+    // Round 190kx (loop analysis, core/LoopAnalysis.h): readMono into `out` (mono, its rate, the WAV's ACID beats as a
+    // load reads them) and the whole file's length in seconds (`totalSeconds`, also when only the first `seconds` are
+    // read). Nothing is cached or kept. False when the file can't be read.
+    bool readForAnalysis (const juce::File& file, double seconds, SampleData& out, double& totalSeconds);
+
     // Issue #193 (round als190ka): a video file's sound track (a Live set's video clips play their sound as audio
     // clips). The engine cannot decode video itself; the app hands it the system's decoder (ui/VideoMedia), which writes
     // the sound to a WAV in the cache and returns it (a non-existent file: no sound / no decoder). Set once at start-up.

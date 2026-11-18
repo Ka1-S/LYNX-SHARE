@@ -17901,3 +17901,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Natives190kjEdisonTests.inc" // round natives190kj: FL Edison Dual view, grid step, pitch-period snap, grid-slicing, scrub, pitch regions
 #include "Natives190kjHarmorTests.inc" // round natives190kj: Harmor resynthesis (analysis, voice, engine revision)
 #include "Ara190kxTests.inc" // round 190kx: ARA 2 on audio clips (the clips as playback regions, ids, tempo, the clip menu)
+#include "LoopAnalysis190kxTests.inc" // round 190kx: loop analysis (key and tempo of the user's own loops; core/LoopAnalysis.h)
