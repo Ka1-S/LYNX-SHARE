@@ -265,8 +265,13 @@ public:
 };
 
 // ---- the document controller, shared by everything that refers to it ---------------------------------------------------
+// It also keeps the plugin's module loaded until the controller is gone: the ARA factory is released (uninitialised,
+// its COM object released) after the controller, by code in the plugin's module, which unloads with its last instance.
+// So the instance the factory was taken from stays, unbound and never processed, until then (round 190kx: without it,
+// the last channel's instance going first unloaded Melodyne's module and the factory's release crashed).
 struct Controller
 {
+    std::unique_ptr<juce::AudioPluginInstance> keeper;
     std::unique_ptr<juce::ARAHostDocumentController> dc;
     ARA::Host::DocumentController& get() const { return dc->getDocumentController(); }
     std::shared_ptr<bool> playbackAlive;
@@ -274,6 +279,8 @@ struct Controller
     {
         if (playbackAlive != nullptr)
             *playbackAlive = false;
+        dc.reset();     // (the document controller and, with it, the factory)
+        keeper.reset(); // (then the module may unload)
     }
 };
 
@@ -345,6 +352,11 @@ public:
         const juce::CriticalSection::ScopedTryLockType lock (plugin.getCallbackLock());
         if (! lock.isLocked() || ! binding->ready.load (std::memory_order_acquire))
             return; // (its regions are being changed: silent for this block)
+        // (an audio clip plays its file at unity at FL's default channel volume, as the channel's sampler does:
+        // core/Instruments.cpp audioClipUnity)
+        static const float unity = 1.0f / channelGain (audioClipUnityVolume);
+        gl *= unity;
+        gr *= unity;
         for (int at = 0; at < n;)
         {
             const auto count = juce::jmin (n - at, buffer.getNumSamples());
@@ -519,12 +531,13 @@ struct AraHost::Impl : private juce::Timer
         return instance;
     }
 
-    Doc* docFor (const std::string& pluginId, const juce::PluginDescription& d, juce::AudioPluginInstance& first)
+    // (takes `first`: the instance the factory comes from stays with the controller, see Controller)
+    Doc* docFor (const std::string& pluginId, const juce::PluginDescription& d, std::unique_ptr<juce::AudioPluginInstance>& first)
     {
         if (auto it = docs.find (pluginId); it != docs.end())
             return it->second.get();
         juce::ARAFactoryWrapper factory;
-        juce::createARAFactoryAsync (first, [&factory] (juce::ARAFactoryWrapper f) { factory = std::move (f); });
+        juce::createARAFactoryAsync (*first, [&factory] (juce::ARAFactoryWrapper f) { factory = std::move (f); });
         if (factory.get() == nullptr)
         {
             error = d.name + ": no ARA";
@@ -542,6 +555,7 @@ struct AraHost::Impl : private juce::Timer
         auto playback = std::make_unique<Playback> (playbackHook);
         auto alive = playback->alive;
         doc->controller = std::make_shared<Controller>();
+        doc->controller->keeper = std::move (first);
         doc->controller->playbackAlive = alive;
         doc->controller->dc = juce::ARAHostDocumentController::create (std::move (factory), "LYNX", std::make_unique<AudioAccess>(),
                                                                          std::make_unique<Archiving>(),
@@ -743,20 +757,21 @@ void AraHost::sync (const Song& song, double sampleRate)
         }
         Doc* doc = nullptr;
         std::unique_ptr<juce::AudioPluginInstance> first;
+        bool fresh = false; // (the document is made in this sync: the song's archive of it is given back)
         if (auto it = impl->docs.find (pluginId); it != impl->docs.end())
             doc = it->second.get();
         else
         {
+            fresh = true;
             juce::String why;
             first = impl->createInstance (*description, why);
-            if (first == nullptr || (doc = impl->docFor (pluginId, *description, *first)) == nullptr)
+            if (first == nullptr || (doc = impl->docFor (pluginId, *description, first)) == nullptr)
             {
                 error = impl->error.isNotEmpty() ? impl->error : description->name + ": " + why;
                 impl->failed.insert (pluginId);
                 continue;
             }
         }
-        const bool fresh = first != nullptr;
         impl->setTimeline (*doc, song);
 
         // the model: channels and their regions, in one edit (with the archive given back in it for a fresh document)
