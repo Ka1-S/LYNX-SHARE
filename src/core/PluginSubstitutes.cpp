@@ -640,11 +640,31 @@ lynx = Apex Limiter
 translate = fitted-map
 names = FG-X 2; FG-X; SSL X-Limit; smartlimit; purelimit; learnlimit; Bus Clipper
 
+[eiosis-aireq]
+product = AirEQ (Eiosis AirEQ, Slate VM AirEQ Air / Earth)
+vendor = Eiosis (Slate Digital)
+lynx = Facet EQ
+# round 190ln: the state is translated in physical units (cuts, Earth / Air shelves, five bells / shelves, strength, mid /
+# side placement, trims); laws and shapes measured on the references' renders, structure read statically
+# (docs/analise/REA_rodada190ln.md §3). Without a readable state: Facet flat, as before
+translate = eiosis-aireq
+names = Eiosis AirEQ; Eiosis AirEQ 5.1; AirEQ; VM AirEQ Air; VM AirEQ Earth
+
+[slate-infinity-eq]
+product = Infinity EQ
+vendor = Slate Digital
+lynx = Facet EQ
+# round 190ln: the state is translated in physical units (the first eight enabled bands of 24: cuts, shelves, bells by
+# width, notch, tilt, dynamics, channel placement, output); laws and shapes measured on the reference's renders
+# (docs/analise/REA_rodada190ln.md §4). Without a readable state: Facet flat, as before
+translate = slate-infinity-eq
+names = Inf EQ; Infinity EQ
+
 [complete-access-eqs]
-product = EQs (Slate Infinity EQ, FG-73 / FG-N / FG-S / SD-PE1 / CS-EQ, Eiosis AirEQ, SSL X-EQ 2, sonible smart:EQ)
+product = EQs (Slate FG-73 / FG-N / FG-S / SD-PE1 / CS-EQ, SSL X-EQ 2, sonible smart:EQ)
 vendor = Complete Access (role)
 lynx = Facet EQ
-names = Inf EQ; Infinity EQ; VM FG-73; VM FG-N; VM FG-S; VM SD-PE1; VM CS-EQ; VM CS-Lift; VM AirEQ Air; VM AirEQ Earth; Eiosis AirEQ; Eiosis AirEQ 5.1; SSL Native X-EQ 2; SSL Fusion Violet EQ; smartEQ4; smartEQ3; pureeq; learneq; Harrison_LegacyEQ; Harrison_MasteringEQ
+names = VM FG-73; VM FG-N; VM FG-S; VM SD-PE1; VM CS-EQ; VM CS-Lift; SSL Native X-EQ 2; SSL Fusion Violet EQ; smartEQ4; smartEQ3; pureeq; learneq; Harrison_LegacyEQ; Harrison_MasteringEQ
 
 [complete-access-deessers]
 product = de-essers (SSL DeEss, Slate FG-DS 902, Eiosis E2Deesser, sonible smart:deess)
@@ -3185,8 +3205,294 @@ int translateFittedMap (const std::vector<std::uint8_t>& state, EffectSlot& slot
     return 0;
 }
 
+// round 190ln: Eiosis AirEQ (and Slate's VM AirEQ Air / Earth, the same filters) -> Facet EQ, in physical units.
+// The state is the plug-in's own XML archive of normalised (0..1) parameter values (the current slot first, then the A / B
+// copies: the first entry of an id wins). Value laws: the reference's tapers are tables interpolated linearly in the unit
+// (seen statically, REA_rodada190ln §3); their points are not copied — the laws below run through the plug-in's own value
+// texts at k/8 read through its public parameter API (refcap0124/par). Filter shapes fitted black-box on the references'
+// renders (refcap0124 one-control sweeps, refcap182 / trial190k settings) with Facet's own prototypes; every number here
+// is LYNX's fit (docs/analise/REA_rodada190ln.md §3).
+namespace aireq
+{
+double knots9 (const double* y, double v) // piecewise linear through the 9 public samples at v = k/8
+{
+    v = std::clamp (v, 0.0, 1.0) * 8.0;
+    const int i = std::min (7, (int) v);
+    return y[i] + (v - i) * (y[i + 1] - y[i]);
+}
+constexpr double bandHz[9] { 10, 85, 240, 530, 1000, 2750, 7500, 16000, 30000 };
+constexpr double lowCutHz[9] { 5, 30, 105, 248, 500, 1250, 2750, 5375, 10000 };
+constexpr double highCutHz[9] { 20, 85, 240, 530, 1000, 2750, 7500, 16000, 30000 };
+constexpr double bandQ[9] { 0.1, 0.24, 0.43, 0.65, 1.0, 1.55, 2.5, 4.5, 7.0 };
+constexpr double cutQ[9] { 0.35, 0.4, 0.46, 0.55, 0.7, 1.05, 1.68, 2.68, 4.0 };
+constexpr double strengthPct[9] { 0, 26.3, 53, 79.8, 100, 111, 123, 135, 150 };
+constexpr int slopeSteps[5] { 6, 12, 18, 24, 36 };
+
+// The bell: a second-order bell (Facet's prototype) whose peak gain and Q follow the dial gain g (dB) and Q q. Fitted on
+// the reference's renders (each within 0.03 … 0.07 dB rms): the peak is larger than the dial at small gains and grows with
+// the dial's Q as q^0.35; the band widens as |g| grows, its Q following q^0.876 (REA_rodada190ln §3 table).
+void bell (double g, double q, double& peakDb, double& facetQ)
+{
+    const double a = std::abs (g);
+    static constexpr double gx[6] { 0.0, 3.0, 4.0, 6.0, 9.0, 18.0 };
+    static constexpr double pk[6] { 0.0, 5.6, 6.82, 9.5, 11.6, 18.1 };   // peak dB at q = 1
+    static constexpr double qr[6] { 1.05, 1.0, 0.93, 0.80, 0.71, 0.504 }; // Facet Q at q = 1
+    int i = 0;
+    while (i < 4 && a > gx[i + 1])
+        ++i;
+    const double t = a > gx[5] ? 1.0 + (a - gx[5]) / (gx[5] - gx[4]) : std::clamp ((a - gx[i]) / (gx[i + 1] - gx[i]), 0.0, 1.0);
+    const double peak = pk[i] + t * (pk[i + 1] - pk[i]);
+    const double qs = std::max (0.3, qr[i] + t * (qr[i + 1] - qr[i]));
+    peakDb = (g < 0 ? -1.0 : 1.0) * peak * std::pow (q, 0.35);
+    facetQ = qs * std::pow (q, 0.876);
+}
+} // namespace aireq
+
+int translateAirEq (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    namespace a = aireq;
+    if (slot.kind != EffectKind::facetEq)
+        return 0;
+    const std::string text (state.begin(), state.end());
+    if (text.find ("AEq") == std::string::npos)
+        return 0;
+    std::map<std::string, double> v;
+    for (auto q = text.find ("<entry "); q != std::string::npos; q = text.find ("<entry ", q + 7))
+    {
+        const auto id = attributeIn (text, q, "id");
+        float x = 0;
+        if (! id.empty() && v.find (id) == v.end() && parseFloat (attributeIn (text, q, "value"), x))
+            v[id] = x;
+    }
+    const auto get = [&] (const std::string& id, double fallback) { const auto it = v.find (id); return it == v.end() ? fallback : it->second; };
+    const auto on = [&] (const std::string& id) { return get (id, 0.25) >= 0.5; };
+    if (v.find ("InputGain") == v.end() && v.find ("AirGain") == v.end() && v.find ("EarthGain") == v.end() && v.find ("Band1Gain") == v.end())
+        return 0;
+    auto& p = slot.params;
+    int band = 0, n = 0;
+    const bool ms = on ("MidSideModeOn");
+    const double strength = a::knots9 (a::strengthPct, get ("Strength", 0.5)) / 100.0;
+    const auto place = [&] (const std::string& prefix) {
+        const int c = std::clamp ((int) std::lround (get (prefix + "Channels", 1.0 / 6.0) * 3.0 - 0.5), 0, 2);
+        return c == 0 ? facet::Placement::stereo : c == 1 ? (ms ? facet::Placement::mid : facet::Placement::left)
+                                                          : (ms ? facet::Placement::side : facet::Placement::right);
+    };
+    const auto gainOf = [&] (const std::string& prefix, const std::string& id) {
+        const double g = -18.0 + 36.0 * get (id, 0.5);
+        return on (prefix + "ExcludeFromStrength") ? g : g * strength;
+    };
+    const auto add = [&] (facet::Shape s, double hz, double db, double fq, int slope, facet::Placement pl) {
+        if (band >= facet::bands)
+            return;
+        p[(std::size_t) facet::param (band, 0)] = facet::shapeValue (s);
+        p[(std::size_t) facet::param (band, 1)] = facet::hzValue (std::clamp (hz, 10.0, 30000.0));
+        p[(std::size_t) facet::param (band, 2)] = facet::gainValue (std::clamp (db, -30.0, 30.0));
+        p[(std::size_t) facet::param (band, 3)] = facet::qValue (std::clamp (fq, 0.025, 40.0));
+        p[(std::size_t) facet::param (band, 4)] = facet::slopeValue (slope);
+        p[(std::size_t) (facet::placementParam0 + band)] = facet::placementValue (pl);
+        ++band;
+        ++n;
+    };
+    const auto cut = [&] (const std::string& id, bool high) {
+        if (! on (id + "On"))
+            return;
+        // Eiosis: <id>Type (shallow / steep) + a slope per type; the VM modules: one <id>Slope, same five steps
+        const bool vm = v.find (id + "Slope") != v.end();
+        const bool steep = ! vm && get (id + "Type", 0.25) >= 0.5;
+        const auto slopeId = vm ? id + "Slope" : id + (steep ? "SteepSlope" : "ShallowSlope");
+        int slope = a::slopeSteps[std::clamp ((int) std::lround (get (slopeId, steep ? 0.3 : 0.1) * 4.0), 0, 4)];
+        const double hz = a::knots9 (high ? a::highCutHz : a::lowCutHz, get (id + (vm ? "Freq" : "Frequency"), 0.5));
+        const double q = a::knots9 (a::cutQ, get (id + "Q", 0.5028));
+        // its 6 dB/oct high cut takes the Q too (a resonant section with a 6 dB/oct skirt): away from 0.7 it plays best as
+        // Facet's 12 dB/oct cut at that Q (refcap0124's Q sweep: 1 … 2 -> 5); the low cut's did not gain from it
+        if (high && slope == 6 && std::abs (std::log (q / 0.7)) > 0.1)
+            slope = 12;
+        // the reference's cuts are Butterworth at Q 0.71 (Facet's Q 1: its highest-Q section × Q)
+        add (high ? facet::Shape::highCut : facet::Shape::lowCut, hz, 0.0, q * std::sqrt (2.0), slope, place (id));
+    };
+    cut (v.find ("LoCutOn") != v.end() ? "LoCut" : "HighPass", false); // the low cut ("LoCut" on the panel)
+    // Earth / Air: the reference's own shelves, fitted per dial gain (dB) as Facet shelves: Hz, gain, Q
+    const auto shelfFit = [] (const double (*t)[4], int count, double g, double& hz, double& db, double& fq) {
+        int i = 0;
+        while (i < count - 2 && g > t[i + 1][0])
+            ++i;
+        const double u = std::clamp ((g - t[i][0]) / (t[i + 1][0] - t[i][0]), 0.0, 1.0);
+        hz = std::exp (std::log (t[i][1]) + u * (std::log (t[i + 1][1]) - std::log (t[i][1])));
+        db = t[i][2] + u * (t[i + 1][2] - t[i][2]);
+        fq = std::exp (std::log (t[i][3]) + u * (std::log (t[i + 1][3]) - std::log (t[i][3])));
+    };
+    // {dial dB, Hz, gain dB, Q}
+    static constexpr double earth[][4] { { -18, 43.3, -22.2, 0.87 }, { -9, 40.3, -10.8, 1.26 }, { 0, 30.0, 0.0, 1.0 },
+                                         { 4.5, 15.6, 30.0, 0.52 }, { 9, 20.8, 27.2, 0.53 }, { 18, 35.1, 30.0, 1.04 } };
+    static constexpr double air[][4] { { -18, 4601, -30.0, 0.238 }, { -9, 3869, -16.2, 0.383 }, { -4.5, 3515, -9.11, 0.446 },
+                                       { 0, 8000, 0.0, 0.45 }, { 2.5, 11079, 9.07, 0.45 }, { 4.5, 9554, 15.2, 0.396 },
+                                       { 9, 8167, 23.6, 0.306 }, { 18, 4491, 30.0, 0.282 } };
+    if (on ("EarthOn"))
+    {
+        double hz, db, fq;
+        const double g = gainOf ("Earth", "EarthGain");
+        shelfFit (earth, 6, g, hz, db, fq);
+        if (std::abs (g) > 1e-3)
+            add (facet::Shape::lowShelf, hz, db, fq, 12, place ("Earth"));
+    }
+    for (int b = 1; b <= 5; ++b)
+    {
+        const auto id = "Band" + std::to_string (b);
+        if (! on (id + "On"))
+            continue;
+        const double hz = a::knots9 (a::bandHz, get (id + "Frequency", 0.5));
+        const double q = a::knots9 (a::bandQ, get (id + "Q", 0.5));
+        const double g = gainOf (id, id + "Gain");
+        const bool shelfType = (b == 1 || b == 5) && get (id + "Type", 0.25) >= 0.5;
+        if (shelfType)
+        {
+            // the reference's shelf at Q q is the cookbook shelf of slope parameter q: Facet's Q law Qs = 0.7071·Q^0.4697
+            add (b == 1 ? facet::Shape::lowShelf : facet::Shape::highShelf, hz, g, std::pow (q / 0.7071, 1.0 / 0.4697), 12, place (id));
+        }
+        // (the "steep" switch, stored as <id>NotchOn, leaves a 0 dB band flat on the references' renders: not modelled)
+        else if (std::abs (g) > 1e-3)
+        {
+            double peak, fq;
+            a::bell (g, q, peak, fq);
+            add (facet::Shape::bell, hz, peak, fq, 12, place (id));
+        }
+    }
+    if (on ("AirOn"))
+    {
+        double hz, db, fq;
+        const double g = gainOf ("Air", "AirGain");
+        shelfFit (air, 8, g, hz, db, fq);
+        if (std::abs (g) > 1e-3)
+            add (facet::Shape::highShelf, hz, db, fq, 12, place ("Air"));
+    }
+    cut (v.find ("HiCutOn") != v.end() ? "HiCut" : "LowPass", true); // the high cut ("HiCut")
+    for (int b = band; b < facet::bands; ++b)
+        p[(std::size_t) facet::param (b, 0)] = facet::shapeValue (facet::Shape::off);
+    // input + output trims (±18 dB each, linear) on Facet's output (±24 dB); the polarity switch on all channels
+    const double trim = v.find ("StandaloneInputGain") != v.end()
+                            ? -48.0 + 48.0 * get ("StandaloneInputGain", 0.5) + 48.0 * get ("StandaloneOutputGain", 0.5) // VM: ±24 dB each
+                            : -36.0 + 36.0 * get ("InputGain", 0.5) + 36.0 * get ("OutputGain", 0.5);
+    p[(std::size_t) facet::outputParam] = (float) std::clamp ((trim + 24.0) / 48.0, 0.0, 1.0);
+    if (on ("PhaseReverse") && get ("PhaseReverseChannels", 1.0 / 6.0) < 1.0 / 3.0)
+        p[(std::size_t) facet::invertParam] = 1.0f;
+    if (on ("Bypass"))
+        for (int b = 0; b < facet::bands; ++b)
+            p[(std::size_t) facet::param (b, 0)] = facet::shapeValue (facet::Shape::off);
+    return std::max (n, 1);
+}
+
+// round 190ln: Slate Digital Infinity EQ -> Facet EQ, in physical units. The same XML archive of normalised values as
+// AirEQ. Value laws through the plug-in's own value texts (refcap0124/par): frequency 10 Hz × 3000^v (log, exact), gains
+// ±36 dB linear, Q 0.35 · 10^(v^1.13), bell width in semitones (the cookbook bandwidth), slope through its texts. Shapes
+// fitted black-box on refcap182's five settings (REA_rodada190ln §4): gains as dialled, the bells' width = the cookbook
+// bandwidth (Facet Q √2 / (2 sinh(ln 2 / 2 · octaves))), shelves the cookbook shelf of slope Q1. 24 bands: the first eight
+// enabled ones play.
+namespace infeq
+{
+constexpr double slopeText[9] { 12, 12, 12, 12, 17.9, 29.6, 48.9, 78.2, 120 };
+constexpr double widthSt[9] { 0.15, 4.13, 9.45, 16.5, 26.0, 38.6, 55.5, 78.0, 108 };
+constexpr double outText[9] { -36, -21.6, -12, -5.14, 0, 5.14, 12, 21.6, 36 };
+constexpr double panText[9] { -200, -100, -66.7, -33.3, 0, 33.3, 66.7, 100, 200 };
+constexpr double cutQScale = 1.4142135623730951; // Facet Q = Q1 · √2 · this: its cuts at Q1 0.71 peak +3 dB at the corner (fitted)
+constexpr double slopeScale = 0.75;           // the Facet slope nearest 0.75 × the dial's (its 24.7 dB/oct cut plays as 18; fitted)
+constexpr double tiltScale = 0.85;            // its tilt: Facet's first-order tilt shelf at 0.85 × the gain (fitted)
+} // namespace infeq
+
+int translateInfEq (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    namespace ie = infeq;
+    if (slot.kind != EffectKind::facetEq)
+        return 0;
+    const std::string text (state.begin(), state.end());
+    if (text.find ("InfE") == std::string::npos)
+        return 0;
+    std::map<std::string, double> v;
+    for (auto q = text.find ("<entry "); q != std::string::npos; q = text.find ("<entry ", q + 7))
+    {
+        const auto id = attributeIn (text, q, "id");
+        float x = 0;
+        if (! id.empty() && v.find (id) == v.end() && parseFloat (attributeIn (text, q, "value"), x))
+            v[id] = x;
+    }
+    const auto get = [&] (const std::string& id, double fallback) { const auto it = v.find (id); return it == v.end() ? fallback : it->second; };
+    if (v.find ("Band1State") == v.end())
+        return 0;
+    auto& p = slot.params;
+    int band = 0, n = 0;
+    for (int b = 1; b <= 24 && band < facet::bands; ++b)
+    {
+        const auto id = "Band" + std::to_string (b);
+        const double stateV = get (id + "State", 1.0 / 6.0);
+        if (stateV < 1.0 / 3.0 || stateV >= 2.0 / 3.0) // disabled / bypassed
+            continue;
+        const int type = std::clamp ((int) std::floor (get (id + "Type", 2.5 / 12.0) * 12.0), 0, 11);
+        const double hz = 10.0 * std::pow (3000.0, std::clamp (get (id + "Frequency", 0.575188), 0.0, 1.0));
+        const double g = -36.0 + 72.0 * get (id + "Gain", 0.5);
+        const double q1 = 0.35 * std::pow (10.0, std::pow (std::clamp (get (id + "Q1", 0.348672), 0.0, 1.0), 1.13));
+        const double oct = aireq::knots9 (ie::widthSt, get (id + "Width", 0.5)) / 12.0;
+        const double slopeDb = aireq::knots9 (ie::slopeText, get (id + "Slope", 0.386969));
+        int slope = facet::slopes[0];
+        for (const int s : facet::slopes)
+            if (std::abs (std::log ((double) s / (ie::slopeScale * slopeDb))) < std::abs (std::log ((double) slope / (ie::slopeScale * slopeDb))))
+                slope = s;
+        facet::Shape shape = facet::Shape::off;
+        double gain = g, fq = 1.0;
+        switch (type)
+        {
+            case 0: shape = facet::Shape::lowCut; gain = 0; fq = q1 * std::sqrt (2.0) * ie::cutQScale; break;
+            case 1: shape = facet::Shape::lowShelf; fq = std::pow (q1 / 0.7071, 1.0 / 0.4697); slope = 12; break;
+            case 2: shape = facet::Shape::bell; fq = std::sqrt (2.0) / (2.0 * std::sinh (std::log (2.0) / 2.0 * std::max (oct, 0.01))); slope = 12; break;
+            case 3: shape = facet::Shape::highShelf; fq = std::pow (q1 / 0.7071, 1.0 / 0.4697); slope = 12; break;
+            case 4: shape = facet::Shape::highCut; gain = 0; fq = q1 * std::sqrt (2.0) * ie::cutQScale; break;
+            case 6: shape = facet::Shape::notch; gain = 0; fq = std::sqrt (2.0) / (2.0 * std::sinh (std::log (2.0) / 2.0 * std::max (oct, 0.01))); slope = 12; break;
+            case 7: shape = facet::Shape::tiltShelf; slope = 6; gain = g * ie::tiltScale; break; // a first-order tilt
+            default: break;
+        }
+        if (shape == facet::Shape::off || (facet::hasGain (shape) && std::abs (g) < 1e-3 && get (id + "DynamicState", 0.25) < 0.5))
+            continue;
+        p[(std::size_t) facet::param (band, 0)] = facet::shapeValue (shape);
+        p[(std::size_t) facet::param (band, 1)] = facet::hzValue (std::clamp (hz, 10.0, 30000.0));
+        p[(std::size_t) facet::param (band, 2)] = facet::gainValue (std::clamp (gain, -30.0, 30.0));
+        p[(std::size_t) facet::param (band, 3)] = facet::qValue (std::clamp (fq, 0.025, 40.0));
+        p[(std::size_t) facet::param (band, 4)] = facet::slopeValue (slope);
+        // channel: Mono = both; Mid/Side or Left/Right with the band's panning (−100 = mid / left only, +100 = side / right)
+        const int mode = std::clamp ((int) std::lround (get (id + "ChannelMode", 1.0 / 6.0) * 3.0 - 0.5), 0, 2);
+        const double pan = aireq::knots9 (ie::panText, get (id + "ChannelPanning", 0.5));
+        auto pl = facet::Placement::stereo;
+        if (mode > 0 && std::abs (pan) >= 50.0)
+            pl = mode == 1 ? (pan < 0 ? facet::Placement::mid : facet::Placement::side) : (pan < 0 ? facet::Placement::left : facet::Placement::right);
+        p[(std::size_t) (facet::placementParam0 + band)] = facet::placementValue (pl);
+        // dynamics: the band moves to its target (dB) above the threshold (−90 … 0 dB linear) or the automatic threshold
+        if (get (id + "DynamicState", 0.25) >= 0.5 && facet::hasGain (shape))
+        {
+            const double range = -36.0 + 72.0 * get (id + "DynamicTarget", 0.5) - g;
+            p[(std::size_t) (facet::rangeParam0 + band)] = facet::rangeValue (std::clamp (range, -30.0, 30.0));
+            if (get (id + "DynamicAutoThresh", 0.75) >= 0.5)
+                p[(std::size_t) (facet::autoThresholdParam0 + band)] = 1.0f;
+            else
+                p[(std::size_t) (facet::thresholdParam0 + band)] = facet::thresholdValue (std::clamp (-90.0 + 90.0 * get (id + "DynamicThreshold", 0.777778), -80.0, 0.0));
+        }
+        ++band;
+        ++n;
+    }
+    for (int b = band; b < facet::bands; ++b)
+        p[(std::size_t) facet::param (b, 0)] = facet::shapeValue (facet::Shape::off);
+    const double out = aireq::knots9 (ie::outText, get ("Gain", 0.5));
+    p[(std::size_t) facet::outputParam] = (float) std::clamp ((out + 24.0) / 48.0, 0.0, 1.0);
+    if (get ("PhaseReverse", 0.25) >= 0.5)
+        p[(std::size_t) facet::invertParam] = 1.0f;
+    if (get ("Bypass", 0.25) >= 0.5)
+        for (int b = 0; b < facet::bands; ++b)
+            p[(std::size_t) facet::param (b, 0)] = facet::shapeValue (facet::Shape::off);
+    return std::max (n, 1);
+}
+
 RawTranslator rawTranslatorNamed (std::string_view name)
 {
+    if (name == "slate-infinity-eq")
+        return translateInfEq;
+    if (name == "eiosis-aireq")
+        return translateAirEq;
     if (name == "fitted-map")
         return translateFittedMap;
     if (name == "soundtoys-echoboy")
