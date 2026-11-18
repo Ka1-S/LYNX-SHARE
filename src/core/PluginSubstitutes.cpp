@@ -282,6 +282,8 @@ vendor = Soundtoys
 lynx = Echoform
 preset = Mode=0.125; Sync L=0.6248; Note L=0.4498; Feedback=0.125; Mix=0.25
 names = PrimalTap
+# round 190kv: its factory presets (recognised by the payload's fingerprint) play their own settings on Echoform
+translate = soundtoys-factory
 
 [soundtoys-little-primaltap]
 product = Little PrimalTap
@@ -292,6 +294,8 @@ vendor = Soundtoys
 lynx = Echoform
 preset = Mix=0.666667; Output=0.367466; Time L=0.113125; Mode=0.541667; Mod depth=0; Age=0.221; High cut=0.45; Feedback=0
 names = Little PrimalTap; LittlePrimalTap
+# round 190kv: its factory presets (recognised by the payload's fingerprint) play their own settings
+translate = soundtoys-factory
 
 # Valhalla delay / modulation plugins -> LYNX's delay / modulation suite (round 101). Their saved state is a JUCE
 # XML block holding every parameter as its normalised value [DATA, EXEC]; the LYNX effects use the same value laws,
@@ -3053,6 +3057,107 @@ std::uint64_t presetHash (const std::vector<std::uint8_t>& state)
     return h;
 }
 
+// ---- Soundtoys (round 190kv): the factory presets, recognised by a fingerprint of the encoded payload ---------------
+// docs/analise/REA_rodada190kv.md. Every factory preset of the installed plug-ins was loaded into the official plug-in
+// in its own hidden host process (public VST3 API: the preset's archive as the component state, every parameter read
+// back as normalised values, the state re-saved) and its values mapped onto LYNX's own engine (round 190is's value maps).
+// The payload is still not decoded. Two saves of one setting differ only in a few volatile fields (the last 24
+// characters and characters 300 … 369: they change with every save and with what the instance loaded before), so the
+// fingerprint is FNV-1a 64 over the payload's length and every other character. Hashes and LYNX values only.
+std::uint64_t soundtoysFingerprint (const std::vector<std::uint8_t>& state)
+{
+    const auto at = findBytes (state, "PRESET =");
+    if (at == std::string::npos)
+        return 0;
+    const std::size_t begin = at + 8;
+    std::size_t end = begin;
+    while (end < state.size() && state[end] != '\r')
+        ++end;
+    if (end > begin && state[end - 1] == ';')
+        --end;
+    constexpr std::size_t volatileFrom = 300, volatileTo = 370, volatileTail = 24;
+    const std::size_t n = end - begin;
+    if (n <= volatileTail)
+        return 0;
+    std::uint64_t h = 0xcbf29ce484222325ull;
+    for (int k = 0; k < 8; ++k)
+        h = (h ^ ((n >> (8 * k)) & 0xffu)) * 0x100000001b3ull;
+    for (std::size_t i = 0; i < n - volatileTail; ++i)
+        if (i < volatileFrom || i >= volatileTo)
+            h = (h ^ state[begin + i]) * 0x100000001b3ull;
+    return h;
+}
+
+namespace st190kv
+{
+struct FactoryParam
+{
+    std::uint16_t index;
+    float value;
+};
+struct FactoryState
+{
+    std::uint64_t fingerprint;
+    std::uint16_t first, count; // a run of the plug-in's parameter list
+};
+struct FactoryTable
+{
+    const char* widget; // "WIDGET = <name>;" in the state
+    EffectKind kind;
+    const FactoryState* states;
+    std::size_t size;
+    const FactoryParam* params;
+};
+#include "core/SoundtoysFactory190kv.inc"
+} // namespace st190kv
+
+// a factory preset of the state's plug-in: the LYNX effect's new-instance values (makeEffectSlot: the current revisions)
+// with the preset's mapped values on top; 0 = not a factory preset (the substitute's preset stays, bit for bit as before)
+int applyFactoryPreset (std::string_view widget, std::uint64_t fp, EffectSlot& slot)
+{
+    using namespace st190kv;
+    if (fp == 0)
+        return 0;
+    for (const auto& t : factoryTables)
+    {
+        if (widget != t.widget || slot.kind != t.kind)
+            continue;
+        const auto* end = t.states + t.size;
+        const auto* hit = std::lower_bound (t.states, end, fp, [] (const FactoryState& x, std::uint64_t v) { return x.fingerprint < v; });
+        if (hit == end || hit->fingerprint != fp)
+            return 0;
+        const auto fresh = makeEffectSlot (slot.kind);
+        for (std::size_t i = 0; i < slot.params.size() && i < fresh.params.size(); ++i)
+            slot.params[i] = fresh.params[i];
+        for (int i = 0; i < hit->count; ++i)
+        {
+            const auto& p = t.params[hit->first + i];
+            if (p.index < slot.params.size())
+                slot.params[p.index] = p.value;
+        }
+        slot.mix = 1.0f;
+        return hit->count;
+    }
+    return 0;
+}
+
+std::string soundtoysWidget (const std::vector<std::uint8_t>& state)
+{
+    const auto w = findBytes (state, "WIDGET =");
+    if (w == std::string::npos)
+        return {};
+    std::size_t a = w + 8, b = a;
+    while (b < state.size() && b - a < 64 && state[b] != ';' && state[b] != '\r')
+        ++b;
+    return trim (std::string (state.begin() + (std::ptrdiff_t) a, state.begin() + (std::ptrdiff_t) b));
+}
+
+int translateSoundtoysFactory (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    const auto widget = soundtoysWidget (state);
+    return widget.empty() ? 0 : applyFactoryPreset (widget, soundtoysFingerprint (state), slot);
+}
+
 int translateSoundtoysDecapitator (const std::vector<std::uint8_t>& state, EffectSlot& slot)
 {
     namespace e = mixsuite::ember;
@@ -3071,7 +3176,7 @@ int translateSoundtoysDecapitator (const std::vector<std::uint8_t>& state, Effec
         slot.mix = 1.0f;
         return 10;
     }
-    return 0;
+    return translateSoundtoysFactory (state, slot);
 }
 
 int translateSoundtoysPanMan (const std::vector<std::uint8_t>& state, EffectSlot& slot)
@@ -3091,6 +3196,35 @@ int translateSoundtoysPanMan (const std::vector<std::uint8_t>& state, EffectSlot
     return 0;
 }
 
+// Little AlterBoy's normalised pitch, formant, drive, mix, shift mode and formant link on LYNX Tune (round 136)
+int applyAlterBoy (const float* v, EffectSlot& slot)
+{
+    namespace t = lynxtune;
+    const double pitch = -12.0 + 24.0 * v[0], formant = -12.0 + 24.0 * v[1];
+    const int mode = std::clamp ((int) std::lround (v[4] * 2.0), 0, 2); // transpose, quantize, robot
+    auto& p = slot.params;
+    p[(std::size_t) t::scale] = 0.0f; // chromatic
+    p[(std::size_t) t::retune] = 0.0f;
+    p[(std::size_t) t::humanize] = 0.0f;
+    p[(std::size_t) t::flexTune] = 0.0f;
+    for (int k = 0; k < 12; ++k)
+    {
+        p[(std::size_t) (t::noteC + k)] = 1.0f;
+        p[(std::size_t) (t::bypassC + k)] = mode == 0 ? 1.0f : 0.0f; // Transpose: no correction
+    }
+    p[(std::size_t) t::transpose] = (float) ((std::clamp (std::lround (pitch), -12L, 12L) + 12) / 24.0);
+    const bool wide = std::abs (formant) > 7.0;
+    p[(std::size_t) t::wideFormant] = wide ? 1.0f : 0.0f;
+    p[(std::size_t) t::formantShift] = (float) std::clamp (formant / (wide ? 24.0 : 14.0) + 0.5, 0.0, 1.0);
+    p[(std::size_t) t::formantPreserve] = v[5] >= 0.5f ? 0.0f : 1.0f; // formant link: the formants follow the pitch
+    p[(std::size_t) t::driveStage] = 1.0f;
+    p[(std::size_t) t::drive] = v[2];
+    p[(std::size_t) t::mix] = v[3];
+    p[(std::size_t) t::outputTrim] = 0.5f;
+    slot.mix = 1.0f;
+    return 8;
+}
+
 int translateSoundtoysAlterBoy (const std::vector<std::uint8_t>& state, EffectSlot& slot)
 {
     namespace t = lynxtune;
@@ -3098,33 +3232,14 @@ int translateSoundtoysAlterBoy (const std::vector<std::uint8_t>& state, EffectSl
         return 0;
     const auto h = presetHash (state);
     for (const auto& st : alterBoyStates)
-    {
-        if (st.hash != h)
-            continue;
-        const double pitch = -12.0 + 24.0 * st.v[0], formant = -12.0 + 24.0 * st.v[1];
-        const int mode = std::clamp ((int) std::lround (st.v[4] * 2.0), 0, 2); // transpose, quantize, robot
-        auto& p = slot.params;
-        p[(std::size_t) t::scale] = 0.0f; // chromatic
-        p[(std::size_t) t::retune] = 0.0f;
-        p[(std::size_t) t::humanize] = 0.0f;
-        p[(std::size_t) t::flexTune] = 0.0f;
-        for (int k = 0; k < 12; ++k)
-        {
-            p[(std::size_t) (t::noteC + k)] = 1.0f;
-            p[(std::size_t) (t::bypassC + k)] = mode == 0 ? 1.0f : 0.0f; // Transpose: no correction
-        }
-        p[(std::size_t) t::transpose] = (float) ((std::clamp (std::lround (pitch), -12L, 12L) + 12) / 24.0);
-        const bool wide = std::abs (formant) > 7.0;
-        p[(std::size_t) t::wideFormant] = wide ? 1.0f : 0.0f;
-        p[(std::size_t) t::formantShift] = (float) std::clamp (formant / (wide ? 24.0 : 14.0) + 0.5, 0.0, 1.0);
-        p[(std::size_t) t::formantPreserve] = st.v[5] >= 0.5f ? 0.0f : 1.0f; // formant link: the formants follow the pitch
-        p[(std::size_t) t::driveStage] = 1.0f;
-        p[(std::size_t) t::drive] = st.v[2];
-        p[(std::size_t) t::mix] = st.v[3];
-        p[(std::size_t) t::outputTrim] = 0.5f;
-        slot.mix = 1.0f;
-        return 8;
-    }
+        if (st.hash == h)
+            return applyAlterBoy (st.v, slot);
+    // round 190kv: a factory preset (its fingerprint), the same mapping
+    if (soundtoysWidget (state) == "Little AlterBoy")
+        if (const auto fp = soundtoysFingerprint (state); fp != 0)
+            for (const auto& st : st190kv::alterBoyFactory)
+                if (st.fingerprint == fp)
+                    return applyAlterBoy (st.v, slot);
     return 0;
 }
 
@@ -3148,7 +3263,7 @@ int translateSoundtoysEchoBoy (const std::vector<std::uint8_t>& state, EffectSlo
         slot.mix = 1.0f;
         return 6;
     }
-    return 0;
+    return translateSoundtoysFactory (state, slot); // EchoBoy's and EchoBoy Jr's factory presets
 }
 
 // round 190ar: fitted setting maps as state translators. A map (reference parameter -> LYNX parameter, a transfer fitted
@@ -3421,6 +3536,34 @@ int translateFittedMap (const std::vector<std::uint8_t>& state, EffectSlot& slot
     return 0;
 }
 
+// round 190kv (tests, tools): the factory-preset tables
+std::uint64_t factoryFingerprintOf (const std::vector<std::uint8_t>& state) { return soundtoysFingerprint (state); }
+std::vector<std::uint64_t> factoryFingerprintsOf (std::string_view widget)
+{
+    std::vector<std::uint64_t> out;
+    for (const auto& t : st190kv::factoryTables)
+        if (widget == t.widget)
+            for (std::size_t i = 0; i < t.size; ++i)
+                out.push_back (t.states[i].fingerprint);
+    if (widget == "Little AlterBoy")
+        for (const auto& st : st190kv::alterBoyFactory)
+            out.push_back (st.fingerprint);
+    return out;
+}
+int applyFactoryPresetOf (std::string_view widget, std::uint64_t fp, EffectSlot& slot)
+{
+    if (widget == "Little AlterBoy")
+    {
+        if (slot.kind != EffectKind::lynxTune || slot.params.size() < (std::size_t) lynxtune::count)
+            return 0;
+        for (const auto& st : st190kv::alterBoyFactory)
+            if (st.fingerprint == fp)
+                return applyAlterBoy (st.v, slot);
+        return 0;
+    }
+    return applyFactoryPreset (widget, fp, slot);
+}
+
 RawTranslator rawTranslatorNamed (std::string_view name)
 {
     if (name == "fitted-map")
@@ -3432,7 +3575,10 @@ RawTranslator rawTranslatorNamed (std::string_view name)
     if (name == "soundtoys-decapitator")
         return translateSoundtoysDecapitator;
     if (name == "soundtoys-panman")
-        return translateSoundtoysPanMan;    if (name == "waves-s1-imager")
+        return translateSoundtoysPanMan;
+    if (name == "soundtoys-factory")
+        return translateSoundtoysFactory;
+    if (name == "waves-s1-imager")
         return translateWavesS1Imager;
     if (name == "waves-h-delay")
         return translateWavesHDelay;
@@ -3494,6 +3640,10 @@ std::string attributeIn (const std::string& text, std::size_t from, const std::s
     return close == std::string::npos ? std::string() : text.substr (start, close - start);
 }
 } // namespace
+
+std::uint64_t soundtoysFactoryFingerprint (const std::vector<std::uint8_t>& state) { return factoryFingerprintOf (state); }
+std::vector<std::uint64_t> soundtoysFactoryFingerprints (std::string_view widget) { return factoryFingerprintsOf (widget); }
+int applySoundtoysFactoryPreset (std::string_view widget, std::uint64_t fingerprint, EffectSlot& slot) { return applyFactoryPresetOf (widget, fingerprint, slot); }
 
 std::optional<std::pair<int, int>> autoTuneProKey (const std::vector<std::uint8_t>& state)
 {

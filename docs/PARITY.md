@@ -4448,3 +4448,46 @@ adds a few `pow` / `log10` per block in `configure`, not per sample. No latency 
 - Score-led stands: Grit Plate −3.25 dB and Gated −2 dB sit under the impulse's energy match (their test-signal / impulse
   files score higher there). Smooth Room's +2.5 dB (test signal only) and Drift Chamber's +1.5 dB (impulse only) were not
   taken.
+
+## Round 190kv: the Soundtoys factory presets recognised (fingerprint of the encoded payload → their own settings)
+
+Follows round 190ku (the state container). Lab and evidence: `/mnt/e/lynx-work/stoys190kv/` (HANDOFF.md);
+docs/analise/REA_rodada190kv.md. Public VST3 API only (our hidden host, one process per preset); no Frida, nothing patched.
+
+**What was wrong in 190ku.** Its wrapper looked only for `ARCHIVE =` (most factory files say `PRESET =`) and left the fxb
+chunk size stale, so the plug-in's parser raised a visible "Syntax Error Expected '{'" box: that was the "hang". Fixed
+(`scripts/wrap2.py`), every factory preset loads; none needed the GUI.
+
+**Captured:** all 631 factory presets of the eight Soundtoys plug-ins that run here, each in its own hidden host
+(values + re-saved state), plus a 60-per-host pass of all 2 026 presets of the 23 installed plug-ins (lab record
+`lab/factory_record.tsv`, numbers and hashes only). Two saves of one setting differ only in a few volatile fields (the
+last 24 characters, characters 300 … 369), so LYNX matches a **fingerprint** without them: stable on 160 / 160 presets
+saved twice, shared only by duplicate presets, and it recognised 112 / 112 independent re-saves.
+
+**Built:** `translateSoundtoysFactory` (core/SoundtoysFactory190kv.inc, 639 fingerprints of 314 presets) after the
+round-136 tables: a hit plays the preset's own values (round 190is's value maps; Decapitator → Ember Classic; Little
+AlterBoy → LYNX Tune) on the effect's new-instance values; a miss leaves the substitute's preset bit for bit. A preset
+ships only if, rendered against the official plug-in (all 371 candidate presets on `stim`, 101 of them also on `mix`), its mapped values score at least the fallback on every file. The rows below are the final binary.
+
+| bank (as LYNX loads it) | files | before | after | per file |
+|---|---|---|---|---|
+| refcap030 PrimalTap (190is's bank) | 165 | 3.39 | 3.39 | 165 identical |
+| refcap030 Little PrimalTap | 108 | 3.53 | 3.53 | 108 identical |
+| refcap030 EchoBoy Jr | 186 | 3.82 | 3.82 | 186 identical |
+| factory EchoBoy (named styles), stim | 152 | 3.19 | **3.93** | 90 up / 62 same / 0 down |
+| factory EchoBoy Jr, stim | 71 | 3.56 | **4.06** | 22 up / 49 same / 0 down |
+| factory PrimalTap, stim | 60 | 2.78 | **3.27** | 25 up / 35 same / 0 down |
+| factory Little PrimalTap, stim | 29 | 2.97 | **3.14** | 3 up / 26 same / 0 down |
+| factory Decapitator, stim | 47 | 2.77 | **4.26** | 33 up / 14 same / 0 down |
+| factory Little AlterBoy, stim | 12 | 2.42 | **3.33** | 9 up / 3 same / 0 down |
+| factory sample, stim + mix (6 plug-ins, 20 presets each; EchoBoy incl. Edited Style at the fallback) | 224 | 3.01 | **3.84** | 103 up / 121 same / 0 down |
+
+The refcap030 bank cannot move: its states are parameter sweeps saved through the API, not factory presets (of its 373
+Soundtoys states only Little PrimalTap's and Little AlterBoy's default-instance states are in the table, and their mapped
+values equal the fallback). The value-map ceilings of round 190is (EchoBoy 4.47, PrimalTap 3.76, Little PrimalTap 3.66,
+EchoBoy Jr 4.26) need arbitrary states decoded — not done. EchoBoy's refcap030 row is scored through tp172d's value map, not
+the translator, and is unchanged (4.13). Her own corpus (round 136, 187 states): 0 untouched factory presets, so her
+projects are unchanged. Not shipped: EchoBoy's Edited-Style presets (192: the style is not in the parameter list), PanMan
+(patterns not in the parameter list), Little Plate (no value map yet), presets that scored lower (9 EchoBoy, 10 EchoBoy Jr,
+13 PrimalTap, 15 Little PrimalTap, 9 Decapitator, 1 Little AlterBoy: the value maps miss their feedback-path / multiply / cut laws).
+CPU: no DSP change (the translator runs once per load: a binary search over ≤ 308 fingerprints). Latency unchanged.
