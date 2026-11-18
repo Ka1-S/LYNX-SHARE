@@ -12,7 +12,7 @@
 #include "core/Effects.h"
 #include "core/MixSuite.h"
 
-namespace parity190kw
+namespace parity190kwSat
 {
 namespace em = lynx::mixsuite::ember;
 // a 220 Hz tone with a 3.1 kHz partial, rising from -40 to 0 dBFS over the render, and a decaying noise burst each 0.4 s
@@ -41,7 +41,7 @@ inline void render (const lynx::EffectSlot& s, double sr, std::vector<float>& l,
     for (int off = 0; off < n; off += 256)
         fx->process (l.data() + off, r.data() + off, std::min (256, n - off), s.params, 120.0);
 }
-} // namespace parity190kw
+} // namespace parity190kwSat
 
 TEST (parity190kw_ember_saturn_law_is_hidden_new_and_translated_run_it_old_projects_do_not)
 {
@@ -127,7 +127,7 @@ TEST (parity190kw_ember_saturn_curves_drive_and_level_laws)
         const int n = (int) (0.5 * sr);
         std::vector<float> l ((std::size_t) n), r ((std::size_t) n);
         for (int i = 0; i < n; ++i) l[(std::size_t) i] = r[(std::size_t) i] = (float) (a * std::sin (2.0 * M_PI * 1000.0 * i / sr));
-        parity190kw::render (s, sr, l, r);
+        parity190kwSat::render (s, sr, l, r);
         float lo = 1e9f, hi = -1e9f;
         for (int i = n / 2; i < n; ++i) { lo = std::min (lo, l[(std::size_t) i]); hi = std::max (hi, l[(std::size_t) i]); }
         CHECK (std::abs (20.0 * std::log10 ((hi - lo) / (2.0 * a))) < 0.3);
@@ -146,7 +146,7 @@ TEST (parity190kw_ember_revision0_renders_as_the_base_commit_did)
         std::uint64_t hash;
         double energy;
     };
-    // 1.6 s of parity190kw::signal in blocks of 256: FNV-1a of the float bits and the energy, revision 0 (a project saved
+    // 1.6 s of parity190kwSat::signal in blocks of 256: FNV-1a of the float bits and the energy, revision 0 (a project saved
     // before the round). Taken with the round's objects; fxrender renders of the same settings through the base commit's
     // and the round's binaries are byte-identical (/mnt/e/lynx-work/rea190kw/sat/ident.sh: 0 of 48 files differ)
     const Case cases[] = {
@@ -167,8 +167,8 @@ TEST (parity190kw_ember_revision0_renders_as_the_base_commit_did)
         }
         const int n = (int) (1.6 * c.sr);
         std::vector<float> l ((std::size_t) n), r ((std::size_t) n);
-        parity190kw::signal (l, r, c.sr);
-        parity190kw::render (s, c.sr, l, r);
+        parity190kwSat::signal (l, r, c.sr);
+        parity190kwSat::render (s, c.sr, l, r);
         std::uint64_t h = 1469598103934665603ull;
         double e = 0.0;
         for (int i = 0; i < n; ++i)
@@ -186,7 +186,7 @@ TEST (parity190kw_ember_revision0_renders_as_the_base_commit_did)
     }
 }
 
-namespace parity190kw
+namespace parity190kwSat
 {
 // the gain (dB) of a law band at small signal: a sine of `hz` at −40 dBFS through Ember (rms of the last half vs the input's)
 inline double sineGainDb (const lynx::EffectSlot& s, double hz, double dbfs = -40.0, double sr = 48000.0)
@@ -200,7 +200,7 @@ inline double sineGainDb (const lynx::EffectSlot& s, double hz, double dbfs = -4
     for (int i = n / 2; i < n; ++i) e += (double) l[(std::size_t) i] * l[(std::size_t) i];
     return 10.0 * std::log10 (e / (n - n / 2)) - 20.0 * std::log10 (a / std::sqrt (2.0));
 }
-} // namespace parity190kw
+} // namespace parity190kwSat
 
 TEST (parity190lg_ember_saturn_channel_clipper_butterworth_cuts_and_dc)
 {
@@ -223,13 +223,13 @@ TEST (parity190lg_ember_saturn_channel_clipper_butterworth_cuts_and_dc)
     };
     // Clean Tape at drive 0: the reference's small-signal gain is 1.1268 (+1.04 dB) at −39 dBFS (the compensation's
     // 1.0016 × the clipper's 9/8); Subtle Tape: its trim alone (+0.1 dB)
-    CHECK (std::abs (parity190kw::sineGainDb (slot (5, 0.0f), 1000.0) - 1.04) < 0.06);
-    CHECK (std::abs (parity190kw::sineGainDb (slot (4, 0.0f), 1000.0) - 0.10) < 0.06);
+    CHECK (std::abs (parity190kwSat::sineGainDb (slot (5, 0.0f), 1000.0) - 1.04) < 0.06);
+    CHECK (std::abs (parity190kwSat::sineGainDb (slot (4, 0.0f), 1000.0) - 0.10) < 0.06);
     // the cut filters' Q 1 is Butterworth: Warm Tube at 25 %, 16 kHz vs 1 kHz small-signal gain (the reference's third
     // octaves: +2.35 vs +1.79 dB; with the old resonant Q 1 the law gave +5.1 vs +0.6)
     const auto wt = slot (2, 0.25f);
-    CHECK (std::abs (parity190kw::sineGainDb (wt, 16000.0) - parity190kw::sineGainDb (wt, 1000.0) - 0.56) < 0.5);
+    CHECK (std::abs (parity190kwSat::sineGainDb (wt, 16000.0) - parity190kwSat::sineGainDb (wt, 1000.0) - 0.56) < 0.5);
     // the law's DC blocker at 1.5 Hz: Subtle Tape (no EQ of its own) loses < 0.05 dB at 31 Hz against 1 kHz
     const auto stp = slot (4, 0.5f);
-    CHECK (std::abs (parity190kw::sineGainDb (stp, 31.0) - parity190kw::sineGainDb (stp, 1000.0)) < 0.05);
+    CHECK (std::abs (parity190kwSat::sineGainDb (stp, 31.0) - parity190kwSat::sineGainDb (stp, 1000.0)) < 0.05);
 }
