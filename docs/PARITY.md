@@ -4468,7 +4468,7 @@ median xcorr 0.057 → 0.206, median ESR +2.55 → +1.56 dB).
 9 are one-step drops with a clearly better waveform match (xcorr +0.15 … +0.48, ESR 1.3 … 3.4 dB lower: Space ½ / ¾ at
 short rates, Distance 0.2 mixes, …); 7 are music / stim files at Space ≤ ¼ one step down with xcorr up but ESR only
 0.3 … 0.6 dB lower (their wet ~1.5 … 2 dB over the reference); 3 are two-step drops on the long 1 kHz tone (the modal
-draw; the reference's own 44.1 / 48 kHz captures of the same state differ by 2.8 dB there); 3 are the default state D at
+draw: on the same state the error is +4.7 dB on the 44.1 kHz capture and +1.8 dB on the 48 kHz one, which went up); 3 are the default state D at
 its 6-point limits (44.1 kHz impulse spectrum 0.98, limit 0.6; 48 kHz 0.80; 44.1 kHz stim rms +1.13); the rest are single
 cases (a far-Distance impulse, a mis-locked mix at lag −2316, a Space ½ Width 0.8 mix at −2.6 dB).
 
