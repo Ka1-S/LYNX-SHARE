@@ -54,6 +54,7 @@ TEST (parity128a_apex_new_controls)
     CHECK (p[pAttack] == 0.0f && p[pLinkRelease] == 0.0f && p[pDither] == 0.0f && p[pUnity] == 0.0f && p[pAudition] == 0.0f && p[pDcFilter] == 0.0f);
     p[pGain] = 12.0f / 30.0f;
     p[pRelease] = releaseValue (300.0);
+    p[pRevision] = 0.0f; // round 190lp: these are revision 0's laws (Parity190lpLgTests covers revision 1)
     const int n = (int) sr * 2;
     std::vector<float> l0, r0;
     signal (l0, r0, n, sr);

@@ -4357,3 +4357,63 @@ against the base binary: every mode state, every third pairs state, every grid s
 44.1 / 48 / 96 kHz): 99 / 99 byte-identical. CPU (one bass band, Pro-MB's default-like state, thread time, one pinned core,
 20 s at 48 kHz, best of 5, three runs): 0.85 … 0.92 % → 1.01 … 1.02 % of a core (the 20 ms look-ahead and the two
 followers). Not traced: the band's 0 … 2 output amount property (+0x108, default 1: kept at 1).
+
+## Round 190lp (Pro-L 2 → Apex Limiter, Pro-G → Sentry Gate): the styles refitted black-box (hidden revision 1)
+
+Pro-L 2's styles and Pro-G's algorithms are presets of a generic engine (round 190lg §8); by the owner's decision this
+round read nothing from either binary (no static analysis, no preset): every law was measured on the reference renders
+already in the banks and LYNX's own smooth laws were fitted to them (REA notes: docs/analise/REA_rodada190lp.md, part lg).
+Both effects run the refit as **revision 1** (hidden `apex::pRevision` = 24, `dyn::sentry::revision` = 32: no control,
+no text, saved only while non-zero): a new instance and a translated Pro-L 2 / Pro-G state get 1; a project or preset
+saved before (saved count ≤ 24 / 32), the Live maps (Limiter, Gate, Expander), the plug-in substitutes and LYNX's own
+chains (mastering looks, reference match, the demo songs, Clean Voice) keep 0, bit for bit. Latency unchanged.
+
+Apex, revision 1 (gain trajectories of the stairs per half cycle and per sample, the tc bursts and the music in 10 …
+100 ms frames):
+- **Output level is a gain after a limiter that holds 0 dB** (the reference's S3: output level −1 dB plays its quiet
+  carrier at gain − 1 dB, not at gain): with a ceiling under 0 dB the chain limits at 0 dB, then the level, then the
+  dither. Unity gain still monitors at the input's level.
+- **A hold of about one half period** for Loud (Aggressive, 0.875 × the mean time between the detected mid's zero
+  crossings), Bus (0.75), Safe (1.0) and Dense (Modern, 0.5): a steady tone keeps one gain through its cycle (the
+  reference adds no harmonics there: stairs H3 −32 → −150 dB at 1 kHz) while a drum's quick crossings are still taken
+  peak by peak (a fixed 5 ms window took drums 1.5 … 3 dB too deep). Loud's, Bus's and Safe's slow stages refitted.
+- **Programme-dependent release**: Clean (Transparent) 0.15 and Glue (Allround) 0.05 per dB of held reduction
+  faster (the reference recovers faster out of deep limiting: pairs mix at 24 dB of gain −0.89 → −0.25 dB mean error).
+  Punch (Punchy) and Dynamic keep revision 0's table (no fit beat Punchy; every Dynamic fit took a programme or sr96 file down).
+
+Sentry, revision 1 (tc bursts in 1 … 5 ms frames): the gain closes **in dB** — a wait (Classic 0.08 × release, Clean
+0.05 ×, Guitar 20 ms + 2.3 × release), then a fall limited to a slope (Classic 20 dB, Clean 10 dB, Guitar 50 dB per
+release time of 16 + 0.3 × release / 60 + 0.5 × release / 3.75 + 0.4 × release ms) through a second pole, landing on the
+range; Classic and Clean open in the linear domain, Guitar along two poles in dB. Vocal (its fit took refcap182's S3
+drums a step down with every variant) and Upward (its lift already matches: tones 10 / 10) keep revision 0's gate.
+
+| bank (time-window scorer; before = fxr_m4, the end of round 190lg) | files | before → after | up / same / down |
+|---|---|---|---|
+| refcap030 Pro-L 2 grid / mode / pairs | 136 / 33 / 54 | 7.65 / 7.88 / 6.69 → **7.79 / 8.00 / 7.02** | 28 / 195 / 0 |
+| prog | 16 | 7.69 → **7.75** | 1 / 15 / 0 |
+| sr44 / sr48 / sr96 | 24 each | 7.62 / 7.50 / 7.54 → **8.00** each | 13 / 59 / 0 |
+| styles | 48 | 6.73 → **7.06** | 10 / 38 / 0 |
+| **refcap030 Pro-L 2, all blocks** | 359 | 7.39 → **7.64** | 52 / 307 / 0 |
+| refcap182 programme (Pro-L 2) | 30 | 7.60 → **7.90** | 4 / 26 / 0 |
+| tp172b (Pro-L 2) | 24 | 7.08 → **7.25** | 2 / 22 / 0 |
+| refcap030 Pro-G grid / mode / pairs | 15 / 30 / 72 | 8.20 / 9.03 / 8.40 → **8.40 / 9.10 / 8.49** | 11 / 106 / 0 |
+| sr44 / sr48 / sr96 | 24 each | 7.58 / 7.54 / 7.58 → **7.83 / 7.79 / 7.79** | 14 / 58 / 0 |
+| styles | 15 | 8.67 → **8.73** | 1 / 14 / 0 |
+| **refcap030 Pro-G, all blocks** | 204 | 8.21 → **8.35** | 26 / 178 / 0 |
+| refcap182 programme (Pro-G) | 30 | 7.43 → **7.57** | 4 / 26 / 0 |
+| tp172b (Pro-G) | 24 | 7.17 → **7.33** | 3 / 21 / 0 |
+
+By style (refcap030): Aggressive 6.22 → 7.43 (S3 5 → 7 … 8 at every rate: the output level), Transparent 7.24 → 7.45
+(pairs at 15 / 24 dB of gain), Safe 7.62 → 7.89, Modern 7.92 → 8.05, Bus 7.48 → 7.56, Allround 7.52 → 7.56, Punchy and
+Dynamic unchanged; Pro-G Guitar 6.22 → 6.78, Clean 8.44 → 8.78, Classic 8.58 → 8.68, Vocal and Upward unchanged. No file
+down in any bank. Old projects: `gold/gold.sh` (fxrender with the revision forced to 0 against round 190lg's final
+binary: every Pro-L 2 / Pro-G styles-block state, refcap182's six states of each, the defaults with every style value;
+tc / stairs / mix; 44.1 / 48 / 96 kHz): 300 / 300 byte-identical. Tests: `tests/Parity190lpLgTests.inc` (the hidden
+parameters and their load / translator / substitute rules, the output level, the half-period hold (100 Hz H3 −119 dB vs
+−61 dB at revision 0), Transparent's faster recovery, Sentry's wait and fall, Vocal / Upward bit for bit); the round
+108 / 128 / 190ar / 190dm tests that pin those rounds' laws now set revision 0. Mini runner 652 702 checks, 0 failures. CPU (thread time,
+one pinned core, 20 s at 48 kHz, best of 5, three runs, `cpu/bench.cpp`): Apex 1.8 … 2.1 % → 1.8 … 2.2 % of a core (within
+the noise; the zero-crossing hold is a few compares per sample), Sentry Classic 0.89 → 1.33 %, Clean 0.9 → 1.25 … 1.43 %
+(the linear-domain opening converts dB ↔ gain while it moves), Guitar 0.9 → 1.0 %, Vocal / Upward unchanged. Not built: the smooth styles' ~50 ms
+look-ahead (it needs their latency), Aggressive's extra ~1.2 dB on a tone held 15 … 18 dB over, Pro-G Vocal (S3 drums)
+and Upward (a mean-square detector fixed the mix, broke the tones).
