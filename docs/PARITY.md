@@ -4199,3 +4199,32 @@ low-pass plus a first-order shelf on four inner paths. Atrium's level over Decay
 ~1 dB; the files at 1 … 3 are the test signal's 1 kHz staircase, a linear effect of the tank's fine structure (the reference
 flat within ±1 dB over ±4 Hz, ours ±4 … 12 dB). More modulation moved it 1 … 1.5 dB only — a denser late tank is its own
 project. Room scores unchanged (mode 3.31, pairs 4.22, sr48 3.44, sr96 3.38).
+
+## Round 190ln (Slate / Eiosis): AirEQ and Infinity EQ translated onto Facet EQ in physical units
+
+Static REA of the third-party binaries by the owner's leave (2026-11-17), clean-room (docs/analise/REA_rodada190ln.md §1 … §5;
+lab /mnt/e/lynx-work/rea3_190ln). Until now a project that used **Eiosis AirEQ**, Slate's **VM AirEQ Air / Earth** or
+**Infinity EQ** opened Facet EQ flat (round 190ar left the EQ modules without a translator: their per-setting maps did not
+interpolate). Their states are XML archives of normalised values; they are now read in physical units:
+- **AirEQ** (`translate = eiosis-aireq`): low / high cuts (shallow / steep, slope, Q), the Earth and Air shelves, five
+  bells / shelves, strength (per-band exclusion), mid / side or left / right placement, input / output trims. Value laws
+  through the plug-in's own value texts (its tapers are 11-knot tables interpolated linearly in the unit — structure seen
+  statically, the knots not read). Shapes fitted with Facet's own prototypes on the references' renders: a bell's peak and
+  width follow the dial (peak 5.6 / 9.5 / 11.6 / 18.1 dB for a dial of 3 / 6 / 9 / 18 dB at Q 1, × q^0.35; Facet Q falls from
+  1.0 to 0.50 as the gain grows, × q^0.876), shelves are the cookbook shelf of slope Q, Earth / Air are Facet shelves fitted
+  per dial value, cuts are Butterworth at Q 0.71.
+- **Infinity EQ** (`translate = slate-infinity-eq`): the first eight enabled of its 24 bands — cuts, shelves, bells (Width =
+  the cookbook bandwidth in semitones), notch, tilt, dynamics (target, threshold or automatic), placement, output.
+
+| reference → LYNX | files (sweeps / programme / probes) | before → after | up / same / down |
+|---|---|---|---|
+| Eiosis AirEQ → Facet EQ | 154 / 25 / 10 | 5.78 → **8.85** (sweeps 6.18 → 8.93, programme 4.20 → 8.52, probes 3.70 → 8.40) | 99 / 90 / 0 |
+| VM AirEQ Air → Facet EQ | 31 / 25 / 10 | 4.38 → **8.05** | 51 / 15 / 0 |
+| VM AirEQ Earth → Facet EQ | 31 / 25 / 10 | 4.44 → **7.39** | 50 / 16 / 0 |
+| Infinity EQ → Facet EQ | — / 30 / 12 | 4.71 → **8.00** | 34 / 8 / 0 |
+
+Score: scripts/fxparity.py with round 190lg's time-based alignment window, before and after. No LYNX effect changed (gold:
+24 renders of Facet, the role-entry EQs and Pro-Q 4 translations at 44.1 / 48 / 96 kHz identical to the base binary); the
+translated Facet costs its bands (+0.1 … 0.3 % of one core over flat). Open: AirEQ's per-band Character and "steep" bell
+switch, the shallow 6 dB low cut's resonance (no capture with them on; the licence ended 11-13), Infinity EQ's Q2, the other
+VM EQ modules (FG-73 / FG-N / FG-S / SD-PE1 / CS-EQ / CS-Lift: same route, thin banks).
