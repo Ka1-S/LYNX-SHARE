@@ -280,3 +280,66 @@ LYNX's code is written from the laws below; the one knob table (0x180129710) is 
   error 0.33 dB → 0.16 dB). The uncertain link is the knob percent: LYNX holds attack / release in ms and maps them back
   (50 % = 9.22 / 268 ms, the translator's law).
 - LYNX's release curve: K (x) = (e^(3.32 x) − 1) / (e^3.32 − 1) (own smooth fit, not the table's points).
+
+## 7. Pro-MB → Prism Multiband: the band compander's own graph [STATIC + EXEC] → built (revision 1, branch `rea2_190lg-mb`, 0 files down)
+
+Branch `rea2_190lg-mb` (off `rea2_190lg` 2fbced9c7). Evidence: this round's decompiles of a copy of the ProMB Ghidra
+project (`/mnt/e/lynx-work/rea2_190lg/mb/out/`: `xref_bcvt.c` = the BandCompander constructor 0x1800f5210, `bc_proc.c`
+= its process 0x1800f6210 and its updates 0x1800f6b20 / 0x1800f6820 / 0x1800f67d0 / listener 0x1800f6640, `nodes.c` =
+the node constructors, `procs.c` = the node processes, `ph.c` = PeakHold), constants read with `rd.py`. LYNX's code is
+written from the laws below; the one knob table (0x1800d8b50, 7 points) is not copied: LYNX fits its own smooth curve
+to the shape of the composite release law.
+
+### The graph [STATIC] (constructor 0x1800f5210)
+Nodes (BandCompander offsets): DelayFilter +0x198 → DBConverter +0x188 → Detector +0x190 → Router +0x590 → PeakHold
++0x3a8 → EQFilter +0x5a0 → Capacitor A +0x170; Mixer +0x298 (mode 2 = max) of (A, EQFilter) → Capacitor B +0x178 →
+Router +0x598 → × two parameter sources (+0x2a8: a 0 … 2 amount, default 1; +0x3b0: the output sign / scale) → 10^(x/20)
+(the vectorised exp in 0x1800f6210). Capacitor B's release bus is driven by a Mixer +0x2a0 (sum): the release time
+(+0x4d8) + w · Capacitor A (w = 0, or 0.007 s per dB in the inverted modes). Two StaticMixers (+0x5a8 / +0x5b0) give
+36 − x for the Routers' second inputs.
+
+Modes (0x1800f6820; DynamicsMode +0x60, range +0x120):
+- compress with range < 0 (downward compression) or expand with range > 0 (upward expansion): Detector purpose 0
+  (the compressor curve: overshoot over the threshold through the quadratic knee, × (1 − 1/ratio) under 100 : 1),
+  its range = |range|, its soft-range width = 0.6 · knee + 12 dB; Routers straight; output sign −1 / +1. **Built.**
+- the other two (upward compression, downward expansion): Detector purpose 1 (below the threshold, a one-sided knee,
+  × (ratio − 1), with a hysteresis flag), range 36, soft width = knee; Routers take 36 − x; output × range / 36; B's
+  release + 0.007 · A. **Built** (see [EXEC]).
+
+Detector (process 0x1800c09a0, general path) [STATIC]: dB domain (GainChangeDomain 1); then the soft range: with
+v = R − GR inside ± S/2, GR = R − ((S/2 + v) / S)² · S/2; GR ≤ R, ≥ 0. Purpose 1 (the inverted modes): under = threshold −
+level; ≤ 0 → 0 (a flag that compares the overshoot with an unconnected bus, value 0: no hysteresis in this graph); inside
+the knee (under / K)² · K/2, past it under − K/2; × (ratio − 1). The plug-in binds the band's ratio / range parameters to
+the compander's properties directly (ProMBBand constructor 0x1801194a0), so the ratio is the plain ratio.
+
+Times (0x1800f6b20; a = attack %, r = release %, 0 … 100):
+- rel = 0.005 + 2.495 K'(r / 100) s; K = a 7-point knob curve, K' = K up to 0.7, then 0.7 + 4.333 (K − 0.7).
+- Capacitor A: attack (1 − min (1, 0.05 a)) · 0.5 + 0.12 s, release (rel + 1) · 0.25 s.
+- Capacitor B: attack 6e−9 a⁴ + 0.00025 s, release = rel (the bus), p5 = 1 − 0.7 (1 − min (1, 0.05 a)), p6 = 0.1 rel
+  (the Capacitor class is byte-identical to Pro-C 3's: REA_rodada190kw §2's v2Step).
+- Look-ahead switch on (+0xc8): lead = clamp (500 / max (centre, 100) + the band's look-ahead ms, 0.1, 20) ms, centre
+  = 2^((lo + hi) / 2) of the band's edges (log2 Hz); the detector input is delayed by 20 − lead ms while the plug-in's
+  latency is 20 ms (refcap030 manifest: 960 samples at 48 kHz; 0 with the switch off). Off: no delay, lead 0.1 ms.
+- PeakHold (process 0x1800c32d0 / 0x1800c33b0: a sliding maximum, time in ms × 0.001 × rate): hold = 1.1 · lead +
+  (r + 2) (1 − min (1, 0.05 a)) ms (switch off: 0.11 + the same knob term).
+- EQFilter (shape 0, order property 1): frequency log2 (650 / lead) → 650 / lead Hz (switch off: 6.5 kHz). LYNX models
+  it as a two-pole Butterworth low pass (the lab compared one pole).
+
+Constants (rd.py, FabFilter_ProMB.dll): 0x1801a3124 6e−9, 0x1801a3154 0.00025, 0x1801a3670 2.495, 0x1801a3174 0.005,
+0x1801a32e0 0.7, 0x1801a3700 4.333, 0x1801a31cc 0.05, 0x1801a32b4 0.5, 0x1801a3214 0.12, 0x1801a3250 0.25,
+0x1801a33d8 0.1, 0x1801a38b0 500, 0x1801a3868 100, 0x1801a3540 1.1, 0x1801a3204 0.1, 0x1801a38bc 650,
+0x1801a3388 0.02 (s, the delay line), 0x1801a380c 36, 0x1801a32c8 0.6, 0x1801a3768 12, 0x1801a317c 0.007,
+0x1801a31a4 1/36, 0x1801a33f8 0.12 (s, PeakHold's buffer), 0x1801a3870 120 (ms, PeakHold's maximum).
+
+### LYNX's own release law (fitted to the curve's shape, not its points)
+rel (x) = 0.005 + 1.76 x² + 3.235 · (σ (x) − σ (0)) / (σ (1) − σ (0)) s, σ (x) = 1 / (1 + e^(−(x − 0.86) / 0.035)).
+
+### [EXEC] what the bank settled (refcap030 Pro-MB, new scorer; band gain trajectories in 50 / 100 ms frames)
+- The reference's laws at scale 1 match: the default bass band (S1: 30 – 200 Hz, −12 dB, 4 : 1, 20 / 20 %, knee 24 dB)
+  on the mix: mean |band gain error| 1.11 dB (fxrG) → 0.02 … 0.05 dB; attack / release 20 … 80 % (PT pairs) 0.02 … 0.05 dB;
+  look-ahead off 1.81 → 0.07 dB; S2's two bands 0.50 / 0.87 → 0.09 / 0.06 dB.
+- The soft range is the main term: with round 150's 12 dB knee (lab `oldSoft`) the S1 mix error stays 0.96 dB.
+- Inverted modes: the raw structural slope (ratio − 1) · |range| / 36 matches (S3 downward expansion stairs 4.97 → 0.04 dB,
+  M_DynamicsMode 1 0.47 → 0.003, upward compression +18 dB 3.33 → 0.02 dB); reading the slope as the gain's own
+  (ratio − 1 per dB) was 1.33 / 1.19 dB off.
+- The EQFilter as a two-pole Butterworth low pass; no time scale was needed (unlike Pro-Q 4's round).

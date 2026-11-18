@@ -745,6 +745,8 @@ lookahead on, expert mode, display range, analyser options.
 
 **After round 152** (REA_rodada152 §1–2): configuration **10**/10, design **10**/10 (sound closer) — the attack in the gain stage (slow attacks 50 – 100 % now within 0.4 dB of the reference over the first 400 ms; round 150 was up to 3 dB off), Dynamic phase's own band shapes for narrow bands and cuts (edges moved out, gain moved — the measured table, ≤ 0.05 dB), the 0.8-octave minimum band width in every mode. Left: Linear phase on LYNX's prewarped axis (≤ 0.35 dB at a 3 kHz edge, 6 dB/oct), mixed 6 / n sides beyond the measured table.
 
+**After round 190lg** (REA_rodada190lg §7, static REA of the reference's `BandCompander`): configuration **10**/10, design **10**/10 (sound closer) — translated Pro-MB states run **revision 1** (hidden): the reference's own detector graph per band (gain computer with its 0.6 × knee + 12 dB soft range → peak hold → low pass timed by the look-ahead → two followers joined by a max), the inverted graph for upward compression / downward expansion, the look-ahead switch's lead (half a period of the band's centre + the band's own) and 20 ms latency. Band gain trajectories on the mix within 0.02 – 0.09 dB of the reference (were 0.5 – 1.8 dB); refcap030 8.17 → 9.32, refcap182 programme 7.64 → 9.16, tp172b 7.60 → 9.05, no file down. Projects saved before keep the measured detector. Left: the knob curve is LYNX's own smooth fit (within 13 % of the reference's release times on 15 … 100 %).
+
 ## Sentry Gate ← Pro-G
 
 Parameters of the original: Threshold, Ratio, Range, Style (Classic, Clean, Vocal, Guitar, Upward; Ducking as an
@@ -4291,3 +4293,33 @@ sixth grid / pairs state, refcap182's Pro-Q 4 states; 44.1 / 48 / 96 kHz): 48 / 
 thread time, one pinned core, 20 s at 48 kHz, best of 5, three runs): 0.24 … 0.26 % → 0.27 … 0.32 % of a core. Not built:
 the reference's start-up follower (its count's setter was not traced) and the band's own detection range (Facet has none:
 the reference's default is used for the times).
+
+## Round 190lg (Pro-MB → Prism Multiband): the band compander on the reference's own graph (hidden revision)
+
+Static REA of Pro-MB's `BandCompander` (REA notes docs/analise/REA_rodada190lg.md §7): per band the level in dB goes
+through the gain computer (quadratic knee, ratio, then a soft range 0.6 × knee + 12 dB wide), a peak hold (1.1 × the
+look-ahead + a fast-attack term), a two-pole low pass at 650 Hz / look-ahead ms, a slow follower A, max (A, the reduction),
+and follower B with the knob times; upward compression and downward expansion run the same graph on 36 dB − the
+reduction, scaled by range / 36. With the reference's look-ahead switch on, each band's detector leads the audio by half
+a period of its centre (at most 5 ms) + its own look-ahead, and the latency is 20 ms (as the reference). Prism runs this
+as **revision 1** (hidden `dyn::prism::revision` = 157, `lookaheadSwitch` = 158): only the Pro-MB translator sets it; a
+project saved before (saved count ≤ 157) keeps the measured detector of rounds 150 / 152, bit for bit; a new Prism is
+unchanged. The laws run at their reference scale (no fitted factor); the release knob is LYNX's own smooth curve.
+
+| bank (new time-based scorer, before and after; before = fxrG) | files | before → after | up / same / down |
+|---|---|---|---|
+| refcap030 Pro-MB grid | 18 | 7.50 → **8.83** | 16 / 2 / 0 |
+| grid2 | 50 | 9.10 → **9.78** | 20 / 30 / 0 |
+| mode | 39 | 7.62 → **9.10** | 27 / 12 / 0 |
+| pairs | 36 | 8.28 → **9.25** | 16 / 20 / 0 |
+| sr44 / sr48 / sr96 | 20 each | 7.85 / 7.90 / 7.90 → **9.25** each | 45 / 15 / 0 |
+| **refcap030 Pro-MB, all blocks** | 203 | 8.17 → **9.32** | 124 / 79 / 0 |
+| refcap182 programme | 25 | 7.64 → **9.16** | 20 / 5 / 0 |
+| tp172b | 20 | 7.60 → **9.05** | 15 / 5 / 0 |
+
+The worst files before: PA Threshold 0.8 × Range 0.8 mix (upward compression +18 dB) 3 → 8 (band gain error 3.3 →
+0.02 dB), M Look-ahead off mix 5 → 8, S2 mix 5 → 8. Old projects: `gold/gold.sh` (fxrender with revision 1 forced off
+against the base binary: every mode state, every third pairs state, every grid state, refcap182's five Pro-MB states;
+44.1 / 48 / 96 kHz): 99 / 99 byte-identical. CPU (one bass band, Pro-MB's default-like state, thread time, one pinned core,
+20 s at 48 kHz, best of 5, three runs): 0.85 … 0.92 % → 1.01 … 1.02 % of a core (the 20 ms look-ahead and the two
+followers). Not traced: the band's 0 … 2 output amount property (+0x108, default 1: kept at 1).

@@ -348,6 +348,9 @@ int fromProMB (const State& s, EffectSlot& slot)
     set (Global::processingMode, (float) std::clamp (roundIndex (s.at (139)), 0, 2) * 0.5f);
     set (Global::oversampling, (float) std::clamp (roundIndex (s.at (140)), 0, 2) * 0.5f);
     set (Global::panMode, 1.0f); // the reference's band pan is always mid / side (state 14: −1 … +1)
+    // round 190lg: the reference's own band compander graph (hidden revision 1) and its look-ahead switch (state 141)
+    p[(std::size_t) revision] = 1.0f;
+    p[(std::size_t) lookaheadSwitch] = s.at (141) >= 0.5f ? 1.0f : 0.0f;
     return n;
 }
 
