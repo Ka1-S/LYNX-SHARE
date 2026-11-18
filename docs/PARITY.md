@@ -4165,3 +4165,37 @@ checks, 0 failures.
 **Still off:** the analog extras (noise, ripple, the small second-order term; off by default in the reference), the
 inter-sample peak allowance, the fade stage; Bus Compressor 2 (above); CLA-76 / CLA-2A read for structure only
 (REA_rodada190kt §5).
+
+## Round 190ln (Valhalla reverbs): Foil Plate on ValhallaPlate's own EQ and bass decay; ValhallaRoom read, not changed
+
+Static analysis of the official ValhallaPlate / ValhallaRoom binaries by the owner's leave (clean-room: the laws understood,
+LYNX's own code written; nothing of the plug-ins copied). Evidence: docs/analise/REA_rodada190ln.md, lab
+`/mnt/e/lynx-work/rea3_190ln/vr/`. Score: `scripts/fxparity.py` with round 190lg's alignment window in time (~85 ms), the
+same scorer before and after.
+
+**Foil Plate ← ValhallaPlate (hidden `verbs::foil::reaLaw`, index 18, one past round 190it's revision).** Read only with
+revision 1 and the plate voicing off (the ValhallaPlate role; Little Plate's role never reads it). A new instance and a
+translated ValhallaPlate state get 1; a project saved before loads 0 and renders bit for bit as before (42 / 42 renders of
+revisions 0 and 1 at 44.1 / 48 / 96 kHz against the base commit's objects, plus 42 / 42 fxrender renders of translated states;
+fingerprints in `tests/Parity190lnVrTests.inc`).
+- Low / High EQ: the reference's first-order shelves — the bilinear transform of (gLow + gHigh·s/ω0) / (1 + s/ω0), the corner
+  at the panel's frequency (not pre-warped), ±12 dB linear in the value — in place of round 183b's second-order shelves placed
+  by ear (`Settings::shelfOrder`, LYNX's engine).
+- Bass decay: the reference's bass lines ring at Decay up to ~2.5 s and at up to 1.4 × Decay from ~10 s; Foil's bass
+  multiplier follows that law's ratio to the default 3 s (its voicings were fitted there).
+
+| Bank (ValhallaPlate captures → Foil Plate) | files | before → after | up / same / down |
+|---|---|---|---|
+| refcap030 mode / pairs / sr48 / sr96 | 124 | 3.73 → **3.76** | 4 / 119 / 1 |
+| verb183b captures | 18 | 3.78 → 3.83 | 1 / 17 / 0 |
+| refcap182 programme | 25 | 3.84 → 3.84 | 0 / 25 / 0 |
+| tp172d | 15 | 3.73 → 3.73 | 0 / 15 / 0 |
+
+Up: the Low EQ +7 dB impulse (spectrum 2.58 → 1.57 dB) and the Decay 1.5 s music files. The one file down (sr48 S3 impulse
+4 → 3) is the scorer's alignment on a diffuse tail: the bands moved < 0.1 dB but the found lag jumped from +16 to −74 ms.
+
+**ValhallaRoom → Atrium: read, not changed.** Its late network has 2 × 16 lines (ours 8), its HiCut is a Butterworth
+low-pass plus a first-order shelf on four inner paths. Atrium's level over Decay and its octaves from 125 Hz up are within
+~1 dB; the files at 1 … 3 are the test signal's 1 kHz staircase, a linear effect of the tank's fine structure (the reference
+flat within ±1 dB over ±4 Hz, ours ±4 … 12 dB). More modulation moved it 1 … 1.5 dB only — a denser late tank is its own
+project. Room scores unchanged (mode 3.31, pairs 4.22, sr48 3.44, sr96 3.38).
