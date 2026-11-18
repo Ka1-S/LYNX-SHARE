@@ -145,13 +145,14 @@ struct Shelf
 struct Bq
 {
     double b0 = 1.0, b1 = 0.0, b2 = 0.0, a1 = 0.0, a2 = 0.0, z1 = 0.0, z2 = 0.0;
-    enum class Kind { lowPass, lowShelf, highShelf };
+    enum class Kind { lowPass, lowShelf, highShelf, peak };
     void set (Kind k, double fc, double q, double db, double sr) noexcept
     {
         const double w = 2.0 * pi * std::clamp (fc, 10.0, sr * 0.49) / sr, cw = std::cos (w), sw = std::sin (w);
         const double al = sw / (2.0 * std::max (q, 0.05)), A = std::pow (10.0, db / 40.0), sa = 2.0 * std::sqrt (A) * al;
         double c0, c1, c2, d0, d1, d2;
         if (k == Kind::lowPass) { c0 = c2 = (1.0 - cw) / 2.0; c1 = 1.0 - cw; d0 = 1.0 + al; d1 = -2.0 * cw; d2 = 1.0 - al; }
+        else if (k == Kind::peak) { c0 = 1.0 + al * A; c1 = d1 = -2.0 * cw; c2 = 1.0 - al * A; d0 = 1.0 + al / A; d2 = 1.0 - al / A; }
         else if (k == Kind::lowShelf)
         {
             c0 = A * ((A + 1) - (A - 1) * cw + sa); c1 = 2 * A * ((A - 1) - (A + 1) * cw); c2 = A * ((A + 1) - (A - 1) * cw - sa);
@@ -289,6 +290,8 @@ public:
         for (auto& c : abs1)
             for (auto& f : c) f.clear();
         for (auto& c : out1)
+            for (auto& f : c) f.clear();
+        for (auto& c : tap1)
             for (auto& f : c) f.clear();
     }
 
@@ -452,7 +455,7 @@ public:
         bool tapUnit = false;    // lab only: every tap at 0 dB (calibration)
         // the whole wet by Distance (dB at D = 0, ¼, ½, ¾, 1, linear between) + distCh (c − ½) min (2 D, 1): far spaces lose
         // their early energy in the reference (−30 dB at 0 … 5 ms from D = 0 to 1) and keep their tail
-        std::array<double, 5> distDb { -0.2, -1.17, 0.26, 0.06, 1.0 };
+        std::array<double, 5> distDb { -0.2, -1.17, 0.26, 0.36, 1.0 }; // round 190lz: ¾ 0.06 → 0.36 (Distance 0.8 impulses −1.7 dB)
         double distCh = 1.3;
         // Thickness (the reference's Thickner): a gain on the body (late, 2-line, early networks; the early reflections too
         // below 0) that acts only on a quiet wet: in full below thickLo dBFS, none above thickHi (the wet's (l² + r²) / 2,
@@ -466,6 +469,16 @@ public:
         double lpOctaves = -0.75; // the brightness low pass's corner moved by this many octaves (fitted, one pole)
         double shelfDb = 0.0;    // the high shelf that follows the darkness …
         double darkDb = 18.0;    // … and its cut per unit of darkness (fitted on the measured B = 0 / 1 curves)
+        // round 190lz: the taps' own tone, a bell + a 4 kHz shelf on the tap sum. Measured per time window on the impulse
+        // captures (third octaves): the 0 … 40 ms window (the taps) carried +3 … +4 dB from 125 Hz to 2 kHz and −1 dB at
+        // 4 … 8 kHz against the reference's single-sample arrivals, more the nearer the Distance, at decay rates ≤ × 1 only
+        // (no excess at × 2 … × 4): music at Space ≤ ¼ played 1.5 … 2 dB loud while the impulses' broadband level matched.
+        // In full up to decay rate eqR0, none from eqR1 on (smoothstep in log2 rate)
+        double tapEqDb = -3.0, tapEqHz = 700.0, tapEqQ = 0.5, tapEqHiDb = 1.5, tapEqTrim = 0.0;
+        double eqR0 = 1.0, eqR1 = 4.0;
+        // round 190lz: the body (late, 2-line, early networks) by Space, dB at S = 0, ¼, ½, ¾, 1 (linear between): the
+        // impulse captures' broadband level at Space ½ sat 1.2 dB under the reference at every rate (median of 21 files)
+        std::array<double, 5> spaceDb { 0.0, 0.0, 1.3, 0.0, 0.0 };
         std::array<double, 3> styleLate { 1.0, 0.95, 0.6 }, styleEarly { 1.0, 1.145, 1.145 };
         std::array<double, 3> styleLowDb { 0.0, -2.0, -1.0 }, styleHighDb { 0.0, 0.0, -3.0 }, styleLpHz { 0.0, 0.0, 9000.0 };
     };
@@ -577,17 +590,32 @@ private:
         const int di = std::min ((int) d4, 3);
         const double distDb = f.distDb[(std::size_t) di] + (f.distDb[(std::size_t) di + 1] - f.distDb[(std::size_t) di]) * (d4 - di)
                               + f.distCh * (ch - 0.5) * std::min (2.0 * D, 1.0);
-        const double lateDb = f.lateS * Sc + f.lateS2 * Sc * Sc + f.lateSR * Sc * lr2 + f.lateR * lr2 + f.lateD * Dc + f.lateD2 * Dc * Dc
+        const double s4 = 4.0 * S;
+        const int si4 = std::min ((int) s4, 3);
+        const double spDb = f.spaceDb[(std::size_t) si4] + (f.spaceDb[(std::size_t) si4 + 1] - f.spaceDb[(std::size_t) si4]) * (s4 - si4);
+        const double lateDb = spDb + f.lateS * Sc + f.lateS2 * Sc * Sc + f.lateSR * Sc * lr2 + f.lateR * lr2 + f.lateD * Dc + f.lateD2 * Dc * Dc
                               + f.lateCh * (ch - 0.3) + distDb;
         const auto dbg = [] (double db) { return std::pow (10.0, db / 20.0); };
         lateGain = f.late * f.styleLate[si] * std::pow (std::max (bd.mid, 0.05), f.lateExp)
                    * (std::pow (250.0 / std::max (tMs, 1.0), 0.7) + 1.3) * (1.0 + 0.5 * dk) * f10 * dbg (lateDb);
         // round 190lp: the early and 2-line networks fade in as the fixed taps fade out (the same smoothstep in Distance)
         const double fu = clamp01 ((f.tapFar1 - D) / std::max (f.tapFar1 - f.tapFar0, 1e-6)), nearW = fu * fu * (3.0 - 2.0 * fu);
-        twoGain = (1.0 - nearW) * f.two * (1.0 + 0.5 * dk) * dbg (f.twoS * Sc + f.twoD * Dc + f.twoD2 * Dc * Dc + distDb);
-        earlyGain = (1.0 - nearW) * f.early * f.styleEarly[si] * (1.0 + 0.5 * dk) * dbg (f.earlyS * Sc + f.earlyD * Dc + f.earlyD2 * Dc * Dc + distDb);
+        twoGain = (1.0 - nearW) * f.two * (1.0 + 0.5 * dk) * dbg (spDb + f.twoS * Sc + f.twoD * Dc + f.twoD2 * Dc * Dc + distDb);
+        earlyGain = (1.0 - nearW) * f.early * f.styleEarly[si] * (1.0 + 0.5 * dk) * dbg (spDb + f.earlyS * Sc + f.earlyD * Dc + f.earlyD2 * Dc * Dc + distDb);
         erGain *= dbg (distDb + f.erS * Sc + f.erD * Dc + f.erD2 * Dc * Dc);
         setTaps (s, S, D);
+        // round 190lz: the taps' tone (Fit1::tapEqDb …), weighted by the decay rate
+        {
+            const double ur = clamp01 ((std::log2 (f.eqR1) - lr2) / std::max (std::log2 (f.eqR1) - std::log2 (f.eqR0), 1e-6)), wR = ur * ur * (3.0 - 2.0 * ur);
+            tapEq = wR > 0.0 && (f.tapEqDb != 0.0 || f.tapEqHiDb != 0.0 || f.tapEqTrim != 0.0);
+            const double tt = dbg (f.tapEqTrim * wR);
+            for (int c = 0; c < 2; ++c)
+            {
+                tap1[(std::size_t) c][0].set (Bq::Kind::peak, f.tapEqHz, f.tapEqQ, f.tapEqDb * wR, sr);
+                tap1[(std::size_t) c][1].set (Bq::Kind::highShelf, 4000.0, 0.5, f.tapEqHiDb * wR, sr);
+                tap1[(std::size_t) c][0].b0 *= tt; tap1[(std::size_t) c][0].b1 *= tt; tap1[(std::size_t) c][0].b2 *= tt;
+            }
+        }
         const double wTerm = 0.5 * std::min (1.25 * f.cross, 1.5) * v;
         const double lpHz = std::pow (2.0, 14.136 - 4.0 * dk + f.lpOctaves);
         const double shHz = std::pow (2.0, 13.873 - 2.0 * dk);
@@ -734,8 +762,11 @@ private:
             }
             for (int c = 0; c < 2; ++c)
             {
-                double y = (o[(std::size_t) c] * lateGain + t[(std::size_t) c] * twoGain + eo[(std::size_t) c] * earlyGain) * thG
-                           + e[(std::size_t) c] * thE;
+                double b = o[(std::size_t) c] * lateGain + t[(std::size_t) c] * twoGain + eo[(std::size_t) c] * earlyGain;
+                double et = e[(std::size_t) c];
+                if (tapEq)
+                    et = tap1[(std::size_t) c][1].run (tap1[(std::size_t) c][0].run (et));
+                double y = b * thG + et * thE;
                 for (auto& fl : out1[(std::size_t) c]) y = fl.run (y);
                 w[(std::size_t) c] = y;
             }
@@ -837,6 +868,8 @@ private:
         return m;
     }();
     std::array<std::array<detail::Bq, 6>, 2> out1;
+    bool tapEq = false;
+    std::array<std::array<detail::Bq, 2>, 2> tap1; // round 190lz: the taps' tone
     double sideIn = 1.0, outX = 1.0, outY = 1.0, rotC = 1.0, rotS = 0.0, rot2C = 1.0, rot2S = 0.0, crossIn = 0.0, twoGain = 0.0, earlyGain = 0.0;
 
     static void hadamard (std::array<double, detail::lines>& v) noexcept
