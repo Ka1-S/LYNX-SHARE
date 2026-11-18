@@ -52,7 +52,7 @@ const DocumentFields& editableDocumentFields (DocumentShape shape)
         add (S::root, "bpm beatsPerBar swing chanceSeed channelGroups masterPitch substitutesBypassed cleanMixer performanceMode crossfader crossfadeCurve "
              "autoCrossfades compCrossfadeMs playTruncatedNotes fastDeclick panLaw autoPdc compensateAutomations timeSettings "
              "scaleHighlight dataFolder currentPattern playlist patternBlocks blocks playlistTracks playlistTrackHeights "
-             "playlistTrackColours playlistTrackGroups playlistCompTracks playlistTrackLocks playlistTrackLanes "
+             "playlistTrackColours playlistTrackGroups playlistCompTracks playlistTakeLanes playlistTrackLocks playlistTrackLanes "
              "playlistTrackModes playlistTrackPerformance playlistTrackIcons currentArrangement mode loop arrangementUids midiLinks initialValues");
         // Fields of 0.1.26..0.1.28 (round 190ha): the meter's unit, Master look, mixer/plugin laws, chord pad, MIDI Tools,
         // folded tracks, the loop switch and the tempo lane's range
