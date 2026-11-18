@@ -1,4 +1,5 @@
 #include "platform/CrashGuard.h"
+#include "platform/CvWait.h"
 #include "core/CrashReport.h"
 
 #include <algorithm>
@@ -1413,7 +1414,7 @@ void watchLoop()
     {
         {
             std::unique_lock<std::mutex> l (w.lock);
-            w.wake.wait_for (l, std::chrono::milliseconds (250), [&w] { return w.quit; });
+            cvwait::waitFor (w.wake, l, std::chrono::milliseconds (250), [&w] { return w.quit; }); // (round 190la: platform/CvWait.h)
             if (w.quit)
                 return;
         }

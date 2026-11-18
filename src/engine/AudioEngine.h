@@ -887,6 +887,11 @@ public:
     // the time the last refresh took (ms), for --perf style measurements
     double getAutomationDisplayMs() const noexcept { return automationDisplayCostMs; }
     void setSong (Song newSong); // new/opened project: clears the history
+    // Round 190la (QA-10): setSong decodes the song's samples in parallel first (round perfgate190id). An export's own
+    // engine skips that: the engine it copies the song from holds them decoded already, and what the parallel pass found
+    // missing there (the full originals of stretched clips, which the racks never keep) was decoded again only to be
+    // dropped after the rack build: +60-120 MB of peak memory on Windows (Future House, Stroll Up).
+    void setParallelSampleDecode (bool on) noexcept { parallelSampleDecode = on; }
     // "Open without third-party plugins" (round 190ap, core/PluginHold.h): the project opens with every hosted plugin
     // switched off (none is created; each slot keeps its saved settings untouched, also through a save). The next
     // project this engine opens the plain way (setSong, an import) ends the mode.
@@ -1772,6 +1777,7 @@ private:
     // round 190jb: an export runs with this engine's plugins (holdForExport); the device callback is inside its block
     std::atomic<bool> exportHold { false }, callbackBusy { false };
     LiveInstrumentSource liveInstrumentSource; // (the export engine's side: setLiveUnits)
+    bool parallelSampleDecode = true; // (round 190la: setParallelSampleDecode)
     LiveEffectSource liveEffectSource;
     std::vector<const void*> lentUnits; // the units the sources gave this engine (the export engine; warmUpPlugins)
     void capturePluginStatesInto (Song& target, bool requireAll);

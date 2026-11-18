@@ -208,7 +208,10 @@ struct Devices final
 
     bool make()
     {
-        const UINT flags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
+        // (round 190la, A/B switch as JUCE's Direct2D device: cmake/LynxPatchJuce.cmake fix 43; LYNX_D3D_DRIVER_THREADS=0:
+        // no driver threads for these frames; default as before)
+        const UINT flags = D3D11_CREATE_DEVICE_BGRA_SUPPORT
+                           | (juce::SystemStats::getEnvironmentVariable ("LYNX_D3D_DRIVER_THREADS", {}) == "0" ? (UINT) D3D11_CREATE_DEVICE_PREVENT_INTERNAL_THREADING_OPTIMIZATIONS : 0u);
         const D3D_FEATURE_LEVEL levels[] = { D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_1, D3D_FEATURE_LEVEL_10_0,
                                              D3D_FEATURE_LEVEL_9_3 };
         Com<ID3D11Device> device;

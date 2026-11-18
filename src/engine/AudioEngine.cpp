@@ -3866,7 +3866,7 @@ void AudioEngine::setSong (Song newSong)
 
     // (round perfgate190id: a .lynx with 24 one-minute takes froze the window for 5-50 s while the rack build decoded
     // them one after the other into the stream cache)
-    const auto decoded = decodeSamplesInParallel (samples, song);
+    const auto decoded = parallelSampleDecode ? decodeSamplesInParallel (samples, song) : std::vector<std::shared_ptr<const SampleData>> {};
     publishSong();
 }
 

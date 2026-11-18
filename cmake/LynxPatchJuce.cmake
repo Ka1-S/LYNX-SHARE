@@ -274,6 +274,22 @@
 #    #18, so "Layout style" in the first of two columns had its submenu beyond the second one). Such a menu stays one
 #    column while it fits on the screen; taller, JUCE's own split applies.
 #
+# 43. Windows only ("fix 190la" in round 190la's branch), juce_graphics/native/juce_DirectX_windows.h (round 190la, perf A/B switch): with
+#    LYNX_D3D_DRIVER_THREADS=0 the Direct3D 11 device JUCE's Direct2D windows draw with is made with
+#    D3D11_CREATE_DEVICE_PREVENT_INTERNAL_THREADING_OPTIMIZATIONS: the graphics driver stops handing each frame's commands
+#    to threads of its own. Measured on Thief playing (RTX 3060): NVIDIA's thread 353 -> 4 Mcycles/s, but the message
+#    thread +316, so the process total is the same; 11 fewer threads and -27 % wake-ups. Off by default (the message
+#    thread is the UI's frame budget); the default creates the device as JUCE does.
+#
+# 44. Windows only ("fix 190la-b" in round 190la's branch), juce_core/threads/juce_WaitableEvent.cpp (round 190la, perf): libc++ (the zig toolchain's)
+#    implements a timed condition-variable wait on Windows with SleepConditionVariableSRW and the time left truncated
+#    to whole milliseconds (thread_win32.cpp __libcpp_condvar_timedwait): with under 1 ms left it does not sleep, and
+#    wait_for's loop spins until the deadline. Every JUCE timed wait (WaitableEvent::wait (ms): Thread::wait, the timer
+#    thread, thread pools, LYNX's prefetcher) ended in such a spin: the JUCE timer thread alone used ~150 Mcycles/s
+#    (~4 % of a core) with LYNX at rest (Frida + QueryThreadCycleTime, round 190la). The wait now sleeps whole
+#    milliseconds rounded up (the event may be seen up to ~1 ms later than its deadline, never earlier).
+#    scripts/build-windows-zig.sh patches juce_core for this one file.
+#
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
 
@@ -596,7 +612,14 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("child window frames shown: after a frame" "LYNX patch (round 190gv, fix 34): a child window's frame"
             "        if (auto* ctx = direct2DContext->startFrame ((float) peer.getPlatformScaleFactor()))|NL|        {|NL|            peer.handlePaint (*ctx);|NL|            direct2DContext->endFrame();|NL|        }"
             "        if (auto* ctx = direct2DContext->startFrame ((float) peer.getPlatformScaleFactor()))|NL|        {|NL|            peer.handlePaint (*ctx);|NL|            direct2DContext->endFrame();|NL|            peer.lynxFramePresented(); // LYNX patch (round 190gv, fix 34): a child window's frame is shown at once|NL|        }")
+    elseif(file MATCHES "juce_WaitableEvent.cpp$")
+        lynx_juce_fix("timed waits without the sub-millisecond spin (fix 44)" "LYNX patch (round 190la, fix 44): libc++ on Windows"
+            "            if (! condition.wait_for (lock, std::chrono::duration<double, std::milli> { timeOutMilliseconds },|NL|                                      [this] { return triggered == true; }))|NL|            {|NL|                return false;|NL|            }"
+            "           #if JUCE_WINDOWS && defined (_LIBCPP_VERSION)|NL|            // LYNX patch (round 190la, fix 44): libc++ on Windows hands SleepConditionVariableSRW the time left truncated to whole|NL|            // milliseconds, so under 1 ms left it does not sleep and wait_for spins until the deadline: the last part of|NL|            // every timed wait (the JUCE timer thread: ~4 % of a core at rest). Whole milliseconds, rounded up, instead.|NL|            const auto lynxEnd = std::chrono::steady_clock::now() + std::chrono::duration_cast<std::chrono::steady_clock::duration> (std::chrono::duration<double, std::milli> { timeOutMilliseconds });|NL||NL|            while (! triggered)|NL|            {|NL|                const auto lynxLeft = lynxEnd - std::chrono::steady_clock::now();|NL||NL|                if (lynxLeft <= std::chrono::steady_clock::duration::zero())|NL|                    return false;|NL||NL|                const auto lynxMs = std::chrono::ceil<std::chrono::milliseconds> (lynxLeft).count();|NL|                SleepConditionVariableSRW (reinterpret_cast<PCONDITION_VARIABLE> (condition.native_handle()),|NL|                                           reinterpret_cast<PSRWLOCK> (mutex.native_handle()),|NL|                                           (DWORD) jlimit<decltype (lynxMs)> (1, 0x7ffffffe, lynxMs), 0);|NL|            }|NL|           #else|NL|            if (! condition.wait_for (lock, std::chrono::duration<double, std::milli> { timeOutMilliseconds },|NL|                                      [this] { return triggered == true; }))|NL|            {|NL|                return false;|NL|            }|NL|           #endif")
     elseif(file MATCHES "juce_DirectX_windows.h$")
+        lynx_juce_fix("no driver threads for the Direct2D device (fix 43)" "LYNX patch (round 190la, fix 43): no driver threads"
+            "        const auto creationFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;"
+            "        // LYNX patch (round 190la, fix 43): LYNX_D3D_DRIVER_THREADS=0: no driver threads for these frames (A/B; default as before)|NL|        const auto creationFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT|NL|                                   | (SystemStats::getEnvironmentVariable (\"LYNX_D3D_DRIVER_THREADS\", {}) == \"0\" ? D3D11_CREATE_DEVICE_PREVENT_INTERNAL_THREADING_OPTIMIZATIONS : 0);")
         lynx_juce_fix("no WARP device beside a hardware adapter" "LYNX patch (round 190go): a software adapter"
             "        for (UINT i = 0;; ++i)|NL|        {|NL|            ComSmartPtr<IDXGIAdapter1> dxgiAdapter;|NL||NL|            if (factory->EnumAdapters1 (i, dxgiAdapter.resetAndGetPointerAddress()) == DXGI_ERROR_NOT_FOUND)|NL|                break;|NL||NL|            if (const auto adapter = DxgiAdapter::create (d2dFactory, dxgiAdapter))|NL|            {|NL|                adapterArray.add (adapter);|NL|                listeners.call ([adapter] (DxgiAdapterListener& l) { l.adapterCreated (adapter); });|NL|            }|NL|        }|NL|"
             "        // LYNX patch (round 190go): a software adapter (WARP, the \"Microsoft Basic Render Driver\") gets its devices only|NL|        // when no hardware adapter gave any; before, every adapter got a Direct3D 11 + Direct2D device at start-up|NL|        std::vector<ComSmartPtr<IDXGIAdapter1>> lynxSoftwareAdapters;|NL|        const auto lynxAdd = [this] (ComSmartPtr<IDXGIAdapter1> dxgiAdapter)|NL|        {|NL|            if (const auto adapter = DxgiAdapter::create (d2dFactory, dxgiAdapter))|NL|            {|NL|                adapterArray.add (adapter);|NL|                listeners.call ([adapter] (DxgiAdapterListener& l) { l.adapterCreated (adapter); });|NL|            }|NL|        };|NL||NL|        for (UINT i = 0;; ++i)|NL|        {|NL|            ComSmartPtr<IDXGIAdapter1> dxgiAdapter;|NL||NL|            if (factory->EnumAdapters1 (i, dxgiAdapter.resetAndGetPointerAddress()) == DXGI_ERROR_NOT_FOUND)|NL|                break;|NL||NL|            DXGI_ADAPTER_DESC1 lynxDesc {};|NL||NL|            if (dxgiAdapter != nullptr && SUCCEEDED (dxgiAdapter->GetDesc1 (&lynxDesc))|NL|                && ((lynxDesc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) != 0 || (lynxDesc.VendorId == 0x1414 && lynxDesc.DeviceId == 0x8c)))|NL|            {|NL|                lynxSoftwareAdapters.push_back (dxgiAdapter);|NL|                continue;|NL|            }|NL||NL|            lynxAdd (dxgiAdapter);|NL|        }|NL||NL|        if (adapterArray.isEmpty())|NL|            for (auto& dxgiAdapter : lynxSoftwareAdapters)|NL|                lynxAdd (dxgiAdapter);|NL|")
@@ -750,6 +773,7 @@ function(lynx_patch_juce juce_dir)
         lynx_patch_juce_file("${juce_dir}/modules/juce_audio_devices/native/juce_WASAPI_windows.cpp")
         lynx_patch_juce_file("${juce_dir}/modules/juce_audio_devices/native/juce_ASIO_windows.cpp")
         lynx_patch_juce_file("${juce_dir}/modules/juce_graphics/native/juce_DirectX_windows.h")
+        lynx_patch_juce_file("${juce_dir}/modules/juce_core/threads/juce_WaitableEvent.cpp")
         lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/juce_gui_basics.cpp")
         lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/native/juce_VBlank_windows.cpp")
         lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/windows/juce_VBlankAttachment.cpp")

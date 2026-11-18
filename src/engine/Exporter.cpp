@@ -392,6 +392,7 @@ ExportJob::ExportJob (const Song& project, const Options& o, const juce::File& f
             engine->setLiveUnits ([lender] (const ChannelDef& c, double rate) { return lender->lendInstrument (c, rate); },
                                   [lender] (const EffectSlot& e, double rate) { return lender->lendEffect (e, rate); });
         }
+    engine->setParallelSampleDecode (false); // (round 190la, QA-10: the song's samples are decoded already)
     engine->setSong (std::move (copy));
 }
 
