@@ -3007,6 +3007,8 @@ int SimpleDock::stepsPlayingStepForCheck() const { return stepsPage->playingStep
 void SimpleDock::stepsPlayingStepForSnapshot (int step) { stepsPage->playingStepForSnapshot (step); }
 juce::PopupMenu SimpleDock::stepsLengthMenuForSnapshot() { return stepsPage->lengthMenuForSnapshot(); }
 void SimpleDock::stepsWatchForCheck() { stepsPage->watchPlayback(); }
+void SimpleDock::stepsVelocityForCheck (int row, int step, float v) { stepsPage->velocityForCheck (row, step, v); }
+void SimpleDock::stepsVelocityToolForSnapshot (bool on) { stepsPage->velocityToolForSnapshot (on); }
 int SimpleDock::stepsChannelForKey (int keyCode)
 {
     if (! stepsTab || tab != Tab::steps)

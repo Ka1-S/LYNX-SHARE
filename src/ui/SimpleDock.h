@@ -194,6 +194,8 @@ public:
     void stepsPlayingStepForSnapshot (int step);
     juce::PopupMenu stepsLengthMenuForSnapshot();
     void stepsWatchForCheck();
+    void stepsVelocityForCheck (int row, int step, float v); // BandLab's V tool on a step
+    void stepsVelocityToolForSnapshot (bool on);
     // a typing key while the Drum Machine tab shows: the row's channel (lit), −1 when the key plays no row
     int stepsChannelForKey (int keyCode);
 

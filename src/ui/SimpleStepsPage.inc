@@ -90,6 +90,8 @@ public:
     void setSwingForCheck (float v) { setSwing (v); }
     void previewForCheck() { togglePreview(); }
     void playingStepForSnapshot (int step) { setPlayingStep (step); }
+    void velocityForCheck (int row, int step, float v) { setVelocity (row, step, v); }
+    void velocityToolForSnapshot (bool on) { velocityTool = on; repaint(); }
     juce::PopupMenu lengthMenuForSnapshot() const { return lengthMenu(); }
     juce::Rectangle<int> gridBoundsForSnapshot() const { return gridArea; }
     // a typing key (BandLab's row keys): plays the row and lights its header; −1 when the key is not one of them
@@ -109,6 +111,29 @@ public:
             g.setFont (font (type::body, true));
             g.setColour (colour::textPrimary);
             g.drawText (tr ("Length"), lengthLabel, juce::Justification::centredRight, false);
+            // BandLab's Edit: the pointer (click steps on / off) | V (drag a step up / down: its velocity)
+            g.drawText (tr ("Edit"), editLabel, juce::Justification::centredRight, false);
+            fillRoundRect (g, editBox.toFloat(), editBox.getHeight() * 0.5f, colour::bg4);
+            for (int k = 0; k < 2; ++k)
+            {
+                const auto seg = editBox.withWidth (editBox.getWidth() / 2).translated (k * editBox.getWidth() / 2, 0).reduced (2);
+                if ((k == 1) == velocityTool)
+                    fillRoundRect (g, seg.toFloat(), seg.getHeight() * 0.5f, colour::bg6);
+                g.setColour ((k == 1) == velocityTool ? colour::textPrimary : colour::textSecondary);
+                if (k == 0)
+                {
+                    juce::Path arrow; // (a pointer)
+                    const auto c = seg.getCentre().toFloat();
+                    arrow.startNewSubPath (c.x - 4.0f, c.y - 6.0f);
+                    arrow.lineTo (c.x + 5.0f, c.y + 1.0f);
+                    arrow.lineTo (c.x + 0.5f, c.y + 1.5f);
+                    arrow.lineTo (c.x - 1.5f, c.y + 6.0f);
+                    arrow.closeSubPath();
+                    g.strokePath (arrow, juce::PathStrokeType (1.3f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+                }
+                else
+                    g.drawText ("V", seg, juce::Justification::centred, false);
+            }
             g.drawText (tr ("Swing"), swingLabel, juce::Justification::centredRight, false);
             g.drawText (tr ("Patterns"), patternsLabel, juce::Justification::centredRight, false);
             // Length: "2 bars ▾"
@@ -246,6 +271,10 @@ public:
         auto top = topArea;
         // left: Length and Swing (BandLab: Edit, Length, Swing in the middle of the row; the kit picker LYNX has no
         // equivalent of sits left of them there)
+        editLabel = top.removeFromLeft (34);
+        top.removeFromLeft (8);
+        editBox = top.removeFromLeft (76).withSizeKeepingCentre (76, 28);
+        top.removeFromLeft (20);
         lengthLabel = top.removeFromLeft (52);
         top.removeFromLeft (8);
         lengthBox = top.removeFromLeft (92).withSizeKeepingCentre (92, 28);
@@ -295,6 +324,12 @@ public:
             setSwing (swingAt (p.x));
             return;
         }
+        if (editBox.contains (p))
+        {
+            velocityTool = p.x >= editBox.getCentreX();
+            repaint (topArea);
+            return;
+        }
         if (playButton.contains (p))
             return songPlaying ? void() : togglePreview();
         for (int l = 0; l < simplesteps::letterCount; ++l)
@@ -309,6 +344,16 @@ public:
             return;
         // FL's and BandLab's grid: a click turns the step over; a drag paints that state along the row; right-click clears
         const auto& pat = engine.getSong().patterns[(std::size_t) pattern];
+        if (velocityTool && ! e.mods.isPopupMenu()) // (BandLab's V: a vertical drag on a step sets its velocity)
+        {
+            if (stepVelocity (pat, rows[(std::size_t) row], step) >= 0.0f)
+            {
+                velocityRow = row, velocityStep = step;
+                velocityStart = stepVelocity (pat, rows[(std::size_t) row], step);
+                engine.beginUndoGesture();
+            }
+            return;
+        }
         paintOn = ! e.mods.isPopupMenu() && stepVelocity (pat, rows[(std::size_t) row], step) < 0.0f;
         paintRow = row;
         lastPainted = -1;
@@ -322,6 +367,8 @@ public:
     {
         if (draggingSwing)
             return setSwing (swingAt (e.x));
+        if (velocityRow >= 0)
+            return setVelocity (velocityRow, velocityStep, juce::jlimit (0.05f, 1.0f, velocityStart - (float) e.getDistanceFromDragStartY() / 100.0f));
         if (paintRow < 0)
             return;
         const auto [row, step] = cellAt ({ e.x, rowY (paintRow) + rowHeight / 2 });
@@ -332,8 +379,9 @@ public:
 
     void mouseUp (const juce::MouseEvent&) override
     {
-        if (draggingSwing || paintRow >= 0)
+        if (draggingSwing || paintRow >= 0 || velocityRow >= 0)
             engine.endUndoGesture();
+        velocityRow = velocityStep = -1;
         draggingSwing = false;
         paintRow = -1;
     }
@@ -353,12 +401,14 @@ private:
     AudioEngine& engine;
     int track = -1, letter = 0, pattern = -1, steps = 16, rowHeight = 20;
     std::vector<int> rows;
-    juce::Rectangle<int> topArea, lengthLabel, lengthBox, swingLabel, swingBar, swingValue, playButton, patternsLabel, lettersArea, addButton,
+    juce::Rectangle<int> topArea, editLabel, editBox, lengthLabel, lengthBox, swingLabel, swingBar, swingValue, playButton, patternsLabel, lettersArea, addButton,
         rulerArea, gridArea;
     Part hover = Part::none;
     int hoverIndex = -1;
     int shownStep = -1;
-    bool previewing = false, draggingSwing = false, paintOn = true, songPlaying = false;
+    bool previewing = false, draggingSwing = false, paintOn = true, songPlaying = false, velocityTool = false;
+    int velocityRow = -1, velocityStep = -1;
+    float velocityStart = 0.78f;
 public:
     juce::String lastMessage; // (the last bubble's text, for the checks)
 private:
@@ -537,6 +587,19 @@ private:
         const auto& pat = engine.getSong().patterns[(std::size_t) pattern];
         if ((stepVelocity (pat, ch, step) >= 0.0f) != paintOn)
             toggle (paintRow, step);
+    }
+
+    void setVelocity (int row, int step, float v)
+    {
+        if (pattern < 0 || row < 0 || row >= (int) rows.size())
+            return;
+        engine.editSong ([p = pattern, ch = rows[(std::size_t) row], tick = (std::int64_t) step * ticksPerStep, v] (Song& s) {
+            if (p < (int) s.patterns.size())
+                for (auto& n : s.patterns[(std::size_t) p].notes)
+                    if (n.channel == ch && n.start == tick)
+                        n.velocity = v;
+        });
+        repaint (cellBounds (row, step).expanded (1));
     }
 
     void audition (int row)

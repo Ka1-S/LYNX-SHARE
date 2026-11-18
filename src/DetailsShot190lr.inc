@@ -127,6 +127,19 @@
                     dock->stepsSwingForCheck (0.6f);
                     offline.dispatchPendingMessages();
                     check ("Swing is the Channel Rack's swing", std::abs (offline.getSong().swing - 0.6f) < 1.0e-4f);
+                    // BandLab's V tool: a softer step is drawn darker
+                    for (int st = 0; st < 32; ++st)
+                        if (offline.getSong().patterns[(std::size_t) pattern].hasStep (kick, st))
+                        {
+                            dock->stepsVelocityForCheck (0, st, 0.3f);
+                            offline.dispatchPendingMessages();
+                            bool soft = false;
+                            for (const auto& n : offline.getSong().patterns[(std::size_t) pattern].notes)
+                                soft = soft || (n.channel == kick && n.start == (std::int64_t) st * ticksPerStep && std::abs (n.velocity - 0.3f) < 1.0e-4f);
+                            check ("V tool: the step's velocity 0.3", soft);
+                            break;
+                        }
+                    dock->stepsVelocityToolForSnapshot (true);
                     // the playing step (the song plays it) lights its column
                     dock->stepsPlayingStepForSnapshot (5);
                     write (*dock, "simple-drum-machine-2bars-playing");
