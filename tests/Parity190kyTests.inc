@@ -40,6 +40,7 @@ TEST (parity190ky_crest_fet_law_is_hidden_and_off_for_new_and_old_crests)
     const auto& info = effectInfo (EffectKind::crestCompressor);
     CHECK (info.params.size() == (std::size_t) cr::count && cr::fetLaw == cr::count + 1); // hidden: no control, no string
     auto s = makeEffectSlot (EffectKind::crestCompressor);
+    s.params[(std::size_t) cr::revision] = 0.0f; // (rollup step 8: round 190kw's revision, set on a new Crest, comes after)
     CHECK (s.params[(std::size_t) cr::fetLaw] == 0.0f && savedEffectParamCount (s) <= (std::size_t) cr::count);
     s.params[(std::size_t) cr::fetLaw] = cr::fetLawValue (3);
     CHECK (savedEffectParamCount (s) == (std::size_t) cr::fetLaw + 1);

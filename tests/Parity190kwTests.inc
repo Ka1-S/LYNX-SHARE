@@ -92,7 +92,8 @@ TEST (parity190kw_crest_revision_is_hidden_new_and_translated_run_it_old_project
     using namespace lynx;
     namespace cr = dyn::crest;
     const auto& info = effectInfo (EffectKind::crestCompressor);
-    CHECK (info.params.size() == (std::size_t) cr::revision); // hidden: no control, no string
+    // hidden: no control, no string (rollup step 8: after 190kt's busLaw and 190ky's fetLaw)
+    CHECK (info.params.size() == (std::size_t) cr::count && cr::revision == cr::fetLaw + 1 && cr::fetLaw == cr::busLaw + 1);
     auto s = makeEffectSlot (EffectKind::crestCompressor);
     CHECK (s.params[(std::size_t) cr::revision] == 1.0f && savedEffectParamCount (s) == (std::size_t) cr::revision + 1);
     auto old = s;
