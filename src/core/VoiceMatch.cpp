@@ -1453,7 +1453,7 @@ constexpr CellLaw cell190lf { 2.99579, 3.41216, 0.0590878, 29.5474, 62.4002, 0.3
 constexpr double cellPrKnob[] { 0, 30, 46, 60, 70, 80, 90, 100 };
 constexpr double cellPrShift[] { -60, -5, 17.9491, 29.3419, 37.824, 42.789, 45.602, 48.4861 };
 constexpr double cellHfKnob[] { 0, 20, 50, 100 };
-constexpr double cellHfShift[] { -2.927, -4.05829, 0, 5.41484 };
+constexpr double cellHfShift[] { -3.2, -4.05829, 0, 5.41484 };
 constexpr double cellGainKnob[] { 0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100 };
 constexpr double cellGainDb[] { -56.219, -34.954, -18.053, -2.544, 8.477, 16.908, 24.746, 29.768, 33.784, 35.289, 38.799 };
 // fit2a:end
