@@ -3170,7 +3170,24 @@ private:
     // Live 12.4 shows it for Monitor "In" only (raw/L09: an armed track on Auto keeps its miniature). LYNX's equivalents:
     // an audio track whose insert monitors "On"; a MIDI track whose channel takes a controller's input whatever is armed
     // (its "Receive from" lock).
+    // (per column, worked out again only when the song changed: the grid's 30 Hz tick asks every column)
     int monitorIcon (int t, bool) const
+    {
+        if (const auto stamp = engine.getSongStamp(); stamp != monitorStamp || monitorCache.empty())
+        {
+            monitorStamp = stamp;
+            monitorCache.assign ((std::size_t) launcher::maxTracks, -1);
+        }
+        if (t < 0 || t >= (int) monitorCache.size())
+            return 0;
+        auto& cached = monitorCache[(std::size_t) t];
+        if (cached < 0)
+            cached = monitorIconNow (t);
+        return cached;
+    }
+    mutable std::vector<int> monitorCache;
+    mutable std::uint64_t monitorStamp = 0;
+    int monitorIconNow (int t) const
     {
         const auto& song = engine.getSong();
         const auto chain = detailchain::forTrack (song, t);
