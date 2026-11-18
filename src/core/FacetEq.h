@@ -84,7 +84,13 @@ constexpr int paramCount = 117;
 // every project saved before loads 0 and plays as before: [117 + b] band b's automatic threshold (Pro-Q 4's "Auto",
 // the default of its dynamic bands; set by the Pro-Q 4 translator). See autoThreshold below.
 constexpr int autoThresholdParam0 = paramCount; // + band
-constexpr int storedParamCount = autoThresholdParam0 + 8;
+// round 190lg (Pro-Q 4 parity), hidden: [125] the automatic threshold's revision. 1 = the reference's own structure
+// (static REA, docs/analise/REA_rodada190lg.md): the band level against a peak follower of itself (instant rise, 10 s fall,
+// floor −40 dB) per sample, then three followers on the reduction whose times follow the band's region and the attack /
+// release knobs. 0 = round 190jh / 190js's fitted law (every project saved before; bit for bit). A new Facet and a
+// translated Pro-Q 4 state get 1.
+constexpr int autoRevisionParam = autoThresholdParam0 + 8;
+constexpr int storedParamCount = autoRevisionParam + 1;
 constexpr int maxSections = 8; // 96 dB/oct = 16th order
 
 enum class Shape { off, bell, lowShelf, highShelf, lowCut, highCut, notch, bandPass, tiltShelf, flatTilt, allPass };
@@ -171,6 +177,18 @@ struct AutoLaw
     double kneePerRange; // > 0: the knee is this many times the range's size (kneeDb unused)
 };
 const AutoLaw& autoLaw() noexcept;
+// round 190lg: revision 1 of the automatic threshold (Pro-Q 4's BandCompander structure; autoRevisionParam): the band's
+// per-sample magnitude against a peak follower of it (instant rise, envSec fall to 10 %, never under `floor`), in dB,
+// through the gain law below; the reduction then runs through three followers whose times come from the band's region
+// and the attack / release knobs (FacetEq.cpp: autoTimes1). relCurve: LYNX's own smooth fit of the reference's release
+// knob curve ((e^(k x) − 1) / (e^k − 1)); t0 / t1 / t2a / t2r: time scales (1 = the reference's)
+struct AutoLaw1
+{
+    double thrK = 1.0, thrOff = 0.0, kneeK = 1.53, envSec = 10.0, floor = 0.01;
+    double t0 = 1.0, t1 = 1.0, t2a = 1.0, t2r = 1.0, relCurve = 3.32;
+};
+const AutoLaw1& autoLaw1() noexcept;
+double autoDynamicGainDb1 (double relDb, double rangeDb) noexcept;
 bool autoThreshold (const EffectParams& params, int band) noexcept;
 // the auto mode's gain law: dynamicGainDb with the auto knee
 double autoDynamicGainDb (double levelDb, double topDb, double rangeDb) noexcept;

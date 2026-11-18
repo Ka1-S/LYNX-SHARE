@@ -4357,6 +4357,8 @@ EffectSlot makeEffectSlot (EffectKind kind)
         slot.params[(std::size_t) echosuite::echoform::revision] = 1.0f;
     if (kind == EffectKind::crestCompressor) // round 190kw: a new Crest runs the V1 styles' revision 1 (hidden parameter)
         slot.params[(std::size_t) dyn::crest::revision] = 1.0f;
+    if (kind == EffectKind::facetEq) // round 190lg: a new Facet's automatic threshold runs Pro-Q 4's structure (hidden)
+        slot.params[(std::size_t) facet::autoRevisionParam] = 1.0f;
     if (kind == EffectKind::ember) // round 190kw: a new Ember runs the Saturn styles' own laws (hidden parameter)
         slot.params[(std::size_t) mixsuite::ember::revision] = 1.0f;
     // round 190it: a new Epoch Verb / Atrium / Foil Plate / Halo runs the 0.1.30 revision of the Measured law (hidden)
@@ -4446,6 +4448,9 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     // round 190kw: … and one saved before the V1 styles' revision keeps the fitted Clean / Classic / Opto (bit for bit)
     if (slot.kind == EffectKind::crestCompressor && savedCount <= (std::size_t) dyn::crest::revision)
         slot.params[(std::size_t) dyn::crest::revision] = 0.0f;
+    // round 190lg: a Facet saved before keeps round 190jh / 190js's automatic-threshold law (bit for bit)
+    if (slot.kind == EffectKind::facetEq && savedCount <= (std::size_t) facet::autoRevisionParam)
+        slot.params[(std::size_t) facet::autoRevisionParam] = 0.0f;
     if (slot.kind == EffectKind::sentryGate && savedCount <= (std::size_t) dyn::sentry::law)
         slot.params[(std::size_t) dyn::sentry::law] = 0.0f;
     // round 150: Auto-pan saved before the Tweak block keeps the Rhythm voicing's clipped angle

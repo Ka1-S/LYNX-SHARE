@@ -907,6 +907,11 @@ private:
         // keep the band's total within +-30 dB
         bool autoT = false;
         double top = autoFloorDb, topFall = 0.0, topRise = 1.0, lo = -60.0, hi = 60.0;
+        // round 190lg: the automatic threshold's revision 1 (Pro-Q 4's structure, AutoLaw1): the peak follower (linear),
+        // its fall, the three followers of the reduction and their coefficients (rise, fall)
+        bool rev1 = false;
+        double env = 0.0, envFall = 0.0, f0 = 0.0, f1 = 0.0, f2 = 0.0;
+        double c0r = 1.0, c1a = 1.0, c1r = 1.0, c2a = 1.0, c2r = 1.0;
     };
 
     void configureMode (Phase p) noexcept
@@ -955,6 +960,14 @@ private:
                 if (d.autoT && ! wasAuto) d.top = A.floorDb;
                 d.topFall = A.decayDbPerSecond / sampleRate;
                 d.topRise = A.topRiseMs > 0.0 ? 1.0 - std::exp (-1.0 / (A.topRiseMs * 0.001 * sampleRate)) : 1.0;
+                // round 190lg: revision 1 (see AutoLaw1)
+                const bool wasRev1 = d.rev1;
+                d.rev1 = d.autoT && params[(std::size_t) autoRevisionParam] >= 0.5f;
+                if (d.rev1)
+                {
+                    if (! wasRev1 || ! wasAuto) d.env = d.f0 = d.f1 = d.f2 = 0.0;
+                    autoTimes1 (params, b, sampleRate, d);
+                }
                 const double g0 = gainDb (params[(std::size_t) param (b, 2)]);
                 d.lo = -30.0 - g0;
                 d.hi = 30.0 - g0;
@@ -1032,6 +1045,32 @@ private:
         return n;
     }
 
+    // round 190lg: revision 1's follower times (Pro-Q 4's BandCompander, REA_rodada190lg): from the band's region (its
+    // edges in octaves) and the attack / release knobs (the translator's ms back to the reference's percent)
+    void autoTimes1 (const EffectParams& params, int b, double rate, Detector& d) const noexcept
+    {
+        const auto& L = autoLaw1();
+        const double f0 = hz (params[(std::size_t) param (b, 1)]), qv = std::max (0.025, q (params[(std::size_t) param (b, 3)]));
+        const double bw = 2.0 * std::asinh (1.0 / (2.0 * qv)) / std::log (2.0); // the band's width (octaves)
+        const double lo = std::log2 (f0) - 0.5 * bw, hi = std::log2 (f0) + 0.5 * bw;
+        const double attPct = std::clamp (50.0 + 50.0 * std::log10 (attackMs (params[(std::size_t) attackParam]) / 9.22), 0.0, 100.0);
+        const double relPct = std::clamp (50.0 + 50.0 * std::log10 (releaseMs (params[(std::size_t) releaseParam]) / 268.0), 0.0, 100.0);
+        const double u = 1.0 - 0.1 * std::clamp (lo - 4.5, 0.0, 10.0), u2 = u * u;
+        const double p = attPct * attPct * ((u2 * 3.6e-5 + 6e-5) * u2 + u2 * 6e-5 + 1e-4);
+        const double atk = p * p * 0.59975 + 0.00025; // s
+        const double kx = std::clamp (relPct / 100.0, 0.0, 1.0);
+        const double rel = 0.005 + 2.495 * (std::exp (L.relCurve * kx) - 1.0) / (std::exp (L.relCurve) - 1.0); // s
+        const double centre = std::pow (2.0, 0.5 * (lo + hi)), low = 100.0 / std::max (centre, 100.0);
+        const double wide = (std::clamp (hi - lo, 2.0, 8.0) - 2.0) / 6.0;
+        const auto c = [rate] (double sec) { return sec <= 1e-9 ? 1.0 : 1.0 - std::exp (-2.302585092994046 / (sec * rate)); };
+        d.c0r = c ((std::min (1.0, wide + low) * 0.02 + 0.015) * L.t0);
+        d.c1a = c (std::max (0.12, 0.3 - atk * 30.0) * L.t1);
+        d.c1r = c ((rel * 1.29 + 0.25) * L.t1);
+        d.c2a = c ((wide * 0.01 + atk) * L.t2a);
+        d.c2r = c ((low * 0.25 + 0.45) * rel * L.t2r);
+        d.envFall = c (L.envSec);
+    }
+
     // detector levels and the dynamic gains, sample by sample over one chunk
     void detect (const float* dl, const float* dr, const float* inL, const float* inR, int m, bool side) noexcept
     {
@@ -1046,6 +1085,20 @@ private:
                 else x = 0.5 * ((double) inL[i] + (double) inR[i]);
                 if (! std::isfinite (x)) x = 0.0;
                 const double y = d.filter.run (x, 0);
+                if (d.rev1) // round 190lg: Pro-Q 4's structure (AutoLaw1)
+                {
+                    const auto& L = autoLaw1();
+                    const double mag = std::abs (y);
+                    d.env = mag > d.env ? mag : d.env + d.envFall * (mag - d.env);
+                    const double rel = 20.0 * std::log10 (std::max (mag, 1e-12) / std::max (d.env, L.floor));
+                    const double amt = std::abs (std::clamp (autoDynamicGainDb1 (rel, d.range), d.lo, d.hi));
+                    d.f0 = amt > d.f0 ? amt : d.f0 + d.c0r * (amt - d.f0);
+                    d.f1 += (d.f0 > d.f1 ? d.c1a : d.c1r) * (d.f0 - d.f1);
+                    const double m1 = std::max (d.f0, d.f1);
+                    d.f2 += (m1 > d.f2 ? d.c2a : d.c2r) * (m1 - d.f2);
+                    d.gain = d.range < 0.0 ? -d.f2 : d.f2;
+                    continue;
+                }
                 d.ms += d.msCoef * (y * y - d.ms);
                 const double level = 10.0 * std::log10 (2.0 * d.ms + 1e-20);
                 double target;
@@ -1728,6 +1781,35 @@ constexpr AutoLaw autoLaw190js { autoFloorDb, autoDecayDbPerSecond, autoKneeDb, 
 } // namespace
 
 const AutoLaw& autoLaw() noexcept { return autoLaw190js; }
+
+// round 190lg: revision 1 (AutoLaw1). The threshold and knee buses of the reference's auto mode were not traced: LYNX keeps
+// round 190js's fitted mapping (the band moves from |range| under its peak level, over a knee of 1.53 |range|), now on the
+// reference's own detector: the per-sample level against the peak follower
+namespace
+{
+AutoLaw1 autoLaw1Value;
+#ifdef LYNX_Q4LAB
+struct AutoLaw1Lab
+{
+    AutoLaw1Lab()
+    {
+        if (const char* e = std::getenv ("LYNX_Q4LAB"))
+            std::sscanf (e, "%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf", &autoLaw1Value.thrK, &autoLaw1Value.thrOff, &autoLaw1Value.kneeK,
+                         &autoLaw1Value.envSec, &autoLaw1Value.floor, &autoLaw1Value.t0, &autoLaw1Value.t1, &autoLaw1Value.t2a,
+                         &autoLaw1Value.t2r, &autoLaw1Value.relCurve);
+    }
+} autoLaw1Lab;
+#endif
+} // namespace
+const AutoLaw1& autoLaw1() noexcept { return autoLaw1Value; }
+double autoDynamicGainDb1 (double rel, double range) noexcept
+{
+    const auto& L = autoLaw1();
+    const double x = rel + L.thrK * std::abs (range) - L.thrOff;
+    const double knee = std::max (0.01, L.kneeK * std::abs (range));
+    const double over = x <= -0.5 * knee ? 0.0 : x < 0.5 * knee ? (x + 0.5 * knee) * (x + 0.5 * knee) / (2.0 * knee) : x;
+    return range < 0.0 ? -std::min (-range, over) : std::min (range, over);
+}
 
 bool autoThreshold (const EffectParams& p, int b) noexcept
 {
