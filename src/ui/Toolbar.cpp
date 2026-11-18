@@ -426,10 +426,18 @@ void TimeDisplay::paint (juce::Graphics& g)
         const auto caption = mode == Mode::clock ? juce::String ("M:S:CS") : mode == Mode::smpte ? "SMPTE " + juce::String (timecode::rates[smpteRate].name)
                                                                                                  : juce::String ("B:S:T");
         const auto captionFont = font (9.0f, true);
-        const auto captionWidth = juce::GlyphArrangement::getStringWidth (captionFont, caption);
-        const auto room = (float) area.getWidth() - 8.0f;
-        for (int i = 0; i < 16 && juce::GlyphArrangement::getStringWidth (big, readout) > room; ++i)
-            big = big.withHeight (big.getHeight() * 0.94f);
+        const auto key = Fit { readout.length(), area.getWidth(), area.getHeight(), (int) mode * 64 + smpteRate, (float) theme::textSize() };
+        if (key.length != fit.length || key.width != fit.width || key.height != fit.height || key.mode != fit.mode || key.scale != fit.scale)
+        {
+            fit = key;
+            fit.caption = juce::GlyphArrangement::getStringWidth (captionFont, caption);
+            const auto room = (float) area.getWidth() - 8.0f;
+            for (int i = 0; i < 16 && juce::GlyphArrangement::getStringWidth (big, readout) > room; ++i)
+                big = big.withHeight (big.getHeight() * 0.94f);
+            fit.digits = big.getHeight();
+        }
+        big = big.withHeight (fit.digits);
+        const auto captionWidth = fit.caption;
         g.setFont (big);
         g.drawText (readout, area.withTrimmedTop (2), juce::Justification::centred, false);
         g.setColour (colour::textSecondary);

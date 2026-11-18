@@ -80,6 +80,14 @@ private:
     juce::uint32 shownAt = 0; // (round 190jo) when `shown` last changed: the B:S:T ticks repaint at most every 100 ms
     bool red = false;           // (round 190jj) the Simple capsule's recording / count-in time
     double linkProgress = -1.0; // (round 190gl) the Link session's progress bar while the transport waits / is stopped
+    // (round 190kz) the FL look's fitted digit height and caption width, worked out again only when the readout's length,
+    // the box or the mode change (the digits are a monospaced font): shaping the text twice per paint was ~4 % of the
+    // message thread while playing
+    struct Fit
+    {
+        int length = -1, width = -1, height = -1, mode = -1;
+        float scale = 0.0f, digits = 0.0f, caption = 0.0f;
+    } fit;
     Mode mode = Mode::bars;
     int smpteRate = 5; // timecode::rates index (30 fps)
 };
