@@ -17917,6 +17917,11 @@ private:
             for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
             {
                 const auto& item = it.getItem();
+                // (round 190kx's loop items, whose labels carry the clip's own key / tempo, are not in the fixed list)
+                if (! item.isSeparator && ! item.isSectionHeader
+                    && (plain (item.text).startsWith (lynx::tr ("Follow the project key")) || plain (item.text).startsWith (lynx::tr ("Loop key"))
+                        || plain (item.text).startsWith (lynx::tr ("Fit to the project tempo ({0}, from {1} BPM)").upToFirstOccurrenceOf (" (", false, false))))
+                    continue;
                 got.add (item.customComponent != nullptr ? "[" + lynx::tr ("Audio clip") + "]"
                          : item.isSeparator              ? juce::String ("-")
                          : item.isSectionHeader          ? "[" + plain (item.text) + "]"
