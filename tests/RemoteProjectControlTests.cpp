@@ -755,6 +755,42 @@ void currentFieldsAllowlist()
         refusesWith ([&] { remote_document::stage (accepted, addValue (path, value)); }, "read-only");
 }
 
+// Round 190lq (issue #204): FL's law for the notes of an audio clip channel (whole clip, layered, key-transposed) is the
+// default; a project saved before the "clipNotes190lq" mark keeps LYNX's earlier law on its audio clip channels, and that
+// survives a save / open
+void audioClipNoteLaw190lq()
+{
+    Song song;
+    ChannelDef clip;
+    clip.instrument = InstrumentKind::audioClip;
+    clip.name = "Clip";
+    ChannelDef sampler;
+    sampler.instrument = InstrumentKind::sampler;
+    sampler.name = "Sampler";
+    song.channels = { clip, sampler };
+    check (! song.channels[0].sampler.clipNoteLegacy, "A new audio clip channel is on FL's law");
+
+    juce::String error;
+    const auto saved = ProjectFile::toJson (song);
+    check (saved.contains ("\"clipNotes190lq\""), "A save writes the mark");
+    check (! saved.contains ("clipNoteLegacy"), "FL's law is not written per channel");
+    auto reopened = ProjectFile::fromJson (saved, error);
+    check (reopened.has_value() && ! reopened->channels[0].sampler.clipNoteLegacy, "A marked project keeps FL's law");
+
+    // an older project (no mark): its audio clip channels keep the legacy law, other channels are left alone
+    const auto old = saved.replace ("\"clipNotes190lq\"", "\"someOtherMark\"");
+    auto legacy = ProjectFile::fromJson (old, error);
+    check (legacy.has_value() && legacy->channels[0].sampler.clipNoteLegacy, "An older project's audio clip channel is legacy");
+    check (! legacy->channels[1].sampler.clipNoteLegacy, "An older project's Sampler is not touched");
+
+    // saved again by this build: the legacy channel stays legacy
+    const auto resaved = ProjectFile::toJson (*legacy);
+    check (resaved.contains ("\"clipNotes190lq\"") && resaved.contains ("\"clipNoteLegacy\""), "The legacy law is written per channel");
+    auto again = ProjectFile::fromJson (resaved, error);
+    check (again.has_value() && again->channels[0].sampler.clipNoteLegacy && ! again->channels[1].sampler.clipNoteLegacy,
+           "The legacy law survives a save and open");
+}
+
 void discoveryCleanup()
 {
     const auto directory = juce::File::getCurrentWorkingDirectory()
@@ -831,6 +867,7 @@ int main()
         run ("currentFieldsAllowlist", currentFieldsAllowlist);
         run ("knownNativeStatePolicy", knownNativeStatePolicy);
         run ("discoveryCleanup", discoveryCleanup);
+        run ("audioClipNoteLaw190lq", audioClipNoteLaw190lq);
         std::puts ("Remote JSON Patch, exact project documents, atomic staging and discovery cleanup tests passed");
         return 0;
     }

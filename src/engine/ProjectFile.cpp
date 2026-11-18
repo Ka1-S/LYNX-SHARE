@@ -2233,6 +2233,8 @@ juce::var channelToVar (const ChannelDef& c)
             sampler->setProperty ("useLoopPoints", false);
         if (c.sampler.flVelocityLaw)
             sampler->setProperty ("flVelocityLaw", true);
+        if (c.sampler.clipNoteLegacy) // round 190lq: an audio clip channel's notes on LYNX's pre-0.1.30 law
+            sampler->setProperty ("clipNoteLegacy", true);
         if (c.sampler.declickMode != 0)
             sampler->setProperty ("declickMode", c.sampler.declickMode);
         // round 190dh (FL's Sampler page): MUL, the loop knobs' points and the Content options, each only when set
@@ -2628,6 +2630,7 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
         }
         def.sampler.useLoopPoints = (bool) s.getProperty ("useLoopPoints", true);
         def.sampler.flVelocityLaw = (bool) s.getProperty ("flVelocityLaw", false);
+        def.sampler.clipNoteLegacy = (bool) s.getProperty ("clipNoteLegacy", false);
         def.sampler.declickMode = juce::jlimit (0, 5, (int) s.getProperty ("declickMode", 0));
         def.sampler.stretchMul = juce::jlimit (-20000, 20000, (int) s.getProperty ("stretchMul", 0));
         if (s.hasProperty ("loopStart") && s.hasProperty ("loopEnd"))
@@ -2917,6 +2920,7 @@ juce::String toJson (const Song& song, bool stampVersion)
         root->setProperty ("savedBy", JUCE_APPLICATION_VERSION_STRING); // the build that wrote it (round 177d, pain point 37)
     root->setProperty ("beatsLaw190gx", true); // round 190gx: channels without a Beats law of their own use the Measured one
     root->setProperty ("warpLaw190ik", true); // round 190ik: channels without laws of their own use PitchAware Beats and the new engines
+    root->setProperty ("clipNotes190lq", true); // round 190lq: audio clip channels without "clipNoteLegacy" play notes on FL's law
     root->setProperty ("bpm", song.bpm);
     root->setProperty ("beatsPerBar", song.beatsPerBar);
     if (song.beatUnit != 4) // (round 190fg: the meter's denominator; older files read n/4)
@@ -4659,6 +4663,13 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
             w.beatsLaw = std::min (w.beatsLaw, WarpModeSettings::beatsLawMeasured);
             w.warpLaw = WarpModeSettings::warpLawClassic;
         }
+    // Round 190lq (issue #204): a project saved before FL's law for the notes of an audio clip channel (no
+    // "clipNotes190lq" mark) keeps LYNX's earlier one on its audio clip channels: each note cut at its end, every key at
+    // the clip's own pitch (core/Song.h SamplerSettings::clipNoteLegacy)
+    if (! (bool) root.getProperty ("clipNotes190lq", false))
+        for (auto& c : song.channels)
+            if (c.instrument == InstrumentKind::audioClip)
+                c.sampler.clipNoteLegacy = true;
     return song;
 }
 
