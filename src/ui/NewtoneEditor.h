@@ -36,4 +36,6 @@ std::unique_ptr<juce::Component> makeNewtoneEditor (AudioEngine& engine, int tra
 // average time of `paints` full paints in ms
 void setNewtoneShotState (juce::Component& editor, const juce::String& state);
 double newtonePaintMs (juce::Component& editor, int paints);
+// Round 190li (--newtoneshot190li): the editor's Edit menu, for a picture
+juce::PopupMenu newtoneEditMenuForSnapshot (juce::Component& editor);
 } // namespace lynx

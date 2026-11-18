@@ -11379,3 +11379,7 @@ countries: fr be ch ca lu
 "Note starts and ends move to the nearest grid line." = "Les débuts et fins des notes vont à la ligne de grille la plus proche."
 "New channel (Synth)" = "Nouveau canal (Synth)"
 "Play them on" = "Les jouer sur"
+"Natural pitch engine (LYNX)" = "Moteur de hauteur naturel (LYNX)"
+"Pitch modulation" = "Modulation de hauteur"
+"Pitch drift" = "Dérive de hauteur"
+"Newtone's natural pitch engine, pitch modulation and pitch drift are left out (the notes play with the first engine): {0}" = "Le moteur de hauteur naturel, la modulation et la dérive de hauteur de Newtone sont omis (les notes jouent avec le premier moteur) : {0}"

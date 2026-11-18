@@ -553,7 +553,7 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
     // end and velocity): 0.1.28 reads up to version 2 and would load no notes at all, so the state is written as version
     // 2 (the notes and every edit kept; the voiced end only shaped the analysed smooth times, which are saved)
     {
-        juce::StringArray resynth, newtone;
+        juce::StringArray resynth, newtone, natural;
         forEachChannel (root, [&] (juce::DynamicObject& c, int i) {
             const auto rev = (int) c.getProperty ("engineRev");
             if (drop (c, "engineRev") && rev >= 1 && c.getProperty ("instrument").toString() == "harmor")
@@ -582,12 +582,16 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
                 const auto older = newtonefx::writeNative (*track, 2);
                 e.setProperty ("state", juce::Base64::toBase64 (older.data(), older.size()));
                 addOnce (newtone, where);
+                if (track->engine != 0) // (round 190li: 0.1.28 renders the notes with Newtone's first engine)
+                    addOnce (natural, where);
             }
         });
         if (! resynth.isEmpty())
             lost.push_back ({ TR_NOOP ("Harmor parts with a sample in the IMG section play their timbres instead of the resynthesis: {0}"), listOf (resynth), true });
         if (! newtone.isEmpty())
             lost.push_back ({ TR_NOOP ("Newtone's detected key and note velocities are left out: {0}"), listOf (newtone), false });
+        if (! natural.isEmpty())
+            lost.push_back ({ TR_NOOP ("Newtone's natural pitch engine, pitch modulation and pitch drift are left out (the notes play with the first engine): {0}"), listOf (natural), true });
     }
 
     // rollup step 7: round 190kl's extra Peak Controller LFO shapes and round 190kt's console law of Crest's Bus style

@@ -11379,3 +11379,7 @@ countries: jp
 "Note starts and ends move to the nearest grid line." = "ノートの開始と終了を最も近いグリッド線に合わせます。"
 "New channel (Synth)" = "新しいチャンネル（Synth）"
 "Play them on" = "演奏するチャンネル"
+"Natural pitch engine (LYNX)" = "ナチュラル ピッチエンジン (LYNX)"
+"Pitch modulation" = "ピッチモジュレーション"
+"Pitch drift" = "ピッチドリフト"
+"Newtone's natural pitch engine, pitch modulation and pitch drift are left out (the notes play with the first engine): {0}" = "Newtone のナチュラル ピッチエンジン、ピッチモジュレーション、ピッチドリフトは含まれません (ノートは最初のエンジンで再生されます): {0}"

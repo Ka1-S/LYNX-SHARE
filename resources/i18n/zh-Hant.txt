@@ -11379,3 +11379,7 @@ countries: tw hk mo
 "Note starts and ends move to the nearest grid line." = "音符的開頭和結尾移到最近的格線。"
 "New channel (Synth)" = "新通道（Synth）"
 "Play them on" = "演奏通道"
+"Natural pitch engine (LYNX)" = "自然音高引擎（LYNX）"
+"Pitch modulation" = "音高調變"
+"Pitch drift" = "音高漂移"
+"Newtone's natural pitch engine, pitch modulation and pitch drift are left out (the notes play with the first engine): {0}" = "Newtone 的自然音高引擎、音高調變與音高漂移將被省略（音符以第一代引擎播放）：{0}"

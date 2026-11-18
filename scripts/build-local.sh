@@ -283,6 +283,8 @@ $CXX $FLAGS $CORE $WAVPACK tools/comparewav.cpp -o build-local/comparewav 2> >(g
 # LYNX effects offline, the LYNX side of the third-party parity harness (round tp172b)
 $CXX $FLAGS $CORE $WAVPACK tools/fxrender.cpp -o build-local/fxrender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS $CORE $WAVPACK tools/vocodexrender.cpp -o build-local/vocodexrender 2> >(grep -v 'glibc version' >&2)
+# Newtone offline (round 190li): the LYNX side of the vocal lab (tools/vocallab)
+$CXX $FLAGS $CORE $WAVPACK tools/newtonelab.cpp -o build-local/newtonelab 2> >(grep -v 'glibc version' >&2)
 # (rollup 0.1.30 step 6: Harmor's resynthesis (natives190kj) reads samples through the core: the whole core, as the other renderers)
 $CXX $FLAGS $CORE $WAVPACK tools/harmorrender.cpp -o build-local/harmorrender 2> >(grep -v 'glibc version' >&2)
 $CXX $FLAGS $CORE $WAVPACK tools/gmsrender.cpp -o build-local/gmsrender 2> >(grep -v 'glibc version' >&2)

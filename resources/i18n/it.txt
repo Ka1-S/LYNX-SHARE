@@ -11379,3 +11379,7 @@ countries: it ch sm
 "Note starts and ends move to the nearest grid line." = "Inizi e fini delle note vanno alla linea di griglia più vicina."
 "New channel (Synth)" = "Nuovo canale (Synth)"
 "Play them on" = "Suonale su"
+"Natural pitch engine (LYNX)" = "Motore di intonazione naturale (LYNX)"
+"Pitch modulation" = "Modulazione di intonazione"
+"Pitch drift" = "Deriva di intonazione"
+"Newtone's natural pitch engine, pitch modulation and pitch drift are left out (the notes play with the first engine): {0}" = "Il motore di intonazione naturale, la modulazione e la deriva di intonazione di Newtone vengono omessi (le note suonano con il primo motore): {0}"
