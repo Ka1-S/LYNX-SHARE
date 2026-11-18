@@ -116,6 +116,8 @@ private:
     int sinceVoiced = 1 << 20, guardMemory = 16; // estimates since then; the guard remembers it this long
     std::array<Biquad, 2> lp {};
     std::vector<float> full, deci, diff;
+    std::vector<float> lin;     // round 190li: a linear copy of the analysed span (maxFull)
+    std::vector<double> sums;   // round 190li: the difference function's sums per lag
     PitchEstimate est;
 };
 
@@ -199,6 +201,8 @@ private:
     int markHead = 0, markCount = 0;
     std::vector<float> in[2], acc[2], env; // input history, output accumulators, a low-passed copy for peak search
     std::vector<float> wsum;               // round 165j: the summed grain windows per output sample
+    std::vector<float> markLin;            // round 190li: a linear copy of the low-passed input around a mark's candidates
+    std::vector<double> markScore;         // round 190li: the candidates' correlations
     float envZ = 0.0f;
 };
 // ---------------------------------------------------------------------------------------------------------------------
