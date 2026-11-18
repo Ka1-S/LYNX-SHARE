@@ -4036,9 +4036,34 @@ identical; fingerprints of both revisions in tests/Parity190kwGold.inc. The edit
 0.38 … 0.42 → 0.52 … 0.60. Bus / Mastering / Pumping cost up to +0.3 point of one core (three followers whose times move
 with every step: one exp each per sample; the coefficient is cached while the time holds). No latency change.
 
-**Still off:** Allround (Versatile) 6.66, Smooth 5.08, Upward 6.62, Two-way (TTM) 7.38, Op-El 5.85 and Vari-Mu 6.19 keep their
+**Still off:** Smooth 5.08, Upward 6.62, Two-way (TTM) 7.38, Op-El 5.85 and Vari-Mu 6.19 keep their
 fitted laws (the reference builds them as generated graph classes — `VariMuCompressor` is a balanced tube-pair model — read
-but not rebuilt); Clean / Classic / Opto's auto release.
+but not rebuilt); Clean / Classic / Opto's auto release. (Allround / Versatile: built in round 190lg, below.)
+**Round 190lg — Allround = Pro-C 3's Versatile (its default style), revision 1.** Rebuilt from the reference's own graph
+(`VersatileCompressor_MainCompressorAlgorithm`, read statically; REA notes docs/analise/REA_rodada190lg.md): two gain
+computers on two readings of the linked side-chain level, working on the reduction share 1 − 10^(−GR / 20) — slow: 0.979 ×
+the level + 0.0203 × its 204 Hz low-pass, then the knob-timed follower (attack 0.8 ms + 249.2 ms · a³, release 10 ms +
+2.49 s · tan (1.2 r²) / tan (1.2), auto release k / (√y + 1)); fast: 0.91 × its 6.39 kHz low-pass, then a slew limiter
+(LYNX's own smooth fits of the reference's knob curves; its fall at half the fit, which reads round 108's measured
+release, 59.5 against 61.6 ms) — and the reduction max (slow, w · fast), w = 0.9 + 0.0398 · fast. The reference's random
+mixer drifts run as their mean; the attack knob's two step-dependent follower terms are not built (every reading scored
+lower on the bank). Revision 1 never shipped (round 190kw is on no released branch), so Versatile joins it: a new Crest
+and a translated Pro-C 3 state run it, a project saved before keeps 0, Live's maps and the substitutes keep 0.
+
+| bank (new time-based scorer, before and after) | files | before → after | up / same / down |
+|---|---|---|---|
+| refcap030 Pro-C 3, all blocks | 508 | 7.99 → **8.08** | 32 / 476 / 0 |
+| · Versatile files | 38 | 6.66 → **7.82** | 32 / 6 / 0 |
+| · grid / sr44 / sr48 / sr96 / styles | 238 / 20 / 20 / 20 / 84 | 7.87 / 7.85 / 7.95 / 7.65 / 7.71 → 7.96 / 8.10 / 8.15 / 7.90 / 7.82 | 32 up |
+| · mode / pairs / prog, every other style | | unchanged file for file | 0 / 126 / 0 |
+| refcap182 programme | 25 | 7.52 → **7.64** | 3 / 22 / 0 (D bass / drums / guitar) |
+| tp172b (its D settings are Versatile) | 20 | 7.55 → **7.95** | 4 / 16 / 0 (D: ESR −21 … −27 → −44 … −52 dB) |
+
+Old projects: `gold/gold.sh` (fxrender with the revision forced off against round 190kw's): 57 / 57 identical; the one
+revision-1 Allround fingerprint in tests/Parity190kwGold.inc moves to the new law. CPU (thread time, one pinned core, 20 s
+at 48 kHz, best of 5, three runs): Allround 0.62 … 0.66 % → 0.97 … 1.00 % of a core (+0.35 point: two gain computers, two
+low-passes and the share's exp / log a sample).
+
 ## Round 190kw (Timeless 3 translator): FabFilter Timeless 3 → Echoform (the hidden line law)
 
 0.1.30 plugin parity. Black-box on captures already on disk (lab and evidence: `/mnt/e/lynx-work/rea190kw/tl3/`,

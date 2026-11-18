@@ -929,6 +929,47 @@ struct SlidingMax
     }
 };
 
+// ---- round 190lg (REA_rodada190lg, Versatile): Pro-C 3's default style (LYNX's Allround), rebuilt from the reference's
+// own graph of generic elements: two gain computers (the usual quadratic knee, ratio and range, as the reduction share
+// 1 − 10^(−GR / 20)) on two slightly different readings of the side chain's level,
+//  - slow: 0.979 × the level + 0.0203 × the level low-passed at 204 Hz → the gain computer → the knob-timed follower
+//    (attack 0.8 ms + 249.2 ms · a³, release 10 ms + 2.49 s · tan (1.2 r²) / tan (1.2); auto release T = k / (√y + 1),
+//    k = 2.0494 r² + 0.0905);
+//  - fast: 0.91 × the level low-passed at 6.39 kHz → the gain computer → a slew limiter (the share rises by at most
+//    1 per T3 s and falls by at most 1 per T4 s, both from the knob times);
+//  the reduction is max (slow, w · fast), w = 0.9 + 0.0398 · fast (within 0.7 … 1.06). The reference drifts two mixer
+//  gains with slow random modulators: LYNX runs their mean. T3 / T4 are LYNX's own smooth fits of the reference's
+//  piecewise-linear knob curves; T4 runs at half that fit: round 108's measured burst (attack 10 / release 200 ms: the
+//  gain back half-way after 61.6 ms) reads 59.5 ms with it (120 ms with the full fit, 28 ms without the fast path), and
+//  the full fit held the fast path up on the bank's music files (0.3 … 0.6 dB too much reduction). The attack knob's two
+//  step-dependent follower terms are not built (every reading of them scored lower on the bank than leaving them neutral)
+struct VersLaw
+{
+    double slowLevel = 0.979424, slowLowMix = 0.020348, slowLowHz = 204.0;
+    double fastLevel = 0.91, fastHz = 6390.0;
+    double wBase = 0.9, wSlope = 0.0397797, wMin = 0.7, wMax = 1.06;
+    double attBase = 0.0008, attSpan = 0.2492, autoA = 2.049379, autoB = 0.0905348;
+    // T3 (attack s): linear up to t3At s (t3Lin · s / t3At), then t3Pow · (s / t3Ref)^t3Exp
+    double t3At = 0.02, t3Lin = 0.08, t3Pow = 0.15, t3Ref = 0.2, t3Exp = 0.273;
+    // T4 (release s) = t4A + t4B s + t4C s²
+    double t4A = 0.19, t4B = 0.55, t4C = 0.03;
+};
+inline const VersLaw& versLaw() noexcept
+{
+    static const VersLaw law;
+    return law;
+}
+inline double versT3 (const VersLaw& v, double s) noexcept
+{
+    s = std::max (s, 0.0);
+    return s <= v.t3At ? v.t3Lin * s / v.t3At : v.t3Pow * std::pow (s / v.t3Ref, v.t3Exp);
+}
+inline double versT4 (const VersLaw& v, double s) noexcept
+{
+    s = std::max (s, 0.0);
+    return v.t4A + v.t4B * s + v.t4C * s * s;
+}
+
 bool revisionStaticDb (const EffectParams& p, double inputDb, double& gainDb) noexcept
 {
     if (! on (p[revision]))
@@ -970,6 +1011,23 @@ bool revisionStaticDb (const EffectParams& p, double inputDb, double& gainDb) no
         if (thr < -1.1920928955078125e-07)
             g = 20.0 * std::log10 (dbToGain (inputDb) * (dbToGain (-thr) - 1.0) + 1.0);
         gainDb = -std::max (0.0, std::min (g, rng));
+        return true;
+    }
+    if (st == Style::allround)
+    {
+        // round 190lg: a steady sine: the slow reading ≈ 0.979 peak + 0.0203 · its mean (2 / π), the fast one 0.91 peak
+        const auto& v = versLaw();
+        const auto curve = [&] (double lev) {
+            auto g = v2Knee (lev - thr, kn);
+            if (rat < 100.0)
+                g -= g / rat;
+            return std::max (0.0, std::min (g, rng));
+        };
+        const auto sl = curve (inputDb + 20.0 * std::log10 (v.slowLevel + v.slowLowMix * 0.6366197723675814));
+        const auto fa = curve (inputDb + 20.0 * std::log10 (v.fastLevel));
+        const auto sh = [] (double g) { return 1.0 - std::exp (-g * 0.1151292546497023); };
+        const auto r = std::max (sh (sl), std::clamp (v.wBase + v.wSlope * sh (fa), v.wMin, v.wMax) * sh (fa));
+        gainDb = 20.0 * std::log10 (std::max (1.0 - r, 1e-9));
         return true;
     }
     if (st == Style::mastering || st == Style::bus || st == Style::punch || st == Style::pumping)
@@ -1090,6 +1148,7 @@ private:
         double v0 = 0.0, v1 = 0.0, v2 = 0.0, held = 0.0; // round 190kw: the V1 styles' follower (reduction, dB) and hold
         double c0 = 0.0, c1 = 0.0, c2 = 0.0, lp1 = 0.0, lp2 = 0.0; // round 190kw: the V2 styles' followers, Mastering's smoother
         V2Cache k0, k1, k2;
+        double va1 = 0.0, va2 = 0.0, vb1 = 0.0, vb2 = 0.0, vF = 0.0; // round 190lg: Versatile's two low-passes, its slew limiter
     };
 
     // per-chunk settings at the rate the detector runs at
@@ -1115,6 +1174,9 @@ private:
         double vocalBase = 0.0; // Vocal: the second follower's release before the programme adds to it
         int holdN = 0;          // Mastering: the reduction's 10 ms peak hold
         double lpB0 = 0.0, lpB1 = 0.0, lpB2 = 0.0, lpA1 = 0.0, lpA2 = 0.0;
+        // round 190lg: Versatile (v2 = 8): the two low-passes (b0, b1, b2, a1, a2), the slew limiter's steps (dB per sample)
+        std::array<double, 5> vA {}, vB {};
+        double vUp = 0.0, vDown = 0.0;
     };
     double styleGain (const Ctx& x, double level) const noexcept
     {
@@ -1292,6 +1354,31 @@ private:
             last->autoK = autoK;
             c.window = 0;
         }
+        else if (on (p[revision]) && c.st == Style::allround)
+        {
+            // round 190lg: Versatile (see VersLaw)
+            const auto& v = versLaw();
+            const auto a3 = std::clamp ((att - 0.005) / 250.0, 0.0, 1.0);
+            const auto rel = std::clamp ((releaseMs (p[release]) - 10.0) / 2490.0, 0.0, 1.0);
+            const auto r2 = std::atan (rel * std::tan (1.2)) / 1.2;
+            const auto attS = v.attBase + v.attSpan * a3, relS = 0.01 + 2.49 * rel;
+            c.v2 = 8;
+            c.f0 = {};
+            c.f0.att = attS; c.f0.rel = relS;
+            c.f0.autoRel = on (p[autoRelease]);
+            c.f0.autoK = v.autoA * r2 + v.autoB;
+            const auto lowPass = [rate] (double hz, std::array<double, 5>& q) {
+                // a two-pole low-pass (Butterworth, bilinear)
+                const auto k = std::tan (3.141592653589793 * std::min (hz, 0.45 * rate) / rate), qq = 1.0 / std::sqrt (2.0);
+                const auto n = 1.0 / (1.0 + k / qq + k * k);
+                q = { k * k * n, 2.0 * k * k * n, k * k * n, 2.0 * (k * k - 1.0) * n, (1.0 - k / qq + k * k) * n };
+            };
+            lowPass (v.slowLowHz, c.vA);
+            lowPass (v.fastHz, c.vB);
+            c.vUp = 1.0 / std::max (0.1, rate * versT3 (v, attS));
+            c.vDown = 1.0 / std::max (0.1, rate * versT4 (v, relS));
+            c.window = 0;
+        }
         return c;
     }
 
@@ -1415,6 +1502,25 @@ private:
                 v2Step (d.c0, g, x.f0, rate, d.k0);
                 v2Step (d.c1, std::max (std::abs (g), std::abs (d.c0)), x.f1, rate, d.k1);
                 gr = v2Step (d.c2, std::max (std::abs (g), std::abs (d.c1)), x.f2, rate, d.k2);
+                break;
+            }
+            case 8: // round 190lg: Versatile (see VersLaw)
+            {
+                const auto& v = versLaw();
+                const auto lp = [] (const std::array<double, 5>& q, double in, double& z1, double& z2) {
+                    const auto y = q[0] * in + z1;
+                    z1 = q[1] * in - q[3] * y + z2;
+                    z2 = q[2] * in - q[4] * y;
+                    return y;
+                };
+                const auto low = lp (x.vA, x0, d.va1, d.va2);
+                const auto sA = v.slowLevel * x0 + v.slowLowMix * std::max (low, 0.0);
+                const auto sB = lp (x.vB, v.fastLevel * x0, d.vb1, d.vb2);
+                const auto dbOf = [] (double m) { m = std::abs (m); return m > 1e-10 ? std::max (-180.0, 20.0 * std::log10 (m)) : -180.0; };
+                const auto slow = v2Step (d.c0, share (curve (dbOf (sA))), x.f0, rate, d.k0);
+                const auto step = share (curve (dbOf (sB))) - d.vF;
+                d.vF += step > 0.0 ? std::min (step, x.vUp) : std::max (step, -x.vDown);
+                gr = toDb (std::max (slow, std::clamp (v.wBase + v.wSlope * d.vF, v.wMin, v.wMax) * d.vF));
                 break;
             }
             case 6: // Punch: one follower on the dB reduction
