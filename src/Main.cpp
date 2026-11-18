@@ -2051,6 +2051,17 @@ public:
         }
 
         // --browsershot190iz <folder> (round 190iz: FL's tabs, tags, Live's browser): src/BrowserShot190iz.inc
+        // --qarest190lcshot <folder> [Live set] (rollup step 7: QA-8's View menu submenu, QA-2's take lanes in Simple):
+        // src/QaRest190lcShot.inc
+        if (args.contains ("--qarest190lcshot"))
+        {
+            const auto i = args.indexOf ("--qarest190lcshot");
+            const auto set = i + 2 < args.size() && ! args[i + 2].startsWith ("--") ? args[i + 2].unquoted() : juce::String();
+            setApplicationReturnValue (runQaRest190lcShot (juce::File (args[i + 1].unquoted()), set) ? 0 : 1);
+            quit();
+            return;
+        }
+
         // --loopshot190kf <folder> (round gaps190kf: the Loop Browser): src/LoopShot190kf.inc
         if (args.contains ("--loopshot190kf"))
         {
@@ -34068,6 +34079,7 @@ private:
 #include "PrShot190jv.inc" // round 190jv
 #include "SimpleGbShot190ke.inc" // round 190ke
 #include "LoopShot190kf.inc"   // round gaps190kf
+#include "QaRest190lcShot.inc"  // rollup 0.1.30 step 7 (round 190lc)
 
     static void writeWaveDemo (const juce::File& file, double bpm)
     {
