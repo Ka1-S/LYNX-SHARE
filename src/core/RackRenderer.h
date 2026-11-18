@@ -714,6 +714,29 @@ public:
     void forgetState() noexcept { lastState = nullptr; }
     // chunks whose boundary did not line up with the part rendered ahead (the live renderer; diagnostics)
     std::uint64_t splitMismatchCount() const noexcept { return splitMismatches; }
+    // Round 190kz (sched): blocks rendered batched (every piece's serial part first, the units' pieces in one task-graph
+    // round: processBatched), and how many of them did go to the workers in that one round (diagnostics, A/B)
+    std::uint64_t batchedBlockCount() const noexcept { return batchedBlocks; }
+    std::uint64_t batchedRoundCount() const noexcept { return batchedRounds; }
+    // ... and the blocks that could not be, by the first reason found (every block is looked at, one cut in a single
+    // piece too: that one runs one round anyway). Audio thread counters, read them between blocks (diagnostics).
+    enum class BatchRefusal : int
+    {
+        switchedOff,      // LYNX_POOL rounds=chunk
+        noGraph,          // no worker pool or no task graph (render-ahead's split, FL's CPU options, extra outputs...)
+        bigBlock,         // more samples than one mixer buffer holds
+        liveControllers,  // a controller's output (Peak / Formula / envelope controllers...) drives the next piece's values
+        midiBetweenUnits, // MIDI from one unit to another between pieces (wrapper output ports, VFX, Dashboards, MIDI routes
+                          // to mixer slots, hardware MIDI)
+        launchers,        // Performance mode or the clip grid
+        bindings,         // a plugin parameter binding reaching another unit
+        heldNotes,        // an effect that follows the Channel rack's held notes (its settings, or automated ones)
+        timedParams,      // sample-accurate plugin parameters
+        manyPieces,       // more than maxPieces pieces (pattern events close together)
+        other,            // FL's "When recording or not playing" PDC switch
+        count
+    };
+    std::uint64_t batchRefusedCount (BatchRefusal why) const noexcept { return batchRefused[(std::size_t) why]; }
     // A7's measure of the last chunk: its units' summed work as a share of the chunk's real time (0 when not measured,
     // e.g. without workers). Render-ahead skips its probe when one thread could not carry the ahead part anyway.
     double lastWorkShare() const noexcept { return lastWorkShareValue; }
@@ -778,6 +801,128 @@ public:
     float automatedLevel (const RackState& state, int automation, float base, int track) const noexcept;
 
 private:
+    // ---- Round 190kz (sched): one task-graph round per device callback ----------------------------------------------
+    // A block cut in pieces (the automation's 128-sample grid, pattern events) used to run one worker-pool round per
+    // piece. A batched block (processBatched) runs every piece's serial part first, then ONE round in which each channel
+    // and insert renders its pieces one after another, then the Master's pieces: each unit gets exactly the calls, sizes,
+    // values and order it got before (the same samples), but the workers are woken and joined once per block.
+    // What a piece's units read of the renderer's per-chunk state lives in one slot per piece: the thread's pieceSlot()
+    // (0 everywhere except inside a batched block) picks it. PieceValue / PieceArray / PieceEvents behave as the plain
+    // member they replace for code that never sets the slot.
+    static constexpr int maxPieces = 8;
+    static int& pieceSlot() noexcept
+    {
+        thread_local int slot = 0;
+        return slot;
+    }
+    template <typename T>
+    struct PieceValue
+    {
+        explicit PieceValue (T init) noexcept { v.fill (init); }
+        std::array<T, maxPieces> v;
+        T& get() noexcept { return v[(std::size_t) pieceSlot()]; }
+        const T& get() const noexcept { return v[(std::size_t) pieceSlot()]; }
+        operator T() const noexcept { return get(); }
+        PieceValue& operator= (const T& x) noexcept
+        {
+            get() = x;
+            return *this;
+        }
+        PieceValue& operator+= (const T& x) noexcept
+        {
+            get() += x;
+            return *this;
+        }
+        void carry (int from, int to) noexcept { v[(std::size_t) to] = v[(std::size_t) from]; }
+    };
+    template <typename T, std::size_t N>
+    struct PieceArray
+    {
+        std::array<std::array<T, N>, maxPieces> v {};
+        std::array<T, N>& get() noexcept { return v[(std::size_t) pieceSlot()]; }
+        const std::array<T, N>& get() const noexcept { return v[(std::size_t) pieceSlot()]; }
+        T& operator[] (std::size_t i) noexcept { return get()[i]; }
+        const T& operator[] (std::size_t i) const noexcept { return get()[i]; }
+        T* data() noexcept { return get().data(); }
+        static constexpr std::size_t size() noexcept { return N; }
+        void fill (const T& x) noexcept { get().fill (x); }
+        // (the plain array's whole-value copy, as adoptGlobals makes it: this slot from the other's same slot)
+        PieceArray& operator= (const PieceArray& o) noexcept
+        {
+            get() = o.get();
+            return *this;
+        }
+        void carry (int from, int to) noexcept { v[(std::size_t) to] = v[(std::size_t) from]; }
+    };
+    struct PieceEvents
+    {
+        EventBuffer first;
+        std::unique_ptr<EventBuffer[]> more = std::make_unique<EventBuffer[]> ((std::size_t) maxPieces - 1);
+        EventBuffer& get() noexcept { const auto s = pieceSlot(); return s == 0 ? first : more[(std::size_t) s - 1]; }
+        const EventBuffer& get() const noexcept { const auto s = pieceSlot(); return s == 0 ? first : more[(std::size_t) s - 1]; }
+        operator EventBuffer&() noexcept { return get(); }
+        operator const EventBuffer&() const noexcept { return get(); }
+        void clear() noexcept { get().clear(); }
+        void add (const NoteEvent& e) noexcept { get().add (e); }
+        void sortByOffset() noexcept { get().sortByOffset(); }
+        int size() const noexcept { return get().size(); }
+        void resize (int n) noexcept { get().resize (n); }
+        int droppedCount() const noexcept { return get().droppedCount(); }
+        const NoteEvent& operator[] (int i) const noexcept { return get()[i]; }
+        NoteEvent& at (int i) noexcept { return get().at (i); }
+        const NoteEvent* begin() const noexcept { return get().begin(); }
+        const NoteEvent* end() const noexcept { return get().end(); }
+    };
+    // a scope in which this thread works on piece `slot` of a batched block
+    struct ScopedPiece
+    {
+        explicit ScopedPiece (int slot) noexcept : previous (pieceSlot()) { pieceSlot() = slot; }
+        ~ScopedPiece() { pieceSlot() = previous; }
+        ScopedPiece (const ScopedPiece&) = delete;
+        ScopedPiece& operator= (const ScopedPiece&) = delete;
+        const int previous;
+    };
+    // a piece of a batched block: its samples, where it starts in the block, its tick, whether it goes on from the
+    // previous block (automation grid), its place on the export grid
+    struct Piece
+    {
+        int samples = 0, offset = 0;
+        double startTick = 0.0;
+        bool continuing = false;
+        std::int64_t gridPos = -1;
+        bool live = false, recording = false;     // (the live input, as runTaskGraph reads it per chunk)
+        bool params = false, paramsLive = false;  // updateAutomation's applyPluginParams, deferred to the units
+        int paramsFirst = 0;
+    };
+    std::array<Piece, maxPieces> pieces {};
+    int pieceCount = 0;
+    bool deferParams = false; // (processBatched's serial parts: applyPluginParams is recorded in the piece, not run)
+    PieceValue<int> pieceOffset { 0 }; // where the slot's piece starts in the units' buffers
+    std::array<HostTimeline, maxPieces> pieceTimelines {};
+    // the plugin parameter bindings of each unit (channel c: c; insert t: maxChannels + t), in RackState::pluginParams'
+    // order, for a state (processBatched applies each unit's own, per piece, inside its task)
+    std::vector<int> unitParamStart, unitParams;
+    const RackState* unitParamsState = nullptr;
+    std::uint64_t unitParamsSerial = 0;
+    bool unitParamsOk = false; // the state can be batched (see batchable)
+    std::uint64_t batchedBlocks = 0, batchedRounds = 0; // (diagnostics: blocks planned as batched, and run as one round)
+    std::array<std::uint64_t, (std::size_t) BatchRefusal::count> batchRefused {};
+    bool batchable (const RackState& state, int numSamples) noexcept;
+    bool buildUnitParams (const RackState& state) noexcept;
+    void applyUnitParams (const RackState& state, int unit, const Piece& piece) noexcept;
+    // plans the block's pieces as process()'s loop cuts them (false: more than maxPieces, or one piece)
+    bool planPieces (const RackState& state, bool playing, double startTick, int numSamples, double tps, int chunk, bool grid) noexcept;
+    void processBatched (const RackState& state, bool playing, int numSamples, float* left, float* right, MeterBank* meters) noexcept;
+    void carryPieceState (int from, int to) noexcept;
+    bool unitParamsBend = false, unitParamsTimed = false, unitParamsHeld = false;
+    bool runBatchedGraph (const RackState& state, bool playing, int channels, MeterBank* meters) noexcept;
+    // processChunk in its three parts (round 190kz): the serial part before the units, the units, the Master's part.
+    // chunkPrelude returns the pool to restore after the units (chunkSchedule may set `workers` to nullptr)
+    void chunkPrelude (const RackState& state, bool playing, double startTick, int numSamples, bool continuing) noexcept;
+    WorkerPool* chunkSchedule (const RackState& state, int numSamples, int eventCount) noexcept;
+    void chunkUnits (const RackState& state, bool playing, int numSamples, MeterBank* meters) noexcept;
+    void chunkMaster (const RackState& state, int numSamples, float* left, float* right, MeterBank* meters, WorkerPool* pool,
+                      std::uint64_t chunkStartNs) noexcept;
     void processChunk (const RackState& state, bool playing, double startTick, int numSamples,
                        float* left, float* right, MeterBank* meters, bool continuing = false) noexcept;
     // render-ahead (round 190gq): this renderer's part of the rack, the boundary in and out
@@ -828,6 +973,8 @@ private:
     static double ticksToNextEvent (const RackState& state, double tick) noexcept;
     // bindings from this automation slot on (andLive: and those of live controllers, the links)
     void applyPluginParams (const RackState& state, int firstSlot, bool andLive = false) noexcept;
+    void applyPluginParam (const RackState& state, std::size_t index, int firstSlot, bool andLive) noexcept; // (one binding)
+    void applyOrDeferParams (const RackState& state, int firstSlot, bool andLive) noexcept;               // (round 190kz)
     // Round 190jg (sample-accurate automation): the automation's changes inside this chunk for hosted CLAP / VST3
     // plugins (Instrument / Effect::setParameterAt), after the chunk's values. Clip automation and lanes (not pattern
     // events: a chunk already ends at each of those). Checked every timedStep samples of the export grid (a ramp moves
@@ -836,8 +983,8 @@ private:
     static constexpr int timedStep = 16;
     std::int64_t timedGridPos = -1;                                  // the chunk's place on the export grid (-1: no grid)
     std::array<float, RackState::maxAutomations> timedLast {};       // the last value sent per automation slot
-    double compensateTick = -1.0;          // the song position of this block's automation (song mode), −1 = none
-    double compensateTicksPerSample = 0.0; // > 0: compensation on in this block
+    PieceValue<double> compensateTick { -1.0 };          // the song position of this block's automation (song mode), −1 = none
+    PieceValue<double> compensateTicksPerSample { 0.0 }; // > 0: compensation on in this block
     float automated (int automation, float base) const noexcept;
     float* trackBuffer (int track, int channel) noexcept;
     // Round 190gp (lazy-zero track buffers): an insert's buffer nobody has written in this chunk holds zeros without
@@ -847,9 +994,9 @@ private:
     const float* trackInput (int track, int channel) noexcept;
     float* rawTrackBuffer (int track, int channel) noexcept;
     bool trackZeros (int track) const noexcept { return (std::size_t) track < trackUnwritten.size() && trackUnwritten[(std::size_t) track] != 0; }
-    std::vector<std::uint8_t> trackUnwritten;
+    PieceArray<std::uint8_t, maxMixerTracks> trackUnwritten; // (round 190kz: per piece)
     std::vector<float> zeroBlock;
-    int trackSamples = 0; // the chunk's samples (what trackBuffer zeroes)
+    PieceValue<int> trackSamples { 0 }; // the chunk's samples (what trackBuffer zeroes)
 
     double sampleRate = 44100.0;
     double bpm = 120.0;
@@ -865,7 +1012,7 @@ private:
     std::uint64_t lastSerial = 0;
     std::vector<VoiceOrder> voiceOrderScratch;   // (round 168s: moving the note state with moved channels)
     std::vector<NoteMask> heldScratch;
-    EventBuffer events;
+    PieceEvents events; // (round 190kz: per piece)
     // round 190gn (A6): the per-chunk channel and insert buffers, sized by the songs (reserveFor) and handed to the
     // audio thread like the snapshots; `buffers` is the one process() uses (audio thread)
     struct Buffers
@@ -882,7 +1029,7 @@ private:
     std::mutex bufferLock; // the producers of bufferExchange: reserveFor (message thread) and prepare
     std::atomic<int> reservedChannels { 0 }, reservedTracks { 0 }, preparedFrames { 0 };
     std::atomic<bool> reserving { false }; // reserveFor is used: the audio thread never grows them itself
-    std::array<float, RackState::maxAutomations> automationValues {}; // NaN = not evaluated yet
+    PieceArray<float, RackState::maxAutomations> automationValues; // NaN = not evaluated yet (round 190kz: per piece)
     // the pitch bend an automation / event lane last gave each LYNX instrument (0..1; NaN = none yet; issue #12)
     std::array<float, maxChannels> automatedBend {};
     bool automatedBendReset = false;
@@ -897,9 +1044,9 @@ private:
     std::array<MixerMatrix, maxMixerTracks> lastTapGain {};
     // issue #144: the fader ramp of a silenced insert's meter (NaN: none yet)
     std::array<MixerMatrix, maxMixerTracks> lastMeterGain {};
-    std::array<char, maxMixerTracks> trackActive {};        // the track output has sound in this block
+    PieceArray<char, maxMixerTracks> trackActive;           // the track output has sound in this block
     std::vector<float> tapBuffers;                          // RackState::maxSendTaps * 2 * chunkCapacity
-    std::array<char, RackState::maxSendTaps> tapActive {};  // the Fruity Send slot sent something this block
+    PieceArray<char, RackState::maxSendTaps> tapActive;     // the Fruity Send slot sent something this block
     // round 190aq: the mute ramp of each insert's pre-fader send signal (1 = heard, 0 = muted; NaN: none yet)
     std::array<float, maxMixerTracks> lastPreGain {};
     // round 190aq: slots skipped for low latency last block; back in the chain they start from a reset state
@@ -915,7 +1062,7 @@ private:
     // click back to the default, becomes a short glide)
     static constexpr double fullTurnSeconds = 0.25;
     float* tapBuffer (int tap, int side) noexcept;
-    std::array<char, maxChannels> channelSilent {};          // channel skipped in this chunk (idle, no notes)
+    PieceArray<char, maxChannels> channelSilent;             // channel skipped in this chunk (idle, no notes)
     std::array<NoteMask, maxChannels> heldNotes {};          // keys held on each channel (effects that follow notes: LYNX Tune)
     std::array<std::array<std::atomic<std::uint64_t>, 2>, maxChannels> sounding {};
     std::array<std::atomic<std::uint32_t>, maxChannels> strikes {}; // (noteStrikes; written only by publishSoundingKeys)
@@ -940,8 +1087,9 @@ private:
     channelpoly::Mode polyMode (const ChannelDef& c, const Instrument& instrument) const noexcept;
     void clearPolyLayers() noexcept;
     static constexpr int chunkCapacity = 512;               // chunks processed at once
-    double chunkStartTick = 0.0, chunkTps = 1.0;            // of the chunk being rendered (for the arpeggiator)
-    bool clipEnvTableShown = false, clipEnvTableWas = false; // round 190gi: the last chunk's song had clip envelopes
+    PieceValue<double> chunkStartTick { 0.0 }, chunkTps { 1.0 }; // of the chunk being rendered (for the arpeggiator)
+    PieceValue<bool> clipEnvTableShown { false };          // round 190gi: the last chunk's song had clip envelopes
+    bool clipEnvTableWas = false;
     // live-played notes of channels with an arpeggiator, echo delay or key / velocity tracking go through the
     // channel's note path like the scheduled ones (FL, round 149); while stopped the arpeggiator runs on its own clock
     std::array<NoteEvent, 256> liveRouted {};
@@ -977,7 +1125,7 @@ private:
     launcher::Runtime* runningLauncher = nullptr;  // the grid's runtime while it plays
     std::vector<float> hwScratch; // 2 × blockCapacity
     void mixHardwareOutputs (const RackState& state, int n) noexcept;
-    int liveInputOffset = 0; // of the chunk within the process() block
+    PieceValue<int> liveInputOffset { 0 }; // of the chunk within the process() block
     // hardware MIDI outputs (round 190jl)
     std::array<std::atomic<std::uint64_t>, 4> hwPorts {};
     std::atomic<bool> hwPortsAny { false };
@@ -1030,9 +1178,9 @@ private:
         bool running = false;
     };
     std::vector<TrackEqState> trackEqs; // built-in EQ of each track
-    double chunkTick = 0.0;             // start of the block (for the global LFOs)
-    bool chunkPlaying = false;          // the song plays during the block (effects that follow the transport)
-    bool pdcBypassNow = false;          // the "When recording or not playing" tracks skip their PDC delays this chunk
+    PieceValue<double> chunkTick { 0.0 };   // start of the block (for the global LFOs)
+    PieceValue<bool> chunkPlaying { false }; // the song plays during the block (effects that follow the transport)
+    PieceValue<bool> pdcBypassNow { false }; // the "When recording or not playing" tracks skip their PDC delays this chunk
     bool pdcBypassBefore = false;       // ... and did in the previous chunk (back to compensated: their lines are emptied)
     void applyTrackEq (const MixerTrack& track, int t, bool bypassed, float* l, float* r, int n) noexcept;
     static constexpr float silenceLevel = 1.5849e-5f;  // -96 dBFS

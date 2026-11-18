@@ -114,7 +114,12 @@ public:
         // cell): 0 = 89-90 % of a core for the process, 25 = 76-81 %, 35 = 78-80 %, 50 = 76-79 %; callbacks over the
         // deadline 0 / 0 / 5 / 15. Default 25; LYNX_POOL="help=0" = every needed sleeper woken (before round 190kr).
         std::atomic<int> helpPercent { 25 };
-        void apply (const char* spec) noexcept; // "spin=60,dry=4,adaptive=1,wait=1,waitspin=30,help=0" (missing keys: unchanged)
+        // Round 190kz (sched): the rounds of a device block cut in pieces (RackRenderer: the automation's 128-sample grid,
+        // pattern events). 1 = one task-graph round for the whole block where that renders the same samples (each unit
+        // runs its pieces one after another inside it); 0 = one round per piece (before round 190kz). LYNX_POOL accepts
+        // "rounds=block" / "rounds=chunk" too.
+        std::atomic<int> blockRounds { 1 };
+        void apply (const char* spec) noexcept; // "spin=60,dry=4,adaptive=1,wait=1,waitspin=30,help=0,rounds=block" (missing keys: unchanged)
     };
     static Tuning& tuning() noexcept;
 

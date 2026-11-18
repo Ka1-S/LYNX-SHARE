@@ -185,6 +185,23 @@ void WorkerPool::Tuning::apply (const char* spec) noexcept
     waitMode.store (std::clamp (parsedValue (spec, "wait", waitMode.load()), 0, 2));
     waitSpinMicros.store (std::clamp (parsedValue (spec, "waitspin", waitSpinMicros.load()), 0, 10000));
     helpPercent.store (std::clamp (parsedValue (spec, "help", helpPercent.load()), 0, 1000));
+    // (round 190kz: "rounds=chunk" / "rounds=block", or 0 / 1)
+    for (const char* at = spec; at != nullptr && *at != 0;)
+    {
+        if (std::strncmp (at, "rounds=", 7) == 0)
+        {
+            const char* v = at + 7;
+            if (std::strncmp (v, "chunk", 5) == 0)
+                blockRounds.store (0);
+            else if (std::strncmp (v, "block", 5) == 0)
+                blockRounds.store (1);
+            else
+                blockRounds.store (std::atoi (v) != 0 ? 1 : 0);
+        }
+        at = std::strchr (at, ',');
+        if (at != nullptr)
+            ++at;
+    }
 }
 
 WorkerPool::Stats WorkerPool::stats() const noexcept
