@@ -67,6 +67,34 @@ constexpr std::array<Tap, 12> erVintage { { { 0.6, 0.7 }, { 1.2, 0.65 }, { 1.7, 
 constexpr std::array<Tap, 12> erPlate { { { 0.02, 0.6 }, { 0.08, 0.55 }, { 1.4, 0.5 }, { 1.46, 0.48 }, { 1.6, 0.45 }, { 1.67, 0.42 },
                                           { 2.77, 0.4 }, { 2.83, 0.38 }, { 3.9, 0.34 }, { 4.6, 0.3 }, { 5.7, 0.26 }, { 6.8, 0.22 } } };
 
+// round 190lp (revision 1): the fixed early taps measured on refcap030's Pro-R 2 impulse captures (black-box: the onset
+// of each single-sample arrival in ms from the input, its polarity, and its level in dB at Space 0 … Distance 0 … rate 1
+// as fitted by the tap law in Engine::setTaps). Their times hold at 44.1 / 48 / 96 kHz and at every Space, Decay Rate
+// and Distance up to ½.
+struct ETap { double ms; int sign; double db; };
+constexpr std::array<ETap, 43> tapsL { {
+    { 6.6667, +1, -7.42 }, { 8.9583, +1, -21.57 }, { 11.3125, -1, -6.84 }, { 14.3542, -1, -30.47 },
+    { 14.6042, -1, -33.94 }, { 18.1250, +1, -13.03 }, { 18.3333, -1, -4.82 }, { 20.6875, +1, -21.99 },
+    { 20.8958, +1, -22.71 }, { 22.8125, -1, -25.89 }, { 23.6042, +1, -23.57 }, { 25.4167, -1, -49.54 },
+    { 28.4375, +1, -9.79 }, { 28.5000, -1, -20.33 }, { 32.2500, -1, -25.04 }, { 34.3542, +1, -16.18 },
+    { 36.5208, -1, -24.59 }, { 38.3542, -1, -19.64 }, { 39.8333, -1, -25.38 }, { 40.7500, +1, -28.31 },
+    { 42.8542, +1, -21.84 }, { 43.8333, -1, -20.01 }, { 46.1667, +1, -21.26 }, { 46.5625, -1, -18.96 },
+    { 48.2083, +1, -20.26 }, { 49.0833, -1, -28.68 }, { 50.9583, -1, -26.50 }, { 55.4792, -1, -19.45 },
+    { 61.8750, +1, -28.77 }, { 64.8750, +1, -20.17 }, { 66.7292, +1, -22.45 }, { 68.8958, -1, -21.91 },
+    { 70.4167, -1, -30.99 }, { 72.3542, +1, -20.53 }, { 74.2292, +1, -24.31 }, { 78.8125, -1, -18.96 },
+    { 82.8958, -1, -21.41 }, { 83.7708, +1, -21.14 }, { 87.5417, +1, -19.92 }, { 89.5625, +1, -20.57 },
+    { 94.5625, +1, -22.86 }, { 96.2708, +1, -22.57 }, { 102.9792, +1, -22.00 } } };
+constexpr std::array<ETap, 36> tapsR { {
+    { 8.2917, +1, -6.74 }, { 10.9583, -1, -29.36 }, { 12.4792, +1, -8.33 }, { 15.8958, +1, -22.94 },
+    { 16.1458, +1, -26.47 }, { 18.7917, +1, -19.74 }, { 21.0417, -1, -10.18 }, { 21.1250, -1, -10.19 },
+    { 24.8125, -1, -18.48 }, { 25.6042, +1, -21.99 }, { 30.6875, +1, -21.56 }, { 32.3958, -1, -7.87 },
+    { 32.8542, -1, -25.07 }, { 36.4583, +1, -17.50 }, { 36.5625, +1, -16.46 }, { 39.3750, +1, -26.13 },
+    { 39.8958, -1, -29.72 }, { 44.3958, +1, -29.60 }, { 47.7083, +1, -19.12 }, { 55.3333, +1, -18.88 },
+    { 56.6250, +1, -20.94 }, { 57.7917, +1, -22.99 }, { 58.9167, +1, -21.96 }, { 62.5625, -1, -24.64 },
+    { 67.6250, -1, -19.09 }, { 68.9792, +1, -21.98 }, { 72.3125, -1, -21.32 }, { 75.6250, +1, -22.49 },
+    { 82.3958, -1, -26.66 }, { 84.4375, +1, -22.66 }, { 89.1042, -1, -23.82 }, { 89.6667, -1, -23.27 },
+    { 95.5000, +1, -22.36 }, { 95.8333, -1, -22.55 }, { 97.9792, +1, -30.23 }, { 104.8958, -1, -22.83 } } };
+
 struct StyleDef
 {
     double basePredelayMs;   // the style's own delay before its first reflection
@@ -223,7 +251,7 @@ public:
         for (auto& d : pre1) d.allocate ((int) std::ceil (0.52 * sr) + 8);
         for (auto& c : early1)
             for (auto& l : c) l.allocate ((int) std::ceil (0.2 * sr) + 8);
-        for (auto& d : er1) d.allocate ((int) std::ceil (0.045 * sr) + 8);
+        for (auto& d : er1) d.allocate ((int) std::ceil (0.65 * sr) + 8); // round 190lp: the taps (≤ 105 ms) + pre-delay (≤ 500 ms)
         pre.allocate ((int) std::ceil (0.52 * sr) + 8);
         er.allocate ((int) std::ceil (0.045 * sr) + 8);
         for (int c = 0; c < 2; ++c)
@@ -398,18 +426,30 @@ public:
         // round 190lg: refitted on refcap030's Pro-R 2 captures per time window (0 … 5 ms … 6.4 s) and per band, not on
         // the total level and spectrum alone (190kw's fit let the early network carry the tail: its level then followed
         // the displayed time instead of the decay rate, so long rates died early and Ducking left no tail)
-        double late = 0.3439;    // the late network's level against the reference (G_late × this × the surface below)
+        // round 190lp: + the fixed early taps (below); the early and 2-line networks only where the taps fade out (Distance
+        // ½ … ¾ on: the reference's near early field is the taps alone, its far one dense), the levels refitted with them
+        double late = 0.3376;    // the late network's level against the reference (G_late × this × the surface below)
         double lateExp = -0.944; // … × (network decay in s)^this …
         // … × 10^(dB / 20) of a fitted surface over Space S, decay rate r, Distance D and Character c:
-        // lateS (S − ½) + lateS2 (S − ½)² + lateSR (S − ½) log2 r + lateR log2 r + lateD2 (D − ½)² + lateCh (c − 0.3)
-        double lateS = 27.73, lateS2 = 1.57, lateSR = 1.71, lateR = 4.76, lateD2 = -8.51, lateCh = -1.59;
-        double two = 0.15676;    // the 2-line network's level, + twoS (S − ½) + twoD (D − ½) + twoD2 (D − ½)² dB
+        // lateS (S − ½) + lateS2 (S − ½)² + lateSR (S − ½) log2 r + lateR log2 r + lateD (D − ½) + lateD2 (D − ½)² + lateCh (c − 0.3)
+        double lateS = 28.81, lateS2 = 1.57, lateSR = 1.71, lateR = 5.16, lateD = 3.02, lateD2 = -8.51, lateCh = -1.59;
+        double two = 0.14579;    // the 2-line network's level, + twoS (S − ½) + twoD (D − ½) + twoD2 (D − ½)² dB
         double twoS = 6.7, twoD = -2.3, twoD2 = -1.5;
-        double early = 0.11755;  // the early network's level (parallel lines, no feedback matrix), + earlyS / D / D2 terms (dB)
-        double earlyS = -7.38, earlyD = -10.03, earlyD2 = -6.14;
+        double early = 0.08906;  // the early network's level (parallel lines, no feedback matrix), + earlyS / D / D2 terms (dB)
+        double earlyS = -6.88, earlyD = -9.87, earlyD2 = -6.14;
         double earlyDecay = 0.3; // … and its decay: this × 1.15 × the displayed time (a short build-up, not a second tail)
         double er = 0.2367;      // the early reflections' level, + erS (S − ½) + erD (D − ½) + erD2 (D − ½)² dB
         double erS = -14.04, erD = 0.59, erD2 = -4.57;
+        // round 190lp: the fixed early taps (detail::tapsL / tapsR) replace tp172b's twelve. Level of each tap (dB) =
+        // its own level + tapS S + tapR log2 r + tapD D + tapT (t / T) (T the network's decay time), plus for the taps that
+        // stand out at some Spaces their bumps over k (tapBoosts), tapMainD D + their own slope d D, and tapMainCh from
+        // Character ¼ to ½ (from Distance ¼ on); all fade out between Distance tapFar0 and tapFar1 (the reference has none
+        // of them from ¾ on). Fitted on the impulse captures' tap peaks (4 413 readings, robust sd 0.6 dB)
+        double tapS = -2.823, tapR = -0.536, tapD = -5.865, tapT = -3.163, tapMainD = -6.81, tapMainCh = 2.24;
+        double tapFar0 = 0.5, tapFar1 = 0.75;
+        double tapTrim = 0.0;    // dB on every tap (the refit against the whole files' level)
+        double tapHiCh0 = 0.55;  // Character from which the later standing-out taps lose their lift (over 0.2)
+        bool tapUnit = false;    // lab only: every tap at 0 dB (calibration)
         // the whole wet by Distance (dB at D = 0, ¼, ½, ¾, 1, linear between) + distCh (c − ½) min (2 D, 1): far spaces lose
         // their early energy in the reference (−30 dB at 0 … 5 ms from D = 0 to 1) and keep their tail
         std::array<double, 5> distDb { -0.2, -1.17, 0.26, 0.06, 1.0 };
@@ -537,14 +577,17 @@ private:
         const int di = std::min ((int) d4, 3);
         const double distDb = f.distDb[(std::size_t) di] + (f.distDb[(std::size_t) di + 1] - f.distDb[(std::size_t) di]) * (d4 - di)
                               + f.distCh * (ch - 0.5) * std::min (2.0 * D, 1.0);
-        const double lateDb = f.lateS * Sc + f.lateS2 * Sc * Sc + f.lateSR * Sc * lr2 + f.lateR * lr2 + f.lateD2 * Dc * Dc
+        const double lateDb = f.lateS * Sc + f.lateS2 * Sc * Sc + f.lateSR * Sc * lr2 + f.lateR * lr2 + f.lateD * Dc + f.lateD2 * Dc * Dc
                               + f.lateCh * (ch - 0.3) + distDb;
         const auto dbg = [] (double db) { return std::pow (10.0, db / 20.0); };
         lateGain = f.late * f.styleLate[si] * std::pow (std::max (bd.mid, 0.05), f.lateExp)
                    * (std::pow (250.0 / std::max (tMs, 1.0), 0.7) + 1.3) * (1.0 + 0.5 * dk) * f10 * dbg (lateDb);
-        twoGain = f.two * (1.0 + 0.5 * dk) * dbg (f.twoS * Sc + f.twoD * Dc + f.twoD2 * Dc * Dc + distDb);
-        earlyGain = f.early * f.styleEarly[si] * (1.0 + 0.5 * dk) * dbg (f.earlyS * Sc + f.earlyD * Dc + f.earlyD2 * Dc * Dc + distDb);
+        // round 190lp: the early and 2-line networks fade in as the fixed taps fade out (the same smoothstep in Distance)
+        const double fu = clamp01 ((f.tapFar1 - D) / std::max (f.tapFar1 - f.tapFar0, 1e-6)), nearW = fu * fu * (3.0 - 2.0 * fu);
+        twoGain = (1.0 - nearW) * f.two * (1.0 + 0.5 * dk) * dbg (f.twoS * Sc + f.twoD * Dc + f.twoD2 * Dc * Dc + distDb);
+        earlyGain = (1.0 - nearW) * f.early * f.styleEarly[si] * (1.0 + 0.5 * dk) * dbg (f.earlyS * Sc + f.earlyD * Dc + f.earlyD2 * Dc * Dc + distDb);
         erGain *= dbg (distDb + f.erS * Sc + f.erD * Dc + f.erD2 * Dc * Dc);
+        setTaps (s, S, D);
         const double wTerm = 0.5 * std::min (1.25 * f.cross, 1.5) * v;
         const double lpHz = std::pow (2.0, 14.136 - 4.0 * dk + f.lpOctaves);
         const double shHz = std::pow (2.0, 13.873 - 2.0 * dk);
@@ -570,14 +613,22 @@ private:
     void process1 (float* left, float* right, int n) noexcept
     {
         using namespace detail;
-        const auto& erTaps = cur.style == Style::modern ? erModern : cur.style == Style::vintage ? erVintage : erPlate;
         const bool duck = cur.ducking > 0.0;
         const double duckDepthDb = 0.71 * 48.0 * clamp01 (cur.ducking);
         const double envA = std::exp (-1.0 / (0.001 * sr)), envR = std::exp (-1.0 / (0.005 * sr));
         const double attA = std::exp (-1.0 / (0.01 * sr)), attR = std::exp (-1.0 / (0.115 * sr));
-        std::array<int, 12> erD {};
-        for (std::size_t q = 0; q < erTaps.size(); ++q)
-            erD[q] = std::max (1, (int) std::lround (erTaps[q].ms * erSpread * 0.001 * sr));
+        // round 190lp: the early and 2-line networks only run while they are heard (Distance past ½); when they come back
+        // they start from silence
+        const bool nets = earlyGain != 0.0 || twoGain != 0.0;
+        if (nets && netsIdle)
+        {
+            for (auto& c : two1)
+                for (auto& l : c) l.clear();
+            for (auto& c : early1)
+                for (auto& l : c) l.clear();
+            tw = {};
+        }
+        netsIdle = ! nets;
         for (int i = 0; i < n; ++i)
         {
             const double inL = left[i], inR = right[i];
@@ -602,12 +653,14 @@ private:
                 auto& pd = pre1[(std::size_t) c];
                 pd.push (x[(std::size_t) c]);
                 const double xc = preS >= 1.0 ? pd.read (preS) : x[(std::size_t) c];
+                // round 190lp: the fixed taps read the channel's input before the network's pre-delay (their times
+                // are the reference's from the input; the user pre-delay moves them)
                 auto& ed = er1[(std::size_t) c];
-                ed.push (xc);
+                ed.push (x[(std::size_t) c]);
                 double ec = 0.0;
-                // each channel reads its own half of the taps (the reference's L / R stay uncorrelated: side ≈ mid)
-                for (std::size_t q = (std::size_t) (1 - c); q < erTaps.size(); q += 2)
-                    ec += ed.tap (erD[q]) * erTaps[q].gain;
+                const int nt = nTaps[(std::size_t) c];
+                for (int q = 0; q < nt; ++q)
+                    ec += ed.tap (tapN[(std::size_t) c][(std::size_t) q]) * tapG[(std::size_t) c][(std::size_t) q];
                 e[(std::size_t) c] = ec;
                 double dd = xc;
                 for (int q = 0; q < 4; ++q)
@@ -636,6 +689,8 @@ private:
                     o[(std::size_t) c] += (j & 1) ? -vc[(std::size_t) j] : vc[(std::size_t) j];
                 }
                 hadamard8 (vc);
+                if (! nets)
+                    continue;
                 // the 2-line network (Hadamard 2)
                 const double p = two1[(std::size_t) c][0].tap ((int) len2[(std::size_t) c][0]) * g2[(std::size_t) c][0];
                 const double q = two1[(std::size_t) c][1].tap ((int) len2[(std::size_t) c][1]) * g2[(std::size_t) c][1];
@@ -660,7 +715,7 @@ private:
                 net1[0][(std::size_t) j].push (rotC * a + rotS * b + ((j & 3) == 1 || (j & 3) == 2 ? -dIn[0] : dIn[0]));
                 net1[1][(std::size_t) j].push (rotC * b - rotS * a + ((j & 3) == 1 || (j & 3) == 2 ? -dIn[1] : dIn[1]));
             }
-            for (int j = 0; j < 2; ++j)
+            for (int j = 0; j < (nets ? 2 : 0); ++j)
             {
                 const double a = tw[0][(std::size_t) j], b = tw[1][(std::size_t) j];
                 two1[0][(std::size_t) j].push (rot2C * a + rot2S * b + dIn[0]);
@@ -680,7 +735,7 @@ private:
             for (int c = 0; c < 2; ++c)
             {
                 double y = (o[(std::size_t) c] * lateGain + t[(std::size_t) c] * twoGain + eo[(std::size_t) c] * earlyGain) * thG
-                           + e[(std::size_t) c] * erGain * thE;
+                           + e[(std::size_t) c] * thE;
                 for (auto& fl : out1[(std::size_t) c]) y = fl.run (y);
                 w[(std::size_t) c] = y;
             }
@@ -695,6 +750,74 @@ private:
         }
     }
     double thickDb = 0.0, thEnv = 0.0, thA = 0.0, thR = 0.0;
+    bool netsIdle = true; // round 190lp: the early / 2-line networks were not run (their lines are stale)
+
+    // round 190lp: the fixed early taps' gains and delays (see Fit1's tap laws)
+    static constexpr int maxTaps = 48;
+    std::array<std::array<double, maxTaps>, 2> tapG {};
+    std::array<std::array<int, maxTaps>, 2> tapN {};
+    std::array<int, 2> nTaps {};
+    void setTaps (const Settings& s, double S, double D) noexcept
+    {
+        using namespace detail;
+        const auto& f = fit1();
+        const double lr2 = std::log2 (std::max (s.rate, 1e-6)), ch = clamp01 (s.character);
+        const double T = std::max (bandDecay (s).mid, 0.02);
+        const double bg = f.tapS * S + f.tapR * lr2 + f.tapD * D;
+        const double fu = clamp01 ((f.tapFar1 - D) / std::max (f.tapFar1 - f.tapFar0, 1e-6));
+        const double far = fu * fu * (3.0 - 2.0 * fu);
+        // Character lifts the standing-out taps from Distance ¼ on (at Distance 0 the reference's do not move)
+        const double chU = clamp01 ((ch - 0.25) / 0.25), chD = clamp01 (D / 0.25);
+        const double mainDb = f.tapMainD * D + f.tapMainCh * chU * chU * (3.0 - 2.0 * chU) * chD * chD * (3.0 - 2.0 * chD);
+        // from Character ~0.6 on the reference's arrivals are modulated: the standing-out ones after 20 ms lose their lift
+        // (20 … 40 ms 4 … 8 dB quieter at Character ¾ / 1 than at ½; the first ones stay)
+        const double hiU = clamp01 ((ch - f.tapHiCh0) / 0.2), hiCh = hiU * hiU * (3.0 - 2.0 * hiU);
+        const double kk = std::floor (14.0 * std::sin (0.5 * pi * std::pow (S, 0.8)));
+        const double pre = std::max (0.0, s.predelayMs);
+        for (int c = 0; c < 2; ++c)
+        {
+            const ETap* T0 = c == 0 ? tapsL.data() : tapsR.data();
+            const int n = (int) (c == 0 ? tapsL.size() : tapsR.size());
+            nTaps[(std::size_t) c] = far > 0.0 || f.tapUnit ? n : 0; // faded out (Distance ¾ on): not read at all
+            for (int q = 0; q < n; ++q)
+            {
+                double db = T0[q].db + bg + f.tapT * 0.001 * T0[q].ms / T;
+                for (const auto& b : tapBoosts)
+                    if (b.ch == c && std::abs (b.ms - T0[q].ms) < 0.001)
+                    {
+                        double bump = 0.0;
+                        for (std::size_t j = 0; j < tapKappa.size(); ++j)
+                            bump += b.a[j] * std::exp (-(kk - tapKappa[j]) * (kk - tapKappa[j]));
+                        db += T0[q].ms > 20.0 ? bump * (1.0 - hiCh) : bump;
+                        db += mainDb + b.d * D;
+                    }
+                const double g = f.tapUnit ? 1.0 : std::pow (10.0, (db + f.tapTrim) / 20.0) * far;
+                tapG[(std::size_t) c][(std::size_t) q] = T0[q].sign * g;
+                tapN[(std::size_t) c][(std::size_t) q] = 1 + (int) std::lround ((T0[q].ms + pre) * 0.001 * sr); // Delay::tap (1) = no delay
+            }
+        }
+    }
+    // the taps that stand out at some Spaces: dB = Σ_j a_j e^(−(k − κ_j)²), κ = 0, 5, 6, 10, 13, 14 (the Spaces measured:
+    // 0, ⅕, ¼, ½, ¾ … ⅘, 1), k = ⌊14 sin (π/2 S^0.8)⌋ the integer of the line-length law (the reference switches these
+    // taps with it: Space ⅕ and ¼ differ, ¾ and ⅘ do not)
+    struct TapBoost { int ch; double ms; std::array<double, 6> a; double d; }; // d: the tap's own dB per unit Distance
+    static constexpr std::array<double, 6> tapKappa { 0.0, 5.0, 6.0, 10.0, 13.0, 14.0 };
+    static constexpr std::array<TapBoost, 15> tapBoosts { {
+        { 0, 6.6667, { 10.96, -0.86, -1.78, -4.53, -3.36, -2.80 }, -10.28 },
+        { 0, 11.3125, { 13.24, 5.07, 4.34, -10.63, -6.98, -6.00 }, -10.30 },
+        { 0, 18.3333, { 2.52, -5.21, -3.78, 1.71, 1.28, 1.91 }, -10.27 },
+        { 0, 25.4167, { 40.00, 0.00, 0.00, 0.00, 0.00, 0.00 }, 0.00 },
+        { 0, 28.4375, { 2.04, 12.31, -8.53, -2.86, -1.74, -0.92 }, -5.09 },
+        { 0, 49.0833, { -2.11, 2.79, 7.75, -0.00, -4.50, -3.14 }, 15.97 },
+        { 0, 50.9583, { -0.49, 2.31, 9.58, -5.36, -2.62, -1.27 }, 16.41 },
+        { 0, 70.4167, { -3.04, 4.78, 5.66, -0.00, -4.15, -2.13 }, 18.28 },
+        { 1, 8.2917, { 13.29, -1.47, -2.34, -5.25, -3.88, -3.30 }, -10.27 },
+        { 1, 12.4792, { 11.99, 14.58, -12.77, -7.02, -4.71, -3.90 }, -10.17 },
+        { 1, 21.1250, { 8.39, -2.48, 11.96, -8.66, -5.15, -3.98 }, -10.20 },
+        { 1, 32.3958, { 3.46, -3.40, -2.01, 5.65, 12.45, -19.50 }, -10.26 },
+        { 1, 36.5625, { 3.29, -0.10, -1.13, -1.32, -1.01, -0.45 }, 4.44 },
+        { 1, 55.3333, { 0.45, -5.27, -0.52, -1.05, -3.22, 9.83 }, -1.98 },
+        { 1, 97.9792, { -8.31, 3.32, 9.01, -1.53, 0.12, 1.02 }, 16.90 } } };
 
     std::array<std::array<detail::Delay, lines1>, 2> net1;
     std::array<std::array<detail::Delay, 2>, 2> two1;
