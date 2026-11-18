@@ -348,6 +348,9 @@ int fromProMB (const State& s, EffectSlot& slot)
     set (Global::processingMode, (float) std::clamp (roundIndex (s.at (139)), 0, 2) * 0.5f);
     set (Global::oversampling, (float) std::clamp (roundIndex (s.at (140)), 0, 2) * 0.5f);
     set (Global::panMode, 1.0f); // the reference's band pan is always mid / side (state 14: −1 … +1)
+    // round 190lg: the reference's own band compander graph (hidden revision 1) and its look-ahead switch (state 141)
+    p[(std::size_t) revision] = 1.0f;
+    p[(std::size_t) lookaheadSwitch] = s.at (141) >= 0.5f ? 1.0f : 0.0f;
     return n;
 }
 
@@ -450,7 +453,8 @@ int fromSaturn2 (const State& s, EffectSlot& slot)
         set (bandParam (b, 0), (float) (int) ourStyle (roundIndex (s.at (base + 3))) / 3.0f);
         // round 150: the measured character of their style k (character k + 1, REA_rodada150b)
         set (characterParam (b), (float) (std::clamp (roundIndex (s.at (base + 3)), 0, characters - 1) + 1) / (float) characters);
-        // drive 0 … 100 % → 0 … +30 dB of ours (their 50 % already saturates a −6 dBFS tone hard)
+        // drive 0 … 100 % → 0 … +30 dB of ours (their 50 % already saturates a −6 dBFS tone hard); round 190kw: with the
+        // Saturn law this is the reference's normalised drive itself (referenceDrive (driveDb) = 36 / 30 × the value)
         set (bandParam (b, 1), clamp01 (30.0 * std::clamp ((double) s.at (base + 4), 0.0, 1.0) / 36.0));
         set (bandParam (b, 2), clamp01 (s.at (base + 10) / 100.0));
         const auto enabled = s.at (base + 13) >= 0.5f;
@@ -494,6 +498,11 @@ int fromSaturn2 (const State& s, EffectSlot& slot)
     // band b at 6 + 13b: +0 crossover, +2 drive, +4 level, +12 mix)
     set (processing, s.at (696) >= 0.5f ? 1.0f : 0.0f);
     set (effectLaw, 1.0f);
+    // round 190kw: the styles' own laws (hidden revision) and 698 High Quality: 0 off = the law's curve at the base rate
+    // (lawRate), as the reference's; Good (8×) / Superb (32×) keep Ember's Oversampling (4×: 8× scored no better on the
+    // lab files and costs twice the CPU)
+    set (revision, 1.0f);
+    set (lawRate, roundIndex (s.at (698)) <= 0 ? 1.0f : 0.0f);
     if (s.count >= 951)
     {
         std::array<double, 2> depth { 1.0, 1.0 };
@@ -623,7 +632,10 @@ int fromProQ4 (const State& s, EffectSlot& slot)
         {
             set (facet::rangeParam0 + band, facet::rangeValue (rangeDb));
             if (s.at (base + 11) >= 0.5f)
+            {
                 set (facet::autoThresholdParam0 + band, 1.0f);
+                p[(std::size_t) facet::autoRevisionParam] = 1.0f; // round 190lg: the reference's own structure
+            }
             else
             {
                 const double v = std::clamp ((double) s.at (base + 12), 0.0, 1.0);

@@ -108,7 +108,12 @@ matches by name).
 
 - Parameter maps only from what the saved data itself shows (attribute names, value lists) plus meanings from the
   vendor's public documentation or our own black-box measurements (render through a legally licensed copy with test
-  signals). Never from decompiling or disassembling third-party binaries. Each map says where its meaning comes from.
+  signals). Each map says where its meaning comes from.
+- Since 2026-11, by the project owner's decision, some stand-ins and translators (the FabFilter roles from round 190kw
+  on) were also informed by clean-room static analysis of the third-party binaries: the laws and structure are written
+  down in our own words (docs/analise/REA_*.md) and LYNX's code is written from that description. No third-party code,
+  tables, presets or other content is copied, and licence protections are never bypassed. Static analysis of a
+  third-party binary is not something a contributor starts on their own: it needs the owner's decision.
 - Unknown meaning → no map (the default preset). Mark unconfirmed readings as such in the table comment.
 - New LYNX SHARE modules that play a third-party role (pitch correction, de-esser, noise suppressor, doubler, exciter…)
   add their entry to `builtInTable` (or call `registerPluginSubstitutes` at start-up) when they land.

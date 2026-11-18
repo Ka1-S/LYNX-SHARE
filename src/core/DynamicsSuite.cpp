@@ -6,6 +6,7 @@
 #include <cmath>
 #include <complex>
 #include <cstdio>
+#include <cstdlib>
 
 #include "core/Biquad.h"
 #include "core/Effects.h"
@@ -1082,6 +1083,47 @@ struct SlidingMax
     }
 };
 
+// ---- round 190lg (REA_rodada190lg, Versatile): Pro-C 3's default style (LYNX's Allround), rebuilt from the reference's
+// own graph of generic elements: two gain computers (the usual quadratic knee, ratio and range, as the reduction share
+// 1 − 10^(−GR / 20)) on two slightly different readings of the side chain's level,
+//  - slow: 0.979 × the level + 0.0203 × the level low-passed at 204 Hz → the gain computer → the knob-timed follower
+//    (attack 0.8 ms + 249.2 ms · a³, release 10 ms + 2.49 s · tan (1.2 r²) / tan (1.2); auto release T = k / (√y + 1),
+//    k = 2.0494 r² + 0.0905);
+//  - fast: 0.91 × the level low-passed at 6.39 kHz → the gain computer → a slew limiter (the share rises by at most
+//    1 per T3 s and falls by at most 1 per T4 s, both from the knob times);
+//  the reduction is max (slow, w · fast), w = 0.9 + 0.0398 · fast (within 0.7 … 1.06). The reference drifts two mixer
+//  gains with slow random modulators: LYNX runs their mean. T3 / T4 are LYNX's own smooth fits of the reference's
+//  piecewise-linear knob curves; T4 runs at half that fit: round 108's measured burst (attack 10 / release 200 ms: the
+//  gain back half-way after 61.6 ms) reads 59.5 ms with it (120 ms with the full fit, 28 ms without the fast path), and
+//  the full fit held the fast path up on the bank's music files (0.3 … 0.6 dB too much reduction). The attack knob's two
+//  step-dependent follower terms are not built (every reading of them scored lower on the bank than leaving them neutral)
+struct VersLaw
+{
+    double slowLevel = 0.979424, slowLowMix = 0.020348, slowLowHz = 204.0;
+    double fastLevel = 0.91, fastHz = 6390.0;
+    double wBase = 0.9, wSlope = 0.0397797, wMin = 0.7, wMax = 1.06;
+    double attBase = 0.0008, attSpan = 0.2492, autoA = 2.049379, autoB = 0.0905348;
+    // T3 (attack s): linear up to t3At s (t3Lin · s / t3At), then t3Pow · (s / t3Ref)^t3Exp
+    double t3At = 0.02, t3Lin = 0.08, t3Pow = 0.15, t3Ref = 0.2, t3Exp = 0.273;
+    // T4 (release s) = t4A + t4B s + t4C s²
+    double t4A = 0.19, t4B = 0.55, t4C = 0.03;
+};
+inline const VersLaw& versLaw() noexcept
+{
+    static const VersLaw law;
+    return law;
+}
+inline double versT3 (const VersLaw& v, double s) noexcept
+{
+    s = std::max (s, 0.0);
+    return s <= v.t3At ? v.t3Lin * s / v.t3At : v.t3Pow * std::pow (s / v.t3Ref, v.t3Exp);
+}
+inline double versT4 (const VersLaw& v, double s) noexcept
+{
+    s = std::max (s, 0.0);
+    return v.t4A + v.t4B * s + v.t4C * s * s;
+}
+
 bool revisionStaticDb (const EffectParams& p, double inputDb, double& gainDb) noexcept
 {
     if (! revisionOn (p))
@@ -1123,6 +1165,23 @@ bool revisionStaticDb (const EffectParams& p, double inputDb, double& gainDb) no
         if (thr < -1.1920928955078125e-07)
             g = 20.0 * std::log10 (dbToGain (inputDb) * (dbToGain (-thr) - 1.0) + 1.0);
         gainDb = -std::max (0.0, std::min (g, rng));
+        return true;
+    }
+    if (st == Style::allround)
+    {
+        // round 190lg: a steady sine: the slow reading ≈ 0.979 peak + 0.0203 · its mean (2 / π), the fast one 0.91 peak
+        const auto& v = versLaw();
+        const auto curve = [&] (double lev) {
+            auto g = v2Knee (lev - thr, kn);
+            if (rat < 100.0)
+                g -= g / rat;
+            return std::max (0.0, std::min (g, rng));
+        };
+        const auto sl = curve (inputDb + 20.0 * std::log10 (v.slowLevel + v.slowLowMix * 0.6366197723675814));
+        const auto fa = curve (inputDb + 20.0 * std::log10 (v.fastLevel));
+        const auto sh = [] (double g) { return 1.0 - std::exp (-g * 0.1151292546497023); };
+        const auto r = std::max (sh (sl), std::clamp (v.wBase + v.wSlope * sh (fa), v.wMin, v.wMax) * sh (fa));
+        gainDb = 20.0 * std::log10 (std::max (1.0 - r, 1e-9));
         return true;
     }
     if (st == Style::mastering || st == Style::bus || st == Style::punch || st == Style::pumping)
@@ -1252,6 +1311,7 @@ private:
         double v0 = 0.0, v1 = 0.0, v2 = 0.0, held = 0.0; // round 190kw: the V1 styles' follower (reduction, dB) and hold
         double q0 = 0.0, q1 = 0.0, q2 = 0.0, lp1 = 0.0, lp2 = 0.0; // round 190kw: the V2 styles' followers, Mastering's smoother
         V2Cache k0, k1, k2;
+        double va1 = 0.0, va2 = 0.0, vb1 = 0.0, vb2 = 0.0, vF = 0.0; // round 190lg: Versatile's two low-passes, its slew limiter
     };
 
     // per-chunk settings at the rate the detector runs at
@@ -1283,6 +1343,9 @@ private:
         double vocalBase = 0.0; // Vocal: the second follower's release before the programme adds to it
         int holdN = 0;          // Mastering: the reduction's 10 ms peak hold
         double lpB0 = 0.0, lpB1 = 0.0, lpB2 = 0.0, lpA1 = 0.0, lpA2 = 0.0;
+        // round 190lg: Versatile (v2 = 8): the two low-passes (b0, b1, b2, a1, a2), the slew limiter's steps (dB per sample)
+        std::array<double, 5> vA {}, vB {};
+        double vUp = 0.0, vDown = 0.0;
     };
     double styleGain (const Ctx& x, double level) const noexcept
     {
@@ -1489,6 +1552,31 @@ private:
             last->autoK = autoK;
             c.window = 0;
         }
+        else if (on (p[revision]) && c.st == Style::allround)
+        {
+            // round 190lg: Versatile (see VersLaw)
+            const auto& v = versLaw();
+            const auto a3 = std::clamp ((att - 0.005) / 250.0, 0.0, 1.0);
+            const auto rel = std::clamp ((releaseMs (p[release]) - 10.0) / 2490.0, 0.0, 1.0);
+            const auto r2 = std::atan (rel * std::tan (1.2)) / 1.2;
+            const auto attS = v.attBase + v.attSpan * a3, relS = 0.01 + 2.49 * rel;
+            c.v2 = 8;
+            c.f0 = {};
+            c.f0.att = attS; c.f0.rel = relS;
+            c.f0.autoRel = on (p[autoRelease]);
+            c.f0.autoK = v.autoA * r2 + v.autoB;
+            const auto lowPass = [rate] (double hz, std::array<double, 5>& q) {
+                // a two-pole low-pass (Butterworth, bilinear)
+                const auto k = std::tan (3.141592653589793 * std::min (hz, 0.45 * rate) / rate), qq = 1.0 / std::sqrt (2.0);
+                const auto n = 1.0 / (1.0 + k / qq + k * k);
+                q = { k * k * n, 2.0 * k * k * n, k * k * n, 2.0 * (k * k - 1.0) * n, (1.0 - k / qq + k * k) * n };
+            };
+            lowPass (v.slowLowHz, c.vA);
+            lowPass (v.fastHz, c.vB);
+            c.vUp = 1.0 / std::max (0.1, rate * versT3 (v, attS));
+            c.vDown = 1.0 / std::max (0.1, rate * versT4 (v, relS));
+            c.window = 0;
+        }
         return c;
     }
 
@@ -1612,6 +1700,25 @@ private:
                 v2Step (d.q0, g, x.f0, rate, d.k0);
                 v2Step (d.q1, std::max (std::abs (g), std::abs (d.q0)), x.f1, rate, d.k1);
                 gr = v2Step (d.q2, std::max (std::abs (g), std::abs (d.q1)), x.f2, rate, d.k2);
+                break;
+            }
+            case 8: // round 190lg: Versatile (see VersLaw)
+            {
+                const auto& v = versLaw();
+                const auto lp = [] (const std::array<double, 5>& q, double in, double& z1, double& z2) {
+                    const auto y = q[0] * in + z1;
+                    z1 = q[1] * in - q[3] * y + z2;
+                    z2 = q[2] * in - q[4] * y;
+                    return y;
+                };
+                const auto low = lp (x.vA, x0, d.va1, d.va2);
+                const auto sA = v.slowLevel * x0 + v.slowLowMix * std::max (low, 0.0);
+                const auto sB = lp (x.vB, v.fastLevel * x0, d.vb1, d.vb2);
+                const auto dbOf = [] (double m) { m = std::abs (m); return m > 1e-10 ? std::max (-180.0, 20.0 * std::log10 (m)) : -180.0; };
+                const auto slow = v2Step (d.c0, share (curve (dbOf (sA))), x.f0, rate, d.k0);
+                const auto step = share (curve (dbOf (sB))) - d.vF;
+                d.vF += step > 0.0 ? std::min (step, x.vUp) : std::max (step, -x.vDown);
+                gr = toDb (std::max (slow, std::clamp (v.wBase + v.wSlope * d.vF, v.wMin, v.wMax) * d.vF));
                 break;
             }
             case 6: // Punch: one follower on the dB reduction
@@ -2520,6 +2627,112 @@ double responseDb (const EffectParams& p, const double* bandGainDb, double sampl
 
 namespace
 {
+// ---- round 190lg (REA_rodada190lg §7, static REA of Pro-MB's BandCompander; LYNX's own code from the laws): revision 1.
+// Per band and detector channel: the level in dB → the gain computer (the usual quadratic knee and ratio, then a soft
+// range of width 0.6 × knee + 12 dB) → the maximum over a hold window → a low pass timed by the look-ahead → follower A
+// (slow: it sets a floor) → max (A, the low-passed reduction) → follower B (the knob times) = the band's reduction.
+#ifdef LYNX_MBLAB
+// lab build only: LYNX_MBLAB="key=value …" scales the laws (fitting on the bank; never in a product build)
+struct MbLab
+{
+    double aAtk = 1, aRel = 1, bAtk = 1, bRel = 1, p6 = 1, hold = 1, lead = 1, lpOrder = 2, soft = 1, oldSoft = 0;
+    double inv = 1, invSlope = 0, invW = 1;
+    MbLab()
+    {
+        if (const char* e = std::getenv ("LYNX_MBLAB"))
+        {
+            std::string t (e);
+            std::size_t i = 0;
+            while (i < t.size())
+            {
+                auto j = t.find (' ', i);
+                if (j == std::string::npos)
+                    j = t.size();
+                const auto kv = t.substr (i, j - i);
+                const auto eq = kv.find ('=');
+                if (eq != std::string::npos)
+                {
+                    const auto k = kv.substr (0, eq);
+                    const auto v = std::atof (kv.c_str() + eq + 1);
+                    double* f = k == "aAtk" ? &aAtk : k == "aRel" ? &aRel : k == "bAtk" ? &bAtk : k == "bRel" ? &bRel : k == "p6" ? &p6
+                              : k == "hold" ? &hold : k == "lead" ? &lead : k == "lp" ? &lpOrder : k == "soft" ? &soft
+                              : k == "oldSoft" ? &oldSoft : k == "inv" ? &inv
+                              : k == "invSlope" ? &invSlope : k == "invW" ? &invW : nullptr;
+                    if (f != nullptr)
+                        *f = v;
+                }
+                i = j + 1;
+            }
+        }
+    }
+};
+const MbLab& mbLab() { static const MbLab l; return l; }
+#endif
+// the release knob (0 … 1) in seconds: LYNX's own smooth law fitted to the shape of the reference's curve (5 ms … 5 s:
+// a power-law rise, then a steep step around 88 % into the long times; fitted on 15 … 100 %, within 13 % there)
+double mbReleaseS (float v) noexcept
+{
+    const auto x = (double) std::clamp (v, 0.0f, 1.0f);
+    const auto step = [] (double t) { return 1.0 / (1.0 + std::exp (-(t - 0.878) / 0.044)); };
+    const auto lo = step (0.0), hi = step (1.0);
+    return 0.005 + 1.64 * std::pow (x, 1.87) + (4.995 - 1.64) * (step (x) - lo) / (hi - lo);
+}
+// the band's detector lead (ms) under the reference's look-ahead switch: half a period of the band's centre (at most 5 ms)
+// plus the band's own look-ahead, 0.1 … 20 ms
+double mbLeadMs (double loHz, double hiHz, double ownMs) noexcept
+{
+    const auto lo = loHz > 0.0 ? loHz : 20.0, hi = hiHz > 0.0 ? hiHz : 30000.0;
+    return std::clamp (500.0 / std::max (std::sqrt (lo * hi), 100.0) + ownMs, 0.1, 20.0);
+}
+// the gain computer of a band that compresses downward or expands upward (≥ 0 dB): knee, ratio, the soft range
+double mbReduction (double over, double squeeze, double knee, double range, double soft) noexcept
+{
+    auto g = kneeCurve (over, squeeze, knee);
+    if (soft > 1.1920928955078125e-07)
+    {
+        const auto v = range - g;
+        if (v >= -0.5 * soft && v <= 0.5 * soft)
+            g = range - (0.5 * soft + v) / soft * ((0.5 * soft + v) / soft) * (0.5 * soft);
+    }
+    return std::max (0.0, std::min (g, range));
+}
+// the inverted modes' gain computer (0 … 36 dB): below the threshold, a one-sided knee (the overshoot's square inside the
+// knee's width, then the overshoot − half the width) × (ratio − 1), the soft range of the knee's width under 36 dB
+double mbBelow (double under, double slope, double knee) noexcept
+{
+    if (under <= 0.0)
+        return 0.0;
+    auto v = under - 0.5 * knee;
+    if (knee > 1.1920928955078125e-07 && v <= 0.5 * knee)
+        v = under / knee * (under / knee) * (0.5 * knee);
+    return mbReduction (v * slope, 1.0, 0.0, 36.0, knee);
+}
+// one detector channel's state
+struct MbDetector
+{
+    crest::SlidingMax hold;
+    double lp1 = 0.0, lp2 = 0.0, a = 0.0, b = 0.0;
+    crest::V2Cache ka, kb;
+    void reset() noexcept
+    {
+        hold.clear();
+        lp1 = lp2 = a = b = 0.0;
+        ka = kb = crest::V2Cache {};
+    }
+};
+// a band's revision-1 settings for one chunk
+struct MbBand
+{
+    bool on = false;
+    bool inverted = false;       // upward compression / downward expansion: the graph runs on 36 − the detector's output
+    double sign = -1.0, thr = 0.0, squeeze = 0.0, knee = 0.0, range = 0.0, soft = 12.0;
+    double slope = 1.0, scale = 1.0, relA = 0.0, rel = 0.0;
+    int holdN = 0;
+    int lpOrder = 2;             // the low pass: two-pole Butterworth (1: one pole; the lab compares)
+    double lp[5] { 1, 0, 0, 0, 0 }; // b0, b1, b2, a1, a2 (one pole: lp[0] = its coefficient)
+    crest::V2Follow fa, fb;
+};
+
 // a delay line sized in prepare() (the linear-phase path's dry signal: up to 12 288 samples at 192 kHz)
 struct LongDelay
 {
@@ -2653,6 +2866,10 @@ public:
             linDry.allocate (linearLatency (rate));
             linSc.allocate (linearLatency (rate));
         }
+        // round 190lg: revision 1's hold windows (up to 1.1 × 20 + 102 ms)
+        for (auto& row : mbDet)
+            for (auto& d : row)
+                d.hold.setup ((int) std::ceil (0.13 * rate) + 2);
         mode = -1;
         osFactor = 0;
         configure (lastParams);
@@ -2691,6 +2908,9 @@ public:
         dynWorks.fill (false);
         env.fill (-120.0);
         env2.fill (-120.0);
+        for (auto& row : mbDet)
+            for (auto& d : row)
+                d.reset();
         held.fill (0.0);
         held2.fill (0.0);
         gains.fill (1.0f);
@@ -2815,6 +3035,7 @@ private:
 
         std::array<double, bands> aA {}, aR {}, aR2 {}, aG {}, kG {}, level {};
         const bool gainAttack = measuredDet && on (p[rev152]);
+        const bool rev190 = on (p[revision]); // round 190lg: the reference's band compander graph (hidden revision)
         std::array<bool, bands> enabled {}, soloed {}, growsWithLevel {};
         std::array<float, bands> panL {}, panR {};
         bool anySolo = false;
@@ -2843,8 +3064,18 @@ private:
             soloed[(std::size_t) b] = on (p[(std::size_t) param (b, fSolo)]) && L.segmentOf[(std::size_t) b] >= 0;
             anySolo = anySolo || soloed[(std::size_t) b];
             // round 128: a band's own look-ahead (≤ the global one): its gain waits for the difference
-            const auto bandLa = std::min (laMs, lookaheadMs (p[(std::size_t) bandLookaheadParam (b)]));
+            auto bandLa = std::min (laMs, lookaheadMs (p[(std::size_t) bandLookaheadParam (b)]));
+            if (rev190 && laMs > 0.0) // round 190lg: the reference's lead (half a period of the band's centre + its own)
+            {
+                bandLa = mbLeadMs (L.loHz[(std::size_t) b], L.hiHz[(std::size_t) b], lookaheadMs (p[(std::size_t) bandLookaheadParam (b)]));
+#ifdef LYNX_MBLAB
+                bandLa = std::clamp (bandLa * mbLab().lead, 0.0, laMs);
+#endif
+            }
             gainDelay[(std::size_t) b].setLength (std::max (0, laSamples - (int) std::lround (bandLa * 0.001 * sr)));
+            mb[(std::size_t) b].on = false;
+            if (rev190)
+                setupRevision1 (p, b, laMs > 0.0 ? bandLa : 0.0);
             gainDelayB[(std::size_t) b].setLength (gainDelay[(std::size_t) b].len);
             // round 147: the stereo link and the free side-chain filter (the expert panel)
             const auto lv = p[(std::size_t) (bandLink0 + b)];
@@ -2994,6 +3225,13 @@ private:
                     }
                     detectorPeak[(std::size_t) b] = std::max (detectorPeak[(std::size_t) b], (double) std::max (std::abs (cl), std::abs (cr)));
                     const auto follow = [&] (double& e, double& hold, double m) noexcept {
+                        if (mb[(std::size_t) b].on) // round 190lg: revision 1
+                        {
+                            const auto gdb = runRevision1 (mb[(std::size_t) b], mbDet[(std::size_t) b][&e == &env2[(std::size_t) b] ? 1 : 0], m);
+                            if (std::abs (gdb) > std::abs (extreme[(std::size_t) b]))
+                                extreme[(std::size_t) b] = gdb;
+                            return gdb;
+                        }
                         const auto x = std::max (-120.0, 20.0 * std::log10 (m + 1e-12));
                         e = x > e ? aA[(std::size_t) b] * e + (1.0 - aA[(std::size_t) b]) * x
                                   : aR[(std::size_t) b] * e + (1.0 - aR[(std::size_t) b]) * x;
@@ -3366,6 +3604,104 @@ private:
         for (auto& o : down) o.reset();
     }
 
+    // round 190lg (REA_rodada190lg §7): revision 1's settings of band b; `leadMs` = its detector lead (0: no look-ahead)
+    void setupRevision1 (const EffectParams& p, int b, double leadMs) noexcept
+    {
+        const auto at = [&] (int f) { return p[(std::size_t) param (b, f)]; };
+        auto& m = mb[(std::size_t) b];
+        const auto rng = rangeDb (at (fRange));
+        const bool expand = on (at (fMode));
+        if (std::abs (rng) < 0.01)
+            return;
+        // a downward compressor or an upward expander runs the graph on the detector's reduction; an upward compressor
+        // or a downward expander on 36 dB − it (the detector then reads how far the level is under the threshold)
+        m.inverted = expand != (rng > 0.0);
+#ifdef LYNX_MBLAB
+        if (m.inverted && mbLab().inv < 0.5)
+            return;
+#endif
+        m.on = true;
+        m.sign = rng > 0.0 ? 1.0 : -1.0;
+        m.slope = ratioOf (at (fRatio)) - 1.0;
+        m.scale = std::abs (rng) / 36.0;
+        m.thr = thresholdDb (at (fThreshold));
+        m.squeeze = isInfiniteRatio (at (fRatio)) ? 1.0 : 1.0 - 1.0 / ratioOf (at (fRatio));
+        m.knee = kneeDb (at (fKnee));
+        m.range = std::abs (rng);
+        m.soft = 0.6 * m.knee + 12.0;
+        const auto a = 100.0 * (double) std::clamp (at (fAttack), 0.0f, 1.0f); // the reference's knobs, 0 … 100 %
+        const auto r = 100.0 * (double) std::clamp (at (fRelease), 0.0f, 1.0f);
+        const auto rel = mbReleaseS (at (fRelease));
+        const auto slow = 1.0 - std::min (1.0, 0.05 * a); // 1 at attack 0 %, 0 from 20 %
+        auto holdMs = (leadMs > 0.0 ? 1.1 * leadMs : 0.11) + (r + 2.0) * slow;
+        const auto lpHz = 650.0 / (leadMs > 0.0 ? leadMs : 0.1);
+        m.fa = {};
+        m.fa.att = slow * 0.5 + 0.12;
+        m.fa.rel = (rel + 1.0) * 0.25;
+        m.fb = {};
+        m.fb.att = 6.0e-9 * a * a * a * a + 0.00025;
+        m.fb.rel = rel;
+        m.fb.p5 = 1.0 - 0.7 * slow;
+        m.fb.p6 = 0.1 * rel;
+        m.rel = rel;
+        m.relA = m.inverted ? 0.007 : 0.0; // follower B's release grows with follower A (s per dB)
+        m.lpOrder = 2;
+#ifdef LYNX_MBLAB
+        const auto& lab = mbLab();
+        m.fa.att *= lab.aAtk;
+        m.fa.rel *= lab.aRel;
+        m.fb.att *= lab.bAtk;
+        m.fb.rel *= lab.bRel;
+        m.rel *= lab.bRel;
+        m.fb.p6 *= lab.p6;
+        holdMs *= lab.hold;
+        m.relA *= lab.invW;
+        if (lab.invSlope > 0.5) // the slope read as the gain's own (ratio − 1 per dB under the threshold)
+            m.slope /= m.scale;
+        m.lpOrder = (int) lab.lpOrder;
+        m.soft *= lab.soft;
+        if (lab.oldSoft > 0.5)
+            m.soft = std::min (12.0, 2.0 * m.range);
+#endif
+        m.holdN = (int) std::lround (holdMs * 0.001 * sr);
+        const auto fc = std::min (lpHz, 0.45 * sr);
+        if (m.lpOrder == 1)
+            m.lp[0] = 1.0 - std::exp (-2.0 * pi * fc / sr);
+        else if (m.lpOrder >= 2)
+        {
+            // two-pole Butterworth (bilinear)
+            const auto k = std::tan (pi * fc / sr), q = 0.7071067811865476, n = 1.0 / (1.0 + k / q + k * k);
+            m.lp[0] = k * k * n;
+            m.lp[1] = 2.0 * m.lp[0];
+            m.lp[2] = m.lp[0];
+            m.lp[3] = 2.0 * (k * k - 1.0) * n;
+            m.lp[4] = (1.0 - k / q + k * k) * n;
+        }
+    }
+
+    // round 190lg: one sample of revision 1's graph for a detector channel reading magnitude x; returns the gain (dB)
+    double runRevision1 (MbBand& m, MbDetector& d, double x) noexcept
+    {
+        const auto level = std::max (-180.0, 20.0 * std::log10 (x + 1e-30));
+        auto g = m.inverted ? 36.0 - mbBelow (m.thr - level, m.slope, m.knee)
+                            : mbReduction (level - m.thr, m.squeeze, m.knee, m.range, m.soft);
+        g = d.hold.push (g, m.holdN);
+        if (m.lpOrder == 1)
+            g = d.lp1 += (g - d.lp1) * m.lp[0];
+        else if (m.lpOrder >= 2)
+        {
+            const auto y = m.lp[0] * g + d.lp1;
+            d.lp1 = m.lp[1] * g - m.lp[3] * y + d.lp2;
+            d.lp2 = m.lp[2] * g - m.lp[4] * y;
+            g = y;
+        }
+        crest::v2Step (d.a, g, m.fa, sr, d.ka);
+        if (m.inverted)
+            m.fb.rel = m.rel + m.relA * d.a;
+        crest::v2Step (d.b, std::max (d.a, g), m.fb, sr, d.kb);
+        return m.inverted ? m.sign * m.scale * (36.0 - d.b) : m.sign * d.b;
+    }
+
     void configure (const EffectParams& p) noexcept
     {
         // round 144: the processing mode and the oversampling (at most 4x, and only up to 400 kHz)
@@ -3373,7 +3709,8 @@ private:
         int factor = oversamplingOf (p[oversampling]);
         while (factor > 1 && sr * factor > 400000.0)
             factor /= 2;
-        const auto la = lookaheadMs (p[lookahead]);
+        // round 190lg: under revision 1 the reference's switch sets the look-ahead: the audio waits 20 ms, or nothing
+        const auto la = on (p[revision]) ? (on (p[lookaheadSwitch]) ? 20.0 : 0.0) : lookaheadMs (p[lookahead]);
         if (la == laMs && m == mode && factor == osFactor)
             return;
         if (m != mode)
@@ -3448,6 +3785,8 @@ private:
     int laSamples = 0;
     std::array<double, bands> env {}, env2 {}, extreme {};
     std::array<double, bands> held {}, held2 {}; // round 150: the measured detector's gain after its own release
+    std::array<MbBand, bands> mb {};                     // round 190lg: revision 1's settings and detector states
+    std::array<std::array<MbDetector, 2>, bands> mbDet {};
     std::array<float, bands> gains {};
     // one chunk of the base-rate streams, and the same at the oversampled rate
     std::array<std::array<float, chunk>, 2> dry {};

@@ -16,7 +16,7 @@ Thanks for wanting to help! LYNX SHARE is an alpha, so bug reports, ideas and pu
 ## Clean-room rule
 LYNX SHARE recreates the FL Studio *workflow*, not its code or artwork.
 - Don't copy code, graphics, presets, samples or names from FL Studio or any third-party plugin.
-- Third-party plugins are studied as black boxes only (host them, feed signals, measure). Never decompile, patch or bypass their licensing.
+- Third-party plugins are studied as black boxes (host them, feed signals, measure). Since 2026-11, by the project owner's decision, some stand-ins were also informed by clean-room static analysis of the third-party binaries (documented in [`docs/analise/REA_*.md`](docs/analise)); that is done only by the owner's decision, and nothing found that way is copied — no code, tables, presets or other content. Never patch a third-party plugin or bypass its licence protection.
 
 ## License
 By contributing you agree that your contribution is licensed under the [GNU AGPL v3](LICENSE), like the rest of LYNX SHARE.

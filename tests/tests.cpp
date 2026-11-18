@@ -17830,9 +17830,13 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Parity190lbTests.inc" // round 190lb: black-box study (no decryption); SSL 4K G Pink EQ + output ceiling
 #include "Harrison190leTests.inc" // round 190le: Ridge Strip's 32C voicing (Harrison 32Classic EQ law)
 #include "Parity190kyTests.inc" // round 190ky: Crest's FET law (REA of the Waves CLA-76 DSP), CLA-76 on it
+#include "Parity190lgQ4Tests.inc" // round 190lg: Facet's automatic threshold on Pro-Q 4's structure (revision 1; after Parity190jh / 190js)
 #include "Parity190kwTests.inc" // round 190kw: static REA — Crest's Pro-C 3 V1 / V2 style laws (hidden revision)
+#include "Parity190lgVersTests.inc" // round 190lg: Crest Allround = Pro-C 3 Versatile (revision 1; after Parity190kw: its helpers)
+#include "Parity190lgMbTests.inc" // round 190lg: Prism revision 1 on Pro-MB's own band compander graph (after DynamicsTests108: its helpers)
 #include "Parity190kwTl3Tests.inc" // round 190kw: Timeless 3 states on Echoform (the hidden line law)
 #include "Parity190kwVvTests.inc" // round 190kw: Epoch Verb's level on ValhallaVintageVerb's loop law (after Parity190it: its gold helpers)
+#include "Parity190kwSatTests.inc" // round 190kw: Saturn 2 -> Ember, the styles' own laws (hidden revision)
 #include "Sampler190dhTests.inc"
 #include "Fix190eaTests.inc"
 #include "Iss158Tests.inc"

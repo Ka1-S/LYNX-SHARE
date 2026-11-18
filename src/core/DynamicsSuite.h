@@ -204,7 +204,14 @@ enum Global { xover1 = legacyBands * fieldsPerBand, xover2, xover3, slope, looka
               // round tp172b6 [EXEC] (Pro-MB's Audition, Expert panel): the output becomes what the band's detector hears (0 off,
               // k / 6 band k): level, range, threshold and mix don't touch it, the Output does, a switched-off band still sounds
               audition = rev152 + 1,
-              count = audition + 1 };
+              count = audition + 1,
+              // round 190lg, hidden (not in the info: no control, no text; saved while non-zero): revision 1 runs the
+              // reference's own band compander graph (REA_rodada190lg §7: the detector with its soft range, a peak hold
+              // and a low pass timed by the look-ahead, two followers joined by a max) for the bands that compress
+              // downward or expand upward; `lookaheadSwitch` is the reference's look-ahead switch under revision 1
+              // (1 on: each band's detector leads by 500 / its centre frequency + its own look-ahead, the audio waits
+              // 20 ms). Only the Pro-MB translator sets them; a project saved before keeps 0 (bit for bit)
+              revision = count, lookaheadSwitch = count + 1 };
 inline int param (int band, int field) noexcept
 {
     return band < legacyBands ? band * fieldsPerBand + field : band5 + (band - legacyBands) * fieldsPerBand + field;
