@@ -269,6 +269,12 @@
 #    the marks there are drawn again over the new pixels, in the same order of requests on the same connection.
 #    `lynxX11Display()` hands LYNX JUCE's display connection (so its requests are ordered with JUCE's). Null hook: nothing.
 #
+# fix 190la. Windows only, juce_graphics/native/juce_DirectX_windows.h (round 190la, perf): the Direct3D 11 device JUCE's
+#    Direct2D windows draw with is made with D3D11_CREATE_DEVICE_PREVENT_INTERNAL_THREADING_OPTIMIZATIONS: the graphics
+#    driver no longer hands each frame's commands to a thread of its own (NVIDIA's driver thread used 5-13 % of a core
+#    while a song played, with ~560 SetThreadAffinityMask calls a second; REA 190hb). The same frames, drawn and presented
+#    on the message thread. LYNX_D3D_DRIVER_THREADS=1: the driver's threads as before (A/B).
+#
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
 
@@ -589,6 +595,9 @@ function(lynx_patch_juce_file file)
             "        if (auto* ctx = direct2DContext->startFrame ((float) peer.getPlatformScaleFactor()))|NL|        {|NL|            peer.handlePaint (*ctx);|NL|            direct2DContext->endFrame();|NL|        }"
             "        if (auto* ctx = direct2DContext->startFrame ((float) peer.getPlatformScaleFactor()))|NL|        {|NL|            peer.handlePaint (*ctx);|NL|            direct2DContext->endFrame();|NL|            peer.lynxFramePresented(); // LYNX patch (round 190gv, fix 34): a child window's frame is shown at once|NL|        }")
     elseif(file MATCHES "juce_DirectX_windows.h$")
+        lynx_juce_fix("no driver threads for the Direct2D device" "LYNX patch (round 190la): no driver threads"
+            "        const auto creationFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;"
+            "        // LYNX patch (round 190la): no driver threads for these frames (LYNX_D3D_DRIVER_THREADS=1: as before)|NL|        const auto creationFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT|NL|                                   | (SystemStats::getEnvironmentVariable (\"LYNX_D3D_DRIVER_THREADS\", {}) == \"1\" ? 0 : D3D11_CREATE_DEVICE_PREVENT_INTERNAL_THREADING_OPTIMIZATIONS);")
         lynx_juce_fix("no WARP device beside a hardware adapter" "LYNX patch (round 190go): a software adapter"
             "        for (UINT i = 0;; ++i)|NL|        {|NL|            ComSmartPtr<IDXGIAdapter1> dxgiAdapter;|NL||NL|            if (factory->EnumAdapters1 (i, dxgiAdapter.resetAndGetPointerAddress()) == DXGI_ERROR_NOT_FOUND)|NL|                break;|NL||NL|            if (const auto adapter = DxgiAdapter::create (d2dFactory, dxgiAdapter))|NL|            {|NL|                adapterArray.add (adapter);|NL|                listeners.call ([adapter] (DxgiAdapterListener& l) { l.adapterCreated (adapter); });|NL|            }|NL|        }|NL|"
             "        // LYNX patch (round 190go): a software adapter (WARP, the \"Microsoft Basic Render Driver\") gets its devices only|NL|        // when no hardware adapter gave any; before, every adapter got a Direct3D 11 + Direct2D device at start-up|NL|        std::vector<ComSmartPtr<IDXGIAdapter1>> lynxSoftwareAdapters;|NL|        const auto lynxAdd = [this] (ComSmartPtr<IDXGIAdapter1> dxgiAdapter)|NL|        {|NL|            if (const auto adapter = DxgiAdapter::create (d2dFactory, dxgiAdapter))|NL|            {|NL|                adapterArray.add (adapter);|NL|                listeners.call ([adapter] (DxgiAdapterListener& l) { l.adapterCreated (adapter); });|NL|            }|NL|        };|NL||NL|        for (UINT i = 0;; ++i)|NL|        {|NL|            ComSmartPtr<IDXGIAdapter1> dxgiAdapter;|NL||NL|            if (factory->EnumAdapters1 (i, dxgiAdapter.resetAndGetPointerAddress()) == DXGI_ERROR_NOT_FOUND)|NL|                break;|NL||NL|            DXGI_ADAPTER_DESC1 lynxDesc {};|NL||NL|            if (dxgiAdapter != nullptr && SUCCEEDED (dxgiAdapter->GetDesc1 (&lynxDesc))|NL|                && ((lynxDesc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) != 0 || (lynxDesc.VendorId == 0x1414 && lynxDesc.DeviceId == 0x8c)))|NL|            {|NL|                lynxSoftwareAdapters.push_back (dxgiAdapter);|NL|                continue;|NL|            }|NL||NL|            lynxAdd (dxgiAdapter);|NL|        }|NL||NL|        if (adapterArray.isEmpty())|NL|            for (auto& dxgiAdapter : lynxSoftwareAdapters)|NL|                lynxAdd (dxgiAdapter);|NL|")
