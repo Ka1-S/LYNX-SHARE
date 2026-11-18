@@ -232,6 +232,8 @@ public:
     void mouseExit (const juce::MouseEvent& e) override;
     // --uiperf (round 173f): where a fader drag starts (the fader's rail, strip coordinates)
     juce::Rectangle<int> faderRailForSnapshot (int track) const { return faderRail (track); }
+    juce::Rectangle<int> muteAreaForSnapshot (int track) const { return muteArea (track); }   // round 190kn
+    juce::Rectangle<int> meterAreaForSnapshot (int track) const { return meterArea (track); } // round 190kn
     void stepHeldRail(); // one step of the rail press being held (also called by --selftest, without the timer)
     // --uiperf: how many repaints spoiled the strips' picture and how often it was drawn again, since the last call
     std::pair<int, int> cacheCountersForPerf() noexcept { return { std::exchange (pictureInvalidations, 0), std::exchange (pictureRefills, 0) }; }

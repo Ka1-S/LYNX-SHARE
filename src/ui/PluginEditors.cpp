@@ -3784,7 +3784,26 @@ public:
             return true;
         }
         if (band < 0)
+        {
+            // round 190kn (DP-20), FL's manual (Parametric EQ 2): "(Left-Click) outside the Bands to adjust the main level
+            // control": a vertical drag (Ctrl fine, Alt+click resets it)
+            if (e.mods.isLeftButtonDown() && ! e.mods.isPopupMenu() && fx->kind == EffectKind::parametricEq)
+            {
+                if (e.mods.isAltDown())
+                {
+                    setParams ({ { peq::outputParam, makeEffectSlot (fx->kind).params[(std::size_t) peq::outputParam] } });
+                    return true;
+                }
+                eqSelected = eqMainLevel;
+                eqDownPos = e.position;
+                eqDownWidth = fx->params[(std::size_t) peq::outputParam];
+                eqFine = e.mods.isCtrlDown();
+                eqWidthDrag = 0;
+                eqDragging = true;
+                ui::showValueTip (*this, juce::Rectangle<int> (6, 6).withCentre (e.getPosition()), mainLevelText());
+            }
             return true;
+        }
         if (e.mods.isPopupMenu())
         {
             peqview::showBandMenu (*this, fx->params, band, [this] (std::vector<std::pair<int, float>> changes) { setParams (changes); });
@@ -3820,9 +3839,26 @@ public:
         return true;
     }
 
+    static constexpr int eqMainLevel = -2; // (eqSelected while the main level is dragged outside the bands)
+    juce::String mainLevelText() const
+    {
+        const auto* fx = current();
+        if (fx == nullptr)
+            return {};
+        return tr ("Main level") + ": "
+               + juce::String::fromUTF8 (formatEffectParam (fx->kind, peq::outputParam, fx->params[(std::size_t) peq::outputParam], engine.getSong().bpm, fx->params).c_str());
+    }
+
     void eqMouseDrag (const juce::MouseEvent& e)
     {
         const auto* fx = current();
+        if (fx != nullptr && eqSelected == eqMainLevel && dragItem >= 0)
+        {
+            const auto moved = (eqDownPos.y - e.position.y) * 0.004f * (eqFine ? 0.2f : 1.0f);
+            setParams ({ { peq::outputParam, juce::jlimit (0.0f, 1.0f, eqDownWidth + moved) } });
+            ui::showValueTip (*this, juce::Rectangle<int> (6, 6).withCentre (e.getPosition()), mainLevelText());
+            return;
+        }
         if (fx == nullptr || eqSelected < 0 || dragItem < 0)
             return;
         const auto graph = eqGraph (rectOf (activeLayout().items[(std::size_t) dragItem]));
@@ -5065,6 +5101,8 @@ public:
     void mouseUp (const juce::MouseEvent& e) override
     {
         eqDragging = false;
+        if (eqSelected == eqMainLevel)
+            eqSelected = -1;
         if (eqSoloing) // round 190ih: the momentary band solo ends with the click
         {
             eqSoloing = false;
@@ -5534,7 +5572,9 @@ private:
         if (isGbAny (item)) // round 168m
             return { gbHint (item, p), {}, false, true };
         if (item.type == Item::display)
-            return { tr ("Drag a handle (frequency and gain); mouse wheel = Q; right-click = type and key; double-click = 0 dB; Alt+click = reset; Ctrl = fine; Shift+click = solo while held (drag up / down: width)"), {}, false, true };
+            return { tr ("Drag a handle (frequency and gain); mouse wheel = Q; right-click = type and key; double-click = 0 dB; Alt+click = reset; Ctrl = fine; Shift+click = solo while held (drag up / down: width)")
+                         + "  " + tr ("Outside the bands: drag up or down = the main level (Alt+click: reset)"), // (round 190kn, DP-20)
+                     {}, false, true };
         if (hasStyle (item, plugui::pageTabs))
             return { tr ("Page: switch the controls shown"), {}, false, false };
         if (isMixItem (item) && captionArea (item).contains (p))

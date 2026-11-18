@@ -17908,3 +17908,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Qa190kpTests.inc" // round qa190kp: Follow pause after a layout switch during playback
 #include "QaFix190kqTests.inc" // round qafix190kq: QA-1/2/6/9/10 release blockers of 0.1.30
 #include "QaFix190kqReportTests.inc" // round qafix190kq: the import report's "not reproduced" list apart from the synth-preset instruments
+#include "Details190knTests.inc" // round details190kn: FL mute-switch modifiers (Unmute All, Lock state, slot solo), BandLab chain-preset stepper

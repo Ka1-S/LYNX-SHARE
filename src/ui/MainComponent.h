@@ -127,6 +127,7 @@ public:
     juce::PopupMenu makeToolbarMoreMenuForSnapshot() { return makeToolbarMoreMenu(); }
     void setSaveStatusForSnapshot (toolbarlayout::SaveState state);
     juce::Component* toolbarPartForSnapshot (const juce::String& name);
+    void updateUndoRedoEnabled(); // round 190kn: the Simple top bar greys Undo / Redo with nothing to undo / redo
     // round 190jj: one timer tick of the transport's shown states (Play / Pause, Stop, Record, the time, the Simple
     // capsule's lock, the master meter), for shots and tests with an offline engine
     void transportTickForSnapshot();
@@ -237,6 +238,10 @@ public:
     int getToolbarAndTrayHeightForSnapshot() const { return toolbarHeight + (toolbarEditor != nullptr ? toolbar::EditOverlay::trayHeight : 0); }
     juce::Rectangle<int> getToolStripAreaForSnapshot (bool playlistStrip);
     void setMetersForSnapshot (double cpu, std::int64_t memory, int polyphony) { perfMeter.setValues (cpu, memory, polyphony); }
+    // round 190kn (--details190knshot): the toolbar's output display, CPU panel and hint bar
+    toolbar::OutputMonitor& getOutputForSnapshot() noexcept { return output; }
+    toolbar::PerformanceMeter& getPerfMeterForSnapshot() noexcept { return perfMeter; }
+    ui::HintBar& getHintBarForSnapshot() noexcept { return hintBar; }
     static std::unique_ptr<juce::Component> makeHelpContent (const keys::KeyMap* keyMap = nullptr); // nullptr: the defaults
     static std::unique_ptr<juce::AlertWindow> makeAboutWindow(); // result 1 = OK, 2 = "Support LYNX SHARE"
     // round 190fq: the start-up support note (ui/SupportLynx.h), once per normal start; `quietRun` = test mode / CI

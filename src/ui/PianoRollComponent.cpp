@@ -1260,10 +1260,11 @@ void PianoRollComponent::paint (juce::Graphics& g)
                 g.drawLine (r.getX() + 2.0f, r.getBottom() - 2.0f, r.getX() + 9.0f, r.getY() + 2.0f, 2.0f);
             }
 
-            if (n.slide) // slide arrow at the start of the note
+            if (n.slide) // slide mark: FL's manual (Piano roll): "slide notes have a small triangle on the right" (round 190kn, DE-80)
             {
                 juce::Path arrow;
-                arrow.addTriangle (r.getX() + 2.0f, r.getBottom() - 2.0f, r.getX() + 2.0f, r.getY() + 2.0f, r.getX() + 9.0f, r.getCentreY());
+                const auto w = juce::jmin (7.0f, juce::jmax (3.0f, r.getWidth() - 4.0f));
+                arrow.addTriangle (r.getRight() - 2.0f - w, r.getBottom() - 2.0f, r.getRight() - 2.0f - w, r.getY() + 2.0f, r.getRight() - 2.0f, r.getCentreY());
                 g.setColour (bg0.withAlpha (0.65f));
                 g.fillPath (arrow);
             }
@@ -1274,7 +1275,7 @@ void PianoRollComponent::paint (juce::Graphics& g)
                 // 2.3:1; bold, 3 px in from the left as FL's)
                 g.setColour (noteLabelColour (fill));
                 g.setFont (noteLabelFont (rowHeight));
-                textcache::drawText (g, keyName (n.key), r.reduced (n.slide || n.porta ? 11.0f : 3.0f, 0.0f), juce::Justification::centredLeft, true);
+                textcache::drawText (g, keyName (n.key), r.withTrimmedLeft (n.porta ? 11.0f : 3.0f).withTrimmedRight (n.slide ? 11.0f : 3.0f), juce::Justification::centredLeft, true);
             }
         }
 

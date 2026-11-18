@@ -853,6 +853,13 @@ public:
                     renameTrack (selectedTrack);
                 return true;
             }
+            // round 190kn (DL-24): Ctrl+R on a selected clip renames the clip (Live's Edit › Rename)
+            if (! shift && letter == 'R' && sessionkeys::defaultKeyActs (sessionkeys::Command::gridRename) && gridOf() != nullptr
+                && launcher::clipAt (*gridOf(), selectedTrack, selectedScene) != nullptr)
+            {
+                renameClip (selectedTrack, selectedScene);
+                return true;
+            }
             // (round 190cm: only in the Clip-launch layout; elsewhere Ctrl+Shift+M stays "Export a MIDI file")
             if (shift && letter == 'M' && sessionkeys::defaultKeyActs (sessionkeys::Command::gridNewMidiClip))
             {
@@ -2152,6 +2159,11 @@ public:
             menu.addItem ((slot->active ? tr ("Deactivate Clip") : tr ("Activate Clip")) + sessionkeys::menuKey (sessionkeys::Command::gridDeactivateClip),
                           [this, track, scene] { toggleClipActive (track, scene); });
             menu.addSubMenu (tr ("Follow action"), followMenu (track, scene, slot->follow));
+            // round 190kn (DL-24 / DL-25): Live's clip Rename (Ctrl+R) and the clip's colour, from the clip's own menu
+            menu.addItem (tr ("Rename") + sessionkeys::menuKey (sessionkeys::Command::gridRename), [this, track, scene] { renameClip (track, scene); });
+            menu.addSubMenu (tr ("Change color"), ui::colourMenu (slot->colour, [this, track, scene] (std::uint32_t c) {
+                editSlot (track, scene, [c] (ClipGridSlot& s) { s.colour = c; });
+            }, mouseArea()));
             // grooves play on the notes of MIDI clips (round 190bv); round 190kc: Commit and Extract on audio clips too
             // (Live's manual 14.1.2 / 14.2.1: warp markers at the attacks; the attacks' timing and levels)
             if (const auto* clip = launcher::clipAt (*grid, track, scene); clip != nullptr && clip->kind == ClipKind::pattern)
@@ -2196,7 +2208,7 @@ public:
             menu.addItem (tr ("Copy") + "\tCtrl+C", [this, track, scene] { copySlot (track, scene, false); });
             menu.addItem (tr ("Paste") + "\tCtrl+V", canPaste(), false, [this, track, scene] { pasteSlot (track, scene); });
             menu.addItem (tr ("Duplicate") + "\tCtrl+D", [this, track, scene] { duplicateSlot (track, scene); });
-            menu.addItem (tr ("Delete"), [this, track, scene] {
+            menu.addItem (tr ("Delete") + "\tDel", [this, track, scene] { // (round 190kn, DL-26: Live's shortcut column)
                 engine.editSong ([=] (Song& s) { launcher::clearClip (s, track, scene); });
                 repaint();
             });
@@ -2357,6 +2369,10 @@ public:
     juce::PopupMenu buildSceneMenu (int scene)
     {
         juce::PopupMenu menu;
+        // round 190kn (DL-7): Live's "Cancel Scene Launch" (manual 7.2: "clicking the Cancel Scene Launch entry in the Main
+        // track's context menu"); here the scene column is Live's Main track. Enabled while a launched scene waits.
+        menu.addItem (tr ("Cancel Scene Launch"), queuedScene >= 0, false, [this] { cancelSceneLaunch(); });
+        menu.addSeparator();
         menu.addItem (tr ("Insert scene") + sessionkeys::menuKey (sessionkeys::Command::gridInsertScene), [this, scene] {
             engine.editSong ([scene] (Song& s) { launcher::insertScene (s, scene); });
             clampScroll();
@@ -2651,6 +2667,49 @@ private:
             }
         }), false);
     }
+    // round 190kn (DL-24): the clip's own name (empty = the pattern's or the sample's name again)
+    void renameClip (int track, int scene)
+    {
+        const auto* grid = gridOf();
+        if (grid == nullptr)
+            return;
+        const auto* clip = launcher::clipAt (*grid, track, scene);
+        if (clip == nullptr)
+            return;
+        auto* window = new juce::AlertWindow (tr ("Rename clip"), {}, juce::MessageBoxIconType::NoIcon, this);
+        window->addTextEditor ("name", clipName (engine.getSong(), *grid, *clip));
+        window->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+        window->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+        juce::Component::SafePointer<ClipGridComponent> self (this);
+        window->enterModalState (true, juce::ModalCallbackFunction::create ([self, window, track, scene] (int result) {
+            const std::unique_ptr<juce::AlertWindow> owned (window);
+            if (result == 1 && self != nullptr)
+            {
+                const auto name = owned->getTextEditorContents ("name").trim().toStdString();
+                self->editSlot (track, scene, [name] (ClipGridSlot& s) {
+                    s.name = name;
+                    s.blankName = false;
+                });
+            }
+        }), false);
+    }
+
+public:
+    // round 190kn (DL-7): drops the launches still waiting (the launcher's cancelLaunch, as the mapping strip's item) and
+    // ends the queued scene's pulse at once
+    void cancelSceneLaunch()
+    {
+        engine.launcherCommand ({ launcher::Command::Type::cancelLaunch });
+        if (queuedScene >= 0)
+        {
+            const auto row = queuedScene;
+            queuedScene = -1;
+            repaintScene (row);
+        }
+    }
+    bool sceneLaunchQueued() const noexcept { return queuedScene >= 0; } // (tests / shots)
+
+private:
     void renameScene (int scene)
     {
         const auto* grid = gridOf();
@@ -3120,6 +3179,18 @@ void launchClipGridSceneForSnapshot (juce::Component& grid, int scene)
 {
     if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
         g->launchSceneForSnapshot (scene);
+}
+
+void cancelClipGridSceneLaunch (juce::Component& grid)
+{
+    if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
+        g->cancelSceneLaunch();
+}
+
+bool clipGridSceneLaunchQueued (juce::Component& grid)
+{
+    auto* g = dynamic_cast<ClipGridComponent*> (&grid);
+    return g != nullptr && g->sceneLaunchQueued();
 }
 
 void tickClipGridForSnapshot (juce::Component& grid)

@@ -235,6 +235,74 @@ public:
     }
 };
 
+// BandLab's preset stepper chevrons and its chain bypass button (round 190kn, DS-26 / DS-28: bandlab190p
+// 11-sounds-free-loops.png "‹ Bass Boost ›" and the struck "Fx" disc beside Save). LYNX vectors.
+class ChevronButton final : public juce::Button
+{
+public:
+    explicit ChevronButton (bool pointsRight) : juce::Button (pointsRight ? "next" : "previous"), right (pointsRight)
+    {
+        setMouseCursor (juce::MouseCursor::PointingHandCursor);
+    }
+    void paintButton (juce::Graphics& g, bool over, bool down) override
+    {
+        auto r = getLocalBounds().toFloat();
+        if (over || down)
+        {
+            g.setColour (down ? colour::bg5 : colour::bg4);
+            g.fillRoundedRectangle (r.reduced (1.0f), radius::sm);
+        }
+        const auto c = r.getCentre();
+        const auto s = 3.5f, d = right ? 1.0f : -1.0f;
+        juce::Path p;
+        p.startNewSubPath (c.x - d * s * 0.5f, c.y - s);
+        p.lineTo (c.x + d * s * 0.5f, c.y);
+        p.lineTo (c.x - d * s * 0.5f, c.y + s);
+        g.setColour (! isEnabled() ? colour::textDisabled : over ? colour::textPrimary : colour::textSecondary);
+        g.strokePath (p, juce::PathStrokeType (1.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+    }
+
+private:
+    bool right;
+};
+
+// BandLab's ⓘ on an effect card (round 190kn, DS-25: bandlab190p 11-sounds-free-loops.png, the card's title bar)
+class InfoButton final : public juce::Button
+{
+public:
+    InfoButton() : juce::Button ("about") { setMouseCursor (juce::MouseCursor::PointingHandCursor); }
+    void paintButton (juce::Graphics& g, bool over, bool down) override
+    {
+        const auto r = getLocalBounds().toFloat().reduced (1.0f);
+        const auto ink = down ? colour::textPrimary : over ? colour::textPrimary : colour::textSecondary;
+        g.setColour (ink);
+        g.drawEllipse (r.reduced (0.5f), 1.2f);
+        const auto c = r.getCentre();
+        const auto u = r.getWidth() / 12.0f;
+        g.fillEllipse (c.x - 0.9f * u, c.y - 3.6f * u, 1.8f * u, 1.8f * u);
+        g.fillRoundedRectangle (c.x - 0.8f * u, c.y - 1.0f * u, 1.6f * u, 4.6f * u, 0.6f * u);
+    }
+};
+
+class ChainBypassButton final : public juce::Button
+{
+public:
+    ChainBypassButton() : juce::Button ("bypass") { setMouseCursor (juce::MouseCursor::PointingHandCursor); }
+    bool bypassed = false; // every effect of the chain off
+    void paintButton (juce::Graphics& g, bool over, bool down) override
+    {
+        const auto r = getLocalBounds().toFloat().withSizeKeepingCentre (26.0f, 26.0f).reduced (0.5f);
+        g.setColour (bypassed ? colour::accent : down ? colour::bg5 : over ? colour::bg4 : colour::bg3);
+        g.fillEllipse (r);
+        const auto ink = ! isEnabled() ? colour::textDisabled : bypassed ? colour::onAccent : over ? colour::textPrimary : colour::textSecondary;
+        g.setColour (ink);
+        g.setFont (font (type::caption, true).withStyle (juce::Font::bold | juce::Font::italic));
+        g.drawText ("Fx", r.toNearestInt(), juce::Justification::centred, false);
+        // the stroke through it (BandLab's bypass glyph)
+        g.drawLine (r.getX() + 7.0f, r.getBottom() - 7.0f, r.getRight() - 7.0f, r.getY() + 7.0f, 1.4f);
+    }
+};
+
 void styleCaption (juce::Label& label, const juce::String& text)
 {
     label.setText (text, juce::dontSendNotification);
@@ -264,6 +332,22 @@ public:
         saveButton.setTooltip (tr ("Keeps this chain as one of your presets"));
         saveButton.onClick = [this] { askSaveName(); };
         addAndMakeVisible (saveButton);
+        // round 190kn: BandLab's ‹ › on the preset and its chain bypass
+        previousPreset.setTooltip (tr ("Previous preset"));
+        nextPreset.setTooltip (tr ("Next preset"));
+        previousPreset.onClick = [this] { stepPreset (-1); };
+        nextPreset.onClick = [this] { stepPreset (1); };
+        addAndMakeVisible (previousPreset);
+        addAndMakeVisible (nextPreset);
+        bypassButton.setTooltip (tr ("Bypass all effects of this track (again: back on)"));
+        bypassButton.onClick = [this] {
+            const auto t = insert;
+            if (t < 0 || ! hasEffects())
+                return;
+            const auto on = ! mixerops::anyEffectEnabled (engine.getSong(), t);
+            engine.editSong ([t, on] (Song& s) { mixerops::setAllEffectsEnabled (s, t, on); });
+        };
+        addAndMakeVisible (bypassButton);
 
         styleCaption (blendCaption, tr ("Blend"));
         addAndMakeVisible (blendCaption);
@@ -325,6 +409,8 @@ public:
         const auto& song = engine.getSong();
         const bool has = insert >= 0 && insert < (int) song.mixer.size();
         presetButton.setEnabled (has);
+        previousPreset.setEnabled (has);
+        nextPreset.setEnabled (has);
         blend.setEnabled (has);
         reverb.setEnabled (has && insert > 0 && insert != simpletracks::sharedReverb (song));
         reverb.setValue (has ? simpletracks::reverbSend (song, insert) : 0.0f);
@@ -334,6 +420,9 @@ public:
             cards.clear();
             presetButton.setButtonText (tr ("None"));
             saveButton.setEnabled (false);
+            bypassButton.setEnabled (false);
+            bypassButton.bypassed = false;
+            bypassButton.repaint();
             blend.setValue (1.0f);
             emptyHint.setText (tr ("Select a track to see its effects."), juce::dontSendNotification);
             layoutStrip();
@@ -362,6 +451,12 @@ public:
             name << " " << tr ("(edited)");
         presetButton.setButtonText (name + glyph (" \xe2\x96\xbe"));
         saveButton.setEnabled (! fx.empty());
+        bypassButton.setEnabled (! fx.empty());
+        if (const auto off = ! fx.empty() && ! mixerops::anyEffectEnabled (song, insert); off != bypassButton.bypassed)
+        {
+            bypassButton.bypassed = off;
+            bypassButton.repaint();
+        }
         blend.setValue (mixer.chainBlend);
         blend.setDimmed (fx.empty());
         addCard.setEnabled ((int) fx.size() < maxEffectSlots);
@@ -375,10 +470,15 @@ public:
         auto side = r.removeFromLeft (sideWidth - pad);
         presetCaption.setBounds (side.removeFromTop (16));
         auto row = side.removeFromTop (26);
-        saveButton.setBounds (row.removeFromRight (58));
-        row.removeFromRight (6);
-        presetButton.setBounds (row);
-        side.removeFromTop (10);
+        presetButton.setBounds (row); // (BandLab: "‹ Bass Boost ›", the arrows inside the preset's capsule)
+        previousPreset.setBounds (row.removeFromLeft (22).reduced (0, 2));
+        nextPreset.setBounds (row.removeFromRight (22).reduced (0, 2));
+        side.removeFromTop (6);
+        auto second = side.removeFromTop (26); // BandLab: Save and the chain bypass under the preset
+        saveButton.setBounds (second.removeFromLeft (58));
+        second.removeFromLeft (8);
+        bypassButton.setBounds (second.removeFromLeft (26));
+        side.removeFromTop (8);
         auto captions = side.removeFromTop (16);
         auto knobs = side.removeFromTop (juce::jmin (84, side.getHeight()));
         blendCaption.setBounds (captions.removeFromLeft (90));
@@ -532,6 +632,15 @@ public:
     void remove (int index) { slotActions.deleteSlot (index); }
     void openEditor (int index) { slotActions.toggleSlotEditor (index); }
 
+    void stepPreset (int direction)
+    {
+        const auto& song = engine.getSong();
+        if (insert < 0 || insert >= (int) song.mixer.size())
+            return;
+        if (const auto* p = chains::stepped (song.mixer[(std::size_t) insert].chainPreset, direction))
+            applyFactory (p->name);
+    }
+
     void applyFactory (const std::string& name)
     {
         const auto t = insert;
@@ -597,6 +706,8 @@ public:
     }
     void blendForCheck (float v) { blend.turnTo (v); }
     void reverbForCheck (float v) { reverb.turnTo (v); }
+    void bypassForCheck() { bypassButton.onClick(); }                     // round 190kn
+    bool bypassLitForCheck() const noexcept { return bypassButton.bypassed; }
     const juce::Component* cardForSnapshot (int card) const
     {
         return card >= 0 && card < (int) cards.size() ? cards[(std::size_t) card].get() : nullptr;
@@ -627,6 +738,29 @@ private:
             close.onClick = [this] { owner.remove (index); };
             for (auto* b : { &left, &right, &close })
                 addAndMakeVisible (*b);
+            // round 190kn (DS-25, BandLab's card: toggle, ⓘ, name, ×): what the effect does, in a bubble
+            info.setTooltip (tr ("About this effect"));
+            info.onClick = [this] { showAbout(); };
+            addAndMakeVisible (info);
+        }
+
+        juce::String aboutText() const
+        {
+            if (goal != 0)
+                return goalText (goal) + ": " + tr (goals::description (goal));
+            return tr ("{0}: its knob sets how much of the effect is mixed in; Editor opens all of its controls.", { title });
+        }
+
+        void showAbout()
+        {
+            auto label = std::make_unique<juce::Label> (juce::String(), aboutText());
+            label->setFont (font (type::body));
+            label->setColour (juce::Label::textColourId, colour::textPrimary);
+            label->setJustificationType (juce::Justification::topLeft);
+            const auto width = 240;
+            const auto lines = juce::jmax (1, (int) std::ceil (juce::GlyphArrangement::getStringWidth (label->getFont(), label->getText()) / (float) (width - 12)));
+            label->setSize (width, 12 + lines * (int) std::ceil (label->getFont().getHeight() + 3.0f));
+            juce::CallOutBox::launchAsynchronously (std::move (label), info.getScreenBounds(), nullptr);
         }
 
         void update (const EffectSlot& slot, int newIndex, int count)
@@ -649,6 +783,7 @@ private:
         }
 
         juce::Rectangle<int> ledBounds() const { return { 7, 6, 14, 14 }; } // (round 190jc, SG-10: 14 px, ringed when off)
+        juce::String aboutForCheck() const { return aboutText(); }
 
         void resized() override
         {
@@ -659,6 +794,7 @@ private:
             close.setBounds (bar.removeFromRight (20).withSizeKeepingCentre (20, 20));
             right.setBounds (bar.removeFromRight (20).withSizeKeepingCentre (20, 20));
             left.setBounds (bar.removeFromRight (20).withSizeKeepingCentre (20, 20));
+            info.setBounds (ledBounds().getRight() + 3, ledBounds().getY(), 14, 14);
             r.reduce (pad, 6);
             editor.setBounds (r.removeFromBottom (24));
             r.removeFromBottom (4);
@@ -691,7 +827,7 @@ private:
             }
             g.setColour (on ? colour::textPrimary : colour::textSecondary);
             g.setFont (font (type::body, true));
-            g.drawText (title, juce::Rectangle<int> (26, 0, left.getX() - 28, titleHeight), juce::Justification::centredLeft, true);
+            g.drawText (title, juce::Rectangle<int> (info.getRight() + 5, 0, left.getX() - info.getRight() - 7, titleHeight), juce::Justification::centredLeft, true);
             g.setColour (colour::textSecondary);
             g.setFont (font (type::caption));
             g.drawText (sub, juce::Rectangle<int> (pad, editor.getY() - 20, getWidth() - 2 * pad, 16), juce::Justification::centred, true);
@@ -743,6 +879,7 @@ private:
         juce::String title, sub;
         DockKnob knob;
         juce::TextButton editor;
+        InfoButton info; // (round 190kn: BandLab's ⓘ)
         GlyphButton left { glyph ("\xe2\x80\xb9"), ui::simplelook::Glyph::chevronLeft, { 5.0f, 9.0f } },
             right { glyph ("\xe2\x80\xba"), ui::simplelook::Glyph::chevronRight, { 5.0f, 9.0f } },
             close { glyph ("\xc3\x97"), ui::simplelook::Glyph::cross, { 8.0f, 8.0f } };
@@ -806,6 +943,8 @@ private:
     EffectsPanel slotActions;
     juce::Label presetCaption, blendCaption, reverbCaption, emptyHint;
     juce::TextButton presetButton, saveButton;
+    ChevronButton previousPreset { false }, nextPreset { true };
+    ChainBypassButton bypassButton;
     AddCardButton addCard;
     DockKnob blend, reverb;
     juce::Viewport view;
@@ -3175,6 +3314,9 @@ bool SimpleDock::loadUserPreset (AudioEngine& engine, int insert, const juce::Fi
 int SimpleDock::cardCountForCheck() const { return effectsPage->cardCount(); }
 int SimpleDock::oneKnobCardsForCheck() const { return effectsPage->oneKnobCards(); }
 juce::PopupMenu SimpleDock::presetMenuForSnapshot() { return effectsPage->presetMenu(); }
+void SimpleDock::stepPresetForCheck (int delta) { effectsPage->stepPreset (delta); }
+void SimpleDock::bypassChainForCheck() { effectsPage->bypassForCheck(); }
+bool SimpleDock::bypassLitForCheck() const { return effectsPage->bypassLitForCheck(); }
 juce::PopupMenu SimpleDock::addMenuForSnapshot() { return effectsPage->addMenu(); }
 void SimpleDock::setFontsForSnapshot (std::vector<sf::IndexedFont> fonts)
 {

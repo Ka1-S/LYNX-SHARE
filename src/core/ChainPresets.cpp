@@ -121,6 +121,22 @@ const Preset* find (const std::string& name)
     return nullptr;
 }
 
+const Preset* stepped (const std::string& current, int direction)
+{
+    std::vector<const Preset*> order;
+    for (const auto* category : categories())
+        for (const auto& p : factory())
+            if (std::string (p.category) == category)
+                order.push_back (&p);
+    if (order.empty())
+        return nullptr;
+    const auto n = (int) order.size();
+    for (int i = 0; i < n; ++i)
+        if (current == order[(std::size_t) i]->name)
+            return order[(std::size_t) (((i + (direction < 0 ? -1 : 1)) % n + n) % n)];
+    return direction < 0 ? order.back() : order.front();
+}
+
 std::vector<EffectSlot> slots (const Preset& preset)
 {
     std::vector<EffectSlot> out;

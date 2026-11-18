@@ -1587,6 +1587,9 @@ struct MixerTrack
     // with solo: the tracks that feed this one are heard too (LYNX's solo switch, FL's "Alt solo"); off = FL's "Solo
     // selected track(s)": only this track and its path to Master (REA_rodada167l §4)
     bool soloSources = true;
+    // FL's "Lock/Unlock State" (Shift+click on the mute switch, round 190kn): a solo elsewhere doesn't silence this track,
+    // and "Unmute all" leaves its mute as it is
+    bool lockState = false;
     std::vector<EffectSlot> effects; // up to maxEffectSlots, processed in order
     bool toMaster = true;            // inserts: output to Master (besides the sends)
     float masterLevel = 1.0f;        // level of that route to Master (linear gain, 0..maxFaderGain; FL's route knob)

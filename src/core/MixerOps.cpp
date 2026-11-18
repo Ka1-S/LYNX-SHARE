@@ -54,6 +54,39 @@ void soloSelected (Song& song, const std::vector<int>& targets, bool alt)
     }
 }
 
+void unmuteAll (Song& song)
+{
+    for (std::size_t i = 1; i < song.mixer.size(); ++i)
+    {
+        if (! song.mixer[i].lockState)
+            song.mixer[i].muted = false;
+        song.mixer[i].solo = false;
+    }
+    if (! song.mixer.empty() && ! song.mixer[0].lockState)
+        song.mixer[0].muted = false;
+}
+
+void toggleLockState (Song& song, int track)
+{
+    if (track >= 0 && track < (int) song.mixer.size())
+        song.mixer[(std::size_t) track].lockState = ! song.mixer[(std::size_t) track].lockState;
+}
+
+void soloSlot (Song& song, int track, int index)
+{
+    if (track < 0 || track >= (int) song.mixer.size())
+        return;
+    auto& fx = song.mixer[(std::size_t) track].effects;
+    if (index < 0 || index >= (int) fx.size())
+        return;
+    bool soloed = fx[(std::size_t) index].enabled;
+    for (std::size_t i = 0; i < fx.size(); ++i)
+        if ((int) i != index && fx[i].enabled)
+            soloed = false;
+    for (std::size_t i = 0; i < fx.size(); ++i)
+        fx[i].enabled = soloed || (int) i == index;
+}
+
 namespace
 {
 bool isInsert (const Song& song, int t) noexcept

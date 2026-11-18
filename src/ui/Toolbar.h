@@ -58,6 +58,7 @@ public:
     void mouseUp (const juce::MouseEvent& e) override;
     ui::Hint hintAt (juce::Point<int> position) override;
     bool showsTime() const noexcept { return mode == Mode::clock || mode == Mode::smpte; }
+    juce::String textForSnapshot() const { return text(); } // round 190kn (--details190knshot)
     // round 190iv: the Simple capsule's time segment, or Live's 17 px position box ("1. 1. 1"); FL's look is unchanged
     void setLook (toolbarlayout::Look l);
 
@@ -178,6 +179,18 @@ public:
     void setLook (toolbarlayout::Look l);
     void paint (juce::Graphics& g) override;
     ui::Hint hintAt (juce::Point<int> position) override;
+    // round 190kn (FL's CPU panel, DF-26 / 27 / 28): a double-click opens the Plugin performance monitor; right-click: the
+    // refresh rate (Slow / Medium / Fast, FL's names) and the monitor; the bar's box carries FL's running CPU graph.
+    void mouseDown (const juce::MouseEvent& e) override;
+    void mouseDoubleClick (const juce::MouseEvent& e) override;
+    juce::PopupMenu makeMenu(); // the right-click menu (shots)
+    std::function<void()> onOpenMonitor, onRefreshChanged;
+    enum Refresh { slow, medium, fast };
+    static inline int refresh = medium;   // saved in the UI options ("cpuRefresh")
+    static int refreshTicks() noexcept { return refresh == slow ? 16 : refresh == fast ? 4 : 8; } // of the main 30 Hz timer
+    static constexpr int historySize = 96; // the running graph's points (one per update; 25 s at Medium)
+    juce::Rectangle<float> graphArea() const; // (tests / shots; empty in the Live look)
+    int historyCount() const noexcept { return cpuHistoryCount; }
 
     static std::int64_t processMemoryBytes(); // working set of this process (0 if unknown)
     static std::int64_t processPrivateBytes(); // memory only this process holds (Windows: private bytes; else the working set)
@@ -193,6 +206,11 @@ private:
     toolbarlayout::Look look = toolbarlayout::Look::fl;
     std::int64_t memory = 0;
     int voices = 0, peakVoices = 0;
+    std::array<float, historySize> cpuHistory {}; // oldest first (round 190kn)
+    int cpuHistoryCount = 0;
+    juce::int64 paintedSignature = -1;
+    bool glitchShown = false;
+    juce::Rectangle<float> barBox() const;
 };
 
 // The output: a display of what is heard and a peak meter (red after clipping, for a while). Like FL's
@@ -296,6 +314,13 @@ public:
     void paint (juce::Graphics& g) override;
     ui::Hint hintAt (juce::Point<int> position) override;
     void mouseDown (const juce::MouseEvent& e) override;
+    // round 190kn (FL's output panel, DF-23 / DF-25): the left / right peak bars beside the display, and the level at
+    // the pointer when it is over them (FL: "hovering your cursor over most peak meters will show the value at the
+    // pointer position"). Public for the shot route and tests.
+    juce::Rectangle<float> barsArea() const;
+    juce::Rectangle<float> barArea (int side) const;
+    static float levelAt (float x01) noexcept;        // the bar's position 0..1 -> dB (-60..0)
+    void setSidesForShot (float left, float right, bool clipLeft, bool clipRight);
 
     enum Mode
     {
@@ -317,6 +342,8 @@ private:
     std::array<float, 256> history {};     // long view: one peak per 1/30 s, oldest first
     std::array<float, 128> bands {};       // spectrum: smoothed level per band, 0..1
     float peak = 0.0f, held = 0.0f;
+    std::array<float, 2> sidePeak {}, sideHeld {};   // (round 190kn) the stereo bars: falling peak and hold line per side
+    std::array<double, 2> sideHoldMs {}, sideClipMs {};
     float column = 0.0f;                   // the long view's next column: the loudest frame since the last one
     double holdMs = 0.0, clipMs = 0.0, columnMs = 0.0, lastMs = 0.0;
     double silentMs = 0.0; // how long the output has been silent: once everything has decayed, no more repaints

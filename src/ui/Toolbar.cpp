@@ -24,6 +24,8 @@ namespace
 namespace live
 {
 const juce::Colour band { 0xff2a2a2a }, box { 0xff363636 }, boxHover { 0xff464646 }, text { 0xffb5b5b5 }, lit { 0xffffad56 }, onLit { 0xff070707 };
+// round 190kn: the count-in's blue in the position field (Live 12 manual 19.6 "in blue"; shade: COUNTIN_BLUE, see below)
+const juce::Colour countIn { 0xff5eb8ff };
 }
 void paintLiveBox (juce::Graphics& g, juce::Rectangle<int> r, bool hover, bool lit = false)
 {
@@ -293,6 +295,12 @@ juce::String TimeDisplay::text() const
         if (const auto left = countin::beatsLeft (engine.getTransport().countIn.load(), song.beatUnit, ppq); left > 0)
             return tr ("REC IN {0}", { juce::String (left) });
 
+    // round 190kn (DL-44, Live 12 manual 19.6): Live's Arrangement Position field shows the count-in "in blue as
+    // bars-beats-sixteenths", from -bars.1.1 up to 1.1.1 (the Clip-launch control bar)
+    if (look == toolbarlayout::Look::live && engine.isCountingIn())
+        if (const auto p = countin::livePosition (engine.getTransport().countIn.load(), song.meter().beats, song.meter().unit, ppq); p.bar < 0)
+            return juce::String (p.bar) + " : " + juce::String (p.beat) + " : " + juce::String (p.sixteenth);
+
     const auto ticks = playheadTicks (engine);
 
     // round 190jj (Simple, capture190ji §1d): BandLab shows its count-in only as negative time counting up to zero
@@ -371,6 +379,14 @@ void TimeDisplay::paintLook (juce::Graphics& g)
         {
             g.setColour (live::lit.withAlpha (0.45f));
             g.fillRect (area.withWidth (juce::roundToInt (area.getWidth() * juce::jlimit (0.0, 1.0, linkProgress))));
+        }
+        const auto countingIn = engine.isCountingIn() && readout.startsWith ("-");
+        if (countingIn) // (round 190kn: Live's count-in, blue, always as bars. beats. sixteenths)
+        {
+            g.setColour (live::countIn);
+            g.setFont (theme::font (theme::type::caption));
+            g.drawFittedText (readout.replace (" : ", ". "), area.withTrimmedRight (4).reduced (3, 0), juce::Justification::centredRight, 1, 0.75f);
+            return;
         }
         paintLiveText (g, mode == Mode::bars ? readout.replace (" : ", ". ") : readout.replace (" ", ""), area.withTrimmedRight (4), false,
                        juce::Justification::centredRight);
@@ -836,7 +852,77 @@ void PerformanceMeter::setValues (double cpu01, std::int64_t memoryBytes, int po
     memory = memoryBytes;
     voices = polyphony;
     peakVoices = juce::jmax (peakVoices, polyphony);
-    repaint();
+    // FL's CPU graph (round 190kn): one point per update, the newest on the right
+    std::rotate (cpuHistory.begin(), cpuHistory.begin() + 1, cpuHistory.end());
+    cpuHistory.back() = (float) juce::jlimit (0.0, 1.0, cpu01);
+    cpuHistoryCount = juce::jmin (historySize, cpuHistoryCount + 1);
+    // repaint only when a pixel would change: the texts, the bar, or the graph's rows (an idle project's 1-3 % load
+    // draws the same flat graph update after update)
+    const auto graph = graphArea();
+    const auto rows = juce::jmax (1.0f, graph.getHeight() - 1.0f);
+    juce::int64 sig = juce::roundToInt (cpuSmoothed * 100.0);
+    sig = sig * 31 + juce::roundToInt (cpuSmoothed * (double) barBox().getWidth());
+    sig = sig * 31 + (juce::int64) (memory / (1024 * 1024));
+    sig = sig * 31 + voices;
+    sig = sig * 31 + juce::jmin (cpuHistoryCount, 2);
+    for (std::size_t i = 0; i < cpuHistory.size(); ++i)
+        sig = sig * 1000003 + (juce::int64) std::round (cpuHistory[i] * rows) * 7 + (juce::int64) i;
+    if (sig != paintedSignature)
+    {
+        paintedSignature = sig;
+        repaint();
+    }
+}
+
+juce::Rectangle<float> PerformanceMeter::barBox() const
+{
+    auto area = getLocalBounds();
+    auto row1 = area.removeFromTop (area.getHeight() / 2).reduced (0, 4);
+    row1.removeFromLeft (30);
+    row1.removeFromRight (34);
+    if (underruns > 0)
+        row1.removeFromRight (26);
+    return row1.reduced (2, 3).toFloat();
+}
+
+juce::Rectangle<float> PerformanceMeter::graphArea() const
+{
+    if (look == toolbarlayout::Look::live)
+        return {};
+    // FL: the load bar on top, the running graph below it in the same box; here the box's lower part, under a 5 px bar
+    const auto box = barBox();
+    return box.getHeight() >= 11.0f ? box.withTrimmedTop (6.0f).reduced (1.0f, 0.0f) : juce::Rectangle<float>();
+}
+
+void PerformanceMeter::mouseDown (const juce::MouseEvent& e)
+{
+    if (e.mods.isPopupMenu())
+        makeMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this));
+}
+
+juce::PopupMenu PerformanceMeter::makeMenu()
+{
+    juce::PopupMenu menu;
+    menu.addSectionHeader (tr ("Refresh"));
+    const std::pair<int, juce::String> rates[] { { slow, tr ("Slow") }, { medium, tr ("Medium") }, { fast, tr ("Fast") } };
+    for (const auto& [id, name] : rates)
+        menu.addItem (name, true, refresh == id, [this, id = id] {
+            refresh = id;
+            if (onRefreshChanged)
+                onRefreshChanged();
+        });
+    menu.addSeparator();
+    menu.addItem (tr ("Plugin performance monitor..."), onOpenMonitor != nullptr, false, [this] {
+        if (onOpenMonitor)
+            onOpenMonitor();
+    });
+    return menu;
+}
+
+void PerformanceMeter::mouseDoubleClick (const juce::MouseEvent& e)
+{
+    if (e.mods.isLeftButtonDown() && onOpenMonitor) // FL: "Double-Click the CPU panel to open the Plugin Performance Monitor"
+        onOpenMonitor();
 }
 
 void PerformanceMeter::setRealtime (std::uint64_t over, std::uint64_t late, double peak, const juce::StringArray& units, int device)
@@ -844,13 +930,21 @@ void PerformanceMeter::setRealtime (std::uint64_t over, std::uint64_t late, doub
     const auto count = RtStats::underrunCount (over, late, device);
     if (over > overDeadline || late > lateCalls || count > underruns)
         lastGlitchAt = juce::jmax<juce::uint32> (1, juce::Time::getMillisecondCounter());
+    // (round 190kn: repaint only when the panel would look different: a new count, the peak mark's pixel, the red
+    // glitch edge coming or going; the hint reads the rest when asked)
+    const auto box = barBox();
+    auto markX = [&box] (double p) { return p > 0.0 ? juce::roundToInt (box.getWidth() * (float) juce::jlimit (0.0, 1.0, p)) * 2 + (p < 0.85 ? 0 : 1) : -1; };
+    const bool glitchLit = lastGlitchAt != 0 && juce::Time::getMillisecondCounter() - lastGlitchAt < 5000;
+    const bool changed = count != underruns || markX (peak) != markX (peakLoad) || glitchLit != glitchShown;
     overDeadline = over;
     lateCalls = late;
     deviceUnderruns = device;
     underruns = count;
     peakLoad = peak;
     heaviest = units;
-    repaint();
+    glitchShown = glitchLit;
+    if (changed)
+        repaint();
 }
 
 void PerformanceMeter::setLook (toolbarlayout::Look l)
@@ -901,9 +995,29 @@ void PerformanceMeter::paint (juce::Graphics& g)
         g.drawText (underruns > 999 ? juce::String ("999+") : juce::String ((juce::int64) underruns), row1.removeFromRight (26),
                     juce::Justification::centredRight, false);
     }
-    const auto bar = row1.reduced (2, 3).toFloat();
+    const auto box = row1.reduced (2, 3).toFloat();
     g.setColour (colour::bg0);
-    g.fillRoundedRectangle (bar, 2.0f);
+    g.fillRoundedRectangle (box, 2.0f);
+    // round 190kn: FL's running CPU graph in the box's lower part (the load bar shrinks to the top 5 px)
+    const auto graph = graphArea();
+    const auto bar = graph.isEmpty() ? box : box.withHeight (5.0f);
+    if (! graph.isEmpty() && cpuHistoryCount > 1)
+    {
+        const auto n = juce::jmin (cpuHistoryCount, juce::jmax (2, (int) graph.getWidth()));
+        const auto step = graph.getWidth() / (float) (n - 1);
+        g.setColour (colour::textSecondary.withAlpha (0.8f));
+        auto yOf = [&] (float v) { return std::round (graph.getBottom() - 1.0f - v * (graph.getHeight() - 1.0f)); };
+        // newest on the right: 1 px columns joined, so a spike shows as FL's thin vertical line
+        float lastY = yOf (cpuHistory[(std::size_t) (historySize - n)]);
+        for (int i = 1; i < n; ++i)
+        {
+            const auto y = yOf (cpuHistory[(std::size_t) (historySize - n + i)]);
+            const auto x0 = std::round (graph.getRight() - (float) (n - i) * step), x1 = std::round (graph.getRight() - (float) (n - 1 - i) * step);
+            g.fillRect (juce::Rectangle<float> (x0, juce::jmin (lastY, y), 1.0f, std::abs (y - lastY) + 1.0f));
+            g.fillRect (juce::Rectangle<float> (x0, y, juce::jmax (1.0f, x1 - x0), 1.0f));
+            lastY = y;
+        }
+    }
     const auto load = (float) juce::jlimit (0.0, 1.0, cpuSmoothed);
     g.setColour (load < 0.6f ? colour::meterLow : load < 0.85f ? colour::meterMid : colour::meterClip);
     if (load > 0.0f)
@@ -1285,6 +1399,10 @@ ui::Hint PerformanceMeter::hintAt (juce::Point<int> p)
             h.text << "  " << tr ("Tip: Windows Audio (shared) drops out more easily; choose the ASIO driver \"{0}\" in Options > Audio settings.",
                                   { driverTip });
         h.value = juce::String (cpu * 100.0, 1) + "%" + (peakLoad > 0.0 ? "  (" + tr ("peak {0}%", { juce::String (juce::roundToInt (peakLoad * 100.0)) }) + ")" : juce::String());
+        if (look != toolbarlayout::Look::live)
+            h.text << "  " << tr ("The graph under the bar is the load over the last seconds.");
+        h.text << "  " << tr ("[Double-click] plugin performance monitor  [RMB] refresh rate");
+        h.hasMenu = true;
     }
     else if (p.x < getWidth() * 58 / 100)
     {
@@ -1331,6 +1449,24 @@ bool OutputMonitor::update (double nowMs)
     else
         clipMs = juce::jmax (0.0, clipMs - elapsed);
 
+    // round 190kn: the stereo bars (FL's output panel), the same laws per side as the mono meter above
+    float sideNow[2] {};
+    for (int ch = 0; ch < 2; ++ch)
+    {
+        const auto v = engine.takeOutputPeak (ch);
+        sideNow[ch] = v;
+        const auto c = (std::size_t) ch;
+        sidePeak[c] = juce::jmax (v, sidePeak[c] * ui::fallFor (0.82f, elapsed));
+        sideHoldMs[c] -= elapsed;
+        if (v >= sideHeld[c] || sideHoldMs[c] <= 0.0)
+        {
+            sideHeld[c] = v;
+            sideHoldMs[c] = 1000.0;
+        }
+        sideClipMs[c] = v >= 0.999f ? 2000.0 : juce::jmax (0.0, sideClipMs[c] - elapsed);
+    }
+    now = juce::jmax (now, juce::jmax (sideNow[0], sideNow[1]));
+
     // silence after everything has fallen to zero (meter, hold, clip, the long view's history, the spectrum bands)
     // looks the same frame after frame: stop repainting while nothing plays (REA round 116, idle CPU). Below -80 dB
     // (a plugin's noise floor, a reverb's last tail) nothing shows: a 0.003 px wiggle on the scope, under the
@@ -1340,6 +1476,8 @@ bool OutputMonitor::update (double nowMs)
     if (silentMs > ((double) history.size() + 90.0) * columnPeriod)
     {
         peak = held = column = 0.0f;
+        sidePeak.fill (0.0f);
+        sideHeld.fill (0.0f);
         bands.fill (0.0f);
         columnMs = 0.0;
         return false;
@@ -1389,6 +1527,8 @@ bool OutputMonitor::update (double nowMs)
     // (the long view only moves with its columns, above; the scope and the spectrum every frame)
     if (mode != longView)
         repaint();
+    else
+        repaint (barsArea().getSmallestIntegerContainer()); // (the stereo bars move every frame)
     return true;
 }
 
@@ -1423,6 +1563,9 @@ void OutputMonitor::mouseDown (const juce::MouseEvent& e)
         menu.addItem (tr ("Reset the peak hold and clip light"), [this] {
             held = 0.0f;
             clipMs = holdMs = 0.0;
+            sideHeld.fill (0.0f);
+            sideClipMs.fill (0.0);
+            sideHoldMs.fill (0.0);
             repaint();
         });
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this));
@@ -1440,24 +1583,27 @@ void OutputMonitor::paint (juce::Graphics& g)
     g.setColour (colour::bg0);
     g.fillRoundedRectangle (area, radius::md);
 
-    // peak meter on the right: -60..0 dB, the top segment red while it clipped recently
-    auto meter = area.removeFromRight (8.0f).reduced (1.5f, 4.0f);
+    // round 190kn (FL's output panel, DF-23): the left and right peak bars beside the display, -60..0 dB from the left;
+    // a side's bar turns red while it clipped recently (FL: "If the bars turn red your project is clipping")
     auto level = [] (float gain) { return juce::jlimit (0.0f, 1.0f, (juce::Decibels::gainToDecibels (gain, -60.0f) + 60.0f) / 60.0f); };
-    g.setColour (colour::bg3);
-    g.fillRoundedRectangle (meter, 1.5f);
-    const auto filled = meter.withTop (meter.getBottom() - meter.getHeight() * level (peak));
-    g.setGradientFill (juce::ColourGradient::vertical (colour::meterMid, meter.getY() + meter.getHeight() * 0.1f, colour::meterLow,
-                                                       meter.getY() + meter.getHeight() * 0.4f));
-    g.fillRect (filled);
-    if (held > 0.0f)
+    area.removeFromRight (getLocalBounds().toFloat().getRight() - barsArea().getX() + 2.0f);
+    for (int side = 0; side < 2; ++side)
     {
-        g.setColour (colour::textSecondary);
-        g.fillRect (meter.withHeight (1.0f).withY (meter.getBottom() - meter.getHeight() * level (held)));
-    }
-    if (clipMs > 0.0)
-    {
-        g.setColour (colour::meterClip);
-        g.fillRoundedRectangle (meter.withHeight (4.0f), 1.0f);
+        const auto bar = barArea (side);
+        const auto c = (std::size_t) side;
+        g.setColour (colour::bg3);
+        g.fillRect (bar);
+        const auto filled = bar.withWidth (bar.getWidth() * level (sidePeak[c]));
+        if (sideClipMs[c] > 0.0)
+            g.setColour (colour::meterClip);
+        else
+            g.setGradientFill (juce::ColourGradient::horizontal (colour::meterLow, bar.getX() + bar.getWidth() * 0.6f, colour::meterMid, bar.getRight()));
+        g.fillRect (filled);
+        if (sideHeld[c] > 0.0f)
+        {
+            g.setColour (sideClipMs[c] > 0.0 ? colour::meterClip : colour::textSecondary);
+            g.fillRect (juce::Rectangle<float> (bar.getX() + bar.getWidth() * level (sideHeld[c]) - 1.0f, bar.getY(), 1.0f, bar.getHeight()));
+        }
     }
 
     auto scope = area.reduced (4.0f, 3.0f);
@@ -1550,14 +1696,54 @@ void OutputMonitor::paint (juce::Graphics& g)
     g.drawImage (scopeNative, box.toFloat());
 }
 
-ui::Hint OutputMonitor::hintAt (juce::Point<int>)
+ui::Hint OutputMonitor::hintAt (juce::Point<int> p)
 {
     ui::Hint h;
+    h.hasMenu = true;
+    const auto bars = barsArea();
+    if (bars.expanded (1.0f, 2.0f).contains (p.toFloat())) // FL: the level at the pointer's position on the peak meter
+    {
+        const auto x01 = juce::jlimit (0.0f, 1.0f, ((float) p.x + 0.5f - bars.getX()) / juce::jmax (1.0f, bars.getWidth()));
+        h.text = tr ("Output peak meter, left and right (a bar turns red when that side clipped). The value is the level at the pointer");
+        // (FL 2026 hovering its output meter: "Peak meter (master)  -7.19dB 0.44", details190kn raw/f07)
+        const auto db = levelAt (x01);
+        h.value = juce::String (db, 2) + " dB  " + juce::String (juce::Decibels::decibelsToGain (db), 2);
+        return h;
+    }
     h.text = tr ("Output: {0} and the peak level of what you hear (the meter's top turns red when it clipped)  [LMB] next display  [RMB] display menu",
                  { modeName (mode).toLowerCase() });
-    h.hasMenu = true;
     h.value = held <= 1.0e-5f ? juce::String ("-inf dB") : juce::String (juce::Decibels::gainToDecibels (held), 1) + " dB";
     return h;
+}
+
+juce::Rectangle<float> OutputMonitor::barsArea() const
+{
+    // FL keeps its bars beside the scope (about as wide as the scope); here the right 40 % of the panel, 2 bars with a
+    // 1 px gap, centred on the panel's height
+    auto area = getLocalBounds().toFloat().reduced (3.0f, 4.0f);
+    const auto w = juce::jlimit (24.0f, 90.0f, std::round (area.getWidth() * 0.4f));
+    const auto h = juce::jmin (area.getHeight(), 21.0f);
+    return area.removeFromRight (w).withSizeKeepingCentre (w, h);
+}
+
+juce::Rectangle<float> OutputMonitor::barArea (int side) const
+{
+    const auto bars = barsArea();
+    const auto each = std::floor ((bars.getHeight() - 1.0f) / 2.0f);
+    return side == 0 ? bars.withHeight (each) : bars.withTrimmedTop (bars.getHeight() - each);
+}
+
+float OutputMonitor::levelAt (float x01) noexcept
+{
+    return -60.0f + 60.0f * juce::jlimit (0.0f, 1.0f, x01);
+}
+
+void OutputMonitor::setSidesForShot (float left, float right, bool clipLeft, bool clipRight)
+{
+    sidePeak = { left, right };
+    sideHeld = { juce::jmin (1.0f, left * 1.12f), juce::jmin (1.0f, right * 1.12f) };
+    sideClipMs = { clipLeft ? 2000.0 : 0.0, clipRight ? 2000.0 : 0.0 };
+    repaint();
 }
 
 // --- customize -------------------------------------------------------------------------------------
