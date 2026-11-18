@@ -86,8 +86,12 @@ void keepFloatersInFront();
 // Round 190kr (QA-11): `c`'s native window is a child window (a docked panel: the Playlist, Piano roll, Mixer...) that
 // lies wholly under visible, opaque sibling windows above it, or under its parent's edges (and the same for each parent
 // child window): nothing it paints or composes reaches the screen. The Playlist behind Thief's maximised Channel rack.
-// A top-level window, a component without a native window of its own, and every platform but Windows: false.
-// Cheap (a walk of the siblings above it: a few user32 calls). LYNX_COVERCHECK=0: always false (A/B).
+// Round 190la: also when the top-level window it is in (the main window, a detached panel, a plugin window) lies wholly
+// under one visible, opaque top-level window of any program (a maximised browser over LYNX): layered, click-through,
+// cloaked, minimised and region windows never count (LYNX_OCCLUSION=0: this part off, A/B).
+// A component without a native window of its own and every platform but Windows: false.
+// Cheap (a walk of the windows above it: a few user32 calls; the top-level answer is kept 8 ms). LYNX_COVERCHECK=0:
+// always false (A/B).
 bool coveredBySiblingWindows (const juce::Component& c);
 // `c` shows on screen: isShowing() (or an off-screen picture route, ui/ShotShowing.h) and not covered as above. The live
 // views' frame steps run only then (ui/FrameTicker.h).

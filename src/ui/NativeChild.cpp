@@ -781,6 +781,101 @@ bool coverCheckWanted()
     static const bool on = juce::SystemStats::getEnvironmentVariable ("LYNX_COVERCHECK", {}).trim() != "0";
     return on;
 }
+
+#if JUCE_WINDOWS
+bool occlusionCheckWanted()
+{
+    static const bool on = juce::SystemStats::getEnvironmentVariable ("LYNX_OCCLUSION", {}).trim() != "0";
+    return on;
+}
+
+// a window's rectangle as it shows (DWM's frame bounds: without Windows 10/11's invisible resize borders)
+RECT shownRect (HWND w)
+{
+    using GetAttribute = HRESULT (WINAPI*) (HWND, DWORD, PVOID, DWORD);
+    static const auto getAttribute = [] {
+        auto* dwm = LoadLibraryW (L"dwmapi.dll");
+        return dwm != nullptr ? (GetAttribute) (void*) GetProcAddress (dwm, "DwmGetWindowAttribute") : nullptr;
+    }();
+    RECT r {};
+    if (getAttribute == nullptr || FAILED (getAttribute (w, 9 /* DWMWA_EXTENDED_FRAME_BOUNDS */, &r, sizeof (r))))
+        GetWindowRect (w, &r);
+    return r;
+}
+
+bool cloaked (HWND w)
+{
+    using GetAttribute = HRESULT (WINAPI*) (HWND, DWORD, PVOID, DWORD);
+    static const auto getAttribute = [] {
+        auto* dwm = LoadLibraryW (L"dwmapi.dll");
+        return dwm != nullptr ? (GetAttribute) (void*) GetProcAddress (dwm, "DwmGetWindowAttribute") : nullptr;
+    }();
+    DWORD value = 0;
+    return getAttribute != nullptr && SUCCEEDED (getAttribute (w, 14 /* DWMWA_CLOAKED */, &value, sizeof (value))) && value != 0;
+}
+
+// Round 190la: a top-level window (the main window, a detached panel, a plugin window) whose visible part (on its
+// monitor) lies wholly under ONE visible, opaque top-level window of any program above it in the stacking order (a
+// maximised browser over LYNX while a song plays): nothing it paints reaches the screen, so its live views need not step
+// and its GPU playhead need not be committed (the frame steps resume within the idle poll's 50 ms when it shows again).
+// Windows that may let it show through never count: layered or click-through windows (overlays, translucent terminals),
+// windows without a redirection surface (DirectComposition content may be translucent), cloaked windows (other virtual
+// desktops, hidden store apps), minimised ones, and windows with a region (a hole). Message thread; the answer is kept
+// for 8 ms (every ticker of a frame asks about the same window). LYNX_OCCLUSION=0: never (A/B).
+bool occludedByOtherWindows (HWND top)
+{
+    if (top == nullptr || ! occlusionCheckWanted() || IsIconic (top))
+        return false;
+    static HWND lastTop = nullptr;
+    static double lastMs = -1.0e9;
+    static bool lastAnswer = false;
+    const auto now = juce::Time::getMillisecondCounterHiRes();
+    if (top == lastTop && now - lastMs < 8.0)
+        return lastAnswer;
+
+    auto answer = false;
+    auto own = shownRect (top);
+    MONITORINFO mi {};
+    mi.cbSize = sizeof (mi);
+    if (auto* monitor = MonitorFromWindow (top, MONITOR_DEFAULTTONULL); monitor != nullptr && GetMonitorInfoW (monitor, &mi))
+    {
+        // (a window across two monitors: only the monitor it is mostly on is looked at if it lies wholly there)
+        RECT onMonitor {};
+        if (IntersectRect (&onMonitor, &own, &mi.rcMonitor) && EqualRect (&onMonitor, &own))
+            own = onMonitor;
+    }
+    if (own.right > own.left && own.bottom > own.top)
+    {
+        auto steps = 0;
+        for (auto above = GetWindow (top, GW_HWNDPREV); above != nullptr && ++steps < 400; above = GetWindow (above, GW_HWNDPREV))
+        {
+            if (! IsWindowVisible (above) || IsIconic (above))
+                continue;
+            const auto ex = GetWindowLongPtr (above, GWL_EXSTYLE);
+            if ((ex & (WS_EX_LAYERED | WS_EX_TRANSPARENT | 0x00200000L /* WS_EX_NOREDIRECTIONBITMAP */)) != 0)
+                continue;
+            const auto r = shownRect (above);
+            if (r.left > own.left || r.top > own.top || r.right < own.right || r.bottom < own.bottom)
+                continue;
+            if (cloaked (above))
+                continue;
+            if (auto* region = CreateRectRgn (0, 0, 0, 0))
+            {
+                const auto type = GetWindowRgn (above, region);
+                DeleteObject (region);
+                if (type != ERROR)
+                    continue;
+            }
+            answer = true;
+            break;
+        }
+    }
+    lastTop = top;
+    lastMs = now;
+    lastAnswer = answer;
+    return answer;
+}
+#endif
 } // namespace
 
 std::atomic<int>& coveredSkips()
@@ -796,8 +891,11 @@ bool coveredBySiblingWindows (const juce::Component& c)
         return false;
     auto* peer = c.getPeer();
     auto* hwnd = peer != nullptr ? static_cast<HWND> (peer->getNativeHandle()) : nullptr;
-    if (hwnd == nullptr || (GetWindowLongPtr (hwnd, GWL_STYLE) & WS_CHILD) == 0)
+    if (hwnd == nullptr)
         return false;
+    // round 190la: the top-level window it is in, wholly under another program's window (or another LYNX window)
+    if ((GetWindowLongPtr (hwnd, GWL_STYLE) & WS_CHILD) == 0)
+        return occludedByOtherWindows (hwnd);
     // what of the window can show: its rectangle, clipped by each parent's client area on the way up (screen pixels)
     RECT visible {};
     if (! GetWindowRect (hwnd, &visible))
@@ -832,6 +930,8 @@ bool coveredBySiblingWindows (const juce::Component& c)
             return true;
         }
         w = parent;
+        if ((GetWindowLongPtr (w, GWL_STYLE) & WS_CHILD) == 0)
+            return occludedByOtherWindows (w); // (round 190la)
     }
     return false;
    #else
