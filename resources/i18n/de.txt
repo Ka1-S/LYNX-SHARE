@@ -11318,3 +11318,5 @@ countries: de at ch li lu
 "Put this pattern on the track at the song position" = "Dieses Pattern an der Song-Position auf die Spur setzen"
 "Make a beat first before exporting it to a track." = "Erstelle zuerst einen Beat, bevor du ihn auf eine Spur exportierst."
 "Back to Arrangement: [LMB] this track plays its Playlist clips again" = "Zurück zum Arrangement: [LMB] diese Spur spielt wieder ihre Playlist-Clips"
+"Previous location" = "Vorheriger Ort"
+"Next location" = "Nächster Ort"

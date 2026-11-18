@@ -199,6 +199,11 @@ public:
     // Up/Down (load = false) or Shift+Up/Down (load = true); Enter = loadSelected()
     void step (int delta, bool load);
     void findMatch (int delta); // round 190lr (DF-97): F3 / Shift+F3, the next / previous search result
+    // round 190lr (DF-96 / DL-102): the folders opened, in order; Backspace / Shift+Backspace (FL), Ctrl+[ / Ctrl+] (Live)
+    void noteLocation (const juce::File& folder);
+    bool walkHistory (int delta);
+    int historySizeForCheck() const noexcept { return (int) locations.size(); }
+    int historyAtForCheck() const noexcept { return historyAt; }
     // Issue #182: a typed character selects the next row whose name starts with it (more letters typed quickly: a
     // longer prefix; ui/TypeAhead.h). The row is selected and shown, not previewed. False: not a typing key, or no match.
     bool typeToJump (const juce::KeyPress& key);
@@ -526,6 +531,10 @@ public:
     // round 190ke: the layout style changed (the Simple layout lists "LYNX content" and its tags): every Browser follows
     static void layoutStyleChanged();
 private:
+    std::vector<juce::File> locations; // (round 190lr: the location history)
+    int historyAt = -1;
+    bool walkingHistory = false;
+
 
     AudioEngine& engine;
     Role role = Role::main;

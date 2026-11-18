@@ -11318,3 +11318,5 @@ countries: jp
 "Put this pattern on the track at the song position" = "このパターンを曲の位置でトラックに置く"
 "Make a beat first before exporting it to a track." = "トラックに書き出す前にビートを作ってください。"
 "Back to Arrangement: [LMB] this track plays its Playlist clips again" = "アレンジメントに戻る：[LMB] このトラックがプレイリストのクリップを再び再生"
+"Previous location" = "前の場所"
+"Next location" = "次の場所"

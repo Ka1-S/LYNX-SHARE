@@ -11318,3 +11318,5 @@ countries: tw hk mo
 "Put this pattern on the track at the song position" = "在歌曲位置把此樣式放到軌道上"
 "Make a beat first before exporting it to a track." = "請先做一個節拍，再把它匯出到軌道。"
 "Back to Arrangement: [LMB] this track plays its Playlist clips again" = "回到編排：[LMB] 此軌道重新播放它的 Playlist 片段"
+"Previous location" = "上一個位置"
+"Next location" = "下一個位置"

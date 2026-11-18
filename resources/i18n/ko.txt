@@ -11318,3 +11318,5 @@ countries: kr
 "Put this pattern on the track at the song position" = "이 패턴을 곡 위치에서 트랙에 넣기"
 "Make a beat first before exporting it to a track." = "트랙으로 내보내기 전에 먼저 비트를 만드세요."
 "Back to Arrangement: [LMB] this track plays its Playlist clips again" = "어레인지먼트로 돌아가기: [LMB] 이 트랙이 플레이리스트 클립을 다시 재생"
+"Previous location" = "이전 위치"
+"Next location" = "다음 위치"

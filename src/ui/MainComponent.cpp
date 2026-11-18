@@ -2412,6 +2412,8 @@ bool MainComponent::runAction (const std::string& id)
     else if (is ("browser.next")) browser.step (1, false);
     else if (is ("browser.findNext")) browser.findMatch (1); // round 190lr (DF-97)
     else if (is ("browser.findPrevious")) browser.findMatch (-1);
+    else if (is ("browser.historyBack")) browser.walkHistory (-1); // round 190lr (DF-96 / DL-102)
+    else if (is ("browser.historyForward")) browser.walkHistory (1);
     else if (is ("browser.swapPrevious")) browser.step (-1, true);
     else if (is ("browser.swapNext")) browser.step (1, true);
     else if (is ("browser.load")) browser.loadSelected();

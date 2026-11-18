@@ -436,6 +436,9 @@ std::vector<Action> makeActions()
         // round 190lr (DF-97): FL's "Use (F3) to skip to the next matching item" of a search (Shift+F3: the previous one)
         { "browser.findNext", TR_NOOP ("Next search match"), Context::browser, { chord (f3) } },
         { "browser.findPrevious", TR_NOOP ("Previous search match"), Context::browser, { chord (f3, shift) } },
+        // round 190lr (DF-96 FL's navigation history; DL-102 Live's Ctrl+[ / Ctrl+])
+        { "browser.historyBack", TR_NOOP ("Previous location"), Context::browser, { chord (backspace), chord ('[', ctrl) } },
+        { "browser.historyForward", TR_NOOP ("Next location"), Context::browser, { chord (backspace, shift), chord (']', ctrl) } },
         // Round 190ce: the Browser's collections with the reference DAW's keys (1-7 put the selected item into a colour
         // collection or take it out, 0 takes it out of all; docs/analise/REA_rodada190ce.md §1). Plain keys: the typing
         // keyboard keeps them while it is on.

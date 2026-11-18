@@ -11318,3 +11318,5 @@ countries: es mx ar co cl pe ve
 "Put this pattern on the track at the song position" = "Poner este patrón en la pista en la posición de la canción"
 "Make a beat first before exporting it to a track." = "Crea un ritmo antes de exportarlo a una pista."
 "Back to Arrangement: [LMB] this track plays its Playlist clips again" = "Volver al Arrangement: [LMB] esta pista vuelve a tocar sus clips de la Playlist"
+"Previous location" = "Ubicación anterior"
+"Next location" = "Ubicación siguiente"

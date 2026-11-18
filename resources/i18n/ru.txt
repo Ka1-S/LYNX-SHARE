@@ -11318,3 +11318,5 @@ countries: ru by kz
 "Put this pattern on the track at the song position" = "Поставить этот паттерн на дорожку в позицию песни"
 "Make a beat first before exporting it to a track." = "Сначала создайте бит, затем переносите его на дорожку."
 "Back to Arrangement: [LMB] this track plays its Playlist clips again" = "Назад к Arrangement: [LMB] эта дорожка снова играет свои клипы Playlist"
+"Previous location" = "Предыдущее место"
+"Next location" = "Следующее место"
