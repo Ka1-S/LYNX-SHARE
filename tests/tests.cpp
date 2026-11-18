@@ -17945,6 +17945,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "LoopAnalysis190kxTests.inc" // round 190kx: loop analysis (key and tempo of the user's own loops; core/LoopAnalysis.h)
 #include "Vocal190liTests.inc" // round 190li: Newtone natural engine (engine 1), modulation / drift split, sung centre, analysis octave guard
 #include "Newtone190lmTests.inc" // rollup 0.1.30 step 8: a new Newtone slot (natural engine) analysed with "Separate close notes"
+#include "Rollup190luTests.inc" // rollup 0.1.30 step 9: per-block batching vs plugins' own notes (190kz x 190ks), LYNX Tune's held notes
 #include "Codegen190kzTests.inc" // round 190kz codegen: runtime CPU dispatch (AVX2 paths render the SSE2 bits)
 #include "Dsp190kzTests.inc" // round 190kz: exact Reeverb 2 LFO sine and sinc seeds, Maximus revision 1
 #include "Issue204Tests.inc" // round 190lq: issue #204, an audio clip channel played from notes (whole clip, layered, key pitch)
