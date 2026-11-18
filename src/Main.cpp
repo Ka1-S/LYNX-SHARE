@@ -6673,8 +6673,8 @@ private:
                 auto crestSlot = lynx::makeEffectSlot (lynx::EffectKind::crestCompressor);
                 crestSlot.params[(std::size_t) lynx::dyn::crest::busLaw] = 1.0f;
                 song.mixer[16].effects.push_back (crestSlot);
-                song.mixer[17].lockState = true;
-                song.mixer[18].solo = true;
+                song.mixer[1].lockState = true; // (the default mixer has inserts 1…16)
+                song.mixer[2].solo = true;
                 song.playlistTracks[3].takeLane = true;
                 for (auto& c : song.channels)
                     if (c.name == "Hosted")
