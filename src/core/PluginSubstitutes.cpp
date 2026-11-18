@@ -1867,7 +1867,7 @@ int translateWavesSuperTap (const std::vector<std::uint8_t>& state, EffectSlot& 
 // RVerb: 2 decay s, 17 pre-delay ms. H-Reverb: 5 reverb time (the tail's, x 1.45 = the measured RT), 16 pre-delay ms,
 // 59 dynamics range dB, 249 dynamics on (ducking: [model] a fixed share of the range off the wet level, fitted on X4).
 // TrueVerb: 0 decay s, 5 distance, 24 pre-delay ms, 29 direct off, 42 reverb level dB, 43 early reflections level dB;
-// the direct path is −0.7 − 0.135 x distance dB (measured: −4.8 … −6.2 dB at distance 2.6 … 13 through deconvolution).
+// the direct path: round 190lf measured its exact filter (below, Reeverb 2's hidden direct law; it was a flat −0.7 − 0.135 x distance dB).
 struct WavesVerbFit
 {
     const char* name;
@@ -1879,7 +1879,7 @@ constexpr WavesVerbFit wavesVerbFits[] {
     { "H-Reverb", 19, 44, 1, 44, 61, 42, 104, 160, 0.60, -7.5, 1.45 },
     { "TrueVerb", 19, 221, 9, 100, 126, 266, 2000, 160, 0.54, -5.25, 1.0 },
 };
-constexpr double hReverbDuckShare = 0.25, trueVerbEarly = 0.36, trueVerbDirectDb = -0.7, trueVerbDirectPerDistance = -0.135;
+constexpr double hReverbDuckShare = 0.25, trueVerbEarly = 0.36;
 int translateWavesReverb (const std::vector<std::uint8_t>& state, EffectSlot& slot)
 {
     if (slot.kind != EffectKind::reeverb2)
@@ -1906,6 +1906,7 @@ int translateWavesReverb (const std::vector<std::uint8_t>& state, EffectSlot& sl
     s.p[5] = std::clamp ((int) std::lround (*decay * fit->decayScale * 10.0), 1, 200);
     s.p[2] = std::clamp ((int) std::lround (wavesValue (rw, predelayAt).value_or (0.0) * 0.384), 0, 384);
     double levelDb = 0.0, early = 1.0, dry = 0.0;
+    bool trueVerbTail = false; // round 190lf
     if (hReverb && wavesValue (rw, 249).value_or (0.0) >= 0.5)
         levelDb += hReverbDuckShare * wavesValue (rw, 59).value_or (0.0);
     if (! rverb && ! hReverb) // TrueVerb
@@ -1913,12 +1914,37 @@ int translateWavesReverb (const std::vector<std::uint8_t>& state, EffectSlot& sl
         levelDb += wavesValue (rw, 42).value_or (0.0);
         early = trueVerbEarly * std::pow (10.0, wavesValue (rw, 43).value_or (0.0) / 20.0);
         if (wavesValue (rw, 29).value_or (0.0) < 0.5)
-            dry = 0.8 * std::pow (10.0, (trueVerbDirectDb + trueVerbDirectPerDistance * wavesValue (rw, 5).value_or (0.0)) / 20.0);
+        {
+            // round 190lf [EXEC] (impulse responses of refcap182's four TrueVerb states with the direct sound on, REA_rodada190lf_verb
+            // §2): the direct sound is a·x − b·Σ ρ^(k−1)·x[n−k], exactly (a first-order low shelf: −4.3 … −5.6 dB at DC, −0.6 dB at
+            // the top), its depth growing with Distance d (m): a = 0.9002 − 0.00335 d, b = 0.0630 + 0.00267 d, ρ = 0.6948 +
+            // 0.00260 d (fitted over 2.6 … 13 m; ±0.009 on a). Reeverb 2's own (flat) dry stays at 0
+            const auto d = std::clamp (wavesValue (rw, 5).value_or (0.0), 0.0, 40.0);
+            slot.params[(std::size_t) reeverb2DirectLaw] = 1.0f;
+            slot.params[(std::size_t) reeverb2DirectLaw + 1] = (float) std::max (0.0, 0.90024 - 0.003351 * d);
+            slot.params[(std::size_t) reeverb2DirectLaw + 2] = (float) std::max (0.0, 0.06297 + 0.002666 * d);
+            slot.params[(std::size_t) reeverb2DirectLaw + 3] = (float) std::clamp (0.69484 + 0.002601 * d, 0.0, 0.95);
+            // and its tail's decay [EXEC] (the same impulse responses after the direct sound: RT60 at 1 kHz 0.84 … 1.03 × the
+            // Decay knob, ×1.35 … 1.6 at 125 Hz, ×0.65 … 0.75 at 8 kHz; Reeverb 2 rings 1.68 s per 1 s of its decay control at a
+            // neutral bass multiplier): decay control 0.54 × the knob, bass ×1.30, high damping 120, the wet 3 dB up to keep its
+            // energy (chosen on the prog182 table, D / X1 / X2 / X3). With the direct sound off the round-190js tail stays (its
+            // tone, not refitted to this decay, sets that table's spectrum: X4 would drop 3.8 → 3.2)
+            trueVerbTail = true;
+            s.p[5] = std::clamp ((int) std::lround (*decay * 5.4), 1, 200);
+            s.p[6] = 120;
+            s.p[7] = 130;
+            s.p[8] = 2000;
+        }
     }
     else
         early = (double) fit->early / 160.0;
     const double wet = std::clamp (fit->wet0 * std::pow (10.0, (fit->tcDb * std::log10 (*decay / 1.5) + levelDb) / 20.0), 0.0, 1.0);
     s.p[12] = (int) std::lround (wet * 160.0);
+    if (trueVerbTail) // +3 dB on Reeverb 2's wet level law, gain = (e^(2.3979 · raw / 256) − 1) / 10
+    {
+        const auto g = (std::exp (2.39789534 * s.p[12] / 256.0) - 1.0) * 0.1 * std::pow (10.0, 3.0 / 20.0);
+        s.p[12] = std::clamp ((int) std::lround (256.0 * std::log (g / 0.1 + 1.0) / 2.39789534), 0, 160);
+    }
     s.p[11] = (int) std::lround (std::min (1.0, early) * 160.0);
     s.p[10] = (int) std::lround (dry * 160.0);
     reeverb2::toParams (s, slot.params);
@@ -2940,42 +2966,24 @@ int translateWavesHDelay (const std::vector<std::uint8_t>& state, EffectSlot& sl
         p[e::output] = linNorm (wavesValue (rw, 14).value_or (0.0), -18.0, 18.0);
         return 9;
     }
-    const auto loop = pingPong ? 0.93 * f * f : 0.98 * f;
-    p[e::feedback] = (float) std::clamp (loop / 2.0, 0.0, 1.0);
-    p[e::mix] = (float) std::clamp (wavesValue (rw, 6).value_or (100.0) / 100.0, 0.0, 1.0);
-    // the analog modes also compress loud input (1 kHz bursts: +3 dB at -34 dBFS, 0 at -10, -2.3 at -4): on her
-    // three vocal takes the echoes of the reference are 2.5 dB under the small-signal gain, hence -1.4 instead of +1.1
-    const auto level = pingPong ? (analog ? -1.4 : 2.5) : (analog ? -4.4 : -0.4);
-    p[e::output] = linNorm (wavesValue (rw, 14).value_or (0.0) + level, -18.0, 18.0);
-    p[e::mode] = e::modeValue (e::Mode::clean);
-    p[e::age] = 0.0f;
-    p[e::drive] = 0.0f;
-    p[e::diffusion] = 0.0f;
-    p[e::ducking] = 0.0f;
-    p[e::width] = 1.0f;
-    p[e::spread] = 0.5f;
-    // round 137: LoFi (RealWorld 21, on = 1) → Echoform's own LoFi switch (the same in-loop low-pass, spec §4.2)
-    p[e::lofi] = wavesValue (rw, 21).value_or (0.0) >= 0.5 ? 1.0f : 0.0f;
-    const auto hp = wavesValue (rw, 17).value_or (19.0), lp = wavesValue (rw, 15).value_or (20100.0);
-    p[e::lowCut] = hp > 19.5 ? linNorm (hp, 10.0, 2000.0) : 0.0f;
-    // Echoform's high cut acts like a one-pole at about half its label below 80 % (REA_rodada101 §3.3)
-    p[e::highCut] = lp < 20000.0 ? linNorm (2.0 * lp, 200.0, 20000.0) : 1.0f;
-    const auto depth = wavesValue (rw, 19).value_or (0.0);
-    p[e::modDepth] = (float) std::clamp (std::sqrt (std::max (0.0, depth) / 100.0), 0.0, 1.0);
-    if (depth > 0.0)
+    // round 190lf: the filters, LoFi and the modulation measured on the same loop (REA_rodada190lf_verb §3): the hybrid
+    // engine's law 1 (HiPass / LoPass / LoFi inside the loop, the smoothed-triangle delay swing of ± depth · T / 2, the
+    // LFO at twice the Rate knob with the BPM / host sync and at the knob with ms [EXEC, 120 BPM])
     {
-        // round 190dl [EXEC] (tp172d bank, Depth 50 %, its stored rate 0.1, Sync own BPM 1/8 dotted = 375 ms, LoFi on): the
-        // echo time swings as a triangle of ± 87.5 ms (23.3 % of the time) about the set time, period 5.0 s, both sides in
-        // step (echo train of an impulse and of a noise burst, fitted to 3 ms). Echoform's Clock law: swing = ½ · depth of
-        // the time, the triangle, rate × 2. One depth and one rate were measured: the depth is taken as proportional to
-        // the time and linear in the percentage, as on a clocked line (the PCM42 lineage the vendor names)
-        const auto rate = 2.0 * std::clamp (wavesValue (rw, 20).value_or (0.1), 0.01, 5.0);
-        p[e::modClock] = 1.0f;
-        p[e::modShape] = 1.5f / 5.0f; // triangle
-        p[e::modDepth] = (float) std::clamp (0.932 * depth / 100.0, 0.0, 1.0);
-        p[e::modRate] = (float) std::clamp (std::pow ((rate - 0.01) / 9.99, 1.0 / 2.3277), 0.0, 1.0);
+        p[e::hybrid] = e::hybridValue (analog ? 2 : 1);
+        p[e::hybridLaw] = 1.0f;
+        p[e::feedback] = (float) std::clamp (f / 2.0, 0.0, 1.0);
+        p[e::mix] = (float) std::clamp (wavesValue (rw, 6).value_or (100.0) / 100.0, 0.0, 1.0);
+        p[e::output] = linNorm (wavesValue (rw, 14).value_or (0.0), -18.0, 18.0);
+        p[e::lofi] = wavesValue (rw, 21).value_or (0.0) >= 0.5 ? 1.0f : 0.0f;
+        p[e::hybridHp] = hp0 > 19.5 ? e::hybridFilterValue (hp0) : 0.0f;
+        p[e::hybridLp] = lp0 < 20000.0 ? e::hybridFilterValue (lp0) : 0.0f;
+        const auto depth = std::clamp (wavesValue (rw, 19).value_or (0.0), 0.0, 100.0);
+        p[e::hybridDepth] = (float) (depth / 100.0);
+        const auto rate = std::clamp (wavesValue (rw, 20).value_or (0.1), 0.0, 10.0) * (*sync < 1.5 ? 2.0 : 1.0);
+        p[e::hybridRate] = depth > 0.0 ? (float) (rate / 20.0) : 0.0f;
+        return 10;
     }
-    return 8;
 }
 
 // NS1 (RealWorld list, round 119): value 229 is the one knob, 0 … 100 %; Quell's Amount follows the same scale

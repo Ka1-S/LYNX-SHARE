@@ -127,8 +127,20 @@ enum Param
     // heard once on the echoes instead of on every pass, the voicing's diffusion inside the echo time, the echoes'
     // measured 1/6 ms behind the dry. 0 = rounds 147 / 150 (a project or preset saved before loads without it, so it
     // keeps that sound bit for bit). Read only with an echo voicing
-    revision = paramCount
+    revision = paramCount,
+    // round 190lf, hidden (not in the info: no control, no string; saved while non-zero; 0 in a new instance and in every
+    // project saved before, which then plays the round-124 hybrid echo bit for bit): the hybrid echo's law. 1 = the
+    // H-Delay loop measured on refcap030's host (docs/analise/REA_rodada190lf_verb.md §3): its high / low passes and
+    // LoFi inside the loop, its delay modulation. Set only by the H-Delay translator; read only with the hybrid engine on
+    hybridLaw,
+    hybridHp,    // law 1: the loop's high pass, 0 = off, else 10 · 2400^v Hz (H-Delay's HiPass knob)
+    hybridLp,    // law 1: the loop's low pass, 0 = off, else 10 · 2400^v Hz (H-Delay's LoPass knob)
+    hybridDepth, // law 1: the delay modulation's depth, 0 … 1 = H-Delay's 0 … 100 %
+    hybridRate   // law 1: the modulation's LFO frequency, v · 20 Hz (the translator folds in the sync mode's factor)
 };
+// round 190lf: the hybrid law's frequency mapping (hybridHp / hybridLp)
+double hybridFilterHz (float v) noexcept;
+float hybridFilterValue (double hz) noexcept;
 enum class Style { single, ratio, quad, dual, pingPong }; // the two-time styles last (the panel shows the right time for both)
 // in the panel's order: the modulation section shows wow / flutter (tape), rate / depth (lo-fi … phaser), shift / detune
 // (shifter) or pitch / detune (pitch, reverse, detune) — contiguous ranges of the Mode value

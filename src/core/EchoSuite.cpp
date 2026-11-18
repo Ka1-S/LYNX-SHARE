@@ -748,6 +748,8 @@ const char* tapeVoicingName (int k) noexcept
     return names[std::clamp (k, 0, tapeVoicingCount)];
 }
 float hybridValue (int h) noexcept { return h <= 0 ? 0.0f : (h == 1 ? 0.5f : 1.0f); }
+double hybridFilterHz (float v) noexcept { return 10.0 * std::pow (2400.0, std::clamp ((double) v, 0.0, 1.0)); }
+float hybridFilterValue (double hz) noexcept { return (float) std::clamp (std::log (std::max (hz, 10.0) / 10.0) / std::log (2400.0), 0.0, 1.0); }
 
 // ---- round 147: the echo voicings, the saturation curves and Multiply (REA_rodada147a) ---------------------------
 // [EXEC] each voicing is one of EchoBoy's 31 factory styles measured black-box on the official trial (Single, 250 ms,
@@ -1033,6 +1035,7 @@ public:
         // round 190is [EXEC] refcap030 EchoBoy (S1 impulse, every style alike): the reference's echoes arrive 8 / 7.7 / 5
         // samples after n · T (+ the L/R offset) at 44.1 / 48 / 96 kHz, against the dry; revision 1 plays them that late
         wetLag = sr < 64000.0 ? 8 : (int) std::lround (5.0 * sr / 96000.0);
+        hyb.lfoPhase = hyb.lfoSmooth = 0.0; // round 190lf: the hybrid law's LFO starts with the instance
         reset();
     }
 
@@ -1953,13 +1956,65 @@ private:
     // - stereo: each side its own line, fb × its echo, the same gain on every write;
     // - analog: the same loop between an input gain and an output gain (fitted on impulses at -66 … +6 dBFS and her takes)
     //   and a gentle low tilt on the echoes; its hiss (≈ -85 dBFS) is not reproduced.
+    static constexpr int hybridFirMax = 96; // round 190lf: LoFi's FIR, up to 192 kHz
     struct HybridState
     {
         Line a, b;
         double ga = 1.0, gb = 1.0, aPrev = 0.0, bPrev = 0.0;
         Biquad tilt;
         bool dirty = true;
+        // round 190lf, law 1: the loop's filters per line (a = channel 0, b = channel 1), LoFi's FIR per line, the LFO
+        Biquad hp, lp;
+        std::array<std::array<double, hybridFirMax>, 2> fir {};
+        int firPos = 0;
+        // the LFO runs from the instance's start, not from a reset (measured: H-Delay's modulation keeps its phase across
+        // the host's reset); prepare() restarts it
+        double lfoPhase = 0.0, lfoSmooth = 0.0;
     } hyb;
+    // round 190lf: LoFi's low pass, LYNX's own design (a Kaiser-windowed sinc, linear phase) fitted to the measured
+    // magnitude of H-Delay's LoFi echo (REA_rodada190lf_verb §3.2: 33 taps at 48 kHz, 6.34 kHz, β 4.8)
+    std::array<double, hybridFirMax> hybFirK {};
+    int hybFirN = 0;
+    double hybFirRate = 0.0;
+    void designHybridFir() noexcept
+    {
+        if (hybFirRate == sr)
+            return;
+        hybFirRate = sr;
+        auto nTaps = (int) std::lround (33.0 * sr / 48000.0);
+        nTaps = std::clamp (nTaps | 1, 3, hybridFirMax - 1);
+        hybFirN = nTaps;
+        const auto i0 = [] (double x) { // the modified Bessel function I0 (its series)
+            double sum = 1.0, term = 1.0;
+            for (int k = 1; k < 40; ++k)
+            {
+                term *= (x / (2.0 * k)) * (x / (2.0 * k));
+                sum += term;
+            }
+            return sum;
+        };
+        constexpr double beta = 4.8, fc = 6340.0;
+        const auto wc = 2.0 * std::min (fc, 0.45 * sr) / sr, mid = 0.5 * (nTaps - 1), norm = i0 (beta);
+        double total = 0.0;
+        for (int k = 0; k < nTaps; ++k)
+        {
+            const auto n = (double) k - mid, r = n / mid;
+            const auto sinc = n == 0.0 ? 1.0 : std::sin (pi * wc * n) / (pi * wc * n);
+            hybFirK[(std::size_t) k] = wc * sinc * i0 (beta * std::sqrt (std::max (0.0, 1.0 - r * r))) / norm;
+            total += hybFirK[(std::size_t) k];
+        }
+        for (int k = 0; k < nTaps; ++k)
+            hybFirK[(std::size_t) k] /= total;
+    }
+    double hybridFir (int line, double x) noexcept
+    {
+        auto& z = hyb.fir[(std::size_t) line];
+        z[(std::size_t) hyb.firPos] = x;
+        double y = 0.0;
+        for (int k = 0, j = hyb.firPos; k < hybFirN; ++k, j = (j == 0 ? hybFirN - 1 : j - 1))
+            y += hybFirK[(std::size_t) k] * z[(std::size_t) j];
+        return y;
+    }
     static constexpr double analogIn = 0.8866, analogOut = 0.9776;
 
     static inline double linkedGain (double level, double& g, double rel) noexcept
@@ -1971,6 +2026,11 @@ private:
 
     void hybridProcess (float* l, float* r, int n, const EffectParams& p, double bpm) noexcept
     {
+        if (p[hybridLaw] >= 0.5f) // round 190lf: the measured H-Delay loop (filters, LoFi, modulation)
+        {
+            hybridLaw1 (l, r, n, p, bpm);
+            return;
+        }
         if (hyb.a.buf.empty() || hyb.dirty)
         {
             if (hyb.a.buf.empty())
@@ -2026,6 +2086,133 @@ private:
             }
             l[i] = dryGain * (float) xl + wetGain * el * (p[phaseL] >= 0.5f ? -1.0f : 1.0f);
             r[i] = dryGain * (float) xr + wetGain * er * (p[phaseR] >= 0.5f ? -1.0f : 1.0f);
+        }
+    }
+
+    // ---- round 190lf: the hybrid echo's law 1 -----------------------------------------------------------------------
+    // [EXEC] black-box probes of H-Delay in Waves demo mode on refcap030's host (REA_rodada190lf_verb.md §3), our own code:
+    // - HiPass / LoPass: 2nd-order sections inside the loop (every pass filters again: the second echo carries the
+    //   response twice), Q 0.80 (high pass) / 0.95 (low pass), the knob's frequency through a bilinear map without
+    //   pre-warping (5 kHz → 4.83 kHz, 7.86 kHz → 7.26 kHz at 48 kHz); fitted to the impulse responses within 0.03 dB;
+    // - LoFi: a steep linear-phase low pass inside the loop whose delay is taken off the echo time (each pass lands on
+    //   T): flat to 4.5 kHz, −4.4 dB at 6 kHz, −27 dB at 8 kHz (here LYNX's own Kaiser-windowed sinc, ±0.6 dB to −40 dB);
+    // - modulation: a triangle LFO through a one-pole of 0.37 s (measured from its harmonics: H3 / H1 0.072 at a 5 s
+    //   period, 0.094 at 10 s, 0.04 at 1 s) swings the read delay by ± depth · T / 2 (depth 0 … 1), both lines in step;
+    //   the LFO starts at the centre, rising, when the instance starts, and runs on across resets.
+    void hybridLaw1 (float* l, float* r, int n, const EffectParams& p, double bpm) noexcept
+    {
+        const auto need = sr * 3.6 * 1.6 + 8.0; // the longest time and its swing
+        if (hyb.a.buf.empty() || hyb.dirty || hyb.a.maxDelay() < need - 16.0)
+        {
+            if (hyb.a.buf.empty() || hyb.a.maxDelay() < need - 16.0)
+            {
+                hyb.a.allocate (need);
+                hyb.b.allocate (need);
+            }
+            hyb.a.clear();
+            hyb.b.clear();
+            hyb.ga = hyb.gb = 1.0;
+            hyb.aPrev = hyb.bPrev = 0.0;
+            hyb.tilt.reset();
+            hyb.hp.reset();
+            hyb.lp.reset();
+            for (auto& z : hyb.fir)
+                z.fill (0.0);
+            hyb.firPos = 0;
+            hyb.dirty = false;
+        }
+        const bool analog = hybridOf (p[hybrid]) == 2;
+        const bool pp = styleOf (p[style]) == Style::pingPong;
+        const bool startRight = p[startSide] >= 0.5f;
+        const bool lofiOn = p[lofi] >= 0.5f;
+        if (lofiOn)
+            designHybridFir();
+        const int firDelay = lofiOn ? (hybFirN - 1) / 2 : 0;
+        const auto maxT = (int) (hyb.a.maxDelay() / 1.6);
+        const auto t = std::clamp ((int) std::lround (sideMs (p, false, bpm) * sr / 1000.0), firDelay + 1, maxT);
+        const auto fb = feedbackGain (p[feedback]);
+        const auto fbPair = fb * fb;
+        float dryGain = 1.0f, wetGain = 0.0f;
+        equalPowerMix (p[mix], dryGain, wetGain);
+        const auto outLevel = (float) std::pow (10.0, outputDb (p[output]) / 20.0);
+        wetGain *= outLevel;
+        dryGain *= outLevel;
+        if (analog)
+            dryGain *= 0.928f;
+        const auto rel = std::exp (-1.0 / (0.010 * sr));
+        const auto inGain = analog ? analogIn : 1.0, outGain = analog ? analogOut : 1.0;
+        if (analog)
+            hyb.tilt.shelf (sr, 942.0, 0.63, false, 0.5);
+        // the knobs' corners as the reference maps them (a bilinear transform without pre-warping)
+        const auto warped = [&] (double hz) { return sr / pi * std::atan (pi * std::min (hz, 0.49 * sr) / sr); };
+        const bool hpOn = p[hybridHp] > 0.0f, lpOn = p[hybridLp] > 0.0f;
+        if (hpOn)
+            hyb.hp.filter (sr, 1, warped (hybridFilterHz (p[hybridHp])), 0.80);
+        if (lpOn)
+            hyb.lp.filter (sr, 0, warped (hybridFilterHz (p[hybridLp])), 0.95);
+        const auto depth = (double) clamp01 (p[hybridDepth]);
+        const bool modOn = depth > 0.0;
+        const auto lfoInc = std::max (0.0, (double) p[hybridRate] * 20.0) / sr;
+        const auto lfoA = std::exp (-1.0 / (0.37 * sr));
+        const auto swing = 0.5 * depth * (double) t;
+        constexpr double invSqrt2 = 0.70710678118654752;
+        const auto phl = p[phaseL] >= 0.5f ? -1.0f : 1.0f, phr = p[phaseR] >= 0.5f ? -1.0f : 1.0f;
+        for (int i = 0; i < n; ++i)
+        {
+            const double xl = l[i], xr = r[i];
+            // the LFO: a triangle from 0 rising (phase 0 … 1), smoothed (runs whether or not the depth is up)
+            const auto u = hyb.lfoPhase;
+            const auto tri = u < 0.25 ? 4.0 * u : (u < 0.75 ? 2.0 - 4.0 * u : 4.0 * u - 4.0);
+            hyb.lfoSmooth = tri + lfoA * (hyb.lfoSmooth - tri);
+            hyb.lfoPhase += lfoInc;
+            if (hyb.lfoPhase >= 1.0)
+                hyb.lfoPhase -= 1.0;
+            double aOut, bOut;
+            if (modOn)
+            {
+                const auto d = (double) (t - firDelay) + swing * hyb.lfoSmooth;
+                aOut = hyb.a.at (d);
+                bOut = hyb.b.at (d);
+            }
+            else
+            {
+                aOut = hyb.a.tap (t - firDelay);
+                bOut = hyb.b.tap (t - firDelay);
+            }
+            const auto va = pp ? inGain * (xl + xr) * invSqrt2 + fbPair * hyb.bPrev : inGain * xl + fb * hyb.aPrev;
+            const auto vb = pp ? hyb.aPrev : inGain * xr + fb * hyb.bPrev;
+            const auto g = linkedGain (std::max (std::fabs (va), std::fabs (vb)), hyb.ga, rel);
+            double wa = va * g, wb = vb * g;
+            if (hpOn)
+            {
+                wa = hyb.hp.process ((float) wa, 0);
+                wb = hyb.hp.process ((float) wb, 1);
+            }
+            if (lpOn)
+            {
+                wa = hyb.lp.process ((float) wa, 0);
+                wb = hyb.lp.process ((float) wb, 1);
+            }
+            if (lofiOn)
+            {
+                wa = hybridFir (0, wa);
+                wb = hybridFir (1, wb);
+                hyb.firPos = hyb.firPos + 1 >= hybFirN ? 0 : hyb.firPos + 1;
+            }
+            hyb.a.push ((float) wa);
+            hyb.b.push ((float) wb);
+            hyb.aPrev = aOut;
+            hyb.bPrev = bOut;
+            float el = (float) (aOut * outGain), er = (float) (bOut * outGain);
+            if (pp && startRight)
+                std::swap (el, er);
+            if (analog)
+            {
+                el = hyb.tilt.process (el, 0);
+                er = hyb.tilt.process (er, 1);
+            }
+            l[i] = dryGain * (float) xl + wetGain * el * phl;
+            r[i] = dryGain * (float) xr + wetGain * er * phr;
         }
     }
 
