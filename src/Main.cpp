@@ -2249,6 +2249,18 @@ public:
             return;
         }
 
+        if (args.contains ("--polyshot190lj") && args.indexOf ("--polyshot190lj") + 2 < args.size())
+        {
+            // LYNX --polyshot190lj prefix audio.wav [bends.wav] (round 190lj): "Convert to MIDI (polyphonic)" — the audio
+            // clip menu (Pattern and Simple layouts), the options dialog, Edison's Tools menu, and the result of a
+            // conversion (Playlist, Piano roll; with bends on the second file), plus <prefix>-checks.txt (OK / FAIL)
+            const auto i = args.indexOf ("--polyshot190lj");
+            const auto ok = runPolyShot190lj (args[i + 1].unquoted(), args[i + 2].unquoted(), i + 3 < args.size() && ! args[i + 3].startsWith ("--") ? args[i + 3].unquoted() : juce::String());
+            setApplicationReturnValue (ok ? 0 : 1);
+            quit();
+            return;
+        }
+
         if (args.contains ("--newtoneshot190kx"))
         {
             // LYNX --newtoneshot190kx prefix audio.wav (round 190kx): Newtone with FL's analysis and with "Separate close
@@ -3180,12 +3192,35 @@ public:
         {
             // LYNX.exe --audio2midi input.wav melody|harmony|drums notes.csv: the clip menu's Convert to MIDI, without the
             // window (round a2m189b's measurements)
+            // Round 190lj: mode "poly" = the "Convert to MIDI (polyphonic)" dialog's path, settings after the CSV as
+            // key=value (poly=0|1 note=0..1 split=0..1 minms=N low=K high=K bends=0|1); audio2midi.txt also gets the
+            // seconds spent resampling, in the model and making the notes.
             const auto i = args.indexOf ("--audio2midi");
             const auto mode = args[i + 2] == "drums" ? lynx::a2m::Mode::drums : args[i + 2] == "harmony" ? lynx::a2m::Mode::harmony : lynx::a2m::Mode::melody;
             lynx::AudioEngine loader (false);
             const juce::File csv (args[i + 3].unquoted());
-            const auto error = lynx::convertFileToMidiCsv (loader, juce::File (args[i + 1].unquoted()), mode, csv);
-            csv.getSiblingFile ("audio2midi.txt").replaceWithText (error.isEmpty() ? "result=OK\n" : "result=FAIL " + error + "\n");
+            juce::String error, timing;
+            if (args[i + 2] == "poly")
+            {
+                lynx::a2m::ConvertOptions options;
+                for (int k = i + 4; k < args.size() && args[k].containsChar ('='); ++k)
+                {
+                    const auto key = args[k].upToFirstOccurrenceOf ("=", false, false);
+                    const auto value = args[k].fromFirstOccurrenceOf ("=", false, false);
+                    if (key == "poly") options.polyphonic = value.getIntValue() != 0;
+                    else if (key == "note") options.noteSensitivity = value.getFloatValue();
+                    else if (key == "split") options.splitSensitivity = value.getFloatValue();
+                    else if (key == "minms") options.minNoteMs = value.getDoubleValue();
+                    else if (key == "low") options.minKey = value.getIntValue();
+                    else if (key == "high") options.maxKey = value.getIntValue();
+                    else if (key == "bends") options.pitchBends = value.getIntValue() != 0;
+                }
+                error = lynx::convertFileToMidiCsv (loader, juce::File (args[i + 1].unquoted()), options, csv, &timing);
+            }
+            else
+                error = lynx::convertFileToMidiCsv (loader, juce::File (args[i + 1].unquoted()), mode, csv);
+            csv.getSiblingFile ("audio2midi.txt").replaceWithText (error.isEmpty() ? "result=OK\n" + (timing.isEmpty() ? juce::String() : "seconds=" + timing + "\n")
+                                                                                   : "result=FAIL " + error + "\n");
             setApplicationReturnValue (error.isEmpty() ? 0 : 1);
             quit();
             return;
@@ -21478,6 +21513,161 @@ private:
         }
         lynx::shot::file (juce::File (prefix + "-menus.txt")).replaceWithText (report);
         std::printf ("%s", report.toRawUTF8());
+    }
+
+    bool runPolyShot190lj (const juce::String& prefix, const juce::String& file, const juce::String& bendFile)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine engine (false);
+        lynx::MainComponent ui (engine, false);
+        ui.setSize (1600, 900);
+        juce::StringArray checks;
+        const auto check = [&checks] (bool ok, const juce::String& what) { checks.add ((ok ? "OK   " : "FAIL ") + what); };
+        const auto setUp = [&engine] (const juce::String& path) {
+            auto song = lynx::Song::makeDefault();
+            const auto sample = engine.getSampleLibrary().load (path);
+            song.channels.push_back ({});
+            song.channels.back().name = juce::File (path).getFileNameWithoutExtension().toStdString();
+            song.channels.back().instrument = lynx::InstrumentKind::audioClip;
+            song.channels.back().samplePath = path.toStdString();
+            lynx::Clip c;
+            c.kind = lynx::ClipKind::audio;
+            c.channel = (int) song.channels.size() - 1;
+            c.track = 3;
+            c.start = 0;
+            const auto seconds = sample != nullptr ? (double) sample->frames() / sample->sampleRate : 4.0;
+            c.length = (std::int64_t) std::llround (seconds * song.bpm / 60.0 * lynx::ppq);
+            song.playlist.push_back (c);
+            engine.setSong (std::move (song));
+            engine.dispatchPendingMessages();
+            return (int) engine.getSong().playlist.size() - 1;
+        };
+        auto clipIndex = setUp (file);
+        auto& playlist = ui.getPlaylistForSnapshot();
+        const auto wanted = lynx::tr ("Convert to MIDI (polyphonic)...");
+        const auto hasItem = [&wanted] (const juce::PopupMenu& menu) {
+            auto afterExtras = false;
+            for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+            {
+                if (it.getItem().isSectionHeader && it.getItem().text == lynx::tr ("LYNX extras"))
+                    afterExtras = true;
+                if (it.getItem().text == wanted)
+                    return afterExtras && it.getItem().isEnabled;
+            }
+            return false;
+        };
+        {
+            const auto menu = playlist.getClipMenuForSnapshot (clipIndex);
+            savePng (columnMenuImage (menu), prefix + "-clip-menu.png");
+            check (hasItem (menu), "Pattern layout: the clip menu's LYNX extras column has \"" + wanted + "\"");
+        }
+        ui.setLayoutStyle (lynx::layoutstyle::Style::simple);
+        engine.dispatchPendingMessages();
+        {
+            const auto menu = ui.getPlaylistForSnapshot().getClipMenuForSnapshot (clipIndex);
+            savePng (columnMenuImage (menu), prefix + "-clip-menu-simple.png");
+            check (hasItem (menu), "Simple layout: the clip menu has \"" + wanted + "\" (LYNX extras)");
+        }
+        ui.setLayoutStyle (lynx::layoutstyle::Style::pattern);
+        engine.dispatchPendingMessages();
+
+        // the dialog as it opens (the song's instruments in "Play them on")
+        {
+            auto dialog = lynx::makeConvertOptionsForSnapshot (engine, lynx::ticksPerStep);
+            savePng (lynx::shot::snapshot (*dialog), prefix + "-dialog.png");
+            auto* box = dynamic_cast<juce::AlertWindow*> (dialog.get());
+            const auto* channels = box != nullptr ? box->getComboBoxComponent ("channel") : nullptr;
+            check (channels != nullptr && channels->getNumItems() > 1 && channels->getItemText (0) == lynx::tr ("New channel (Synth)"),
+                   "dialog: \"Play them on\" offers a new Synth channel and the song's instruments (" + juce::String (channels != nullptr ? channels->getNumItems() : 0) + " items)");
+        }
+
+        // Edison: Tools › Analysis
+        {
+            auto editor = lynx::makeAudioEditorForFileSnapshot (engine, juce::File (file));
+            editor->setSize (1100, 520);
+            const auto menu = lynx::audioEditorMainMenuForSnapshot (*editor);
+            const juce::PopupMenu* tools = nullptr;
+            for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+                if (it.getItem().subMenu != nullptr && it.getItem().text.upToFirstOccurrenceOf ("\t", false, false).removeCharacters ("&") == lynx::tr ("Tools").removeCharacters ("&"))
+                    tools = it.getItem().subMenu.get();
+            auto found = false;
+            if (tools != nullptr)
+            {
+                savePng (columnMenuImage (*tools), prefix + "-edison-tools.png");
+                for (juce::PopupMenu::MenuItemIterator it (*tools); it.next();)
+                    found = found || it.getItem().text == wanted;
+            }
+            check (found, "Edison: Tools has \"" + wanted + "\"");
+        }
+
+        // a conversion with the dialog's defaults: a new pattern on a new Synth channel, on a new track under the clip
+        auto convert = [&] (const lynx::a2m::ConvertOptions& options, const juce::String& name) {
+            const auto channelsBefore = engine.getSong().channels.size();
+            juce::String error;
+            const auto t0 = juce::Time::getMillisecondCounterHiRes();
+            const auto pattern = lynx::convertClipToMidiNow (engine, clipIndex, options, error);
+            const auto ms = juce::Time::getMillisecondCounterHiRes() - t0;
+            engine.dispatchPendingMessages();
+            const auto& song = engine.getSong();
+            if (pattern < 0 || pattern >= (int) song.patterns.size())
+            {
+                check (false, name + ": no pattern (" + error + ")");
+                return -1;
+            }
+            const auto& notes = song.patterns[(std::size_t) pattern].notes;
+            int curved = 0;
+            for (const auto& n : notes)
+                curved += n.curves.has() ? 1 : 0;
+            check (! notes.empty(), name + ": " + juce::String ((int) notes.size()) + " notes (" + juce::String (curved) + " with a pitch curve) in pattern \""
+                                         + juce::String::fromUTF8 (song.patterns[(std::size_t) pattern].name.c_str()) + "\", " + juce::String (ms, 0) + " ms");
+            check (options.channel >= 0 ? song.channels.size() == channelsBefore : song.channels.size() == channelsBefore + 1,
+                   name + (options.channel >= 0 ? ": played by the chosen channel (none added)" : ": one new Synth channel"));
+            const auto& added = song.playlist.back();
+            check (added.kind == lynx::ClipKind::pattern && added.pattern == pattern && added.track == 4, name + ": the pattern clip is on a new track under the audio clip");
+            if (! notes.empty())
+                engine.setSelectedChannel (notes.front().channel);
+            return pattern;
+        };
+        lynx::a2m::ConvertOptions plain;
+        plain.gridTicks = lynx::ticksPerStep;
+        convert (plain, "defaults");
+        ui.selectTabForSnapshot (2);
+        engine.dispatchPendingMessages();
+        saveSnapshot (ui, prefix + "-playlist.png");
+        ui.selectTabForSnapshot (1);
+        engine.dispatchPendingMessages();
+        saveSnapshot (ui, prefix + "-pianoroll.png");
+        // quantized, on the song's first instrument
+        lynx::a2m::ConvertOptions onFirst = plain;
+        onFirst.quantize = true;
+        for (int c = 0; c < (int) engine.getSong().channels.size(); ++c)
+            if (lynx::a2m::canPlayNotes (engine.getSong().channels[(std::size_t) c]))
+            {
+                onFirst.channel = c;
+                break;
+            }
+        if (const auto q = convert (onFirst, "quantized, first channel"); q >= 0)
+        {
+            auto onGrid = true;
+            for (const auto& n : engine.getSong().patterns[(std::size_t) q].notes)
+                onGrid = onGrid && n.start % lynx::ticksPerStep == 0 && n.length % lynx::ticksPerStep == 0;
+            check (onGrid, "quantized: every note starts and ends on the 1/16 grid");
+        }
+        if (bendFile.isNotEmpty())
+        {
+            clipIndex = setUp (bendFile);
+            lynx::a2m::ConvertOptions bent = plain;
+            bent.polyphonic = false;
+            bent.minNoteMs = 50.0;
+            bent.pitchBends = true;
+            convert (bent, "melody with pitch bends");
+            ui.selectTabForSnapshot (1);
+            engine.dispatchPendingMessages();
+            saveSnapshot (ui, prefix + "-pianoroll-bends.png");
+        }
+        lynx::shot::file (juce::File (prefix + "-checks.txt")).replaceWithText (checks.joinIntoString ("\n") + "\n");
+        std::printf ("%s\n", checks.joinIntoString ("\n").toRawUTF8());
+        return ! checks.joinIntoString ("\n").contains ("FAIL");
     }
 
     void runNewtoneShot190kx (const juce::String& prefix, const juce::String& file)

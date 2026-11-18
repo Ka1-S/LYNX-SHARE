@@ -17508,6 +17508,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Remote190aiTests.inc"
 #include "StemSplitTests.inc"
 #include "AudioToMidi189bTests.inc"
+#include "Poly2Midi190ljTests.inc"
 #include "Zoom167tTests.inc"
 #include "PianoKeys190jTests.inc"
 #include "Proll168gTests.inc"
