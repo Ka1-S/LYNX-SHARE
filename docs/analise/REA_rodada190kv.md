@@ -126,5 +126,6 @@ other state is translated exactly as before (`tests/Stoys190kvTests.inc`).
 | factory Little PrimalTap, stim | 29 | 2.97 | 3.14 | 3 up, 0 down |
 | factory Decapitator, stim | 47 | 2.77 | 4.26 | 33 up, 0 down |
 | factory Little AlterBoy, stim | 12 | 2.42 | 3.33 | 9 up, 0 down |
+| factory sample, stim + mix (20 presets per plug-in) | 224 | 3.01 | 3.84 | 103 up, 0 down |
 
 Value-map lab ceilings (round 190is, refcap030) are not reachable this way (§5).

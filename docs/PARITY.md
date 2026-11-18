@@ -4014,6 +4014,7 @@ ships only if, rendered against the official plug-in (all 371 candidate presets 
 | factory Little PrimalTap, stim | 29 | 2.97 | **3.14** | 3 up / 26 same / 0 down |
 | factory Decapitator, stim | 47 | 2.77 | **4.26** | 33 up / 14 same / 0 down |
 | factory Little AlterBoy, stim | 12 | 2.42 | **3.33** | 9 up / 3 same / 0 down |
+| factory sample, stim + mix (6 plug-ins, 20 presets each; EchoBoy incl. Edited Style at the fallback) | 224 | 3.01 | **3.84** | 103 up / 121 same / 0 down |
 
 The refcap030 bank cannot move: its states are parameter sweeps saved through the API, not factory presets (of its 373
 Soundtoys states only Little PrimalTap's and Little AlterBoy's default-instance states are in the table, and their mapped
