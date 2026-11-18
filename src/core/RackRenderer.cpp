@@ -6267,6 +6267,10 @@ bool RackRenderer::batchable (const RackState& state, int numSamples) noexcept
     if (state.hasMidiOutputs || ! state.portEventChannels.empty() || ! state.dashboardChannels.empty() || ! state.vfxChannels.empty()
         || state.hasEffectMidiRoutes || ! state.hardwareMidiChannels.empty())
         return refuse (BatchRefusal::midiBetweenUnits);
+    // (rollup 0.1.30 step 9: a take records a plugin's own notes per chunk (round 190ks, GitHub #198): ownNotesBefore /
+    // AfterChunk run in process()'s per-piece loop only)
+    if (ownAnyOn || ownWantedAny.load (std::memory_order_acquire))
+        return refuse (BatchRefusal::midiBetweenUnits);
     if (state.anyBypassWhenIdle)
         return refuse (BatchRefusal::other);
     if (state.launchers || launchersRunning || runningLauncher != nullptr || ! state.performanceZone.empty() || perfRunning

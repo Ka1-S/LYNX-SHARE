@@ -501,6 +501,10 @@ public:
         held = channels;
         heldCount = count;
     }
+    // (rollup 0.1.30 step 9: round 190kz's per-block batching must leave a block piece by piece when a MIDI target channel is
+    // set: process() reads that channel's held notes, which change from piece to piece)
+    bool followsHeldNotes() const noexcept override { return true; }
+    bool followsHeldNotesWith (const EffectParams& p) const noexcept override { return midiChannelIndex (p[midiChannel]) >= 0; }
 
     void process (float* l, float* r, int n, const EffectParams& p, double) noexcept override
     {
