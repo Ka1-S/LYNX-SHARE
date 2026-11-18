@@ -45,7 +45,9 @@ public:
     MaximusProcessor (const MaximusProcessor&) = delete;
     MaximusProcessor& operator= (const MaximusProcessor&) = delete;
 
-    void prepare (std::shared_ptr<const MaximusPreset> preset, double sampleRate, int mixParameter);
+    // engineRev (round 190kz, EffectSlot::engineRev): 0 = the gain smoothers' state on the x87 unit (FL's arithmetic), 1 =
+    // in double precision (faster; the same samples on every demo state measured)
+    void prepare (std::shared_ptr<const MaximusPreset> preset, double sampleRate, int mixParameter, int engineRev = 0);
     void process (float* left, float* right, int n) noexcept;
     void reset() noexcept;
     int latencySamples() const noexcept; // reported to the host (FL compensates it)

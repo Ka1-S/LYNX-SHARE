@@ -1302,6 +1302,11 @@ struct EffectSlot
     std::vector<EffectBranch> branches;           // used when kind == parallel
     std::vector<EffectLink> links;                // used when kind == parallel
     std::vector<std::uint8_t> state;              // FL's raw plugin state, for exact effects built from it (vocodex, maximus)
+    // The engine revision of this slot's built-in effect (round 190kz, as ChannelDef::engineRev): a project saved before
+    // loads with 0 and plays exactly as before; new slots and FL imports get the current one. Maximus: 1 = its gain
+    // smoothers keep their state in double precision instead of the x87 unit's (FL's own arithmetic; the same samples
+    // on every demo state measured, the old law stays for old projects).
+    int engineRev = 1;
     std::string samplePath;                       // audio file the effect plays (Newtone/Newtime source sample); "" = none
     // When set (id or foreign), this built-in effect is a LYNX substitute for that missing third-party plugin
     // (core/PluginSubstitutes.h): the original reference is kept byte for byte, saved with the project, and the slot

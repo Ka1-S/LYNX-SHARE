@@ -1004,10 +1004,12 @@ struct Smoother
 // products (y − x)·c0 and (y − x)·c1 are formed and the one Smoother::run would form is kept (c0 when the input is ≥ the
 // state): the comparison runs beside the multiplication instead of in front of it. (The chains of one band share their
 // coefficients: one-coefficient chains take the plain step.)
-template <int count, bool single>
+// (round 190kz: R = the state's type — long double, the x87 unit as FL's FUN_00605410 runs it, or double for Maximus slots
+// of EffectSlot::engineRev 1: on every Maximus state of the demo projects the two give the same samples)
+template <int count, bool single, typename R = long double>
 void smootherChainN (Smoother* sm, float* x, int n) noexcept
 {
-    long double y[count];
+    R y[count];
     double c0[count], c1[count];
     for (int k = 0; k < count; ++k)
         y[k] = sm[k].s, c0[k] = sm[k].c0, c1[k] = sm[k].c1;
@@ -1016,13 +1018,13 @@ void smootherChainN (Smoother* sm, float* x, int n) noexcept
         float v = x[i];
         for (int k = 0; k < count; ++k)
         {
-            const long double u = v;
-            const long double d = y[k] - u;
+            const R u = v;
+            const R d = y[k] - u;
             if constexpr (single)
-                y[k] = d * (long double) c0[k] + u;
+                y[k] = d * (R) c0[k] + u;
             else
             {
-                const long double p0 = d * (long double) c0[k], p1 = d * (long double) c1[k];
+                const R p0 = d * (R) c0[k], p1 = d * (R) c1[k];
                 y[k] = (u >= y[k] ? p0 : p1) + u;
             }
             v = (float) y[k];
@@ -1033,28 +1035,35 @@ void smootherChainN (Smoother* sm, float* x, int n) noexcept
         sm[k].s = std::fabs ((double) y[k]) > (double) flushLevel ? (double) y[k] : 0.0;
 }
 
-template <bool single>
+template <bool single, typename R = long double>
 void smootherChainOf (Smoother* sm, int count, float* x, int n) noexcept
 {
     switch (count)
     {
         case 0: return;
-        case 1: smootherChainN<1, single> (sm, x, n); return;
-        case 2: smootherChainN<2, single> (sm, x, n); return;
-        case 3: smootherChainN<3, single> (sm, x, n); return;
+        case 1: smootherChainN<1, single, R> (sm, x, n); return;
+        case 2: smootherChainN<2, single, R> (sm, x, n); return;
+        case 3: smootherChainN<3, single, R> (sm, x, n); return;
         default:
-            smootherChainN<4, single> (sm, x, n);
-            smootherChainOf<single> (sm + 4, count - 4, x, n);
+            smootherChainN<4, single, R> (sm, x, n);
+            smootherChainOf<single, R> (sm + 4, count - 4, x, n);
             return;
     }
 }
 
-void smootherChain (Smoother* sm, int count, float* x, int n) noexcept
+void smootherChain (Smoother* sm, int count, float* x, int n, bool doubleState = false) noexcept
 {
     bool single = true;
     for (int k = 0; k < count; ++k)
         single = single && sm[k].c0 == sm[k].c1;
-    if (single)
+    if (doubleState)
+    {
+        if (single)
+            smootherChainOf<true, double> (sm, count, x, n);
+        else
+            smootherChainOf<false, double> (sm, count, x, n);
+    }
+    else if (single)
         smootherChainOf<true> (sm, count, x, n);
     else
         smootherChainOf<false> (sm, count, x, n);
@@ -1367,8 +1376,9 @@ class Maximus
 public:
     static constexpr int maxFrames = Rack::maxBlock * 8;
 
-    void prepare (std::shared_ptr<const MaximusPreset> preset, double rate, int mixParam)
+    void prepare (std::shared_ptr<const MaximusPreset> preset, double rate, int mixParam, int engineRev = 0)
     {
+        doubleSmoothers = engineRev >= 1;
         pr = std::move (preset);
         fs = rate;
         const auto& P = *pr;
@@ -1660,7 +1670,7 @@ private:
                 B.rmsDet.run (xl, xr, g, n);
             else
                 B.det.run (xl, xr, g, n);
-            smootherChain (B.rel.data(), (int) B.rel.size(), g, n);
+            smootherChain (B.rel.data(), (int) B.rel.size(), g, n, doubleSmoothers);
             const auto k = f32 ((double) S.pre * 8192.25);
             const auto pp = S.pre * S.post;
             const auto hiGain = f32 (S.end * (double) S.post);
@@ -1680,7 +1690,7 @@ private:
                     g[i] = (t[idx] + (t[idx + 1] - t[idx]) * fr) * pp;
                 }
             }
-            smootherChain (B.att.data(), (int) B.att.size(), g, n);
+            smootherChain (B.att.data(), (int) B.att.size(), g, n, doubleSmoothers);
         }
         B.delay.run (xl, xr, n);
         const auto keepDry = mixOn && b < 3;
@@ -1742,6 +1752,7 @@ public:
 
 private:
     std::shared_ptr<const MaximusPreset> pr;
+    bool doubleSmoothers = false; // round 190kz: MaximusProcessor::prepare's engineRev >= 1
     double fs = 44100.0;
     int K = 1, first = 0, inPlaceStages = 0, tailLength = 0, counter = 0, reportedLatency = 0, firLatency = 0;
     bool firOn = false;
@@ -2807,7 +2818,7 @@ namespace lynx::hlfx
 MaximusProcessor::MaximusProcessor() = default;
 MaximusProcessor::~MaximusProcessor() = default;
 
-void MaximusProcessor::prepare (std::shared_ptr<const MaximusPreset> preset, double sampleRate, int mixParameter)
+void MaximusProcessor::prepare (std::shared_ptr<const MaximusPreset> preset, double sampleRate, int mixParameter, int engineRev)
 {
     if (preset == nullptr)
     {
@@ -2815,7 +2826,7 @@ void MaximusProcessor::prepare (std::shared_ptr<const MaximusPreset> preset, dou
         return;
     }
     engine = std::make_unique<Maximus>();
-    engine->prepare (std::move (preset), sampleRate, mixParameter);
+    engine->prepare (std::move (preset), sampleRate, mixParameter, engineRev);
 }
 
 void MaximusProcessor::process (float* left, float* right, int n) noexcept
