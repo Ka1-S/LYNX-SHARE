@@ -58,6 +58,8 @@ CORE="$CORE src/core/WavetableSynth.cpp src/core/WavetableTables.cpp src/core/Al
 CORE="$CORE src/core/FlPluginDb.cpp"
 # missing files of an opened project: search and relocation (round 81)
 CORE="$CORE src/core/MissingFiles.cpp"
+# polyphonic note editor on PitchNet's engine (round 190lk, third_party/pitchnet-poly)
+CORE="$CORE src/core/PolyEdit.cpp third_party/pitchnet-poly/PolyEngine.cpp third_party/pitchnet-poly/PolyExtraction.cpp third_party/pitchnet-poly/PolyPurifier.cpp third_party/pitchnet-poly/PolyRenderer.cpp third_party/pitchnet-poly/PolySoundModel.cpp third_party/pitchnet-poly/PolySpectral.cpp third_party/pitchnet-poly/PolyLazy.cpp"
 # the plugin picker's catalog (round 151)
 CORE="$CORE src/core/PluginCatalog.cpp"
 CORE="$CORE src/core/PluginDbFolder.cpp"
