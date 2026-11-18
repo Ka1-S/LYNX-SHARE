@@ -174,7 +174,11 @@ TEST (lynxverbs100_onsets_levels_and_stereo)
         classic[(std::size_t) lynx::verbs::epoch::engineLaw] = 0.0f;
         const auto was = energyDb (impulse (EffectKind::epochVerb, classic, 4.0), 0, 4800);
         CHECK (std::abs (was - (-3.1)) < 1.5);
-        CHECK (energyDb (hall, 0, 4800) - was > 0.5 && energyDb (hall, 0, 4800) - was < 4.5);
+        // (revision 1 of the measured law: round 190kw's loop law moves the level with Decay, round 190kw's own test)
+        auto measured = p;
+        measured[(std::size_t) lynx::verbs::epoch::loopLaw] = 0.0f;
+        const auto now = energyDb (impulse (EffectKind::epochVerb, measured, 4.0), 0, 4800);
+        CHECK (now - was > 0.5 && now - was < 4.5);
     }
     double lr = 0, ll = 0, rr = 0;
     for (std::size_t i = 0; i < 48000; ++i)

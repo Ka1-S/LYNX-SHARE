@@ -17777,6 +17777,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Parity190jsTests.inc" // round 190js: the Waves reverbs on Reeverb 2, Hush's Single Vocal revision, Facet's auto-threshold refit
 #include "Parity190kwTests.inc" // round 190kw: static REA — Crest's Pro-C 3 V1 / V2 style laws (hidden revision)
 #include "Parity190kwTl3Tests.inc" // round 190kw: Timeless 3 states on Echoform (the hidden line law)
+#include "Parity190kwVvTests.inc" // round 190kw: Epoch Verb's level on ValhallaVintageVerb's loop law (after Parity190it: its gold helpers)
 #include "Sampler190dhTests.inc"
 #include "Fix190eaTests.inc"
 #include "Iss158Tests.inc"
