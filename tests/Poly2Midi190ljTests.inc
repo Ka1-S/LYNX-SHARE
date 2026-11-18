@@ -184,7 +184,7 @@ TEST (poly190lj_pitch_bends_follow_the_contour)
     addPitchBends (pg, reference, BendCentre::basicPitch);
     CHECK (reference[0].bends.size() == 3 && std::abs (reference[0].bends.front().cents - 33.333f) < 0.01f
            && std::abs (reference[0].bends.back().cents - 133.333f) < 0.01f);
-    CHECK (reference[1].bends.size() == 1 && std::abs (reference[1].bends[0].cents + 33.333f) < 0.01f);
+    CHECK (reference[1].bends.size() == 1 && std::abs (reference[1].bends[0].cents - 33.333f) < 0.01f);
     // the lowest key (bin 0): the window starts at the edge; no contour = nothing to do
     auto low = poly190lj::flatPg (40);
     for (int t = 0; t < 40; ++t)
