@@ -1050,9 +1050,10 @@ private:
     void autoTimes1 (const EffectParams& params, int b, double rate, Detector& d) const noexcept
     {
         const auto& L = autoLaw1();
-        const double f0 = hz (params[(std::size_t) param (b, 1)]), qv = std::max (0.025, q (params[(std::size_t) param (b, 3)]));
-        const double bw = 2.0 * std::asinh (1.0 / (2.0 * qv)) / std::log (2.0); // the band's width (octaves)
-        const double lo = std::log2 (f0) - 0.5 * bw, hi = std::log2 (f0) + 0.5 * bw;
+        // the region the reference reads its times from is the dynamic band's own detection range (state values 17 / 18,
+        // log2 Hz), 10 Hz … 20 kHz by default; Facet has no such range, so the default's
+        (void) b;
+        const double lo = std::log2 (10.0), hi = std::log2 (20000.0);
         const double attPct = std::clamp (50.0 + 50.0 * std::log10 (attackMs (params[(std::size_t) attackParam]) / 9.22), 0.0, 100.0);
         const double relPct = std::clamp (50.0 + 50.0 * std::log10 (releaseMs (params[(std::size_t) releaseParam]) / 268.0), 0.0, 100.0);
         const double u = 1.0 - 0.1 * std::clamp (lo - 4.5, 0.0, 10.0), u2 = u * u;

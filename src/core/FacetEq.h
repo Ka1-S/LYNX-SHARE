@@ -181,11 +181,14 @@ const AutoLaw& autoLaw() noexcept;
 // per-sample magnitude against a peak follower of it (instant rise, envSec fall to 10 %, never under `floor`), in dB,
 // through the gain law below; the reduction then runs through three followers whose times come from the band's region
 // and the attack / release knobs (FacetEq.cpp: autoTimes1). relCurve: LYNX's own smooth fit of the reference's release
-// knob curve ((e^(k x) − 1) / (e^k − 1)); t0 / t1 / t2a / t2r: time scales (1 = the reference's)
+// knob curve ((e^(k x) − 1) / (e^k − 1)); t0 / t1 / t2a / t2r: scales on the reference's times, fitted on refcap030
+// grid2's gain trajectories (50 ms frames, ranges −30 / −15 / +15 / +30, tc + stairs: mean error 0.33 dB for round 190js's
+// law, 0.16 dB here): the knob-percent link from Facet's ms controls is the uncertain part (the reference's own times
+// with scale 1 released 3× too slowly and attacked over 250 ms where the captures settle in under 100 ms)
 struct AutoLaw1
 {
     double thrK = 1.0, thrOff = 0.0, kneeK = 1.53, envSec = 10.0, floor = 0.01;
-    double t0 = 1.0, t1 = 1.0, t2a = 1.0, t2r = 1.0, relCurve = 3.32;
+    double t0 = 1.0, t1 = 0.65, t2a = 0.05, t2r = 0.6, relCurve = 3.32;
 };
 const AutoLaw1& autoLaw1() noexcept;
 double autoDynamicGainDb1 (double relDb, double rangeDb) noexcept;
