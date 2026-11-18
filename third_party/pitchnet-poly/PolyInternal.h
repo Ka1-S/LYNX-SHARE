@@ -134,6 +134,8 @@ std::vector<Candidate> splitReattacks(const Context& ctx, const std::vector<Cand
 /** One note per stroke from overlapping or touching notes of one pitch (see PolyExtraction.cpp). */
 std::vector<Candidate> mergeFragments(const Context& ctx, std::vector<Candidate> notes, bool overlapsOnly = false);
 void refineOnsets(const Context& ctx, std::vector<Candidate>& notes);
+// LYNX modification (round 190lo): split active notes at slow re-attacks (Params::slowReattacks)
+std::vector<Candidate> splitSlowReattacks(const Context& ctx, const std::vector<Candidate>& notes);
 
 // ---- PolyPurifier.cpp ----
 void scoreCandidates(const Context& ctx, std::vector<Candidate>& cands, const NoteEvidence* evidence,

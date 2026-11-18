@@ -762,6 +762,12 @@ namespace
 // their energy rising again, all of them together, by much more than the note's own amplitude
 // modulation (beating, vibrato, bow pressure) moves it, and staying up. Another note entering on
 // one shared partial lifts only some of the partials.
+// LYNX modification (round 190lo): slow re-attacks (see splitReattacks)
+constexpr double kSlowDip = 0.3;    // the dip: at most 30 % of the level the note had reached (-10.5 dB)
+constexpr double kSlowRise = 3.0;   // then back up by 3x (+9.5 dB) within 0.5 s
+constexpr double kSlowBack = 0.35;  // to at least 35 % of the earlier level
+constexpr double kSlowShare = 0.6;  // with 60 % of its present partials rising 2x or more
+
 struct ReattackTest
 {
     std::vector<float> env, rise, peakSoFar;
@@ -877,6 +883,89 @@ std::vector<Candidate> splitReattacks(const Context& ctx, const std::vector<Cand
     }
     const int minLen = static_cast<int>(std::lround(ctx.p.minNoteSeconds * ctx.p.sampleRate / ctx.p.hop));
     out.erase(std::remove_if(out.begin(), out.end(), [&](const Candidate& c) { return c.length() < minLen; }), out.end());
+    return out;
+}
+
+// LYNX modification (round 190lo): slow re-attacks. A note played again with a slow attack (a pad, strings, a swell)
+// never rises by 2x within splitReattacks()'s 4-frame window, so two chords that hold the same pitch became one note.
+// Here: the level dips well below what it had been, then comes back within ~0.5 s with most of the note's partials
+// rising together; the cut goes at the bottom of the dip. Run on the active notes after the note filter (the pieces
+// keep the note's probability), so that it never changes which candidates are notes.
+std::vector<Candidate> splitSlowReattacks(const Context& ctx, const std::vector<Candidate>& notes)
+{
+    std::vector<Candidate> out;
+    for (const auto& n : notes)
+    {
+        const ReattackTest test(ctx, n);
+        const int len = test.len;
+        std::vector<int> cuts;
+        if (len > 80)
+        {
+            const int span = static_cast<int>(std::lround(0.5 * ctx.p.sampleRate / ctx.p.hop));
+            const int gap = static_cast<int>(std::lround(0.3 * ctx.p.sampleRate / ctx.p.hop));
+            for (int i = gap; i <= len - gap; ++i)
+            {
+                const double trough = test.meanOf(i - 2, i + 2);
+                bool lowest = true;
+                for (int j = i - gap / 2; j <= i + gap / 2 && lowest; ++j)
+                    lowest = j == i || j < 2 || j > len - 3 || test.meanOf(j - 2, j + 2) >= trough;
+                if (!lowest)
+                    continue;
+                const double before = test.peakSoFar[static_cast<size_t>(i - 6)];
+                double after = 0.0;
+                int afterAt = i;
+                for (int j = i + 6; j <= std::min(len - 4, i + span); ++j)
+                    if (test.meanOf(j - 3, j + 3) > after)
+                        after = test.meanOf(j - 3, j + 3), afterAt = j;
+                if (!(trough <= kSlowDip * before && after >= kSlowRise * trough && after >= kSlowBack * before))
+                    continue;
+                // most present partials rise together from the dip to the new peak
+                int present = 0, rising = 0;
+                double strongest = 0.0;
+                std::vector<double> lo(test.partials.size()), hi(test.partials.size());
+                for (size_t h = 0; h < test.partials.size(); ++h)
+                {
+                    const auto& e = test.partials[h];
+                    for (int j = i - 2; j <= i + 2; ++j)
+                        lo[h] += e[static_cast<size_t>(std::clamp(j, 0, len - 1))] / 5.0;
+                    for (int j = afterAt - 3; j <= afterAt + 3; ++j)
+                        hi[h] += e[static_cast<size_t>(std::clamp(j, 0, len - 1))] / 7.0;
+                    strongest = std::max(strongest, hi[h]);
+                }
+                for (size_t h = 0; h < test.partials.size(); ++h)
+                    if (hi[h] > 0.06 * strongest)
+                        ++present, rising += hi[h] >= 2.0 * lo[h] ? 1 : 0;
+                if (present == 0 || rising < kSlowShare * present)
+                    continue;
+                const int at = n.start + i;
+                const bool clear = std::all_of(cuts.begin(), cuts.end(), [&](int c) { return std::abs(c - at) >= gap; });
+                if (clear)
+                    cuts.push_back(at);
+            }
+            std::sort(cuts.begin(), cuts.end());
+        }
+
+        if (cuts.empty())
+        {
+            out.push_back(n);
+            continue;
+        }
+        std::vector<int> bounds{n.start};
+        bounds.insert(bounds.end(), cuts.begin(), cuts.end());
+        bounds.push_back(n.end + 1);
+        for (size_t q = 0; q + 1 < bounds.size(); ++q)
+        {
+            const int i0 = bounds[q] - n.start, i1 = bounds[q + 1] - n.start;
+            Candidate m = n;
+            m.start = bounds[q];
+            m.end = bounds[q + 1] - 1;
+            m.cents.assign(n.cents.begin() + i0, n.cents.begin() + i1);
+            m.strength.assign(n.strength.begin() + i0, n.strength.begin() + i1);
+            m.f0.assign(n.f0.begin() + i0, n.f0.begin() + i1);
+            m.energy = n.energy * (i1 - i0) / static_cast<double>(n.cents.size());
+            out.push_back(std::move(m));
+        }
+    }
     return out;
 }
 

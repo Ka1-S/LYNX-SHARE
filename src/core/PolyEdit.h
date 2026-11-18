@@ -94,6 +94,9 @@ struct Model
     std::vector<Note> notes;          // sorted by start
     std::map<int, Edit> edits;        // note index -> edit (identity edits are not kept)
     bool takeBackground = true;       // edited notes take their part of what no note owns (PitchNet's Lab default)
+    // round 190lo: a moved note's copy joins what stays by level, not by a complex sum that partly cancels in the bins it
+    // shares (third_party/pitchnet-poly Params::overlapAwareMoves); false for round-190lk blobs (they play as they did)
+    bool overlapAwareMoves = true;
 
     bool edited() const noexcept;
     double frameSeconds() const noexcept { return sampleRate > 0.0 ? hop / sampleRate : 0.0; }
@@ -112,6 +115,8 @@ struct AnalyseOptions
 {
     Detector detector = Detector::fallback;
     bool keepCandidates = true; // keep the rejected candidates (Note::active false) for note assignment
+    bool slowReattacks = true;  // split notes at slow re-attacks (pads, strings: the same pitch in the next chord)
+    bool rescueHeard = true;    // with evidence: a candidate the filter nearly took and Basic Pitch hears becomes a note
 };
 
 // The analysis of a clip's sample (mono mix of its channels). `evidence` may be null (DSP-only note filter). Runs on

@@ -121,6 +121,14 @@ struct Params
     // of the recording (the masks were ~0.6 MB per second of dense chords).
     bool deferMasks = false;
 
+    // LYNX modification (round 190lo): also split notes at slow re-attacks (a pad or strings playing the same pitch in
+    // the next chord after a dip; splitReattacks()). Off = PitchNet's behaviour.
+    bool slowReattacks = false;
+
+    // LYNX modification (round 190lo): overlap-aware moves in render() (a moved note's copy joined with what stays by
+    // the phase of their complex sum and the level of their power sum; see PolyRenderer.cpp). Off = PitchNet's sum.
+    bool overlapAwareMoves = false;
+
     /** Framing that keeps ~93 ms windows and 8x overlap at any sample rate. */
     static Params forSampleRate(double rate)
     {
