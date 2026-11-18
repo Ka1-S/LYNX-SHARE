@@ -198,6 +198,7 @@ public:
     void showPreviewForSnapshot (const juce::File& file);
     // Up/Down (load = false) or Shift+Up/Down (load = true); Enter = loadSelected()
     void step (int delta, bool load);
+    void findMatch (int delta); // round 190lr (DF-97): F3 / Shift+F3, the next / previous search result
     // Issue #182: a typed character selects the next row whose name starts with it (more letters typed quickly: a
     // longer prefix; ui/TypeAhead.h). The row is selected and shown, not previewed. False: not a typing key, or no match.
     bool typeToJump (const juce::KeyPress& key);

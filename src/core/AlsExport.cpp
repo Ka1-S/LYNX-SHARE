@@ -2198,6 +2198,20 @@ struct Exporter
                         s.value ("TimeSignatureId", num (alsTimeSignatureCode (g.beatsPerBar, g.beatUnit)));
                         s.value ("IsTimeSignatureEnabled", "true");
                     }
+                    if (s.child ("FollowAction") != nullptr) // round 190lr (DL-14): the scene's follow action, as a clip's
+                    {
+                        const auto& f = g.follow;
+                        s.value ("FollowAction/FollowTime", num (beats (f.ticks)));
+                        s.value ("FollowAction/IsLinked", boolean (f.linked));
+                        s.value ("FollowAction/LoopIterations", num (f.iterations));
+                        s.value ("FollowAction/FollowActionA", num ((int) f.a));
+                        s.value ("FollowAction/FollowActionB", num ((int) f.b));
+                        s.value ("FollowAction/FollowChanceA", num (f.chanceA));
+                        s.value ("FollowAction/FollowChanceB", num (f.chanceB));
+                        s.value ("FollowAction/JumpIndexA", num (f.jumpA + 1));
+                        s.value ("FollowAction/JumpIndexB", num (f.jumpB + 1));
+                        s.value ("FollowAction/FollowActionEnabled", boolean (f.enabled));
+                    }
                 }
                 scenes->add (std::move (s));
             }

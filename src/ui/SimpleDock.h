@@ -55,7 +55,7 @@ public:
         std::function<void()> openPianoRollPanel;
     };
 
-    enum class Tab { instrument, keyboard, editor, effects, pads, controls };
+    enum class Tab { instrument, keyboard, editor, effects, pads, controls, steps };
 
     SimpleDock (AudioEngine& engine, Hooks hooks);
     ~SimpleDock() override;
@@ -174,6 +174,28 @@ public:
     class InstrumentPage;
     class EditorPage;
     class ControlsPage; // round 190ke: the Controls tab (GarageBand's Smart Controls, ui/SimpleControlsPage.inc)
+    class StepsPage;    // round 190lr: the Drum Machine tab (BandLab's drum machine, ui/SimpleStepsPage.inc)
+
+    // round 190lr (DS-39, tests and --details190lrshot): a Drums track's Drum Machine tab
+    bool hasStepsTabForCheck() const noexcept { return stepsTab; }
+    StepsPage* stepsPageForCheck() { return stepsPage.get(); }
+    juce::Component* stepsComponentForSnapshot();
+    int stepsRowsForCheck() const;
+    int stepsCountForCheck() const;
+    void stepsClickForCheck (int row, int step);
+    void stepsLetterForCheck (int letter);
+    void stepsAddClipForCheck();
+    void stepsLengthForCheck (int bars);
+    void stepsSwingForCheck (float v);
+    void stepsPreviewForCheck();
+    bool stepsPreviewingForCheck() const;
+    int stepsPatternForCheck() const;
+    int stepsPlayingStepForCheck() const;
+    void stepsPlayingStepForSnapshot (int step);
+    juce::PopupMenu stepsLengthMenuForSnapshot();
+    void stepsWatchForCheck();
+    // a typing key while the Drum Machine tab shows: the row's channel (lit), −1 when the key plays no row
+    int stepsChannelForKey (int keyCode);
 
     // round 190ke (tests, --simplegb190keshot): the Controls tab's knobs
     bool hasControlsTabForCheck() const noexcept { return controlsTab; }
@@ -195,6 +217,7 @@ private:
     std::unique_ptr<EditorPage> editorPage;
     std::unique_ptr<PadsPage> padsPage;
     std::unique_ptr<ControlsPage> controlsPage; // round 190ke
+    std::unique_ptr<StepsPage> stepsPage;       // round 190lr
     std::unique_ptr<juce::Component> keyboardPage; // (made the first time the Keyboard tab shows)
     // round 190jc (design190ia SG-7, SG-8): the strip's buttons draw themselves: the tabs with a vector icon before the
     // label (a lone tab as a section title), the hide button as BandLab's round close X at the strip's left
@@ -205,7 +228,7 @@ private:
         bool lone = false; // the only tab: drawn as a section title
         void paintButton (juce::Graphics& g, bool over, bool down) override;
     };
-    StripButton instrumentButton, keyboardButton, editorButton, effectsButton, padsButton, controlsButton, hideButton;
+    StripButton instrumentButton, keyboardButton, editorButton, effectsButton, padsButton, controlsButton, stepsButton, hideButton;
     juce::ToggleButton followButton;
     juce::String followText;
     Tab tab = Tab::effects;
@@ -214,6 +237,7 @@ private:
     bool playTabs = false;      // the track plays notes (Instrument / Sampler): Keyboard and Editor
     bool padsTab = false;       // round 190fo: a Sampler track's pads
     bool controlsTab = false;   // round 190ke: a track with an insert: its eight knobs
+    bool stepsTab = false;      // round 190lr: a Drums track's step grid
     int track = -1, insert = -1, channel = -1;
     juce::Colour trackColourNow() const; // round 190jj: the shown track's colour (its own, else its kind's), for held keys
     // round 190ih (DS-9): the record dock's input level

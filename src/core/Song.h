@@ -2490,6 +2490,11 @@ struct ClipGridScene
     // round 190em: the scene time signature's denominator (Live's field is "n / d"; 1, 2, 4, 8 or 16). A launch gives
     // the song this meter (round 190fg: Song::beatUnit; before, the same bar length in quarter notes)
     int beatUnit = 4;
+    // round 190lr (DL-14): Live's scene Follow Action (the Scene View's lower section, .als Scene/FollowAction). A scene
+    // has no Linked mode ("The Linked/Unlinked switch is only available for clips", Live 12 manual 16.7): the action
+    // comes `follow.ticks` after the scene starts (Follow Action Time); `linked` / `iterations` are only kept for the set.
+    // Saved in .lynx only when it is not the default.
+    ClipFollow follow {};
     bool operator== (const ClipGridScene&) const = default;
 };
 

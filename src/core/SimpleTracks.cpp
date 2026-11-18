@@ -454,6 +454,11 @@ std::string rename (Song& song, int track, const std::string& name)
             if (clip.track == track && clip.kind == ClipKind::pattern && clip.pattern >= 0 && clip.pattern < (int) song.patterns.size()
                 && song.patterns[(std::size_t) clip.pattern].name == old)
                 song.patterns[(std::size_t) clip.pattern].name = unique;
+        // round 190lr: the Drum Machine's patterns B … H ("<track> B", core/SimpleSteps.h) keep their letter
+        for (auto& p : song.patterns)
+            if (p.name.size() == old.size() + 2 && p.name.compare (0, old.size(), old) == 0 && p.name[old.size()] == ' '
+                && p.name.back() >= 'B' && p.name.back() <= 'H')
+                p.name = unique + p.name.substr (old.size());
     }
     return unique;
 }

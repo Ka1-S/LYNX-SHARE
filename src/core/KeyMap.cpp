@@ -433,6 +433,9 @@ std::vector<Action> makeActions()
         { "browser.closeFolder", TR_NOOP ("Close the folder (or go to the parent folder)"), Context::browser, { chord (left) } },
         { "browser.openFolder", TR_NOOP ("Open the folder"), Context::browser, { chord (right) } },
         { "browser.rename", TR_NOOP ("Rename the selected plugin (Plugin database)"), Context::browser, { chord (f2) } },
+        // round 190lr (DF-97): FL's "Use (F3) to skip to the next matching item" of a search (Shift+F3: the previous one)
+        { "browser.findNext", TR_NOOP ("Next search match"), Context::browser, { chord (f3) } },
+        { "browser.findPrevious", TR_NOOP ("Previous search match"), Context::browser, { chord (f3, shift) } },
         // Round 190ce: the Browser's collections with the reference DAW's keys (1-7 put the selected item into a colour
         // collection or take it out, 0 takes it out of all; docs/analise/REA_rodada190ce.md §1). Plain keys: the typing
         // keyboard keeps them while it is on.

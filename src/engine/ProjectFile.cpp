@@ -1753,6 +1753,12 @@ juce::var clipGridToVar (const ClipGrid& grid, const std::vector<int>* envelopes
             o->setProperty ("beatsPerBar", scene.beatsPerBar);
         if (scene.beatsPerBar > 0 && scene.beatUnit != 4) // (round 190em)
             o->setProperty ("beatUnit", scene.beatUnit);
+        if (scene.follow != ClipFollow {}) // (round 190lr: the scene's follow action, as a clip's)
+        {
+            const auto& f = scene.follow;
+            juce::Array<juce::var> follow { f.enabled, (int) f.a, (int) f.b, f.chanceA, f.chanceB, f.jumpA, f.jumpB, f.linked, f.iterations, (juce::int64) f.ticks };
+            o->setProperty ("follow", follow);
+        }
         scenes.add (juce::var (o.release()));
     }
     root->setProperty ("scenes", scenes);
@@ -1830,6 +1836,11 @@ std::optional<ClipGrid> clipGridFromVar (const juce::var& v, const Song& song)
             scene.tempo = (double) o.getProperty ("tempo", 0.0);
             scene.beatsPerBar = (int) o.getProperty ("beatsPerBar", 0);
             scene.beatUnit = scene.beatsPerBar > 0 ? session::sceneBeatUnit ((int) o.getProperty ("beatUnit", 4)) : 4;
+            if (const auto f = o["follow"]; f.isArray() && f.size() >= 10) // (round 190lr)
+            {
+                const auto kind = [] (const juce::var& k) { return (FollowKind) juce::jlimit (0, (int) FollowKind::jump, (int) k); };
+                scene.follow = { (bool) f[0], kind (f[1]), kind (f[2]), (int) f[3], (int) f[4], (int) f[5], (int) f[6], (bool) f[7], juce::jmax (1, (int) f[8]), juce::jmax<juce::int64> (1, (juce::int64) f[9]) };
+            }
             grid.scenes.push_back (std::move (scene));
         }
     if (const auto* clips = v["clips"].getArray())

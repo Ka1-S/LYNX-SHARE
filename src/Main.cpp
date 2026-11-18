@@ -78,6 +78,7 @@
 #include "engine/AudioEngine.h"
 #include "engine/ProjectDowngrade.h"
 #include "core/ClipLauncher.h"
+#include "core/SimpleSteps.h"
 #include "core/DirectWaveState.h"
 #include "core/MixSnapshots.h"
 #include "core/VoiceShift.h"
@@ -2474,6 +2475,16 @@ public:
             const auto i = args.indexOf ("--capfix190jjshot");
             const auto set = i + 3 < args.size() && ! args[i + 3].startsWith ("--") ? args[i + 3].unquoted() : juce::String();
             runCapfix190jjShot (args[i + 1].unquoted(), args[i + 2].unquoted(), set);
+            quit();
+            return;
+        }
+
+        if (args.contains ("--details190lrshot"))
+        {
+            // LYNX --details190lrshot prefix project.flp [set.als]: round 190lr off screen (src/DetailsShot190lr.inc)
+            const auto i = args.indexOf ("--details190lrshot");
+            const auto set = i + 3 < args.size() && ! args[i + 3].startsWith ("--") ? args[i + 3].unquoted() : juce::String();
+            setApplicationReturnValue (runDetailsShot190lr (args[i + 1].unquoted(), args[i + 2].unquoted(), set) ? 0 : 1);
             quit();
             return;
         }
@@ -16581,6 +16592,7 @@ private:
 #include "IssuesShot190jz.inc" // round 190jz
 #include "DetailsShot190kn.inc" // round 190kn
 #include "DetailsShot190ld.inc" // round 190ld
+#include "DetailsShot190lr.inc" // round 190lr
     // --trackautoshot190gz (round 190gz): see the dispatch above
     bool runTrackAutoShot190gz (const juce::String& prefix)
     {

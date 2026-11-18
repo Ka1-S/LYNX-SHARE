@@ -2673,8 +2673,9 @@ void sessionToGrid (Ctx& ctx, const Element& set, const std::vector<Element>& tr
             sc.beatsPerBar = n;
             sc.beatUnit = session::sceneBeatUnit (d); // (round 190em: the scene keeps its denominator)
         }
-        if (scenes[s].boolean ("FollowAction/FollowActionEnabled", false))
-            ctx.note (&FlpImportReport::unsupported, "Scene follow actions");
+        // round 190lr (DL-14): the scene's follow action, read as a clip's
+        if (const auto f = scenes[s].child ("FollowAction"))
+            sc.follow = followOf (f);
     }
     // the set-wide value has no Global entry: a clip's number is that + 1 [LIVE: 9 = 1/8 = clip 10]
     grid.globalQuant = (LaunchQuant) std::clamp ((int) set.number ("GlobalQuantisation", 4) + 1, 1, 14);

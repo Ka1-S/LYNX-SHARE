@@ -6126,6 +6126,23 @@ void BrowserComponent::step (int delta, bool load)
         onLoadIntoChannel (file);
 }
 
+// Round 190lr (DF-97, FL's Browser: "Use (F3) to skip to the next matching item"): with a search typed, the next (−1:
+// previous) row of the results, round to the first after the last; a file is previewed as Up / Down do
+void BrowserComponent::findMatch (int delta)
+{
+    if (searchBox.getText().trim().isEmpty())
+        return;
+    auto& list = activeList();
+    const auto count = list.numRows();
+    if (count == 0)
+        return;
+    const auto at = list.getSelectedRow();
+    const auto row = at < 0 ? (delta > 0 ? 0 : count - 1) : ((at + delta) % count + count) % count;
+    list.select (row, false);
+    if (const auto file = list.selectedFile(); file.existsAsFile())
+        fileSelected (file, true);
+}
+
 bool BrowserComponent::typeToJump (const juce::KeyPress& key)
 {
     auto& list = activeList();

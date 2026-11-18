@@ -197,6 +197,46 @@ FollowOutcome followTarget (const ClipGrid& grid, int track, int scene, FollowKi
     return outcome;
 }
 
+FollowOutcome sceneFollowTarget (const ClipGrid& grid, int scene, FollowKind kind, int jump, std::uint32_t random) noexcept
+{
+    FollowOutcome outcome;
+    const auto n = (int) grid.scenes.size();
+    if (n <= 0 || scene < 0 || scene >= n)
+        return outcome;
+    switch (kind)
+    {
+        case FollowKind::none: return outcome;
+        case FollowKind::stop: outcome.stops = true; return outcome;
+        case FollowKind::playAgain: outcome.scene = scene; return outcome;
+        case FollowKind::previous: outcome.scene = (scene + n - 1) % n; return outcome;
+        case FollowKind::next: outcome.scene = (scene + 1) % n; return outcome;
+        case FollowKind::first: outcome.scene = 0; return outcome;
+        case FollowKind::last: outcome.scene = n - 1; return outcome;
+        case FollowKind::any: outcome.scene = (int) (random % (std::uint32_t) n); return outcome;
+        case FollowKind::other:
+        {
+            if (n == 1)
+                outcome.scene = scene;
+            else
+            {
+                auto pick = (int) (random % (std::uint32_t) (n - 1));
+                outcome.scene = pick >= scene ? pick + 1 : pick;
+            }
+            return outcome;
+        }
+        case FollowKind::jump:
+            if (jump >= 0 && jump < n)
+                outcome.scene = jump;
+            return outcome;
+    }
+    return outcome;
+}
+
+bool sceneFollows (const ClipGrid& grid, int scene) noexcept
+{
+    return grid.followActions && scene >= 0 && scene < (int) grid.scenes.size() && grid.scenes[(std::size_t) scene].follow.enabled;
+}
+
 bool recordedClip (const ClipGrid& grid, const RecordedPass& pass, Clip& out)
 {
     for (const auto& c : grid.clips)
@@ -387,7 +427,10 @@ void Player::launch (const Song& song, const ClipGrid& grid, const GridIndex& in
     if (clip == nullptr || ! grid.slots[(std::size_t) slot].active) // (round 190im: a deactivated clip stays silent)
         return;
     const auto& settings = grid.slots[(std::size_t) slot];
-    const auto from = nextGrid (now, slotQuant (song, grid, slot));
+    // (round 190lr: a scene's follow action launches on the moment it acts, each clip on its own quantisation only)
+    const auto own = settings.quant;
+    const auto from = followLaunch ? (own == LaunchQuant::global ? now : nextGrid (now, quantTicks (own, song.meter())))
+                                   : nextGrid (now, slotQuant (song, grid, slot));
     // a clip launched on a track that records ends the recording where it starts (round 190bv)
     dropNextRecording (t, commandRuntime);
     if (t.recScene >= 0 && (t.recUntil == never || t.recUntil > from))
@@ -605,16 +648,7 @@ void Player::apply (const Song& song, const ClipGrid& grid, const GridIndex& ind
             }
             return;
         case Command::Type::launchScene:
-            // a track with no clip in the scene stops, if its slot has a stop button
-            for (int i = 0; i < numActive; ++i)
-                if (const auto track = active[(std::size_t) i].track;
-                    clipAt (grid, track, c.scene) == nullptr && hasStopButton (grid, track, c.scene))
-                    stopTrack (song, grid, active[(std::size_t) i], now);
-            for (const auto& clip : grid.clips)
-                if (clip.gridSlot >= 0 && clip.gridSlot < (int) grid.slots.size() && grid.slots[(std::size_t) clip.gridSlot].scene == c.scene
-                    && clip.track >= 0 && clip.track < maxTracks)
-                    if (auto* t = stateOf (clip.track, true))
-                        launch (song, grid, index, *t, clip.gridSlot, now);
+            launchScene (song, grid, index, c.scene, now, false);
             return;
         case Command::Type::stopTrack:
             if (auto* t = stateOf (c.track, false))
@@ -623,6 +657,8 @@ void Player::apply (const Song& song, const ClipGrid& grid, const GridIndex& ind
         case Command::Type::stopAll:
             for (int i = 0; i < numActive; ++i)
                 stopTrack (song, grid, active[(std::size_t) i], now);
+            followScene = -1; // (round 190lr: Stop All Clips ends a scene's follow action too)
+            followSceneAt = never;
             return;
         case Command::Type::cancelLaunch: // (round 190kc)
             for (int i = 0; i < numActive; ++i)
@@ -646,6 +682,8 @@ void Player::apply (const Song& song, const ClipGrid& grid, const GridIndex& ind
             takenTracks.reset();
             return;
         case Command::Type::reset: // another project
+            followScene = -1;
+            followSceneAt = never;
             for (int i = 0; i < numActive; ++i)
                 if (auto& t = active[(std::size_t) i]; t.recScene >= 0)
                 {
@@ -659,6 +697,71 @@ void Player::apply (const Song& song, const ClipGrid& grid, const GridIndex& ind
             backTracks.reset();
             return;
     }
+}
+
+void Player::launchScene (const Song& song, const ClipGrid& grid, const GridIndex& index, int scene, double now, bool byFollow) noexcept
+{
+    const auto quant = quantTicks (grid.globalQuant, song.meter());
+    const auto start = byFollow ? now : nextGrid (now, quant); // (where the scene starts: its follow time counts from there)
+    // a track with no clip in the scene stops, if its slot has a stop button
+    for (int i = 0; i < numActive; ++i)
+        if (const auto track = active[(std::size_t) i].track; clipAt (grid, track, scene) == nullptr && hasStopButton (grid, track, scene))
+        {
+            if (byFollow)
+            {
+                auto& t = active[(std::size_t) i];
+                t.next = Play {};
+                if (t.current.slot >= 0)
+                    t.current.until = std::min (t.current.until, std::max (now, t.current.from));
+            }
+            else
+                stopTrack (song, grid, active[(std::size_t) i], now);
+        }
+    followLaunch = byFollow;
+    for (const auto& clip : grid.clips)
+        if (clip.gridSlot >= 0 && clip.gridSlot < (int) grid.slots.size() && grid.slots[(std::size_t) clip.gridSlot].scene == scene
+            && clip.track >= 0 && clip.track < maxTracks)
+            if (auto* t = stateOf (clip.track, true))
+                launch (song, grid, index, *t, clip.gridSlot, now);
+    followLaunch = false;
+    // round 190lr (DL-14): a scene launched (by hand or by a follow action) replaces any scene follow action that waits;
+    // its own acts its Follow Action Time after the scene starts
+    followScene = -1;
+    followSceneAt = never;
+    if (sceneFollows (grid, scene))
+    {
+        followScene = scene;
+        followSceneAt = start + (double) std::max<std::int64_t> (1, grid.scenes[(std::size_t) scene].follow.ticks);
+    }
+}
+
+void Player::sceneFollow (const Song& song, const ClipGrid& grid, const GridIndex& index, double at) noexcept
+{
+    const auto scene = followScene;
+    followScene = -1;
+    followSceneAt = never;
+    if (! sceneFollows (grid, scene))
+        return;
+    const auto& f = grid.scenes[(std::size_t) scene].follow;
+    const auto a = std::max (0, f.chanceA), b = std::max (0, f.chanceB);
+    if (a + b <= 0)
+        return;
+    const auto useA = (int) (nextRandom() % (std::uint32_t) (a + b)) < a;
+    const auto outcome = sceneFollowTarget (grid, scene, useA ? f.a : f.b, useA ? f.jumpA : f.jumpB, nextRandom());
+    if (outcome.stops)
+    {
+        // every clip ends there (a follow action does not wait for the global quantisation)
+        for (int i = 0; i < numActive; ++i)
+        {
+            auto& t = active[(std::size_t) i];
+            t.next = Play {};
+            if (t.current.slot >= 0)
+                t.current.until = std::min (t.current.until, std::max (at, t.current.from));
+        }
+        return;
+    }
+    if (outcome.scene >= 0)
+        launchScene (song, grid, index, outcome.scene, at, true);
 }
 
 void Player::addCut (const ClipGrid& grid, const GridIndex& index, const Play& p, double at) noexcept
@@ -688,6 +791,8 @@ void Player::stopAll (Runtime* runtime, bool giveBack) noexcept
             tellTake (t, runtime);
         }
     numActive = numVirtual = numCuts = numTakeovers = 0;
+    followScene = -1; // (round 190lr)
+    followSceneAt = never;
     backTracks.reset();
     if (giveBack)
         takenTracks.reset();
@@ -796,6 +901,10 @@ void Player::process (const Song& song, const ClipGrid& grid, const GridIndex& i
             }
         }
     }
+
+    // round 190lr (DL-14): a scene's follow action due in this block launches its target before the tracks advance
+    for (int guard = 0; guard < 4 && followSceneAt < end; ++guard)
+        sceneFollow (song, grid, index, std::max (followSceneAt, clock));
 
     for (int i = 0; i < numActive; ++i)
     {

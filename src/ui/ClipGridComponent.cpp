@@ -1895,6 +1895,8 @@ public:
         g.setColour (scene.colour != 0 ? juce::Colour (scene.colour) : c::bg3);
         g.fillRect (cell);
         const auto a = cell.withWidth (launchZone).toFloat().withSizeKeepingCentre (9.0f, 11.0f);
+        if (scene.follow.enabled && (scene.follow.a != FollowKind::none || scene.follow.b != FollowKind::none))
+            paintFollowStripes (g, cell.withWidth (launchZone), (scene.colour != 0 ? juce::Colour (scene.colour) : c::bg3).contrasting (0.18f));
         // (round 190em: a scene with its own tempo or time signature has a coloured launch triangle, as Live's cyan one)
         // (a plain scene's triangle: Live's dark grey, measured in the 190ei shot live-scenes-tempo-sig-on.png)
         const auto queuedOn = row == queuedScene && (! ui::motion::enabled() || (juce::Time::getMillisecondCounter() / classicBlinkPhaseMs) % 2 == 0);
@@ -1948,6 +1950,9 @@ public:
         g.fillRect (cell);
         const auto ink = selected ? lv::ink : scene.colour != 0 ? theme::liveShade (juce::Colour (scene.colour), 0.24f) : lv::text;
         const auto a = juce::Rectangle<float> ((float) cell.getX() + 4.0f, (float) cell.getCentreY() - 4.5f, 7.0f, 9.0f);
+        // round 190lr (DL-14, Live's manual 16.7): a scene with a follow action has a striped Scene Launch button, as a clip
+        if (scene.follow.enabled && (scene.follow.a != FollowKind::none || scene.follow.b != FollowKind::none))
+            paintFollowStripes (g, cell.withWidth (14), theme::liveShade (fill, 0.5f));
         // (round 190im, DL-5: a launched scene's button pulses until its clips start, as a queued clip's does)
         theme::fillLaunchTriangle (g, a, row == queuedScene ? livePulsed (lv::playing) : scene.tempo > 0.0 || scene.beatsPerBar > 0 ? c::info : lv::well);
         g.setFont (liveFont()); // (round 190im: the grid's wider Live text, as the slots and headers: round 190ig's follow-up)
@@ -1978,6 +1983,17 @@ public:
         }
         g.setColour (ink);
         textcache::drawText (g, utf8 (scene.name), nameArea, juce::Justification::centred, false);
+    }
+
+    // diagonal stripes across a launch button (Live: "Clips and scenes with assigned Follow Actions are indicated by a
+    // striped Clip/Scene Launch button"), the clip version's 4 px pitch
+    static void paintFollowStripes (juce::Graphics& g, juce::Rectangle<int> zone, juce::Colour colour)
+    {
+        const juce::Graphics::ScopedSaveState keep (g);
+        g.reduceClipRegion (zone);
+        g.setColour (colour);
+        for (int k = -zone.getHeight(); k < zone.getWidth(); k += 4)
+            g.drawLine ((float) (zone.getX() + k), (float) zone.getBottom(), (float) (zone.getX() + k + zone.getHeight()), (float) zone.getY(), 1.0f);
     }
 
     // round 190ef: the scene cell's fields: 1 tempo, 2 / 3 the time signature (in the cell `r`; both parts share one box)
@@ -2328,6 +2344,31 @@ private:
         const auto edit = [this, track, scene] (std::function<void (ClipFollow&)> fn) {
             editSlot (track, scene, [fn] (ClipGridSlot& s) { fn (s.follow); });
         };
+        return followMenuFor (track, scene, f, edit);
+    }
+
+    // round 190lr (DL-14): a scene's follow action (Live: the Scene View's Follow Action controls; no Linked mode for a
+    // scene, its time counts from the scene's start)
+    juce::PopupMenu sceneFollowMenu (int scene)
+    {
+        const auto* grid = gridOf();
+        static const ClipFollow none;
+        const auto& f = grid != nullptr && scene >= 0 && scene < (int) grid->scenes.size() ? grid->scenes[(std::size_t) scene].follow : none;
+        const auto edit = [this, scene] (std::function<void (ClipFollow&)> fn) {
+            engine.editSong ([scene, fn] (Song& s) {
+                auto& g = launcher::ensureGrid (s);
+                while ((int) g.scenes.size() <= scene)
+                    g.scenes.emplace_back();
+                fn (g.scenes[(std::size_t) scene].follow);
+            });
+            repaint();
+        };
+        return followMenuFor (-1, scene, f, edit);
+    }
+
+    // the follow action items of a clip (track >= 0) or a scene (track −1)
+    juce::PopupMenu followMenuFor (int track, int scene, const ClipFollow& f, std::function<void (std::function<void (ClipFollow&)>)> edit)
+    {
         juce::PopupMenu menu;
         menu.addItem (tr ("On"), true, f.enabled, [edit, on = f.enabled] { edit ([on] (ClipFollow& x) { x.enabled = ! on; }); });
         const auto* grid = gridOf();
@@ -2336,9 +2377,9 @@ private:
             const auto current = isA ? f.a : f.b;
             for (const auto& [k, name] : followNames)
                 sub.addItem (tr (name), true, current == k, [edit, isA, k = k] { edit ([isA, k] (ClipFollow& x) { (isA ? x.a : x.b) = k; }); });
-            // jump: to a row of this column that has a clip
+            // jump: to a row of this column that has a clip (a scene: to any other scene)
             for (int r = 0; grid != nullptr && r < (int) grid->scenes.size(); ++r)
-                if (r != scene && launcher::clipAt (*grid, track, r) != nullptr)
+                if (r != scene && (track < 0 || launcher::clipAt (*grid, track, r) != nullptr))
                     sub.addItem (tr ("Jump to scene {0}", { juce::String (r + 1) }), true, current == FollowKind::jump && (isA ? f.jumpA : f.jumpB) == r, [edit, isA, r] {
                         edit ([isA, r] (ClipFollow& x) {
                             (isA ? x.a : x.b) = FollowKind::jump;
@@ -2360,6 +2401,7 @@ private:
         menu.addSubMenu (tr ("Chance A / B"), chance);
         juce::PopupMenu after;
         for (const auto n : { 1, 2, 4, 8 })
+            if (track >= 0) // (a scene has no Linked mode)
             after.addItem (tr ("{0} passes of the clip", { juce::String (n) }), true, f.linked && f.iterations == n, [edit, n] {
                 edit ([n] (ClipFollow& x) {
                     x.linked = true;
@@ -2369,7 +2411,7 @@ private:
         for (const auto bars : { 1, 2, 4, 8 })
         {
             const auto ticks = (std::int64_t) bars * engine.getSong().barTicks();
-            after.addItem (tr ("{0} bars", { juce::String (bars) }), true, ! f.linked && f.ticks == ticks, [edit, ticks] {
+            after.addItem (tr ("{0} bars", { juce::String (bars) }), true, (track < 0 || ! f.linked) && f.ticks == ticks, [edit, ticks] {
                 edit ([ticks] (ClipFollow& x) {
                     x.linked = false;
                     x.ticks = ticks;
@@ -2501,6 +2543,7 @@ public:
                       });
         if (info.beatsPerBar > 0)
             menu.addItem (tr ("Disable scene time signature"), [this, scene] { engine.editSong ([scene] (Song& s) { session::setSceneBeats (s, scene, 0); }); });
+        menu.addSubMenu (tr ("Follow Action"), sceneFollowMenu (scene)); // round 190lr (DL-14)
         menu.addSeparator();
         addGridOptions (menu);
         return menu;
@@ -2560,6 +2603,7 @@ public:
                       });
         if (info.beatsPerBar > 0)
             menu.addItem (tr ("Disable scene time signature"), [this, scene] { engine.editSong ([scene] (Song& s) { session::setSceneBeats (s, scene, 0); }); });
+        menu.addSubMenu (tr ("Follow Action"), sceneFollowMenu (scene)); // round 190lr (DL-14)
         menu.addSeparator();
         addGridOptions (menu);
         return menu;

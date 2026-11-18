@@ -522,6 +522,21 @@ private:
     bool backupWaitsForQuiet = true;              // (round 177d) also while playing / right after MIDI input
     int backupLongestWaitMinutes = prefs::defaultBackupLongestWaitMinutes; // ...but a backup is written after this long
     bool hoverValues = false;                     // (round 177d) the hovered control's value next to the mouse
+    // round 190lr (DL-49): Live's Tap box in the Clip-launch layout taps the tempo itself (FL's tapper window stays in its
+    // right-click menu); "Start Playback with Tap Tempo" (a UI setting, Live's preference: off) starts the song on the 4th tap
+    controls::TapTempo liveTaps;
+    bool tapStartsPlayback = false;
+    void liveTap();
+    void showLiveTapMenu();
+    juce::PopupMenu makeLiveTapMenu();
+    juce::PopupMenu makeMetronomeMenu();
+
+public:
+    // round 190lr (--details190lrshot)
+    juce::PopupMenu metronomeMenuForSnapshot() { return makeMetronomeMenu(); }
+    juce::PopupMenu liveTapMenuForSnapshot() { return makeLiveTapMenu(); }
+
+private:
     bool hoverTipShown = false;                   // ...and it is showing now
     juce::String hoverTipText;
     juce::Point<int> hoverTipAt;

@@ -1156,7 +1156,11 @@ bool SimpleWorkflow::addPads()
 
 int SimpleWorkflow::padChannelForKey (int keyCode)
 {
-    if (! active || dock == nullptr || dock->getParentComponent() == nullptr || ! dock->isVisible() || dock->getTab() != SimpleDock::Tab::pads)
+    if (! active || dock == nullptr || dock->getParentComponent() == nullptr || ! dock->isVisible())
+        return -1;
+    if (dock->getTab() == SimpleDock::Tab::steps) // round 190lr: the Drum Machine's row keys (BandLab: A O F I E J K L)
+        return dock->stepsChannelForKey (keyCode);
+    if (dock->getTab() != SimpleDock::Tab::pads)
         return -1;
     const auto pad = simplepads::padForKey (keyCode);
     const auto channel = pad >= 0 ? simplepads::padChannel (engine.getSong(), dock->shownTrack(), pad) : -1;
