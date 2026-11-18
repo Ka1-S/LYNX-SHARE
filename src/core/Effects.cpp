@@ -4632,6 +4632,8 @@ EffectSlot makeEffectSlot (EffectKind kind)
     if (kind == EffectKind::epochVerb) slot.params[(std::size_t) verbs::epoch::revision] = 1.0f;
     if (kind == EffectKind::atrium) slot.params[(std::size_t) verbs::atrium::revision] = 1.0f;
     if (kind == EffectKind::foilPlate) slot.params[(std::size_t) verbs::foil::revision] = 1.0f;
+    if (kind == EffectKind::foilPlate) // round 190ln: … and Foil Plate the reference's EQ / bass-decay laws (hidden)
+        slot.params[(std::size_t) verbs::foil::reaLaw] = 1.0f;
     if (kind == EffectKind::halo) slot.params[(std::size_t) verbs::halo::revision] = 1.0f;
     if (kind == EffectKind::latticeMod) // round 190it: … and a new Lattice Mod its tap network's revision 1 (hidden)
         slot.params[(std::size_t) echosuite::lattice::revision] = 1.0f;
@@ -4787,6 +4789,9 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
         }
         if (rev >= 0 && savedCount <= (std::size_t) rev)
             slot.params[(std::size_t) rev] = 0.0f;
+        // round 190ln: a Foil Plate saved before the reference's EQ / bass-decay laws keeps revision 1 as it was, bit for bit
+        if (slot.kind == EffectKind::foilPlate && savedCount <= (std::size_t) verbs::foil::reaLaw)
+            slot.params[(std::size_t) verbs::foil::reaLaw] = 0.0f;
     }
     // round 152: a Compressor saved before the measured vintage curve keeps the round-150 curve
     if (slot.kind == EffectKind::compressor && savedCount <= 18 && slot.params.size() > 18)

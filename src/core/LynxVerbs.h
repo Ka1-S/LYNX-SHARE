@@ -135,6 +135,10 @@ struct Settings
     int revision = 0;
     bool buildSplit = false; // round 190it: above ~600 Hz the build-up taps reach the tank in four independent groups (a
                              // tail without the one FIR's ripple: a steady tone meets the tail's mean gain); Atrium, Halo
+    // round 190ln: 1 = the panel shelves (lowShelf* / highShelf*) are first order: the bilinear transform of
+    // (gLow + gHigh·s/ω0) / (1 + s/ω0), ω0 = 2π·hz (not pre-warped), gLow or gHigh the shelf's gain (Foil Plate's ValhallaPlate
+    // role, read by static REA); 2 = the second-order shelves every front-end had (projects saved before, every other effect)
+    int shelfOrder = 2;
 };
 constexpr int engineBands = 8;
 // the octave-band RT60 (s, 63 Hz … 8 kHz) the engine aims at for a line of lineMs under law 1 (tests, fitting)
@@ -187,10 +191,14 @@ constexpr int paramCount = 17; // round 135: + Infinite, Low cut; round 150: + V
 constexpr int engineLaw = 16; // round 190bz: 0 = the classic engine (projects saved before), 1 = the 0.1.27 law
 constexpr int revision = paramCount; // round 190it, hidden (no control, saved while non-zero): 1 = the 0.1.30 revision of
                                      //   the Measured law (new instances, translated states); 0 = projects saved before
+constexpr int reaLaw = paramCount + 1; // round 190ln, hidden (read only with revision 1 and the plate voicing off): 1 = the
+                                       //   reference's own EQ (first-order shelves) and bass decay over Decay, read by static REA
+                                       //   (new instances, translated states); 0 = revision 1 as round 190it left it
 constexpr int typeCount = 12;
 const char* typeName (int index) noexcept;
 double decaySec (float v) noexcept;
 double lowCutHz (float v) noexcept; // 0 = off, else 20 Hz … 1 kHz
+double reaBassRtMult (double decaySec) noexcept; // round 190ln: the bass decay's multiple of Decay (1 up to 2.5 s, 1.4 from 10 s)
 }
 namespace nebula
 {
