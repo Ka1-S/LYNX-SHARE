@@ -11285,3 +11285,6 @@ countries: nl be
 "Crest Compressor's console law (the Waves SSLComp stand-in) plays as its Bus style: {0}" = "De consolewet van Crest Compressor (de vervanger van Waves SSLComp) speelt als zijn Bus-stijl: {0}"
 "Mixer lock states (a solo silences these inserts, and Unmute all unmutes them): {0}" = "Vergrendelstatussen van de mixer (een solo dempt deze inserts, en Alles dempen opheffen heft hun demping op): {0}"
 "{0} imported take lane(s) get their own columns in the clip grid and the Session mixer" = "{0} geïmporteerde take-baan/banen krijgen eigen kolommen in het clipraster en de Session-mixer"
+
+# --- rollup 0.1.30 step 7 (owner, QA-8): the Clip-launch / Simple View menu's submenu
+"Windows and tools" = "Vensters en hulpmiddelen"

@@ -11285,3 +11285,6 @@ countries: id
 "Crest Compressor's console law (the Waves SSLComp stand-in) plays as its Bus style: {0}" = "Hukum konsol Crest Compressor (pengganti Waves SSLComp) diputar sebagai gaya Bus-nya: {0}"
 "Mixer lock states (a solo silences these inserts, and Unmute all unmutes them): {0}" = "Status kunci mixer (solo membisukan insert ini, dan Unmute all menyalakannya lagi): {0}"
 "{0} imported take lane(s) get their own columns in the clip grid and the Session mixer" = "{0} lajur take yang diimpor mendapat kolom sendiri di grid klip dan mixer Session"
+
+# --- rollup 0.1.30 step 7 (owner, QA-8): the Clip-launch / Simple View menu's submenu
+"Windows and tools" = "Jendela dan alat"

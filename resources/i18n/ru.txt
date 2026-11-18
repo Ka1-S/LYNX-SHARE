@@ -11285,3 +11285,6 @@ countries: ru by kz
 "Crest Compressor's console law (the Waves SSLComp stand-in) plays as its Bus style: {0}" = "Консольный закон Crest Compressor (замена Waves SSLComp) звучит как его стиль Bus: {0}"
 "Mixer lock states (a solo silences these inserts, and Unmute all unmutes them): {0}" = "Состояния блокировки микшера (соло заглушает эти инсерты, а «Включить звук всех» снимает с них заглушение): {0}"
 "{0} imported take lane(s) get their own columns in the clip grid and the Session mixer" = "Импортированные дорожки дублей ({0}) получают свои столбцы в сетке клипов и в микшере Session"
+
+# --- rollup 0.1.30 step 7 (owner, QA-8): the Clip-launch / Simple View menu's submenu
+"Windows and tools" = "Окна и инструменты"

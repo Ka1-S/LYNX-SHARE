@@ -11285,3 +11285,6 @@ countries: kr
 "Crest Compressor's console law (the Waves SSLComp stand-in) plays as its Bus style: {0}" = "Crest Compressor의 콘솔 법칙(Waves SSLComp 대체)은 Bus 스타일로 재생됩니다: {0}"
 "Mixer lock states (a solo silences these inserts, and Unmute all unmutes them): {0}" = "믹서 잠금 상태(솔로하면 이 인서트가 음소거되고, 모두 음소거 해제로 해제됩니다): {0}"
 "{0} imported take lane(s) get their own columns in the clip grid and the Session mixer" = "가져온 테이크 레인 {0}개가 클립 그리드와 Session 믹서에 자체 열을 갖습니다"
+
+# --- rollup 0.1.30 step 7 (owner, QA-8): the Clip-launch / Simple View menu's submenu
+"Windows and tools" = "창 및 도구"

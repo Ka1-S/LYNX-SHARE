@@ -9395,6 +9395,13 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
     }
     else if (index == 2)
     {
+        // rollup 0.1.30 step 7 (owner, QA-8): in the Clip-launch and Simple layouts the View menu keeps the views and the
+        // switches people use often, and the rarely used window and tool items go to one "Windows and tools" submenu, so
+        // that the menu fits a 1080p screen at 150 % (it had 41 rows: taller than the screen, JUCE split it). The Pattern
+        // layout keeps FL's full menu, in FL's order (`rare` is the menu itself there).
+        const auto compact = layoutStyle != layoutstyle::Style::pattern;
+        juce::PopupMenu windowsAndTools;
+        auto& rare = compact ? windowsAndTools : menu;
         for (auto panel : panelOrder)
             menu.addItem (panelName (panel) + shortcutText (panelAction (panel)), true, workspace.isPanelVisible (panel), [this, panel] { togglePanel (panel); });
 
@@ -9410,32 +9417,38 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
                     workspace.setDetached (panel, ! workspace.isDetached (panel));
                     refreshPanelButtons();
                 });
-            menu.addSubMenu (tr ("Detached panels (own window)"), detach);
+            rare.addSubMenu (tr ("Detached panels (own window)"), detach);
         }
         menu.addSeparator();
         menu.addItem (tr ("Reset layout"), [this] {
             workspace.resetLayout();
             refreshPanelButtons();
         });
-        menu.addItem (tr ("Save layout as..."), [this] { saveLayoutAs(); });
-        menu.addSubMenu (tr ("Load layout"), layoutsMenu());
+        rare.addItem (tr ("Save layout as..."), [this] { saveLayoutAs(); });
+        rare.addSubMenu (tr ("Load layout"), layoutsMenu());
         addLayoutStyleItems (menu);
-        menu.addItem (tr ("Bring back off-screen panels"), [this] { workspace.bringBackOffscreen(); });
-        menu.addItem (tr ("Close all windows (plugins, channel settings, tools)") + shortcutText ("view.closeWindows"), [this] { runAction ("view.closeWindows"); });
-        menu.addItem (tr ("Close all plugin windows") + shortcutText ("view.closePluginWindows"), [this] { runAction ("view.closePluginWindows"); });
-        menu.addItem (tr ("Close all windows except the focused one") + shortcutText ("view.closeUnfocusedWindows"), [this] { runAction ("view.closeUnfocusedWindows"); });
-        menu.addItem (tr ("Align all channel editors") + shortcutText ("view.alignChannelEditors"), [this] { runAction ("view.alignChannelEditors"); });
+        if (compact)
+            rare.addSeparator();
+        rare.addItem (tr ("Bring back off-screen panels"), [this] { workspace.bringBackOffscreen(); });
+        rare.addItem (tr ("Close all windows (plugins, channel settings, tools)") + shortcutText ("view.closeWindows"), [this] { runAction ("view.closeWindows"); });
+        rare.addItem (tr ("Close all plugin windows") + shortcutText ("view.closePluginWindows"), [this] { runAction ("view.closePluginWindows"); });
+        rare.addItem (tr ("Close all windows except the focused one") + shortcutText ("view.closeUnfocusedWindows"), [this] { runAction ("view.closeUnfocusedWindows"); });
+        rare.addItem (tr ("Align all channel editors") + shortcutText ("view.alignChannelEditors"), [this] { runAction ("view.alignChannelEditors"); });
         menu.addSeparator();
-        menu.addItem (tr ("Plugin database (in the Browser)") + shortcutText ("view.pluginDatabase"), [this] { runAction ("view.pluginDatabase"); });
+        if (compact)
+            rare.addSeparator();
+        rare.addItem (tr ("Plugin database (in the Browser)") + shortcutText ("view.pluginDatabase"), [this] { runAction ("view.pluginDatabase"); });
         menu.addItem (tr ("Audio editor") + shortcutText ("view.audioEditor"), [this] { openAudioEditorForSelection(); });
-        menu.addItem (tr ("Tempo tapper") + shortcutText ("view.tempoTapper"), [this] { openTempoTapper (engine); });
-        menu.addItem (tr ("Sample browser (separate window)") + shortcutText ("view.sampleBrowser"), true, findToolWindow ("sampleBrowser") != nullptr,
+        rare.addItem (tr ("Tempo tapper") + shortcutText ("view.tempoTapper"), [this] { openTempoTapper (engine); });
+        rare.addItem (tr ("Sample browser (separate window)") + shortcutText ("view.sampleBrowser"), true, findToolWindow ("sampleBrowser") != nullptr,
                       [this] { toggleSampleBrowser(); });
         // round 190ch (LYNX's own): the project's lyrics / notes beside the Playlist, and matching a reference track
         menu.addItem (tr ("Lyrics and notes"), true, isLyricsShowing(), [this] { toggleLyrics(); });
-        menu.addItem (tr ("Reference match..."), [this] { showReferenceMatch(); });
+        rare.addItem (tr ("Reference match..."), [this] { showReferenceMatch(); });
         menu.addSeparator();
-        menu.addItem (tr ("Typing keyboard to piano") + shortcutText ("view.typingPiano"), true, typingPiano, [this] { toggleTypingPiano(); });
+        if (compact)
+            rare.addSeparator();
+        rare.addItem (tr ("Typing keyboard to piano") + shortcutText ("view.typingPiano"), true, typingPiano, [this] { toggleTypingPiano(); });
         menu.addItem (tr ("Touch keyboard") + shortcutText ("view.touchKeyboard"), true, isTouchKeyboardOpen(), [this] { toggleTouchKeyboard (engine); });
         if (layoutStyle == layoutstyle::Style::simple) // round 190jc (owner decision 9): touch-size controls, Simple only
             menu.addItem (tr ("Large controls (touch size)"), true, ui::simplelook::largeControls(),
@@ -9446,8 +9459,10 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
             background.addItem (tr ("Set image wallpaper..."), [] { themeui::setImageWallpaper(); });
             background.addItem (tr ("Remove image wallpaper"), ! themeui::current().image.empty(), false, [] { themeui::removeImageWallpaper(); });
             background.addItem (tr ("Set background color..."), [this] { openSettings ((int) SettingsPage::theme); });
-            menu.addSubMenu (tr ("Background"), background);
+            rare.addSubMenu (tr ("Background"), background);
         }
+        if (compact)
+            menu.addSubMenu (tr ("Windows and tools"), windowsAndTools);
         menu.addSeparator();
         // FL's "Auto scrolling" (round 162, issue #9)
         menu.addItem (tr ("Playlist follows the playhead (auto scrolling)") + shortcutText ("playlist.follow"), true,

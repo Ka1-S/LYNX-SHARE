@@ -11285,3 +11285,6 @@ countries: tr
 "Crest Compressor's console law (the Waves SSLComp stand-in) plays as its Bus style: {0}" = "Crest Compressor'ın konsol yasası (Waves SSLComp yerine geçen) Bus stiliyle çalar: {0}"
 "Mixer lock states (a solo silences these inserts, and Unmute all unmutes them): {0}" = "Mikser kilit durumları (bir solo bu insert'leri susturur, Tümünün sesini aç da sesini açar): {0}"
 "{0} imported take lane(s) get their own columns in the clip grid and the Session mixer" = "İçe aktarılan {0} take şeridi klip ızgarasında ve Session mikserinde kendi sütunlarını alır"
+
+# --- rollup 0.1.30 step 7 (owner, QA-8): the Clip-launch / Simple View menu's submenu
+"Windows and tools" = "Pencereler ve araçlar"

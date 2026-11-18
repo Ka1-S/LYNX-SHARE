@@ -11285,3 +11285,6 @@ countries: tw hk mo
 "Crest Compressor's console law (the Waves SSLComp stand-in) plays as its Bus style: {0}" = "Crest Compressor 的控台定律（Waves SSLComp 的替代）以其 Bus 風格播放：{0}"
 "Mixer lock states (a solo silences these inserts, and Unmute all unmutes them): {0}" = "混音器鎖定狀態（獨奏會使這些插入軌靜音，「全部取消靜音」會取消它們的靜音）：{0}"
 "{0} imported take lane(s) get their own columns in the clip grid and the Session mixer" = "{0} 條匯入的錄音條（take lane）在片段網格與 Session 混音器中有各自的欄"
+
+# --- rollup 0.1.30 step 7 (owner, QA-8): the Clip-launch / Simple View menu's submenu
+"Windows and tools" = "視窗與工具"

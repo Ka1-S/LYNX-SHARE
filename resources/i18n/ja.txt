@@ -11285,3 +11285,6 @@ countries: jp
 "Crest Compressor's console law (the Waves SSLComp stand-in) plays as its Bus style: {0}" = "Crest Compressor のコンソール則（Waves SSLComp の代替）は Bus スタイルとして再生されます: {0}"
 "Mixer lock states (a solo silences these inserts, and Unmute all unmutes them): {0}" = "ミキサーのロック状態（ソロでこれらのインサートがミュートされ、「すべてミュート解除」でミュートが解除されます）: {0}"
 "{0} imported take lane(s) get their own columns in the clip grid and the Session mixer" = "インポートしたテイクレーン {0} 本がクリップグリッドと Session ミキサーに専用の列を持ちます"
+
+# --- rollup 0.1.30 step 7 (owner, QA-8): the Clip-launch / Simple View menu's submenu
+"Windows and tools" = "ウィンドウとツール"
