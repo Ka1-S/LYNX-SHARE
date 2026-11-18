@@ -4072,10 +4072,10 @@ is that round's own run (old scorer; its 96 kHz files were not re-scored).
 - 7 are dominated by a long steady 1 kHz sine (Rate × Ducking 0.5 / 0 and 1 / 0.5 · 0.75 · 1, the mode stim at Character
   Tilt 0, the 44.1 kHz S1 / D stims): a static network's response at one frequency is a modal draw (±5 dB; this engine
   L / R +6.4 / −2.4 dB on that tone, revision 0 −0.5 / −1.5) and the reference varies ±1.5 dB between identical captures.
-- 4 are the default state D (30 % mix) at its 6-point limits: 44.1 / 48 kHz impulse spectrum 0.88 / 0.72 dB (limit 0.6:
+- 3 are the default state D (30 % mix) at its 6-point limits: 44.1 / 48 kHz impulse spectrum 0.88 / 0.72 dB (limit 0.6:
   the 31 … 62 Hz third octaves, a modal pattern again), tp172b D drums rms −0.58 dB (limit 0.5). The D state as a whole:
   20 files, 4 down / 3 up (prog182 D mix 4 → 6, 48 / 96 kHz D stim 4 → 6 / 3 → 4).
-- 6 one-step drops where fxparity's alignment moved (lag 203 → 3542, 227 → 1238, …): Space 0.75 at Rate 0, Distance 0.25
+- 7 one-step drops where fxparity's alignment moved (lag 203 → 3542, 227 → 1238, …): Space 0.75 at Rate 0, Distance 0.25
   Character 0.75, Brightness 0.75 Thickness 0.25, two Distance 0.2 mixes, Character 0.8 Thickness 0.5, Space 0.5 Width
   0.8 mix. The reference's reflections are fixed single-sample taps (L 6.69 / 11.33 / 18.35 / 25.42 ms, R 8.31 / 12.50 /
   21.15 / 32.40 ms at every rate, Space and Distance); LYNX's do not line up, so the cross-correlation often locks onto a
