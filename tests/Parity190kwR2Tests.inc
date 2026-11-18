@@ -170,3 +170,111 @@ TEST (parity190kwR2_space0_level_and_brightness_law)
     CHECK (b100 < b50 + 4.0 && b100 > b50 - 4.0);
     CHECK (b0 < b50 - 2.0);
 }
+
+// Round 190lg: revision 1's levels refitted on the captures' energy per time window (0 … 5 ms … 6.4 s) and band. The late
+// network carries the tail at every decay rate (190kw's fit had let the 1.15 × displayed-time early network carry it, so
+// long rates died early and a ducked long decay left no tail), far Distances lose their early energy, and Thickness acts
+// on a quiet wet only (the reference's Thickner: an impulse moves by −13.2 dB per unit, a loud wet hardly at all).
+namespace p190lgr2t
+{
+// a Pro-R 2 state (Modern, 100 % wet): Space, Decay Rate (−1 … 1), Distance, Thickness (−1 … 1), Ducking (dB)
+inline lynx::EffectSlot state (float space, float rate, float distance, float thick, float duckDb)
+{
+    std::vector<float> v (136, 0.0f);
+    v[0] = space; v[1] = rate; v[2] = distance; v[3] = 0.5f; v[5] = 0.3f; v[6] = thick; v[7] = 0.7f; v[8] = duckDb; v[9] = 100.0f;
+    auto slot = lynx::makeEffectSlot (lynx::EffectKind::luxeVerb);
+    if (const auto st = lynx::fabfilter::parseState (p190kwr2t::ffbs (v))) lynx::fabfilter::fromProR2 (*st, slot);
+    return slot;
+}
+// renders `in` (mono, both channels) through the slot; returns the left + right sum
+inline std::vector<double> render (const lynx::EffectSlot& slot, const std::vector<float>& in, double sr = 48000.0)
+{
+    std::vector<float> l (in), r (in);
+    auto fx = lynx::makeEffect (slot);
+    fx->prepare (sr);
+    const int n = (int) in.size();
+    for (int off = 0; off < n; off += 512)
+        fx->process (l.data() + off, r.data() + off, std::min (512, n - off), slot.params, 120.0);
+    std::vector<double> m ((std::size_t) n);
+    for (std::size_t i = 0; i < m.size(); ++i) m[i] = (double) l[i] + r[i];
+    return m;
+}
+inline double db (const std::vector<double>& x, double t0, double t1, double sr = 48000.0)
+{
+    double e = 0.0;
+    for (std::size_t i = (std::size_t) (t0 * sr); i < std::min (x.size(), (std::size_t) (t1 * sr)); ++i) e += x[i] * x[i];
+    return 10.0 * std::log10 (e + 1e-30);
+}
+inline std::vector<float> impulse (double seconds, double sr = 48000.0)
+{
+    std::vector<float> x ((std::size_t) (seconds * sr), 0.0f);
+    x[100] = 0.5f;
+    return x;
+}
+inline std::vector<float> noise (double seconds, double from, double to, float amp, double sr = 48000.0)
+{
+    std::vector<float> x ((std::size_t) (seconds * sr), 0.0f);
+    unsigned s = 12345u;
+    for (std::size_t i = (std::size_t) (from * sr); i < (std::size_t) (to * sr); ++i)
+    {
+        s = s * 1664525u + 1013904223u;
+        x[i] = amp * (float) ((double) (s >> 8) / 8388608.0 - 1.0);
+    }
+    return x;
+}
+} // namespace p190lgr2t
+
+TEST (parity190lgR2_the_tail_follows_the_decay_rate)
+{
+    using namespace p190lgr2t;
+    // Space 50 % (2.5 s): Decay Rate −100 % (× 0.25) is gone by 1.6 s (the reference: −150 dB in 1.6 … 3.2 s), +100 %
+    // (× 4) still rings there (−18.5 dB against −14.0 in 0.2 … 0.4 s)
+    const auto shortRate = render (state (0.5f, -1.0f, 0.5f, 0.0f, 0.0f), impulse (4.0));
+    const auto longRate = render (state (0.5f, 1.0f, 0.5f, 0.0f, 0.0f), impulse (4.0));
+    const double s1 = db (shortRate, 0.2, 0.4) - db (shortRate, 1.6, 3.2), l1 = db (longRate, 0.2, 0.4) - db (longRate, 1.6, 3.2);
+    std::printf ("  0.2 … 0.4 s over 1.6 … 3.2 s: rate × 0.25 %.1f dB, × 4 %.1f dB\n", s1, l1);
+    CHECK (s1 > 60.0);
+    CHECK (l1 < 12.0);
+}
+
+TEST (parity190lgR2_ducking_a_long_decay_leaves_its_tail)
+{
+    using namespace p190lgr2t;
+    // a 0.3 s noise burst, Decay Rate +100 %: with Ducking at 48 dB the wet dips while the burst plays and its tail
+    // comes back once the input stops (the reference: 0.5 … 1.5 s after the burst within ~3 dB of the un-ducked tail)
+    const auto in = noise (3.0, 0.1, 0.4, 0.3f);
+    const auto dry = render (state (0.25f, 1.0f, 0.5f, 0.0f, 0.0f), in), duck = render (state (0.25f, 1.0f, 0.5f, 0.0f, 48.0f), in);
+    const double during = db (duck, 0.15, 0.4) - db (dry, 0.15, 0.4), after = db (duck, 0.9, 1.9) - db (dry, 0.9, 1.9);
+    std::printf ("  ducked − plain: during the burst %.1f dB, 0.5 … 1.5 s after %.1f dB\n", during, after);
+    CHECK (during < -20.0);
+    CHECK (after > -4.0);
+}
+
+TEST (parity190lgR2_distance_takes_the_early_energy)
+{
+    using namespace p190lgr2t;
+    // Distance 0 → 100 %: the reference's first 20 ms fall by ~25 dB, its tail (0.2 … 1 s) stays within ~2 dB
+    const auto nearS = render (state (0.25f, 0.0f, 0.0f, 0.0f, 0.0f), impulse (1.5)), farS = render (state (0.25f, 0.0f, 1.0f, 0.0f, 0.0f), impulse (1.5));
+    const double early = db (farS, 0.0, 0.0225) - db (nearS, 0.0, 0.0225), tail = db (farS, 0.2, 1.0) - db (nearS, 0.2, 1.0);
+    std::printf ("  far − near: first 20 ms %.1f dB, 0.2 … 1 s %.1f dB\n", early, tail);
+    CHECK (early < -10.0);
+    CHECK (std::abs (tail) < 4.0);
+}
+
+TEST (parity190lgR2_thickness_acts_on_a_quiet_wet_only)
+{
+    using namespace p190lgr2t;
+    // Thickness −100 % / +100 % against 0: an impulse's response by about −13 / +6 dB, a loud noise's wet (≈ −20 dBFS) by
+    // under 2 dB (the reference: −13.2 / +6.6 dB and a music wet within 1.4 dB)
+    const auto ir = impulse (1.5), loud = noise (1.5, 0.0, 1.5, 0.5f);
+    const double i0 = db (render (state (0.25f, 0.0f, 0.5f, 0.0f, 0.0f), ir), 0.0, 1.5);
+    const double iN = db (render (state (0.25f, 0.0f, 0.5f, -1.0f, 0.0f), ir), 0.0, 1.5) - i0;
+    const double iP = db (render (state (0.25f, 0.0f, 0.5f, 1.0f, 0.0f), ir), 0.0, 1.5) - i0;
+    const double n0 = db (render (state (0.25f, 0.0f, 0.5f, 0.0f, 0.0f), loud), 0.5, 1.5);
+    const double nN = db (render (state (0.25f, 0.0f, 0.5f, -1.0f, 0.0f), loud), 0.5, 1.5) - n0;
+    const double nP = db (render (state (0.25f, 0.0f, 0.5f, 1.0f, 0.0f), loud), 0.5, 1.5) - n0;
+    std::printf ("  thickness −1 / +1: impulse %.1f / %+.1f dB, loud noise %.1f / %+.1f dB\n", iN, iP, nN, nP);
+    CHECK (iN < -10.0 && iN > -16.0);
+    CHECK (iP > 3.0 && iP < 8.0);
+    CHECK (std::abs (nN) < 2.0 && std::abs (nP) < 2.0);
+}

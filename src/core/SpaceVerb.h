@@ -249,6 +249,7 @@ public:
         for (auto& f : toneLp) f.clear();
         phase = 0.0;
         duckEnv = duckDb = 0.0;
+        thEnv = 0.0;
         for (auto& c : net1)
             for (auto& l : c) l.clear();
         for (auto& c : two1)
@@ -394,12 +395,30 @@ public:
     // round 190kw, revision 1: the constants fitted on refcap030's Pro-R 2 captures (the laws themselves are below)
     struct Fit1
     {
-        double late = 0.0761;    // the late network's level against the reference (G_late × this)
-        double two = 0.4239;     // the 2-line network's level
-        double early = 0.092;    // the early network's level (parallel lines, no feedback matrix)
-        double earlyMaxSec = 60.0; // … and its longest decay (the law: 1.15 × the displayed time, no cap)
-        double er = 0.2367;      // the early reflections' level …
-        double erSmall = 0.0;    // … and how much louder they get towards Space 0 (fitted: none)
+        // round 190lg: refitted on refcap030's Pro-R 2 captures per time window (0 … 5 ms … 6.4 s) and per band, not on
+        // the total level and spectrum alone (190kw's fit let the early network carry the tail: its level then followed
+        // the displayed time instead of the decay rate, so long rates died early and Ducking left no tail)
+        double late = 0.3439;    // the late network's level against the reference (G_late × this × the surface below)
+        double lateExp = -0.944; // … × (network decay in s)^this …
+        // … × 10^(dB / 20) of a fitted surface over Space S, decay rate r, Distance D and Character c:
+        // lateS (S − ½) + lateS2 (S − ½)² + lateSR (S − ½) log2 r + lateR log2 r + lateD2 (D − ½)² + lateCh (c − 0.3)
+        double lateS = 27.73, lateS2 = 1.57, lateSR = 1.71, lateR = 4.76, lateD2 = -8.51, lateCh = -1.59;
+        double two = 0.15676;    // the 2-line network's level, + twoS (S − ½) + twoD (D − ½) + twoD2 (D − ½)² dB
+        double twoS = 6.7, twoD = -2.3, twoD2 = -1.5;
+        double early = 0.11755;  // the early network's level (parallel lines, no feedback matrix), + earlyS / D / D2 terms (dB)
+        double earlyS = -7.38, earlyD = -10.03, earlyD2 = -6.14;
+        double earlyDecay = 0.3; // … and its decay: this × 1.15 × the displayed time (a short build-up, not a second tail)
+        double er = 0.2367;      // the early reflections' level, + erS (S − ½) + erD (D − ½) + erD2 (D − ½)² dB
+        double erS = -14.04, erD = 0.59, erD2 = -4.57;
+        // the whole wet by Distance (dB at D = 0, ¼, ½, ¾, 1, linear between) + distCh (c − ½) min (2 D, 1): far spaces lose
+        // their early energy in the reference (−30 dB at 0 … 5 ms from D = 0 to 1) and keep their tail
+        std::array<double, 5> distDb { -0.2, -1.17, 0.26, 0.06, 1.0 };
+        double distCh = 1.3;
+        // Thickness (the reference's Thickner): a gain on the body (late, 2-line, early networks; the early reflections too
+        // below 0) that acts only on a quiet wet: in full below thickLo dBFS, none above thickHi (the wet's (l² + r²) / 2,
+        // thickAtt / thickRel s). Measured: an impulse's whole response moves by −13.2 dB per unit below 0 and by
+        // 6.8 (1 − (1 − t)²) dB above (here − 1.12 dB at t = 1), a music wet at −25 dBFS by under 1.5 dB either way
+        double thickNegDb = 13.2, thickPosDb = 5.68, thickLo = -38.0, thickHi = -28.0, thickAtt = 0.02, thickRel = 0.3;
         double cross = 0.5;      // the unresolved factor x of the CrossInput gain 0.5477 · x · min (v / 0.5477, 1)²: the
                                  // left-only impulses across Stereo Width score 2.92 / 3.32 / 3.40 / 3.20 at x = 0 / 0.5 / 1 /
                                  // 1.5, but x = 1 lifts a centred input by 1.7 dB against the fitted levels (grid 3.33 → 2.90)
@@ -407,8 +426,6 @@ public:
         double lpOctaves = -0.75; // the brightness low pass's corner moved by this many octaves (fitted, one pole)
         double shelfDb = 0.0;    // the high shelf that follows the darkness …
         double darkDb = 18.0;    // … and its cut per unit of darkness (fitted on the measured B = 0 / 1 curves)
-        double lateExp = -0.944; // the late level × (network decay in s)^this (the measured level grows slower with T)
-        double thickNeg = 15.6, thickPos = 6.75; // Thickness −1 … +1 → the body (late, early, 2-line) by dB per unit
         std::array<double, 3> styleLate { 1.0, 0.95, 0.6 }, styleEarly { 1.0, 1.145, 1.145 };
         std::array<double, 3> styleLowDb { 0.0, -2.0, -1.0 }, styleHighDb { 0.0, 0.0, -3.0 }, styleLpHz { 0.0, 0.0, 9000.0 };
     };
@@ -465,8 +482,9 @@ private:
                 g2[(std::size_t) c][(std::size_t) j] = gOf (len, t2);
             }
         // the early network: lines without a feedback matrix (each feeds itself back), decaying at 1.15 × the displayed
-        // time without the rate multiplier — what keeps a small space's level when the rate is low
-        const double tEarly = std::min (1.15 * s.decaySec, f.earlyMaxSec);
+        // time without the rate multiplier (the law), shortened by earlyDecay (round 190lg: the time windows of the
+        // reference end its energy with the late network's, at every rate)
+        const double tEarly = 1.15 * s.decaySec * f.earlyDecay;
         for (int c = 0; c < 2; ++c)
             for (int j = 0; j < earlyLines; ++j)
             {
@@ -482,8 +500,7 @@ private:
             for (int q = 0; q < 4; ++q)
                 diff[(std::size_t) c][(std::size_t) q].g = q < st.diffusers ? st.diffuserGain : 0.0;
         const double near = 1.0 - D;
-        erGain = st.erLevel * (0.6 + 4.4 * near * near * near) * (1.0 + 0.8 * std::max (0.0, s.thickness)) * f.er
-                 * (1.0 + f.erSmall * (1.0 - S) * (1.0 - S));
+        erGain = st.erLevel * (0.6 + 4.4 * near * near * near) * (1.0 + 0.8 * std::max (0.0, s.thickness)) * f.er;
         erSpread = (0.55 + 0.9 * near) * (0.5 + 0.5 * S);
         // stereo width W (0 … 1.2): v = √|W − 1|; the input's side scaled by s_in into the two networks; the networks'
         // feedback rotated into each other by v; the output's mid / side by X / Y
@@ -512,12 +529,22 @@ private:
         const double sd = std::sqrt (D);
         const double f10 = 1.0 - ((0.045 * sd + 0.0375) * f4 * sd + (0.0375 * sd + 0.03125) * f4) * f4;
         const double th = std::clamp (s.thickness, -1.0, 1.0);
-        const double body = std::pow (10.0, (th >= 0.0 ? f.thickPos * th : f.thickNeg * th) / 20.0);
+        thickDb = th >= 0.0 ? f.thickPosDb * (1.0 - (1.0 - th) * (1.0 - th)) : f.thickNegDb * th;
         const auto si = (std::size_t) s.style;
+        // round 190lg: the fitted surfaces (dB) over Space, decay rate, Distance and Character, and the whole wet by Distance
+        const double lr2 = std::log2 (std::max (s.rate, 1e-6)), Sc = S - 0.5, Dc = D - 0.5, ch = clamp01 (s.character);
+        const double d4 = 4.0 * D;
+        const int di = std::min ((int) d4, 3);
+        const double distDb = f.distDb[(std::size_t) di] + (f.distDb[(std::size_t) di + 1] - f.distDb[(std::size_t) di]) * (d4 - di)
+                              + f.distCh * (ch - 0.5) * std::min (2.0 * D, 1.0);
+        const double lateDb = f.lateS * Sc + f.lateS2 * Sc * Sc + f.lateSR * Sc * lr2 + f.lateR * lr2 + f.lateD2 * Dc * Dc
+                              + f.lateCh * (ch - 0.3) + distDb;
+        const auto dbg = [] (double db) { return std::pow (10.0, db / 20.0); };
         lateGain = f.late * f.styleLate[si] * std::pow (std::max (bd.mid, 0.05), f.lateExp)
-                   * (std::pow (250.0 / std::max (tMs, 1.0), 0.7) + 1.3) * (1.0 + 0.5 * dk) * f10 * body;
-        twoGain = f.two * (1.0 + 0.5 * dk) * body;
-        earlyGain = f.early * f.styleEarly[si] * (1.0 + 0.5 * dk) * body;
+                   * (std::pow (250.0 / std::max (tMs, 1.0), 0.7) + 1.3) * (1.0 + 0.5 * dk) * f10 * dbg (lateDb);
+        twoGain = f.two * (1.0 + 0.5 * dk) * dbg (f.twoS * Sc + f.twoD * Dc + f.twoD2 * Dc * Dc + distDb);
+        earlyGain = f.early * f.styleEarly[si] * (1.0 + 0.5 * dk) * dbg (f.earlyS * Sc + f.earlyD * Dc + f.earlyD2 * Dc * Dc + distDb);
+        erGain *= dbg (distDb + f.erS * Sc + f.erD * Dc + f.erD2 * Dc * Dc);
         const double wTerm = 0.5 * std::min (1.25 * f.cross, 1.5) * v;
         const double lpHz = std::pow (2.0, 14.136 - 4.0 * dk + f.lpOctaves);
         const double shHz = std::pow (2.0, 13.873 - 2.0 * dk);
@@ -537,6 +564,7 @@ private:
         }
         dryGain = std::cos (clamp01 (s.mix) * pi * 0.5);
         wetGain = std::sin (clamp01 (s.mix) * pi * 0.5);
+        thA = std::exp (-1.0 / (f.thickAtt * sr)); thR = std::exp (-1.0 / (f.thickRel * sr));
     }
 
     void process1 (float* left, float* right, int n) noexcept
@@ -639,18 +667,34 @@ private:
                 two1[1][(std::size_t) j].push (rot2C * b - rot2S * a + (j == 0 ? dIn[1] : -dIn[1]));
             }
             std::array<double, 2> w {};
+            // thickness: the body (late, 2-line, early networks) × the gain the wet's level allows (the
+            // envelope of the previous output sample); the early reflections only below 0 (a cut)
+            double thG = 1.0, thE = 1.0;
+            if (thickDb != 0.0)
+            {
+                const double lv = 10.0 * std::log10 (thEnv + 1e-30);
+                const double wv = std::clamp ((fit1().thickHi - lv) / (fit1().thickHi - fit1().thickLo), 0.0, 1.0);
+                thG = std::exp (thickDb * wv * 0.11512925464970229);
+                if (thickDb < 0.0) thE = thG;
+            }
             for (int c = 0; c < 2; ++c)
             {
-                double y = o[(std::size_t) c] * lateGain + e[(std::size_t) c] * erGain + t[(std::size_t) c] * twoGain
-                           + eo[(std::size_t) c] * earlyGain;
+                double y = (o[(std::size_t) c] * lateGain + t[(std::size_t) c] * twoGain + eo[(std::size_t) c] * earlyGain) * thG
+                           + e[(std::size_t) c] * erGain * thE;
                 for (auto& fl : out1[(std::size_t) c]) y = fl.run (y);
                 w[(std::size_t) c] = y;
             }
-            const double wm = 0.5 * (w[0] + w[1]) * outX * duckGain, ws = 0.5 * (w[0] - w[1]) * outY * duckGain;
+            double wm = 0.5 * (w[0] + w[1]) * outX * duckGain, ws = 0.5 * (w[0] - w[1]) * outY * duckGain;
+            if (thickDb != 0.0)
+            {
+                const double e2 = wm * wm + ws * ws; // (l² + r²) / 2 of the wet
+                thEnv = e2 > thEnv ? e2 + thA * (thEnv - e2) : e2 + thR * (thEnv - e2);
+            }
             left[i] = (float) (inL * dryGain + (wm + ws) * wetGain);
             right[i] = (float) (inR * dryGain + (wm - ws) * wetGain);
         }
     }
+    double thickDb = 0.0, thEnv = 0.0, thA = 0.0, thR = 0.0;
 
     std::array<std::array<detail::Delay, lines1>, 2> net1;
     std::array<std::array<detail::Delay, 2>, 2> two1;
