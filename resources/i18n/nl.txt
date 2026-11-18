@@ -11249,3 +11249,6 @@ countries: nl be
 "No clear key in this audio (drums, noise or too short)" = "Geen duidelijke toonsoort in deze audio (drums, ruis of te kort)"
 "Dropped loops take the tempo and key found in their audio" = "Neergezette loops nemen het tempo en de toonsoort uit hun audio over"
 "In the Simple layout a loop whose file and name don't say its tempo or key is analysed when it is dropped: a loop of whole beats keeps the project's tempo and a key it finds follows the project key, as BandLab's loops do. On by default. Also in the Browser options menu of the Simple layout." = "In de Simple-indeling wordt een loop waarvan bestand en naam tempo noch toonsoort noemen, geanalyseerd wanneer hij wordt neergezet: een loop van hele tellen volgt het projecttempo en een gevonden toonsoort volgt de projecttoonsoort, zoals de loops van BandLab. Standaard aan. Ook in het optiemenu van de browser in de Simple-indeling."
+"Natural pitch engine (LYNX)" = "Natuurlijke toonhoogte-engine (LYNX)"
+"Pitch modulation" = "Toonhoogtemodulatie"
+"Pitch drift" = "Toonhoogtedrift"

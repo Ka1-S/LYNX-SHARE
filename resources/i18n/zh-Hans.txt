@@ -11249,3 +11249,6 @@ countries: cn sg
 "No clear key in this audio (drums, noise or too short)" = "此音频没有明确的调性（鼓、噪声或太短）"
 "Dropped loops take the tempo and key found in their audio" = "拖入的循环采用其音频中检测到的速度和调性"
 "In the Simple layout a loop whose file and name don't say its tempo or key is analysed when it is dropped: a loop of whole beats keeps the project's tempo and a key it finds follows the project key, as BandLab's loops do. On by default. Also in the Browser options menu of the Simple layout." = "在 Simple 布局中，文件和名称都没有标明速度或调性的循环会在拖入时分析：整拍的循环跟随项目速度，检测到的调性跟随项目调性，与 BandLab 的循环一样。默认开启。也在 Simple 布局的浏览器选项菜单中。"
+"Natural pitch engine (LYNX)" = "自然音高引擎（LYNX）"
+"Pitch modulation" = "音高调制"
+"Pitch drift" = "音高漂移"

@@ -11249,3 +11249,6 @@ countries: fr be ch ca lu
 "No clear key in this audio (drums, noise or too short)" = "Aucune tonalité nette dans cet audio (batterie, bruit ou trop court)"
 "Dropped loops take the tempo and key found in their audio" = "Les boucles déposées prennent le tempo et la tonalité trouvés dans leur audio"
 "In the Simple layout a loop whose file and name don't say its tempo or key is analysed when it is dropped: a loop of whole beats keeps the project's tempo and a key it finds follows the project key, as BandLab's loops do. On by default. Also in the Browser options menu of the Simple layout." = "Dans la disposition Simple, une boucle dont le fichier et le nom n'indiquent ni le tempo ni la tonalité est analysée quand on la dépose : une boucle de temps entiers suit le tempo du projet et une tonalité trouvée suit celle du projet, comme les boucles de BandLab. Activé par défaut. Aussi dans le menu des options du Navigateur de la disposition Simple."
+"Natural pitch engine (LYNX)" = "Moteur de hauteur naturel (LYNX)"
+"Pitch modulation" = "Modulation de hauteur"
+"Pitch drift" = "Dérive de hauteur"

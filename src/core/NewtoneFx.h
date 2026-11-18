@@ -58,6 +58,10 @@ struct Note
     // centre split into its slow part (drift, under ~2.5 Hz) and its fast part (vibrato, modulation), each scaled on its
     // own on top of `drift` (FL's Variation, which scales both). 1 = as sung.
     double modulation = 1.0, pitchDrift = 1.0;
+    // round 190li: the note's sung pitch centre (MIDI, fractional): the mean of its pitch over the held part (the scoop
+    // into it and the glide out of it left out; exact periods, not FL's whole-sample ones). Engine 1's Center and its
+    // drift / modulation pivot use it; 0 = not known (an older state: origPitch is used).
+    double sungPitch = 0.0;
     bool voiced() const noexcept { return validEnd != 0; }
     std::int64_t voicedEnd() const noexcept { return validEnd > origStart ? std::min (validEnd, origEnd) : origEnd; }
 
@@ -137,9 +141,14 @@ std::shared_ptr<SampleData> renderEdits (const SampleData& source, const Track& 
 // attack on the same breath). Melodyne 5 (its Melodic algorithm, round 190kx's reference captures) separates notes 45
 // cents apart; FL's analysis joins them into one note between the two pitches, which Center then moves to the wrong
 // semitone.
+// Round 190li: `octaveGuard` (on by default): where the FL-fitted loose voicing threshold (0.3) takes a period one or
+// more octaves off the strict one (0.15), the strict one's pitch is used (YIN's first dip under a loose threshold can
+// be a formant's sub-period: a low male voice came out up to two octaves high, breaking Center and Snap to scale);
+// the voicing and the segmentation rules are FL's as before. Stored notes never change: only a new analysis uses it.
 struct AnalyseOptions
 {
     bool fineSplit = false;
+    bool octaveGuard = true;
 };
 Track analyseNotes (const SampleData& source, const AnalyseOptions& options = {});
 

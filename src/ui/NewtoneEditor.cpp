@@ -968,6 +968,7 @@ private:
         {
             // a sample without notes yet (a fresh slot, or a sample chosen from the slot menu): analyse it now
             notes = newtonefx::analyseNotes (*sample);
+            notes.engine = newtonefx::latestEngine; // (round 190li: a new slot renders with LYNX's natural engine)
             juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<NewtoneEditor> (this)] {
                 if (safe != nullptr)
                     safe->commit();
@@ -1051,7 +1052,9 @@ private:
     {
         if (sample == nullptr || warpMode())
             return;
+        const auto engineWas = notes.engine; // (the slot keeps its engine)
         notes = newtonefx::analyseNotes (*sample, analyseOptions());
+        notes.engine = engineWas;
         selected.clear();
         commit();
     }
@@ -2332,6 +2335,33 @@ private:
             fineAnalysis = ! fineAnalysis;
             reanalyse();
         });
+        // round 190li (LYNX extras): the natural engine (a new slot has it; older projects keep the engine they were made
+        // with until it is ticked), and Melodyne-style pitch modulation (vibrato) / pitch drift amounts for the selected
+        // notes (all when none is selected), which the natural engine renders
+        {
+            const auto noteMode = sample != nullptr && ! warpMode();
+            m.addItem (tr ("Natural pitch engine (LYNX)"), noteMode, notes.engine >= 1, [this] {
+                notes.engine = notes.engine >= 1 ? 0 : newtonefx::latestEngine;
+                commit();
+            });
+            const auto natural = noteMode && notes.engine >= 1;
+            auto amounts = [this] (bool modulation) {
+                juce::PopupMenu sub;
+                const auto* first = notes.pitches.empty() ? nullptr : &notes.pitches[(std::size_t) (selected.empty() ? 0 : *selected.begin())];
+                const auto now = first == nullptr ? 1.0 : modulation ? first->modulation : first->pitchDrift;
+                for (const auto v : { 0, 25, 50, 75, 100, 125, 150, 200 })
+                    sub.addItem (juce::String (v) + " %", true, std::abs (now * 100.0 - v) < 0.5, [this, v, modulation] {
+                        if (modulation)
+                            newtonefx::applyModulation (notes, v / 100.0, selection());
+                        else
+                            newtonefx::applyPitchDrift (notes, v / 100.0, selection());
+                        commit();
+                    });
+                return sub;
+            };
+            m.addSubMenu (tr ("Pitch modulation"), amounts (true), natural);
+            m.addSubMenu (tr ("Pitch drift"), amounts (false), natural);
+        }
         m.addSeparator();
         m.addItem (tr ("Advanced edit pitch") + "\tCtrl+E", sample != nullptr, advancedEdit, [this] { headerClick (Hit::advanced); });
         m.addItem (tr ("Advanced edit vibrato"), sample != nullptr, vibratoEdit, [this] {

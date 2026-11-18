@@ -11249,3 +11249,6 @@ countries: tr
 "No clear key in this audio (drums, noise or too short)" = "Bu seste net bir ton yok (davul, gürültü ya da çok kısa)"
 "Dropped loops take the tempo and key found in their audio" = "Bırakılan döngüler seslerinde bulunan tempo ve tonu alır"
 "In the Simple layout a loop whose file and name don't say its tempo or key is analysed when it is dropped: a loop of whole beats keeps the project's tempo and a key it finds follows the project key, as BandLab's loops do. On by default. Also in the Browser options menu of the Simple layout." = "Simple düzeninde dosyası ve adı temposunu ya da tonunu söylemeyen bir döngü bırakıldığında analiz edilir: tam vuruşlu bir döngü proje temposunu izler, bulunan ton da proje tonunu izler; BandLab döngüleri gibi. Varsayılan olarak açık. Simple düzeninde Tarayıcı seçenekleri menüsünde de var."
+"Natural pitch engine (LYNX)" = "Doğal perde motoru (LYNX)"
+"Pitch modulation" = "Perde modülasyonu"
+"Pitch drift" = "Perde kayması"

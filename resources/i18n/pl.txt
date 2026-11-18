@@ -11249,3 +11249,6 @@ countries: pl
 "No clear key in this audio (drums, noise or too short)" = "Brak wyraźnej tonacji w tym dźwięku (perkusja, szum lub zbyt krótko)"
 "Dropped loops take the tempo and key found in their audio" = "Upuszczone pętle przyjmują tempo i tonację znalezione w ich dźwięku"
 "In the Simple layout a loop whose file and name don't say its tempo or key is analysed when it is dropped: a loop of whole beats keeps the project's tempo and a key it finds follows the project key, as BandLab's loops do. On by default. Also in the Browser options menu of the Simple layout." = "W układzie Simple pętla, której plik i nazwa nie podają tempa ani tonacji, jest analizowana po upuszczeniu: pętla z pełnych uderzeń podąża za tempem projektu, a znaleziona tonacja za tonacją projektu, jak pętle BandLab. Domyślnie włączone. Także w menu opcji przeglądarki w układzie Simple."
+"Natural pitch engine (LYNX)" = "Naturalny silnik wysokości (LYNX)"
+"Pitch modulation" = "Modulacja wysokości"
+"Pitch drift" = "Dryf wysokości"

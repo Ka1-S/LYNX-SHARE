@@ -11249,3 +11249,6 @@ countries: kr
 "No clear key in this audio (drums, noise or too short)" = "이 오디오에는 뚜렷한 키가 없습니다 (드럼, 노이즈 또는 너무 짧음)"
 "Dropped loops take the tempo and key found in their audio" = "드롭한 루프는 오디오에서 찾은 템포와 키를 따릅니다"
 "In the Simple layout a loop whose file and name don't say its tempo or key is analysed when it is dropped: a loop of whole beats keeps the project's tempo and a key it finds follows the project key, as BandLab's loops do. On by default. Also in the Browser options menu of the Simple layout." = "Simple 레이아웃에서는 파일과 이름에 템포나 키가 없는 루프를 드롭할 때 분석합니다. 박이 딱 맞는 루프는 프로젝트 템포를, 찾은 키는 프로젝트 키를 따릅니다 (BandLab 루프처럼). 기본값은 켬. Simple 레이아웃의 브라우저 옵션 메뉴에도 있습니다."
+"Natural pitch engine (LYNX)" = "자연스러운 피치 엔진 (LYNX)"
+"Pitch modulation" = "피치 모듈레이션"
+"Pitch drift" = "피치 드리프트"

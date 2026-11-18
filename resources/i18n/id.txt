@@ -11249,3 +11249,6 @@ countries: id
 "No clear key in this audio (drums, noise or too short)" = "Tidak ada kunci yang jelas di audio ini (drum, derau, atau terlalu pendek)"
 "Dropped loops take the tempo and key found in their audio" = "Loop yang dijatuhkan mengikuti tempo dan kunci yang ditemukan di audionya"
 "In the Simple layout a loop whose file and name don't say its tempo or key is analysed when it is dropped: a loop of whole beats keeps the project's tempo and a key it finds follows the project key, as BandLab's loops do. On by default. Also in the Browser options menu of the Simple layout." = "Di tata letak Simple, loop yang file dan namanya tidak menyebut tempo atau kuncinya dianalisis saat dijatuhkan: loop berketukan utuh mengikuti tempo proyek dan kunci yang ditemukan mengikuti kunci proyek, seperti loop BandLab. Aktif secara bawaan. Juga di menu opsi Peramban pada tata letak Simple."
+"Natural pitch engine (LYNX)" = "Mesin nada alami (LYNX)"
+"Pitch modulation" = "Modulasi nada"
+"Pitch drift" = "Pergeseran nada"

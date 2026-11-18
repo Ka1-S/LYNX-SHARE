@@ -348,6 +348,140 @@ std::vector<Mark> analyse (const std::vector<float>& x, double fs, std::vector<v
     return marks;
 }
 
+// Round 190li (engine 1): the voiced marks moved to where the waveform best repeats the one before (normalised
+// cross-correlation over a period, within 0.15 of a period of the peak-locked mark; whole samples, so an unshifted
+// render stays the source itself). A run's first mark keeps its peak. Consistent marks give consistent grains: the
+// cycle-to-cycle jitter of peak picking would otherwise become roughness between the harmonics.
+void refineMarks (std::vector<Mark>& marks, const std::vector<float>& x)
+{
+    const auto n = (std::ptrdiff_t) x.size();
+    auto ncc = [&] (std::ptrdiff_t a, std::ptrdiff_t b, std::ptrdiff_t half) {
+        double d = 0.0, ea = 0.0, eb = 0.0;
+        for (auto o = -half; o < half; ++o)
+        {
+            const auto ia = a + o, ib = b + o;
+            const double va = ia >= 0 && ia < n ? x[(std::size_t) ia] : 0.0, vb = ib >= 0 && ib < n ? x[(std::size_t) ib] : 0.0;
+            d += va * vb, ea += va * va, eb += vb * vb;
+        }
+        return ea * eb > 1e-24 ? d / std::sqrt (ea * eb) : 0.0;
+    };
+    for (std::size_t i = 1; i < marks.size(); ++i)
+    {
+        auto& m = marks[i];
+        const auto& prev = marks[i - 1];
+        if (! m.voiced || ! prev.voiced)
+            continue;
+        const auto p = m.period;
+        // (around the peak-locked mark itself: the frame's period, smeared over a glide or wrong at an onset, does not
+        // steer the search)
+        const auto guess = (std::ptrdiff_t) std::llround (m.pos);
+        const auto reach = std::max<std::ptrdiff_t> (1, (std::ptrdiff_t) std::lround (0.15 * p));
+        const auto half = std::max<std::ptrdiff_t> (4, (std::ptrdiff_t) std::lround (0.5 * p));
+        auto best = (std::ptrdiff_t) m.pos;
+        auto bestScore = ncc ((std::ptrdiff_t) prev.pos, best, half);
+        for (auto c = guess - reach; c <= guess + reach; ++c)
+        {
+            if ((double) c <= prev.pos + 0.5 * p)
+                continue;
+            if (const auto sc = ncc ((std::ptrdiff_t) prev.pos, c, half); sc > bestScore + 1e-9)
+                bestScore = sc, best = c;
+        }
+        m.pos = (double) best;
+    }
+    // (keep them strictly increasing)
+    for (std::size_t i = 1; i < marks.size(); ++i)
+        if (marks[i].pos <= marks[i - 1].pos)
+            marks[i].pos = marks[i - 1].pos + 1.0;
+
+    // Voiced runs reach back to the voice's real onset and on to its end: the pitch frames switch on ~20 ms late (their
+    // window must fill with periods first), so the start of a sung note was read unshifted. From a run's first mark,
+    // periods are walked backwards (and from its last one forwards) while the waveform still repeats (normalised
+    // correlation over a period >= 0.7) and carries energy; the unvoiced marks they cover go.
+    std::vector<Mark> out;
+    out.reserve (marks.size() + 64);
+    std::size_t i = 0;
+    while (i < marks.size())
+    {
+        if (! marks[i].voiced)
+        {
+            out.push_back (marks[i++]);
+            continue;
+        }
+        auto j = i;
+        while (j + 1 < marks.size() && marks[j + 1].voiced)
+            ++j;
+        // backwards from marks[i]
+        std::vector<Mark> head;
+        {
+            auto at = marks[i];
+            const auto floorPos = out.empty() ? 0.0 : out.back().pos; // (never before what is already placed... see below)
+            (void) floorPos;
+            for (int step = 0; step < 8; ++step)
+            {
+                const auto p = at.period;
+                const auto guess = (std::ptrdiff_t) std::llround (at.pos - p);
+                const auto reach = std::max<std::ptrdiff_t> (1, (std::ptrdiff_t) std::lround (0.15 * p));
+                const auto half = std::max<std::ptrdiff_t> (4, (std::ptrdiff_t) std::lround (0.5 * p));
+                auto best = guess;
+                auto bestScore = -2.0;
+                for (auto c = guess - reach; c <= guess + reach; ++c)
+                    if (const auto sc = ncc ((std::ptrdiff_t) at.pos, c, half); sc > bestScore)
+                        bestScore = sc, best = c;
+                // (the voiced run before, or an earlier voiced mark, ends the walk; so does a waveform that no longer repeats)
+                const auto lastVoiced = [&] {
+                    for (auto k = out.size(); k-- > 0;)
+                        if (out[k].voiced)
+                            return out[k].pos;
+                    return -1.0;
+                }();
+                if (bestScore < 0.7 || best <= 1 || (double) best <= lastVoiced + 0.5 * p)
+                    break;
+                at.pos = (double) best;
+                head.push_back (at);
+            }
+        }
+        // drop the unvoiced marks the head covers, keep it in order
+        if (! head.empty())
+        {
+            const auto from = head.back().pos - 0.5 * head.back().period;
+            while (! out.empty() && ! out.back().voiced && out.back().pos >= from)
+                out.pop_back();
+            for (auto h = head.rbegin(); h != head.rend(); ++h)
+                out.push_back (*h);
+        }
+        for (auto k = i; k <= j; ++k)
+            out.push_back (marks[k]);
+        // forwards from marks[j]
+        auto at = marks[j];
+        std::size_t next = j + 1;
+        for (int step = 0; step < 8; ++step)
+        {
+            const auto p = at.period;
+            const auto guess = (std::ptrdiff_t) std::llround (at.pos + p);
+            const auto reach = std::max<std::ptrdiff_t> (1, (std::ptrdiff_t) std::lround (0.15 * p));
+            const auto half = std::max<std::ptrdiff_t> (4, (std::ptrdiff_t) std::lround (0.5 * p));
+            auto best = guess;
+            auto bestScore = -2.0;
+            for (auto c = guess - reach; c <= guess + reach; ++c)
+                if (const auto sc = ncc ((std::ptrdiff_t) at.pos, c, half); sc > bestScore)
+                    bestScore = sc, best = c;
+            // (stop before the next voiced run)
+            auto k = next;
+            while (k < marks.size() && ! marks[k].voiced)
+                ++k;
+            const auto nextVoiced = k < marks.size() ? marks[k].pos : (double) n;
+            if (bestScore < 0.7 || best + half >= n || (double) best >= nextVoiced - 0.5 * p)
+                break;
+            at.pos = (double) best;
+            out.push_back (at);
+            while (next < marks.size() && ! marks[next].voiced && marks[next].pos <= at.pos + 0.5 * p)
+                ++next; // (the unvoiced marks it covers)
+        }
+        i = next;
+    }
+    marks.swap (out);
+}
+
 float readAt (const std::vector<float>& x, double pos) noexcept
 {
     const auto i = (std::int64_t) std::floor (pos);
@@ -369,8 +503,11 @@ float readAt (const std::vector<float>& x, double pos) noexcept
 //  - TD-PSOLA with asymmetric grains: every analysis mark's window reaches back to the mark before and on to the mark
 //    after (raised-cosine halves), so at no shift the windows add up to exactly one and an unshifted part is the source
 //    itself (seamless joins with the plain sample, no phase jumps); synthesis marks start on the analysis marks;
+//  - pitch marks refined by normalised cross-correlation with the mark before (each period cut at the same phase of
+//    the waveform; peak picking's cycle-to-cycle jitter was the main source of roughness between the harmonics, 5-10 dB);
 //  - grain interpolation (waveform interpolation, W. B. Kleijn, "Encoding speech using prototype waveforms", IEEE
-//    Trans. Speech Audio Proc. 1(4), 1993): a synthesis mark between two analysis marks mixes both grains, so a
+//    Trans. Speech Audio Proc. 1(4), 1993): a synthesis mark mixes the analysis grains around its source time with a
+//    triangle one mark wide (1/ratio marks when shifting down, an anti-alias filter on the sequence of periods), so a
 //    shift repeats or skips no single period;
 //  - overlap normalised where grains overlap (upward shifts), the loudness kept: the rendered voice follows the
 //    source's level envelope (30 ms RMS) instead of PSOLA's pulse-rate law (+/- 3 dB at a fifth);
@@ -399,7 +536,8 @@ std::shared_ptr<SampleData> renderNatural (const SampleData& source, const Track
 
     const int hop = 128, unvoicedHop = std::max (16, (int) std::lround (128.0 * fs / 44100.0));
     std::vector<vocal::PitchFrame> frames;
-    const auto marks = analyse (mono, fs, frames, hop, unvoicedHop);
+    auto marks = analyse (mono, fs, frames, hop, unvoicedHop);
+    refineMarks (marks, mono);
     if (marks.empty() || frames.empty())
         return nullptr;
     const auto frameOf = [&] (double pos) {
@@ -409,7 +547,8 @@ std::shared_ptr<SampleData> renderNatural (const SampleData& source, const Track
 
     // each note's centre (its mean sung pitch) and, per frame of it, the slow part of its deviation (the drift)
     std::vector<double> centre (notes.size(), 0.0);
-    std::vector<double> slow (frames.size(), 0.0);
+    std::vector<double> slow (frames.size(), 0.0), fine (frames.size(), 0.0); // (fine: the deviation without the
+                                                                                // pitch track's frame-to-frame noise)
     {
         const auto reach = std::max (1, (int) std::lround (0.09 * fs / hop)); // ±90 ms: a 180 ms moving average
         std::vector<double> dev, w, tmp;
@@ -422,7 +561,7 @@ std::shared_ptr<SampleData> renderNatural (const SampleData& source, const Track
             for (auto f = f0; f < f1; ++f)
                 if (frames[(std::size_t) f].hz > 0.0)
                     sum += vocal::hzToNote (frames[(std::size_t) f].hz), ++count;
-            centre[k] = count > 0 ? sum / count : notes[k].origPitch;
+            centre[k] = notes[k].sungPitch > 0.0 ? notes[k].sungPitch : count > 0 ? sum / count : notes[k].origPitch;
             if (f1 <= f0)
                 continue;
             const auto m = (std::size_t) (f1 - f0);
@@ -431,6 +570,29 @@ std::shared_ptr<SampleData> renderNatural (const SampleData& source, const Track
             for (std::size_t i = 0; i < m; ++i)
                 if (const auto hz = frames[(std::size_t) f0 + i].hz; hz > 0.0)
                     dev[i] = vocal::hzToNote (hz) - centre[k], w[i] = 1.0;
+            // the deviation lightly smoothed (two passes of ±8 ms: a vibrato passes, the estimator's noise does not, so
+            // scaling the modulation does not scale the noise into roughness)
+            {
+                const auto r8 = std::max (1, (int) std::lround (0.008 * fs / hop));
+                auto d = dev;
+                for (int pass = 0; pass < 2; ++pass)
+                {
+                    tmp.assign (m, 0.0);
+                    for (std::size_t i = 0; i < m; ++i)
+                    {
+                        double s = 0.0, ws = 0.0;
+                        for (auto j = (std::ptrdiff_t) i - r8; j <= (std::ptrdiff_t) i + r8; ++j)
+                            if (j >= 0 && j < (std::ptrdiff_t) m && w[(std::size_t) j] > 0.0)
+                                s += d[(std::size_t) j], ws += 1.0;
+                        tmp[i] = ws > 0.0 ? s / ws : 0.0;
+                    }
+                    for (std::size_t i = 0; i < m; ++i)
+                        if (w[i] > 0.0)
+                            d[i] = tmp[i];
+                }
+                for (std::size_t i = 0; i < m; ++i)
+                    fine[(std::size_t) f0 + i] = d[i];
+            }
             // two passes of a moving average over the voiced frames (weights renormalised at the note's ends / gaps)
             for (int pass = 0; pass < 2; ++pass)
             {
@@ -517,7 +679,9 @@ std::shared_ptr<SampleData> renderNatural (const SampleData& source, const Track
         auto noteOf = [&] (std::size_t i) { return frames[i].hz > 0.0 ? vocal::hzToNote (frames[i].hz) : vocal::hzToNote (frames[f].hz); };
         const auto dev = (1.0 - a) * noteOf (f0) + a * noteOf (f1) - centre[k];
         const auto sl = (1.0 - a) * slow[f0] + a * slow[f1];
-        return p.drift * (p.pitchDrift * sl + p.modulation * (dev - sl)) - dev;
+        const auto fn = frames[f0].hz > 0.0 && frames[f1].hz > 0.0 ? (1.0 - a) * fine[f0] + a * fine[f1] : dev;
+        // (the noise dev - fn stays as sung: it is not scaled with the modulation)
+        return p.drift * (p.pitchDrift * sl + p.modulation * (fn - sl)) + (dev - fn) - dev;
     };
 
     auto out = std::make_shared<SampleData>();
@@ -550,8 +714,67 @@ std::shared_ptr<SampleData> renderNatural (const SampleData& source, const Track
         const auto k = (int) (it - owned.begin()) - 1;
         return t < (double) owned[(std::size_t) k].second ? k : -1;
     };
-    auto srcOf = [&] (int k, double t) { const auto& p = notes[(std::size_t) k]; return (double) p.origStart + (t - (double) p.curStart) * p.stretch; };
-    auto outOf = [&] (int k, double s) { const auto& p = notes[(std::size_t) k]; return (double) p.curStart + (s - (double) p.origStart) / p.stretch; };
+    // A stretched note holds its vowel (as PitchNet's NoteTimeMap, AGPL-3.0, SessionLoops/PitchNet, does; method
+    // reimplemented): its onset glide (the analysed smooth-in) and its unvoiced tail (the silence / consonant after the
+    // voice) keep their recorded length, the held part between takes all of the change; a note too short for that
+    // stretches evenly. Per note: the head and tail lengths (source = output samples) and the body's rate.
+    struct TimeMap
+    {
+        double head = 0.0, tail = 0.0, rate = 1.0; // rate = source samples per output sample in the body
+        bool split = false;
+    };
+    std::vector<TimeMap> maps (notes.size());
+    for (std::size_t k = 0; k < notes.size(); ++k)
+    {
+        const auto& p = notes[k];
+        auto& m = maps[k];
+        m.rate = p.stretch;
+        if (! differs (p.stretch, 1.0) || ! p.voiced())
+            continue;
+        const auto srcLen = (double) (p.origEnd - p.origStart), outLen = (double) (p.curEnd - p.curStart);
+        const auto head = std::clamp (p.origSmoothIn, 0.0, 0.25 * srcLen);
+        const auto tail = std::max (0.0, (double) (p.origEnd - p.voicedEnd()));
+        const auto bodySrc = srcLen - head - tail, bodyOut = outLen - head - tail;
+        if (bodySrc > 0.1 * srcLen && bodyOut > 0.0)
+            m = { head, tail, bodySrc / bodyOut, true };
+    }
+    auto srcOf = [&] (int k, double t) {
+        const auto& p = notes[(std::size_t) k];
+        const auto& m = maps[(std::size_t) k];
+        const auto u = t - (double) p.curStart;
+        if (! m.split)
+            return (double) p.origStart + u * p.stretch;
+        const auto outLen = (double) (p.curEnd - p.curStart);
+        if (u <= m.head)
+            return (double) p.origStart + u;
+        if (u >= outLen - m.tail)
+            return (double) p.origEnd - (outLen - u);
+        return (double) p.origStart + m.head + (u - m.head) * m.rate;
+    };
+    auto outOf = [&] (int k, double s) {
+        const auto& p = notes[(std::size_t) k];
+        const auto& m = maps[(std::size_t) k];
+        const auto v = s - (double) p.origStart;
+        if (! m.split)
+            return (double) p.curStart + v / p.stretch;
+        const auto srcLen = (double) (p.origEnd - p.origStart);
+        if (v <= m.head)
+            return (double) p.curStart + v;
+        if (v >= srcLen - m.tail)
+            return (double) p.curEnd - (srcLen - v);
+        return (double) p.curStart + m.head + (v - m.head) / m.rate;
+    };
+    // the source plays 1:1 at output time t of note k (no stretch there)
+    auto oneToOne = [&] (int k, double t) {
+        const auto& p = notes[(std::size_t) k];
+        const auto& m = maps[(std::size_t) k];
+        if (! differs (p.stretch, 1.0))
+            return true;
+        if (! m.split)
+            return false;
+        const auto u = t - (double) p.curStart;
+        return u <= m.head || u >= (double) (p.curEnd - p.curStart) - m.tail;
+    };
     auto markBefore = [&] (double src) {
         const auto it = std::upper_bound (marks.begin(), marks.end(), src, [] (double v, const Mark& m) { return v < m.pos; });
         return (std::size_t) std::max<std::ptrdiff_t> (0, (it - marks.begin()) - 1);
@@ -642,10 +865,11 @@ std::shared_ptr<SampleData> renderNatural (const SampleData& source, const Track
             const auto src = srcOf (k, ts);
             i = markBefore (src);
             const auto& m0 = marks[i];
-            const auto voiced = m0.voiced && i + 1 < marks.size() && marks[i + 1].voiced;
+            const auto voiced = m0.voiced;
+            const auto nextVoiced = i + 1 < marks.size() && marks[i + 1].voiced; // (no: the run's last period)
             if (! voiced)
             {
-                if (! differs (p.stretch, 1.0))
+                if (oneToOne (k, ts) && oneToOne (k, outOf (k, m0.pos)))
                 {
                     // unvoiced, not stretched: each mark read 1:1 at its own place (with its neighbours' windows: exact)
                     const auto t = outOf (k, m0.pos);
@@ -664,16 +888,32 @@ std::shared_ptr<SampleData> renderNatural (const SampleData& source, const Track
                 }
                 continue;
             }
-            const auto& m1 = marks[i + 1];
-            const auto period = std::max (1.0, m1.pos - m0.pos);
-            const auto alpha = std::clamp ((src - m0.pos) / period, 0.0, 1.0);
+            const auto period = nextVoiced ? std::max (1.0, marks[i + 1].pos - m0.pos) : std::max (1.0, m0.period);
+            const auto alpha = nextVoiced ? std::clamp ((src - m0.pos) / period, 0.0, 1.0) : 0.0;
             const auto semis = shiftAt ((std::size_t) k, ts) + deviationAt ((std::size_t) k, src);
             const auto r = std::exp2 (std::clamp (semis, -36.0, 36.0) / 12.0);
             const auto f = std::clamp (p.formant * track.globalFormant, 0.25, 4.0);
-            if (alpha < 1.0 - 1e-9)
-                grain (i, ts, m0.pos, i > 0 ? gap (i - 1) : gap (i), gap (i), f, (float) (1.0 - alpha));
-            if (alpha > 1e-9)
-                grain (i + 1, ts, m1.pos, gap (i), gap (i + 1), f, (float) alpha);
+            // the grain: the analysis grains around the source position mixed by a triangle `reach` marks wide (one
+            // mark either side; wider when shifting down, where each synthesis mark moves the source on by more than a
+            // period: the cycle-to-cycle variation is then low-passed instead of aliased into a rough under-tone)
+            {
+                const auto reach = std::max (1.0, 1.0 / r);
+                const auto at = (double) i + alpha; // in marks
+                const auto lo = (std::ptrdiff_t) std::ceil (at - reach + 1e-9), hi = (std::ptrdiff_t) std::floor (at + reach - 1e-9);
+                double total = 0.0;
+                for (auto j = std::max<std::ptrdiff_t> (0, lo); j <= std::min<std::ptrdiff_t> ((std::ptrdiff_t) marks.size() - 1, hi); ++j)
+                    if (marks[(std::size_t) j].voiced)
+                        total += 1.0 - std::abs ((double) j - at) / reach;
+                for (auto j = std::max<std::ptrdiff_t> (0, lo); j <= std::min<std::ptrdiff_t> ((std::ptrdiff_t) marks.size() - 1, hi); ++j)
+                {
+                    const auto& mj = marks[(std::size_t) j];
+                    const auto wj = 1.0 - std::abs ((double) j - at) / reach;
+                    if (! mj.voiced || wj <= 1e-9 || total <= 0.0)
+                        continue;
+                    const auto jj = (std::size_t) j;
+                    grain (jj, ts, mj.pos, jj > 0 ? gap (jj - 1) : gap (jj), gap (jj), f, (float) (wj / total));
+                }
+            }
             auto next = ts + period / r;
             // (into an unvoiced stretch: go on from its first mark's own place)
             if (const auto k2 = ownerOf (next); k2 >= 0)
@@ -1134,7 +1374,14 @@ Track analyseNotes (const SampleData& source, const AnalyseOptions& options)
 
     const int hop = std::max (64, (int) std::lround (256.0 * fs / 44100.0));
     // (round 190kj: a looser voicing threshold than the tuner's 0.15, so rough and low voices stay voiced as in FL)
-    const auto frames = vocal::analysePitch (mono.data(), (int) n, fs, hop, 60.0, 1000.0, 0.3f);
+    auto frames = vocal::analysePitch (mono.data(), (int) n, fs, hop, 60.0, 1000.0, 0.3f);
+    if (options.octaveGuard)
+    {
+        const auto strict = vocal::analysePitch (mono.data(), (int) n, fs, hop, 60.0, 1000.0, 0.15f);
+        for (std::size_t k = 0; k < frames.size() && k < strict.size(); ++k)
+            if (frames[k].hz > 0.0 && strict[k].hz > 0.0 && std::abs (std::log2 (frames[k].hz / strict[k].hz)) > 0.5)
+                frames[k].hz = strict[k].hz;
+    }
     float loudest = 0.0f;
     for (const auto& f : frames)
         loudest = std::max (loudest, f.level);
@@ -1285,6 +1532,14 @@ Track analyseNotes (const SampleData& source, const AnalyseOptions& options)
             --k;
         p.smoothIn = p.origSmoothIn = in;
         p.smoothOut = p.origSmoothOut = (double) (r.b - k) * hop; // + the silence after the voice (below)
+        {
+            double sum = 0.0;
+            int count = 0;
+            for (auto j = settle; j < std::max (settle, k); ++j)
+                if (note[j] >= 0.0)
+                    sum += note[j], ++count;
+            p.sungPitch = count > 0 ? sum / count : target;
+        }
         out.push_back (p);
     }
     if (! out.empty() && out.front().origStart > 0)
@@ -1392,12 +1647,16 @@ bool glueNote (Track& track, std::size_t k)
 void applyCentre (Track& track, double amount, const std::vector<int>& which)
 {
     amount = std::clamp (amount, 0.0, 1.0);
-    forNotes (track, which, [amount] (Note& p) {
+    // (engine 1: the note's sung centre instead of FL's origPitch, whose whole-sample periods read sharp by up to
+    // ~10 cents and whose median takes in the glides)
+    const auto natural = track.engine >= 1;
+    forNotes (track, which, [amount, natural] (Note& p) {
         if (p.origPitch <= 0.0)
             return;
-        const auto target = std::round (p.origPitch + p.shift);      // the semitone the note is on now
-        const auto detune = p.origPitch - std::round (p.origPitch); // how far it was sung from its own semitone
-        p.shift = target - p.origPitch + (1.0 - amount) * detune;
+        const auto pitch = natural && p.sungPitch > 0.0 ? p.sungPitch : p.origPitch;
+        const auto target = std::round (pitch + p.shift);  // the semitone the note is on now
+        const auto detune = pitch - std::round (pitch);    // how far it was sung from its own semitone
+        p.shift = target - pitch + (1.0 - amount) * detune;
     });
     if (which.empty())
         track.centre = amount;
@@ -1783,6 +2042,7 @@ std::vector<std::uint8_t> writeNative (const Track& track, std::uint32_t version
         {
             put (out, p.modulation);
             put (out, p.pitchDrift);
+            put (out, p.sungPitch);
         }
     }
     return out;
@@ -1842,6 +2102,7 @@ std::optional<Track> parseNative (const std::vector<std::uint8_t>& state)
         {
             p.modulation = r.get<double>();
             p.pitchDrift = r.get<double>();
+            p.sungPitch = r.get<double>();
         }
         t.pitches.push_back (p);
     }

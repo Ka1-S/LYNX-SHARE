@@ -169,9 +169,17 @@ def align(render, ideal, max_lag=int(0.12 * SR)):
 
 
 # ------------------------------------------------------------------------------------------------------------- scores
+ALIGN = False   # (renders are sample-aligned: LYNX by construction, Melodyne's exports checked with an unedited one;
+                #  the envelope alignment mis-locked by 0.5-15 ms on pitch-shifted renders. --align turns it on.)
+
+
 def score(render, ideal, truth):
     hop = truth['hop']
-    render, lag = align(render, ideal)
+    if ALIGN:
+        render, lag = align(render, ideal)
+    else:
+        lag = 0
+        render = np.pad(render, (0, max(0, len(ideal) - len(render))))[:len(ideal)]
     f0c = truth['f0_cents']
     notes = truth['notes']
     peak = max(1e-9, np.sqrt(np.convolve(ideal ** 2, np.ones(960) / 960, 'same')).max())
@@ -371,6 +379,9 @@ def table(results):
 
 
 if __name__ == '__main__':
+    if '--align' in sys.argv:
+        ALIGN = True
+        sys.argv.remove('--align')
     if len(sys.argv) > 1 and sys.argv[1] == 'run':
         run(sys.argv[2:])
     elif len(sys.argv) > 3 and sys.argv[1] == 'score':
