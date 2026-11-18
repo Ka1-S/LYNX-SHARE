@@ -17780,6 +17780,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Parity190lfTests.inc" // round 190lf: the Limiter's L2 law (REA of the Waves L2 DSP), L2 on it; PuigTec EQP1A on Facet EQ
 #include "Parity190lfDynTests.inc" // round 190lf (dyn): Glow Leveler's cell law (REA of the Waves CLA-2A), CLA-2A on it
 #include "Parity190lfVerbTests.inc" // round 190lf (verb): H-Delay's measured loop (Echoform hybrid law 1), TrueVerb's direct sound
+#include "Parity190lfNs1Tests.inc" // round 190lf (ns1): Quell's zero law (REA of the Waves NS1: 0 % = its bare all-pass pair), NS1 on it
 #include "Sampler190dhTests.inc"
 #include "Fix190eaTests.inc"
 #include "Iss158Tests.inc"

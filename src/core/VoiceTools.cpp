@@ -197,8 +197,10 @@ public:
     }
     // in place; returns the mean reduction (dB) of the block for the meter. `tr` = the noise-floor tracker (round
     // 190dp), nullptr = round 124's fixed thresholds (bit for bit)
-    double process (float* l, float* r, int n, double amt, bool listenOnly, float out, const Track* tr = nullptr) noexcept
+    double process (float* l, float* r, int n, double amt, bool listenOnly, float out, const Track* tr = nullptr, bool zero = false) noexcept
     {
+        // round 190lf (zeroLaw): the engine's share over the bare all-pass pair (1 = the engine alone, as before)
+        const auto wet = zero && amt < zeroFade ? std::max (0.0, amt) / zeroFade : 1.0;
         if (tr != nullptr && (tr != trackDesigned || amt != trackAmount))
             designTrack (*tr, amt);
         const int nb = fit.bands + 2;
@@ -289,6 +291,8 @@ public:
                 for (int b = 0; b < fit.bands; ++b)
                     o = peaking[(std::size_t) b].run (o, c);
                 o = hsh.run (lsh.run (o, c), c);
+                if (wet < 1.0)
+                    o = a[c] + (o - a[c]) * wet; // round 190lf: 0 % = exactly the all-pass pair
                 // Listen: what is taken away (the open chain minus the processed one)
                 const auto y = listenOnly ? a[c] - o : o;
                 (c == 0 ? l[i] : r[i]) = (float) y * out;
@@ -431,7 +435,7 @@ public:
                 matchedEngine.prepare (sr);
                 matchedOn = true;
             }
-            const auto red = matchedEngine.process (l, r, n, amt, listenOnly, out, on (p[law]) ? &track : nullptr);
+            const auto red = matchedEngine.process (l, r, n, amt, listenOnly, out, on (p[law]) ? &track : nullptr, on (p[zeroLaw]));
             meter[0].store ((float) std::clamp (red / 30.0, 0.0, 1.0), std::memory_order_relaxed);
             return;
         }
