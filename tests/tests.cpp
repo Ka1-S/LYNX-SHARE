@@ -17825,6 +17825,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Parity190ktTests.inc" // round 190kt: REA of the Waves SSLComp DSP, Crest's console law, SSLComp on Crest
 #include "Parity190lbTests.inc" // round 190lb: black-box study (no decryption); SSL 4K G Pink EQ + output ceiling
 #include "Harrison190leTests.inc" // round 190le: Ridge Strip's 32C voicing (Harrison 32Classic EQ law)
+#include "Parity190kyTests.inc" // round 190ky: Crest's FET law (REA of the Waves CLA-76 DSP), CLA-76 on it
 #include "Sampler190dhTests.inc"
 #include "Fix190eaTests.inc"
 #include "Iss158Tests.inc"

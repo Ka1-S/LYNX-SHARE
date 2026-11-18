@@ -4245,3 +4245,50 @@ Gate: old projects `lab/gold.sh` (base = round 190lb's fxrender): every strip wh
 Foil Plate as the role preset and at defaults; 44.1 / 48 / 96 kHz: **666 renders, 0 mismatches**. CPU (one binary, 280 s
 programme, user seconds best of 5): old translation vs 32C voicing 3.02 / 2.93 (S1), 5.97 / 5.88 (S3), 2.86 / 2.95 (S2):
 no measurable difference (same section count; the coefficients are designed once per block). Latency 0.
+
+## Round 190ky: REA of the Waves DSP, second pass — Crest's FET law, Waves CLA-76 on it
+
+Round 190kt's path (the Waves V17 DSP DLLs are small and unwrapped) applied to the brief's list in order of use. Evidence
+and method: `docs/analise/REA_rodada190ky.md`. CLA-76 was read completely (DSP and the control DLL's coefficient
+setters): a FET **feedback** limiter — the side chain hears the gained output, three parallel peak followers with their
+own attack / release times and weights (set by the attack knob) sum into the FET's control voltage, which reads a
+per-ratio transfer table. CLA-2A (a circuit-level opto model) and L2 (a look-ahead brickwall with a CIC-smoothed gain and
+a table-driven programme release) were read for structure only; RVerb, H-Delay, PuigTec were not reached.
+
+**Crest Compressor — the FET law** (hidden `fetLaw`, past Crest's info and past `busLaw`: no control, no string; 0 for new
+instances and every project saved before). The detector hears the input × the gain applied now; two (of three) peak
+followers sum into a control level; the gain (dB) is `−S1·W1·softplus((L − T1)/W1) − S2·W2·softplus((L − T2)/W2)`, floored
+at −range; a fixed wet-path tone (two first-order shelves). Ten voicings (Blacky / Bluey × 20 / 12 / 8 / 4 / all) carry
+the second term, the followers' multiples and weights; threshold, ratio, knee, attack and release keep their knobs.
+LYNX's analytic law replaces the reference's tables (not read out); every constant is fitted on our demo-mode probes
+(`/mnt/e/lynx-work/waves190ky/cap`, mutes masked, a 1.5 s silent lead against the host's reset ramps).
+
+**Waves CLA-76 → Crest's FET law** (was the Bus style fitted around one factory state, rounds 127 / 148 / 190jh). Input
+and Output through their measured gains (the Output knob is far from its dB scale: −30 → −24 is +9.7 dB, −6 → 0 is
++0.9 dB); Input moves the threshold, both plus the voicing's small-signal gain make up the compressed path; attack /
+release per ratio group (20 / 12 / 8, 4, all); revision, comp off, mix (inside Crest: the dry path is the plain input)
+and trim.
+
+| reference → LYNX | bank | files | before → after | up / same / down |
+|---|---|---|---|---|
+| CLA-76 → Crest (FET law) | refcap182 programme | 25 | 4.16 → **6.92** | 21 / 3 / 1 |
+
+Per setting: D 5.6 → 7.6, X1 5.6 → 7.4, X2 4.0 → 6.6, X3 (all buttons, 40 % mix) 1.0 → 7.8, X4 (Bluey 12:1) 4.6 → 5.2.
+The one file down, X1_mix 8 → 7: its waveform match improved (ESR −23.9 → −28.1 dB) but its third-octave error moved from
+0.14 to 0.19 dB, over the score's 0.15 dB step. Owner decision 1 below. The 4:1 timing was refined on two of the five
+scored settings (D, X1; fit76p.py); 8:1, Bluey 12:1 and all buttons rest on the probes only.
+
+**Old projects.** The FET law runs only with `fetLaw` > 0, which only the CLA-76 translator sets. `lab/gold.sh` (base =
+rea190kt's binary): Crest at all 11 styles × 2 settings (+ auto release), the Bus default, the console law
+(SSLComp state and busLaw by hand), 44.1 / 48 / 96 kHz × 3 programme signals: 225 renders, 0 differ.
+
+**CPU** (`cpu/bench.log`, 35 s stereo at 48 kHz incl. file I/O, best of 5 on one core, under load ~22, so ±30 %):
+CLA-76 X1 / X3 states 0.91 / 0.86 s (old translation, Crest's Bus style) → 1.27 / 1.17 s (the FET law): about +1 % of a
+core per CLA-76 instance. No latency.
+
+**Tests:** `tests/Parity190kyTests.inc` (4) and `Vmatch127Tests.inc`'s CLA-76 expectations (now the FET law); the mini runner (190kt's list
++ the round's) 543 827 checks, 0 failures. No full Linux / Windows build, no --selftest (no UI change).
+
+**Still off:** the amplifier / output saturation stage, the analog noise and hum, auto make-up, the reset ramps (host
+artefacts in refcap182's first second); X4 (Bluey 12:1) stays at 5 (its release scaling is a model, no Bluey 12:1 step
+probe); CLA-2A, L2, RVerb, H-Delay, PuigTec, Valhalla FutureVerb and Slate / Eiosis not refit (REA_rodada190ky §5–§7).

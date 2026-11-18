@@ -482,9 +482,10 @@ product = CLA-76
 vendor = Waves
 lynx = Crest Compressor
 waves = CLA-76
-# round 127: LYNX's style compressor fitted to the official trial at her one state (the factory "Start Me Up":
-# Input -8.7 dB, Output -16.9 dB, attack 4.3, release 4.31, all buttons, Mix 41.3 %); the RealWorld list is
-# translated (REA_rodada127 §3). Without a readable state: a light 4:1 at Waves' defaults
+# round 190ky: Crest's FET law (a feedback limiter, LYNX's own model of the structure REA showed in the reference's DSP,
+# fitted on our demo-mode probes: docs/PARITY.md "Round 190ky", docs/analise/REA_rodada190ky.md); the RealWorld list is
+# translated (Input / Output by their measured gains, attack, release, ratio, revision, comp off, mix, trim). Was the Bus
+# style fitted around one factory state (rounds 127 / 148 / 190jh). Without a readable state: a light 4:1 at Waves' defaults
 translate = waves-cla-76
 preset = Style=0.9; Threshold=0.6; Ratio=0.546; Knee=0.13; Range=0.53; Auto gain=1
 
@@ -1865,18 +1866,58 @@ int translateWavesCla2a (const std::vector<std::uint8_t>& state, EffectSlot& slo
 }
 
 // CLA-76 (106 values): 0 / 1 Input / Output as positive dB magnitudes (−0 … −∞ dB), 2 / 3 Attack / Release knobs
-// 1 … 7, 59 Ratio (0 = 20, 1 = 12, 2 = 8, 3 = 4, 4 = all buttons), 103 Mix %. [EXEC] Read back through the trial's own
-// parameter API with her state loaded (REA_rodada127 §3). Her only state was rendered on the official trial (mix 0 /
-// 100 / 41.3 %: the mix is a linear dry / wet blend, the dry path is exact) and Crest fitted to its wet path: Bus
-// style, threshold −43.7 dB, 7.1:1, 9.3 dB knee, 31.9 dB range (the FET's gain-reduction ceiling), attack 5.9 ms,
-// release 97 ms, +31.6 dB (the all-buttons wet path's small-signal gain) — on her take the null went from −11.5 dB
-// (2:1 Compressor) to −19.9 dB. Other settings move around that point by the manual's laws [model]: the input level
-// moves the threshold and the wet gain dB for dB, the output the wet gain, attack 800 → 20 µs and release
-// 1100 → 50 ms log-spaced over the knobs 1 … 7, the ratio buttons as labelled; the mix becomes the slot's dry / wet.
-// Round 148 (the Waves trial in full, no demo mutes; REA_rodada148 §5): her state re-rendered on her three whole takes
-// and Crest refitted on them (Nelder–Mead on the waveform null): threshold −55.4 dB, 2.8:1 (all buttons), knee 24.8 dB,
-// range 31.5 dB, attack 1.56 ms, release 2.5 s (Crest's longest: the reference's all-buttons release is slow) — null
-// go / kwe / lu −13.0 / −7.9 / −10.2 → −25.4 / −19.2 / −21.8 dB, 1/3-octave error 3.3–3.9 → 0.5–1.0 dB.
+// 1 … 7, 4 Comp off, 56 Revision (0 Bluey, 1 Blacky), 59 Ratio (0 = 20, 1 = 12, 2 = 8, 3 = 4, 4 = all buttons),
+// 103 Mix %, 104 Trim dB. [EXEC] Read back through the trial's own parameter API (REA_rodada127 §3); 4 / 56 / 104 by
+// the bundle's parameter list (REA_rodada190ky §2).
+// Rounds 127 / 148 / 190jh fitted Crest's Bus style around the reference's one factory state; round 190ky replaces that
+// with Crest's FET law (DynamicsSuite.h fetLaw: LYNX's own model of the structure REA showed in the reference's DSP,
+// every constant fitted on our demo-mode probes, waves190ky/lab: fit76s.py on 1 kHz stairs at 5 ratio settings × 3 input
+// levels and the Input sweep, fit76t.py on level steps and release probes per knob, fit76io.py on the Input / Output
+// sweeps). The voicing carries the second term and the followers; the knobs here carry the rest:
+//   - Input and Output are attenuators whose real gain departs from their dB scale (the Output knob far from it: −30 →
+//     −24 dB is +9.7 dB, −6 → 0 dB +0.9 dB): our measured gains, interpolated; Input lowers the detector's threshold,
+//     and both plus the voicing's small-signal gain are the compressed path's make-up;
+//   - attack / release (1 … 7, 7 = fastest): the slow follower's attack and half the fast follower's release, geometric
+//     over the knob; two followers fitted per knob on the level steps and release probes at 4:1 (fit76r.py: 20 / 12 /
+//     8), jointly on the probes and refined on refcap182's 4:1 programme (fit76j.py, fit76p.py: 4) and jointly on the
+//     all-buttons probes (fit76jA.py); the voicing holds the other follower's multiples and the weights;
+//   - the mix (linear, as measured in round 127) and the trim: Crest's mix and output (consoleMix), the slot at 100 %.
+struct Cla76Fit { double t1, w1, s1, plateauDb; };
+struct Cla76Times { double attack1, attack7, release1, release7; }; // ms at knob 1 and knob 7
+// fit76:begin (CLA76FITS: lab/gen76.py)
+constexpr Cla76Fit cla76Fits[10] {
+    { -20.0555, 0.1526, 11.9590, -4.94 }, // Blacky 20 (law at -40 dBFS: -0.00 dB)
+    { -21.6982, 0.1045, 8.5697, -4.94 }, // Blacky 12 (law at -40 dBFS: -0.00 dB)
+    { -22.7854, 0.1099, 5.5674, -4.94 }, // Blacky 8 (law at -40 dBFS: -0.00 dB)
+    { -24.7504, 0.1128, 3.6843, -4.94 }, // Blacky 4 (law at -40 dBFS: 0.00 dB)
+    { -23.2310, 0.1762, 10.9191, -3.53 }, // Blacky A (law at -40 dBFS: -0.00 dB)
+    { -24.9258, 0.2195, 18.2726, -1.71 }, // Bluey 20 (law at -40 dBFS: -0.00 dB)
+    { -26.5097, 0.2127, 11.3739, -1.71 }, // Bluey 12 (law at -40 dBFS: -0.00 dB)
+    { -28.3762, 0.1074, 6.5792, -1.71 }, // Bluey 8 (law at -40 dBFS: -0.00 dB)
+    { -31.3386, 0.1073, 3.5943, -1.71 }, // Bluey 4 (law at -40 dBFS: 0.00 dB)
+    { -27.7634, 0.1384, 11.2319, -1.06 }, // Bluey A (law at -40 dBFS: -0.00 dB)
+};
+constexpr Cla76Times cla76Times[3] { // the slow follower's attack and half the fast follower's release (ms) at knob 1 / 7
+    { 11.8931, 5.4866, 247.8996, 30.3698 }, // 20 / 12 / 8 (fit76r.py)
+    { 29.6727, 0.6607, 1039.0365, 132.2632 }, // 4 (fit76j.py, fit76p.py)
+    { 5.2967, 0.1560, 1847.6547, 33.0881 }, // all buttons (fit76jA.py)
+};
+constexpr double cla76RangeDb = 40.0;
+constexpr int cla76InPoints = 14, cla76OutPoints = 12;
+constexpr double cla76InLabel[cla76InPoints] { -48.0, -42.0, -36.0, -33.0, -30.0, -27.0, -24.0, -21.0, -18.0, -15.0, -12.0, -9.0, -6.0, 0.0 };
+constexpr double cla76InGain[cla76InPoints] { -22.10, -17.44, -13.53, -10.06, -5.95, -2.62, 0.00, 4.29, 6.85, 9.21, 12.21, 15.81, 18.81, 24.81 }; // dB from the −24 dB mark (−6 / 0: extrapolated)
+constexpr double cla76OutLabel[cla76OutPoints] { -48.0, -36.0, -33.0, -30.0, -27.0, -24.0, -21.0, -18.0, -15.0, -12.0, -6.0, 0.0 };
+constexpr double cla76OutGain[cla76OutPoints] { -29.68, -14.69, -6.62, 0.00, 5.56, 9.66, 13.27, 17.07, 20.96, 24.17, 28.57, 29.47 }; // dB from the −30 dB mark
+// fit76:end
+double cla76Interp (double x, const double* xs, const double* ys, int n)
+{
+    if (x <= xs[0])
+        return ys[0] + (x - xs[0]) * (ys[1] - ys[0]) / (xs[1] - xs[0]);
+    for (int i = 1; i < n; ++i)
+        if (x <= xs[i])
+            return ys[i - 1] + (ys[i] - ys[i - 1]) * (x - xs[i - 1]) / (xs[i] - xs[i - 1]);
+    return ys[n - 1];
+}
 int translateWavesCla76 (const std::vector<std::uint8_t>& state, EffectSlot& slot)
 {
     namespace c = dyn::crest;
@@ -1885,30 +1926,43 @@ int translateWavesCla76 (const std::vector<std::uint8_t>& state, EffectSlot& slo
     if (slot.kind != EffectKind::crestCompressor || ! in || ! out)
         return 0;
     const auto at = [&] (std::size_t i, double fallback) { return wavesValue (rw, i).value_or (fallback); };
-    const auto inDb = -std::clamp (*in, 0.0, 120.0), outDb = -std::clamp (*out, 0.0, 120.0);
+    const auto inDb = -std::clamp (*in, 0.0, 60.0), outDb = -std::clamp (*out, 0.0, 60.0);
     const auto attackKnob = std::clamp (at (2, 3.0), 1.0, 7.0), releaseKnob = std::clamp (at (3, 4.0), 1.0, 7.0);
-    const auto attackLaw = [] (double k) { return 0.8 * std::pow (0.02 / 0.8, (k - 1.0) / 6.0); };
-    const auto releaseLaw = [] (double k) { return 1100.0 * std::pow (50.0 / 1100.0, (k - 1.0) / 6.0); };
-    static constexpr double ratios[5] { 20.0, 12.0, 8.0, 4.0, 2.8 };
     const int ratioIndex = std::clamp ((int) std::lround (at (59, 3.0)), 0, 4);
+    const bool bluey = at (56, 1.0) < 0.5, off = at (4, 0.0) >= 0.5;
+    const int voice = (bluey ? 5 : 0) + ratioIndex;
+    const auto& f = cla76Fits[voice];
     auto& p = slot.params;
     p[c::style] = c::styleValue (c::Style::bus);
-    p[c::threshold] = linNorm (-55.4 - (inDb + 8.7), -60.0, 0.0);
-    p[c::ratio] = c::ratioValue (ratios[ratioIndex]);
-    p[c::knee] = linNorm (24.8, 0.0, 72.0);
-    p[c::range] = linNorm (31.5, 0.0, 60.0);
-    p[c::attack] = c::attackValue (1.56 * attackLaw (attackKnob) / attackLaw (4.3));
-    p[c::release] = c::releaseValue (std::min (2500.0, 2500.0 * releaseLaw (releaseKnob) / releaseLaw (4.31)));
+    p[c::voicing] = 0.0f;
+    p[c::busLaw] = 0.0f;
+    p[c::fetLaw] = c::fetLawValue (voice);
+    p[c::ratio] = c::ratioValue (1.0 + f.s1);
+    p[c::knee] = linNorm (f.w1, 0.0, 72.0);
+    p[c::range] = off ? 0.0f : linNorm (cla76RangeDb, 0.0, 60.0);
+    // the knobs' times, geometric between knob 1 and knob 7 (20 / 12 / 8, 4 and all buttons each their own)
+    const auto& t = cla76Times[ratioIndex == 4 ? 2 : ratioIndex == 3 ? 1 : 0];
+    p[c::attack] = c::attackValue (t.attack7 * std::pow (t.attack1 / t.attack7, (7.0 - attackKnob) / 6.0));
+    p[c::release] = c::releaseValue (t.release7 * std::pow (t.release1 / t.release7, (7.0 - releaseKnob) / 6.0));
     p[c::autoRelease] = 0.0f;
+    p[c::hold] = p[c::lookahead] = p[c::maxLookahead] = 0.0f;
+    p[c::character] = 0.0f;
+    p[c::oversampling] = 0.0f;
     p[c::autoGain] = 0.0f;
-    p[c::mix] = 1.0f;
-    // round 190jh [EXEC] (refcap182's CLA-76 programme captures: D, X1 at 4:1, X2 at 8:1, X4 at 12:1, all at 100 % mix): with a
-    // single ratio button the reference's wet path stands higher than the all-buttons fit puts it — Crest's output +7.7 /
-    // +11 / +10.2 dB at 4 / 8 / 12 (and 20) : 1 (refcap182 D / X1 / X2 / X4, 20 files: 1.00 → 4.95); the all-buttons fit is unchanged
-    static constexpr double singleButtonDb[4] { 10.2, 10.2, 11.0, 7.7 };
-    p[c::output] = linNorm (31.5 + (inDb + 8.7) + (outDb + 16.9) + (ratioIndex < 4 ? singleButtonDb[ratioIndex] : 0.0), -36.0, 36.0);
-    slot.mix = (float) std::clamp (at (103, 100.0) / 100.0, 0.0, 1.0);
-    return 11;
+    p[c::autoThreshold] = 0.0f;
+    p[c::stereoLink] = 1.0f; // [EXEC] linked: a loud left channel reduces the right as much (d76_L_r4)
+    p[c::linkMode] = c::linkModeValue (c::LinkMode::stereo);
+    for (int b = 0; b < c::scBands; ++b)
+        p[c::scParam (b, 0)] = facet::shapeValue (facet::Shape::off);
+    // the Input knob's gain moves the detector's threshold (the dry path stays the plain input); its gain, the Output
+    // knob's and the voicing's small-signal gain act on the compressed path only, blended with the dry input at the mix
+    // and trimmed (Crest's mix and output carry it, as for SSLComp)
+    const auto inGain = cla76Interp (inDb, cla76InLabel, cla76InGain, cla76InPoints);
+    const auto outGain = cla76Interp (outDb, cla76OutLabel, cla76OutGain, cla76OutPoints);
+    p[c::threshold] = linNorm (f.t1 - inGain, -60.0, 0.0);
+    consoleMix (p, at (103, 100.0) / 100.0, inGain + outGain + f.plateauDb, at (104, 0.0));
+    slot.mix = 1.0f;
+    return 13;
 }
 
 // round tp172c5: Harrison 32Classic Channel Strip and Harrison MPC Channel Strip -> Ridge Strip's own engine (brown EQ
