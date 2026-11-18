@@ -4334,6 +4334,7 @@ countries: cn sg
 "Measured effect characters" = "实测效果特性"
 "Brown|Black|Orange" = "Brown|Black|Orange"
 "4K console" = "4K调音台"
+"32C console" = "32C调音台"
 "Mic pre" = "话放"
 "Mic" = "麦克风"
 "Vocal detector" = "人声检测器"

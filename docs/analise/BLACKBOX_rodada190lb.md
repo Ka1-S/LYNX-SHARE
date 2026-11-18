@@ -163,6 +163,11 @@ dial stops at 450 Hz). Two ways (owner decision, §11): **(a, recommended)** a "
 Strip with its own ranges and read-outs, as the 4K and Modern voicings have; (b) hidden per-band frequencies set by the
 translation (the visible dials would no longer drive those bands — not recommended).
 
+**Built in round 190le** (owner decision 3, recommended option): Ridge Strip's "32C" voicing — Ridge's own engine with
+this law (Lo shelf bilinear prewarped at its centre, Hi shelf magnitude-matched at DC / centre / Nyquist, Vicanek-matched
+bells and Butterworth filters), the original's own dial scales (the host table's texts) and read-outs, a hidden parameter
+with its own panel switch. H32_eq 5.36 → 9.99, curve error 1.15 → 0.00 dB rms. `docs/PARITY.md`, round 190le.
+
 ## 5. LiquidSonics Lustrous Plates — parameter laws and state (spec)
 ### 5.1 API (refcap0124 host table)
 Master Gain −20 … +20 dB (linear); Dry/Wet "Dry" … "Equal Mix" … "Wet" (default Wet); Plate Model 25 steps (Chrome,
@@ -185,6 +190,8 @@ roughly constant in frequency, so the high end is dense from the start and there
 just under 1 s to ~5 s, varying by band, and a low-frequency onset ~10 ms later than the highs (dispersion)
 ([Lustrous Plates manual](https://www.falkemedia-shop.de/media/pdf/b4/00/f4/Lustrous_Plates_ManualCddKXRlmsIyQw.pdf)).
 ### 5.4 Why no translator this round
+(Round 190le: 190bz is in; the translator was built on round 190ca's physical Foil fit, which runs on Foil's Classic
+law — untouched by 190bz — so it needed no refit. `docs/PARITY.md`, round 190le.)
 Today the role preset plays (Foil Plate, Decay 0.3, 25 % wet). A translator needs Damper → Foil decay and model → Foil type
 per band, calibrated on Foil's wet law, which round 190bz is changing (`/mnt/e/lynx-work/nebula190ca/HANDOFF.md`: all Foil maps
 need a refit after 190bz lands); its only scorable references with states are refcap182's 20 programme files (the tp172c

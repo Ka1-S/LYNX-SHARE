@@ -437,6 +437,12 @@ public:
                 setParams (edits);
                 return;
             }
+        if (kind == EffectKind::ridgeStrip) // round 190le: the 32C voicing and the console voicings exclude each other
+            if (const auto edits = mixsuite::ridge::linkedEdit (current()->params, param, value); edits.size() > 1)
+            {
+                setParams (edits);
+                return;
+            }
         if (kind == EffectKind::ember) // round 165: the Classic voicing's Auto moves Output with Drive
             if (const auto edits = mixsuite::ember::linkedEdit (current()->params, param, value); edits.size() > 1)
             {

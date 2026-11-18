@@ -5,6 +5,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstring>
+#include <functional>
 #include <initializer_list>
 #include <limits>
 #include <map>
@@ -17,6 +18,7 @@
 #include "core/FlPluginDb.h"
 #include "core/FlWrapper.h"
 #include "core/LynxTune.h"
+#include "core/LynxVerbs.h"
 #include "core/MixSuite.h"
 #include "core/VocalPitch.h"
 #include "core/VoiceTools.h"
@@ -687,6 +689,9 @@ lynx = Foil Plate
 names = Lustrous Plates; Seventh Heaven; Seventh Heaven Professional; Cinematic Rooms; Cinematic Rooms Professional; Illusion; VerbSuite Classics; SSL Native FlexVerb; SSL PlateVerb; SSL SpringVerb; SSL GateVerb; smartreverb2; smartreverb; pureverb; learnreverb; Vocal Reverb
 preset = Decay=0.3; Mix=1; Law=0
 mix = 0.25
+# round 190le: a Lustrous Plates state (its plain ValueTree) gets round 190ca's fitted Foil setting (translateLustrousPlates);
+# the other devices keep the role preset or their default line below
+translate = lustrous-plates
 # round 190ca: four of these devices at their own default setting, from Foil setting maps fitted on physical measurements of
 # each device's probe renders (decay per band, onset, dry gain, wet energy and band balance, echo density, L/R correlation,
 # band limit; the lab folder nebula190ca/maps, fitverb.py). FlexVerb and VerbSuite default to 100 % wet, the two SSL plates
@@ -1928,36 +1933,11 @@ double interp (double x, std::initializer_list<double> xs, std::initializer_list
 }
 double lg (double hz) { return std::log (std::max (hz, 1.0)); }
 
-// bells: the dial's gain; Q 0.5 (Ridge's widest) for small gains up to 0.75 at full gain
+// bells (the MPC's bands on Ridge's own curve): Q 0.5 (Ridge's widest) for small gains up to 0.75 at full gain
 double bellQ (double gainDb) { return interp (std::abs (gainDb), { 0.0, 7.0, 13.74 }, { 0.5, 0.55, 0.75 }); }
 
-// the 32C's low shelf (dial 19 .. 800 Hz): Ridge's corner and plateau at full gain, scaled for smaller gains
-void lowShelf (double hz, double gainDb, double& ridgeHz, double& ridgeDb)
-{
-    const auto x = lg (hz);
-    const std::initializer_list<double> f { lg (18.95), lg (58.81), lg (111.35), lg (369.3), lg (798.7) };
-    const auto fullHz = std::exp (interp (x, f, { lg (51.0), lg (111.4), lg (174.2), lg (887.5), lg (1593.0) }));
-    const auto fullDb = interp (x, f, { 6.65, 10.8, 11.67, 12.73, 12.87 });
-    const auto a = std::abs (gainDb);
-    ridgeDb = std::copysign (fullDb * interp (a, { 0.0, 2.49, 6.94, 13.74 }, { 0.0, 0.307, 0.709, 1.0 }), gainDb);
-    ridgeHz = fullHz * interp (a, { 2.49, 6.94, 13.74 }, { 0.93, 0.96, 1.0 });
-}
-
-// the 32C's high shelf (dial 690 Hz .. 14.5 kHz): boost and cut differ
-void highShelf (double hz, double gainDb, double& ridgeHz, double& ridgeDb)
-{
-    const auto x = lg (hz);
-    const std::initializer_list<double> f { lg (689.0), lg (1389.5), lg (3619.0), lg (9021.6), lg (14497.5) };
-    const bool boost = gainDb >= 0.0;
-    const auto fullHz = std::exp (boost ? interp (x, f, { lg (362.6), lg (1286.4), lg (2104.8), lg (4212.6), lg (5744.7) })
-                                        : interp (x, f, { lg (382.4), lg (1406.5), lg (2363.2), lg (4995.4), lg (6982.4) }));
-    const auto fullDb = boost ? interp (x, f, { 12.52, 11.79, 11.16, 9.19, 7.38 }) : interp (x, f, { 13.05, 12.71, 12.40, 11.27, 10.02 });
-    const auto a = std::abs (gainDb);
-    ridgeDb = std::copysign (fullDb * (boost ? interp (a, { 0.0, 2.49, 6.94, 13.74 }, { 0.0, 0.274, 0.694, 1.0 })
-                                             : interp (a, { 0.0, 2.49, 6.94, 13.74 }, { 0.0, 0.341, 0.722, 1.0 })), gainDb);
-    ridgeHz = fullHz * (boost ? interp (a, { 2.49, 6.94, 13.74 }, { 0.948, 1.008, 1.0 }) : interp (a, { 2.49, 6.94, 13.74 }, { 1.16, 1.042, 1.0 }));
-}
-
+// (round 190le: the 32C's shelves and filters play in Ridge's 32C voicing since; the corner / plateau fits of tp172c5 that
+// played them on the brown curve are gone. The filter laws below still serve the MPC's high- / low-pass shapes.)
 // the 32C's filters: high-pass 12 dB/oct (Ridge's 18 dB/oct one a little lower), low-pass 12 dB/oct (as measured)
 double hpfHz (double hz) { return hz * std::exp (interp (lg (hz), { lg (30.0), lg (250.0) }, { std::log (0.93), std::log (0.70) })); }
 double lpfHz (double hz)
@@ -2033,35 +2013,26 @@ int translateHarrisonStrip (const std::vector<std::uint8_t>& state, EffectSlot& 
     {
         // ---- 32Classic: 4-band EQ (Hi / Hi-Mid / Low-Mid / Low; shelf or bell at the ends), filters, compressor
         // (Leveler / Compressor / Limiter), gate / expander, saturator (Ridge's DRIVE section since tp172c6), trims
+        // round 190le: the EQ goes to Ridge's 32C voicing (the original's measured EQ law, its own dials: the saved
+        // values in the original's units map to its dial positions; the end bands' frequency and gain are saved as the
+        // Bell mode's, the shelf's centre and plateau follow the dial). Before, Ridge's brown curve played it (tp172c5:
+        // fitted corners and plateaus, mids moved to a neighbour band outside Ridge's ranges, an 18 dB/oct high-pass
+        // stopping at 350 Hz)
+        p[r::h32] = 1.0f;
         const bool filtersIn = sw ("equalizer_in", true) && sw ("equalizer_filters_in", true);
-        const auto hp = at ("equalizer_highpass_filter_freq", 25.0), lp = at ("equalizer_lowpass_filter_freq", 20000.0);
-        p[r::hpf] = filtersIn ? std::max (1e-4f, logNorm (harrison::hpfHz (hp), 16.0, 350.0)) : 0.0f;
-        p[r::lpf] = filtersIn ? std::max (1e-4f, logNorm (harrison::lpfHz (lp), 22000.0, 3000.0)) : 0.0f;
+        p[r::hpf] = filtersIn ? r::h32HpfValue (at ("equalizer_highpass_filter_freq", 25.0)) : 0.0f;
+        p[r::lpf] = filtersIn ? r::h32LpfValue (at ("equalizer_lowpass_filter_freq", 20000.0)) : 0.0f;
         p[r::eqOn] = sw ("equalizer_in", true) && sw ("equalizer_eq_in", true) ? 1.0f : 0.0f;
-        // the dials: Hi (shelf / bell), Hi-Mid 270 .. 8000 Hz, Low-Mid 104 .. 4366 Hz, Low (shelf / bell). A mid outside
-        // its Ridge band's range (Hi-Mid 600 .. 7000, Low-Mid 200 .. 2500), or an end bell outside LF / HF's (30 .. 450,
-        // 1500 .. 16000), moves to a neighbour band left flat
-        struct Dial { double hz, db; bool bell; };
-        Dial hi { at ("equalizer_band_freq_1", 3619.0), at ("equalizer_band_gain_1", 0.0), sw ("equalizer_hi_bell", false) };
-        Dial hm { at ("equalizer_band_freq_2", 1422.0), at ("equalizer_band_gain_2", 0.0), true };
-        Dial lm { at ("equalizer_band_freq_3", 609.0), at ("equalizer_band_gain_3", 0.0), true };
-        Dial lo { at ("equalizer_band_freq_4", 111.35), at ("equalizer_band_gain_4", 0.0), sw ("equalizer_lo_bell", false) };
-        auto flat = [] (const Dial& d) { return std::abs (d.db) < 0.05; };
-        if (! flat (hm) && hm.hz < 600.0 && flat (lm)) std::swap (hm, lm);
-        else if (! flat (hm) && hm.hz > 7000.0 && flat (hi)) { hi = hm; hm.db = 0.0; }
-        if (! flat (lm) && lm.hz > 2500.0 && flat (hm)) std::swap (hm, lm);
-        else if (! flat (lm) && lm.hz < 200.0 && flat (lo)) { lo = lm; lm.db = 0.0; }
-        if (hi.bell && ! flat (hi) && hi.hz < 1500.0 && flat (hm)) { hm = hi; hi.db = 0.0; }
-        if (lo.bell && ! flat (lo) && lo.hz > 450.0 && flat (lm)) { lm = lo; lo.db = 0.0; }
-        double hz = 0, db = 0;
-        p[r::hfBell] = hi.bell ? 1.0f : 0.0f;
-        if (hi.bell) { hz = hi.hz; db = hi.db; } else harrison::highShelf (hi.hz, hi.db, hz, db);
-        setBell (r::hfGain, r::hfFreq, -1, hz, db, 1500.0, 16000.0);
-        setBell (r::hmfGain, r::hmfFreq, r::hmfQ, hm.hz, hm.db, 600.0, 7000.0);
-        setBell (r::lmfGain, r::lmfFreq, r::lmfQ, lm.hz, lm.db, 200.0, 2500.0);
-        p[r::lfBell] = lo.bell ? 1.0f : 0.0f;
-        if (lo.bell) { hz = lo.hz; db = lo.db; } else harrison::lowShelf (lo.hz, lo.db, hz, db);
-        setBell (r::lfGain, r::lfFreq, -1, hz, db, 30.0, 450.0);
+        p[r::hfBell] = sw ("equalizer_hi_bell", false) ? 1.0f : 0.0f;
+        p[r::hfFreq] = r::h32HfValue (at ("equalizer_band_freq_1", 3618.97));
+        p[r::hfGain] = r::h32GainValue (at ("equalizer_band_gain_1", 0.0));
+        p[r::hmfFreq] = r::h32HmfValue (at ("equalizer_band_freq_2", 1421.74));
+        p[r::hmfGain] = r::h32GainValue (at ("equalizer_band_gain_2", 0.0));
+        p[r::lmfFreq] = r::h32LmfValue (at ("equalizer_band_freq_3", 608.74));
+        p[r::lmfGain] = r::h32GainValue (at ("equalizer_band_gain_3", 0.0));
+        p[r::lfBell] = sw ("equalizer_lo_bell", false) ? 1.0f : 0.0f;
+        p[r::lfFreq] = r::h32LfValue (at ("equalizer_band_freq_4", 111.355));
+        p[r::lfGain] = r::h32GainValue (at ("equalizer_band_gain_4", 0.0));
         // compressor: threshold in dBFS, ratio 1 .. 100 : 1. On the stair (sines) its static line meets the input at
         // the dial - 2 dB RMS (the Limiter's ~1.8 dB lower); Ridge's detector reads the sine's peak (+3 dB), so its
         // threshold sits at the dial + 1. Under Ridge's -40 dBFS floor the rest moves into the input trim (taken back
@@ -3167,6 +3138,169 @@ float fittedValue (const FittedLink& l, double v)
     return k.back().second;
 }
 
+// round 190le: LiquidSonics Lustrous Plates -> Foil Plate. Its component state carries a plain JUCE ValueTree
+// (LP_FullState > StateVT > PARAM id="<host index>" value=<double in the parameter's own units>; read, nothing decoded:
+// BLACKBOX_rodada190lb.md §5.2). The Foil settings are round 190ca's physical fit of the plate's scored impulse renders
+// (nebula190ca/maps/maps2/Lustrous_Plates.json: T30 500 Hz … 2 kHz, onset, band energies, L/R correlation, time
+// variance; Iron type, full band, Foil's Classic law — the law it was fitted on, kept as the role preset keeps it),
+// keyed by the Damper (2.5 / 5.0) with the plate model's offset (Chrome / model 12, which plays Iridium). Dry/Wet goes to
+// Foil's Mix (the same wet : dry ratio on its equal-power law), Width scales the fitted width, Master Gain moves the two
+// 700 Hz shelves together (a flat wet gain), a Master EQ low cut above the fitted one replaces it.
+namespace lustrous
+{
+// one JUCE ValueTree node (ValueTree::writeToStream): name, properties, children; false = malformed
+struct Reader
+{
+    const std::vector<std::uint8_t>& d;
+    std::size_t at;
+    bool ok = true;
+    long long compressed()
+    {
+        if (at >= d.size()) { ok = false; return 0; }
+        const auto head = d[at++];
+        const int n = head & 0x7f;
+        if (n > 8 || at + (std::size_t) n > d.size()) { ok = false; return 0; }
+        unsigned long long v = 0;
+        for (int i = 0; i < n; ++i)
+            v |= (unsigned long long) d[at + (std::size_t) i] << (8 * i);
+        at += (std::size_t) n;
+        return (head & 0x80) != 0 ? -(long long) v : (long long) v;
+    }
+    std::string cstring()
+    {
+        std::string s;
+        while (at < d.size() && d[at] != 0)
+            s += (char) d[at++];
+        if (at >= d.size()) ok = false;
+        ++at;
+        return s;
+    }
+};
+// the StateVT node's PARAM children: id -> value (doubles, ints and numeric strings)
+std::map<int, double> stateParams (const std::vector<std::uint8_t>& state)
+{
+    std::map<int, double> out;
+    const auto start = findBytes (state, std::string_view ("StateVT\0", 8));
+    if (start == std::string::npos)
+        return out;
+    Reader r { state, start };
+    std::function<bool (int, bool)> node = [&] (int depth, bool keep) -> bool {
+        const auto name = r.cstring();
+        const auto props = r.compressed();
+        if (! r.ok || props < 0 || props > 4096 || depth > 8)
+            return false;
+        std::string id;
+        std::optional<double> value;
+        for (long long k = 0; k < props && r.ok; ++k)
+        {
+            const auto key = r.cstring();
+            const auto size = r.compressed();
+            if (! r.ok || size < 0 || r.at + (std::size_t) size > state.size())
+                return false;
+            const auto* p = state.data() + r.at;
+            if (size > 0)
+            {
+                const auto type = p[0];
+                double v = std::numeric_limits<double>::quiet_NaN();
+                std::string text;
+                if (type == 1 && size >= 5) { std::int32_t x; std::memcpy (&x, p + 1, 4); v = x; }
+                else if (type == 4 && size >= 9) std::memcpy (&v, p + 1, 8);
+                else if (type == 6 && size >= 9) { std::int64_t x; std::memcpy (&x, p + 1, 8); v = (double) x; }
+                else if (type == 5) text.assign ((const char*) p + 1, (std::size_t) size - 1);
+                if (! text.empty() && text.back() == 0) text.pop_back();
+                if (key == "id") id = ! text.empty() ? text : (std::isfinite (v) ? std::to_string ((long long) v) : std::string());
+                else if (key == "value")
+                {
+                    float f = 0;
+                    if (std::isfinite (v)) value = v;
+                    else if (! text.empty() && parseFloat (text, f) && std::isfinite (f)) value = f;
+                }
+            }
+            r.at += (std::size_t) size;
+        }
+        if (keep && name == "PARAM" && ! id.empty() && value && id.find_first_not_of ("0123456789") == std::string::npos && id.size() < 4)
+            out[std::stoi (id)] = *value;
+        const auto children = r.compressed();
+        if (! r.ok || children < 0 || children > 4096)
+            return false;
+        for (long long c = 0; c < children; ++c)
+            if (! node (depth + 1, depth == 0))
+                return false;
+        return true;
+    };
+    if (! node (0, false))
+        out.clear();
+    return out;
+}
+double knots (double x, double x0, double y0, double x1, double y1) noexcept
+{
+    const auto t = std::clamp ((x - x0) / (x1 - x0), 0.0, 1.0);
+    return y0 + t * (y1 - y0);
+}
+} // namespace lustrous
+
+int translateLustrousPlates (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    if (slot.kind != EffectKind::foilPlate || findBytes (state, "LP_FullState") == std::string::npos)
+        return 0;
+    const auto v = lustrous::stateParams (state);
+    if (v.size() < 10)
+        return 0;
+    auto at = [&v] (int id, double fallback) {
+        const auto it = v.find (id);
+        return it != v.end() && std::isfinite (it->second) ? it->second : fallback;
+    };
+    auto& p = slot.params;
+    using lustrous::knots;
+    // the host table's units: 0 Master Gain dB, 1 Dry/Wet 0 … 1, 2 Plate Model 0 … 24, 3 Damper 0 … 10, 9 Width 0 … 10,
+    // 12 Master EQ, 13 Low Cut Hz
+    const auto damper = std::clamp (at (3, 5.0), 0.0, 10.0) / 10.0, model = std::clamp (at (2, 0.0), 0.0, 24.0) / 24.0;
+    const auto offset = [model] (double y) { return knots (model, 0.0, 0.0, 0.5, y); };
+    p[1] = 0.0f;                                                   // the fit's onset: Foil's own plate delay is already later
+    p[2] = (float) std::clamp (knots (damper, 0.25, 0.3876, 0.5, 0.38241) + offset (-0.10713), 0.0, 1.0);
+    p[3] = 0.0f;
+    p[5] = 0.0f;
+    p[6] = 0.04363f;
+    p[7] = 0.742f;
+    p[9] = 0.0606f;
+    p[11] = 0.792f;                                                // Iron (full band, the reference's 16 kHz reach)
+    p[12] = 0.0f;
+    p[14] = 0.0f;
+    p[16] = 0.0f;                                                  // the Classic law (what the fit was made on)
+    p[(std::size_t) verbs::foil::revision] = 0.0f;
+    const auto width = std::clamp (at (9, 7.5), 0.0, 10.0);
+    p[4] = (float) std::clamp (0.36298 * width / 7.5, 0.0, 1.0);
+    // Master Gain: both 700 Hz shelves (low −12 … +12 dB over the dial; high +24 dB per dial above its middle)
+    const auto gainDb = std::clamp (at (0, 0.0), -20.0, 20.0);
+    const auto low = knots (damper, 0.25, 0.65531, 0.5, 0.64922) + offset (0.05273);
+    const auto high = knots (damper, 0.25, 0.56156, 0.5, 0.56589) + offset (0.09439);
+    p[8] = (float) std::clamp (low + gainDb / 24.0, 0.0, 1.0);
+    p[10] = (float) std::clamp (high + gainDb / 24.0, 0.5, 1.0);
+    // low cut: the fit's (Foil's 20 Hz … 1 kHz law), or the reference's Master EQ low cut when that is higher
+    auto lowCut = (float) std::clamp (knots (damper, 0.25, 0.25244, 0.5, 0.17804) + offset (-0.0248), 0.0, 1.0);
+    if (at (12, 0.0) >= 0.5)
+    {
+        const auto hz = std::clamp (at (13, 20.0), 20.0, 1000.0);
+        const auto value = (float) (std::log (hz / 20.0) / std::log (1000.0 / 20.0));
+        if (verbs::foil::lowCutHz (value) > verbs::foil::lowCutHz (lowCut))
+            lowCut = value;
+    }
+    p[13] = lowCut;
+    // Dry/Wet: dry 0 dB and wet -40 dB per unit below the middle, wet 0 dB and dry falling above it; the ends are one path
+    const auto mixV = std::clamp (at (1, 1.0), 0.0, 1.0);
+    if (mixV >= 0.9995)
+        p[0] = 1.0f;
+    else if (mixV <= 0.0005)
+        p[0] = 0.0f;
+    else
+    {
+        const auto ratio = std::pow (10.0, (mixV <= 0.5 ? -40.0 * (0.5 - mixV) : 40.0 * (mixV - 0.5)) / 20.0); // wet : dry
+        p[0] = (float) (std::atan (ratio) / (3.14159265358979 * 0.5));
+    }
+    slot.mix = 1.0f;
+    return (int) v.size();
+}
+
 int translateFittedMap (const std::vector<std::uint8_t>& state, EffectSlot& slot)
 {
     const std::string text (state.begin(), state.end());
@@ -3246,6 +3380,8 @@ RawTranslator rawTranslatorNamed (std::string_view name)
         return translateSslVocalstrip2;
     if (name == "harrison-strip")
         return translateHarrisonStrip;
+    if (name == "lustrous-plates") // round 190le
+        return translateLustrousPlates;
     if (name == "vcc-channel")
         return translateVccChannel;
     if (name == "ssl-guitarstrip")

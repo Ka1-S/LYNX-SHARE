@@ -164,7 +164,13 @@ enum Param
     // ceiling (1.1108, both polarities)
     k4Pink, k4LmfDiv3, k4HmfMult3, k4gLaw,
     // round 190lb, hidden (set only by the SSL 4K E translation): its Black / Orange high-pass at 18 dB/oct (as measured)
-    k4eHpLaw
+    k4eHpLaw,
+    // round 190le, hidden the same way (saved only while on: off = the old sound) but with a control on the panel ("32C
+    // console", Effects.h hiddenEffectParamIndex): the "32C" voicing — Ridge's own engine with the EQ measured on the
+    // Harrison 32Classic trial (tp172c H32_eq; docs/analise/BLACKBOX_rodada190lb.md §4): first-order shelves, matched
+    // bells at the dial with a gain-dependent Q, 12 dB/oct filters to 3.15 kHz / 160 Hz. The EQ controls then read the
+    // original's own dials (h32* below); the dynamics, trims and DRIVE section stay Ridge's
+    h32
 };
 double compGrCapDb (float v) noexcept;   // 0 = no cap (a huge value), else 0 .. 60 dB
 double compAttackFineSeconds (float v) noexcept; // 0 .. 0.25 s
@@ -237,6 +243,30 @@ double mQ (float v) noexcept;        // 0.5 .. 2.5
 double mRatio (float v) noexcept;    // 1 (0) .. 63 : 1, infinity at the top (1e9); the reference's dial
 float mRatioValue (double ratio) noexcept;
 double mHoldSeconds (float v) noexcept; // 0 .. 4 s
+// round 190le: the 32C voicing (on, and none of the console voicings above) and its scales: the dial position 0..1 is the
+// original's own (its host-visible parameter), so the read-outs are its texts
+bool h32Voicing (const EffectParams& p) noexcept;
+std::string h32ParamText (int param, float v, const EffectParams& p);
+double h32HpfHz (float v) noexcept;              // 0 = out, else 25 Hz .. 3.15 kHz
+double h32LpfHz (float v) noexcept;              // 0 = out, else 20 kHz .. 160 Hz
+double h32LmfHz (float v) noexcept;              // 104 Hz .. 4.37 kHz
+double h32HmfHz (float v) noexcept;              // 271 Hz .. 8 kHz
+double h32LfHz (float v, bool bell) noexcept;    // the shelf's centre 25 Hz .. 1.5 kHz, the bell's 19 .. 799 Hz
+double h32HfHz (float v, bool bell) noexcept;    // the shelf's centre 400 Hz .. 10 kHz, the bell's 689 Hz .. 14.5 kHz
+double h32ShelfDb (float v) noexcept;            // the shelves' plateau, ±13.5 dB (linear in the dial)
+double h32BellDb (float v) noexcept;             // the bells' peak, ±13.74 dB (the original's gain taper)
+double h32Q (double gainDb) noexcept;            // the bells' Q: 0.525 at ±2.5 dB .. 0.75 at ±13.74 dB
+// the inverses (the state translation: the original's saved values in its own units -> the dial position)
+float h32HpfValue (double hz) noexcept;
+float h32LpfValue (double hz) noexcept;
+float h32LmfValue (double hz) noexcept;
+float h32HmfValue (double hz) noexcept;
+float h32LfValue (double bellHz) noexcept;       // the saved Low frequency is the bell's (its shelf centre follows the dial)
+float h32HfValue (double bellHz) noexcept;
+float h32GainValue (double dialDb) noexcept;     // the saved gain is the bells' taper (a shelf's plateau follows the dial)
+// round 190le: an editor edit that switches a voicing on switches the 32C voicing off and the reverse (the console
+// voicings take precedence in the engine; the panel shows one at a time)
+std::vector<std::pair<int, float>> linkedEdit (const EffectParams& p, int param, float value);
 } // namespace ridge
 
 // ---- Glow Leveler (optical leveler) ----

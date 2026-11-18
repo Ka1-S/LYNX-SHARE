@@ -4334,6 +4334,7 @@ countries: it ch sm
 "Measured effect characters" = "Caratteri di effetto misurati"
 "Brown|Black|Orange" = "Marrone|Nero|Arancione"
 "4K console" = "Console 4K"
+"32C console" = "Console 32C"
 "Mic pre" = "Preamp mic"
 "Mic" = "Mic"
 "Vocal detector" = "Rilevatore vocale"

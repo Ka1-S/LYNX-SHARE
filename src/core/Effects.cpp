@@ -69,6 +69,7 @@
 #include <cmath>
 #include <complex>
 #include <cstdio>
+#include <cstring>
 
 namespace lynx
 {
@@ -3649,6 +3650,8 @@ std::string formatEffectParam (EffectKind kind, int param, float v, double bpm, 
         return mixsuite::ridge::k4ParamText (param, v);
     if (kind == EffectKind::ridgeStrip && mixsuite::ridge::eVoicing (context)) // round 123: the console's own scales
         return mixsuite::ridge::eParamText (param, v);
+    if (kind == EffectKind::ridgeStrip && mixsuite::ridge::h32Voicing (context)) // round 190le: the 32C's own dials
+        return mixsuite::ridge::h32ParamText (param, v, context);
     if (kind == EffectKind::ridgeStrip && (param == mixsuite::ridge::lfGain || param == mixsuite::ridge::lmfGain
                                            || param == mixsuite::ridge::hmfGain || param == mixsuite::ridge::hfGain))
     {
@@ -4375,6 +4378,36 @@ std::size_t savedEffectParamCount (const EffectSlot& slot) noexcept
         if (slot.params[i - 1] != 0.0f)
             return i;
     return count;
+}
+
+namespace
+{
+struct HiddenParam
+{
+    EffectKind kind;
+    int index;
+    const char* name;
+};
+const HiddenParam kHiddenWithControl[] {
+    { EffectKind::ridgeStrip, (int) mixsuite::ridge::h32, "32C voicing" }, // round 190le
+};
+} // namespace
+
+int hiddenEffectParamIndex (EffectKind kind, const char* name) noexcept
+{
+    if (name != nullptr)
+        for (const auto& h : kHiddenWithControl)
+            if (h.kind == kind && std::strcmp (h.name, name) == 0)
+                return h.index;
+    return -1;
+}
+
+const char* hiddenEffectParamName (EffectKind kind, int index) noexcept
+{
+    for (const auto& h : kHiddenWithControl)
+        if (h.kind == kind && h.index == index)
+            return h.name;
+    return nullptr;
 }
 
 double savedEffectParamValue (float v) noexcept

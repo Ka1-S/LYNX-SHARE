@@ -4334,6 +4334,7 @@ countries: ru by kz
 "Measured effect characters" = "Измеренные характеры эффекта"
 "Brown|Black|Orange" = "Brown|Black|Orange"
 "4K console" = "4K console"
+"32C console" = "Консоль 32C"
 "Mic pre" = "Микр. пред."
 "Mic" = "Микрофон"
 "Vocal detector" = "Вокальный детектор"
