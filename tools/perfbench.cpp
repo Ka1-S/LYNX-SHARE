@@ -6,7 +6,7 @@
 // a bit-identical null test).
 //
 // usage: perfbench <scenario> [--block N] [--threads N] [--seconds S] [--reps R] [--offline] [--nometers] [--raw path]
-//                              [--stopped] [--ahead] [--live C] [--paced] [--apptransport]
+//                              [--stopped] [--ahead] [--live C] [--paced] [--apptransport] [--engine-rev N] [--fx-rev N]
 // scenarios:
 //   demo            the showcase song (Demo.lynx), whole song
 //   hiphop | pop    the two LYNX demo songs
@@ -42,6 +42,7 @@
 #include <chrono>
 #include <ctime>
 #include <cmath>
+#include <functional>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -274,6 +275,8 @@ int main (int argc, char** argv)
     std::vector<int> liveChannels;
     int loopBars = 0;
     bool gate = false;
+    int engineRev = -1; // (round 190kz: --engine-rev N sets every channel's ChannelDef::engineRev, -1 = as imported)
+    int fxRev = -1;     // (round 190kz: --fx-rev N sets every effect slot's EffectSlot::engineRev, e.g. 0 = a project saved before)
     const bool playWarmup = scenario == "afterstop"; // (the warmup plays, the measured part is stopped)
     const char* raw = nullptr;
     for (int i = 2; i < argc; ++i)
@@ -312,6 +315,10 @@ int main (int argc, char** argv)
             appTransport = true;
         else if (a == "--loop")
             loopBars = std::max (0, std::atoi (next()));
+        else if (a == "--engine-rev") // (round 190kz: an old project's revision, e.g. 1 = before the sampler's unity bypass)
+            engineRev = std::atoi (next());
+        else if (a == "--fx-rev")
+            fxRev = std::atoi (next());
         else if (a == "--gate") // (perfgate190id: one machine-readable GATE line at the end, scripts/perf_gate.py)
             gate = true;
     }
@@ -373,6 +380,22 @@ int main (int argc, char** argv)
     }
 
     const auto importMs = std::chrono::duration<double, std::milli> (std::chrono::steady_clock::now() - import0).count();
+    if (engineRev >= 0)
+        for (auto& c : song.channels)
+            c.engineRev = engineRev;
+    if (fxRev >= 0)
+    {
+        std::function<void (std::vector<EffectSlot>&)> setRev = [&] (std::vector<EffectSlot>& slots) {
+            for (auto& e : slots)
+            {
+                e.engineRev = fxRev;
+                for (auto& b : e.branches)
+                    setRev (b.chain);
+            }
+        };
+        for (auto& t : song.mixer)
+            setRev (t.effects);
+    }
     std::int64_t songTicks = 0;
     song = makeExportSong (song, true, (std::int64_t) std::ceil (ticksPerSample (song.bpm, sampleRate) * sampleRate), songTicks);
     const auto tps = ticksPerSample (song.bpm, sampleRate);

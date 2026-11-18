@@ -1026,6 +1026,10 @@ struct ChannelDef
     // The native engine's revision for this channel (round natives190kj): a project saved before it loads with 0 and
     // plays as it did; new channels and FL imports get the current one. Harmor: 1 = resynthesis (a sample in the IMG
     // section) played as FL plays it (0: such a part plays its timbres, as LYNX did before).
+    // 2 (round 190kz, owner decision 4a, NOT the default): a sampler / audio clip voice that keeps its pitch reads its
+    // sample directly while its shift is exactly unity (no transposition, the song's own tempo) instead of running its
+    // real-time shifter at a factor of 1 (issue #187's tempo-following voices). Measured against FL's own render of Thief it
+    // came out slightly further from FL than the shifter (agents/dsp of round 190kz), so new channels stay at 1.
     int engineRev = 1;
     SamplerSettings sampler; // used when instrument == sampler
     SynthSettings synth;     // used when instrument == synth

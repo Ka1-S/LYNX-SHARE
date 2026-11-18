@@ -2234,6 +2234,7 @@ public:
         // the tempo or not
         keyShift.store (s.keepPitch);
         keyShiftMethod.store ((int) s.stretchMethod);
+        unityBypass.store (channel.engineRev >= 2);
         knob (samplerparam::start, s.regionStart);
         knob (samplerparam::end, s.regionEnd);
         startOffset.store (std::clamp (s.startOffset, 0.0f, 1.0f));
@@ -2607,7 +2608,14 @@ public:
         double owed = 0.0; // input frames owed to the shifter (n / factor per block, the fraction carried)
         double tempoAt = 1.0; // issue #187: the tempo ratio the shifter's alignment is set for (its priming assumes 1)
         int pos = 0, count = 0;
+        // round 190kz (ChannelDef::engineRev 2): at an exact unity shift (no transposition, the song's own tempo) the voice
+        // reads its sample directly, as an unshifted voice does, and its shifter rests; `fade` samples cross-fade between
+        // the direct read and the shifter's output when the voice leaves or reaches unity (towards the direct read when
+        // `fadeToDirect`)
+        bool direct = false, fadeToDirect = false;
+        int fade = 0;
     };
+    static constexpr int unityFadeLength = 256;
     // Stretch keeping pitch (round 162, issue #9): a transposed note reads the stretched sample at its own speed, so it
     // lasts as long as at the root key, and its pitch shifter transposes it (FL's Stretch modes: "pitch changes keep
     // the original duration", the voices of a chord stay in sync). The root key plays the stretched sample untouched.
@@ -2618,6 +2626,8 @@ public:
         auto& ks = shifts[index];
         ks.on = false;
         ks.shifter = nullptr;
+        ks.direct = ks.fadeToDirect = false;
+        ks.fade = 0;
         // (issue #187: while the tempo can move, a warped voice that keeps its pitch takes a shifter even untransposed, so a
         // tempo change never changes its pitch)
         const auto followsTempo = tempoMoves && keyShift.load (std::memory_order_relaxed) && warpedTempo.load (std::memory_order_relaxed);
@@ -2714,6 +2724,93 @@ public:
         return true;
     }
 
+    // round 190kz (engineRev 2): the voice's shift is exactly unity — no transposition, glide, slide steps or pitch
+    // modulation now, the song's own tempo — so its shifter would only resynthesise the sample it reads
+    bool atUnity (const SamplerVoice& v, const KeyShift& ks) const noexcept
+    {
+        return tempoC == 1.0 && shiftFactor (v, ks) == 1.0 && ks.glideLeft == 0 && v.stepsLeft == 0 && ks.gain == 1.0f;
+    }
+
+    // Before a block of a shifted voice: prime its shifter (as before), or, with engineRev 2, let it read directly while
+    // its shift is unity. Leaving unity primes the shifter from the voice's place now (as a note start does, within the
+    // block's priming budget; without budget it reads directly one more block) and cross-fades into its output; reaching
+    // unity cross-fades back to the direct read. Returns false when the voice waits for its first priming (as before).
+    bool prepareShift (SamplerVoice& v, KeyShift& ks, int& budget) noexcept
+    {
+        if (! ks.on)
+            return true;
+        const auto bypass = unityBypass.load (std::memory_order_relaxed);
+        if (! bypass && ! ks.direct && ks.fade == 0)
+            return primeKeyShift (v, ks, budget); // (engineRev 0 / 1: exactly as before)
+        const auto unity = bypass && atUnity (v, ks);
+        if (ks.direct)
+        {
+            if (unity || budget <= 0)
+                return true;
+            const auto kernel = ks.ahead.kernel; // (a clip beyond +24 st keeps its finer kernel)
+            ks.ahead = v;
+            ks.ahead.kernel = kernel;
+            ks.ahead.pitchMul = 1.0;
+            ks.pos = ks.count = 0;
+            ks.owed = 0.0;
+            ks.tempoAt = 1.0;
+            ks.primed = false;
+            primeKeyShift (v, ks, budget);
+            ks.direct = false;
+            ks.fadeToDirect = false;
+            ks.fade = unityFadeLength;
+            return true;
+        }
+        if (! ks.primed)
+        {
+            if (unity && ks.fade == 0)
+            {
+                ks.direct = true; // a voice that starts at unity: no priming, no shifter work until it leaves unity
+                return true;
+            }
+            return primeKeyShift (v, ks, budget);
+        }
+        if (unity && ks.fade == 0)
+        {
+            ks.fadeToDirect = true;
+            ks.fade = unityFadeLength;
+        }
+        else if (! unity && ks.fade > 0 && ks.fadeToDirect)
+            ks.fade = 0; // (left unity again while fading out: the shifter keeps playing)
+        return true;
+    }
+
+    // a shifted voice's next frame at or around unity (round 190kz, engineRev 2: the direct read, or the cross-fade
+    // between it and the shifter's output; the call sites take readShifted when neither applies)
+    // (out of line, and chosen once per block by the callers, so revisions 0 / 1 keep their per-sample loop as before)
+    [[gnu::noinline]] void readUnityShift (SamplerVoice& v, KeyShift& ks, const float* l, const float* r, double lastFrame, bool looping,
+                                           float& outL, float& outR) noexcept
+    {
+        if (! ks.direct && ks.fade == 0) // (the fade into the shifter ended within this block)
+        {
+            readShifted (v, ks, outL, outR);
+            return;
+        }
+        if (ks.direct)
+        {
+            readFrame (v, l, r, lastFrame, looping, outL, outR, v.rate * v.pitchMul * bendMul);
+            return;
+        }
+        float dl, dr, wl, wr;
+        readFrame (v, l, r, lastFrame, looping, dl, dr, v.rate * v.pitchMul * bendMul);
+        readShifted (v, ks, wl, wr);
+        const auto w = (float) ks.fade / (float) unityFadeLength; // the share of the side being left
+        if (ks.fadeToDirect)
+            outL = wl * w + dl * (1.0f - w), outR = wr * w + dr * (1.0f - w);
+        else
+            outL = dl * w + wl * (1.0f - w), outR = dr * w + wr * (1.0f - w);
+        if (--ks.fade == 0 && ks.fadeToDirect)
+        {
+            ks.direct = true;
+            ks.primed = false;
+        }
+    }
+
     // the shifter's source: the stretched sample read at the voice's (untransposed) speed, ahead of the voice
     void readAhead (const SamplerVoice& v, KeyShift& ks, double factor, float& outL, float& outR) noexcept
     {
@@ -2735,7 +2832,8 @@ public:
 
     // the next frame of a shifted voice (blocks of keyShiftBlock through its shifter): the transposition, its glide,
     // the pitch envelope / LFO (pitchMul) and the pitch wheel change the shift, never the speed
-    void readShifted (const SamplerVoice& v, KeyShift& ks, float& outL, float& outR) noexcept
+    // (always inlined into the render loops, as before round 190kz added a third caller, readUnityShift)
+    [[gnu::always_inline]] inline void readShifted (const SamplerVoice& v, KeyShift& ks, float& outL, float& outR) noexcept
     {
         if (ks.pos >= ks.count)
         {
@@ -3355,7 +3453,7 @@ public:
             auto primeBudget = offlineRendering() ? keyShiftVoices : 2;
             for (auto& v : voices)
                 if (v.active && v.data != nullptr && v.flVoice)
-                    if (auto& ks = shifts[(std::size_t) (&v - voices.data())]; ! ks.on || primeKeyShift (v, ks, primeBudget))
+                    if (auto& ks = shifts[(std::size_t) (&v - voices.data())]; prepareShift (v, ks, primeBudget))
                         renderFl (v, left, right, n, chanVol, chanPan);
         }
 
@@ -3399,8 +3497,11 @@ public:
         {
             if (! v.active || v.data == nullptr || v.flVoice)
                 continue;
-            if (auto& ks = shifts[(std::size_t) (&v - voices.data())]; ks.on && ! primeKeyShift (v, ks, primeBudget))
+            const auto& vks = shifts[(std::size_t) (&v - voices.data())];
+            if (! prepareShift (v, shifts[(std::size_t) (&v - voices.data())], primeBudget))
                 continue; // (its shifter primes in the next block)
+            // (engineRev 2 only: the voice reads directly or cross-fades at unity in this block)
+            const auto unityPath = vks.on && (vks.direct || vks.fade > 0);
 
             const auto* l = v.data->leftData();
             const auto* r = v.data->rightData();
@@ -3473,7 +3574,9 @@ public:
                     sl = v.holdL, sr = v.holdR;
                 else
                 {
-                    if (ks.on)
+                    if (unityPath)
+                        readUnityShift (v, ks, l, r, lastFrame, looping, sl, sr);
+                    else if (ks.on)
                         readShifted (v, ks, sl, sr);
                     else
                         readFrame (v, l, r, lastFrame, looping, sl, sr, v.rate * v.pitchMul * bendMul);
@@ -3718,6 +3821,9 @@ public:
         const auto* r = v.data->rightData();
         const auto lastFrame = std::min ((double) (v.data->frames() - 1), v.last);
         auto& pr = v.flProc;
+        // (engineRev 2 only: the voice reads directly or cross-fades at unity in this block; prepareShift ran before)
+        const auto& vks = shifts[(std::size_t) (&v - voices.data())];
+        const auto unityPath = vks.on && (vks.direct || vks.fade > 0);
 
         for (int pos = 0; pos < n && v.active;)
         {
@@ -3784,7 +3890,9 @@ public:
                 }
                 else
                 {
-                    if (auto& ks = shifts[(std::size_t) (&v - voices.data())]; ks.on)
+                    if (auto& ks = shifts[(std::size_t) (&v - voices.data())]; unityPath)
+                        readUnityShift (v, ks, l, r, lastFrame, looping, sl, sr);
+                    else if (ks.on)
                         readShifted (v, ks, sl, sr);
                     else
                         readFrame (v, l, r, lastFrame, looping, sl, sr, v.rate * v.pitchMul * bendMul);
@@ -3960,6 +4068,7 @@ private:
     bool tempoHooked = false; // (rollup 0.1.30: the renderer calls setTempoRatio, issue #187's tempo following)
     bool tempoMoves = false;
     std::atomic<bool> warpedTempo { false };
+    std::atomic<bool> unityBypass { false }; // round 190kz: ChannelDef::engineRev >= 2 (prepareShift)
     double bendMul = 1.0;    // the pitch wheel (pitchBend), audio thread
     int quality = flrs::liveQuality;        // FL's interpolation index (prepare)
     bool preparedOffline = false;           // prepare() ran for an export: `quality` stays the export's
