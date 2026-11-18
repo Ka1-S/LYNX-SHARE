@@ -4832,7 +4832,7 @@ std::unique_ptr<Effect> makeEffect (const EffectSlot& slot)
     if (slot.kind == EffectKind::vocodex)
         return vocodex::make (slot.state);
     if (slot.kind == EffectKind::maximus)
-        return maximusfx::make (slot.state);
+        return maximusfx::make (slot.state, slot.engineRev);
     if (slot.kind == EffectKind::multibandDelay)
         return mbdelay::make (slot.state, &slot.params); // (#113: the mode's latency known at once)
     if (slot.kind == EffectKind::vocoder)
