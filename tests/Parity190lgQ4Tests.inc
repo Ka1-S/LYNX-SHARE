@@ -32,7 +32,7 @@ inline double gainAt (double rangeDb, float rev, double loud, double a, double b
 TEST (parity190lg_facet_auto_revision_is_hidden_set_by_the_translator_only)
 {
     using namespace lynx;
-    CHECK (facet::autoRevisionParam == facet::autoThresholdParam0 + facet::bands && facet::storedParamCount == facet::autoRevisionParam + 1);
+    CHECK (facet::autoRevisionParam == facet::autoThresholdParam0 + facet::bands && facet::dispersionCountParam == facet::autoRevisionParam + 1); // (rollup step 9: round 190ln's dispersion [126 … 128] follows)
     auto s = makeEffectSlot (EffectKind::facetEq);
     CHECK (s.params[(std::size_t) facet::autoRevisionParam] == 0.0f && savedEffectParamCount (s) <= (std::size_t) facet::paramCount);
     // a translated Pro-Q 4 band with Auto gets the revision

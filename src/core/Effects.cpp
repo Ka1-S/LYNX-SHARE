@@ -945,7 +945,9 @@ class Limiter final : public Effect
 public:
     static constexpr double lookaheadSeconds = 0.0015;
 
-    Limiter()
+    // (rollup step 9: `l2` = the slot's settings run round 190lf's L2 law, so the latency PDC reads before the first block
+    // is the law's window, as after it: issue #113's rule, tests/Pdc188eTests.inc)
+    explicit Limiter (bool l2 = false) : l2Active (l2)
     {
         const auto size = (std::size_t) (lookaheadSeconds * maxSampleRate) + 4;
         delay[0].assign (size, 0.0f);
@@ -5112,6 +5114,8 @@ std::unique_ptr<Effect> makeEffect (const EffectSlot& slot)
         return std::make_unique<ParametricEq> (slot.params);
     if (slot.kind == EffectKind::frequencySplitter)
         return fsplit::make (slot.params);
+    if (slot.kind == EffectKind::limiter) // (rollup step 9: the L2 law's latency known at once)
+        return std::make_unique<Limiter> (limiterlaw::isL2 (slot.params[(std::size_t) limiterlaw::lawParam]));
     if (slot.kind == EffectKind::hardwareInsert) // its round trip (latency) known before the first block (round 164d)
         return std::make_unique<hwinsert::HardwareInsertFx> (&slot.params);
     if (slot.kind == EffectKind::flEmphasis) // its look-ahead / oversampling latency known before the first block (round 167f)
