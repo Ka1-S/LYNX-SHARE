@@ -88,7 +88,7 @@ constexpr StyleLaw1 laws1[styleCount] = {
     { 0.214, 0.436, 0.080, 1.0, 0.0, 0.0, 1.5, 0.0, 0.0, 0.0 },       // Clean (Transparent): faster out of deep limiting
     { 0.325, 0.958, 0.0365, 0.365, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0 },    // Glue (Allround): a quicker fast stage, a little depth
     { 0.178, 0.876, 0.512, 0.522, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 },     // Punch (Punchy): as revision 0 (no fit beat it)
-    { 0.086, 0.191, 0.04575, 1.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0 },     // Dynamic: a quicker fast stage, recovers faster when deep
+    { 0.086, 0.191, 0.183, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 },       // Dynamic: as revision 0 (its fits took a programme file down)
     { 0.251, 0.684, 0.327, 0.008, 5.74, 0.0, 0.0, 0.0, 0.0, 0.5 },    // Dense (Modern): holds half a half period
     { 1.81, 0.795, 0.024, 0.378, 0.0, 0.0, 0.0, 0.0, 0.0, 0.875 },    // Loud (Aggressive): one gain through a tone's cycle, slow stage
     { 0.056, 0.224, 0.108, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.75 },      // Bus: the same hold, a faster slow stage
