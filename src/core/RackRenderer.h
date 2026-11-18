@@ -480,6 +480,8 @@ struct ProcessTimes
     // slot's effect before each block (Effect::setMetersShown), so a costly meter runs only while one is open.
     std::array<std::atomic<std::uint16_t>, (std::size_t) maxMixerTracks * maxEffectSlots> metersWanted {};
     std::array<std::atomic<float>, (std::size_t) maxMixerTracks * maxEffectSlots * 2> slotLevels {};
+    // round 190lr (DL-87, Live's stereo meter after each device): the same peaks per side, [key * 2 + side], input and output
+    std::array<std::atomic<float>, (std::size_t) maxMixerTracks * maxEffectSlots * 2> slotInputSides {}, slotOutputSides {};
 
     // Audio of one effect slot for an editor's spectrum analyser (Facet EQ, round 103): the editor sets `key`
     // (track * maxEffectSlots + slot, −1 = none); the audio thread then writes the slot's input (pre) and output

@@ -186,19 +186,23 @@ public:
                 const auto beat = s / juce::jmax (1, stepsPerBeat);
                 const auto ground = beat % 2 == 0 ? colour::bg3 : colour::bg2; // (BandLab: every other beat a shade darker)
                 const auto velocity = stepVelocity (pat, ch, s);
+                const auto hovered = hover == Part::cell && hoverIndex == row * maxSteps + s;
+                // BandLab (capture bl-drum-preview-playing.png): the steps the playhead is on turn white; an empty cell under
+                // the pointer takes a tint of the track colour (bl-drum-hover-cell-off.png)
+                if (velocity >= 0.0f && s == shownStep)
+                {
+                    g.setColour (juce::Colours::white);
+                    g.fillRect (cell);
+                    continue;
+                }
                 auto fill = velocity < 0.0f ? ground : ground.interpolatedWith (colourOfTrack, simplesteps::shade (velocity));
-                if (s == shownStep)
-                    fill = fill.brighter (0.35f);
+                if (velocity < 0.0f && hovered)
+                    fill = ground.interpolatedWith (colourOfTrack, 0.18f);
                 g.setColour (fill);
                 g.fillRect (cell);
                 if (velocity >= 0.0f)
                 {
-                    g.setColour (colourOfTrack.brighter (0.3f));
-                    g.drawRect (cell, 1);
-                }
-                else if (hover == Part::cell && hoverIndex == row * maxSteps + s)
-                {
-                    g.setColour (colour::outline);
+                    g.setColour (colourOfTrack.brighter (hovered ? 0.6f : 0.3f));
                     g.drawRect (cell, 1);
                 }
             }

@@ -65,6 +65,11 @@ void tickClipGridForSnapshot (juce::Component& grid);
 void cancelClipGridSceneLaunch (juce::Component& grid);
 bool clipGridSceneLaunchQueued (juce::Component& grid);
 juce::Rectangle<int> clipGridCellForSnapshot (juce::Component& grid, int kind, int track, int scene);
+// round 190lr (--details190lrshot): Live's hover (0 none, 1 a slot's button, 2 a track's Stop, 3 a scene's ▶), a rectangle
+// selection of slots and how many slots it selects
+void clipGridHoverForSnapshot (juce::Component& grid, int kind, int track, int scene);
+void clipGridSelectRangeForSnapshot (juce::Component& grid, int track0, int scene0, int track1, int scene1);
+int clipGridSelectedCountForSnapshot (juce::Component& grid);
 std::pair<int, bool> clipGridSceneSelectionForSnapshot (juce::Component& grid);
 void selectClipGridSlotForSnapshot (juce::Component& grid, int track, int scene);
 std::pair<juce::String, juce::String> clipGridHintForSnapshot (juce::Component& grid, juce::Point<int> p);

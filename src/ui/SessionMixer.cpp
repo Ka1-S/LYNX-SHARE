@@ -1395,6 +1395,17 @@ void SessionMixerComponent::paintMeterLive (juce::Graphics& g, int insert, juce:
     const auto volumeDb = sessionmixer::volumeDb (song.mixer[(std::size_t) insert].volume);
     const auto hy = (float) meter.getY() + liveMeterY (std::isfinite (volumeDb) ? (float) volumeDb : -INFINITY, meter.getHeight());
     theme::fillLaunchTriangle (g, { (float) meter.getX() - 12.0f, hy - 6.5f, 11.0f, 13.0f }, lv::text); // (a cached tile)
+    // round 190lr (DL-59, Live manual 25.1 "a little LED has appeared in the slider thumb to indicate that the control is
+    // now automated"; capture live-automated-led.png): a 4 x 4 #009AAC dot at the volume slider's tip
+    const auto& automated = engine.getAutomationDisplay().automatedTargets();
+    if (std::find (automated.begin(), automated.end(), AutomationTarget { AutomationTargetKind::mixerVolume, insert }) != automated.end())
+    {
+        const juce::Point<float> tip { (float) meter.getX() - 2.5f, hy };
+        g.setColour (lv::meterWell); // (its dark ring)
+        g.fillEllipse (juce::Rectangle<float> (6.0f, 6.0f).withCentre (tip));
+        g.setColour (juce::Colour (0xff009aac));
+        g.fillEllipse (juce::Rectangle<float> (4.0f, 4.0f).withCentre (tip));
+    }
 }
 
 void SessionMixerComponent::setMeterForSnapshot (int insert, float left, float right, float holdLeft, float holdRight, float maxPeak)

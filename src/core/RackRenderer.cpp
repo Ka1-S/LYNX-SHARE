@@ -4111,7 +4111,12 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
         if (levels)
         {
             auto& in = times->slotLevels[key * 2];
-            in.store (std::max (in.load (std::memory_order_relaxed), std::max (peakOf (l, n), peakOf (r, n))), std::memory_order_relaxed);
+            const auto pl = peakOf (l, n), pr = peakOf (r, n);
+            in.store (std::max (in.load (std::memory_order_relaxed), std::max (pl, pr)), std::memory_order_relaxed);
+            auto& il = times->slotInputSides[key * 2];
+            auto& ir = times->slotInputSides[key * 2 + 1];
+            il.store (std::max (il.load (std::memory_order_relaxed), pl), std::memory_order_relaxed);
+            ir.store (std::max (ir.load (std::memory_order_relaxed), pr), std::memory_order_relaxed);
         }
 
         if (slots[i].kind == EffectKind::hardwareInsert && wet < 0.999f)
@@ -4191,7 +4196,12 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
         if (levels) // round 170c: and its output peak
         {
             auto& out = times->slotLevels[key * 2 + 1];
-            out.store (std::max (out.load (std::memory_order_relaxed), std::max (peakOf (l, n), peakOf (r, n))), std::memory_order_relaxed);
+            const auto pl = peakOf (l, n), pr = peakOf (r, n);
+            out.store (std::max (out.load (std::memory_order_relaxed), std::max (pl, pr)), std::memory_order_relaxed);
+            auto& ol = times->slotOutputSides[key * 2];
+            auto& orr = times->slotOutputSides[key * 2 + 1];
+            ol.store (std::max (ol.load (std::memory_order_relaxed), pl), std::memory_order_relaxed);
+            orr.store (std::max (orr.load (std::memory_order_relaxed), pr), std::memory_order_relaxed);
         }
 
         // ... and its output

@@ -1835,7 +1835,7 @@ private:
     // view shows (RackRenderer's levelWanted / slotLevels, the editors' own level taps); mono (the louder side).
     bool deviceMeters() const { return theme::livelook::active(); }
     int cardGap() const { return deviceMeters() ? deviceMeterGap : gap; }
-    static constexpr int deviceMeterGap = 12;
+    static constexpr int deviceMeterGap = 9; // (Live, L28: 9 px between two devices, the meter in its middle)
     std::size_t slotKey (int slot) const { return (std::size_t) juce::jmax (0, insert) * (std::size_t) maxEffectSlots + (std::size_t) slot; }
     void watchDevices (bool on)
     {
@@ -1858,7 +1858,8 @@ private:
         else
             watched.clear();
     }
-    // the meter after card `i` (empty: none)
+    // the meter after card `i` (empty: none): Live's 2 + 1 + 2 px well in the middle of the gap, centred on the device's
+    // height (L28: 108 of 188 px; its top 11 px cut off by a line, as Live's)
     juce::Rectangle<int> deviceMeterBounds (int i) const
     {
         if (! deviceMeters() || i < 0 || i >= (int) cards.size())
@@ -1866,35 +1867,40 @@ private:
         const auto& c = cards[(std::size_t) i];
         if (c.kind == Card::add || (c.kind == Card::instrument && effectCount() == 0))
             return {};
-        return { c.bounds.getRight() + (deviceMeterGap - 5) / 2, c.bounds.getY() + 22, 5, juce::jmax (0, c.bounds.getHeight() - 26) };
+        const auto inset = juce::roundToInt ((float) c.bounds.getHeight() * 0.21f);
+        return { c.bounds.getRight() + (deviceMeterGap - 5) / 2 + 1, c.bounds.getY() + inset, 5, juce::jmax (0, c.bounds.getHeight() - 2 * inset) };
     }
-    // its level: an effect's output, the instrument's = the first effect's input
-    float takeDeviceLevel (const Card& c)
+    // its level, one side: an effect's output, the instrument's = the first effect's input
+    float takeDeviceLevel (const Card& c, int side)
     {
         auto* times = engine.getProcessTimes();
         if (times == nullptr)
             return 0.0f;
-        const auto k = c.kind == Card::effect ? slotKey (c.index) * 2 + 1 : slotKey (0) * 2;
-        return k < times->slotLevels.size() ? times->slotLevels[k].exchange (0.0f, std::memory_order_relaxed) : 0.0f;
+        auto& sides = c.kind == Card::effect ? times->slotOutputSides : times->slotInputSides;
+        const auto k = (c.kind == Card::effect ? slotKey (c.index) : slotKey (0)) * 2 + (std::size_t) side;
+        return k < sides.size() ? sides[k].exchange (0.0f, std::memory_order_relaxed) : 0.0f;
     }
     void tickDeviceMeters()
     {
         watchDevices (true);
         if (! deviceMeters())
             return;
-        if (deviceLevels.size() != cards.size())
-            deviceLevels.assign (cards.size(), {});
+        if (deviceLevels.size() != cards.size() * 2)
+            deviceLevels.assign (cards.size() * 2, {});
         for (int i = 0; i < (int) cards.size(); ++i)
         {
             const auto r = deviceMeterBounds (i);
             if (r.isEmpty())
                 continue;
-            auto& m = deviceLevels[(std::size_t) i];
-            const auto before = m.level;
-            const auto beforePeak = m.peak;
-            m.tick (takeDeviceLevel (cards[(std::size_t) i]));
-            if (std::abs (m.level - before) > 1e-4f || std::abs (m.peak - beforePeak) > 1e-4f)
-                repaint (r.expanded (1));
+            for (int side = 0; side < 2; ++side)
+            {
+                auto& m = deviceLevels[(std::size_t) i * 2 + (std::size_t) side];
+                const auto before = m.level;
+                const auto beforePeak = m.peak;
+                m.tick (takeDeviceLevel (cards[(std::size_t) i], side));
+                if (std::abs (m.level - before) > 1e-4f || std::abs (m.peak - beforePeak) > 1e-4f)
+                    repaint (r.expanded (1));
+            }
         }
     }
     void paintDeviceMeters (juce::Graphics& g)
@@ -1907,22 +1913,37 @@ private:
             const auto r = deviceMeterBounds (i);
             if (r.isEmpty() || ! g.clipRegionIntersects (r))
                 continue;
-            g.setColour (lv::meterWell);
-            g.fillRect (r);
-            const auto& m = i < (int) deviceLevels.size() ? deviceLevels[(std::size_t) i] : meters::PeakHold {};
-            const auto yOf = [&r] (float gain) {
-                const auto db = juce::Decibels::gainToDecibels (gain, -60.0f);
-                return r.getBottom() - juce::roundToInt ((float) r.getHeight() * juce::jlimit (0.0f, 1.0f, (db + 60.0f) / 66.0f));
-            };
-            if (m.level > 0.0f)
+            // (Live, capture L28: two 2 px wells #181818 with the window between, a 1 px #363636 line 11 px under the top;
+            // the level #00F758, the peak hold a 1 px line)
+            const auto body = r.withTrimmedTop (12);
+            for (int side = 0; side < 2; ++side)
             {
-                g.setColour (m.level >= 1.0f ? juce::Colour (0xffff3a3a) : juce::Colour (0xff00f758)); // (Live's meter green)
-                g.fillRect (r.reduced (1, 0).withTop (yOf (m.level)).withBottom (r.getBottom() - 1));
-            }
-            if (m.peak > 0.001f)
-            {
-                g.setColour (juce::Colour (0xff00f758));
-                g.fillRect (r.getX() + 1, juce::jmin (r.getBottom() - 2, yOf (m.peak)), r.getWidth() - 2, 1);
+                const auto bar = juce::Rectangle<int> (r.getX() + side * 3, r.getY(), 2, r.getHeight());
+                g.setColour (lv::meterWell);
+                g.fillRect (bar);
+                g.setColour (lv::surface);
+                g.fillRect (bar.getX(), r.getY() + 11, 2, 1);
+                const auto& m = (std::size_t) i * 2 + (std::size_t) side < deviceLevels.size() ? deviceLevels[(std::size_t) i * 2 + (std::size_t) side]
+                                                                                               : meters::PeakHold {};
+                const auto yOf = [&body] (float gain) {
+                    const auto db = juce::Decibels::gainToDecibels (gain, -60.0f);
+                    return body.getBottom() - juce::roundToInt ((float) body.getHeight() * juce::jlimit (0.0f, 1.0f, (db + 60.0f) / 66.0f));
+                };
+                if (m.level > 0.0f)
+                {
+                    g.setColour (juce::Colour (0xff00f758)); // (Live's meter green)
+                    g.fillRect (bar.withTop (yOf (m.level)).withBottom (body.getBottom()));
+                }
+                if (m.peak > 0.001f)
+                {
+                    g.setColour (juce::Colour (0xff00f758));
+                    g.fillRect (bar.getX(), juce::jmin (body.getBottom() - 1, yOf (m.peak)), 2, 1);
+                }
+                if (m.clipped)
+                {
+                    g.setColour (juce::Colour (0xffff3a3a));
+                    g.fillRect (bar.withHeight (11));
+                }
             }
         }
     }
