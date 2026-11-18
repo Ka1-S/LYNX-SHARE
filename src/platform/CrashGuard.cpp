@@ -1649,9 +1649,32 @@ MainProfiler& mainProfiler()
 }
 
 #if defined(LYNX_UNWIND)
+// LYNX_PROFILE_SYMBOLS=1: LYNX.exe's own frames named in the process (its PDB). Off by default (round 190kz): dbghelp
+// loads the whole ~750 MB LYNX.pdb on the first such frame, which took longer than a measurement run, so no window was
+// ever written (rounds 190gr-190kr). The frames are written as "LYNX.exe+0x<rva>" and in a raw section per window that
+// scripts/profile_symbolize.py names afterwards (llvm-symbolizer with the build's PDB). Other modules keep their exports.
+bool symbolizeOwnFrames()
+{
+    static const bool on = [] {
+        const auto* v = std::getenv ("LYNX_PROFILE_SYMBOLS");
+        return v != nullptr && v[0] == '1';
+    }();
+    return on;
+}
+
+bool inOwnModule (std::uintptr_t address)
+{
+    HMODULE module = nullptr;
+    return GetModuleHandleExW (GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                               reinterpret_cast<LPCWSTR> (address), &module)
+           && module == GetModuleHandleW (nullptr);
+}
+
 // "function" of a frame: its symbol without the offset, else the module
 std::string functionOf (std::uintptr_t address)
 {
+    if (! symbolizeOwnFrames() && inOwnModule (address))
+        return describeAddress (reinterpret_cast<const void*> (address));
     auto name = symbolOf ((DWORD64) address);
     if (const auto plus = name.rfind (" + 0x"); plus != std::string::npos)
         name.resize (plus);
@@ -1704,6 +1727,17 @@ void writeProfileWindow (const std::string& file, double fromS, double toS, long
     std::fprintf (out, "-- total (self + callees)\n");
     for (const auto& [n, k] : top (totalByName, 70))
         std::fprintf (out, "%6.1f %%  %s\n", 100.0 * (double) n / (double) std::max (1L, samples), k.c_str());
+    if (! symbolizeOwnFrames())
+    {
+        // (round 190kz) every own-module address with its weight, for scripts/profile_symbolize.py: "S|T <rva> <weight>"
+        const auto base = (std::uintptr_t) GetModuleHandleW (nullptr);
+        std::fprintf (out, "-- raw (LYNX.exe rva, weight; S = self, T = total; of %ld)\n", samples);
+        for (const auto* m : { &self, &total })
+            for (const auto& [a, n] : *m)
+                if (inOwnModule (a))
+                    std::fprintf (out, "%c %llx %ld\n", m == &self ? 'S' : 'T', (unsigned long long) (a - base), n);
+    }
+    std::fprintf (out, "-- end\n");
     std::fclose (out);
 }
 
