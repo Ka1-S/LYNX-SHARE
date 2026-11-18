@@ -3615,6 +3615,72 @@ constexpr StyleDef styleDefs[styles] {
 };
 constexpr double guitarWaitMs = 110.0;
 
+// round 190lp, revision 1 (hidden `revision`): the level gate refitted black-box on the reference's renders (refcap030 /
+// refcap182 / tp172b; gain trajectories in 1 … 10 ms frames around the tone bursts' onsets and ends). The gain moves in
+// dB: it opens with the attack (attackMinMs … attackScale × Attack), waits the hold (holdScale × Hold) plus the style's
+// own wait (waitMs + waitRelease × Release), then closes along two cascaded one-pole curves (time releaseBaseMs +
+// releaseScale × Release, the second one pole2 × as long: a smooth start, a straight middle in dB and a soft landing on
+// the range); attackPole2 likewise smooths the opening
+struct GateLaw1
+{
+    double attackMinMs, attackScale, releaseBaseMs, releaseScale, holdScale, waitMs, pole2, waitRelease = 0.0, attackPole2 = 0.0;
+    double slewDb = 0.0; // > 0: the closing falls at most this many dB per release time (straight in dB, then lands)
+    double attackLinear = 0.0; // ≥ 0.5: the opening moves in the linear domain (fast through the deep dBs, then settles)
+    double rmsMs = 0.0; // > 0: the level is the mean square over this time (× 2: a sine reads its peak), not the peak
+    bool own = true;    // false: the style keeps revision 0's measured gate (Upward: its lift already matches)
+};
+#ifdef LYNX_LGLAB
+GateLaw1 gateLaws1[styles] {
+#else
+constexpr GateLaw1 gateLaws1[styles] {
+#endif
+    // attack min / scale, release base / scale, hold scale, wait, pole2, wait × release, attack pole2, slew, linear attack
+    { 0.0, 0.49, 16.0, 0.3, 0.50, 0.0, 0.5, 0.08, 0.0, 20.0, 1.0 },    // classic: waits 0.08 × release, falls 20 dB per release
+    { 0.15, 0.49, 60.0, 0.5, 0.50, 0.0, 0.5, 0.05, 0.0, 10.0, 1.0 },   // clean: the slow fall toward its expansion
+    // vocal: the fit (opening along one pole in dB, closing along two) lifted the tones but took refcap182's S3 drums a
+    // step down with every variant tried: it keeps revision 0's gate
+    { 4.0, 0.49, 66.7, 0.5, 0.50, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, false },
+    { 0.25, 0.2, 3.75, 0.4, 0.60, 20.0, 0.0, 2.3, 1.0, 50.0, 0.0 },   // guitar: waits ~2.3 × release, falls 50 dB per release
+    { 0.0, 0.49, 273.0, 2.73, 0.50, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, false }, // upward: revision 0's lift (it matches)
+};
+#ifdef LYNX_LGLAB
+// lab only: LYNX_LGLAB="g0.wait=30,g3.pole2=1,..." overrides the revision-1 table
+struct GateLab
+{
+    GateLab()
+    {
+        const char* e = std::getenv ("LYNX_LGLAB");
+        if (e == nullptr) return;
+        std::string str (e);
+        std::size_t pos = 0;
+        while (pos < str.size())
+        {
+            auto end = str.find (',', pos);
+            if (end == std::string::npos) end = str.size();
+            const auto item = str.substr (pos, end - pos);
+            pos = end + 1;
+            const auto dot = item.find ('.'), eq = item.find ('=');
+            if (dot == std::string::npos || eq == std::string::npos || item[0] != 'g') continue;
+            const auto who = item.substr (0, dot), field = item.substr (dot + 1, eq - dot - 1);
+            const double v = std::atof (item.c_str() + eq + 1);
+            for (int k = 0; k < styles; ++k)
+            {
+                if (who != "gall" && who != "g" + std::to_string (k)) continue;
+                auto& l = gateLaws1[k];
+                if (field == "amin") l.attackMinMs = v; else if (field == "ascale") l.attackScale = v;
+                else if (field == "rbase") l.releaseBaseMs = v; else if (field == "rscale") l.releaseScale = v;
+                else if (field == "hscale") l.holdScale = v; else if (field == "wait") l.waitMs = v;
+                else if (field == "pole2") l.pole2 = v; else if (field == "wrel") l.waitRelease = v;
+                else if (field == "apole2") l.attackPole2 = v; else if (field == "slew") l.slewDb = v;
+                else if (field == "alin") l.attackLinear = v; else if (field == "rms") l.rmsMs = v;
+                else if (field == "own") l.own = v >= 0.5;
+            }
+        }
+    }
+};
+const GateLab gateLab;
+#endif
+
 // round 190v [EXEC] (trial190k's noise probes through the reference's Vocal style, threshold −60 so the gate itself
 // stays out of it): after a pause, content above about 4 kHz comes back turned down and recovers on its own: white
 // noise is 0.375 dB down per dB over −62 dBFS at its onset (−7.6 dB at −42 dBFS, −15 at −20, −21 at −6) and the gain
@@ -3749,6 +3815,10 @@ public:
         osGain.reset();
         level = 0.0;
         gain = 0.0;
+        gainDb1 = gainDb2 = -200.0;
+        shownDb = -200.0;
+        shownGain = 0.0;
+        meanSq = 0.0;
         isOpen = false;
         holdLeft = 0;
         nrHp.reset();
@@ -3833,6 +3903,24 @@ private:
         const auto holdSamples = (int) (holdMs (p[hold]) * sd.holdScale * 0.001 * sr)
                                  + (st == Style::guitar ? (int) (guitarWaitMs * 0.001 * sr) : 0);
         const auto levelRel = coef (5.0, sr);
+        // round 190lp: revision 1 (hidden) — the gain moves in dB along the style's own curves (gateLaws1)
+        const auto& g1 = gateLaws1[(int) st];
+        const bool rev1 = p[revision] >= 0.5f && g1.own;
+        const auto kA1 = rev1 ? 1.0 - coef (std::max (g1.attackMinMs, attackMs (p[attack]) * g1.attackScale), sr) : 0.0; // (one pole)
+        const auto relMs1 = g1.releaseBaseMs + g1.releaseScale * releaseMs (p[release]);
+        const auto kR1 = rev1 ? 1.0 - coef (relMs1, sr) : 0.0;
+        const auto kR2 = rev1 ? (g1.pole2 > 0.0 ? 1.0 - coef (relMs1 * g1.pole2, sr) : 1.0) : 0.0;
+        const bool attLin1 = rev1 && g1.attackLinear >= 0.5;
+        const bool rms1 = rev1 && g1.rmsMs > 0.0;
+        const auto kRms1 = rms1 ? coef (g1.rmsMs, sr) : 0.0;
+        const auto slew1 = rev1 && g1.slewDb > 0.0 ? g1.slewDb / (std::max (1.0, relMs1) * 0.001 * sr) : 1.0e9;
+        const auto hold1 = rev1 ? (int) ((holdMs (p[hold]) * g1.holdScale + g1.waitMs + g1.waitRelease * releaseMs (p[release])) * 0.001 * sr) : 0;
+        const auto attMs1 = std::max (g1.attackMinMs, attackMs (p[attack]) * g1.attackScale);
+        const auto kA2 = rev1 && g1.attackPole2 > 0.0 ? 1.0 - coef (attMs1 * g1.attackPole2, sr) : 1.0;
+        if (! rev1)
+            gainDb1 = gainDb2 = -200.0; // (revision 1's state follows the gain it takes over when it is switched on)
+        else if (gainDb2 <= -199.0 && gain > 1.0e-10)
+            gainDb1 = gainDb2 = gainToDb (gain);
         const auto gap = st == Style::upward ? 0.0 : closeGap (p);
         if (gap <= 0.0)
             isOpen = false;
@@ -3949,7 +4037,13 @@ private:
             }
             // peak detector: instant attack, 5 ms release
             const auto m = (double) std::max (std::abs (sa), std::abs (sb));
-            level = m > level ? m : levelRel * level + (1.0 - levelRel) * m;
+            if (rms1) // round 190lp, revision 1: the style's mean-square level
+            {
+                meanSq = kRms1 * meanSq + (1.0 - kRms1) * m * m;
+                level = std::sqrt (2.0 * meanSq);
+            }
+            else
+                level = m > level ? m : levelRel * level + (1.0 - levelRel) * m;
             if (trans)
             {
                 // round 190dm: the onset detector on the side chain's first difference (unity at 1 kHz)
@@ -4002,11 +4096,49 @@ private:
                 else if (gateCurve (p, levelDb, gap) < -1.0)
                     isOpen = false;
             }
-            auto target = dbToGain (gateCurve (p, levelDb, isOpen ? gap : 0.0));
+            const auto curveDb = gateCurve (p, levelDb, isOpen ? gap : 0.0);
+            auto target = dbToGain (curveDb);
             if (duck) // ducking: an open gate is the deepest cut
                 target = duckFloor / std::max (1e-9, target);
             // the gain moves in the linear domain: opening with the attack, closing (after hold) with the release
-            if (target >= gain)
+            if (rev1) // round 190lp: in dB — opening with the attack, closing after the hold + wait along two poles
+            {
+                const auto tDb = std::max (-200.0, duck ? -rangeDb (p[range]) - curveDb : curveDb);
+                if (tDb >= gainDb2)
+                {
+                    gainDb1 = std::max (gainDb1, gainDb2); // (after a closing the first pole sits lower)
+                    if (gainDb1 == tDb && gainDb2 == tDb)
+                        ; // (settled: nothing moves)
+                    else if (attLin1)
+                    {
+                        auto l1 = gainDb1 <= -199.0 ? 0.0 : dbToGain (gainDb1), l2 = gainDb2 <= -199.0 ? 0.0 : dbToGain (gainDb2);
+                        l1 += (target - l1) * kA1;
+                        l2 += (l1 - l2) * kA2;
+                        gainDb1 = std::max (-200.0, gainToDb (std::max (l1, 1e-10)));
+                        gainDb2 = std::max (-200.0, gainToDb (std::max (l2, 1e-10)));
+                    }
+                    else
+                    {
+                        gainDb1 += (tDb - gainDb1) * kA1;
+                        gainDb2 += (gainDb1 - gainDb2) * kA2;
+                    }
+                    holdLeft = hold1;
+                }
+                else if (holdLeft > 0)
+                    --holdLeft;
+                else
+                {
+                    gainDb1 += std::max ((tDb - gainDb1) * kR1, -slew1);
+                    gainDb2 += (gainDb1 - gainDb2) * kR2;
+                }
+                if (gainDb2 != shownDb) // (the gain only when its dB changed)
+                {
+                    shownDb = gainDb2;
+                    shownGain = gainDb2 <= -199.0 ? 0.0 : dbToGain (gainDb2);
+                }
+                gain = shownGain;
+            }
+            else if (target >= gain)
             {
                 gain = aA * gain + (1.0 - aA) * target;
                 holdLeft = holdSamples;
@@ -4111,6 +4243,8 @@ private:
     double nrMs = 0.0, nrAll = 0.0, nrPeak = 0.0, nrRecovered = 0.0, nrGapMs = 1e9, nrTarget = 1.0, nrGain = 1.0;
     int nrCount = 0;
     double level = 0.0, gain = 0.0;
+    double gainDb1 = -200.0, gainDb2 = -200.0, meanSq = 0.0; // round 190lp: revision 1's two poles (dB), mean square
+    double shownDb = -200.0, shownGain = 0.0; // round 190lp: the last pole value turned into a gain
     bool isOpen = false; // round tp172b: past the opening point (the hysteresis)
     int holdLeft = 0;
     // round 190dm: the transient trigger — the detector's followers, the last side-chain samples, the time since the

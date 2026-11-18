@@ -207,6 +207,7 @@ EffectSlot limiterSlot (const Point& p, double ceilingDb)
 EffectSlot truePeakSlotOf()
 {
     auto slot = makeEffectSlot (EffectKind::apexLimiter);
+    slot.params[(std::size_t) apex::pRevision] = 0.0f; // round 190lp: the safety stage keeps the laws it was tuned on
     slot.params[(std::size_t) apex::pGain] = 0.0f;
     slot.params[(std::size_t) apex::pCeiling] = (30.0f + trueCeilingDb - truePeakMarginDb) / 30.0f; // (−30 … 0 dB)
     slot.params[(std::size_t) apex::pTruePeak] = 1.0f;
