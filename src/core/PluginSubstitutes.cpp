@@ -25,6 +25,7 @@
 #include "core/EchoSuite.h"
 #include "core/Reeverb2.h"
 #include "core/DynamicsSuite.h"
+#include "core/ZipLite.h"
 
 namespace lynx
 {
@@ -789,6 +790,236 @@ names = Fresh Air; FreshAir
 # round 113: its two air amounts are read from the state (freshAirAmounts); round 124: they drive Aether's dynamic
 # air model, measured black-box on the official trial to match it sample for sample (REA_rodada124 §3)
 translate = fresh-air
+
+# ---------------------------------------------------------------- Kilohearts (round 190ln)
+# The kHs snapins (kHs Essentials) and Faturator. Their state is a ZIP with state.json whose model holds every setting in
+# the plug-in's own units (core/KiloheartsStates.inc); one translator ("kilohearts") sets the stand-in to those units.
+# The plug-ins on this PC run without a licence (Slate's iLok builds): they render only their start-up settings and ignore
+# every change, so the maps follow the plug-ins' own parameter texts and public manuals, scored on those defaults only.
+# Disperser plays on Facet EQ's hidden all-pass cascade (its structure read statically). Ring Mod, Reverser, Resonator, Shaper and Phase Distortion have no stand-in yet (bypass).
+[kilohearts-disperser]
+product = Disperser
+vendor = Kilohearts
+lynx = Facet EQ
+names = Disperser
+translate = kilohearts
+
+[khs-gain]
+product = kHs Gain
+vendor = Kilohearts
+lynx = Utility
+names = kHs Gain
+translate = kilohearts
+
+[khs-channel-mixer]
+product = kHs Channel Mixer
+vendor = Kilohearts
+lynx = Utility
+names = kHs Channel Mixer
+translate = kilohearts
+
+[khs-stereo]
+product = kHs Stereo
+vendor = Kilohearts
+lynx = Utility
+names = kHs Stereo
+translate = kilohearts
+
+[khs-haas]
+product = kHs Haas
+vendor = Kilohearts
+lynx = Stereo Shaper
+names = kHs Haas
+translate = kilohearts
+
+[khs-filter]
+product = kHs Filter
+vendor = Kilohearts
+lynx = Facet EQ
+names = kHs Filter
+translate = kilohearts
+
+[khs-3-band-eq]
+product = kHs 3-Band EQ
+vendor = Kilohearts
+lynx = Facet EQ
+names = kHs 3-Band EQ
+translate = kilohearts
+
+[khs-formant-filter]
+product = kHs Formant Filter
+vendor = Kilohearts
+lynx = Facet EQ
+names = kHs Formant Filter
+translate = kilohearts
+
+[khs-ladder-filter]
+product = kHs Ladder Filter
+vendor = Kilohearts
+lynx = Filter
+names = kHs Ladder Filter
+translate = kilohearts
+
+[khs-nonlinear-filter]
+product = kHs Nonlinear Filter
+vendor = Kilohearts
+lynx = Filter
+names = kHs Nonlinear Filter
+translate = kilohearts
+
+[khs-compressor]
+product = kHs Compressor
+vendor = Kilohearts
+lynx = Compressor
+names = kHs Compressor
+translate = kilohearts
+
+[khs-compactor]
+product = kHs Compactor
+vendor = Kilohearts
+lynx = Compressor
+names = kHs Compactor
+translate = kilohearts
+
+[khs-dynamics]
+product = kHs Dynamics
+vendor = Kilohearts
+lynx = Compressor
+names = kHs Dynamics
+translate = kilohearts
+
+[khs-limiter]
+product = kHs Limiter
+vendor = Kilohearts
+lynx = Limiter
+names = kHs Limiter
+translate = kilohearts
+
+[khs-clipper]
+product = kHs Clipper
+vendor = Kilohearts
+lynx = Fruity Soft Clipper
+names = kHs Clipper
+translate = kilohearts
+
+[khs-gate]
+product = kHs Gate
+vendor = Kilohearts
+lynx = Sentry Gate
+names = kHs Gate
+translate = kilohearts
+
+[khs-transient-shaper]
+product = kHs Transient Shaper
+vendor = Kilohearts
+lynx = Strike Shaper
+names = kHs Transient Shaper
+translate = kilohearts
+
+[khs-distortion]
+product = kHs Distortion
+vendor = Kilohearts
+lynx = Distortion
+names = kHs Distortion
+translate = kilohearts
+
+[kilohearts-faturator]
+product = Faturator
+vendor = Kilohearts
+lynx = Distortion
+names = Faturator
+translate = kilohearts
+
+[khs-bitcrush]
+product = kHs Bitcrush
+vendor = Kilohearts
+lynx = Lo-fi
+names = kHs Bitcrush
+translate = kilohearts
+
+[khs-frequency-shifter]
+product = kHs Frequency Shifter
+vendor = Kilohearts
+lynx = Frequency shifter
+names = kHs Frequency Shifter
+translate = kilohearts
+
+[khs-pitch-shifter]
+product = kHs Pitch Shifter
+vendor = Kilohearts
+lynx = Pitch shift
+names = kHs Pitch Shifter
+translate = kilohearts
+
+[khs-chorus]
+product = kHs Chorus
+vendor = Kilohearts
+lynx = Chorus
+names = kHs Chorus
+translate = kilohearts
+
+[khs-ensemble]
+product = kHs Ensemble
+vendor = Kilohearts
+lynx = Chorus
+names = kHs Ensemble
+translate = kilohearts
+
+[khs-phaser]
+product = kHs Phaser
+vendor = Kilohearts
+lynx = Fruity Phaser
+names = kHs Phaser
+translate = kilohearts
+
+[khs-flanger]
+product = kHs Flanger
+vendor = Kilohearts
+lynx = Fruity Flanger
+names = kHs Flanger
+translate = kilohearts
+
+[khs-reverb]
+product = kHs Reverb
+vendor = Kilohearts
+lynx = Reeverb 2
+names = kHs Reverb
+translate = kilohearts
+
+[khs-delay]
+product = kHs Delay
+vendor = Kilohearts
+lynx = Echoform
+names = kHs Delay
+translate = kilohearts
+
+[khs-dual-delay]
+product = kHs Dual Delay
+vendor = Kilohearts
+lynx = Echoform
+names = kHs Dual Delay
+translate = kilohearts
+
+[khs-tape-stop]
+product = kHs Tape Stop
+vendor = Kilohearts
+lynx = Pocket Tape Stop
+names = kHs Tape Stop
+translate = kilohearts
+
+[khs-comb-filter]
+product = kHs Comb Filter
+vendor = Kilohearts
+lynx = Pocket Comb Filter
+names = kHs Comb Filter
+translate = kilohearts
+
+[khs-trance-gate]
+product = kHs Trance Gate
+vendor = Kilohearts
+lynx = Volume gate
+names = kHs Trance Gate
+translate = kilohearts
 
 [soundtoys-decapitator]
 product = Decapitator
@@ -3185,6 +3416,8 @@ int translateFittedMap (const std::vector<std::uint8_t>& state, EffectSlot& slot
     return 0;
 }
 
+#include "core/KiloheartsStates.inc" // round 190ln
+
 RawTranslator rawTranslatorNamed (std::string_view name)
 {
     if (name == "fitted-map")
@@ -3240,6 +3473,8 @@ RawTranslator rawTranslatorNamed (std::string_view name)
         return translateWavesSslCompBus;
     if (name == "waves-reverb")
         return translateWavesReverb;
+    if (name == "kilohearts") // round 190ln
+        return translateKilohearts;
     return nullptr;
 }
 

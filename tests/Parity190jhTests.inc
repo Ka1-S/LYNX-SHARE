@@ -74,7 +74,9 @@ TEST (parity190jh_facet_auto_threshold_is_hidden_and_off_in_old_projects)
     using namespace lynx;
     const auto& info = effectInfo (EffectKind::facetEq);
     CHECK (info.params.size() == (std::size_t) facet::paramCount);          // hidden: no new control or string
-    CHECK (facet::autoThresholdParam0 == facet::paramCount && facet::storedParamCount == facet::paramCount + facet::bands);
+    // (round 190ln: three more hidden parameters after them, the all-pass cascade of the Disperser role)
+    CHECK (facet::autoThresholdParam0 == facet::paramCount && facet::dispersionCountParam == facet::paramCount + facet::bands
+           && facet::storedParamCount == facet::dispersionCountParam + 3);
     auto s = makeEffectSlot (EffectKind::facetEq);
     for (int b = 0; b < facet::bands; ++b)
         CHECK (! facet::autoThreshold (s.params, b));
