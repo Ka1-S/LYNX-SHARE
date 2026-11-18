@@ -11424,3 +11424,14 @@ countries: cn sg
 "Prepare edited clips when a project opens (LYNX)" = "打开项目时准备已编辑的片段 (LYNX)"
 "Select all notes" = "选择所有音符"
 "When a project opens, the audio clips whose notes were edited in Edit notes (polyphonic) are prepared in the background, so the editor opens ready to play a dragged note. Also in that editor's Options menu." = "打开项目时，在“编辑音符（复音）”中编辑过音符的音频片段会在后台准备好，编辑器打开后即可播放拖动的音符。也在该编辑器的“选项”菜单中。"
+
+# --- rollup 0.1.30 step 9: Save a copy for 0.1.28 knows rounds 190lq / 190kw-190lg / 190lf / 190ln
+"Echoform's H-Delay loop law (the Waves H-Delay stand-in) plays as its plain hybrid echo: {0}" = "Echoform 的 H-Delay 环路定律（Waves H-Delay 的替代）按其普通混合回声播放：{0}"
+"Facet EQ's all-pass dispersion (the Kilohearts Disperser stand-in) is left out: {0}" = "Facet EQ 的全通色散（Kilohearts Disperser 的替代）被省略：{0}"
+"Ember's Saturn styles play their earlier measured characters (not the reference's): {0}" = "Ember 的 Saturn 风格按其先前测量的特性播放（而非参考的）：{0}"
+"Prism Multiband's Pro-MB band law plays its measured detector: {0}" = "Prism Multiband 的 Pro-MB 频段定律按其测量的检测器播放：{0}"
+"The Limiter's L2 law (the Waves L2 stand-in) plays as the classic Limiter: {0}" = "Limiter 的 L2 定律（Waves L2 的替代）按经典 Limiter 播放：{0}"
+"Glow Leveler's cell law (the Waves CLA-2A stand-in) plays as its Opto voicing: {0}" = "Glow Leveler 的光电池定律（Waves CLA-2A 的替代）按其 Opto 音色播放：{0}"
+"Reeverb 2's measured direct sound (the Waves TrueVerb stand-in) is left out: {0}" = "Reeverb 2 的测量直达声（Waves TrueVerb 的替代）被省略：{0}"
+"Quell's zero law (the Waves NS1 stand-in) is left out: its lowest Amount settings play the matched engine: {0}" = "Quell 的零点定律（Waves NS1 的替代）被省略：其最低的 Amount 设置播放匹配引擎：{0}"
+"Notes on audio clip channels play cut at each note's end and at the clip's own pitch: {0}" = "音频片段通道上的音符在每个音符结束处被截断，并以片段本身的音高播放：{0}"

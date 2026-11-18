@@ -11424,3 +11424,14 @@ countries: ru by kz
 "Prepare edited clips when a project opens (LYNX)" = "Готовить изменённые клипы при открытии проекта (LYNX)"
 "Select all notes" = "Выделить все ноты"
 "When a project opens, the audio clips whose notes were edited in Edit notes (polyphonic) are prepared in the background, so the editor opens ready to play a dragged note. Also in that editor's Options menu." = "При открытии проекта аудиоклипы, ноты которых изменены в «Редактировать ноты (полифония)», готовятся в фоне, и редактор открывается готовым сразу проиграть перетаскиваемую ноту. Также в меню «Параметры» этого редактора."
+
+# --- rollup 0.1.30 step 9: Save a copy for 0.1.28 knows rounds 190lq / 190kw-190lg / 190lf / 190ln
+"Echoform's H-Delay loop law (the Waves H-Delay stand-in) plays as its plain hybrid echo: {0}" = "Закон петли H-Delay в Echoform (замена Waves H-Delay) звучит как обычное гибридное эхо: {0}"
+"Facet EQ's all-pass dispersion (the Kilohearts Disperser stand-in) is left out: {0}" = "Всепропускающая дисперсия Facet EQ (замена Kilohearts Disperser) опускается: {0}"
+"Ember's Saturn styles play their earlier measured characters (not the reference's): {0}" = "Стили Saturn в Ember звучат с прежними измеренными характерами (не эталонными): {0}"
+"Prism Multiband's Pro-MB band law plays its measured detector: {0}" = "Закон полос Pro-MB в Prism Multiband звучит со своим измеренным детектором: {0}"
+"The Limiter's L2 law (the Waves L2 stand-in) plays as the classic Limiter: {0}" = "Закон L2 в Limiter (замена Waves L2) звучит как классический Limiter: {0}"
+"Glow Leveler's cell law (the Waves CLA-2A stand-in) plays as its Opto voicing: {0}" = "Закон ячейки Glow Leveler (замена Waves CLA-2A) звучит как его режим Opto: {0}"
+"Reeverb 2's measured direct sound (the Waves TrueVerb stand-in) is left out: {0}" = "Измеренный прямой звук Reeverb 2 (замена Waves TrueVerb) опускается: {0}"
+"Quell's zero law (the Waves NS1 stand-in) is left out: its lowest Amount settings play the matched engine: {0}" = "Нулевой закон Quell (замена Waves NS1) опускается: самые низкие значения Amount звучат с подобранным движком: {0}"
+"Notes on audio clip channels play cut at each note's end and at the clip's own pitch: {0}" = "Ноты на каналах аудиоклипов звучат обрезанными в конце каждой ноты и на собственной высоте клипа: {0}"

@@ -11424,3 +11424,14 @@ countries: kr
 "Prepare edited clips when a project opens (LYNX)" = "프로젝트를 열 때 편집된 클립 준비 (LYNX)"
 "Select all notes" = "모든 노트 선택"
 "When a project opens, the audio clips whose notes were edited in Edit notes (polyphonic) are prepared in the background, so the editor opens ready to play a dragged note. Also in that editor's Options menu." = "프로젝트를 열면 노트 편집 (폴리포닉)에서 노트를 편집한 오디오 클립을 백그라운드에서 준비하여, 편집기가 드래그한 노트를 바로 재생할 수 있게 열립니다. 해당 편집기의 옵션 메뉴에도 있습니다."
+
+# --- rollup 0.1.30 step 9: Save a copy for 0.1.28 knows rounds 190lq / 190kw-190lg / 190lf / 190ln
+"Echoform's H-Delay loop law (the Waves H-Delay stand-in) plays as its plain hybrid echo: {0}" = "Echoform의 H-Delay 루프 법칙(Waves H-Delay 대체)은 기본 하이브리드 에코로 재생됩니다: {0}"
+"Facet EQ's all-pass dispersion (the Kilohearts Disperser stand-in) is left out: {0}" = "Facet EQ의 올패스 분산(Kilohearts Disperser 대체)은 제외됩니다: {0}"
+"Ember's Saturn styles play their earlier measured characters (not the reference's): {0}" = "Ember의 Saturn 스타일은 이전에 측정된 캐릭터로 재생됩니다(레퍼런스의 것이 아님): {0}"
+"Prism Multiband's Pro-MB band law plays its measured detector: {0}" = "Prism Multiband의 Pro-MB 밴드 법칙은 측정된 디텍터로 재생됩니다: {0}"
+"The Limiter's L2 law (the Waves L2 stand-in) plays as the classic Limiter: {0}" = "Limiter의 L2 법칙(Waves L2 대체)은 클래식 Limiter로 재생됩니다: {0}"
+"Glow Leveler's cell law (the Waves CLA-2A stand-in) plays as its Opto voicing: {0}" = "Glow Leveler의 셀 법칙(Waves CLA-2A 대체)은 Opto 보이싱으로 재생됩니다: {0}"
+"Reeverb 2's measured direct sound (the Waves TrueVerb stand-in) is left out: {0}" = "Reeverb 2의 측정된 직접음(Waves TrueVerb 대체)은 제외됩니다: {0}"
+"Quell's zero law (the Waves NS1 stand-in) is left out: its lowest Amount settings play the matched engine: {0}" = "Quell의 제로 법칙(Waves NS1 대체)은 제외됩니다. 가장 낮은 Amount 설정에서는 매칭 엔진이 재생됩니다: {0}"
+"Notes on audio clip channels play cut at each note's end and at the clip's own pitch: {0}" = "오디오 클립 채널의 노트는 각 노트의 끝에서 잘리고 클립 고유의 피치로 재생됩니다: {0}"

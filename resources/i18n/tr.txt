@@ -11424,3 +11424,14 @@ countries: tr
 "Prepare edited clips when a project opens (LYNX)" = "Proje açılırken düzenlenmiş klipleri hazırla (LYNX)"
 "Select all notes" = "Tüm notaları seç"
 "When a project opens, the audio clips whose notes were edited in Edit notes (polyphonic) are prepared in the background, so the editor opens ready to play a dragged note. Also in that editor's Options menu." = "Bir proje açılırken, notaları Notaları düzenle (polifonik) içinde düzenlenen ses klipleri arka planda hazırlanır; düzenleyici sürüklenen bir notayı hemen çalmaya hazır açılır. Ayrıca o düzenleyicinin Seçenekler menüsünde."
+
+# --- rollup 0.1.30 step 9: Save a copy for 0.1.28 knows rounds 190lq / 190kw-190lg / 190lf / 190ln
+"Echoform's H-Delay loop law (the Waves H-Delay stand-in) plays as its plain hybrid echo: {0}" = "Echoform'un H-Delay döngü yasası (Waves H-Delay yerine geçen) sade hibrit yankısı olarak çalar: {0}"
+"Facet EQ's all-pass dispersion (the Kilohearts Disperser stand-in) is left out: {0}" = "Facet EQ'nun tüm geçiren dağılımı (Kilohearts Disperser yerine geçen) dışarıda bırakılır: {0}"
+"Ember's Saturn styles play their earlier measured characters (not the reference's): {0}" = "Ember'in Saturn stilleri önceki ölçülmüş karakterleriyle çalar (referansınkiyle değil): {0}"
+"Prism Multiband's Pro-MB band law plays its measured detector: {0}" = "Prism Multiband'ın Pro-MB bant yasası ölçülmüş dedektörüyle çalar: {0}"
+"The Limiter's L2 law (the Waves L2 stand-in) plays as the classic Limiter: {0}" = "Limiter'ın L2 yasası (Waves L2 yerine geçen) klasik Limiter olarak çalar: {0}"
+"Glow Leveler's cell law (the Waves CLA-2A stand-in) plays as its Opto voicing: {0}" = "Glow Leveler'ın hücre yasası (Waves CLA-2A yerine geçen) Opto sesi olarak çalar: {0}"
+"Reeverb 2's measured direct sound (the Waves TrueVerb stand-in) is left out: {0}" = "Reeverb 2'nin ölçülmüş doğrudan sesi (Waves TrueVerb yerine geçen) dışarıda bırakılır: {0}"
+"Quell's zero law (the Waves NS1 stand-in) is left out: its lowest Amount settings play the matched engine: {0}" = "Quell'in sıfır yasası (Waves NS1 yerine geçen) dışarıda bırakılır: en düşük Amount ayarları eşleştirilmiş motoru çalar: {0}"
+"Notes on audio clip channels play cut at each note's end and at the clip's own pitch: {0}" = "Ses klibi kanallarındaki notalar her notanın sonunda kesilerek ve klibin kendi perdesinde çalar: {0}"

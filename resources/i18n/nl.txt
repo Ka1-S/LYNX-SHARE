@@ -11424,3 +11424,14 @@ countries: nl be
 "Prepare edited clips when a project opens (LYNX)" = "Bewerkte clips voorbereiden bij het openen van een project (LYNX)"
 "Select all notes" = "Alle noten selecteren"
 "When a project opens, the audio clips whose notes were edited in Edit notes (polyphonic) are prepared in the background, so the editor opens ready to play a dragged note. Also in that editor's Options menu." = "Bij het openen van een project worden audioclips waarvan noten in Noten bewerken (polyfoon) zijn bewerkt op de achtergrond voorbereid, zodat de editor opent en een gesleepte noot meteen kan afspelen. Ook in het menu Opties van die editor."
+
+# --- rollup 0.1.30 step 9: Save a copy for 0.1.28 knows rounds 190lq / 190kw-190lg / 190lf / 190ln
+"Echoform's H-Delay loop law (the Waves H-Delay stand-in) plays as its plain hybrid echo: {0}" = "De H-Delay-luswet van Echoform (de vervanger van Waves H-Delay) speelt als zijn gewone hybride echo: {0}"
+"Facet EQ's all-pass dispersion (the Kilohearts Disperser stand-in) is left out: {0}" = "De allpass-dispersie van Facet EQ (de vervanger van Kilohearts Disperser) vervalt: {0}"
+"Ember's Saturn styles play their earlier measured characters (not the reference's): {0}" = "De Saturn-stijlen van Ember spelen hun eerdere gemeten karakters (niet die van de referentie): {0}"
+"Prism Multiband's Pro-MB band law plays its measured detector: {0}" = "De Pro-MB-bandwet van Prism Multiband speelt zijn gemeten detector: {0}"
+"The Limiter's L2 law (the Waves L2 stand-in) plays as the classic Limiter: {0}" = "De L2-wet van de Limiter (de vervanger van Waves L2) speelt als de klassieke Limiter: {0}"
+"Glow Leveler's cell law (the Waves CLA-2A stand-in) plays as its Opto voicing: {0}" = "De celwet van Glow Leveler (de vervanger van Waves CLA-2A) speelt als zijn Opto-stemming: {0}"
+"Reeverb 2's measured direct sound (the Waves TrueVerb stand-in) is left out: {0}" = "Het gemeten directe geluid van Reeverb 2 (de vervanger van Waves TrueVerb) vervalt: {0}"
+"Quell's zero law (the Waves NS1 stand-in) is left out: its lowest Amount settings play the matched engine: {0}" = "De nulwet van Quell (de vervanger van Waves NS1) vervalt: de laagste Amount-instellingen spelen de aangepaste engine: {0}"
+"Notes on audio clip channels play cut at each note's end and at the clip's own pitch: {0}" = "Noten op audioclipkanalen spelen afgekapt aan het einde van elke noot en op de eigen toonhoogte van de clip: {0}"

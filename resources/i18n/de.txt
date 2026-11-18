@@ -11424,3 +11424,14 @@ countries: de at ch li lu
 "Prepare edited clips when a project opens (LYNX)" = "Bearbeitete Clips beim Öffnen eines Projekts vorbereiten (LYNX)"
 "Select all notes" = "Alle Noten auswählen"
 "When a project opens, the audio clips whose notes were edited in Edit notes (polyphonic) are prepared in the background, so the editor opens ready to play a dragged note. Also in that editor's Options menu." = "Beim Öffnen eines Projekts werden Audioclips, deren Noten in Noten bearbeiten (polyphon) geändert wurden, im Hintergrund vorbereitet, sodass der Editor eine gezogene Note sofort abspielen kann. Auch im Optionen-Menü dieses Editors."
+
+# --- rollup 0.1.30 step 9: Save a copy for 0.1.28 knows rounds 190lq / 190kw-190lg / 190lf / 190ln
+"Echoform's H-Delay loop law (the Waves H-Delay stand-in) plays as its plain hybrid echo: {0}" = "Das H-Delay-Schleifengesetz von Echoform (der Ersatz für Waves H-Delay) spielt als sein einfaches Hybrid-Echo: {0}"
+"Facet EQ's all-pass dispersion (the Kilohearts Disperser stand-in) is left out: {0}" = "Die Allpass-Dispersion von Facet EQ (der Ersatz für Kilohearts Disperser) entfällt: {0}"
+"Ember's Saturn styles play their earlier measured characters (not the reference's): {0}" = "Die Saturn-Stile von Ember spielen ihre früheren gemessenen Charaktere (nicht die der Referenz): {0}"
+"Prism Multiband's Pro-MB band law plays its measured detector: {0}" = "Das Pro-MB-Bandgesetz von Prism Multiband spielt seinen gemessenen Detektor: {0}"
+"The Limiter's L2 law (the Waves L2 stand-in) plays as the classic Limiter: {0}" = "Das L2-Gesetz des Limiters (der Ersatz für Waves L2) spielt als klassischer Limiter: {0}"
+"Glow Leveler's cell law (the Waves CLA-2A stand-in) plays as its Opto voicing: {0}" = "Das Zellgesetz von Glow Leveler (der Ersatz für Waves CLA-2A) spielt als seine Opto-Stimmung: {0}"
+"Reeverb 2's measured direct sound (the Waves TrueVerb stand-in) is left out: {0}" = "Der gemessene Direktschall von Reeverb 2 (der Ersatz für Waves TrueVerb) entfällt: {0}"
+"Quell's zero law (the Waves NS1 stand-in) is left out: its lowest Amount settings play the matched engine: {0}" = "Das Nullgesetz von Quell (der Ersatz für Waves NS1) entfällt: die niedrigsten Amount-Werte spielen die angepasste Engine: {0}"
+"Notes on audio clip channels play cut at each note's end and at the clip's own pitch: {0}" = "Noten auf Audioclip-Kanälen spielen am Ende jeder Note abgeschnitten und in der Tonhöhe des Clips: {0}"

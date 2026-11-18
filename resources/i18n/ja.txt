@@ -11424,3 +11424,14 @@ countries: jp
 "Prepare edited clips when a project opens (LYNX)" = "プロジェクトを開くときに編集済みクリップを準備 (LYNX)"
 "Select all notes" = "すべてのノートを選択"
 "When a project opens, the audio clips whose notes were edited in Edit notes (polyphonic) are prepared in the background, so the editor opens ready to play a dragged note. Also in that editor's Options menu." = "プロジェクトを開くと、ノートを編集 (ポリフォニック) でノートを編集したオーディオクリップがバックグラウンドで準備され、エディターはドラッグしたノートをすぐ再生できる状態で開きます。このエディターのオプションメニューにもあります。"
+
+# --- rollup 0.1.30 step 9: Save a copy for 0.1.28 knows rounds 190lq / 190kw-190lg / 190lf / 190ln
+"Echoform's H-Delay loop law (the Waves H-Delay stand-in) plays as its plain hybrid echo: {0}" = "Echoform の H-Delay ループ則（Waves H-Delay の代替）は通常のハイブリッドエコーとして再生されます: {0}"
+"Facet EQ's all-pass dispersion (the Kilohearts Disperser stand-in) is left out: {0}" = "Facet EQ のオールパス分散（Kilohearts Disperser の代替）は省かれます: {0}"
+"Ember's Saturn styles play their earlier measured characters (not the reference's): {0}" = "Ember の Saturn スタイルは以前の計測キャラクター（リファレンスのものではない）で再生されます: {0}"
+"Prism Multiband's Pro-MB band law plays its measured detector: {0}" = "Prism Multiband の Pro-MB バンド則は計測ディテクターで再生されます: {0}"
+"The Limiter's L2 law (the Waves L2 stand-in) plays as the classic Limiter: {0}" = "Limiter の L2 則（Waves L2 の代替）はクラシック Limiter として再生されます: {0}"
+"Glow Leveler's cell law (the Waves CLA-2A stand-in) plays as its Opto voicing: {0}" = "Glow Leveler のセル則（Waves CLA-2A の代替）は Opto ボイシングとして再生されます: {0}"
+"Reeverb 2's measured direct sound (the Waves TrueVerb stand-in) is left out: {0}" = "Reeverb 2 の計測ダイレクト音（Waves TrueVerb の代替）は省かれます: {0}"
+"Quell's zero law (the Waves NS1 stand-in) is left out: its lowest Amount settings play the matched engine: {0}" = "Quell のゼロ則（Waves NS1 の代替）は省かれます。最も低い Amount 設定ではマッチドエンジンが再生されます: {0}"
+"Notes on audio clip channels play cut at each note's end and at the clip's own pitch: {0}" = "オーディオクリップチャンネルのノートは各ノートの終わりで切れ、クリップ本来のピッチで再生されます: {0}"

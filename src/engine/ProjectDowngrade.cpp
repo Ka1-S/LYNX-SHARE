@@ -8,13 +8,16 @@
 #include "core/FacetEq.h"
 #include "core/GeneratorPresets.h"
 #include "core/Harmor.h"
+#include "core/LimiterLaw.h"
 #include "core/LuxeVerb.h"
 #include "core/LynxVerbs.h"
 #include "core/MixSuite.h"
 #include "core/NewtoneFx.h"
 #include "core/PeakShapes.h"
 #include "core/RackRenderer.h"
+#include "core/Reeverb2.h"
 #include "core/VoiceShift.h"
+#include "core/VoiceTools.h"
 
 #include <cmath>
 #include <functional>
@@ -271,7 +274,7 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
     // effects (round 190ho): Voice Shift's Measured law revision 1, Ridge Strip's 4K Pink EQ; (round 190iq) Hush De-esser's
     // measured Allround timing (hidden parameters 0.1.28 ignores: it plays revision 0, Black, and the earlier timing)
     {
-        juce::StringArray thump, pink, consoleFilters, lineLaw, hushTiming, hushVocal, echoVoicings, latticeTaps, luxeDucking, verbRevisions;
+        juce::StringArray thump, pink, consoleFilters, lineLaw, hybridLoop, hushTiming, hushVocal, echoVoicings, latticeTaps, luxeDucking, verbRevisions;
         forEachEffect (root, [&] (juce::DynamicObject& e, const juce::String& where) {
             auto* params = arrayOf (e.getProperty ("params"));
             if (params == nullptr) // (a slot written without parameters)
@@ -313,6 +316,10 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
                 // rollup step 8: round 190kw's line law (set only by a translated FabFilter Timeless 3 state)
                 if (params->size() > echosuite::echoform::lineLaw && (float) (double) (*params)[echosuite::echoform::lineLaw] >= 0.5f)
                     addOnce (lineLaw, where);
+                // rollup step 9: round 190lf's H-Delay loop law (set only by a translated Waves H-Delay state; read with the
+                // hybrid engine on)
+                if (params->size() > echosuite::echoform::hybridLaw && (float) (double) (*params)[echosuite::echoform::hybridLaw] >= 0.5f)
+                    addOnce (hybridLoop, where);
                 params->removeRange (echosuite::echoform::revision, params->size() - echosuite::echoform::revision);
             }
             else if (kind == "latticeMod" && params->size() > echosuite::lattice::revision)
@@ -350,6 +357,8 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
             lost.push_back ({ TR_NOOP ("Ridge Strip's measured SSL 4K G / 4K E filters and its 32C voicing are left out: {0}"), listOf (consoleFilters), true });
         if (! lineLaw.isEmpty())
             lost.push_back ({ TR_NOOP ("Echoform's Timeless 3 line law plays as its own echo: {0}"), listOf (lineLaw), true });
+        if (! hybridLoop.isEmpty())
+            lost.push_back ({ TR_NOOP ("Echoform's H-Delay loop law (the Waves H-Delay stand-in) plays as its plain hybrid echo: {0}"), listOf (hybridLoop), true });
         if (! hushTiming.isEmpty())
             lost.push_back ({ TR_NOOP ("Hush De-esser's Allround mode plays its earlier timing: {0}"), listOf (hushTiming), true });
         if (! hushVocal.isEmpty())
@@ -433,7 +442,7 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
     // rollup step 4, round 190jh: Facet EQ's automatic dynamic thresholds (hidden parameters past its count; 0.1.28 plays
     // those bands with their manual threshold)
     {
-        juce::StringArray autoBands;
+        juce::StringArray autoBands, dispersion;
         forEachEffect (root, [&] (juce::DynamicObject& e, const juce::String& where) {
             auto* params = arrayOf (e.getProperty ("params"));
             if (params == nullptr || e.getProperty ("kind").toString() != "facetEq" || params->size() <= facet::autoThresholdParam0)
@@ -441,10 +450,16 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
             for (int b = 0; b < 8 && facet::autoThresholdParam0 + b < params->size(); ++b)
                 if ((float) (double) (*params)[facet::autoThresholdParam0 + b] >= 0.5f)
                     addOnce (autoBands, where);
+            // rollup step 9: round 190lg's automatic-threshold revision [125] goes with the bands' automatic thresholds (above);
+            // round 190ln's all-pass dispersion [126 … 128] (set only by a translated Kilohearts Disperser state)
+            if (params->size() > facet::dispersionCountParam && facet::dispersionSections ((float) (double) (*params)[facet::dispersionCountParam]) > 0)
+                addOnce (dispersion, where);
             params->removeRange (facet::autoThresholdParam0, params->size() - facet::autoThresholdParam0);
         });
         if (! autoBands.isEmpty())
             lost.push_back ({ TR_NOOP ("Facet EQ's automatic dynamic thresholds play with the bands' manual threshold: {0}"), listOf (autoBands), true });
+        if (! dispersion.isEmpty())
+            lost.push_back ({ TR_NOOP ("Facet EQ's all-pass dispersion (the Kilohearts Disperser stand-in) is left out: {0}"), listOf (dispersion), true });
     }
 
     // rollup step 4, round 190jl: MIDI Out channels and the plugin wrappers' Output port reach hardware MIDI outputs from
@@ -714,6 +729,98 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
             lost.push_back ({ TR_NOOP ("Automation clip colours"), {}, false });
         if (drop (o, "mixSnapshots"))
             lost.push_back ({ TR_NOOP ("Mix snapshots (the Mixer menu)"), {}, false });
+    }
+
+    // rollup step 9: hidden parameters past the slot's count, written only when set (0.1.28 plays the effect without them):
+    // round 190kw / 190lg's Saturn laws of Ember (every new Ember, and a translated FabFilter Saturn 2 state), round 190lg's
+    // Pro-MB band law of Prism Multiband, round 190lf's Waves stand-in laws — L2 on the Limiter, CLA-2A's cell law on Glow
+    // Leveler, TrueVerb's direct sound on Reeverb 2, NS1's zero law on Quell (each set only by its translator)
+    {
+        juce::StringArray saturn, proMb, l2, cell, direct, zero;
+        forEachEffect (root, [&] (juce::DynamicObject& e, const juce::String& where) {
+            auto* params = arrayOf (e.getProperty ("params"));
+            if (params == nullptr)
+                return;
+            const auto kind = e.getProperty ("kind").toString();
+            const auto cut = [params, &where] (int from, juce::StringArray& list) {
+                if (params->size() <= from)
+                    return;
+                for (int i = from; i < params->size(); ++i)
+                    if ((float) (double) (*params)[i] != 0.0f)
+                    {
+                        addOnce (list, where);
+                        break;
+                    }
+                params->removeRange (from, params->size() - from);
+            };
+            if (kind == "ember")
+            {
+                // (lawRate alone changes nothing without the law)
+                if (params->size() > mixsuite::ember::revision && (float) (double) (*params)[mixsuite::ember::revision] >= 0.5f)
+                    addOnce (saturn, where);
+                if (params->size() > mixsuite::ember::revision)
+                    params->removeRange (mixsuite::ember::revision, params->size() - mixsuite::ember::revision);
+            }
+            else if (kind == "prismMultiband")
+                cut (dyn::prism::revision, proMb);
+            else if (kind == "limiter")
+            {
+                if (params->size() > limiterlaw::lawParam && limiterlaw::isL2 ((float) (double) (*params)[limiterlaw::lawParam]))
+                    addOnce (l2, where);
+                if (params->size() > limiterlaw::lawParam)
+                    params->removeRange (limiterlaw::lawParam, params->size() - limiterlaw::lawParam);
+            }
+            else if (kind == "glowLeveler")
+                cut (mixsuite::glow::cellLaw, cell);
+            else if (kind == "reeverb2")
+                cut (reeverb2DirectLaw, direct);
+            else if (kind == "quellDenoiser")
+                cut (voicetools::quell::zeroLaw, zero);
+        });
+        if (! saturn.isEmpty())
+            lost.push_back ({ TR_NOOP ("Ember's Saturn styles play their earlier measured characters (not the reference's): {0}"), listOf (saturn), true });
+        if (! proMb.isEmpty())
+            lost.push_back ({ TR_NOOP ("Prism Multiband's Pro-MB band law plays its measured detector: {0}"), listOf (proMb), true });
+        if (! l2.isEmpty())
+            lost.push_back ({ TR_NOOP ("The Limiter's L2 law (the Waves L2 stand-in) plays as the classic Limiter: {0}"), listOf (l2), true });
+        if (! cell.isEmpty())
+            lost.push_back ({ TR_NOOP ("Glow Leveler's cell law (the Waves CLA-2A stand-in) plays as its Opto voicing: {0}"), listOf (cell), true });
+        if (! direct.isEmpty())
+            lost.push_back ({ TR_NOOP ("Reeverb 2's measured direct sound (the Waves TrueVerb stand-in) is left out: {0}"), listOf (direct), true });
+        if (! zero.isEmpty())
+            lost.push_back ({ TR_NOOP ("Quell's zero law (the Waves NS1 stand-in) is left out: its lowest Amount settings play the matched engine: {0}"), listOf (zero), true });
+    }
+
+    // rollup step 9, round 190lq (issue #204): a channel's notes on an audio clip channel play as the channel's Sampler
+    // (FL's law: the whole clip, layered, the key transposes it) in projects with the "clipNotes190lq" mark; 0.1.28 plays
+    // every such note cut at its own end, at the clip's own pitch (a channel already on "clipNoteLegacy" plays that law
+    // there too, but a note's end there ends every sounding note of the channel)
+    {
+        juce::StringArray fl;
+        std::vector<bool> played;
+        if (auto* patterns = arrayOf (root["patterns"]))
+            for (auto& p : *patterns)
+                if (auto* notes = arrayOf (p["notes"]))
+                    for (auto& n : *notes)
+                        if (auto* fields = arrayOf (n); fields != nullptr && fields->size() > 2)
+                            if (const auto c = (int) (*fields)[2]; c >= 0 && c < 4096)
+                            {
+                                if ((int) played.size() <= c)
+                                    played.resize ((std::size_t) c + 1, false);
+                                played[(std::size_t) c] = true;
+                            }
+        const auto marked = drop (o, "clipNotes190lq");
+        forEachChannel (root, [&] (juce::DynamicObject& c, int i) {
+            if (c.getProperty ("instrument").toString() != "audioClip")
+                return;
+            auto legacy = ! marked;
+            if (auto* sampler = objectOf (c.getProperty ("samplerSettings")))
+                legacy = drop (*sampler, "clipNoteLegacy") || legacy;
+            if (! legacy && i < (int) played.size() && played[(std::size_t) i])
+                fl.add (channelName (juce::var (&c), i));
+        });
+        if (! fl.isEmpty())
+            lost.push_back ({ TR_NOOP ("Notes on audio clip channels play cut at each note's end and at the clip's own pitch: {0}"), listOf (fl), true });
     }
 
     // round 190kx: audio clips edited in an ARA plugin (Melodyne...) play unedited in 0.1.28 (it hosts no ARA)

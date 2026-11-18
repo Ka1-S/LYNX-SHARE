@@ -11553,3 +11553,14 @@ countries: br
 "Prepare edited clips when a project opens (LYNX)" = "Preparar clipes editados ao abrir um projeto (LYNX)"
 "Select all notes" = "Selecionar todas as notas"
 "When a project opens, the audio clips whose notes were edited in Edit notes (polyphonic) are prepared in the background, so the editor opens ready to play a dragged note. Also in that editor's Options menu." = "Ao abrir um projeto, os clipes de áudio cujas notas foram editadas em Editar notas (polifônico) são preparados em segundo plano, e o editor abre pronto para tocar uma nota arrastada. Também no menu Opções desse editor."
+
+# --- rollup 0.1.30 step 9: Save a copy for 0.1.28 knows rounds 190lq / 190kw-190lg / 190lf / 190ln
+"Echoform's H-Delay loop law (the Waves H-Delay stand-in) plays as its plain hybrid echo: {0}" = "A lei de loop H-Delay do Echoform (o substituto do Waves H-Delay) toca como seu eco híbrido simples: {0}"
+"Facet EQ's all-pass dispersion (the Kilohearts Disperser stand-in) is left out: {0}" = "A dispersão passa-tudo do Facet EQ (o substituto do Kilohearts Disperser) fica de fora: {0}"
+"Ember's Saturn styles play their earlier measured characters (not the reference's): {0}" = "Os estilos Saturn do Ember tocam seus caracteres medidos anteriores (não os da referência): {0}"
+"Prism Multiband's Pro-MB band law plays its measured detector: {0}" = "A lei de bandas Pro-MB do Prism Multiband toca com seu detector medido: {0}"
+"The Limiter's L2 law (the Waves L2 stand-in) plays as the classic Limiter: {0}" = "A lei L2 do Limiter (o substituto do Waves L2) toca como o Limiter clássico: {0}"
+"Glow Leveler's cell law (the Waves CLA-2A stand-in) plays as its Opto voicing: {0}" = "A lei de célula do Glow Leveler (o substituto do Waves CLA-2A) toca como sua voz Opto: {0}"
+"Reeverb 2's measured direct sound (the Waves TrueVerb stand-in) is left out: {0}" = "O som direto medido do Reeverb 2 (o substituto do Waves TrueVerb) fica de fora: {0}"
+"Quell's zero law (the Waves NS1 stand-in) is left out: its lowest Amount settings play the matched engine: {0}" = "A lei zero do Quell (o substituto do Waves NS1) fica de fora: seus ajustes de Amount mais baixos tocam o motor ajustado: {0}"
+"Notes on audio clip channels play cut at each note's end and at the clip's own pitch: {0}" = "Notas em canais de clipe de áudio tocam cortadas no fim de cada nota e na altura própria do clipe: {0}"

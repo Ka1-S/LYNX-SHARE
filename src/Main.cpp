@@ -235,6 +235,9 @@
 #include "ui/TempoTapper.h"
 #include "core/EventEdit.h"
 #include "core/FacetEq.h"
+#include "core/LimiterLaw.h" // (rollup step 9: the copy for 0.1.28 self-test)
+#include "core/Reeverb2.h"
+#include "core/VoiceTools.h"
 #include "ui/FacetEqEditor.h"
 #include "core/RackRenderer.h"
 #include "ui/ProEditors.h"
@@ -6851,6 +6854,44 @@ private:
                     if (c.name == "Hosted")
                         c.plugin.recordOwnNotes = false;
             }
+            // rollup step 9 (round 190lu): a new Ember (round 190kw / 190lg's Saturn laws), a Prism on round 190lg's Pro-MB
+            // law, round 190lf's L2 law on the Limiter, cell law on Glow Leveler, direct sound on Reeverb 2, zero law on Quell
+            // and H-Delay loop law on Echoform, round 190ln's all-pass dispersion on Facet, and a note on an audio clip
+            // channel (round 190lq: FL's law in a marked project)
+            {
+                auto& m16 = song.mixer[16].effects;
+                m16.push_back (lynx::makeEffectSlot (lynx::EffectKind::ember)); // [5]
+                auto prism = lynx::makeEffectSlot (lynx::EffectKind::prismMultiband);
+                prism.params[(std::size_t) lynx::dyn::prism::revision] = 1.0f;
+                m16.push_back (prism); // [6]
+                auto l2 = lynx::makeEffectSlot (lynx::EffectKind::limiter);
+                l2.params[(std::size_t) lynx::limiterlaw::lawParam] = lynx::limiterlaw::l2LawValue;
+                m16.push_back (l2); // [7]
+                auto glow = lynx::makeEffectSlot (lynx::EffectKind::glowLeveler);
+                glow.params[(std::size_t) lynx::mixsuite::glow::cellLaw] = 1.0f;
+                m16.push_back (glow); // [8]
+                auto verb = lynx::makeEffectSlot (lynx::EffectKind::reeverb2);
+                verb.params[(std::size_t) lynx::reeverb2DirectLaw] = 1.0f;
+                m16.push_back (verb); // [9]
+                auto quell = lynx::makeEffectSlot (lynx::EffectKind::quellDenoiser);
+                quell.params[(std::size_t) lynx::voicetools::quell::zeroLaw] = 1.0f;
+                m16.push_back (quell); // [10]
+                auto disperser = lynx::makeEffectSlot (lynx::EffectKind::facetEq);
+                disperser.params[(std::size_t) lynx::facet::dispersionCountParam] = 0.25f;
+                m16.push_back (disperser); // [11]
+                auto hybrid = lynx::makeEffectSlot (lynx::EffectKind::echoform);
+                hybrid.params[(std::size_t) lynx::echosuite::echoform::hybridLaw] = 1.0f;
+                m16.push_back (hybrid); // [12]
+                lynx::ChannelDef clipChannel;
+                clipChannel.name = "Clip";
+                clipChannel.instrument = lynx::InstrumentKind::audioClip;
+                song.channels.push_back (clipChannel);
+                lynx::Note hit;
+                hit.length = lynx::ppq / 4;
+                hit.channel = (int) song.channels.size() - 1;
+                hit.key = 67;
+                song.patterns[0].notes.push_back (hit);
+            }
 
             const auto copy = lynx::olderlynx::forRelease (song, "0.1.28");
             juce::String why;
@@ -6967,6 +7008,16 @@ private:
                      || m16[1]["params"].size() > lynx::dyn::crest::busLaw || m16[2]["params"].size() > lynx::dyn::crest::busLaw
                      || m16[3]["params"].size() > lynx::mixsuite::ridge::k4Pink || m16[4]["params"].size() > lynx::echosuite::echoform::revision)
                 rollup030Result = "ERROR step-8 items";
+            else if (const auto& m16 = parsed["mixer"][16]["effects"];
+                     ! said ("Ember's Saturn styles") || ! said ("Prism Multiband's Pro-MB band law") || ! said ("The Limiter's L2 law")
+                     || ! said ("Glow Leveler's cell law") || ! said ("Reeverb 2's measured direct sound") || ! said ("Quell's zero law")
+                     || ! said ("Facet EQ's all-pass dispersion") || ! said ("Echoform's H-Delay loop law")
+                     || ! said ("Notes on audio clip channels play cut") || copy.json.contains ("clipNotes190lq") || copy.json.contains ("clipNoteLegacy")
+                     || m16[5]["params"].size() > lynx::mixsuite::ember::revision || m16[6]["params"].size() > lynx::dyn::prism::revision
+                     || m16[7]["params"].size() > lynx::limiterlaw::lawParam || m16[8]["params"].size() > lynx::mixsuite::glow::cellLaw
+                     || m16[9]["params"].size() > lynx::reeverb2DirectLaw || m16[10]["params"].size() > lynx::voicetools::quell::zeroLaw
+                     || m16[11]["params"].size() > lynx::facet::autoThresholdParam0 || m16[12]["params"].size() > lynx::echosuite::echoform::revision)
+                rollup030Result = "ERROR step-9 items";
             else if (const auto plain = lynx::olderlynx::forRelease (lynx::Song::makeDefault(), "0.1.28");
                      ! plain.ok || std::any_of (plain.lost.begin(), plain.lost.end(), [] (const lynx::olderlynx::Loss& l) {
                          const auto t = juce::String (l.text);
@@ -6978,7 +7029,9 @@ private:
                                 || t.contains ("CURVE") || t.startsWith ("Slide notes") || t.contains ("crossfader") || t.contains ("return tracks")
                                 || t.contains ("Controls tab") || t.startsWith ("Harmor") || t.startsWith ("Newtone")
                                 || t.contains ("Peak Controller") || t.contains ("console law") || t.startsWith ("Mixer lock") || t.contains ("take lane")
-                                || t.contains ("Crest") || t.startsWith ("Lock states");
+                                || t.contains ("Crest") || t.startsWith ("Lock states") || t.startsWith ("Ember") || t.startsWith ("Prism")
+                                || t.contains ("L2 law") || t.startsWith ("Glow") || t.startsWith ("Reeverb 2") || t.startsWith ("Quell")
+                                || t.contains ("audio clip channels");
                      }))
                 rollup030Result = "ERROR a plain project reports a loss it does not have";
         }
