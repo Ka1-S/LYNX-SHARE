@@ -204,8 +204,9 @@ TEST (parity190jh_waves_l2_sslcomp_supertap_are_translated)
     int n = 0;
     // L2: release 100 ms (ARC off), threshold -6, ceiling -1
     auto l2 = parity190jh::waves ("L2 Stereo", "L2", "100 -6 -1 * * * * * 0 0\n0 1 2 0 0 0.1", n);
-    CHECK (l2.kind == EffectKind::limiter && n == 3);
-    CHECK (std::abs (l2.params[0] - 11.0f / 12.0f) < 1e-5f && std::abs (l2.params[1] - 6.0f / 24.0f) < 1e-5f && std::abs (l2.params[2] - 0.5f) < 1e-5f);
+    // (round 190lf: on the Limiter's L2 law — the Gain knob is L2's make-up, ceiling − threshold; tests/Parity190lfTests.inc)
+    CHECK (l2.kind == EffectKind::limiter && n == 6);
+    CHECK (std::abs (l2.params[0] - 11.0f / 12.0f) < 1e-5f && std::abs (l2.params[1] - 5.0f / 24.0f) < 1e-5f && std::abs (l2.params[2] - 0.5f) < 1e-5f);
     auto arc = parity190jh::waves ("L2 Stereo", "L2", "1 -3 -0.3 * * * * * 0 0\n0 1 2 1 0 0.1", n);
     CHECK (arc.params[2] == 0.0f); // ARC: the Limiter's shortest release
     parity190jh::waves ("L3 Stereo", "L3", "1 -3 -0.3 * * * * * 0 0\n0 1 2 1 0 0.1", n);
