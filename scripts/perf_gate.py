@@ -22,7 +22,15 @@ faster or slower machine moves both alike; memory and instruction counts are com
 
 A baseline keeps one set of numbers per CPU model ("machines"; CI runners come with several): a run compares with
 its own model's numbers, or with the default set and every threshold widened by cross_machine_factor (1.5). With
-PERF_GATE_ADD_MACHINE=1, update only adds this run's CPU model.
+PERF_GATE_ADD_MACHINE=1, update only adds this run's CPU model; with PERF_GATE_ONLY_METRICS=paint_instr (names, comma
+separated) it only adds those metrics of this run to its model's numbers and keeps every other number.
+
+Paint cells (rollup 0.1.30 step 9): --paintbench also reports, on Linux where the CPU counter can be read, the
+instructions the message thread retires per whole frame ("paint_instr"). Drawn by the software renderer, the same pixels
+retire nearly the same instructions on every run, while the frame's time divided by the (calculation-bound)
+calibration moves with the runner's memory system: one CPU model's frames came out 20 … 50 % "slower" than another's
+for the same code. Where the run and the baseline both have a cell's instruction count, the count gates it (tight
+threshold) and the time is reported only ("slower (time only)"); elsewhere the time gates, as before.
 
 A metric regresses when it is worse than the baseline by more than its relative threshold AND by more than its
 absolute floor (small values are noisy in absolute terms). Missing metrics that the baseline has fail too (a step
@@ -44,6 +52,7 @@ DEFAULT_THRESHOLDS = {
     "import_norm": [0.30, 0.2],
     "rss_mb": [0.10, 12.0],
     "paint_norm": [0.30, 0.03],
+    "paint_instr": [0.05, 20000.0],     # instructions per whole frame (rollup step 9: the stable paint measure)
     "open_norm": [0.30, 0.2],
     "open_rss_mb": [0.10, 24.0],
     "save_norm": [0.30, 0.2],
@@ -114,8 +123,11 @@ def collect(d):
             if om:
                 add("app/" + proj + "/open_norm", float(om.group(1)) / calib)
                 add("app/" + proj + "/open_rss_mb", float(om.group(3)))
-            for vm in re.finditer(r"^([a-z ]+), whole frame: median " + NUM + r" ms", text, re.M):
+            for vm in re.finditer(r"^([a-z ]+), whole frame: median " + NUM + r" ms(.*)$", text, re.M):
                 add("paint/" + proj + "/" + vm.group(1).replace(" ", "_") + "/paint_norm", float(vm.group(2)) / calib)
+                im = re.search(r", instructions median ([0-9]+)", vm.group(3))
+                if im:
+                    add("paint/" + proj + "/" + vm.group(1).replace(" ", "_") + "/paint_instr", float(im.group(1)))
             continue
         m = re.match(r"open-(.+)-\d+\.txt$", f)
         if m:
@@ -205,6 +217,10 @@ def compare(d, baseline_path, show=False):
         delta = (c - b) / b if b > 0 else 0.0
         worse = c > b * (1.0 + rel) and c - b > floor
         verdict = "FAIL" if worse else ("better" if c < b * (1.0 - rel) and b - c > floor else "ok")
+        # (a paint cell whose instructions both sides counted: the count gates it, its time is reported only)
+        counted = key[: -len("paint_norm")] + "paint_instr"
+        if key.endswith("/paint_norm") and counted in bm and counted in cm and worse:
+            worse, verdict = False, "slower (time only: the instruction count gates this cell)"
         if worse:
             failed.append(key)
             retry.add(cell_of(key))
@@ -235,6 +251,24 @@ def update(d, baseline_path, show=False):
     res = collect(d)
     json.dump(res, open(os.path.join(d, "results.json"), "w"), indent=1, sort_keys=True)
     old = json.load(open(baseline_path)) if os.path.exists(baseline_path) else {}
+    only = [n for n in os.environ.get("PERF_GATE_ONLY_METRICS", "").split(",") if n]
+    if only and old:
+        # (rollup step 9) PERF_GATE_ONLY_METRICS=paint_instr,...: only those metrics of this run go into its CPU model's
+        # numbers (and the default set when it is that model's or the model has none): every other number stays as it was
+        new = dict(old)
+        model = cpu_model(res["machine"])
+        picked = {k: v for k, v in res["metrics"].items() if k.rsplit("/", 1)[1] in only}
+        machines = {m: dict(v) for m, v in old.get("machines", {}).items()}
+        if model in machines:
+            machines[model].update(picked)
+        if model not in machines or cpu_model(old.get("machine", "")) == model:
+            new["metrics"] = dict(old.get("metrics", {}), **picked)
+        new["machines"] = machines
+        json.dump(new, open(baseline_path, "w"), indent=1, sort_keys=True)
+        open(baseline_path, "a").write("\n")
+        if show:
+            print("perf_gate: added %d %s metrics of %s to %s" % (len(picked), ",".join(only), model, baseline_path))
+        return 0
     machines = dict(old.get("machines", {}))
     machines[cpu_model(res["machine"])] = res["metrics"]
     keep_default = os.environ.get("PERF_GATE_ADD_MACHINE") == "1" and old.get("metrics")  # (only add this CPU model)

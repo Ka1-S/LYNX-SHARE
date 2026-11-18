@@ -238,6 +238,7 @@
 #include "core/LimiterLaw.h" // (rollup step 9: the copy for 0.1.28 self-test)
 #include "core/Reeverb2.h"
 #include "core/VoiceTools.h"
+#include "platform/ThreadInstructions.h" // (rollup step 9: --paintbench counts instructions)
 #include "ui/FacetEqEditor.h"
 #include "core/RackRenderer.h"
 #include "ui/ProEditors.h"
@@ -24583,9 +24584,13 @@ private:
         };
         // mode 0: whole frames after a repaint of everything; 1: whole frames, the views' own caches kept; 2: a 14-pixel
         // column of the whole height at 40 places (what a moving playhead repaints each frame)
+        // (rollup step 9: the instructions the message thread retires per frame, Linux, where the CPU counter can be read:
+        // the performance gate's stable paint measure, scripts/perf_gate.py "paint_instr")
+        const lynx::platform::ThreadInstructions instructions;
         auto measure = [&] (const juce::String& name, int mode) {
             offline.dispatchPendingMessages();
             std::vector<double> ms, wall;
+            std::vector<long long> instr;
             juce::String hash;
             for (int f = -3; f < frames; ++f) // (3 frames to warm the caches up)
             {
@@ -24594,12 +24599,15 @@ private:
                 const auto column = juce::Rectangle<int> ((juce::jmax (0, f) * 97) % juce::jmax (1, ui.getWidth() - 14), 0, 14, ui.getHeight());
                 const auto t0 = lynx::threadCpuSeconds();
                 const auto w0 = juce::Time::getMillisecondCounterHiRes();
+                const auto i0 = instructions.now();
                 {
                     juce::Graphics g (image);
                     if (mode == 2)
                         g.reduceClipRegion (column);
                     ui.paintEntireComponent (g, true);
                 }
+                if (const auto i1 = instructions.now(); f >= 0 && i0 >= 0 && i1 >= i0)
+                    instr.push_back (i1 - i0);
                 if (f >= 0)
                 {
                     ms.push_back (1000.0 * (lynx::threadCpuSeconds() - t0));
@@ -24623,7 +24631,13 @@ private:
             text << name << (mode == 0 ? ", whole frame" : mode == 1 ? ", cached frame" : ", playhead column") << ": median "
                  << juce::String (ms[ms.size() / 2], 3) << " ms, p90 " << juce::String (ms[(ms.size() * 9) / 10], 3) << " ms, wall median "
                  << juce::String (wall[wall.size() / 2], 3) << " ms"
-                 << (hash.isNotEmpty() ? ", pixels " + hash : juce::String()) << "\n";
+                 << (hash.isNotEmpty() ? ", pixels " + hash : juce::String());
+            if (instr.size() == ms.size())
+            {
+                std::sort (instr.begin(), instr.end());
+                text << ", instructions median " << juce::String ((juce::int64) instr[instr.size() / 2]);
+            }
+            text << "\n";
             report.replaceWithText (text);
         };
         auto measureAll = [&] (const juce::String& name) {

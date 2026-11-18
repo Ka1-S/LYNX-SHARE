@@ -22,16 +22,17 @@ def bench_line(cpu, rss=100.0, instr=-1, build=10.0):
             "build_ms=%.2f rebuild_ms=5 rss_mb=%.1f hash=00ff hash_stable=1\n" % (cpu, instr, build, rss))
 
 
-def paint_report(ms):
-    return "open: 500.0 ms wall, 450.0 ms message thread CPU, working set 300 MB\nmixer, whole frame: median %.3f ms, p90 1 ms\nresult=OK\n" % ms
+def paint_report(ms, instr=None):
+    return ("open: 500.0 ms wall, 450.0 ms message thread CPU, working set 300 MB\nmixer, whole frame: median %.3f ms, p90 1 ms%s\nresult=OK\n"
+            % (ms, "" if instr is None else ", wall median 1 ms, pixels 00ff, instructions median %d" % instr))
 
 
 class PerfGateTests(unittest.TestCase):
-    def results(self, cpu=50.0, calib=10.0, rss=100.0, paint=2.0):
+    def results(self, cpu=50.0, calib=10.0, rss=100.0, paint=2.0, instr=None):
         d = tempfile.mkdtemp()
         write(d, "calib-1-a.txt", "GATE scenario=calibrate calib_ms=%.3f\n" % calib)
         write(d, "bench-big200@256-1.txt", "load 1\n" + bench_line(cpu, rss))
-        write(d, "paint-big200-1.txt", paint_report(paint))
+        write(d, "paint-big200-1.txt", paint_report(paint, instr))
         return d
 
     def baseline(self, d):
@@ -115,6 +116,44 @@ class PerfGateTests(unittest.TestCase):
         b = os.path.join(d, "b.json")
         self.assertEqual(subprocess.call([sys.executable, SCRIPT, "update", d, b], stdout=subprocess.DEVNULL), 0)
         self.assertEqual(subprocess.call([sys.executable, SCRIPT, "compare", d, b], stdout=subprocess.DEVNULL), 0)
+
+    # rollup 0.1.30 step 9: the paint cells' instruction count (the stable measure)
+    def test_paint_instructions_are_collected(self):
+        d = self.results(instr=12345678)
+        m = perf_gate.collect(d)["metrics"]
+        self.assertAlmostEqual(m["paint/big200/mixer/paint_instr"], 12345678.0)
+        self.assertAlmostEqual(m["paint/big200/mixer/paint_norm"], 0.2)
+
+    def test_counted_paint_time_alone_does_not_fail(self):
+        b = self.baseline(self.results(instr=10000000))
+        d = self.results(paint=3.0, instr=10100000)  # time +50 %, the same drawing (+1 % instructions)
+        self.assertEqual(perf_gate.compare(d, b), 0)
+        self.assertIn("time only", open(os.path.join(d, "summary.md")).read())
+
+    def test_more_paint_instructions_fail(self):
+        b = self.baseline(self.results(instr=10000000))
+        d = self.results(instr=11000000)  # +10 %
+        self.assertEqual(perf_gate.compare(d, b), 1)
+        self.assertIn("paint:big200", open(os.path.join(d, "retry.txt")).read())
+
+    def test_paint_time_still_gates_without_a_counted_baseline(self):
+        b = self.baseline(self.results())  # (a baseline without instruction counts)
+        d = self.results(paint=3.0, instr=10000000)
+        self.assertEqual(perf_gate.compare(d, b), 1)
+
+    def test_only_named_metrics_are_added_to_a_cpu_models_baseline(self):
+        b = self.baseline(self.results(cpu=50.0))
+        d = self.results(cpu=70.0, instr=10000000)
+        os.environ["PERF_GATE_ONLY_METRICS"] = "paint_instr"
+        try:
+            perf_gate.update(d, b)
+        finally:
+            del os.environ["PERF_GATE_ONLY_METRICS"]
+        base = json.load(open(b))
+        own = base["machines"][perf_gate.cpu_model(open(os.path.join(d, "machine.txt")).read().strip())] if os.path.exists(os.path.join(d, "machine.txt")) else None
+        for numbers in [base["metrics"]] + ([own] if own else []):
+            self.assertAlmostEqual(numbers["bench/big200@256/cpu_norm"], 5.0)  # (kept)
+            self.assertAlmostEqual(numbers["paint/big200/mixer/paint_instr"], 10000000.0)  # (added)
 
 
 if __name__ == "__main__":

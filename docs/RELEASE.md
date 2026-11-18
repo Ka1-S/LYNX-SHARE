@@ -43,7 +43,10 @@ Steps:
    *Performance gate*, `tests/perf/baseline-ci-ubuntu.json`). Then the Windows comparison with FL Studio and Live:
    `scripts/perf-vs-fl.sh startup|open|play` (start-up, project open, RAM, playback CPU / fps; `scripts/perf-vs-fl-sum.py`).
    A baseline changes only for a reviewed, intended change: `PROFILE=<name> scripts/perf-gate.sh update`, committed
-   with the reason.
+   with the reason. Paint cells: where the CPU counter can be read (Linux), `--paintbench` also counts the instructions
+   per frame, and a cell whose instructions the run and the baseline both have is gated on them (5 %), its time only
+   reported (the time divided by the calibration moves with the runner's memory system); add a CPU model's counts with
+   `PERF_GATE_ONLY_METRICS=paint_instr scripts/perf_gate.py update <results> <baseline>` (every other number stays).
 3. Optional local package check: `scripts/make-installer.sh` (defaults to `build-win/LYNX.exe`) writes the installer,
    the zip and `SHA256SUMS.txt` to `dist/`. NSIS: `makensis` on PATH, `$MAKENSIS`, or the NSIS zip release unpacked
    into `~/opt/nsis-<version>` (its `makensis.exe` runs through WSL interop). Quick installer check:
