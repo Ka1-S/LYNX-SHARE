@@ -178,6 +178,8 @@ public:
         held = channels;
         heldCount = count;
     }
+    bool followsHeldNotes() const noexcept override { return true; } // (round 190kz)
+    bool followsHeldNotesWith (const EffectParams& p) const noexcept override { return midiChannelIndex (p[midi]) >= 0; } // (process())
 
     void process (float* l, float* r, int n, const EffectParams& p, double) noexcept override
     {

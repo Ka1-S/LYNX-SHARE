@@ -92,6 +92,7 @@ public:
     void setSongPosition (double ticks) noexcept;
     void setPlaying (bool playing) noexcept;
     void setHeldNotes (const NoteMask* channels, int count) noexcept;
+    bool followsHeldNotes() const noexcept; // (round 190kz: a node's effect reads them)
 
     // One block: the host's input (and side-chain, may be null) in, the main output out (may alias the input);
     // the extra outputs land in auxOutput(). Any n (split into pieces).
