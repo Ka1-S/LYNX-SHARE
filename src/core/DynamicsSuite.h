@@ -80,7 +80,13 @@ enum Param
     // revisions × the four ratio buttons and all buttons); the knobs keep their meaning: threshold = the control
     // level's knee, ratio = 1 + the first term's slope, knee = its width (dB), attack / release = the followers' time
     // constants (each follower at fitted multiples of them)
-    fetLaw
+    fetLaw,
+    // round 190kw, hidden (not in the info: no control, no text; saved while non-zero; after busLaw / fetLaw since the
+    // 0.1.30 rollup, step 8; either of those laws, when on, takes precedence): revision 1 runs the reference's
+    // own law for Clean, Classic and Opto (REA_rodada190kw §1: the reduction smoothed by each style's two-stage follower,
+    // its knee shape, its attack / release scaling). A new Crest and a translated Pro-C 3 state get 1; a project or
+    // preset saved before keeps 0 (the fitted laws, bit for bit)
+    revision
 };
 constexpr int fetVoices = 10;
 float fetLawValue (int voice) noexcept; // voice 0 … 9 → the fetLaw value (voice + 1) / 16

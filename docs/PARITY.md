@@ -4292,3 +4292,159 @@ core per CLA-76 instance. No latency.
 **Still off:** the amplifier / output saturation stage, the analog noise and hum, auto make-up, the reset ramps (host
 artefacts in refcap182's first second); X4 (Bluey 12:1) stays at 5 (its release scaling is a model, no Bluey 12:1 step
 probe); CLA-2A, L2, RVerb, H-Delay, PuigTec, Valhalla FutureVerb and Slate / Eiosis not refit (REA_rodada190ky §5–§7).
+
+## Round 190kw: static REA of the references — Crest gets Pro-C 3's own style laws
+
+The owner allowed static reverse-engineering of the third-party binaries for parity (clean-room: the laws are understood
+and re-written in LYNX's own code; nothing copied, nothing bypassed). The binaries keep MSVC RTTI, which names every DSP
+class; the Pro-C 3 style laws were read from the decompiled classes and rebuilt (evidence, addresses and constants:
+docs/analise/REA_rodada190kw.md; lab /mnt/e/lynx-work/rea190kw/).
+
+**Built (Crest, hidden `crest::revision` = 1):**
+- Clean / Classic / Opto (the reference's "V1" styles): the instantaneous reduction of the side chain's sample level, smoothed
+  in dB by each style's own two-stage, program-dependent follower (every step 1 − exp(−ln 10 / T), T in samples); the
+  style's Bézier knee shape blended with the quadratic knee by the knob; attack lo + span · a³ and a release that shortens
+  with the attack, per style. Classic is a feedback design (its target reads the reduction already applied).
+- Vocal / Mastering / Bus / Punch / Pumping: the reference wires them from its generic gain computer (quadratic knee, ratio,
+  range; Vocal its own soft curve without ratio) and generic followers (attack / release blended with the step size, the
+  step's exponential lengthening, maxima between stages); Mastering also holds the reduction 10 ms and smooths it at 10 Hz.
+- A new Crest and a translated Pro-C 3 state run revision 1; a project or preset saved before keeps 0 (the fitted laws, bit
+  for bit); Live's device maps and the plug-in substitutes' Crest keep 0 (they were measured on the fitted laws); with Auto
+  release on, Clean / Classic / Opto keep the fitted law. Allround (Versatile), Smooth, Upward, Two-way (TTM), Op-El and
+  Vari-Mu are untouched (generated graph classes in the reference: not rebuilt this round).
+
+**Scores** (refcap030 bank, Pro-C 3 → Crest through the translator; before = the branch point, after = revision 1):
+
+| block | files | before → after | up / same / down |
+|---|---|---|---|
+| grid | 238 | 6.35 → 7.87 | 136 / 102 / 0 |
+| mode | 48 | 6.56 → 8.54 | 47 / 1 / 0 |
+| pairs | 36 | 6.22 → 9.44 | 35 / 1 / 0 |
+| prog | 42 | 5.95 → 7.64 | 24 / 18 / 0 |
+| sr44 / sr48 / sr96 | 20 each | 6.55 / 6.70 / 6.50 → 7.85 / 7.95 / 7.65 | 35 / 25 / 0 |
+| styles | 84 | 6.01 → 7.71 | 48 / 36 / 0 |
+| **all** | **508** | **6.30 → 7.99** | **325 / 183 / 0** |
+
+Per style (all blocks): Clean 6.59 → 8.91, Classic 5.73 → 8.96, Opto 5.76 → 8.21, Vocal 5.73 → 8.77, Mastering 5.46 → 8.00,
+Bus 6.13 → 9.18, Punch 7.05 → 8.95, Pumping 6.73 → 9.31; the six untouched styles are unchanged file for file.
+
+Other banks: refcap182's programme (Pro-C 3, 25 files) 6.04 → 7.52 (15 up, 0 down); tp172b's Pro-C 3 captures (20 files)
+6.2 → 7.5 (S1 / S2 / S4 up to 8–9, D and S3 unchanged, 0 down).
+
+**Old projects.** Revision 0 renders byte for byte as the base commit: `gold/gold.sh` (base fxrender against the round's,
+every Pro-C 3 style's state with the revision forced off + Crest defaults over five styles, 44.1 / 48 / 96 kHz): 57 / 57
+identical; fingerprints of both revisions in tests/Parity190kwGold.inc. The editor's static curve follows the law that runs
+(revision 1: the reference's curves; revision 0 unchanged).
+
+**CPU** (thread time on one pinned core, 20 s at 48 kHz in blocks of 512, best of 5, three runs; % of real time, revision 0 →
+1): Clean 0.54 … 0.64 → 0.46 … 0.58, Classic 0.46 … 0.62 → 0.46 … 0.64, Opto 0.50 … 0.61 → 0.35 … 0.55, Vocal 0.78 … 1.08 →
+1.01 … 1.06, Mastering 0.54 … 0.68 → 0.81 … 0.90, Bus 0.43 … 0.47 → 0.70 … 0.75, Punch 0.49 … 0.53 → 0.28 … 0.37, Pumping
+0.38 … 0.42 → 0.52 … 0.60. Bus / Mastering / Pumping cost up to +0.3 point of one core (three followers whose times move
+with every step: one exp each per sample; the coefficient is cached while the time holds). No latency change.
+
+**Still off:** Allround (Versatile) 6.66, Smooth 5.08, Upward 6.62, Two-way (TTM) 7.38, Op-El 5.85 and Vari-Mu 6.19 keep their
+fitted laws (the reference builds them as generated graph classes — `VariMuCompressor` is a balanced tube-pair model — read
+but not rebuilt); Clean / Classic / Opto's auto release.
+## Round 190kw (Timeless 3 translator): FabFilter Timeless 3 → Echoform (the hidden line law)
+
+0.1.30 plugin parity. Black-box on captures already on disk (lab and evidence: `/mnt/e/lynx-work/rea190kw/tl3/`,
+REA_part.md). Same score as rounds 190iq … 190js (`scripts/fxparity.py`, 0–10): the references' own renders against LYNX
+loading the plug-in's saved state through its substitute.
+
+**Before.** `[fabfilter-timeless]` played Fruity Delay 3 at FL's default whatever the state said: 2.37 / 10 on refcap030's
+Timeless 3 bank (279 files), the lowest FabFilter row.
+
+**The state.** FFBS v1, 1007 values, one per parameter of the plug-in's own VST3 list in its order (refcap182's parameter
+dumps name every index; the plug-in's parameter-set order read statically agrees): delay time (the normalised knob), time
+pan, offset, sync, read mode, freeze, ping pong, 15 taps, feedback (0 … 2) / pan / cross mix / inverts, six filters
+(log2 Hz, gain, pan, peak, style, shape, slope, enabled, used), drive, lo-fi, diffuse, dynamics, pitch, width, wet level
+/ pan, mix (−1 … 1). Every capture's Filter 1 is "unused": its 55 frequency × style renders are the same sound.
+
+**What the reference does (measured).** The delay time knob, read off the echoes' sample positions at 44.1 / 48 / 96 kHz
+and the display texts (5 ms … 5 s; no closed form fits, so a monotone cubic in log ms through 11 points); echoes on whole
+samples; the dry at unity up to Mix 50 %, the wet 2 × Mix; the echo flat to 15 kHz through a linear-phase low-pass on
+every read (−2.3 dB at 20 kHz, −6 dB at 24 kHz at 48 kHz) and a 15.5 Hz one-pole low cut in the loop; the feedback per
+pass = the stored fraction; nearly linear (−0.08 dB at a 0 dBFS impulse), the loop settling near ±6 above 100 %; ping
+pong feeds the start side's own input only (programme regression: left echo 0.60 × left input, −0.03 × right).
+
+**Stand-in: Echoform** (the multi-mode echo already playing H-Delay, SuperTap and the Soundtoys delays). Fruity Delay 3 is
+FL-exact and has no line to match the reference's dry / wet law, read filter or whole-sample times; Echoform's Clean mode
+reaches them with one hidden addition: **the line law** (`echoform::lineLaw`, past the info's parameters and its revision:
+no control, no text; saved while non-zero; set only by a translated Timeless 3 state or the entry's preset `#109=1`): the
+reference's dry / wet law, the read through a Kaiser-windowed sinc fitted per rate (44.1 kHz: half length 12, cutoff 0.94
+of Nyquist, β 11; 48 kHz: 8 / 0.9175 / 9.5; 96 kHz: 4 / 0.8625 / 6.5; residual −44 … −49 dB under the echo), whole-sample
+delays, a 5.5 tanh (x / 5.5) limit instead of the Clean shaper and the line's 2 tanh (x / 2), and in ping pong the start
+side's own input. Without it (every project and preset saved before) Echoform renders bit for bit as before (six Echoform
+settings and Fruity Delay 3 compared byte for byte against the base build). The translator `timeless3`
+(`fabfilter::fromTimeless3`) carries delay time / sync (1/2 … 1/16, dotted / triplet offsets) / time pan, feedback (ping
+pong: the square, as Echoform's ping-pong loops √gain per side), feedback pan / cross mix, mix, width, wet level / pan,
+freeze, the filters in use (low pass → high cut, high pass → low cut), drive and diffuse; the last groups are by meaning,
+not measured (no capture uses them). Not carried: the extra taps, lo-fi, dynamics, pitch shift, feedback invert, the M/S
+channel mode, the modulation sources. Without a readable state (Timeless 2): the reference's default (a single 350 ms
+echo, no feedback, Mix 50 %, the line law).
+
+| refcap030 Timeless 3 block | files | before → after | up / same / down |
+|---|---|---|---|
+| grid (Filter 1 style × freq, inert: S1 250 ms / 50 %; ping pong × feedback, left impulse) | 125 | 1.94 → **7.68** | 122 / 3 / 0 |
+| grid2 (delay time × feedback 0 … 200 %, 96 kHz) | 25 | 2.16 → **5.88** | 24 / 1 / 0 |
+| mode (read mode, filter style, channel mode on S1) | 45 | 3.00 → **6.00** | 45 / 0 / 0 |
+| pairs (time × feedback, feedback × filter freq) | 36 | 1.75 → **5.03** | 36 / 0 / 0 |
+| sr44 / sr48 / sr96 (D, S1, S2 ping pong, S3 width 0) | 48 | 3.38 / 3.44 / 3.56 → **7.94 / 7.94 / 7.56** | 47 / 1 / 0 |
+| **all** | 279 | **2.37 → 6.93** | 274 / 5 / 0 |
+| refcap182 programme (D / S1 / S2 / S3 × drums, bass, guitar, vocal, mix) | 20 | 3.45 → **7.25** | 20 / 0 / 0 |
+
+What is still off: feedback at 100 % and above (the reference's loop grows to about ±6 and self-oscillates from nothing
+in ping pong; scores 1 … 5), the mode block's ir renders (the reference put the same state's echo at 12000 samples there and
+at 11999 in grid / sr48: a one-sample spread in its own captures; 4 / 10 on those 15 files), S1's programme with louder
+peaks (5 … 7). CPU (thread time, 20 s at 48 kHz, blocks of 512, best of 5, three runs on a loaded machine): Fruity Delay 3
+at its default 0.68 … 0.84 % → Echoform from the D / S1 / S2 states 1.50 … 2.12 % (the same settings without the line law
+1.32 … 1.68 %): Echoform's engine costs about twice Fruity Delay 3's (+0.8 … 1.2 points of one core).
+## Round 190kw (VintageVerb → Epoch)
+
+Built from the laws recovered by static REA of ValhallaVintageVerb (docs/analise/REA_rodada190kw.md §4; clean-room, LYNX's own
+code and tables). Lab and evidence: `/mnt/e/lynx-work/rea190kw/vvimpl/` (REA_part.md). Same score as rounds 190iq / it
+(`scripts/fxparity.py`, 0–10), the reference's own renders against LYNX loading the saved state through its translator.
+
+The step is a **hidden parameter past 190it's revision**: `verbs::epoch::loopLaw` (index 19, no control, no string, saved
+while non-zero). It is read only with the Measured law and revision 1. New instances and the VintageVerb translator get it.
+A project or preset saved before loads 0, so revisions 0 and 1 render bit for bit as the base commit did. Gold: 72 / 72
+renders (12 settings × revision 0 / 1 × 44.1 / 48 / 96 kHz, `gold/`); fingerprints in `tests/Parity190kwVvTests.inc`.
+
+| What the reference does (static, checked on the captures) | What loopLaw changes |
+|---|---|
+| No per-mode output gain. Each mode is a loop whose gain is the RT60 law over N gain stages, the input entering after a stage, so the wet energy is E(T, s) = E0 / (1 − 10^(−6 ℓ(s)/T)) with ℓ = c·L(s)/N | Epoch's level follows that law per mode: the base level at 0.513 s (the mode sweep's impulse energy), plus the reference's growth over Decay and Size (its own loop-length law per mode), minus Epoch's own growth. Epoch's growth was measured once per mode at 0.513 … 70 s, and over Size it is (0.3 + 0.7 s)^−0.64 at any Decay. Revision 1's per-mode tone trims still fade out by 1.41 s |
+| The first 80 ms hold over Decay (−10.65 dB at 0.51 / 7 / 33 s); Epoch's rose 3 dB from 2 to 4 s | The early taps hold their long-decay level at every Decay |
+| Spectra differ, so the best-scoring level is not always the energy match | Fitted on the scores: Concert Hall +0.3 dB (its own-growth knots fitted to the 2.9 … 33 s captures), Room −0.4 dB, Bright Hall +1.25 dB, Grit Plate −3.25 dB, Gated −2 dB. Drift Chamber keeps revision 1 (its test signal lost a step) |
+
+Concert Hall against revision 1 (`tests/Parity190kwVvTests.inc`): +2.3 dB at Decay 0.51 s, −1.3 dB at 7 s (the analyst's
+law: +2.0 / −1.3).
+
+**Scores** (refcap030 bank, 154 files; before → after; up / same / down):
+
+| Block | files | before → after | up / same / down |
+|---|---|---|---|
+| mode (ReverbMode + ColorMode sweeps, 0.51 s) | 96 | 2.16 → **2.74** | 56 / 40 / 0 |
+| pairs (PreDelay × Decay 0.51 / 7 / 33 s) | 18 | 3.44 → **3.89** | 8 / 10 / 0 |
+| sr48 (D, S1 … S4) | 20 | 3.50 → **3.70** | 4 / 16 / 0 |
+| sr96 | 20 | 3.60 → **3.70** | 3 / 16 / 1 (S1 impulse 4 → 3) |
+| **all** | 154 | **2.67 → 3.12** | 71 / 82 / 1 |
+
+Other Epoch banks (round 190it's `gate2.py`): tp172d's matched settings 3.73 → 3.73 (15 files, 0 / 15 / 0), verb183b's captures 3.56 → 3.89 (18, 6 up, 0 down), refcap182's programme 3.48 → 3.64 (25, 4 up, 0 down).
+
+**CPU** (thread time, 20 s at 48 kHz in blocks of 512, best of 5, two runs; `cpu/bench.log`, a loaded machine ±15 %):
+Concert Hall default 2.00 % (base) / 2.04 % (new instance); Concert Hall 0.51 s 1.98 / 1.99; Room 2.90 / 3.03; Plate 7 s
+2.38 / 2.55. Revision 0 / 1 forced on the round's objects: 1.90 … 2.97 %, the same as the base within the noise. The step
+adds a few `pow` / `log10` per block in `configure`, not per sample. No latency change.
+
+**Still off / not built:**
+- The per-mode Size law in the DSP (only the level follows it; Epoch's lines still scale by 0.3 + 0.7·Size). There are no
+  captures at Size ≠ 100 % except Concert Hall's.
+- RT = Decay with a first lap free of Decay, as a DSP change. 1970s at half the host rate and the ×0.64 mod depth.
+- The early level at long decays is 1.5 … 2 dB under the reference's −10.65 dB at 7 … 33 s, because the law scales the
+  whole wet path.
+- 96 kHz: at Decay 0.51 s the reference is 1.3 dB quieter at 96 kHz than at 48 kHz against Epoch. With the law, sr96 S1's
+  impulse is +1.6 dB over it (4 → 3; the setting's sweep, test signal and music there went up). A 96 kHz trim is not
+  built (owner decision: the rate dependence is Epoch's, not measured further).
+- Score-led stands: Grit Plate −3.25 dB and Gated −2 dB sit under the impulse's energy match (their test-signal / impulse
+  files score higher there). Smooth Room's +2.5 dB (test signal only) and Drift Chamber's +1.5 dB (impulse only) were not
+  taken.

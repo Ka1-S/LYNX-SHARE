@@ -108,6 +108,7 @@ inline std::vector<EffectSlot> chain (const Options& options = {})
     {
         namespace c = dyn::crest;
         auto comp = makeEffectSlot (EffectKind::crestCompressor);
+        comp.params[c::revision] = 0.0f; // round 190kw: this chain was tuned on the fitted laws (revision 0)
         comp.params[c::style] = c::styleValue (c::Style::clean);
         comp.params[c::threshold] = valueFor ([] (float v) { return c::thresholdDb (v); }, compThresholdDb);
         comp.params[c::ratio] = c::ratioValue (compRatio);

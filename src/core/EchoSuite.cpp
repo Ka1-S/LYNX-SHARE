@@ -739,6 +739,43 @@ double pitchSemis (float v) noexcept { return 24.0 * bipolar (v); }
 double lowCutHz (float v) noexcept { return 10.0 + 1990.0 * clamp01 (v); }
 double highCutHz (float v) noexcept { return 200.0 + 19800.0 * clamp01 (v); }
 double outputDb (float v) noexcept { return -18.0 + 36.0 * clamp01 (v); }
+
+// round 190kw: the line law's read filter. A Kaiser-windowed sinc per rate, its half length, cutoff (of Nyquist) and
+// window fitted [EXEC] on the first echo of refcap030 / refcap182's Timeless 3 impulse renders (D, 350 ms, feedback 0),
+// with the line's 15.5 Hz low cut in the model; the residual is 44 … 49 dB under the echo. Other rates take the nearest.
+int lineLawKernel (double rate, std::array<float, 33>& taps) noexcept
+{
+    struct Fit { double sr; int half; double cutoff, beta; };
+    static constexpr Fit fits[] { { 44100.0, 12, 0.94, 11.0 }, { 48000.0, 8, 0.9175, 9.5 }, { 96000.0, 4, 0.8625, 6.5 } };
+    const Fit* f = &fits[0];
+    for (const auto& c : fits)
+        if (std::abs (std::log (rate / c.sr)) < std::abs (std::log (rate / f->sr)))
+            f = &c;
+    const auto bessel0 = [] (double x) {
+        double sum = 1.0, term = 1.0;
+        for (int k = 1; k < 32; ++k)
+        {
+            term *= (x * 0.5 / k) * (x * 0.5 / k);
+            sum += term;
+        }
+        return sum;
+    };
+    taps.fill (0.0f);
+    double total = 0.0;
+    std::array<double, 33> h {};
+    for (int k = -f->half; k <= f->half; ++k)
+    {
+        const double x = f->cutoff * k;
+        const double sinc = k == 0 ? 1.0 : std::sin (pi * x) / (pi * x);
+        const double r = (double) k / f->half;
+        const double w = bessel0 (f->beta * std::sqrt (std::max (0.0, 1.0 - r * r))) / bessel0 (f->beta);
+        h[(std::size_t) (k + f->half)] = sinc * w;
+        total += sinc * w;
+    }
+    for (int k = 0; k <= 2 * f->half; ++k)
+        taps[(std::size_t) k] = (float) (h[(std::size_t) k] / total);
+    return f->half;
+}
 int hybridOf (float v) noexcept { return v < 0.25f ? 0 : (v < 0.75f ? 1 : 2); }
 int tapeVoicingOf (float v) noexcept { return std::clamp ((int) std::lround (clamp01 (v) * tapeVoicingCount), 0, tapeVoicingCount); }
 float tapeVoicingValue (int k) noexcept { return (float) std::clamp (k, 0, tapeVoicingCount) / (float) tapeVoicingCount; }
@@ -1041,6 +1078,9 @@ public:
         for (auto& w : wetBuf) // round 190is
             w.fill (0.0f);
         wetPos = 0;
+        for (auto& h : lawHist) // round 190kw
+            h.fill (0.0f);
+        lawPos[0] = lawPos[1] = 0;
         std::uint32_t seed = 0x1234567u;
         for (auto& c : ch)
         {
@@ -1177,6 +1217,19 @@ private:
         const auto st = rhythmOn ? Style::single : styleOf (p[style]);
         float dryGain = 1.0f, wetGain = 0.0f;
         equalPowerMix (p[mix], dryGain, wetGain);
+        // round 190kw: the line law (hidden; a translated Timeless 3 state): the reference's dry / wet law, its read filter
+        const bool lineLawOn = vd == nullptr && p[lineLaw] >= 0.5f;
+        if (lineLawOn)
+        {
+            const auto m = clamp01 (p[mix]);
+            dryGain = std::min (1.0f, 2.0f * (1.0f - m));
+            wetGain = std::min (1.0f, 2.0f * m);
+            if (sr != lawSr)
+            {
+                lawHalf = lineLawKernel (sr, lawTaps);
+                lawSr = sr;
+            }
+        }
 
         // times: sync / ms, spread (±¼ of the spread on each side), style
         auto tL = sideMs (p, false, bpm);
@@ -1407,6 +1460,9 @@ private:
             if (primesOn)
                 for (auto& t : target)
                     t = (double) nearestPrime ((int) std::lround (t));
+            if (lineLawOn) // round 190kw: the reference reads whole samples (its echoes land on them at 44.1 / 48 / 96 kHz)
+                for (auto& t : target)
+                    t = std::round (t);
             double d[2];
             for (int c = 0; c < 2; ++c)
             {
@@ -1485,7 +1541,10 @@ private:
                 {
                     // the pitch shifter's window delays the echo by half a window: read that much earlier
                     const auto early = (md == Mode::pitch || md == Mode::detune) ? s.pitch.window * 0.5 : 0.0;
-                    y = s.line.at (std::max (2.0, d[c] - early));
+                    if (lineLawOn) // round 190kw: read the filter's half length early, through the linear-phase low-pass
+                        y = lawRead (c, s.line.at (std::max (2.0, d[c] - early - (double) lawHalf)));
+                    else
+                        y = s.line.at (std::max (2.0, d[c] - early));
                     fbSig[c] = y;
                 }
                 const auto sign = c == 0 ? 1.0 : -1.0;
@@ -1563,8 +1622,10 @@ private:
             }
             else if (st == Style::pingPong)
             {
+                // round 190kw: the line law feeds the start side its own input only (the reference's ping pong, measured on
+                // refcap030's programme: the left echo is the left input's, the right input is not heard)
                 const auto half = (float) std::sqrt (loopG);
-                loopIn[first] = feed * mono + half * fbSig[second];
+                loopIn[first] = feed * (lineLawOn ? in[first] : mono) + half * fbSig[second];
                 loopIn[second] = half * fbSig[first];
             }
             else
@@ -1609,7 +1670,7 @@ private:
                     for (int k = 0; k < loopN; ++k)
                         u = loopQ[(std::size_t) k].process (u, c);
                 }
-                else
+                else if (! (lineLawOn && md == Mode::clean && ageV <= 0.0f && driveGain <= 1.0f)) // round 190kw: a clean line
                     u = character (s, c, u, md, ageV, driveGain);
                 u = s.highCut.lp (s.lowCut.hp (u));
                 if (loopEq) // round 144: the loop EQ shapes every repeat again
@@ -1618,7 +1679,7 @@ private:
                     u = lofiLp.process (u, c);
                 if (mult > 1) // round 147: Multiply's band
                     u = multLp2.process (multLp1.process (u, c), c);
-                s.line.push (softLimit (u));
+                s.line.push (lineLawOn ? (float) (lineLawLimit * std::tanh ((double) u / lineLawLimit)) : softLimit (u));
             }
             // round 150: the L/R offset's second loop gets the odd repeats (one more pass: gain, diffusion, colour, cuts)
             for (int c = 0; c < 2; ++c)
@@ -2282,6 +2343,24 @@ private:
         const auto u = satDrive * (double) x + (double) v.b;
         const auto y = (kneeShape (u, (double) v.p) - satKb) / satSlope;
         return (float) ((satLoopUnity ? 1.0 : satGain) * y / satDrive);
+    }
+
+    // round 190kw: the line law's read filter (taps, half length, the rate they were made for) and its history per side
+    std::array<float, 33> lawTaps {};
+    int lawHalf = 0;
+    double lawSr = 0.0;
+    std::array<std::array<float, 64>, 2> lawHist {};
+    int lawPos[2] {};
+    float lawRead (int c, float x) noexcept
+    {
+        auto& hst = lawHist[(std::size_t) c];
+        auto& pos = lawPos[c];
+        pos = (pos + 1) & 63;
+        hst[(std::size_t) pos] = x;
+        float y = 0.0f;
+        for (int k = 0; k <= 2 * lawHalf; ++k)
+            y += lawTaps[(std::size_t) k] * hst[(std::size_t) ((pos - k) & 63)];
+        return y;
     }
 
     const VoicingData* satCurve = nullptr;

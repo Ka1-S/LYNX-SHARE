@@ -1731,6 +1731,70 @@ LYNX_FIT_TABLE Rev1Trim epochTrim[epoch::modeCount] = {
     { -6.17, { 1.19, -1.22, -1.27, 0.88, 0.86, 2.55, -1.82, -11.16 } }, // Vintage Chamber
     { -2.85, { 0.07, -5.03, -1.68, 1.48, 1.22, 4.32, -0.31, -12.19 } }, // Vintage Hall
 };
+// round 190kw (revision 1 + loopLaw): Epoch's level over Decay and Size from the reference's loop (static REA of
+// ValhallaVintageVerb, docs/analise/REA_rodada190kw.md §4 / §11). Each of its modes is one loop whose gain is the RT60 law
+// 10^(−3 L / (fs T)) split over N gain stages, the input entering after a stage, with no output gain of its own: its wet
+// energy is E(T, s) = E0 / (1 − 10^(−6 ℓ(s) / T)), ℓ = c · L(s) / N, and the first 80 ms do not move with Decay. Per mode:
+// ℓ at Size 100 % (s), the loop's size law L(s) / L(1) = a + b · s^e, the level at the capture's base Decay (0.513 s) against
+// revision 1 (dB, refcap030's mode sweep, impulse) and Epoch's own wet-energy growth over Decay (dB at the knots below,
+// measured on the impulse with the law's level off). The trim is the reference's growth minus Epoch's own. Fitted on the
+// scores after that (the stand-in's spectrum is not the reference's, so the level that scores best is not always the
+// energy match): Concert Hall +0.3 dB, and its own growth 0.1 / 0.6 / 0.2 / 0.9 dB less at 2 / 4 / 7 / 15 s and 0.3 / 0.3 dB
+// more at 33 / 70 s (refcap030's pairs and sr48 / sr96 captures, refcap182's programme and tp172d at 0.51 / 2.9 / 4 / 7 /
+// 12.8 / 33 s), Room −0.4 dB (its 1.41 s captures), Bright Hall +1.25 dB, Grit Plate −3.25 dB, Gated −2 dB (its impulse).
+// A negative ℓ: the mode keeps revision 1 (early part and level as round 190it left them).
+struct EpochLoop
+{
+    double ell, a, b, e, atDb;
+    double grow[8];
+};
+constexpr double epochLoopKnots[8] = { 0.513, 1.0, 2.0, 4.0, 7.0, 15.0, 33.0, 70.0 }; // Decay (s)
+LYNX_FIT_TABLE EpochLoop epochLoop[epoch::modeCount] = {
+    { 0.39520, 0.200, 0.800, 1.0, 0.85, { 0.00, 0.35, 1.39, 2.79, 4.78, 6.48, 10.11, 12.31 } }, // Concert Hall: 0.5605 s (0.2 + 0.8 s), N 2, c 1.41
+    { 0.18654, 0.16155, 0.83845, 1.0, -2.05, { 0.00, 0.93, 3.42, 6.14, 8.22, 10.84, 13.33, 15.50 } }, // Plate: 5100 (1 + 5.19 s) / 33850, N 5
+    { 0.13013, 0.250, 0.750, 1.0, -1.22, { 0.00, 1.76, 3.86, 5.93, 7.57, 9.72, 11.82, 13.71 } }, // Room: 26770 (0.5 + 1.5 s) / 48000, N 6, c 0.7
+    { 0.15545, 0.16155, 0.83845, 1.0, -1.68, { 0.00, 1.09, 3.60, 6.26, 8.29, 10.85, 13.28, 15.42 } }, // Chamber: as Plate, N 6
+    { 0.26899, 0.19750, 0.80250, 1.0, 1.43, { 0.00, 1.14, 3.53, 6.35, 8.53, 11.28, 13.87, 16.12 } }, // Random Space: 5100 (3 + 12.19 s) / 48000, N 6
+    { 0.26899, 0.19750, 0.80250, 1.0, 0.97, { 0.00, 1.00, 3.10, 5.71, 7.84, 10.58, 13.18, 15.44 } }, // Chorus Space: as Random Space
+    { 0.20566, 0.36630, 0.63370, 1.0, -2.95, { 0.00, 0.18, 2.39, 4.89, 6.81, 9.25, 11.59, 13.67 } }, // Ambience: 5100 (3 + 5.19 s) / 33850, N 6
+    { 0.30797, 0.200, 0.800, 1.0, -3.41, { 0.00, -2.44, -2.10, -0.65, 0.79, 2.92, 5.15, 7.22 } }, // Bright Hall: 11210 (0.2 + 0.8 s) / 18200, N 2
+    { 1.13677, 0.200, 0.800, 1.0, -2.93, { 0.00, -0.33, 0.74, 2.65, 4.39, 6.81, 9.25, 11.46 } }, // Nave ← Sanctuary: 21826 (1 + 4 s) / 48000, N 2
+    { 0.28025, 0.200, 0.800, 1.0, -2.47, { 0.00, -1.33, -1.02, 0.30, 1.65, 3.68, 5.86, 7.89 } }, // Grit Hall ← Dirty Hall: as Concert Hall, c 1
+    { 0.08252, 0.09434, 0.90566, 1.0, -0.33, { 0.00, 1.65, 4.25, 6.99, 9.06, 11.66, 14.12, 16.29 } }, // Grit Plate ← Dirty Plate: 11210 (0.8 s fs / 20000 + 0.2) / fs (48 kHz), N 6
+    { 0.47326, 0.05263, 0.94737, 1.0, -2.39, { 0.00, 0.29, 1.66, 3.60, 5.29, 7.60, 9.90, 11.97 } }, // Smooth Plate: 4250 (1 + 18 s) / 34125, N 5
+    { 0.32854, 0.07582, 0.92418, 1.0, -3.36, { 0.00, 1.43, 3.90, 6.05, 7.84, 10.21, 12.47, 14.33 } }, // Smooth Room: 5100 (1 + 12.19 s) / 34125, N 6
+    { 0.26899, 0.19750, 0.80250, 1.0, -2.55, { 0.00, 1.10, 3.35, 5.62, 7.53, 10.07, 12.52, 14.59 } }, // Smooth Space ← Smooth Random: as Random Space
+    { 0.0, 0.07582, 0.92418, 2.0, 0.43, { 0.00, -0.44, -0.36, -0.36, -2.06, -4.42, -7.61, -7.28 } }, // Gated ← Nonlin: 5100 (1 + 12.19 s²) / 34125; its gate, not the loop, sets the level
+    { -0.39438, 0.15789, 0.84211, 1.0, -3.96, { 0.00, -0.95, 0.21, 2.17, 3.87, 6.15, 8.39, 10.40 } }, // Drift Chamber ← Chaotic Chamber: 4250 (3 + 16 s) / 34125, N 6; keeps revision 1 (its test signal lost a step)
+    { 0.28025, 0.200, 0.800, 1.0, -1.57, { 0.00, -0.73, -0.13, 1.48, 3.03, 5.26, 7.56, 9.66 } }, // Drift Hall ← Chaotic Hall: as Grit Hall
+    { 0.44835, 0.11111, 0.88889, 1.0, -0.02, { 0.00, 0.96, 3.35, 6.09, 8.20, 10.87, 13.39, 15.59 } }, // Drift Space ← Chaotic Neutral: 5100 (2 + 16 s) / 34125, N 6
+    { 0.38147, 0.200, 0.800, 1.0, 1.39, { 0.00, 0.91, 1.36, 2.99, 4.45, 6.83, 9.64, 12.25 } }, // Cathedral: 30000 (0.5 + 2 s) / 32768, N 6
+    { 0.32005, 0.03125, 0.96875, 1.5, 0.43, { 0.00, -0.82, -0.12, 1.73, 3.59, 6.23, 8.84, 11.17 } }, // Grand Hall ← Palace: 61449 (0.125 + 3.875 s^1.5) / 48000, N 16
+    { 0.41550, 0.500, 0.500, 1.0, 2.93, { 0.00, 0.97, 3.13, 5.73, 7.76, 10.34, 12.79, 14.97 } }, // Vintage Chamber ← Chamber1979: 9972 (0.5 + 0.5 s) / 20000 per line, RT 1.2 × Decay
+    { 0.46667, 0.500, 0.500, 1.0, 2.33, { 0.00, -0.79, -0.33, 1.10, 2.54, 4.67, 6.91, 8.97 } }, // Vintage Hall ← Hall1984: 11200 (0.5 + 0.5 s) / 20000 per line, RT 1.2 × Decay
+};
+// the level trim (dB) of revision 1 + loopLaw for mode k at Decay T (s) and Size s (0..1): the base level, plus the
+// reference's growth from (0.513 s, 100 %) to (T, s) through its own size law, minus Epoch's own growth over Decay and Size
+double epochLoopDb (int k, double decay, double size) noexcept
+{
+    const auto& m = epochLoop[k];
+    if (m.ell <= 0.0)
+        return m.atDb;
+    const auto t = std::clamp (decay, epochLoopKnots[0], epochLoopKnots[7]);
+    const auto grow = [t] (double ell) { return -10.0 * std::log10 (std::max (1.0e-9, 1.0 - std::pow (10.0, -6.0 * ell / t))); };
+    const auto lawSize = m.a + m.b * std::pow (std::clamp (size, 0.0, 1.0), m.e);
+    // Epoch's own lines scale by 0.3 + 0.7 s, and its wet energy rises by that factor^−0.64 at any Decay (measured:
+    // +1.2 / +2.0 dB at Size 50 / 25 %, Concert Hall and Room, 0.51 … 12.8 s)
+    const auto ownSizeDb = -6.4 * std::log10 (0.3 + 0.7 * std::clamp (size, 0.0, 1.0));
+    const auto ref = grow (m.ell * lawSize) - ownSizeDb + 10.0 * std::log10 (1.0 - std::pow (10.0, -6.0 * m.ell / epochLoopKnots[0]));
+    int i = 0;
+    while (i < 6 && t > epochLoopKnots[i + 1])
+        ++i;
+    const auto f = std::log (t / epochLoopKnots[i]) / std::log (epochLoopKnots[i + 1] / epochLoopKnots[i]);
+    const auto own = m.grow[i] + (m.grow[i + 1] - m.grow[i]) * std::clamp (f, 0.0, 1.0);
+    return m.atDb + ref - own;
+}
+
 // Atrium ← ValhallaRoom's type sweep (3-point smoothed over the bands, half the 63 Hz band's; Large Room, the type of
 // every other capture, keeps its 0.1.27 voicing; Medium Room's level a compromise between its impulse (+2 dB) and its
 // test signal (−3 dB))
@@ -1958,7 +2022,11 @@ protected:
         // first 100 ms still holds), its modes sit denser low down (lines × 0.85: the −20 dB impulses and music both
         // closer), and it is 0.7 dB lower
         s.lineScale *= 0.85;
-        s.earlyLevel *= std::min (1.6, 1.13 * std::sqrt (std::max (1.0, decay / 2.0)));
+        // round 190kw (loopLaw): the reference's first 80 ms do not move with Decay (−10.65 dB at 0.51 / 7 / 33 s): the
+        // early level holds at its long-decay value
+        const auto loopLaw = p[epoch::engineLaw] >= 0.5f && p[epoch::revision] >= 0.5f && p[epoch::loopLaw] >= 0.5f
+                          && epochLoop[modeIndex].ell >= 0.0;
+        s.earlyLevel *= loopLaw ? 1.6 : std::min (1.6, 1.13 * std::sqrt (std::max (1.0, decay / 2.0)));
         s.gain *= 0.92;
         if (p[epoch::engineLaw] >= 0.5f)
             applyLaw (s, epochLaw[modeIndex]);
@@ -1967,7 +2035,18 @@ protected:
             s.revision = 1; // round 190it
             // Epoch's trims were measured at the capture's base Decay (0.51 s); its Room mode needs none at 1.41 s
             // (refcap182 S2): they fade out between the two on the decay's logarithm
-            applyTrim (s, epochTrim[modeIndex], std::clamp (std::log (1.41 / std::max (0.01, decay)) / std::log (1.41 / 0.51), 0.0, 1.0));
+            const auto fade = std::clamp (std::log (1.41 / std::max (0.01, decay)) / std::log (1.41 / 0.51), 0.0, 1.0);
+            if (! loopLaw)
+                applyTrim (s, epochTrim[modeIndex], fade);
+            else
+            {
+                // round 190kw: the tone trims fade as before; the level is the loop law's at every Decay and Size
+                auto tone = epochTrim[modeIndex];
+                const auto levelDb = tone.gainDb;
+                tone.gainDb = 0.0;
+                applyTrim (s, tone, fade);
+                s.gain *= std::pow (10.0, (levelDb + epochLoopDb (modeIndex, decay, size)) / 20.0);
+            }
         }
     }
 };

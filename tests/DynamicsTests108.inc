@@ -719,7 +719,9 @@ TEST (dyn108_fabfilter_states_translate_to_the_suite)
         old.state = ffbs (90, { { 1, -40.0f } });
         int none = -1;
         const auto slot3 = makeSubstituteSlot (*entry, &old, &none);
-        CHECK (none == 0 && slot3.params == makeEffectSlot (EffectKind::crestCompressor).params);
+        auto plainCrest = makeEffectSlot (EffectKind::crestCompressor);
+        plainCrest.params[(std::size_t) dyn::crest::revision] = 0.0f; // round 190kw: a substitute's untranslated Crest keeps revision 0
+        CHECK (none == 0 && slot3.params == plainCrest.params);
 
         // the substitute keeps the original plugin, state byte for byte
         EffectSlot fl;

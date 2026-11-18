@@ -132,7 +132,7 @@ matches by name).
 | D16 Group Repeater | Echoform (round 190lb; the delay role's quarter-note preset, 25 % mix; spec-based, unscored: no capture or state exists) | name | — |
 | Soundtoys EchoBoy / PrimalTap | Echoform (round 129; tape / lo-fi echo, 1/4 note, 25 % feedback, 25 % mix; was Fruity Delay 3) | VST2 ID [DATA] (EchoBoy), names | — |
 | Waves SuperTap | Echoform (round 190jh; was Fruity Delay 3; no state: the dry signal, as SuperTap's default) | Waves name | taps 1–2 (on, gain, pan, delay at its BPM), feedback, tap filter → Echoform's clean Single / Dual echo, dry at unity [EXEC] (refcap182) |
-| FabFilter Timeless | Fruity Delay 3 | names | — |
+| FabFilter Timeless | Echoform (round 190kw; was Fruity Delay 3; no readable state: Timeless 3's default, 350 ms, no feedback, mix 50 %) | names | Timeless 3 (FFBS, 1007 values): delay time / sync / time pan, feedback (ping pong, pan, cross mix), mix, width, wet level / pan, filters in use, drive, diffuse, freeze → Echoform's Clean mode with the hidden line law (the reference's dry / wet law, read filter, limit) [EXEC] (refcap030 / refcap182) |
 | ValhallaDelay | Echoform (round 101) | VST3 class ID [derived], name | every setting but Era / taps / repeat-swell: mix, style, sync, times, feedback, filters, modulation, shift, pitch, ducking; the 17 modes onto Echoform's 12 characters |
 | ValhallaFreqEcho | Spiral Echo (round 101) | VST3 class ID [derived], name | all 8 settings |
 | ValhallaSpaceModulator | Orbit (round 101) | VST3 class ID [derived], name | all 6 settings |

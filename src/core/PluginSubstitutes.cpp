@@ -430,8 +430,16 @@ map = xml:DelaySync -> Delay sync
 [fabfilter-timeless]
 product = FabFilter Timeless
 vendor = FabFilter
-lynx = Fruity Delay 3
+# round 190kw: LYNX's multi-mode echo (was Fruity Delay 3 at FL's default, 2.37 / 10 on refcap030's Timeless 3 bank): a
+# Timeless 3 state (component state "FFBS", 1007 values) is translated onto Echoform's Clean mode with the line law
+# measured on the reference (hidden #109: its dry / wet law, read filter and wide limit): delay time / sync / time pan,
+# feedback (ping pong, pan, cross mix), mix, stereo width, wet level / pan, the filters in use, drive, diffuse, freeze
+# (docs/PARITY.md "Round 190kw"). Without a readable state (Timeless 2): the reference's default, a single 350 ms echo
+# without feedback at Mix 50 % (the dry at unity)
+lynx = Echoform
 names = FabFilter Timeless 2; FabFilter Timeless 3; Timeless 2; Timeless 3
+translate = timeless3
+preset = Mode=0.541667; Style=0.1; Sync L=0; Sync R=0; Time L=0.35; Time R=0.35; Feedback=0; Mix=0.5; Width=1; Low cut=0.002764; High cut=1; Age=0; Mod depth=0; Wow=0; Flutter=0; Drive=0; #109=1
 
 # ---------------------------------------------------------------- limiters -> Limiter (ceiling -0.3 dB)
 [waves-l-series]
@@ -4082,6 +4090,10 @@ const SubstituteEntry* findPluginSubstitute (const PluginIdentity& plugin, bool 
 EffectSlot makeSubstituteSlot (const SubstituteEntry& entry, const PluginIdentity* original, int* translated)
 {
     auto slot = makeEffectSlot (entry.effect);
+    // round 190kw: the substitutes' Crest settings were measured on the fitted laws: they keep revision 0 (the Pro-C 3
+    // translator, applied below, sets 1)
+    if (slot.kind == EffectKind::crestCompressor)
+        slot.params[(std::size_t) dyn::crest::revision] = 0.0f;
     for (const auto& [index, value] : entry.preset)
         if (index >= 0 && index < maxEffectParams)
             slot.params[(std::size_t) index] = value;

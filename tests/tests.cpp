@@ -17826,6 +17826,9 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Parity190lbTests.inc" // round 190lb: black-box study (no decryption); SSL 4K G Pink EQ + output ceiling
 #include "Harrison190leTests.inc" // round 190le: Ridge Strip's 32C voicing (Harrison 32Classic EQ law)
 #include "Parity190kyTests.inc" // round 190ky: Crest's FET law (REA of the Waves CLA-76 DSP), CLA-76 on it
+#include "Parity190kwTests.inc" // round 190kw: static REA — Crest's Pro-C 3 V1 / V2 style laws (hidden revision)
+#include "Parity190kwTl3Tests.inc" // round 190kw: Timeless 3 states on Echoform (the hidden line law)
+#include "Parity190kwVvTests.inc" // round 190kw: Epoch Verb's level on ValhallaVintageVerb's loop law (after Parity190it: its gold helpers)
 #include "Sampler190dhTests.inc"
 #include "Fix190eaTests.inc"
 #include "Iss158Tests.inc"

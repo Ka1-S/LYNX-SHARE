@@ -459,6 +459,9 @@ TEST (reverb190bz_unfitted_modes_stay_close_to_the_classic_law)
     auto slot = makeEffectSlot (EffectKind::epochVerb);
     slot.params[16] = 7.0f / 21.0f; // Bright Hall
     slot.params[12] = 0.0f;         // no modulation
+    // (round 190kw: the 0.1.27 law's neutral numbers, so its revision 0; the loop law of new instances moves Bright Hall's
+    // level with Decay, checked by tests/Parity190kwVvTests.inc)
+    slot.params[(std::size_t) verbs::epoch::revision] = 0.0f;
     Stereo out[2];
     for (int law = 0; law < 2; ++law)
     {
