@@ -44,7 +44,19 @@ namespace quell
 // octave bands and gain-reduced low / high bands; off (older projects) = the 6-band expander of round 119
 // `law` (appended, round 190dp; Measured for new instances, Classic for projects saved before): the matched engine's
 // noise-floor tracker (below). Off = round 124's fixed thresholds
-enum Param { amount, listen, output, matched, law, paramCount };
+enum Param
+{
+    amount, listen, output, matched, law, paramCount,
+    // round 190lf, hidden (not in the info: no control, no text; saved while non-zero): the matched engine's zero law.
+    // [REA + black box, the NS1 trial's DSP, saved states and renders] at 0 % the reference is exactly its all-pass pair
+    // (60 Hz / 16 kHz; the refcap182 programme to −40 … −71 dB ESR, pink-noise steps −50 … −20 dBFS to −55 … −60 dB):
+    // nothing dynamic, no shelf. On (the NS1 translator sets it): Amount 0 is that bare pair, and up to 20 % (the first
+    // measured setting, where the engine's fit holds) the engine's output fades in over it — both run on the same
+    // all-pass skeleton, so the fade is phase-coherent. 0 = off: new instances and every project saved before, bit for bit
+    zeroLaw = paramCount
+};
+// round 190lf: the Amount up to which zeroLaw fades the engine in over the bare all-pass pair
+constexpr double zeroFade = 0.2;
 constexpr int bands = 6;
 // crossover frequencies (Hz) between the six bands
 constexpr double split[bands - 1] { 105.0, 311.0, 921.0, 2727.0, 8075.0 };
