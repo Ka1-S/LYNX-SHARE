@@ -572,6 +572,14 @@ struct SamplerSettings
     // every sample in memory (it streams files over 30 s from its disk cache by itself), resamples in real time, and its
     // sampler does not play the file's regions or ACID markers itself, so they change nothing audible in LYNX.
     bool keepOnDisk = false, resampleOnLoad = false, loadRegions = true, loadSliceMarkers = false;
+    // Round 190lq (issue #204): how an audio clip channel plays its NOTES (steps, Piano roll notes, keys). FL's law (the
+    // default: new channels, .flp imports): a note plays as the channel's Sampler note would (FL 2026's renders of the
+    // two are bit-identical) — the whole clip whatever the note's length, overlapping notes layer, the key transposes it
+    // from C5 (the channel's root note), the Sampler's velocity law. Legacy: how LYNX played them before 0.1.30 (each
+    // note cut at its own end, every key at the clip's own pitch), kept for audio clip channels of projects saved before
+    // the "clipNotes190lq" mark (engine/ProjectFile.cpp) so they sound as they did.
+    // Playlist audio clips are not notes: this changes nothing for them.
+    bool clipNoteLegacy = false;
 
     bool operator== (const SamplerSettings&) const = default;
 };

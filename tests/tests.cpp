@@ -6644,7 +6644,9 @@ TEST (audio_clip_unity_at_fl_default_volume)
     c.instrument = lynx::InstrumentKind::audioClip;
     c.volume = 10000.0f / 12800.0f;
     clip->configure (c, 120.0);
-    clip->noteOn (60, 1.0f);
+    // (a Playlist clip's own key: since round 190lq a key below audioClipKeyBase is a NOTE of the channel, which plays as a
+    // Sampler note — tests/Issue204Tests.inc)
+    clip->noteOn (lynx::audioClipKey (0), 1.0f);
     std::vector<float> l (4800, 0.0f), r (4800, 0.0f);
     const auto g = lynx::channelGain (c.volume);
     clip->render (l.data(), r.data(), 4800, g, g);
@@ -17928,3 +17930,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "LoopAnalysis190kxTests.inc" // round 190kx: loop analysis (key and tempo of the user's own loops; core/LoopAnalysis.h)
 #include "Vocal190liTests.inc" // round 190li: Newtone natural engine (engine 1), modulation / drift split, sung centre, analysis octave guard
 #include "Newtone190lmTests.inc" // rollup 0.1.30 step 8: a new Newtone slot (natural engine) analysed with "Separate close notes"
+#include "Issue204Tests.inc" // round 190lq: issue #204, an audio clip channel played from notes (whole clip, layered, key pitch)

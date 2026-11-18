@@ -1245,8 +1245,11 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
         }
 
         // FL's whole native sampler voice (REA_rodada76): the five articulator records as stored (a missing one keeps
-        // the plugins' default record), Mod X/Y, filter type, PPQ
-        if (c.type == flp::ChannelType::sampler && def.instrument == InstrumentKind::sampler)
+        // the plugins' default record), Mod X/Y, filter type, PPQ.
+        // Round 190lq (issue #204): an audio clip channel's notes play through it too — FL's renders of the same notes on
+        // an audio clip channel and on a Sampler are bit-identical (its Playlist clips keep the clip voice)
+        if ((c.type == flp::ChannelType::sampler && def.instrument == InstrumentKind::sampler)
+            || (isAudioClip && def.instrument == InstrumentKind::audioClip))
         {
             const auto defaults = flvp::defaultSnapshot();
             def.sampler.flChannel.assign (90, 0);

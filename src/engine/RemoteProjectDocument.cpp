@@ -64,6 +64,7 @@ const DocumentFields& editableDocumentFields (DocumentShape shape)
         add (S::root, "playlistRowHeight linkTracksToMixer");
         add (S::root, "beatsLaw190gx", S::readOnly);
         add (S::root, "warpLaw190ik", S::readOnly); // (round 190ik: the Beats detector / Texture / Complex Pro laws' mark)
+        add (S::root, "clipNotes190lq", S::readOnly); // (round 190lq: FL's law for the notes of audio clip channels' mark)
         add (S::root, "sfModBase190he", S::readOnly); // (round 190he: the mark of a song saved with the real Soundfont modulator centre)
         add (S::root, "mixerLevelPdc190hq"); // (round 190hq: Mixer › Plugin delay compensation › compensate fader and route automations)
         add (S::root, "format version savedBy projectId nextUid session clipFadesPerClip", S::readOnly);
@@ -113,7 +114,7 @@ const DocumentFields& editableDocumentFields (DocumentShape shape)
         add (S::synth, "osc spectrum spectrumPhase spectrumDecay spectrumTarget adsr filter ladder chorus stereoTremolo vibratoCents "
              "mono porta portaTime am ring keyTrack bands sweep sweepTime fm filterEnv pitchEnv lfo");
         add (S::sampler, "pitch attack decay sustain release stretchBeats keepPitch stretchMethod flStretchMode flStretchPitch stretchPitch "
-             "warp region startOffset slices reverse cut porta portaTime filter gainDb useLoopPoints flVelocityLaw declickMode "
+             "warp region startOffset slices reverse cut porta portaTime filter gainDb useLoopPoints flVelocityLaw clipNoteLegacy declickMode "
              "flVolumeEnvelope flChannel filterEnv pitchEnv lfo loopKey warpModes stretchMul loopStart loopEnd keepOnDisk resample "
              "loadRegions loadSliceMarkers flmPad");
         add (S::sampler, "precomputed", S::precomputed);
