@@ -63,6 +63,16 @@
             const auto wells = strips.meterAreaForSnapshot (0).getUnion (strips.meterAreaForSnapshot (4)).expanded (4);
             savePng (strips.createComponentSnapshot (wells.getIntersection (strips.getLocalBounds()), true, 3.0f), prefix + "-mixer-waveforms@3x.png");
             strips.setMeterWaveforms (false);
+            // the Browser's location history (FL's Backspace / Shift+Backspace; Live's Ctrl+[ / Ctrl+])
+            auto& browser = ui.getBrowserForSnapshot();
+            const auto a = juce::File::getSpecialLocation (juce::File::tempDirectory), b = a.getParentDirectory();
+            browser.noteLocation (a);
+            browser.noteLocation (b);
+            check ("history: two places, at the last", browser.historySizeForCheck() == 2 && browser.historyAtForCheck() == 1);
+            browser.walkHistory (-1);
+            check ("Backspace: back to the first", browser.historyAtForCheck() == 0);
+            browser.walkHistory (1);
+            check ("Shift+Backspace: forward again", browser.historyAtForCheck() == 1);
         }
         {
             // ---- Simple layout: a Drums track and its Drum Machine tab
