@@ -268,6 +268,8 @@
 #include "ui/SimpleDock.h"
 #include "ui/SimpleTuner.h"
 #include "ui/AudioToMidi.h"
+#include "ui/PolyEditor.h"
+#include "core/PolyEdit.h"
 #include "ui/ShotScale.h"
 #include "core/LaneView.h"       // round 190iu
 #include "core/PlaylistTrackOps.h"
@@ -2256,6 +2258,19 @@ public:
             // conversion (Playlist, Piano roll; with bends on the second file), plus <prefix>-checks.txt (OK / FAIL)
             const auto i = args.indexOf ("--polyshot190lj");
             const auto ok = runPolyShot190lj (args[i + 1].unquoted(), args[i + 2].unquoted(), i + 3 < args.size() && ! args[i + 3].startsWith ("--") ? args[i + 3].unquoted() : juce::String());
+            setApplicationReturnValue (ok ? 0 : 1);
+            quit();
+            return;
+        }
+
+        if (args.contains ("--polyeditshot190lk") && args.indexOf ("--polyeditshot190lk") + 2 < args.size())
+        {
+            // LYNX --polyeditshot190lk prefix audio.wav [key] (round 190lk): "Edit notes (polyphonic)" — the audio clip menu,
+            // the editor as analysed and after one note (the one nearest `key`, default 64 = E4) moved down a semitone,
+            // at 100 % and 150 %, plus <prefix>-checks.txt (OK / FAIL, timings) and <prefix>-notes.txt
+            const auto i = args.indexOf ("--polyeditshot190lk");
+            const auto ok = runPolyEditShot190lk (args[i + 1].unquoted(), args[i + 2].unquoted(),
+                                                  i + 3 < args.size() && ! args[i + 3].startsWith ("--") ? args[i + 3].getDoubleValue() : 64.0);
             setApplicationReturnValue (ok ? 0 : 1);
             quit();
             return;
@@ -21513,6 +21528,120 @@ private:
         }
         lynx::shot::file (juce::File (prefix + "-menus.txt")).replaceWithText (report);
         std::printf ("%s", report.toRawUTF8());
+    }
+
+    bool runPolyEditShot190lk (const juce::String& prefix, const juce::String& file, double key)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine engine (false);
+        lynx::MainComponent ui (engine, false);
+        ui.setSize (1600, 900);
+        juce::StringArray checks;
+        const auto check = [&checks] (bool ok, const juce::String& what) { checks.add ((ok ? "OK   " : "FAIL ") + what); };
+        auto song = lynx::Song::makeDefault();
+        const auto sample = engine.getSampleLibrary().load (file);
+        song.channels.push_back ({});
+        song.channels.back().name = juce::File (file).getFileNameWithoutExtension().toStdString();
+        song.channels.back().instrument = lynx::InstrumentKind::audioClip;
+        song.channels.back().samplePath = file.toStdString();
+        const auto channel = (int) song.channels.size() - 1;
+        lynx::Clip c;
+        c.kind = lynx::ClipKind::audio;
+        c.channel = channel;
+        c.track = 3;
+        const auto seconds = sample != nullptr ? (double) sample->frames() / sample->sampleRate : 4.0;
+        c.length = (std::int64_t) std::llround (seconds * song.bpm / 60.0 * lynx::ppq);
+        song.playlist.push_back (c);
+        engine.setSong (std::move (song));
+        engine.dispatchPendingMessages();
+        const auto clipIndex = (int) engine.getSong().playlist.size() - 1;
+        check (sample != nullptr && sample->frames() > 0, "the sample loads: " + file);
+
+        const auto wanted = lynx::tr ("Edit notes (polyphonic)...");
+        for (const auto simple : { false, true })
+        {
+            ui.setLayoutStyle (simple ? lynx::layoutstyle::Style::simple : lynx::layoutstyle::Style::pattern);
+            engine.dispatchPendingMessages();
+            const auto menu = ui.getPlaylistForSnapshot().getClipMenuForSnapshot (clipIndex);
+            auto afterExtras = false, found = false;
+            for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+            {
+                afterExtras = afterExtras || (it.getItem().isSectionHeader && it.getItem().text == lynx::tr ("LYNX extras"));
+                found = found || (it.getItem().text == wanted && it.getItem().isEnabled && (afterExtras || simple));
+            }
+            savePng (columnMenuImage (menu), prefix + (simple ? "-clip-menu-simple.png" : "-clip-menu.png"));
+            check (found, juce::String (simple ? "Simple" : "Pattern") + " layout: the clip menu has \"" + wanted + "\" (LYNX extras)");
+        }
+        ui.setLayoutStyle (lynx::layoutstyle::Style::pattern);
+        engine.dispatchPendingMessages();
+
+        // the editor: analysis on this thread (Basic Pitch's evidence when ONNX Runtime loads)
+        const auto t0 = juce::Time::getMillisecondCounterHiRes();
+        auto editor = lynx::makePolyEditor (engine, channel, true);
+        const auto analyseMs = juce::Time::getMillisecondCounterHiRes() - t0;
+        engine.dispatchPendingMessages();
+        editor->setSize (1100, 560);
+        const auto notes = lynx::polyEditorNotes (*editor);
+        juce::File (prefix + "-notes.txt").replaceWithText (notes);
+        const auto lines = juce::StringArray::fromLines (notes.trim());
+        check (notes.isNotEmpty(), juce::String (lines.size()) + " notes found in " + juce::String (analyseMs / 1000.0, 2) + " s for "
+                                       + juce::String (seconds, 2) + " s of audio (" + juce::String (analyseMs / 1000.0 / std::max (0.01, seconds), 3) + " x real time)");
+        const auto saved = engine.getSong().channels[(std::size_t) channel].polyEdit;
+        check (! saved.empty() && lynx::polyedit::parse (saved).has_value(), "the analysis is in the channel (the project keeps it): " + juce::String ((int) saved.size()) + " bytes");
+        const auto shoot = [&] (const juce::String& name) {
+            savePng (editor->createComponentSnapshot (editor->getLocalBounds()), prefix + "-" + name + ".png");
+            savePng (editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.5f), prefix + "-" + name + "@150.png");
+        };
+        shoot ("editor");
+        // the note nearest `key` in the first two seconds
+        int pick = -1;
+        double best = 1e9;
+        for (const auto& line : lines)
+        {
+            const auto t = juce::StringArray::fromTokens (line, " ", "");
+            if (t.size() < 4)
+                continue;
+            const auto start = t[3].upToFirstOccurrenceOf ("-", false, false).getDoubleValue();
+            const auto d = std::abs (t[2].getDoubleValue() - key) + (start > 2.0 ? 100.0 : 0.0);
+            if (d < best)
+                best = d, pick = t[0].getIntValue();
+        }
+        check (pick >= 0 && best < 0.5, "a note at key " + juce::String (key, 1) + ": note " + juce::String (pick));
+        if (pick >= 0)
+        {
+            lynx::setPolyEditorShotState (*editor, "select:" + juce::String (pick));
+            lynx::setPolyEditorShotState (*editor, "pitch:" + juce::String (pick) + ":-1");
+            const auto rendered = lynx::setPolyEditorShotState (*editor, "render");
+            engine.dispatchPendingMessages();
+            check (rendered.startsWith ("render"), "the edit renders: " + rendered);
+            const auto blob = engine.getSong().channels[(std::size_t) channel].polyEdit;
+            const auto model = lynx::polyedit::parse (blob);
+            check (model && model->edited(), "the edit is in the channel (one undo step)");
+            // what the clip plays: the cached render, at once
+            const auto t1 = juce::Time::getMillisecondCounterHiRes();
+            const auto plays = lynx::polyedit::renderedFor (file.toStdString(), sample, blob);
+            const auto lookupMs = juce::Time::getMillisecondCounterHiRes() - t1;
+            check (plays != nullptr && plays != sample && plays->frames() == sample->frames(), "the clip plays the edited render (cache hit in " + juce::String (lookupMs, 2) + " ms)");
+            // the project keeps it
+            juce::String error;
+            const auto back = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (engine.getSong()), error);
+            check (back && back->channels.size() > (std::size_t) channel && back->channels[(std::size_t) channel].polyEdit == blob, "the .lynx round trip keeps the notes and edits");
+            // undo: the edit goes, the analysis stays
+            engine.undo();
+            engine.dispatchPendingMessages();
+            const auto undone = lynx::polyedit::parse (engine.getSong().channels[(std::size_t) channel].polyEdit);
+            check (undone && ! undone->edited() && undone->notes.size() == model->notes.size(), "undo takes the edit back, the analysis stays");
+            engine.redo();
+            engine.dispatchPendingMessages();
+            shoot ("edited");
+            lynx::setPolyEditorShotState (*editor, "select:");
+            shoot ("edited-plain");
+        }
+        check (true, "paint " + juce::String (lynx::polyEditorPaintMs (*editor, 10), 2) + " ms (1100 x 560)");
+        juce::File (prefix + "-checks.txt").replaceWithText (checks.joinIntoString ("\n") + "\n");
+        editor.reset();
+        engine.dispatchPendingMessages();
+        return ! checks.joinIntoString ("\n").contains ("FAIL ");
     }
 
     bool runPolyShot190lj (const juce::String& prefix, const juce::String& file, const juce::String& bendFile)
