@@ -119,7 +119,11 @@ public:
         // runs its pieces one after another inside it); 0 = one round per piece (before round 190kz). LYNX_POOL accepts
         // "rounds=block" / "rounds=chunk" too.
         std::atomic<int> blockRounds { 1 };
-        void apply (const char* spec) noexcept; // "spin=60,dry=4,adaptive=1,wait=1,waitspin=30,help=0,rounds=block" (missing keys: unchanged)
+        // Round 190lv (sched2): with blockRounds on, the blocks of a project with live controllers (Peak / Formula /
+        // envelope controllers) batched too, in two rounds where that renders the same samples. 0 = those blocks piece
+        // by piece (before round 190lv). LYNX_POOL "live=0" / "live=1".
+        std::atomic<int> liveRounds { 1 };
+        void apply (const char* spec) noexcept; // "spin=60,dry=4,adaptive=1,wait=1,waitspin=30,help=0,rounds=block,live=1" (missing keys: unchanged)
     };
     static Tuning& tuning() noexcept;
 

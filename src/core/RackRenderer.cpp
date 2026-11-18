@@ -2674,6 +2674,13 @@ void RackRenderer::prepare (double sr, int maxBlockSize)
     unitParamStart.assign ((std::size_t) maxChannels + maxMixerTracks + 1, 0);
     unitParams.assign (4096, 0);
     unitParamsState = nullptr;
+    // round 190lv: the live controllers' two rounds (built with the bindings, same rule)
+    liveInA.assign ((std::size_t) graphCapacity, 0);
+    liveSourceStart.assign ((std::size_t) graphCapacity + 1, 0);
+    liveSources.assign ((std::size_t) RackState::maxAutomations, 0);
+    liveRootsA.assign ((std::size_t) graphCapacity, 0);
+    liveRootsB.assign ((std::size_t) graphCapacity, 0);
+    livePendingB.assign ((std::size_t) graphCapacity, 0);
     zeroBlock.assign ((std::size_t) blockCapacity, 0.0f);
     hwScratch.assign (2 * (std::size_t) blockCapacity, 0.0f);
     layerPick.assign ((std::size_t) maxChannels * 128, (std::int16_t) -1);
@@ -2897,15 +2904,19 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
         const auto& src = automation.source;
         if (src.channel >= 0 ? foreignChannel (src.channel) : foreignTrack (src.track))
             continue; // (render-ahead: that unit's renderer works it out; what it drives is that renderer's too)
+        // (round 190lv: a batched block's piece >= 1 holds a placeholder here, the source writes the value into the piece's
+        // slot right after it rendered the piece before: runGraphRound / processBatched)
         if (src.channel >= 0)
         {
             if (src.channel < (int) state.instruments.size() && state.instruments[(std::size_t) src.channel] != nullptr)
-                automationValues[(std::size_t) a] = automation.mapLive (state.instruments[(std::size_t) src.channel]->controlOutput (src.output));
+                automationValues[(std::size_t) a] = deferLive ? 0.0f : automation.mapLive (state.instruments[(std::size_t) src.channel]->controlOutput (src.output));
         }
         else if (src.track < (int) state.effects.size() && src.slot >= 0 && src.slot < (int) state.effects[(std::size_t) src.track].size()
             && state.effects[(std::size_t) src.track][(std::size_t) src.slot] != nullptr)
-            automationValues[(std::size_t) a] = automation.mapLive (state.effects[(std::size_t) src.track][(std::size_t) src.slot]->controlOutput (src.output));
+            automationValues[(std::size_t) a] = deferLive ? 0.0f : automation.mapLive (state.effects[(std::size_t) src.track][(std::size_t) src.slot]->controlOutput (src.output));
     }
+    if (deferLive)
+        pieces[(std::size_t) pieceSlot()].liveDeferred = true;
 
     // pattern events: in pattern mode the current pattern's (looped); in song mode those of the pattern clip
     // that covers the position. Elsewhere the value holds.
@@ -4641,8 +4652,10 @@ void RackRenderer::process (const RackState* state,
     const auto batch = batchable (*state, numSamples);
     if (batch && planPieces (*state, playing, startTick, numSamples, tps, chunk, grid))
         processBatched (*state, playing, numSamples, left, right, meters);
-    else if (batch && pieceCount < 0) // (more than maxPieces: pattern events close together)
+    else if (batch && pieceCount == -1) // (more than maxPieces: pattern events close together)
         ++batchRefused[(std::size_t) BatchRefusal::manyPieces];
+    else if (batch && pieceCount == -2) // (round 190lv: a later piece goes on without its live values: piece by piece)
+        ++batchRefused[(std::size_t) BatchRefusal::liveControllers];
     else
     for (int done = 0; done < numSamples;)
     {
@@ -6137,12 +6150,243 @@ void RackRenderer::applyUnitParams (const RackState& state, int unit, const Piec
         applyPluginParam (state, (std::size_t) unitParams[(std::size_t) k], piece.paramsFirst, piece.paramsLive);
 }
 
+// Round 190lv (sched2): can this state's live controllers be batched (two rounds per block, processBatched)? In the
+// per-piece path piece k+1's updateAutomation reads each controller's output after every unit rendered piece k. Batched,
+// the source writes it into piece k+1's slot right after it rendered piece k, in round A; round B and the Master read it
+// later. That is the same value read at the same point of the source's own calls. It is exact only when nothing else
+// reads or writes the slot in a later piece's serial part (the placeholder must stay unseen), and when a round-A unit reads
+// only the live values of its own source or of one upstream of it (any other source's pieces can run after the unit's).
+// Anything else: piece by piece.
+bool RackRenderer::buildLivePlan (const RackState& state) noexcept
+{
+    const auto& song = state.song;
+    const auto channels = std::min<int> ({ (int) state.instruments.size(), (int) song.channels.size(), maxChannels });
+    const auto tracks = std::max<int> (1, (int) song.mixer.size());
+    const auto tasks = channels + tracks - 1;
+    const auto no = [this] (const char* why) noexcept {
+        livePlanWhy = why;
+        return false;
+    };
+    if (state.liveAutomations.empty() || tasks <= 0 || tasks > graphCapacity || (int) liveInA.size() < tasks
+        || (int) liveSourceStart.size() < tasks + 1 || state.liveAutomations.size() > liveSources.size()
+        || (int) state.graphNextStart.size() < tasks + 1 || (int) state.graphFused.size() < tasks)
+        return no ("no graph");
+    std::array<char, RackState::maxAutomations> live {};
+    for (const auto a : state.liveAutomations)
+    {
+        if (a < 0 || a >= RackState::maxAutomations || (std::size_t) a >= song.automations.size())
+            return no ("automation index");
+        live[(std::size_t) a] = 1;
+    }
+    const auto isLive = [&live] (int slot) noexcept { return slot >= 0 && slot < RackState::maxAutomations && live[(std::size_t) slot] != 0; };
+
+    // a slot a later piece's serial part reads or writes besides the live loop: clips, Performance zone, lanes, links,
+    // modulators, pattern events; the tempo, VCAs, the crossfader (their readers are not one unit)
+    for (const auto a : state.liveAutomations)
+    {
+        if (((std::size_t) a < state.automationClips.size() && ! state.automationClips[(std::size_t) a].empty())
+            || ((std::size_t) a < state.zoneAutomations.size() && state.zoneAutomations[(std::size_t) a] != 0)
+            || a == state.tempoAutomation || a == state.crossfaderAutomation)
+            return no ("clips, zone, tempo or crossfader on a live automation");
+        if (std::find (state.vcaLevelAuto.begin(), state.vcaLevelAuto.end(), a) != state.vcaLevelAuto.end())
+            return no ("a live VCA level");
+    }
+    for (const auto& lane : state.laneAutomations)
+    {
+        if (isLive (lane.automation))
+            return no ("a live automation's lane");
+        for (const auto peer : lane.clipPeers)
+            if (isLive (peer))
+                return no ("a live lane peer");
+        for (const auto& held : lane.clipSlots)
+            if (isLive (held.first) || isLive (held.second))
+                return no ("a live lane peer");
+    }
+    for (const auto& link : state.linkSlots)
+        if (isLive (link.automation) || isLive (link.slot))
+            return no ("a link on a live slot");
+    for (const auto& r : state.modRoutes)
+        if (isLive (r.source) || isLive (r.slot))
+            return no ("a modulator on a live slot");
+    for (const auto& lane : state.eventLanes)
+        if (isLive (lane.slot))
+            return no ("pattern events on a live slot");
+
+    const auto trackTask = [channels] (int t) noexcept { return channels + t - 1; };
+    // the sources: a channel's controller instrument or an insert's effect (not the Master: it runs after the rounds)
+    std::fill (liveInA.begin(), liveInA.begin() + tasks, 0);
+    std::fill (liveSourceStart.begin(), liveSourceStart.begin() + tasks + 1, 0);
+    const auto sourceOf = [&] (int a) noexcept -> int {
+        const auto& src = song.automations[(std::size_t) a].source;
+        if (src.channel >= 0)
+            return src.channel < channels && state.instruments[(std::size_t) src.channel] != nullptr ? src.channel : -1;
+        if (src.track <= 0 || src.track >= tracks || src.track >= maxMixerTracks || (std::size_t) src.track >= state.effects.size()
+            || src.slot < 0 || (std::size_t) src.slot >= state.effects[(std::size_t) src.track].size()
+            || state.effects[(std::size_t) src.track][(std::size_t) src.slot] == nullptr)
+            return -1;
+        return trackTask (src.track);
+    };
+    for (const auto a : state.liveAutomations)
+    {
+        const auto node = sourceOf (a);
+        if (node < 0)
+            return no ("a source that is not a task (the Master, an empty slot, a channel past the graph)");
+        liveInA[(std::size_t) node] = 1;
+        ++liveSourceStart[(std::size_t) node + 1];
+    }
+    for (int i = 0; i < tasks; ++i)
+        liveSourceStart[(std::size_t) i + 1] += liveSourceStart[(std::size_t) i];
+    for (const auto a : state.liveAutomations) // (in liveAutomations' order per source; the cursor moves to its end, then back)
+        liveSources[(std::size_t) liveSourceStart[(std::size_t) sourceOf (a)]++] = a;
+    for (int i = tasks; i > 0; --i)
+        liveSourceStart[(std::size_t) i] = liveSourceStart[(std::size_t) i - 1];
+    liveSourceStart[0] = 0;
+
+    // round A: every unit that reaches a source (the upstream closure: its units wait only for each other)
+    for (auto changed = true; changed;)
+    {
+        changed = false;
+        for (int i = 0; i < tasks; ++i)
+            if (liveInA[(std::size_t) i] == 0)
+                for (auto k = state.graphNextStart[(std::size_t) i]; k < state.graphNextStart[(std::size_t) i + 1]; ++k)
+                    if (liveInA[(std::size_t) state.graphNext[(std::size_t) k]] != 0)
+                    {
+                        liveInA[(std::size_t) i] = 1;
+                        changed = true;
+                        break;
+                    }
+    }
+    // the units that read a live value (automated / automatedLevel / applyPluginParam): a channel's volume, pan and
+    // levels adjustment; an insert's fader, pan, effect parameters and mix, the routes into it; plugin bindings. Round B
+    // reads them after round A. A round-A unit reads them right: its own (it writes piece k+1's value after its piece k,
+    // then works on piece k+1) and an upstream source's (that one rendered every piece before the unit starts); any
+    // other source may not have written the value yet.
+    std::array<char, graphCapacity> seen {};
+    std::array<int, graphCapacity> stack {};
+    const auto reaches = [&] (int from, int to) noexcept {
+        std::fill (seen.begin(), seen.begin() + tasks, 0);
+        int depth = 0;
+        stack[(std::size_t) depth++] = from;
+        seen[(std::size_t) from] = 1;
+        while (depth > 0)
+        {
+            const auto at = stack[(std::size_t) --depth];
+            if (at == to)
+                return true;
+            for (auto k = state.graphNextStart[(std::size_t) at]; k < state.graphNextStart[(std::size_t) at + 1]; ++k)
+                if (const auto j = state.graphNext[(std::size_t) k]; seen[(std::size_t) j] == 0)
+                {
+                    seen[(std::size_t) j] = 1;
+                    stack[(std::size_t) depth++] = j;
+                }
+        }
+        return false;
+    };
+    const auto readOk = [&] (int node, int a) noexcept {
+        if (! isLive (a) || liveInA[(std::size_t) node] == 0)
+            return true;
+        const auto source = sourceOf (a);
+        return source == node || reaches (source, node);
+    };
+    const auto lateRead = [&] (int node) noexcept {
+        return no (node < channels ? "a round-A channel reads a live value its source may not have written yet"
+                                   : "a round-A insert reads a live value its source may not have written yet");
+    };
+    for (int c = 0; c < channels; ++c)
+    {
+        const auto at = (std::size_t) c;
+        if ((at < state.channelVolumeAuto.size() && ! readOk (c, state.channelVolumeAuto[at]))
+            || (at < state.channelPanAuto.size() && ! readOk (c, state.channelPanAuto[at]))
+            || (at < state.channelAdjustAuto.size() && (! readOk (c, state.channelAdjustAuto[at][0]) || ! readOk (c, state.channelAdjustAuto[at][1]))))
+            return lateRead (c);
+    }
+    for (int t = 1; t < tracks; ++t)
+    {
+        const auto at = (std::size_t) t;
+        const auto node = trackTask (t);
+        auto ok = (at >= state.mixerVolumeAuto.size() || readOk (node, state.mixerVolumeAuto[at]))
+                  && (at >= state.mixerPanAuto.size() || readOk (node, state.mixerPanAuto[at]));
+        if (at < state.effectParamAuto.size())
+            for (const auto& slot : state.effectParamAuto[at])
+                for (const auto a : slot)
+                    ok = ok && readOk (node, a);
+        if (at < state.effectMixAuto.size())
+            for (const auto a : state.effectMixAuto[at])
+                ok = ok && readOk (node, a);
+        if (at < state.mixerInputs.size())
+            for (const auto& in : state.mixerInputs[at])
+                ok = ok && readOk (node, in.automation);
+        if (! ok)
+            return lateRead (node);
+    }
+    for (const auto& b : state.pluginParams)
+    {
+        if (! isLive (b.automation))
+            continue;
+        if (b.channel >= 0)
+        {
+            if (midictl::isPitchBend (b.param)) // (applyLiveControl's bend: kept piece by piece)
+                return no ("a live pitch bend");
+            if (b.channel < channels && ! readOk (b.channel, b.automation))
+                return lateRead (b.channel);
+        }
+        else if (b.track > 0 && b.track < tracks && ! readOk (trackTask (b.track), b.automation))
+            return lateRead (trackTask (b.track));
+    }
+
+    // the rounds' roots, pending counts and positions (round B's units count only their round-B predecessors; a fused
+    // chain from round A into round B starts round B)
+    liveRootCountA = liveRootCountB = liveCountA = liveCountB = 0;
+    for (int i = 0; i < tasks; ++i)
+        livePendingB[(std::size_t) i] = state.graphIndegree[(std::size_t) i];
+    for (int i = 0; i < tasks; ++i)
+        if (liveInA[(std::size_t) i] != 0)
+            for (auto k = state.graphNextStart[(std::size_t) i]; k < state.graphNextStart[(std::size_t) i + 1]; ++k)
+                if (const auto j = state.graphNext[(std::size_t) k]; liveInA[(std::size_t) j] == 0)
+                    --livePendingB[(std::size_t) j];
+    for (int i = 0; i < tasks; ++i)
+    {
+        const auto inA = liveInA[(std::size_t) i] != 0;
+        const auto fused = state.graphFused[(std::size_t) i];
+        const auto fusedSameRound = fused >= 0 && (liveInA[(std::size_t) fused] != 0) == inA;
+        if (inA)
+        {
+            if (state.graphIndegree[(std::size_t) i] == 0)
+                liveRootsA[(std::size_t) liveRootCountA++] = i;
+            liveCountA += fusedSameRound ? 0 : 1;
+        }
+        else
+        {
+            if (livePendingB[(std::size_t) i] == 0)
+                liveRootsB[(std::size_t) liveRootCountB++] = i;
+            liveCountB += fusedSameRound ? 0 : 1;
+        }
+    }
+    // (each position is one unit handed out: the nodes of the round minus those run inline by their fused predecessor)
+    livePlanWhy = liveCountA > 0 ? "" : "no round A";
+    return liveCountA > 0;
+}
+
+// a controller's value for piece `slot`, as that piece's updateAutomation would have read it (unless the control's own
+// value plays there: clearOverriddenValues left NaN)
+void RackRenderer::writeLiveValue (const RackState& state, int automation, int slot) noexcept
+{
+    auto& value = automationValues.v[(std::size_t) slot][(std::size_t) automation];
+    if (std::isnan (value))
+        return;
+    const auto& a = state.song.automations[(std::size_t) automation];
+    const auto& src = a.source;
+    value = src.channel >= 0 ? a.mapLive (state.instruments[(std::size_t) src.channel]->controlOutput (src.output))
+                             : a.mapLive (state.effects[(std::size_t) src.track][(std::size_t) src.slot]->controlOutput (src.output));
+}
+
 bool RackRenderer::batchable (const RackState& state, int numSamples) noexcept
 {
     const auto refuse = [this] (BatchRefusal why) noexcept {
         ++batchRefused[(std::size_t) why];
         return false;
     };
+    liveBatch = false;
     if (WorkerPool::tuning().blockRounds.load (std::memory_order_relaxed) == 0)
         return refuse (BatchRefusal::switchedOff);
     if (workers == nullptr || workers->workers() == 0 || split != nullptr || ownTimeline != nullptr || buffers == nullptr || ! taskGraphEnabled() || ! state.graphOk)
@@ -6151,8 +6395,8 @@ bool RackRenderer::batchable (const RackState& state, int numSamples) noexcept
         return refuse (BatchRefusal::noGraph);
     if (numSamples > chunkCapacity || numSamples > buffers->frames || numSamples > (int) zeroBlock.size())
         return refuse (BatchRefusal::bigBlock);
-    if (! state.liveAutomations.empty())
-        return refuse (BatchRefusal::liveControllers);
+    if (! state.liveAutomations.empty() && WorkerPool::tuning().liveRounds.load (std::memory_order_relaxed) == 0)
+        return refuse (BatchRefusal::liveControllers); // (round 190lv: LYNX_POOL live=0, piece by piece as before)
     if (state.hasMidiOutputs || ! state.portEventChannels.empty() || ! state.dashboardChannels.empty() || ! state.vfxChannels.empty()
         || state.hasEffectMidiRoutes || ! state.hardwareMidiChannels.empty())
         return refuse (BatchRefusal::midiBetweenUnits);
@@ -6172,6 +6416,7 @@ bool RackRenderer::batchable (const RackState& state, int numSamples) noexcept
     if (&state != unitParamsState || state.serial != unitParamsSerial)
     {
         unitParamsOk = buildUnitParams (state);
+        livePlanOk = unitParamsOk && ! state.liveAutomations.empty() && buildLivePlan (state); // (round 190lv)
         unitParamsState = &state;
         unitParamsSerial = state.serial;
     }
@@ -6187,6 +6432,13 @@ bool RackRenderer::batchable (const RackState& state, int numSamples) noexcept
         return refuse (BatchRefusal::heldNotes);
     if (unitParamsTimed && sampleAccurateAutomation())
         return refuse (BatchRefusal::timedParams);
+    // round 190lv: live controllers, in two rounds where buildLivePlan proved that exact
+    if (! state.liveAutomations.empty())
+    {
+        if (! livePlanOk)
+            return refuse (BatchRefusal::liveControllers);
+        liveBatch = true;
+    }
     return true;
 }
 
@@ -6246,6 +6498,23 @@ bool RackRenderer::planPieces (const RackState& state, bool playing, double star
         pieceCount = 0;
         return false;
     }
+    // (round 190lv: with live controllers a block costs two rounds: two pieces cost no more piece by piece, where A7 can
+    // still keep a light piece on this thread — measured at 256 samples, 1.26 rounds per block against 1.59)
+    if (liveBatch && pieceCount < 3)
+    {
+        pieceStart = pieceStartBefore;
+        pieceCount = 0;
+        return false;
+    }
+    // (round 190lv: a later piece that goes on from the one before skips updateAutomation, it would keep the placeholder)
+    if (liveBatch)
+        for (int k = 1; k < pieceCount; ++k)
+            if (pieces[(std::size_t) k].continuing)
+            {
+                pieceStart = pieceStartBefore;
+                pieceCount = -2; // (counted as a refusal by process())
+                return false;
+            }
     return true;
 }
 
@@ -6288,7 +6557,9 @@ void RackRenderer::processBatched (const RackState& state, bool playing, int num
         liveInputOffset = piece.offset;
         timedGridPos = piece.gridPos;
         deferParams = true;
+        deferLive = liveBatch && k > 0;
         chunkPrelude (state, playing, piece.startTick, piece.samples, piece.continuing);
+        deferLive = false;
         deferParams = false;
         eventCount += events.size();
         piece.live = liveInput != nullptr && liveInput->numChannels > 0;
@@ -6310,6 +6581,8 @@ void RackRenderer::processBatched (const RackState& state, bool playing, int num
     if (runBatchedGraph (state, playing, channels, meters))
     {
         ++batchedRounds;
+        if (liveBatch)
+            ++batchedLiveRounds;
         for (int k = 0; k < pieceCount; ++k)
         {
             const auto& piece = pieces[(std::size_t) k];
@@ -6335,6 +6608,10 @@ void RackRenderer::processBatched (const RackState& state, bool playing, int num
             workers = chosen;
             chunkUnits (state, playing, piece.samples, meters);
             chunkMaster (state, piece.samples, left + piece.offset, right + piece.offset, meters, pool, chunkStartNs);
+            // (round 190lv: the controllers' values after this piece, read as the next piece's updateAutomation read them)
+            if (liveBatch && k + 1 < pieceCount && pieces[(std::size_t) k + 1].liveDeferred)
+                for (const auto a : state.liveAutomations)
+                    writeLiveValue (state, a, k + 1);
         }
     workers = pool;
 
@@ -6357,8 +6634,6 @@ bool RackRenderer::runBatchedGraph (const RackState& state, bool playing, int ch
     // (runTaskGraph's conditions; batchable checked the rest for the whole block)
     if (workers == nullptr || ! parallelChunk)
         return false;
-    const auto tracks = std::max<int> (1, (int) state.song.mixer.size());
-    const auto tasks = channels + tracks - 1;
 
     for (int k = 0; k < pieceCount; ++k)
     {
@@ -6366,14 +6641,34 @@ bool RackRenderer::runBatchedGraph (const RackState& state, bool playing, int ch
         trackActive.fill (0);
         tapActive.fill (0);
     }
+    if (! liveBatch)
+        return runGraphRound (state, playing, channels, meters, 0);
+    // round 190lv: the controllers' sources and what feeds them, then the rest (each unit still renders all its pieces
+    // after every unit it depends on: the graph's order, cut in two)
+    runGraphRound (state, playing, channels, meters, 1);
+    if (liveCountB > 0)
+        runGraphRound (state, playing, channels, meters, 2);
+    return true;
+}
+
+// one round of the batched task graph: round 0 = every unit, 1 = round A of a live block (liveInA), 2 = its round B
+bool RackRenderer::runGraphRound (const RackState& state, bool playing, int channels, MeterBank* meters, int round) noexcept
+{
+    const auto tracks = std::max<int> (1, (int) state.song.mixer.size());
+    const auto tasks = channels + tracks - 1;
+    const auto liveA = round == 1;
     for (int i = 0; i < tasks; ++i)
     {
-        graphPending[(std::size_t) i].store (state.graphIndegree[(std::size_t) i], std::memory_order_relaxed);
+        graphPending[(std::size_t) i].store (round == 2 ? livePendingB[(std::size_t) i] : state.graphIndegree[(std::size_t) i], std::memory_order_relaxed);
         graphSlots[(std::size_t) i].store (0, std::memory_order_relaxed);
     }
     auto pushed = 0;
-    for (const auto r : state.graphRoots)
-        graphSlots[(std::size_t) pushed++].store (r + 1, std::memory_order_relaxed);
+    if (round == 0)
+        for (const auto r : state.graphRoots)
+            graphSlots[(std::size_t) pushed++].store (r + 1, std::memory_order_relaxed);
+    else
+        for (int k = 0, n = round == 1 ? liveRootCountA : liveRootCountB; k < n; ++k)
+            graphSlots[(std::size_t) pushed++].store ((round == 1 ? liveRootsA : liveRootsB)[(std::size_t) k] + 1, std::memory_order_relaxed);
     graphPushed.store (pushed, std::memory_order_release);
 
     const auto timing = times->enabled.load (std::memory_order_relaxed);
@@ -6443,6 +6738,11 @@ bool RackRenderer::runBatchedGraph (const RackState& state, bool playing, int ch
                         mixSideInput (state, t, n);
                         processTrack (state, t, n, meters);
                     }
+                    // (round 190lv: a controller's source: its values for the next piece, as that piece's
+                    // updateAutomation read them after this one)
+                    if (liveA && k + 1 < pieceCount && pieces[(std::size_t) k + 1].liveDeferred)
+                        for (auto s = liveSourceStart[(std::size_t) at]; s < liveSourceStart[(std::size_t) at + 1]; ++s)
+                            writeLiveValue (state, liveSources[(std::size_t) s], k + 1);
                 }
                 const auto spent = ProcessTimes::now() - before;
                 // (A7 keeps one chunk's cost: the pieces' average)
@@ -6456,13 +6756,15 @@ bool RackRenderer::runBatchedGraph (const RackState& state, bool playing, int ch
                 else if (const auto t = at - channels + 1; measureUnits && t < maxMixerTracks)
                     trackCostNs[(std::size_t) t] = (std::uint32_t) std::min<std::uint64_t> (spent / count, 0xffffffffu);
                 const auto fused = (std::size_t) at < state.graphFused.size() ? state.graphFused[(std::size_t) at] : -1;
-                if (fused < 0)
+                if (fused < 0 || (liveA && liveInA[(std::size_t) fused] == 0)) // (round A: a chain into round B is cut there)
                     break;
                 at = fused;
             }
             for (auto k = state.graphNextStart[(std::size_t) at]; k < state.graphNextStart[(std::size_t) at + 1]; ++k)
             {
                 const auto j = state.graphNext[(std::size_t) k];
+                if (liveA && liveInA[(std::size_t) j] == 0) // (round B's: its pending count left out round A's units)
+                    continue;
                 if (graphPending[(std::size_t) j].fetch_sub (1, std::memory_order_acq_rel) == 1)
                 {
                     const auto pos = graphPushed.fetch_add (1, std::memory_order_acq_rel);
@@ -6480,7 +6782,7 @@ bool RackRenderer::runBatchedGraph (const RackState& state, bool playing, int ch
         while (takenCount > 0)
             chain (taken[(std::size_t) --takenCount], chain);
     };
-    workers->parallelFor (tasks - state.graphFusedCount, task);
+    workers->parallelFor (round == 0 ? tasks - state.graphFusedCount : round == 1 ? liveCountA : liveCountB, task);
     return true;
 }
 
