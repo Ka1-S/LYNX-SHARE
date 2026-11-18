@@ -295,7 +295,7 @@ bool Note::edited (double globalFormant) const noexcept
     return differs (shift, 0.0) || differs (drift, 1.0) || differs (stretch, 1.0) || curStart != origStart
            || differs (volume, 1.0) || differs (formant * globalFormant, 1.0) || ! enabled || vibPeriod > 0.0
            || differs (tremAmp, 0.0) || differs (fadeInGain, 1.0) || differs (fadeOutGain, 1.0) || differs (rampIn, 0.0)
-           || differs (rampOut, 0.0);
+           || differs (rampOut, 0.0) || differs (modulation, 1.0) || differs (pitchDrift, 1.0);
 }
 
 namespace
@@ -363,6 +363,397 @@ float readAt (const std::vector<float>& x, double pos) noexcept
 }
 } // namespace
 
+// ------------------------------------------------------------------------------------------- round 190li: engine 1
+// LYNX's natural engine (Track::engine 1), scored against Melodyne 5 with tools/vocallab (docs/analise/REA_rodada190li.md).
+// The same notes and edits as engine 0, rendered with textbook methods only:
+//  - TD-PSOLA with asymmetric grains: every analysis mark's window reaches back to the mark before and on to the mark
+//    after (raised-cosine halves), so at no shift the windows add up to exactly one and an unshifted part is the source
+//    itself (seamless joins with the plain sample, no phase jumps); synthesis marks start on the analysis marks;
+//  - grain interpolation (waveform interpolation, W. B. Kleijn, "Encoding speech using prototype waveforms", IEEE
+//    Trans. Speech Audio Proc. 1(4), 1993): a synthesis mark between two analysis marks mixes both grains, so a
+//    shift repeats or skips no single period;
+//  - overlap normalised where grains overlap (upward shifts), the loudness kept: the rendered voice follows the
+//    source's level envelope (30 ms RMS) instead of PSOLA's pulse-rate law (+/- 3 dB at a fifth);
+//  - unvoiced marks (consonants, breaths, silence) are never shifted or formant-moved: they are read 1:1;
+//  - note transitions: a moved note joins its neighbour through a raised-cosine blend of the two shifts centred on the
+//    boundary (the analysed glide's length) instead of FL's step-and-ramp;
+//  - the pitch modulation / drift split (Note::modulation, Note::pitchDrift): the sung deviation from the note's centre,
+//    low-passed by two passes of a 180 ms moving average (a 5.5 Hz vibrato's period: it is removed), is the drift; the
+//    rest is the modulation.
+namespace
+{
+std::shared_ptr<SampleData> renderNatural (const SampleData& source, const Track& track)
+{
+    const auto n = (std::int64_t) source.frames();
+    const auto& notes = track.pitches;
+    const auto fs = source.sampleRate > 0.0 ? source.sampleRate : 44100.0;
+    const auto stereo = source.isStereo();
+    std::vector<float> in[2];
+    in[0].assign (source.leftData(), source.leftData() + n);
+    if (stereo)
+        in[1].assign (source.rightData(), source.rightData() + n);
+    std::vector<float> mono = in[0];
+    if (stereo)
+        for (std::int64_t i = 0; i < n; ++i)
+            mono[(std::size_t) i] = 0.5f * (in[0][(std::size_t) i] + in[1][(std::size_t) i]);
+
+    const int hop = 128, unvoicedHop = std::max (16, (int) std::lround (128.0 * fs / 44100.0));
+    std::vector<vocal::PitchFrame> frames;
+    const auto marks = analyse (mono, fs, frames, hop, unvoicedHop);
+    if (marks.empty() || frames.empty())
+        return nullptr;
+    const auto frameOf = [&] (double pos) {
+        return std::min (frames.size() - 1, (std::size_t) std::max<double> (0.0, std::round (pos / hop)));
+    };
+    auto voicedAt = [&] (double pos) { return ! frames.empty() && frames[frameOf (pos)].hz > 0.0; };
+
+    // each note's centre (its mean sung pitch) and, per frame of it, the slow part of its deviation (the drift)
+    std::vector<double> centre (notes.size(), 0.0);
+    std::vector<double> slow (frames.size(), 0.0);
+    {
+        const auto reach = std::max (1, (int) std::lround (0.09 * fs / hop)); // ±90 ms: a 180 ms moving average
+        std::vector<double> dev, w, tmp;
+        for (std::size_t k = 0; k < notes.size(); ++k)
+        {
+            const auto f0 = std::max<std::int64_t> (0, notes[k].origStart / hop);
+            const auto f1 = std::min<std::int64_t> ((std::int64_t) frames.size(), notes[k].origEnd / hop + 1);
+            double sum = 0.0;
+            int count = 0;
+            for (auto f = f0; f < f1; ++f)
+                if (frames[(std::size_t) f].hz > 0.0)
+                    sum += vocal::hzToNote (frames[(std::size_t) f].hz), ++count;
+            centre[k] = count > 0 ? sum / count : notes[k].origPitch;
+            if (f1 <= f0)
+                continue;
+            const auto m = (std::size_t) (f1 - f0);
+            dev.assign (m, 0.0);
+            w.assign (m, 0.0);
+            for (std::size_t i = 0; i < m; ++i)
+                if (const auto hz = frames[(std::size_t) f0 + i].hz; hz > 0.0)
+                    dev[i] = vocal::hzToNote (hz) - centre[k], w[i] = 1.0;
+            // two passes of a moving average over the voiced frames (weights renormalised at the note's ends / gaps)
+            for (int pass = 0; pass < 2; ++pass)
+            {
+                tmp.assign (m, 0.0);
+                for (std::size_t i = 0; i < m; ++i)
+                {
+                    double s = 0.0, ws = 0.0;
+                    for (auto j = (std::ptrdiff_t) i - reach; j <= (std::ptrdiff_t) i + reach; ++j)
+                        if (j >= 0 && j < (std::ptrdiff_t) m && w[(std::size_t) j] > 0.0)
+                            s += dev[(std::size_t) j], ws += 1.0;
+                    tmp[i] = ws > 0.0 ? s / ws : 0.0;
+                }
+                for (std::size_t i = 0; i < m; ++i)
+                    if (w[i] > 0.0)
+                        dev[i] = tmp[i];
+            }
+            for (std::size_t i = 0; i < m; ++i)
+                slow[(std::size_t) f0 + i] = dev[i];
+        }
+    }
+
+    std::int64_t length = n;
+    std::vector<std::pair<std::int64_t, std::int64_t>> owned (notes.size());
+    std::int64_t covered = 0;
+    for (std::size_t k = 0; k < notes.size(); ++k)
+    {
+        const auto a = std::max (notes[k].curStart, covered), b = notes[k].curEnd;
+        owned[k] = { a, std::max (a, b) };
+        covered = std::max (covered, b);
+        length = std::max (length, b);
+    }
+    auto adjacent = [&] (std::size_t j, std::size_t k) {
+        return notes[j].curEnd == notes[k].curStart && voicedAt ((double) notes[k].origStart);
+    };
+    // the blend between note k-1 and k: its half-width (output samples) around their boundary
+    auto joinHalf = [&] (std::size_t k) {
+        const auto& p = notes[k];
+        const auto lenA = (double) (notes[k - 1].curEnd - notes[k - 1].curStart), lenB = (double) (p.curEnd - p.curStart);
+        return std::clamp (0.5 * std::max (p.smoothIn, 0.0), 0.01 * fs, std::max (0.01 * fs, 0.25 * std::min (lenA, lenB)));
+    };
+    auto joins = [&] (std::size_t k) { return k > 0 && k < notes.size() && adjacent (k - 1, k) && differs (notes[k - 1].shift, notes[k].shift); };
+    auto blend = [] (double u) { return u <= 0.0 ? 0.0 : u >= 1.0 ? 1.0 : 0.5 - 0.5 * std::cos (3.141592653589793 * u); };
+
+    // the shift (semitones) of note k at output sample t: its own, blended with a neighbour's across a join; ramps; vibrato
+    auto shiftAt = [&] (std::size_t k, double t) {
+        const auto& p = notes[k];
+        auto s = p.shift;
+        if (joins (k))
+        {
+            const auto h = joinHalf (k), b = (double) p.curStart;
+            if (t < b + h)
+                s = notes[k - 1].shift + (p.shift - notes[k - 1].shift) * blend ((t - (b - h)) / (2.0 * h));
+        }
+        if (joins (k + 1))
+        {
+            const auto h = joinHalf (k + 1), b = (double) p.curEnd;
+            if (t >= b - h)
+                s = p.shift + (notes[k + 1].shift - p.shift) * blend ((t - (b - h)) / (2.0 * h));
+        }
+        if (p.rampIn != 0.0 && p.smoothIn > 0.0 && t >= (double) p.curStart && t < (double) p.curStart + p.smoothIn)
+            s += p.rampIn * (1.0 - (t - (double) p.curStart) / p.smoothIn);
+        if (p.rampOut != 0.0 && p.smoothOut > 0.0 && t < (double) p.curEnd && t >= (double) p.curEnd - p.smoothOut)
+            s += p.rampOut * (1.0 - ((double) p.curEnd - t) / p.smoothOut);
+        if (p.vibPeriod > 0.0 && p.curEnd > p.curStart)
+        {
+            const auto u = (t - (double) p.curStart) / (double) (p.curEnd - p.curStart);
+            const auto amp = p.vibAmpStart + (p.vibAmpEnd - p.vibAmpStart) * std::clamp (u, 0.0, 1.0);
+            s += amp * std::sin (twoPi * (t - (double) p.curStart) / (p.vibPeriod * fs));
+        }
+        return s;
+    };
+    // the change of the sung deviation at source position `src` of note k (Variation, modulation, drift)
+    auto deviationAt = [&] (std::size_t k, double src) {
+        const auto& p = notes[k];
+        if (! differs (p.drift, 1.0) && ! differs (p.modulation, 1.0) && ! differs (p.pitchDrift, 1.0))
+            return 0.0;
+        const auto f = frameOf (src);
+        if (frames[f].hz <= 0.0)
+            return 0.0;
+        // (between frames: linear)
+        const auto x = std::clamp (src / hop, 0.0, (double) (frames.size() - 1));
+        const auto f0 = (std::size_t) std::floor (x), f1 = std::min (frames.size() - 1, f0 + 1);
+        const auto a = x - (double) f0;
+        auto noteOf = [&] (std::size_t i) { return frames[i].hz > 0.0 ? vocal::hzToNote (frames[i].hz) : vocal::hzToNote (frames[f].hz); };
+        const auto dev = (1.0 - a) * noteOf (f0) + a * noteOf (f1) - centre[k];
+        const auto sl = (1.0 - a) * slow[f0] + a * slow[f1];
+        return p.drift * (p.pitchDrift * sl + p.modulation * (dev - sl)) - dev;
+    };
+
+    auto out = std::make_shared<SampleData>();
+    out->sampleRate = fs;
+    out->left.assign ((std::size_t) length, 0.0f);
+    if (stereo)
+        out->right.assign ((std::size_t) length, 0.0f);
+    float* const dst[2] { out->left.data(), stereo ? out->right.data() : out->left.data() };
+    const auto channels = stereo ? 2 : 1;
+
+    // the source's level envelope (30 ms RMS, mono): the rendered voice keeps it
+    std::vector<float> level (mono.size());
+    {
+        const auto half = std::max<std::int64_t> (1, (std::int64_t) std::lround (0.015 * fs));
+        std::vector<double> c (mono.size() + 1, 0.0);
+        for (std::size_t i = 0; i < mono.size(); ++i)
+            c[i + 1] = c[i] + (double) mono[i] * mono[i];
+        for (std::int64_t i = 0; i < n; ++i)
+        {
+            const auto lo = std::max<std::int64_t> (0, i - half), hi = std::min (n, i + half);
+            level[(std::size_t) i] = (float) std::sqrt ((c[(std::size_t) hi] - c[(std::size_t) lo]) / (double) std::max<std::int64_t> (1, hi - lo));
+        }
+    }
+
+    // the note that owns output sample t (-1: none)
+    auto ownerOf = [&] (double t) {
+        const auto it = std::upper_bound (owned.begin(), owned.end(), t, [] (double v, const std::pair<std::int64_t, std::int64_t>& o) { return v < (double) o.first; });
+        if (it == owned.begin())
+            return -1;
+        const auto k = (int) (it - owned.begin()) - 1;
+        return t < (double) owned[(std::size_t) k].second ? k : -1;
+    };
+    auto srcOf = [&] (int k, double t) { const auto& p = notes[(std::size_t) k]; return (double) p.origStart + (t - (double) p.curStart) * p.stretch; };
+    auto outOf = [&] (int k, double s) { const auto& p = notes[(std::size_t) k]; return (double) p.curStart + (s - (double) p.origStart) / p.stretch; };
+    auto markBefore = [&] (double src) {
+        const auto it = std::upper_bound (marks.begin(), marks.end(), src, [] (double v, const Mark& m) { return v < m.pos; });
+        return (std::size_t) std::max<std::ptrdiff_t> (0, (it - marks.begin()) - 1);
+    };
+    auto gap = [&] (std::size_t i) { // source distance from mark i to the next (the window's right half; the next one's left)
+        return i + 1 < marks.size() ? std::min (marks[i + 1].pos - marks[i].pos, 0.05 * fs) : marks[i].period;
+    };
+
+    // the output ranges to render: the edited notes, and the joins an edited neighbour gives an unedited note
+    std::vector<std::pair<std::int64_t, std::int64_t>> dirty;
+    for (std::size_t k = 0; k < notes.size(); ++k)
+    {
+        const auto [a, b] = owned[k];
+        if (a >= b || ! notes[k].enabled)
+            continue;
+        if (notes[k].edited (track.globalFormant))
+            dirty.push_back ({ a, b });
+        if (joins (k))
+        {
+            const auto h = (std::int64_t) std::ceil (joinHalf (k)) + 1;
+            dirty.push_back ({ std::max<std::int64_t> (0, notes[k].curStart - h), std::min (length, notes[k].curStart + h) });
+        }
+    }
+    std::sort (dirty.begin(), dirty.end());
+    std::vector<std::pair<std::int64_t, std::int64_t>> ranges;
+    for (const auto& d : dirty)
+        if (! ranges.empty() && d.first <= ranges.back().second)
+            ranges.back().second = std::max (ranges.back().second, d.second);
+        else
+            ranges.push_back (d);
+
+    // everything plays the source where it is not rendered; disabled notes are silent
+    for (std::size_t k = 0; k < notes.size(); ++k)
+    {
+        const auto& p = notes[k];
+        const auto [a, b] = owned[k];
+        for (auto t = a; t < b; ++t)
+        {
+            const auto src = p.origStart + (t - p.curStart);
+            for (int c = 0; c < channels; ++c)
+                dst[c][(std::size_t) t] = p.enabled && src >= 0 && src < n ? in[c][(std::size_t) src] : 0.0f;
+        }
+    }
+
+    std::vector<float> accL, accR, wsum, gainCurve;
+    for (const auto& [x, y] : ranges)
+    {
+        const auto margin = (std::int64_t) std::ceil (2.0 * fs / 60.0) + 4;
+        const auto from = x - margin, to = y + margin;
+        const auto span = (std::size_t) (to - from);
+        accL.assign (span, 0.0f);
+        if (channels == 2)
+            accR.assign (span, 0.0f);
+        wsum.assign (span, 0.0f);
+        float* const sum[2] { accL.data(), channels == 2 ? accR.data() : accL.data() };
+        // a grain of mark i at output time ts (formant factor f, weight g); `at` = the source position read at u = 0
+        auto grain = [&] (std::size_t i, double ts, double at, double left, double right, double f, float g) {
+            const auto o0 = (std::int64_t) std::max ((double) from, std::ceil (ts - left / f));
+            const auto o1 = (std::int64_t) std::min ((double) (to - 1), std::floor (ts + right / f));
+            (void) i;
+            for (auto o = o0; o <= o1; ++o)
+            {
+                const auto u = ((double) o - ts) * f;
+                const auto w = g * (float) (u < 0.0 ? 0.5 + 0.5 * std::cos (3.141592653589793 * u / left) : 0.5 + 0.5 * std::cos (3.141592653589793 * u / right));
+                for (int c = 0; c < channels; ++c)
+                    sum[c][o - from] += w * readAt (in[c], at + u);
+                wsum[(std::size_t) (o - from)] += w;
+            }
+        };
+        // the walk: synthesis marks over [from, to); each takes the note that owns it and that note's source time
+        auto start = ownerOf ((double) std::max<std::int64_t> (0, from));
+        if (start < 0)
+            start = ownerOf ((double) x);
+        if (start < 0)
+            continue;
+        auto i = markBefore (srcOf (start, (double) std::max<std::int64_t> (0, from)));
+        double ts = outOf (start, marks[i].pos);
+        int guard = 0;
+        while (ts < (double) to && ++guard < 50000000)
+        {
+            const auto k = ownerOf (ts);
+            if (k < 0 || ! notes[(std::size_t) k].enabled)
+            {
+                ts += unvoicedHop;
+                continue;
+            }
+            const auto& p = notes[(std::size_t) k];
+            const auto src = srcOf (k, ts);
+            i = markBefore (src);
+            const auto& m0 = marks[i];
+            const auto voiced = m0.voiced && i + 1 < marks.size() && marks[i + 1].voiced;
+            if (! voiced)
+            {
+                if (! differs (p.stretch, 1.0))
+                {
+                    // unvoiced, not stretched: each mark read 1:1 at its own place (with its neighbours' windows: exact)
+                    const auto t = outOf (k, m0.pos);
+                    grain (i, t, m0.pos, i > 0 ? gap (i - 1) : gap (i), gap (i), 1.0, 1.0f);
+                    if (i + 1 >= marks.size())
+                        break;
+                    const auto next = outOf (k, marks[i + 1].pos);
+                    ts = next > ts ? next : ts + 1.0;
+                }
+                else
+                {
+                    // stretched: regular grains reading the source at the mapped time (overlap-add, no pitch change)
+                    const auto h = (double) unvoicedHop;
+                    grain (i, ts, src, h, h, 1.0, 1.0f);
+                    ts += h;
+                }
+                continue;
+            }
+            const auto& m1 = marks[i + 1];
+            const auto period = std::max (1.0, m1.pos - m0.pos);
+            const auto alpha = std::clamp ((src - m0.pos) / period, 0.0, 1.0);
+            const auto semis = shiftAt ((std::size_t) k, ts) + deviationAt ((std::size_t) k, src);
+            const auto r = std::exp2 (std::clamp (semis, -36.0, 36.0) / 12.0);
+            const auto f = std::clamp (p.formant * track.globalFormant, 0.25, 4.0);
+            if (alpha < 1.0 - 1e-9)
+                grain (i, ts, m0.pos, i > 0 ? gap (i - 1) : gap (i), gap (i), f, (float) (1.0 - alpha));
+            if (alpha > 1e-9)
+                grain (i + 1, ts, m1.pos, gap (i), gap (i + 1), f, (float) alpha);
+            auto next = ts + period / r;
+            // (into an unvoiced stretch: go on from its first mark's own place)
+            if (const auto k2 = ownerOf (next); k2 >= 0)
+            {
+                const auto s2 = srcOf (k2, next);
+                const auto j = markBefore (s2);
+                if (! marks[j].voiced && k2 == k)
+                    next = std::max (next, outOf (k, marks[j].pos));
+            }
+            ts = next;
+        }
+        // overlapping grains normalised (an upward shift stacks more than one); gaps (a downward one) left as they are
+        for (std::size_t j = 0; j < span; ++j)
+            if (wsum[j] > 1.0f)
+                for (int c = 0; c < channels; ++c)
+                    sum[c][j] /= wsum[j];
+        // the loudness kept: where voiced, the output follows the source's 30 ms level at the mapped time
+        gainCurve.assign (span, 1.0f);
+        {
+            const auto half = std::max<std::int64_t> (1, (std::int64_t) std::lround (0.015 * fs));
+            std::vector<double> c (span + 1, 0.0);
+            for (std::size_t j = 0; j < span; ++j)
+            {
+                const double v = channels == 2 ? 0.5 * ((double) sum[0][j] + (double) sum[1][j]) : (double) sum[0][j];
+                c[j + 1] = c[j] + v * v;
+            }
+            for (auto t = std::max<std::int64_t> (0, x); t < y; ++t)
+            {
+                const auto k = ownerOf ((double) t);
+                if (k < 0)
+                    continue;
+                const auto src = srcOf (k, (double) t);
+                if (src < 0.0 || src >= (double) n || ! voicedAt (src))
+                    continue;
+                const auto j = t - from;
+                const auto lo = std::max<std::int64_t> (0, j - half), hi = std::min<std::int64_t> ((std::int64_t) span, j + half);
+                const auto outRms = std::sqrt ((c[(std::size_t) hi] - c[(std::size_t) lo]) / (double) std::max<std::int64_t> (1, hi - lo));
+                const auto want = (double) level[(std::size_t) std::min<std::int64_t> (n - 1, std::llround (src))];
+                if (outRms > 1e-7 && want > 1e-7)
+                    gainCurve[(std::size_t) j] = (float) std::clamp (want / outRms, 0.25, 4.0);
+            }
+        }
+        for (auto t = std::max<std::int64_t> (0, x); t < std::min (y, length); ++t)
+        {
+            const auto k = ownerOf ((double) t);
+            if (k < 0 || ! notes[(std::size_t) k].enabled)
+                continue;
+            const auto& p = notes[(std::size_t) k];
+            auto g = p.volume * gainCurve[(std::size_t) (t - from)];
+            const auto since = (double) (t - p.curStart), until = (double) (p.curEnd - t);
+            if (p.fadeInTime > 0.0 && since < p.fadeInTime)
+                g *= p.fadeInGain + (1.0 - p.fadeInGain) * since / p.fadeInTime;
+            if (p.fadeOutTime > 0.0 && until < p.fadeOutTime)
+                g *= p.fadeOutGain + (1.0 - p.fadeOutGain) * until / p.fadeOutTime;
+            const auto tremPeak = std::max (std::abs (p.vibAmpStart), std::abs (p.vibAmpEnd));
+            if (p.tremAmp != 0.0 && p.vibPeriod > 0.0 && tremPeak > 0.0)
+            {
+                const auto u = std::clamp (since / (double) std::max<std::int64_t> (1, p.curEnd - p.curStart), 0.0, 1.0);
+                const auto depth = (p.vibAmpStart + (p.vibAmpEnd - p.vibAmpStart) * u) / tremPeak;
+                g *= 1.0 + p.tremAmp * depth * std::sin (twoPi * since / (p.vibPeriod * fs));
+            }
+            // (short joins with the plain sample at the range's ends: there the render is the source itself)
+            const auto fade = 64.0;
+            const auto edge = std::min (x > 0 ? (double) (t - x) + 1.0 : 1e9, y < length ? (double) (y - t) : 1e9);
+            const auto w = (float) std::clamp (edge / (fade + 1.0), 0.0, 1.0);
+            const auto wf = w >= 1.0f ? 1.0f : 0.5f - 0.5f * std::cos (3.14159265f * w);
+            for (int c = 0; c < channels; ++c)
+            {
+                const auto v = (float) g * sum[c][t - from];
+                auto& d = dst[c][(std::size_t) t];
+                d = d + wf * ((std::isfinite (v) ? v : 0.0f) - d);
+            }
+        }
+    }
+    if (! stereo)
+        out->right.clear();
+    return out;
+}
+} // namespace
+
 std::shared_ptr<SampleData> renderEdits (const SampleData& source, const Track& track)
 {
     const auto n = (std::int64_t) source.frames();
@@ -371,6 +762,9 @@ std::shared_ptr<SampleData> renderEdits (const SampleData& source, const Track& 
     const auto& notes = track.pitches;
     if (std::none_of (notes.begin(), notes.end(), [&] (const Note& p) { return p.edited (track.globalFormant); }))
         return nullptr;
+    if (track.engine >= 1)
+        if (auto natural = renderNatural (source, track))
+            return natural;
 
     const auto fs = source.sampleRate > 0.0 ? source.sampleRate : 44100.0;
     const auto stereo = source.isStereo();
@@ -711,8 +1105,9 @@ struct Reader
     }
 };
 
-constexpr std::uint32_t nativeVersion = 3; // 2 (round 165g): + the editor's knobs, the notes' pitch ramps and analysed smooth times;
-                                           // 3 (round 190kj): + each note's voiced end and analysed velocity
+constexpr std::uint32_t nativeVersion = 4; // 2 (round 165g): + the editor's knobs, the notes' pitch ramps and analysed smooth times;
+                                           // 3 (round 190kj): + each note's voiced end and analysed velocity;
+                                           // 4 (round 190li): + the engine revision, each note's modulation / pitch drift
 constexpr std::uint32_t warpVersion = 1;
 
 double median (std::vector<double> v)
@@ -1030,6 +1425,27 @@ void applyTransition (Track& track, double factor, const std::vector<int>& which
     refreshEdited (track);
 }
 
+void applyModulation (Track& track, double amount, const std::vector<int>& which)
+{
+    amount = std::clamp (amount, 0.0, 2.0);
+    forNotes (track, which, [amount] (Note& p) { p.modulation = amount; });
+    refreshEdited (track);
+}
+
+void applyPitchDrift (Track& track, double amount, const std::vector<int>& which)
+{
+    amount = std::clamp (amount, 0.0, 2.0);
+    forNotes (track, which, [amount] (Note& p) { p.pitchDrift = amount; });
+    refreshEdited (track);
+}
+
+void correctPitch (Track& track, double centre, double drift, const std::vector<int>& which)
+{
+    // (Melodyne's Correct Pitch macro: the centre pulled to the semitone, the drift reduced; the vibrato stays)
+    applyCentre (track, centre, which);
+    applyPitchDrift (track, 1.0 - std::clamp (drift, 0.0, 1.0), which);
+}
+
 double nearestInScale (double pitch, int key, std::uint16_t mask) noexcept
 {
     mask &= 0xFFF;
@@ -1321,7 +1737,14 @@ std::shared_ptr<SampleData> cropped (const SampleData& s, std::int64_t a, std::i
     return out;
 }
 
-std::vector<std::uint8_t> writeNative (const Track& track) { return writeNative (track, nativeVersion); }
+std::vector<std::uint8_t> writeNative (const Track& track)
+{
+    // (round 190li: a track that uses nothing of version 4 is written as version 3, byte for byte as before)
+    const auto v4 = track.engine != 0 || std::any_of (track.pitches.begin(), track.pitches.end(), [] (const Note& p) {
+                        return p.modulation != 1.0 || p.pitchDrift != 1.0;
+                    });
+    return writeNative (track, v4 ? nativeVersion : 3u);
+}
 
 std::vector<std::uint8_t> writeNative (const Track& track, std::uint32_t version)
 {
@@ -1336,6 +1759,8 @@ std::vector<std::uint8_t> writeNative (const Track& track, std::uint32_t version
     put (out, track.transition);
     if (version >= 3)
         put (out, (std::int32_t) track.key); // (version 3)
+    if (version >= 4)
+        put (out, (std::int32_t) track.engine); // (version 4)
     put (out, (std::uint32_t) track.pitches.size());
     for (const auto& p : track.pitches)
     {
@@ -1353,6 +1778,11 @@ std::vector<std::uint8_t> writeNative (const Track& track, std::uint32_t version
         {
             put (out, p.validEnd);
             put (out, p.velocity);
+        }
+        if (version >= 4)
+        {
+            put (out, p.modulation);
+            put (out, p.pitchDrift);
         }
     }
     return out;
@@ -1377,6 +1807,8 @@ std::optional<Track> parseNative (const std::vector<std::uint8_t>& state)
     }
     if (version >= 3)
         t.key = r.get<std::int32_t>();
+    if (version >= 4)
+        t.engine = r.get<std::int32_t>();
     const auto count = r.get<std::uint32_t>();
     if (! r.ok || count > 100000)
         return std::nullopt;
@@ -1405,6 +1837,11 @@ std::optional<Track> parseNative (const std::vector<std::uint8_t>& state)
         {
             p.validEnd = r.get<std::int64_t>();
             p.velocity = r.get<double>();
+        }
+        if (version >= 4)
+        {
+            p.modulation = r.get<double>();
+            p.pitchDrift = r.get<double>();
         }
         t.pitches.push_back (p);
     }

@@ -54,6 +54,10 @@ struct Note
     // the whole note), fOrigVelocity = its analysed level 0..1 (-1 = not known)
     std::int64_t validEnd = -1;
     double velocity = -1.0;
+    // round 190li (LYNX extras, as Melodyne's Pitch Modulation / Pitch Drift tools): the sung deviation from the note's
+    // centre split into its slow part (drift, under ~2.5 Hz) and its fast part (vibrato, modulation), each scaled on its
+    // own on top of `drift` (FL's Variation, which scales both). 1 = as sung.
+    double modulation = 1.0, pitchDrift = 1.0;
     bool voiced() const noexcept { return validEnd != 0; }
     std::int64_t voicedEnd() const noexcept { return validEnd > origStart ? std::min (validEnd, origEnd) : origEnd; }
 
@@ -77,7 +81,13 @@ struct Track
     // (pull toward the note's semitone), Variation 0..1 (the notes' drift), Transition 0..2 (× the analysed times)
     double centre = 0.0, variation = 1.0, transition = 1.0;
     int key = -1; // FL's KeyIdx (the sample's detected key: 0-11 C..B major, 12-23 C..B minor); -1 = not known
+    // round 190li: the render engine's revision. 0 = the engine as built up to round 190kx (FL's transitions, plain
+    // TD-PSOLA; every older project and FL import keeps it, bit for bit); 1 = LYNX's natural engine (round 190li,
+    // scored against Melodyne 5: tools/vocallab): a voicing-aware pitch-synchronous resynthesis, smooth note joins,
+    // the drift / modulation split. A new Newtone slot gets `latestEngine`.
+    int engine = 0;
 };
+constexpr int latestEngine = 1;
 
 // The plugin's saved state (record 0xD5 of a mixer slot), REA_rodada73 §2
 struct State
@@ -149,6 +159,12 @@ bool glueNote (Track& track, std::size_t k);
 void applyCentre (Track& track, double amount, const std::vector<int>& which = {});
 void applyVariation (Track& track, double amount, const std::vector<int>& which = {});
 void applyTransition (Track& track, double factor, const std::vector<int>& which = {});
+// Round 190li (LYNX extras): the chosen notes' pitch modulation (vibrato: the fast deviation) and pitch drift (the slow
+// one), 0 = removed, 1 = as sung, 2 = doubled — Melodyne's Pitch Modulation / Pitch Drift tools; FL's Variation scales
+// both together. Correct pitch (Melodyne's macro): centre `centre` and drift `drift` amounts, 0..1, vibrato kept.
+void applyModulation (Track& track, double amount, const std::vector<int>& which = {});
+void applyPitchDrift (Track& track, double amount, const std::vector<int>& which = {});
+void correctPitch (Track& track, double centre, double drift, const std::vector<int>& which = {});
 // The nearest allowed note to `pitch` (MIDI) in a scale: `mask` bit n = pitch class (key + n) % 12 allowed;
 // 0xFFF = chromatic. Ties go down.
 double nearestInScale (double pitch, int key, std::uint16_t mask) noexcept;
