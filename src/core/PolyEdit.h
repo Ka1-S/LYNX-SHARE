@@ -47,7 +47,8 @@ struct SampleData;
 
 namespace polyedit
 {
-// One note's edit (PitchNet's NoteEdit without the per-frame pitch curve)
+// One note's edit (PitchNet's NoteEdit; round 190lo: the pitch curve as Melodyne's / Newtone's modulation and drift scales
+// plus a drawn curve)
 struct Edit
 {
     float semitones = 0.0f; // pitch offset (whole semitones from the UI; cents with Alt)
@@ -55,7 +56,16 @@ struct Edit
     double moveSeconds = 0.0;
     float stretch = 1.0f;   // length ratio 0.25 .. 4 (the attack keeps its speed)
     bool mute = false;
-    bool identity() const noexcept { return ! mute && semitones == 0.0f && gainDb == 0.0f && moveSeconds == 0.0 && stretch == 1.0f; }
+    // round 190lo: the note's own pitch movement, split as in Newtone's natural engine (round 190li): the drift (the slow
+    // wander around the note's centre, below ~3 Hz) and the modulation (vibrato, the rest), each scaled 0 .. 2 (1 = as
+    // played, 0 = flat)
+    float modulation = 1.0f;
+    float drift = 1.0f;
+    // round 190lo: a drawn pitch curve, semitones per analysis frame from the note's first frame (added to the rest;
+    // empty = none)
+    std::vector<float> curve;
+    bool pitchMoves() const noexcept;
+    bool identity() const noexcept { return ! mute && semitones == 0.0f && gainDb == 0.0f && moveSeconds == 0.0 && stretch == 1.0f && ! pitchMoves(); }
     bool operator== (const Edit&) const = default;
 };
 
@@ -67,6 +77,9 @@ struct Note
     float inharmonicity = 0.0f;
     double energy = 0.0;
     float probability = 1.0f;
+    // round 190lo: false = a candidate the note filter rejected (an overtone, a ghost, or a note it missed): drawn faint,
+    // and the user can make it a note ("note assignment", as Melodyne's); true for every note of a round-190lk blob
+    bool active = true;
     float medianMidi() const;         // the note's pitch (MIDI, fractional)
     float f0At (int frame) const;     // clamped to the note's frames
     bool operator== (const Note&) const = default;
@@ -87,10 +100,41 @@ struct Model
     bool operator== (const Model&) const = default;
 };
 
+// Round 190lo: how notes are found
+enum class Detector
+{
+    harmonic, // PitchNet's harmonic-sum detector and note filter (with Basic Pitch's posteriorgram as evidence when given)
+    guided,   // PitchNet's Basic Pitch-guided detector everywhere (needs evidence)
+    fallback  // harmonic, then the guided detector in the regions where Basic Pitch hears notes the harmonic one missed
+              // (LYNX, round 190lo: pads / detuned saws); = harmonic without evidence
+};
+struct AnalyseOptions
+{
+    Detector detector = Detector::fallback;
+    bool keepCandidates = true; // keep the rejected candidates (Note::active false) for note assignment
+};
+
 // The analysis of a clip's sample (mono mix of its channels). `evidence` may be null (DSP-only note filter). Runs on
 // the calling thread (a worker: seconds per minute of audio); false when cancelled.
 bool analyse (const SampleData& source, const polyphonic::NoteEvidence* evidence, Model& out, const std::atomic<bool>* cancel = nullptr,
-              const std::function<void (float)>& progress = {});
+              const std::function<void (float)>& progress = {}, const AnalyseOptions& options = {});
+
+// Round 190lo: the index of model note `k` in toAnalysis()'s object (the engine wants the active notes first; candidates
+// follow), -1 when out of range. Changing a note's `active` changes the mapping: build a new analysis then.
+int analysisIndex (const Model& model, int k);
+// the active notes' indices, in order (the identity of an analysis object: same list = the same masks)
+std::vector<int> activeNotes (const Model& model);
+
+// Round 190lo: a note's pitch track split for the modulation / drift scales: per frame of the note, the centre (MIDI),
+// the drift (slow wander around it, semitones) and the modulation (the rest)
+struct PitchParts
+{
+    float centre = 0.0f;
+    std::vector<float> drift, modulation;
+};
+PitchParts pitchParts (const Note& note, double frameSeconds);
+// the per-frame pitch offset (semitones, without Edit::semitones) the engine applies for `edit` on `note`; empty = none
+std::vector<float> pitchCurveOf (const Note& note, const Edit& edit, double frameSeconds);
 
 // Saved form ("LXPE" + version): notes and edits. An empty blob = not edited in the polyphonic editor.
 std::vector<std::uint8_t> write (const Model& model);

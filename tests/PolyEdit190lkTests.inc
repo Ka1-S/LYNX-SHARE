@@ -57,7 +57,7 @@ double level (const std::vector<float>& x, double f, double from, double to)
 int noteNear (const lynx::polyedit::Model& m, double key)
 {
     for (int k = 0; k < (int) m.notes.size(); ++k)
-        if (std::abs (m.notes[(std::size_t) k].medianMidi() - key) < 0.4)
+        if (m.notes[(std::size_t) k].active && std::abs (m.notes[(std::size_t) k].medianMidi() - key) < 0.4) // (190lo: not a candidate)
             return k;
     return -1;
 }
@@ -120,9 +120,9 @@ TEST (polyedit190lk_analysis_finds_the_chord)
     CHECK (m.sampleRate == pe190lk::rate && m.frames == (std::int64_t) (1.6 * pe190lk::rate) && m.hop == 512 && m.fftSize == 4096);
     CHECK (pe190lk::noteNear (m, 60.0) >= 0 && pe190lk::noteNear (m, 64.0) >= 0 && pe190lk::noteNear (m, 67.0) >= 0);
     CHECK (! m.edited());
-    // notes in order of their start
+    // notes in order of their start (round 190lo: the active notes; the rejected candidates follow them)
     for (std::size_t k = 1; k < m.notes.size(); ++k)
-        CHECK (m.notes[k - 1].startFrame <= m.notes[k].startFrame);
+        CHECK (! m.notes[k].active || (m.notes[k - 1].active && m.notes[k - 1].startFrame <= m.notes[k].startFrame));
 }
 
 TEST (polyedit190lk_unedited_plays_the_source_itself)

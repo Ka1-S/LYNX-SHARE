@@ -14,7 +14,8 @@ namespace lynx::polyedit
 {
 namespace
 {
-constexpr std::uint32_t formatVersion = 1;
+// 1 = round 190lk; 2 = round 190lo (candidates: Note::active; Edit::modulation / drift / curve)
+constexpr std::uint32_t formatVersion = 2;
 
 std::vector<float> monoOf (const SampleData& s)
 {
@@ -40,16 +41,17 @@ std::map<int, polyphonic::NoteEdit> editsOf (const Model& m)
     std::map<int, polyphonic::NoteEdit> out;
     for (const auto& [k, e] : m.edits)
     {
-        if (k < 0 || k >= (int) m.notes.size() || e.identity())
+        if (k < 0 || k >= (int) m.notes.size() || e.identity() || ! m.notes[(std::size_t) k].active)
             continue;
         polyphonic::NoteEdit n;
+        n.pitchCurve = pitchCurveOf (m.notes[(std::size_t) k], e, m.frameSeconds());
         n.semitones = e.semitones;
         n.gainDb = e.gainDb;
         n.mute = e.mute;
         n.timeOffsetSeconds = e.moveSeconds;
         n.stretch = std::clamp (e.stretch, 0.25f, 4.0f);
         n.takeBackground = m.takeBackground;
-        out[k] = n;
+        out[analysisIndex (m, k)] = n;
     }
     return out;
 }
@@ -117,13 +119,176 @@ float Note::medianMidi() const
     return 69.0f + 12.0f * std::log2 (v[v.size() / 2] / 440.0f);
 }
 
-bool Model::edited() const noexcept
+bool Edit::pitchMoves() const noexcept
 {
-    return std::any_of (edits.begin(), edits.end(), [this] (const auto& e) { return e.first >= 0 && e.first < (int) notes.size() && ! e.second.identity(); });
+    return modulation != 1.0f || drift != 1.0f || std::any_of (curve.begin(), curve.end(), [] (float v) { return v != 0.0f; });
 }
 
+bool Model::edited() const noexcept
+{
+    return std::any_of (edits.begin(), edits.end(), [this] (const auto& e) {
+        return e.first >= 0 && e.first < (int) notes.size() && notes[(std::size_t) e.first].active && ! e.second.identity();
+    });
+}
+
+int analysisIndex (const Model& m, int k)
+{
+    if (k < 0 || k >= (int) m.notes.size())
+        return -1;
+    int before = 0, active = 0;
+    for (int i = 0; i < (int) m.notes.size(); ++i)
+    {
+        const auto a = m.notes[(std::size_t) i].active;
+        active += a ? 1 : 0;
+        if (i < k && a == m.notes[(std::size_t) k].active)
+            ++before;
+    }
+    return m.notes[(std::size_t) k].active ? before : active + before;
+}
+
+std::vector<int> activeNotes (const Model& m)
+{
+    std::vector<int> out;
+    for (int i = 0; i < (int) m.notes.size(); ++i)
+        if (m.notes[(std::size_t) i].active)
+            out.push_back (i);
+    return out;
+}
+
+namespace
+{
+// two passes of a centred moving average of `width` frames (190li's drift filter), over the voiced frames
+std::vector<float> smoothed (const std::vector<float>& x, int width)
+{
+    auto pass = [width] (const std::vector<float>& in) {
+        std::vector<float> o (in.size());
+        const int h = std::max (0, width / 2);
+        for (int i = 0; i < (int) in.size(); ++i)
+        {
+            double sum = 0.0;
+            int n = 0;
+            for (int j = std::max (0, i - h); j <= std::min ((int) in.size() - 1, i + h); ++j)
+                sum += in[(std::size_t) j], ++n;
+            o[(std::size_t) i] = (float) (sum / std::max (1, n));
+        }
+        return o;
+    };
+    return pass (pass (x));
+}
+} // namespace
+
+PitchParts pitchParts (const Note& n, double frameSeconds)
+{
+    PitchParts out;
+    out.centre = n.medianMidi();
+    if (n.f0.empty() || frameSeconds <= 0.0)
+        return out;
+    std::vector<float> dev (n.f0.size());
+    for (std::size_t i = 0; i < dev.size(); ++i)
+        dev[i] = n.f0[i] > 0.0f ? 69.0f + 12.0f * std::log2 (n.f0[i] / 440.0f) - out.centre : 0.0f;
+    // drift: 2 x 180 ms (a 5.5 Hz vibrato's period: it is removed); modulation: the rest after 2 x 35 ms (the frame-to-frame
+    // noise of the pitch track stays as it is, it is not scaled)
+    const auto slow = smoothed (dev, std::max (1, (int) std::lround (0.18 / frameSeconds)));
+    const auto fine = smoothed (dev, std::max (1, (int) std::lround (0.035 / frameSeconds)));
+    out.drift = slow;
+    out.modulation.resize (dev.size());
+    for (std::size_t i = 0; i < dev.size(); ++i)
+        out.modulation[i] = fine[i] - slow[i];
+    return out;
+}
+
+std::vector<float> pitchCurveOf (const Note& n, const Edit& e, double frameSeconds)
+{
+    if (! e.pitchMoves() || n.f0.empty())
+        return {};
+    std::vector<float> c (n.f0.size(), 0.0f);
+    if (e.modulation != 1.0f || e.drift != 1.0f)
+    {
+        const auto parts = pitchParts (n, frameSeconds);
+        for (std::size_t i = 0; i < c.size(); ++i)
+            c[i] = (e.drift - 1.0f) * parts.drift[i] + (e.modulation - 1.0f) * parts.modulation[i];
+    }
+    for (std::size_t i = 0; i < c.size() && i < e.curve.size(); ++i)
+        c[i] += e.curve[i];
+    return c;
+}
+
+namespace
+{
+Note noteOf (const polyphonic::Note& n)
+{
+    Note note;
+    note.startFrame = n.startFrame;
+    note.endFrame = n.endFrame;
+    note.f0 = n.f0;
+    note.inharmonicity = n.inharmonicity;
+    note.energy = n.energy;
+    note.probability = n.probability;
+    note.active = n.active;
+    return note;
+}
+
+bool covers (const Note& n, double midi, int frame, float tolerance = 0.6f)
+{
+    return frame >= n.startFrame && frame <= n.endFrame && n.f0At (frame) > 0.0f
+           && std::abs (69.0f + 12.0f * std::log2 (n.f0At (frame) / 440.0f) - (float) midi) < tolerance;
+}
+
+// Round 190lo: the regions (frame ranges) where Basic Pitch hears a note no active note covers
+std::vector<std::pair<int, int>> missedRegions (const std::vector<Note>& notes, const polyphonic::NoteEvidence& ev, double frameSeconds, int numFrames)
+{
+    constexpr float sure = 0.5f;     // posterior of a sounding note
+    constexpr double minSeconds = 0.25, joinSeconds = 0.3, padSeconds = 0.5;
+    std::vector<char> missed ((std::size_t) std::max (0, numFrames), 0);
+    const auto bands = ev.frameTimes.empty() ? 0 : ev.note.size() / ev.frameTimes.size();
+    for (std::size_t f = 0; f < ev.frameTimes.size(); ++f)
+    {
+        const int frame = (int) std::lround (ev.frameTimes[f] / frameSeconds);
+        if (frame < 0 || frame >= numFrames)
+            continue;
+        for (std::size_t b = 0; b < bands; ++b)
+        {
+            if (ev.note[f * bands + b] < sure)
+                continue;
+            const double midi = 21.0 + (double) b;
+            const auto hit = std::any_of (notes.begin(), notes.end(), [&] (const Note& n) { return n.active && covers (n, midi, frame); });
+            if (! hit)
+                missed[(std::size_t) frame] = 1;
+        }
+    }
+    std::vector<std::pair<int, int>> runs;
+    const int join = (int) std::lround (joinSeconds / frameSeconds), minLen = (int) std::lround (minSeconds / frameSeconds);
+    for (int t = 0; t < numFrames; ++t)
+    {
+        if (! missed[(std::size_t) t])
+            continue;
+        if (! runs.empty() && t - runs.back().second <= join)
+            runs.back().second = t;
+        else
+            runs.push_back ({ t, t });
+    }
+    std::vector<std::pair<int, int>> out;
+    const int pad = (int) std::lround (padSeconds / frameSeconds);
+    for (const auto& [a, b] : runs)
+    {
+        // (count the missed frames: a few stray posteriors are not a missed note)
+        int count = 0;
+        for (int t = a; t <= b; ++t)
+            count += missed[(std::size_t) t];
+        if (count < minLen)
+            continue;
+        const auto lo = std::max (0, a - pad), hi = std::min (numFrames - 1, b + pad);
+        if (! out.empty() && lo <= out.back().second)
+            out.back().second = hi;
+        else
+            out.push_back ({ lo, hi });
+    }
+    return out;
+}
+} // namespace
+
 bool analyse (const SampleData& source, const polyphonic::NoteEvidence* evidence, Model& out, const std::atomic<bool>* cancel,
-              const std::function<void (float)>& progress)
+              const std::function<void (float)>& progress, const AnalyseOptions& options)
 {
     out = {};
     if (source.left.empty() || source.sampleRate <= 0.0)
@@ -132,7 +297,12 @@ bool analyse (const SampleData& source, const polyphonic::NoteEvidence* evidence
     auto params = polyphonic::Params::forSampleRate (source.sampleRate);
     params.deferMasks = true; // (LYNX: the masks of the edited blocks are built when rendering)
     const auto useEvidence = evidence != nullptr && ! evidence->empty();
-    const auto a = polyphonic::analyze (mono.data(), (int) mono.size(), params, useEvidence ? evidence : nullptr, cancel, progress);
+    const auto detector = useEvidence ? options.detector : Detector::harmonic;
+    if (detector == Detector::guided)
+        params.detectionMode = polyphonic::DetectionMode::NeuralGuided;
+    const auto share = detector == Detector::fallback ? 0.8f : 1.0f;
+    const auto a = polyphonic::analyze (mono.data(), (int) mono.size(), params, useEvidence ? evidence : nullptr, cancel,
+                                        [&progress, share] (float v) { if (progress) progress (share * v); });
     if (cancel != nullptr && cancel->load())
         return false;
     out.sampleRate = source.sampleRate;
@@ -140,19 +310,68 @@ bool analyse (const SampleData& source, const polyphonic::NoteEvidence* evidence
     out.fftSize = params.fftSize;
     out.hop = params.hop;
     out.evidence = useEvidence;
+    std::vector<Note> active, candidates;
     for (const auto& n : a.notes)
+        (n.active ? active : candidates).push_back (noteOf (n));
+    if (detector == Detector::fallback)
     {
-        if (! n.active)
-            break; // (active notes come first; the rejected candidates are not kept)
-        Note note;
-        note.startFrame = n.startFrame;
-        note.endFrame = n.endFrame;
-        note.f0 = n.f0;
-        note.inharmonicity = n.inharmonicity;
-        note.energy = n.energy;
-        note.probability = n.probability;
-        out.notes.push_back (std::move (note));
+        // Round 190lo: where Basic Pitch hears notes the harmonic detector missed (pads, detuned saws, slow attacks), the
+        // guided detector looks again over that region (whole hops, so its frames are the same frames); its notes that cover
+        // a missed note and do not double one already there are added
+        const auto regions = missedRegions (active, *evidence, out.frameSeconds(), a.numFrames);
+        auto guided = params;
+        guided.detectionMode = polyphonic::DetectionMode::NeuralGuided;
+        for (std::size_t r = 0; r < regions.size(); ++r)
+        {
+            const auto [lo, hi] = regions[r];
+            const auto from = (std::int64_t) lo * params.hop, to = std::min ((std::int64_t) mono.size(), (std::int64_t) (hi + 1) * params.hop);
+            if (to - from < params.fftSize)
+                continue;
+            polyphonic::NoteEvidence part;
+            const auto bands = evidence->note.size() / evidence->frameTimes.size();
+            const auto t0 = (double) from / source.sampleRate, t1 = (double) to / source.sampleRate;
+            for (std::size_t f = 0; f < evidence->frameTimes.size(); ++f)
+                if (evidence->frameTimes[f] >= t0 && evidence->frameTimes[f] <= t1)
+                {
+                    part.frameTimes.push_back ((float) (evidence->frameTimes[f] - t0));
+                    part.note.insert (part.note.end(), evidence->note.begin() + (long) (f * bands), evidence->note.begin() + (long) ((f + 1) * bands));
+                }
+            if (part.empty())
+                continue;
+            const auto g = polyphonic::analyze (mono.data() + from, (int) (to - from), guided, &part, cancel);
+            if (cancel != nullptr && cancel->load())
+                return false;
+            for (const auto& gn : g.notes)
+            {
+                if (! gn.active)
+                    continue;
+                auto n = noteOf (gn);
+                n.startFrame += lo;
+                n.endFrame += lo;
+                const auto mid = (n.startFrame + n.endFrame) / 2;
+                const auto midi = n.medianMidi();
+                const auto doubles = std::any_of (active.begin(), active.end(), [&] (const Note& o) {
+                    const auto overlap = std::min (o.endFrame, n.endFrame) - std::max (o.startFrame, n.startFrame);
+                    return overlap > 0 && std::abs (o.medianMidi() - midi) < 0.6f;
+                });
+                bool fills = false;
+                for (int t = n.startFrame; t <= n.endFrame && ! fills; t += 4)
+                    fills = ! std::any_of (active.begin(), active.end(), [&] (const Note& o) { return covers (o, midi, t); });
+                (void) mid;
+                if (! doubles && fills)
+                    active.push_back (std::move (n));
+            }
+            if (progress)
+                progress (0.8f + 0.2f * (float) (r + 1) / (float) regions.size());
+        }
+        std::stable_sort (active.begin(), active.end(), [] (const Note& x, const Note& y) {
+            return x.startFrame != y.startFrame ? x.startFrame < y.startFrame : x.medianMidi() < y.medianMidi();
+        });
     }
+    out.notes = std::move (active);
+    if (options.keepCandidates)
+        for (auto& c : candidates)
+            out.notes.push_back (std::move (c));
     return true;
 }
 
@@ -174,6 +393,7 @@ std::vector<std::uint8_t> write (const Model& m)
         o.put (n.inharmonicity);
         o.put (n.energy);
         o.put (n.probability);
+        o.put ((std::uint8_t) (n.active ? 1 : 0)); // (version 2)
         o.put ((std::uint32_t) n.f0.size());
         for (auto f : n.f0)
             o.put (f);
@@ -192,6 +412,12 @@ std::vector<std::uint8_t> write (const Model& m)
         o.put (e.moveSeconds);
         o.put (e.stretch);
         o.put ((std::uint8_t) (e.mute ? 1 : 0));
+        // (version 2)
+        o.put (e.modulation);
+        o.put (e.drift);
+        o.put ((std::uint32_t) e.curve.size());
+        for (auto v : e.curve)
+            o.put (v);
     }
     return b;
 }
@@ -223,6 +449,8 @@ std::optional<Model> parse (const std::vector<std::uint8_t>& blob)
         n.inharmonicity = in.get<float>();
         n.energy = in.get<double>();
         n.probability = in.get<float>();
+        if (version >= 2)
+            n.active = in.get<std::uint8_t>() != 0;
         const auto frames = in.get<std::uint32_t>();
         if (! in.ok || (std::size_t) frames * 4 > blob.size() - in.at)
             return std::nullopt;
@@ -241,6 +469,17 @@ std::optional<Model> parse (const std::vector<std::uint8_t>& blob)
         e.moveSeconds = in.get<double>();
         e.stretch = in.get<float>();
         e.mute = in.get<std::uint8_t>() != 0;
+        if (version >= 2)
+        {
+            e.modulation = in.get<float>();
+            e.drift = in.get<float>();
+            const auto points = in.get<std::uint32_t>();
+            if (! in.ok || (std::size_t) points * 4 > blob.size() - in.at)
+                return std::nullopt;
+            e.curve.resize (points);
+            for (auto& v : e.curve)
+                v = in.get<float>();
+        }
         if (k >= 0 && k < (int) m.notes.size())
             m.edits[k] = e;
     }
@@ -260,8 +499,17 @@ std::unique_ptr<polyphonic::Analysis> toAnalysis (const Model& m)
     a->numFrames = 1 + (int) ((m.frames + m.hop - 1) / m.hop); // (PitchNet's StftFrames)
     a->numBins = m.fftSize / 2 + 1;
     int id = 0;
+    // (the engine wants the active notes first, the candidates after them: analysisIndex())
+    std::vector<const Note*> order;
     for (const auto& n : m.notes)
+        if (n.active)
+            order.push_back (&n);
+    for (const auto& n : m.notes)
+        if (! n.active)
+            order.push_back (&n);
+    for (const auto* np : order)
     {
+        const auto& n = *np;
         polyphonic::Note p;
         p.id = id++;
         p.startFrame = n.startFrame;
@@ -270,7 +518,7 @@ std::unique_ptr<polyphonic::Analysis> toAnalysis (const Model& m)
         p.inharmonicity = n.inharmonicity;
         p.energy = n.energy;
         p.probability = n.probability;
-        p.active = true;
+        p.active = n.active;
         a->notes.push_back (std::move (p));
     }
     polyphonic::releaseMasks (*a);
@@ -329,16 +577,17 @@ std::shared_ptr<SampleData> render (const SampleData& source, const Model& model
 
 std::shared_ptr<SampleData> renderNote (const SampleData& source, const Model& model, int note, polyphonic::Analysis& analysis, std::int64_t* from)
 {
-    if (! fits (model, source) || note < 0 || note >= (int) model.notes.size())
+    if (! fits (model, source) || note < 0 || note >= (int) model.notes.size() || ! model.notes[(std::size_t) note].active)
         return nullptr;
+    const auto index = analysisIndex (model, note);
     auto edits = editsOf (model);
-    if (edits.count (note) == 0)
+    if (edits.count (index) == 0)
     {
         polyphonic::NoteEdit plain;
         plain.takeBackground = model.takeBackground;
-        edits[note] = plain;
+        edits[index] = plain;
     }
-    const std::map<int, polyphonic::NoteEdit> one { { note, edits[note] } };
+    const std::map<int, polyphonic::NoteEdit> one { { index, edits[index] } };
     const auto mono = monoOf (source);
     // (framesForEdits ignores identity edits for the span: ask for the note's own span with a tiny edit)
     auto span = one;
@@ -346,7 +595,7 @@ std::shared_ptr<SampleData> renderNote (const SampleData& source, const Model& m
         span.begin()->second.gainDb = 1e-6f;
     if (! prepare (source, span, analysis, mono, nullptr))
         return nullptr;
-    auto part = polyphonic::renderNotes (analysis, channelsOf (source), { note }, one);
+    auto part = polyphonic::renderNotes (analysis, channelsOf (source), { index }, one);
     if (part.channels.empty() || part.channels[0].empty())
         return nullptr;
     if (from != nullptr)
