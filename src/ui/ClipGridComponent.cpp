@@ -1795,6 +1795,9 @@ public:
                 g.setFont (liveFont());
                 textcache::drawText (g, juce::String (loops), juce::Rectangle<float> ((float) area.getX(), (float) cell.getY(), pie.getX() - 4.0f - (float) area.getX(), (float) cell.getHeight()),
                             juce::Justification::centredRight, false);
+                // (Live 12.4, details2_190ld shots/ref/live-status-session-playing-a.png: an uneven length, "31+", in #e75f3a)
+                if (beats - whole > 1.0e-6)
+                    g.setColour (juce::Colour (0xffe75f3a));
                 textcache::drawText (g, juce::String (whole) + (beats - whole > 1.0e-6 ? "+" : ""),
                             juce::Rectangle<float> (pie.getRight() + 5.0f, (float) cell.getY(), (float) right - pie.getRight() - 5.0f, (float) cell.getHeight()),
                             juce::Justification::centredLeft, false);
@@ -1816,8 +1819,8 @@ public:
     }
 
     // Round 190ld (DL-11): Live's monitor icons, measured in Live 12.4 (details2_190ld raw/L08), drawn as LYNX vectors:
-    // a MIDI track's 22 x 11 keyboard (a #757575 frame and key lines, the black keys 2 x 6 in #b5b5b5) and an audio track's
-    // 7 x 13 microphone (#b5b5b5: a 3 x 7 head in a U-shaped holder on a stem)
+    // a MIDI track's 22 x 11 keyboard (a #757575 frame and key lines every 3 px, the black keys 3 x 6 with a #b5b5b5 core) and an audio track's
+    // 7 x 11 microphone (#b5b5b5: a 3 x 7 head in a U-shaped holder on a stem)
     static void paintMonitorIcon (juce::Graphics& g, int icon, juce::Rectangle<int> area)
     {
         namespace lv = theme::livelook;
@@ -1829,12 +1832,16 @@ public:
             g.drawRect (k, 1);
             for (int i = 1; i < 7; ++i) // the white keys' edges, every 3 px
                 g.fillRect (k.getX() + i * 3, k.getY() + 1, 1, k.getHeight() - 2);
-            g.setColour (lv::text);
-            for (const auto i : { 1, 2, 4, 5, 6 }) // C# D#, F# G# A#
-                g.fillRect (k.getX() + i * 3 - 1, k.getY() + 1, 2, 6);
+            for (const auto i : { 1, 2, 4, 5, 6 }) // C# D#, F# G# A#: 3 x 6 in the frame grey with a #b5b5b5 core (Live's)
+            {
+                g.setColour (frame);
+                g.fillRect (k.getX() + i * 3 - 1, k.getY() + 1, 3, 6);
+                g.setColour (lv::text);
+                g.fillRect (k.getX() + i * 3, k.getY() + 1, 1, 6);
+            }
             return;
         }
-        const auto m = juce::Rectangle<int> (7, 13).withCentre (area.getCentre());
+        const auto m = juce::Rectangle<int> (7, 11).withCentre (area.getCentre());
         g.setColour (lv::text);
         g.fillRoundedRectangle (juce::Rectangle<float> ((float) m.getX() + 2.0f, (float) m.getY(), 3.0f, 7.0f), 1.2f);
         g.fillRect (m.getX(), m.getY() + 4, 1, 3);
@@ -1842,7 +1849,7 @@ public:
         g.fillRect (m.getX() + 1, m.getY() + 7, 1, 1);
         g.fillRect (m.getRight() - 2, m.getY() + 7, 1, 1);
         g.fillRect (m.getX() + 2, m.getY() + 8, 3, 1);
-        g.fillRect (m.getX() + 3, m.getY() + 9, 1, 3);
+        g.fillRect (m.getX() + 3, m.getY() + 9, 1, 2);
     }
 
     // Round 190ld (DL-10): the Arrangement miniature of track `t` in `area` (Live: 55 x 13 px, blocks and line alike)
@@ -2519,7 +2526,7 @@ public:
         menu.addItem (tr ("Capture and Insert Scene") + sessionkeys::menuKey (sessionkeys::Command::gridCaptureInsertScene),
                       [this, scene] { captureAndInsertScene (scene); });
         menu.addSeparator();
-        menu.addItem (tr ("Cancel Scene Launch"), queuedScene >= 0, false, [this] { cancelSceneLaunch(); });
+        menu.addItem (tr ("Cancel Scene Launch"), [this] { cancelSceneLaunch(); }); // (Live: enabled whether or not a scene waits)
         menu.addSeparator();
         menu.addItem (tr ("Select Next Scene on Launch (Pref)"), true, selectNextOnLaunch, [this] {
             selectNextOnLaunch = ! selectNextOnLaunch;

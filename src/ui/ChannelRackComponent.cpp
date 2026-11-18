@@ -1345,7 +1345,7 @@ juce::Rectangle<int> ChannelRackComponent::controlBounds (Area area, int row) co
     {
         case Area::pan: return { muteWidth, y, knobWidth, rowHeight };
         case Area::volume: return { muteWidth + knobWidth, y, knobWidth, rowHeight };
-        case Area::route: return { muteWidth + 2 * knobWidth + 1, y + 7, routeWidth - 3, rowHeight - 14 };
+        case Area::route: return showMixerSelectors ? juce::Rectangle<int> { muteWidth + 2 * knobWidth + 1, y + 7, routeWidth - 3, rowHeight - 14 } : juce::Rectangle<int>();
         case Area::lane:
         {
             const auto lane = laneBounds();

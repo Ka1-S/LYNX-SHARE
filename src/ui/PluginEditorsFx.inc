@@ -358,6 +358,33 @@
     int rhythmDrag = -1;
     float rhythmStartX = 0.0f;
 
+    // --- round 190ld (DP-32): Fruity Vocoder's live band levels ------------------------------------------------------
+    // The effect publishes up to 32 columns, 6 bits each (0 = −60 dB or less … 63 = 0 dB), four per meter output 0…7
+    // (core/Effects.cpp Vocoder::controlOutput). The timer repaints the band display only when a column changed (one
+    // last frame when the signal stops); a held HOLD freezes the envelopes, so nothing is redrawn.
+    std::array<std::uint32_t, 8> vocBandsSeen {};
+    int vocHoldParam = -1; // the HOLD button held down (released on mouse up)
+
+    float vocoderBandLevel (int column) const
+    {
+        if (column < 0 || column >= 32)
+            return 0.0f;
+        return (float) ((vocBandsSeen[(std::size_t) (column / 4)] >> (6 * (column % 4))) & 63u) / 63.0f;
+    }
+
+    void vocoderBandsTick()
+    {
+        std::array<std::uint32_t, 8> now {};
+        for (int k = 0; k < 8; ++k)
+            now[(std::size_t) k] = (std::uint32_t) juce::jlimit (0.0f, 16777215.0f, liveMeter (k));
+        if (now == vocBandsSeen)
+            return;
+        vocBandsSeen = now;
+        for (const auto& item : activeLayout().items)
+            if (item.type == Item::display && item.display != nullptr && std::strcmp (item.display, "vocbands") == 0 && visible (item))
+                repaint (rectOf (item).getSmallestIntegerContainer().expanded (1));
+    }
+
     // --- the other displays -----------------------------------------------------------------------------
 
     // true = drawn (id is one of round 105's displays)
@@ -382,7 +409,7 @@
             paintRhythmPatterns (g, item);
             return true;
         }
-        if (id == "vocbands") // Fruity Vocoder: one column per band (FL animates their levels; LYNX shows the bands)
+        if (id == "vocbands") // Fruity Vocoder: one column per band, each with its live level (round 190ld, DP-32)
         {
             const auto bands = 4 << juce::jlimit (0, 5, juce::roundToInt (param01 ("Bands") * 5.0f));
             const auto shown = juce::jmin (bands, 32);
@@ -392,6 +419,13 @@
                 const auto cell = juce::Rectangle<float> (inner.getX() + w * (float) i, inner.getY(), w, inner.getHeight()).reduced (1.0f, 0.0f);
                 g.setColour (colour::bg2);
                 g.fillRect (cell);
+                // FL 2026 (capture 190ld B4, fl-vocoder-playing-*): a light fill per band rising with the band's level
+                // while the signal plays (LYNX: its curve colour, translucent); frozen while HOLD is held
+                if (const auto level = vocoderBandLevel (i); level > 0.0f)
+                {
+                    g.setColour (curveColour.withAlpha (0.42f));
+                    g.fillRect (cell.withTop (cell.getBottom() - cell.getHeight() * level));
+                }
                 g.setColour (curveColour.withAlpha (0.8f));
                 g.fillRect (cell.withTop (cell.getY() + cell.getHeight() * 0.32f).withHeight (2.0f * s));
             }

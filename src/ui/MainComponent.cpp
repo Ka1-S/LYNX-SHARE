@@ -2387,6 +2387,14 @@ bool MainComponent::runAction (const std::string& id)
         }
     }
     else if (is ("rack.groupSelected")) rack.groupSelected();
+    else if (is ("rack.mixerSelectors")) // round 190ld (DE-26): FL's "Show mixer track selectors"
+    {
+        ChannelRackComponent::showMixerSelectors = ! ChannelRackComponent::showMixerSelectors;
+        rack.updateSize();
+        rack.resized();
+        rack.repaint();
+        saveUiSettings();
+    }
     else if (is ("rack.filterPrevious")) rack.stepFilterGroup (-1); // round 190ld (DE-37)
     else if (is ("rack.filterNext")) rack.stepFilterGroup (1);
     else if (is ("rack.rotateLeft")) rack.rotateSelected (-1);
@@ -2947,6 +2955,8 @@ void MainComponent::loadUiSettings()
             setEditorsInMainWindow (on);
         else if (key == "muteRemovedSteps")
             ChannelRackComponent::muteRemovedSteps = on;
+        else if (key == "rackMixerSelectors") // round 190ld
+            ChannelRackComponent::showMixerSelectors = on;
         else if (key == "rackNameAlignLeft") // round 190kd: FL's Channel name alignment
             ChannelRackComponent::nameAlignLeft = on;
         else if (key == "audioTrackControls") // round 190w: Playlist › View › Track headers
@@ -3318,6 +3328,7 @@ void MainComponent::saveUiSettings()
                                       + "\nautoSelectLinked=" + juce::String (ChannelRackComponent::autoSelectLinked ? 1 : 0)
                                       + "\neditorsInMain=" + juce::String (editorsInMainWindowSetting() ? 1 : 0)
                                       + "\nmuteRemovedSteps=" + juce::String (ChannelRackComponent::muteRemovedSteps ? 1 : 0)
+                                      + "\nrackMixerSelectors=" + juce::String (ChannelRackComponent::showMixerSelectors ? 1 : 0)
                                       + "\nrackNameAlignLeft=" + juce::String (ChannelRackComponent::nameAlignLeft ? 1 : 0)
                                       + "\naudioTrackControls=" + juce::String (PlaylistComponent::showAudioTrackControls ? 1 : 0)
                                       + "\naudioTrackLevels=" + juce::String (PlaylistComponent::showAudioTrackLevels ? 1 : 0)
@@ -4584,6 +4595,9 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
                 ChannelRackComponent::muteRemovedSteps = ! ChannelRackComponent::muteRemovedSteps;
                 saveUiSettings();
             });
+            // FL 2026's next item there (round 190ld, DE-26): the mixer track number boxes on / off (Alt+M)
+            menu.addItem (tr ("Show mixer track selectors") + shortcutText ("rack.mixerSelectors"), true, ChannelRackComponent::showMixerSelectors,
+                          [this] { runAction ("rack.mixerSelectors"); });
             // FL's place for it (round 190cj, seen in FL 2026: Channel rack menu > Options, after "Mute removed steps" and
             // "Show mixer track selectors"; it was in Settings > General): a row's miniature shows the whole pattern
             menu.addItem (tr ("Show complete piano roll preview"), true, ChannelRackComponent::completePreview.load(), [this] {

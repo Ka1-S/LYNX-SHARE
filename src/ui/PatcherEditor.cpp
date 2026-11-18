@@ -29,6 +29,7 @@
 #include "core/NativeEngines.h"
 #include "core/SoundFont.h"
 #include "core/Patcher.h"
+#include "ui/Motion.h"
 #include "core/Vfx.h"
 #include "engine/PluginHost.h"
 #include "ui/I18n.h"
@@ -56,6 +57,18 @@ namespace col = theme::colour;
 
 // Add plugin › Browse plugin database: the Patcher editor waiting for the Browser's next pick (round 162)
 std::function<bool (const ChannelDef*, const EffectSlot*)> pendingBrowserPick;
+
+// round 190ld (FL's Patcher main menu › View, capture 190ld B3 fl-patcher-view-menu): Activity (on by default, as in
+// FL), Latency and Performance; one setting for every Patcher editor of the session
+struct PatcherViewOptions
+{
+    bool activity = true, latency = false, performance = false;
+};
+PatcherViewOptions& patcherView()
+{
+    static PatcherViewOptions v;
+    return v;
+}
 
 constexpr float nodeWidth = 150.0f;
 constexpr float headerHeight = 24.0f;
@@ -171,6 +184,7 @@ public:
         // cables
         for (std::size_t w = 0; w < doc->wires.size(); ++w)
             drawWire (g, *doc, pins, doc->wires[w], (int) w == selectedWire);
+        paintActivity (g, *doc, pins); // round 190ld: View › Activity
 
         // nodes
         drawHost (g, *doc, true);
@@ -188,6 +202,7 @@ public:
             drawCurve (g, toScreen (dragFrom.at), dragPoint, 2.0f);
         }
 
+        paintNodeBadges (g, *doc); // round 190ld: View › Performance / Latency
         paintMinimap (g, *doc);
 
         g.setColour (col::textSecondary);
@@ -214,6 +229,13 @@ public:
             return;
         }
         const auto world = toWorld (e.position);
+        if (e.mods.isMiddleButtonDown()) // round 190ld (DP-64): FL's middle-drag pans the map
+        {
+            dragging = Drag::view;
+            dragStart = e.position;
+            dragOrigin = offset;
+            return;
+        }
         if (e.mods.isPopupMenu())
         {
             if (const auto pin = pinAt (*doc, world); pin && pin->node >= 0 && pin->kind == PatchWire::Kind::control
@@ -317,8 +339,24 @@ public:
     {
         if (surfaceView)
             return;
+        // round 190ld (DP-64): FL's navigation — the wheel scrolls the map (up / down; Shift or a sideways swipe: left /
+        // right), Alt+wheel zooms around the mouse (Ctrl+wheel too, LYNX's earlier zoom gesture)
+        if (! e.mods.isAltDown() && ! e.mods.isCtrlDown() && ! e.mods.isCommandDown())
+        {
+            const auto sideways = e.mods.isShiftDown() || std::abs (wheel.deltaX) > std::abs (wheel.deltaY);
+            const auto amount = (sideways ? (std::abs (wheel.deltaX) > std::abs (wheel.deltaY) ? wheel.deltaX : wheel.deltaY) : wheel.deltaY) * 240.0f / zoom;
+            if (sideways)
+                offset.x -= amount;
+            else
+                offset.y -= amount;
+            repaint();
+            return;
+        }
+        const auto delta = std::abs (wheel.deltaY) >= std::abs (wheel.deltaX) ? wheel.deltaY : wheel.deltaX;
+        if (delta == 0.0f)
+            return;
         const auto before = toWorld (e.position);
-        zoom = std::clamp (zoom * (wheel.deltaY > 0 ? 1.1f : 1.0f / 1.1f), 0.25f, 3.0f);
+        zoom = std::clamp (zoom * (delta > 0 ? 1.1f : 1.0f / 1.1f), 0.25f, 3.0f);
         offset = before - e.position / zoom;
         repaint();
     }
@@ -661,6 +699,236 @@ private:
             shown = doc != nullptr ? *doc : PatcherDoc {};
             repaint();
         }
+        viewTick();
+    }
+
+    // --- round 190ld: FL's View › Activity / Latency / Performance (DP-61, DP-62, DP-63) ----------------------------
+    // The running graph measures its nodes only while this editor keeps watching (Graph::watch, core/Patcher.h): the
+    // timer polls the nodes' output peaks (Activity) and process times (Performance, refreshed twice a second). The
+    // arrows move at 30 Hz only while a cable carries audio, Activity is on and motion is allowed; else 10 Hz.
+    std::vector<char> nodeActive;         // [node] its output carried audio in the last tick
+    bool hostActive = false;              // "From LYNX SHARE"
+    float activityPhase = 0.0f;           // px along the cables
+    std::vector<float> nodeCpu;           // [node] % of real time
+    std::vector<int> nodeLatencyTotal;    // [node] its output's latency (samples) along the longest path
+    float totalCpu = 0.0f, modulesCpu = 0.0f;
+    std::vector<std::uint64_t> lastNodeNs;
+    std::uint64_t lastGraphNs = 0;
+    juce::int64 lastPerfTicks = 0;
+    const patcher::Graph* perfGraph = nullptr;
+
+    juce::PopupMenu viewMenu()
+    {
+        auto& v = patcherView();
+        juce::PopupMenu m;
+        auto toggle = [this] (bool& flag) {
+            flag = ! flag;
+            lastPerfTicks = 0;
+            repaint();
+        };
+        m.addItem (tr ("Activity"), true, v.activity, [toggle, &v] { toggle (v.activity); });
+        m.addItem (tr ("Latency"), true, v.latency, [toggle, &v] { toggle (v.latency); });
+        m.addItem (tr ("Performance"), true, v.performance, [toggle, &v] { toggle (v.performance); });
+        return m;
+    }
+
+    bool wireActive (const PatchWire& w) const
+    {
+        if (w.kind != PatchWire::Kind::audio || ! w.enabled)
+            return false;
+        if (w.from == patchFromHost)
+            return w.fromPort == 0 && hostActive;
+        return w.from >= 0 && w.from < (int) nodeActive.size() && nodeActive[(std::size_t) w.from] != 0;
+    }
+
+    void viewTick()
+    {
+        const auto& v = patcherView();
+        auto* g = (v.activity || v.performance) && ! surfaceView && isShowing() ? runningGraph() : nullptr;
+        const auto* doc = currentDoc();
+        const auto wasAnimating = std::find (nodeActive.begin(), nodeActive.end(), 1) != nodeActive.end() || hostActive;
+        if (g == nullptr || doc == nullptr)
+        {
+            if (wasAnimating)
+            {
+                nodeActive.clear();
+                hostActive = false;
+                repaint();
+            }
+            if (getTimerInterval() != 100)
+                startTimerHz (10);
+            return;
+        }
+        g->watch();
+        const auto count = g->nodeCount();
+        nodeActive.resize ((std::size_t) count, 0);
+        bool changed = false;
+        for (int n = 0; n < count; ++n)
+        {
+            const char on = g->takeNodePeak (n) > 1.0e-4f ? 1 : 0; // (−80 dB)
+            changed = changed || on != nodeActive[(std::size_t) n];
+            nodeActive[(std::size_t) n] = on;
+        }
+        const auto hostOn = g->takeInputPeak() > 1.0e-4f;
+        changed = changed || hostOn != hostActive;
+        hostActive = hostOn;
+
+        juce::Rectangle<float> dirty;
+        const auto pins = allPins (*doc);
+        bool moving = false;
+        if (v.activity)
+            for (const auto& w : doc->wires)
+                if (wireActive (w) || changed)
+                {
+                    juce::Point<float> a, b;
+                    if (wireEnds (*doc, pins, w, a, b))
+                        dirty = dirty.getUnion (curve (toScreen (a), toScreen (b)).getBounds().expanded (8.0f));
+                    moving = moving || wireActive (w);
+                }
+        const auto animate = moving && ui::motion::enabled();
+        if (animate)
+            activityPhase = std::fmod (activityPhase + 2.2f, 1000.0f);
+        if (! dirty.isEmpty() && (animate || changed))
+            repaint (dirty.getSmallestIntegerContainer());
+        const auto wantMs = animate ? 33 : 100;
+        if (std::abs (getTimerInterval() - wantMs) > 2)
+            startTimer (wantMs);
+
+        // Performance: each node's process time over the real time since the last read-out (twice a second)
+        const auto now = juce::Time::getHighResolutionTicks();
+        const auto secs = lastPerfTicks != 0 ? juce::Time::highResolutionTicksToSeconds (now - lastPerfTicks) : 0.0;
+        if (v.performance && (lastPerfTicks == 0 || secs >= 0.5 || perfGraph != g))
+        {
+            const auto fresh = perfGraph != g || lastPerfTicks == 0 || (int) lastNodeNs.size() != count;
+            nodeCpu.assign ((std::size_t) count, 0.0f);
+            lastNodeNs.resize ((std::size_t) count, 0);
+            float modules = 0.0f;
+            for (int n = 0; n < count; ++n)
+            {
+                const auto ns = g->nodeNanoseconds (n);
+                if (! fresh && secs > 0.0)
+                    modules += nodeCpu[(std::size_t) n] = (float) ((double) (ns - lastNodeNs[(std::size_t) n]) / (secs * 1.0e9) * 100.0);
+                lastNodeNs[(std::size_t) n] = ns;
+            }
+            const auto graphNs = g->watchedNanoseconds();
+            totalCpu = ! fresh && secs > 0.0 ? (float) ((double) (graphNs - lastGraphNs) / (secs * 1.0e9) * 100.0) : 0.0f;
+            modulesCpu = modules;
+            lastGraphNs = graphNs;
+            lastPerfTicks = now;
+            perfGraph = g;
+            repaint();
+        }
+    }
+
+    // Latency: each node's output latency along its longest input path ("total"), as the delay compensation plans it
+    void updateLatencies (const PatcherDoc& d)
+    {
+        const auto* g = runningGraph();
+        const auto count = (int) d.nodes.size();
+        std::vector<int> own ((std::size_t) count, 0);
+        for (int n = 0; n < count; ++n)
+            if (g != nullptr && n < g->nodeCount())
+            {
+                if (const auto fx = g->effectAt (n); fx != nullptr && d.nodes[(std::size_t) n].effect.enabled)
+                    own[(std::size_t) n] = std::max (0, fx->latencySamples());
+                else if (const auto in = g->instrumentAt (n); in != nullptr)
+                    own[(std::size_t) n] = std::max (0, in->latencySamples());
+            }
+        nodeLatencyTotal.assign ((std::size_t) count, 0);
+        for (int pass = 0; pass <= count; ++pass) // (longest path; the graph has no audio loops)
+        {
+            bool moved = false;
+            for (int n = 0; n < count; ++n)
+            {
+                int in = 0;
+                for (const auto& w : d.wires)
+                    if (w.kind == PatchWire::Kind::audio && w.to == n && w.from >= 0 && w.from < count)
+                        in = std::max (in, nodeLatencyTotal[(std::size_t) w.from]);
+                const auto out = in + own[(std::size_t) n];
+                moved = moved || out != nodeLatencyTotal[(std::size_t) n];
+                nodeLatencyTotal[(std::size_t) n] = out;
+            }
+            if (! moved)
+                break;
+        }
+    }
+
+    // FL (capture 190ld B3, fl-patcher-activity-frames): arrowheads travel along the audio cables while they carry signal
+    void paintActivity (juce::Graphics& g, const PatcherDoc& d, const std::vector<Pin>& pins) const
+    {
+        if (! patcherView().activity || (nodeActive.empty() && ! hostActive))
+            return;
+        constexpr float spacing = 70.0f;
+        const auto size = 5.0f * std::clamp (zoom, 0.7f, 1.4f);
+        for (const auto& w : d.wires)
+        {
+            juce::Point<float> a, b;
+            if (! wireActive (w) || ! wireEnds (d, pins, w, a, b))
+                continue;
+            const auto path = curve (toScreen (a), toScreen (b));
+            const auto length = path.getLength();
+            g.setColour (wireColour (w.kind));
+            for (auto at = std::fmod (activityPhase, spacing); at < length; at += spacing)
+            {
+                const auto tip = path.getPointAlongPath (at);
+                const auto back = path.getPointAlongPath (juce::jmax (0.0f, at - 1.0f));
+                const auto dir = tip - back;
+                const auto len = juce::jmax (1.0e-3f, dir.getDistanceFromOrigin());
+                const auto u = dir / len;
+                const juce::Point<float> nrm { -u.y, u.x };
+                juce::Path arrow;
+                arrow.addTriangle (tip + u * size, tip - u * size + nrm * size * 0.8f, tip - u * size - nrm * size * 0.8f);
+                g.fillPath (arrow);
+            }
+        }
+    }
+
+    // FL (capture 190ld B3, fl-patcher-perf-badge / -latency-badge / -perf-total): a rounded translucent grey badge above
+    // each module ("total: N samples" over "cpu: 0.1%"), and the "total / patcher / modules" box at the bottom left
+    void paintNodeBadges (juce::Graphics& g, const PatcherDoc& d)
+    {
+        const auto& v = patcherView();
+        if (! v.performance && ! v.latency)
+            return;
+        if (v.latency)
+            updateLatencies (d);
+        const auto badgeFill = juce::Colour (113, 115, 116).withAlpha (0.82f);
+        const auto font = juce::Font (juce::FontOptions (12.0f * std::clamp (zoom, 0.75f, 1.25f)));
+        g.setFont (font);
+        for (int n = 0; n < (int) d.nodes.size(); ++n)
+        {
+            juce::StringArray lines;
+            if (v.latency && n < (int) nodeLatencyTotal.size() && nodeLatencyTotal[(std::size_t) n] > 0)
+                lines.add (tr ("total: {0} samples", { juce::String (nodeLatencyTotal[(std::size_t) n]) }));
+            if (v.performance)
+                lines.add (tr ("cpu: {0}%", { juce::String (n < (int) nodeCpu.size() ? nodeCpu[(std::size_t) n] : 0.0f, 1) }));
+            if (lines.isEmpty())
+                continue;
+            const auto r = nodeBounds (d, n);
+            const auto top = toScreen (r.getTopLeft());
+            const auto lineH = font.getHeight() + 2.0f;
+            float w = 0.0f;
+            for (const auto& l : lines)
+                w = juce::jmax (w, juce::GlyphArrangement::getStringWidth (font, l));
+            const auto box = juce::Rectangle<float> (top.x, top.y - lineH * (float) lines.size() - 6.0f, w + 10.0f, lineH * (float) lines.size() + 4.0f);
+            g.setColour (badgeFill);
+            g.fillRoundedRectangle (box, 4.0f);
+            g.setColour (col::textPrimary);
+            for (int k = 0; k < lines.size(); ++k)
+                g.drawText (lines[k], box.withTrimmedLeft (5.0f).withTrimmedTop (2.0f + lineH * (float) k).withHeight (lineH), juce::Justification::centredLeft, false);
+        }
+        if (! v.performance)
+            return;
+        const juce::String totals[] { tr ("total: {0}%", { juce::String (totalCpu, 1) }), tr ("patcher: {0}%", { juce::String (juce::jmax (0.0f, totalCpu - modulesCpu), 1) }),
+                                      tr ("modules: {0}%", { juce::String (modulesCpu, 1) }) };
+        const auto lineH = 15.0f;
+        const auto box = juce::Rectangle<float> (4.0f, (float) getHeight() - 24.0f - lineH * 3.0f - 6.0f, 104.0f, lineH * 3.0f + 6.0f);
+        g.setColour (badgeFill);
+        g.fillRoundedRectangle (box, 3.0f);
+        g.setColour (col::textPrimary);
+        g.setFont (juce::Font (juce::FontOptions (12.0f)));
+        for (int k = 0; k < 3; ++k)
+            g.drawText (totals[k], box.withTrimmedLeft (5.0f).withTrimmedTop (3.0f + lineH * (float) k).withHeight (lineH), juce::Justification::centredLeft, false);
     }
 
     void edit (std::function<void (PatcherDoc&)> fn)
@@ -1411,6 +1679,7 @@ private:
         juce::PopupMenu menu;
         menu.addItem (tr ("Open plugin picker..."), [this, at] { pickPlugin (target.channel, at); });
         menu.addSubMenu (tr ("Add plugin"), addPluginMenu (at));
+        menu.addSubMenu (tr ("View"), viewMenu()); // round 190ld: FL's main menu › View (its Activity / Latency / Performance)
         menu.addSeparator();
         menu.addItem (tr ("Fit to window"), [this] {
             fit();

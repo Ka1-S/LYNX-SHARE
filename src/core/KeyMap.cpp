@@ -204,6 +204,8 @@ std::vector<Action> makeActions()
         // filter group, in the group menu's order
         { "rack.filterPrevious", TR_NOOP ("Previous filter group"), Context::channelRack, { chord (pageUp) } },
         { "rack.filterNext", TR_NOOP ("Next filter group"), Context::channelRack, { chord (pageDown) } },
+        // FL 2026's Channel rack menu › Options › "Show mixer track selectors" (Alt+M) (round 190ld, DE-26)
+        { "rack.mixerSelectors", TR_NOOP ("Show mixer track selectors"), Context::channelRack, { chord ('M', alt) } },
 
         // Piano Roll (focused): tool dialogs and zoom
         { "pianoRoll.toStart", TR_NOOP ("Move the playback marker to start"), Context::pianoRoll, { chord (home) } }, // (issue #195)

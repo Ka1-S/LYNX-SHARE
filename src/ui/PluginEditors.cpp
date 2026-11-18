@@ -213,6 +213,9 @@ public:
         if (levelMeter && ! node.locate)
             if (auto* times = engine.getProcessTimes(); times != nullptr && levelKey() < times->levelWanted.size())
                 times->levelWanted[levelKey()].fetch_add (1, std::memory_order_relaxed);
+        if (kind == EffectKind::vocoder && ! node.locate) // round 190ld (DP-32): the band display's live levels
+            if (auto* times = engine.getProcessTimes(); times != nullptr && levelKey() < times->metersWanted.size())
+                times->metersWanted[levelKey()].fetch_add (1, std::memory_order_relaxed);
         if (! node.locate)
             startTimerHz (30); // live displays, and the controls following their automation (cheap while nothing moves)
         else if (liveDisplays || kind == EffectKind::grossBeat) // (round 190ih: Gross Beat's locator, in a Patcher too)
@@ -228,6 +231,9 @@ public:
         if (levelMeter && ! node.locate)
             if (auto* times = engine.getProcessTimes(); times != nullptr && levelKey() < times->levelWanted.size())
                 times->levelWanted[levelKey()].fetch_sub (1, std::memory_order_relaxed);
+        if (kind == EffectKind::vocoder && ! node.locate)
+            if (auto* times = engine.getProcessTimes(); times != nullptr && levelKey() < times->metersWanted.size())
+                times->metersWanted[levelKey()].fetch_sub (1, std::memory_order_relaxed);
         engine.removeChangeListener (this);
         ui::hideValueTip();
     }
@@ -428,7 +434,7 @@ public:
                 && (plugui::displayTakesMouse (item.display) // round 168x: the list lives in PluginLayout (Maximus' curve added)
                     || isBars (item) || isRhythmEdit (item) || isRhythmPatterns (item)
                     || isGbAny (item) // round 168m: Gross Beat's editor parts
-                    || (limiterViewItem (item) && limiterViewPartAt (item, p) >= 0))) // round 190jd: the Limiter's view switch
+                    || (limiterViewItem (item) && (limiterViewPartAt (item, p) >= 0 || limiterGraphShown())))) // round 190jd: the Limiter's view switch (190ld: and its graph, click = pause)
                 return i;
             if (item.type == Item::display || (item.param == nullptr && ! hasStyle (item, plugui::pageTabs)))
                 continue;
@@ -875,6 +881,85 @@ public:
         return skin::sectionFillIsDark (under);
     }
 
+    // --- round 190ld: Fruity Delay 3's Time / Feedback details (DP-39, DP-40, DP-41) ---------------------------------
+
+    // the Time knob while TEMPO SYNC is on (FL: step dots around it, no value arc, and the Set ▸ menu of note values)
+    bool delay3SyncedTime (const LayoutItem& item) const
+    {
+        if (kind != EffectKind::fruityDelay3 || item.type != Item::knob || item.param == nullptr || std::strcmp (item.param, "Time") != 0)
+            return false;
+        return valueOf (plugui::paramIndex (kind, "Tempo sync")) >= 0.5f;
+    }
+
+    // FL 2026 (capture 190ld B2, fl-delay3-feedback-a..p): the Feedback LEVEL ring keeps its colour up to ~93.8 % and
+    // blends linearly to orange (255,168,48) at 100 % (the knob's end; no red inside its range). Res: FL's manual — the
+    // ring goes from its colour through orange to red above 75 % (not captured: the same blend, orange half-way).
+    // LYNX keeps its own ring colour (the theme's accent) as the start of the blend.
+    void delay3KnobLook (const LayoutItem& item, float value, skin::KnobLook& look, bool synced) const
+    {
+        static const juce::Colour orange { 255, 168, 48 };
+        if (synced)
+            look.noArc = true;
+        auto warn = juce::Colour();
+        if (std::strcmp (item.param, "Feedback") == 0 && value > 0.9375f)
+            warn = look.accent.interpolatedWith (orange, juce::jlimit (0.0f, 1.0f, (value - 0.9375f) / 0.0625f));
+        else if (std::strcmp (item.param, "Resonance") == 0 && value > 0.75f)
+        {
+            const auto t = juce::jlimit (0.0f, 1.0f, (value - 0.75f) / 0.25f);
+            warn = t < 0.5f ? look.accent.interpolatedWith (orange, t * 2.0f) : orange.interpolatedWith (theme::colour::meterClip, t * 2.0f - 1.0f);
+        }
+        if (warn.getAlpha() > 0)
+            look.accent = look.ring = warn;
+    }
+
+    // FL 2026 (capture 190ld B2, fl-delay3-time-sync vs -nosync): with TEMPO SYNC on, 15 small dots evenly spaced
+    // around the Time knob over its whole travel (darker marks on FL's panel; LYNX: its caption colour, faint)
+    void paintDelay3StepDots (juce::Graphics& g, juce::Rectangle<float> circle, bool enabled) const
+    {
+        const auto s = scale();
+        const auto c = circle.getCentre();
+        const auto rad = circle.getWidth() * 0.5f + 3.5f * s;
+        const auto d = juce::jmax (1.6f, 2.2f * s);
+        g.setColour (skin::captionColour().withAlpha (enabled ? 0.5f : 0.25f));
+        constexpr int dots = 15;
+        for (int i = 0; i < dots; ++i)
+        {
+            const auto a = juce::MathConstants<float>::pi * (-0.75f + 1.5f * (float) i / (float) (dots - 1));
+            g.fillEllipse (juce::Rectangle<float> (d, d).withCentre (c + juce::Point<float> (std::sin (a), -std::cos (a)) * rad));
+        }
+    }
+
+    // FL's Time knob menu with TEMPO SYNC on: "Set ▸" (2nd item, after Reset) with the musical values, in FL's order
+    // (capture 190ld F05set, fl-delay3-time-set-submenu). Synced Time = 1/48 step … 16 steps (raw 1…768, FL's manual):
+    // a step (1/16 note) = 48.
+    void showDelay3TimeMenu (int param, const ui::ValueSpec& spec)
+    {
+        struct NoteValue { const char* note; int kind; int raw; }; // kind 0 plain, 1 dotted, 2 triplet
+        static const NoteValue values[] { { "1/64", 0, 12 }, { "1/32", 0, 24 }, { "1/16", 0, 48 }, { "1/8", 0, 96 }, { "1/4", 0, 192 },
+                                          { "1/2", 0, 384 }, { "1/16", 1, 72 }, { "1/8", 1, 144 }, { "1/4", 1, 288 }, { "1/2", 1, 576 },
+                                          { "1/16", 2, 32 }, { "1/8", 2, 64 }, { "1/4", 2, 128 }, { "1/2", 2, 256 } };
+        juce::PopupMenu set;
+        for (const auto& v : values)
+            set.addItem (v.kind == 0 ? juce::String (v.note) : tr (v.kind == 1 ? "{0} dotted" : "{0} triplet", { juce::String (v.note) }),
+                         [this, param, raw = v.raw] { setValue (param, (float) (raw - 1) / 767.0f); });
+        juce::PopupMenu standard;
+        ui::addValueItems (standard, *this, &engine, spec, valueOf (param), [this, param] (double x) { setValue (param, (float) x); });
+        juce::PopupMenu menu;
+        if (spec.name.isNotEmpty())
+            menu.addSectionHeader (spec.name + ": " + spec.text (valueOf (param)));
+        bool placed = false;
+        for (juce::PopupMenu::MenuItemIterator it (standard); it.next();)
+        {
+            menu.addItem (it.getItem());
+            if (! placed && ! it.getItem().isSectionHeader && ! it.getItem().isSeparator) // after Reset
+            {
+                menu.addSubMenu (tr ("Set"), set);
+                placed = true;
+            }
+        }
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+    }
+
     void paintItem (juce::Graphics& g, const LayoutItem& item, int index, const EffectSlot& fx)
     {
         using namespace theme;
@@ -991,7 +1076,12 @@ public:
                 look.active = index == dragItem;
                 look.enabled = fx.enabled;
                 look.capTint = skin::capTintFor (item.param);
+                const auto syncDots = delay3SyncedTime (item);
+                if (kind == EffectKind::fruityDelay3)
+                    delay3KnobLook (item, value, look, syncDots);
                 skin::knob (g, circle, look);
+                if (syncDots)
+                    paintDelay3StepDots (g, circle, fx.enabled);
                 auto below = r.withTop (circle.getBottom() + 1.0f * s);
                 if (hasStyle (item, plugui::valueAbove))
                 {
@@ -4554,6 +4644,15 @@ public:
                 setLimiterView (part);
                 return;
             }
+        if (limiterViewItem (item)) // round 190ld (DP-25): FL's "Click on the display to Pause" (again: it scrolls on)
+        {
+            if (! e.mods.isPopupMenu())
+            {
+                monitorPaused = ! monitorPaused;
+                repaint (r.getSmallestIntegerContainer());
+            }
+            return;
+        }
 
         if (! e.mods.isPopupMenu() && isMixItem (item) && captionArea (item).contains (e.position))
         {
@@ -4855,6 +4954,11 @@ public:
             showStepperMenu (item, true);
             return;
         }
+        if (e.mods.isPopupMenu() && delay3SyncedTime (item)) // round 190ld (DP-39): FL's Set ▸ note values
+        {
+            showDelay3TimeMenu (param, spec);
+            return;
+        }
         if (e.mods.isPopupMenu())
         {
             ui::showValueMenu (*this, &engine, spec, valueOf (param), [this, param] (double v) { setValue (param, (float) v); });
@@ -4895,6 +4999,14 @@ public:
                 return;
             }
             case Item::toggle:
+                if (kind == EffectKind::vocoder && item.param != nullptr && std::strcmp (item.param, "Hold") == 0)
+                {
+                    // round 190ld (DP-32): FL's HOLD is momentary (capture 190ld B4, fl-vocoder-hold-pressed / -normal):
+                    // the band levels freeze while it is held down and move again on release
+                    vocHoldParam = param;
+                    setValue (param, 1.0f);
+                    return;
+                }
                 setValue (param, valueOf (param) >= 0.5f ? 0.0f : 1.0f);
                 return;
             case Item::stepper:
@@ -5028,6 +5140,11 @@ public:
 
     void mouseUp (const juce::MouseEvent& e) override
     {
+        if (vocHoldParam >= 0) // round 190ld: the momentary HOLD lets go
+        {
+            setValue (std::exchange (vocHoldParam, -1), 0.0f);
+            return;
+        }
         eqDragging = false;
         if (eqSelected == eqMainLevel)
             eqSelected = -1;
@@ -5462,6 +5579,8 @@ private:
         if (limiterViewItem (item) && limiterViewPartAt (item, p) >= 0) // round 190jd
             return { tr ("Display: FL's scrolling graph or LYNX's transfer curve  [LMB] switch (kept for this effect)"),
                      limiterViewPartAt (item, p) == 0 ? tr ("GRAPH") : tr ("CURVE"), false, false };
+        if (limiterViewItem (item)) // round 190ld (DP-25)
+            return { tr ("Analysis display  [LMB] pause / resume"), monitorPaused ? tr ("Paused") : juce::String(), false, false };
         if (item.type == Item::display && juce::String (item.display) == "sgamount")
             return { tr ("Amount: drag up or down (Ctrl: fine)"), juce::String (soundgoodizerAmount() * 100.0f, 0) + "%", false, false };
         if (item.type == Item::display && juce::String (item.display) == "sgpresets")
@@ -5768,6 +5887,8 @@ private:
         if (kind == EffectKind::grossBeat) // round 190ih: the playback locator and the playing / queued slots
             gbLiveTick();
         repaintMonitor(); // round 190jd: FL's scrolling Limiter display / Maximus Monitor (new columns only)
+        if (kind == EffectKind::vocoder && ! node.locate) // round 190ld (DP-32): the bands move with the signal
+            vocoderBandsTick();
         if (! liveDisplays) return;
         learnScaleFromMidi();
         if (kind == EffectKind::hardwareInsert)
@@ -5953,8 +6074,16 @@ private:
     {
         return id != nullptr && ((kind == EffectKind::fruityLimiter && std::strcmp (id, "limiter") == 0) || std::strcmp (id, "maxbands") == 0);
     }
+    bool monitorPaused = false; // round 190ld (DP-25): the Limiter's graph paused by a click (Maximus' Monitor never is)
+    bool limiterGraphShown() const
+    {
+        const auto* fx = current();
+        return kind == EffectKind::fruityLimiter && fx != nullptr && fx->displayView == 0;
+    }
     void monitorStep (float inPeak, float outPeak, double elapsedMs, bool playing)
     {
+        if (monitorPaused)
+            return;
         monitor.feed (inPeak, outPeak);
         if (playing)
             monitor.advance (elapsedMs);

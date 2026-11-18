@@ -109,6 +109,11 @@ struct KnobLook
     // round tp172c: the cap's own colour (a console's colour-coded knobs: red HF, green HMF...); transparent = the
     // theme's. Only the themed style reads it, through the theme's capTint hook (see capTintFor)
     juce::Colour capTint {};
+    // round 190ld (DP-41): the lit ring's own colour (Fruity Delay 3's Feedback / Res warning blend); transparent = the
+    // style's. The glow / neon / hardware styles light the ring in `accent`, which the caller sets to the same colour
+    juce::Colour ring {};
+    // round 190ld (DP-40): no lit value arc (Fruity Delay 3's synced Time knob shows its step dots instead; Themed style)
+    bool noArc = false;
 };
 void knob (juce::Graphics&, juce::Rectangle<float> bounds, const KnobLook&);
 // round tp172c: the cap colour the current plugin theme gives the knob of this parameter (transparent = none)

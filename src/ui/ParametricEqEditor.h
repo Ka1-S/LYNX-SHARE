@@ -62,6 +62,7 @@ struct DisplaySettings
     bool spectrum = true, heatmap = false;
     int position = 0; // core/SpectrumHeat.h Position
     bool soloOnShift = true; // round 190ih: FL's "Solo on Shift" (owner decision PL5: on); off = Shift+drag left / right = width
+    bool monitorInput = false; // round 190ld (DP-14): FL's Monitor — the input (pre-EQ) instead of the output (post-EQ)
 };
 DisplaySettings& displaySettings();
 void saveDisplaySettings();
