@@ -98,7 +98,7 @@ struct TempoOptions
     double loopConfidence = 0.5;   // the confidence a pulse the loop's length agrees with gets at least
     bool detectorOctave = true;    // without a backbeat: the octave tempodetect::detect reads, when it is of the same pulse
     double priorCentre = 112.0, priorSigma = 0.8; // ... else the octave preference (BPM, octaves)
-    double wholeTolerance = 0.04;  // beats off a whole number (per 8 beats) for a loop of whole beats
+    double wholeTolerance = 0.02;  // beats off a whole number (per 8 beats: 0.25 %) for a loop of whole beats
 };
 TempoOptions& tempoOptions();
 

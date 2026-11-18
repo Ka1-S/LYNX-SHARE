@@ -112,6 +112,18 @@ TEST (loop190kx_name_and_acid_come_first_and_long_files_are_left_alone)
         song.left[i] = drums.audio->leftData()[i];
     r = loopanalysis::analyse (song, "Song.wav");
     CHECK (r.bpm == 0.0 && ! r.wholeBeats && ! r.key && r.seconds > 70.0);
+    // a take that is not a whole number of beats (a loop with 0.73 s more of itself): its tempo, but not a loop
+    {
+        auto take = *loopcorpus::drums ("rock", 100.0, 4, 6).audio;
+        const auto extra = (std::size_t) (0.73 * take.sampleRate);
+        for (std::size_t i = 0; i < extra; ++i)
+            take.left.push_back (take.left[i]);
+        take.right.clear();
+        r = loopanalysis::analyse (take, "Take 3.wav");
+        CHECK (! r.wholeBeats && std::abs (r.bpm - 100.0) < 1.0);
+        if (r.wholeBeats || std::abs (r.bpm - 100.0) >= 1.0)
+            std::printf ("  loop190kx: take %.3f BPM, %.3f beats, whole %d\n", r.bpm, r.beats, (int) r.wholeBeats);
+    }
     // a one-shot: no tempo, no loop
     const auto hit = loopcorpus::oneShot (false, 0, 4);
     r = loopanalysis::analyse (*hit.audio, "Kick.wav");
