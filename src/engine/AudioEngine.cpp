@@ -1,4 +1,5 @@
 #include "engine/AudioEngine.h"
+#include "core/RackOps.h"
 #include "core/FlPluginDb.h"
 #include "core/HarmorResynth.h"
 #include "core/BrowserSend.h" // round 190iz (FL's preview length)
@@ -797,6 +798,9 @@ float AudioEngine::renderOffline (const RenderOptions& options)
 {
     offlineRendersRunning().fetch_add (1, std::memory_order_acq_rel);
     const juce::ScopeGuard rendered { [] { offlineRendersRunning().fetch_sub (1, std::memory_order_acq_rel); } };
+    // (round 190mp: FL's Half speed is a listening state: an export renders at the song's own speed)
+    const auto speedBefore = transport.playSpeed.exchange (1.0, std::memory_order_relaxed);
+    const juce::ScopeGuard speedBack { [this, speedBefore] { transport.playSpeed.store (speedBefore, std::memory_order_relaxed); } };
     const auto sampleRate = options.sampleRate;
     const auto& progress = options.progress;
     auto* shared = options.shared;
@@ -3425,6 +3429,22 @@ void AudioEngine::setLinkStartStopSync (bool on)
     auto p = midiPrefs;
     p.linkStartStopSync = on;
     setMidiPrefs (p);
+}
+
+int AudioEngine::restretchAll()
+{
+    // (round 190mp) the file read again and its stretched copies dropped, then the rack built anew: the copies come from
+    // the file as it is now (an edit made elsewhere included), at the tempo of the song now
+    const auto count = lynx::restretchableChannels (song);
+    if (count == 0)
+        return 0;
+    for (const auto& c : song.channels)
+        if ((c.instrument == InstrumentKind::sampler || c.instrument == InstrumentKind::audioClip) && ! c.samplePath.empty()
+            && c.sampler.keepPitch && c.sampler.stretchBeats > 0.0f)
+            samples.forget (juce::String::fromUTF8 (c.samplePath.c_str()));
+    lastPublishedShape.song.bpm = -1.0; // (no stretched channel is kept from the last rack: each one is built again)
+    publishSong();
+    return count;
 }
 
 double AudioEngine::shownTempo() const noexcept

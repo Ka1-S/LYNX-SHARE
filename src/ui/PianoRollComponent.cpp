@@ -13,6 +13,7 @@
 #include "ui/TextCache.h"
 
 #include "core/EditorPolish.h"
+#include "core/MagicLasso.h"
 #include "core/EventEdit.h"
 #include "core/MarkerPlan.h"
 #include "core/NoteEdit.h"
@@ -224,6 +225,10 @@ PianoRollComponent::PianoRollComponent (AudioEngine& e)
     tools.onChange = [this] (EditTool) {
         stopListening();
         updateCursor (juce::ModifierKeys::currentModifiers);
+    };
+    tools.onZoomMenu = [this] (juce::Component& button) { // (round 190mp, DE-74)
+        quickZoomMenu ("pianoRoll.", [this] (const std::string& id) { return runAction (id); }, shortcutText, false)
+            .showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&button));
     };
     addAndMakeVisible (tools);
 
@@ -2088,6 +2093,14 @@ void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
     downMods = e.mods;
     startedOnEmpty = erasedSomething = holdExpired = false;
 
+    // FL's middle + right click (round 190mp, DE-62; capture 190mp A3.2): the second button's press opens the main menu at
+    // the mouse with the tools' "Mode" column on its left; whatever the first press began stops
+    if (e.mods.isMiddleButtonDown() && e.mods.isRightButtonDown())
+    {
+        showToolModeMenu();
+        return;
+    }
+
     const auto onKeyboard = e.x < keyboardWidth && e.y >= headerHeight && e.y < gridArea().getBottom();
     hover = {};
     gliding = false;
@@ -3105,6 +3118,7 @@ void PianoRollComponent::mouseMove (const juce::MouseEvent& e)
     if (mpeStacked) // round 190jd: the value ghost point on a lane's line
         updateMpeGhost (e.getPosition());
     updateHover (e.getPosition(), e.mods);
+    feedMagicLasso (e.getPosition(), false); // (round 190mp, DE-71: nothing while the option is off)
     if (const auto inLane = velocityArea().contains (e.getPosition()); liveNotes() && inLane != liveLaneHover) // (round 190mf, DL-80)
     {
         liveLaneHover = inLane;
@@ -4179,7 +4193,75 @@ juce::PopupMenu PianoRollComponent::selectMenu()
     menu.addSeparator();
     menu.addItem (tr ("Group the selected notes") + "\tShift+G", selection.size() > 1, false, [this] { runAction ("pianoRoll.groupNotes"); });
     menu.addItem (tr ("Ungroup the selected notes") + "\tAlt+G", ! selection.empty(), false, [this] { runAction ("pianoRoll.ungroupNotes"); });
+    // FL's last Select item, alone after a line (round 190mp, DE-71; capture 190mp A3.4): Magic lasso, no key, off
+    menu.addSeparator();
+    menu.addItem (tr ("Magic lasso"), true, EditorGlobals::get().pianoRollMagicLasso, [] {
+        auto& g = EditorGlobals::get();
+        g.pianoRollMagicLasso = ! g.pianoRollMagicLasso;
+        if (g.onOptionsChanged != nullptr)
+            g.onOptionsChanged();
+    });
     return menu;
+}
+
+// FL's Magic lasso over the notes (round 190mp, DE-71; core/MagicLasso.h, FL's Playlist rules of round 189g): with the
+// option on, a loop drawn with the mouse (no button) around notes selects them (Shift / a second loop: as FL's decide)
+void PianoRollComponent::feedMagicLasso (juce::Point<int> p, bool buttonDown)
+{
+    if (! EditorGlobals::get().pianoRollMagicLasso)
+    {
+        lassoPath.clear();
+        return;
+    }
+    const auto grid = gridArea();
+    const auto at = grid.getConstrainedPoint (p);
+    const auto loop = lassoPath.move ({ (double) at.x, (double) at.y }, juce::Time::getMillisecondCounter(), buttonDown || ! grid.contains (p));
+    if (loop.empty())
+        return;
+    const auto& notes = currentPattern (engine.getSong()).notes;
+    std::vector<int> enclosed;
+    std::vector<bool> enclosedSelected;
+    for (const auto i : channelNotes())
+    {
+        const auto& n = notes[(std::size_t) i];
+        const auto r = noteRect (n.start, n.length, n.key);
+        if (! r.toNearestInt().intersects (grid))
+            continue;
+        if (magiclasso::rectInsidePolygon (loop, magiclasso::innerRect ({ (double) r.getX(), (double) r.getY(), (double) r.getRight(), (double) r.getBottom() })))
+        {
+            enclosed.push_back (i);
+            enclosedSelected.push_back (isSelected (i));
+        }
+    }
+    switch (magiclasso::decide (enclosed, juce::ModifierKeys::currentModifiers.isShiftDown(), (int) selection.size(), enclosedSelected))
+    {
+        case magiclasso::Result::select:
+        {
+            auto chosen = selection;
+            for (const auto i : enclosed)
+                if (std::find (chosen.begin(), chosen.end(), i) == chosen.end())
+                    chosen.push_back (i);
+            setSelection (chosen);
+            lassoPath.clear();
+            break;
+        }
+        case magiclasso::Result::zoomToSelection:
+        {
+            std::int64_t from = std::numeric_limits<std::int64_t>::max(), to = 0;
+            for (const auto i : selection)
+                if (i >= 0 && i < (int) notes.size())
+                {
+                    from = std::min (from, notes[(std::size_t) i].start);
+                    to = std::max (to, notes[(std::size_t) i].start + notes[(std::size_t) i].length);
+                }
+            if (to > from)
+                zoomToTicks ((double) from, (double) to);
+            lassoPath.clear();
+            break;
+        }
+        case magiclasso::Result::nothing:
+            break;
+    }
 }
 
 void PianoRollComponent::showKeyMenu (int key)
@@ -4645,9 +4727,48 @@ void PianoRollComponent::mouseMagnify (const juce::MouseEvent& e, float scale)
     repaint();
 }
 
+PianoRollComponent::NoteOnScreen PianoRollComponent::firstVisibleNoteForSnapshot (int skip, juce::Point<int> near) const
+{
+    const auto& notes = currentPattern (engine.getSong()).notes;
+    const auto grid = gridArea().reduced (8);
+    NoteOnScreen best;
+    for (const auto i : channelNotes())
+    {
+        const auto& n = notes[(std::size_t) i];
+        if (const auto r = noteRect (n.start, n.length, n.key).toNearestInt(); grid.contains (r) && i != skip)
+        {
+            if (skip < 0)
+                return { i, r };
+            if (best.index < 0 || r.getCentre().getDistanceFrom (near) < best.bounds.getCentre().getDistanceFrom (near))
+                best = { i, r };
+        }
+    }
+    return best;
+}
+
+void PianoRollComponent::showToolModeMenu()
+{
+    drag = Drag::none;
+    setMouseCursor (juce::MouseCursor::NormalCursor);
+    toolModeMenu (tools, [this] (EditTool t) { tools.setTool (t); }, mainMenu != nullptr ? mainMenu() : juce::PopupMenu())
+        .showMenuAsync (juce::PopupMenu::Options().withMousePosition());
+}
+
 void PianoRollComponent::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& rawWheel)
 {
     const auto wheel = flmods::normalisedWheel (rawWheel); // Windows touchpads: pieces of a notch (round 170e)
+    // FL's right-hold + wheel (round 190mp, DE-61; capture 190mp A3.3): each notch down picks the next tool to the right,
+    // up the one to the left, stopping at the ends; the held press does nothing more (no erase stroke, no knife, nothing
+    // on release)
+    if (e.mods.isRightButtonDown() && ! e.mods.isLeftButtonDown() && ! e.mods.isMiddleButtonDown())
+    {
+        if (wheel.deltaY != 0.0f)
+        {
+            drag = Drag::none;
+            tools.step (wheel.deltaY < 0.0f ? 1 : -1);
+        }
+        return;
+    }
     const auto ctrl = flmods::ctrl (e.mods), alt = e.mods.isAltDown(), shift = e.mods.isShiftDown();
     const auto overGrid = gridArea().contains (e.getPosition()) || velocityArea().contains (e.getPosition());
 

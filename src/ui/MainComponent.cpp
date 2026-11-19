@@ -301,6 +301,9 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     if (startupMark != nullptr) startupMark ("main window: settings, key map, start-up song, session");
     PianoRollComponent::shortcutText = [this] (const std::string& id) { return shortcutText (id.c_str()); };
     PlaylistComponent::shortcutText = [this] (const std::string& id) { return shortcutText (id.c_str()); };
+    // FL's middle + right click tool menu (round 190mp, DE-62): the editor's main menu = its window's ▾ items
+    pianoRoll.mainMenu = [this] { juce::PopupMenu m; addPanelMenuItems (Panel::pianoRoll, m); return m; };
+    playlist.mainMenu = [this] { juce::PopupMenu m; addPanelMenuItems (Panel::playlist, m); return m; };
     pianoRoll.onNoteNamesChanged = [this] { saveUiSettings(); };
     // FL's EEPlayBtnClick (FLEngine 0xe4bd40, REA round 169f): Pattern mode first (also while the song plays), then the
     // play / pause of the transport. EEPlayBtnMouseDown (0xe4bda0), right button: FL's Stop (FUN_011ca520 (0, 0), the very
@@ -2434,6 +2437,7 @@ bool MainComponent::runAction (const std::string& id)
     }
     else if (is ("rack.zipSelected")) rack.zipSelected(); // round 190mk (DE-38)
     else if (is ("rack.unzipAll")) rack.unzipAll();
+    else if (is ("rack.restretchAll")) engine.restretchAll(); // round 190mp (DE-38)
     else if (is ("rack.filterPrevious")) rack.stepFilterGroup (-1); // round 190ld (DE-37)
     else if (is ("rack.filterNext")) rack.stepFilterGroup (1);
     else if (is ("rack.rotateLeft")) rack.rotateSelected (-1);
@@ -3089,6 +3093,8 @@ void MainComponent::loadUiSettings()
             EditorGlobals::get().followPausesOnEdit = on ? 1 : 0;
         else if (key == "plMagicLasso")
             EditorGlobals::get().magicLasso = on;
+        else if (key == "prMagicLasso") // (round 190mp, DE-71)
+            EditorGlobals::get().pianoRollMagicLasso = on;
         else if (key == "dropAudioOnHeaders") // round 189e: FL's Edit › Drop audio on track headers (DropAudioToPLMode)
         {
             const auto v = line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue();
@@ -3429,6 +3435,7 @@ void MainComponent::saveUiSettings()
                                       + (EditorGlobals::get().followPausesOnEdit < 0 ? juce::String()
                                              : "\nfollowPausesOnEdit=" + juce::String (EditorGlobals::get().followPausesOnEdit))
                                       + "\nplMagicLasso=" + juce::String (EditorGlobals::get().magicLasso ? 1 : 0)
+                                      + "\nprMagicLasso=" + juce::String (EditorGlobals::get().pianoRollMagicLasso ? 1 : 0)
                                       + "\ndropAudioOnHeaders=" + juce::String ((int) trackmodes::headerDropOptions().mode)
                                       + "\ndropLocksToContent=" + juce::String (trackmodes::headerDropOptions().lockToContent ? 1 : 0)
                                       + "\nselectTracksOnDrop=" + juce::String (trackmodes::headerDropOptions().selectTracks ? 1 : 0)
@@ -4662,6 +4669,10 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
             action (menu, "rack.zipSelected", tr ("Zip selected"), ! engine.getSelectedChannels().empty());
             action (menu, "rack.unzipAll", tr ("Unzip all"), std::any_of (engine.getSong().channels.begin(), engine.getSong().channels.end(),
                                                                          [] (const ChannelDef& c) { return c.zipped; }));
+            // FL's "Restretch all Ctrl+Alt+R" after a line (round 190mp, DE-38; capture 190mp A2, REA ChanRestretchMenuClick →
+            // FUN_00fe7510: every channel stretched offline is stretched again). Greyed with no such channel (FL in Thief)
+            menu.addSeparator();
+            action (menu, "rack.restretchAll", tr ("Restretch all"), restretchableChannels (engine.getSong()) > 0);
             menu.addSectionHeader (tr ("Options")); // (FL's SSMenu: "Mute removed steps" is in its Options part)
             {
                 // FL's "Channel button width" › 100 % ... 400 %, Custom (N%), Size to fit (round 190mk, DE-39; capture 190mk
@@ -6476,6 +6487,11 @@ ui::Hint MainComponent::TempoDisplay::hintAt (juce::Point<int> p)
 
 void MainComponent::TempoDisplay::showMenu()
 {
+    buildMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this));
+}
+
+juce::PopupMenu MainComponent::TempoDisplay::buildMenu()
+{
     const auto bpm = engine.getSong().bpm;
     juce::PopupMenu menu;
     menu.addSectionHeader (tr ("Tempo") + ": " + juce::String (bpm, 3) + " BPM");
@@ -6485,12 +6501,18 @@ void MainComponent::TempoDisplay::showMenu()
     // (flat items after the tapper and before "Half", as FL's menu resource orders them)
     for (int t = 80; t <= 160; t += 10)
         menu.addItem (juce::String (t) + " BPM", [this, t] { setBpm ((double) t); });
+    // FL's "Half speed" (round 190mp, DF-16; capture 190mp A4, fl-tempo-menu.png): the last item of FL's column, after a
+    // line; ticked while on. The song plays at half its tempo and the display keeps showing the tempo (FL: "a temporary
+    // state"). LYNX's Half / Double (which change the tempo) follow under a line.
+    menu.addSeparator();
+    menu.addItem (tr ("Half speed"), true, engine.isHalfSpeed(), [this] { engine.setHalfSpeed (! engine.isHalfSpeed()); });
+    menu.addSeparator();
     menu.addItem (tr ("Half ({0} BPM)", { juce::String (controls::halfTempo (bpm), 2) }), [this, bpm] { setBpm (controls::halfTempo (bpm)); });
     menu.addItem (tr ("Double ({0} BPM)", { juce::String (controls::doubleTempo (bpm), 2) }), [this, bpm] { setBpm (controls::doubleTempo (bpm)); });
     menu.addItem (tr ("Reset ({0})", { "130 BPM" }), [this] { setBpm (130.0); });
     menu.addSeparator();
     addAutomationItem (menu, engine, { AutomationTargetKind::tempo, 0 });
-    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this));
+    return menu;
 }
 
 void MainComponent::TempoDisplay::showTap()

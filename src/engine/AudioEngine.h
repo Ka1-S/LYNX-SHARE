@@ -844,6 +844,13 @@ public:
     void setLinkStartStopSync (bool on);
     // The tempo the toolbar shows: the Link session's while Link is on, else the project's.
     double shownTempo() const noexcept;
+    // FL's Channel rack "Restretch all" (round 190mp, DE-38; FLEngine FUN_00fe7510): every channel that plays a copy stretched
+    // ahead of time (pitch kept, a length in beats) is stretched again from its file now. Returns how many channels.
+    int restretchAll();
+    // FL's tempo menu "Half speed" (round 190mp, DF-16; capture 190mp A4): playback at half the tempo, the tempo shown and
+    // saved unchanged; a temporary state (not saved, exports play at the normal speed)
+    void setHalfSpeed (bool on) noexcept { transport.playSpeed.store (on ? 0.5 : 1.0, std::memory_order_relaxed); }
+    bool isHalfSpeed() const noexcept { return transport.playSpeed.load (std::memory_order_relaxed) != 1.0; }
     // MIDI controller profiles (round 190aw, core/ControllerSession.h): the devices that run one, and LYNX as they see
     // it (the main window's bridge; null when it closes).
     ControllerIo& getControllers() noexcept { return controllerIo; }

@@ -3399,7 +3399,7 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
     if ((std::size_t) i < state.instruments.size() && state.instruments[(std::size_t) i] != nullptr)
     {
         // (round 190hq: while the tempo can move, the tempo this chunk plays at; tempo-synced Resample samples follow it)
-        state.instruments[(std::size_t) i]->setSongTempo (state.tempoMap || tempoOverride > 0.0 ? bpm : 0.0);
+        state.instruments[(std::size_t) i]->setSongTempo (state.tempoMap || tempoOverride > 0.0 || playSpeed != 1.0 ? bpm : 0.0);
         state.instruments[(std::size_t) i]->setSongPosition (chunkTick);
     }
 
@@ -4408,12 +4408,12 @@ void RackRenderer::process (const RackState* state,
         const auto length = (double) std::max<std::int64_t> (1, state->schedule.songLength);
         ownBpm = tempomap::tempoAt (state->song, songMode ? linearSongTick (liveInput, startTick, length) : std::max (0.0, startTick));
     }
-    bpm = tempoOverride > 0.0 ? tempoOverride : ownBpm;
+    bpm = (tempoOverride > 0.0 ? tempoOverride : ownBpm) * playSpeed; // (round 190mp: FL's Half speed)
     // issue #187 (round 190ik): warped samples follow the playing tempo (automation, Tempo events, a dragged or Link
     // tempo); at the song's own fixed tempo the ratio is exactly 1 and nothing changes
     if (tempofollow::enabled())
     {
-        const auto moves = state->tempoMap || tempoOverride > 0.0;
+        const auto moves = state->tempoMap || tempoOverride > 0.0 || playSpeed != 1.0;
         const auto ratio = bpm / std::max (1.0, state->song.bpm);
         for (auto& instrument : state->instruments)
             if (instrument != nullptr)

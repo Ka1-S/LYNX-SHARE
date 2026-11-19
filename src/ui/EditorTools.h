@@ -57,6 +57,18 @@ juce::MouseCursor editorCursor (gesture::Cursor cursor);
 juce::String actionHint (gesture::Action action, bool playlist);
 const EditToolInfo& editToolInfo (EditTool tool);
 
+class ToolStrip;
+
+// FL's Zoom tool icon right-click menu (round 190mp, DE-74; capture 190mp A3.1, fl-pr-zoom-menu.png / fl-pl-zoom-menu.png):
+// Zoom in, Zoom out | Quick zoom 1–3 | Zoom out far, Zoom on selection | Step sequencer mode zoom (Piano roll, which LYNX
+// has not: greyed) or Zoom on performance clips (Playlist), each running the editor's key map action (`prefix` =
+// "pianoRoll." / "playlist."), with its key from `keyText` ("\tShift+1"...).
+juce::PopupMenu quickZoomMenu (const std::string& prefix, const std::function<bool (const std::string&)>& run,
+                               const std::function<juce::String (const std::string&)>& keyText, bool performanceClips);
+// FL's middle + right click (round 190mp, DE-62; capture 190mp A3.2, fl-pr-midright-menu.png): the editor's main menu at
+// the mouse with a "Mode" column of the tools on its left (the one in use ticked).
+juce::PopupMenu toolModeMenu (const ToolStrip& strip, const std::function<void (EditTool)>& choose, const juce::PopupMenu& mainMenu);
+
 // A row of radio icon buttons, one per tool. Icon size and button width follow the toolbar icon size
 // (Options > Toolbar), shared by every strip; the owner re-lays the strip out after a change.
 class ToolStrip final : public juce::Component
@@ -80,6 +92,13 @@ public:
     void paint (juce::Graphics& g) override; // round 170e3: the tools sit in one well, apart from the header's other controls
     // the wheel over the strip steps through the tools
     void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override;
+    // One tool to the right (+1) or left (−1) in the strip's order, stopping at the ends (FL's wheel order; round 190mp:
+    // also the editors' right-hold + wheel, DE-61, capture 190mp A3.3). Fires onChange.
+    void step (int direction);
+    // The strip's tools in their order (the editors' "Mode" column, DE-62).
+    const std::vector<EditTool>& toolList() const noexcept { return tools; }
+    // FL's Zoom tool icon: a right-click opens its quick-zoom menu (round 190mp, DE-74); the owner builds and shows it.
+    std::function<void (juce::Component& zoomButton)> onZoomMenu;
 
 private:
     EditTool tool = EditTool::pencil;
@@ -224,6 +243,9 @@ public:
     // FL's Playlist menu › Select › "Magic lasso" (EESelMagicAction, the PLForm's +0xb49; off in FL): circling clips with
     // the mouse selects them (FUN_00e6ff80).
     bool magicLasso = false;
+    // FL's Piano roll menu › Select › "Magic lasso" (round 190mp, DE-71; capture 190mp A3.4: the Select submenu's last item,
+    // after a line, off by default): the same gesture over the notes. The Piano roll's own switch (saved).
+    bool pianoRollMagicLasso = false;
 
     // "Follow" (FL's auto scrolling, round 162 / issue #9): the Playlist (Song mode) and the Piano Roll page along
     // with the playhead while playing; off, they stay where the user scrolled. Saved with the UI options.

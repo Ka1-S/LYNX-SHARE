@@ -4,6 +4,7 @@
 
 #include "core/EventPaneSplit.h"
 #include "core/LiveGrid.h"
+#include "core/MagicLasso.h"
 #include "core/MpeTab.h"
 #include "core/NoteTools.h"
 #include "core/PianoKeys.h"
@@ -72,6 +73,8 @@ public:
     ui::Hint hintAt (juce::Point<int> position) override;
     void mouseDoubleClick (const juce::MouseEvent& e) override;
     void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override;
+    void showToolModeMenu(); // FL's middle + right click (round 190mp, DE-62)
+    void feedMagicLasso (juce::Point<int> p, bool buttonDown); // FL's Magic lasso (round 190mp, DE-71)
     // trackpad pinch (macOS; Windows touch screens): time zoom around the pointer, with Alt the vertical zoom (round 170e)
     void mouseMagnify (const juce::MouseEvent& e, float scale) override;
 
@@ -87,6 +90,8 @@ public:
     juce::PopupMenu moreMenuForSnapshot() { return moreMenu(); } // --userfixshot190ib (issue #183's item)
     // The shortcut text of a key map action for menus ("\tCtrl+Q"; empty when unbound), set by the main window.
     static inline std::function<juce::String (const std::string& id)> shortcutText;
+    // The Piano roll's main menu (its window's ▾ items), for FL's middle + right click tool menu (round 190mp, DE-62).
+    std::function<juce::PopupMenu()> mainMenu;
 
     // Note tool dialogs on the selection (or all of the channel's notes).
     void openNoteTool (NoteTool tool);
@@ -188,6 +193,16 @@ public:
 
     // For snapshots: the tool in use and the Note inspector of the selection.
     void setToolForSnapshot (EditTool tool) { tools.setTool (tool); }
+    const ToolStrip& toolsForSnapshot() const noexcept { return tools; } // (round 190mp)
+    juce::PopupMenu selectMenuForSnapshot() { return selectMenu(); }     // (round 190mp, DE-71)
+    void setSelectionForSnapshot (const std::vector<int>& s) { setSelection (s); }
+    struct NoteOnScreen
+    {
+        int index = -1;
+        juce::Rectangle<int> bounds;
+    };
+    NoteOnScreen firstVisibleNoteForSnapshot (int skip = -1, juce::Point<int> near = {}) const; // (round 190mp: a note of the
+                                                                                                 // channel wholly on the grid; with `skip`, the one nearest `near`)
     // --details190imshot (round 190im): one display-rate frame step, and where the playhead is (−1: none)
     void frameStepForSnapshot() { playheadFrame (0.0); }
     double playheadForSnapshot() const noexcept { return playheadTick; }
@@ -589,6 +604,7 @@ private:
     void beginKeyZoom (const juce::MouseEvent&);
     // round 190j: the zoom wheel (FL's VZoomSelect) at the right end of the overview strip
     static constexpr int zoomWheelSize = 16;
+    magiclasso::Trail lassoPath; // FL's Magic lasso (round 190mp, DE-71): the mouse trail while the option is on
     bool zoomWheelHover = false; // (round 190he, issue #152 "no vertical zoom found": the box lights up under the mouse)
     juce::Rectangle<int> zoomWheelArea() const;
     int zoomAnchorKey() const; // the key whose centre stays put: the middle of the notes in view, else of the view

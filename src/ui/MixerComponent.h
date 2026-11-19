@@ -688,6 +688,15 @@ public:
     void selectFirstTrackWithEffects();
     void selectTrack (int track); // also scrolls the strip into view
     void selectSlot (int slot) { effects.selectSlot (slot); }
+    // (round 190mp, DF-77: the shots read the selected track's slot menu as built)
+    juce::PopupMenu slotMenuForSnapshot (int slot)
+    {
+        juce::PopupMenu menu;
+        EffectsPanel::slotMenuForSnapshot = &menu;
+        effects.showSlotMenuFor (slot);
+        EffectsPanel::slotMenuForSnapshot = nullptr;
+        return menu;
+    }
     int getSelectedTrack() const noexcept { return strips.getSelectedTrack(); }
     // Round 183a: the strips' meters run (they are on screen), and the level one shows.
     bool metersShowing() const { return strips.isShowing(); }

@@ -209,6 +209,7 @@ std::vector<Action> makeActions()
         // FL's Channel rack menu › Options › "Zip selected" (Alt+Z) / "Unzip all" (Alt+U) (round 190mk, DE-38)
         { "rack.zipSelected", TR_NOOP ("Zip selected"), Context::channelRack, { chord ('Z', alt) } },
         { "rack.unzipAll", TR_NOOP ("Unzip all"), Context::channelRack, { chord ('U', alt) } },
+        { "rack.restretchAll", TR_NOOP ("Restretch all"), Context::channelRack, { chord ('R', ctrl | alt) } }, // (round 190mp, DE-38)
 
         // Piano Roll (focused): tool dialogs and zoom
         { "pianoRoll.toStart", TR_NOOP ("Move the playback marker to start"), Context::pianoRoll, { chord (home) } }, // (issue #195)
