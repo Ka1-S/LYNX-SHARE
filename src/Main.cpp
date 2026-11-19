@@ -7060,6 +7060,44 @@ private:
                     song.clipGrid->scenes.emplace_back();
                 song.clipGrid->scenes[0].follow.enabled = true;
             }
+            // rollup step 11 (round 190mn): a new Horizon (round 190mb / 190mj's revision and FutureVerb law), a Nebula on the
+            // Supermassive tone, an Orbit on the SpaceModulator laws (190mb / 190mj), round 190mg's Waves laws (Prism C4,
+            // Compressor Renaissance, Quell NS1, Gemini splice, LYNX Tune Waves Tune, Facet PuigTec) and a note repeat (190ma)
+            {
+                auto& m16 = song.mixer[16].effects; // (after step 10's [13] … [17])
+                m16.push_back (lynx::makeEffectSlot (lynx::EffectKind::horizon)); // [18]
+                auto nebula = lynx::makeEffectSlot (lynx::EffectKind::nebula);
+                nebula.params[(std::size_t) lynx::verbs::nebula::toneLaw] = 1.0f;
+                m16.push_back (nebula); // [19]
+                auto orbit = lynx::makeEffectSlot (lynx::EffectKind::orbit);
+                orbit.params[(std::size_t) lynx::echosuite::orbit::smLaw] = 1.0f;
+                orbit.params[(std::size_t) lynx::echosuite::orbit::voiceLaw] = 1.0f;
+                m16.push_back (orbit); // [20]
+                auto c4 = lynx::makeEffectSlot (lynx::EffectKind::prismMultiband);
+                c4.params[(std::size_t) lynx::dyn::prism::c4Law] = lynx::dyn::prism::c4LawValue (false);
+                m16.push_back (c4); // [21]
+                auto ren = lynx::makeEffectSlot (lynx::EffectKind::compressor);
+                ren.params[(std::size_t) lynx::compressorRenLaw] = 1.0f;
+                m16.push_back (ren); // [22]
+                auto ns1 = lynx::makeEffectSlot (lynx::EffectKind::quellDenoiser);
+                ns1.params[(std::size_t) lynx::voicetools::quell::ns1Law] = 1.0f;
+                m16.push_back (ns1); // [23]
+                auto splice = lynx::makeEffectSlot (lynx::EffectKind::geminiDoubler);
+                splice.params[(std::size_t) lynx::voicetools::gemini::spliceLaw] = 1.0f;
+                m16.push_back (splice); // [24]
+                auto tune = lynx::makeEffectSlot (lynx::EffectKind::lynxTune);
+                tune.params[(std::size_t) lynx::lynxtune::wavesLaw] = 1.0f;
+                m16.push_back (tune); // [25]
+                auto puig = lynx::makeEffectSlot (lynx::EffectKind::facetEq);
+                puig.params[(std::size_t) lynx::facet::puigLawParam] = lynx::facet::puigLawValue (2);
+                m16.push_back (puig); // [26]
+                lynx::Note repeated;
+                repeated.length = lynx::ppq;
+                repeated.channel = 0;
+                repeated.key = 60;
+                repeated.repeat = 9;
+                song.patterns[0].notes.push_back (repeated);
+            }
 
             const auto copy = lynx::olderlynx::forRelease (song, "0.1.28");
             juce::String why;
@@ -7193,6 +7231,17 @@ private:
                      || m16[15]["params"].size() > lynx::luxeVerbSpaceDucking || m16[16]["params"].size() > lynx::echosuite::echoform::revision
                      || m16[17]["params"].size() > (int) lynx::echosuite::spiral::rateLaw || parsed["clipGrid"]["scenes"][0].hasProperty ("follow"))
                 rollup030Result = "ERROR step-10 items";
+            else if (const auto& m16 = parsed["mixer"][16]["effects"];
+                     ! said ("Horizon plays its earlier") || ! said ("Nebula's classic modes") || ! said ("Orbit plays its own voices")
+                     || ! said ("Prism Multiband's C4 law") || ! said ("Compressor's Renaissance law") || ! said ("Quell's NS1 law")
+                     || ! said ("Gemini Doubler's splice law") || ! said ("LYNX Tune's Waves Tune") || ! said ("Facet EQ's PuigTec law")
+                     || ! said ("{0} note(s) play once instead of repeating")
+                     || m16[18]["params"].size() > lynx::verbs::horizon::revision || m16[19]["params"].size() > lynx::verbs::nebula::toneLaw
+                     || m16[20]["params"].size() > (int) lynx::echosuite::orbit::smLaw || m16[21]["params"].size() > (int) lynx::dyn::prism::revision
+                     || m16[22]["params"].size() > lynx::compressorRenLaw || m16[23]["params"].size() > (int) lynx::voicetools::quell::zeroLaw
+                     || m16[24]["params"].size() > (int) lynx::voicetools::gemini::spliceLaw || m16[25]["params"].size() > (int) lynx::lynxtune::wavesLaw
+                     || m16[26]["params"].size() > lynx::facet::autoThresholdParam0)
+                rollup030Result = "ERROR step-11 items";
             else if (const auto plain = lynx::olderlynx::forRelease (lynx::Song::makeDefault(), "0.1.28");
                      ! plain.ok || std::any_of (plain.lost.begin(), plain.lost.end(), [] (const lynx::olderlynx::Loss& l) {
                          const auto t = juce::String (l.text);
@@ -7207,7 +7256,8 @@ private:
                                 || t.contains ("Crest") || t.startsWith ("Lock states") || t.startsWith ("Ember") || t.startsWith ("Prism")
                                 || t.contains ("L2 law") || t.startsWith ("Glow") || t.startsWith ("Reeverb 2") || t.startsWith ("Quell")
                                 || t.contains ("audio clip channels") || t.startsWith ("Apex") || t.startsWith ("Sentry") || t.startsWith ("Spiral")
-                                || t.contains ("scene follow");
+                                || t.contains ("scene follow") || t.startsWith ("Horizon") || t.startsWith ("Nebula") || t.startsWith ("Orbit")
+                                || t.startsWith ("Compressor's") || t.startsWith ("Gemini") || t.startsWith ("LYNX Tune") || t.contains ("Repeat");
                      }))
                 rollup030Result = "ERROR a plain project reports a loss it does not have";
         }

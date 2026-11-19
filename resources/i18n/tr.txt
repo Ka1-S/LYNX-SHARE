@@ -11670,3 +11670,15 @@ countries: tr
 "Unison Blend" = "Unison karışımı"
 "As device" = "Cihazdaki gibi"
 "Stack" = "Yığın"
+
+# --- rollup 0.1.30 step 11: Save a copy for 0.1.28 knows rounds 190ma / 190mb / 190mj / 190mg
+"{0} note(s) play once instead of repeating (FL's note Repeat)" = "{0} nota tekrarlanmak yerine bir kez çalar (FL'nin nota Repeat'i)"
+"Prism Multiband's C4 law (the Waves C4 stand-in) plays as Prism's own engine: {0}" = "Prism Multiband'in C4 yasası (Waves C4 yerine geçen) Prism'in kendi motoru olarak çalar: {0}"
+"Quell's NS1 law (the Waves NS1 stand-in) plays the matched engine: {0}" = "Quell'in NS1 yasası (Waves NS1 yerine geçen) uyarlanmış motoru çalar: {0}"
+"Facet EQ's PuigTec law (the Waves PuigTec stand-in: its output stage and mains hum) is left out: {0}" = "Facet EQ'nun PuigTec yasası (Waves PuigTec yerine geçen: çıkış katı ve şebeke uğultusu) dışarıda kalır: {0}"
+"Horizon plays its earlier reverb and echo modes (not the ValhallaFutureVerb laws): {0}" = "Horizon önceki reverb ve eko modlarını çalar (ValhallaFutureVerb yasalarını değil): {0}"
+"Nebula's classic modes play without the ValhallaSupermassive tone: {0}" = "Nebula'nın klasik modları ValhallaSupermassive tınısı olmadan çalar: {0}"
+"Orbit plays its own voices and levels (not the ValhallaSpaceModulator laws): {0}" = "Orbit kendi seslerini ve seviyelerini çalar (ValhallaSpaceModulator yasalarını değil): {0}"
+"Compressor's Renaissance law (the Waves Renaissance Compressor stand-in) plays as its vintage voicing: {0}" = "Compressor'ün Renaissance yasası (Waves Renaissance Compressor yerine geçen) vintage sesi olarak çalar: {0}"
+"Gemini Doubler's splice law (the Waves Doubler stand-in) plays its measured read head: {0}" = "Gemini Doubler'ın ekleme yasası (Waves Doubler yerine geçen) ölçülmüş okuma kafasını çalar: {0}"
+"LYNX Tune's Waves Tune Real-Time law is left out (the uncorrected sound is re-synthesised): {0}" = "LYNX Tune'un Waves Tune Real-Time yasası dışarıda kalır (düzeltilmemiş ses yeniden sentezlenir): {0}"

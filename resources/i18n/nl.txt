@@ -11670,3 +11670,15 @@ countries: nl be
 "Unison Blend" = "Unisonomenging"
 "As device" = "Zoals het apparaat"
 "Stack" = "Stapel"
+
+# --- rollup 0.1.30 step 11: Save a copy for 0.1.28 knows rounds 190ma / 190mb / 190mj / 190mg
+"{0} note(s) play once instead of repeating (FL's note Repeat)" = "{0} noot/noten spelen één keer in plaats van te herhalen (FL's noot-Repeat)"
+"Prism Multiband's C4 law (the Waves C4 stand-in) plays as Prism's own engine: {0}" = "De C4-wet van Prism Multiband (de vervanger van Waves C4) speelt als Prisms eigen engine: {0}"
+"Quell's NS1 law (the Waves NS1 stand-in) plays the matched engine: {0}" = "De NS1-wet van Quell (de vervanger van Waves NS1) speelt de aangepaste engine: {0}"
+"Facet EQ's PuigTec law (the Waves PuigTec stand-in: its output stage and mains hum) is left out: {0}" = "De PuigTec-wet van Facet EQ (de vervanger van Waves PuigTec: zijn uitgangstrap en netbrom) vervalt: {0}"
+"Horizon plays its earlier reverb and echo modes (not the ValhallaFutureVerb laws): {0}" = "Horizon speelt zijn eerdere galm- en echomodi (niet de ValhallaFutureVerb-wetten): {0}"
+"Nebula's classic modes play without the ValhallaSupermassive tone: {0}" = "De klassieke modi van Nebula spelen zonder de ValhallaSupermassive-klank: {0}"
+"Orbit plays its own voices and levels (not the ValhallaSpaceModulator laws): {0}" = "Orbit speelt zijn eigen stemmen en niveaus (niet de ValhallaSpaceModulator-wetten): {0}"
+"Compressor's Renaissance law (the Waves Renaissance Compressor stand-in) plays as its vintage voicing: {0}" = "De Renaissance-wet van de Compressor (de vervanger van Waves Renaissance Compressor) speelt als zijn vintage klankkleur: {0}"
+"Gemini Doubler's splice law (the Waves Doubler stand-in) plays its measured read head: {0}" = "De splice-wet van Gemini Doubler (de vervanger van Waves Doubler) speelt zijn gemeten leeskop: {0}"
+"LYNX Tune's Waves Tune Real-Time law is left out (the uncorrected sound is re-synthesised): {0}" = "De Waves Tune Real-Time-wet van LYNX Tune vervalt (de ongecorrigeerde klank wordt opnieuw gesynthetiseerd): {0}"

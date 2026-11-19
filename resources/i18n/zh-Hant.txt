@@ -11670,3 +11670,15 @@ countries: tw hk mo
 "Unison Blend" = "齊奏混合"
 "As device" = "與裝置相同"
 "Stack" = "堆疊"
+
+# --- rollup 0.1.30 step 11: Save a copy for 0.1.28 knows rounds 190ma / 190mb / 190mj / 190mg
+"{0} note(s) play once instead of repeating (FL's note Repeat)" = "{0} 個音符只播放一次而不重複（FL 的音符 Repeat）"
+"Prism Multiband's C4 law (the Waves C4 stand-in) plays as Prism's own engine: {0}" = "Prism Multiband 的 C4 規律（Waves C4 的替代）按 Prism 自身的引擎播放：{0}"
+"Quell's NS1 law (the Waves NS1 stand-in) plays the matched engine: {0}" = "Quell 的 NS1 規律（Waves NS1 的替代）按匹配的引擎播放：{0}"
+"Facet EQ's PuigTec law (the Waves PuigTec stand-in: its output stage and mains hum) is left out: {0}" = "Facet EQ 的 PuigTec 規律（Waves PuigTec 的替代：其輸出級和電源嗡聲）被省略：{0}"
+"Horizon plays its earlier reverb and echo modes (not the ValhallaFutureVerb laws): {0}" = "Horizon 按其早期的殘響和回聲模式播放（不是 ValhallaFutureVerb 的規律）：{0}"
+"Nebula's classic modes play without the ValhallaSupermassive tone: {0}" = "Nebula 的經典模式播放時沒有 ValhallaSupermassive 的音色：{0}"
+"Orbit plays its own voices and levels (not the ValhallaSpaceModulator laws): {0}" = "Orbit 按其自身的聲部和電平播放（不是 ValhallaSpaceModulator 的規律）：{0}"
+"Compressor's Renaissance law (the Waves Renaissance Compressor stand-in) plays as its vintage voicing: {0}" = "Compressor 的 Renaissance 規律（Waves Renaissance Compressor 的替代）按其復古音色播放：{0}"
+"Gemini Doubler's splice law (the Waves Doubler stand-in) plays its measured read head: {0}" = "Gemini Doubler 的拼接規律（Waves Doubler 的替代）按其測量的讀取頭播放：{0}"
+"LYNX Tune's Waves Tune Real-Time law is left out (the uncorrected sound is re-synthesised): {0}" = "LYNX Tune 的 Waves Tune Real-Time 規律被省略（未校正的聲音會被重新合成）：{0}"

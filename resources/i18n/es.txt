@@ -11670,3 +11670,15 @@ countries: es mx ar co cl pe ve
 "Unison Blend" = "Mezcla de unísono"
 "As device" = "Como el dispositivo"
 "Stack" = "Apilar"
+
+# --- rollup 0.1.30 step 11: Save a copy for 0.1.28 knows rounds 190ma / 190mb / 190mj / 190mg
+"{0} note(s) play once instead of repeating (FL's note Repeat)" = "{0} nota(s) suenan una vez en lugar de repetirse (el Repeat de notas de FL)"
+"Prism Multiband's C4 law (the Waves C4 stand-in) plays as Prism's own engine: {0}" = "La ley C4 de Prism Multiband (el sustituto de Waves C4) suena como el motor propio de Prism: {0}"
+"Quell's NS1 law (the Waves NS1 stand-in) plays the matched engine: {0}" = "La ley NS1 de Quell (el sustituto de Waves NS1) suena con el motor ajustado: {0}"
+"Facet EQ's PuigTec law (the Waves PuigTec stand-in: its output stage and mains hum) is left out: {0}" = "La ley PuigTec de Facet EQ (el sustituto de Waves PuigTec: su etapa de salida y el zumbido de red) se omite: {0}"
+"Horizon plays its earlier reverb and echo modes (not the ValhallaFutureVerb laws): {0}" = "Horizon suena con sus modos de reverb y eco anteriores (no las leyes de ValhallaFutureVerb): {0}"
+"Nebula's classic modes play without the ValhallaSupermassive tone: {0}" = "Los modos clásicos de Nebula suenan sin el tono de ValhallaSupermassive: {0}"
+"Orbit plays its own voices and levels (not the ValhallaSpaceModulator laws): {0}" = "Orbit suena con sus propias voces y niveles (no las leyes de ValhallaSpaceModulator): {0}"
+"Compressor's Renaissance law (the Waves Renaissance Compressor stand-in) plays as its vintage voicing: {0}" = "La ley Renaissance de Compressor (el sustituto de Waves Renaissance Compressor) suena como su voz vintage: {0}"
+"Gemini Doubler's splice law (the Waves Doubler stand-in) plays its measured read head: {0}" = "La ley de empalme de Gemini Doubler (el sustituto de Waves Doubler) suena con su cabezal de lectura medido: {0}"
+"LYNX Tune's Waves Tune Real-Time law is left out (the uncorrected sound is re-synthesised): {0}" = "La ley Waves Tune Real-Time de LYNX Tune se omite (el sonido sin corregir se resintetiza): {0}"

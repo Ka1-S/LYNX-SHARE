@@ -11670,3 +11670,15 @@ countries: fr be ch ca lu
 "Unison Blend" = "Mélange d'unisson"
 "As device" = "Comme l'appareil"
 "Stack" = "Empiler"
+
+# --- rollup 0.1.30 step 11: Save a copy for 0.1.28 knows rounds 190ma / 190mb / 190mj / 190mg
+"{0} note(s) play once instead of repeating (FL's note Repeat)" = "{0} note(s) jouent une fois au lieu de se répéter (le Repeat de notes de FL)"
+"Prism Multiband's C4 law (the Waves C4 stand-in) plays as Prism's own engine: {0}" = "La loi C4 de Prism Multiband (le remplaçant de Waves C4) joue comme le moteur propre de Prism : {0}"
+"Quell's NS1 law (the Waves NS1 stand-in) plays the matched engine: {0}" = "La loi NS1 de Quell (le remplaçant de Waves NS1) joue le moteur ajusté : {0}"
+"Facet EQ's PuigTec law (the Waves PuigTec stand-in: its output stage and mains hum) is left out: {0}" = "La loi PuigTec de Facet EQ (le remplaçant de Waves PuigTec : son étage de sortie et le ronflement secteur) est omise : {0}"
+"Horizon plays its earlier reverb and echo modes (not the ValhallaFutureVerb laws): {0}" = "Horizon joue ses modes de réverbération et d'écho antérieurs (pas les lois de ValhallaFutureVerb) : {0}"
+"Nebula's classic modes play without the ValhallaSupermassive tone: {0}" = "Les modes classiques de Nebula jouent sans le timbre de ValhallaSupermassive : {0}"
+"Orbit plays its own voices and levels (not the ValhallaSpaceModulator laws): {0}" = "Orbit joue ses propres voix et niveaux (pas les lois de ValhallaSpaceModulator) : {0}"
+"Compressor's Renaissance law (the Waves Renaissance Compressor stand-in) plays as its vintage voicing: {0}" = "La loi Renaissance du Compressor (le remplaçant de Waves Renaissance Compressor) joue comme sa voix vintage : {0}"
+"Gemini Doubler's splice law (the Waves Doubler stand-in) plays its measured read head: {0}" = "La loi de raccord de Gemini Doubler (le remplaçant de Waves Doubler) joue sa tête de lecture mesurée : {0}"
+"LYNX Tune's Waves Tune Real-Time law is left out (the uncorrected sound is re-synthesised): {0}" = "La loi Waves Tune Real-Time de LYNX Tune est omise (le son non corrigé est resynthétisé) : {0}"

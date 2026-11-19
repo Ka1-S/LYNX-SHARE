@@ -11,6 +11,7 @@
 #include "core/Harmor.h"
 #include "core/LimiterLaw.h"
 #include "core/LuxeVerb.h"
+#include "core/LynxTune.h"
 #include "core/LynxVerbs.h"
 #include "core/MixSuite.h"
 #include "core/NewtoneFx.h"
@@ -199,20 +200,26 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
             lost.push_back ({ TR_NOOP ("Braid is not in this release: its channels become empty Samplers and play nothing: {0}"), listOf (braid), true });
     }
 
-    // notes: index 19 holds a note's MPE curves (round 190hy)
+    // notes: index 19 holds a note's MPE curves (round 190hy); rollup step 11: index 20 its FL note repeat (round 190ma,
+    // issue #208), written with a null curves slot when the note has no curves
     {
-        int curved = 0;
+        int curved = 0, repeated = 0;
         if (auto* patterns = arrayOf (root["patterns"]))
             for (auto& p : *patterns)
                 if (auto* notes = arrayOf (p["notes"]))
                     for (auto& n : *notes)
                         if (auto* fields = arrayOf (n); fields != nullptr && fields->size() > 19)
                         {
-                            ++curved;
+                            if (! (*fields)[19].isVoid() && ! (*fields)[19].isUndefined())
+                                ++curved;
+                            if (fields->size() > 20 && (int) (*fields)[20] != 0)
+                                ++repeated;
                             fields->removeRange (19, fields->size() - 19);
                         }
         if (curved > 0)
             lost.push_back ({ TR_NOOP ("{0} note(s) lose their MPE curves (pitch bend, slide, pressure)"), juce::String (curved), true });
+        if (repeated > 0)
+            lost.push_back ({ TR_NOOP ("{0} note(s) play once instead of repeating (FL's note Repeat)"), juce::String (repeated), true });
     }
 
     // Pattern Blocks: a third element marks a muted block (round 190ht); 0.1.28 reads only [pattern, start] and drops
@@ -466,7 +473,7 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
     // rollup step 4, round 190jh: Facet EQ's automatic dynamic thresholds (hidden parameters past its count; 0.1.28 plays
     // those bands with their manual threshold)
     {
-        juce::StringArray autoBands, dispersion;
+        juce::StringArray autoBands, dispersion, puig;
         forEachEffect (root, [&] (juce::DynamicObject& e, const juce::String& where) {
             auto* params = arrayOf (e.getProperty ("params"));
             if (params == nullptr || e.getProperty ("kind").toString() != "facetEq" || params->size() <= facet::autoThresholdParam0)
@@ -478,12 +485,17 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
             // round 190ln's all-pass dispersion [126 … 128] (set only by a translated Kilohearts Disperser state)
             if (params->size() > facet::dispersionCountParam && facet::dispersionSections ((float) (double) (*params)[facet::dispersionCountParam]) > 0)
                 addOnce (dispersion, where);
+            // rollup step 11: round 190mg's PuigTec law [129] (set only by a translated Waves PuigTec EQP1A state)
+            if (params->size() > facet::puigLawParam && facet::puigLaw ((float) (double) (*params)[facet::puigLawParam]) > 0)
+                addOnce (puig, where);
             params->removeRange (facet::autoThresholdParam0, params->size() - facet::autoThresholdParam0);
         });
         if (! autoBands.isEmpty())
             lost.push_back ({ TR_NOOP ("Facet EQ's automatic dynamic thresholds play with the bands' manual threshold: {0}"), listOf (autoBands), true });
         if (! dispersion.isEmpty())
             lost.push_back ({ TR_NOOP ("Facet EQ's all-pass dispersion (the Kilohearts Disperser stand-in) is left out: {0}"), listOf (dispersion), true });
+        if (! puig.isEmpty())
+            lost.push_back ({ TR_NOOP ("Facet EQ's PuigTec law (the Waves PuigTec stand-in: its output stage and mains hum) is left out: {0}"), listOf (puig), true });
     }
 
     // rollup step 4, round 190jl: MIDI Out channels and the plugin wrappers' Output port reach hardware MIDI outputs from
@@ -760,7 +772,7 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
     // Pro-MB band law of Prism Multiband, round 190lf's Waves stand-in laws — L2 on the Limiter, CLA-2A's cell law on Glow
     // Leveler, TrueVerb's direct sound on Reeverb 2, NS1's zero law on Quell (each set only by its translator)
     {
-        juce::StringArray saturn, proMb, l2, cell, direct, zero;
+        juce::StringArray saturn, proMb, l2, cell, direct, zero, c4, ns1;
         forEachEffect (root, [&] (juce::DynamicObject& e, const juce::String& where) {
             auto* params = arrayOf (e.getProperty ("params"));
             if (params == nullptr)
@@ -786,7 +798,15 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
                     params->removeRange (mixsuite::ember::revision, params->size() - mixsuite::ember::revision);
             }
             else if (kind == "prismMultiband")
+            {
+                // rollup step 11: round 190mg's C4 law [count + 2, + 3] (set only by the Waves C4 translator) has its own line
+                if (params->size() > dyn::prism::c4Law && (float) (double) (*params)[dyn::prism::c4Law] > 0.0f)
+                {
+                    addOnce (c4, where);
+                    params->removeRange (dyn::prism::c4Law, params->size() - dyn::prism::c4Law);
+                }
                 cut (dyn::prism::revision, proMb);
+            }
             else if (kind == "limiter")
             {
                 if (params->size() > limiterlaw::lawParam && limiterlaw::isL2 ((float) (double) (*params)[limiterlaw::lawParam]))
@@ -799,7 +819,15 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
             else if (kind == "reeverb2")
                 cut (reeverb2DirectLaw, direct);
             else if (kind == "quellDenoiser")
+            {
+                // rollup step 11: round 190mg's NS1 law (after the zero law; set only by the NS1 translator) has its own line
+                if (params->size() > voicetools::quell::ns1Law && (float) (double) (*params)[voicetools::quell::ns1Law] > 0.0f)
+                {
+                    addOnce (ns1, where);
+                    params->removeRange (voicetools::quell::ns1Law, params->size() - voicetools::quell::ns1Law);
+                }
                 cut (voicetools::quell::zeroLaw, zero);
+            }
         });
         if (! saturn.isEmpty())
             lost.push_back ({ TR_NOOP ("Ember's Saturn styles play their earlier measured characters (not the reference's): {0}"), listOf (saturn), true });
@@ -813,6 +841,10 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
             lost.push_back ({ TR_NOOP ("Reeverb 2's measured direct sound (the Waves TrueVerb stand-in) is left out: {0}"), listOf (direct), true });
         if (! zero.isEmpty())
             lost.push_back ({ TR_NOOP ("Quell's zero law (the Waves NS1 stand-in) is left out: its lowest Amount settings play the matched engine: {0}"), listOf (zero), true });
+        if (! c4.isEmpty())
+            lost.push_back ({ TR_NOOP ("Prism Multiband's C4 law (the Waves C4 stand-in) plays as Prism's own engine: {0}"), listOf (c4), true });
+        if (! ns1.isEmpty())
+            lost.push_back ({ TR_NOOP ("Quell's NS1 law (the Waves NS1 stand-in) plays the matched engine: {0}"), listOf (ns1), true });
     }
 
     // rollup step 10: round 190lp's black-box revision 1 of Apex Limiter (Pro-L 2) and Sentry Gate (Pro-G), every new one
@@ -856,6 +888,64 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
             lost.push_back ({ TR_NOOP ("Sentry Gate plays its earlier measured gate (not the reference's): {0}"), listOf (sentryLaws), true });
         if (! spiralRate.isEmpty())
             lost.push_back ({ TR_NOOP ("Spiral Echo's Measured loop plays its earlier phase at sample rates other than 48 kHz: {0}"), listOf (spiralRate), true });
+    }
+
+    // rollup step 11: hidden parameters past the slot's count, written only when set (0.1.28 plays the effect without them):
+    // round 190mb / 190mj's Valhalla laws — Horizon's revision (every new Horizon) and its FutureVerb law, Nebula's
+    // Supermassive tone, Orbit's SpaceModulator level and voices (Epoch's rate law goes with the reverbs' revision, the
+    // Measured law's line); round 190mg's Waves laws — Compressor's Renaissance law, Gemini Doubler's splice law, LYNX Tune's
+    // Waves Tune Real-Time law (each set only by its translator; Crest's FET amplifier goes with the FET law's line, the
+    // L2 requantizer with the L2 law's, Prism's C4 law, Quell's NS1 law and Facet's PuigTec law have their lines above)
+    {
+        juce::StringArray horizonLaws, nebulaTone, orbitLaws, renLaw, splice, wavesTune;
+        forEachEffect (root, [&] (juce::DynamicObject& e, const juce::String& where) {
+            auto* params = arrayOf (e.getProperty ("params"));
+            if (params == nullptr)
+                return;
+            const auto kind = e.getProperty ("kind").toString();
+            const auto cut = [params, &where] (int from, juce::StringArray& list) {
+                if (params->size() <= from)
+                    return;
+                for (int i = from; i < params->size(); ++i)
+                    if ((float) (double) (*params)[i] != 0.0f)
+                    {
+                        addOnce (list, where);
+                        break;
+                    }
+                params->removeRange (from, params->size() - from);
+            };
+            if (kind == "horizon")
+            {
+                // (revision 1 is heard only with the engine law on; reaLaw is read with it)
+                const auto lawOn = params->size() > verbs::horizon::engineLaw && (float) (double) (*params)[verbs::horizon::engineLaw] >= 0.5f;
+                if (lawOn)
+                    cut (verbs::horizon::revision, horizonLaws);
+                else if (params->size() > verbs::horizon::revision)
+                    params->removeRange (verbs::horizon::revision, params->size() - verbs::horizon::revision);
+            }
+            else if (kind == "nebula")
+                cut (verbs::nebula::toneLaw, nebulaTone);
+            else if (kind == "orbit")
+                cut (echosuite::orbit::smLaw, orbitLaws);
+            else if (kind == "compressor")
+                cut (compressorRenLaw, renLaw);
+            else if (kind == "geminiDoubler")
+                cut (voicetools::gemini::spliceLaw, splice);
+            else if (kind == "lynxTune")
+                cut (lynxtune::wavesLaw, wavesTune);
+        });
+        if (! horizonLaws.isEmpty())
+            lost.push_back ({ TR_NOOP ("Horizon plays its earlier reverb and echo modes (not the ValhallaFutureVerb laws): {0}"), listOf (horizonLaws), true });
+        if (! nebulaTone.isEmpty())
+            lost.push_back ({ TR_NOOP ("Nebula's classic modes play without the ValhallaSupermassive tone: {0}"), listOf (nebulaTone), true });
+        if (! orbitLaws.isEmpty())
+            lost.push_back ({ TR_NOOP ("Orbit plays its own voices and levels (not the ValhallaSpaceModulator laws): {0}"), listOf (orbitLaws), true });
+        if (! renLaw.isEmpty())
+            lost.push_back ({ TR_NOOP ("Compressor's Renaissance law (the Waves Renaissance Compressor stand-in) plays as its vintage voicing: {0}"), listOf (renLaw), true });
+        if (! splice.isEmpty())
+            lost.push_back ({ TR_NOOP ("Gemini Doubler's splice law (the Waves Doubler stand-in) plays its measured read head: {0}"), listOf (splice), true });
+        if (! wavesTune.isEmpty())
+            lost.push_back ({ TR_NOOP ("LYNX Tune's Waves Tune Real-Time law is left out (the uncorrected sound is re-synthesised): {0}"), listOf (wavesTune), true });
     }
 
     // rollup step 9, round 190lq (issue #204): a channel's notes on an audio clip channel play as the channel's Sampler

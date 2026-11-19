@@ -11670,3 +11670,15 @@ countries: id
 "Unison Blend" = "Campuran unison"
 "As device" = "Seperti perangkat"
 "Stack" = "Tumpuk"
+
+# --- rollup 0.1.30 step 11: Save a copy for 0.1.28 knows rounds 190ma / 190mb / 190mj / 190mg
+"{0} note(s) play once instead of repeating (FL's note Repeat)" = "{0} not diputar sekali alih-alih berulang (Repeat not milik FL)"
+"Prism Multiband's C4 law (the Waves C4 stand-in) plays as Prism's own engine: {0}" = "Hukum C4 milik Prism Multiband (pengganti Waves C4) diputar sebagai mesin Prism sendiri: {0}"
+"Quell's NS1 law (the Waves NS1 stand-in) plays the matched engine: {0}" = "Hukum NS1 milik Quell (pengganti Waves NS1) memutar mesin yang disesuaikan: {0}"
+"Facet EQ's PuigTec law (the Waves PuigTec stand-in: its output stage and mains hum) is left out: {0}" = "Hukum PuigTec milik Facet EQ (pengganti Waves PuigTec: tahap output dan dengung listriknya) dihilangkan: {0}"
+"Horizon plays its earlier reverb and echo modes (not the ValhallaFutureVerb laws): {0}" = "Horizon memutar mode reverb dan echo sebelumnya (bukan hukum ValhallaFutureVerb): {0}"
+"Nebula's classic modes play without the ValhallaSupermassive tone: {0}" = "Mode klasik Nebula diputar tanpa nada ValhallaSupermassive: {0}"
+"Orbit plays its own voices and levels (not the ValhallaSpaceModulator laws): {0}" = "Orbit memutar suara dan level miliknya sendiri (bukan hukum ValhallaSpaceModulator): {0}"
+"Compressor's Renaissance law (the Waves Renaissance Compressor stand-in) plays as its vintage voicing: {0}" = "Hukum Renaissance milik Compressor (pengganti Waves Renaissance Compressor) diputar sebagai voicing vintage-nya: {0}"
+"Gemini Doubler's splice law (the Waves Doubler stand-in) plays its measured read head: {0}" = "Hukum sambungan milik Gemini Doubler (pengganti Waves Doubler) memutar head baca terukurnya: {0}"
+"LYNX Tune's Waves Tune Real-Time law is left out (the uncorrected sound is re-synthesised): {0}" = "Hukum Waves Tune Real-Time milik LYNX Tune dihilangkan (suara yang tidak dikoreksi disintesis ulang): {0}"

@@ -11670,3 +11670,15 @@ countries: it ch sm
 "Unison Blend" = "Miscela unisono"
 "As device" = "Come il dispositivo"
 "Stack" = "Impila"
+
+# --- rollup 0.1.30 step 11: Save a copy for 0.1.28 knows rounds 190ma / 190mb / 190mj / 190mg
+"{0} note(s) play once instead of repeating (FL's note Repeat)" = "{0} nota/e suonano una volta invece di ripetersi (il Repeat delle note di FL)"
+"Prism Multiband's C4 law (the Waves C4 stand-in) plays as Prism's own engine: {0}" = "La legge C4 di Prism Multiband (il sostituto di Waves C4) suona come il motore di Prism: {0}"
+"Quell's NS1 law (the Waves NS1 stand-in) plays the matched engine: {0}" = "La legge NS1 di Quell (il sostituto di Waves NS1) suona il motore adattato: {0}"
+"Facet EQ's PuigTec law (the Waves PuigTec stand-in: its output stage and mains hum) is left out: {0}" = "La legge PuigTec di Facet EQ (il sostituto di Waves PuigTec: lo stadio d'uscita e il ronzio di rete) è esclusa: {0}"
+"Horizon plays its earlier reverb and echo modes (not the ValhallaFutureVerb laws): {0}" = "Horizon suona i suoi modi di riverbero ed eco precedenti (non le leggi di ValhallaFutureVerb): {0}"
+"Nebula's classic modes play without the ValhallaSupermassive tone: {0}" = "I modi classici di Nebula suonano senza il timbro di ValhallaSupermassive: {0}"
+"Orbit plays its own voices and levels (not the ValhallaSpaceModulator laws): {0}" = "Orbit suona le sue voci e i suoi livelli (non le leggi di ValhallaSpaceModulator): {0}"
+"Compressor's Renaissance law (the Waves Renaissance Compressor stand-in) plays as its vintage voicing: {0}" = "La legge Renaissance del Compressor (il sostituto di Waves Renaissance Compressor) suona come la sua voce vintage: {0}"
+"Gemini Doubler's splice law (the Waves Doubler stand-in) plays its measured read head: {0}" = "La legge di giunzione di Gemini Doubler (il sostituto di Waves Doubler) suona la sua testina di lettura misurata: {0}"
+"LYNX Tune's Waves Tune Real-Time law is left out (the uncorrected sound is re-synthesised): {0}" = "La legge Waves Tune Real-Time di LYNX Tune è esclusa (il suono non corretto viene risintetizzato): {0}"

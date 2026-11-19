@@ -11670,3 +11670,15 @@ countries: de at ch li lu
 "Unison Blend" = "Unisono-Mischung"
 "As device" = "Wie das Gerät"
 "Stack" = "Stapeln"
+
+# --- rollup 0.1.30 step 11: Save a copy for 0.1.28 knows rounds 190ma / 190mb / 190mj / 190mg
+"{0} note(s) play once instead of repeating (FL's note Repeat)" = "{0} Note(n) spielen einmal statt sich zu wiederholen (FLs Noten-Repeat)"
+"Prism Multiband's C4 law (the Waves C4 stand-in) plays as Prism's own engine: {0}" = "Das C4-Gesetz von Prism Multiband (der Ersatz für Waves C4) spielt als Prisms eigene Engine: {0}"
+"Quell's NS1 law (the Waves NS1 stand-in) plays the matched engine: {0}" = "Das NS1-Gesetz von Quell (der Ersatz für Waves NS1) spielt die angepasste Engine: {0}"
+"Facet EQ's PuigTec law (the Waves PuigTec stand-in: its output stage and mains hum) is left out: {0}" = "Das PuigTec-Gesetz von Facet EQ (der Ersatz für Waves PuigTec: seine Ausgangsstufe und sein Netzbrummen) entfällt: {0}"
+"Horizon plays its earlier reverb and echo modes (not the ValhallaFutureVerb laws): {0}" = "Horizon spielt seine früheren Hall- und Echomodi (nicht die ValhallaFutureVerb-Gesetze): {0}"
+"Nebula's classic modes play without the ValhallaSupermassive tone: {0}" = "Die klassischen Modi von Nebula spielen ohne den ValhallaSupermassive-Klang: {0}"
+"Orbit plays its own voices and levels (not the ValhallaSpaceModulator laws): {0}" = "Orbit spielt seine eigenen Stimmen und Pegel (nicht die ValhallaSpaceModulator-Gesetze): {0}"
+"Compressor's Renaissance law (the Waves Renaissance Compressor stand-in) plays as its vintage voicing: {0}" = "Das Renaissance-Gesetz des Compressors (der Ersatz für Waves Renaissance Compressor) spielt als seine Vintage-Klangfarbe: {0}"
+"Gemini Doubler's splice law (the Waves Doubler stand-in) plays its measured read head: {0}" = "Das Splice-Gesetz von Gemini Doubler (der Ersatz für Waves Doubler) spielt seinen gemessenen Lesekopf: {0}"
+"LYNX Tune's Waves Tune Real-Time law is left out (the uncorrected sound is re-synthesised): {0}" = "Das Waves-Tune-Real-Time-Gesetz von LYNX Tune entfällt (der unkorrigierte Klang wird neu synthetisiert): {0}"
