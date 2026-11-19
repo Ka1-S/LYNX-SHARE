@@ -1,15 +1,15 @@
 ---
-source: a79e43f031
+source: 98a5eb9945
 ---
-LYNX SHARE salva i progetti come file `.lynx`. Apre anche i progetti di altri programmi, carica i comuni file audio ed esporta audio, MIDI e progetti per altri programmi. La tabella elenca ogni formato della 0.1.26 alpha.
+LYNX SHARE salva i progetti come file `.lynx`. Apre anche i progetti di altri programmi, carica i comuni file audio ed esporta audio, MIDI e progetti per altri programmi. La tabella elenca ogni formato della 0.1.30 alpha.
 
 Un progetto aperto dal formato di un altro programma è un'importazione. `File › Salva` chiede allora dove scrivere un file `.lynx`, e il file originale non viene mai modificato.
 
 ## Aprire un progetto di un altro programma
 
 1. Scegli `File › Apri...` (`Ctrl+O`).
-2. Seleziona un file `.flp`, `.als`, `.flm`, `.mid` o `.zip`.
-3. Per un `.flp`, scegli `Aiuto › Last FL Studio import report` per leggere cosa è stato approssimato o tralasciato.
+2. Seleziona un file `.flp`, `.als`, `.flm`, `.dawproject`, `.band`, `.blx`, `.mid` o `.zip`.
+3. Scegli `Aiuto › Ultimo report di importazione del progetto` per leggere cosa è stato approssimato o tralasciato.
 4. Scegli `File › Salva` e seleziona dove scrivere il file `.lynx`.
 
 ## Formati
@@ -22,14 +22,21 @@ Un progetto aperto dal formato di un altro programma è un'importazione. `File �
 | `.flp` | `File › Apri...` | `File › Esporta › Progetto FL Studio...`, un progetto FL Studio 2026 o un pacchetto di loop zippato | I plugin nativi suonano su motori ricreati con diversi gradi di esattezza. I pacchetti FLEX non vengono mai aperti. In esportazione, gli strumenti e gli effetti solo LYNX vengono renderizzati in audio o sostituiti con il plugin FL più vicino, e i modulatori vengono tralasciati. Vedi [Se vieni da FL Studio](/wiki/coming-from-fl-studio/) |
 | `.flm` | `File › Apri...` | No | Progetto di FL Studio Mobile. Parziale: gli strumenti diversi da MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw, DW Sampler, lo Slicer e DirectWave suonano con il synth integrato |
 | `.als` | `File › Apri...`, set di Live 11 e 12 | `File › Esporta › Set di Ableton Live (.als)...`, per Live 12 o Live 11 | In importazione, i dispositivi di Live senza equivalente in LYNX SHARE vengono scartati. In esportazione, gli strumenti e gli effetti propri di LYNX SHARE non vengono convertiti, e l'automazione dei parametri degli effetti e i collegamenti da insert a insert vengono scartati. Vedi [Se vieni da Ableton Live](/wiki/coming-from-ableton/) |
+| `.dawproject` | `File › Apri...` | `File › Esporta › DAWproject (.dawproject)...` | Il formato di scambio aperto di Bitwig, Studio One, Cubase e altre app: tracce, cartelle, clip, note, audio con i suoi marker di warp, automazione, tempo, marker, il mixer con i send e plugin VST3, VST2 e CLAP con il loro stato. Gli effetti di note e le espressioni MIDI vengono lasciati fuori in importazione; la griglia di clip, gli altri arrangiamenti e alcuni dettagli per nota in esportazione. In entrambe le direzioni viene elencato ciò che è stato lasciato fuori |
+| `.band` | `File › Apri...` (il pacchetto, il suo file `projectData` o uno zip di esso) | No | Progetto GarageBand 10 o GarageBand per iOS, come tracce del flusso semplice. Parziale: le tracce di strumento suonano con il synth e la batteria integrati, tranne gli strumenti Sampler creati in GarageBand per iOS. I progetti di GarageBand 11 e precedenti non sono leggibili |
+| `.blx` | `File › Apri...`, o la sua cartella con l'importazione `Cartella...` del flusso semplice | No | Progetto BandLab scaricato da Cakewalk o Sonar, come tracce del flusso semplice con regioni, tempo, tonalità, il mix, l'automazione di volume e pan e gli effetti comuni. Parziale: i suoni di strumento di BandLab e gli altri pedali sono elencati nel report di importazione |
 | `.mid`, `.midi` | `File › Apri...` crea un nuovo progetto. `File › Importa › File MIDI...` e il Piano Roll importano in quello corrente | `File › Esporta › File MIDI...` (`Ctrl+Shift+M`) | |
 | `.wav` | Come sample o come clip audio | `File › Esporta › File Wave...`, 16 bit, 24 bit o 32 bit float | Dither, informazioni di tempo, marcatori di loop e marcatori della Playlist opzionali |
 | `.mp3` | Come sample o come clip audio | `File › Esporta › File MP3...` | Bitrate costante |
 | `.ogg` | Come sample o come clip audio | `File › Esporta › File OGG...` | |
 | `.flac` | Come sample o come clip audio | `File › Esporta › File FLAC...`, compressione da 0 a 8 | Senza perdita a ogni livello |
-| `.aif`, `.aiff` | Come sample o come clip audio | No | |
+| `.aif`, `.aiff` | Come sample o come clip audio | `File › Esporta › File AIFF...`, 16 bit o 24 bit | |
+| `.m4a` | – | `File › Esporta › File M4A...` | Solo esportazione. AAC con l'encoder del sistema su Windows e macOS; non offerto su Linux |
 | `.wv` | Come sample | No | Sample WavPack, come distribuiti nei pacchetti di FL Studio |
 | `.sf2`, `.sf3` | Suonati da LYNX Soundfont | No | SoundFont |
+| `.dwp`, `.dwb` | Doppio clic nel Browser, un trascinamento sul Channel Rack, o `Apri programma / bank...` di DirectWave | Salvataggio di programmi e banchi di DirectWave | Programmi e banchi di DirectWave. I sample vengono cercati dove li cerca DirectWave |
+| `.gig` | Come canale DirectWave | No | Strumenti GigaStudio: livelli di velocity, round robin, loop, accordatura e inviluppo dell'ampli. I sample di release, i keyswitch e i sample compressi non vengono ancora letti |
+| `.ncw` | Come sample o come clip audio | No | Sample compressi di Kontakt. Gli strumenti Kontakt `.nki` richiedono Kontakt stesso come plugin; le librerie protette non vengono mai decifrate |
 | `.fst` | Dal Browser | No | Preset di un plugin nativo di FL Studio. Solo per i plugin per cui LYNX SHARE ha un motore |
 | `.fsc` | Piano Roll ed editor degli eventi | Piano Roll ed editor degli eventi | File di partitura e automazione di FL Studio |
 | `.lynxpreset`, `.fxp`, `.fxb`, `.vstpreset` | `Carica file di preset...` nel menu dei preset di un plugin ospitato | `Salva preset...` e `Esporta file di preset...` | Preset dei plugin di terze parti. `.fxp` e `.fxb` sono per i plugin VST2 e `.vstpreset` per i plugin VST3, e solo mentre il plugin gira dentro LYNX SHARE |
@@ -63,7 +70,7 @@ LYNX.exe --export-flp project.lynx out.flp  write an FL Studio project
 ## Da sapere
 
 - I file audio più lunghi di 30 secondi vengono letti in streaming da una cache su disco.
-- Un `.flp`, `.als` o `.flm` non viene mai scritto quando salvi. I comandi di esportazione scrivono file nuovi.
+- Un `.flp`, `.als`, `.flm`, `.dawproject`, `.band` o `.blx` non viene mai scritto quando salvi. I comandi di esportazione scrivono file nuovi.
 - I file `.wv` sono di sola lettura.
 - Uno `.zip` viene prima estratto in una cartella, poi si apre il progetto al suo interno.
 

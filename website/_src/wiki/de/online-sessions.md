@@ -89,7 +89,7 @@ Der Host geht so vor:
 
 Ein Gast geht so vor:
 
-1. Öffne das Plugin-Menü eines deiner Kanäle oder Effekt-Slots. Die geteilten Plugins stehen zuerst, unter `On <host>'s computer`.
+1. Öffne das Plugin-Menü eines deiner Kanäle oder Effekt-Slots. Die geteilten Plugins stehen zuerst, unter `Auf dem Computer von <host>`.
 2. Wähle eines. Sein Fenster listet die Parameter des Plugins als Slider auf, mit `Parameter suchen`.
 3. Füge Noten hinzu und bewege die Slider. Das Fenster zeigt `Updating...`, während der Rechner des Hosts rendert, danach `Aktuell`.
 

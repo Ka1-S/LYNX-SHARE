@@ -8,7 +8,7 @@ LYNX SHARE
 
 ## Short description
 
-Kostenlose, quelloffene DAW mit drei Arbeitsabläufen in einem Programm: Patterns im Stil von FL Studio (Channel Rack, Piano Roll, Playlist, Mixer), Clip-Start im Stil von Ableton Live und ein einfacher Ein-Fenster-Modus im Stil von BandLab und FL Studio Mobile. Öffnet .flp-, .als- und .flm-Projekte.
+Kostenlose, quelloffene DAW mit drei Arbeitsabläufen in einem Programm: Patterns im Stil von FL Studio (Channel Rack, Piano Roll, Playlist, Mixer), Clip-Start im Stil von Ableton Live und ein einfacher Ein-Fenster-Modus im Stil von BandLab und FL Studio Mobile. Öffnet .flp-, .als-, .flm-, .dawproject-, GarageBand-.band- und BandLab-.blx-Projekte.
 
 ## Description
 
@@ -26,11 +26,10 @@ Sie ist darauf gebaut, auf jedem PC schlank und schnell zu bleiben.
 • Schlank: eine Lock-free-Audio-Engine, die Kanäle und Mixer-Spuren auf deine CPU-Kerne verteilt, inaktive Kanäle überspringt und lange Audiodateien direkt von der Festplatte streamt.
 • Komplett: über 100 integrierte Instrumente und Effekte – Synthesizer, Drum Machines, Sampler, EQs, Kompressoren, Limiter, Reverbs, Delays, Tonhöhenkorrektur, Visualizer und mehr.
 • Deine Plugins: lädt VST3-, CLAP- und VST2-Instrumente und -Effekte, auf Wunsch jeweils in einem eigenen Sandbox-Prozess, damit ein abstürzendes Plugin nicht deine ganze Session mitreißt.
-• Deine Projekte: öffnet FL-Studio-Projekte (.flp) mit Patterns, Noten, Mixer, Automation und Samples; öffnet und
-speichert Sets aus Ableton Live 11/12 (.als), samt Session-Clips; exportiert .flp zurück nach FL Studio; importiert
-Projekte aus FL Studio Mobile (.flm, teilweise) und MIDI-Dateien.
+• Deine Projekte: öffnet FL-Studio-Projekte (.flp) mit Patterns, Noten, Mixer, Automation und Samples; öffnet und speichert Sets aus Ableton Live 11/12 (.als), samt Session-Clips; öffnet und speichert DAWproject-Dateien (.dawproject) für Bitwig, Studio One, Cubase und andere Programme; exportiert .flp zurück nach FL Studio; importiert Projekte aus FL Studio Mobile (.flm, teilweise), GarageBand (.band, teilweise), BandLab (.blx, teilweise) und MIDI-Dateien.
+• Audiobearbeitung: ARA-2-Plugins wie Melodyne arbeiten direkt an Audio-Clips, ein polyphoner Noteneditor verschiebt und stimmt einzelne Noten innerhalb von Akkorden um, und Audio lässt sich in MIDI umwandeln.
 • Niedrige Latenz: ASIO (einschließlich des eigenen ASIO-Treibers von LYNX SHARE für jedes Gerät), WASAPI im Shared- und Exclusive-Modus.
-• Audio und MIDI aufnehmen, Audio bearbeiten, alles automatisieren, als WAV, FLAC, MP3, OGG oder Stems rendern.
+• Audio und MIDI aufnehmen (auch MPE), Audio bearbeiten, alles automatisieren, als WAV, FLAC, MP3, OGG, AIFF, M4A oder Stems rendern.
 • Oberfläche in 15 Sprachen, darunter Deutsch, Englisch, Französisch, Spanisch, Italienisch, Niederländisch, Polnisch, Russisch, Türkisch, Japanisch, Koreanisch und Chinesisch.
 
 Kein Konto, kein Abo, keine Werbung und keine Telemetrie. LYNX SHARE ist freie Software (GNU AGPL-3.0); der Quellcode liegt auf GitHub.
@@ -43,27 +42,21 @@ LYNX SHARE befindet sich im Alpha-Stadium: Rechne mit Ecken und Kanten und melde
 
 ## What's new
 
-LYNX SHARE 0.1.28: schneller und leichter, mit einem Fenster, das nach etwa einer Sekunde bereit ist, großen
-Projekten, die schneller öffnen und weniger Speicher brauchen, flüssigerer Wiedergabe, Stems in einem Durchgang
-exportiert und Vorausberechnen für schwere Projekte bei kleinen Puffern; Ableton Link; Freeze und Bounce im
-Clip-Start-Arbeitsablauf; Clip-Hüllkurven; auf Plugins gezogene Samples; mehr eigene Devices von Ableton Live, die aus
-.als-Sets geöffnet werden; Werkssounds von FL Studio Mobile aus deiner eigenen Kopie der App; ein Sampler mit 16 Pads
-im Einfachen Arbeitsablauf; Preset speichern für die eingebauten Instrumente; eine experimentelle Remote-Control-API;
-Playlist-Spuren, die sich am Rand in der Größe ändern lassen, Strg+Klick zum Auswählen mehrerer Spuren und mit
-Mixer-Spuren verknüpfte Playlist-Spuren; und viele Korrekturen.
+LYNX SHARE 0.1.30: leichter denn je, mit etwa der halben CPU-Last von FL Studio 2026, während auf unserem Test-PC die Thief-Demo von FL läuft; ARA-2-Hosting, sodass Melodyne und andere ARA-Plugins Audio-Clips direkt bearbeiten; ein polyphoner Noteneditor und polyphones Audio-zu-MIDI; ein natürlicheres Newtone; Helix, ein neuer Wavetable-Synthesizer, und Tetra, ein FM-Synthesizer mit 4 Operatoren; ein Akkord-Helfer; eine Drum Machine im Stil von BandLab, ein Stimmgerät und ein Loop-Browser im Einfachen Arbeitsablauf; Return-Spuren, Sends und ein Crossfader im Clip-Start-Arbeitsablauf; MPE und Hardware-MIDI-Out; ein DirectWave-Editor; DAWproject-, GarageBand- und BandLab-Projekte, .gig-, .dwp- und .ncw-Instrumente und -Samples sowie AIFF- und M4A-Export; mehr als 40 überarbeitete Plugin-Platzhalter; und Korrekturen für rund 40 gemeldete Probleme.
 
 ## Features
 
 1. Drei Arbeitsabläufe in einem Programm: Patterns im Stil von FL Studio als Standard, Clip-Start im Stil von Ableton Live oder ein Einfacher Arbeitsablauf im Stil von BandLab und FL Studio Mobile
-2. Öffnet Projekte aus FL Studio (.flp), Ableton Live (.als) und FL Studio Mobile (.flm) sowie MIDI-Dateien; speichert .als und .flp
+2. Öffnet Projekte aus FL Studio (.flp), Ableton Live (.als), FL Studio Mobile (.flm), DAWproject, GarageBand und BandLab sowie MIDI-Dateien; speichert .flp, .als und .dawproject
 3. Über 100 integrierte Instrumente und Effekte
 4. Lädt VST3-, CLAP- und VST2-Plugins, auf Wunsch isoliert im eigenen Prozess
 5. Audio mit niedriger Latenz: ASIO, WASAPI Shared und Exclusive
 6. Multicore-Engine, die auch auf älteren PCs schlank bleibt
 7. Audio- und MIDI-Aufnahme, Audio-Editor, Automation-Clips
-8. Export als WAV, FLAC, MP3, OGG und Stems
+8. Export als WAV, FLAC, MP3, OGG, AIFF, M4A und Stems
 9. Oberfläche in 15 Sprachen, darunter Deutsch
 10. Kostenlos und Open Source (AGPL-3.0): kein Konto, keine Werbung, keine Telemetrie
+11. ARA-2-Plugin-Hosting, ein polyphoner Noteneditor und Audio-zu-MIDI-Umwandlung
 
 ## Search terms
 

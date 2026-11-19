@@ -62,7 +62,7 @@ Secara default plugin berjalan di dalam LYNX SHARE, sehingga plugin yang crash b
 
 Jika plugin semacam itu crash atau berhenti merespons, ia dibisukan, pesan muncul, dan LYNX SHARE tetap berjalan. `Muat ulang` di pesan itu menjalankan plugin lagi dengan pengaturan dari penyimpanan atau backup terakhir, tanpa membuka ulang proyek. Editor plugin terbuka di jendelanya sendiri dan tidak bisa ditempelkan atau dipin.
 
-Untuk melakukannya pada satu plugin saja, pakai `Jalankan di proses terpisah` atau `Always run <plugin> in a separate process` di menu wrapper jendela plugin. Saat editor plugin crash, pesan yang muncul juga menawarkan yang kedua.
+Untuk melakukannya pada satu plugin saja, pakai `Jalankan di proses terpisah` atau `Selalu jalankan <plugin> di proses terpisah` di menu wrapper jendela plugin. Saat editor plugin crash, pesan yang muncul juga menawarkan yang kedua.
 
 Ini bekerja di Windows dan Linux, dan sejak 0.1.25 di macOS.
 

@@ -89,7 +89,7 @@ Host şunu yapar:
 
 Konuk şunu yapar:
 
-1. Kanallarınızdan birinin veya efekt yuvalarınızdan birinin plugin menüsünü açın. Paylaşılan plugin'ler `On <host>'s computer` altında en başta gelir.
+1. Kanallarınızdan birinin veya efekt yuvalarınızdan birinin plugin menüsünü açın. Paylaşılan plugin'ler `<host> kişisinin bilgisayarında` altında en başta gelir.
 2. Birini seçin. Penceresi plugin'in parametrelerini kaydırıcılar olarak listeler; `Parametrelerde ara` ile.
 3. Nota ekleyin ve kaydırıcıları oynatın. Host'un bilgisayarı render alırken pencerede `Updating...`, sonra `Güncel` yazar.
 

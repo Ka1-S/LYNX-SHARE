@@ -64,7 +64,7 @@ Folder itu menyimpan opsimu, bahasa yang dipilih (`language.txt`), pintasanmu (`
 
 ## Pembaruan
 
-Saat dijalankan, LYNX SHARE menanyakan nomor versi terbaru ke GitHub. Tidak ada data tentangmu yang dikirim. Ketika versi baru rilis, sebuah bilah menampilkan `LYNX SHARE <version> is available` dengan tombol `Yang baru` dan tombol pembaruan. `Bantuan › Periksa pembaruan...` menanyakannya kapan saja.
+Saat dijalankan, LYNX SHARE menanyakan nomor versi terbaru ke GitHub. Tidak ada data tentangmu yang dikirim. Ketika versi baru rilis, sebuah bilah menampilkan `LYNX SHARE <version> sudah tersedia` dengan tombol `Yang baru` dan tombol pembaruan. `Bantuan › Periksa pembaruan...` menanyakannya kapan saja.
 
 | Build | Cara memperbarui |
 |---|---|

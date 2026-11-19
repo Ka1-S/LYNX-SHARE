@@ -8,7 +8,7 @@ LYNX SHARE
 
 ## Short description
 
-Tek programda üç iş akışı sunan ücretsiz, açık kaynaklı DAW: FL Studio tarzı pattern'ler (Channel Rack, Piano Roll, Playlist, Mixer), Ableton Live tarzı klip başlatma ve BandLab ile FL Studio Mobile tarzında basit, tek pencereli bir mod. .flp, .als ve .flm projelerini açar.
+Tek programda üç iş akışı sunan ücretsiz, açık kaynaklı DAW: FL Studio tarzı pattern'ler (Channel Rack, Piano Roll, Playlist, Mixer), Ableton Live tarzı klip başlatma ve BandLab ile FL Studio Mobile tarzında basit, tek pencereli bir mod. .flp, .als, .flm, .dawproject, GarageBand .band ve BandLab .blx projelerini açar.
 
 ## Description
 
@@ -26,11 +26,10 @@ Her PC'de hafif ve hızlı kalacak şekilde yapıldı.
 • Hafif: kanalları ve mixer kanallarını işlemci çekirdeklerine dağıtan, boştaki kanalları atlayan ve uzun ses dosyalarını doğrudan diskten akıtan kilitsiz (lock-free) bir ses motoru.
 • Eksiksiz: 100'den fazla dahili enstrüman ve efekt — synth'ler, davul makineleri, sampler'lar, EQ'lar, kompresörler, limiter'lar, reverb'ler, delay'ler, perde düzeltme, görselleştiriciler ve daha fazlası.
 • Kendi eklentileriniz: VST3, CLAP ve VST2 enstrüman ve efektlerini çalıştırır; isterseniz her biri kendi sandbox işleminde çalışır, böylece çöken bir eklenti oturumunuzu çökertemez.
-• Projelerin: FL Studio projelerini (.flp) pattern'leri, notaları, mixer'ı, otomasyonu ve sample'larıyla açar; Ableton
-Live 11/12 setlerini (.als) Session klipleriyle birlikte açar ve kaydeder; .flp'yi FL Studio'ya geri aktarır; FL
-Studio Mobile projelerini (.flm, kısmen) ve MIDI dosyalarını içe aktarır.
+• Projelerin: FL Studio projelerini (.flp) pattern'leri, notaları, mixer'ı, otomasyonu ve sample'larıyla açar; Ableton Live 11/12 setlerini (.als) Session klipleriyle birlikte açar ve kaydeder; Bitwig, Studio One, Cubase ve diğer uygulamalar için DAWproject dosyalarını (.dawproject) açar ve kaydeder; .flp'yi FL Studio'ya geri aktarır; FL Studio Mobile (.flm, kısmen), GarageBand (.band, kısmen) ve BandLab (.blx, kısmen) projelerini ve MIDI dosyalarını içe aktarır.
+• Ses düzenleme: Melodyne gibi ARA 2 plugin'leri ses kliplerinde yerinde çalışır, polifonik bir nota editörü akorların içindeki tek tek notaları taşır ve yeniden akort eder, ses de MIDI'ye dönüştürülür.
 • Düşük gecikme: ASIO (her cihaz için LYNX SHARE'in kendi ASIO sürücüsü dahil), paylaşımlı ve özel modda WASAPI.
-• Ses ve MIDI kaydedin, ses düzenleyin, her şeyi otomatikleştirin; WAV, FLAC, MP3, OGG veya stem olarak dışa aktarın.
+• Ses ve MIDI kaydedin (MPE dahil), ses düzenleyin, her şeyi otomatikleştirin; WAV, FLAC, MP3, OGG, AIFF, M4A veya stem olarak dışa aktarın.
 • Türkçe, İngilizce, Portekizce, İspanyolca, Fransızca, Almanca, İtalyanca, Felemenkçe, Lehçe, Rusça, Japonca, Korece ve Çince dahil 15 dilde arayüz.
 
 Hesap yok, abonelik yok, reklam yok, telemetri yok. LYNX SHARE özgür bir yazılımdır (GNU AGPL-3.0); kaynak kodu GitHub'dadır.
@@ -43,26 +42,21 @@ LYNX SHARE alfa aşamasındadır: bazı pürüzler olabilir, lütfen sorunları 
 
 ## What's new
 
-LYNX SHARE 0.1.28: daha hafif ve hızlı; pencere yaklaşık bir saniyede hazır, büyük projeler daha hızlı açılıp daha az
-bellek kullanıyor, çalma daha akıcı, stem'ler tek geçişte dışa aktarılıyor ve küçük arabelleklerdeki ağır projeler
-için önceden işleme var; Ableton Link; Klip başlatma iş akışında Dondur ve Bounce; klip zarfları; plugin'lere
-sürüklenen sample'lar; .als setlerinden açılan Ableton Live'ın daha fazla kendi cihazı; uygulamanın kendi kopyanızdan
-FL Studio Mobile fabrika sesleri; Basit iş akışında 16 pad'li bir Sampler; yerleşik enstrümanlar için Preset kaydet;
-deneysel bir Uzaktan Kontrol API'si; kenarından yeniden boyutlanan Playlist izleri, birkaç izi seçmek için Ctrl+tık ve
-mixer izlerine bağlı Playlist izleri; ve birçok düzeltme.
+LYNX SHARE 0.1.30: hiç olmadığı kadar hafif; test PC'mizde FL'nin Thief demosu çalarken FL Studio 2026'nın yaklaşık yarısı kadar CPU kullanıyor; ARA 2 desteği sayesinde Melodyne ve diğer ARA plugin'leri ses kliplerini yerinde düzenliyor; polifonik bir nota editörü ve polifonik sesten MIDI'ye dönüştürme; daha doğal bir Newtone; yeni bir wavetable synth olan Helix ve 4 operatörlü bir FM synth olan Tetra; bir Akor yardımcısı; Basit iş akışında BandLab tarzı bir Drum Machine, bir akort aleti ve bir Loop Browser; Klip başlatma iş akışında dönüş izleri, send'ler ve bir crossfader; MPE ve donanım MIDI Out; bir DirectWave editörü; DAWproject, GarageBand ve BandLab projeleri, .gig, .dwp ve .ncw enstrümanları ve sample'ları, AIFF ve M4A dışa aktarma; yenilenmiş 40'tan fazla plugin yedeği; ve bildirilen yaklaşık 40 sorun için düzeltmeler.
 
 ## Features
 
 1. Tek programda üç iş akışı: varsayılan olarak FL Studio tarzı pattern'ler, Ableton Live tarzı klip başlatma ya da BandLab ve FL Studio Mobile tarzında bir Basit iş akışı
-2. FL Studio (.flp), Ableton Live (.als) ve FL Studio Mobile (.flm) projelerini ve MIDI dosyalarını açar; .als ve .flp kaydeder
+2. FL Studio (.flp), Ableton Live (.als), FL Studio Mobile (.flm), DAWproject, GarageBand ve BandLab projelerini ve MIDI dosyalarını açar; .flp, .als ve .dawproject kaydeder
 3. 100'den fazla dahili enstrüman ve efekt
 4. VST3, CLAP ve VST2 eklenti desteği, isteğe bağlı olarak ayrı işlemde izole
 5. Düşük gecikmeli ses: ASIO, paylaşımlı ve özel modda WASAPI
 6. Eski bilgisayarlarda bile hafif kalan çok çekirdekli motor
 7. Ses ve MIDI kaydı, ses düzenleyici, otomasyon klipleri
-8. WAV, FLAC, MP3, OGG ve stem olarak dışa aktarma
+8. WAV, FLAC, MP3, OGG, AIFF, M4A ve stem olarak dışa aktarma
 9. Türkçe dahil 15 dilde arayüz
 10. Ücretsiz ve açık kaynak (AGPL-3.0): hesap yok, reklam yok, telemetri yok
+11. ARA 2 plugin desteği, polifonik nota editörü ve sesten MIDI'ye dönüştürme
 
 ## Search terms
 

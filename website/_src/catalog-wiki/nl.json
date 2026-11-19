@@ -6545,7 +6545,7 @@
 "intro": "Transporter is een transient-looper: een detector met acht banden triggert de loops A en B, die de ingang opnieuw afspelen. Voeg hem toe aan een insert voor stutters en glitch-herhalingen.",
 "controls": [
 [
-"Dry level",
+"Dry-niveau",
 "Niveau van het onbewerkte signaal."
 ],
 [
@@ -8667,7 +8667,7 @@
 "Schaal van een uitgang."
 ],
 [
-"Polarity",
+"Polariteit",
 "Bipolaire of unipolaire offset."
 ],
 [
@@ -8897,7 +8897,7 @@
 "Zet het geluid van de video op mute."
 ],
 [
-"Afspelen volgt de host",
+"Afspelen aan host koppelen",
 "De songpositie stuurt de video aan; als dit uit staat, worden de eigen Afspelen en Stop van de speler gebruikt."
 ],
 [

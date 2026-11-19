@@ -62,7 +62,7 @@ Standardmäßig läuft ein Plugin innerhalb von LYNX SHARE, ein abstürzendes Pl
 
 Stürzt ein solches Plugin ab oder antwortet nicht mehr, wird es stummgeschaltet, eine Meldung erscheint, und LYNX SHARE läuft weiter. `Neu laden` in dieser Meldung startet das Plugin mit den Einstellungen des letzten Speicherstands oder Backups neu, ohne das Projekt erneut zu öffnen. Der Editor des Plugins öffnet sich in einem eigenen Fenster und lässt sich weder andocken noch anheften.
 
-Um das nur für ein einzelnes Plugin zu tun, nimm `In separatem Prozess ausführen` oder `Always run <plugin> in a separate process` im Wrapper-Menü des Plugin-Fensters. Stürzt der Editor eines Plugins ab, bietet die Meldung, die dann erscheint, auch das zweite an.
+Um das nur für ein einzelnes Plugin zu tun, nimm `In separatem Prozess ausführen` oder `<plugin> immer in separatem Prozess ausführen` im Wrapper-Menü des Plugin-Fensters. Stürzt der Editor eines Plugins ab, bietet die Meldung, die dann erscheint, auch das zweite an.
 
 Das funktioniert unter Windows und Linux, und seit 0.1.25 auch unter macOS.
 

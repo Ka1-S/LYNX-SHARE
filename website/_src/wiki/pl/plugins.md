@@ -62,7 +62,7 @@ Domyślnie plugin działa wewnątrz LYNX SHARE, więc plugin, który się wywali
 
 Jeśli taki plugin się wywali albo przestanie odpowiadać, zostaje wyciszony, pojawia się komunikat, a LYNX SHARE działa dalej. `Odśwież` w tym komunikacie uruchamia plugin ponownie z ustawieniami z ostatniego zapisu lub kopii zapasowej, bez ponownego otwierania projektu. Edytor pluginu otwiera się w osobnym oknie i nie można go zadokować ani przypiąć.
 
-Aby zrobić to tylko dla jednego pluginu, użyj `Uruchamiaj w osobnym procesie` albo `Always run <plugin> in a separate process` w menu wrappera w oknie pluginu. Gdy edytor pluginu się wywali, komunikat, który się pojawi, oferuje także to drugie.
+Aby zrobić to tylko dla jednego pluginu, użyj `Uruchamiaj w osobnym procesie` albo `Zawsze uruchamiaj <plugin> w osobnym procesie` w menu wrappera w oknie pluginu. Gdy edytor pluginu się wywali, komunikat, który się pojawi, oferuje także to drugie.
 
 Działa to w Windows i Linuksie, a od wersji 0.1.25 także w macOS.
 

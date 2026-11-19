@@ -89,7 +89,7 @@ Host melakukan ini:
 
 Tamu melakukan ini:
 
-1. Buka menu plugin salah satu channel atau slot efekmu. Plugin yang dibagikan muncul lebih dulu, di bawah `On <host>'s computer`.
+1. Buka menu plugin salah satu channel atau slot efekmu. Plugin yang dibagikan muncul lebih dulu, di bawah `Di komputer <host>`.
 2. Pilih salah satunya. Jendelanya mencantumkan parameter plugin sebagai slider, dengan `Cari parameter`.
 3. Tambahkan not dan gerakkan slider. Jendela menampilkan `Updating...` saat komputer host sedang me-render, lalu `Terbaru`.
 

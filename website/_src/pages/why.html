@@ -52,13 +52,15 @@
 <section class="why" id="projects"><div class="wrap split rev">
   <div class="prose">
     <h2 data-i18n="why.projects.t">Opens and writes other DAWs' projects</h2>
-    <p class="lead2" data-i18n="why.projects.l">FL Studio projects and Ableton Live sets open with File › Open and can be written back.</p>
+    <p class="lead2" data-i18n="why.projects.l">FL Studio projects, Ableton Live sets and DAWproject files open with File › Open and can be written back.</p>
     <p data-i18n="why.projects.p1">An .flp comes in with its channels, samples, patterns, arrangement, automation and mixer. A Live 11 or 12 set (.als) comes in with its tracks, clips and Session view, which lands in the clip grid. FL Studio Mobile projects (.flm) import the arrangement, samples, drum kits, DW Sampler and DirectWave programs, the Slicer, five of its synths, its effects, its automation and its chord sets. FL Studio Mobile Rack channels in an .flp play on the same engines. The original file is never changed: saving writes a .lynx file.</p>
     <div class="tablewrap"><table>
       <thead><tr><th data-i18n="why.projects.c1">Format</th><th data-i18n="why.projects.c2">Open</th><th data-i18n="why.projects.c3">Export</th><th data-i18n="why.projects.c4">What does not convert</th></tr></thead>
       <tbody>
         <tr><td>.flp</td><td data-i18n="why.yes">Yes</td><td data-i18n="why.yes">Yes</td><td data-i18n="why.projects.r1">FLEX packs are never opened. On export, LYNX-only instruments and effects are rendered to audio or swapped for the nearest FL plugin, and modulators are left out.</td></tr>
         <tr><td>.als</td><td data-i18n="why.yes">Yes</td><td data-i18n="why.yes">Yes</td><td data-i18n="why.projects.r2">Many of Live's own effects and instruments become LYNX SHARE's own, Hybrid Reverb, Roar, Grain Delay and Drum Buss among them; the ones with no equivalent are dropped and listed. On export, LYNX SHARE's own instruments and effects, effect-parameter automation and insert-to-insert routes are not written.</td></tr>
+        <tr><td>.dawproject</td><td data-i18n="why.yes">Yes</td><td data-i18n="why.yes">Yes</td><td data-i18n="why.projects.r4">The open exchange format of Bitwig, Studio One, Cubase and others. Note effects, MIDI expressions and unknown built-in devices are left out on import; the clip grid, other arrangements and some per-note details on export. Every loss is listed.</td></tr>
+        <tr><td>.band, .blx</td><td data-i18n="why.yes">Yes</td><td data-i18n="why.no">No</td><td data-i18n="why.projects.r5">GarageBand and BandLab projects open as Simple-workflow tracks with their regions, tempo, key and mix. Their instrument sounds are not stored in a readable form, so instrument tracks play LYNX SHARE's built-in synth and drums.</td></tr>
         <tr><td>.flm</td><td data-i18n="why.yes">Yes</td><td data-i18n="why.no">No</td><td data-i18n="why.projects.r3">Instruments other than MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw, DW Sampler, Slicer, DirectWave and the samplers play the built-in synth. Factory sounds play when you point LYNX SHARE at your own copy of FL Studio Mobile's Resources folder.</td></tr>
       </tbody>
     </table></div>

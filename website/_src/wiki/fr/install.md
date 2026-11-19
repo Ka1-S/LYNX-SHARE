@@ -64,7 +64,7 @@ Le dossier contient vos options, la langue choisie (`language.txt`), vos raccour
 
 ## Mettre à jour
 
-Au démarrage, LYNX SHARE demande à GitHub le numéro de la version la plus récente. Rien sur vous n'est envoyé. Quand une nouvelle version est sortie, une barre affiche `LYNX SHARE <version> is available` avec un bouton `Nouveautés` et un bouton de mise à jour. `Aide › Rechercher des mises à jour...` interroge à tout moment.
+Au démarrage, LYNX SHARE demande à GitHub le numéro de la version la plus récente. Rien sur vous n'est envoyé. Quand une nouvelle version est sortie, une barre affiche `LYNX SHARE <version> est disponible` avec un bouton `Nouveautés` et un bouton de mise à jour. `Aide › Rechercher des mises à jour...` interroge à tout moment.
 
 | Build | Comment il se met à jour |
 |---|---|
