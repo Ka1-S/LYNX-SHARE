@@ -703,6 +703,16 @@ public:
     void setTrackOutput (int track, int channel, OutputMode mode);
     // Opens the device output channels the song's targets need (that the device has). UI thread.
     void openTargetedOutputs();
+    // Round 190nc (DL-110, Live's Solo/Cue, core/SessionMixer.h): the Main strip's Cue Out (outputDefault = as Main Out;
+    // opens its channels), Solo/Cue Mode switch and Cue Volume (0..1, Live's volume taper; `undoable` false while dragged).
+    // Undoable edits of the clip grid's SessionCue (made with the grid). UI thread.
+    void setCueOutput (int channel, OutputMode mode);
+    void setCueMode (bool cue);
+    void setCueVolume (float position, bool undoable);
+    // How many output channels the open device has (0 without one)
+    int outputChannelCount() const { return outputCountForCheck >= 0 ? outputCountForCheck : (int) getOutputChannelNames().size(); }
+    // (tests and shots) a device with `count` outputs as far as outputChannelCount is concerned (−1: the real one)
+    void setOutputChannelCountForCheck (int count) noexcept { outputCountForCheck = count; }
     // The hardware inserts' channels (round 164d): opens their outputs and, when one returns from an input, the device
     // input. UI thread.
     void openHardwareInsertIo();
@@ -1680,6 +1690,7 @@ private:
     std::atomic<bool> performanceMidiOn { false }; // Performance mode is on with a zone (UI writes, MIDI thread reads)
     perf::MidiMapping performanceMidi;             // MIDI thread only
     HardwareOutput hwOutput;                              // inserts' hardware outputs (renderer -> callback)
+    int outputCountForCheck = -1;                         // round 190nc: setOutputChannelCountForCheck
     std::array<int, HardwareOutput::maxChannels> outputSlot {}; // device output channel -> callback output index (-1: closed)
     std::atomic<int> masterOutChannel { outputDefault };  // the Master's target (UI -> audio)
     std::atomic<int> masterOutMode { 0 };

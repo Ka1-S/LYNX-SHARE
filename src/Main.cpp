@@ -2790,6 +2790,14 @@ public:
             return;
         }
 
+        if (args.contains ("--rack190ncshot") && args.indexOf ("--rack190ncshot") + 1 < args.size())
+        {
+            // LYNX --rack190ncshot prefix: round 190nc off screen (src/RackShot190nc.inc): Live's rack with its devices
+            // inline and the Macro Map overlay (DL-95), the Session mixer's Solo / Cue (DL-110)
+            setApplicationReturnValue (runRackShot190nc (args[args.indexOf ("--rack190ncshot") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
         if (args.contains ("--details190mpshot"))
         {
             // LYNX --details190mpshot prefix project.flp: round 190mp off screen (src/DetailsShot190mp.inc)
@@ -17306,6 +17314,7 @@ private:
 #include "DetailsShot190mf.inc" // round 190mf
 #include "DetailsShot190mk.inc" // round 190mk
 #include "DetailsShot190mp.inc" // round 190mp
+#include "RackShot190nc.inc" // round 190nc
     // --trackautoshot190gz (round 190gz): see the dispatch above
     bool runTrackAutoShot190gz (const juce::String& prefix)
     {

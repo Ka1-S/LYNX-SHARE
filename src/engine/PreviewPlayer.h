@@ -5,6 +5,7 @@
 #include <array>
 
 #include "core/FlResampler.h"
+#include "core/HardwareOutput.h"
 #include "core/Instruments.h"
 
 namespace lynx
@@ -43,6 +44,14 @@ public:
     // instead of stopping. play() / playBrowser() / play (nullptr) end it. UI thread.
     void playScrub (std::shared_ptr<const SampleData> sample, std::int64_t startFrame, float gain = 0.8f);
     void setScrubSpeed (double speed) noexcept { scrubSpeed.store (speed, std::memory_order_relaxed); }
+    // Round 190nc (DL-110): where Browser previews go while Live's Cue mode is in effect (the Cue Out's first device channel
+    // and its mode; -1 = the main output) and the buses that reach the device. Any thread.
+    void setCueOutput (HardwareOutput* buses, int firstChannel, OutputMode mode) noexcept
+    {
+        cueOut = buses;
+        cueMode.store ((int) mode, std::memory_order_relaxed);
+        cueFirst.store (firstChannel, std::memory_order_relaxed);
+    }
     // Any thread: the frame being played in the current sample, or -1 when nothing plays.
     double getPlayPosition() const noexcept { return playPosition.load (std::memory_order_relaxed); }
 
@@ -65,6 +74,9 @@ public:
     void setStateInformation (const void*, int) override {}
 
 private:
+    void renderBlock (juce::AudioBuffer<float>& buffer);
+    HardwareOutput* cueOut = nullptr;
+    std::atomic<int> cueFirst { -1 }, cueMode { 0 };
     juce::SpinLock lock;                       // the audio thread only tries (never waits)
     std::shared_ptr<const SampleData> pending; // swapped by the UI
     bool hasPending = false;

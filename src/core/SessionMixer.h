@@ -14,6 +14,8 @@
 #include <vector>
 
 #include "core/DetailChain.h"
+#include "core/HardwareOutput.h"
+#include "core/Rack.h"
 #include "core/Song.h"
 
 namespace lynx::sessionmixer
@@ -96,6 +98,74 @@ inline void solo (Song& song, int insert, bool exclusive)
                        && std::none_of (mixer.begin() + 1, mixer.end(), [&] (const MixerTrack& m) { return &m != &mixer[(std::size_t) insert] && m.solo; });
     for (std::size_t i = 1; i < mixer.size(); ++i)
         mixer[i].solo = ! alone && (int) i == insert;
+}
+
+// --- Solo / Cue (round 190nc, DL-110; Live 12 manual 18.6 "Soloing and Cueing", from the manual: Live's Cue mode was
+// not captured, the owner's device has one output pair) ------------------------------------------------------------
+// Live: the Main track's Solo/Cue Mode switch turns the tracks' Solo switches into Cue switches (headphone icons); a
+// cued track's output is heard through the Cue Out, at the Cue Volume, and still at Main as its Track Activator says;
+// previewed files go to the Cue Out too. The Cue Out "has to be set to an output other than that selected for Main":
+// with one shared output pair the switch stays on Solo (captured 190mv B1: Cue Out 1/2 or 1 with Main Out 1/2, the
+// switch does not toggle).
+inline const SessionCue& cueOf (const Song& song) noexcept
+{
+    static const SessionCue none;
+    return song.clipGrid ? song.clipGrid->cue : none;
+}
+// The device channels of the Main Out (the Master's output; outputDefault = the first pair) and of the Cue Out
+// (outputDefault = the same as Main Out): { first, count }
+inline std::pair<int, int> mainOutChannels (const Song& song) noexcept
+{
+    if (song.mixer.empty() || song.mixer[0].outputChannel == outputDefault)
+        return { 0, 2 };
+    return outputChannelsOf (song.mixer[0].outputChannel, song.mixer[0].outputMode);
+}
+inline std::pair<int, int> cueOutChannels (const Song& song) noexcept
+{
+    const auto& cue = cueOf (song);
+    return cue.out == outputDefault ? mainOutChannels (song) : outputChannelsOf (cue.out, cue.outMode);
+}
+// The Cue Out is an output of the device (`deviceChannels` outputs) that shares no channel with the Main Out
+inline bool cueOutputSeparate (const Song& song, int deviceChannels) noexcept
+{
+    const auto [m0, mn] = mainOutChannels (song);
+    const auto [c0, cn] = cueOutChannels (song);
+    if (cn <= 0 || c0 < 0 || c0 + cn > deviceChannels || c0 + cn > HardwareOutput::maxChannels)
+        return false;
+    return c0 + cn <= m0 || m0 + mn <= c0;
+}
+// Cue mode in effect: the switch on Cue and the Cue Out separate (else the Solo switches stay Solo switches)
+inline bool cueActive (const Song& song, int deviceChannels) noexcept
+{
+    return cueOf (song).cueMode && cueOutputSeparate (song, deviceChannels);
+}
+// The Cue Volume as a gain: Live's volume taper (the rack chain's, REA_rodada183c §4: 0.85 = 0 dB, 1 = +6 dB, 0 = silence)
+inline float cueGain (float position) noexcept { return rack::volumeGain (std::clamp (position, 0.0f, 1.0f)); }
+// A Cue switch pressed: as Solo (exclusive unless Ctrl / Cmd), on the Cue flags
+inline void cue (Song& song, int insert, bool exclusive)
+{
+    if (! validInsert (song, insert))
+        return;
+    auto& mixer = song.mixer;
+    if (! exclusive)
+    {
+        mixer[(std::size_t) insert].cue = ! mixer[(std::size_t) insert].cue;
+        return;
+    }
+    const auto alone = mixer[(std::size_t) insert].cue
+                       && std::none_of (mixer.begin() + 1, mixer.end(), [&] (const MixerTrack& m) { return &m != &mixer[(std::size_t) insert] && m.cue; });
+    for (std::size_t i = 1; i < mixer.size(); ++i)
+        mixer[i].cue = ! alone && (int) i == insert;
+}
+// The Cue Out / Main Out box text as Live writes it: "1/2" for a stereo pair, "1" for one channel (Live's chooser
+// lists the pairs and the single outputs, 190mv B1: "1/2, 1, 2")
+inline std::string outputBoxText (int channel, OutputMode mode)
+{
+    if (channel == outputDefault)
+        channel = 0, mode = OutputMode::stereo;
+    if (channel < 0)
+        return "-";
+    return mode == OutputMode::stereo ? std::to_string (channel + 1) + "/" + std::to_string (channel + 2) : std::to_string (channel + 1);
 }
 
 // --- In/Out section -----------------------------------------------------------------------------------------------

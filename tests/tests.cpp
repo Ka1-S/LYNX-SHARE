@@ -17982,3 +17982,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Details190mkTests.inc" // round details6_190mk: Live insert marker, rack zip, details pass 6
 #include "Details190mpTests.inc" // round details7_190mp: FL Half speed, Auto name clips, Restretch all, details pass 7
 #include "Issues190mqTests.inc" // round 190mq: issues #211 / #212 / #213 (paste per layout, key-row shading, ruler double click)
+#include "Rack190ncTests.inc" // round 190nc (0.1.31): Live's Solo / Cue (DL-110) and the Macro Map pick (DL-95)

@@ -4,6 +4,7 @@
 #include "core/Dropouts.h"
 #include "core/HostTimelineScope.h"
 #include "core/Rack.h"
+#include "core/SessionMixer.h"
 #include "core/MixerOps.h"
 #include "core/FlSettings.h"
 
@@ -1785,6 +1786,24 @@ void RackState::buildPdc (const RackState* previous)
                 if (r.track == (int) t)
                     old = &r.delay;
         hwRoutes.push_back ({ (int) t, track.outputChannel, track.outputMode, line (length, old) });
+    }
+    // round 190nc (DL-110, Live's Cue mode): each cued track's output also to the Cue Out, lined up with Main (the routes
+    // exist only while the Cue Out is separate from the Main Out; channels the device lacks are dropped by the callback)
+    if (sessionmixer::cueActive (song, HardwareOutput::maxChannels))
+    {
+        const auto& cue = sessionmixer::cueOf (song);
+        for (std::size_t t = 1; t < song.mixer.size() && t < (std::size_t) maxMixerTracks; ++t)
+        {
+            if (! song.mixer[t].cue)
+                continue;
+            const auto length = t < pdc.outLat.size() ? std::max (0, pdc.total - pdc.outLat[t]) : 0;
+            const std::shared_ptr<DelayLine>* old = nullptr;
+            if (previous != nullptr)
+                for (const auto& r : previous->hwRoutes)
+                    if (r.track == (int) t && r.cue)
+                        old = &r.delay;
+            hwRoutes.push_back ({ (int) t, cue.out, cue.outMode, line (length, old), true });
+        }
     }
 
     bypassWhenIdle.assign (song.mixer.size(), 0);
@@ -5929,6 +5948,17 @@ void RackRenderer::mixHardwareOutputs (const RackState& state, int n) noexcept
 
         if (l == nullptr)
             continue;
+        if (route.cue) // round 190nc: the Cue Volume
+            if (const auto g = hwOut->cueGain.load (std::memory_order_relaxed); g != 1.0f)
+            {
+                for (int i = 0; i < n; ++i) // (in place when the delay already wrote them)
+                {
+                    sl[i] = l[i] * g;
+                    sr[i] = r[i] * g;
+                }
+                l = sl;
+                r = sr;
+            }
 
         const auto [first, count] = outputChannelsOf (route.channel, route.mode);
         auto* a = hwOut->bus (first, liveInputOffset, n);

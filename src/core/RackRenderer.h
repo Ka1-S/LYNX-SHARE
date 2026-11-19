@@ -204,6 +204,7 @@ struct RackState
         int channel = 0;
         OutputMode mode = OutputMode::stereo;
         std::shared_ptr<DelayLine> delay;
+        bool cue = false; // round 190nc (DL-110): a cued track to the Cue Out, at HardwareOutput::cueGain
     };
     std::vector<HwRoute> hwRoutes;
     // FL's "Bypass track latency compensation › When recording or not playing" (REA round 165f-mixer): these tracks'

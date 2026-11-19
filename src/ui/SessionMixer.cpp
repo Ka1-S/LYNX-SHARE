@@ -225,6 +225,41 @@ void drawLiveKnob (juce::Graphics& g, juce::Rectangle<float> box, float value01)
     // (ui/LiveLook.h's mixer knob, from a cached tile: drawn straight, each ring was a new Direct2D path geometry)
     theme::drawLiveKnobTile (g, box, value01, 0.0f, 1, &lv::drawMixerKnobDirect);
 }
+// Round 190nc (DL-110, 190mv B1 live-solo-cue.png / co3.png, Main x 1557..1583 y 754..780): the Cue Volume knob, Live's
+// open ring in its cue blue #3C6AB6 with the #181818 needle and a #838383 headphone glyph in the ring's gap
+void drawCueKnobDirect (juce::Graphics& g, juce::Rectangle<float> box, float value01, float)
+{
+    const auto centre = box.getCentre();
+    const auto radius = box.getWidth() * 0.5f - 1.5f;
+    constexpr auto from = -juce::MathConstants<float>::pi * 0.75f, to = juce::MathConstants<float>::pi * 0.75f;
+    juce::Path ring;
+    ring.addCentredArc (centre.x, centre.y, radius, radius, 0.0f, from, to, true);
+    g.setColour (juce::Colour (0xff3c6ab6));
+    g.strokePath (ring, juce::PathStrokeType (3.0f, juce::PathStrokeType::curved, juce::PathStrokeType::butt));
+    const auto angle = from + juce::jlimit (0.0f, 1.0f, value01) * (to - from);
+    g.setColour (juce::Colour (0xff181818));
+    g.drawLine ({ centre, centre.getPointOnCircumference (radius + 1.0f, angle) }, 3.0f);
+    // the headphones: a 6 px band over two ear cups, in the gap at the foot of the ring
+    const auto cx = centre.x, top = box.getBottom() - 8.0f;
+    g.setColour (juce::Colour (0xff838383));
+    juce::Path band;
+    band.addCentredArc (cx, top + 3.0f, 3.0f, 3.0f, 0.0f, -juce::MathConstants<float>::halfPi, juce::MathConstants<float>::halfPi, true);
+    g.strokePath (band, juce::PathStrokeType (1.0f));
+    g.fillRect (cx - 3.5f, top + 3.0f, 2.0f, 3.0f);
+    g.fillRect (cx + 1.5f, top + 3.0f, 2.0f, 3.0f);
+}
+// Round 190nc: Live's Cue switch glyph (manual 18.6: "Cue switches with headphone icons"; Live's Cue mode itself was
+// not captured): headphones in the 23 x 13 Solo button, in its ink
+void drawHeadphones (juce::Graphics& g, juce::Rectangle<int> button, juce::Colour ink)
+{
+    const auto c = button.toFloat().getCentre();
+    g.setColour (ink);
+    juce::Path band;
+    band.addCentredArc (c.x, c.y + 0.5f, 3.5f, 3.5f, 0.0f, -juce::MathConstants<float>::halfPi, juce::MathConstants<float>::halfPi, true);
+    g.strokePath (band, juce::PathStrokeType (1.0f));
+    g.fillRect (c.x - 4.0f, c.y, 2.0f, 3.5f);
+    g.fillRect (c.x + 2.0f, c.y, 2.0f, 3.5f);
+}
 // round 190kc: a return's send knob that is switched off
 void drawLiveKnobOff (juce::Graphics& g, juce::Rectangle<float> box, float value01)
 {
@@ -585,6 +620,10 @@ juce::Rectangle<int> SessionMixerComponent::partBounds (int column, Part part, i
         case Part::crossfader:
             return sections.crossfade > 0 && main ? juce::Rectangle<int> (x0 + 8, crossY + 4, w - 16, 16) : juce::Rectangle<int>();
         case Part::peak: // (Live's look only)
+        case Part::cueOut:
+        case Part::mainOut:
+        case Part::soloCue:
+        case Part::cueVolume:
         case Part::none:
             break;
     }
@@ -660,6 +699,17 @@ juce::Rectangle<int> SessionMixerComponent::livePartBounds (int column, Part par
             return { x0 + (part == Part::xfadeA ? 11 : 38), crossY + 4, 24, 13 };
         case Part::crossfader: // (the line x 1549..1618 and the triangle to y 785 on a Main strip at x 1540, section y 769)
             return sections.crossfade > 0 && main ? R (x0 + 9, crossY + 4, w - 16, 13) : R();
+        // round 190nc (DL-110, 190mv B1 co3.png, Main x 1540): "Main Out" on the tracks' Audio To row, "Cue Out" 31 px
+        // above it (box y 581 vs 612); the Solo/Cue switch 25 x 13 at y 739 and the Cue Volume knob 27 px at y 754,
+        // centred under the pan (x 1558..1582, 1557..1583)
+        case Part::mainOut:
+            return sections.io > 0 && main ? full (ioY + 93, 16) : R();
+        case Part::cueOut:
+            return sections.io > 0 && main ? full (ioY + 62, 16) : R();
+        case Part::soloCue:
+            return sections.volume > 0 && main ? R (centreX - 11, volumeY + 105, 25, 13) : R();
+        case Part::cueVolume:
+            return sections.volume > 0 && main ? R (centreX - 13, volumeY + 120, 27, 27) : R();
         case Part::none:
             break;
     }
@@ -676,7 +726,8 @@ SessionMixerComponent::Hit SessionMixerComponent::hitAt (juce::Point<int> p) con
     if (column != mainColumn && ! isReturn (column) && (column < 0 || column >= columns))
         return {};
     for (auto part : { Part::inType, Part::inChannel, Part::monIn, Part::monAuto, Part::monOff, Part::output, Part::delay, Part::volume, Part::pan,
-                       Part::activator, Part::solo, Part::arm, Part::fader, Part::peak, Part::xfadeA, Part::xfadeB, Part::crossfader })
+                       Part::activator, Part::solo, Part::arm, Part::fader, Part::peak, Part::xfadeA, Part::xfadeB, Part::crossfader, Part::cueOut,
+                       Part::mainOut, Part::soloCue, Part::cueVolume })
         if (partBounds (column, part).contains (p))
             return { column, part, 0 };
     for (int r = 0; r < (int) rows.size(); ++r)
@@ -748,6 +799,20 @@ ui::ValueSpec SessionMixerComponent::specFor (const Hit& hit) const
             s.target = AutomationTarget { AutomationTargetKind::crossfader, 0, 0, 0 };
             return s;
         }
+        case Part::cueVolume: // round 190nc: Live's volume taper (0.85 = 0 dB)
+        {
+            ui::ValueSpec s;
+            s.name = tr ("Main") + " - " + tr ("Cue Volume");
+            s.minimum = 0.0;
+            s.maximum = 1.0;
+            s.defaultValue = 0.85;
+            s.pixelsForRange = 200.0;
+            s.toText = [] (double v) {
+                const auto g = sessionmixer::cueGain ((float) v);
+                return g <= 0.0f ? juce::String ("-inf dB") : juce::String (juce::Decibels::gainToDecibels (g), 1) + " dB";
+            };
+            return s;
+        }
         case Part::volume:
         case Part::fader:
         {
@@ -809,6 +874,7 @@ double SessionMixerComponent::valueFor (const Hit& hit) const
         case Part::send: return std::max (0.0f, sessionmixer::sendPosition (song, insert, hit.row < (int) rows.size() ? rows[(std::size_t) hit.row] : 0));
         case Part::delay: return sessionmixer::trackDelayMs (song, insert) + 0.0; // (+ 0.0: no "-0.00")
         case Part::crossfader: return song.crossfader; // (round 190kc)
+        case Part::cueVolume: return sessionmixer::cueOf (song).volume; // (round 190nc)
         default: break;
     }
     return 0.0;
@@ -873,6 +939,9 @@ void SessionMixerComponent::setValue (const Hit& hit, double v)
         case Part::crossfader: // (round 190kc: a level, as a fader: the snapshot in use hears it at once)
             engine.editLevels ([v = (float) juce::jlimit (-1.0, 1.0, v)] (Song& s) { s.crossfader = v; });
             break;
+        case Part::cueVolume: // (round 190nc: the drag's undo point is set when it starts)
+            engine.setCueVolume ((float) v, false);
+            break;
         default:
             break;
     }
@@ -887,6 +956,7 @@ void SessionMixerComponent::paint (juce::Graphics& g)
     {
         // round 190jn: Live's strips on its #242424 separators
         g.fillAll (lv::separator);
+        cueChannels = engine.outputChannelCount(); // (round 190nc: the device's outputs, once per paint)
         if (sections.total() == 0)
             return;
         auto* parent = getParentComponent();
@@ -1186,6 +1256,7 @@ void SessionMixerComponent::paintStripLive (juce::Graphics& g, int column, int s
     const auto content = juce::Rectangle<int> (main ? x0 + 2 : x0, liveTop, w - 2, sections.total());
     const auto hot = [this, column] (Part p, int row = 0) { return hover == Hit { column, p, row } || dragging == Hit { column, p, row }; };
     const auto* m = strip.insert >= 0 && strip.insert < (int) song.mixer.size() ? &song.mixer[(std::size_t) strip.insert] : nullptr;
+    const auto cueShown = ! main && sessionmixer::cueActive (song, cueChannels); // (round 190nc)
 
     // the strip (selected track #464646), each section's 2 px separator under it, the track-colour stripe at the foot
     // (round 190lr's grouped strips; rollup step 10: the grid's selection holds Playlist tracks, a column shows trackOf (column))
@@ -1232,6 +1303,17 @@ void SessionMixerComponent::paintStripLive (juce::Graphics& g, int column, int s
         text (t, r, juce::Justification::centred, on ? lv::ink : lv::text);
     };
     const auto label = [&] (int y, const juce::String& t) { text (t, { content.getX() + 4, y, content.getWidth() - 8, 12 }, juce::Justification::centredLeft); };
+    if (sections.io > 0 && main) // round 190nc (DL-110): Cue Out over Main Out (190mv B1 co3.png)
+    {
+        const auto y0 = liveTop;
+        const auto& cue = sessionmixer::cueOf (song);
+        label (y0 + 50, tr ("Cue Out"));
+        const auto cueText = cue.out == outputDefault && ! song.mixer.empty() ? sessionmixer::outputBoxText (song.mixer[0].outputChannel, song.mixer[0].outputMode)
+                                                                              : sessionmixer::outputBoxText (cue.out, cue.outMode);
+        box (Part::cueOut, utf8 (cueText), true);
+        label (y0 + 81, tr ("Main Out"));
+        box (Part::mainOut, song.mixer.empty() ? juce::String ("1/2") : utf8 (sessionmixer::outputBoxText (song.mixer[0].outputChannel, song.mixer[0].outputMode)), true);
+    }
     if (sections.io > 0 && ! main)
     {
         const auto y0 = liveTop;
@@ -1360,8 +1442,28 @@ void SessionMixerComponent::paintStripLive (juce::Graphics& g, int column, int s
                   ! active ? liveOffInk : soloing ? liveSoloingInk : lv::ink);
             g.setFont (liveFont());
             const auto solo = partBounds (column, Part::solo);
-            liveWell (g, solo, m->solo ? liveSoloOn : lv::well);
-            text ("S", solo, juce::Justification::centred, m->solo ? lv::ink : lv::text);
+            if (cueShown) // round 190nc (DL-110, Live manual 18.6): in Cue mode the Solo switch is a Cue switch with headphones
+            {
+                liveWell (g, solo, m->cue ? liveSoloOn : lv::well);
+                drawHeadphones (g, solo, m->cue ? lv::ink : lv::text);
+            }
+            else
+            {
+                liveWell (g, solo, m->solo ? liveSoloOn : lv::well);
+                text ("S", solo, juce::Justification::centred, m->solo ? lv::ink : lv::text);
+            }
+        }
+        else // round 190nc (DL-110): the Main strip's Solo/Cue Mode switch and Cue Volume knob (190mv B1)
+        {
+            const auto sw = partBounds (column, Part::soloCue);
+            const auto separate = sessionmixer::cueOutputSeparate (song, cueChannels);
+            const auto cueMode = separate && sessionmixer::cueOf (song).cueMode;
+            // (captured with one output pair, the switch unavailable: #757575 with its word in #363636; Cue lit in the
+            // Solo blue: from the manual, not captured)
+            liveWell (g, sw, cueMode ? liveSoloOn : juce::Colour (0xff757575));
+            text (cueMode ? tr ("Cue") : tr ("Solo"), sw, juce::Justification::centred, separate ? lv::ink : lv::surface);
+            const auto knob = partBounds (column, Part::cueVolume).toFloat();
+            theme::drawLiveKnobTile (g, knob, sessionmixer::cueOf (song).volume, 0.0f, 3, &drawCueKnobDirect);
         }
         paintMeterLive (g, strip.insert, partBounds (column, Part::fader));
     }
@@ -1497,6 +1599,7 @@ void SessionMixerComponent::mouseDown (const juce::MouseEvent& e)
         case Part::send:
         case Part::delay:
         case Part::crossfader:
+        case Part::cueVolume:
         {
             if (popup && hit.part == Part::send && isReturn (hit.column)) // (round 190kc: Enable Send / Enable All Sends)
             {
@@ -1523,6 +1626,8 @@ void SessionMixerComponent::mouseDown (const juce::MouseEvent& e)
                 ui::flashValueTip (*this, partBounds (hit.column, hit.part, hit.row), spec.text (spec.defaultValue));
                 return;
             }
+            if (hit.part == Part::cueVolume) // (round 190nc: one undo step for the whole drag)
+                engine.setCueVolume ((float) value, true);
             dragging = hit;
             if (hit.part == Part::fader || hit.part == Part::crossfader)
                 mouseDrag (e); // (the handle jumps to the click)
@@ -1548,8 +1653,20 @@ void SessionMixerComponent::mouseDown (const juce::MouseEvent& e)
                 });
             break;
         case Part::solo:
-            if (! popup)
+            if (! popup && cueInEffect()) // round 190nc (DL-110): Live's Cue switch in Cue mode
+                engine.editSong ([insert, exclusive = ! e.mods.isCommandDown()] (Song& s) { sessionmixer::cue (s, insert, exclusive); });
+            else if (! popup)
                 engine.editSong ([insert, exclusive = ! e.mods.isCommandDown()] (Song& s) { sessionmixer::solo (s, insert, exclusive); });
+            break;
+        case Part::soloCue: // round 190nc: the switch moves only while the Cue Out is separate (190mv B1: else it stays Solo)
+            if (! popup && sessionmixer::cueOutputSeparate (song, engine.outputChannelCount()))
+                engine.setCueMode (! sessionmixer::cueOf (song).cueMode);
+            break;
+        case Part::cueOut:
+            showDeviceOutputMenu (true);
+            break;
+        case Part::mainOut:
+            showDeviceOutputMenu (false);
             break;
         case Part::arm:
             if (! popup)
@@ -1648,6 +1765,7 @@ void SessionMixerComponent::mouseDoubleClick (const juce::MouseEvent& e)
         case Part::pan:
         case Part::send:
         case Part::crossfader: // (round 190kc: back to the centre)
+        case Part::cueVolume:  // (round 190nc: 0 dB)
             setValue (hit, specFor (hit).defaultValue);
             break;
         case Part::volume:
@@ -1663,7 +1781,7 @@ void SessionMixerComponent::mouseWheelMove (const juce::MouseEvent& e, const juc
 {
     const auto hit = hitAt (e.getPosition());
     if (hit.part == Part::volume || hit.part == Part::fader || hit.part == Part::pan || hit.part == Part::send || hit.part == Part::delay
-        || hit.part == Part::crossfader)
+        || hit.part == Part::crossfader || hit.part == Part::cueVolume)
     {
         const auto spec = specFor (hit);
         if (const auto v = ui::wheelValue (valueFor (hit), e, wheel, spec))
@@ -1716,7 +1834,9 @@ juce::String SessionMixerComponent::tipFor (const Hit& hit) const
         case Part::fader: return tr ("Drag the handle to set the volume; double-click the meter for 0 dB");
         case Part::pan: return tr ("Pan");
         case Part::activator: return tr ("Track Activator: switches the track's mixer track on or off");
-        case Part::solo: return tr ("Solo (Ctrl-click: solo several tracks)");
+        case Part::solo:
+            return cueInEffect() ? tr ("Cue: hear the track through the Cue Out (Ctrl-click: cue several tracks)")
+                                 : tr ("Solo (Ctrl-click: solo several tracks)");
         case Part::arm: return tr ("Arm Recording (Ctrl-click: arm several tracks)");
         case Part::peak: return tr ("Peak level: the loudest peak since the last reset. Click to reset it");
         // round 190kc
@@ -1724,6 +1844,13 @@ juce::String SessionMixerComponent::tipFor (const Hit& hit) const
         case Part::xfadeA: return tr ("Crossfade Assign A: the crossfader fades this track out as it moves to B");
         case Part::xfadeB: return tr ("Crossfade Assign B: the crossfader fades this track out as it moves to A");
         case Part::crossfader: return tr ("Crossfader: fades between the tracks assigned to A and B. Right-click for its curve");
+        case Part::cueOut: return tr ("Cue Out: the outputs that play the cued tracks and the Browser's previews in Cue mode (an output other than Main Out)");
+        case Part::mainOut: return tr ("Main Out: the outputs the Main track plays to");
+        case Part::soloCue:
+            return sessionmixer::cueOutputSeparate (engine.getSong(), engine.outputChannelCount())
+                       ? tr ("Solo/Cue Mode: Cue turns the tracks' Solo switches into Cue switches that send them to the Cue Out")
+                       : tr ("Solo/Cue Mode: set the Cue Out to an output other than Main Out to use Cue mode");
+        case Part::cueVolume: return tr ("Cue Volume: the level of the Cue Out");
         case Part::none: break;
     }
     return {};
@@ -1814,6 +1941,51 @@ juce::PopupMenu SessionMixerComponent::crossfaderMenu()
             repaint();
         });
     return menu;
+}
+
+bool SessionMixerComponent::cueInEffect() const
+{
+    return sessionmixer::cueActive (engine.getSong(), engine.outputChannelCount());
+}
+
+// Round 190nc (DL-110): Live's Cue Out / Main Out choosers list the device's stereo pairs, then its single outputs, in
+// Live's own numbering (190mv B1: "1/2, 1, 2, Configure..."; LYNX has no Configure item: the outputs come from the device)
+juce::PopupMenu SessionMixerComponent::deviceOutputMenu (bool cue)
+{
+    const auto& song = engine.getSong();
+    const auto& c = sessionmixer::cueOf (song);
+    auto now = cue ? c.out : (song.mixer.empty() ? outputDefault : song.mixer[0].outputChannel);
+    auto nowMode = cue ? c.outMode : (song.mixer.empty() ? OutputMode::stereo : song.mixer[0].outputMode);
+    if (now == outputDefault)
+    {
+        const auto [first, count] = cue ? sessionmixer::mainOutChannels (song) : std::pair<int, int> { 0, 2 };
+        now = first;
+        nowMode = count == 2 ? OutputMode::stereo : nowMode;
+    }
+    juce::PopupMenu menu;
+    auto names = engine.getOutputChannelNames();
+    for (auto k = (int) names.size(); k < engine.outputChannelCount(); ++k) // (a device given for a check)
+        names.push_back ("Out " + std::to_string (k + 1));
+    for (const auto& t : outputTargets (names))
+    {
+        const auto mode = t.mode;
+        menu.addItem (utf8 (sessionmixer::outputBoxText (t.channel, mode)), true, t.channel == now && (mode == OutputMode::stereo) == (nowMode == OutputMode::stereo),
+                      [this, cue, ch = t.channel, mode] {
+                          if (cue)
+                              engine.setCueOutput (ch, mode);
+                          else
+                              engine.setTrackOutput (0, ch, mode);
+                          repaint();
+                      });
+    }
+    if (menu.getNumItems() == 0)
+        menu.addItem (tr ("No audio device"), false, false, nullptr);
+    return menu;
+}
+
+void SessionMixerComponent::showDeviceOutputMenu (bool cue)
+{
+    deviceOutputMenu (cue).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
 }
 
 void SessionMixerComponent::showOutputMenu (int insert)
