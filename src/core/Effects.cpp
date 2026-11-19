@@ -229,7 +229,8 @@ public:
     explicit Compressor (const EffectParams* initial = nullptr)
         : vintageAtStart (initial != nullptr && (*initial)[8] >= 0.5f),
           renAtStart (initial != nullptr && (*initial)[8] >= 0.5f && (*initial)[(std::size_t) compressorRenLaw] >= 0.5f),
-          voxAtStart (initial != nullptr && (*initial)[8] >= 0.5f && (*initial)[(std::size_t) compressorVoxLaw] >= 0.5f) {}
+          voxAtStart (initial != nullptr && (*initial)[8] >= 0.5f && (*initial)[(std::size_t) compressorVoxLaw] >= 0.5f),
+          apiAtStart (initial != nullptr && (*initial)[(std::size_t) compressorApiLaw] >= 0.5f) {}
 
     void prepare (double sr) noexcept override
     {
@@ -239,7 +240,7 @@ public:
         vox.prepare (sr);
         apiOn = false;
         reset();
-        if (vintageAtStart)
+        if (vintageAtStart && ! apiAtStart) // (rollup step 12: the API-2500 bus law, first in process(), has no latency)
             latency.store (voxAtStart ? vox.latency() : renAtStart ? ren.latency() : vintage.latency(), std::memory_order_relaxed);
     }
     void reset() noexcept override
@@ -611,7 +612,7 @@ private:
     rendyn::Vox vox; // round 190mm (dyn)
     buscomp::Engine api; // round 190mm (dyn)
     bool apiOn = false;
-    bool vintageAtStart = false, renAtStart = false, voxAtStart = false;
+    bool vintageAtStart = false, renAtStart = false, voxAtStart = false, apiAtStart = false;
     double sampleRate = 44100.0;
     float envelopeDb = 0.0f;
     float inPower = 0.0f, outPower = 0.0f, autoGain = 1.0f;

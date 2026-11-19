@@ -1353,6 +1353,8 @@ public:
                 vocalLatency = vocalEngine.latencySamples();
             }
             driveLatency = on (params0[driveOn]) ? DriveStage::latency() : 0;
+            if (omni::omniLawOn (params0)) // (rollup step 12: the omni law plays without latency, as process() says)
+                vocalLatency = driveLatency = 0;
         }
     }
 
@@ -1385,6 +1387,7 @@ public:
         {
             const auto inPeak = Meters::peak (l, r, n);
             vocalLatency = 0;
+            driveLatency = 0; // (rollup step 12: the omni law has no latency; the DRIVE section is not used)
             omniEngine.process (l, r, n, p);
             meters.set (omniEngine.compGrDb(), omniEngine.gateGrDb(), inPeak, Meters::peak (l, r, n));
             return;
