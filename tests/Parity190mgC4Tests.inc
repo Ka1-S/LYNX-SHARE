@@ -128,3 +128,40 @@ TEST (parity190mg_c4_static_gain_follows_the_reference_stair)
         CHECK (std::abs (out - gainDb) < 0.15);
     }
 }
+
+TEST (parity190mg_c4_release_follows_the_reference_after_a_long_burst)
+{
+    using namespace lynx;
+    namespace pr = dyn::prism;
+    // the reference's 1 kHz burst probes (band 2: threshold -30, range -12, knee 0.5): -50 dBFS, 2 s at -10, back to -50;
+    // the gain 100 ms after the burst is -3.12 dB (electro, attack 0.5 / release 50 ms) and 50 ms after it -3.08 dB
+    // (opto, attack 5 / release 50 ms)
+    for (const bool opto : { false, true })
+    {
+        auto s = parity190mgc4::c4Slot();
+        s.params[(std::size_t) pr::c4Law] = pr::c4LawValue (opto);
+        s.params[(std::size_t) pr::param (1, pr::fThreshold)] = pr::thresholdValue (-30.0);
+        s.params[(std::size_t) pr::param (1, pr::fRange)] = (float) ((-12.0 + 30.0) / 60.0);
+        s.params[(std::size_t) pr::param (1, pr::fKnee)] = (float) (0.5 * 64.0 / 48.0);
+        s.params[(std::size_t) pr::param (1, pr::fAttack)] = pr::c4AttackValue (opto ? 5.0 : 0.5);
+        s.params[(std::size_t) pr::param (1, pr::fRelease)] = pr::c4ReleaseValue (50.0);
+        const double sr = 48000.0;
+        const int n = 48000 * 4, on = 48000, off = 48000 * 3;
+        std::vector<float> l ((std::size_t) n), r ((std::size_t) n), x ((std::size_t) n);
+        for (int i = 0; i < n; ++i)
+        {
+            const double a = std::pow (10.0, (i >= on && i < off ? -10.0 : -50.0) / 20.0);
+            x[(std::size_t) i] = l[(std::size_t) i] = r[(std::size_t) i] = (float) (a * std::sin (2.0 * M_PI * 1000.0 * i / sr));
+        }
+        int lat = 0;
+        parity190mgc4::render (s, sr, l, r, lat);
+        const int t = off + (opto ? 2400 : 4800);
+        double ey = 0.0, ex = 0.0;
+        for (int i = t; i < t + 48; ++i)
+        {
+            ey += (double) l[(std::size_t) (i + lat)] * l[(std::size_t) (i + lat)];
+            ex += (double) x[(std::size_t) i] * x[(std::size_t) i];
+        }
+        CHECK (std::abs (10.0 * std::log10 (ey / ex) - (opto ? -3.08 : -3.12)) < 0.3);
+    }
+}
