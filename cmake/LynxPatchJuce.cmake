@@ -290,6 +290,30 @@
 #    milliseconds rounded up (the event may be seen up to ~1 ms later than its deadline, never earlier).
 #    scripts/build-windows-zig.sh patches juce_core for this one file.
 #
+# (fix 190ms; the integration round assigns the number) Every platform, juce_graphics/native/juce_RenderingHelpers.h
+#    (round 190ms, perf of JUCE's software renderer; both parts give the same pixels by construction):
+#    a) fillPath built each path's edge table over the whole clip's bounds: a table row per pixel row of the clip
+#       (allocated, cleared, sorted and walked) for every shape, so a 20 px rounded rectangle in a whole-window repaint
+#       cost as much as ~1000 empty rows. The table is now built over the clip's bounds cut to the path's own bounds
+#       plus one pixel: the rows outside held no edge, and no edge point is clamped by the new limits that was not
+#       clamped by the old ones (a side keeps the clip's edge wherever the path reaches past it).
+#    b) ImageFill::copyRow (an opaque RGB image drawn into an ARGB image at full opacity, e.g. LYNX's cached keycap and
+#       step strips): the same pixel conversion as PixelARGB::blend (PixelRGB) = set, one 4-byte load per pixel instead
+#       of three byte loads (little-endian platforms where PixelRGB is stored b, g, r; others keep JUCE's loop).
+#
+# (fix 190ms-glyph; the integration round assigns the number) Every platform: JUCE's two text caches of 128 entries
+#    (juce_LruCache.h's default) hold 1024 (round 190ms, perf; owner's decision on round 190ml's Helix window):
+#    a) juce_graphics/contexts/juce_GraphicsContext.cpp, the shaped lines Graphics::drawText / drawFittedText /
+#       drawSingleLineText / drawMultiLineText keep per (font, text, area, justification...): a window with more than
+#       128 distinct labels (Helix+ 2's channel window, round 190ml) shaped every label again on every whole repaint
+#       (fontconfig fallback look-ups included: 67 % of that window's paint; 22-25 ms a frame, 3-5 ms with either half
+#       of it hidden). drawSingleLineText's key now holds its justification flags too (it was left out of the key, so
+#       two calls that differ only there could get each other's line).
+#    b) juce_graphics/native/juce_RenderingHelpers.h, the software renderer's glyphs (each glyph's outline as an edge
+#       table, per font and size): every whole frame of the main views evicted and rebuilt glyphs (-6 ... -12 %
+#       paint instructions a whole frame with 1024).
+#    Both caches are pure functions of their keys, so the pixels are the same; the memory is a few MB at most.
+#
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
 
@@ -474,6 +498,23 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("clip to an empty path" "LYNX patch (issue #11): clipping to an empty path"
             "void CoreGraphicsContext::clipToPath (const Path& path, const AffineTransform& transform)|NL|{|NL|    createPath (path, transform);|NL|"
             "void CoreGraphicsContext::clipToPath (const Path& path, const AffineTransform& transform)|NL|{|NL|    createPath (path, transform);|NL||NL|    // LYNX patch (issue #11): clipping to an empty path leaves nothing (Quartz would ignore it)|NL|    if (CGContextIsPathEmpty (context.get()))|NL|    {|NL|        CGContextClipToRect (context.get(), CGRectZero);|NL|        lastClipRect.reset();|NL|        return;|NL|    }|NL|")
+    elseif(file MATCHES "juce_RenderingHelpers.h$")
+        lynx_juce_fix("path edge tables over the path's own rows (fix 190ms)" "LYNX patch (round 190ms, fix 190ms): the edge table"
+            "            if (path.getBoundsTransformed (trans).getSmallestIntegerContainer().intersects (clipRect))|NL|                fillShape (*new EdgeTableRegionType (clipRect, path, trans), false);"
+            "            // LYNX patch (round 190ms, fix 190ms): the edge table over the clip cut to the path's bounds + 1 px, not over|NL|            // the whole clip (a row per pixel row of the clip for every shape); the same pixels (cmake/LynxPatchJuce.cmake)|NL|            const auto lynxPathArea = path.getBoundsTransformed (trans).getSmallestIntegerContainer();|NL||NL|            if (lynxPathArea.intersects (clipRect))|NL|            {|NL|                const auto lynxNear = [] (int v) { return v > -0x1000000 && v < 0x1000000; };|NL|                const auto lynxArea = lynxNear (lynxPathArea.getX()) && lynxNear (lynxPathArea.getY()) && lynxNear (lynxPathArea.getRight()) && lynxNear (lynxPathArea.getBottom())|NL|                                          ? clipRect.getIntersection (lynxPathArea.expanded (1))|NL|                                          : clipRect;|NL|                fillShape (*new EdgeTableRegionType (lynxArea, path, trans), false);|NL|            }")
+        lynx_juce_fix("RGB rows into ARGB images (fix 190ms)" "LYNX patch (round 190ms, fix 190ms): an RGB row"
+            "            else|NL|            {|NL|                do|NL|                {|NL|                    dest->blend (*src);|NL|                    dest = addBytesToPointer (dest, destStride);|NL|                    src  = addBytesToPointer (src, srcStride);|NL|                } while (--width > 0);|NL|            }"
+            "            else|NL|            {|NL|               #if JUCE_LITTLE_ENDIAN && ! JUCE_ANDROID|NL|                // LYNX patch (round 190ms, fix 190ms): an RGB row into an ARGB one, as PixelARGB::blend (PixelRGB) = set does it|NL|                // (0xff000000 | r << 16 | g << 8 | b), one 4-byte load per pixel (cmake/LynxPatchJuce.cmake)|NL|                if constexpr (std::is_same_v<DestPixelType, PixelARGB> && std::is_same_v<SrcPixelType, PixelRGB>|NL|                              && PixelRGB::indexB == 0 && PixelRGB::indexG == 1 && PixelRGB::indexR == 2)|NL|                {|NL|                    if (destStride == 4 && srcStride == 3 && width > 0)|NL|                    {|NL|                        auto* d = reinterpret_cast<uint8*> (dest);|NL|                        auto* s = reinterpret_cast<const uint8*> (src);|NL||NL|                        for (int i = 0; i < width - 1; ++i)|NL|                        {|NL|                            uint32 v;|NL|                            memcpy (&v, s + 3 * i, 4);|NL|                            v |= 0xff000000u;|NL|                            memcpy (d + 4 * i, &v, 4);|NL|                        }|NL||NL|                        const auto* last = s + 3 * (width - 1); // (its fourth byte would be past the row)|NL|                        const auto v = 0xff000000u | (uint32) last[0] | ((uint32) last[1] << 8) | ((uint32) last[2] << 16);|NL|                        memcpy (d + 4 * (width - 1), &v, 4);|NL|                        return;|NL|                    }|NL|                }|NL|               #endif|NL||NL|                do|NL|                {|NL|                    dest->blend (*src);|NL|                    dest = addBytesToPointer (dest, destStride);|NL|                    src  = addBytesToPointer (src, srcStride);|NL|                } while (--width > 0);|NL|            }")
+        lynx_juce_fix("software glyph cache of 1024 (fix 190ms-glyph)" "LYNX patch (round 190ms, fix 190ms-glyph)"
+            "    LruCache<Key, std::vector<GlyphLayer>> cache;|NL|    CriticalSection lock;"
+            "    // LYNX patch (round 190ms, fix 190ms-glyph): 1024 glyphs (LruCache's default 128 is fewer than one busy window|NL|    // shows, so a whole repaint evicted and rebuilt its own glyphs; cmake/LynxPatchJuce.cmake)|NL|    LruCache<Key, std::vector<GlyphLayer>, 1024> cache;|NL|    CriticalSection lock;")
+    elseif(file MATCHES "juce_GraphicsContext.cpp$")
+        lynx_juce_fix("text arrangement caches of 1024 (fix 190ms-glyph)" "LYNX patch (round 190ms, fix 190ms-glyph)"
+            "        LruCache<ArrangementArgs, ConfiguredArrangement> cache;"
+            "        // LYNX patch (round 190ms, fix 190ms-glyph): 1024 shaped lines, not LruCache's default 128 (a busy window shows|NL|        // more labels than that and shaped them all again every whole repaint; cmake/LynxPatchJuce.cmake)|NL|        LruCache<ArrangementArgs, ConfiguredArrangement, 1024> cache;")
+        lynx_juce_fix("drawSingleLineText's key holds its flags (fix 190ms-glyph)" "LYNX patch (round 190ms, fix 190ms-glyph): the flags"
+            "        auto tie() const noexcept { return std::tie (font, text, startX, baselineY); }"
+            "        // LYNX patch (round 190ms, fix 190ms-glyph): the flags are part of the line (cmake/LynxPatchJuce.cmake)|NL|        auto tie() const noexcept { return std::tie (font, text, startX, baselineY, flags); }")
     elseif(file MATCHES "juce_SimpleShapedText.cpp$")
         lynx_juce_fix("no walk back over no glyphs" "LYNX patch (issue #142): no glyphs"
             "                        auto it = glyphs.cend();|NL||NL|                        while (--it != glyphs.begin())"
@@ -763,6 +804,8 @@ function(lynx_patch_juce juce_dir)
     lynx_patch_juce_file("${juce_dir}/modules/juce_graphics/native/juce_CoreGraphicsContext_mac.mm")
     lynx_patch_juce_file("${juce_dir}/modules/juce_graphics/native/juce_Direct2DImage_windows.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_graphics/fonts/juce_SimpleShapedText.cpp")
+    lynx_patch_juce_file("${juce_dir}/modules/juce_graphics/native/juce_RenderingHelpers.h")
+    lynx_patch_juce_file("${juce_dir}/modules/juce_graphics/contexts/juce_GraphicsContext.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_audio_processors/format_types/juce_VST3Common.h")
     lynx_patch_juce_file("${juce_dir}/modules/juce_audio_processors/format_types/juce_VST3PluginFormat.cpp")
     lynx_patch_juce_file("${juce_dir}/modules/juce_events/native/juce_Messaging_windows.cpp")

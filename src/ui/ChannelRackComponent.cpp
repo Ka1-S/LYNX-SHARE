@@ -179,6 +179,9 @@ ChannelRackComponent::ChannelRackComponent (AudioEngine& e)
 {
     setWantsKeyboardFocus (false);
     setMouseClickGrabsKeyboardFocus (false);
+    // paints every pixel (paint() starts with an opaque fillAll): the panel behind it is no longer filled under it on every
+    // frame (round 190ms, perf: the window frame's fill under the rack was ~2.5 M instructions a whole frame)
+    setOpaque (true);
     engine.addChangeListener (this);
     engine.getLevelsBroadcaster().addChangeListener (this);
     previews.setSender ([this] (int channel, int key, float velocity, bool on) { engine.sendLiveNote (channel, key, velocity, on); });

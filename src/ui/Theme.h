@@ -391,6 +391,8 @@ juce::StringArray fontFoldersToScan (const juce::StringArray& fontconfigFolders,
 juce::String fontSelfTest();
 // --selftest "paint_caches=" (round 190gr): the font cache and the shape tiles against shapes drawn straight.
 juce::String paintCacheSelfTest();
+// Round 190ms: what JUCE fix 190ms rests on (edge tables over a path's own rows; RGB rows into ARGB pixels): "OK" or an error.
+juce::String softwareRendererSelfTest();
 
 // --- LookAndFeel ---------------------------------------------------------------------------------
 class LookAndFeel final : public juce::LookAndFeel_V4
