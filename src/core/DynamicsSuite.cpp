@@ -2121,7 +2121,7 @@ struct ScFilter
 //    chain exactly (probes: < -86 dB ESR);
 //  * per band: peak of the band (stereo linked) → g = 1 / (1 + k · peak / threshold), the knee's cubic
 //    g + 2 knee · g² (1 − g) (≤ 1), the minimum over the look-ahead, the smoother with its programme-dependent release
-//    (TimeLaw), two box filters, then the band's gain range + (1 − range) · g (linear), times its make-up; the audio is
+//    (TimeLaw) and its slow follower, the deeper of the two (unlike RComp, which takes the smoother), two box filters, then the band's gain range + (1 − range) · g (linear), times its make-up; the audio is
 //    delayed by the look-ahead.
 //  k = 0.5 · 2^(-R / 12) at knee 0 (R = range dB; probes: ±0.5 %), times exp (s(R) · (knee / 0.5)^0.78) with s(R)
 //  measured at knee 0.5 (c4KneeNodes) — 0.003 dB rms on every stair.
@@ -2273,7 +2273,7 @@ public:
                 s1[bi] = (s1[bi] - m) * co + m;
                 s2[bi] = (s2[bi] - s1[bi]) * (s1[bi] < s2[bi] ? cqFall : cqRise) + s1[bi];
                 // two box filters (64-bit fixed point: no drift)
-                const auto qn = (std::int64_t) std::llround (s1[bi] * (double) one);
+                const auto qn = (std::int64_t) std::llround (std::min (s1[bi], s2[bi]) * (double) one); // the deeper of the two
                 acc1[bi] += qn - box1[bi][(std::size_t) bposA];
                 box1[bi][(std::size_t) bposA] = qn;
                 const auto v1 = acc1[bi] / boxLenA;
