@@ -17849,6 +17849,8 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Parity190lfNs1Tests.inc" // round 190lf (ns1): Quell's zero law (REA of the Waves NS1: 0 % = its bare all-pass pair), NS1 on it
 #include "Parity190lnTests.inc" // round 190ln: Eiosis AirEQ / Slate Infinity EQ translated onto Facet EQ in physical units
 #include "Parity190lnKhsTests.inc" // round 190ln: Kilohearts states (kHs snapins, Faturator, Disperser) on LYNX stand-ins
+#include "Parity190kwR2Tests.inc" // round 190kw: Pro-R 2 → LuxeVerb Space, the Space engine's revision 1 (recovered laws)
+#include "Parity190lpR2Tests.inc" // round 190lp: Pro-R 2 → LuxeVerb Space revision 1, the reference's fixed early taps (after Parity190kwR2: its helpers)
 #include "Sampler190dhTests.inc"
 #include "Fix190eaTests.inc"
 #include "Iss158Tests.inc"
