@@ -1684,8 +1684,8 @@ constexpr double superTapLossDb = 0.3, superTapHardDb = 3.0, superTapFeedback = 
 // (core/LimiterLaw.h). L2 limits the input at the threshold and adds the make-up ceiling − threshold (measured: the
 // small-signal gain is exactly that, and 0.999 at Ceiling 0 dB) — the Limiter's Gain knob is that make-up (a threshold
 // above the ceiling: the hidden trim takes the gain below 0 dB), its Ceiling the ceiling, ARC the law's programme-
-// dependent release, else the Release knob (L2's dial: the 90 % recovery time, 10 … 1000 ms here). IDR dither is not
-// modelled (noise far below the scores' thresholds).
+// dependent release, else the Release knob (L2's dial: the 90 % recovery time, 10 … 1000 ms here). Round 190mg: IDR's
+// requantizer (word length, dither, noise shaping) on the law's output.
 int translateWavesL2 (const std::vector<std::uint8_t>& state, EffectSlot& slot)
 {
     namespace ll = limiterlaw;
@@ -1703,13 +1703,19 @@ int translateWavesL2 (const std::vector<std::uint8_t>& state, EffectSlot& slot)
     slot.params[(std::size_t) ll::lawParam] = ll::l2LawValue;
     slot.params[(std::size_t) ll::arcParam] = arc ? 1.0f : 0.0f;
     slot.params[(std::size_t) ll::trimParam] = (float) (std::max (-gainDb, 0.0) / 24.0);
+    // round 190mg (REA_rodada190mg_dyn §2, measured): IDR — 8 Quantize 0 … 4 = 24 / 22 / 20 / 18 / 16 bits, 11 the dither
+    // setting (1 = Type 1, TPDF), 12 the shaping (0 none, 1 moderate, 2 normal, 3 ultra)
+    const int quantize = std::clamp ((int) std::lround (wavesValue (rw, 8).value_or (0.0)), 0, 4);
+    slot.params[(std::size_t) ll::ditherBitsParam] = (float) (24 - 2 * quantize) / 32.0f;
+    slot.params[(std::size_t) ll::ditherTypeParam] = (float) (std::clamp ((int) std::lround (wavesValue (rw, 11).value_or (1.0)), 0, 2) + 1) / 4.0f;
+    slot.params[(std::size_t) ll::ditherShapeParam] = (float) (std::clamp ((int) std::lround (wavesValue (rw, 12).value_or (2.0)), 0, 3) + 1) / 8.0f;
     return 6;
 }
 
 // PuigTec EQP1A (round 190lf [EXEC]: crafted states through loadcomponent on refcap030's host, impulse responses;
 // docs/analise/REA_rodada190lf.md §3): RealWorld 0 output gain dB, 6 high boost, 7 bandwidth, 8 high frequency (1 … 7 =
 // 3, 4, 5, 8, 10, 12, 16 kHz), 9 low atten, 10 atten select (1 … 3 = 5, 10, 20 kHz), 11 low frequency (1 … 4 = 20, 30,
-// 60, 100 Hz), 12 low boost, 14 high atten (the knobs 0 … 11), 15 in (1) / out, 16 mains hum (not modelled). The
+// 60, 100 Hz), 12 low boost, 14 high atten (the knobs 0 … 11), 15 in (1) / out, 16 mains (round 190mg: modelled). The
 // reference is an oversampled passive-EQ model (REA of the DSP: a block convolution / resampling frame, a hum generator,
 // per-instance component tolerances): its curves are minimum phase plus a linear-phase resampler (149 samples at 48 kHz,
 // a −0.46 dB roll-off at 20 kHz, a +1.1 dB insertion gain). LYNX plays them on Facet EQ's zero-latency bands: the low
@@ -1871,6 +1877,10 @@ int translateWavesPuigTec (const std::vector<std::uint8_t>& state, EffectSlot& s
     setBand (5, facet::Shape::lowShelf, std::exp (pt::flat[4]), pt::flat[5], std::exp (pt::flat[6]), 12);
     setBand (6, facet::Shape::highShelf, std::exp (pt::lift[lf][0]), pt::lift[lf][1], std::exp (pt::lift[lf][2]), 12);
     setBand (7, facet::Shape::lowShelf, std::exp (pt::lift[lf][3]), pt::lift[lf][4], std::exp (pt::lift[lf][5]), 12);
+    // round 190mg (REA_rodada190mg_dyn §1): the output stage's tube harmonics, the resampler's fractional delay and, with
+    // the Mains switch (16: 0 off, 1 = 60 Hz, 2 = 50 Hz — measured), the hum and noise floor: Facet's PuigTec law
+    const int mains = std::clamp ((int) std::lround (v (16, 0.0)), 0, 2);
+    p[(std::size_t) facet::puigLawParam] = facet::puigLawValue (mains == 1 ? 2 : mains == 2 ? 3 : 1);
     if (v (15, 1.0) < 0.5) // the In switch off: the curves out, the reference's flat response stays
         return 8;
 
@@ -2245,6 +2255,9 @@ int translateWavesCla76 (const std::vector<std::uint8_t>& state, EffectSlot& slo
     const auto outGain = cla76Interp (outDb, cla76OutLabel, cla76OutGain, cla76OutPoints);
     p[c::threshold] = linNorm (f.t1 - inGain, -60.0, 0.0);
     consoleMix (p, at (103, 100.0) / 100.0, inGain + outGain + f.plateauDb, at (104, 0.0));
+    // round 190mg (REA_rodada190mg_dyn §3): the output amplifier's harmonics were measured and modelled (Crest's hidden
+    // fetAmp), but not set here: on refcap182 it cost two files a step (X1_bass 8 → 7, X4_vocal 6 → 5, ESR 0.2 … 0.8 dB
+    // worse). Auto make-up (105): no steady change measured (only a start-up ramp after reset), so it is not translated.
     slot.mix = 1.0f;
     return 13;
 }

@@ -17785,6 +17785,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Parity190mgRenTests.inc" // round 190mg (ren): Compressor's Renaissance law (REA of the Waves Renaissance Compressor), RComp on it
 #include "Parity190mgNs1Tests.inc" // round 190mg (ns1): Quell's NS1 law (REA of the Waves NS1: its own structure for 20 … 100 %), NS1 on it
 #include "Parity190mgVocTests.inc" // round 190mg (voc): the Waves Doubler DSP's splice law on Gemini, the Waves Tune RT law on LYNX Tune
+#include "Parity190mgDynTests.inc" // round 190mg (dyn): Facet's PuigTec law, L2's IDR on the Limiter (REA of the Waves PuigTec / L2 DSP)
 #include "Sampler190dhTests.inc"
 #include "Fix190eaTests.inc"
 #include "Iss158Tests.inc"

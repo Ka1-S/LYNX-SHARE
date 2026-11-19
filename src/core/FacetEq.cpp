@@ -5,6 +5,7 @@
 #include <cmath>
 #include <complex>
 #include <cstdio>
+#include <cstdint>
 #include <cstdlib>
 #include <vector>
 
@@ -688,6 +689,143 @@ private:
     std::array<Band, bands> bandsData {};
 };
 
+// ---- round 190mg: the PuigTec law's output stage (FacetEq.h puigLawParam; docs/analise/REA_rodada190mg_dyn.md §1) ----
+// LYNX's own model of what REA showed in the Waves PuigTec EQP1A's DSP (an output stage after the EQ: the mains hum and
+// a noise floor added, then a waveshaper, then the oversampler's resampling filter), every constant fitted on our own
+// demo-mode renders (waves3_190mg/dyn/lab: tubefit.py, humfit2.py, noisefit.py; the flat impulse response's delay).
+namespace puig
+{
+// the resampler's linear phase: the reference is 148.774 samples late at 48 kHz, LYNX's curve (minimum phase) 0 — the
+// integer part is latency the host compensates, the fraction (0.226 samples at 48 kHz = 4.7 us) is what an aligned
+// comparison hears (−30 dB of error at 1 kHz): a 3rd-order Thiran all-pass of delay puigLatency − fraction
+constexpr double leadSeconds = 0.226 / 48000.0;
+// the hum: frequency (Hz), level (dB), even term, low pass (Hz, Q), high pass (Hz, Q) — 60 Hz and 50 Hz settings
+struct Hum { double hz, levelDb, even, lpHz, lpQ, hpHz, hpQ; };
+constexpr Hum hums[2] {
+    { 59.8505, -87.0972, 0.15324, 117.52, 0.5954, 1.0, 8.0 },   // H1 -90.0 / H2 -115.9 / H3 -117.2 dBFS (ref -90.1 / -115.9 / -116.8)
+    { 49.7940, -90.3888, 0.05256, 170.10, 0.2925, 93.84, 8.0 }, // H1 -103.0 / H2 -114.5 / H3 -116.6 (ref -103.3 / -114.3 / -114.3)
+};
+// the noise floor: white (sigma, linear) through a broad low bell and a high shelf (RBJ): 0.34 dB rms over 1/6 octaves
+constexpr double noiseSigma = 7.829e-6, noiseBellHz = 18.98, noiseBellDb = 18.27, noiseBellQ = 0.0500, noiseShelfHz = 12168.0, noiseShelfDb = -3.167;
+// the waveshaper (LYNX's rational form, fitted on the complex H2 … H5 of 1 kHz / 100 Hz / 4.8 kHz stairs and the
+// Output ±12 dB renders: within 0.1 dB and the phases): v = s·y, z = [v + g·c·v / (g|v| + c) · (1 + k·g·v)] / ((1 + g)·s)
+constexpr double shapeS = 3.32662, shapeG = 0.0411740, shapeC = 0.214359, shapeK = 2.44709;
+
+struct Bq
+{
+    double b0 = 1, b1 = 0, b2 = 0, a1 = 0, a2 = 0, z1 = 0, z2 = 0;
+    double run (double x) noexcept { const double y = b0 * x + z1; z1 = b1 * x - a1 * y + z2; z2 = b2 * x - a2 * y; return y; }
+    void set (double nb0, double nb1, double nb2, double na0, double na1, double na2) noexcept
+    { b0 = nb0 / na0; b1 = nb1 / na0; b2 = nb2 / na0; a1 = na1 / na0; a2 = na2 / na0; }
+    // bilinear 2nd-order low / high pass (w = tan (pi f / sr))
+    void pass (bool high, double hz, double q, double sr) noexcept
+    {
+        const double w = std::tan (pi * std::min (hz, 0.45 * sr) / sr), n = 1.0 + w / q + w * w;
+        if (high) set (1.0, -2.0, 1.0, n, 2.0 * w * w - 2.0, 1.0 - w / q + w * w);
+        else set (w * w, 2.0 * w * w, w * w, n, 2.0 * w * w - 2.0, 1.0 - w / q + w * w);
+    }
+    void bell (double hz, double db, double q, double sr) noexcept
+    {
+        const double A = std::pow (10.0, db / 40.0), w = 2.0 * pi * hz / sr, al = std::sin (w) / (2.0 * q), c = std::cos (w);
+        set (1.0 + al * A, -2.0 * c, 1.0 - al * A, 1.0 + al / A, -2.0 * c, 1.0 - al / A);
+    }
+    void highShelf (double hz, double db, double sr) noexcept
+    {
+        const double A = std::pow (10.0, db / 40.0), w = 2.0 * pi * std::min (hz, 0.45 * sr) / sr, al = std::sin (w) / (2.0 * 0.70710678118654752);
+        const double c = std::cos (w), s2 = 2.0 * std::sqrt (A) * al;
+        set (A * ((A + 1) + (A - 1) * c + s2), -2.0 * A * ((A - 1) + (A + 1) * c), A * ((A + 1) + (A - 1) * c - s2),
+             (A + 1) - (A - 1) * c + s2, 2.0 * ((A - 1) - (A + 1) * c), (A + 1) - (A - 1) * c - s2);
+    }
+    void clear() noexcept { z1 = z2 = 0.0; }
+};
+
+class Stage
+{
+public:
+    void configure (int law, double sr) noexcept
+    {
+        k = law;
+        rate = sr;
+        // 3rd-order Thiran all-pass, delay D = puigLatency − the lead
+        const double D = (double) puigLatency - leadSeconds * sr;
+        constexpr int N = puigLatency;
+        a[0] = 1.0;
+        for (int j = 1; j <= N; ++j)
+        {
+            double prod = 1.0;
+            for (int n = 0; n <= N; ++n) prod *= (D - N + n) / (D - N + j + n);
+            const double binom = j == 1 ? 3.0 : j == 2 ? 3.0 : 1.0;
+            a[j] = ((j & 1) ? -1.0 : 1.0) * binom * prod;
+        }
+        if (k >= 2)
+        {
+            const auto& h = hums[k == 2 ? 0 : 1];
+            step = h.hz / sr;
+            humGain = std::pow (10.0, h.levelDb / 20.0);
+            even = h.even;
+            humLp.pass (false, h.lpHz, h.lpQ, sr);
+            humHp.pass (true, h.hpHz, h.hpQ, sr);
+            for (int c = 0; c < 2; ++c)
+            {
+                bell[c].bell (noiseBellHz, noiseBellDb, noiseBellQ, sr);
+                shelf[c].highShelf (noiseShelfHz, noiseShelfDb, sr);
+            }
+        }
+        reset();
+    }
+    void reset() noexcept
+    {
+        for (auto& c : xs) for (auto& v : c) v = 0.0;
+        for (auto& c : ys) for (auto& v : c) v = 0.0;
+        phase = 0.0;
+        humLp.clear(); humHp.clear();
+        for (int c = 0; c < 2; ++c) { bell[c].clear(); shelf[c].clear(); }
+        seed[0] = 0x2545F491u; seed[1] = 0x9E3779B9u; // LYNX renders stay deterministic (the reference's are not)
+    }
+    void process (float* l, float* r, int n) noexcept
+    {
+        const bool mains = k >= 2;
+        for (int i = 0; i < n; ++i)
+        {
+            double hum = 0.0;
+            if (mains)
+            {
+                const double tri = 4.0 * std::abs (phase - 0.5) - 1.0;
+                phase += step;
+                if (phase >= 1.0) phase -= 1.0;
+                hum = humGain * humHp.run (humLp.run (tri + even * std::abs (tri)));
+            }
+            float* io[2] { l + i, r + i };
+            for (int c = 0; c < 2; ++c)
+            {
+                double y = *io[c];
+                if (mains)
+                    y += hum + noiseSigma * shelf[c].run (bell[c].run (white (c)));
+                y = puigShape (y);
+                // the all-pass (direct form: numerator = the reversed denominator)
+                double out = a[3] * y + a[2] * xs[c][0] + a[1] * xs[c][1] + xs[c][2] - a[1] * ys[c][0] - a[2] * ys[c][1] - a[3] * ys[c][2];
+                xs[c][2] = xs[c][1]; xs[c][1] = xs[c][0]; xs[c][0] = y;
+                ys[c][2] = ys[c][1]; ys[c][1] = ys[c][0]; ys[c][0] = out;
+                *io[c] = (float) out;
+            }
+        }
+    }
+
+private:
+    // unit-variance triangular noise (two uniforms, xorshift32)
+    double white (int c) noexcept
+    {
+        auto next = [this, c]() noexcept { auto& x = seed[c]; x ^= x << 13; x ^= x >> 17; x ^= x << 5; return (double) x * (1.0 / 4294967296.0) - 0.5; };
+        return (next() + next()) * 2.449489742783178; // var of a sum of two U(-1/2, 1/2) = 1/6
+    }
+    int k = 0;
+    double rate = 48000.0, a[puigLatency + 1] { 1.0, 0.0, 0.0, 0.0 }, xs[2][3] {}, ys[2][3] {};
+    double phase = 0.0, step = 0.0, humGain = 0.0, even = 0.0;
+    Bq humLp, humHp, bell[2], shelf[2];
+    std::uint32_t seed[2] { 1u, 2u };
+};
+} // namespace puig
+
 class FacetEqEffect final : public Effect
 {
 public:
@@ -697,6 +835,7 @@ public:
         {
             mode = phase ((*initial)[(std::size_t) phaseParam]);
             allocRes = resolution ((*initial)[(std::size_t) resolutionParam]);
+            puigNow = puigLaw ((*initial)[(std::size_t) puigLawParam]); // round 190mg: its latency known from the start
             initialParams = *initial;
             haveInitial = true;
         }
@@ -738,6 +877,7 @@ public:
             const auto& q = seenParams ? current : initialParams;
             spectral.configure (q, attackMs (q[(std::size_t) attackParam]), releaseMs (q[(std::size_t) releaseParam]));
         }
+        if (puigNow > 0) puigStage.configure (puigNow, sr); // round 190mg
         configureMode (mode);
         reset();
     }
@@ -760,6 +900,7 @@ public:
         cmpPos = 0;
         powSrc = powTgt = 0.0;
         tgtGain = 1.0f;
+        if (puigNow > 0) puigStage.reset();
     }
 
     void setSidechain (const float* left, const float* right) noexcept override
@@ -874,6 +1015,8 @@ public:
                 left[i] = characterSample (characterNow, left[i]);
                 right[i] = characterSample (characterNow, right[i]);
             }
+        if (puigNow > 0) // round 190mg: the PuigTec law's output stage (off = untouched)
+            puigStage.process (left, right, n);
         if (comparing && keep) // round 166f: the source / the target instead of (crossfaded with) the EQ's output
         {
             const auto wantGain = params[(std::size_t) targetLevelParam] >= 0.5f ? (float) targetMatchGain (powSrc, powTgt) : 1.0f;
@@ -925,7 +1068,8 @@ private:
     // round 152: the phase mode's latency plus the spectral stage's when a band is spectral
     void storeLatency() noexcept
     {
-        latencyNow.store (latencyFor (mode, sampleRate, allocRes) + (spectral.active() ? spectral.latency() : 0), std::memory_order_relaxed);
+        latencyNow.store (latencyFor (mode, sampleRate, allocRes) + (spectral.active() ? spectral.latency() : 0) + (puigNow > 0 ? puigLatency : 0),
+                          std::memory_order_relaxed);
     }
 
     void update (const EffectParams& params) noexcept
@@ -1013,6 +1157,12 @@ private:
         outR = level * (float) (pan < 0.0 ? 1.0 + pan : 1.0);
         outMidSide = panMidSide (params[(std::size_t) panModeParam]) && outL != outR;
         characterNow = character (params[(std::size_t) characterParam]);
+        if (const int k = puigLaw (params[(std::size_t) puigLawParam]); k != puigNow) // round 190mg
+        {
+            puigNow = k;
+            if (k > 0) puigStage.configure (k, sampleRate);
+            storeLatency();
+        }
 
         const int sb = soloBand (params[(std::size_t) soloParam]);
         const bool wasSolo = soloOn;
@@ -1263,6 +1413,8 @@ private:
     double autoAttackCoef = 0.1, autoReleaseCoef = 0.001, autoTopOffset = 0.0, autoFloor = autoFloorDb; // round 190js
     float outGain = 1.0f, outL = 1.0f, outR = 1.0f;
     int characterNow = 0;
+    int puigNow = 0; // round 190mg: the PuigTec law (0 = off)
+    puig::Stage puigStage;
     std::array<Placement, bands> placed {};
     bool anyPlaced = false, anyMidSide = false, outMidSide = false;
     bool anyDynamic = false, soloOn = false, firLoaded = false, firDirty = true, sideGiven = false;
@@ -1315,6 +1467,14 @@ const std::array<Shape, shapeCount - 1>& menuShapes() noexcept
     return m;
 }
 int character (float v) noexcept { return std::clamp ((int) std::lround (v * 2.0f), 0, 2); }
+int puigLaw (float v) noexcept { return v > 0.0f ? std::clamp ((int) std::lround (v * 16.0f), 0, 3) : 0; }
+float puigLawValue (int k) noexcept { return (float) std::clamp (k, 0, 3) / 16.0f; }
+double puigShape (double y) noexcept
+{
+    using namespace puig;
+    const double v = shapeS * y;
+    return (v + shapeG * shapeC * v / (shapeG * std::abs (v) + shapeC) * (1.0 + shapeK * shapeG * v)) / ((1.0 + shapeG) * shapeS);
+}
 float characterSample (int c, float x) noexcept
 {
     // Subtle: a soft knee that bends hot peaks a little (odd harmonics); Warm: an earlier, rounder knee. Both are unity

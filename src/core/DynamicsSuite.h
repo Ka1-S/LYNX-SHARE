@@ -80,8 +80,15 @@ enum Param
     // revisions × the four ratio buttons and all buttons); the knobs keep their meaning: threshold = the control
     // level's knee, ratio = 1 + the first term's slope, knee = its width (dB), attack / release = the followers' time
     // constants (each follower at fitted multiples of them)
-    fetLaw
+    fetLaw,
+    // round 190mg, hidden like fetLaw (saved while non-zero; 0 = off, every project before): the FET law's output
+    // amplifier — LYNX's own static law of the amplifier stage after the FET (level-dependent H2 / H3, a DC part, the
+    // harmonics led by a first-order pre-emphasis), fitted on our Comp Off / Comp On stairs of the reference (REA_rodada190mg_dyn
+    // §3). The value carries the compressed path's level at the amplifier: (dB + 64) / 128 (the translator's Input + voicing gain)
+    fetAmp
 };
+double fetAmpDb (float v) noexcept;   // the wet path's gain to the amplifier's reference level (dB)
+float fetAmpValue (double db) noexcept;
 constexpr int fetVoices = 10;
 float fetLawValue (int voice) noexcept; // voice 0 … 9 → the fetLaw value (voice + 1) / 16
 enum class Trigger { off, hostSync, midi };

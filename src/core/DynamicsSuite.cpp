@@ -375,6 +375,13 @@ double fetLawDb (double levelDb, double t1, double w1, double s1, const FetVoice
 // prewarped), fitted on the third-octave balance of refcap182's CLA-76 programme against LYNX without it (−0.35 dB at
 // 60 Hz, −0.12 dB at 200 Hz; the probes' low-level response: −0.37 / −0.25 dB) [EXEC: lab/tone76.py, lab/fittone.py]
 constexpr double fetLowShelfDb = -0.423, fetLowShelfHz = 131.0, fetHighShelfDb = -0.816, fetHighShelfHz = 16906.0;
+// round 190mg: the output amplifier (the hidden fetAmp parameter) on the signal s at the amplifier's reference level
+// (0 dBFS there = 0 dBFS at the Output knob's −30 mark): z = s + q(n) + lead·(q(n) − q(n − 1)), q = a·s² + b·s·|s| — the
+// even part H2 (and a DC part, kept as the reference keeps it), the odd part H3 / H5 (−9 dB under H2, both 1 dB per dB),
+// led by lead samples at 48 kHz (the harmonics' measured phase lead: +14° / +20° / +34° at 2 / 3 / 5 kHz). Fitted on the
+// complex H2 / H3 / H5 of the Comp Off stairs at Input −36 … 0 (below the clip): 0.2 dB / 1 dB / 1 dB, the phases within
+// 5° [EXEC: waves3_190mg/dyn/lab/ampfit.py]. The amplifier's clip (above about −11 dBFS at the reference level) is not modelled.
+constexpr double fetAmpA = 0.139751, fetAmpB = 0.116562, fetAmpLead = 1.10438;
 struct FetTone
 {
     double b0[2] {}, b1[2] {}, a1[2] {};
@@ -811,6 +818,8 @@ double staticGainDb (const EffectParams& p, double inputDb)
 }
 
 float fetLawValue (int voice) noexcept { return (float) (std::clamp (voice, 0, fetVoices - 1) + 1) / 16.0f; }
+double fetAmpDb (float v) noexcept { return (double) v * 128.0 - 64.0; }
+float fetAmpValue (double db) noexcept { return (float) std::clamp ((db + 64.0) / 128.0, 1.0 / 128.0, 1.0); }
 
 double fetSteadyDb (const EffectParams& p, double peakDb) noexcept
 {
@@ -920,6 +929,7 @@ public:
             pk.fill (0.0f);
         dc.reset();
         fetTone.reset();
+        ampPrev[0] = ampPrev[1] = 0.0;
         splitAudio.reset();
         splitSide.reset();
         for (auto& b : bandDet)
@@ -1497,9 +1507,22 @@ private:
         }
         const bool panned = wetA != 1.0f || wetB != 1.0f || dryA != 1.0f || dryB != 1.0f;
         const bool fetToneOn = fetVoiceOf (p) >= 0;
+        const bool ampOn = fetToneOn && p[fetAmp] > 0.0f;
+        const double ampK = ampOn ? std::pow (10.0, fetAmpDb (p[fetAmp]) / 20.0) : 1.0, ampLead = fetAmpLead * sr / 48000.0;
         for (int i = 0; i < n; ++i)
         {
             float a = wl[(std::size_t) i], b = wr[(std::size_t) i];
+            if (ampOn) // round 190mg: the output amplifier at its reference level
+            {
+                const auto amp = [&] (float v, int c) noexcept {
+                    const double s = (double) v * ampK, q = fetAmpA * s * s + fetAmpB * s * std::abs (s);
+                    const double z = s + q + ampLead * (q - ampPrev[c]);
+                    ampPrev[c] = q;
+                    return (float) (z / ampK);
+                };
+                a = amp (a, 0);
+                b = amp (b, 1);
+            }
             if (fetToneOn) // round 190ky: the FET law's static tone, on the compressed path only
             {
                 a = fetTone.process (a, 0);
@@ -1565,6 +1588,7 @@ private:
 
     double sr = 48000.0, latencyMs = -1.0;
     FetTone fetTone; // round 190ky: the FET law's wet-path tone
+    double ampPrev[2] {}; // round 190mg: the output amplifier's previous non-linear term
     double programSum = 0.0, programMs = 1e-4, programDb = -40.0; // auto threshold: the programme's slow RMS
     int osFactor = 0, laSamples = 0;
     std::atomic<int> latency { 0 };
