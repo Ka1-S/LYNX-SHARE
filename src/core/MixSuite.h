@@ -174,6 +174,42 @@ enum Param
 };
 double compGrCapDb (float v) noexcept;   // 0 = no cap (a huge value), else 0 .. 60 dB
 double compAttackFineSeconds (float v) noexcept; // 0 .. 0.25 s
+
+// round 190mm (scheps), hidden like compGrCap (not in the info: no control, no text; saved while non-zero) at FIXED
+// indices 100 … 191: the "omni" law — a five-module channel strip (Pre, Gate, DS2, EQ, Comp in a stored order) that
+// stands in for a multi-module channel strip whose modules the user can reorder (REA_rodada190mm_scheps). omniLaw 0 =
+// off: new instances and every project saved before (Ridge's engines above, bit for bit); only the Waves translator
+// sets it. Values are stored 0 … 1 through the omni:: scales below.
+enum OmniParam
+{
+    omniLaw = 100, omniOrder, omniIn, omniOut, omniInvL, omniInvR, omniLimOn, omniLimThr,
+    // Pre: saturation, thump, high- / low-pass
+    oPreOn = 110, oHpOn, oHpHz, oHpSlope, oHpQ, oLpOn, oLpHz, oLpSlope, oLpQ, oThump, oSatOn, oSatType, oSatAmount,
+    // Gate / expander
+    oGateOn = 125, oGateThr, oGateFloor, oGateClose, oGateAtt, oGateRel, oGateExp, oGateHpOn, oGateHpHz, oGateLpOn, oGateLpHz,
+    // DS2 (two dynamic bands)
+    oDsOn = 140, oDs1On, oDs1Thr, oDs1Type, oDs1Hz, oDs1Range, oDs2On, oDs2Thr, oDs2Type, oDs2Hz, oDs2Range, oDsOut, oDsAtt, oDsRel,
+    // EQ: four bands (LF, Tone, Mid, HF) × on, type, frequency, gain, Q
+    oEqOn = 155, oEqBand0,
+    // Compressor
+    oCompOn = 176, oCompType, oCompRatio, oCompAtt, oCompRel, oCompThr, oCompMix, oCompOut,
+    oScHpOn, oScHpHz, oScBellOn, oScBellHz, oScBellDb, oScShelfOn, oScShelfHz, oScShelfDb,
+    omniEnd
+};
+namespace omni
+{
+enum Module { pre = 1, gate, ds2, eq, comp };
+float dbValue (double db) noexcept;      double db (float v) noexcept;      // −72 … +24 dB
+float hzValue (double hz) noexcept;      double hz (float v) noexcept;      // 20 Hz … 20 kHz (log)
+float qValue (double q) noexcept;        double q (float v) noexcept;       // 0.1 … 10 (log)
+float msValue (double ms) noexcept;      double ms (float v) noexcept;      // 0.01 ms … 10 s (log)
+float ratioValue (double r) noexcept;    double ratio (float v) noexcept;   // 1 … 20 : 1 (∞ = 20)
+float indexValue (int k) noexcept;       int index (float v) noexcept;      // a selector position k / 8
+// the module order: five digits (module ids above, first to last) / 100000; a bad value = the default order
+float orderValue (const int (&order)[5]) noexcept;
+void orderOf (float v, int (&order)[5]) noexcept;
+bool omniLawOn (const EffectParams& p) noexcept;
+} // namespace omni
 // round tp172c6: the drive models (DRIVE section), in the Model selector's order
 enum DriveModel { driveSaturate, driveConsoleE, driveConsoleG, driveConsoleA, driveConsoleN, driveConsoleY, driveTube,
                   driveGuitarAmp, driveBassAmp, driveModels };
@@ -340,7 +376,12 @@ enum Param { frequency, threshold, range, mode, detector, listen, lookahead, rel
              // round 190js, hidden (saved while non-zero): Single Vocal's "stands out" revision (vmatch::vocalds
              // Settings::vocalRevision = 1; Allround is unchanged); a new Hush and a translated Pro-DS state get 1, a project
              // or preset saved before keeps 0 (round 148's Single Vocal, bit for bit)
-             vocalRevision };
+             vocalRevision,
+             // round 190mm (sub-round dyn), hidden (saved while non-zero): the split / wide-band Renaissance de-esser law
+             // (core/RenDynamics.h rendyn::DeEsser; 1 = on, set only by the RDeEsser translator) and its values in the
+             // reference's own units: threshold −dB / 80 (0 … −80 dB), range −dB / 48, frequency (Hz − 2000) / 14000,
+             // band-pass (1) / high-pass, wide-band (1) / split. 0 = every project and preset saved before
+             essLaw, essThreshold, essRange, essFreq, essBandPass, essWideBand };
 double airDb (float v) noexcept;        // round 190dm: 0 … +12 dB
 constexpr double airHz = 8151.0, airSlope = 0.5;
 bool extended (const EffectParams& p) noexcept;         // round 165x: the extended law (and not the classic voicing)
@@ -372,7 +413,15 @@ namespace aether
 // ~3 kHz, High air from ~9 kHz), each lifted by a compressed copy of itself, so quiet highs come up more than loud
 // ones; `midAir` / `highAir` set the two amounts (0..1). On by default since issue #77 (round tp172c); off keeps the
 // shelf + exciter above (projects saved before round 124 load with it off).
-enum Param { air, airFreq, harmonics, exciterFreq, character, mix, output, dynamic, midAir, highAir, count };
+enum Param { air, airFreq, harmonics, exciterFreq, character, mix, output, dynamic, midAir, highAir, count,
+             // round 190mm (sub-round dyn), hidden (saved while non-zero; only the Waves Vitamin translator sets them):
+             // the five-band harmonic enhancer law (core/VitaminLaw.h; 1 = on), its band gains (dB / 48, 0 = Off), the
+             // direct gain (1 − (dB + 72) / 96 … 0 = 0 dB… see vitDirectDb), its four crossovers (log 16 … 21357 Hz)
+             vitLaw = count, vitGain0, vitDirect = vitGain0 + 5, vitCross0, vitEnd = vitCross0 + 4 };
+double vitDirectDb (float v) noexcept;  // 0 = 0 dB, else −72 … +24 dB as (v · 96 − 72), 1e-4 … 1 (and ≥ 0.999 = Off)
+float vitDirectValue (double db) noexcept;
+double vitCrossHz (float v) noexcept;   // 0 = the reference's defaults, else 16 · 1335^v
+float vitCrossValue (double hz) noexcept;
 double airDb (float v) noexcept;       // 0 .. +15 dB
 double airHz (float v) noexcept;       // 5 .. 20 kHz
 double exciterHz (float v) noexcept;   // 1 .. 12 kHz

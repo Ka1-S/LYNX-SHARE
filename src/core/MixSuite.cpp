@@ -1,4 +1,6 @@
 #include "core/MixSuite.h"
+#include "core/RenDynamics.h"
+#include "core/VitaminLaw.h"
 
 #include <algorithm>
 #include <atomic>
@@ -402,6 +404,39 @@ double mLfGainDb (float v) noexcept { return lin (v, -16.5, 16.5); }
 double mGainDb (float v) noexcept { return lin (v, -20.0, 20.0); }
 double mQ (float v) noexcept { return lin (v, 0.5, 2.5); }
 double mHoldSeconds (float v) noexcept { return lin (v, 0.0, 4.0); }
+// round 190mm (scheps): the hidden omni law's value scales (MixSuite.h OmniParam)
+namespace omni
+{
+float dbValue (double db) noexcept { return (float) std::clamp ((db + 72.0) / 96.0, 0.0, 1.0); }
+double db (float v) noexcept { return lin (v, -72.0, 24.0); }
+float hzValue (double hz) noexcept { return (float) std::clamp (std::log (std::max (hz, 20.0) / 20.0) / std::log (1000.0), 0.0, 1.0); }
+double hz (float v) noexcept { return logMap (v, 20.0, 20000.0); }
+float qValue (double q) noexcept { return (float) std::clamp (std::log (std::max (q, 0.1) / 0.1) / std::log (100.0), 0.0, 1.0); }
+double q (float v) noexcept { return logMap (v, 0.1, 10.0); }
+float msValue (double ms) noexcept { return (float) std::clamp (std::log10 (std::max (ms, 0.01) / 0.01) / 6.0, 0.0, 1.0); }
+double ms (float v) noexcept { return logMap (v, 0.01, 10000.0); }
+float ratioValue (double r) noexcept { return (float) std::clamp ((1.0 - 1.0 / std::clamp (r, 1.0, 20.0)) / 0.95, 0.0, 1.0); }
+double ratio (float v) noexcept { return 1.0 / std::max (0.05, 1.0 - 0.95 * (double) std::clamp (v, 0.0f, 1.0f)); }
+float indexValue (int k) noexcept { return (float) std::clamp (k, 0, 8) / 8.0f; }
+int index (float v) noexcept { return (int) std::lround (std::clamp (v, 0.0f, 1.0f) * 8.0f); }
+float orderValue (const int (&order)[5]) noexcept
+{
+    long code = 0;
+    for (int m : order) code = code * 10 + std::clamp (m, 0, 9);
+    return (float) ((double) code / 100000.0);
+}
+void orderOf (float v, int (&order)[5]) noexcept
+{
+    static constexpr int byDefault[5] = { pre, comp, ds2, eq, gate };   // the reference's default chain (REA §1)
+    auto code = (long) std::lround ((double) v * 100000.0);
+    int seen = 0;
+    for (int i = 4; i >= 0; --i) { order[i] = (int) (code % 10); code /= 10; }
+    for (int m : order) if (m >= pre && m <= comp) seen |= 1 << m;
+    if (seen != 0x3e)
+        for (int i = 0; i < 5; ++i) order[i] = byDefault[i];
+}
+bool omniLawOn (const EffectParams& p) noexcept { return p[(std::size_t) omniLaw] > 0.5f; }
+} // namespace omni
 namespace
 {
 // the reference's ratio dial (its read-outs at eighths of the travel); 63 .. infinity on the last eighth
@@ -1286,6 +1321,8 @@ std::unique_ptr<Effect> makeKiln() { return std::make_unique<KilnChannel>(); }
 
 namespace
 {
+#include "core/OmniStrip.inc" // round 190mm (scheps): the hidden omni law
+
 class Strip final : public Effect
 {
 public:
@@ -1305,6 +1342,7 @@ public:
         modernEngine.prepare (rate);
         vocalEngine.prepare (rate);
         drive.prepare (rate);
+        omniEngine.prepare (rate);
         reset();
         if (hasParams0)
         {
@@ -1328,6 +1366,7 @@ public:
         modernEngine.reset();
         vocalEngine.reset();
         drive.reset();
+        omniEngine.reset();
         for (auto* d : { &audio, &side })
         {
             d->hp1.reset(); d->hp2.reset(); d->lp.reset(); d->lf.reset(); d->lmf.reset(); d->hmf.reset(); d->hf.reset();
@@ -1342,6 +1381,14 @@ public:
 
     void process (float* l, float* r, int n, const EffectParams& p, double) noexcept override
     {
+        if (omni::omniLawOn (p)) // round 190mm (scheps): the hidden omni law (off = everything below, unchanged)
+        {
+            const auto inPeak = Meters::peak (l, r, n);
+            vocalLatency = 0;
+            omniEngine.process (l, r, n, p);
+            meters.set (omniEngine.compGrDb(), omniEngine.gateGrDb(), inPeak, Meters::peak (l, r, n));
+            return;
+        }
         if (vocalVoicing (p))
         {
             const auto inPeak = Meters::peak (l, r, n);
@@ -1536,6 +1583,7 @@ private:
     int vocalLatency = 0;
     DriveStage drive; // round tp172c6
     int driveLatency = 0;
+    omnistrip::Engine omniEngine; // round 190mm (scheps): the hidden omni law
     bool driveWasIn = false;
     EffectParams params0 {};
     bool hasParams0 = false;
@@ -1884,7 +1932,8 @@ public:
     explicit DeEsser (const EffectParams* p = nullptr)
         : primedMs (p != nullptr ? lookaheadTimeMs ((*p)[lookaheadTime]) : lookaheadMs()),
           vocalOn (p != nullptr && (vocal (*p) || (extended (*p) && on ((*p)[allround]) && ! classic (*p)))),
-          classicOn (p != nullptr && classic (*p))
+          classicOn (p != nullptr && classic (*p)),
+          essOn (p != nullptr && (*p)[essLaw] >= 0.5f)
     {
         // (the same as processCore does when the factor moves)
         if (const auto factor = p != nullptr && ! classic (*p) ? oversamplingOf ((*p)[oversampling]) : 1; factor != osFactor)
@@ -1901,6 +1950,7 @@ public:
         setDelay (primedMs);
         classicEngine.prepare (rate);
         vocalEngine.prepare (rate);
+        essEngine.prepare (rate);
         reset();
     }
 
@@ -1910,6 +1960,7 @@ public:
         scDelay.reset();
         classicEngine.reset();
         vocalEngine.reset();
+        essEngine.reset();
         detect.reset();
         detectLp.reset();
         listenF.reset();
@@ -1933,6 +1984,8 @@ public:
 
     int latencySamples() const noexcept override
     {
+        if (essOn)
+            return essEngine.latency();
         if (vocalOn)
             return vocalEngine.latencySamples();
         if (classicOn) // round 165 [EXEC]: the reference reports 0 samples, so the classic voicing has no latency
@@ -1944,6 +1997,22 @@ public:
 
     void process (float* l, float* r, int n, const EffectParams& p, double bpm) noexcept override
     {
+        if (p[essLaw] >= 0.5f)
+        {
+            // round 190mm (dyn): the Renaissance de-esser law (set only by the RDeEsser translator); its own controls
+            essOn = true;
+            rendyn::EssSettings st;
+            st.thresholdDb = -80.0 * std::clamp ((double) p[essThreshold], 0.0, 1.0);
+            st.rangeDb = -48.0 * std::clamp ((double) p[essRange], 0.0, 1.0);
+            st.freqHz = 2000.0 + 14000.0 * std::clamp ((double) p[essFreq], 0.0, 1.0);
+            st.bandPass = p[essBandPass] >= 0.5f;
+            st.wideBand = p[essWideBand] >= 0.5f;
+            const auto inPeak = Meters::peak (l, r, n);
+            essEngine.process (l, r, n, st);
+            meters.set (essEngine.reductionDb(), 0.0f, inPeak, Meters::peak (l, r, n));
+            return;
+        }
+        essOn = false;
         if (n > maxBlock) // the oversampled path works on blocks of at most maxBlock samples
         {
             const auto* sl = scL;
@@ -2363,6 +2432,8 @@ private:
     vmatch::vocalds::DeEsser vocalEngine;
     bool vocalOn = false;
     bool classicOn = false; // round 165: the classic voicing has no latency
+    bool essOn = false;     // round 190mm (dyn): the Renaissance de-esser law
+    rendyn::DeEsser essEngine;
     Biquad detect, detectLp, listenF, listenLp, split, bandLp, bandLp2, topHp, topHp2;
     // round 190dm: Air and Mix — the shelf, the block's dry input and the dry line (latency ≤ 8191 samples)
     static constexpr int dryLen = 8192;
@@ -2406,6 +2477,21 @@ std::vector<std::pair<int, float>> linkedEdit (const EffectParams& p, int param,
 
 namespace aether
 {
+double vitDirectDb (float v) noexcept
+{
+    if (v <= 0.0f)
+        return 0.0;
+    return v >= 0.999f ? -200.0 : (double) v * 96.0 - 72.0;
+}
+float vitDirectValue (double db) noexcept
+{
+    if (db <= -71.9)
+        return 1.0f;
+    return db == 0.0 ? 0.0f : (float) std::clamp ((db + 72.0) / 96.0, 1.0e-4, 0.998);
+}
+double vitCrossHz (float v) noexcept { return 16.0 * std::pow (21357.0 / 16.0, (double) std::clamp (v, 0.0f, 1.0f)); }
+float vitCrossValue (double hz) noexcept { return (float) std::clamp (std::log (std::max (hz, 16.0) / 16.0) / std::log (21357.0 / 16.0), 1.0e-4, 1.0); }
+
 double airDb (float v) noexcept { return lin (v, 0.0, 15.0); }
 double airHz (float v) noexcept { return logMap (v, 5000.0, 20000.0); }
 double exciterHz (float v) noexcept { return logMap (v, 1000.0, 12000.0); }
@@ -2578,6 +2664,27 @@ public:
 
     void process (float* l, float* r, int n, const EffectParams& p, double) noexcept override
     {
+        if (p[vitLaw] >= 0.5f)
+        {
+            // round 190mm (dyn): the five-band harmonic enhancer law (set only by the Waves Vitamin translator)
+            static constexpr double defaults[4] { 90.0, 500.0, 2594.0, 9310.0 };
+            vitamin::Settings st;
+            for (int k = 0; k < 4; ++k)
+                st.crossHz[k] = p[vitCross0 + k] > 0.0f ? vitCrossHz (p[vitCross0 + k]) : defaults[k];
+            for (int b = 0; b < 5; ++b)
+                st.bandGainDb[b] = p[vitGain0 + b] > 0.0f ? 48.0 * std::clamp ((double) p[vitGain0 + b], 0.0, 1.0) : -200.0;
+            st.directDb = vitDirectDb (p[vitDirect]);
+            if (! vitOn)
+            {
+                vitEngine.prepare (sr);
+                vitOn = true;
+            }
+            const auto inPeak = Meters::peak (l, r, n);
+            vitEngine.process (l, r, n, st);
+            meters.set (0.0f, 0.0f, inPeak, Meters::peak (l, r, n));
+            return;
+        }
+        vitOn = false;
         const bool dynamicNow = p[dynamic] >= 0.5f;
         if (dynamicNow != dynamicMode)
         {
@@ -2670,6 +2777,8 @@ private:
     bool dynamicMode = true; // issue #77: the default model (its latency is known before the first block)
     std::array<float, maxBlock> hl {}, hr {};
     Meters meters;
+    vitamin::Engine vitEngine; // round 190mm (dyn)
+    bool vitOn = false;
 };
 } // namespace
 } // namespace aether

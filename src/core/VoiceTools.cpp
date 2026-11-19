@@ -673,9 +673,10 @@ public:
         const auto out = (float) dbToGain (outputDb (p[output]));
         if (on (p[matched]))
         {
-            // round 190mg (ns1): the NS1 law above 0 % (and from then on, so that automation down to 0 stays continuous;
-            // its Amount 0 is the same bare pair); Amount 0 from the start keeps the zero law's path bit for bit
-            if (on (p[ns1Law]) && (amt > 0.0 || ns1On))
+            // round 190mg (ns1): the NS1 law above 0 % (and from then on, so that automation down to 0 stays continuous).
+            // Round 190mm (owner, 11-19): Amount 0 runs the NS1 engine's own open all-pass pair too (refcap182's 0 % mix
+            // −54 → −76 dB ESR); the zero law and the NS1 law are both unreleased, so no saved project changes
+            if (on (p[ns1Law]))
             {
                 if (! ns1On)
                 {

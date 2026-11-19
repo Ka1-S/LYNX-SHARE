@@ -9,6 +9,8 @@ the same scale as the FL-native parity tracker (round 170i).
 Usage:
   fxparity.py pair <original.wav> <lynx.wav>        metrics + score as JSON
   fxparity.py dir <original-dir> <lynx-dir>         every <name>.wav present in both, one JSON line each
+  (round 190mm) a reference with a sidecar <name>.mask.json has those spans (Waves demo-mode mutes) left out of
+  every metric; references without one score exactly as before
   fxparity.py verb <original.wav> <lynx.wav> [t0]   reverb score of two impulse renders (impulse at t0 s, default
                                                     0.1): the mean of seven 0-10 sub-scores (see verb_score)
 """
@@ -94,9 +96,20 @@ def rate_of(path):
     return read_wav(path)[1]
 
 
+def demo_mask(ref):
+    """Round 190mm: the demo-mode mute spans of a reference, from its sidecar `<ref>.mask.json` ({"spans": [[start, end],
+    ...]} in reference samples; written by the capture, which finds each mute as a digital-silence run in take A that a
+    second take B, started 7.5 s later, plays, widened over the fades where the takes differ). None without a sidecar:
+    every older reference scores exactly as before."""
+    p = ref[:-4] + '.mask.json'
+    if not os.path.exists(p):
+        return None
+    return [tuple(x) for x in json.load(open(p)).get('spans', [])]
+
+
 def pair(a, b):
     fc.SR = rate_of(a)
-    r = fc.compare(a, b)
+    r = fc.compare(a, b, mask=demo_mask(a))
     r['score'] = score(r)
     return r
 

@@ -78,7 +78,7 @@ TEST (parity190jh_facet_auto_threshold_is_hidden_and_off_in_old_projects)
     // round 190mg: + the PuigTec law after those, since the 0.1.30 rollup step 11)
     CHECK (facet::autoThresholdParam0 == facet::paramCount && facet::autoRevisionParam == facet::paramCount + facet::bands
            && facet::dispersionCountParam == facet::paramCount + facet::bands + 1 && facet::puigLawParam == facet::dispersionCountParam + 3
-           && facet::storedParamCount == facet::puigLawParam + 1);
+           && facet::wavesLawParam == facet::puigLawParam + 1 && facet::storedParamCount == facet::wavesBandParam0 + facet::bands); // (190mm: + the Waves design law, rollup step 12)
     auto s = makeEffectSlot (EffectKind::facetEq);
     for (int b = 0; b < facet::bands; ++b)
         CHECK (! facet::autoThreshold (s.params, b));

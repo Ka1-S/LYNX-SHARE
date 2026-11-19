@@ -60,7 +60,7 @@ enum Param
     // low / high parts are cut as the Amount rises (corners and cuts move with it), six bands of three cascaded
     // Regalia–Mitra cuts sharing one gain, each band's gain from a slewing noise-floor tracker and level follower, a
     // threshold between them, a soft fourth-power weight, opening / closing smoothing and a voice-activity flag that
-    // lifts the thresholds in pauses. Amount 0 stays the zero law's bare pair (bit for bit). 0 = off: new instances and
+    // lifts the thresholds in pauses. Amount 0 runs the same engine's open all-pass pair (round 190mm; was the zero law's pair). 0 = off: new instances and
     // every project saved before; the NS1 translator sets it
     ns1Law
 };

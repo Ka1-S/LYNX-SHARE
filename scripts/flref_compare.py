@@ -143,7 +143,23 @@ def spec_distance(fa, la):
     return float(np.mean(np.abs(np.clip(d, -60, 60))))
 
 
-def compare(flpath, lypath):
+def apply_mask(fa, la, lag, spans):
+    """Round 190mm: drop the reference's masked spans (demo-mode mutes; [start, end) in reference samples) from both
+    aligned signals. fa[k] is reference sample k + max(0, -lag). The kept parts are joined; the error, level, spectrum
+    and envelope metrics then see only audio both sides really played."""
+    keep = np.ones(len(fa), bool)
+    off = max(0, -lag)
+    for s0, s1 in spans:
+        a, b = max(0, int(s0) - off), min(len(fa), int(s1) - off)
+        if b > a:
+            keep[a:b] = False
+    return fa[keep], la[keep], int(len(keep) - keep.sum())
+
+
+def compare(flpath, lypath, mask=None):
+    """`mask` (round 190mm): optional [start, end) spans in reference samples left out of every metric (the Waves
+    demo mode's periodic mutes, detected in the capture and stored next to the reference, see fxparity.py). None =
+    the unmasked comparison, bit-identical to before."""
     f = read_fl(flpath)
     l = read_lynx(lypath)
     r = {'fl_s': round(len(f) / SR, 2), 'lynx_s': round(len(l) / SR, 2),
@@ -159,6 +175,8 @@ def compare(flpath, lypath):
     r['lag'] = lag
     r['xcorr'] = round(corr, 4)
     fa, la = align(f, l, lag)
+    if mask:
+        fa, la, r['masked'] = apply_mask(fa, la, lag, mask)
     pf, pl = float(np.max(np.abs(fa))) if len(fa) else 0.0, float(np.max(np.abs(la))) if len(la) else 0.0
     rf, rl = rms(fa), rms(la)
     e = la - fa

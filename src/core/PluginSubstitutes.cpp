@@ -15,14 +15,15 @@
 #include "core/Effects.h"
 #include "core/FabFilterStates.h"
 #include "core/FacetEq.h"
+#include "core/WavesApiEq.h"
 #include "core/FlEffects.h"
 #include "core/FlPluginDb.h"
 #include "core/FlWrapper.h"
 #include "core/LimiterLaw.h"
 #include "core/LynxVerbs.h"
 #include "core/LynxTune.h"
-#include "core/LynxVerbs.h"
 #include "core/MixSuite.h"
+#include "core/LowLifterFl.h"
 #include "core/VocalPitch.h"
 #include "core/VoiceTools.h"
 #include "core/VoiceShift.h"
@@ -534,10 +535,10 @@ translate = waves-sslcomp-bus
 preset = Style=0.9; Threshold=1
 
 [waves-compressors]
-product = Waves compressor (CLA-3A / C1 / API-2500)
+product = Waves compressor (CLA-3A / C1)
 vendor = Waves
 lynx = Compressor
-waves = CLA-3A; C1 comp; C1comp; API-2500
+waves = CLA-3A; C1 comp; C1comp
 preset = Threshold=0.75; Ratio=0.0526; Auto gain=1
 # round 190jh: an SSLComp state's RealWorld list is translated (threshold, ratio, attack, release, make-up, mix),
 # measured on refcap182's SSLComp programme captures; the others keep the preset
@@ -585,6 +586,16 @@ lynx = Ridge Strip
 vst3 = 5354535648437353736c6368616e6e65
 waves = SSLChannel
 translate = waves-ssl-channel
+
+# round 190mm: the G-series channel (no entry before: such projects lost the plug-in). Its RealWorld list has the E
+# channel's layout (55 = LMF ÷3, 56 = HMF ×3; LF / HF are shelves only), translated onto Ridge Strip's measured E
+# console like the SSL E-Channel; scored on our demo-mode captures (docs/analise/REA_rodada190mm.md §4)
+[waves-ssl-g-channel]
+product = SSL G-Channel
+vendor = Waves
+lynx = Ridge Strip
+waves = SSLGChannel
+translate = waves-ssl-g-channel
 
 [ssl-native-channel]
 product = SSL Native Channel Strip / 4K E
@@ -810,6 +821,85 @@ waves = C4
 # (docs/analise/REA_rodada190mg.md §2)
 translate = waves-c4
 
+# round 190mm (scheps): the multi-module channel strip role (no entry before: such projects lost the plug-in). Its five
+# modules (Pre, Gate, DS2, EQ, Comp), their on / off and the module order are read from the state and run by Ridge
+# Strip's hidden omni law: LYNX's own model of each module, fitted on our Waves-demo probes (EQ shapes, filters, thump,
+# saturation, the compressor types with their automatic make-up; docs/analise/REA_rodada190mm_scheps.md)
+[waves-scheps-omni]
+product = Scheps Omni Channel
+vendor = Waves
+lynx = Ridge Strip
+waves = Scheps Omni Channel; Scheps Omni Channel 2
+translate = waves-scheps-omni
+
+# ---------------------------------------------------------------- round 190mm (sub-round dyn): Waves without a stand-in
+# before (such projects lost the plug-in). Each law is LYNX's own model of the structure REA read in the reference's DSP,
+# every constant fitted on our demo-mode probes (docs/analise/REA_rodada190mm_dyn.md)
+[waves-rvox]
+product = Renaissance Vox
+vendor = Waves
+lynx = Compressor
+waves = Renaissance Vox; RVox
+# the one-knob vocal compressor on Compressor's hidden Vox law: the threshold with its automatic make-up, the gate and
+# the output gain. Without a readable state: Compressor at a 0 dBFS threshold (the reference's default compresses nothing)
+translate = waves-rvox
+preset = Threshold=1
+
+[waves-rdeesser]
+product = Renaissance DeEsser
+vendor = Waves
+lynx = Hush De-esser
+waves = RDeEsser; Renaissance DeEsser
+# the split / wide-band de-esser on Hush's hidden Renaissance de-esser law (its crossover, the threshold that rises with
+# the level below the band, the Renaissance smoother): threshold, range, frequency, high-pass / band-pass, split /
+# wide-band. Without a readable state: Hush's own engine at its defaults
+translate = waves-rdeesser
+
+[waves-c6]
+product = C6 Multiband Compressor
+vendor = Waves
+lynx = Prism Multiband
+waves = C6; C6-SideChain
+# the C4's four crossover bands on Prism's C4 law (round 190mg) and the C6's two floating dynamic bands on the law's hidden
+# floating bands (a band-pass of the crossovers' sum through the same gain law and smoother)
+translate = waves-c6
+
+[waves-api-2500]
+product = API-2500
+vendor = Waves
+lynx = Compressor
+waves = API-2500
+# the VCA bus compressor on Compressor's hidden bus law: threshold, ratio, attack, release (incl. variable), knee,
+# thrust, type (feed-forward / feedback), make-up (auto / manual), mix, trim. Was the generic Waves compressor entry
+# (Compressor preset). Without a readable state: that preset
+translate = waves-api-2500
+preset = Threshold=0.75; Ratio=0.0526; Auto gain=1
+
+[waves-rbass]
+product = Renaissance Bass
+vendor = Waves
+lynx = Low Lifter
+waves = Renaissance Bass; RBass
+# the psycho-acoustic bass enhancer on Low Lifter's hidden bass law: its crossover at Frequency, the harmonics of the band
+# below it at Intensity, the original bass in / out, the output gain. Without a readable state: Low Lifter's default
+translate = waves-rbass
+
+[waves-maxxbass]
+product = MaxxBass
+vendor = Waves
+lynx = Low Lifter
+waves = MaxxBass
+# the same bass law in the MaxxBass role: input gain, frequency, original bass gain, harmonics gain
+translate = waves-maxxbass
+
+[waves-vitamin]
+product = Vitamin
+vendor = Waves
+lynx = Aether
+waves = Vitamin
+# the five-band harmonic enhancer on Aether's hidden Vitamin law: the four crossovers, each band's gain, the direct gain
+translate = waves-vitamin
+
 [waves-ar-plates]
 product = Abbey Road Reverb Plates
 vendor = Waves
@@ -840,10 +930,56 @@ waves = PuigTec EQP1A; PuigTec EQP-1A; EQP1A
 translate = waves-puigtec
 
 [waves-eqs]
-product = Waves EQ (Q10 / Renaissance EQ / SSL EQ)
+product = Waves EQ (SSL EQ)
 vendor = Waves
 lynx = Parametric EQ
-waves = Q10; REQ; SSLEQ
+# round 190mm: Renaissance EQ and Q10 have their own entries below
+waves = SSLEQ
+
+# round 190mm: Renaissance EQ (REQ 2 / 4 / 6) and Q10 on Facet EQ's Waves design law — every band shape identified on our
+# demo-mode impulse responses (docs/analise/REA_rodada190mm.md §2: the bell's prescribed-Nyquist-gain design, the shelves'
+# shared-s-term law, the resonant shelves, the 18 dB/oct cuts; Q10's bandwidth-prewarped bells, first-order shelves,
+# Butterworth cuts), the RealWorld list translated band by band (no entry before: a flat Parametric EQ)
+[waves-req]
+product = Renaissance Equalizer (REQ)
+vendor = Waves
+lynx = Facet EQ
+waves = REQ; REQ 2; REQ 4; REQ 6
+translate = waves-req
+
+# round 190mm: the API-550A / 550B / 560 EQs on Facet EQ (no entry before): every control position probed on our demo-mode
+# impulse responses and fitted with one Facet band each (core/WavesApiEq.h; docs/analise/REA_rodada190mm.md §3), plus the
+# 550s' own flat response; the RealWorld list is translated band by band
+[waves-api-550]
+product = API 550A / 550B
+vendor = Waves
+lynx = Facet EQ
+waves = API-550; API-550A; API-550B
+translate = waves-api-550
+
+# round 190mm: Renaissance Channel (no entry before) — its compressor is the Renaissance Compressor's, so it plays on
+# Compressor's Renaissance law (round 190mg) with the law's hidden channel EQ (the Renaissance EQ's bands, Facet's Waves
+# design law) before / after it as routed; the gate is not carried (docs/analise/REA_rodada190mm.md §4)
+[waves-rchannel]
+product = Renaissance Channel (RChannel)
+vendor = Waves
+lynx = Compressor
+waves = RChannel
+translate = waves-rchannel
+
+[waves-api-560]
+product = API 560
+vendor = Waves
+lynx = Facet EQ
+waves = API-560
+translate = waves-api-560
+
+[waves-q10]
+product = Q10 Equalizer
+vendor = Waves
+lynx = Facet EQ
+waves = Q10
+translate = waves-q10
 
 [fabfilter-pro-q]
 product = FabFilter Pro-Q
@@ -2221,6 +2357,305 @@ int translateWavesPuigTec (const std::vector<std::uint8_t>& state, EffectSlot& s
     return 8;
 }
 
+// ---- round 190mm: Waves EQs on Facet EQ's Waves design law (docs/analise/REA_rodada190mm.md §2) ----------------------
+namespace wavesEq
+{
+void band (EffectSlot& slot, int b, facet::Shape shape, facet::WaveCode code, double hzv, double db, double qv, int slope = 12)
+{
+    auto& p = slot.params;
+    p[(std::size_t) facet::param (b, 0)] = facet::shapeValue (shape);
+    p[(std::size_t) facet::param (b, 1)] = facet::hzValue (hzv);
+    p[(std::size_t) facet::param (b, 2)] = facet::gainValue (db);
+    p[(std::size_t) facet::param (b, 3)] = facet::qValue (qv);
+    p[(std::size_t) facet::param (b, 4)] = facet::slopeValue (slope);
+    p[(std::size_t) (facet::wavesBandParam0 + b)] = facet::waveCodeValue (code);
+}
+void off (EffectSlot& slot, int b)
+{
+    slot.params[(std::size_t) facet::param (b, 0)] = facet::shapeValue (facet::Shape::off);
+    slot.params[(std::size_t) (facet::wavesBandParam0 + b)] = 0.0f;
+}
+} // namespace wavesEq
+
+// Renaissance EQ (REQ 2 / 4 / 6: one layout, 140 values): band k = 0 … 5 at 5 k: on, type, gain dB, frequency Hz, Q (the
+// left channel; the right copy at 30 + 5 k), 60 / 61 the output gain left / right. Types by band: 1st: bell, low shelf,
+// high pass, resonant low shelf; 2nd / 3rd: bell, low shelf; 4th / 5th: bell, high shelf; 6th: bell, high shelf, low pass,
+// resonant high shelf. REQ 2 uses the 1st and 6th, REQ 4 the 1st, 2nd, 5th and 6th. Facet's bands 0 … 5 take them.
+int translateWavesReq (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    namespace F = facet;
+    const auto rw = wavesRealWorldParams (state);
+    if (slot.kind != EffectKind::facetEq || rw.size() < 62 || ! wavesValue (rw, 3) || ! wavesValue (rw, 28))
+        return 0;
+    const auto v = [&rw] (std::size_t i, double fallback) { return wavesValue (rw, i).value_or (fallback); };
+    int n = 0;
+    for (int k = 0; k < 6; ++k)
+    {
+        const auto i = (std::size_t) (5 * k);
+        const bool on = v (i, 0.0) >= 0.5;
+        const int type = (int) std::lround (v (i + 1, 0.0));
+        const double db = std::clamp (v (i + 2, 0.0), -18.0, 18.0), f = std::clamp (v (i + 3, 1000.0), 10.0, 22000.0);
+        const double q = std::clamp (v (i + 4, 1.0), 0.1, 10.0);
+        if (! on) { wavesEq::off (slot, k); continue; }
+        ++n;
+        using S = F::Shape; using C = F::WaveCode;
+        if (type == 0) wavesEq::band (slot, k, S::bell, C::reqBell, f, db, q);
+        else if (k == 0 && type == 2) wavesEq::band (slot, k, S::lowCut, C::reqHighPass, f, 0.0, q, 18);
+        else if (k == 5 && type == 2) wavesEq::band (slot, k, S::highCut, C::reqLowPass, f, 0.0, q, 18);
+        else if (k == 0 && type == 3) wavesEq::band (slot, k, S::lowShelf, C::rbjLowShelf, f, db, q);
+        else if (k == 5 && type == 3) wavesEq::band (slot, k, S::highShelf, C::rbjHighShelf, f, db, q);
+        else if (k <= 2) wavesEq::band (slot, k, S::lowShelf, C::reqLowShelf, f, db, q);
+        else wavesEq::band (slot, k, S::highShelf, C::reqHighShelf, f, db, q);
+    }
+    wavesEq::off (slot, 6);
+    wavesEq::off (slot, 7);
+    slot.params[(std::size_t) F::outputParam] = (float) std::clamp (v (60, 0.0) / 48.0 + 0.5, 0.0, 1.0);
+    slot.params[(std::size_t) F::wavesLawParam] = 1.0f;
+    return 2 + 5 * n;
+}
+
+// Q10 (122 values): band k = 0 … 9 at 5 k: in, type (0 bell, 1 low shelf, 2 high shelf, 3 low pass, 4 high pass, 5 PQ
+// bell), gain dB, frequency Hz, Q (the left channel; the right copy at 50 + 5 k); 100 / 102 the input / output gain left.
+// Facet has eight bands: when more than eight Q10 bands are in, the eight with the largest effect (cuts first, then by
+// |gain|) are kept.
+int translateWavesQ10 (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    namespace F = facet;
+    const auto rw = wavesRealWorldParams (state);
+    if (slot.kind != EffectKind::facetEq || rw.size() < 103 || ! wavesValue (rw, 3) || ! wavesValue (rw, 48))
+        return 0;
+    const auto v = [&rw] (std::size_t i, double fallback) { return wavesValue (rw, i).value_or (fallback); };
+    struct B { int type; double db, f, q, weight; };
+    std::vector<B> in;
+    for (int k = 0; k < 10; ++k)
+    {
+        const auto i = (std::size_t) (5 * k);
+        if (v (i, 0.0) < 0.5) continue;
+        B b { (int) std::lround (v (i + 1, 0.0)), std::clamp (v (i + 2, 0.0), -18.0, 18.0), std::clamp (v (i + 3, 1000.0), 10.0, 22000.0),
+              std::clamp (v (i + 4, 7.0), 0.5, 100.0), 0.0 };
+        b.weight = b.type == 3 || b.type == 4 ? 1e9 : std::abs (b.db);
+        in.push_back (b);
+    }
+    std::stable_sort (in.begin(), in.end(), [] (const B& x, const B& y) { return x.weight > y.weight; });
+    if (in.size() > (std::size_t) F::bands) in.resize ((std::size_t) F::bands);
+    for (int k = 0; k < F::bands; ++k)
+    {
+        if (k >= (int) in.size()) { wavesEq::off (slot, k); continue; }
+        const auto& b = in[(std::size_t) k];
+        using S = F::Shape; using C = F::WaveCode;
+        switch (b.type)
+        {
+            case 1: wavesEq::band (slot, k, S::lowShelf, C::lowShelf1, b.f, b.db, 0.7071, 6); break;
+            case 2: wavesEq::band (slot, k, S::highShelf, C::highShelf1, b.f, b.db, 0.7071, 6); break;
+            case 3: wavesEq::band (slot, k, S::highCut, C::butterLowPass, b.f, 0.0, 1.0, 12); break;
+            case 4: wavesEq::band (slot, k, S::lowCut, C::butterHighPass, b.f, 0.0, 1.0, 12); break;
+            case 5: wavesEq::band (slot, k, S::bell, C::q10PqBell, b.f, b.db, b.q / 4.0); break;
+            default: wavesEq::band (slot, k, S::bell, C::q10Bell, b.f, b.db, b.q / 4.0); break;
+        }
+    }
+    slot.params[(std::size_t) F::outputParam] = (float) std::clamp ((v (100, 0.0) + v (102, 0.0)) / 48.0 + 0.5, 0.0, 1.0);
+    slot.params[(std::size_t) F::wavesLawParam] = 1.0f;
+    return 3 + 5 * (int) in.size();
+}
+
+// Renaissance Channel (137 values: 0 … 19 the EQ's four bands like the Renaissance EQ's, 22 … 28 routing / side chain,
+// 42 attack ms, 43 release ms, 45 threshold dB, 46 ratio, 47 gain dB, 52 ARC (0) / manual, 58 … 62 the gate): its
+// compressor block mirrors the Renaissance Compressor's list (0 / 1 / 2 / 8 / 9 / 17 there), so it takes the same
+// translation onto Compressor's Renaissance law; its EQ runs on the law's hidden channel EQ (Facet's Waves design law),
+// before or after the dynamics as routed. The gate is not carried.
+int translateWavesRChannel (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    const auto rw = wavesRealWorldParams (state);
+    const auto threshold = wavesValue (rw, 45), ratio = wavesValue (rw, 46);
+    if (slot.kind != EffectKind::compressor || rw.size() < 63 || ! threshold || ! ratio)
+        return 0;
+    const auto v = [&rw] (std::size_t i, double fallback) { return wavesValue (rw, i).value_or (fallback); };
+    const double attack = v (42, 16.0), release = v (43, 160.0), gain = v (47, 0.0);
+    slot.params[0] = linNorm (*threshold, -60.0, 0.0);
+    slot.params[1] = linNorm (*ratio, 1.0, 20.0);
+    slot.params[2] = logNorm (attack, 0.1, 100.0);
+    slot.params[3] = logNorm (release, 10.0, 1000.0);
+    slot.params[4] = linNorm (gain, 0.0, 24.0);
+    slot.params[5] = 0.0f;
+    slot.params[6] = 1.0f;
+    slot.params[7] = linNorm (0.0, -18.0, 18.0);
+    slot.params[8] = 1.0f;
+    slot.params[9] = v (52, 0.0) >= 0.5 ? 1.0f : 0.0f;
+    slot.params[10] = slot.params[11] = 0.0f;
+    slot.params[12] = 1.0f;
+    const auto r = std::clamp (*ratio, 0.5, 50.0);
+    slot.params[13] = 1.0f;
+    slot.params[14] = (float) (r >= 1.0 ? 0.625 * (1.0 - std::log (r) / std::log (50.0)) : 0.625 + 0.375 * std::log (r) / std::log (0.5));
+    slot.params[15] = linNorm (gain, -30.0, 30.0);
+    slot.params[16] = logNorm (attack, 0.5, 500.0);
+    slot.params[17] = logNorm (release, 5.0, 5000.0);
+    if (slot.params.size() > (std::size_t) compressorRenLaw)
+        slot.params[(std::size_t) compressorRenLaw] = 1.0f;
+    // the EQ (20 on; band k at 5 k: on, type, gain, Hz, Q; 26 routing 1 = dynamics first) on the Renaissance Channel law:
+    // the Renaissance EQ's own band structures through Facet's Waves design law
+    int bands = 0;
+    if (v (20, 1.0) >= 0.5 && slot.params.size() > (std::size_t) (compressorChannelBand0 + 15))
+    {
+        using C = facet::WaveCode;
+        for (int k = 0; k < 4; ++k)
+        {
+            const auto i = (std::size_t) (5 * k);
+            if (v (i, 0.0) < 0.5) continue;
+            const int type = (int) std::lround (v (i + 1, 0.0));
+            C code = C::reqBell;
+            if (type == 1) code = k <= 1 ? C::reqLowShelf : C::reqHighShelf;
+            else if (type == 2) code = k <= 1 ? C::rbjLowShelf : C::rbjHighShelf;
+            else if (type == 3) code = k == 0 ? C::reqHighPass : C::reqLowPass;
+            const auto b = (std::size_t) (compressorChannelBand0 + 4 * k);
+            slot.params[b] = facet::waveCodeValue (code);
+            slot.params[b + 1] = facet::hzValue (std::clamp (v (i + 3, 1000.0), 10.0, 22000.0));
+            slot.params[b + 2] = facet::gainValue (std::clamp (v (i + 2, 0.0), -18.0, 18.0));
+            slot.params[b + 3] = facet::qValue (std::clamp (v (i + 4, 1.0), 0.1, 10.0));
+            ++bands;
+        }
+        slot.params[(std::size_t) compressorChannelLaw] = 1.0f;
+        slot.params[(std::size_t) compressorChannelRouting] = v (26, 0.0) >= 0.5 ? 1.0f : 0.0f;
+    }
+    return 7 + 4 * bands;
+}
+
+namespace wavesApi
+{
+void put (EffectSlot& slot, int b, const wavesApiEq::Band& e, double dbScale = 1.0)
+{
+    using S = facet::Shape;
+    static constexpr S shapes[6] = { S::off, S::bell, S::lowShelf, S::highShelf, S::lowShelf, S::highShelf };
+    const int k = std::clamp (e.shape, 0, 5);
+    auto& p = slot.params;
+    p[(std::size_t) facet::param (b, 0)] = facet::shapeValue (shapes[k]);
+    p[(std::size_t) facet::param (b, 1)] = facet::hzValue (e.hz);
+    p[(std::size_t) facet::param (b, 2)] = facet::gainValue (e.db * dbScale);
+    p[(std::size_t) facet::param (b, 3)] = facet::qValue (e.q);
+    p[(std::size_t) facet::param (b, 4)] = facet::slopeValue (k >= 4 ? 6 : 12);
+}
+int nearest (const float* xs, int n, double x, bool logScale)
+{
+    int best = 0;
+    for (int i = 1; i < n; ++i)
+        if (logScale ? std::abs (std::log (xs[i] / x)) < std::abs (std::log (xs[best] / x)) : std::abs (xs[i] - x) < std::abs (xs[best] - x))
+            best = i;
+    return best;
+}
+} // namespace wavesApi
+
+// API-550A (26 values: 0 Filter, 1 / 2 low gain dB / Hz, 3 / 4 mid gain / kHz, 5 / 6 high gain / kHz, 14 / 15 low / high
+// bell) and API-550B (the same name "API-550" in its state: 1 / 17 low gain / Hz, 21 / 18 low-mid gain / Hz, 3 / 19 high-mid
+// gain / kHz, 5 / 20 high gain / kHz, 14 / 15 low / high bell; told apart by the state's sub-component). Each band is the
+// fitted Facet band of its nearest control position (the reference's gains and frequencies are stepped), on top of the 550s'
+// flat response (two / three bands) and the 550A's Filter (a low and a high cut).
+int translateWavesApi550 (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    namespace A = wavesApiEq;
+    const auto rw = wavesRealWorldParams (state);
+    if (slot.kind != EffectKind::facetEq || rw.size() < 22 || ! wavesValue (rw, 1) || ! wavesValue (rw, 6))
+        return 0;
+    const auto v = [&rw] (std::size_t i, double fallback) { return wavesValue (rw, i).value_or (fallback); };
+    for (int b = 0; b < facet::bands; ++b)
+        slot.params[(std::size_t) facet::param (b, 0)] = facet::shapeValue (facet::Shape::off);
+    // the two share the name "API-550" and one RealWorld layout; the state's sub-component says which ("A5BS" / "A5BM")
+    const bool typeB = findBytes (state, "<PluginSubComp>A5B") != std::string::npos;
+    int b = 0, n = 0;
+    const auto add = [&] (const A::Band& e) { if (b < facet::bands && e.shape > 0) wavesApi::put (slot, b++, e); };
+    const auto gainPos = [] (double db, int& g) { if (std::abs (db) < 1.0) return false; g = wavesApi::nearest (A::gains550, 10, db, false); return true; };
+    if (! typeB)
+    {
+        const double gain[3] = { v (1, 0.0), v (3, 0.0), v (5, 0.0) }, hzv[3] = { v (2, 50.0), v (4, 0.4) * 1000.0, v (6, 5.0) * 1000.0 };
+        const int bell[3] = { v (14, 0.0) > 0.5 ? 1 : 0, 0, v (15, 0.0) > 0.5 ? 1 : 0 };
+        for (int k = 0; k < 3; ++k)
+        {
+            int g = 0;
+            if (! gainPos (gain[k], g)) continue;
+            add (A::api550a[k][bell[k]][wavesApi::nearest (A::freqs550a[k], 5, hzv[k], true)][g]);
+            ++n;
+        }
+        add (A::flat550a[0]);
+        add (A::flat550a[1]);
+        if (v (0, 0.0) > 0.5 && b + 2 <= facet::bands)
+        {
+            using S = facet::Shape;
+            for (int k = 0; k < 2; ++k, ++b)
+            {
+                auto& p = slot.params;
+                p[(std::size_t) facet::param (b, 0)] = facet::shapeValue (k == 0 ? S::lowCut : S::highCut);
+                p[(std::size_t) facet::param (b, 1)] = facet::hzValue (A::filterBands[k][0]);
+                p[(std::size_t) facet::param (b, 3)] = facet::qValue (A::filterBands[k][1]);
+                p[(std::size_t) facet::param (b, 4)] = facet::slopeValue (A::filterSlopes[k]);
+            }
+        }
+    }
+    else
+    {
+        const double gain[4] = { v (1, 0.0), v (21, 0.0), v (3, 0.0), v (5, 0.0) };
+        const double hzv[4] = { v (17, 30.0), v (18, 75.0), v (19, 1.5) * 1000.0, v (20, 2.5) * 1000.0 };
+        const int bell[4] = { v (14, 0.0) > 0.5 ? 1 : 0, 0, 0, v (15, 0.0) > 0.5 ? 1 : 0 };
+        for (int k = 0; k < 4; ++k)
+        {
+            int g = 0;
+            if (! gainPos (gain[k], g)) continue;
+            add (A::api550b[k][bell[k]][wavesApi::nearest (A::freqs550b[k], 7, hzv[k], true)][g]);
+            ++n;
+        }
+        add (A::flat550b[0]);
+        add (A::flat550b[1]);
+        add (A::flat550b[2]);
+        slot.params[(std::size_t) facet::outputParam] = (float) std::clamp (A::flatOutput550b / 48.0 + 0.5, 0.0, 1.0);
+    }
+    return 2 + 2 * n;
+}
+
+// API-560 (23 values: the ten bands' gains dB at 1 … 10 in the order 63, 250, 1k, 4k, 16k, 31, 125, 500, 2k, 8k Hz). Its
+// gain is continuous: each band's fitted Facet bell is interpolated between the probed gains (frequency and Q in log),
+// scaled below ±1.5 dB. Facet has eight bands: the eight largest gains are kept.
+int translateWavesApi560 (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    namespace A = wavesApiEq;
+    const auto rw = wavesRealWorldParams (state);
+    if (slot.kind != EffectKind::facetEq || rw.size() < 11 || ! wavesValue (rw, 1) || ! wavesValue (rw, 10))
+        return 0;
+    static constexpr int order[10] = { 1, 3, 5, 7, 9, 0, 2, 4, 6, 8 }; // RealWorld 1 … 10 -> band 31 Hz … 16 kHz (0 … 9)
+    std::vector<std::pair<double, int>> on;
+    double gain[10] {};
+    for (int i = 0; i < 10; ++i)
+    {
+        gain[order[i]] = std::clamp (wavesValue (rw, (std::size_t) (1 + i)).value_or (0.0), -12.0, 12.0);
+        if (std::abs (gain[order[i]]) > 0.05) on.push_back ({ std::abs (gain[order[i]]), order[i] });
+    }
+    std::stable_sort (on.begin(), on.end(), [] (auto& x, auto& y) { return x.first > y.first; });
+    if (on.size() > (std::size_t) facet::bands) on.resize ((std::size_t) facet::bands);
+    for (int b = 0; b < facet::bands; ++b)
+        slot.params[(std::size_t) facet::param (b, 0)] = facet::shapeValue (facet::Shape::off);
+    int b = 0;
+    for (const auto& [mag, k] : on)
+    {
+        const double g = gain[k];
+        A::Band e {};
+        if (std::abs (g) <= 1.5)
+        {
+            e = A::api560[k][g < 0 ? 4 : 5];
+            e.db = (float) (e.db * std::abs (g) / 1.5);
+        }
+        else
+        {
+            int i = 0;
+            while (i < 8 && A::gains560[i + 1] < g) ++i;
+            const auto& lo = A::api560[k][i];
+            const auto& hi = A::api560[k][i + 1];
+            const double t = std::clamp ((g - A::gains560[i]) / (A::gains560[i + 1] - A::gains560[i]), 0.0, 1.0);
+            e.shape = 1;
+            e.hz = (float) std::exp (std::log (lo.hz) * (1 - t) + std::log (hi.hz) * t);
+            e.db = (float) (lo.db * (1 - t) + hi.db * t);
+            e.q = (float) std::exp (std::log (lo.q) * (1 - t) + std::log (hi.q) * t);
+        }
+        wavesApi::put (slot, b++, e);
+    }
+    return 1 + (int) on.size();
+}
+
 // SuperTap 2-Taps (98 values; round 190jh [EXEC]: refcap182's states against the settings set through the trial's own
 // parameters, and the tap times / levels read off its programme renders): 4 tempo BPM, 10 feedback on, 11 feedback %,
 // 13 feedback delay; tap k (k = 0, 1) at 33 + 10 k: on, gain dB, pan (−45 … +45°), delay, 6 filter kHz, 8 filter on.
@@ -2290,6 +2725,183 @@ int translateWavesSuperTap (const std::vector<std::uint8_t>& state, EffectSlot& 
         p[e::highCut] = linNorm (lp, 200.0, 20000.0);
     return (int) taps.size() * 4 + 2;
 }
+
+// ======================================================================= round 190mm (sub-round dyn): Renaissance Vox,
+// RDeEsser, RBass / MaxxBass, API-2500, C6, Vitamin (docs/analise/REA_rodada190mm_dyn.md). Every law below is LYNX's own
+// model of the structure REA read in the reference's DSP, with every constant fitted on our demo-mode probes.
+
+// Renaissance Vox (RealWorld [EXEC] the bank's states vs the settings read back: 0 compression dB (−36 … 0), 1 gate dB
+// (−80 = off … 0), 2 gate release ms (10 … 250), 7 output gain dB (−36 … 0)) → Compressor's hidden Vox law
+int translateWavesRVox (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    const auto rw = wavesRealWorldParams (state);
+    const auto comp = wavesValue (rw, 0);
+    if (slot.kind != EffectKind::compressor || ! comp || slot.params.size() <= (std::size_t) compressorVoxGain)
+        return 0;
+    slot.params[0] = linNorm (std::clamp (*comp, -36.0, 0.0), -60.0, 0.0);
+    slot.params[8] = 1.0f; // the vintage voicing (its laws)
+    const auto gate = std::clamp (wavesValue (rw, 1).value_or (-80.0), -80.0, 0.0);
+    slot.params[(std::size_t) compressorVoxGate] = gate > -79.95 ? (float) std::max (1e-4, (gate + 80.0) / 80.0) : 0.0f;
+    slot.params[(std::size_t) compressorVoxGateRelease] = linNorm (wavesValue (rw, 2).value_or (130.0), 10.0, 250.0);
+    slot.params[(std::size_t) compressorVoxGain] = (float) std::clamp (-wavesValue (rw, 7).value_or (0.0) / 36.0, 0.0, 1.0);
+    slot.params[(std::size_t) compressorVoxLaw] = 1.0f;
+    return 4;
+}
+// RDeEsser (RealWorld [EXEC] the bank's states vs the settings read back: 0 threshold dB, 1 range dB, 11 frequency Hz,
+// 13 filter type (0 high-pass, 1 band-pass), 14 mode (0 split, 1 wide-band), 15 monitor (not translated); 2 … 7 and 12
+// hold the reference's hidden detector values, the same in every state we have: the law uses them as constants) →
+// Hush De-esser's hidden Renaissance de-esser law
+int translateWavesRDeEsser (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    namespace h = mixsuite::hush;
+    const auto rw = wavesRealWorldParams (state);
+    const auto thr = wavesValue (rw, 0), hz = wavesValue (rw, 11);
+    if (slot.kind != EffectKind::hushDeEsser || ! thr || ! hz || slot.params.size() <= (std::size_t) h::essWideBand)
+        return 0;
+    slot.params[h::essLaw] = 1.0f;
+    slot.params[h::essThreshold] = (float) std::clamp (-*thr / 80.0, 0.0, 1.0);
+    slot.params[h::essRange] = (float) std::clamp (-wavesValue (rw, 1).value_or (-16.0) / 48.0, 0.0, 1.0);
+    slot.params[h::essFreq] = linNorm (*hz, 2000.0, 16000.0);
+    slot.params[h::essBandPass] = wavesValue (rw, 13).value_or (0.0) >= 0.5 ? 1.0f : 0.0f;
+    slot.params[h::essWideBand] = wavesValue (rw, 14).value_or (0.0) >= 0.5 ? 1.0f : 0.0f;
+    return 5;
+}
+// C6 (123 values; [EXEC] the bank's states vs the settings read back): the C4's layout — 0 … 2 crossovers Hz, 3 crossover
+// Q, 7 output dB, the bands at 14 + 14 b (+2 solo, +3 bypass, +4 gain, +5 threshold, +6 range, +7 knee, +8 attack ms,
+// +9 release ms, +10 / +11 release mode and behaviour (Opto = 1)) — for b = 0 … 3 the crossover bands (the C6's bands 2 … 5)
+// and b = 4, 5 its floating bands 1 and 6, whose frequency and Q are 98 / 99 and 102 / 103 → Prism's C4 law plus its
+// hidden floating bands
+int translateWavesC6 (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    namespace pr = dyn::prism;
+    const auto rw = wavesRealWorldParams (state);
+    if (slot.kind != EffectKind::prismMultiband || rw.size() < 104 || ! wavesValue (rw, 0) || ! wavesValue (rw, 19)
+        || slot.params.size() <= (std::size_t) pr::c6Param (1, pr::c6Rel))
+        return 0;
+    if (translateWavesC4 (state, slot) == 0)
+        return 0;
+    auto& p = slot.params;
+    const auto v = [&rw] (std::size_t i, double fallback) { return wavesValue (rw, i).value_or (fallback); };
+    const auto set = [&p] (int k, float x) { p[(std::size_t) k] = std::clamp (x, 0.0f, 1.0f); };
+    static constexpr std::size_t freqAt[2] { 98, 102 };
+    for (int f = 0; f < 2; ++f)
+    {
+        const auto at = [&] (int fld, double fallback) { return v ((std::size_t) (14 + 14 * (4 + f) + fld), fallback); };
+        const double range = std::clamp (at (6, 0.0), -30.0, 30.0), gain = std::clamp (at (4, 0.0), -30.0, 30.0);
+        const bool on = at (3, 0.0) < 0.5 && (range != 0.0 || gain != 0.0);
+        set (pr::c6Param (f, pr::c6On), on ? 1.0f : 0.0f);
+        if (! on)
+            continue;
+        set (pr::c6Param (f, pr::c6Freq), pr::c6FreqValue (v (freqAt[f], f == 0 ? 1000.0 : 5003.0)));
+        set (pr::c6Param (f, pr::c6Width), pr::c6WidthValue (v (freqAt[f] + 1, 1.65)));
+        set (pr::c6Param (f, pr::c6Thr), pr::thresholdValue (std::clamp (at (5, 0.0), -90.0, 0.0)));
+        set (pr::c6Param (f, pr::c6Range), (float) ((range + 30.0) / 60.0));
+        set (pr::c6Param (f, pr::c6Gain), (float) ((gain + 30.0) / 60.0));
+        set (pr::c6Param (f, pr::c6Att), pr::c4AttackValue (at (8, 16.03)));
+        set (pr::c6Param (f, pr::c6Rel), pr::c4ReleaseValue (at (9, 160.31)));
+    }
+    return 50;
+}
+// API-2500 (RealWorld [EXEC] the bank's states vs the settings read back: 0 threshold (+10 … −20), 1 ratio step (1.5, 2, 3,
+// 4, 6, 10, ∞), 2 attack step (0.03 … 30 ms), 3 release step (0.05 … 2 s, 6 = Var), 5 In, 7 thrust (Norm, Med, Loud),
+// 8 knee (Soft, Med, Hard), 11 variable release s, 12 type (1 = Old: feedback), 13 make-up (0 = Auto), 14 make-up dB,
+// 37 mix %, 39 trim dB) → Compressor's hidden bus compressor law
+int translateWavesApi2500 (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    const auto rw = wavesRealWorldParams (state);
+    const auto thr = wavesValue (rw, 0), ratio = wavesValue (rw, 1);
+    if (slot.kind != EffectKind::compressor || ! thr || ! ratio || slot.params.size() <= (std::size_t) compressorApiTrim
+        || wavesPluginName (state) != "API-2500")
+        return 0;
+    auto& p = slot.params;
+    const auto v = [&rw] (std::size_t i, double fallback) { return wavesValue (rw, i).value_or (fallback); };
+    const auto put = [&p] (int k, double x) { p[(std::size_t) k] = (float) std::clamp (x, 0.0, 1.0); };
+    p[8] = 0.0f; // no vintage voicing (no latency)
+    put (compressorApiLaw, 1.0);
+    put (compressorApiThreshold, (10.0 - std::clamp (*thr, -20.0, 10.0)) / 30.0);
+    put (compressorApiRatio, std::round (std::clamp (*ratio, 0.0, 6.0)) / 6.0);
+    put (compressorApiAttack, std::round (std::clamp (v (2, 3.0), 0.0, 6.0)) / 6.0);
+    put (compressorApiRelease, std::round (std::clamp (v (3, 6.0), 0.0, 6.0)) / 6.0);
+    put (compressorApiVar, (std::clamp (v (11, 0.5), 0.05, 3.0) - 0.05) / 2.95);
+    put (compressorApiKnee, (2.0 - std::round (std::clamp (v (8, 2.0), 0.0, 2.0))) / 2.0);
+    put (compressorApiThrust, std::round (std::clamp (v (7, 0.0), 0.0, 2.0)) / 2.0);
+    put (compressorApiFeedback, v (12, 0.0) >= 0.5 ? 1.0 : 0.0);
+    put (compressorApiManual, v (13, 0.0) >= 0.5 ? 1.0 : 0.0);
+    const double mk = std::clamp (v (14, 0.0), -24.0, 24.0), trim = std::clamp (v (39, 0.0), -18.0, 18.0);
+    put (compressorApiMakeup, mk == 0.0 ? 0.0 : std::max (1.0e-4, (mk + 24.0) / 48.0));
+    put (compressorApiTrim, trim == 0.0 ? 0.0 : std::max (1.0e-4, (trim + 18.0) / 36.0));
+    const bool in = v (5, 1.0) >= 0.5;
+    put (compressorApiDry, in ? 1.0 - std::clamp (v (37, 100.0), 0.0, 100.0) / 100.0 : 1.0);
+    return 12;
+}
+
+// MaxxBass (RealWorld [EXEC] the bank's states vs the settings read back: 0 input gain dB, 1 frequency Hz, 12 original bass
+// gain dB, 13 harmonics gain dB (−144 = off); 2 decay, 3 response, 4 ratio and 10 the high-pass, which move only the
+// harmonics, are not translated) → Low Lifter's hidden bass law (the MaxxBass role)
+int translateWavesMaxxBass (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    namespace ll = lowlifter;
+    const auto rw = wavesRealWorldParams (state);
+    const auto hz = wavesValue (rw, 1);
+    if (slot.kind != EffectKind::flLowLifter || ! hz || slot.params.size() <= (std::size_t) ll::bassOut || wavesPluginName (state) != "MaxxBass")
+        return 0;
+    auto& p = slot.params;
+    p[4] = 0.0f; // Low Lifter's own look-ahead off (the law has no latency)
+    p[(std::size_t) ll::bassLaw] = 1.0f;
+    p[(std::size_t) ll::bassMaxx] = 1.0f;
+    p[(std::size_t) ll::bassFreq] = ll::bassFreqValue (*hz);
+    p[(std::size_t) ll::bassInput] = ll::bassLevelValue (wavesValue (rw, 0).value_or (0.0));
+    const double orig = wavesValue (rw, 12).value_or (0.0);
+    p[(std::size_t) ll::bassOrig] = orig <= -143.0 ? 0.0f : (float) std::min (4.0, std::pow (10.0, orig / 20.0));
+    p[(std::size_t) ll::bassHarm] = ll::bassLevelValue (wavesValue (rw, 13).value_or (-144.0));
+    p[(std::size_t) ll::bassOut] = ll::bassLevelValue (0.0);
+    return 4;
+}
+
+// Renaissance Bass (RealWorld [EXEC] the bank's states vs the settings read back: 1 frequency Hz, 5 intensity dB, 6 original
+// in (0) / out (1), 7 output gain dB) → Low Lifter's hidden bass law (the Renaissance Bass role)
+int translateWavesRBass (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    namespace ll = lowlifter;
+    const auto rw = wavesRealWorldParams (state);
+    const auto hz = wavesValue (rw, 1), intensity = wavesValue (rw, 5);
+    if (slot.kind != EffectKind::flLowLifter || ! hz || ! intensity || slot.params.size() <= (std::size_t) ll::bassOut)
+        return 0;
+    auto& p = slot.params;
+    p[4] = 0.0f;
+    p[(std::size_t) ll::bassLaw] = 1.0f;
+    p[(std::size_t) ll::bassMaxx] = 0.0f;
+    p[(std::size_t) ll::bassFreq] = ll::bassFreqValue (*hz);
+    p[(std::size_t) ll::bassInput] = ll::bassLevelValue (0.0);
+    p[(std::size_t) ll::bassOrig] = wavesValue (rw, 6).value_or (0.0) >= 0.5 ? 0.0f : 1.0f;
+    p[(std::size_t) ll::bassHarm] = ll::bassLevelValue (std::clamp (*intensity, -24.0, 24.0));
+    p[(std::size_t) ll::bassOut] = ll::bassLevelValue (std::clamp (wavesValue (rw, 7).value_or (0.0), -30.0, 0.0));
+    return 4;
+}
+
+// Vitamin (145 values; [EXEC] the bank's states vs the settings read back: 0 … 3 crossovers Hz, 91 … 95 the bands' gains
+// A … E (0 = Off), 100 direct gain dB; 103 punch and 125 … 129 the bands' widths are not translated) → Aether's hidden
+// five-band harmonic enhancer law
+int translateWavesVitamin (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    namespace a = mixsuite::aether;
+    const auto rw = wavesRealWorldParams (state);
+    if (slot.kind != EffectKind::aether || rw.size() < 101 || ! wavesValue (rw, 0) || slot.params.size() <= (std::size_t) a::vitEnd)
+        return 0;
+    auto& p = slot.params;
+    p[(std::size_t) a::vitLaw] = 1.0f;
+    static constexpr double defaults[4] { 90.0, 500.0, 2594.0, 9310.0 };
+    for (int k = 0; k < 4; ++k)
+    {
+        const double hz = wavesValue (rw, (std::size_t) k).value_or (defaults[k]);
+        p[(std::size_t) (a::vitCross0 + k)] = std::abs (hz - defaults[k]) < 0.5 ? 0.0f : a::vitCrossValue (hz);
+    }
+    for (int b = 0; b < 5; ++b)
+        p[(std::size_t) (a::vitGain0 + b)] = (float) std::clamp (wavesValue (rw, (std::size_t) (91 + b)).value_or (0.0) / 48.0, 0.0, 1.0);
+    p[(std::size_t) a::vitDirect] = a::vitDirectValue (wavesValue (rw, 100).value_or (0.0));
+    return 10;
+}
+// ======================================================================= end of round 190mm (dyn) translators
 
 // round 190js: the Waves reverbs on Reeverb 2 (the stand-in since round 129, now with their states translated). Black-box on
 // refcap182's programme (D, X1 … X4 x drums, bass, guitar, vocal, mix; the RealWorld lists read against the settings set
@@ -3339,6 +3951,25 @@ int translateWavesSslChannel (const std::vector<std::uint8_t>& state, EffectSlot
     p[r::analog] = at (31, 0.0) > 0.5 ? 1.0f : 0.0f; // round 147b: ANALOG (its noise floor, measured on the trial)
     p[r::eqToSidechain] = at (26, 0.0) > 0.5 ? 1.0f : 0.0f; // round 165: Dyn S.C. ([EXEC] RealWorld 26 follows the switch)
     return 32;
+}
+
+// round 190mm: SSL G-Channel (57 values: the E channel's layout; 55 LMF ÷3, 56 HMF ×3, no LF / HF bell switches) on
+// Ridge Strip's E voicing through the E-Channel's translation, then the G's own switches
+int translateWavesSslG (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    namespace r = mixsuite::ridge;
+    const int n = translateWavesSslChannel (state, slot);
+    if (n == 0)
+        return 0;
+    const auto rw = wavesRealWorldParams (state);
+    const auto at = [&rw] (std::size_t i, double fallback) { return wavesValue (rw, i).value_or (fallback); };
+    auto& p = slot.params;
+    p[r::lfBell] = p[r::hfBell] = 0.0f;
+    if (at (55, 0.0) > 0.5)
+        p[r::lmfFreq] = logNorm (at (17, 0.5) * 1000.0 / 3.0, 200.0, 2500.0);
+    if (at (56, 0.0) > 0.5)
+        p[r::hmfFreq] = logNorm (at (20, 3.5) * 3000.0, 600.0, 7000.0);
+    return n + 2;
 }
 
 // H-Delay (RealWorld list, round 119): 1 sync (0 BPM, 1 host, 2 ms), 2 BPM, 3 delay ms, 4 note (3 per length: triplet,
@@ -4417,6 +5048,186 @@ int translateInfEq (const std::vector<std::uint8_t>& state, EffectSlot& slot)
 }
 #include "core/KiloheartsStates.inc" // round 190ln
 
+// ---- round 190mm (scheps): Scheps Omni Channel -> Ridge Strip's hidden omni law (MixSuite.h OmniParam) ----
+// The state holds the strip's own RealWorld list (input / output, phase, limiter, PARAM_SLOT_SERILIZATION_PLUGIN = the
+// module order as slot numbers 1 … 6, first to last) and one <slot index="k"> per module with the module's own preset
+// (its SETUP_A RealWorld list) and <plugin_bypass>. Indices below: REA_rodada190mm_scheps §1 (states of the bank and
+// the module presets compared value by value); the left / mid values are taken (both sides linked).
+namespace
+{
+std::vector<double> omniNumbers (std::string_view text)
+{
+    std::vector<double> out;
+    std::size_t p = 0;
+    while (p < text.size())
+    {
+        while (p < text.size() && std::isspace ((unsigned char) text[p])) ++p;
+        const auto s = p;
+        while (p < text.size() && ! std::isspace ((unsigned char) text[p])) ++p;
+        if (p == s) break;
+        const std::string tok (text.substr (s, p - s));
+        char* end = nullptr;
+        const auto v = std::strtod (tok.c_str(), &end);
+        out.push_back (tok != "*" && end != nullptr && *end == 0 ? v : std::numeric_limits<double>::quiet_NaN());
+    }
+    return out;
+}
+std::string_view omniBetween (std::string_view t, std::string_view a, std::string_view b, std::size_t from = 0)
+{
+    const auto i = t.find (a, from);
+    if (i == std::string_view::npos) return {};
+    const auto j = t.find (b, i + a.size());
+    return j == std::string_view::npos ? std::string_view {} : t.substr (i + a.size(), j - i - a.size());
+}
+struct OmniModule { int kind = 0; bool bypass = true; std::vector<double> rw; };
+} // namespace
+
+int translateWavesSchepsOmni (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    namespace o = mixsuite::ridge::omni;
+    namespace rg = mixsuite::ridge;
+    if (slot.kind != EffectKind::ridgeStrip)
+        return 0;
+    const auto start = findBytes (state, "<PresetChunkXMLTree");
+    if (start == std::string::npos)
+        return 0;
+    const std::string xml (state.begin() + (std::ptrdiff_t) start, state.end());
+    const std::string_view x (xml);
+    if (omniBetween (x, "<PluginName>", "</PluginName>").find ("Scheps Omni Channel") == std::string_view::npos)
+        return 0;
+    const auto outer = wavesRealWorldParams (state);
+    const auto a = x.find ("<PresetData Setup=\"SETUP_A\"");
+    const auto slotsEnd = a == std::string_view::npos ? a : x.find ("</PluginSpecificXMLData>", a);
+    if (outer.size() < 58 || slotsEnd == std::string_view::npos)
+        return 0;
+    OmniModule slots[6];
+    for (int k = 0; k < 6; ++k)
+    {
+        const auto tag = "<slot index=\"" + std::to_string (k) + "\">";
+        const auto i = x.find (tag, a);
+        if (i == std::string_view::npos || i > slotsEnd) continue;
+        const auto j = x.find ("</slot>", i);
+        const auto t = x.substr (i, (j == std::string_view::npos ? slotsEnd : j) - i);
+        const auto name = omniBetween (t, "<plugin_name>", "</plugin_name>");
+        auto& m = slots[k];
+        m.kind = name == "Internal_SOC_Pre" ? o::pre : name == "Internal_SOC_Gate" ? o::gate : name == "Internal_SOC_DeEsser" ? o::ds2
+               : name == "Internal_SOC_EQ" ? o::eq : name == "Internal_SOC_Comp" ? o::comp : 0;
+        m.bypass = omniBetween (t, "<plugin_bypass>", "</plugin_bypass>") != "false";
+        const auto pd = t.find ("<PresetData Setup=\"SETUP_A\"");
+        if (pd != std::string_view::npos)
+            m.rw = omniNumbers (omniBetween (t, "<Parameters Type=\"RealWorld\">", "</Parameters>", pd));
+    }
+    auto& p = slot.params;
+    const auto set = [&p] (int k, float v) { p[(std::size_t) k] = std::clamp (v, 0.0f, 1.0f); };
+    const auto val = [] (const std::vector<double>& rw, std::size_t i, double fallback) {
+        return i < rw.size() && std::isfinite (rw[i]) ? rw[i] : fallback;
+    };
+    for (int k = rg::omniLaw; k < rg::omniEnd; ++k) p[(std::size_t) k] = 0.0f;
+    set (rg::omniLaw, 1.0f);
+    // the order: the slot numbers, first to last (the insert slot, 6, holds no LYNX module)
+    int order[5] = {}, n = 0;
+    const auto code = (long) std::llround (val (outer, 57, 153426.0));
+    const auto digits = std::to_string (code);
+    for (const auto c : digits)
+    {
+        const auto s = c - '1';
+        if (s >= 0 && s < 6 && slots[s].kind != 0 && n < 5) order[n++] = slots[s].kind;
+    }
+    set (rg::omniOrder, n == 5 ? o::orderValue (order) : 0.0f);
+    set (rg::omniIn, o::dbValue (std::max (-72.0, val (outer, 0, 0.0))));
+    set (rg::omniOut, o::dbValue (std::max (-72.0, val (outer, 4, 0.0))));
+    set (rg::omniInvL, val (outer, 2, 0.0) >= 0.5 ? 1.0f : 0.0f);
+    set (rg::omniInvR, val (outer, 3, 0.0) >= 0.5 ? 1.0f : 0.0f);
+    set (rg::omniLimOn, val (outer, 35, 0.0) >= 0.5 ? 1.0f : 0.0f);
+    set (rg::omniLimThr, o::dbValue (val (outer, 36, 0.0)));
+    int modules = 0;
+    for (const auto& m : slots)
+    {
+        if (m.kind == 0 || m.rw.empty()) continue;
+        const auto& rw = m.rw;
+        const auto on = ! m.bypass;
+        modules += on ? 1 : 0;
+        switch (m.kind)
+        {
+            case o::pre:
+                set (rg::oPreOn, on ? 1.0f : 0.0f);
+                set (rg::oSatAmount, (float) (val (rw, 9, 0.0) / 100.0));
+                set (rg::oSatOn, val (rw, 10, 0.0) >= 0.5 ? 1.0f : 0.0f);
+                set (rg::oSatType, o::indexValue ((int) std::lround (val (rw, 11, 0.0))));
+                set (rg::oThump, val (rw, 12, 0.0) >= 0.5 ? (val (rw, 13, 0.0) >= 0.5 ? 1.0f : 0.5f) : 0.0f);
+                set (rg::oHpOn, val (rw, 14, 0.0) >= 0.5 ? 1.0f : 0.0f);
+                set (rg::oHpSlope, o::indexValue ((int) std::lround (val (rw, 15, 1.0))));
+                set (rg::oHpHz, o::hzValue (val (rw, 16, 20.0)));
+                set (rg::oHpQ, o::qValue (val (rw, 17, 1.0)));
+                set (rg::oLpOn, val (rw, 18, 0.0) >= 0.5 ? 1.0f : 0.0f);
+                set (rg::oLpSlope, o::indexValue ((int) std::lround (val (rw, 19, 1.0))));
+                set (rg::oLpHz, o::hzValue (val (rw, 20, 20000.0)));
+                set (rg::oLpQ, o::qValue (val (rw, 21, 1.0)));
+                break;
+            case o::gate:
+                set (rg::oGateOn, on ? 1.0f : 0.0f);
+                set (rg::oGateThr, val (rw, 18, -144.0) <= -72.0 ? 0.0f : o::dbValue (val (rw, 18, -144.0)));
+                set (rg::oGateFloor, o::dbValue (val (rw, 23, -60.0)));
+                set (rg::oGateClose, o::dbValue (val (rw, 28, 0.0)));
+                set (rg::oGateAtt, o::msValue (val (rw, 24, 1.0)));
+                set (rg::oGateRel, o::msValue (val (rw, 25, 100.0)));
+                set (rg::oGateExp, val (rw, 26, 0.0) >= 0.5 ? 1.0f : 0.0f);
+                set (rg::oGateHpOn, val (rw, 13, 0.0) >= 0.5 ? 1.0f : 0.0f);
+                set (rg::oGateHpHz, o::hzValue (val (rw, 14, 60.0)));
+                set (rg::oGateLpOn, val (rw, 15, 0.0) >= 0.5 ? 1.0f : 0.0f);
+                set (rg::oGateLpHz, o::hzValue (val (rw, 16, 15000.0)));
+                break;
+            case o::ds2:
+                set (rg::oDsOn, on ? 1.0f : 0.0f);
+                for (int b = 0; b < 2; ++b)
+                {
+                    const auto i0 = (std::size_t) (b == 0 ? 20 : 28); const int k0 = b == 0 ? rg::oDs1On : rg::oDs2On;
+                    set (k0, val (rw, i0, 0.0) >= 0.5 ? 1.0f : 0.0f);
+                    set (k0 + 1, o::dbValue (val (rw, i0 + 1, 0.0)));
+                    set (k0 + 4, o::dbValue (val (rw, i0 + 2, -12.0)));
+                    set (k0 + 3, o::hzValue (val (rw, i0 + 3, b == 0 ? 4490.0 : 300.0)));
+                    set (k0 + 2, o::indexValue ((int) std::lround (val (rw, i0 + 4, b == 0 ? 3.0 : 1.0))));
+                }
+                set (rg::oDsOut, o::dbValue (val (rw, 17, 0.0)));
+                set (rg::oDsAtt, o::msValue (val (rw, 12, 42.0) * 0.1));
+                set (rg::oDsRel, o::msValue (val (rw, 15, 50.0)));
+                break;
+            case o::eq:
+                set (rg::oEqOn, on ? 1.0f : 0.0f);
+                for (int b = 0; b < 4; ++b)
+                {
+                    const auto i0 = (std::size_t) (6 * b); const int k0 = rg::oEqBand0 + 5 * b;
+                    set (k0, val (rw, i0 + 1, 1.0) >= 0.5 ? 1.0f : 0.0f);
+                    set (k0 + 1, o::indexValue ((int) std::lround (val (rw, i0 + 2, 1.0))));
+                    set (k0 + 2, o::hzValue (val (rw, i0 + 4, 1000.0)));
+                    set (k0 + 3, o::dbValue (val (rw, i0 + 3, 0.0)));
+                    set (k0 + 4, o::qValue (val (rw, i0 + 5, 1.0)));
+                }
+                break;
+            case o::comp:
+                set (rg::oCompOn, on ? 1.0f : 0.0f);
+                set (rg::oCompType, o::indexValue ((int) std::lround (val (rw, 29, 0.0))));
+                set (rg::oCompRatio, o::ratioValue (val (rw, 38, 3.5)));
+                set (rg::oCompAtt, o::msValue (val (rw, 44, 3.0)));
+                set (rg::oCompRel, o::msValue (val (rw, 42, 200.0)));
+                set (rg::oCompThr, o::dbValue (val (rw, 40, 0.0)));
+                set (rg::oCompMix, (float) (val (rw, 78, 100.0) / 100.0));
+                set (rg::oCompOut, o::dbValue (val (rw, 34, 0.0)));
+                set (rg::oScHpOn, val (rw, 47, 0.0) >= 0.5 ? 1.0f : 0.0f);
+                set (rg::oScHpHz, o::hzValue (val (rw, 49, 80.0)));
+                set (rg::oScBellOn, val (rw, 51, 0.0) >= 0.5 ? 1.0f : 0.0f);
+                set (rg::oScBellDb, o::dbValue (val (rw, 53, 0.0)));
+                set (rg::oScBellHz, o::hzValue (val (rw, 55, 500.0)));
+                set (rg::oScShelfOn, val (rw, 59, 0.0) >= 0.5 ? 1.0f : 0.0f);
+                set (rg::oScShelfDb, o::dbValue (val (rw, 61, 0.0)));
+                set (rg::oScShelfHz, o::hzValue (val (rw, 63, 8000.0)));
+                break;
+            default: break;
+        }
+    }
+    return 8 + modules;
+}
+
 RawTranslator rawTranslatorNamed (std::string_view name)
 {
     if (name == "slate-infinity-eq")
@@ -4473,10 +5284,36 @@ RawTranslator rawTranslatorNamed (std::string_view name)
         return translateWavesCla76;
     if (name == "waves-l2")
         return translateWavesL2;
+    if (name == "waves-ssl-g-channel")
+        return translateWavesSslG;
+    if (name == "waves-rchannel")
+        return translateWavesRChannel;
+    if (name == "waves-api-550")
+        return translateWavesApi550;
+    if (name == "waves-api-560")
+        return translateWavesApi560;
+    if (name == "waves-req")
+        return translateWavesReq;
+    if (name == "waves-q10")
+        return translateWavesQ10;
     if (name == "waves-puigtec")
         return translateWavesPuigTec;
     if (name == "waves-c4")
         return translateWavesC4;
+    if (name == "waves-rvox") // round 190mm (dyn)
+        return translateWavesRVox;
+    if (name == "waves-rdeesser")
+        return translateWavesRDeEsser;
+    if (name == "waves-c6")
+        return translateWavesC6;
+    if (name == "waves-api-2500")
+        return translateWavesApi2500;
+    if (name == "waves-maxxbass")
+        return translateWavesMaxxBass;
+    if (name == "waves-rbass")
+        return translateWavesRBass;
+    if (name == "waves-vitamin")
+        return translateWavesVitamin;
     if (name == "waves-ar-plates")
         return translateWavesArPlates;
     if (name == "waves-atlas")
@@ -4491,6 +5328,8 @@ RawTranslator rawTranslatorNamed (std::string_view name)
         return translateWavesReverb;
     if (name == "kilohearts") // round 190ln
         return translateKilohearts;
+    if (name == "waves-scheps-omni") // round 190mm (scheps)
+        return translateWavesSchepsOmni;
     return nullptr;
 }
 

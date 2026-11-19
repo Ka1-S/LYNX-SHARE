@@ -3105,6 +3105,8 @@ bool c4Active (const EffectParams& p) noexcept { return std::lround (std::clamp 
 bool c4Opto (const EffectParams& p) noexcept { return std::lround (std::clamp (p[c4Law], 0.0f, 1.0f) * 8.0f) == 2; }
 float c4QValue (double q) noexcept { return (float) std::clamp ((q - 0.1) / 0.65, 0.0, 1.0); }
 double c4QOf (const EffectParams& p) noexcept { return p[c4Q] <= 0.0f ? 0.6 : 0.1 + 0.65 * (double) std::clamp (p[c4Q], 0.0f, 1.0f); }
+float c6FreqValue (double hz) noexcept { return (float) std::clamp (std::log (std::max (hz, 16.0) / 16.0) / std::log (21357.0 / 16.0), 0.0, 1.0); }
+float c6WidthValue (double q) noexcept { return (float) std::clamp (std::log (std::max (q, 0.35) / 0.35) / std::log (60.0 / 0.35), 0.0, 1.0); }
 float c4AttackValue (double ms) noexcept { return (float) std::clamp (std::log (std::max (ms, 0.5) / 0.5) / std::log (1000.0), 0.0, 1.0); }
 float c4ReleaseValue (double ms) noexcept { return (float) std::clamp (std::log (std::max (ms, 5.0) / 5.0) / std::log (1000.0), 0.0, 1.0); }
 int c4Lookahead (double sampleRate) noexcept { return sampleRate <= 50000.0 ? 64 : (sampleRate <= 100000.0 ? 128 : 256); }
@@ -3657,6 +3659,15 @@ struct TimeLaw { double attackScale, releaseScale, d, pe, qFallMs, qRiseMs, vpow
 // c4fit:begin
 constexpr TimeLaw c4Time { 0.999677, 0.998302, 0.003912, 0.005823, 149.78441, 56.044957, 4.015778, 4.006325 }; // c4/lab/fit5.py (19 probes, −65 … −84 dB)
 // c4fit:end
+// round 190mm (dyn): the C6's floating bands — their band-pass Q against the control's and their threshold offset (dB),
+// fitted on the C6's X2 renders (lab/c6var.sh: Q × 1.0 / 0.8 / 0.7 / 0.65 / 0.5 → 0.67); threshold offset 0 / −3 / +3 dB → 0 (−3: one bank file down)
+#ifndef C6_QSCALE
+#define C6_QSCALE 0.67
+#endif
+#ifndef C6_THRDB
+#define C6_THRDB 0.0
+#endif
+constexpr double c6QScale = C6_QSCALE, c6ThrDb = C6_THRDB;
 constexpr int boxA = 27, boxB = 38; // the two box filters (27 + 38 − 1 = 64 samples at 48 kHz, × the look-ahead's rate factor)
 
 inline double kOf (double rangeDb, double knee) noexcept
@@ -3737,6 +3748,7 @@ public:
         }
         bposA = bposB = 0;
         tick = 0;
+        fOn.fill (false); // round 190mm (dyn): the floating bands start again at their next configure
     }
 
     // returns the four bands' gain reductions (dB, for the meters) of the last sample
@@ -3811,6 +3823,8 @@ public:
                     y[c] += old * w;
                 }
             }
+            if (floatAny) // round 190mm (dyn): the C6's floating bands on the crossovers' sum
+                floating (bandS, y);
             dpos = (dpos + 1) % la;
             bposA = (bposA + 1) % boxLenA;
             bposB = (bposB + 1) % boxLenB;
@@ -3821,6 +3835,115 @@ public:
     }
 
 private:
+    // round 190mm (dyn): a floating band = a band-pass of the crossovers' sum (in phase with the bands), its level through
+    // the same gain law and smoother as the bands, added back as (G − 1) · the delayed band-pass
+    void floating (const double (&bandS)[2][bandsN], double (&y)[2]) noexcept
+    {
+        for (int f = 0; f < floatN; ++f)
+        {
+            const auto fi = (std::size_t) f;
+            if (! fOn[fi])
+                continue;
+            double bp[2];
+            for (int c = 0; c < 2; ++c)
+                bp[c] = fBp[(std::size_t) c][fi].run (bandS[c][0] + bandS[c][1] + bandS[c][2] + bandS[c][3]);
+            const double lev = std::max (std::abs (bp[0]), std::abs (bp[1]));
+            double g = 1.0 / (1.0 + fkb[fi] * lev * fInvT[fi]);
+            g = std::min (g + fCKnee[fi] * g * g * (1.0 - g), 1.0);
+            auto& qv = fqVal[fi];
+            auto& qt = fqTime[fi];
+            auto& h = fqHead[fi];
+            auto& t = fqTail[fi];
+            while (t != h && qv[(std::size_t) ((t + qcap - 1) % qcap)] >= g)
+                t = (t + qcap - 1) % qcap;
+            qv[(std::size_t) t] = g;
+            qt[(std::size_t) t] = tick;
+            t = (t + 1) % qcap;
+            while (qt[(std::size_t) h] + la <= tick)
+                h = (h + 1) % qcap;
+            const double m = qv[(std::size_t) h];
+            double co = fAtt[fi];
+            if (m >= fs1[fi])
+            {
+                const double q = fs2[fi];
+                const double qv8 = std::floor (q * 255.0) / 256.0, mv8 = std::floor (std::min (fs1[fi], q) * 255.0) / 255.0;
+                const double qq = std::floor (q * 255.0) / 255.0;
+                const double v = std::clamp (opto ? 1.0 - qv8 : qv8, 0.0, 1.0);
+                const double tau = std::max (0.002, fRel[fi] * std::pow (1.0 - std::pow (v, c4Time.vpow), c4Time.vexp));
+                co = std::exp (-1.0 / (tau * 1.0e-3 * sr)) * std::exp2 (-c4Time.d * (1.0 / (mv8 + c4Time.pe) - 1.0 / (qq + c4Time.pe)));
+            }
+            fs1[fi] = (fs1[fi] - m) * co + m;
+            fs2[fi] = (fs2[fi] - fs1[fi]) * (fs1[fi] < fs2[fi] ? cqFall : cqRise) + fs1[fi];
+            const auto qn = (std::int64_t) std::llround (std::min (fs1[fi], fs2[fi]) * (double) one);
+            facc1[fi] += qn - fbox1[fi][(std::size_t) bposA];
+            fbox1[fi][(std::size_t) bposA] = qn;
+            const auto v1 = facc1[fi] / boxLenA;
+            facc2[fi] += v1 - fbox2[fi][(std::size_t) bposB];
+            fbox2[fi][(std::size_t) bposB] = v1;
+            const double gs = (double) facc2[fi] / (double) boxLenB / (double) one;
+            const double G = (fgr[fi] + (1.0 - fgr[fi]) * gs) * fmk[fi];
+            for (int c = 0; c < 2; ++c)
+            {
+                auto& d = fDelay[(std::size_t) c][fi];
+                const double old = d[(std::size_t) dpos];
+                d[(std::size_t) dpos] = bp[c];
+                y[c] += old * (G - 1.0) * mix;
+            }
+        }
+    }
+    void configureFloating (const EffectParams& p) noexcept
+    {
+        floatAny = false;
+        for (int f = 0; f < floatN; ++f)
+        {
+            const auto fi = (std::size_t) f;
+            const auto at = [&] (int field) { return p[(std::size_t) c6Param (f, field)]; };
+            const bool was = fOn[fi];
+            fOn[fi] = at (c6On) >= 0.5f;
+            if (! fOn[fi])
+                continue;
+            floatAny = true;
+            if (! was)
+            {
+                fs1[fi] = fs2[fi] = 1.0;
+                fqHead[fi] = fqTail[fi] = 0;
+                for (auto& v : fbox1[fi]) v = one;
+                for (auto& v : fbox2[fi]) v = one;
+                facc1[fi] = one * boxLenA;
+                facc2[fi] = one * boxLenB;
+                for (int c = 0; c < 2; ++c)
+                {
+                    fBp[(std::size_t) c][fi].reset();
+                    fDelay[(std::size_t) c][fi].fill (0.0);
+                }
+            }
+            const double hz = 16.0 * std::pow (21357.0 / 16.0, (double) std::clamp (at (c6Freq), 0.0f, 1.0f));
+            const double q = c6QScale * 0.35 * std::pow (60.0 / 0.35, (double) std::clamp (at (c6Width), 0.0f, 1.0f));
+            if (hz != fHz[fi] || q != fQ[fi])
+            {
+                fHz[fi] = hz;
+                fQ[fi] = q;
+                // a band-pass with 0 dB at its centre (bilinear, warped there)
+                const double w0 = 2.0 * M_PI * std::clamp (hz, 10.0, 0.49 * sr) / sr, al = std::sin (w0) / (2.0 * q), a0 = 1.0 + al;
+                for (int c = 0; c < 2; ++c)
+                {
+                    auto& b = fBp[(std::size_t) c][fi];
+                    b.b0 = al / a0; b.b1 = 0.0; b.b2 = -al / a0; b.a1 = -2.0 * std::cos (w0) / a0; b.a2 = (1.0 - al) / a0;
+                }
+            }
+            const double rng = std::clamp ((double) at (c6Range) * 60.0 - 30.0, -30.0, 30.0), knee = kneeDb (p[(std::size_t) param (0, fKnee)]) / 64.0;
+            fgr[fi] = dbToGain (rng);
+            fInvT[fi] = 1.0 / dbToGain (thresholdDb (at (c6Thr)) + c6ThrDb);
+            fkb[fi] = kOf (rng, knee);
+            fCKnee[fi] = 2.0 * knee;
+            fmk[fi] = dbToGain ((double) at (c6Gain) * 60.0 - 30.0);
+            const double attMs = 0.5 * std::pow (1000.0, (double) std::clamp (at (c6Att), 0.0f, 1.0f));
+            const double relMs0 = 5.0 * std::pow (1000.0, (double) std::clamp (at (c6Rel), 0.0f, 1.0f));
+            fAtt[fi] = std::exp (-1.0 / (c4Time.attackScale * attMs * 1.0e-3 * sr));
+            fRel[fi] = c4Time.releaseScale * relMs0;
+        }
+    }
+
     void configure (const EffectParams& p) noexcept
     {
         std::array<double, 4 + 6 * bandsN + 4> k {};
@@ -3867,6 +3990,7 @@ private:
         mix = std::clamp ((double) p[prism::mix], 0.0, 1.0);
         inGain = dbToGain (trimDb (p[input]));
         outGain = dbToGain (trimDb (p[output]));
+        configureFloating (p);
     }
 
     static constexpr std::int64_t one = (std::int64_t) 1 << 40;
@@ -3887,6 +4011,18 @@ private:
     std::array<int, bandsN> qHead {}, qTail {};
     std::array<std::array<std::int64_t, maxBox>, bandsN> box1 {}, box2 {};
     std::array<std::int64_t, bandsN> acc1 {}, acc2 {};
+    // round 190mm (dyn): the C6's floating bands
+    static constexpr int floatN = 2;
+    bool floatAny = false;
+    std::array<bool, floatN> fOn {};
+    std::array<double, floatN> fHz {}, fQ {}, fs1 {}, fs2 {}, fgr {}, fInvT {}, fkb {}, fCKnee {}, fmk {}, fAtt {}, fRel {};
+    std::array<std::array<Bq, floatN>, 2> fBp {};
+    std::array<std::array<std::array<double, maxLa>, floatN>, 2> fDelay {};
+    std::array<std::array<double, qcap>, floatN> fqVal {};
+    std::array<std::array<std::int64_t, qcap>, floatN> fqTime {};
+    std::array<int, floatN> fqHead {}, fqTail {};
+    std::array<std::array<std::int64_t, maxBox>, floatN> fbox1 {}, fbox2 {};
+    std::array<std::int64_t, floatN> facc1 {}, facc2 {};
 };
 } // namespace c4
 

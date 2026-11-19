@@ -107,7 +107,37 @@ int dispersionSections (float v) noexcept; // 0 … 64
 // switch, a hum generator (a triangle at the mains frequency with an even term through a low and a high pass) plus a
 // coloured noise floor. k / 16: 1 = the stage, 2 = + mains 60 Hz, 3 = + mains 50 Hz (set by the PuigTec translator).
 constexpr int puigLawParam = dispersionCountParam + 3;
-constexpr int storedParamCount = puigLawParam + 1;
+// round 190mm (Waves EQ parity; after the PuigTec law [129] since the 0.1.30 rollup, step 12, docs/analise/REA_rodada190mm.md §2), hidden like the above (saved while non-zero; 0 = every
+// older project, bit for bit): [130] the Waves design law (1 = on; set only by the Waves EQ translators: Renaissance EQ /
+// RChannel, Q10) and [131 + b] band b's design code (k / 64, waveCode below). With the law on and a band's code non-zero,
+// that band is not designed from Facet's own prototypes: its digital sections come from the reference's own structure,
+// measured black-box on our demo-mode impulse responses (every section identified exactly, −100 dB and better): the
+// band's frequency / gain / Q fields hold the reference's own control values. Facet's phase modes, dynamics and every
+// other band keep their behaviour.
+constexpr int wavesLawParam = puigLawParam + 1;
+constexpr int wavesBandParam0 = wavesLawParam + 1; // + band
+constexpr int storedParamCount = wavesBandParam0 + bands;
+// the band design codes of the Waves law
+enum class WaveCode
+{
+    off = 0,
+    reqBell = 1,      // Renaissance EQ bell: (s² + s G/q + 1) / (s² + s/q + 1), digitised with a prescribed Nyquist gain
+    q10Bell = 2,      // Q10 bell: symmetric, its Q scaled by the gain (Q field = the Q10's Q / 4), bandwidth-prewarped bilinear
+    q10PqBell = 3,    // Q10 "PQ" bell: the same with the steeper constant-Q law
+    reqLowShelf = 4,  // Renaissance EQ shelves: shared s-term, width from Q (clamped 0.707 … 1.414), bilinear at the centre
+    reqHighShelf = 5,
+    rbjLowShelf = 6,  // resonant shelves: the cookbook shelf, Q clamped 0.707 … 1.414, bilinear at the band frequency
+    rbjHighShelf = 7,
+    reqHighPass = 8,  // Renaissance EQ cuts: 18 dB/oct, a pole at the band frequency × a second-order section whose Q and
+    reqLowPass = 9,   //   compensating zeros follow the Q control (clamped 0.707 … 1.414)
+    lowShelf1 = 10,   // Q10 shelves: first order, centred on the band frequency, bilinear
+    highShelf1 = 11,
+    butterHighPass = 12, // Q10 cuts: 12 dB/oct Butterworth, bilinear
+    butterLowPass = 13,
+    count
+};
+int waveCode (float v) noexcept;           // 0 … count - 1
+float waveCodeValue (WaveCode c) noexcept; // k / 64
 int puigLaw (float v) noexcept;          // 0 off, 1 stage, 2 stage + 60 Hz mains, 3 stage + 50 Hz mains
 float puigLawValue (int k) noexcept;     // k / 16
 constexpr int puigLatency = 3;           // the fractional delay's all-pass order (samples of latency at every rate)
