@@ -17950,3 +17950,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Dsp190kzTests.inc" // round 190kz: exact Reeverb 2 LFO sine and sinc seeds, Maximus revision 1
 #include "Issue204Tests.inc" // round 190lq: issue #204, an audio clip channel played from notes (whole clip, layered, key pitch)
 #include "Issues190llTests.inc" // round 190ll: issues #199 (hosted synth from the piano roll), #200, #201, #203
+#include "Modal190mcTests.inc" // round 190mc: the Piano roll's Chord helper (discussion #105) and Transistor Bass's program row (discussion #202)

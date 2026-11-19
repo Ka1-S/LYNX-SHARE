@@ -235,6 +235,8 @@ std::vector<Action> makeActions()
         { "pianoRoll.articulate", TR_NOOP ("Articulate..."), Context::pianoRoll, { chord ('L', alt) } },
         { "pianoRoll.riffMachine", TR_NOOP ("Riff machine..."), Context::pianoRoll, { chord ('E', alt) } },
         { "pianoRoll.chordProgression", TR_NOOP ("Generate chord progression..."), Context::pianoRoll, { chord ('P', alt) } },
+        // LYNX's Chord helper (round 190mc, discussion #105): no key of its own (FL has no such tool; the user may give it one)
+        { "pianoRoll.chordHelper", TR_NOOP ("Chord helper..."), Context::pianoRoll, {} },
         // FL's "Run last script again" (Piano roll scripts, round 190as)
         { "pianoRoll.runLastScript", TR_NOOP ("Run last script again"), Context::pianoRoll, { chord ('Y', ctrl | alt) } },
         // note colours and the Select menu (REA round 153: FL's keys from its piano roll manual)

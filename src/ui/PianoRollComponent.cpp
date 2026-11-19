@@ -3,6 +3,7 @@
 #include "ui/Motion.h"
 #include "ui/FileChoosers.h"
 #include "ui/PianoRollComponent.h"
+#include "ui/ChordHelper.h"
 #include "ui/PaintAB.h"
 #include "core/ChordReadout.h"
 #include "core/KeyMap.h"
@@ -3893,6 +3894,43 @@ void PianoRollComponent::openMidiTools()
     openToolWindow (std::make_unique<Padded> (std::move (panel)), tr ("MIDI Tools"), "midiTools");
 }
 
+void PianoRollComponent::openChordHelper()
+{
+    const juce::Component::SafePointer<PianoRollComponent> safe (this);
+    const auto look = ChordHelperPanel::lookNow();
+    auto panel = std::make_unique<ChordHelperPanel> (
+        engine,
+        [safe] {
+            ChordHelperPanel::Target t;
+            if (safe != nullptr)
+            {
+                t.pattern = safe->engine.getSong().currentPattern;
+                t.channel = safe->engine.getSelectedChannel();
+                t.selected = safe->selection;
+            }
+            return t;
+        },
+        [safe] (const std::vector<int>& indices) {
+            if (safe != nullptr)
+                safe->selectOwnNewNotes (indices);
+        },
+        look);
+    auto* raw = panel.get();
+    openToolWindow (std::move (panel), tr ("Chord helper"), "chordHelper");
+    chordHelper = raw;
+}
+
+void PianoRollComponent::selectOwnNewNotes (std::vector<int> indices)
+{
+    const auto& song = engine.getSong();
+    if (song.currentPattern == knownPattern && engine.getSelectedChannel() == knownChannel)
+        knownNoteCount = currentPattern (song).notes.size();
+    setSelection (std::move (indices));
+    chordPanelSelection = selection; // (the helper already read it)
+}
+
+ChordHelperPanel* PianoRollComponent::chordHelperForTests() const noexcept { return dynamic_cast<ChordHelperPanel*> (chordHelper.getComponent()); }
+
 juce::PopupMenu PianoRollComponent::toolsMenu()
 {
     // FL's piano roll Tools menu (REA round 143, EXEC capture): its groups and keys, in its order
@@ -3936,6 +3974,8 @@ juce::PopupMenu PianoRollComponent::toolsMenu()
     tool (NoteTool::noteRepeat, nullptr);
     // Live 12's MIDI Transformations as a docked-style panel (round 190s; LYNX addition beside FL's tools above)
     menu.addItem (tr ("MIDI Tools") + "...", [this] { openMidiTools(); });
+    // LYNX's Chord helper (round 190mc, discussion #105): modal interchange from the selected chord
+    menu.addItem (tr ("Chord helper") + "..." + keyText ("pianoRoll.chordHelper"), [this] { openChordHelper(); });
     {
         juce::PopupMenu velocity;
         auto choose = [this] (std::function<std::vector<int> (const Pattern&, const std::vector<int>&)> pick) {
@@ -4256,6 +4296,8 @@ void PianoRollComponent::updateChordBubble()
     {
         // the toolbar's chord panel follows the selection whether this bubble is on or not (FL: FUN_00d32da0)
         chordPanelSelection = selection;
+        if (auto* helper = dynamic_cast<ChordHelperPanel*> (chordHelper.getComponent())) // (round 190mc: only while it is open)
+            helper->refresh();
         if (onSelectedKeys)
         {
             const auto& notes = currentPattern (engine.getSong()).notes;
@@ -4387,6 +4429,7 @@ bool PianoRollComponent::runAction (const std::string& id)
     else if (is ("pianoRoll.articulate")) openNoteTool (NoteTool::articulate);
     else if (is ("pianoRoll.riffMachine")) openNoteTool (NoteTool::riffMachine);
     else if (is ("pianoRoll.chordProgression")) openNoteTool (NoteTool::chordProgression);
+    else if (is ("pianoRoll.chordHelper")) openChordHelper();
     else if (is ("pianoRoll.runLastScript")) runLastScript();
     else if (is ("pianoRoll.zoomIn")) zoomAroundCentre (1.25);
     else if (is ("pianoRoll.zoomOut")) zoomAroundCentre (1.0 / 1.25);

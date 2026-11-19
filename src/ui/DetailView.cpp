@@ -2338,6 +2338,16 @@ public:
             b->setConnectedEdges (0);
             addAndMakeVisible (*b);
         }
+        // LYNX's Chord helper (round 190mc, discussion #105): the docked editor's selection, in Live's look
+        chordHelper.setButtonText (tr ("Chord helper"));
+        chordHelper.setTooltip (tr ("Select a chord: related keys and borrowed chords to insert after it"));
+        chordHelper.setConnectedEdges (0);
+        chordHelper.onClick = [this] {
+            if (editorOf)
+                if (auto* roll = editorOf())
+                    roll->openChordHelper();
+        };
+        addAndMakeVisible (chordHelper);
         const auto stretch = [this] (bool twice) {
             notes ([twice] (Pattern& p, const std::vector<int>& all, const Song&) {
                 for (auto i : all)
@@ -2555,6 +2565,7 @@ public:
         addInterval.setBounds (cell (4, 1));
         duplicate.setBounds (cell (5, 0).withWidth (60));
         randomize.setBounds (cell (5, 0).withTrimmedLeft (64).withRight (n.getRight()));
+        chordHelper.setBounds (cell (6, 0).withRight (n.getRight()));
     }
     void reload() { load(); } // (the page docked an editor: it gets the column's hooks)
 
@@ -2614,7 +2625,7 @@ private:
     std::vector<juce::Component*> styledChildren()
     {
         return { &start, &end, &position, &length, &followTime, &setStart, &setEnd, &setPosition, &setLength, &followOn, &linked, &invert, &reverse,
-                 &makeLegato, &humanize, &duplicate, &quantize, &randomize, &timesTwo, &divideTwo, &fitScale, &addInterval, &scaleMode, &groove, &mode,
+                 &makeLegato, &humanize, &duplicate, &quantize, &randomize, &timesTwo, &divideTwo, &fitScale, &chordHelper, &addInterval, &scaleMode, &groove, &mode,
                  &quant, &followA, &followB, &scaleRoot, &scaleName, &loop, &legato, &nameLabel, &startLabel, &endLabel, &lengthLabel,
                  &positionLabel, &grooveLabel, &signatureLabel, &modeLabel, &quantLabel, &scaleLabel, &signature, &commitGroove };
     }
@@ -2796,11 +2807,12 @@ private:
                 put (addInterval, cell (4, 1));
                 put (duplicate, cell (5, 0));
                 put (randomize, cell (5, 1));
-                y += 6 * (row + 4) + 4;
+                put (chordHelper, cell (6, 0).withRight (cell (6, 1).getRight()));
+                y += 7 * (row + 4) + 4;
             }
             else
                 hide ({ pitchRange.get(), &invert, &reverse, &makeLegato, &humanize, &quantize, &timesTwo, &divideTwo, &fitScale, intervalSize.get(),
-                        &addInterval, &duplicate, &randomize });
+                        &addInterval, &duplicate, &randomize, &chordHelper });
         }
         contentHeight = y + scrollY;
         if (scrollY > maxScroll()) // (a section folded at the bottom: the column scrolls back)
@@ -2981,7 +2993,7 @@ private:
                 parent->resized();
         for (auto* b : { &notesTitle })
             b->setVisible (pattern);
-        for (auto* b : { &invert, &reverse, &makeLegato, &humanize, &duplicate, &quantize, &randomize, &timesTwo, &divideTwo, &fitScale, &addInterval })
+        for (auto* b : { &invert, &reverse, &makeLegato, &humanize, &duplicate, &quantize, &randomize, &timesTwo, &divideTwo, &fitScale, &addInterval, &chordHelper })
             b->setVisible (pattern);
         pitchRange->setVisible (pattern);
         intervalSize->setVisible (pattern);
@@ -3249,7 +3261,7 @@ private:
     std::unique_ptr<ui::NumBox> chanceA, chanceB, multiplier, jumpA, jumpB;
     juce::TextEditor followTime;
     juce::ComboBox mode, quant;
-    juce::TextButton invert, reverse, makeLegato, humanize, duplicate, quantize, randomize, timesTwo, divideTwo, fitScale;
+    juce::TextButton invert, reverse, makeLegato, humanize, duplicate, quantize, randomize, timesTwo, divideTwo, fitScale, chordHelper;
     juce::Label scaleLabel;
     juce::ComboBox scaleRoot, scaleName; // the clip's scale (round 190hr; before: the project key)
     juce::TextButton scaleMode;          // Live's Scale Mode switch of the clip (IsInKey)

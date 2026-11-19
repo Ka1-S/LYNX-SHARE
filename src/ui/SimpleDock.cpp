@@ -22,6 +22,7 @@
 #include "ui/BrowserComponent.h"
 #include "ui/I18n.h"
 #include "ui/MixerComponent.h"
+#include "ui/PianoRollComponent.h"
 #include "ui/QuickPick.h"
 #include "ui/SimpleLook.h"
 #include "ui/SoundFontEditor.h"
@@ -1492,6 +1493,14 @@ public:
         makePattern.setButtonText (tr ("New pattern"));
         makePattern.setTooltip (tr ("An empty 4-bar pattern on this track, to write notes into"));
         makePattern.onClick = [this] { make(); };
+        // round 190mc (discussion #105): the Chord helper of the docked editor, in the Simple look
+        chordHelper.setButtonText (tr ("Chord helper"));
+        chordHelper.setTooltip (tr ("Select a chord: related keys and borrowed chords to insert after it"));
+        chordHelper.onClick = [this] {
+            if (auto* roll = dynamic_cast<PianoRollComponent*> (editor))
+                roll->openChordHelper();
+        };
+        addAndMakeVisible (chordHelper);
         addAndMakeVisible (fold);
         addAndMakeVisible (open);
         addChildComponent (again);
@@ -1608,6 +1617,8 @@ public:
         open.setBounds (bar.removeFromRight (170));
         bar.removeFromRight (8);
         fold.setBounds (bar.removeFromRight (160));
+        bar.removeFromRight (8);
+        chordHelper.setBounds (bar.removeFromRight (120));
         const auto body = getLocalBounds().withTrimmedTop (barHeight);
         again.setBounds (body.withSizeKeepingCentre (220, 30));
         makePattern.setBounds (body.withSizeKeepingCentre (160, 30));
@@ -1654,6 +1665,7 @@ private:
     {
         const auto& song = engine.getSong();
         fold.setEnabled (projectkey::get (song).has_value() && editor != nullptr);
+        chordHelper.setEnabled (editor != nullptr);
         fold.setToggleState (hooks.foldedToKey && hooks.foldedToKey(), juce::dontSendNotification);
         again.setVisible (takenBack && editor == nullptr);
         makePattern.setVisible (! takenBack && editor == nullptr && pattern < 0 && track >= 0 && ! pendingMake);
@@ -1663,7 +1675,7 @@ private:
     AudioEngine& engine;
     Hooks& hooks;
     juce::ToggleButton fold;
-    juce::TextButton open, again, makePattern;
+    juce::TextButton open, again, makePattern, chordHelper;
     juce::Component* editor = nullptr; // the main window's Piano roll while docked here (not owned)
     int track = -1, channel = -1, dockedPattern = -1;
     bool takenBack = false, pendingMake = false;
