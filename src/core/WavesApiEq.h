@@ -115,11 +115,12 @@ inline constexpr Band api560[10][10] = {
   { { 1, 4213.247f, -12.26459f, 1.02942f }, { 1, 4380.496f, -4.210642f, 0.4491436f }, { 1, 4447.066f, -2.049642f, 0.3303605f }, { 1, 4471.4f, -0.8826066f, 0.2860473f }, { 1, 4473.492f, -0.4265129f, 0.2769392f }, { 1, 4458.897f, 0.4264595f, 0.2777408f }, { 1, 4441.113f, 0.8824953f, 0.2876613f }, { 1, 4379.093f, 2.048876f, 0.3343765f }, { 1, 4265.819f, 4.207802f, 0.4583815f }, { 1, 4089.943f, 12.29247f, 1.05737f } },
   { { 1, 9603.731f, -12.28373f, 0.9815098f }, { 1, 10569.3f, -4.598735f, 0.4691592f }, { 1, 11658.64f, -2.268105f, 0.3242722f }, { 1, 12982.99f, -0.9839903f, 0.2548806f }, { 1, 13501.0f, -0.4766497f, 0.2377778f }, { 1, 13441.25f, 0.4767335f, 0.2395855f }, { 1, 12867.85f, 0.9847845f, 0.25882f }, { 1, 11417.41f, 2.279395f, 0.3360043f }, { 1, 10115.89f, 4.673318f, 0.4962644f }, { 1, 8742.149f, 12.92425f, 1.086031f } },
   { { 1, 21111.28f, -11.77906f, 0.8340869f }, { 1, 23217.25f, -4.944459f, 0.3609424f }, { 1, 27072.48f, -2.532193f, 0.2448156f }, { 1, 30000.0f, -1.109065f, 0.2063752f }, { 1, 30000.0f, -0.5337026f, 0.2006705f }, { 1, 30000.0f, 0.5330812f, 0.1987937f }, { 1, 30000.0f, 1.106196f, 0.2021341f }, { 1, 27339.3f, 2.531425f, 0.2350742f }, { 1, 23017.1f, 4.93407f, 0.3858223f }, { 1, 16031.72f, 13.60641f, 2.03617f } } };
-// the flat response of the 550s (every band at 0 dB), fitted in magnitude AND phase (flatfit2.py): a first-order low
-// shelf and a high bell each (the 550A's a narrow cut at Nyquist), the 550B's small output offset; the 550A's Filter
+// the flat response of the 550s (every band at 0 dB), fitted in magnitude AND phase (flatfit2.py / flatfit3.py): a
+// first-order low shelf and a high bell (550A: a narrow cut at Nyquist; 550B: + a low shelf, Facet's floor being 10 Hz),
+// the 550B's output offset; the 550A's Filter
 inline constexpr Band flat550a[2] = { { 4, 14.31977f, 1.449996f, 1.0f }, { 1, 30000.0f, -2.170970f, 6.693902f } };
-inline constexpr Band flat550b[2] = { { 4, 6.839245f, 2.465409f, 1.0f }, { 1, 18699.42f, 0.1962748f, 0.7785217f } };
-inline constexpr float flatOutput550b = -0.04195138f;
+inline constexpr Band flat550b[3] = { { 4, 10.0f, 3.006402f, 1.0f }, { 2, 17.19971f, -0.8357204f, 0.567766f }, { 1, 16149.95f, 0.1956780f, 0.7874477f } };
+inline constexpr float flatOutput550b = -0.04546773f;
 // Filter: a low cut (slope dB/oct, Hz, Q) and a high cut
 inline constexpr int filterSlopes[2] = { 18, 6 };
 inline constexpr float filterBands[2][2] = { { 20.6169f, 0.3327589f }, { 20560.03f, 3.30936f } };

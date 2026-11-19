@@ -2157,7 +2157,7 @@ int nearest (const float* xs, int n, double x, bool logScale)
 // bell) and API-550B (the same name "API-550" in its state: 1 / 17 low gain / Hz, 21 / 18 low-mid gain / Hz, 3 / 19 high-mid
 // gain / kHz, 5 / 20 high gain / kHz, 14 / 15 low / high bell; told apart by the state's sub-component). Each band is the
 // fitted Facet band of its nearest control position (the reference's gains and frequencies are stepped), on top of the 550s'
-// flat response (two bands) and the 550A's Filter (a low and a high cut).
+// flat response (two / three bands) and the 550A's Filter (a low and a high cut).
 int translateWavesApi550 (const std::vector<std::uint8_t>& state, EffectSlot& slot)
 {
     namespace A = wavesApiEq;
@@ -2212,6 +2212,7 @@ int translateWavesApi550 (const std::vector<std::uint8_t>& state, EffectSlot& sl
         }
         add (A::flat550b[0]);
         add (A::flat550b[1]);
+        add (A::flat550b[2]);
         slot.params[(std::size_t) facet::outputParam] = (float) std::clamp (A::flatOutput550b / 48.0 + 0.5, 0.0, 1.0);
     }
     return 2 + 2 * n;
