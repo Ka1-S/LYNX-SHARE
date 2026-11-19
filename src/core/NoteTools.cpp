@@ -83,6 +83,36 @@ const char* stepLevelName (int tab, int size)
     return (size >= 2 ? full : size == 1 ? medium : brief)[tab];
 }
 
+const char* graphLaneName (int lane)
+{
+    for (int tab = 0; tab < stepLevelCount; ++tab)
+        if ((int) stepLevel (tab) == lane)
+            return stepLevelName (tab);
+    return "";
+}
+
+float graphValue (const Note& n, int lane, std::int64_t stepTicks) noexcept
+{
+    if (lane == graphShift && stepTicks != ticksPerStep && stepTicks > 0)
+        return std::clamp ((float) ((double) (((n.start % stepTicks) + stepTicks) % stepTicks) / (0.99 * (double) stepTicks)), 0.0f, 1.0f);
+    return levelValue (n, (Level) std::clamp (lane, 0, graphRepeat));
+}
+
+void setGraphValue (Note& n, int lane, float v, std::int64_t stepTicks) noexcept
+{
+    if (lane == graphShift && stepTicks != ticksPerStep && stepTicks > 0)
+    {
+        const auto base = n.start - (((n.start % stepTicks) + stepTicks) % stepTicks);
+        n.start = base + (std::int64_t) std::llround ((double) std::clamp (v, 0.0f, 1.0f) * 0.99 * (double) stepTicks);
+        return;
+    }
+    setLevelValue (n, (Level) std::clamp (lane, 0, graphRepeat), v);
+}
+
+float graphDefault (int lane) noexcept { return levelDefault ((Level) std::clamp (lane, 0, graphRepeat)); }
+
+bool graphIsBipolar (int lane) noexcept { return levelIsBipolar ((Level) std::clamp (lane, 0, graphRepeat)); }
+
 std::string levelText (Level level, float v)
 {
     v = std::clamp (v, 0.0f, 1.0f);
@@ -117,7 +147,8 @@ float levelValue (const Note& n, Level level) noexcept
         case Level::modX: return n.modX;
         case Level::modY: return n.modY;
         case Level::notePitch: return (float) std::clamp (n.key, 0, 127) / 127.0f;
-        case Level::shift: return (float) (((n.start % ticksPerStep) + ticksPerStep) % ticksPerStep) / (float) ticksPerStep;
+        case Level::shift: // (FL's manual: "100% shift equals 99% of the note position equal to one 16th note")
+            return std::clamp ((float) ((double) (((n.start % ticksPerStep) + ticksPerStep) % ticksPerStep) / (0.99 * ticksPerStep)), 0.0f, 1.0f);
         case Level::repeat: return (float) std::clamp (n.repeat, 0, noterepeat::rateCount) / (float) noterepeat::rateCount;
     }
     return 0.0f;
@@ -140,7 +171,7 @@ void setLevelValue (Note& n, Level level, float v) noexcept
         {
             // the note stays in its step: FL's 100 % is the step's last tick (it never reaches the next step)
             const auto step = n.start - (((n.start % ticksPerStep) + ticksPerStep) % ticksPerStep);
-            n.start = step + std::min<std::int64_t> (ticksPerStep - 1, std::lround (v * (float) ticksPerStep));
+            n.start = step + std::min<std::int64_t> (ticksPerStep - 1, std::llround ((double) v * 0.99 * ticksPerStep));
             break;
         }
         case Level::repeat: n.repeat = (int) std::lround (v * noterepeat::rateCount); break;

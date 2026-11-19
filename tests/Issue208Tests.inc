@@ -114,6 +114,14 @@ TEST (i208_graph_lanes_in_fls_order)
     CHECK (std::string (stepLevelName (4)) == "Panning" && std::string (stepLevelName (8)) == "Repeat");
     CHECK (std::string (stepLevelName (2, 1)) == "Release" && std::string (stepLevelName (8, 1)) == "Repeats");
     CHECK (std::string (stepLevelName (0, 0)) == "Note" && std::string (stepLevelName (8, 0)) == "Rep" && std::string (stepLevelName (5, 0)) == "X");
+    // round 190lx's lane ids and order (its Channel Rack code reads these)
+    CHECK (graphNote == 6 && graphShift == 7 && graphRepeat == 8 && graphLaneCount == 9);
+    for (int tab = 0; tab < graphLaneCount; ++tab)
+        CHECK (graphTabOrder[tab] == (int) stepLevel (tab));
+    lynx::Note n;
+    setGraphValue (n, graphShift, 0.5f);
+    CHECK (std::abs (graphValue (n, graphShift) - 0.5f) < 0.01f && graphDefault (graphShift) == 0.0f && ! graphIsBipolar (graphShift));
+    CHECK (std::string (graphLaneName (graphRepeat)) == "Repeat");
 }
 
 TEST (i208_note_pitch_shift_and_repeat_levels)
@@ -126,10 +134,12 @@ TEST (i208_note_pitch_shift_and_repeat_levels)
     CHECK (n.key == 72 && std::abs (levelValue (n, Level::notePitch) - 72.0f / 127.0f) < 1e-6f);
     CHECK (levelText (Level::notePitch, 60.0f / 127.0f) == "C5"); // (FL's C5 = 60)
     // Shift: the note moves inside its step, never into the next one
+    // (FL's manual: 100 % shift is 99 % of a step; round 190lx's mapping too)
     setLevelValue (n, Level::shift, 0.5f);
-    CHECK (n.start == 5 * ticksPerStep + ticksPerStep / 2);
+    CHECK (n.start == 5 * ticksPerStep + std::llround (0.5 * 0.99 * ticksPerStep));
     setLevelValue (n, Level::shift, 1.0f);
-    CHECK (n.start == 6 * ticksPerStep - 1);
+    CHECK (n.start == 5 * ticksPerStep + std::llround (0.99 * ticksPerStep) && n.start < 6 * ticksPerStep);
+    CHECK (std::abs (levelValue (n, Level::shift) - 1.0f) < 1e-3f);
     setLevelValue (n, Level::shift, 0.0f);
     CHECK (n.start == 5 * ticksPerStep && levelDefault (Level::shift) == 0.0f);
     CHECK (levelText (Level::shift, 0.25f) == "0.25");
