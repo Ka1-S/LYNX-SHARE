@@ -2164,7 +2164,7 @@ struct TimeLaw { double attackScale, releaseScale, d, pe, qFallMs, qRiseMs, vpow
 constexpr TimeLaw c4Time { 0.999677, 0.998302, 0.003912, 0.005823, 149.78441, 56.044957, 4.015778, 4.006325 }; // c4/lab/fit5.py (19 probes, −65 … −84 dB)
 // c4fit:end
 // round 190mm (dyn): the C6's floating bands — their band-pass Q against the control's and their threshold offset (dB),
-// fitted on the C6's X2 renders (lab/c6var.sh: Q × 1.0 / 0.8 / 0.7 / 0.65 / 0.5 → 0.67)
+// fitted on the C6's X2 renders (lab/c6var.sh: Q × 1.0 / 0.8 / 0.7 / 0.65 / 0.5 → 0.67); threshold offset 0 / −3 / +3 dB → 0 (−3: one bank file down)
 #ifndef C6_QSCALE
 #define C6_QSCALE 0.67
 #endif

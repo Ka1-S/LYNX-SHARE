@@ -12,15 +12,18 @@
 
 namespace lynx::buscomp
 {
-// ---- fitted constants (REA_rodada190mm_dyn.md §4; lab/fitapi.py: 18 bank renders, mean ESR −8.9 → −18.9 dB)
+// ---- fitted constants (REA_rodada190mm_dyn.md §4; lab/fitapi.py on 18 bank renders (ESR −8.9 → −18.9 dB), then
+// lab/fitapi2.py on all 25 with a level term and the feedback loop gain, lab/fitapi3.py with the threshold's slope)
 struct Fit
 {
-    double calDb = -23.4598;                             // the threshold knob → detector dBFS
-    double kneeDb[3] { 23.7520, 10.8522, 12.9270 };      // Soft, Med, Hard knee widths (dB)
-    double attackScale = 2.26207, releaseScale = 0.364396; // the knobs' times × these
-    double detectMs = 9.01427;                           // the mean-square detector
-    double thrustHz = 76.8663, thrust[3] { 0.0, 0.628681, 0.564657 }; // Norm, Med, Loud: the side chain's high-pass share
-    double makeupK = 0.337269, makeupRefDb = 9.76324;    // auto make-up dB = K · (ref − threshold) · (1 − 1 / ratio)
+    double calDb = -23.191;                              // the threshold knob → detector dBFS: cal + slope · knob
+    double calSlope = 1.06387;
+    double kneeDb[3] { 23.42, 13.00, 9.5844 };           // Soft, Med, Hard knee widths (dB)
+    double attackScale = 2.681, releaseScale = 0.386;    // the knobs' times × these
+    double detectMs = 9.935;                             // the mean-square detector
+    double thrustHz = 80.59, thrust[3] { 0.0, 0.6436, 0.6956 }; // Norm, Med, Loud: the side chain's high-pass share
+    double makeupK = 0.335853, makeupRefDb = 10.7813;    // auto make-up dB = K · (ref − threshold) · (1 − 1 / ratio)
+    double feedbackLoop = 0.520711;                      // feedback type: the loop gain = this · (ratio − 1)
 };
 
 struct Settings
@@ -63,7 +66,9 @@ public:
         const double share = fit.thrust[std::clamp (st.thrust, 0, 2)];
         const double W = fit.kneeDb[std::clamp (st.knee, 0, 2)];
         const double slope = st.ratio >= 1e5 ? 1.0 : 1.0 - 1.0 / std::max (1.0, st.ratio);
-        const double thr = st.thresholdDb + fit.calDb;
+        // a feedback detector hears the compressed output: its loop gain (ratio − 1) gives the nominal static ratio
+        const double loop = st.feedback ? fit.feedbackLoop * (st.ratio >= 1e5 ? 30.0 : std::max (0.0, st.ratio - 1.0)) : slope;
+        const double thr = fit.calSlope * st.thresholdDb + fit.calDb;
         const double mkDb = (st.autoMakeup ? fit.makeupK * (fit.makeupRefDb - st.thresholdDb) * slope : 0.0) + st.makeupDb;
         const double makeup = std::pow (10.0, mkDb / 20.0), trim = std::pow (10.0, st.trimDb / 20.0);
         const double mix = std::clamp (st.mix, 0.0, 1.0);
@@ -83,9 +88,9 @@ public:
             const double over = 10.0 * std::log10 (ms + 1e-30) - thr;
             double red = 0.0;
             if (W > 0.0 && std::abs (over) <= 0.5 * W)
-                red = slope * (over + 0.5 * W) * (over + 0.5 * W) / (2.0 * W);
+                red = loop * (over + 0.5 * W) * (over + 0.5 * W) / (2.0 * W);
             else if (over > 0.0)
-                red = slope * over;
+                red = loop * over;
             env = red + (env - red) * (red > env ? cA : cR);
             const double g = std::pow (10.0, -env / 20.0);
             most = std::max (most, env);

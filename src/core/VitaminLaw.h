@@ -20,8 +20,8 @@ struct Fit
     // −56 dB; lab/fitvitap.py)
     double fScale[4] { 0.94396, 0.95661, 0.93832, 0.93357 };
     double q[4] { 0.6172, 0.57424, 0.56248, 0.62559 };
-    double drive = 0.33267; // the enhancement's saturation drive (lab/fitvit.py: 12 X renders, ESR + spectrum)
-    double level = 0.0225;  // its level at a band gain of 0 dB (the gain control adds dB to it)
+    double drive = 0.24040; // the enhancement's saturation drive (lab/fitvit2.py: the 20 X renders, ESR + spectrum)
+    double level[5] { 0.01995, 0.01816, 0.01669, 0.03159, 0.03301 }; // per band: its level at a band gain of 0 dB (the gain adds dB)
 };
 
 struct Settings
@@ -65,7 +65,7 @@ public:
         bool any = false;
         for (int b = 0; b < 5; ++b)
         {
-            g[(std::size_t) b] = st.bandGainDb[b] > -143.9 ? fit.level * std::pow (10.0, st.bandGainDb[b] / 20.0) : 0.0;
+            g[(std::size_t) b] = st.bandGainDb[b] > -143.9 ? fit.level[b] * std::pow (10.0, st.bandGainDb[b] / 20.0) : 0.0;
             any = any || g[(std::size_t) b] > 0.0;
         }
         const double d = std::max (1e-3, fit.drive);
