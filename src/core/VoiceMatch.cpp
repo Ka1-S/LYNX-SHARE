@@ -1675,6 +1675,201 @@ void Compressor::process (float* l, float* r, int n, const Settings& s) noexcept
     last = (float) maxGr;
     change = (float) -extreme;
 }
+
+// ================================================================== round 190mg: the Renaissance law
+// [REA] structure of the reference's DSP and control code (docs/analise/REA_rodada190mg_ren.md §1), [EXEC] every constant
+// below fitted on LYNX's own demo-mode probes (1 kHz stairs at 11 ratios / 3 thresholds, tone bursts at Manual / ARC ×
+// Electro / Opto and 5 release / 3 attack settings, 50 / 100 Hz tones at Warm / Smooth; ren/fit): the probes' sample
+// ESR is −50 … −85 dB. Per sample: a linked peak detector (Smooth: also three first-order all-passes of the input, the
+// largest magnitude), its maximum over a look-ahead window, a gain computer in linear gain g = 1 / (1 + x / T) bent by
+// c g² (1 − g), a one-pole smoother on it (attack; release time shaped by the slow follower's depth, faster while the
+// gain sits under its slow follower), the gain's floor a (ratio law), the 0 dBFS limiter, two boxcars over the gain,
+// the audio and the dry path delayed by the window.
+namespace
+{
+// static law (fitstatic2.py): ln (a + f3) = f0 + f1 u + f2 u², u = ln ratio (ratio > 1); below 1 : 1 a = e^(e0 (1 − ratio))
+constexpr double renF0 = 0.00615309, renF1 = -2.99994666, renF2 = 0.43417198, renF3 = 0.00620109, renE0 = 5.5452;
+// threshold shift at low ratios: max (0, s0 − s1 ratio) dB; curve bend c (compressing / expanding)
+constexpr double renS0 = 25.0, renS1 = 20.0, renBendComp = 1.5, renBendExp = 1.25;
+// dynamics (fitdyn.py on 16 burst / tone probes, sample ESR −78 … −94 dB; fitlim.py on the limiter probes, −76 … −97 dB):
+// attack / release knob scales, the program-dependent exponent (ARC / Manual) and offset, the slow follower's fall / rise,
+// the release shape (1 − v⁴)⁴ with its floor, the limiter's recovery (× 5 in Manual), its +24 dB cap, the all-passes
+constexpr double renAttackK = 1.0, renReleaseK = 0.9998, renPdrArc = 0.003911, renPdrManual = 0.0003532, renPdrOffset = 0.003941;
+constexpr double renSlowFallMs = 149.58, renSlowRiseMs = 56.24, renReleaseFloorMs = 0.002, renShapePow = 4.0, renShapeExp = 4.0;
+constexpr double renLimitMs = 1.5, renLimitManual = 5.0, renLimitMax = 16.0, renMixMs = 10.0;
+constexpr double renAllPassHz[3] { 49.50, 130.74, 280.18 };
+constexpr double renBoxShare = 0.42; // the first boxcar's share of the window (the second: the rest + 1)
+constexpr double renFix = 1073741824.0; // 2^30: the boxcars' fixed point
+inline double renCoef (double ms, double sr) noexcept { return ms <= 0.0 ? 0.0 : std::exp (-1000.0 / (ms * sr)); }
+} // namespace
+
+double renFloor (double ratio) noexcept
+{
+    if (ratio < 1.0)
+        return std::exp (renE0 * (1.0 - std::max (0.5, ratio)));
+    const double u = std::log (ratio);
+    return std::max (0.0, std::exp (renF0 + renF1 * u + renF2 * u * u) - renF3);
+}
+
+double renShiftDb (double ratio) noexcept { return std::max (0.0, renS0 - renS1 * ratio); }
+
+double renStaticGain (double x, double thresholdDb, double ratio) noexcept
+{
+    const double a = renFloor (ratio), c = a < 1.0 ? renBendComp : renBendExp;
+    double g = 1.0 / (1.0 + x / dbToGain (thresholdDb + renShiftDb (ratio)));
+    g = std::min (1.0, g + c * g * g * (1.0 - g));
+    return (1.0 - a) * g + a;
+}
+
+int Renaissance::windowFor (double sampleRate) noexcept { return sampleRate < 64000.0 ? 64 : sampleRate < 128000.0 ? 128 : 256; }
+
+void Renaissance::prepare (double sampleRate) noexcept
+{
+    sr = sampleRate;
+    win = windowFor (sr);
+    boxA = (int) std::lround (renBoxShare * win);
+    boxB = win + 1 - boxA;
+    for (int k = 0; k < 3; ++k)
+    {
+        const double t = std::tan (3.14159265358979323846 * std::min (renAllPassHz[k], 0.45 * sr) / sr);
+        apc[k] = (t - 1.0) / (t + 1.0);
+    }
+    tRelease = -1.0;
+    reset();
+}
+
+void Renaissance::reset() noexcept
+{
+    std::memset (apx, 0, sizeof (apx));
+    std::memset (apy, 0, sizeof (apy));
+    qh = qt = n0 = 0;
+    s = q = 1.0;
+    lim = renLimitMax;
+    b1.fill ((std::int64_t) renFix);
+    b2.fill ((std::int64_t) renFix);
+    sum1 = (std::int64_t) renFix * boxA;
+    sum2 = (std::int64_t) renFix * boxB;
+    p1 = p2 = 0;
+    dl.fill (0.0f);
+    dr.fill (0.0f);
+    dp = 0;
+    started = false;
+    last = change = 0.0f;
+}
+
+void Renaissance::process (float* l, float* r, int n, const RenSettings& st) noexcept
+{
+    const int mode = (st.manual ? 1 : 0) | (st.opto ? 2 : 0);
+    if (st.releaseMs != tRelease || mode != tMode)
+    {
+        // the release coefficient = relT[q] · pdrT[min (s, q)]: the time constant set by the slow follower's position
+        // (Electro: faster towards no reduction, Opto: the reverse), times the program-dependent factor
+        tRelease = st.releaseMs;
+        tMode = mode;
+        const double d = st.manual ? renPdrManual : renPdrArc;
+        for (int k = 0; k < tableSize; ++k)
+        {
+            // read at 256 steps, truncated (the reference's tables; the probes' ESR is 15 … 20 dB better than with a
+            // continuous law)
+            const double v = st.opto ? 1.0 - k / 256.0 : k / 256.0;
+            const double tau = std::max (renReleaseFloorMs, std::max (1.0, st.releaseMs) * renReleaseK * std::pow (1.0 - std::pow (v, renShapePow), renShapeExp));
+            pdrT[(std::size_t) k] = std::exp2 (-d / ((double) k / (tableSize - 1) + renPdrOffset));
+            relT[(std::size_t) k] = renCoef (tau, sr) / pdrT[(std::size_t) k];
+        }
+    }
+    const auto at = [] (double u) noexcept { return (std::size_t) std::clamp ((int) (u * (tableSize - 1)), 0, tableSize - 1); };
+    const double ratio = std::clamp (st.ratio, 0.5, 50.0), a = renFloor (ratio), bend = a < 1.0 ? renBendComp : renBendExp;
+    const double invT = 1.0 / dbToGain (st.thresholdDb + renShiftDb (ratio));
+    const double aC = renCoef (std::max (0.01, st.attackMs) * renAttackK, sr), qF = renCoef (renSlowFallMs, sr), qR = renCoef (renSlowRiseMs, sr);
+    const double makeup = dbToGain (st.gainDb), ceiling = 1.0 / makeup;
+    const double lR = renCoef (renLimitMs * (st.manual ? renLimitManual : 1.0), sr), mC = renCoef (renMixMs, sr);
+    const double trim = dbToGain (st.trimDb), wetT = trim * std::clamp (st.mix, 0.0, 1.0), dryT = trim * (1.0 - std::clamp (st.mix, 0.0, 1.0));
+    if (! started)
+    {
+        wetG = wetT;
+        dryG = dryT;
+        started = true;
+    }
+    const int nap = st.smooth ? 3 : 0;
+    const double invB = 1.0 / boxB;
+    double minG = 1e9, maxG = 0.0;
+    for (int i = 0; i < n; ++i)
+    {
+        // linked peak detector (Smooth: with the all-passed copies)
+        double x = 0.0;
+        const float in[2] { l[i], r[i] };
+        for (int ch = 0; ch < 2; ++ch)
+        {
+            const double v = in[ch];
+            double m = std::abs (v);
+            for (int k = 0; k < nap; ++k)
+            {
+                const double y = apc[k] * (v - apy[ch][k]) + apx[ch][k];
+                apx[ch][k] = v;
+                apy[ch][k] = y;
+                m = std::max (m, std::abs (y));
+            }
+            x = std::max (x, m);
+        }
+        // its maximum over the window
+        while (qt != qh && qv[(std::size_t) ((qt - 1) & (cap - 1))] <= x)
+            --qt;
+        qv[(std::size_t) (qt & (cap - 1))] = x;
+        qi[(std::size_t) (qt & (cap - 1))] = n0;
+        ++qt;
+        if (qi[(std::size_t) (qh & (cap - 1))] <= n0 - win)
+            ++qh;
+        if (qh >= cap) // the same slots (cap is a power of two): the positions stay small
+        {
+            qh -= cap;
+            qt -= cap;
+        }
+        ++n0;
+        if (n0 >= (1 << 30)) // keep the counters small (the queue's indices move with it)
+        {
+            for (int k = qh; k != qt; ++k)
+                qi[(std::size_t) (k & (cap - 1))] -= (1 << 29);
+            n0 -= (1 << 29);
+        }
+        const double peak = qv[(std::size_t) (qh & (cap - 1))];
+        // the limiter on the same peak: instant down, one pole up
+        // (its target at most 16 = +24 dB: the expansion's boost passes under the ceiling)
+        const double lt = peak * renLimitMax > ceiling ? ceiling / peak : renLimitMax;
+        lim = std::min (lt, (lim - lt) * lR + lt);
+        // the curve gain and its smoother
+        double g = 1.0 / (1.0 + peak * invT);
+        g = std::min (1.0, g + bend * g * g * (1.0 - g));
+        const double co = g < s ? aC : relT[at (q)] * pdrT[at (std::min (s, q))];
+        s = (s - g) * co + g;
+        q = (q - s) * (s < q ? qF : qR) + s;
+        const double G = std::min ((1.0 - a) * s + a, st.limiter ? lim : 1e9);
+        // two boxcars (exact running sums in fixed point)
+        const auto gi = (std::int64_t) std::llround (std::min (G, 64.0) * renFix);
+        sum1 += gi - b1[(std::size_t) p1];
+        b1[(std::size_t) p1] = gi;
+        if (++p1 == boxA) p1 = 0;
+        const auto m1 = (std::int64_t) std::llround ((double) sum1 / boxA);
+        sum2 += m1 - b2[(std::size_t) p2];
+        b2[(std::size_t) p2] = m1;
+        if (++p2 == boxB) p2 = 0;
+        const double Gs = (double) sum2 * invB / renFix;
+        minG = std::min (minG, Gs);
+        maxG = std::max (maxG, Gs);
+        // the audio (wet and dry) delayed by the window
+        const float xl = dl[(std::size_t) dp], xr = dr[(std::size_t) dp];
+        dl[(std::size_t) dp] = l[i];
+        dr[(std::size_t) dp] = r[i];
+        if (++dp == win) dp = 0;
+        wetG = (wetG - wetT) * mC + wetT;
+        dryG = (dryG - dryT) * mC + dryT;
+        const double w = makeup * Gs * wetG + dryG;
+        l[i] = (float) (xl * w);
+        r[i] = (float) (xr * w);
+    }
+    const double redDb = minG < 1.0 ? -gainToDb (minG) : 0.0, boostDb = maxG > 1.0 ? gainToDb (maxG) : 0.0;
+    last = (float) redDb;
+    change = (float) (boostDb > redDb ? boostDb : -redDb);
+}
 } // namespace progcomp
 } // namespace lynx::vmatch
 

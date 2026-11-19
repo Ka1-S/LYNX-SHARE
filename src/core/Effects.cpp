@@ -220,15 +220,18 @@ class Compressor final : public Effect
 public:
     // `initial` (may be null): the slot's parameters, so the voicing's latency is known after prepare(), before the
     // first block (issue #113: a Patcher plans its delay compensation right after building its nodes)
-    explicit Compressor (const EffectParams* initial = nullptr) : vintageAtStart (initial != nullptr && (*initial)[8] >= 0.5f) {}
+    explicit Compressor (const EffectParams* initial = nullptr)
+        : vintageAtStart (initial != nullptr && (*initial)[8] >= 0.5f),
+          renAtStart (initial != nullptr && (*initial)[8] >= 0.5f && (*initial)[(std::size_t) compressorRenLaw] >= 0.5f) {}
 
     void prepare (double sr) noexcept override
     {
         sampleRate = sr;
         vintage.prepare (sr);
+        ren.prepare (sr);
         reset();
         if (vintageAtStart)
-            latency.store (vintage.latency(), std::memory_order_relaxed);
+            latency.store (renAtStart ? ren.latency() : vintage.latency(), std::memory_order_relaxed);
     }
     void reset() noexcept override
     {
@@ -236,6 +239,7 @@ public:
         inPower = outPower = 0.0f;
         autoGain = 1.0f;
         vintage.reset();
+        ren.reset();
     }
 
     // round 123: voicing 1 = the measured program-dependent compressor (core/VoiceMatch.h); it delays the audio
@@ -271,6 +275,39 @@ public:
 
     void process (float* l, float* r, int n, const EffectParams& params, double) noexcept override
     {
+        if (params[8] >= 0.5f && params[(std::size_t) compressorRenLaw] >= 0.5f)
+        {
+            // round 190mg: the vintage voicing's Renaissance law (core/VoiceMatch.h progcomp::Renaissance; set only by the
+            // Renaissance Compressor translator)
+            tail = -1;
+            latency.store (ren.latency(), std::memory_order_relaxed);
+            float peakIn = 0.0f, peakOut = 0.0f;
+            for (int i = 0; i < n; ++i)
+                peakIn = std::max (peakIn, std::max (std::abs (l[i]), std::abs (r[i])));
+            vmatch::progcomp::RenSettings v;
+            const bool rc = params[13] >= 0.5f;
+            v.thresholdDb = compThresholdDb (params[0]);
+            v.ratio = rc ? rcRatio (params[14]) : compRatio (params[1]);
+            v.attackMs = rc ? rcAttackMs (params[16]) : compAttackMs (params[2]);
+            v.releaseMs = rc ? rcReleaseMs (params[17]) : compReleaseMs (params[3]);
+            v.gainDb = rc ? rcGainDb (params[15]) : compMakeupDb (params[4]);
+            v.mix = std::clamp ((double) params[6], 0.0, 1.0);
+            v.trimDb = -18.0 + 36.0 * std::clamp ((double) params[7], 0.0, 1.0);
+            v.manual = params[9] >= 0.5f;
+            v.opto = params[10] >= 0.5f;
+            v.smooth = params[11] >= 0.5f;
+            v.limiter = params[12] >= 0.5f; // the reference's limiter sits inside its gain path
+            ren.process (l, r, n, v);
+            meterLimit.store (0.0f, std::memory_order_relaxed);
+            for (int i = 0; i < n; ++i)
+                peakOut = std::max (peakOut, std::max (std::abs (l[i]), std::abs (r[i])));
+            useSidechain = false;
+            meterGr.store (std::clamp (ren.reductionDb() / 30.0f, 0.0f, 1.0f), std::memory_order_relaxed);
+            meterChange.store (ren.changeDb(), std::memory_order_relaxed);
+            meterIn.store (std::min (peakIn, 1.0f), std::memory_order_relaxed);
+            meterOut.store (std::min (peakOut, 1.0f), std::memory_order_relaxed);
+            return;
+        }
         if (params[8] >= 0.5f)
         {
             tail = -1; // (round 190gp: the measured voicing keeps the fixed hold)
@@ -427,7 +464,8 @@ private:
     float limitGain = 1.0f;
     std::atomic<int> latency { 0 };
     vmatch::progcomp::Compressor vintage;
-    bool vintageAtStart = false;
+    vmatch::progcomp::Renaissance ren; // round 190mg
+    bool vintageAtStart = false, renAtStart = false;
     double sampleRate = 44100.0;
     float envelopeDb = 0.0f;
     float inPower = 0.0f, outPower = 0.0f, autoGain = 1.0f;
@@ -4667,6 +4705,9 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     // round 152: a Compressor saved before the measured vintage curve keeps the round-150 curve
     if (slot.kind == EffectKind::compressor && savedCount <= 18 && slot.params.size() > 18)
         slot.params[18] = 0.0f;
+    // round 190mg: … and one saved before the Renaissance law keeps the vintage voicing's round-123 / 152 engine
+    if (slot.kind == EffectKind::compressor && savedCount <= (std::size_t) compressorRenLaw && slot.params.size() > (std::size_t) compressorRenLaw)
+        slot.params[(std::size_t) compressorRenLaw] = 0.0f;
     // round 190do: a Gemini Doubler saved before the measured read head keeps the two crossfaded taps
     if (slot.kind == EffectKind::geminiDoubler && savedCount <= (std::size_t) voicetools::gemini::headLaw)
         slot.params[(std::size_t) voicetools::gemini::headLaw] = 0.0f;
