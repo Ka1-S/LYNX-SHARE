@@ -4187,6 +4187,13 @@ void PianoRollComponent::centreOnPlayhead()
     repaint();
 }
 
+void PianoRollComponent::centreOnTick (double tick, double at)
+{
+    scrollTicks = juce::jmax (0.0, tick - gridArea().getWidth() / pixelsPerTick * at);
+    updateScrollBars();
+    repaint();
+}
+
 void PianoRollComponent::ColourSwatch::paintButton (juce::Graphics& g, bool over, bool down)
 {
     auto r = getLocalBounds().toFloat().reduced (3.0f);

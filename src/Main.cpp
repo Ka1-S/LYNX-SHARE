@@ -15,6 +15,7 @@
 #include "core/DrawMode.h"
 #include "core/SessionOps.h"
 #include "ui/ClipGridComponent.h"
+#include "ui/ArticulatorTools.h"
 #include "ui/ExternalDrag.h"
 #include "ui/LabelFont.h"
 #include "ui/SessionMixer.h"
@@ -2756,6 +2757,15 @@ public:
             const auto i = args.indexOf ("--capfix190jjshot");
             const auto set = i + 3 < args.size() && ! args[i + 3].startsWith ("--") ? args[i + 3].unquoted() : juce::String();
             runCapfix190jjShot (args[i + 1].unquoted(), args[i + 2].unquoted(), set);
+            quit();
+            return;
+        }
+
+        if (args.contains ("--details190mkshot"))
+        {
+            // LYNX --details190mkshot prefix project.flp: round 190mk off screen (src/DetailsShot190mk.inc)
+            const auto i = args.indexOf ("--details190mkshot");
+            setApplicationReturnValue (runDetailsShot190mk (args[i + 1].unquoted(), i + 2 < args.size() ? args[i + 2].unquoted() : juce::String()) ? 0 : 1);
             quit();
             return;
         }
@@ -17154,6 +17164,7 @@ private:
 #include "DetailsShot190lr.inc" // round 190lr
 #include "DetailsShot190lx.inc" // round 190lx
 #include "DetailsShot190mf.inc" // round 190mf
+#include "DetailsShot190mk.inc" // round 190mk
     // --trackautoshot190gz (round 190gz): see the dispatch above
     bool runTrackAutoShot190gz (const juce::String& prefix)
     {

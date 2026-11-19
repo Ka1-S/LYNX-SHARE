@@ -1066,6 +1066,9 @@ struct ChannelDef
     // FL's "Lock active/mute state" (the mute switch's menu, .flp 0x20, REA_rodada167l §5): soloing another channel
     // leaves this one as it is
     bool soloLock = false;
+    // FL's "Zip selected" (Alt+Z, the Channel rack's Options menu; round 190mk, core/RackZip.h): the row is shown as a
+    // thin bar in a shared strip. View only (the sound is untouched); saved in .lynx ("zipped")
+    bool zipped = false;
     // FL's key region (the Channel settings keyboard's ruler, REA_rodada164a §2): the channel plays only the notes
     // from keyLow to keyHigh (MIDI keys); 0…127 = every note. Layer's "Split children" sets one key per child.
     int keyLow = 0, keyHigh = 127;

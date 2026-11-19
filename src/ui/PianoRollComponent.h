@@ -108,6 +108,7 @@ public:
     // Centers the view on the channel's notes and, with `fitPattern`, zooms to show the whole pattern
     // (called on open).
     void scrollToNotes (bool fitPattern = true);
+    void centreOnTick (double tick, double at = 0.5); // round 190mk (DE-33): this pattern tick at `at` of the view's width
 
     // FL's parameter menu "Edit events in piano roll" (REA round 146): the bottom lane shows and draws the current
     // pattern's events of `target` (the lane box lists the pattern's event lanes after the note properties).

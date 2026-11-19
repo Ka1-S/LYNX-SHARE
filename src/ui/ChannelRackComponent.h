@@ -11,6 +11,7 @@
 #include "core/HeldNotes.h"
 
 #include "core/RackOps.h"
+#include "core/RackZip.h"
 #include "engine/AudioEngine.h"
 #include "ui/TimerWhileShowing.h"
 #include "ui/FrameTicker.h"
@@ -59,6 +60,10 @@ public:
     void visibilityChanged() override;
 
     std::function<void()> onOpenPianoRoll;
+    // FL's piano roll preview (manual "Channel Rack › Piano roll preview", round 190mk DE-33): "Left-click the preview to
+    // show/hide the Piano roll window"; "Right-Click to open the Piano roll centered on the notes clicked" (the tick)
+    std::function<void (int row)> onPreviewClick;
+    std::function<void (int row, double tick)> onPreviewRightClick;
     std::function<void (int)> onOpenMixerInsert; // double-click on a route box: show the Mixer at that insert
 
     // Settings > "Keep channel editors open": opening an editor never closes the previous one.
@@ -75,6 +80,15 @@ public:
     static inline bool showMixerSelectors = true;
     // FL's Channel rack menu › Options › "Channel name alignment" (round 190kd): Left / Center (FL's default: Center)
     static bool nameAlignLeft;
+    // FL's Options › "Show a mute button on the piano roll preview" (on; round 190mk, DE-33): saved ("rackPreviewMute")
+    static inline bool previewMuteButton = true;
+    // FL's Options › "Zip selected" (Alt+Z) / "Unzip all" (Alt+U) (round 190mk, DE-38; core/RackZip.h): zipped
+    // channels show as bars in a half-row strip; a right-click on a bar unzips that channel (FL's manual)
+    void zipSelected();
+    void unzipAll();
+    void unzip (int row);
+    bool zipStripForSnapshot (int row, juce::Rectangle<int>& strip) const; // (the strip a zipped row is in)
+    int rowTopForSnapshot (int row) const { return rowY (row); }
 
     void paint (juce::Graphics& g) override;
     void mouseDown (const juce::MouseEvent& e) override;
@@ -199,12 +213,18 @@ public:
     static constexpr int muteWidth = 26;
     static constexpr int knobWidth = 28;
     static constexpr int routeWidth = 30;
-    static constexpr int nameWidth = 150;
+    // FL's Options › "Channel button width" (round 190mk, DE-39; capture 190mk A2.1): 100 / 200 / 300 / 400 %, Custom (a
+    // percentage), Size to fit (0 here). FL's button is 80 px at 100 % and 332 px at 400 % (+84 px per 100 %); LYNX's 150 px
+    // button grows in the same proportion. Saved ("rackButtonWidth")
+    static inline int nameWidth = 150;
+    static inline int buttonWidthPercent = 100;
+    static int widthForPercent (int percent) noexcept { return juce::roundToInt (150.0 * (1.0 + 1.05 * (juce::jlimit (100, 400, percent) / 100.0 - 1.0))); }
+    void setButtonWidth (int percent); // 0 = size to fit the longest name
     static constexpr int selectWidth = 12;
     static constexpr int stepWidth = 18; // (round 190io, FM-11: FL's keycap pitch is 16, LYNX 18; was 22)
 
 private:
-    enum class Area { none, mute, pan, volume, route, name, select, grid, addRow, laneLevels, lane, loop };
+    enum class Area { none, mute, pan, volume, route, name, select, grid, addRow, laneLevels, lane, loop, zipped };
 
     void changeListenerCallback (juce::ChangeBroadcaster*) override;
     void timerCallback() override;
@@ -234,7 +254,15 @@ private:
     int selectLeft() const noexcept { return nameLeft() + nameWidth + 4; }
     int gridLeft() const noexcept { return selectLeft() + selectWidth + 8; }
     juce::Rectangle<int> rowBounds (int row) const;
+    juce::Rectangle<int> previewMuteBounds (int row) const; // (round 190mk: the preview's round mute button)
     int rowY (int row) const;       // top of a row (rows below the graph lane shift down)
+    // round 190mk (DE-38): the rows' places while any channel is zipped (empty: none is, FL's fixed 30 px rows)
+    rackzip::Layout zipLayout;
+    void refreshZipLayout();
+    bool isZipped (int row) const noexcept { return ! zipLayout.slot.empty() && row >= 0 && row < (int) zipLayout.slot.size() && zipLayout.slot[(std::size_t) row] >= 0; }
+    int zipBarAt (int row, int x) const; // the zipped row whose bar is under x (x in the rack's coordinates), -1 none
+    juce::Rectangle<int> zipBar (int row) const; // a zipped row's bar
+    void paintZipStrips (juce::Graphics& g);
     int filterGroup = -1;
     static inline ChannelStepsClipboard stepClipboard; // Cut / Copy / Paste (Ctrl+X / C / V, the channel menu)
     int visibleIndex (int row) const; // the row's place among the shown rows

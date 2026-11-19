@@ -196,6 +196,41 @@ void slidePoint (std::vector<EditPoint>& points, int index, double x, float y);
 void stepDraw (std::vector<EditPoint>& points, double x0, double x1, float y);
 // the slot's level at `beat` (0…4) as the engine plays it
 float levelAt (const Slot& slot, double beat);
+
+// --- round 190mk (DP-7, capture 190mk A1): the rest of FL's mapping options menu -------------------------------------
+// FL's "Envelope state file (*.fnv)" (State › Open / Save state file..., the Presets in FL's Data\System\Articulator\Maps)
+// is the envelope's own TCustomMEnvelope "map" stream, as in the plugin's state: kind 3, version, point count, the points
+// (Δx, level, tension, curve type), five integers. Read: the Δx are stretched to the bar as the plugin does (the
+// factory maps span 1.0); nullopt when it is not such a stream. Write: version 3, the slot's points as the state has them.
+std::optional<std::vector<EditPoint>> readEnvelopeFile (const std::uint8_t* data, std::size_t size);
+std::vector<std::uint8_t> writeEnvelopeFile (const Slot& slot);
+// State › "Prepare for smooth editing": one smooth point per beat at the level the envelope has there (the bar's end
+// takes the start's level: it loops), every segment an S-curve (FL: 5 points, the −0.75 step between beats gone)
+std::vector<EditPoint> prepareForSmoothEditing (const Slot& slot);
+// Points selection › Cut / Copy / Paste (insert) / Paste (replace) / Duplicate (capture 190mk A1.4). The clipboard keeps
+// the selected points from the first selected one (x relative to it). Insert: the copy goes right after the selection
+// (at its last point's x; none selected: at `at`) and every later point moves right by the copy's length. Replace: the
+// selected points go, the copy starts where they started, later points move by the length difference. Duplicate: an
+// insert of the selection itself; the copy becomes the selection. Cut: the selected points go and the later points close
+// the gap (they move left by the time from the point before the selection to the point after it). LYNX keeps the bar's
+// end point at the bar's end (its level kept; a point pushed past the end is dropped, the end then takes the level the
+// envelope had there) — FL lets an envelope run past or stop short of the bar while it is edited.
+struct PointClip
+{
+    std::vector<EditPoint> points; // x from 0
+    double length() const noexcept { return points.empty() ? 0.0 : points.back().x; }
+};
+PointClip copyPoints (const std::vector<EditPoint>& points, const std::vector<int>& selected);
+// the result's points and the indices of the points to select afterwards
+std::pair<std::vector<EditPoint>, std::vector<int>> pasteInsert (const std::vector<EditPoint>& points, const std::vector<int>& selected,
+                                                                 const PointClip& clip, double at);
+std::pair<std::vector<EditPoint>, std::vector<int>> pasteReplace (const std::vector<EditPoint>& points, const std::vector<int>& selected,
+                                                                  const PointClip& clip);
+std::pair<std::vector<EditPoint>, std::vector<int>> duplicatePoints (const std::vector<EditPoint>& points, const std::vector<int>& selected);
+std::vector<EditPoint> cutPoints (const std::vector<EditPoint>& points, const std::vector<int>& selected);
+// Tools › "Analyze audio file...": the whole file's level over the bar (loud = 1, silence = 0) as single-curve points,
+// dense where it changes fast (FL: ~100 points for an 8 s drum loop). `peaks` = the file's peak level per equal slice.
+std::vector<EditPoint> envelopeFromLevels (const std::vector<float>& peaks, int maxPoints = 110);
 // n levels over the bar (for drawing)
 std::vector<float> renderSlot (const Slot& slot, int n);
 // FL's snap selector (off, 1/16, 1/12, 1/8, 1/6, 1/4, 1/3 beat — table 0x8b6ae8): the step in beats (0 = off)

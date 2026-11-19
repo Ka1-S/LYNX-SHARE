@@ -18,6 +18,13 @@
     // FL's point selection (capture 190mf A1: Ctrl+A / Ctrl+D / Ctrl+I, the dragged point; a selected point = a 9 px ring
     // with a dot); indexes into the slot's points
     std::set<int> gbSelected;
+    // round 190mk (DP-7): the points clipboard (Cut / Copy / Paste / Duplicate), the options' switches and the file chooser
+    static inline std::optional<grossbeat::PointClip> gbPointClip;
+    static inline bool gbFocusOnClick = false, gbBackgroundGradient = false, gbInvertGrid = true; // (FL 2026's defaults)
+    bool gbBoxing = false; // FL's Ctrl+left-drag box (the only way to select several points: capture 190mk A1.4)
+    juce::Point<float> gbBoxFrom, gbBoxTo;
+    double gbLastMouseBeat = 0.0; // where the pointer was over the envelope (a paste with nothing selected goes there)
+    std::unique_ptr<juce::FileChooser> gbChooser;
     double gbStepLastX = -1.0; // (step editing: where the drag was last)
     int gbDragPoint = -1, gbDragTension = -1, gbHoverPoint = -1, gbHoverHandle = -1;
     int gbHoverCell = -1; // the slot under the mouse in a grid (kind × 36 + slot)
@@ -412,6 +419,7 @@
 
     bool gbEnvelopeDown (const juce::MouseEvent& e, const LayoutItem& item)
     {
+        gbLastMouseBeat = gbMouseValue (item, e.position).first;
         if (gbFrozen) // (FL's Freeze editing: the envelope can't be edited, its points are hidden)
             return false;
         if (getWantsKeyboardFocus())
@@ -459,6 +467,14 @@
             gbDragging = true;
             gbWritePoints (points);
             gbShowTip (item, x, y);
+            return true;
+        }
+        if (point < 0 && handle < 0 && e.mods.isCommandDown()) // round 190mk (DP-7): FL's Ctrl+left-drag box selects
+        {
+            gbBoxing = gbDragging = true;
+            gbBoxFrom = gbBoxTo = e.position;
+            gbSelected.clear();
+            repaint();
             return true;
         }
         if (handle >= 0 && e.mods.isAltDown()) // FL: Alt+click on a handle = default tension
@@ -510,6 +526,19 @@
     {
         if (! gbDragging)
             return;
+        if (gbBoxing) // (round 190mk: the points inside the box are the selection)
+        {
+            gbBoxTo = e.position;
+            const auto box = juce::Rectangle<float> (gbBoxFrom, gbBoxTo);
+            const auto pts = grossbeat::editPoints (gbState().slots[(std::size_t) gbSlotIndex()]);
+            const auto inner = gbArea (item);
+            gbSelected.clear();
+            for (int i = 0; i < (int) pts.size(); ++i)
+                if (box.contains (gbPos (inner, pts[(std::size_t) i].x, pts[(std::size_t) i].y)))
+                    gbSelected.insert (i);
+            repaint();
+            return;
+        }
         if (gbStepEdit && gbDragPoint < 0 && gbDragTension < 0)
         {
             gbStepDraw (item, e, false);
@@ -605,11 +634,178 @@
             gbDeleteSelected();
             return true;
         }
+        // round 190mk (DP-7): FL's Cut Ctrl+X, Copy Ctrl+C, Paste (insert) Ctrl+V, Paste (replace) Ctrl+R, Duplicate Ctrl+B
+        if (cmd && ! k.getModifiers().isShiftDown() && ! k.getModifiers().isAltDown())
+            switch (k.getKeyCode())
+            {
+                case 'X': gbClipboardCommand (0); return true;
+                case 'C': gbClipboardCommand (1); return true;
+                case 'V': gbClipboardCommand (2); return true;
+                case 'R': gbClipboardCommand (3); return true;
+                case 'B': gbClipboardCommand (4); return true;
+                default: break;
+            }
         return false;
+    }
+
+    std::vector<int> gbSelectionVector() const { return { gbSelected.begin(), gbSelected.end() }; }
+
+    // 0 Cut, 1 Copy, 2 Paste (insert), 3 Paste (replace), 4 Duplicate (capture 190mk A1.4; core/GrossBeat.h)
+    void gbClipboardCommand (int which)
+    {
+        if (gbFrozen)
+            return;
+        const auto points = grossbeat::editPoints (gbState().slots[(std::size_t) gbSlotIndex()]);
+        const auto sel = gbSelectionVector();
+        const auto select = [this] (const std::vector<int>& indices) { gbSelected = std::set<int> (indices.begin(), indices.end()); };
+        switch (which)
+        {
+            case 0:
+            case 1:
+                if (sel.empty())
+                    return;
+                gbPointClip = grossbeat::copyPoints (points, sel);
+                if (which == 0)
+                {
+                    gbSelected.clear();
+                    gbWritePoints (grossbeat::cutPoints (points, sel));
+                }
+                return;
+            case 2:
+            case 3:
+            {
+                if (! gbPointClip || gbPointClip->points.empty() || (which == 3 && sel.empty()))
+                    return;
+                const auto r = which == 2 ? grossbeat::pasteInsert (points, sel, *gbPointClip, gbLastMouseBeat)
+                                          : grossbeat::pasteReplace (points, sel, *gbPointClip);
+                select (r.second);
+                gbWritePoints (r.first);
+                return;
+            }
+            case 4:
+            {
+                if (sel.empty())
+                    return;
+                const auto r = grossbeat::duplicatePoints (points, sel);
+                select (r.second);
+                gbWritePoints (r.first);
+                return;
+            }
+            default:
+                return;
+        }
+    }
+
+    // State › Presets: FL's envelope maps from its installation (Data\System\Articulator\Maps; read, never shipped),
+    // after "Default" (a flat bar at full level, as Reset)
+    static juce::Array<juce::File> gbPresetFiles()
+    {
+        static const juce::Array<juce::File> files = [] {
+            juce::Array<juce::File> out;
+            const auto fl = findFlStudio();
+            if (fl.installDir.isDirectory())
+                out = fl.installDir.getChildFile ("Data").getChildFile ("System").getChildFile ("Articulator").getChildFile ("Maps")
+                          .findChildFiles (juce::File::findFiles, false, "*.fnv");
+            std::sort (out.begin(), out.end(), [] (const juce::File& a, const juce::File& b) { return a.getFileName().compareNatural (b.getFileName()) < 0; });
+            return out;
+        }();
+        return files;
+    }
+    static juce::File gbStateFolder() { return platform::documentsFolder().getChildFile ("LYNX/Envelope states"); }
+
+    bool gbLoadEnvelopeFile (const juce::File& file)
+    {
+        juce::MemoryBlock data;
+        if (file.getSize() > 4 * 1024 * 1024 || ! file.loadFileAsData (data))
+            return false;
+        const auto points = grossbeat::readEnvelopeFile ((const std::uint8_t*) data.getData(), data.getSize());
+        if (! points)
+        {
+            ui::postHint ({ tr ("Not an envelope state file: {0}", { file.getFileName() }), {} }, 3000);
+            return false;
+        }
+        gbSelected.clear();
+        gbWritePoints (*points);
+        return true;
+    }
+
+    void gbOpenStateFile()
+    {
+        const auto folder = gbStateFolder();
+        folder.createDirectory();
+        gbChooser = ui::makeFileChooser (tr ("Open state file"), folder, "*.fnv");
+        ui::launchChooser (gbChooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                           [safe = juce::Component::SafePointer<NativeEffectEditor> (this)] (const juce::FileChooser& c) {
+                               if (safe != nullptr && c.getResult().existsAsFile())
+                                   safe->gbLoadEnvelopeFile (c.getResult());
+                           });
+    }
+
+    void gbSaveStateFile()
+    {
+        const auto folder = gbStateFolder();
+        folder.createDirectory();
+        gbChooser = ui::makeFileChooser (tr ("Save state file"), folder, "*.fnv");
+        ui::launchChooser (gbChooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
+                                          | juce::FileBrowserComponent::warnAboutOverwriting,
+                           [safe = juce::Component::SafePointer<NativeEffectEditor> (this)] (const juce::FileChooser& c) {
+                               if (safe == nullptr || c.getResult() == juce::File())
+                                   return;
+                               const auto file = c.getResult().withFileExtension ("fnv");
+                               const auto bytes = grossbeat::writeEnvelopeFile (safe->gbState().slots[(std::size_t) safe->gbSlotIndex()]);
+                               if (! file.replaceWithData (bytes.data(), bytes.size()))
+                                   ui::postHint ({ tr ("Could not write {0}", { file.getFullPathName() }), {} }, 3000);
+                           });
+    }
+
+    // Tools › Analyze audio file... (FL's manual: "Opens a file-import window and analyzes the envelope volume of the
+    // selected audio, converting it to an mapping envelope"; capture 190mk A1.5: no options dialog, the whole file over
+    // the bar, ~100 single-curve points, loud at the top)
+    void gbAnalyzeAudioFile()
+    {
+        gbChooser = ui::makeFileChooser (tr ("Analyze audio file"), juce::File(), "*.wav;*.aif;*.aiff;*.flac;*.ogg;*.mp3");
+        ui::launchChooser (gbChooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                           [safe = juce::Component::SafePointer<NativeEffectEditor> (this)] (const juce::FileChooser& c) {
+                               if (safe != nullptr && c.getResult().existsAsFile())
+                                   safe->gbAnalyze (c.getResult());
+                           });
+    }
+    bool gbAnalyze (const juce::File& file)
+    {
+        juce::AudioFormatManager formats;
+        formats.registerBasicFormats();
+        std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (file));
+        if (reader == nullptr || reader->lengthInSamples <= 0)
+        {
+            ui::postHint ({ tr ("Could not read {0}", { file.getFileName() }), {} }, 3000);
+            return false;
+        }
+        constexpr int slices = 1024;
+        const auto total = std::min<juce::int64> (reader->lengthInSamples, (juce::int64) (reader->sampleRate * 1200.0)); // (20 minutes at most)
+        std::vector<float> peaks (slices, 0.0f);
+        const auto channels = (int) juce::jlimit (1u, 2u, reader->numChannels);
+        juce::AudioBuffer<float> block (channels, 8192);
+        for (juce::int64 pos = 0; pos < total; pos += block.getNumSamples())
+        {
+            const auto n = (int) std::min<juce::int64> (block.getNumSamples(), total - pos);
+            reader->read (&block, 0, n, pos, true, channels > 1);
+            for (int i = 0; i < n; ++i)
+            {
+                auto v = 0.0f;
+                for (int ch = 0; ch < channels; ++ch)
+                    v = juce::jmax (v, std::abs (block.getSample (ch, i)));
+                auto& peak = peaks[(std::size_t) std::min<juce::int64> (slices - 1, (pos + i) * slices / total)];
+                peak = juce::jmax (peak, v);
+            }
+        }
+        gbSelected.clear();
+        gbWritePoints (grossbeat::envelopeFromLevels (peaks));
+        return true;
     }
 
     void gbEnvelopeUp()
     {
+        gbBoxing = false;
         gbDragging = false;
         gbDragPoint = gbDragTension = -1;
         ui::hideValueTip();
@@ -788,9 +984,9 @@
     // tool column), two columns as FL's: [State] Reset, Copy state, Paste state; [Tools] Insert point at locator, Flip
     // vertically, Scale levels..., Normalize levels, Decimate points..., Filter..., Smooth up..., Turn all points
     // smooth, Create sequence... (the forms are LYNX's Edison envelope tools, core/AudioEditTools.h: FL opens the same
-    // TMEnvEditor tool forms). Not built (yet): State › Presets / Open / Save state file / Prepare for smooth editing, the
-    // Points selection section, Analyze audio file..., Options › Focus on click, View › Background gradient / Invert grid.
-    // LYNX's own items (rename, factory slots, the locator's colours) follow under a line.
+    // TMEnvEditor tool forms). Round 190mk (capture 190mk A1) added the rest: State › Presets / Open / Save state file /
+    // Prepare for smooth editing, the point clipboard items, Analyze audio file..., Options › Focus on click, View ›
+    // Background gradient / Invert grid. LYNX's own items (rename, factory slots, the locator's colours) follow under a line.
     void gbOptionsMenu (juce::Rectangle<float> at)
     {
         gbBuildOptionsMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withTargetScreenArea (localAreaToGlobal (at.toNearestInt())));
@@ -800,7 +996,21 @@
     {
         juce::PopupMenu menu;
         menu.addSectionHeader (tr ("State"));
+        { // round 190mk (DP-7, capture 190mk A1): FL's Presets (Default, then FL's maps), Open / Save state file (*.fnv)
+            juce::PopupMenu presets;
+            presets.addItem (tr ("Default"), [this] { gbResetSlot(); });
+            for (const auto& f : gbPresetFiles())
+                presets.addItem (f.getFileNameWithoutExtension(), [this, f] { gbLoadEnvelopeFile (f); });
+            menu.addSubMenu (tr ("Presets"), presets);
+        }
+        menu.addItem (tr ("Open state file..."), [this] { gbOpenStateFile(); });
+        menu.addItem (tr ("Save state file..."), [this] { gbSaveStateFile(); });
+        menu.addSeparator();
         menu.addItem (tr ("Reset"), [this] { gbResetSlot(); });
+        menu.addItem (tr ("Prepare for smooth editing"), [this] {
+            gbSelected.clear();
+            gbWritePoints (grossbeat::prepareForSmoothEditing (gbState().slots[(std::size_t) gbSlotIndex()]));
+        });
         menu.addSeparator(); // (FL: a line between Reset and Copy state)
         menu.addItem (tr ("Copy state"), [this] { gbClipboard = gbState().slots[(std::size_t) gbSlotIndex()]; });
         menu.addItem (tr ("Paste state"), gbClipboard.has_value(), false, [this] {
@@ -811,6 +1021,18 @@
         { auto it = juce::PopupMenu::Item (tr ("Select all")).setAction ([this] { gbSelectAll (0); }); it.shortcutKeyDescription = "Ctrl+A"; menu.addItem (std::move (it)); }
         { auto it = juce::PopupMenu::Item (tr ("Deselect all")).setAction ([this] { gbSelectAll (1); }); it.shortcutKeyDescription = "Ctrl+D"; menu.addItem (std::move (it)); }
         { auto it = juce::PopupMenu::Item (tr ("Invert")).setAction ([this] { gbSelectAll (2); }); it.shortcutKeyDescription = "Ctrl+I"; menu.addItem (std::move (it)); }
+        // round 190mk (DP-7): FL's point clipboard items
+        const auto clipItem = [this, &menu] (const juce::String& text, const char* keys, bool enabled, int which) {
+            auto it = juce::PopupMenu::Item (text).setEnabled (enabled).setAction ([this, which] { gbClipboardCommand (which); });
+            it.shortcutKeyDescription = keys;
+            menu.addItem (std::move (it));
+        };
+        const auto hasClip = gbPointClip.has_value() && ! gbPointClip->points.empty();
+        clipItem (tr ("Cut"), "Ctrl+X", ! gbSelected.empty(), 0);
+        clipItem (tr ("Copy"), "Ctrl+C", ! gbSelected.empty(), 1);
+        clipItem (tr ("Paste (insert)"), "Ctrl+V", hasClip, 2);
+        clipItem (tr ("Paste (replace)"), "Ctrl+R", hasClip && ! gbSelected.empty(), 3);
+        clipItem (tr ("Duplicate"), "Ctrl+B", ! gbSelected.empty(), 4);
         { auto it = juce::PopupMenu::Item (tr ("Delete")).setEnabled (! gbSelected.empty()).setAction ([this] { gbDeleteSelected(); }); it.shortcutKeyDescription = "Del"; menu.addItem (std::move (it)); }
         menu.addColumnBreak();
         menu.addSectionHeader (tr ("Tools"));
@@ -855,6 +1077,12 @@
             gbWritePoints (pts);
         });
         menu.addItem (tr ("Create sequence..."), [this] { gbOpenTool (audiotools::Tool::createSequence); });
+        menu.addItem (tr ("Analyze audio file..."), [this] { gbAnalyzeAudioFile(); }); // round 190mk
+        menu.addSectionHeader (tr ("Options"));
+        menu.addItem (tr ("Focus on click"), true, gbFocusOnClick, [] { gbFocusOnClick = ! gbFocusOnClick; });
+        menu.addSectionHeader (tr ("View"));
+        menu.addItem (tr ("Background gradient"), true, gbBackgroundGradient, [this] { gbBackgroundGradient = ! gbBackgroundGradient; repaint(); });
+        menu.addItem (tr ("Invert grid"), true, gbInvertGrid, [this] { gbInvertGrid = ! gbInvertGrid; repaint(); });
         menu.addSeparator();
         menu.addItem (tr ("Rename..."), [this] { gbRename(); });
         menu.addSubMenu (tr ("Factory slots"), gbFactorySlots());
@@ -1169,6 +1397,8 @@
     // true = handled (a drag may follow when gbDragging is set)
     bool gbMouseDown (const juce::MouseEvent& e, const LayoutItem& item, int index)
     {
+        if (gbFocusOnClick && getWantsKeyboardFocus()) // round 190mk: Options › Focus on click (any click takes the keys)
+            grabKeyboardFocus();
         if (item.type == Item::radio && item.param != nullptr) // FL: a click in a slot grid shows that slot's envelope
         {
             gbSelected.clear(); // (round 190mf: another slot's points)
@@ -1590,6 +1820,18 @@
         // the editor: grid (bars of the snap grid, beats stronger), the curve filled, points and tension handles
         g.setColour (colour::bg0);
         g.fillRoundedRectangle (r, radius::md * s);
+        // round 190mk (DP-7, capture 190mk A1.6): View › "Background gradient" (FL: lighter at the top, ~6 % up and down
+        // from the flat ground) and "Invert grid" off (FL: the ground darker, the fine lines lighter than it)
+        if (gbBackgroundGradient)
+        {
+            g.setGradientFill (juce::ColourGradient (colour::bg0.brighter (0.12f), r.getX(), r.getY(), colour::bg0.darker (0.22f), r.getX(), r.getBottom(), false));
+            g.fillRoundedRectangle (r, radius::md * s);
+        }
+        if (! gbInvertGrid)
+        {
+            g.setColour (juce::Colours::black.withAlpha (0.18f));
+            g.fillRoundedRectangle (r, radius::md * s);
+        }
         if (gbFrozen) // (FL: Freeze editing turns the ground slightly bluer, (52,75,91) -> (45,78,97))
         {
             g.setColour (colour::info.withAlpha (0.05f));
@@ -1597,7 +1839,7 @@
         }
         const auto inner = gbArea (item);
         const auto step = grossbeat::snapStep (gbSnap > 0 ? gbSnap : 3);
-        g.setColour (colour::gridBeat.withAlpha (0.45f));
+        g.setColour (colour::gridBeat.withAlpha (gbInvertGrid ? 0.45f : 0.7f));
         for (double x = step; x < grossbeat::barBeats - 1.0e-9; x += step)
             g.drawVerticalLine ((int) gbPos (inner, x, 0.0f).x, inner.getY(), inner.getBottom());
         g.setColour (colour::gridBar);
@@ -1662,6 +1904,14 @@
             }
             g.setColour (hot ? colour::textPrimary : kindColour);
             g.fillEllipse (juce::Rectangle<float> ((hot ? 8.0f : 6.0f) * s, (hot ? 8.0f : 6.0f) * s).withCentre (pt));
+        }
+        if (gbBoxing) // (round 190mk: the Ctrl+drag selection box)
+        {
+            const auto box = juce::Rectangle<float> (gbBoxFrom, gbBoxTo);
+            g.setColour (kindColour.withAlpha (0.12f));
+            g.fillRect (box);
+            g.setColour (kindColour.withAlpha (0.8f));
+            g.drawRect (box, 1.0f);
         }
         // the scale: beat numbers along the top, the level on the left (time: how far back; volume: percent)
         g.setFont (font (juce::jmax (7.5f, 9.0f * s)));
