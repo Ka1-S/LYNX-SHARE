@@ -2082,9 +2082,21 @@ LYNX_FIT_TABLE Rev1Trim nebulaTone[nebula::modeCount] = {
 };
 constexpr double nebulaToneFrom = 0.65, nebulaToneFull = 0.8; // Feedback
 // round 190mb (horizon::revision): ValhallaFutureVerb's tone and level per reverb mode on Horizon's 0.1.27 law, from this
-// round's probe renders of the reference (every reverb mode at its own value, Mix 100 %, Decay 25 %: impulse, test signal,
-// music) and verb183b's / tp172d's captures. Gain (dB) + the tone corrector's octave bands 63 Hz … 8 kHz (dB)
-LYNX_FIT_TABLE Rev1Trim horizonTrim[horizon::reverbModeCount] = {};
+// round's probe renders of the reference (every reverb mode at its own value, Mix 100 %, Decay 25 %: impulse + test signal;
+// three closed-loop passes of lab/hztrim.py). Gain (dB) + the tone corrector's octave bands 63 Hz … 8 kHz (dB). The bands
+// under 500 Hz stay 0 (the fit's lows took the music files 1 … 2 dB loud); Room and Chamber keep no trim (Chamber, the
+// default, took verb183b's music captures and Reverse's echo files down at any share tried; Room its music files), Space
+// keeps its tone only (its +5.9 dB at the probe's value took tp172d's Space impulse 2 → 1: the level differs inside the mode)
+LYNX_FIT_TABLE Rev1Trim horizonTrim[horizon::reverbModeCount] = {
+    {}, // Room
+    {}, // Chamber
+    { -0.80, { 0.00, 0.00, 0.00, -0.68, -1.41, -0.67, 0.61, 3.13 } }, // Plate
+    { 0.00, { 0.00, 0.00, 0.00, 1.15, -2.49, -1.76, -1.08, -0.43 } }, // Hall
+    { -3.36, { 0.00, 0.00, 0.00, -2.01, -0.90, -0.10, 0.40, 2.23 } }, // Cathedral
+    { 0.00, { 0.00, 0.00, 0.00, -0.16, 1.21, 0.98, 0.20, -0.17 } }, // Space
+    { 1.95, { 0.00, 0.00, 0.00, -0.18, 0.19, 0.03, 0.64, 3.18 } }, // Freeze
+    { -3.95, { 0.00, 0.00, 0.00, -0.92, 2.42, 0.89, -1.49, -0.54 } }, // Gated
+};
 // round 190mb (epoch::rateLaw): ValhallaVintageVerb is not rate-independent where Epoch is (Epoch's impulse at 96 kHz is its
 // 48 kHz one to 0.05 dB). Against its own 48 kHz renders the reference's sr96 captures (refcap182's D / S1 / S2 / S3 states)
 // lose 1.4 … 1.7 dB in the first 80 ms and ~0.9 dB to 300 ms in its 1970s colour (ColorMode 0.33: D / S1 / S2), nothing in the

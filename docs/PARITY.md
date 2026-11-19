@@ -4243,6 +4243,31 @@ with it off the round renders byte for byte as round 190ls (126 / 126 fxrender r
 CPU (fxrender, 20 s incl. file I/O, instructions): Echoform's ValhallaDelay role +0.9 %, Spiral Echo at 96 kHz +1.8 % (0 at
 48 kHz), Epoch's short trim +0.01 %, a new Atrium −29 % (light tank).
 
+## Round 190mb (Valhalla, part 3): Supermassive's tone, FutureVerb, SpaceModulator levels, Epoch's merge and rate laws
+
+Black-box (refcap030's host for new probe renders; clean-room: LYNX's own code and fits). Evidence:
+docs/analise/REA_rodada190mb.md, lab `/mnt/e/lynx-work/parity190mb/`. Score: round 190lg's time-window scorer, the same copy
+before and after. Before = origin/valhalla2_190ly merged with origin/rea3_190lp (621cd37bd, `bin/fxr_m0`). Every change is a
+hidden value; with it off every render is byte for byte the before binary's (`gold/gold.sh`).
+
+- **Names:** the Valhalla plug-ins' own mode / colour names, read back through the host after each value was processed
+  (their value texts were stale): every translator map already agrees — SpaceModulator's modes run in Orbit's order.
+- **Nebula ← ValhallaSupermassive (hidden `nebula::toneLaw`, the translator only):** law 1's octave-band tone corrector after
+  the classic networks' loop, a per-mode gain + tone fitted on the Mode sweep, from Feedback 65 % to full at 80 %.
+- **Epoch Verb ← ValhallaVintageVerb:** the merge stacked round 190kw's loop-law level and round 190ly's short trim (+1.9 dB at
+  0.51 s); the short trim is refitted on top of the loop law (lows left to it, 1 kHz +2.5 dB for the staircase). Hidden
+  `epoch::rateLaw` (the translator only): the reference's own level change away from 48 kHz (Epoch itself is
+  rate-independent; the reference loses 1.4 … 1.7 dB of its early field at 96 kHz in the 1970s colour).
+- **Orbit ← ValhallaSpaceModulator (hidden `orbit::smLaw`, the translator only):** the wet level per mode (Up/Down −3.5, the
+  through-zero pair +4.8 / +4.0, Octo −6.5, Drift rise +0.8 dB), scaled by |feedback| (none at Feedback 0).
+- **Echoform ← ValhallaDelay (valhallaLaw):** from round 190ly's 80 … 140 % probe renders: −1.1 dB held from 100 to 120 %,
+  −0.5 dB at 140 %, 0 from 160 % (up to 100 % as round 190ly left it).
+- **Horizon ← ValhallaFutureVerb (hidden `horizon::revision`, new instances / translated):** HORIZON_LINE
+
+| Bank (refcap030 → LYNX) | files | before → after | up / same / down |
+|---|---|---|---|
+TABLE_ROWS
+
 ## Round 190ls (Valhalla): Atrium on a dense late tank for the ValhallaRoom role
 
 Static analysis of the official ValhallaRoom binary by the owner's leave (clean-room: the structure understood, LYNX's own

@@ -753,10 +753,12 @@ static const VdLaw& vdLaw() noexcept
         // The diffusers 3.5 × as long at 0.8 × Diffusion, read inside the echo time: the first echo's energy spreads from
         // −88 to +203 ms around it at Diffusion 80 % (the reference −88 … +253 ms; without the law +12 … +62 ms: always late)
         // Round 190mb: the probe renders at 80 / 90 / 95 / 100 / 105 / 110 / 120 / 140 % (round 190ly's script, refcap030's
-        // host) showed Echoform still fading 0.4 … 0.9 dB a pass slower than the reference at every one of them (at 105 …
-        // 120 % it held or grew where the reference faded 0.7 … 1.1 dB a pass: impulse renders +4 … +15 dB loud). Knots at
-        // 80 / 100 / 120 / 140 %: −1.3 / −1.5 / −1.0 / −0.5 dB, 70 % and 160 % kept at 0
-        VdLaw r { { 0.0, 0.0, 0.0, -1.3, -1.5, -1.0, -0.5, 0.0, 0.0 }, 3.5, 0.8, 1.0 };
+        // host; base S1, Diffusion 20 %) showed Echoform fading 0.4 … 0.9 dB a pass slower than the reference at every one
+        // of them; at 105 … 120 % it held or grew where the reference faded 0.7 … 1.1 dB a pass (impulses +4 … +15 dB
+        // loud). Up to 100 % the law stays (a deeper cut there, −1.3 / −1.5 dB at 80 / 100 %, took refcap182 / tp172d's S2
+        // at 80 % and a pairs file down: their other settings fade faster); over it the cut holds −1.1 dB to 120 % and
+        // eases to 0 by 160 % (knot 80 % = the old line's value there)
+        VdLaw r { { 0.0, 0.0, 0.0, -1.1 / 3.0, -1.1, -1.1, -0.5, 0.0, 0.0 }, 3.5, 0.8, 1.0 };
        #ifdef LYNX_VD_FIT
         if (const char* v = std::getenv ("VD_FB"))
             std::sscanf (v, "%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf", &r.fbDb[0], &r.fbDb[1], &r.fbDb[2], &r.fbDb[3], &r.fbDb[4], &r.fbDb[5],
@@ -2774,7 +2776,10 @@ float modeValue (Mode m) noexcept { return ((float) m + 1.0f) / (float) modeCoun
 // TZFlange−, TriFlange, Ocho, Doubler, VariUp, VariUpDown, Ensemble360, Symphonic with the value law floor (11 v) − 1 (Up
 // below 2/11, Symphonic at 1 only): Orbit's own order and law, so the map stands; what differs is each voice's level.
 // Fitted on the sweep (three variants scored, the best kept): Up/Down −3.5, Through-zero + / − +4.8 / +4.0, Octo −6.5, Drift
-// rise +0.8 dB; the others 0 (Tri's steady tone and test signal sit ±2.5 dB either side: no level fits both)
+// rise +0.8 dB; the others 0 (Tri's steady tone and test signal sit ±2.5 dB either side: no level fits both). Those levels
+// are the feedback's: at Feedback 0 (verb183b's mode captures, refcap182 S2) the voices already sat on the reference and the
+// full trim took 4 files down, so it scales with |feedback| up to the sweep's ±50 % (held beyond; negative feedback assumed
+// alike, not captured)
 double smModeDb (Mode m) noexcept
 {
     static double db[modeCount] = { 0.0, -3.5, 4.8, 4.0, 0.0, -6.5, 0.0, 0.8, 0.0, 0.0, 0.0 };
@@ -2830,8 +2835,8 @@ public:
         float dryGain = 1.0f, wetGain = 0.0f;
         equalPowerMix (p[mix], dryGain, wetGain);
         const auto m = modeOf (p[mode]);
-        if (p[smLaw] >= 0.5f) // round 190mb: the SpaceModulator role's wet level per mode
-            wetGain *= (float) std::pow (10.0, smModeDb (m) / 20.0);
+        if (p[smLaw] >= 0.5f) // round 190mb: the SpaceModulator role's wet level per mode, with the feedback's resonance
+            wetGain *= (float) std::pow (10.0, smModeDb (m) * std::min (1.0, std::abs (bipolar (p[feedback])) / 0.5) / 20.0);
         const auto hz = rateHz (p[rate]);
         const auto dm = depthMs (p[depth]) * 0.001 * sr;
         // round 190do [EXEC] (tp172d renders, black-box): the measured sweep reads from the manual delay alone (the

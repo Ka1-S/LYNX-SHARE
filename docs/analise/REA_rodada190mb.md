@@ -59,3 +59,27 @@ revision 1 at #33 instead of #32 in fxr_m0; back to #32 — no saved project car
   only the VintageVerb translator sets it): the early field's and the level's change per octave of rate per colour.
   Grid (`lab/erate.sh`): 1970s early −2 dB / octave, 1980s level +0.5 dB / octave. Every sr96 file keeps its score, the
   mean |level| error 0.88 → 0.76 dB and spectrum 2.18 → 2.11 dB; more early cut or a level cut took 1 … 3 files down.
+
+## 4. ValhallaSpaceModulator → Orbit: the map stands, the level per mode [EXEC, built]
+- The captured names (§1) put the reference's modes in Orbit's own order, with Orbit's own value law: the translator's
+  direct `Mode` map was right. Round 190ly's "order differs" came from scoring each reference value against every Orbit
+  voice — Orbit's voices for Up/Down, the through-zero pair, Tri and Ocho simply sound least like the reference's.
+- What a level can do: on the Mode sweep (Mix 100 %, Feedback +50 %) Orbit's Up/Down sat +2.3 dB (steady) / +8 dB (test
+  signal) over, the through-zero pair −4 … −6 dB under, Ocho +6.4 / +8.2 dB over. Hidden `orbit::smLaw` (#7, only the
+  SpaceModulator translator sets it, `replaced = #7=1`): Up/Down −3.5, TZ+ +4.8, TZ− +4.0, Octo −6.5, Drift rise +0.8 dB
+  (three variants scored; Tri's steady tone and test signal sit ±2.5 dB either side, no level fits both).
+- Those levels are the feedback's resonance: at Feedback 0 (verb183b's mode captures, refcap182 S2) the voices already sat
+  on the reference and the full trim took 4 files down, so the trim scales with |feedback| up to ±50 % (held beyond;
+  negative feedback assumed alike, not captured). Re-voicing Orbit's Up/Down, through-zero, Tri and Octo voices is the
+  next step (their time structure, not their level, keeps those files at 2 … 3).
+
+## 5. ValhallaDelay → Echoform: the 80 … 140 % probes [EXEC, built]
+- Echo-pass energies (passE, impulse at 0.1 s, 300 ms echo) of the 18 probe renders against Echoform's translated renders
+  (`lab/dlyprobe.py`): Echoform faded 0.4 … 0.9 dB a pass slower at every Feedback probed; at 105 … 120 % it held or grew
+  where the reference faded 0.7 … 1.1 dB a pass (impulses +4 … +15 dB loud).
+- A deeper cut below 100 % (−1.3 dB at 80 %, −1.5 at 100 %) matched the probes but took refcap182 / tp172d's S2 (80 %) and
+  one pairs file down — those states fade faster than the probes' base. Kept: round 190ly's line up to 100 %, then −1.1 dB
+  held to 120 %, −0.5 dB at 140 %, 0 from 160 % (knots now 0 / 0.2 / 0.35 / 0.40 / 0.5 / 0.6 / 0.7 / 0.8 / 1).
+- refcap030 Delay (164 files), refcap182 / tp172d: identical. verb183b's 140 % capture (dlFb7) 1 → 3. The probes:
+  105 % 2 → 4, 110 % 1 → 1 / 1 → 2, 120 % 1 → 2 / 1 → 3, but 140 % 3 → 2 (both signals: −2.3 dB under, where dlFb7 at the
+  same Feedback rose two steps; the probes are this round's new references, not a gate bank — listed, not hidden).
