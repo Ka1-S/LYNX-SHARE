@@ -6,6 +6,7 @@
 #include <functional>
 #include <map>
 #include <set>
+#include <utility>
 
 #include "core/XmlLite.h"
 
@@ -633,6 +634,26 @@ std::optional<Project> parseSong (const std::vector<std::uint8_t>& song, std::st
                     continue; // (the initial tempo: the song record's)
                 if (std::abs (bpm - (p.tempoChanges.empty() ? p.bpm : p.tempoChanges.back().second)) > 1e-6)
                     p.tempoChanges.push_back ({ std::max<std::int64_t> (0, tick), bpm });
+            }
+        }
+        else if (r.classId == 1 && r.idx == 0 && r.size >= 32 + 48 && b[0] == 0x32 && b[0x17] == 0x88)
+        {
+            // round 190mx (issue #184's file): GarageBand for iOS 2.3+ starts this sequence with the same 32-byte settings
+            // event as its regions (0x32, marked 0x88 @+0x17), then the signatures as 48-byte events (0x30, den exponent
+            // @+0x0B, numerator @+0x0C): the first is the song's, the others are changes (read before as 7/1)
+            bool first = true;
+            for (std::size_t o = 32; o + 48 <= r.size && b[o] == 0x30; o += 48)
+            {
+                const auto n = (int) b[o + 0x0C], e = (int) b[o + 0x0B];
+                if (n < 1 || n > 64 || e < 0 || e > 5)
+                    continue;
+                if (std::exchange (first, false))
+                {
+                    p.numerator = n;
+                    p.denominator = 1 << e;
+                }
+                else
+                    p.meters.push_back ({ std::max<std::int64_t> (0, (std::int64_t) u32 (b + o + 4) - eventOrigin), { n, 1 << e } });
             }
         }
         else if (r.classId == 1 && r.idx == 0 && r.size >= 80 + 16)
