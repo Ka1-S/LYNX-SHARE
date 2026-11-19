@@ -12685,8 +12685,10 @@ private:
         // at 1920 px since 0.1.30's strips (the step turned a control at the Mixer's centre until 293333ae6, nothing
         // after): the step uses Extra large when they fit, and turns the wheel on a strip's blank body near the centre)
         auto scrollLayout = std::make_shared<std::optional<lynx::mixerlayout::Layout>>();
+        auto scrollTrace = std::make_shared<juce::String>();
         run->steps.push_back ({ "mixer scroll",
-                                [ui, scrollLayout] {
+                                [ui, scrollLayout, scrollTrace] {
+                                    scrollTrace->clear();
                                     auto& strips = ui->getMixerForSnapshot().getStripsForSnapshot();
                                     const auto* holder = strips.getParentComponent();
                                     if (holder != nullptr && strips.getWidth() <= holder->getWidth() + 200)
@@ -12695,7 +12697,7 @@ private:
                                         strips.setLayout (lynx::mixerlayout::Layout::extraLarge);
                                     }
                                 },
-                                [this, ui] (int f) {
+                                [this, ui, scrollTrace] (int f) {
                                    auto& mixer = ui->getMixerForSnapshot();
                                    auto& strips = mixer.getStripsForSnapshot();
                                    auto* peer = mainWindow->getPeer();
@@ -12709,15 +12711,23 @@ private:
                                    juce::ModifierKeys::currentModifiers = {};
                                    juce::MouseWheelDetails wheel { 0.0f, f < 30 ? -0.25f : 0.25f, false, false, false };
                                    peer->handleMouseWheel (juce::MouseInputSource::InputSourceType::mouse, local, juce::Time::currentTimeMillis(), wheel);
+                                   if (f == 0 || f == 29)
+                                   {
+                                       auto* under = peer->getComponent().getComponentAt (local.roundToInt());
+                                       const auto* holder = strips.getParentComponent();
+                                       *scrollTrace << "    mixer scroll frame " << f << ": wheel at " << at.toString() << " (strips), under it "
+                                                    << (under == &strips ? juce::String ("the strips") : under != nullptr ? juce::String (typeid (*under).name()) : juce::String ("nothing"))
+                                                    << ", view " << (holder != nullptr ? holder->getBounds().toString() : juce::String()) << ", strips at x " << strips.getX() << "\n";
+                                   }
                                }, 60,
-                                [ui, scrollLayout] {
+                                [ui, scrollLayout, scrollTrace] {
                                     auto& strips = ui->getMixerForSnapshot().getStripsForSnapshot();
                                     const auto width = strips.getWidth();
                                     juce::String used = scrollLayout->has_value() ? "Extra large (the strips fit the view in their layout)" : "the project's layout";
                                     if (scrollLayout->has_value())
                                         strips.setLayout (**scrollLayout);
                                     scrollLayout->reset();
-                                    return juce::String ("    mixer scroll: strips ") + juce::String (width) + " px, " + used + "\n";
+                                    return juce::String ("    mixer scroll: strips ") + juce::String (width) + " px, " + used + "\n" + *scrollTrace;
                                 } });
         // a fader dragged while the song plays (round 171c, discussion #10): 4 mouse moves per frame on insert 1's fader,
         // through the old path (a whole snapshot per move) and through editLevels
