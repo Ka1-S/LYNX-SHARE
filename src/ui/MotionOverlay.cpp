@@ -10,6 +10,7 @@
 #include <array>
 #include <cmath>
 #include <cstdlib>
+#include <cstring>
 #include <map>
 #include <typeinfo>
 #include <utility>
@@ -90,6 +91,189 @@ bool overlayWanted()
     }();
     return on;
 }
+
+#if JUCE_WINDOWS
+// Round 190lv: a live picture (the toolbar's output display) as a layered child window drawn with GDI, instead of a
+// composition swap chain. Measured (Windows, Thief playing, per-thread cycles): each Present of the 190kz swap chain cost
+// the GPU driver's thread about 1 M cycles, about half of that thread's work while the song plays (~140 of ~280 Mc/s);
+// a layered window's new picture is handed to the window manager (UpdateLayeredWindow), with no Direct3D call in LYNX's
+// process (FL Studio draws all of its UI with GDI: its driver thread does nothing). The pixels are the same picture,
+// premultiplied as the swap chain took it. LYNX_LIVE_GDI=0: the swap chain, as in round 190kz.
+bool liveGdiWanted()
+{
+    static const bool on = [] {
+        const auto* v = std::getenv ("LYNX_LIVE_GDI");
+        return v == nullptr || juce::String (v).trim() != "0";
+    }();
+    return on;
+}
+
+constexpr const wchar_t* liveGdiClass = L"LynxLivePicture";
+constexpr const wchar_t* liveGdiProp = L"LynxLivePicture";
+
+LRESULT CALLBACK liveGdiProc (HWND h, UINT m, WPARAM w, LPARAM l)
+{
+    switch (m)
+    {
+        case WM_NCHITTEST: return HTTRANSPARENT; // (the mouse goes to the view under it: its clicks and hints)
+        case WM_MOUSEACTIVATE: return MA_NOACTIVATE;
+        case WM_ERASEBKGND: return 1;
+        default: return DefWindowProcW (h, m, w, l);
+    }
+}
+
+bool liveGdiClassReady()
+{
+    static const bool ok = [] {
+        WNDCLASSEXW c {};
+        c.cbSize = sizeof (c);
+        c.lpfnWndProc = liveGdiProc;
+        c.hInstance = GetModuleHandleW (nullptr);
+        c.lpszClassName = liveGdiClass;
+        return RegisterClassExW (&c) != 0 || GetLastError() == ERROR_CLASS_ALREADY_EXISTS;
+    }();
+    return ok;
+}
+
+// one live picture's window and its bitmap (message thread)
+struct LiveGdiWindow
+{
+    HWND window = nullptr, parent = nullptr;
+    HDC memory = nullptr;
+    HBITMAP bitmap = nullptr, previous = nullptr;
+    void* bits = nullptr;
+    int bw = 0, bh = 0;
+    RECT placed { 0, 0, 0, 0 }, shownClip { 0, 0, 0, 0 };
+    bool visible = false, fresh = false; // fresh: the window shows the bitmap's pixels
+
+    ~LiveGdiWindow() { destroy(); }
+
+    void destroy()
+    {
+        if (window != nullptr)
+        {
+            RemovePropW (window, liveGdiProp);
+            DestroyWindow (window);
+        }
+        window = nullptr;
+        parent = nullptr;
+        visible = false;
+        placed = { 0, 0, 0, 0 };
+        freeBitmap();
+    }
+
+    void freeBitmap()
+    {
+        if (memory != nullptr)
+        {
+            SelectObject (memory, previous);
+            DeleteDC (memory);
+        }
+        if (bitmap != nullptr)
+            DeleteObject (bitmap);
+        memory = nullptr;
+        bitmap = previous = nullptr;
+        bits = nullptr;
+        bw = bh = 0;
+        fresh = false;
+    }
+
+    void hide()
+    {
+        if (window != nullptr && visible)
+            ShowWindow (window, SW_HIDE);
+        visible = false;
+    }
+
+    // the picture (premultiplied ARGB, w x h) shown with its top-left corner at (x, y) of the parent window's client
+    // area, only the part inside `clip` (picture pixels)
+    bool show (HWND parentWindow, const juce::Image& picture, int x, int y, juce::Rectangle<int> clip)
+    {
+        const auto w = picture.getWidth(), h = picture.getHeight();
+        clip = clip.getIntersection ({ 0, 0, w, h });
+        if (clip.isEmpty())
+        {
+            hide();
+            return true;
+        }
+        if (window != nullptr && (parent != parentWindow || ! IsWindow (window)))
+            destroy();
+        if (window == nullptr)
+        {
+            if (! liveGdiClassReady())
+                return false;
+            window = CreateWindowExW (WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE, liveGdiClass, L"", WS_CHILD | WS_CLIPSIBLINGS,
+                                      0, 0, 1, 1, parentWindow, nullptr, GetModuleHandleW (nullptr), nullptr);
+            if (window == nullptr)
+                return false;
+            SetPropW (window, liveGdiProp, (HANDLE) 1);
+            parent = parentWindow;
+        }
+        if (bitmap == nullptr || bw != w || bh != h)
+        {
+            freeBitmap();
+            BITMAPINFO info {};
+            info.bmiHeader.biSize = sizeof (info.bmiHeader);
+            info.bmiHeader.biWidth = w;
+            info.bmiHeader.biHeight = -h; // (top-down, as the image's rows)
+            info.bmiHeader.biPlanes = 1;
+            info.bmiHeader.biBitCount = 32;
+            info.bmiHeader.biCompression = BI_RGB;
+            bitmap = CreateDIBSection (nullptr, &info, DIB_RGB_COLORS, &bits, nullptr, 0);
+            memory = CreateCompatibleDC (nullptr);
+            if (bitmap == nullptr || memory == nullptr || bits == nullptr)
+            {
+                freeBitmap();
+                return false;
+            }
+            previous = (HBITMAP) SelectObject (memory, bitmap);
+            bw = w;
+            bh = h;
+        }
+        auto changed = false;
+        {
+            // (a frame whose pixels are the ones shown already, at the same place, is not handed over again: no work for
+            // the window manager either, e.g. the scope's flat line in a quiet passage)
+            const juce::Image::BitmapData pixels (picture, juce::Image::BitmapData::readOnly);
+            for (int row = 0; row < h; ++row)
+            {
+                auto* dst = static_cast<std::uint8_t*> (bits) + (std::size_t) row * (std::size_t) w * 4;
+                if (changed || std::memcmp (dst, pixels.getLinePointer (row), (std::size_t) w * 4) != 0)
+                {
+                    std::memcpy (dst, pixels.getLinePointer (row), (std::size_t) w * 4);
+                    changed = true;
+                }
+            }
+        }
+        const RECT want { x + clip.getX(), y + clip.getY(), x + clip.getRight(), y + clip.getBottom() };
+        const RECT clip0 { clip.getX(), clip.getY(), clip.getRight(), clip.getBottom() };
+        if (! changed && visible && fresh && EqualRect (&want, &placed) && EqualRect (&clip0, &shownClip))
+            return true;
+        GdiFlush();
+        if (! EqualRect (&want, &placed))
+        {
+            SetWindowPos (window, HWND_TOP, want.left, want.top, want.right - want.left, want.bottom - want.top, SWP_NOACTIVATE | SWP_NOREDRAW);
+            placed = want;
+        }
+        SIZE size { want.right - want.left, want.bottom - want.top };
+        POINT from { clip.getX(), clip.getY() };
+        BLENDFUNCTION blend { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
+        if (! UpdateLayeredWindow (window, nullptr, nullptr, &size, memory, &from, 0, &blend, ULW_ALPHA))
+        {
+            fresh = false;
+            return false;
+        }
+        fresh = true;
+        shownClip = clip0;
+        if (! visible)
+        {
+            ShowWindow (window, SW_SHOWNA);
+            visible = true;
+        }
+        return true;
+    }
+};
+#endif
 
 #if JUCE_LINUX || JUCE_BSD
 bool hookInstalled(); // (below: fix 41's hook, which also counts JUCE's blits for the statistics)
@@ -410,7 +594,8 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
     bool place (const Mark& mark)
     {
         auto& dev = Devices::get();
-        if (! overlayWanted() || ! dev.isReady())
+        const auto gdi = live && liveGdiWanted(); // (round 190lv: no Direct3D device, no composition target)
+        if (! overlayWanted() || (! gdi && ! dev.isReady()))
             return false;
         auto* peer = owner.getPeer();
         if (peer == nullptr || ! owner.isShowing() || peer->isMinimised() || windowDrawnByCpu (owner))
@@ -480,7 +665,7 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
                 hideNow (false);
             return true;
         }
-        if (! attachTo (peer, targetHwnd))
+        if (! gdi && ! attachTo (peer, targetHwnd))
             return false;
 
         // the picture of this phase, painted once per look: the mark at the reference place + phase / 8 of a pixel
@@ -503,12 +688,14 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
         auto& picture = pictures[exact ? 0 : (std::size_t) phase];
         if (exact && picture.drawn && picture.phase != phase)
             picture.drawn = false; // (one picture, painted again at the new phase)
-        if (live) // (round 190kz) painted again and presented on every frame, in its own swap chain
+        if (live) // (round 190kz) painted again and presented on every frame, in its own swap chain (190lv: or window)
         {
             const auto originX = reference + left;
             const auto at = juce::AffineTransform::scale ((float) s).translated ((float) (ownerPos.x - originX), (float) (ownerPos.y - topY));
             const auto xAt = ((double) reference + (double) phase / steps - ownerPos.x) / s;
-            if (! paintLive (w, h, at, (float) xAt))
+            if (gdi) // (painted again each frame anyway: at its exact sub-pixel place, the window at a whole pixel)
+                paintScratch (w, h, at, (float) (((double) reference + (xWin - whole) - ownerPos.x) / s));
+            else if (! paintLive (w, h, at, (float) xAt))
                 return false;
         }
         else if (! picture.drawn)
@@ -532,6 +719,20 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
         shiftRest._11 = 1.0f;
         shiftRest._22 = 1.0f;
         shiftRest._31 = (float) rest;
+        if (gdi)
+        {
+            // (round 190lv) the window at whole pixels (the sub-pixel part is in the picture); its clip as a part of it
+            const auto clipPicture = juce::Rectangle<float>::leftTopRightBottom (local.left, local.top, local.right, local.bottom)
+                                         .getSmallestIntegerContainer();
+            if (! gdiWindow.show (targetHwnd, scratch, (int) offsetX, (int) offsetY, clipPicture))
+            {
+                gdiWindow.destroy();
+                return false;
+            }
+            inTree = true;
+            ++picturesPainted();
+            return true;
+        }
         if (live)
         {
             // the swap chain's presents show the new pictures by themselves: the visual changes (and is committed) only
@@ -620,7 +821,7 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
         // path there made a Playlist behind the maximised Channel rack repaint its playhead at the display's rate.)
         for (auto child = GetWindow (hwnd, GW_CHILD); child != nullptr; child = GetWindow (child, GW_HWNDNEXT))
         {
-            if (! IsWindowVisible (child))
+            if (! IsWindowVisible (child) || GetPropW (child, liveGdiProp) != nullptr) // (round 190lv: a live picture's window)
                 continue;
             RECT r {};
             GetWindowRect (child, &r);
@@ -744,6 +945,18 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
         return true;
     }
 
+    // the live picture, painted in software (premultiplied ARGB)
+    void paintScratch (int w, int h, const juce::AffineTransform& at, float x)
+    {
+        if (scratch.isNull() || scratch.getWidth() != w || scratch.getHeight() != h)
+            scratch = juce::Image (juce::Image::ARGB, w, h, true, juce::SoftwareImageType());
+        else
+            scratch.clear (scratch.getBounds());
+        juce::Graphics g (scratch);
+        g.addTransform (at);
+        painter (g, x);
+    }
+
     // (round 190kz) the live picture: painted in software, copied into the swap chain's back buffer, presented without
     // waiting (a frame the compositor has not taken yet is simply replaced by the next one)
     bool paintLive (int w, int h, const juce::AffineTransform& at, float x)
@@ -777,15 +990,7 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
             chainH = h;
             ++chainSerial;
         }
-        if (scratch.isNull() || scratch.getWidth() != w || scratch.getHeight() != h)
-            scratch = juce::Image (juce::Image::ARGB, w, h, true, juce::SoftwareImageType());
-        else
-            scratch.clear (scratch.getBounds());
-        {
-            juce::Graphics g (scratch);
-            g.addTransform (at);
-            painter (g, x);
-        }
+        paintScratch (w, h, at, x);
         Com<ID3D11Texture2D> buffer;
         if (FAILED (chain->GetBuffer (0, __uuidof (ID3D11Texture2D), (void**) buffer.put())))
         {
@@ -817,6 +1022,7 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
             if (auto& dev = Devices::get(); dev.dcomp)
                 dev.dcomp->Commit();
         }
+        gdiWindow.hide();
         inTree = false;
         stopTimer();
         if (lostIt && was && overlay.onHidden)
@@ -830,6 +1036,7 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
         inTree = false;
         visual.reset();
         chain.reset();
+        gdiWindow.destroy();
         liveKey = {};
         for (auto& p : pictures)
             p = {};
@@ -913,6 +1120,7 @@ struct MotionOverlay::Impl final : private juce::Timer, private juce::ComponentL
     };
     Com<IDXGISwapChain1> chain;
     int chainW = 0, chainH = 0, chainSerial = 0;
+    LiveGdiWindow gdiWindow; // (round 190lv) the live picture as a layered child window
     LiveKey liveKey;
     bool live = false;
     bool showing = false, inTree = false;
@@ -962,7 +1170,37 @@ juce::String MotionOverlay::selfTest()
     impl.drop();
     if (! ok)
         return "ERROR commit";
-    return targets().empty() ? "OK" : "ERROR target kept";
+    if (! targets().empty())
+        return "ERROR target kept";
+    // round 190lv: a live picture's layered window under the host's window: made, given a picture (a part of it), hidden,
+    // gone, and the cover check does not count it
+    if (liveGdiWanted())
+    {
+        juce::Image picture (juce::Image::ARGB, 40, 20, true, juce::SoftwareImageType());
+        {
+            juce::Graphics g (picture);
+            g.setColour (theme::colour::playhead);
+            g.fillRoundedRectangle (1.0f, 1.0f, 38.0f, 18.0f, 4.0f);
+        }
+        LiveGdiWindow window;
+        if (! window.show (hwnd, picture, 10, 12, { 2, 0, 30, 20 }) || window.window == nullptr || ! window.visible)
+            return "ERROR live window";
+        RECT r {};
+        GetWindowRect (window.window, &r);
+        if (r.right - r.left != 30 || r.bottom - r.top != 20 || GetPropW (window.window, liveGdiProp) == nullptr) // (x 2, width 30)
+            return "ERROR live window place";
+        if (! window.show (hwnd, picture, 10, 12, { 2, 0, 30, 20 })) // (the next frame: the same window)
+            return "ERROR live window frame";
+        const auto made = window.window;
+        window.hide();
+        if (IsWindowVisible (made))
+            return "ERROR live window not hidden";
+        window.destroy();
+        if (IsWindow (made))
+            return "ERROR live window kept";
+        return "OK (live window OK)";
+    }
+    return "OK";
 }
 
 bool MotionOverlay::prepareNow()

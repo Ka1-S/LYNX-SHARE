@@ -614,6 +614,45 @@ private:
 	std::vector<Sample> twistR, twistI, longTwistR, longTwistI; // per channel, bands (+ padding)
 	std::vector<Sample> selTwistR, selTwistI, selLongTwistR, selLongTwistI, selUpR, selUpI, selLongUpR, selLongUpI;
 	std::vector<Sample> drawDown, drawUp;
+	// LYNX (round 190lv, memory): the scratch above holds ONE chunk of the main prediction (its bands [startB, endB) and the
+	// twists up to endB + longVerticalStep), not all bands: each chunk's twists, selections and random draws are written
+	// and read inside that chunk's step (processSpectrum), so nothing of another chunk is ever read from them. 1/8 of
+	// the size (~0.15 MB less per voice pitch shifter: ~100 of them in FL's Thief). The `...p` pointers stand at band 0
+	// for the chunk being worked on (setScratchChunk); the arithmetic is unchanged.
+	int chunkStride = 0;
+	Sample *twistRp = nullptr, *twistIp = nullptr, *longTwistRp = nullptr, *longTwistIp = nullptr;
+	Sample *selTwistRp = nullptr, *selTwistIp = nullptr, *selLongTwistRp = nullptr, *selLongTwistIp = nullptr;
+	Sample *selUpRp = nullptr, *selUpIp = nullptr, *selLongUpRp = nullptr, *selLongUpIp = nullptr;
+	Sample *drawDownp = nullptr, *drawUpp = nullptr;
+	void setScratchChunk(int startB, int endB, int longVerticalStep) {
+		// the twists of the chunk reach endB + max(longVerticalStep, 1) (prepareMainPrediction's twistEnd)
+		const int need = endB - startB + std::max(longVerticalStep, 1) + 8;
+		if (need > chunkStride) sizeScratch(need); // (never with configure()'s own sizes: the steps cut the bands evenly)
+		auto at = [&](std::vector<Sample> &v, size_t c, int stride) { return v.data() + c*size_t(stride) - startB; };
+		twistRp = at(twistR, 0, chunkStride);
+		twistIp = at(twistI, 0, chunkStride);
+		longTwistRp = at(longTwistR, 0, chunkStride);
+		longTwistIp = at(longTwistI, 0, chunkStride);
+		selTwistRp = at(selTwistR, 0, 0);
+		selTwistIp = at(selTwistI, 0, 0);
+		selLongTwistRp = at(selLongTwistR, 0, 0);
+		selLongTwistIp = at(selLongTwistI, 0, 0);
+		selUpRp = at(selUpR, 0, 0);
+		selUpIp = at(selUpI, 0, 0);
+		selLongUpRp = at(selLongUpR, 0, 0);
+		selLongUpIp = at(selLongUpI, 0, 0);
+		drawDownp = at(drawDown, 0, 0);
+		drawUpp = at(drawUp, 0, 0);
+	}
+	void sizeScratch(int window) {
+		chunkStride = window;
+		for (auto *v : {&twistR, &twistI, &longTwistR, &longTwistI}) {
+			v->assign(size_t(window)*channels, Sample(0));
+		}
+		for (auto *v : {&selTwistR, &selTwistI, &selLongTwistR, &selLongTwistI, &selUpR, &selUpI, &selLongUpR, &selLongUpI, &drawDown, &drawUp}) {
+			v->assign(size_t(window), Sample(0));
+		}
+	}
 	std::vector<int> maxChannelOf;
 	std::vector<Sample> rotTableR, rotTableI; // the new-spectrum rotation of each band (the original's running product)
 	bool identityMap = false; // the output map is {b, 1} (no frequency mapping)
@@ -630,11 +669,14 @@ private:
 		for (auto *v : {&bandInR, &bandInIm, &bandPrevR, &bandPrevIm, &bandOutR, &bandOutIm, &bandEnergyV}) {
 			v->assign(total, Sample(0));
 		}
-		for (auto *v : {&twistR, &twistI, &longTwistR, &longTwistI}) {
-			v->assign(total, Sample(0));
-		}
-		for (auto *v : {&selTwistR, &selTwistI, &selLongTwistR, &selLongTwistI, &selUpR, &selUpI, &selLongUpR, &selLongUpI, &drawDown, &drawUp}) {
-			v->assign(size_t(bands), Sample(0));
+		// (round 190lv) the main prediction's scratch: its largest chunk of bands, and the twists' reach past it
+		{
+			int largest = 0;
+			for (size_t chunk = 0; chunk < splitMainPrediction; ++chunk) {
+				largest = std::max(largest, int(bands*(chunk + 1)/splitMainPrediction) - int(bands*chunk/splitMainPrediction));
+			}
+			int longVerticalStep = static_cast<int>(std::round(Sample(stft.fftSamples())/stft.defaultInterval()));
+			sizeScratch(largest + std::max(longVerticalStep, 1) + 8);
 		}
 		maxChannelOf.assign(size_t(bands), 0);
 		rotationPending.assign(size_t(channels), 0);
@@ -828,6 +870,7 @@ private:
 			size_t chunk = step;
 			int startB = int(bands*chunk/splitMainPrediction);
 			int endB = int(bands*(chunk + 1)/splitMainPrediction);
+			setScratchChunk(startB, endB, longVerticalStep); // (round 190lv: the scratch holds this chunk)
 			prepareMainPrediction(startB, endB, timeFactor, longVerticalStep, randomTimeFactor, timeFactorDist);
 			if (channels == 2) {
 				mainChainStereo(startB, endB, longVerticalStep);
@@ -840,22 +883,22 @@ private:
 				Sample phaseR = 0, phaseI = 0;
 				// Upwards vertical steps
 				if (b > 0) {
-					Sample aR = oR[b - 1], aI = oI[b - 1], tR = selTwistR[b], tI = selTwistI[b];
+					Sample aR = oR[b - 1], aI = oI[b - 1], tR = selTwistRp[b], tI = selTwistIp[b];
 					phaseR += aR*tR - aI*tI;
 					phaseI += aR*tI + aI*tR;
 					if (b >= longVerticalStep) {
-						Sample lR = oR[b - longVerticalStep], lI = oI[b - longVerticalStep], ltR = selLongTwistR[b], ltI = selLongTwistI[b];
+						Sample lR = oR[b - longVerticalStep], lI = oI[b - longVerticalStep], ltR = selLongTwistRp[b], ltI = selLongTwistIp[b];
 						phaseR += lR*ltR - lI*ltI;
 						phaseI += lR*ltI + lI*ltR;
 					}
 				}
 				// Downwards vertical steps
 				if (b < bands - 1) {
-					phaseR += selUpR[b];
-					phaseI += selUpI[b];
+					phaseR += selUpRp[b];
+					phaseI += selUpIp[b];
 					if (b < bands - longVerticalStep) {
-						phaseR += selLongUpR[b];
-						phaseI += selLongUpI[b];
+						phaseR += selLongUpRp[b];
+						phaseI += selLongUpIp[b];
 					}
 				}
 
@@ -912,22 +955,22 @@ private:
 			Sample phaseR = 0, phaseI = 0;
 			// Upwards vertical steps
 			if (b > 0) {
-				Sample aR = m ? prev1R : prev0R, aI = m ? prev1I : prev0I, tR = selTwistR[b], tI = selTwistI[b];
+				Sample aR = m ? prev1R : prev0R, aI = m ? prev1I : prev0I, tR = selTwistRp[b], tI = selTwistIp[b];
 				phaseR += aR*tR - aI*tI;
 				phaseI += aR*tI + aI*tR;
 				if (b >= L) {
-					Sample lR = outR[m][b - L], lI = outI[m][b - L], ltR = selLongTwistR[b], ltI = selLongTwistI[b];
+					Sample lR = outR[m][b - L], lI = outI[m][b - L], ltR = selLongTwistRp[b], ltI = selLongTwistIp[b];
 					phaseR += lR*ltR - lI*ltI;
 					phaseI += lR*ltI + lI*ltR;
 				}
 			}
 			// Downwards vertical steps
 			if (b < bands - 1) {
-				phaseR += selUpR[b];
-				phaseI += selUpI[b];
+				phaseR += selUpRp[b];
+				phaseI += selUpIp[b];
 				if (b < bands - L) {
-					phaseR += selLongUpR[b];
-					phaseI += selLongUpI[b];
+					phaseR += selLongUpRp[b];
+					phaseI += selLongUpIp[b];
 				}
 			}
 			Sample pInR = qR[m][b], pInI = qI[m][b], newR, newI;
@@ -1228,54 +1271,54 @@ private:
 		const Sample *iR = bandIn(m), *iI = bandInI(m), *oR = bandOut(m), *oI = bandOutI(m);
 		const Sample *qR = predInR.data() + size_t(m)*bands, *qI = predInI.data() + size_t(m)*bands;
 		if (b > 0) {
-			Sample binTimeFactor = drawDown[b];
+			Sample binTimeFactor = drawDownp[b];
 			Sample dR, dI;
 			fractionalAt(iR, iI, bands, outputMap[b].inputBin - binTimeFactor, dR, dI);
-			selTwistR[b] = dR*qR[b] + dI*qI[b];
-			selTwistI[b] = dR*qI[b] - dI*qR[b];
+			selTwistRp[b] = dR*qR[b] + dI*qI[b];
+			selTwistIp[b] = dR*qI[b] - dI*qR[b];
 			if (b >= longVerticalStep) {
 				fractionalAt(iR, iI, bands, outputMap[b].inputBin - longVerticalStep*binTimeFactor, dR, dI);
-				selLongTwistR[b] = dR*qR[b] + dI*qI[b];
-				selLongTwistI[b] = dR*qI[b] - dI*qR[b];
+				selLongTwistRp[b] = dR*qR[b] + dI*qI[b];
+				selLongTwistIp[b] = dR*qI[b] - dI*qR[b];
 			}
 		}
 		if (b < bands - 1) {
-			Sample binTimeFactor = drawUp[b];
+			Sample binTimeFactor = drawUpp[b];
 			Sample dR, dI;
 			fractionalAt(iR, iI, bands, outputMap[b + 1].inputBin - binTimeFactor, dR, dI);
 			Sample tR = dR*qR[b + 1] + dI*qI[b + 1];
 			Sample tI = dR*qI[b + 1] - dI*qR[b + 1];
 			// mul<true>(upBin.output, shortVerticalTwist)
-			selUpR[b] = tR*oR[b + 1] + tI*oI[b + 1];
-			selUpI[b] = tR*oI[b + 1] - tI*oR[b + 1];
+			selUpRp[b] = tR*oR[b + 1] + tI*oI[b + 1];
+			selUpIp[b] = tR*oI[b + 1] - tI*oR[b + 1];
 			if (b < bands - longVerticalStep) {
 				int u = b + longVerticalStep;
 				fractionalAt(iR, iI, bands, outputMap[u].inputBin - longVerticalStep*binTimeFactor, dR, dI);
 				Sample lR = dR*qR[u] + dI*qI[u];
 				Sample lI = dR*qI[u] - dI*qR[u];
-				selLongUpR[b] = lR*oR[u] + lI*oI[u];
-				selLongUpI[b] = lR*oI[u] - lI*oR[u];
+				selLongUpRp[b] = lR*oR[u] + lI*oI[u];
+				selLongUpIp[b] = lR*oI[u] - lI*oR[u];
 			}
 		}
 	}
 	// one band's terms with one time factor for all bands, from each channel's twists (any channel count)
 	void selectBand(int b, int longVerticalStep) {
 		int m = maxChannelOf[b];
-		const Sample *tR = twistR.data() + size_t(m)*bandStride, *tI = twistI.data() + size_t(m)*bandStride;
-		const Sample *lR = longTwistR.data() + size_t(m)*bandStride, *lI = longTwistI.data() + size_t(m)*bandStride;
+		const Sample *tR = twistRp + size_t(m)*chunkStride, *tI = twistIp + size_t(m)*chunkStride;
+		const Sample *lR = longTwistRp + size_t(m)*chunkStride, *lI = longTwistIp + size_t(m)*chunkStride;
 		const Sample *oR = bandOut(m), *oI = bandOutI(m);
-		selTwistR[b] = tR[b];
-		selTwistI[b] = tI[b];
-		selLongTwistR[b] = lR[b];
-		selLongTwistI[b] = lI[b];
+		selTwistRp[b] = tR[b];
+		selTwistIp[b] = tI[b];
+		selLongTwistRp[b] = lR[b];
+		selLongTwistIp[b] = lI[b];
 		if (b < bands - 1) {
 			// mul<true>(upBin.output, shortVerticalTwist)
-			selUpR[b] = tR[b + 1]*oR[b + 1] + tI[b + 1]*oI[b + 1];
-			selUpI[b] = tR[b + 1]*oI[b + 1] - tI[b + 1]*oR[b + 1];
+			selUpRp[b] = tR[b + 1]*oR[b + 1] + tI[b + 1]*oI[b + 1];
+			selUpIp[b] = tR[b + 1]*oI[b + 1] - tI[b + 1]*oR[b + 1];
 			if (b < bands - longVerticalStep) {
 				int u = b + longVerticalStep;
-				selLongUpR[b] = lR[u]*oR[u] + lI[u]*oI[u];
-				selLongUpI[b] = lR[u]*oI[u] - lI[u]*oR[u];
+				selLongUpRp[b] = lR[u]*oR[u] + lI[u]*oI[u];
+				selLongUpIp[b] = lR[u]*oI[u] - lI[u]*oR[u];
 			}
 		}
 	}
@@ -1538,23 +1581,23 @@ private:
 		const Sample *oR[2] = {bandOut(0), bandOut(1)}, *oI[2] = {bandOutI(0), bandOutI(1)};
 		const Sample *tR[2], *tI[2], *lR[2], *lI[2];
 		for (int c = 0; c < 2; ++c) {
-			tR[c] = twistR.data() + size_t(c)*bandStride;
-			tI[c] = twistI.data() + size_t(c)*bandStride;
-			lR[c] = longTwistR.data() + size_t(c)*bandStride;
-			lI[c] = longTwistI.data() + size_t(c)*bandStride;
+			tR[c] = twistRp + size_t(c)*chunkStride;
+			tI[c] = twistIp + size_t(c)*chunkStride;
+			lR[c] = longTwistRp + size_t(c)*chunkStride;
+			lI[c] = longTwistIp + size_t(c)*chunkStride;
 		}
 		for (; b + 8 <= endB && b + 8 + L <= bands; b += 8) {
 			__m256 mask = maskAt8(b), xR, xI;
-			_mm256_storeu_ps(selTwistR.data() + b, selectedV8(tR, mask, b));
-			_mm256_storeu_ps(selTwistI.data() + b, selectedV8(tI, mask, b));
-			_mm256_storeu_ps(selLongTwistR.data() + b, selectedV8(lR, mask, b));
-			_mm256_storeu_ps(selLongTwistI.data() + b, selectedV8(lI, mask, b));
+			_mm256_storeu_ps(selTwistRp + b, selectedV8(tR, mask, b));
+			_mm256_storeu_ps(selTwistIp + b, selectedV8(tI, mask, b));
+			_mm256_storeu_ps(selLongTwistRp + b, selectedV8(lR, mask, b));
+			_mm256_storeu_ps(selLongTwistIp + b, selectedV8(lI, mask, b));
 			mulConjV8(selectedV8(oR, mask, b + 1), selectedV8(oI, mask, b + 1), selectedV8(tR, mask, b + 1), selectedV8(tI, mask, b + 1), xR, xI);
-			_mm256_storeu_ps(selUpR.data() + b, xR);
-			_mm256_storeu_ps(selUpI.data() + b, xI);
+			_mm256_storeu_ps(selUpRp + b, xR);
+			_mm256_storeu_ps(selUpIp + b, xI);
 			mulConjV8(selectedV8(oR, mask, b + L), selectedV8(oI, mask, b + L), selectedV8(lR, mask, b + L), selectedV8(lI, mask, b + L), xR, xI);
-			_mm256_storeu_ps(selLongUpR.data() + b, xR);
-			_mm256_storeu_ps(selLongUpI.data() + b, xI);
+			_mm256_storeu_ps(selLongUpRp + b, xR);
+			_mm256_storeu_ps(selLongUpIp + b, xI);
 		}
 		return b;
 	}
@@ -1634,8 +1677,8 @@ private:
 		if (randomTimeFactor) {
 			// the same draws in the same order as the original loop: per band, the downward one then the upward one
 			for (int b = startB; b < endB; ++b) {
-				if (b > 0) drawDown[b] = timeFactorDist(randomEngine);
-				if (b < bands - 1) drawUp[b] = timeFactorDist(randomEngine);
+				if (b > 0) drawDownp[b] = timeFactorDist(randomEngine);
+				if (b < bands - 1) drawUpp[b] = timeFactorDist(randomEngine);
 			}
 			int b = startB;
 #if SIGNALSMITH_STRETCH_SSE2
@@ -1653,29 +1696,29 @@ private:
 						re[j] = inR[lane[j]];
 						im[j] = inI[lane[j]];
 					}
-					__m128 down = _mm_loadu_ps(drawDown.data() + b), up = _mm_loadu_ps(drawUp.data() + b);
+					__m128 down = _mm_loadu_ps(drawDownp + b), up = _mm_loadu_ps(drawUpp + b);
 					__m128 pR = selected(qR, mask, b), pI = selected(qI, mask, b), dR, dI, xR, xI;
 					__m128 bin = inputBinsV(b);
 					fractionalV(_mm_sub_ps(bin, down), re, im, same, dR, dI);
 					mulConjV(pR, pI, dR, dI, xR, xI);
-					_mm_storeu_ps(selTwistR.data() + b, xR);
-					_mm_storeu_ps(selTwistI.data() + b, xI);
+					_mm_storeu_ps(selTwistRp + b, xR);
+					_mm_storeu_ps(selTwistIp + b, xI);
 					fractionalV(_mm_sub_ps(bin, _mm_mul_ps(longStep, down)), re, im, same, dR, dI);
 					mulConjV(pR, pI, dR, dI, xR, xI);
-					_mm_storeu_ps(selLongTwistR.data() + b, xR);
-					_mm_storeu_ps(selLongTwistI.data() + b, xI);
+					_mm_storeu_ps(selLongTwistRp + b, xR);
+					_mm_storeu_ps(selLongTwistIp + b, xI);
 					// upwards: the twist at b + 1 (b + L) from this band's draw, onto that band's preliminary output
 					__m128 tR, tI;
 					fractionalV(_mm_sub_ps(inputBinsV(b + 1), up), re, im, same, dR, dI);
 					mulConjV(selected(qR, mask, b + 1), selected(qI, mask, b + 1), dR, dI, tR, tI);
 					mulConjV(selected(oR, mask, b + 1), selected(oI, mask, b + 1), tR, tI, xR, xI);
-					_mm_storeu_ps(selUpR.data() + b, xR);
-					_mm_storeu_ps(selUpI.data() + b, xI);
+					_mm_storeu_ps(selUpRp + b, xR);
+					_mm_storeu_ps(selUpIp + b, xI);
 					fractionalV(_mm_sub_ps(inputBinsV(b + L), _mm_mul_ps(longStep, up)), re, im, same, dR, dI);
 					mulConjV(selected(qR, mask, b + L), selected(qI, mask, b + L), dR, dI, tR, tI);
 					mulConjV(selected(oR, mask, b + L), selected(oI, mask, b + L), tR, tI, xR, xI);
-					_mm_storeu_ps(selLongUpR.data() + b, xR);
-					_mm_storeu_ps(selLongUpI.data() + b, xI);
+					_mm_storeu_ps(selLongUpRp + b, xR);
+					_mm_storeu_ps(selLongUpIp + b, xI);
 				}
 			}
 #endif
@@ -1690,8 +1733,8 @@ private:
 			if (channels == 2 && !usedChannel[c]) continue; // (never selected below)
 			const Sample *iR = bandIn(c), *iI = bandInI(c);
 			const Sample *cqR = predInR.data() + size_t(c)*bands, *cqI = predInI.data() + size_t(c)*bands;
-			Sample *tR = twistR.data() + size_t(c)*bandStride, *tI = twistI.data() + size_t(c)*bandStride;
-			Sample *lR = longTwistR.data() + size_t(c)*bandStride, *lI = longTwistI.data() + size_t(c)*bandStride;
+			Sample *tR = twistRp + size_t(c)*chunkStride, *tI = twistIp + size_t(c)*chunkStride;
+			Sample *lR = longTwistRp + size_t(c)*chunkStride, *lI = longTwistIp + size_t(c)*chunkStride;
 			int b = startB;
 #if SIGNALSMITH_STRETCH_SSE2
 			const __m128 tf = _mm_set1_ps(timeFactor), ltf = _mm_set1_ps(longTimeFactor);
@@ -1733,26 +1776,26 @@ private:
 		if (vector) {
 			const Sample *tR[2], *tI[2], *lR[2], *lI[2];
 			for (int c = 0; c < 2; ++c) {
-				tR[c] = twistR.data() + size_t(c)*bandStride;
-				tI[c] = twistI.data() + size_t(c)*bandStride;
-				lR[c] = longTwistR.data() + size_t(c)*bandStride;
-				lI[c] = longTwistI.data() + size_t(c)*bandStride;
+				tR[c] = twistRp + size_t(c)*chunkStride;
+				tI[c] = twistIp + size_t(c)*chunkStride;
+				lR[c] = longTwistRp + size_t(c)*chunkStride;
+				lI[c] = longTwistIp + size_t(c)*chunkStride;
 			}
 #if SIGNALSMITH_STRETCH_AVX
 			if (avxOn()) b = selectAvx(b, endB, L);
 #endif
 			for (; b + 4 <= endB && b + 4 + L <= bands; b += 4) {
 				__m128 mask = maskAt(b), xR, xI;
-				_mm_storeu_ps(selTwistR.data() + b, selected(tR, mask, b));
-				_mm_storeu_ps(selTwistI.data() + b, selected(tI, mask, b));
-				_mm_storeu_ps(selLongTwistR.data() + b, selected(lR, mask, b));
-				_mm_storeu_ps(selLongTwistI.data() + b, selected(lI, mask, b));
+				_mm_storeu_ps(selTwistRp + b, selected(tR, mask, b));
+				_mm_storeu_ps(selTwistIp + b, selected(tI, mask, b));
+				_mm_storeu_ps(selLongTwistRp + b, selected(lR, mask, b));
+				_mm_storeu_ps(selLongTwistIp + b, selected(lI, mask, b));
 				mulConjV(selected(oR, mask, b + 1), selected(oI, mask, b + 1), selected(tR, mask, b + 1), selected(tI, mask, b + 1), xR, xI);
-				_mm_storeu_ps(selUpR.data() + b, xR);
-				_mm_storeu_ps(selUpI.data() + b, xI);
+				_mm_storeu_ps(selUpRp + b, xR);
+				_mm_storeu_ps(selUpIp + b, xI);
 				mulConjV(selected(oR, mask, b + L), selected(oI, mask, b + L), selected(lR, mask, b + L), selected(lI, mask, b + L), xR, xI);
-				_mm_storeu_ps(selLongUpR.data() + b, xR);
-				_mm_storeu_ps(selLongUpI.data() + b, xI);
+				_mm_storeu_ps(selLongUpRp + b, xR);
+				_mm_storeu_ps(selLongUpIp + b, xI);
 			}
 		}
 #endif

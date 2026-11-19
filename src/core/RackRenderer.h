@@ -723,6 +723,11 @@ public:
     // round: processBatched), and how many of them did go to the workers in that one round (diagnostics, A/B)
     std::uint64_t batchedBlockCount() const noexcept { return batchedBlocks; }
     std::uint64_t batchedRoundCount() const noexcept { return batchedRounds; }
+    // Round 190lv (sched2): batched blocks of a project with live controllers, run as two rounds (the controllers' sources
+    // and what feeds them, then the rest; processBatched's liveBatch)
+    std::uint64_t batchedLiveRoundCount() const noexcept { return batchedLiveRounds; }
+    // ... and why the last state's live controllers could not be ("" = they can, or none were looked at)
+    const char* livePlanRefusal() const noexcept { return livePlanWhy; }
     // ... and the blocks that could not be, by the first reason found (every block is looked at, one cut in a single
     // piece too: that one runs one round anyway). Audio thread counters, read them between blocks (diagnostics).
     enum class BatchRefusal : int
@@ -914,6 +919,7 @@ private:
         bool live = false, recording = false;     // (the live input, as runTaskGraph reads it per chunk)
         bool params = false, paramsLive = false;  // updateAutomation's applyPluginParams, deferred to the units
         int paramsFirst = 0;
+        bool liveDeferred = false; // (round 190lv) updateAutomation's live loop left a placeholder: the source writes it
     };
     std::array<Piece, maxPieces> pieces {};
     int pieceCount = 0;
@@ -937,6 +943,26 @@ private:
     void carryPieceState (int from, int to) noexcept;
     bool unitParamsBend = false, unitParamsTimed = false, unitParamsHeld = false;
     bool runBatchedGraph (const RackState& state, bool playing, int channels, MeterBank* meters) noexcept;
+    // ---- Round 190lv (sched2): batched blocks with live controllers --------------------------------------------------
+    // A controller's output after piece k is what piece k+1's serial part reads (updateAutomation's live loop). Batched,
+    // those parts leave a placeholder for pieces k >= 1 (deferLive), and the block runs two rounds: round A = the
+    // controllers' sources and every unit that feeds them (liveInA: the upstream closure, so nothing in it waits for a
+    // unit outside), each source writing its live values into the next piece's slot right after rendering a piece; round
+    // B = the rest. Exact only where no later serial part touches a live value and a round-A unit reads only its own source's
+    // or an upstream source's (buildLivePlan).
+    bool deferLive = false;           // (processBatched's serial parts of pieces >= 1)
+    bool liveBatch = false;           // this block runs the two rounds
+    bool livePlanOk = false;          // the state's live controllers can be batched (for unitParamsState)
+    std::vector<char> liveInA;        // [task] in round A
+    std::vector<int> liveSourceStart, liveSources; // [task] → its live automations (CSR, in liveAutomations' order)
+    std::vector<int> liveRootsA, liveRootsB, livePendingB;
+    int liveRootCountA = 0, liveRootCountB = 0;
+    int liveCountA = 0, liveCountB = 0; // positions of each round (its nodes minus the fused links inside it)
+    std::uint64_t batchedLiveRounds = 0;
+    const char* livePlanWhy = "";
+    bool buildLivePlan (const RackState& state) noexcept;
+    void writeLiveValue (const RackState& state, int automation, int slot) noexcept;
+    bool runGraphRound (const RackState& state, bool playing, int channels, MeterBank* meters, int round) noexcept;
     // processChunk in its three parts (round 190kz): the serial part before the units, the units, the Master's part.
     // chunkPrelude returns the pool to restore after the units (chunkSchedule may set `workers` to nullptr)
     void chunkPrelude (const RackState& state, bool playing, double startTick, int numSamples, bool continuing) noexcept;
