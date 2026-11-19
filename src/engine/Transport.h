@@ -17,6 +17,9 @@ struct Transport
 {
     std::atomic<bool> playing { false };
     std::atomic<bool> metronome { false };
+    // round 190lr (DL-47): Live's metronome option "Enable Only While Recording" (a UI setting): the click sounds only while
+    // recording (the count-in still counts)
+    std::atomic<bool> metronomeOnlyRecording { false };
     // the metronome's sound in FL's Metronome sound menu order (core/MetronomeVoice.h, REA round 165z-a2): 0 Hi-hat,
     // 1 Tick (FL's default), 2 Beep, 3 Cowbell, 4 Pulse
     std::atomic<int> metronomeSound { 1 };

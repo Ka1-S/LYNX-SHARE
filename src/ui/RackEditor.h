@@ -99,6 +99,7 @@ public:
     // (shots, a Drum Rack) the menu of the pad of `key` (empty for an empty pad) and of an I-O cell (0 Receive, 1 Play,
     // 2 Choke, 3 Audio To) of chain `chain`
     juce::PopupMenu padMenuForSnapshot (int key);
+    void padLitForSnapshot (int key); // round 190lr (DL-94): pad `key` drawn as sounding
     juce::PopupMenu ioMenuForSnapshot (int chain, int column);
 
 private:

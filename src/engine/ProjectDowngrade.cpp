@@ -439,6 +439,17 @@ void toRelease0128FromRollup030 (juce::var& root, Losses& lost)
             lost.push_back ({ TR_NOOP ("{0} deactivated clip slot(s) play again"), juce::String (inactive), true });
     }
 
+    // round 190lr (DL-14): Live's scene follow actions ("follow" on a scene); 0.1.28 has none
+    {
+        int follows = 0;
+        if (auto* scenes = arrayOf (root["clipGrid"]["scenes"]))
+            for (auto& scene : *scenes)
+                if (auto* so = objectOf (scene))
+                    follows += drop (*so, "follow") ? 1 : 0;
+        if (follows > 0)
+            lost.push_back ({ TR_NOOP ("{0} scene follow action(s) are left out"), juce::String (follows), true });
+    }
+
     // rollup step 4, round 190jh: Facet EQ's automatic dynamic thresholds (hidden parameters past its count; 0.1.28 plays
     // those bands with their manual threshold)
     {

@@ -168,7 +168,7 @@ const DocumentFields& editableDocumentFields (DocumentShape shape)
         add (S::grid, "quant backOnStop followActions mixerView");
         add (S::grid, "scenes", S::scene, true);
         add (S::grid, "clips", S::gridClip, true);
-        add (S::scene, "name colour tempo beatsPerBar beatUnit");
+        add (S::scene, "name colour tempo beatsPerBar beatUnit follow");
         add (S::gridClip, "scene name colour mode quant legato loop noStop follow clip blankName groove inactive");
         add (S::arrangement, "name clips blocks loop markers");
         add (S::clipEnvelope, "volume pan shown");

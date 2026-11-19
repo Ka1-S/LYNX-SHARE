@@ -2947,6 +2947,8 @@ private:
         }
         if (n.expanded)
             load (n);
+        if (n.expanded && n.file.isDirectory()) // round 190lr (DF-96): an opened folder is a place in the history
+            browser.noteLocation (n.file);
         rebuild();
         restoreSelection (keep);
 
@@ -6310,6 +6312,48 @@ void BrowserComponent::step (int delta, bool load)
 
     if (load && file.existsAsFile() && onLoadIntoChannel)
         onLoadIntoChannel (file);
+}
+
+// Round 190lr (DF-96, FL's Browser "Navigation history": Backspace / Shift+Backspace = previous / next location; DL-102,
+// Live's Ctrl+[ / Ctrl+]): the folders opened, in order; going back or forward selects and reveals that folder again
+void BrowserComponent::noteLocation (const juce::File& folder)
+{
+    if (walkingHistory || folder == juce::File())
+        return;
+    if (historyAt >= 0 && historyAt < (int) locations.size() && locations[(std::size_t) historyAt] == folder)
+        return;
+    locations.resize ((std::size_t) juce::jmax (0, historyAt + 1)); // (a new place drops the forward part)
+    locations.push_back (folder);
+    if (locations.size() > 64)
+        locations.erase (locations.begin());
+    historyAt = (int) locations.size() - 1;
+}
+
+bool BrowserComponent::walkHistory (int delta)
+{
+    const auto to = historyAt + delta;
+    if (to < 0 || to >= (int) locations.size())
+        return false;
+    historyAt = to;
+    const juce::ScopedValueSetter<bool> walking (walkingHistory, true);
+    return locateFile (locations[(std::size_t) to]);
+}
+
+// Round 190lr (DF-97, FL's Browser: "Use (F3) to skip to the next matching item"): with a search typed, the next (−1:
+// previous) row of the results, round to the first after the last; a file is previewed as Up / Down do
+void BrowserComponent::findMatch (int delta)
+{
+    if (searchBox.getText().trim().isEmpty())
+        return;
+    auto& list = activeList();
+    const auto count = list.numRows();
+    if (count == 0)
+        return;
+    const auto at = list.getSelectedRow();
+    const auto row = at < 0 ? (delta > 0 ? 0 : count - 1) : ((at + delta) % count + count) % count;
+    list.select (row, false);
+    if (const auto file = list.selectedFile(); file.existsAsFile())
+        fileSelected (file, true);
 }
 
 bool BrowserComponent::typeToJump (const juce::KeyPress& key)

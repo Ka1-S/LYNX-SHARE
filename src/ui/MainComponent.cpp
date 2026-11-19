@@ -441,7 +441,16 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     blendButton.setOnColour (theme::colour::bg6);
     blendButton.setIconColourWhenOn (theme::colour::accent);
     blendButton.onClick = [this] { runAction ("record.blend"); };
-    tapTempoButton.onClick = [this] { openTempoTapper (engine); };
+    tapTempoButton.onClick = [this] {
+        if (isClipLaunchWorkflow())
+            liveTap(); // (round 190lr, DL-49: Live's Tap box taps)
+        else
+            openTempoTapper (engine);
+    };
+    tapTempoButton.onRightClick = [this] {
+        if (isClipLaunchWorkflow())
+            showLiveTapMenu();
+    };
     // round 170e3: loop record, step edit and punch in/out as switches beside them
     for (auto* b : { &loopRecordButton, &stepEditButton, &punchButton })
     {
@@ -2408,6 +2417,10 @@ bool MainComponent::runAction (const std::string& id)
     else if (is ("rack.rotateRight")) rack.rotateSelected (1);
     else if (is ("browser.previous")) browser.step (-1, false);
     else if (is ("browser.next")) browser.step (1, false);
+    else if (is ("browser.findNext")) browser.findMatch (1); // round 190lr (DF-97)
+    else if (is ("browser.findPrevious")) browser.findMatch (-1);
+    else if (is ("browser.historyBack")) browser.walkHistory (-1); // round 190lr (DF-96 / DL-102)
+    else if (is ("browser.historyForward")) browser.walkHistory (1);
     else if (is ("browser.swapPrevious")) browser.step (-1, true);
     else if (is ("browser.swapNext")) browser.step (1, true);
     else if (is ("browser.load")) browser.loadSelected();
@@ -3191,6 +3204,10 @@ void MainComponent::loadUiSettings()
             autosaveKeep = prefs::clampAutosaveKeep (line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
         else if (key == "metronomeSound" && ! flMetronomeSound) // (before 0.1.20: 0 LYNX click, 1..5 hi-hat..pulse)
             engine.getTransport().metronomeSound.store (metronome::soundFromLegacy (line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue()));
+        else if (key == "tapStartsPlayback") // round 190lr (DL-49)
+            tapStartsPlayback = line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue() != 0;
+        else if (key == "metronomeOnlyRec") // round 190lr (DL-47)
+            engine.getTransport().metronomeOnlyRecording.store (line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue() != 0);
         else if (key == "metronomeSoundFl") // FL's order: 0 Hi-hat, 1 Tick, 2 Beep, 3 Cowbell, 4 Pulse
             engine.getTransport().metronomeSound.store (metronome::clampSound (line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue()));
         // FL's Settings options of round 190bx (core/FlSettings.h: resampling quality, CPU switches, auto close...)
@@ -3294,6 +3311,8 @@ void MainComponent::loadUiSettings()
         }
         else if (NewProjectDefaults::ownsKey (key.toStdString())) // (issue #170: newLinkTracks was missing from this list)
             newProjectDefaults().readKey (key.toStdString(), line.fromFirstOccurrenceOf ("=", false, false).trim().toStdString());
+        else if (key == "mixerWaveforms") // round 190lr (DF-60)
+            MixerStrips::meterWaveforms = line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue() != 0;
         else if (key == "mixerUsedOnly")
             MixerStrips::showUsedOnly = on;
         else if (key == "mixerLoudness") // round 190am (also starts the measurement)
@@ -3445,6 +3464,8 @@ void MainComponent::saveUiSettings()
                                       + "\nundoLevels=" + juce::String (engine.getUndoLevels())
                                       + "\nmetronomeVolume=" + juce::String (engine.getTransport().metronomeVolume.load(), 2)
                                       + "\nmetronomeSoundFl=" + juce::String (metronome::clampSound (engine.getTransport().metronomeSound.load()))
+                                      + "\nmetronomeOnlyRec=" + juce::String (engine.getTransport().metronomeOnlyRecording.load() ? 1 : 0)
+                                      + "\ntapStartsPlayback=" + juce::String (tapStartsPlayback ? 1 : 0)
                                       + "\nmetronomeTrack=" + juce::String (engine.getTransport().metronomeTrack.load())
                                       + "\nplayTruncatedOnTransport=" + juce::String (engine.getTransport().playTruncatedOnTransport.load() ? 1 : 0)
                                       + "\nresetPluginsOnTransport=" + juce::String (engine.getTransport().resetPluginsOnTransport.load() ? 1 : 0)
@@ -3485,7 +3506,7 @@ void MainComponent::saveUiSettings()
                                       + "\nmetronomeOn=" + juce::String (engine.getTransport().metronome.load() ? 1 : 0)
                                       + "\nrecordCatchWindow=" + juce::String (engine.getRecordOptions().catchWindow)
                                       + "\nrecordCompensateOutput=" + juce::String (engine.getRecordOptions().compensateOutput ? 1 : 0)
-                                      + "\nrecordPostRoll=" + juce::String (engine.getRecordOptions().postRollBars) + "\nmixerUsedOnly=" + juce::String (MixerStrips::showUsedOnly ? 1 : 0) + "\nmixerLoudness=" + juce::String (MixerStrips::showLoudness ? 1 : 0) + "\nmixerStripInserts=" + juce::String (MixerStrips::showStripInserts ? 1 : 0) + "\ngrossBeatFlLocator=" + juce::String (gblocator::flStyle() ? 1 : 0) + "\nmixerKeepLostLinks=" + juce::String (MixerStrips::keepLostLinks ? 1 : 0) + "\nmixerFollowPlaylist=" + juce::String (MixerStrips::followPlaylist ? 1 : 0) + "\nmixerLayout=" + juce::String ((int) MixerStrips::layout)
+                                      + "\nrecordPostRoll=" + juce::String (engine.getRecordOptions().postRollBars) + "\nmixerUsedOnly=" + juce::String (MixerStrips::showUsedOnly ? 1 : 0) + "\nmixerWaveforms=" + juce::String (MixerStrips::meterWaveforms ? 1 : 0) + "\nmixerLoudness=" + juce::String (MixerStrips::showLoudness ? 1 : 0) + "\nmixerStripInserts=" + juce::String (MixerStrips::showStripInserts ? 1 : 0) + "\ngrossBeatFlLocator=" + juce::String (gblocator::flStyle() ? 1 : 0) + "\nmixerKeepLostLinks=" + juce::String (MixerStrips::keepLostLinks ? 1 : 0) + "\nmixerFollowPlaylist=" + juce::String (MixerStrips::followPlaylist ? 1 : 0) + "\nmixerLayout=" + juce::String ((int) MixerStrips::layout)
                                       + "\nquantizeSongJumps=" + juce::String (engine.quantizeSongJumps.load()) + "\n"
                                       + juce::String (newProjectDefaults().toText()));
 }
@@ -5269,7 +5290,41 @@ void MainComponent::armSelectedInsertForAudio()
         mixerinput::toggleArm (engine, target, &this->mixer);
 }
 
+// Round 190lr (DL-49, Live manual 9.1.2): each click on the Tap box is a beat; from the second tap the song takes the
+// tapped tempo (core/ValueMath.h TapTempo, the tapper window's own rule); with "Start Playback with Tap Tempo" on, "it
+// takes four taps to start song playback at the tapped tempo"
+void MainComponent::liveTap()
+{
+    const auto now = juce::Time::getMillisecondCounterHiRes();
+    if (const auto bpm = liveTaps.tap (now); bpm && std::abs (*bpm - engine.getSong().bpm) > 1e-9)
+        engine.editSong ([b = *bpm] (Song& s) { clipops::followTempo (s, b); });
+    if (tapStartsPlayback && liveTaps.count() == 4 && ! engine.getTransport().playing.load())
+        engine.play();
+}
+
+void MainComponent::showLiveTapMenu()
+{
+    makeLiveTapMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&tapTempoButton));
+}
+
+juce::PopupMenu MainComponent::makeLiveTapMenu()
+{
+    juce::PopupMenu menu;
+    menu.addItem (tr ("Start Playback with Tap Tempo"), true, tapStartsPlayback, [this] {
+        tapStartsPlayback = ! tapStartsPlayback;
+        saveUiSettings();
+    });
+    menu.addSeparator();
+    menu.addItem (tr ("Tempo tapper") + shortcutText ("view.tempoTapper"), [this] { openTempoTapper (engine); });
+    return menu;
+}
+
 void MainComponent::showMetronomeMenu()
+{
+    makeMetronomeMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&metronomeButton));
+}
+
+juce::PopupMenu MainComponent::makeMetronomeMenu()
 {
     // FL 2026's right-click on the metronome button, as it is (REA round 165z-a2): the "Metronome sound" choice only,
     // in FL's order. The volume trim is in Options, the count-in has its own button and the track the click plays
@@ -5282,7 +5337,18 @@ void MainComponent::showMetronomeMenu()
             engine.getTransport().metronomeSound.store (i);
             saveUiSettings();
         });
-    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&metronomeButton));
+    // round 190lr (DL-47): Live's metronome menu ends with "Enable Only While Recording" (details2_190ld capture L13);
+    // in the Clip-launch layout it follows FL's choice (add, never remove)
+    if (isClipLaunchWorkflow())
+    {
+        menu.addSeparator();
+        menu.addItem (tr ("Enable Only While Recording"), true, transport.metronomeOnlyRecording.load(), [this] {
+            auto& t = engine.getTransport();
+            t.metronomeOnlyRecording.store (! t.metronomeOnlyRecording.load());
+            saveUiSettings();
+        });
+    }
+    return menu;
 }
 
 void MainComponent::showTypingPianoMenu()
@@ -6848,6 +6914,7 @@ void MainComponent::timerCallback()
         resized();
     }
     const uitrace::Scope trace ("MainComponent timer", false);
+    engine.getMeters().expirePower (juce::Time::getMillisecondCounter()); // (round 190lr: the RMS sums stop with their reader)
     {
         const uitrace::Scope part ("timer: toolbar displays", false);
         masterVolume.update();

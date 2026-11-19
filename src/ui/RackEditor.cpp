@@ -193,6 +193,44 @@ struct RackView::Impl
     const RackDoc* rack() const { return rack::rackOf (shown); }
     bool drum() const { const auto* r = rack(); return r != nullptr && r->drum; }
 
+    // Round 190lr (DL-94, capture live-drumrack-pad-lit.png): a Drum Rack pad whose note sounds lights its ▶ (Live: orange
+    // #FFAD56) and its cell in the pad overview, for at least 200 ms (Live lights it while the sample sounds; the engine
+    // tells which keys are held or struck). Read on the view's 30 Hz tick; the pads repaint only when a light changes.
+    NoteMask soundingShown {};
+    std::array<double, 128> litUntil {};
+    bool padLit (int key) const noexcept
+    {
+        return key >= 0 && key < 128 && (soundingShown[(std::size_t) (key >> 6)] >> (key & 63) & 1u) != 0;
+    }
+    void watchSounding()
+    {
+        const auto channel = channelOfRack();
+        if (pads.isEmpty() || channel < 0)
+        {
+            if (soundingShown != NoteMask {})
+            {
+                soundingShown = {};
+                owner.repaint();
+            }
+            return;
+        }
+        const auto keys = engine.soundingKeys (channel);
+        const auto now = juce::Time::getMillisecondCounterHiRes();
+        NoteMask lit {};
+        for (int k = 0; k < 128; ++k)
+        {
+            if ((keys[(std::size_t) (k >> 6)] >> (k & 63) & 1u) != 0)
+                litUntil[(std::size_t) k] = juce::jmax (litUntil[(std::size_t) k], now + 200.0);
+            if (litUntil[(std::size_t) k] > now)
+                lit[(std::size_t) (k >> 6)] |= std::uint64_t (1) << (k & 63);
+        }
+        if (lit != soundingShown)
+        {
+            soundingShown = lit;
+            owner.repaint (pads);
+        }
+    }
+
     void refresh()
     {
         auto& song = const_cast<Song&> (engine.getSong());
@@ -1009,6 +1047,8 @@ struct RackView::Impl
     }
     int channelOfRack() const { return automation && automation->kind == AutomationTargetKind::channelParam ? automation->index : -1; }
 
+    static juce::Colour padLitColour() { return theme::livelook::active() ? juce::Colour (0xffffad56) : col::accent; }
+
     void paintPads (juce::Graphics& g, const RackDoc& r)
     {
         g.setColour (theme::livelook::active() ? theme::livelook::surface : col::bg1);
@@ -1021,7 +1061,7 @@ struct RackView::Impl
             {
                 const auto key = rack::rowFirstKey (row) + c;
                 const auto chain = rack::padChain (r, key);
-                g.setColour (chain >= 0 ? chainColour (r.chains[(std::size_t) chain], chain) : col::bg3);
+                g.setColour (chain >= 0 && padLit (key) ? padLitColour() : chain >= 0 ? chainColour (r.chains[(std::size_t) chain], chain) : col::bg3);
                 g.fillRect (juce::Rectangle<float> ((float) overview.getX() + (float) c * colW, (float) overview.getY() + (float) row * rowH, colW - 1.0f, std::max (1.0f, rowH - 1.0f)));
             }
         g.setColour (col::accent);
@@ -1065,7 +1105,8 @@ struct RackView::Impl
                         const auto b = padButton (pad, k).toFloat();
                         g.setColour (lit[k] ? on[k] : ll::surface);
                         g.fillRect (b);
-                        g.setColour (lit[k] ? col::bg0 : k == 1 ? ll::raised.brighter (0.3f) : ll::text);
+                        // (round 190lr: a sounding pad's ▶ glyph turns Live's orange, its cell stays)
+                        g.setColour (lit[k] ? col::bg0 : k == 1 && padLit (key) ? padLitColour() : k == 1 ? ll::raised.brighter (0.3f) : ll::text);
                         g.drawText (juce::String::fromUTF8 (labels[k]), b, juce::Justification::centred);
                     }
                 }
@@ -1088,7 +1129,7 @@ struct RackView::Impl
                         const auto b = padButton (pad, k).toFloat();
                         g.setColour (lit[k] ? on[k] : col::bg4);
                         g.fillRoundedRectangle (b, 2.0f);
-                        g.setColour (lit[k] ? col::bg0 : col::textSecondary);
+                        g.setColour (lit[k] ? col::bg0 : k == 1 && padLit (key) ? padLitColour() : col::textSecondary); // (round 190lr)
                         g.drawText (juce::String::fromUTF8 (labels[k]), b, juce::Justification::centred);
                     }
                 }
@@ -2696,6 +2737,16 @@ RackView::~RackView() = default;
 
 bool RackView::keyPressed (const juce::KeyPress& key) { return impl->padKey (key); }
 
+void RackView::padLitForSnapshot (int key)
+{
+    if (key >= 0 && key < 128)
+    {
+        impl->soundingShown[(std::size_t) (key >> 6)] |= std::uint64_t (1) << (key & 63);
+        impl->litUntil[(std::size_t) key] = juce::Time::getMillisecondCounterHiRes() + 60000.0;
+    }
+    repaint();
+}
+
 juce::PopupMenu RackView::padMenuForSnapshot (int key)
 {
     const auto* r = impl->rack();
@@ -2963,6 +3014,7 @@ void RackView::timerCallback()
 {
     impl->stepGlide();
     impl->refresh();
+    impl->watchSounding(); // round 190lr (DL-94)
 }
 
 // ---------------------------------------------------------------------------------------------------------------

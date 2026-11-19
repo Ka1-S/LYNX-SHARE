@@ -160,6 +160,8 @@ public:
     static inline std::atomic<int> instances { 0 };
     // how many exist now (round 190fc: none may outlive its MainComponent's destructor body)
     static inline std::atomic<int> alive { 0 };
+    // round 190lr (--details190lrshot): a Drums track as the Drums tile's starter adds it
+    void addDrumsForSnapshot (const std::string& genre, bool steps) { addDrums (genre, steps, false); }
 
 private:
     class Chooser;

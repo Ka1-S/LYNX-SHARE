@@ -4,6 +4,7 @@
 #include "ui/PlaylistComponent.h"
 
 #include <algorithm>
+#include <set>
 #include <cmath>
 #include <cstring>
 
@@ -370,6 +371,85 @@ public:
         g.fillRect (foot.getX(), foot.getY(), foot.getWidth(), 1);
     }
 
+    // Round 190lr (DL-20, capture live-hover-*.png): in Live's look the button under the pointer grows by 2 px in its own
+    // colour (a clip's launch ▶ 7 -> 9 px, an empty slot's ■ / an armed slot's ●, a track's Stop ■ and a scene's ▶ 9 -> 11
+    // px); a clip's body, a slot's body and a scene's name don't change. Only the two cells concerned repaint.
+    enum class HoverButton { none, slot, trackStop, scene };
+    HoverButton hoverButton = HoverButton::none;
+    int hoverTrack = -1, hoverScene = -1;
+    juce::Rectangle<int> hoverCell (HoverButton b, int track, int scene) const
+    {
+        switch (b)
+        {
+            case HoverButton::slot: return cellForSnapshot (0, track, scene);
+            case HoverButton::trackStop: return cellForSnapshot (1, track, 0);
+            case HoverButton::scene: return cellForSnapshot (2, 0, scene);
+            default: return {};
+        }
+    }
+    void setHoverButton (HoverButton b, int track, int scene)
+    {
+        if (b == hoverButton && track == hoverTrack && scene == hoverScene)
+            return;
+        repaint (hoverCell (hoverButton, hoverTrack, hoverScene));
+        hoverButton = b, hoverTrack = track, hoverScene = scene;
+        repaint (hoverCell (hoverButton, hoverTrack, hoverScene));
+    }
+    bool hovering (HoverButton b, int track, int scene) const noexcept { return hoverButton == b && hoverTrack == track && hoverScene == scene; }
+    void mouseMove (const juce::MouseEvent& e) override
+    {
+        if (! liveLook())
+            return setHoverButton (HoverButton::none, -1, -1);
+        const auto p = e.getPosition();
+        if (const auto t = statusTrackAt (p); t >= 0)
+            return setHoverButton (p.x - columnX (t) < launchZone ? HoverButton::trackStop : HoverButton::none, t, -1);
+        const auto hit = hitTestCell (p);
+        if (hit.scene >= 0 && hit.track < 0)
+            return setHoverButton (p.x < sceneX() + launchZone && sceneFieldAt (p, hit.scene) == 0 ? HoverButton::scene : HoverButton::none, -1, hit.scene);
+        if (hit.track >= 0 && hit.scene >= 0 && p.x - columnX (hit.track) < launchZone)
+            return setHoverButton (HoverButton::slot, hit.track, hit.scene);
+        setHoverButton (HoverButton::none, -1, -1);
+    }
+    void mouseExit (const juce::MouseEvent&) override { setHoverButton (HoverButton::none, -1, -1); }
+    void hoverForSnapshot (int kind, int track, int scene) // (--details190lrshot: 0 none, 1 a slot's button, 2 a track's Stop, 3 a scene's ▶)
+    {
+        setHoverButton ((HoverButton) kind, track, scene);
+    }
+
+    // Round 190lr (DL-29, Live manual 7.4 "click into an empty slot and 'rubber-band' select from there"; capture
+    // live-multisel-L21..23): Shift+click selects the rectangle from the selected slot to the clicked one, a drag from an
+    // empty slot (outside its button) selects the slots it covers; Delete clears them all. Ctrl+click replaces the
+    // selection as in Live 12.4.16 (filmed). The rectangle: tracks rangeTrack0..selectedTrack, scenes rangeScene0..selectedScene
+    // (−1: one slot).
+    int rangeTrack0 = -1, rangeScene0 = -1;
+    bool rubberBand = false;
+    bool rangeLive() const noexcept { return rangeTrack0 >= 0 && ! sceneSelected && rangeEndTrack == selectedTrack && rangeEndScene == selectedScene; }
+    int rangeEndTrack = -1, rangeEndScene = -1; // (the selection the rectangle was made with: any other selection ends it)
+    void markRangeEnd() noexcept { rangeEndTrack = selectedTrack, rangeEndScene = selectedScene; }
+    bool inRange (int t, int row) const noexcept
+    {
+        if (! rangeLive())
+            return t == selectedTrack && row == selectedScene && ! sceneSelected;
+        return t >= juce::jmin (rangeTrack0, selectedTrack) && t <= juce::jmax (rangeTrack0, selectedTrack) && row >= juce::jmin (rangeScene0, selectedScene)
+               && row <= juce::jmax (rangeScene0, selectedScene);
+    }
+    void clearRange() noexcept { rangeTrack0 = rangeScene0 = -1; }
+    void selectRangeForSnapshot (int t0, int s0, int t1, int s1)
+    {
+        sceneSelected = titleSelected = false;
+        rangeTrack0 = t0, rangeScene0 = s0, selectedTrack = t1, selectedScene = s1;
+        markRangeEnd();
+        repaint();
+    }
+    int rangeCountForCheck() const
+    {
+        int n = 0;
+        for (int t = 0; t < columnCount(); ++t)
+            for (int r = 0; r < rowCount(); ++r)
+                n += inRange (t, r) ? 1 : 0;
+        return n;
+    }
+
     void mouseDown (const juce::MouseEvent& e) override
     {
         grabKeyboardFocus();
@@ -410,12 +490,39 @@ public:
                 showSlotMenu (hit.track, hit.scene);
             return;
         }
+        // round 190lr (DL-38, Live's single-track Back to Arrangement): a click on a taken track's mark gives that track's
+        // Playlist clips back at once (the others stay with the grid)
+        if (const auto t = headerTrackAt (e.getPosition()); t >= 0 && e.x >= columnX (t) + columnWidth - 22 && trackTaken (t))
+        {
+            engine.launcherCommand ({ launcher::Command::Type::trackBackToArrangement, t });
+            repaint();
+            return;
+        }
         if (const auto t = headerTrackAt (e.getPosition()); t >= 0) // a column's title selects its track (round 183a)
         {
+            // round 190lr (DL-109, Live manual 18.2 "Multiple adjacent or nonadjacent tracks can be selected at once by
+            // Shift-clicking or Ctrl-clicking"): the Session mixer's edits then act on all of them
+            if (e.mods.isShiftDown() && selectedTrack >= 0)
+            {
+                trackSet.clear();
+                for (int k = juce::jmin (selectedTrack, t); k <= juce::jmax (selectedTrack, t); ++k)
+                    trackSet.insert (k);
+            }
+            else if (e.mods.isCommandDown())
+            {
+                if (trackSet.empty() && selectedTrack >= 0)
+                    trackSet.insert (selectedTrack);
+                if (trackSet.erase (t) == 0)
+                    trackSet.insert (t);
+            }
+            else
+                trackSet.clear();
             selectedTrack = t;
             sceneSelected = false;
             titleSelected = true; // (round 190ef: Ctrl+R renames it)
             repaint();
+            if (mixer != nullptr)
+                mixer->repaint();
             notify (GridPick::select);
             return;
         }
@@ -441,6 +548,19 @@ public:
         }
         if (hit.track < 0 || hit.scene < 0)
             return;
+        // round 190lr (DL-29): Shift+click extends the selection to a rectangle; any other click starts a new one
+        if (e.mods.isShiftDown() && ! sceneSelected && selectedTrack >= 0 && selectedScene >= 0)
+        {
+            if (! rangeLive())
+                rangeTrack0 = selectedTrack, rangeScene0 = selectedScene;
+            selectedTrack = hit.track;
+            selectedScene = hit.scene;
+            markRangeEnd();
+            repaint();
+            notify (GridPick::select);
+            return;
+        }
+        clearRange();
         sceneSelected = titleSelected = false;
         selectedTrack = hit.track;
         selectedScene = hit.scene;
@@ -450,6 +570,7 @@ public:
         if (grid == nullptr)
             return;
         const auto filled = launcher::clipAt (*grid, hit.track, hit.scene) != nullptr;
+        rubberBand = ! filled && e.x - columnX (hit.track) >= launchZone && e.mods.isLeftButtonDown(); // (round 190lr: from an empty slot)
         if (e.x - columnX (hit.track) < launchZone)
         {
             if (recordingScene (hit.track) == hit.scene)
@@ -479,6 +600,20 @@ public:
         if (fieldScene >= 0)
         {
             dragSceneField (e);
+            return;
+        }
+        if (rubberBand) // round 190lr (DL-29): the rectangle from the empty slot pressed to the slot under the pointer
+        {
+            const auto hit = hitTestCell (e.getPosition());
+            if (hit.track >= 0 && hit.scene >= 0 && (hit.track != selectedTrack || hit.scene != selectedScene || ! rangeLive()))
+            {
+                if (! rangeLive())
+                    rangeTrack0 = selectedTrack, rangeScene0 = selectedScene;
+                selectedTrack = hit.track;
+                selectedScene = hit.scene;
+                markRangeEnd();
+                repaint();
+            }
             return;
         }
         if (dragTrack < 0 || e.getDistanceFromDragStart() < 5)
@@ -681,6 +816,8 @@ public:
             repaint (stopAllBox().expanded (4));
         }
         fieldScene = -1;
+        if (std::exchange (rubberBand, false) && rangeLive() && rangeTrack0 == selectedTrack && rangeScene0 == selectedScene)
+            clearRange(); // (a click without a drag: one slot)
         if (pressedTrack >= 0)
             engine.launcherCommand ({ launcher::Command::Type::release, pressedTrack, pressedScene });
         pressedTrack = pressedScene = -1;
@@ -779,6 +916,7 @@ public:
         const auto code = key.getKeyCode();
         if (code == juce::KeyPress::leftKey || code == juce::KeyPress::rightKey || code == juce::KeyPress::upKey || code == juce::KeyPress::downKey)
         {
+            clearRange(); // (round 190lr)
             selectedTrack = stepTrack (selectedTrack, code == juce::KeyPress::leftKey ? -1 : code == juce::KeyPress::rightKey ? 1 : 0); // (round qafix190kq: past the lanes)
             selectedScene = juce::jlimit (0, rowCount() - 1, selectedScene + (code == juce::KeyPress::upKey ? -1 : code == juce::KeyPress::downKey ? 1 : 0));
             revealSelection();
@@ -807,6 +945,18 @@ public:
         }
         if (code == juce::KeyPress::deleteKey)
         {
+            if (rangeLive()) // round 190lr (DL-29): every slot of the rectangle, one undo step
+            {
+                const auto t0 = juce::jmin (rangeTrack0, selectedTrack), t1 = juce::jmax (rangeTrack0, selectedTrack);
+                const auto r0 = juce::jmin (rangeScene0, selectedScene), r1 = juce::jmax (rangeScene0, selectedScene);
+                engine.editSong ([=] (Song& s) {
+                    for (int t = t0; t <= t1; ++t)
+                        for (int r = r0; r <= r1; ++r)
+                            launcher::clearClip (s, t, r);
+                });
+                repaint();
+                return true;
+            }
             const int t = selectedTrack, r = selectedScene;
             engine.editSong ([t, r] (Song& s) { launcher::clearClip (s, t, r); });
             repaint();
@@ -896,6 +1046,11 @@ public:
             return hint;
         const auto& song = engine.getSong();
         const auto cells = cellArea();
+        if (const auto t = headerTrackAt (p); t >= 0 && p.x >= columnX (t) + columnWidth - 22 && trackTaken (t)) // (round 190lr)
+        {
+            hint.text = tr ("Back to Arrangement: [LMB] this track plays its Playlist clips again");
+            return hint;
+        }
         if (const auto t = headerTrackAt (p); t >= 0)
         {
             hint.text = tr ("Track title: [LMB] selects the track  [RMB] track menu  [Ctrl][R] renames it");
@@ -1333,6 +1488,26 @@ public:
             onPick (selectedTrack, selectedScene, pick);
     }
     // the track whose column title is at p, or -1
+    // round 190lr (DL-109): the tracks selected together (empty: only selectedTrack)
+    std::set<int> trackSet;
+    std::vector<int> selectedTracks() const
+    {
+        if (trackSet.size() < 2)
+            return { selectedTrack };
+        return { trackSet.begin(), trackSet.end() };
+    }
+    void selectTracksForSnapshot (std::vector<int> tracks)
+    {
+        trackSet = { tracks.begin(), tracks.end() };
+        if (! tracks.empty())
+            selectedTrack = tracks.back();
+        repaint();
+    }
+    bool trackTaken (int t) const
+    {
+        const auto* state = engine.launcherState();
+        return state != nullptr && t >= 0 && t < launcher::maxTracks && state->tracks[(std::size_t) t].taken.load (std::memory_order_relaxed);
+    }
     int headerTrackAt (juce::Point<int> p) const
     {
         if (p.y < 0 || p.y >= headerHeight || p.x < 0 || p.x >= cellArea().getRight())
@@ -1510,7 +1685,7 @@ public:
                 g.fillRect (cell);
             }
         }
-        if (t == selectedTrack && row == selectedScene)
+        if ((t == selectedTrack && row == selectedScene) || inRange (t, row)) // (round 190lr: a rectangle selection too)
         {
             g.setColour (c::accent);
             g.drawRect (cell, 1);
@@ -1694,10 +1869,11 @@ public:
         const auto recording = view != nullptr && view->recording.load (std::memory_order_relaxed) == row;
         const auto waiting = view != nullptr && view->recordPending.load (std::memory_order_relaxed) == row;
         const auto stopping = playing && view->stopping.load (std::memory_order_relaxed);
-        const auto selected = t == selectedTrack && row == selectedScene && ! sceneSelected;
+        const auto selected = inRange (t, row); // (round 190lr, DL-29: every slot of a rectangle selection)
         const auto focused = hasKeyboardFocus (true);
         const auto selection = focused ? lv::selectionFocused : lv::selectionUnfocused;
-        const auto triangle = liveTriangle (cell);
+        const auto hoveredButton = hovering (HoverButton::slot, t, row); // (round 190lr, DL-20: the glyph grows by 2 px)
+        const auto triangle = hoveredButton ? liveTriangle (cell).expanded (1.0f) : liveTriangle (cell);
 
         if (clip == nullptr && ! recording)
         {
@@ -1705,7 +1881,7 @@ public:
             // selection's own colour when selected (CL-7); its stop square, or an armed track's record circle (CL-9)
             g.setColour (selected ? selection : t == selectedTrack || row == selectedScene ? lv::raised : lv::surface);
             g.fillRect (cell);
-            const auto mark = juce::Rectangle<float> ((float) cell.getX() + 4.0f, (float) cell.getCentreY() - 4.5f, 9.0f, 9.0f);
+            const auto mark = juce::Rectangle<float> ((float) cell.getX() + 4.0f, (float) cell.getCentreY() - 4.5f, 9.0f, 9.0f).expanded (hoveredButton ? 1.0f : 0.0f);
             if (waiting) // (a slot waiting for its recording: the circle pulses in the record red — Live not captured)
             {
                 g.setColour (livePulsed (lv::arm));
@@ -1796,12 +1972,13 @@ public:
         namespace c = theme::colour;
         namespace lv = theme::livelook;
         const auto cell = r.withTrimmedTop (2).withTrimmedRight (2);
-        g.setColour (t == selectedTrack ? lv::raised : lv::surface);
+        g.setColour (t == selectedTrack || trackSet.count (t) > 0 ? lv::raised : lv::surface);
         g.fillRect (cell);
         const auto* view = state != nullptr ? &state->tracks[(std::size_t) t] : nullptr;
         // (a stop waiting for its grid point: the square pulses black ↔ the playing green, as in Live — film3)
         g.setColour (view != nullptr && view->stopping.load (std::memory_order_relaxed) ? livePulsed (lv::playing) : lv::well);
-        g.fillRect (juce::Rectangle<float> ((float) cell.getX() + 4.0f, (float) cell.getCentreY() - 4.5f, 9.0f, 9.0f));
+        g.fillRect (juce::Rectangle<float> ((float) cell.getX() + 4.0f, (float) cell.getCentreY() - 4.5f, 9.0f, 9.0f)
+                        .expanded (hovering (HoverButton::trackStop, t, -1) ? 1.0f : 0.0f)); // (round 190lr, DL-20)
         const auto armShown = ! mixer->armsShown();
         const auto arm = juce::Rectangle<int> (cell.getRight() - armWidth - 2, cell.getY(), armWidth, cell.getHeight()).withSizeKeepingCentre (armWidth, 13).toFloat();
         const auto right = armShown ? (int) arm.getX() - 2 : cell.getRight() - 1;
@@ -1972,6 +2149,8 @@ public:
         g.setColour (scene.colour != 0 ? juce::Colour (scene.colour) : c::bg3);
         g.fillRect (cell);
         const auto a = cell.withWidth (launchZone).toFloat().withSizeKeepingCentre (9.0f, 11.0f);
+        if (scene.follow.enabled && (scene.follow.a != FollowKind::none || scene.follow.b != FollowKind::none))
+            paintFollowStripes (g, cell.withWidth (launchZone), (scene.colour != 0 ? juce::Colour (scene.colour) : c::bg3).contrasting (0.18f));
         // (round 190em: a scene with its own tempo or time signature has a coloured launch triangle, as Live's cyan one)
         // (a plain scene's triangle: Live's dark grey, measured in the 190ei shot live-scenes-tempo-sig-on.png)
         const auto queuedOn = row == queuedScene && (! ui::motion::enabled() || (juce::Time::getMillisecondCounter() / classicBlinkPhaseMs) % 2 == 0);
@@ -2024,7 +2203,11 @@ public:
         g.setColour (fill);
         g.fillRect (cell);
         const auto ink = selected ? lv::ink : scene.colour != 0 ? theme::liveShade (juce::Colour (scene.colour), 0.24f) : lv::text;
-        const auto a = juce::Rectangle<float> ((float) cell.getX() + 4.0f, (float) cell.getCentreY() - 4.5f, 7.0f, 9.0f);
+        const auto a = juce::Rectangle<float> ((float) cell.getX() + 4.0f, (float) cell.getCentreY() - 4.5f, 7.0f, 9.0f)
+                           .expanded (hovering (HoverButton::scene, -1, row) ? 1.0f : 0.0f); // (round 190lr, DL-20)
+        // round 190lr (DL-14, Live's manual 16.7): a scene with a follow action has a striped Scene Launch button, as a clip
+        if (scene.follow.enabled && (scene.follow.a != FollowKind::none || scene.follow.b != FollowKind::none))
+            paintFollowStripes (g, cell.withWidth (14), theme::liveShade (fill, 0.5f));
         // (round 190im, DL-5: a launched scene's button pulses until its clips start, as a queued clip's does)
         theme::fillLaunchTriangle (g, a, row == queuedScene ? livePulsed (lv::playing) : scene.tempo > 0.0 || scene.beatsPerBar > 0 ? c::info : lv::well);
         g.setFont (liveFont()); // (round 190im: the grid's wider Live text, as the slots and headers: round 190ig's follow-up)
@@ -2055,6 +2238,17 @@ public:
         }
         g.setColour (ink);
         textcache::drawText (g, utf8 (scene.name), nameArea, juce::Justification::centred, false);
+    }
+
+    // diagonal stripes across a launch button (Live: "Clips and scenes with assigned Follow Actions are indicated by a
+    // striped Clip/Scene Launch button"), the clip version's 4 px pitch
+    static void paintFollowStripes (juce::Graphics& g, juce::Rectangle<int> zone, juce::Colour colour)
+    {
+        const juce::Graphics::ScopedSaveState keep (g);
+        g.reduceClipRegion (zone);
+        g.setColour (colour);
+        for (int k = -zone.getHeight(); k < zone.getWidth(); k += 4)
+            g.drawLine ((float) (zone.getX() + k), (float) zone.getBottom(), (float) (zone.getX() + k + zone.getHeight()), (float) zone.getY(), 1.0f);
     }
 
     // round 190ef: the scene cell's fields: 1 tempo, 2 / 3 the time signature (in the cell `r`; both parts share one box)
@@ -2405,6 +2599,31 @@ private:
         const auto edit = [this, track, scene] (std::function<void (ClipFollow&)> fn) {
             editSlot (track, scene, [fn] (ClipGridSlot& s) { fn (s.follow); });
         };
+        return followMenuFor (track, scene, f, edit);
+    }
+
+    // round 190lr (DL-14): a scene's follow action (Live: the Scene View's Follow Action controls; no Linked mode for a
+    // scene, its time counts from the scene's start)
+    juce::PopupMenu sceneFollowMenu (int scene)
+    {
+        const auto* grid = gridOf();
+        static const ClipFollow none;
+        const auto& f = grid != nullptr && scene >= 0 && scene < (int) grid->scenes.size() ? grid->scenes[(std::size_t) scene].follow : none;
+        const auto edit = [this, scene] (std::function<void (ClipFollow&)> fn) {
+            engine.editSong ([scene, fn] (Song& s) {
+                auto& g = launcher::ensureGrid (s);
+                while ((int) g.scenes.size() <= scene)
+                    g.scenes.emplace_back();
+                fn (g.scenes[(std::size_t) scene].follow);
+            });
+            repaint();
+        };
+        return followMenuFor (-1, scene, f, edit);
+    }
+
+    // the follow action items of a clip (track >= 0) or a scene (track −1)
+    juce::PopupMenu followMenuFor (int track, int scene, const ClipFollow& f, std::function<void (std::function<void (ClipFollow&)>)> edit)
+    {
         juce::PopupMenu menu;
         menu.addItem (tr ("On"), true, f.enabled, [edit, on = f.enabled] { edit ([on] (ClipFollow& x) { x.enabled = ! on; }); });
         const auto* grid = gridOf();
@@ -2413,9 +2632,9 @@ private:
             const auto current = isA ? f.a : f.b;
             for (const auto& [k, name] : followNames)
                 sub.addItem (tr (name), true, current == k, [edit, isA, k = k] { edit ([isA, k] (ClipFollow& x) { (isA ? x.a : x.b) = k; }); });
-            // jump: to a row of this column that has a clip
+            // jump: to a row of this column that has a clip (a scene: to any other scene)
             for (int r = 0; grid != nullptr && r < (int) grid->scenes.size(); ++r)
-                if (r != scene && launcher::clipAt (*grid, track, r) != nullptr)
+                if (r != scene && (track < 0 || launcher::clipAt (*grid, track, r) != nullptr))
                     sub.addItem (tr ("Jump to scene {0}", { juce::String (r + 1) }), true, current == FollowKind::jump && (isA ? f.jumpA : f.jumpB) == r, [edit, isA, r] {
                         edit ([isA, r] (ClipFollow& x) {
                             (isA ? x.a : x.b) = FollowKind::jump;
@@ -2437,6 +2656,7 @@ private:
         menu.addSubMenu (tr ("Chance A / B"), chance);
         juce::PopupMenu after;
         for (const auto n : { 1, 2, 4, 8 })
+            if (track >= 0) // (a scene has no Linked mode)
             after.addItem (tr ("{0} passes of the clip", { juce::String (n) }), true, f.linked && f.iterations == n, [edit, n] {
                 edit ([n] (ClipFollow& x) {
                     x.linked = true;
@@ -2446,7 +2666,7 @@ private:
         for (const auto bars : { 1, 2, 4, 8 })
         {
             const auto ticks = (std::int64_t) bars * engine.getSong().barTicks();
-            after.addItem (tr ("{0} bars", { juce::String (bars) }), true, ! f.linked && f.ticks == ticks, [edit, ticks] {
+            after.addItem (tr ("{0} bars", { juce::String (bars) }), true, (track < 0 || ! f.linked) && f.ticks == ticks, [edit, ticks] {
                 edit ([ticks] (ClipFollow& x) {
                     x.linked = false;
                     x.ticks = ticks;
@@ -2578,6 +2798,7 @@ public:
                       });
         if (info.beatsPerBar > 0)
             menu.addItem (tr ("Disable scene time signature"), [this, scene] { engine.editSong ([scene] (Song& s) { session::setSceneBeats (s, scene, 0); }); });
+        menu.addSubMenu (tr ("Follow Action"), sceneFollowMenu (scene)); // round 190lr (DL-14)
         menu.addSeparator();
         addGridOptions (menu);
         return menu;
@@ -2637,6 +2858,7 @@ public:
                       });
         if (info.beatsPerBar > 0)
             menu.addItem (tr ("Disable scene time signature"), [this, scene] { engine.editSong ([scene] (Song& s) { session::setSceneBeats (s, scene, 0); }); });
+        menu.addSubMenu (tr ("Follow Action"), sceneFollowMenu (scene)); // round 190lr (DL-14)
         menu.addSeparator();
         addGridOptions (menu);
         return menu;
@@ -3424,6 +3646,19 @@ bool clipGridDrag (const juce::var& description, int& track, int& scene)
     return track >= 0 && scene >= 0;
 }
 
+std::vector<int> clipGridSelectedTracks (juce::Component& grid)
+{
+    if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
+        return g->selectedTracks();
+    return {};
+}
+
+void clipGridSelectTracksForSnapshot (juce::Component& grid, std::vector<int> tracks)
+{
+    if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
+        g->selectTracksForSnapshot (std::move (tracks));
+}
+
 std::pair<int, int> clipGridSelection (juce::Component& grid)
 {
     if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
@@ -3488,6 +3723,25 @@ juce::Rectangle<int> clipGridCellForSnapshot (juce::Component& grid, int kind, i
     if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
         return g->cellForSnapshot (kind, track, scene);
     return {};
+}
+
+void clipGridHoverForSnapshot (juce::Component& grid, int kind, int track, int scene)
+{
+    if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
+        g->hoverForSnapshot (kind, track, scene);
+}
+
+void clipGridSelectRangeForSnapshot (juce::Component& grid, int track0, int scene0, int track1, int scene1)
+{
+    if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
+        g->selectRangeForSnapshot (track0, scene0, track1, scene1);
+}
+
+int clipGridSelectedCountForSnapshot (juce::Component& grid)
+{
+    if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
+        return g->rangeCountForCheck();
+    return 0;
 }
 
 std::pair<int, bool> clipGridSceneSelectionForSnapshot (juce::Component& grid)

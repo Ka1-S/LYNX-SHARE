@@ -119,6 +119,7 @@ add_library(lynx_core STATIC
     src/core/LoopStarter.cpp
     src/core/SimpleTracks.cpp
     src/core/SimplePads.cpp
+    src/core/SimpleSteps.cpp
     src/core/KeyFollow.cpp
     src/core/LoopAnalysis.cpp
     src/core/LoopKeywords.cpp

@@ -52,7 +52,7 @@ inline juce::Colour inkOn (juce::Colour fill)
 
 // --- the Simple workflow's small vector glyphs (round 190jc, design190ia SG-7..SG-10, SG-12: no more 2-5 px text glyphs
 // for ‹ › × − +). LYNX's own shapes, stroked with round caps; `r` is the glyph's box, drawn centred in it.
-enum class Glyph { chevronLeft, chevronRight, cross, plus, minus, piano, keyboard, notes, fx, pads, dials, headphones };
+enum class Glyph { chevronLeft, chevronRight, cross, plus, minus, piano, keyboard, notes, fx, pads, dials, headphones, drumMachine };
 
 inline void drawGlyph (juce::Graphics& g, Glyph glyph, juce::Rectangle<float> r, juce::Colour colour, float stroke = 1.5f)
 {
@@ -175,6 +175,18 @@ inline void drawGlyph (juce::Graphics& g, Glyph glyph, juce::Rectangle<float> r,
             const auto gap = b.getWidth() * 0.16f, cell = (b.getWidth() - gap) * 0.5f;
             for (int i = 0; i < 4; ++i)
                 g.fillRoundedRectangle (b.getX() + (float) (i % 2) * (cell + gap), b.getY() + (float) (i / 2) * (cell + gap), cell, cell, cell * 0.25f);
+            return;
+        }
+        case Glyph::drumMachine: // round 190lr, the Drum Machine tab (BandLab's drum machine mark): a box, its top strip and 3 x 2 keys
+        {
+            const auto side = juce::jmin (r.getWidth(), r.getHeight()) - stroke;
+            const auto b = juce::Rectangle<float> (side, side * 0.86f).withCentre (c);
+            g.drawRoundedRectangle (b, side * 0.14f, stroke);
+            g.drawLine (b.getX(), b.getY() + b.getHeight() * 0.32f, b.getRight(), b.getY() + b.getHeight() * 0.32f, stroke);
+            const auto cell = b.getWidth() * 0.16f;
+            for (int i = 0; i < 6; ++i)
+                g.fillRect (juce::Rectangle<float> (cell, cell).withCentre ({ b.getX() + b.getWidth() * (0.27f + 0.23f * (float) (i % 3)),
+                                                                             b.getY() + b.getHeight() * (i < 3 ? 0.53f : 0.77f) }));
             return;
         }
         case Glyph::dials: // round 190ke, the Controls tab (GarageBand's Smart Controls dial): two knobs with their pointers

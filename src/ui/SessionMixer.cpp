@@ -238,6 +238,7 @@ SessionMixerComponent::SessionMixerComponent (AudioEngine& e) : engine (e)
     setRepaintsOnMouseActivity (false);
     levels.resize ((std::size_t) maxMixerTracks * 2);
     loudest.resize ((std::size_t) maxMixerTracks, 0.0f);
+    rms.resize ((std::size_t) maxMixerTracks * 2, 0.0f);
 }
 
 int SessionMixerComponent::returnColumnsFor (const Song& song)
@@ -380,6 +381,13 @@ bool SessionMixerComponent::tick()
     auto& meterBank = engine.getMeters();
     std::vector<bool> seen ((std::size_t) maxMixerTracks, false), movedInsert ((std::size_t) maxMixerTracks, false);
     auto moved = false;
+    // round 190lr (DL-108): Live's meter shows the RMS level under the peak; the sums are asked for only while it shows
+    const auto withRms = liveLook() && sections.volume > 0;
+    if (withRms)
+    {
+        meterBank.powerWanted.store (true, std::memory_order_relaxed);
+        meterBank.powerReadMs = juce::Time::getMillisecondCounter();
+    }
     const auto take = [&] (int insert) {
         if (insert < 0 || insert >= maxMixerTracks || seen[(std::size_t) insert])
             return;
@@ -395,6 +403,24 @@ bool SessionMixerComponent::tick()
             // round 190jn (DL-107): Live's peak pill holds the loudest peak until it is clicked
             if (auto& top = loudest[(std::size_t) insert]; blockPeak > top)
                 top = blockPeak, moved = true, movedInsert[(std::size_t) insert] = true;
+        }
+        if (withRms)
+        {
+            // an RMS over ~300 ms (an exponential average of the mean squares, 30 ticks a second), never above the peak bar
+            float l = 0.0f, r = 0.0f;
+            const auto got = meterBank.takeSessionPower (insert, l, r);
+            for (int ch = 0; ch < 2; ++ch)
+            {
+                auto& shown = rms[(std::size_t) insert * 2 + (std::size_t) ch];
+                const auto before = shown;
+                const auto meanSquare = got ? (ch == 0 ? l : r) : 0.0f;
+                auto power = 0.9f * shown * shown + 0.1f * meanSquare;
+                shown = juce::jmin (std::sqrt (power), levels[(std::size_t) insert * 2 + (std::size_t) ch].level);
+                if (shown < 0.001f)
+                    shown = 0.0f;
+                if (std::abs (shown - before) > 1.0e-4f)
+                    moved = true, movedInsert[(std::size_t) insert] = true;
+            }
         }
     };
     if (sections.volume > 0)
@@ -788,24 +814,53 @@ double SessionMixerComponent::valueFor (const Hit& hit) const
     return 0.0;
 }
 
+// Round 190lr (DL-109): the inserts of the other tracks selected with this column (Shift / Ctrl+click on the grid's titles)
+std::vector<int> SessionMixerComponent::groupedInserts (int column) const
+{
+    std::vector<int> out;
+    auto* parent = getParentComponent();
+    if (parent == nullptr || column < 0 || column >= columns)
+        return out;
+    // (rollup step 10: the grid's selection holds Playlist tracks; round qafix190kq's take lanes have no column)
+    const auto tracks = clipGridSelectedTracks (*parent);
+    if (tracks.size() < 2 || std::find (tracks.begin(), tracks.end(), trackOf (column)) == tracks.end())
+        return out;
+    const auto own = insertFor (column);
+    for (const auto t : tracks)
+        if (const auto c = columnOf (t), i = c >= 0 && c < columns ? insertFor (c) : -1; i >= 0 && i != own && std::find (out.begin(), out.end(), i) == out.end())
+            out.push_back (i);
+    return out;
+}
+
 void SessionMixerComponent::setValue (const Hit& hit, double v)
 {
     const auto insert = insertFor (hit.column);
     if (insert < 0)
         return;
+    const auto others = groupedInserts (hit.column); // (round 190lr: the selected tracks move by the same amount)
     switch (hit.part)
     {
         case Part::volume:
         case Part::fader:
-            engine.editLevels ([insert, v = (float) juce::jlimit (0.0, 1.0, v)] (Song& s) {
-                if (insert < (int) s.mixer.size())
-                    s.mixer[(std::size_t) insert].volume = v;
+            engine.editLevels ([insert, others, v = (float) juce::jlimit (0.0, 1.0, v)] (Song& s) {
+                if (insert >= (int) s.mixer.size())
+                    return;
+                const auto delta = v - s.mixer[(std::size_t) insert].volume;
+                s.mixer[(std::size_t) insert].volume = v;
+                for (const auto i : others)
+                    if (i < (int) s.mixer.size())
+                        s.mixer[(std::size_t) i].volume = juce::jlimit (0.0f, 1.0f, s.mixer[(std::size_t) i].volume + delta);
             });
             break;
         case Part::pan:
-            engine.editLevels ([insert, v = (float) juce::jlimit (-1.0, 1.0, v)] (Song& s) {
-                if (insert < (int) s.mixer.size())
-                    s.mixer[(std::size_t) insert].pan = v;
+            engine.editLevels ([insert, others, v = (float) juce::jlimit (-1.0, 1.0, v)] (Song& s) {
+                if (insert >= (int) s.mixer.size())
+                    return;
+                const auto delta = v - s.mixer[(std::size_t) insert].pan;
+                s.mixer[(std::size_t) insert].pan = v;
+                for (const auto i : others)
+                    if (i < (int) s.mixer.size())
+                        s.mixer[(std::size_t) i].pan = juce::jlimit (-1.0f, 1.0f, s.mixer[(std::size_t) i].pan + delta);
             });
             break;
         case Part::send:
@@ -836,6 +891,7 @@ void SessionMixerComponent::paint (juce::Graphics& g)
             return;
         auto* parent = getParentComponent();
         const auto selected = parent != nullptr ? clipGridSelection (*parent).first : -1;
+        paintGroup = parent != nullptr ? clipGridSelectedTracks (*parent) : std::vector<int> {}; // (round 190lr, DL-109)
         {
             juce::Graphics::ScopedSaveState save (g);
             g.reduceClipRegion (juce::Rectangle<int> (0, 0, tracksWidth, getHeight()));
@@ -1128,7 +1184,10 @@ void SessionMixerComponent::paintStripLive (juce::Graphics& g, int column, int s
     const auto* m = strip.insert >= 0 && strip.insert < (int) song.mixer.size() ? &song.mixer[(std::size_t) strip.insert] : nullptr;
 
     // the strip (selected track #464646), each section's 2 px separator under it, the track-colour stripe at the foot
-    g.setColour (! main && trackOf (column) == selected ? lv::raised : lv::surface);
+    // (round 190lr's grouped strips; rollup step 10: the grid's selection holds Playlist tracks, a column shows trackOf (column))
+    g.setColour (! main && (trackOf (column) == selected
+                            || (paintGroup.size() > 1 && std::find (paintGroup.begin(), paintGroup.end(), trackOf (column)) != paintGroup.end()))
+                     ? lv::raised : lv::surface);
     g.fillRect (content);
     g.setColour (lv::separator);
     {
@@ -1341,12 +1400,24 @@ void SessionMixerComponent::paintMeterLive (juce::Graphics& g, int insert, juce:
             const auto db = juce::Decibels::gainToDecibels (level.level, -100.0f);
             const auto lit = bar.withTop (juce::jlimit (bar.getY(), bar.getBottom(), yAt (db)));
             // (one fill per colour band of Live's ramp: green below -18 dB, then towards yellow, orange and red)
+            // round 190lr (DL-108, live-meter-peak-rms.png): the RMS part in the ramp's colour (#00F758 green), the peak
+            // part above it darker (#08AB42); with no RMS reading yet the whole bar keeps the ramp's colour
+            const auto rmsLevel = rms[(std::size_t) insert * 2 + (std::size_t) ch];
+            const auto rmsTop = rmsLevel > 0.0f ? juce::jlimit (lit.getY(), lit.getBottom(), yAt (juce::Decibels::gainToDecibels (rmsLevel, -100.0f)))
+                                                : lit.getY();
+            const auto shade = [&] (juce::Colour c, int y) { return y < rmsTop ? c.withMultipliedBrightness (0.69f) : c; };
             const auto bandY = [&] (float d) { return juce::jlimit (lit.getY(), lit.getBottom(), yAt (d)); };
+            const auto green = lit.withTop (bandY (-18.0f));
             g.setColour (liveGreen);
-            g.fillRect (lit.withTop (bandY (-18.0f)));
+            g.fillRect (green.withTop (juce::jmax (green.getY(), rmsTop)));
+            if (rmsTop > green.getY())
+            {
+                g.setColour (liveGreen.withMultipliedBrightness (0.69f));
+                g.fillRect (green.withBottom (juce::jmin (green.getBottom(), rmsTop)));
+            }
             for (auto y = lit.getY(); y < bandY (-18.0f); ++y)
             {
-                g.setColour (liveLevelColour ((float) liveDbAt ((float) (y - meter.getY()), meter.getHeight())));
+                g.setColour (shade (liveLevelColour ((float) liveDbAt ((float) (y - meter.getY()), meter.getHeight())), y));
                 g.fillRect (lit.getX(), y, lit.getWidth(), 1);
             }
         }
@@ -1367,6 +1438,17 @@ void SessionMixerComponent::paintMeterLive (juce::Graphics& g, int insert, juce:
     const auto volumeDb = sessionmixer::volumeDb (song.mixer[(std::size_t) insert].volume);
     const auto hy = (float) meter.getY() + liveMeterY (std::isfinite (volumeDb) ? (float) volumeDb : -INFINITY, meter.getHeight());
     theme::fillLaunchTriangle (g, { (float) meter.getX() - 12.0f, hy - 6.5f, 11.0f, 13.0f }, lv::text); // (a cached tile)
+    // round 190lr (DL-59, Live manual 25.1 "a little LED has appeared in the slider thumb to indicate that the control is
+    // now automated"; capture live-automated-led.png): a 4 x 4 #009AAC dot at the volume slider's tip
+    const auto& automated = engine.getAutomationDisplay().automatedTargets();
+    if (std::find (automated.begin(), automated.end(), AutomationTarget { AutomationTargetKind::mixerVolume, insert }) != automated.end())
+    {
+        const juce::Point<float> tip { (float) meter.getX() - 2.5f, hy };
+        g.setColour (lv::meterWell); // (its dark ring)
+        g.fillEllipse (juce::Rectangle<float> (6.0f, 6.0f).withCentre (tip));
+        g.setColour (juce::Colour (0xff009aac));
+        g.fillEllipse (juce::Rectangle<float> (4.0f, 4.0f).withCentre (tip));
+    }
 }
 
 void SessionMixerComponent::setMeterForSnapshot (int insert, float left, float right, float holdLeft, float holdRight, float maxPeak)
@@ -1376,6 +1458,7 @@ void SessionMixerComponent::setMeterForSnapshot (int insert, float left, float r
     auto& l = levels[(std::size_t) insert * 2];
     auto& r = levels[(std::size_t) insert * 2 + 1];
     l.level = left, r.level = right, l.peak = holdLeft, r.peak = holdRight;
+    rms[(std::size_t) insert * 2] = left * 0.5f, rms[(std::size_t) insert * 2 + 1] = right * 0.5f; // (round 190lr: −6 dB under the peak)
     l.clipped = holdLeft >= 1.0f, r.clipped = holdRight >= 1.0f;
     loudest[(std::size_t) insert] = maxPeak;
     repaint();
@@ -1444,7 +1527,11 @@ void SessionMixerComponent::mouseDown (const juce::MouseEvent& e)
             break;
         case Part::activator:
             if (! popup)
-                engine.editSong ([insert, on = ! sessionmixer::isActive (song, insert)] (Song& s) { sessionmixer::setActive (s, insert, on); });
+                engine.editSong ([insert, others = groupedInserts (hit.column), on = ! sessionmixer::isActive (song, insert)] (Song& s) {
+                    sessionmixer::setActive (s, insert, on);
+                    for (const auto i : others) // (round 190lr, DL-109: every selected track)
+                        sessionmixer::setActive (s, i, on);
+                });
             break;
         case Part::solo:
             if (! popup)

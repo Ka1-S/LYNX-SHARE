@@ -65,7 +65,8 @@ bool Metronome::render (float* outLeft, float* outRight, int numSamples) noexcep
     const auto countIn = transport.countIn.load (std::memory_order_relaxed);
     const auto counting = countIn > 0.0 && ! transport.playing.load (std::memory_order_relaxed);
 
-    if (! counting && (! transport.playing.load (std::memory_order_relaxed) || ! transport.metronome.load (std::memory_order_relaxed)))
+    if (! counting && (! transport.playing.load (std::memory_order_relaxed) || ! transport.metronome.load (std::memory_order_relaxed)
+                       || (transport.metronomeOnlyRecording.load (std::memory_order_relaxed) && ! transport.recording.load (std::memory_order_relaxed))))
     {
         lastBeat = -1;
         hasLastBeat = false;

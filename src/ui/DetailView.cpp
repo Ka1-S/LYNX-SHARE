@@ -235,9 +235,17 @@ public:
         scrollBar.setAutoHide (false);
         engine.addChangeListener (this);
         showingTimer = std::make_unique<ui::TimerWhileShowing> (*this, static_cast<juce::Timer&> (*this), 30);
+        showingTimer->onRunningChanged = [this] (bool running) {
+            if (! running)
+                watchDevices (false); // (round 190lr: hidden, the audio thread stops measuring the devices' levels)
+        };
     }
 
-    ~DeviceChain() override { engine.removeChangeListener (this); }
+    ~DeviceChain() override
+    {
+        watchDevices (false);
+        engine.removeChangeListener (this);
+    }
 
     void setTrack (int t)
     {
@@ -329,7 +337,7 @@ public:
             }
             else if (insert >= 0) // the free room after the last card shows the drop hint, as the reference does [SHOT d01]
             {
-                const auto room = area.withLeft (cards.empty() ? area.getX() : cards.back().bounds.getRight() + gap);
+                const auto room = area.withLeft (cards.empty() ? area.getX() : cards.back().bounds.getRight() + cardGap());
                 if (room.getWidth() > 120)
                 {
                     g.setColour (colour::textDisabled);
@@ -342,6 +350,7 @@ public:
                 g.setColour (colour::accent);
                 g.fillRect (juce::Rectangle<int> (dropLineX (dropBefore) - 1, area.getY() + 2, 3, area.getHeight() - 4));
             }
+            paintDeviceMeters (g); // round 190lr (DL-87)
         }
         paintMeter (g);
     }
@@ -919,7 +928,7 @@ private:
                            : c.knobs.size() > 2u ? std::max (instrumentWidth, 16 + (((int) c.knobs.size() + 1) / 2) * knobColumn)
                                                    : instrumentWidth;
             c.bounds = { x, top, w, height };
-            x += w + gap;
+            x += w + cardGap();
             cards.push_back (std::move (c));
         }
         for (int i = 0; i < effectCount(); ++i)
@@ -946,7 +955,7 @@ private:
                            : fx.kind == EffectKind::plugin ? pluginWidth
                                                            : std::max (136, 16 + columns * knobColumn);
             c.bounds = { x, top, w, height };
-            x += w + gap;
+            x += w + cardGap();
             cards.push_back (std::move (c));
         }
         if (insert >= 0 && effectCount() < maxEffectSlots)
@@ -954,7 +963,7 @@ private:
             Card c;
             c.kind = Card::add;
             c.bounds = { x, top, addWidth, height };
-            x += addWidth + gap;
+            x += addWidth + cardGap();
             cards.push_back (std::move (c));
         }
         placeCustomCards();
@@ -1003,7 +1012,7 @@ private:
         // (x: the card's left with the scroll applied; the room is measured with the chain at its start, so the width
         // doesn't change while it scrolls)
         const auto area = chainArea();
-        card.widthLimit = std::max (area.getWidth() / 2, area.getRight() - (x + scroll) - gap);
+        card.widthLimit = std::max (area.getWidth() / 2, area.getRight() - (x + scroll) - cardGap());
         return std::max (foldedWidth * 2, card.preferredWidth (height - titleHeight - 6));
     }
     void placeCustomCards()
@@ -1060,8 +1069,8 @@ private:
     int dropLineX (int position) const
     {
         if (position >= 0 && position < (int) cards.size())
-            return cards[(std::size_t) position].bounds.getX() - gap / 2;
-        return cards.empty() ? chainArea().getX() : cards.back().bounds.getRight() + gap / 2;
+            return cards[(std::size_t) position].bounds.getX() - cardGap() / 2;
+        return cards.empty() ? chainArea().getX() : cards.back().bounds.getRight() + cardGap() / 2;
     }
     // a card position as a place in the effect chain (0 = the first effect)
     int effectPositionFor (int position) const
@@ -1919,8 +1928,142 @@ private:
     }
     juce::Rectangle<int> meterBounds() const { return { getWidth() - meterWidth, 4, meterWidth - 4, std::max (0, getHeight() - 16) }; }
 
+    // Round 190lr (DL-87, Live manual 23.2 "Devices in Live's tracks have input and output level meters"; capture
+    // live-device-meters.png): in Live's look a slim meter stands in the gap after each device, the level that leaves it
+    // (after the instrument: what enters the first effect). The slots' peaks come from the audio thread only while this
+    // view shows (RackRenderer's levelWanted / slotLevels, the editors' own level taps); mono (the louder side).
+    bool deviceMeters() const { return theme::livelook::active(); }
+    int cardGap() const { return deviceMeters() ? deviceMeterGap : gap; }
+    static constexpr int deviceMeterGap = 9; // (Live, L28: 9 px between two devices, the meter in its middle)
+    std::size_t slotKey (int slot) const { return (std::size_t) juce::jmax (0, insert) * (std::size_t) maxEffectSlots + (std::size_t) slot; }
+    void watchDevices (bool on)
+    {
+        std::vector<std::size_t> want;
+        if (on && deviceMeters() && insert >= 0)
+            for (int i = 0; i < effectCount() && i < maxEffectSlots; ++i)
+                want.push_back (slotKey (i));
+        if (want == watched)
+            return;
+        if (auto* times = engine.getProcessTimes())
+        {
+            for (const auto k : watched)
+                if (k < times->levelWanted.size())
+                    times->levelWanted[k].fetch_sub (1, std::memory_order_relaxed);
+            for (const auto k : want)
+                if (k < times->levelWanted.size())
+                    times->levelWanted[k].fetch_add (1, std::memory_order_relaxed);
+            watched = std::move (want);
+        }
+        else
+            watched.clear();
+    }
+    // the meter after card `i` (empty: none): Live's 2 + 1 + 2 px well in the middle of the gap, centred on the device's
+    // height (L28: 108 of 188 px; its top 11 px cut off by a line, as Live's)
+    juce::Rectangle<int> deviceMeterBounds (int i) const
+    {
+        if (! deviceMeters() || i < 0 || i >= (int) cards.size())
+            return {};
+        const auto& c = cards[(std::size_t) i];
+        if (c.kind == Card::add || (c.kind == Card::instrument && effectCount() == 0))
+            return {};
+        const auto inset = juce::roundToInt ((float) c.bounds.getHeight() * 0.21f);
+        return { c.bounds.getRight() + (deviceMeterGap - 5) / 2 + 1, c.bounds.getY() + inset, 5, juce::jmax (0, c.bounds.getHeight() - 2 * inset) };
+    }
+    // its level, one side: an effect's output, the instrument's = the first effect's input
+    float takeDeviceLevel (const Card& c, int side)
+    {
+        auto* times = engine.getProcessTimes();
+        if (times == nullptr)
+            return 0.0f;
+        auto& sides = c.kind == Card::effect ? times->slotOutputSides : times->slotInputSides;
+        const auto k = (c.kind == Card::effect ? slotKey (c.index) : slotKey (0)) * 2 + (std::size_t) side;
+        return k < sides.size() ? sides[k].exchange (0.0f, std::memory_order_relaxed) : 0.0f;
+    }
+    void tickDeviceMeters()
+    {
+        watchDevices (true);
+        if (! deviceMeters())
+            return;
+        if (deviceLevels.size() != cards.size() * 2)
+            deviceLevels.assign (cards.size() * 2, {});
+        for (int i = 0; i < (int) cards.size(); ++i)
+        {
+            const auto r = deviceMeterBounds (i);
+            if (r.isEmpty())
+                continue;
+            for (int side = 0; side < 2; ++side)
+            {
+                auto& m = deviceLevels[(std::size_t) i * 2 + (std::size_t) side];
+                const auto before = m.level;
+                const auto beforePeak = m.peak;
+                m.tick (takeDeviceLevel (cards[(std::size_t) i], side));
+                if (std::abs (m.level - before) > 1e-4f || std::abs (m.peak - beforePeak) > 1e-4f)
+                    repaint (r.expanded (1));
+            }
+        }
+    }
+    void paintDeviceMeters (juce::Graphics& g)
+    {
+        if (! deviceMeters())
+            return;
+        namespace lv = theme::livelook;
+        for (int i = 0; i < (int) cards.size(); ++i)
+        {
+            const auto r = deviceMeterBounds (i);
+            if (r.isEmpty() || ! g.clipRegionIntersects (r))
+                continue;
+            // (Live, capture L28: two 2 px wells #181818 with the window between, a 1 px #363636 line 11 px under the top;
+            // the level #00F758, the peak hold a 1 px line)
+            const auto body = r.withTrimmedTop (12);
+            for (int side = 0; side < 2; ++side)
+            {
+                const auto bar = juce::Rectangle<int> (r.getX() + side * 3, r.getY(), 2, r.getHeight());
+                g.setColour (lv::meterWell);
+                g.fillRect (bar);
+                g.setColour (lv::surface);
+                g.fillRect (bar.getX(), r.getY() + 11, 2, 1);
+                const auto& m = (std::size_t) i * 2 + (std::size_t) side < deviceLevels.size() ? deviceLevels[(std::size_t) i * 2 + (std::size_t) side]
+                                                                                               : meters::PeakHold {};
+                const auto yOf = [&body] (float gain) {
+                    const auto db = juce::Decibels::gainToDecibels (gain, -60.0f);
+                    return body.getBottom() - juce::roundToInt ((float) body.getHeight() * juce::jlimit (0.0f, 1.0f, (db + 60.0f) / 66.0f));
+                };
+                if (m.level > 0.0f)
+                {
+                    g.setColour (juce::Colour (0xff00f758)); // (Live's meter green)
+                    g.fillRect (bar.withTop (yOf (m.level)).withBottom (body.getBottom()));
+                }
+                if (m.peak > 0.001f)
+                {
+                    g.setColour (juce::Colour (0xff00f758));
+                    g.fillRect (bar.getX(), juce::jmin (body.getBottom() - 1, yOf (m.peak)), 2, 1);
+                }
+                if (m.clipped)
+                {
+                    g.setColour (juce::Colour (0xffff3a3a));
+                    g.fillRect (bar.withHeight (11));
+                }
+            }
+        }
+    }
+    std::vector<std::size_t> watched;
+    std::vector<meters::PeakHold> deviceLevels;
+public:
+    void deviceLevelsForSnapshot (float left, float right)
+    {
+        deviceLevels.assign (cards.size() * 2, {});
+        for (std::size_t i = 0; i < deviceLevels.size(); ++i)
+        {
+            deviceLevels[i].level = i % 2 == 0 ? left : right;
+            deviceLevels[i].peak = juce::jmin (1.0f, (i % 2 == 0 ? left : right) * 1.25f);
+        }
+        repaint();
+    }
+private:
+
     void timerCallback() override
     {
+        tickDeviceMeters(); // round 190lr (DL-87)
         if (insert < 0 || hooks.levelOf == nullptr)
             return;
         bool moved = false;
@@ -4000,6 +4143,7 @@ int DetailView::chainInsertForCheck() const { return chain->insertShown(); }
 int DetailView::chainChannelForCheck() const { return chain->channelShown(); }
 bool DetailView::isFoldedForCheck (int card) const { return chain->isCardFolded (card); }
 void DetailView::toggleFoldForCheck (int card) { chain->toggleCardFold (card); }
+void DetailView::deviceLevelsForSnapshot (float left, float right) { chain->deviceLevelsForSnapshot (left, right); }
 // ---------------------------------------------------------------------------------------------------------------------
 // Round 190dr: the description of a device card dragged out of the Device View
 namespace

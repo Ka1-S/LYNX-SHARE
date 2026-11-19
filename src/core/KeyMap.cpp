@@ -436,6 +436,12 @@ std::vector<Action> makeActions()
         { "browser.closeFolder", TR_NOOP ("Close the folder (or go to the parent folder)"), Context::browser, { chord (left) } },
         { "browser.openFolder", TR_NOOP ("Open the folder"), Context::browser, { chord (right) } },
         { "browser.rename", TR_NOOP ("Rename the selected plugin (Plugin database)"), Context::browser, { chord (f2) } },
+        // round 190lr (DF-97): FL's "Use (F3) to skip to the next matching item" of a search (Shift+F3: the previous one)
+        { "browser.findNext", TR_NOOP ("Next search match"), Context::browser, { chord (f3) } },
+        { "browser.findPrevious", TR_NOOP ("Previous search match"), Context::browser, { chord (f3, shift) } },
+        // round 190lr (DF-96 FL's navigation history; DL-102 Live's Ctrl+[ / Ctrl+])
+        { "browser.historyBack", TR_NOOP ("Previous location"), Context::browser, { chord (backspace), chord ('[', ctrl) } },
+        { "browser.historyForward", TR_NOOP ("Next location"), Context::browser, { chord (backspace, shift), chord (']', ctrl) } },
         // Round 190ce: the Browser's collections with the reference DAW's keys (1-7 put the selected item into a colour
         // collection or take it out, 0 takes it out of all; docs/analise/REA_rodada190ce.md §1). Plain keys: the typing
         // keyboard keeps them while it is on.
@@ -454,6 +460,7 @@ std::vector<Action> makeActions()
         { "mixer.linkChannels", TR_NOOP ("Link the selected channels to the selected insert"), Context::mixer, { chord ('L', ctrl) } },
         { "mixer.linkChannelsFrom", TR_NOOP ("Link the selected channels to inserts starting from the selected one"), Context::mixer, { chord ('L', ctrl | shift) } },
         { "mixer.selectLinkedChannels", TR_NOOP ("Select the channels linked to the selected insert"), Context::mixer, { chord ('L', alt) } },
+        { "mixer.waveforms", TR_NOOP ("Waveforms instead of the peak meters"), Context::mixer, { chord ('W', alt) } }, // round 190lr (DF-60)
         // FL's mixer track menu keys (round 167k, the DFM's ShortCut values: F2, S, Alt+R, Shift+Alt+R)
         { "mixer.rename", TR_NOOP ("Rename and color the selected mixer track"), Context::mixer, { chord (f2) } },
         { "mixer.audioEditor", TR_NOOP ("Open the audio editor"), Context::mixer, { chord ('E', ctrl) } },
