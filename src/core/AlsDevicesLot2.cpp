@@ -657,6 +657,7 @@ bool limiterToApex (const Element& device, Translated& out)
         return false;
     out.slot = makeEffectSlot (EffectKind::apexLimiter);
     auto& p = out.slot.params;
+    p[(std::size_t) pRevision] = 0.0f; // round 190lp: the map was measured on the laws before the styles' refit
     const Put put { device, out };
     const auto gain = manual (device, "Gain", 0.0);
     put ("Gain", pGain, [] (double db) { return linValue (db, 0.0, 30.0); }, 0.0);           // [DATA −24 … 24 dB]
@@ -694,6 +695,7 @@ bool gateToSentry (const Element& device, Translated& out)
         return false;
     out.slot = makeEffectSlot (EffectKind::sentryGate);
     auto& p = out.slot.params;
+    p[(std::size_t) revision] = 0.0f; // round 190lp: the map was measured on the gate before the level gate's refit
     const Put put { device, out };
     p[style] = styleValue (Style::classic);
     // Threshold: a linear gain [DATA 0.000316 … 1.995] → −60 … 0 dB
@@ -728,6 +730,7 @@ bool expanderToSentry (const Element& device, Translated& out)
         return false;
     out.slot = makeEffectSlot (EffectKind::sentryGate);
     auto& p = out.slot.params;
+    p[(std::size_t) revision] = 0.0f; // round 190lp: (as above)
     const Put put { device, out };
     // Expand [DOC]: what is over the threshold comes out (ratio) dB louder per dB — Sentry's Upward style lifts by
     // (ratio − 1) dB per dB over its upward threshold, the same curve

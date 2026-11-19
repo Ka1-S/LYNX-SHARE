@@ -107,6 +107,7 @@ TEST (ember_characters_match_the_measured_styles_round150b)
     using namespace lynx;
     namespace em = mixsuite::ember;
     auto p = makeEffectSlot (EffectKind::ember).params;
+    p[em::revision] = 0.0f; // round 190kw: round 150's measured characters (a new Ember runs the Saturn law)
     // [EXEC] the trial, 1 kHz sine: the fundamental's gain (dB) at a level for (style, drive %) — D:\lynx-work\parity150\b\an1.json
     struct Case { int style; double drive, inDb, gainDb; };
     // (an1.json's amplitudes read 1.76 dB high — the energy of five Hann bins — corrected here)

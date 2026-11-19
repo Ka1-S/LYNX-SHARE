@@ -71,7 +71,13 @@ enum Param
     // translators (Waves SSLComp) set it. Threshold / ratio / knee / attack / release keep their ranges and mean, in
     // this law: the detector's threshold, 1 + the loop gain, the knee's width (dB), and the RC time constants (ms);
     // Auto release adds a slow second capacitor (consoleAuto* in DynamicsSuite.cpp)
-    busLaw = count
+    busLaw = count,
+    // round 190kw, hidden (not in the info: no control, no text; saved while non-zero; after busLaw, as the 0.1.30 rollup
+    // orders it; busLaw, when on, takes precedence): revision 1 runs the reference's
+    // own law for Clean, Classic and Opto (REA_rodada190kw §1: the reduction smoothed by each style's two-stage follower,
+    // its knee shape, its attack / release scaling). A new Crest and a translated Pro-C 3 state get 1; a project or
+    // preset saved before keeps 0 (the fitted laws, bit for bit)
+    revision
 };
 enum class Trigger { off, hostSync, midi };
 Trigger triggerOf (float v) noexcept;
@@ -184,7 +190,14 @@ enum Global { xover1 = legacyBands * fieldsPerBand, xover2, xover3, slope, looka
               // round tp172b6 [EXEC] (Pro-MB's Audition, Expert panel): the output becomes what the band's detector hears (0 off,
               // k / 6 band k): level, range, threshold and mix don't touch it, the Output does, a switched-off band still sounds
               audition = rev152 + 1,
-              count = audition + 1 };
+              count = audition + 1,
+              // round 190lg, hidden (not in the info: no control, no text; saved while non-zero): revision 1 runs the
+              // reference's own band compander graph (REA_rodada190lg §7: the detector with its soft range, a peak hold
+              // and a low pass timed by the look-ahead, two followers joined by a max) for the bands that compress
+              // downward or expand upward; `lookaheadSwitch` is the reference's look-ahead switch under revision 1
+              // (1 on: each band's detector leads by 500 / its centre frequency + its own look-ahead, the audio waits
+              // 20 ms). Only the Pro-MB translator sets them; a project saved before keeps 0 (bit for bit)
+              revision = count, lookaheadSwitch = count + 1 };
 inline int param (int band, int field) noexcept
 {
     return band < legacyBands ? band * fieldsPerBand + field : band5 + (band - legacyBands) * fieldsPerBand + field;
@@ -286,7 +299,12 @@ enum Param
     // over Release, whatever the level does meanwhile (the style's level curve, ratio and knee are not used). Measured
     // black-box on a drum-gate reference's probes (docs/PARITY.md "Round 190dm").
     trigger, sensitivity, releaseShape,
-    count
+    count,
+    // round 190lp, hidden (not in the info: no control, no text; saved while non-zero): revision 1 runs the level gate's
+    // algorithms refitted black-box on the reference gate's renders (the gain moves in dB: opening, a wait, a smooth
+    // closing curve per style). A new Sentry and a translated Pro-G state get 1; a project or preset saved before (and
+    // the Live maps / substitutes) keep 0, bit for bit
+    revision
 };
 enum class Shape { smooth, mid, sharp };
 bool transientTrigger (const EffectParams& p) noexcept;

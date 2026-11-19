@@ -130,7 +130,7 @@ TEST (parity190ly_echoform_valhalla_law_fades_at_feedback_100_and_keeps_the_time
 {
     using namespace lynx;
     namespace ef = echosuite::echoform;
-    CHECK ((int) ef::valhallaLaw == (int) ef::revision + 1);
+    CHECK ((int) ef::valhallaLaw == (int) ef::lineLaw + 1); // (after round 190kw's lineLaw since the 190mb merge)
     CHECK (makeEffectSlot (EffectKind::echoform).params[(std::size_t) ef::valhallaLaw] == 0.0f); // a new Echoform: as before
     PluginIdentity id;
     id.format = ForeignPlugin::Format::vst3;
@@ -189,7 +189,7 @@ TEST (parity190ly_epoch_concert_hall_short_decay_trim)
 {
     using namespace lynx;
     namespace ep = verbs::epoch;
-    CHECK (ep::shortTrim == ep::revision + 1 && effectInfo (EffectKind::epochVerb).params.size() == (std::size_t) ep::paramCount);
+    CHECK (ep::shortTrim == ep::loopLaw + 1 && effectInfo (EffectKind::epochVerb).params.size() == (std::size_t) ep::paramCount);
     const auto s = makeEffectSlot (EffectKind::epochVerb);
     CHECK (s.params[(std::size_t) ep::shortTrim] == 1.0f && savedEffectParamCount (s) == (std::size_t) ep::shortTrim + 1);
     auto rev1 = s; // saved by 0.1.30 before this round

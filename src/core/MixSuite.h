@@ -510,8 +510,32 @@ enum Param
     // speed losses fitted black-box on the reference tape saturator's renders) in the single-band mode, and the tape
     // speed it runs at (30, 15, 7½, 3¾, 1⅞ ips; 15 by default). Classic = the tape curve of round 108 … 190, bit for bit.
     law, tapeSpeed,
-    count
+    count,
+    // round 190kw, hidden (not in the info: no control, no text; saved while non-zero): the Saturn styles' own laws
+    // (docs/PARITY.md "Round 190kw", recovered by static analysis of the reference): a band whose character is one of
+    // the reference's styles runs its curve, its drive range with the reference's level compensation and its own EQ
+    // before / after the curve (core/EmberSaturnStyles.inc), and its tone stack. A new Ember and a translated Saturn 2
+    // state get 1; a project or preset saved before keeps 0 (round 150's measured characters, bit for bit).
+    // `lawRate` 1 = the reference's High Quality "Off": those bands run their curve at the base rate (no oversampling,
+    // the same latency); 0 = Ember's Oversampling.
+    revision = count,
+    lawRate
 };
+// round 190kw: the Saturn law (`revision`). Ember's Drive keeps its scale (0 … +36 dB); the reference's normalised drive
+// is referenceDrive (driveDb) = 1.2 × the parameter value (the translator's value = 30 / 36 × the reference's drive)
+bool saturnLaw (const EffectParams& p) noexcept;
+bool saturnRaw (const EffectParams& p) noexcept;   // lawRate: the base rate for the law's bands
+bool lawCharacter (int k) noexcept;                // character k (1 … 28) runs the law (the effect styles keep round 150's)
+// the reference style s's (0 … 27) transfer curve with its power and negative-side scale (no gains)
+float saturnCurve (int s, float x) noexcept;
+double saturnPreDb (int s, double referenceDrive) noexcept;   // the gain before the curve (dB): lo + (hi − lo) · drive
+// the level compensation after the curve: 10^(trim / 20) · 2C / (F (G·C) − min (F (−G·C), 0)), C = 10^(ref / 20): a
+// sine at the style's reference level keeps its peak-to-peak level
+double saturnPostGain (int s, double referenceDrive) noexcept;
+// round 190lg: the reference's channel output soft clipper (threshold 0 dB, small-signal gain 9/8) and the styles it
+// measures on (all but the Subtle ones and the transformers)
+bool saturnClipStyle (int s) noexcept;
+float saturnClip (float x) noexcept;
 constexpr int tapeSpeeds = 5;
 int tapeSpeedIndex (float v) noexcept;          // 0 … 4 = 30, 15, 7½, 3¾, 1⅞ ips
 const char* tapeSpeedName (int k) noexcept;

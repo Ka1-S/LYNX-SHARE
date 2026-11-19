@@ -158,6 +158,7 @@ TEST (prism_old_projects_keep_classic_dynamic_round147)
     auto crest = makeEffectSlot (EffectKind::crestCompressor);
     auto before = crest.params;
     before[(std::size_t) dyn::crest::law] = 0.0f;
+    before[(std::size_t) dyn::crest::revision] = 0.0f; // round 190kw: … and the V1 / V2 styles' revision
     upgradeLoadedEffectParams (crest, 3);
     CHECK (crest.params == before);
 }

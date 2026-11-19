@@ -86,6 +86,7 @@ inline std::vector<EffectSlot> chain (const Options& options = {})
     {
         namespace s = dyn::sentry;
         auto gate = makeEffectSlot (EffectKind::sentryGate);
+        gate.params[(std::size_t) s::revision] = 0.0f; // round 190lp: the chain was tuned on the gate before its refit
         gate.params[s::style] = s::styleValue (s::Style::clean);
         gate.params[s::threshold] = valueFor ([] (float v) { return s::thresholdDb (v); }, expanderThresholdDb);
         gate.params[s::ratio] = valueFor ([] (float v) { return s::ratioOf (v); }, expanderRatio);
@@ -108,6 +109,7 @@ inline std::vector<EffectSlot> chain (const Options& options = {})
     {
         namespace c = dyn::crest;
         auto comp = makeEffectSlot (EffectKind::crestCompressor);
+        comp.params[c::revision] = 0.0f; // round 190kw: this chain was tuned on the fitted laws (revision 0)
         comp.params[c::style] = c::styleValue (c::Style::clean);
         comp.params[c::threshold] = valueFor ([] (float v) { return c::thresholdDb (v); }, compThresholdDb);
         comp.params[c::ratio] = c::ratioValue (compRatio);

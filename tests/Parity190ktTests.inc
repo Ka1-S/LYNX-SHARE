@@ -68,7 +68,11 @@ TEST (parity190kt_crest_console_law_is_hidden_and_off_for_new_and_old_crests)
     const auto& info = effectInfo (EffectKind::crestCompressor);
     CHECK (info.params.size() == (std::size_t) cr::count && cr::busLaw == cr::count); // hidden: no control, no string
     auto s = makeEffectSlot (EffectKind::crestCompressor);
-    CHECK (s.params[(std::size_t) cr::busLaw] == 0.0f && savedEffectParamCount (s) <= (std::size_t) cr::count);
+    // (190mb merge, as the rollup's step 8: a new Crest has round 190kw's revision 1, the last hidden parameter, so it
+    // saves up to there)
+    CHECK (s.params[(std::size_t) cr::busLaw] == 0.0f && savedEffectParamCount (s) == (std::size_t) cr::revision + 1);
+    s.params[(std::size_t) cr::revision] = 0.0f; // (as every Crest saved before round 190kw)
+    CHECK (savedEffectParamCount (s) <= (std::size_t) cr::count);
     s.params[(std::size_t) cr::busLaw] = 1.0f;
     CHECK (savedEffectParamCount (s) == (std::size_t) cr::busLaw + 1);
 }

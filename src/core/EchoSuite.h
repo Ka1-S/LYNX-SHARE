@@ -128,12 +128,23 @@ enum Param
     // measured 1/6 ms behind the dry. 0 = rounds 147 / 150 (a project or preset saved before loads without it, so it
     // keeps that sound bit for bit). Read only with an echo voicing
     revision = paramCount,
+    // round 190kw, hidden (not in the info: no control, no string; saved while non-zero): the line law. 1 = the clean
+    // digital line measured on refcap030's Timeless 3 captures (only a translated Timeless 3 state sets it): the dry / wet
+    // law dry = min (1, 2 (1 − mix)), wet = min (1, 2 mix); the delay read at whole samples through a short linear-phase
+    // low-pass (a Kaiser-windowed sinc fitted per rate, see lineLawKernel) and the line bounded by a wide soft limit
+    // (lineLawLimit · tanh (x / lineLawLimit)) instead of the Clean character's shaper and the 2 tanh (x / 2). Without a
+    // voicing only. 0 (the default: every project and preset saved before) = the engine as it was, bit for bit
+    lineLaw,
     // round 190ly, hidden (no control, no string; saved while non-zero): the ValhallaDelay role's loop laws, set only by the
     // ValhallaDelay translator (the substitute table's `replaced` items): the loop diffusion inside the echo time (the
     // reference keeps the time and smears around it) with its measured spread, and the loop gain over Feedback measured on
     // refcap030's captures (40 / 70 / 100 / 160 %). Without a voicing; 0 = as before (every other Echoform)
-    valhallaLaw
+    valhallaLaw // (round 190mb merge: after round 190kw's lineLaw, as the 0.1.30 rollup orders 190kw first)
 };
+// round 190kw: the line law's read filter at `rate` — the taps of a linear-phase low-pass (2 · half + 1 of them, half ≤ 16)
+// fitted on the reference's echoes at 44.1 / 48 / 96 kHz (the nearest of those rates is used)
+int lineLawKernel (double rate, std::array<float, 33>& taps) noexcept;
+constexpr double lineLawLimit = 5.5;
 enum class Style { single, ratio, quad, dual, pingPong }; // the two-time styles last (the panel shows the right time for both)
 // in the panel's order: the modulation section shows wow / flutter (tape), rate / depth (lo-fi … phaser), shift / detune
 // (shifter) or pitch / detune (pitch, reverse, detune) — contiguous ranges of the Mode value

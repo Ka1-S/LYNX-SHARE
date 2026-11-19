@@ -196,6 +196,7 @@ inline void finish (Song& song, int look, float intensity, float inputDb, float 
     m.inputDb = inputDb;
     looks::apply (song, m);
     auto limiter = makeEffectSlot (EffectKind::apexLimiter);
+    limiter.params[(std::size_t) apex::pRevision] = 0.0f; // round 190lp: the demo keeps the master it was tuned on
     limiter.params[(std::size_t) apex::pGain] = limiterGainDb / 30.0f;      // (0 … 30 dB)
     limiter.params[(std::size_t) apex::pCeiling] = (30.0f + demoCeilingDb) / 30.0f; // (−30 … 0 dB)
     limiter.params[(std::size_t) apex::pTruePeak] = 1.0f;

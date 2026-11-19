@@ -9,6 +9,7 @@
 #include "core/ApexLimiter.h"
 #include "core/LuxeVerb.h"
 #include "core/DynamicsSuite.h"
+#include "core/EchoSuite.h"
 #include "core/FacetEq.h"
 #include "core/MixSuite.h"
 
@@ -248,6 +249,7 @@ int fromProC3 (const State& s, EffectSlot& slot)
     set (output, linValue (levelDb (s.at (91)) + levelDb (s.at (15)), -36.0, 36.0));
     set (oversampling, (float) std::clamp (roundIndex (s.at (94)), 0, 3) / 3.0f);
     set (maxLookahead, (float) std::clamp (roundIndex (s.at (95)), 0, 5) / 5.0f);
+    set (revision, 1.0f); // round 190kw: the reference's own V1 laws (Clean / Classic / Opto)
     return n;
 }
 
@@ -346,6 +348,9 @@ int fromProMB (const State& s, EffectSlot& slot)
     set (Global::processingMode, (float) std::clamp (roundIndex (s.at (139)), 0, 2) * 0.5f);
     set (Global::oversampling, (float) std::clamp (roundIndex (s.at (140)), 0, 2) * 0.5f);
     set (Global::panMode, 1.0f); // the reference's band pan is always mid / side (state 14: −1 … +1)
+    // round 190lg: the reference's own band compander graph (hidden revision 1) and its look-ahead switch (state 141)
+    p[(std::size_t) revision] = 1.0f;
+    p[(std::size_t) lookaheadSwitch] = s.at (141) >= 0.5f ? 1.0f : 0.0f;
     return n;
 }
 
@@ -400,6 +405,7 @@ int fromProG (const State& s, EffectSlot& slot)
     set (dryPan, expert ? linValue (s.at (23), -1.0, 1.0) : 0.5f);
     set (channelMode, s.at (27) >= 0.5f ? 1.0f : 0.0f);
     set (input, linValue (levelDb (s.at (28)), -24.0, 24.0));
+    p[(std::size_t) revision] = 1.0f; // round 190lp: the algorithms' black-box refit (hidden revision 1)
     return n;
 }
 
@@ -448,7 +454,8 @@ int fromSaturn2 (const State& s, EffectSlot& slot)
         set (bandParam (b, 0), (float) (int) ourStyle (roundIndex (s.at (base + 3))) / 3.0f);
         // round 150: the measured character of their style k (character k + 1, REA_rodada150b)
         set (characterParam (b), (float) (std::clamp (roundIndex (s.at (base + 3)), 0, characters - 1) + 1) / (float) characters);
-        // drive 0 … 100 % → 0 … +30 dB of ours (their 50 % already saturates a −6 dBFS tone hard)
+        // drive 0 … 100 % → 0 … +30 dB of ours (their 50 % already saturates a −6 dBFS tone hard); round 190kw: with the
+        // Saturn law this is the reference's normalised drive itself (referenceDrive (driveDb) = 36 / 30 × the value)
         set (bandParam (b, 1), clamp01 (30.0 * std::clamp ((double) s.at (base + 4), 0.0, 1.0) / 36.0));
         set (bandParam (b, 2), clamp01 (s.at (base + 10) / 100.0));
         const auto enabled = s.at (base + 13) >= 0.5f;
@@ -492,6 +499,11 @@ int fromSaturn2 (const State& s, EffectSlot& slot)
     // band b at 6 + 13b: +0 crossover, +2 drive, +4 level, +12 mix)
     set (processing, s.at (696) >= 0.5f ? 1.0f : 0.0f);
     set (effectLaw, 1.0f);
+    // round 190kw: the styles' own laws (hidden revision) and 698 High Quality: 0 off = the law's curve at the base rate
+    // (lawRate), as the reference's; Good (8×) / Superb (32×) keep Ember's Oversampling (4×: 8× scored no better on the
+    // lab files and costs twice the CPU)
+    set (revision, 1.0f);
+    set (lawRate, roundIndex (s.at (698)) <= 0 ? 1.0f : 0.0f);
     if (s.count >= 951)
     {
         std::array<double, 2> depth { 1.0, 1.0 };
@@ -621,7 +633,10 @@ int fromProQ4 (const State& s, EffectSlot& slot)
         {
             set (facet::rangeParam0 + band, facet::rangeValue (rangeDb));
             if (s.at (base + 11) >= 0.5f)
+            {
                 set (facet::autoThresholdParam0 + band, 1.0f);
+                p[(std::size_t) facet::autoRevisionParam] = 1.0f; // round 190lg: the reference's own structure
+            }
             else
             {
                 const double v = std::clamp ((double) s.at (base + 12), 0.0, 1.0);
@@ -743,6 +758,7 @@ int fromProL2 (const State& s, EffectSlot& slot)
     set (apex::pUnity, s.at (15) >= 0.5f ? 1.0f : 0.0f);
     set (apex::pAudition, s.at (16) >= 0.5f ? 1.0f : 0.0f);
     set (apex::pCeiling, linValue (s.at (18), -30.0, 0.0));
+    p[(std::size_t) apex::pRevision] = 1.0f; // round 190lp: the styles' black-box refit (hidden revision 1)
     if (s.at (17) >= 0.5f)
         slot.enabled = false;
     return n;
@@ -803,6 +819,176 @@ int fromProR2 (const State& s, EffectSlot& slot)
     return n;
 }
 
+// ---------------------------------------------------------------- Timeless 3 -> Echoform (round 190kw)
+namespace
+{
+// The Delay Time knob (value 0, normalised 0 … 1 = 5 ms … 5 s): read [EXEC] off refcap030's renders (the echo's sample
+// position at 44.1 / 48 / 96 kHz) and the trial's own display texts; monotone cubic in log ms between the points
+constexpr std::array<double, 11> timelessN { 0.0, 0.2, 0.247028, 0.25, 0.29334, 0.304714, 0.361589, 0.5, 0.75, 0.8, 1.0 };
+constexpr std::array<double, 11> timelessMs { 5.0, 174.8125, 249.979, 254.75, 350.0, 375.0, 500.0, 804.195, 2490.01, 3176.81, 5000.0 };
+} // namespace
+
+double timeless3DelayMs (float v) noexcept
+{
+    constexpr int n = (int) timelessN.size();
+    const double x = std::clamp ((double) v, 0.0, 1.0);
+    std::array<double, 11> y {}, d {}, m {};
+    for (int i = 0; i < n; ++i)
+        y[(std::size_t) i] = std::log (timelessMs[(std::size_t) i]);
+    for (int i = 0; i + 1 < n; ++i)
+        d[(std::size_t) i] = (y[(std::size_t) i + 1] - y[(std::size_t) i]) / (timelessN[(std::size_t) i + 1] - timelessN[(std::size_t) i]);
+    m[0] = d[0];
+    m[(std::size_t) n - 1] = d[(std::size_t) n - 2];
+    for (int i = 1; i + 1 < n; ++i) // Fritsch-Carlson: harmonic mean of the neighbouring slopes (monotone)
+    {
+        const auto a = d[(std::size_t) i - 1], b = d[(std::size_t) i];
+        m[(std::size_t) i] = a * b <= 0.0 ? 0.0 : 2.0 * a * b / (a + b);
+    }
+    int i = 0;
+    while (i + 2 < n && x > timelessN[(std::size_t) i + 1])
+        ++i;
+    const auto h = timelessN[(std::size_t) i + 1] - timelessN[(std::size_t) i], t = (x - timelessN[(std::size_t) i]) / h;
+    const auto t2 = t * t, t3 = t2 * t;
+    const auto ly = (2 * t3 - 3 * t2 + 1) * y[(std::size_t) i] + (t3 - 2 * t2 + t) * h * m[(std::size_t) i]
+                    + (-2 * t3 + 3 * t2) * y[(std::size_t) i + 1] + (t3 - t2) * h * m[(std::size_t) i + 1];
+    return std::exp (ly);
+}
+
+// layout (FFBS v1, 1007 values, one per parameter of the plug-in's own VST3 list in its order — refcap182's parameter dumps
+// name every index, and the static parameter-set order agrees; [EXEC] = moved by the capture's own parameter sets in
+// refcap030 / refcap182, [ORDER] = known from the list only): 0 delay time (norm) [EXEC],
+// 1 delay time pan (−2 … 2: the time × 2^|pan| on one side) [ORDER], 2 delay offset (0 = 100 %) [ORDER], 3 delay sync
+// (Free, 1/2, 1/4, 1/8, 1/16 note) [ORDER], 4 read mode (tape / stretch) [EXEC], 5 freeze [ORDER], 6 ping pong (off, L-R,
+// R-L) [EXEC], 7 … 81 fifteen extra taps, 82 … 84 main tap, 85 feedback (0 … 2 = 0 … 200 %) [EXEC], 86 feedback pan,
+// 87 cross feedback mix, 88 / 89 feedback invert L / R, 90 + 9 k filter k (6: log2 Hz [EXEC], gain, pan, peak, style
+// [EXEC], shape (low pass, high pass, band pass, bell, low shelf, high shelf, notch), slope (6 … 48 dB/oct), enabled,
+// used) [ORDER], 144 filter routing, 145 drive / 146 on, 147 lo-fi / 148 on, 149 diffuse / 150 on, 151 dynamics / 152 on,
+// 153 pitch shift / 154 on, 157 stereo width (0 … 1) [EXEC], 158 wet level (linear), 159 wet pan, 160 mix (−1 … 1 =
+// 0 … 100 %) [EXEC], 752 channel mode (L/R, M/S) [EXEC].
+// Echoform's Clean mode with the line law (hidden; see echoform::lineLaw): the reference's dry / wet law (dry at unity up
+// to 50 %), its read filter and wide limit, a 15.5 Hz low cut in the loop (measured: the echo's DC tail), the delay at
+// whole samples. Ping pong: the start side fed with its own input (the line law; measured) and the feedback per hop
+// (Echoform's ping-pong without pairs loops √gain per side, so its feedback is the square). Filters only when used and enabled (none of the captures
+// uses one: the shapes / slopes follow the plug-in's lists, low pass → the high cut, high pass → the low cut, unmeasured);
+// drive, diffuse, freeze, time / feedback pan, cross feedback, wet level / pan by meaning (unmeasured). Not carried over:
+// the extra taps, lo-fi, dynamics, pitch shift, feedback invert, the M/S channel mode, the modulation sources.
+int fromTimeless3 (const State& s, EffectSlot& slot)
+{
+    if (slot.kind != EffectKind::echoform || s.named || s.count != 1007 || s.values.size() < 1007 || ! finiteAll (s, 161))
+        return 0;
+    namespace e = echosuite::echoform;
+    auto& p = slot.params;
+    const auto set = [&p] (int k, double v) { p[(std::size_t) k] = clamp01 (v); };
+    set (e::mode, e::modeValue (e::Mode::clean));
+    set (e::age, 0.0);
+    set (e::modDepth, 0.0);
+    set (e::wow, 0.0);
+    set (e::flutter, 0.0);
+    set (e::voicing, 0.0);
+    set (e::satType, 0.0);
+    set (e::tapeVoicing, 0.0);
+    set (e::hybrid, 0.0);
+    set (e::rhythm, 0.0);
+    set (e::spread, 0.5);
+    set (e::pairs, 0.0);
+    set (e::output, 0.5);
+    set (e::inputLevel, 0.5);
+    set (e::diffusion, 0.0);
+    set (e::drive, 0.0);
+    set (e::ducking, 0.0);
+    p[(std::size_t) e::lineLaw] = 1.0f;
+    int n = 6;
+
+    // time: free (the knob) or synced (a note value; the offset 0 = 100 %, 0.585 = dotted, −0.585 = triplet as log2)
+    const int sync = std::clamp (roundIndex (s.at (3)), 0, 4);
+    const double ms = timeless3DelayMs (s.at (0));
+    const double pan = std::clamp ((double) s.at (1), -2.0, 2.0);
+    const int pp = std::clamp (roundIndex (s.at (6)), 0, 2);
+    if (sync > 0)
+    {
+        const double off = s.at (2);
+        const int kind = std::abs (off - 0.585) < 0.05 ? 2 : std::abs (off + 0.585) < 0.05 ? 3 : 1;
+        const int note = 6 - sync; // 1/2 … 1/16 = Echoform's note index 5 … 2
+        set (e::syncL, (kind + 1) / 4.0 + 0.125);
+        set (e::noteL, (note + 0.5) / 10.0);
+        p[(std::size_t) e::syncR] = p[(std::size_t) e::syncL];
+        p[(std::size_t) e::noteR] = p[(std::size_t) e::noteL];
+    }
+    else
+    {
+        set (e::syncL, 0.0);
+        set (e::syncR, 0.0);
+        const bool dual = pp == 0 && std::abs (pan) > 1e-4;
+        set (e::timeL, e::timeValue (ms * (dual && pan < 0.0 ? std::pow (2.0, -pan) : 1.0)));
+        set (e::timeR, e::timeValue (ms * (dual && pan > 0.0 ? std::pow (2.0, pan) : 1.0)));
+        set (e::style, e::styleValue (dual ? e::Style::dual : e::Style::single));
+    }
+    const double fb = std::clamp ((double) s.at (85), 0.0, 2.0);
+    if (pp > 0)
+    {
+        set (e::style, e::styleValue (e::Style::pingPong));
+        set (e::startSide, pp == 2 ? 1.0 : 0.0);
+        set (e::feedback, fb * fb / 2.0);
+    }
+    else
+    {
+        if (sync > 0)
+            set (e::style, e::styleValue (e::Style::single));
+        set (e::feedback, fb / 2.0);
+        set (e::crossFeedback, s.at (87));
+    }
+    set (e::fbBalance, (std::clamp ((double) s.at (86), -1.0, 1.0) + 1.0) / 2.0);
+    set (e::freeze, s.at (5) >= 0.5f ? 1.0 : 0.0);
+
+    // mix, width, wet level / pan
+    set (e::mix, (std::clamp ((double) s.at (160), -1.0, 1.0) + 1.0) / 2.0);
+    set (e::width, 0.5 + 0.5 * std::clamp ((double) s.at (157), 0.0, 1.0));
+    const double wet = s.at (158);
+    if (wet > 0.0 && std::abs (wet - 1.0) > 1e-4)
+        set (e::output, (20.0 * std::log10 (wet) + 18.0) / 36.0);
+    set (e::balance, (std::clamp ((double) s.at (159), -1.0, 1.0) + 1.0) / 2.0);
+
+    // the loop's tone: the measured 15.5 Hz low cut; the filters in use (low pass → high cut, high pass → low cut)
+    double lowHz = 15.5, highHz = 1e9;
+    for (std::size_t k = 0; k < 6; ++k)
+    {
+        const std::size_t o = 90 + 9 * k;
+        if (s.at (o + 8) < 0.5f || s.at (o + 7) < 0.5f)
+            continue;
+        const double hz = std::pow (2.0, std::clamp ((double) s.at (o), 1.0, 17.0));
+        const int shape = roundIndex (s.at (o + 5));
+        if (shape == 0)
+            highHz = std::min (highHz, hz);
+        else if (shape == 1)
+            lowHz = std::max (lowHz, hz);
+    }
+    set (e::lowCut, (std::min (lowHz, 2000.0) - 10.0) / 1990.0);
+    set (e::highCut, 1.0);
+    if (highHz < 19000.0)
+    {
+        // Echoform's measured high cut is a one-pole at highCutHz (v) · (0.5 + 1.5 · open²), open = (v − 0.8) / 0.2 above 0.8
+        double v = 0.0;
+        for (int it = 0; it <= 1000; ++it)
+        {
+            const double t = it / 1000.0, open = std::max (0.0, (t - 0.8) / 0.2);
+            if (e::highCutHz ((float) t) * (0.5 + 1.5 * open * open) >= highHz)
+            {
+                v = t;
+                break;
+            }
+            v = t;
+        }
+        set (e::highCut, std::min (v, 0.998));
+    }
+
+    // drive (Echoform's 0 … 24 dB: the knob's 0 … 100 % as 0 … 12 dB) and diffuse, when switched on
+    if (s.at (146) >= 0.5f)
+        set (e::drive, 0.5 * std::clamp ((double) s.at (145), 0.0, 1.0));
+    if (s.at (150) >= 0.5f)
+        set (e::diffusion, std::clamp ((double) s.at (149), 0.0, 1.0));
+    return n + 10;
+}
+
 Translator translatorNamed (std::string_view name)
 {
     if (name == "pro-l2")
@@ -821,6 +1007,8 @@ Translator translatorNamed (std::string_view name)
         return fromProG;
     if (name == "saturn2")
         return fromSaturn2;
+    if (name == "timeless3")
+        return fromTimeless3;
     return nullptr;
 }
 } // namespace lynx::fabfilter

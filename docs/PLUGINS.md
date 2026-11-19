@@ -10,6 +10,7 @@ LYNX SHARE ships **native** plugins inspired by the third-party plugins producer
 
 | Inspired by | LYNX SHARE plugin | Status | What it is |
 |---|---|---|---|
+| FabFilter Timeless 3 | **Echoform** | native LYNX SHARE engine · auto-opens | Multi-mode echo: tape, bucket brigade, analog, digital, shifter, pitch and reverse characters, tempo sync, wow / flutter, feedback past 100 %. |
 | FabFilter Pro-L 2 | **Apex Limiter** | native LYNX SHARE engine · auto-opens | Transparent mastering limiter: look-ahead, true-peak ceiling, two-stage release and four styles. |
 | FabFilter Pro-C 2 / 3 | **Crest Compressor** | native LYNX SHARE engine · auto-opens | Style compressor fitted to black-box measurements: 11 styles, knee, range, look-ahead, 3-band side-chain EQ, character, oversampling and a live gain-reduction graph. |
 | FabFilter Pro-MB | **Prism Multiband** | native LYNX SHARE engine · auto-opens | 4-band dynamics: compress or expand, downward or upward, per-band attack, release, knee and level; transparent while a band rests. |
@@ -18,7 +19,6 @@ LYNX SHARE ships **native** plugins inspired by the third-party plugins producer
 | FabFilter Pro-DS | **Hush De-esser** | native LYNX SHARE engine · auto-opens | Split-band or wideband de-esser with band or high-pass detection, listen mode and 2 ms lookahead. |
 | FabFilter Saturn | **Ember Saturator** | native LYNX SHARE engine · auto-opens | Tube, tape, transistor and fuzz saturation with tone tilt, auto gain and up to 8x oversampling; up to four bands, each with its own style and drive. |
 | FabFilter Pro-R 2 | **LuxeVerb** | stand-in · auto-opens | an existing LYNX SHARE effect plays its role until a dedicated engine exists |
-| FabFilter Timeless 3 | **Fruity Delay 3** | stand-in · auto-opens | an existing LYNX SHARE effect plays its role until a dedicated engine exists |
 | Valhalla VintageVerb | **Epoch Verb** | native LYNX SHARE engine · auto-opens | 22 vintage-digital reverb algorithms (halls, plates, rooms, chorused and random spaces, gated) with 1970s, 1980s or now colour. |
 | Valhalla Room | **Atrium** | native LYNX SHARE engine · auto-opens | Rooms and chambers with separate early and late sections, three-band decay and twelve room types. |
 | Valhalla Plate | **Foil Plate** | native LYNX SHARE engine · auto-opens | Bright plate reverb that speaks at once, with a real plate's frequency-dependent decay and twelve plate types. |
@@ -169,7 +169,7 @@ see [Generators](#generators).
 | **Close** | the same algorithm; within −60 dB of the original on (almost) all tested states, typically −80 dB or better; the gaps are listed |
 | **Approximate** | the plugin's saved settings are mapped onto a LYNX SHARE built-in effect or synth: similar sound, not the same engine |
 | **Placeholder** | the state is kept and the plugin makes no sound / passes audio through, as the original does in FL Studio 2026 |
-| **Fitted** | LYNX SHARE's own engine (not the original's algorithm), designed so that black-box measurements of the third-party original — decay times per band, onset, build-up, levels, filters, parameter laws — match within the tolerances listed for it |
+| **Fitted** | LYNX SHARE's own engine (not the original's algorithm), designed so that black-box measurements of the third-party original — decay times per band, onset, build-up, levels, filters, parameter laws — match within the tolerances listed for it. Since 2026-11, by the project owner's decision, some are also informed by clean-room static analysis of the original's binary (laws and structure in our own words, [`docs/analise/REA_*.md`](analise)); no third-party code, tables, presets or content is copied and licence protections are never bypassed |
 
 **How you get it:** *Insert* = can be added to any mixer insert (Mixer slot menu or the F8 quick-add palette).
 *Import* = created when you open an FL Studio project (`.flp`) or drop an FL effect preset; the engine is kept

@@ -33,6 +33,7 @@ inline double peakDb (const std::vector<float>& y, double from, double to)
 inline EffectParams settings (double thresholdDb, double attackMs = 9.0)
 {
     auto p = defaults (EffectKind::apexLimiter);
+    p[ap::pRevision] = 0.0f; // round 190lp: round 190ar's laws (a new Apex runs revision 1)
     p[ap::pLevelThreshold] = (float) (-thresholdDb / 36.0);
     p[ap::pLevelAttack] = (float) (std::log (attackMs / 0.1) / std::log (1000.0));
     p[ap::pRelease] = ap::releaseValue (300.0);

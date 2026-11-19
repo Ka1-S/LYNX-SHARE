@@ -109,7 +109,12 @@ matches by name).
 
 - Parameter maps only from what the saved data itself shows (attribute names, value lists) plus meanings from the
   vendor's public documentation or our own black-box measurements (render through a legally licensed copy with test
-  signals). Never from decompiling or disassembling third-party binaries. Each map says where its meaning comes from.
+  signals). Each map says where its meaning comes from.
+- Since 2026-11, by the project owner's decision, some stand-ins and translators (the FabFilter roles from round 190kw
+  on) were also informed by clean-room static analysis of the third-party binaries: the laws and structure are written
+  down in our own words (docs/analise/REA_*.md) and LYNX's code is written from that description. No third-party code,
+  tables, presets or other content is copied, and licence protections are never bypassed. Static analysis of a
+  third-party binary is not something a contributor starts on their own: it needs the owner's decision.
 - Unknown meaning → no map (the default preset). Mark unconfirmed readings as such in the table comment.
 - New LYNX SHARE modules that play a third-party role (pitch correction, de-esser, noise suppressor, doubler, exciter…)
   add their entry to `builtInTable` (or call `registerPluginSubstitutes` at start-up) when they land.
@@ -132,7 +137,7 @@ matches by name).
 | Waves Doubler (2 / 4 voices) | Gemini Doubler (round 119) | Waves name | every control of voices 1–2, direct, align, shelves, feedback cut, range [EXEC] (round 119 §4) |
 | Soundtoys EchoBoy / PrimalTap | Echoform (round 129; tape / lo-fi echo, 1/4 note, 25 % feedback, 25 % mix; was Fruity Delay 3) | VST2 ID [DATA] (EchoBoy), names | — |
 | Waves SuperTap | Echoform (round 190jh; was Fruity Delay 3; no state: the dry signal, as SuperTap's default) | Waves name | taps 1–2 (on, gain, pan, delay at its BPM), feedback, tap filter → Echoform's clean Single / Dual echo, dry at unity [EXEC] (refcap182) |
-| FabFilter Timeless | Fruity Delay 3 | names | — |
+| FabFilter Timeless | Echoform (round 190kw; was Fruity Delay 3; no readable state: Timeless 3's default, 350 ms, no feedback, mix 50 %) | names | Timeless 3 (FFBS, 1007 values): delay time / sync / time pan, feedback (ping pong, pan, cross mix), mix, width, wet level / pan, filters in use, drive, diffuse, freeze → Echoform's Clean mode with the hidden line law (the reference's dry / wet law, read filter, limit) [EXEC] (refcap030 / refcap182) |
 | ValhallaDelay | Echoform (round 101) | VST3 class ID [derived], name | every setting but Era / taps / repeat-swell: mix, style, sync, times, feedback, filters, modulation, shift, pitch, ducking; the 17 modes onto Echoform's 12 characters |
 | ValhallaFreqEcho | Spiral Echo (round 101) | VST3 class ID [derived], name | all 8 settings |
 | ValhallaSpaceModulator | Orbit (round 101) | VST3 class ID [derived], name | all 6 settings |

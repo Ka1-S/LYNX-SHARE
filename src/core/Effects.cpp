@@ -4630,10 +4630,20 @@ EffectSlot makeEffectSlot (EffectKind kind)
         slot.params[(std::size_t) mixsuite::hush::vocalRevision] = 1.0f;
     if (kind == EffectKind::echoform) // round 190is: a new Echoform runs the echo voicings' revision 1 (hidden parameter)
         slot.params[(std::size_t) echosuite::echoform::revision] = 1.0f;
+    if (kind == EffectKind::crestCompressor) // round 190kw: a new Crest runs the V1 styles' revision 1 (hidden parameter)
+        slot.params[(std::size_t) dyn::crest::revision] = 1.0f;
+    if (kind == EffectKind::apexLimiter) // round 190lp: a new Apex runs the styles' refit, revision 1 (hidden parameter)
+        slot.params[(std::size_t) apex::pRevision] = 1.0f;
+    if (kind == EffectKind::sentryGate) // round 190lp: … and a new Sentry the level gate's refit (hidden parameter)
+        slot.params[(std::size_t) dyn::sentry::revision] = 1.0f;
+    if (kind == EffectKind::ember) // round 190kw: a new Ember runs the Saturn styles' own laws (hidden parameter)
+        slot.params[(std::size_t) mixsuite::ember::revision] = 1.0f;
     // round 190it: a new Epoch Verb / Atrium / Foil Plate / Halo runs the 0.1.30 revision of the Measured law (hidden)
     if (kind == EffectKind::epochVerb) slot.params[(std::size_t) verbs::epoch::revision] = 1.0f;
     if (kind == EffectKind::epochVerb) // round 190ly: … and Epoch Verb Concert Hall's short-decay trim (hidden)
         slot.params[(std::size_t) verbs::epoch::shortTrim] = 1.0f;
+    if (kind == EffectKind::epochVerb) // round 190kw: … and Epoch's level the reference's loop law (hidden)
+        slot.params[(std::size_t) verbs::epoch::loopLaw] = 1.0f;
     if (kind == EffectKind::atrium) slot.params[(std::size_t) verbs::atrium::revision] = 1.0f;
     if (kind == EffectKind::foilPlate) slot.params[(std::size_t) verbs::foil::revision] = 1.0f;
     if (kind == EffectKind::foilPlate) // round 190ln: … and Foil Plate the reference's EQ / bass-decay laws (hidden)
@@ -4714,10 +4724,25 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     // round 152: … and before the gain-stage attack keeps round 150's level-follower attack
     if (slot.kind == EffectKind::prismMultiband && savedCount <= (std::size_t) dyn::prism::rev152)
         slot.params[(std::size_t) dyn::prism::rev152] = 0.0f;
+    // round 190lg: … and before revision 1 (Pro-MB's own band compander graph) keeps the measured detector (bit for bit)
+    if (slot.kind == EffectKind::prismMultiband && savedCount <= (std::size_t) dyn::prism::revision)
+        slot.params[(std::size_t) dyn::prism::revision] = slot.params[(std::size_t) dyn::prism::lookaheadSwitch] = 0.0f;
     // round 190v: Crest saved before its two-way / vari-mu refit keeps round 108's laws, Sentry saved before its Vocal
     // noise reduction has none
     if (slot.kind == EffectKind::crestCompressor && savedCount <= (std::size_t) dyn::crest::law)
         slot.params[(std::size_t) dyn::crest::law] = 0.0f;
+    // round 190kw: … and one saved before the V1 styles' revision keeps the fitted Clean / Classic / Opto (bit for bit)
+    if (slot.kind == EffectKind::crestCompressor && savedCount <= (std::size_t) dyn::crest::revision)
+        slot.params[(std::size_t) dyn::crest::revision] = 0.0f;
+    // round 190lp: an Apex saved before the styles' refit keeps the fitted laws of rounds tp172b … 190co (bit for bit)
+    if (slot.kind == EffectKind::apexLimiter && savedCount <= (std::size_t) apex::pRevision)
+        slot.params[(std::size_t) apex::pRevision] = 0.0f;
+    // round 190lp: … and a Sentry saved before the level gate's refit keeps the measured gate of rounds tp172b … 190dm
+    if (slot.kind == EffectKind::sentryGate && savedCount <= (std::size_t) dyn::sentry::revision)
+        slot.params[(std::size_t) dyn::sentry::revision] = 0.0f;
+    // round 190lg: a Facet saved before keeps round 190jh / 190js's automatic-threshold law (bit for bit)
+    if (slot.kind == EffectKind::facetEq && savedCount <= (std::size_t) facet::autoRevisionParam)
+        slot.params[(std::size_t) facet::autoRevisionParam] = 0.0f;
     if (slot.kind == EffectKind::sentryGate && savedCount <= (std::size_t) dyn::sentry::law)
         slot.params[(std::size_t) dyn::sentry::law] = 0.0f;
     // round 150: Auto-pan saved before the Tweak block keeps the Rhythm voicing's clipped angle
@@ -4804,6 +4829,9 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
         // round 190ls: an Atrium saved before the dense tank keeps revision 1 as it was, bit for bit
         if (slot.kind == EffectKind::atrium && savedCount <= (std::size_t) verbs::atrium::reaLaw)
             slot.params[(std::size_t) verbs::atrium::reaLaw] = 0.0f;
+        // round 190kw: an Epoch Verb saved before the loop law keeps revision 1 as it was (or revision 0), bit for bit
+        if (slot.kind == EffectKind::epochVerb && savedCount <= (std::size_t) verbs::epoch::loopLaw)
+            slot.params[(std::size_t) verbs::epoch::loopLaw] = 0.0f;
     }
     // round 152: a Compressor saved before the measured vintage curve keeps the round-150 curve
     if (slot.kind == EffectKind::compressor && savedCount <= 18 && slot.params.size() > 18)
@@ -4835,12 +4863,18 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     // round 190js: … and one saved before Single Vocal's revision keeps round 148's Single Vocal (bit for bit)
     if (slot.kind == EffectKind::hushDeEsser && savedCount <= (std::size_t) mixsuite::hush::vocalRevision)
         slot.params[(std::size_t) mixsuite::hush::vocalRevision] = 0.0f;
+    // round 190kw: an Ember saved before the Saturn styles' laws keeps round 150's measured characters (bit for bit)
+    if (slot.kind == EffectKind::ember && savedCount <= (std::size_t) mixsuite::ember::revision)
+        slot.params[(std::size_t) mixsuite::ember::revision] = 0.0f;
     // round 190is: an Echoform saved before the voicings' revision keeps rounds 147 / 150's voicings
     if (slot.kind == EffectKind::echoform && savedCount <= (std::size_t) echosuite::echoform::revision)
         slot.params[(std::size_t) echosuite::echoform::revision] = 0.0f;
     // round 190ly: the ValhallaDelay role's loop laws are only ever saved with it (a translated ValhallaDelay)
     if (slot.kind == EffectKind::echoform && savedCount <= (std::size_t) echosuite::echoform::valhallaLaw)
         slot.params[(std::size_t) echosuite::echoform::valhallaLaw] = 0.0f;
+    // round 190kw: … and one saved before the line law (hidden, set only by a translated Timeless 3 state) keeps the engine
+    if (slot.kind == EffectKind::echoform && savedCount <= (std::size_t) echosuite::echoform::lineLaw)
+        slot.params[(std::size_t) echosuite::echoform::lineLaw] = 0.0f;
     // round 190ca: a Nebula saved before the cloud law keeps the classic engine in every mode
     if (slot.kind == EffectKind::nebula && savedCount <= (std::size_t) verbs::nebula::law)
         slot.params[(std::size_t) verbs::nebula::law] = 0.0f;
