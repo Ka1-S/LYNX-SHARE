@@ -4357,9 +4357,9 @@ identical; fingerprints of both revisions in tests/Parity190kwGold.inc. The edit
 0.38 … 0.42 → 0.52 … 0.60. Bus / Mastering / Pumping cost up to +0.3 point of one core (three followers whose times move
 with every step: one exp each per sample; the coefficient is cached while the time holds). No latency change.
 
-**Still off:** Upward 6.62, Two-way (TTM) 7.38 and Vari-Mu 6.19 keep their fitted laws (the reference builds them as
-generated graph classes — `VariMuCompressor` is a balanced tube-pair model — read but not rebuilt); Clean / Classic / Opto's
-auto release. (Allround / Versatile: built in round 190lg; Smooth 5.08 and Op-El 5.85: built in round 190lp; both below.)
+**Still off:** Two-way (TTM) 7.38 keeps its measured three-band law (the reference's separate multiband object: read, not
+rebuilt); Clean / Classic / Opto's auto release. (Allround / Versatile: built in round 190lg; Smooth 5.08 and Op-El 5.85:
+built in round 190lp; Upward 6.62 and Vari-Mu 6.19: built in round 190mb; all below.)
 **Round 190lg — Allround = Pro-C 3's Versatile (its default style), revision 1.** Rebuilt from the reference's own graph
 (`VersatileCompressor_MainCompressorAlgorithm`, read statically; REA notes docs/analise/REA_rodada190lg.md): two gain
 computers on two readings of the linked side-chain level, working on the reduction share 1 − 10^(−GR / 20) — slow: 0.979 ×
@@ -4418,6 +4418,41 @@ Pro-C 3 style's state, the style values and the Smooth / Op-El voicings at 44.1 
 load ~27): Smooth 0.62 … 0.68 % → 1.27 … 1.39 % of a core (+0.65 point: four followers, two gain computers and their
 exp / log a sample), Op-El 0.61 … 0.73 % → 1.03 … 1.16 % (+0.43 point: three followers, two gain computers, the shelf;
 Allround in the same runs 0.65 … 0.66 → 0.93 … 1.06, as round 190lg measured).
+
+**Round 190mb — Upward and Vari-mu = Pro-C 3's own Upward graph and Vari-Mu tube node (revision 1).** Read statically (REA
+notes docs/analise/REA_rodada190mb.md, part crest) and rebuilt in LYNX's own code:
+- **Upward** — the side chain's level (instant attack, 5 ms release, dB) into an expansion gain computer (the dB under the
+  threshold through a one-sided quadratic knee, × (1 − 1 / ratio), within the upward range = the range knob, at most 36 dB);
+  the lift is L − follower (L − E (level)), L the lift at silence, the follower on the knob times (attack 0.25 s · a³,
+  release 0.2 + 2.3 F (r) s, F LYNX's smooth fit of the reference's curve; auto 9 r² + 1). Measured on the reference's
+  stairs [EXEC] and applied as such: a level-independent cut of (1 − 1 / ratio) · √a · (threshold + the upward range) dB
+  (0 / 2.63 / 5.26 / 10.53 dB at threshold −48 / −30 / −24 / −12, ratio 4, attack 10 ms; the 5 dB round 190lp's build
+  missed). Without any bound the rebuild is near-exact (the 26 Upward files 9.92, ESR −63 … −98 dB); LYNX keeps issue
+  #77's bound (a lift never takes the instantaneous level above the threshold: no boosted first hit after a lifted gap),
+  which costs the programme and level-step files 9.92 → 8.65 (owner decision).
+- **Vari-mu** — a push-pull tube stage: the side chain's sample 6 dB down swings around a bias b on both sides of LYNX's
+  own tube curve (a quintic fitted to the reference's shape) and a tanh; the gain is (tanh T (b + d) − tanh T (b − d)) / 2d.
+  Feedback: the stage's own output over the threshold (linear; the knee in dB) drives one follower (attack 0.249 (a² + a³ −
+  a⁴) + 0.001 s, release 0.005 + 0.97 tan (1.2 r²) s, auto 3.6 r² + 0.1), b = (r' − 1) × that, r' = (1 − 0.5 √(knee / 60)) ×
+  the ratio's own scale (1 / 40 / 80 at 1 / 10 / 100 : 1, LYNX's smooth fit). The stairs land within 0.06 dB.
+- **TTM** (not rebuilt): the reference's multiband object splits at 88 Hz / 2.5 kHz (LR4), the split LYNX's measured
+  two-way law already runs; its band processors (hold, look-ahead smoother) are the next step.
+
+| bank (time-window scorer, before = parity190mb's fxr_m0) | files | before → after | up / same / down |
+|---|---|---|---|
+| refcap030 Pro-C 3, all blocks | 508 | 8.35 → **8.54** | 48 / 460 / 0 |
+| · Upward files | 26 | 6.62 → **8.65** | 22 / 4 / 0 (stairs ESR −28 … −34 → −55 … −97 dB) |
+| · Vari-Mu files | 26 | 6.19 → **7.96** | 26 / 0 / 0 (stairs ESR −21 … −28 → −45 … −48 dB) |
+| · grid / prog / styles blocks | 238 / 42 / 84 | 8.33 / 7.79 / 8.31 → 8.63 / 7.93 / 8.56 | the 48 up |
+| · every other style's file (all blocks) | 456 | unchanged file for file (score, rms, spectrum, ESR) | 0 / 456 / 0 |
+| refcap182 programme / tp172b (no Upward or Vari-Mu setting) | 25 / 20 | 7.64 / 7.95 = | identical metrics |
+
+Old projects: `gold/gold.sh` (fxrender with the revision forced off, index 53, against fxr_m0): 72 / 72 renders identical;
+every other style's translated state renders byte for byte as fxr_m0 (108 / 108, 44.1 / 48 / 96 kHz); revision-0
+fingerprints (tests/Parity190mbCrestGold.inc) equal the base's. A Vari-mu project saved before round 190v (law off) keeps
+its classic law under any revision. CPU (thread time, 20 s at 48 kHz, best of 5, three runs, load ~11): Upward 0.54 … 0.56 %
+→ 0.49 … 0.50 % of a core (two followers and one gain computer a sample), Vari-mu 0.45 … 0.46 % → 0.81 … 0.84 % (+0.37
+point: two tanh, the tube curve twice and a log a sample).
 
 ## Round 190kw (Timeless 3 translator): FabFilter Timeless 3 → Echoform (the hidden line law)
 

@@ -1107,6 +1107,115 @@ inline const OpElLaw& opElLaw() noexcept
     return law;
 }
 
+// ---- round 190mb (REA_rodada190mb, crest): Pro-C 3's Upward, rebuilt from the reference's own graph:
+//  - the level: the side chain's magnitude through a follower that rises at once and falls in 5 ms, in dB (floor −180);
+//  - an expansion gain computer E on that level: the dB under the threshold, o = threshold − level, through a ONE-SIDED
+//    quadratic knee (nothing at the threshold, (o / k)² · k / 2 up to o = k, o − k / 2 beyond), × (1 − 1 / ratio),
+//    within 0 … the upward range (the knob's range, at most 36 dB);
+//  - the same gain computer on silence (−180 dB) gives the lift at silence, L = E (−180) (the upward range);
+//  - one knob-timed follower smooths L − E (level): it rises (the lift goes away) at the attack time, falls (the lift
+//    comes back) at the release time; the lift is L − that follower.
+// [EXEC] (refcap030 / tp172b 1 kHz stairs, ratio 2 / 4 / 10, knee 0 … 72, thresholds −48 … −12, five attacks): the lift is
+// further lowered by a constant, level-independent amount, (1 − 1 / ratio) · √a · (threshold + the upward range) dB when
+// positive (a = the attack knob's position 0 … 1): 0 / 2.63 / 5.26 / 10.53 dB at thresholds −48 / −30 / −24 / −12 (ratio 4,
+// attack 10 ms), 1.21 … 3.16 dB at threshold −30 over attacks 0.1 … 30 ms, within 0.02 dB on every capture. The
+// reference's graph does not show where it comes from (its loud-signal output is the lift minus this); LYNX applies it
+// as measured.
+// Knob laws: attack 0.25 s · a³; release 0.2 s + 2.3 s · F (r), F LYNX's smooth fit of the reference's curve (0.625 r up
+// to r = 0.8, then rising to 1 at r = 1); auto release T = k / (√y + 1), k = 9 r² + 1.
+struct UpLaw
+{
+    double attScale = 0.25, relBase = 0.2, relSpan = 2.3, autoA = 9.0, autoB = 1.0;
+    double fSlope = 0.625, fKnee = 0.8, fBend = 1.875, fWidth = 0.02; // F (r) = fSlope r + fBend · w · ln (1 + e^((r − fKnee) / w))
+    double levelRel = 0.005, rangeMax = 36.0, silenceDb = -180.0, cutScale = 1.0;
+};
+inline const UpLaw& upLaw() noexcept
+{
+    static const UpLaw law;
+    return law;
+}
+inline double upRelShape (const UpLaw& u, double r) noexcept
+{
+    const auto z = (r - u.fKnee) / u.fWidth;
+    return u.fSlope * r + u.fBend * u.fWidth * (z > 30.0 ? z : std::log1p (std::exp (z)));
+}
+// the expansion gain computer: o dB under the threshold → dB of lift (0 … lim)
+inline double upExpand (double under, double knee, double slope, double lim) noexcept
+{
+    if (under <= 0.0)
+        return 0.0;
+    auto v = under - 0.5 * knee;
+    if (knee > 1.1920928955078125e-07 && under <= knee)
+        v = under / knee * (under / knee) * (0.5 * knee);
+    return std::clamp (v * slope, 0.0, lim);
+}
+
+// ---- round 190mb (REA_rodada190mb, crest): Pro-C 3's Vari-Mu, rebuilt from the reference's own node (a feedback tube
+// stage, not a graph of generic elements):
+//  - a push-pull stage: the side chain's sample x enters 6 dB down (d = 0.501 |x|) on both sides of a bias b, each side
+//    through the tube curve T and a soft clip (tanh); the stage's gain is (tanh T (b + d) − tanh T (b − d)) / 2d — the
+//    curve's slope at the bias, taken over the signal's own swing (so loud peaks also bend: a little odd distortion);
+//  - FEEDBACK: the stage's last output y (= x · that gain) is the detector's signal; the amount over the threshold,
+//    max (0, |y| − 10^(threshold / 20)) (with a knee: the usual quadratic knee in dB, read back as (1 − 10^(−over / 20)) |y|),
+//    goes through one follower (attack / release; auto release T = k / (√b + 1)); the bias is b = (r' − 1) × that follower,
+//    r' = (1 − 0.5 √(knee / 60)) × the ratio's own scale (1 at 1 : 1, 40 at 10 : 1, 80 at 100 : 1);
+//  - the reduction is −20 log10 of the gain, at most the range.
+// T (u) = 0.5 u + 0.5 Q (u), Q LYNX's own quintic fitted to the reference's curve over its working span (−11.4 … 18.03,
+// flat beyond: Q (0) = 0, slope 1 there, a little steeper below, bending to flat at the top; 0.055 worst over the span,
+// 0.009 within |u| < 8, its slope within 0.002); the ratio scale is LYNX's smooth fit of the reference's straight lines.
+// Knob laws: attack 0.249 (a² + a³ − a⁴) + 0.001 s (0.001 … 0.25), release 0.005 + 0.97 tan (1.2 r²) s, auto release's
+// constant 3.6 r² + 0.1.
+struct VmuLaw
+{
+    double inGain = 0.5011872336272722; // −6 dB
+    double uLo = -11.4, uHi = 18.03, q2 = -2.78613777e-02, q3 = -1.52802139e-03, q4 = 1.27100459e-04, q5 = -2.92540601e-06;
+    double rLoSlope = 39.0 / 9.0, rKnee = 10.0, rKneeValue = 40.0, rHiSlope = 40.0 / 90.0, rTop = 80.0, rSoft = 0.5;
+    double kneeShrink = 0.5, kneeRef = 60.0;
+    double attA = 0.249, attMin = 0.001, attMax = 0.25, relBase = 0.005, relSpan = 0.97, autoA = 3.6, autoB = 0.1;
+};
+inline const VmuLaw& vmuLaw() noexcept
+{
+#ifdef LYNX_CLAB
+    static const VmuLaw law = [] {
+        VmuLaw v;
+        v.q2 = clab ("vq2", v.q2); v.q3 = clab ("vq3", v.q3); v.q4 = clab ("vq4", v.q4); v.q5 = clab ("vq5", v.q5);
+        v.inGain = clab ("vIn", v.inGain); v.rSoft = clab ("vSoft", v.rSoft);
+        return v;
+    }();
+#else
+    static const VmuLaw law;
+#endif
+    return law;
+}
+inline double vmuTube (const VmuLaw& v, double u) noexcept
+{
+    const auto c = std::clamp (u, v.uLo, v.uHi);
+    return 0.5 * u + 0.5 * (c + c * c * (v.q2 + c * (v.q3 + c * (v.q4 + c * v.q5))));
+}
+// the stage's gain for a swing d around the bias b
+inline double vmuGain (const VmuLaw& v, double b, double d) noexcept
+{
+    return (std::tanh (vmuTube (v, b + d)) - std::tanh (vmuTube (v, b - d))) / (2.0 * d);
+}
+// the ratio's own scale (1 at 1 : 1, 40 at 10 : 1, 80 at 100 : 1): a smooth minimum of the two straight lines
+inline double vmuRatio (const VmuLaw& v, double ratio) noexcept
+{
+    const auto r = std::clamp (ratio, 1.0, 100.0);
+    const auto a = 1.0 + v.rLoSlope * (r - 1.0), b = v.rKneeValue + v.rHiSlope * (r - v.rKnee);
+    const auto m = std::min (a, b);
+    return std::min (v.rTop, m - v.rSoft * std::log1p (std::exp (-std::abs (a - b) / v.rSoft)));
+}
+// the detector's amount over the threshold (linear) of the stage's output y
+inline double vmuOver (double y, double thrDb, double thrLin, double knee) noexcept
+{
+    y = std::abs (y);
+    if (knee <= 1.1920928955078125e-07)
+        return std::max (0.0, y - thrLin);
+    auto over = (y > 1e-10 ? std::max (-180.0, 20.0 * std::log10 (y)) : -180.0) - thrDb;
+    over = v2Knee (over, knee);
+    return over <= 0.0 ? 0.0 : (1.0 - std::exp (-over * 0.1151292546497023)) * y;
+}
+
 bool revisionStaticDb (const EffectParams& p, double inputDb, double& gainDb) noexcept
 {
     if (! revisionOn (p))
@@ -1199,6 +1308,30 @@ bool revisionStaticDb (const EffectParams& p, double inputDb, double& gainDb) no
         const auto s1 = curve (kn, rng), s2 = curve (o.d2Knee, o.d2Range);
         const auto r = std::sqrt ((o.wA + o.wB) * s1 * s1 + o.wC * s2 * s2);
         gainDb = 20.0 * std::log10 (std::max (1.0 - r, 1e-9));
+        return true;
+    }
+    if (st == Style::upward)
+    {
+        // round 190mb: a steady level: the follower at L − E (level), so the lift is E (level) less the measured cut
+        const auto& u = upLaw();
+        const auto lim = std::min (rng, u.rangeMax), s = rat < 1.0e8 ? 1.0 - 1.0 / rat : 1.0;
+        const auto a = std::cbrt (std::clamp ((attackMs (p[attack]) - 0.005) / 250.0, 0.0, 1.0));
+        gainDb = upExpand (thr - inputDb, kn, s, lim) - u.cutScale * s * std::sqrt (a) * std::max (0.0, thr + lim);
+        return true;
+    }
+    if (st == Style::variMu && on (p[law]))
+    {
+        // round 190mb: a steady level (the stage's gain at the peak sample): the loop settles where the follower holds
+        // the amount its own output sets over the threshold
+        const auto& v = vmuLaw();
+        const auto k = std::max (0.0, (1.0 - v.kneeShrink * std::sqrt (std::max (0.0, kn) / v.kneeRef)) * vmuRatio (v, rat) - 1.0);
+        const auto A = dbToGain (inputDb), dl = std::max (A * v.inGain, 1.0e-4), thrLin = dbToGain (thr);
+        const auto h = [&] (double f) { return vmuOver (A * std::abs (vmuGain (v, k * f, dl)), thr, thrLin, kn) - f; };
+        double lo = 0.0, hi = A + 1.0;
+        for (int i = 0; i < 80; ++i)
+            (h (0.5 * (lo + hi)) > 0.0 ? lo : hi) = 0.5 * (lo + hi);
+        const auto g = std::abs (vmuGain (v, k * 0.5 * (lo + hi), dl));
+        gainDb = -std::max (0.0, std::min (rng, g > 1e-10 ? -20.0 * std::log10 (g) : 200.0)); // (never a boost, as the detector)
         return true;
     }
     if (st == Style::mastering || st == Style::bus || st == Style::punch || st == Style::pumping)
@@ -1360,6 +1493,12 @@ private:
         // round 190lp: Op-El's high shelf on D1's input (the signed side chain, per channel): b0 b1 b2 a1 a2
         std::array<double, 5> oeEq {};
         bool oeShelf = false;
+        // round 190mb: Upward (v2 = 11): the expansion's slope (1 − 1/ratio), the upward range, the lift at silence, the cut
+        double uSlope = 0.0, uLim = 0.0, uSilence = 0.0, uCut = 0.0;
+        bool uSafe = true;
+        // round 190mb: Vari-Mu (v2 = 12): the loop gain r' − 1, the threshold (linear), the follower's coefficients
+        double vmK = 0.0, vmThrLin = 1.0, vmAtt = 1.0, vmRel = 1.0, vmAutoK = 1.0;
+        bool vmAuto = false;
     };
     double styleGain (const Ctx& x, double level) const noexcept
     {
@@ -1600,6 +1739,46 @@ private:
             c.sThrD = c.thr * (clab ("p1", 1.0) > 0.0 ? smoothThrFactor (s, c.rat) : 1.0);
             c.window = 0;
         }
+        else if (revisionOn (p) && c.st == Style::upward)
+        {
+            // round 190mb: Upward (see UpLaw)
+            const auto& u = upLaw();
+            const auto a3 = std::clamp ((att - 0.005) / 250.0, 0.0, 1.0);
+            const auto rel = std::clamp ((releaseMs (p[release]) - 10.0) / 2490.0, 0.0, 1.0);
+            const auto r2 = std::atan (rel * std::tan (1.2)) / 1.2; // the release knob's position, squared
+            c.v2 = 11;
+            c.f0 = c.f1 = {};
+            c.f0.att = u.attScale * a3;
+            c.f0.rel = u.relBase + u.relSpan * upRelShape (u, std::sqrt (r2)) * clab ("uRel", 1.0);
+            c.f0.autoRel = on (p[autoRelease]);
+            c.f0.autoK = u.autoA * r2 + u.autoB;
+            c.f1.rel = clab ("uLev", u.levelRel);
+            c.uSlope = c.rat < 1.0e8 ? 1.0 - 1.0 / c.rat : 1.0;
+            c.uLim = std::min (c.rng, clab ("uMax", u.rangeMax));
+            c.uSilence = upExpand (c.thr - u.silenceDb, c.kn, c.uSlope, c.uLim);
+            c.uSafe = clab ("uSafe", 1.0) > 0.0;
+            c.uCut = clab ("uCut", u.cutScale) * c.uSlope * std::sqrt (std::cbrt (a3)) * std::max (0.0, c.thr + c.uLim);
+            c.window = 0;
+        }
+        else if (revisionOn (p) && c.st == Style::variMu && on (p[law])) // (law off: a project saved before round 190v)
+        {
+            // round 190mb: Vari-Mu (see VmuLaw)
+            const auto& v = vmuLaw();
+            const auto a = std::cbrt (std::clamp ((att - 0.005) / 250.0, 0.0, 1.0));
+            const auto rel = std::clamp ((releaseMs (p[release]) - 10.0) / 2490.0, 0.0, 1.0);
+            const auto r2 = std::atan (rel * std::tan (1.2)) / 1.2;
+            const auto attS = std::clamp (v.attA * (a * a + a * a * a - a * a * a * a) + v.attMin, v.attMin, v.attMax);
+            const auto relS = v.relBase + v.relSpan * std::tan (1.2 * r2);
+            c.v2 = 12;
+            c.vmK = std::max (0.0, (1.0 - v.kneeShrink * std::sqrt (std::max (0.0, c.kn) / v.kneeRef)) * vmuRatio (v, c.rat) - 1.0)
+                    * clab ("vmK", 1.0);
+            c.vmThrLin = std::exp (c.thr * 0.1151292546497023);
+            c.vmAtt = 1.0 - std::exp (-2.302585092994046 / (attS * clab ("vmAtt", 1.0) * rate));
+            c.vmRel = 1.0 - std::exp (-2.302585092994046 / (relS * clab ("vmRel", 1.0) * rate));
+            c.vmAuto = on (p[autoRelease]);
+            c.vmAutoK = v.autoA * r2 + v.autoB;
+            c.window = 0;
+        }
         else if (on (p[revision]) && c.st == Style::opEl)
         {
             // round 190lp: Op-El (see OpElLaw)
@@ -1808,6 +1987,36 @@ private:
                 const auto b = v2Step (d.q1, s1 * s1, x.f1, rate, d.k1);
                 const auto cc = v2Step (d.q2, s2 * s2, x.f2, rate, d.k2);
                 gr = toDb (std::sqrt (std::max (0.0, o.wA * a + o.wB * b + o.wC * cc)));
+                break;
+            }
+            case 11: // round 190mb: Upward (see UpLaw): returns the lift (dB, + = up), no hold
+            {
+                const auto lev = v2Step (d.q1, mag, x.f1, rate, d.k1);
+                const auto ld = lev > 1e-10 ? std::max (-180.0, 20.0 * std::log10 (lev)) : -180.0;
+                const auto o = v2Step (d.q0, x.uSilence - upExpand (x.thr - ld, x.kn, x.uSlope, x.uLim), x.f0, rate, d.k0);
+                auto lift = x.uSilence - o - x.uCut;
+                // LYNX's own bound (issue #77, kept from the fitted law): a lift never takes the level (instant attack)
+                // above the threshold, so a hit arriving in a lifted gap is not boosted past it. The reference lets the
+                // first attack time of every such hit through up to 30 dB louder; the bound costs the bank's Upward files
+                // 9.92 → 8.65 (round 190mb, owner decision). It does not act on a steady level (the lift stays under
+                // 0.75 · (threshold − level) there)
+                if (lift > 0.0 && x.uSafe)
+                    lift = std::min (lift, std::max (0.0, x.thr - ld));
+                d.sustain = x.slowCoef * d.sustain + (1.0 - x.slowCoef) * std::max (0.0, -lift);
+                return lift;
+            }
+            case 12: // round 190mb: Vari-Mu (see VmuLaw): the feedback tube stage
+            {
+                const auto& v = vmuLaw();
+                const auto e = vmuOver (d.q2, x.thr, x.vmThrLin, x.kn);
+                double k = e > d.q0 ? x.vmAtt : x.vmRel;
+                if (x.vmAuto && e <= d.q0)
+                    k = 1.0 - std::exp (-2.302585092994046 * (std::sqrt (x.vmK * d.q0) + 1.0) / (x.vmAutoK * rate));
+                d.q0 += k * (e - d.q0);
+                const auto dl = std::max (mag * v.inGain, 1.0e-4);
+                const auto g = std::abs (vmuGain (v, x.vmK * d.q0, dl));
+                d.q2 = mag * g;
+                gr = std::min (x.rng, g > 1e-10 ? -20.0 * std::log10 (g) : 200.0);
                 break;
             }
             case 6: // Punch: one follower on the dB reduction
