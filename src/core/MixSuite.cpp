@@ -395,6 +395,39 @@ double mLfGainDb (float v) noexcept { return lin (v, -16.5, 16.5); }
 double mGainDb (float v) noexcept { return lin (v, -20.0, 20.0); }
 double mQ (float v) noexcept { return lin (v, 0.5, 2.5); }
 double mHoldSeconds (float v) noexcept { return lin (v, 0.0, 4.0); }
+// round 190mm (scheps): the hidden omni law's value scales (MixSuite.h OmniParam)
+namespace omni
+{
+float dbValue (double db) noexcept { return (float) std::clamp ((db + 72.0) / 96.0, 0.0, 1.0); }
+double db (float v) noexcept { return lin (v, -72.0, 24.0); }
+float hzValue (double hz) noexcept { return (float) std::clamp (std::log (std::max (hz, 20.0) / 20.0) / std::log (1000.0), 0.0, 1.0); }
+double hz (float v) noexcept { return logMap (v, 20.0, 20000.0); }
+float qValue (double q) noexcept { return (float) std::clamp (std::log (std::max (q, 0.1) / 0.1) / std::log (100.0), 0.0, 1.0); }
+double q (float v) noexcept { return logMap (v, 0.1, 10.0); }
+float msValue (double ms) noexcept { return (float) std::clamp (std::log10 (std::max (ms, 0.01) / 0.01) / 6.0, 0.0, 1.0); }
+double ms (float v) noexcept { return logMap (v, 0.01, 10000.0); }
+float ratioValue (double r) noexcept { return (float) std::clamp ((1.0 - 1.0 / std::clamp (r, 1.0, 20.0)) / 0.95, 0.0, 1.0); }
+double ratio (float v) noexcept { return 1.0 / std::max (0.05, 1.0 - 0.95 * (double) std::clamp (v, 0.0f, 1.0f)); }
+float indexValue (int k) noexcept { return (float) std::clamp (k, 0, 8) / 8.0f; }
+int index (float v) noexcept { return (int) std::lround (std::clamp (v, 0.0f, 1.0f) * 8.0f); }
+float orderValue (const int (&order)[5]) noexcept
+{
+    long code = 0;
+    for (int m : order) code = code * 10 + std::clamp (m, 0, 9);
+    return (float) ((double) code / 100000.0);
+}
+void orderOf (float v, int (&order)[5]) noexcept
+{
+    static constexpr int byDefault[5] = { pre, comp, ds2, eq, gate };   // the reference's default chain (REA §1)
+    auto code = (long) std::lround ((double) v * 100000.0);
+    int seen = 0;
+    for (int i = 4; i >= 0; --i) { order[i] = (int) (code % 10); code /= 10; }
+    for (int m : order) if (m >= pre && m <= comp) seen |= 1 << m;
+    if (seen != 0x3e)
+        for (int i = 0; i < 5; ++i) order[i] = byDefault[i];
+}
+bool omniLawOn (const EffectParams& p) noexcept { return p[(std::size_t) omniLaw] > 0.5f; }
+} // namespace omni
 namespace
 {
 // the reference's ratio dial (its read-outs at eighths of the travel); 63 .. infinity on the last eighth
@@ -1042,6 +1075,8 @@ std::unique_ptr<Effect> makeKiln() { return std::make_unique<KilnChannel>(); }
 
 namespace
 {
+#include "core/OmniStrip.inc" // round 190mm (scheps): the hidden omni law
+
 class Strip final : public Effect
 {
 public:
@@ -1061,6 +1096,7 @@ public:
         modernEngine.prepare (rate);
         vocalEngine.prepare (rate);
         drive.prepare (rate);
+        omniEngine.prepare (rate);
         reset();
         if (hasParams0)
         {
@@ -1084,6 +1120,7 @@ public:
         modernEngine.reset();
         vocalEngine.reset();
         drive.reset();
+        omniEngine.reset();
         for (auto* d : { &audio, &side })
         {
             d->hp1.reset(); d->hp2.reset(); d->lp.reset(); d->lf.reset(); d->lmf.reset(); d->hmf.reset(); d->hf.reset();
@@ -1098,6 +1135,14 @@ public:
 
     void process (float* l, float* r, int n, const EffectParams& p, double) noexcept override
     {
+        if (omni::omniLawOn (p)) // round 190mm (scheps): the hidden omni law (off = everything below, unchanged)
+        {
+            const auto inPeak = Meters::peak (l, r, n);
+            vocalLatency = 0;
+            omniEngine.process (l, r, n, p);
+            meters.set (omniEngine.compGrDb(), omniEngine.gateGrDb(), inPeak, Meters::peak (l, r, n));
+            return;
+        }
         if (vocalVoicing (p))
         {
             const auto inPeak = Meters::peak (l, r, n);
@@ -1292,6 +1337,7 @@ private:
     int vocalLatency = 0;
     DriveStage drive; // round tp172c6
     int driveLatency = 0;
+    omnistrip::Engine omniEngine; // round 190mm (scheps): the hidden omni law
     bool driveWasIn = false;
     EffectParams params0 {};
     bool hasParams0 = false;
