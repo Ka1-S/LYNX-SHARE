@@ -7,6 +7,7 @@
 //     clock's due times are only reported, a loaded CI runner's callbacks wake up late), and a stop must end the note
 //     that still sounds with exactly one note off.
 
+#include <memory>
 #include <mutex>
 
 #include "core/MidiOut.h"
@@ -126,7 +127,8 @@ juce::String AudioEngine::midiOutPortSelfTest()
     };
     std::mutex lock;
     std::vector<Sent> sent; // (before the engine: its sender thread, which fills them, ends first)
-    AudioEngine live (false);
+    const auto livePtr = std::make_unique<AudioEngine> (false); // (round 190mh: on the heap, as the stack of --selftest is tight)
+    auto& live = *livePtr;
     live.player.setProcessor (&live.graph);
     live.deviceManager.addAudioDeviceType (std::make_unique<PortTestType>());
     if (const auto e = live.deviceManager.initialise (0, 2, nullptr, true); e.isNotEmpty())

@@ -5,6 +5,8 @@
 #include "ui/I18n.h"
 #include "ui/Theme.h"
 
+#include <memory>
+
 namespace lynx
 {
 namespace
@@ -285,7 +287,10 @@ juce::String pluginsOffSelfTest()
         return "the test project does not read back as written";
 
     {
-        AudioEngine engine (false, 0, false);
+        // (round 190mh: on the heap; the engine is ~3 MB and --selftest's frames below this one already take ~4.5 MB of
+        //  the main thread's 8 MB stack: a few more bytes in the engine overflowed it)
+        const auto enginePtr = std::make_unique<AudioEngine> (false, 0, false);
+        auto& engine = *enginePtr;
         int asked = 0;
         juce::StringArray askedFor;
         engine.getPluginHost().onInstantiate = [&] (const juce::String& name) {
@@ -388,7 +393,10 @@ juce::String pluginsOffSelfTest()
     }
     // 6. the engine going away ends it too
     {
-        AudioEngine engine (false, 0, false);
+        // (round 190mh: on the heap; the engine is ~3 MB and --selftest's frames below this one already take ~4.5 MB of
+        //  the main thread's 8 MB stack: a few more bytes in the engine overflowed it)
+        const auto enginePtr = std::make_unique<AudioEngine> (false, 0, false);
+        auto& engine = *enginePtr;
         engine.setSongWithPluginsOff (*loaded);
     }
     if (pluginsHeld())

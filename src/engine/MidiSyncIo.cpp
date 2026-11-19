@@ -203,8 +203,7 @@ void MidiSyncIo::channelMessage (int port, int sample, const std::uint8_t* bytes
         // clock's alone, FLEngine 0xbb0b00 / 0x15e05e8). Rollup 0.1.30: the rack's delay compensation too (round
         // 190hq's heardLatencyMs, as the clock): the block's audio is heard that much later behind latent plugins
         t.dueMs = blockStartMs + heardLatencyMs() + 1000.0 * sample / sampleRate;
-        t.message.sample = sample;
-        t.deviceSample = blockSample + sample;
+        t.message.sample = (int) ((blockSample + sample) & 0x7fffffff); // (the stream's sample: Timed's note in the header)
         t.message.size = (std::uint8_t) size;
         std::copy (bytes, bytes + size, t.message.bytes.begin());
         if (! slot.portQueue.push (t))
@@ -501,7 +500,7 @@ void MidiSyncIo::run()
                         if (t.message.size == 0)
                             releasePortNotes (slot); // (a stop / panic marker)
                         else
-                            sendNow (slot, t.message.bytes.data(), (int) t.message.size, t.dueMs, t.deviceSample);
+                            sendNow (slot, t.message.bytes.data(), (int) t.message.size, t.dueMs, queue == &pendingPort[(std::size_t) i] ? t.message.sample : -1);
                         queue->pop_front();
                         now = juce::Time::getMillisecondCounterHiRes();
                     }

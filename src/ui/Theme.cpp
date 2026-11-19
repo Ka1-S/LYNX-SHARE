@@ -1076,7 +1076,7 @@ void setPalette (const themes::Palette& p)
 ButtonColours buttonColours (themes::ButtonKind kind, bool on, float hover, bool down, bool enabled)
 {
     // (round 190mh, perf: the state rule mixes colours and checks contrast at every button paint; its answer is kept per
-    // palette and state. Message thread only, as every paint.)
+    // palette and state, per thread: some self-tests and renders paint off the message thread)
     std::uint32_t hoverBits = 0;
     static_assert (sizeof (hoverBits) == sizeof (hover));
     std::memcpy (&hoverBits, &hover, sizeof (hover));
@@ -1089,7 +1089,7 @@ ButtonColours buttonColours (themes::ButtonKind kind, bool on, float hover, bool
         int state;
         ButtonColours colours;
     };
-    static std::unordered_map<std::uint64_t, Entry> cache;
+    static thread_local std::unordered_map<std::uint64_t, Entry> cache;
     const auto state = (int) kind * 8 + (on ? 4 : 0) + (down ? 2 : 0) + (enabled ? 1 : 0);
     if (const auto it = cache.find (key); it != cache.end() && it->second.stamp == paletteStamp && it->second.hover == hoverBits && it->second.state == state)
         return it->second.colours;

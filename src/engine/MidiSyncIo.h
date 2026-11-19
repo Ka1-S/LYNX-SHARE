@@ -74,8 +74,8 @@ public:
     void requestPortNotesOff() noexcept;
     // tests: a sink that gets every message the sender sends or (dry run) would send: device name, bytes, due and send
     // times (ms, Time::getMillisecondCounterHiRes) and (round 190mh) a port message's sample in the device's stream:
-    // the samples of the blocks since deviceStarted + its offset in its block (−1: not a port message, e.g. a note off
-    // of a stop / panic marker)
+    // the samples of the blocks since deviceStarted + its offset in its block, modulo 2^31 (−1: not a port message, e.g.
+    // a note off of a stop / panic marker)
     std::function<void (const std::string&, const std::uint8_t*, int, double, double, std::int64_t)> testSink;
     // LYNX --selftest (round 190jl): ports, timing, echo guard and notes off through the sender thread (dry run)
     static juce::String portSelfTest (bool& ok);
@@ -107,8 +107,9 @@ private:
     struct Timed
     {
         double dueMs = 0.0;
-        midisync::Message message;
-        std::int64_t deviceSample = -1; // (round 190mh) a port message: its sample in the device's stream (testSink)
+        midisync::Message message; // (round 190mh: a port message's `sample` is its sample in the device's stream since
+                                   //  deviceStarted, modulo 2^31, for testSink; the sender reads no sample. Timed keeps
+                                   //  its 24 bytes: two queues of 2048 per output live in every AudioEngine)
     };
     struct Slot
     {
