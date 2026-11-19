@@ -589,9 +589,9 @@ int main (int argc, char** argv)
                          ms (p.callerWaitNs - pool0.callerWaitNs), per (p.callerSleeps - pool0.callerSleeps));
             // round 190kz (sched): rounds per device block, and the blocks rendered batched (one round for all their pieces)
             const auto blocks = (double) ((totalSamples + (std::size_t) blockSize - 1) / (std::size_t) blockSize);
-            std::printf ("sched: %.2f rounds per block, batched blocks %llu (one round %llu) since start, of %.0f measured blocks\n",
+            std::printf ("sched: %.2f rounds per block, batched blocks %llu (one round %llu) since start, of %.0f measured blocks; two-round blocks %llu\n",
                          (double) (p.rounds - pool0.rounds) / std::max (1.0, blocks), (unsigned long long) renderer->batchedBlockCount(),
-                         (unsigned long long) renderer->batchedRoundCount(), blocks);
+                         (unsigned long long) renderer->batchedRoundCount(), blocks, (unsigned long long) renderer->batchedLiveRoundCount());
             {
                 static const char* const why[] = { "switched off", "no graph", "big block", "live controllers", "MIDI between units",
                                                    "launchers", "bindings", "held notes", "timed params", "many pieces", "other" };
@@ -601,6 +601,8 @@ int main (int argc, char** argv)
                     if (const auto c = renderer->batchRefusedCount ((RackRenderer::BatchRefusal) k); c > 0)
                         std::printf (" %s %llu", why[k], (unsigned long long) c), any = true;
                 std::printf ("%s\n", any ? "" : " none");
+                if (*renderer->livePlanRefusal() != 0) // (round 190lv)
+                    std::printf ("sched: live controllers kept piece by piece: %s\n", renderer->livePlanRefusal());
             }
         }
         if (ahead != nullptr)
@@ -623,6 +625,13 @@ int main (int argc, char** argv)
         const auto p99 = blockCpu[std::min (blockCpu.size() - 1, (std::size_t) (0.99 * (double) blockCpu.size()))];
         const auto budget = 1000.0 * blockSize / sampleRate;
         const auto h = hashSamples (left, right);
+        if (const char* dump = std::getenv ("LYNX_PB_DUMP"); dump != nullptr && rep == 0) // (round 190lv: the samples, for a diff)
+            if (auto* f = std::fopen (dump, "wb"); f != nullptr)
+            {
+                std::fwrite (left.data(), sizeof (float), left.size(), f);
+                std::fwrite (right.data(), sizeof (float), right.size(), f);
+                std::fclose (f);
+            }
         if (rep == 0)
             firstHash = h;
         sameHash = sameHash && h == firstHash;
