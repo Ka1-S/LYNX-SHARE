@@ -1918,13 +1918,13 @@ private:
                     return g > 0.0 ? share (g) : 0.0;
                 };
                 const auto e = at (levelDb, x.sThrE, x.sRatE);
-                const auto f0 = v2Step (d.c2, e, x.f2, rate, d.k2);
+                const auto f0 = v2Step (d.q2, e, x.f2, rate, d.k2);
                 const auto f1 = v2Step (d.c3, e, x.f3, rate, d.k3);
                 const auto down = std::clamp (std::max (s.g0 * f0, s.g1 * f1), 0.0, 1.0);
                 const auto m = mag * (1.0 - down);
                 const auto dd = at (down == 0.0 ? levelDb : m > 1e-10 ? std::max (-180.0, 20.0 * std::log10 (m)) : -180.0, x.sThrD, x.rat);
-                const auto c0 = v2Step (d.c0, dd, x.f0, rate, d.k0);
-                const auto c1 = v2Step (d.c1, dd, x.f1, rate, d.k1);
+                const auto c0 = v2Step (d.q0, dd, x.f0, rate, d.k0);
+                const auto c1 = v2Step (d.q1, dd, x.f1, rate, d.k1);
                 const auto a = s.aBase + s.aSlope * (s.bGain * c0 * f0);
                 gr = toDb (std::max (std::abs (a * c0), std::abs (c1)));
                 break;
@@ -1941,9 +1941,9 @@ private:
                 // D1 reads the shelved side chain (alt), D2 the side chain itself
                 const auto lev1 = alt < 0.0 ? levelDb : alt > 1e-10 ? std::max (-180.0, 20.0 * std::log10 (alt)) : -180.0;
                 const auto s1 = at (lev1, x.kn, x.rng), s2 = at (levelDb, o.d2Knee, o.d2Range);
-                const auto a = v2Step (d.c0, s1 * s1, x.f0, rate, d.k0);
-                const auto b = v2Step (d.c1, s1 * s1, x.f1, rate, d.k1);
-                const auto cc = v2Step (d.c2, s2 * s2, x.f2, rate, d.k2);
+                const auto a = v2Step (d.q0, s1 * s1, x.f0, rate, d.k0);
+                const auto b = v2Step (d.q1, s1 * s1, x.f1, rate, d.k1);
+                const auto cc = v2Step (d.q2, s2 * s2, x.f2, rate, d.k2);
                 gr = toDb (std::sqrt (std::max (0.0, o.wA * a + o.wB * b + o.wC * cc)));
                 break;
             }
