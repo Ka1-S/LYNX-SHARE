@@ -4243,6 +4243,46 @@ with it off the round renders byte for byte as round 190ls (126 / 126 fxrender r
 CPU (fxrender, 20 s incl. file I/O, instructions): Echoform's ValhallaDelay role +0.9 %, Spiral Echo at 96 kHz +1.8 % (0 at
 48 kHz), Epoch's short trim +0.01 %, a new Atrium −29 % (light tank).
 
+## Round 190mj (Valhalla, part 4): Orbit on ValhallaSpaceModulator's own voices, Horizon's echo modes and Room / Chamber
+
+Black-box (refcap030's host for new probe renders; clean-room: LYNX's own code and fits). Evidence:
+docs/analise/REA_rodada190mj.md, lab `/mnt/e/lynx-work/parity190mj/` (Horizon: `hz/`). Score: round 190lg's time-window scorer,
+the same copy before and after. Before = origin/parity190mb (ebbadbe4e, `bin/fxr_b0`). Every change is a hidden value; with it
+off every render is byte for byte the before binary's (`gold/gold.sh` 114 / 114, `hz/gold/gold.sh` 114 / 114).
+
+- **Orbit ← ValhallaSpaceModulator (hidden `orbit::voiceLaw`, #8, the translator only):** the reference's own voices,
+  measured black-box on click-train and still probes (`smcap/`): one sweep phase that runs on from load (a reset does not
+  restart it) at 10 |2 v − 1|^(10/3) Hz; every tap read through a first-order all-pass (Thiran) fractional delay; the
+  through-zero pair on smooth random paths over 0.5 … 2.5 × Depth (both at 1.75 × Depth at load, the − mode inverting one);
+  Octo's four-tap barber pole at 1/√2; Vari Up / Down's hard-wrapping ramps; two random taps for Ensemble / Symphonic; the
+  mode by the reference's own value law floor (11 v) − 1 (verb183b's saved 0.2727 / 0.5454 are Up / Down and TriFlange, which
+  the translator had played as Through-zero + / Octo). Up, Up / Down, Tri, Doubler and Vari Up keep round 190mb's voices
+  under the law (their new voices did not gate; for those files the sweep's start phase decides, which a render cannot
+  share with a capture made after minutes of earlier settings).
+
+| ValhallaSpaceModulator → Orbit (refcap030) | files | before → after | up / same / down |
+|---|---|---|---|
+| mode sweep | 48 | 3.23 → 3.38 | 7 / 41 / 0 |
+| pairs / sr48 / sr96 | 58 | 4.33 / 4.40 / 4.40 = | 0 / 58 / 0 |
+| verb183b captures | 17 | 4.18 = | 1 / 15 / 1 |
+| tp172d matched / refcap182 programme | 12 / 20 | 5.25 / 4.50 = | 0 / 32 / 0 |
+
+The one down is verb183b's single-impulse capture spM3 (3 → 2): its state's Mode 0.2727 is the reference's Up / Down (its
+own impulse shows the barber pole's two taps 5.0 ms apart); before, LYNX played it as Through-zero + (the wrong mode) and
+the impulse's spectrum happened to sit closer. Listed, not hidden: the mode correction is the parity fix.
+
+- **Horizon ← ValhallaFutureVerb (hidden `horizon::reaLaw`, #26):** Hidden `horizon::reaLaw` (#26; new instances and translated ValhallaFutureVerb states; read with the engine law and revision 1;
+a project saved before keeps revision 1 bit for bit). From this round's black-box probe renders of the reference (echo modes
+alone; Room / Chamber at five Sizes × three Decays): the Digital echo's slope-limited coder (impulse +19.2 → +2.2 dB), a
+four-head shifter for Reverse Up / Reverse Down / Sparkle, Analog / Reverse Up/Down / Lo-fi low-passes, and Room / Chamber's
+onset, late level and gain over Size. Time-window scorer, before → after, files up / same / down: probe bank mode 2.66 → 2.86
+(18 / 81 / 0), pairs 2.61 → 2.69 (3 / 33 / 0), sr44 / 48 / 96 2.25 / 2.19 / 2.25 → 2.44 / 2.38 / 2.44 (3 / 13 / 0 each),
+verb183b 2.82 → 2.89 (4 / 58 / 0), tp172d probes 3.20 → 3.25 (2 / 38 / 0), refcap182 programme 3.75 → 3.80 (1 / 19 / 0), tp172d
+matched =. Gold 114 / 114 byte-identical with the law off. CPU (instructions, 20 s): Digital +1.5 %, the four-head modes
++11 %, Analog +0.2 %, Room / Chamber +0.01 %. Still off: Digital's repeats under Feedback (the reference's die after one),
+Chamber's two-slope decay, the reference's level dependence (−20 dB input ~1.5 … 2 dB lower), Clean / Tape / Detune / Reverse /
+Swarm voicings (their fits lost on the bank).
+
 ## Round 190mb (Valhalla, part 3): Supermassive's tone, FutureVerb, SpaceModulator levels, Epoch's merge and rate laws
 
 Black-box (refcap030's host for new probe renders; clean-room: LYNX's own code and fits). Evidence:
