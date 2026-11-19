@@ -116,10 +116,10 @@ PARAM_MIN_ADAPT_REDUCTION (228, 0 / −6 dB); the band centres 0 / 13 / … / 65
 Mean 5.40 → 7.04; up 16, same 9, down 0. ESR means: 20 % −15.3 → −27.7, 35 % −15.4 → −27.0, 50 % −16.3 → −26.0,
 100 % −4.5 → −13.6 dB.
 
-- Probes (lab/probechk.py; ESR vs the trial, lead and demo mutes masked; base → this branch): mean −0.5 → −9.8 dB;
-  noise steps X1 −5.0 → −29.0, S1 −4.9 → −14.3, S2 −1.2 → −1.4; sine stairs X1 −12.3 → −18.5, S2 −5.9 → −9.4; bursts
-  over noise S2 −11.4 → −16.9; impulses (+19 … +61 → ±0.5); noise + tone X1 −14.2 → −11.9 and S1 −6.2 → −5.8 (worse).
-  Measured on the fxr_w3 constants (the 20 … 50 % set before its last constrained refinement).
+- Probes (lab/probechk.py; ESR vs the trial, lead and demo mutes masked; base → this branch; runs/probechk.txt): mean
+  −0.5 → −9.9 dB; noise steps X1 −5.0 → −29.0, S1 −4.9 → −14.4, S2 −1.2 → −1.4; sine stairs X1 −12.3 → −18.8, S2 −5.9 →
+  −9.4; bursts over noise S2 −11.4 → −16.9; impulses (+20 … +61 → ±0.8); noise + tone X1 −14.2 → −11.9, X2 −7.6 → −6.9
+  and S1 −6.2 → −5.8 (worse: the tone's onset over learnt noise is opened later than the trial does).
 - **Gold renders** (ns1/lab/gold.sh, base fxr_base = origin/waves2_190lf 2c893d3ca vs this branch): Quell default, the
   classic engine at 4 amounts, the matched engine at 4 amounts × tracker law on / off, the zero law at 4 amounts, Listen,
   Output, and NS1's 0 % state through the translator; × 44.1 / 48 / 96 kHz × vocal / mix / drums: 180 renders,
