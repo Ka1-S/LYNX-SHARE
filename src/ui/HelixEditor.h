@@ -28,7 +28,14 @@ namespace helixcards
 // adds Helix's card to the Device View (keeps the factory that was there for the other instruments)
 void install();
 // pictures (round 190ja shots): every Helix editor under `root` shows this modulation page (0 Mod Sources, 1 Matrix,
-// 2 MIDI, 3 MPE), source tab (0 Amp … 4 LFO 2) and oscillator (0 / 1); returns how many it found
+// 2 MIDI, 3 MPE; 4 Macros in LYNX's look, round 190ml), source tab (0 Amp … 4 LFO 2) and oscillator (0 / 1); returns how
+// many it found
 int showView (juce::Component& root, int modTab, int source, int osc);
+// Helix+ 2 (round 190ml): the Device View card's Helix+ panel shown or hidden (every Helix card under `root`, and the
+// next ones: its title-bar well); returns the cards found
+int showPlusInCard (juce::Component& root, bool shown);
+// the table editor of oscillator `osc` (0…2) of a channel, as its window shows it (mode 0 Draw, 1 Harmonics; a frame)
+std::unique_ptr<juce::Component> makeTableEditor (AudioEngine& engine, std::function<ChannelDef* (Song&)> locate, int channel, int osc, int mode = 0,
+                                                  int frame = 0);
 } // namespace helixcards
 } // namespace lynx

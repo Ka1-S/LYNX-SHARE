@@ -735,7 +735,7 @@ struct UnisonVoice
     float randomCents = 0.0f;                // Random Note: the note's own detune
     // Helix+ 2 (round 190ml): the anti-aliased warps' memory: the last warp input phase, the correction held for the next
     // sample (polyBLEP / polyBLAMP), Crush's last input (its antiderivative's difference)
-    float px = -1.0f, wheld = 0.0f, crushPrev = 0.0f;
+    float px = -1.0f, wheld = 0.0f, crushPrev = 0.0f, crushG = 0.0f;
 };
 
 struct OscState
@@ -820,6 +820,7 @@ struct Engine::Impl
     std::array<const Table*, oscCount> user { nullptr, nullptr, nullptr };    // Helix+ 2: the channel's user tables
     const SampleBuffer* sample = nullptr;                                       // Helix+ 2: the sample oscillator's sample
     std::array<bool, chaosCount> chaosUsed {};
+    bool newMacrosUsed = false; // (a cell reads Macro 5…8)
     std::array<Voice, maxVoices> voices {};
     std::array<EnvParams, 3> envP {};
     std::uint64_t clock = 0;
@@ -831,8 +832,32 @@ struct Engine::Impl
     struct Cell
     {
         std::uint8_t target, source;
+        // (190ml: what applyCells asks of every cell, worked out once here)
+        std::uint8_t flags;
         float amount;
     };
+    enum CellFlag : std::uint8_t
+    {
+        lfoRowCell = 1, wheelCell = 2, internalCell = 4, levelCell = 8, bipolarCell = 16, keyTrackCell = 32
+    };
+    static Cell makeCell (int t, int s, float a) noexcept
+    {
+        std::uint8_t f = 0;
+        if (t >= tgt::lfo1 && t < tgt::lfo2 + 3)
+            f |= lfoRowCell;
+        if (t == tgt::pitch && s == src::pitchBend) // (Pitch ← Pitch Bend is the channel's wheel in LYNX [MODEL])
+            f |= wheelCell;
+        if (s <= src::lfo2 || s >= src::chaos1)
+            f |= internalCell;
+        if (t == tgt::amp || t == tgt::subGain || t == tgt::oscGain || t == tgt::oscGain + tgt::oscStride || t == tgt::osc3 + tgt::oscGain || t == tgt::sampleGain)
+            f |= levelCell;
+        if (s == src::lfo1 || s == src::lfo2 || s == src::velocity || s == src::note || s == src::pitchBend || s == src::random || s == src::notePitchBend
+            || s >= src::chaos1)
+            f |= bipolarCell;
+        if (s == src::note && (t == tgt::filterFreq || t == tgt::filterFreq + tgt::filterStride))
+            f |= keyTrackCell;
+        return { (std::uint8_t) t, (std::uint8_t) s, f, a };
+    }
     std::array<Cell, allTargetCount * allSourceCount> cells {};
     int cellCount = 0;
     float bufL[controlRate] {}, bufR[controlRate] {};
@@ -918,7 +943,7 @@ struct Engine::Impl
         prepareFx();
     }
 
-    int ip (int i) const noexcept { return (int) roundHalfAway (p[(std::size_t) i]); }
+    HELIX_INLINE int ip (int i) const noexcept { return (int) roundHalfAway (p[(std::size_t) i]); }
     std::array<int, mipCount> partialsAt {}; // (mipPartials, read once)
     float fp (int i) const noexcept { return (float) p[(std::size_t) i]; }
 
@@ -941,21 +966,24 @@ struct Engine::Impl
         for (int t = 0; t < targetCount; ++t)
             for (int s = 0; s < sourceCount; ++s)
                 if (const auto a = (float) p[(std::size_t) matrixIndex (t, s)]; a != 0.0f && std::isfinite (a))
-                    cells[(std::size_t) cellCount++] = { (std::uint8_t) t, (std::uint8_t) s, a };
+                    cells[(std::size_t) cellCount++] = makeCell (t, s, a);
         if (plus()) // Helix+: the macros' columns, then Helix+'s rows (after Live's cells: revision 0 sums exactly as before)
             for (int t = 0; t < plusTargetCount; ++t)
                 for (int s = t < targetCount ? sourceCount : 0; s < plusSourceCount; ++s)
                     if (const auto a = (float) p[(std::size_t) cellIndex (t, s)]; a != 0.0f && std::isfinite (a))
-                        cells[(std::size_t) cellCount++] = { (std::uint8_t) t, (std::uint8_t) s, a };
+                        cells[(std::size_t) cellCount++] = makeCell (t, s, a);
         chaosUsed = {};
+        newMacrosUsed = false;
         if (plus2()) // Helix+ 2: the new sources on the older rows, then the new rows (after: revision 1 sums as before)
             for (int t = 0; t < allTargetCount; ++t)
                 for (int s = t < plusTargetCount ? plusSourceCount : 0; s < allSourceCount; ++s)
                     if (const auto a = (float) p[(std::size_t) cellIndex (t, s)]; a != 0.0f && std::isfinite (a))
                     {
-                        cells[(std::size_t) cellCount++] = { (std::uint8_t) t, (std::uint8_t) s, a };
+                        cells[(std::size_t) cellCount++] = makeCell (t, s, a);
                         if (s >= src::chaos1)
                             chaosUsed[(std::size_t) (s - src::chaos1)] = true;
+                        else if (s >= plusSourceCount)
+                            newMacrosUsed = true;
                     }
     }
 
@@ -1032,7 +1060,7 @@ struct Engine::Impl
                 uv.held = 0.0f;
                 uv.drift = uv.driftTarget = 0.0f;
                 uv.randomCents = bipolarRandom();
-                uv.px = -1.0f, uv.wheld = 0.0f, uv.crushPrev = 0.0f;
+                uv.px = -1.0f, uv.wheld = 0.0f, uv.crushPrev = 0.0f, uv.crushG = 0.0f;
             }
             o.pos = -1.0f;
         }
@@ -1051,7 +1079,7 @@ struct Engine::Impl
                     uv.held = 0.0f;
                     uv.drift = uv.driftTarget = 0.0f;
                     uv.randomCents = bipolarRandom();
-                    uv.px = -1.0f, uv.wheld = 0.0f, uv.crushPrev = 0.0f;
+                    uv.px = -1.0f, uv.wheld = 0.0f, uv.crushPrev = 0.0f, uv.crushG = 0.0f;
                 }
         // Helix+ 2 (round 190ml): oscillator 3's voices draw last, only while it plays (a channel without it keeps the
         // random sequence it had); the sample's voices start at Start; the chaos sources from the voice's own seed
@@ -1068,7 +1096,7 @@ struct Engine::Impl
                 uv.held = 0.0f;
                 uv.drift = uv.driftTarget = 0.0f;
                 uv.randomCents = bipolarRandom();
-                uv.px = -1.0f, uv.wheld = 0.0f, uv.crushPrev = 0.0f;
+                uv.px = -1.0f, uv.wheld = 0.0f, uv.crushPrev = 0.0f, uv.crushG = 0.0f;
             }
             o.pos = -1.0f;
         }
@@ -1168,8 +1196,9 @@ struct Engine::Impl
         v.plus2 = plus2On;
         if (plus2On) // Helix+ 2: macros 5…8, the chaos sources (each voice's own, stepped only when a cell reads it)
         {
-            for (int j = plusMacroCount; j < macroCount; ++j)
-                s[src::macro1 + j] = clamp01 ((float) xp2 (ext2::macro5 + j - plusMacroCount));
+            if (newMacrosUsed)
+                for (int j = plusMacroCount; j < macroCount; ++j)
+                    s[src::macro1 + j] = clamp01 ((float) xp2 (ext2::macro5 + j - plusMacroCount));
             for (int k = 0; k < chaosCount; ++k)
                 if (chaosUsed[(std::size_t) k])
                 {
@@ -1183,35 +1212,37 @@ struct Engine::Impl
         // (envelopes, LFOs) scale with Global Mod Amount, the MIDI ones do not [MEASURED m8: Amount 50 % leaves Pitch ←
         // Velocity whole]. The level rows (Amp, the oscillators' and the sub's Gain) multiply instead: a unipolar view of
         // the source pulls the level down from full as it falls [MEASURED m4, m5, m6, m7, m10, d1]
-        float mod[allTargetCount] {};
-        float level[allTargetCount] {};
-        std::fill (std::begin (level), std::end (level), 1.0f);
+        // (190ml: Helix+ 2's rows are cleared only when its block is live: nothing reads them otherwise)
+        float mod[allTargetCount];
+        float level[allTargetCount];
+        std::fill (mod, mod + plusTargetCount, 0.0f);
+        std::fill (level, level + plusTargetCount, 1.0f);
+        if (plus2On)
+        {
+            std::fill (mod + plusTargetCount, mod + allTargetCount, 0.0f);
+            std::fill (level + plusTargetCount, level + allTargetCount, 1.0f);
+        }
         auto internalScale = std::clamp (fp (modAmount), 0.0f, 2.0f);
         auto applyCells = [&] (bool lfoRowsOnly) HELIX_LAMBDA_INLINE {
             for (int i = 0; i < cellCount; ++i)
             {
                 const auto& c = cells[(std::size_t) i];
-                const bool lfoRow = c.target >= tgt::lfo1 && c.target < tgt::lfo2 + 3;
+                const bool lfoRow = (c.flags & lfoRowCell) != 0;
                 if (lfoRow != lfoRowsOnly)
                     continue;
                 // Pitch ← Pitch Bend is the channel's wheel in LYNX (its range is the channel's) [MODEL]
-                if (c.target == tgt::pitch && c.source == src::pitchBend)
+                if (c.flags & wheelCell)
                     continue;
-                const auto a = c.amount * (c.source <= src::lfo2 || c.source >= src::chaos1 ? internalScale : 1.0f);
+                const auto a = c.amount * ((c.flags & internalCell) ? internalScale : 1.0f);
                 const auto t = c.target;
-                if (t == tgt::amp || t == tgt::subGain || t == tgt::oscGain || t == tgt::oscGain + tgt::oscStride || t == tgt::osc3 + tgt::oscGain
-                    || t == tgt::sampleGain)
+                if (c.flags & levelCell)
                 {
-                    const bool bipolar = c.source == src::lfo1 || c.source == src::lfo2 || c.source == src::velocity || c.source == src::note
-                                         || c.source == src::pitchBend || c.source == src::random || c.source == src::notePitchBend
-                                         || c.source >= src::chaos1;
-                    const auto u = bipolar ? 0.5f * (s[c.source] + 1.0f) : s[c.source];
+                    const auto u = (c.flags & bipolarCell) ? 0.5f * (s[c.source] + 1.0f) : s[c.source];
                     level[t] *= std::max (0.0f, a >= 0.0f ? 1.0f - a * (1.0f - u) : 1.0f + a * u);
                     continue;
                 }
                 // Filter Freq ← Note is key tracking: 1 = an octave per octave [MEASURED m2 f1 note1]
-                const bool keyTrack = c.source == src::note && (t == tgt::filterFreq || t == tgt::filterFreq + tgt::filterStride);
-                mod[t] += a * s[c.source] * (keyTrack ? (float) (laws.keyTrackOctaves / laws.filterOctaves) : 1.0f);
+                mod[t] += a * s[c.source] * ((c.flags & keyTrackCell) ? (float) (laws.keyTrackOctaves / laws.filterOctaves) : 1.0f);
             }
         };
         applyCells (true);
@@ -1260,10 +1291,7 @@ struct Engine::Impl
             const auto g = std::clamp (internalScale + 2.0f * mod[tgt::globalMod], 0.0f, 2.0f);
             if (internalScale > 0.0f)
                 for (int i = 0; i < cellCount; ++i)
-                    if (const auto& c = cells[(std::size_t) i]; (c.source <= src::lfo2 || c.source >= src::chaos1) && c.target != tgt::amp
-                                                                && c.target != tgt::subGain && c.target != tgt::oscGain
-                                                                && c.target != tgt::oscGain + tgt::oscStride && c.target != tgt::osc3 + tgt::oscGain
-                                                                && c.target != tgt::sampleGain)
+                    if (const auto& c = cells[(std::size_t) i]; (c.flags & internalCell) && ! (c.flags & levelCell))
                         mod[c.target] += c.amount * s[c.source] * (g - internalScale);
         }
         // envelopes
@@ -1634,33 +1662,38 @@ struct Engine::Impl
     // phase). The next sample's input phase is foreseen from the last step (exact for a steady phase); a jump between this
     // sample and the next one at a fraction tau of the way adds the polyBLEP's two halves (this one now, the next one held),
     // a kink the polyBLAMP's; Crush's steps go through the first-order antiderivative of the quantiser.
-    template <typename Read, typename ToPhase>
-    static HELIX_INLINE float antiAlias (UnisonVoice& uv, float y, float px, float dt, int w2, float wa, float syncK, float pwmW, float flipAt,
-                                         float crushL, float delta, const Read& read, const ToPhase& toPhase) noexcept
+    // (w2: the warp as a constant, so each anti-aliased warp's voice loop holds only its own corrections)
+    // (the memory: a copy in locals while the voice's samples run, so the stores into the output need not reload it)
+    struct AaMemory
     {
-        if (w2 == warp::crush)
+        float px, wheld, crushPrev, crushG;
+    };
+    template <int w2, typename Read, typename ToPhase>
+    static HELIX_INLINE float antiAlias (AaMemory& uv, float y, float px, float dt, float wa, float syncK, float pwmW, float flipAt,
+                                         float crushL, float delta, bool linear, const Read& read, const ToPhase& toPhase) noexcept
+    {
+        if constexpr (w2 == warp::crush)
         {
             if (wa < 1.0e-4f)
                 return y;
-            // F (x) = ∫0^x round (s L) / L ds = (k (k − 1) / 2 + k (u − k + ½)) / L², u = |x| L, k = round (u) (even in x)
-            const auto F = [crushL] (float x) noexcept {
+            // F (x) = ∫0^x round (s L) / L ds = G (u) / L², G (u) = k (k − 1) / 2 + k (u − k + ½), u = |x| L, k = round (u)
+            // (even in x); the last sample's G is kept
+            const auto G = [crushL] (float x) noexcept {
                 const auto u = std::abs (x) * crushL;
                 const auto k = std::floor (u + 0.5f);
-                return (k * (k - 1.0f) * 0.5f + k * (u - k + 0.5f)) / (crushL * crushL);
+                return k * (k - 1.0f) * 0.5f + k * (u - k + 0.5f);
             };
-            const auto x0 = uv.crushPrev;
-            uv.crushPrev = y;
+            const auto x0 = uv.crushPrev, g0 = uv.crushG;
+            const auto gy = G (y);
+            const bool first = uv.px < 0.0f;
+            uv.crushPrev = y, uv.crushG = gy, uv.px = px;
             const auto dx = y - x0;
-            if (uv.px < 0.0f || std::abs (dx) < 1.0e-5f)
-            {
-                uv.px = px;
-                return std::round ((uv.px < 0.0f ? y : 0.5f * (y + x0)) * crushL) / crushL;
-            }
-            uv.px = px;
-            return (F (y) - F (x0)) / dx;
+            if (first || std::abs (dx) < 1.0e-5f)
+                return std::round ((first ? y : 0.5f * (y + x0)) * crushL) / crushL;
+            return (gy - g0) / (crushL * crushL * dx);
         }
         auto d = dt;
-        if (uv.px >= 0.0f)
+        if (! linear && uv.px >= 0.0f) // (a steady phase moves by dt: nothing to foresee)
         {
             d = px - uv.px;
             if (d < 0.0f)
@@ -1710,8 +1743,9 @@ struct Engine::Impl
                     cut (1.0f, read (0u) - read (toPhase (end)), syncK * (slopeAt (0.0f) - slopeAt (end)));
                 }
                 break;
+            // (the cuts' values are read only in the sample before a cut: once or twice a cycle)
             case warp::pwm:
-                if (next >= pwmW && pwmW < 1.0f)
+                if (pwmW < 1.0f && ((px < pwmW && next >= pwmW) || next >= 1.0f))
                 {
                     const auto r0 = read (0u), s0 = slopeAt (0.0f) / pwmW;
                     cut (pwmW, -r0, -s0);
@@ -1719,14 +1753,13 @@ struct Engine::Impl
                 }
                 break;
             case warp::flip:
-                if (flipAt < 1.0f && next >= flipAt)
-                {
+                if (flipAt < 1.0f && px < flipAt && next >= flipAt)
                     cut (flipAt, -2.0f * read (toPhase (flipAt)), -2.0f * slopeAt (flipAt));
+                if (flipAt < 1.0f && next >= 1.0f)
                     cut (1.0f, 2.0f * read (0u), 2.0f * slopeAt (0.0f));
-                }
                 break;
             case warp::mirror:
-                if (wa > 1.0e-4f && next >= 0.5f)
+                if (wa > 1.0e-4f && ((px < 0.5f && next >= 0.5f) || next >= 1.0f))
                 {
                     // the turn reads the table's start backwards: its slope there, from both sides of phase 0
                     const auto slope0 = slopeAt (0.0f);
@@ -1739,8 +1772,15 @@ struct Engine::Impl
         return y;
     }
 
+    // oscillator 3's step (190ml): the same body in a call of its own, so oscillators 1 and 2 stay inlined in the voice loop
+    // as before (the default patch's instructions)
+#if defined(__GNUC__) || defined(__clang__)
+    __attribute__ ((noinline))
+#endif
+    void osc3Step (Voice& v, int n, float* outL, float* outR) noexcept { oscStep (v, 2, n, outL, outR); }
+
     // one oscillator's step into out L / R (adds)
-    void oscStep (Voice& v, int k, int n, float* outL, float* outR) noexcept
+    HELIX_INLINE void oscStep (Voice& v, int k, int n, float* outL, float* outR) noexcept
     {
         const auto* tb = tables[(std::size_t) k];
         const auto g = v.gain[(std::size_t) k];
@@ -1801,6 +1841,7 @@ struct Engine::Impl
         // Helix+ 2 (round 190ml): the hard-edged warps anti-aliased (revision 2): a polyBLEP at each jump (Sync's restart,
         // PWM's gap, Flip's turn), a polyBLAMP at each kink (Mirror's turn), Crush through its antiderivative
         const bool aa = v.plus2 && hardEdged (w2);
+        const auto invLen = 1.0f / (float) len;
         const auto ok = otherOsc (k);
         const auto* otherTable = xmod ? tables[(std::size_t) ok] : nullptr;
         const float* oa = nullptr;
@@ -1821,8 +1862,9 @@ struct Engine::Impl
         const auto oFracScale = 1.0f / (float) (1u << oShift);
         const auto oFracMask = (1u << oShift) - 1u;
         // the voices' loop twice: as before 190mi (no second warp: exactly the code that was) and with Helix+'s second warp
-        const auto voicesLoop = [&] (auto warpOn) HELIX_LAMBDA_INLINE {
+        const auto voicesLoop = [&] (auto warpOn, auto aaWarp) HELIX_LAMBDA_INLINE {
         constexpr bool warping = decltype (warpOn)::value;
+        constexpr int aaMode = decltype (aaWarp)::value; // (Helix+ 2: the anti-aliased warp, 0 = none)
         for (int u = 0; u < uCount; ++u)
         {
             auto& uv = o.u[(std::size_t) u];
@@ -1845,6 +1887,7 @@ struct Engine::Impl
             const bool moving = o.posStep != 0.0f;
             findFrames (pos);
             auto oph = v.phaseAtStep[(std::size_t) ok][(std::size_t) u];
+            AaMemory aaMemory { uv.px, uv.wheld, uv.crushPrev, uv.crushG };
             const auto oinc = v.uInc[(std::size_t) ok][(std::size_t) u];
             for (int i = 0; i < n; ++i)
             {
@@ -1992,20 +2035,31 @@ struct Engine::Impl
                     }
                     default: y = sample (uv.phase); break;
                 }
-                if constexpr (warping)
-                    if (aa)
-                        y = antiAlias (uv, y, wIn, dt, w2, wa, syncK, pwmW, flipAt, crushL, 1.0f / (float) len, read, toPhase);
+                if constexpr (warping && aaMode != 0)
+                    y = antiAlias<aaMode> (aaMemory, y, wIn, dt, wa, syncK, pwmW, flipAt, crushL, invLen, mode == effectNone, read, toPhase);
                 uv.phase += inc;
                 outL[i] += y * gl;
                 outR[i] += y * gr;
                 pos += o.posStep;
             }
+            if constexpr (aaMode != 0)
+                uv.px = aaMemory.px, uv.wheld = aaMemory.wheld, uv.crushPrev = aaMemory.crushPrev, uv.crushG = aaMemory.crushG;
         }
         };
+        using none = std::integral_constant<int, 0>;
         if (w2 == warp::off)
-            voicesLoop (std::false_type {});
+            voicesLoop (std::false_type {}, none {});
+        else if (! aa)
+            voicesLoop (std::true_type {}, none {});
         else
-            voicesLoop (std::true_type {});
+            switch (w2)
+            {
+                case warp::sync: voicesLoop (std::true_type {}, std::integral_constant<int, warp::sync> {}); break;
+                case warp::pwm: voicesLoop (std::true_type {}, std::integral_constant<int, warp::pwm> {}); break;
+                case warp::mirror: voicesLoop (std::true_type {}, std::integral_constant<int, warp::mirror> {}); break;
+                case warp::flip: voicesLoop (std::true_type {}, std::integral_constant<int, warp::flip> {}); break;
+                default: voicesLoop (std::true_type {}, std::integral_constant<int, warp::crush> {}); break;
+            }
         o.pos += o.posStep * (float) n;
     }
 
@@ -2697,7 +2751,7 @@ struct Engine::Impl
                 else
                     oscStep (v, 1, c, o1L, o1R);
                 if (v.oscs > 2) // (Helix+ 2: oscillator 3 and the sample join oscillator 1's bus)
-                    oscStep (v, 2, c, o1L, o1R);
+                    osc3Step (v, c, o1L, o1R);
                 if (v.sampleOn)
                     sampleStep (v, c, o1L, o1R);
                 subStep (v, c, o1L, o1R);
