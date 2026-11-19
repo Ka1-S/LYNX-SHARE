@@ -11797,3 +11797,7 @@ countries: cn sg
 "Aether's Vitamin law (the Waves Vitamin stand-in) plays Aether's own enhancer: {0}" = "Aether 的 Vitamin 规律（Waves Vitamin 的替代）按 Aether 自身的增强器播放：{0}"
 "Fruity Multiband Compressor's display SPEED goes back to its default: {0}" = "Fruity Multiband Compressor 的显示 SPEED 恢复为默认值：{0}"
 "{0} zipped channel(s) show at full height in the Channel rack" = "{0} 个折叠的通道在 Channel rack 中以完整高度显示"
+"Undo {0}" = "撤销 {0}"
+"Redo {0}" = "重做 {0}"
+"Nothing to undo" = "没有可撤销的操作"
+"Nothing to redo" = "没有可重做的操作"

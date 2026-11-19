@@ -11797,3 +11797,7 @@ countries: it ch sm
 "Aether's Vitamin law (the Waves Vitamin stand-in) plays Aether's own enhancer: {0}" = "La legge Vitamin di Aether (il sostituto di Waves Vitamin) suona l'enhancer proprio di Aether: {0}"
 "Fruity Multiband Compressor's display SPEED goes back to its default: {0}" = "La SPEED del display di Fruity Multiband Compressor torna al valore predefinito: {0}"
 "{0} zipped channel(s) show at full height in the Channel rack" = "{0} canali compattati appaiono a piena altezza nel Channel rack"
+"Undo {0}" = "Annulla {0}"
+"Redo {0}" = "Ripeti {0}"
+"Nothing to undo" = "Niente da annullare"
+"Nothing to redo" = "Niente da ripetere"

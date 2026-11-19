@@ -84,6 +84,20 @@ render, **[GUI]** LYNX driven on Windows (fresh profile, `LYNX_TEST_MODE=1`), **
   back, and Ctrl+Alt+Z is the undo/redo key (before, both walked back). The Edit menu shows the swapped shortcuts.
   The rule is in `core/UndoKeys.h`. [TEST] `u190b_default_mode_ctrl_z_toggles_and_ctrl_alt_z_walks_back`,
   `u190b_alternate_mode_ctrl_z_walks_the_history`, `u190b_undo_and_redo_shortcuts`.
+- **Round 190mz (issue #214): the default is ON, not off.** FL 2026 (26.1.7, build 5654) starts with "Alternate undo
+  mode" on. [DATA] the option's variable is a typed constant initialised to 1 (FLEngine .data 0x15452d0, through the
+  pointer at 0x15e2f18). [DISASM FUN_0119f820] it is read from `General\AlternateUndoMode` (older store) and from
+  HKCU\Software\Image-Line\Shared\General "Alternate undo mode", each with the variable's own value as the default;
+  the only other write is the check box's click (FUN_0135d5d0). The DFM check box has no `Checked` because the form
+  copies the variable when it opens, which is what 167k misread as "off by default". [LIVE, shots in
+  /mnt/e/lynx-work/issue214_190mz/shots/ref] Options › General settings › Undo history: Maximum undo levels (100),
+  Undo knob tweaks, Alternate undo mode, Put undone recordings in the recycle bin. FL's main Edit menu is two items
+  that name the step: "Undo knob tweak (Insert 2 - Volume)" and, while something is undone, "Redo …". Alternate mode:
+  Undo Ctrl+Z, Redo Ctrl+Alt+Z, and Ctrl+Z twice walked back two steps. Toggle mode: Undo Ctrl+Z while nothing is
+  undone, then Undo Ctrl+Alt+Z / Redo Ctrl+Z, and the second Ctrl+Z redid. LYNX now: default on in every layout
+  (old settings files: an `alternateUndo=0` written by the old default is read as "never chosen"; the new key
+  `alternateUndoMode` wins), and the Edit menu has FL's two items (Clip-launch / Simple: Live's "Nothing to redo" and
+  Ctrl+Y). [TEST] `u190mz_*`, `--undoshot190mz`.
 
 ## 5. Playlist keys 7 / 8 / 9: clip pitch and clip reverse
 

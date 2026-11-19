@@ -11797,3 +11797,7 @@ countries: ru by kz
 "Aether's Vitamin law (the Waves Vitamin stand-in) plays Aether's own enhancer: {0}" = "Закон Vitamin в Aether (замена Waves Vitamin) звучит собственным энхансером Aether: {0}"
 "Fruity Multiband Compressor's display SPEED goes back to its default: {0}" = "SPEED дисплея Fruity Multiband Compressor возвращается к значению по умолчанию: {0}"
 "{0} zipped channel(s) show at full height in the Channel rack" = "Свёрнутые каналы ({0}) показываются в Channel rack в полную высоту"
+"Undo {0}" = "Отменить: {0}"
+"Redo {0}" = "Повторить: {0}"
+"Nothing to undo" = "Нечего отменять"
+"Nothing to redo" = "Нечего повторять"

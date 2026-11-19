@@ -11797,3 +11797,7 @@ countries: id
 "Aether's Vitamin law (the Waves Vitamin stand-in) plays Aether's own enhancer: {0}" = "Hukum Vitamin milik Aether (pengganti Waves Vitamin) memutar enhancer Aether sendiri: {0}"
 "Fruity Multiband Compressor's display SPEED goes back to its default: {0}" = "SPEED tampilan Fruity Multiband Compressor kembali ke nilai bawaannya: {0}"
 "{0} zipped channel(s) show at full height in the Channel rack" = "{0} kanal yang diringkas tampil dengan tinggi penuh di Channel rack"
+"Undo {0}" = "Urungkan {0}"
+"Redo {0}" = "Ulangi {0}"
+"Nothing to undo" = "Tidak ada yang bisa diurungkan"
+"Nothing to redo" = "Tidak ada yang bisa diulangi"

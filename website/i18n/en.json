@@ -514,7 +514,7 @@
 "fix.24.l": "Convert to MIDI turns the melody, the harmony or the drums of an audio clip into a new pattern. It runs on your own computer.",
 "fix.25.t": "Undo keys that differ between programs",
 "fix.25.c": "In FL Studio, Ctrl+Z undoes and redoes only the last step. People who come from other programs expect it to keep stepping back.",
-"fix.25.l": "By default the keys are FL Studio's: Ctrl+Z undoes and redoes the last step, and Ctrl+Alt+Z steps back through the history. \"Alternate undo mode\" in the general settings swaps the two.",
+"fix.25.l": "Ctrl+Z steps back through the history by default, as in FL Studio 2026 (its \"Alternate undo mode\", on out of the box), and the Edit menu names the step. Turn that mode off in the general settings for FL's other keys: Ctrl+Z undoes and redoes the last step, Ctrl+Alt+Z steps back.",
 "fix.26.t": "Too many windows on the first day",
 "fix.26.c": "A full DAW shows a beginner dozens of windows and controls before the first sound.",
 "fix.26.l": "View › Layout style › Simple workflow shows one window with the tracks and the timeline. A new track is a voice, an instrument, a sampler or a starter beat in one click, and the other windows stay one click away. The setup wizard offers it at the first start.",

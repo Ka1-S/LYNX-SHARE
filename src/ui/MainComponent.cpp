@@ -2975,6 +2975,7 @@ void MainComponent::loadUiSettings()
         engine.setRecordOptions (o);
     }
 
+    undokeys::SettingsReader undoSetting; // "Alternate undo mode" (round 190mz: two keys, read in any order)
     for (const auto& line : lines)
     {
         const auto key = line.upToFirstOccurrenceOf ("=", false, false).trim();
@@ -3044,8 +3045,10 @@ void MainComponent::loadUiSettings()
             pickerPanelOn = on;
             playlistArea.setPickerHidden (layoutStyle == layoutstyle::Style::simple || ! pickerPanelOn);
         }
-        else if (key == "alternateUndo")
-            alternateUndo = on;
+        else if (key == "alternateUndo") // (rounds 167k-190b; round 190mz: an old 0 was the old default)
+            undoSetting.legacyKey (on);
+        else if (key == "alternateUndoMode") // round 190mz
+            undoSetting.currentKey (on);
         else if (key == "waveSpectral") // ("waveColours", the old spectral-by-default key, is ignored)
             ui::WaveformCache::spectral = on;
         else if (key == "pluginStyle") // "Automatic" or a style forced on every plugin
@@ -3381,6 +3384,7 @@ void MainComponent::loadUiSettings()
         else if (key == "quantizeSongJumps")
             engine.quantizeSongJumps.store (juce::jlimit (0, 5, line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue()));
     }
+    alternateUndo = undoSetting.alternate;
 
     startup = StartupOptions::load();
     browser.refreshPreviewVolume();
@@ -3417,7 +3421,8 @@ void MainComponent::saveUiSettings()
                                       + "\ntrackInserts=" + juce::String (PlaylistComponent::showTrackInserts ? 1 : 0)
                                       + workflowextras::uiOptionsText() // round 190iu
                                       + "\npickerPanel=" + juce::String (pickerPanelOn ? 1 : 0)
-                                      + "\nalternateUndo=" + juce::String (alternateUndo ? 1 : 0)
+                                      + "\nalternateUndo=" + juce::String (alternateUndo ? 1 : 0) // (read by older versions)
+                                      + "\nalternateUndoMode=" + juce::String (alternateUndo ? 1 : 0)
                                       + "\neditPatternsIn="
                                       + juce::String (PlaylistComponent::editPatternsIn) + "\nsplash=" + juce::String (startup.splash ? 1 : 0)
                                       + "\nstartupSound=" + juce::String (startup.sound ? 1 : 0)
@@ -9739,14 +9744,25 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
     }
     else if (index == 1)
     {
-        // FL's Edit menu: "Undo backwards" (Ctrl+Alt+Z) above "Undo" (Ctrl+Z: undo, or redo after an undo)
-        // ("Alternate undo mode" swaps the two shortcuts, as FL's menu does: round 190b)
-        const auto backwardsId = alternateUndo ? "edit.undo" : "edit.undoBackwards";
-        const auto toggleId = alternateUndo ? "edit.undoBackwards" : "edit.undo";
-        menu.addItem (tr ("Undo backwards") + shortcutText (backwardsId), engine.canUndo(), false, [this] { undoRedo (false); });
-        menu.addItem ((engine.canRedo() ? tr ("Undo (redo)") : tr ("Undo")) + shortcutText (toggleId), engine.canUndo() || engine.canRedo(), false,
-                      [this] { runUndoStep (undokeys::toggle (engine.canUndo(), engine.canRedo())); });
-        menu.addItem (tr ("Redo") + shortcutText ("edit.redo"), engine.canRedo(), false, [this] { undoRedo (true); });
+        // FL 2026's Edit menu (round 190mz, issue #214): "Undo <step>", and "Redo <step>" while something is undone, each
+        // with the key that does it now (core/UndoKeys.h); the Clip-launch and Simple layouts show Live's form
+        {
+            const auto liveStyle = layoutStyle != layoutstyle::Style::pattern;
+            const auto position = engine.getHistoryPosition();
+            const auto stepName = [this] (int step) {
+                const auto label = engine.getHistoryLabel (step);
+                auto name = tr (label.text, { juce::String::fromUTF8 (label.arg.c_str()) });
+                return name.length() > 48 ? name.substring (0, 47).trimEnd() + "..." : name;
+            };
+            const auto undoItem = undokeys::undoMenuItem (alternateUndo, position, engine.canUndo(), engine.canRedo());
+            const auto redoItem = undokeys::redoMenuItem (alternateUndo, liveStyle, position, engine.canRedo());
+            menu.addItem ((undoItem.step >= 0 ? tr ("Undo {0}", { stepName (undoItem.step) }) : liveStyle ? tr ("Nothing to undo") : tr ("Undo"))
+                              + shortcutText (undoItem.action),
+                          undoItem.enabled, false, [this] { undoRedo (false); });
+            if (redoItem.shown)
+                menu.addItem ((redoItem.step >= 0 ? tr ("Redo {0}", { stepName (redoItem.step) }) : tr ("Nothing to redo")) + shortcutText (redoItem.action),
+                              redoItem.enabled, false, [this] { undoRedo (true); });
+        }
         menu.addItem (tr ("Undo history...") + shortcutText ("edit.history"), [this] { showHistory(); });
         menu.addItem (tr ("Audio editor..."), [this] { openAudioEditor (engine); });
         menu.addSeparator();

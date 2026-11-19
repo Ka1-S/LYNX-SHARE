@@ -11797,3 +11797,7 @@ countries: kr
 "Aether's Vitamin law (the Waves Vitamin stand-in) plays Aether's own enhancer: {0}" = "Aether의 Vitamin 법칙(Waves Vitamin 대체)은 Aether 자체 인핸서로 재생됩니다: {0}"
 "Fruity Multiband Compressor's display SPEED goes back to its default: {0}" = "Fruity Multiband Compressor의 표시 SPEED는 기본값으로 돌아갑니다: {0}"
 "{0} zipped channel(s) show at full height in the Channel rack" = "접힌 채널 {0}개가 Channel rack에서 전체 높이로 표시됩니다"
+"Undo {0}" = "실행 취소: {0}"
+"Redo {0}" = "다시 실행: {0}"
+"Nothing to undo" = "실행 취소할 항목 없음"
+"Nothing to redo" = "다시 실행할 항목 없음"

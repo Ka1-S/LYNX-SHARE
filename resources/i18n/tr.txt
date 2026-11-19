@@ -11797,3 +11797,7 @@ countries: tr
 "Aether's Vitamin law (the Waves Vitamin stand-in) plays Aether's own enhancer: {0}" = "Aether'in Vitamin yasası (Waves Vitamin yerine geçen) Aether'in kendi güçlendiricisini çalar: {0}"
 "Fruity Multiband Compressor's display SPEED goes back to its default: {0}" = "Fruity Multiband Compressor'ın ekran SPEED değeri varsayılana döner: {0}"
 "{0} zipped channel(s) show at full height in the Channel rack" = "Daraltılmış {0} kanal Channel rack'te tam yükseklikte gösterilir"
+"Undo {0}" = "Geri al: {0}"
+"Redo {0}" = "Yinele: {0}"
+"Nothing to undo" = "Geri alınacak bir şey yok"
+"Nothing to redo" = "Yinelenecek bir şey yok"

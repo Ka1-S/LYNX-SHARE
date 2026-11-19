@@ -11797,3 +11797,7 @@ countries: jp
 "Aether's Vitamin law (the Waves Vitamin stand-in) plays Aether's own enhancer: {0}" = "Aether の Vitamin 則（Waves Vitamin の代替）は Aether 独自のエンハンサーで再生されます: {0}"
 "Fruity Multiband Compressor's display SPEED goes back to its default: {0}" = "Fruity Multiband Compressor の表示 SPEED は既定値に戻ります: {0}"
 "{0} zipped channel(s) show at full height in the Channel rack" = "Zip された {0} 個のチャンネルは Channel rack で通常の高さで表示されます"
+"Undo {0}" = "元に戻す: {0}"
+"Redo {0}" = "やり直し: {0}"
+"Nothing to undo" = "元に戻す操作はありません"
+"Nothing to redo" = "やり直す操作はありません"
