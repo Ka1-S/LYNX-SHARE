@@ -206,6 +206,25 @@ struct Shifter
         }
         return y;
     }
+    // round 190mj (Horizon's reaLaw granular echoes): four heads a quarter window apart, each sin²-windowed and the sum
+    // scaled by ½ (the windows sum to 2): low tones keep their level, while a click — or a high tone, whose heads add
+    // without coherence — carries half the energy of the two-head pitch shifter's (ValhallaFutureVerb's reverse / octave
+    // modes: the impulse 3 … 4 dB under LYNX's two heads, the 4 … 10 kHz bursts 1 … 2 dB under, the low bursts level)
+    float process4 (float x, double ratio) noexcept
+    {
+        line.write (x);
+        phase += (1.0 - ratio) / window;
+        phase -= std::floor (phase);
+        float y = 0.0f;
+        for (int h = 0; h < 4; ++h)
+        {
+            auto p = phase + 0.25 * h;
+            p -= std::floor (p);
+            const auto w = (float) std::sin (pi * p);
+            y += w * w * line.readFrac (2.0 + p * window);
+        }
+        return 0.5f * y;
+    }
 };
 
 double clampPos (double v, double lo, double hi) noexcept { return std::isfinite (v) ? std::clamp (v, lo, hi) : lo; }
@@ -2097,6 +2116,61 @@ LYNX_FIT_TABLE Rev1Trim horizonTrim[horizon::reverbModeCount] = {
     { 1.95, { 0.00, 0.00, 0.00, -0.18, 0.19, 0.03, 0.64, 3.18 } }, // Freeze
     { -3.95, { 0.00, 0.00, 0.00, -0.92, 2.42, 0.89, -1.49, -0.54 } }, // Gated
 };
+// round 190mj (horizon::reaLaw) [EXEC]: ValhallaFutureVerb's echo modes against this round's probe renders of the echo alone
+// (Reverb level 0, Echo level 100 %, Feedback 0 / 40 %; impulses at 0.5 / 0.05 / 0.005, tone bursts 100 Hz … 10 kHz at −40 /
+// −20 / −6 dB, pink bursts, a sweep; lab/echoan.py): each mode's voicing (level of the heard echo, low-pass, drive)
+struct HorizonEcho
+{
+    double gainDb = 0.0, cutHz = 0.0; // the echo's level (dB) and its low-pass (Hz; 0 = the mode's own, as before)
+    int poles = 1;                    // the low-pass's order (1 or 2 one-pole sections)
+    double driveMult = 1.0;           // × the Drive control's dB (the plain modes)
+};
+// Fitted on the echo alone (lab/echofit.py: gain, low-pass, order, drive per mode), then kept only where the probe bank's
+// echo-mode renders (echo + Chamber, the reference's S2: Level 50 %, Feedback 40 %) gained without a file down: Analog a
+// darker two-pole 3 kHz low-pass, Reverse Up/Down a two-pole 8 kHz one and +2 dB, Lo-fi a two-pole 4 kHz one. (The level the
+// echo-alone fit asks for, +2 … +5 dB on most modes, took those renders down: the reverb behind the echo was measured with
+// LYNX's echo level; the voicing's gain is the heard echo's only)
+LYNX_FIT_TABLE HorizonEcho horizonEcho[horizon::echoModeCount] = {
+    {}, {}, {},                    // Clean, Tape, Digital (its own coder)
+    { 1.0, 3000.0, 2, 1.0 },       // Analog
+    {}, {}, {}, {},                // Detune, Reverse, Reverse Up, Reverse Down
+    { 2.0, 8000.0, 2, 1.0 },       // Reverse Up/Down
+    {}, {},                        // Sparkle, Swarm
+    { 1.0, 4000.0, 2, 1.0 },       // Lo-fi
+};
+// round 190mj (horizon::reaLaw) [EXEC]: Room and Chamber against this round's probe renders of the reference (each at Size
+// 0 / 25 / 50 / 75 / 100 % × Decay 0.15 / 0.29 / 0.45: an impulse at 0.5 and 0.05, a pink burst, music). Their errors move
+// with Size, not Decay: at Size 0 LYNX's first 100 ms sit 4 dB (Chamber) / 9 … 12 dB (Room) under the reference, at Size 100 %
+// 2 … 3 dB over, and the tail at Size 25 … 50 % (Chamber) 2 … 3 dB over — which is why one trim per mode (round 190mb) took
+// files down at the other sizes. The law, per mode at five Sizes (linear in between): the onset network's level (its span
+// stays the mode's), the late tank's level (×) and the wet gain (dB)
+struct HorizonRoomKnot
+{
+    double onset = -1.0, late = 1.0, gainDb = 0.0; // onset < 0: the mode's own
+    double rt = 1.0, early = 1.0;                  // × the decay, × the early taps' level
+};
+// Fitted per Size on the probe renders (lab/roomfit.py: window levels 0-0.1 / 0.1-0.3 / 0.3-0.8 / 0.8-2 s after the impulse,
+// the quiet impulse, the pink burst, the music), then eased until no file of the gate banks went down (Room: Size 25 % from
+// +1 to +0.5 dB and its onset 0.45 → 0.3, Size 50 … 100 % without the fit's +1 … +2 dB, which the short decays' music did not
+// want; Chamber: Size 50 % from late 0.6 / +3 dB to 0.75 / +1.7 dB, Size 75 % halfway, Size 100 % as it was)
+LYNX_FIT_TABLE HorizonRoomKnot horizonRoomLaw[2][5] = {
+    { { 0.7, 1.0, 3.0 }, { 0.3, 1.0, 0.5 }, {}, {}, { -1.0, 1.0, 0.5, 1.0, 0.5 } },                          // Room (its onset: 0)
+    { { 0.7, 0.8, 2.0 }, { 0.45, 0.7, 2.0 }, { 0.45, 0.75, 1.7 }, { 0.3, 0.8, 1.5 }, {} },                   // Chamber (0.45)
+};
+// round 190mj: which granular echo modes run the four-head shifter (Shifter::process4) under reaLaw
+// (Reverse Up, Reverse Down and Sparkle gained on the probe bank; Detune, Reverse, Reverse Up/Down and Swarm lost: two heads)
+LYNX_FIT_TABLE bool horizonHeads4[horizon::echoModeCount] = { false, false, false, false, false, false, true, true, false, true, false, false };
+// The Digital mode's coder (LYNX's own law of what the probe renders show: a single-sample impulse leaves the reference's
+// Digital echo as the same small ramp-shaped pulse, ~19 dB under the clean echo's, whatever its height, while tones pass
+// within ~1.3 dB up to −6 dB at 1 kHz, 4 kHz loses ~4 dB and 10 kHz ~20 dB — a coder that slews towards its input by a
+// limited step): a two-pole pre low-pass, the slew limiter (Coder: stepMin per sample at 48 kHz, growing towards stepMax over
+// tauMs while it stays at its limit), a post low-pass and a gain; fitted on the probe bank's Digital renders (1 / 2 / 1 → 2 /
+// 3 / 3). Not reproduced: the reference's repeats under Feedback die after the first (its coder drops the smooth small pulse)
+struct HorizonCoder
+{
+    double gainDb, preHz, postHz, stepMin, stepMax, tauMs, leak;
+};
+LYNX_FIT_TABLE HorizonCoder horizonCoder { -3.5, 6000.0, 10000.0, 0.002, 0.1, 1.0, 1.0 };
 // round 190mb (epoch::rateLaw): ValhallaVintageVerb is not rate-independent where Epoch is (Epoch's impulse at 96 kHz is its
 // 48 kHz one to 0.05 dB). Against its own 48 kHz renders the reference's sr96 captures (refcap182's D / S1 / S2 / S3 states)
 // lose 1.4 … 1.7 dB in the first 80 ms and ~0.9 dB to 300 ms in its 1970s colour (ColorMode 0.33: D / S1 / S2), nothing in the
@@ -2245,6 +2319,30 @@ bool loadTrims()
                 {
                     if (i >= 0 && i < epoch::colourCount)
                         epochRate[i] = { t.gainDb, t.db[0] };
+                    continue;
+                }
+                if (n == "hecho") // round 190mj: "hecho <echo mode> <dB> <cut Hz> <poles> <drive ×> + 5 unused"
+                {
+                    if (i >= 0 && i < horizon::echoModeCount)
+                        horizonEcho[i] = { t.gainDb, t.db[0], (int) t.db[1], t.db[2] };
+                    continue;
+                }
+                if (n == "hroom") // round 190mj: "hroom <mode 0 | 1> <onset> <late ×> <size knot 0 … 4> <gain dB> <rt × (0 = 1)> <1 + early × (0 = 1)> + 3 unused"
+                {
+                    const auto k = (int) t.db[1];
+                    if (i >= 0 && i < 2 && k >= 0 && k < 5)
+                        horizonRoomLaw[i][k] = { t.gainDb, t.db[0], t.db[2], t.db[3] > 0.0 ? t.db[3] : 1.0, t.db[4] > 0.0 ? t.db[4] - 1.0 : 1.0 };
+                    continue;
+                }
+                if (n == "hheads") // round 190mj: "hheads <echo mode> <0 | 1> + 8 unused"
+                {
+                    if (i >= 0 && i < horizon::echoModeCount)
+                        horizonHeads4[i] = t.gainDb >= 0.5;
+                    continue;
+                }
+                if (n == "hcoder") // round 190mj: "hcoder 0 <gain dB> <pre Hz> <post Hz> <step min> <step max> <tau ms> <leak> + 2 unused"
+                {
+                    horizonCoder = { t.gainDb, t.db[0], t.db[1], t.db[2], t.db[3], t.db[4], t.db[5] };
                     continue;
                 }
                 if (n == "eshort") // round 190ly: "eshort <end s> <gain> <8 × dB>"
@@ -3295,6 +3393,7 @@ public:
         for (auto& sh : shifters)
             sh.clear();
         tone[0].z = tone[1].z = 0.0f;
+        tone2[0].z = tone2[1].z = 0.0f;
         lowCutState[0].z = lowCutState[1].z = 0.0f;
         compEnv = 0.0f;
         compGain = 1.0f;
@@ -3302,6 +3401,8 @@ public:
         wow = 0.0;
         crush[0] = crush[1] = 0.0f;
         crushPhase = 0.0;
+        for (auto& c : codeState)
+            c.clear();
     }
 
 protected:
@@ -3386,6 +3487,25 @@ protected:
             applyLaw (s, horizonLaw[mode]);
         if (p[horizon::engineLaw] >= 0.5f && p[horizon::revision] >= 0.5f) // round 190mb: the reference's tone and level per mode
             applyTrim (s, horizonTrim[mode]);
+        if (p[horizon::engineLaw] >= 0.5f && p[horizon::revision] >= 0.5f && p[horizon::reaLaw] >= 0.5f && mode <= 1)
+        {
+            // round 190mj: Room / Chamber's law over Size (horizonRoomLaw)
+           #ifdef LYNX_VERB_FIT
+            static const bool loaded = loadTrims();
+            (void) loaded;
+           #endif
+            const auto at = std::clamp (size, 0.0, 1.0) * 4.0;
+            const auto k0 = std::min (3, (int) at);
+            const auto f = at - k0;
+            const auto& a = horizonRoomLaw[mode][k0];
+            const auto& b = horizonRoomLaw[mode][k0 + 1];
+            const auto onsetA = a.onset < 0.0 ? s.onsetLevel : a.onset, onsetB = b.onset < 0.0 ? s.onsetLevel : b.onset;
+            s.onsetLevel = onsetA + (onsetB - onsetA) * f;
+            s.lateLevel *= a.late + (b.late - a.late) * f;
+            s.gain *= std::pow (10.0, (a.gainDb + (b.gainDb - a.gainDb) * f) / 20.0);
+            s.rt60 *= a.rt + (b.rt - a.rt) * f;
+            s.earlyLevel *= a.early + (b.early - a.early) * f;
+        }
     }
 
     // round 183b: the echo section as the reference's manual has it. Echo → Reverb: the echo's output (not the dry
@@ -3404,7 +3524,14 @@ protected:
         const auto spread = (double) p[6];
         const auto mode = choice (p[21], horizon::echoModeCount);
         const auto granular = mode >= 4 && mode <= 10;
-        const auto drive = granular ? 1.0 : std::pow (10.0, 24.0 * p[7] / 20.0);
+        // round 190mj (reaLaw): the reference's voicing per echo mode (level, low-pass, drive) and its Digital mode's coder
+        const auto rea = p[horizon::engineLaw] >= 0.5f && p[horizon::revision] >= 0.5f && p[horizon::reaLaw] >= 0.5f;
+       #ifdef LYNX_VERB_FIT
+        static const bool loaded = loadTrims();
+        (void) loaded;
+       #endif
+        const HorizonEcho voicing = rea ? horizonEcho[mode] : HorizonEcho {};
+        const auto drive = granular ? 1.0 : std::pow (10.0, 24.0 * p[7] * voicing.driveMult / 20.0);
         const auto detune = granular ? (-30.0 + 60.0 * p[8]) / 100.0 : 0.0; // semitones
         double ratio = 1.0, ratio2 = 1.0;
         bool shift = false, dual = false;
@@ -3428,11 +3555,36 @@ protected:
             shift = true;
             ratio = std::pow (2.0, detune / 12.0);
         }
+        if (voicing.cutHz > 0.0)
+            cut = voicing.cutHz;
         tone[0].setLowpass (cut, rate);
         tone[1].a = tone[0].a;
+        const auto twoPole = voicing.poles >= 2;
+        const auto fourHeads = rea && granular && horizonHeads4[mode];
+        tone2[0].a = tone2[1].a = tone[0].a;
         const auto lowCut = skewLaw (p[19], 20.0, 1000.0, 1.807);
         lowCutState[0].setLowpass (lowCut, rate);
         lowCutState[1].a = lowCutState[0].a;
+        // (the voicing's level is the heard echo's — Level's share beside the reverb —, not what the loop or the reverb gets:
+        // the reverb's own level law was measured with the echo as it was)
+        const auto heard = rea ? level * (float) std::pow (10.0, voicing.gainDb / 20.0) : level;
+        const auto coder = rea && mode == 2;
+        if (coder)
+        {
+            const auto& k = horizonCoder;
+            for (int c = 0; c < 2; ++c)
+            {
+                codeState[c].pre.setLowpass (k.preHz, rate);
+                codeState[c].pre2.a = codeState[c].pre.a;
+                codeState[c].post.setLowpass (k.postHz, rate);
+            }
+            codeGain = (float) std::pow (10.0, k.gainDb / 20.0);
+            const auto toRate = 48000.0 / rate; // (the steps are per sample at 48 kHz: the same slew per second at any rate)
+            codeMin = (float) (k.stepMin * toRate);
+            codeMax = (float) (k.stepMax * toRate);
+            codeTau = (float) (1.0 - std::exp (-1.0 / (std::max (0.01, k.tauMs) * 0.001 * rate)));
+            codeLeak = (float) std::pow (k.leak, toRate);
+        }
         const auto spreadL = delay * (1.0 - 0.25 * spread), spreadR = delay * (1.0 + 0.25 * spread);
         const auto wowInc = 2.0 * pi * 0.7 / rate;
         const auto hold = mode == 11 ? std::max (1.0, rate / 11025.0) : 1.0;
@@ -3449,12 +3601,17 @@ protected:
                 auto v = y[c];
                 if (shift)
                 {
-                    auto a = shifters[c].process (v, ratio);
+                    auto a = fourHeads ? shifters[c].process4 (v, ratio) : shifters[c].process (v, ratio);
                     if (dual)
-                        a = 0.5f * (a + shifters[c + 2].process (v, ratio2));
+                        a = 0.5f * (a + (fourHeads ? shifters[c + 2].process4 (v, ratio2) : shifters[c + 2].process (v, ratio2)));
                     v = a;
                 }
-                v = tone[c].lp (v);
+                if (coder)
+                    v = codeState[c].run (v, codeMin, codeMax, codeTau, codeLeak) * codeGain;
+                else
+                    v = tone[c].lp (v);
+                if (twoPole)
+                    v = tone2[c].lp (v);
                 if (drive > 1.0001)
                     v = (float) (std::tanh (drive * v) / drive);
                 if (mode == 11)
@@ -3476,15 +3633,15 @@ protected:
             }
             if (beforeReverb)
             {
-                echoOut[0][(std::size_t) i] = level * y[0];
-                echoOut[1][(std::size_t) i] = level * y[1];
+                echoOut[0][(std::size_t) i] = heard * y[0];
+                echoOut[1][(std::size_t) i] = heard * y[1];
                 l[i] = y[0];
                 r[i] = y[1];
             }
             else
             {
-                l[i] = x[0] + level * y[0];
-                r[i] = x[1] + level * y[1];
+                l[i] = x[0] + heard * y[0];
+                r[i] = x[1] + heard * y[1];
             }
         }
     }
@@ -3521,6 +3678,30 @@ protected:
             }
     }
 
+    // round 190mj: the Digital echo's slope-limited coder (LYNX's own law, see horizonCoder): the output slews towards the
+    // (pre-filtered) input by at most a step per sample; the step grows towards stepMax (syllabic, over tauMs) while the
+    // slew stays at its limit for three samples or more, and falls back to stepMin when it does not
+    struct Coder
+    {
+        OnePole pre, pre2, post;
+        float y = 0.0f, syl = 0.0f;
+        int run1 = 0;
+        float run (float x, float stepMin, float stepMax, float tau, float leak) noexcept
+        {
+            const auto in = pre2.lp (pre.lp (x));
+            const auto step = stepMin + (stepMax - stepMin) * syl;
+            const auto e = in - y;
+            const auto limited = std::abs (e) > step;
+            y = leak * (y + std::clamp (e, -step, step));
+            run1 = limited ? run1 + 1 : 0;
+            syl += tau * ((run1 >= 3 ? 1.0f : 0.0f) - syl);
+            return post.lp (y);
+        }
+        void clear() noexcept { pre.z = pre2.z = post.z = y = syl = 0.0f; run1 = 0; }
+    };
+    Coder codeState[2];
+    OnePole tone2[2]; // round 190mj: the echo low-pass's second section (reaLaw voicings with two poles)
+    float codeGain = 1.0f, codeMin = 0.0f, codeMax = 0.0f, codeTau = 0.0f, codeLeak = 1.0f;
     Line echo[2];
     Shifter shifters[4];
     OnePole tone[2], lowCutState[2];
