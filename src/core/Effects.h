@@ -63,6 +63,18 @@ std::size_t savedEffectParamCount (const EffectSlot& slot) noexcept;
 // round 190mg: Compressor's hidden law (after its named parameters; saved only while non-zero): 1 = the vintage voicing's
 // Renaissance law (core/VoiceMatch.h progcomp::Renaissance), set only by the Renaissance Compressor translator
 constexpr int compressorRenLaw = 20;
+// round 190mm (sub-round dyn): the one-knob vocal compressor's law (core/RenDynamics.h rendyn::Vox; 1 = on, set only by
+// the Renaissance Vox translator) and its own values, hidden and saved while non-zero: the gate (0 = off, else −80 … 0 dB),
+// the gate's release (10 … 250 ms) and the output gain (0 … −36 dB); its threshold knob is Threshold [0]
+constexpr int compressorVoxLaw = 21, compressorVoxGate = 22, compressorVoxGateRelease = 23, compressorVoxGain = 24;
+// round 190mm (sub-round dyn): the VCA bus compressor law (core/BusComp2500.h; set only by the Waves API-2500 translator)
+// and its values, hidden and saved while non-zero: on (1), threshold (10 − dB) / 30 (+10 … −20), ratio step / 6 (1.5, 2,
+// 3, 4, 6, 10, ∞), attack step / 6 (0.03 … 30 ms), release step / 6 (0.05 … 2 s, 6 = variable), the variable release
+// (s − 0.05) / 2.95, knee (2 − step) / 2 (Hard 0, Med, Soft), thrust step / 2, type (1 = feedback), manual make-up (1),
+// make-up (dB + 24) / 48, dry share (1 − mix), trim (dB + 18) / 36
+enum CompressorApi { compressorApiLaw = 25, compressorApiThreshold, compressorApiRatio, compressorApiAttack, compressorApiRelease,
+                     compressorApiVar, compressorApiKnee, compressorApiThrust, compressorApiFeedback, compressorApiManual,
+                     compressorApiMakeup, compressorApiDry, compressorApiTrim, compressorApiEnd };
 // round 190mm: the Renaissance Channel's EQ around the Renaissance law (hidden like the above; 0 = off: every other
 // Compressor). [48] on, [49] routing (0 = EQ before the dynamics, 1 = after), [50 + 4 k …] band k = 0 … 3: its Facet
 // Waves design code (facet::WaveCode, k / 64), frequency / gain / Q as Facet's normalized values (facet::hzValue …).

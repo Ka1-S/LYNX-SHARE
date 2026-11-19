@@ -212,7 +212,16 @@ enum Global { xover1 = legacyBands * fieldsPerBand, xover2, xover3, slope, looka
               // knee → look-ahead minimum → two-stage release → triangular smoothing → gain between 0 dB and the
               // range. 0 = Prism's own engine (every project saved before); c4LawValue (false) electro, (true) opto
               c4Law = count,
-              c4Q };
+              c4Q,
+              // round 190mm (sub-round dyn), hidden (saved while non-zero; only the Waves C6 translator sets them): the
+              // C6's two floating dynamic bands on the C4 law, each c6Float0 + 8 k + field (c6On, c6Freq 16 · 1335^v Hz,
+              // c6Width Q 0.35 · 171^v, c6Thr / c6Range / c6Gain / c6Att / c6Rel as the bands' threshold, range, level,
+              // attack and release values). All 0 = no floating band (every project saved before)
+              c6Float0 };
+enum C6Field { c6On, c6Freq, c6Width, c6Thr, c6Range, c6Gain, c6Att, c6Rel, c6Fields };
+inline int c6Param (int band, int field) noexcept { return c6Float0 + c6Fields * band + field; }
+float c6FreqValue (double hz) noexcept;
+float c6WidthValue (double q) noexcept;
 float c4LawValue (bool opto) noexcept;
 bool c4Active (const EffectParams& p) noexcept;
 bool c4Opto (const EffectParams& p) noexcept;

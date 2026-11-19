@@ -4234,3 +4234,18 @@ could move onto the new engine's own pair (D mix −54 → −76 dB ESR), which 
 **Still off:** Scheps Omni Channel 2 (no stand-in; five inner modules); the three reverbs on Reeverb 2; Doubler2's waveform
 (the reference's heads free-run through the host's reset); references for the common Waves without any (demo mode mutes).
 
+
+## Round 190mm: Waves, fifth pass — NS1 at 0 %, a masked demo-mode bank, REQ / Q10 / API / SSL G / RChannel / Scheps / the Renaissance dynamics family
+
+Owner's decisions of 11-19: (1) NS1 at 0 % on the NS1 engine's own pair; (2) the common Waves plug-ins without any
+reference captured in demo mode, the scorer taught to mask the demo's periodic mutes, then stand-ins built by how common
+they are; (3) Scheps Omni Channel 2 as a chain of its five inner modules. Clean-room as before (structure read from the
+unprotected Waves V17 DSP where needed, every LYNX constant fitted on our demo-mode probes; no vendor code, table or preset
+read out). Evidence: `docs/analise/REA_rodada190mm.md` (coordinator: NS1, the bank and the masks, REQ / Q10 / API / SSL G /
+RChannel), `_scheps.md`, `_dyn.md`.
+
+**The demo-mode bank and the masks.** 16 plug-ins × D + X1 … X4 × refcap182's five programme files (+ the 7 s stimulus
+for fitting), each rendered twice (1.5 s and 9 s of silence after the reset). The demo mutes (≈ 0.95 s of digital silence
+every 20 s of processed audio, ≈ 10 ms fades) are found as silence runs of take A that take B plays, widened over the
+fades, and stored next to the reference (`<name>.mask.json`); scripts/fxparity.py leaves those spans out of every metric.
+References without a sidecar score exactly as before.

@@ -1,4 +1,5 @@
 #include "core/LowLifterFl.h"
+#include "core/BassHarmonics.h"
 
 #include <algorithm>
 #include <atomic>
@@ -452,6 +453,7 @@ public:
     {
         rate = (int) std::lround (sampleRate);
         ready = false;
+        bassOn = false;
     }
     void reset() noexcept override {}
     // what the plug-in reports to FL's PDC: the look-ahead, rint(rate · 0.01)
@@ -459,6 +461,24 @@ public:
     int latencySamples() const noexcept override { return lookahead.load() ? (int) std::nearbyint ((double) rate * 0.01) : 0; }
     void process (float* left, float* right, int n, const EffectParams& params, double) noexcept override
     {
+        if (params[(std::size_t) bassLaw] >= 0.5f)
+        {
+            // round 190mm (dyn): the psycho-acoustic bass law (set only by the Renaissance Bass / MaxxBass translators)
+            bassharm::Settings st;
+            st.freqHz = bassFreqHz (params[(std::size_t) bassFreq]);
+            st.inputDb = std::max (-72.0, bassLevelDb (params[(std::size_t) bassInput]));
+            st.origGain = std::clamp ((double) params[(std::size_t) bassOrig], 0.0, 4.0);
+            st.harmDb = bassLevelDb (params[(std::size_t) bassHarm]);
+            st.outDb = std::max (-72.0, bassLevelDb (params[(std::size_t) bassOut]));
+            if (! bassOn)
+            {
+                bass.prepare ((double) rate);
+                bassOn = true;
+            }
+            bass.process (left, right, n, st);
+            return;
+        }
+        bassOn = false;
         std::array<int, numParams> raw {};
         for (int k = 0; k < numParams; ++k)
             raw[(std::size_t) k] = (int) std::lround (std::clamp (params[(std::size_t) k], 0.0f, 1.0f) * rawMax[(std::size_t) k]);
@@ -509,6 +529,8 @@ private:
     }
 
     std::unique_ptr<Engine> engine;
+    bassharm::Engine bass; // round 190mm (dyn)
+    bool bassOn = false;
     std::array<int, numParams> current {};
     int rate = 44100, silent = 0, tail = 44100;
     bool ready = false;
@@ -517,4 +539,8 @@ private:
 } // namespace
 
 std::unique_ptr<Effect> make (bool lookahead) { return std::make_unique<LowLifterEffect> (lookahead); }
+float bassLevelValue (double db) noexcept { return db <= -71.9 ? 0.0f : (float) std::clamp ((db + 72.0) / 96.0, 1.0e-4, 1.0); }
+double bassLevelDb (float v) noexcept { return v <= 0.0f ? -200.0 : (double) std::clamp (v, 0.0f, 1.0f) * 96.0 - 72.0; }
+float bassFreqValue (double hz) noexcept { return (float) std::clamp (std::log (std::max (hz, 16.0) / 16.0) / std::log (1000.0 / 16.0), 1.0e-4, 1.0); }
+double bassFreqHz (float v) noexcept { return 16.0 * std::pow (1000.0 / 16.0, (double) std::clamp (v, 0.0f, 1.0f)); }
 } // namespace lynx::lowlifter

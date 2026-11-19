@@ -338,7 +338,12 @@ enum Param { frequency, threshold, range, mode, detector, listen, lookahead, rel
              // round 190js, hidden (saved while non-zero): Single Vocal's "stands out" revision (vmatch::vocalds
              // Settings::vocalRevision = 1; Allround is unchanged); a new Hush and a translated Pro-DS state get 1, a project
              // or preset saved before keeps 0 (round 148's Single Vocal, bit for bit)
-             vocalRevision };
+             vocalRevision,
+             // round 190mm (sub-round dyn), hidden (saved while non-zero): the split / wide-band Renaissance de-esser law
+             // (core/RenDynamics.h rendyn::DeEsser; 1 = on, set only by the RDeEsser translator) and its values in the
+             // reference's own units: threshold −dB / 80 (0 … −80 dB), range −dB / 48, frequency (Hz − 2000) / 14000,
+             // band-pass (1) / high-pass, wide-band (1) / split. 0 = every project and preset saved before
+             essLaw, essThreshold, essRange, essFreq, essBandPass, essWideBand };
 double airDb (float v) noexcept;        // round 190dm: 0 … +12 dB
 constexpr double airHz = 8151.0, airSlope = 0.5;
 bool extended (const EffectParams& p) noexcept;         // round 165x: the extended law (and not the classic voicing)
@@ -370,7 +375,15 @@ namespace aether
 // ~3 kHz, High air from ~9 kHz), each lifted by a compressed copy of itself, so quiet highs come up more than loud
 // ones; `midAir` / `highAir` set the two amounts (0..1). On by default since issue #77 (round tp172c); off keeps the
 // shelf + exciter above (projects saved before round 124 load with it off).
-enum Param { air, airFreq, harmonics, exciterFreq, character, mix, output, dynamic, midAir, highAir, count };
+enum Param { air, airFreq, harmonics, exciterFreq, character, mix, output, dynamic, midAir, highAir, count,
+             // round 190mm (sub-round dyn), hidden (saved while non-zero; only the Waves Vitamin translator sets them):
+             // the five-band harmonic enhancer law (core/VitaminLaw.h; 1 = on), its band gains (dB / 48, 0 = Off), the
+             // direct gain (1 − (dB + 72) / 96 … 0 = 0 dB… see vitDirectDb), its four crossovers (log 16 … 21357 Hz)
+             vitLaw = count, vitGain0, vitDirect = vitGain0 + 5, vitCross0, vitEnd = vitCross0 + 4 };
+double vitDirectDb (float v) noexcept;  // 0 = 0 dB, else −72 … +24 dB as (v · 96 − 72), 1e-4 … 1 (and ≥ 0.999 = Off)
+float vitDirectValue (double db) noexcept;
+double vitCrossHz (float v) noexcept;   // 0 = the reference's defaults, else 16 · 1335^v
+float vitCrossValue (double hz) noexcept;
 double airDb (float v) noexcept;       // 0 .. +15 dB
 double airHz (float v) noexcept;       // 5 .. 20 kHz
 double exciterHz (float v) noexcept;   // 1 .. 12 kHz

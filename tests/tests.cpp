@@ -17788,6 +17788,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Parity190mgDynTests.inc" // round 190mg (dyn): Facet's PuigTec law, L2's IDR on the Limiter (REA of the Waves PuigTec / L2 DSP)
 #include "Parity190mmTests.inc" // round 190mm: Facet's Waves design law (REQ, Q10), API-550 / 560 on Facet, SSL G-Channel on Ridge
 #include "Parity190mmSchepsTests.inc" // round 190mm (scheps): the Scheps Omni Channel on Ridge Strip's hidden omni law (five modules, order)
+#include "Parity190mmDynTests.inc" // round 190mm (dyn): Waves RVox / RDeEsser / C6 / API-2500 / MaxxBass / RBass / Vitamin stand-ins on hidden laws
 #include "Sampler190dhTests.inc"
 #include "Fix190eaTests.inc"
 #include "Iss158Tests.inc"
