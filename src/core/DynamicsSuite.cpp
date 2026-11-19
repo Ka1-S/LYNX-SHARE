@@ -3689,7 +3689,7 @@ struct Crossover
     void design (double fc, double q, double sr) noexcept
     {
         const double b = 1.0 / (q * q) - 2.0, l2 = 0.5 * (-b + std::sqrt (b * b + 4.0));
-        const double K = 2.0 * sr, w = K * std::tan (M_PI * std::clamp (fc, 10.0, 0.49 * sr) / sr) / std::sqrt (l2);
+        const double K = 2.0 * sr, w = K * std::tan (pi * std::clamp (fc, 10.0, 0.49 * sr) / sr) / std::sqrt (l2);
         const double al = K / (q * w), be = (K / w) * (K / w);
         const double p0 = 1.0 + al + be, p1 = (2.0 - 2.0 * be) / p0, p2 = (1.0 - al + be) / p0;
         for (auto* s : { &lpA, &lpB })

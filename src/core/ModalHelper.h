@@ -639,6 +639,9 @@ inline std::vector<Mode> parallelOrder (Mode home)
 
 struct Borrowed;
 inline std::vector<Borrowed> borrowedChords (const Analysis& a, const RelatedKey& source);
+// (rollup 0.1.30 step 11: relatedKeys only asks whether a key has any; defined after Borrowed is complete — libc++ (the
+// Windows zig build) instantiates std::vector<Borrowed> where it is used, so the call cannot stand before the struct)
+inline bool hasBorrowedChords (const Analysis& a, const RelatedKey& source);
 
 // Panel 1: the parallel modes (the three most common first), then the closely related keys (dominant, subdominant,
 // relative and their relatives: the sources of the secondary dominants), then the rarer modes; a key with nothing to
@@ -655,7 +658,7 @@ inline std::vector<RelatedKey> relatedKeys (const Analysis& a)
             if (k.scale == s)
                 return;
         RelatedKey k { s, r, 0 };
-        if (borrowedChords (a, k).empty())
+        if (! hasBorrowedChords (a, k))
             return;
         k.rank = (int) out.size() + 1;
         out.push_back (k);
@@ -944,6 +947,11 @@ inline std::vector<Borrowed> borrowedChords (const Analysis& a, const RelatedKey
 inline std::vector<Borrowed> borrowedChords (const Analysis& a, const RelatedKey& source)
 {
     return borrowedChords (a, source, Extension::triad);
+}
+
+inline bool hasBorrowedChords (const Analysis& a, const RelatedKey& source)
+{
+    return ! borrowedChords (a, source).empty();
 }
 
 // --- voicing --------------------------------------------------------------------------------------------------------
